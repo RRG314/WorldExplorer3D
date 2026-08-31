@@ -223,6 +223,15 @@ All surface star layers switch to terrain-occluded rendering on planetary entry
 and restore their exact Earth material state on exit. Catalog and generated
 mission worlds use the same entry and cleanup path.
 
+`app/js/planetary/field-activities.js` owns the shared planetary photography,
+geology, and environment-survey sites. Their panorama camera, sample scanner,
+case, sensor mast, and sampling plate are presentation attached to the existing
+activity record; they do not own a second mission or evidence ledger. The same
+E/touch context interaction advances each three-step procedure. Only the final
+step calls the existing Journal record and, for geology, the existing Expedition
+sample transfer. Destination missions listen for that final field record rather
+than maintaining separate field objects.
+
 Spacecraft state uses SI units for mass, velocity, thrust, propellant, gravity,
 collision, and landing checks. The rendered solar system uses declared
 presentation scales so it remains playable. Manual input cancels assisted travel,

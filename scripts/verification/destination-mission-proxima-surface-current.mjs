@@ -65,10 +65,13 @@ async function recordSurfaceActivity(page, activityId) {
     Object.assign(ctx.Walk.state.walker, { x: activity.x + 2.2, z: activity.z + 0.8, y: activity.y + 1.2, vy: 0, onGround: true });
   }, activityId);
   await page.waitForTimeout(180);
-  assert.equal(await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
-    return ctx.handlePrimaryContextInteraction();
-  }), true);
+  for (let step = 0; step < 3; step += 1) {
+    assert.equal(await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      return ctx.handlePrimaryContextInteraction();
+    }), true);
+    await page.waitForTimeout(120);
+  }
 }
 
 async function run() {

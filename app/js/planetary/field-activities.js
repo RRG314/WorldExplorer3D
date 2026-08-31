@@ -8,6 +8,11 @@ const ACTIVITY_OFFSETS = Object.freeze([
   Object.freeze({ x: -44, z: 18 }),
   Object.freeze({ x: 16, z: 58 })
 ]);
+const FIELD_PROCEDURES = Object.freeze({
+  photograph: Object.freeze(['Deploy panorama stabilizers', 'Calibrate the panorama sweep', 'Capture the panorama']),
+  'geology-inspect': Object.freeze(['Scan the exposed material', 'Select a representative fragment', 'Seal the sample case']),
+  'habitat-survey': Object.freeze(['Level the sampling plate', 'Calibrate the sensor mast', 'Record the environment'])
+});
 
 const BODY_FIELD_NOTES = Object.freeze({
   mercury: Object.freeze([
@@ -194,26 +199,170 @@ function nearestActivity() {
   return closestActivity(INTERACTION_RADIUS);
 }
 
+function fieldMaterial(color, options = {}) {
+  return new THREE.MeshStandardMaterial({
+    color,
+    metalness: options.metalness ?? 0.28,
+    roughness: options.roughness ?? 0.52,
+    emissive: options.emissive ?? 0x000000,
+    emissiveIntensity: options.emissiveIntensity ?? 0,
+    transparent: options.transparent === true,
+    opacity: options.opacity ?? 1,
+    depthWrite: options.depthWrite ?? true
+  });
+}
+
+function addFieldMesh(group, geometry, material, name, position, rotation = null) {
+  const object = new THREE.Mesh(geometry, material);
+  object.name = name;
+  object.position.set(...position);
+  if (rotation) object.rotation.set(...rotation);
+  object.castShadow = material.transparent !== true;
+  object.receiveShadow = material.transparent !== true;
+  group.add(object);
+  return object;
+}
+
+function addFieldBrace(group, start, end, radius, material, name) {
+  const direction = new THREE.Vector3().subVectors(end, start);
+  const object = addFieldMesh(
+    group,
+    new THREE.CylinderGeometry(radius, radius, direction.length(), 10),
+    material,
+    name,
+    [0, 0, 0]
+  );
+  object.position.copy(start).add(end).multiplyScalar(0.5);
+  object.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+  return object;
+}
+
+function addPhotographySite(group, materials) {
+  const hub = new THREE.Vector3(0, 1.45, 0);
+  [[-0.85, 0, -0.62], [0.85, 0, -0.62], [0, 0, 0.92]].forEach((foot, index) => {
+    addFieldBrace(group, hub, new THREE.Vector3(...foot), 0.055, materials.frame, `panorama-tripod-leg-${index + 1}`);
+    addFieldMesh(group, new THREE.CylinderGeometry(0.16, 0.2, 0.08, 16), materials.frame, `panorama-tripod-foot-${index + 1}`, [foot[0], 0.04, foot[2]]);
+  });
+  addFieldMesh(group, new THREE.CylinderGeometry(0.12, 0.17, 0.36, 16), materials.frame, 'panorama-gimbal', [0, 1.56, 0]);
+  addFieldMesh(group, new THREE.BoxGeometry(0.92, 0.5, 0.48), materials.shell, 'panorama-camera-body', [0, 1.86, 0]);
+  addFieldMesh(group, new THREE.CylinderGeometry(0.23, 0.31, 0.5, 20), materials.dark, 'panorama-camera-lens', [0, 1.87, -0.48], [Math.PI / 2, 0, 0]);
+  addFieldMesh(group, new THREE.CylinderGeometry(0.14, 0.2, 0.08, 20), materials.glass, 'panorama-camera-glass', [0, 1.87, -0.75], [Math.PI / 2, 0, 0]);
+  addFieldMesh(group, new THREE.BoxGeometry(0.44, 0.24, 0.05), materials.screen, 'panorama-camera-display', [0, 1.86, 0.265]);
+  const sweep = addFieldMesh(group, new THREE.TorusGeometry(2.1, 0.035, 8, 48, Math.PI * 1.55), materials.guide, 'panorama-sweep-guide', [0, 0.08, 0]);
+  sweep.rotation.x = Math.PI / 2;
+  sweep.rotation.z = -Math.PI * 0.77;
+}
+
+function addGeologySite(group, materials) {
+  const rockMaterial = fieldMaterial(0x695246, { metalness: 0.04, roughness: 0.96 });
+  const mineralMaterial = fieldMaterial(0xb8834d, { metalness: 0.18, roughness: 0.7 });
+  const rockLayout = [
+    [-1.1, 0.34, -0.15, 0.62, 0.38], [-0.55, 0.48, -0.35, 0.82, -0.22], [0.12, 0.55, -0.28, 0.92, 0.17],
+    [0.78, 0.42, -0.18, 0.7, -0.3], [1.18, 0.25, 0.02, 0.48, 0.12], [-0.28, 0.27, 0.32, 0.5, 0.44]
+  ];
+  rockLayout.forEach(([x, y, z, scale, turn], index) => {
+    const rock = addFieldMesh(group, new THREE.DodecahedronGeometry(0.72, 1), index === 2 ? mineralMaterial : rockMaterial, `geology-outcrop-${index + 1}`, [x, y, z], [0.12 * index, turn, -0.08 * index]);
+    rock.scale.set(scale * 1.3, scale * 0.72, scale);
+  });
+  addFieldMesh(group, new THREE.BoxGeometry(1.7, 0.16, 1.05), materials.dark, 'sample-case-base', [0.45, 0.13, 1.45]);
+  const lid = addFieldMesh(group, new THREE.BoxGeometry(1.7, 0.12, 1.05), materials.shell, 'sample-case-lid', [0.45, 0.82, 1.88], [-0.82, 0, 0]);
+  lid.userData.fieldActionPart = 'sample-case-lid';
+  [-0.08, 0.36, 0.8].forEach((x, index) => {
+    addFieldMesh(group, new THREE.CylinderGeometry(0.16, 0.16, 0.12, 16), index === 1 ? mineralMaterial : rockMaterial, `sealed-sample-slot-${index + 1}`, [x, 0.28, 1.42]);
+  });
+  addFieldBrace(group, new THREE.Vector3(-1.55, 0.05, 1.22), new THREE.Vector3(-1.25, 1.42, 0.94), 0.06, materials.frame, 'sample-scanner-support-port');
+  addFieldBrace(group, new THREE.Vector3(1.55, 0.05, 1.22), new THREE.Vector3(1.25, 1.42, 0.94), 0.06, materials.frame, 'sample-scanner-support-starboard');
+  addFieldBrace(group, new THREE.Vector3(-1.25, 1.42, 0.94), new THREE.Vector3(1.25, 1.42, 0.94), 0.08, materials.frame, 'sample-scanner-crossbar');
+  addFieldMesh(group, new THREE.BoxGeometry(0.62, 0.24, 0.38), materials.shell, 'sample-scanner-head', [0, 1.34, 0.94]);
+  addFieldMesh(group, new THREE.CylinderGeometry(0.06, 0.23, 1.28, 18, 1, true), materials.beam, 'sample-scanner-field', [0, 0.72, 0.78]);
+}
+
+function addHabitatSite(group, materials) {
+  const mast = addFieldMesh(group, new THREE.CylinderGeometry(0.08, 0.11, 3.2, 12), materials.frame, 'environment-mast', [0, 1.6, 0]);
+  mast.userData.fieldActionPart = 'environment-mast';
+  [[-1.1, 0, -0.72], [1.1, 0, -0.72], [0, 0, 1.2]].forEach((foot, index) => {
+    addFieldBrace(group, new THREE.Vector3(0, 1.05, 0), new THREE.Vector3(...foot), 0.045, materials.frame, `environment-mast-brace-${index + 1}`);
+    addFieldMesh(group, new THREE.CylinderGeometry(0.16, 0.2, 0.07, 14), materials.dark, `environment-mast-foot-${index + 1}`, [foot[0], 0.035, foot[2]]);
+  });
+  addFieldMesh(group, new THREE.BoxGeometry(0.88, 0.62, 0.46), materials.shell, 'environment-control-box', [0, 1.48, 0.12]);
+  addFieldMesh(group, new THREE.BoxGeometry(0.56, 0.28, 0.04), materials.screen, 'environment-control-display', [0, 1.51, -0.125]);
+  addFieldMesh(group, new THREE.CylinderGeometry(0.22, 0.32, 0.48, 18), materials.shell, 'environment-sensor-head', [0, 3.35, 0]);
+  addFieldMesh(group, new THREE.SphereGeometry(0.19, 16, 10), materials.glass, 'environment-optical-sensor', [0, 3.58, -0.18]);
+  const crossbar = addFieldBrace(group, new THREE.Vector3(-0.72, 3.15, 0), new THREE.Vector3(0.72, 3.15, 0), 0.035, materials.frame, 'environment-anemometer-crossbar');
+  crossbar.userData.fieldActionPart = 'anemometer';
+  [-0.72, 0.72].forEach((x, index) => {
+    addFieldMesh(group, new THREE.SphereGeometry(0.16, 12, 8), materials.shell, `environment-anemometer-cup-${index + 1}`, [x, 3.15, index ? 0.16 : -0.16]);
+  });
+  const plate = addFieldMesh(group, new THREE.CylinderGeometry(0.95, 0.95, 0.06, 24), materials.dark, 'environment-sampling-plate', [1.85, 0.05, 0.55]);
+  plate.scale.z = 0.62;
+  addFieldMesh(group, new THREE.TorusGeometry(0.58, 0.035, 8, 28), materials.guide, 'environment-sampling-zone', [1.85, 0.1, 0.55], [Math.PI / 2, 0, 0]);
+}
+
 function markerFor(activity) {
   const group = new THREE.Group();
-  group.name = `${activity.bodyId} ${activity.activityId} field marker`;
+  group.name = `${activity.bodyId} ${activity.activityId} field site`;
   const color = activity.activityId === 'photograph' ? 0x6fd5ff : activity.activityId === 'geology-inspect' ? 0xffc866 : 0x83e6a6;
+  const materials = Object.freeze({
+    shell: fieldMaterial(0xaab9c2, { metalness: 0.58, roughness: 0.32 }),
+    frame: fieldMaterial(0x1b2b35, { metalness: 0.74, roughness: 0.26 }),
+    dark: fieldMaterial(0x151b20, { metalness: 0.34, roughness: 0.66 }),
+    glass: fieldMaterial(0x5ecfff, { metalness: 0.08, roughness: 0.12, emissive: 0x165c79, emissiveIntensity: 0.72 }),
+    screen: fieldMaterial(color, { metalness: 0.08, roughness: 0.2, emissive: color, emissiveIntensity: 0.56 }),
+    guide: fieldMaterial(color, { metalness: 0.02, roughness: 0.25, emissive: color, emissiveIntensity: 0.72, transparent: true, opacity: 0.72, depthWrite: false }),
+    beam: fieldMaterial(color, { metalness: 0, roughness: 0.35, emissive: color, emissiveIntensity: 0.38, transparent: true, opacity: 0.16, depthWrite: false })
+  });
   const ring = new THREE.Mesh(
-    new THREE.TorusGeometry(1.8, 0.12, 8, 28),
-    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.82 })
+    new THREE.TorusGeometry(2.6, 0.055, 8, 40),
+    materials.guide
   );
   ring.rotation.x = Math.PI / 2;
+  ring.position.y = 0.06;
+  ring.name = `${activity.activityId}-work-zone`;
   group.add(ring);
-  const beacon = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.06, 0.1, 2.6, 8),
-    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.65 })
-  );
-  beacon.position.y = 1.3;
-  group.add(beacon);
+  addFieldMesh(group, new THREE.CylinderGeometry(0.34, 0.42, 0.18, 18), materials.frame, `${activity.activityId}-status-base`, [-2.15, 0.09, 1.85]);
+  addFieldMesh(group, new THREE.CylinderGeometry(0.12, 0.18, 0.18, 18), materials.screen, `${activity.activityId}-status-light`, [-2.15, 0.28, 1.85]);
+  if (activity.activityId === 'photograph') addPhotographySite(group, materials);
+  else if (activity.activityId === 'geology-inspect') addGeologySite(group, materials);
+  else addHabitatSite(group, materials);
   group.position.set(activity.x, activity.y + 0.08, activity.z);
   group.userData.truthClass = 'generated_game_detail';
   group.userData.planetaryFieldActivityId = activity.id;
+  group.userData.activityStep = 0;
+  group.userData.presentation = activity.activityId === 'photograph'
+    ? 'panorama-imaging-station'
+    : activity.activityId === 'geology-inspect'
+      ? 'sample-analysis-site'
+      : 'environment-monitoring-station';
   return group;
+}
+
+function fieldSite(activity) {
+  return active?.sites?.get?.(activity?.id) || null;
+}
+
+function procedureState(activity) {
+  const steps = FIELD_PROCEDURES[activity?.activityId] || Object.freeze([activity?.label || 'Record field point']);
+  const site = fieldSite(activity);
+  const step = Math.max(0, Math.min(steps.length, Number(site?.userData?.activityStep || 0)));
+  return Object.freeze({ steps, step, complete: step >= steps.length, label: step >= steps.length ? `Review ${activity.label}` : steps[step] });
+}
+
+function updateFieldSitePresentation(activity, step) {
+  const site = fieldSite(activity);
+  if (!site) return;
+  site.userData.activityStep = step;
+  site.traverse((object) => {
+    if (!object.isMesh) return;
+    if (object.name.endsWith('-status-light') && object.material) object.material.emissiveIntensity = step >= 3 ? 1.15 : 0.5 + step * 0.2;
+    if (object.name === 'sample-scanner-field') object.visible = step > 0 && step < 3;
+    if (object.name === 'sample-case-lid') {
+      object.rotation.x = step >= 3 ? -0.05 : -0.82;
+      object.position.y = step >= 3 ? 0.69 : 0.82;
+      object.position.z = step >= 3 ? 1.48 : 1.88;
+    }
+    if (object.name === 'panorama-sweep-guide') object.rotation.z = -Math.PI * 0.77 + step * 0.42;
+    if (object.name === 'environment-anemometer-crossbar') object.rotation.y = step * Math.PI * 0.68;
+  });
 }
 
 function activatePlanetaryFieldActivities(pack, world, sampleHeight) {
@@ -223,6 +372,7 @@ function activatePlanetaryFieldActivities(pack, world, sampleHeight) {
     return Object.freeze([]);
   }
   if (!world.fieldActivities) {
+    world.fieldActivitySites = new Map();
     world.fieldActivities = definitions.map((definition, index) => {
       const [label, activityId, family, description] = definition;
       const offset = ACTIVITY_OFFSETS[index];
@@ -242,6 +392,7 @@ function activatePlanetaryFieldActivities(pack, world, sampleHeight) {
         z
       });
       const marker = markerFor(activity);
+      world.fieldActivitySites.set(activity.id, marker);
       world.objects.push(marker);
       appCtx.scene.add(marker);
       return activity;
@@ -252,7 +403,8 @@ function activatePlanetaryFieldActivities(pack, world, sampleHeight) {
     bodyName: pack.bodyName || getAstronomicalBody(pack.bodyId)?.name || pack.bodyId,
     regionId: pack.manifest.regionId,
     center: Object.freeze({ x: pack.spawn.x, z: pack.spawn.z }),
-    activities: world.fieldActivities
+    activities: world.fieldActivities,
+    sites: world.fieldActivitySites || new Map()
   });
   return Object.freeze([...world.fieldActivities]);
 }
@@ -301,8 +453,9 @@ function updatePlanetaryFieldMap(dt = 0) {
   context.restore();
   const nearby = nearestActivity();
   const closest = nearby || closestActivity();
+  const nearbyProcedure = nearby ? procedureState(nearby) : null;
   if (hint) hint.textContent = nearby
-    ? `${nearby.label} · ${Math.round(nearby.distance)} m · use E or Explore`
+    ? `${nearbyProcedure.label} · ${Math.round(nearby.distance)} m · use E or Explore`
     : closest
       ? `Nearest: ${closest.label} · ${Math.round(closest.distance)} m`
       : 'Blue: photo · gold: surface · green: environment';
@@ -349,23 +502,37 @@ async function recordActivity(activity) {
   return true;
 }
 
+async function advanceActivity(activity) {
+  const procedure = procedureState(activity);
+  if (procedure.complete) return recordActivity(activity);
+  const nextStep = procedure.step + 1;
+  updateFieldSitePresentation(activity, nextStep);
+  if (nextStep < procedure.steps.length) {
+    appCtx.showSpaceFlightMessage?.(`${procedure.steps[procedure.step].toUpperCase()} · ${nextStep} OF ${procedure.steps.length}`, '#8ab4ff');
+    globalThis.dispatchEvent?.(new CustomEvent('we3d:planetary-field-step', { detail: { activity, step: nextStep, total: procedure.steps.length } }));
+    return true;
+  }
+  return recordActivity(activity);
+}
+
 appCtx.registerContextInteraction?.({
   id: 'planetary-field-activity',
   priority: 72,
   evaluate() {
     if (!appCtx.activePlanetaryBodyId || appCtx.paused) return null;
     const activity = nearestActivity();
+    const procedure = activity ? procedureState(activity) : null;
     return activity ? {
       available: true,
       action: activity.activityId,
-      label: activity.label,
-      detail: 'Planetary field point',
+      label: procedure.label,
+      detail: procedure.complete ? 'Field record complete' : `Field procedure · step ${procedure.step + 1} of ${procedure.steps.length}`,
       distance: activity.distance,
       data: activity
     } : null;
   },
   perform(candidate) {
-    return candidate?.data ? recordActivity(candidate.data) : false;
+    return candidate?.data ? advanceActivity(candidate.data) : false;
   }
 });
 
@@ -378,7 +545,7 @@ Object.assign(appCtx, {
   planetaryFieldActivitySnapshot: () => Object.freeze({
     activeBodyId: active?.bodyId || null,
     regionId: active?.regionId || null,
-    activities: Object.freeze((active?.activities || []).map((entry) => Object.freeze({ ...entry }))),
+    activities: Object.freeze((active?.activities || []).map((entry) => Object.freeze({ ...entry, procedure: procedureState(entry) }))),
     nearest: nearestActivity(),
     closest: closestActivity()
   })

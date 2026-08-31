@@ -240,13 +240,26 @@ async function run() {
     await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
       const activity = ctx.planetaryFieldActivitySnapshot().activities.find((entry) => entry.activityId === 'geology-inspect');
+      const x = activity.x + 6;
+      const z = activity.z + 8;
+      const heading = Math.atan2(activity.x - x, activity.z - z);
+      Object.assign(ctx.Walk.state.walker, { x, z, y: activity.y + 1.2, angle: heading, yaw: heading, lookYawOffset: 0, pitch: -0.08, vy: 0, onGround: true });
+    });
+    await page.waitForTimeout(350);
+    await page.screenshot({ path: path.join(outputDir, 'desktop-geology-field-site.png'), fullPage: true });
+    await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const activity = ctx.planetaryFieldActivitySnapshot().activities.find((entry) => entry.activityId === 'geology-inspect');
       Object.assign(ctx.Walk.state.walker, { x: activity.x + 3, z: activity.z + 1, y: activity.y + 1.2, vy: 0, onGround: true });
     });
     await page.waitForTimeout(180);
-    assert.equal(await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
-      return ctx.handlePrimaryContextInteraction();
-    }), true);
+    for (let step = 0; step < 3; step += 1) {
+      assert.equal(await page.evaluate(async () => {
+        const { ctx } = await import('/app/js/shared-context.js?v=55');
+        return ctx.handlePrimaryContextInteraction();
+      }), true);
+      await page.waitForTimeout(120);
+    }
     await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').interstellarExpedition?.localOperation?.state === 'surface-sampled');
 
     const podCandidate = await page.evaluate(async (pose) => {

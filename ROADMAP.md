@@ -371,6 +371,15 @@ the button-only gap for the shared incident path, but event-specific tools,
 crew animation, damaged-component variants, and broader room art still remain
 part of the alpha quality gate.
 
+Planetary photography, geology, and environmental survey points now have
+distinct physical equipment rather than sharing a bare beacon: a stabilized
+panorama camera, exposed outcrop with scanner and sample case, and a braced
+sensor mast with sampling plate. Each uses a three-step in-world procedure
+through the normal interaction input, and only the final step may commit the
+existing Journal evidence or geology sample. This improves the shared field
+action standard, but it does not complete surface life, NPC behavior, rover and
+pod art, or destination-specific resource-site variety.
+
 The current connected slice is mechanically ahead of its presentation. It is
 not yet the intended visual or activity standard for a public Space alpha.
 Primary pods, rooms, crew, field tools, surface life, resource sites, and mission

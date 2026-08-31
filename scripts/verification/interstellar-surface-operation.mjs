@@ -163,10 +163,13 @@ async function run(viewport, name) {
     assert.equal(interaction.nearest.activityId, 'geology-inspect');
     assert.equal(interaction.candidate.id, 'planetary-field-activity');
     await page.waitForTimeout(180);
-    assert.equal(await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
-      return ctx.handlePrimaryContextInteraction();
-    }), true);
+    for (let step = 0; step < 3; step += 1) {
+      assert.equal(await page.evaluate(async () => {
+        const { ctx } = await import('/app/js/shared-context.js?v=55');
+        return ctx.handlePrimaryContextInteraction();
+      }), true);
+      await page.waitForTimeout(120);
+    }
     await page.waitForFunction((bodyId) => {
       const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}').interstellarExpedition;
       return snapshot?.localOperation?.state === 'surface-sampled' && snapshot.localOperation.sampleCatalogId?.includes(bodyId);

@@ -133,9 +133,15 @@ async function recordSurfaceActivity(page, activityId) {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     const activity = ctx.planetaryFieldActivitySnapshot().activities.find((entry) => entry.activityId === id);
     Object.assign(ctx.Walk.state.walker, { x: activity.x + 2.2, z: activity.z + 0.8, y: activity.y + 1.2, vy: 0, onGround: true });
-    ctx.handlePrimaryContextInteraction();
   }, activityId);
   await page.waitForTimeout(160);
+  for (let step = 0; step < 3; step += 1) {
+    assert.equal(await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      return ctx.handlePrimaryContextInteraction();
+    }), true);
+    await page.waitForTimeout(120);
+  }
 }
 
 async function runSurfaceMission(page, destinationId, expectedEvidence, screenshotName) {
