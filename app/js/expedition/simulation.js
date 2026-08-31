@@ -1,4 +1,4 @@
-import { RESOURCE_KEYS, withExpeditionChanges } from './model.js?v=1';
+import { RESOURCE_KEYS, withExpeditionChanges } from './model.js?v=2';
 import { JULIAN_YEAR_S } from './travel-calculator.js?v=1';
 
 const MAINTENANCE_EVENT_PROGRESS = 0.12;
@@ -44,13 +44,31 @@ function degradeSystems(systems, deltaS, totalS) {
   return Object.freeze(next);
 }
 
-function advanceCrew(crew, deltaS) {
+function advanceCrew(crew, deltaS, systems = {}) {
   const years = Math.max(0, Number(deltaS) || 0) / JULIAN_YEAR_S;
+  const lifeSupportCondition = Math.max(0, Math.min(1, Number(systems['life-support']?.condition ?? 1)));
+  const medicalCondition = Math.max(0, Math.min(1, Number(systems.medical?.condition ?? 1)));
   return Object.freeze((crew || []).map((member) => Object.freeze({
     ...member,
     ageYears: Number(member.ageYears || 0) + years,
-    fatigue: Math.min(1, Math.max(0, Number(member.fatigue || 0)) + Math.min(0.08, years * 0.003))
+    experienceYears: Number(member.experienceYears || 0) + years,
+    health: Math.max(0, Math.min(1, Number(member.health ?? 1) - years * (1 - lifeSupportCondition) * 0.004 - years * (1 - medicalCondition) * 0.002)),
+    fatigue: Math.min(1, Math.max(0, Number(member.fatigue || 0)) + Math.min(0.08, years * 0.003 + (1 - lifeSupportCondition) * 0.025))
   })));
+}
+
+function applyCrewEventOutcome(crew, eventKind, choice) {
+  return Object.freeze((crew || []).map((member) => {
+    const roles = new Set(member.roles || []);
+    const repaired = eventKind === 'maintenance' && roles.has('engineering');
+    const observed = eventKind === 'discovery' && choice === 'observe' && roles.has('science');
+    if (!repaired && !observed) return member;
+    return Object.freeze({
+      ...member,
+      experienceYears: Number(member.experienceYears || 0) + (repaired ? 0.03 : 0.02),
+      fatigue: Math.min(1, Number(member.fatigue || 0) + (repaired ? 0.035 : 0.015))
+    });
+  }));
 }
 
 function maintenanceEvent(expedition) {
@@ -118,7 +136,7 @@ function advanceExpedition(expedition, requestedDeltaS) {
     progress: totalS > 0 ? Math.min(1, elapsed / totalS) : 0,
     resources: consumeResources(expedition.resources, expedition.calculation.expectedResources, deltaS, totalS),
     systems: degradeSystems(expedition.systems, deltaS, totalS),
-    crew: advanceCrew(expedition.crew, deltaS)
+    crew: advanceCrew(expedition.crew, deltaS, expedition.systems)
   });
   if (!next.eventFlags.maintenance && elapsed + 1 >= maintenanceAt) return maintenanceEvent(next);
   if (!next.eventFlags.discovery && elapsed + 1 >= discoveryAt) return discoveryEvent(next);
@@ -158,6 +176,7 @@ function resolveExpeditionEvent(expedition, choice) {
       pendingEvent: null,
       systems: Object.freeze(systems),
       resources: Object.freeze(resources),
+      crew: applyCrewEventOutcome(expedition.crew, event.kind, choice),
       log: appendLog(expedition.log, {
         atMissionS: expedition.strategicElapsedS,
         kind: 'repair',
@@ -168,6 +187,7 @@ function resolveExpeditionEvent(expedition, choice) {
   if (event.kind === 'discovery') {
     return withExpeditionChanges(expedition, {
       pendingEvent: null,
+      crew: applyCrewEventOutcome(expedition.crew, event.kind, choice),
       log: appendLog(expedition.log, {
         atMissionS: expedition.strategicElapsedS,
         kind: choice === 'observe' ? 'science' : 'course',

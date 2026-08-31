@@ -1,6 +1,7 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { getPrimaryWorldCanvas } from '../engine/webgl-lifecycle.js?v=1';
 import { SHIP_CREW_POSTS, SHIP_DECK_BOUNDS, SHIP_ROOMS, SHIP_STATIONS } from './ship-layout.js?v=1';
+import { deriveCrewOperations, summarizeCrewOperations } from './crew-operations.js?v=1';
 
 let activeSession = null;
 
@@ -96,6 +97,9 @@ function addCrewMember(group, post, crew) {
   root.name = `ship-crew:${crew?.id || post.crewId}`;
   root.userData.crewId = crew?.id || post.crewId;
   root.userData.crewName = crew?.name || 'Surveyor crew';
+  root.userData.currentRoomId = post.roomId;
+  root.userData.route = [];
+  root.userData.assignmentId = null;
   const uniform = material(crew?.id === 'crew-eng' ? 0xb5652a : crew?.id === 'crew-med' ? 0x5e789d : 0x253d66, { roughness: 0.72 });
   const skin = material(0xb88264, { roughness: 0.84, metalness: 0 });
   const trim = material(0xc8d4e4, { roughness: 0.58, metalness: 0.18 });
@@ -109,6 +113,109 @@ function addCrewMember(group, post, crew) {
   root.rotation.y = post.yaw;
   group.add(root);
   return root;
+}
+
+const ROOM_DOORS = Object.freeze({
+  bridge: Object.freeze({ x: 0, z: 24.7 }),
+  science: Object.freeze({ x: -2.45, z: 15.5 }),
+  medical: Object.freeze({ x: 2.45, z: 15.5 }),
+  quarters: Object.freeze({ x: -2.45, z: 0.5 }),
+  'life-support': Object.freeze({ x: 2.45, z: 0.5 }),
+  'cargo-fabrication': Object.freeze({ x: -2.45, z: -14.5 }),
+  'local-craft-bay': Object.freeze({ x: 2.45, z: -14.5 }),
+  engineering: Object.freeze({ x: 0, z: -23.7 })
+});
+
+const ASSIGNMENT_TARGETS = Object.freeze({
+  'navigation-watch': Object.freeze({ x: -4.5, z: 29.5 }),
+  'flight-watch': Object.freeze({ x: 4.5, z: 29.5 }),
+  'engineering-watch': Object.freeze({ x: -4.2, z: -30 }),
+  'life-support-watch': Object.freeze({ x: 8.5, z: 2.5 }),
+  'medical-watch': Object.freeze({ x: 8.5, z: 18 }),
+  'science-watch': Object.freeze({ x: -8.5, z: 18 }),
+  'systems-watch': Object.freeze({ x: -8.5, z: -12 }),
+  'systems-round': Object.freeze({ x: 8.5, z: -1.7 }),
+  'stores-round': Object.freeze({ x: -7.2, z: -17 }),
+  'science-support': Object.freeze({ x: -6.2, z: 12.2 }),
+  'thermal-response': Object.freeze({ x: 4.2, z: -30 }),
+  'maintenance-support': Object.freeze({ x: 6.4, z: 12.2 }),
+  'discovery-response': Object.freeze({ x: -6.2, z: 12.2 })
+});
+
+function targetForOperation(operation, crewIndex) {
+  if (operation.assignmentId === 'crew-rest') {
+    return { x: -9.5 + (crewIndex % 3) * 2.6, z: -3.2 + (crewIndex % 2) * 5.2 };
+  }
+  return ASSIGNMENT_TARGETS[operation.assignmentId] || ROOM_DOORS[operation.roomId] || { x: 0, z: 0 };
+}
+
+function buildCrewRoute(mesh, targetRoomId, target) {
+  const currentRoomId = mesh.userData.currentRoomId;
+  if (currentRoomId === targetRoomId) return [{ ...target, roomId: targetRoomId, final: true }];
+  const fromDoor = ROOM_DOORS[currentRoomId];
+  const toDoor = ROOM_DOORS[targetRoomId];
+  if (!fromDoor || !toDoor) return [{ ...target, roomId: targetRoomId, final: true }];
+  const route = [
+    { ...fromDoor },
+    { x: 0, z: fromDoor.z },
+    { x: 0, z: toDoor.z },
+    { ...toDoor },
+    { ...target, roomId: targetRoomId, final: true }
+  ];
+  return route.filter((waypoint, index) => index === 0 || Math.hypot(
+    waypoint.x - route[index - 1].x,
+    waypoint.z - route[index - 1].z
+  ) > 0.05);
+}
+
+function refreshCrewOperations(session, force = false) {
+  if (!session?.sceneState) return;
+  const operations = deriveCrewOperations(session.expedition);
+  const byCrew = new Map(operations.map((operation) => [operation.crewId, operation]));
+  session.sceneState.crewMeshes.forEach((mesh, index) => {
+    const operation = byCrew.get(mesh.userData.crewId);
+    if (!operation) return;
+    if (force || mesh.userData.assignmentId !== operation.assignmentId || mesh.userData.operationStatus !== operation.status) {
+      const target = targetForOperation(operation, index);
+      mesh.userData.route = buildCrewRoute(mesh, operation.roomId, target);
+      mesh.userData.assignmentId = operation.assignmentId;
+      mesh.userData.operationStatus = operation.status;
+      mesh.userData.operationTask = operation.task;
+    }
+  });
+  session.operations = operations;
+  session.operationSummary = summarizeCrewOperations(operations);
+}
+
+function updateCrewMotion(session, dt) {
+  const step = Math.max(0, Math.min(0.05, Number(dt) || 0));
+  session.visualClock += step;
+  session.operationRefreshElapsed += step;
+  if (session.operationRefreshElapsed >= 1) {
+    session.operationRefreshElapsed = 0;
+    refreshCrewOperations(session);
+  }
+  session.sceneState.crewMeshes.forEach((mesh, index) => {
+    const waypoint = mesh.userData.route?.[0];
+    if (!waypoint) {
+      mesh.position.y = 0.05 + Math.sin(session.visualClock * 1.8 + index) * 0.012;
+      return;
+    }
+    const dx = waypoint.x - mesh.position.x;
+    const dz = waypoint.z - mesh.position.z;
+    const distance = Math.hypot(dx, dz);
+    if (distance <= 0.07) {
+      mesh.position.set(waypoint.x, 0.05, waypoint.z);
+      mesh.userData.route.shift();
+      if (waypoint.final) mesh.userData.currentRoomId = waypoint.roomId;
+      return;
+    }
+    const travel = Math.min(distance, step * 1.25);
+    mesh.position.x += dx / distance * travel;
+    mesh.position.z += dz / distance * travel;
+    mesh.position.y = 0.05 + Math.sin(session.visualClock * 7 + index) * 0.025;
+    mesh.rotation.y = Math.atan2(dx, dz);
+  });
 }
 
 function addRoomDetails(group) {
@@ -232,7 +339,7 @@ function buildSurveyorScene(expedition) {
   };
 }
 
-function ensureShipHud(expedition) {
+function ensureShipHud(expedition, crewSummary = null) {
   let hud = document.getElementById('shipInteriorHud');
   if (!hud) {
     hud = document.createElement('section');
@@ -240,7 +347,8 @@ function ensureShipHud(expedition) {
     document.body.appendChild(hud);
   }
   const progress = Math.round((Number(expedition?.progress) || 0) * 100);
-  hud.innerHTML = `<div><span>SURVEYOR · MAIN DECK</span><strong>${expedition?.state === 'planned' ? 'Expedition staging' : `${progress}% to ${String(expedition?.destinationId || 'destination').replaceAll('-', ' ')}`}</strong><small>Move through the ship · E interacts · C changes view</small></div><div><button id="shipJournalButton" type="button">Journal</button><button id="shipExitButton" type="button">Return to flight</button></div>`;
+  const crewLine = crewSummary ? `${crewSummary.active} on duty · ${crewSummary.resting} resting` : 'Crew watch active';
+  hud.innerHTML = `<div><span>SURVEYOR · MAIN DECK</span><strong>${expedition?.state === 'planned' ? 'Expedition staging' : `${progress}% to ${String(expedition?.destinationId || 'destination').replaceAll('-', ' ')}`}</strong><small>${crewLine} · Move through the ship · E interacts · C changes view</small></div><div><button id="shipJournalButton" type="button">Journal</button><button id="shipExitButton" type="button">Return to flight</button></div>`;
   hud.classList.add('show');
   hud.querySelector('#shipExitButton')?.addEventListener('click', () => exitSurveyorInterior());
   hud.querySelector('#shipJournalButton')?.addEventListener('click', () => appCtx.toggleWorldDiscoveryJournal?.(true));
@@ -297,12 +405,19 @@ function enterSurveyorInterior(options = {}) {
     sceneBackground: appCtx.scene.background,
     shadowMapEnabled: appCtx.renderer?.shadowMap?.enabled === true,
     interiorPromptDisplay: document.getElementById('interiorPrompt')?.style.display || '',
-    overlayDisplays: Object.fromEntries(['mainMenuBtn', 'gameShareFloatBtn'].map((id) => [id, document.getElementById(id)?.style.display || ''])),
+    overlayDisplays: Object.fromEntries(['mainMenuBtn', 'gameShareFloatBtn', 'tutorialHintCard'].map((id) => [id, document.getElementById(id)?.style.display || ''])),
     skyVisibility: Object.fromEntries(['sunSphere', 'moonSphere', 'starField'].map((key) => [key, appCtx[key]?.visible !== false])),
     sceneState,
-    worldCanvas
+    worldCanvas,
+    bodyHadShipInteriorClass: document.body.classList.contains('expedition-ship-interior-open'),
+    operations: Object.freeze([]),
+    operationSummary: null,
+    operationRefreshElapsed: 0,
+    visualClock: 0
   };
   activeSession = session;
+  refreshCrewOperations(session, true);
+  document.body.classList.add('expedition-ship-interior-open');
 
   if (appCtx.spaceFlight.animationId != null) cancelAnimationFrame(appCtx.spaceFlight.animationId);
   appCtx.spaceFlight.animationId = null;
@@ -313,7 +428,7 @@ function enterSurveyorInterior(options = {}) {
   if (appCtx.spaceFlight.hud) appCtx.spaceFlight.hud.style.display = 'none';
   appCtx.hideSolarSystemUI?.();
   appCtx.hideUniverseUI?.();
-  ['mainMenuBtn', 'gameShareFloatBtn'].forEach((id) => {
+  ['mainMenuBtn', 'gameShareFloatBtn', 'tutorialHintCard'].forEach((id) => {
     const element = document.getElementById(id);
     if (element) element.style.display = 'none';
   });
@@ -356,7 +471,7 @@ function enterSurveyorInterior(options = {}) {
   const interiorPrompt = document.getElementById('interiorPrompt');
   if (interiorPrompt) interiorPrompt.style.display = '';
   appCtx.renderLoop?.();
-  ensureShipHud(options.expedition);
+  ensureShipHud(options.expedition, session.operationSummary);
   appCtx.updateControlsModeUI?.();
   return true;
 }
@@ -370,6 +485,7 @@ function exitSurveyorInterior() {
   appCtx.activeInterior = null;
   appCtx.interiorHint = null;
   appCtx.activeShipInterior = false;
+  if (!session.bodyHadShipInteriorClass) document.body.classList.remove('expedition-ship-interior-open');
   appCtx.replaceWorldCollection('dynamicBuildingColliders', session.dynamicBuildingColliders);
   session.sceneState.root.parent?.remove?.(session.sceneState.root);
   session.sceneState.root.traverse((child) => {
@@ -411,6 +527,14 @@ function handleShipInteriorInteraction(interaction) {
   return result !== false;
 }
 
+function updateExpeditionShipInterior(dt) {
+  if (!activeSession) return false;
+  const tutorialCard = document.getElementById('tutorialHintCard');
+  if (tutorialCard && tutorialCard.style.display !== 'none') tutorialCard.style.display = 'none';
+  updateCrewMotion(activeSession, dt);
+  return true;
+}
+
 function getShipInteriorSnapshot() {
   if (!activeSession) return null;
   return {
@@ -420,12 +544,28 @@ function getShipInteriorSnapshot() {
     roomCount: SHIP_ROOMS.length,
     stationCount: SHIP_STATIONS.length,
     visibleCrewCount: activeSession.sceneState.crewMeshes.length,
+    crewOperations: activeSession.operations.map((operation) => ({ ...operation })),
+    crewOperationSummary: { ...activeSession.operationSummary },
+    crewPresentation: activeSession.sceneState.crewMeshes.map((mesh) => ({
+      crewId: mesh.userData.crewId,
+      roomId: mesh.userData.currentRoomId,
+      assignmentId: mesh.userData.assignmentId,
+      task: mesh.userData.operationTask,
+      x: Number(mesh.position.x.toFixed(3)),
+      z: Number(mesh.position.z.toFixed(3)),
+      moving: (mesh.userData.route?.length || 0) > 0
+    })),
     parentEnvironment: 'SPACE_FLIGHT',
     movementAuthority: 'Walk',
     collisionAuthority: 'activeInterior'
   };
 }
 
-Object.assign(appCtx, { exitExpeditionShipInterior: exitSurveyorInterior, getShipInteriorSnapshot, handleShipInteriorInteraction });
+Object.assign(appCtx, {
+  exitExpeditionShipInterior: exitSurveyorInterior,
+  getShipInteriorSnapshot,
+  handleShipInteriorInteraction,
+  updateExpeditionShipInterior
+});
 
-export { enterSurveyorInterior, exitSurveyorInterior, getShipInteriorSnapshot, handleShipInteriorInteraction };
+export { enterSurveyorInterior, exitSurveyorInterior, getShipInteriorSnapshot, handleShipInteriorInteraction, updateExpeditionShipInterior };

@@ -119,14 +119,14 @@ const SHIP_PROFILES = Object.freeze([
 ]);
 
 const DEFAULT_CREW = Object.freeze([
-  Object.freeze({ id: 'player', name: 'Explorer', ageYears: 34, roles: Object.freeze(['command', 'science']), status: 'active' }),
-  Object.freeze({ id: 'crew-nav', name: 'Mara Velez', ageYears: 39, roles: Object.freeze(['navigation', 'command']), status: 'active' }),
-  Object.freeze({ id: 'crew-eng', name: 'Dev Malik', ageYears: 42, roles: Object.freeze(['engineering', 'fabrication']), status: 'active' }),
-  Object.freeze({ id: 'crew-life', name: 'Avery Okafor', ageYears: 36, roles: Object.freeze(['life-support', 'engineering']), status: 'active' }),
-  Object.freeze({ id: 'crew-med', name: 'Jules Park', ageYears: 41, roles: Object.freeze(['medical', 'life-support']), status: 'active' }),
-  Object.freeze({ id: 'crew-science', name: 'Noor Haddad', ageYears: 33, roles: Object.freeze(['science', 'navigation']), status: 'active' }),
-  Object.freeze({ id: 'crew-flight', name: 'Tessa Morgan', ageYears: 38, roles: Object.freeze(['navigation', 'command']), status: 'active' }),
-  Object.freeze({ id: 'crew-systems', name: 'Eli Chen', ageYears: 45, roles: Object.freeze(['engineering', 'medical']), status: 'active' })
+  Object.freeze({ id: 'player', name: 'Explorer', ageYears: 34, experienceYears: 6, health: 1, fatigue: 0.08, assignment: 'expedition-lead', roles: Object.freeze(['command', 'science']), status: 'active' }),
+  Object.freeze({ id: 'crew-nav', name: 'Mara Velez', ageYears: 39, experienceYears: 14, health: 0.98, fatigue: 0.11, assignment: 'navigation-watch', roles: Object.freeze(['navigation', 'command']), status: 'active' }),
+  Object.freeze({ id: 'crew-eng', name: 'Dev Malik', ageYears: 42, experienceYears: 17, health: 0.97, fatigue: 0.13, assignment: 'engineering-watch', roles: Object.freeze(['engineering', 'fabrication']), status: 'active' }),
+  Object.freeze({ id: 'crew-life', name: 'Avery Okafor', ageYears: 36, experienceYears: 11, health: 0.99, fatigue: 0.1, assignment: 'life-support-watch', roles: Object.freeze(['life-support', 'engineering']), status: 'active' }),
+  Object.freeze({ id: 'crew-med', name: 'Jules Park', ageYears: 41, experienceYears: 16, health: 0.98, fatigue: 0.09, assignment: 'medical-watch', roles: Object.freeze(['medical', 'life-support']), status: 'active' }),
+  Object.freeze({ id: 'crew-science', name: 'Noor Haddad', ageYears: 33, experienceYears: 9, health: 0.99, fatigue: 0.12, assignment: 'science-watch', roles: Object.freeze(['science', 'navigation']), status: 'active' }),
+  Object.freeze({ id: 'crew-flight', name: 'Tessa Morgan', ageYears: 38, experienceYears: 13, health: 0.98, fatigue: 0.1, assignment: 'flight-watch', roles: Object.freeze(['navigation', 'command']), status: 'active' }),
+  Object.freeze({ id: 'crew-systems', name: 'Eli Chen', ageYears: 45, experienceYears: 20, health: 0.96, fatigue: 0.14, assignment: 'systems-watch', roles: Object.freeze(['engineering', 'medical']), status: 'active' })
 ]);
 
 function getShipProfile(id) {

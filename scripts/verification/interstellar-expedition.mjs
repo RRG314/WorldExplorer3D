@@ -79,9 +79,15 @@ async function runJourney(viewport, name) {
     assert.equal(state.expeditionShipInterior.roomCount, 8);
     assert.equal(state.expeditionShipInterior.stationCount, 8);
     assert.equal(state.expeditionShipInterior.visibleCrewCount, 7);
+    assert.equal(state.expeditionShipInterior.crewOperationSummary.total, 7);
+    assert.equal(state.expeditionShipInterior.crewOperationSummary.active, 5);
+    assert.equal(state.expeditionShipInterior.crewOperationSummary.resting, 2);
+    assert.equal(state.expeditionShipInterior.crewOperations.length, 7);
+    const initialCrewPositions = new Map(state.expeditionShipInterior.crewPresentation.map((crew) => [crew.crewId, crew]));
     assert.equal(state.interior.key, 'expedition-ship:surveyor');
     assert.equal(await page.locator('#shipInteriorHud').isVisible(), true);
     assert.equal(await page.locator('#spaceFlightCanvas').isVisible(), false);
+    assert.equal(await page.locator('#tutorialHintCard').isVisible(), false);
     if (name === 'mobile') {
       await page.waitForFunction(() => document.getElementById('mobileTouchControls')?.dataset.mode === 'walking');
       assert.equal(await page.locator('#mobileActionSecondary').textContent(), 'Interact');
@@ -89,6 +95,12 @@ async function runJourney(viewport, name) {
     await page.keyboard.down('ArrowUp');
     await page.waitForTimeout(1800);
     await page.keyboard.up('ArrowUp');
+    state = await diagnostics(page);
+    assert.equal(await page.locator('#tutorialHintCard').isVisible(), false);
+    assert.ok(state.expeditionShipInterior.crewPresentation.some((crew) => {
+      const initial = initialCrewPositions.get(crew.crewId);
+      return initial && Math.hypot(crew.x - initial.x, crew.z - initial.z) > 0.05;
+    }));
     await page.screenshot({ path: path.join(outputDir, `${name}-surveyor-interior.png`), fullPage: true });
     await page.keyboard.down('ArrowUp');
     await page.waitForTimeout(1200);

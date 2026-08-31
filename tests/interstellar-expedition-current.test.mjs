@@ -17,6 +17,7 @@ import {
   startExpedition
 } from '../app/js/expedition/simulation.js';
 import { createExpeditionStore } from '../app/js/expedition/store.js';
+import { deriveCrewOperations, summarizeCrewOperations } from '../app/js/expedition/crew-operations.js';
 import { SHIP_CREW_POSTS, SHIP_ROOMS, SHIP_STATIONS, validateShipLayout } from '../app/js/expedition/ship-layout.js';
 import {
   calculateExpeditionTravel,
@@ -85,6 +86,7 @@ test('one complete strategic journey consumes supplies, changes ship state, logs
   const initialFood = expedition.resources.foodKg;
   const initialMaintenance = expedition.resources.maintenanceKg;
   const initialAge = expedition.crew[0].ageYears;
+  const initialEngineeringExperience = expedition.crew.find((member) => member.id === 'crew-eng').experienceYears;
   expedition = startExpedition(expedition, 1100);
 
   expedition = advanceToNextMilestone(expedition);
@@ -95,6 +97,7 @@ test('one complete strategic journey consumes supplies, changes ship state, logs
   expedition = resolveExpeditionEvent(expedition, 'replace');
   assert.equal(expedition.systems.thermal.status, 'optimal');
   assert.ok(expedition.resources.maintenanceKg < initialMaintenance - 179);
+  assert.ok(expedition.crew.find((member) => member.id === 'crew-eng').experienceYears > initialEngineeringExperience);
 
   expedition = advanceToNextMilestone(expedition);
   assert.equal(expedition.pendingEvent.kind, 'discovery');
@@ -109,6 +112,24 @@ test('one complete strategic journey consumes supplies, changes ship state, logs
   assert.ok(expedition.log.some((entry) => entry.kind === 'repair'));
   assert.ok(expedition.log.some((entry) => entry.kind === 'discovery'));
   assert.ok(expedition.log.some((entry) => entry.kind === 'arrival'));
+});
+
+test('crew work, support, rest, and emergency assignments derive from the persistent Expedition state', () => {
+  let expedition = createExpeditionPlan({ destinationId: 'proxima-centauri', crew: DEFAULT_CREW, createdAtMs: 1500 });
+  const routine = deriveCrewOperations(expedition);
+  const summary = summarizeCrewOperations(routine);
+  assert.equal(summary.total, 7);
+  assert.equal(summary.active, 5);
+  assert.equal(summary.resting, 2);
+  assert.ok(routine.every((operation) => operation.roomId && operation.assignmentId && operation.task));
+  assert.ok(DEFAULT_CREW.every((member) => Number.isFinite(member.health) && Number.isFinite(member.fatigue) && Number.isFinite(member.experienceYears)));
+
+  expedition = startExpedition(expedition, 1600);
+  expedition = advanceToNextMilestone(expedition);
+  const response = deriveCrewOperations(expedition);
+  assert.equal(response.find((operation) => operation.crewId === 'crew-eng').assignmentId, 'thermal-response');
+  assert.equal(response.find((operation) => operation.crewId === 'crew-eng').roomId, 'engineering');
+  assert.ok(response.some((operation) => operation.status === 'responding'));
 });
 
 test('save, overwrite, and rollback preserve the complete versioned Expedition record', () => {
@@ -126,6 +147,24 @@ test('save, overwrite, and rollback preserve the complete versioned Expedition r
   assert.equal(store.load().state, 'traveling');
   assert.equal(store.restoreBackup().state, 'planned');
   assert.equal(store.load().id, expedition.id);
+});
+
+test('the current store fills crew-state fields in an earlier compatible Expedition save', () => {
+  const memory = new Map();
+  const storage = {
+    getItem: (key) => memory.get(key) ?? null,
+    setItem: (key, value) => memory.set(key, String(value)),
+    removeItem: (key) => memory.delete(key)
+  };
+  const expedition = createExpeditionPlan({ destinationId: 'proxima-centauri', crew: DEFAULT_CREW, createdAtMs: 2500 });
+  const earlier = structuredClone(expedition);
+  earlier.crew = earlier.crew.map(({ health, fatigue, experienceYears, assignment, ...member }) => member);
+  const store = createExpeditionStore(storage);
+  storage.setItem(store.storageKey, JSON.stringify(earlier));
+  const restored = store.load();
+  assert.equal(restored.id, expedition.id);
+  assert.ok(restored.crew.every((member) => Number.isFinite(member.health) && Number.isFinite(member.fatigue) && Number.isFinite(member.experienceYears)));
+  assert.ok(restored.crew.every((member) => typeof member.assignment === 'string' && member.assignment.length > 0));
 });
 
 test('Surveyor publishes every required room through one bounded walkable deck contract', () => {

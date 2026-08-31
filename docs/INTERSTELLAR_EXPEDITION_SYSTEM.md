@@ -212,12 +212,19 @@ existing Explorer Journal. Entering the ship pauses the current Space session;
 returning to flight resumes that same session and course instead of creating a
 second Space environment.
 
-This is not the whole Interstellar Expedition roadmap. The visible crew do not
-yet run strategic work and rest routines in the rendered ship. Full ship-system
+The seven visible crew now follow deterministic work, support, rest, and
+emergency-response assignments derived from the same persistent Expedition
+record. Crew health, fatigue, experience, and primary assignment survive save
+and restore; strategic time changes age, experience, fatigue, and health, while
+repair and science outcomes affect the crew members whose roles performed the
+work. Their movement is a bounded presentation of that state, not another crew
+simulation.
+
+This is not the whole Interstellar Expedition roadmap. Full ship-system
 operations, explicit Backpack and planetary resource transfers, multi-stop
 resupply, cryogenic and generation missions, multiplayer rescue, persistent
-outposts, complete save-and-restore coverage, and the wider failure matrix
-remain later connected slices. Ordinary manual Space flight and optional
+outposts, complete active-journey restore coverage, and the wider failure
+matrix remain later connected slices. Ordinary manual Space flight and optional
 Wayfinder assistance remain the established travel paths outside Expeditions.
 
 ## Verification gates

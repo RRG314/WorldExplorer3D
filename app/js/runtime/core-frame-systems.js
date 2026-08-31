@@ -50,7 +50,10 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
         // Earth weather, astronomical-sky refresh, boat availability, and
         // planetary field layers must not mutate this scene while it owns the
         // shared world renderer.
-        if (appCtx.activeShipInterior === true) return;
+        if (appCtx.activeShipInterior === true) {
+          appCtx.updateExpeditionShipInterior?.(frame.dt);
+          return;
+        }
         appCtx.kickOptionalRuntimeBoot?.('main_loop');
         appCtx.updatePlanetaryTracks?.();
         appCtx.updatePlanetaryFieldMap?.(frame.dt);

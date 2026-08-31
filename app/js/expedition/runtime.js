@@ -1,11 +1,11 @@
-import { DEFAULT_CREW, PROPULSION_PROFILES, SHIP_PROFILES } from './catalog.js?v=1';
-import { createExpeditionPlan, withExpeditionChanges } from './model.js?v=1';
+import { DEFAULT_CREW, PROPULSION_PROFILES, SHIP_PROFILES } from './catalog.js?v=2';
+import { createExpeditionPlan, withExpeditionChanges } from './model.js?v=2';
 import {
   advanceToNextMilestone,
   resolveExpeditionEvent,
   startExpedition
-} from './simulation.js?v=1';
-import { createExpeditionStore } from './store.js?v=1';
+} from './simulation.js?v=2';
+import { createExpeditionStore } from './store.js?v=3';
 import { getUniverseDestinations, resolveUniverseAddress } from '../universe/catalog.js?v=10';
 
 let activeContext = null;
@@ -218,7 +218,7 @@ async function handleShipInteraction(interaction) {
 
 async function enterActiveShip() {
   if (!activeExpedition || !activeContext?.spaceFlight?.active) return false;
-  const ship = await import('./ship-interior.js?v=1');
+  const ship = await import('./ship-interior.js?v=2');
   closeExpeditionPlanner();
   const entered = ship.enterSurveyorInterior({
     expedition: activeExpedition,

@@ -1,4 +1,4 @@
-import { getPropulsionProfile, getShipProfile } from './catalog.js?v=1';
+import { getPropulsionProfile, getShipProfile } from './catalog.js?v=2';
 import { calculateExpeditionTravel } from './travel-calculator.js?v=1';
 
 const EXPEDITION_SCHEMA_VERSION = 1;
