@@ -275,6 +275,11 @@ Explorer through the existing local Space and planetary systems.
 
 ### Stage 3: the ship, crew, and voyage
 
+Implementation design: `docs/SURVEYOR_EXPEDITION_SHIP.md` defines the original
+three-deck ship, compact and expanded maps, pressure-door and route graph,
+room-specific activities, connected voyage loop, science/fiction boundary,
+failure recovery, shared authorities, and staged acceptance journeys.
+
 Current status: the first bounded Surveyor main deck is implemented locally
 with its validated eight-room layout, eight functional stations, seven visible
 crew assignments, shared walking/collision authorities, mobile controls,
