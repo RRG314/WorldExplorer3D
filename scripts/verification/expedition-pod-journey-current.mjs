@@ -227,6 +227,16 @@ async function run() {
       const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
       return state.universeNavigation?.courseDestinationId === id && state.interstellarExpedition?.podJourney?.phase === 'local_flight';
     }, bodyId, { timeout: 10_000 });
+    const outboundPodPresentation = await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const pod = ctx.spaceFlight.rocket?.getObjectByName('Surveyor Pathfinder Pod');
+      return {
+        visible: pod?.visible === true,
+        authority: pod?.userData?.authority || null,
+        wayfinderVisible: ctx.spaceFlight.rocket?.children.some((child) => child !== pod && child.visible !== false) || false
+      };
+    });
+    assert.deepEqual(outboundPodPresentation, { visible: true, authority: 'expedition-pod-journey', wayfinderVisible: false });
 
     await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
@@ -319,6 +329,11 @@ async function run() {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
       return ctx.handlePrimaryContextInteraction();
     }), true);
+    assert.equal(await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const pod = ctx.spaceFlight.rocket?.getObjectByName('Surveyor Pathfinder Pod');
+      return pod?.visible === true && pod?.userData?.authority === 'expedition-pod-journey';
+    }), true, 'Surface launch did not restore the same pod flight presentation.');
     await page.waitForFunction(() => {
       const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
       return state.modes?.space === true && state.interstellarExpedition?.podJourney?.phase === 'recovered' && state.universeNavigation?.transitionDestinationId == null;
@@ -333,6 +348,11 @@ async function run() {
     assert.equal(final.interstellarExpedition.scienceSamples.length, 1);
     assert.equal(final.interstellarExpedition.scienceSamples[0].processed, false);
     assert.equal(final.interstellarExpedition.resources.scienceCargoKg >= 4, true);
+    assert.equal(await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      return ctx.spaceFlight.rocket?.getObjectByName('Surveyor Pathfinder Pod') == null
+        && ctx.spaceFlight.rocket?.children.some((child) => child.visible !== false) === true;
+    }), true, 'Surveyor recovery did not restore the normal Wayfinder flight presentation.');
 
     if (await page.locator('#spaceFlightHUD').evaluate((element) => element.classList.contains('collapsed'))) await page.locator('#sfHudToggle').click();
     await page.locator('#sfExpeditionBtn').click();
@@ -374,6 +394,7 @@ async function run() {
       finalPhase: final.interstellarExpedition.podJourney.phase,
       returnFrameId: final.universeNavigation.currentFrameId,
       surfacePodVisible: surfacePod.visible,
+      outboundPodPresentation,
       podCollision: { startDistance: podCollisionStart, stoppedDistance: podCollisionEnd },
       sampleId: exported.sample.id,
       sampleValue: exported.sample.gameTradeValue,

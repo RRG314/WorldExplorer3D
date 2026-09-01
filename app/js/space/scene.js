@@ -9,6 +9,7 @@ import { PLANETARY_BODIES, configureColorTexture } from "../planetary/catalog.js
 import { createSpaceCelestialCatalog } from "./celestial-catalog.js?v=5";
 import { initUniverseRuntime } from "../universe/runtime.js?v=29";
 import { createExpeditionSpacecraftMesh } from "./expedition-spacecraft-mesh.js?v=3";
+import { createExpeditionPodMesh } from './expedition-pod-mesh.js?v=1';
 import { restoreExpeditionDiscoveries } from '../expedition/contact-authority.js?v=4';
 
 export function createSpaceFlightScene(options = {}) {
@@ -169,6 +170,41 @@ function createSpaceMoon() {
 function createSpaceRocket() {
   appCtx.spaceFlight.rocket = createExpeditionSpacecraftMesh();
   appCtx.spaceFlight.scene.add(appCtx.spaceFlight.rocket);
+  const phase = appCtx.getInterstellarExpeditionSnapshot?.()?.podJourney?.phase;
+  if (['ship_launch', 'local_flight', 'descent', 'surface_launch', 'rendezvous'].includes(phase)) {
+    setExpeditionPodFlightPresentation(true);
+  }
+}
+
+export function setExpeditionPodFlightPresentation(active) {
+  const rocket = appCtx.spaceFlight?.rocket;
+  if (!rocket) return false;
+  const current = rocket.userData.expeditionPodPresentation;
+  if (active === true) {
+    if (current?.pod) return true;
+    const originals = rocket.children.map((child) => ({
+      child,
+      visible: child.visible,
+      name: child.name
+    }));
+    originals.forEach((entry) => {
+      entry.child.visible = false;
+      if (['engineGlow', 'exhaust'].includes(entry.child.name)) entry.child.name = `wayfinder-${entry.child.name}`;
+    });
+    const pod = createExpeditionPodMesh();
+    rocket.add(pod);
+    rocket.userData.expeditionPodPresentation = { pod, originals };
+    return true;
+  }
+  if (!current?.pod) return true;
+  current.pod.parent?.remove?.(current.pod);
+  disposeThreeObjectTree(current.pod);
+  current.originals.forEach((entry) => {
+    entry.child.visible = entry.visible;
+    entry.child.name = entry.name;
+  });
+  delete rocket.userData.expeditionPodPresentation;
+  return true;
 }
 
 export function resetSpaceFlightForMoon() {

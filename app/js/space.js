@@ -3,7 +3,7 @@ import { getPrimaryWorldCanvas } from "./engine/webgl-lifecycle.js?v=1";
 import { captureEarthWorldSession } from "./earth-session.js?v=17";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
 import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=18";
-import { createSpaceFlightScene, destroySpaceFlightScene, ensureExtendedSpaceScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon } from "./space/scene.js?v=31";
+import { createSpaceFlightScene, destroySpaceFlightScene, ensureExtendedSpaceScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon, setExpeditionPodFlightPresentation } from "./space/scene.js?v=32";
 import { hideGameUI, initSpaceFlightUI, prepareSpaceFlightHudForEntry, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=32";
 import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 import {
@@ -434,6 +434,7 @@ Object.assign(appCtx, {
   forceSpaceFlightLanding,
   showSpaceFlightMessage: showFlightMessage,
   setSpaceFlightLandingTarget,
+  setExpeditionPodFlightPresentation,
   startSpaceFlightToEarth,
   startSpaceFlightFromExpeditionSurface,
   startSpaceFlightToMars,
@@ -445,6 +446,7 @@ export {
   exitSpaceFlight,
   forceSpaceFlightLanding,
   setSpaceFlightLandingTarget,
+  setExpeditionPodFlightPresentation,
   startSpaceFlightToEarth,
   startSpaceFlightFromExpeditionSurface,
   startSpaceFlightToMars,

@@ -26,12 +26,16 @@ let sharedAuthorityLoading = false;
 let sharedState = null;
 let activePodJourney = null;
 let podCourseTimer = 0;
+let podRecoveryTimer = 0;
 
 function setPodJourney(next) {
   activePodJourney = next || null;
   if (activeExpedition && store) {
     activeExpedition = withExpeditionChanges(activeExpedition, { podJourney: activePodJourney });
     store.save(activeExpedition);
+  }
+  if ([POD_PHASE.RECOVERED, POD_PHASE.FAILED].includes(activePodJourney?.phase)) {
+    activeContext?.setExpeditionPodFlightPresentation?.(false);
   }
   return activePodJourney;
 }
@@ -48,6 +52,26 @@ function cancelPodCourseTimer() {
   if (!podCourseTimer) return;
   window.clearTimeout(podCourseTimer);
   podCourseTimer = 0;
+}
+
+function schedulePodRecovery(returnFrameId, startedAt = performance.now(), minimumVisibleMs = 700) {
+  if (podRecoveryTimer) window.clearTimeout(podRecoveryTimer);
+  const attempt = () => {
+    podRecoveryTimer = 0;
+    if (!activePodJourney || activePodJourney.phase !== POD_PHASE.RENDEZVOUS) return;
+    const runtime = activeContext?.universeRuntime;
+    if (performance.now() - startedAt >= minimumVisibleMs && !runtime?.transition && (!returnFrameId || runtime?.current?.id === returnFrameId)) {
+      advancePodJourney('recover');
+      activeContext?.showSpaceFlightMessage?.('POD DOCKED · SURVEYOR HAS THE FLIGHT', '#83e6a6');
+      return;
+    }
+    if (performance.now() - startedAt >= 20_000) {
+      activeContext?.showSpaceFlightMessage?.('Hold near Surveyor while docking guidance reacquires.', '#f59e0b');
+      return;
+    }
+    podRecoveryTimer = window.setTimeout(attempt, 120);
+  };
+  podRecoveryTimer = window.setTimeout(attempt, 120);
 }
 
 function schedulePodPlanetCourse(contact, startedAt = performance.now()) {
@@ -253,6 +277,7 @@ function launchPodToContact(contactId) {
     returnFrameId
   }));
   advancePodJourney('launch');
+  activeContext?.setExpeditionPodFlightPresentation?.(true);
   closeShipStationPanel();
   const exited = activeContext?.exitExpeditionShipInterior?.() === true;
   if (!exited) {
@@ -279,6 +304,7 @@ function launchDestinationMissionPod() {
     returnFrameId
   }));
   advancePodJourney('launch');
+  activeContext?.setExpeditionPodFlightPresentation?.(true);
   closeShipStationPanel();
   const exited = activeContext?.exitExpeditionShipInterior?.() === true;
   if (!exited) {
@@ -316,7 +342,7 @@ function returnFromLocalContact() {
     routeLabel: 'Return to Surveyor'
   });
   if (accepted) {
-    if (activePodJourney?.phase === POD_PHASE.RENDEZVOUS) advancePodJourney('recover');
+    if (activePodJourney?.phase === POD_PHASE.RENDEZVOUS) schedulePodRecovery(operation.returnFrameId || activeExpedition.originId || 'sol');
     return true;
   }
   activeExpedition = previous;
@@ -442,8 +468,10 @@ function leaveDestinationMissionSurface(bodyId) {
     courseDestinationId: bodyId,
     onReady: () => {
       if (activePodJourney?.phase === POD_PHASE.SURFACE_LAUNCH) advancePodJourney('rendezvous');
-      if (activePodJourney?.phase === POD_PHASE.RENDEZVOUS) advancePodJourney('recover');
-      activeContext?.showSpaceFlightMessage?.('POD RECOVERED · SURFACE EVIDENCE READY FOR ANALYSIS', '#83e6a6');
+      if (activePodJourney?.phase === POD_PHASE.RENDEZVOUS) {
+        activeContext?.showSpaceFlightMessage?.('RENDEZVOUS APPROACH · SURVEYOR DOCKING LIGHTS ACQUIRED', '#6fe8ff');
+        schedulePodRecovery(mission.systemId || activePodJourney.returnFrameId, performance.now(), 1100);
+      }
     }
   }) === true;
   if (!departureStarted) return false;
@@ -1146,7 +1174,9 @@ function markExpeditionPodLanded(bodyId) {
 
 function markExpeditionPodSurfaceLaunch(bodyId) {
   if (!activePodJourney || String(bodyId || '').toLowerCase() !== activePodJourney.bodyId.toLowerCase()) return false;
-  return activePodJourney.phase === POD_PHASE.SURFACE ? advancePodJourney('launch') : activePodJourney.phase === POD_PHASE.SURFACE_LAUNCH;
+  const launched = activePodJourney.phase === POD_PHASE.SURFACE ? advancePodJourney('launch') : activePodJourney.phase === POD_PHASE.SURFACE_LAUNCH;
+  if (launched) activeContext?.setExpeditionPodFlightPresentation?.(true);
+  return launched;
 }
 
 async function handleShipInteraction(interaction) {
