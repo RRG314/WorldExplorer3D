@@ -267,9 +267,9 @@ async function run() {
     });
     await page.waitForTimeout(220);
     await page.keyboard.press('KeyE');
-    await page.locator('[data-complete-destination-analysis]').waitFor({ state: 'visible' });
+    await page.locator('[data-complete-destination-analysis="cautious-baseline"]').waitFor({ state: 'visible' });
     await page.screenshot({ path: path.join(outputDir, 'desktop-proxima-b-analysis.png'), fullPage: true });
-    await page.locator('[data-complete-destination-analysis]').click();
+    await page.locator('[data-complete-destination-analysis="cautious-baseline"]').click();
     await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').destinationMission?.phase === 'complete');
     const final = await snapshot(page);
     const fictionalWorldProfile = await page.evaluate(async () => {

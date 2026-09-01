@@ -1,4 +1,4 @@
-const DESTINATION_MISSION_STATE_VERSION = 1;
+const DESTINATION_MISSION_STATE_VERSION = 2;
 const DESTINATION_MISSION_STORAGE_KEY = 'world-explorer:destination-missions:v1';
 
 const PHASE = Object.freeze({
@@ -20,6 +20,9 @@ const TRANSITIONS = Object.freeze({
 function freezeMissionState(value) {
   return Object.freeze({
     ...value,
+    outcomeId: value.outcomeId || null,
+    crewLeadId: value.crewLeadId || null,
+    returnConsequence: value.returnConsequence || null,
     evidence: Object.freeze([...(value.evidence || [])]),
     history: Object.freeze([...(value.history || [])])
   });
@@ -36,6 +39,9 @@ function createDestinationMissionState(definition, atMs = Date.now()) {
     startedAtMs: null,
     updatedAtMs: Number(atMs),
     completedAtMs: null,
+    outcomeId: null,
+    crewLeadId: null,
+    returnConsequence: null,
     evidence: [],
     history: []
   });
@@ -52,6 +58,9 @@ function advanceDestinationMission(state, event, details = {}) {
     startedAtMs: state.startedAtMs || atMs,
     updatedAtMs: atMs,
     completedAtMs: nextPhase === PHASE.COMPLETE ? atMs : state.completedAtMs,
+    outcomeId: nextPhase === PHASE.COMPLETE ? String(details.outcomeId || state.outcomeId || 'cautious-baseline') : state.outcomeId,
+    crewLeadId: nextPhase === PHASE.COMPLETE ? String(details.crewLeadId || state.crewLeadId || '') || null : state.crewLeadId,
+    returnConsequence: nextPhase === PHASE.COMPLETE ? String(details.returnConsequence || state.returnConsequence || '') || null : state.returnConsequence,
     history: [...state.history, Object.freeze({ event, phase: nextPhase, atMs, evidenceId: details.evidenceId || null })]
   });
   return Object.freeze({ accepted: true, reason: null, state: next });
@@ -60,8 +69,14 @@ function advanceDestinationMission(state, event, details = {}) {
 function normalizeLedger(input = {}) {
   const missions = {};
   for (const [id, value] of Object.entries(input.missions || {})) {
-    if (value?.type !== 'DestinationMissionState' || Number(value.version) !== DESTINATION_MISSION_STATE_VERSION) continue;
-    missions[id] = freezeMissionState(value);
+    if (value?.type !== 'DestinationMissionState' || ![1, DESTINATION_MISSION_STATE_VERSION].includes(Number(value.version))) continue;
+    missions[id] = freezeMissionState({
+      ...value,
+      version: DESTINATION_MISSION_STATE_VERSION,
+      outcomeId: value.outcomeId || null,
+      crewLeadId: value.crewLeadId || null,
+      returnConsequence: value.returnConsequence || null
+    });
   }
   return Object.freeze({
     type: 'DestinationMissionLedger',

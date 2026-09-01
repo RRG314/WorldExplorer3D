@@ -12,7 +12,7 @@ import {
   UNIVERSE_GUIDANCE_MODE
 } from './course-authority.js?v=3';
 import { SPACE_CONSTANTS } from '../space/constants.js?v=1';
-import { initDestinationMissionRuntime, updateDestinationMissionRuntime } from './mission-runtime.js?v=5';
+import { initDestinationMissionRuntime, updateDestinationMissionRuntime } from './mission-runtime.js?v=6';
 import { createUniverseSky, setUniverseSkyFrame, updateUniverseSky } from './sky-field.js?v=6';
 import {
   createUniverseFrameVisual,

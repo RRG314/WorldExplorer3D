@@ -1,5 +1,5 @@
 import { getDestinationMission } from './mission-catalog.js?v=2';
-import { createDestinationMissionStore, DESTINATION_MISSION_PHASE } from './mission-authority.js?v=2';
+import { createDestinationMissionStore, DESTINATION_MISSION_PHASE } from './mission-authority.js?v=3';
 import { resolveUniverseAddress } from './catalog.js?v=11';
 import { DEFAULT_CREW } from '../expedition/catalog.js?v=2';
 import { createExpeditionPlan } from '../expedition/model.js?v=8';
@@ -13,6 +13,10 @@ let fieldEvidenceBound = false;
 
 const SURFACE_EVIDENCE = Object.freeze(['photograph', 'geology-inspect', 'habitat-survey']);
 const THERMAL_ORBIT_EVIDENCE = Object.freeze(['dayside', 'terminator', 'nightside']);
+const ANALYSIS_OUTCOMES = Object.freeze([
+  Object.freeze({ id: 'cautious-baseline', label: 'Publish a cautious baseline', points: 30, requiresScienceLead: false }),
+  Object.freeze({ id: 'priority-follow-up', label: 'Mark a priority return site', points: 40, requiresScienceLead: true })
+]);
 const SURFACE_MISSION_PLANS = Object.freeze({
   'trappist-1-e': Object.freeze([
     Object.freeze({ activityId: 'photograph', evidenceId: 'terminator-panorama', label: 'Photograph the light-and-shadow boundary', family: 'places', description: 'Record the modeled terminator terrain while treating surface and atmosphere as unresolved.' }),
@@ -61,6 +65,51 @@ function evidenceProfile(mission) {
   if (mission?.truthClass === 'fictional-game-world') return 'Original World Explorer destination';
   if (mission?.truthClass === 'observed-context-with-modeled-gameplay') return 'Astronomical observations · simulated fieldwork';
   return 'Published orbital data · simulated fieldwork';
+}
+
+function destinationScienceLead() {
+  const crew = activeContext?.getInterstellarExpeditionSnapshot?.()?.crew || [];
+  const ready = crew.filter((member) => (member.roles || []).includes('science')
+    && Number(member.health || 0) >= 0.55
+    && Number(member.fatigue || 0) <= 0.85);
+  return ready.find((member) => member.assignment === 'science-watch')
+    || ready.find((member) => member.id !== 'player')
+    || ready[0]
+    || null;
+}
+
+function crewNameForId(crewId) {
+  const id = String(crewId || '');
+  if (!id) return '';
+  const activeCrew = activeContext?.getInterstellarExpeditionSnapshot?.()?.crew || [];
+  return activeCrew.find((member) => member.id === id)?.name
+    || DEFAULT_CREW.find((member) => member.id === id)?.name
+    || '';
+}
+
+function analysisOutcomeOptions(mission, state = missionStore?.get?.(mission)) {
+  const scienceLead = destinationScienceLead();
+  const required = requiresSurfaceMission(mission)
+    ? surfaceEvidencePlan(mission).map((entry) => entry.evidenceId)
+    : orbitalEvidencePlan(mission) || [];
+  const evidenceComplete = required.every((id) => state?.evidence?.includes(id));
+  return ANALYSIS_OUTCOMES.map((outcome) => Object.freeze({
+    ...outcome,
+    available: evidenceComplete && (!outcome.requiresScienceLead || scienceLead != null),
+    crewLeadId: outcome.requiresScienceLead ? scienceLead?.id || null : scienceLead?.id || null,
+    crewLeadName: scienceLead?.name || null,
+    consequence: outcome.id === 'priority-follow-up'
+      ? `${mission.destinationName} remains marked for a higher-value return survey.`
+      : `${mission.destinationName} is recorded as a bounded baseline with unresolved questions preserved.`
+  }));
+}
+
+async function recordDestinationExplorerEvent(record) {
+  if (typeof activeContext?.recordExplorerEvent === 'function') return activeContext.recordExplorerEvent(record);
+  const { createIndexedDbDiscoveryProfileStore } = await import('../discovery/profile-store.js?v=4');
+  const store = activeContext?.discoveryProfileStore || createIndexedDbDiscoveryProfileStore();
+  if (activeContext) activeContext.discoveryProfileStore = store;
+  return store.recordExplorerEvent(record);
 }
 
 function phaseObjective(mission, state) {
@@ -281,10 +330,13 @@ function renderDestinationMission(destinationId = '') {
   } else {
     action = '<button type="button" class="universe-action" disabled>Mission recorded in the Captain’s Log</button>';
   }
+  const completion = state.phase === DESTINATION_MISSION_PHASE.COMPLETE && state.returnConsequence
+    ? `<div class="destination-mission-current"><span>RETURN CONSEQUENCE</span><strong>${state.returnConsequence}</strong>${state.crewLeadId ? `<small>Analysis led by ${crewNameForId(state.crewLeadId) || 'the Surveyor science team'}</small>` : ''}</div>`
+    : '';
   panel.innerHTML = `<article class="destination-mission-card" role="dialog" aria-modal="true" aria-labelledby="destinationMissionTitle">
     <header><div><span>DESTINATION MISSION · ${mission.destinationName}</span><h2 id="destinationMissionTitle">${mission.title}</h2></div><button type="button" class="universe-icon-button" data-mission-close aria-label="Close mission">×</button></header>
     <p>${mission.premise}</p>${evidence}
-    <div class="destination-mission-current"><span>CURRENT OBJECTIVE</span><strong>${phaseObjective(mission, state)}</strong></div>
+    <div class="destination-mission-current"><span>CURRENT OBJECTIVE</span><strong>${phaseObjective(mission, state)}</strong></div>${completion}
     <ol>${stageRows}</ol>
     <div class="destination-mission-actions">${action}</div>
   </article>`;
@@ -387,28 +439,36 @@ function performDestinationMissionFieldwork() {
   return true;
 }
 
-async function completeDestinationMissionAnalysis() {
+async function completeDestinationMissionAnalysis(outcomeId = 'cautious-baseline') {
   const mission = currentDefinition();
   if (!mission || !missionStore || missionStore.get(mission).phase !== DESTINATION_MISSION_PHASE.ANALYSIS) return false;
-  const result = missionStore.advance(mission, 'complete_analysis', { evidenceId: `${mission.id}:analysis` });
+  const outcome = analysisOutcomeOptions(mission).find((entry) => entry.id === String(outcomeId || ''));
+  if (!outcome?.available) return false;
+  missionStore.recordEvidence(mission, `analysis:${outcome.id}`, { evidenceId: `${mission.id}:analysis:${outcome.id}` });
+  const result = missionStore.advance(mission, 'complete_analysis', {
+    evidenceId: `${mission.id}:analysis:${outcome.id}`,
+    outcomeId: outcome.id,
+    crewLeadId: outcome.crewLeadId,
+    returnConsequence: outcome.consequence
+  });
   if (!result.accepted) return false;
-  await activeContext?.recordExplorerEvent?.({
+  await recordDestinationExplorerEvent({
     eventId: `event:destination-mission:${mission.destinationId}`,
     eventType: 'destination-mission-complete',
     sourceSystem: 'destination-missions',
     sourceId: mission.id,
     pathId: 'space-science',
     name: mission.title,
-    detail: `${mission.destinationName}: ${mission.premise}`,
+    detail: `${mission.destinationName}: ${outcome.consequence}${outcome.crewLeadName ? ` Science lead: ${outcome.crewLeadName}.` : ''}`,
     regionId: mission.systemId,
     regionLabel: mission.destinationName,
     worldIdentity: mission.destinationId,
     environment: 'SPACE_FLIGHT',
-    points: 30,
+    points: outcome.points,
     firstCompletion: true,
     projections: { journal: true, profile: true, place: false, fieldGuide: true }
   });
-  activeContext?.showToast?.(`${mission.title} completed and recorded.`);
+  activeContext?.showToast?.(`${mission.title} completed · ${outcome.label}.`);
   return true;
 }
 
@@ -432,6 +492,12 @@ function destinationMissionSnapshot() {
       lifeEvidence: mission.habitability.lifeEvidence
     } : null,
     evidence: [...state.evidence],
+    outcomeId: state.outcomeId,
+    crewLeadId: state.crewLeadId,
+    returnConsequence: state.returnConsequence,
+    analysisOutcomes: state.phase === DESTINATION_MISSION_PHASE.ANALYSIS
+      ? analysisOutcomeOptions(mission, state).map((outcome) => ({ ...outcome }))
+      : [],
     evidenceRequired: requiresSurfaceMission(mission)
       ? surfaceEvidencePlan(mission).map((entry) => entry.evidenceId)
       : orbitalEvidencePlan(mission) ? [...orbitalEvidencePlan(mission)] : []

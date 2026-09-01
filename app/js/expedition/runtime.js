@@ -1144,20 +1144,22 @@ function renderDestinationMissionAnalysisPanel(interaction) {
   const lifeFinding = mission.habitability?.lifeEvidence === 'none-confirmed'
     ? 'No confirmed evidence of life'
     : mission.habitability?.lifeEvidence || 'No confirmed extraterrestrial life';
+  const outcomes = mission.analysisOutcomes || [];
+  const outcomeActions = outcomes.map((outcome) => `<button type="button" data-complete-destination-analysis="${outcome.id}" ${outcome.available ? '' : 'disabled'}>${outcome.label}</button><small>${outcome.consequence}${outcome.requiresScienceLead ? ` · ${outcome.crewLeadName ? `${outcome.crewLeadName} can lead the review` : 'Science lead unavailable'}` : ''}</small>`).join('');
   panel.innerHTML = `<div class="ship-station-card destination-analysis-card" role="dialog" aria-modal="true" aria-labelledby="shipStationTitle">
     <header><div><span>SURVEYOR ANALYSIS LAB</span><strong id="shipStationTitle">${mission.title}</strong></div><button type="button" data-close-station aria-label="Close analysis">×</button></header>
     <p>The field package is aboard. Compare the instrument record, preserve uncertainty, and publish the destination report to the Captain’s Log and Explorer Journal.</p>
     <div class="ship-station-metrics"><div><span>Destination</span><strong>${destinationName}</strong></div><div><span>Evidence</span><strong>Field survey secured</strong></div><div><span>Life finding</span><strong>${lifeFinding}</strong></div></div>
-    <div class="ship-station-actions"><button type="button" data-complete-destination-analysis>Complete science analysis</button></div>
+    <div class="ship-station-actions">${outcomeActions || '<small>The evidence package is not ready for a supported result.</small>'}</div>
   </div>`;
   panel.classList.add('show');
   panel.querySelector('[data-close-station]')?.addEventListener('click', closeShipStationPanel);
-  panel.querySelector('[data-complete-destination-analysis]')?.addEventListener('click', async () => {
-    const completed = await activeContext?.completeDestinationMissionAnalysis?.();
-    if (!completed) return activeContext?.showToast?.('The destination evidence is not ready for analysis.');
+  panel.querySelectorAll('[data-complete-destination-analysis]').forEach((button) => button.addEventListener('click', async () => {
+    const completed = await activeContext?.completeDestinationMissionAnalysis?.(button.dataset.completeDestinationAnalysis);
+    if (!completed) return activeContext?.showToast?.('That analysis result is not supported by the current evidence and crew readiness.');
     activeContext?.playExpeditionShipAction?.({ actionId: 'destination-analysis', kind: 'science', message: `${mission.title} analysis complete.`, interaction });
     closeShipStationPanel();
-  });
+  }));
   return true;
 }
 

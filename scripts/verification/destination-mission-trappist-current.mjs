@@ -4,6 +4,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 
 const baseUrl = String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4192').replace(/\/$/, '');
+const sliceOnly = process.argv.includes('--slice-only') || process.env.WE3D_VERIFY_SLICE_ONLY === '1';
 const outputDir = path.resolve('output/verification/destination-mission-trappist');
 await fs.mkdir(outputDir, { recursive: true });
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
@@ -45,19 +46,64 @@ async function enterAnalysisLab(page) {
   });
   await page.waitForTimeout(220);
   await page.keyboard.press('KeyE');
-  await page.locator('[data-complete-destination-analysis]').waitFor({ state: 'visible' });
+  await page.locator('[data-complete-destination-analysis="cautious-baseline"]').waitFor({ state: 'visible' });
 }
 
 async function completeAnalysisAndExit(page) {
   await enterAnalysisLab(page);
-  await page.locator('[data-complete-destination-analysis]').click();
+  const outcomes = page.locator('[data-complete-destination-analysis]');
+  assert.equal(await outcomes.count(), 2);
+  assert.equal(await page.locator('[data-complete-destination-analysis="cautious-baseline"]').isEnabled(), true);
+  const priority = page.locator('[data-complete-destination-analysis="priority-follow-up"]');
+  assert.equal(await priority.isEnabled(), true);
+  assert.match(await page.locator('#shipStationPanel').textContent(), /Noor Haddad can lead the review/i);
+  await page.screenshot({ path: path.join(outputDir, 'desktop-trappist-analysis-outcomes.png'), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await priority.scrollIntoViewIfNeeded();
+  const mobileAction = await priority.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    return { left: box.left, right: box.right, top: box.top, bottom: box.bottom, width: innerWidth, height: innerHeight };
+  });
+  assert.ok(mobileAction.left >= 0 && mobileAction.right <= mobileAction.width, JSON.stringify(mobileAction));
+  assert.ok(mobileAction.top >= 0 && mobileAction.bottom <= mobileAction.height, JSON.stringify(mobileAction));
+  await page.screenshot({ path: path.join(outputDir, 'mobile-trappist-analysis-outcomes.png'), fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await priority.click();
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').destinationMission?.phase === 'complete');
+  const completed = await snapshot(page);
+  assert.equal(completed.destinationMission.outcomeId, 'priority-follow-up');
+  assert.equal(completed.destinationMission.crewLeadId, 'crew-science');
+  assert.match(completed.destinationMission.returnConsequence, /higher-value return survey/i);
+  await page.waitForFunction(async (destinationId) => {
+    const { createIndexedDbDiscoveryProfileStore } = await import('/app/js/discovery/profile-store.js?v=4');
+    const events = await createIndexedDbDiscoveryProfileStore().listEvents(500);
+    return events.some((entry) => entry.eventId === `event:destination-mission:${destinationId}`);
+  }, completed.destinationMission.destinationId, { timeout: 5_000 });
+  const journal = await page.evaluate(async (destinationId) => {
+    const { createIndexedDbDiscoveryProfileStore } = await import('/app/js/discovery/profile-store.js?v=4');
+    const events = await createIndexedDbDiscoveryProfileStore().listEvents(500);
+    const event = events.find((entry) => entry.eventId === `event:destination-mission:${destinationId}`);
+    return event ? { detail: event.detail, points: event.progress?.points, projections: event.projections } : null;
+  }, completed.destinationMission.destinationId);
+  assert.ok(journal, 'Destination result was not recorded in the Explorer Journal event store.');
+  assert.match(journal.detail, /higher-value return survey/i);
+  assert.match(journal.detail, /Noor Haddad/i);
+  assert.equal(journal.points, 40);
+  assert.equal(journal.projections.journal, true);
   await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     ctx.exitExpeditionShipInterior();
   });
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.active !== true);
   await page.waitForFunction(() => document.getElementById('universeToggle')?.offsetParent !== null);
+  await page.evaluate(async (destinationId) => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    ctx.openDestinationMission(destinationId);
+  }, completed.destinationMission.destinationId);
+  assert.match(await page.locator('#destinationMissionPanel').textContent(), /return consequence/i);
+  assert.match(await page.locator('#destinationMissionPanel').textContent(), /higher-value return survey/i);
+  assert.match(await page.locator('#destinationMissionPanel').textContent(), /Analysis led by Noor Haddad/i);
+  await page.locator('[data-mission-close]').click();
 }
 
 async function runTransitNetwork(page) {
@@ -198,6 +244,10 @@ async function run() {
   page.on('response', (response) => { if (response.url().startsWith(baseUrl) && response.status() >= 400) failures.push(`${response.status()} ${response.url()}`); });
   try {
     await openSpace(page);
+    if (sliceOnly) {
+      const e = await runSurfaceMission(page, 'trappist-1-e', ['terminator-panorama', 'surface-chemistry', 'climate-boundary'], 'desktop-trappist-1-e-surface.png');
+      return { sliceOnly: true, e };
+    }
     const transit = await runTransitNetwork(page);
     const e = await runSurfaceMission(page, 'trappist-1-e', ['terminator-panorama', 'surface-chemistry', 'climate-boundary'], 'desktop-trappist-1-e-surface.png');
     const f = await runSurfaceMission(page, 'trappist-1-f', ['volatile-panorama', 'volatile-sample', 'thermal-gradient'], 'desktop-trappist-1-f-surface.png');

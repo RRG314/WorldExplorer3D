@@ -107,7 +107,7 @@ async function desktopJourney() {
     await page.locator('#shipStationPanel').waitFor({ state: 'visible' });
     assert.equal(await page.locator('#shipStationTitle').textContent(), 'The Flare Watch');
     await page.screenshot({ path: path.join(outputDir, 'desktop-proxima-analysis-lab.png'), fullPage: true });
-    await page.locator('[data-complete-destination-analysis]').click();
+    await page.locator('[data-complete-destination-analysis="cautious-baseline"]').click();
     await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').destinationMission?.phase === 'complete');
     const final = await state(page);
     assert.equal(final.destinationMission.destinationId, 'proxima-centauri');

@@ -91,8 +91,8 @@ async function run() {
     });
     await page.waitForTimeout(220);
     await page.keyboard.press('KeyE');
-    await page.locator('[data-complete-destination-analysis]').waitFor({ state: 'visible' });
-    await page.locator('[data-complete-destination-analysis]').click();
+    await page.locator('[data-complete-destination-analysis="cautious-baseline"]').waitFor({ state: 'visible' });
+    await page.locator('[data-complete-destination-analysis="cautious-baseline"]').click();
     await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').destinationMission?.phase === 'complete');
     const final = await page.evaluate(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').destinationMission);
     return { phase: final.phase, evidence: final.evidence, destinationId: final.destinationId };
