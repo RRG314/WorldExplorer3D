@@ -1091,6 +1091,10 @@ function markExpeditionPodSurfaceLaunch(bodyId) {
 }
 
 async function handleShipInteraction(interaction) {
+  if (interaction?.id === 'bridge-flight') {
+    closeShipStationPanel();
+    return activeContext?.exitExpeditionShipInterior?.() === true;
+  }
   if (interaction?.id === 'craft-bay-status') return renderPodLaunchPanel(interaction);
   if (interaction?.id === 'analysis-review' && activeContext?.getDestinationMissionSnapshot?.()?.phase === 'analysis') {
     return renderDestinationMissionAnalysisPanel(interaction);
@@ -1100,7 +1104,7 @@ async function handleShipInteraction(interaction) {
 
 async function enterActiveShip() {
   if (!activeExpedition || !activeContext?.spaceFlight?.active) return false;
-  const ship = await import('./ship-interior.js?v=10');
+  const ship = await import('./ship-interior.js?v=11');
   closeExpeditionPlanner();
   const entered = ship.enterSurveyorInterior({
     expedition: activeExpedition,

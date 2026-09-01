@@ -9,7 +9,7 @@ import {
   SHIP_DOORS,
   SHIP_ROOMS,
   SHIP_STATIONS
-} from './ship-layout.js?v=4';
+} from './ship-layout.js?v=5';
 import { deriveCrewOperations, summarizeCrewOperations } from './crew-operations.js?v=1';
 import { shipAlertState } from './failure-authority.js?v=1';
 
@@ -988,6 +988,13 @@ function addDeckDetails(group, deckId) {
       cylinder(shuttle, 0.27, 0.27, 0.18, { x: side, y: -1.24, z: index === 1 ? 1.9 : -0.55 }, material(0x17212b, { metalness: 0.25, roughness: 0.72 }), 'survey-craft-landing-pad', null, 16);
     });
     [-0.56, 0.56].forEach((side) => box(shuttle, { x: 0.12, y: 0.12, z: 2.1 }, { x: side, y: 0.55, z: -3.5 }, material(0xdfa14a, { emissive: 0xdfa14a, emissiveIntensity: 0.62 }), 'survey-craft-marker'));
+    const hatchSurface = material(0x203746, { metalness: 0.58, roughness: 0.3 });
+    box(shuttle, { x: 0.09, y: 1.35, z: 1.18 }, { x: 1.62, y: 0.62, z: 1.12 }, hatchSurface, 'survey-craft-boarding-hatch');
+    [-0.62, 0.62].forEach((offset) => box(shuttle, { x: 0.12, y: 1.55, z: 0.12 }, { x: 1.7, y: 0.62, z: 1.12 + offset }, steel, 'survey-craft-hatch-frame'));
+    box(shuttle, { x: 0.12, y: 0.12, z: 1.42 }, { x: 1.7, y: 1.38, z: 1.12 }, steel, 'survey-craft-hatch-header');
+    box(shuttle, { x: 0.12, y: 0.16, z: 0.42 }, { x: 1.74, y: 0.72, z: 1.12 }, material(0x67d8e8, { emissive: 0x2a9eb5, emissiveIntensity: 0.72, metalness: 0.12, roughness: 0.24 }), 'survey-craft-hatch-control');
+    const boardingRamp = box(shuttle, { x: 2.75, y: 0.12, z: 1.22 }, { x: 2.9, y: -0.58, z: 1.12 }, material(0x566a77, { metalness: 0.62, roughness: 0.32 }), 'survey-craft-boarding-ramp');
+    boardingRamp.rotation.z = -0.16;
     shuttle.position.set(0, 1.45, -29.5);
     group.add(shuttle);
     [-3.35, 3.35].forEach((side) => {
@@ -1559,6 +1566,8 @@ function syncIncidentPresentation(session) {
     z
   };
   session.selectedRoomId = room.id;
+  session.selectedStationId = station?.id || null;
+  session.manualGuidance = false;
   session.mapDeckId = room.deckId;
   let cue = document.getElementById('shipObjectiveCue');
   if (!cue) {
@@ -1752,6 +1761,7 @@ function switchSurveyorDeck(deckId) {
   Object.assign(walker, { x: 0, z: 2.8, y: (appCtx.Walk.CFG.eyeHeight || 1.7) + 0.04, vy: 0, onGround: true });
   refreshCrewOperations(session, true);
   updateActiveDeckContract(session);
+  syncShipGuidance(session);
   renderShipMaps(session);
   ensureShipHud(session.expedition, session.operationSummary);
   appCtx.showToast?.(nextDeck.label);
@@ -1798,13 +1808,137 @@ function mapPoint(x, z) {
   };
 }
 
-function routePolyline(session, deckId) {
-  if (!session.selectedRoomId || deckId !== session.activeDeckId || getShipDeckForRoom(session.selectedRoomId) !== deckId) return '';
+function stationGuidance(stationId, title, detail, source = 'ship') {
+  const station = SHIP_STATIONS.find((entry) => entry.id === stationId);
+  if (!station) return null;
+  const room = SHIP_ROOMS.find((entry) => entry.id === station.roomId);
+  return Object.freeze({
+    source,
+    title,
+    detail,
+    deckId: station.deckId,
+    roomId: station.roomId,
+    stationId: station.id,
+    x: station.x,
+    z: station.z,
+    deckLabel: getShipDeck(station.deckId)?.label || station.deckId,
+    roomLabel: room?.label || station.label
+  });
+}
+
+function deriveShipGuidance(session) {
+  const pending = session?.expedition?.pendingEvent;
+  if (pending?.roomId) {
+    const station = SHIP_STATIONS.find((entry) => entry.roomId === pending.roomId && !entry.id.startsWith('deck-lift:'));
+    if (station) return stationGuidance(station.id, pending.title, `Respond at ${station.label}.`, 'voyage-event');
+  }
+
+  const mission = appCtx.getDestinationMissionSnapshot?.();
+  if (mission?.activeMissionId) {
+    if (mission.phase === 'analysis') {
+      return stationGuidance('analysis-review', mission.currentObjective || mission.title, 'Review the returned field evidence in Analysis & Data.', 'destination-mission');
+    }
+    if (mission.phase === 'fieldwork' && mission.surfaceRequired && mission.atDestination) {
+      return stationGuidance('craft-bay-status', mission.currentObjective || mission.title, 'Board the pod at its side hatch and launch for the surface.', 'destination-mission');
+    }
+    if (mission.phase === 'approach' || mission.phase === 'available') {
+      return stationGuidance('bridge-flight', mission.currentObjective || mission.title, 'Return to flight and follow the active destination course.', 'destination-mission');
+    }
+    if (mission.phase === 'complete') {
+      return stationGuidance('bridge-log', 'Mission record complete', 'Review the completed mission in the Captain’s Log.', 'destination-mission');
+    }
+  }
+
+  const localContactReady = (session?.expedition?.routeContacts || []).some((contact) => ['available', 'returned'].includes(contact.localOperationState));
+  if (localContactReady) {
+    return stationGuidance('craft-bay-status', 'Surface operation available', 'Board the pod at its side hatch and choose the surveyed local world.', 'local-operation');
+  }
+  if (session?.expedition?.state === 'planned') {
+    return stationGuidance('bridge-flight', 'Ready for departure', 'Return to flight controls when you are ready to begin the Expedition.', 'expedition');
+  }
+  return stationGuidance('navigation-course', 'Continue the current watch', 'Review the route and arrival margins in Navigation & Cartography.', 'expedition');
+}
+
+function ensureShipObjectiveCue() {
+  let cue = document.getElementById('shipObjectiveCue');
+  if (!cue) {
+    cue = document.createElement('aside');
+    cue.id = 'shipObjectiveCue';
+    document.body.appendChild(cue);
+  }
+  return cue;
+}
+
+function syncShipGuidance(session = activeSession) {
+  if (!session) return null;
+  const guidance = deriveShipGuidance(session);
+  session.objectiveGuidance = guidance;
+  if (!session.manualGuidance && guidance) {
+    session.selectedRoomId = guidance.roomId;
+    session.selectedStationId = guidance.stationId;
+  }
+  if (session.incidentProcedure) return guidance;
+  const cue = ensureShipObjectiveCue();
+  if (!guidance) {
+    cue.classList.remove('show');
+    return null;
+  }
+  const transfer = guidance.deckId !== session.activeDeckId
+    ? `Take the deck lift to ${guidance.deckLabel}.`
+    : `${guidance.roomLabel} · ${guidance.detail}`;
+  cue.innerHTML = `<span>CURRENT SHIP OBJECTIVE</span><strong>${guidance.title}</strong><small>${transfer}</small><button type="button">${guidance.deckId === session.activeDeckId ? 'Show route' : 'Route via lift'}</button>`;
+  cue.classList.add('show');
+  cue.querySelector('button')?.addEventListener('click', () => {
+    session.manualGuidance = false;
+    session.selectedRoomId = guidance.roomId;
+    session.selectedStationId = guidance.stationId;
+    session.mapDeckId = guidance.deckId;
+    toggleShipMap(true);
+  });
+  return guidance;
+}
+
+function selectedMapTarget(session) {
+  const station = SHIP_STATIONS.find((entry) => entry.id === session.selectedStationId);
+  if (station) return { ...station };
   const room = SHIP_ROOMS.find((entry) => entry.id === session.selectedRoomId);
-  const door = SHIP_DOORS.find((entry) => entry.roomId === session.selectedRoomId);
+  if (!room) return null;
+  return {
+    deckId: room.deckId,
+    roomId: room.id,
+    label: room.label,
+    x: (room.minX + room.maxX) * 0.5,
+    z: (room.minZ + room.maxZ) * 0.5
+  };
+}
+
+function routePointsToTarget(start, target) {
+  const room = SHIP_ROOMS.find((entry) => entry.id === target.roomId);
+  const door = SHIP_DOORS.find((entry) => entry.roomId === target.roomId);
+  if (!room || !door) return [start, { x: target.x, z: target.z }];
+  return [
+    start,
+    { x: 0, z: start.z },
+    { x: 0, z: door.z },
+    { x: door.x, z: door.z },
+    { x: target.x, z: target.z }
+  ];
+}
+
+function routePolyline(session, deckId) {
+  const target = selectedMapTarget(session);
+  if (!target) return '';
   const walker = appCtx.Walk.state.walker;
-  const center = { x: (room.minX + room.maxX) * 0.5, z: (room.minZ + room.maxZ) * 0.5 };
-  const points = [mapPoint(walker.x, walker.z), mapPoint(0, walker.z), mapPoint(0, door.z), mapPoint(door.x, door.z), mapPoint(center.x, center.z)];
+  let route = [];
+  if (target.deckId === session.activeDeckId && deckId === session.activeDeckId) {
+    route = routePointsToTarget({ x: walker.x, z: walker.z }, target);
+  } else if (deckId === session.activeDeckId) {
+    route = [{ x: walker.x, z: walker.z }, { x: 0, z: walker.z }, { x: 0, z: 0 }];
+  } else if (deckId === target.deckId) {
+    route = routePointsToTarget({ x: 0, z: 0 }, target);
+  }
+  if (route.length < 2) return '';
+  const points = route.map((point) => mapPoint(point.x, point.z));
   return `<svg class="ship-map-route" viewBox="0 0 100 100" preserveAspectRatio="none"><polyline points="${points.map((point) => `${point.x},${point.y}`).join(' ')}"/></svg>`;
 }
 
@@ -1813,6 +1947,7 @@ function deckMapMarkup(session, deckId, compact = false) {
   if (!deck) return '';
   const walker = appCtx.Walk.state.walker;
   const player = mapPoint(walker.x, walker.z);
+  const target = selectedMapTarget(session);
   const state = session.sceneState.deckStates.get(deckId);
   const crew = session.sceneState.crewMeshes.filter((mesh) => mesh.userData.deckId === deckId);
   return `<div class="ship-map-deck ${compact ? 'compact' : ''}" data-deck-map="${deckId}">
@@ -1824,6 +1959,8 @@ function deckMapMarkup(session, deckId, compact = false) {
       return `<button type="button" class="ship-map-room status-${status} ${session.selectedRoomId === room.id ? 'selected' : ''}" data-room="${room.id}" style="left:${a.x}%;top:${a.y}%;width:${b.x - a.x}%;height:${b.y - a.y}%" title="${room.label}">${compact ? '' : `<span>${room.label}</span>`}</button>`;
     }).join('')}
     ${(state?.doorStates || []).map((door) => { const point = mapPoint(door.x, door.z); return `<i class="ship-map-door ${door.open ? 'open' : ''}" style="left:${point.x}%;top:${point.y}%"></i>`; }).join('')}
+    ${target?.deckId === deckId ? (() => { const point = mapPoint(target.x, target.z); return `<i class="ship-map-objective" style="left:${point.x}%;top:${point.y}%" title="${target.label || 'Current objective'}"></i>`; })() : ''}
+    ${target && target.deckId !== session.activeDeckId && deckId === session.activeDeckId ? (() => { const point = mapPoint(0, 0); return `<i class="ship-map-lift" style="left:${point.x}%;top:${point.y}%" title="Deck lift"></i>`; })() : ''}
     ${deckId === session.activeDeckId ? `<i class="ship-map-player" style="left:${player.x}%;top:${player.y}%"></i>` : ''}
     ${crew.map((mesh) => { const point = mapPoint(mesh.position.x, mesh.position.z); return `<i class="ship-map-crew" style="left:${point.x}%;top:${point.y}%" title="${mesh.userData.crewName}"></i>`; }).join('')}
   </div>`;
@@ -1836,12 +1973,25 @@ function renderShipMaps(session = activeSession) {
   mini?.querySelector('[data-open-map]')?.addEventListener('click', () => toggleShipMap(true));
   const overlay = document.getElementById('shipMapOverlay');
   if (overlay) {
-    overlay.innerHTML = `<section><header><div><span>SURVEYOR</span><strong>Ship Map</strong></div><button type="button" data-close-map>×</button></header><nav>${SHIP_DECKS.map((deck) => `<button type="button" data-map-deck="${deck.id}" class="${deck.id === session.mapDeckId ? 'active' : ''}">${deck.shortLabel}</button>`).join('')}</nav>${deckMapMarkup(session, session.mapDeckId, false)}<footer>${session.selectedRoomId ? `Guidance set: ${SHIP_ROOMS.find((room) => room.id === session.selectedRoomId)?.label}` : 'Choose a room for internal guidance. Use the deck lift to change decks.'}</footer></section>`;
+    const target = selectedMapTarget(session);
+    const targetDeck = target?.deckId;
+    const footer = target
+      ? targetDeck !== session.activeDeckId
+        ? session.mapDeckId === session.activeDeckId
+          ? `Follow the route to the deck lift, then choose ${getShipDeck(targetDeck)?.label || targetDeck}.`
+          : session.mapDeckId === targetDeck
+            ? `After the lift, follow the route to ${target.label}.`
+            : `Objective is on ${getShipDeck(targetDeck)?.label || targetDeck}.`
+        : `Guidance set: ${target.label}.`
+      : 'Choose a room for internal guidance. Use the deck lift to change decks.';
+    overlay.innerHTML = `<section><header><div><span>SURVEYOR</span><strong>Ship Map</strong></div><button type="button" data-close-map>×</button></header><nav>${SHIP_DECKS.map((deck) => `<button type="button" data-map-deck="${deck.id}" class="${deck.id === session.mapDeckId ? 'active' : ''}">${deck.shortLabel}</button>`).join('')}</nav>${deckMapMarkup(session, session.mapDeckId, false)}<footer>${footer}</footer></section>`;
     overlay.querySelector('[data-close-map]')?.addEventListener('click', () => toggleShipMap(false));
     overlay.querySelectorAll('[data-map-deck]').forEach((button) => button.addEventListener('click', () => { session.mapDeckId = button.dataset.mapDeck; renderShipMaps(session); }));
   }
   document.querySelectorAll('.ship-map-room[data-room]').forEach((button) => button.addEventListener('click', () => {
     session.selectedRoomId = button.dataset.room;
+    session.selectedStationId = null;
+    session.manualGuidance = true;
     renderShipMaps(session);
   }));
 }
@@ -1861,6 +2011,7 @@ function updateExpeditionShipRecord(expedition) {
   syncCrewMeshes(activeSession, expedition);
   refreshCrewOperations(activeSession, true);
   syncIncidentPresentation(activeSession);
+  syncShipGuidance(activeSession);
   renderShipMaps(activeSession);
   ensureShipHud(expedition, activeSession.operationSummary);
   return true;
@@ -1871,7 +2022,7 @@ function ensureShipMaps(session) {
     const link = document.createElement('link');
     link.id = 'expeditionShipStyles';
     link.rel = 'stylesheet';
-    link.href = 'styles/expedition-ship.css?v=5';
+    link.href = 'styles/expedition-ship.css?v=6';
     document.head.appendChild(link);
   }
   let mini = document.getElementById('shipMiniMap');
@@ -1904,6 +2055,9 @@ function enterSurveyorInterior(options = {}) {
     activeDeckId: 'command',
     mapDeckId: 'command',
     selectedRoomId: null,
+    selectedStationId: null,
+    manualGuidance: false,
+    objectiveGuidance: null,
     mapRefreshElapsed: 0,
     bodyHadShipInteriorClass: document.body.classList.contains('expedition-ship-interior-open'),
     operations: Object.freeze([]),
@@ -1974,6 +2128,7 @@ function enterSurveyorInterior(options = {}) {
   if (interiorPrompt) interiorPrompt.style.display = '';
   appCtx.renderLoop?.();
   syncIncidentPresentation(session);
+  syncShipGuidance(session);
   ensureShipMaps(session);
   ensureShipHud(options.expedition, session.operationSummary);
   if (session.incidentPresentation) playShipTone('alert');

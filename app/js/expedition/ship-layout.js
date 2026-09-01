@@ -72,7 +72,7 @@ const SHIP_DECKS = Object.freeze([
     { id: 'cargo-status', roomId: 'cargo-hold', label: 'Review cargo manifest', x: 4.3, z: 0.5 },
     { id: 'resource-processor-status', roomId: 'resource-processing', label: 'Inspect resource processor', x: -4.3, z: -14.5 },
     { id: 'airlock-status', roomId: 'eva-airlock', label: 'Inspect EVA readiness', x: 4.3, z: -14.5 },
-    { id: 'craft-bay-status', roomId: 'local-craft-bay', label: 'Board expedition pod', x: 5.4, z: -29 }
+    { id: 'craft-bay-status', roomId: 'local-craft-bay', label: 'Board expedition pod', x: 4.8, z: -28.4 }
   ])
 ]);
 
