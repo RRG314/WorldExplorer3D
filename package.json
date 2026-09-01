@@ -79,6 +79,7 @@
     "verify:explorer-coherence": "node --test tests/explorer-coherence-current.test.mjs",
     "verify:discovery-receipts": "node --test tests/discovery-receipt-endpoint-current.test.mjs",
     "verify:explorer-coherence-browser": "node scripts/verification/explorer-coherence.mjs",
+    "verify:connected-explorer-journey": "node scripts/verification/connected-explorer-journey-current.mjs",
     "verify:explorer-pack-actions": "node scripts/verification/explorer-pack-actions.mjs",
     "verify:regional-guide-new-york": "node scripts/verification/regional-guide-new-york.mjs",
     "verify:creature-quality": "node --test tests/creature-quality.test.mjs",

@@ -564,6 +564,7 @@ function createDiscoveryUi(state) {
     document.querySelectorAll('.discoveryPane').forEach((pane) => pane.classList.toggle('active', pane.dataset.discoveryPane === activeTab));
     const activePane = document.querySelector(`.discoveryPane[data-discovery-pane="${activeTab}"]`);
     if (activePane) activePane.scrollTop = 0;
+    globalThis.dispatchEvent?.(new CustomEvent('we3d:explorer-section-opened', { detail: { section: activeTab } }));
     if (activeTab !== 'today') void refreshData();
   }
 
@@ -1010,6 +1011,7 @@ function disposeWorldDiscoveryRuntime(appCtx, reason = 'world-reload') {
   appCtx.worldDiscoveryPublication = null;
   appCtx.worldDiscoveryRuntime = null;
   appCtx.toggleWorldDiscoveryJournal = null;
+  appCtx.openWorldDiscoverySection = null;
   appCtx.handleWorldDiscoveryQuickAction = null;
   appCtx.handleWorldDiscoveryToolUse = null;
   if (appCtx.recordFishingExplorerCatch === state.recordFishingExplorerCatch) appCtx.recordFishingExplorerCatch = null;
@@ -1927,7 +1929,16 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     state.ui.showResult(null);
     state.ui.setTab('today');
     state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
-    if (began) state.ui.setOpen(false);
+    if (began) {
+      state.ui.setOpen(false);
+      emitDiscoveryTelemetry('activity_started', {
+        activityId,
+        discipline: state.actions.find((action) => action.id === activityId)?.discipline,
+        contextBands: telemetryContextBands(),
+        liveGps: appCtx.liveGpsActive === true,
+        result: 'today-route'
+      });
+    }
     return began;
   };
   state.startEncounterLead = async () => {
@@ -2102,6 +2113,12 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   appCtx.toggleWorldDiscoveryJournal = (force) => {
     const next = typeof force === 'boolean' ? force : !state.ui.open;
     state.ui.setOpen(next);
+    state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
+    return true;
+  };
+  appCtx.openWorldDiscoverySection = (section = 'today') => {
+    state.ui.setTab(section);
+    state.ui.setOpen(true);
     state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
     return true;
   };

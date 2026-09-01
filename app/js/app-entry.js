@@ -296,7 +296,7 @@ function scheduleTutorialInit() {
             if (started) return;
             started = true;
             try {
-                const mod = await import('./tutorial/tutorial.js?v=8');
+                const mod = await import('./tutorial/tutorial.js?v=9');
                 if (typeof mod.initTutorial === 'function') mod.initTutorial();
             } catch (error) {
                 console.warn('[boot] Tutorial init deferred import failed.', error);

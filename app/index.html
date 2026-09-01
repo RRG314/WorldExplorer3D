@@ -694,6 +694,10 @@ Graphics changes apply to the current session.
 <div id="boatPrompt" aria-live="polite"></div>
 <div id="discoveryContextPrompt" aria-live="polite"><span id="discoveryContextText">Explore what is possible here.</span><button id="discoveryContextOpenBtn" type="button">Explore</button></div>
 <button id="discoveryQuickToolBtn" type="button" aria-controls="discoveryPanel" aria-expanded="false"><span>⌁</span><strong>Resume Field Activity</strong><span id="discoveryQuickSignal">Ready</span></button>
+<aside id="currentJourneyCard" aria-label="Current journey" aria-live="polite" hidden>
+  <div class="currentJourneyCopy"><span id="currentJourneyEyebrow">CURRENT JOURNEY</span><strong id="currentJourneyTitle">Explore this place</strong><small id="currentJourneyDetail">Choose something nearby and begin when you are ready.</small></div>
+  <button id="currentJourneyAction" type="button">Open</button>
+</aside>
 <aside id="discoveryPanel" aria-label="My Explorer" aria-hidden="true">
   <header class="discoveryHead">
     <div class="discoveryIdentity"><span class="discoveryMark" aria-hidden="true">⌖</span><div><span class="discoveryEyebrow">My Explorer</span><strong id="discoveryPanelTitle">Today</strong></div></div>
