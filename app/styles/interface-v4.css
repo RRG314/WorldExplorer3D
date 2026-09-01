@@ -378,13 +378,25 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 #weatherLine, #street, #hudClockDisplay { color: var(--wx-text); }
 #hudClockDisplay { position: static; width: 100%; margin-top: 8px; padding-top: 6px; transform: none; border-top: 1px solid var(--wx-line-soft); }
 #worldQuickControls {
-  display: flex;
+  position: fixed;
+  top: 66px;
+  right: 16px;
+  z-index: 10019;
+  display: none;
   align-items: center;
   justify-content: flex-end;
   gap: 4px;
-  margin-top: 6px;
+  margin: 0;
+  pointer-events: auto;
 }
+#worldQuickControls.show { display: flex; }
 #worldQuickControls[hidden] { display: none !important; }
+body.space-flight-active #worldQuickControls,
+body.solid-world-active #worldQuickControls,
+body.activity-creator-open #worldQuickControls,
+body.activity-browser-open #worldQuickControls,
+body.editor-workspace-open #worldQuickControls,
+body:has(#largeMap.show) #worldQuickControls { display: none !important; }
 .worldQuickControl {
   min-width: 30px;
   width: 30px;
@@ -615,7 +627,7 @@ body.deflock-active .floatBtn::after {
   .hud-label span:not(#speedUnitLabel) { display: none; }
   #weatherPanel { display: contents !important; }
   #weatherLine,#weatherTimeLine,#weatherMetaLine { display: none !important; }
-  #worldQuickControls { grid-column: 3; grid-row: 1; justify-content: flex-end; gap: 4px; margin: 0; padding: 0; border: 0; pointer-events: auto; }
+  #worldQuickControls { position: fixed; top: 74px; right: 8px; justify-content: flex-end; gap: 4px; margin: 0; padding: 0; border: 0; pointer-events: auto; }
   .worldQuickControl { min-width: 34px; width: 34px; height: 34px; padding: 0; border-radius: 50%; }
   .worldQuickControl svg { width: 15px; height: 15px; }
   .worldQuickControl span { display: none; }
@@ -624,7 +636,7 @@ body.deflock-active .floatBtn::after {
   #street { grid-column: 2; grid-row: 1; overflow: hidden; font: 600 10px/1.2 Orbitron, sans-serif; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
   .mainMenuBtn { width: 58px; height: 66px; padding: 0; overflow: hidden; font-size: 0; pointer-events: auto; z-index: 10020; }
   .mainMenuBtn::before { content: '☰'; font: 28px/1 Inter, sans-serif; }
-  #gameShareFloatBtn { top: 74px; right: 10px; width: 46px; height: 46px; border-radius: 50%; }
+  #gameShareFloatBtn { top: 74px; right: 88px; width: 46px; height: 46px; border-radius: 50%; }
   #minimap { top: 78px; bottom: auto; left: 10px; width: min(190px, 48vw); height: min(190px, 48vw); border-radius: 8px; }
   #coords { top: calc(78px + min(190px, 48vw) - 38px); bottom: auto !important; left: 10px !important; width: min(190px, 48vw); min-height: 38px; font-size: 9px; background: rgba(3, 9, 14, 0.86); border-radius: 0 0 8px 8px; }
   #coords { z-index: 102; }

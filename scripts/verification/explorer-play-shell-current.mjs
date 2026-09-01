@@ -60,17 +60,23 @@ function layoutSnapshot() {
     };
     const overlaps = (left, right) => !!left && !!right && left.x < right.right && left.right > right.x && left.y < right.bottom && left.bottom > right.y;
     const hud = rect('#hudBox');
+    const mainMenu = rect('#mainMenuBtn');
+    const share = rect('#gameShareFloatBtn');
     const quick = rect('#worldQuickControls');
     const map = rect('#minimap');
     const journey = rect('#currentJourneyCard');
     const dock = rect('#floatMenuContainer');
     return {
       hud,
+      mainMenu,
+      share,
       quick,
       map,
       journey,
       dock,
-      quickInsideHud: !!hud && !!quick && quick.x >= hud.x && quick.right <= hud.right && quick.y >= hud.y && quick.bottom <= hud.bottom,
+      quickUnderMainMenu: !!mainMenu && !!quick && quick.y >= mainMenu.bottom && quick.right <= mainMenu.right,
+      quickClearsShare: !overlaps(quick, share),
+      quickClearsJourney: !overlaps(quick, journey),
       journeyClearsMap: !overlaps(journey, map),
       journeyClearsDock: !overlaps(journey, dock),
       dockLabels: [...document.querySelectorAll('.floatBtn')].map((button) => button.getAttribute('data-mobile-label') || button.textContent.trim()).filter(Boolean),
@@ -78,6 +84,35 @@ function layoutSnapshot() {
       quickWeatherLabel: document.getElementById('quickWeatherMode')?.getAttribute('aria-label') || ''
     };
   });
+}
+
+async function sampleEnvironmentTravelAction(frameCount = 36) {
+  return page.evaluate(async (count) => {
+    const ocean = document.getElementById('fOceanMode');
+    const earth = document.getElementById('fEarthMode');
+    const visible = (element) => !!element && !element.hidden && getComputedStyle(element).display !== 'none';
+    const samples = [];
+    for (let frame = 0; frame < count; frame += 1) {
+      samples.push({
+        oceanVisible: visible(ocean),
+        earthVisible: visible(earth),
+        oceanLabel: ocean?.textContent?.trim() || '',
+        earthLabel: earth?.textContent?.trim() || ''
+      });
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+    return samples;
+  }, frameCount);
+}
+
+function assertStableEnvironmentAction(samples, expected) {
+  assert.ok(samples.length > 0);
+  const signatures = new Set(samples.map((sample) => JSON.stringify(sample)));
+  assert.equal(signatures.size, 1, `Travel environment action changed while the environment was stable: ${[...signatures].join(' | ')}`);
+  const sample = samples[0];
+  assert.equal(sample.oceanVisible, expected === 'ocean');
+  assert.equal(sample.earthVisible, expected === 'earth');
+  assert.match(expected === 'ocean' ? sample.oceanLabel : sample.earthLabel, expected === 'ocean' ? /Explore the Ocean/i : /Return to Earth/i);
 }
 
 try {
@@ -110,10 +145,14 @@ try {
   await page.waitForSelector('#travelMenu.open');
   assert.match(await page.locator('#fTimeOfDay').textContent(), /Day/i);
   assert.match(await page.locator('#fWeatherMode').textContent(), /Clear/i);
+  const desktopEarthActionSamples = await sampleEnvironmentTravelAction();
+  assertStableEnvironmentAction(desktopEarthActionSamples, 'ocean');
   await page.locator('#travelBtn').click();
 
   const desktopLayout = await layoutSnapshot();
-  assert.equal(desktopLayout.quickInsideHud, true, 'Quick world controls must remain inside the HUD.');
+  assert.equal(desktopLayout.quickUnderMainMenu, true, 'Quick world controls must sit below Main Menu.');
+  assert.equal(desktopLayout.quickClearsShare, true, 'Quick world controls must clear Share.');
+  assert.equal(desktopLayout.quickClearsJourney, true, 'Quick world controls must clear Current Journey.');
   assert.equal(desktopLayout.journeyClearsDock, true, 'Current Journey must clear the destination dock.');
   assert.ok(desktopLayout.dock?.width <= 622, `Desktop destination dock is still oversized: ${desktopLayout.dock?.width}`);
   assert.deepEqual(desktopLayout.dockLabels, ['Explore', 'Travel', 'Create', 'Community', 'My Explorer']);
@@ -122,7 +161,9 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForTimeout(500);
   const mobileLayout = await layoutSnapshot();
-  assert.equal(mobileLayout.quickInsideHud, true, 'Mobile quick world controls must remain inside the HUD.');
+  assert.equal(mobileLayout.quickUnderMainMenu, true, 'Mobile quick world controls must sit below Main Menu.');
+  assert.equal(mobileLayout.quickClearsShare, true, 'Mobile quick world controls must clear Share.');
+  assert.equal(mobileLayout.quickClearsJourney, true, 'Mobile quick world controls must clear Current Journey.');
   assert.equal(mobileLayout.journeyClearsMap, true, 'Current Journey must sit beside, not across, the mobile map.');
   assert.equal(mobileLayout.journeyClearsDock, true, 'Current Journey must clear the mobile destination dock.');
   assert.ok(mobileLayout.dock?.height <= 65, `Mobile destination dock is still oversized: ${mobileLayout.dock?.height}`);
@@ -135,6 +176,27 @@ try {
   await page.locator('#exploreBtn').click();
   await page.screenshot({ path: `${evidenceDir}/02-mobile-play-shell.png`, fullPage: true });
 
+  await page.locator('#travelBtn').click();
+  assertStableEnvironmentAction(await sampleEnvironmentTravelAction(), 'ocean');
+  await page.locator('#fOceanMode').click();
+  await page.waitForFunction(() => {
+    const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+    return state.environment === 'OCEAN' && state.modes?.ocean === true;
+  }, null, { timeout: 180_000 });
+  await page.locator('#travelBtn').click();
+  const oceanActionSamples = await sampleEnvironmentTravelAction();
+  assertStableEnvironmentAction(oceanActionSamples, 'earth');
+  await page.screenshot({ path: `${evidenceDir}/03-mobile-ocean-return-action.png`, fullPage: true });
+  await page.locator('#fEarthMode').click();
+  await page.waitForFunction(() => {
+    const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+    return state.environment === 'EARTH' && state.modes?.ocean === false && state.worldLoading === false;
+  }, null, { timeout: 240_000 });
+  await page.locator('#travelBtn').click();
+  const returnedEarthActionSamples = await sampleEnvironmentTravelAction();
+  assertStableEnvironmentAction(returnedEarthActionSamples, 'ocean');
+  await page.locator('#travelBtn').click();
+
   const finalState = await textState();
   const report = {
     ok: browserErrors.length === 0 && failedLocalResources.length === 0,
@@ -143,12 +205,17 @@ try {
       existingTimeAuthorityChanged: finalState.worldConditions?.skyMode === 'day',
       existingWeatherAuthorityChanged: finalState.worldConditions?.weatherMode === 'clear',
       travelMenuReflectsQuickControls: true,
-      desktopQuickControlsInsideHud: desktopLayout.quickInsideHud,
+      desktopQuickControlsUnderMainMenu: desktopLayout.quickUnderMainMenu,
+      desktopQuickControlsClearOtherActions: desktopLayout.quickClearsShare && desktopLayout.quickClearsJourney,
       desktopJourneyClearsDock: desktopLayout.journeyClearsDock,
-      mobileQuickControlsInsideHud: mobileLayout.quickInsideHud,
+      mobileQuickControlsUnderMainMenu: mobileLayout.quickUnderMainMenu,
+      mobileQuickControlsClearOtherActions: mobileLayout.quickClearsShare && mobileLayout.quickClearsJourney,
       mobileJourneyClearsMap: mobileLayout.journeyClearsMap,
       mobileJourneyClearsDock: mobileLayout.journeyClearsDock,
       mobileExploreMenuStillWorks: true,
+      earthOffersOnlyOceanAction: desktopEarthActionSamples.every((sample) => sample.oceanVisible && !sample.earthVisible),
+      oceanOffersOnlyEarthAction: oceanActionSamples.every((sample) => !sample.oceanVisible && sample.earthVisible),
+      returnedEarthActionStable: returnedEarthActionSamples.every((sample) => sample.oceanVisible && !sample.earthVisible),
       noBrowserErrors: browserErrors.length === 0,
       noFailedLocalResources: failedLocalResources.length === 0
     },

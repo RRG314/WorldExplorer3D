@@ -614,6 +614,7 @@ function initTitleScreenUi({
     document.getElementById('minimapZoomControls')?.classList.add('show');
     document.getElementById('floatMenuContainer')?.classList.add('show');
     document.getElementById('mainMenuBtn')?.classList.add('show');
+    document.getElementById('worldQuickControls')?.classList.add('show');
     document.getElementById('controlsTab')?.classList.add('show');
     const accessibilitySettings = document.getElementById('accessibilitySettings');
     const mobileControlSettings = document.getElementById('mobileControlSettings');
