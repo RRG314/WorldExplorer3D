@@ -377,6 +377,31 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .hud-label, #weatherMetaLine, #locationLine, .indicators { color: var(--wx-muted); }
 #weatherLine, #street, #hudClockDisplay { color: var(--wx-text); }
 #hudClockDisplay { position: static; width: 100%; margin-top: 8px; padding-top: 6px; transform: none; border-top: 1px solid var(--wx-line-soft); }
+#worldQuickControls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 6px;
+}
+#worldQuickControls[hidden] { display: none !important; }
+.worldQuickControl {
+  min-width: 30px;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: var(--wx-muted);
+  background: rgba(16,25,33,.88);
+  border: 1px solid var(--wx-line-soft);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.worldQuickControl svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.65; stroke-linecap: round; stroke-linejoin: round; }
+.worldQuickControl span { display: none; }
+.worldQuickControl:hover,.worldQuickControl:focus-visible,.worldQuickControl[aria-pressed="true"] { color: var(--wx-text); background: rgba(45,125,255,.13); border-color: rgba(90,151,255,.7); }
 #boostBar { background: #27323b; border-radius: 0; }
 #boostFill { background: var(--wx-blue); border-radius: 0; }
 #coords {
@@ -405,10 +430,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .minimapZoomBtn, #minimapZoomLevel { border-radius: 0; }
 .floatMenuContainer {
   left: 260px;
-  right: 310px;
+  right: 260px;
   bottom: 14px;
   width: auto;
-  max-width: 760px;
+  max-width: 620px;
   margin: 0 auto;
   transform: none;
   display: none;
@@ -422,8 +447,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .floatMenu { min-width: 0; }
 .floatBtn {
   position: relative;
-  height: 66px;
-  padding: 7px 4px;
+  height: 56px;
+  padding: 5px 4px;
   flex-direction: column;
   gap: 5px;
   color: var(--wx-muted) !important;
@@ -435,6 +460,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   box-shadow: none;
   font-size: 10px;
 }
+#exploreBtn.primaryDestination { color: var(--wx-text) !important; background: linear-gradient(180deg,rgba(45,125,255,.12),rgba(45,125,255,.035)); border-bottom-color: rgba(45,125,255,.72); }
+#exploreBtn.primaryDestination .btnIcon { color: #8fc1ff; }
 .floatBtn::before {
   content: '';
   position: absolute;
@@ -586,8 +613,12 @@ body.deflock-active .floatBtn::after {
   #speed { font-size: 21px; }
   .hud-label { font-size: 8px; }
   .hud-label span:not(#speedUnitLabel) { display: none; }
-  #weatherPanel { grid-column: 3; min-width: 0; text-align: right; }
-  #weatherLine { font-size: 10px; }
+  #weatherPanel { display: contents !important; }
+  #weatherLine,#weatherTimeLine,#weatherMetaLine { display: none !important; }
+  #worldQuickControls { grid-column: 3; grid-row: 1; justify-content: flex-end; gap: 4px; margin: 0; padding: 0; border: 0; pointer-events: auto; }
+  .worldQuickControl { min-width: 34px; width: 34px; height: 34px; padding: 0; border-radius: 50%; }
+  .worldQuickControl svg { width: 15px; height: 15px; }
+  .worldQuickControl span { display: none; }
   #weatherTimeLine, #weatherMetaLine { display: none; }
   #hudDetails { display: contents; }
   #street { grid-column: 2; grid-row: 1; overflow: hidden; font: 600 10px/1.2 Orbitron, sans-serif; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
@@ -603,7 +634,7 @@ body.deflock-active .floatBtn::after {
     right: 0;
     bottom: 0;
     width: 100%;
-    height: 78px;
+    height: 64px;
     transform: none;
     max-width: none;
     margin: 0;
@@ -613,15 +644,15 @@ body.deflock-active .floatBtn::after {
     border-left: 0;
   }
   #multiplayerMenu { position: relative; left: auto; bottom: auto; z-index: auto; }
-  .floatBtn { height: 78px; padding: 8px 2px 5px; }
-  .btnIcon { width: 24px; height: 24px; }
+  .floatBtn { height: 64px; padding: 6px 2px 4px; }
+  .btnIcon { width: 22px; height: 22px; }
   .btnText { display: none; }
   .floatBtn::after { content: attr(data-mobile-label); display: block; color: inherit; font: 650 7.5px/1.1 Orbitron, sans-serif; letter-spacing: .02em; text-transform: uppercase; }
   .floatItems {
     top: auto;
     left: 0;
     right: 0;
-    bottom: calc(78px + env(safe-area-inset-bottom));
+    bottom: calc(64px + env(safe-area-inset-bottom));
     width: 100%;
     min-width: 0;
     max-width: none;

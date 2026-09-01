@@ -405,6 +405,9 @@ function setupUI() {
     if (typeof appCtx.cycleTimeOfDay === 'function') appCtx.cycleTimeOfDay();
     closeAllFloatMenus();
   });
+  document.getElementById('quickTimeOfDay')?.addEventListener('click', () => {
+    if (typeof appCtx.cycleTimeOfDay === 'function') appCtx.cycleTimeOfDay();
+  });
   const weatherModeItem = document.getElementById('fWeatherMode');
   if (weatherModeItem) {
     weatherModeItem.addEventListener('click', () => {
@@ -412,6 +415,9 @@ function setupUI() {
       closeAllFloatMenus();
     });
   }
+  document.getElementById('quickWeatherMode')?.addEventListener('click', () => {
+    if (typeof appCtx.cycleWeatherMode === 'function') appCtx.cycleWeatherMode();
+  });
   const seaStateItem = document.getElementById('fSeaState');
   if (seaStateItem) {
     seaStateItem.addEventListener('click', () => {

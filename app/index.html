@@ -26,10 +26,10 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link rel="stylesheet" href="styles/block-builder.css?v=7">
 <link rel="stylesheet" href="styles/universe.css?v=8">
 <link rel="stylesheet" href="styles/fishing-game.css?v=5">
-<link rel="stylesheet" href="styles/interface-v4.css?v=21">
+<link rel="stylesheet" href="styles/interface-v4.css?v=23">
 <link rel="stylesheet" href="styles/start-hub.css?v=18">
 <link rel="stylesheet" href="styles/discovery.css?v=16">
-<link rel="stylesheet" href="styles/tutorial.css?v=8">
+<link rel="stylesheet" href="styles/tutorial.css?v=9">
 <link rel="stylesheet" href="styles/ar.css?v=1">
 <link rel="stylesheet" href="styles/mobile-controls.css?v=1">
 <link rel="stylesheet" href="styles/map-explorer.css?v=4">
@@ -679,6 +679,16 @@ Graphics changes apply to the current session.
 <div id="weatherLine"></div>
 <div id="weatherTimeLine"></div>
 <div id="weatherMetaLine"></div>
+<div id="worldQuickControls" aria-label="Quick world controls">
+<button id="quickTimeOfDay" class="worldQuickControl" type="button" aria-label="Change time of day" title="Change time of day">
+<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"></circle><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"></path></svg>
+<span id="quickTimeOfDayState">Live</span>
+</button>
+<button id="quickWeatherMode" class="worldQuickControl" type="button" aria-label="Change weather" title="Change weather">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.2 18.2h10.3a3.6 3.6 0 0 0 .4-7.2 5.8 5.8 0 0 0-11-1.1 4.2 4.2 0 0 0 .3 8.3Z"></path></svg>
+<span id="quickWeatherModeState">Live</span>
+</button>
+</div>
 </div>
 </div>
 <div id="hudClockDisplay"></div>
@@ -1196,7 +1206,7 @@ Explore the area
 <!-- Five player choices. Existing gameplay systems remain behind these entry points. -->
 <div class="floatMenuRow">
 <div class="floatMenu" id="exploreMenu">
-<button class="floatBtn explore" id="exploreBtn" type="button" aria-label="Explore activities" aria-expanded="false" data-mobile-label="Explore"><span class="btnIcon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="m15.8 8.2-2.1 5.5-5.5 2.1 2.1-5.5 5.5-2.1Z"></path></svg></span><span class="btnText">Explore</span></button>
+<button class="floatBtn explore primaryDestination" id="exploreBtn" type="button" aria-label="Explore activities" aria-expanded="false" data-mobile-label="Explore"><span class="btnIcon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="m15.8 8.2-2.1 5.5-5.5 2.1 2.1-5.5 5.5-2.1Z"></path></svg></span><span class="btnText">Explore</span></button>
 <div class="floatItems" data-menu-title="EXPLORE">
 <div class="floatItemSection" role="separator">YOUR NEXT STEP</div>
 <div class="floatItem" id="fWorldDiscovery">🧭 Today &amp; Nearby</div>

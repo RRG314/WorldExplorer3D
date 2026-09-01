@@ -1236,6 +1236,10 @@ globalThis.render_game_to_text = () => JSON.stringify({
     space: !!appCtx.spaceFlight?.active,
     walking: appCtx.Walk?.state?.mode === 'walk'
   },
+  worldConditions: {
+    skyMode: appCtx.skyMode || 'live',
+    weatherMode: appCtx.weatherMode || 'live'
+  },
   planetary: {
     flightDestination: appCtx.spaceFlight?.destination || null,
     flightMode: appCtx.spaceFlight?.mode || null,
