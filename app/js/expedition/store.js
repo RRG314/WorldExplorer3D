@@ -1,4 +1,4 @@
-import { EXPEDITION_SCHEMA_VERSION } from './model.js?v=8';
+import { EXPEDITION_SCHEMA_VERSION } from './model.js?v=9';
 import { DEFAULT_CREW } from './catalog.js?v=2';
 import { normalizeVoyageDirector, VOYAGE_SLOTS } from './voyage-director.js?v=1';
 import { createLongDurationState, crewPopulationForShip } from './long-duration.js?v=1';
@@ -26,6 +26,9 @@ function parseRecord(value) {
         assignment: member?.assignment || defaults.assignment || 'general-watch'
       };
     });
+    if (record.ship?.profileId === 'long-range-research-vessel' && record.ship.name === 'Surveyor') {
+      record.ship = { ...record.ship, name: 'Asteria' };
+    }
     record.voyagePhase ||= record.state === 'arrived' ? 'arrival' : 'departure';
     record.eventFlags = { ...(record.eventFlags || {}) };
     record.operationFlags = { ...(record.operationFlags || {}) };

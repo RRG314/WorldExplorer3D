@@ -17,7 +17,6 @@ function setDroneModeActive(active) {
 
 function syncTravelModeButtons() {
   const activeMode = getCurrentTravelMode();
-  const boatLocked = activeMode === 'boat';
   const drivingBtn = document.getElementById('fDriving');
   const walkingBtn = document.getElementById('fWalk');
   const droneBtn = document.getElementById('fDrone');
@@ -29,21 +28,41 @@ function syncTravelModeButtons() {
   if (planeBtn) planeBtn.classList.toggle('on', activeMode === 'plane');
   if (boatBtn) boatBtn.classList.toggle('on', activeMode === 'boat');
   const planetaryCapabilities = appCtx.activePlanetaryBodyId ? appCtx.planetaryTravelCapabilities : null;
-  [
-    [drivingBtn, 'drive'],
-    [walkingBtn, 'walk'],
-    [droneBtn, 'drone'],
-    [planeBtn, 'plane'],
-    [boatBtn, 'boat'],
-    [document.getElementById('fOceanMode'), 'ocean'],
-    [document.getElementById('fEarthMode'), 'earth'],
-    [document.getElementById('fSpaceDirect'), 'space'],
-    [document.getElementById('fSpaceRocket'), 'space'],
-    [document.getElementById('fSpaceSurveyor'), 'space'],
-    [document.getElementById('fSpaceBoardSurveyor'), 'space']
-  ].forEach(([button, mode]) => {
-    if (button) button.style.display = boatLocked || (planetaryCapabilities && planetaryCapabilities[mode] !== true) ? 'none' : '';
-  });
+  const currentEnvironment = appCtx.getEnv?.()
+    || (appCtx.oceanMode?.active ? appCtx.ENV?.OCEAN : appCtx.ENV?.EARTH);
+  const onEarth = currentEnvironment === appCtx.ENV?.EARTH;
+  const setAvailable = (button, available) => {
+    if (!button) return;
+    const hidden = available !== true;
+    if (button.hidden !== hidden) button.hidden = hidden;
+    const display = hidden ? 'none' : '';
+    if (button.style.display !== display) button.style.display = display;
+  };
+  const supports = (mode) => !planetaryCapabilities || planetaryCapabilities[mode] === true;
+
+  setAvailable(drivingBtn, supports('drive'));
+  setAvailable(walkingBtn, supports('walk'));
+  setAvailable(droneBtn, supports('drone'));
+  setAvailable(planeBtn, supports('plane'));
+  setAvailable(boatBtn, supports('boat'));
+
+  // Environment choices have one owner. Mobile control rendering used to
+  // rewrite these same elements while this function also rewrote them.
+  const oceanBtn = document.getElementById('fOceanMode');
+  const earthBtn = document.getElementById('fEarthMode');
+  if (oceanBtn) {
+    oceanBtn.classList.remove('on');
+    oceanBtn.textContent = activeMode === 'boat' ? '🌊 Dive Underwater' : '🌊 Explore the Ocean';
+  }
+  if (earthBtn) {
+    earthBtn.classList.remove('on');
+    earthBtn.textContent = '🌍 Return to Earth';
+  }
+  setAvailable(oceanBtn, onEarth && supports('ocean'));
+  setAvailable(earthBtn, !onEarth && supports('earth'));
+
+  ['fSpaceDirect', 'fSpaceRocket', 'fSpaceSurveyor', 'fSpaceBoardSurveyor']
+    .forEach((id) => setAvailable(document.getElementById(id), supports('space')));
   return activeMode;
 }
 

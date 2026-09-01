@@ -2,9 +2,9 @@ import { ctx as appCtx } from "./shared-context.js?v=55";
 import { getPrimaryWorldCanvas } from "./engine/webgl-lifecycle.js?v=1";
 import { captureEarthWorldSession } from "./earth-session.js?v=17";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
-import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=21";
-import { createSpaceFlightScene, destroySpaceFlightScene, ensureExpeditionSurveyorDockTarget, ensureExtendedSpaceScene, getExpeditionSurveyorDockTarget, positionSpacecraftAtSurveyorDock, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon, setExpeditionPodFlightPresentation, updateExpeditionPodFlightPresentation } from "./space/scene.js?v=36";
-import { hideGameUI, initSpaceFlightUI, prepareSpaceFlightHudForEntry, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=36";
+import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=23";
+import { createSpaceFlightScene, destroySpaceFlightScene, ensureExpeditionSurveyorDockTarget, ensureExtendedSpaceScene, getExpeditionSurveyorDockTarget, positionSpacecraftAtSurveyorDock, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon, setExpeditionPodFlightPresentation, setSurveyorFlightPresentation, updateExpeditionPodFlightPresentation } from "./space/scene.js?v=38";
+import { hideGameUI, initSpaceFlightUI, prepareSpaceFlightHudForEntry, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=38";
 import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 import {
   beginEnvironmentTransition,
@@ -46,10 +46,13 @@ appCtx.spaceFlight = {
   launchStartMs: 0,
   _launchSource: null,
   _isThrusting: false,
+  _landingApproachDirection: null,
+  earthLandingSelection: null,
   presentationAuthority: 'classic',
   _lastFrameMs: 0,
   _frameScale: 1,
   overviewMode: false,
+  cameraMode: 'chase',
   _sessionId: 0
 };
 
@@ -63,9 +66,79 @@ function beginSpaceFlightSession() {
   spaceSessionScope = createLifecycleScope('space-flight-session');
   appCtx.spaceFlight._sessionId = Number(appCtx.spaceFlight._sessionId || 0) + 1;
   appCtx.spaceFlight.overviewMode = false;
+  appCtx.spaceFlight.cameraMode = 'chase';
   appCtx.spaceFlight._landingTarget = null;
   appCtx.spaceFlight._runtimeLandingTarget = null;
+  appCtx.spaceFlight._landingApproachDirection = null;
+  appCtx.spaceFlight.earthLandingSelection = null;
   return appCtx.spaceFlight._sessionId;
+}
+
+function beginEarthLandingSelection() {
+  const rocket = appCtx.spaceFlight?.rocket;
+  const earth = appCtx.spaceFlight?.earth;
+  if (!rocket?.position || !earth?.position) return null;
+  const referenceDirection = rocket.position.clone().sub(earth.position);
+  if (referenceDirection.lengthSq() < 1e-6) referenceDirection.set(0, 1, 0);
+  else referenceDirection.normalize();
+  const savedPose = appCtx.earthSessionState?.pose || appCtx.earthPosition || {};
+  appCtx.spaceFlight.earthLandingSelection = {
+    referenceDirection,
+    basePose: {
+      mode: savedPose.mode || 'walk',
+      x: Number(savedPose.x) || 0,
+      z: Number(savedPose.z) || 0,
+      angle: Number(savedPose.angle) || 0
+    },
+    maxOffset: 900
+  };
+  return getEarthLandingSelection();
+}
+
+function getEarthLandingSelection() {
+  if (!appCtx.spaceFlight?.earthLandingSelection && appCtx.spaceFlight?.destination === 'earth') {
+    beginEarthLandingSelection();
+  }
+  const selection = appCtx.spaceFlight?.earthLandingSelection;
+  const rocket = appCtx.spaceFlight?.rocket;
+  const earth = appCtx.spaceFlight?.earth;
+  if (!selection?.referenceDirection || !rocket?.position || !earth?.position) return null;
+  const currentDirection = rocket.position.clone().sub(earth.position);
+  if (currentDirection.lengthSq() < 1e-6) currentDirection.copy(selection.referenceDirection);
+  else currentDirection.normalize();
+  const reference = selection.referenceDirection.clone().normalize();
+  const axis = Math.abs(reference.y) > 0.92 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+  const east = new THREE.Vector3().crossVectors(axis, reference).normalize();
+  const north = new THREE.Vector3().crossVectors(reference, east).normalize();
+  const maxOffset = Math.max(200, Number(selection.maxOffset) || 900);
+  const eastOffset = Math.max(-maxOffset, Math.min(maxOffset, currentDirection.dot(east) * maxOffset * 1.65));
+  const northOffset = Math.max(-maxOffset, Math.min(maxOffset, currentDirection.dot(north) * maxOffset * 1.65));
+  return Object.freeze({
+    eastOffset: Number(eastOffset.toFixed(1)),
+    northOffset: Number(northOffset.toFixed(1)),
+    x: Number((selection.basePose.x + eastOffset).toFixed(1)),
+    z: Number((selection.basePose.z + northOffset).toFixed(1)),
+    maxOffset,
+    locationName: String(appCtx.customLoc?.name || appCtx.LOCS?.[appCtx.selLoc]?.name || 'current Earth location')
+  });
+}
+
+function commitEarthLandingSelection() {
+  const landing = getEarthLandingSelection();
+  const selection = appCtx.spaceFlight?.earthLandingSelection;
+  if (!landing || !selection?.basePose) return null;
+  appCtx.earthSessionState ||= { pose: null };
+  appCtx.earthSessionState.pose = {
+    ...selection.basePose,
+    x: landing.x,
+    z: landing.z
+  };
+  appCtx.earthPosition = {
+    x: landing.x,
+    z: landing.z,
+    angle: Number(selection.basePose.angle) || 0
+  };
+  return landing;
 }
 
 function isCurrentSpaceFlightSession(sessionId, destination = '') {
@@ -189,8 +262,8 @@ function startSpaceFlightToSurveyor(options = {}) {
   appCtx.spaceFlight.canvas.style.display = 'block';
   appCtx.spaceFlight.hud.style.display = 'block';
   prepareSpaceFlightHudForEntry();
-  document.getElementById('sfDestination').textContent = 'Surveyor';
-  document.getElementById('sfLandBtn').textContent = 'APPROACH SURVEYOR';
+  document.getElementById('sfDestination').textContent = 'Asteria';
+  document.getElementById('sfLandBtn').textContent = 'APPROACH ASTERIA';
   const worldCanvas = getPrimaryWorldCanvas(appCtx);
   if (worldCanvas) worldCanvas.style.display = 'none';
   hideGameUI();
@@ -216,7 +289,7 @@ function startSpaceFlightToSurveyor(options = {}) {
     appCtx.spaceFlight.mode = 'flying';
     appCtx.spaceFlight.speed = 0;
     appCtx.setPauseReason?.('planetary_transition', false);
-    showFlightMessage(usePathfinder ? 'SURVEYOR ACQUIRED · MANUAL DOCKING APPROACH' : 'SURVEYOR TRANSFER COMPLETE', '#6fe8ff');
+    showFlightMessage(usePathfinder ? 'ASTERIA ACQUIRED · MANUAL DOCKING APPROACH' : 'ASTERIA TRANSFER COMPLETE', '#6fe8ff');
     options.onReady?.();
   }, 1000);
   return true;
@@ -261,6 +334,7 @@ function startSpaceFlightToEarth() {
   leaseSpaceFlightResources();
   appCtx.returnUniverseToSolImmediate?.();
   resetSpaceFlightForEarth();
+  beginEarthLandingSelection();
   appCtx.spaceFlight._launchSource = sourceLabel;
   appCtx.beginRenderedSpaceJourney?.({
     sourceBodyId,
@@ -404,6 +478,7 @@ function attemptLanding() {
 function completeLanding(sessionId = appCtx.spaceFlight._sessionId) {
   if (!isCurrentSpaceFlightSession(sessionId)) return;
   const targetName = resolveCompletedLandingTarget(appCtx.spaceFlight, appCtx.spaceJourney);
+  if (['Earth', 'earth'].includes(targetName)) commitEarthLandingSelection();
   console.log("Landing complete! Target:", targetName);
   appCtx.markExpeditionPodDescent?.(targetName);
 
@@ -461,6 +536,8 @@ function exitSpaceFlight(source = 'runtime') {
   appCtx.spaceFlight._launchSource = null;
   appCtx.spaceFlight.launchStartMs = 0;
   appCtx.spaceFlight._isThrusting = false;
+  appCtx.spaceFlight._landingApproachDirection = null;
+  appCtx.spaceFlight.earthLandingSelection = null;
   appCtx.clearRenderedSpaceJourney?.();
   if (appCtx.spaceFlight.gravityVelocity) appCtx.spaceFlight.gravityVelocity.set(0, 0, 0);
   if (appCtx.spaceFlight._gravityVec) appCtx.spaceFlight._gravityVec.set(0, 0, 0);
@@ -497,7 +574,9 @@ Object.assign(appCtx, {
   forceSpaceFlightLanding,
   showSpaceFlightMessage: showFlightMessage,
   setSpaceFlightLandingTarget,
+  getEarthLandingSelection,
   setExpeditionPodFlightPresentation,
+  setSurveyorFlightPresentation,
   ensureExpeditionSurveyorDockTarget,
   getExpeditionSurveyorDockTarget,
   positionSpacecraftAtSurveyorDock,
@@ -514,7 +593,9 @@ export {
   exitSpaceFlight,
   forceSpaceFlightLanding,
   setSpaceFlightLandingTarget,
+  getEarthLandingSelection,
   setExpeditionPodFlightPresentation,
+  setSurveyorFlightPresentation,
   ensureExpeditionSurveyorDockTarget,
   getExpeditionSurveyorDockTarget,
   positionSpacecraftAtSurveyorDock,

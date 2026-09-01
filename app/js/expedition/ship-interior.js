@@ -718,7 +718,7 @@ function addCrewMember(group, post, crew) {
   const appearance = CREW_APPEARANCE[crewId] || CREW_APPEARANCE['crew-nav'];
   root.name = `ship-crew:${crewId}`;
   root.userData.crewId = crewId;
-  root.userData.crewName = crew?.name || 'Surveyor crew';
+  root.userData.crewName = crew?.name || 'Asteria crew';
   root.userData.crewRoles = [...(crew?.roles || [])];
   root.userData.crewAssignment = crew?.assignment || '';
   root.userData.currentRoomId = post.roomId;
@@ -1455,7 +1455,7 @@ function buildSurveyorScene(expedition) {
         { x: SHIP_DECK_BOUNDS.minX, z: SHIP_DECK_BOUNDS.maxZ }
       ],
       y: 0,
-      label: 'Surveyor deck'
+      label: 'Asteria deck'
     }
   };
 }
@@ -1474,7 +1474,7 @@ function ensureShipHud(expedition, crewSummary = null) {
   const alert = shipAlertState(expedition);
   hud.classList.toggle('attention', alert.level === 'attention');
   hud.classList.toggle('critical', alert.level === 'critical');
-  hud.innerHTML = `<div><span>${String(expedition?.ship?.name || 'Surveyor').toUpperCase()} · ${deckLabel.toUpperCase()} DECK</span><strong>${expedition?.state === 'planned' ? 'Expedition staging' : `${progress}% to ${String(expedition?.destinationId || 'destination').replaceAll('-', ' ')}`}</strong><small>${crewLine} · E interacts · M opens ship map</small><em class="ship-alert ship-alert-${alert.level}">${alert.message}</em></div><div><button id="shipMapButton" type="button">Map</button><button id="shipJournalButton" type="button">Journal</button><button id="shipExitButton" type="button">Return to flight</button></div>`;
+  hud.innerHTML = `<div><span>${String(expedition?.ship?.name || 'Asteria').toUpperCase()} · ${deckLabel.toUpperCase()} DECK</span><strong>${expedition?.state === 'planned' ? 'Expedition staging' : `${progress}% to ${String(expedition?.destinationId || 'destination').replaceAll('-', ' ')}`}</strong><small>${crewLine} · E interacts · M opens ship map</small><em class="ship-alert ship-alert-${alert.level}">${alert.message}</em></div><div><button id="shipMapButton" type="button">Map</button><button id="shipJournalButton" type="button">Journal</button><button id="shipExitButton" type="button">Return to flight</button></div>`;
   hud.classList.add('show');
   hud.querySelector('#shipExitButton')?.addEventListener('click', () => exitSurveyorInterior());
   hud.querySelector('#shipJournalButton')?.addEventListener('click', () => appCtx.toggleWorldDiscoveryJournal?.(true));
@@ -2245,7 +2245,7 @@ function enterSurveyorInterior(options = {}) {
 
   appCtx.activeInterior = {
     key: 'expedition-ship:surveyor',
-    label: options.expedition?.ship?.name || 'Surveyor',
+    label: options.expedition?.ship?.name || 'Asteria',
     mode: 'authored-ship',
     environmentKind: 'expedition-ship',
     group: sceneState.root,
@@ -2266,7 +2266,7 @@ function enterSurveyorInterior(options = {}) {
     lastValidPosition: { x: 0, y: (appCtx.Walk.CFG.eyeHeight || 1.7) + 0.04, z: 20.5, yaw: 0, angle: 0 },
     containmentNoticeUntil: 0
   };
-  appCtx.interiorHint = { state: 'inside', label: options.expedition?.ship?.name || 'Surveyor', mode: 'authored-ship' };
+  appCtx.interiorHint = { state: 'inside', label: options.expedition?.ship?.name || 'Asteria', mode: 'authored-ship' };
   appCtx.setPauseReason?.('planetary_transition', false);
   applyShipWalkingState();
   appCtx.scene.background = new THREE.Color(0x02050b);

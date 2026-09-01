@@ -100,9 +100,12 @@ export function startLandingSequence(targetMesh, targetRadius, targetName, deps 
 
   const startTime = Date.now();
   const startPos = appCtx.spaceFlight.rocket.position.clone();
-  const landPos = targetMesh.position.clone();
-  landPos.y += targetRadius + 10;
   const frozenTargetPos = targetMesh.position.clone();
+  const approachDirection = startPos.clone().sub(frozenTargetPos);
+  if (approachDirection.lengthSq() < 1e-6) approachDirection.set(0, 1, 0);
+  else approachDirection.normalize();
+  const landPos = frozenTargetPos.clone().addScaledVector(approachDirection, targetRadius + 10);
+  appCtx.spaceFlight._landingApproachDirection = approachDirection.clone();
   const duration = Math.max(1200, landingDuration);
   const landingAxis = new three.Vector3(0, -1, 0);
   const toTarget = new three.Vector3();
@@ -628,6 +631,8 @@ export function updateSpaceFlightCamera() {
   const {
     cameraLookMatrix,
     cameraQuaternion,
+    controlRight: _sfControlRight,
+    controlUp: _sfCameraUp,
     forward: _sfForward,
     launchRadial: _sfLaunchRadial,
     targetPosition: _sfTargetPos,
@@ -647,27 +652,50 @@ export function updateSpaceFlightCamera() {
   }
   _sfForward.set(0, 1, 0).applyQuaternion(rocket.quaternion);
   _sfTempVec.set(0, 0, -1).applyQuaternion(rocket.quaternion);
+  _sfControlRight.set(1, 0, 0).applyQuaternion(rocket.quaternion);
   const launchBody = findLandableBodyByName(appCtx.spaceFlight._launchSource);
   const launchAltitude = launchBody?.position && Number.isFinite(launchBody.radius)
     ? rocket.position.distanceTo(launchBody.position) - launchBody.radius
     : Infinity;
-  if (appCtx.spaceFlight.mode === 'launching' && launchBody?.position && launchAltitude < 180) {
+  const cameraMode = String(appCtx.spaceFlight.cameraMode || 'chase');
+  if (cameraMode === 'cockpit') {
+    _sfTargetPos.copy(rocket.position)
+      .addScaledVector(_sfForward, 4.8)
+      .addScaledVector(_sfTempVec, 1.1);
+    _sfCameraUp.copy(_sfTempVec);
+  } else if (cameraMode === 'side') {
+    _sfTargetPos.copy(rocket.position)
+      .addScaledVector(_sfControlRight, 92)
+      .addScaledVector(_sfTempVec, 19)
+      .addScaledVector(_sfForward, -12);
+    _sfCameraUp.copy(_sfTempVec);
+  } else if (cameraMode === 'overhead') {
+    _sfTargetPos.copy(rocket.position)
+      .addScaledVector(_sfTempVec, 108)
+      .addScaledVector(_sfForward, -12);
+    _sfCameraUp.copy(_sfForward);
+  } else if (appCtx.spaceFlight.mode === 'launching' && launchBody?.position && launchAltitude < 180) {
     _sfLaunchRadial.copy(rocket.position).sub(launchBody.position).normalize();
     _sfTargetPos.copy(rocket.position)
       .addScaledVector(_sfLaunchRadial, 48)
       .addScaledVector(_sfTempVec, 24);
+    _sfCameraUp.copy(_sfTempVec);
   } else {
     _sfTargetPos.copy(rocket.position)
       .addScaledVector(_sfForward, -70)
       .addScaledVector(_sfTempVec, 25);
+    _sfCameraUp.copy(_sfTempVec);
   }
 
   appCtx.spaceFlight.camera.position.lerp(_sfTargetPos, 0.1);
   // Follow the spacecraft's transported up vector rather than a fixed world-up
   // pole. Physics reads the resulting camera axes, so arrows retain the same
   // visible direction through every world-axis crossing.
-  appCtx.spaceFlight.camera.up.copy(_sfTempVec);
-  cameraLookMatrix.lookAt(appCtx.spaceFlight.camera.position, rocket.position, _sfTempVec);
+  appCtx.spaceFlight.camera.up.copy(_sfCameraUp);
+  const cameraTarget = cameraMode === 'cockpit'
+    ? _sfLaunchRadial.copy(appCtx.spaceFlight.camera.position).addScaledVector(_sfForward, 100)
+    : rocket.position;
+  cameraLookMatrix.lookAt(appCtx.spaceFlight.camera.position, cameraTarget, _sfCameraUp);
   cameraQuaternion.setFromRotationMatrix(cameraLookMatrix);
   appCtx.spaceFlight.camera.quaternion.slerp(cameraQuaternion, 0.045).normalize();
 }

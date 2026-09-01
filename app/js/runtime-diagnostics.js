@@ -61,6 +61,15 @@ function spaceFlightSnapshot() {
       kind: appCtx.spaceJourneyAssistState.kind || null,
       progress: numberOrNull(appCtx.spaceJourneyAssistState.progress)
     } : null,
+    cameraMode: String(appCtx.spaceFlight?.cameraMode || 'chase'),
+    earthLandingSelection: appCtx.getEarthLandingSelection?.() || null,
+    vehiclePresentation: rocket?.userData?.expeditionPodPresentation?.pod
+      ? 'pathfinder'
+      : rocket?.userData?.surveyorFlightPresentation?.ship
+      ? 'asteria'
+      : rocket
+      ? 'wayfinder'
+      : null,
     position: vectorSnapshot(rocket?.position),
     forward: vectorSnapshot(forward),
     up: vectorSnapshot(up)

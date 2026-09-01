@@ -38,8 +38,8 @@ async function seedExpedition(page) {
   return page.evaluate(async () => {
     const [{ DEFAULT_CREW }, { createExpeditionPlan }, { createExpeditionStore }] = await Promise.all([
       import('/app/js/expedition/catalog.js?v=2'),
-      import('/app/js/expedition/model.js?v=8'),
-      import('/app/js/expedition/store.js?v=8')
+      import('/app/js/expedition/model.js?v=9'),
+      import('/app/js/expedition/store.js?v=9')
     ]);
     const expedition = createExpeditionPlan({
       destinationId: 'proxima-centauri',
@@ -66,7 +66,7 @@ async function approachAndBoardEarthPathfinder(page) {
     ctx.Walk.setModeWalk({ preserveResolvedSpawn: true, deferWorldSync: true });
     Object.assign(ctx.Walk.state.walker, {
       x: pod.position.x + 2,
-      y: pod.position.y - 4.15,
+      y: Number(pod.userData?.surfaceGroundY || 0) + 1.7,
       z: pod.position.z + 1,
       angle: 0,
       yaw: 0,
@@ -77,7 +77,19 @@ async function approachAndBoardEarthPathfinder(page) {
     });
   });
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').stagedEarthPathfinder?.distance < 4);
-  await page.keyboard.press('KeyE');
+  const interaction = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const before = ctx.contextInteractionSnapshot?.() || null;
+    const handled = await ctx.handlePrimaryContextInteraction?.();
+    return { before, handled };
+  });
+  assert.equal(interaction.before?.active?.id, 'expedition-earth-pathfinder', JSON.stringify(interaction));
+  assert.equal(interaction.handled, true, JSON.stringify(interaction));
+  await page.waitForFunction(() => {
+    const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+    return state.surfacePodLaunch?.active === true
+      && state.interstellarExpedition?.podJourney?.phase === 'surface_launch';
+  }, null, { timeout: 10_000 });
 }
 
 async function placeAtDockingRange(page) {
@@ -96,9 +108,9 @@ async function placeAtDockingRange(page) {
 
 async function dockWithSurveyor(page) {
   const target = await placeAtDockingRange(page);
-  assert.equal(target.name, 'Surveyor');
+  assert.equal(target.name, 'Asteria');
   assert.ok(target.childCount >= 20, JSON.stringify(target));
-  await page.waitForFunction(() => document.getElementById('sfLandBtn')?.textContent?.includes('DOCK WITH SURVEYOR') && document.getElementById('sfLandBtn')?.disabled === false);
+  await page.waitForFunction(() => document.getElementById('sfLandBtn')?.textContent?.includes('DOCK WITH ASTERIA') && document.getElementById('sfLandBtn')?.disabled === false);
   await page.waitForTimeout(900);
   await page.screenshot({ path: path.join(outputDir, 'desktop-surveyor-docking-approach.png'), fullPage: true });
   await page.locator('#sfLandBtn').click();
@@ -133,6 +145,9 @@ async function approachEarthAndLand(page) {
     ctx.spaceFlight.speed = 0;
   });
   await page.waitForFunction(() => document.getElementById('sfLandBtn')?.textContent?.includes('LAND ON EARTH') && document.getElementById('sfLandBtn')?.disabled === false, null, { timeout: 10_000 });
+  const landingSelection = (await snapshot(page)).spaceFlight?.earthLandingSelection;
+  assert.ok(landingSelection, 'Earth approach did not publish a selectable local landing area.');
+  assert.ok(Math.hypot(landingSelection.eastOffset, landingSelection.northOffset) > 10, JSON.stringify(landingSelection));
   await page.waitForTimeout(900);
   await page.screenshot({ path: path.join(outputDir, 'desktop-earth-pod-approach.png'), fullPage: true });
   await page.locator('#sfLandBtn').click();
@@ -140,6 +155,7 @@ async function approachEarthAndLand(page) {
     const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
     return state.environment === 'EARTH' && !state.worldLoading && state.interstellarExpedition?.podJourney?.phase === 'surface';
   }, null, { timeout: 120_000 });
+  return landingSelection;
 }
 
 async function run() {
@@ -160,13 +176,18 @@ async function run() {
 
     const travelCopy = await page.locator('#travelMenu .floatItems').textContent();
     assert.match(travelCopy, /Deploy Pathfinder/i);
-    assert.match(travelCopy, /Board Surveyor Directly/i);
+    assert.match(travelCopy, /Board Asteria Directly/i);
     assert.match(travelCopy, /Fly with Wayfinder/i);
     assert.match(travelCopy, /Quick Trip to the Moon/i);
     assert.doesNotMatch(travelCopy, /Launch to Mars|Launch to the Moon/i);
     assert.equal(await page.locator('#fSpaceMars').count(), 0);
 
     await page.locator('#travelBtn').click();
+    await page.waitForTimeout(1_200);
+    assert.equal(await page.locator('#travelMenu').evaluate((menu) => menu.classList.contains('open')), true, 'Travel menu closed or flickered without input.');
+    assert.equal(await page.locator('#travelBtn').getAttribute('aria-expanded'), 'true');
+    assert.equal(await page.locator('#fOceanMode').isVisible(), true);
+    assert.equal(await page.locator('#fEarthMode').isVisible(), false);
     await page.locator('#fSpaceBoardSurveyor').click();
     await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.active === true, null, { timeout: 120_000 });
     assert.equal((await snapshot(page)).environment, 'SPACE_FLIGHT');
@@ -177,7 +198,7 @@ async function run() {
     assert.equal(earthbound.modes?.space, true, `Earth pod did not return to Space Flight: ${JSON.stringify(earthbound)}`);
     assert.equal(earthbound.interstellarExpedition?.podJourney?.phase, 'local_flight', `Earth pod did not acquire its course: ${JSON.stringify(earthbound.interstellarExpedition)}`);
     const returnJourneyId = earthbound.interstellarExpedition.podJourney.id;
-    await approachEarthAndLand(page);
+    const earthLandingSelection = await approachEarthAndLand(page);
     const landed = await snapshot(page);
     assert.equal(landed.interstellarExpedition.podJourney.id, returnJourneyId);
     assert.equal(landed.interstellarExpedition.podJourney.phase, 'surface');
@@ -192,6 +213,7 @@ async function run() {
     const staged = await snapshot(page);
     assert.equal(staged.environment, 'EARTH');
     assert.equal(staged.stagedEarthPathfinder.active, true);
+    assert.ok(Math.abs(staged.stagedEarthPathfinder.groundClearance - 0.04) < 0.08, JSON.stringify(staged.stagedEarthPathfinder));
     await page.screenshot({ path: path.join(outputDir, 'desktop-earth-pathfinder-staged.png'), fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
     await page.screenshot({ path: path.join(outputDir, 'mobile-earth-return-to-surveyor.png'), fullPage: true });
@@ -201,10 +223,22 @@ async function run() {
     assert.equal(surfaceLaunchStarted.environment, 'EARTH', JSON.stringify(surfaceLaunchStarted.surfacePodLaunch));
     assert.equal(surfaceLaunchStarted.interstellarExpedition?.podJourney?.phase, 'surface_launch');
     assert.equal(surfaceLaunchStarted.surfacePodLaunch?.active, true, JSON.stringify(surfaceLaunchStarted.surfacePodLaunch));
+    assert.equal(surfaceLaunchStarted.surfacePodLaunch?.phase, 'ready');
+    assert.equal(surfaceLaunchStarted.surfacePodLaunch?.awaitingLaunchInput, true);
+    await page.waitForTimeout(800);
+    const stillReady = await snapshot(page);
+    assert.equal(stillReady.environment, 'EARTH');
+    assert.equal(stillReady.surfacePodLaunch?.altitude, 0, JSON.stringify(stillReady.surfacePodLaunch));
+    await page.keyboard.press('KeyC');
+    await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').surfacePodLaunch?.cameraMode === 'side');
+    await page.keyboard.down('ArrowUp');
+    await page.keyboard.down('Space');
     await page.waitForFunction(() => {
       const altitude = JSON.parse(globalThis.render_game_to_text?.() || '{}').surfacePodLaunch?.altitude;
       return altitude > 2 && altitude < 20;
     });
+    await page.keyboard.up('Space');
+    await page.keyboard.up('ArrowUp');
     await page.screenshot({ path: path.join(outputDir, 'desktop-earth-surface-liftoff.png'), fullPage: true });
     await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').interstellarExpedition?.podJourney?.phase === 'rendezvous', null, { timeout: 120_000 });
     assert.equal((await snapshot(page)).interstellarExpedition.podJourney.id, returnJourneyId);
@@ -229,7 +263,22 @@ async function run() {
     const final = await snapshot(page);
     assert.equal(final.interstellarExpedition.podJourney.phase, 'recovered');
     assert.equal(final.expeditionShipInterior.active, true);
-    return { directBoarding: true, returnJourneyId, finalPhase: final.interstellarExpedition.podJourney.phase, earthSelection: earthLocationBefore, initialEnvironment: earthBefore.environment };
+    assert.equal(final.interstellarExpedition.ship.name, 'Asteria');
+    const recoveredPresentation = await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const asteria = ctx.spaceFlight.rocket?.getObjectByName('Asteria Flight Vessel');
+      return {
+        asteriaVisible: asteria?.visible === true,
+        asteriaScale: Number(asteria?.scale?.x || 0),
+        pathfinderPresent: !!ctx.spaceFlight.rocket?.getObjectByName('Surveyor Pathfinder Pod'),
+        dockTargetVisible: ctx.getExpeditionSurveyorDockTarget?.()?.mesh?.visible ?? false
+      };
+    });
+    assert.equal(recoveredPresentation.asteriaVisible, true, JSON.stringify(recoveredPresentation));
+    assert.equal(recoveredPresentation.asteriaScale, 2.5, JSON.stringify(recoveredPresentation));
+    assert.equal(recoveredPresentation.pathfinderPresent, false, JSON.stringify(recoveredPresentation));
+    assert.equal(recoveredPresentation.dockTargetVisible, false, JSON.stringify(recoveredPresentation));
+    return { directBoarding: true, returnJourneyId, finalPhase: final.interstellarExpedition.podJourney.phase, earthSelection: earthLocationBefore, earthLandingSelection, initialEnvironment: earthBefore.environment };
   } finally {
     await context.close();
   }

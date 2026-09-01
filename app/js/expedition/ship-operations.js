@@ -143,7 +143,7 @@ function actionAvailability(expedition, actionId) {
 }
 
 function getShipStationView(expedition, stationId) {
-  const base = STATION_VIEWS[stationId] || Object.freeze({ title: 'Surveyor Station', systemId: 'hull', summary: 'Review the station.' });
+  const base = STATION_VIEWS[stationId] || Object.freeze({ title: 'Asteria Station', systemId: 'hull', summary: 'Review the station.' });
   const actions = (base.actions || []).map((id) => Object.freeze({ id, label: ACTION_LABELS[id] || id, ...actionAvailability(expedition, id) }));
   return Object.freeze({ ...base, metrics: stationMetrics(expedition, base), actions: Object.freeze(actions) });
 }

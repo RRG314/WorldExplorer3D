@@ -78,7 +78,7 @@ function assessCausalFailure(expedition) {
     systemId: offline,
     atMissionS: Number(expedition?.strategicElapsedS) || 0,
     causes: Object.freeze(report),
-    summary: `Surveyor was lost after ${offline.replaceAll('-', ' ')} became unrecoverable.`
+    summary: `Asteria was lost after ${offline.replaceAll('-', ' ')} became unrecoverable.`
   });
 }
 

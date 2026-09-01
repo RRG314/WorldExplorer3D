@@ -1,12 +1,12 @@
 import { DEFAULT_CREW, getPropulsionProfile, getShipProfile, PROPULSION_PROFILES, SHIP_PROFILES } from './catalog.js?v=2';
-import { assessExpeditionReadiness, createExpeditionPlan, totalCargoMass, withExpeditionChanges } from './model.js?v=8';
+import { assessExpeditionReadiness, createExpeditionPlan, totalCargoMass, withExpeditionChanges } from './model.js?v=9';
 import {
   advanceToNextMilestone,
   resolveExpeditionEvent,
   startExpedition,
   VOYAGE_MILESTONES
 } from './simulation.js?v=7';
-import { createExpeditionStore } from './store.js?v=8';
+import { createExpeditionStore } from './store.js?v=9';
 import { applyShipOperation, getShipStationView } from './ship-operations.js?v=6';
 import { getUniverseDestinations, resolveUniverseAddress } from '../universe/catalog.js?v=11';
 import { ensurePlayerBackpackInventory } from '../urban-sandbox/equipment-model.js?v=9';
@@ -15,7 +15,7 @@ import { registerExpeditionDiscovery } from './contact-authority.js?v=4';
 import { createPodJourney, POD_PHASE, POD_ROUTE_KIND, transitionPodJourney } from './pod-journey-authority.js?v=2';
 import { approvedSampleTradeValue, summarizeExpeditionTransfers } from '../resources/material-catalog.js?v=2';
 import { SHIP_STATIONS } from './ship-layout.js?v=5';
-import { consumeStagedEarthPod, getStagedEarthPodSnapshot, playSurfacePodLaunch, stageEarthPod } from '../planetary/surface-pod-launch.js?v=2';
+import { consumeStagedEarthPod, getStagedEarthPodSnapshot, playSurfacePodLaunch, stageEarthPod } from '../planetary/surface-pod-launch.js?v=3';
 
 let activeContext = null;
 let activeExpedition = null;
@@ -58,6 +58,7 @@ function setPodJourney(next) {
   }
   if ([POD_PHASE.RECOVERED, POD_PHASE.FAILED].includes(activePodJourney?.phase)) {
     activeContext?.setExpeditionPodFlightPresentation?.(false);
+    activeContext?.setSurveyorFlightPresentation?.(activePodJourney?.phase === POD_PHASE.RECOVERED);
   }
   return activePodJourney;
 }
@@ -162,12 +163,12 @@ function stageEarthPodToSurveyor(appContext) {
   }
   const expedition = ensureTransitExpedition();
   if (!expedition || expedition.readiness?.status === 'insufficient') {
-    activeContext.showToast?.('Surveyor needs a ready Expedition before Pathfinder can launch.');
+    activeContext.showToast?.('Asteria needs a ready Expedition before Pathfinder can launch.');
     return false;
   }
   const existing = earthShuttleJourney();
   if (existing && ![POD_PHASE.SURFACE, POD_PHASE.FAILED, POD_PHASE.RECOVERED].includes(existing.phase)) {
-    activeContext.showToast?.('Pathfinder is already committed to the current Surveyor flight.');
+    activeContext.showToast?.('Pathfinder is already committed to the current Asteria flight.');
     return false;
   }
   const pod = stageEarthPod(activeContext, {
@@ -245,7 +246,7 @@ function schedulePodRecovery(returnFrameId, startedAt = performance.now(), minim
       return;
     }
     if (performance.now() - startedAt >= 20_000) {
-      activeContext?.showSpaceFlightMessage?.('Hold near Surveyor while docking guidance reacquires.', '#f59e0b');
+      activeContext?.showSpaceFlightMessage?.('Hold near Asteria while docking guidance reacquires.', '#f59e0b');
       return;
     }
     podRecoveryTimer = window.setTimeout(attempt, 120);
@@ -534,7 +535,7 @@ function returnFromLocalContact() {
   const contact = activeExpedition?.routeContacts?.find((entry) => entry.id === operation?.contactId);
   if (!operation || !contact) return false;
   if (activeContext?.universeRuntime?.transition) {
-    activeContext?.showSpaceFlightMessage?.('Complete the local approach before returning to Surveyor.', '#f59e0b');
+    activeContext?.showSpaceFlightMessage?.('Complete the local approach before returning to Asteria.', '#f59e0b');
     return false;
   }
   const previous = activeExpedition;
@@ -543,13 +544,13 @@ function returnFromLocalContact() {
     activeLocalContactId: null,
     localOperation: null,
     routeContacts: updateContact(contact.id, { localOperationState: 'returned', status: 'surveyed' }),
-    log: appendMissionLog(activeExpedition, 'local-operation', `${contact.designation} local survey ended. Surveyor resumed the voyage.`)
+    log: appendMissionLog(activeExpedition, 'local-operation', `${contact.designation} local survey ended. Asteria resumed the voyage.`)
   });
   store.save(activeExpedition);
   closeExpeditionPlanner();
   const accepted = activeContext?.travelToUniverseDestination?.(operation.returnFrameId || activeExpedition.originId || 'sol', {
     kind: 'expedition-route-return',
-    routeLabel: 'Return to Surveyor'
+    routeLabel: 'Return to Asteria'
   });
   if (accepted) {
     if (activePodJourney?.phase === POD_PHASE.RENDEZVOUS) schedulePodRecovery(operation.returnFrameId || activeExpedition.originId || 'sol');
@@ -558,7 +559,7 @@ function returnFromLocalContact() {
   activeExpedition = previous;
   store.save(activeExpedition);
   openExpeditionPlanner(activeContext);
-  activeContext?.showSpaceFlightMessage?.('Surveyor could not recover the prior route frame.', '#f59e0b');
+  activeContext?.showSpaceFlightMessage?.('Asteria could not recover the prior route frame.', '#f59e0b');
   return false;
 }
 
@@ -619,7 +620,7 @@ function leaveExpeditionSurface(bodyId) {
   const inventory = activeContext ? ensurePlayerBackpackInventory(activeContext) : null;
   const catalogId = operation.sampleCatalogId;
   if (!catalogId || !inventory?.has?.(catalogId)) {
-    activeContext?.showToast?.('Collect the geology sample before returning to Surveyor.');
+    activeContext?.showToast?.('Collect the geology sample before returning to Asteria.');
     return false;
   }
   const item = inventory.snapshot?.().items?.find((entry) => entry.catalogId === catalogId);
@@ -639,7 +640,7 @@ function leaveExpeditionSurface(bodyId) {
       }) === true;
       if (!departureStarted) {
         advancePodJourney('fail', { reason: 'expedition-surface-launch-unavailable' });
-        activeContext?.showToast?.('Surveyor could not begin the return flight. The sample remains in your Backpack.');
+        activeContext?.showToast?.('Asteria could not begin the return flight. The sample remains in your Backpack.');
         return false;
       }
       const consumed = inventory.consumeItem?.(catalogId, 1) ?? inventory.consume?.(catalogId, 1);
@@ -664,7 +665,7 @@ function leaveExpeditionSurface(bodyId) {
           scienceCargoKg: Number(activeExpedition.resources?.scienceCargoKg || 0) + sample.massKg
         }),
         localOperation: Object.freeze({ ...operation, state: 'cargo-loaded', transferredSampleId: sample.id }),
-        log: appendMissionLog(activeExpedition, 'science', `Transferred one ${sample.massKg} kg ${contact.designation} sample from Backpack to Surveyor cargo.`)
+        log: appendMissionLog(activeExpedition, 'science', `Transferred one ${sample.massKg} kg ${contact.designation} sample from Backpack to Asteria cargo.`)
       });
       store.save(activeExpedition);
       activeContext?.updateExpeditionShipRecord?.(activeExpedition);
@@ -683,7 +684,7 @@ function leaveDestinationMissionSurface(bodyId) {
   const mission = activeContext?.getDestinationMissionSnapshot?.();
   if (!activePodJourney || activePodJourney.bodyId !== bodyId || mission?.destinationId !== bodyId) return false;
   if (mission.phase !== 'analysis') {
-    activeContext?.showToast?.('Complete all three marked field records before returning to Surveyor.');
+    activeContext?.showToast?.('Complete all three marked field records before returning to Asteria.');
     return false;
   }
   if (!markExpeditionPodSurfaceLaunch(bodyId)) return false;
@@ -743,7 +744,7 @@ function renderPlanner() {
         <div style="min-width:0"><span>SPACE EXPLORER · ALPHA</span><h2 id="expeditionTitle" style="max-width:270px">Interstellar Expedition</h2></div>
         <button id="expeditionClose" type="button" aria-label="Close Expedition" style="flex:0 0 42px">×</button>
       </header>
-      <p class="expeditionIntro">Try an evolving long-range voyage aboard Surveyor. Progress is saved, and ordinary Space Flight remains available when this panel is closed.</p>
+      <p class="expeditionIntro">Begin an evolving long-range voyage aboard Asteria. Progress is saved, and ordinary Space Flight remains available when this panel is closed.</p>
       <div class="expeditionPlannerGrid">
         <label>Destination<select id="expeditionDestination">${destinationOptions}</select></label>
         <label>Travel model<select id="expeditionRealism"><option value="science-inspired">Science-inspired</option><option value="custom">Custom</option></select></label>
@@ -893,8 +894,8 @@ function renderMission() {
     const recovery = expedition.localOperation?.recoveryRequirement;
     const purpose = recovery
       ? `Engineering needs suitable feedstock before it can restore ${recovery.systemId.replaceAll('-', ' ')}. The current cargo is ${Math.round(recovery.fabricationFeedstockShortfallKg)} kg short of a fabrication batch.`
-      : 'The field team can collect a documented geology sample for Surveyor science.';
-    action = `<div class="expeditionEvent"><span>LOCAL SURVEY</span><h3>${activeContact?.designation || 'Route contact'}</h3><p>${purpose} Surveyor will hold this voyage chapter while you fly, land, and return.</p><div>${localTransitActive ? '' : `<button id="expeditionSetSurveyCourse" class="expeditionChoice" type="button">Set course to ${activeContact?.designation || 'contact'} I</button>`}<button id="expeditionReturnFromContact" class="expeditionChoice" type="button" ${localTransitActive ? 'disabled' : ''}>${localTransitActive ? 'Local approach in progress' : 'Return to Surveyor'}</button></div></div>`;
+      : 'The field team can collect a documented geology sample for Asteria science.';
+    action = `<div class="expeditionEvent"><span>LOCAL SURVEY</span><h3>${activeContact?.designation || 'Route contact'}</h3><p>${purpose} Asteria will hold this voyage chapter while you fly, land, and return.</p><div>${localTransitActive ? '' : `<button id="expeditionSetSurveyCourse" class="expeditionChoice" type="button">Set course to ${activeContact?.designation || 'contact'} I</button>`}<button id="expeditionReturnFromContact" class="expeditionChoice" type="button" ${localTransitActive ? 'disabled' : ''}>${localTransitActive ? 'Local approach in progress' : 'Return to Asteria'}</button></div></div>`;
     if (localTransitActive) {
       localTransitRefreshTimer = window.setTimeout(() => {
         localTransitRefreshTimer = 0;
@@ -902,17 +903,17 @@ function renderMission() {
       }, 250);
     }
   } else if (expedition.state === 'planned') {
-    action = `<button id="expeditionDepart" class="expeditionPrimary" type="button" ${expedition.readiness.status === 'insufficient' ? 'disabled' : ''}>Depart on Surveyor</button>`;
+    action = `<button id="expeditionDepart" class="expeditionPrimary" type="button" ${expedition.readiness.status === 'insufficient' ? 'disabled' : ''}>Depart on Asteria</button>`;
   } else if (expedition.pendingEvent) {
     const responseRoom = String(expedition.pendingEvent.roomId || 'the ship').replaceAll('-', ' ');
-    action = `<div class="expeditionEvent"><span>${expedition.pendingEvent.kind}</span><h3>${expedition.pendingEvent.title}</h3><p>${expedition.pendingEvent.message}</p><small>Response location: ${responseRoom}. Enter Surveyor; the ship map and warning beacon are already set to the affected station.</small></div>`;
+    action = `<div class="expeditionEvent"><span>${expedition.pendingEvent.kind}</span><h3>${expedition.pendingEvent.title}</h3><p>${expedition.pendingEvent.message}</p><small>Response location: ${responseRoom}. Enter Asteria; the ship map and warning beacon are already set to the affected station.</small></div>`;
   } else if (expedition.state === 'traveling') {
     action = `<button id="expeditionAdvance" class="expeditionPrimary" type="button">Continue to next watch or event</button>`;
   } else if (expedition.state === 'arrived') {
     action = `<button id="expeditionArrive" class="expeditionPrimary" type="button">Continue in local Space</button>`;
   } else if (expedition.state === 'failed') {
     const report = expedition.failureReport;
-    action = `<div class="expeditionEvent expeditionFailure"><span>MISSION ENDED</span><h3>${report?.summary || 'Surveyor could not continue.'}</h3>${report?.causes?.length ? `<ol>${report.causes.map((cause) => `<li>${cause}</li>`).join('')}</ol>` : '<p>The Captain’s Log retains the mission record.</p>'}</div>`;
+    action = `<div class="expeditionEvent expeditionFailure"><span>MISSION ENDED</span><h3>${report?.summary || 'Asteria could not continue.'}</h3>${report?.causes?.length ? `<ol>${report.causes.map((cause) => `<li>${cause}</li>`).join('')}</ol>` : '<p>The Captain’s Log retains the mission record.</p>'}</div>`;
   }
   const log = [...(expedition.log || [])].reverse().slice(0, 6);
   const reachedCount = Math.min(VOYAGE_MILESTONES.length, Number(expedition.voyageDirector?.nextSlotIndex || 0));
@@ -921,8 +922,8 @@ function renderMission() {
   const earthPodReady = earthShuttleJourney()?.phase === POD_PHASE.SURFACE;
   const shipAction = expedition.readiness.status !== 'insufficient' && expedition.state !== 'failed'
     ? onEarth
-      ? `<div class="expeditionShipAction"><button id="expeditionEarthPod" class="expeditionPrimary" type="button">${earthPodReady ? 'Return to Surveyor in Pathfinder' : 'Launch Pathfinder to Surveyor'}</button><small>Depart from the currently loaded Earth location, fly manually to Surveyor, and dock with the same saved Expedition.</small></div>`
-      : `<div class="expeditionShipAction"><button id="expeditionEnterShip" class="expeditionPrimary" type="button">${expedition.pendingEvent ? 'Respond aboard Surveyor' : 'Enter Surveyor'}</button><small>${expedition.pendingEvent ? `Follow the highlighted route to ${String(expedition.pendingEvent.roomId || 'the affected station').replaceAll('-', ' ')} and interact with the equipment there.` : 'Walk the ship, meet the crew, inspect systems, and return to the same flight.'}</small></div>`
+      ? `<div class="expeditionShipAction"><button id="expeditionEarthPod" class="expeditionPrimary" type="button">${earthPodReady ? 'Return to Asteria in Pathfinder' : 'Launch Pathfinder to Asteria'}</button><small>Depart from the currently loaded Earth location, fly manually to Asteria, and dock with the same saved Expedition.</small></div>`
+      : `<div class="expeditionShipAction"><button id="expeditionEnterShip" class="expeditionPrimary" type="button">${expedition.pendingEvent ? 'Respond aboard Asteria' : 'Enter Asteria'}</button><small>${expedition.pendingEvent ? `Follow the highlighted route to ${String(expedition.pendingEvent.roomId || 'the affected station').replaceAll('-', ' ')} and interact with the equipment there.` : 'Walk the ship, meet the crew, inspect systems, and return to the same flight.'}</small></div>`
     : '';
   host.innerHTML = `
     ${readinessMarkup(expedition)}
@@ -976,7 +977,7 @@ function renderMission() {
     closeExpeditionPlanner();
     const accepted = activeContext?.travelToUniverseDestination?.(destinationId, {
       kind: 'expedition-arrival',
-      routeLabel: 'Surveyor arrival'
+      routeLabel: 'Asteria arrival'
     });
     if (!accepted) activeContext?.showSpaceFlightMessage?.('Open Wayfinder to continue at the destination.', '#8ab4ff');
   });
@@ -1053,7 +1054,7 @@ function crewMissionAdvice(crew) {
   if (mission?.phase === 'fieldwork' && mission.surfaceRequired && mission.atDestination) return Object.freeze({ stationId: 'craft-bay-status', title: mission.currentObjective || mission.title, message: `${crew.name} recommends taking the lift to Engineering, boarding the pod at its side hatch, and checking the landing objective before launch.` });
   if (mission?.phase === 'approach' || mission?.phase === 'available') return Object.freeze({ stationId: 'bridge-flight', title: mission.currentObjective || mission.title, message: `${crew.name} recommends returning to the bridge flight controls and following the selected destination course.` });
   if ((activeExpedition?.routeContacts || []).some((contact) => ['available', 'returned'].includes(contact.localOperationState))) return Object.freeze({ stationId: 'craft-bay-status', title: 'Surveyed world available', message: `${crew.name} recommends using the Pod Launch Bay for the local surface operation.` });
-  if (activeExpedition?.state === 'planned') return Object.freeze({ stationId: 'bridge-flight', title: 'Surveyor is ready', message: `${crew.name} recommends returning to flight controls when you are ready to depart.` });
+  if (activeExpedition?.state === 'planned') return Object.freeze({ stationId: 'bridge-flight', title: 'Asteria is ready', message: `${crew.name} recommends returning to flight controls when you are ready to depart.` });
   const roles = new Set(crew.roles || []);
   if (roles.has('engineering')) return Object.freeze({ stationId: 'engineering-status', title: 'Engineering watch', message: `${crew.name} recommends reviewing the lowest ship-system margin before the next voyage chapter.` });
   if (roles.has('medical')) return Object.freeze({ stationId: 'medical-status', title: 'Crew readiness', message: `${crew.name} recommends checking fatigue and treatment reserves before the next watch.` });
@@ -1075,7 +1076,7 @@ function renderCrewInteractionPanel(interaction) {
   const roles = (crew.roles || []).map((role) => String(role).replaceAll('-', ' ')).join(' · ');
   panel.innerHTML = `<div class="ship-station-card ship-crew-card" role="dialog" aria-modal="true" aria-labelledby="shipStationTitle">
     <header><div><span>SURVEYOR CREW</span><strong id="shipStationTitle">${crew.name}</strong></div><button type="button" data-close-station aria-label="Close crew conversation">×</button></header>
-    <div class="ship-crew-conversation"><figure><img src="assets/expedition/crew/space-crew-reference-v1.png" alt="Surveyor crew visual" style="object-position:${crewPortraitPosition(crew.id)}"></figure><div><span>${roles}</span><h3>${advice.title}</h3><p>${advice.message}</p><dl><div><dt>Assignment</dt><dd>${String(crew.assignment || 'active watch').replaceAll('-', ' ')}</dd></div><div><dt>Health</dt><dd>${Math.round(Number(crew.health || 0) * 100)}%</dd></div><div><dt>Fatigue</dt><dd>${Math.round(Number(crew.fatigue || 0) * 100)}%</dd></div></dl></div></div>
+    <div class="ship-crew-conversation"><figure><img src="assets/expedition/crew/space-crew-reference-v1.png" alt="Asteria crew visual" style="object-position:${crewPortraitPosition(crew.id)}"></figure><div><span>${roles}</span><h3>${advice.title}</h3><p>${advice.message}</p><dl><div><dt>Assignment</dt><dd>${String(crew.assignment || 'active watch').replaceAll('-', ' ')}</dd></div><div><dt>Health</dt><dd>${Math.round(Number(crew.health || 0) * 100)}%</dd></div><div><dt>Fatigue</dt><dd>${Math.round(Number(crew.fatigue || 0) * 100)}%</dd></div></dl></div></div>
     <div class="ship-station-actions"><button type="button" data-crew-route="${advice.stationId}">Show route</button><small>The route uses the existing ship objective, map, lift, door, and station authorities.</small></div>
   </div>`;
   panel.classList.add('show');
@@ -1117,8 +1118,8 @@ async function recordBaselineInJournal() {
     sourceSystem: 'interstellar-expedition',
     sourceId: `${activeExpedition.id}:ship-survey`,
     pathId: 'travel',
-    name: 'Surveyor stellar baseline',
-    detail: 'A stellar baseline was recorded from the Surveyor science lab.',
+    name: 'Asteria stellar baseline',
+    detail: 'A stellar baseline was recorded from the Asteria science lab.',
     regionId: activeExpedition.destinationId,
     regionLabel: String(activeExpedition.destinationId).replaceAll('-', ' '),
     worldIdentity: activeExpedition.destinationId,
@@ -1145,7 +1146,7 @@ async function loadBackpackMaterialsToShip() {
   });
   const ship = getShipProfile(activeExpedition.ship?.profileId);
   if (ship && totalCargoMass(resources) > Number(ship.cargoCapacityKg || 0)) {
-    return Object.freeze({ changed: false, message: 'Surveyor does not have enough cargo capacity for those Backpack materials.' });
+    return Object.freeze({ changed: false, message: 'Asteria does not have enough cargo capacity for those Backpack materials.' });
   }
   const originals = transfer.transfers.map((entry) => before.items.find((item) => item.instanceId === entry.instanceId)).filter(Boolean);
   const restoreBackpack = () => {
@@ -1160,7 +1161,7 @@ async function loadBackpackMaterialsToShip() {
   }
   activeContext?.playerBackpackStore?.save?.(inventory.exportState?.());
   const manifest = transfer.transfers.map((entry) => `${entry.quantity} × ${entry.label}`).join(', ');
-  const message = `${transfer.totalMassKg.toFixed(1)} kg moved from the Backpack into Surveyor stores: ${manifest}.`;
+  const message = `${transfer.totalMassKg.toFixed(1)} kg moved from the Backpack into Asteria stores: ${manifest}.`;
   const readiness = assessExpeditionReadiness({
     ship,
     propulsion: getPropulsionProfile(activeExpedition.propulsionId),
@@ -1215,7 +1216,7 @@ async function transferApprovedSampleToBackpack() {
     icon: 'SAMPLE',
     verbs: Object.freeze(['inspect']),
     stackLimit: 1,
-    description: 'A sealed game-world research sample approved aboard Surveyor. Its value is a game rule, not a real commodity price.'
+    description: 'A sealed game-world research sample approved aboard Asteria. Its value is a game rule, not a real commodity price.'
   });
   inventory.registerDefinitions?.([definition]);
   const priorItem = inventory.snapshot?.().items?.find((entry) => entry.instanceId === instanceId) || null;
@@ -1257,7 +1258,7 @@ async function transferApprovedSampleToBackpack() {
       ...activeExpedition.resources,
       scienceCargoKg: Math.max(0, Number(activeExpedition.resources.scienceCargoKg || 0) - massKg)
     }),
-    log: appendMissionLog(activeExpedition, 'science', `Transferred the approved ${sample.label} lot from Surveyor science cargo to the Explorer Backpack.`)
+    log: appendMissionLog(activeExpedition, 'science', `Transferred the approved ${sample.label} lot from Asteria science cargo to the Explorer Backpack.`)
   });
   try {
     await applyExpeditionMutation(next, 'operation');
@@ -1284,7 +1285,7 @@ function renderShipStationPanel(interaction) {
     <div>${(voyageEvent.options || []).map((option) => `<div><button type="button" data-voyage-response="${option.id}" ${option.enabled ? '' : 'disabled'}>${option.label}</button>${option.reason ? `<small>${option.reason}</small>` : ''}</div>`).join('')}</div>
   </section>` : '';
   panel.innerHTML = `<div class="ship-station-card" role="dialog" aria-modal="true" aria-labelledby="shipStationTitle">
-    <header><div><span>SURVEYOR SYSTEM</span><strong id="shipStationTitle">${view.title}</strong></div><button type="button" data-close-station aria-label="Close station">×</button></header>
+    <header><div><span>ASTERIA SYSTEM</span><strong id="shipStationTitle">${view.title}</strong></div><button type="button" data-close-station aria-label="Close station">×</button></header>
     <p>${view.summary}</p>
     ${voyageEventMarkup}
     <div class="ship-station-metrics">${view.metrics.map((metric) => `<div><span>${metric.label}</span><strong>${metric.value}</strong></div>`).join('')}</div>
@@ -1355,11 +1356,11 @@ function renderPodLaunchPanel(interaction) {
   const blockedByTransit = Boolean(activeContext?.universeRuntime?.transition);
   const earthReady = activeContext?.universeRuntime?.current?.id === 'sol';
   const targetMarkup = contacts.length || missionReady || earthReady
-    ? `<div class="ship-station-actions">${earthReady ? `<button type="button" data-pod-earth ${blockedByTransit ? 'disabled' : ''}>Launch for Earth</button><small>Manual descent · return to the saved Earth location · Pathfinder remains available for the flight back</small>` : ''}${missionReady ? `<button type="button" data-pod-mission ${blockedByTransit ? 'disabled' : ''}>Launch for ${mission.destinationId.split('-').map((word) => word ? word[0].toUpperCase() + word.slice(1) : '').join(' ')}</button><small>${mission.title} · manual approach · three surface field records · return to Surveyor</small>` : ''}${contacts.map((contact) => `<button type="button" data-pod-contact="${contact.id}" ${blockedByTransit ? 'disabled' : ''}>Launch for ${contact.designation} I</button><small>${contact.worldClass} · manual orbital and atmospheric approach · surface return pod</small>`).join('')}</div>`
+    ? `<div class="ship-station-actions">${earthReady ? `<button type="button" data-pod-earth ${blockedByTransit ? 'disabled' : ''}>Launch for Earth</button><small>Manual descent · return to the saved Earth location · Pathfinder remains available for the flight back</small>` : ''}${missionReady ? `<button type="button" data-pod-mission ${blockedByTransit ? 'disabled' : ''}>Launch for ${mission.destinationId.split('-').map((word) => word ? word[0].toUpperCase() + word.slice(1) : '').join(' ')}</button><small>${mission.title} · manual approach · three surface field records · return to Asteria</small>` : ''}${contacts.map((contact) => `<button type="button" data-pod-contact="${contact.id}" ${blockedByTransit ? 'disabled' : ''}>Launch for ${contact.designation} I</button><small>${contact.worldClass} · manual orbital and atmospheric approach · surface return pod</small>`).join('')}</div>`
     : '<small class="ship-station-readonly">No surveyed surface target is available in this voyage chapter. Continue the Expedition until the crew identifies a local world.</small>';
   panel.innerHTML = `<div class="ship-station-card pod-launch-card" role="dialog" aria-modal="true" aria-labelledby="shipStationTitle">
-    <header><div><span>SURVEYOR FLIGHT DECK</span><strong id="shipStationTitle">Pod Launch Bay</strong></div><button type="button" data-close-station aria-label="Close pod launch">×</button></header>
-    <p>Board the expedition pod and launch from Surveyor. The pod enters the existing local Space world under manual control; approach and landing preserve the destination body's modeled environment, collision, and surface authorities.</p>
+    <header><div><span>ASTERIA FLIGHT DECK</span><strong id="shipStationTitle">Pod Launch Bay</strong></div><button type="button" data-close-station aria-label="Close pod launch">×</button></header>
+    <p>Board Pathfinder and launch from Asteria. The pod enters the existing local Space world under manual control; approach and landing preserve the destination body's modeled environment, collision, and surface authorities.</p>
     <div class="ship-station-metrics"><div><span>Pod</span><strong>Sealed · fueled · surface capable</strong></div><div><span>Flight</span><strong>Manual after bay departure</strong></div><div><span>Landing</span><strong>Descent masks surface preparation</strong></div><div><span>Return</span><strong>Board the same pod on the surface</strong></div></div>
     ${targetMarkup}
   </div>`;
@@ -1442,6 +1443,7 @@ async function handleShipInteraction(interaction) {
 
 async function enterActiveShip() {
   if (!activeExpedition || !activeContext?.spaceFlight?.active) return false;
+  activeContext?.setSurveyorFlightPresentation?.(true);
   ensureStylesheet();
   const ship = await import('./ship-interior.js?v=13');
   closeExpeditionPlanner();
@@ -1451,7 +1453,7 @@ async function enterActiveShip() {
   });
   if (!entered) {
     openExpeditionPlanner(activeContext);
-    activeContext?.showSpaceFlightMessage?.('The Surveyor interior is unavailable right now.', '#f59e0b');
+    activeContext?.showSpaceFlightMessage?.('The Asteria interior is unavailable right now.', '#f59e0b');
   }
   return entered;
 }

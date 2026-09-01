@@ -9,6 +9,18 @@ import {
 import { spacecraftOperationTuning } from '../character/spacecraft-assistance.js?v=1';
 
 const MAX_LOCAL_SPACECRAFT_SPEED_KM_S = 192.2;
+const SPACE_CAMERA_MODES = Object.freeze(['chase', 'side', 'overhead', 'cockpit']);
+
+function cycleSpaceFlightCameraMode() {
+  const current = String(appCtx.spaceFlight?.cameraMode || 'chase');
+  const index = SPACE_CAMERA_MODES.indexOf(current);
+  const next = SPACE_CAMERA_MODES[(index + 1) % SPACE_CAMERA_MODES.length];
+  appCtx.spaceFlight.cameraMode = next;
+  showFlightMessage(`${next.toUpperCase()} CAMERA`, '#6fe8ff');
+  const button = document.getElementById('sfCameraBtn');
+  if (button) button.setAttribute('aria-label', `Change camera. Current view: ${next}`);
+  return next;
+}
 
 function setMetric(labelId, valueId, unitId, label, value, unit) {
   const labelElement = document.getElementById(labelId);
@@ -59,6 +71,7 @@ export function initSpaceFlightUI(attemptLanding, lifecycleScope = null) {
   hud.innerHTML = `
     <div class="spaceFlightHudHead">
       <span aria-hidden="true">✦</span><strong id="sfFlightTitle">WAYFINDER FLIGHT</strong>
+      <button id="sfCameraBtn" type="button" aria-label="Change camera. Current view: chase">◉</button>
       <button id="sfHudToggle" type="button" aria-expanded="true" aria-label="Collapse flight instruments">−</button>
     </div>
     <div id="sfFlightStatus" class="spaceFlightHudStatus">Preparing flight</div>
@@ -122,13 +135,14 @@ function setupSpaceFlightControls(attemptLanding, lifecycleScope = null) {
   });
   listen(document.getElementById('sfLandBtn'), 'click', attemptLanding);
   listen(document.getElementById('sfExpeditionBtn'), 'click', async () => {
-    const runtime = await import('../expedition/runtime.js?v=31');
+    const runtime = await import('../expedition/runtime.js?v=32');
     runtime.openExpeditionPlanner(appCtx);
   });
   listen(document.getElementById('sfHudToggle'), 'click', () => {
     const hud = document.getElementById('spaceFlightHUD');
     setSpaceFlightHudCollapsed(!hud?.classList.contains('collapsed'));
   });
+  listen(document.getElementById('sfCameraBtn'), 'click', cycleSpaceFlightCameraMode);
   listen(document.getElementById('sfAssistBtn'), 'click', () => {
     if (appCtx.spaceJourney?.phase === 'atmospheric_exploration') return;
     const universeTarget = appCtx.getUniverseHudTarget?.();
@@ -157,6 +171,11 @@ function setupSpaceFlightControls(attemptLanding, lifecycleScope = null) {
   listen(document, 'keydown', (e) => {
     if (appCtx.spaceFlight.active) {
       const key = normalizedSpaceKey(e);
+      if (key === 'c') {
+        cycleSpaceFlightCameraMode();
+        e.preventDefault();
+        return;
+      }
       appCtx.spaceFlight.keys[key] = true;
       if ([' ', 'shift', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
         e.preventDefault();
@@ -231,9 +250,10 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
   const rocket = appCtx.spaceFlight.rocket;
   const podPhase = appCtx.getInterstellarExpeditionSnapshot?.()?.podJourney?.phase || '';
   const podActive = ['ship_launch', 'local_flight', 'descent', 'surface_launch', 'rendezvous'].includes(podPhase);
+  const asteriaActive = !!rocket?.userData?.surveyorFlightPresentation?.ship;
   const title = document.getElementById('sfFlightTitle');
   const phaseBadge = document.getElementById('sfPodPhase');
-  if (title) title.textContent = podActive ? 'PATHFINDER POD' : 'WAYFINDER FLIGHT';
+  if (title) title.textContent = podActive ? 'PATHFINDER POD' : asteriaActive ? 'ASTERIA' : 'WAYFINDER FLIGHT';
   if (phaseBadge) {
     phaseBadge.hidden = !podActive;
     phaseBadge.textContent = podActive ? String(podPhase).replaceAll('_', ' ').toUpperCase() : '';
@@ -326,7 +346,14 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
       appCtx.resolveCharacterCapability?.('spacecraft', { vehicleAvailable: true, environment: 'SPACE_FLIGHT' })
     );
     const flightRate = Number(appCtx.spaceFlight.manualFlightRate) || 1;
-    flightRead.textContent = universeTarget
+    const earthLanding = appCtx.spaceFlight.destination === 'earth'
+      ? appCtx.getEarthLandingSelection?.()
+      : null;
+    const eastLabel = earthLanding ? `${Math.abs(Math.round(earthLanding.eastOffset))} m ${earthLanding.eastOffset < 0 ? 'west' : 'east'}` : '';
+    const northLabel = earthLanding ? `${Math.abs(Math.round(earthLanding.northOffset))} m ${earthLanding.northOffset < 0 ? 'south' : 'north'}` : '';
+    flightRead.textContent = earthLanding
+      ? `Landing area · ${eastLabel} · ${northLabel} · steer around Earth to adjust`
+      : universeTarget
       ? universeTarget.course?.guidance === 'assisted' ? 'Wayfinder guidance · assisted flight' : 'Wayfinder guidance · manual flight'
       : flightRate > 1
       ? `${characterFlight.guidanceLabel} · manual flight ×${flightRate}`
@@ -500,12 +527,12 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
       ? 'Docking corridor acquired · match speed and dock'
       : inDockingRange
       ? `Reduce relative speed to dock · ${Number(expeditionDockTarget.relativeSpeed || 0).toFixed(1)} display units/s`
-      : `Manual approach to Surveyor · ${Math.max(0, Math.round(activeDist - expeditionDockTarget.radius))} display units`;
+      : `Manual approach to Asteria · ${Math.max(0, Math.round(activeDist - expeditionDockTarget.radius))} display units`;
     if (landBtn) {
       landBtn.disabled = !canDock;
       landBtn.style.opacity = canDock ? '1' : '0.7';
       landBtn.style.background = canDock ? '#10b981' : '#315d9d';
-      landBtn.textContent = canDock ? 'DOCK WITH SURVEYOR' : 'APPROACH SURVEYOR';
+      landBtn.textContent = canDock ? 'DOCK WITH ASTERIA' : 'APPROACH ASTERIA';
     }
   } else if (universeTarget) {
     const supportedSurface = universeTarget.targetKind === 'exoplanet' && universeTarget.landable === true;

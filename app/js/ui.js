@@ -4,7 +4,7 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=17";
 import { prepareTitleEnvironment } from "./planetary/entry.js?v=9";
 import { initMapInteractions } from "./ui/map-interactions.js?v=60";
-import { initMobileControls } from "./ui/mobile-controls.js?v=81";
+import { initMobileControls } from "./ui/mobile-controls.js?v=82";
 import { initShareUi } from "./ui/share-links.js?v=64";
 import { setupSettingsUi } from "./ui/settings.js?v=2";
 import { bindSpaceActions } from "./ui/space-actions.js?v=3";
@@ -236,14 +236,15 @@ function setupUI() {
   // Native click is the single menu input authority on mouse and touch. A
   // second touchend dispatcher used to invoke the same toggle twice on some
   // mobile browsers, making a menu appear to switch rapidly between states.
-  document.getElementById('travelBtn').addEventListener('click', () => toggleFloatMenuByButton('travelBtn'));
-  document.getElementById('realEstateFloatBtn').addEventListener('click', () => toggleFloatMenuByButton('realEstateFloatBtn'));
-  document.getElementById('exploreBtn').addEventListener('click', () => toggleFloatMenuByButton('exploreBtn'));
-  document.getElementById('gameBtn').addEventListener('click', () => {
+  document.getElementById('travelBtn').onclick = () => toggleFloatMenuByButton('travelBtn');
+  document.getElementById('realEstateFloatBtn').onclick = () => toggleFloatMenuByButton('realEstateFloatBtn');
+  document.getElementById('exploreBtn').onclick = () => toggleFloatMenuByButton('exploreBtn');
+  document.getElementById('gameBtn').onclick = () => {
     toggleFloatMenuByButton('gameBtn');
     void titleUi.primeMultiplayerUi?.();
-  });
-  document.getElementById('myExplorerBtn')?.addEventListener('click', () => toggleFloatMenuByButton('myExplorerBtn'));
+  };
+  const myExplorerButton = document.getElementById('myExplorerBtn');
+  if (myExplorerButton) myExplorerButton.onclick = () => toggleFloatMenuByButton('myExplorerBtn');
 
   const homeMenuItem = document.getElementById('fHome');
   if (homeMenuItem) homeMenuItem.addEventListener('click', goToMainMenu);

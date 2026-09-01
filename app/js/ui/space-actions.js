@@ -1,13 +1,13 @@
 export function bindSpaceActions(appCtx, closeAllFloatMenus) {
   document.getElementById('fSpaceSurveyor')?.addEventListener('click', async () => {
     closeAllFloatMenus();
-    const { stageEarthPodToSurveyor } = await import('../expedition/runtime.js?v=31');
+    const { stageEarthPodToSurveyor } = await import('../expedition/runtime.js?v=32');
     stageEarthPodToSurveyor(appCtx);
   });
   document.getElementById('fSpaceBoardSurveyor')?.addEventListener('click', async () => {
     closeAllFloatMenus();
-    const { boardSurveyorDirect } = await import('../expedition/runtime.js?v=31');
-    if (!await boardSurveyorDirect(appCtx)) appCtx.showToast?.('Direct Surveyor boarding is unavailable from here.');
+    const { boardSurveyorDirect } = await import('../expedition/runtime.js?v=32');
+    if (!await boardSurveyorDirect(appCtx)) appCtx.showToast?.('Direct Asteria boarding is unavailable from here.');
   });
   document.getElementById('fSpaceDirect')?.addEventListener('click', () => {
     if (appCtx.onMars) appCtx.startFastTravelJourney?.('earth', { sourceBodyId: 'mars' });

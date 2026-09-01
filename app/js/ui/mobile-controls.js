@@ -615,18 +615,6 @@ function initMobileControls() {
     if (planeControls) planeControls.style.display = mode === 'plane' ? 'block' : 'none';
     if (rocketControls) rocketControls.style.display = mode === 'rocket' ? 'block' : 'none';
     if (oceanControls) oceanControls.style.display = mode === 'ocean' ? 'block' : 'none';
-    const currentEnvironment = appCtx.getEnv?.() || (appCtx.oceanMode?.active ? appCtx.ENV?.OCEAN : appCtx.ENV?.EARTH);
-    const onEarth = currentEnvironment === appCtx.ENV?.EARTH;
-    if (oceanModeMenuItem) {
-      oceanModeMenuItem.hidden = !onEarth;
-      oceanModeMenuItem.classList.remove('on');
-      oceanModeMenuItem.textContent = mode === 'boat' ? '🌊 Dive Underwater' : '🌊 Explore the Ocean';
-    }
-    if (earthModeMenuItem) {
-      earthModeMenuItem.hidden = onEarth;
-      earthModeMenuItem.classList.remove('on');
-      earthModeMenuItem.textContent = '🌍 Return to Earth';
-    }
     if (controlsTab && ctrlContent) {
       controlsTab.classList.toggle('compact', isTouchPreferredClient && ctrlContent.classList.contains('hidden'));
     }

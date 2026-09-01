@@ -98,7 +98,7 @@ function createExpeditionPlan({
     ship: Object.freeze({
       id: `${id}-ship`,
       profileId: shipId,
-      name: shipId === 'generation-ship' ? 'Continuance' : shipId === 'cryogenic-expedition-vessel' ? 'Vigil' : 'Surveyor',
+      name: shipId === 'generation-ship' ? 'Continuance' : shipId === 'cryogenic-expedition-vessel' ? 'Vigil' : 'Asteria',
       interiorSeed: ship?.interiorSeed || 0
     }),
     propulsionId,

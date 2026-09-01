@@ -25,10 +25,11 @@ function mesh(parent, geometry, material, name, position, rotation = null) {
 
 function createSurveyorExteriorMesh() {
   const ship = new THREE.Group();
-  ship.name = 'Surveyor Long-Range Research Vessel';
+  ship.name = 'Asteria Long-Range Exploration Vessel';
   ship.userData.authority = 'interstellar-expedition';
   ship.userData.visualOnly = true;
-  ship.userData.dockingRadius = 18;
+  ship.userData.dockingRadius = 45;
+  ship.userData.playerFacingName = 'Asteria';
 
   const hull = surveyorMaterial(0xbecbd1, { shininess: 74, specular: 0x7f95a3 });
   const panel = surveyorMaterial(0x3d5260, { shininess: 48, specular: 0x2a3c49 });
@@ -82,7 +83,7 @@ function createSurveyorExteriorMesh() {
   });
 
   const dock = new THREE.Group();
-  dock.name = 'Surveyor Pathfinder Dock';
+  dock.name = 'Asteria Pathfinder Dock';
   dock.position.set(0, -4.1, 3.25);
   ship.add(dock);
   mesh(dock, new THREE.CylinderGeometry(2.05, 2.45, 2.6, 28), panel, 'surveyor-dock-bay', [0, 0, 0], [Math.PI / 2, 0, 0]);
@@ -96,6 +97,7 @@ function createSurveyorExteriorMesh() {
   });
 
   ship.rotation.set(0.18, 0.45, -0.22);
+  ship.scale.setScalar(2.5);
   return ship;
 }
 

@@ -1,4 +1,4 @@
-import { VOYAGE_EVENT_BY_ID, VOYAGE_EVENT_FAMILIES } from './voyage-events.js?v=1';
+import { VOYAGE_EVENT_BY_ID, VOYAGE_EVENT_FAMILIES } from './voyage-events.js?v=2';
 
 const VOYAGE_SLOTS = Object.freeze([
   Object.freeze({ id: 'departure', progress: 0.04, category: 'navigation', forceEventId: 'departure-handoff', phase: 'departure-watch' }),

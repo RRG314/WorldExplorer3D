@@ -356,7 +356,7 @@ test('strategic simulation ends only after an essential offline chain has exhaus
   assert.equal(failed.state, 'failed');
   assert.equal(failed.failureReport.systemId, 'life-support');
   assert.equal(failed.pendingEvent, null);
-  assert.match(failed.log.at(-1).message, /Surveyor was lost/i);
+  assert.match(failed.log.at(-1).message, /Asteria was lost/i);
 
   const recoverable = advanceExpedition({
     ...expedition,
@@ -514,6 +514,7 @@ test('the current store fills crew-state fields in an earlier compatible Expedit
   };
   const expedition = createExpeditionPlan({ destinationId: 'proxima-centauri', crew: DEFAULT_CREW, createdAtMs: 2500 });
   const earlier = structuredClone(expedition);
+  earlier.ship.name = 'Surveyor';
   earlier.crew = earlier.crew.map(({ health, fatigue, experienceYears, assignment, ...member }) => member);
   delete earlier.voyageDirector;
   earlier.progress = 0.26;
@@ -522,6 +523,7 @@ test('the current store fills crew-state fields in an earlier compatible Expedit
   storage.setItem(store.storageKey, JSON.stringify(earlier));
   const restored = store.load();
   assert.equal(restored.id, expedition.id);
+  assert.equal(restored.ship.name, 'Asteria');
   assert.ok(restored.crew.every((member) => Number.isFinite(member.health) && Number.isFinite(member.fatigue) && Number.isFinite(member.experienceYears)));
   assert.ok(restored.crew.every((member) => typeof member.assignment === 'string' && member.assignment.length > 0));
   assert.equal(restored.pendingEvent, null);
@@ -529,7 +531,7 @@ test('the current store fills crew-state fields in an earlier compatible Expedit
   assert.equal(restored.voyageDirector.tags.migratedFromRepresentativeVoyage, true);
 });
 
-test('Surveyor publishes three bounded mapped decks and retains every required ship-class room', () => {
+test('Asteria publishes three bounded mapped decks and retains every required ship-class room', () => {
   const validation = validateShipLayout();
   assert.equal(validation.valid, true);
   assert.equal(validation.deckCount, 3);
