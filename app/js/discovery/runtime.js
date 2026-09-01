@@ -256,7 +256,7 @@ function createDiscoveryUi(state) {
     guideOverview: byId('discoveryGuideOverview'), guideSearch: byId('discoveryGuideSearch'), guideScope: byId('discoveryGuideScope'),
     lifeList: byId('discoveryLifeList'), retention: byId('discoveryRetentionDashboard'),
     guideCategory: byId('discoveryGuideCategory'), guideHelp: byId('discoveryGuideHelp'), guideHelpButton: byId('discoveryGuideHelpBtn'),
-    companions: byId('discoveryCompanionList'), tools: byId('discoveryToolList'), progress: byId('discoveryProgress'),
+    companions: byId('discoveryCompanionList'), tools: byId('discoveryToolList'), progress: byId('discoveryProgress'), journeyOverview: byId('discoveryJourneyOverview'),
     equipped: byId('discoveryEquippedSummary'), openBackpack: byId('discoveryOpenBackpackBtn'),
     profileButton: byId('discoveryProfileBtn'), profileRank: byId('discoveryProfileRank'), profilePoints: byId('discoveryProfilePoints'), profileHero: byId('discoveryProfileHero'),
     tutorial: byId('discoveryTutorial'), tutorialTitle: byId('discoveryTutorialTitle'),
@@ -526,6 +526,17 @@ function createDiscoveryUi(state) {
       if (elements.profileHero) {
         elements.profileHero.innerHTML = `<div><span>${escapeHtml(background.label)}</span><strong>${escapeHtml(progress.rankLabel)}</strong><small>${progress.points} Explorer points · ${progress.totalRecords || 0} Journal memories</small></div><div class="discoveryProfileStrengths"><span>Current strengths</span><b>${strengths.map((entry) => escapeHtml(entry.label)).join(' · ')}</b></div>${activeCompanion ? `<div class="discoveryProfileCompanion"><span>Exploring with</span><strong>${escapeHtml(activeCompanion.name)}</strong><small>Level ${activeCompanion.progression?.level || 1} · ${escapeHtml(activeCompanion.progression?.trustState || 'Comfortable')}</small></div>` : ''}`;
       }
+      if (elements.journeyOverview) {
+        const routeCards = [
+          { id: 'today', label: 'Discover', detail: 'Observe, photograph, survey, and add what you learn to your Journal.', records: Number(progress.paths?.field?.records || 0) + Number(progress.paths?.activity?.records || 0) },
+          { id: 'travel', label: 'Travel', detail: 'Explore cities, oceans, planets, and the journeys between them.', records: Number(progress.paths?.travel?.records || 0) },
+          { id: 'create', label: 'Create', detail: 'Shape virtual places, build with blocks, and grow a place of your own.', records: Number(progress.paths?.creation?.records || 0) },
+          { id: 'community', label: 'Explore Together', detail: 'Join rooms, share expeditions, and take part in the Explorer board.', records: Number(progress.paths?.community?.records || 0) },
+          { id: 'companion', label: 'Companions', detail: 'Meet, befriend, care for, and train animals that travel with you.', records: Number(progress.paths?.companion?.records || 0) }
+        ];
+        const nextRoute = routeCards.reduce((lowest, route) => route.records < lowest.records ? route : lowest, routeCards[0]);
+        elements.journeyOverview.innerHTML = `<div class="discoveryJourneyIntro"><span>YOUR WORLD</span><strong>Choose what kind of day you want</strong><small>Every route adds to the same Explorer story. You can change direction whenever you like.</small><b>Try next · ${escapeHtml(nextRoute.label)}</b></div><div class="discoveryJourneyRoutes">${routeCards.map((route) => `<button type="button" data-explorer-route="${escapeHtml(route.id)}"${route.id === nextRoute.id ? ' class="suggested"' : ''}><span>${escapeHtml(route.label)}</span><small>${escapeHtml(route.detail)}</small><b>${route.records ? `${route.records} ${route.records === 1 ? 'memory' : 'memories'}` : 'Ready to begin'}</b></button>`).join('')}</div>`;
+      }
       const specialtyMarkup = specialties.length
         ? specialties.map(([id, specialty]) => { const definition = definitionById(SPECIALTY_DEFINITIONS, id); const specialtyRank = rankForXp(SPECIALTY_RANKS, specialty.xp); return `<article class="discoveryProgressCard"><strong>${specialtyRank.rank}</strong>${escapeHtml(definition?.label || displayDiscoveryLabel(id))}<small>${escapeHtml(specialtyRank.label)} · ${specialty.meaningfulEvents || 0} meaningful activities</small></article>`; }).join('')
         : '<div class="discoveryEmpty">Complete meaningful activities to begin developing specialties.</div>';
@@ -605,6 +616,28 @@ function createDiscoveryUi(state) {
     document.querySelectorAll('.floatMenu').forEach((menu) => menu.classList.remove('open'));
     setTab('today');
     setOpen(true);
+  });
+  listen(elements.journeyOverview, 'click', (event) => {
+    const button = event.target instanceof Element ? event.target.closest('[data-explorer-route]') : null;
+    if (!button) return;
+    const route = String(button.dataset.explorerRoute || 'today');
+    if (route === 'today') {
+      setTab('today');
+      return;
+    }
+    if (route === 'companion') {
+      setTab('profile');
+      requestAnimationFrame(() => document.querySelector('.discoveryCompanionSection')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }));
+      return;
+    }
+    const destination = {
+      travel: 'travelBtn',
+      create: 'realEstateFloatBtn',
+      community: 'gameBtn'
+    }[route];
+    if (!destination) return;
+    setOpen(false);
+    requestAnimationFrame(() => document.getElementById(destination)?.click());
   });
   listen(elements.promptOpen, 'click', () => {
     if (state.encounterLead?.available) void state.startEncounterLead?.();

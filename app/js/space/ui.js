@@ -180,6 +180,7 @@ function setupSpaceFlightControls(attemptLanding, lifecycleScope = null) {
 }
 
 export function hideGameUI() {
+  document.body.classList.add('space-flight-active');
   const elementsToHide = [
     'hud',
     'minimap',
@@ -202,6 +203,7 @@ export function hideGameUI() {
 }
 
 export function showGameUI() {
+  document.body.classList.remove('space-flight-active');
   const elementsToShow = [
     'hud',
     'minimap',

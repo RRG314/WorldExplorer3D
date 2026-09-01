@@ -710,6 +710,7 @@ export function animateSpaceFlight(deps = {}) {
     appCtx.updateSolarSystem();
   }
 
+  appCtx.tutorialUpdate?.(appCtx.spaceFlight._frameScale / 60);
   appCtx.updateUniverseRuntime?.(appCtx.spaceFlight._frameScale / 60);
   updateSpaceFlightPhysics();
   deps.updateSpaceFlightHUD?.(findLandableBodyByName);

@@ -4,7 +4,7 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=17";
 import { prepareTitleEnvironment } from "./planetary/entry.js?v=9";
 import { initMapInteractions } from "./ui/map-interactions.js?v=60";
-import { initMobileControls } from "./ui/mobile-controls.js?v=78";
+import { initMobileControls } from "./ui/mobile-controls.js?v=79";
 import { initShareUi } from "./ui/share-links.js?v=64";
 import { setupSettingsUi } from "./ui/settings.js?v=2";
 import { bindSpaceActions } from "./ui/space-actions.js?v=2";
@@ -207,7 +207,8 @@ function setupUI() {
     travelBtn: 'travelMenu',
     realEstateFloatBtn: 'realEstateMenu',
     exploreBtn: 'exploreMenu',
-    gameBtn: 'gameMenu'
+    gameBtn: 'gameMenu',
+    myExplorerBtn: 'myExplorerMenu'
   };
 
   const toggleFloatMenuByButton = (buttonId) => {
@@ -242,6 +243,7 @@ function setupUI() {
     toggleFloatMenuByButton('gameBtn');
     void titleUi.primeMultiplayerUi?.();
   });
+  document.getElementById('myExplorerBtn')?.addEventListener('click', () => toggleFloatMenuByButton('myExplorerBtn'));
 
   const homeMenuItem = document.getElementById('fHome');
   if (homeMenuItem) homeMenuItem.addEventListener('click', goToMainMenu);
@@ -251,6 +253,15 @@ function setupUI() {
     emitTutorialEvent('opened_backpack', { source: 'exploration_menu' });
     closeAllFloatMenus();
   });
+  const openExplorerSection = (section) => {
+    if (typeof appCtx.openWorldDiscoverySection === 'function') appCtx.openWorldDiscoverySection(section);
+    else appCtx.toggleWorldDiscoveryJournal?.(true);
+    closeAllFloatMenus();
+  };
+  document.getElementById('fExplorerToday')?.addEventListener('click', () => openExplorerSection('today'));
+  document.getElementById('fExplorerJournal')?.addEventListener('click', () => openExplorerSection('journal'));
+  document.getElementById('fExplorerGuide')?.addEventListener('click', () => openExplorerSection('guide'));
+  document.getElementById('fExplorerProfile')?.addEventListener('click', () => openExplorerSection('profile'));
   document.getElementById('fEditorMode')?.addEventListener('click', () => {
     if (typeof appCtx.closeActivityBrowser === 'function') appCtx.closeActivityBrowser();
     if (typeof appCtx.closeBlockBuilder === 'function') appCtx.closeBlockBuilder();

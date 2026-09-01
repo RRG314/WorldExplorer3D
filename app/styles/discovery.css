@@ -83,6 +83,10 @@ body:has(#urbanVehiclePrompt.show) #discoveryContextPrompt,body:has(#interiorPro
   .discoveryProfileHero span{display:block;color:#78909f;font:700 7px Orbitron,sans-serif;letter-spacing:.08em;text-transform:uppercase}
   .discoveryProfileHero strong{display:block;margin-top:5px;color:#e7f0f5;font:700 16px Orbitron,sans-serif;text-transform:uppercase}
   .discoveryProfileHero small,.discoveryProfileStrengths b{display:block;margin-top:5px;color:#91a3ae;font-size:9px}
+  .discoveryJourneyOverview{margin:0 0 12px;border:1px solid var(--wx-line-soft);background:#071018}
+  .discoveryJourneyIntro{padding:12px;border-left:3px solid var(--wx-green);background:linear-gradient(110deg,rgba(53,210,114,.10),rgba(7,16,24,.95) 72%)}
+  .discoveryJourneyIntro span,.discoveryJourneyIntro strong,.discoveryJourneyIntro small{display:block}.discoveryJourneyIntro span{color:#79dda0;font:700 7px Orbitron,sans-serif;letter-spacing:.11em}.discoveryJourneyIntro strong{margin-top:4px;color:#edf6f1;font:700 12px Orbitron,sans-serif;text-transform:uppercase}.discoveryJourneyIntro small{margin-top:4px;color:#91a4ae;font-size:9px}.discoveryJourneyIntro b{display:inline-block;margin-top:8px;color:#bdeacf;font:700 7px Orbitron,sans-serif;letter-spacing:.06em;text-transform:uppercase}
+  .discoveryJourneyRoutes{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--wx-line-soft)}.discoveryJourneyRoutes button{min-height:86px;border:0;padding:10px;background:#09131b;color:#dce7ed;text-align:left;cursor:pointer}.discoveryJourneyRoutes button:last-child{grid-column:1/-1}.discoveryJourneyRoutes button:hover,.discoveryJourneyRoutes button:focus-visible{outline:1px solid var(--wx-blue);outline-offset:-1px;background:#0d1b26}.discoveryJourneyRoutes button.suggested{box-shadow:inset 2px 0 var(--wx-green)}.discoveryJourneyRoutes span,.discoveryJourneyRoutes small,.discoveryJourneyRoutes b{display:block}.discoveryJourneyRoutes span{font:700 9px Orbitron,sans-serif;text-transform:uppercase}.discoveryJourneyRoutes small{margin-top:5px;color:#82949f;font:500 9px/1.35 Inter,sans-serif}.discoveryJourneyRoutes b{margin-top:7px;color:#7fa8e4;font:700 7px Orbitron,sans-serif;text-transform:uppercase}
   .discoveryProfileGroup{width:100%;box-sizing:border-box;margin-top:7px}
   .discoveryProfileGroupGrid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
   .discoveryProgressGrid{display:block}
@@ -115,6 +119,7 @@ body:has(#urbanVehiclePrompt.show) #discoveryContextPrompt,body:has(#interiorPro
     .discoveryBackpackEntry{grid-template-columns:26px minmax(0,1fr);margin-top:8px}.discoveryBackpackEntry>small{grid-column:2}
     .discoveryProfileHero{grid-template-columns:1fr}
     .discoveryProfileHero>div:first-child{grid-row:auto}
+    .discoveryJourneyRoutes{grid-template-columns:1fr}.discoveryJourneyRoutes button:last-child{grid-column:auto}.discoveryJourneyRoutes button{min-height:78px}
     .discoveryProfileGroupGrid{grid-template-columns:1fr}
     .discoveryGuideOverview{grid-template-columns:1fr 1fr}
     .discoveryGuideOverview article:last-child{grid-column:1/-1}

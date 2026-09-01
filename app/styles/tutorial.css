@@ -1,7 +1,8 @@
 #tutorialHintCard[hidden]{display:none!important}
 #currentJourneyCard[hidden]{display:none!important}
 #currentJourneyCard{position:fixed;top:88px;right:16px;z-index:138;display:flex;align-items:center;gap:12px;width:min(360px,calc(100vw - 30px));box-sizing:border-box;padding:10px 11px;border:1px solid rgba(91,132,163,.42);border-left:3px solid #5ca7e8;border-radius:3px;background:rgba(5,12,18,.93);box-shadow:0 12px 30px rgba(0,0,0,.34);color:#edf5fb;backdrop-filter:blur(10px)}
-.currentJourneyCopy{min-width:0;flex:1}.currentJourneyCopy span,.currentJourneyCopy strong,.currentJourneyCopy small{display:block}.currentJourneyCopy span{color:#75b8f1;font:700 7px/1.2 Orbitron,sans-serif;letter-spacing:.13em}.currentJourneyCopy strong{margin-top:4px;overflow:hidden;color:#f3f8fb;font:700 11px/1.25 Orbitron,sans-serif;text-overflow:ellipsis;white-space:nowrap}.currentJourneyCopy small{margin-top:3px;overflow:hidden;color:#9dafba;font:500 9px/1.35 Inter,sans-serif;text-overflow:ellipsis;white-space:nowrap}#currentJourneyAction{flex:0 0 auto;min-height:34px;border:1px solid #4f91ca;border-radius:2px;padding:0 10px;background:#153f63;color:#f4f9ff;font:700 8px/1 Orbitron,sans-serif;cursor:pointer}#currentJourneyAction:hover{border-color:#83c2f8;background:#1b527f}
+.space-flight-active #currentJourneyCard{right:260px;z-index:10002}
+.currentJourneyCopy{min-width:0;flex:1}.currentJourneyCopy span,.currentJourneyCopy strong,.currentJourneyCopy small{display:block}.currentJourneyCopy span{color:#75b8f1;font:700 7px/1.2 Orbitron,sans-serif;letter-spacing:.13em}.currentJourneyCopy strong{margin-top:4px;overflow:hidden;color:#f3f8fb;font:700 11px/1.25 Orbitron,sans-serif;text-overflow:ellipsis;white-space:nowrap}.currentJourneyCopy small{margin-top:3px;overflow:hidden;color:#9dafba;font:500 9px/1.35 Inter,sans-serif;white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}#currentJourneyAction{flex:0 0 auto;min-height:34px;border:1px solid #4f91ca;border-radius:2px;padding:0 10px;background:#153f63;color:#f4f9ff;font:700 8px/1 Orbitron,sans-serif;cursor:pointer}#currentJourneyAction:hover{border-color:#83c2f8;background:#1b527f}
 .tutorial-card{position:fixed;top:86px;right:16px;z-index:250;width:min(344px,calc(100vw - 30px));padding:13px;border:1px solid var(--wx-line-soft);border-left:2px solid var(--wx-blue);border-radius:3px;background:rgba(5,12,18,.96);color:var(--wx-text);box-shadow:0 18px 44px rgba(0,0,0,.46);font:500 12px/1.45 Inter,sans-serif;backdrop-filter:blur(12px);pointer-events:none;transition:width .16s ease,padding .16s ease}
 .tutorial-card button{pointer-events:auto}
 .tutorial-card.compact{width:min(292px,calc(100vw - 24px));padding:10px 11px}
@@ -41,9 +42,11 @@ body.game-panel-layer-open #currentJourneyCard,
 body.game-activity-layer-open #currentJourneyCard,
 body.editor-workspace-open #currentJourneyCard,
 body:has(#largeMap.show) #currentJourneyCard{display:none!important}
+body:has(#universeNavigator:not([hidden])) #currentJourneyCard{display:none!important}
 @media(max-width:700px){
   .tutorial-card{top:max(164px,calc(env(safe-area-inset-top) + 154px));right:max(9px,env(safe-area-inset-right));bottom:auto;width:min(330px,calc(100vw - 18px));max-height:calc(100dvh - 250px);overflow:auto;padding:11px}
   .tutorial-card.compact{width:min(286px,calc(100vw - 18px));padding:9px 10px}
   .tutorial-body{margin:8px 0}.tutorial-actions{margin-top:9px;flex-wrap:wrap}.tutorial-text-btn{margin-left:auto}
   #currentJourneyCard{top:max(154px,calc(env(safe-area-inset-top) + 146px));right:max(7px,env(safe-area-inset-right));width:min(336px,calc(100vw - 14px));padding:9px 10px}.currentJourneyCopy small{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}#currentJourneyAction{min-height:38px}
+  .space-flight-active #currentJourneyCard{top:max(224px,calc(env(safe-area-inset-top) + 216px));right:max(7px,env(safe-area-inset-right))}.space-flight-active.space-flight-hud-expanded #currentJourneyCard{top:max(500px,calc(env(safe-area-inset-top) + 492px))}
 }

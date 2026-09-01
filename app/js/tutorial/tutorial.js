@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { createTutorialUi } from './ui.js?v=4';
+import { createTutorialUi } from './ui.js?v=5';
 import { createCurrentJourneyUi } from './current-journey.js?v=1';
 
 const STORAGE_KEY = 'worldExplorer3D.tutorialState.v4';

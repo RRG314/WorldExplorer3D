@@ -643,7 +643,7 @@ function initMobileControls() {
       ctrlHeader.textContent = `⚙️ ${modeLabel} ${arrow}`;
       const controlsBarBtn = document.getElementById('controlsBarBtn');
       const controlsBarLabel = controlsBarBtn?.querySelector('.btnText');
-      if (controlsBarLabel) controlsBarLabel.textContent = modeLabel;
+      if (controlsBarLabel) controlsBarLabel.textContent = `⚙️ ${modeLabel} Controls`;
       controlsBarBtn?.setAttribute('aria-expanded', String(!ctrlContent?.classList.contains('hidden')));
       controlsTab?.classList.toggle('bar-open', !ctrlContent?.classList.contains('hidden'));
     }

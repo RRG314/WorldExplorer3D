@@ -470,6 +470,7 @@ body.deflock-active .floatBtn::after {
 .floatItems::before { content: attr(data-menu-title); position: absolute; top: 20px; left: 16px; right: 16px; padding-bottom: 12px; color: var(--wx-blue); border-bottom: 1px solid var(--wx-line-soft); font: 600 10px/1 Orbitron, sans-serif; }
 .floatItems:not([data-menu-title])::before { content: 'SYSTEM CONTROLS'; }
 .floatItem {
+  width: 100%;
   min-height: 54px;
   box-sizing: border-box;
   display: flex;
@@ -482,6 +483,8 @@ body.deflock-active .floatBtn::after {
   border-radius: 0;
   box-shadow: none;
   font: 600 11px/1.3 Orbitron, sans-serif;
+  text-align: left;
+  cursor: pointer;
 }
 .floatItem:hover, .floatItem.on { color: var(--wx-text); background: rgba(45, 125, 255, 0.12); transform: none; box-shadow: inset 4px 0 var(--wx-blue); }
 .floatItemSection {
@@ -491,10 +494,10 @@ body.deflock-active .floatBtn::after {
   font: 600 9px/1 Orbitron, sans-serif;
   letter-spacing: 0.1em;
 }
-#gameMenu .floatItems { padding-bottom: 18px; }
-#gameMenu .floatItemSection { padding-top: 16px; }
-#gameMenu .floatItemSection:first-of-type { padding-top: 4px; }
-#gameMenu .floatItem { min-height: 50px; }
+#gameMenu .floatItems, #exploreMenu .floatItems, #travelMenu .floatItems { padding-bottom: 18px; }
+#gameMenu .floatItemSection, #exploreMenu .floatItemSection, #travelMenu .floatItemSection { padding-top: 16px; }
+#gameMenu .floatItemSection:first-of-type, #exploreMenu .floatItemSection:first-of-type, #travelMenu .floatItemSection:first-of-type { padding-top: 4px; }
+#gameMenu .floatItem, #exploreMenu .floatItem, #travelMenu .floatItem { min-height: 50px; }
 [hidden] { display: none !important; }
 .mainMenuBtn {
   top: 0;
@@ -517,7 +520,8 @@ body.deflock-active .floatBtn::after {
 #controlsTab.show { display: none; }
 #controlsTab.show.bar-open { display: block; }
 #ctrlHeader { display: none; color: var(--wx-blue); }
-#controlsBarBtn[aria-expanded="true"] { color: var(--wx-text) !important; background: rgba(45, 125, 255, 0.1); border-bottom-color: var(--wx-blue); }
+#controlsBarBtn .btnText { display: inline; font: inherit; text-transform: none; }
+#controlsBarBtn[aria-expanded="true"] { color: var(--wx-text) !important; background: rgba(45, 125, 255, 0.1); box-shadow: inset 4px 0 var(--wx-blue); }
 
 /* Mobile play shell */
 @media (max-width: 760px), (pointer: coarse) {
@@ -613,9 +617,10 @@ body.deflock-active .floatBtn::after {
   }
   .floatMenu.open .floatItems { display: grid; }
   .floatItem { min-height: 48px; padding: 8px; font-size: 9px; white-space: normal; }
-  #gameMenu .floatItemSection { grid-column: 1 / -1; padding: 10px 8px 6px; }
-  #gameMenu .floatItemSection:first-of-type { padding-top: 0; }
-  #gameMenu .floatItem { min-height: 48px; }
+  #gameMenu .floatItemSection, #exploreMenu .floatItemSection, #travelMenu .floatItemSection { grid-column: 1 / -1; padding: 10px 8px 6px; }
+  #gameMenu .floatItemSection:first-of-type, #exploreMenu .floatItemSection:first-of-type, #travelMenu .floatItemSection:first-of-type { padding-top: 0; }
+  #gameMenu .floatItem, #exploreMenu .floatItem, #travelMenu .floatItem { min-height: 48px; }
+  #controlsBarBtn .btnText { display: inline; }
   #controlsTab, #memoryFlowerFloatBtn { display: none !important; }
   body.deflock-active .floatMenuContainer { left: 0; right: 0; height: 58px; max-width: none; }
   body.deflock-active .floatBtn { height: 58px; padding: 5px 2px 3px; }
