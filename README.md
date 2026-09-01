@@ -70,6 +70,8 @@ active world.*
   shared creations later.
 - Leave Earth for the Moon, planets, the solar system, and selected deep-space
   destinations, with manual flight always available.
+- Try Interstellar Expeditions in Alpha: live aboard Surveyor, work with its
+  crew, respond to voyage events, and take a pod to supported planetary sites.
 
 ## Version 5.1
 

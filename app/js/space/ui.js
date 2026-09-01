@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { getAstronomicalBody, LANDING_MODE } from '../astronomy/body-catalog.js?v=2';
+import { getAstronomicalBody, LANDING_MODE } from '../astronomy/body-catalog.js?v=3';
 import { SPACE_CONSTANTS } from "./constants.js?v=1";
 import { evaluateAtmosphericEntry } from './atmospheric-descent-authority.js?v=1';
 import {
@@ -80,7 +80,7 @@ export function initSpaceFlightUI(attemptLanding, lifecycleScope = null) {
       ENGAGE FLIGHT ASSIST
     </button>
     <button id="sfExpeditionBtn" style="width:100%;padding:11px;margin-bottom:8px;background:#152b4f;border:1px solid #38bdf8;border-radius:8px;color:#e0f2fe;font-weight:600;cursor:pointer;font-family:Orbitron,sans-serif;transition:all 0.2s;">
-      INTERSTELLAR EXPEDITION
+      INTERSTELLAR EXPEDITION · ALPHA
     </button>
     <button id="sfLandBtn" style="width:100%;padding:12px;background:#667eea;border:none;border-radius:8px;color:#fff;font-weight:600;cursor:pointer;font-family:Orbitron,sans-serif;transition:all 0.2s;opacity:0.5;" disabled>
       EXPLORE SOLAR SYSTEM

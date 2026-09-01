@@ -1,4 +1,4 @@
-import { normalizeAstronomicalBodyId } from '../../astronomy/body-catalog.js?v=2';
+import { normalizeAstronomicalBodyId } from '../../astronomy/body-catalog.js?v=3';
 import { getPlanetarySurfaceRegion } from './surface-authority.js?v=4';
 
 function activePlanetaryBodyId(appContext) {

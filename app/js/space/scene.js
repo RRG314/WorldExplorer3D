@@ -9,7 +9,7 @@ import { PLANETARY_BODIES, configureColorTexture } from "../planetary/catalog.js
 import { createSpaceCelestialCatalog } from "./celestial-catalog.js?v=5";
 import { initUniverseRuntime } from "../universe/runtime.js?v=29";
 import { createExpeditionSpacecraftMesh } from "./expedition-spacecraft-mesh.js?v=3";
-import { restoreExpeditionDiscoveries } from '../expedition/contact-authority.js?v=1';
+import { restoreExpeditionDiscoveries } from '../expedition/contact-authority.js?v=4';
 
 export function createSpaceFlightScene(options = {}) {
   console.log("Creating space flight scene...");

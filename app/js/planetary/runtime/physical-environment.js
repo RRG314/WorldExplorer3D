@@ -3,7 +3,7 @@ import {
   getAstronomicalBody,
   LANDING_MODE,
   TRUTH_CLASS
-} from '../../astronomy/body-catalog.js?v=2';
+} from '../../astronomy/body-catalog.js?v=3';
 import { normalizeLatitudeDeg, normalizePositiveEastLongitudeDeg } from '../../astronomy/frames.js?v=1';
 
 const PHYSICAL_ENVIRONMENT_SCHEMA_VERSION = 1;

@@ -1,7 +1,7 @@
 import {
   getAstronomicalBody,
   SOLAR_SYSTEM_EXPLORATION_DESTINATION_IDS
-} from '../astronomy/body-catalog.js?v=2';
+} from '../astronomy/body-catalog.js?v=3';
 
 function setInfoMetricBlock(metaLabel, metric1Label, metric1Value, metric2Label, metric2Value, metric3Label, metric3Value) {
   const metaEl = document.getElementById('ssInfoMetaLabel');

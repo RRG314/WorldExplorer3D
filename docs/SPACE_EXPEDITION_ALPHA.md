@@ -1,6 +1,22 @@
 # Space Expedition Alpha
 
-Status: complete connected alpha candidate; owner release review required
+Status: pre-release Alpha candidate; connected journey verified; owner playtest
+and visual review required
+
+## How Alpha appears in a release
+
+Interstellar Expeditions ship as an optional feature inside a normal World
+Explorer release, not as a claim that all of Space is finished. The Space HUD
+and planner identify the feature as **Alpha** before a player begins a voyage.
+Release notes should list the connected activities players can use, link to the
+known limitations, and keep ordinary manual and assisted Space Flight described
+as established parts of the game.
+
+An Alpha release may contain unfinished visual variety and a limited mission
+catalog. It may not contain a broken or misleading core journey. Boarding
+Surveyor, finding an objective, entering a pod, flying to a supported surface,
+working there, returning to the pod, rendezvousing with Surveyor, saving, and
+resuming must work before the Alpha is published.
 
 ## The player promise
 

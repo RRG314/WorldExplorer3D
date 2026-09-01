@@ -1,4 +1,4 @@
-import { normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=2';
+import { normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=3';
 
 function resolveCompletedLandingTarget(spaceFlight = {}, journey = null) {
   const runtimeTarget = String(spaceFlight._runtimeLandingTarget || '').trim().toLowerCase();

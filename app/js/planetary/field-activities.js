@@ -1,4 +1,4 @@
-import { getAstronomicalBody } from '../astronomy/body-catalog.js?v=2';
+import { getAstronomicalBody } from '../astronomy/body-catalog.js?v=3';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { createIndexedDbDiscoveryProfileStore } from '../discovery/profile-store.js?v=4';
 

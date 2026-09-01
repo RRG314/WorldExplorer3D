@@ -258,6 +258,14 @@ existing ship room and station; the ship interior owns its warning beacon,
 route guidance, crew response, and physical interaction. The planner can report
 the incident but cannot resolve it outside the ship.
 
+The bridge and Observation Gallery sample the active local Space renderer into
+bounded viewport surfaces; they do not run a second universe simulation. Ship
+walls and closed pressure doors publish through the existing interior collision
+collection. Crew interactions also use that collection and the normal E/touch
+action. `expedition/runtime.js` derives phase-aware advice from the same voyage,
+destination mission, and contact records, while `ship-interior.js` sends the
+chosen station to the existing cross-deck map and lift route.
+
 At the affected station, a selected response starts one three-step physical
 procedure. `ship-interior.js` publishes only the current procedure node through
 the existing interior interaction collection; `interiors/runtime.js` routes the

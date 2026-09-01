@@ -12,7 +12,7 @@ import {
 import {
   getAstronomicalBody,
   SOLAR_SYSTEM_EXPLORATION_DESTINATION_IDS
-} from '../astronomy/body-catalog.js?v=2';
+} from '../astronomy/body-catalog.js?v=3';
 
 function formatKilometers(km) {
   if (km >= 1e9) return (km / 1e9).toFixed(1) + 'B';

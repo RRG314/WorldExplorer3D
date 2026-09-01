@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { getAstronomicalBody, LANDING_MODE } from '../astronomy/body-catalog.js?v=2';
+import { getAstronomicalBody, LANDING_MODE } from '../astronomy/body-catalog.js?v=3';
 import { alignStarFieldToBody } from '../sky/starfield-ui.js?v=15';
 import { ensurePlanetaryAtmosphere, updatePlanetaryAtmosphere } from './atmosphere-dome.js?v=1';
 import { setPlanetaryStarOcclusion } from './star-occlusion.js?v=1';

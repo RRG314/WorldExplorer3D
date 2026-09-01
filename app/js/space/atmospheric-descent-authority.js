@@ -1,4 +1,4 @@
-import { getAstronomicalBody, LANDING_MODE, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=2';
+import { getAstronomicalBody, LANDING_MODE, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=3';
 import { getPhysicalEnvironmentProfile, samplePhysicalEnvironment } from '../planetary/runtime/physical-environment.js?v=2';
 
 const ATMOSPHERIC_EXPLORATION_SCHEMA_VERSION = 1;

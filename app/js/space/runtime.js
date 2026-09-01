@@ -3,7 +3,7 @@ import {
   getAstronomicalBody,
   LANDING_MODE,
   normalizeAstronomicalBodyId
-} from '../astronomy/body-catalog.js?v=2';
+} from '../astronomy/body-catalog.js?v=3';
 import { SPACE_CONSTANTS } from "./constants.js?v=1";
 import { spacecraftOperationTuning } from '../character/spacecraft-assistance.js?v=1';
 import { resolveCelestialSceneCollision } from './celestial-collision.js?v=2';

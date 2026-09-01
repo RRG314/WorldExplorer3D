@@ -1,4 +1,4 @@
-import { getAstronomicalBody, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=2';
+import { getAstronomicalBody, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=3';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { ENV, getEnv } from '../env.js?v=58';
 import {

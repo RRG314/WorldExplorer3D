@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
-import { getAstronomicalBody } from './astronomy/body-catalog.js?v=2';
+import { getAstronomicalBody } from './astronomy/body-catalog.js?v=3';
 import {
   createAsteroidBelt as createSolarSystemAsteroidBelt,
   createKuiperBelt as createSolarSystemKuiperBelt,

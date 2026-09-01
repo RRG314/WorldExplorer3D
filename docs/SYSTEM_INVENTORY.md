@@ -1,6 +1,6 @@
 # World Explorer 3D System Inventory
 
-Last updated: 2026-08-30 for World Explorer 3D 5.1.
+Last updated: 2026-08-31 for World Explorer 3D 5.1.
 
 This inventory describes the systems present in the current source tree and
 their honest product boundaries. See [ARCHITECTURE_MAP.md](ARCHITECTURE_MAP.md)
@@ -22,7 +22,7 @@ with explicit entry and exit lifecycles.
 | --- | --- | --- |
 | World selection | Interactive globe, search, presets, coordinates, geolocation, favorites, and recent places | Provider and imagery availability vary |
 | Earth traversal | Walk, drive, drone, plane, and boat with shared location handoff | One bounded location per session |
-| Other environments | Underwater, Moon, Mars, solid and atmospheric planets, featured moons and small bodies, solar-system flight, deep space, three distinct three-step planetary field instrument procedures, and the three-deck Surveyor Expedition ship with room-bound incident actions | Distances use explicit game scales; planetary life, NPC, pod, rover, and ship visual detail remains an active quality program rather than worldwide or final asset completeness |
+| Other environments | Underwater, Moon, Mars, solid and atmospheric planets, featured moons and small bodies, solar-system flight, deep space, three distinct three-step planetary field instrument procedures, and the three-deck Surveyor Expedition Alpha with live local-space views, objective routing, crew guidance, and a connected pod/surface/return path | Distances use explicit game scales; planetary life, NPC, pod, rover, mission, and ship visual detail remains an active quality program rather than worldwide or final asset completeness |
 | Mobile play | Analog movement/look controls, mode actions, handedness, sensitivity, camera follow, map, Backpack, and recovery | Physical-device battery and thermal performance still require device testing |
 | Browser support | Standards-based WebGL browser runtime verified through current Chromium and Firefox desktop gameplay, with responsive keyboard and touch layouts | Physical-device and assistive-technology coverage remains a release acceptance responsibility; provider features still depend on browser permissions and capabilities |
 | Character and equipment | One persistent character profile, attributes, skills, condition, six assignable quick slots, ammunition, field tools, and usable equipment | Complete cross-device character sync is not yet available |

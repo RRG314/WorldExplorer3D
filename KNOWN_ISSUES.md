@@ -68,6 +68,17 @@ Last reviewed: 2026-08-30 for World Explorer 3D 5.1.0.
 - Solar-system distance and body-size presentation uses documented visual
   scaling so destinations remain playable; it is not an orbital simulator.
 
+## Interstellar Expeditions Alpha
+
+- Interstellar Expeditions are an optional Alpha inside the main game. The
+  connected Surveyor, voyage, pod, surface-work, return, and cargo paths are
+  playable, but room art, crew animation, vehicle presentation, destination
+  variety, mission action variety, sound, and mobile performance remain under
+  active development.
+- Alpha saves are versioned and migrated, but players should still use the
+  built-in backup before a long voyage. Ordinary manual and assisted Space
+  Flight remains available independently of an Expedition.
+
 ## Action and combat
 
 - Ranged equipment has a screen reticle, camera-directed projectiles, visible

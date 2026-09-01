@@ -40,7 +40,7 @@ travel and sandbox play.
 | Character and companions | Attributes, skills, condition, equipment, companion care, trust, levels, livestock, and vehicle travel | Player-selectable Explorer identities, richer appearance, training, and ability growth |
 | Earth travel | Walking, distinct road vehicles, responder vehicles, drone, personal aircraft, airport aircraft, boats, ships, and skydiving | More vehicle classes, facilities, damage presentation, and physical-device tuning |
 | Water | Shore visibility, mapped vessel identity, marinas, ports, playable boat and ship classes, shore/boat/underwater fishing | Wider port coverage, water traffic, maritime activities, and reviewed bathymetry |
-| Space | Manual and assisted flight, selectable courses, celestial collision, planetary entry, accepted surfaces, landing, and return | Optional long-distance Expeditions, more complete planetary activities, destinations, spacecraft, and visual review |
+| Space | Manual and assisted flight, selectable courses, celestial collision, planetary entry, accepted surfaces, landing, and return; optional Interstellar Expeditions are in Alpha | Expand Alpha mission and destination variety, room and crew presentation, planetary activities, spacecraft, and visual review |
 | World construction | One World Editor containing persistent local and room Blocks | Terrain shaping, building materials, interiors, decoration, and creator publishing |
 | Community | Bounded rooms, presence, chat, activities, shared Blocks, persistent room vehicles, and public game leaderboards | Larger-room review, moderation depth, clubs, events, and shared settlements |
 | Access and performance | Keyboard, touch, mobile layouts, accessibility settings, bounded loading, and lifecycle cleanup | Broader phone, browser, assistive-technology, battery, and thermal review |
@@ -364,6 +364,15 @@ contacts now open in ordinary Space, accept supported planetary landing and
 field collection, return exact sample custody to Surveyor, process material,
 and resume the same voyage. Further room art, animation, audio, and interaction
 variety remain continuing quality work rather than missing system authorities.
+The current ship pass also gives the bridge and Observation Gallery a live view
+from the active local Space renderer, seals authored walls through the shared
+interior collision authority, routes objectives across decks to exact stations,
+and lets crew members provide phase-aware advice through that same map. The pod
+route has been rechecked as one conserved journey from Surveyor launch to
+manual local flight, surface work, return, rendezvous, ship processing, and
+Earth trade. These verified mechanics define the connected Alpha foundation;
+they do not make the remaining art, animation, mission, destination, audio, or
+performance work complete.
 Voyage responses now begin at the affected station and require three visible,
 role-specific interactions at a connected service console before the existing
 Voyage Director commits its success, partial, or setback outcome. This closes

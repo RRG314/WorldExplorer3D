@@ -149,7 +149,7 @@ function ensureStylesheet() {
   const link = document.createElement('link');
   link.id = 'expeditionStyles';
   link.rel = 'stylesheet';
-  link.href = 'styles/expedition.css?v=6';
+  link.href = 'styles/expedition.css?v=7';
   document.head.appendChild(link);
 }
 
@@ -477,10 +477,10 @@ function renderPlanner() {
   root.innerHTML = `
     <section class="expeditionPanel" role="dialog" aria-modal="true" aria-labelledby="expeditionTitle">
       <header class="expeditionHeader">
-        <div style="min-width:0"><span>SPACE EXPLORER</span><h2 id="expeditionTitle" style="max-width:270px">Interstellar Expedition</h2></div>
+        <div style="min-width:0"><span>SPACE EXPLORER · ALPHA</span><h2 id="expeditionTitle" style="max-width:270px">Interstellar Expedition</h2></div>
         <button id="expeditionClose" type="button" aria-label="Close Expedition" style="flex:0 0 42px">×</button>
       </header>
-      <p class="expeditionIntro">Plan a persistent long-range voyage. Ordinary Space Flight remains available when this panel is closed.</p>
+      <p class="expeditionIntro">Try an evolving long-range voyage aboard Surveyor. Progress is saved, and ordinary Space Flight remains available when this panel is closed.</p>
       <div class="expeditionPlannerGrid">
         <label>Destination<select id="expeditionDestination">${destinationOptions}</select></label>
         <label>Travel model<select id="expeditionRealism"><option value="science-inspired">Science-inspired</option><option value="custom">Custom</option></select></label>

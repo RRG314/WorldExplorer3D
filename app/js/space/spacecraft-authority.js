@@ -1,4 +1,4 @@
-import { getAstronomicalBody, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=2';
+import { getAstronomicalBody, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=3';
 
 const SPACECRAFT_SCHEMA_VERSION = 1;
 const GRAVITATIONAL_CONSTANT = 6.67430e-11;
