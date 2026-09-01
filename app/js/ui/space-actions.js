@@ -1,7 +1,7 @@
 export function bindSpaceActions(appCtx, closeAllFloatMenus) {
   document.getElementById('fSpaceSurveyor')?.addEventListener('click', async () => {
     closeAllFloatMenus();
-    const { openExpeditionPlanner } = await import('../expedition/runtime.js?v=27');
+    const { openExpeditionPlanner } = await import('../expedition/runtime.js?v=28');
     openExpeditionPlanner(appCtx);
   });
   document.getElementById('fSpaceDirect')?.addEventListener('click', () => {

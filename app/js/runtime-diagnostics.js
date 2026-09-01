@@ -1057,6 +1057,7 @@ function getWorldExplorerRuntimeDiagnostics() {
       onMoon: !!appCtx.onMoon,
       traveling: !!appCtx.travelingToMoon
     },
+    surfacePodLaunch: appCtx.surfacePodLaunchSnapshot || null,
     universeNavigation: appCtx.getUniverseCourseSnapshot?.() || (appCtx.universeRuntime ? {
       currentFrameId: appCtx.universeRuntime.current?.id || null,
       selectedDestinationId: appCtx.universeRuntime.selected?.id || null,
@@ -1240,6 +1241,7 @@ globalThis.render_game_to_text = () => JSON.stringify({
     flightMode: appCtx.spaceFlight?.mode || null,
     nearestBody: appCtx.spaceFlight?._nearestBody?.name || null
   },
+  surfacePodLaunch: appCtx.surfacePodLaunchSnapshot || null,
   universeNavigation: appCtx.getUniverseCourseSnapshot?.() || (appCtx.universeRuntime ? {
     currentFrameId: appCtx.universeRuntime.current?.id || null,
     selectedDestinationId: appCtx.universeRuntime.selected?.id || null,

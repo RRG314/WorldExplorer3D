@@ -341,7 +341,18 @@ async function run() {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
       return ctx.handlePrimaryContextInteraction();
     }), true);
-    await page.waitForTimeout(120);
+    await page.waitForFunction(() => {
+      const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+      return state.environment === 'PLANETARY'
+        && state.interstellarExpedition?.podJourney?.phase === 'surface_launch'
+        && state.surfacePodLaunch?.active === true;
+    });
+    await page.waitForFunction(() => {
+      const altitude = JSON.parse(globalThis.render_game_to_text?.() || '{}').surfacePodLaunch?.altitude;
+      return altitude > 2 && altitude < 20;
+    });
+    await page.screenshot({ path: path.join(outputDir, 'desktop-surface-pod-liftoff.png'), fullPage: true });
+    await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').modes?.space === true, null, { timeout: 15_000 });
     assert.equal(await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
       const pod = ctx.spaceFlight.rocket?.getObjectByName('Surveyor Pathfinder Pod');

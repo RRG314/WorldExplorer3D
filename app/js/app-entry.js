@@ -8,7 +8,7 @@ import { ctx as appCtx } from './shared-context.js?v=55';
 import { createAccountService } from './platform/account-service.js?v=1';
 import { createPlatformServiceRegistry } from './platform/service-registry.js?v=1';
 import { scheduleAfterFirstPlay } from './runtime/workload-policy.js?v=1';
-import './runtime-diagnostics.js?v=70';
+import './runtime-diagnostics.js?v=71';
 import './ui/legal-attribution.js?v=1';
 import './state.js?v=65';
 import './camera-mode.js?v=1';
@@ -37,7 +37,7 @@ import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.j
 import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=1';
 import { installOnDemandLiveEarth } from './runtime/on-demand-live-earth.js?v=5';
 import { installOnDemandMars } from './runtime/on-demand-mars.js?v=1';
-import './planetary/solid-world-runtime.js?v=15';
+import './planetary/solid-world-runtime.js?v=16';
 import './planetary/vehicles.js?v=3';
 import './planetary/astronaut.js?v=2';
 import './planetary/sky-orientation.js?v=14';

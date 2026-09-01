@@ -237,6 +237,10 @@ The surface return pod remains presentation inside
 continues to own phase changes and `app/js/expedition/runtime.js` owns sample
 custody. Added shell, docking, thermal, landing, ramp, and hatch meshes therefore
 cannot bypass the established approach radius, return check, or rendezvous.
+`app/js/planetary/surface-pod-launch.js` provides the single visible liftoff
+handoff for Earth and modeled planetary surfaces. It moves the existing landed
+pod when one is present, creates only a temporary Earth presentation otherwise,
+and commits to the existing Space Flight authority after the surface ascent.
 `app/js/planetary/runtime/obstacle-authority.js` publishes the active pod hull
 to planetary walking only and clears it on departure. Earth building collision,
 interior collision, and Blocks remain separate owners and receive no pod record.

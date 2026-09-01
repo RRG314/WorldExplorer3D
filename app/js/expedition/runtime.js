@@ -15,6 +15,7 @@ import { registerExpeditionDiscovery } from './contact-authority.js?v=4';
 import { createPodJourney, POD_PHASE, POD_ROUTE_KIND, transitionPodJourney } from './pod-journey-authority.js?v=2';
 import { approvedSampleTradeValue, summarizeExpeditionTransfers } from '../resources/material-catalog.js?v=2';
 import { SHIP_STATIONS } from './ship-layout.js?v=5';
+import { playSurfacePodLaunch } from '../planetary/surface-pod-launch.js?v=1';
 
 let activeContext = null;
 let activeExpedition = null;
@@ -80,13 +81,28 @@ async function launchEarthPodToSurveyor() {
   }
   if (!advancePodJourney('launch')) return false;
   closeExpeditionPlanner();
-  const started = await activeContext?.startSpaceFlightToSurveyor?.({
-    onReady: () => {
-      if (activePodJourney?.phase === POD_PHASE.SURFACE_LAUNCH) advancePodJourney('rendezvous');
+  const launchVisible = playSurfacePodLaunch(activeContext, {
+    bodyId: 'earth',
+    onCommit: async () => {
+      const started = await activeContext?.startSpaceFlightToSurveyor?.({
+        onReady: () => {
+          if (activePodJourney?.phase === POD_PHASE.SURFACE_LAUNCH) advancePodJourney('rendezvous');
+        }
+      });
+      if (started !== true) {
+        advancePodJourney('fail', { reason: 'earth-pod-launch-unavailable' });
+        openExpeditionPlanner(activeContext);
+        return false;
+      }
+      return true;
+    },
+    onFailure: () => {
+      if (activePodJourney?.phase === POD_PHASE.SURFACE_LAUNCH) advancePodJourney('fail', { reason: 'earth-pod-launch-presentation-failed' });
+      openExpeditionPlanner(activeContext);
     }
   });
-  if (started !== true) {
-    advancePodJourney('fail', { reason: 'earth-pod-launch-unavailable' });
+  if (!launchVisible) {
+    advancePodJourney('fail', { reason: 'earth-pod-launch-presentation-unavailable' });
     openExpeditionPlanner(activeContext);
     return false;
   }
@@ -514,45 +530,58 @@ function leaveExpeditionSurface(bodyId) {
   }
   const item = inventory.snapshot?.().items?.find((entry) => entry.catalogId === catalogId);
   if (!item || Number(item.quantity) < 1) return false;
-  const departureStarted = activeContext?.startSpaceFlightFromExpeditionSurface?.({
-    frameId: contact.id,
-    courseDestinationId: bodyId,
-    onReady: () => {
-      if (activePodJourney?.phase === POD_PHASE.SURFACE_LAUNCH) advancePodJourney('rendezvous');
-      returnFromLocalContact();
-    }
-  }) === true;
-  if (!departureStarted) {
-    activeContext?.showToast?.('Surveyor could not begin the return flight. The sample remains in your Backpack.');
+  if (!markExpeditionPodSurfaceLaunch(bodyId)) return false;
+  const launchVisible = playSurfacePodLaunch(activeContext, {
+    bodyId,
+    pod: activeContext?.getActivePlanetaryReturnPod?.(),
+    onCommit: () => {
+      const departureStarted = activeContext?.startSpaceFlightFromExpeditionSurface?.({
+        frameId: contact.id,
+        courseDestinationId: bodyId,
+        onReady: () => {
+          if (activePodJourney?.phase === POD_PHASE.SURFACE_LAUNCH) advancePodJourney('rendezvous');
+          returnFromLocalContact();
+        }
+      }) === true;
+      if (!departureStarted) {
+        advancePodJourney('fail', { reason: 'expedition-surface-launch-unavailable' });
+        activeContext?.showToast?.('Surveyor could not begin the return flight. The sample remains in your Backpack.');
+        return false;
+      }
+      const consumed = inventory.consumeItem?.(catalogId, 1) ?? inventory.consume?.(catalogId, 1);
+      if (!consumed) return false;
+      activeContext?.playerBackpackStore?.save?.(inventory.exportState?.());
+      const sample = Object.freeze({
+        id: `${activeExpedition.id}:${catalogId}:cargo`,
+        catalogId,
+        label: item.label,
+        contactId: contact.id,
+        bodyId,
+        massKg: 4,
+        processed: false,
+        recoveryRequirement: operation.recoveryRequirement || null,
+        resourceSignature: contact.resourceSignature,
+        truthClass: 'modeled-game-world-material'
+      });
+      activeExpedition = withExpeditionChanges(activeExpedition, {
+        scienceSamples: Object.freeze([...(activeExpedition.scienceSamples || []), sample]),
+        resources: Object.freeze({
+          ...activeExpedition.resources,
+          scienceCargoKg: Number(activeExpedition.resources?.scienceCargoKg || 0) + sample.massKg
+        }),
+        localOperation: Object.freeze({ ...operation, state: 'cargo-loaded', transferredSampleId: sample.id }),
+        log: appendMissionLog(activeExpedition, 'science', `Transferred one ${sample.massKg} kg ${contact.designation} sample from Backpack to Surveyor cargo.`)
+      });
+      store.save(activeExpedition);
+      activeContext?.updateExpeditionShipRecord?.(activeExpedition);
+      return true;
+    },
+    onFailure: () => activeContext?.showToast?.('The pod remained on the surface. Your sample is still in your Backpack.')
+  });
+  if (!launchVisible) {
+    advancePodJourney('fail', { reason: 'expedition-surface-launch-presentation-unavailable' });
     return false;
   }
-  markExpeditionPodSurfaceLaunch(bodyId);
-  const consumed = inventory.consumeItem?.(catalogId, 1) ?? inventory.consume?.(catalogId, 1);
-  if (!consumed) return false;
-  activeContext?.playerBackpackStore?.save?.(inventory.exportState?.());
-  const sample = Object.freeze({
-    id: `${activeExpedition.id}:${catalogId}:cargo`,
-    catalogId,
-    label: item.label,
-    contactId: contact.id,
-    bodyId,
-    massKg: 4,
-    processed: false,
-    recoveryRequirement: operation.recoveryRequirement || null,
-    resourceSignature: contact.resourceSignature,
-    truthClass: 'modeled-game-world-material'
-  });
-  activeExpedition = withExpeditionChanges(activeExpedition, {
-    scienceSamples: Object.freeze([...(activeExpedition.scienceSamples || []), sample]),
-    resources: Object.freeze({
-      ...activeExpedition.resources,
-      scienceCargoKg: Number(activeExpedition.resources?.scienceCargoKg || 0) + sample.massKg
-    }),
-    localOperation: Object.freeze({ ...operation, state: 'cargo-loaded', transferredSampleId: sample.id }),
-    log: appendMissionLog(activeExpedition, 'science', `Transferred one ${sample.massKg} kg ${contact.designation} sample from Backpack to Surveyor cargo.`)
-  });
-  store.save(activeExpedition);
-  activeContext?.updateExpeditionShipRecord?.(activeExpedition);
   return true;
 }
 
@@ -563,19 +592,31 @@ function leaveDestinationMissionSurface(bodyId) {
     activeContext?.showToast?.('Complete all three marked field records before returning to Surveyor.');
     return false;
   }
-  const departureStarted = activeContext?.startSpaceFlightFromExpeditionSurface?.({
-    frameId: mission.systemId || activePodJourney.returnFrameId,
-    courseDestinationId: bodyId,
-    onReady: () => {
-      if (activePodJourney?.phase === POD_PHASE.SURFACE_LAUNCH) advancePodJourney('rendezvous');
-      if (activePodJourney?.phase === POD_PHASE.RENDEZVOUS) {
-        activeContext?.showSpaceFlightMessage?.('RENDEZVOUS APPROACH · SURVEYOR DOCKING LIGHTS ACQUIRED', '#6fe8ff');
-        schedulePodRecovery(mission.systemId || activePodJourney.returnFrameId, performance.now(), 1100);
-      }
+  if (!markExpeditionPodSurfaceLaunch(bodyId)) return false;
+  const launchVisible = playSurfacePodLaunch(activeContext, {
+    bodyId,
+    pod: activeContext?.getActivePlanetaryReturnPod?.(),
+    onCommit: () => {
+      const departureStarted = activeContext?.startSpaceFlightFromExpeditionSurface?.({
+        frameId: mission.systemId || activePodJourney.returnFrameId,
+        courseDestinationId: bodyId,
+        onReady: () => {
+          if (activePodJourney?.phase === POD_PHASE.SURFACE_LAUNCH) advancePodJourney('rendezvous');
+          if (activePodJourney?.phase === POD_PHASE.RENDEZVOUS) {
+            activeContext?.showSpaceFlightMessage?.('RENDEZVOUS APPROACH · SURVEYOR DOCKING LIGHTS ACQUIRED', '#6fe8ff');
+            schedulePodRecovery(mission.systemId || activePodJourney.returnFrameId, performance.now(), 1100);
+          }
+        }
+      }) === true;
+      if (!departureStarted) advancePodJourney('fail', { reason: 'destination-surface-launch-unavailable' });
+      return departureStarted;
     }
-  }) === true;
-  if (!departureStarted) return false;
-  return markExpeditionPodSurfaceLaunch(bodyId);
+  });
+  if (!launchVisible) {
+    advancePodJourney('fail', { reason: 'destination-surface-launch-presentation-unavailable' });
+    return false;
+  }
+  return true;
 }
 
 function destinationTypeLabel(destination) {

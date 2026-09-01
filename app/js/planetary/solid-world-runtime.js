@@ -1234,6 +1234,10 @@ function sampleActiveSolidWorldHeight(x, z) {
   return activePack ? sampleModeledRelief(activePack, x, z) : null;
 }
 
+function getActivePlanetaryReturnPod() {
+  return activeReturnPod || null;
+}
+
 registerEnvironmentLifecycle(ENV.PLANETARY, {
   exitSync: hideActiveWorld,
   snapshot: () => ({
@@ -1246,6 +1250,7 @@ registerEnvironmentLifecycle(ENV.PLANETARY, {
 
 Object.assign(appCtx, {
   arriveAtSolidWorld,
+  getActivePlanetaryReturnPod,
   renderActiveExpeditionOutpost,
   registerExpeditionSolidWorld,
   sampleActiveSolidWorldHeight
@@ -1254,6 +1259,7 @@ Object.assign(appCtx, {
 export {
   arriveAtSolidWorld,
   deriveExpeditionWorldProfile,
+  getActivePlanetaryReturnPod,
   registerExpeditionSolidWorld,
   sampleActiveSolidWorldHeight,
   sampleModeledRelief,

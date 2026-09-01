@@ -139,6 +139,19 @@ async function run() {
     await openEarthExpedition(page);
     assert.match(await page.locator('#expeditionEarthPod').textContent(), /Launch Pathfinder to Surveyor/i);
     await page.locator('#expeditionEarthPod').click();
+    await page.waitForTimeout(300);
+    const surfaceLaunchStarted = await snapshot(page);
+    assert.equal(surfaceLaunchStarted.environment, 'EARTH', JSON.stringify(surfaceLaunchStarted.surfacePodLaunch));
+    assert.equal(surfaceLaunchStarted.interstellarExpedition?.podJourney?.phase, 'surface_launch', JSON.stringify({
+      journey: surfaceLaunchStarted.interstellarExpedition?.podJourney,
+      launch: surfaceLaunchStarted.surfacePodLaunch
+    }));
+    assert.equal(surfaceLaunchStarted.surfacePodLaunch?.active, true, JSON.stringify(surfaceLaunchStarted.surfacePodLaunch));
+    await page.waitForFunction(() => {
+      const altitude = JSON.parse(globalThis.render_game_to_text?.() || '{}').surfacePodLaunch?.altitude;
+      return altitude > 2 && altitude < 20;
+    });
+    await page.screenshot({ path: path.join(outputDir, 'desktop-earth-surface-liftoff.png'), fullPage: true });
     await page.waitForFunction(() => {
       const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
       return state.modes?.space === true && state.interstellarExpedition?.podJourney?.phase === 'rendezvous';
@@ -198,6 +211,7 @@ async function run() {
     await page.screenshot({ path: path.join(outputDir, 'mobile-earth-return-to-surveyor.png'), fullPage: true });
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.locator('#expeditionEarthPod').click();
+    await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').surfacePodLaunch?.active === true);
     await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').interstellarExpedition?.podJourney?.phase === 'rendezvous', null, { timeout: 120_000 });
     assert.equal((await snapshot(page)).interstellarExpedition.podJourney.id, returnJourneyId);
     await dockWithSurveyor(page);
