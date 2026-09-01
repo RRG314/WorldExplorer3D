@@ -15,6 +15,11 @@ Last reviewed: 2026-08-30 for World Explorer 3D 5.1.0.
 - The same accepted location snapshot is deterministic. A later session can
   differ when an upstream map provider publishes newer data or a primary source
   is temporarily unavailable and the documented fallback is used.
+- Major waterfall sites are not yet represented at production quality. A future
+  waterfall pass must extend the existing water and terrain authorities with
+  reviewed crest geometry, real upper and lower elevations, flow-aligned
+  cascades, whitewater and mist, mobile detail levels, and site-specific visual
+  validation. Experimental waterfall rendering is not part of the release.
 
 ## Roads and structures
 
