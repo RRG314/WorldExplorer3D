@@ -704,7 +704,7 @@ async function readRenderedBlocks(page) {
 
 async function readRoomBlockDocumentCount(page, roomCode) {
   return page.evaluate(async (code) => {
-    const { initFirebase } = await import('/js/firebase-init.js?v=55');
+    const { initFirebase } = await import('/js/firebase-init.js?v=56');
     const firestore = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js');
     const { db } = initFirebase();
     const snapshot = await firestore.getDocs(firestore.collection(db, 'rooms', code, 'blocks'));

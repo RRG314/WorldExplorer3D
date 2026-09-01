@@ -332,12 +332,13 @@ client or infer online players from local scene objects.
 
 Firebase Analytics is a presentation and reporting consumer, not a gameplay
 authority. Session and bounded product events exclude exact GPS coordinates,
-room codes, names, messages, artifact text, and other free-form input. With
-analytics storage unset or denied, the Firebase SDK runs in advanced consent
-mode and sends basic cookieless measurements without a World Explorer account
-identifier. Stored analytics and signed-in session identity begin only after an
-explicit analytics-storage preference; advertising storage and personalization
-remain denied.
+room codes, names, messages, artifact text, and other free-form input. Standard
+first-party analytics storage is used when no preference has been recorded so
+visits and returning sessions can be counted reliably. An explicit limited
+analytics preference denies storage, removes the analytics cookies, and leaves
+only cookieless measurements. A signed-in account identifier is attached only
+after an explicit standard-analytics preference. Advertising storage, user
+data, and personalization remain denied in every state.
 
 ## Data classification
 

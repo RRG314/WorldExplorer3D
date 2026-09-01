@@ -1,5 +1,5 @@
 import { getCurrentUserToken } from './auth-ui.js?v=55';
-import { readFirebaseConfig } from './firebase-init.js?v=55';
+import { readFirebaseConfig } from './firebase-init.js?v=56';
 
 const DEFAULT_FUNCTIONS_REGION = 'us-central1';
 const RETRYABLE_STATUS_CODES = new Set([404, 405, 406, 501, 502, 503, 504]);

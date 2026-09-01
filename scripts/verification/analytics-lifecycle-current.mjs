@@ -103,7 +103,7 @@ async function verifyGrantedDestination(destination) {
     const collectionEvidence = collectionRequests.join('\n');
     await page.screenshot({ path: path.join(outputDir, `${destination.id}-analytics-ready.png`), fullPage: true });
     assert.equal(snapshot.consent, 'granted', `${destination.id}: ${JSON.stringify({ consentEvidence, snapshot })}`);
-    assert.equal(snapshot.deliveryState, 'ready');
+    assert.equal(snapshot.deliveryState, 'ready_explicit');
     assert.equal(snapshot.worldSessionCount, 1);
     assert.equal(snapshot.errors.length, 0);
     assert.match(collectionEvidence, /we3d_runtime_ready/, `${destination.id}: runtime-ready collection request was not formed`);
@@ -124,7 +124,7 @@ async function verifyGrantedDestination(destination) {
   }
 }
 
-async function verifyCookielessFirstEntry() {
+async function verifyDefaultStoredFirstEntry() {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   await context.addInitScript((config) => {
     globalThis.WORLD_EXPLORER_FIREBASE = config;
@@ -165,30 +165,34 @@ async function verifyCookielessFirstEntry() {
     }
     const snapshot = await analyticsSnapshot(page);
     assert.equal(snapshot.consent, 'unset');
-    assert.equal(snapshot.deliveryState, 'cookieless_unset');
+    assert.equal(snapshot.deliveryState, 'ready_default');
     assert.equal(snapshot.worldSessionActive, true);
     assert.ok(snapshot.eventLoggedCount >= 2);
     assert.match(collectionRequests.join('\n'), /we3d_runtime_ready/);
     assert.match(collectionRequests.join('\n'), /we3d_world_session_start/);
     assert.match(collectionRequests.join('\n'), /[?&](?:gcs|gcd)=/);
+    const defaultAnalyticsCookies = (await context.cookies(baseUrl)).filter((cookie) => /^_ga(?:_|$)/.test(cookie.name));
+    assert.ok(defaultAnalyticsCookies.length > 0, 'Default analytics must create a stable first-party analytics identifier');
 
     await page.evaluate(async () => {
-      const consent = await import('/js/analytics-consent.js?v=2');
+      const consent = await import('/js/analytics-consent.js?v=3');
       consent.writeAnalyticsConsent('denied');
     });
     await page.waitForFunction(() => globalThis.getWorldExplorerAnalyticsSnapshot?.().deliveryState === 'cookieless_denied');
     const deniedSnapshot = await analyticsSnapshot(page);
     assert.equal(deniedSnapshot.worldSessionCount, 1, 'Denying storage must not restart the active play session');
+    const deniedAnalyticsCookies = (await context.cookies(baseUrl)).filter((cookie) => /^_ga(?:_|$)/.test(cookie.name));
+    assert.equal(deniedAnalyticsCookies.length, 0, 'Limited analytics must remove first-party analytics cookies');
 
     await page.evaluate(async () => {
-      const consent = await import('/js/analytics-consent.js?v=2');
+      const consent = await import('/js/analytics-consent.js?v=3');
       consent.writeAnalyticsConsent('granted');
     });
     await page.waitForFunction(() => {
       const analytics = globalThis.getWorldExplorerAnalyticsSnapshot?.();
       return analytics?.consent === 'granted' &&
         analytics?.worldSessionActive === true &&
-        analytics?.worldSessionCount === 1 && analytics?.deliveryState === 'ready';
+        analytics?.worldSessionCount === 1 && analytics?.deliveryState === 'ready_explicit';
     }, null, { timeout: 30_000 });
     for (let attempt = 0; attempt < 40; attempt += 1) {
       const evidence = collectionRequests.join('\n');
@@ -202,9 +206,11 @@ async function verifyCookielessFirstEntry() {
     return {
       ok: true,
       initial,
-      cookielessDeliveryState: snapshot.deliveryState,
-      cookielessEventLoggedCount: snapshot.eventLoggedCount,
+      defaultDeliveryState: snapshot.deliveryState,
+      defaultEventLoggedCount: snapshot.eventLoggedCount,
+      defaultAnalyticsCookieCount: defaultAnalyticsCookies.length,
       deniedDeliveryState: deniedSnapshot.deliveryState,
+      deniedAnalyticsCookieCount: deniedAnalyticsCookies.length,
       grantedDeliveryState: grantedSnapshot.deliveryState,
       grantedSessionCount: grantedSnapshot.worldSessionCount
     };
@@ -237,7 +243,7 @@ async function verifyStorageBlockedConsent() {
     await page.waitForSelector('#analyticsConsentAllowBtn', { state: 'visible', timeout: 30_000 });
     await page.locator('#analyticsConsentAllowBtn').click();
     const evidence = await page.evaluate(async () => {
-      const consent = await import('/js/analytics-consent.js?v=1');
+      const consent = await import('/js/analytics-consent.js?v=3');
       return {
         readValue: consent.readAnalyticsConsent(),
         memoryValue: globalThis.__WE3D_ANALYTICS_CONSENT__ || null
@@ -252,12 +258,12 @@ async function verifyStorageBlockedConsent() {
 }
 
 await fs.mkdir(outputDir, { recursive: true });
-const result = { ok: false, contract: 'analytics-advanced-consent-and-playable-environment-delivery', storageBlocked: null, cookieless: null, destinations: [] };
+const result = { ok: false, contract: 'default-standard-analytics-with-explicit-limited-mode', storageBlocked: null, defaultStorage: null, destinations: [] };
 try {
   result.storageBlocked = await verifyStorageBlockedConsent();
-  result.cookieless = await verifyCookielessFirstEntry();
+  result.defaultStorage = await verifyDefaultStoredFirstEntry();
   for (const destination of destinations) result.destinations.push(await verifyGrantedDestination(destination));
-  result.ok = result.storageBlocked.ok && result.cookieless.ok && result.destinations.every((entry) => entry.ok);
+  result.ok = result.storageBlocked.ok && result.defaultStorage.ok && result.destinations.every((entry) => entry.ok);
   await fs.writeFile(path.join(outputDir, 'report.json'), `${JSON.stringify(result, null, 2)}\n`, 'utf8');
   console.log(JSON.stringify(result, null, 2));
   assert.equal(result.ok, true);

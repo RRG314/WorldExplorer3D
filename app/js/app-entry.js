@@ -1,7 +1,7 @@
 // ES module entrypoint with explicit application boot contract.
 // Import order mirrors legacy runtime dependencies.
 import { getCurrentUser, observeAuth } from '../../js/auth-ui.js?v=55';
-import { setupAnalyticsConsentUi } from '../../js/analytics-consent.js?v=2';
+import { setupAnalyticsConsentUi } from '../../js/analytics-consent.js?v=3';
 import './rdt.js?v=55';
 import './config.js?v=62';
 import { ctx as appCtx } from './shared-context.js?v=55';
@@ -137,7 +137,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'analytics', category: 'telemetry',
         load: async () => {
-            const mod = await import('../../js/analytics.js?v=2');
+            const mod = await import('../../js/analytics.js?v=3');
             if (typeof mod.getAnalyticsSessionSnapshot === 'function') {
                 appCtx.getAnalyticsSessionSnapshot = () => mod.getAnalyticsSessionSnapshot(appCtx);
             }

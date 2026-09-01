@@ -1,6 +1,6 @@
 import { observeAuth } from './auth-ui.js?v=55';
-import { initFirebaseAnalytics, readFirebaseConfig } from './firebase-init.js?v=55';
-import { readAnalyticsConsent } from './analytics-consent.js?v=2';
+import { initFirebaseAnalytics, readFirebaseConfig } from './firebase-init.js?v=56';
+import { analyticsStorageAllowed, readAnalyticsConsent } from './analytics-consent.js?v=3';
 
 const ANALYTICS_EVENT_WORLD_START = 'we3d_world_session_start';
 const ANALYTICS_EVENT_WORLD_END = 'we3d_world_session_end';
@@ -403,7 +403,7 @@ function startAnalyticsTracking(appCtx) {
 
   consentEventListener = async (event) => {
     const analyticsMod = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-analytics.js').catch(() => null);
-    const granted = event?.detail?.value === 'granted';
+    const granted = analyticsStorageAllowed(event?.detail?.value);
     analyticsMod?.setConsent?.({
       analytics_storage: granted ? 'granted' : 'denied',
       ad_storage: 'denied',
@@ -480,7 +480,9 @@ function getAnalyticsSessionSnapshot(appCtx = null) {
     deliveryState: !trackingStarted
         ? 'warmup_pending'
         : state.ready
-          ? readAnalyticsConsent() === 'granted' ? 'ready' : `cookieless_${readAnalyticsConsent()}`
+          ? readAnalyticsConsent() === 'denied'
+            ? 'cookieless_denied'
+            : readAnalyticsConsent() === 'granted' ? 'ready_explicit' : 'ready_default'
           : state.disabledReason || 'initializing',
     currentMode: ctx ? currentTravelMode(ctx) : '',
     currentEnvironment: ctx ? currentEnvironment(ctx) : '',
