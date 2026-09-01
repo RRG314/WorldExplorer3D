@@ -421,6 +421,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .floatMenuRow { display: contents; }
 .floatMenu { min-width: 0; }
 .floatBtn {
+  position: relative;
   height: 66px;
   padding: 7px 4px;
   flex-direction: column;
@@ -434,7 +435,21 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   box-shadow: none;
   font-size: 10px;
 }
-.floatBtn:hover, .floatMenu.open .floatBtn { color: var(--wx-text) !important; background: rgba(45, 125, 255, 0.1); border-bottom-color: var(--wx-blue); transform: none; box-shadow: none; }
+.floatBtn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 18%;
+  right: 18%;
+  height: 2px;
+  background: var(--wx-blue);
+  opacity: 0;
+  transform: scaleX(.35);
+  transition: opacity .16s ease, transform .16s ease;
+}
+.floatBtn:hover, .floatBtn:focus-visible, .floatMenu.open .floatBtn { color: var(--wx-text) !important; background: linear-gradient(180deg,rgba(45,125,255,.13),rgba(45,125,255,.04)); border-bottom-color: var(--wx-blue); transform: none; box-shadow: none; }
+.floatBtn:hover::before, .floatBtn:focus-visible::before, .floatMenu.open .floatBtn::before { opacity: 1; transform: scaleX(1); }
+.floatBtn:focus-visible { outline: 1px solid rgba(126,181,255,.82); outline-offset: -2px; }
 body.deflock-active .floatMenuContainer {
   left: 300px;
   right: 300px;
@@ -450,8 +465,10 @@ body.deflock-active .floatBtn::after {
   font: 600 8px/1 Orbitron,sans-serif;
   text-transform: uppercase;
 }
-.btnIcon { display: block; font-size: 23px; line-height: 1; filter: grayscale(1) brightness(2); }
-.btnText { display: block; color: inherit; font: 600 9px/1 Orbitron, sans-serif; text-transform: uppercase; }
+.btnIcon { display: grid; place-items: center; width: 25px; height: 25px; line-height: 1; color: #c7d0d7; }
+.btnIcon svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.55; stroke-linecap: round; stroke-linejoin: round; }
+.floatBtn:hover .btnIcon, .floatBtn:focus-visible .btnIcon, .floatMenu.open .btnIcon { color: #8fc1ff; }
+.btnText { display: block; color: inherit; font: 650 9px/1 Orbitron, sans-serif; letter-spacing: .035em; text-transform: uppercase; }
 .floatItems {
   top: 88px;
   right: 0;
@@ -597,9 +614,9 @@ body.deflock-active .floatBtn::after {
   }
   #multiplayerMenu { position: relative; left: auto; bottom: auto; z-index: auto; }
   .floatBtn { height: 78px; padding: 8px 2px 5px; }
-  .btnIcon { font-size: 23px; }
+  .btnIcon { width: 24px; height: 24px; }
   .btnText { display: none; }
-  .floatBtn::after { content: attr(data-mobile-label); display: block; color: inherit; font: 600 8px/1 Orbitron, sans-serif; text-transform: uppercase; }
+  .floatBtn::after { content: attr(data-mobile-label); display: block; color: inherit; font: 650 7.5px/1.1 Orbitron, sans-serif; letter-spacing: .02em; text-transform: uppercase; }
   .floatItems {
     top: auto;
     left: 0;

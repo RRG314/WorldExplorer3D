@@ -44,8 +44,15 @@ try {
   await page.waitForSelector('#tutorialHintCard:not([hidden])', { timeout: 20_000 });
   await page.locator('#tutorialHintCard .tutorial-text-btn').click();
 
-  const hubLabels = await page.locator('#floatMenuContainer > .floatMenuRow > .floatMenu > .floatBtn').allTextContents();
-  assert.deepEqual(hubLabels.map((label) => label.trim()), ['🧭Explore', '🌍Travel', '🧱Create', '👥Community', '🎒My Explorer']);
+  const hubPresentation = await page.locator('#floatMenuContainer > .floatMenuRow > .floatMenu > .floatBtn').evaluateAll((buttons) => buttons.map((button) => ({
+    label: button.querySelector('.btnText')?.textContent?.trim(),
+    mobileLabel: button.getAttribute('data-mobile-label'),
+    accessibleLabel: button.getAttribute('aria-label'),
+    hasVectorIcon: Boolean(button.querySelector('.btnIcon[aria-hidden="true"] svg'))
+  })));
+  assert.deepEqual(hubPresentation.map((entry) => entry.label), ['Explore', 'Travel', 'Create', 'Community', 'My Explorer']);
+  assert.deepEqual(hubPresentation.map((entry) => entry.mobileLabel), ['Explore', 'Travel', 'Create', 'Community', 'My Explorer']);
+  assert.ok(hubPresentation.every((entry) => entry.accessibleLabel && entry.hasVectorIcon));
 
   await openMenu('exploreBtn', 'exploreMenu');
   assert.match(await page.locator('#exploreMenu .floatItems').textContent(), /Today & Nearby.*Choose an Activity.*Explore with Live GPS/s);
@@ -61,7 +68,7 @@ try {
   await openMenu('myExplorerBtn', 'myExplorerMenu');
   await page.locator('#fExplorerProfile').click();
   await page.waitForSelector('#discoveryPanel.show .discoveryPane[data-discovery-pane="profile"].active');
-  assert.match(await page.locator('#discoveryJourneyOverview').textContent(), /Choose what kind of day you want.*Discover.*Travel.*Create.*Explore Together.*Companions/is);
+  assert.match(await page.locator('#discoveryJourneyOverview').textContent(), /Choose your next direction.*Discover.*Travel.*Create.*Explore Together.*Companions/is);
   await page.screenshot({ path: `${evidenceDir}/00-my-explorer-story-desktop.png` });
   await page.locator('#discoveryJourneyOverview [data-explorer-route="travel"]').click();
   await page.waitForSelector('#travelMenu.open');
