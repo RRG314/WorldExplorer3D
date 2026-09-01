@@ -571,7 +571,7 @@ export async function handleInteriorAction(deps) {
   if (appCtx.activeInterior) {
     const active = appCtx.activeInterior;
     const interaction = nearestInteriorInteraction(active, appCtx.Walk?.state?.walker);
-    if (['ship-station', 'ship-exit', 'ship-door', 'ship-lift', 'ship-incident-step'].includes(interaction?.kind)) {
+    if (['ship-station', 'ship-exit', 'ship-door', 'ship-lift', 'ship-incident-step', 'ship-crew'].includes(interaction?.kind)) {
       return (await appCtx.handleShipInteriorInteraction?.(interaction)) !== false;
     }
     if (interaction?.kind === 'exit') {

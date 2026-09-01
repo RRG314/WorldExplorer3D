@@ -14,6 +14,7 @@ import { constructOutpost, constructionAvailability, createOutpostSite, serviceO
 import { registerExpeditionDiscovery } from './contact-authority.js?v=4';
 import { createPodJourney, POD_PHASE, transitionPodJourney } from './pod-journey-authority.js?v=1';
 import { approvedSampleTradeValue, summarizeExpeditionTransfers } from '../resources/material-catalog.js?v=2';
+import { SHIP_STATIONS } from './ship-layout.js?v=5';
 
 let activeContext = null;
 let activeExpedition = null;
@@ -758,6 +759,64 @@ function closeShipStationPanel() {
   document.getElementById('shipStationPanel')?.classList.remove('show');
 }
 
+function crewPortraitPosition(crewId) {
+  if (['crew-science', 'crew-life'].includes(crewId)) return '36% center';
+  if (crewId === 'crew-med') return '67% center';
+  if (['crew-eng', 'crew-systems'].includes(crewId)) return '96% center';
+  return '4% center';
+}
+
+function crewMissionAdvice(crew) {
+  const pending = activeExpedition?.pendingEvent;
+  if (pending?.roomId) {
+    const station = SHIP_STATIONS.find((entry) => entry.roomId === pending.roomId && !entry.id.startsWith('deck-lift:'));
+    return Object.freeze({
+      stationId: station?.id || 'navigation-course',
+      title: pending.title,
+      message: station
+        ? `${crew.name} recommends going to ${station.label} now. The ship map will guide you to the correct deck and station.`
+        : `${crew.name} recommends following the active response marker and completing each physical procedure in order.`
+    });
+  }
+  const mission = activeContext?.getDestinationMissionSnapshot?.();
+  if (mission?.phase === 'analysis') return Object.freeze({ stationId: 'analysis-review', title: mission.currentObjective || mission.title, message: `${crew.name} recommends taking the returned field record to Analysis & Data before continuing.` });
+  if (mission?.phase === 'fieldwork' && mission.surfaceRequired && mission.atDestination) return Object.freeze({ stationId: 'craft-bay-status', title: mission.currentObjective || mission.title, message: `${crew.name} recommends taking the lift to Engineering, boarding the pod at its side hatch, and checking the landing objective before launch.` });
+  if (mission?.phase === 'approach' || mission?.phase === 'available') return Object.freeze({ stationId: 'bridge-flight', title: mission.currentObjective || mission.title, message: `${crew.name} recommends returning to the bridge flight controls and following the selected destination course.` });
+  if ((activeExpedition?.routeContacts || []).some((contact) => ['available', 'returned'].includes(contact.localOperationState))) return Object.freeze({ stationId: 'craft-bay-status', title: 'Surveyed world available', message: `${crew.name} recommends using the Pod Launch Bay for the local surface operation.` });
+  if (activeExpedition?.state === 'planned') return Object.freeze({ stationId: 'bridge-flight', title: 'Surveyor is ready', message: `${crew.name} recommends returning to flight controls when you are ready to depart.` });
+  const roles = new Set(crew.roles || []);
+  if (roles.has('engineering')) return Object.freeze({ stationId: 'engineering-status', title: 'Engineering watch', message: `${crew.name} recommends reviewing the lowest ship-system margin before the next voyage chapter.` });
+  if (roles.has('medical')) return Object.freeze({ stationId: 'medical-status', title: 'Crew readiness', message: `${crew.name} recommends checking fatigue and treatment reserves before the next watch.` });
+  if (roles.has('life-support')) return Object.freeze({ stationId: 'life-support-status', title: 'Life-support watch', message: `${crew.name} recommends checking atmosphere, water recovery, and stored reserves.` });
+  if (roles.has('science')) return Object.freeze({ stationId: 'science-survey', title: 'Science watch', message: `${crew.name} recommends recording a local baseline while the voyage is stable.` });
+  return Object.freeze({ stationId: 'navigation-course', title: 'Navigation watch', message: `${crew.name} recommends reviewing the active route and arrival margins.` });
+}
+
+function renderCrewInteractionPanel(interaction) {
+  const crew = (activeExpedition?.crew || []).find((entry) => entry.id === interaction?.crewId);
+  if (!crew) return false;
+  let panel = document.getElementById('shipStationPanel');
+  if (!panel) {
+    panel = document.createElement('section');
+    panel.id = 'shipStationPanel';
+    document.body.appendChild(panel);
+  }
+  const advice = crewMissionAdvice(crew);
+  const roles = (crew.roles || []).map((role) => String(role).replaceAll('-', ' ')).join(' · ');
+  panel.innerHTML = `<div class="ship-station-card ship-crew-card" role="dialog" aria-modal="true" aria-labelledby="shipStationTitle">
+    <header><div><span>SURVEYOR CREW</span><strong id="shipStationTitle">${crew.name}</strong></div><button type="button" data-close-station aria-label="Close crew conversation">×</button></header>
+    <div class="ship-crew-conversation"><figure><img src="assets/expedition/crew/space-crew-reference-v1.png" alt="Surveyor crew visual" style="object-position:${crewPortraitPosition(crew.id)}"></figure><div><span>${roles}</span><h3>${advice.title}</h3><p>${advice.message}</p><dl><div><dt>Assignment</dt><dd>${String(crew.assignment || 'active watch').replaceAll('-', ' ')}</dd></div><div><dt>Health</dt><dd>${Math.round(Number(crew.health || 0) * 100)}%</dd></div><div><dt>Fatigue</dt><dd>${Math.round(Number(crew.fatigue || 0) * 100)}%</dd></div></dl></div></div>
+    <div class="ship-station-actions"><button type="button" data-crew-route="${advice.stationId}">Show route</button><small>The route uses the existing ship objective, map, lift, door, and station authorities.</small></div>
+  </div>`;
+  panel.classList.add('show');
+  panel.querySelector('[data-close-station]')?.addEventListener('click', closeShipStationPanel);
+  panel.querySelector('[data-crew-route]')?.addEventListener('click', (event) => {
+    closeShipStationPanel();
+    if (!activeContext?.setExpeditionShipGuidanceTarget?.(event.currentTarget.dataset.crewRoute)) activeContext?.showToast?.('That ship station is not available right now.');
+  });
+  return true;
+}
+
 async function commitVoyageResponse(choiceId, interaction) {
   const previousId = activeExpedition?.pendingEvent?.id;
   const next = resolveExpeditionEvent(activeExpedition, choiceId);
@@ -1091,6 +1150,7 @@ function markExpeditionPodSurfaceLaunch(bodyId) {
 }
 
 async function handleShipInteraction(interaction) {
+  if (interaction?.kind === 'ship-crew') return renderCrewInteractionPanel(interaction);
   if (interaction?.id === 'bridge-flight') {
     closeShipStationPanel();
     return activeContext?.exitExpeditionShipInterior?.() === true;
@@ -1104,7 +1164,7 @@ async function handleShipInteraction(interaction) {
 
 async function enterActiveShip() {
   if (!activeExpedition || !activeContext?.spaceFlight?.active) return false;
-  const ship = await import('./ship-interior.js?v=11');
+  const ship = await import('./ship-interior.js?v=12');
   closeExpeditionPlanner();
   const entered = ship.enterSurveyorInterior({
     expedition: activeExpedition,

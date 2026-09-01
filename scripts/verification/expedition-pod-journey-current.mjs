@@ -58,6 +58,23 @@ async function enterPodBay(page, contactId) {
   await page.locator('#expeditionOverlay').waitFor({ state: 'visible' });
   await page.locator('#expeditionEnterShip').click();
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.active === true);
+  const crewInteraction = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const interaction = ctx.activeInterior?.interactions.find((entry) => entry.kind === 'ship-crew');
+    if (!interaction) return null;
+    Object.assign(ctx.Walk.state.walker, { x: interaction.x, z: interaction.z, angle: 0, yaw: 0, lookYawOffset: 0, pitch: 0, vy: 0, onGround: true });
+    return interaction;
+  });
+  assert.ok(crewInteraction?.crewId, 'No physical crew interaction target was available on the command deck.');
+  await page.waitForTimeout(180);
+  await page.keyboard.press('KeyE');
+  await page.locator('#shipStationPanel .ship-crew-card').waitFor({ state: 'visible' });
+  assert.equal(await page.locator('#shipStationPanel .ship-crew-conversation img').evaluate((image) => image.complete && image.naturalWidth > 0), true);
+  assert.match(await page.locator('#shipStationPanel .ship-crew-conversation p').textContent(), /recommends/i);
+  await page.locator('#shipStationPanel [data-crew-route]').click();
+  await page.locator('#shipMapOverlay.show').waitFor({ state: 'visible' });
+  assert.ok((await snapshot(page)).expeditionShipInterior?.selectedRoomId, 'Crew advice did not select a physical ship-map destination.');
+  await page.locator('#shipMapOverlay [data-close-map]').click();
   await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     Object.assign(ctx.Walk.state.walker, { x: 0, z: 0.6, angle: 0, yaw: 0, lookYawOffset: 0, pitch: 0 });
@@ -67,7 +84,7 @@ async function enterPodBay(page, contactId) {
   await page.locator('#shipDeckPicker [data-deck="engineering"]').click();
   await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    Object.assign(ctx.Walk.state.walker, { x: 5.4, z: -29, angle: Math.PI / 2, yaw: Math.PI / 2, lookYawOffset: 0, pitch: 0, vy: 0, onGround: true });
+    Object.assign(ctx.Walk.state.walker, { x: 4.8, z: -28.4, angle: Math.PI / 2, yaw: Math.PI / 2, lookYawOffset: 0, pitch: 0, vy: 0, onGround: true });
   });
   await page.waitForTimeout(250);
   await page.keyboard.press('KeyE');
@@ -194,7 +211,7 @@ async function run() {
     await page.screenshot({ path: path.join(outputDir, 'desktop-pod-launch-bay.png'), fullPage: true });
     await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
-      Object.assign(ctx.Walk.state.walker, { x: 5.4, z: -29, angle: Math.PI / 2, yaw: Math.PI / 2, lookYawOffset: 0, pitch: 0 });
+      Object.assign(ctx.Walk.state.walker, { x: 4.8, z: -28.4, angle: Math.PI / 2, yaw: Math.PI / 2, lookYawOffset: 0, pitch: 0 });
     });
     await page.keyboard.press('KeyE');
     await page.locator(`[data-pod-contact="${contact.id}"]`).click();

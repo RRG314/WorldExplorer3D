@@ -12,6 +12,7 @@ import {
 } from './ship-layout.js?v=5';
 import { deriveCrewOperations, summarizeCrewOperations } from './crew-operations.js?v=1';
 import { shipAlertState } from './failure-authority.js?v=1';
+import { createBeveledVehicleBoxGeometry, createTaperedPrismGeometry } from '../engine/classic-utility-car.js?v=3';
 
 let activeSession = null;
 
@@ -690,24 +691,77 @@ function addEvaSuit(group, x, z, yaw, accent, label) {
   return root;
 }
 
+const CREW_APPEARANCE = Object.freeze({
+  'crew-nav': Object.freeze({ uniform: 0x234f78, secondary: 0x172d46, skin: 0xa96f50, hair: 0x2a1c18, accent: 0x7dd7f2 }),
+  'crew-flight': Object.freeze({ uniform: 0x2a5782, secondary: 0x1d334c, skin: 0xc89168, hair: 0x503428, accent: 0x8adcf2 }),
+  'crew-science': Object.freeze({ uniform: 0x1c6970, secondary: 0x163f48, skin: 0x704733, hair: 0x171412, accent: 0x78e3cf }),
+  'crew-med': Object.freeze({ uniform: 0x5d718c, secondary: 0x34445b, skin: 0xc18b67, hair: 0x3c332f, accent: 0xc3e7ff }),
+  'crew-life': Object.freeze({ uniform: 0x32675f, secondary: 0x213e3b, skin: 0x86583f, hair: 0x1c1714, accent: 0x83e2be }),
+  'crew-eng': Object.freeze({ uniform: 0xb45d24, secondary: 0x5d321f, skin: 0xb97855, hair: 0x211815, accent: 0xffbf72 }),
+  'crew-systems': Object.freeze({ uniform: 0x9a5728, secondary: 0x51372a, skin: 0xc28d69, hair: 0x201a18, accent: 0xffca82 })
+});
+
+function addCrewPart(root, geometry, surface, name, position, scale = null, rotation = null) {
+  const mesh = new THREE.Mesh(geometry, surface);
+  mesh.name = name;
+  mesh.position.set(position.x || 0, position.y || 0, position.z || 0);
+  if (scale) mesh.scale.set(scale.x ?? 1, scale.y ?? 1, scale.z ?? 1);
+  if (rotation) mesh.rotation.set(rotation.x || 0, rotation.y || 0, rotation.z || 0);
+  mesh.castShadow = true;
+  root.add(mesh);
+  return mesh;
+}
+
 function addCrewMember(group, post, crew) {
   const root = new THREE.Group();
-  root.name = `ship-crew:${crew?.id || post.crewId}`;
-  root.userData.crewId = crew?.id || post.crewId;
+  const crewId = crew?.id || post.crewId;
+  const appearance = CREW_APPEARANCE[crewId] || CREW_APPEARANCE['crew-nav'];
+  root.name = `ship-crew:${crewId}`;
+  root.userData.crewId = crewId;
   root.userData.crewName = crew?.name || 'Surveyor crew';
+  root.userData.crewRoles = [...(crew?.roles || [])];
+  root.userData.crewAssignment = crew?.assignment || '';
   root.userData.currentRoomId = post.roomId;
   root.userData.deckId = post.deckId;
   root.userData.route = [];
   root.userData.assignmentId = null;
-  const uniform = material(crew?.id === 'crew-eng' ? 0xb5652a : crew?.id === 'crew-med' ? 0x5e789d : 0x253d66, { roughness: 0.72 });
-  const skin = material(0xb88264, { roughness: 0.84, metalness: 0 });
-  const trim = material(0xc8d4e4, { roughness: 0.58, metalness: 0.18 });
-  box(root, { x: 0.72, y: 1.05, z: 0.42 }, { x: 0, y: 1.12, z: 0 }, uniform);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 14, 10), skin);
-  head.position.y = 1.84;
-  root.add(head);
-  [-0.22, 0.22].forEach((x) => box(root, { x: 0.18, y: 0.78, z: 0.2 }, { x, y: 0.39, z: 0 }, uniform));
-  box(root, { x: 0.5, y: 0.08, z: 0.05 }, { x: 0, y: 1.35, z: -0.235 }, trim);
+  const uniform = material(appearance.uniform, { roughness: 0.78, metalness: 0.03 });
+  const secondary = material(appearance.secondary, { roughness: 0.86, metalness: 0.02 });
+  const skin = material(appearance.skin, { roughness: 0.86, metalness: 0 });
+  const hair = material(appearance.hair, { roughness: 0.94, metalness: 0 });
+  const trim = material(0xaebdc6, { roughness: 0.52, metalness: 0.28 });
+  const accent = material(appearance.accent, { emissive: appearance.accent, emissiveIntensity: 0.35, roughness: 0.42, metalness: 0.1 });
+  const dark = material(0x151d24, { roughness: 0.78, metalness: 0.12 });
+
+  addCrewPart(root, createTaperedPrismGeometry(THREE, { widthBottom: 0.78, widthTop: 0.66, height: 1, length: 0.42, frontInset: 0.03, rearInset: 0.03 }), uniform, `${crewId}:torso`, { x: 0, y: 1.27, z: 0 });
+  addCrewPart(root, createTaperedPrismGeometry(THREE, { widthBottom: 0.68, widthTop: 0.76, height: 0.42, length: 0.38, frontInset: 0.02, rearInset: 0.02 }), secondary, `${crewId}:waist`, { x: 0, y: 0.83, z: 0 });
+  box(root, { x: 0.72, y: 0.09, z: 0.44 }, { x: 0, y: 0.93, z: 0 }, trim, `${crewId}:utility-belt`);
+  box(root, { x: 0.18, y: 0.26, z: 0.12 }, { x: 0.31, y: 0.77, z: -0.23 }, dark, `${crewId}:belt-pouch`);
+  box(root, { x: 0.5, y: 0.07, z: 0.045 }, { x: 0, y: 1.43, z: -0.225 }, accent, `${crewId}:service-stripe`);
+  [-0.24, 0.24].forEach((x, index) => box(root, { x: 0.18, y: 0.08, z: 0.07 }, { x, y: 1.64, z: -0.2 }, index ? trim : accent, `${crewId}:collar-tab`));
+
+  const legs = [-0.22, 0.22].map((x, index) => addCrewPart(root, new THREE.CylinderGeometry(0.105, 0.12, 0.72, 10), secondary, `${crewId}:leg:${index}`, { x, y: 0.42, z: 0 }));
+  [-0.22, 0.22].forEach((x, index) => addCrewPart(root, createBeveledVehicleBoxGeometry(THREE, 0.24, 0.19, 0.38, 0.05), dark, `${crewId}:boot:${index}`, { x, y: 0.09, z: -0.06 }));
+  const arms = [-1, 1].map((side, index) => {
+    const armRoot = new THREE.Group();
+    armRoot.name = `${crewId}:arm:${index}`;
+    armRoot.position.set(side * 0.47, 1.48, 0);
+    addCrewPart(armRoot, new THREE.CylinderGeometry(0.085, 0.1, 0.58, 10), uniform, `${crewId}:upper-arm:${index}`, { x: 0, y: -0.25, z: 0 }, null, { z: side * -0.08 });
+    addCrewPart(armRoot, new THREE.CylinderGeometry(0.075, 0.085, 0.46, 10), secondary, `${crewId}:forearm:${index}`, { x: 0, y: -0.72, z: -0.02 });
+    addCrewPart(armRoot, new THREE.SphereGeometry(0.1, 12, 8), skin, `${crewId}:hand:${index}`, { x: 0, y: -0.99, z: -0.02 });
+    root.add(armRoot);
+    return armRoot;
+  });
+
+  addCrewPart(root, new THREE.CylinderGeometry(0.1, 0.12, 0.16, 12), skin, `${crewId}:neck`, { x: 0, y: 1.79, z: 0 });
+  addCrewPart(root, new THREE.SphereGeometry(0.25, 20, 14), skin, `${crewId}:head`, { x: 0, y: 2.02, z: 0 }, { x: 0.92, y: 1.08, z: 0.9 });
+  addCrewPart(root, new THREE.SphereGeometry(0.255, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.52), hair, `${crewId}:hair`, { x: 0, y: 2.12, z: 0.015 }, { x: 0.96, y: 0.8, z: 0.94 });
+  [-0.085, 0.085].forEach((x, index) => addCrewPart(root, new THREE.SphereGeometry(0.018, 8, 6), dark, `${crewId}:eye:${index}`, { x, y: 2.045, z: -0.223 }));
+  addCrewPart(root, new THREE.ConeGeometry(0.035, 0.09, 8), skin, `${crewId}:nose`, { x: 0, y: 1.995, z: -0.245 }, null, { x: Math.PI / 2 });
+  box(root, { x: 0.28, y: 0.045, z: 0.025 }, { x: 0, y: 1.92, z: -0.235 }, material(0x6e3c35, { roughness: 0.88, metalness: 0 }), `${crewId}:mouth`);
+
+  root.userData.animatedArms = arms;
+  root.userData.animatedLegs = legs;
   root.position.set(post.x, 0.05, post.z);
   root.rotation.y = post.yaw;
   group.add(root);
@@ -832,6 +886,8 @@ function updateCrewMotion(session, dt) {
     const waypoint = mesh.userData.route?.[0];
     if (!waypoint) {
       mesh.position.y = 0.05 + Math.sin(session.visualClock * 1.8 + index) * 0.012;
+      (mesh.userData.animatedArms || []).forEach((arm, armIndex) => { arm.rotation.x = Math.sin(session.visualClock * 1.2 + index + armIndex) * 0.025; });
+      (mesh.userData.animatedLegs || []).forEach((leg) => { leg.rotation.x *= 0.78; });
       return;
     }
     const dx = waypoint.x - mesh.position.x;
@@ -848,6 +904,17 @@ function updateCrewMotion(session, dt) {
     mesh.position.z += dz / distance * travel;
     mesh.position.y = 0.05 + Math.sin(session.visualClock * 7 + index) * 0.025;
     mesh.rotation.y = Math.atan2(dx, dz);
+    const stride = Math.sin(session.visualClock * 8.2 + index) * 0.34;
+    (mesh.userData.animatedArms || []).forEach((arm, armIndex) => { arm.rotation.x = armIndex === 0 ? stride : -stride; });
+    (mesh.userData.animatedLegs || []).forEach((leg, legIndex) => { leg.rotation.x = legIndex === 0 ? -stride : stride; });
+  });
+  const interactions = appCtx.activeInterior?.interactions || [];
+  session.sceneState.crewMeshes.forEach((mesh) => {
+    const interaction = interactions.find((entry) => entry.kind === 'ship-crew' && entry.crewId === mesh.userData.crewId);
+    if (!interaction) return;
+    interaction.x = mesh.position.x;
+    interaction.z = mesh.position.z;
+    interaction.roomId = mesh.userData.currentRoomId;
   });
 }
 
@@ -1760,6 +1827,20 @@ function activeDeckInteractions(session = activeSession) {
     kind: 'ship-door',
     level: 0
   }));
+  const crew = session.sceneState.crewMeshes
+    .filter((mesh) => mesh.visible && mesh.userData.deckId === session.activeDeckId)
+    .map((mesh) => ({
+      id: `ship-crew:${mesh.userData.crewId}`,
+      crewId: mesh.userData.crewId,
+      deckId: session.activeDeckId,
+      roomId: mesh.userData.currentRoomId,
+      label: `Talk to ${mesh.userData.crewName}`,
+      x: mesh.position.x,
+      z: mesh.position.z,
+      radius: 1.85,
+      kind: 'ship-crew',
+      level: 0
+    }));
   if (session.activeDeckId === 'command') {
     stations.push({ id: 'return-to-flight', deckId: 'command', roomId: 'bridge', label: 'Return to flight controls', x: 0, z: 25.8, radius: 2.1, kind: 'ship-exit', level: 0 });
   }
@@ -1779,7 +1860,7 @@ function activeDeckInteractions(session = activeSession) {
       level: 0
     });
   }
-  return stations.concat(doors);
+  return stations.concat(doors, crew);
 }
 
 function updateActiveDeckContract(session = activeSession) {
@@ -1952,6 +2033,18 @@ function syncShipGuidance(session = activeSession) {
   return guidance;
 }
 
+function setShipGuidanceTarget(stationId) {
+  const session = activeSession;
+  const station = SHIP_STATIONS.find((entry) => entry.id === stationId);
+  if (!session || !station) return false;
+  session.manualGuidance = true;
+  session.selectedRoomId = station.roomId;
+  session.selectedStationId = station.id;
+  session.mapDeckId = station.deckId;
+  toggleShipMap(true);
+  return true;
+}
+
 function selectedMapTarget(session) {
   const station = SHIP_STATIONS.find((entry) => entry.id === session.selectedStationId);
   if (station) return { ...station };
@@ -2075,7 +2168,7 @@ function ensureShipMaps(session) {
     const link = document.createElement('link');
     link.id = 'expeditionShipStyles';
     link.rel = 'stylesheet';
-    link.href = 'styles/expedition-ship.css?v=6';
+    link.href = 'styles/expedition-ship.css?v=7';
     document.head.appendChild(link);
   }
   let mini = document.getElementById('shipMiniMap');
@@ -2419,8 +2512,9 @@ Object.assign(appCtx, {
   toggleExpeditionShipMap: toggleShipMap,
   updateExpeditionShipRecord,
   playExpeditionShipAction,
+  setExpeditionShipGuidanceTarget: setShipGuidanceTarget,
   startExpeditionIncidentProcedure: startIncidentProcedure,
   updateExpeditionShipInterior
 });
 
-export { enterSurveyorInterior, exitSurveyorInterior, getShipInteriorSnapshot, handleShipInteriorInteraction, playExpeditionShipAction, startIncidentProcedure, switchSurveyorDeck, toggleShipMap, updateExpeditionShipInterior, updateExpeditionShipRecord };
+export { enterSurveyorInterior, exitSurveyorInterior, getShipInteriorSnapshot, handleShipInteriorInteraction, playExpeditionShipAction, setShipGuidanceTarget, startIncidentProcedure, switchSurveyorDeck, toggleShipMap, updateExpeditionShipInterior, updateExpeditionShipRecord };
