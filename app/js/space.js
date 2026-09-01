@@ -2,9 +2,9 @@ import { ctx as appCtx } from "./shared-context.js?v=55";
 import { getPrimaryWorldCanvas } from "./engine/webgl-lifecycle.js?v=1";
 import { captureEarthWorldSession } from "./earth-session.js?v=17";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
-import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=18";
-import { createSpaceFlightScene, destroySpaceFlightScene, ensureExtendedSpaceScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon, setExpeditionPodFlightPresentation } from "./space/scene.js?v=32";
-import { hideGameUI, initSpaceFlightUI, prepareSpaceFlightHudForEntry, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=32";
+import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=19";
+import { createSpaceFlightScene, destroySpaceFlightScene, ensureExtendedSpaceScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon, setExpeditionPodFlightPresentation, updateExpeditionPodFlightPresentation } from "./space/scene.js?v=33";
+import { hideGameUI, initSpaceFlightUI, prepareSpaceFlightHudForEntry, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=33";
 import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 import {
   beginEnvironmentTransition,
@@ -435,6 +435,7 @@ Object.assign(appCtx, {
   showSpaceFlightMessage: showFlightMessage,
   setSpaceFlightLandingTarget,
   setExpeditionPodFlightPresentation,
+  updateExpeditionPodFlightPresentation,
   startSpaceFlightToEarth,
   startSpaceFlightFromExpeditionSurface,
   startSpaceFlightToMars,
@@ -447,6 +448,7 @@ export {
   forceSpaceFlightLanding,
   setSpaceFlightLandingTarget,
   setExpeditionPodFlightPresentation,
+  updateExpeditionPodFlightPresentation,
   startSpaceFlightToEarth,
   startSpaceFlightFromExpeditionSurface,
   startSpaceFlightToMars,

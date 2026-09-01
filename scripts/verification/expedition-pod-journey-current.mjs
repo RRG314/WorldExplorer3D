@@ -233,10 +233,22 @@ async function run() {
       return {
         visible: pod?.visible === true,
         authority: pod?.userData?.authority || null,
-        wayfinderVisible: ctx.spaceFlight.rocket?.children.some((child) => child !== pod && child.visible !== false) || false
+        wayfinderVisible: ctx.spaceFlight.rocket?.children.some((child) => child !== pod && child.visible !== false) || false,
+        entryEffectReady: pod?.getObjectByName('podEntryPlasma') != null,
+        dockingGuideReady: pod?.getObjectByName('podDockingGuide') != null,
+        hudTitle: document.getElementById('sfFlightTitle')?.textContent || '',
+        phaseBadge: document.getElementById('sfPodPhase')?.textContent || ''
       };
     });
-    assert.deepEqual(outboundPodPresentation, { visible: true, authority: 'expedition-pod-journey', wayfinderVisible: false });
+    assert.deepEqual(outboundPodPresentation, {
+      visible: true,
+      authority: 'expedition-pod-journey',
+      wayfinderVisible: false,
+      entryEffectReady: true,
+      dockingGuideReady: true,
+      hudTitle: 'PATHFINDER POD',
+      phaseBadge: 'LOCAL FLIGHT'
+    });
 
     await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
@@ -329,10 +341,13 @@ async function run() {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
       return ctx.handlePrimaryContextInteraction();
     }), true);
+    await page.waitForTimeout(120);
     assert.equal(await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
       const pod = ctx.spaceFlight.rocket?.getObjectByName('Surveyor Pathfinder Pod');
-      return pod?.visible === true && pod?.userData?.authority === 'expedition-pod-journey';
+      return pod?.visible === true
+        && pod?.userData?.authority === 'expedition-pod-journey'
+        && document.getElementById('sfFlightTitle')?.textContent === 'PATHFINDER POD';
     }), true, 'Surface launch did not restore the same pod flight presentation.');
     await page.waitForFunction(() => {
       const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');

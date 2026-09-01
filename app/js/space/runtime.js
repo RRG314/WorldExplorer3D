@@ -714,6 +714,7 @@ export function animateSpaceFlight(deps = {}) {
   updateSpaceFlightPhysics();
   deps.updateSpaceFlightHUD?.(findLandableBodyByName);
   updateSpaceFlightCamera();
+  appCtx.updateExpeditionPodFlightPresentation?.(appCtx.spaceFlight._frameScale / 60);
 
   if (appCtx.spaceFlight.renderer && appCtx.spaceFlight.scene && appCtx.spaceFlight.camera) {
     appCtx.spaceFlight.renderer.render(appCtx.spaceFlight.scene, appCtx.spaceFlight.camera);

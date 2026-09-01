@@ -925,6 +925,7 @@ body.editor-workspace-open .floatMenu.open .floatItems{display:none!important}
 .spaceFlightHudHead strong{flex:1}
 .spaceFlightHudHead button{width:28px;height:28px;padding:0;border:1px solid rgba(157,185,255,.42);border-radius:7px;background:rgba(33,51,90,.72);color:#fff;font:700 16px/1 system-ui;cursor:pointer}
 .spaceFlightHudStatus{margin:7px 0;color:#c7d7ff;font:600 10px/1.3 system-ui;letter-spacing:.03em}
+.spaceFlightPodPhase{display:inline-flex;margin:0 0 7px;padding:4px 7px;border:1px solid rgba(103,232,255,.55);border-radius:999px;background:rgba(15,78,96,.48);color:#a9f1ff;font:700 8px/1 Orbitron,sans-serif;letter-spacing:.08em}.spaceFlightPodPhase[hidden]{display:none}
 .spaceFlightHudRead,.spaceFlightHudEnvironment{margin:5px 0 8px;color:#b8c4d8;font:500 10px/1.35 system-ui}
 .spaceFlightMetric{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:5px 0;color:#aab8ce;font-family:system-ui}
 .spaceFlightMetric b{color:#eef4ff;text-align:right;font-size:11px}

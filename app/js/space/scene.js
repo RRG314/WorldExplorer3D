@@ -9,7 +9,7 @@ import { PLANETARY_BODIES, configureColorTexture } from "../planetary/catalog.js
 import { createSpaceCelestialCatalog } from "./celestial-catalog.js?v=5";
 import { initUniverseRuntime } from "../universe/runtime.js?v=29";
 import { createExpeditionSpacecraftMesh } from "./expedition-spacecraft-mesh.js?v=3";
-import { createExpeditionPodMesh } from './expedition-pod-mesh.js?v=1';
+import { createExpeditionPodMesh } from './expedition-pod-mesh.js?v=2';
 import { restoreExpeditionDiscoveries } from '../expedition/contact-authority.js?v=4';
 
 export function createSpaceFlightScene(options = {}) {
@@ -204,6 +204,37 @@ export function setExpeditionPodFlightPresentation(active) {
     entry.child.name = entry.name;
   });
   delete rocket.userData.expeditionPodPresentation;
+  return true;
+}
+
+export function updateExpeditionPodFlightPresentation(dt = 0) {
+  const pod = appCtx.spaceFlight?.rocket?.getObjectByName('Surveyor Pathfinder Pod');
+  if (!pod) return false;
+  const phase = appCtx.getInterstellarExpeditionSnapshot?.()?.podJourney?.phase || '';
+  const time = performance.now() * 0.001;
+  const plasma = pod.getObjectByName('podEntryPlasma');
+  if (plasma) {
+    plasma.visible = phase === 'descent';
+    plasma.rotation.y += Math.max(0, Number(dt) || 0) * 0.8;
+    plasma.children.forEach((layer, index) => {
+      if (layer.material) layer.material.opacity = Number(layer.userData.baseOpacity || 0.1) * (0.76 + Math.sin(time * (4.5 + index)) * 0.24);
+    });
+  }
+  const touchdown = pod.getObjectByName('podTouchdownLights');
+  if (touchdown) {
+    touchdown.visible = ['descent', 'surface_launch'].includes(phase);
+    touchdown.children.forEach((light, index) => { light.material.opacity = 0.6 + Math.sin(time * 6 + index) * 0.25; });
+  }
+  const docking = pod.getObjectByName('podDockingGuide');
+  if (docking) {
+    docking.visible = phase === 'rendezvous';
+    docking.rotation.y += Math.max(0, Number(dt) || 0) * 0.32;
+    docking.position.y = Math.sin(time * 1.8) * 0.22;
+  }
+  if (['ship_launch', 'surface_launch'].includes(phase)) {
+    const glow = pod.getObjectByName('engineGlow');
+    if (glow) glow.scale.y = 1.15 + Math.sin(time * 18) * 0.12;
+  }
   return true;
 }
 

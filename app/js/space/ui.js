@@ -58,10 +58,11 @@ export function initSpaceFlightUI(attemptLanding, lifecycleScope = null) {
   hud.className = 'spaceFlightHud';
   hud.innerHTML = `
     <div class="spaceFlightHudHead">
-      <span aria-hidden="true">✦</span><strong>WAYFINDER FLIGHT</strong>
+      <span aria-hidden="true">✦</span><strong id="sfFlightTitle">WAYFINDER FLIGHT</strong>
       <button id="sfHudToggle" type="button" aria-expanded="true" aria-label="Collapse flight instruments">−</button>
     </div>
     <div id="sfFlightStatus" class="spaceFlightHudStatus">Preparing flight</div>
+    <div id="sfPodPhase" class="spaceFlightPodPhase" hidden></div>
     <div class="spaceFlightHudBody">
     <div id="sfFlightRead" class="spaceFlightHudRead">Basic flight guidance</div>
     <div class="spaceFlightMetric"><span>Nearest</span><b id="sfDestination">---</b></div>
@@ -226,6 +227,15 @@ export function showGameUI() {
 
 export function updateSpaceFlightHUD(findLandableBodyByName) {
   const rocket = appCtx.spaceFlight.rocket;
+  const podPhase = appCtx.getInterstellarExpeditionSnapshot?.()?.podJourney?.phase || '';
+  const podActive = ['ship_launch', 'local_flight', 'descent', 'surface_launch', 'rendezvous'].includes(podPhase);
+  const title = document.getElementById('sfFlightTitle');
+  const phaseBadge = document.getElementById('sfPodPhase');
+  if (title) title.textContent = podActive ? 'PATHFINDER POD' : 'WAYFINDER FLIGHT';
+  if (phaseBadge) {
+    phaseBadge.hidden = !podActive;
+    phaseBadge.textContent = podActive ? String(podPhase).replaceAll('_', ' ').toUpperCase() : '';
+  }
   const manualTargetBody = findLandableBodyByName(appCtx.spaceFlight._manualLandingTarget);
 
   let nearestBody = null;

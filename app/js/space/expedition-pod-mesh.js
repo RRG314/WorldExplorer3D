@@ -81,6 +81,38 @@ function createExpeditionPodMesh() {
     ring.scale.z = 0.9;
   }
 
+  const entryPlasma = new THREE.Group();
+  entryPlasma.name = 'podEntryPlasma';
+  entryPlasma.visible = false;
+  [
+    { color: 0xffb052, opacity: 0.18, scale: [1.18, 2.55, 1.08] },
+    { color: 0xff5b32, opacity: 0.1, scale: [1.35, 2.9, 1.18] }
+  ].forEach((layer, index) => {
+    const shell = addMesh(entryPlasma, new THREE.SphereGeometry(1.82, 24, 16), new THREE.MeshBasicMaterial({ color: layer.color, transparent: true, opacity: layer.opacity, depthWrite: false, side: THREE.BackSide }), `pod-entry-plasma-${index + 1}`, [0, -0.1, 0]);
+    shell.scale.set(...layer.scale);
+    shell.userData.baseOpacity = layer.opacity;
+  });
+  pod.add(entryPlasma);
+
+  const dockingGuide = new THREE.Group();
+  dockingGuide.name = 'podDockingGuide';
+  dockingGuide.visible = false;
+  const dockingRing = addMesh(dockingGuide, new THREE.TorusGeometry(3.2, 0.11, 10, 40), guidance, 'pod-docking-ring', [0, 25, 0], [Math.PI / 2, 0, 0]);
+  dockingRing.userData.baseY = 25;
+  [-1, 1].forEach((side) => {
+    addMesh(dockingGuide, new THREE.BoxGeometry(0.16, 3.4, 0.16), guidance, 'pod-docking-rail', [side * 3.2, 25, 0]);
+    addMesh(dockingGuide, new THREE.SphereGeometry(0.24, 10, 8), new THREE.MeshBasicMaterial({ color: side < 0 ? 0xff6275 : 0x66ffc7 }), 'pod-docking-light', [side * 3.2, 27, 0]);
+  });
+  pod.add(dockingGuide);
+
+  const touchdownLights = new THREE.Group();
+  touchdownLights.name = 'podTouchdownLights';
+  touchdownLights.visible = false;
+  [-1, 1].forEach((side) => {
+    [-0.65, 0.65].forEach((z) => addMesh(touchdownLights, new THREE.SphereGeometry(0.14, 10, 8), guidance, 'pod-touchdown-light', [side * 1.35, -2.65, z]));
+  });
+  pod.add(touchdownLights);
+
   const engineGlow = new THREE.Group();
   engineGlow.name = 'engineGlow';
   [-0.72, 0, 0.72].forEach((x) => {
