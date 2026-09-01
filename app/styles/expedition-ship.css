@@ -7,10 +7,10 @@
 #shipObjectiveCue.show{display:grid;grid-template-columns:1fr auto;gap:3px 10px;align-items:center}
 #shipObjectiveCue span{grid-column:1;color:#ffbb68;font:700 8px Orbitron,sans-serif;letter-spacing:.12em}
 #shipObjectiveCue strong{grid-column:1;font:700 12px/1.25 Orbitron,sans-serif}
-#shipObjectiveCue small{grid-column:1;color:#d9c4ab;font-size:10px;text-transform:capitalize}
+#shipObjectiveCue small{grid-column:1;color:#d9c4ab;font-size:10px}
 #shipObjectiveCue button{grid-column:2;grid-row:1/4;min-height:38px;padding:7px 9px;border:1px solid rgba(255,187,104,.64);border-radius:7px;background:#5d3b1e;color:#fff;font:700 8px Orbitron,sans-serif}
-.ship-map-deck{position:relative;width:min(330px,70vw);aspect-ratio:26/72;margin:12px auto;border:1px solid rgba(123,189,221,.6);border-radius:14px;background:linear-gradient(90deg,rgba(34,56,74,.94) 0 40%,rgba(23,52,69,.96) 40% 60%,rgba(34,56,74,.94) 60%);overflow:hidden}
-.ship-map-deck.compact{width:100%;margin:0;aspect-ratio:26/55;border-radius:7px}
+.ship-map-deck{position:relative;width:min(720px,92vw);aspect-ratio:72/26;margin:12px auto;border:1px solid rgba(123,189,221,.6);border-radius:14px;background:linear-gradient(180deg,rgba(34,56,74,.94) 0 40%,rgba(23,52,69,.96) 40% 60%,rgba(34,56,74,.94) 60%);overflow:hidden}
+.ship-map-deck.compact{width:100%;margin:0;aspect-ratio:72/30;border-radius:7px}
 .ship-map-room{position:absolute;z-index:2;display:grid;place-items:center;padding:2px;border:1px solid rgba(139,190,215,.5);border-radius:3px;background:rgba(34,76,99,.7);color:#e9f8ff;font:600 8px/1.15 Inter,sans-serif;text-align:center;overflow:hidden}
 .ship-map-room.status-degraded,.ship-map-room.status-operational{border-color:#f0b45c;background:rgba(119,73,25,.72)}
 .ship-map-room.status-critical{border-color:#ff6b6b;background:rgba(121,35,43,.78)}
@@ -27,7 +27,7 @@
 .ship-map-route polyline{fill:none;stroke:#8be8ff;stroke-width:1.4;stroke-dasharray:3 2;vector-effect:non-scaling-stroke}
 #shipMapOverlay{position:fixed;inset:0;z-index:12070;display:none;place-items:center;padding:12px;box-sizing:border-box;background:rgba(1,6,14,.8);backdrop-filter:blur(12px);font-family:Inter,sans-serif}
 #shipMapOverlay.show{display:grid}
-#shipMapOverlay>section{width:min(760px,100%);max-height:calc(100dvh - 24px);overflow:auto;padding:16px;box-sizing:border-box;border:1px solid rgba(105,196,235,.58);border-radius:16px;background:linear-gradient(145deg,#091a2d,#07111f);color:#eff8ff;box-shadow:0 24px 80px rgba(0,0,0,.56)}
+#shipMapOverlay>section{width:min(900px,100%);max-height:calc(100dvh - 24px);overflow:auto;padding:16px;box-sizing:border-box;border:1px solid rgba(105,196,235,.58);border-radius:16px;background:linear-gradient(145deg,#091a2d,#07111f);color:#eff8ff;box-shadow:0 24px 80px rgba(0,0,0,.56)}
 #shipMapOverlay header{display:flex;align-items:center;justify-content:space-between}
 #shipMapOverlay header span{display:block;color:#76d8ff;font:700 9px Orbitron,sans-serif;letter-spacing:.14em}
 #shipMapOverlay header strong{font:700 21px Orbitron,sans-serif}

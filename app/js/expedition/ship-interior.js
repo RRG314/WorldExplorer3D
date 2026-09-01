@@ -268,7 +268,7 @@ function wall(group, colliders, start, end, surface, id) {
   const dz = end.z - start.z;
   const length = Math.hypot(dx, dz);
   const thickness = 0.28;
-  const height = 3.35;
+  const height = 3.42;
   const mesh = box(group, { x: thickness, y: height, z: length }, {
     x: (start.x + end.x) * 0.5,
     y: height * 0.5,
@@ -285,6 +285,23 @@ function wall(group, colliders, start, end, surface, id) {
     height,
     id
   ));
+}
+
+function hullWallWithViewport(group, colliders, z, openingWidth, surface, id) {
+  const wallHeight = 3.42;
+  const halfWidth = openingWidth * 0.5;
+  const sideWidth = 13 - halfWidth;
+  const sideY = wallHeight * 0.5;
+  [-1, 1].forEach((side) => {
+    box(group, { x: sideWidth, y: wallHeight, z: 0.28 }, {
+      x: side * (halfWidth + sideWidth * 0.5),
+      y: sideY,
+      z
+    }, surface, `${id}:${side < 0 ? 'port' : 'starboard'}`);
+  });
+  box(group, { x: openingWidth, y: 0.72, z: 0.28 }, { x: 0, y: 0.36, z }, surface, `${id}:sill`);
+  box(group, { x: openingWidth, y: 0.46, z: 0.28 }, { x: 0, y: 3.19, z }, surface, `${id}:header`);
+  colliders.push(colliderForBox(0, z, 26, 0.28, 0, wallHeight, id));
 }
 
 function partitionWithDoor(group, colliders, x1, x2, z, doorX, surface, id) {
@@ -874,7 +891,6 @@ function addDeckDetails(group, deckId) {
       box(group, { x: 2.05, y: 0.2, z: 0.82 }, { x, y: 0.48, z: -31 }, soft, 'observation-seat');
       box(group, { x: 2.05, y: 0.72, z: 0.16 }, { x, y: 0.86, z: -31.35 }, soft, 'observation-seat-back');
     });
-    addBridgeView(group);
   } else if (deckId === 'habitat') {
     addRoomTaskLight(group, 1.5, 30, 0xffd5a4, 'wardroom', 0.74, 12);
     addRoomTaskLight(group, -8.2, 15.5, 0xc7f0f2, 'medical', 0.68, 9);
@@ -1045,22 +1061,42 @@ function addDeckPropColliders(colliders, deckId) {
 }
 
 function addBridgeView(group) {
-  const glass = material(0x061426, { emissive: 0x071c35, emissiveIntensity: 0.24, roughness: 0.18, metalness: 0.08 });
-  glass.transparent = true;
-  glass.opacity = 0.48;
-  glass.depthWrite = false;
-  box(group, { x: 18, y: 2.2, z: 0.12 }, { x: 0, y: 2, z: 35.82 }, glass, 'bridge-forward-window');
-  const points = [];
-  for (let index = 0; index < 90; index += 1) {
-    const angle = index * 2.399963229728653;
-    const radius = 4 + (index % 17) * 0.72;
-    points.push(Math.cos(angle) * radius, 0.7 + (index % 11) * 0.55, 39 + Math.sin(angle) * 5);
+  const sourceCanvas = appCtx.spaceFlight?.canvas;
+  const texture = sourceCanvas ? new THREE.CanvasTexture(sourceCanvas) : null;
+  if (texture) {
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.generateMipmaps = false;
+    texture.needsUpdate = true;
   }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
-  const stars = new THREE.Points(geometry, new THREE.PointsMaterial({ color: 0xeaf6ff, size: 0.09, sizeAttenuation: true }));
-  stars.name = 'ship-window-starfield';
-  group.add(stars);
+  const viewSurface = texture
+    ? new THREE.MeshBasicMaterial({ map: texture, color: 0xffffff, toneMapped: false })
+    : new THREE.MeshBasicMaterial({ color: 0x020713, toneMapped: false });
+  const bridgeView = box(group, { x: 18, y: 2.2, z: 0.055 }, { x: 0, y: 1.82, z: 35.79 }, viewSurface, 'bridge-forward-local-space-view');
+  const observationView = box(group, { x: 22.4, y: 2.62, z: 0.055 }, { x: 0, y: 1.78, z: -35.79 }, viewSurface, 'observation-gallery-local-space-view');
+  const frame = material(0x526b7b, { metalness: 0.72, roughness: 0.24 });
+  [-9.15, -4.55, 0, 4.55, 9.15].forEach((x) => {
+    box(group, { x: 0.18, y: 2.74, z: 0.22 }, { x, y: 1.8, z: -35.66 }, frame, 'observation-gallery-window-mullion');
+  });
+  box(group, { x: 22.8, y: 0.18, z: 0.28 }, { x: 0, y: 0.68, z: -35.65 }, frame, 'observation-gallery-window-sill');
+  box(group, { x: 22.8, y: 0.2, z: 0.28 }, { x: 0, y: 3.12, z: -35.65 }, frame, 'observation-gallery-window-header');
+  const portalCamera = appCtx.spaceFlight?.camera?.clone?.() || null;
+  if (portalCamera) {
+    portalCamera.fov = 64;
+    portalCamera.aspect = 18 / 7;
+    portalCamera.near = 0.5;
+    portalCamera.far = appCtx.spaceFlight.camera.far;
+    portalCamera.updateProjectionMatrix();
+  }
+  return {
+    source: texture ? 'live-local-space-renderer' : 'unavailable',
+    texture,
+    camera: portalCamera,
+    surfaces: [bridgeView, observationView],
+    elapsed: 0,
+    frameCount: 0
+  };
 }
 
 function roomLabelTexture(label, accentColor) {
@@ -1225,8 +1261,13 @@ function buildDeckScene(deckDefinition) {
   box(group, { x: 26, y: 0.16, z: 72 }, { x: 0, y: 3.48, z: 0 }, ceiling, `${deckDefinition.id}:ceiling`);
   wall(group, colliders, { x: -13, z: -36 }, { x: -13, z: 36 }, wallSurface, `${deckDefinition.id}:hull-port`);
   wall(group, colliders, { x: 13, z: -36 }, { x: 13, z: 36 }, wallSurface, `${deckDefinition.id}:hull-starboard`);
-  wall(group, colliders, { x: -13, z: -36 }, { x: 13, z: -36 }, wallSurface, `${deckDefinition.id}:hull-aft`);
-  wall(group, colliders, { x: -13, z: 36 }, { x: 13, z: 36 }, wallSurface, `${deckDefinition.id}:hull-forward`);
+  if (deckDefinition.id === 'command') {
+    hullWallWithViewport(group, colliders, -36, 23, wallSurface, `${deckDefinition.id}:hull-aft`);
+    hullWallWithViewport(group, colliders, 36, 18.6, wallSurface, `${deckDefinition.id}:hull-forward`);
+  } else {
+    wall(group, colliders, { x: -13, z: -36 }, { x: 13, z: -36 }, wallSurface, `${deckDefinition.id}:hull-aft`);
+    wall(group, colliders, { x: -13, z: 36 }, { x: 13, z: 36 }, wallSurface, `${deckDefinition.id}:hull-forward`);
+  }
   [24, 8, -7, -22].forEach((z, index) => partitionWithDoor(group, colliders, -13, 13, z, 0, wallSurface, `${deckDefinition.id}:zone:${index}`));
   deckDefinition.rooms.filter((room) => room.side !== 'full').forEach((room) => {
     const x = room.side === 'port' ? -2.7 : 2.7;
@@ -1256,6 +1297,7 @@ function buildDeckScene(deckDefinition) {
   });
   addDeckArchitecture(group, deckDefinition, accentColor);
   addDeckDetails(group, deckDefinition.id);
+  const spaceView = deckDefinition.id === 'command' ? addBridgeView(group) : null;
   addDeckPropColliders(colliders, deckDefinition.id);
   group.add(new THREE.HemisphereLight(0xcde7ff, 0x101923, 0.5));
   const fill = new THREE.DirectionalLight(0xdceaf3, 0.68);
@@ -1270,7 +1312,7 @@ function buildDeckScene(deckDefinition) {
   alertLight.position.set(0, 3.1, 0);
   alertLight.name = `ship-alert-light:${deckDefinition.id}`;
   group.add(alertLight);
-  return { group, colliders, doorStates, alertLight };
+  return { group, colliders, doorStates, alertLight, spaceView };
 }
 
 function buildSurveyorScene(expedition) {
@@ -1335,6 +1377,7 @@ function buildSurveyorScene(expedition) {
     crewMeshes,
     crewLayer,
     animatedParts,
+    spaceView: deckStates.get('command')?.spaceView || null,
     visualContract: Object.freeze(visualContract),
     walkSurface: {
       kind: 'polygon',
@@ -1803,8 +1846,19 @@ function toggleShipDoor(doorId) {
 
 function mapPoint(x, z) {
   return {
-    x: ((x - SHIP_DECK_BOUNDS.minX) / (SHIP_DECK_BOUNDS.maxX - SHIP_DECK_BOUNDS.minX)) * 100,
-    y: ((SHIP_DECK_BOUNDS.maxZ - z) / (SHIP_DECK_BOUNDS.maxZ - SHIP_DECK_BOUNDS.minZ)) * 100
+    x: ((z - SHIP_DECK_BOUNDS.minZ) / (SHIP_DECK_BOUNDS.maxZ - SHIP_DECK_BOUNDS.minZ)) * 100,
+    y: ((x - SHIP_DECK_BOUNDS.minX) / (SHIP_DECK_BOUNDS.maxX - SHIP_DECK_BOUNDS.minX)) * 100
+  };
+}
+
+function mapRoomRect(room) {
+  const a = mapPoint(room.minX, room.minZ);
+  const b = mapPoint(room.maxX, room.maxZ);
+  return {
+    left: Math.min(a.x, b.x),
+    top: Math.min(a.y, b.y),
+    width: Math.abs(b.x - a.x),
+    height: Math.abs(b.y - a.y)
   };
 }
 
@@ -1953,10 +2007,9 @@ function deckMapMarkup(session, deckId, compact = false) {
   return `<div class="ship-map-deck ${compact ? 'compact' : ''}" data-deck-map="${deckId}">
     ${routePolyline(session, deckId)}
     ${deck.rooms.map((room) => {
-      const a = mapPoint(room.minX, room.maxZ);
-      const b = mapPoint(room.maxX, room.minZ);
+      const rect = mapRoomRect(room);
       const status = session.expedition?.systems?.[room.systemId]?.status || 'optimal';
-      return `<button type="button" class="ship-map-room status-${status} ${session.selectedRoomId === room.id ? 'selected' : ''}" data-room="${room.id}" style="left:${a.x}%;top:${a.y}%;width:${b.x - a.x}%;height:${b.y - a.y}%" title="${room.label}">${compact ? '' : `<span>${room.label}</span>`}</button>`;
+      return `<button type="button" class="ship-map-room status-${status} ${session.selectedRoomId === room.id ? 'selected' : ''}" data-room="${room.id}" style="left:${rect.left}%;top:${rect.top}%;width:${rect.width}%;height:${rect.height}%" title="${room.label}">${compact ? '' : `<span>${room.label}</span>`}</button>`;
     }).join('')}
     ${(state?.doorStates || []).map((door) => { const point = mapPoint(door.x, door.z); return `<i class="ship-map-door ${door.open ? 'open' : ''}" style="left:${point.x}%;top:${point.y}%"></i>`; }).join('')}
     ${target?.deckId === deckId ? (() => { const point = mapPoint(target.x, target.z); return `<i class="ship-map-objective" style="left:${point.x}%;top:${point.y}%" title="${target.label || 'Current objective'}"></i>`; })() : ''}
@@ -2201,11 +2254,45 @@ function handleShipInteriorInteraction(interaction) {
   return result !== false;
 }
 
+function updateLocalSpaceView(session, dt) {
+  const view = session?.sceneState?.spaceView;
+  const flight = appCtx.spaceFlight;
+  if (!view?.texture || !view.camera || !flight?.scene || !flight.renderer || !flight.rocket) return false;
+  view.elapsed += Math.max(0, Number(dt) || 0);
+  if (view.elapsed < 1 / 15) return false;
+  view.elapsed = 0;
+  view.position ||= new THREE.Vector3();
+  view.quaternion ||= new THREE.Quaternion();
+  view.forward ||= new THREE.Vector3();
+  view.up ||= new THREE.Vector3();
+  view.lookAt ||= new THREE.Vector3();
+  flight.rocket.updateMatrixWorld?.(true);
+  flight.rocket.getWorldPosition(view.position);
+  flight.rocket.getWorldQuaternion(view.quaternion);
+  view.forward.set(0, 1, 0).applyQuaternion(view.quaternion).normalize();
+  view.up.set(0, 0, -1).applyQuaternion(view.quaternion).normalize();
+  view.camera.position.copy(view.position).addScaledVector(view.forward, 18);
+  view.camera.up.copy(view.up);
+  view.lookAt.copy(view.position).addScaledVector(view.forward, 2200);
+  view.camera.lookAt(view.lookAt);
+  const rocketWasVisible = flight.rocket.visible;
+  flight.rocket.visible = false;
+  try {
+    flight.renderer.render(flight.scene, view.camera);
+    view.texture.needsUpdate = true;
+    view.frameCount += 1;
+  } finally {
+    flight.rocket.visible = rocketWasVisible;
+  }
+  return true;
+}
+
 function updateExpeditionShipInterior(dt) {
   if (!activeSession) return false;
   const tutorialCard = document.getElementById('tutorialHintCard');
   if (tutorialCard && tutorialCard.style.display !== 'none') tutorialCard.style.display = 'none';
   updateCrewMotion(activeSession, dt);
+  updateLocalSpaceView(activeSession, dt);
   activeSession.visualClock += Math.max(0, Number(dt) || 0);
   const alert = shipAlertState(activeSession.expedition);
   activeSession.sceneState.deckStates.forEach((deckState) => {
@@ -2297,6 +2384,11 @@ function getShipInteriorSnapshot() {
     } : null,
     audioState: activeSession.audioContext?.state || 'not-started',
     visualContract: { ...activeSession.sceneState.visualContract },
+    exteriorView: activeSession.sceneState.spaceView ? {
+      source: activeSession.sceneState.spaceView.source,
+      frameCount: activeSession.sceneState.spaceView.frameCount,
+      surfaceCount: activeSession.sceneState.spaceView.surfaces.length
+    } : null,
     player: walker ? {
       x: Number(walker.x.toFixed(3)),
       y: Number(walker.y.toFixed(3)),
