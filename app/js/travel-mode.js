@@ -39,8 +39,8 @@ function syncTravelModeButtons() {
     [document.getElementById('fEarthMode'), 'earth'],
     [document.getElementById('fSpaceDirect'), 'space'],
     [document.getElementById('fSpaceRocket'), 'space'],
-    [document.getElementById('fSpaceMars'), 'space'],
-    [document.getElementById('fSpaceSurveyor'), 'space']
+    [document.getElementById('fSpaceSurveyor'), 'space'],
+    [document.getElementById('fSpaceBoardSurveyor'), 'space']
   ].forEach(([button, mode]) => {
     if (button) button.style.display = boatLocked || (planetaryCapabilities && planetaryCapabilities[mode] !== true) ? 'none' : '';
   });

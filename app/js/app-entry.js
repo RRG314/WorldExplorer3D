@@ -8,7 +8,7 @@ import { ctx as appCtx } from './shared-context.js?v=55';
 import { createAccountService } from './platform/account-service.js?v=1';
 import { createPlatformServiceRegistry } from './platform/service-registry.js?v=1';
 import { scheduleAfterFirstPlay } from './runtime/workload-policy.js?v=1';
-import './runtime-diagnostics.js?v=72';
+import './runtime-diagnostics.js?v=73';
 import './ui/legal-attribution.js?v=1';
 import './state.js?v=65';
 import './camera-mode.js?v=1';
@@ -50,7 +50,7 @@ import './hud.js?v=102';
 import './map.js?v=61';
 import { renderLoop } from './main.js?v=75';
 import './memory.js?v=55';
-import { setupUI } from './ui.js?v=152';
+import { setupUI } from './ui.js?v=153';
 import { initAccessibility } from './ui/accessibility.js?v=1';
 
 let _booted = false;

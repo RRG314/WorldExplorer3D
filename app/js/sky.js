@@ -259,7 +259,9 @@ function arriveAtMoon() {
   const directBtn = document.getElementById('fSpaceDirect');
   const rocketBtn = document.getElementById('fSpaceRocket');
   if (directBtn) directBtn.textContent = '🌍 Return to Earth';
-  if (rocketBtn) rocketBtn.textContent = '🌍 Return to Earth';
+  if (rocketBtn) rocketBtn.hidden = true;
+  document.getElementById('fSpaceSurveyor')?.setAttribute('hidden', '');
+  document.getElementById('fSpaceBoardSurveyor')?.setAttribute('hidden', '');
 
   // Hide moon sphere (we're on it now!)
   appCtx.moonSphere.visible = false;
@@ -394,8 +396,13 @@ async function arriveAtEarth(expectedSessionId = null) {
   // Update space menu button labels
   const directBtn = document.getElementById('fSpaceDirect');
   const rocketBtn = document.getElementById('fSpaceRocket');
-  if (directBtn) directBtn.textContent = '🌙 Direct to Moon';
-  if (rocketBtn) rocketBtn.textContent = '🚀 Rocket to Moon';
+  if (directBtn) directBtn.textContent = '🌙 Quick Trip to the Moon';
+  if (rocketBtn) {
+    rocketBtn.textContent = '✦ Fly with Wayfinder';
+    rocketBtn.hidden = false;
+  }
+  document.getElementById('fSpaceSurveyor')?.removeAttribute('hidden');
+  document.getElementById('fSpaceBoardSurveyor')?.removeAttribute('hidden');
 
   // Restore Earth lighting
   if (appCtx.sun) {

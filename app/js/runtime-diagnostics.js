@@ -46,6 +46,27 @@ function vectorSnapshot(vector) {
   };
 }
 
+function spaceFlightSnapshot() {
+  const rocket = appCtx.spaceFlight?.rocket;
+  const Vector3 = globalThis.THREE?.Vector3;
+  const forward = rocket && Vector3 ? new Vector3(0, 1, 0).applyQuaternion(rocket.quaternion).normalize() : null;
+  const up = rocket && Vector3 ? new Vector3(0, 0, -1).applyQuaternion(rocket.quaternion).normalize() : null;
+  return {
+    active: appCtx.spaceFlight?.active === true,
+    destinationBodyId: appCtx.spaceJourney?.destinationBodyId || appCtx.spaceFlight?.destination || null,
+    phase: appCtx.spaceJourney?.phase || null,
+    assist: appCtx.spaceJourneyAssistState ? {
+      active: appCtx.spaceJourneyAssistState.active === true,
+      available: appCtx.spaceJourneyAssistState.available !== false,
+      kind: appCtx.spaceJourneyAssistState.kind || null,
+      progress: numberOrNull(appCtx.spaceJourneyAssistState.progress)
+    } : null,
+    position: vectorSnapshot(rocket?.position),
+    forward: vectorSnapshot(forward),
+    up: vectorSnapshot(up)
+  };
+}
+
 function transportFacilitySnapshot() {
   const graph = appCtx.transportFacilityGraph;
   const visual = appCtx.transportFacilityVisual?.group;
@@ -1058,6 +1079,7 @@ function getWorldExplorerRuntimeDiagnostics() {
       traveling: !!appCtx.travelingToMoon
     },
     surfacePodLaunch: appCtx.surfacePodLaunchSnapshot || null,
+    stagedEarthPathfinder: appCtx.getStagedEarthPodSnapshot?.() || null,
     universeNavigation: appCtx.getUniverseCourseSnapshot?.() || (appCtx.universeRuntime ? {
       currentFrameId: appCtx.universeRuntime.current?.id || null,
       selectedDestinationId: appCtx.universeRuntime.selected?.id || null,
@@ -1245,7 +1267,9 @@ globalThis.render_game_to_text = () => JSON.stringify({
     flightMode: appCtx.spaceFlight?.mode || null,
     nearestBody: appCtx.spaceFlight?._nearestBody?.name || null
   },
+  spaceFlight: spaceFlightSnapshot(),
   surfacePodLaunch: appCtx.surfacePodLaunchSnapshot || null,
+  stagedEarthPathfinder: appCtx.getStagedEarthPodSnapshot?.() || null,
   universeNavigation: appCtx.getUniverseCourseSnapshot?.() || (appCtx.universeRuntime ? {
     currentFrameId: appCtx.universeRuntime.current?.id || null,
     selectedDestinationId: appCtx.universeRuntime.selected?.id || null,

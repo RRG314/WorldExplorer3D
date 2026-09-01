@@ -687,9 +687,15 @@ function installSpaceJourneyRuntime(appContext) {
       JOURNEY_PHASE.HOME_DESCENT,
       JOURNEY_PHASE.ATMOSPHERIC_EXPLORATION
     ].includes(rendered.journey.phase);
+    const guidedSourceDeparture = Boolean(
+      assistedUpdate && rendered.assistedPlan?.kind === 'ascent'
+    );
     if (collisionActive) {
       const protectedPhysicalBodies = [rendered.ephemeris.source, rendered.ephemeris.destination]
-        .filter((body) => !destinationContactAuthorized || body.bodyId !== rendered.ephemeris.destination.bodyId)
+        .filter((body) => {
+          if (guidedSourceDeparture && body.bodyId === rendered.ephemeris.source.bodyId) return false;
+          return !destinationContactAuthorized || body.bodyId !== rendered.ephemeris.destination.bodyId;
+        })
         .map((body) => ({
           bodyId: body.bodyId,
           name: getAstronomicalBody(body.bodyId)?.name || body.bodyId,

@@ -211,7 +211,19 @@ export function createToggleButton(ctx) {
     if (!result?.accepted) {
       destinationSelect.value = '';
       destinationSelect.title = 'Course changes are available from parking orbit.';
+      ctx.appCtx.showSpaceFlightMessage?.(
+        String(result?.reason || 'Course change unavailable').replaceAll('-', ' ').toUpperCase(),
+        '#f59e0b'
+      );
+      return;
     }
+    destinationSelect.title = '';
+    const destination = getAstronomicalBody(bodyId);
+    const assisted = ctx.appCtx.spaceJourneyAssistState?.active === true;
+    ctx.appCtx.showSpaceFlightMessage?.(
+      `COURSE SET · ${String(destination?.name || bodyId).toUpperCase()} · ${assisted ? 'FLIGHT ASSIST ENGAGED' : 'PRESS FLIGHT ASSIST TO BEGIN'}`,
+      assisted ? '#10b981' : '#6fe8ff'
+    );
   });
   container.appendChild(destinationSelect);
 

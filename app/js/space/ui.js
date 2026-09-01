@@ -122,7 +122,7 @@ function setupSpaceFlightControls(attemptLanding, lifecycleScope = null) {
   });
   listen(document.getElementById('sfLandBtn'), 'click', attemptLanding);
   listen(document.getElementById('sfExpeditionBtn'), 'click', async () => {
-    const runtime = await import('../expedition/runtime.js?v=28');
+    const runtime = await import('../expedition/runtime.js?v=31');
     runtime.openExpeditionPlanner(appCtx);
   });
   listen(document.getElementById('sfHudToggle'), 'click', () => {
@@ -136,7 +136,7 @@ function setupSpaceFlightControls(attemptLanding, lifecycleScope = null) {
       ? appCtx.toggleUniverseCourseAssist?.()
       : appCtx.toggleRenderedJourneyAssist?.();
     if (!result?.accepted) {
-      showFlightMessage('FLIGHT ASSIST IS NOT AVAILABLE HERE', '#f59e0b');
+      showFlightMessage(String(result?.reason || 'Flight assist is not available here').replaceAll('-', ' ').toUpperCase(), '#f59e0b');
     } else if (result.active === false) {
       showFlightMessage('MANUAL CONTROL', '#60a5fa');
     } else {

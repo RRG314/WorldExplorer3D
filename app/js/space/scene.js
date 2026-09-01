@@ -81,6 +81,23 @@ export function ensureExtendedSpaceScene() {
   return true;
 }
 
+function orientSpacecraftForForward(rocket, forwardInput, preferredUpInput = new THREE.Vector3(0, 1, 0)) {
+  if (!rocket || !forwardInput) return false;
+  const forward = forwardInput.clone().normalize();
+  if (forward.lengthSq() <= 1e-8) return false;
+  const preferredUp = preferredUpInput.clone().normalize();
+  const up = preferredUp.addScaledVector(forward, -preferredUp.dot(forward));
+  if (up.lengthSq() <= 1e-6) {
+    up.set(0, 0, 1).addScaledVector(forward, -forward.z);
+  }
+  up.normalize();
+  const right = up.clone().cross(forward).normalize();
+  const localZ = up.clone().negate();
+  const basis = new THREE.Matrix4().makeBasis(right, forward, localZ);
+  rocket.quaternion.setFromRotationMatrix(basis).normalize();
+  return true;
+}
+
 export function ensureExpeditionSurveyorDockTarget() {
   const earth = appCtx.spaceFlight?.earth;
   if (!earth) return null;
@@ -126,7 +143,7 @@ export function positionSpacecraftAtSurveyorDock(distance = 36) {
   const approachDirection = target.approachDirection?.clone?.().normalize()
     || target.position.clone().normalize();
   rocket.position.copy(target.position).addScaledVector(approachDirection, Math.max(target.radius + 8, Number(distance) || 36));
-  rocket.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), approachDirection.clone().negate());
+  orientSpacecraftForForward(rocket, approachDirection.clone().negate());
   appCtx.spaceFlight.velocity?.set?.(0, 0, 0);
   appCtx.spaceFlight.gravityVelocity?.set?.(0, 0, 0);
   appCtx.spaceFlight.speed = 0;
@@ -315,10 +332,7 @@ export function resetSpaceFlightForMoon() {
     launchDirection,
     SPACE_CONSTANTS.EARTH_SIZE + 8
   );
-  appCtx.spaceFlight.rocket.quaternion.setFromUnitVectors(
-    new THREE.Vector3(0, 1, 0),
-    launchDirection
-  );
+  orientSpacecraftForForward(appCtx.spaceFlight.rocket, launchDirection);
 
   appCtx.spaceFlight.velocity.set(0, 0, 0);
   if (appCtx.spaceFlight.gravityVelocity) appCtx.spaceFlight.gravityVelocity.set(0, 0, 0);
@@ -362,7 +376,10 @@ export function resetSpaceFlightForEarth() {
     moonPos.y + SPACE_CONSTANTS.MOON_SIZE + 8,
     moonPos.z
   );
-  appCtx.spaceFlight.rocket.quaternion.identity();
+  orientSpacecraftForForward(
+    appCtx.spaceFlight.rocket,
+    earthPos.clone().sub(appCtx.spaceFlight.rocket.position)
+  );
 
   appCtx.spaceFlight.velocity.set(0, 0, 0);
   if (appCtx.spaceFlight.gravityVelocity) appCtx.spaceFlight.gravityVelocity.set(0, 0, 0);

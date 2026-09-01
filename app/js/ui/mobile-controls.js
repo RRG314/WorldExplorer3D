@@ -115,15 +115,15 @@ const MOBILE_CONTROL_PROFILES = {
     ]
   },
   rocket: {
-    moveLabel: 'Move',
-    lookLabel: 'Steer',
-    move: null,
-    look: {
+    moveLabel: 'Flight',
+    lookLabel: 'Look',
+    move: {
       up: { channel: 'space', key: 'arrowup' },
       down: { channel: 'space', key: 'arrowdown' },
       left: { channel: 'space', key: 'arrowleft' },
       right: { channel: 'space', key: 'arrowright' }
     },
+    look: null,
     actions: [
       { label: 'Accelerate', binding: { channel: 'space', key: ' ' } },
       { label: 'Decelerate', binding: { channel: 'space', key: 'shift' } }
@@ -158,7 +158,7 @@ const MOBILE_CONTROL_GUIDANCE = {
   skydiving: ['Skydiving', 'Steer · flare', 'Look', 'Deploy parachute'],
   drone: ['Drone', 'Fly · turn', 'Look', 'Ascend · descend'],
   plane: ['Plane', 'Pitch · roll', 'Look', 'Throttle + · −'],
-  rocket: ['Rocket', '—', 'Steer', 'Accelerate · brake'],
+  rocket: ['Space Flight', 'Pitch · turn', 'Camera follows', 'Accelerate · brake'],
   ocean: ['Submersible', 'Thrust · turn', 'Look', 'Ascend · descend']
 };
 

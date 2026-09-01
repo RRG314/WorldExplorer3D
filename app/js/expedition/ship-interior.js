@@ -1465,6 +1465,7 @@ function ensureShipHud(expedition, crewSummary = null) {
   if (!hud) {
     hud = document.createElement('section');
     hud.id = 'shipInteriorHud';
+    hud.className = 'shipInteriorHud';
     document.body.appendChild(hud);
   }
   const progress = Math.round((Number(expedition?.progress) || 0) * 100);

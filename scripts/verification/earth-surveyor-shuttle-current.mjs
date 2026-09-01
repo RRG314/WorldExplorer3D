@@ -52,10 +52,32 @@ async function seedExpedition(page) {
   });
 }
 
-async function openEarthExpedition(page) {
+async function deployEarthPathfinder(page) {
   await page.evaluate(() => document.getElementById('fSpaceSurveyor')?.click());
-  await page.locator('#expeditionOverlay').waitFor({ state: 'visible' });
-  await page.locator('#expeditionEarthPod').waitFor({ state: 'visible' });
+  await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').stagedEarthPathfinder?.active === true);
+  assert.equal(await page.locator('#expeditionOverlay').isVisible(), false, 'Deploy Pathfinder must not detour through the Expedition planner.');
+}
+
+async function approachAndBoardEarthPathfinder(page) {
+  await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const pod = ctx.earthSceneRoot?.getObjectByName('expedition-surface-launch-pod:earth');
+    if (!pod) throw new Error('Staged Earth Pathfinder is missing from the active Earth scene.');
+    ctx.Walk.setModeWalk({ preserveResolvedSpawn: true, deferWorldSync: true });
+    Object.assign(ctx.Walk.state.walker, {
+      x: pod.position.x + 2,
+      y: pod.position.y - 4.15,
+      z: pod.position.z + 1,
+      angle: 0,
+      yaw: 0,
+      lookYawOffset: 0,
+      pitch: 0,
+      vy: 0,
+      onGround: true
+    });
+  });
+  await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').stagedEarthPathfinder?.distance < 4);
+  await page.keyboard.press('KeyE');
 }
 
 async function placeAtDockingRange(page) {
@@ -136,29 +158,56 @@ async function run() {
     const expedition = await seedExpedition(page);
     assert.equal(expedition.readiness, 'ready');
 
-    await openEarthExpedition(page);
-    assert.match(await page.locator('#expeditionEarthPod').textContent(), /Launch Pathfinder to Surveyor/i);
-    await page.locator('#expeditionEarthPod').click();
-    await page.waitForTimeout(300);
+    const travelCopy = await page.locator('#travelMenu .floatItems').textContent();
+    assert.match(travelCopy, /Deploy Pathfinder/i);
+    assert.match(travelCopy, /Board Surveyor Directly/i);
+    assert.match(travelCopy, /Fly with Wayfinder/i);
+    assert.match(travelCopy, /Quick Trip to the Moon/i);
+    assert.doesNotMatch(travelCopy, /Launch to Mars|Launch to the Moon/i);
+    assert.equal(await page.locator('#fSpaceMars').count(), 0);
+
+    await page.locator('#travelBtn').click();
+    await page.locator('#fSpaceBoardSurveyor').click();
+    await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.active === true, null, { timeout: 120_000 });
+    assert.equal((await snapshot(page)).environment, 'SPACE_FLIGHT');
+    await enterPodBay(page);
+    await page.locator('[data-pod-earth]').click();
+    await page.waitForTimeout(1_000);
+    const earthbound = await snapshot(page);
+    assert.equal(earthbound.modes?.space, true, `Earth pod did not return to Space Flight: ${JSON.stringify(earthbound)}`);
+    assert.equal(earthbound.interstellarExpedition?.podJourney?.phase, 'local_flight', `Earth pod did not acquire its course: ${JSON.stringify(earthbound.interstellarExpedition)}`);
+    const returnJourneyId = earthbound.interstellarExpedition.podJourney.id;
+    await approachEarthAndLand(page);
+    const landed = await snapshot(page);
+    assert.equal(landed.interstellarExpedition.podJourney.id, returnJourneyId);
+    assert.equal(landed.interstellarExpedition.podJourney.phase, 'surface');
+    assert.equal(landed.environment, 'EARTH');
+    const earthLocationAfter = await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      return { selLoc: String(ctx.selLoc || ''), name: String(ctx.customLoc?.name || ctx.LOCS?.[ctx.selLoc]?.name || '') };
+    });
+    assert.deepEqual(earthLocationAfter, earthLocationBefore);
+
+    await deployEarthPathfinder(page);
+    const staged = await snapshot(page);
+    assert.equal(staged.environment, 'EARTH');
+    assert.equal(staged.stagedEarthPathfinder.active, true);
+    await page.screenshot({ path: path.join(outputDir, 'desktop-earth-pathfinder-staged.png'), fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: path.join(outputDir, 'mobile-earth-return-to-surveyor.png'), fullPage: true });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await approachAndBoardEarthPathfinder(page);
     const surfaceLaunchStarted = await snapshot(page);
     assert.equal(surfaceLaunchStarted.environment, 'EARTH', JSON.stringify(surfaceLaunchStarted.surfacePodLaunch));
-    assert.equal(surfaceLaunchStarted.interstellarExpedition?.podJourney?.phase, 'surface_launch', JSON.stringify({
-      journey: surfaceLaunchStarted.interstellarExpedition?.podJourney,
-      launch: surfaceLaunchStarted.surfacePodLaunch
-    }));
+    assert.equal(surfaceLaunchStarted.interstellarExpedition?.podJourney?.phase, 'surface_launch');
     assert.equal(surfaceLaunchStarted.surfacePodLaunch?.active, true, JSON.stringify(surfaceLaunchStarted.surfacePodLaunch));
     await page.waitForFunction(() => {
       const altitude = JSON.parse(globalThis.render_game_to_text?.() || '{}').surfacePodLaunch?.altitude;
       return altitude > 2 && altitude < 20;
     });
     await page.screenshot({ path: path.join(outputDir, 'desktop-earth-surface-liftoff.png'), fullPage: true });
-    await page.waitForFunction(() => {
-      const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
-      return state.modes?.space === true && state.interstellarExpedition?.podJourney?.phase === 'rendezvous';
-    }, null, { timeout: 120_000 });
-    const outbound = await snapshot(page);
-    const firstJourneyId = outbound.interstellarExpedition.podJourney.id;
-    assert.equal(outbound.interstellarExpedition.podJourney.routeKind, 'earth-shuttle');
+    await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').interstellarExpedition?.podJourney?.phase === 'rendezvous', null, { timeout: 120_000 });
+    assert.equal((await snapshot(page)).interstellarExpedition.podJourney.id, returnJourneyId);
     assert.equal(await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
       return ctx.spaceFlight.rocket.getObjectByName('Surveyor Pathfinder Pod')?.visible === true
@@ -177,48 +226,10 @@ async function run() {
     });
     assert.notDeepEqual(afterThrust, beforeThrust, 'Manual pod throttle did not move Pathfinder.');
     await dockWithSurveyor(page);
-    assert.equal((await snapshot(page)).interstellarExpedition.podJourney.phase, 'recovered');
-
-    await enterPodBay(page);
-    await page.locator('[data-pod-earth]').click();
-    await page.waitForFunction(() => {
-      const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
-      return state.modes?.space === true && state.interstellarExpedition?.podJourney?.phase === 'local_flight';
-    }, null, { timeout: 15_000 });
-    const earthbound = await snapshot(page);
-    const returnJourneyId = earthbound.interstellarExpedition.podJourney.id;
-    assert.notEqual(returnJourneyId, firstJourneyId);
-    await approachEarthAndLand(page);
-    const landed = await snapshot(page);
-    assert.equal(landed.interstellarExpedition.podJourney.id, returnJourneyId);
-    assert.equal(landed.interstellarExpedition.podJourney.phase, 'surface');
-    assert.equal(landed.environment, 'EARTH');
-    const earthLocationAfter = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
-      return { selLoc: String(ctx.selLoc || ''), name: String(ctx.customLoc?.name || ctx.LOCS?.[ctx.selLoc]?.name || '') };
-    });
-    assert.deepEqual(earthLocationAfter, earthLocationBefore);
-
-    await openEarthExpedition(page);
-    assert.match(await page.locator('#expeditionEarthPod').textContent(), /Return to Surveyor/i);
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.locator('#expeditionEarthPod').scrollIntoViewIfNeeded();
-    const mobileButton = await page.locator('#expeditionEarthPod').evaluate((element) => {
-      const box = element.getBoundingClientRect();
-      return { left: box.left, right: box.right, top: box.top, bottom: box.bottom, width: innerWidth, height: innerHeight };
-    });
-    assert.ok(mobileButton.left >= 0 && mobileButton.right <= mobileButton.width && mobileButton.top >= 0 && mobileButton.bottom <= mobileButton.height, JSON.stringify(mobileButton));
-    await page.screenshot({ path: path.join(outputDir, 'mobile-earth-return-to-surveyor.png'), fullPage: true });
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await page.locator('#expeditionEarthPod').click();
-    await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').surfacePodLaunch?.active === true);
-    await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').interstellarExpedition?.podJourney?.phase === 'rendezvous', null, { timeout: 120_000 });
-    assert.equal((await snapshot(page)).interstellarExpedition.podJourney.id, returnJourneyId);
-    await dockWithSurveyor(page);
     const final = await snapshot(page);
     assert.equal(final.interstellarExpedition.podJourney.phase, 'recovered');
     assert.equal(final.expeditionShipInterior.active, true);
-    return { firstJourneyId, returnJourneyId, finalPhase: final.interstellarExpedition.podJourney.phase, earthSelection: earthLocationBefore, initialEnvironment: earthBefore.environment };
+    return { directBoarding: true, returnJourneyId, finalPhase: final.interstellarExpedition.podJourney.phase, earthSelection: earthLocationBefore, initialEnvironment: earthBefore.environment };
   } finally {
     await context.close();
   }
