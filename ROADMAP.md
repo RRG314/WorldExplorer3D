@@ -395,6 +395,16 @@ contact, entry/launch effects, and interior presentation remain in the quality g
 pod hull now blocks planetary walking through a dedicated active-world obstacle
 authority; it does not reuse Earth buildings or player-created Blocks.
 
+Earth joins this loop through the existing authorities rather than a parallel
+travel mode. The roadmap route is selected/current Earth location → Pathfinder
+manual ascent → visible Surveyor docking → walkable ship → Pod Bay departure →
+manual Earth approach and descent → the same saved Earth world session. Globe
+search owns arbitrary Earth destinations, Space Flight owns all flight and
+landing behavior, the pod journey owns shuttle state, and the Earth session owns
+the final geographic handoff. The first accepted slice must work from the
+currently loaded location in both directions before Pod Bay destination search
+or saved-location expansion is claimed.
+
 The current connected slice is mechanically ahead of its presentation. It is
 not yet the intended visual or activity standard for a public Space alpha.
 Primary pods, rooms, crew, field tools, surface life, resource sites, and mission

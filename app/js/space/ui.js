@@ -122,7 +122,7 @@ function setupSpaceFlightControls(attemptLanding, lifecycleScope = null) {
   });
   listen(document.getElementById('sfLandBtn'), 'click', attemptLanding);
   listen(document.getElementById('sfExpeditionBtn'), 'click', async () => {
-    const runtime = await import('../expedition/runtime.js?v=26');
+    const runtime = await import('../expedition/runtime.js?v=27');
     runtime.openExpeditionPlanner(appCtx);
   });
   listen(document.getElementById('sfHudToggle'), 'click', () => {
@@ -241,8 +241,12 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
   let nearestBody = null;
   let nearestDist = Infinity;
   const universeTarget = appCtx.getUniverseHudTarget?.();
+  const expeditionDockTarget = appCtx.getExpeditionPodDockingTarget?.();
 
-  if (universeTarget?.position) {
+  if (expeditionDockTarget?.position) {
+    nearestBody = expeditionDockTarget;
+    nearestDist = rocket.position.distanceTo(expeditionDockTarget.position);
+  } else if (universeTarget?.position) {
     nearestBody = universeTarget;
     nearestDist = rocket.position.distanceTo(universeTarget.position);
   } else if (typeof appCtx.getAllSpaceBodies === 'function') {
@@ -483,7 +487,25 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
     ? physicalLanding.eligible && ['approach', 'home_approach'].includes(appCtx.spaceJourney?.phase)
     : activeDist < SPACE_CONSTANTS.LANDING_DISTANCE + activeHudBody.radius;
 
-  if (universeTarget) {
+  if (expeditionDockTarget) {
+    const dockingRange = expeditionDockTarget.radius + 24;
+    const canDock = expeditionDockTarget.canDock === true;
+    const inDockingRange = activeDist < dockingRange;
+    const dockingProgress = Math.max(0, 1 - Math.max(0, activeDist - expeditionDockTarget.radius) / 220);
+    if (zoneLabel) zoneLabel.textContent = 'DOCKING APPROACH';
+    if (landingBar) landingBar.style.width = `${Math.round(dockingProgress * 100)}%`;
+    if (landingText) landingText.textContent = canDock
+      ? 'Docking corridor acquired · match speed and dock'
+      : inDockingRange
+      ? `Reduce relative speed to dock · ${Number(expeditionDockTarget.relativeSpeed || 0).toFixed(1)} display units/s`
+      : `Manual approach to Surveyor · ${Math.max(0, Math.round(activeDist - expeditionDockTarget.radius))} display units`;
+    if (landBtn) {
+      landBtn.disabled = !canDock;
+      landBtn.style.opacity = canDock ? '1' : '0.7';
+      landBtn.style.background = canDock ? '#10b981' : '#315d9d';
+      landBtn.textContent = canDock ? 'DOCK WITH SURVEYOR' : 'APPROACH SURVEYOR';
+    }
+  } else if (universeTarget) {
     const supportedSurface = universeTarget.targetKind === 'exoplanet' && universeTarget.landable === true;
     const surveyDescentDistance = Math.max(18, universeTarget.radius * 3);
     const surveyCanLand = supportedSurface && activeDist < universeTarget.radius + surveyDescentDistance;

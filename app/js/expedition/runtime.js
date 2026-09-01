@@ -12,7 +12,7 @@ import { getUniverseDestinations, resolveUniverseAddress } from '../universe/cat
 import { ensurePlayerBackpackInventory } from '../urban-sandbox/equipment-model.js?v=9';
 import { constructOutpost, constructionAvailability, createOutpostSite, serviceOutpost } from './outpost.js?v=1';
 import { registerExpeditionDiscovery } from './contact-authority.js?v=4';
-import { createPodJourney, POD_PHASE, transitionPodJourney } from './pod-journey-authority.js?v=1';
+import { createPodJourney, POD_PHASE, POD_ROUTE_KIND, transitionPodJourney } from './pod-journey-authority.js?v=2';
 import { approvedSampleTradeValue, summarizeExpeditionTransfers } from '../resources/material-catalog.js?v=2';
 import { SHIP_STATIONS } from './ship-layout.js?v=5';
 
@@ -45,6 +45,75 @@ function advancePodJourney(event, details = {}) {
   const result = transitionPodJourney(activePodJourney, event, details);
   if (!result.accepted) return false;
   setPodJourney(result.journey);
+  return true;
+}
+
+function earthShuttleJourney() {
+  return activePodJourney?.routeKind === POD_ROUTE_KIND.EARTH_SHUTTLE
+    && activePodJourney?.bodyId === 'earth'
+    ? activePodJourney
+    : null;
+}
+
+function currentEarthAnchorId() {
+  const location = activeContext?.customLoc?.name
+    || activeContext?.LOCS?.[activeContext?.selLoc]?.name
+    || activeContext?.selLoc
+    || 'current-location';
+  return `earth:${String(location).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'current-location'}`;
+}
+
+async function launchEarthPodToSurveyor() {
+  if (!activeExpedition || activeContext?.getEnv?.() !== activeContext?.ENV?.EARTH) return false;
+  if (activeExpedition.state === 'failed' || activeExpedition.readiness?.status === 'insufficient') return false;
+  const existing = earthShuttleJourney();
+  if (existing && ![POD_PHASE.SURFACE, POD_PHASE.FAILED, POD_PHASE.RECOVERED].includes(existing.phase)) return false;
+  if (!existing || [POD_PHASE.FAILED, POD_PHASE.RECOVERED].includes(existing.phase)) {
+    setPodJourney(createPodJourney({
+      expeditionId: activeExpedition.id,
+      contactId: currentEarthAnchorId(),
+      bodyId: 'earth',
+      returnFrameId: 'sol',
+      routeKind: POD_ROUTE_KIND.EARTH_SHUTTLE,
+      initialPhase: POD_PHASE.SURFACE
+    }));
+  }
+  if (!advancePodJourney('launch')) return false;
+  closeExpeditionPlanner();
+  const started = await activeContext?.startSpaceFlightToSurveyor?.({
+    onReady: () => {
+      if (activePodJourney?.phase === POD_PHASE.SURFACE_LAUNCH) advancePodJourney('rendezvous');
+    }
+  });
+  if (started !== true) {
+    advancePodJourney('fail', { reason: 'earth-pod-launch-unavailable' });
+    openExpeditionPlanner(activeContext);
+    return false;
+  }
+  return true;
+}
+
+function getExpeditionPodDockingTarget() {
+  if (earthShuttleJourney()?.phase !== POD_PHASE.RENDEZVOUS) return null;
+  const target = activeContext?.getExpeditionSurveyorDockTarget?.();
+  const rocket = activeContext?.spaceFlight?.rocket;
+  if (!target?.position || !rocket) return null;
+  const distance = rocket.position.distanceTo(target.position);
+  const relativeSpeed = activeContext.spaceFlight.velocity?.length?.() || Number(activeContext.spaceFlight.speed || 0);
+  return {
+    ...target,
+    distance,
+    relativeSpeed,
+    canDock: distance < target.radius + 24 && relativeSpeed <= 1.35
+  };
+}
+
+function attemptExpeditionPodDocking() {
+  const target = getExpeditionPodDockingTarget();
+  if (!target?.canDock || !activeExpedition) return false;
+  if (!advancePodJourney('recover')) return false;
+  activeContext?.showSpaceFlightMessage?.('PATHFINDER SECURED · ENTERING SURVEYOR', '#83e6a6');
+  window.setTimeout(() => { void enterActiveShip(); }, 180);
   return true;
 }
 
@@ -315,6 +384,37 @@ function launchDestinationMissionPod() {
     if (!activePodJourney || activePodJourney.bodyId !== mission.destinationId) return;
     advancePodJourney('course_acquired');
     activeContext?.showSpaceFlightMessage?.(`POD RELEASED · ${mission.destinationId.replaceAll('-', ' ').toUpperCase()} · MANUAL APPROACH`, '#6fe8ff');
+  });
+  return true;
+}
+
+function launchPodToEarth() {
+  if (!activeExpedition || activeContext?.universeRuntime?.current?.id !== 'sol' || activeContext?.universeRuntime?.transition) return false;
+  setPodJourney(createPodJourney({
+    expeditionId: activeExpedition.id,
+    contactId: currentEarthAnchorId(),
+    bodyId: 'earth',
+    returnFrameId: 'sol',
+    routeKind: POD_ROUTE_KIND.EARTH_SHUTTLE
+  }));
+  if (!advancePodJourney('launch')) return false;
+  activeContext?.ensureExpeditionSurveyorDockTarget?.();
+  activeContext?.positionSpacecraftAtSurveyorDock?.();
+  activeContext?.clearRenderedSpaceJourney?.();
+  activeContext.spaceFlight.destination = 'earth';
+  activeContext.spaceFlight._manualLandingTarget = 'Earth';
+  activeContext.spaceFlight._autopilotTarget = null;
+  activeContext?.setExpeditionPodFlightPresentation?.(true);
+  closeShipStationPanel();
+  if (activeContext?.exitExpeditionShipInterior?.() !== true) {
+    advancePodJourney('fail', { reason: 'ship-interior-exit-failed' });
+    return false;
+  }
+  window.requestAnimationFrame(() => {
+    if (activePodJourney?.phase !== POD_PHASE.SHIP_LAUNCH) return;
+    advancePodJourney('course_acquired');
+    activeContext?.setSpaceFlightLandingTarget?.('Earth');
+    activeContext?.showSpaceFlightMessage?.('EARTH COURSE SET · MANUAL APPROACH · CURRENT LOCATION SAVED', '#6fe8ff');
   });
   return true;
 }
@@ -682,8 +782,12 @@ function renderMission() {
   const log = [...(expedition.log || [])].reverse().slice(0, 6);
   const reachedCount = Math.min(VOYAGE_MILESTONES.length, Number(expedition.voyageDirector?.nextSlotIndex || 0));
   const contacts = expedition.routeContacts || [];
+  const onEarth = activeContext?.getEnv?.() === activeContext?.ENV?.EARTH;
+  const earthPodReady = earthShuttleJourney()?.phase === POD_PHASE.SURFACE;
   const shipAction = expedition.readiness.status !== 'insufficient' && expedition.state !== 'failed'
-    ? `<div class="expeditionShipAction"><button id="expeditionEnterShip" class="expeditionPrimary" type="button">${expedition.pendingEvent ? 'Respond aboard Surveyor' : 'Enter Surveyor'}</button><small>${expedition.pendingEvent ? `Follow the highlighted route to ${String(expedition.pendingEvent.roomId || 'the affected station').replaceAll('-', ' ')} and interact with the equipment there.` : 'Walk the ship, meet the crew, inspect systems, and return to the same flight.'}</small></div>`
+    ? onEarth
+      ? `<div class="expeditionShipAction"><button id="expeditionEarthPod" class="expeditionPrimary" type="button">${earthPodReady ? 'Return to Surveyor in Pathfinder' : 'Launch Pathfinder to Surveyor'}</button><small>Depart from the currently loaded Earth location, fly manually to Surveyor, and dock with the same saved Expedition.</small></div>`
+      : `<div class="expeditionShipAction"><button id="expeditionEnterShip" class="expeditionPrimary" type="button">${expedition.pendingEvent ? 'Respond aboard Surveyor' : 'Enter Surveyor'}</button><small>${expedition.pendingEvent ? `Follow the highlighted route to ${String(expedition.pendingEvent.roomId || 'the affected station').replaceAll('-', ' ')} and interact with the equipment there.` : 'Walk the ship, meet the crew, inspect systems, and return to the same flight.'}</small></div>`
     : '';
   host.innerHTML = `
     ${readinessMarkup(expedition)}
@@ -742,6 +846,9 @@ function renderMission() {
     if (!accepted) activeContext?.showSpaceFlightMessage?.('Open Wayfinder to continue at the destination.', '#8ab4ff');
   });
   document.getElementById('expeditionReturnFromContact')?.addEventListener('click', returnFromLocalContact);
+  document.getElementById('expeditionEarthPod')?.addEventListener('click', async () => {
+    if (!await launchEarthPodToSurveyor()) activeContext?.showToast?.('Pathfinder cannot launch from this Earth session yet.');
+  });
   document.getElementById('expeditionSetSurveyCourse')?.addEventListener('click', () => {
     const bodyId = `${activeExpedition?.activeLocalContactId || ''}-i`;
     if (activeContext?.travelToUniverseDestination?.(bodyId, { kind: 'expedition-surface-approach', routeLabel: 'Survey site' })) {
@@ -1111,8 +1218,9 @@ function renderPodLaunchPanel(interaction) {
   const mission = activeContext?.getDestinationMissionSnapshot?.();
   const missionReady = Boolean(mission?.surfaceRequired && mission.phase === 'fieldwork' && mission.atDestination);
   const blockedByTransit = Boolean(activeContext?.universeRuntime?.transition);
-  const targetMarkup = contacts.length || missionReady
-    ? `<div class="ship-station-actions">${missionReady ? `<button type="button" data-pod-mission ${blockedByTransit ? 'disabled' : ''}>Launch for ${mission.destinationId.split('-').map((word) => word ? word[0].toUpperCase() + word.slice(1) : '').join(' ')}</button><small>${mission.title} · manual approach · three surface field records · return to Surveyor</small>` : ''}${contacts.map((contact) => `<button type="button" data-pod-contact="${contact.id}" ${blockedByTransit ? 'disabled' : ''}>Launch for ${contact.designation} I</button><small>${contact.worldClass} · manual orbital and atmospheric approach · surface return pod</small>`).join('')}</div>`
+  const earthReady = activeContext?.universeRuntime?.current?.id === 'sol';
+  const targetMarkup = contacts.length || missionReady || earthReady
+    ? `<div class="ship-station-actions">${earthReady ? `<button type="button" data-pod-earth ${blockedByTransit ? 'disabled' : ''}>Launch for Earth</button><small>Manual descent · return to the saved Earth location · Pathfinder remains available for the flight back</small>` : ''}${missionReady ? `<button type="button" data-pod-mission ${blockedByTransit ? 'disabled' : ''}>Launch for ${mission.destinationId.split('-').map((word) => word ? word[0].toUpperCase() + word.slice(1) : '').join(' ')}</button><small>${mission.title} · manual approach · three surface field records · return to Surveyor</small>` : ''}${contacts.map((contact) => `<button type="button" data-pod-contact="${contact.id}" ${blockedByTransit ? 'disabled' : ''}>Launch for ${contact.designation} I</button><small>${contact.worldClass} · manual orbital and atmospheric approach · surface return pod</small>`).join('')}</div>`
     : '<small class="ship-station-readonly">No surveyed surface target is available in this voyage chapter. Continue the Expedition until the crew identifies a local world.</small>';
   panel.innerHTML = `<div class="ship-station-card pod-launch-card" role="dialog" aria-modal="true" aria-labelledby="shipStationTitle">
     <header><div><span>SURVEYOR FLIGHT DECK</span><strong id="shipStationTitle">Pod Launch Bay</strong></div><button type="button" data-close-station aria-label="Close pod launch">×</button></header>
@@ -1127,6 +1235,9 @@ function renderPodLaunchPanel(interaction) {
   }));
   panel.querySelector('[data-pod-mission]')?.addEventListener('click', () => {
     if (!launchDestinationMissionPod()) activeContext?.showToast?.('The destination mission pod route is not ready.');
+  });
+  panel.querySelector('[data-pod-earth]')?.addEventListener('click', () => {
+    if (!launchPodToEarth()) activeContext?.showToast?.('The Earth pod route is not ready from this ship position.');
   });
   return true;
 }
@@ -1212,10 +1323,13 @@ async function enterActiveShip() {
 function openExpeditionPlanner(appContext) {
   activeContext = appContext || activeContext;
   if (activeContext) Object.assign(activeContext, {
+    attemptExpeditionPodDocking,
     collectExpeditionGeologySample,
+    getExpeditionPodDockingTarget,
     getInterstellarExpeditionSnapshot: getExpeditionSnapshot,
     leaveExpeditionSurface,
     leaveDestinationMissionSurface,
+    launchEarthPodToSurveyor,
     markExpeditionPodDescent,
     markExpeditionPodLanded,
     markExpeditionPodSurfaceLaunch

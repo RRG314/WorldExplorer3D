@@ -10,6 +10,7 @@ import { createSpaceCelestialCatalog } from "./celestial-catalog.js?v=5";
 import { initUniverseRuntime } from "../universe/runtime.js?v=30";
 import { createExpeditionSpacecraftMesh } from "./expedition-spacecraft-mesh.js?v=3";
 import { createExpeditionPodMesh } from './expedition-pod-mesh.js?v=2';
+import { createSurveyorExteriorMesh } from './expedition-surveyor-mesh.js?v=1';
 import { restoreExpeditionDiscoveries } from '../expedition/contact-authority.js?v=4';
 
 export function createSpaceFlightScene(options = {}) {
@@ -77,6 +78,58 @@ export function ensureExtendedSpaceScene() {
   restoreExpeditionDiscoveries();
   initUniverseRuntime(appCtx.spaceFlight.scene);
   appCtx.spaceFlight._extendedSpaceLoaded = true;
+  return true;
+}
+
+export function ensureExpeditionSurveyorDockTarget() {
+  const earth = appCtx.spaceFlight?.earth;
+  if (!earth) return null;
+  let surveyor = earth.getObjectByName('Surveyor Long-Range Research Vessel');
+  if (!surveyor) {
+    surveyor = createSurveyorExteriorMesh();
+    surveyor.position.set(0, SPACE_CONSTANTS.EARTH_SIZE + 260, 0);
+    earth.add(surveyor);
+  }
+  surveyor.visible = true;
+  appCtx.spaceFlight.expeditionSurveyor = surveyor;
+  return surveyor;
+}
+
+export function getExpeditionSurveyorDockTarget() {
+  const surveyor = appCtx.spaceFlight?.expeditionSurveyor;
+  if (!surveyor?.visible || !surveyor.parent) return null;
+  const dockingCollar = surveyor.getObjectByName('surveyor-docking-collar');
+  const position = new THREE.Vector3();
+  (dockingCollar || surveyor).getWorldPosition(position);
+  const approachDirection = new THREE.Vector3(0, 0, 1);
+  if (dockingCollar) {
+    approachDirection.applyQuaternion(dockingCollar.getWorldQuaternion(new THREE.Quaternion())).normalize();
+  } else {
+    approachDirection.applyQuaternion(surveyor.getWorldQuaternion(new THREE.Quaternion())).normalize();
+  }
+  return {
+    id: 'surveyor-earth-orbit',
+    name: 'Surveyor',
+    position,
+    approachDirection,
+    radius: Number(surveyor.userData.dockingRadius || 18),
+    mesh: surveyor,
+    landable: false,
+    targetKind: 'expedition-dock'
+  };
+}
+
+export function positionSpacecraftAtSurveyorDock(distance = 36) {
+  const target = getExpeditionSurveyorDockTarget();
+  const rocket = appCtx.spaceFlight?.rocket;
+  if (!target || !rocket) return false;
+  const approachDirection = target.approachDirection?.clone?.().normalize()
+    || target.position.clone().normalize();
+  rocket.position.copy(target.position).addScaledVector(approachDirection, Math.max(target.radius + 8, Number(distance) || 36));
+  rocket.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), approachDirection.clone().negate());
+  appCtx.spaceFlight.velocity?.set?.(0, 0, 0);
+  appCtx.spaceFlight.gravityVelocity?.set?.(0, 0, 0);
+  appCtx.spaceFlight.speed = 0;
   return true;
 }
 

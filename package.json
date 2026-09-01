@@ -100,6 +100,7 @@
     "verify:destination-mission-thermal": "node scripts/verification/destination-mission-proxima-thermal-current.mjs",
     "verify:destination-mission-trappist": "node scripts/verification/destination-mission-trappist-current.mjs",
     "verify:destination-mission-slice": "node scripts/verification/destination-mission-trappist-current.mjs --slice-only",
+    "verify:earth-surveyor-shuttle": "node scripts/verification/earth-surveyor-shuttle-current.mjs",
     "verify:destination-mission-proxima": "node --test tests/destination-missions-current.test.mjs && node scripts/verification/destination-mission-proxima-current.mjs && node scripts/verification/destination-mission-proxima-surface-current.mjs && node scripts/verification/destination-mission-proxima-thermal-current.mjs",
     "verify:space-atmosphere": "node --test tests/space-atmospheric-exploration-current.test.mjs",
     "verify:space-destinations": "node --test tests/space-destination-completeness-current.test.mjs",

@@ -39,6 +39,7 @@ async function verifyGrantedDestination(destination) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   await context.addInitScript((config) => {
     globalThis.WORLD_EXPLORER_FIREBASE = config;
+    localStorage.setItem('worldExplorer3D.analyticsConsent.v1', 'granted');
   }, safeConfig);
   const page = await context.newPage();
   const browserErrors = [];
@@ -57,9 +58,7 @@ async function verifyGrantedDestination(destination) {
   try {
     await openStartHub(page);
     const banner = page.locator('#analyticsConsentBanner');
-    assert.equal(await banner.isVisible(), true, `${destination.id}: first-run analytics choice must be visible`);
-    await page.locator('#analyticsConsentAllowBtn').click();
-    assert.equal(await banner.isVisible(), false, `${destination.id}: Allow analytics must close the choice`);
+    assert.equal(await banner.isVisible(), false, `${destination.id}: stored analytics preference must not interrupt entry`);
 
     await page.locator(destination.selector).click();
     await page.waitForFunction((expectedEnvironment) => {
@@ -125,7 +124,7 @@ async function verifyGrantedDestination(destination) {
   }
 }
 
-async function verifyDeniedAndFirstChoice() {
+async function verifyCookielessFirstEntry() {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   await context.addInitScript((config) => {
     globalThis.WORLD_EXPLORER_FIREBASE = config;
@@ -139,48 +138,57 @@ async function verifyDeniedAndFirstChoice() {
   });
   try {
     await openStartHub(page);
-    await page.evaluate(() => document.getElementById('globeSelectorSpaceBtn')?.click());
-    await page.waitForTimeout(700);
-    const blocked = await page.evaluate(() => ({
+    const initial = await page.evaluate(() => ({
       consent: localStorage.getItem('worldExplorer3D.analyticsConsent.v1'),
       gameStarted: globalThis.getWorldExplorerRuntimeDiagnostics?.().gameStarted === true,
       bannerVisible: !document.getElementById('analyticsConsentBanner')?.hidden,
       focusedControl: document.activeElement?.id || ''
     }));
-    assert.equal(blocked.consent, null, 'An ignored choice must remain unset');
-    assert.equal(blocked.gameStarted, false, 'First entry must wait for an explicit analytics preference');
-    assert.equal(blocked.bannerVisible, true, 'The required choice must remain visible');
-    assert.equal(blocked.focusedControl, 'analyticsConsentAllowBtn', 'The choice must receive visible keyboard focus');
-    await page.screenshot({ path: path.join(outputDir, 'mobile-required-choice.png'), fullPage: true });
-
-    await page.locator('#analyticsConsentDenyBtn').click();
+    assert.equal(initial.consent, null, 'First entry must begin with analytics storage unset');
+    assert.equal(initial.gameStarted, false);
+    assert.equal(initial.bannerVisible, false, 'Analytics preference must not interrupt first entry');
     await page.locator('#globeSelectorSpaceBtn').click();
     await page.waitForFunction(() => {
       const runtime = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
       return runtime.gameStarted === true && runtime.environment === 'SPACE_FLIGHT';
     }, null, { timeout: 180_000 });
     await page.waitForFunction(() => {
-      return globalThis.getWorldExplorerAnalyticsSnapshot?.().trackingStarted === true;
+      const analytics = globalThis.getWorldExplorerAnalyticsSnapshot?.();
+      return analytics?.trackingStarted === true && analytics?.ready === true &&
+        analytics?.worldSessionActive === true && analytics?.recentEvents?.includes('we3d_runtime_ready') &&
+        analytics?.recentEvents?.includes('we3d_world_session_start');
     }, null, { timeout: 30_000 });
-    await page.waitForTimeout(2_500);
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const evidence = collectionRequests.join('\n');
+      if (/we3d_runtime_ready/.test(evidence) && /we3d_world_session_start/.test(evidence)) break;
+      await page.waitForTimeout(250);
+    }
     const snapshot = await analyticsSnapshot(page);
-    assert.equal(snapshot.consent, 'denied');
-    assert.equal(snapshot.deliveryState, 'consent_denied');
-    assert.equal(snapshot.worldSessionActive, false);
-    assert.equal(snapshot.eventLoggedCount, 0);
-    assert.doesNotMatch(collectionRequests.join('\n'), /we3d_runtime_ready|we3d_world_session_start/);
+    assert.equal(snapshot.consent, 'unset');
+    assert.equal(snapshot.deliveryState, 'cookieless_unset');
+    assert.equal(snapshot.worldSessionActive, true);
+    assert.ok(snapshot.eventLoggedCount >= 2);
+    assert.match(collectionRequests.join('\n'), /we3d_runtime_ready/);
+    assert.match(collectionRequests.join('\n'), /we3d_world_session_start/);
+    assert.match(collectionRequests.join('\n'), /[?&](?:gcs|gcd)=/);
 
     await page.evaluate(async () => {
-      const consent = await import('/js/analytics-consent.js?v=1');
+      const consent = await import('/js/analytics-consent.js?v=2');
+      consent.writeAnalyticsConsent('denied');
+    });
+    await page.waitForFunction(() => globalThis.getWorldExplorerAnalyticsSnapshot?.().deliveryState === 'cookieless_denied');
+    const deniedSnapshot = await analyticsSnapshot(page);
+    assert.equal(deniedSnapshot.worldSessionCount, 1, 'Denying storage must not restart the active play session');
+
+    await page.evaluate(async () => {
+      const consent = await import('/js/analytics-consent.js?v=2');
       consent.writeAnalyticsConsent('granted');
     });
     await page.waitForFunction(() => {
       const analytics = globalThis.getWorldExplorerAnalyticsSnapshot?.();
       return analytics?.consent === 'granted' &&
         analytics?.worldSessionActive === true &&
-        analytics?.worldSessionCount === 1 &&
-        analytics?.recentEvents?.includes('we3d_runtime_ready') &&
-        analytics?.recentEvents?.includes('we3d_world_session_start');
+        analytics?.worldSessionCount === 1 && analytics?.deliveryState === 'ready';
     }, null, { timeout: 30_000 });
     for (let attempt = 0; attempt < 40; attempt += 1) {
       const evidence = collectionRequests.join('\n');
@@ -193,9 +201,10 @@ async function verifyDeniedAndFirstChoice() {
     assert.equal(grantedSnapshot.worldSessionCount, 1, 'Granting after entry must start exactly one current session');
     return {
       ok: true,
-      blocked,
-      deniedDeliveryState: snapshot.deliveryState,
-      deniedEventLoggedCount: snapshot.eventLoggedCount,
+      initial,
+      cookielessDeliveryState: snapshot.deliveryState,
+      cookielessEventLoggedCount: snapshot.eventLoggedCount,
+      deniedDeliveryState: deniedSnapshot.deliveryState,
       grantedDeliveryState: grantedSnapshot.deliveryState,
       grantedSessionCount: grantedSnapshot.worldSessionCount
     };
@@ -223,6 +232,8 @@ async function verifyStorageBlockedConsent() {
   const page = await context.newPage();
   try {
     await page.goto(`${baseUrl}/app/`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
+    await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
+    await page.evaluate(() => globalThis.dispatchEvent(new CustomEvent('we3d:analytics-consent-request')));
     await page.waitForSelector('#analyticsConsentAllowBtn', { state: 'visible', timeout: 30_000 });
     await page.locator('#analyticsConsentAllowBtn').click();
     const evidence = await page.evaluate(async () => {
@@ -241,12 +252,12 @@ async function verifyStorageBlockedConsent() {
 }
 
 await fs.mkdir(outputDir, { recursive: true });
-const result = { ok: false, contract: 'analytics-consent-and-playable-environment-delivery', storageBlocked: null, denied: null, destinations: [] };
+const result = { ok: false, contract: 'analytics-advanced-consent-and-playable-environment-delivery', storageBlocked: null, cookieless: null, destinations: [] };
 try {
   result.storageBlocked = await verifyStorageBlockedConsent();
-  result.denied = await verifyDeniedAndFirstChoice();
+  result.cookieless = await verifyCookielessFirstEntry();
   for (const destination of destinations) result.destinations.push(await verifyGrantedDestination(destination));
-  result.ok = result.storageBlocked.ok && result.denied.ok && result.destinations.every((entry) => entry.ok);
+  result.ok = result.storageBlocked.ok && result.cookieless.ok && result.destinations.every((entry) => entry.ok);
   await fs.writeFile(path.join(outputDir, 'report.json'), `${JSON.stringify(result, null, 2)}\n`, 'utf8');
   console.log(JSON.stringify(result, null, 2));
   assert.equal(result.ok, true);

@@ -266,6 +266,16 @@ action. `expedition/runtime.js` derives phase-aware advice from the same voyage,
 destination mission, and contact records, while `ship-interior.js` sends the
 chosen station to the existing cross-deck map and lift route.
 
+Earth–Surveyor travel reuses that same ownership chain. The current Earth
+session supplies the geographic anchor, `space.js` and the Space runtime own
+manual Pathfinder motion, camera, gravity, collision, approach, and landing,
+and `expedition/pod-journey-authority.js` owns the ordered shuttle phases. The
+Surveyor docking target is the physical exterior collar in Earth orbit rather
+than a second Earth-world vehicle. Docking enters the existing ship interior;
+Earth descent returns through the existing Earth session loader at the saved
+location. Backpack, Journal, account, and multiplayer records are not copied at
+either boundary.
+
 At the affected station, a selected response starts one three-step physical
 procedure. `ship-interior.js` publishes only the current procedure node through
 the existing interior interaction collection; `interiors/runtime.js` routes the
@@ -319,6 +329,15 @@ Room presence is the source for player and room discovery. Future map-based
 discovery will aggregate privacy-safe activity areas and current counts from
 that authority; it will not publish precise coordinates from an unrelated
 client or infer online players from local scene objects.
+
+Firebase Analytics is a presentation and reporting consumer, not a gameplay
+authority. Session and bounded product events exclude exact GPS coordinates,
+room codes, names, messages, artifact text, and other free-form input. With
+analytics storage unset or denied, the Firebase SDK runs in advanced consent
+mode and sends basic cookieless measurements without a World Explorer account
+identifier. Stored analytics and signed-in session identity begin only after an
+explicit analytics-storage preference; advertising storage and personalization
+remain denied.
 
 ## Data classification
 

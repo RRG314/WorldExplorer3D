@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   createPodJourney,
   POD_PHASE,
+  POD_ROUTE_KIND,
   transitionPodJourney
 } from '../app/js/expedition/pod-journey-authority.js';
 
@@ -32,6 +33,31 @@ test('expedition pod journey has one ordered ship-to-surface-to-ship state chain
   }
   assert.equal(Object.isFrozen(journey), true);
   assert.equal(transitionPodJourney(journey, 'launch').accepted, false);
+});
+
+test('Earth shuttle starts on the loaded surface and reuses the return half of the pod chain', () => {
+  let journey = createPodJourney({
+    expeditionId: 'expedition-earth',
+    contactId: 'earth-current-location',
+    bodyId: 'earth',
+    returnFrameId: 'sol',
+    routeKind: POD_ROUTE_KIND.EARTH_SHUTTLE,
+    initialPhase: POD_PHASE.SURFACE,
+    atMs: 300
+  });
+  assert.equal(journey.schemaVersion, 2);
+  assert.equal(journey.routeKind, POD_ROUTE_KIND.EARTH_SHUTTLE);
+  assert.equal(journey.phase, POD_PHASE.SURFACE);
+  for (const [event, expected] of [
+    ['launch', POD_PHASE.SURFACE_LAUNCH],
+    ['rendezvous', POD_PHASE.RENDEZVOUS],
+    ['recover', POD_PHASE.RECOVERED]
+  ]) {
+    const result = transitionPodJourney(journey, event, { atMs: journey.updatedAtMs + 10 });
+    assert.equal(result.accepted, true);
+    assert.equal(result.journey.phase, expected);
+    journey = result.journey;
+  }
 });
 
 test('pod journey rejects skipped descent and records terminal failure', () => {

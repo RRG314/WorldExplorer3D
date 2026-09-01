@@ -2,9 +2,9 @@ import { ctx as appCtx } from "./shared-context.js?v=55";
 import { getPrimaryWorldCanvas } from "./engine/webgl-lifecycle.js?v=1";
 import { captureEarthWorldSession } from "./earth-session.js?v=17";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
-import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=19";
-import { createSpaceFlightScene, destroySpaceFlightScene, ensureExtendedSpaceScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon, setExpeditionPodFlightPresentation, updateExpeditionPodFlightPresentation } from "./space/scene.js?v=33";
-import { hideGameUI, initSpaceFlightUI, prepareSpaceFlightHudForEntry, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=33";
+import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=20";
+import { createSpaceFlightScene, destroySpaceFlightScene, ensureExpeditionSurveyorDockTarget, ensureExtendedSpaceScene, getExpeditionSurveyorDockTarget, positionSpacecraftAtSurveyorDock, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon, setExpeditionPodFlightPresentation, updateExpeditionPodFlightPresentation } from "./space/scene.js?v=35";
+import { hideGameUI, initSpaceFlightUI, prepareSpaceFlightHudForEntry, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=34";
 import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 import {
   beginEnvironmentTransition,
@@ -156,6 +156,63 @@ function startSpaceFlightToMoon() {
     appCtx.spaceFlight.mode = 'flying';
     appCtx.spaceFlight.speed = 0;
     showFlightMessage('SPACE FLIGHT READY', '#10b981');
+  }, 1000);
+  return true;
+}
+
+function startSpaceFlightToSurveyor(options = {}) {
+  if (appCtx.spaceFlight.active) return false;
+  const sessionId = beginSpaceFlightSession();
+  const transition = beginEnvironmentTransition(appCtx.ENV.SPACE_FLIGHT, { source: 'earth_to_surveyor_pod' });
+
+  appCtx.setEnvironmentTransitionActive(true);
+  appCtx.setPauseReason?.('planetary_transition', true);
+  appCtx.earthPosition = { x: appCtx.car.x, z: appCtx.car.z, angle: appCtx.car.angle };
+  captureEarthWorldSession();
+  suspendEarthModesForPlanetaryEntry(appCtx.ENV.SPACE_FLIGHT);
+  appCtx.scene.background = new THREE.Color(0x000000);
+
+  appCtx.spaceFlight.destination = 'surveyor';
+  appCtx.spaceFlight.mode = 'launching';
+  appCtx.spaceFlight.active = true;
+  appCtx.spaceFlight._launchSource = 'Earth';
+  appCtx.spaceFlight.launchStartMs = Date.now();
+  appCtx.spaceFlight._isThrusting = false;
+  if (!commitEnvironment(appCtx.ENV.SPACE_FLIGHT, { token: transition })) return false;
+  emitTutorialEvent('entered_space', { destination: 'surveyor', source: 'pathfinder_pod' });
+
+  appCtx.spaceFlight.canvas.style.display = 'block';
+  appCtx.spaceFlight.hud.style.display = 'block';
+  prepareSpaceFlightHudForEntry();
+  document.getElementById('sfDestination').textContent = 'Surveyor';
+  document.getElementById('sfLandBtn').textContent = 'APPROACH SURVEYOR';
+  const worldCanvas = getPrimaryWorldCanvas(appCtx);
+  if (worldCanvas) worldCanvas.style.display = 'none';
+  hideGameUI();
+
+  createSpaceFlightScene({ includeExtendedSpace: true });
+  ensureExtendedSpaceScene();
+  leaseSpaceFlightResources();
+  appCtx.returnUniverseToSolImmediate?.();
+  resetSpaceFlightForMoon();
+  appCtx.clearRenderedSpaceJourney?.();
+  appCtx.spaceFlight.destination = 'surveyor';
+  appCtx.spaceFlight._manualLandingTarget = null;
+  appCtx.spaceFlight._autopilotTarget = null;
+  ensureExpeditionSurveyorDockTarget();
+  setExpeditionPodFlightPresentation(true);
+
+  appCtx.stopRuntimeKernel?.('space-flight-active');
+  animateSpaceFlight();
+  appCtx.showSolarSystemUI?.();
+  appCtx.showUniverseUI?.();
+  spaceSessionScope.timeout(() => {
+    if (!isCurrentSpaceFlightSession(sessionId, 'surveyor')) return;
+    appCtx.spaceFlight.mode = 'flying';
+    appCtx.spaceFlight.speed = 0;
+    appCtx.setPauseReason?.('planetary_transition', false);
+    showFlightMessage('SURVEYOR ACQUIRED · MANUAL DOCKING APPROACH', '#6fe8ff');
+    options.onReady?.();
   }, 1000);
   return true;
 }
@@ -358,6 +415,7 @@ function completeLanding(sessionId = appCtx.spaceFlight._sessionId) {
     } else if (!['Earth', 'earth'].includes(targetName) && typeof appCtx.arriveAtSolidWorld === 'function') {
       appCtx.arriveAtSolidWorld(targetName);
     } else if (typeof appCtx.arriveAtEarth === 'function') {
+      appCtx.markExpeditionPodLanded?.('earth');
       appCtx.arriveAtEarth();
     }
   }, 1500);
@@ -435,10 +493,14 @@ Object.assign(appCtx, {
   showSpaceFlightMessage: showFlightMessage,
   setSpaceFlightLandingTarget,
   setExpeditionPodFlightPresentation,
+  ensureExpeditionSurveyorDockTarget,
+  getExpeditionSurveyorDockTarget,
+  positionSpacecraftAtSurveyorDock,
   updateExpeditionPodFlightPresentation,
   startSpaceFlightToEarth,
   startSpaceFlightFromExpeditionSurface,
   startSpaceFlightToMars,
+  startSpaceFlightToSurveyor,
   startSpaceFlightToMoon
 });
 
@@ -448,10 +510,14 @@ export {
   forceSpaceFlightLanding,
   setSpaceFlightLandingTarget,
   setExpeditionPodFlightPresentation,
+  ensureExpeditionSurveyorDockTarget,
+  getExpeditionSurveyorDockTarget,
+  positionSpacecraftAtSurveyorDock,
   updateExpeditionPodFlightPresentation,
   startSpaceFlightToEarth,
   startSpaceFlightFromExpeditionSurface,
   startSpaceFlightToMars,
+  startSpaceFlightToSurveyor,
   startSpaceFlightToMoon
 };
 

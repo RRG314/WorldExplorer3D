@@ -22,7 +22,7 @@ with explicit entry and exit lifecycles.
 | --- | --- | --- |
 | World selection | Interactive globe, search, presets, coordinates, geolocation, favorites, and recent places | Provider and imagery availability vary |
 | Earth traversal | Walk, drive, drone, plane, and boat with shared location handoff | One bounded location per session |
-| Other environments | Underwater, Moon, Mars, solid and atmospheric planets, featured moons and small bodies, solar-system flight, deep space, three distinct three-step planetary field instrument procedures, and the three-deck Surveyor Expedition Alpha with live local-space views, objective routing, crew guidance, and a connected pod/surface/return path | Distances use explicit game scales; planetary life, NPC, pod, rover, mission, and ship visual detail remains an active quality program rather than worldwide or final asset completeness |
+| Other environments | Underwater, Moon, Mars, solid and atmospheric planets, featured moons and small bodies, solar-system flight, deep space, three distinct three-step planetary field instrument procedures, and the three-deck Surveyor Expedition Alpha with live local-space views, objective routing, crew guidance, planet pod journeys, and a manual Earth–Surveyor Pathfinder shuttle | Distances use explicit game scales; planetary life, NPC, pod, rover, mission, and ship visual detail remains an active quality program rather than worldwide or final asset completeness |
 | Mobile play | Analog movement/look controls, mode actions, handedness, sensitivity, camera follow, map, Backpack, and recovery | Physical-device battery and thermal performance still require device testing |
 | Browser support | Standards-based WebGL browser runtime verified through current Chromium and Firefox desktop gameplay, with responsive keyboard and touch layouts | Physical-device and assistive-technology coverage remains a release acceptance responsibility; provider features still depend on browser permissions and capabilities |
 | Character and equipment | One persistent character profile, attributes, skills, condition, six assignable quick slots, ammunition, field tools, and usable equipment | Complete cross-device character sync is not yet available |
@@ -34,6 +34,7 @@ with explicit entry and exit lifecycles.
 | Fishing | Shared shore, boat, and underwater records with catch, loss, retry, and recovery | Fish availability depends on the current water and regional data boundary |
 | Live GPS | Optional foreground location following, privacy/consent controls, three-stop Expeditions, and shared field activities | No continuous world streaming; background tracking is not part of the product |
 | Multiplayer | Bounded public/private rooms, presence, chat, shared Blocks, activities, published overlays, and persistent room vehicles | Large-room capacity and moderation continue to evolve |
+| Product analytics | Firebase Analytics session and bounded gameplay events; cookieless basic measurement when analytics storage is unset or denied; optional stored analytics and signed-in session identity | Exact GPS, room codes, names, messages, artifact text, and other free-form text are excluded; advertising storage and personalization remain denied |
 | World Editor | One editor for reviewed overlays and persistent local/room Blocks | It does not edit OpenStreetMap or other provider data |
 | Accessibility | Keyboard navigation, visible focus, browser zoom, larger text, increased contrast, reduced motion, live status, and coarse-pointer targets | Cross-device assistive-technology review remains ongoing |
 
@@ -56,7 +57,7 @@ with explicit entry and exit lifecycles.
 | Input and cameras | `app/js/controls/`, `app/js/ui/mobile-controls.js`, `app/js/hud.js`, `app/js/hud/boat-camera.js`, `app/js/walking/` | Keyboard, touch, gamepad, movement, follow cameras, harbor/channel framing, and HUD units |
 | Editor and Blocks | `app/js/editor/`, `app/js/block-builder/`, `app/js/blocks.js` | Integrated editing, persistence, undo, sharing, moderation, and rollback |
 | Multiplayer | `app/js/multiplayer/`, `firestore.rules`, `functions/` | Room state, authorization, presence, chat, shared content, and activities |
-| Planetary and space | `app/js/planetary/`, `app/js/space/`, `app/js/universe/` | Body catalog, physical environments, accepted surfaces, spacecraft state, journeys, collision, landing, and return |
+| Planetary and space | `app/js/planetary/`, `app/js/space/`, `app/js/universe/`, `app/js/expedition/` | Body catalog, physical environments, accepted surfaces, spacecraft state, journeys, Surveyor rooms and docking, Pathfinder shuttle state, collision, landing, Earth handoff, and return |
 
 ## Data and truth boundaries
 

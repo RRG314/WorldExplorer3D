@@ -1,4 +1,9 @@
-const POD_JOURNEY_SCHEMA_VERSION = 1;
+const POD_JOURNEY_SCHEMA_VERSION = 2;
+
+const POD_ROUTE_KIND = Object.freeze({
+  SHIP_SURFACE_ROUND_TRIP: 'ship-surface-round-trip',
+  EARTH_SHUTTLE: 'earth-shuttle'
+});
 
 const POD_PHASE = Object.freeze({
   ABOARD: 'aboard',
@@ -33,6 +38,10 @@ function createPodJourney(input = {}) {
   const contactId = String(input.contactId || '').trim();
   const bodyId = String(input.bodyId || '').trim();
   const returnFrameId = String(input.returnFrameId || '').trim();
+  const routeKind = Object.values(POD_ROUTE_KIND).includes(input.routeKind)
+    ? input.routeKind
+    : POD_ROUTE_KIND.SHIP_SURFACE_ROUND_TRIP;
+  const initialPhase = input.initialPhase === POD_PHASE.SURFACE ? POD_PHASE.SURFACE : POD_PHASE.ABOARD;
   if (!expeditionId || !contactId || !bodyId || !returnFrameId) {
     throw new TypeError('Pod journey requires expedition, contact, body, and return-frame identities.');
   }
@@ -45,7 +54,8 @@ function createPodJourney(input = {}) {
     contactId,
     bodyId,
     returnFrameId,
-    phase: POD_PHASE.ABOARD,
+    routeKind,
+    phase: initialPhase,
     startedAtMs: now,
     updatedAtMs: now,
     failureReason: null
@@ -70,5 +80,6 @@ export {
   createPodJourney,
   POD_JOURNEY_SCHEMA_VERSION,
   POD_PHASE,
+  POD_ROUTE_KIND,
   transitionPodJourney
 };

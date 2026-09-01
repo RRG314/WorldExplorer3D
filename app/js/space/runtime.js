@@ -722,6 +722,15 @@ export function animateSpaceFlight(deps = {}) {
 }
 
 export function attemptLanding(deps = {}) {
+  const expeditionDock = appCtx.getExpeditionPodDockingTarget?.();
+  if (expeditionDock?.position) {
+    const accepted = appCtx.attemptExpeditionPodDocking?.() === true;
+    deps.showFlightMessage?.(
+      accepted ? 'PATHFINDER DOCKING · SURVEYOR HAS THE POD' : 'MOVE CLOSER TO SURVEYOR AND MATCH SPEED',
+      accepted ? '#10b981' : '#f59e0b'
+    );
+    return accepted;
+  }
   const universeTarget = appCtx.getUniverseHudTarget?.();
   if (universeTarget?.targetKind === 'exoplanet' && universeTarget.landable === true && universeTarget.position) {
     const distance = appCtx.spaceFlight.rocket.position.distanceTo(universeTarget.position);

@@ -1,6 +1,6 @@
 import { observeAuth } from './auth-ui.js?v=55';
 import { initFirebaseAnalytics, readFirebaseConfig } from './firebase-init.js?v=55';
-import { readAnalyticsConsent } from './analytics-consent.js?v=1';
+import { readAnalyticsConsent } from './analytics-consent.js?v=2';
 
 const ANALYTICS_EVENT_WORLD_START = 'we3d_world_session_start';
 const ANALYTICS_EVENT_WORLD_END = 'we3d_world_session_end';
@@ -175,7 +175,6 @@ async function ensureAnalyticsTools() {
 }
 
 async function logAnalyticsEvent(eventName, params = {}) {
-  if (readAnalyticsConsent() !== 'granted') return false;
   const tools = await ensureAnalyticsTools();
   if (!tools?.analytics || typeof tools.logEvent !== 'function') return false;
   try {
@@ -282,7 +281,7 @@ async function syncAnalyticsUser(user = null) {
 }
 
 async function logRuntimeReady(appCtx) {
-  if (state.runtimeReadyLogged || runtimeReadyLogPending || readAnalyticsConsent() !== 'granted') return false;
+  if (state.runtimeReadyLogged || runtimeReadyLogPending) return false;
   runtimeReadyLogPending = true;
   try {
     const logged = await logAnalyticsEvent(ANALYTICS_EVENT_RUNTIME_READY, worldSessionParams(appCtx, {
@@ -296,7 +295,7 @@ async function logRuntimeReady(appCtx) {
 }
 
 async function startWorldSession(appCtx, reason = 'game_started') {
-  if (state.worldSessionActive || worldSessionStartPending || readAnalyticsConsent() !== 'granted') return false;
+  if (state.worldSessionActive || worldSessionStartPending) return false;
   worldSessionStartPending = true;
   try {
     const nextSessionIndex = state.worldSessionCount + 1;
@@ -317,12 +316,6 @@ async function startWorldSession(appCtx, reason = 'game_started') {
   } finally {
     worldSessionStartPending = false;
   }
-}
-
-function abandonWorldSession(reason = 'consent_denied') {
-  state.worldSessionActive = false;
-  state.worldSessionStartedAt = 0;
-  state.lastReason = reason;
 }
 
 async function endWorldSession(appCtx, reason = 'ended') {
@@ -421,10 +414,10 @@ function startAnalyticsTracking(appCtx) {
       await syncAnalyticsUser(lastAuthUser);
       await tick(appCtx);
     } else {
-      abandonWorldSession('consent_denied');
       state.currentUserId = '';
       const tools = await ensureAnalyticsTools();
       tools?.setUserId?.(tools.analytics, null);
+      await tick(appCtx);
     }
   };
   globalThis.addEventListener?.('we3d:analytics-consent', consentEventListener, { passive: true });
@@ -484,12 +477,10 @@ function getAnalyticsSessionSnapshot(appCtx = null) {
     productEventCount: state.productEventCount,
     eventLoggedCount: state.eventLoggedCount,
     recentEvents: [...state.recentEvents],
-    deliveryState: readAnalyticsConsent() !== 'granted'
-      ? `consent_${readAnalyticsConsent()}`
-      : !trackingStarted
+    deliveryState: !trackingStarted
         ? 'warmup_pending'
         : state.ready
-          ? 'ready'
+          ? readAnalyticsConsent() === 'granted' ? 'ready' : `cookieless_${readAnalyticsConsent()}`
           : state.disabledReason || 'initializing',
     currentMode: ctx ? currentTravelMode(ctx) : '',
     currentEnvironment: ctx ? currentEnvironment(ctx) : '',

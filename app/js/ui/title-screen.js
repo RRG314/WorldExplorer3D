@@ -4,7 +4,6 @@ import { commitEnvironment } from '../session-coordinator.js?v=2';
 import { createGlobeSelector } from "./globe-selector.js?v=93";
 import { readSharedExperienceParams } from "./share-links.js?v=64";
 import { prepareTitleEnvironment } from "../planetary/entry.js?v=9";
-import { readAnalyticsConsent } from '../../../js/analytics-consent.js?v=1';
 import { markFirstPlayReady, scheduleAfterFirstPlay } from '../runtime/workload-policy.js?v=1';
 import { setupGlobeHub } from './title-screen/globe-hub.js?v=5';
 import {
@@ -570,10 +569,6 @@ function initTitleScreenUi({
 
   const runTitleStart = async () => {
     if (appCtx.runtimeReady !== true) return false;
-    if (readAnalyticsConsent() === 'unset') {
-      globalThis.dispatchEvent?.(new CustomEvent('we3d:analytics-consent-request'));
-      return false;
-    }
     const requestedLaunchMode = Object.entries(launchModeButtons)
       .find(([, button]) => button?.classList.contains('active'))?.[0] || titleLaunchMode;
     setLaunchMode(requestedLaunchMode);

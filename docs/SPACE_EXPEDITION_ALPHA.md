@@ -356,6 +356,36 @@ required inputs, expected result, risks, time, recommendation, and response.
 Mobile uses the same information architecture in a single-column sheet. It does
 not receive a separate set of authorities or abbreviated consequences.
 
+## Earth–Surveyor shuttle loop
+
+Earth is a full endpoint of the Pathfinder pod journey, not a separate travel
+minigame. The connected route is:
+
+1. choose or load an Earth location through the existing globe, search, current
+   location, or Live GPS entry authority;
+2. open Interstellar Expeditions from the existing Exploration travel menu and
+   board Pathfinder at that Earth session;
+3. launch under the existing Space Flight controller, with manual steering,
+   Earth collision, gravity, camera, and optional guidance unchanged;
+4. acquire the visible Surveyor docking target, approach it, and dock through
+   the existing pod journey state;
+5. enter the same walkable Surveyor interior and continue the saved Expedition;
+6. leave from Surveyor's existing Pod Bay, manually descend to Earth, and hand
+   off to the existing Earth world loader at the selected saved location; and
+7. reboard Pathfinder on Earth and return to Surveyor without creating a second
+   ship, inventory, crew, world, or mission record.
+
+Ownership is strict. Earth search and world loading own the geographic anchor.
+Space Flight owns motion, camera, gravity, collision, atmosphere, and landing.
+The Expedition pod journey owns boarding, launch, surface, rendezvous, recovery,
+and save/reload. Surveyor interior owns rooms and crew. The normal Explorer,
+Backpack, Journal, and multiplayer records cross the boundary unchanged.
+
+The initial Alpha slice may offer the currently loaded Earth location plus
+saved recent locations. Arbitrary destination search from the Pod Bay must reuse
+the globe search provider and Earth selection record before it is advertised;
+it must not invent a second geocoder or silently substitute a nearby city.
+
 ## Implemented alpha slices
 
 1. Three validated decks, mapped rooms, doors, lift, ship map, crew posts, and
@@ -401,6 +431,10 @@ following work in actual gameplay:
 - ordinary manual Space, Wayfinder assistance, Solar System landing, planetary
   play, Character, Backpack, Journal, geology/mining, and Earth play remain
   unchanged when no Expedition is active; and
+- Earth-to-Surveyor and Surveyor-to-Earth pod travel preserve the selected Earth
+  session, require real manual flight or an explicit assist choice, show a
+  physical docking target, and recover after reload without duplicating a pod;
+  and
 - focused installed-browser journeys pass on desktop and 390×844, and visual,
   performance, memory cleanup, keyboard, touch, and accessibility review have
   current evidence.

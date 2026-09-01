@@ -28,6 +28,7 @@ function setupAnalyticsConsentUi() {
   const allowButton = document.getElementById('analyticsConsentAllowBtn');
   const denyButton = document.getElementById('analyticsConsentDenyBtn');
   const manageButton = document.getElementById('analyticsConsentManageBtn');
+  const licensesDialog = document.getElementById('dataLicensesDialog');
   const titleScreen = document.getElementById('titleScreen');
   if (!banner || !allowButton || !denyButton) return false;
 
@@ -46,11 +47,13 @@ function setupAnalyticsConsentUi() {
   };
   allowButton.addEventListener('click', () => choose(CONSENT_GRANTED));
   denyButton.addEventListener('click', () => choose(CONSENT_DENIED));
-  manageButton?.addEventListener('click', show);
+  manageButton?.addEventListener('click', () => {
+    if (licensesDialog instanceof HTMLDialogElement && licensesDialog.open) licensesDialog.close();
+    show();
+  });
   const syncTitleVisibility = () => {
     const titleVisible = !titleScreen?.classList.contains('hidden');
     if (!titleVisible) hide();
-    else if (readAnalyticsConsent() === 'unset') show();
   };
   if (titleScreen) {
     new MutationObserver(syncTitleVisibility).observe(titleScreen, {
