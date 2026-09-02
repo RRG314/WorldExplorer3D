@@ -204,6 +204,7 @@ body.deflock-active.live-gps-active #liveGpsHud{top:164px}
 @media(max-width:600px){#propertyPanel{top:max(74px,calc(env(safe-area-inset-top) + 68px));right:4px;width:calc(100vw - 8px);max-height:calc(100dvh - max(82px,calc(env(safe-area-inset-top) + 76px)));border-radius:7px}.propertyHubHeader{padding:12px}.propertyHubTabs button{font-size:9px;padding:8px 3px}.propertyHomeCard{grid-template-columns:70px minmax(0,1fr);gap:9px}.propertyHomeVisual{min-height:72px}.propertyHomeVisual span{font-size:32px}.propertyStorageColumns{grid-template-columns:1fr}.propertyCardActions{grid-column:1/-1}.propertyMarketCard{grid-template-columns:76px 1fr}.propertyMarketCard img,.propertyMarketPlaceholder{width:76px}.propertyHubSupportingLink{align-items:flex-start;flex-direction:column}.propertyHubSupportingLink button{width:100%}}
 #historicBtn.show{display:block}
 #historicBtn:hover{transform:scale(1.1);box-shadow:0 12px 32px rgba(245,158,11,0.5)}
+#historicPanel{display:none}
 #historicPanel.show{display:flex}
 
 /* Persistent memory markers */

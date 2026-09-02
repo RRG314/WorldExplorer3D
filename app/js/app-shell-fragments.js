@@ -19,7 +19,7 @@ const APP_SHELL_FRAGMENT_HTML = `
 
 <!-- Historic Sites System -->
 <button id="historicBtn" title="Toggle Historic Sites" style="position:fixed;bottom:150px;right:20px;width:56px;height:56px;background:linear-gradient(135deg,#f59e0b,#d97706);border:none;border-radius:50%;color:#ffffff;font-size:24px;cursor:pointer;box-shadow:0 8px 24px rgba(245,158,11,0.4);transition:all 0.2s;z-index:100;display:none">⛩️</button>
-<div id="historicPanel" style="position:fixed;top:20px;right:20px;width:380px;max-height:80vh;background:rgba(255,255,255,0.98);border:none;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:110;display:none;overflow:hidden;backdrop-filter:blur(10px);flex-direction:column">
+<div id="historicPanel" style="position:fixed;top:20px;right:20px;width:380px;max-height:80vh;background:rgba(255,255,255,0.98);border:none;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:110;overflow:hidden;backdrop-filter:blur(10px);flex-direction:column">
   <div class="panel-header" style="background:linear-gradient(135deg,#f59e0b,#d97706)">
     <div class="panel-title">Historic Sites</div>
     <button class="panel-close" id="closeHistoricPanelBtn">×</button>

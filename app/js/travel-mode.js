@@ -51,7 +51,11 @@ function syncTravelModeButtons() {
     walk: supports('walk'),
     drone: supports('drone'),
     plane: supports('plane'),
-    boat: supports('boat')
+    // Boat visibility is contextual. The boat runtime owns whether a nearby
+    // vessel, an active vessel, or the ocean-to-surface transfer is available.
+    // Treating every Earth location as boat-ready made the hotbar advertise a
+    // mode that could silently do nothing inland.
+    boat: supports('boat') && !!(appCtx.boatMode?.active || appCtx.boatMode?.available || appCtx.oceanMode?.active)
   };
   const signature = JSON.stringify({
     activeMode,

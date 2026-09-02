@@ -299,15 +299,20 @@ function setupUI() {
       appCtx.showToast?.('Multiplayer is unavailable right now.');
     });
   });
-  document.getElementById('fCommunityBoard')?.addEventListener('click', () => {
+  document.getElementById('fCommunityBoard')?.addEventListener('click', async () => {
     closeAllFloatMenus();
-    appCtx.setChallengeLeaderboardView?.('explorer');
-    const panel = document.getElementById('flowerChallengePanel');
-    if (!panel?.classList.contains('open')) document.getElementById('flowerChallengeToggleBtn')?.click();
+    try {
+      await appCtx.ensureFlowerChallengeReady?.();
+      await appCtx.setChallengeLeaderboardView?.('explorer');
+      const panel = document.getElementById('flowerChallengePanel');
+      if (!panel?.classList.contains('open')) document.getElementById('flowerChallengeToggleBtn')?.click();
+    } catch (error) {
+      console.error('[community-board] Could not open the board.', error);
+      appCtx.showToast?.('The Community Board is unavailable right now.');
+    }
   });
   document.getElementById('fSharePlace')?.addEventListener('click', () => {
-    closeAllFloatMenus();
-    document.getElementById('gameShareFloatBtn')?.click();
+    shareUi?.openGameShareMenu?.();
   });
   document.getElementById('fDeFlock')?.addEventListener('click', () => {
     if (appCtx.onMoon || appCtx.onMars || appCtx.spaceFlight?.active || appCtx.oceanMode?.active) {

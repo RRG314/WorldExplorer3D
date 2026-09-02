@@ -544,6 +544,10 @@ function setupFlowerChallenge() {
 
   ui.titlePanel = document.getElementById('flowerChallengePanel');
   ui.titleToggleBtn = document.getElementById('flowerChallengeToggleBtn');
+  // The Community Board is shared by the start screen and the in-world
+  // hotbar. Keep it at the application shell level so hiding the start screen
+  // cannot also hide an already-open in-world board.
+  if (ui.titlePanel?.parentElement !== document.body) document.body.appendChild(ui.titlePanel);
   ui.status = document.getElementById('flowerChallengeStatus');
   ui.titleNameInput = document.getElementById('flowerPlayerName');
   ui.titleLocation = document.getElementById('flowerChallengeLocation');

@@ -914,6 +914,12 @@ How Connected Data Is Used
 <div id="largeMap">
 <header id="mapExplorerHeader">
   <div><span>WORLD MAP</span><strong id="mapExplorerStatus">Following your position</strong></div>
+  <form id="mapSearchForm" class="mapSearchForm" role="search">
+    <label class="sr-only" for="mapSearchInput">Search for a city, place, airport, or coordinates</label>
+    <input id="mapSearchInput" type="search" autocomplete="off" placeholder="City, place, airport, or coordinates">
+    <button id="mapSearchBtn" type="submit">Search</button>
+    <span id="mapSearchStatus" role="status" aria-live="polite"></span>
+  </form>
   <button id="mapRecenter" type="button">◎ My position</button>
 </header>
 <canvas id="largeMapCanvas" width="800" height="800"></canvas>
