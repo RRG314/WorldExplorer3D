@@ -8,6 +8,10 @@ const RESOURCE_KEYS = Object.freeze([
   'foodKg', 'waterKg', 'powerMWh', 'propellantKg', 'medicalUnits',
   'maintenanceKg', 'feedstockKg', 'scienceCargoKg', 'processingResidueKg'
 ]);
+const {
+  createAuthorizedExpeditionPlan,
+  executeExpeditionCommand
+} = require('./generated/expedition-command-engine.cjs');
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -46,20 +50,6 @@ function assertPlan(plan) {
   return clone(plan);
 }
 
-function identityOf(plan) {
-  return Object.freeze({
-    id: text(plan?.id, 160),
-    destinationId: text(plan?.destinationId, 160),
-    shipId: text(plan?.ship?.id, 180),
-    shipProfileId: text(plan?.ship?.profileId, 80),
-    propulsionId: text(plan?.propulsionId, 80)
-  });
-}
-
-function sameIdentity(left, right) {
-  return JSON.stringify(identityOf(left)) === JSON.stringify(identityOf(right));
-}
-
 function connectedParticipants(state, activeUids = null) {
   const active = activeUids ? new Set(activeUids.map(String)) : null;
   return Object.values(state.participants || {}).filter((participant) =>
@@ -74,10 +64,10 @@ function chooseRole(state, requestedRole = '') {
   return SHARED_EXPEDITION_ROLES.find((role) => !claimed.has(role)) || requested || 'science';
 }
 
-function createSharedExpedition({ roomCode, actor, plan, nowMs = Date.now() }) {
+function createSharedExpedition({ roomCode, actor, configuration, nowMs = Date.now() }) {
   const uid = text(actor?.uid, 160);
   if (!uid) throw new Error('signed_in_actor_required');
-  const expedition = assertPlan(plan);
+  const expedition = assertPlan(createAuthorizedExpeditionPlan(configuration, { nowMs }));
   const role = chooseRole({ participants: {} }, actor.role || 'command');
   return Object.freeze({
     type: 'SharedInterstellarExpedition',
@@ -169,47 +159,26 @@ function setParticipantReady(state, { uid, ready = true, nowMs = Date.now() }) {
   });
 }
 
-function validateResourceTransition(before, after, mutationKind) {
-  for (const key of RESOURCE_KEYS) {
-    const from = finite(before?.resources?.[key], NaN);
-    const to = finite(after?.resources?.[key], NaN);
-    if (!Number.isFinite(to) || to < 0) throw new Error(`invalid_resource:${key}`);
-    if (mutationKind === 'advance' && to > from + 1e-6) throw new Error(`advance_cannot_create_resource:${key}`);
-  }
-}
-
-function validateSnapshotTransition(before, after, mutationKind) {
-  const next = assertPlan(after);
-  if (!sameIdentity(before, next)) throw new Error('expedition_identity_is_immutable');
-  const beforeElapsed = finite(before.strategicElapsedS, 0);
-  const nextElapsed = finite(next.strategicElapsedS, 0);
-  if (mutationKind === 'advance' && nextElapsed <= beforeElapsed) throw new Error('advance_requires_time_progress');
-  if (mutationKind !== 'advance' && Math.abs(nextElapsed - beforeElapsed) > 1e-6) throw new Error('only_advance_changes_time');
-  if (finite(next.progress, 0) + 1e-9 < finite(before.progress, 0)) throw new Error('progress_cannot_reverse');
-  validateResourceTransition(before, next, mutationKind);
-  return next;
-}
-
 function commitSharedExpedition(state, {
   uid,
   expectedRevision,
-  mutationKind,
-  nextExpedition,
+  command,
   activeUids = null,
   nowMs = Date.now()
 }) {
   const actorUid = text(uid, 160);
   requireParticipant(state, actorUid);
   if (Number(expectedRevision) !== Number(state.revision)) throw new Error('stale_expedition_revision');
-  if (!['advance', 'event', 'operation'].includes(mutationKind)) throw new Error('invalid_expedition_mutation');
+  const commandType = text(command?.type, 40).toLowerCase();
   const connected = connectedParticipants(state, activeUids);
-  if (mutationKind === 'advance') {
+  if (commandType === 'advance') {
     if (connected.length < 2) throw new Error('two_connected_crew_required');
     if (connected.some((participant) => participant.readyForRevision !== state.revision)) {
       throw new Error('connected_crew_not_ready');
     }
   }
-  const expedition = validateSnapshotTransition(state.expedition, nextExpedition, mutationKind);
+  const result = executeExpeditionCommand(state.expedition, command, { nowMs });
+  const expedition = assertPlan(result.expedition);
   const revision = state.revision + 1;
   const participants = Object.freeze(Object.fromEntries(Object.entries(state.participants || {}).map(([key, participant]) => [
     key,
@@ -221,7 +190,7 @@ function commitSharedExpedition(state, {
     expedition,
     participants,
     updatedAtMs: nowMs,
-    lastMutation: Object.freeze({ kind: mutationKind, actorUid, atMs: nowMs })
+    lastMutation: Object.freeze({ kind: commandType, actorUid, atMs: nowMs })
   });
 }
 

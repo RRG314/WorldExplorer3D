@@ -14,10 +14,10 @@ async function mutateSharedExpedition(input = {}) {
     ready: input.ready !== false,
     connected: input.connected !== false,
     expectedRevision: Number(input.expectedRevision || 0),
-    mutationKind: String(input.mutationKind || '').slice(0, 24),
+    command: input.command && typeof input.command === 'object' ? input.command : null,
     manifestId: String(input.manifestId || '').slice(0, 160)
   };
-  if (input.expedition) payload.expedition = input.expedition;
+  if (input.configuration && typeof input.configuration === 'object') payload.configuration = input.configuration;
   return postProtectedFunction('/mutateSharedExpedition', payload, {
     label: 'Shared Expedition authority',
     forceRefreshToken: input.forceRefreshToken !== false

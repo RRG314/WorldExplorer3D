@@ -257,7 +257,10 @@
     ]
   },
   "functions": {
-    "source": "functions"
+    "source": "functions",
+    "predeploy": [
+      "npm run build:shared-expedition-engine"
+    ]
   },
   "firestore": {
     "rules": "firestore.rules",

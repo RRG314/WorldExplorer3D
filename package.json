@@ -20,6 +20,7 @@
     "verify:firestore-rules": "firebase emulators:exec --only firestore --project we3d-staging-20260712 \"node --test tests/firestore.rules.security.test.mjs\"",
     "verify:multiplayer": "firebase emulators:exec --only auth,firestore,functions --project we3d-staging-20260712 \"node scripts/verification/multiplayer.mjs\"",
     "verify:interstellar-shared": "firebase emulators:exec --only auth,firestore,functions --project we3d-staging-20260712 \"node scripts/verification/interstellar-shared.mjs\"",
+    "build:shared-expedition-engine": "node scripts/build-shared-expedition-engine.mjs",
     "verify:connected-property-multiplayer": "firebase emulators:exec --only auth,firestore,functions --project we3d-staging-20260712 \"node scripts/verification/connected-property-multiplayer-current.mjs\"",
     "verify:connected-property-backend": "firebase emulators:exec --only auth,firestore,functions --project we3d-staging-20260712 \"node scripts/verification/connected-property-backend-current.mjs\"",
     "verify:world": "node scripts/verification/world.mjs",

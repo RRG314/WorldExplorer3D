@@ -2164,7 +2164,7 @@ exports.mutateSharedExpedition = functions.region('us-central1').https.onRequest
         if (current && current.expedition?.state !== 'failed' && current.expedition?.state !== 'arrived') {
           throw new Error('shared_expedition_already_active');
         }
-        next = createSharedExpedition({ roomCode: context.roomCode, actor, plan: req.body?.expedition, nowMs });
+        next = createSharedExpedition({ roomCode: context.roomCode, actor, configuration: req.body?.configuration, nowMs });
       } else {
         if (!current || current.type !== 'SharedInterstellarExpedition') throw new Error('shared_expedition_not_found');
         if (action === 'join') next = joinSharedExpedition(current, { actor, requestedRole: req.body?.role, nowMs });
@@ -2173,8 +2173,7 @@ exports.mutateSharedExpedition = functions.region('us-central1').https.onRequest
         else if (action === 'commit') next = commitSharedExpedition(current, {
           uid: auth.uid,
           expectedRevision: req.body?.expectedRevision,
-          mutationKind: sanitizeText(req.body?.mutationKind, 24).toLowerCase(),
-          nextExpedition: req.body?.expedition,
+          command: req.body?.command,
           activeUids,
           nowMs
         });
@@ -2194,7 +2193,7 @@ exports.mutateSharedExpedition = functions.region('us-central1').https.onRequest
     const conflicts = new Set([
       'shared_expedition_already_active', 'shared_expedition_not_found',
       'stale_expedition_revision', 'two_connected_crew_required', 'connected_crew_not_ready',
-      'rescue_already_completed'
+      'rescue_already_completed', 'expedition_command_not_available'
     ]);
     const invalid = code.startsWith('invalid_') || code.startsWith('advance_') ||
       code === 'expedition_identity_is_immutable' || code === 'only_advance_changes_time' ||

@@ -56,7 +56,7 @@ import {
   togglePropertyFilters,
   toggleRealEstate,
   updatePropertyPanel
-} from "./game/property-ui.js?v=3";
+} from "./game/property-ui.js?v=4";
 import {
   closeHistoricPanel,
   createHistoricCard,
@@ -64,7 +64,7 @@ import {
   openHistoricModal,
   toggleHistoric,
   updateHistoricPanel
-} from "./game/historic-ui.js?v=1";
+} from "./game/historic-ui.js?v=2";
 import { escapeHtml, escapeJsString, formatPrice, toFiniteNumber } from "./game/ui-utils.js?v=1";
 
 function isPOIVisible(poiType) {

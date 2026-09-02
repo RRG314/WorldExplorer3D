@@ -1,7 +1,7 @@
 import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { getCurrentUser } from '../../../js/auth-ui.js?v=55';
 import { initFirebase } from '../../../js/firebase-init.js?v=56';
-import { mutateSharedExpedition } from '../../../js/expedition-api.js?v=1';
+import { mutateSharedExpedition } from '../../../js/expedition-api.js?v=2';
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -24,7 +24,14 @@ function createSharedExpeditionAuthority(options = {}) {
 
   function enqueue(input) {
     if (disposed) return Promise.reject(new Error('Shared Expedition is closed.'));
-    writeChain = writeChain.catch(() => {}).then(() => mutateSharedExpedition({ roomCode, ...input }));
+    writeChain = writeChain.catch(() => {}).then(async () => {
+      const result = await mutateSharedExpedition({ roomCode, ...input });
+      if (!disposed && result?.state) {
+        latest = clone(result.state);
+        options.onState?.(clone(latest));
+      }
+      return result;
+    });
     return writeChain;
   }
 
@@ -32,13 +39,12 @@ function createSharedExpeditionAuthority(options = {}) {
     roomCode,
     userUid: user.uid,
     snapshot: () => clone(latest),
-    create: (expedition, role = 'command') => enqueue({ action: 'create', expedition, role }),
+    create: (configuration, role = 'command') => enqueue({ action: 'create', configuration, role }),
     join: (role = '') => enqueue({ action: 'join', role }),
     setReady: (ready = true) => enqueue({ action: 'ready', ready, forceRefreshToken: false }),
-    commit: (expedition, mutationKind) => enqueue({
+    commit: (command) => enqueue({
       action: 'commit',
-      expedition,
-      mutationKind,
+      command,
       expectedRevision: latest?.revision,
       forceRefreshToken: false
     }),

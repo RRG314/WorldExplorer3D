@@ -313,7 +313,7 @@ async function ensureSharedAuthority() {
   sharedState = null;
   sharedAuthorityLoading = true;
   try {
-    const module = await import('./shared-authority.js?v=1');
+    const module = await import('./shared-authority.js?v=3');
     const authority = module.createSharedExpeditionAuthority({
       room,
       onState(next) {
@@ -837,11 +837,12 @@ function sharedMissionMarkup() {
   return `<section class="expeditionShared"><span>ROOM EXPEDITION · REVISION ${sharedState.revision}</span><h3>${roomLabel}</h3><p>${connected.length} connected · ${ready} ready for the next watch</p><ul>${crew}</ul>${participant ? `<button id="expeditionShareReady" type="button">${participant.readyForRevision === sharedState.revision ? 'Not ready yet' : 'Ready for next watch'}</button>` : '<button id="expeditionShareJoin" type="button">Join this crew</button>'}</section>`;
 }
 
-async function applyExpeditionMutation(next, mutationKind) {
+async function applyExpeditionMutation(next, mutationKind, command = null) {
   if (!next || next === activeExpedition) return false;
   if (sharedState) {
     if (!sharedParticipant()) throw new Error('Join the room crew before changing its Expedition.');
-    const response = await sharedAuthority?.commit?.(next, mutationKind);
+    if (!command) throw new Error('That shared Expedition action is not available yet.');
+    const response = await sharedAuthority?.commit?.(command);
     if (response?.state?.expedition) {
       sharedState = response.state;
       activeExpedition = response.state.expedition;
@@ -942,7 +943,13 @@ function renderMission() {
     try {
       const authority = await ensureSharedAuthority();
       if (!authority) throw new Error('Sign in and join the current multiplayer room first.');
-      const response = await authority.create(activeExpedition, 'command');
+      const response = await authority.create({
+        destinationId: activeExpedition.destinationId,
+        shipId: activeExpedition.ship?.profileId,
+        propulsionId: activeExpedition.propulsionId,
+        realism: activeExpedition.realism,
+        survival: activeExpedition.survival
+      }, 'command');
       if (response?.state) sharedState = response.state;
       renderMission();
     } catch (error) { reportSharedMutationError(error); }
@@ -964,13 +971,13 @@ function renderMission() {
   });
   document.getElementById('expeditionDepart')?.addEventListener('click', async () => {
     try {
-      await applyExpeditionMutation(startExpedition(activeExpedition), 'operation');
+      await applyExpeditionMutation(startExpedition(activeExpedition), 'operation', { type: 'start' });
       renderMission();
     } catch (error) { reportSharedMutationError(error); }
   });
   document.getElementById('expeditionAdvance')?.addEventListener('click', async () => {
     try {
-      await applyExpeditionMutation(advanceToNextMilestone(activeExpedition), 'advance');
+      await applyExpeditionMutation(advanceToNextMilestone(activeExpedition), 'advance', { type: 'advance' });
       renderMission();
     } catch (error) { reportSharedMutationError(error); }
   });
@@ -999,7 +1006,7 @@ function renderMission() {
     try {
       const result = createOutpostSite(activeExpedition, button.dataset.planOutpost);
       if (!result.changed) return activeContext?.showToast?.(result.message);
-      await applyExpeditionMutation(result.expedition, 'operation');
+      await applyExpeditionMutation(result.expedition, 'operation', { type: 'outpost-plan', contactId: button.dataset.planOutpost });
       syncExpeditionContacts(activeExpedition);
       activeContext?.showToast?.(result.message);
       renderMission();
@@ -1009,7 +1016,7 @@ function renderMission() {
     try {
       const result = constructOutpost(activeExpedition, button.dataset.buildOutpost);
       if (!result.changed) return activeContext?.showToast?.(result.message);
-      await applyExpeditionMutation(result.expedition, 'operation');
+      await applyExpeditionMutation(result.expedition, 'operation', { type: 'outpost-build', outpostId: button.dataset.buildOutpost });
       syncExpeditionContacts(activeExpedition);
       activeContext?.showToast?.(result.message);
       renderMission();
@@ -1019,7 +1026,7 @@ function renderMission() {
     try {
       const result = serviceOutpost(activeExpedition, button.dataset.serviceOutpost);
       if (!result.changed) return activeContext?.showToast?.(result.message);
-      await applyExpeditionMutation(result.expedition, 'operation');
+      await applyExpeditionMutation(result.expedition, 'operation', { type: 'outpost-service', outpostId: button.dataset.serviceOutpost });
       syncExpeditionContacts(activeExpedition);
       activeContext?.showToast?.(result.message);
       renderMission();
@@ -1098,7 +1105,7 @@ async function commitVoyageResponse(choiceId, interaction) {
     return false;
   }
   try {
-    await applyExpeditionMutation(next, 'event');
+    await applyExpeditionMutation(next, 'event', { type: 'event-response', choiceId });
   } catch (error) {
     reportSharedMutationError(error);
     return false;
@@ -1315,7 +1322,7 @@ function renderShipStationPanel(interaction) {
       return;
     }
     try {
-      await applyExpeditionMutation(result.expedition, 'operation');
+      await applyExpeditionMutation(result.expedition, 'operation', { type: 'ship-operation', operationId: actionId });
     } catch (error) {
       reportSharedMutationError(error);
       return;

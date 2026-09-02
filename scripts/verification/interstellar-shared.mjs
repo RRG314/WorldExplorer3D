@@ -112,42 +112,37 @@ try {
   await member.page.waitForFunction((code) => String(document.getElementById('roomPanelRoomCode')?.textContent || '').includes(code), roomCode, { timeout: 30_000 });
 
   const created = await owner.page.evaluate(async (roomCode) => {
-    const [{ createExpeditionPlan }, { DEFAULT_CREW }, api] = await Promise.all([
-      import('/app/js/expedition/model.js?v=6'),
-      import('/app/js/expedition/catalog.js?v=2'),
-      import('/js/expedition-api.js?v=1')
-    ]);
-    const base = createExpeditionPlan({ destinationId: 'proxima-centauri', crew: DEFAULT_CREW });
-    const expedition = {
-      ...base,
-      rescueManifests: [{
-        id: 'stranded-route-team',
-        crew: [{ id: 'rescue-specialist', name: 'Mara Chen', roles: ['engineering'], status: 'active', health: 0.82, fatigue: 0.35 }],
-        resources: { foodKg: 6, waterKg: 4, maintenanceKg: 5 }
-      }]
-    };
-    return api.mutateSharedExpedition({ roomCode, action: 'create', role: 'command', expedition });
+    const api = await import('/js/expedition-api.js?v=2');
+    return api.mutateSharedExpedition({
+      roomCode,
+      action: 'create',
+      role: 'command',
+      configuration: {
+        destinationId: 'proxima-centauri',
+        shipId: 'long-range-research-vessel',
+        propulsionId: 'radiant-plasma-field-drive',
+        realism: 'science-inspired',
+        survival: 'forgiving'
+      }
+    });
   }, roomCode);
   assert.equal(created.state.revision, 1);
 
   const joined = await member.page.evaluate(async (roomCode) => {
-    const api = await import('/js/expedition-api.js?v=1');
+    const api = await import('/js/expedition-api.js?v=2');
     return api.mutateSharedExpedition({ roomCode, action: 'join', role: 'engineering' });
   }, roomCode);
   assert.equal(joined.state.participants[member.identity.uid].role, 'engineering');
 
   const started = await owner.page.evaluate(async ({ roomCode, state }) => {
-    const [api, simulation] = await Promise.all([
-      import('/js/expedition-api.js?v=1'), import('/app/js/expedition/simulation.js?v=5')
-    ]);
-    const expedition = simulation.startExpedition(state.expedition, Date.now());
-    return api.mutateSharedExpedition({ roomCode, action: 'commit', mutationKind: 'operation', expectedRevision: state.revision, expedition });
+    const api = await import('/js/expedition-api.js?v=2');
+    return api.mutateSharedExpedition({ roomCode, action: 'commit', command: { type: 'start' }, expectedRevision: state.revision });
   }, { roomCode, state: joined.state });
   assert.equal(started.state.revision, 2);
 
   await Promise.all([
-    owner.page.evaluate(async (roomCode) => (await import('/js/expedition-api.js?v=1')).mutateSharedExpedition({ roomCode, action: 'ready' }), roomCode),
-    member.page.evaluate(async (roomCode) => (await import('/js/expedition-api.js?v=1')).mutateSharedExpedition({ roomCode, action: 'ready' }), roomCode)
+    owner.page.evaluate(async (roomCode) => (await import('/js/expedition-api.js?v=2')).mutateSharedExpedition({ roomCode, action: 'ready' }), roomCode),
+    member.page.evaluate(async (roomCode) => (await import('/js/expedition-api.js?v=2')).mutateSharedExpedition({ roomCode, action: 'ready' }), roomCode)
   ]);
 
   const beforeAdvance = await owner.page.evaluate(async (roomCode) => {
@@ -158,29 +153,47 @@ try {
   assert.equal(Object.values(beforeAdvance.participants).filter((entry) => entry.readyForRevision === 2).length, 2);
 
   const advanced = await owner.page.evaluate(async ({ roomCode, state }) => {
-    const [api, simulation] = await Promise.all([
-      import('/js/expedition-api.js?v=1'), import('/app/js/expedition/simulation.js?v=5')
-    ]);
-    const expedition = simulation.advanceToNextMilestone(state.expedition);
-    return api.mutateSharedExpedition({ roomCode, action: 'commit', mutationKind: 'advance', expectedRevision: state.revision, expedition });
+    const api = await import('/js/expedition-api.js?v=2');
+    return api.mutateSharedExpedition({ roomCode, action: 'commit', command: { type: 'advance' }, expectedRevision: state.revision });
   }, { roomCode, state: beforeAdvance });
   assert.equal(advanced.state.revision, 3);
   assert.ok(advanced.state.expedition.strategicElapsedS > 0);
 
-  await member.page.evaluate(async (roomCode) => (await import('/js/expedition-api.js?v=1')).mutateSharedExpedition({ roomCode, action: 'connection', connected: false }), roomCode);
-  const rejoined = await member.page.evaluate(async (roomCode) => (await import('/js/expedition-api.js?v=1')).mutateSharedExpedition({ roomCode, action: 'join' }), roomCode);
+  await member.page.evaluate(async (roomCode) => (await import('/js/expedition-api.js?v=2')).mutateSharedExpedition({ roomCode, action: 'connection', connected: false }), roomCode);
+  const rejoined = await member.page.evaluate(async (roomCode) => (await import('/js/expedition-api.js?v=2')).mutateSharedExpedition({ roomCode, action: 'join' }), roomCode);
   assert.equal(rejoined.state.participants[member.identity.uid].role, 'engineering');
   assert.equal(rejoined.state.participants[member.identity.uid].connected, true);
 
-  const rescued = await owner.page.evaluate(async (roomCode) => (await import('/js/expedition-api.js?v=1')).mutateSharedExpedition({ roomCode, action: 'rescue', manifestId: 'stranded-route-team' }), roomCode);
-  assert.equal(rescued.state.revision, 4);
-  assert.equal(rescued.state.rescueLedger.length, 1);
-  assert.equal(rescued.state.expedition.crew.filter((crew) => crew.id === 'rescue-specialist').length, 1);
+  const choiceId = advanced.state.expedition.pendingEvent?.choices?.[0];
+  assert.ok(choiceId, 'the first server-calculated watch should produce a crew response');
+  const responded = await owner.page.evaluate(async ({ roomCode, revision, choiceId }) => (
+    await import('/js/expedition-api.js?v=2')
+  ).mutateSharedExpedition({
+    roomCode,
+    action: 'commit',
+    command: { type: 'event-response', choiceId },
+    expectedRevision: revision
+  }), { roomCode, revision: advanced.state.revision, choiceId });
+  assert.equal(responded.state.revision, 4);
+  assert.equal(responded.state.expedition.pendingEvent, null);
 
   await Promise.all([openSharedPlanner(owner), openSharedPlanner(member)]);
   await Promise.all([
     owner.page.waitForFunction(() => document.querySelector('.expeditionShared')?.textContent?.includes('REVISION 4'), null, { timeout: 30_000 }),
     member.page.waitForFunction(() => document.querySelector('.expeditionShared')?.textContent?.includes('REVISION 4'), null, { timeout: 30_000 })
+  ]);
+  await Promise.all([
+    owner.page.locator('#expeditionShareReady').click(),
+    member.page.locator('#expeditionShareReady').click()
+  ]);
+  await Promise.all([
+    owner.page.waitForFunction(() => document.querySelector('.expeditionShared')?.textContent?.includes('2 ready'), null, { timeout: 30_000 }),
+    member.page.waitForFunction(() => document.querySelector('.expeditionShared')?.textContent?.includes('2 ready'), null, { timeout: 30_000 })
+  ]);
+  await owner.page.locator('#expeditionAdvance').click();
+  await Promise.all([
+    owner.page.waitForFunction(() => document.querySelector('.expeditionShared')?.textContent?.includes('REVISION 5'), null, { timeout: 30_000 }),
+    member.page.waitForFunction(() => document.querySelector('.expeditionShared')?.textContent?.includes('REVISION 5'), null, { timeout: 30_000 })
   ]);
   await owner.page.locator('.expeditionShared').scrollIntoViewIfNeeded();
   await member.page.locator('.expeditionShared').scrollIntoViewIfNeeded();
@@ -199,13 +212,20 @@ try {
   await owner.page.screenshot({ path: path.join(outputDir, 'desktop-shared-crew.png'), fullPage: true });
   await member.page.screenshot({ path: path.join(outputDir, 'mobile-shared-crew.png'), fullPage: true });
 
+  const finalShared = await owner.page.evaluate(async (code) => {
+    const services = globalThis.WorldExplorerFirebase.initFirebase();
+    const firestore = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js');
+    return (await firestore.getDoc(firestore.doc(services.db, 'rooms', code, 'expeditions', 'active'))).data();
+  }, roomCode);
+
   const report = {
     ok: failures.length === 0,
     roomCode,
-    revision: rescued.state.revision,
-    roles: Object.values(rescued.state.participants).map((entry) => ({ uid: entry.uid, role: entry.role, connected: entry.connected })),
-    strategicElapsedS: rescued.state.expedition.strategicElapsedS,
-    rescuedCrew: rescued.state.rescueLedger[0].crewIds,
+    revision: finalShared.revision,
+    roles: Object.values(finalShared.participants).map((entry) => ({ uid: entry.uid, role: entry.role, connected: entry.connected })),
+    strategicElapsedS: finalShared.expedition.strategicElapsedS,
+    resolvedChoiceId: choiceId,
+    uiAdvanceCompleted: finalShared.revision === 5,
     failures
   };
   await fs.writeFile(path.join(outputDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);

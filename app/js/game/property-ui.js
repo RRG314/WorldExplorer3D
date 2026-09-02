@@ -455,8 +455,8 @@ async function handlePropertyAction(button) {
   else if (action === 'primary') success = `${result.home?.label || label} is now your primary home.`;
   else if (action === 'store') success = `${result.item?.label || 'Item'} moved into home storage.`;
   else if (action === 'withdraw') success = `${result.item?.label || 'Item'} moved back to your Backpack.`;
-  setStatus(success, 'ok');
   appCtx.properties = [...currentCandidates()]; renderPropertyMarkers(); updatePropertyPanel();
+  setStatus(success, 'ok');
   return true;
 }
 

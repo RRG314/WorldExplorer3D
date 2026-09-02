@@ -7,7 +7,7 @@ import { initMapInteractions } from "./ui/map-interactions.js?v=60";
 import { initMobileControls } from "./ui/mobile-controls.js?v=82";
 import { initShareUi } from "./ui/share-links.js?v=64";
 import { setupSettingsUi } from "./ui/settings.js?v=2";
-import { bindSpaceActions } from "./ui/space-actions.js?v=8";
+import { bindSpaceActions } from "./ui/space-actions.js?v=10";
 import { initTitleScreenUi } from "./ui/title-screen.js?v=117";
 import { commitEnvironment, exitCurrentEnvironmentSync } from './session-coordinator.js?v=2';
 
