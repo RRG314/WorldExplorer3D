@@ -3,15 +3,15 @@ import { getPrimaryWorldCanvas } from "./engine/webgl-lifecycle.js?v=1";
 import { captureEarthWorldSession } from "./earth-session.js?v=17";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
 import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=24";
-import { createSpaceFlightScene, destroySpaceFlightScene, ensureExpeditionSurveyorDockTarget, ensureExtendedSpaceScene, getExpeditionSurveyorDockTarget, positionSpacecraftAtSurveyorDock, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon, setExpeditionPodFlightPresentation, setSurveyorFlightPresentation, updateExpeditionPodFlightPresentation } from "./space/scene.js?v=39";
-import { hideGameUI, initSpaceFlightUI, prepareSpaceFlightHudForEntry, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=45";
+import { createSpaceFlightScene, destroySpaceFlightScene, ensureExpeditionSurveyorDockTarget, ensureExtendedSpaceScene, getExpeditionSurveyorDockTarget, positionSpacecraftAtSurveyorDock, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon, setExpeditionPodFlightPresentation, setSurveyorFlightPresentation, updateExpeditionPodFlightPresentation } from "./space/scene.js?v=41";
+import { hideGameUI, initSpaceFlightUI, prepareSpaceFlightHudForEntry, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=46";
 import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 import {
   beginEnvironmentTransition,
   commitEnvironment,
   registerEnvironmentLifecycle
 } from './session-coordinator.js?v=2';
-import { installSpaceJourneyRuntime } from './space/journey-runtime.js?v=6';
+import { installSpaceJourneyRuntime } from './space/journey-runtime.js?v=8';
 import { resolveCompletedLandingTarget } from './space/landing-target.js?v=2';
 import { SPACE_CRAFT_IDENTITY } from './space/craft-identity.js?v=1';
 
@@ -54,6 +54,7 @@ appCtx.spaceFlight = {
   _frameScale: 1,
   overviewMode: false,
   cameraMode: 'chase',
+  craftRole: 'wayfinder',
   _sessionId: 0
 };
 
@@ -190,6 +191,7 @@ function startSpaceFlightToMoon(options = {}) {
   appCtx.scene.background = new THREE.Color(0x000000);
 
   appCtx.spaceFlight.destination = 'moon';
+  appCtx.spaceFlight.craftRole = 'wayfinder';
   appCtx.spaceFlight.mode = 'launching';
   appCtx.spaceFlight.active = true;
   appCtx.spaceFlight._launchSource = 'Earth';
@@ -261,6 +263,7 @@ function startSpaceFlightToSurveyor(options = {}) {
   appCtx.scene.background = new THREE.Color(0x000000);
 
   appCtx.spaceFlight.destination = 'surveyor';
+  appCtx.spaceFlight.craftRole = usePathfinder ? 'pathfinder' : 'starship';
   appCtx.spaceFlight.mode = 'launching';
   appCtx.spaceFlight.active = true;
   appCtx.spaceFlight._launchSource = 'Earth';
@@ -319,6 +322,7 @@ function startSpaceFlightToEarth() {
   suspendEarthModesForPlanetaryEntry(appCtx.ENV.SPACE_FLIGHT);
 
   appCtx.spaceFlight.destination = 'earth';
+  appCtx.spaceFlight.craftRole = 'wayfinder';
   appCtx.spaceFlight.mode = 'launching';
   appCtx.spaceFlight.active = true;
   appCtx.spaceFlight._launchSource = sourceLabel;
@@ -383,6 +387,7 @@ function startSpaceFlightToMars() {
   appCtx.scene.background = new THREE.Color(0x000000);
 
   appCtx.spaceFlight.destination = 'mars';
+  appCtx.spaceFlight.craftRole = 'wayfinder';
   appCtx.spaceFlight.mode = 'launching';
   appCtx.spaceFlight.active = true;
   appCtx.spaceFlight._launchSource = appCtx.onMoon ? 'Moon' : 'Earth';
@@ -433,6 +438,7 @@ function startSpaceFlightFromExpeditionSurface(options = {}) {
   appCtx.setPauseReason?.('planetary_transition', true);
   suspendEarthModesForPlanetaryEntry(appCtx.ENV.SPACE_FLIGHT);
   appCtx.spaceFlight.destination = courseDestinationId;
+  appCtx.spaceFlight.craftRole = 'pathfinder';
   appCtx.spaceFlight.mode = 'launching';
   appCtx.spaceFlight.active = true;
   appCtx.spaceFlight._launchSource = courseDestinationId;

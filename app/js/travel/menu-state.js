@@ -1,12 +1,13 @@
 function resolveTravelMenuState({
   environment,
   earthEnvironment = 'EARTH',
-  onMoon = false,
-  onMars = false,
+  moonEnvironment = 'MOON',
+  marsEnvironment = 'MARS',
+  pathfinderStaged = false,
   supports = () => true
 } = {}) {
   const onEarth = environment === earthEnvironment;
-  const returningFromSurface = onMoon === true || onMars === true;
+  const returningFromSurface = environment === moonEnvironment || environment === marsEnvironment;
   const spaceAvailable = supports('space') === true;
 
   return Object.freeze({
@@ -14,7 +15,7 @@ function resolveTravelMenuState({
     earth: Object.freeze({ visible: !onEarth && supports('earth') === true }),
     pathfinder: Object.freeze({
       visible: onEarth && spaceAvailable,
-      label: '🛸 Deploy Pathfinder Pod'
+      label: pathfinderStaged ? '🛸 Pathfinder Ready Nearby' : '🛸 Deploy Pathfinder Pod'
     }),
     boardStarship: Object.freeze({
       visible: onEarth && spaceAvailable,

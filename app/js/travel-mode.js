@@ -1,7 +1,9 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { nextPrimaryTravelMode } from "./controls/traversal-control-policy.js?v=8";
 import { planetarySurfaceYAtRenderXZ } from './planetary/runtime/surface-query.js?v=3';
-import { resolveTravelMenuState } from './travel/menu-state.js?v=1';
+import { resolveTravelMenuState } from './travel/menu-state.js?v=2';
+
+let lastTravelUiSignature = '';
 
 function getCurrentTravelMode() {
   if (appCtx.boatMode?.active) return 'boat';
@@ -23,15 +25,9 @@ function syncTravelModeButtons() {
   const droneBtn = document.getElementById('fDrone');
   const planeBtn = document.getElementById('fPlane');
   const boatBtn = document.getElementById('fBoat');
-  if (drivingBtn) drivingBtn.classList.toggle('on', activeMode === 'drive');
-  if (walkingBtn) walkingBtn.classList.toggle('on', activeMode === 'walk');
-  if (droneBtn) droneBtn.classList.toggle('on', activeMode === 'drone');
-  if (planeBtn) planeBtn.classList.toggle('on', activeMode === 'plane');
-  if (boatBtn) boatBtn.classList.toggle('on', activeMode === 'boat');
   const planetaryCapabilities = appCtx.activePlanetaryBodyId ? appCtx.planetaryTravelCapabilities : null;
   const currentEnvironment = appCtx.getEnv?.()
     || (appCtx.oceanMode?.active ? appCtx.ENV?.OCEAN : appCtx.ENV?.EARTH);
-  const onEarth = currentEnvironment === appCtx.ENV?.EARTH;
   const setAvailable = (button, available) => {
     if (!button) return;
     const hidden = available !== true;
@@ -40,17 +36,46 @@ function syncTravelModeButtons() {
     if (button.style.display !== display) button.style.display = display;
   };
   const supports = (mode) => !planetaryCapabilities || planetaryCapabilities[mode] === true;
-
-  setAvailable(drivingBtn, supports('drive'));
-  setAvailable(walkingBtn, supports('walk'));
-  setAvailable(droneBtn, supports('drone'));
-  setAvailable(planeBtn, supports('plane'));
-  setAvailable(boatBtn, supports('boat'));
-
-  // Environment choices have one owner. Mobile control rendering used to
-  // rewrite these same elements while this function also rewrote them.
   const oceanBtn = document.getElementById('fOceanMode');
   const earthBtn = document.getElementById('fEarthMode');
+  const menuState = resolveTravelMenuState({
+    environment: currentEnvironment,
+    earthEnvironment: appCtx.ENV?.EARTH,
+    moonEnvironment: appCtx.ENV?.MOON,
+    marsEnvironment: appCtx.ENV?.MARS,
+    pathfinderStaged: appCtx.getStagedEarthPodSnapshot?.().active === true,
+    supports
+  });
+  const availability = {
+    drive: supports('drive'),
+    walk: supports('walk'),
+    drone: supports('drone'),
+    plane: supports('plane'),
+    boat: supports('boat')
+  };
+  const signature = JSON.stringify({
+    activeMode,
+    environment: currentEnvironment,
+    activePlanetaryBodyId: appCtx.activePlanetaryBodyId || '',
+    availability,
+    menuState
+  });
+  if (signature === lastTravelUiSignature) return activeMode;
+  lastTravelUiSignature = signature;
+
+  if (drivingBtn) drivingBtn.classList.toggle('on', activeMode === 'drive');
+  if (walkingBtn) walkingBtn.classList.toggle('on', activeMode === 'walk');
+  if (droneBtn) droneBtn.classList.toggle('on', activeMode === 'drone');
+  if (planeBtn) planeBtn.classList.toggle('on', activeMode === 'plane');
+  if (boatBtn) boatBtn.classList.toggle('on', activeMode === 'boat');
+  setAvailable(drivingBtn, availability.drive);
+  setAvailable(walkingBtn, availability.walk);
+  setAvailable(droneBtn, availability.drone);
+  setAvailable(planeBtn, availability.plane);
+  setAvailable(boatBtn, availability.boat);
+
+  // Environment choices have one owner and are published only when their
+  // underlying state changes. The HUD frame loop must never rewrite menus.
   if (oceanBtn) {
     oceanBtn.classList.remove('on');
     oceanBtn.textContent = activeMode === 'boat' ? '🌊 Dive Underwater' : '🌊 Explore the Ocean';
@@ -59,13 +84,6 @@ function syncTravelModeButtons() {
     earthBtn.classList.remove('on');
     earthBtn.textContent = '🌍 Return to Earth';
   }
-  const menuState = resolveTravelMenuState({
-    environment: currentEnvironment,
-    earthEnvironment: appCtx.ENV?.EARTH,
-    onMoon: appCtx.onMoon === true,
-    onMars: appCtx.onMars === true,
-    supports
-  });
   setAvailable(oceanBtn, menuState.ocean.visible);
   setAvailable(earthBtn, menuState.earth.visible);
 

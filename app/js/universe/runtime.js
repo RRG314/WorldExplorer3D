@@ -1,4 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
+import { getAstronomicalBody, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=3';
 import { disposeThreeObjectTree } from '../engine/webgl-lifecycle.js?v=1';
 import { getGalaxyEntryDestination, getUniverseFrame, resolveUniverseAddress } from './catalog.js?v=11';
 import { updateBlackHoleEncounter, updateBlackHoleVisual } from './black-hole.js?v=3';
@@ -556,6 +557,21 @@ function restoreUniverseLocalFrame(frameId, courseDestinationId = '') {
 
 function getLocalCourseTarget() {
   const course = universeRuntime.course;
+  if (!course && universeRuntime.current?.id === 'sol' && !universeRuntime.transition) {
+    const destinationBodyId = normalizeAstronomicalBodyId(appCtx.spaceJourney?.destinationBodyId);
+    const body = destinationBodyId && appCtx.getAllSpaceBodies?.().find((entry) =>
+      normalizeAstronomicalBodyId(entry?.name) === destinationBodyId
+    );
+    if (!body?.position) return null;
+    _localCourseTarget.position.copy(body.position);
+    _localCourseTarget.destination = {
+      id: destinationBodyId,
+      name: getAstronomicalBody(destinationBodyId)?.name || body.name || destinationBodyId
+    };
+    _localCourseTarget.radius = Number(body.radius) || 20;
+    _localCourseTarget.mesh = body.mesh || null;
+    return _localCourseTarget;
+  }
   if (
     universeRuntime.transition ||
     course?.status !== 'active' ||
@@ -685,7 +701,8 @@ function updateLocalCourseCue(target = getLocalCourseTarget()) {
   _localCourseCue.y = halfHeight + directionY * edgeScale;
   _localCourseCue.angleDeg = Math.atan2(directionY, directionX) * 180 / Math.PI + 90;
   _localCourseCue.label = target.destination.name;
-  _localCourseCue.assisted = universeRuntime.course?.guidance === UNIVERSE_GUIDANCE_MODE.ASSISTED;
+  _localCourseCue.assisted = universeRuntime.course?.guidance === UNIVERSE_GUIDANCE_MODE.ASSISTED
+    || appCtx.spaceJourneyAssistState?.active === true;
   _localCourseCue.ndcX = _courseProjected.x;
   _localCourseCue.ndcY = _courseProjected.y;
   updateUniverseCourseCue(_localCourseCue);

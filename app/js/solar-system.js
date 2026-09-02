@@ -16,7 +16,7 @@ import {
   toggleOrbits as toggleSolarSystemOrbitsImpl,
   toggleSolarSystem as toggleSolarSystemImpl,
   updateSolarSystem as updateSolarSystemImpl
-} from "./solar-system/ui.js?v=19";
+} from "./solar-system/ui.js?v=20";
 import {
   ASTEROID_BELT,
   AU_TO_SCENE,

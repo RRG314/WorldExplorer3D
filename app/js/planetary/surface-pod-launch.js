@@ -57,6 +57,45 @@ function groundPod(appCtx, pod, groundY) {
   return pod;
 }
 
+function resolveEarthPodPlacement(appCtx, actor) {
+  const candidates = [];
+  [8, 10, 12].forEach((distance) => {
+    [0, -0.36, 0.36, -0.72, 0.72].forEach((offset) => {
+      const heading = actor.angle + offset;
+      candidates.push({
+        x: actor.x + Math.sin(heading) * distance,
+        z: actor.z + Math.cos(heading) * distance
+      });
+    });
+  });
+  for (const candidate of candidates) {
+    const groundY = terrainHeightAt(appCtx, candidate.x, candidate.z, actor.y);
+    if (appCtx.isInsideWaterArea?.(candidate.x, candidate.z) === true) continue;
+    const blocked = appCtx.checkBuildingCollision?.(candidate.x, candidate.z, 2.2, {
+      actorBaseY: groundY,
+      actorHeight: 8.5
+    })?.collision === true;
+    if (!blocked) return { ...candidate, groundY };
+  }
+  const heading = actor.angle - 0.36;
+  const x = actor.x + Math.sin(heading) * 8;
+  const z = actor.z + Math.cos(heading) * 8;
+  return { x, z, groundY: terrainHeightAt(appCtx, x, z, actor.y) };
+}
+
+function faceActorTowardPod(appCtx, pod) {
+  const walker = appCtx?.Walk?.state?.mode === 'walk' ? appCtx.Walk.state.walker : null;
+  if (!walker || !pod) return false;
+  const heading = Math.atan2(pod.position.x - walker.x, pod.position.z - walker.z);
+  walker.angle = heading;
+  walker.yaw = heading;
+  walker.lookYawOffset = 0;
+  walker.mobileMoveBasisYaw = null;
+  if (appCtx.Walk.state.characterMesh) appCtx.Walk.state.characterMesh.rotation.y = heading;
+  if (appCtx.camera?.userData) delete appCtx.camera.userData.lookTarget;
+  return true;
+}
+
 function createEarthPod(appCtx) {
   const actor = actorPosition(appCtx);
   const pod = createExpeditionPodMesh();
@@ -65,12 +104,12 @@ function createEarthPod(appCtx) {
   pod.userData.temporarySurfaceLaunchPod = true;
   pod.scale.setScalar(0.62);
   pod.rotation.y = actor.angle;
-  const x = actor.x + Math.sin(actor.angle + 0.72) * 10;
-  const z = actor.z + Math.cos(actor.angle + 0.72) * 10;
+  const placement = resolveEarthPodPlacement(appCtx, actor);
+  const { x, z } = placement;
   pod.position.set(x, 0, z);
   if (typeof appCtx.addEarthWorldObject === 'function') appCtx.addEarthWorldObject(pod);
   else appCtx.scene.add(pod);
-  groundPod(appCtx, pod, terrainHeightAt(appCtx, x, z, actor.y));
+  groundPod(appCtx, pod, placement.groundY);
   return pod;
 }
 
@@ -84,6 +123,7 @@ function releaseStagedEarthPod({ remove = true } = {}) {
   unregisterStagedEarthInteraction?.();
   unregisterStagedEarthInteraction = null;
   const pod = stagedEarthPod;
+  const context = stagedEarthContext;
   stagedEarthPod = null;
   stagedEarthContext = null;
   stagedEarthBoard = null;
@@ -93,6 +133,7 @@ function releaseStagedEarthPod({ remove = true } = {}) {
     if (Array.isArray(child.material)) child.material.forEach((material) => material?.dispose?.());
     else child.material?.dispose?.();
   });
+  context?.updateControlsModeUI?.();
   return pod;
 }
 
@@ -103,6 +144,7 @@ function stageEarthPod(appCtx, options = {}) {
   stagedEarthContext = appCtx;
   stagedEarthBoard = typeof options.onBoard === 'function' ? options.onBoard : null;
   stagedEarthPod.userData.boardingRadius = 7.5;
+  faceActorTowardPod(appCtx, stagedEarthPod);
   if (!unregisterStagedEarthInteraction && typeof appCtx.registerContextInteraction === 'function') {
     unregisterStagedEarthInteraction = appCtx.registerContextInteraction({
       id: 'expedition-earth-pathfinder',
@@ -130,6 +172,7 @@ function stageEarthPod(appCtx, options = {}) {
       }
     });
   }
+  appCtx.updateControlsModeUI?.();
   return stagedEarthPod;
 }
 

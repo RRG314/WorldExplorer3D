@@ -59,6 +59,48 @@ test('landing target normalization follows the canonical body catalog', () => {
   assert.equal(normalizeLandingTargetName('not-a-world'), null);
 });
 
+test('Set Course starts one assisted journey from free flight and keeps that journey for the selected destination', () => {
+  const position = (x, y, z) => ({ x, y, z, set(nx, ny, nz) { this.x = nx; this.y = ny; this.z = nz; } });
+  const marsMesh = { position: position(260, 35, -20) };
+  const appContext = {
+    getAllSpaceBodies() {
+      return [{ name: 'Mars', mesh: marsMesh, position: marsMesh.position, radius: 28, landable: true }];
+    },
+    spaceFlight: {
+      active: true,
+      earth: { position: position(0, 0, 0) },
+      moon: { position: position(120, 20, 0) },
+      rocket: { position: position(58, 0, 0) },
+      velocity: position(0, 0, 0),
+      speed: 0,
+      mode: 'flying',
+      _nearestBody: { name: 'Earth' }
+    }
+  };
+  const runtime = installSpaceJourneyRuntime(appContext);
+  const selected = runtime.setSolarSystemCourse('mars');
+  assert.equal(selected.accepted, true, selected.reason);
+  assert.equal(selected.initialized, true);
+  assert.equal(appContext.spaceJourney.sourceBodyId, 'earth');
+  assert.equal(appContext.spaceJourney.destinationBodyId, 'mars');
+  assert.equal(appContext.spaceJourney.mode, JOURNEY_MODE.ASSISTED);
+  assert.equal(appContext.spaceJourneyAssistState.available, true);
+  const journeyId = appContext.spaceJourney.journeyId;
+
+  const selectedAgain = runtime.setSolarSystemCourse('mars');
+  assert.equal(selectedAgain.accepted, true, selectedAgain.reason);
+  assert.equal(selectedAgain.continued, true);
+  assert.equal(appContext.spaceJourney.journeyId, journeyId);
+
+  assert.equal(runtime.engageRenderedJourneyAssist().accepted, true);
+  advanceUntil(runtime, appContext, JOURNEY_PHASE.APPROACH, 400);
+  const approachCourse = runtime.setSolarSystemCourse('mars');
+  assert.equal(approachCourse.accepted, true, approachCourse.reason);
+  assert.equal(approachCourse.continued, true);
+  assert.equal(appContext.spaceJourney.phase, JOURNEY_PHASE.APPROACH);
+  assert.equal(appContext.spaceJourney.journeyId, journeyId);
+});
+
 test('Earth-Moon journey cannot skip evidence-gated phases', () => {
   let journey = createSpaceJourney({
     sourceBodyId: 'earth',

@@ -21,7 +21,7 @@ import {
   createAssistedAscentPlan,
   createAssistedDescentPlan,
   createAssistedTransferPlan
-} from './assisted-guidance.js?v=2';
+} from './assisted-guidance.js?v=3';
 import { samplePhysicalEnvironment } from '../planetary/runtime/physical-environment.js?v=2';
 import {
   advanceAtmosphericExploration,
@@ -395,6 +395,19 @@ function installSpaceJourneyRuntime(appContext) {
     return engageRenderedJourneyAssist();
   };
 
+  const publishCourseDestination = (destinationBodyId) => {
+    const body = getAstronomicalBody(destinationBodyId);
+    appContext.spaceFlight.destination = destinationBodyId;
+    appContext.spaceFlight._landingTarget = null;
+    appContext.spaceFlight.mode = 'flying';
+    appContext.spaceFlight._lastFrameMs = 0;
+    appContext.spaceFlight._manualLandingTarget = body?.name || destinationBodyId;
+    const destinationElement = globalThis.document?.getElementById?.('sfDestination');
+    const landingButton = globalThis.document?.getElementById?.('sfLandBtn');
+    if (destinationElement) destinationElement.textContent = body?.name || destinationBodyId;
+    if (landingButton) landingButton.textContent = `APPROACH ${(body?.name || destinationBodyId).toUpperCase()}`;
+  };
+
   const retargetRenderedSpaceJourney = (destinationInput) => {
     if (!rendered || ![JOURNEY_PHASE.LAUNCH, JOURNEY_PHASE.PARKING_ORBIT].includes(rendered.journey.phase)) {
       return Object.freeze({ accepted: false, reason: 'destination-change-requires-parking-orbit' });
@@ -408,17 +421,45 @@ function installSpaceJourneyRuntime(appContext) {
     if (!beginRenderedSpaceJourney({ sourceBodyId, destinationBodyId, mode })) {
       return Object.freeze({ accepted: false, reason: 'destination-scene-unavailable' });
     }
-    const body = getAstronomicalBody(destinationBodyId);
-    appContext.spaceFlight.destination = destinationBodyId;
-    appContext.spaceFlight._landingTarget = null;
-    appContext.spaceFlight.mode = 'flying';
-    appContext.spaceFlight._lastFrameMs = 0;
-    appContext.spaceFlight._manualLandingTarget = body?.name || destinationBodyId;
-    const destinationElement = globalThis.document?.getElementById?.('sfDestination');
-    const landingButton = globalThis.document?.getElementById?.('sfLandBtn');
-    if (destinationElement) destinationElement.textContent = body?.name || destinationBodyId;
-    if (landingButton) landingButton.textContent = `LAND ON ${(body?.name || destinationBodyId).toUpperCase()}`;
+    publishCourseDestination(destinationBodyId);
     return Object.freeze({ accepted: true, reason: null, destinationBodyId });
+  };
+
+  const setSolarSystemCourse = (destinationInput) => {
+    if (!appContext.spaceFlight?.active || !appContext.spaceFlight?.rocket) {
+      return Object.freeze({ accepted: false, reason: 'space-flight-not-active' });
+    }
+    const destinationBodyId = normalizeAstronomicalBodyId(destinationInput);
+    if (!destinationBodyId || !sceneBody(destinationBodyId)) {
+      return Object.freeze({ accepted: false, reason: 'invalid-space-destination' });
+    }
+    if (rendered) {
+      if (destinationBodyId === rendered.ephemeris.destination.bodyId) {
+        publishCourseDestination(destinationBodyId);
+        return Object.freeze({
+          accepted: true,
+          reason: null,
+          destinationBodyId,
+          continued: true,
+          phase: rendered.journey.phase
+        });
+      }
+      return retargetRenderedSpaceJourney(destinationBodyId);
+    }
+
+    const nearestBodyId = normalizeAstronomicalBodyId(appContext.spaceFlight._nearestBody?.name);
+    const launchBodyId = normalizeAstronomicalBodyId(appContext.spaceFlight._launchSource);
+    let sourceBodyId = nearestBodyId || launchBodyId || 'earth';
+    if (sourceBodyId === destinationBodyId) sourceBodyId = destinationBodyId === 'earth' ? 'moon' : 'earth';
+    if (!sceneBody(sourceBodyId) || !beginRenderedSpaceJourney({
+      sourceBodyId,
+      destinationBodyId,
+      mode: JOURNEY_MODE.ASSISTED
+    })) {
+      return Object.freeze({ accepted: false, reason: 'destination-scene-unavailable' });
+    }
+    publishCourseDestination(destinationBodyId);
+    return Object.freeze({ accepted: true, reason: null, destinationBodyId, initialized: true });
   };
 
   const updateRenderedJourneyPhase = (atMs) => {
@@ -1008,6 +1049,7 @@ function installSpaceJourneyRuntime(appContext) {
     engageRenderedJourneyAssist,
     releaseRenderedJourneyToManualFlight,
     retargetRenderedSpaceJourney,
+    setSolarSystemCourse,
     requestRenderedJourneyLanding,
     requestRenderedAtmosphericDeparture,
     requestRenderedAtmosphericEntry,
@@ -1022,6 +1064,7 @@ function installSpaceJourneyRuntime(appContext) {
     engageRenderedJourneyAssist,
     releaseRenderedJourneyToManualFlight,
     retargetRenderedSpaceJourney,
+    setSolarSystemCourse,
     requestRenderedJourneyLanding,
     requestRenderedAtmosphericDeparture,
     requestRenderedAtmosphericEntry,

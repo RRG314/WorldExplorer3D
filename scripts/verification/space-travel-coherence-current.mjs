@@ -73,6 +73,35 @@ async function verifyPathfinderAndInterior(page) {
   const staged = await snapshot(page);
   assert.equal(staged.interstellarExpedition?.readiness?.status, 'insufficient');
   assert.equal(staged.stagedEarthPathfinder?.active, true);
+  const stagedPresentation = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const pod = ctx.earthSceneRoot?.getObjectByName('expedition-surface-launch-pod:earth');
+    if (!pod) return null;
+    pod.updateMatrixWorld(true);
+    ctx.camera.updateMatrixWorld(true);
+    ctx.camera.updateProjectionMatrix();
+    const world = new THREE.Vector3();
+    pod.getWorldPosition(world);
+    const projected = world.clone().project(ctx.camera);
+    const groundY = Number(pod.userData?.surfaceGroundY);
+    const collision = ctx.checkBuildingCollision?.(world.x, world.z, 2.2, {
+      actorBaseY: groundY,
+      actorHeight: 8.5
+    });
+    return {
+      walkMode: ctx.Walk?.state?.mode,
+      projected: projected.toArray(),
+      inFront: projected.z > -1 && projected.z < 1,
+      inViewport: Math.abs(projected.x) < 0.82 && Math.abs(projected.y) < 0.82,
+      buildingCollision: collision?.collision === true,
+      menuLabel: document.getElementById('fSpaceSurveyor')?.textContent?.trim() || ''
+    };
+  });
+  assert.equal(stagedPresentation?.walkMode, 'walk');
+  assert.equal(stagedPresentation?.inFront, true, JSON.stringify(stagedPresentation));
+  assert.equal(stagedPresentation?.inViewport, true, JSON.stringify(stagedPresentation));
+  assert.equal(stagedPresentation?.buildingCollision, false, JSON.stringify(stagedPresentation));
+  assert.match(stagedPresentation?.menuLabel || '', /Pathfinder Ready Nearby/i);
   await page.screenshot({ path: path.join(outputDir, 'pathfinder-staged-from-incomplete-expedition.png'), fullPage: true });
 
   await page.evaluate(() => document.getElementById('fSpaceBoardSurveyor')?.click());
@@ -149,7 +178,7 @@ async function verifyPathfinderAndInterior(page) {
   assert.equal(collisionEvidence.collision, false, JSON.stringify(collisionEvidence));
   assert.ok(collisionEvidence.visibleCrew.length >= 1, JSON.stringify(collisionEvidence));
   await page.screenshot({ path: path.join(outputDir, 'solis-reach-interior-crew.png'), fullPage: true });
-  return { staged: staged.stagedEarthPathfinder, presentation, collisionEvidence };
+  return { staged: staged.stagedEarthPathfinder, stagedPresentation, presentation, collisionEvidence };
 }
 
 async function verifyFreeFlight(page) {

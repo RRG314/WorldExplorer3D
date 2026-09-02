@@ -7,7 +7,7 @@ import {
 import { SPACE_CONSTANTS } from "./constants.js?v=1";
 import { PLANETARY_BODIES, configureColorTexture } from "../planetary/catalog.js?v=1";
 import { createSpaceCelestialCatalog } from "./celestial-catalog.js?v=5";
-import { initUniverseRuntime } from "../universe/runtime.js?v=30";
+import { initUniverseRuntime } from "../universe/runtime.js?v=31";
 import { createExpeditionSpacecraftMesh } from "./expedition-spacecraft-mesh.js?v=4";
 import { createExpeditionPodMesh } from './expedition-pod-mesh.js?v=2';
 import { createSurveyorExteriorMesh } from './expedition-surveyor-mesh.js?v=3';
@@ -241,10 +241,8 @@ function createSpaceMoon() {
 function createSpaceRocket() {
   appCtx.spaceFlight.rocket = createExpeditionSpacecraftMesh();
   appCtx.spaceFlight.scene.add(appCtx.spaceFlight.rocket);
-  const phase = appCtx.getInterstellarExpeditionSnapshot?.()?.podJourney?.phase;
-  if (['ship_launch', 'local_flight', 'descent', 'surface_launch', 'rendezvous'].includes(phase)) {
-    setExpeditionPodFlightPresentation(true);
-  }
+  if (appCtx.spaceFlight.craftRole === 'pathfinder') setExpeditionPodFlightPresentation(true);
+  else if (appCtx.spaceFlight.craftRole === 'starship') setSurveyorFlightPresentation(true);
 }
 
 export function setExpeditionPodFlightPresentation(active) {
@@ -253,6 +251,7 @@ export function setExpeditionPodFlightPresentation(active) {
   if (active === true) setSurveyorFlightPresentation(false);
   const current = rocket.userData.expeditionPodPresentation;
   if (active === true) {
+    appCtx.spaceFlight.craftRole = 'pathfinder';
     if (current?.pod) return true;
     const originals = rocket.children.map((child) => ({
       child,
@@ -277,6 +276,7 @@ export function setExpeditionPodFlightPresentation(active) {
     entry.child.name = entry.name;
   });
   delete rocket.userData.expeditionPodPresentation;
+  if (appCtx.spaceFlight.craftRole === 'pathfinder') appCtx.spaceFlight.craftRole = 'wayfinder';
   return true;
 }
 
@@ -291,6 +291,7 @@ export function setSurveyorFlightPresentation(active) {
     rocket.scale.setScalar(1.45);
     rocket.name = `${SPACE_CRAFT_IDENTITY.starship.name} Flight Vessel`;
     rocket.userData.surveyorFlightPresentation = { active: true, originalScale };
+    appCtx.spaceFlight.craftRole = 'starship';
     if (appCtx.spaceFlight.expeditionSurveyor) appCtx.spaceFlight.expeditionSurveyor.visible = false;
     return true;
   }
@@ -298,6 +299,7 @@ export function setSurveyorFlightPresentation(active) {
   rocket.scale.copy(current.originalScale);
   rocket.name = `${SPACE_CRAFT_IDENTITY.starship.name} Exploration Starship`;
   delete rocket.userData.surveyorFlightPresentation;
+  if (appCtx.spaceFlight.craftRole === 'starship') appCtx.spaceFlight.craftRole = 'wayfinder';
   if (appCtx.spaceFlight.expeditionSurveyor) appCtx.spaceFlight.expeditionSurveyor.visible = true;
   return true;
 }

@@ -50,8 +50,8 @@ try {
     accessibleLabel: button.getAttribute('aria-label'),
     hasVectorIcon: Boolean(button.querySelector('.btnIcon[aria-hidden="true"] svg'))
   })));
-  assert.deepEqual(hubPresentation.map((entry) => entry.label), ['Explore', 'Travel', 'Create', 'Community', 'My Explorer']);
-  assert.deepEqual(hubPresentation.map((entry) => entry.mobileLabel), ['Explore', 'Travel', 'Create', 'Community', 'My Explorer']);
+  assert.deepEqual(hubPresentation.map((entry) => entry.label), ['Explore', 'Travel', 'Create', 'Community', 'Journal']);
+  assert.deepEqual(hubPresentation.map((entry) => entry.mobileLabel), ['Explore', 'Travel', 'Create', 'Community', 'Journal']);
   assert.ok(hubPresentation.every((entry) => entry.accessibleLabel && entry.hasVectorIcon));
 
   await openMenu('exploreBtn', 'exploreMenu');
@@ -72,12 +72,28 @@ try {
   await page.screenshot({ path: `${evidenceDir}/00-my-explorer-story-desktop.png` });
   await page.locator('#discoveryJourneyOverview [data-explorer-route="travel"]').click();
   await page.waitForSelector('#travelMenu.open');
-  assert.match(await page.locator('#travelMenu .floatItems').textContent(), /Drive.*Walk.*Board the Surveyor.*World View.*Controls/is);
+  assert.match(await page.locator('#travelMenu .floatItems').textContent(), /Choose Another Place.*Open World Map.*Drive.*Walk.*Deploy Pathfinder Pod.*Current Controls/is);
+  const travelMutationCount = await page.evaluate(async () => {
+    const menu = document.querySelector('#travelMenu .floatItems');
+    let mutations = 0;
+    const observer = new MutationObserver((records) => { mutations += records.length; });
+    observer.observe(menu, { attributes: true, childList: true, characterData: true, subtree: true });
+    await new Promise((resolve) => setTimeout(resolve, 1_500));
+    observer.disconnect();
+    return mutations;
+  });
+  assert.equal(travelMutationCount, 0, 'Travel content changed without a travel or environment transition.');
   await page.locator('#controlsBarBtn').click();
   await page.waitForFunction(() => !document.getElementById('ctrlContent')?.classList.contains('hidden'));
   assert.equal(await page.locator('#controlsTab').evaluate((element) => element.classList.contains('bar-open')), true);
   await page.mouse.click(720, 420);
   await page.waitForFunction(() => document.getElementById('ctrlContent')?.classList.contains('hidden'));
+
+  await openMenu('realEstateFloatBtn', 'realEstateMenu');
+  assert.match(await page.locator('#realEstateMenu .floatItems').textContent(), /Quick Build.*Edit This World.*Live Sky.*Weather Live.*Satellite View/s);
+  await page.locator('#fQuickBuild').click();
+  await page.waitForSelector('#blockBuilderPanel.show', { timeout: 30_000 });
+  await page.locator('#blockBuilderClose').click();
 
   await openMenu('realEstateFloatBtn', 'realEstateMenu');
   await page.locator('#fEditorMode').click();
@@ -86,7 +102,12 @@ try {
   await page.waitForFunction(() => !document.body.classList.contains('editor-workspace-open'));
 
   await openMenu('gameBtn', 'gameMenu');
-  assert.match(await page.locator('#gameMenu .floatItems').textContent(), /Rooms & Explorer Board/);
+  assert.match(await page.locator('#gameMenu .floatItems').textContent(), /Rooms & Players.*Community Board.*Memory Marker.*Share This Place/s);
+  await page.locator('#fCommunityBoard').click();
+  await page.waitForSelector('#flowerChallengePanel.open');
+  await page.locator('#flowerChallengeToggleBtn').click();
+
+  await openMenu('gameBtn', 'gameMenu');
   await page.locator('#fMultiplayer').click();
   await page.waitForSelector('#roomPanelModal.show', { timeout: 60_000 });
   await page.locator('#roomPanelCloseBtn').click();
@@ -111,7 +132,7 @@ try {
     };
   });
   assert.equal(mobileLayout.buttons.length, 5);
-  assert.deepEqual(mobileLayout.buttons.map((entry) => entry.label), ['Explore', 'Travel', 'Create', 'Community', 'My Explorer']);
+  assert.deepEqual(mobileLayout.buttons.map((entry) => entry.label), ['Explore', 'Travel', 'Create', 'Community', 'Journal']);
   assert.equal(mobileLayout.overflow, false);
   assert.ok(mobileLayout.buttons.every((entry) => entry.box.x >= 0 && entry.box.x + entry.box.width <= 390));
   await page.screenshot({ path: `${evidenceDir}/02-five-player-choices-mobile.png` });
@@ -130,8 +151,9 @@ try {
       fiveClearChoices: true,
       exploreOpensToday: true,
       travelIncludesModesWorldViewControlsAndRecovery: true,
-      createOpensExistingEditor: true,
-      communityOpensExistingRoomsAndExplorerBoard: true,
+      travelMenuStableWithoutStateChange: travelMutationCount === 0,
+      createOpensQuickBuildAndExistingEditor: true,
+      communitySeparatesRoomsBoardMemoriesAndSharing: true,
       myExplorerOpensJournal: true,
       explorerStoryLinksToExistingHubs: true,
       noDuplicateElementIds: duplicateIds.length === 0,

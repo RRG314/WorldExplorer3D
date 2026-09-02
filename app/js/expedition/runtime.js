@@ -15,7 +15,7 @@ import { registerExpeditionDiscovery } from './contact-authority.js?v=4';
 import { createPodJourney, POD_PHASE, POD_ROUTE_KIND, transitionPodJourney } from './pod-journey-authority.js?v=2';
 import { approvedSampleTradeValue, summarizeExpeditionTransfers } from '../resources/material-catalog.js?v=2';
 import { SHIP_STATIONS } from './ship-layout.js?v=5';
-import { consumeStagedEarthPod, getStagedEarthPodSnapshot, playSurfacePodLaunch, stageEarthPod } from '../planetary/surface-pod-launch.js?v=5';
+import { consumeStagedEarthPod, getStagedEarthPodSnapshot, playSurfacePodLaunch, stageEarthPod } from '../planetary/surface-pod-launch.js?v=6';
 import { SPACE_CRAFT_IDENTITY } from '../space/craft-identity.js?v=1';
 
 const STARSHIP_NAME = SPACE_CRAFT_IDENTITY.starship.name;
@@ -173,6 +173,11 @@ function stageEarthPodToSurveyor(appContext) {
     activeContext.showToast?.('Pathfinder is already committed to the current Solis Reach flight.');
     return false;
   }
+  activeContext.setTravelMode?.('walk', {
+    source: 'pathfinder_deploy',
+    force: true,
+    emitTutorial: false
+  });
   const pod = stageEarthPod(activeContext, {
     onBoard: (boardingPod) => launchEarthPodToSurveyor({ pod: boardingPod })
   });
@@ -208,6 +213,8 @@ async function boardSurveyorDirect(appContext) {
 
 function getExpeditionPodDockingTarget() {
   if (earthShuttleJourney()?.phase !== POD_PHASE.RENDEZVOUS) return null;
+  if (activeContext?.spaceFlight?.craftRole !== 'pathfinder') return null;
+  if (!activeContext?.spaceFlight?.rocket?.userData?.expeditionPodPresentation?.pod) return null;
   const target = activeContext?.getExpeditionSurveyorDockTarget?.();
   const rocket = activeContext?.spaceFlight?.rocket;
   if (!target?.position || !rocket) return null;

@@ -19,7 +19,7 @@ test('Moon publishes only its return action instead of competing Earth actions',
   const state = resolveTravelMenuState({
     environment: 'MOON',
     earthEnvironment: 'EARTH',
-    onMoon: true,
+    moonEnvironment: 'MOON',
     supports: allModes
   });
   assert.equal(state.pathfinder.visible, false);
@@ -40,4 +40,14 @@ test('planetary capability rules suppress space actions at the state boundary', 
   assert.equal(state.boardStarship.visible, false);
   assert.equal(state.freeSpaceFlight.visible, false);
   assert.equal(state.quickTrip.visible, false);
+});
+
+test('Earth reports a staged Pathfinder without creating another travel action', () => {
+  const state = resolveTravelMenuState({
+    environment: 'EARTH',
+    earthEnvironment: 'EARTH',
+    pathfinderStaged: true,
+    supports: allModes
+  });
+  assert.deepEqual(state.pathfinder, { visible: true, label: '🛸 Pathfinder Ready Nearby' });
 });

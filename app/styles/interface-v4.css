@@ -550,10 +550,10 @@ body.deflock-active .floatBtn::after {
   font: 600 9px/1 Orbitron, sans-serif;
   letter-spacing: 0.1em;
 }
-#gameMenu .floatItems, #exploreMenu .floatItems, #travelMenu .floatItems { padding-bottom: 18px; }
-#gameMenu .floatItemSection, #exploreMenu .floatItemSection, #travelMenu .floatItemSection { padding-top: 16px; }
-#gameMenu .floatItemSection:first-of-type, #exploreMenu .floatItemSection:first-of-type, #travelMenu .floatItemSection:first-of-type { padding-top: 4px; }
-#gameMenu .floatItem, #exploreMenu .floatItem, #travelMenu .floatItem { min-height: 50px; }
+#gameMenu .floatItems, #exploreMenu .floatItems, #travelMenu .floatItems, #realEstateMenu .floatItems { padding-bottom: 18px; }
+#gameMenu .floatItemSection, #exploreMenu .floatItemSection, #travelMenu .floatItemSection, #realEstateMenu .floatItemSection { padding-top: 16px; }
+#gameMenu .floatItemSection:first-of-type, #exploreMenu .floatItemSection:first-of-type, #travelMenu .floatItemSection:first-of-type, #realEstateMenu .floatItemSection:first-of-type { padding-top: 4px; }
+#gameMenu .floatItem, #exploreMenu .floatItem, #travelMenu .floatItem, #realEstateMenu .floatItem { min-height: 50px; }
 [hidden] { display: none !important; }
 .mainMenuBtn {
   top: 0;
@@ -677,9 +677,9 @@ body.deflock-active .floatBtn::after {
   }
   .floatMenu.open .floatItems { display: grid; }
   .floatItem { min-height: 48px; padding: 8px; font-size: 9px; white-space: normal; }
-  #gameMenu .floatItemSection, #exploreMenu .floatItemSection, #travelMenu .floatItemSection { grid-column: 1 / -1; padding: 10px 8px 6px; }
-  #gameMenu .floatItemSection:first-of-type, #exploreMenu .floatItemSection:first-of-type, #travelMenu .floatItemSection:first-of-type { padding-top: 0; }
-  #gameMenu .floatItem, #exploreMenu .floatItem, #travelMenu .floatItem { min-height: 48px; }
+  .floatItemSection { grid-column: 1 / -1; padding: 10px 8px 6px; }
+  .floatItemSection:first-of-type { padding-top: 0; }
+  #gameMenu .floatItem, #exploreMenu .floatItem, #travelMenu .floatItem, #realEstateMenu .floatItem { min-height: 48px; }
   #controlsBarBtn .btnText { display: inline; }
   #controlsTab, #memoryFlowerFloatBtn { display: none !important; }
   body.deflock-active .floatMenuContainer { left: 0; right: 0; height: 58px; max-width: none; }

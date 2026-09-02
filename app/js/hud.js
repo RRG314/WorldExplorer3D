@@ -553,9 +553,6 @@ function updateCamera(dt = 1 / 60) {
 }
 
 function updateHUD() {
-  // Keep controls panel sections and header synchronized with the active mode.
-  if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
-
   if (appCtx.boatMode?.active) {
     const knots = Math.max(0, Math.round(Math.abs(worldUnitsPerSecondToKnots(
       appCtx.boat.forwardSpeed ?? appCtx.boat.speed,

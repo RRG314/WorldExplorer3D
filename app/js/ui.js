@@ -7,7 +7,7 @@ import { initMapInteractions } from "./ui/map-interactions.js?v=60";
 import { initMobileControls } from "./ui/mobile-controls.js?v=82";
 import { initShareUi } from "./ui/share-links.js?v=64";
 import { setupSettingsUi } from "./ui/settings.js?v=2";
-import { bindSpaceActions } from "./ui/space-actions.js?v=10";
+import { bindSpaceActions } from "./ui/space-actions.js?v=11";
 import { initTitleScreenUi } from "./ui/title-screen.js?v=117";
 import { commitEnvironment, exitCurrentEnvironmentSync } from './session-coordinator.js?v=2';
 
@@ -248,6 +248,11 @@ function setupUI() {
 
   const homeMenuItem = document.getElementById('fHome');
   if (homeMenuItem) homeMenuItem.addEventListener('click', goToMainMenu);
+  document.getElementById('fChooseLocation')?.addEventListener('click', goToMainMenu);
+  document.getElementById('fWorldMap')?.addEventListener('click', () => {
+    closeAllFloatMenus();
+    appCtx.openLargeMap?.();
+  });
   document.getElementById('fBackpack')?.addEventListener('click', () => {
     appCtx.toggleWorldDiscoveryJournal?.(false);
     appCtx.toggleUrbanEquipment?.(true);
@@ -269,6 +274,13 @@ function setupUI() {
     if (typeof appCtx.openEditorSession === 'function') {
       void appCtx.openEditorSession({ initialTab: 'workspace' });
     }
+    closeAllFloatMenus();
+  });
+  document.getElementById('fQuickBuild')?.addEventListener('click', () => {
+    if (typeof appCtx.closeActivityBrowser === 'function') appCtx.closeActivityBrowser();
+    if (typeof appCtx.closeEditorSession === 'function') appCtx.closeEditorSession();
+    if (typeof appCtx.openBlockBuilder === 'function') appCtx.openBlockBuilder();
+    else appCtx.showToast?.('Quick Build is still loading. Try again in a moment.');
     closeAllFloatMenus();
   });
   document.getElementById('fEditorMine')?.addEventListener('click', () => {
@@ -318,6 +330,16 @@ function setupUI() {
       console.error('[multiplayer] Could not open the room panel.', error);
       appCtx.showToast?.('Multiplayer is unavailable right now.');
     });
+  });
+  document.getElementById('fCommunityBoard')?.addEventListener('click', () => {
+    closeAllFloatMenus();
+    appCtx.setChallengeLeaderboardView?.('explorer');
+    const panel = document.getElementById('flowerChallengePanel');
+    if (!panel?.classList.contains('open')) document.getElementById('flowerChallengeToggleBtn')?.click();
+  });
+  document.getElementById('fSharePlace')?.addEventListener('click', () => {
+    closeAllFloatMenus();
+    document.getElementById('gameShareFloatBtn')?.click();
   });
   document.getElementById('fDeFlock')?.addEventListener('click', () => {
     if (appCtx.onMoon || appCtx.onMars || appCtx.spaceFlight?.active || appCtx.oceanMode?.active) {
