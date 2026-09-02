@@ -20,7 +20,7 @@ function createBuildingCollisionQuery(appCtx) {
     const indexedCandidates = typeof appCtx.getNearbyBuildings === 'function'
       ? appCtx.getNearbyBuildings(x, z, carRadius + 8)
       : appCtx.buildings;
-    // Authored interiors, editor builds and other active-world obstacles are
+    // Authored interiors, Quick Builds and other active-world obstacles are
     // intentionally kept out of the cached Earth building index. They still
     // belong to this one collision authority. In particular, a ship interior
     // can be entered before getNearbyBuildings is published on the shared
@@ -30,8 +30,7 @@ function createBuildingCollisionQuery(appCtx) {
     const seenCandidates = new Set();
     [
       ...(Array.isArray(indexedCandidates) ? indexedCandidates : []),
-      ...(Array.isArray(appCtx.dynamicBuildingColliders) ? appCtx.dynamicBuildingColliders : []),
-      ...(Array.isArray(appCtx.overlayRuntimeBuildingColliders) ? appCtx.overlayRuntimeBuildingColliders : [])
+      ...(Array.isArray(appCtx.dynamicBuildingColliders) ? appCtx.dynamicBuildingColliders : [])
     ].forEach((candidate) => {
       if (!candidate || seenCandidates.has(candidate)) return;
       seenCandidates.add(candidate);

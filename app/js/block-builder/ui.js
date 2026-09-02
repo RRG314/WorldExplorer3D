@@ -115,10 +115,6 @@ function initBlockBuilderUi() {
   panel.addEventListener('pointerdown', stopBuildPointer);
   panel.addEventListener('click', stopBuildPointer);
   document.getElementById('blockBuilderClose')?.addEventListener('click', closeBlockBuilder);
-  document.getElementById('blockBuilderBack')?.addEventListener('click', async () => {
-    closeBlockBuilder();
-    await appCtx.openEditorSession?.({ initialTab: 'workspace', skipTutorial: true });
-  });
   panel.querySelectorAll('[data-block-tool]').forEach((button) => {
     button.addEventListener('click', () => appCtx.setBlockBuildTool?.(button.dataset.blockTool));
   });

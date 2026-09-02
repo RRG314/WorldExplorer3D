@@ -393,9 +393,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 #worldQuickControls[hidden] { display: none !important; }
 body.space-flight-active #worldQuickControls,
 body.solid-world-active #worldQuickControls,
-body.activity-creator-open #worldQuickControls,
 body.activity-browser-open #worldQuickControls,
-body.editor-workspace-open #worldQuickControls,
 body:has(#largeMap.show) #worldQuickControls { display: none !important; }
 .worldQuickControl {
   min-width: 30px;

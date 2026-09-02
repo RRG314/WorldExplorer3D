@@ -962,13 +962,6 @@ function getWorldExplorerRuntimeDiagnostics() {
     augmentedReality: appCtx.getArPlatformSnapshot?.() || { phase: 'idle', active: false },
     livingWorld: appCtx.livingWorldRuntimeSnapshot?.() || { active: false },
     worldDiscovery: appCtx.worldDiscoveryRuntimeSnapshot?.() || { active: false },
-    publishedOverlays: appCtx.getApprovedEditorContributionSnapshot?.() || {
-      activeAreaSignature: '',
-      publishedCount: 0,
-      featureIds: [],
-      renderedObjectCount: 0,
-      groupAttached: false
-    },
     fishing: appCtx.getFishingSnapshot?.() || { open: false, active: false },
     interior: activeInterior ? {
       active: true,
@@ -1320,12 +1313,6 @@ globalThis.render_game_to_text = () => JSON.stringify({
   } : { active: false },
   worldDiscovery: appCtx.worldDiscoveryRuntimeSnapshot?.() || { active: false },
   editableWorld: appCtx.editableWorldRuntimeSnapshot?.() || { active: false },
-  publishedOverlays: appCtx.getApprovedEditorContributionSnapshot?.() || {
-    publishedCount: 0,
-    featureIds: [],
-    renderedObjectCount: 0,
-    groupAttached: false
-  },
   transportStructures: transportStructureSnapshot(),
   worldCounts: {
     buildings: appCtx.buildings?.length ?? null,

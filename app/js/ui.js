@@ -263,52 +263,10 @@ function setupUI() {
   document.getElementById('fExplorerJournal')?.addEventListener('click', () => openExplorerSection('journal'));
   document.getElementById('fExplorerGuide')?.addEventListener('click', () => openExplorerSection('guide'));
   document.getElementById('fExplorerProfile')?.addEventListener('click', () => openExplorerSection('profile'));
-  document.getElementById('fEditorMode')?.addEventListener('click', () => {
-    if (typeof appCtx.closeActivityBrowser === 'function') appCtx.closeActivityBrowser();
-    if (typeof appCtx.closeBlockBuilder === 'function') appCtx.closeBlockBuilder();
-    if (typeof appCtx.openEditorSession === 'function') {
-      void appCtx.openEditorSession({ initialTab: 'workspace' });
-    }
-    closeAllFloatMenus();
-  });
   document.getElementById('fQuickBuild')?.addEventListener('click', () => {
     if (typeof appCtx.closeActivityBrowser === 'function') appCtx.closeActivityBrowser();
-    if (typeof appCtx.closeEditorSession === 'function') appCtx.closeEditorSession();
     if (typeof appCtx.openBlockBuilder === 'function') appCtx.openBlockBuilder();
     else appCtx.showToast?.('Quick Build is still loading. Try again in a moment.');
-    closeAllFloatMenus();
-  });
-  document.getElementById('fEditorMine')?.addEventListener('click', () => {
-    if (typeof appCtx.closeActivityBrowser === 'function') appCtx.closeActivityBrowser();
-    if (typeof appCtx.openEditorSession === 'function') {
-      appCtx.openEditorSession({ initialTab: 'mine', skipTutorial: true });
-    } else if (typeof appCtx.toggleEditorSession === 'function') {
-      appCtx.toggleEditorSession();
-    }
-    closeAllFloatMenus();
-  });
-  document.getElementById('fModerationPanel')?.addEventListener('click', () => {
-    if (typeof appCtx.closeActivityBrowser === 'function') appCtx.closeActivityBrowser();
-    if (typeof appCtx.openEditorSession === 'function') {
-      appCtx.openEditorSession({ initialTab: 'moderation', skipTutorial: true });
-    }
-    closeAllFloatMenus();
-  });
-  document.getElementById('fActivityCreator')?.addEventListener('click', () => {
-    if (typeof appCtx.closeActivityBrowser === 'function') appCtx.closeActivityBrowser();
-    if (typeof appCtx.toggleActivityCreator === 'function') {
-      appCtx.toggleActivityCreator();
-    } else if (typeof appCtx.openActivityCreator === 'function') {
-      appCtx.openActivityCreator();
-    }
-    closeAllFloatMenus();
-  });
-  document.getElementById('fActivities')?.addEventListener('click', () => {
-    if (typeof appCtx.openActivityBrowser === 'function') {
-      appCtx.openActivityBrowser({ scope: 'all' });
-    } else if (typeof appCtx.toggleActivityBrowser === 'function') {
-      appCtx.toggleActivityBrowser({ scope: 'all' });
-    }
     closeAllFloatMenus();
   });
   document.getElementById('fRoomGames')?.addEventListener('click', () => {

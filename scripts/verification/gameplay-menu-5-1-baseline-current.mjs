@@ -44,6 +44,8 @@ async function verify(viewport, screenshotName) {
   const touchViewport = viewport.width <= 760;
   const context = await browser.newContext({ viewport, hasTouch: touchViewport, isMobile: touchViewport });
   const page = await context.newPage();
+  const runtimeRequests = [];
+  page.on('request', (request) => runtimeRequests.push(request.url()));
   page.on('pageerror', (error) => pageErrors.push(String(error?.stack || error)));
   await startEarth(page);
 
@@ -57,6 +59,8 @@ async function verify(viewport, screenshotName) {
   assert.match(labels[4] || '', /Walking Mode Controls/i);
   assert.equal(await page.locator('#packBtn').count(), 0);
   assert.equal(await page.locator('#fEditorMode').count(), 0);
+  assert.equal(await page.locator('#editorPanel, #activityCreatorPanel').count(), 0);
+  assert.equal(await page.locator('#fActivities, #fActivityCreator').count(), 0);
 
   await page.evaluate(() => {
     const loading = document.getElementById('loading');
@@ -73,6 +77,23 @@ async function verify(viewport, screenshotName) {
   assert.match(exploration, /Board Solis Reach/i);
   assert.match(exploration, /Free Space Flight/i);
 
+  await page.locator('#gameBtn').click();
+  const games = (await page.locator('#gameMenu .floatItems').textContent()).replace(/\s+/g, ' ').trim();
+  assert.doesNotMatch(games, /Choose a Game|Create Game/i);
+  assert.match(games, /DeFlock Hunt/i);
+  assert.match(games, /Find Red Flower/i);
+
+  await page.locator('#realEstateFloatBtn').click();
+  await page.locator('#fQuickBuild').click();
+  await page.locator('#blockBuilderPanel').waitFor({ state: 'visible', timeout: 20_000 });
+  assert.equal(await page.locator('#blockBuilderPanel').getAttribute('aria-hidden'), 'false');
+  assert.match(await page.locator('#blockBuilderPanel').textContent(), /Quick Build/i);
+  await page.locator('#blockBuilderClose').click();
+  await page.locator('#blockBuilderPanel').waitFor({ state: 'hidden', timeout: 10_000 });
+
+  const removedRuntimeRequests = runtimeRequests.filter((url) => /\/js\/(?:editor|activity-editor)\//.test(url));
+  assert.deepEqual(removedRuntimeRequests, [], `Removed editor runtime was requested: ${removedRuntimeRequests.join(', ')}`);
+
   if (touchViewport) {
     const controlsTextDisplay = await page.locator('#controlsBarBtn .btnText').evaluate((element) => getComputedStyle(element).display);
     assert.equal(controlsTextDisplay, 'none', 'The dynamic controls title overlaps the compact mobile label.');
@@ -80,7 +101,7 @@ async function verify(viewport, screenshotName) {
 
   await page.screenshot({ path: path.join(outputDir, screenshotName), fullPage: true });
   await context.close();
-  return { viewport, labels, exploration: exploration.replace(/\s+/g, ' ').trim() };
+  return { viewport, labels, exploration: exploration.replace(/\s+/g, ' ').trim(), games };
 }
 
 const mobileOnly = process.argv.includes('--mobile-only');

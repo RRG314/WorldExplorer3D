@@ -4,7 +4,7 @@ import {
   getActivityTemplate,
   orderedRouteAnchors,
   sanitizeText
-} from '../activity-editor/schema.js?v=2';
+} from './schema-core.js?v=1';
 
 const STORAGE_KEY = 'worldExplorer3D.activityLibrary.v1';
 const STORAGE_BACKUP_KEY = 'worldExplorer3D.activityLibrary.backup.v1';

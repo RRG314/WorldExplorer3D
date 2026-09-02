@@ -635,7 +635,6 @@ function initTitleScreenUi({
     gameShareFloatBtn?.classList.add('show');
     closeGameShareMenu?.();
     appCtx.gameStarted = true;
-    appCtx.kickOptionalRuntimeBoot?.('boot');
     if (requestedLaunchMode !== 'ocean' && requestedLaunchMode !== 'earth') {
       void appCtx.ensureStarCatalogLoaded?.();
     }

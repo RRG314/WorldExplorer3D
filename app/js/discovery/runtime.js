@@ -1288,11 +1288,11 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     void state.recordExplorerEvent({
       eventId: `event:creation:${detail.worldId}:${detail.revision || Date.now()}`,
       eventType: 'world-edited',
-      sourceSystem: 'world-editor',
+      sourceSystem: 'quick-build',
       sourceId: `${detail.worldId}:${detail.revision || ''}`,
       pathId: 'creation',
       name: 'World edit saved',
-      detail: 'A change to this place was saved in the World Editor.',
+      detail: 'A change to this place was saved with Quick Build.',
       points: 0,
       progressReason: 'creative-history'
     });

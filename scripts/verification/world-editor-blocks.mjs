@@ -199,15 +199,10 @@ async function navigateAndStartWorld(page, url) {
 
 async function openIntegratedBlocks(page) {
   await page.locator('#realEstateFloatBtn').click();
-  await page.locator('#fEditorMode').click();
-  await page.locator('#editorPanel.show').waitFor({ state: 'visible', timeout: 30_000 });
-  await page.waitForTimeout(350);
-  assert.equal(await page.locator('#starInfo').isVisible().catch(() => false), false, 'A star-information card remained above the opened World Editor.');
-  if (await page.locator('#editorTutorialStartBtn').isVisible().catch(() => false)) {
-    await page.locator('#editorTutorialStartBtn').click();
-  }
-  await page.locator('#editorTabBlocks').click();
+  await page.locator('#fQuickBuild').click();
   await page.locator('#blockBuilderPanel.show').waitFor({ state: 'visible', timeout: 30_000 });
+  await page.waitForTimeout(350);
+  assert.equal(await page.locator('#starInfo').isVisible().catch(() => false), false, 'A star-information card remained above Quick Build.');
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().blockBuilder?.enabled === true, null, { timeout: 30_000 });
 }
 
@@ -749,13 +744,10 @@ async function executeMobileJourney() {
   await explorer.page.screenshot({ path: path.join(evidenceDir, 'world-editor-blocks-local-mobile.png'), fullPage: true });
   await explorer.page.locator('#blockBuilderUndo').tap();
   const afterUndo = await waitForBlockCount(explorer.page, 0, false);
-  await explorer.page.locator('#blockBuilderBack').tap();
-  await explorer.page.locator('#editorPanel.show').waitFor({ state: 'visible', timeout: 30_000 });
-  await explorer.page.locator('#editorCloseBtn').tap();
+  await explorer.page.locator('#blockBuilderClose').tap();
   await explorer.page.waitForFunction(() => {
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
-    return state.gameStarted === true && state.worldLoading === false && state.blockBuilder?.enabled === false &&
-      document.querySelector('#editorPanel')?.classList.contains('show') !== true;
+    return state.gameStarted === true && state.worldLoading === false && state.blockBuilder?.enabled === false;
   }, null, { timeout: 30_000 });
   return { explorer, placed, afterCompatibilityWindow, afterUndo };
 }
@@ -810,7 +802,7 @@ try {
     await installEditorEntryStarObstruction(localExplorer.page);
     let editorClearedStarObstruction = false;
     for (const shape of ['cube', 'wall', 'ramp']) {
-      phase(`vehicle: create ${shape} through visible World Editor controls`);
+      phase(`vehicle: create ${shape} through visible Quick Build controls`);
       await replaceVisibleBlockFixture(localExplorer.page, shape);
       if (shape === 'cube') {
         editorClearedStarObstruction = !(await localExplorer.page.locator('#starInfo').isVisible().catch(() => false));
@@ -1154,7 +1146,7 @@ try {
   }
 
   const localChecks = {
-    integratedEditorOpened: localPlaced.enabled === true,
+    quickBuildOpened: localPlaced.enabled === true,
     localPlacementPersistedPrimaryAndBackup: localRowsAfterPlacement.primary.length === 1 && localRowsAfterPlacement.backup.length === 1,
     rejectedRemovalKeptRenderedBlock: localAfterRejectedRemoval.count === 1,
     rejectedRemovalKeptCommittedRecords: localRowsAfterRejectedRemoval.primary.length === 1 && localRowsAfterRejectedRemoval.backup.length === 1,
@@ -1166,10 +1158,10 @@ try {
     damagedPrimaryRecoveredExactBackup: localAfterBackupRecovery.count === 1 &&
       rowsAfterBackupRecovery.primary.length === 1 && rowsAfterBackupRecovery.backup.length === 1 &&
       JSON.stringify(rowsAfterBackupRecovery.primary) === JSON.stringify(rowsAfterBackupRecovery.backup),
-    backupRecoveryWasExplainedInVisibleEditor: backupRecoveryState.persistence?.notice === 'recovered' &&
+    backupRecoveryWasExplainedInQuickBuild: backupRecoveryState.persistence?.notice === 'recovered' &&
       /recovered your blocks.*backup.*main saved copy was damaged/i.test(backupRecoveryState.status),
     bothDamagedCopiesStartedSafeAndEmpty: localAfterBothCorrupt.count === 0 && bothCorruptState.persistence?.notice === 'warning',
-    bothDamagedCopiesWereExplainedInVisibleEditor: /both saved block copies were damaged.*started empty/i.test(bothCorruptState.status),
+    bothDamagedCopiesWereExplainedInQuickBuild: /both saved block copies were damaged.*started empty/i.test(bothCorruptState.status),
     walkingControllerStoppedBeforeBlock: walkingBlocked.maxZ > walkingBlocked.startZ + 0.5 &&
       walkingBlocked.maxZ < walkingBlocked.blockZ - 0.35,
     collisionNegativeControlPassedThroughBlock: walkingBypassed.maxZ > walkingBypassed.blockZ + 0.35,

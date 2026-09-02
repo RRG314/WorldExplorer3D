@@ -65,7 +65,7 @@ function initAccessibility() {
     }
     [
       'locationSearchStatus', 'perfSettingsStatus', 'urbanEquipmentStatus',
-      'gameShareStatus', 'editorStatus', 'activityCreatorStatus', 'roomPanelStatus'
+      'gameShareStatus', 'roomPanelStatus'
     ].forEach((id) => {
       const element = document.getElementById(id);
       if (!element) return;

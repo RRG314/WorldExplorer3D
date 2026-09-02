@@ -22,14 +22,14 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <script src="../js/firebase-project-config.js"></script>
 <style>@layer legacy, interface;</style>
 <link rel="stylesheet" href="styles/title-shell.css?v=95">
-<link rel="stylesheet" href="styles/runtime-shell.css?v=119">
-<link rel="stylesheet" href="styles/block-builder.css?v=7">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=120">
+<link rel="stylesheet" href="styles/block-builder.css?v=8">
 <link rel="stylesheet" href="styles/universe.css?v=8">
-<link rel="stylesheet" href="styles/fishing-game.css?v=5">
-<link rel="stylesheet" href="styles/interface-v4.css?v=28">
+<link rel="stylesheet" href="styles/fishing-game.css?v=6">
+<link rel="stylesheet" href="styles/interface-v4.css?v=29">
 <link rel="stylesheet" href="styles/start-hub.css?v=18">
 <link rel="stylesheet" href="styles/discovery.css?v=16">
-<link rel="stylesheet" href="styles/tutorial.css?v=12">
+<link rel="stylesheet" href="styles/tutorial.css?v=13">
 <link rel="stylesheet" href="styles/ar.css?v=1">
 <link rel="stylesheet" href="styles/mobile-controls.css?v=1">
 <link rel="stylesheet" href="styles/map-explorer.css?v=4">
@@ -969,18 +969,6 @@ How Connected Data Is Used
 
   <details class="mapLegendGroup">
     <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;color:#0ff;display:flex;align-items:center;gap:6px">
-      <input type="checkbox" id="filterContributions" checked style="cursor:pointer">
-      <label for="filterContributions" style="cursor:pointer">Community places</label>
-    </summary>
-    <div style="font-size:10px;line-height:1.5;padding-left:24px;opacity:0.9">
-      <div style="margin-bottom:3px"><span style="color:#14b8a6">●</span> Approved place info</div>
-      <div style="margin-bottom:3px"><span style="color:#a855f7">◆</span> Approved artifact markers</div>
-      <div style="margin-bottom:3px">Drafts and pending submissions stay private until approved.</div>
-    </div>
-  </details>
-
-  <details class="mapLegendGroup">
-    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;color:#0ff;display:flex;align-items:center;gap:6px">
       <input type="checkbox" id="filterActivities" checked style="cursor:pointer">
       <label for="filterActivities" style="cursor:pointer">Activities</label>
     </summary>
@@ -1217,7 +1205,6 @@ Explore the area
 <button class="floatBtn game" id="gameBtn" type="button" aria-label="Open games" aria-expanded="false" data-mobile-label="Games"><span class="btnIcon">🎮</span><span class="btnText">Games</span></button>
 <div class="floatItems" data-menu-title="GAMES">
 <div class="floatItemSection" role="separator">PLAY</div>
-<div class="floatItem" id="fActivities">🎮 Choose a Game</div>
 <div class="floatItem" id="fDeFlock">📷 DeFlock Hunt</div>
 <div class="floatItem" id="fFlowerChallenge">🔴 Find Red Flower</div>
 <div class="floatItem" id="fFishing" style="display:none">🎣 Fishing</div>
@@ -1231,7 +1218,6 @@ Explore the area
 <div class="floatItem" id="fRespawn">🎯 Return to Safe Ground</div>
 <!-- Preserved for future product work, intentionally absent from production UI. -->
 <div class="floatItem" id="fRoomGames" hidden>👥 Room Games</div>
-<div class="floatItem" id="fActivityCreator" hidden>🧩 Create Game</div>
 <div class="floatItem" id="fTrack" hidden>🏁 Record Track</div>
 <div class="floatItem" id="fEraseTrack" hidden>🗑️ Erase Track</div>
 <div class="floatItem" id="fRespawnRand" hidden>🎲 Random Respawn</div>
@@ -1292,355 +1278,6 @@ Explore the area
 </div>
 </div>
 
-<section id="editorPanel" aria-label="Overlay editor panel">
-  <div class="editorPanelHeader">
-    <div class="editorPanelTitleWrap">
-      <div id="editorPanelTitle">World Editor Beta</div>
-      <div id="editorPanelSubline">Create reviewed World Explorer overlays or switch to persistent block building. Neither workflow changes OpenStreetMap, Overture, or imported provider data.</div>
-      <div id="editorAuthBadge">Preview only • Sign in to save drafts</div>
-    </div>
-    <div class="editorHeaderActions">
-      <button id="editorHelpBtn" type="button">Guide</button>
-      <button id="editorViewModeBtn" type="button">2D Plan</button>
-      <button id="editorPeekBtn" type="button">Peek World</button>
-      <button id="editorCloseBtn" type="button">Close</button>
-    </div>
-  </div>
-  <div id="editorStatus" data-tone="info">Overlay editor is ready.</div>
-  <div id="editorToolbar" class="editorToolbar">
-    <button type="button" data-editor-tool="select">Select</button>
-    <button type="button" data-editor-tool="draw_point">Point</button>
-    <button type="button" data-editor-tool="draw_line">Line</button>
-    <button type="button" data-editor-tool="draw_polygon">Polygon</button>
-    <button type="button" data-editor-tool="add_vertex">Add Vertex</button>
-    <button type="button" data-editor-tool="delete_vertex">Delete Vertex</button>
-    <button type="button" data-editor-tool="split_line">Split</button>
-    <button type="button" data-editor-action="merge">Merge</button>
-    <div class="editorToolbarSpacer"></div>
-    <button type="button" data-editor-action="undo">Undo</button>
-    <button type="button" data-editor-action="redo">Redo</button>
-    <button type="button" data-editor-action="validate">Validate</button>
-    <button type="button" data-editor-action="preview">Preview</button>
-  </div>
-  <div class="editorTabRow">
-    <button id="editorTabWorkspace" class="editorTabBtn active" type="button">Workspace</button>
-    <button id="editorTabMine" class="editorTabBtn" type="button">My Features</button>
-    <button id="editorTabBlocks" class="editorTabBtn" type="button">Blocks</button>
-    <button id="editorTabModeration" class="editorTabBtn" type="button" hidden>Moderation</button>
-  </div>
-  <div class="editorPanelBody">
-    <div id="editorWorkspacePane" class="editorPane active">
-      <div class="editorWorkspaceShell">
-        <aside id="editorSidebarPanel" class="editorSidePanel">
-          <div class="editorPanelSwitch">
-            <button id="editorSidebarStartBtn" class="active" type="button">Start Here</button>
-            <button id="editorSidebarPresetsBtn" type="button">Presets</button>
-            <button id="editorSidebarSelectionBtn" type="button">Workspace</button>
-          </div>
-          <div id="editorSidebarStartView" class="editorSidebarView">
-            <div id="editorOnboardingCard" class="editorOnboardingCard"></div>
-            <div class="editorSectionBlock">
-              <div class="editorSectionTitle">Base Feature</div>
-              <div id="editorBaseSelection" class="editorTargetCard">Select a base world feature in the scene to clone it into a World Explorer overlay draft.</div>
-              <button id="editorCloneBaseBtn" class="editorActionBtn" type="button">Clone Base To Overlay</button>
-            </div>
-          </div>
-          <div id="editorSidebarPresetsView" class="editorSidebarView" hidden>
-            <div class="editorSectionTitle">Presets</div>
-            <label class="editorField">
-              <span class="editorFieldLabel">Search Presets</span>
-              <input id="editorPresetSearchInput" type="text" maxlength="80" placeholder="road, building, water, entrance">
-            </label>
-            <div id="editorPresetSummary" class="editorHintCard editorPresetSummaryCard">Road: LineString road. base_patch / local_replace.</div>
-            <div id="editorPresetList" class="editorPresetGrid"></div>
-          </div>
-          <div id="editorSidebarSelectionView" class="editorSidebarView" hidden>
-            <div class="editorSectionBlock">
-              <div class="editorSectionTitle">Workspace Features</div>
-              <div id="editorWorkspaceFeatureList" class="editorListStack"></div>
-            </div>
-            <div class="editorSectionBlock">
-              <div class="editorSectionTitle">Validation</div>
-              <div id="editorValidationIssues" class="editorTagList"></div>
-            </div>
-          </div>
-        </aside>
-        <section class="editorViewportPanel">
-          <div id="editorViewportHint" class="editorViewportHint">Select: select overlay or base features, move vertices, and inspect geometry.</div>
-          <div id="editorViewportMeta" class="editorViewportMeta"></div>
-        </section>
-        <aside id="editorInspectorPanel" class="editorSidePanel editorInspectorPanel">
-          <div class="editorInspectorTop">
-            <div id="editorSelectedFeatureTitle">No Overlay Selected</div>
-            <div id="editorSelectedFeatureMeta">Select a base feature or draw a new overlay.</div>
-            <div class="editorMetaRow"><span>Geometry</span><span id="editorGeometryTypeValue">n/a</span></div>
-            <div class="editorMetaRow"><span>Review State</span><span id="editorReviewStateBadge" class="editorSubmissionStatus">unsaved</span></div>
-          </div>
-          <div class="editorActionRow compact">
-            <button id="editorCenterFeatureBtn" type="button">Focus</button>
-            <button id="editorDeleteFeatureBtn" type="button">Delete</button>
-            <button id="editorAddEntranceBtn" type="button">Add Entrance</button>
-          </div>
-          <div class="editorSectionTitle">Guided Editing</div>
-          <div id="editorSelectedPresetCard" class="editorHintCard">Select a feature or preset to see guided fields and examples.</div>
-          <div id="editorGuidedFieldPanel" class="editorGuidedFieldPanel"></div>
-          <label class="editorAdvancedToggle">
-            <input id="editorAdvancedToggle" type="checkbox">
-            <span>Show advanced mapping and raw editing. Use this only when the guided fields are not enough.</span>
-          </label>
-          <div id="editorAdvancedPanel" class="editorAdvancedPanel" hidden>
-            <div class="editorAdvancedWarning">Advanced edits write raw overlay properties and can create moderation risk if they drift from the preset. Use them deliberately.</div>
-            <div class="editorSectionTitle">Advanced Fields</div>
-            <div id="editorAdvancedFieldPanel" class="editorGuidedFieldPanel"></div>
-            <div class="editorSectionTitle">Underlying Mapping</div>
-            <div id="editorAdvancedMapping" class="editorAdvancedMapping"></div>
-            <div class="editorSectionTitle">Raw Tags</div>
-            <div id="editorTagList" class="editorTagList"></div>
-            <div class="editorKeyValueComposer">
-              <input id="editorNewTagKeyInput" type="text" maxlength="64" placeholder="tag key">
-              <input id="editorNewTagValueInput" type="text" maxlength="180" placeholder="tag value">
-              <button id="editorAddTagBtn" type="button">Add</button>
-            </div>
-            <div class="editorSectionTitle">Manual 3D / Relations</div>
-            <div class="editorGridTwo">
-              <label class="editorField">
-                <span class="editorFieldLabel">Height</span>
-                <input id="editorHeightInput" type="number" step="0.1" placeholder="meters">
-              </label>
-              <label class="editorField">
-                <span class="editorFieldLabel">Building Levels</span>
-                <input id="editorLevelsInput" type="number" step="1" placeholder="levels">
-              </label>
-              <label class="editorField">
-                <span class="editorFieldLabel">Min Height</span>
-                <input id="editorMinHeightInput" type="number" step="0.1" value="0">
-              </label>
-              <label class="editorField">
-                <span class="editorFieldLabel">Roof Shape</span>
-                <select id="editorRoofShapeSelect">
-                  <option value="flat">Flat</option>
-                  <option value="gabled">Gabled</option>
-                  <option value="hipped">Hipped</option>
-                  <option value="shed">Shed</option>
-                  <option value="dome">Dome</option>
-                </select>
-              </label>
-              <label class="editorField">
-                <span class="editorFieldLabel">Layer</span>
-                <input id="editorLayerInput" type="number" step="1" value="0">
-              </label>
-              <label class="editorField">
-                <span class="editorFieldLabel">Surface</span>
-                <input id="editorSurfaceInput" type="text" maxlength="60" placeholder="asphalt, concrete, grass">
-              </label>
-            </div>
-            <div class="editorToggleRow">
-              <label><input id="editorBridgeCheckbox" type="checkbox"> Bridge</label>
-              <label><input id="editorTunnelCheckbox" type="checkbox"> Tunnel</label>
-            </div>
-            <div class="editorGridTwo">
-              <label class="editorField">
-                <span class="editorFieldLabel">Level Ref</span>
-                <input id="editorLevelRefInput" type="text" maxlength="40" placeholder="G, L2, B1">
-              </label>
-              <label class="editorField">
-                <span class="editorFieldLabel">Building Ref</span>
-                <input id="editorBuildingRefInput" type="text" maxlength="180" placeholder="building id">
-              </label>
-            </div>
-            <div class="editorSectionTitle">Entrance Anchors</div>
-            <div id="editorEntrancesList" class="editorListStack"></div>
-          </div>
-        </aside>
-      </div>
-      <div id="editorPreviewDrawer" class="editorPreviewDrawer">
-        <div class="editorPreviewHead">
-          <div class="editorSectionTitle">Submission Preview</div>
-          <span class="editorSubmissionStatus">Overlay</span>
-        </div>
-        <div id="editorPreviewSummary">Select a feature to preview submission details.</div>
-        <div id="editorPreviewHighlights"></div>
-        <div id="editorPreviewValidation"></div>
-        <div id="editorPreviewChecklist"></div>
-        <label class="editorField" style="margin-top:10px">
-          <span class="editorFieldLabel">Submission Note</span>
-          <textarea id="editorSubmissionNoteInput" maxlength="320" placeholder="Optional moderation note or context for reviewers."></textarea>
-        </label>
-        <div class="editorActionRow">
-          <button id="editorSaveDraftBtn" class="editorActionBtn" type="button">Save Draft</button>
-          <button id="editorPreviewBtn" class="editorActionBtn" type="button">Refresh Preview</button>
-          <button id="editorSubmitBtn" class="editorActionBtn" type="button">Submit For Review</button>
-        </div>
-      </div>
-    </div>
-    <div id="editorMinePane" class="editorPane">
-      <div class="editorPaneIntro">Saved drafts stay private until you submit them. Approved contributions can appear in World Explorer; they are not sent to OpenStreetMap.</div>
-      <div id="editorOwnFeatureList" class="editorSubmissionList"></div>
-    </div>
-    <div id="editorModerationPane" class="editorPane">
-      <div class="editorPaneIntro">Moderators review submitted contributions, request changes, reject them, or approve and publish them to the shared world.</div>
-      <div class="editorModerationControls">
-        <label class="editorField">
-          <span class="editorFieldLabel">Review State</span>
-          <select id="editorModerationStateFilter">
-            <option value="all">All</option>
-            <option value="submitted">Submitted</option>
-            <option value="approved">Approved</option>
-            <option value="needs_changes">Needs Changes</option>
-            <option value="rejected">Rejected</option>
-          </select>
-        </label>
-        <label class="editorField wide">
-          <span class="editorFieldLabel">Search</span>
-          <input id="editorModerationSearchInput" type="text" maxlength="80" placeholder="Search label, preset, or base feature">
-        </label>
-      </div>
-      <div class="editorModerationShell">
-        <div id="editorModerationList" class="editorListStack"></div>
-        <div id="editorModerationDetail">
-          <div class="editorEmptyState">Select a submitted overlay feature to inspect and moderate it.</div>
-        </div>
-      </div>
-      <label class="editorField">
-        <span class="editorFieldLabel">Moderation Note</span>
-        <textarea id="editorModerationNoteInput" maxlength="320" placeholder="Explain approval, rejection, or requested changes."></textarea>
-      </label>
-      <div class="editorActionRow">
-        <button id="editorModerationApproveBtn" class="editorActionBtn" type="button">Approve &amp; Publish</button>
-        <button id="editorModerationNeedsBtn" class="editorActionBtn" type="button">Needs Changes</button>
-        <button id="editorModerationRejectBtn" class="editorActionBtn" type="button">Reject</button>
-      </div>
-    </div>
-  </div>
-  <aside id="editorHelpDrawer" class="editorHelpDrawer" aria-hidden="true">
-    <div class="editorHelpHead">
-      <div>
-        <div class="editorSectionTitle">Contributor Guide</div>
-        <div id="editorHelpDrawerTitle" class="editorHelpTitle">How Editing Works</div>
-        <div id="editorHelpDrawerSummary" class="editorHelpSummary">Use presets and guided fields to contribute to World Explorer. Changes are reviewed here and are not sent to OpenStreetMap.</div>
-      </div>
-      <button id="editorHelpCloseBtn" type="button">Close</button>
-    </div>
-    <div id="editorHelpTopicList" class="editorHelpTopicList"></div>
-    <div id="editorHelpContent" class="editorHelpContent"></div>
-  </aside>
-</section>
-
-<div id="editorTutorialModal" aria-hidden="true">
-  <div class="editorTutorialCard">
-    <div class="editorTutorialTitle">World Editor Beta</div>
-    <div class="editorTutorialText">Add details to World Explorer without changing the original map source. Contributions are reviewed here and are not sent to OpenStreetMap.</div>
-    <div class="editorTutorialList">
-      <div>1. Select a base feature to patch, or choose a preset and draw a point, line, or polygon directly in the 3D world.</div>
-      <div>2. Edit vertices, tags, and 3D properties like height, levels, roof shape, bridges, tunnels, and entrances.</div>
-      <div>3. Validate the overlay, preview it locally, and save draft revisions without affecting the public world.</div>
-      <div>4. Submit the overlay for moderation. Admin review decides whether it needs changes, is rejected, or is approved and published.</div>
-      <div>5. Published contributions appear in the world while the original map data remains unchanged.</div>
-    </div>
-    <div class="editorTutorialActions">
-      <button id="editorTutorialCancelBtn" type="button">Cancel</button>
-      <button id="editorTutorialStartBtn" type="button">Start Editing</button>
-    </div>
-  </div>
-</div>
-
-<section id="activityCreatorPanel" aria-label="Activity creator panel">
-  <div class="activityCreatorTopBar">
-    <div class="activityCreatorTitleWrap">
-      <div id="activityCreatorTitle">Activity Creator Beta</div>
-      <div id="activityCreatorSubline">Place anchors directly in the 3D world for routes, zones, dock points, and collectibles.</div>
-    </div>
-    <div class="activityCreatorHeaderActions">
-      <button id="activityCreatorGuideBtn" type="button">Start Here</button>
-      <button id="activityCreatorViewModeBtn" type="button">2D Plan</button>
-      <button id="activityCreatorSaveBtn" type="button">Save Activity</button>
-      <button id="activityCreatorResetBtn" type="button">Clear Draft</button>
-      <button id="activityCreatorCloseBtn" type="button">Close</button>
-    </div>
-  </div>
-  <div id="activityCreatorStatus" data-tone="info">Activity creator is ready.</div>
-  <div class="activityCreatorWorkspaceShell">
-    <aside class="activityCreatorSidePanel activityCreatorLeftPanel">
-      <div id="activityCreatorGuideCard" class="activityCreatorGuideCard">
-        <div class="activityCreatorGuideHead">
-          <div>
-            <div class="activityCreatorSectionTitle">Creator Walkthrough</div>
-            <div id="activityCreatorGuideProgress" class="activityCreatorGuideProgress">Step 1 of 6</div>
-          </div>
-          <button id="activityCreatorGuideDismissBtn" type="button">Hide</button>
-        </div>
-        <div id="activityCreatorGuideTitle" class="activityCreatorGuideTitle">Start with a simple route</div>
-        <div id="activityCreatorGuideBody" class="activityCreatorGuideBody">Pick a template, place a start point, then build a route step by step.</div>
-        <div class="activityCreatorGuideActions">
-          <button id="activityCreatorGuideActionBtn" class="primary" type="button">Let's Build</button>
-          <button id="activityCreatorGuideRestartBtn" type="button">Restart Guide</button>
-        </div>
-      </div>
-      <div class="activityCreatorSectionTitle">Template</div>
-      <label class="activityCreatorField">
-        <span>Activity Template</span>
-        <select id="activityCreatorTemplateSelect"></select>
-      </label>
-      <div id="activityCreatorSummary" class="activityCreatorSummaryCard"></div>
-      <div id="activityCreatorTemplateHelp" class="activityCreatorHelpCard"></div>
-      <div class="activityCreatorSectionTitle">Game Details</div>
-      <label class="activityCreatorField">
-        <span>Title</span>
-        <input id="activityCreatorTitleInput" type="text" maxlength="120" placeholder="Give this activity a name">
-      </label>
-      <label class="activityCreatorField">
-        <span>Description</span>
-        <textarea id="activityCreatorDescriptionInput" maxlength="220" placeholder="Tell players what this activity is about"></textarea>
-      </label>
-      <label class="activityCreatorField">
-        <span>Save To</span>
-        <select id="activityCreatorAudienceSelect">
-          <option value="library">Creator Library</option>
-        </select>
-      </label>
-      <div id="activityCreatorAudienceHelp" class="activityCreatorHelpCard">Creator Library activities stay only on this browser. Public activity publishing is not available yet.</div>
-      <div class="activityCreatorFieldGrid">
-        <label class="activityCreatorField">
-          <span>Placement Offset</span>
-          <input id="activityCreatorPlacementOffset" type="number" step="0.5" value="0">
-        </label>
-        <label class="activityCreatorToggle">
-          <input id="activityCreatorSnapToggle" type="checkbox" checked>
-          <span>Snap</span>
-        </label>
-      </div>
-      <div class="activityCreatorSectionTitle">Required Anchors</div>
-      <div id="activityCreatorChecklist" class="activityCreatorChecklist"></div>
-      <div class="activityCreatorSectionTitle">Anchor Palette</div>
-      <div id="activityCreatorAnchorPalette" class="activityCreatorAnchorPalette"></div>
-      <div class="activityCreatorSectionTitle">Validation</div>
-      <div id="activityCreatorValidation" class="activityCreatorValidation"></div>
-    </aside>
-    <section class="activityCreatorViewportPanel" aria-hidden="true"></section>
-    <aside class="activityCreatorSidePanel activityCreatorRightPanel">
-      <div class="activityCreatorSectionTitle">Placed Anchors</div>
-      <div id="activityCreatorAnchorList" class="activityCreatorAnchorList"></div>
-      <div class="activityCreatorSectionTitle">Inspector</div>
-      <div id="activityCreatorInspectorBody" class="activityCreatorInspectorBody"></div>
-    </aside>
-  </div>
-  <div id="activityCreatorToolDock" class="activityCreatorToolDock">
-    <button type="button" data-activity-tool="select">Select</button>
-    <button type="button" data-activity-tool="place">Place</button>
-    <button type="button" data-activity-tool="move">Move</button>
-    <button type="button" data-activity-tool="height">Height</button>
-    <button type="button" data-activity-tool="rotate">Rotate</button>
-    <button type="button" data-activity-tool="scale">Scale</button>
-    <button type="button" data-activity-action="undo">Undo</button>
-    <button type="button" data-activity-action="redo">Redo</button>
-    <button type="button" data-activity-action="test" id="activityCreatorTestBtn">Test Activity</button>
-  </div>
-  <div id="activityCreatorTestBar" class="activityCreatorTestBar" hidden>
-    <div id="activityCreatorTestSummary">Testing activity</div>
-    <button id="activityCreatorStopTestBtn" type="button">Return To Creator</button>
-  </div>
-</section>
-
 <section id="activityDiscoveryPanel" aria-label="Activity browser panel">
   <div class="activityDiscoveryTopBar">
     <div class="activityDiscoveryTitleWrap">
@@ -1648,7 +1285,6 @@ Explore the area
       <div id="activityDiscoverySubline">Choose a ready-to-play activity tied to the current real-world location.</div>
     </div>
     <div class="activityDiscoveryHeaderActions">
-      <button id="activityDiscoveryOpenCreatorBtn" type="button" hidden>Create Game</button>
       <button id="activityDiscoveryCloseBtn" type="button">Close</button>
     </div>
   </div>
@@ -1746,10 +1382,9 @@ Explore the area
 </div>
 <aside id="blockBuilderPanel" aria-label="Build with Blocks" aria-hidden="true">
   <header class="blockBuilderHeader">
-    <strong>World Editor · Blocks</strong>
+    <strong>Quick Build</strong>
     <div class="blockBuilderHeaderActions">
-      <button id="blockBuilderBack" type="button">Overlays</button>
-      <button id="blockBuilderClose" type="button" aria-label="Close World Editor" title="Close World Editor">×</button>
+      <button id="blockBuilderClose" type="button" aria-label="Close Quick Build" title="Close Quick Build">×</button>
     </div>
   </header>
   <p class="blockBuilderTruthNote">Blocks persist in this virtual location on this device or in the current shared room. They never change OpenStreetMap, Overture, or real-world data.</p>
@@ -1915,5 +1550,5 @@ Explore the area
 <!-- Real Estate System -->
 <script type="module" src="js/app-shell-fragments.js?v=86"></script>
 <script type="module" src="js/app-auth-shell.js?v=87"></script>
-<script type="module" src="js/bootstrap.js?v=583"></script>
+<script type="module" src="js/bootstrap.js?v=584"></script>
 </body></html>

@@ -31,14 +31,6 @@ function isVisibleRect(element) {
   return rect.width > 0 && rect.height > 0 ? rect : null;
 }
 
-function isEditorWorkspaceOpen() {
-  return !!document.body?.classList.contains('editor-workspace-open');
-}
-
-function isActivityCreatorOpen() {
-  return !!document.body?.classList.contains('activity-creator-open');
-}
-
 function positionOverlayBetween(overlay, leftRect, rightRect) {
   if (!overlay || !leftRect || !rightRect) return;
   const overlayRect = overlay.getBoundingClientRect();
@@ -55,7 +47,7 @@ function positionOverlayBetween(overlay, leftRect, rightRect) {
 }
 
 function positionTopOverlays() {
-  if (!appCtx.gameStarted || isEditorWorkspaceOpen() || isActivityCreatorOpen()) return;
+  if (!appCtx.gameStarted) return;
   const hudRect = isVisibleRect(document.getElementById('hud'));
   const menuRect = isVisibleRect(document.getElementById('mainMenuBtn'));
   if (!hudRect || !menuRect) return;
@@ -121,11 +113,7 @@ const runtimeKernel = createRuntimeKernel({
 function registerRuntimeSystems() {
   if (runtimeSystemsRegistered) return;
   runtimeSystemsRegistered = true;
-  const systems = createCoreFrameSystems(appCtx, {
-    isActivityCreatorOpen,
-    isEditorWorkspaceOpen,
-    positionTopOverlays
-  });
+  const systems = createCoreFrameSystems(appCtx, { positionTopOverlays });
   systems.forEach((system) => runtimeKernel.registerSystem(system));
   runtimeKernel.registerSystem(createDebugPresentationSystem(appCtx));
   runtimeKernel.registerSystem({

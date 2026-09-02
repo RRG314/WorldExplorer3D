@@ -140,14 +140,10 @@ export function updateMapLayers() {
   appCtx.mapLayers.memoryFlowers = document.getElementById('filterMemoryFlowers').checked;
   appCtx.mapLayers.paths = document.getElementById('filterPaths').checked;
   appCtx.mapLayers.interiors = document.getElementById('filterInteriors').checked;
-  appCtx.mapLayers.contributions = document.getElementById('filterContributions').checked;
   appCtx.showPathOverlays = appCtx.mapLayers.paths;
 
   if (typeof appCtx.syncLinearFeatureOverlayVisibility === 'function') {
     appCtx.syncLinearFeatureOverlayVisibility();
-  }
-  if (typeof appCtx.syncApprovedEditorContributionVisibility === 'function') {
-    appCtx.syncApprovedEditorContributionVisibility();
   }
 
   const allPOIs = appCtx.mapLayers.schools && appCtx.mapLayers.healthcare && appCtx.mapLayers.emergency &&
@@ -168,7 +164,7 @@ export function toggleAllLayers(state) {
     'filterParks', 'filterParking', 'filterFuel', 'filterBanks', 'filterPostal',
     'filterHotels', 'filterTourism', 'filterGameElementsAll', 'filterCheckpoints',
     'filterDestination', 'filterCustomTrack', 'filterPolice', 'filterMemoryPins',
-    'filterMemoryFlowers', 'filterRoads', 'filterPaths', 'filterInteriors', 'filterContributions'
+    'filterMemoryFlowers', 'filterRoads', 'filterPaths', 'filterInteriors'
   ].forEach((id) => {
     document.getElementById(id).checked = state;
   });

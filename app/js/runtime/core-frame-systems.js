@@ -7,8 +7,6 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
   let weatherUiTimer = 0;
   let boatTimer = 0;
   let liveEarthTimer = 0;
-  const workspaceOpen = () => hooks.isEditorWorkspaceOpen?.() || hooks.isActivityCreatorOpen?.();
-
   return [
     {
       id: 'core.frame-metrics',
@@ -54,7 +52,6 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
           appCtx.updateExpeditionShipInterior?.(frame.dt);
           return;
         }
-        appCtx.kickOptionalRuntimeBoot?.('main_loop');
         appCtx.updatePlanetaryTracks?.();
         appCtx.updatePlanetaryFieldMap?.(frame.dt);
         if (!appCtx.onMars && !appCtx.activePlanetaryBodyId) appCtx.refreshAstronomicalSky?.(false);
@@ -117,10 +114,8 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
         if (hudTimer > 0.066) {
           hudTimer = 0;
           frame.flags.hudRefreshed = true;
-          if (!workspaceOpen()) {
-            appCtx.updateHUD();
-            hooks.positionTopOverlays?.();
-          }
+          appCtx.updateHUD();
+          hooks.positionTopOverlays?.();
         }
 
         mapTimer += frame.dt;
@@ -129,10 +124,8 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
         const interval = appCtx.planeMode?.active ? 0.25 : 0.2;
         if (mapTimer > interval) {
           mapTimer = 0;
-          if (!workspaceOpen()) {
-            appCtx.drawMinimap();
-            if (appCtx.showLargeMap) appCtx.drawLargeMap();
-          }
+          appCtx.drawMinimap();
+          if (appCtx.showLargeMap) appCtx.drawLargeMap();
         }
 
         lodTimer += frame.dt;

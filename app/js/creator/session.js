@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { loadCreatorProfileView } from './store.js?v=1';
+import { loadCreatorProfileView } from './store.js?v=2';
 
 const state = {
   initialized: false,

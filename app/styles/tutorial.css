@@ -41,7 +41,6 @@ body:has(#discoveryPanel.show) #currentJourneyCard,
 body:has(#urbanEquipment[aria-hidden="false"]) #currentJourneyCard,
 body.game-panel-layer-open #currentJourneyCard,
 body.game-activity-layer-open #currentJourneyCard,
-body.editor-workspace-open #currentJourneyCard,
 body:has(#largeMap.show) #currentJourneyCard{display:none!important}
 body:has(#universeNavigator:not([hidden])) #currentJourneyCard{display:none!important}
 @media(max-width:700px){

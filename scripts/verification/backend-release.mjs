@@ -13,7 +13,6 @@ const steps = [
   { id: 'firestore-rules', command: [process.execPath, '--test', 'tests/firestore.rules.security.test.mjs'] },
   { id: 'discovery-receipts', command: [process.execPath, '--test', 'tests/discovery-receipt-endpoint-current.test.mjs'] },
   { id: 'multiplayer', command: [process.execPath, 'scripts/verification/multiplayer.mjs'] },
-  { id: 'creator-flow', command: [process.execPath, 'scripts/verification/creator-flow.mjs'] },
   ...['desktop', 'mobile', 'vehicle', 'room'].map((scope) => ({
     id: `world-editor-blocks-${scope}`,
     command: [process.execPath, 'scripts/verification/world-editor-blocks.mjs'],

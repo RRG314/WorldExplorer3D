@@ -136,9 +136,6 @@ export async function finalizeLoadedWorld(options = {}) {
   if (typeof appCtx.refreshEditableWorldPresentation === 'function') {
     runFinalStep('refreshEditableWorldPresentation', () => appCtx.refreshEditableWorldPresentation());
   }
-  if (typeof appCtx.refreshApprovedEditorContributions === 'function') {
-    runFinalStep('refreshApprovedEditorContributions', () => appCtx.refreshApprovedEditorContributions());
-  }
   if (typeof publishLocationWorld === 'function') {
     runFinalStep('publishLocationWorld', () => publishLocationWorld());
   }
