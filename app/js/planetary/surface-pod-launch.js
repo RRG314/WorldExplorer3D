@@ -120,7 +120,7 @@ function stageEarthPod(appCtx, options = {}) {
           available: true,
           action: 'board-earth-pathfinder',
           label: 'Board Pathfinder',
-          detail: 'Launch to Asteria in Earth orbit',
+          detail: 'Launch to Solis Reach in Earth orbit',
           distance,
           data: { destination: 'surveyor' }
         };

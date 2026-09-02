@@ -11,8 +11,11 @@ import {
   SHIP_STATIONS
 } from './ship-layout.js?v=5';
 import { deriveCrewOperations, summarizeCrewOperations } from './crew-operations.js?v=1';
-import { shipAlertState } from './failure-authority.js?v=1';
+import { shipAlertState } from './failure-authority.js?v=2';
 import { createBeveledVehicleBoxGeometry, createTaperedPrismGeometry } from '../engine/classic-utility-car.js?v=3';
+import { SPACE_CRAFT_IDENTITY } from '../space/craft-identity.js?v=1';
+
+const STARSHIP_NAME = SPACE_CRAFT_IDENTITY.starship.name;
 
 let activeSession = null;
 
@@ -718,7 +721,7 @@ function addCrewMember(group, post, crew) {
   const appearance = CREW_APPEARANCE[crewId] || CREW_APPEARANCE['crew-nav'];
   root.name = `ship-crew:${crewId}`;
   root.userData.crewId = crewId;
-  root.userData.crewName = crew?.name || 'Asteria crew';
+  root.userData.crewName = crew?.name || 'ship crew';
   root.userData.crewRoles = [...(crew?.roles || [])];
   root.userData.crewAssignment = crew?.assignment || '';
   root.userData.currentRoomId = post.roomId;
@@ -806,39 +809,69 @@ function syncCrewMeshes(session, expedition) {
 const ROOM_DOORS = Object.freeze(Object.fromEntries(SHIP_DOORS.map((door) => [door.roomId, Object.freeze({ x: door.x, z: door.z })])));
 
 const ASSIGNMENT_TARGETS = Object.freeze({
-  'navigation-watch': Object.freeze({ x: -4.5, z: 29.5 }),
-  'flight-watch': Object.freeze({ x: 4.5, z: 29.5 }),
-  'engineering-watch': Object.freeze({ x: -7, z: 30 }),
-  'life-support-watch': Object.freeze({ x: 4.8, z: -14.5 }),
-  'medical-watch': Object.freeze({ x: -4.5, z: 18 }),
-  'science-watch': Object.freeze({ x: -5.1, z: 3 }),
-  'systems-watch': Object.freeze({ x: -5.1, z: 3 }),
-  'systems-round': Object.freeze({ x: 4.8, z: -14.5 }),
-  'stores-round': Object.freeze({ x: -4.3, z: 0 }),
-  'science-support': Object.freeze({ x: -5.1, z: 0 }),
-  'thermal-response': Object.freeze({ x: 7, z: 30 }),
-  'maintenance-support': Object.freeze({ x: 4.3, z: -14.5 }),
-  'discovery-response': Object.freeze({ x: -5.1, z: 0 })
+  'navigation-watch': Object.freeze({ x: -4.5, z: 29.5, yaw: Math.PI }),
+  'flight-watch': Object.freeze({ x: 4.5, z: 29.5, yaw: Math.PI }),
+  'engineering-watch': Object.freeze({ x: -7, z: 30, yaw: 0 }),
+  'life-support-watch': Object.freeze({ x: 4.8, z: -14.5, yaw: -Math.PI / 2 }),
+  'medical-watch': Object.freeze({ x: -4.5, z: 18, yaw: Math.PI / 2 }),
+  'science-watch': Object.freeze({ x: -5.1, z: 3, yaw: Math.PI / 2 }),
+  'systems-watch': Object.freeze({ x: -5.1, z: 3, yaw: Math.PI / 2 }),
+  'systems-round': Object.freeze({ x: 4.8, z: -14.5, yaw: -Math.PI / 2 }),
+  'stores-round': Object.freeze({ x: -4.3, z: 0, yaw: Math.PI / 2 }),
+  'science-support': Object.freeze({ x: -5.1, z: 0, yaw: Math.PI / 2 }),
+  'thermal-response': Object.freeze({ x: 7, z: 30, yaw: 0 }),
+  'maintenance-support': Object.freeze({ x: 4.3, z: -14.5, yaw: -Math.PI / 2 }),
+  'discovery-response': Object.freeze({ x: -5.1, z: 0, yaw: Math.PI / 2 }),
+  'general-watch': Object.freeze({ x: 0, z: 30.2, yaw: Math.PI })
 });
 
-function targetForOperation(operation, crewIndex) {
+const CREW_WORK_OFFSETS = Object.freeze([
+  Object.freeze({ x: 0, z: 0 }),
+  Object.freeze({ x: 0.62, z: 0.34 }),
+  Object.freeze({ x: -0.52, z: -0.38 })
+]);
+
+function roomCenterTarget(roomId) {
+  const room = SHIP_ROOMS.find((entry) => entry.id === roomId);
+  if (!room) return { x: 0, z: 0 };
+  return {
+    x: (Number(room.minX) + Number(room.maxX)) * 0.5,
+    z: (Number(room.minZ) + Number(room.maxZ)) * 0.5
+  };
+}
+
+function keepTargetInsideRoom(target, roomId) {
+  const room = SHIP_ROOMS.find((entry) => entry.id === roomId);
+  if (!room) return target;
+  const inset = 0.85;
+  return {
+    ...target,
+    x: Math.max(Number(room.minX) + inset, Math.min(Number(room.maxX) - inset, target.x)),
+    z: Math.max(Number(room.minZ) + inset, Math.min(Number(room.maxZ) - inset, target.z))
+  };
+}
+
+function targetForOperation(operation, crewIndex, workCycle = 0) {
   if (operation.assignmentId === 'crew-rest') {
     return { x: -9.5 + (crewIndex % 3) * 2.6, z: -3.2 + (crewIndex % 2) * 5.2 };
   }
-  return ASSIGNMENT_TARGETS[operation.assignmentId] || ROOM_DOORS[operation.roomId] || { x: 0, z: 0 };
+  const base = ASSIGNMENT_TARGETS[operation.assignmentId] || roomCenterTarget(operation.roomId);
+  const offset = CREW_WORK_OFFSETS[Math.abs(Number(workCycle) || 0) % CREW_WORK_OFFSETS.length];
+  return keepTargetInsideRoom({ x: base.x + offset.x, z: base.z + offset.z, yaw: base.yaw }, operation.roomId);
 }
 
-function buildCrewRoute(mesh, targetRoomId, target) {
+function buildCrewRoute(mesh, targetRoomId, target, crewIndex = 0) {
   const currentRoomId = mesh.userData.currentRoomId;
   if (currentRoomId === targetRoomId) return [{ ...target, roomId: targetRoomId, final: true }];
   const fromDoor = ROOM_DOORS[currentRoomId];
   const toDoor = ROOM_DOORS[targetRoomId];
   if (!fromDoor || !toDoor) return [{ ...target, roomId: targetRoomId, final: true }];
+  const laneOffset = ((crewIndex % 3) - 1) * 0.26;
   const route = [
-    { ...fromDoor },
-    { x: 0, z: fromDoor.z },
-    { x: 0, z: toDoor.z },
-    { ...toDoor },
+    { x: fromDoor.x + laneOffset, z: fromDoor.z },
+    { x: laneOffset, z: fromDoor.z },
+    { x: laneOffset, z: toDoor.z },
+    { x: toDoor.x + laneOffset, z: toDoor.z },
     { ...target, roomId: targetRoomId, final: true }
   ];
   return route.filter((waypoint, index) => index === 0 || Math.hypot(
@@ -863,8 +896,12 @@ function refreshCrewOperations(session, force = false) {
     }
     mesh.visible = operationDeckId === session.activeDeckId;
     if (force || mesh.userData.assignmentId !== operation.assignmentId || mesh.userData.operationStatus !== operation.status) {
-      const target = targetForOperation(operation, index);
-      mesh.userData.route = buildCrewRoute(mesh, operation.roomId, target);
+      mesh.userData.workCycle = 0;
+      mesh.userData.workDwell = 0;
+      mesh.userData.operation = operation;
+      mesh.userData.crewIndex = index;
+      const target = targetForOperation(operation, index, 0);
+      mesh.userData.route = buildCrewRoute(mesh, operation.roomId, target, index);
       mesh.userData.assignmentId = operation.assignmentId;
       mesh.userData.operationStatus = operation.status;
       mesh.userData.operationTask = operation.task;
@@ -885,8 +922,20 @@ function updateCrewMotion(session, dt) {
   session.sceneState.crewMeshes.forEach((mesh, index) => {
     const waypoint = mesh.userData.route?.[0];
     if (!waypoint) {
+      mesh.userData.workDwell = Math.max(0, Number(mesh.userData.workDwell || 0) - step);
+      if (mesh.userData.workDwell <= 0 && mesh.userData.operation) {
+        mesh.userData.workCycle = Number(mesh.userData.workCycle || 0) + 1;
+        const operation = mesh.userData.operation;
+        const target = targetForOperation(operation, Number(mesh.userData.crewIndex || index), mesh.userData.workCycle);
+        mesh.userData.route = buildCrewRoute(mesh, operation.roomId, target, Number(mesh.userData.crewIndex || index));
+      }
       mesh.position.y = 0.05 + Math.sin(session.visualClock * 1.8 + index) * 0.012;
-      (mesh.userData.animatedArms || []).forEach((arm, armIndex) => { arm.rotation.x = Math.sin(session.visualClock * 1.2 + index + armIndex) * 0.025; });
+      (mesh.userData.animatedArms || []).forEach((arm, armIndex) => {
+        const resting = mesh.userData.operationStatus === 'resting';
+        const basePose = resting ? 0 : -0.58;
+        const workMotion = resting ? 0.025 : 0.1;
+        arm.rotation.x = basePose + Math.sin(session.visualClock * 2.4 + index + armIndex * 0.7) * workMotion;
+      });
       (mesh.userData.animatedLegs || []).forEach((leg) => { leg.rotation.x *= 0.78; });
       return;
     }
@@ -896,7 +945,11 @@ function updateCrewMotion(session, dt) {
     if (distance <= 0.07) {
       mesh.position.set(waypoint.x, 0.05, waypoint.z);
       mesh.userData.route.shift();
-      if (waypoint.final) mesh.userData.currentRoomId = waypoint.roomId;
+      if (waypoint.final) {
+        mesh.userData.currentRoomId = waypoint.roomId;
+        if (Number.isFinite(waypoint.yaw)) mesh.rotation.y = waypoint.yaw;
+        mesh.userData.workDwell = mesh.userData.operationStatus === 'resting' ? 5.5 : 2.5 + (index % 3) * 0.7;
+      }
       return;
     }
     const travel = Math.min(distance, step * 1.25);
@@ -1455,7 +1508,7 @@ function buildSurveyorScene(expedition) {
         { x: SHIP_DECK_BOUNDS.minX, z: SHIP_DECK_BOUNDS.maxZ }
       ],
       y: 0,
-      label: 'Asteria deck'
+      label: `${STARSHIP_NAME} deck`
     }
   };
 }
@@ -1474,7 +1527,7 @@ function ensureShipHud(expedition, crewSummary = null) {
   const alert = shipAlertState(expedition);
   hud.classList.toggle('attention', alert.level === 'attention');
   hud.classList.toggle('critical', alert.level === 'critical');
-  hud.innerHTML = `<div><span>${String(expedition?.ship?.name || 'Asteria').toUpperCase()} · ${deckLabel.toUpperCase()} DECK</span><strong>${expedition?.state === 'planned' ? 'Expedition staging' : `${progress}% to ${String(expedition?.destinationId || 'destination').replaceAll('-', ' ')}`}</strong><small>${crewLine} · E interacts · M opens ship map</small><em class="ship-alert ship-alert-${alert.level}">${alert.message}</em></div><div><button id="shipMapButton" type="button">Map</button><button id="shipJournalButton" type="button">Journal</button><button id="shipExitButton" type="button">Return to flight</button></div>`;
+  hud.innerHTML = `<div><span>${String(expedition?.ship?.name || STARSHIP_NAME).toUpperCase()} · ${deckLabel.toUpperCase()} DECK</span><strong>${expedition?.state === 'planned' ? 'Expedition staging' : `${progress}% to ${String(expedition?.destinationId || 'destination').replaceAll('-', ' ')}`}</strong><small>${crewLine} · E interacts · M opens ship map</small><em class="ship-alert ship-alert-${alert.level}">${alert.message}</em></div><div><button id="shipMapButton" type="button">Map</button><button id="shipJournalButton" type="button">Journal</button><button id="shipExitButton" type="button">Return to flight</button></div>`;
   hud.classList.add('show');
   hud.querySelector('#shipExitButton')?.addEventListener('click', () => exitSurveyorInterior());
   hud.querySelector('#shipJournalButton')?.addEventListener('click', () => appCtx.toggleWorldDiscoveryJournal?.(true));
@@ -2245,7 +2298,7 @@ function enterSurveyorInterior(options = {}) {
 
   appCtx.activeInterior = {
     key: 'expedition-ship:surveyor',
-    label: options.expedition?.ship?.name || 'Asteria',
+    label: options.expedition?.ship?.name || STARSHIP_NAME,
     mode: 'authored-ship',
     environmentKind: 'expedition-ship',
     group: sceneState.root,
@@ -2266,7 +2319,7 @@ function enterSurveyorInterior(options = {}) {
     lastValidPosition: { x: 0, y: (appCtx.Walk.CFG.eyeHeight || 1.7) + 0.04, z: 20.5, yaw: 0, angle: 0 },
     containmentNoticeUntil: 0
   };
-  appCtx.interiorHint = { state: 'inside', label: options.expedition?.ship?.name || 'Asteria', mode: 'authored-ship' };
+  appCtx.interiorHint = { state: 'inside', label: options.expedition?.ship?.name || STARSHIP_NAME, mode: 'authored-ship' };
   appCtx.setPauseReason?.('planetary_transition', false);
   applyShipWalkingState();
   appCtx.scene.background = new THREE.Color(0x02050b);
@@ -2456,6 +2509,18 @@ function getShipInteriorSnapshot() {
     miniMapVisible: document.getElementById('shipMiniMap')?.classList.contains('show') === true,
     visibleCrewCount: activeSession.sceneState.crewMeshes.filter((mesh) => mesh.visible).length,
     totalCrewCount: activeSession.sceneState.crewMeshes.length,
+    crewActors: activeSession.sceneState.crewMeshes.map((mesh) => ({
+      crewId: mesh.userData.crewId,
+      deckId: mesh.userData.deckId,
+      roomId: mesh.userData.currentRoomId,
+      assignmentId: mesh.userData.assignmentId,
+      task: mesh.userData.operationTask,
+      x: Number(mesh.position.x.toFixed(2)),
+      z: Number(mesh.position.z.toFixed(2)),
+      moving: Array.isArray(mesh.userData.route) && mesh.userData.route.length > 0,
+      routeRemaining: Number(mesh.userData.route?.length || 0),
+      workDwellS: Number(Number(mesh.userData.workDwell || 0).toFixed(2))
+    })),
     crewOperations: activeSession.operations.map((operation) => ({ ...operation })),
     crewOperationSummary: { ...activeSession.operationSummary },
     alert: shipAlertState(activeSession.expedition),

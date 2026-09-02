@@ -1,13 +1,13 @@
 export function bindSpaceActions(appCtx, closeAllFloatMenus) {
   document.getElementById('fSpaceSurveyor')?.addEventListener('click', async () => {
     closeAllFloatMenus();
-    const { stageEarthPodToSurveyor } = await import('../expedition/runtime.js?v=32');
+    const { stageEarthPodToSurveyor } = await import('../expedition/runtime.js?v=35');
     stageEarthPodToSurveyor(appCtx);
   });
   document.getElementById('fSpaceBoardSurveyor')?.addEventListener('click', async () => {
     closeAllFloatMenus();
-    const { boardSurveyorDirect } = await import('../expedition/runtime.js?v=32');
-    if (!await boardSurveyorDirect(appCtx)) appCtx.showToast?.('Direct Asteria boarding is unavailable from here.');
+    const { boardSurveyorDirect } = await import('../expedition/runtime.js?v=35');
+    if (!await boardSurveyorDirect(appCtx)) appCtx.showToast?.('Direct Solis Reach boarding is unavailable from here.');
   });
   document.getElementById('fSpaceDirect')?.addEventListener('click', () => {
     if (appCtx.onMars) appCtx.startFastTravelJourney?.('earth', { sourceBodyId: 'mars' });
@@ -18,7 +18,7 @@ export function bindSpaceActions(appCtx, closeAllFloatMenus) {
 
   document.getElementById('fSpaceRocket')?.addEventListener('click', () => {
     if (appCtx.onMoon || appCtx.onMars) appCtx.returnToEarth?.();
-    else if (!appCtx.travelingToMoon) appCtx.travelToMoon?.();
+    else if (!appCtx.travelingToMoon) appCtx.startFreeSpaceFlight?.();
     closeAllFloatMenus();
   });
 }

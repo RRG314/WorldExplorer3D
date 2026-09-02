@@ -1,6 +1,7 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { nextPrimaryTravelMode } from "./controls/traversal-control-policy.js?v=8";
 import { planetarySurfaceYAtRenderXZ } from './planetary/runtime/surface-query.js?v=3';
+import { resolveTravelMenuState } from './travel/menu-state.js?v=1';
 
 function getCurrentTravelMode() {
   if (appCtx.boatMode?.active) return 'boat';
@@ -58,11 +59,25 @@ function syncTravelModeButtons() {
     earthBtn.classList.remove('on');
     earthBtn.textContent = '🌍 Return to Earth';
   }
-  setAvailable(oceanBtn, onEarth && supports('ocean'));
-  setAvailable(earthBtn, !onEarth && supports('earth'));
+  const menuState = resolveTravelMenuState({
+    environment: currentEnvironment,
+    earthEnvironment: appCtx.ENV?.EARTH,
+    onMoon: appCtx.onMoon === true,
+    onMars: appCtx.onMars === true,
+    supports
+  });
+  setAvailable(oceanBtn, menuState.ocean.visible);
+  setAvailable(earthBtn, menuState.earth.visible);
 
-  ['fSpaceDirect', 'fSpaceRocket', 'fSpaceSurveyor', 'fSpaceBoardSurveyor']
-    .forEach((id) => setAvailable(document.getElementById(id), supports('space')));
+  const applyAction = (id, state) => {
+    const button = document.getElementById(id);
+    setAvailable(button, state.visible);
+    if (button && button.textContent !== state.label) button.textContent = state.label;
+  };
+  applyAction('fSpaceSurveyor', menuState.pathfinder);
+  applyAction('fSpaceBoardSurveyor', menuState.boardStarship);
+  applyAction('fSpaceRocket', menuState.freeSpaceFlight);
+  applyAction('fSpaceDirect', menuState.quickTrip);
   return activeMode;
 }
 

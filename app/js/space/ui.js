@@ -70,7 +70,7 @@ export function initSpaceFlightUI(attemptLanding, lifecycleScope = null) {
   hud.className = 'spaceFlightHud';
   hud.innerHTML = `
     <div class="spaceFlightHudHead">
-      <span aria-hidden="true">✦</span><strong id="sfFlightTitle">WAYFINDER FLIGHT</strong>
+      <span aria-hidden="true">✦</span><strong id="sfFlightTitle">SPACE FLIGHT</strong>
       <button id="sfCameraBtn" type="button" aria-label="Change camera. Current view: chase">◉</button>
       <button id="sfHudToggle" type="button" aria-expanded="true" aria-label="Collapse flight instruments">−</button>
     </div>
@@ -94,7 +94,7 @@ export function initSpaceFlightUI(attemptLanding, lifecycleScope = null) {
       ENGAGE FLIGHT ASSIST
     </button>
     <button id="sfExpeditionBtn" style="width:100%;padding:11px;margin-bottom:8px;background:#152b4f;border:1px solid #38bdf8;border-radius:8px;color:#e0f2fe;font-weight:600;cursor:pointer;font-family:Orbitron,sans-serif;transition:all 0.2s;">
-      INTERSTELLAR EXPEDITION · ALPHA
+      INTERSTELLAR EXPEDITION
     </button>
     <button id="sfLandBtn" style="width:100%;padding:12px;background:#667eea;border:none;border-radius:8px;color:#fff;font-weight:600;cursor:pointer;font-family:Orbitron,sans-serif;transition:all 0.2s;opacity:0.5;" disabled>
       EXPLORE SOLAR SYSTEM
@@ -135,7 +135,7 @@ function setupSpaceFlightControls(attemptLanding, lifecycleScope = null) {
   });
   listen(document.getElementById('sfLandBtn'), 'click', attemptLanding);
   listen(document.getElementById('sfExpeditionBtn'), 'click', async () => {
-    const runtime = await import('../expedition/runtime.js?v=32');
+    const runtime = await import('../expedition/runtime.js?v=35');
     runtime.openExpeditionPlanner(appCtx);
   });
   listen(document.getElementById('sfHudToggle'), 'click', () => {
@@ -250,10 +250,10 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
   const rocket = appCtx.spaceFlight.rocket;
   const podPhase = appCtx.getInterstellarExpeditionSnapshot?.()?.podJourney?.phase || '';
   const podActive = ['ship_launch', 'local_flight', 'descent', 'surface_launch', 'rendezvous'].includes(podPhase);
-  const asteriaActive = !!rocket?.userData?.surveyorFlightPresentation?.ship;
+  const starshipActive = rocket?.userData?.surveyorFlightPresentation?.active === true;
   const title = document.getElementById('sfFlightTitle');
   const phaseBadge = document.getElementById('sfPodPhase');
-  if (title) title.textContent = podActive ? 'PATHFINDER POD' : asteriaActive ? 'ASTERIA' : 'WAYFINDER FLIGHT';
+  if (title) title.textContent = podActive ? 'PATHFINDER POD' : starshipActive ? 'SOLIS REACH' : 'SPACE FLIGHT';
   if (phaseBadge) {
     phaseBadge.hidden = !podActive;
     phaseBadge.textContent = podActive ? String(podPhase).replaceAll('_', ' ').toUpperCase() : '';
@@ -527,7 +527,7 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
       ? 'Docking corridor acquired · match speed and dock'
       : inDockingRange
       ? `Reduce relative speed to dock · ${Number(expeditionDockTarget.relativeSpeed || 0).toFixed(1)} display units/s`
-      : `Manual approach to Asteria · ${Math.max(0, Math.round(activeDist - expeditionDockTarget.radius))} display units`;
+      : `Manual approach to Solis Reach · ${Math.max(0, Math.round(activeDist - expeditionDockTarget.radius))} display units`;
     if (landBtn) {
       landBtn.disabled = !canDock;
       landBtn.style.opacity = canDock ? '1' : '0.7';

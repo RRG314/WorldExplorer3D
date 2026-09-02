@@ -1,7 +1,8 @@
 import { getPropulsionProfile, getShipProfile } from './catalog.js?v=2';
 import { calculateExpeditionTravel } from './travel-calculator.js?v=2';
-import { createVoyageDirector } from './voyage-director.js?v=1';
+import { createVoyageDirector } from './voyage-director.js?v=2';
 import { createLongDurationState, crewPopulationForShip } from './long-duration.js?v=1';
+import { SPACE_CRAFT_IDENTITY } from '../space/craft-identity.js?v=1';
 
 const EXPEDITION_SCHEMA_VERSION = 1;
 const RESOURCE_KEYS = Object.freeze([
@@ -98,7 +99,7 @@ function createExpeditionPlan({
     ship: Object.freeze({
       id: `${id}-ship`,
       profileId: shipId,
-      name: shipId === 'generation-ship' ? 'Continuance' : shipId === 'cryogenic-expedition-vessel' ? 'Vigil' : 'Asteria',
+      name: shipId === 'generation-ship' ? 'Continuance' : shipId === 'cryogenic-expedition-vessel' ? 'Vigil' : SPACE_CRAFT_IDENTITY.starship.name,
       interiorSeed: ship?.interiorSeed || 0
     }),
     propulsionId,

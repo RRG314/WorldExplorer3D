@@ -1,5 +1,5 @@
-import { withExpeditionChanges } from './model.js?v=8';
-import { resolveSystemFailure } from './failure-authority.js?v=1';
+import { withExpeditionChanges } from './model.js?v=11';
+import { resolveSystemFailure } from './failure-authority.js?v=2';
 import { reinforceGenerationTraining, wakeReserveSpecialist } from './long-duration.js?v=1';
 
 const STATION_VIEWS = Object.freeze({
@@ -143,7 +143,7 @@ function actionAvailability(expedition, actionId) {
 }
 
 function getShipStationView(expedition, stationId) {
-  const base = STATION_VIEWS[stationId] || Object.freeze({ title: 'Asteria Station', systemId: 'hull', summary: 'Review the station.' });
+  const base = STATION_VIEWS[stationId] || Object.freeze({ title: 'Solis Reach Station', systemId: 'hull', summary: 'Review the station.' });
   const actions = (base.actions || []).map((id) => Object.freeze({ id, label: ACTION_LABELS[id] || id, ...actionAvailability(expedition, id) }));
   return Object.freeze({ ...base, metrics: stationMetrics(expedition, base), actions: Object.freeze(actions) });
 }

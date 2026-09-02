@@ -255,13 +255,9 @@ function arriveAtMoon() {
   const walkBtn = document.getElementById('fWalk');
   if (walkBtn) walkBtn.classList.remove('on');
 
-  // Update space menu button labels
-  const directBtn = document.getElementById('fSpaceDirect');
-  const rocketBtn = document.getElementById('fSpaceRocket');
-  if (directBtn) directBtn.textContent = '🌍 Return to Earth';
-  if (rocketBtn) rocketBtn.hidden = true;
-  document.getElementById('fSpaceSurveyor')?.setAttribute('hidden', '');
-  document.getElementById('fSpaceBoardSurveyor')?.setAttribute('hidden', '');
+  // Travel menu visibility and copy are rendered by travel-mode.js after the
+  // environment transition commits. Sky owns the world transition only.
+  appCtx.syncTravelModeButtons?.();
 
   // Hide moon sphere (we're on it now!)
   appCtx.moonSphere.visible = false;
@@ -393,16 +389,9 @@ async function arriveAtEarth(expectedSessionId = null) {
   const weatherPanel = document.getElementById('weatherPanel');
   if (weatherPanel) weatherPanel.style.display = '';
 
-  // Update space menu button labels
-  const directBtn = document.getElementById('fSpaceDirect');
-  const rocketBtn = document.getElementById('fSpaceRocket');
-  if (directBtn) directBtn.textContent = '🌙 Quick Trip to the Moon';
-  if (rocketBtn) {
-    rocketBtn.textContent = '✦ Fly with Wayfinder';
-    rocketBtn.hidden = false;
-  }
-  document.getElementById('fSpaceSurveyor')?.removeAttribute('hidden');
-  document.getElementById('fSpaceBoardSurveyor')?.removeAttribute('hidden');
+  // The Travel menu has one renderer. Publishing Earth is enough for it to
+  // expose the Earth-only actions without a second DOM writer.
+  appCtx.syncTravelModeButtons?.();
 
   // Restore Earth lighting
   if (appCtx.sun) {

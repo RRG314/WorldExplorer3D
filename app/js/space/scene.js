@@ -8,9 +8,10 @@ import { SPACE_CONSTANTS } from "./constants.js?v=1";
 import { PLANETARY_BODIES, configureColorTexture } from "../planetary/catalog.js?v=1";
 import { createSpaceCelestialCatalog } from "./celestial-catalog.js?v=5";
 import { initUniverseRuntime } from "../universe/runtime.js?v=30";
-import { createExpeditionSpacecraftMesh } from "./expedition-spacecraft-mesh.js?v=3";
+import { createExpeditionSpacecraftMesh } from "./expedition-spacecraft-mesh.js?v=4";
 import { createExpeditionPodMesh } from './expedition-pod-mesh.js?v=2';
-import { createSurveyorExteriorMesh } from './expedition-surveyor-mesh.js?v=2';
+import { createSurveyorExteriorMesh } from './expedition-surveyor-mesh.js?v=3';
+import { SPACE_CRAFT_IDENTITY } from './craft-identity.js?v=1';
 import { restoreExpeditionDiscoveries } from '../expedition/contact-authority.js?v=4';
 
 export function createSpaceFlightScene(options = {}) {
@@ -101,7 +102,7 @@ function orientSpacecraftForForward(rocket, forwardInput, preferredUpInput = new
 export function ensureExpeditionSurveyorDockTarget() {
   const earth = appCtx.spaceFlight?.earth;
   if (!earth) return null;
-  let surveyor = earth.getObjectByName('Asteria Long-Range Exploration Vessel');
+  let surveyor = earth.getObjectByName(`${SPACE_CRAFT_IDENTITY.starship.name} Orbital Starship`);
   if (!surveyor) {
     surveyor = createSurveyorExteriorMesh();
     surveyor.position.set(0, SPACE_CONSTANTS.EARTH_SIZE + 260, 0);
@@ -126,7 +127,7 @@ export function getExpeditionSurveyorDockTarget() {
   }
   return {
     id: 'surveyor-earth-orbit',
-    name: 'Asteria',
+    name: SPACE_CRAFT_IDENTITY.starship.name,
     position,
     approachDirection,
     radius: Number(surveyor.userData.dockingRadius || 18),
@@ -284,28 +285,18 @@ export function setSurveyorFlightPresentation(active) {
   if (!rocket) return false;
   const current = rocket.userData.surveyorFlightPresentation;
   if (active === true) {
-    if (current?.ship) return true;
+    if (current?.active) return true;
     setExpeditionPodFlightPresentation(false);
-    const originals = rocket.children.map((child) => ({ child, visible: child.visible, name: child.name }));
-    originals.forEach((entry) => {
-      entry.child.visible = false;
-      if (['engineGlow', 'exhaust'].includes(entry.child.name)) entry.child.name = `wayfinder-${entry.child.name}`;
-    });
-    const ship = createSurveyorExteriorMesh();
-    ship.name = 'Asteria Flight Vessel';
-    ship.rotation.set(0, 0, 0);
-    rocket.add(ship);
-    rocket.userData.surveyorFlightPresentation = { ship, originals };
+    const originalScale = rocket.scale.clone();
+    rocket.scale.setScalar(1.45);
+    rocket.name = `${SPACE_CRAFT_IDENTITY.starship.name} Flight Vessel`;
+    rocket.userData.surveyorFlightPresentation = { active: true, originalScale };
     if (appCtx.spaceFlight.expeditionSurveyor) appCtx.spaceFlight.expeditionSurveyor.visible = false;
     return true;
   }
-  if (!current?.ship) return true;
-  current.ship.parent?.remove?.(current.ship);
-  disposeThreeObjectTree(current.ship);
-  current.originals.forEach((entry) => {
-    entry.child.visible = entry.visible;
-    entry.child.name = entry.name;
-  });
+  if (!current?.active) return true;
+  rocket.scale.copy(current.originalScale);
+  rocket.name = `${SPACE_CRAFT_IDENTITY.starship.name} Exploration Starship`;
   delete rocket.userData.surveyorFlightPresentation;
   if (appCtx.spaceFlight.expeditionSurveyor) appCtx.spaceFlight.expeditionSurveyor.visible = true;
   return true;

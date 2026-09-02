@@ -3,8 +3,8 @@ import { getPrimaryWorldCanvas } from "./engine/webgl-lifecycle.js?v=1";
 import { captureEarthWorldSession } from "./earth-session.js?v=17";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
 import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=23";
-import { createSpaceFlightScene, destroySpaceFlightScene, ensureExpeditionSurveyorDockTarget, ensureExtendedSpaceScene, getExpeditionSurveyorDockTarget, positionSpacecraftAtSurveyorDock, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon, setExpeditionPodFlightPresentation, setSurveyorFlightPresentation, updateExpeditionPodFlightPresentation } from "./space/scene.js?v=38";
-import { hideGameUI, initSpaceFlightUI, prepareSpaceFlightHudForEntry, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=38";
+import { createSpaceFlightScene, destroySpaceFlightScene, ensureExpeditionSurveyorDockTarget, ensureExtendedSpaceScene, getExpeditionSurveyorDockTarget, positionSpacecraftAtSurveyorDock, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon, setExpeditionPodFlightPresentation, setSurveyorFlightPresentation, updateExpeditionPodFlightPresentation } from "./space/scene.js?v=39";
+import { hideGameUI, initSpaceFlightUI, prepareSpaceFlightHudForEntry, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=41";
 import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 import {
   beginEnvironmentTransition,
@@ -13,6 +13,7 @@ import {
 } from './session-coordinator.js?v=2';
 import { installSpaceJourneyRuntime } from './space/journey-runtime.js?v=6';
 import { resolveCompletedLandingTarget } from './space/landing-target.js?v=2';
+import { SPACE_CRAFT_IDENTITY } from './space/craft-identity.js?v=1';
 
 function emitTutorialEvent(eventName, payload = {}) {
   if (typeof appCtx.tutorialOnEvent === 'function') {
@@ -174,7 +175,8 @@ const animationDeps = {
   updateSpaceFlightHUD
 };
 
-function startSpaceFlightToMoon() {
+function startSpaceFlightToMoon(options = {}) {
+  const freeFlight = options.freeFlight === true;
   if (appCtx.spaceFlight.active) return appCtx.spaceFlight.destination === 'moon';
   console.log("Starting space flight to Moon...");
   const sessionId = beginSpaceFlightSession();
@@ -199,8 +201,8 @@ function startSpaceFlightToMoon() {
   appCtx.spaceFlight.canvas.style.display = 'block';
   appCtx.spaceFlight.hud.style.display = 'block';
   prepareSpaceFlightHudForEntry();
-  document.getElementById('sfDestination').textContent = 'Moon';
-  document.getElementById('sfLandBtn').textContent = 'LAND ON MOON';
+  document.getElementById('sfDestination').textContent = freeFlight ? 'Free flight' : 'Moon';
+  document.getElementById('sfLandBtn').textContent = freeFlight ? 'SELECT A DESTINATION' : 'LAND ON MOON';
 
   const worldCanvas = getPrimaryWorldCanvas(appCtx);
   if (worldCanvas) worldCanvas.style.display = 'none';
@@ -212,13 +214,17 @@ function startSpaceFlightToMoon() {
   leaseSpaceFlightResources();
   appCtx.returnUniverseToSolImmediate?.();
   resetSpaceFlightForMoon();
-  appCtx.beginRenderedSpaceJourney?.({
-    sourceBodyId: 'earth',
-    destinationBodyId: 'moon',
-    // Wayfinder begins under player control, but keeps guidance available
-    // after the player chooses a destination.
-    mode: 'assisted'
-  });
+  if (freeFlight) {
+    // Free flight retains the classic local controller. Wayfinder starts the
+    // long-range journey only after the player sets a course.
+    appCtx.clearRenderedSpaceJourney?.();
+  } else {
+    appCtx.beginRenderedSpaceJourney?.({
+      sourceBodyId: 'earth',
+      destinationBodyId: 'moon',
+      mode: 'assisted'
+    });
+  }
 
   appCtx.stopRuntimeKernel?.('space-flight-active');
   animateSpaceFlight();
@@ -230,9 +236,13 @@ function startSpaceFlightToMoon() {
     if (!isCurrentSpaceFlightSession(sessionId, 'moon')) return;
     appCtx.spaceFlight.mode = 'flying';
     appCtx.spaceFlight.speed = 0;
-    showFlightMessage('SPACE FLIGHT READY', '#10b981');
+    showFlightMessage(freeFlight ? 'FREE SPACE FLIGHT READY · OPEN WAYFINDER TO SET A COURSE' : 'SPACE FLIGHT READY', '#10b981');
   }, 1000);
   return true;
+}
+
+function startFreeSpaceFlight() {
+  return startSpaceFlightToMoon({ freeFlight: true });
 }
 
 function startSpaceFlightToSurveyor(options = {}) {
@@ -262,8 +272,8 @@ function startSpaceFlightToSurveyor(options = {}) {
   appCtx.spaceFlight.canvas.style.display = 'block';
   appCtx.spaceFlight.hud.style.display = 'block';
   prepareSpaceFlightHudForEntry();
-  document.getElementById('sfDestination').textContent = 'Asteria';
-  document.getElementById('sfLandBtn').textContent = 'APPROACH ASTERIA';
+  document.getElementById('sfDestination').textContent = SPACE_CRAFT_IDENTITY.starship.name;
+  document.getElementById('sfLandBtn').textContent = `APPROACH ${SPACE_CRAFT_IDENTITY.starship.name.toUpperCase()}`;
   const worldCanvas = getPrimaryWorldCanvas(appCtx);
   if (worldCanvas) worldCanvas.style.display = 'none';
   hideGameUI();
@@ -289,7 +299,7 @@ function startSpaceFlightToSurveyor(options = {}) {
     appCtx.spaceFlight.mode = 'flying';
     appCtx.spaceFlight.speed = 0;
     appCtx.setPauseReason?.('planetary_transition', false);
-    showFlightMessage(usePathfinder ? 'ASTERIA ACQUIRED · MANUAL DOCKING APPROACH' : 'ASTERIA TRANSFER COMPLETE', '#6fe8ff');
+    showFlightMessage(usePathfinder ? `${SPACE_CRAFT_IDENTITY.starship.name.toUpperCase()} ACQUIRED · MANUAL DOCKING APPROACH` : `${SPACE_CRAFT_IDENTITY.starship.name.toUpperCase()} TRANSFER COMPLETE`, '#6fe8ff');
     options.onReady?.();
   }, 1000);
   return true;
@@ -585,6 +595,7 @@ Object.assign(appCtx, {
   startSpaceFlightFromExpeditionSurface,
   startSpaceFlightToMars,
   startSpaceFlightToSurveyor,
+  startFreeSpaceFlight,
   startSpaceFlightToMoon
 });
 
@@ -604,6 +615,7 @@ export {
   startSpaceFlightFromExpeditionSurface,
   startSpaceFlightToMars,
   startSpaceFlightToSurveyor,
+  startFreeSpaceFlight,
   startSpaceFlightToMoon
 };
 

@@ -356,7 +356,7 @@ test('strategic simulation ends only after an essential offline chain has exhaus
   assert.equal(failed.state, 'failed');
   assert.equal(failed.failureReport.systemId, 'life-support');
   assert.equal(failed.pendingEvent, null);
-  assert.match(failed.log.at(-1).message, /Asteria was lost/i);
+  assert.match(failed.log.at(-1).message, /Solis Reach was lost/i);
 
   const recoverable = advanceExpedition({
     ...expedition,
@@ -523,7 +523,7 @@ test('the current store fills crew-state fields in an earlier compatible Expedit
   storage.setItem(store.storageKey, JSON.stringify(earlier));
   const restored = store.load();
   assert.equal(restored.id, expedition.id);
-  assert.equal(restored.ship.name, 'Asteria');
+  assert.equal(restored.ship.name, 'Solis Reach');
   assert.ok(restored.crew.every((member) => Number.isFinite(member.health) && Number.isFinite(member.fatigue) && Number.isFinite(member.experienceYears)));
   assert.ok(restored.crew.every((member) => typeof member.assignment === 'string' && member.assignment.length > 0));
   assert.equal(restored.pendingEvent, null);
@@ -531,7 +531,7 @@ test('the current store fills crew-state fields in an earlier compatible Expedit
   assert.equal(restored.voyageDirector.tags.migratedFromRepresentativeVoyage, true);
 });
 
-test('Asteria publishes three bounded mapped decks and retains every required ship-class room', () => {
+test('Solis Reach publishes three bounded mapped decks and retains every required ship-class room', () => {
   const validation = validateShipLayout();
   assert.equal(validation.valid, true);
   assert.equal(validation.deckCount, 3);

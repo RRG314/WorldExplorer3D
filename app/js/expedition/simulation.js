@@ -1,4 +1,4 @@
-import { RESOURCE_KEYS, withExpeditionChanges } from './model.js?v=8';
+import { RESOURCE_KEYS, withExpeditionChanges } from './model.js?v=11';
 import { JULIAN_YEAR_S } from './travel-calculator.js?v=2';
 import {
   applyDueConsequences,
@@ -6,8 +6,8 @@ import {
   nextVoyageSlot,
   resolveDirectedEvent,
   VOYAGE_SLOTS
-} from './voyage-director.js?v=1';
-import { appendSystemTransitions, assessCausalFailure } from './failure-authority.js?v=1';
+} from './voyage-director.js?v=2';
+import { appendSystemTransitions, assessCausalFailure } from './failure-authority.js?v=2';
 import { advanceLongDurationState } from './long-duration.js?v=1';
 import { advanceOutposts } from './outpost.js?v=1';
 
@@ -28,7 +28,7 @@ function startExpedition(expedition, atMs = Date.now()) {
   if (expedition.readiness.status === 'insufficient') throw new Error('The Expedition is not ready to depart.');
   return withExpeditionChanges(expedition, {
     state: 'traveling', voyagePhase: 'departure', departedAtMs: atMs, updatedAtMs: atMs,
-    log: appendLog(expedition.log, { atMissionS: 0, kind: 'departure', message: `${expedition.ship?.name || 'Asteria'} departed the Solar System.` })
+    log: appendLog(expedition.log, { atMissionS: 0, kind: 'departure', message: `${expedition.ship?.name || 'Solis Reach'} departed the Solar System.` })
   });
 }
 
@@ -131,7 +131,7 @@ function advanceExpedition(expedition, requestedDeltaS) {
   }
   if (elapsed + 1 >= totalS) return withExpeditionChanges(next, {
     state: 'arrived', voyagePhase: 'arrival', progress: 1,
-    log: appendLog(next.log, { atMissionS: totalS, kind: 'arrival', message: `${next.ship?.name || 'Asteria'} arrived at ${next.destinationId}.` })
+    log: appendLog(next.log, { atMissionS: totalS, kind: 'arrival', message: `${next.ship?.name || 'Solis Reach'} arrived at ${next.destinationId}.` })
   });
   return next;
 }

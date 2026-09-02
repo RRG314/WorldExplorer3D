@@ -53,6 +53,8 @@ function spaceFlightSnapshot() {
   const up = rocket && Vector3 ? new Vector3(0, 0, -1).applyQuaternion(rocket.quaternion).normalize() : null;
   return {
     active: appCtx.spaceFlight?.active === true,
+    controlMode: String(appCtx.spaceFlight?.mode || 'idle'),
+    presentationAuthority: String(appCtx.spaceFlight?.presentationAuthority || 'classic'),
     destinationBodyId: appCtx.spaceJourney?.destinationBodyId || appCtx.spaceFlight?.destination || null,
     phase: appCtx.spaceJourney?.phase || null,
     assist: appCtx.spaceJourneyAssistState ? {
@@ -65,10 +67,10 @@ function spaceFlightSnapshot() {
     earthLandingSelection: appCtx.getEarthLandingSelection?.() || null,
     vehiclePresentation: rocket?.userData?.expeditionPodPresentation?.pod
       ? 'pathfinder'
-      : rocket?.userData?.surveyorFlightPresentation?.ship
-      ? 'asteria'
+      : rocket?.userData?.surveyorFlightPresentation?.active === true
+      ? 'solis-reach'
       : rocket
-      ? 'wayfinder'
+      ? 'solis-reach'
       : null,
     position: vectorSnapshot(rocket?.position),
     forward: vectorSnapshot(forward),

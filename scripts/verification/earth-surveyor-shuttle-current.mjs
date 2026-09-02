@@ -34,18 +34,29 @@ async function startEarth(page) {
   await page.locator('#loading.show').waitFor({ state: 'hidden', timeout: 120_000 });
 }
 
-async function seedExpedition(page) {
+async function seedIncompleteExpedition(page) {
   return page.evaluate(async () => {
     const [{ DEFAULT_CREW }, { createExpeditionPlan }, { createExpeditionStore }] = await Promise.all([
       import('/app/js/expedition/catalog.js?v=2'),
-      import('/app/js/expedition/model.js?v=9'),
-      import('/app/js/expedition/store.js?v=9')
+      import('/app/js/expedition/model.js?v=11'),
+      import('/app/js/expedition/store.js?v=11')
     ]);
     const expedition = createExpeditionPlan({
       destinationId: 'proxima-centauri',
       crew: DEFAULT_CREW,
-      id: 'earth-surveyor-shuttle-verification',
-      createdAtMs: 91_000
+      id: 'earth-pathfinder-incomplete-expedition',
+      createdAtMs: 91_000,
+      resources: {
+        foodKg: 0,
+        waterKg: 0,
+        powerMWh: 0,
+        propellantKg: 0,
+        medicalUnits: 0,
+        maintenanceKg: 0,
+        feedstockKg: 0,
+        scienceCargoKg: 0,
+        processingResidueKg: 0
+      }
     });
     createExpeditionStore().save(expedition);
     return { id: expedition.id, state: expedition.state, readiness: expedition.readiness.status };
@@ -108,9 +119,9 @@ async function placeAtDockingRange(page) {
 
 async function dockWithSurveyor(page) {
   const target = await placeAtDockingRange(page);
-  assert.equal(target.name, 'Asteria');
+  assert.equal(target.name, 'Solis Reach');
   assert.ok(target.childCount >= 20, JSON.stringify(target));
-  await page.waitForFunction(() => document.getElementById('sfLandBtn')?.textContent?.includes('DOCK WITH ASTERIA') && document.getElementById('sfLandBtn')?.disabled === false);
+  await page.waitForFunction(() => document.getElementById('sfLandBtn')?.textContent?.includes('DOCK WITH SOLIS REACH') && document.getElementById('sfLandBtn')?.disabled === false);
   await page.waitForTimeout(900);
   await page.screenshot({ path: path.join(outputDir, 'desktop-surveyor-docking-approach.png'), fullPage: true });
   await page.locator('#sfLandBtn').click();
@@ -171,13 +182,13 @@ async function run() {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
       return { selLoc: String(ctx.selLoc || ''), name: String(ctx.customLoc?.name || ctx.LOCS?.[ctx.selLoc]?.name || '') };
     });
-    const expedition = await seedExpedition(page);
-    assert.equal(expedition.readiness, 'ready');
+    const expedition = await seedIncompleteExpedition(page);
+    assert.equal(expedition.readiness, 'insufficient');
 
     const travelCopy = await page.locator('#travelMenu .floatItems').textContent();
     assert.match(travelCopy, /Deploy Pathfinder/i);
-    assert.match(travelCopy, /Board Asteria Directly/i);
-    assert.match(travelCopy, /Fly with Wayfinder/i);
+    assert.match(travelCopy, /Board Solis Reach Directly/i);
+    assert.match(travelCopy, /Enter Free Space Flight/i);
     assert.match(travelCopy, /Quick Trip to the Moon/i);
     assert.doesNotMatch(travelCopy, /Launch to Mars|Launch to the Moon/i);
     assert.equal(await page.locator('#fSpaceMars').count(), 0);
@@ -263,19 +274,20 @@ async function run() {
     const final = await snapshot(page);
     assert.equal(final.interstellarExpedition.podJourney.phase, 'recovered');
     assert.equal(final.expeditionShipInterior.active, true);
-    assert.equal(final.interstellarExpedition.ship.name, 'Asteria');
+    assert.equal(final.interstellarExpedition.ship.name, 'Solis Reach');
     const recoveredPresentation = await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
-      const asteria = ctx.spaceFlight.rocket?.getObjectByName('Asteria Flight Vessel');
       return {
-        asteriaVisible: asteria?.visible === true,
-        asteriaScale: Number(asteria?.scale?.x || 0),
+        starshipActive: ctx.spaceFlight.rocket?.userData?.surveyorFlightPresentation?.active === true,
+        starshipScale: Number(ctx.spaceFlight.rocket?.scale?.x || 0),
+        starshipName: String(ctx.spaceFlight.rocket?.name || ''),
         pathfinderPresent: !!ctx.spaceFlight.rocket?.getObjectByName('Surveyor Pathfinder Pod'),
         dockTargetVisible: ctx.getExpeditionSurveyorDockTarget?.()?.mesh?.visible ?? false
       };
     });
-    assert.equal(recoveredPresentation.asteriaVisible, true, JSON.stringify(recoveredPresentation));
-    assert.equal(recoveredPresentation.asteriaScale, 2.5, JSON.stringify(recoveredPresentation));
+    assert.equal(recoveredPresentation.starshipActive, true, JSON.stringify(recoveredPresentation));
+    assert.equal(recoveredPresentation.starshipScale, 1.45, JSON.stringify(recoveredPresentation));
+    assert.match(recoveredPresentation.starshipName, /Solis Reach/);
     assert.equal(recoveredPresentation.pathfinderPresent, false, JSON.stringify(recoveredPresentation));
     assert.equal(recoveredPresentation.dockTargetVisible, false, JSON.stringify(recoveredPresentation));
     return { directBoarding: true, returnJourneyId, finalPhase: final.interstellarExpedition.podJourney.phase, earthSelection: earthLocationBefore, earthLandingSelection, initialEnvironment: earthBefore.environment };

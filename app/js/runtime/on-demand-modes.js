@@ -32,7 +32,7 @@ export function ensureSpaceRuntime() {
       // Solar-system and universe code is intentionally outside the Earth
       // startup graph. It is evaluated only after a space action.
       await import('../solar-system.js?v=83');
-      return import('../space.js?v=133');
+      return import('../space.js?v=136');
     })().catch((error) => {
       modeLoads.space = null;
       throw error;
@@ -77,6 +77,7 @@ Object.assign(appCtx, {
   startSpaceFlightToEarth: (...args) => invokeSpace('startSpaceFlightToEarth', args),
   startSpaceFlightToMars: (...args) => invokeSpace('startSpaceFlightToMars', args),
   startSpaceFlightToSurveyor: (...args) => invokeSpace('startSpaceFlightToSurveyor', args),
+  startFreeSpaceFlight: (...args) => invokeSpace('startFreeSpaceFlight', args),
   startSpaceFlightToMoon: (...args) => invokeSpace('startSpaceFlightToMoon', args),
   getOnDemandModeSnapshot: () => ({
     ocean: {

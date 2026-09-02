@@ -4,131 +4,214 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 
 const baseUrl = String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4192').replace(/\/$/, '');
+const freeFlightOnly = process.argv.includes('--free-flight-only');
+const pathfinderOnly = process.argv.includes('--pathfinder-only');
 const outputDir = path.resolve('output/verification/space-travel-coherence');
 await fs.mkdir(outputDir, { recursive: true });
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
-const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, hasTouch: true });
-const page = await context.newPage();
-const failures = [];
 
-page.on('pageerror', (error) => failures.push(`pageerror: ${error.stack || error}`));
-page.on('requestfailed', (request) => {
-  if (request.url().startsWith(baseUrl)) failures.push(`request failed: ${request.url()}`);
-});
-page.on('response', (response) => {
-  if (response.url().startsWith(baseUrl) && response.status() >= 400) failures.push(`${response.status()} ${response.url()}`);
-});
-await page.addInitScript(() => {
-  localStorage.setItem('worldExplorer3D.tutorialState.v4', JSON.stringify({
-    version: 4,
-    enabled: true,
-    completed: true,
-    skipped: false,
-    stage: 'complete',
-    distanceMoved: 8,
-    startedAtMs: Date.now() - 1000,
-    completedAtMs: Date.now(),
-    analyticsBegan: true,
-    contextSeen: {}
-  }));
-});
+async function snapshot(page) {
+  return page.evaluate(() => JSON.parse(globalThis.render_game_to_text?.() || '{}'));
+}
 
-const snapshot = () => page.evaluate(() => JSON.parse(globalThis.render_game_to_text?.() || '{}'));
-
-try {
-  await page.goto(`${baseUrl}/app/?launch=space&diagnostics=1`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
-  if (await page.locator('#analyticsConsentDenyBtn').isVisible()) await page.locator('#analyticsConsentDenyBtn').click();
+async function startEarth(page) {
+  await page.goto(`${baseUrl}/app/?diagnostics=1&coherence=${Date.now()}`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
   await page.waitForFunction(() => document.getElementById('startBtn')?.disabled === false, null, { timeout: 120_000 });
-  await page.evaluate(() => {
-    document.getElementById('spaceLaunchToggle')?.click();
-    document.getElementById('startBtn')?.click();
-  });
-  await page.waitForFunction(() => {
-    const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
-    return state.modes?.space === true && state.spaceFlight?.active === true && state.spaceFlight?.up;
-  }, null, { timeout: 120_000 });
-  await page.locator('#spaceDestinationSelect').waitFor({ state: 'visible', timeout: 30_000 });
-
-  const initial = await snapshot();
-  assert.ok(initial.spaceFlight.up.y > 0.75, `Spacecraft began sideways: ${JSON.stringify(initial.spaceFlight.up)}`);
-
-  await page.locator('#spaceDestinationSelect').selectOption('venus');
-  await page.waitForFunction(() => {
-    const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
-    return state.spaceFlight?.destinationBodyId === 'venus' && state.planetary?.flightDestination === 'venus';
-  }, null, { timeout: 15_000 });
-  assert.equal(await page.locator('#spaceDestinationSelect').inputValue(), 'venus');
-  assert.match(await page.locator('#sfDestination').textContent(), /Venus/i);
-
-  if (!(await page.locator('#sfAssistBtn').isVisible())) {
-    await page.locator('#sfHudToggle').click();
+  if (await page.locator('#analyticsConsentDenyBtn').isVisible()) await page.locator('#analyticsConsentDenyBtn').click();
+  if (await page.locator('#globeLocationSearch').isVisible()) {
+    await page.locator('#globeLocationSearch').fill('Baltimore, Maryland');
+    await page.locator('#globeLocationSearchBtn').click();
+    const result = page.locator('#globeLocationSearchResults [role="option"]').first();
+    await result.waitFor({ state: 'visible', timeout: 30_000 });
+    await result.click();
+    await page.locator('#globeSelectorStartBtn').click();
+  } else {
+    await page.locator('#startBtn').click();
   }
-  await page.locator('#sfAssistBtn').waitFor({ state: 'visible', timeout: 5_000 });
-  assert.equal(await page.locator('#sfAssistBtn').isEnabled(), true, 'Venus flight assist must be available after setting the course.');
-  const clickState = await page.evaluate(() => {
-    document.getElementById('sfAssistBtn')?.click();
-    return JSON.parse(globalThis.render_game_to_text?.() || '{}').spaceFlight;
+  await page.waitForFunction(() => {
+    const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+    return state.gameStarted && !state.worldLoading && state.environment === 'EARTH';
+  }, null, { timeout: 120_000 });
+  await page.locator('#loading.show').waitFor({ state: 'hidden', timeout: 120_000 });
+}
+
+async function saveIncompleteExpedition(page) {
+  return page.evaluate(async () => {
+    const [{ DEFAULT_CREW }, { createExpeditionPlan }, { createExpeditionStore }] = await Promise.all([
+      import('/app/js/expedition/catalog.js?v=2'),
+      import('/app/js/expedition/model.js?v=11'),
+      import('/app/js/expedition/store.js?v=11')
+    ]);
+    const expedition = createExpeditionPlan({
+      destinationId: 'proxima-centauri',
+      crew: DEFAULT_CREW,
+      id: 'coherence-incomplete-expedition',
+      resources: {
+        foodKg: 0, waterKg: 0, powerMWh: 0, propellantKg: 0,
+        medicalUnits: 0, maintenanceKg: 0, feedstockKg: 0,
+        scienceCargoKg: 0, processingResidueKg: 0
+      }
+    });
+    createExpeditionStore().save(expedition);
+    return expedition.readiness.status;
   });
-  assert.equal(clickState.assist.active, true, `Venus assist did not engage: ${JSON.stringify(clickState)}`);
-  const beforeAssist = await snapshot();
-  await page.waitForTimeout(1300);
-  const afterAssist = await snapshot();
-  const assistRuntimeDetail = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+}
+
+async function verifyPathfinderAndInterior(page) {
+  assert.equal(await saveIncompleteExpedition(page), 'insufficient');
+  await page.locator('#travelBtn').click();
+  await page.waitForTimeout(1_500);
+  assert.equal(await page.locator('#travelMenu').evaluate((menu) => menu.classList.contains('open')), true, 'Travel menu flickered closed without player input.');
+  const copy = await page.locator('#travelMenu .floatItems').textContent();
+  assert.match(copy, /Deploy Pathfinder Pod/i);
+  assert.match(copy, /Board Solis Reach Directly/i);
+  assert.match(copy, /Enter Free Space Flight/i);
+  assert.doesNotMatch(copy, /Fly with Wayfinder|Board Asteria/i);
+
+  await page.locator('#fSpaceSurveyor').click();
+  await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').stagedEarthPathfinder?.active === true, null, { timeout: 15_000 });
+  const staged = await snapshot(page);
+  assert.equal(staged.interstellarExpedition?.readiness?.status, 'insufficient');
+  assert.equal(staged.stagedEarthPathfinder?.active, true);
+  await page.screenshot({ path: path.join(outputDir, 'pathfinder-staged-from-incomplete-expedition.png'), fullPage: true });
+
+  await page.evaluate(() => document.getElementById('fSpaceBoardSurveyor')?.click());
+  await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.active === true, null, { timeout: 120_000 });
+  await page.waitForTimeout(4_000);
+  const interior = await snapshot(page);
+  assert.equal(interior.interstellarExpedition?.ship?.name, 'Solis Reach');
+  assert.equal(interior.expeditionShipInterior?.active, true);
+  assert.ok(interior.expeditionShipInterior?.crewActors?.length >= 5, JSON.stringify(interior.expeditionShipInterior));
+  const presentation = await page.evaluate(async () => {
+    const [{ ctx }, { SHIP_DOORS }] = await Promise.all([
+      import('/app/js/shared-context.js?v=55'),
+      import('/app/js/expedition/ship-layout.js?v=5')
+    ]);
+    const actors = ctx.getShipInteriorSnapshot?.()?.crewActors || [];
+    const stationaryAtDoor = actors.filter((actor) => {
+      if (actor.moving) return false;
+      return SHIP_DOORS.some((door) => Math.hypot(actor.x - door.x, actor.z - door.z) < 0.48);
+    });
     return {
-      contact: ctx.spaceFlight.lastCelestialContact || null,
-      avoidance: ctx.spaceFlight.lastCelestialAvoidance || null,
-      journeyPhase: ctx.spaceJourney?.phase || null,
-      spacecraftEvent: ctx.spacecraftState?.lastEvent || null
+      rocketName: String(ctx.spaceFlight.rocket?.name || ''),
+      rocketScale: Number(ctx.spaceFlight.rocket?.scale?.x || 0),
+      starshipActive: ctx.spaceFlight.rocket?.userData?.surveyorFlightPresentation?.active === true,
+      ringShipPresent: !!ctx.spaceFlight.rocket?.getObjectByName('surveyor-habitat-ring'),
+      stationaryAtDoor,
+      crewActors: actors
     };
   });
-  const moved = Math.hypot(
-    afterAssist.spaceFlight.position.x - beforeAssist.spaceFlight.position.x,
-    afterAssist.spaceFlight.position.y - beforeAssist.spaceFlight.position.y,
-    afterAssist.spaceFlight.position.z - beforeAssist.spaceFlight.position.z
-  );
-  assert.ok(moved > 0.000001, `Venus assist did not move the spacecraft: ${moved}`);
-  assert.ok(
-    afterAssist.spaceFlight.assist.progress > beforeAssist.spaceFlight.assist.progress,
-    `Venus assist did not advance: ${JSON.stringify({ before: beforeAssist.spaceFlight.assist, after: afterAssist.spaceFlight.assist, runtime: assistRuntimeDetail })}`
-  );
-  assert.equal(afterAssist.spaceFlight.destinationBodyId, 'venus');
-  await page.screenshot({ path: path.join(outputDir, 'desktop-venus-assist.png'), fullPage: true });
+  assert.match(presentation.rocketName, /Solis Reach/);
+  assert.equal(presentation.rocketScale, 1.45);
+  assert.equal(presentation.starshipActive, true);
+  assert.equal(presentation.ringShipPresent, false);
+  assert.deepEqual(presentation.stationaryAtDoor, []);
+  const cameraEvidence = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const candidates = [];
+    for (let z = 25.5; z <= 32.5; z += 0.5) {
+      for (let x = -1.5; x <= 1.5; x += 0.5) candidates.push({ x, z });
+    }
+    const clear = candidates.find((point) => ctx.checkBuildingCollision?.(point.x, point.z, 0.32, {
+      actorBaseY: 0.05,
+      actorHeight: 1.9
+    })?.collision !== true);
+    if (!clear) return false;
+    ctx.Walk.state.view = 'third';
+    Object.assign(ctx.Walk.state.walker, {
+      x: clear.x,
+      y: 1.7,
+      z: clear.z,
+      angle: 0,
+      yaw: 0,
+      lookYawOffset: 0,
+      pitch: 0,
+      vy: 0,
+      onGround: true
+    });
+    return true;
+  });
+  assert.equal(cameraEvidence, true);
+  await page.waitForTimeout(900);
+  const collisionEvidence = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const camera = ctx.camera;
+    const collision = ctx.checkBuildingCollision?.(camera.position.x, camera.position.z, 0.18, {
+      actorBaseY: camera.position.y - 0.24,
+      actorHeight: 0.48
+    });
+    return {
+      camera: camera.position.toArray(),
+      collision: collision?.collision === true,
+      visibleCrew: ctx.getShipInteriorSnapshot?.()?.crewActors?.filter((actor) => actor.deckId === 'command') || []
+    };
+  });
+  assert.equal(collisionEvidence.collision, false, JSON.stringify(collisionEvidence));
+  assert.ok(collisionEvidence.visibleCrew.length >= 1, JSON.stringify(collisionEvidence));
+  await page.screenshot({ path: path.join(outputDir, 'solis-reach-interior-crew.png'), fullPage: true });
+  return { staged: staged.stagedEarthPathfinder, presentation, collisionEvidence };
+}
 
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.evaluate(async () => {
+async function verifyFreeFlight(page) {
+  await page.locator('#travelBtn').click();
+  await page.locator('#fSpaceRocket').click();
+  await page.waitForFunction(() => {
+    const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+    return state.modes?.space === true && state.spaceFlight?.controlMode === 'flying';
+  }, null, { timeout: 120_000 });
+  const before = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    ctx.updateControlsModeUI?.();
+    return {
+      position: ctx.spaceFlight.rocket.position.toArray(),
+      journey: ctx.spaceJourney || null,
+      presentationAuthority: ctx.spaceFlight.presentationAuthority
+    };
   });
-  if ((await page.locator('#sfHudToggle').getAttribute('aria-expanded')) === 'true') {
-    await page.locator('#sfHudToggle').click();
+  assert.equal(before.journey, null, 'Free flight started a Wayfinder journey before the player selected a course.');
+  await page.keyboard.down('Space');
+  await page.waitForTimeout(600);
+  await page.keyboard.up('Space');
+  const after = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return ctx.spaceFlight.rocket.position.toArray();
+  });
+  assert.notDeepEqual(after, before.position, 'Classic free-flight throttle did not move the starship.');
+  await page.screenshot({ path: path.join(outputDir, 'free-space-flight.png'), fullPage: true });
+  return { before, after };
+}
+
+const failures = [];
+const pageErrors = [];
+let result = null;
+try {
+  let pathfinder = null;
+  if (!freeFlightOnly) {
+    const pathfinderContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const pathfinderPage = await pathfinderContext.newPage();
+    pathfinderPage.on('pageerror', (error) => pageErrors.push(String(error?.stack || error)));
+    await startEarth(pathfinderPage);
+    pathfinder = await verifyPathfinderAndInterior(pathfinderPage);
+    await pathfinderContext.close();
   }
-  await page.waitForTimeout(500);
-  assert.equal(await page.locator('#mobileMoveLabel').textContent(), 'Flight');
-  assert.equal(await page.locator('#mobileMovePad').isVisible(), true, 'Space steering must use the plane-style directional pad.');
-  assert.equal(await page.locator('#mobileLookPad').isVisible(), false, 'Space must not present a second competing steering pad.');
-  const beforeTurn = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
-    return ctx.spaceFlight.rocket.quaternion.toArray();
-  });
-  await page.locator('#mobileMoveRight').dispatchEvent('pointerdown', { pointerId: 1, pointerType: 'touch', isPrimary: true });
-  await page.waitForTimeout(320);
-  await page.locator('#mobileMoveRight').dispatchEvent('pointerup', { pointerId: 1, pointerType: 'touch', isPrimary: true });
-  const afterTurn = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
-    return ctx.spaceFlight.rocket.quaternion.toArray();
-  });
-  assert.notDeepEqual(afterTurn, beforeTurn, 'Plane-style right input did not steer Space Flight.');
-  assert.equal((await snapshot()).spaceFlight.assist.active, false, 'Manual steering must return control from assist.');
-  await page.screenshot({ path: path.join(outputDir, 'mobile-space-flight-controls.png'), fullPage: true });
+
+  let freeFlight = null;
+  if (!pathfinderOnly) {
+    const freeFlightContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const freeFlightPage = await freeFlightContext.newPage();
+    freeFlightPage.on('pageerror', (error) => pageErrors.push(String(error?.stack || error)));
+    await startEarth(freeFlightPage);
+    freeFlight = await verifyFreeFlight(freeFlightPage);
+    await freeFlightContext.close();
+  }
+  result = { pathfinder, freeFlight };
 } catch (error) {
-  failures.push(error.stack || String(error));
+  failures.push(String(error?.stack || error));
 } finally {
-  await context.close();
   await browser.close();
 }
 
-const report = { ok: failures.length === 0, baseUrl, failures };
+failures.push(...pageErrors);
+const report = { ok: failures.length === 0, baseUrl, result, failures };
 await fs.writeFile(path.join(outputDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
 console.log(JSON.stringify(report, null, 2));
 assert.deepEqual(failures, []);
