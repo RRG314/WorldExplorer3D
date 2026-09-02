@@ -4,8 +4,6 @@ export function setupSettingsUi(appCtx) {
   const attomKeyInput = document.getElementById('attomKeyInput');
   const estatedKeyInput = document.getElementById('estatedKeyInput');
   const saveApiKeyBtn = document.getElementById('saveApiKey');
-  const realEstateToggle = document.getElementById('realEstateToggle');
-  const toggleLabel = document.getElementById('realEstateToggleLabel');
   const renderQualitySelect = document.getElementById('renderQualitySelect');
   const highQualityToggle = document.getElementById('highQualityToggle');
   const ssaoToggle = document.getElementById('ssaoToggle');
@@ -51,13 +49,6 @@ export function setupSettingsUi(appCtx) {
   if (savedEstated) {
     appCtx.apiConfig.estated = savedEstated;
     if (estatedKeyInput) estatedKeyInput.value = savedEstated;
-  }
-
-  // Load real estate mode preference
-  const savedRealEstateMode = localStorage.getItem('realEstateEnabled');
-  if (savedRealEstateMode === 'true') {
-    if (realEstateToggle) realEstateToggle.checked = true;
-    if (toggleLabel) toggleLabel.style.background = '#f0f4ff';
   }
 
   // Save API keys
@@ -117,16 +108,6 @@ export function setupSettingsUi(appCtx) {
         saveApiKeyBtn.textContent = '💾 Save All API Keys';
         saveApiKeyBtn.style.background = '#667eea';
       }, 2000);
-    });
-  }
-
-  // Real estate toggle
-  if (realEstateToggle && toggleLabel) {
-    realEstateToggle.addEventListener('change', (e) => {
-      const enabled = e.target.checked;
-      localStorage.setItem('realEstateEnabled', enabled);
-      toggleLabel.style.background = enabled ? '#f0f4ff' : '#f8fafc';
-      toggleLabel.style.borderColor = enabled ? '#667eea' : '#e2e8f0';
     });
   }
 

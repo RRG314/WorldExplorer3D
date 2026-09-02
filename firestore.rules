@@ -1854,6 +1854,26 @@ service cloud.firestore {
           request.resource.data.createdAt == resource.data.createdAt;
         allow delete: if isSelf(userId);
       }
+
+      match /economy/{documentId} {
+        allow read: if isSelf(userId) && documentId == 'wallet';
+        allow create, update, delete: if false;
+      }
+
+      match /propertyReceipts/{receiptId} {
+        allow read: if isSelf(userId);
+        allow create, update, delete: if false;
+      }
+
+      match /propertyEntitlements/{entitlementId} {
+        allow read: if isSelf(userId);
+        allow create, update, delete: if false;
+      }
+
+      match /notifications/{notificationId} {
+        allow read: if isSelf(userId);
+        allow create, update, delete: if false;
+      }
     }
 
     match /creatorProfiles/{userId} {
@@ -1976,6 +1996,22 @@ service cloud.firestore {
       allow create: if isSelf(uid) && validExplorerLeaderboardCreate(uid);
       allow update: if isSelf(uid) && validExplorerLeaderboardUpdate(uid);
       allow delete: if false;
+    }
+
+    match /propertyLeaderboard/{uid} {
+      allow read: if true;
+      allow create, update, delete: if false;
+    }
+
+    match /worldProperties/{propertyId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if false;
+    }
+
+    match /propertyTradeOffers/{offerId} {
+      allow read: if isSignedIn() &&
+        (resource.data.proposerUid == request.auth.uid || resource.data.recipientUid == request.auth.uid);
+      allow create, update, delete: if false;
     }
 
     match /rooms/{roomId} {

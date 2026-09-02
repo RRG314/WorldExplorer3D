@@ -39,6 +39,11 @@ const {
   setParticipantConnection,
   setParticipantReady
 } = require('./expedition-authority');
+const {
+  propertyDocumentId,
+  settlePropertyAction,
+  settlePropertyTrade
+} = require('./property-authority');
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -1817,6 +1822,100 @@ async function handleUrbanVehicleLeaseUpdate(req, res, release = false) {
 
 exports.updateUrbanVehicle = functions.region('us-central1').https.onRequest((req, res) => handleUrbanVehicleLeaseUpdate(req, res, false));
 exports.releaseUrbanVehicle = functions.region('us-central1').https.onRequest((req, res) => handleUrbanVehicleLeaseUpdate(req, res, true));
+
+exports.commitWorldPropertyAction = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+  try {
+    const input = req.body || {};
+    let context = null;
+    if (sanitizeText(input.roomCode, 12)) {
+      context = await requireUrbanRoomContext(req, res, auth);
+      if (!context) return;
+    } else {
+      const worldSeed = sanitizeText(input.worldSeed, 180);
+      if (!worldSeed) return res.status(400).json({ error: 'A loaded world is required.' });
+      const profile = (await db.collection('users').doc(auth.uid).get()).data() || {};
+      context = {
+        roomCode: 'WORLD',
+        worldSeed,
+        player: { displayName: profile.displayName || auth.name || 'Explorer' },
+        nowMs: Date.now()
+      };
+    }
+    const action = sanitizeText(input.action, 32).toLowerCase();
+    const requestId = sanitizeText(input.requestId, 120).replace(/[^A-Za-z0-9:._-]/g, '');
+    if (action.startsWith('trade_')) {
+      const offerId = sanitizeText(action === 'trade_offer' ? requestId : input.offerId, 120).replace(/[^A-Za-z0-9:._-]/g, '');
+      if (!offerId || !requestId) return res.status(400).json({ error: 'A valid trade offer is required.' });
+      const offerRef = db.collection('propertyTradeOffers').doc(offerId);
+      const existingOffer = action === 'trade_offer' ? null : (await offerRef.get()).data();
+      if (action !== 'trade_offer' && !existingOffer) return res.status(404).json({ error: 'This trade offer is no longer available.' });
+      const offeredPropertyId = action === 'trade_offer' ? input.offeredProperty?.propertyId : existingOffer.offeredPropertyId;
+      const requestedPropertyId = action === 'trade_offer' ? input.requestedProperty?.propertyId : existingOffer.requestedPropertyId;
+      const offeredDocumentId = propertyDocumentId(offeredPropertyId);
+      const requestedDocumentId = propertyDocumentId(requestedPropertyId);
+      if (!offeredDocumentId || !requestedDocumentId) return res.status(400).json({ error: 'Both properties are required for a trade.' });
+      const actorWalletRef = db.collection('users').doc(auth.uid).collection('economy').doc('wallet');
+      const proposerUid = existingOffer?.proposerUid || auth.uid;
+      const recipientUid = existingOffer?.recipientUid || '';
+      const result = await settlePropertyTrade({
+        runTransaction: (callback) => db.runTransaction(callback),
+        offerRef,
+        offeredPropertyRef: db.collection('worldProperties').doc(offeredDocumentId),
+        requestedPropertyRef: db.collection('worldProperties').doc(requestedDocumentId),
+        actorWalletRef,
+        proposerWalletRef: db.collection('users').doc(proposerUid).collection('economy').doc('wallet'),
+        recipientWalletRef: recipientUid ? db.collection('users').doc(recipientUid).collection('economy').doc('wallet') : null,
+        receiptRef: db.collection('users').doc(auth.uid).collection('propertyReceipts').doc(requestId),
+        actorBoardRef: db.collection('propertyLeaderboard').doc(auth.uid),
+        proposerBoardRef: db.collection('propertyLeaderboard').doc(proposerUid),
+        recipientBoardRef: recipientUid ? db.collection('propertyLeaderboard').doc(recipientUid) : null,
+        notificationRefForUid: (uid, id) => db.collection('users').doc(uid).collection('notifications').doc(id),
+        activityRef: db.collection('activityFeed').doc(`property-${requestId}`.slice(0, 160)),
+        uid: auth.uid,
+        displayName: sanitizeText(context.player.displayName || context.player.name || auth.name || 'Explorer', 80),
+        roomCode: context.roomCode,
+        input: { ...input, action, offerId, requestId },
+        nowMs: context.nowMs,
+        timestampFromMs: urbanTimestampFromMs
+      });
+      return res.status(200).json(result);
+    }
+    const property = input.property || {};
+    const documentId = propertyDocumentId(property.propertyId);
+    if (!documentId || !requestId) return res.status(400).json({ error: 'A valid property and request are required.' });
+    const userRef = db.collection('users').doc(auth.uid);
+    const result = await settlePropertyAction({
+      runTransaction: (callback) => db.runTransaction(callback),
+      propertyRef: db.collection('worldProperties').doc(documentId),
+      actorWalletRef: userRef.collection('economy').doc('wallet'),
+      receiptRef: userRef.collection('propertyReceipts').doc(requestId),
+      starterEntitlementRef: userRef.collection('propertyEntitlements').doc('starter'),
+      sellerWalletRefForUid: (uid) => db.collection('users').doc(uid).collection('economy').doc('wallet'),
+      notificationRefForUid: (uid, id) => db.collection('users').doc(uid).collection('notifications').doc(id),
+      actorBoardRef: db.collection('propertyLeaderboard').doc(auth.uid),
+      sellerBoardRefForUid: (uid) => db.collection('propertyLeaderboard').doc(uid),
+      activityRef: db.collection('activityFeed').doc(`property-${requestId}`.slice(0, 160)),
+      uid: auth.uid,
+      displayName: sanitizeText(context.player.displayName || context.player.name || auth.name || 'Explorer', 80),
+      roomCode: context.roomCode,
+      input: { ...input, requestId },
+      nowMs: context.nowMs,
+      timestampFromMs: urbanTimestampFromMs
+    });
+    res.status(200).json(result);
+  } catch (error) {
+    const code = String(error?.message || '');
+    if (['invalid_action', 'invalid_property', 'property_identity_conflict', 'trade_offer_exists', 'trade_property_conflict'].includes(code)) {
+      return res.status(400).json({ error: 'This property action is not valid.' });
+    }
+    console.error('[commitWorldPropertyAction] failed:', error);
+    res.status(500).json({ error: 'Could not complete this property action right now.' });
+  }
+});
 
 exports.commitUrbanImpacts = functions.region('us-central1').https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;

@@ -25,11 +25,19 @@ const LEADERBOARD_CATALOG = Object.freeze({
   }),
   explorer: Object.freeze({
     id: 'explorer',
-    icon: '🧭',
-    label: 'Explorer Profile',
-    scope: 'This device • Current profile',
-    objective: 'Earn Explorer points through fieldwork, travel, games, making, community, and companions.',
-    empty: 'No Explorer progress yet. Record a discovery or complete an Explorer activity to begin.'
+    icon: '◎',
+    label: 'Community',
+    scope: 'Global • All time',
+    objective: 'Join rooms, share finds, and make explorer connections.',
+    empty: 'No shared community activity yet. Join a room or share a find to begin.'
+  }),
+  property: Object.freeze({
+    id: 'property',
+    icon: '⌂',
+    label: 'Property',
+    scope: 'Global • All time',
+    objective: 'Build your portfolio through ownership, sales, and rentals.',
+    empty: 'No property activity yet. Sign in and choose an available mapped building to begin.'
   }),
   deflock: Object.freeze({
     id: 'deflock',

@@ -11,6 +11,7 @@ const LOCAL_LEADERBOARD_KEY = 'worldExplorer3D.flowerChallenge.localLeaderboard.
 const LOCAL_PAINT_LEADERBOARD_KEY = 'worldExplorer3D.paintTown.localLeaderboard.v1';
 const LOCAL_FISHING_LEADERBOARD_KEY = 'worldExplorer3D.fishing.localLeaderboard.v1';
 const LOCAL_EXPLORER_LEADERBOARD_KEY = 'worldExplorer3D.explorer.localLeaderboard.v1';
+const LOCAL_PROPERTY_LEADERBOARD_KEY = 'worldExplorer3D.property.localLeaderboard.v1';
 const LOCAL_DEFLOCK_LEADERBOARD_KEY = 'worldExplorer3D.deflock.localLeaderboard.v1';
 const PLAYER_NAME_KEY = 'worldExplorer3D.flowerChallenge.playerName';
 const FIREBASE_CONFIG_KEY = 'worldExplorer3D.firebaseConfig';
@@ -18,6 +19,7 @@ const FIREBASE_COLLECTION = 'flowerLeaderboard';
 const FIREBASE_PAINT_COLLECTION = 'paintTownLeaderboard';
 const FIREBASE_FISHING_COLLECTION = 'fishingLeaderboard';
 const FIREBASE_EXPLORER_COLLECTION = 'explorerLeaderboard';
+const FIREBASE_PROPERTY_COLLECTION = 'propertyLeaderboard';
 const FIREBASE_DEFLOCK_COLLECTION = 'deflockLeaderboard';
 const LEADERBOARD_LIMIT = 10;
 const FLOWER_MIN_DISTANCE = 120;
@@ -55,6 +57,7 @@ const ui = {
   titlePaintTabBtn: null,
   titleFishingTabBtn: null,
   titleExplorerTabBtn: null,
+  titlePropertyTabBtn: null,
   titleDeFlockTabBtn: null,
   titleHint: null,
   titleBadge: null,
@@ -103,6 +106,7 @@ function getLeaderboardStorageKey(challengeType) {
   if (type === 'painttown') return LOCAL_PAINT_LEADERBOARD_KEY;
   if (type === 'fishing') return LOCAL_FISHING_LEADERBOARD_KEY;
   if (type === 'explorer') return LOCAL_EXPLORER_LEADERBOARD_KEY;
+  if (type === 'property') return LOCAL_PROPERTY_LEADERBOARD_KEY;
   if (type === 'deflock') return LOCAL_DEFLOCK_LEADERBOARD_KEY;
   return LOCAL_LEADERBOARD_KEY;
 }
@@ -112,6 +116,7 @@ function getLeaderboardCollection(challengeType) {
   if (type === 'painttown') return FIREBASE_PAINT_COLLECTION;
   if (type === 'fishing') return FIREBASE_FISHING_COLLECTION;
   if (type === 'explorer') return FIREBASE_EXPLORER_COLLECTION;
+  if (type === 'property') return FIREBASE_PROPERTY_COLLECTION;
   if (type === 'deflock') return FIREBASE_DEFLOCK_COLLECTION;
   return FIREBASE_COLLECTION;
 }
@@ -260,11 +265,13 @@ const leaderboardApi = createFlowerChallengeLeaderboardApi({
   constants: {
     FIREBASE_COLLECTION,
     FIREBASE_EXPLORER_COLLECTION,
+    FIREBASE_PROPERTY_COLLECTION,
     FIREBASE_DEFLOCK_COLLECTION,
     FIREBASE_FISHING_COLLECTION,
     FIREBASE_PAINT_COLLECTION,
     LOCAL_LEADERBOARD_KEY,
     LOCAL_EXPLORER_LEADERBOARD_KEY,
+    LOCAL_PROPERTY_LEADERBOARD_KEY,
     LOCAL_DEFLOCK_LEADERBOARD_KEY,
     LOCAL_FISHING_LEADERBOARD_KEY,
     LOCAL_PAINT_LEADERBOARD_KEY
@@ -546,6 +553,7 @@ function setupFlowerChallenge() {
   ui.titlePaintTabBtn = document.getElementById('leaderboardTabPaintTown');
   ui.titleFishingTabBtn = document.getElementById('leaderboardTabFishing');
   ui.titleExplorerTabBtn = document.getElementById('leaderboardTabExplorer');
+  ui.titlePropertyTabBtn = document.getElementById('leaderboardTabProperty');
   ui.titleDeFlockTabBtn = document.getElementById('leaderboardTabDeFlock');
   ui.titleHint = document.getElementById('gameLeaderboardHint');
   ui.titleBadge = document.getElementById('gameLeaderboardBadge');
@@ -617,6 +625,12 @@ function setupFlowerChallenge() {
   if (ui.titleExplorerTabBtn) {
     ui.titleExplorerTabBtn.addEventListener('click', () => {
       setChallengeLeaderboardView('explorer');
+    });
+  }
+
+  if (ui.titlePropertyTabBtn) {
+    ui.titlePropertyTabBtn.addEventListener('click', () => {
+      setChallengeLeaderboardView('property');
     });
   }
 

@@ -28,11 +28,13 @@ function createFlowerChallengeLeaderboardApi(context) {
   const {
     FIREBASE_COLLECTION,
     FIREBASE_EXPLORER_COLLECTION,
+    FIREBASE_PROPERTY_COLLECTION,
     FIREBASE_DEFLOCK_COLLECTION,
     FIREBASE_FISHING_COLLECTION,
     FIREBASE_PAINT_COLLECTION,
     LOCAL_LEADERBOARD_KEY,
     LOCAL_EXPLORER_LEADERBOARD_KEY,
+    LOCAL_PROPERTY_LEADERBOARD_KEY,
     LOCAL_DEFLOCK_LEADERBOARD_KEY,
     LOCAL_FISHING_LEADERBOARD_KEY,
     LOCAL_PAINT_LEADERBOARD_KEY
@@ -43,6 +45,7 @@ function createFlowerChallengeLeaderboardApi(context) {
     if (type === 'painttown') return LOCAL_PAINT_LEADERBOARD_KEY;
     if (type === 'fishing') return LOCAL_FISHING_LEADERBOARD_KEY;
     if (type === 'explorer') return LOCAL_EXPLORER_LEADERBOARD_KEY;
+    if (type === 'property') return LOCAL_PROPERTY_LEADERBOARD_KEY;
     if (type === 'deflock') return LOCAL_DEFLOCK_LEADERBOARD_KEY;
     return LOCAL_LEADERBOARD_KEY;
   }
@@ -52,6 +55,7 @@ function createFlowerChallengeLeaderboardApi(context) {
     if (type === 'painttown') return FIREBASE_PAINT_COLLECTION;
     if (type === 'fishing') return FIREBASE_FISHING_COLLECTION;
     if (type === 'explorer') return FIREBASE_EXPLORER_COLLECTION;
+    if (type === 'property') return FIREBASE_PROPERTY_COLLECTION;
     if (type === 'deflock') return FIREBASE_DEFLOCK_COLLECTION;
     return FIREBASE_COLLECTION;
   }
@@ -153,6 +157,13 @@ function createFlowerChallengeLeaderboardApi(context) {
       if (Math.abs(pctDelta) > 0.0001) return pctDelta;
       return String(b.foundAt || '').localeCompare(String(a.foundAt || ''));
     }
+    if (normalizedType === 'property') {
+      const valueDelta = (Number(b.propertyValue) || 0) - (Number(a.propertyValue) || 0);
+      if (valueDelta !== 0) return valueDelta;
+      const ownedDelta = (Number(b.propertiesOwned) || 0) - (Number(a.propertiesOwned) || 0);
+      if (ownedDelta !== 0) return ownedDelta;
+      return String(b.foundAt || '').localeCompare(String(a.foundAt || ''));
+    }
     if (normalizedType === 'fishing' || normalizedType === 'explorer' || normalizedType === 'deflock') {
       const scoreDelta = (Number(b.score) || 0) - (Number(a.score) || 0);
       if (scoreDelta !== 0) return scoreDelta;
@@ -172,19 +183,13 @@ function createFlowerChallengeLeaderboardApi(context) {
 
   async function readRemoteLeaderboard(challengeType = 'flower') {
     const normalizedType = normalizeChallengeType(challengeType);
-    // The existing cloud collection belongs to Community League. Keep the
-    // Explorer profile separate until its server schema is reviewed.
-    if (normalizedType === 'explorer') {
-      challengeState.leaderboardBackend = 'local';
-      return null;
-    }
     const ready = await ensureFirebase();
     if (!ready || !challengeState.firebase) return null;
 
     try {
       const { db, firestoreMod } = challengeState.firebase;
       const leaderboardRef = firestoreMod.collection(db, getLeaderboardCollection(normalizedType));
-      const orderField = normalizedType === 'flower' ? 'timeMs' : normalizedType === 'painttown' ? 'paintedBuildings' : 'score';
+      const orderField = normalizedType === 'flower' ? 'timeMs' : normalizedType === 'painttown' ? 'paintedBuildings' : normalizedType === 'property' ? 'propertyValue' : 'score';
       const orderDirection = normalizedType === 'flower' ? 'asc' : 'desc';
       const q = firestoreMod.query(
         leaderboardRef,
@@ -211,7 +216,7 @@ function createFlowerChallengeLeaderboardApi(context) {
 
     try {
       const user = typeof getSignedInUser === 'function' ? getSignedInUser() : null;
-      if (!user?.uid || normalizedType === 'explorer') return false;
+      if (!user?.uid || normalizedType === 'explorer' || normalizedType === 'property') return false;
       const { db, firestoreMod } = challengeState.firebase;
       const payload = {
         uid: user.uid,
@@ -304,6 +309,7 @@ function createFlowerChallengeLeaderboardApi(context) {
     if (ui.titlePaintTabBtn) ui.titlePaintTabBtn.classList.toggle('active', normalizedType === 'painttown');
     if (ui.titleFishingTabBtn) ui.titleFishingTabBtn.classList.toggle('active', normalizedType === 'fishing');
     if (ui.titleExplorerTabBtn) ui.titleExplorerTabBtn.classList.toggle('active', normalizedType === 'explorer');
+    if (ui.titlePropertyTabBtn) ui.titlePropertyTabBtn.classList.toggle('active', normalizedType === 'property');
     if (ui.titleDeFlockTabBtn) ui.titleDeFlockTabBtn.classList.toggle('active', normalizedType === 'deflock');
     if (ui.titleStartBtn) {
       const flowerView = normalizedType === 'flower';
@@ -320,8 +326,9 @@ function createFlowerChallengeLeaderboardApi(context) {
       ui.status.textContent = `Loading ${definition.label}…`;
       ui.status.classList.remove('error', 'ok');
     }
-    if (normalizedType === 'explorer') await syncExplorerProfileToLocalLeaderboard();
-    const localEntries = readLocalLeaderboard(normalizedType).map((entry) => ({ ...entry, source: 'device' }));
+    const localEntries = normalizedType === 'explorer' || normalizedType === 'property'
+      ? []
+      : readLocalLeaderboard(normalizedType).map((entry) => ({ ...entry, source: 'device' }));
     const remoteEntries = await readRemoteLeaderboard(normalizedType);
     const entries = remoteEntries === null
       ? localEntries
@@ -334,7 +341,7 @@ function createFlowerChallengeLeaderboardApi(context) {
     if (ui.status) {
       const prefix = {
         flower: 'Flower leaderboard', painttown: 'Paint leaderboard',
-        fishing: 'Fishing leaderboard', explorer: 'Explorer leaderboard', deflock: 'DeFlock leaderboard'
+        fishing: 'Fishing leaderboard', explorer: 'Community board', property: 'Property leaderboard', deflock: 'DeFlock leaderboard'
       }[normalizedType];
       ui.status.dataset.backend = challengeState.leaderboardBackend === 'firebase'
         ? `${prefix}: Firebase live`

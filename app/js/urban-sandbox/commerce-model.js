@@ -156,6 +156,34 @@ function createLocalCommerceModel(options = {}) {
     save();
   }
 
+  function wallet() {
+    return Object.freeze({
+      type: 'ExplorerWallet',
+      schemaVersion: COMMERCE_SCHEMA_VERSION,
+      credits: state.credits,
+      transactions: Object.freeze(state.transactions.slice())
+    });
+  }
+
+  function debit(amount, detail = {}) {
+    const credits = Math.max(0, Math.floor(Number(amount) || 0));
+    if (credits <= 0) return Object.freeze({ ok: false, reason: 'invalid_amount', credits: state.credits });
+    if (state.credits < credits) return Object.freeze({ ok: false, reason: 'not_enough_credits', credits: state.credits });
+    const { type = 'debit', ...transactionDetail } = detail;
+    state.credits -= credits;
+    record(String(type), { ...transactionDetail, credits });
+    return Object.freeze({ ok: true, amount: credits, credits: state.credits });
+  }
+
+  function credit(amount, detail = {}) {
+    const credits = Math.max(0, Math.floor(Number(amount) || 0));
+    if (credits <= 0) return Object.freeze({ ok: false, reason: 'invalid_amount', credits: state.credits });
+    const { type = 'credit', ...transactionDetail } = detail;
+    state.credits += credits;
+    record(String(type), { ...transactionDetail, credits });
+    return Object.freeze({ ok: true, amount: credits, credits: state.credits });
+  }
+
   function inventoryItem(catalogId) {
     return inventory?.snapshot?.().items?.find((item) => item.catalogId === catalogId) || null;
   }
@@ -283,9 +311,12 @@ function createLocalCommerceModel(options = {}) {
   return Object.freeze({
     type: 'WorldExplorerEconomy',
     buy,
+    credit,
+    debit,
     sell,
     snapshot: storeSnapshot,
-    trade
+    trade,
+    wallet
   });
 }
 

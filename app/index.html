@@ -90,7 +90,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <div id="titleScreen">
 <div class="logo">WORLD EXPLORER</div>
 <div class="sub">Explore Any Place on Earth and Beyond</div>
-<button id="flowerChallengeToggleBtn" class="flowerChallengeToggleBtn" type="button" aria-label="Toggle challenge leaderboard" aria-controls="flowerChallengePanel" aria-expanded="false">🏁 Leaderboard</button>
+<button id="flowerChallengeToggleBtn" class="flowerChallengeToggleBtn" type="button" aria-label="Open Community Board" aria-controls="flowerChallengePanel" aria-expanded="false">◉ Community Board</button>
 <div class="title-main-row">
 <div class="menu-container">
 <div class="tab-nav">
@@ -301,40 +301,22 @@ Graphics changes apply to the current session.
 </div>
 <div style="margin-bottom:24px">
 <div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin-bottom:12px;display:flex;align-items:center;gap:8px">
-🏠 Real Estate Mode
-</div>
-<label style="display:flex;align-items:center;gap:12px;cursor:pointer;padding:12px;background:#f8fafc;border-radius:8px;border:2px solid #e2e8f0;transition:all 0.2s" id="realEstateToggleLabel">
-<input type="checkbox" id="realEstateToggle" style="width:20px;height:20px;cursor:pointer">
-<div>
-<div style="font-size:13px;font-weight:600;color:#1e293b">Enable Real Estate Features</div>
-<div style="font-size:11px;color:#64748b;margin-top:2px">Show property listings and prices in 3D</div>
-</div>
-</label>
-</div>
-<div style="margin-bottom:24px">
-<div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin-bottom:12px;display:flex;align-items:center;gap:8px">
-🔑 API Configuration
+Optional Property Data
 </div>
 <div style="background:#f8fafc;border:2px solid #e2e8f0;border-radius:12px;padding:16px">
-<div style="margin-bottom:16px">
-<label style="display:block;font-size:12px;font-weight:600;color:#1e293b;margin-bottom:6px">Estated API Key (FREE - 1000/month) ⭐</label>
-<input type="text" id="estatedKeyInput" placeholder="Enter your Estated API key" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;font-family:'Inter',sans-serif;color:#1e293b;margin-bottom:4px">
-<div style="font-size:10px;color:#10b981;margin-bottom:8px">
-✓ Recommended: Highest free tier! Get key at <a href="https://estated.com" target="_blank" style="color:#10b981;font-weight:600">Estated.com</a>
-</div>
-</div>
+<div hidden><input type="password" id="estatedKeyInput" autocomplete="off"></div>
 <div style="margin-bottom:16px">
 <label style="display:block;font-size:12px;font-weight:600;color:#1e293b;margin-bottom:6px">ATTOM API Key</label>
-<input type="text" id="attomKeyInput" placeholder="Enter your ATTOM API key" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;font-family:'Inter',sans-serif;color:#1e293b;margin-bottom:4px">
+<input type="password" id="attomKeyInput" autocomplete="off" placeholder="Enter your ATTOM API key" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;font-family:'Inter',sans-serif;color:#1e293b;margin-bottom:4px">
 <div style="font-size:10px;color:#64748b;margin-bottom:8px">
-ℹ️ Premium data with free trial. Get key at <a href="https://www.attomdata.com" target="_blank" style="color:#667eea">ATTOM.com</a>
+Property records from your ATTOM account. <a href="https://api.developer.attomdata.com/docs" target="_blank" rel="noopener noreferrer" style="color:#667eea">ATTOM documentation</a>
 </div>
 </div>
 <div style="margin-bottom:12px">
-<label style="display:block;font-size:12px;font-weight:600;color:#1e293b;margin-bottom:6px">RentCast API Key (Optional)</label>
-<input type="text" id="rentcastKeyInput" placeholder="Enter your RentCast API key" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;font-family:'Inter',sans-serif;color:#1e293b;margin-bottom:4px">
+<label style="display:block;font-size:12px;font-weight:600;color:#1e293b;margin-bottom:6px">RentCast API Key</label>
+<input type="password" id="rentcastKeyInput" autocomplete="off" placeholder="Enter your RentCast API key" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;font-family:'Inter',sans-serif;color:#1e293b;margin-bottom:4px">
 <div style="font-size:10px;color:#64748b;margin-bottom:8px">
-ℹ️ 100 free requests/month. Get key at <a href="https://rentcast.io" target="_blank" style="color:#667eea">RentCast.io</a>
+Sale and rental listings from your RentCast account. <a href="https://developers.rentcast.io/reference/search-queries" target="_blank" rel="noopener noreferrer" style="color:#667eea">RentCast documentation</a>
 </div>
 </div>
 <button id="saveApiKey" style="background:#667eea;border:none;border-radius:8px;padding:10px 20px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;font-size:13px;transition:all 0.2s;width:100%">
@@ -344,13 +326,12 @@ Graphics changes apply to the current session.
 </div>
 <div>
 <div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin-bottom:12px;display:flex;align-items:center;gap:8px">
-ℹ️ About Real Estate APIs
+How Connected Data Is Used
 </div>
 <div style="background:#f0f4ff;border:2px solid #c7d2fe;border-radius:12px;padding:16px;font-size:12px;color:#475569;line-height:1.6">
-<p style="margin:0 0 8px 0"><strong>🌟 Estated (Recommended):</strong> 1000 free requests/month - highest free tier!</p>
-<p style="margin:0 0 8px 0"><strong>💎 ATTOM:</strong> Premium comprehensive data with free trial available.</p>
-<p style="margin:0 0 8px 0"><strong>🏠 RentCast:</strong> 100 free requests/month for listings with photos.</p>
-<p style="margin:0"><strong>Demo Mode:</strong> No API key needed - realistic simulated data for testing.</p>
+<p style="margin:0 0 8px 0">Connected records appear under <strong>Home &amp; Property → Property Data</strong> as optional reference information.</p>
+<p style="margin:0 0 8px 0">Provider terms, coverage, and request limits depend on your own account. Keys are stored only in this browser.</p>
+<p style="margin:0">Outside data never creates game buildings, changes in-game home prices, or grants ownership.</p>
 </div>
 </div>
 </div>
@@ -425,7 +406,7 @@ Graphics changes apply to the current session.
 </div>
 <aside id="flowerChallengePanel" class="flowerChallengePanel">
 <div class="flowerChallengeHeader">
-<div class="flowerChallengeTitle">Leaderboards</div>
+<div class="flowerChallengeTitle">Community Board</div>
 <div id="gameLeaderboardBadge" class="flowerChallengeBadge">Flower Sprint</div>
 </div>
 <div class="flowerChallengeBody">
@@ -436,7 +417,8 @@ Graphics changes apply to the current session.
 <button id="leaderboardTabFlower" class="flowerLeaderboardTab active" type="button">🌹 Flower</button>
 <button id="leaderboardTabPaintTown" class="flowerLeaderboardTab" type="button">🟥 Paint Town</button>
 <button id="leaderboardTabFishing" class="flowerLeaderboardTab" type="button">🎣 Fishing</button>
-<button id="leaderboardTabExplorer" class="flowerLeaderboardTab" type="button">🧭 Explorer</button>
+<button id="leaderboardTabExplorer" class="flowerLeaderboardTab" type="button">◎ Community</button>
+<button id="leaderboardTabProperty" class="flowerLeaderboardTab" type="button">⌂ Property</button>
 <button id="leaderboardTabDeFlock" class="flowerLeaderboardTab" type="button">📷 DeFlock</button>
 </div>
 <div class="flowerChallengeRow">
@@ -1206,6 +1188,9 @@ Explore the area
 <div class="floatItem" id="fFlowerChallenge">🌺 Find Red Flower</div>
 <div class="floatItem" id="fFishing" style="display:none">🎣 Fishing</div>
 <div class="floatItem" id="fLiveGps">📍 Explore with Live GPS</div>
+<div class="floatItemSection" role="separator">PLACES AROUND YOU</div>
+<div class="floatItem" id="fHistoric">⛩️ Historic Places</div>
+<div class="floatItem" id="fPOI">📍 Nearby Places</div>
 </div>
 </div>
 
@@ -1249,17 +1234,14 @@ Explore the area
 <div class="floatItem" id="fEditorMode">🏗️ Edit This World</div>
 <div class="floatItem" id="fEditorMine" hidden>📬 My Submissions</div>
 <div class="floatItem" id="fModerationPanel" hidden>🛡️ Review Queue</div>
-<div class="floatItem" id="fRealEstate">🏘️ Land &amp; Property</div>
-<div class="floatItem" id="fHistoric">⛩️ Historic</div>
-<div class="floatItem" id="fPOI">📍 POI</div>
-<div class="floatItem" id="fLandUseRE">🗺️ Land Use</div>
+<div class="floatItem" id="fLandUseRE" hidden>🗺️ Land Use</div>
 </div>
 </div>
 
 <div class="floatMenu" id="gameMenu">
 <button class="floatBtn game" id="gameBtn" type="button" aria-label="Community and multiplayer" aria-expanded="false" data-mobile-label="Community"><span class="btnIcon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"></circle><circle cx="17" cy="9" r="2.25"></circle><path d="M3.5 19c.4-3.5 2.2-5.2 5.5-5.2s5.1 1.7 5.5 5.2M14.5 14.3c3.6-.8 5.7.8 6 4.2"></path></svg></span><span class="btnText">Community</span></button>
 <div class="floatItems" data-menu-title="COMMUNITY">
-<div class="floatItem" id="fMultiplayer">👥 Rooms &amp; Explorer Board</div>
+<div class="floatItem" id="fMultiplayer">👥 Rooms &amp; Community Board</div>
 
 <!-- Preserved for future product work, intentionally absent from production UI. -->
 <div class="floatItem" id="fRoomGames" hidden>👥 Room Games</div>
@@ -1284,6 +1266,7 @@ Explore the area
 <div class="floatItem" id="fExplorerJournal">📖 Journal</div>
 <div class="floatItem" id="fExplorerGuide">📚 Field Guide</div>
 <div class="floatItem" id="fBackpack">🎒 Backpack &amp; Quick Slots</div>
+<div class="floatItem" id="fRealEstate">🏠 Home &amp; Property</div>
 <div class="floatItem" id="fExplorerProfile">🧑 Explorer Profile</div>
 </div>
 </div>
