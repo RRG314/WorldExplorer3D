@@ -57,6 +57,10 @@ try {
   assert.doesNotMatch(initialCopy, /authority|schema|pipeline|scaffold|procedural|generated/i);
   await page.screenshot({ path: path.join(evidenceDir, '01-space-flight-journey.png') });
 
+  const preCoursePosition = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return ctx.spaceFlight.rocket.position.toArray();
+  });
   await page.selectOption('#spaceDestinationSelect', 'mars');
   await page.waitForFunction(() => {
     const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
@@ -71,16 +75,18 @@ try {
       destinationBodyId: ctx.spaceJourney?.destinationBodyId,
       phase: ctx.spaceJourney?.phase,
       assistAvailable: ctx.spaceJourneyAssistState?.available,
-      craftRole: ctx.spaceFlight?.craftRole,
-      pathfinderVisible: Boolean(ctx.spaceFlight?.rocket?.userData?.expeditionPodPresentation?.pod),
+      activeCraftId: ctx.getSpaceTravelSession?.()?.activeCraftId,
+      pathfinderActive: ctx.spaceFlight?.rocket?.userData?.spaceCraftId === 'pathfinder-pod',
+      position: ctx.spaceFlight.rocket.position.toArray(),
       destinationReadout: document.getElementById('sfDestination')?.textContent,
       courseMessage: document.getElementById('sfMessage')?.textContent || ''
     };
   });
   assert.equal(solarCourse.destinationBodyId, 'mars');
   assert.equal(solarCourse.assistAvailable, true);
-  assert.equal(solarCourse.craftRole, 'wayfinder');
-  assert.equal(solarCourse.pathfinderVisible, false);
+  assert.equal(solarCourse.activeCraftId, 'solis-reach');
+  assert.equal(solarCourse.pathfinderActive, false);
+  assert.ok(Math.hypot(...solarCourse.position.map((value, index) => value - preCoursePosition[index])) < 15, 'Selecting a course teleported the active ship.');
   assert.match(solarCourse.courseMessage, /COURSE SET.*MARS.*FLIGHT ASSIST/i);
   const solarDirection = await page.evaluate(() => {
     const cue = document.getElementById('universeCourseCue');
@@ -99,6 +105,26 @@ try {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     return ctx.spaceJourneyAssistState?.active === true;
   });
+  const assistedJourneyId = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return ctx.spaceJourney?.journeyId;
+  });
+  await page.keyboard.down('ArrowLeft');
+  await page.waitForTimeout(120);
+  await page.keyboard.up('ArrowLeft');
+  const manualTakeover = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return {
+      journeyId: ctx.spaceJourney?.journeyId,
+      spacecraftStatePresent: Boolean(ctx.spacecraftState),
+      assistActive: ctx.spaceJourneyAssistState?.active === true,
+      guidance: ctx.getSpaceTravelSession?.()?.guidance
+    };
+  });
+  assert.equal(manualTakeover.journeyId, assistedJourneyId, 'Manual steering destroyed the active journey.');
+  assert.equal(manualTakeover.spacecraftStatePresent, true, 'Manual steering discarded physical spacecraft state.');
+  assert.equal(manualTakeover.assistActive, false, 'Manual steering did not release Wayfinder guidance.');
+  assert.equal(manualTakeover.guidance, 'manual');
 
   await page.locator('#currentJourneyAction').click();
   await page.waitForSelector('#universeNavigator:not([hidden])');
@@ -123,7 +149,7 @@ try {
     return { card: card?.toJSON(), hud: hud?.toJSON(), overlaps };
   });
   assert.ok(mobileLayout.card && mobileLayout.card.x >= 0 && mobileLayout.card.x + mobileLayout.card.width <= 390 && mobileLayout.card.y + mobileLayout.card.height <= 844);
-  assert.equal(mobileLayout.overlaps, false);
+  assert.equal(mobileLayout.overlaps, false, JSON.stringify(mobileLayout));
   await page.screenshot({ path: path.join(evidenceDir, '04-space-journey-mobile.png') });
 
   const report = {
@@ -132,7 +158,9 @@ try {
       currentJourneyAppearsInFreeFlight: true,
       solarCourseCreatesAssistedJourney: solarCourse.destinationBodyId === 'mars' && solarCourse.assistAvailable === true,
       solarCourseHasPersistentDirection: solarDirection.offscreenCueVisible || solarDirection.visibleBodyLabelCount > 0,
-      activeCraftNotReplacedBySavedPathfinder: solarCourse.craftRole === 'wayfinder' && solarCourse.pathfinderVisible === false,
+      activeCraftNotReplacedBySavedPathfinder: solarCourse.activeCraftId === 'solis-reach' && solarCourse.pathfinderActive === false,
+      courseSelectionPreservesPosition: Math.hypot(...solarCourse.position.map((value, index) => value - preCoursePosition[index])) < 15,
+      manualTakeoverPreservesJourney: manualTakeover.journeyId === assistedJourneyId && manualTakeover.spacecraftStatePresent && !manualTakeover.assistActive,
       journeyOpensWayfinder: true,
       selectedCourseChangesJourney: true,
       mobileJourneyClearsFlightHud: mobileLayout.overlaps === false,

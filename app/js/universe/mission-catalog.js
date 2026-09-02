@@ -86,10 +86,10 @@ function missionStages(operation) {
       ? 'Reach the assigned corridor and deploy the instrument package.'
       : 'Reach the assigned observation position and complete the primary scan.';
   return Object.freeze([
-    Object.freeze({ id: 'briefing', label: 'Review the mission briefing aboard Surveyor.' }),
+    Object.freeze({ id: 'briefing', label: 'Review the mission briefing aboard Solis Reach.' }),
     Object.freeze({ id: 'approach', label: 'Set the destination course and enter the local frame.' }),
     Object.freeze({ id: 'fieldwork', label: fieldLabel }),
-    Object.freeze({ id: 'analysis', label: 'Return the evidence to Surveyor and complete science analysis.' })
+    Object.freeze({ id: 'analysis', label: 'Return the evidence to Solis Reach and complete science analysis.' })
   ]);
 }
 

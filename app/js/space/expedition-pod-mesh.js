@@ -24,7 +24,7 @@ function addMesh(parent, geometry, surface, name, position, rotation = null) {
 
 function createExpeditionPodMesh() {
   const pod = new THREE.Group();
-  pod.name = 'Surveyor Pathfinder Pod';
+  pod.name = 'Pathfinder Flight Pod';
   pod.userData.visualOnly = true;
   pod.userData.authority = 'expedition-pod-journey';
 

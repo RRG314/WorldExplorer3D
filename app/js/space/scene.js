@@ -4,13 +4,13 @@ import {
   disposeThreeObjectTree,
   disposeThreeRenderer
 } from "../engine/webgl-lifecycle.js?v=1";
-import { SPACE_CONSTANTS } from "./constants.js?v=1";
+import { SPACE_CONSTANTS } from "./constants.js?v=3";
 import { PLANETARY_BODIES, configureColorTexture } from "../planetary/catalog.js?v=1";
 import { createSpaceCelestialCatalog } from "./celestial-catalog.js?v=5";
-import { initUniverseRuntime } from "../universe/runtime.js?v=31";
+import { initUniverseRuntime } from "../universe/runtime.js?v=33";
 import { createExpeditionSpacecraftMesh } from "./expedition-spacecraft-mesh.js?v=4";
-import { createExpeditionPodMesh } from './expedition-pod-mesh.js?v=2';
-import { createSurveyorExteriorMesh } from './expedition-surveyor-mesh.js?v=3';
+import { createExpeditionPodMesh } from './expedition-pod-mesh.js?v=3';
+import { createSolisReachExteriorMesh } from './solis-reach-exterior-mesh.js?v=1';
 import { SPACE_CRAFT_IDENTITY } from './craft-identity.js?v=1';
 import { restoreExpeditionDiscoveries } from '../expedition/contact-authority.js?v=4';
 
@@ -99,46 +99,67 @@ function orientSpacecraftForForward(rocket, forwardInput, preferredUpInput = new
   return true;
 }
 
-export function ensureExpeditionSurveyorDockTarget() {
+export function ensureSolisReachDockTarget(options = {}) {
+  const scene = appCtx.spaceFlight?.scene;
   const earth = appCtx.spaceFlight?.earth;
-  if (!earth) return null;
-  let surveyor = earth.getObjectByName(`${SPACE_CRAFT_IDENTITY.starship.name} Orbital Starship`);
-  if (!surveyor) {
-    surveyor = createSurveyorExteriorMesh();
-    surveyor.position.set(0, SPACE_CONSTANTS.EARTH_SIZE + 260, 0);
-    earth.add(surveyor);
+  if (!scene) return null;
+  let starship = scene.getObjectByName(`${SPACE_CRAFT_IDENTITY.starship.name} Orbital Starship`);
+  if (!starship) {
+    starship = createSolisReachExteriorMesh();
+    scene.add(starship);
+  } else if (starship.parent !== scene) {
+    const worldPosition = starship.getWorldPosition(new THREE.Vector3());
+    const worldQuaternion = starship.getWorldQuaternion(new THREE.Quaternion());
+    scene.attach(starship);
+    starship.position.copy(worldPosition);
+    starship.quaternion.copy(worldQuaternion);
   }
-  surveyor.visible = true;
-  appCtx.spaceFlight.expeditionSurveyor = surveyor;
-  return surveyor;
+  const rocket = appCtx.spaceFlight?.rocket;
+  if (options.nearActiveCraft === true && rocket) {
+    const approach = new THREE.Vector3(0, 1, 0).applyQuaternion(rocket.quaternion).normalize();
+    if (approach.lengthSq() <= 1e-8) approach.set(0, 0, -1);
+    starship.position.copy(rocket.position).addScaledVector(approach, Math.max(180, Number(options.distance) || 220));
+    orientSpacecraftForForward(starship, approach.clone().negate());
+  } else if (earth) {
+    const earthPosition = earth.getWorldPosition(new THREE.Vector3());
+    starship.position.copy(earthPosition).add(new THREE.Vector3(0, SPACE_CONSTANTS.EARTH_SIZE + 260, 0));
+  }
+  const session = appCtx.getSpaceTravelSession?.();
+  starship.visible = session?.active === true
+    && session.activeCraftId === SPACE_CRAFT_IDENTITY.pod.id
+    && session.phase === 'rendezvous';
+  appCtx.spaceFlight.solisReachDockTarget = starship;
+  return starship;
 }
 
-export function getExpeditionSurveyorDockTarget() {
-  const surveyor = appCtx.spaceFlight?.expeditionSurveyor;
-  if (!surveyor?.visible || !surveyor.parent) return null;
-  const dockingCollar = surveyor.getObjectByName('surveyor-docking-collar');
+export function getSolisReachDockTarget() {
+  const starship = appCtx.spaceFlight?.solisReachDockTarget;
+  const session = appCtx.getSpaceTravelSession?.();
+  if (session?.activeCraftId !== SPACE_CRAFT_IDENTITY.pod.id || session.phase !== 'rendezvous') return null;
+  if (!starship?.visible || !starship.parent) return null;
+  const dockingCollar = starship.getObjectByName('solis-reach-docking-collar');
   const position = new THREE.Vector3();
-  (dockingCollar || surveyor).getWorldPosition(position);
+  (dockingCollar || starship).getWorldPosition(position);
   const approachDirection = new THREE.Vector3(0, 0, 1);
   if (dockingCollar) {
     approachDirection.applyQuaternion(dockingCollar.getWorldQuaternion(new THREE.Quaternion())).normalize();
   } else {
-    approachDirection.applyQuaternion(surveyor.getWorldQuaternion(new THREE.Quaternion())).normalize();
+    approachDirection.applyQuaternion(starship.getWorldQuaternion(new THREE.Quaternion())).normalize();
   }
   return {
-    id: 'surveyor-earth-orbit',
+    id: 'solis-reach-rendezvous',
     name: SPACE_CRAFT_IDENTITY.starship.name,
     position,
     approachDirection,
-    radius: Number(surveyor.userData.dockingRadius || 18),
-    mesh: surveyor,
+    radius: Number(starship.userData.dockingRadius || 18),
+    mesh: starship,
     landable: false,
     targetKind: 'expedition-dock'
   };
 }
 
-export function positionSpacecraftAtSurveyorDock(distance = 36) {
-  const target = getExpeditionSurveyorDockTarget();
+export function positionSpacecraftAtSolisReachDock(distance = 36) {
+  const target = getSolisReachDockTarget();
   const rocket = appCtx.spaceFlight?.rocket;
   if (!target || !rocket) return false;
   const approachDirection = target.approachDirection?.clone?.().normalize()
@@ -238,76 +259,78 @@ function createSpaceMoon() {
   appCtx.spaceFlight.moon.add(ring);
 }
 
-function createSpaceRocket() {
-  appCtx.spaceFlight.rocket = createExpeditionSpacecraftMesh();
-  appCtx.spaceFlight.scene.add(appCtx.spaceFlight.rocket);
-  if (appCtx.spaceFlight.craftRole === 'pathfinder') setExpeditionPodFlightPresentation(true);
-  else if (appCtx.spaceFlight.craftRole === 'starship') setSurveyorFlightPresentation(true);
+function buildActiveSpaceCraft(craftId) {
+  if (craftId === SPACE_CRAFT_IDENTITY.pod.id) {
+    const pod = createExpeditionPodMesh();
+    pod.name = `${SPACE_CRAFT_IDENTITY.pod.name} Flight Pod`;
+    pod.userData.spaceCraftId = SPACE_CRAFT_IDENTITY.pod.id;
+    pod.scale.setScalar(0.62);
+    return pod;
+  }
+  const starship = createExpeditionSpacecraftMesh();
+  starship.name = `${SPACE_CRAFT_IDENTITY.starship.name} Exploration Starship`;
+  starship.userData.spaceCraftId = SPACE_CRAFT_IDENTITY.starship.id;
+  starship.scale.setScalar(1.45);
+  return starship;
 }
 
-export function setExpeditionPodFlightPresentation(active) {
-  const rocket = appCtx.spaceFlight?.rocket;
-  if (!rocket) return false;
-  if (active === true) setSurveyorFlightPresentation(false);
-  const current = rocket.userData.expeditionPodPresentation;
-  if (active === true) {
-    appCtx.spaceFlight.craftRole = 'pathfinder';
-    if (current?.pod) return true;
-    const originals = rocket.children.map((child) => ({
-      child,
-      visible: child.visible,
-      name: child.name
-    }));
-    originals.forEach((entry) => {
-      entry.child.visible = false;
-      if (['engineGlow', 'exhaust'].includes(entry.child.name)) entry.child.name = `wayfinder-${entry.child.name}`;
-    });
-    const pod = createExpeditionPodMesh();
-    pod.scale.setScalar(0.62);
-    rocket.add(pod);
-    rocket.userData.expeditionPodPresentation = { pod, originals };
+function syncOrbitalStarshipVisibility() {
+  const target = appCtx.spaceFlight?.solisReachDockTarget;
+  if (!target) return;
+  const session = appCtx.getSpaceTravelSession?.();
+  target.visible = session?.active === true
+    && session.activeCraftId === SPACE_CRAFT_IDENTITY.pod.id
+    && session.phase === 'rendezvous';
+}
+
+function replaceActiveSpaceCraft(craftId) {
+  const scene = appCtx.spaceFlight?.scene;
+  if (!scene) return false;
+  const current = appCtx.spaceFlight.rocket;
+  if (current?.userData?.spaceCraftId === craftId) {
+    appCtx.updateSpaceTravelSession?.({ activeCraftId: craftId, reason: 'active-craft-confirmed' });
+    syncOrbitalStarshipVisibility();
     return true;
   }
-  if (!current?.pod) return true;
-  current.pod.parent?.remove?.(current.pod);
-  disposeThreeObjectTree(current.pod);
-  current.originals.forEach((entry) => {
-    entry.child.visible = entry.visible;
-    entry.child.name = entry.name;
-  });
-  delete rocket.userData.expeditionPodPresentation;
-  if (appCtx.spaceFlight.craftRole === 'pathfinder') appCtx.spaceFlight.craftRole = 'wayfinder';
+  const position = current?.position?.clone?.() || new THREE.Vector3();
+  const quaternion = current?.quaternion?.clone?.() || new THREE.Quaternion();
+  if (current) {
+    current.parent?.remove?.(current);
+    disposeThreeObjectTree(current);
+  }
+  const next = buildActiveSpaceCraft(craftId);
+  next.position.copy(position);
+  next.quaternion.copy(quaternion);
+  scene.add(next);
+  appCtx.spaceFlight.rocket = next;
+  appCtx.updateSpaceTravelSession?.({ activeCraftId: craftId, reason: 'active-craft-changed' });
+  syncOrbitalStarshipVisibility();
   return true;
 }
 
-export function setSurveyorFlightPresentation(active) {
-  const rocket = appCtx.spaceFlight?.rocket;
-  if (!rocket) return false;
-  const current = rocket.userData.surveyorFlightPresentation;
-  if (active === true) {
-    if (current?.active) return true;
-    setExpeditionPodFlightPresentation(false);
-    const originalScale = rocket.scale.clone();
-    rocket.scale.setScalar(1.45);
-    rocket.name = `${SPACE_CRAFT_IDENTITY.starship.name} Flight Vessel`;
-    rocket.userData.surveyorFlightPresentation = { active: true, originalScale };
-    appCtx.spaceFlight.craftRole = 'starship';
-    if (appCtx.spaceFlight.expeditionSurveyor) appCtx.spaceFlight.expeditionSurveyor.visible = false;
-    return true;
-  }
-  if (!current?.active) return true;
-  rocket.scale.copy(current.originalScale);
-  rocket.name = `${SPACE_CRAFT_IDENTITY.starship.name} Exploration Starship`;
-  delete rocket.userData.surveyorFlightPresentation;
-  if (appCtx.spaceFlight.craftRole === 'starship') appCtx.spaceFlight.craftRole = 'wayfinder';
-  if (appCtx.spaceFlight.expeditionSurveyor) appCtx.spaceFlight.expeditionSurveyor.visible = true;
+function createSpaceRocket() {
+  const craftId = appCtx.getActiveSpaceCraftId?.() || SPACE_CRAFT_IDENTITY.starship.id;
+  appCtx.spaceFlight.rocket = buildActiveSpaceCraft(craftId);
+  appCtx.spaceFlight.scene.add(appCtx.spaceFlight.rocket);
+  syncOrbitalStarshipVisibility();
+}
+
+export function setExpeditionPodFlightPresentation(active) {
+  return active === true
+    ? replaceActiveSpaceCraft(SPACE_CRAFT_IDENTITY.pod.id)
+    : replaceActiveSpaceCraft(SPACE_CRAFT_IDENTITY.starship.id);
+}
+
+export function setSolisReachFlightPresentation(active) {
+  if (active === true) return replaceActiveSpaceCraft(SPACE_CRAFT_IDENTITY.starship.id);
+  syncOrbitalStarshipVisibility();
   return true;
 }
 
 export function updateExpeditionPodFlightPresentation(dt = 0) {
-  const pod = appCtx.spaceFlight?.rocket?.getObjectByName('Surveyor Pathfinder Pod');
-  if (!pod) return false;
-  const phase = appCtx.getInterstellarExpeditionSnapshot?.()?.podJourney?.phase || '';
+  const pod = appCtx.spaceFlight?.rocket;
+  if (pod?.userData?.spaceCraftId !== SPACE_CRAFT_IDENTITY.pod.id) return false;
+  const phase = appCtx.getSpaceTravelSession?.()?.phase || '';
   const time = performance.now() * 0.001;
   const plasma = pod.getObjectByName('podEntryPlasma');
   if (plasma) {
@@ -319,7 +342,7 @@ export function updateExpeditionPodFlightPresentation(dt = 0) {
   }
   const touchdown = pod.getObjectByName('podTouchdownLights');
   if (touchdown) {
-    touchdown.visible = ['descent', 'surface_launch'].includes(phase);
+    touchdown.visible = ['descent', 'ascent', 'launch'].includes(phase);
     touchdown.children.forEach((light, index) => { light.material.opacity = 0.6 + Math.sin(time * 6 + index) * 0.25; });
   }
   const docking = pod.getObjectByName('podDockingGuide');
@@ -328,7 +351,7 @@ export function updateExpeditionPodFlightPresentation(dt = 0) {
     docking.rotation.y += Math.max(0, Number(dt) || 0) * 0.32;
     docking.position.y = Math.sin(time * 1.8) * 0.22;
   }
-  if (['ship_launch', 'surface_launch'].includes(phase)) {
+  if (['launch', 'ascent'].includes(phase)) {
     const glow = pod.getObjectByName('engineGlow');
     if (glow) glow.scale.y = 1.15 + Math.sin(time * 18) * 0.12;
   }
@@ -453,4 +476,5 @@ export function destroySpaceFlightScene() {
   appCtx.spaceFlight.rocket = null;
   appCtx.spaceFlight.earth = null;
   appCtx.spaceFlight.moon = null;
+  appCtx.spaceFlight.solisReachDockTarget = null;
 }

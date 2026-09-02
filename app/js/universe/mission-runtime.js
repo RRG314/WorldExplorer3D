@@ -1,4 +1,4 @@
-import { getDestinationMission } from './mission-catalog.js?v=2';
+import { getDestinationMission } from './mission-catalog.js?v=3';
 import { createDestinationMissionStore, DESTINATION_MISSION_PHASE } from './mission-authority.js?v=3';
 import { resolveUniverseAddress } from './catalog.js?v=11';
 import { DEFAULT_CREW } from '../expedition/catalog.js?v=2';
@@ -295,7 +295,7 @@ function renderDestinationMission(destinationId = '') {
       const evidenceCount = evidencePlan.filter((entry) => state.evidence.includes(entry.evidenceId)).length;
       action = activeContext?.activePlanetaryBodyId === mission.destinationId
         ? `<button type="button" class="universe-action" disabled>Surface record ${evidenceCount} of ${evidencePlan.length} · use the marked field stations</button>`
-        : `<button type="button" class="universe-action" disabled>${missionAtDestination(mission) ? 'Board Surveyor and launch from the Pod Bay' : 'Reach the marked planet before launching the pod'}</button>`;
+        : `<button type="button" class="universe-action" disabled>${missionAtDestination(mission) ? 'Board Solis Reach and launch from the Pod Bay' : 'Reach the marked planet before launching the pod'}</button>`;
     } else if (orbitalEvidencePlan(mission)) {
       const nextEvidence = nextOrbitalEvidence(mission, state);
       if (mission.operation === 'transit-network-survey') {
@@ -326,12 +326,12 @@ function renderDestinationMission(destinationId = '') {
       action = `<button type="button" class="universe-action primary" data-mission-field ${missionAtDestination(mission) && !scanTimer ? '' : 'disabled'}>${scanTimer ? 'Survey in progress…' : missionAtDestination(mission) ? 'Run mission survey' : 'Reach the marked survey position'}</button>`;
     }
   } else if (state.phase === DESTINATION_MISSION_PHASE.ANALYSIS) {
-    action = '<button type="button" class="universe-action" disabled>Complete analysis in Surveyor’s Analysis Lab</button>';
+    action = '<button type="button" class="universe-action" disabled>Complete analysis in Solis Reach’s Analysis Lab</button>';
   } else {
     action = '<button type="button" class="universe-action" disabled>Mission recorded in the Captain’s Log</button>';
   }
   const completion = state.phase === DESTINATION_MISSION_PHASE.COMPLETE && state.returnConsequence
-    ? `<div class="destination-mission-current"><span>RETURN CONSEQUENCE</span><strong>${state.returnConsequence}</strong>${state.crewLeadId ? `<small>Analysis led by ${crewNameForId(state.crewLeadId) || 'the Surveyor science team'}</small>` : ''}</div>`
+    ? `<div class="destination-mission-current"><span>RETURN CONSEQUENCE</span><strong>${state.returnConsequence}</strong>${state.crewLeadId ? `<small>Analysis led by ${crewNameForId(state.crewLeadId) || 'the Solis Reach science team'}</small>` : ''}</div>`
     : '';
   panel.innerHTML = `<article class="destination-mission-card" role="dialog" aria-modal="true" aria-labelledby="destinationMissionTitle">
     <header><div><span>DESTINATION MISSION · ${mission.destinationName}</span><h2 id="destinationMissionTitle">${mission.title}</h2></div><button type="button" class="universe-icon-button" data-mission-close aria-label="Close mission">×</button></header>

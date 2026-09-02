@@ -64,7 +64,7 @@ async function seedIncompleteExpedition(page) {
 }
 
 async function deployEarthPathfinder(page) {
-  await page.evaluate(() => document.getElementById('fSpaceSurveyor')?.click());
+  await page.evaluate(() => document.getElementById('fDeployPathfinder')?.click());
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').stagedEarthPathfinder?.active === true);
   assert.equal(await page.locator('#expeditionOverlay').isVisible(), false, 'Deploy Pathfinder must not detour through the Expedition planner.');
 }
@@ -106,7 +106,7 @@ async function approachAndBoardEarthPathfinder(page) {
 async function placeAtDockingRange(page) {
   return page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    const target = ctx.getExpeditionSurveyorDockTarget();
+    const target = ctx.getSolisReachDockTarget();
     const approachDirection = target.approachDirection.clone().normalize();
     ctx.spaceFlight.rocket.position.copy(target.position).addScaledVector(approachDirection, target.radius + 8);
     ctx.spaceFlight.rocket.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), approachDirection.clone().negate());
@@ -199,7 +199,7 @@ async function run() {
     assert.equal(await page.locator('#travelBtn').getAttribute('aria-expanded'), 'true');
     assert.equal(await page.locator('#fOceanMode').isVisible(), true);
     assert.equal(await page.locator('#fEarthMode').isVisible(), false);
-    await page.locator('#fSpaceBoardSurveyor').click();
+    await page.locator('#fBoardSolisReach').click();
     await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.active === true, null, { timeout: 120_000 });
     assert.equal((await snapshot(page)).environment, 'SPACE_FLIGHT');
     await enterPodBay(page);
@@ -255,8 +255,8 @@ async function run() {
     assert.equal((await snapshot(page)).interstellarExpedition.podJourney.id, returnJourneyId);
     assert.equal(await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
-      return ctx.spaceFlight.rocket.getObjectByName('Surveyor Pathfinder Pod')?.visible === true
-        && ctx.getExpeditionSurveyorDockTarget()?.mesh?.visible === true;
+      return ctx.spaceFlight.rocket?.userData?.spaceCraftId === 'pathfinder-pod'
+        && ctx.getSolisReachDockTarget()?.mesh?.visible === true;
     }), true);
     const beforeThrust = await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
@@ -278,11 +278,11 @@ async function run() {
     const recoveredPresentation = await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
       return {
-        starshipActive: ctx.spaceFlight.rocket?.userData?.surveyorFlightPresentation?.active === true,
+        starshipActive: ctx.spaceFlight.rocket?.userData?.spaceCraftId === 'solis-reach',
         starshipScale: Number(ctx.spaceFlight.rocket?.scale?.x || 0),
         starshipName: String(ctx.spaceFlight.rocket?.name || ''),
-        pathfinderPresent: !!ctx.spaceFlight.rocket?.getObjectByName('Surveyor Pathfinder Pod'),
-        dockTargetVisible: ctx.getExpeditionSurveyorDockTarget?.()?.mesh?.visible ?? false
+        pathfinderPresent: !!ctx.spaceFlight.rocket?.getObjectByName('Pathfinder Flight Pod'),
+        dockTargetVisible: ctx.getSolisReachDockTarget?.()?.mesh?.visible ?? false
       };
     });
     assert.equal(recoveredPresentation.starshipActive, true, JSON.stringify(recoveredPresentation));

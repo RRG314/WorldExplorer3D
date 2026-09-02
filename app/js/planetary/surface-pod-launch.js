@@ -1,4 +1,4 @@
-import { createExpeditionPodMesh } from '../space/expedition-pod-mesh.js?v=2';
+import { createExpeditionPodMesh } from '../space/expedition-pod-mesh.js?v=3';
 
 const ASCENT_HANDOFF_ALTITUDE = 165;
 const SURFACE_CAMERA_MODES = Object.freeze(['chase', 'side', 'cockpit']);
@@ -57,7 +57,7 @@ function groundPod(appCtx, pod, groundY) {
   return pod;
 }
 
-function resolveEarthPodPlacement(appCtx, actor) {
+function resolveSurfacePodPlacement(appCtx, actor) {
   const candidates = [];
   [8, 10, 12].forEach((distance) => {
     [0, -0.36, 0.36, -0.72, 0.72].forEach((offset) => {
@@ -96,18 +96,19 @@ function faceActorTowardPod(appCtx, pod) {
   return true;
 }
 
-function createEarthPod(appCtx) {
+function createSurfacePod(appCtx, bodyId = 'earth') {
   const actor = actorPosition(appCtx);
   const pod = createExpeditionPodMesh();
-  pod.name = 'expedition-surface-launch-pod:earth';
+  pod.name = `expedition-surface-launch-pod:${bodyId}`;
   pod.userData.authority = 'expedition-pod-journey';
   pod.userData.temporarySurfaceLaunchPod = true;
   pod.scale.setScalar(0.62);
   pod.rotation.y = actor.angle;
-  const placement = resolveEarthPodPlacement(appCtx, actor);
+  const placement = resolveSurfacePodPlacement(appCtx, actor);
   const { x, z } = placement;
   pod.position.set(x, 0, z);
-  if (typeof appCtx.addEarthWorldObject === 'function') appCtx.addEarthWorldObject(pod);
+  const earthActive = appCtx.getEnv?.() === appCtx.ENV?.EARTH;
+  if (earthActive && typeof appCtx.addEarthWorldObject === 'function') appCtx.addEarthWorldObject(pod);
   else appCtx.scene.add(pod);
   groundPod(appCtx, pod, placement.groundY);
   return pod;
@@ -140,7 +141,7 @@ function releaseStagedEarthPod({ remove = true } = {}) {
 function stageEarthPod(appCtx, options = {}) {
   if (!appCtx?.scene || appCtx.getEnv?.() !== appCtx.ENV?.EARTH || appCtx.spaceFlight?.active) return null;
   if (stagedEarthPod?.parent !== appCtx.earthSceneRoot) releaseStagedEarthPod();
-  if (!stagedEarthPod) stagedEarthPod = createEarthPod(appCtx);
+  if (!stagedEarthPod) stagedEarthPod = createSurfacePod(appCtx, 'earth');
   stagedEarthContext = appCtx;
   stagedEarthBoard = typeof options.onBoard === 'function' ? options.onBoard : null;
   stagedEarthPod.userData.boardingRadius = 7.5;
@@ -164,7 +165,7 @@ function stageEarthPod(appCtx, options = {}) {
           label: 'Board Pathfinder',
           detail: 'Launch to Solis Reach in Earth orbit',
           distance,
-          data: { destination: 'surveyor' }
+          data: { destination: 'solis-reach' }
         };
       },
       perform() {
@@ -392,7 +393,7 @@ function clearLaunch(appCtx, launch, { restore = false } = {}) {
 
 function playSurfacePodLaunch(appCtx, options = {}) {
   if (activeLaunch || !appCtx?.scene || !appCtx?.camera || !appCtx?.renderer) return false;
-  const pod = options.pod || createEarthPod(appCtx);
+  const pod = options.pod || createSurfacePod(appCtx, String(options.bodyId || 'earth'));
   if (!pod) return false;
   const temporary = pod.userData?.temporarySurfaceLaunchPod === true;
   const launch = {

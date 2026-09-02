@@ -1,12 +1,13 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { getAstronomicalBody, LANDING_MODE } from '../astronomy/body-catalog.js?v=3';
-import { SPACE_CONSTANTS } from "./constants.js?v=1";
+import { SPACE_CONSTANTS } from "./constants.js?v=3";
 import { evaluateAtmosphericEntry } from './atmospheric-descent-authority.js?v=1';
 import {
   computeBodyRelativeNavigation,
   evaluateLandingEligibility
-} from './spacecraft-authority.js?v=2';
+} from './spacecraft-authority.js?v=4';
 import { spacecraftOperationTuning } from '../character/spacecraft-assistance.js?v=1';
+import { SPACE_CRAFT_IDENTITY } from './craft-identity.js?v=1';
 
 const MAX_LOCAL_SPACECRAFT_SPEED_KM_S = 192.2;
 const SPACE_CAMERA_MODES = Object.freeze(['chase', 'side', 'overhead', 'cockpit']);
@@ -135,7 +136,7 @@ function setupSpaceFlightControls(attemptLanding, lifecycleScope = null) {
   });
   listen(document.getElementById('sfLandBtn'), 'click', attemptLanding);
   listen(document.getElementById('sfExpeditionBtn'), 'click', async () => {
-    const runtime = await import('../expedition/runtime.js?v=40');
+    const runtime = await import('../expedition/runtime.js?v=42');
     runtime.openExpeditionPlanner(appCtx);
   });
   listen(document.getElementById('sfHudToggle'), 'click', () => {
@@ -248,22 +249,23 @@ export function showGameUI() {
 
 export function updateSpaceFlightHUD(findLandableBodyByName) {
   const rocket = appCtx.spaceFlight.rocket;
-  const podPhase = appCtx.getInterstellarExpeditionSnapshot?.()?.podJourney?.phase || '';
-  const podActive = ['ship_launch', 'local_flight', 'descent', 'surface_launch', 'rendezvous'].includes(podPhase);
-  const starshipActive = rocket?.userData?.surveyorFlightPresentation?.active === true;
+  const travelSession = appCtx.getSpaceTravelSession?.();
+  const podActive = travelSession?.activeCraftId === SPACE_CRAFT_IDENTITY.pod.id;
+  const starshipActive = travelSession?.activeCraftId === SPACE_CRAFT_IDENTITY.starship.id;
+  const travelPhase = String(travelSession?.phase || '');
   const title = document.getElementById('sfFlightTitle');
   const phaseBadge = document.getElementById('sfPodPhase');
   if (title) title.textContent = podActive ? 'PATHFINDER POD' : starshipActive ? 'SOLIS REACH' : 'SPACE FLIGHT';
   if (phaseBadge) {
-    phaseBadge.hidden = !podActive;
-    phaseBadge.textContent = podActive ? String(podPhase).replaceAll('_', ' ').toUpperCase() : '';
+    phaseBadge.hidden = !travelPhase || travelPhase === 'free-flight';
+    phaseBadge.textContent = travelPhase ? travelPhase.replaceAll('-', ' ').toUpperCase() : '';
   }
   const manualTargetBody = findLandableBodyByName(appCtx.spaceFlight._manualLandingTarget);
 
   let nearestBody = null;
   let nearestDist = Infinity;
   const universeTarget = appCtx.getUniverseHudTarget?.();
-  const expeditionDockTarget = appCtx.getExpeditionPodDockingTarget?.();
+  const expeditionDockTarget = appCtx.getExpeditionPodDockingTarget?.() || appCtx.getSolisReachDockTarget?.();
 
   if (expeditionDockTarget?.position) {
     nearestBody = expeditionDockTarget;
@@ -304,7 +306,8 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
     activeDist = rocket.position.distanceTo(manualTargetBody.position);
   }
 
-  document.getElementById('sfDestination').textContent = activeHudBody.name;
+  const selectedDestination = travelSession?.destination?.name || activeHudBody.name;
+  document.getElementById('sfDestination').textContent = selectedDestination;
   const altitude = Math.max(0, activeDist - activeHudBody.radius);
   const displaySpeed = appCtx.spaceFlight.velocity ? appCtx.spaceFlight.velocity.length() : appCtx.spaceFlight.speed;
   const zoneLabel = document.getElementById('sfZoneLabel');
@@ -312,7 +315,7 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
   const assistBtn = document.getElementById('sfAssistBtn');
   const flightRead = document.getElementById('sfFlightRead');
   const environmentText = document.getElementById('sfEnvironment');
-  const destinationName = appCtx.spaceJourneyEphemeris?.destination?.bodyId || appCtx.spaceFlight.destination || 'destination';
+  const destinationName = travelSession?.destination?.id || appCtx.spaceJourneyEphemeris?.destination?.bodyId || appCtx.spaceFlight.destination || 'destination';
   const departureName = appCtx.spaceJourneyEphemeris?.source?.bodyId || appCtx.spaceJourney?.sourceBodyId || 'departure point';
   const destinationLabel = getAstronomicalBody(destinationName)?.name || destinationName;
   const departureLabel = getAstronomicalBody(departureName)?.name || departureName;
@@ -336,6 +339,8 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
     const universeAssistActive = universeTarget?.course?.guidance === 'assisted';
     const copy = universeTarget
       ? universeAssistActive ? `Assisted approach to ${universeTarget.name}` : `Course set for ${universeTarget.name}`
+      : travelSession?.guidance === 'assisted' && travelSession?.destination
+      ? `Assisted flight to ${travelSession.destination.name}`
       : appCtx.spaceFlight.presentationAuthority === 'classic'
       ? appCtx.spaceFlight.speed > 0 ? 'Manual flight' : 'Ready to fly'
       : phaseCopy[appCtx.spaceJourney?.phase] || 'Manual flight';

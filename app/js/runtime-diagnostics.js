@@ -65,13 +65,7 @@ function spaceFlightSnapshot() {
     } : null,
     cameraMode: String(appCtx.spaceFlight?.cameraMode || 'chase'),
     earthLandingSelection: appCtx.getEarthLandingSelection?.() || null,
-    vehiclePresentation: rocket?.userData?.expeditionPodPresentation?.pod
-      ? 'pathfinder'
-      : rocket?.userData?.surveyorFlightPresentation?.active === true
-      ? 'solis-reach'
-      : rocket
-      ? 'solis-reach'
-      : null,
+    vehiclePresentation: appCtx.getActiveSpaceCraftId?.() || rocket?.userData?.spaceCraftId || null,
     position: vectorSnapshot(rocket?.position),
     forward: vectorSnapshot(forward),
     up: vectorSnapshot(up)

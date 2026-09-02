@@ -1,13 +1,13 @@
 export function bindSpaceActions(appCtx, closeAllFloatMenus) {
-  document.getElementById('fSpaceSurveyor')?.addEventListener('click', async () => {
+  document.getElementById('fDeployPathfinder')?.addEventListener('click', async () => {
     closeAllFloatMenus();
-    const { stageEarthPodToSurveyor } = await import('../expedition/runtime.js?v=40');
-    stageEarthPodToSurveyor(appCtx);
+    const { stageEarthPathfinder } = await import('../expedition/runtime.js?v=42');
+    stageEarthPathfinder(appCtx);
   });
-  document.getElementById('fSpaceBoardSurveyor')?.addEventListener('click', async () => {
+  document.getElementById('fBoardSolisReach')?.addEventListener('click', async () => {
     closeAllFloatMenus();
-    const { boardSurveyorDirect } = await import('../expedition/runtime.js?v=40');
-    if (!await boardSurveyorDirect(appCtx)) appCtx.showToast?.('Direct Solis Reach boarding is unavailable from here.');
+    const { boardSolisReachDirect } = await import('../expedition/runtime.js?v=42');
+    if (!await boardSolisReachDirect(appCtx)) appCtx.showToast?.('Direct Solis Reach boarding is unavailable from here.');
   });
   document.getElementById('fSpaceDirect')?.addEventListener('click', () => {
     if (appCtx.onMars) appCtx.startFastTravelJourney?.('earth', { sourceBodyId: 'mars' });

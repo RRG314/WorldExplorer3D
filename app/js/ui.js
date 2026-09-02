@@ -7,7 +7,7 @@ import { initMapInteractions } from "./ui/map-interactions.js?v=60";
 import { initMobileControls } from "./ui/mobile-controls.js?v=82";
 import { initShareUi } from "./ui/share-links.js?v=64";
 import { setupSettingsUi } from "./ui/settings.js?v=2";
-import { bindSpaceActions } from "./ui/space-actions.js?v=11";
+import { bindSpaceActions } from "./ui/space-actions.js?v=12";
 import { initTitleScreenUi } from "./ui/title-screen.js?v=117";
 import { commitEnvironment, exitCurrentEnvironmentSync } from './session-coordinator.js?v=2';
 
@@ -208,7 +208,7 @@ function setupUI() {
     realEstateFloatBtn: 'realEstateMenu',
     exploreBtn: 'exploreMenu',
     gameBtn: 'gameMenu',
-    myExplorerBtn: 'myExplorerMenu'
+    packBtn: 'packMenu'
   };
 
   const toggleFloatMenuByButton = (buttonId) => {
@@ -243,12 +243,11 @@ function setupUI() {
     toggleFloatMenuByButton('gameBtn');
     void titleUi.primeMultiplayerUi?.();
   };
-  const myExplorerButton = document.getElementById('myExplorerBtn');
-  if (myExplorerButton) myExplorerButton.onclick = () => toggleFloatMenuByButton('myExplorerBtn');
+  const packButton = document.getElementById('packBtn');
+  if (packButton) packButton.onclick = () => toggleFloatMenuByButton('packBtn');
 
   const homeMenuItem = document.getElementById('fHome');
   if (homeMenuItem) homeMenuItem.addEventListener('click', goToMainMenu);
-  document.getElementById('fChooseLocation')?.addEventListener('click', goToMainMenu);
   document.getElementById('fWorldMap')?.addEventListener('click', () => {
     closeAllFloatMenus();
     appCtx.openLargeMap?.();
@@ -264,7 +263,6 @@ function setupUI() {
     else appCtx.toggleWorldDiscoveryJournal?.(true);
     closeAllFloatMenus();
   };
-  document.getElementById('fExplorerToday')?.addEventListener('click', () => openExplorerSection('today'));
   document.getElementById('fExplorerJournal')?.addEventListener('click', () => openExplorerSection('journal'));
   document.getElementById('fExplorerGuide')?.addEventListener('click', () => openExplorerSection('guide'));
   document.getElementById('fExplorerProfile')?.addEventListener('click', () => openExplorerSection('profile'));

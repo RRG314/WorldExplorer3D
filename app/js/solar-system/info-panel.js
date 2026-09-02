@@ -51,7 +51,7 @@ function configureSetCourse(ctx, bodyId, label) {
   const currentDestination = journey?.destinationBodyId;
   const canRetarget = selectable && bodyId !== 'earth' && (
     !ctx.appCtx.spacecraftState ||
-    ['launch', 'parking_orbit'].includes(journey?.phase) ||
+    !['descent', 'home_descent', 'surface', 'complete'].includes(journey?.phase) ||
     currentDestination === bodyId
   );
   const alreadySet = currentDestination === bodyId;

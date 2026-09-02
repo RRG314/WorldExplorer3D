@@ -184,7 +184,7 @@ function createMoonLandingUiApi(context) {
       btn = document.createElement('button');
       btn.id = 'returnToEarthBtn';
       btn.className = 'game-btn';
-      btn.textContent = 'Return to Earth';
+      btn.textContent = 'Launch Pathfinder to Solis Reach';
       btn.style.position = 'fixed';
       btn.style.top = '82px';
       btn.style.right = '20px';

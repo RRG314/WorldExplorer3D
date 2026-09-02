@@ -92,8 +92,8 @@ function syncTravelModeButtons() {
     setAvailable(button, state.visible);
     if (button && button.textContent !== state.label) button.textContent = state.label;
   };
-  applyAction('fSpaceSurveyor', menuState.pathfinder);
-  applyAction('fSpaceBoardSurveyor', menuState.boardStarship);
+  applyAction('fDeployPathfinder', menuState.pathfinder);
+  applyAction('fBoardSolisReach', menuState.boardStarship);
   applyAction('fSpaceRocket', menuState.freeSpaceFlight);
   applyAction('fSpaceDirect', menuState.quickTrip);
   return activeMode;

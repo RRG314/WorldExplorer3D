@@ -29,7 +29,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link rel="stylesheet" href="styles/interface-v4.css?v=25">
 <link rel="stylesheet" href="styles/start-hub.css?v=18">
 <link rel="stylesheet" href="styles/discovery.css?v=16">
-<link rel="stylesheet" href="styles/tutorial.css?v=10">
+<link rel="stylesheet" href="styles/tutorial.css?v=12">
 <link rel="stylesheet" href="styles/ar.css?v=1">
 <link rel="stylesheet" href="styles/mobile-controls.css?v=1">
 <link rel="stylesheet" href="styles/map-explorer.css?v=4">
@@ -1197,8 +1197,7 @@ Explore the area
 <div class="floatMenu" id="travelMenu">
 <button class="floatBtn travel" id="travelBtn" type="button" aria-label="Travel and world view" aria-expanded="false" data-mobile-label="Travel"><span class="btnIcon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="6" cy="17" r="2.5"></circle><circle cx="18" cy="7" r="2.5"></circle><path d="M8.5 17c5.5 0 1.5-10 7-10"></path><path d="m15.5 4.5 2.5-2 2.5 2"></path></svg></span><span class="btnText">Travel</span></button>
 <div class="floatItems" data-menu-title="TRAVEL">
-<div class="floatItemSection" role="separator">WHERE TO GO</div>
-<div class="floatItem" id="fChooseLocation">◎ Choose Another Place</div>
+<div class="floatItemSection" role="separator">WORLD VIEW</div>
 <div class="floatItem" id="fWorldMap">🗺️ Open World Map</div>
 <div class="floatItemSection" role="separator">HOW TO MOVE</div>
 <div class="floatItem" id="fDriving">🚗 Drive</div>
@@ -1209,8 +1208,8 @@ Explore the area
 <div class="floatItem" id="fOceanMode">🌊 Explore the Ocean</div>
 <div class="floatItem" id="fEarthMode" hidden>🌍 Return to Earth</div>
 <div class="floatItemSection" role="separator">BEYOND EARTH</div>
-<div class="floatItem" id="fSpaceSurveyor">🛸 Deploy Pathfinder Pod</div>
-<div class="floatItem" id="fSpaceBoardSurveyor">🛰️ Board Solis Reach Directly</div>
+<div class="floatItem" id="fDeployPathfinder">🛸 Deploy Pathfinder Pod</div>
+<div class="floatItem" id="fBoardSolisReach">🛰️ Board Solis Reach Directly</div>
 <div class="floatItem" id="fSpaceRocket">✦ Enter Free Space Flight</div>
 <div class="floatItem" id="fSpaceDirect">🌙 Quick Trip to the Moon</div>
 <div class="floatItem" id="fSeaState" style="display:none">🌊 Sea State: Moderate</div>
@@ -1231,6 +1230,8 @@ Explore the area
 <div class="floatItem" id="fEditorMine" hidden>📬 My Submissions</div>
 <div class="floatItem" id="fModerationPanel" hidden>🛡️ Review Queue</div>
 <div class="floatItem" id="fLandUseRE" hidden>🗺️ Land Use</div>
+<div class="floatItemSection" role="separator">HOME &amp; PROPERTY</div>
+<div class="floatItem" id="fRealEstate">🏠 Home &amp; Property</div>
 <div class="floatItemSection" role="separator">CHANGE THE VIEW</div>
 <div class="floatItem" id="fTimeOfDay">☀️ Live Sky</div>
 <div class="floatItem" id="fWeatherMode">🌦️ Weather Live</div>
@@ -1267,14 +1268,12 @@ Explore the area
 </div>
 </div>
 
-<div class="floatMenu" id="myExplorerMenu">
-<button class="floatBtn controls" id="myExplorerBtn" type="button" aria-label="Open journal, gear, and progress" aria-expanded="false" data-mobile-label="Journal"><span class="btnIcon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 8.5V7a5 5 0 0 1 10 0v1.5"></path><path d="M5 10.5A2.5 2.5 0 0 1 7.5 8h9a2.5 2.5 0 0 1 2.5 2.5V21H5V10.5Z"></path><path d="M8 13h8M9 17h6"></path></svg></span><span class="btnText">Journal</span></button>
-<div class="floatItems" data-menu-title="JOURNAL &amp; GEAR">
-<div class="floatItem" id="fExplorerToday">🧭 Today’s Journey</div>
+<div class="floatMenu" id="packMenu">
+<button class="floatBtn controls" id="packBtn" type="button" aria-label="Open Backpack, Journal, Field Guide, and profile" aria-expanded="false" data-mobile-label="Pack"><span class="btnIcon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 8.5V7a5 5 0 0 1 10 0v1.5"></path><path d="M5 10.5A2.5 2.5 0 0 1 7.5 8h9a2.5 2.5 0 0 1 2.5 2.5V21H5V10.5Z"></path><path d="M8 13h8M9 17h6"></path></svg></span><span class="btnText">Pack</span></button>
+<div class="floatItems" data-menu-title="YOUR PACK">
+<div class="floatItem" id="fBackpack">🎒 Backpack &amp; Quick Slots</div>
 <div class="floatItem" id="fExplorerJournal">📖 Journal</div>
 <div class="floatItem" id="fExplorerGuide">📚 Field Guide</div>
-<div class="floatItem" id="fBackpack">🎒 Backpack &amp; Quick Slots</div>
-<div class="floatItem" id="fRealEstate">🏠 Home &amp; Property</div>
 <div class="floatItem" id="fExplorerProfile">🧑 Profile &amp; Progress</div>
 </div>
 </div>
@@ -1934,5 +1933,5 @@ Explore the area
 <!-- Real Estate System -->
 <script type="module" src="js/app-shell-fragments.js?v=86"></script>
 <script type="module" src="js/app-auth-shell.js?v=87"></script>
-<script type="module" src="js/bootstrap.js?v=578"></script>
+<script type="module" src="js/bootstrap.js?v=581"></script>
 </body></html>

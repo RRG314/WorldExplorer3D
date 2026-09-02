@@ -68,7 +68,7 @@ async function verifyPathfinderAndInterior(page) {
   assert.match(copy, /Enter Free Space Flight/i);
   assert.doesNotMatch(copy, /Fly with Wayfinder|Board Asteria/i);
 
-  await page.locator('#fSpaceSurveyor').click();
+  await page.locator('#fDeployPathfinder').click();
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').stagedEarthPathfinder?.active === true, null, { timeout: 15_000 });
   const staged = await snapshot(page);
   assert.equal(staged.interstellarExpedition?.readiness?.status, 'insufficient');
@@ -94,7 +94,7 @@ async function verifyPathfinderAndInterior(page) {
       inFront: projected.z > -1 && projected.z < 1,
       inViewport: Math.abs(projected.x) < 0.82 && Math.abs(projected.y) < 0.82,
       buildingCollision: collision?.collision === true,
-      menuLabel: document.getElementById('fSpaceSurveyor')?.textContent?.trim() || ''
+      menuLabel: document.getElementById('fDeployPathfinder')?.textContent?.trim() || ''
     };
   });
   assert.equal(stagedPresentation?.walkMode, 'walk');
@@ -104,7 +104,7 @@ async function verifyPathfinderAndInterior(page) {
   assert.match(stagedPresentation?.menuLabel || '', /Pathfinder Ready Nearby/i);
   await page.screenshot({ path: path.join(outputDir, 'pathfinder-staged-from-incomplete-expedition.png'), fullPage: true });
 
-  await page.evaluate(() => document.getElementById('fSpaceBoardSurveyor')?.click());
+  await page.evaluate(() => document.getElementById('fBoardSolisReach')?.click());
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.active === true, null, { timeout: 120_000 });
   await page.waitForTimeout(4_000);
   const interior = await snapshot(page);
@@ -124,8 +124,8 @@ async function verifyPathfinderAndInterior(page) {
     return {
       rocketName: String(ctx.spaceFlight.rocket?.name || ''),
       rocketScale: Number(ctx.spaceFlight.rocket?.scale?.x || 0),
-      starshipActive: ctx.spaceFlight.rocket?.userData?.surveyorFlightPresentation?.active === true,
-      ringShipPresent: !!ctx.spaceFlight.rocket?.getObjectByName('surveyor-habitat-ring'),
+      starshipActive: ctx.spaceFlight.rocket?.userData?.spaceCraftId === 'solis-reach',
+      pathfinderNestedInsideStarship: !!ctx.spaceFlight.rocket?.getObjectByName('Pathfinder Flight Pod'),
       stationaryAtDoor,
       crewActors: actors
     };
@@ -133,7 +133,7 @@ async function verifyPathfinderAndInterior(page) {
   assert.match(presentation.rocketName, /Solis Reach/);
   assert.equal(presentation.rocketScale, 1.45);
   assert.equal(presentation.starshipActive, true);
-  assert.equal(presentation.ringShipPresent, false);
+  assert.equal(presentation.pathfinderNestedInsideStarship, false);
   assert.deepEqual(presentation.stationaryAtDoor, []);
   const cameraEvidence = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');

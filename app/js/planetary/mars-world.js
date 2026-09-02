@@ -343,7 +343,7 @@ function showMarsReturnButton() {
     button = document.createElement('button');
     button.id = 'marsReturnEarthBtn';
     button.className = 'game-btn';
-    button.textContent = 'Return to Earth';
+    button.textContent = 'Launch Pathfinder to Solis Reach';
     button.style.cssText = 'position:fixed;top:82px;right:20px;z-index:1000;padding:10px 20px;font-size:16px;background:#b4532a;color:#fff;border:1px solid #efb08c;border-radius:5px;cursor:pointer;';
     button.addEventListener('click', () => void returnFromMars());
     document.body.appendChild(button);

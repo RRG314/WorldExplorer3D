@@ -53,8 +53,8 @@ try {
       journeyId: ctx.spaceJourney?.journeyId,
       phase: ctx.spaceJourney?.phase,
       destinationBodyId: ctx.spaceJourney?.destinationBodyId,
-      craftRole: ctx.spaceFlight?.craftRole,
-      podVisible: Boolean(ctx.spaceFlight?.rocket?.userData?.expeditionPodPresentation?.pod),
+      activeCraftId: ctx.getSpaceTravelSession?.()?.activeCraftId,
+      pathfinderActive: ctx.spaceFlight?.rocket?.userData?.spaceCraftId === 'pathfinder-pod',
       landingButtonText: document.getElementById('sfLandBtn')?.textContent?.trim() || '',
       landingButtonDisabled: document.getElementById('sfLandBtn')?.disabled === true,
       altitudeM: ctx.spacecraftState && ctx.spaceJourneyEphemeris?.destination
@@ -77,8 +77,8 @@ try {
       journeyId: ctx.spaceJourney?.journeyId,
       phase: ctx.spaceJourney?.phase,
       destinationBodyId: ctx.spaceJourney?.destinationBodyId,
-      craftRole: ctx.spaceFlight?.craftRole,
-      podVisible: Boolean(ctx.spaceFlight?.rocket?.userData?.expeditionPodPresentation?.pod),
+      activeCraftId: ctx.getSpaceTravelSession?.()?.activeCraftId,
+      pathfinderActive: ctx.spaceFlight?.rocket?.userData?.spaceCraftId === 'pathfinder-pod',
       shipInteriorActive: ctx.getShipInteriorSnapshot?.()?.active === true
     };
   });
@@ -86,12 +86,14 @@ try {
 
   assert.equal(before.destinationBodyId, 'jupiter');
   assert.equal(before.phase, 'approach');
-  assert.equal(before.podVisible, false);
+  assert.equal(before.activeCraftId, 'solis-reach');
+  assert.equal(before.pathfinderActive, false);
   assert.equal(after.journeyId, before.journeyId, 'Planet entry replaced the active journey.');
   assert.equal(after.destinationBodyId, 'jupiter');
   assert.equal(after.phase, 'atmospheric_exploration');
   assert.equal(after.shipInteriorActive, false, 'Planet entry opened the starship interior.');
-  assert.equal(after.podVisible, false, 'An unrelated saved Pathfinder replaced the current craft.');
+  assert.equal(after.activeCraftId, 'pathfinder-pod');
+  assert.equal(after.pathfinderActive, true, 'Atmospheric descent did not hand flight from Solis Reach to Pathfinder.');
   assert.deepEqual(browserErrors, []);
   assert.deepEqual(failedLocalResources, []);
   console.log(JSON.stringify({
@@ -101,7 +103,7 @@ try {
       planetEntryPreservedJourney: after.journeyId === before.journeyId,
       gasGiantOpenedAtmosphericFlight: after.phase === 'atmospheric_exploration',
       planetEntryDidNotOpenShipInterior: after.shipInteriorActive === false,
-      activeCraftWasNotReplacedByPathfinder: after.podVisible === false,
+      starshipTravelHandsDescentToPathfinder: after.activeCraftId === 'pathfinder-pod' && after.pathfinderActive === true,
       noBrowserErrors: true,
       noFailedLocalResources: true
     },

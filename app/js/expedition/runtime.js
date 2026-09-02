@@ -15,8 +15,9 @@ import { registerExpeditionDiscovery } from './contact-authority.js?v=4';
 import { createPodJourney, POD_PHASE, POD_ROUTE_KIND, transitionPodJourney } from './pod-journey-authority.js?v=2';
 import { approvedSampleTradeValue, summarizeExpeditionTransfers } from '../resources/material-catalog.js?v=2';
 import { SHIP_STATIONS } from './ship-layout.js?v=5';
-import { consumeStagedEarthPod, getStagedEarthPodSnapshot, playSurfacePodLaunch, stageEarthPod } from '../planetary/surface-pod-launch.js?v=6';
+import { consumeStagedEarthPod, getStagedEarthPodSnapshot, playSurfacePodLaunch, stageEarthPod } from '../planetary/surface-pod-launch.js?v=8';
 import { SPACE_CRAFT_IDENTITY } from '../space/craft-identity.js?v=1';
+import { SPACE_TRAVEL_LOCATION, SPACE_TRAVEL_PHASE } from '../space/travel-session.js?v=1';
 
 const STARSHIP_NAME = SPACE_CRAFT_IDENTITY.starship.name;
 
@@ -37,18 +38,18 @@ function bindRuntimeContext(appContext) {
   if (!activeContext) return null;
   Object.assign(activeContext, {
     attemptExpeditionPodDocking,
-    boardSurveyorDirect,
+    boardSolisReachDirect,
     collectExpeditionGeologySample,
     getExpeditionPodDockingTarget,
     getInterstellarExpeditionSnapshot: getExpeditionSnapshot,
     getStagedEarthPodSnapshot,
     leaveExpeditionSurface,
     leaveDestinationMissionSurface,
-    launchEarthPodToSurveyor,
+    launchEarthPathfinderToSolisReach,
     markExpeditionPodDescent,
     markExpeditionPodLanded,
     markExpeditionPodSurfaceLaunch,
-    stageEarthPodToSurveyor
+    stageEarthPathfinder
   });
   return activeContext;
 }
@@ -59,11 +60,47 @@ function setPodJourney(next) {
     activeExpedition = withExpeditionChanges(activeExpedition, { podJourney: activePodJourney });
     store.save(activeExpedition);
   }
-  if ([POD_PHASE.RECOVERED, POD_PHASE.FAILED].includes(activePodJourney?.phase)) {
-    activeContext?.setExpeditionPodFlightPresentation?.(false);
-    activeContext?.setSurveyorFlightPresentation?.(activePodJourney?.phase === POD_PHASE.RECOVERED);
-  }
+  syncSpaceSessionToPodJourney(activePodJourney);
   return activePodJourney;
+}
+
+function syncSpaceSessionToPodJourney(journey) {
+  const session = activeContext?.getSpaceTravelSession?.();
+  if (!session?.active || !journey) return;
+  const phaseMap = {
+    [POD_PHASE.SHIP_LAUNCH]: SPACE_TRAVEL_PHASE.LAUNCH,
+    [POD_PHASE.LOCAL_FLIGHT]: SPACE_TRAVEL_PHASE.APPROACH,
+    [POD_PHASE.DESCENT]: SPACE_TRAVEL_PHASE.DESCENT,
+    [POD_PHASE.SURFACE]: SPACE_TRAVEL_PHASE.LANDED,
+    [POD_PHASE.SURFACE_LAUNCH]: SPACE_TRAVEL_PHASE.ASCENT,
+    [POD_PHASE.RENDEZVOUS]: SPACE_TRAVEL_PHASE.RENDEZVOUS
+  };
+  if (journey.phase === POD_PHASE.RECOVERED) {
+    activeContext.updateSpaceTravelSession?.({
+      activeCraftId: SPACE_CRAFT_IDENTITY.starship.id,
+      location: SPACE_TRAVEL_LOCATION.STARSHIP,
+      phase: SPACE_TRAVEL_PHASE.DOCKED,
+      destination: null,
+      reason: 'pathfinder-recovered'
+    });
+    activeContext.setSolisReachFlightPresentation?.(true);
+    return;
+  }
+  const travelPhase = phaseMap[journey.phase];
+  if (!travelPhase) return;
+  activeContext.updateSpaceTravelSession?.({
+    activeCraftId: SPACE_CRAFT_IDENTITY.pod.id,
+    location: travelPhase === SPACE_TRAVEL_PHASE.LANDED ? SPACE_TRAVEL_LOCATION.SURFACE : SPACE_TRAVEL_LOCATION.LOCAL_SPACE,
+    phase: travelPhase,
+    sourceBodyId: journey.bodyId || session.sourceBodyId,
+    destination: travelPhase === SPACE_TRAVEL_PHASE.RENDEZVOUS
+      ? { id: SPACE_CRAFT_IDENTITY.starship.id, kind: 'starship', name: STARSHIP_NAME }
+      : journey.bodyId
+        ? { id: journey.bodyId, kind: 'body', name: journey.bodyId.replaceAll('-', ' ') }
+        : session.destination,
+    reason: `pathfinder-${travelPhase}`
+  });
+  activeContext.setExpeditionPodFlightPresentation?.(true);
 }
 
 function advancePodJourney(event, details = {}) {
@@ -110,7 +147,7 @@ function ensureTransitExpedition() {
   return activeExpedition;
 }
 
-async function launchEarthPodToSurveyor(options = {}) {
+async function launchEarthPathfinderToSolisReach(options = {}) {
   if (!activeExpedition || activeContext?.getEnv?.() !== activeContext?.ENV?.EARTH) return false;
   const existing = earthShuttleJourney();
   if (existing && ![POD_PHASE.SURFACE, POD_PHASE.FAILED, POD_PHASE.RECOVERED].includes(existing.phase)) return false;
@@ -131,7 +168,7 @@ async function launchEarthPodToSurveyor(options = {}) {
     bodyId: 'earth',
     pod: stagedPod,
     onCommit: async () => {
-      const started = await activeContext?.startSpaceFlightToSurveyor?.({
+      const started = await activeContext?.startSpaceFlightToSolisReach?.({
         onReady: () => {
           if (activePodJourney?.phase === POD_PHASE.SURFACE_LAUNCH) advancePodJourney('rendezvous');
         }
@@ -157,7 +194,7 @@ async function launchEarthPodToSurveyor(options = {}) {
   return true;
 }
 
-function stageEarthPodToSurveyor(appContext) {
+function stageEarthPathfinder(appContext) {
   bindRuntimeContext(appContext);
   if (!activeContext || activeContext.getEnv?.() !== activeContext.ENV?.EARTH) {
     activeContext?.showToast?.('Pathfinder can be deployed from an active Earth location.');
@@ -179,7 +216,7 @@ function stageEarthPodToSurveyor(appContext) {
     emitTutorial: false
   });
   const pod = stageEarthPod(activeContext, {
-    onBoard: (boardingPod) => launchEarthPodToSurveyor({ pod: boardingPod })
+    onBoard: (boardingPod) => launchEarthPathfinderToSolisReach({ pod: boardingPod })
   });
   if (!pod) {
     activeContext.showToast?.('Pathfinder could not be placed at this location.');
@@ -190,32 +227,31 @@ function stageEarthPodToSurveyor(appContext) {
   return true;
 }
 
-async function boardSurveyorDirect(appContext) {
+async function boardSolisReachDirect(appContext) {
   bindRuntimeContext(appContext);
   const expedition = ensureTransitExpedition();
   if (!activeContext || !expedition) return false;
   closeExpeditionPlanner();
   if (activeContext.spaceFlight?.active) {
-    activeContext.ensureExpeditionSurveyorDockTarget?.();
-    activeContext.positionSpacecraftAtSurveyorDock?.();
+    activeContext.ensureSolisReachDockTarget?.();
     activeContext.setExpeditionPodFlightPresentation?.(false);
     return enterActiveShip();
   }
   if (activeContext.getEnv?.() !== activeContext.ENV?.EARTH) return false;
-  return (await activeContext.startSpaceFlightToSurveyor?.({
+  return (await activeContext.startSpaceFlightToSolisReach?.({
     pathfinder: false,
     onReady: () => {
-      activeContext.positionSpacecraftAtSurveyorDock?.();
       void enterActiveShip();
     }
   })) === true;
 }
 
 function getExpeditionPodDockingTarget() {
-  if (earthShuttleJourney()?.phase !== POD_PHASE.RENDEZVOUS) return null;
-  if (activeContext?.spaceFlight?.craftRole !== 'pathfinder') return null;
-  if (!activeContext?.spaceFlight?.rocket?.userData?.expeditionPodPresentation?.pod) return null;
-  const target = activeContext?.getExpeditionSurveyorDockTarget?.();
+  const session = activeContext?.getSpaceTravelSession?.();
+  if (session?.activeCraftId !== SPACE_CRAFT_IDENTITY.pod.id || session.phase !== SPACE_TRAVEL_PHASE.RENDEZVOUS) return null;
+  if (activePodJourney && activePodJourney.phase !== POD_PHASE.RENDEZVOUS) return null;
+  if (activeContext?.spaceFlight?.rocket?.userData?.spaceCraftId !== SPACE_CRAFT_IDENTITY.pod.id) return null;
+  const target = activeContext?.getSolisReachDockTarget?.();
   const rocket = activeContext?.spaceFlight?.rocket;
   if (!target?.position || !rocket) return null;
   const distance = rocket.position.distanceTo(target.position);
@@ -230,8 +266,17 @@ function getExpeditionPodDockingTarget() {
 
 function attemptExpeditionPodDocking() {
   const target = getExpeditionPodDockingTarget();
-  if (!target?.canDock || !activeExpedition) return false;
-  if (!advancePodJourney('recover')) return false;
+  if (!target?.canDock) return false;
+  if (activePodJourney && !advancePodJourney('recover')) return false;
+  if (!activeExpedition) activeExpedition = ensureTransitExpedition();
+  activeContext?.setSolisReachFlightPresentation?.(true);
+  activeContext?.updateSpaceTravelSession?.({
+    activeCraftId: SPACE_CRAFT_IDENTITY.starship.id,
+    location: SPACE_TRAVEL_LOCATION.STARSHIP,
+    phase: SPACE_TRAVEL_PHASE.DOCKED,
+    destination: null,
+    reason: 'pathfinder-docked'
+  });
   activeContext?.showSpaceFlightMessage?.(`PATHFINDER SECURED · ENTERING ${STARSHIP_NAME.toUpperCase()}`, '#83e6a6');
   window.setTimeout(() => { void enterActiveShip(); }, 180);
   return true;
@@ -250,8 +295,8 @@ function schedulePodRecovery(returnFrameId, startedAt = performance.now(), minim
     if (!activePodJourney || activePodJourney.phase !== POD_PHASE.RENDEZVOUS) return;
     const runtime = activeContext?.universeRuntime;
     if (performance.now() - startedAt >= minimumVisibleMs && !runtime?.transition && (!returnFrameId || runtime?.current?.id === returnFrameId)) {
-      advancePodJourney('recover');
-      activeContext?.showSpaceFlightMessage?.(`POD DOCKED · ${STARSHIP_NAME.toUpperCase()} HAS THE FLIGHT`, '#83e6a6');
+      activeContext?.ensureSolisReachDockTarget?.({ nearActiveCraft: true });
+      activeContext?.showSpaceFlightMessage?.(`${STARSHIP_NAME.toUpperCase()} ACQUIRED · FLY TO THE DOCKING LIGHTS`, '#83e6a6');
       return;
     }
     if (performance.now() - startedAt >= 20_000) {
@@ -518,13 +563,20 @@ function launchPodToEarth() {
     routeKind: POD_ROUTE_KIND.EARTH_SHUTTLE
   }));
   if (!advancePodJourney('launch')) return false;
-  activeContext?.ensureExpeditionSurveyorDockTarget?.();
-  activeContext?.positionSpacecraftAtSurveyorDock?.();
+  activeContext?.ensureSolisReachDockTarget?.();
+  activeContext?.positionSpacecraftAtSolisReachDock?.();
   activeContext?.clearRenderedSpaceJourney?.();
   activeContext.spaceFlight.destination = 'earth';
   activeContext.spaceFlight._manualLandingTarget = 'Earth';
   activeContext.spaceFlight._autopilotTarget = null;
   activeContext?.setExpeditionPodFlightPresentation?.(true);
+  activeContext?.updateSpaceTravelSession?.({
+    activeCraftId: SPACE_CRAFT_IDENTITY.pod.id,
+    location: SPACE_TRAVEL_LOCATION.LOCAL_SPACE,
+    phase: SPACE_TRAVEL_PHASE.LAUNCH,
+    destination: { id: 'earth', kind: 'body', name: 'Earth' },
+    reason: 'pathfinder-earth-departure'
+  });
   closeShipStationPanel();
   if (activeContext?.exitExpeditionShipInterior?.() !== true) {
     advancePodJourney('fail', { reason: 'ship-interior-exit-failed' });
@@ -999,7 +1051,7 @@ function renderMission() {
   });
   document.getElementById('expeditionReturnFromContact')?.addEventListener('click', returnFromLocalContact);
   document.getElementById('expeditionEarthPod')?.addEventListener('click', async () => {
-    if (!await launchEarthPodToSurveyor()) activeContext?.showToast?.('Pathfinder cannot launch from this Earth session yet.');
+    if (!await launchEarthPathfinderToSolisReach()) activeContext?.showToast?.('Pathfinder cannot launch from this Earth session yet.');
   });
   document.getElementById('expeditionSetSurveyCourse')?.addEventListener('click', () => {
     const bodyId = `${activeExpedition?.activeLocalContactId || ''}-i`;
@@ -1242,7 +1294,7 @@ async function transferApprovedSampleToBackpack() {
     catalogId,
     quantity: 1,
     authority: 'expedition-cargo-transfer',
-    provenance: 'approved-surveyor-science-cargo',
+    provenance: 'approved-solis-reach-science-cargo',
     sourceEventId: sample.id,
     tradeable: true,
     acquiredAt: Date.now(),
@@ -1459,11 +1511,17 @@ async function handleShipInteraction(interaction) {
 
 async function enterActiveShip() {
   if (!activeExpedition || !activeContext?.spaceFlight?.active) return false;
-  activeContext?.setSurveyorFlightPresentation?.(true);
+  activeContext?.setSolisReachFlightPresentation?.(true);
+  activeContext?.updateSpaceTravelSession?.({
+    activeCraftId: SPACE_CRAFT_IDENTITY.starship.id,
+    location: SPACE_TRAVEL_LOCATION.STARSHIP,
+    phase: SPACE_TRAVEL_PHASE.INTERIOR,
+    reason: 'solis-reach-interior-entered'
+  });
   ensureStylesheet();
-  const ship = await import('./ship-interior.js?v=17');
+  const ship = await import('./ship-interior.js?v=18');
   closeExpeditionPlanner();
-  const entered = ship.enterSurveyorInterior({
+  const entered = ship.enterSolisReachInterior({
     expedition: activeExpedition,
     onInteraction: handleShipInteraction
   });
@@ -1515,4 +1573,4 @@ function getExpeditionSnapshot() {
   };
 }
 
-export { boardSurveyorDirect, closeExpeditionPlanner, getExpeditionSnapshot, openExpeditionPlanner, stageEarthPodToSurveyor };
+export { boardSolisReachDirect, closeExpeditionPlanner, getExpeditionSnapshot, openExpeditionPlanner, stageEarthPathfinder };

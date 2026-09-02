@@ -50,8 +50,8 @@ try {
     accessibleLabel: button.getAttribute('aria-label'),
     hasVectorIcon: Boolean(button.querySelector('.btnIcon[aria-hidden="true"] svg'))
   })));
-  assert.deepEqual(hubPresentation.map((entry) => entry.label), ['Explore', 'Travel', 'Create', 'Community', 'Journal']);
-  assert.deepEqual(hubPresentation.map((entry) => entry.mobileLabel), ['Explore', 'Travel', 'Create', 'Community', 'Journal']);
+  assert.deepEqual(hubPresentation.map((entry) => entry.label), ['Explore', 'Travel', 'Create', 'Community', 'Pack']);
+  assert.deepEqual(hubPresentation.map((entry) => entry.mobileLabel), ['Explore', 'Travel', 'Create', 'Community', 'Pack']);
   assert.ok(hubPresentation.every((entry) => entry.accessibleLabel && entry.hasVectorIcon));
 
   await openMenu('exploreBtn', 'exploreMenu');
@@ -60,19 +60,20 @@ try {
   await page.waitForSelector('#discoveryPanel.show .discoveryPane[data-discovery-pane="today"].active');
   await page.locator('#discoveryCloseBtn').click();
 
-  await openMenu('myExplorerBtn', 'myExplorerMenu');
+  await openMenu('packBtn', 'packMenu');
   await page.locator('#fExplorerJournal').click();
   await page.waitForSelector('#discoveryPanel.show .discoveryPane[data-discovery-pane="journal"].active');
   await page.locator('#discoveryCloseBtn').click();
 
-  await openMenu('myExplorerBtn', 'myExplorerMenu');
+  await openMenu('packBtn', 'packMenu');
   await page.locator('#fExplorerProfile').click();
   await page.waitForSelector('#discoveryPanel.show .discoveryPane[data-discovery-pane="profile"].active');
   assert.match(await page.locator('#discoveryJourneyOverview').textContent(), /Choose your next direction.*Discover.*Travel.*Create.*Explore Together.*Companions/is);
   await page.screenshot({ path: `${evidenceDir}/00-my-explorer-story-desktop.png` });
   await page.locator('#discoveryJourneyOverview [data-explorer-route="travel"]').click();
   await page.waitForSelector('#travelMenu.open');
-  assert.match(await page.locator('#travelMenu .floatItems').textContent(), /Choose Another Place.*Open World Map.*Drive.*Walk.*Deploy Pathfinder Pod.*Current Controls/is);
+  assert.match(await page.locator('#travelMenu .floatItems').textContent(), /Open World Map.*Drive.*Walk.*Deploy Pathfinder Pod.*Current Controls/is);
+  assert.doesNotMatch(await page.locator('#travelMenu .floatItems').textContent(), /Choose Another Place/is);
   const travelMutationCount = await page.evaluate(async () => {
     const menu = document.querySelector('#travelMenu .floatItems');
     let mutations = 0;
@@ -90,7 +91,7 @@ try {
   await page.waitForFunction(() => document.getElementById('ctrlContent')?.classList.contains('hidden'));
 
   await openMenu('realEstateFloatBtn', 'realEstateMenu');
-  assert.match(await page.locator('#realEstateMenu .floatItems').textContent(), /Quick Build.*Edit This World.*Live Sky.*Weather Live.*Satellite View/s);
+  assert.match(await page.locator('#realEstateMenu .floatItems').textContent(), /Quick Build.*Edit This World.*Home & Property.*Live Sky.*Weather Live.*Satellite View/s);
   await page.locator('#fQuickBuild').click();
   await page.waitForSelector('#blockBuilderPanel.show', { timeout: 30_000 });
   await page.locator('#blockBuilderClose').click();
@@ -132,12 +133,12 @@ try {
     };
   });
   assert.equal(mobileLayout.buttons.length, 5);
-  assert.deepEqual(mobileLayout.buttons.map((entry) => entry.label), ['Explore', 'Travel', 'Create', 'Community', 'Journal']);
+  assert.deepEqual(mobileLayout.buttons.map((entry) => entry.label), ['Explore', 'Travel', 'Create', 'Community', 'Pack']);
   assert.equal(mobileLayout.overflow, false);
   assert.ok(mobileLayout.buttons.every((entry) => entry.box.x >= 0 && entry.box.x + entry.box.width <= 390));
   await page.screenshot({ path: `${evidenceDir}/02-five-player-choices-mobile.png` });
 
-  await openMenu('myExplorerBtn', 'myExplorerMenu');
+  await openMenu('packBtn', 'packMenu');
   await page.locator('#fExplorerProfile').click();
   await page.waitForSelector('#discoveryPanel.show .discoveryPane[data-discovery-pane="profile"].active');
   const mobileExplorerBox = await page.locator('#discoveryPanel').boundingBox();
@@ -154,7 +155,7 @@ try {
       travelMenuStableWithoutStateChange: travelMutationCount === 0,
       createOpensQuickBuildAndExistingEditor: true,
       communitySeparatesRoomsBoardMemoriesAndSharing: true,
-      myExplorerOpensJournal: true,
+      packOpensJournal: true,
       explorerStoryLinksToExistingHubs: true,
       noDuplicateElementIds: duplicateIds.length === 0,
       naturalPlayerLanguage: !/authority|schema|pipeline|scaffold|procedural|generated/i.test(playerCopy),

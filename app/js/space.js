@@ -2,18 +2,25 @@ import { ctx as appCtx } from "./shared-context.js?v=55";
 import { getPrimaryWorldCanvas } from "./engine/webgl-lifecycle.js?v=1";
 import { captureEarthWorldSession } from "./earth-session.js?v=17";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
-import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=24";
-import { createSpaceFlightScene, destroySpaceFlightScene, ensureExpeditionSurveyorDockTarget, ensureExtendedSpaceScene, getExpeditionSurveyorDockTarget, positionSpacecraftAtSurveyorDock, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon, setExpeditionPodFlightPresentation, setSurveyorFlightPresentation, updateExpeditionPodFlightPresentation } from "./space/scene.js?v=41";
-import { hideGameUI, initSpaceFlightUI, prepareSpaceFlightHudForEntry, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=46";
+import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=26";
+import { createSpaceFlightScene, destroySpaceFlightScene, ensureSolisReachDockTarget, ensureExtendedSpaceScene, getSolisReachDockTarget, positionSpacecraftAtSolisReachDock, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon, setExpeditionPodFlightPresentation, setSolisReachFlightPresentation, updateExpeditionPodFlightPresentation } from "./space/scene.js?v=44";
+import { hideGameUI, initSpaceFlightUI, prepareSpaceFlightHudForEntry, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=48";
 import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 import {
   beginEnvironmentTransition,
   commitEnvironment,
   registerEnvironmentLifecycle
 } from './session-coordinator.js?v=2';
-import { installSpaceJourneyRuntime } from './space/journey-runtime.js?v=8';
+import { installSpaceJourneyRuntime } from './space/journey-runtime.js?v=9';
 import { resolveCompletedLandingTarget } from './space/landing-target.js?v=2';
+import { playSurfacePodLaunch } from './planetary/surface-pod-launch.js?v=8';
 import { SPACE_CRAFT_IDENTITY } from './space/craft-identity.js?v=1';
+import {
+  installSpaceTravelSession,
+  SPACE_GUIDANCE_MODE,
+  SPACE_TRAVEL_LOCATION,
+  SPACE_TRAVEL_PHASE
+} from './space/travel-session.js?v=1';
 
 function emitTutorialEvent(eventName, payload = {}) {
   if (typeof appCtx.tutorialOnEvent === 'function') {
@@ -54,16 +61,16 @@ appCtx.spaceFlight = {
   _frameScale: 1,
   overviewMode: false,
   cameraMode: 'chase',
-  craftRole: 'wayfinder',
   _sessionId: 0
 };
 
+installSpaceTravelSession(appCtx);
 installSpaceJourneyRuntime(appCtx);
 
 let spaceSessionScope = null;
 const spaceModuleScope = createLifecycleScope('space-module');
 
-function beginSpaceFlightSession() {
+function beginSpaceFlightSession(options = {}) {
   spaceSessionScope?.dispose('space-session-replaced');
   spaceSessionScope = createLifecycleScope('space-flight-session');
   appCtx.spaceFlight._sessionId = Number(appCtx.spaceFlight._sessionId || 0) + 1;
@@ -73,6 +80,15 @@ function beginSpaceFlightSession() {
   appCtx.spaceFlight._runtimeLandingTarget = null;
   appCtx.spaceFlight._landingApproachDirection = null;
   appCtx.spaceFlight.earthLandingSelection = null;
+  appCtx.beginSpaceTravelSession?.({
+    activeCraftId: options.activeCraftId || SPACE_CRAFT_IDENTITY.starship.id,
+    location: options.location || SPACE_TRAVEL_LOCATION.LOCAL_SPACE,
+    phase: options.phase || SPACE_TRAVEL_PHASE.FREE_FLIGHT,
+    sourceBodyId: options.sourceBodyId || null,
+    destination: options.destination || null,
+    guidance: options.guidance || SPACE_GUIDANCE_MODE.MANUAL,
+    reason: options.reason || 'space-flight-started'
+  });
   return appCtx.spaceFlight._sessionId;
 }
 
@@ -180,7 +196,14 @@ function startSpaceFlightToMoon(options = {}) {
   const freeFlight = options.freeFlight === true;
   if (appCtx.spaceFlight.active) return appCtx.spaceFlight.destination === 'moon';
   console.log("Starting space flight to Moon...");
-  const sessionId = beginSpaceFlightSession();
+  const sessionId = beginSpaceFlightSession({
+    activeCraftId: SPACE_CRAFT_IDENTITY.starship.id,
+    phase: freeFlight ? SPACE_TRAVEL_PHASE.FREE_FLIGHT : SPACE_TRAVEL_PHASE.LAUNCH,
+    sourceBodyId: 'earth',
+    destination: { id: 'moon', kind: 'body', name: 'Moon' },
+    guidance: freeFlight ? SPACE_GUIDANCE_MODE.MANUAL : SPACE_GUIDANCE_MODE.ASSISTED,
+    reason: freeFlight ? 'free-space-flight' : 'earth-moon-flight'
+  });
   const transition = beginEnvironmentTransition(appCtx.ENV.SPACE_FLIGHT, { source: 'space_to_moon' });
 
   appCtx.setEnvironmentTransitionActive(true);
@@ -191,7 +214,6 @@ function startSpaceFlightToMoon(options = {}) {
   appCtx.scene.background = new THREE.Color(0x000000);
 
   appCtx.spaceFlight.destination = 'moon';
-  appCtx.spaceFlight.craftRole = 'wayfinder';
   appCtx.spaceFlight.mode = 'launching';
   appCtx.spaceFlight.active = true;
   appCtx.spaceFlight._launchSource = 'Earth';
@@ -224,7 +246,8 @@ function startSpaceFlightToMoon(options = {}) {
     appCtx.beginRenderedSpaceJourney?.({
       sourceBodyId: 'earth',
       destinationBodyId: 'moon',
-      mode: 'assisted'
+      mode: 'assisted',
+      autoAssist: true
     });
   }
 
@@ -238,6 +261,10 @@ function startSpaceFlightToMoon(options = {}) {
     if (!isCurrentSpaceFlightSession(sessionId, 'moon')) return;
     appCtx.spaceFlight.mode = 'flying';
     appCtx.spaceFlight.speed = 0;
+    appCtx.updateSpaceTravelSession?.({
+      phase: freeFlight ? SPACE_TRAVEL_PHASE.FREE_FLIGHT : SPACE_TRAVEL_PHASE.ASCENT,
+      reason: freeFlight ? 'free-flight-ready' : 'earth-ascent-ready'
+    });
     showFlightMessage(freeFlight ? 'FREE SPACE FLIGHT READY · OPEN WAYFINDER TO SET A COURSE' : 'SPACE FLIGHT READY', '#10b981');
   }, 1000);
   return true;
@@ -247,12 +274,19 @@ function startFreeSpaceFlight() {
   return startSpaceFlightToMoon({ freeFlight: true });
 }
 
-function startSpaceFlightToSurveyor(options = {}) {
+function startSpaceFlightToSolisReach(options = {}) {
   if (appCtx.spaceFlight.active) return false;
   const usePathfinder = options.pathfinder !== false;
-  const sessionId = beginSpaceFlightSession();
+  const sessionId = beginSpaceFlightSession({
+    activeCraftId: usePathfinder ? SPACE_CRAFT_IDENTITY.pod.id : SPACE_CRAFT_IDENTITY.starship.id,
+    phase: usePathfinder ? SPACE_TRAVEL_PHASE.RENDEZVOUS : SPACE_TRAVEL_PHASE.DOCKED,
+    sourceBodyId: 'earth',
+    destination: { id: SPACE_CRAFT_IDENTITY.starship.id, kind: 'starship', name: SPACE_CRAFT_IDENTITY.starship.name },
+    guidance: SPACE_GUIDANCE_MODE.MANUAL,
+    reason: usePathfinder ? 'pathfinder-earth-rendezvous' : 'direct-starship-boarding'
+  });
   const transition = beginEnvironmentTransition(appCtx.ENV.SPACE_FLIGHT, {
-    source: usePathfinder ? 'earth_to_surveyor_pod' : 'earth_to_surveyor_direct'
+    source: usePathfinder ? 'earth_to_pathfinder_pod' : 'earth_to_solis_reach_direct'
   });
 
   appCtx.setEnvironmentTransitionActive(true);
@@ -262,15 +296,14 @@ function startSpaceFlightToSurveyor(options = {}) {
   suspendEarthModesForPlanetaryEntry(appCtx.ENV.SPACE_FLIGHT);
   appCtx.scene.background = new THREE.Color(0x000000);
 
-  appCtx.spaceFlight.destination = 'surveyor';
-  appCtx.spaceFlight.craftRole = usePathfinder ? 'pathfinder' : 'starship';
+  appCtx.spaceFlight.destination = SPACE_CRAFT_IDENTITY.starship.id;
   appCtx.spaceFlight.mode = 'launching';
   appCtx.spaceFlight.active = true;
   appCtx.spaceFlight._launchSource = 'Earth';
   appCtx.spaceFlight.launchStartMs = Date.now();
   appCtx.spaceFlight._isThrusting = false;
   if (!commitEnvironment(appCtx.ENV.SPACE_FLIGHT, { token: transition })) return false;
-  emitTutorialEvent('entered_space', { destination: 'surveyor', source: usePathfinder ? 'pathfinder_pod' : 'direct_surveyor' });
+  emitTutorialEvent('entered_space', { destination: SPACE_CRAFT_IDENTITY.starship.id, source: usePathfinder ? 'pathfinder_pod' : 'direct_starship' });
 
   appCtx.spaceFlight.canvas.style.display = 'block';
   appCtx.spaceFlight.hud.style.display = 'block';
@@ -287,10 +320,10 @@ function startSpaceFlightToSurveyor(options = {}) {
   appCtx.returnUniverseToSolImmediate?.();
   resetSpaceFlightForMoon();
   appCtx.clearRenderedSpaceJourney?.();
-  appCtx.spaceFlight.destination = 'surveyor';
+  appCtx.spaceFlight.destination = SPACE_CRAFT_IDENTITY.starship.id;
   appCtx.spaceFlight._manualLandingTarget = null;
   appCtx.spaceFlight._autopilotTarget = null;
-  ensureExpeditionSurveyorDockTarget();
+  ensureSolisReachDockTarget();
   setExpeditionPodFlightPresentation(usePathfinder);
 
   appCtx.stopRuntimeKernel?.('space-flight-active');
@@ -298,9 +331,13 @@ function startSpaceFlightToSurveyor(options = {}) {
   appCtx.showSolarSystemUI?.();
   appCtx.showUniverseUI?.();
   spaceSessionScope.timeout(() => {
-    if (!isCurrentSpaceFlightSession(sessionId, 'surveyor')) return;
+    if (!isCurrentSpaceFlightSession(sessionId, SPACE_CRAFT_IDENTITY.starship.id)) return;
     appCtx.spaceFlight.mode = 'flying';
     appCtx.spaceFlight.speed = 0;
+    appCtx.updateSpaceTravelSession?.({
+      phase: usePathfinder ? SPACE_TRAVEL_PHASE.RENDEZVOUS : SPACE_TRAVEL_PHASE.DOCKED,
+      reason: usePathfinder ? 'pathfinder-rendezvous-ready' : 'starship-boarding-ready'
+    });
     appCtx.setPauseReason?.('planetary_transition', false);
     showFlightMessage(usePathfinder ? `${SPACE_CRAFT_IDENTITY.starship.name.toUpperCase()} ACQUIRED · MANUAL DOCKING APPROACH` : `${SPACE_CRAFT_IDENTITY.starship.name.toUpperCase()} TRANSFER COMPLETE`, '#6fe8ff');
     options.onReady?.();
@@ -308,54 +345,68 @@ function startSpaceFlightToSurveyor(options = {}) {
   return true;
 }
 
-function startSpaceFlightToEarth() {
-  if (appCtx.spaceFlight.active) return appCtx.spaceFlight.destination === 'earth';
-  console.log("Starting space flight to Earth...");
+function startSpaceFlightToEarth(options = {}) {
+  if (appCtx.spaceFlight.active) return appCtx.getSpaceTravelSession?.()?.phase === SPACE_TRAVEL_PHASE.RENDEZVOUS;
   const sourceBodyId = appCtx.activePlanetaryBodyId || (appCtx.onMars ? 'mars' : 'moon');
   const sourceLabel = sourceBodyId[0].toUpperCase() + sourceBodyId.slice(1);
-  const sessionId = beginSpaceFlightSession();
-  const transition = beginEnvironmentTransition(appCtx.ENV.SPACE_FLIGHT, { source: 'space_to_earth' });
+  if (options.surfaceLaunchCommitted !== true) {
+    return playSurfacePodLaunch(appCtx, {
+      bodyId: sourceBodyId,
+      onCommit: () => startSpaceFlightToEarth({ surfaceLaunchCommitted: true }),
+      onFailure: () => showFlightMessage('PATHFINDER REMAINED ON THE SURFACE', '#f59e0b')
+    });
+  }
+  const sessionId = beginSpaceFlightSession({
+    activeCraftId: SPACE_CRAFT_IDENTITY.pod.id,
+    phase: SPACE_TRAVEL_PHASE.RENDEZVOUS,
+    sourceBodyId,
+    destination: { id: SPACE_CRAFT_IDENTITY.starship.id, kind: 'starship', name: SPACE_CRAFT_IDENTITY.starship.name },
+    guidance: SPACE_GUIDANCE_MODE.MANUAL,
+    reason: 'surface-pathfinder-rendezvous'
+  });
+  const transition = beginEnvironmentTransition(appCtx.ENV.SPACE_FLIGHT, { source: 'surface_to_pathfinder_pod' });
 
   appCtx.setEnvironmentTransitionActive(true);
   appCtx.setPauseReason?.('planetary_transition', true);
   if (typeof appCtx.hideReturnToEarthButton === 'function') appCtx.hideReturnToEarthButton();
+  const marsReturnButton = document.getElementById('marsReturnEarthBtn');
+  if (marsReturnButton) marsReturnButton.style.display = 'none';
   suspendEarthModesForPlanetaryEntry(appCtx.ENV.SPACE_FLIGHT);
 
-  appCtx.spaceFlight.destination = 'earth';
-  appCtx.spaceFlight.craftRole = 'wayfinder';
+  appCtx.spaceFlight.destination = SPACE_CRAFT_IDENTITY.starship.id;
   appCtx.spaceFlight.mode = 'launching';
   appCtx.spaceFlight.active = true;
   appCtx.spaceFlight._launchSource = sourceLabel;
   appCtx.spaceFlight.launchStartMs = Date.now();
   appCtx.spaceFlight._isThrusting = false;
   if (!commitEnvironment(appCtx.ENV.SPACE_FLIGHT, { token: transition })) return false;
-  emitTutorialEvent('entered_space', { destination: 'earth', source: 'space_flight' });
+  emitTutorialEvent('entered_space', { destination: SPACE_CRAFT_IDENTITY.starship.id, source: 'pathfinder_pod' });
 
   appCtx.spaceFlight.canvas.style.display = 'block';
   appCtx.spaceFlight.hud.style.display = 'block';
   prepareSpaceFlightHudForEntry();
-  document.getElementById('sfDestination').textContent = 'Earth';
-  document.getElementById('sfLandBtn').textContent = 'LAND ON EARTH';
+  document.getElementById('sfDestination').textContent = SPACE_CRAFT_IDENTITY.starship.name;
+  document.getElementById('sfLandBtn').textContent = `DOCK WITH ${SPACE_CRAFT_IDENTITY.starship.name.toUpperCase()}`;
 
   const worldCanvas = getPrimaryWorldCanvas(appCtx);
   if (worldCanvas) worldCanvas.style.display = 'none';
 
   hideGameUI();
-  if (!appCtx.spaceFlight.scene || !appCtx.spaceFlight.renderer || !appCtx.spaceFlight.camera) {
-    createSpaceFlightScene({ includeExtendedSpace: sourceBodyId !== 'moon' });
-  }
-  if (sourceBodyId !== 'moon') ensureExtendedSpaceScene();
+  createSpaceFlightScene({ includeExtendedSpace: true });
+  ensureExtendedSpaceScene();
   leaseSpaceFlightResources();
   appCtx.returnUniverseToSolImmediate?.();
-  resetSpaceFlightForEarth();
-  beginEarthLandingSelection();
+  if (sourceBodyId === 'moon') resetSpaceFlightForEarth();
+  else if (sourceBodyId === 'mars') {
+    const mars = appCtx.getAllSpaceBodies?.().find((body) => String(body?.name || '').toLowerCase() === 'mars');
+    if (mars?.position) {
+      appCtx.spaceFlight.rocket.position.copy(mars.position).add(new THREE.Vector3(0, Number(mars.radius || 24) + 8, 0));
+    } else resetSpaceFlightForEarth();
+  } else resetSpaceFlightForMoon();
   appCtx.spaceFlight._launchSource = sourceLabel;
-  appCtx.beginRenderedSpaceJourney?.({
-    sourceBodyId,
-    destinationBodyId: 'earth',
-    mode: 'assisted',
-    resumeJourney: true
-  });
+  appCtx.clearRenderedSpaceJourney?.();
+  setExpeditionPodFlightPresentation(true);
+  ensureSolisReachDockTarget({ nearActiveCraft: true });
   appCtx.stopRuntimeKernel?.('space-flight-active');
   animateSpaceFlight();
 
@@ -365,10 +416,12 @@ function startSpaceFlightToEarth() {
   }
 
   spaceSessionScope.timeout(() => {
-    if (!isCurrentSpaceFlightSession(sessionId, 'earth')) return;
+    if (!isCurrentSpaceFlightSession(sessionId, SPACE_CRAFT_IDENTITY.starship.id)) return;
     appCtx.spaceFlight.mode = 'flying';
     appCtx.spaceFlight.speed = 0;
-    showFlightMessage('EARTH RETURN READY', '#3b82f6');
+    appCtx.updateSpaceTravelSession?.({ phase: SPACE_TRAVEL_PHASE.RENDEZVOUS, reason: 'surface-rendezvous-ready' });
+    appCtx.setPauseReason?.('planetary_transition', false);
+    showFlightMessage(`${SPACE_CRAFT_IDENTITY.starship.name.toUpperCase()} ACQUIRED · MANUAL DOCKING APPROACH`, '#6fe8ff');
   }, 1000);
   return true;
 }
@@ -377,7 +430,15 @@ function startSpaceFlightToMars() {
   console.log('Starting space flight to Mars...');
   if (appCtx.onMars) return false;
   if (appCtx.spaceFlight.active) return appCtx.spaceFlight.destination === 'mars';
-  const sessionId = beginSpaceFlightSession();
+  const sourceBodyId = appCtx.onMoon ? 'moon' : 'earth';
+  const sessionId = beginSpaceFlightSession({
+    activeCraftId: SPACE_CRAFT_IDENTITY.starship.id,
+    phase: SPACE_TRAVEL_PHASE.LAUNCH,
+    sourceBodyId,
+    destination: { id: 'mars', kind: 'body', name: 'Mars' },
+    guidance: SPACE_GUIDANCE_MODE.ASSISTED,
+    reason: `${sourceBodyId}-mars-flight`
+  });
   const transition = beginEnvironmentTransition(appCtx.ENV.SPACE_FLIGHT, { source: 'space_to_mars' });
   appCtx.setEnvironmentTransitionActive(true);
   appCtx.setPauseReason?.('planetary_transition', true);
@@ -387,7 +448,6 @@ function startSpaceFlightToMars() {
   appCtx.scene.background = new THREE.Color(0x000000);
 
   appCtx.spaceFlight.destination = 'mars';
-  appCtx.spaceFlight.craftRole = 'wayfinder';
   appCtx.spaceFlight.mode = 'launching';
   appCtx.spaceFlight.active = true;
   appCtx.spaceFlight._launchSource = appCtx.onMoon ? 'Moon' : 'Earth';
@@ -412,7 +472,8 @@ function startSpaceFlightToMars() {
   appCtx.beginRenderedSpaceJourney?.({
     sourceBodyId: appCtx.spaceFlight._launchSource?.toLowerCase?.() || 'earth',
     destinationBodyId: 'mars',
-    mode: 'assisted'
+    mode: 'assisted',
+    autoAssist: true
   });
   appCtx.stopRuntimeKernel?.('space-flight-active');
   animateSpaceFlight();
@@ -422,6 +483,7 @@ function startSpaceFlightToMars() {
     if (!isCurrentSpaceFlightSession(sessionId, 'mars')) return;
     appCtx.spaceFlight.mode = 'flying';
     appCtx.spaceFlight.speed = 0;
+    appCtx.updateSpaceTravelSession?.({ phase: SPACE_TRAVEL_PHASE.ASCENT, reason: 'mars-flight-ready' });
     showFlightMessage('MARS FLIGHT READY', '#e26f45');
   }, 1000);
   return true;
@@ -432,13 +494,19 @@ function startSpaceFlightFromExpeditionSurface(options = {}) {
   const frameId = String(options.frameId || '').trim();
   const courseDestinationId = String(options.courseDestinationId || '').trim();
   if (!frameId || !courseDestinationId) return false;
-  const sessionId = beginSpaceFlightSession();
+  const sessionId = beginSpaceFlightSession({
+    activeCraftId: SPACE_CRAFT_IDENTITY.pod.id,
+    phase: SPACE_TRAVEL_PHASE.RENDEZVOUS,
+    sourceBodyId: courseDestinationId,
+    destination: { id: SPACE_CRAFT_IDENTITY.starship.id, kind: 'starship', name: SPACE_CRAFT_IDENTITY.starship.name },
+    guidance: SPACE_GUIDANCE_MODE.MANUAL,
+    reason: 'pathfinder-surface-return'
+  });
   const transition = beginEnvironmentTransition(appCtx.ENV.SPACE_FLIGHT, { source: 'expedition_surface_return' });
   appCtx.setEnvironmentTransitionActive(true);
   appCtx.setPauseReason?.('planetary_transition', true);
   suspendEarthModesForPlanetaryEntry(appCtx.ENV.SPACE_FLIGHT);
   appCtx.spaceFlight.destination = courseDestinationId;
-  appCtx.spaceFlight.craftRole = 'pathfinder';
   appCtx.spaceFlight.mode = 'launching';
   appCtx.spaceFlight.active = true;
   appCtx.spaceFlight._launchSource = courseDestinationId;
@@ -461,6 +529,8 @@ function startSpaceFlightFromExpeditionSurface(options = {}) {
     exitSpaceFlight('expedition_surface_restore_failed');
     return false;
   }
+  setExpeditionPodFlightPresentation(true);
+  ensureSolisReachDockTarget({ nearActiveCraft: true });
   appCtx.stopRuntimeKernel?.('space-flight-active');
   animateSpaceFlight();
   appCtx.showUniverseUI?.();
@@ -468,10 +538,33 @@ function startSpaceFlightFromExpeditionSurface(options = {}) {
     if (!isCurrentSpaceFlightSession(sessionId, courseDestinationId)) return;
     appCtx.spaceFlight.mode = 'flying';
     appCtx.spaceFlight.speed = 0;
+    appCtx.updateSpaceTravelSession?.({ phase: SPACE_TRAVEL_PHASE.RENDEZVOUS, reason: 'pathfinder-return-ready' });
     appCtx.setPauseReason?.('planetary_transition', false);
     showFlightMessage('SURVEY TEAM ABOARD · SAMPLE TRANSFER COMPLETE', '#83e6a6');
     options.onReady?.();
   }, 800);
+  return true;
+}
+
+function completePathfinderDocking() {
+  const session = appCtx.getSpaceTravelSession?.();
+  const target = getSolisReachDockTarget();
+  const pod = appCtx.spaceFlight?.rocket;
+  if (!target?.position || !pod || session?.activeCraftId !== SPACE_CRAFT_IDENTITY.pod.id || session.phase !== SPACE_TRAVEL_PHASE.RENDEZVOUS) return false;
+  const distance = pod.position.distanceTo(target.position);
+  const relativeSpeed = appCtx.spaceFlight.velocity?.length?.() || Number(appCtx.spaceFlight.speed || 0);
+  if (distance >= target.radius + 24 || relativeSpeed > 1.35) return false;
+  setSolisReachFlightPresentation(true);
+  appCtx.updateSpaceTravelSession?.({
+    activeCraftId: SPACE_CRAFT_IDENTITY.starship.id,
+    location: SPACE_TRAVEL_LOCATION.STARSHIP,
+    phase: SPACE_TRAVEL_PHASE.DOCKED,
+    destination: null,
+    reason: 'pathfinder-docked'
+  });
+  appCtx.spaceFlight.velocity?.set?.(0, 0, 0);
+  appCtx.spaceFlight.speed = 0;
+  showFlightMessage(`PATHFINDER SECURED · ${SPACE_CRAFT_IDENTITY.starship.name.toUpperCase()} HAS THE FLIGHT`, '#83e6a6');
   return true;
 }
 
@@ -494,6 +587,11 @@ function attemptLanding() {
 function completeLanding(sessionId = appCtx.spaceFlight._sessionId) {
   if (!isCurrentSpaceFlightSession(sessionId)) return;
   const targetName = resolveCompletedLandingTarget(appCtx.spaceFlight, appCtx.spaceJourney);
+  appCtx.updateSpaceTravelSession?.({
+    location: SPACE_TRAVEL_LOCATION.SURFACE,
+    phase: SPACE_TRAVEL_PHASE.LANDED,
+    reason: `landed-${String(targetName || 'destination').toLowerCase()}`
+  });
   if (['Earth', 'earth'].includes(targetName)) commitEarthLandingSelection();
   console.log("Landing complete! Target:", targetName);
   appCtx.markExpeditionPodDescent?.(targetName);
@@ -521,6 +619,7 @@ function exitSpaceFlight(source = 'runtime') {
   console.log('Exiting space flight...', String(source || 'runtime'));
 
   appCtx.spaceFlight.active = false;
+  appCtx.endSpaceTravelSession?.(source || 'space-flight-exit');
   spaceSessionScope?.dispose('space-flight-exit');
   spaceSessionScope = null;
   appCtx.spaceFlight._sessionId = Number(appCtx.spaceFlight._sessionId || 0) + 1;
@@ -569,7 +668,8 @@ registerEnvironmentLifecycle(appCtx.ENV.SPACE_FLIGHT, {
     destination: appCtx.spaceFlight.destination || null,
     rendererReady: !!appCtx.spaceFlight.renderer,
     scope: spaceSessionScope?.snapshot() || null,
-    sessionId: Number(appCtx.spaceFlight._sessionId || 0)
+    sessionId: Number(appCtx.spaceFlight._sessionId || 0),
+    travelSession: appCtx.getSpaceTravelSession?.() || null
   })
 });
 
@@ -592,15 +692,16 @@ Object.assign(appCtx, {
   setSpaceFlightLandingTarget,
   getEarthLandingSelection,
   setExpeditionPodFlightPresentation,
-  setSurveyorFlightPresentation,
-  ensureExpeditionSurveyorDockTarget,
-  getExpeditionSurveyorDockTarget,
-  positionSpacecraftAtSurveyorDock,
+  setSolisReachFlightPresentation,
+  ensureSolisReachDockTarget,
+  getSolisReachDockTarget,
+  completePathfinderDocking,
+  positionSpacecraftAtSolisReachDock,
   updateExpeditionPodFlightPresentation,
   startSpaceFlightToEarth,
   startSpaceFlightFromExpeditionSurface,
   startSpaceFlightToMars,
-  startSpaceFlightToSurveyor,
+  startSpaceFlightToSolisReach,
   startFreeSpaceFlight,
   startSpaceFlightToMoon
 });
@@ -612,15 +713,16 @@ export {
   setSpaceFlightLandingTarget,
   getEarthLandingSelection,
   setExpeditionPodFlightPresentation,
-  setSurveyorFlightPresentation,
-  ensureExpeditionSurveyorDockTarget,
-  getExpeditionSurveyorDockTarget,
-  positionSpacecraftAtSurveyorDock,
+  setSolisReachFlightPresentation,
+  ensureSolisReachDockTarget,
+  getSolisReachDockTarget,
+  completePathfinderDocking,
+  positionSpacecraftAtSolisReachDock,
   updateExpeditionPodFlightPresentation,
   startSpaceFlightToEarth,
   startSpaceFlightFromExpeditionSurface,
   startSpaceFlightToMars,
-  startSpaceFlightToSurveyor,
+  startSpaceFlightToSolisReach,
   startFreeSpaceFlight,
   startSpaceFlightToMoon
 };

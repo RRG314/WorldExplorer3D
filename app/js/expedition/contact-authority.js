@@ -1,5 +1,5 @@
 import { registerUniverseRuntimeDestination, resolveUniverseAddress } from '../universe/catalog.js?v=11';
-import { registerExpeditionSolidWorld } from '../planetary/solid-world-runtime.js?v=16';
+import { registerExpeditionSolidWorld } from '../planetary/solid-world-runtime.js?v=18';
 import { createExpeditionArchive } from './archive.js?v=1';
 
 function contactStellarProfile(seed) {

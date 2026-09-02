@@ -7,6 +7,7 @@ import {
 } from '../session-coordinator.js?v=2';
 import { suspendEarthModesForPlanetaryEntry } from './entry.js?v=9';
 import { configureColorTexture } from './catalog.js?v=1';
+import { playSurfacePodLaunch } from './surface-pod-launch.js?v=8';
 import { samplePhysicalEnvironment } from './runtime/physical-environment.js?v=2';
 import { clearActivePlanetaryObstacles, setActivePlanetaryObstacles } from './runtime/obstacle-authority.js?v=1';
 import {
@@ -492,7 +493,7 @@ function addVisualSurfaceHorizon(pack, world) {
 }
 
 function addExpeditionReturnPod(pack, world) {
-  if (!['expedition-contact', 'destination-mission'].includes(pack.returnMode)) return null;
+  if (!['expedition-contact', 'destination-mission', 'space-flight'].includes(pack.returnMode)) return null;
   if (world.returnPod) {
     world.returnPod.visible = true;
     if (world.returnPod.parent !== appCtx.scene) appCtx.scene.add(world.returnPod);
@@ -687,7 +688,15 @@ function startReturnPodLaunch() {
   if (activePack.returnMode === 'expedition-contact') return appCtx.leaveExpeditionSurface?.(activePack.bodyId) === true;
   if (activePack.returnMode === 'destination-mission') return appCtx.leaveDestinationMissionSurface?.(activePack.bodyId) === true;
   if (activePack.returnMode === 'space-flight') {
-    return appCtx.startSpaceFlightFromExpeditionSurface?.({ frameId: activePack.parentSystemId, courseDestinationId: activePack.bodyId }) === true;
+    return playSurfacePodLaunch(appCtx, {
+      bodyId: activePack.bodyId,
+      pod: activeReturnPod,
+      onCommit: () => appCtx.startSpaceFlightFromExpeditionSurface?.({
+        frameId: activePack.parentSystemId,
+        courseDestinationId: activePack.bodyId
+      }) === true,
+      onFailure: () => appCtx.showToast?.('Pathfinder remained on the surface.')
+    }) === true;
   }
   return false;
 }
@@ -703,7 +712,7 @@ function ensureReturnPodInteraction() {
       return {
         available: true,
         action: 'board-return-pod',
-        label: 'Board pod for Surveyor',
+        label: 'Board Pathfinder for Solis Reach',
         detail: 'Surface launch and ship rendezvous',
         distance,
         data: { bodyId: activePack?.bodyId || null }
@@ -885,25 +894,18 @@ function showReturnButton(pack) {
     button.className = 'game-btn';
     button.style.cssText = 'position:fixed;top:82px;right:20px;z-index:1000;padding:10px 20px;font-size:16px;background:#315d9d;color:#fff;border:1px solid #8ab4ff;border-radius:5px;cursor:pointer;';
     button.addEventListener('click', () => {
-      if (['expedition-contact', 'destination-mission'].includes(activePack?.returnMode)) {
+      if (['expedition-contact', 'destination-mission', 'space-flight'].includes(activePack?.returnMode)) {
         const distance = returnPodDistance();
         if (distance <= Number(activeReturnPod?.userData?.boardingRadius || 5.5)) startReturnPodLaunch();
         else appCtx.showToast?.(`Return pod is ${Math.round(distance)} m away. Approach its ramp and use Interact.`);
-        return;
-      }
-      if (activePack?.returnMode === 'space-flight') {
-        appCtx.startSpaceFlightFromExpeditionSurface?.({
-          frameId: activePack.parentSystemId,
-          courseDestinationId: activePack.bodyId
-        });
         return;
       }
       appCtx.startSpaceFlightToEarth?.();
     });
     document.body.appendChild(button);
   }
-  button.textContent = ['expedition-contact', 'destination-mission'].includes(pack.returnMode)
-    ? `Return pod · approach to board`
+  button.textContent = ['expedition-contact', 'destination-mission', 'space-flight'].includes(pack.returnMode)
+    ? 'Pathfinder · approach to board'
     : `Return to Space from ${getAstronomicalBody(pack.bodyId)?.name || pack.bodyName || pack.title}`;
   const compact = globalThis.innerWidth <= 600;
   const panelBottom = document.getElementById('solidWorldPanel')?.getBoundingClientRect?.().bottom;
@@ -1221,7 +1223,7 @@ function registerExpeditionSolidWorld(input = {}) {
     }),
     fieldNotes: Object.freeze((input.fieldNotes || [
       Object.freeze(['Document the survey site', 'photograph', 'places', 'Record the generated survey terrain and the model inputs used to create it.']),
-      Object.freeze(['Collect geology sample', 'geology-inspect', 'rock', 'Collect one modeled field sample for Surveyor processing. The sample represents game-world material, not a real-world observation.']),
+      Object.freeze(['Collect geology sample', 'geology-inspect', 'rock', 'Collect one modeled field sample for Solis Reach processing. The sample represents game-world material, not a real-world observation.']),
       Object.freeze(['Survey local conditions', 'habitat-survey', 'places', 'Log the model-derived gravity and thermal estimate with their uncertainty.'])
     ]).map((entry) => Object.freeze([...entry]))),
     outpost: input.outpost || null

@@ -11,7 +11,7 @@ function dockMaterial(color, emissive = 0x000000) {
   });
 }
 
-function createSurveyorExteriorMesh() {
+function createSolisReachExteriorMesh() {
   // The orbital target and the flyable vessel share one exterior recipe. The
   // former ring ship competed with the flyable ship even though both
   // represented the same expedition vessel.
@@ -39,7 +39,7 @@ function createSurveyorExteriorMesh() {
     new THREE.TorusGeometry(1.22, 0.14, 10, 40),
     dockMaterial(0x6fe8ff, 0x1b95b2)
   );
-  collar.name = 'surveyor-docking-collar';
+  collar.name = 'solis-reach-docking-collar';
   collar.position.z = 0.98;
   dock.add(collar);
 
@@ -64,4 +64,4 @@ function createSurveyorExteriorMesh() {
   return ship;
 }
 
-export { createSurveyorExteriorMesh };
+export { createSolisReachExteriorMesh };

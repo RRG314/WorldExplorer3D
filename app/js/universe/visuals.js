@@ -1,4 +1,4 @@
-import { createBlackHoleVisual } from './black-hole.js?v=3';
+import { createBlackHoleVisual } from './black-hole.js?v=4';
 import { createRoundStarMaterial } from '../sky/star-point-material.js?v=4';
 import { derivePlanetVisualProfile, deriveStarVisualProfile } from './body-visual-profile.js?v=1';
 

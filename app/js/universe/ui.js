@@ -1,5 +1,5 @@
 import { distanceLightYears, getUniverseDestinations } from './catalog.js?v=11';
-import { getDestinationMission } from './mission-catalog.js?v=2';
+import { getDestinationMission } from './mission-catalog.js?v=3';
 
 const CLASS_LABELS = Object.freeze({
   planetary_system: 'Star Systems',

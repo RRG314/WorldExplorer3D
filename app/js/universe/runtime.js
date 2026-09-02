@@ -2,7 +2,7 @@ import { ctx as appCtx } from '../shared-context.js?v=55';
 import { getAstronomicalBody, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=3';
 import { disposeThreeObjectTree } from '../engine/webgl-lifecycle.js?v=1';
 import { getGalaxyEntryDestination, getUniverseFrame, resolveUniverseAddress } from './catalog.js?v=11';
-import { updateBlackHoleEncounter, updateBlackHoleVisual } from './black-hole.js?v=3';
+import { updateBlackHoleEncounter, updateBlackHoleVisual } from './black-hole.js?v=4';
 import { createDeepSkyLayer, setDeepSkyFrame, updateDeepSkyLayer } from './deep-sky.js?v=3';
 import { createRegionEncounter, fireEncounterPulse, updateRegionEncounter } from './encounters.js?v=1';
 import { getUniverseNavigationMetrics } from './navigation-scale.js?v=1';
@@ -12,15 +12,15 @@ import {
   setUniverseCourseStatus,
   UNIVERSE_GUIDANCE_MODE
 } from './course-authority.js?v=3';
-import { SPACE_CONSTANTS } from '../space/constants.js?v=1';
-import { initDestinationMissionRuntime, updateDestinationMissionRuntime } from './mission-runtime.js?v=6';
+import { SPACE_CONSTANTS } from '../space/constants.js?v=3';
+import { initDestinationMissionRuntime, updateDestinationMissionRuntime } from './mission-runtime.js?v=7';
 import { createUniverseSky, setUniverseSkyFrame, updateUniverseSky } from './sky-field.js?v=6';
 import {
   createUniverseFrameVisual,
   getUniverseDestinationMesh,
   setUniverseCourseMarker,
   updateUniverseFrameVisual
-} from './visuals.js?v=18';
+} from './visuals.js?v=19';
 import {
   closeUniverseNavigator,
   createUniverseNavigator,
@@ -50,6 +50,7 @@ const _courseCameraLocal = new THREE.Vector3();
 const _courseCameraInverse = new THREE.Quaternion();
 const _courseDesiredRotation = new THREE.Quaternion();
 const _courseProjected = new THREE.Vector3();
+const _courseDesiredVelocity = new THREE.Vector3();
 const _courseForwardAxis = new THREE.Vector3(0, 1, 0);
 const _localCourseTarget = {
   destination: null,
@@ -306,10 +307,17 @@ function travelToUniverseDestination(addressOrId, options = {}) {
   if (!destination || !destinationFrame) return false;
   universeRuntime.selected = destination;
   universeRuntime.course = createUniverseCourse(destination, universeRuntime.current.id, performance.now());
-  // Wayfinder owns the active deep-space course. Release the Solar System's
-  // optional SI journey so it cannot continue moving or reorienting the ship
-  // toward the Moon behind the player's selected interstellar destination.
+  // Interstellar frames and the local Solar System use different physical
+  // scales. End the local transfer once, then keep Wayfinder as navigation;
+  // the active craft and its travel session remain unchanged.
   appCtx.releaseRenderedJourneyToManualFlight?.();
+  appCtx.updateSpaceTravelSession?.({
+    location: 'deep-space',
+    phase: 'transfer',
+    destination: { id: destination.id, kind: destination.objectClass === 'planetary_system' ? 'system' : 'contact', name: destination.name },
+    guidance: 'manual',
+    reason: 'wayfinder-interstellar-course-set'
+  });
   if (destination.objectClass === 'exoplanet' && destinationFrame.id === universeRuntime.current.id) {
     setUniverseCourseMarker(universeRuntime.frameGroup, destination.id, true);
     showMessage(`COURSE SET · ${destination.name.toUpperCase()}`, '#6fe8ff');
@@ -439,6 +447,12 @@ function updateTransition(nowMs) {
     universeRuntime.course = setUniverseCourseStatus(universeRuntime.course, 'active');
   }
   positionRocketForCourseDestination(transition.destination);
+  appCtx.updateSpaceTravelSession?.({
+    location: 'deep-space',
+    phase: 'approach',
+    guidance: universeRuntime.course?.guidance || 'manual',
+    reason: 'wayfinder-destination-frame-arrived'
+  });
   updateUniverseNavigator(universeRuntime);
   showMessage(`${transition.destination?.name || transition.to.name} APPROACH ACQUIRED`, '#68d8c0');
   if (universeRuntime.pendingEarthReturn && transition.to.id === 'sol') {
@@ -470,8 +484,8 @@ function updateBlackHole(frameScale) {
   universeRuntime.encounter = updateBlackHoleEncounter(
     group,
     appCtx.spaceFlight.rocket,
-    appCtx.spaceFlight.gravityVelocity,
-    frameScale
+    appCtx.spaceFlight.velocity,
+    frameScale / 60
   );
   if (!universeRuntime.encounter?.captured || performance.now() < universeRuntime.captureRecoveryAt) return;
   const route = getWormholeRoute(universeRuntime.current.id);
@@ -600,6 +614,10 @@ function toggleUniverseCourseAssist() {
     universeRuntime.course,
     active ? UNIVERSE_GUIDANCE_MODE.ASSISTED : UNIVERSE_GUIDANCE_MODE.MANUAL
   );
+  appCtx.updateSpaceTravelSession?.({
+    guidance: active ? 'assisted' : 'manual',
+    reason: active ? 'wayfinder-assist-engaged' : 'manual-flight-resumed'
+  });
   updateUniverseNavigator(universeRuntime);
   showMessage(
     active ? `FLIGHT ASSIST · ${target.destination.name.toUpperCase()}` : 'MANUAL FLIGHT',
@@ -619,6 +637,7 @@ function updateLocalCourseAssist(frameSeconds) {
   if (manualInput) {
     universeRuntime.course = setUniverseCourseGuidance(universeRuntime.course, UNIVERSE_GUIDANCE_MODE.MANUAL);
     updateUniverseNavigator(universeRuntime);
+    appCtx.updateSpaceTravelSession?.({ guidance: 'manual', reason: 'manual-flight-resumed' });
     showMessage('MANUAL FLIGHT', '#60a5fa');
     return target;
   }
@@ -638,12 +657,11 @@ function updateLocalCourseAssist(frameSeconds) {
   const desiredSpeed = remaining <= 2
     ? 0
     : Math.min(SPACE_CONSTANTS.MAX_SPEED * 0.72, Math.max(SPACE_CONSTANTS.CRUISE_SPEED, remaining / 55)) * alignment;
-  const response = desiredSpeed > appCtx.spaceFlight.speed ? SPACE_CONSTANTS.BOOST * 0.65 : SPACE_CONSTANTS.BRAKE * 0.8;
-  const maxChange = response * (appCtx.spaceFlight._frameScale || 1);
-  appCtx.spaceFlight.speed += Math.max(-maxChange, Math.min(maxChange, desiredSpeed - appCtx.spaceFlight.speed));
-  if (remaining <= 2 && appCtx.spaceFlight.gravityVelocity) {
-    appCtx.spaceFlight.gravityVelocity.multiplyScalar(Math.max(0, 1 - frameSeconds * 3));
-  }
+  const targetVelocity = _courseDesiredVelocity.copy(_courseDirection).multiplyScalar(desiredSpeed);
+  const velocityBlend = 1 - Math.exp(-Math.max(0, frameSeconds) * (desiredSpeed > appCtx.spaceFlight.speed ? 1.8 : 3.2));
+  appCtx.spaceFlight.velocity?.lerp?.(targetVelocity, velocityBlend);
+  appCtx.spaceFlight.speed = appCtx.spaceFlight.velocity?.length?.() || 0;
+  if (remaining <= 2) appCtx.spaceFlight.velocity?.multiplyScalar?.(Math.max(0, 1 - frameSeconds * 3));
   return target;
 }
 

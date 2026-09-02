@@ -1366,7 +1366,7 @@ function addDeckArchitecture(group, deckDefinition, accentColor) {
 
 function buildDeckScene(deckDefinition) {
   const group = new THREE.Group();
-  group.name = `surveyor-deck:${deckDefinition.id}`;
+  group.name = `solis-reach-deck:${deckDefinition.id}`;
   const colliders = [];
   const doorStates = [];
   const deckSurface = shipSurfaceMaterial('floor', deckDefinition.id);
@@ -1435,9 +1435,9 @@ function buildDeckScene(deckDefinition) {
   return { group, colliders, doorStates, alertLight, spaceView };
 }
 
-function buildSurveyorScene(expedition) {
+function buildSolisReachScene(expedition) {
   const root = new THREE.Group();
-  root.name = 'expedition-ship:surveyor';
+  root.name = 'expedition-ship:solis-reach';
   root.userData.environmentOwner = 'SPACE_FLIGHT:SHIP_INTERIOR';
   const deckStates = new Map();
   SHIP_DECKS.forEach((deckDefinition, index) => {
@@ -1447,7 +1447,7 @@ function buildSurveyorScene(expedition) {
     deckStates.set(deckDefinition.id, state);
   });
   const crewLayer = new THREE.Group();
-  crewLayer.name = 'surveyor-crew-layer';
+  crewLayer.name = 'solis-reach-crew-layer';
   root.add(crewLayer);
   const crewById = new Map((expedition?.crew || []).map((crew) => [crew.id, crew]));
   const crewMeshes = SHIP_CREW_POSTS.map((post) => addCrewMember(crewLayer, post, crewById.get(post.crewId)));
@@ -1529,7 +1529,7 @@ function ensureShipHud(expedition, crewSummary = null) {
   hud.classList.toggle('critical', alert.level === 'critical');
   hud.innerHTML = `<div><span>${String(expedition?.ship?.name || STARSHIP_NAME).toUpperCase()} · ${deckLabel.toUpperCase()} DECK</span><strong>${expedition?.state === 'planned' ? 'Expedition staging' : `${progress}% to ${String(expedition?.destinationId || 'destination').replaceAll('-', ' ')}`}</strong><small>${crewLine} · E interacts · M opens ship map</small><em class="ship-alert ship-alert-${alert.level}">${alert.message}</em></div><div><button id="shipMapButton" type="button">Map</button><button id="shipJournalButton" type="button">Journal</button><button id="shipExitButton" type="button">Return to flight</button></div>`;
   hud.classList.add('show');
-  hud.querySelector('#shipExitButton')?.addEventListener('click', () => exitSurveyorInterior());
+  hud.querySelector('#shipExitButton')?.addEventListener('click', () => exitSolisReachInterior());
   hud.querySelector('#shipJournalButton')?.addEventListener('click', () => appCtx.toggleWorldDiscoveryJournal?.(true));
   hud.querySelector('#shipMapButton')?.addEventListener('click', () => toggleShipMap());
   return hud;
@@ -1922,13 +1922,13 @@ function updateActiveDeckContract(session = activeSession) {
   const deck = getShipDeck(session.activeDeckId);
   appCtx.replaceWorldCollection('dynamicBuildingColliders', activeDeckColliders(session));
   appCtx.activeInterior.interactions = activeDeckInteractions(session);
-  appCtx.activeInterior.floorId = `surveyor-${session.activeDeckId}`;
+  appCtx.activeInterior.floorId = `solis-reach-${session.activeDeckId}`;
   appCtx.activeInterior.floorLabel = deck?.label || session.activeDeckId;
   appCtx.activeInterior.activeLevel = SHIP_DECKS.findIndex((entry) => entry.id === session.activeDeckId);
   appCtx.activeInterior.loadedLevels = [appCtx.activeInterior.activeLevel];
 }
 
-function switchSurveyorDeck(deckId) {
+function switchSolisReachDeck(deckId) {
   const session = activeSession;
   const nextDeck = getShipDeck(deckId);
   if (!session || !nextDeck || deckId === session.activeDeckId) return false;
@@ -1958,7 +1958,7 @@ function showDeckLift() {
   picker.innerHTML = `<div><span>DECK LIFT</span><strong>Choose a deck</strong>${SHIP_DECKS.map((deck) => `<button type="button" data-deck="${deck.id}" ${deck.id === session.activeDeckId ? 'disabled' : ''}>${deck.label}</button>`).join('')}<button type="button" data-close>Cancel</button></div>`;
   picker.classList.add('show');
   picker.querySelectorAll('[data-deck]').forEach((button) => button.addEventListener('click', () => {
-    switchSurveyorDeck(button.dataset.deck);
+    switchSolisReachDeck(button.dataset.deck);
     picker.classList.remove('show');
   }));
   picker.querySelector('[data-close]')?.addEventListener('click', () => picker.classList.remove('show'));
@@ -2233,9 +2233,9 @@ function ensureShipMaps(session) {
   renderShipMaps(session);
 }
 
-function enterSurveyorInterior(options = {}) {
+function enterSolisReachInterior(options = {}) {
   if (activeSession || !appCtx.spaceFlight?.active || !appCtx.Walk || !appCtx.scene) return false;
-  const sceneState = buildSurveyorScene(options.expedition);
+  const sceneState = buildSolisReachScene(options.expedition);
   const worldCanvas = getPrimaryWorldCanvas(appCtx);
   const session = {
     expedition: options.expedition || null,
@@ -2297,7 +2297,7 @@ function enterSurveyorInterior(options = {}) {
   appCtx.replaceWorldCollection('dynamicBuildingColliders', activeDeckColliders(session));
 
   appCtx.activeInterior = {
-    key: 'expedition-ship:surveyor',
+    key: 'expedition-ship:solis-reach',
     label: options.expedition?.ship?.name || STARSHIP_NAME,
     mode: 'authored-ship',
     environmentKind: 'expedition-ship',
@@ -2307,7 +2307,7 @@ function enterSurveyorInterior(options = {}) {
     center: { x: 0, z: 0 },
     usableFootprint: sceneState.walkSurface.pts,
     floorPlan: { floorCount: SHIP_DECKS.length, storyHeight: 3.5 },
-    floorId: 'surveyor-command',
+    floorId: 'solis-reach-command',
     floorLabel: getShipDeck('command').label,
     floorBaseY: 0,
     activeLevel: 0,
@@ -2336,7 +2336,7 @@ function enterSurveyorInterior(options = {}) {
   return true;
 }
 
-function exitSurveyorInterior() {
+function exitSolisReachInterior() {
   const session = activeSession;
   if (!session) return false;
   activeSession = null;
@@ -2390,7 +2390,7 @@ function exitSurveyorInterior() {
 
 function handleShipInteriorInteraction(interaction) {
   if (!activeSession || !interaction) return false;
-  if (interaction.kind === 'ship-exit' || interaction.id === 'return-to-flight') return exitSurveyorInterior();
+  if (interaction.kind === 'ship-exit' || interaction.id === 'return-to-flight') return exitSolisReachInterior();
   if (interaction.kind === 'ship-door') return toggleShipDoor(interaction.id);
   if (interaction.kind === 'ship-lift' || interaction.id.startsWith('deck-lift:')) return showDeckLift();
   if (interaction.kind === 'ship-incident-step') {
@@ -2497,7 +2497,7 @@ function getShipInteriorSnapshot() {
   const walker = appCtx.Walk?.state?.walker;
   return {
     active: true,
-    shipId: 'surveyor',
+    shipId: 'solis-reach',
     deckId: activeSession.activeDeckId,
     deckCount: SHIP_DECKS.length,
     roomCount: SHIP_ROOMS.length,
@@ -2571,10 +2571,10 @@ function getShipInteriorSnapshot() {
 }
 
 Object.assign(appCtx, {
-  exitExpeditionShipInterior: exitSurveyorInterior,
+  exitExpeditionShipInterior: exitSolisReachInterior,
   getShipInteriorSnapshot,
   handleShipInteriorInteraction,
-  switchSurveyorDeck,
+  switchSolisReachDeck,
   toggleExpeditionShipMap: toggleShipMap,
   updateExpeditionShipRecord,
   playExpeditionShipAction,
@@ -2583,4 +2583,4 @@ Object.assign(appCtx, {
   updateExpeditionShipInterior
 });
 
-export { enterSurveyorInterior, exitSurveyorInterior, getShipInteriorSnapshot, handleShipInteriorInteraction, playExpeditionShipAction, setShipGuidanceTarget, startIncidentProcedure, switchSurveyorDeck, toggleShipMap, updateExpeditionShipInterior, updateExpeditionShipRecord };
+export { enterSolisReachInterior, exitSolisReachInterior, getShipInteriorSnapshot, handleShipInteriorInteraction, playExpeditionShipAction, setShipGuidanceTarget, startIncidentProcedure, switchSolisReachDeck, toggleShipMap, updateExpeditionShipInterior, updateExpeditionShipRecord };

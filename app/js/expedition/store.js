@@ -27,6 +27,7 @@ function parseRecord(value) {
         assignment: member?.assignment || defaults.assignment || 'general-watch'
       };
     });
+    // Preserve old local saves while keeping retired ship names out of the live runtime.
     if (record.ship?.profileId === 'long-range-research-vessel' && ['Surveyor', 'Asteria'].includes(record.ship.name)) {
       record.ship = { ...record.ship, name: SPACE_CRAFT_IDENTITY.starship.name };
     }

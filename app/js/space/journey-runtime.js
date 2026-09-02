@@ -14,7 +14,7 @@ import {
   executePlannedBurn,
   GRAVITATIONAL_CONSTANT,
   propagateSpacecraft
-} from './spacecraft-authority.js?v=2';
+} from './spacecraft-authority.js?v=4';
 import {
   advanceAssistedPlan,
   completeAssistedCapture,
@@ -323,8 +323,39 @@ function installSpaceJourneyRuntime(appContext) {
         epochMs,
         departureDirection || ephemeris.axis
       );
+      if (journey.mode !== JOURNEY_MODE.MANUAL && options.autoAssist === true) {
+        initialAssistedPlan = createAssistedAscentPlan(spacecraft, ephemeris.source);
+      }
     }
     const presentation = createLivePresentation(ephemeris, sourceScene, destinationScene);
+    if (options.fromCurrentPosition === true) {
+      const currentScenePosition = {
+        x: Number(rocket.position.x),
+        y: Number(rocket.position.y),
+        z: Number(rocket.position.z)
+      };
+      const currentSceneVelocity = appContext.spaceFlight.velocity || { x: 0, y: 0, z: 0 };
+      const physicalPosition = presentation.sceneToPhysical(currentScenePosition);
+      const physicalAhead = presentation.sceneToPhysical({
+        x: currentScenePosition.x + Number(currentSceneVelocity.x || 0),
+        y: currentScenePosition.y + Number(currentSceneVelocity.y || 0),
+        z: currentScenePosition.z + Number(currentSceneVelocity.z || 0)
+      });
+      spacecraft = createSpacecraftState({
+        ...spacecraft,
+        epochMs,
+        targetBodyId: destinationBodyId,
+        positionM: physicalPosition,
+        velocityMps: {
+          x: physicalAhead.x - physicalPosition.x,
+          y: physicalAhead.y - physicalPosition.y,
+          z: physicalAhead.z - physicalPosition.z
+        },
+        propellantCapacityKg: spacecraft.propellantCapacityKg,
+        propellantKg: spacecraft.propellantKg,
+        lastEvent: 'course-acquired-in-flight'
+      });
+    }
     rendered = {
       ephemeris,
       journey,
@@ -338,14 +369,14 @@ function installSpaceJourneyRuntime(appContext) {
       assistedPlan: initialAssistedPlan,
       atmosphericExploration: null,
       approachHold: false,
-      launchHold: !initialAssistedPlan,
+      launchHold: !initialAssistedPlan && options.fromCurrentPosition !== true,
       continuingReturn
     };
     rocket.position.set(rendered.lastScenePosition.x, rendered.lastScenePosition.y, rendered.lastScenePosition.z);
     appContext.spaceJourney = journey;
     appContext.spacecraftState = spacecraft;
     appContext.spaceJourneyEphemeris = ephemeris;
-    appContext.spaceFlight.presentationAuthority = initialAssistedPlan ? 'si' : 'classic';
+    appContext.spaceFlight.presentationAuthority = 'si';
     appContext.spaceFlight.speed = Math.hypot(spacecraft.velocityMps.x, spacecraft.velocityMps.y, spacecraft.velocityMps.z);
     publishAssistState();
     return true;
@@ -363,6 +394,7 @@ function installSpaceJourneyRuntime(appContext) {
       rendered.assistedPlan = createAssistedAscentPlan(rendered.spacecraft, rendered.ephemeris.source);
       rendered.launchHold = false;
       appContext.spaceFlight.presentationAuthority = 'si';
+      appContext.updateSpaceTravelSession?.({ guidance: 'assisted', reason: 'wayfinder-assist-engaged' });
       publishAssistState();
       return Object.freeze({ accepted: true, reason: null, plan: rendered.assistedPlan });
     }
@@ -382,6 +414,7 @@ function installSpaceJourneyRuntime(appContext) {
     appContext.spacecraftState = rendered.spacecraft;
     appContext.spaceJourney = rendered.journey;
     publishAssistState();
+    appContext.updateSpaceTravelSession?.({ guidance: 'assisted', reason: 'wayfinder-assist-engaged' });
     return Object.freeze({ accepted: true, reason: null, plan });
   };
 
@@ -390,6 +423,7 @@ function installSpaceJourneyRuntime(appContext) {
     if (rendered.assistedPlan?.kind === 'transfer') {
       rendered.assistedPlan = null;
       publishAssistState({ cancelled: true });
+      appContext.updateSpaceTravelSession?.({ guidance: 'manual', reason: 'manual-flight-resumed' });
       return Object.freeze({ accepted: true, reason: null, active: false });
     }
     return engageRenderedJourneyAssist();
@@ -406,11 +440,22 @@ function installSpaceJourneyRuntime(appContext) {
     const landingButton = globalThis.document?.getElementById?.('sfLandBtn');
     if (destinationElement) destinationElement.textContent = body?.name || destinationBodyId;
     if (landingButton) landingButton.textContent = `APPROACH ${(body?.name || destinationBodyId).toUpperCase()}`;
+    appContext.updateSpaceTravelSession?.({
+      destination: { id: destinationBodyId, kind: 'body', name: body?.name || destinationBodyId },
+      guidance: 'manual',
+      reason: 'wayfinder-course-set'
+    });
   };
 
   const retargetRenderedSpaceJourney = (destinationInput) => {
-    if (!rendered || ![JOURNEY_PHASE.LAUNCH, JOURNEY_PHASE.PARKING_ORBIT].includes(rendered.journey.phase)) {
-      return Object.freeze({ accepted: false, reason: 'destination-change-requires-parking-orbit' });
+    const blockedPhases = new Set([
+      JOURNEY_PHASE.DESCENT,
+      JOURNEY_PHASE.HOME_DESCENT,
+      JOURNEY_PHASE.SURFACE,
+      JOURNEY_PHASE.COMPLETE
+    ]);
+    if (!rendered || blockedPhases.has(rendered.journey.phase)) {
+      return Object.freeze({ accepted: false, reason: 'finish-landing-before-changing-course' });
     }
     const destinationBodyId = normalizeAstronomicalBodyId(destinationInput);
     if (!destinationBodyId || destinationBodyId === rendered.ephemeris.source.bodyId) {
@@ -418,7 +463,7 @@ function installSpaceJourneyRuntime(appContext) {
     }
     const sourceBodyId = rendered.ephemeris.source.bodyId;
     const mode = rendered.journey.mode;
-    if (!beginRenderedSpaceJourney({ sourceBodyId, destinationBodyId, mode })) {
+    if (!beginRenderedSpaceJourney({ sourceBodyId, destinationBodyId, mode, fromCurrentPosition: true })) {
       return Object.freeze({ accepted: false, reason: 'destination-scene-unavailable' });
     }
     publishCourseDestination(destinationBodyId);
@@ -454,7 +499,8 @@ function installSpaceJourneyRuntime(appContext) {
     if (!sceneBody(sourceBodyId) || !beginRenderedSpaceJourney({
       sourceBodyId,
       destinationBodyId,
-      mode: JOURNEY_MODE.ASSISTED
+      mode: JOURNEY_MODE.ASSISTED,
+      fromCurrentPosition: true
     })) {
       return Object.freeze({ accepted: false, reason: 'destination-scene-unavailable' });
     }
@@ -603,6 +649,7 @@ function installSpaceJourneyRuntime(appContext) {
       rendered.assistedPlan = null;
       rendered.approachHold = false;
       publishAssistState({ cancelled: true, manual: true });
+      appContext.updateSpaceTravelSession?.({ guidance: 'manual', reason: 'manual-flight-resumed' });
     }
     if (rendered.launchHold && !manualControl && !rendered.assistedPlan) {
       const heldScenePosition = rendered.presentation.physicalToScene(rendered.spacecraft.positionM);
@@ -831,6 +878,25 @@ function installSpaceJourneyRuntime(appContext) {
     );
     appContext.spacecraftState = rendered.spacecraft;
     appContext.spaceJourney = rendered.journey;
+    const travelPhaseByJourney = {
+      launch: 'launch',
+      parking_orbit: 'parking-orbit',
+      transfer: 'transfer',
+      approach: 'approach',
+      atmospheric_exploration: 'approach',
+      descent: 'descent',
+      surface: 'landed',
+      ascent: 'ascent',
+      return_transfer: 'transfer',
+      home_approach: 'approach',
+      home_descent: 'descent',
+      complete: 'landed'
+    };
+    appContext.updateSpaceTravelSession?.({
+      phase: travelPhaseByJourney[rendered.journey.phase] || 'free-flight',
+      guidance: rendered.assistedPlan ? 'assisted' : 'manual',
+      reason: `space-${rendered.journey.phase}`
+    });
     publishRenderedEnvironment();
     appContext.spaceFlight._isThrusting = Number(options.throttle) > 0 || braking;
     appContext.spaceFlight.manualFlightRate = !rendered.assistedPlan && !rendered.approachHold
