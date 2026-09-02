@@ -34,7 +34,7 @@ import {
   applyTerrainSemanticMaterialBlend,
   applyWorldCoverVertexTints,
   ensureTerrainTextureSet
-} from './surface-profiles.js?v=54';
+} from './surface-profiles.js?v=55';
 import {
   applyWorldCoverSurfaceMaterialMix,
   setNormalizedTerrainAttribute,

@@ -29,7 +29,7 @@ import {
   refreshTerrainSurfaceProfiles,
   refreshTerrainSurfaceProfilesCooperatively,
   setWorldSurfaceProfile
-} from "./terrain/surface-profiles.js?v=54";
+} from "./terrain/surface-profiles.js?v=55";
 import {
   applyHeightsToTerrainMesh,
   buildTerrainTileMesh,
