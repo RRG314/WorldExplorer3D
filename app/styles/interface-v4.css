@@ -442,10 +442,10 @@ body:has(#largeMap.show) #worldQuickControls { display: none !important; }
 .minimapZoomBtn, #minimapZoomLevel { border-radius: 0; }
 .floatMenuContainer {
   left: 260px;
-  right: 260px;
+  right: 310px;
   bottom: 14px;
   width: auto;
-  max-width: 620px;
+  max-width: 760px;
   margin: 0 auto;
   transform: none;
   display: none;
@@ -458,9 +458,8 @@ body:has(#largeMap.show) #worldQuickControls { display: none !important; }
 .floatMenuRow { display: contents; }
 .floatMenu { min-width: 0; }
 .floatBtn {
-  position: relative;
-  height: 56px;
-  padding: 5px 4px;
+  height: 66px;
+  padding: 7px 4px;
   flex-direction: column;
   gap: 5px;
   color: var(--wx-muted) !important;
@@ -472,22 +471,7 @@ body:has(#largeMap.show) #worldQuickControls { display: none !important; }
   box-shadow: none;
   font-size: 10px;
 }
-#exploreBtn.primaryDestination { color: var(--wx-text) !important; background: linear-gradient(180deg,rgba(45,125,255,.12),rgba(45,125,255,.035)); border-bottom-color: rgba(45,125,255,.72); }
-#exploreBtn.primaryDestination .btnIcon { color: #8fc1ff; }
-.floatBtn::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 18%;
-  right: 18%;
-  height: 2px;
-  background: var(--wx-blue);
-  opacity: 0;
-  transform: scaleX(.35);
-  transition: opacity .16s ease, transform .16s ease;
-}
-.floatBtn:hover, .floatBtn:focus-visible, .floatMenu.open .floatBtn { color: var(--wx-text) !important; background: linear-gradient(180deg,rgba(45,125,255,.13),rgba(45,125,255,.04)); border-bottom-color: var(--wx-blue); transform: none; box-shadow: none; }
-.floatBtn:hover::before, .floatBtn:focus-visible::before, .floatMenu.open .floatBtn::before { opacity: 1; transform: scaleX(1); }
+.floatBtn:hover, .floatBtn:focus-visible, .floatMenu.open .floatBtn { color: var(--wx-text) !important; background: rgba(45, 125, 255, 0.1); border-bottom-color: var(--wx-blue); transform: none; box-shadow: none; }
 .floatBtn:focus-visible { outline: 1px solid rgba(126,181,255,.82); outline-offset: -2px; }
 body.deflock-active .floatMenuContainer {
   left: 300px;
@@ -504,10 +488,8 @@ body.deflock-active .floatBtn::after {
   font: 600 8px/1 Orbitron,sans-serif;
   text-transform: uppercase;
 }
-.btnIcon { display: grid; place-items: center; width: 25px; height: 25px; line-height: 1; color: #c7d0d7; }
-.btnIcon svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.55; stroke-linecap: round; stroke-linejoin: round; }
-.floatBtn:hover .btnIcon, .floatBtn:focus-visible .btnIcon, .floatMenu.open .btnIcon { color: #8fc1ff; }
-.btnText { display: block; color: inherit; font: 650 9px/1 Orbitron, sans-serif; letter-spacing: .035em; text-transform: uppercase; }
+.btnIcon { display: block; width: auto; height: auto; font-size: 23px; line-height: 1; color: inherit; filter: grayscale(1) brightness(2); }
+.btnText { display: block; color: inherit; font: 600 9px/1 Orbitron, sans-serif; text-transform: uppercase; }
 .floatItems {
   top: 88px;
   right: 0;
@@ -576,7 +558,6 @@ body.deflock-active .floatBtn::after {
 #controlsTab.show { display: none; }
 #controlsTab.show.bar-open { display: block; }
 #ctrlHeader { display: none; color: var(--wx-blue); }
-#controlsBarBtn .btnText { display: inline; font: inherit; text-transform: none; }
 #controlsBarBtn[aria-expanded="true"] { color: var(--wx-text) !important; background: rgba(45, 125, 255, 0.1); box-shadow: inset 4px 0 var(--wx-blue); }
 
 /* Mobile play shell */
@@ -646,7 +627,7 @@ body.deflock-active .floatBtn::after {
     right: 0;
     bottom: 0;
     width: 100%;
-    height: 64px;
+    height: 78px;
     transform: none;
     max-width: none;
     margin: 0;
@@ -656,15 +637,15 @@ body.deflock-active .floatBtn::after {
     border-left: 0;
   }
   #multiplayerMenu { position: relative; left: auto; bottom: auto; z-index: auto; }
-  .floatBtn { height: 64px; padding: 6px 2px 4px; }
-  .btnIcon { width: 22px; height: 22px; }
+  .floatBtn { height: 78px; padding: 8px 2px 5px; }
+  .btnIcon { width: auto; height: auto; font-size: 23px; }
   .btnText { display: none; }
-  .floatBtn::after { content: attr(data-mobile-label); display: block; color: inherit; font: 650 7.5px/1.1 Orbitron, sans-serif; letter-spacing: .02em; text-transform: uppercase; }
+  .floatBtn::after { content: attr(data-mobile-label); display: block; color: inherit; font: 600 8px/1 Orbitron, sans-serif; text-transform: uppercase; }
   .floatItems {
     top: auto;
     left: 0;
     right: 0;
-    bottom: calc(64px + env(safe-area-inset-bottom));
+    bottom: calc(78px + env(safe-area-inset-bottom));
     width: 100%;
     min-width: 0;
     max-width: none;
@@ -680,7 +661,6 @@ body.deflock-active .floatBtn::after {
   .floatItemSection { grid-column: 1 / -1; padding: 10px 8px 6px; }
   .floatItemSection:first-of-type { padding-top: 0; }
   #gameMenu .floatItem, #exploreMenu .floatItem, #travelMenu .floatItem, #realEstateMenu .floatItem { min-height: 48px; }
-  #controlsBarBtn .btnText { display: inline; }
   #controlsTab, #memoryFlowerFloatBtn { display: none !important; }
   body.deflock-active .floatMenuContainer { left: 0; right: 0; height: 58px; max-width: none; }
   body.deflock-active .floatBtn { height: 58px; padding: 5px 2px 3px; }

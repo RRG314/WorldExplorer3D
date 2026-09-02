@@ -59,13 +59,13 @@ async function saveIncompleteExpedition(page) {
 
 async function verifyPathfinderAndInterior(page) {
   assert.equal(await saveIncompleteExpedition(page), 'insufficient');
-  await page.locator('#travelBtn').click();
+  await page.locator('#exploreBtn').click();
   await page.waitForTimeout(1_500);
-  assert.equal(await page.locator('#travelMenu').evaluate((menu) => menu.classList.contains('open')), true, 'Travel menu flickered closed without player input.');
-  const copy = await page.locator('#travelMenu .floatItems').textContent();
+  assert.equal(await page.locator('#exploreMenu').evaluate((menu) => menu.classList.contains('open')), true, 'Exploration menu flickered closed without player input.');
+  const copy = await page.locator('#exploreMenu .floatItems').textContent();
   assert.match(copy, /Deploy Pathfinder Pod/i);
-  assert.match(copy, /Board Solis Reach Directly/i);
-  assert.match(copy, /Enter Free Space Flight/i);
+  assert.match(copy, /Board Solis Reach/i);
+  assert.match(copy, /Free Space Flight/i);
   assert.doesNotMatch(copy, /Fly with Wayfinder|Board Asteria/i);
 
   await page.locator('#fDeployPathfinder').click();
@@ -182,7 +182,7 @@ async function verifyPathfinderAndInterior(page) {
 }
 
 async function verifyFreeFlight(page) {
-  await page.locator('#travelBtn').click();
+  await page.locator('#exploreBtn').click();
   await page.locator('#fSpaceRocket').click();
   await page.waitForFunction(() => {
     const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
@@ -200,13 +200,45 @@ async function verifyFreeFlight(page) {
   await page.keyboard.down('Space');
   await page.waitForTimeout(600);
   await page.keyboard.up('Space');
-  const after = await page.evaluate(async () => {
+  const afterThrottle = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    return ctx.spaceFlight.rocket.position.toArray();
+    return {
+      position: ctx.spaceFlight.rocket.position.toArray(),
+      quaternion: ctx.spaceFlight.rocket.quaternion.toArray()
+    };
   });
-  assert.notDeepEqual(after, before.position, 'Classic free-flight throttle did not move the starship.');
+  assert.notDeepEqual(afterThrottle.position, before.position, 'Classic free-flight throttle did not move the starship.');
+
+  await page.keyboard.down('ArrowLeft');
+  await page.waitForTimeout(450);
+  await page.keyboard.up('ArrowLeft');
+  await page.waitForTimeout(350);
+  const afterTurn = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const forward = new THREE.Vector3(0, 1, 0).applyQuaternion(ctx.spaceFlight.rocket.quaternion).normalize();
+    const localUp = new THREE.Vector3(0, 0, -1).applyQuaternion(ctx.spaceFlight.rocket.quaternion).normalize();
+    const velocity = ctx.spaceFlight.velocity.clone().normalize();
+    const cameraOffset = ctx.spaceFlight.camera.position.clone().sub(ctx.spaceFlight.rocket.position);
+    return {
+      position: ctx.spaceFlight.rocket.position.toArray(),
+      quaternion: ctx.spaceFlight.rocket.quaternion.toArray(),
+      forwardAlignment: velocity.dot(forward),
+      cameraTrailingDistance: -cameraOffset.dot(forward),
+      cameraUpAlignment: ctx.spaceFlight.camera.up.clone().normalize().dot(localUp),
+      cameraModeButtonPresent: Boolean(document.getElementById('sfCameraBtn')),
+      activeCraftId: ctx.getActiveSpaceCraftId?.(),
+      craftName: ctx.spaceFlight.rocket?.name || ''
+    };
+  });
+  assert.notDeepEqual(afterTurn.quaternion, afterThrottle.quaternion, 'Arrow steering did not turn the starship.');
+  assert.ok(afterTurn.forwardAlignment > 0.94, JSON.stringify(afterTurn));
+  assert.ok(afterTurn.cameraTrailingDistance > 30, JSON.stringify(afterTurn));
+  assert.ok(afterTurn.cameraUpAlignment > 0.94, JSON.stringify(afterTurn));
+  assert.equal(afterTurn.cameraModeButtonPresent, false, 'An added Space camera-mode control replaced the 5.1 chase view.');
+  assert.equal(afterTurn.activeCraftId, 'solis-reach');
+  assert.match(afterTurn.craftName, /Solis Reach/);
   await page.screenshot({ path: path.join(outputDir, 'free-space-flight.png'), fullPage: true });
-  return { before, after };
+  return { before, afterThrottle, afterTurn };
 }
 
 const failures = [];

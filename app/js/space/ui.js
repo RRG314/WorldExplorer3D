@@ -10,18 +10,6 @@ import { spacecraftOperationTuning } from '../character/spacecraft-assistance.js
 import { SPACE_CRAFT_IDENTITY } from './craft-identity.js?v=1';
 
 const MAX_LOCAL_SPACECRAFT_SPEED_KM_S = 192.2;
-const SPACE_CAMERA_MODES = Object.freeze(['chase', 'side', 'overhead', 'cockpit']);
-
-function cycleSpaceFlightCameraMode() {
-  const current = String(appCtx.spaceFlight?.cameraMode || 'chase');
-  const index = SPACE_CAMERA_MODES.indexOf(current);
-  const next = SPACE_CAMERA_MODES[(index + 1) % SPACE_CAMERA_MODES.length];
-  appCtx.spaceFlight.cameraMode = next;
-  showFlightMessage(`${next.toUpperCase()} CAMERA`, '#6fe8ff');
-  const button = document.getElementById('sfCameraBtn');
-  if (button) button.setAttribute('aria-label', `Change camera. Current view: ${next}`);
-  return next;
-}
 
 function setMetric(labelId, valueId, unitId, label, value, unit) {
   const labelElement = document.getElementById(labelId);
@@ -72,7 +60,6 @@ export function initSpaceFlightUI(attemptLanding, lifecycleScope = null) {
   hud.innerHTML = `
     <div class="spaceFlightHudHead">
       <span aria-hidden="true">✦</span><strong id="sfFlightTitle">SPACE FLIGHT</strong>
-      <button id="sfCameraBtn" type="button" aria-label="Change camera. Current view: chase">◉</button>
       <button id="sfHudToggle" type="button" aria-expanded="true" aria-label="Collapse flight instruments">−</button>
     </div>
     <div id="sfFlightStatus" class="spaceFlightHudStatus">Preparing flight</div>
@@ -143,7 +130,6 @@ function setupSpaceFlightControls(attemptLanding, lifecycleScope = null) {
     const hud = document.getElementById('spaceFlightHUD');
     setSpaceFlightHudCollapsed(!hud?.classList.contains('collapsed'));
   });
-  listen(document.getElementById('sfCameraBtn'), 'click', cycleSpaceFlightCameraMode);
   listen(document.getElementById('sfAssistBtn'), 'click', () => {
     if (appCtx.spaceJourney?.phase === 'atmospheric_exploration') return;
     const universeTarget = appCtx.getUniverseHudTarget?.();
@@ -172,11 +158,6 @@ function setupSpaceFlightControls(attemptLanding, lifecycleScope = null) {
   listen(document, 'keydown', (e) => {
     if (appCtx.spaceFlight.active) {
       const key = normalizedSpaceKey(e);
-      if (key === 'c') {
-        cycleSpaceFlightCameraMode();
-        e.preventDefault();
-        return;
-      }
       appCtx.spaceFlight.keys[key] = true;
       if ([' ', 'shift', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
         e.preventDefault();

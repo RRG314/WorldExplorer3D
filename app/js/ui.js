@@ -207,8 +207,7 @@ function setupUI() {
     travelBtn: 'travelMenu',
     realEstateFloatBtn: 'realEstateMenu',
     exploreBtn: 'exploreMenu',
-    gameBtn: 'gameMenu',
-    packBtn: 'packMenu'
+    gameBtn: 'gameMenu'
   };
 
   const toggleFloatMenuByButton = (buttonId) => {
@@ -243,8 +242,6 @@ function setupUI() {
     toggleFloatMenuByButton('gameBtn');
     void titleUi.primeMultiplayerUi?.();
   };
-  const packButton = document.getElementById('packBtn');
-  if (packButton) packButton.onclick = () => toggleFloatMenuByButton('packBtn');
 
   const homeMenuItem = document.getElementById('fHome');
   if (homeMenuItem) homeMenuItem.addEventListener('click', goToMainMenu);

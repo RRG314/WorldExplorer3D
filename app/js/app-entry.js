@@ -31,7 +31,7 @@ import './travel-mode.js?v=27';
 import { initBoatMode } from './boat-mode.js?v=57';
 import './sky.js?v=89';
 import './weather.js?v=11';
-import './runtime/on-demand-modes.js?v=45';
+import './runtime/on-demand-modes.js?v=46';
 import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=174';
 import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=10';
 import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=1';
@@ -50,7 +50,7 @@ import './hud.js?v=103';
 import './map.js?v=61';
 import { renderLoop } from './main.js?v=75';
 import './memory.js?v=55';
-import { setupUI } from './ui.js?v=164';
+import { setupUI } from './ui.js?v=165';
 import { initAccessibility } from './ui/accessibility.js?v=1';
 
 let _booted = false;
