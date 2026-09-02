@@ -13,7 +13,14 @@ const PROPERTY_STATUS = Object.freeze({
   rent: 'listed_for_rent',
   leased: 'leased'
 });
-const NON_OWNABLE_SOURCE = /^(fallback-|dynamic:|overlay:|inferred:|interior[-:]|generated:)|:guardrail:|structure-collider/i;
+const NON_OWNABLE_SOURCE = /^(fallback-|dynamic:|overlay:|inferred(?::|-)|interior[-:]|generated:)|:guardrail:|structure-collider/i;
+const MAPPED_SOURCE_PATTERNS = Object.freeze([
+  /^overture:[0-9a-f-]{8,}$/i,
+  /^shortbread:buildings:\d+:\d+:\d+:[^:]+:\d+$/i,
+  /^(?:osm:)?(?:node|way|relation)[:/]\d+$/i,
+  /^\d+$/
+]);
+const PROPERTY_INTERACTION_RADIUS = 55;
 
 function finite(value, fallback = 0) {
   const number = Number(value);
@@ -57,6 +64,30 @@ function categoryFor(type) {
   return 'mixed';
 }
 
+function sourceAuthorityFor(sourceBuildingId) {
+  const value = text(sourceBuildingId, 220).toLowerCase();
+  if (value.startsWith('overture:')) return 'overture';
+  if (value.startsWith('shortbread:')) return 'shortbread';
+  if (MAPPED_SOURCE_PATTERNS.some((pattern) => pattern.test(value))) return 'openstreetmap';
+  return '';
+}
+
+function propertyDistance(left = {}, right = {}) {
+  return Math.hypot(finite(left.x) - finite(right.x), finite(left.z) - finite(right.z));
+}
+
+function validatePropertyProximity(property, actorPose, radius = PROPERTY_INTERACTION_RADIUS) {
+  if (!actorPose || !Number.isFinite(Number(actorPose.x)) || !Number.isFinite(Number(actorPose.z))) {
+    return Object.freeze({ valid: false, distance: Infinity, reason: 'property_proximity_required' });
+  }
+  const distance = propertyDistance(property, actorPose);
+  return Object.freeze({
+    valid: distance <= Math.max(5, finite(radius, PROPERTY_INTERACTION_RADIUS)),
+    distance,
+    reason: distance <= Math.max(5, finite(radius, PROPERTY_INTERACTION_RADIUS)) ? '' : 'property_too_far'
+  });
+}
+
 function hashAdjustment(value) {
   let hash = 2166136261;
   for (const character of String(value || '')) {
@@ -79,13 +110,15 @@ function normalizeProperty(input = {}) {
   const propertyId = text(input.propertyId, 420);
   const sourceBuildingId = text(input.sourceBuildingId, 220);
   const locationId = text(input.locationId, 180);
-  if (!propertyId || !sourceBuildingId || !locationId || !propertyId.includes(sourceBuildingId) || NON_OWNABLE_SOURCE.test(sourceBuildingId)) throw new Error('invalid_property');
+  const sourceAuthority = sourceAuthorityFor(sourceBuildingId);
+  if (!propertyId || !sourceBuildingId || !locationId || !propertyId.includes(sourceBuildingId) || NON_OWNABLE_SOURCE.test(sourceBuildingId) || !sourceAuthority) throw new Error('invalid_property');
   const buildingType = text(input.buildingType || 'building', 60).toLowerCase();
   const area = Math.max(16, Math.min(250_000, finite(input.area, 16)));
   const levels = integer(input.levels, 1, 180, 1);
   const property = Object.freeze({
     propertyId,
     sourceBuildingId,
+    sourceAuthority,
     locationId,
     locationLabel: text(input.locationLabel || 'Saved location', 80),
     label: text(input.label || 'World property', 100),
@@ -107,6 +140,50 @@ function normalizeProperty(input = {}) {
     z: Math.max(-25_000, Math.min(25_000, finite(input.z)))
   });
   return Object.freeze({ ...property, baseValue: propertyBaseValue(property) });
+}
+
+function catalogFingerprint(property = {}) {
+  return [
+    text(property.propertyId, 420),
+    text(property.sourceBuildingId, 220),
+    text(property.sourceAuthority, 40),
+    text(property.locationId, 180),
+    text(property.buildingType, 60),
+    integer(property.area, 16, 250_000, 16),
+    integer(property.levels, 1, 180, 1),
+    Math.round(finite(property.x) * 10) / 10,
+    Math.round(finite(property.z) * 10) / 10
+  ].join('|');
+}
+
+function catalogRecord(property, nowMs, timestampFromMs) {
+  return Object.freeze({
+    authority: 'world-property-catalog-v1',
+    ...property,
+    catalogFingerprint: catalogFingerprint(property),
+    registeredAt: timestampFromMs(nowMs)
+  });
+}
+
+function canonicalProperty(submitted, currentProperty, currentCatalog) {
+  const source = currentCatalog || currentProperty || submitted;
+  const normalized = normalizeProperty(source);
+  if (catalogFingerprint(normalized) !== catalogFingerprint(submitted)) throw new Error('property_catalog_mismatch');
+  return normalized;
+}
+
+function clearExpiredLease(property, nowMs) {
+  if (!property || property.status !== PROPERTY_STATUS.leased || timestampMillis(property.leaseEndsAt, 0) > nowMs) return property;
+  return {
+    ...property,
+    status: PROPERTY_STATUS.owned,
+    tenantUid: '',
+    tenantName: '',
+    rentPrice: 0,
+    rentTermDays: 0,
+    leaseStartsAt: null,
+    leaseEndsAt: null
+  };
 }
 
 function walletData(raw = {}) {
@@ -326,6 +403,7 @@ async function settlePropertyAction(options = {}) {
   const {
     runTransaction,
     propertyRef,
+    catalogRef,
     actorWalletRef,
     receiptRef,
     starterEntitlementRef,
@@ -341,18 +419,19 @@ async function settlePropertyAction(options = {}) {
     nowMs = Date.now(),
     timestampFromMs
   } = options;
-  if (typeof runTransaction !== 'function' || !propertyRef || !actorWalletRef || !receiptRef || !uid || typeof timestampFromMs !== 'function') {
+  if (typeof runTransaction !== 'function' || !propertyRef || !catalogRef || !actorWalletRef || !receiptRef || !uid || typeof timestampFromMs !== 'function') {
     throw new TypeError('Property transaction inputs are required.');
   }
   const action = text(input?.action, 32).toLowerCase();
   const receiptId = text(input?.requestId, 120);
   if (!VALID_ACTIONS.has(action) || !receiptId) throw new Error('invalid_action');
-  const submitted = normalizeProperty(input?.property);
+  const submittedInput = normalizeProperty(input?.property);
   const actorName = text(displayName || 'Explorer', 80);
   return runTransaction(async (transaction) => {
-    const [receiptSnapshot, propertySnapshot, actorWalletSnapshot, starterSnapshot, actorBoardSnapshot] = await Promise.all([
+    const [receiptSnapshot, propertySnapshot, catalogSnapshot, actorWalletSnapshot, starterSnapshot, actorBoardSnapshot] = await Promise.all([
       transaction.get(receiptRef),
       transaction.get(propertyRef),
+      transaction.get(catalogRef),
       transaction.get(actorWalletRef),
       starterEntitlementRef ? transaction.get(starterEntitlementRef) : Promise.resolve(null),
       actorBoardRef ? transaction.get(actorBoardRef) : Promise.resolve(null)
@@ -360,12 +439,15 @@ async function settlePropertyAction(options = {}) {
     const priorReceipt = snapshotData(receiptSnapshot);
     if (priorReceipt?.result) return Object.freeze({ ...priorReceipt.result, idempotent: true });
     const current = snapshotData(propertySnapshot);
-    if (current && current.propertyId !== submitted.propertyId) throw new Error('property_identity_conflict');
+    const currentCatalog = snapshotData(catalogSnapshot);
+    if (current && current.propertyId !== submittedInput.propertyId) throw new Error('property_identity_conflict');
+    const submitted = canonicalProperty(submittedInput, current, currentCatalog);
     const actorWallet = walletData(snapshotData(actorWalletSnapshot) || {});
     const actorBoard = boardData(snapshotData(actorBoardSnapshot) || {}, uid, actorName);
     const starterEntitlement = snapshotData(starterSnapshot) || {};
-    const leaseActive = current?.tenantUid && timestampMillis(current.leaseEndsAt, 0) > nowMs;
-    const base = current || {
+    const normalizedCurrent = clearExpiredLease(current, nowMs);
+    const leaseActive = normalizedCurrent?.tenantUid && timestampMillis(normalizedCurrent.leaseEndsAt, 0) > nowMs;
+    const base = normalizedCurrent || {
       authority: 'world-property-transaction-v1',
       ...submitted,
       ownerUid: '', ownerName: '', tenantUid: '', tenantName: '', status: PROPERTY_STATUS.available,
@@ -447,6 +529,7 @@ async function settlePropertyAction(options = {}) {
     };
     next = { ...next, authority: 'world-property-transaction-v1', ...submitted, revision: integer(base.revision, 0, MAX_CREDITS, 0) + 1, updatedAt: timestampFromMs(nowMs) };
     const result = publicResult(next, nextActorWallet, receiptId);
+    if (!currentCatalog) transaction.set(catalogRef, catalogRecord(submitted, nowMs, timestampFromMs), { merge: false });
     transaction.set(propertyRef, next, { merge: false });
     transaction.set(actorWalletRef, nextActorWallet, { merge: false });
     if (action === 'starter_claim') {
@@ -527,11 +610,15 @@ async function settlePropertyAction(options = {}) {
 
 module.exports = {
   PROPERTY_STATUS,
+  PROPERTY_INTERACTION_RADIUS,
   STARTING_CREDITS,
+  catalogFingerprint,
   normalizeProperty,
   propertyBaseValue,
   propertyDocumentId,
+  sourceAuthorityFor,
   settlePropertyAction,
   settlePropertyTrade,
+  validatePropertyProximity,
   walletData
 };

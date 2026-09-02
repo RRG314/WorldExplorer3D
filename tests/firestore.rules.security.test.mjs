@@ -305,6 +305,12 @@ async function seedData(testEnv) {
       baseValue: 120,
       revision: 1
     });
+    await setDoc(doc(db, 'worldPropertyCatalog', 'property-state-1'), {
+      authority: 'world-property-catalog-v1',
+      propertyId: 'world:osm:way:42',
+      sourceBuildingId: 'osm:way:42',
+      sourceAuthority: 'openstreetmap'
+    });
     await setDoc(doc(db, 'users', OWNER_UID, 'economy', 'wallet'), { credits: 380, revision: 1 });
     await setDoc(doc(db, 'users', OWNER_UID, 'propertyEntitlements', 'starter'), { claimed: true, propertyId: 'world:osm-way:home-42' });
     await setDoc(doc(db, 'users', OWNER_UID, 'propertyReceipts', 'receipt-1'), { action: 'starter_claim', propertyId: 'world:osm-way:home-42' });
@@ -612,6 +618,13 @@ await runCheck('signed-in explorers can read global property ownership but canno
 
 await runCheck('anonymous visitors cannot read global property ownership', async () => {
   await assertFails(getDoc(doc(anonDb, 'worldProperties', 'property-state-1')));
+});
+
+await runCheck('mapped property catalog is server-only', async () => {
+  const reference = doc(ownerDb, 'worldPropertyCatalog', 'property-state-1');
+  await assertFails(getDoc(reference));
+  await assertFails(setDoc(reference, { x: 999 }, { merge: true }));
+  await assertFails(getDoc(doc(anonDb, 'worldPropertyCatalog', 'property-state-1')));
 });
 
 await runCheck('players can read only their own wallet, receipts, deed, and notifications and cannot write them', async () => {

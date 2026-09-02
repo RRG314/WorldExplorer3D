@@ -11,6 +11,7 @@ function propertyPayload(property = {}) {
   return {
     propertyId: String(property.worldPropertyId || property.propertyId || property.id || '').slice(0, 420),
     sourceBuildingId: String(property.sourceBuildingId || '').slice(0, 220),
+    sourceAuthority: String(property.sourceAuthority || '').slice(0, 40),
     locationId: String(property.locationId || '').slice(0, 180),
     locationLabel: String(property.locationLabel || '').slice(0, 80),
     label: String(property.label || '').slice(0, 100),
@@ -40,6 +41,10 @@ async function commitWorldPropertyAction(input = {}) {
     salePrice: Number(input.salePrice || 0),
     rentPrice: Number(input.rentPrice || 0),
     rentTermDays: Number(input.rentTermDays || 0),
+    actorPose: input.actorPose && typeof input.actorPose === 'object' ? {
+      x: Number(input.actorPose.x || 0),
+      z: Number(input.actorPose.z || 0)
+    } : null,
     property: propertyPayload(input.property)
   }, { label: 'Shared property', forceRefreshToken: false });
 }

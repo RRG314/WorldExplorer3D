@@ -3,7 +3,13 @@ const HOUSING_STORAGE_KEY = 'world-explorer:homes:v1';
 
 const RESIDENTIAL_TYPES = /house|residential|apartments|terrace|townhouse|detached|semidetached|bungalow|dormitory/;
 const EXCLUDED_TYPES = /bridge|guardrail|roof|canopy|carport|aircraft|ship|transport|runway|taxiway/;
-const NON_OWNABLE_SOURCE = /^(fallback-|dynamic:|overlay:|inferred:|interior[-:]|generated:)|:guardrail:|structure-collider/i;
+const NON_OWNABLE_SOURCE = /^(fallback-|dynamic:|overlay:|inferred(?::|-)|interior[-:]|generated:)|:guardrail:|structure-collider/i;
+const MAPPED_SOURCE_PATTERNS = Object.freeze([
+  /^overture:[0-9a-f-]{8,}$/i,
+  /^shortbread:buildings:\d+:\d+:\d+:[^:]+:\d+$/i,
+  /^(?:osm:)?(?:node|way|relation)[:/]\d+$/i,
+  /^\d+$/
+]);
 
 function finite(value, fallback = 0) {
   const number = Number(value);
@@ -17,7 +23,14 @@ function clean(value, fallback = '') {
 
 function hasStableMappedIdentity(value) {
   const identity = clean(value);
-  return !!identity && !NON_OWNABLE_SOURCE.test(identity);
+  return !!identity && !NON_OWNABLE_SOURCE.test(identity) && MAPPED_SOURCE_PATTERNS.some((pattern) => pattern.test(identity));
+}
+
+function mappedSourceAuthority(value) {
+  const identity = clean(value).toLowerCase();
+  if (identity.startsWith('overture:')) return 'overture';
+  if (identity.startsWith('shortbread:')) return 'shortbread';
+  return hasStableMappedIdentity(identity) ? 'openstreetmap' : '';
 }
 
 function hashText(value = '') {
@@ -104,6 +117,7 @@ function normalizeCandidate(building, options = {}, index = 0) {
     worldPropertyId: `world:${sourceId}`,
     sharedEligible: hasStableMappedIdentity(explicitSourceId),
     sourceBuildingId: sourceId,
+    sourceAuthority: mappedSourceAuthority(explicitSourceId),
     locationId,
     locationLabel,
     label: clean(building?.name, `${kind} in ${locationLabel}`),

@@ -3,11 +3,13 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const {
+  PROPERTY_INTERACTION_RADIUS,
   STARTING_CREDITS,
   normalizeProperty,
   propertyDocumentId,
   settlePropertyAction,
-  settlePropertyTrade
+  settlePropertyTrade,
+  validatePropertyProximity
 } = require('../functions/property-authority.js');
 
 function memoryRef(path, store) {
@@ -46,8 +48,8 @@ function timestampFromMs(value) {
 
 function property() {
   return {
-    propertyId: 'home:baltimore:39.29:-76.61:osm-way:home-42',
-    sourceBuildingId: 'osm-way:home-42',
+    propertyId: 'home:baltimore:39.29:-76.61:osm:way:42',
+    sourceBuildingId: 'osm:way:42',
     locationId: 'baltimore:39.29:-76.61',
     locationLabel: 'Baltimore',
     label: 'House in Baltimore',
@@ -61,10 +63,12 @@ function property() {
 }
 
 function actionOptions(state, uid, action, requestId, extra = {}) {
-  const propertyId = propertyDocumentId(property().propertyId);
+  const selectedProperty = extra.property || property();
+  const propertyId = propertyDocumentId(selectedProperty.propertyId);
   return {
     runTransaction: state.runTransaction,
     propertyRef: state.ref(`worldProperties/${propertyId}`),
+    catalogRef: state.ref(`worldPropertyCatalog/${propertyId}`),
     actorWalletRef: state.ref(`users/${uid}/economy/wallet`),
     receiptRef: state.ref(`users/${uid}/propertyReceipts/${requestId}`),
     starterEntitlementRef: state.ref(`users/${uid}/propertyEntitlements/starter`),
@@ -78,7 +82,7 @@ function actionOptions(state, uid, action, requestId, extra = {}) {
     roomCode: 'ABC123',
     nowMs: extra.nowMs || 1000,
     timestampFromMs,
-    input: { action, requestId, property: property(), ...extra }
+    input: { action, requestId, property: selectedProperty, ...extra }
   };
 }
 
@@ -93,13 +97,14 @@ test('the free first property is account-wide, single use, and creates no sell-b
 
   const secondProperty = {
     ...property(),
-    propertyId: 'world:osm-way:home-99',
-    sourceBuildingId: 'osm-way:home-99',
+    propertyId: 'world:osm:way:99',
+    sourceBuildingId: 'osm:way:99',
     label: 'Another House'
   };
   const second = await settlePropertyAction({
     ...actionOptions(state, 'one', 'starter_claim', 'starter-two'),
     propertyRef: state.ref(`worldProperties/${propertyDocumentId(secondProperty.propertyId)}`),
+    catalogRef: state.ref(`worldPropertyCatalog/${propertyDocumentId(secondProperty.propertyId)}`),
     input: { action: 'starter_claim', requestId: 'starter-two', property: secondProperty }
   });
   assert.equal(second.accepted, false);
@@ -136,6 +141,33 @@ test('generated scene pieces are rejected by the world property authority', () =
       sourceBuildingId
     }), /invalid_property/);
   }
+  assert.throws(() => normalizeProperty({
+    ...property(),
+    propertyId: 'world:looks-mapped-but-is-not',
+    sourceBuildingId: 'looks-mapped-but-is-not'
+  }), /invalid_property/);
+});
+
+test('property actions require a nearby actor pose', () => {
+  assert.equal(validatePropertyProximity(property(), { x: 20, z: 28 }).valid, true);
+  const far = validatePropertyProximity(property(), { x: 20 + PROPERTY_INTERACTION_RADIUS + 1, z: 28 });
+  assert.equal(far.valid, false);
+  assert.equal(far.reason, 'property_too_far');
+  assert.equal(validatePropertyProximity(property(), null).reason, 'property_proximity_required');
+});
+
+test('the first accepted action registers immutable mapped property geometry', async () => {
+  const state = transactionStore();
+  await settlePropertyAction(actionOptions(state, 'one', 'buy', 'catalog-buy'));
+  const id = propertyDocumentId(property().propertyId);
+  const catalog = state.store.get(`worldPropertyCatalog/${id}`);
+  assert.equal(catalog.sourceBuildingId, 'osm:way:42');
+  assert.equal(catalog.sourceAuthority, 'openstreetmap');
+  await assert.rejects(() => settlePropertyAction(actionOptions(state, 'one', 'list_sale', 'catalog-mutate', {
+    property: { ...property(), x: 500, area: 800 },
+    salePrice: 140
+  })), /property_catalog_mismatch/);
+  assert.equal(state.store.get(`worldPropertyCatalog/${id}`).x, 20);
 });
 
 test('a listed sale moves ownership and credits in one transaction', async () => {
@@ -179,8 +211,8 @@ test('a property trade offer swaps both owners atomically and cannot be replayed
   const firstProperty = property();
   const secondProperty = {
     ...property(),
-    propertyId: 'world:osm-way:home-99',
-    sourceBuildingId: 'osm-way:home-99',
+    propertyId: 'world:osm:way:99',
+    sourceBuildingId: 'osm:way:99',
     label: 'Second House',
     area: 144
   };
@@ -190,6 +222,7 @@ test('a property trade offer swaps both owners atomically and cannot be replayed
   await settlePropertyAction({
     ...actionOptions(state, 'two', 'buy', 'trade-second-buy'),
     propertyRef: secondRef,
+    catalogRef: state.ref(`worldPropertyCatalog/${propertyDocumentId(secondProperty.propertyId)}`),
     input: { action: 'buy', requestId: 'trade-second-buy', property: secondProperty }
   });
   const common = {

@@ -1,11 +1,11 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { ensurePlayerBackpackInventory } from '../urban-sandbox/equipment-model.js?v=9';
-import { createLocalCommerceModel } from '../urban-sandbox/commerce-model.js?v=2';
-import { createHousingModel, makeHomeCandidates } from '../real-estate/housing-model.js?v=1';
-import { createConnectedPropertyAuthority } from '../real-estate/connected-property-authority.js?v=1';
+import { createLocalCommerceModel } from '../urban-sandbox/commerce-model.js?v=3';
+import { createHousingModel, makeHomeCandidates } from '../real-estate/housing-model.js?v=2';
+import { createConnectedPropertyAuthority } from '../real-estate/connected-property-authority.js?v=2';
 import { getCurrentUser } from '../../../js/auth-ui.js?v=55';
-import { getCurrentRoom } from '../multiplayer/rooms.js?v=1';
-import { postActivity } from '../multiplayer/loop.js?v=1';
+import { getCurrentRoom } from '../multiplayer/rooms.js?v=67';
+import { postActivity } from '../multiplayer/loop.js?v=56';
 import { createNavigationRoute, describeDestinationEntrySupport, getNavigationTargetForDestination } from './navigation-ui.js?v=1';
 import { escapeHtml, sanitizeHttpUrl } from './ui-utils.js?v=1';
 
@@ -18,11 +18,30 @@ let marketLoaded = false;
 let marketLoading = false;
 let propertyEventsBound = false;
 let nearbyVisibleLimit = 24;
+const PROPERTY_INTERACTION_RADIUS = 55;
 
 function actorPosition() {
   if (appCtx.Walk?.state?.mode === 'walk' && appCtx.Walk?.state?.walker) return appCtx.Walk.state.walker;
   if (appCtx.droneMode && appCtx.drone) return appCtx.drone;
   return appCtx.car || { x: 0, z: 0 };
+}
+
+function propertyDistance(property) {
+  const actor = actorPosition();
+  return Math.hypot(Number(actor?.x || 0) - Number(property?.x || 0), Number(actor?.z || 0) - Number(property?.z || 0));
+}
+
+function requirePropertyVisit(property, action) {
+  if (!property || !['buy', 'sell-world', 'list-sale', 'list-rent', 'rent', 'cancel-listing'].includes(action)) return true;
+  if (property.locationId && property.locationId !== runtimeLocation().id) {
+    setStatus(`Return to ${property.locationLabel || 'that location'} before changing this property.`, 'error');
+    return false;
+  }
+  const meters = propertyDistance(property);
+  if (meters <= PROPERTY_INTERACTION_RADIUS) return true;
+  navigateToProperty(property.id);
+  setStatus(`Route set. Go to ${property.label} before completing this action.`, 'error');
+  return false;
 }
 
 function runtimeLocation() {
@@ -73,6 +92,7 @@ function ensureAuthority() {
       room,
       locationId: location.id,
       worldSeed,
+      getActorPosition: actorPosition,
       onChange: () => appCtx.PropertyUI.panel?.classList.contains('show') && updatePropertyPanel(),
       onError: () => setStatus('Property information could not refresh. Try again in a moment.', 'error')
     });
@@ -393,18 +413,20 @@ async function handlePropertyAction(button) {
   }
   const model = ensureAuthority();
   const shared = model === connectedAuthority;
+  const selectedProperty = propertyId ? propertyById(propertyId) : null;
+  if (shared && !requirePropertyVisit(selectedProperty, action)) return false;
   let result = null;
-  if (action === 'buy') result = await model.buy(propertyById(propertyId));
+  if (action === 'buy') result = await model.buy(selectedProperty);
   else if (action === 'sell') result = model.sell(propertyId);
-  else if (action === 'sell-world') result = await model.sellWorld(propertyById(propertyId));
+  else if (action === 'sell-world') result = await model.sellWorld(selectedProperty);
   else if (action === 'list-sale') {
-    const property = propertyById(propertyId);
+    const property = selectedProperty;
     result = await model.listSale(property, property.baseValue || property.price);
   } else if (action === 'list-rent') {
-    const property = propertyById(propertyId);
+    const property = selectedProperty;
     result = await model.listRent(property, Math.max(1, Math.ceil((property.baseValue || property.price) * .05)), 7);
-  } else if (action === 'rent') result = await model.rent(propertyById(propertyId));
-  else if (action === 'cancel-listing') result = await model.cancelListing(propertyById(propertyId));
+  } else if (action === 'rent') result = await model.rent(selectedProperty);
+  else if (action === 'cancel-listing') result = await model.cancelListing(selectedProperty);
   else if (action === 'propose-trade') {
     const offeredId = button.closest('.propertyHomeCard')?.querySelector('[data-trade-offer-for]')?.value || '';
     result = await model.proposeTrade(propertyById(offeredId), propertyById(propertyId), 0);

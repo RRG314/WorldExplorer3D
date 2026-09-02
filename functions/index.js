@@ -40,9 +40,11 @@ const {
   setParticipantReady
 } = require('./expedition-authority');
 const {
+  PROPERTY_INTERACTION_RADIUS,
   propertyDocumentId,
   settlePropertyAction,
-  settlePropertyTrade
+  settlePropertyTrade,
+  validatePropertyProximity
 } = require('./property-authority');
 
 if (!admin.apps.length) {
@@ -773,6 +775,55 @@ async function deleteDocsByQuery(query, batchSize = 200, label = '') {
   }
 }
 
+async function updateDocsByQuery(query, updateForDoc, batchSize = 200, label = '') {
+  const limit = Math.max(10, Math.min(500, Number(batchSize) || 200));
+  for (;;) {
+    let snap;
+    try {
+      snap = await query.limit(limit).get();
+    } catch (err) {
+      if (isFailedPreconditionError(err)) {
+        const tag = label ? ` (${label})` : '';
+        console.warn(`[deleteAccount] Skipping query update${tag}: Firestore failed precondition.`, err && err.message ? err.message : err);
+        return;
+      }
+      throw err;
+    }
+    if (snap.empty) return;
+    const batch = db.batch();
+    snap.docs.forEach((doc) => batch.update(doc.ref, updateForDoc(doc)));
+    await batch.commit();
+    if (snap.size < limit) return;
+  }
+}
+
+async function releaseWorldPropertiesForUser(uid) {
+  await updateDocsByQuery(
+    db.collection('worldProperties').where('ownerUid', '==', uid),
+    () => ({
+      ownerUid: '', ownerName: '', tenantUid: '', tenantName: '',
+      status: 'available', purchasePrice: 0, acquiredAt: null,
+      salePrice: 0, rentPrice: 0, rentTermDays: 0,
+      leaseStartsAt: null, leaseEndsAt: null,
+      revision: FieldValue.increment(1), updatedAt: FieldValue.serverTimestamp()
+    }),
+    200,
+    'worldProperties(ownerUid)'
+  );
+  await updateDocsByQuery(
+    db.collection('worldProperties').where('tenantUid', '==', uid),
+    () => ({
+      tenantUid: '', tenantName: '', status: 'owned',
+      rentPrice: 0, rentTermDays: 0, leaseStartsAt: null, leaseEndsAt: null,
+      revision: FieldValue.increment(1), updatedAt: FieldValue.serverTimestamp()
+    }),
+    200,
+    'worldProperties(tenantUid)'
+  );
+  await deleteDocsByQuery(db.collection('propertyTradeOffers').where('proposerUid', '==', uid), 200, 'propertyTradeOffers(proposerUid)');
+  await deleteDocsByQuery(db.collection('propertyTradeOffers').where('recipientUid', '==', uid), 200, 'propertyTradeOffers(recipientUid)');
+}
+
 async function deleteRoomTree(roomRef) {
   if (db && typeof db.recursiveDelete === 'function') {
     await db.recursiveDelete(roomRef);
@@ -867,6 +918,8 @@ async function deleteUserData(uid) {
   await deleteDocsByQuery(db.collection('deflockLeaderboard').where('uid', '==', uid), 200, 'deflockLeaderboard(uid)');
   await deleteDocsByQuery(db.collection('activityFeed').where('uid', '==', uid), 200, 'activityFeed(uid)');
   await db.collection('explorerLeaderboard').doc(uid).delete().catch(() => {});
+  await releaseWorldPropertiesForUser(uid);
+  await db.collection('propertyLeaderboard').doc(uid).delete().catch(() => {});
   await deleteDiscoveryTradesForUser(uid);
 
   if (db && typeof db.recursiveDelete === 'function') {
@@ -1887,10 +1940,25 @@ exports.commitWorldPropertyAction = functions.region('us-central1').https.onRequ
     const property = input.property || {};
     const documentId = propertyDocumentId(property.propertyId);
     if (!documentId || !requestId) return res.status(400).json({ error: 'A valid property and request are required.' });
+    const visitRequired = new Set([
+      'starter_claim', 'buy', 'buy_listing', 'sell_world',
+      'list_sale', 'list_rent', 'rent', 'cancel_listing'
+    ]).has(action);
+    if (visitRequired) {
+      const actorPose = context.roomCode === 'WORLD' ? input.actorPose : context.player.pose;
+      const proximity = validatePropertyProximity(property, actorPose, PROPERTY_INTERACTION_RADIUS);
+      if (!proximity.valid) {
+        const message = proximity.reason === 'property_proximity_required'
+          ? 'Move near this building before using its property options.'
+          : 'This building is too far away. Travel to it before using its property options.';
+        return res.status(422).json({ error: message, reason: proximity.reason });
+      }
+    }
     const userRef = db.collection('users').doc(auth.uid);
     const result = await settlePropertyAction({
       runTransaction: (callback) => db.runTransaction(callback),
       propertyRef: db.collection('worldProperties').doc(documentId),
+      catalogRef: db.collection('worldPropertyCatalog').doc(documentId),
       actorWalletRef: userRef.collection('economy').doc('wallet'),
       receiptRef: userRef.collection('propertyReceipts').doc(requestId),
       starterEntitlementRef: userRef.collection('propertyEntitlements').doc('starter'),
@@ -1909,7 +1977,7 @@ exports.commitWorldPropertyAction = functions.region('us-central1').https.onRequ
     res.status(200).json(result);
   } catch (error) {
     const code = String(error?.message || '');
-    if (['invalid_action', 'invalid_property', 'property_identity_conflict', 'trade_offer_exists', 'trade_property_conflict'].includes(code)) {
+    if (['invalid_action', 'invalid_property', 'property_catalog_mismatch', 'property_identity_conflict', 'trade_offer_exists', 'trade_property_conflict'].includes(code)) {
       return res.status(400).json({ error: 'This property action is not valid.' });
     }
     console.error('[commitWorldPropertyAction] failed:', error);

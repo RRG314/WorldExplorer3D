@@ -17,7 +17,7 @@ function memoryStorage(seed = {}) {
 
 function mappedBuilding(overrides = {}) {
   return {
-    sourceBuildingId: 'osm-way:home-42',
+    sourceBuildingId: 'osm:way:42',
     buildingType: 'house',
     levels: 1,
     baseY: 4,
@@ -49,18 +49,19 @@ test('nearby homes come from stable loaded-world buildings and exclude transport
   });
 
   assert.equal(candidates.length, 1);
-  assert.equal(candidates[0].sourceBuildingId, 'osm-way:home-42');
+  assert.equal(candidates[0].sourceBuildingId, 'osm:way:42');
   assert.equal(candidates[0].locationId, 'baltimore:39.29:-76.61');
   assert.equal(candidates[0].locationLabel, 'Baltimore');
   assert.equal(candidates[0].x, 24);
   assert.equal(candidates[0].z, 24);
-  assert.match(candidates[0].id, /^home:baltimore:39\.29:-76\.61:osm-way:home-42$/);
+  assert.match(candidates[0].id, /^home:baltimore:39\.29:-76\.61:osm:way:42$/);
   assert.equal(candidates[0].provenance, 'loaded-world-building');
 });
 
 test('generated scene pieces cannot enter connected property ownership', () => {
   assert.equal(hasStableMappedIdentity('osm:way:12345'), true);
-  assert.equal(hasStableMappedIdentity('overture:building-123'), true);
+  assert.equal(hasStableMappedIdentity('overture:01234567-89ab-cdef-0123-456789abcdef'), true);
+  assert.equal(hasStableMappedIdentity('overture:building-123'), false);
   assert.equal(hasStableMappedIdentity('shortbread:buildings:12:34:56:78:0'), true);
   assert.equal(hasStableMappedIdentity('fallback-1-20-30'), false);
   assert.equal(hasStableMappedIdentity('dynamic:airport-ticket-hall'), false);

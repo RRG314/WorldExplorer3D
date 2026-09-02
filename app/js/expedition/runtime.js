@@ -15,7 +15,7 @@ import { registerExpeditionDiscovery } from './contact-authority.js?v=4';
 import { createPodJourney, POD_PHASE, POD_ROUTE_KIND, transitionPodJourney } from './pod-journey-authority.js?v=2';
 import { approvedSampleTradeValue, summarizeExpeditionTransfers } from '../resources/material-catalog.js?v=2';
 import { SHIP_STATIONS } from './ship-layout.js?v=5';
-import { consumeStagedEarthPod, getStagedEarthPodSnapshot, playSurfacePodLaunch, stageEarthPod } from '../planetary/surface-pod-launch.js?v=4';
+import { consumeStagedEarthPod, getStagedEarthPodSnapshot, playSurfacePodLaunch, stageEarthPod } from '../planetary/surface-pod-launch.js?v=5';
 import { SPACE_CRAFT_IDENTITY } from '../space/craft-identity.js?v=1';
 
 const STARSHIP_NAME = SPACE_CRAFT_IDENTITY.starship.name;
@@ -225,7 +225,7 @@ function attemptExpeditionPodDocking() {
   const target = getExpeditionPodDockingTarget();
   if (!target?.canDock || !activeExpedition) return false;
   if (!advancePodJourney('recover')) return false;
-  activeContext?.showSpaceFlightMessage?.('PATHFINDER SECURED · ENTERING SURVEYOR', '#83e6a6');
+  activeContext?.showSpaceFlightMessage?.(`PATHFINDER SECURED · ENTERING ${STARSHIP_NAME.toUpperCase()}`, '#83e6a6');
   window.setTimeout(() => { void enterActiveShip(); }, 180);
   return true;
 }
@@ -244,7 +244,7 @@ function schedulePodRecovery(returnFrameId, startedAt = performance.now(), minim
     const runtime = activeContext?.universeRuntime;
     if (performance.now() - startedAt >= minimumVisibleMs && !runtime?.transition && (!returnFrameId || runtime?.current?.id === returnFrameId)) {
       advancePodJourney('recover');
-      activeContext?.showSpaceFlightMessage?.('POD DOCKED · SURVEYOR HAS THE FLIGHT', '#83e6a6');
+      activeContext?.showSpaceFlightMessage?.(`POD DOCKED · ${STARSHIP_NAME.toUpperCase()} HAS THE FLIGHT`, '#83e6a6');
       return;
     }
     if (performance.now() - startedAt >= 20_000) {
@@ -700,7 +700,7 @@ function leaveDestinationMissionSurface(bodyId) {
         onReady: () => {
           if (activePodJourney?.phase === POD_PHASE.SURFACE_LAUNCH) advancePodJourney('rendezvous');
           if (activePodJourney?.phase === POD_PHASE.RENDEZVOUS) {
-            activeContext?.showSpaceFlightMessage?.('RENDEZVOUS APPROACH · SURVEYOR DOCKING LIGHTS ACQUIRED', '#6fe8ff');
+            activeContext?.showSpaceFlightMessage?.(`RENDEZVOUS APPROACH · ${STARSHIP_NAME.toUpperCase()} DOCKING LIGHTS ACQUIRED`, '#6fe8ff');
             schedulePodRecovery(mission.systemId || activePodJourney.returnFrameId, performance.now(), 1100);
           }
         }
@@ -1077,7 +1077,7 @@ function renderCrewInteractionPanel(interaction) {
   const advice = crewMissionAdvice(crew);
   const roles = (crew.roles || []).map((role) => String(role).replaceAll('-', ' ')).join(' · ');
   panel.innerHTML = `<div class="ship-station-card ship-crew-card" role="dialog" aria-modal="true" aria-labelledby="shipStationTitle">
-    <header><div><span>SURVEYOR CREW</span><strong id="shipStationTitle">${crew.name}</strong></div><button type="button" data-close-station aria-label="Close crew conversation">×</button></header>
+    <header><div><span>${STARSHIP_NAME.toUpperCase()} CREW</span><strong id="shipStationTitle">${crew.name}</strong></div><button type="button" data-close-station aria-label="Close crew conversation">×</button></header>
     <div class="ship-crew-conversation"><figure><img src="assets/expedition/crew/space-crew-reference-v1.png" alt="${STARSHIP_NAME} crew member" style="object-position:${crewPortraitPosition(crew.id)}"></figure><div><span>${roles}</span><h3>${advice.title}</h3><p>${advice.message}</p><dl><div><dt>Assignment</dt><dd>${String(crew.assignment || 'active watch').replaceAll('-', ' ')}</dd></div><div><dt>Health</dt><dd>${Math.round(Number(crew.health || 0) * 100)}%</dd></div><div><dt>Fatigue</dt><dd>${Math.round(Number(crew.fatigue || 0) * 100)}%</dd></div></dl></div></div>
     <div class="ship-station-actions"><button type="button" data-crew-route="${advice.stationId}">Show route</button><small>The route uses the existing ship objective, map, lift, door, and station authorities.</small></div>
   </div>`;
@@ -1287,7 +1287,7 @@ function renderShipStationPanel(interaction) {
     <div>${(voyageEvent.options || []).map((option) => `<div><button type="button" data-voyage-response="${option.id}" ${option.enabled ? '' : 'disabled'}>${option.label}</button>${option.reason ? `<small>${option.reason}</small>` : ''}</div>`).join('')}</div>
   </section>` : '';
   panel.innerHTML = `<div class="ship-station-card" role="dialog" aria-modal="true" aria-labelledby="shipStationTitle">
-    <header><div><span>ASTERIA SYSTEM</span><strong id="shipStationTitle">${view.title}</strong></div><button type="button" data-close-station aria-label="Close station">×</button></header>
+    <header><div><span>${STARSHIP_NAME.toUpperCase()} SYSTEM</span><strong id="shipStationTitle">${view.title}</strong></div><button type="button" data-close-station aria-label="Close station">×</button></header>
     <p>${view.summary}</p>
     ${voyageEventMarkup}
     <div class="ship-station-metrics">${view.metrics.map((metric) => `<div><span>${metric.label}</span><strong>${metric.value}</strong></div>`).join('')}</div>
@@ -1361,7 +1361,7 @@ function renderPodLaunchPanel(interaction) {
     ? `<div class="ship-station-actions">${earthReady ? `<button type="button" data-pod-earth ${blockedByTransit ? 'disabled' : ''}>Launch for Earth</button><small>Manual descent · return to the saved Earth location · Pathfinder remains available for the flight back</small>` : ''}${missionReady ? `<button type="button" data-pod-mission ${blockedByTransit ? 'disabled' : ''}>Launch for ${mission.destinationId.split('-').map((word) => word ? word[0].toUpperCase() + word.slice(1) : '').join(' ')}</button><small>${mission.title} · manual approach · three surface field records · return to ${STARSHIP_NAME}</small>` : ''}${contacts.map((contact) => `<button type="button" data-pod-contact="${contact.id}" ${blockedByTransit ? 'disabled' : ''}>Launch for ${contact.designation} I</button><small>${contact.worldClass} · manual orbital and atmospheric approach · surface return pod</small>`).join('')}</div>`
     : '<small class="ship-station-readonly">No surveyed surface target is available in this voyage chapter. Continue the Expedition until the crew identifies a local world.</small>';
   panel.innerHTML = `<div class="ship-station-card pod-launch-card" role="dialog" aria-modal="true" aria-labelledby="shipStationTitle">
-    <header><div><span>ASTERIA FLIGHT DECK</span><strong id="shipStationTitle">Pod Launch Bay</strong></div><button type="button" data-close-station aria-label="Close pod launch">×</button></header>
+    <header><div><span>${STARSHIP_NAME.toUpperCase()} FLIGHT DECK</span><strong id="shipStationTitle">Pod Launch Bay</strong></div><button type="button" data-close-station aria-label="Close pod launch">×</button></header>
     <p>Board Pathfinder and launch from ${STARSHIP_NAME}. The pod enters the existing local Space world under manual control; approach and landing preserve the destination body's modeled environment, collision, and surface authorities.</p>
     <div class="ship-station-metrics"><div><span>Pod</span><strong>Sealed · fueled · surface capable</strong></div><div><span>Flight</span><strong>Manual after bay departure</strong></div><div><span>Landing</span><strong>Descent masks surface preparation</strong></div><div><span>Return</span><strong>Board the same pod on the surface</strong></div></div>
     ${targetMarkup}
@@ -1396,7 +1396,7 @@ function renderDestinationMissionAnalysisPanel(interaction) {
   const outcomes = mission.analysisOutcomes || [];
   const outcomeActions = outcomes.map((outcome) => `<button type="button" data-complete-destination-analysis="${outcome.id}" ${outcome.available ? '' : 'disabled'}>${outcome.label}</button><small>${outcome.consequence}${outcome.requiresScienceLead ? ` · ${outcome.crewLeadName ? `${outcome.crewLeadName} can lead the review` : 'Science lead unavailable'}` : ''}</small>`).join('');
   panel.innerHTML = `<div class="ship-station-card destination-analysis-card" role="dialog" aria-modal="true" aria-labelledby="shipStationTitle">
-    <header><div><span>SURVEYOR ANALYSIS LAB</span><strong id="shipStationTitle">${mission.title}</strong></div><button type="button" data-close-station aria-label="Close analysis">×</button></header>
+    <header><div><span>${STARSHIP_NAME.toUpperCase()} ANALYSIS LAB</span><strong id="shipStationTitle">${mission.title}</strong></div><button type="button" data-close-station aria-label="Close analysis">×</button></header>
     <p>The field package is aboard. Compare the instrument record, preserve uncertainty, and publish the destination report to the Captain’s Log and Explorer Journal.</p>
     <div class="ship-station-metrics"><div><span>Destination</span><strong>${destinationName}</strong></div><div><span>Evidence</span><strong>Field survey secured</strong></div><div><span>Life finding</span><strong>${lifeFinding}</strong></div></div>
     <div class="ship-station-actions">${outcomeActions || '<small>The evidence package is not ready for a supported result.</small>'}</div>
@@ -1447,7 +1447,7 @@ async function enterActiveShip() {
   if (!activeExpedition || !activeContext?.spaceFlight?.active) return false;
   activeContext?.setSurveyorFlightPresentation?.(true);
   ensureStylesheet();
-  const ship = await import('./ship-interior.js?v=16');
+  const ship = await import('./ship-interior.js?v=17');
   closeExpeditionPlanner();
   const entered = ship.enterSurveyorInterior({
     expedition: activeExpedition,

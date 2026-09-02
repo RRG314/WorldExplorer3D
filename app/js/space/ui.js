@@ -135,7 +135,7 @@ function setupSpaceFlightControls(attemptLanding, lifecycleScope = null) {
   });
   listen(document.getElementById('sfLandBtn'), 'click', attemptLanding);
   listen(document.getElementById('sfExpeditionBtn'), 'click', async () => {
-    const runtime = await import('../expedition/runtime.js?v=35');
+    const runtime = await import('../expedition/runtime.js?v=37');
     runtime.openExpeditionPlanner(appCtx);
   });
   listen(document.getElementById('sfHudToggle'), 'click', () => {
@@ -517,6 +517,7 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
     : activeDist < SPACE_CONSTANTS.LANDING_DISTANCE + activeHudBody.radius;
 
   if (expeditionDockTarget) {
+    const starshipName = String(expeditionDockTarget.name || 'starship');
     const dockingRange = expeditionDockTarget.radius + 24;
     const canDock = expeditionDockTarget.canDock === true;
     const inDockingRange = activeDist < dockingRange;
@@ -527,12 +528,14 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
       ? 'Docking corridor acquired · match speed and dock'
       : inDockingRange
       ? `Reduce relative speed to dock · ${Number(expeditionDockTarget.relativeSpeed || 0).toFixed(1)} display units/s`
-      : `Manual approach to Solis Reach · ${Math.max(0, Math.round(activeDist - expeditionDockTarget.radius))} display units`;
+      : `Manual approach to ${starshipName} · ${Math.max(0, Math.round(activeDist - expeditionDockTarget.radius))} display units`;
     if (landBtn) {
       landBtn.disabled = !canDock;
       landBtn.style.opacity = canDock ? '1' : '0.7';
       landBtn.style.background = canDock ? '#10b981' : '#315d9d';
-      landBtn.textContent = canDock ? 'DOCK WITH ASTERIA' : 'APPROACH ASTERIA';
+      landBtn.textContent = canDock
+        ? `DOCK WITH ${starshipName.toUpperCase()}`
+        : `APPROACH ${starshipName.toUpperCase()}`;
     }
   } else if (universeTarget) {
     const supportedSurface = universeTarget.targetKind === 'exoplanet' && universeTarget.landable === true;

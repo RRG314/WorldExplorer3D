@@ -1,4 +1,4 @@
-import { createExpeditionPodMesh } from '../space/expedition-pod-mesh.js?v=1';
+import { createExpeditionPodMesh } from '../space/expedition-pod-mesh.js?v=2';
 
 const ASCENT_HANDOFF_ALTITUDE = 165;
 const SURFACE_CAMERA_MODES = Object.freeze(['chase', 'side', 'cockpit']);

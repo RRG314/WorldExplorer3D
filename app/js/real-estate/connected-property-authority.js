@@ -8,7 +8,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { getCurrentUser } from '../../../js/auth-ui.js?v=55';
 import { initFirebase } from '../../../js/firebase-init.js?v=56';
-import { commitWorldPropertyAction, commitWorldPropertyTradeAction } from '../../../js/property-api.js?v=2';
+import { commitWorldPropertyAction, commitWorldPropertyTradeAction } from '../../../js/property-api.js?v=3';
 
 const LOCATION_PROPERTY_LIMIT = 320;
 
@@ -175,7 +175,9 @@ function createConnectedPropertyAuthority(options = {}) {
   async function act(action, property, fields = {}) {
     if (disposed) return Object.freeze({ accepted: false, reason: 'disposed' });
     const requestId = `${action}:${user.uid.slice(0, 18)}:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 8)}`;
-    return commitWorldPropertyAction({ roomCode, worldSeed, action, requestId, property, ...fields });
+    const actor = options.getActorPosition?.() || null;
+    const actorPose = actor ? { x: finite(actor.x), z: finite(actor.z) } : null;
+    return commitWorldPropertyAction({ roomCode, worldSeed, action, requestId, property, actorPose, ...fields });
   }
 
   async function actTrade(action, fields = {}) {

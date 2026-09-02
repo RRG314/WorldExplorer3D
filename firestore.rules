@@ -2008,6 +2008,10 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    match /worldPropertyCatalog/{propertyId} {
+      allow read, create, update, delete: if false;
+    }
+
     match /propertyTradeOffers/{offerId} {
       allow read: if isSignedIn() &&
         (resource.data.proposerUid == request.auth.uid || resource.data.recipientUid == request.auth.uid);

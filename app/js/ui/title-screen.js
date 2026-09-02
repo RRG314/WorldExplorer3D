@@ -46,6 +46,7 @@ function initTitleScreenUi({
   let liveGpsLaunchBusy = false;
   let oceanEntryHadEarthWorld = false;
   let multiplayerWarmupPromise = null;
+  let pendingForcedLaunchMode = '';
   let requestTitleStart = () => Promise.resolve(false);
 
   const primeMultiplayerUi = () => {
@@ -354,6 +355,13 @@ function initTitleScreenUi({
   };
 
   appCtx.triggerTitleStart = (options = {}) => {
+    const forcedLaunchMode = ['earth', 'ocean', 'moon', 'mars', 'space'].includes(options?.launchMode)
+      ? options.launchMode
+      : '';
+    if (forcedLaunchMode) {
+      pendingForcedLaunchMode = forcedLaunchMode;
+      setLaunchMode(forcedLaunchMode);
+    }
     if (options?.bypassCustomGate) {
       skipGlobeGateOnce = true;
       appCtx.pendingCustomLaunchBypass = true;
@@ -380,7 +388,7 @@ function initTitleScreenUi({
       emitTutorialEvent('location_selected', selection || {});
       setTitleLocationMode('custom');
       if (!appCtx.gameStarted) {
-        return appCtx.triggerTitleStart({ bypassCustomGate: true });
+        return appCtx.triggerTitleStart({ bypassCustomGate: true, launchMode: 'earth' });
       } else if (typeof appCtx.loadRoads === 'function') {
         await ensureEarthWorldRuntime();
         resetTitleEarthTravelMode('globe_location_change');
@@ -406,7 +414,7 @@ function initTitleScreenUi({
       }, { transient: false });
       if (!appCtx.gameStarted) {
         setLaunchMode('ocean');
-        return appCtx.triggerTitleStart({ bypassCustomGate: true });
+        return appCtx.triggerTitleStart({ bypassCustomGate: true, launchMode: 'ocean' });
       }
       if (typeof appCtx.startOceanMode !== 'function') return false;
       if (typeof appCtx.showTransitionLoad === 'function') await appCtx.showTransitionLoad('ocean', 700);
@@ -422,7 +430,7 @@ function initTitleScreenUi({
     onMoonShortcut: async () => {
       if (!appCtx.gameStarted) {
         setLaunchMode('moon');
-        return appCtx.triggerTitleStart({ bypassCustomGate: true });
+        return appCtx.triggerTitleStart({ bypassCustomGate: true, launchMode: 'moon' });
       } else if (!appCtx.onMoon && !appCtx.travelingToMoon && typeof appCtx.directTravelToMoon === 'function') {
         return appCtx.directTravelToMoon();
       }
@@ -431,7 +439,7 @@ function initTitleScreenUi({
     onSpaceShortcut: async () => {
       if (!appCtx.gameStarted) {
         setLaunchMode('space');
-        return appCtx.triggerTitleStart({ bypassCustomGate: true });
+        return appCtx.triggerTitleStart({ bypassCustomGate: true, launchMode: 'space' });
       } else if (!appCtx.onMoon && !appCtx.travelingToMoon && typeof appCtx.travelToMoon === 'function') {
         return appCtx.travelToMoon();
       }
@@ -444,7 +452,7 @@ function initTitleScreenUi({
     onEarthMode: () => setTitleLocationMode('custom'),
     onLaunchMode: (mode) => {
       setLaunchMode(mode);
-      void appCtx.triggerTitleStart({ bypassCustomGate: true }).catch((error) => {
+      void appCtx.triggerTitleStart({ bypassCustomGate: true, launchMode: mode }).catch((error) => {
         console.error(`[title] ${mode} launch failed:`, error);
       });
     },
@@ -569,7 +577,9 @@ function initTitleScreenUi({
 
   const runTitleStart = async () => {
     if (appCtx.runtimeReady !== true) return false;
-    const requestedLaunchMode = Object.entries(launchModeButtons)
+    const forcedLaunchMode = pendingForcedLaunchMode;
+    pendingForcedLaunchMode = '';
+    const requestedLaunchMode = forcedLaunchMode || Object.entries(launchModeButtons)
       .find(([, button]) => button?.classList.contains('active'))?.[0] || titleLaunchMode;
     setLaunchMode(requestedLaunchMode);
     if (requestedLaunchMode === 'earth' && appCtx.gameMode === 'livegps') {

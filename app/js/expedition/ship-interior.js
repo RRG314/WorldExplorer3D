@@ -81,7 +81,7 @@ function createShipDisplayTexture(label, accentColor) {
   context.fillText(String(label).replaceAll('-', ' ').toUpperCase(), 28, 42);
   context.fillStyle = 'rgba(220,245,255,.7)';
   context.font = '16px monospace';
-  context.fillText('SURVEYOR // ACTIVE', 302, 220);
+  context.fillText(`${STARSHIP_NAME.toUpperCase()} // ACTIVE`, 302, 220);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = Math.min(8, appCtx.renderer?.capabilities?.getMaxAnisotropy?.() || 1);
@@ -2184,7 +2184,7 @@ function renderShipMaps(session = activeSession) {
             : `Objective is on ${getShipDeck(targetDeck)?.label || targetDeck}.`
         : `Guidance set: ${target.label}.`
       : 'Choose a room for internal guidance. Use the deck lift to change decks.';
-    overlay.innerHTML = `<section><header><div><span>SURVEYOR</span><strong>Ship Map</strong></div><button type="button" data-close-map>×</button></header><nav>${SHIP_DECKS.map((deck) => `<button type="button" data-map-deck="${deck.id}" class="${deck.id === session.mapDeckId ? 'active' : ''}">${deck.shortLabel}</button>`).join('')}</nav>${deckMapMarkup(session, session.mapDeckId, false)}<footer>${footer}</footer></section>`;
+    overlay.innerHTML = `<section><header><div><span>${STARSHIP_NAME.toUpperCase()}</span><strong>Ship Map</strong></div><button type="button" data-close-map>×</button></header><nav>${SHIP_DECKS.map((deck) => `<button type="button" data-map-deck="${deck.id}" class="${deck.id === session.mapDeckId ? 'active' : ''}">${deck.shortLabel}</button>`).join('')}</nav>${deckMapMarkup(session, session.mapDeckId, false)}<footer>${footer}</footer></section>`;
     overlay.querySelector('[data-close-map]')?.addEventListener('click', () => toggleShipMap(false));
     overlay.querySelectorAll('[data-map-deck]').forEach((button) => button.addEventListener('click', () => { session.mapDeckId = button.dataset.mapDeck; renderShipMaps(session); }));
   }

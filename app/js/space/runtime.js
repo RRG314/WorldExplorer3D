@@ -753,9 +753,10 @@ export function animateSpaceFlight(deps = {}) {
 export function attemptLanding(deps = {}) {
   const expeditionDock = appCtx.getExpeditionPodDockingTarget?.();
   if (expeditionDock?.position) {
+    const starshipName = String(expeditionDock.name || 'the starship').toUpperCase();
     const accepted = appCtx.attemptExpeditionPodDocking?.() === true;
     deps.showFlightMessage?.(
-      accepted ? 'PATHFINDER DOCKING · SURVEYOR HAS THE POD' : 'MOVE CLOSER TO SURVEYOR AND MATCH SPEED',
+      accepted ? `PATHFINDER DOCKING · ${starshipName} HAS THE POD` : `MOVE CLOSER TO ${starshipName} AND MATCH SPEED`,
       accepted ? '#10b981' : '#f59e0b'
     );
     return accepted;
