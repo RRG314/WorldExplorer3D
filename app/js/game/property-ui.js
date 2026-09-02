@@ -440,7 +440,21 @@ async function handlePropertyAction(button) {
   if (!(shared ? result.accepted : result.ok)) { setStatus(reasonMessage(result.reason), 'error'); return false; }
   if (!shared && (action === 'buy' || action === 'sell')) await recordPropertyProgress(result, action === 'buy' ? 'bought' : 'sold');
   const label = propertyById(propertyId)?.label || 'Property';
-  const success = { buy: `${label} is now yours.`, sell: `${result.home.label} sold for ${credits(result.salePrice)}.`, 'sell-world': `${label} was sold back to the world.`, 'list-sale': `${label} is listed for sale.`, 'list-rent': `${label} is available for a 7-day rental.`, rent: `${label} is rented to you.`, 'cancel-listing': `${label} is no longer listed.`, 'propose-trade': 'Your property trade offer was sent.', 'accept-trade': 'The property trade is complete.', 'decline-trade': 'The property trade offer was declined.', 'cancel-trade': 'Your property trade offer was cancelled.', primary: `${result.home.label} is now your primary home.`, store: `${result.item.label} moved into home storage.`, withdraw: `${result.item.label} moved back to your Backpack.` }[action] || 'Saved.';
+  let success = 'Saved.';
+  if (action === 'buy') success = `${label} is now yours.`;
+  else if (action === 'sell') success = `${result.home?.label || label} sold for ${credits(result.salePrice)}.`;
+  else if (action === 'sell-world') success = `${label} was sold back to the world.`;
+  else if (action === 'list-sale') success = `${label} is listed for sale.`;
+  else if (action === 'list-rent') success = `${label} is available for a 7-day rental.`;
+  else if (action === 'rent') success = `${label} is rented to you.`;
+  else if (action === 'cancel-listing') success = `${label} is no longer listed.`;
+  else if (action === 'propose-trade') success = 'Your property trade offer was sent.';
+  else if (action === 'accept-trade') success = 'The property trade is complete.';
+  else if (action === 'decline-trade') success = 'The property trade offer was declined.';
+  else if (action === 'cancel-trade') success = 'Your property trade offer was cancelled.';
+  else if (action === 'primary') success = `${result.home?.label || label} is now your primary home.`;
+  else if (action === 'store') success = `${result.item?.label || 'Item'} moved into home storage.`;
+  else if (action === 'withdraw') success = `${result.item?.label || 'Item'} moved back to your Backpack.`;
   setStatus(success, 'ok');
   appCtx.properties = [...currentCandidates()]; renderPropertyMarkers(); updatePropertyPanel();
   return true;

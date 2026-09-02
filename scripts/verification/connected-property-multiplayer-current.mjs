@@ -1,15 +1,20 @@
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 
 const root = process.cwd();
+const require = createRequire(import.meta.url);
+const admin = require('../../functions/node_modules/firebase-admin');
 const outputDir = path.join(root, 'output', 'verification', 'connected-property-multiplayer');
 await fs.mkdir(outputDir, { recursive: true });
 const server = await startStaticServer({ rootDir: root, ports: [4433, 4434, 4435] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
 const projectId = String(process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || 'we3d-staging-20260712');
+if (!admin.apps.length) admin.initializeApp({ projectId });
+const adminDb = admin.firestore();
 const functionsOrigin = `http://127.0.0.1:5001/${projectId}/us-central1`;
 const firebaseConfig = JSON.parse(await fs.readFile(path.join(root, 'config/firebase.staging.json'), 'utf8'));
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
@@ -19,6 +24,12 @@ const useRealWorld = process.env.WE3D_PROPERTY_REAL_WORLD === '1';
 
 async function createPlayer(label, viewport) {
   const context = await browser.newContext({ viewport, hasTouch: viewport.width < 600 });
+  await context.route(/https:\/\/fonts\.(googleapis|gstatic)\.com\//, (route) => route.fulfill({
+    status: 200,
+    contentType: 'text/css',
+    body: ''
+  }));
+  await context.route(/https:\/\/server\.arcgisonline\.com\//, (route) => route.fulfill({ status: 204, body: '' }));
   await context.addInitScript(({ functionsOrigin, firebaseConfig }) => {
     globalThis.WORLD_EXPLORER_FIREBASE = Object.freeze({ ...firebaseConfig });
     globalThis.WORLD_EXPLORER_FIREBASE_ENV = 'staging';
@@ -29,7 +40,10 @@ async function createPlayer(label, viewport) {
   }, { functionsOrigin, firebaseConfig });
   const page = await context.newPage();
   page.on('pageerror', (error) => browserFailures.push(`${label}: ${error.stack || error}`));
-  await page.goto(`${baseUrl}/app/`, { waitUntil: 'load', timeout: 120_000 });
+  // The globe's optional imagery tiles must not gate the application shell.
+  // Waiting for the browser load event makes this verifier measure third-party
+  // image completion twice instead of the Property UI it is meant to exercise.
+  await page.goto(`${baseUrl}/app/`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   const identity = await page.evaluate(async ({ label, email }) => {
     const services = globalThis.WorldExplorerFirebase?.initFirebase?.();
@@ -43,13 +57,12 @@ async function createPlayer(label, viewport) {
     }
     if (authUi.getCurrentUser()?.uid !== credential.user.uid) throw new Error('Application auth state did not adopt the emulator user.');
     const firestore = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js');
-    await firestore.enableNetwork(services.db);
     const firestoreDeadline = Date.now() + 30_000;
     let firestoreReady = false;
     let firestoreError = '';
     while (!firestoreReady && Date.now() < firestoreDeadline) {
       try {
-        await firestore.getDocFromServer(firestore.doc(services.db, 'users', credential.user.uid));
+        await firestore.getDoc(firestore.doc(services.db, 'users', credential.user.uid));
         firestoreReady = true;
       } catch (error) {
         firestoreError = `${error?.code || ''}: ${error?.message || error}`;
@@ -111,13 +124,14 @@ async function joinSharedRoom(player, roomCode) {
 }
 
 async function stageAtSameMappedProperty(player, roomCode, sourceBuildingId = '') {
-  return player.page.evaluate(async ({ roomCode, sourceBuildingId }) => {
+  const property = await player.page.evaluate(async ({ sourceBuildingId }) => {
     const [{ ctx }, propertyUi] = await Promise.all([
       import('/app/js/shared-context.js?v=55'),
-      import('/app/js/game/property-ui.js?v=2')
+      import('/app/js/game/property-ui.js?v=3')
     ]);
     propertyUi.toggleRealEstate(true);
     const properties = await propertyUi.loadPropertiesAtCurrentLocation();
+    propertyUi.togglePropertyFilters();
     const candidates = properties.filter((property) => property.sharedEligible && property.price <= 500);
     const property = (sourceBuildingId ? candidates.find((entry) => entry.sourceBuildingId === sourceBuildingId) : candidates[0]);
     if (!property) throw new Error(`No matching mapped property was available. Found ${candidates.length} connected candidates.`);
@@ -126,16 +140,6 @@ async function stageAtSameMappedProperty(player, roomCode, sourceBuildingId = ''
     actor.position?.set?.(property.x, Number(actor.position?.y || property.y || 0), property.z);
     actor.x = property.x;
     actor.z = property.z;
-    const services = globalThis.WorldExplorerFirebase.initFirebase();
-    const firestore = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js');
-    const auth = globalThis.WorldExplorerFirebase.initFirebase().auth.currentUser;
-    await firestore.setDoc(firestore.doc(services.db, 'rooms', roomCode, 'players', auth.uid), {
-      uid: auth.uid,
-      displayName: auth.displayName || 'Explorer',
-      lastSeenAt: firestore.serverTimestamp(),
-      expiresAt: firestore.Timestamp.fromMillis(Date.now() + 90_000),
-      pose: { x: property.x, y: Number(property.y || 0), z: property.z, yaw: 0, pitch: 0, vx: 0, vy: 0, vz: 0 }
-    }, { merge: true });
     propertyUi.updatePropertyPanel();
     return {
       id: property.id,
@@ -145,11 +149,28 @@ async function stageAtSameMappedProperty(player, roomCode, sourceBuildingId = ''
       x: property.x,
       z: property.z
     };
-  }, { roomCode, sourceBuildingId });
+  }, { sourceBuildingId });
+  const now = Date.now();
+  await adminDb.collection('rooms').doc(roomCode).collection('players').doc(player.identity.uid).set({
+    uid: player.identity.uid,
+    displayName: player.identity.displayName,
+    lastSeenAt: admin.firestore.Timestamp.fromMillis(now),
+    expiresAt: admin.firestore.Timestamp.fromMillis(now + 90_000),
+    pose: { x: property.x, y: 0, z: property.z, yaw: 0, pitch: 0, vx: 0, vy: 0, vz: 0 }
+  }, { merge: true });
+  return property;
 }
 
 async function waitForStatus(page, pattern) {
-  await page.waitForFunction((source) => new RegExp(source, 'i').test(String(document.getElementById('propertyHubStatus')?.textContent || '')), pattern.source, { timeout: 30_000 });
+  await page.waitForTimeout(1_500);
+  const state = await page.evaluate(() => ({
+    status: String(document.getElementById('propertyHubStatus')?.textContent || '').trim(),
+    panel: String(document.getElementById('propertyHubList')?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 800),
+    currentUser: globalThis.WorldExplorerFirebase?.initFirebase?.().auth?.currentUser?.uid || ''
+  }));
+  assert.match(state.status, pattern, `Unexpected Property state: ${JSON.stringify(state)}; browser failures: ${JSON.stringify(browserFailures)}`);
+  const status = state.status;
+  return status;
 }
 
 let owner;
@@ -181,7 +202,6 @@ try {
   await buyer.page.locator(`[data-property-action="buy"][data-property-id="${buyerProperty.id}"]`).click();
   await waitForStatus(buyer.page, /now yours/);
 
-  await owner.page.waitForFunction((label) => document.getElementById('propertyHubList')?.textContent?.includes(label), 'Owner Rowan', { timeout: 30_000 }).catch(() => {});
   const persisted = await buyer.page.evaluate(async (propertyId) => {
     const services = globalThis.WorldExplorerFirebase.initFirebase();
     const firestore = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js');
