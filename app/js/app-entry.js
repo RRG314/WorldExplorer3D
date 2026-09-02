@@ -111,7 +111,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'creator-profile', category: 'identity',
         load: async () => {
-            const mod = await import('./creator/session.js?v=3');
+            const mod = await import('./creator/session.js?v=4');
             mod.initCreatorProfileSession?.();
             return mod;
         }

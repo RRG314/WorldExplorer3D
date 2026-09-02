@@ -15,7 +15,7 @@ import {
   explorerGoalSnapshot,
   explorerToolProgress,
   regionalProgressSnapshot
-} from './explorer-goals.js?v=1';
+} from './explorer-goals.js?v=2';
 import {
   compileEncounterPlan,
   compileGeographicEligibility,
