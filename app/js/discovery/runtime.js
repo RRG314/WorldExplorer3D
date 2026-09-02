@@ -157,7 +157,7 @@ const EXPLORER_SECTION_TUTORIALS = Object.freeze({
     'Choose an activity in Today. The first option is the best fit for this place; the next two are alternatives.',
     'Begin, then return to the world so your tool and the nearby clues can guide you.',
     'Finish the activity to add a memory to your Journal. Identifications also update the Guide, and objects you keep enter your Pack.',
-    'Open My Explorer when you want to see your rank, specialties, and companions.'
+    'Open your Explorer Profile when you want to see your rank, specialties, and companions.'
   ]) }),
   journal: Object.freeze({ id: 'explorer-journal-v1', title: 'Journal', steps: Object.freeze([
     'The Journal is the shared story of your fieldwork, games, creations, travel, rooms, and companions.',
@@ -169,7 +169,7 @@ const EXPLORER_SECTION_TUTORIALS = Object.freeze({
     'Unidentified groups show how much is left and which field methods can help. Search and category filters narrow the Guide.',
     'Reference photographs help identification but do not claim the subject exists at an exact real-world point.'
   ]) }),
-  profile: Object.freeze({ id: 'my-explorer-profile-v1', title: 'My Explorer', steps: Object.freeze([
+  profile: Object.freeze({ id: 'my-explorer-profile-v1', title: 'Explorer Profile', steps: Object.freeze([
     'This is your identity: Explorer rank, developing specialties, and the companions you have met.',
     'Detailed progress stays grouped here instead of competing with the activities you can do today.',
     'Wild species belong in the Field Guide. Individual animals you befriend belong with your Explorer profile.'
@@ -566,12 +566,12 @@ function createDiscoveryUi(state) {
   function setTab(tab) {
     const normalizedTab = tab === 'gear' || tab === 'progress' ? 'profile' : tab === 'collection' ? 'journal' : tab;
     activeTab = ['today', 'journal', 'guide', 'profile'].includes(normalizedTab) ? normalizedTab : 'today';
-    const tabTitles = { today: 'Today', journal: 'Journal', guide: 'Field Guide', profile: 'My Explorer' };
+    const tabTitles = { today: 'Today', journal: 'Journal', guide: 'Field Guide', profile: 'Explorer Profile' };
     if (elements.title) elements.title.textContent = tabTitles[activeTab] || 'Today';
     document.querySelectorAll('[data-discovery-tab]').forEach((button) => button.classList.toggle('active', button.dataset.discoveryTab === activeTab));
     elements.profileButton?.classList.toggle('active', activeTab === 'profile');
     elements.profileButton?.setAttribute('aria-pressed', activeTab === 'profile' ? 'true' : 'false');
-    elements.profileButton?.setAttribute('aria-label', activeTab === 'profile' ? 'Return to Today' : 'Open My Explorer profile');
+    elements.profileButton?.setAttribute('aria-label', activeTab === 'profile' ? 'Return to Today' : 'Open Explorer Profile');
     document.querySelectorAll('.discoveryPane').forEach((pane) => pane.classList.toggle('active', pane.dataset.discoveryPane === activeTab));
     const activePane = document.querySelector(`.discoveryPane[data-discovery-pane="${activeTab}"]`);
     if (activePane) activePane.scrollTop = 0;
@@ -596,7 +596,7 @@ function createDiscoveryUi(state) {
     }).join(' · ');
     const rewardSummary = [points > 0 ? `Explorer +${points}` : '', specialtySummary].filter(Boolean).join(' · ');
     elements.result.hidden = false;
-    elements.result.innerHTML = `<span class="discoveryResultEyebrow">FIELD RESULT SAVED</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><p>${escapeHtml(collection ? 'Journal updated · Field Guide updated · Added to Backpack' : 'Journal and Field Guide updated')}</p><div class="discoveryResultProgress">${escapeHtml(rewardSummary || 'Observation saved · already credited here')}</div><div class="discoveryResultActions"><button data-result-tab="guide" type="button">Open Field Guide</button>${collection ? '<button data-open-backpack="true" type="button">Open Backpack</button>' : ''}<button data-result-tab="profile" type="button">My Explorer</button></div>`;
+    elements.result.innerHTML = `<span class="discoveryResultEyebrow">FIELD RESULT SAVED</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><p>${escapeHtml(collection ? 'Journal updated · Field Guide updated · Added to Backpack' : 'Journal and Field Guide updated')}</p><div class="discoveryResultProgress">${escapeHtml(rewardSummary || 'Observation saved · already credited here')}</div><div class="discoveryResultActions"><button data-result-tab="guide" type="button">Open Field Guide</button>${collection ? '<button data-open-backpack="true" type="button">Open Backpack</button>' : ''}<button data-result-tab="profile" type="button">Explorer Profile</button></div>`;
     document.querySelector('.discoveryPane[data-discovery-pane="today"]')?.scrollTo?.({ top: 0 });
     return true;
   }
@@ -633,7 +633,7 @@ function createDiscoveryUi(state) {
     const destination = {
       travel: 'travelBtn',
       create: 'realEstateFloatBtn',
-      community: 'gameBtn'
+      community: 'communityBtn'
     }[route];
     if (!destination) return;
     setOpen(false);
@@ -2155,6 +2155,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
     return true;
   };
+  globalThis.dispatchEvent?.(new CustomEvent('we3d:world-discovery-ready'));
   appCtx.handleWorldDiscoveryToolUse = (toolId) => state.useEquippedFieldTool(toolId);
   state.unregisterCompanionTrainingInteraction = appCtx.registerContextInteraction?.({
     id: 'world_discovery_companion_training',

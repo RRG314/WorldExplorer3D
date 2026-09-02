@@ -681,13 +681,13 @@ How Connected Data Is Used
   <div class="currentJourneyCopy"><span id="currentJourneyEyebrow">CURRENT JOURNEY</span><strong id="currentJourneyTitle">Explore this place</strong><small id="currentJourneyDetail">Choose something nearby and begin when you are ready.</small></div>
   <button id="currentJourneyAction" type="button">Open</button>
 </aside>
-<aside id="discoveryPanel" aria-label="My Explorer" aria-hidden="true">
+<aside id="discoveryPanel" aria-label="Explorer fieldwork" aria-hidden="true">
   <header class="discoveryHead">
-    <div class="discoveryIdentity"><span class="discoveryMark" aria-hidden="true">⌖</span><div><span class="discoveryEyebrow">My Explorer</span><strong id="discoveryPanelTitle">Today</strong></div></div>
-    <div class="discoveryHeadActions"><button id="discoveryProfileBtn" class="discoveryProfileBtn" type="button" aria-label="Open My Explorer profile" aria-pressed="false"><span id="discoveryProfileRank">Trailhead</span><b id="discoveryProfilePoints">0</b></button><button id="discoveryHelpBtn" type="button" aria-label="Show help for this section">?</button><button id="discoveryCloseBtn" type="button" aria-label="Minimize My Explorer" title="Minimize during play">—</button></div>
+    <div class="discoveryIdentity"><span class="discoveryMark" aria-hidden="true">⌖</span><div><span class="discoveryEyebrow">Explorer Fieldwork</span><strong id="discoveryPanelTitle">Today</strong></div></div>
+    <div class="discoveryHeadActions"><button id="discoveryProfileBtn" class="discoveryProfileBtn" type="button" aria-label="Open Explorer Profile" aria-pressed="false"><span id="discoveryProfileRank">Trailhead</span><b id="discoveryProfilePoints">0</b></button><button id="discoveryHelpBtn" type="button" aria-label="Show help for this section">?</button><button id="discoveryCloseBtn" type="button" aria-label="Minimize fieldwork" title="Minimize during play">—</button></div>
   </header>
   <div class="discoveryWorkspace">
-    <nav class="discoveryTabs" aria-label="My Explorer sections">
+    <nav class="discoveryTabs" aria-label="Explorer fieldwork sections">
       <button class="discoveryTab active" data-discovery-tab="today" type="button"><span>⌖</span>Today</button>
       <button class="discoveryTab" data-discovery-tab="journal" type="button"><span>≡</span>Journal</button>
       <button class="discoveryTab" data-discovery-tab="guide" type="button"><span>▤</span>Guide</button>
@@ -733,7 +733,7 @@ How Connected Data Is Used
         <div id="discoveryFieldGuideList" class="discoveryList"></div>
       </section>
       <section class="discoveryPane discoveryProfilePane" data-discovery-pane="profile">
-        <div class="discoverySectionHead"><span>MY EXPLORER</span><small>IDENTITY / SKILLS / COMPANIONS</small></div>
+        <div class="discoverySectionHead"><span>EXPLORER PROFILE</span><small>IDENTITY / SKILLS / COMPANIONS</small></div>
         <div id="discoveryProfileHero" class="discoveryProfileHero"></div>
         <section id="discoveryJourneyOverview" class="discoveryJourneyOverview" aria-label="Ways to explore"></section>
         <div id="discoveryProgress" class="discoveryProgressGrid"></div>
@@ -1163,59 +1163,64 @@ Explore the area
 <div id="poiDistance" style="font-size:12px;text-align:center;padding-top:8px;border-top:1px solid rgba(0,255,200,0.3)">50m ahead</div>
 </div>
 <div class="floatMenuContainer" id="floatMenuContainer">
-<!-- World Explorer 5.1 gameplay menu baseline. -->
-<div class="floatMenuRow">
+<!-- Stable player goals. Detailed controls stay inside their owning panels. -->
 <div class="floatMenu" id="exploreMenu">
-<button class="floatBtn explore" id="exploreBtn" type="button" aria-label="Travel modes" aria-expanded="false" data-mobile-label="Modes"><span class="btnIcon">🌍</span><span class="btnText">Exploration</span></button>
-<div class="floatItems" data-menu-title="EXPLORATION">
-<div class="floatItem" id="fDriving">🚗 Driving Mode</div>
-<div class="floatItem" id="fWalk">🚶 Walk Mode</div>
-<div class="floatItem" id="fWorldDiscovery">⌖ My Explorer &amp; Activities</div>
-<div class="floatItem" id="fBackpack">🎒 Backpack &amp; Quick Slots</div>
-<div class="floatItem" id="fDrone">🚁 Drone Mode</div>
-<div class="floatItem" id="fPlane">✈️ Personal Plane</div>
-<div class="floatItem" id="fBoat" style="display:none">🚤 Boat Mode</div>
-<div class="floatItem" id="fOceanMode">🌊 Ocean Mode</div>
-<div class="floatItem" id="fEarthMode">🌍 Earth Mode</div>
-<div class="floatItem" id="fDeployPathfinder">🛸 Deploy Pathfinder Pod</div>
-<div class="floatItem" id="fBoardSolisReach">🛰️ Board Solis Reach</div>
-<div class="floatItem" id="fSpaceRocket">✦ Free Space Flight</div>
-<div class="floatItem" id="fSpaceDirect">🌙 Direct to Moon</div>
+<button class="floatBtn explore" id="exploreBtn" type="button" aria-label="Open Explore" aria-expanded="false" data-mobile-label="Explore"><span class="btnIcon">⌖</span><span class="btnText">Explore</span></button>
+<div class="floatItems" data-menu-title="EXPLORE">
+<div class="floatItemSection" role="separator">FIELDWORK</div>
+<div class="floatItem" id="fWorldDiscovery">⌖ Today &amp; Nearby</div>
+<div class="floatItem" id="fLiveGps">📍 Explore with Live GPS</div>
+<div class="floatItemSection" role="separator">ACTIVITIES</div>
+<div class="floatItem" id="fDeFlock">📷 DeFlock Hunt</div>
+<div class="floatItem" id="fFlowerChallenge">🔴 Find Red Flower</div>
+<div class="floatItem" id="fFishing" style="display:none">🎣 Fishing</div>
+<div class="floatItemSection" role="separator">PLACES</div>
+<div class="floatItem" id="fHistoric">⛩️ Historic Places</div>
+<div class="floatItem" id="fPOI">📍 Nearby Places</div>
 </div>
 </div>
 
 <div class="floatMenu" id="travelMenu">
-<button class="floatBtn travel" id="travelBtn" type="button" aria-label="Environment controls" aria-expanded="false" data-mobile-label="World"><span class="btnIcon">🌿</span><span class="btnText">Environment</span></button>
-<div class="floatItems" data-menu-title="ENVIRONMENT">
-<div class="floatItem" id="fSatellite">🛰️ Satellite</div>
-<div class="floatItem" id="fRoads">🛣️ Show Roads</div>
-<div class="floatItem" id="fPaths" hidden>🚶 Path Overlay</div>
-<div class="floatItem" id="fLandUse">🗺️ Land Use</div>
-<div class="floatItem" id="fTimeOfDay">☀️ Live Sky</div>
-<div class="floatItem" id="fWeatherMode">🌦️ Weather Live</div>
-<div class="floatItem" id="fSeaState" style="display:none">🌊 Sea State: Moderate</div>
-<div class="floatItem" id="fClouds">☁️ Clouds</div>
-<div class="floatItem" id="fConstellations">✨ Constellations</div>
-</div>
+<button class="floatBtn travel" id="travelBtn" type="button" aria-label="Open Travel" aria-expanded="false" data-mobile-label="Travel"><span class="btnIcon">◈</span><span class="btnText">Travel</span></button>
+<div class="floatItems" data-menu-title="TRAVEL">
+<div class="floatItemSection" role="separator">MAP</div>
+<div class="floatItem" id="fWorldMap">🗺️ World Map &amp; Search</div>
+<div class="floatItemSection" role="separator">MOVE</div>
+<div class="floatItem" id="fWalk">🚶 Walk</div>
+<div class="floatItem" id="fDriving">🚗 Drive</div>
+<div class="floatItem" id="fDrone">🚁 Fly Drone</div>
+<div class="floatItem" id="fPlane">✈️ Fly Plane</div>
+<div class="floatItem" id="fBoat" style="display:none">🚤 Pilot Boat</div>
+<div class="floatItemSection" role="separator">WORLDS</div>
+<div class="floatItem" id="fEarthMode">🌍 Explore Earth</div>
+<div class="floatItem" id="fOceanMode">🌊 Explore the Ocean</div>
+<div class="floatItemSection" role="separator">SPACE</div>
+<div class="floatItem" id="fDeployPathfinder">🛸 Launch Pathfinder</div>
+<div class="floatItem" id="fBoardSolisReach">🛰️ Board Solis Reach</div>
+<div class="floatItem" id="fSpaceRocket">✦ Free Space Flight</div>
+<div class="floatItem" id="fSpaceDirect">🌙 Direct to Moon</div>
+<div class="floatItemSection" role="separator">RECOVERY</div>
+<div class="floatItem" id="fRespawn">🎯 Return to Safe Ground</div>
 </div>
 </div>
 
-<div class="floatMenuRow">
-<div class="floatMenu" id="gameMenu">
-<button class="floatBtn game" id="gameBtn" type="button" aria-label="Open games" aria-expanded="false" data-mobile-label="Games"><span class="btnIcon">🎮</span><span class="btnText">Games</span></button>
-<div class="floatItems" data-menu-title="GAMES">
-<div class="floatItemSection" role="separator">PLAY</div>
-<div class="floatItem" id="fDeFlock">📷 DeFlock Hunt</div>
-<div class="floatItem" id="fFlowerChallenge">🔴 Find Red Flower</div>
-<div class="floatItem" id="fFishing" style="display:none">🎣 Fishing</div>
-<div class="floatItemSection" role="separator">LIVE</div>
-<div class="floatItem" id="fLiveGps">📍 Live GPS Explore</div>
+<div class="floatMenu" id="backpackMenu">
+<button class="floatBtn backpack" id="backpackBtn" type="button" aria-label="Open Backpack" aria-expanded="false" data-mobile-label="Backpack"><span class="btnIcon">▣</span><span class="btnText">Backpack</span></button>
+<div class="floatItems" data-menu-title="BACKPACK">
+<div class="floatItem" id="fBackpack">🎒 Items &amp; Quick Slots</div>
+<div class="floatItem" id="fExplorerJournal">≡ Journal</div>
+<div class="floatItem" id="fExplorerGuide">▤ Field Guide</div>
+<div class="floatItem" id="fExplorerProfile">◎ Profile, Skills &amp; Companions</div>
+</div>
+</div>
+
+<div class="floatMenu" id="communityMenu">
+<button class="floatBtn community" id="communityBtn" type="button" aria-label="Open Community" aria-expanded="false" data-mobile-label="Community"><span class="btnIcon">◎</span><span class="btnText">Community</span></button>
+<div class="floatItems" data-menu-title="COMMUNITY">
 <div class="floatItem" id="fMultiplayer">👥 Multiplayer</div>
 <div class="floatItem" id="fCommunityBoard">◎ Community Board</div>
 <div class="floatItem" id="fMemoryFlower">🌸 Leave a Memory Marker</div>
 <div class="floatItem" id="fSharePlace">↗ Share This Place</div>
-<div class="floatItemSection" role="separator">RECOVERY</div>
-<div class="floatItem" id="fRespawn">🎯 Return to Safe Ground</div>
 <!-- Preserved for future product work, intentionally absent from production UI. -->
 <div class="floatItem" id="fRoomGames" hidden>👥 Room Games</div>
 <div class="floatItem" id="fTrack" hidden>🏁 Record Track</div>
@@ -1231,22 +1236,31 @@ Explore the area
 </div>
 
 <div class="floatMenu" id="realEstateMenu">
-<button class="floatBtn realEstate" id="realEstateFloatBtn" type="button" aria-label="Build, land, and property" aria-expanded="false" data-mobile-label="Build"><span class="btnIcon">🏘️</span><span class="btnText">Land &amp; Property</span></button>
-<div class="floatItems" data-menu-title="LAND &amp; PROPERTY">
+<button class="floatBtn realEstate" id="realEstateFloatBtn" type="button" aria-label="Open Real Estate" aria-expanded="false" data-mobile-label="Real Estate"><span class="btnIcon">⌂</span><span class="btnText">Real Estate</span></button>
+<div class="floatItems" data-menu-title="REAL ESTATE">
+<div class="floatItem" id="fRealEstate">⌂ Property Hub</div>
 <div class="floatItem" id="fQuickBuild">🧱 Quick Build</div>
-<div class="floatItem" id="fRealEstate">🏘️ Home &amp; Property</div>
-<div class="floatItem" id="fHistoric">⛩️ Historic Places</div>
-<div class="floatItem" id="fPOI">📍 Nearby Places</div>
-<div class="floatItem" id="fLandUseRE">🗺️ Land Use</div>
 </div>
 </div>
-</div>
-<div class="floatMenuRow">
-<div class="floatMenu" id="controlsMenu">
-<button class="floatBtn controls" id="controlsBarBtn" type="button" aria-label="Open controls" aria-expanded="false" data-mobile-label="Controls"><span class="btnIcon">⚙️</span><span class="btnText">Driving Mode</span></button>
-</div>
+
+<div class="floatMenu contextualMenuControl" id="controlsMenu">
+<button class="floatBtn controls" id="controlsBarBtn" type="button" aria-label="Open current controls" aria-expanded="false" title="Current controls"><span class="btnIcon">⚙️</span><span class="btnText">Controls</span></button>
 </div>
 <div class="floatItem" id="fHome" style="display:none">🏠 Menu</div>
+
+<!-- Map display settings live with the map; weather and time live in the top quick controls. -->
+<div hidden aria-hidden="true">
+<div class="floatItem" id="fSatellite">🛰️ Satellite</div>
+<div class="floatItem" id="fRoads">🛣️ Show Roads</div>
+<div class="floatItem" id="fPaths">🚶 Path Overlay</div>
+<div class="floatItem" id="fLandUse">🗺️ Land Use</div>
+<div class="floatItem" id="fLandUseRE">🗺️ Land Use</div>
+<div class="floatItem" id="fTimeOfDay">☀️ Live Sky</div>
+<div class="floatItem" id="fWeatherMode">🌦️ Weather Live</div>
+<div class="floatItem" id="fSeaState">🌊 Sea State: Moderate</div>
+<div class="floatItem" id="fClouds">☁️ Clouds</div>
+<div class="floatItem" id="fConstellations">✨ Constellations</div>
+</div>
 </div>
 
 <div id="memoryComposer">

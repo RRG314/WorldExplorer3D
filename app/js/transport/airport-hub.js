@@ -47,7 +47,7 @@ function createAirportHub(options = {}) {
       <div class="airport-hub__search"><input id="airportDestinationSearch" autocomplete="off" placeholder="Try Chicago, Tokyo, or BWI Airport"><button type="button">Search</button></div>
       <div class="airport-hub__status" aria-live="polite">Search worldwide. These are game journeys, not real airline schedules.</div>
       <div class="airport-hub__results"></div>
-      <footer class="airport-hub__footer"><small class="airport-hub__progress">Airport arrivals are saved to My Explorer.</small><button class="airport-hub__travel" type="button" disabled>Choose a destination</button></footer>
+      <footer class="airport-hub__footer"><small class="airport-hub__progress">Airport arrivals are saved to your Journal.</small><button class="airport-hub__travel" type="button" disabled>Choose a destination</button></footer>
     </div>`;
   document.body.appendChild(dialog);
   const refs = {

@@ -4,104 +4,112 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 
 const baseUrl = String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4192').replace(/\/$/, '');
-const outputDir = path.resolve('output/verification/gameplay-menu-5-1-baseline');
+const outputDir = path.resolve('output/verification/player-navigation-current');
 await fs.mkdir(outputDir, { recursive: true });
 
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const failures = [];
-const pageErrors = [];
+const browserErrors = [];
 
 async function startEarth(page) {
-  await page.goto(`${baseUrl}/app/?menuBaseline=${Date.now()}`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
+  await page.goto(`${baseUrl}/app/?navigation=${Date.now()}`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
   await page.waitForFunction(() => document.getElementById('startBtn')?.disabled === false, null, { timeout: 120_000 });
-  if (await page.locator('#analyticsConsentDenyBtn').isVisible()) await page.locator('#analyticsConsentDenyBtn').click();
-  if (await page.locator('#globeLocationSearch').isVisible()) {
-    await page.locator('#globeLocationSearch').fill('Baltimore, Maryland');
-    await page.locator('#globeLocationSearchBtn').click();
-    const result = page.locator('#globeLocationSearchResults [role="option"]').first();
-    await result.waitFor({ state: 'visible', timeout: 30_000 });
-    await result.click();
-    await page.locator('#globeSelectorStartBtn').click();
-  } else if (await page.locator('#globeSelectorStartBtn').isVisible()) {
-    await page.locator('#globeSelectorStartBtn').click();
-  } else {
-    await page.locator('#startBtn').click();
-  }
-  await page.waitForFunction(() => {
-    const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
-    return state.gameStarted && !state.worldLoading && state.environment === 'EARTH';
+  if (await page.locator('#analyticsConsentDenyBtn').isVisible().catch(() => false)) await page.locator('#analyticsConsentDenyBtn').click();
+  if (await page.locator('#globeSelectorStartBtn').isVisible().catch(() => false)) await page.locator('#globeSelectorStartBtn').click();
+  else await page.locator('#startBtn').click();
+  await page.locator('#loading.show').waitFor({ state: 'visible', timeout: 30_000 });
+  await page.locator('#loading.show').waitFor({ state: 'hidden', timeout: 180_000 });
+  await page.waitForFunction(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return !!(ctx.gameStarted && ctx.initialEarthWorldReady && !ctx.worldLoading && ctx.worldDiscoveryRuntime && ctx.urbanSandboxRuntime && ctx.openWorldDiscoverySection);
   }, null, { timeout: 180_000 });
-  if (await page.locator('#loading.show').isVisible()) {
-    await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
-      ctx.hideLoad?.();
-    });
-  }
-  await page.locator('#loading.show').waitFor({ state: 'hidden', timeout: 120_000 });
 }
 
-async function verify(viewport, screenshotName) {
-  const touchViewport = viewport.width <= 760;
-  const context = await browser.newContext({ viewport, hasTouch: touchViewport, isMobile: touchViewport });
+async function openMenu(page, buttonId, menuId) {
+  await page.locator(`#${buttonId}`).click();
+  await page.waitForTimeout(450);
+  assert.equal(await page.locator(`#${menuId}`).evaluate((menu) => menu.classList.contains('open')), true, `${buttonId} did not stay open`);
+  assert.equal(await page.locator(`#${buttonId}`).getAttribute('aria-expanded'), 'true');
+}
+
+async function verify(viewport, name) {
+  const touch = viewport.width <= 760;
+  const context = await browser.newContext({ viewport, hasTouch: touch, isMobile: touch });
   const page = await context.newPage();
   const runtimeRequests = [];
   page.on('request', (request) => runtimeRequests.push(request.url()));
-  page.on('pageerror', (error) => pageErrors.push(String(error?.stack || error)));
+  page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   await startEarth(page);
 
-  const labels = await page.locator('#floatMenuContainer > .floatMenuRow > .floatMenu > .floatBtn .btnText').allTextContents();
-  assert.deepEqual(labels.slice(0, 4).map((label) => label.trim()), [
-    'Exploration',
-    'Environment',
-    'Games',
-    'Land & Property'
-  ]);
-  assert.match(labels[4] || '', /Walking Mode Controls/i);
-  assert.equal(await page.locator('#packBtn').count(), 0);
-  assert.equal(await page.locator('#fEditorMode').count(), 0);
-  assert.equal(await page.locator('#editorPanel, #activityCreatorPanel').count(), 0);
-  assert.equal(await page.locator('#fActivities, #fActivityCreator').count(), 0);
+  const labels = await page.locator('#floatMenuContainer > .floatMenu:not(.contextualMenuControl) > .floatBtn .btnText').allTextContents();
+  assert.deepEqual(labels.map((label) => label.trim()), ['Explore', 'Travel', 'Backpack', 'Community', 'Real Estate']);
+  assert.equal(await page.locator('#gameBtn, #gameMenu').count(), 0);
+  assert.equal(await page.getByText('My Explorer', { exact: true }).count(), 0);
 
-  await page.evaluate(() => {
-    const loading = document.getElementById('loading');
-    loading?.classList.remove('show');
-    if (loading) loading.style.display = 'none';
-  });
-  await page.locator('#exploreBtn').click();
-  await page.waitForTimeout(900);
-  assert.equal(await page.locator('#exploreMenu').evaluate((menu) => menu.classList.contains('open')), true);
-  const exploration = await page.locator('#exploreMenu .floatItems').textContent();
-  assert.match(exploration, /My Explorer & Activities/i);
-  assert.match(exploration, /Backpack & Quick Slots/i);
-  assert.match(exploration, /Deploy Pathfinder Pod/i);
-  assert.match(exploration, /Board Solis Reach/i);
-  assert.match(exploration, /Free Space Flight/i);
+  await openMenu(page, 'exploreBtn', 'exploreMenu');
+  const exploreText = (await page.locator('#exploreMenu .floatItems').textContent()).replace(/\s+/g, ' ').trim();
+  assert.match(exploreText, /Today & Nearby.*Explore with Live GPS.*DeFlock Hunt.*Historic Places/s);
+  await page.locator('#fWorldDiscovery').click();
+  await page.locator('#discoveryPanel[aria-hidden="false"]').waitFor({ state: 'visible', timeout: 20_000 });
+  await page.locator('#discoveryCloseBtn').click();
 
-  await page.locator('#gameBtn').click();
-  const games = (await page.locator('#gameMenu .floatItems').textContent()).replace(/\s+/g, ' ').trim();
-  assert.doesNotMatch(games, /Choose a Game|Create Game/i);
-  assert.match(games, /DeFlock Hunt/i);
-  assert.match(games, /Find Red Flower/i);
+  await openMenu(page, 'travelBtn', 'travelMenu');
+  const travelText = (await page.locator('#travelMenu .floatItems').textContent()).replace(/\s+/g, ' ').trim();
+  assert.match(travelText, /World Map & Search.*Walk.*Drive.*Earth.*Pathfinder.*Return to Safe Ground/s);
+  await page.locator('#fWorldMap').click();
+  await page.locator('#largeMap').waitFor({ state: 'visible', timeout: 10_000 });
+  await page.locator('#mapClose').click();
 
-  await page.locator('#realEstateFloatBtn').click();
+  await openMenu(page, 'backpackBtn', 'backpackMenu');
+  const backpackText = (await page.locator('#backpackMenu .floatItems').textContent()).replace(/\s+/g, ' ').trim();
+  assert.match(backpackText, /Items & Quick Slots.*Journal.*Field Guide.*Profile, Skills & Companions/s);
+  await page.locator('#fBackpack').click();
+  await page.locator('#urbanEquipment.show').waitFor({ state: 'visible', timeout: 20_000 });
+  await page.locator('#urbanEquipmentCloseBtn').click();
+  await openMenu(page, 'backpackBtn', 'backpackMenu');
+  await page.locator('#fExplorerJournal').click();
+  await page.locator('.discoveryPane[data-discovery-pane="journal"].active').waitFor({ state: 'visible', timeout: 20_000 });
+  await page.locator('#discoveryCloseBtn').click();
+  await openMenu(page, 'backpackBtn', 'backpackMenu');
+  await page.locator('#fExplorerGuide').click();
+  await page.locator('.discoveryPane[data-discovery-pane="guide"].active').waitFor({ state: 'visible', timeout: 20_000 });
+  await page.locator('#discoveryCloseBtn').click();
+  await openMenu(page, 'backpackBtn', 'backpackMenu');
+  await page.locator('#fExplorerProfile').click();
+  await page.locator('.discoveryPane[data-discovery-pane="profile"].active').waitFor({ state: 'visible', timeout: 20_000 });
+  await page.locator('#discoveryCloseBtn').click();
+
+  await openMenu(page, 'communityBtn', 'communityMenu');
+  const communityText = (await page.locator('#communityMenu .floatItems').textContent()).replace(/\s+/g, ' ').trim();
+  assert.match(communityText, /Multiplayer.*Community Board.*Memory Marker.*Share This Place/s);
+
+  await openMenu(page, 'realEstateFloatBtn', 'realEstateMenu');
+  const realEstateText = (await page.locator('#realEstateMenu .floatItems').textContent()).replace(/\s+/g, ' ').trim();
+  assert.equal(realEstateText, '⌂ Property Hub 🧱 Quick Build');
+  await page.locator('#fRealEstate').click();
+  await page.locator('#propertyPanel.show').waitFor({ state: 'visible', timeout: 30_000 });
+  assert.deepEqual(await page.locator('.propertyHubTabs button').allTextContents(), ['My Properties', 'Find a Property']);
+  assert.equal(await page.locator('.propertyHubTabs [data-property-view="offers"], .propertyHubTabs [data-property-view="storage"], .propertyHubTabs [data-property-view="market"]').count(), 0);
+  await page.locator('.propertyHubTabs [data-property-view="nearby"]').click();
+  assert.equal(await page.locator('.propertyHubTabs [data-property-view="nearby"]').getAttribute('aria-selected'), 'true');
+  await page.locator('.propertyHubTabs [data-property-view="home"]').click();
+  assert.equal(await page.locator('.propertyHubTabs [data-property-view="home"]').getAttribute('aria-selected'), 'true');
+  await page.screenshot({ path: path.join(outputDir, `${name}-real-estate.png`), fullPage: true });
+  await page.locator('#closePropertyPanelBtn').click();
+
+  await openMenu(page, 'realEstateFloatBtn', 'realEstateMenu');
   await page.locator('#fQuickBuild').click();
-  await page.locator('#blockBuilderPanel').waitFor({ state: 'visible', timeout: 20_000 });
-  assert.equal(await page.locator('#blockBuilderPanel').getAttribute('aria-hidden'), 'false');
-  assert.match(await page.locator('#blockBuilderPanel').textContent(), /Quick Build/i);
+  await page.locator('#blockBuilderPanel[aria-hidden="false"]').waitFor({ state: 'visible', timeout: 20_000 });
   await page.locator('#blockBuilderClose').click();
-  await page.locator('#blockBuilderPanel').waitFor({ state: 'hidden', timeout: 10_000 });
 
-  const removedRuntimeRequests = runtimeRequests.filter((url) => /\/js\/(?:editor|activity-editor)\//.test(url));
-  assert.deepEqual(removedRuntimeRequests, [], `Removed editor runtime was requested: ${removedRuntimeRequests.join(', ')}`);
+  await page.locator('#controlsBarBtn').click();
+  assert.equal(await page.locator('#ctrlContent').evaluate((element) => element.classList.contains('hidden')), false);
+  if (touch) assert.notEqual(await page.locator('#controlsTab').evaluate((element) => getComputedStyle(element).display), 'none');
 
-  if (touchViewport) {
-    const controlsTextDisplay = await page.locator('#controlsBarBtn .btnText').evaluate((element) => getComputedStyle(element).display);
-    assert.equal(controlsTextDisplay, 'none', 'The dynamic controls title overlaps the compact mobile label.');
-  }
-
-  await page.screenshot({ path: path.join(outputDir, screenshotName), fullPage: true });
+  assert.deepEqual(runtimeRequests.filter((url) => /\/js\/(?:editor|activity-editor)\//.test(url)), []);
+  await page.screenshot({ path: path.join(outputDir, `${name}-navigation.png`), fullPage: true });
   await context.close();
-  return { viewport, labels, exploration: exploration.replace(/\s+/g, ' ').trim(), games };
+  return { viewport, labels, exploreText, travelText, backpackText, communityText, realEstateText };
 }
 
 const mobileOnly = process.argv.includes('--mobile-only');
@@ -109,8 +117,8 @@ const desktopOnly = process.argv.includes('--desktop-only');
 let result = null;
 try {
   result = {
-    desktop: mobileOnly ? null : await verify({ width: 1440, height: 900 }, 'desktop.png'),
-    mobile: desktopOnly ? null : await verify({ width: 390, height: 844 }, 'mobile.png')
+    desktop: mobileOnly ? null : await verify({ width: 1440, height: 900 }, 'desktop'),
+    mobile: desktopOnly ? null : await verify({ width: 390, height: 844 }, 'mobile')
   };
 } catch (error) {
   failures.push(String(error?.stack || error));
@@ -118,7 +126,7 @@ try {
   await browser.close();
 }
 
-failures.push(...pageErrors);
+failures.push(...browserErrors);
 const report = { ok: failures.length === 0, baseUrl, result, failures };
 await fs.writeFile(path.join(outputDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
 console.log(JSON.stringify(report, null, 2));

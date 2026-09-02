@@ -207,7 +207,8 @@ function setupUI() {
     travelBtn: 'travelMenu',
     realEstateFloatBtn: 'realEstateMenu',
     exploreBtn: 'exploreMenu',
-    gameBtn: 'gameMenu'
+    backpackBtn: 'backpackMenu',
+    communityBtn: 'communityMenu'
   };
 
   const toggleFloatMenuByButton = (buttonId) => {
@@ -238,8 +239,9 @@ function setupUI() {
   document.getElementById('travelBtn').onclick = () => toggleFloatMenuByButton('travelBtn');
   document.getElementById('realEstateFloatBtn').onclick = () => toggleFloatMenuByButton('realEstateFloatBtn');
   document.getElementById('exploreBtn').onclick = () => toggleFloatMenuByButton('exploreBtn');
-  document.getElementById('gameBtn').onclick = () => {
-    toggleFloatMenuByButton('gameBtn');
+  document.getElementById('backpackBtn').onclick = () => toggleFloatMenuByButton('backpackBtn');
+  document.getElementById('communityBtn').onclick = () => {
+    toggleFloatMenuByButton('communityBtn');
     void titleUi.primeMultiplayerUi?.();
   };
 
@@ -252,14 +254,27 @@ function setupUI() {
   document.getElementById('fBackpack')?.addEventListener('click', () => {
     appCtx.toggleWorldDiscoveryJournal?.(false);
     appCtx.toggleUrbanEquipment?.(true);
-    emitTutorialEvent('opened_backpack', { source: 'exploration_menu' });
+    emitTutorialEvent('opened_backpack', { source: 'backpack_menu' });
     closeAllFloatMenus();
   });
+  let pendingExplorerSection = null;
   const openExplorerSection = (section) => {
-    if (typeof appCtx.openWorldDiscoverySection === 'function') appCtx.openWorldDiscoverySection(section);
-    else appCtx.toggleWorldDiscoveryJournal?.(true);
+    if (typeof appCtx.openWorldDiscoverySection === 'function') {
+      pendingExplorerSection = null;
+      appCtx.openWorldDiscoverySection(section);
+    } else {
+      pendingExplorerSection = section;
+      appCtx.showToast?.('Opening Explorer Fieldwork…');
+    }
     closeAllFloatMenus();
   };
+  globalThis.addEventListener('we3d:world-discovery-ready', () => {
+    if (!pendingExplorerSection || typeof appCtx.openWorldDiscoverySection !== 'function') return;
+    const section = pendingExplorerSection;
+    pendingExplorerSection = null;
+    appCtx.openWorldDiscoverySection(section);
+  });
+  document.getElementById('fWorldDiscovery')?.addEventListener('click', () => openExplorerSection('today'));
   document.getElementById('fExplorerJournal')?.addEventListener('click', () => openExplorerSection('journal'));
   document.getElementById('fExplorerGuide')?.addEventListener('click', () => openExplorerSection('guide'));
   document.getElementById('fExplorerProfile')?.addEventListener('click', () => openExplorerSection('profile'));

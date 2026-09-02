@@ -242,9 +242,9 @@ function presentCurrentStage() {
     });
   } else if (runtime.state.stage === STAGES.EXPLORER) {
     showPrompt(STAGES.EXPLORER, {
-      title: 'Open My Explorer',
+      title: 'Open Explorer Fieldwork',
       body: 'This is the home for Field Today, activities, Journal records, the Field Guide, companions, and your Explorer progress.',
-      actionLabel: 'Open My Explorer',
+      actionLabel: 'Open Fieldwork',
       onAction: openExplorer,
       progress: 48,
       expanded: true
@@ -306,7 +306,7 @@ function completeTutorial(reason = 'path_chosen') {
     contextual: true,
     eyebrow: 'First Journey complete',
     title: 'Explore your way',
-    body: 'My Explorer remembers what you learn. Your Backpack carries what you use. Travel modes change how you move through the same world.',
+    body: 'Your Journal and Field Guide remember what you learn. Your Backpack carries what you use. Travel changes how you move through the same world.',
     progress: 100,
     expanded: true,
     autoHideMs: 12000

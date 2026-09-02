@@ -113,7 +113,7 @@ export function createTutorialUi(options = {}) {
     wrap.innerHTML = `
       <span class="tutorial-settings-eyebrow">Learning</span>
       <h3>First Journey</h3>
-      <p>Six short steps introduce movement, your Backpack, My Explorer, a field activity, and your Journal. Optional tips appear once when you enter an unfamiliar system.</p>
+      <p>Six short steps introduce movement, your Backpack, fieldwork, an activity, and your Journal. Optional tips appear once when you enter an unfamiliar system.</p>
       <label><input id="tutorialEnabledToggle" type="checkbox"> <span>Show First Journey and contextual tips</span></label>
       <div class="tutorial-settings-actions"><button id="tutorialRestartBtn" type="button">Replay First Journey</button></div>
       <div id="tutorialSettingsStatus" role="status"></div>

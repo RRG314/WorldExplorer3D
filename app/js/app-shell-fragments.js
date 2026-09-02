@@ -1,20 +1,17 @@
 const APP_SHELL_FRAGMENT_HTML = `
-<button id="realEstateBtn" title="Open Home &amp; Property">🏠</button>
-<div id="propertyPanel" aria-label="Home and Property">
+<button id="realEstateBtn" title="Open Real Estate">🏠</button>
+<div id="propertyPanel" aria-label="Real Estate">
   <div class="propertyHubHeader">
     <div>
       <span class="propertyHubEyebrow">YOUR PLACE IN THE WORLD</span>
-      <div class="panel-title">Home &amp; Property</div>
+      <div class="panel-title">Real Estate</div>
     </div>
-    <button class="panel-close" id="closePropertyPanelBtn" aria-label="Close Home and Property">×</button>
+    <button class="panel-close" id="closePropertyPanelBtn" aria-label="Close Real Estate">×</button>
   </div>
   <div class="propertyHubBalance"><span>Explorer Credits</span><strong id="propertyWalletBalance">0</strong></div>
-  <div class="propertyHubTabs" role="tablist" aria-label="Home and Property sections">
-    <button type="button" class="active" data-property-view="home">My Home</button>
-    <button type="button" data-property-view="nearby">Properties Nearby</button>
-    <button type="button" data-property-view="storage">Storage</button>
-    <button type="button" data-property-view="offers">Offers</button>
-    <button type="button" data-property-view="market">Property Data</button>
+  <div class="propertyHubTabs" role="tablist" aria-label="Real Estate sections">
+    <button type="button" class="active" data-property-view="home">My Properties</button>
+    <button type="button" data-property-view="nearby">Find a Property</button>
   </div>
   <div class="panel-content" id="propertyList"></div>
   <div id="propertyHubStatus" class="propertyHubStatus" role="status" aria-live="polite"></div>

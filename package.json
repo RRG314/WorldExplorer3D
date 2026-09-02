@@ -83,7 +83,7 @@
     "verify:discovery-receipts": "node --test tests/discovery-receipt-endpoint-current.test.mjs",
     "verify:explorer-coherence-browser": "node scripts/verification/explorer-coherence.mjs",
     "verify:connected-explorer-journey": "node scripts/verification/connected-explorer-journey-current.mjs",
-    "verify:player-navigation": "node scripts/verification/player-navigation-current.mjs",
+    "verify:player-navigation": "node scripts/verification/gameplay-menu-5-1-baseline-current.mjs",
     "verify:current-space-journey": "node scripts/verification/current-space-journey.mjs",
     "verify:space-landing-continuity": "node scripts/verification/space-landing-continuity-current.mjs",
     "verify:explorer-pack-actions": "node scripts/verification/explorer-pack-actions.mjs",

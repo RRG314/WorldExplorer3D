@@ -136,7 +136,11 @@ function updateHeader(view = snapshot()) {
     ? '—'
     : Math.max(0, Number(view.credits) || 0).toLocaleString();
   document.querySelectorAll('[data-property-view]').forEach((button) => {
-    const selected = button.dataset.propertyView === activeView;
+    const buttonView = button.dataset.propertyView;
+    const selected = button.closest('.propertyHubTabs')
+      ? (buttonView === 'home' && ['home', 'storage', 'offers'].includes(activeView)) ||
+        (buttonView === 'nearby' && ['nearby', 'market'].includes(activeView))
+      : buttonView === activeView;
     button.classList.toggle('active', selected);
     button.setAttribute('aria-selected', selected ? 'true' : 'false');
   });
@@ -169,7 +173,9 @@ function renderHome(view) {
       ${view.authRequired ? '<section class="propertyHowItWorks"><strong>Sign in when you are ready to choose</strong><p>You can explore and compare buildings as a guest. A free account keeps ownership, Credits, storage, and shared play connected wherever you return.</p><button type="button" data-property-action="sign-in">Sign In or Create an Account</button></section>' : ''}
       <section class="propertyHowItWorks"><strong>One connected economy</strong><p>Explorer Credits earned from field finds, trade, travel, and missions can be used here. Items stay in the same Backpack until you move them into home storage.</p></section>`;
   }
+  const openOffers = (view.incomingTrades || []).filter((offer) => offer.status === 'pending' && offer.expiresAtMs > Date.now()).length;
   return `<section class="propertySectionIntro"><span>${view.shared ? 'CONNECTED WORLD' : 'MY PLACES'}</span><strong>${view.homes.length} propert${view.homes.length === 1 ? 'y' : 'ies'} ${view.shared ? 'owned or rented' : 'owned'}</strong><p>${view.shared ? 'Your ownership, listings, rentals, and Credits follow your account across the world and every room.' : 'Your primary home is shown first for routes and storage.'}</p></section>
+    <div class="propertyHubShortcuts"><button type="button" data-property-view="storage">Home Storage</button><button type="button" data-property-view="offers">${openOffers ? `${openOffers} New ` : ''}Property Offers</button></div>
     ${view.homes.map((home) => homeSummaryCard(home, view, { allowSell: true })).join('')}<button class="propertyWideAction" type="button" data-property-view="nearby">Find another property</button>`;
 }
 
@@ -205,7 +211,7 @@ function renderNearby(view) {
     : view.shared && view.starterAvailable ? '<div class="propertyStarterNotice"><strong>Your first property is free</strong><span>You can choose any available mapped building in the world. The free deed can only be used once, so explore before you decide.</span></div>' : '';
   const visible = mappedCandidates.slice(0, nearbyVisibleLimit);
   const remaining = Math.max(0, mappedCandidates.length - visible.length);
-  return `${starter}<section class="propertySectionIntro"><span>PROPERTIES NEARBY</span><strong>${mappedCandidates.length} mapped propert${mappedCandidates.length === 1 ? 'y' : 'ies'} found</strong><p>Showing the closest ${visible.length}. Set a route to walk or drive to the actual building.</p></section>${visible.map((property) => createPropertyCard(property, view)).join('')}${remaining ? `<button class="propertyWideAction" type="button" data-property-action="show-more-nearby">Show ${Math.min(24, remaining)} More</button>` : ''}`;
+  return `${starter}<section class="propertySectionIntro"><span>PROPERTIES NEARBY</span><strong>${mappedCandidates.length} mapped propert${mappedCandidates.length === 1 ? 'y' : 'ies'} found</strong><p>Showing the closest ${visible.length}. Set a route to walk or drive to the actual building.</p></section>${visible.map((property) => createPropertyCard(property, view)).join('')}${remaining ? `<button class="propertyWideAction" type="button" data-property-action="show-more-nearby">Show ${Math.min(24, remaining)} More</button>` : ''}<div class="propertyHubSupportingLink"><button type="button" data-property-view="market">Connected Property Data</button><span>Optional reference records; game ownership and prices stay separate.</span></div>`;
 }
 
 function storageItem(item, homeId, carried = false) {
@@ -223,7 +229,7 @@ function renderStorage(view) {
     const samePlace = home.locationId === runtimeLocation().id;
     return `<section class="propertyEmptyState"><span class="propertyEmptyIcon">⌂</span><h3>Storage is at your home</h3><p>${samePlace ? `${escapeHtml(home.label)} is ${distance(home.distance)} away. Set a route and go there to move items.` : `Return to ${escapeHtml(home.locationLabel)} to use storage at ${escapeHtml(home.label)}.`}</p>${samePlace ? `<button type="button" data-property-action="navigate" data-property-id="${escapeHtml(home.id)}">Set Route Home</button>` : ''}</section>`;
   }
-  return `<section class="propertySectionIntro"><span>HOME STORAGE</span><strong>${escapeHtml(home.label)}</strong><p>${used} of ${home.storageCapacity} spaces used. Equip a different item before storing the one in your hands.</p></section>
+  return `<button class="propertyBackAction" type="button" data-property-view="home">← My Properties</button><section class="propertySectionIntro"><span>HOME STORAGE</span><strong>${escapeHtml(home.label)}</strong><p>${used} of ${home.storageCapacity} spaces used. Equip a different item before storing the one in your hands.</p></section>
     <div class="propertyStorageColumns"><section><h3>At Home</h3>${home.storage.length ? home.storage.map((item) => storageItem(item, home.id, false)).join('') : '<p class="propertyMuted">Nothing stored here yet.</p>'}</section>
     <section><h3>In Your Backpack</h3>${carried.length ? carried.map((item) => storageItem(item, home.id, true)).join('') : '<p class="propertyMuted">No available Backpack items.</p>'}</section></div>`;
 }
@@ -243,12 +249,13 @@ function tradeOfferCard(offer, direction) {
 }
 
 function renderOffers(view) {
-  if (view.authRequired) return `<section class="propertyEmptyState"><span class="propertyEmptyIcon">\u21c4</span><h3>Property offers follow your account</h3><p>Sign in to send, receive, accept, or decline property trades.</p><button type="button" data-property-action="sign-in">Sign In or Create an Account</button></section>`;
-  if (!view.shared) return `<section class="propertyEmptyState"><span class="propertyEmptyIcon">\u21c4</span><h3>Trade offers are unavailable offline</h3><p>Reconnect to view property offers saved to your account.</p></section>`;
+  const back = '<button class="propertyBackAction" type="button" data-property-view="home">← My Properties</button>';
+  if (view.authRequired) return `${back}<section class="propertyEmptyState"><span class="propertyEmptyIcon">\u21c4</span><h3>Property offers follow your account</h3><p>Sign in to send, receive, accept, or decline property trades.</p><button type="button" data-property-action="sign-in">Sign In or Create an Account</button></section>`;
+  if (!view.shared) return `${back}<section class="propertyEmptyState"><span class="propertyEmptyIcon">\u21c4</span><h3>Trade offers are unavailable offline</h3><p>Reconnect to view property offers saved to your account.</p></section>`;
   const incoming = view.incomingTrades || [];
   const outgoing = view.outgoingTrades || [];
-  if (!incoming.length && !outgoing.length) return `<section class="propertyEmptyState"><span class="propertyEmptyIcon">\u21c4</span><h3>No property offers yet</h3><p>When another explorer owns a nearby property, choose one of your properties and send a trade offer from Properties Nearby.</p><button type="button" data-property-view="nearby">See Properties Nearby</button></section>`;
-  return `${incoming.length ? `<section class="propertySectionIntro"><span>OFFERS FOR YOU</span><strong>${incoming.length} received</strong><p>Ownership changes only after you accept an open offer.</p></section>${incoming.map((offer) => tradeOfferCard(offer, 'incoming')).join('')}` : ''}${outgoing.length ? `<section class="propertySectionIntro"><span>OFFERS YOU SENT</span><strong>${outgoing.length} sent</strong><p>You can cancel an open offer before it is accepted.</p></section>${outgoing.map((offer) => tradeOfferCard(offer, 'outgoing')).join('')}` : ''}`;
+  if (!incoming.length && !outgoing.length) return `${back}<section class="propertyEmptyState"><span class="propertyEmptyIcon">\u21c4</span><h3>No property offers yet</h3><p>When another explorer owns a nearby property, choose one of your properties and send a trade offer from Find a Property.</p><button type="button" data-property-view="nearby">Find a Property</button></section>`;
+  return `${back}${incoming.length ? `<section class="propertySectionIntro"><span>OFFERS FOR YOU</span><strong>${incoming.length} received</strong><p>Ownership changes only after you accept an open offer.</p></section>${incoming.map((offer) => tradeOfferCard(offer, 'incoming')).join('')}` : ''}${outgoing.length ? `<section class="propertySectionIntro"><span>OFFERS YOU SENT</span><strong>${outgoing.length} sent</strong><p>You can cancel an open offer before it is accepted.</p></section>${outgoing.map((offer) => tradeOfferCard(offer, 'outgoing')).join('')}` : ''}`;
 }
 
 function marketCard(property) {
@@ -260,12 +267,13 @@ function marketCard(property) {
 }
 
 function renderMarket() {
+  const back = '<button class="propertyBackAction" type="button" data-property-view="nearby">← Find a Property</button>';
   const connected = !!(appCtx.apiConfig?.attom || appCtx.apiConfig?.rentcast);
-  if (marketLoading) return '<section class="propertyEmptyState"><span class="propertyEmptyIcon">…</span><h3>Loading connected property data</h3><p>This does not change the in-game home price.</p></section>';
-  if (!connected) return `<section class="propertyEmptyState"><span class="propertyEmptyIcon">↗</span><h3>Optional property data</h3><p>You can connect a supported property-data account from Main Menu → Settings. Connected records are reference information only; they never set in-game prices or ownership.</p><button type="button" data-property-action="main-menu-settings">Open Main Menu</button></section>`;
-  if (!marketLoaded) return `<section class="propertyEmptyState"><span class="propertyEmptyIcon">⌕</span><h3>Connected property data is ready</h3><p>Load records near your current location. Your provider key stays in this browser.</p><button type="button" data-property-action="load-market">Load Property Data</button></section>`;
-  if (!marketProperties.length) return `<section class="propertyEmptyState"><span class="propertyEmptyIcon">⌕</span><h3>No connected records found</h3><p>The provider did not return a record for this area. Nearby in-game homes still come from the buildings in the world.</p><button type="button" data-property-action="load-market">Try Again</button></section>`;
-  return `<section class="propertySectionIntro"><span>CONNECTED PROPERTY DATA</span><strong>${marketProperties.length} nearby record${marketProperties.length === 1 ? '' : 's'}</strong><p>Reference data only. In-game homes and prices remain separate.</p></section>${marketProperties.map(marketCard).join('')}`;
+  if (marketLoading) return `${back}<section class="propertyEmptyState"><span class="propertyEmptyIcon">…</span><h3>Loading connected property data</h3><p>This does not change the in-game home price.</p></section>`;
+  if (!connected) return `${back}<section class="propertyEmptyState"><span class="propertyEmptyIcon">↗</span><h3>Optional property data</h3><p>You can connect a supported property-data account from Main Menu → Settings. Connected records are reference information only; they never set in-game prices or ownership.</p><button type="button" data-property-action="main-menu-settings">Open Main Menu</button></section>`;
+  if (!marketLoaded) return `${back}<section class="propertyEmptyState"><span class="propertyEmptyIcon">⌕</span><h3>Connected property data is ready</h3><p>Load records near your current location. Your provider key stays in this browser.</p><button type="button" data-property-action="load-market">Load Property Data</button></section>`;
+  if (!marketProperties.length) return `${back}<section class="propertyEmptyState"><span class="propertyEmptyIcon">⌕</span><h3>No connected records found</h3><p>The provider did not return a record for this area. Nearby in-game homes still come from the buildings in the world.</p><button type="button" data-property-action="load-market">Try Again</button></section>`;
+  return `${back}<section class="propertySectionIntro"><span>CONNECTED PROPERTY DATA</span><strong>${marketProperties.length} nearby record${marketProperties.length === 1 ? '' : 's'}</strong><p>Reference data only. In-game homes and prices remain separate.</p></section>${marketProperties.map(marketCard).join('')}`;
 }
 
 export function updatePropertyPanel() {
