@@ -57,6 +57,7 @@ const ALLOWED_PLANS = new Set(['support', 'supporter', 'pro']);
 const TRIAL_DURATION_MS = 48 * 60 * 60 * 1000;
 const DELETE_ACCOUNT_MAX_AUTH_AGE_SECONDS = 10 * 60;
 const ADMIN_TEST_ROOM_CREATE_LIMIT = 10000;
+const PUBLIC_SITE_STATS_CACHE_MS = 5 * 60 * 1000;
 const DEFAULT_ALLOWED_ORIGINS = Object.freeze([
   'https://rrg314.github.io',
   'https://worldexplorer.io',
@@ -81,6 +82,7 @@ const PARAM_RESEND_API_KEY = defineString('WE3D_RESEND_API_KEY', { default: '' }
 const PARAM_EMAIL_FROM = defineString('WE3D_EMAIL_FROM', { default: '' });
 const PARAM_ADMIN_NOTIFICATION_EMAIL = defineString('WE3D_ADMIN_NOTIFICATION_EMAIL', { default: '' });
 const PARAM_MODERATION_PANEL_URL = defineString('WE3D_MODERATION_PANEL_URL', { default: 'https://worldexplorer3d.io/account/admin.html?view=moderation' });
+let publicSiteStatsCache = null;
 
 const CONTRIBUTION_EDIT_TYPE_CONFIG = Object.freeze({
   place_info: Object.freeze({
@@ -669,6 +671,41 @@ function setCors(req, res) {
   return false;
 }
 
+function isRegisteredAuthUser(user) {
+  return Boolean(
+    user && (
+      String(user.email || '').trim() ||
+      String(user.phoneNumber || '').trim() ||
+      (Array.isArray(user.providerData) && user.providerData.length > 0)
+    )
+  );
+}
+
+async function countRegisteredAuthUsers() {
+  let totalUsers = 0;
+  let pageToken;
+  do {
+    const page = await admin.auth().listUsers(1000, pageToken);
+    totalUsers += (Array.isArray(page.users) ? page.users : []).filter(isRegisteredAuthUser).length;
+    pageToken = page.pageToken;
+  } while (pageToken);
+  return totalUsers;
+}
+
+async function getPublicSiteStatsSnapshot(nowMs = Date.now()) {
+  if (publicSiteStatsCache && publicSiteStatsCache.expiresAtMs > nowMs) {
+    return publicSiteStatsCache.payload;
+  }
+  const payload = Object.freeze({
+    totalUsers: await countRegisteredAuthUsers()
+  });
+  publicSiteStatsCache = Object.freeze({
+    payload,
+    expiresAtMs: nowMs + PUBLIC_SITE_STATS_CACHE_MS
+  });
+  return payload;
+}
+
 async function verifyAuth(req, res) {
   const header = req.get('authorization') || '';
   const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
@@ -1088,6 +1125,19 @@ async function upsertPlanFromSubscription({ uid, customerId, subscriptionId, sta
     { merge: true }
   );
 }
+
+exports.getPublicSiteStats = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed.' });
+  try {
+    const payload = await getPublicSiteStatsSnapshot();
+    res.set('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=3600');
+    return res.status(200).json(payload);
+  } catch (error) {
+    console.error('[getPublicSiteStats] failed:', error);
+    return res.status(503).json({ error: 'Explorer count is temporarily unavailable.' });
+  }
+});
 
 exports.createCheckoutSession = functions.region('us-central1').https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;

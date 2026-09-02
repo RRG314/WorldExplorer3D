@@ -2,7 +2,7 @@ import { ctx as appCtx } from "./shared-context.js?v=55";
 import { getPrimaryWorldCanvas } from "./engine/webgl-lifecycle.js?v=1";
 import { captureEarthWorldSession } from "./earth-session.js?v=17";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
-import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=27";
+import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=28";
 import { createSpaceFlightScene, destroySpaceFlightScene, ensureSolisReachDockTarget, ensureExtendedSpaceScene, getSolisReachDockTarget, positionSpacecraftAtSolisReachDock, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon, setExpeditionPodFlightPresentation, setSolisReachFlightPresentation, updateExpeditionPodFlightPresentation } from "./space/scene.js?v=44";
 import { hideGameUI, initSpaceFlightUI, prepareSpaceFlightHudForEntry, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=49";
 import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
@@ -11,7 +11,7 @@ import {
   commitEnvironment,
   registerEnvironmentLifecycle
 } from './session-coordinator.js?v=2';
-import { installSpaceJourneyRuntime } from './space/journey-runtime.js?v=9';
+import { installSpaceJourneyRuntime } from './space/journey-runtime.js?v=10';
 import { resolveCompletedLandingTarget } from './space/landing-target.js?v=2';
 import { playSurfacePodLaunch } from './planetary/surface-pod-launch.js?v=8';
 import { SPACE_CRAFT_IDENTITY } from './space/craft-identity.js?v=1';

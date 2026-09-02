@@ -434,7 +434,6 @@ export function updateSpaceFlightPhysics() {
     keys[' '] || keys['shift'] ||
     keys['arrowup'] || keys['arrowdown'] || keys['arrowleft'] || keys['arrowright']
   );
-  if (manualControl) appCtx.releaseRenderedJourneyToManualFlight?.();
 
   const siRuntimeActive = appCtx.updateRenderedSpaceJourney?.({
     realDtS: frameScale / 60,

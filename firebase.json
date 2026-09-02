@@ -103,6 +103,10 @@
     ],
     "rewrites": [
       {
+        "source": "/getPublicSiteStats",
+        "function": "getPublicSiteStats"
+      },
+      {
         "source": "/api/geospatial/deflock-cameras",
         "function": "getDeFlockCameras"
       },

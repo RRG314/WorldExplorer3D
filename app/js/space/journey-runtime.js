@@ -1050,26 +1050,6 @@ function installSpaceJourneyRuntime(appContext) {
     publishAssistState();
   };
 
-  // Manual input returns presentation ownership to the established game-feel
-  // controller. The SI journey remains available for explicit flight assist,
-  // but it must not silently replace the player's familiar Space Flight.
-  const releaseRenderedJourneyToManualFlight = () => {
-    if (!rendered) return false;
-    rendered = null;
-    appContext.spaceJourney = null;
-    appContext.spacecraftState = null;
-    appContext.spaceJourneyEphemeris = null;
-    appContext.spaceFlightEnvironment = null;
-    appContext.spaceAtmosphereExploration = null;
-    if (appContext.spaceFlight) {
-      appContext.spaceFlight.manualFlightRate = 1;
-      appContext.spaceFlight.presentationAuthority = 'classic';
-      appContext.spaceFlight._atmosphericClimbRequested = false;
-    }
-    publishAssistState({ manual: true, available: true });
-    return true;
-  };
-
   const startFastTravelJourney = async (destinationInput, options = {}) => {
     const destinationBodyId = normalizeAstronomicalBodyId(destinationInput);
     const sourceBodyId = options.sourceBodyId
@@ -1113,7 +1093,6 @@ function installSpaceJourneyRuntime(appContext) {
     clearRenderedSpaceJourney,
     completeFastTravelEvidence,
     engageRenderedJourneyAssist,
-    releaseRenderedJourneyToManualFlight,
     retargetRenderedSpaceJourney,
     setSolarSystemCourse,
     requestRenderedJourneyLanding,
@@ -1128,7 +1107,6 @@ function installSpaceJourneyRuntime(appContext) {
     cancelSpaceJourneyOperation,
     clearRenderedSpaceJourney,
     engageRenderedJourneyAssist,
-    releaseRenderedJourneyToManualFlight,
     retargetRenderedSpaceJourney,
     setSolarSystemCourse,
     requestRenderedJourneyLanding,
