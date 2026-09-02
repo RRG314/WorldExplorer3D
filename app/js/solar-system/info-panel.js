@@ -39,8 +39,14 @@ function hidePlanetInfo(ctx) {
   if (ctx.solarSystem.infoPanel) {
     ctx.solarSystem.infoPanel.style.display = 'none';
   }
+  document.body?.classList.remove('space-destination-details-open');
   ctx.solarSystem.selectedPlanet = null;
   ctx.solarSystem.selectedBodyId = null;
+}
+
+function openPlanetInfo(ctx) {
+  ctx.solarSystem.infoPanel.style.display = 'block';
+  document.body?.classList.add('space-destination-details-open');
 }
 
 function configureSetCourse(ctx, bodyId, label) {
@@ -86,7 +92,7 @@ function showPlanetInfo(ctx, entry) {
     distEarth.toFixed(3) + ' AU (' + formatKM(distEarthKM) + ' km)'
   );
 
-  ctx.solarSystem.infoPanel.style.display = 'block';
+  openPlanetInfo(ctx);
   ctx.solarSystem.selectedPlanet = entry;
   configureSetCourse(ctx, planet.bodyId, planet.name);
 
@@ -120,7 +126,7 @@ function showSunInfo(ctx) {
     distSun.toFixed(3) + ' AU (' + formatKM(distSunKM) + ' km)'
   );
 
-  ctx.solarSystem.infoPanel.style.display = 'block';
+  openPlanetInfo(ctx);
   ctx.solarSystem.selectedPlanet = null;
   configureSetCourse(ctx, null, '');
 }
@@ -145,7 +151,7 @@ function showAsteroidInfo(ctx, entry) {
     distEarth.toFixed(3) + ' AU (' + formatKM(distEarthKM) + ' km)'
   );
 
-  ctx.solarSystem.infoPanel.style.display = 'block';
+  openPlanetInfo(ctx);
   ctx.solarSystem.selectedPlanet = entry;
   const bodyId = getAstronomicalBody(asteroid.name)?.id || null;
   configureSetCourse(ctx, bodyId, asteroid.name);
@@ -169,7 +175,7 @@ function showMoonInfo(ctx, entry) {
     'Orbital period',
     `${Math.abs(body.physical.orbitalPeriodS / 86400).toFixed(2)} days`
   );
-  ctx.solarSystem.infoPanel.style.display = 'block';
+  openPlanetInfo(ctx);
   ctx.solarSystem.selectedPlanet = null;
   configureSetCourse(ctx, body.id, body.name);
 }
@@ -201,7 +207,7 @@ function showSpacecraftInfo(ctx, entry) {
     sceneDistText
   );
 
-  ctx.solarSystem.infoPanel.style.display = 'block';
+  openPlanetInfo(ctx);
   ctx.solarSystem.selectedPlanet = null;
   configureSetCourse(ctx, null, '');
 }
@@ -228,7 +234,7 @@ function showGalaxyInfo(ctx, entry) {
     sceneDistText
   );
 
-  ctx.solarSystem.infoPanel.style.display = 'block';
+  openPlanetInfo(ctx);
   ctx.solarSystem.selectedPlanet = null;
   configureSetCourse(ctx, null, '');
 }

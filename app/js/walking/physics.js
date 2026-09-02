@@ -14,7 +14,7 @@ function wrapYaw(angle = 0) {
 }
 
 function isPlanetarySurface() {
-  return !!(appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId);
+  return !appCtx.activeInterior && !!(appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId);
 }
 
 function activePlanetaryBodyId() {

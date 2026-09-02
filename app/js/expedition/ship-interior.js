@@ -1924,8 +1924,11 @@ function updateActiveDeckContract(session = activeSession) {
   appCtx.activeInterior.interactions = activeDeckInteractions(session);
   appCtx.activeInterior.floorId = `solis-reach-${session.activeDeckId}`;
   appCtx.activeInterior.floorLabel = deck?.label || session.activeDeckId;
-  appCtx.activeInterior.activeLevel = SHIP_DECKS.findIndex((entry) => entry.id === session.activeDeckId);
-  appCtx.activeInterior.loadedLevels = [appCtx.activeInterior.activeLevel];
+  // Ship decks are swapped into one local scene plane by the ship runtime;
+  // they are not vertically stacked floors owned by the building-interior
+  // elevator runtime.
+  appCtx.activeInterior.activeLevel = 0;
+  appCtx.activeInterior.loadedLevels = [0];
 }
 
 function switchSolisReachDeck(deckId) {
@@ -2306,7 +2309,7 @@ function enterSolisReachInterior(options = {}) {
     placementTargets: [],
     center: { x: 0, z: 0 },
     usableFootprint: sceneState.walkSurface.pts,
-    floorPlan: { floorCount: SHIP_DECKS.length, storyHeight: 3.5 },
+    floorPlan: { floorCount: 1, storyHeight: 3.5 },
     floorId: 'solis-reach-command',
     floorLabel: getShipDeck('command').label,
     floorBaseY: 0,

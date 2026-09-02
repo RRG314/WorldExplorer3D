@@ -299,6 +299,29 @@ function sampleModeledRelief(pack, x, z) {
   return noise * 12;
 }
 
+function sampleRenderedRelief(pack, x, z) {
+  const size = Number(pack.terrainSize);
+  const segments = Number(pack.segments);
+  if (!(size > 0) || !(segments > 0)) return sampleModeledRelief(pack, x, z);
+  const half = size * 0.5;
+  const step = size / segments;
+  const clampedX = Math.max(-half, Math.min(half, Number(x) || 0));
+  const clampedZ = Math.max(-half, Math.min(half, Number(z) || 0));
+  const gridX = Math.min(segments - 1, Math.max(0, Math.floor((clampedX + half) / step)));
+  const gridZ = Math.min(segments - 1, Math.max(0, Math.floor((clampedZ + half) / step)));
+  const x0 = -half + gridX * step;
+  const z0 = -half + gridZ * step;
+  const u = Math.max(0, Math.min(1, (clampedX - x0) / step));
+  const v = Math.max(0, Math.min(1, (clampedZ - z0) / step));
+  const a = sampleModeledRelief(pack, x0, z0);
+  const b = sampleModeledRelief(pack, x0, z0 + step);
+  const c = sampleModeledRelief(pack, x0 + step, z0 + step);
+  const d = sampleModeledRelief(pack, x0 + step, z0);
+  return u + v <= 1
+    ? a + u * (d - a) + v * (b - a)
+    : c + (1 - u) * (b - c) + (1 - v) * (d - c);
+}
+
 function loadSurfaceTexture(pack) {
   const asset = pack.manifest.assets[0];
   if (!asset) {
@@ -417,7 +440,7 @@ function addGeneratedSurfaceDetail(pack, world) {
     const x = pack.spawn.x + Math.cos(theta) * radius;
     const z = pack.spawn.z + Math.sin(theta) * radius;
     const scale = 0.45 + Math.pow(random(), 2.5) * pack.rockScale;
-    transform.position.set(x, pack.manifest.renderPlacement.y + sampleModeledRelief(pack, x, z) + scale * 0.35, z);
+    transform.position.set(x, pack.manifest.renderPlacement.y + sampleRenderedRelief(pack, x, z) + scale * 0.35, z);
     transform.rotation.set(random(), random() * Math.PI * 2, random());
     transform.scale.set(scale * 1.3, scale * (0.45 + random() * 0.5), scale);
     transform.updateMatrix();
@@ -657,7 +680,7 @@ function addExpeditionReturnPod(pack, world) {
   const offsetZ = 7;
   const x = Number(pack.spawn.x) + offsetX;
   const z = Number(pack.spawn.z) + offsetZ;
-  const y = Number(pack.manifest.renderPlacement.y) + sampleModeledRelief(pack, x, z) + 0.36;
+  const y = Number(pack.manifest.renderPlacement.y) + sampleRenderedRelief(pack, x, z) + 0.36;
   group.position.set(x, y, z);
   const toSpawnX = Number(pack.spawn.x) - x;
   const toSpawnZ = Number(pack.spawn.z) - z;
@@ -774,7 +797,7 @@ async function createSolidWorld(pack) {
     surface.userData.terrainTruthClass = 'modeled';
     surface.userData.textureTruthClass = pack.runtimeModeled ? 'generated_model_material' : 'derived_from_observations';
     return {
-      sampleHeight: (x, z) => sampleModeledRelief(pack, x, z),
+      sampleHeight: (x, z) => sampleRenderedRelief(pack, x, z),
       renderArtifact: surface,
       readyAssetIds: pack.manifest.assets.map((asset) => asset.id)
     };
@@ -793,7 +816,7 @@ async function createSolidWorld(pack) {
 }
 
 function positionPlayer(pack) {
-  const ground = pack.manifest.renderPlacement.y + sampleModeledRelief(pack, pack.spawn.x, pack.spawn.z);
+  const ground = pack.manifest.renderPlacement.y + sampleRenderedRelief(pack, pack.spawn.x, pack.spawn.z);
   Object.assign(appCtx.car, {
     x: pack.spawn.x,
     z: pack.spawn.z,
@@ -866,7 +889,7 @@ function renderActiveExpeditionOutpost() {
   if (!pack || outpost?.state !== 'operational' || !Array.isArray(outpost.blueprint)) return 0;
   const originX = Math.round(Number(pack.spawn?.x || 0) + 58);
   const originZ = Math.round(Number(pack.spawn?.z || 0) + 24);
-  const originY = Math.round((Number(pack.manifest?.renderPlacement?.y || 0) + sampleModeledRelief(pack, originX, originZ)) * 2) / 2;
+  const originY = Math.round((Number(pack.manifest?.renderPlacement?.y || 0) + sampleRenderedRelief(pack, originX, originZ)) * 2) / 2;
   let placed = 0;
   for (const block of outpost.blueprint) {
     if (appCtx.placeBuildBlock?.(
@@ -1007,7 +1030,7 @@ async function arriveAtSolidWorld(bodyInput) {
   const environment = pack.environment || samplePhysicalEnvironment(bodyId, { heightM: 0, timestampS: Date.now() / 1000 });
   appCtx.activePlanetaryEnvironment = environment;
   appCtx.planetaryTravelCapabilities = pack.capabilities;
-  appCtx.activatePlanetaryFieldActivities?.(pack, world, (x, z) => sampleModeledRelief(pack, x, z));
+  appCtx.activatePlanetaryFieldActivities?.(pack, world, (x, z) => sampleRenderedRelief(pack, x, z));
   if (!priorWorldPresentation) {
     priorWorldPresentation = {
       exposure: Number(appCtx.renderer?.toneMappingExposure),
@@ -1233,7 +1256,7 @@ function registerExpeditionSolidWorld(input = {}) {
 }
 
 function sampleActiveSolidWorldHeight(x, z) {
-  return activePack ? sampleModeledRelief(activePack, x, z) : null;
+  return activePack ? sampleRenderedRelief(activePack, x, z) : null;
 }
 
 function getActivePlanetaryReturnPod() {

@@ -80,13 +80,38 @@ function sampleMarsDem(x, z) {
   return Math.max(0, Math.min(1, (elevationByte - 42) / 213)) * OLYMPUS_RELIEF_SCENE;
 }
 
+// The rendered terrain is a triangle grid. Sampling the source image again at an
+// arbitrary point can disagree with the triangle that is actually on screen,
+// especially where adjacent DEM pixels change sharply. Interpolate the exact
+// three rendered vertices so driving, walking, props, and the visible surface
+// all use one height.
+function sampleMarsRenderedHeight(x, z) {
+  const half = MARS_SIZE * 0.5;
+  const step = MARS_SIZE / MARS_SEGMENTS;
+  const clampedX = Math.max(-half, Math.min(half, Number(x) || 0));
+  const clampedZ = Math.max(-half, Math.min(half, Number(z) || 0));
+  const gridX = Math.min(MARS_SEGMENTS - 1, Math.max(0, Math.floor((clampedX + half) / step)));
+  const gridZ = Math.min(MARS_SEGMENTS - 1, Math.max(0, Math.floor((clampedZ + half) / step)));
+  const x0 = -half + gridX * step;
+  const z0 = -half + gridZ * step;
+  const u = Math.max(0, Math.min(1, (clampedX - x0) / step));
+  const v = Math.max(0, Math.min(1, (clampedZ - z0) / step));
+  const a = sampleMarsDem(x0, z0);
+  const b = sampleMarsDem(x0, z0 + step);
+  const c = sampleMarsDem(x0 + step, z0 + step);
+  const d = sampleMarsDem(x0 + step, z0);
+  return u + v <= 1
+    ? a + u * (d - a) + v * (b - a)
+    : c + (1 - u) * (b - c) + (1 - v) * (d - c);
+}
+
 function sampleMarsLocalHeight(x, z) {
   const accepted = appCtx.planetarySurfaceAuthority?.sampleAtLocalXZ?.(x, z, {
     bodyId: 'mars',
     regionId: OLYMPUS_MONS_SURFACE_REGION.regionId
   });
   if (accepted?.status === 'available') return accepted.local.y;
-  return sampleMarsDem(x, z);
+  return sampleMarsRenderedHeight(x, z);
 }
 
 function loadMarsColorTexture() {
@@ -183,7 +208,7 @@ async function createMarsSurface() {
         localRocksAndDust: 'generated_game_detail'
       };
       return {
-        sampleHeight: sampleMarsDem,
+        sampleHeight: sampleMarsRenderedHeight,
         renderArtifact: candidateSurface,
         readyAssetIds: OLYMPUS_MONS_SURFACE_REGION.assets.map((asset) => asset.id)
       };

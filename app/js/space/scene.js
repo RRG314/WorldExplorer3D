@@ -146,12 +146,19 @@ export function getSolisReachDockTarget() {
   } else {
     approachDirection.applyQuaternion(starship.getWorldQuaternion(new THREE.Quaternion())).normalize();
   }
+  const rocket = appCtx.spaceFlight?.rocket;
+  const distance = rocket?.position?.distanceTo?.(position) ?? Infinity;
+  const relativeSpeed = appCtx.spaceFlight?.velocity?.length?.() || Number(appCtx.spaceFlight?.speed || 0);
+  const radius = Number(starship.userData.dockingRadius || 18);
   return {
     id: 'solis-reach-rendezvous',
     name: SPACE_CRAFT_IDENTITY.starship.name,
     position,
     approachDirection,
-    radius: Number(starship.userData.dockingRadius || 18),
+    radius,
+    distance,
+    relativeSpeed,
+    canDock: distance < radius + 24 && relativeSpeed <= 1.35,
     mesh: starship,
     landable: false,
     targetKind: 'expedition-dock'

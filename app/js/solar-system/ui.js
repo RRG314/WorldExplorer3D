@@ -8,7 +8,7 @@ import {
   showPlanetInfo,
   showSpacecraftInfo,
   showSunInfo
-} from "./info-panel.js?v=4";
+} from "./info-panel.js?v=5";
 import {
   getAstronomicalBody,
   SOLAR_SYSTEM_EXPLORATION_DESTINATION_IDS

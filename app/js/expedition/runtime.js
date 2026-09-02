@@ -54,6 +54,26 @@ function bindRuntimeContext(appContext) {
   return activeContext;
 }
 
+function prepareSolisReachSurfaceRendezvous(appContext, bodyId = 'earth') {
+  bindRuntimeContext(appContext);
+  const expedition = ensureTransitExpedition();
+  if (!activeContext || !expedition) return false;
+  const normalizedBodyId = String(bodyId || 'earth').trim().toLowerCase() || 'earth';
+  const journeyMatches = activePodJourney?.bodyId === normalizedBodyId;
+  if (!journeyMatches || [POD_PHASE.ABOARD, POD_PHASE.RECOVERED, POD_PHASE.FAILED].includes(activePodJourney?.phase)) {
+    setPodJourney(createPodJourney({
+      expeditionId: expedition.id,
+      contactId: `solar-system:${normalizedBodyId}`,
+      bodyId: normalizedBodyId,
+      returnFrameId: 'sol',
+      initialPhase: POD_PHASE.SURFACE
+    }));
+  }
+  if (activePodJourney?.phase === POD_PHASE.SURFACE) advancePodJourney('launch');
+  if (activePodJourney?.phase === POD_PHASE.SURFACE_LAUNCH) advancePodJourney('rendezvous');
+  return activePodJourney?.phase === POD_PHASE.RENDEZVOUS;
+}
+
 function setPodJourney(next) {
   activePodJourney = next || null;
   if (activeExpedition && store) {
@@ -1519,7 +1539,7 @@ async function enterActiveShip() {
     reason: 'solis-reach-interior-entered'
   });
   ensureStylesheet();
-  const ship = await import('./ship-interior.js?v=18');
+  const ship = await import('./ship-interior.js?v=19');
   closeExpeditionPlanner();
   const entered = ship.enterSolisReachInterior({
     expedition: activeExpedition,
@@ -1573,4 +1593,11 @@ function getExpeditionSnapshot() {
   };
 }
 
-export { boardSolisReachDirect, closeExpeditionPlanner, getExpeditionSnapshot, openExpeditionPlanner, stageEarthPathfinder };
+export {
+  boardSolisReachDirect,
+  closeExpeditionPlanner,
+  getExpeditionSnapshot,
+  openExpeditionPlanner,
+  prepareSolisReachSurfaceRendezvous,
+  stageEarthPathfinder
+};

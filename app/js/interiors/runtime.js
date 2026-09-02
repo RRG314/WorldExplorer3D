@@ -165,14 +165,23 @@ function replaceActiveInteriorFloor(active, targetLevel, deps) {
 function nearestInteriorInteraction(active, walker) {
   if (!active || !walker || !Array.isArray(active.interactions)) return null;
   const feetY = walker.y - (appCtx.Walk?.CFG?.eyeHeight || 1.7);
+  const traversalPriority = {
+    'ship-exit': 0,
+    'ship-door': 1,
+    'ship-lift': 2,
+    'ship-incident-step': 3,
+    'ship-station': 4,
+    'ship-crew': 5
+  };
   return active.interactions.map((interaction) => ({
     ...interaction,
+    interactionPriority: traversalPriority[interaction.kind] ?? 4,
     distance: Math.hypot(interaction.x - walker.x, interaction.z - walker.z),
     verticalDistance: Math.abs(
       active.floorBaseY + interaction.level * active.floorPlan.storyHeight - feetY
     )
   })).filter((interaction) => interaction.distance <= interaction.radius && interaction.verticalDistance <= 1.15)
-    .sort((a, b) => a.distance - b.distance)[0] || null;
+    .sort((a, b) => a.interactionPriority - b.interactionPriority || a.distance - b.distance)[0] || null;
 }
 
 function closeElevatorFloorPicker(active = appCtx.activeInterior) {

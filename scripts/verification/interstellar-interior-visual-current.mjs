@@ -67,7 +67,21 @@ async function openDoor(page, pose) {
   const before = (await snapshot(page)).expeditionShipInterior.openDoorCount;
   await placeCamera(page, pose);
   await page.keyboard.press('KeyE');
-  await page.waitForFunction((expected) => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.openDoorCount === expected, before + 1);
+  try {
+    await page.waitForFunction((expected) => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.openDoorCount === expected, before + 1, { timeout: 3_000 });
+  } catch (error) {
+    const diagnostics = await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const walker = ctx.Walk?.state?.walker;
+      return {
+        activeDeckId: ctx.getShipInteriorSnapshot?.()?.deckId || null,
+        activeLevel: ctx.activeInterior?.activeLevel,
+        walker: walker ? { x: walker.x, y: walker.y, z: walker.z } : null,
+        nearby: (ctx.activeInterior?.interactions || []).map((entry) => ({ id: entry.id, kind: entry.kind, x: entry.x, z: entry.z, radius: entry.radius, level: entry.level, distance: walker ? Math.hypot(entry.x - walker.x, entry.z - walker.z) : null })).filter((entry) => entry.distance < 4)
+      };
+    });
+    throw new Error(`Door interaction failed: ${JSON.stringify({ before, pose, diagnostics })}`, { cause: error });
+  }
 }
 
 async function runViewport(name, viewport) {
@@ -97,14 +111,14 @@ async function runViewport(name, viewport) {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
       const evidence = { roots: 0, textured: [], displayLabels: [], surfaceNames: [] };
       ctx.scene?.traverse?.((child) => {
-        if (child.name === 'expedition-ship:surveyor') evidence.roots += 1;
+        if (child.name === 'expedition-ship:solis-reach') evidence.roots += 1;
         if (child.material?.map && evidence.textured.length < 40) evidence.textured.push(child.name || child.type);
         if (child.name?.endsWith(':display') && child.parent?.name?.startsWith('ship-console:')) evidence.displayLabels.push(child.name);
         if (/^(floor-access-panel|ceiling-crossbeam|door-threshold):/.test(child.name || '') && evidence.surfaceNames.length < 90) evidence.surfaceNames.push(child.name);
       });
       return evidence;
     });
-    assert.equal(sceneEvidence.roots, 1, 'Only one Surveyor interior renderer may own the scene.');
+    assert.equal(sceneEvidence.roots, 1, 'Only one Solis Reach interior renderer may own the scene.');
     assert.ok(sceneEvidence.textured.some((entry) => entry.includes(':deck')));
     assert.ok(sceneEvidence.textured.some((entry) => entry.includes(':hull-')));
     assert.ok(sceneEvidence.displayLabels.length >= 10);

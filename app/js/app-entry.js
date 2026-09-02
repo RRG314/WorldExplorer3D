@@ -26,7 +26,7 @@ import './planetary/scene-ownership.js?v=9';
 import './real-estate.js?v=55';
 import { init, tryEnablePostProcessing } from './engine.js?v=95';
 import './physics.js?v=126';
-import './walking.js?v=90';
+import './walking.js?v=91';
 import './travel-mode.js?v=27';
 import { initBoatMode } from './boat-mode.js?v=57';
 import './sky.js?v=89';
@@ -37,7 +37,7 @@ import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.j
 import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=1';
 import { installOnDemandLiveEarth } from './runtime/on-demand-live-earth.js?v=6';
 import { installOnDemandMars } from './runtime/on-demand-mars.js?v=1';
-import './planetary/solid-world-runtime.js?v=18';
+import './planetary/solid-world-runtime.js?v=19';
 import './planetary/vehicles.js?v=3';
 import './planetary/astronaut.js?v=2';
 import './planetary/sky-orientation.js?v=14';
@@ -153,7 +153,7 @@ function ensurePlatformService(id) {
 
 function ensureInteriorsReady() {
     if (!_interiorsModulePromise) {
-        _interiorsModulePromise = import('./interiors.js?v=21').catch((error) => {
+        _interiorsModulePromise = import('./interiors.js?v=22').catch((error) => {
             _interiorsModulePromise = null;
             throw error;
         });

@@ -68,6 +68,12 @@ installSpaceJourneyRuntime(appCtx);
 
 let spaceSessionScope = null;
 const spaceModuleScope = createLifecycleScope('space-module');
+let expeditionRuntimeModulePromise = null;
+
+function prepareSolisReachSurfaceRendezvous(bodyId) {
+  expeditionRuntimeModulePromise ||= import('./expedition/runtime.js?v=43');
+  return expeditionRuntimeModulePromise.then((runtime) => runtime.prepareSolisReachSurfaceRendezvous?.(appCtx, bodyId) === true);
+}
 
 function beginSpaceFlightSession(options = {}) {
   spaceSessionScope?.dispose('space-session-replaced');
@@ -362,6 +368,9 @@ function startSpaceFlightToEarth(options = {}) {
     guidance: SPACE_GUIDANCE_MODE.MANUAL,
     reason: 'surface-pathfinder-rendezvous'
   });
+  void prepareSolisReachSurfaceRendezvous(sourceBodyId).catch((error) => {
+    console.error('Solis Reach rendezvous could not be prepared.', error);
+  });
   const transition = beginEnvironmentTransition(appCtx.ENV.SPACE_FLIGHT, { source: 'surface_to_pathfinder_pod' });
 
   appCtx.setEnvironmentTransitionActive(true);
@@ -552,17 +561,16 @@ function completePathfinderDocking() {
   const distance = pod.position.distanceTo(target.position);
   const relativeSpeed = appCtx.spaceFlight.velocity?.length?.() || Number(appCtx.spaceFlight.speed || 0);
   if (distance >= target.radius + 24 || relativeSpeed > 1.35) return false;
-  setSolisReachFlightPresentation(true);
-  appCtx.updateSpaceTravelSession?.({
-    activeCraftId: SPACE_CRAFT_IDENTITY.starship.id,
-    location: SPACE_TRAVEL_LOCATION.STARSHIP,
-    phase: SPACE_TRAVEL_PHASE.DOCKED,
-    destination: null,
-    reason: 'pathfinder-docked'
-  });
   appCtx.spaceFlight.velocity?.set?.(0, 0, 0);
   appCtx.spaceFlight.speed = 0;
-  showFlightMessage(`PATHFINDER SECURED · ${SPACE_CRAFT_IDENTITY.starship.name.toUpperCase()} HAS THE FLIGHT`, '#83e6a6');
+  void prepareSolisReachSurfaceRendezvous(session.sourceBodyId).then(() => {
+    if (appCtx.attemptExpeditionPodDocking?.() !== true) {
+      showFlightMessage(`HOLD POSITION NEAR ${SPACE_CRAFT_IDENTITY.starship.name.toUpperCase()} AND TRY AGAIN`, '#f59e0b');
+    }
+  }).catch((error) => {
+    console.error('Solis Reach boarding could not be completed.', error);
+    showFlightMessage(`${SPACE_CRAFT_IDENTITY.starship.name.toUpperCase()} BOARDING IS TEMPORARILY UNAVAILABLE`, '#f59e0b');
+  });
   return true;
 }
 
