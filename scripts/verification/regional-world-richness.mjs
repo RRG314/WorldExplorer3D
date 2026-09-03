@@ -165,7 +165,7 @@ async function inspectJourney(journey) {
       creatureBudgetHonest: snapshot.creatureTaxonCount === 12 && snapshot.referenceFallbacks === 12 && snapshot.promotionReadyCount === 0,
       guideOpenedByNormalInput: snapshot.activeGuide === true,
       lifeListShowsRegionalTarget: /0\s*\/\s*12/.test(snapshot.lifeListText),
-      lifeListExplainsTruth: /not a live-presence count/i.test(snapshot.lifeListText),
+      lifeListExplainsTruth: /not a live(?:-presence| wildlife) count/i.test(snapshot.lifeListText),
       panelFitsViewport: snapshot.panelVisible === true,
       lifeListVisible: snapshot.lifeListVisible === true,
       noBrowserErrors: pageErrors.length === 0,
