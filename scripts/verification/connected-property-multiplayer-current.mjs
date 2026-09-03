@@ -10,7 +10,8 @@ const require = createRequire(import.meta.url);
 const admin = require('../../functions/node_modules/firebase-admin');
 const outputDir = path.join(root, 'output', 'verification', 'connected-property-multiplayer');
 await fs.mkdir(outputDir, { recursive: true });
-const server = await startStaticServer({ rootDir: root, ports: [4433, 4434, 4435] });
+const artifactRoot = path.resolve(process.env.WE3D_VERIFY_ROOT || root);
+const server = await startStaticServer({ rootDir: artifactRoot, ports: [4433, 4434, 4435] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
 const projectId = String(process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || 'we3d-staging-20260712');
 if (!admin.apps.length) admin.initializeApp({ projectId });
@@ -43,7 +44,7 @@ async function createPlayer(label, viewport) {
   // The globe's optional imagery tiles must not gate the application shell.
   // Waiting for the browser load event makes this verifier measure third-party
   // image completion twice instead of the Property UI it is meant to exercise.
-  await page.goto(`${baseUrl}/app/`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
+  await page.goto(`${baseUrl}/app/?diagnostics=1`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   const identity = await page.evaluate(async ({ label, email }) => {
     const services = globalThis.WorldExplorerFirebase?.initFirebase?.();
@@ -100,13 +101,11 @@ async function createPlayer(label, viewport) {
 
 async function createSharedRoom(owner) {
   return owner.page.evaluate(async (name) => {
-    const [{ createRoom }, { ctx }] = await Promise.all([
-      import('/app/js/multiplayer/rooms.js?v=67'),
-      import('/app/js/shared-context.js?v=55')
-    ]);
-    const lat = Number(ctx.LOC?.lat || 39.2904);
-    const lon = Number(ctx.LOC?.lon || -76.6122);
-    const room = await createRoom({
+    const support = globalThis.__WE3D_ROOM_SUPPORT__;
+    if (!support) throw new Error('Built room diagnostics support is unavailable.');
+    const lat = 39.2904;
+    const lon = -76.6122;
+    const room = await support.create({
       name,
       visibility: 'private',
       world: { kind: 'earth', seed: `property-loop:${lat.toFixed(5)}:${lon.toFixed(5)}`, lat, lon, name: 'Baltimore' }
@@ -117,30 +116,18 @@ async function createSharedRoom(owner) {
 
 async function joinSharedRoom(player, roomCode) {
   return player.page.evaluate(async (code) => {
-    const { joinRoomByCode } = await import('/app/js/multiplayer/rooms.js?v=67');
-    const room = await joinRoomByCode(code);
+    const room = await globalThis.__WE3D_ROOM_SUPPORT__?.join?.(code);
+    if (!room) throw new Error('Built room diagnostics support could not join the room.');
     return { code: room.code || room.id, world: room.world };
   }, roomCode);
 }
 
 async function stageAtSameMappedProperty(player, roomCode, sourceBuildingId = '') {
   const property = await player.page.evaluate(async ({ sourceBuildingId }) => {
-    const [{ ctx }, propertyUi] = await Promise.all([
-      import('/app/js/shared-context.js?v=55'),
-      import('/app/js/game/property-ui.js?v=3')
-    ]);
-    propertyUi.toggleRealEstate(true);
-    const properties = await propertyUi.loadPropertiesAtCurrentLocation();
-    propertyUi.togglePropertyFilters();
-    const candidates = properties.filter((property) => property.sharedEligible && property.price <= 500);
-    const property = (sourceBuildingId ? candidates.find((entry) => entry.sourceBuildingId === sourceBuildingId) : candidates[0]);
-    if (!property) throw new Error(`No matching mapped property was available. Found ${candidates.length} connected candidates.`);
-    const actor = ctx.Walk?.state?.mode === 'walk' && ctx.Walk?.state?.walker ? ctx.Walk.state.walker : ctx.car;
-    if (!actor) throw new Error('No active Earth actor was available.');
-    actor.position?.set?.(property.x, Number(actor.position?.y || property.y || 0), property.z);
-    actor.x = property.x;
-    actor.z = property.z;
-    propertyUi.updatePropertyPanel();
+    const support = globalThis.__WE3D_PROPERTY_SUPPORT__;
+    if (!support) throw new Error('Built property diagnostics support is unavailable.');
+    const property = await support.stageMappedFixture(sourceBuildingId || 'osm:way:424242');
+    if (!property) throw new Error('No matching mapped property was available from the controlled fixture.');
     return {
       id: property.id,
       worldPropertyId: property.worldPropertyId,

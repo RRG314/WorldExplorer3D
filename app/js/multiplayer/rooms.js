@@ -640,6 +640,14 @@ async function deleteOwnedRoom(roomCode) {
   }
 }
 
+if (new URLSearchParams(globalThis.location?.search || '').get('diagnostics') === '1') {
+  globalThis.__WE3D_ROOM_SUPPORT__ = Object.freeze({
+    create: (options) => createRoom(options),
+    join: (code) => joinRoomByCode(code),
+    current: () => getCurrentRoom()
+  });
+}
+
 export {
   createRoom,
   deleteOwnedRoom,

@@ -328,6 +328,35 @@ export async function loadPropertiesAtCurrentLocation() {
   return appCtx.properties;
 }
 
+if (appCtx.developerDiagnosticsEnabled) {
+  globalThis.__WE3D_PROPERTY_SUPPORT__ = Object.freeze({
+    async stageMappedFixture(sourceBuildingId = 'osm:way:424242') {
+      appCtx.selLoc = 'baltimore';
+      appCtx.LOC = { lat: 39.2904, lon: -76.6122, name: 'Baltimore' };
+      appCtx.LOCS = { ...(appCtx.LOCS || {}), baltimore: { name: 'Baltimore', lat: 39.2904, lon: -76.6122 } };
+      appCtx.car ||= { x: 0, y: 0, z: 0, position: { set(x, y, z) { this.x = x; this.y = y; this.z = z; } } };
+      appCtx.buildings = [{
+        sourceBuildingId: String(sourceBuildingId), buildingType: 'house', levels: 2, baseY: 0,
+        pts: [{ x: -8, z: -8 }, { x: 8, z: -8 }, { x: 8, z: 8 }, { x: -8, z: 8 }]
+      }];
+      document.getElementById('globeSelectorScreen')?.classList.remove('show');
+      appCtx.realEstateMode = true;
+      activeView = 'nearby';
+      const properties = await loadPropertiesAtCurrentLocation();
+      const property = properties.find((entry) => entry.sharedEligible && entry.sourceBuildingId === String(sourceBuildingId));
+      if (!property) return null;
+      const actor = actorPosition();
+      actor.position?.set?.(property.x, Number(actor.position?.y || property.y || 0), property.z);
+      actor.x = property.x;
+      actor.z = property.z;
+      updatePropertyPanel();
+      return { ...property };
+    },
+    refresh: () => updatePropertyPanel(),
+    snapshot: () => snapshot()
+  });
+}
+
 export function renderPropertyMarkers() {
   clearPropertyMarkers();
   if (!globalThis.THREE || !appCtx.scene) return;
