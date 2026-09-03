@@ -2,8 +2,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
+import { startStaticServer } from './static-server.mjs';
 
-const baseUrl = String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4192').replace(/\/$/, '');
+const verifyRoot = process.env.WE3D_VERIFY_ROOT || '';
+const staticServer = verifyRoot ? await startStaticServer({ rootDir: verifyRoot, ports: [4441, 4442, 4443] }) : null;
+const baseUrl = staticServer
+  ? `http://127.0.0.1:${staticServer.port}`
+  : String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4192').replace(/\/$/, '');
 const outputDir = path.resolve('output/verification/world-economy-earth');
 await fs.mkdir(outputDir, { recursive: true });
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
@@ -28,31 +33,19 @@ async function run() {
       const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
       return state.gameStarted && !state.worldLoading && state.urbanSandbox?.active;
     }, null, { timeout: 120_000 });
-    const places = await page.evaluate(async () => {
-      const [{ ctx }, commerce] = await Promise.all([
-        import('/app/js/shared-context.js?v=55'),
-        import('/app/js/urban-sandbox/commerce-model.js?v=3')
-      ]);
-      const published = new Map((ctx.urbanSandboxRuntimeSnapshot?.().commerce?.stores || []).map((store) => [store.id, store]));
-      return commerce.mappedCommercePlaces(ctx.pois).map((place) => ({
-        id: place.id, name: place.name, kind: place.kind, mappedType: place.mappedType,
-        x: place.x, z: place.z,
-        interactionX: published.get(place.id)?.interactionX ?? place.x,
-        interactionZ: published.get(place.id)?.interactionZ ?? place.z
-      }));
+    const places = await page.evaluate(() => {
+      const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+      return snapshot.urbanSandbox?.commerce?.stores || [];
     });
     assert.ok(places.length > 0, 'The loaded Earth world did not publish an eligible mapped business.');
     const preferred = places.find((place) => place.kind === 'hardware' || place.kind === 'mechanic') || places[0];
     const openedStoreId = await page.evaluate(async (orderedPlaces) => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
-      ctx.setTravelMode?.('walk', { source: 'world-economy-verification', emitTutorial: false });
-      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       for (const place of orderedPlaces) {
         if (!globalThis.__WE3D_STORE_SUPPORT__?.moveNear(place.id)) continue;
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-        const candidate = ctx.resolvePrimaryContextInteraction?.();
+        const candidate = globalThis.__WE3D_STORE_SUPPORT__?.context?.()?.active;
         if (candidate?.action !== 'visit_store' || candidate?.data?.storeId !== place.id) continue;
-        if (await ctx.handlePrimaryContextInteraction?.() === true) return place.id;
+        if (await globalThis.__WE3D_STORE_SUPPORT__?.perform?.() === true) return place.id;
       }
       return '';
     }, [preferred, ...places.filter((place) => place.id !== preferred.id)]);
@@ -74,11 +67,11 @@ async function run() {
     const buy = page.locator('#urbanStoreStock [data-store-action="buy"]:not([disabled])').first();
     const itemLabel = String(await buy.locator('xpath=..').locator('strong').textContent());
     await buy.click();
-    const after = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const after = await page.evaluate(() => {
+      const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
       return {
         credits: Number((document.getElementById('urbanStoreCredits')?.textContent || '').match(/\d+/)?.[0] || 0),
-        backpackLabels: ctx.playerBackpackInventory.snapshot().items.map((item) => item.label)
+        backpackLabels: (snapshot.urbanSandbox?.equipment?.items || []).map((item) => item.label)
       };
     });
     assert.ok(after.credits < beforeCredits, JSON.stringify({ beforeCredits, after }));
@@ -96,6 +89,7 @@ try {
   failures.push(error.stack || String(error));
 } finally {
   await browser.close();
+  await staticServer?.close();
 }
 const report = { ok: failures.length === 0, baseUrl, result, failures };
 await fs.writeFile(path.join(outputDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);

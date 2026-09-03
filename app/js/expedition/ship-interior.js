@@ -2334,6 +2334,31 @@ function enterSolisReachInterior(options = {}) {
   syncShipGuidance(session);
   ensureShipMaps(session);
   ensureShipHud(options.expedition, session.operationSummary);
+  if (appCtx.developerDiagnosticsEnabled) {
+    const support = Object.freeze({
+      moveToStation(stationId) {
+        const station = SHIP_STATIONS.find((entry) => entry.id === String(stationId || ''));
+        const walker = appCtx.Walk?.state?.walker;
+        if (!activeSession || !station || !walker) return false;
+        if (activeSession.activeDeckId !== station.deckId) switchSolisReachDeck(station.deckId);
+        Object.assign(walker, {
+          x: Number(station.x),
+          z: Number(station.z),
+          y: Number(appCtx.Walk?.CFG?.eyeHeight || 1.7) + 0.04,
+          angle: 0,
+          yaw: 0,
+          lookYawOffset: 0,
+          pitch: 0,
+          vy: 0,
+          onGround: true
+        });
+        return { id: station.id, deckId: station.deckId, x: station.x, z: station.z };
+      },
+      snapshot: () => getShipInteriorSnapshot()
+    });
+    session.diagnosticsSupport = support;
+    globalThis.__WE3D_SHIP_INTERIOR_SUPPORT__ = support;
+  }
   if (session.incidentPresentation) playShipTone('alert');
   appCtx.updateControlsModeUI?.();
   return true;
@@ -2342,6 +2367,9 @@ function enterSolisReachInterior(options = {}) {
 function exitSolisReachInterior() {
   const session = activeSession;
   if (!session) return false;
+  if (globalThis.__WE3D_SHIP_INTERIOR_SUPPORT__ === session.diagnosticsSupport) {
+    delete globalThis.__WE3D_SHIP_INTERIOR_SUPPORT__;
+  }
   activeSession = null;
   document.getElementById('shipInteriorHud')?.classList.remove('show');
   document.getElementById('shipMiniMap')?.classList.remove('show');

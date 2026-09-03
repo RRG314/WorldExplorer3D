@@ -2,8 +2,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
+import { startStaticServer } from './static-server.mjs';
 
-const baseUrl = String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4192').replace(/\/$/, '');
+const verifyRoot = process.env.WE3D_VERIFY_ROOT || '';
+const staticServer = verifyRoot ? await startStaticServer({ rootDir: verifyRoot, ports: [4444, 4445, 4446] }) : null;
+const baseUrl = staticServer
+  ? `http://127.0.0.1:${staticServer.port}`
+  : String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4192').replace(/\/$/, '');
 const outputDir = path.resolve('output/verification/world-economy-cargo');
 await fs.mkdir(outputDir, { recursive: true });
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
@@ -13,77 +18,121 @@ async function state(page) {
   return page.evaluate(() => JSON.parse(globalThis.render_game_to_text?.() || '{}'));
 }
 
-async function run() {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-  const page = await context.newPage();
+function observePage(page) {
   page.on('pageerror', (error) => failures.push(`pageerror: ${error.stack || error}`));
-  page.on('requestfailed', (request) => { if (request.url().startsWith(baseUrl)) failures.push(`request failed: ${request.url()}`); });
+  page.on('requestfailed', (request) => {
+    if (request.url().startsWith(baseUrl)) failures.push(`request failed: ${request.url()}`);
+  });
+}
+
+async function buyEarthMaterial(context) {
+  const page = await context.newPage();
+  observePage(page);
   try {
-    await page.goto(`${baseUrl}/app/?launch=space`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
+    await page.goto(`${baseUrl}/app/?diagnostics=1`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
     await page.waitForFunction(() => document.getElementById('startBtn')?.disabled === false, null, { timeout: 120_000 });
     if (await page.locator('#analyticsConsentDenyBtn').isVisible()) await page.locator('#analyticsConsentDenyBtn').click();
-    await page.evaluate(() => {
-      document.getElementById('spaceLaunchToggle')?.click();
-      document.getElementById('startBtn')?.click();
+    await page.locator('#globeLocationSearch').fill('Baltimore, Maryland');
+    await page.locator('#globeLocationSearchBtn').click();
+    const searchResult = page.locator('#globeLocationSearchResults [role="option"]').first();
+    await searchResult.waitFor({ state: 'visible', timeout: 30_000 });
+    await searchResult.click();
+    await page.locator('#globeSelectorStartBtn').click();
+    await page.waitForFunction(() => {
+      const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+      return snapshot.gameStarted && !snapshot.worldLoading && snapshot.urbanSandbox?.active;
+    }, null, { timeout: 120_000 });
+
+    const places = await page.evaluate(() => {
+      const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+      return snapshot.urbanSandbox?.commerce?.stores || [];
     });
+    const materialStores = places.filter((place) => ['hardware', 'mechanic', 'pawn'].includes(place.kind));
+    assert.ok(materialStores.length > 0, 'The built Earth world did not publish a mapped material seller.');
+    const opened = await page.evaluate(async (orderedPlaces) => {
+      for (const place of orderedPlaces) {
+        if (!globalThis.__WE3D_STORE_SUPPORT__?.moveNear(place.id)) continue;
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const candidate = globalThis.__WE3D_STORE_SUPPORT__?.context?.()?.active;
+        if (candidate?.action !== 'visit_store' || candidate?.data?.storeId !== place.id) continue;
+        if (await globalThis.__WE3D_STORE_SUPPORT__?.perform?.() === true) return place;
+      }
+      return null;
+    }, materialStores);
+    assert.ok(opened, 'No mapped material seller opened through its published player interaction.');
+    await page.locator('#urbanStore.show').waitFor({ state: 'visible' });
+    const buy = page.locator('#urbanStoreStock [data-store-action="buy"][data-store-item="reclaimed-aluminum-stock"]');
+    await buy.waitFor({ state: 'visible' });
+    const before = await state(page);
+    await buy.click();
+    await page.waitForFunction(() => {
+      const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+      return snapshot.backpack?.items?.some((item) => item.catalogId === 'reclaimed-aluminum-stock');
+    });
+    const after = await state(page);
+    const item = after.backpack.items.find((entry) => entry.catalogId === 'reclaimed-aluminum-stock');
+    assert.ok(item, JSON.stringify(after.backpack));
+    assert.ok(after.urbanSandbox.commerce.current.credits < before.urbanSandbox.commerce.current.credits);
+    await page.screenshot({ path: path.join(outputDir, 'earth-material-purchased.png'), fullPage: true });
+    return { store: opened, item, credits: after.urbanSandbox.commerce.current.credits };
+  } finally {
+    await page.close();
+  }
+}
+
+async function loadMaterialAboard(context, purchase) {
+  const page = await context.newPage();
+  observePage(page);
+  try {
+    await page.goto(`${baseUrl}/app/?launch=space&diagnostics=1`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
+    await page.waitForFunction(() => document.getElementById('startBtn')?.disabled === false, null, { timeout: 120_000 });
+    await page.locator('#spaceLaunchToggle').click();
+    await page.locator('#startBtn').click();
     await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').modes?.space === true, null, { timeout: 120_000 });
+    const carried = await state(page);
+    assert.ok(carried.backpack?.items?.some((item) => item.catalogId === purchase.item.catalogId), 'The Earth purchase did not persist into space.');
+
     await page.locator('#sfExpeditionBtn').click();
     await page.locator('#expeditionPlan').click();
     await page.waitForFunction(() => document.querySelector('.expeditionSummary .is-ready')?.textContent?.includes('READY'));
-
-    const purchase = await page.evaluate(async () => {
-      const [{ ctx }, equipment, commerce] = await Promise.all([
-        import('/app/js/shared-context.js?v=55'),
-        import('/app/js/urban-sandbox/equipment-model.js?v=9'),
-        import('/app/js/urban-sandbox/commerce-model.js?v=3')
-      ]);
-      const inventory = equipment.ensurePlayerBackpackInventory(ctx);
-      const economy = commerce.createLocalCommerceModel({ inventory, now: () => Date.parse('2026-08-31T12:00:00Z') });
-      const store = { id: 'verification:hardware', name: 'Mapped Hardware', kind: 'hardware', provenance: 'loaded-map-poi' };
-      const view = economy.snapshot(store);
-      const item = view.standard.find((entry) => entry.id === 'reclaimed-aluminum-stock')
-        || view.standard.find((entry) => entry.category === 'material');
-      const bought = economy.buy(store, item.id);
-      ctx.playerBackpackStore.save(inventory.exportState());
-      return { bought, credits: economy.snapshot(store).credits, item: inventory.snapshot().items.find((entry) => entry.catalogId === item.id) };
-    });
-    assert.equal(purchase.bought.ok, true, JSON.stringify(purchase));
-    assert.ok(purchase.item, JSON.stringify(purchase));
-
     await page.locator('#expeditionEnterShip').click();
     await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.active === true);
-    await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
-      Object.assign(ctx.Walk.state.walker, { x: 0, z: 0.6, angle: 0, yaw: 0, lookYawOffset: 0, pitch: 0, vy: 0, onGround: true });
-    });
-    await page.keyboard.press('KeyE');
-    await page.locator('#shipDeckPicker [data-deck="engineering"]').click();
-    await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
-      Object.assign(ctx.Walk.state.walker, { x: 4.3, z: 0.5, angle: 0, yaw: 0, lookYawOffset: 0, pitch: 0, vy: 0, onGround: true });
-    });
+    const positioned = await page.evaluate(() => globalThis.__WE3D_SHIP_INTERIOR_SUPPORT__?.moveToStation?.('cargo-status') || false);
+    assert.ok(positioned, 'The built ship interior did not publish its diagnostics-only Cargo Hold position.');
     await page.waitForTimeout(250);
     await page.keyboard.press('KeyE');
-    await page.locator('#shipStationPanel [data-ship-action="load-backpack-materials"]').waitFor({ state: 'visible' });
-    await page.screenshot({ path: path.join(outputDir, 'cargo-transfer-ready.png'), fullPage: true });
+    const transfer = page.locator('#shipStationPanel [data-ship-action="load-backpack-materials"]');
+    await transfer.waitFor({ state: 'visible' });
     const before = await state(page);
-    await page.locator('#shipStationPanel [data-ship-action="load-backpack-materials"]').click();
-    await page.waitForFunction((feedstock) => JSON.parse(globalThis.render_game_to_text?.() || '{}').interstellarExpedition?.resources?.feedstockKg > feedstock, before.interstellarExpedition.resources.feedstockKg);
-    const result = await page.evaluate(async (catalogId) => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+    await page.screenshot({ path: path.join(outputDir, 'cargo-transfer-ready.png'), fullPage: true });
+    await transfer.click();
+    await page.waitForFunction((feedstock) => {
       const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
-      return {
-        feedstockKg: snapshot.interstellarExpedition.resources.feedstockKg,
-        beforeFeedstockKg: Number(snapshot.interstellarExpedition.resources.feedstockKg) - Number(snapshot.interstellarExpedition.materialLedger?.earthLoadedKg || 0),
-        earthLoadedKg: snapshot.interstellarExpedition.materialLedger?.earthLoadedKg,
-        materialStillCarried: ctx.playerBackpackInventory.snapshot().items.some((item) => item.catalogId === catalogId),
-        stationTitle: document.getElementById('shipStationTitle')?.textContent || ''
-      };
-    }, purchase.item.catalogId);
+      return snapshot.interstellarExpedition?.resources?.feedstockKg > feedstock;
+    }, before.interstellarExpedition.resources.feedstockKg);
+    const after = await state(page);
+    const result = {
+      feedstockKg: after.interstellarExpedition.resources.feedstockKg,
+      beforeFeedstockKg: before.interstellarExpedition.resources.feedstockKg,
+      earthLoadedKg: after.interstellarExpedition.materialLedger?.earthLoadedKg,
+      materialStillCarried: after.backpack?.items?.some((item) => item.catalogId === purchase.item.catalogId) === true,
+      stationTitle: await page.locator('#shipStationTitle').textContent()
+    };
     assert.equal(result.materialStillCarried, false, JSON.stringify(result));
     assert.equal(result.feedstockKg - result.beforeFeedstockKg, result.earthLoadedKg, JSON.stringify(result));
     assert.equal(result.stationTitle, 'Cargo Hold');
     await page.screenshot({ path: path.join(outputDir, 'cargo-transfer-complete.png'), fullPage: true });
+    return result;
+  } finally {
+    await page.close();
+  }
+}
+
+async function run() {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  try {
+    const purchase = await buyEarthMaterial(context);
+    const result = await loadMaterialAboard(context, purchase);
     return { purchase, result };
   } finally {
     await context.close();
@@ -97,6 +146,7 @@ try {
   failures.push(error.stack || String(error));
 } finally {
   await browser.close();
+  await staticServer?.close();
 }
 const report = { ok: failures.length === 0, baseUrl, result, failures };
 await fs.writeFile(path.join(outputDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);

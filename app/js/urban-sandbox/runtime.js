@@ -2977,6 +2977,7 @@ function startUrbanSandboxRuntime(options = {}) {
     state.storeSupportHook = Object.freeze({
       context: () => appCtx.contextInteractionSnapshot?.() || null,
       moveNear: (storeId) => moveNearStoreForSupport(state, storeId),
+      perform: () => appCtx.handlePrimaryContextInteraction?.(),
       snapshot: () => snapshot(state)
     });
     globalThis.__WE3D_STORE_SUPPORT__ = state.storeSupportHook;

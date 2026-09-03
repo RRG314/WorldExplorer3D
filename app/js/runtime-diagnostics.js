@@ -1298,6 +1298,7 @@ globalThis.render_game_to_text = () => JSON.stringify({
   interstellarExpedition: appCtx.getInterstellarExpeditionSnapshot?.() || null,
   destinationMission: appCtx.getDestinationMissionSnapshot?.() || null,
   expeditionShipInterior: appCtx.getShipInteriorSnapshot?.() || null,
+  backpack: appCtx.playerBackpackInventory?.snapshot?.() || null,
   gameStarted: !!appCtx.gameStarted,
   paused: !!appCtx.paused,
   worldLoading: !!appCtx.worldLoading,
