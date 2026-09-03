@@ -74,6 +74,7 @@ function transferSnapshot(client) {
   let localRequests = 0;
   let externalRequests = 0;
   const externalOrigins = new Set();
+  const byOrigin = new Map();
   for (const [requestId, url] of client.requests) {
     if (!/^https?:/i.test(url)) continue;
     const bytes = client.transfers.get(requestId) || 0;
@@ -83,7 +84,14 @@ function transferSnapshot(client) {
     } else {
       externalRequests += 1;
       externalTransferBytes += bytes;
-      try { externalOrigins.add(new URL(url).origin); } catch {}
+      try {
+        const origin = new URL(url).origin;
+        externalOrigins.add(origin);
+        const current = byOrigin.get(origin) || { requests: 0, transferBytes: 0 };
+        current.requests += 1;
+        current.transferBytes += bytes;
+        byOrigin.set(origin, current);
+      } catch {}
     }
   }
   return {
@@ -91,7 +99,8 @@ function transferSnapshot(client) {
     localTransferBytes,
     externalRequests,
     externalTransferBytes,
-    externalOriginCount: externalOrigins.size
+    externalOriginCount: externalOrigins.size,
+    externalByOrigin: Object.fromEntries([...byOrigin.entries()].sort((a, b) => b[1].requests - a[1].requests))
   };
 }
 
@@ -108,18 +117,31 @@ async function waitForPlayable(page) {
 
 async function launchWorld(client) {
   const startedAt = Date.now();
+  const milestones = {};
   await client.page.goto(`${baseUrl}/app/?loc=custom&lat=39.2904&lon=-76.6122&lname=Baltimore&launch=earth&gm=free&mode=walk`, {
     waitUntil: 'load', timeout: 120_000
   });
+  milestones.documentLoadedMs = Date.now() - startedAt;
   await client.page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
+  milestones.runtimeReadyMs = Date.now() - startedAt;
   const titleHeapBytes = await heapUsedBytes(client.cdp, true);
   await client.page.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
   if (await client.page.locator('#analyticsConsentDenyBtn').isVisible().catch(() => false)) {
     await client.page.locator('#analyticsConsentDenyBtn').click();
   }
   await client.page.locator('#globeSelectorStartBtn').click();
+  milestones.worldRequestedMs = Date.now() - startedAt;
   await waitForPlayable(client.page);
-  return { firstPlayableMs: Date.now() - startedAt, titleHeapBytes };
+  milestones.playableMs = Date.now() - startedAt;
+  const diagnostics = await client.page.evaluate(() => {
+    const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
+    return {
+      worldLoad: state.worldLoad || null,
+      performance: state.performance || null,
+      transportCompilation: state.transportCompilation || null
+    };
+  });
+  return { firstPlayableMs: milestones.playableMs, titleHeapBytes, milestones, diagnostics };
 }
 
 async function selectMode(page, expected, selector) {

@@ -959,6 +959,11 @@ function getWorldExplorerRuntimeDiagnostics() {
       capturedErrors: runtimeErrors.length
     },
     runtimeKernel: appCtx.getRuntimeKernelSnapshot?.() || null,
+    performance: appCtx.perfStats ? {
+      mode: appCtx.perfStats.mode || null,
+      lastLoad: appCtx.perfStats.lastLoad ? { ...appCtx.perfStats.lastLoad } : null,
+      live: appCtx.perfStats.live ? { ...appCtx.perfStats.live } : null
+    } : null,
     runtimeErrors: [...runtimeErrors],
     sessionLifecycle: appCtx.getSessionCoordinatorDebugState?.() || null,
     account: appCtx.getAccountSnapshot?.() || null,
