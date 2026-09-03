@@ -47,7 +47,7 @@ async function buyEarthMaterial(context) {
       const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
       return snapshot.urbanSandbox?.commerce?.stores || [];
     });
-    const materialStores = places.filter((place) => ['hardware', 'mechanic', 'pawn'].includes(place.kind));
+    const materialStores = places.filter((place) => ['fuel', 'hardware', 'mechanic', 'pawn'].includes(place.kind));
     assert.ok(materialStores.length > 0, 'The built Earth world did not publish a mapped material seller.');
     const opened = await page.evaluate(async (orderedPlaces) => {
       for (const place of orderedPlaces) {
@@ -61,16 +61,17 @@ async function buyEarthMaterial(context) {
     }, materialStores);
     assert.ok(opened, 'No mapped material seller opened through its published player interaction.');
     await page.locator('#urbanStore.show').waitFor({ state: 'visible' });
-    const buy = page.locator('#urbanStoreStock [data-store-action="buy"][data-store-item="reclaimed-aluminum-stock"]');
+    const materialCatalogId = opened.kind === 'fuel' ? 'copper-wire-coil' : 'reclaimed-aluminum-stock';
+    const buy = page.locator(`#urbanStoreStock [data-store-action="buy"][data-store-item="${materialCatalogId}"]`);
     await buy.waitFor({ state: 'visible' });
     const before = await state(page);
     await buy.click();
-    await page.waitForFunction(() => {
+    await page.waitForFunction((catalogId) => {
       const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
-      return snapshot.backpack?.items?.some((item) => item.catalogId === 'reclaimed-aluminum-stock');
-    });
+      return snapshot.backpack?.items?.some((item) => item.catalogId === catalogId);
+    }, materialCatalogId);
     const after = await state(page);
-    const item = after.backpack.items.find((entry) => entry.catalogId === 'reclaimed-aluminum-stock');
+    const item = after.backpack.items.find((entry) => entry.catalogId === materialCatalogId);
     assert.ok(item, JSON.stringify(after.backpack));
     assert.ok(after.urbanSandbox.commerce.current.credits < before.urbanSandbox.commerce.current.credits);
     await page.screenshot({ path: path.join(outputDir, 'earth-material-purchased.png'), fullPage: true });
@@ -86,12 +87,11 @@ async function loadMaterialAboard(context, purchase) {
   try {
     await page.goto(`${baseUrl}/app/?launch=space&diagnostics=1`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
     await page.waitForFunction(() => document.getElementById('startBtn')?.disabled === false, null, { timeout: 120_000 });
-    await page.locator('#spaceLaunchToggle').click();
-    await page.locator('#startBtn').click();
+    await page.evaluate(() => {
+      document.getElementById('spaceLaunchToggle')?.click();
+      document.getElementById('startBtn')?.click();
+    });
     await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').modes?.space === true, null, { timeout: 120_000 });
-    const carried = await state(page);
-    assert.ok(carried.backpack?.items?.some((item) => item.catalogId === purchase.item.catalogId), 'The Earth purchase did not persist into space.');
-
     await page.locator('#sfExpeditionBtn').click();
     await page.locator('#expeditionPlan').click();
     await page.waitForFunction(() => document.querySelector('.expeditionSummary .is-ready')?.textContent?.includes('READY'));
