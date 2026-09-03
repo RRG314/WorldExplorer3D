@@ -51,8 +51,8 @@ try {
   }, null, { timeout: 300_000 });
   await page.waitForTimeout(4_000);
 
-  await page.locator('#exploreBtn').click();
-  await page.waitForSelector('#exploreMenu.open #fBoat', { timeout: 10_000 });
+  await page.locator('#travelBtn').click();
+  await page.waitForSelector('#travelMenu.open #fBoat', { timeout: 10_000 });
   await page.locator('#fBoat').click();
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().modes?.boat === true, null, { timeout: 30_000 });
   const boatEntry = await page.evaluate(() => {

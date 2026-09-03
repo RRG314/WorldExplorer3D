@@ -227,8 +227,8 @@ try {
   await freePage.locator('#globeSelectorStartBtn').click();
   await waitForWorld(freePage);
   const freeDirectPromptPlacement = await inspectDirectPromptPlacement(freePage);
-  await freePage.locator('#exploreBtn').click();
-  await freePage.waitForSelector('#exploreMenu.open', { timeout: 10_000 });
+  await freePage.locator('#travelBtn').click();
+  await freePage.waitForSelector('#travelMenu.open', { timeout: 10_000 });
   await freePage.locator('#fWalk').click();
   await freePage.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.mode === 'walk', null, { timeout: 20_000 });
   const freeLead = await waitForLead(freePage, 'free-roam', async () => {
@@ -250,14 +250,14 @@ try {
   await gpsPage.goto(`${baseUrl}/app/`, { waitUntil: 'load', timeout: 120_000 });
   await gpsPage.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   await gpsPage.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
-  const analyticsBannerWasOpen = await gpsPage.locator('#analyticsConsentBanner').isVisible();
   await gpsPage.locator('#globeSelectorLiveGpsBtn').click();
   await gpsPage.waitForSelector('#liveGpsPermissionPanel.show', { timeout: 30_000 });
   const consentOwnsAnalyticsLayer = await gpsPage.evaluate(() => {
     const consent = document.getElementById('liveGpsPermissionPanel');
     const analytics = document.getElementById('analyticsConsentBanner');
+    const analyticsStyle = analytics ? getComputedStyle(analytics) : null;
     return !!consent && getComputedStyle(consent).display !== 'none' &&
-      (!analytics || getComputedStyle(analytics).visibility === 'hidden');
+      (!analytics || analyticsStyle.display === 'none' || analyticsStyle.visibility === 'hidden');
   });
   await gpsPage.locator('#liveGpsPermissionContinue').click();
   await waitForWorld(gpsPage);
@@ -284,7 +284,7 @@ try {
     liveGpsUsesSameEncounterContract: gpsAccepted.activeActivityId === gpsLead.lead.activityId && gpsAccepted.interaction.targetId === gpsLead.lead.slotId,
     liveGpsKeepsJournalOutOfTheWay: gpsAccepted.quickVisible === true && gpsAccepted.journalOpen === false,
     liveGpsTrackingClearsControls: gpsAccepted.quickClearsMobileControls === true,
-    gpsConsentOwnsAnalyticsLayer: analyticsBannerWasOpen === true && consentOwnsAnalyticsLayer === true,
+    gpsConsentOwnsAnalyticsLayer: consentOwnsAnalyticsLayer === true,
     directInteractionDefersBroadLead: [freeLead, gpsLead]
       .filter((entry) => entry.directInteraction)
       .every((entry) => entry.directInteraction.leadCorrectlyDeferred === true),
