@@ -16,6 +16,10 @@ const worldReadyTimeoutMs = Number.isFinite(configuredWorldReadyTimeoutMs) && co
   : process.env.CI ? 480_000 : 240_000;
 const policy = JSON.parse(await fs.readFile(path.join(root, 'config', 'verification-policy.json'), 'utf8'));
 const captureManifest = JSON.parse(await fs.readFile(path.join(root, 'config', 'public-capture-manifest.json'), 'utf8'));
+const firebaseConfig = JSON.parse(await fs.readFile(path.join(root, 'firebase.json'), 'utf8'));
+const localFunctionRoutes = new Set((firebaseConfig.hosting?.rewrites || [])
+  .filter((rewrite) => rewrite?.function && typeof rewrite.source === 'string' && !rewrite.source.includes('*'))
+  .map((rewrite) => rewrite.source));
 const captureByFile = new Map(captureManifest.captures.map((capture) => [capture.file, capture]));
 const requiredGalleryFiles = new Set([
   'assets/landing/current/world-entry-5.0.png',
@@ -37,16 +41,35 @@ const context = await browser.newContext({ viewport: { width: 1440, height: 900 
 const page = await context.newPage();
 const browserErrors = [];
 const localFailures = [];
+const expectedStaticBackendMisses = [];
+
+function isExpectedStaticBackendMiss(resourceUrl) {
+  if (externalUrl || !resourceUrl.startsWith(baseUrl)) return false;
+  return localFunctionRoutes.has(new URL(resourceUrl).pathname);
+}
 
 function attachDiagnostics(targetPage) {
   targetPage.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   targetPage.on('response', (response) => {
     if (response.url().startsWith(baseUrl) && response.status() >= 400) {
+      const pathname = new URL(response.url()).pathname;
+      if (response.status() === 404 && isExpectedStaticBackendMiss(response.url())) {
+        expectedStaticBackendMisses.push({ url: response.url(), route: pathname });
+        return;
+      }
       localFailures.push({ kind: 'response', url: response.url(), status: response.status() });
     }
   });
   targetPage.on('requestfailed', (request) => {
     if (request.url().startsWith(baseUrl)) {
+      if (isExpectedStaticBackendMiss(request.url())) {
+        expectedStaticBackendMisses.push({
+          url: request.url(),
+          route: new URL(request.url()).pathname,
+          reason: request.failure()?.errorText || 'failed'
+        });
+        return;
+      }
       localFailures.push({ kind: 'request', url: request.url(), reason: request.failure()?.errorText || 'failed' });
     }
   });
@@ -220,7 +243,8 @@ async function waitForCompleteWorld() {
   throw new Error(`Complete world did not become ready within ${worldReadyTimeoutMs}ms: ${JSON.stringify({
     latest,
     browserErrors,
-    localFailures
+    localFailures,
+    expectedStaticBackendMisses
   })}`);
 }
 
@@ -466,7 +490,8 @@ try {
       screenshotsWritten: [],
       error: String(error?.stack || error),
       browserErrors,
-      localFailures
+      localFailures,
+      expectedStaticBackendMisses
     };
     await fs.mkdir(path.dirname(reportPath), { recursive: true });
     await fs.writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);

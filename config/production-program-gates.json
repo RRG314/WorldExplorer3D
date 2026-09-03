@@ -93,7 +93,7 @@
       "name": "UI, accessibility, presentation, and release identity",
       "status": "complete",
       "minimumDecision": "Require keyboard and 390x844 touch completion of every retained primary flow, honest public claims, inspected runtime captures, and one immutable 5.2 identity.",
-      "requiredCommands": ["verify:accessibility-release", "verify:mobile-controls", "verify:player-reported-blockers", "verify:connected-explorer-journey", "verify:current-space-journey", "verify:release-claims", "verify:source", "verify:hosting", "verify:release-identity", "release:verify"],
+      "requiredCommands": ["verify:accessibility-release", "verify:mobile-controls", "verify:player-reported-blockers", "verify:connected-explorer-journey", "verify:current-space-journey", "verify:landing-user-count", "verify:analytics-lifecycle", "verify:release-claims", "verify:source", "verify:hosting", "verify:release-identity", "release:verify"],
       "openItems": []
     }
   }
