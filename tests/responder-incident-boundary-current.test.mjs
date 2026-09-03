@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createResponderResponseModel } from '../app/js/urban-sandbox/responder-model.js';
+import { createResponderResponseModel, responderApproachSpeed } from '../app/js/urban-sandbox/responder-model.js';
 
 function activeIncident(eventId = 'incident:1') {
   return {
@@ -52,4 +52,14 @@ test('clearing a completed responder incident cannot replay its arrest outcome',
   const next = holdForResolution(model, 'incident:2');
   assert.equal(next.resolution?.type, 'arrest');
   assert.equal(next.resolution?.eventId, 'incident:2');
+});
+
+test('response vehicles slow to converge instead of orbiting an approach target', () => {
+  const aligned = responderApproachSpeed({ distance: 66, level: 2, stopDistance: 9, headingError: 0 });
+  const crossing = responderApproachSpeed({ distance: 66, level: 2, stopDistance: 9, headingError: Math.PI / 2 });
+  const reversing = responderApproachSpeed({ distance: 66, level: 2, stopDistance: 9, headingError: Math.PI });
+  const stopped = responderApproachSpeed({ distance: 8, level: 2, stopDistance: 9, headingError: 0 });
+  assert.ok(aligned > 20, 'an aligned responder retains useful approach speed');
+  assert.ok(crossing < aligned * .25 && reversing < aligned * .25, 'a misaligned responder slows enough to turn toward the target');
+  assert.equal(stopped, 0);
 });

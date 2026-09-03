@@ -2,14 +2,14 @@ import { ctx as appCtx } from '../shared-context.js?v=55';
 import { carSpeedToMph, mphToCarSpeed } from '../physics/vehicle-speed-units.js?v=2';
 import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleMassKg } from '../engine/vehicle-catalog.js?v=6';
 import { applyTransportDamage } from '../transport/damage-model.js?v=1';
-import { createCivicResponseModel } from './civic-response-model.js?v=2';
+import { createCivicResponseModel } from './civic-response-model.js?v=3';
 import { ensurePlayerBackpackInventory } from './equipment-model.js?v=9';
 import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=21';
 import { createEquipmentVisuals } from './equipment-visuals.js?v=3';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=7';
 import { nearestMappedFacility } from './facility-model.js?v=3';
 import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=4';
-import { createUrbanResponderRuntime } from './responder-runtime.js?v=18';
+import { createUrbanResponderRuntime } from './responder-runtime.js?v=19';
 import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=7';
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=9';
 import { applyConditionImpact } from './impact-model.js?v=1';
@@ -1864,7 +1864,9 @@ function updateCivicResponse(state, dt) {
     const detected = (responderSnapshot?.responders || []).some((responder) =>
       Number(responder.distanceToActor) <= (responder.officer ? 46 : 58)
     );
-    state.civic.update(step, civicActorPosition(state), { detected });
+    const responseEnRoute = Number(responderSnapshot?.activeCount || 0) > 0 &&
+      ['dispatched', 'pursuit', 'searching'].includes(String(responderSnapshot?.phase || ''));
+    state.civic.update(step, civicActorPosition(state), { detected, responseEnRoute });
   }
   state.recklessEventCooldown = Math.max(0, state.recklessEventCooldown - step);
   if (state.activeVehicle?.attachedToPlayer && appCtx.Walk?.state?.mode !== 'walk') {

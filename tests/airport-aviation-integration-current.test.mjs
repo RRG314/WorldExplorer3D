@@ -173,3 +173,21 @@ test('civic response holds pursuit while responders see the actor and searches t
   assert.equal(snapshot.pursuit, false);
   assert.equal(snapshot.status.title, 'Searching last known area');
 });
+
+test('an approaching response receives bounded arrival time without making incidents permanent', () => {
+  const model = createCivicResponseModel();
+  model.observe({ kind: 'assault', severity: 2, position: { x: 4, z: 8 } }, [{ id: 'witness:1', distance: 4 }]);
+  for (let index = 0; index < 25; index += 1) model.update(.25, { x: 4, z: 8 });
+  assert.equal(model.snapshot().phase, 'searching');
+
+  const beforeArrival = model.snapshot().phaseRemaining;
+  for (let index = 0; index < 40; index += 1) {
+    model.update(.25, { x: 4, z: 8 }, { responseEnRoute: true });
+  }
+  const duringArrival = model.snapshot();
+  assert.equal(duringArrival.phase, 'searching');
+  assert.ok(beforeArrival - duringArrival.phaseRemaining < 4, 'active response uses the bounded slow-decay arrival window');
+
+  for (let index = 0; index < 220; index += 1) model.update(.25, { x: 4, z: 8 });
+  assert.equal(model.snapshot().phase, 'clear', 'an abandoned response still reaches clear');
+});

@@ -3,7 +3,7 @@ import { carSpeedToMph } from '../physics/vehicle-speed-units.js?v=2';
 import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleDefinitionById } from '../engine/vehicle-catalog.js?v=6';
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=9';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=7';
-import { createResponderResponseModel, responderAgencyProfile } from './responder-model.js?v=3';
+import { createResponderResponseModel, responderAgencyProfile, responderApproachSpeed } from './responder-model.js?v=4';
 import { vehicleDoorPosition } from './vehicle-model.js?v=7';
 import { applyConditionImpact } from './impact-model.js?v=1';
 import { applyTransportDamage } from '../transport/damage-model.js?v=1';
@@ -14,8 +14,8 @@ import { ENTITY_LIFECYCLE_MS, lifecycleExpired, markLifecycleStart } from '../ru
 const RESPONDER_BASE_Y = VEHICLE_ROOT_TO_GROUND_METERS;
 const RESPONDER_DESPAWN_DISTANCE = 58;
 const OFFICER_CONTACT_DISTANCE = 3.2;
-const OFFICER_DEPLOY_DISTANCE = 48;
-const OFFICER_APPROACH_DISTANCE = 52;
+const OFFICER_DEPLOY_DISTANCE = 75;
+const OFFICER_APPROACH_DISTANCE = 80;
 
 function finite(value, fallback = 0) {
   const number = Number(value);
@@ -290,7 +290,11 @@ function createUrbanResponderRuntime(options = {}) {
       : actorWithinSearch ? actor : civic.searchCenter || actor;
     if (!raw) return responder.origin;
     const road = roadAnchorNear(raw.x, raw.z, raw.y, responder.road);
-    if (road && road.distance <= 36) return road;
+    // Stay on the mapped road even when its nearest endpoint is a block from
+    // the incident. The vehicle stops at that endpoint and the officer covers
+    // the remaining distance on foot; using the raw off-road point here made
+    // road contact pull the moving vehicle back to the endpoint forever.
+    if (road && road.distance <= OFFICER_DEPLOY_DISTANCE) return road;
     return { x: finite(raw.x), z: finite(raw.z), y: surfaceY(raw.x, raw.z, responder.y - RESPONDER_BASE_Y), road: responder.road };
   }
 
@@ -326,12 +330,19 @@ function createUrbanResponderRuntime(options = {}) {
     const dz = target.z - responder.z;
     const distance = Math.hypot(dx, dz);
     const targetYaw = Math.atan2(dx, dz);
+    const headingError = Math.abs(angleDelta(targetYaw, responder.yaw));
     responder.avoidanceRemaining = Math.max(0, finite(responder.avoidanceRemaining) - dt);
     const steeringTargetYaw = targetYaw + (responder.avoidanceRemaining > 0 ? responder.avoidanceSide * .68 : 0);
-    responder.yaw += angleDelta(steeringTargetYaw, responder.yaw) * Math.min(1, dt * 2.8);
+    const steeringRate = 2.8 + Math.min(2.7, headingError * 1.35);
+    responder.yaw += angleDelta(steeringTargetYaw, responder.yaw) * Math.min(1, dt * steeringRate);
     const civicLevel = Math.max(1, Number(civic.level) || 1);
     const stopDistance = returning ? 4 : actorWithinSearch ? 9 : 15;
-    const targetSpeed = distance <= stopDistance ? 0 : Math.min(22 + civicLevel * 2, 7 + distance * .24);
+    const targetSpeed = responderApproachSpeed({
+      distance,
+      level: civicLevel,
+      stopDistance,
+      headingError
+    });
     const acceleration = targetSpeed > responder.speed ? 7.5 : 11;
     responder.speed += Math.sign(targetSpeed - responder.speed) * Math.min(Math.abs(targetSpeed - responder.speed), acceleration * dt);
     const vehicleBlockers = [
@@ -538,6 +549,12 @@ function createUrbanResponderRuntime(options = {}) {
         yaw: Number(responder.yaw.toFixed(4)),
         speed: Number(responder.speed.toFixed(2)),
         distanceToActor: actor ? Number(Math.hypot(responder.x - finite(actor.x), responder.z - finite(actor.z)).toFixed(2)) : null,
+        navigationTarget: responder.navigationTarget ? Object.freeze({
+          x: Number(responder.navigationTarget.x.toFixed(2)),
+          z: Number(responder.navigationTarget.z.toFixed(2)),
+          distance: Number(Math.hypot(responder.navigationTarget.x - responder.x, responder.navigationTarget.z - responder.z).toFixed(2)),
+          roadBound: !!responder.navigationTarget.road
+        }) : null,
         officer: responder.officer ? Object.freeze({
           id: responder.officer.id,
           x: Number(responder.officer.x.toFixed(2)),

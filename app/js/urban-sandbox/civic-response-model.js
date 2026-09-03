@@ -3,6 +3,7 @@ const PHASE_DURATION = Object.freeze({
   reporting: 3.6,
   cooling: 8
 });
+const ACTIVE_RESPONSE_DECAY_RATE = .35;
 
 function clamp(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, Number(value) || 0));
@@ -109,6 +110,12 @@ function createCivicResponseModel(options = {}) {
       if (state.unseenSeconds >= 1.5) state.pursuit = false;
     }
     let decay = step;
+    // A dispatched unit owns an active search, so its arrival must not race the
+    // unattended-incident timer. The reduced rate remains bounded: if the unit
+    // never reaches or detects the actor, the incident still cools naturally.
+    if (state.phase === 'searching' && !state.pursuit && awareness.responseEnRoute === true) {
+      decay *= ACTIVE_RESPONSE_DECAY_RATE;
+    }
     if (state.phase === 'searching' && !state.pursuit && distanceFromSearch(actorPosition) > searchRadius()) decay *= 1.65;
     state.phaseRemaining = Math.max(0, state.phaseRemaining - decay);
     if (state.phaseRemaining > 0) return snapshot();
@@ -189,4 +196,4 @@ function createCivicResponseModel(options = {}) {
   return Object.freeze({ agency, clear, observe, snapshot, status, update });
 }
 
-export { PHASE_DURATION, civicAgencyForLocation, createCivicResponseModel, eventLabel };
+export { ACTIVE_RESPONSE_DECAY_RATE, PHASE_DURATION, civicAgencyForLocation, createCivicResponseModel, eventLabel };
