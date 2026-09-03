@@ -15,6 +15,7 @@ import {
 import { SPACE_CONSTANTS } from '../space/constants.js?v=3';
 import { initDestinationMissionRuntime, updateDestinationMissionRuntime } from './mission-runtime.js?v=7';
 import { createUniverseSky, setUniverseSkyFrame, updateUniverseSky } from './sky-field.js?v=6';
+import { releaseGaiaSkyLayers } from '../sky/gaia-catalog.js?v=4';
 import {
   createUniverseFrameVisual,
   getUniverseDestinationMesh,
@@ -121,6 +122,53 @@ function disposeActiveFrame() {
   universeRuntime.frameGroup = null;
   universeRuntime.encounter = null;
   universeRuntime.galaxyEntry = null;
+}
+
+function releaseUniverseRuntimeScene(scene = universeRuntime.scene, options = {}) {
+  if (scene && universeRuntime.scene && scene !== universeRuntime.scene) return false;
+  if (options.disposeObjects === true) {
+    const ownedRoots = new Set([
+      universeRuntime.frameGroup,
+      universeRuntime.transitGroup,
+      universeRuntime.wormholeGroup,
+      universeRuntime.sky?.group,
+      universeRuntime.deepSky?.group
+    ].filter(Boolean));
+    ownedRoots.forEach((root) => {
+      root.parent?.remove?.(root);
+      disposeThreeObjectTree(root);
+      root.clear?.();
+    });
+  }
+  missionScanEffects.length = 0;
+  if (universeRuntime.sky) {
+    universeRuntime.sky.disposed = true;
+    releaseGaiaSkyLayers(universeRuntime.sky.gaiaSky);
+  }
+  if (universeRuntime.deepSky) {
+    universeRuntime.deepSky.sprites = [];
+    universeRuntime.deepSky.currentEntity = null;
+  }
+  Object.assign(universeRuntime, {
+    initialized: false,
+    scene: null,
+    frameGroup: null,
+    transitGroup: null,
+    wormholeGroup: null,
+    sky: null,
+    deepSky: null,
+    current: resolveUniverseAddress('sol'),
+    selected: resolveUniverseAddress('sol'),
+    course: null,
+    transition: null,
+    pendingEarthReturn: false,
+    elapsedSeconds: 0,
+    encounter: null,
+    captureRecoveryAt: 0,
+    galaxyEntry: null
+  });
+  universeRuntime.canonicalFrameOffset.set(0, 0, 0);
+  return true;
 }
 
 function playDestinationMissionScan(destinationId, operation = 'survey') {
@@ -816,7 +864,9 @@ function updateUniverseRuntime(frameSeconds = 1 / 60) {
 function initUniverseRuntime(scene) {
   if (!scene) return null;
   if (universeRuntime.scene !== scene) {
-    disposeActiveFrame();
+    if (universeRuntime.scene) {
+      releaseUniverseRuntimeScene(universeRuntime.scene, { disposeObjects: true });
+    }
     universeRuntime.scene = scene;
     universeRuntime.transitGroup = createTransitVisual(scene);
     universeRuntime.wormholeGroup = createWormholeVisual(scene);
@@ -863,6 +913,7 @@ Object.assign(appCtx, {
   hideUniverseUI,
   initUniverseRuntime,
   playDestinationMissionScan,
+  releaseUniverseRuntimeScene,
   returnToEarthFromUniverse,
   returnUniverseToSol,
   returnUniverseToSolImmediate,
@@ -881,6 +932,7 @@ export {
   getUniverseGravityBodies,
   hideUniverseUI,
   initUniverseRuntime,
+  releaseUniverseRuntimeScene,
   returnToEarthFromUniverse,
   returnUniverseToSol,
   returnUniverseToSolImmediate,

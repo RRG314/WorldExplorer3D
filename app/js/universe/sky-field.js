@@ -12,7 +12,7 @@ function observerCartesian(entity) {
 }
 
 function rebuildGaiaGeometry(state) {
-  if (!state.gaiaSky.stars.length || !state.currentEntity) return;
+  if (state?.disposed || state?.gaiaSky?.disposed || !state.gaiaSky.stars.length || !state.currentEntity) return;
   const observer = observerCartesian(state.currentEntity);
   rebuildGaiaSkyLayers(state.gaiaSky, observer);
 }
@@ -34,7 +34,8 @@ function createUniverseSky(scene) {
     group,
     gaiaSky,
     currentEntity: null,
-    loadPromise: gaiaSky.ready
+    loadPromise: gaiaSky.ready,
+    disposed: false
   };
   state.loadPromise.then(() => rebuildGaiaGeometry(state));
   return state;

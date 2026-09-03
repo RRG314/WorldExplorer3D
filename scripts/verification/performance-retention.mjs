@@ -9,6 +9,8 @@ const budgets = JSON.parse(await readFile(`${root}/config/performance-budgets.js
 const server = await startStaticServer({ rootDir: verifyRoot, ports: [4421, 4422, 4423] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const requestedProfile = String(process.env.WE3D_VERIFY_PROFILE || 'all').trim().toLowerCase();
+assert.ok(['all', 'desktop', 'mobile'].includes(requestedProfile), `Unsupported WE3D_VERIFY_PROFILE: ${requestedProfile}`);
 
 const percentile = (values, portion) => {
   const ordered = [...values].sort((a, b) => a - b);
@@ -121,8 +123,9 @@ async function launchWorld(client) {
 }
 
 async function selectMode(page, expected, selector) {
-  await page.locator('#exploreBtn').click();
-  await page.waitForSelector('#exploreMenu.open', { timeout: 10_000 });
+  await page.locator('#travelBtn').click();
+  await page.waitForSelector('#travelMenu.open', { timeout: 10_000 });
+  assert.equal(await page.locator(selector).isVisible(), true, `${selector} is not a visible Travel action.`);
   await page.locator(selector).click();
   await page.waitForFunction((mode) => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.mode === mode, expected, { timeout: 20_000 });
   await page.waitForTimeout(1_200);
@@ -137,12 +140,23 @@ async function measureMode(client, id, sampleMs = 5_000) {
       if (now > previous) deltas.push(now - previous);
       previous = now;
       if (now - startedAt < durationMs) requestAnimationFrame(frame);
-      else resolve({ deltas, diagnostics: globalThis.getWorldExplorerRuntimeDiagnostics?.() || {} });
+      else {
+        const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
+        resolve({
+          deltas,
+          diagnostics: {
+            renderer: diagnostics.renderer || {},
+            worldCounts: diagnostics.worldCounts || null
+          }
+        });
+      }
     };
     requestAnimationFrame(frame);
   }), sampleMs);
   const deltas = raw.deltas.filter((value) => Number.isFinite(value) && value > 0);
   const averageFrameMs = deltas.reduce((sum, value) => sum + value, 0) / Math.max(1, deltas.length);
+  const rawJsHeapUsedBytes = await heapUsedBytes(client.cdp);
+  const jsHeapUsedBytes = await heapUsedBytes(client.cdp, true);
   return {
     id,
     sampleMs,
@@ -157,7 +171,8 @@ async function measureMode(client, id, sampleMs = 5_000) {
     programs: Number(raw.diagnostics.renderer?.programs || 0),
     geometries: Number(raw.diagnostics.renderer?.geometries || 0),
     textures: Number(raw.diagnostics.renderer?.textures || 0),
-    jsHeapUsedBytes: await heapUsedBytes(client.cdp),
+    rawJsHeapUsedBytes,
+    jsHeapUsedBytes,
     worldCounts: raw.diagnostics.worldCounts || null
   };
 }
@@ -274,10 +289,24 @@ async function runMobileRegression() {
 }
 
 try {
-  const desktop = await runDesktop();
-  const mobileRegression = await runMobileRegression();
+  await mkdir('output/verification/performance-retention', { recursive: true });
+  let desktop = null;
+  let mobileRegression = null;
+  if (requestedProfile !== 'mobile') {
+    console.log('[performance-retention] starting desktop');
+    desktop = await runDesktop();
+    await writeFile('output/verification/performance-retention/report-desktop.json', `${JSON.stringify(desktop, null, 2)}\n`);
+    console.log('[performance-retention] desktop complete');
+  }
+  if (requestedProfile !== 'desktop') {
+    console.log('[performance-retention] starting mobile');
+    mobileRegression = await runMobileRegression();
+    await writeFile('output/verification/performance-retention/report-mobile.json', `${JSON.stringify(mobileRegression, null, 2)}\n`);
+    console.log('[performance-retention] mobile complete');
+  }
+  const selectedReports = [desktop, mobileRegression].filter(Boolean);
   const report = {
-    ok: desktop.ok && mobileRegression.ok,
+    ok: selectedReports.every((entry) => entry.ok),
     contract: 'world-explorer-minimum-5-performance-retention-v1',
     generatedAt: new Date().toISOString(),
     baseUrl,
@@ -293,7 +322,6 @@ try {
       reason: 'No physical phone is connected; touch emulation is not presented as device evidence.'
     }
   };
-  await mkdir('output/verification/performance-retention', { recursive: true });
   await writeFile('output/verification/performance-retention/report.json', `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify(report, null, 2));
   assert.equal(report.ok, true, 'Minimum-5 desktop/mobile-regression performance or retention budget failed.');

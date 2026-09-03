@@ -152,6 +152,31 @@ try {
   assert.equal(mobileLayout.overlaps, false, JSON.stringify(mobileLayout));
   await page.screenshot({ path: path.join(evidenceDir, '04-space-journey-mobile.png') });
 
+  const cleanup = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    ctx.exitSpaceFlight?.('space-lifecycle-verification');
+    return {
+      active: ctx.spaceFlight?.active === true,
+      rendererRetained: ctx.spaceFlight?.renderer != null,
+      sceneRetained: ctx.spaceFlight?.scene != null,
+      celestialCatalogRetained: ctx.spaceFlight?.celestialCatalog != null,
+      universeSceneRetained: ctx.universeRuntime?.scene != null,
+      universeSkyRetained: ctx.universeRuntime?.sky != null,
+      universeDeepSkyRetained: ctx.universeRuntime?.deepSky != null,
+      universeFrameRetained: ctx.universeRuntime?.frameGroup != null
+    };
+  });
+  assert.deepEqual(cleanup, {
+    active: false,
+    rendererRetained: false,
+    sceneRetained: false,
+    celestialCatalogRetained: false,
+    universeSceneRetained: false,
+    universeSkyRetained: false,
+    universeDeepSkyRetained: false,
+    universeFrameRetained: false
+  });
+
   const report = {
     ok: browserErrors.length === 0 && failedLocalResources.length === 0,
     checks: {
@@ -164,6 +189,7 @@ try {
       journeyOpensWayfinder: true,
       selectedCourseChangesJourney: true,
       mobileJourneyClearsFlightHud: mobileLayout.overlaps === false,
+      spaceResourcesReleasedOnExit: Object.values(cleanup).every((value) => value === false),
       naturalPlayerLanguage: !/authority|schema|pipeline|scaffold|procedural|generated/i.test(`${initialCopy} ${activeCopy}`),
       noBrowserErrors: browserErrors.length === 0,
       noFailedLocalResources: failedLocalResources.length === 0

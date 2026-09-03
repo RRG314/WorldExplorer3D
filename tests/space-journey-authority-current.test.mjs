@@ -354,7 +354,7 @@ test('rendered journey controller makes the mesh a presentation of fuel-accounte
   assert.equal(appContext.spaceFlight.manualFlightRate, 100);
 });
 
-test('classic manual flight can take presentation ownership without a second position authority', () => {
+test('manual input cancels assist without creating a second position authority', () => {
   const position = (x, y, z) => ({
     x, y, z,
     set(nx, ny, nz) { this.x = nx; this.y = ny; this.z = nz; }
@@ -374,13 +374,17 @@ test('classic manual flight can take presentation ownership without a second pos
   });
   const scenePosition = { ...appContext.spaceFlight.rocket.position };
 
-  assert.equal(runtime.releaseRenderedJourneyToManualFlight(), true);
-  assert.equal(appContext.spaceFlight.presentationAuthority, 'classic');
-  assert.equal(appContext.spaceJourney, null);
-  assert.equal(appContext.spacecraftState, null);
-  assert.equal(appContext.spaceJourneyEphemeris, null);
-  assert.deepEqual(appContext.spaceFlight.rocket.position, scenePosition);
-  assert.equal(runtime.updateRenderedSpaceJourney({ realDtS: 0.1, throttle: 1 }), false);
+  assert.equal(runtime.updateRenderedSpaceJourney({
+    realDtS: 0.1,
+    throttle: 1,
+    thrustDirection: { x: 1, y: 0, z: 0 },
+    manualControl: true
+  }), true);
+  assert.equal(appContext.spaceFlight.presentationAuthority, 'si');
+  assert.ok(appContext.spaceJourney, 'manual takeover must preserve the active journey');
+  assert.ok(appContext.spacecraftState, 'manual takeover must preserve the authoritative spacecraft state');
+  assert.ok(appContext.spaceJourneyEphemeris, 'manual takeover must preserve the journey frame');
+  assert.notDeepEqual(appContext.spaceFlight.rocket.position, scenePosition);
 });
 
 test('rendered journey follows live body positions without changing physical spacecraft state', () => {

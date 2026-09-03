@@ -427,7 +427,7 @@ function ensureStylesheet() {
   const link = document.createElement('link');
   link.id = 'expeditionStyles';
   link.rel = 'stylesheet';
-  link.href = 'styles/expedition.css?v=8';
+  link.href = '/app/styles/expedition.css?v=8';
   document.head.appendChild(link);
 }
 

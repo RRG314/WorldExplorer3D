@@ -60,8 +60,8 @@ async function switchToWalking(page) {
     globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.mode === 'walk'
   );
   if (!alreadyWalking) {
-    await page.locator('#exploreBtn').click();
-    await page.waitForSelector('#exploreMenu.open', { timeout: 10_000 });
+    await page.locator('#travelBtn').click();
+    await page.waitForSelector('#travelMenu.open', { timeout: 10_000 });
     await page.locator('#fWalk').click();
   }
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.mode === 'walk', null, { timeout: 20_000 });
@@ -70,11 +70,12 @@ async function switchToWalking(page) {
 }
 
 async function switchTravelMode(page, selector, expectedMode, controlClass) {
-  const menuOpen = await page.locator('#exploreMenu').evaluate((menu) => menu.classList.contains('open'));
+  const menuOpen = await page.locator('#travelMenu').evaluate((menu) => menu.classList.contains('open'));
   if (!menuOpen) {
-    await page.locator('#exploreBtn').click();
-    await page.waitForSelector('#exploreMenu.open', { timeout: 10_000 });
+    await page.locator('#travelBtn').click();
+    await page.waitForSelector('#travelMenu.open', { timeout: 10_000 });
   }
+  assert.equal(await page.locator(selector).isVisible(), true, `${selector} is not a visible Travel action.`);
   await page.locator(selector).click();
   await page.waitForFunction((mode) => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.mode === mode, expectedMode, { timeout: 20_000 });
   await page.waitForSelector(`#mobileTouchControls.show.${controlClass}`, { timeout: 10_000 });
@@ -309,7 +310,7 @@ try {
       horizontalDistance(driveMove.before.activeActor?.position, driveMove.held.diagnostics?.activeActor?.position) > 0.15,
     droneSeparatesSpeedAndHeight: droneMove.held.hud.unit === 'MPH' && droneMove.held.hud.secondaryLabel === 'HEIGHT' &&
       /m$/.test(droneMove.held.hud.secondary) && droneMove.held.hud.speed > 0 && droneMove.held.hud.speed < 160,
-    planeSpeedUsesMph: planeMove.held.hud.unit === 'MPH' && planeMove.held.hud.secondaryLabel === 'ALT' &&
+    planeSpeedUsesKnots: planeMove.held.hud.unit === 'KTS' && planeMove.held.hud.secondaryLabel === 'ALT' &&
       planeMove.held.hud.speed > 0 && planeMove.held.hud.speed < 500,
     oceanSpeedUsesKnots: oceanMove.held.hud.unit === 'KTS' && oceanMove.held.hud.secondaryLabel === 'DEPTH' &&
       /m$/.test(oceanMove.held.hud.secondary) && oceanMove.held.hud.speed > 0 && oceanMove.held.hud.speed < 100,

@@ -7,7 +7,8 @@ import {
 import { SPACE_CONSTANTS } from "./constants.js?v=3";
 import { PLANETARY_BODIES, configureColorTexture } from "../planetary/catalog.js?v=1";
 import { createSpaceCelestialCatalog } from "./celestial-catalog.js?v=5";
-import { initUniverseRuntime } from "../universe/runtime.js?v=33";
+import { initUniverseRuntime, releaseUniverseRuntimeScene } from "../universe/runtime.js?v=33";
+import { releaseGaiaSkyLayers } from '../sky/gaia-catalog.js?v=4';
 import { createExpeditionSpacecraftMesh } from "./expedition-spacecraft-mesh.js?v=4";
 import { createExpeditionPodMesh } from './expedition-pod-mesh.js?v=3';
 import { createSolisReachExteriorMesh } from './solis-reach-exterior-mesh.js?v=1';
@@ -470,9 +471,13 @@ export function resetSpaceFlightForMars() {
 }
 
 export function destroySpaceFlightScene() {
+  const scene = appCtx.spaceFlight.scene;
   appCtx.resetSolarSystemRuntime?.();
-  if (appCtx.spaceFlight.scene) {
-    disposeThreeObjectTree(appCtx.spaceFlight.scene);
+  releaseUniverseRuntimeScene(scene);
+  releaseGaiaSkyLayers(appCtx.spaceFlight.celestialCatalog?.gaiaSky);
+  if (scene) {
+    disposeThreeObjectTree(scene);
+    scene.clear();
   }
   appCtx.spaceFlight.renderer?.info?.reset?.();
   appCtx.spaceFlight.renderer?.clear?.();
@@ -484,4 +489,5 @@ export function destroySpaceFlightScene() {
   appCtx.spaceFlight.earth = null;
   appCtx.spaceFlight.moon = null;
   appCtx.spaceFlight.solisReachDockTarget = null;
+  appCtx.spaceFlight.celestialCatalog = null;
 }
