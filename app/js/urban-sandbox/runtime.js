@@ -9,7 +9,7 @@ import { createEquipmentVisuals } from './equipment-visuals.js?v=3';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=7';
 import { nearestMappedFacility } from './facility-model.js?v=3';
 import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=4';
-import { createUrbanResponderRuntime } from './responder-runtime.js?v=17';
+import { createUrbanResponderRuntime } from './responder-runtime.js?v=18';
 import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=7';
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=9';
 import { applyConditionImpact } from './impact-model.js?v=1';
@@ -589,7 +589,7 @@ function resolveUrbanActorCollision(from = {}, to = {}, options = {}) {
         showCrashFeedback(state, response.severity);
         setStatus(state, `${response.severity === 'minor' ? 'Impact' : 'Crash'} · ${Math.round(response.closingMph)} mph closing speed`, 1800);
         reportCivicEvent(state, {
-          kind: 'vehicle_collision',
+          kind: 'collision',
           severity: response.severity === 'severe' ? 3 : response.severity === 'major' ? 2 : 1,
           radius: 38,
           audibleRadius: 24,

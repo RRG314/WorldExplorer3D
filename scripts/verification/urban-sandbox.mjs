@@ -603,6 +603,14 @@ async function runArrestRecoveryJourney() {
     const witnessedResponse = await triggerWitnessedAssaultResponse(page);
     await page.waitForFunction(() => Number(globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.responders?.activeCount || 0) > 0, null, { timeout: 45_000 });
     const responderArrived = await meetResponderUntilOfficer(page);
+    if (!responderArrived.urbanSandbox?.responders?.responders?.some((entry) => !!entry.officer)) {
+      console.error('CP5 arrest responder arrival evidence', JSON.stringify({
+        activeActor: responderArrived.activeActor,
+        civicResponse: responderArrived.urbanSandbox?.civicResponse,
+        responders: responderArrived.urbanSandbox?.responders,
+        trace: responderArrived.__responderMeetTrace
+      }, null, 2));
+    }
     assert.ok(responderArrived.urbanSandbox?.responders?.responders?.some((entry) => !!entry.officer), 'Normal walking input could not meet a dispatched responder.');
     const custody = await chaseOfficerUntilCustody(page);
     if (custody.urbanSandbox?.custody?.type !== 'police') {

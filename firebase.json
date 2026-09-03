@@ -167,6 +167,22 @@
         "function": "commitUrbanImpacts"
       },
       {
+        "source": "/commitWorldPropertyAction",
+        "function": "commitWorldPropertyAction"
+      },
+      {
+        "source": "/commitUrbanCivicEvent",
+        "function": "commitUrbanCivicEvent"
+      },
+      {
+        "source": "/resolveUrbanCivicOutcome",
+        "function": "resolveUrbanCivicOutcome"
+      },
+      {
+        "source": "/mutateSharedExpedition",
+        "function": "mutateSharedExpedition"
+      },
+      {
         "source": "/submitContribution",
         "function": "submitContribution"
       },

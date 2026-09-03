@@ -14,6 +14,8 @@ import { ENTITY_LIFECYCLE_MS, lifecycleExpired, markLifecycleStart } from '../ru
 const RESPONDER_BASE_Y = VEHICLE_ROOT_TO_GROUND_METERS;
 const RESPONDER_DESPAWN_DISTANCE = 58;
 const OFFICER_CONTACT_DISTANCE = 3.2;
+const OFFICER_DEPLOY_DISTANCE = 48;
+const OFFICER_APPROACH_DISTANCE = 52;
 
 function finite(value, fallback = 0) {
   const number = Number(value);
@@ -213,7 +215,10 @@ function createUrbanResponderRuntime(options = {}) {
 
   function updateOfficer(responder, dt, civic, actor, returning) {
     const distanceToActor = actor ? Math.hypot(responder.x - finite(actor.x), responder.z - finite(actor.z)) : Infinity;
-    if (!responder.officer && !returning && responder.speed <= 2.8 && distanceToActor <= 18) spawnOfficer(responder);
+    // A mapped road can legitimately end tens of metres from the reported
+    // location. Once the response vehicle stops, continue the approach on
+    // foot instead of leaving the unit parked indefinitely on that road.
+    if (!responder.officer && !returning && responder.speed <= 2.8 && distanceToActor <= OFFICER_DEPLOY_DISTANCE) spawnOfficer(responder);
     const officer = responder.officer;
     if (!officer) return;
     if (Number(officer.condition ?? 1) <= .05) {
@@ -244,7 +249,7 @@ function createUrbanResponderRuntime(options = {}) {
     const dz = finite(actor?.z) - officer.z;
     const distance = Math.hypot(dx, dz);
     officer.yaw = Math.atan2(dx, dz);
-    if (!returning && distance > OFFICER_CONTACT_DISTANCE && distance < 34) {
+    if (!returning && distance > OFFICER_CONTACT_DISTANCE && distance < OFFICER_APPROACH_DISTANCE) {
       const speed = Math.min(3.2, Math.max(0, distance - OFFICER_CONTACT_DISTANCE + .35) * .9);
       officer.x += Math.sin(officer.yaw) * speed * dt;
       officer.z += Math.cos(officer.yaw) * speed * dt;
