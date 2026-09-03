@@ -141,10 +141,18 @@ function normalizedVerticalControl(control) {
 
 function createSharedSurfaceBinding(control, matchedRoads) {
   const horizontal = normalizedHorizontalControl(control);
-  if (!horizontal || matchedRoads.length !== horizontal.requiredDirectionalMembers) return null;
-  const centerline = compileHorizontalCenterline(matchedRoads);
+  if (!horizontal || matchedRoads.length < horizontal.requiredDirectionalMembers) return null;
+  // OSM can split one directional carriageway into a short continuation way.
+  // Vertical control applies to every matching segment, but the shared
+  // physical deck must bind the two complete opposing carriageways rather
+  // than disappear because a third short segment also matched by name.
+  const directionalMembers = [...matchedRoads]
+    .sort((left, right) =>
+      polylineMetrics(right.pts).total - polylineMetrics(left.pts).total)
+    .slice(0, horizontal.requiredDirectionalMembers);
+  const centerline = compileHorizontalCenterline(directionalMembers);
   if (centerline.length < 2) return null;
-  const memberFeatureIds = Object.freeze(matchedRoads.map((road) => String(road.sourceFeatureId || '')));
+  const memberFeatureIds = Object.freeze(directionalMembers.map((road) => String(road.sourceFeatureId || '')));
   return Object.freeze({
     id: `shared-transport-surface:${String(control.id || '')}`,
     controlId: String(control.id || ''),

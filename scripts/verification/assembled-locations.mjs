@@ -38,7 +38,9 @@ const regressionLocations = [
   ...allLocations,
   // Exact player-reported regression anchor. Keep it opt-in so the ordinary
   // worldwide matrix does not repeat a second Tokyo-area load on every run.
-  { id: 'suginami', name: 'Suginami, Tokyo, Japan', lat: 35.6966, lon: 139.6235, class: 'urban-partial-provider', driveOnLeft: true }
+  { id: 'suginami', name: 'Suginami, Tokyo, Japan', lat: 35.6966, lon: 139.6235, class: 'urban-partial-provider', driveOnLeft: true },
+  { id: 'baltimore-camden', name: 'Baltimore, Maryland, United States', lat: 39.2802, lon: -76.6198, class: 'urban-road-coverage', driveOnLeft: false },
+  { id: 'chiyoda', name: 'Chiyoda, Tokyo, Japan', lat: 35.6814, lon: 139.7650, class: 'dense-urban-terrain', driveOnLeft: true }
 ];
 const requestedLocations = new Set(String(process.env.WE3D_VERIFY_LOCATIONS || '')
   .split(',').map((value) => value.trim()).filter(Boolean));
@@ -114,6 +116,16 @@ try {
           diagnostics.livingWorld?.active === true && diagnostics.urbanSandbox?.active === true;
       }, null, { timeout: 360000 });
       await page.waitForTimeout(3000);
+      if (capture && ['baltimore-camden', 'chiyoda'].includes(location.id)) {
+        const timeButton = page.locator('#quickTimeOfDay');
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          const label = await timeButton.getAttribute('aria-label').catch(() => '');
+          if (/Current:\s*Day/i.test(String(label))) break;
+          await timeButton.click();
+          await page.waitForTimeout(120);
+        }
+        await page.waitForTimeout(400);
+      }
 
       const snapshot = await page.evaluate(() => {
         const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
@@ -134,7 +146,10 @@ try {
           farTerrainClipmap: diagnostics.farTerrainClipmap || null,
           livingWorld: diagnostics.livingWorld || null,
           urbanSandbox: diagnostics.urbanSandbox || null,
+          transportFacilities: diagnostics.transportFacilities || null,
           surfaceChain: diagnostics.surfaceChain || null,
+          worldSurfaceProfile: diagnostics.worldSurfaceProfile || null,
+          denseSettlementGround: diagnostics.denseSettlementGround || null,
           worldLoad: {
             providers: diagnostics.worldLoad?.session?.providers || {},
             regionalStructures: diagnostics.worldLoad?.regionalStructures || null,
@@ -243,7 +258,11 @@ try {
           snapshot.generalizedEndpointIntegrity?.authority ===
             'compiled-generalized-structure-endpoints' &&
           Number(snapshot.generalizedEndpointIntegrity?.unsupportedOpenBoundaryCount || 0) === 0,
-        compiledRoadGradesWithinDesignBounds: Number(snapshot.transportGradeProfile?.violationCount || 0) === 0,
+        compiledRoadGradesWithinDesignBounds:
+          Number(snapshot.transportGradeProfile?.violationCount || 0) === 0 &&
+          snapshot.transportGradeProfile?.localAtGradePlausibility?.authority ===
+            'active-district-driveable-road-plausibility' &&
+          Number(snapshot.transportGradeProfile?.localAtGradePlausibility?.violationCount || 0) === 0,
         solidRoadSurfaceFootprints:
           snapshot.roadSurfaceIntegrity?.authority ===
             'solid-at-grade-segments-and-bounded-turn-joins' &&
@@ -273,6 +292,8 @@ try {
           snapshot.atGradeTerrainAuthority?.terrainSeamAuthority ===
             'one-shared-world-height-per-terrain-edge-coordinate' &&
           Number(snapshot.atGradeTerrainAuthority?.sharedTerrainEdgeVertices || 0) > 0,
+        boundedAtGradeTerrainDeformation:
+          Number(snapshot.atGradeTerrainAuthority?.maximumTerrainDelta || 0) <= 0.651,
         publishedBridgeElevationControlResolved: location.id !== 'golden-gate' || (
           snapshot.publishedVerticalControls.length === 2 &&
           snapshot.publishedVerticalControls.every((control) =>
@@ -298,7 +319,7 @@ try {
             ),
         bridgeLandmarkReadsCompiledSurface: location.id !== 'golden-gate' || (
           snapshot.mappedLandmarks?.suspensionBridge?.status === 'published_from_compiled_transport_surface' &&
-          Number(snapshot.mappedLandmarks?.suspensionBridge?.controlledRoads || 0) === 2 &&
+          Number(snapshot.mappedLandmarks?.suspensionBridge?.controlledRoads || 0) >= 2 &&
           Number(snapshot.mappedLandmarks?.suspensionBridge?.towers || 0) === 2 &&
           Number(snapshot.mappedLandmarks?.suspensionBridge?.cables || 0) === 2 &&
           Number(snapshot.mappedLandmarks?.suspensionBridge?.girders || 0) === 2 &&
@@ -318,7 +339,12 @@ try {
             snapshot.worldLoad?.transportProviderDecision?.optionalExactProvider === 'osm-overpass' &&
             snapshot.worldLoad?.transportProviderDecision?.optionalExactUnavailable === true &&
             snapshot.worldLoad?.transportProviderDecision?.exactTransportLoaded === false &&
-            snapshot.worldLoad?.transportProviderDecision?.selected === 'shortbread-vector' &&
+            snapshot.worldLoad?.transportProviderDecision?.selected ===
+              'shortbread-vector-z14-core+z13-regional' &&
+            snapshot.worldLoad?.transportProviderDecision?.generalizedCoreTransportLoaded === true &&
+            snapshot.worldLoad?.regionalTransport?.coreSource === 'shortbread-vector-z14' &&
+            Number(snapshot.worldLoad?.regionalTransport?.coreRoads || 0) > 0 &&
+            Number(snapshot.worldLoad?.regionalTransport?.coreTiles?.zoom || 0) === 14 &&
             Number(snapshot.worldLoad?.providers?.['openstreetmap-shortbread']?.completed || 0) > 0 &&
             Number(snapshot.worldLoad?.providers?.['osm-overpass']?.failed || 0) > 0
           )
@@ -336,7 +362,12 @@ try {
               ) || (
                 snapshot.worldLoad?.transportProviderDecision?.exactTransportLoaded === false &&
                 snapshot.worldLoad?.transportProviderDecision?.optionalExactUnavailable === true &&
-                snapshot.worldLoad?.transportProviderDecision?.selected === 'shortbread-vector' &&
+                snapshot.worldLoad?.transportProviderDecision?.selected ===
+                  'shortbread-vector-z14-core+z13-regional' &&
+                snapshot.worldLoad?.transportProviderDecision?.generalizedCoreTransportLoaded === true &&
+                snapshot.worldLoad?.regionalTransport?.coreSource === 'shortbread-vector-z14' &&
+                Number(snapshot.worldLoad?.regionalTransport?.coreRoads || 0) > 0 &&
+                Number(snapshot.worldLoad?.regionalTransport?.coreTiles?.zoom || 0) === 14 &&
                 Number(snapshot.worldLoad?.providers?.['osm-overpass']?.failed || 0) > 0
               )
             )

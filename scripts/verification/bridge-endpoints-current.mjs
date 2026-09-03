@@ -88,7 +88,8 @@ try {
     earthWalkingGameplay:
       snapshot.environment === 'EARTH' && snapshot.activeActor?.mode === 'walk',
     worldwideFallbackSelected:
-      snapshot.provider?.selected === 'shortbread-vector' &&
+      snapshot.provider?.selected === 'shortbread-vector-z14-core+z13-regional' &&
+      snapshot.provider?.generalizedCoreTransportLoaded === true &&
       snapshot.provider?.exactTransportLoaded === false,
     generalizedConnectionsExpanded:
       Number(snapshot.transportNetwork?.generalizedExpandedEndpointConnections || 0) > 0,

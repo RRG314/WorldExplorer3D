@@ -278,7 +278,9 @@ function createSurfaceQuery(appCtx, GroundHeight) {
   const units = () => Math.max(0.000001, finiteOr(appCtx.METERS_PER_WORLD_UNIT, 1));
   const traversalBounds = () => earthTraversalBounds(profile(), appCtx);
   const airportSurfaceYAt = (x, z) => {
-    const y = Number(appCtx.transportFacilityVisual?.surfaceYAt?.(Number(x), Number(z)));
+    const sample = appCtx.transportFacilityVisual?.surfaceYAt?.(Number(x), Number(z));
+    if (sample === null || sample === undefined || sample === '') return null;
+    const y = Number(sample);
     return Number.isFinite(y) ? y : null;
   };
   const airportSurfaceProvenance = Object.freeze({

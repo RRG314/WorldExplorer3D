@@ -1,4 +1,4 @@
-import { pruneSupersededGeneralizedStructures } from '../fixed-regional-structures.js?v=15';
+import { pruneSupersededGeneralizedStructures } from '../fixed-regional-structures.js?v=16';
 
 const WAY_COLLECTION_KEYS = Object.freeze([
   'roadWays',
@@ -34,6 +34,11 @@ function isReviewedBridgeSpan(way) {
   return way?.tags?._fixedRegionalStructure === 'exact' &&
     mappedTagIsPresent(way?.tags?.bridge) &&
     Array.isArray(way?.nodes) && way.nodes.length >= 2;
+}
+
+function isBundledReviewedBridgeSpan(way) {
+  return isReviewedBridgeSpan(way) &&
+    way?.tags?._reviewedStructureAuthority === 'bundled-landmark-pack';
 }
 
 export function filterSelectionToAcceptedGround(
@@ -86,6 +91,13 @@ export function filterSelectionToAcceptedGround(
       // does not apply to generalized roads, tunnels, or a bridge with an
       // unsupported endpoint.
       if (isReviewedBridgeSpan(way)) {
+        // A versioned landmark pack can contain a complete suspended span
+        // whose OSM way endpoints are both over water (or at an internal way
+        // split). Its reviewed vertical-control record, not a terrain sample,
+        // owns that deck. Requiring land at every constituent way endpoint
+        // silently discarded the exact Golden Gate carriageways whenever the
+        // optional live provider was unavailable.
+        if (isBundledReviewedBridgeSpan(way)) return true;
         return acceptsRegionalNode(way.nodes[0]) &&
           acceptsRegionalNode(way.nodes[way.nodes.length - 1]);
       }

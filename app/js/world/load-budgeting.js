@@ -40,6 +40,10 @@ function mappedTagIsPresent(value) {
   return normalized !== '' && normalized !== 'no' && normalized !== 'false' && normalized !== '0';
 }
 
+function roadFamily(value) {
+  return String(value || '').toLowerCase().replace(/_link$/, '');
+}
+
 export function isFixedRegionalEngineeredRoad(way) {
   const tags = way?.tags || {};
   return mappedTagIsPresent(tags.bridge) ||
@@ -78,7 +82,9 @@ export function partitionFixedRegionalRoads(regionalRoadWays = []) {
       const strong = candidates.filter((candidate) => {
         const highway = String(candidate.tags?.highway || '');
         const name = String(candidate.tags?.name || '').trim().toLowerCase();
-        return highway.endsWith('_link') || (structureName && name === structureName);
+        return roadFamily(highway) === roadFamily(structureHighway) ||
+          highway.endsWith('_link') ||
+          (structureName && name === structureName);
       });
       strong.forEach((candidate) => connectorSet.add(candidate));
       candidates
@@ -232,16 +238,37 @@ export function prepareWorldFeatureSelections(options = {}) {
     mobileLike ? 240 : 1200,
     Math.max(mobileLike ? 80 : 160, Math.ceil(regionalPartition.engineered.length * (mobileLike ? 0.25 : 0.5)))
   );
-  const selectedCoreRoadWays = limitWaysByTileBudget(coreRoadWays, nodes, {
-    // The fixed outer context is additive. It must not consume the existing
-    // exact-city budget and silently reduce core road coverage.
-    globalCap: maxRoadWays,
+  const generalizedCore = coreRoadWays.some((way) =>
+    way?.tags?._sourceCompleteness === 'generalized');
+  const corePartition = generalizedCore
+    ? partitionFixedRegionalRoads(coreRoadWays)
+    : null;
+  const protectedCoreRoadWays = corePartition
+    ? [...new Set([
+        ...corePartition.engineered,
+        ...corePartition.exactConnectors,
+        ...corePartition.connectors
+      ])]
+    : [];
+  const protectedCoreSet = new Set(protectedCoreRoadWays);
+  const coreRoadCandidates = generalizedCore
+    ? coreRoadWays.filter((way) => !protectedCoreSet.has(way))
+    : coreRoadWays;
+  const selectedCoreGeneralRoadWays = limitWaysByTileBudget(coreRoadCandidates, nodes, {
+    // The detailed core may be budgeted, but a bridge/ramp and the mapped
+    // surface roads that connect to it are one topology unit. Protect that
+    // unit before selecting ordinary streets; selecting individual fragments
+    // is what produced missing roads and elevated dead ends in dense cities.
+    globalCap: Math.max(0, maxRoadWays - protectedCoreRoadWays.length),
     basePerTile: tileBudgetCfg.roadsPerTile,
     minPerTile: tileBudgetCfg.roadsMinPerTile,
     tileDegrees: tileBudgetCfg.tileDegrees,
     useRdt: useRdtBudgeting,
     compareFn: (a, b) => roadTypePriority(b.tags?.highway) - roadTypePriority(a.tags?.highway)
   });
+  const selectedCoreRoadWays = generalizedCore
+    ? [...protectedCoreRoadWays, ...selectedCoreGeneralRoadWays]
+    : selectedCoreGeneralRoadWays;
   const regionalPerTile = Math.max(mobileLike ? 8 : 16, Math.floor(regionalRoadCap / 64));
   const selectedRegionalRoadWays = limitWaysByTileBudget(regionalPartition.general, nodes, {
     globalCap: regionalRoadCap,
@@ -399,6 +426,7 @@ export function prepareWorldFeatureSelections(options = {}) {
   loadMetrics.roads.selection = {
     coreRequested: coreRoadWays.length,
     coreSelected: selectedCoreRoadWays.length,
+    coreTopologyProtected: protectedCoreRoadWays.length,
     regionalRequested: regionalRoadWays.length,
     regionalSelected: selectedRegionalRoadWays.length,
     regionalCap: regionalRoadCap,
@@ -428,12 +456,17 @@ export function prepareWorldFeatureSelections(options = {}) {
   const worldSurfaceProfile = classifyWorldSurfaceProfile({
     centerLat: options.centerLat,
     landuseWays,
-    waterwayWays
+    waterwayWays,
+    roadWays: coreRoadWays,
+    buildingWays: allBuildingWays
   });
   loadMetrics.surfaceProfile = {
     reason: worldSurfaceProfile.reason,
     terrainModeHint: worldSurfaceProfile.terrainModeHint,
     waterModeHint: worldSurfaceProfile.waterModeHint,
+    denseSettlement: worldSurfaceProfile.settlement?.dense === true,
+    settlementRoads: Number(worldSurfaceProfile.settlement?.roadCount || 0),
+    settlementBuildings: Number(worldSurfaceProfile.settlement?.buildingCount || 0),
     absLat: Number(worldSurfaceProfile.absLat?.toFixed?.(2) || worldSurfaceProfile.absLat || 0),
     signals: worldSurfaceProfile.signals?.normalized || {}
   };

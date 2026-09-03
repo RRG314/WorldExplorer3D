@@ -10,7 +10,7 @@ import {
 import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=27";
 import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=7";
 import { createWorldLoadPlan } from "../earth-core/world-load-plan.js?v=1";
-import { diagnoseDistrictGroundSource, prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=15";
+import { diagnoseDistrictGroundSource, prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=16";
 import { shouldLoadDetailedBuildings } from "./settlement-density-policy.js?v=1";
 import {
   waitForInitialTerrain,
@@ -24,14 +24,16 @@ import {
 import {
   beginFixedRegionalTransportLoad,
   completeFixedRegionalTransportLoad,
+  fixedRegionalContextBounds,
   fixedRegionalRoadGeometryGuards,
+  selectDetailedCoreTransport,
   sampleFixedRegionalGround,
   waitForFixedRegionalGround
-} from "./fixed-regional-context.js?v=9";
+} from "./fixed-regional-context.js?v=10";
 import {
   beginFixedRegionalStructureLoad,
   completeFixedRegionalStructureLoad
-} from "./fixed-regional-structures.js?v=15";
+} from "./fixed-regional-structures.js?v=16";
 import { reviewedCivicFacilitiesForLocation } from "./regional-civic-facilities.js?v=2";
 import { compileTransportFacilityGraph } from "../transport/facility-compiler.js?v=4";
 import { createTransportFacilityVisuals } from "../transport/facility-visuals.js?v=7";
@@ -463,8 +465,17 @@ export function createWorldRoadLoader(deps = {}) {
           (signal) => fetchShortbreadWorldData({
             lat: appCtx.LOC.lat,
             lon: appCtx.LOC.lon,
-            radius: Math.min(0.02, Math.max(0.008, featureRadius)),
-            zoom: 14,
+            // This existing request is also the detailed core-road fallback
+            // when optional exact Overpass data is unavailable. Its bounds
+            // extend beyond the regional LOD handoff in real metres so the
+            // z14 and z13 authorities never leave a visual gap.
+            bounds: fixedRegionalContextBounds(
+              appCtx.LOC,
+              Math.max(2600, Math.ceil(loadedRadiusWorld * 1.18))
+            ),
+            preferredZoom: 14,
+            minimumZoom: 13,
+            maxTiles: 40,
             includeBuildings: false,
             layerNames: [
               'streets', 'street_polygons', 'public_transport', 'ferries',
@@ -479,6 +490,7 @@ export function createWorldRoadLoader(deps = {}) {
         let exactSupplementData = null;
         let primaryOverpassError = null;
         let exactTransportLoaded = false;
+        let generalizedCoreTransportData = null;
         let mappedWaterStructureCoverageComplete = false;
         try {
           try {
@@ -508,6 +520,12 @@ export function createWorldRoadLoader(deps = {}) {
           }
         } finally {
           endLoadPhase('fetchOverpass');
+        }
+        const generalizedTransportFacilityResult = await generalizedTransportFacilityRequest;
+        if (!exactTransportLoaded && generalizedTransportFacilityResult.facilityData?.elements?.length) {
+          generalizedCoreTransportData = selectDetailedCoreTransport(
+            generalizedTransportFacilityResult.facilityData
+          );
         }
         const airportSelection = worldSession?.request?.selection || {
           ...appCtx.LOC,
@@ -583,6 +601,7 @@ export function createWorldRoadLoader(deps = {}) {
             coreRadiusMeters: loadedRadiusWorld * Number(appCtx.METERS_PER_WORLD_UNIT || 1),
             exactData: data,
             exactTransportLoaded,
+            generalizedCoreData: generalizedCoreTransportData,
             loadMetrics,
             request: regionalRequest
           });
@@ -598,8 +617,11 @@ export function createWorldRoadLoader(deps = {}) {
           optionalExactProvider: 'osm-overpass',
           selected: exactTransportLoaded
             ? 'shortbread-vector+osm-overpass-exact'
-            : 'shortbread-vector',
+            : generalizedCoreTransportData
+              ? 'shortbread-vector-z14-core+z13-regional'
+              : 'shortbread-vector-z13-regional',
           exactTransportLoaded,
+          generalizedCoreTransportLoaded: Boolean(generalizedCoreTransportData),
           optionalExactActive: exactTransportLoaded,
           optionalExactUnavailable: !exactTransportLoaded,
           deterministicPriority: Object.freeze(['shortbread-vector', 'osm-overpass-exact-gap-fill'])
@@ -663,7 +685,6 @@ export function createWorldRoadLoader(deps = {}) {
           inventoryAuthority: 'world-explorer-gameplay'
         };
         runtimeState.commercePlaces = loadMetrics.commercePlaces;
-        const generalizedTransportFacilityResult = await generalizedTransportFacilityRequest;
         const exactFacilityElements = selectExactFacilityElements(exactSupplementData);
         const generalizedFacilityElements = generalizedTransportFacilityResult.facilityData?.elements || [];
         const facilityElements = new Map(generalizedFacilityElements.map((element) => [

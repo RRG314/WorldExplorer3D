@@ -1,4 +1,4 @@
-import { fixedRegionalContextBounds } from './fixed-regional-context.js?v=9';
+import { fixedRegionalContextBounds } from './fixed-regional-context.js?v=10';
 import { fetchBundledLandmarkData } from './landmark-source.js?v=3';
 
 const DRIVEABLE_HIGHWAYS =
@@ -579,8 +579,21 @@ export async function completeFixedRegionalStructureLoad(options = {}) {
     lat: request?.location?.lat,
     lon: request?.location?.lon
   }).catch(() => null);
-  const reviewedExact = reviewedLandmarkData
-    ? retainExactRegionalStructures(reviewedLandmarkData)
+  const reviewedAuthorityData = reviewedLandmarkData ? {
+    ...reviewedLandmarkData,
+    elements: (reviewedLandmarkData.elements || []).map((element) =>
+      element?.type === 'way'
+        ? {
+            ...element,
+            tags: {
+              ...element.tags,
+              _reviewedStructureAuthority: 'bundled-landmark-pack'
+            }
+          }
+        : element)
+  } : null;
+  const reviewedExact = reviewedAuthorityData
+    ? retainExactRegionalStructures(reviewedAuthorityData)
     : null;
   const reviewedExactWays = Number(reviewedExact?._fixedRegionalStructures?.exactWays || 0);
   if (!outcome?.value && reviewedExactWays === 0) {
@@ -597,9 +610,9 @@ export async function completeFixedRegionalStructureLoad(options = {}) {
     // reviewed carriageways and their published surface controls. Retire only
     // same-named live engineered ways that are not part of the reviewed pack;
     // unrelated live roads and the reviewed ids remain intact.
-    merged = removeLiveStructuresSupersededByReviewedPack(merged, reviewedLandmarkData);
-    merged = mergeExactRegionalStructures(merged, reviewedLandmarkData);
-    merged = markReviewedGeneralizedStructureFallbacks(merged, reviewedLandmarkData);
+    merged = removeLiveStructuresSupersededByReviewedPack(merged, reviewedAuthorityData);
+    merged = mergeExactRegionalStructures(merged, reviewedAuthorityData);
+    merged = markReviewedGeneralizedStructureFallbacks(merged, reviewedAuthorityData);
   }
   merged._fixedRegionalStructures.source = reviewedExactWays > 0
     ? outcome?.value

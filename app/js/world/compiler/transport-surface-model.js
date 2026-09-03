@@ -24,7 +24,7 @@ import {
   smoothGradeLimitedProfile,
   smoothSignedCutFillProfile,
   tangentAtDistance
-} from './transport-surface-profile.js?v=12';
+} from './transport-surface-profile.js?v=14';
 
 const TRANSPORT_SURFACE_SCHEMA_VERSION = 1;
 

@@ -1,7 +1,7 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { sampleFeatureSurfaceY } from '../structure-semantics.js?v=63';
+import { sampleFeatureSurfaceY } from '../structure-semantics.js?v=69';
 import { createBridgeStructuralDetails } from './bridge-landmark-structure.js?v=1';
-import { applyPublishedTransportSurfaceControls } from './transport-surface-controls.js?v=2';
+import { applyPublishedTransportSurfaceControls } from './transport-surface-controls.js?v=3';
 
 const BRIDGE_COLOR = 0xbf4e3b;
 const MIN_SUSPENSION_SPAN_METERS = 600;

@@ -635,7 +635,7 @@ async function fetchTileCoverage(lat, lon, radius, zoom, options = {}) {
   const fetchTile = typeof options.shortbreadFetchTile === 'function'
     ? options.shortbreadFetchTile
     : fetchShortbreadTile;
-  const { settled, metrics } = await runBoundedProviderBatch(
+  const initialBatch = await runBoundedProviderBatch(
     coordinates,
     ({ x, y }, _index, signal) => fetchTile(zoom, x, y, { signal }),
     {
@@ -644,6 +644,38 @@ async function fetchTileCoverage(lat, lon, radius, zoom, options = {}) {
       abortMessage: 'Shortbread coverage aborted'
     }
   );
+  const settled = initialBatch.settled.slice();
+  const failedCoordinates = coordinates
+    .map((coordinate, index) => ({ coordinate, index }))
+    .filter(({ index }) => settled[index]?.status === 'rejected');
+  let recoveredTiles = 0;
+  let retryMetrics = null;
+  if (failedCoordinates.length > 0) {
+    const retryBatch = await runBoundedProviderBatch(
+      failedCoordinates,
+      ({ coordinate: { x, y } }, _index, signal) => fetchTile(zoom, x, y, { signal }),
+      {
+        signal: options.signal,
+        concurrency: Math.min(4, options.concurrency || SHORTBREAD_TILE_CONCURRENCY),
+        abortMessage: 'Shortbread coverage retry aborted'
+      }
+    );
+    retryMetrics = retryBatch.metrics;
+    retryBatch.settled.forEach((entry, retryIndex) => {
+      const originalIndex = failedCoordinates[retryIndex].index;
+      if (entry?.status === 'fulfilled') recoveredTiles += 1;
+      settled[originalIndex] = entry;
+    });
+  }
+  const metrics = Object.freeze({
+    requested: coordinates.length,
+    started: initialBatch.metrics.started + Number(retryMetrics?.started || 0),
+    fulfilled: settled.filter((entry) => entry?.status === 'fulfilled').length,
+    rejected: settled.filter((entry) => entry?.status === 'rejected').length,
+    maxInFlight: Math.max(initialBatch.metrics.maxInFlight, Number(retryMetrics?.maxInFlight || 0)),
+    retryAttempts: Number(retryMetrics?.started || 0),
+    recoveredTiles
+  });
   const tiles = settled
     .filter((entry) => entry.status === 'fulfilled' && entry.value)
     .map((entry) => entry.value);
@@ -702,6 +734,8 @@ export async function fetchShortbreadWorldData(options = {}) {
       partialRoadFeatures,
       coverageAuthority: 'per-feature-adjacent-tile-continuity',
       maxInFlight: metrics.maxInFlight,
+      retryAttempts: metrics.retryAttempts,
+      recoveredTiles: metrics.recoveredTiles,
       zoom,
       bounds,
       status: elements.length > 0 ? 'available' : 'authoritative-empty',

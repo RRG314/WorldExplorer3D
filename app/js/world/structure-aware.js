@@ -8,10 +8,10 @@ import {
   isPointWithinMappedWater,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=63";
-import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=15";
+} from "../structure-semantics.js?v=69";
+import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=17";
 import { compileTransportStructureModel } from "./compiler/transport-structure-model.js?v=1";
-import { compileTransportStructureAssemblies } from "./compiler/transport-structure-assembly.js?v=14";
+import { compileTransportStructureAssemblies } from "./compiler/transport-structure-assembly.js?v=16";
 import {
   auditTransportJunctionContinuity,
   buildExactTransportNodeFinalizationAnchors,
@@ -23,10 +23,10 @@ import {
   createDriveableRoadConflictIndex,
   supportPointConflictsWithDriveableRoad,
   supportSpanConflictsWithDriveableRoad
-} from "./bridge-safety.js?v=13";
-import { refreshStructureColliders } from "./structure-colliders.js?v=13";
+} from "./bridge-safety.js?v=17";
+import { refreshStructureColliders } from "./structure-colliders.js?v=17";
 import { yieldToMainThread } from "./cooperative-scheduling.js?v=1";
-import { compileSharedTransportSurfacePresentations } from './transport-surface-controls.js?v=2';
+import { compileSharedTransportSurfacePresentations } from './transport-surface-controls.js?v=3';
 
 const runtime = {
   enableLinearFeatures: () => false,

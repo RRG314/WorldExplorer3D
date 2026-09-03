@@ -8,7 +8,7 @@ import {
   worldUnitsPerSecondToMph
 } from "./physics/vehicle-speed-units.js?v=2";
 import { resolveChaseCameraTerrainCollision } from "./hud/chase-camera-terrain.js?v=1";
-import { resolveTunnelCameraState } from "./hud/tunnel-camera-controller.js?v=6";
+import { resolveTunnelCameraState } from "./hud/tunnel-camera-controller.js?v=7";
 import { cameraSmoothingBlend } from "./controls/traversal-control-policy.js?v=8";
 import { planetarySurfaceYAtRenderXZ } from './planetary/runtime/surface-query.js?v=3';
 // hud.js - HUD updates, camera system, sky positioning
