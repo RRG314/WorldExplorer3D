@@ -130,7 +130,9 @@ try {
   await page.screenshot({ path: 'output/release-evidence/current/fishing-teardown-recovery-mobile.png', fullPage: true });
   const recordsAfterClose = await catchRecordCount();
 
-  await page.locator('#fishingDockBtn').click();
+  await page.locator('#exploreBtn').click();
+  await page.waitForSelector('#exploreMenu.open #fFishing', { timeout: 10_000 });
+  await page.locator('#fFishing').click();
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().fishing?.open === true, null, { timeout: 10_000 });
   const reopened = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().fishing || {});
   await page.locator('#fishingCloseBtn').click();
