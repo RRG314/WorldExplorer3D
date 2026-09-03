@@ -32,7 +32,7 @@ async function discoveryCatchRecords() {
         db.close();
         resolve({
           items: itemsRequest.result.filter((entry) => String(entry.instanceId || '').startsWith('fish-catch:')),
-          guide: guideRequest.result.filter((entry) => String(entry.stableTaxonId || '').startsWith('we3d-game-fish:'))
+          guide: guideRequest.result.filter((entry) => entry.fishingAuthorityVersion === 'water-fish-authority-v2')
         });
       };
       transaction.onerror = () => reject(transaction.error);
@@ -55,7 +55,7 @@ try {
   }, null, { timeout: 300_000 });
   await page.waitForTimeout(4_000);
 
-  await page.locator('#exploreBtn').click();
+  await page.locator('#travelBtn').click();
   const preBoatEntry = await page.evaluate(() => {
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     const button = document.querySelector('#fBoat');
@@ -84,7 +84,9 @@ try {
   };
   assert.equal(boatEntry.started, true, `Could not enter boat through the shared-link gameplay path: ${JSON.stringify(boatEntry)}`);
 
-  await page.locator('#fishingDockBtn').click();
+  await page.locator('#exploreBtn').click();
+  await page.waitForSelector('#exploreMenu.open #fFishing', { timeout: 10_000 });
+  await page.locator('#fFishing').click();
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().fishing?.open === true, null, { timeout: 30_000 });
   const controlGeometry = await page.evaluate(() => {
     const snapshot = (selector) => {
@@ -194,7 +196,11 @@ try {
       item.evidencePayload?.livePresenceClaim === false,
     guideAuthorityPersisted: guide.fishingAuthorityVersion === 'water-fish-authority-v2' &&
       guide.populationEvidence === 'gameplay-model-only' && guide.livePresenceClaim === false,
-    regionalLifeListNotInvented: !item.regionalPackId && String(guide.stableTaxonId || '').startsWith('we3d-game-fish:'),
+    regionalLifeListNotInvented: fishing.populationContext?.evidence?.regionalEcologyPackApplied === false && (
+      item.regionalPackId
+        ? guide.regionalPackId === item.regionalPackId && String(guide.stableTaxonId || '').startsWith('gbif-backbone-2023:')
+        : !guide.regionalPackId && String(guide.stableTaxonId || '').startsWith('we3d-game-fish:')
+    ),
     generalizedCatchPrivacy: fishing.fish?.locationPrecision === 'generalized-100m' &&
       Math.abs(Number(fishing.fish?.lat) * 1000 - Math.round(Number(fishing.fish?.lat) * 1000)) < 1e-8 &&
       Math.abs(Number(fishing.fish?.lon) * 1000 - Math.round(Number(fishing.fish?.lon) * 1000)) < 1e-8,

@@ -36,7 +36,7 @@ import {
   updateWaterWaveVisuals
 } from "./boat-mode/surface-effects.js?v=18";
 import { createBoatModeMesh } from "./boat-mode/boat-model.js?v=7";
-import { createBoatPromptUi } from "./boat-mode/prompt-ui.js?v=2";
+import { createBoatPromptUi } from "./boat-mode/prompt-ui.js?v=3";
 import { clamp, normalizeAngle, shortestAngleDelta, stepBoatSpring } from "./boat-mode/dynamics.js?v=1";
 import { createBoatRuntimeDynamics } from "./boat-mode/runtime-dynamics.js?v=16";
 import { createBoatOceanTransferApi } from "./boat-mode/ocean-transfer.js?v=3";

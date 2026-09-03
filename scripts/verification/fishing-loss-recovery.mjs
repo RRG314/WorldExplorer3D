@@ -67,7 +67,9 @@ try {
   assert.equal(boatEntry.started, true, `Could not enter boat through the shared-link gameplay path: ${JSON.stringify(boatEntry)}`);
 
   const recordsBefore = await catchRecordCount();
-  await page.locator('#fishingDockBtn').click();
+  await page.locator('#exploreBtn').click();
+  await page.waitForSelector('#exploreMenu.open #fFishing', { timeout: 10_000 });
+  await page.locator('#fFishing').click();
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().fishing?.open === true, null, { timeout: 30_000 });
   const catchesBefore = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().fishing?.catches || 0);
 
