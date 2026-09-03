@@ -79,22 +79,6 @@ async function createPlayer(label, viewport) {
       const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.();
       return diagnostics?.gameStarted === true && diagnostics.worldLoading === false;
     }, null, { timeout: 360_000 });
-  } else {
-    await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
-      ctx.selLoc = 'baltimore';
-      ctx.LOC = { lat: 39.2904, lon: -76.6122, name: 'Baltimore' };
-      ctx.LOCS = { ...(ctx.LOCS || {}), baltimore: { name: 'Baltimore', lat: 39.2904, lon: -76.6122 } };
-      ctx.car = { x: 0, y: 0, z: 0, position: { set(x, y, z) { this.x = x; this.y = y; this.z = z; } } };
-      ctx.buildings = [{
-        sourceBuildingId: 'osm:way:424242',
-        buildingType: 'house',
-        levels: 2,
-        baseY: 0,
-        pts: [{ x: -8, z: -8 }, { x: 8, z: -8 }, { x: 8, z: 8 }, { x: -8, z: 8 }]
-      }];
-      document.getElementById('globeSelectorScreen')?.classList.remove('show');
-    });
   }
   return { context, page, identity };
 }
