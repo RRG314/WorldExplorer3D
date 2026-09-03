@@ -69,6 +69,17 @@ test('descent stops at the pressure envelope and climb returns to a higher altit
   }
 });
 
+test('gas-giant exploration has controllable horizontal flight instead of a stationary fog state', () => {
+  for (const bodyId of GIANT_BODY_IDS) {
+    let state = createAtmosphericExploration(bodyId, { altitudeM: 20_000, timestampS: 10 });
+    for (let frame = 0; frame < 20; frame += 1) {
+      state = advanceAtmosphericExploration(state, 0.1, { throttle: 1 });
+    }
+    assert.ok(state.horizontalSpeedMps > 0, `${bodyId} should accelerate through its atmosphere`);
+    assert.ok(state.groundTrackM > 0, `${bodyId} should record actual travel`);
+  }
+});
+
 test('journey authority permits atmospheric exploration without permitting a solid touchdown', () => {
   let journey = createSpaceJourney({
     sourceBodyId: 'earth', destinationBodyId: 'jupiter', mode: JOURNEY_MODE.ASSISTED, startedAtMs: 1000

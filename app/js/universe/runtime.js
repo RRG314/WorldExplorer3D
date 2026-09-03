@@ -429,6 +429,7 @@ function returnUniverseToSolImmediate() {
   if (universeRuntime.transitGroup) universeRuntime.transitGroup.visible = false;
   stopWormholeVisual(universeRuntime.wormholeGroup);
   universeRuntime.course = null;
+  updateUniverseCourseCue(null);
   universeRuntime.selected = resolveUniverseAddress('sol');
   if (universeRuntime.scene) installFrame(resolveUniverseAddress('sol'));
   return true;
@@ -611,6 +612,7 @@ function restoreUniverseLocalFrame(frameId, courseDestinationId = '') {
   universeRuntime.pendingEarthReturn = false;
   universeRuntime.selected = destination || frame;
   universeRuntime.course = destination ? createUniverseCourse(destination, frame.id, performance.now()) : null;
+  if (!destination) updateUniverseCourseCue(null);
   installFrame(frame);
   if (destination?.parentFrameId === frame.id) positionRocketForCourseDestination(destination);
   updateUniverseNavigator(universeRuntime);
@@ -618,6 +620,23 @@ function restoreUniverseLocalFrame(frameId, courseDestinationId = '') {
 }
 
 function getLocalCourseTarget() {
+  const travelSession = appCtx.getSpaceTravelSession?.();
+  if (
+    travelSession?.phase === 'rendezvous' &&
+    travelSession?.destination?.id === 'solis-reach'
+  ) {
+    const dockTarget = appCtx.getSolisReachDockTarget?.();
+    if (dockTarget?.position) {
+      _localCourseTarget.position.copy(dockTarget.position);
+      _localCourseTarget.destination = {
+        id: 'solis-reach',
+        name: travelSession.destination.name || 'Solis Reach'
+      };
+      _localCourseTarget.radius = Number(dockTarget.radius) || 18;
+      _localCourseTarget.mesh = dockTarget.mesh || null;
+      return _localCourseTarget;
+    }
+  }
   const course = universeRuntime.course;
   if (!course && universeRuntime.current?.id === 'sol' && !universeRuntime.transition) {
     const destinationBodyId = normalizeAstronomicalBodyId(appCtx.spaceJourney?.destinationBodyId);

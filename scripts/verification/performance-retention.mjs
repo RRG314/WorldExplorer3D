@@ -10,6 +10,7 @@ const server = await startStaticServer({ rootDir: verifyRoot, ports: [4421, 4422
 const baseUrl = `http://127.0.0.1:${server.port}`;
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const requestedProfile = String(process.env.WE3D_VERIFY_PROFILE || 'all').trim().toLowerCase();
+const auditOnly = process.env.WE3D_VERIFY_AUDIT_ONLY === '1';
 assert.ok(['all', 'desktop', 'mobile'].includes(requestedProfile), `Unsupported WE3D_VERIFY_PROFILE: ${requestedProfile}`);
 
 const percentile = (values, portion) => {
@@ -148,13 +149,18 @@ async function selectMode(page, expected, selector) {
   await page.locator('#travelBtn').click();
   await page.waitForSelector('#travelMenu.open', { timeout: 10_000 });
   assert.equal(await page.locator(selector).isVisible(), true, `${selector} is not a visible Travel action.`);
+  const startedAt = performance.now();
   await page.locator(selector).click();
   await page.waitForFunction((mode) => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.mode === mode, expected, { timeout: 20_000 });
+  const activationMs = Math.round(performance.now() - startedAt);
   await page.waitForTimeout(1_200);
+  return activationMs;
 }
 
 async function measureMode(client, id, sampleMs = 5_000) {
-  const raw = await client.page.evaluate((durationMs) => new Promise((resolve) => {
+  const raw = await client.page.evaluate(async (durationMs) => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return new Promise((resolve) => {
     const deltas = [];
     const startedAt = performance.now();
     let previous = startedAt;
@@ -164,17 +170,37 @@ async function measureMode(client, id, sampleMs = 5_000) {
       if (now - startedAt < durationMs) requestAnimationFrame(frame);
       else {
         const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
+        const drawCallsByRoot = new Map();
+        ctx.scene?.traverse?.((object) => {
+          if (!object?.isMesh) return;
+          let visible = object.visible !== false;
+          for (let parent = object.parent; visible && parent; parent = parent.parent) visible = parent.visible !== false;
+          if (!visible) return;
+          let root = object;
+          while (root.parent && root.parent !== ctx.scene) root = root.parent;
+          const label = String(root.name || object.name || root.type || 'unnamed');
+          const estimatedCalls = Math.max(1, Number(object.geometry?.groups?.length || 0));
+          const current = drawCallsByRoot.get(label) || { meshes: 0, estimatedCalls: 0 };
+          current.meshes += 1;
+          current.estimatedCalls += estimatedCalls;
+          drawCallsByRoot.set(label, current);
+        });
         resolve({
           deltas,
           diagnostics: {
             renderer: diagnostics.renderer || {},
-            worldCounts: diagnostics.worldCounts || null
+            worldCounts: diagnostics.worldCounts || null,
+            drawCallBreakdown: [...drawCallsByRoot.entries()]
+              .map(([label, value]) => ({ label, ...value }))
+              .sort((left, right) => right.estimatedCalls - left.estimatedCalls)
+              .slice(0, 24)
           }
         });
       }
     };
     requestAnimationFrame(frame);
-  }), sampleMs);
+    });
+  }, sampleMs);
   const deltas = raw.deltas.filter((value) => Number.isFinite(value) && value > 0);
   const averageFrameMs = deltas.reduce((sum, value) => sum + value, 0) / Math.max(1, deltas.length);
   const rawJsHeapUsedBytes = await heapUsedBytes(client.cdp);
@@ -195,7 +221,8 @@ async function measureMode(client, id, sampleMs = 5_000) {
     textures: Number(raw.diagnostics.renderer?.textures || 0),
     rawJsHeapUsedBytes,
     jsHeapUsedBytes,
-    worldCounts: raw.diagnostics.worldCounts || null
+    worldCounts: raw.diagnostics.worldCounts || null,
+    drawCallBreakdown: raw.diagnostics.drawCallBreakdown || []
   };
 }
 
@@ -231,17 +258,18 @@ async function runDesktop() {
   const client = await createMeasuredClient({ viewport: { width: 1440, height: 900 } });
   try {
     const launch = await launchWorld(client);
-    await selectMode(client.page, 'walk', '#fWalk');
-    const walk = await measureMode(client, 'walk');
-    await selectMode(client.page, 'drive', '#fDriving');
-    const drive = await measureMode(client, 'drive');
-    await selectMode(client.page, 'plane', '#fPlane');
-    const plane = await measureMode(client, 'plane');
+    const walkActivationMs = await selectMode(client.page, 'walk', '#fWalk');
+    const walk = { ...(await measureMode(client, 'walk', auditOnly ? 1_500 : 5_000)), activationMs: walkActivationMs };
+    const driveActivationMs = await selectMode(client.page, 'drive', '#fDriving');
+    const drive = { ...(await measureMode(client, 'drive', auditOnly ? 1_500 : 5_000)), activationMs: driveActivationMs };
+    const planeActivationMs = await selectMode(client.page, 'plane', '#fPlane');
+    const plane = { ...(await measureMode(client, 'plane', auditOnly ? 1_500 : 5_000)), activationMs: planeActivationMs };
     const modes = [walk, drive, plane];
     const baselineCounts = walk.worldCounts;
     const releases = [];
     const reloadCounts = [];
-    for (let cycle = 0; cycle < budgets.retention.minimumEnvironmentCycles; cycle += 1) {
+    const environmentCycles = auditOnly ? 0 : budgets.retention.minimumEnvironmentCycles;
+    for (let cycle = 0; cycle < environmentCycles; cycle += 1) {
       await client.page.locator('#mainMenuBtn').click();
       await client.page.waitForFunction(() => {
         const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
@@ -262,6 +290,7 @@ async function runDesktop() {
     const releaseTextures = releases.map((entry) => Number(entry?.after?.rendererTextures || 0));
     const checks = {
       firstPlayableWithinBudget: launch.firstPlayableMs <= limit.firstPlayableMs,
+      modeActivationResponsive: modes.every((mode) => mode.activationMs <= limit.maximumModeActivationMs),
       completeWorld: modes.every((mode) => Number(mode.worldCounts?.buildings) > 0 && Number(mode.worldCounts?.roads) > 0 && Number(mode.worldCounts?.terrainTiles) > 0),
       modesWithinBudgets: modesWithinBudgets(modes, budgets.desktopTier),
       teardownClearsWorldOwners: releases.every((entry) =>
@@ -288,8 +317,8 @@ async function runMobileRegression() {
   const client = await createMeasuredClient({ ...devices['iPhone 13'], viewport });
   try {
     const launch = await launchWorld(client);
-    await selectMode(client.page, 'walk', '#fWalk');
-    const modes = [await measureMode(client, 'walk-touch-regression')];
+    const walkActivationMs = await selectMode(client.page, 'walk', '#fWalk');
+    const modes = [{ ...(await measureMode(client, 'walk-touch-regression')), activationMs: walkActivationMs }];
     await client.page.screenshot({ path: 'output/release-evidence/current/performance-mobile-390x844.png', fullPage: false });
     const storage = await storageSnapshot(client.page);
     const transfer = transferSnapshot(client);
@@ -297,6 +326,7 @@ async function runMobileRegression() {
     const checks = {
       viewportIs390x844: await client.page.evaluate(() => innerWidth === 390 && innerHeight === 844),
       firstPlayableWithinBudget: launch.firstPlayableMs <= limit.firstPlayableMs,
+      modeActivationResponsive: modes.every((mode) => mode.activationMs <= limit.maximumModeActivationMs),
       completeWorld: modes.every((mode) => Number(mode.worldCounts?.buildings) > 0 && Number(mode.worldCounts?.roads) > 0 && Number(mode.worldCounts?.terrainTiles) > 0),
       modesWithinBudgets: modesWithinBudgets(modes, budgets.mobileRegressionTier),
       transferWithinBudget: transferWithinBudget(transfer, limit),

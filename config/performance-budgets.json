@@ -8,6 +8,7 @@
     "measurementAuthority": "physical desktop host",
     "budgets": {
       "firstPlayableMs": 120000,
+      "maximumModeActivationMs": 1000,
       "minimumAverageFps": 43.65,
       "maximumP95FrameMs": 34.36,
       "maximumP99FrameMs": 50,
@@ -30,6 +31,7 @@
     "measurementAuthority": "software regression proxy; not physical-phone battery or thermal evidence",
     "budgets": {
       "firstPlayableMs": 60000,
+      "maximumModeActivationMs": 1000,
       "minimumAverageFps": 30,
       "maximumP95FrameMs": 50,
       "maximumP99FrameMs": 100,

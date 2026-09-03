@@ -99,6 +99,19 @@ function ensurePlaneMesh(catalog) {
   return createPlaneMesh(catalog);
 }
 
+function preparePlaneModeVisual() {
+  if (
+    state.mesh ||
+    !appCtx.gameStarted ||
+    appCtx.worldLoading ||
+    appCtx.spaceFlight?.active ||
+    appCtx.oceanMode?.active ||
+    appCtx.onMoon ||
+    appCtx.onMars
+  ) return false;
+  return !!ensurePlaneMesh(getAviationCatalogEntry(state.transportCatalogId));
+}
+
 function buildingTopY(building) {
   const minY = Number.isFinite(building?.minY) ? building.minY : Number(building?.baseY) || 0;
   if (Number.isFinite(building?.maxY)) return building.maxY;
@@ -799,10 +812,11 @@ appCtx.planeMode = state;
 Object.assign(appCtx, {
   applyPlaneCamera,
   getPlaneSnapshot,
+  preparePlaneModeVisual,
   startPlaneMode,
   stopPlaneMode,
   updatePlane
 });
 
-export { applyPlaneCamera, getPlaneSnapshot, startPlaneMode, stopPlaneMode, updatePlane };
+export { applyPlaneCamera, getPlaneSnapshot, preparePlaneModeVisual, startPlaneMode, stopPlaneMode, updatePlane };
 export { PLANE_MAX_SPEED_MPS };

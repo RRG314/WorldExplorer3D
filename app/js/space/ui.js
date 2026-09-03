@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { getAstronomicalBody, LANDING_MODE } from '../astronomy/body-catalog.js?v=3';
 import { SPACE_CONSTANTS } from "./constants.js?v=3";
-import { evaluateAtmosphericEntry } from './atmospheric-descent-authority.js?v=1';
+import { evaluateAtmosphericEntry } from './atmospheric-descent-authority.js?v=2';
 import {
   computeBodyRelativeNavigation,
   evaluateLandingEligibility
@@ -392,7 +392,14 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
     }
   }
 
-  if (universeTarget?.targetKind === 'exoplanet') {
+  if (expeditionDockTarget?.position) {
+    const approachRange = Math.max(0, activeDist - Number(expeditionDockTarget.radius || 0));
+    const relativeSpeed = Number(expeditionDockTarget.relativeSpeed || 0);
+    setMetric('sfAltitudeLabel', 'sfAltitude', 'sfAltitudeUnit', 'Approach range', Math.round(approachRange).toLocaleString(), 'm');
+    setMetric('sfSpeedLabel', 'sfSpeed', 'sfSpeedUnit', 'Relative speed', relativeSpeed.toFixed(1), 'm/s');
+    setMetric('sfDistanceLabel', 'sfDistance', 'sfDistanceUnit', 'Separation', Math.round(activeDist).toLocaleString(), 'm');
+    if (zoneLabel) zoneLabel.textContent = 'DOCKING APPROACH';
+  } else if (universeTarget?.targetKind === 'exoplanet') {
     const sceneToKm = universeTarget.physicalRadiusKm && universeTarget.radius > 0
       ? universeTarget.physicalRadiusKm / universeTarget.radius
       : null;
@@ -562,9 +569,10 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
       landingBar.style.background = 'linear-gradient(90deg,#38bdf8,#f59e0b)';
     }
     if (landingText) {
+      const horizontalSpeed = Math.round(Number(atmosphericExploration.horizontalSpeedMps) || 0);
       landingText.textContent = depthLimit
-        ? 'Safe depth limit reached · no solid surface'
-        : 'Descending through the atmosphere · hold Climb to rise';
+        ? `Safe depth limit reached · ${horizontalSpeed.toLocaleString()} m/s across the cloud deck · no solid surface`
+        : `Space accelerates · arrows steer · hold Climb to rise · ${horizontalSpeed.toLocaleString()} m/s across the cloud deck`;
     }
     if (landBtn) {
       landBtn.disabled = false;

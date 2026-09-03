@@ -2,16 +2,16 @@ import { ctx as appCtx } from "./shared-context.js?v=55";
 import { getPrimaryWorldCanvas } from "./engine/webgl-lifecycle.js?v=2";
 import { captureEarthWorldSession } from "./earth-session.js?v=17";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
-import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=28";
-import { createSpaceFlightScene, destroySpaceFlightScene, ensureSolisReachDockTarget, ensureExtendedSpaceScene, getSolisReachDockTarget, positionSpacecraftAtSolisReachDock, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon, setExpeditionPodFlightPresentation, setSolisReachFlightPresentation, updateExpeditionPodFlightPresentation } from "./space/scene.js?v=44";
-import { hideGameUI, initSpaceFlightUI, prepareSpaceFlightHudForEntry, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=49";
+import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=30";
+import { createSpaceFlightScene, destroySpaceFlightScene, ensureSolisReachDockTarget, ensureExtendedSpaceScene, getSolisReachDockTarget, orientActiveCraftForAtmosphere, orientActiveCraftTowardSolisReach, positionSpacecraftAtSolisReachDock, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon, setExpeditionPodFlightPresentation, setSolisReachFlightPresentation, updateExpeditionPodFlightPresentation } from "./space/scene.js?v=47";
+import { hideGameUI, initSpaceFlightUI, prepareSpaceFlightHudForEntry, setSpaceFlightHudCollapsed, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=50";
 import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 import {
   beginEnvironmentTransition,
   commitEnvironment,
   registerEnvironmentLifecycle
 } from './session-coordinator.js?v=2';
-import { installSpaceJourneyRuntime } from './space/journey-runtime.js?v=10';
+import { installSpaceJourneyRuntime } from './space/journey-runtime.js?v=11';
 import { resolveCompletedLandingTarget } from './space/landing-target.js?v=2';
 import { playSurfacePodLaunch } from './planetary/surface-pod-launch.js?v=8';
 import { SPACE_CRAFT_IDENTITY } from './space/craft-identity.js?v=1';
@@ -183,6 +183,9 @@ const landingDeps = {
     return globalThis.THREE;
   },
   completeLanding,
+  collapseFlightHud() {
+    if (globalThis.matchMedia?.('(max-width: 768px)').matches === true) setSpaceFlightHudCollapsed(true);
+  },
   requestFrame: requestSessionFrame,
   showFlightMessage
 };
@@ -245,7 +248,7 @@ function startSpaceFlightToMoon(options = {}) {
   if (freeFlight) {
     // Free flight retains the classic local controller. Wayfinder starts the
     // long-range journey only after the player sets a course.
-    appCtx.clearRenderedSpaceJourney?.();
+    appCtx.releaseRenderedJourneyToManualFlight?.();
   } else {
     appCtx.beginRenderedSpaceJourney?.({
       sourceBodyId: 'earth',
@@ -323,7 +326,7 @@ function startSpaceFlightToSolisReach(options = {}) {
   leaseSpaceFlightResources();
   appCtx.returnUniverseToSolImmediate?.();
   resetSpaceFlightForMoon();
-  appCtx.clearRenderedSpaceJourney?.();
+  appCtx.releaseRenderedJourneyToManualFlight?.();
   appCtx.spaceFlight.destination = SPACE_CRAFT_IDENTITY.starship.id;
   appCtx.spaceFlight._manualLandingTarget = null;
   appCtx.spaceFlight._autopilotTarget = null;
@@ -368,9 +371,6 @@ function startSpaceFlightToEarth(options = {}) {
     guidance: SPACE_GUIDANCE_MODE.MANUAL,
     reason: 'surface-pathfinder-rendezvous'
   });
-  void prepareSolisReachSurfaceRendezvous(sourceBodyId).catch((error) => {
-    console.error('Solis Reach rendezvous could not be prepared.', error);
-  });
   const transition = beginEnvironmentTransition(appCtx.ENV.SPACE_FLIGHT, { source: 'surface_to_pathfinder_pod' });
 
   appCtx.setEnvironmentTransitionActive(true);
@@ -411,9 +411,17 @@ function startSpaceFlightToEarth(options = {}) {
     } else resetSpaceFlightForEarth();
   } else resetSpaceFlightForMoon();
   appCtx.spaceFlight._launchSource = sourceLabel;
-  appCtx.clearRenderedSpaceJourney?.();
+  appCtx.releaseRenderedJourneyToManualFlight?.();
   setExpeditionPodFlightPresentation(true);
   ensureSolisReachDockTarget({ nearActiveCraft: true });
+  orientActiveCraftTowardSolisReach();
+  void prepareSolisReachSurfaceRendezvous(sourceBodyId).then(() => {
+    if (!isCurrentSpaceFlightSession(sessionId, SPACE_CRAFT_IDENTITY.starship.id)) return;
+    ensureSolisReachDockTarget({ nearActiveCraft: true });
+    orientActiveCraftTowardSolisReach();
+  }).catch((error) => {
+    console.error('Solis Reach rendezvous could not be refreshed.', error);
+  });
   appCtx.stopRuntimeKernel?.('space-flight-active');
   animateSpaceFlight();
 
@@ -513,7 +521,7 @@ function startSpaceFlightFromExpeditionSurface(options = {}) {
   appCtx.setEnvironmentTransitionActive(true);
   appCtx.setPauseReason?.('planetary_transition', true);
   suspendEarthModesForPlanetaryEntry(appCtx.ENV.SPACE_FLIGHT);
-  appCtx.spaceFlight.destination = courseDestinationId;
+  appCtx.spaceFlight.destination = SPACE_CRAFT_IDENTITY.starship.id;
   appCtx.spaceFlight.mode = 'launching';
   appCtx.spaceFlight.active = true;
   appCtx.spaceFlight._launchSource = courseDestinationId;
@@ -525,24 +533,38 @@ function startSpaceFlightFromExpeditionSurface(options = {}) {
   appCtx.spaceFlight.hud.style.display = 'block';
   prepareSpaceFlightHudForEntry();
   const destinationLabel = document.getElementById('sfDestination');
-  if (destinationLabel) destinationLabel.textContent = courseDestinationId;
+  if (destinationLabel) destinationLabel.textContent = SPACE_CRAFT_IDENTITY.starship.name;
+  const landButton = document.getElementById('sfLandBtn');
+  if (landButton) landButton.textContent = `DOCK WITH ${SPACE_CRAFT_IDENTITY.starship.name.toUpperCase()}`;
   const worldCanvas = getPrimaryWorldCanvas(appCtx);
   if (worldCanvas) worldCanvas.style.display = 'none';
   hideGameUI();
   createSpaceFlightScene({ includeExtendedSpace: true });
   ensureExtendedSpaceScene();
   leaseSpaceFlightResources();
-  if (!appCtx.restoreUniverseLocalFrame?.(frameId, courseDestinationId)) {
+  // The surface journey is finished. Keep the local star-system frame for
+  // visual continuity, but do not leave the departed planet as an active
+  // navigation course while the pod is actually rendezvousing with the ship.
+  appCtx.releaseRenderedJourneyToManualFlight?.();
+  if (!appCtx.restoreUniverseLocalFrame?.(frameId, '')) {
     exitSpaceFlight('expedition_surface_restore_failed');
     return false;
   }
   setExpeditionPodFlightPresentation(true);
   ensureSolisReachDockTarget({ nearActiveCraft: true });
+  orientActiveCraftTowardSolisReach();
+  void prepareSolisReachSurfaceRendezvous(courseDestinationId).then(() => {
+    if (!isCurrentSpaceFlightSession(sessionId, SPACE_CRAFT_IDENTITY.starship.id)) return;
+    ensureSolisReachDockTarget({ nearActiveCraft: true });
+    orientActiveCraftTowardSolisReach();
+  }).catch((error) => {
+    console.error('Solis Reach expedition rendezvous could not be refreshed.', error);
+  });
   appCtx.stopRuntimeKernel?.('space-flight-active');
   animateSpaceFlight();
   appCtx.showUniverseUI?.();
   spaceSessionScope.timeout(() => {
-    if (!isCurrentSpaceFlightSession(sessionId, courseDestinationId)) return;
+    if (!isCurrentSpaceFlightSession(sessionId, SPACE_CRAFT_IDENTITY.starship.id)) return;
     appCtx.spaceFlight.mode = 'flying';
     appCtx.spaceFlight.speed = 0;
     appCtx.updateSpaceTravelSession?.({ phase: SPACE_TRAVEL_PHASE.RENDEZVOUS, reason: 'pathfinder-return-ready' });
@@ -703,6 +725,8 @@ Object.assign(appCtx, {
   getSolisReachDockTarget,
   completePathfinderDocking,
   positionSpacecraftAtSolisReachDock,
+  orientActiveCraftForAtmosphere,
+  orientActiveCraftTowardSolisReach,
   updateExpeditionPodFlightPresentation,
   startSpaceFlightToEarth,
   startSpaceFlightFromExpeditionSurface,
@@ -724,6 +748,8 @@ export {
   getSolisReachDockTarget,
   completePathfinderDocking,
   positionSpacecraftAtSolisReachDock,
+  orientActiveCraftForAtmosphere,
+  orientActiveCraftTowardSolisReach,
   updateExpeditionPodFlightPresentation,
   startSpaceFlightToEarth,
   startSpaceFlightFromExpeditionSurface,

@@ -7,6 +7,7 @@ import {
 import { SPACE_CONSTANTS } from "./constants.js?v=3";
 import { spacecraftOperationTuning } from '../character/spacecraft-assistance.js?v=1';
 import { resolveCelestialSceneCollision } from './celestial-collision.js?v=2';
+import { releaseAtmosphericFlightPresentation, updateAtmosphericFlightPresentation } from './atmospheric-flight-presentation.js?v=1';
 
 let injectedThree = null;
 let math = null;
@@ -476,9 +477,18 @@ export function updateSpaceFlightPhysics() {
       }
       appCtx.spaceFlight.scene.fog.color.setHex(fogColor);
       appCtx.spaceFlight.scene.fog.density = 0.00035 + pressureRatio * 0.0024;
+      if (appCtx.spaceJourney?.phase === 'atmospheric_exploration' && giantAtmosphere) {
+        updateAtmosphericFlightPresentation(environment.bodyId, {
+          radial: appCtx.spaceFlight.atmosphericRadialScene,
+          horizontalSpeedMps: appCtx.spaceAtmosphereExploration?.horizontalSpeedMps
+        });
+      } else {
+        releaseAtmosphericFlightPresentation();
+      }
     } else if (appCtx.spaceFlight._journeyFogActive && appCtx.spaceFlight.scene) {
       appCtx.spaceFlight.scene.fog = null;
       appCtx.spaceFlight._journeyFogActive = false;
+      releaseAtmosphericFlightPresentation();
     }
     const glow = rocket.getObjectByName('engineGlow');
     const exhaust = rocket.getObjectByName('exhaust');
@@ -646,14 +656,19 @@ export function updateSpaceFlightCamera() {
       .addScaledVector(_sfTempVec, 25);
   }
 
-  appCtx.spaceFlight.camera.position.lerp(_sfTargetPos, 0.1);
+  const snapCamera = appCtx.spaceFlight._snapCameraToCraft === true;
+  const atmosphericChase = appCtx.spaceJourney?.phase === 'atmospheric_exploration';
+  if (snapCamera) appCtx.spaceFlight.camera.position.copy(_sfTargetPos);
+  else appCtx.spaceFlight.camera.position.lerp(_sfTargetPos, atmosphericChase ? 0.18 : 0.1);
   // Follow the spacecraft's transported up vector rather than a fixed world-up
   // pole. Physics reads the resulting camera axes, so arrows retain the same
   // visible direction through every world-axis crossing.
   appCtx.spaceFlight.camera.up.copy(_sfTempVec);
   cameraLookMatrix.lookAt(appCtx.spaceFlight.camera.position, rocket.position, _sfTempVec);
   cameraQuaternion.setFromRotationMatrix(cameraLookMatrix);
-  appCtx.spaceFlight.camera.quaternion.slerp(cameraQuaternion, 0.045).normalize();
+  if (snapCamera) appCtx.spaceFlight.camera.quaternion.copy(cameraQuaternion).normalize();
+  else appCtx.spaceFlight.camera.quaternion.slerp(cameraQuaternion, atmosphericChase ? 0.12 : 0.045).normalize();
+  appCtx.spaceFlight._snapCameraToCraft = false;
 }
 
 export function animateSpaceFlight(deps = {}) {
@@ -765,6 +780,11 @@ export function attemptLanding(deps = {}) {
       typeof appCtx.requestRenderedAtmosphericEntry === 'function'
     ) {
       const result = appCtx.requestRenderedAtmosphericEntry(targetName);
+      if (result.accepted) {
+        const atmosphereBody = findLandableBodyByName(targetName);
+        appCtx.orientActiveCraftForAtmosphere?.(atmosphereBody?.position);
+        deps.collapseFlightHud?.();
+      }
       deps.showFlightMessage?.(
         result.accepted ? 'ATMOSPHERIC FLIGHT ENGAGED' : String(result.reason || 'ATMOSPHERIC ENTRY NOT AVAILABLE').replaceAll('-', ' ').toUpperCase(),
         result.accepted ? '#10b981' : '#f59e0b'

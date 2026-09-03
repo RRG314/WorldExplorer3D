@@ -430,6 +430,17 @@ function createLabel(text, parentMesh, objectRadius) {
   sprite.scale.set(labelScale, labelScale * 0.25, 1);
   sprite.position.y = objectRadius * 1.8;
   sprite.name = text + '_label';
+  if (!isSpacecraft) {
+    const labelWorldPosition = new THREE.Vector3();
+    sprite.onBeforeRender = (_renderer, _scene, camera) => {
+      sprite.getWorldPosition(labelWorldPosition);
+      const distance = labelWorldPosition.distanceTo(camera.position);
+      // Keep nearby body labels readable without letting a fixed world-space
+      // sprite expand across the entire screen during approach or departure.
+      const responsiveScale = Math.max(Math.min(labelScale, 5), Math.min(labelScale, distance * 0.18));
+      sprite.scale.set(responsiveScale, responsiveScale * 0.25, 1);
+    };
+  }
   parentMesh.add(sprite);
 }
 

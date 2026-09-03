@@ -25,7 +25,7 @@ import './session-coordinator.js?v=2';
 import './planetary/scene-ownership.js?v=9';
 import './real-estate.js?v=55';
 import { init, tryEnablePostProcessing } from './engine.js?v=95';
-import './physics.js?v=126';
+import './physics.js?v=127';
 import './walking.js?v=91';
 import './travel-mode.js?v=27';
 import { initBoatMode } from './boat-mode.js?v=58';
@@ -457,6 +457,9 @@ function bootApp() {
         globalThis.dispatchEvent?.(new CustomEvent('we3d:runtime-ready'));
     });
     runBootStep('scheduleAnalyticsWarmup', () => scheduleAnalyticsWarmup(2800));
+    runBootStep('schedulePlaneVisualWarmup', () => {
+        scheduleAfterFirstPlay('plane-visual', () => appCtx.preparePlaneModeVisual?.(), { timeout: 9000 });
+    });
     _booted = true;
     return { tryEnablePostProcessing };
 }

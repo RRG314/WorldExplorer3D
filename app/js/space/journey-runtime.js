@@ -27,7 +27,7 @@ import {
   advanceAtmosphericExploration,
   createAtmosphericExploration,
   evaluateAtmosphericEntry
-} from './atmospheric-descent-authority.js?v=1';
+} from './atmospheric-descent-authority.js?v=2';
 import { resolveCelestialSceneCollision } from './celestial-collision.js?v=2';
 
 const MANUAL_FLIGHT_RATE = 100;
@@ -168,6 +168,9 @@ function completeFastTravelEvidence(options = {}) {
 function installSpaceJourneyRuntime(appContext) {
   let operationId = 0;
   let rendered = null;
+  let assistedSceneMotion = null;
+  let assistedCurrentForward = null;
+  let assistedOrientationDelta = null;
 
   const publishAssistState = (overrides = {}) => {
     const plan = rendered?.assistedPlan || null;
@@ -568,7 +571,8 @@ function installSpaceJourneyRuntime(appContext) {
     const throttle = Number.isFinite(Number(options.throttle)) ? Number(options.throttle) : 0;
     const next = advanceAtmosphericExploration(previous, realDtS, {
       climb: options.braking === true,
-      descend: throttle <= 0
+      descend: throttle <= 0,
+      throttle
     });
     const body = rendered.ephemeris.destination;
     const offset = {
@@ -578,25 +582,64 @@ function installSpaceJourneyRuntime(appContext) {
     };
     const length = Math.hypot(offset.x, offset.y, offset.z) || 1;
     const radial = { x: offset.x / length, y: offset.y / length, z: offset.z / length };
+    const scenePosition = rendered.presentation.physicalToScene(rendered.spacecraft.positionM);
+    const thrust = options.thrustDirection || { x: 0, y: 1, z: 0 };
+    const physicalAhead = rendered.presentation.sceneToPhysical({
+      x: scenePosition.x + Number(thrust.x || 0),
+      y: scenePosition.y + Number(thrust.y || 0),
+      z: scenePosition.z + Number(thrust.z || 0)
+    });
+    const physicalForward = {
+      x: physicalAhead.x - rendered.spacecraft.positionM.x,
+      y: physicalAhead.y - rendered.spacecraft.positionM.y,
+      z: physicalAhead.z - rendered.spacecraft.positionM.z
+    };
+    const radialComponent = physicalForward.x * radial.x + physicalForward.y * radial.y + physicalForward.z * radial.z;
+    const tangent = {
+      x: physicalForward.x - radial.x * radialComponent,
+      y: physicalForward.y - radial.y * radialComponent,
+      z: physicalForward.z - radial.z * radialComponent
+    };
+    const tangentLength = Math.hypot(tangent.x, tangent.y, tangent.z) || 1;
+    tangent.x /= tangentLength;
+    tangent.y /= tangentLength;
+    tangent.z /= tangentLength;
+    const angularStep = realDtS > 0
+      ? next.horizontalSpeedMps * realDtS / Math.max(1, body.radiusM + next.altitudeM)
+      : 0;
+    const movedRadial = {
+      x: radial.x + tangent.x * angularStep,
+      y: radial.y + tangent.y * angularStep,
+      z: radial.z + tangent.z * angularStep
+    };
+    const movedRadialLength = Math.hypot(movedRadial.x, movedRadial.y, movedRadial.z) || 1;
+    movedRadial.x /= movedRadialLength;
+    movedRadial.y /= movedRadialLength;
+    movedRadial.z /= movedRadialLength;
     const verticalSpeedMps = realDtS > 0 ? (next.altitudeM - previous.altitudeM) / realDtS : 0;
     rendered.spacecraft = createSpacecraftState({
       ...rendered.spacecraft,
       epochMs: rendered.spacecraft.epochMs + realDtS * 1000,
       positionM: {
-        x: body.positionM.x + radial.x * (body.radiusM + next.altitudeM),
-        y: body.positionM.y + radial.y * (body.radiusM + next.altitudeM),
-        z: body.positionM.z + radial.z * (body.radiusM + next.altitudeM)
+        x: body.positionM.x + movedRadial.x * (body.radiusM + next.altitudeM),
+        y: body.positionM.y + movedRadial.y * (body.radiusM + next.altitudeM),
+        z: body.positionM.z + movedRadial.z * (body.radiusM + next.altitudeM)
       },
       velocityMps: {
-        x: body.velocityMps.x + radial.x * verticalSpeedMps,
-        y: body.velocityMps.y + radial.y * verticalSpeedMps,
-        z: body.velocityMps.z + radial.z * verticalSpeedMps
+        x: body.velocityMps.x + movedRadial.x * verticalSpeedMps + tangent.x * next.horizontalSpeedMps,
+        y: body.velocityMps.y + movedRadial.y * verticalSpeedMps + tangent.y * next.horizontalSpeedMps,
+        z: body.velocityMps.z + movedRadial.z * verticalSpeedMps + tangent.z * next.horizontalSpeedMps
       },
       propellantCapacityKg: rendered.spacecraft.propellantCapacityKg,
       propellantKg: rendered.spacecraft.propellantKg
     });
     rendered.atmosphericExploration = next;
     appContext.spaceAtmosphereExploration = next;
+    appContext.spaceFlight.atmosphericRadialScene = {
+      x: scenePosition.x - rendered.destinationScene.mesh.position.x,
+      y: scenePosition.y - rendered.destinationScene.mesh.position.y,
+      z: scenePosition.z - rendered.destinationScene.mesh.position.z
+    };
     return true;
   };
 
@@ -860,6 +903,27 @@ function installSpaceJourneyRuntime(appContext) {
           appContext.spaceFlight.lastCelestialContact = event;
           publishAssistState({ cancelled: true, collision: true });
         }
+      }
+    }
+    if (
+      assistedUpdate && realDtS > 0 &&
+      typeof appContext.spaceFlight.rocket.position?.clone === 'function' &&
+      typeof appContext.spaceFlight.rocket.quaternion?.clone === 'function'
+    ) {
+      const rocket = appContext.spaceFlight.rocket;
+      assistedSceneMotion ||= rocket.position.clone();
+      assistedCurrentForward ||= rocket.position.clone();
+      assistedOrientationDelta ||= rocket.quaternion.clone();
+      assistedSceneMotion.set(
+        scenePosition.x - prior.x,
+        scenePosition.y - prior.y,
+        scenePosition.z - prior.z
+      );
+      if (assistedSceneMotion.lengthSq() > 1e-8) {
+        assistedSceneMotion.normalize();
+        assistedCurrentForward.set(0, 1, 0).applyQuaternion(rocket.quaternion).normalize();
+        assistedOrientationDelta.setFromUnitVectors(assistedCurrentForward, assistedSceneMotion);
+        rocket.quaternion.premultiply(assistedOrientationDelta).normalize();
       }
     }
     appContext.spaceFlight.rocket.position.set(scenePosition.x, scenePosition.y, scenePosition.z);

@@ -7,13 +7,14 @@ import {
 import { SPACE_CONSTANTS } from "./constants.js?v=3";
 import { PLANETARY_BODIES, configureColorTexture } from "../planetary/catalog.js?v=1";
 import { createSpaceCelestialCatalog } from "./celestial-catalog.js?v=5";
-import { initUniverseRuntime, releaseUniverseRuntimeScene } from "../universe/runtime.js?v=33";
+import { initUniverseRuntime, releaseUniverseRuntimeScene } from "../universe/runtime.js?v=34";
 import { releaseGaiaSkyLayers } from '../sky/gaia-catalog.js?v=4';
 import { createExpeditionSpacecraftMesh } from "./expedition-spacecraft-mesh.js?v=4";
 import { createExpeditionPodMesh } from './expedition-pod-mesh.js?v=3';
 import { createSolisReachExteriorMesh } from './solis-reach-exterior-mesh.js?v=1';
 import { SPACE_CRAFT_IDENTITY } from './craft-identity.js?v=1';
 import { restoreExpeditionDiscoveries } from '../expedition/contact-authority.js?v=4';
+import { releaseAtmosphericFlightPresentation } from './atmospheric-flight-presentation.js?v=1';
 
 export function createSpaceFlightScene(options = {}) {
   console.log("Creating space flight scene...");
@@ -122,10 +123,10 @@ export function ensureSolisReachDockTarget(options = {}) {
     if (needsLocalAnchor) {
       const approach = new THREE.Vector3(0, 1, 0).applyQuaternion(rocket.quaternion).normalize();
       if (approach.lengthSq() <= 1e-8) approach.set(0, 0, -1);
-      starship.position.copy(rocket.position).addScaledVector(approach, Math.max(180, Number(options.distance) || 220));
+      starship.position.copy(rocket.position).addScaledVector(approach, Math.max(90, Number(options.distance) || 130));
       orientSpacecraftForForward(starship, approach.clone().negate());
       // Anchor once per local Universe frame. Re-running acquisition in the same
-      // frame must not move the ship another 220 units away from an approaching
+      // frame must not move the ship farther away from an approaching
       // pod and create an endless leapfrog rendezvous.
       starship.userData.rendezvousFrameId = rendezvousFrameId;
     }
@@ -172,6 +173,33 @@ export function getSolisReachDockTarget() {
     landable: false,
     targetKind: 'expedition-dock'
   };
+}
+
+export function orientActiveCraftTowardSolisReach(options = {}) {
+  const rocket = appCtx.spaceFlight?.rocket;
+  const target = getSolisReachDockTarget();
+  if (!rocket || !target?.position) return false;
+  const forward = target.position.clone().sub(rocket.position);
+  if (forward.lengthSq() <= 1e-8) return false;
+  const radialUp = rocket.position.clone().normalize();
+  orientSpacecraftForForward(rocket, forward, radialUp.lengthSq() > 1e-8 ? radialUp : undefined);
+  if (options.snapCamera !== false) appCtx.spaceFlight._snapCameraToCraft = true;
+  return true;
+}
+
+export function orientActiveCraftForAtmosphere(bodyPosition) {
+  const rocket = appCtx.spaceFlight?.rocket;
+  if (!rocket || !bodyPosition) return false;
+  const radialUp = rocket.position.clone().sub(bodyPosition).normalize();
+  if (radialUp.lengthSq() <= 1e-8) return false;
+  const forward = new THREE.Vector3(0, 1, 0).applyQuaternion(rocket.quaternion);
+  forward.addScaledVector(radialUp, -forward.dot(radialUp));
+  if (forward.lengthSq() <= 1e-6) {
+    forward.set(1, 0, 0).addScaledVector(radialUp, -radialUp.x);
+  }
+  orientSpacecraftForForward(rocket, forward, radialUp);
+  appCtx.spaceFlight._snapCameraToCraft = true;
+  return true;
 }
 
 export function positionSpacecraftAtSolisReachDock(distance = 36) {
@@ -480,6 +508,7 @@ export function resetSpaceFlightForMars() {
 
 export function destroySpaceFlightScene() {
   const scene = appCtx.spaceFlight.scene;
+  releaseAtmosphericFlightPresentation();
   appCtx.resetSolarSystemRuntime?.();
   releaseUniverseRuntimeScene(scene);
   releaseGaiaSkyLayers(appCtx.spaceFlight.celestialCatalog?.gaiaSky);
@@ -498,4 +527,5 @@ export function destroySpaceFlightScene() {
   appCtx.spaceFlight.moon = null;
   appCtx.spaceFlight.solisReachDockTarget = null;
   appCtx.spaceFlight.celestialCatalog = null;
+  appCtx.spaceFlight._snapCameraToCraft = false;
 }
