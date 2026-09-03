@@ -3,13 +3,13 @@ const ACTIVE_FIELD_PHASES = new Set([
 ]);
 
 const POD_PHASE_COPY = Object.freeze({
-  ship_launch: ['Leave Surveyor', 'Fly Pathfinder clear of the ship and acquire your local course.'],
+  ship_launch: ['Leave Solis Reach', 'Fly Pathfinder clear of the ship and acquire your local course.'],
   local_flight: ['Fly Pathfinder', 'Follow the selected course or continue under manual control.'],
   descent: ['Land Pathfinder', 'Complete the approach and touch down on the selected surface.'],
   surface: ['Explore the surface', 'Complete the marked fieldwork, then return to Pathfinder.'],
-  surface_launch: ['Return to Surveyor', 'Climb away from the surface and follow the rendezvous course.'],
-  rendezvous: ['Dock with Surveyor', 'Approach the docking collar at low relative speed.'],
-  recovered: ['Continue aboard Surveyor', 'Review the returned work and prepare the next voyage step.']
+  surface_launch: ['Return to Solis Reach', 'Climb away from the surface and follow the rendezvous course.'],
+  rendezvous: ['Dock with Solis Reach', 'Approach the docking collar at low relative speed.'],
+  recovered: ['Continue aboard Solis Reach', 'Review the returned work and prepare the next voyage step.']
 });
 
 function text(value, fallback = '') {

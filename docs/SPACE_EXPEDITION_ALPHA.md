@@ -14,13 +14,13 @@ as established parts of the game.
 
 An Alpha release may contain unfinished visual variety and a limited mission
 catalog. It may not contain a broken or misleading core journey. Boarding
-Surveyor, finding an objective, entering a pod, flying to a supported surface,
-working there, returning to the pod, rendezvousing with Surveyor, saving, and
+Solis Reach, finding an objective, entering a pod, flying to a supported surface,
+working there, returning to the pod, rendezvousing with Solis Reach, saving, and
 resuming must work before the Alpha is published.
 
 ## The player promise
 
-An Interstellar Expedition is a saved journey lived aboard the Surveyor. The
+An Interstellar Expedition is a saved journey lived aboard the Solis Reach. The
 player flies, walks the ship, stands watches, works with the crew, responds to
 problems, studies discoveries, diverts to local systems, lands where a solid
 surface and the craft permit it, gathers real mission inputs, returns aboard,
@@ -62,7 +62,7 @@ Every chapter contains some combination of:
 The player can leave the planner and walk the ship between events. Important
 events identify the responsible room and crew member. Choosing a response may
 start a real task there rather than resolving everything inside the event card.
-Voyage problems are handled aboard Surveyor: the ship map marks the affected
+Voyage problems are handled aboard Solis Reach: the ship map marks the affected
 room, the equipment area carries a visible warning beacon, assigned crew move
 to the response, and the available action is completed at that room's station.
 The mission panel reports the situation but cannot resolve it remotely.
@@ -247,7 +247,7 @@ the stable seed and modeled-content truth label.
 
 No event, contact, scan, or button creates supplies by itself.
 
-## The Surveyor visual design
+## The Solis Reach visual design
 
 These references establish the target language; they are not textures to paste
 onto flat walls:
@@ -356,7 +356,7 @@ required inputs, expected result, risks, time, recommendation, and response.
 Mobile uses the same information architecture in a single-column sheet. It does
 not receive a separate set of authorities or abbreviated consequences.
 
-## Earth–Surveyor shuttle loop
+## Earth–Solis Reach shuttle loop
 
 Earth is a full endpoint of the Pathfinder pod journey, not a separate travel
 minigame. The connected route is:
@@ -367,18 +367,18 @@ minigame. The connected route is:
    board Pathfinder at that Earth session;
 3. launch under the existing Space Flight controller, with manual steering,
    Earth collision, gravity, camera, and optional guidance unchanged;
-4. acquire the visible Surveyor docking target, approach it, and dock through
+4. acquire the visible Solis Reach docking target, approach it, and dock through
    the existing pod journey state;
-5. enter the same walkable Surveyor interior and continue the saved Expedition;
-6. leave from Surveyor's existing Pod Bay, manually descend to Earth, and hand
+5. enter the same walkable Solis Reach interior and continue the saved Expedition;
+6. leave from Solis Reach's existing Pod Bay, manually descend to Earth, and hand
    off to the existing Earth world loader at the selected saved location; and
-7. reboard Pathfinder on Earth and return to Surveyor without creating a second
+7. reboard Pathfinder on Earth and return to Solis Reach without creating a second
    ship, inventory, crew, world, or mission record.
 
 Ownership is strict. Earth search and world loading own the geographic anchor.
 Space Flight owns motion, camera, gravity, collision, atmosphere, and landing.
 The Expedition pod journey owns boarding, launch, surface, rendezvous, recovery,
-and save/reload. Surveyor interior owns rooms and crew. The normal Explorer,
+and save/reload. Solis Reach interior owns rooms and crew. The normal Explorer,
 Backpack, Journal, and multiplayer records cross the boundary unchanged.
 
 The initial Alpha slice may offer the currently loaded Earth location plus
@@ -431,7 +431,7 @@ following work in actual gameplay:
 - ordinary manual Space, Wayfinder assistance, Solar System landing, planetary
   play, Character, Backpack, Journal, geology/mining, and Earth play remain
   unchanged when no Expedition is active; and
-- Earth-to-Surveyor and Surveyor-to-Earth pod travel preserve the selected Earth
+- Earth-to-Solis Reach and Solis Reach-to-Earth pod travel preserve the selected Earth
   session, require real manual flight or an explicit assist choice, show a
   physical docking target, and recover after reload without duplicating a pod;
   and

@@ -1,13 +1,13 @@
 {
   "schemaVersion": 3,
-  "programId": "world-explorer-5.1-release-2026-08-27",
-  "targetVersion": "5.1.0",
+  "programId": "world-explorer-5.2-release-2026-09-03",
+  "targetVersion": "5.2.0",
   "productionBaseline": {
-    "version": "5.0.0",
-    "releaseCommit": "caa95d990db8ee30806b28e7962af2777eff56bf"
+    "version": "5.1.0",
+    "releaseCommit": "a4bc3247b3fccf209f558710f7f960a0d859c247"
   },
   "roadmap": "ROADMAP.md",
-  "acceptanceContract": "RELEASE_NOTES_5.1.0.md",
+  "acceptanceContract": "RELEASE_NOTES_5.2.0.md",
   "deploymentRequiresExplicitUserApproval": true,
   "requiredCompleteStatus": "complete",
   "statusDefinitions": ["complete", "in-progress", "partial", "not-implemented"],
@@ -15,7 +15,7 @@
     "CP0": {
       "name": "Current feature evidence",
       "status": "complete",
-      "minimumDecision": "Retain only public feature claims backed by current source evidence and fresh normal-input journeys on the immutable 5.1 candidate.",
+      "minimumDecision": "Retain only public feature claims backed by current source evidence and fresh normal-input journeys on the immutable 5.2 candidate.",
       "requiredCommands": ["verify:source", "verify:world", "verify:artifact-runtime", "verify:release-claims", "verify:explorer-coherence-browser", "verify:regional-guide-new-york"],
       "openItems": []
     },
@@ -43,7 +43,7 @@
     "CP4": {
       "name": "Player, Backpack, Journal, progression, and controls",
       "status": "complete",
-      "minimumDecision": "Ship one Explorer event and profile authority across the Backpack, Journal, Field Guide, fieldwork, games, making, travel, community, and companions; retain tested touch profiles with reset and reload recovery. Full cross-device Journal sync and per-action remapping remain staged and are not 5.1 claims.",
+      "minimumDecision": "Ship one Explorer event and profile authority across the Backpack, Journal, Field Guide, fieldwork, games, making, travel, community, and companions; retain tested touch profiles with reset and reload recovery. Full cross-device Journal sync and per-action remapping remain staged and are not 5.2 claims.",
       "requiredCommands": ["verify:player-state", "verify:urban-equipment", "verify:mobile-controls", "verify:field-retention-ui", "verify:explorer-coherence", "verify:discovery-receipts", "verify:explorer-coherence-browser"],
       "openItems": []
     },
@@ -57,8 +57,8 @@
     "CP6": {
       "name": "Missions, engagement, crafting, and economy",
       "status": "complete",
-      "minimumDecision": "Retain Field Today, daily and weekly Expeditions, seasonal surveys, progression, and existing games while projecting them into the same Explorer Journal. Crafting, currency, and a reward-grade unified economy are excluded and must not be publicly claimed.",
-      "requiredCommands": ["verify:mission-lifecycle", "verify:retention-release", "verify:field-retention-ui", "verify:explorer-coherence", "audit:release-claims"],
+      "minimumDecision": "Retain Field Today, daily and weekly Expeditions, seasonal surveys, progression, and existing games in the same Explorer Journal. Credits, mapped-business exchange, connected property transactions, and conserved Earth-to-ship materials must use the existing Backpack, cargo, property, and backend authorities.",
+      "requiredCommands": ["verify:mission-lifecycle", "verify:retention-release", "verify:field-retention-ui", "verify:explorer-coherence", "verify:world-economy", "verify:connected-property-backend", "audit:release-claims"],
       "openItems": []
     },
     "CP7": {
@@ -76,24 +76,24 @@
       "openItems": []
     },
     "CP9": {
-      "name": "Multiplayer and creator publishing",
+      "name": "Multiplayer and Quick Build",
       "status": "complete",
-      "minimumDecision": "Retain authenticated rooms, one public World Editor containing reviewed semantic overlays and persistent local/room Blocks, and explicitly device-local activity creation. Do not expose Blocks as a competing top-level editor or claim public activity publishing.",
-      "requiredCommands": ["verify:multiplayer", "verify:creator-flow", "verify:block-local-store", "verify:block-shared-sync", "verify:world-editor-blocks-desktop", "verify:world-editor-blocks-mobile", "verify:world-editor-blocks-vehicle", "verify:world-editor-blocks-room"],
+      "minimumDecision": "Retain authenticated rooms and one Quick Build path for persistent local and room Blocks. The removed game editor and unfinished overlay-authoring interface must not be loaded or presented as released features.",
+      "requiredCommands": ["verify:multiplayer", "verify:block-local-store", "verify:block-shared-sync", "verify:gameplay-menu", "verify:hotbar-actions"],
       "openItems": []
     },
     "CP10": {
       "name": "Performance, memory, and data use",
       "status": "complete",
       "minimumDecision": "Enforce numeric budgets on the physical Apple M1/8 GB desktop and a clearly labeled 390x844 Chrome touch-regression tier; do not claim physical-phone battery, thermal, or sustained FPS evidence until a phone is measured.",
-      "requiredCommands": ["verify:performance-retention", "verify:assembled-locations", "verify:environments"],
+      "requiredCommands": ["verify:performance-retention", "verify:space-memory-lifecycle", "verify:assembled-locations", "verify:environments"],
       "openItems": []
     },
     "CP11": {
       "name": "UI, accessibility, presentation, and release identity",
       "status": "complete",
-      "minimumDecision": "Require keyboard and 390x844 touch completion of every retained primary flow, honest public claims, inspected runtime captures, and one immutable 5.1 identity.",
-      "requiredCommands": ["verify:accessibility-release", "verify:mobile-controls", "verify:player-reported-blockers", "verify:release-claims", "verify:source", "verify:hosting", "verify:release-identity", "release:verify"],
+      "minimumDecision": "Require keyboard and 390x844 touch completion of every retained primary flow, honest public claims, inspected runtime captures, and one immutable 5.2 identity.",
+      "requiredCommands": ["verify:accessibility-release", "verify:mobile-controls", "verify:player-reported-blockers", "verify:connected-explorer-journey", "verify:current-space-journey", "verify:release-claims", "verify:source", "verify:hosting", "verify:release-identity", "release:verify"],
       "openItems": []
     }
   }

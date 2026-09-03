@@ -19,7 +19,7 @@ World Explorer keeps three travel depths through the same destination catalog:
    on arrival.
 
 An Expedition never creates another copy of a star, planet, Explorer, Journal,
-Backpack, planetary surface, geology activity, World Editor, Blocks world, or
+Backpack, planetary surface, geology activity, Quick Build, Blocks world, or
 multiplayer platform.
 
 ## Selected architecture
@@ -204,7 +204,7 @@ available without creating or loading an Expedition.
 
 ## Current implementation status
 
-The Surveyor now has three validated decks, 25 reachable rooms, working
+The Solis Reach now has three validated decks, 25 reachable rooms, working
 pressure doors and lift, compact and expanded maps, visible assigned crew,
 mobile walking controls, and room stations connected to the same crew,
 resources, systems, mission log, and existing Explorer Journal. Entering the

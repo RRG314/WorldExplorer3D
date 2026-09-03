@@ -1,4 +1,4 @@
-# Surveyor Expedition Ship
+# Solis Reach Expedition Ship
 
 Status: implementation design for the playable Interstellar Expedition ship
 
@@ -7,7 +7,7 @@ Parent environment: existing `SPACE_FLIGHT`
 
 ## Experience
 
-The Surveyor turns an interstellar route into a journey rather than a loading
+The Solis Reach turns an interstellar route into a journey rather than a loading
 screen. The player remains the same Explorer and can walk the ship, stand a
 watch, care for the crew, inspect and repair systems, run science, prepare local
 craft, process returned samples, respond to hazards, keep the log, and return
@@ -21,7 +21,7 @@ The journey combines three complementary rhythms:
 - the existing World Explorer space sandbox, planetary surfaces, geology,
   mining, vehicles, Backpack, Journal, and progression.
 
-The Surveyor is not a replica of a television or film spacecraft. Its visual
+The Solis Reach is not a replica of a television or film spacecraft. Its visual
 language is an original practical research vessel: warm crew spaces, restrained
 navy and pale structural surfaces, visible service trunks, labeled pressure
 doors, readable status lighting, and distinct room silhouettes.
@@ -190,11 +190,11 @@ and voyage resumption. The detection itself awards nothing. Material type,
 accessibility, yield, equipment, energy cost, waste, and transfer are explicit.
 
 The Pod Launch Bay makes that journey physical. The Explorer boards the pod,
-leaves Surveyor for manual local flight, chooses when to begin the supported
+leaves Solis Reach for manual local flight, chooses when to begin the supported
 landing sequence, and arrives beside the same pod on the walkable surface. The
 surface is prepared behind the descent transition. Returning requires walking
 back to the ramp, boarding the pod, launching, and completing rendezvous with
-Surveyor. Course, landing, surface, field-work, cargo, and return state remain
+Solis Reach. Course, landing, surface, field-work, cargo, and return state remain
 owned by their existing authorities; the pod journey only orders those stages.
 
 Catalog black holes are valid Expedition destinations. They use the observed
@@ -220,7 +220,7 @@ chain, not a random instant failure.
 
 | Concern | Owner |
 | --- | --- |
-| deck geometry, rooms, doors, lift, stations, and map graph | Surveyor layout catalog |
+| deck geometry, rooms, doors, lift, stations, and map graph | Solis Reach layout catalog |
 | player movement and camera | existing `Walk` authority |
 | collision and containment | existing `activeInterior` plus current-deck door colliders |
 | ship, route, crew, systems, resources, cargo, events, and log | versioned Expedition record |

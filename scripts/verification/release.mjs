@@ -2,12 +2,8 @@ import { spawnSync } from 'node:child_process';
 
 const steps = [
   {
-    name: 'Current source and entry graph',
-    command: [process.execPath, 'scripts/verification/source.mjs']
-  },
-  {
-    name: 'Pinned external provider release is current and reachable',
-    command: [process.execPath, 'scripts/verification/provider-release.mjs']
+    name: 'Current release scope and public claims',
+    command: [process.execPath, 'scripts/verification/release-scope.mjs', '--require-ready']
   },
   {
     name: 'Firebase Functions syntax',
@@ -23,63 +19,18 @@ const steps = [
     cwd: 'functions'
   },
   {
-    name: 'Firestore authorization and legacy-account compatibility',
-    command: ['npm', 'run', 'verify:firestore-rules']
-  },
-  {
     name: 'Build the production hosting artifact',
     command: [process.execPath, 'scripts/hosting-artifact.mjs', 'build', '--firebase-env', 'production']
   },
   {
-    name: 'Verify artifact hashes and source parity',
-    command: [process.execPath, 'scripts/hosting-artifact.mjs', 'verify']
-  },
-  {
-    name: 'Verify one release version, commit, artifact, and displayed identity',
-    command: [process.execPath, 'scripts/verification/release-identity.mjs']
-  },
-  {
-    name: 'Two authenticated multiplayer clients converge in one bounded room',
-    command: ['npm', 'run', 'verify:multiplayer'],
+    name: 'Run the complete candidate system matrix against the artifact',
+    command: [process.execPath, 'scripts/verification/system-release.mjs', '--run', '--scope=candidate'],
     environment: { WE3D_VERIFY_ROOT: 'dist' }
   },
   {
-    name: 'Verify reachable hosting sources',
-    command: [process.execPath, 'scripts/audit-hosting-reachability.mjs', '--strict']
-  },
-  {
-    name: 'Verify reachable hosting assets',
-    command: [process.execPath, 'scripts/audit-hosting-assets.mjs', '--strict']
-  },
-  {
-    name: 'Run the complete player journey against the artifact',
-    command: [process.execPath, 'scripts/verification/world.mjs'],
+    name: 'Run the complete backend authority matrix',
+    command: ['npm', 'run', 'verify:backend-release'],
     environment: { WE3D_VERIFY_ROOT: 'dist' }
-  },
-  {
-    name: 'Verify the shared Backpack and equipment through normal player input',
-    command: [process.execPath, 'scripts/verification/urban-equipment.mjs'],
-    environment: { WE3D_VERIFY_ROOT: 'dist' }
-  },
-  {
-    name: 'Verify the final visible player owns the Jones Falls elevated deck',
-    command: [process.execPath, 'scripts/verification/jfx-player-surface.mjs'],
-    environment: { WE3D_VERIFY_ROOT: 'dist' }
-  },
-  {
-    name: 'Verify Moon, Mars, Space, and Ocean environment ownership',
-    command: [process.execPath, 'scripts/verification/environments.mjs'],
-    environment: { WE3D_VERIFY_ROOT: 'dist' }
-  },
-  {
-    name: 'Verify live GPS walk/drive selection and behind-actor camera return',
-    command: [process.execPath, 'scripts/verification/live-gps.mjs'],
-    environment: { WE3D_VERIFY_ROOT: 'dist' }
-  },
-  {
-    name: 'Verify representative complete assembled Earth locations',
-    command: [process.execPath, 'scripts/verification/assembled-locations.mjs'],
-    environment: { WE3D_VERIFY_ROOT: 'dist', WE3D_CAPTURE_RELEASE_EVIDENCE: '1' }
   }
 ];
 
@@ -95,4 +46,4 @@ for (const step of steps) {
   }
 }
 
-console.log('\n[release] Current automated release boundaries passed. Visual evidence still requires an explicit clean-artifact capture and human approval.');
+console.log('\n[release] Automated release boundaries passed on the production artifact. Desktop and phone owner approval are still required before deployment.');

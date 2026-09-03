@@ -2,6 +2,49 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
+## [5.2.0] - 2026-09-03
+
+### Added
+
+- Interstellar Expeditions Alpha aboard Solis Reach, including a walkable
+  three-deck ship, crew work, voyage events, persistent journey state, long-term
+  travel, discoveries, failures, recovery, shared Expeditions, and outposts.
+- A connected Pathfinder journey between Earth, Solis Reach, supported
+  planetary surfaces, surface fieldwork, return cargo, and ship analysis.
+- Destination mission families for Proxima Centauri and TRAPPIST-1, plus
+  catalog-backed mission identity and modeled planetary environments.
+- Explorer Credits and a connected virtual-property loop with one free first
+  claim, listings, authorized purchases, mapped public addresses, and Community
+  Board records.
+- A conserved material path from planetary collection to ship cargo, analysis,
+  the Backpack, and eligible mapped Earth stores.
+- A privacy-safe public explorer total on the landing page.
+
+### Changed
+
+- Reorganized the gameplay bar around Explore, Travel, Backpack, Community,
+  Real Estate, Quick Build, and current controls.
+- Kept Quick Build as the player-facing Blocks workflow and removed the
+  unfinished game editor from the runtime.
+- Improved Space and planetary lifecycle ownership so inactive renderers release
+  their buffers without breaking later entry.
+- Updated analytics initialization and bounded gameplay events so ordinary
+  visits are counted while precise locations, room codes, names, messages, and
+  other free-form text remain excluded.
+
+### Fixed
+
+- Preserved one Pathfinder and one Solis Reach identity across launch, landing,
+  surface return, rendezvous, docking, ship entry, and Earth return.
+- Prevented Wayfinder assistance and manual input from competing during
+  destination handoff.
+- Kept solid planetary surfaces opaque and prevented below-ground traversal on
+  supported landing worlds.
+- Completed route-dependent civic response approaches and prevented a completed
+  custody incident from immediately repeating.
+- Added missing Hosting routes for property, civic-response, and shared
+  Expedition actions.
+
 ## [5.1.0] - 2026-08-30
 
 ### Added

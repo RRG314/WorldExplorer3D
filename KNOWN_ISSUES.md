@@ -1,6 +1,6 @@
 # Known Issues and Limitations
 
-Last reviewed: 2026-08-30 for World Explorer 3D 5.1.0.
+Last reviewed: 2026-09-03 for World Explorer 3D 5.2.0.
 
 ## Location and map coverage
 
@@ -71,7 +71,7 @@ Last reviewed: 2026-08-30 for World Explorer 3D 5.1.0.
 ## Interstellar Expeditions Alpha
 
 - Interstellar Expeditions are an optional Alpha inside the main game. The
-  connected Surveyor, voyage, pod, surface-work, return, and cargo paths are
+  connected Solis Reach, voyage, pod, surface-work, return, and cargo paths are
   playable, but room art, crew animation, vehicle presentation, destination
   variety, mission action variety, sound, and mobile performance remain under
   active development.

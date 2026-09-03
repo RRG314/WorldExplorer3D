@@ -346,7 +346,7 @@ function tutorialOnEvent(eventName, payload = {}) {
     showContextTip('building', {
       eyebrow: 'Building tip',
       title: 'Build in this world',
-      body: 'Build with Blocks and the Editor share the same placed-work authority. Save locally as you work; publish only when you choose.'
+      body: 'Quick Build places Blocks in this location. Your local builds save on this device, and room builds can be shared with other explorers.'
     });
   } else if (name === 'opened_rooms_menu' || name === 'room_created_or_toggled') {
     showContextTip('rooms', {

@@ -13,7 +13,7 @@ space.
 <p align="center">
   <a href="https://worldexplorer3d.io/app/"><strong>Play World Explorer 3D</strong></a>
   · <a href="CONTROLS_REFERENCE.md">Controls</a>
-  · <a href="RELEASE_NOTES_5.1.0.md">What’s new</a>
+  · <a href="RELEASE_NOTES_5.2.0.md">What’s new</a>
   · <a href="ROADMAP.md">Roadmap</a>
 </p>
 
@@ -31,9 +31,9 @@ generated interiors, drive, fly, sail, fish, survey habitats, build, or meet
 other players in a room tied to that location.
 
 The same Explorer connects your Backpack, quick slots, Journal, Field Guide,
-activities, Expeditions, specialties, companions, and seasonal surveys. The
-World Editor holds both reviewed overlays and persistent Blocks, so creating a
-place remains part of the world instead of a separate building game.
+activities, Expeditions, specialties, companions, property, and seasonal
+surveys. Quick Build places persistent Blocks directly in the current world,
+including shared builds inside multiplayer rooms.
 
 | Water and shore | Flight |
 | :--: | :--: |
@@ -54,6 +54,8 @@ active world.*
 
 - Explore on foot, by car, drone, plane, helicopter, boat, ship, rover,
   astronaut, or spacecraft, or use optional Live GPS play while walking.
+- Drive vehicle families with distinct vehicle handling, visible condition, and
+  enterable responder vehicles.
 - Visit supported mapped airports to board aircraft, choose pilot or passenger
   travel, search for destinations, or take a local sightseeing flight.
 - Search for places by familiar names, including cities, landmarks, airports,
@@ -62,31 +64,36 @@ active world.*
   equipment, and ranged actions.
 - Photograph, inspect, survey, identify, fish, follow tracks and signs, and
   record finds in the Journal and Field Guide.
+- Explore eleven regional Field Guide packs with 180 attainable entries across
+  the built-in Earth destinations.
 - Care for companions, build trust and levels, and travel with eligible
   domestic, bird, and livestock companions.
 - Enter persistent multiplayer rooms with presence, chat, activities, shared
   Blocks, and room vehicles.
-- Build with Blocks inside the World Editor and return to supported local or
-  shared creations later.
+- Use Quick Build to place persistent Blocks in local play or a multiplayer
+  room.
 - Leave Earth for the Moon, planets, the solar system, and selected deep-space
   destinations, with manual flight always available.
-- Try Interstellar Expeditions in Alpha: live aboard Surveyor, work with its
-  crew, respond to voyage events, and take a pod to supported planetary sites.
+- Try Interstellar Expeditions in Alpha: live aboard Solis Reach, work with its
+  crew, respond to voyage events, and fly Pathfinder to supported planetary
+  sites and back.
+- Claim a first virtual property, list or purchase available properties with
+  Explorer Credits, and connect planetary samples to the same Backpack, cargo,
+  and mapped-business exchange loop.
 
-## Version 5.1
+## Version 5.2
 
-Version 5.1 brings the Explorer systems into one clearer experience and expands
-the sandbox across Earth, oceans, airports, and space. It includes distinct
-vehicle handling, visible damage, enterable responder vehicles, aviation and
-skydiving, playable maritime fleets, regional field guides, companion growth,
-configurable quick slots, improved place search, a redesigned First Journey,
-rooftop traversal, and a more capable Wayfinder.
+Version 5.2 extends the 5.1 sandbox with the Interstellar Expeditions Alpha,
+connected virtual property and Explorer Credits, a clearer gameplay menu, and
+faster cleanup when moving between worlds. The established 5.1 Earth,
+Ocean, vehicle, flight, fieldwork, Backpack, Journal, and multiplayer paths
+remain part of the release.
 
-Eleven regional Field Guide packs provide 180 attainable entries across the
-built-in Earth destinations. Field leads are game opportunities: they do not
-claim that a real animal is physically present at the player’s location.
+Interstellar Expeditions are intentionally labeled Alpha. They provide a
+connected playable journey and saved progression, while ship art, crew motion,
+mission variety, audio, and planetary detail continue to grow.
 
-Read the full [5.1 release notes](RELEASE_NOTES_5.1.0.md) and the current
+Read the full [5.2 release notes](RELEASE_NOTES_5.2.0.md) and the current
 [known issues](KNOWN_ISSUES.md).
 
 ## Multiplayer and building
@@ -96,9 +103,9 @@ shares one location, player presence, chat, activities, persistent vehicles,
 and player-built Blocks. Private rooms use invite codes; public rooms can be
 found by city.
 
-Blocks are part of the World Editor. Existing supported local and room Blocks
-remain on that shared persistence path, with one owner for placement,
-permissions, saving, and recovery.
+Quick Build is the single player-facing Blocks workspace. Existing supported
+local and room Blocks remain on the same persistence path, with one owner for
+placement, permissions, saving, and recovery.
 
 ## World data and accuracy
 
@@ -140,7 +147,7 @@ environment. Secrets are not included in the repository.
 
 ## Project guide
 
-- [Release notes](RELEASE_NOTES_5.1.0.md)
+- [Release notes](RELEASE_NOTES_5.2.0.md)
 - [Changelog](CHANGELOG.md)
 - [Roadmap](ROADMAP.md)
 - [System inventory](docs/SYSTEM_INVENTORY.md)

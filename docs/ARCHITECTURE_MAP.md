@@ -16,14 +16,14 @@ flowchart LR
     Earth --> Actors[Player, traffic, pedestrians, and wildlife]
     Earth --> Field[Field activities and progression]
     Earth --> Sandbox[Vehicles, companions, commerce, combat, and civic response]
-    Earth --> Editor[World Editor and Blocks]
+    Earth --> Build[Quick Build and Blocks]
     Earth --> Rooms[Multiplayer rooms]
     Field --> PlayerState[Backpack, Journal, Guide, and goals]
-    Editor --> LocalState[Local persistence]
-    Editor --> Rooms
+    Build --> LocalState[Local persistence]
+    Build --> Rooms
     Rooms --> Firebase[Authorized backend and Firestore]
     Expedition --> PlayerState
-    Expedition --> Editor
+    Expedition --> Build
     Expedition --> Rooms
 ```
 
@@ -167,7 +167,7 @@ service availability, staffing, access, or a promise that a transaction can
 occur at the real place. Those are deterministic game rules and are labeled as
 game stock in the interface.
 
-Earth-to-ship material transfer is performed at the existing Surveyor cargo
+Earth-to-ship material transfer is performed at the existing Solis Reach cargo
 station. It consumes the exact Backpack quantities, adds the declared mass to
 the existing Expedition resources, checks ship capacity, records the transfer,
 and restores the Backpack if persistence fails. Personal equipment, ship cargo,
@@ -177,7 +177,7 @@ together.
 
 The return path uses the same owners in reverse without collapsing their roles.
 A planetary field interaction creates one Backpack sample; boarding the return
-pod transfers that exact lot into Surveyor science cargo. Resource Processing
+pod transfers that exact lot into Solis Reach science cargo. Resource Processing
 documents and seals it, Analysis & Data approves eligible non-recovery evidence,
 and the Cargo Hold performs the only ship-to-Backpack export. The exported item
 retains its sample, body, contact, mass, truth-class, and review identifiers.
@@ -270,11 +270,11 @@ action. `expedition/runtime.js` derives phase-aware advice from the same voyage,
 destination mission, and contact records, while `ship-interior.js` sends the
 chosen station to the existing cross-deck map and lift route.
 
-Earth–Surveyor travel reuses that same ownership chain. The current Earth
+Earth–Solis Reach travel reuses that same ownership chain. The current Earth
 session supplies the geographic anchor, `space.js` and the Space runtime own
 manual Pathfinder motion, camera, gravity, collision, approach, and landing,
 and `expedition/pod-journey-authority.js` owns the ordered shuttle phases. The
-Surveyor docking target is the physical exterior collar in Earth orbit rather
+Solis Reach's docking target is the physical exterior collar in Earth orbit rather
 than a second Earth-world vehicle. Docking enters the existing ship interior;
 Earth descent returns through the existing Earth session loader at the saved
 location. Backpack, Journal, account, and multiplayer records are not copied at
@@ -306,18 +306,16 @@ power, stores, condition, operating status, revision, and log. Single-player
 state is local and versioned; a room Expedition is server-owned and clients may
 only request validated mutations through the existing room backend.
 
-## World Editor and persistent Blocks
+## Quick Build and persistent Blocks
 
-The World Editor is the single entry point for two related workflows:
+Quick Build is the single player-facing entry for Blocks. It uses the existing
+shape catalog, placement and removal authority, undo history, collision, and
+local or room persistence. Opening it does not create another world, editor
+scene, movement controller, or copy of the block store.
 
-- Reviewed overlays use drafts, validation, revisions, moderation, and a
-  published read-only projection.
-- Blocks use direct local or room persistence, placement/removal authority,
-  undo, reconnect handling, and collision integration.
-
-These workflows share navigation and world ownership but not trust rules.
-Blocks do not become map-provider edits, and overlay drafts do not bypass
-moderation.
+Local builds remain device-local. Room builds use authenticated room ownership
+and Firestore rules. Blocks are game-created content and never become edits to
+OpenStreetMap or another map provider.
 
 ## Multiplayer and backend
 
@@ -368,8 +366,8 @@ the selected Firebase environment configuration. Backend deployment is a
 separate operation from hosting deployment.
 
 Production promotion is intentionally separate from staging preview creation.
-The 5.1 release build is built once, preserved with its manifest and content
+The 5.2 release build is built once, preserved with its manifest and content
 hash, and exercised on desktop and mobile. Backend authorization, multiplayer,
-and creator checks run against local Firebase emulators. Production hosting and
+property, account, civic, and shared Expedition checks run against local Firebase emulators. Production hosting and
 backend services are not changed until that exact build is reviewed and
 explicitly approved.
