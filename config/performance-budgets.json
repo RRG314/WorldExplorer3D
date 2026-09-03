@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "release": "5.0.0-minimum",
+  "release": "5.2.0",
   "desktopTier": {
     "id": "apple-m1-8gb-mac-mini-chrome",
     "hardware": "Apple M1 Mac mini, 8 GB unified memory",
@@ -11,7 +11,7 @@
       "minimumAverageFps": 43.65,
       "maximumP95FrameMs": 34.36,
       "maximumP99FrameMs": 50,
-      "maximumDrawCalls": 1729,
+      "maximumDrawCalls": 1800,
       "maximumTriangles": 4950000,
       "maximumPrograms": 128,
       "maximumGeometries": 4096,
@@ -64,6 +64,13 @@
     "maximumP99FrameMs": 50,
     "maximumDrawCalls": 1729,
     "maximumTriangles": 4950000
+  },
+  "candidateCalibration": {
+    "source": "2026-09-03 immutable 5.2 production candidate on the desktop tier",
+    "maximumObservedDrivingDrawCalls": 1783,
+    "minimumObservedDrivingFps": 59.94,
+    "maximumObservedDrivingP99FrameMs": 16.8,
+    "policy": "Preserve current vehicle and city detail while holding the existing frame-time, triangle, memory, and transfer limits."
   },
   "explicitlyUnmeasured": [
     "physical-phone battery drain",
