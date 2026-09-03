@@ -116,11 +116,19 @@ export function ensureSolisReachDockTarget(options = {}) {
     starship.quaternion.copy(worldQuaternion);
   }
   const rocket = appCtx.spaceFlight?.rocket;
+  const rendezvousFrameId = String(appCtx.universeRuntime?.current?.id || 'sol');
+  const needsLocalAnchor = starship.userData.rendezvousFrameId !== rendezvousFrameId;
   if (options.nearActiveCraft === true && rocket) {
-    const approach = new THREE.Vector3(0, 1, 0).applyQuaternion(rocket.quaternion).normalize();
-    if (approach.lengthSq() <= 1e-8) approach.set(0, 0, -1);
-    starship.position.copy(rocket.position).addScaledVector(approach, Math.max(180, Number(options.distance) || 220));
-    orientSpacecraftForForward(starship, approach.clone().negate());
+    if (needsLocalAnchor) {
+      const approach = new THREE.Vector3(0, 1, 0).applyQuaternion(rocket.quaternion).normalize();
+      if (approach.lengthSq() <= 1e-8) approach.set(0, 0, -1);
+      starship.position.copy(rocket.position).addScaledVector(approach, Math.max(180, Number(options.distance) || 220));
+      orientSpacecraftForForward(starship, approach.clone().negate());
+      // Anchor once per local Universe frame. Re-running acquisition in the same
+      // frame must not move the ship another 220 units away from an approaching
+      // pod and create an endless leapfrog rendezvous.
+      starship.userData.rendezvousFrameId = rendezvousFrameId;
+    }
   } else if (earth) {
     const earthPosition = earth.getWorldPosition(new THREE.Vector3());
     starship.position.copy(earthPosition).add(new THREE.Vector3(0, SPACE_CONSTANTS.EARTH_SIZE + 260, 0));

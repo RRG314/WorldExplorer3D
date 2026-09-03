@@ -1050,6 +1050,19 @@ function installSpaceJourneyRuntime(appContext) {
     publishAssistState();
   };
 
+  // Interstellar navigation owns the craft pose once Wayfinder leaves the
+  // local Solar System route. Unlike the surface-return pause above, this is
+  // a terminal authority handoff: stale local journey state must not keep
+  // moving the same craft or overwrite the interstellar travel phase.
+  const releaseRenderedJourneyToManualFlight = () => {
+    const released = rendered != null;
+    clearRenderedSpaceJourney();
+    appContext.spaceJourney = null;
+    appContext.spacecraftState = null;
+    appContext.spaceJourneyEphemeris = null;
+    return released;
+  };
+
   const startFastTravelJourney = async (destinationInput, options = {}) => {
     const destinationBodyId = normalizeAstronomicalBodyId(destinationInput);
     const sourceBodyId = options.sourceBodyId
@@ -1093,6 +1106,7 @@ function installSpaceJourneyRuntime(appContext) {
     clearRenderedSpaceJourney,
     completeFastTravelEvidence,
     engageRenderedJourneyAssist,
+    releaseRenderedJourneyToManualFlight,
     retargetRenderedSpaceJourney,
     setSolarSystemCourse,
     requestRenderedJourneyLanding,
@@ -1107,6 +1121,7 @@ function installSpaceJourneyRuntime(appContext) {
     cancelSpaceJourneyOperation,
     clearRenderedSpaceJourney,
     engageRenderedJourneyAssist,
+    releaseRenderedJourneyToManualFlight,
     retargetRenderedSpaceJourney,
     setSolarSystemCourse,
     requestRenderedJourneyLanding,

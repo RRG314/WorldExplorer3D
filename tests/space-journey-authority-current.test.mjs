@@ -101,6 +101,35 @@ test('Set Course starts one assisted journey from free flight and keeps that jou
   assert.equal(appContext.spaceJourney.journeyId, journeyId);
 });
 
+test('interstellar handoff releases the local journey before another controller owns the craft', () => {
+  const position = (x, y, z) => ({ x, y, z, set(nx, ny, nz) { this.x = nx; this.y = ny; this.z = nz; } });
+  const appContext = {
+    spaceFlight: {
+      active: true,
+      earth: { position: position(0, 0, 0) },
+      moon: { position: position(120, 20, 0) },
+      rocket: { position: position(58, 0, 0) },
+      velocity: position(0, 0, 0),
+      speed: 0,
+      mode: 'flying'
+    }
+  };
+  const runtime = installSpaceJourneyRuntime(appContext);
+  assert.equal(runtime.beginRenderedSpaceJourney({
+    sourceBodyId: 'earth',
+    destinationBodyId: 'moon',
+    mode: JOURNEY_MODE.MANUAL
+  }), true);
+  assert.equal(runtime.updateRenderedSpaceJourney({ realDtS: 0.1 }), true);
+  assert.equal(runtime.releaseRenderedJourneyToManualFlight(), true);
+  assert.equal(runtime.updateRenderedSpaceJourney({ realDtS: 0.1 }), false);
+  assert.equal(appContext.spaceJourney, null);
+  assert.equal(appContext.spacecraftState, null);
+  assert.equal(appContext.spaceJourneyEphemeris, null);
+  assert.equal(appContext.spaceJourneyAssistState.active, false);
+  assert.equal(appContext.spaceJourneyAssistState.available, false);
+});
+
 test('Earth-Moon journey cannot skip evidence-gated phases', () => {
   let journey = createSpaceJourney({
     sourceBodyId: 'earth',

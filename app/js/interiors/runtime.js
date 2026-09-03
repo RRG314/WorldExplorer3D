@@ -181,7 +181,13 @@ function nearestInteriorInteraction(active, walker) {
       active.floorBaseY + interaction.level * active.floorPlan.storyHeight - feetY
     )
   })).filter((interaction) => interaction.distance <= interaction.radius && interaction.verticalDistance <= 1.15)
-    .sort((a, b) => a.interactionPriority - b.interactionPriority || a.distance - b.distance)[0] || null;
+    .sort((a, b) => {
+      // Adjacent pressure doors and workstations have intentionally generous
+      // touch radii. Prefer the clearly closer object so a doorway cannot
+      // consume E while the player is standing directly at a console.
+      if (Math.abs(a.distance - b.distance) > 0.35) return a.distance - b.distance;
+      return a.interactionPriority - b.interactionPriority || a.distance - b.distance;
+    })[0] || null;
 }
 
 function closeElevatorFloorPicker(active = appCtx.activeInterior) {

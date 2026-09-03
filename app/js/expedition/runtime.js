@@ -315,6 +315,10 @@ function schedulePodRecovery(returnFrameId, startedAt = performance.now(), minim
     if (!activePodJourney || activePodJourney.phase !== POD_PHASE.RENDEZVOUS) return;
     const runtime = activeContext?.universeRuntime;
     if (performance.now() - startedAt >= minimumVisibleMs && !runtime?.transition && (!returnFrameId || runtime?.current?.id === returnFrameId)) {
+      // Universe arrival owns the transfer phase while frames are changing.
+      // Hand the session back to the pod journey before exposing the dock so
+      // the target, HUD, and docking action cannot disappear after arrival.
+      syncSpaceSessionToPodJourney(activePodJourney);
       activeContext?.ensureSolisReachDockTarget?.({ nearActiveCraft: true });
       activeContext?.showSpaceFlightMessage?.(`${STARSHIP_NAME.toUpperCase()} ACQUIRED · FLY TO THE DOCKING LIGHTS`, '#83e6a6');
       return;

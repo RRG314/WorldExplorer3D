@@ -531,7 +531,17 @@ export function updateSpaceFlightPhysics() {
   }
 
   appCtx.spaceFlight._isThrusting = isThrusting;
-  applyPlanetaryGravity(rocket, launchAssist, isThrusting);
+  const sharedOrbitalRendezvous = appCtx.getSpaceTravelSession?.()?.phase === 'rendezvous'
+    && appCtx.getSolisReachDockTarget?.()?.position != null;
+  if (sharedOrbitalRendezvous) {
+    // The pod and Solis Reach share the same orbital free-fall frame. Applying
+    // planetary acceleration to the pod alone creates artificial relative
+    // speed and makes the final manual docking corridor impossible to hold.
+    appCtx.spaceFlight.gravityVelocity?.multiplyScalar?.(Math.pow(0.35, frameScale));
+    appCtx.spaceFlight._gravityVec?.set?.(0, 0, 0);
+  } else {
+    applyPlanetaryGravity(rocket, launchAssist, isThrusting);
+  }
   _sfForward.set(0, 1, 0).applyQuaternion(rocket.quaternion);
   appCtx.spaceFlight.velocity.copy(_sfForward).multiplyScalar(appCtx.spaceFlight.speed);
   if (appCtx.spaceFlight.gravityVelocity) {

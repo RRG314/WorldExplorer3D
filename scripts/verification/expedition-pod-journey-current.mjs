@@ -227,13 +227,21 @@ async function run() {
       const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
       return state.universeNavigation?.courseDestinationId === id && state.interstellarExpedition?.podJourney?.phase === 'local_flight';
     }, bodyId, { timeout: 10_000 });
+    await page.waitForFunction(() => {
+      const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+      return state.spaceFlight?.travelSession?.activeCraftId === 'pathfinder-pod'
+        && state.spaceFlight?.travelSession?.phase === 'approach'
+        && document.getElementById('sfFlightTitle')?.textContent === 'PATHFINDER POD';
+    });
     const outboundPodPresentation = await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
-      const pod = ctx.spaceFlight.rocket?.getObjectByName('Surveyor Pathfinder Pod');
+      const pod = ctx.spaceFlight.rocket?.userData?.spaceCraftId === 'pathfinder-pod'
+        ? ctx.spaceFlight.rocket
+        : null;
       return {
         visible: pod?.visible === true,
         authority: pod?.userData?.authority || null,
-        wayfinderVisible: ctx.spaceFlight.rocket?.children.some((child) => child !== pod && child.visible !== false) || false,
+        wayfinderVisible: ctx.spaceFlight.rocket?.userData?.spaceCraftId === 'solis-reach',
         entryEffectReady: pod?.getObjectByName('podEntryPlasma') != null,
         dockingGuideReady: pod?.getObjectByName('podDockingGuide') != null,
         hudTitle: document.getElementById('sfFlightTitle')?.textContent || '',
@@ -247,17 +255,33 @@ async function run() {
       entryEffectReady: true,
       dockingGuideReady: true,
       hudTitle: 'PATHFINDER POD',
-      phaseBadge: 'LOCAL FLIGHT'
+      phaseBadge: 'APPROACH'
     });
 
     await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
       const target = ctx.getUniverseHudTarget();
-      ctx.spaceFlight.rocket.position.set(target.position.x, target.position.y, target.position.z + target.radius + Math.max(12, target.radius * 2));
+      const approachOffset = target.radius + Math.max(9, target.radius * 1.5);
+      ctx.spaceFlight.rocket.position.set(target.position.x, target.position.y, target.position.z + approachOffset);
       ctx.spaceFlight.velocity.set(0, 0, 0);
       ctx.spaceFlight.speed = 0;
     });
-    await page.waitForFunction(() => document.getElementById('sfLandBtn')?.disabled === false, null, { timeout: 10_000 });
+    await page.waitForTimeout(500);
+    const approachState = await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const target = ctx.getUniverseHudTarget?.();
+      return {
+        buttonDisabled: document.getElementById('sfLandBtn')?.disabled,
+        buttonText: document.getElementById('sfLandBtn')?.textContent || '',
+        targetId: target?.destinationId || null,
+        targetKind: target?.targetKind || null,
+        landable: target?.landable === true,
+        radius: Number(target?.radius || 0),
+        distance: target?.position ? ctx.spaceFlight.rocket.position.distanceTo(target.position) : null,
+        travel: ctx.getSpaceTravelSession?.() || null
+      };
+    });
+    assert.equal(approachState.buttonDisabled, false, JSON.stringify(approachState));
     await page.screenshot({ path: path.join(outputDir, 'desktop-pod-manual-approach.png'), fullPage: true });
     await page.locator('#sfLandBtn').click();
     await page.waitForFunction((id) => {
@@ -347,6 +371,7 @@ async function run() {
         && state.interstellarExpedition?.podJourney?.phase === 'surface_launch'
         && state.surfacePodLaunch?.active === true;
     });
+    await page.keyboard.press('Space');
     await page.waitForFunction(() => {
       const altitude = JSON.parse(globalThis.render_game_to_text?.() || '{}').surfacePodLaunch?.altitude;
       return altitude > 2 && altitude < 20;
@@ -355,15 +380,68 @@ async function run() {
     await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').modes?.space === true, null, { timeout: 15_000 });
     assert.equal(await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
-      const pod = ctx.spaceFlight.rocket?.getObjectByName('Surveyor Pathfinder Pod');
+      const pod = ctx.spaceFlight.rocket?.userData?.spaceCraftId === 'pathfinder-pod'
+        ? ctx.spaceFlight.rocket
+        : null;
       return pod?.visible === true
         && pod?.userData?.authority === 'expedition-pod-journey'
         && document.getElementById('sfFlightTitle')?.textContent === 'PATHFINDER POD';
     }), true, 'Surface launch did not restore the same pod flight presentation.');
     await page.waitForFunction(() => {
       const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
-      return state.modes?.space === true && state.interstellarExpedition?.podJourney?.phase === 'recovered' && state.universeNavigation?.transitionDestinationId == null;
+      return state.modes?.space === true
+        && state.interstellarExpedition?.podJourney?.phase === 'rendezvous'
+        && state.universeNavigation?.currentFrameId === 'sol'
+        && state.universeNavigation?.transitionDestinationId == null;
     }, null, { timeout: 35_000 });
+    await page.waitForFunction(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+      const target = ctx.getExpeditionPodDockingTarget?.();
+      if (
+        state.universeNavigation?.currentFrameId !== 'sol'
+        || state.universeNavigation?.transitionDestinationId != null
+        || !target?.position
+      ) return false;
+      return true;
+    });
+    // Let the destination-frame arrival finish its visual pose handoff before
+    // beginning the player's manual docking approach.
+    await page.waitForTimeout(1000);
+    const dockingApproach = await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const target = ctx.getExpeditionPodDockingTarget?.();
+      if (!target?.position) return null;
+      ctx.spaceFlight.rocket.position.set(target.position.x, target.position.y, target.position.z + Math.max(2, target.radius * 0.25));
+      ctx.spaceFlight.velocity.set(0, 0, 0);
+      ctx.spaceFlight.gravityVelocity?.set?.(0, 0, 0);
+      ctx.spaceFlight.speed = 0;
+      return { name: target.name, radius: target.radius };
+    });
+    assert.ok(dockingApproach, 'The Solis Reach docking target disappeared after the return-frame handoff.');
+    await page.waitForTimeout(500);
+    const dockingState = await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const target = ctx.getExpeditionPodDockingTarget?.();
+      return {
+        buttonDisabled: document.getElementById('sfLandBtn')?.disabled,
+        buttonText: document.getElementById('sfLandBtn')?.textContent || '',
+        targetAvailable: target != null,
+        targetDistance: target?.distance ?? null,
+        targetPosition: target?.position ? { x: target.position.x, y: target.position.y, z: target.position.z } : null,
+        rocketPosition: ctx.spaceFlight.rocket?.position ? { x: ctx.spaceFlight.rocket.position.x, y: ctx.spaceFlight.rocket.position.y, z: ctx.spaceFlight.rocket.position.z } : null,
+        relativeSpeed: target?.relativeSpeed ?? null,
+        travel: ctx.getSpaceTravelSession?.() || null
+      };
+    });
+    assert.equal(dockingState.buttonDisabled, false, JSON.stringify(dockingState));
+    await page.screenshot({ path: path.join(outputDir, 'desktop-pod-docking-approach.png'), fullPage: true });
+    await page.locator('#sfLandBtn').click();
+    await page.waitForFunction(() => {
+      const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+      return state.interstellarExpedition?.podJourney?.phase === 'recovered'
+        && state.expeditionShipInterior?.active === true;
+    });
     const final = await snapshot(page);
     assert.equal(final.universeNavigation.currentFrameId, 'sol');
     assert.equal(final.interstellarExpedition.activeLocalContactId, null);
@@ -376,15 +454,11 @@ async function run() {
     assert.equal(final.interstellarExpedition.resources.scienceCargoKg >= 4, true);
     assert.equal(await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
-      return ctx.spaceFlight.rocket?.getObjectByName('Surveyor Pathfinder Pod') == null
+      return ctx.spaceFlight.rocket?.userData?.spaceCraftId === 'solis-reach'
         && ctx.spaceFlight.rocket?.children.some((child) => child.visible !== false) === true;
-    }), true, 'Surveyor recovery did not restore the normal Wayfinder flight presentation.');
+    }), true, 'Pathfinder recovery did not restore the Solis Reach flight presentation.');
 
-    if (await page.locator('#spaceFlightHUD').evaluate((element) => element.classList.contains('collapsed'))) await page.locator('#sfHudToggle').click();
-    await page.locator('#sfExpeditionBtn').click();
-    await page.locator('#expeditionOverlay').waitFor({ state: 'visible' });
-    await page.locator('#expeditionEnterShip').click();
-    await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.active === true);
+    assert.equal(dockingApproach.name, 'Solis Reach');
     await switchShipDeck(page, 'engineering');
     await useShipStation(page, { x: -4.3, z: -14.5 }, 'process-resource-sample');
     await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').interstellarExpedition?.scienceSamples?.[0]?.processed === true);

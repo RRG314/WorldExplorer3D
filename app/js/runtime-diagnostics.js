@@ -48,6 +48,7 @@ function vectorSnapshot(vector) {
 
 function spaceFlightSnapshot() {
   const rocket = appCtx.spaceFlight?.rocket;
+  const travelSession = appCtx.getSpaceTravelSession?.() || null;
   const Vector3 = globalThis.THREE?.Vector3;
   const forward = rocket && Vector3 ? new Vector3(0, 1, 0).applyQuaternion(rocket.quaternion).normalize() : null;
   const up = rocket && Vector3 ? new Vector3(0, 0, -1).applyQuaternion(rocket.quaternion).normalize() : null;
@@ -55,6 +56,17 @@ function spaceFlightSnapshot() {
     active: appCtx.spaceFlight?.active === true,
     controlMode: String(appCtx.spaceFlight?.mode || 'idle'),
     presentationAuthority: String(appCtx.spaceFlight?.presentationAuthority || 'classic'),
+    travelSession: travelSession ? {
+      active: travelSession.active === true,
+      sequence: Number(travelSession.sequence || 0),
+      activeCraftId: travelSession.activeCraftId || null,
+      location: travelSession.location || null,
+      phase: travelSession.phase || null,
+      sourceBodyId: travelSession.sourceBodyId || null,
+      destinationId: travelSession.destination?.id || null,
+      guidance: travelSession.guidance || null,
+      reason: travelSession.reason || null
+    } : null,
     destinationBodyId: appCtx.spaceJourney?.destinationBodyId || appCtx.spaceFlight?.destination || null,
     phase: appCtx.spaceJourney?.phase || null,
     assist: appCtx.spaceJourneyAssistState ? {
