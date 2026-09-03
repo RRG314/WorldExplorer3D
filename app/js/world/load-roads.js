@@ -795,6 +795,7 @@ export function createWorldRoadLoader(deps = {}) {
               highway: String(way.tags?.highway || ''),
               nodeCount: Number(way.nodes?.length || 0)
             }));
+          runtimeState.regionalTransport = loadMetrics.regionalTransport || null;
           runtimeState.regionalTransportSelection = loadMetrics.regionalTransportSelection || null;
           runtimeState.reviewedStructureSelection = {
             input: summarizeReviewedStructures(data.elements),

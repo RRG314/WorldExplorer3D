@@ -360,6 +360,74 @@ function geometrySignature(layerName, part, tags) {
   ].join(':');
 }
 
+function shortbreadTileKey(z, x, y) {
+  return `${Number(z)}/${Number(x)}/${Number(y)}`;
+}
+
+function shortbreadTileBounds(z, x, y) {
+  const zoom = Number(z);
+  const column = Number(x);
+  const row = Number(y);
+  const scale = 2 ** zoom;
+  const longitude = (tileX) => tileX / scale * 360 - 180;
+  const latitude = (tileY) => Math.atan(Math.sinh(Math.PI * (1 - 2 * tileY / scale))) * 180 / Math.PI;
+  return {
+    west: longitude(column),
+    east: longitude(column + 1),
+    north: latitude(row),
+    south: latitude(row + 1)
+  };
+}
+
+export function shortbreadPartCoverageStatus(part, tile, failedTileKeys = []) {
+  const coordinates = Array.isArray(part?.coords) ? part.coords : [];
+  if (coordinates.length < 2) {
+    return Object.freeze({ complete: false, truncated: true, missingNeighbors: Object.freeze([]) });
+  }
+  const failed = failedTileKeys instanceof Set ? failedTileKeys : new Set(failedTileKeys || []);
+  if (failed.size === 0) {
+    return Object.freeze({ complete: true, truncated: false, missingNeighbors: Object.freeze([]) });
+  }
+  const z = Number(tile?.z);
+  const x = Number(tile?.x);
+  const y = Number(tile?.y);
+  if (![z, x, y].every(Number.isFinite)) {
+    return Object.freeze({ complete: false, truncated: true, missingNeighbors: Object.freeze([]) });
+  }
+  const bounds = shortbreadTileBounds(z, x, y);
+  // Shortbread uses a 4096-unit vector-tile grid. Two grid units tolerate the
+  // coordinate round trip without classifying an ordinary near-edge road as
+  // clipped by a missing neighboring tile.
+  const longitudeTolerance = Math.abs(bounds.east - bounds.west) / 2048;
+  const latitudeTolerance = Math.abs(bounds.north - bounds.south) / 2048;
+  const endpoints = [coordinates[0], coordinates[coordinates.length - 1]];
+  const missingNeighbors = [];
+  const touches = (side) => endpoints.some((coordinate) => {
+    const longitude = Number(coordinate?.[0]);
+    const latitude = Number(coordinate?.[1]);
+    if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) return false;
+    if (side === 'west') return Math.abs(longitude - bounds.west) <= longitudeTolerance;
+    if (side === 'east') return Math.abs(longitude - bounds.east) <= longitudeTolerance;
+    if (side === 'north') return Math.abs(latitude - bounds.north) <= latitudeTolerance;
+    return Math.abs(latitude - bounds.south) <= latitudeTolerance;
+  });
+  const neighbors = [
+    ['west', x - 1, y],
+    ['east', x + 1, y],
+    ['north', x, y - 1],
+    ['south', x, y + 1]
+  ];
+  for (const [side, neighborX, neighborY] of neighbors) {
+    const key = shortbreadTileKey(z, neighborX, neighborY);
+    if (failed.has(key) && touches(side)) missingNeighbors.push(key);
+  }
+  return Object.freeze({
+    complete: missingNeighbors.length === 0,
+    truncated: missingNeighbors.length > 0,
+    missingNeighbors: Object.freeze(missingNeighbors)
+  });
+}
+
 function partIntersectsBounds(part, bounds) {
   if (!bounds || !Array.isArray(part?.coords) || part.coords.length === 0) return true;
   let minLon = Infinity;
@@ -379,7 +447,7 @@ function partIntersectsBounds(part, bounds) {
     minLat <= bounds.maxLat && maxLat >= bounds.minLat;
 }
 
-async function convertTilesToElements(tiles, layerNames, bounds = null) {
+async function convertTilesToElements(tiles, layerNames, bounds = null, options = {}) {
   const elements = [];
   const nodesByCoordinate = new Map();
   const featureSignatures = new Set();
@@ -459,6 +527,17 @@ async function convertTilesToElements(tiles, layerNames, bounds = null) {
             ...tags,
             ...(layerName === 'buildings' ? { _geometrySource: 'shortbread-vector' } : {})
           };
+          if (layerName === 'streets') {
+            const coverage = shortbreadPartCoverageStatus(
+              part,
+              { x, y, z },
+              options.failedTileKeys
+            );
+            if (coverage.truncated) {
+              resolvedTags._sourceTruncated = 'yes';
+              resolvedTags._sourceCoverage = 'partial-adjacent-tile-missing';
+            }
+          }
           if (layerName === 'streets' && resolveRoadName) {
             const roadName = resolveRoadName(projectLine(part.coords), geojson.properties?.kind);
             if (roadName) resolvedTags.name = roadName;
@@ -568,13 +647,18 @@ async function fetchTileCoverage(lat, lon, radius, zoom, options = {}) {
   const tiles = settled
     .filter((entry) => entry.status === 'fulfilled' && entry.value)
     .map((entry) => entry.value);
+  const failedTileKeys = new Set(settled.flatMap((entry, index) =>
+    entry?.status === 'rejected'
+      ? [shortbreadTileKey(zoom, coordinates[index].x, coordinates[index].y)]
+      : []
+  ));
   const successfulTiles = settled.filter((entry) => entry.status === 'fulfilled').length;
   if (tiles.length === 0) {
-    if (successfulTiles > 0) return { tiles, requestedTiles: coordinates.length, bounds, metrics };
+    if (successfulTiles > 0) return { tiles, requestedTiles: coordinates.length, bounds, metrics, failedTileKeys };
     const reason = settled.find((entry) => entry.status === 'rejected')?.reason;
     throw new Error(`Shortbread coverage unavailable: ${reason?.message || reason || 'no tiles'}`);
   }
-  return { tiles, requestedTiles: coordinates.length, bounds, metrics };
+  return { tiles, requestedTiles: coordinates.length, bounds, metrics, failedTileKeys };
 }
 
 export async function fetchShortbreadWorldData(options = {}) {
@@ -588,7 +672,7 @@ export async function fetchShortbreadWorldData(options = {}) {
     : coverageBounds
       ? selectShortbreadZoomForBounds(coverageBounds, options)
       : SHORTBREAD_ZOOM;
-  const { tiles, requestedTiles, bounds, metrics } = await fetchTileCoverage(
+  const { tiles, requestedTiles, bounds, metrics, failedTileKeys } = await fetchTileCoverage(
     lat,
     lon,
     options.radius,
@@ -599,14 +683,12 @@ export async function fetchShortbreadWorldData(options = {}) {
     ? options.layerNames.slice()
     : ['streets', 'land', 'sites', 'pois', 'street_polygons'];
   if (includeBuildings && !layerNames.includes('buildings')) layerNames.push('buildings');
-  const elements = await convertTilesToElements(tiles, layerNames, bounds);
-  if (metrics.rejected > 0) {
-    for (const element of elements) {
-      if (element?.type === 'way' && element?.tags?.highway) {
-        element.tags._sourceTruncated = 'yes';
-      }
-    }
-  }
+  const elements = await convertTilesToElements(tiles, layerNames, bounds, { failedTileKeys });
+  const partialRoadFeatures = elements.filter((element) =>
+    element?.type === 'way' &&
+    element?.tags?.highway &&
+    element?.tags?._sourceTruncated === 'yes'
+  ).length;
   return {
     elements,
     _overpassSource: 'shortbread-vector',
@@ -617,6 +699,8 @@ export async function fetchShortbreadWorldData(options = {}) {
       decoded: tiles.length,
       requested: requestedTiles,
       failed: metrics.rejected,
+      partialRoadFeatures,
+      coverageAuthority: 'per-feature-adjacent-tile-continuity',
       maxInFlight: metrics.maxInFlight,
       zoom,
       bounds,

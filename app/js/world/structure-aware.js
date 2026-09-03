@@ -58,18 +58,22 @@ function structureAwareLinearFeatures() {
   );
 }
 
-function publishAtGradeTerrainCorridors(roads = []) {
-  const indexedFeatures = [];
-  for (const feature of roads) {
-    if (
-      !feature ||
-      feature.driveable === false ||
-      feature?.structureSemantics?.terrainMode !== 'at_grade' ||
-      !feature?.transportSurfaceModel ||
-      !Array.isArray(feature.pts) ||
-      feature.pts.length < 2
-    ) continue;
-    indexedFeatures.push(feature);
+export function publishAtGradeTerrainCorridors(roads = []) {
+  const sourceEligibleRoads = roads.filter((feature) =>
+    feature &&
+    feature?.structureSemantics?.terrainMode === 'at_grade' &&
+    Array.isArray(feature.pts) &&
+    feature.pts.length >= 2 &&
+    feature?.transportRecord?.access?.motorVehicle !== 'prohibited'
+  );
+  const indexedFeatures = sourceEligibleRoads.filter((feature) =>
+    feature.driveable !== false && feature?.transportSurfaceModel
+  );
+  if (indexedFeatures.length !== sourceEligibleRoads.length) {
+    throw new Error(
+      `Mapped driveable roads cannot publish without terrain corridors ` +
+      `(${indexedFeatures.length}/${sourceEligibleRoads.length}).`
+    );
   }
   // Retain only references to the canonical road objects. Per-road wrapper
   // records and a second feature map duplicated an entire metropolitan road
@@ -81,7 +85,10 @@ function publishAtGradeTerrainCorridors(roads = []) {
   });
   appCtx.transportTerrainCorridorPublication = Object.freeze({
     authority: 'compiled_transport_surface',
+    eligibleRoadCount: sourceEligibleRoads.length,
     corridorCount: indexedFeatures.length,
+    incompleteRouteFragments: indexedFeatures.filter((feature) =>
+      feature?.transportRecord?.routeState === 'incomplete').length,
     index: appCtx.structureTerrainCutIndex.snapshot()
   });
   return appCtx.transportTerrainCorridorPublication;
