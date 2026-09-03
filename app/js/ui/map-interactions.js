@@ -245,6 +245,7 @@ function bindMapControls() {
     appCtx.clearControlInputState?.('large-map-open');
     appCtx.showLargeMap = true;
     largeMap?.classList.add('show');
+    appCtx.updateControlsModeUI?.();
     if (typeof appCtx.renderInteriorLegend === 'function') appCtx.renderInteriorLegend();
     appCtx.drawLargeMap?.();
   };
@@ -254,6 +255,7 @@ function bindMapControls() {
     largeMap?.classList.remove('show');
     document.getElementById('legendPanel')?.style.setProperty('display', 'none');
     appCtx.closeMapInfo?.();
+    appCtx.updateControlsModeUI?.();
   };
   appCtx.openLargeMap = openLargeMap;
   appCtx.closeLargeMap = closeLargeMap;

@@ -629,12 +629,16 @@ function initMobileControls() {
         mode === 'ocean' ? 'Submarine Mode' :
         'Driving Mode';
       const arrow = ctrlContent?.classList.contains('hidden') ? '▼' : '▲';
-      ctrlHeader.textContent = `⚙️ ${modeLabel} ${arrow}`;
+      const controlsOpen = !ctrlContent?.classList.contains('hidden');
+      ctrlHeader.textContent = isTouchPreferredClient && controlsOpen
+        ? 'Close controls ×'
+        : `⚙️ ${modeLabel} ${arrow}`;
+      ctrlHeader.setAttribute('aria-expanded', String(controlsOpen));
       const controlsBarBtn = document.getElementById('controlsBarBtn');
       const controlsBarLabel = controlsBarBtn?.querySelector('.btnText');
       if (controlsBarLabel) controlsBarLabel.textContent = `⚙️ ${modeLabel} Controls`;
-      controlsBarBtn?.setAttribute('aria-expanded', String(!ctrlContent?.classList.contains('hidden')));
-      controlsTab?.classList.toggle('bar-open', !ctrlContent?.classList.contains('hidden'));
+      controlsBarBtn?.setAttribute('aria-expanded', String(controlsOpen));
+      controlsTab?.classList.toggle('bar-open', controlsOpen);
     }
     updateMobileTouchControls(mode);
   }
