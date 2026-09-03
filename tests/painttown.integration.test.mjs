@@ -27,7 +27,7 @@ async function selectPaintTownAndStart(page) {
   await paintTownMode.evaluate((element) => element.scrollIntoView({ block: 'center', inline: 'nearest' }));
   await paintTownMode.focus();
   await paintTownMode.press('Enter');
-  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().gameplayPlugins?.activeId === 'painttown', null, { timeout: 10_000 });
+  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().gameMode === 'painttown', null, { timeout: 10_000 });
   await page.screenshot({ path: SCREEN_TITLE_PATH, fullPage: true });
   await page.click('#globeHubOverlayCloseBtn');
   await page.click('#globeSelectorStartBtn');
@@ -57,7 +57,7 @@ async function capturePaintTownRuntime(page) {
   return page.evaluate(() => {
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return {
-      gameMode: diagnostics.gameplayPlugins?.activeId || null,
+      gameMode: diagnostics.gameMode || null,
       buildings: Number(diagnostics.worldCounts?.buildings || 0),
       gameplay: diagnostics.gameplayPlugins || null,
       paintTown: diagnostics.paintTown || null

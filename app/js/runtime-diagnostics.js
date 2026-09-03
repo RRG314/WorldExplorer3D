@@ -1054,6 +1054,7 @@ function getWorldExplorerRuntimeDiagnostics() {
     surfaceChain: surfaceChainSnapshot(activeActor),
     environment: appCtx.getEnv?.() || null,
     gameStarted: !!appCtx.gameStarted,
+    gameMode: String(appCtx.gameMode || 'free'),
     paused: !!appCtx.paused,
     worldLoading: !!appCtx.worldLoading,
     worldLoad: appCtx.worldLoadRuntimeState || null,
