@@ -784,10 +784,20 @@ function nearestStoreCandidate(state, radius = STORE_INTERACTION_DISTANCE) {
   if (!activeWorldMatches(state) || appCtx.Walk?.state?.mode !== 'walk' || state.storeOpen) return null;
   const walker = appCtx.Walk?.state?.walker;
   if (!walker) return null;
-  return state.stores.map((store) => ({
-    store,
-    distance: Math.hypot(store.interactionX - walker.x, store.interactionZ - walker.z)
-  })).filter((entry) => entry.distance <= radius)
+  // A mapped shop can sit inside its building footprint. Resolving every shop
+  // against every collider during world startup made dense cities wait more
+  // than a minute before becoming playable. Resolve only stores close enough
+  // to interact with and retain that result for the publication lifetime.
+  return state.stores
+    .filter((store) => Math.hypot(store.x - walker.x, store.z - walker.z) <= radius + 14)
+    .map((store) => {
+      const resolved = resolvedStoreApproach(state, store);
+      return {
+        store: resolved,
+        distance: Math.hypot(resolved.interactionX - walker.x, resolved.interactionZ - walker.z)
+      };
+    })
+    .filter((entry) => entry.distance <= radius)
     .sort((left, right) => left.distance - right.distance)[0] || null;
 }
 
@@ -806,7 +816,8 @@ function storeInteractionCandidate(state) {
 }
 
 function activeStore(state) {
-  return state.stores.find((store) => store.id === state.activeStoreId) || null;
+  const store = state.stores.find((entry) => entry.id === state.activeStoreId) || null;
+  return store ? resolvedStoreApproach(state, store) : null;
 }
 
 function resolveStoreApproach(store) {
@@ -833,9 +844,19 @@ function resolveStoreApproach(store) {
   return Object.freeze({ ...store, interactionX: store.x, interactionZ: store.z });
 }
 
+function resolvedStoreApproach(state, store) {
+  if (!store) return null;
+  const cached = state.storeApproaches.get(store.id);
+  if (cached) return cached;
+  const resolved = resolveStoreApproach(store);
+  state.storeApproaches.set(store.id, resolved);
+  return resolved;
+}
+
 function moveNearStoreForSupport(state, storeId) {
   if (!appCtx.developerDiagnosticsEnabled || appCtx.Walk?.state?.mode !== 'walk') return null;
-  const store = state.stores.find((entry) => entry.id === String(storeId || ''));
+  const mappedStore = state.stores.find((entry) => entry.id === String(storeId || ''));
+  const store = mappedStore ? resolvedStoreApproach(state, mappedStore) : null;
   if (!store) return null;
   const resolved = appCtx.resolveSafeWorldSpawn?.(store.interactionX, store.interactionZ, {
     mode: 'walk',
@@ -2389,7 +2410,13 @@ function snapshot(state) {
     backpackMigration: state.backpackStore?.migrationSnapshot?.() || null,
     commerce: Object.freeze({
       mappedStoreCount: state.stores.length,
-      stores: Object.freeze(state.stores.map((store) => Object.freeze({ ...store }))),
+      stores: Object.freeze(state.stores.map((store) => Object.freeze({
+        ...store,
+        ...(state.storeApproaches.get(store.id) || {
+          interactionX: store.x,
+          interactionZ: store.z
+        })
+      }))),
       open: state.storeOpen === true,
       activeStoreId: state.activeStoreId,
       current: activeStore(state) ? state.commerce.snapshot(activeStore(state)) : null,
@@ -2593,7 +2620,7 @@ function startUrbanSandboxRuntime(options = {}) {
   };
   const equipment = ensurePlayerBackpackInventory(appCtx);
   const backpackStore = appCtx.playerBackpackStore;
-  const stores = mappedCommercePlaces(appCtx.pois).map(resolveStoreApproach);
+  const stores = mappedCommercePlaces(appCtx.pois);
   const commerce = appCtx.worldEconomy || appCtx.localConvenienceStoreCommerce || createLocalCommerceModel({ inventory: equipment });
   appCtx.worldEconomy = commerce;
   appCtx.localConvenienceStoreCommerce = commerce;
@@ -2688,6 +2715,7 @@ function startUrbanSandboxRuntime(options = {}) {
     equipment,
     backpackStore,
     stores,
+    storeApproaches: new Map(),
     commerce,
     storeOpen: false,
     activeStoreId: '',
