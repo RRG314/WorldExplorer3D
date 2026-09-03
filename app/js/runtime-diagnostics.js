@@ -964,6 +964,7 @@ function getWorldExplorerRuntimeDiagnostics() {
     account: appCtx.getAccountSnapshot?.() || null,
     platformServices: appCtx.getPlatformServicesSnapshot?.() || null,
     gameplayPlugins: appCtx.getGameplayRegistrySnapshot?.() || null,
+    paintTown: appCtx.paintTownDebugSnapshot?.() || { active: false },
     blockBuilder: {
       ...(appCtx.getBlockBuilderSnapshot?.() || { enabled: false, count: 0, shared: false }),
       persistence: appCtx.getBuildPersistenceStatus?.() || null
