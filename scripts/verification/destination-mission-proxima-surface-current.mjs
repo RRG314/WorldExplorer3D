@@ -159,8 +159,10 @@ async function run() {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
       const target = ctx.getUniverseHudTarget();
       if (!target?.landable) return false;
-      ctx.spaceFlight.rocket.position.set(target.position.x, target.position.y, target.position.z + target.radius + Math.max(12, target.radius * 2));
+      const approachOffset = target.radius + Math.max(9, target.radius * 1.5);
+      ctx.spaceFlight.rocket.position.set(target.position.x, target.position.y, target.position.z + approachOffset);
       ctx.spaceFlight.velocity.set(0, 0, 0);
+      ctx.spaceFlight.gravityVelocity?.set?.(0, 0, 0);
       ctx.spaceFlight.speed = 0;
       return true;
     });
@@ -251,16 +253,44 @@ async function run() {
     }), true);
     await page.waitForFunction(() => {
       const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
-      return state.modes?.space === true && state.interstellarExpedition?.podJourney?.phase === 'recovered';
+      return state.environment === 'PLANETARY'
+        && state.interstellarExpedition?.podJourney?.phase === 'surface_launch'
+        && state.surfacePodLaunch?.active === true;
+    });
+    await page.keyboard.press('Space');
+    await page.waitForFunction(() => {
+      const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+      return state.modes?.space === true
+        && state.interstellarExpedition?.podJourney?.phase === 'rendezvous'
+        && state.universeNavigation?.currentFrameId === 'proxima-centauri'
+        && state.universeNavigation?.transitionDestinationId == null;
     }, null, { timeout: 35_000 });
     assert.equal(await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
       return ctx.starField?.userData?.planetarySurfaceOcclusion === false;
     }), true);
-
-    await page.locator('#sfExpeditionBtn').click();
-    await page.locator('#expeditionEnterShip').click();
-    await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.active === true);
+    await page.waitForFunction(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      return ctx.getExpeditionPodDockingTarget?.()?.position != null;
+    });
+    await page.waitForTimeout(1000);
+    assert.equal(await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const target = ctx.getExpeditionPodDockingTarget?.();
+      if (!target?.position) return false;
+      ctx.spaceFlight.rocket.position.set(target.position.x, target.position.y, target.position.z + Math.max(2, target.radius * 0.25));
+      ctx.spaceFlight.velocity.set(0, 0, 0);
+      ctx.spaceFlight.gravityVelocity?.set?.(0, 0, 0);
+      ctx.spaceFlight.speed = 0;
+      return true;
+    }), true);
+    await page.waitForFunction(() => document.getElementById('sfLandBtn')?.disabled === false);
+    await page.locator('#sfLandBtn').click();
+    await page.waitForFunction(() => {
+      const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+      return state.interstellarExpedition?.podJourney?.phase === 'recovered'
+        && state.expeditionShipInterior?.active === true;
+    });
     await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
       Object.assign(ctx.Walk.state.walker, { x: -5.1, z: -14.5, angle: Math.PI / 2, yaw: Math.PI / 2, lookYawOffset: 0, pitch: 0, vy: 0, onGround: true });
