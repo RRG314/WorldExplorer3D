@@ -1,6 +1,6 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { getAstronomicalBody, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=3';
-import { disposeThreeObjectTree } from '../engine/webgl-lifecycle.js?v=1';
+import { disposeThreeObjectTree } from '../engine/webgl-lifecycle.js?v=2';
 import { getGalaxyEntryDestination, getUniverseFrame, resolveUniverseAddress } from './catalog.js?v=11';
 import { updateBlackHoleEncounter, updateBlackHoleVisual } from './black-hole.js?v=4';
 import { createDeepSkyLayer, setDeepSkyFrame, updateDeepSkyLayer } from './deep-sky.js?v=3';

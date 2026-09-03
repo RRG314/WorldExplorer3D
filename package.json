@@ -69,6 +69,7 @@
     "verify:retention-release": "node scripts/verification/retention-release.mjs",
     "verify:retention-ui": "node scripts/verification/retention-ui.mjs",
     "verify:performance-retention": "node scripts/verification/performance-retention.mjs",
+    "verify:space-memory-lifecycle": "node scripts/verification/space-memory-lifecycle-current.mjs",
     "verify:analytics-lifecycle": "node scripts/verification/analytics-lifecycle-current.mjs",
     "verify:landing-user-count": "node scripts/verification/landing-user-count-current.mjs",
     "verify:public-user-count-backend": "firebase emulators:exec --only auth,functions --project we3d-staging-20260712 \"node scripts/verification/public-user-count-backend-current.mjs\"",

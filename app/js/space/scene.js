@@ -3,7 +3,7 @@ import {
   createAuxiliaryRenderer,
   disposeThreeObjectTree,
   disposeThreeRenderer
-} from "../engine/webgl-lifecycle.js?v=1";
+} from "../engine/webgl-lifecycle.js?v=2";
 import { SPACE_CONSTANTS } from "./constants.js?v=3";
 import { PLANETARY_BODIES, configureColorTexture } from "../planetary/catalog.js?v=1";
 import { createSpaceCelestialCatalog } from "./celestial-catalog.js?v=5";

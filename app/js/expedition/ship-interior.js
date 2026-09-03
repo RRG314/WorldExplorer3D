@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { getPrimaryWorldCanvas } from '../engine/webgl-lifecycle.js?v=1';
+import { getPrimaryWorldCanvas } from '../engine/webgl-lifecycle.js?v=2';
 import {
   getShipDeck,
   getShipDeckForRoom,
