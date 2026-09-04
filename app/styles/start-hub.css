@@ -310,7 +310,12 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 .globe-selector-mode-tabs { margin-top: 0; }
 .globe-selector-mode-panel { min-height: 0; }
 .globe-mobile-search { display: none; }
-.globe-selector-city-list { max-height: min(31vh, 250px); }
+.globe-selector-city-list {
+  max-height: min(31vh, 250px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
 .globe-selector-city-section {
   display: flex;
   align-items: baseline;
