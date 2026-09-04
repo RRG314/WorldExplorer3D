@@ -40,7 +40,7 @@ flowchart LR
     Normalize --> Compile[Compile world layers]
     Compile --> Snapshot[Assembled world snapshot]
     Snapshot --> Publish[Visible scene and collision]
-    Publish --> Play[Traversal, field play, editor, and rooms]
+    Publish --> Play[Traversal, field play, Quick Build, and rooms]
 ```
 
 Provider responses do not attach competing final worlds directly to the scene.

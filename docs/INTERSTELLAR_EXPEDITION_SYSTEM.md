@@ -1,7 +1,7 @@
 # Interstellar Expedition System
 
 Decision record: 2026-08-30  
-Status: implementation authority; connected alpha candidate implemented
+Status: implementation authority; connected Alpha released in World Explorer 3D 5.2
 
 ## Product boundary
 

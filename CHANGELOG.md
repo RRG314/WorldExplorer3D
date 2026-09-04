@@ -34,6 +34,8 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
 
 ### Fixed
 
+- Retained the established 5.1 Earth terrain, road, bridge, and building
+  publication behavior while keeping the new 5.2 systems layered above it.
 - Preserved one Pathfinder and one Solis Reach identity across launch, landing,
   surface return, rendezvous, docking, ship entry, and Earth return.
 - Prevented Wayfinder assistance and manual input from competing during
@@ -42,6 +44,8 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
   supported landing worlds.
 - Completed route-dependent civic response approaches and prevented a completed
   custody incident from immediately repeating.
+- Kept the Featured Cities list scrollable so every destination remains usable
+  without overlapping the data and legal links.
 - Added missing Hosting routes for property, civic-response, and shared
   Expedition actions.
 

@@ -13,6 +13,10 @@ water, buildings, land cover, places, vegetation, traffic, pedestrians, and
 player-created content are assembled into that location. Earth is not a
 continuously streaming planet.
 
+Version 5.2 retains the established 5.1 terrain, road, bridge, building, and
+traversal owners. Property, Expeditions, economy, and interface additions
+consume that assembled world instead of publishing a replacement Earth.
+
 Ocean, Moon, Mars, solar-system, and deep-space play are separate environments
 with explicit entry and exit lifecycles.
 

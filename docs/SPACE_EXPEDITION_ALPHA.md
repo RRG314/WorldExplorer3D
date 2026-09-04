@@ -1,7 +1,7 @@
 # Space Expedition Alpha
 
-Status: pre-release Alpha candidate; connected journey verified; owner playtest
-and visual review required
+Status: released in World Explorer 3D 5.2 as an optional Alpha; the connected
+journey is playable while presentation and mission variety continue to grow
 
 ## How Alpha appears in a release
 

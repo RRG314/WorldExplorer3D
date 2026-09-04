@@ -73,6 +73,8 @@ audio, and mobile presentation remain active areas of improvement.
 
 The 5.1 Earth, Ocean, airport, aircraft, maritime, vehicle, fieldwork, regional
 Field Guide, Backpack, Journal, companion, quick-slot, multiplayer, accessibility,
-and mobile-control features remain part of this release.
+and mobile-control features remain part of this release. The new 5.2 systems use
+the established Earth terrain, road, bridge, building, and traversal authorities
+rather than replacing them.
 
 See [Known Issues](KNOWN_ISSUES.md) for current boundaries and continuing work.
