@@ -47,6 +47,14 @@ async function inputStep(page, key, milliseconds) {
   await page.keyboard.up(key);
 }
 
+async function sprintForward(page, milliseconds) {
+  await page.keyboard.down('ShiftLeft');
+  await page.keyboard.down('ArrowUp');
+  await page.evaluate((duration) => globalThis.advanceTime?.(duration), milliseconds);
+  await page.keyboard.up('ArrowUp');
+  await page.keyboard.up('ShiftLeft');
+}
+
 async function actorState(page, target = null) {
   return page.evaluate((point) => {
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
@@ -412,7 +420,11 @@ async function evadeOfficerUntilHospital(page, timeoutMs = 45_000) {
         z: Number(actor.z) + Math.cos(radialYaw) * 14
       };
       await turnToward(page, retreat, .18, 45, { keepMoving: true });
-      await inputStep(page, 'ArrowUp', 520);
+      // Use the player's real sprint control during the officer's deployment
+      // grace period. Walking here makes the medical path depend on the
+      // response vehicle's exact road-side stop position and can turn this
+      // distinct scenario into a duplicate arrest scenario.
+      await sprintForward(page, 760);
     } else if (distance > 20) {
       const approach = {
         x: Number(actor.x) - Math.sin(radialYaw) * 14,
