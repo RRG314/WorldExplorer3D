@@ -671,6 +671,7 @@ function initMobileControls() {
   installMobileUiPointerShield();
   appCtx.updateControlsModeUI = updateControlsModeUI;
   appCtx.updateMobileTouchControls = updateMobileTouchControls;
+  appCtx.isTouchPreferredClient = isTouchPreferredClient;
 
   const dispose = (reason = 'mobile-controls-disposed') => {
     clearVirtualHeldInputs();

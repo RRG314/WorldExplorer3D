@@ -7,6 +7,7 @@ import { getScreenLayoutService } from '../ui/screen-layout.js?v=2';
 import { NPC_COMBAT_STATES, beginNpcResponse, npcFireDecision } from './npc-combat-policy.js?v=2';
 import { reticlePresentation } from './weapon-reticle-authority.js?v=1';
 import { resolvePlayerProjectileLaunch } from './projectile-ballistics.js?v=1';
+import { readExplorerAppearanceId } from '../characters/explorer-appearance.js?v=1';
 
 const ITEM_ICON_PATHS = Object.freeze({
   hands: '<path d="M18 31v-9a4 4 0 0 1 8 0v6-12a4 4 0 0 1 8 0v12-10a4 4 0 0 1 8 0v12-6a4 4 0 0 1 8 0v13c0 12-7 20-18 20-8 0-13-4-17-10l-7-11a4 4 0 0 1 7-4l3 4Z"/>',
@@ -124,6 +125,11 @@ function createUrbanEquipmentRuntime(options = {}) {
     ui.toggle.hidden = !state.mobile;
     ui.filters?.querySelectorAll?.('[data-backpack-filter]').forEach((button) => {
       button.classList.toggle('active', button.dataset.backpackFilter === (state.backpackFilter || 'all'));
+    });
+    ui.appearance?.querySelectorAll?.('[data-explorer-appearance]').forEach((button) => {
+      const selected = button.dataset.explorerAppearance === readExplorerAppearanceId();
+      button.classList.toggle('active', selected);
+      button.setAttribute('aria-pressed', selected ? 'true' : 'false');
     });
     const hotbarItems = new Map(inventory.items.filter((item) => item.hotbarSlot != null).map((item) => [item.hotbarSlot, item]));
     ui.slots.innerHTML = Array.from({ length: 6 }, (_, index) => {

@@ -1,4 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
+import { getModelAssetRuntimeMetrics } from './assets/model-asset-runtime.js?v=1';
 
 const diagnosticsParams = new URLSearchParams(globalThis.location?.search || '');
 // Production-like local runs must behave exactly like the deployed build.
@@ -1075,6 +1076,16 @@ function getWorldExplorerRuntimeDiagnostics() {
     terrainSurfaceCompilation: appCtx.terrainSurfaceProfileStats || null,
     earthResumePending: !!appCtx.earthResumePending,
     worldDetail: appCtx.worldDetailState || null,
+    modelAssets: {
+      ...getModelAssetRuntimeMetrics(),
+      playerAssetId: appCtx.Walk?.state?.characterMesh?.userData?.characterAssetId || null,
+      playerAppearanceId: appCtx.Walk?.state?.characterMesh?.userData?.characterAppearanceId || null,
+      playerCharacterAuthority: appCtx.Walk?.state?.characterMesh?.userData?.performanceProfile?.authority || null,
+      playerCharacterProfile: appCtx.Walk?.state?.characterMesh?.userData?.performanceProfile || null
+    },
+    transportVisuals: {
+      activeAircraft: appCtx.planeMode?.mesh?.userData?.performanceProfile || null
+    },
     mappedTallBuildingVisuals: mappedTallBuildingVisualSnapshot(),
     modes: {
       boat: !!appCtx.boatMode?.active,
