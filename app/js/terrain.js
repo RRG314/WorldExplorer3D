@@ -4,11 +4,11 @@ import {
   rebuildStructureVisualMeshes,
   rebuildStructureVisualMeshesCooperatively,
   updateStructureVisualVisibility
-} from "./terrain/structure-visuals.js?v=62";
-import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=19";
+} from "./terrain/structure-visuals.js?v=58";
+import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=14";
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=3";
 import { stitchTerrainGroupEdges } from "./terrain/seams.js?v=2";
-import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=26";
+import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=22";
 import {
   groundProviderCatalogSnapshot
 } from "./terrain/ground-provider-registry.js?v=3";
@@ -29,7 +29,7 @@ import {
   refreshTerrainSurfaceProfiles,
   refreshTerrainSurfaceProfilesCooperatively,
   setWorldSurfaceProfile
-} from "./terrain/surface-profiles.js?v=55";
+} from "./terrain/surface-profiles.js?v=54";
 import {
   applyHeightsToTerrainMesh,
   buildTerrainTileMesh,
@@ -53,21 +53,17 @@ import {
   waitForTerrainReadyAt as waitForTerrainTileReadyAt,
   waitForTerrainReadyBounds as waitForTerrainTileReadyBounds,
   worldToLatLon
-} from "./terrain/tiles.js?v=51";
-import {
-  createDenseSettlementGroundModel,
-  denseSettlementNeedsTerrainRegularization,
-} from './terrain/urban-ground-regularization.js?v=5';
+} from "./terrain/tiles.js?v=49";
 import {
   buildRoadSkirts,
   detectRoadIntersections,
   publishCompiledTransportMeshes
-} from "./terrain/rebuild.js?v=54";
+} from "./terrain/rebuild.js?v=50";
 import {
   disableRoadDebugMode as disableRoadDebugModeInternal,
   toggleRoadDebugMode as toggleRoadDebugModeInternal,
   validateRoadTerrainConformance as validateRoadTerrainConformanceInternal
-} from "./terrain/debug-tools.js?v=19";
+} from "./terrain/debug-tools.js?v=15";
 import { createLocationTerrainApi } from "./terrain/location-world.js?v=4";
 import { buildPolarCryosphereSurface } from "./terrain/polar-cryosphere-surface.js?v=1";
 import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=73";
@@ -138,8 +134,6 @@ const ROAD_ENDPOINT_EXTENSION_MIN = 0.35;
 const ROAD_ENDPOINT_EXTENSION_MAX = 2.0;
 const MIN_VALID_ELEVATION_METERS = -500;
 const MAX_VALID_ELEVATION_METERS = 9000;
-let denseSettlementGroundModel = null;
-let denseSettlementGroundModelKey = null;
 
 function clampElevationMeters(meters) {
   if (!Number.isFinite(meters)) return null;
@@ -165,7 +159,7 @@ function elevationMetersAtLatLon(latitude, longitude) {
     : null;
 }
 
-function rawElevationWorldYAtWorldXZ(x, z) {
+function elevationWorldYAtWorldXZ(x, z) {
   if (appCtx.worldLoadRuntimeState?.groundMode === 'polar-cryosphere-local') {
     const worldY = appCtx.samplePolarCryosphereWorldYAt?.(x, z);
     return Number.isFinite(worldY) ? worldY : null;
@@ -188,43 +182,6 @@ function rawElevationWorldYAtWorldXZ(x, z) {
   return clampElevationMeters(Number(sample.groundElevationMeters)) *
     appCtx.WORLD_UNITS_PER_METER *
     appCtx.TERRAIN_Y_EXAGGERATION;
-}
-
-function elevationWorldYAtWorldXZ(x, z) {
-  const rawY = rawElevationWorldYAtWorldXZ(x, z);
-  if (!Number.isFinite(rawY) ||
-      appCtx.worldLoadRuntimeState?.groundMode === 'polar-cryosphere-local' ||
-      !denseSettlementNeedsTerrainRegularization(appCtx.worldSurfaceProfile)) {
-    return rawY;
-  }
-  const modelKey = [
-    Number(appCtx.LOC?.lat || 0).toFixed(7),
-    Number(appCtx.LOC?.lon || 0).toFixed(7),
-    Number(appCtx.WORLD_UNITS_PER_METER || 1)
-  ].join(':');
-  if (!denseSettlementGroundModel || denseSettlementGroundModelKey !== modelKey) {
-    const units = Number(appCtx.WORLD_UNITS_PER_METER || 1);
-    denseSettlementGroundModel = createDenseSettlementGroundModel(rawElevationWorldYAtWorldXZ, {
-      // A city block can be almost entirely rooftops in a surface DSM. Use a
-      // district-scale lower-surface fit so roads, terrain and foundations do
-      // not inherit the height of the dominant building block. The coarser
-      // lattice also reduces node work across the 14 km context while its
-      // fitted planes retain sustained real slopes such as Monaco's hillside.
-      gridSpacing: 360 * units,
-      sampleRadius: 480 * units,
-      sampleDivisions: 6
-    });
-    denseSettlementGroundModelKey = modelKey;
-  }
-  return denseSettlementGroundModel.sample(x, z, rawY);
-}
-
-function denseSettlementGroundSnapshot() {
-  return {
-    enabled: Boolean(denseSettlementGroundModel),
-    profile: appCtx.worldSurfaceProfile?.settlement || null,
-    ...(denseSettlementGroundModel?.snapshot?.() || {})
-  };
 }
 
 function peekElevationMetersAtLatLon(latitude, longitude) {
@@ -303,10 +260,6 @@ const terrainTileDeps = {
   createWaterTerrainContext,
   resolveWaterTerrainY,
   computeElevationStatsMeters: (samplesMeters) => computeElevationStatsMeters(samplesMeters),
-  resolveTerrainSourceWorldY: (x, z, rawY) => {
-    if (!denseSettlementNeedsTerrainRegularization(appCtx.worldSurfaceProfile)) return rawY;
-    return elevationWorldYAtWorldXZ(x, z);
-  },
   reapplyTerrainMeshHeights: (mesh) => {
     applyHeightsToTerrainMesh(mesh, terrainTileDeps);
     if (mesh?.userData?.pendingTerrainTile === false) {
@@ -349,7 +302,6 @@ function applyTransportTerrainCorridors(options = {}) {
     (mesh) => mesh?.userData?.isTerrainMesh
   );
   let adjustedVertices = 0;
-  let maximumTerrainDelta = 0;
   let waterMaskedVertices = 0;
   for (const mesh of meshes) {
     applyHeightsToTerrainMesh(mesh, terrainTileDeps, {
@@ -357,10 +309,6 @@ function applyTransportTerrainCorridors(options = {}) {
       refreshVisualProfile: options.deferVisualProfile !== true
     });
     adjustedVertices += Number(mesh.userData?.transportCorridorAdjustedVertices || 0);
-    maximumTerrainDelta = Math.max(
-      maximumTerrainDelta,
-      Number(mesh.userData?.maximumTransportCorridorDelta || 0)
-    );
     waterMaskedVertices += Number(mesh.userData?.waterMaskedVertices || 0);
   }
   const terrainSeams = stitchTerrainGroupEdges(appCtx);
@@ -371,7 +319,6 @@ function applyTransportTerrainCorridors(options = {}) {
     terrainMeshes: meshes.length,
     corridorCount: Number(appCtx.transportTerrainCorridorPublication?.corridorCount || 0),
     adjustedVertices,
-    maximumTerrainDelta,
     terrainSeams
   });
   appCtx.transportTerrainCorridorStats = stats;
@@ -390,7 +337,7 @@ const {
   baseTerrainHeightAt,
   cachedBaseTerrainHeight,
   cachedTerrainHeight,
-  clearTerrainHeightCache: clearTerrainSamplingCache,
+  clearTerrainHeightCache,
   pointAlongPolyline,
   polylineCurvatureMetric,
   subdivideRoadPoints,
@@ -400,16 +347,6 @@ const {
   terrainTileDeps,
   elevationWorldYAtWorldXZ
 });
-
-function clearTerrainHeightCache() {
-  clearTerrainSamplingCache();
-}
-
-function resetDenseSettlementGroundModel() {
-  denseSettlementGroundModel?.clear?.();
-  denseSettlementGroundModel = null;
-  denseSettlementGroundModelKey = null;
-}
 
 const { getSharedRoadMaterials } = createTerrainMaterialCacheApi({
   appCtx,
@@ -493,7 +430,6 @@ function resetEarthStreaming(reason = 'earth_streaming_reset') {
   // The far-field reset invalidates asynchronous work synchronously before its
   // returned drain promise settles, so a replacement world cannot republish an
   // obsolete generation after this release.
-  resetDenseSettlementGroundModel();
   resetLocationTerrainPublication();
   clearTerrainMeshes();
   clearAcceptedGroundRuntime(reason);
@@ -640,7 +576,6 @@ Object.assign(appCtx, {
   getGroundProviderCatalogSnapshot: groundProviderCatalogSnapshot,
   getAcceptedGroundCatalogSnapshot,
   getAcceptedGroundRuntimeSnapshot,
-  getDenseSettlementGroundSnapshot: denseSettlementGroundSnapshot,
   latLonToTileXY,
   peekElevationMetersAtLatLon,
   peekElevationWorldYAtWorldXZ,

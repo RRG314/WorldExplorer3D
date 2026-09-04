@@ -1,7 +1,7 @@
 import {
   projectPointToFeature,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=69";
+} from "../structure-semantics.js?v=63";
 import { roadWidthAtProjection } from '../world/road-cross-section-profile.js?v=1';
 
 // THREE.PlaneGeometry splits each grid cell along the bottom-left to
@@ -14,16 +14,6 @@ function interpolateRenderedTerrainCell(sx, sz, y00, y10, y01, y11) {
     return y00 + (y10 - y00) * x + (y01 - y00) * z;
   }
   return (1 - x) * y01 + (1 - z) * y10 + (x + z - 1) * y11;
-}
-
-export function boundedAtGradeTerrainTarget(feature, terrainY, requestedTargetY) {
-  const base = Number(terrainY);
-  const target = Number(requestedTargetY);
-  if (!Number.isFinite(base) || !Number.isFinite(target)) return base;
-  const policy = feature?.transportSurfaceModel?.cutFillPolicy || {};
-  const maximumCut = Math.max(0, Number(policy.maximumCutMeters) || 0);
-  const maximumFill = Math.max(0, Number(policy.maximumFillMeters) || 0);
-  return Math.max(base - maximumCut, Math.min(base + maximumFill, target));
 }
 
 function createTerrainHeightSamplingApi(deps = {}) {
@@ -136,12 +126,7 @@ function createTerrainHeightSamplingApi(deps = {}) {
         if (!Number.isFinite(projected.dist) || projected.dist > influenceRadius) continue;
         const surfaceY = sampleFeatureSurfaceY(feature, worldX, worldZ, projected);
         if (!Number.isFinite(surfaceY)) continue;
-        const requestedTargetY = surfaceY - Math.max(0, Number(feature.surfaceBias) || 0.08);
-        // A compiled centerline can legitimately span a lateral DEM slope,
-        // but the terrain mesh at either carriageway edge must still obey the
-        // same bounded cut/fill policy. Applying the raw planar target here
-        // was the writer that produced multi-metre urban banks and trenches.
-        const targetTerrainY = boundedAtGradeTerrainTarget(feature, terrainY, requestedTargetY);
+        const targetTerrainY = surfaceY - Math.max(0, Number(feature.surfaceBias) || 0.08);
         const shoulderT = Math.max(0, Math.min(1,
           (projected.dist - halfWidth) / shoulderBlend
         ));

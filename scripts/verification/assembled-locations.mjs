@@ -12,15 +12,12 @@ const baseUrl = `http://127.0.0.1:${server.port}`;
 const evidenceDir = path.join(root, 'output', 'release-evidence', 'current');
 const capture = process.env.WE3D_CAPTURE_RELEASE_EVIDENCE === '1';
 const forceTransportFallback = process.env.WE3D_FORCE_TRANSPORT_FALLBACK === '1';
-const forceShortbreadPartial = process.env.WE3D_FORCE_SHORTBREAD_PARTIAL === '1';
 const reportPath = path.join(
   root,
   'output',
   'verification',
   'assembled-locations',
-  forceShortbreadPartial
-    ? 'report-shortbread-partial.json'
-    : forceTransportFallback ? 'report-fallback.json' : 'report.json'
+  forceTransportFallback ? 'report-fallback.json' : 'report.json'
 );
 
 // These are product-owned catalog/audit anchors, selected by current release
@@ -34,18 +31,10 @@ const allLocations = [
   { id: 'iowa-rural', name: 'Iowa Rural', lat: 42.08, lon: -93.87, class: 'rural', driveOnLeft: false },
   { id: 'tokyo', name: 'Tokyo', lat: 35.6762, lon: 139.6503, class: 'dense-urban', driveOnLeft: true }
 ];
-const regressionLocations = [
-  ...allLocations,
-  // Exact player-reported regression anchor. Keep it opt-in so the ordinary
-  // worldwide matrix does not repeat a second Tokyo-area load on every run.
-  { id: 'suginami', name: 'Suginami, Tokyo, Japan', lat: 35.6966, lon: 139.6235, class: 'urban-partial-provider', driveOnLeft: true },
-  { id: 'baltimore-camden', name: 'Baltimore, Maryland, United States', lat: 39.2802, lon: -76.6198, class: 'urban-road-coverage', driveOnLeft: false },
-  { id: 'chiyoda', name: 'Chiyoda, Tokyo, Japan', lat: 35.6814, lon: 139.7650, class: 'dense-urban-terrain', driveOnLeft: true }
-];
 const requestedLocations = new Set(String(process.env.WE3D_VERIFY_LOCATIONS || '')
   .split(',').map((value) => value.trim()).filter(Boolean));
 const locations = requestedLocations.size > 0
-  ? regressionLocations.filter((location) => requestedLocations.has(location.id))
+  ? allLocations.filter((location) => requestedLocations.has(location.id))
   : allLocations;
 assert.ok(locations.length > 0, 'No assembled verification locations matched WE3D_VERIFY_LOCATIONS.');
 
@@ -61,7 +50,6 @@ try {
     const browserErrors = [];
     const browserConsole = [];
     const localFailures = [];
-    let forcedShortbreadFailureCount = 0;
     page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
     page.on('console', (message) => {
       if (!['warning', 'error'].includes(message.type())) return;
@@ -82,18 +70,6 @@ try {
     if (forceTransportFallback) {
       await page.route(/https:\/\/[^/]*overpass[^/]*\/api\/interpreter/i, (route) =>
         route.abort('failed'));
-    }
-    if (forceShortbreadPartial) {
-      // Regional transport is selected at z13 for this radius. Abort one of
-      // those requests specifically so a POI/building tile cannot accidentally
-      // satisfy the partial-coverage test instead of the road provider.
-      await page.route(/\/shortbread_v1\/13\/\d+\/\d+\.mvt(?:\?|$)/i, (route) => {
-        if (forcedShortbreadFailureCount === 0) {
-          forcedShortbreadFailureCount += 1;
-          return route.abort('failed');
-        }
-        return route.continue();
-      });
     }
 
     try {
@@ -116,16 +92,6 @@ try {
           diagnostics.livingWorld?.active === true && diagnostics.urbanSandbox?.active === true;
       }, null, { timeout: 360000 });
       await page.waitForTimeout(3000);
-      if (capture && ['baltimore-camden', 'chiyoda'].includes(location.id)) {
-        const timeButton = page.locator('#quickTimeOfDay');
-        for (let attempt = 0; attempt < 5; attempt += 1) {
-          const label = await timeButton.getAttribute('aria-label').catch(() => '');
-          if (/Current:\s*Day/i.test(String(label))) break;
-          await timeButton.click();
-          await page.waitForTimeout(120);
-        }
-        await page.waitForTimeout(400);
-      }
 
       const snapshot = await page.evaluate(() => {
         const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
@@ -146,14 +112,10 @@ try {
           farTerrainClipmap: diagnostics.farTerrainClipmap || null,
           livingWorld: diagnostics.livingWorld || null,
           urbanSandbox: diagnostics.urbanSandbox || null,
-          transportFacilities: diagnostics.transportFacilities || null,
           surfaceChain: diagnostics.surfaceChain || null,
-          worldSurfaceProfile: diagnostics.worldSurfaceProfile || null,
-          denseSettlementGround: diagnostics.denseSettlementGround || null,
           worldLoad: {
             providers: diagnostics.worldLoad?.session?.providers || {},
             regionalStructures: diagnostics.worldLoad?.regionalStructures || null,
-            regionalTransport: diagnostics.worldLoad?.regionalTransport || null,
             regionalTransportSelection: diagnostics.worldLoad?.regionalTransportSelection || null,
             reviewedStructureSelection: diagnostics.worldLoad?.reviewedStructureSelection || null,
             transportProviderDecision: diagnostics.worldLoad?.transportProviderDecision || null,
@@ -258,11 +220,7 @@ try {
           snapshot.generalizedEndpointIntegrity?.authority ===
             'compiled-generalized-structure-endpoints' &&
           Number(snapshot.generalizedEndpointIntegrity?.unsupportedOpenBoundaryCount || 0) === 0,
-        compiledRoadGradesWithinDesignBounds:
-          Number(snapshot.transportGradeProfile?.violationCount || 0) === 0 &&
-          snapshot.transportGradeProfile?.localAtGradePlausibility?.authority ===
-            'active-district-driveable-road-plausibility' &&
-          Number(snapshot.transportGradeProfile?.localAtGradePlausibility?.violationCount || 0) === 0,
+        compiledRoadGradesWithinDesignBounds: Number(snapshot.transportGradeProfile?.violationCount || 0) === 0,
         solidRoadSurfaceFootprints:
           snapshot.roadSurfaceIntegrity?.authority ===
             'solid-at-grade-segments-and-bounded-turn-joins' &&
@@ -292,8 +250,6 @@ try {
           snapshot.atGradeTerrainAuthority?.terrainSeamAuthority ===
             'one-shared-world-height-per-terrain-edge-coordinate' &&
           Number(snapshot.atGradeTerrainAuthority?.sharedTerrainEdgeVertices || 0) > 0,
-        boundedAtGradeTerrainDeformation:
-          Number(snapshot.atGradeTerrainAuthority?.maximumTerrainDelta || 0) <= 0.651,
         publishedBridgeElevationControlResolved: location.id !== 'golden-gate' || (
           snapshot.publishedVerticalControls.length === 2 &&
           snapshot.publishedVerticalControls.every((control) =>
@@ -319,7 +275,7 @@ try {
             ),
         bridgeLandmarkReadsCompiledSurface: location.id !== 'golden-gate' || (
           snapshot.mappedLandmarks?.suspensionBridge?.status === 'published_from_compiled_transport_surface' &&
-          Number(snapshot.mappedLandmarks?.suspensionBridge?.controlledRoads || 0) >= 2 &&
+          Number(snapshot.mappedLandmarks?.suspensionBridge?.controlledRoads || 0) === 2 &&
           Number(snapshot.mappedLandmarks?.suspensionBridge?.towers || 0) === 2 &&
           Number(snapshot.mappedLandmarks?.suspensionBridge?.cables || 0) === 2 &&
           Number(snapshot.mappedLandmarks?.suspensionBridge?.girders || 0) === 2 &&
@@ -339,12 +295,7 @@ try {
             snapshot.worldLoad?.transportProviderDecision?.optionalExactProvider === 'osm-overpass' &&
             snapshot.worldLoad?.transportProviderDecision?.optionalExactUnavailable === true &&
             snapshot.worldLoad?.transportProviderDecision?.exactTransportLoaded === false &&
-            snapshot.worldLoad?.transportProviderDecision?.selected ===
-              'shortbread-vector-z14-core+z13-regional' &&
-            snapshot.worldLoad?.transportProviderDecision?.generalizedCoreTransportLoaded === true &&
-            snapshot.worldLoad?.regionalTransport?.coreSource === 'shortbread-vector-z14' &&
-            Number(snapshot.worldLoad?.regionalTransport?.coreRoads || 0) > 0 &&
-            Number(snapshot.worldLoad?.regionalTransport?.coreTiles?.zoom || 0) === 14 &&
+            snapshot.worldLoad?.transportProviderDecision?.selected === 'shortbread-vector' &&
             Number(snapshot.worldLoad?.providers?.['openstreetmap-shortbread']?.completed || 0) > 0 &&
             Number(snapshot.worldLoad?.providers?.['osm-overpass']?.failed || 0) > 0
           )
@@ -362,26 +313,11 @@ try {
               ) || (
                 snapshot.worldLoad?.transportProviderDecision?.exactTransportLoaded === false &&
                 snapshot.worldLoad?.transportProviderDecision?.optionalExactUnavailable === true &&
-                snapshot.worldLoad?.transportProviderDecision?.selected ===
-                  'shortbread-vector-z14-core+z13-regional' &&
-                snapshot.worldLoad?.transportProviderDecision?.generalizedCoreTransportLoaded === true &&
-                snapshot.worldLoad?.regionalTransport?.coreSource === 'shortbread-vector-z14' &&
-                Number(snapshot.worldLoad?.regionalTransport?.coreRoads || 0) > 0 &&
-                Number(snapshot.worldLoad?.regionalTransport?.coreTiles?.zoom || 0) === 14 &&
+                snapshot.worldLoad?.transportProviderDecision?.selected === 'shortbread-vector' &&
                 Number(snapshot.worldLoad?.providers?.['osm-overpass']?.failed || 0) > 0
               )
             )
           );
-      if (forceShortbreadPartial) {
-        checks.partialShortbreadCoverageObserved =
-          forcedShortbreadFailureCount === 1 &&
-          Number(snapshot.worldLoad?.regionalTransport?.tiles?.failed || 0) > 0 &&
-          snapshot.worldLoad?.regionalTransport?.tiles?.coverageAuthority ===
-            'per-feature-adjacent-tile-continuity' &&
-          Number(snapshot.atGradeTerrainAuthority?.roadCount || 0) > 0 &&
-          Number(snapshot.atGradeTerrainAuthority?.corridorCount || 0) ===
-            Number(snapshot.atGradeTerrainAuthority?.roadCount || -1);
-      }
       const skipGuide = page.getByText('Skip guide', { exact: true });
       if (await skipGuide.isVisible().catch(() => false)) {
         // The guide may auto-dismiss between the visibility read and click.
@@ -395,9 +331,7 @@ try {
         await page.waitForTimeout(200);
       }
       if (capture) {
-        const suffix = forceShortbreadPartial
-          ? '-shortbread-partial'
-          : forceTransportFallback ? '-transport-fallback' : '';
+        const suffix = forceTransportFallback ? '-transport-fallback' : '';
         await page.screenshot({ path: path.join(evidenceDir, `${location.id}${suffix}.png`) });
       }
       results.push({
@@ -406,8 +340,7 @@ try {
         checks,
         verifierEvidence: {
           directAtGradeContactAligned,
-          atGradeTerrainOutcomeObserved,
-          forcedShortbreadFailureCount
+          atGradeTerrainOutcomeObserved
         },
         snapshot,
         browserErrors,
@@ -438,7 +371,6 @@ const report = {
   contract: 'complete-assembled-gameplay-representative-location-matrix',
   captureEnabled: capture,
   forceTransportFallback,
-  forceShortbreadPartial,
   results
 };
 await fs.writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);

@@ -4,14 +4,8 @@ const TRANSPORT_SURFACE_SCHEMA_VERSION = 1;
 const DEFAULT_SURFACE_BIAS = 0.08;
 const DEFAULT_SAMPLE_STEP = 2;
 const DEFAULT_MAX_GRADE = 0.12;
-// Ordinary mapped streets do not carry surveyed vertical alignments. Let the
-// accepted terrain remain the landform authority and permit only a shallow
-// local fit for a stable carriageway. The former four-metre envelope allowed
-// dense road networks to manufacture urban hills and canyons from coarse DEM
-// samples. Engineered bridge/tunnel approaches publish their own explicit
-// bounds through the structure compiler.
-const DEFAULT_MAX_AT_GRADE_CUT = 0.65;
-const DEFAULT_MAX_AT_GRADE_FILL = 0.65;
+const DEFAULT_MAX_AT_GRADE_CUT = 4;
+const DEFAULT_MAX_AT_GRADE_FILL = 4;
 const DEFAULT_VERTICAL_FIT_RADIUS = 14;
 
 function finiteNumber(value, fallback = 0) {
@@ -588,14 +582,24 @@ function smoothSignedCutFillProfile(
     heights[index] = clamp(target, lowerBounds[index], upperBounds[index]);
   }
 
-  // Ordinary roads do not have a surveyed vertical alignment. Their shallow
-  // cut/fill envelope is the hard contract; a universal grade constraint can
-  // be mathematically incompatible with a real hillside. The old projection
-  // responded to that conflict by moving an endpoint outside both bounds on
-  // every pass, eventually creating an 80 m wall beside smooth terrain.
-  // Smooth locally, but never let a later pass escape the accepted-ground
-  // bounds. Engineered approaches use their separate constrained solver.
-  for (let pass = 0; pass < 6; pass += 1) {
+  const grade = Math.max(0.01, finiteNumber(maximumGrade, DEFAULT_MAX_GRADE));
+  for (let pass = 0; pass < 8; pass += 1) {
+    for (let index = 1; index < heights.length; index += 1) {
+      const run = Math.max(1e-6, distances[index] - distances[index - 1]);
+      heights[index] = clamp(
+        heights[index],
+        Math.max(lowerBounds[index], heights[index - 1] - grade * run),
+        Math.min(upperBounds[index], heights[index - 1] + grade * run)
+      );
+    }
+    for (let index = heights.length - 2; index >= 0; index -= 1) {
+      const run = Math.max(1e-6, distances[index + 1] - distances[index]);
+      heights[index] = clamp(
+        heights[index],
+        Math.max(lowerBounds[index], heights[index + 1] - grade * run),
+        Math.min(upperBounds[index], heights[index + 1] + grade * run)
+      );
+    }
     const next = new Float64Array(heights);
     for (let index = 1; index < heights.length - 1; index += 1) {
       next[index] = clamp(

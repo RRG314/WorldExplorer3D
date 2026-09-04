@@ -18,7 +18,7 @@ import {
   applyTerrainVisualProfile,
   classifyTerrainVisualProfile,
   TERRAIN_GRASS_COLOR_HEX
-} from "./surface-profiles.js?v=55";
+} from "./surface-profiles.js?v=54";
 import { stitchTerrainMeshEdges } from "./seams.js?v=2";
 import {
   cancelTerrainTileRequest as cancelTileRequest,
@@ -556,7 +556,6 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}, options = {}) {
   let maxElevation = -Infinity;
   let waterMaskedVertices = 0;
   let transportCorridorAdjustedVertices = 0;
-  let maximumTransportCorridorDelta = 0;
   const elevations = [];
   const elevationMetersSamples = [];
   const segments = Math.max(1, Number(appCtx.TERRAIN_SEGMENTS) || 1);
@@ -660,15 +659,10 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}, options = {}) {
       return;
     }
     elevationMetersSamples.push(meters);
-    const rawBaseY = meters * appCtx.WORLD_UNITS_PER_METER * appCtx.TERRAIN_Y_EXAGGERATION;
-    const baseY = typeof deps.resolveTerrainSourceWorldY === 'function'
-      ? deps.resolveTerrainSourceWorldY(wx, wz, rawBaseY)
-      : rawBaseY;
+    const baseY = meters * appCtx.WORLD_UNITS_PER_METER * appCtx.TERRAIN_Y_EXAGGERATION;
     if (!reuseBaseElevations) nextBaseElevations[i] = baseY;
     const structureY = typeof deps.applyStructureTerrainCuts === "function" ? deps.applyStructureTerrainCuts(wx, wz, baseY) : baseY;
-    const transportCorridorDelta = Math.abs(structureY - baseY);
-    if (transportCorridorDelta > 1e-6) transportCorridorAdjustedVertices += 1;
-    maximumTransportCorridorDelta = Math.max(maximumTransportCorridorDelta, transportCorridorDelta);
+    if (Math.abs(structureY - baseY) > 1e-6) transportCorridorAdjustedVertices += 1;
     const y = typeof deps.resolveWaterTerrainY === "function"
       ? deps.resolveWaterTerrainY(wx, wz, structureY, waterTerrainContext)
       : structureY;
@@ -690,7 +684,6 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}, options = {}) {
   mesh.userData.baseTerrainWorldY = nextBaseElevations;
   mesh.userData.waterMaskedVertices = waterMaskedVertices;
   mesh.userData.transportCorridorAdjustedVertices = transportCorridorAdjustedVertices;
-  mesh.userData.maximumTransportCorridorDelta = maximumTransportCorridorDelta;
   mesh.userData.groundUnavailableReason = null;
   mesh.visible = true;
 

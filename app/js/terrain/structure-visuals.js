@@ -2,7 +2,7 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   polylineDistances,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=69";
+} from "../structure-semantics.js?v=63";
 import {
   clearStructureVisualMeshesForContext,
   rebuildStructureVisualMeshesForContext,
@@ -11,13 +11,13 @@ import {
 import {
   canPublishTunnelVisual,
   collectTunnelVisualInstances
-} from "./structure-tunnel-visuals.js?v=28";
+} from "./structure-tunnel-visuals.js?v=24";
 import {
   barrierPointConflictsWithDriveableRoad,
   createDriveableRoadConflictIndex,
   elevatedSegmentSafety,
   supportPointConflictsWithDriveableRoad
-} from "../world/bridge-safety.js?v=17";
+} from "../world/bridge-safety.js?v=13";
 import { applyTerrainPortalMasksForContext } from './structure-terrain-portals.js?v=1';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
 

@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   classifyTerrainSurfaceProfile as classifySharedTerrainSurfaceProfile
-} from "../surface-rules.js?v=19";
+} from "../surface-rules.js?v=18";
 import {
   classifyWorldCoverSurface,
   loadWorldCoverBaseline,
@@ -476,49 +476,9 @@ export function applyMappedSemanticVertexTints(
     geometry.setAttribute('color', colors);
   }
   const materialMix = ensureTerrainSurfaceMixAttributes(geometry);
-  const cachedOwnership = mesh.userData?.mappedSemanticTintOwnership;
-  if (
-    options.force === true &&
-    cachedOwnership?.context === mappedContext &&
-    cachedOwnership?.positionCount === positions.count &&
-    cachedOwnership.indices?.length
-  ) {
-    for (let entry = 0; entry < cachedOwnership.indices.length; entry += 1) {
-      const vertexIndex = cachedOwnership.indices[entry];
-      const colorOffset = entry * 3;
-      const mixAOffset = entry * 4;
-      const mixBOffset = entry * 2;
-      const vertexColorOffset = vertexIndex * 3;
-      colors.array[vertexColorOffset] = cachedOwnership.colors[colorOffset];
-      colors.array[vertexColorOffset + 1] = cachedOwnership.colors[colorOffset + 1];
-      colors.array[vertexColorOffset + 2] = cachedOwnership.colors[colorOffset + 2];
-      if (materialMix) {
-        const vertexMixAOffset = vertexIndex * 4;
-        const vertexMixBOffset = vertexIndex * 2;
-        materialMix.mixA.array[vertexMixAOffset] = cachedOwnership.mixA[mixAOffset];
-        materialMix.mixA.array[vertexMixAOffset + 1] = cachedOwnership.mixA[mixAOffset + 1];
-        materialMix.mixA.array[vertexMixAOffset + 2] = cachedOwnership.mixA[mixAOffset + 2];
-        materialMix.mixA.array[vertexMixAOffset + 3] = cachedOwnership.mixA[mixAOffset + 3];
-        materialMix.mixB.array[vertexMixBOffset] = cachedOwnership.mixB[mixBOffset];
-        materialMix.mixB.array[vertexMixBOffset + 1] = cachedOwnership.mixB[mixBOffset + 1];
-      }
-    }
-    colors.needsUpdate = true;
-    if (materialMix) {
-      materialMix.mixA.needsUpdate = true;
-      materialMix.mixB.needsUpdate = true;
-    }
-    mesh.material.vertexColors = true;
-    mesh.material.needsUpdate = true;
-    return cachedOwnership.indices.length;
-  }
   const separableLocalProjection = Math.abs(Number(appCtx.LOC?.lat || 0)) < 84;
   const longitudeTileByWorldX = separableLocalProjection ? new Map() : null;
   const latitudeTileByWorldZ = separableLocalProjection ? new Map() : null;
-  const ownedIndices = [];
-  const ownedColors = [];
-  const ownedMixA = [];
-  const ownedMixB = [];
   let tintedVertices = 0;
   for (let index = 0; index < positions.count; index += 1) {
     const worldX = positions.getX(index) + Number(mesh.position?.x || 0);
@@ -576,20 +536,6 @@ export function applyMappedSemanticVertexTints(
     if (!Array.isArray(owner?.tint) || owner.tint.length < 3) continue;
     setNormalizedTerrainAttribute(colors, index, owner.tint);
     setTerrainSurfaceMaterialMixAt(materialMix, index, owner.mode || owner.kind);
-    ownedIndices.push(index);
-    const colorOffset = index * 3;
-    ownedColors.push(colors.array[colorOffset], colors.array[colorOffset + 1], colors.array[colorOffset + 2]);
-    if (materialMix) {
-      const mixAOffset = index * 4;
-      const mixBOffset = index * 2;
-      ownedMixA.push(
-        materialMix.mixA.array[mixAOffset],
-        materialMix.mixA.array[mixAOffset + 1],
-        materialMix.mixA.array[mixAOffset + 2],
-        materialMix.mixA.array[mixAOffset + 3]
-      );
-      ownedMixB.push(materialMix.mixB.array[mixBOffset], materialMix.mixB.array[mixBOffset + 1]);
-    }
     tintedVertices += 1;
   }
   if (tintedVertices > 0) {
@@ -603,14 +549,6 @@ export function applyMappedSemanticVertexTints(
   }
   mesh.userData.mappedSemanticTintVertices = tintedVertices;
   mesh.userData.mappedSemanticTintContext = mappedContext;
-  mesh.userData.mappedSemanticTintOwnership = {
-    context: mappedContext,
-    positionCount: positions.count,
-    indices: Uint32Array.from(ownedIndices),
-    colors: Uint8Array.from(ownedColors),
-    mixA: Uint8Array.from(ownedMixA),
-    mixB: Uint8Array.from(ownedMixB)
-  };
   return tintedVertices;
 }
 

@@ -1,4 +1,4 @@
-import { getVectorTileLib } from './shortbread-source.js?v=20';
+import { getVectorTileLib } from './shortbread-source.js?v=19';
 
 // Overture retains public releases for a bounded window. Keep the reviewed
 // release explicit so one immutable application build never changes datasets

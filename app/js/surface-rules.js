@@ -190,9 +190,7 @@ function summarizeSurfaceSignals(landuseWays = [], waterwayWays = []) {
 function classifyWorldSurfaceProfile({
   centerLat = null,
   landuseWays = [],
-  waterwayWays = [],
-  roadWays = [],
-  buildingWays = []
+  waterwayWays = []
 } = {}) {
   const lat = Number.isFinite(centerLat) ? centerLat : Number(appCtx.LOC?.lat || 0);
   const absLat = Math.abs(lat);
@@ -249,13 +247,6 @@ function classifyWorldSurfaceProfile({
     latitude: lat,
     signals: norm
   });
-  const roadCount = Array.isArray(roadWays) ? roadWays.length : 0;
-  const buildingCount = Array.isArray(buildingWays) ? buildingWays.length : 0;
-  const settlement = Object.freeze({
-    dense: roadCount >= 800 || buildingCount >= 100,
-    roadCount,
-    buildingCount
-  });
   return {
     absLat,
     centerLat: lat,
@@ -263,7 +254,6 @@ function classifyWorldSurfaceProfile({
     waterModeHint: frozenWater ? 'ice' : 'water',
     reason: polar ? 'polar_latitude' : aridTerrain ? 'arid_surface' : 'temperate',
     biome,
-    settlement,
     signals
   };
 }

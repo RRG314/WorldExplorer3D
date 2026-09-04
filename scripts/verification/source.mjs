@@ -788,9 +788,8 @@ const generalizedMetricConnection = compileTransportNetworkModel([
   })
 ]);
 if (generalizedMetricConnection.connections.length === 0 ||
-    generalizedMetricConnection.connections[0].provenance?.method !==
-      'generalized-aligned-endpoint-conflation') {
-  structureFallbackAuthorityFailures.push('generalized transport lost its bounded aligned endpoint continuity');
+    !String(generalizedMetricConnection.connections[0].provenance?.method || '').startsWith('metric-')) {
+  structureFallbackAuthorityFailures.push('generalized transport lost its bounded metric conflation fallback');
 }
 const generalizedDriftConnection = compileTransportNetworkModel([
   exactTransportFeature({

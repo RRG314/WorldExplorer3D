@@ -68,22 +68,3 @@ test('a higher existing traversal surface is not replaced by airport pavement be
   assert.equal(query.walkAt(0, 0).position.y, 18);
   assert.equal(query.driveAt(0, 0).position.y, 18);
 });
-
-test('no airport surface remains no surface below sea level', () => {
-  const appCtx = {
-    METERS_PER_WORLD_UNIT: 1,
-    transportFacilityVisual: {
-      airportLayout: null,
-      surfaceYAt: () => null
-    }
-  };
-  const query = createSurfaceQuery(appCtx, groundHeightAt(-1.4));
-  const walk = query.walkAt(0, 0);
-  const drive = query.driveAt(0, 0);
-  assert.equal(walk.position.y, -1.4);
-  assert.equal(drive.position.y, -1.4);
-  assert.equal(walk.kind, 'terrain');
-  assert.equal(drive.kind, 'terrain');
-  assert.notEqual(walk.provenance.source, 'exact_osm_airport_surface');
-  assert.notEqual(drive.provenance.source, 'exact_osm_airport_surface');
-});

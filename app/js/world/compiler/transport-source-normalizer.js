@@ -240,11 +240,11 @@ export function normalizeTransportSource(source = {}, tags = {}) {
   const crossSection = normalizedCrossSection(tags);
   const access = normalizedAccess(tags);
   const explicitlyIncomplete = source.incomplete === true || tags._sourceTruncated === 'yes';
-  // Route continuity and physical-surface safety are separate facts. A road
-  // fragment can end at a missing provider tile while its loaded geometry is
-  // still a valid road and terrain corridor. Keep the fragment out of route
-  // continuation decisions without removing its physical surface.
-  const safeForDriving = access.motorVehicle !== 'prohibited';
+  // Attribute generalization is not missing route geometry. Shortbread's
+  // complete tile coverage preserves mapped road centerlines and explicit
+  // bridge/tunnel/layer fields, so it remains a valid drive surface. Only an
+  // actually truncated feature or prohibited access makes the route unsafe.
+  const safeForDriving = access.motorVehicle !== 'prohibited' && !explicitlyIncomplete;
 
   return Object.freeze({
     schemaVersion: TRANSPORT_SOURCE_SCHEMA_VERSION,

@@ -2,7 +2,7 @@ import {
   polylineDistances,
   segmentIntersection2D
 } from '../../structure-semantics/geometry.js?v=2';
-import { sampleTransportSurfaceAtDistance } from './transport-surface-model.js?v=27';
+import { sampleTransportSurfaceAtDistance } from './transport-surface-model.js?v=25';
 
 // A shell roof that merely touches the sampled terrain is visibly exposed by
 // interpolation and precision differences. Require physical soil/road cover

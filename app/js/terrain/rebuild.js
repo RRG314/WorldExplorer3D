@@ -7,13 +7,13 @@ import {
   roadSkirtDepth,
   sampleFeatureSurfaceY,
   shouldRenderRoadSkirts
-} from "../structure-semantics.js?v=69";
+} from "../structure-semantics.js?v=63";
 import { yieldToMainThread } from "../world/cooperative-scheduling.js?v=1";
 
 import {
   computeIntersectionCapRadius,
   shouldBuildCompactIntersectionCap
-} from "./road-junctions.js?v=15";
+} from "./road-junctions.js?v=11";
 import { appendSolidAtGradeRoadGeometry } from "./road-surface-geometry.js?v=2";
 import { roadWidthAtSegment } from "../world/road-cross-section-profile.js?v=1";
 

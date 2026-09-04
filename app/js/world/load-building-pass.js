@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { classifyStructureSemantics } from "../structure-semantics.js?v=69";
+import { classifyStructureSemantics } from "../structure-semantics.js?v=63";
 import {
   buildingSeedFromIdentity,
   inferFallbackBuildingHeightMeters,
@@ -401,13 +401,6 @@ export async function buildBuildingGeometryPass(options = {}) {
     const colliderDetail = useRdtBudgeting && lodTier !== 'near' && !roadCoreConflict ? 'bbox' : 'full';
 
     const sampleTerrainY = (x, z) => {
-      // Buildings and roads must compile against the same source ground. The
-      // terrain mesh may still contain its initial provider heights here; it
-      // is rebuilt against this authority after transport compilation.
-      const sourceHeight = typeof appCtx.baseTerrainHeightAt === 'function'
-        ? Number(appCtx.baseTerrainHeightAt(x, z))
-        : NaN;
-      if (Number.isFinite(sourceHeight)) return sourceHeight;
       const meshHeight = typeof appCtx.terrainMeshHeightAt === 'function'
         ? Number(appCtx.terrainMeshHeightAt(x, z))
         : NaN;

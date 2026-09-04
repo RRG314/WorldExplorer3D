@@ -110,17 +110,6 @@ function transportFacilitySnapshot() {
     aviation: Number(graph.byDomain?.aviation?.length || 0),
     maritime: Number(graph.byDomain?.maritime?.length || 0),
     typeCounts: graph.diagnostics?.typeCounts || {},
-    aviationRecords: (graph.byDomain?.aviation || []).slice(0, 80).map((record) => ({
-      id: String(record.id || ''),
-      type: String(record.type || ''),
-      name: String(record.name || ''),
-      geometryAuthority: String(record.geometryAuthority || ''),
-      geometryKind: String(record.geometry?.kind || ''),
-      points: (record.geometry?.points || []).slice(0, 4).map((point) => ({
-        x: numberOrNull(Number(point?.x)),
-        z: numberOrNull(Number(point?.z))
-      }))
-    })),
     visualAttached: Boolean(visual?.parent),
     visualCount: Number(visual?.children?.length || 0),
     mappedOnly: (graph.records || []).every((record) => record.mapped === true && record.generatedActivity === false),
@@ -714,10 +703,6 @@ function transportStructureSnapshot() {
           ? Number(station?.distance) <= 18
           : Number(road?.transportStructureAssembly?.total) - Number(station?.distance) <= 18);
       const compiledConnectionPublished = compiledEndpointConnectionPublished(road, endpoint);
-      const deckThickness = Number(road?.transportStructureAssembly?.baseThickness || 0);
-      const clearance = Number.isFinite(surfaceY) && Number.isFinite(terrainY)
-        ? surfaceY - terrainY
-        : null;
       return {
         id: String(road?.sourceFeatureId || road?.transportGraphRef?.featureId || ''),
         name: String(road?.name || ''),
@@ -728,9 +713,8 @@ function transportStructureSnapshot() {
         connectionCount: Number(endpointRef?.connectionCount || 0),
         surfaceY: numberOrNull(surfaceY),
         terrainY: numberOrNull(terrainY),
-        clearance,
-        unsupportedClearance: Number.isFinite(clearance)
-          ? Math.max(0, clearance - deckThickness)
+        clearance: Number.isFinite(surfaceY) && Number.isFinite(terrainY)
+          ? surfaceY - terrainY
           : null,
         x: numberOrNull(Number(point?.x)),
         z: numberOrNull(Number(point?.z)),
@@ -739,27 +723,7 @@ function transportStructureSnapshot() {
         abutmentPublished,
         terminalSupportPublished,
         supportWithinEndpointRun,
-        compiledConnectionPublished,
-        transitionAnchors: (road?.structureTransitionAnchors || []).map((anchor) => ({
-          endpoint: String(anchor?.endpoint || ''),
-          distance: numberOrNull(Number(anchor?.distance)),
-          span: numberOrNull(Number(anchor?.span)),
-          targetOffset: numberOrNull(Number(anchor?.targetOffset)),
-          targetSurfaceY: numberOrNull(Number(anchor?.targetSurfaceY)),
-          source: String(anchor?.source || '')
-        })),
-        assembly: road?.transportStructureAssembly ? {
-          publishBody: road.transportStructureAssembly.publishBody === true,
-          visualSupportDetail: road.transportStructureAssembly.visualSupportDetail === true,
-          surfaceSampleCount: Number(road.transportStructureAssembly.surfaceSamples?.length || 0),
-          supportCount: Number(road.transportStructureAssembly.supportStations?.length || 0),
-          terminalSupportCount: Number(road.transportStructureAssembly.terminalSupports?.length || 0),
-          abutmentCount: Number(road.transportStructureAssembly.abutments?.length || 0)
-        } : null,
-        featurePoints: (road?.pts || []).map((entry) => ({
-          x: numberOrNull(Number(entry?.x)),
-          z: numberOrNull(Number(entry?.z))
-        }))
+        compiledConnectionPublished
       };
     });
   });
@@ -770,53 +734,12 @@ function transportStructureSnapshot() {
   const unsupportedGeneralizedOpenBoundaries = generalizedEndpointRecords
     .filter((record) =>
       record.state === 'open_boundary' &&
-      Number(record.unsupportedClearance) > 1.2 &&
+      Number(record.clearance) > 1.2 &&
       record.compiledConnectionPublished !== true &&
       record.abutmentPublished !== true &&
       record.terminalSupportPublished !== true &&
       record.supportWithinEndpointRun !== true)
-    .sort((left, right) => Number(right.clearance) - Number(left.clearance))
-    .map((record) => {
-      const nearbyCandidates = roads.flatMap((road) => {
-        const id = String(road?.sourceFeatureId || road?.transportGraphRef?.featureId || '');
-        const points = Array.isArray(road?.pts) ? road.pts : [];
-        if (!id || id === record.id || points.length < 2) return [];
-        let nearest = null;
-        for (let index = 0; index < points.length - 1; index += 1) {
-          const a = points[index];
-          const b = points[index + 1];
-          const dx = Number(b?.x) - Number(a?.x);
-          const dz = Number(b?.z) - Number(a?.z);
-          const lengthSq = dx * dx + dz * dz;
-          if (!(lengthSq > 1e-8)) continue;
-          const t = Math.max(0, Math.min(1,
-            ((record.x - Number(a.x)) * dx + (record.z - Number(a.z)) * dz) / lengthSq
-          ));
-          const x = Number(a.x) + dx * t;
-          const z = Number(a.z) + dz * t;
-          const distance = Math.hypot(record.x - x, record.z - z);
-          if (!nearest || distance < nearest.distance) nearest = { distance, index, t, x, z };
-        }
-        if (!nearest || nearest.distance > 20) return [];
-        return [{
-          id,
-          name: String(road?.transportRecord?.sourceTags?.name || road?.name || ''),
-          type: String(road?.type || ''),
-          distance: numberOrNull(nearest.distance),
-          segmentIndex: nearest.index,
-          segmentT: numberOrNull(nearest.t),
-          terrainMode: String(road?.structureSemantics?.terrainMode || ''),
-          verticalOrder: Number(road?.structureSemantics?.verticalOrder || 0),
-          completeness: String(road?.transportRecord?.completeness || ''),
-          graphStationCount: Number(road?.transportGraphRef?.stations?.length || 0),
-          segment: {
-            a: { x: numberOrNull(Number(points[nearest.index]?.x)), z: numberOrNull(Number(points[nearest.index]?.z)) },
-            b: { x: numberOrNull(Number(points[nearest.index + 1]?.x)), z: numberOrNull(Number(points[nearest.index + 1]?.z)) }
-          }
-        }];
-      }).sort((left, right) => Number(left.distance) - Number(right.distance)).slice(0, 8);
-      return { ...record, nearbyCandidates };
-    });
+    .sort((left, right) => Number(right.clearance) - Number(left.clearance));
   const exactStructureSamples = roads.filter((road) =>
     road?.transportRecord?.completeness === 'lossless' &&
     road?.structureSemantics?.gradeSeparated === true &&
@@ -860,22 +783,11 @@ function transportStructureSnapshot() {
       terrainMode: String(road?.structureSemantics?.terrainMode || 'at_grade'),
       verticalOrder: Number(road?.structureSemantics?.verticalOrder || 0),
       engineeredApproach: road?.transportSurfaceModel?.engineeredApproach === true,
-      driveable: road?.driveable !== false,
-      minimumWorldRadius: Math.min(...(road?.pts || []).map((point) =>
-        Math.hypot(Number(point?.x || 0), Number(point?.z || 0)))),
       maximumGrade: Number(steepestSegment?.grade || 0),
       compilerReportedMaximumGrade: Number(road?.transportSurfaceModel?.stats?.maximumGrade),
       designMaximumGrade: Number(road?.transportSurfaceModel?.maximumGrade),
       profileLength: Number(distances[distances.length - 1] || 0),
       steepestSegment,
-      steepestSamples: steepestSegment ? [steepestSegment.index - 1, steepestSegment.index].map((index) => ({
-        index,
-        distance: numberOrNull(Number(distances[index])),
-        centerY: numberOrNull(Number(heights[index])),
-        groundY: numberOrNull(Number(road?.transportSurfaceModel?.groundHeights?.[index])),
-        leftGroundY: numberOrNull(Number(road?.transportSurfaceModel?.leftGround?.[index])),
-        rightGroundY: numberOrNull(Number(road?.transportSurfaceModel?.rightGround?.[index]))
-      })) : [],
       graphAnchors: (road?.structureTransitionAnchors || [])
         .filter((anchor) => anchor?.source === 'transport_graph_node')
         .map((anchor) => ({
@@ -899,21 +811,6 @@ function transportStructureSnapshot() {
     record.terrainMode !== 'at_grade' || record.engineeredApproach === true);
   const gradeViolations = engineeredGradeProfiles.filter((record) =>
     record.maximumGrade > record.designMaximumGrade + 0.002);
-  // Natural terrain can exceed the engineered-road design envelope, but a
-  // driveable street near the active district must never become a near-
-  // vertical wall because of contaminated or discontinuous source heights.
-  // This is a catastrophic-geometry alarm, not a claim that every mapped
-  // road follows one design standard. Monaco's real/exaggerated hillside can
-  // legitimately approach 46%, while the reported regressions produced
-  // 900%–4,000% one-sample walls.
-  const localAtGradeMaximum = 0.5;
-  const localAtGradeProfiles = gradeProfiles.filter((record) =>
-    record.terrainMode === 'at_grade' &&
-    record.engineeredApproach !== true &&
-    record.driveable === true &&
-    record.minimumWorldRadius <= 3000);
-  const localAtGradeViolations = localAtGradeProfiles.filter((record) =>
-    record.maximumGrade > localAtGradeMaximum);
   const atGradeRoads = roads.filter((road) =>
     road?.structureSemantics?.terrainMode === 'at_grade' &&
     road?.driveable !== false);
@@ -928,7 +825,6 @@ function transportStructureSnapshot() {
       typeof road?.surfaceTerrainSampler === 'function').length,
     corridorCount: Number(appCtx.transportTerrainCorridorPublication?.corridorCount || 0),
     adjustedTerrainVertices: Number(appCtx.transportTerrainCorridorStats?.adjustedVertices || 0),
-    maximumTerrainDelta: Number(appCtx.transportTerrainCorridorStats?.maximumTerrainDelta || 0),
     terrainMeshes: Number(appCtx.transportTerrainCorridorStats?.terrainMeshes || 0),
     heightSamplingAuthority:
       String(appCtx.transportTerrainCorridorStats?.heightSamplingAuthority || '') || null,
@@ -1019,15 +915,6 @@ function transportStructureSnapshot() {
       violationCount: gradeViolations.length,
       violations: gradeViolations.slice(0, 24),
       steepest: engineeredGradeProfiles.slice(0, 24),
-      localAtGradePlausibility: {
-        authority: 'active-district-driveable-road-plausibility',
-        auditRadius: 3000,
-        maximumGrade: localAtGradeMaximum,
-        sampledRoads: localAtGradeProfiles.length,
-        violationCount: localAtGradeViolations.length,
-        violations: localAtGradeViolations.slice(0, 24),
-        steepest: localAtGradeProfiles.slice(0, 24)
-      },
       allMappedRoadsObserved: gradeProfiles.length,
       allMappedRoadsSteepest: gradeProfiles.slice(0, 24)
     },
@@ -1176,11 +1063,6 @@ function getWorldExplorerRuntimeDiagnostics() {
     paused: !!appCtx.paused,
     worldLoading: !!appCtx.worldLoading,
     worldLoad: appCtx.worldLoadRuntimeState || null,
-    worldSurfaceProfile: appCtx.worldSurfaceProfile || null,
-    denseSettlementGround: appCtx.getDenseSettlementGroundSnapshot?.() || {
-      enabled: false,
-      profile: appCtx.worldSurfaceProfile?.settlement || null
-    },
     onDemandModes: appCtx.getOnDemandModeSnapshot?.() || {
       ocean: { requested: false, active: false, rendererReady: false },
       space: { requested: false, active: false, rendererReady: false }

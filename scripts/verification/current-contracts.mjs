@@ -40,7 +40,6 @@ const tests = [
   'tests/space-journey-authority-current.test.mjs',
   'tests/space-landing-target-current.test.mjs',
   'tests/spacecraft-authority-current.test.mjs',
-  'tests/shortbread-coverage-current.test.mjs',
   'tests/vehicle-handling-current.test.mjs',
   'tests/walking-encounter-director.test.mjs',
   'tests/weapon-reticle-current.test.mjs'

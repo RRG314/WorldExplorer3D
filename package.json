@@ -45,7 +45,6 @@
     "verify:environments": "node scripts/verification/environments.mjs",
     "verify:assembled-locations": "node scripts/verification/assembled-locations.mjs",
     "verify:assembled-locations-fallback": "WE3D_FORCE_TRANSPORT_FALLBACK=1 node scripts/verification/assembled-locations.mjs",
-    "verify:shortbread-partial": "WE3D_FORCE_TRANSPORT_FALLBACK=1 WE3D_FORCE_SHORTBREAD_PARTIAL=1 WE3D_VERIFY_LOCATIONS=suginami WE3D_CAPTURE_RELEASE_EVIDENCE=1 node scripts/verification/assembled-locations.mjs",
     "verify:actors-vehicles": "node scripts/verification/actors-vehicles.mjs",
     "verify:live-gps": "node scripts/verification/live-gps.mjs",
     "verify:live-gps-authority": "node --test tests/live-gps-field-session.test.mjs",

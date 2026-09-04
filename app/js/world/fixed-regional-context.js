@@ -52,32 +52,10 @@ function isEngineeredTransportWay(element) {
     (Number.isFinite(Number(tags.layer)) && Number(tags.layer) !== 0);
 }
 
-export function selectDetailedCoreTransport(data = {}) {
-  const elements = Array.isArray(data?.elements) ? data.elements : [];
-  const roadWays = elements.filter((element) =>
-    element?.type === 'way' &&
-    element?.tags?.highway &&
-    String(element?.tags?._sourceFeatureId || '').startsWith('shortbread:streets:')
-  );
-  const roadWayIds = new Set(roadWays.map((way) => way.id));
-  const nodeIds = new Set(roadWays.flatMap((way) => (way.nodes || []).map(String)));
-  return {
-    ...data,
-    elements: elements.filter((element) =>
-      (element?.type === 'way' && roadWayIds.has(element.id)) ||
-      (element?.type === 'node' && nodeIds.has(String(element.id)))
-    ),
-    _overpassSource: 'shortbread-vector-z14-core'
-  };
-}
-
 export function retainRegionalTransportOutsideCore(data, options = {}) {
   const location = options.location;
   const coreRadiusMeters = Math.max(0, Number(options.coreRadiusMeters) || 0);
-  const overlapRadiusMeters = Math.max(
-    0,
-    Number(options.overlapRadiusMeters) || coreRadiusMeters * 0.82
-  );
+  const overlapRadiusMeters = coreRadiusMeters * 0.82;
   const elements = Array.isArray(data?.elements) ? data.elements : [];
   const nodes = new Map(
     elements
@@ -85,20 +63,14 @@ export function retainRegionalTransportOutsideCore(data, options = {}) {
       .map((node) => [node.id, node])
   );
   const includeCore = options.includeCore === true;
-  const excludeCoreCrossingWays = options.excludeCoreCrossingWays === true;
-  const retainCoreStructureFallbacks = options.retainCoreStructureFallbacks !== false;
   const classifiedWays = elements.map((element) => {
     if (element?.type !== 'way' || !Array.isArray(element.nodes)) return false;
     const points = element.nodes.map((id) => nodes.get(id)).filter(Boolean);
     if (points.length < 2) return null;
-    const pointDistances = points.map((point) => distanceFromLocationMeters(point, location));
-    const reachesRegionalDomain = pointDistances.some((distance) => distance >= overlapRadiusMeters);
-    const entersCoreDomain = pointDistances.some((distance) => distance < overlapRadiusMeters);
-    // A detailed Shortbread core and its coarse regional LOD must not render
-    // the same physical segment. The detailed core deliberately extends past
-    // this handoff ring, so discard z13 ways that cross back into its domain.
-    const regional = reachesRegionalDomain && !(excludeCoreCrossingWays && entersCoreDomain);
-    const coreStructureFallback = retainCoreStructureFallbacks && !regional && !includeCore &&
+    const regional = points.some(
+      (point) => distanceFromLocationMeters(point, location) >= overlapRadiusMeters
+    );
+    const coreStructureFallback = !regional && !includeCore &&
       isEngineeredTransportWay(element);
     if (!regional && !includeCore && !coreStructureFallback) return null;
     return {
@@ -238,41 +210,23 @@ export async function completeFixedRegionalTransportLoad(options = {}) {
     coreRadiusMeters,
     exactData,
     exactTransportLoaded,
-    generalizedCoreData,
     loadMetrics,
     request
   } = options;
   const outcome = await request?.outcome;
   if (outcome?.error) throw outcome.error;
   if (!outcome?.value) throw new Error('Fixed regional transport returned no source data.');
-  const generalizedCoreRoadCount = Array.isArray(generalizedCoreData?.elements)
-    ? generalizedCoreData.elements.filter((element) => element?.type === 'way' && element?.tags?.highway).length
-    : 0;
-  const generalizedCoreLoaded = exactTransportLoaded !== true && generalizedCoreRoadCount > 0;
-  const primaryCoreData = exactTransportLoaded === true ? exactData : generalizedCoreData;
-  const primaryCoreLoaded = exactTransportLoaded === true || generalizedCoreLoaded;
   const regional = retainRegionalTransportOutsideCore(outcome.value, {
     location: request.location,
     coreRadiusMeters,
-    includeCore: !primaryCoreLoaded,
-    excludeCoreCrossingWays: generalizedCoreLoaded,
-    retainCoreStructureFallbacks: exactTransportLoaded === true,
-    // The detailed request covers 1.18x the playable core. Hand off inside
-    // that overlap so a coarse z13 feature cannot re-enter the z14 scene and
-    // publish a second, clipped bridge or ramp.
-    overlapRadiusMeters: generalizedCoreLoaded ? coreRadiusMeters * 1.08 : undefined,
+    includeCore: exactTransportLoaded !== true,
     radiusMeters: request.radiusMeters
   });
-  const data = primaryCoreLoaded
-    ? mergeFixedRegionalTransport(primaryCoreData, regional)
+  const data = exactTransportLoaded
+    ? mergeFixedRegionalTransport(exactData, regional)
     : regional;
   loadMetrics.regionalTransport = {
     ...regional._regionalContext,
-    coreSource: exactTransportLoaded === true
-      ? 'osm-overpass-exact'
-      : generalizedCoreLoaded ? 'shortbread-vector-z14' : 'shortbread-vector-z13',
-    coreRoads: generalizedCoreLoaded ? generalizedCoreRoadCount : null,
-    coreTiles: generalizedCoreLoaded ? generalizedCoreData?._shortbreadTiles || null : null,
     tiles: outcome.value._shortbreadTiles || null
   };
   appCtx.fixedRegionalContextBounds = request.bounds;

@@ -86,50 +86,6 @@ function roadFamily(feature) {
   return type || 'unknown';
 }
 
-function generalizedStructureRouteName(feature) {
-  return String(feature?.transportRecord?.sourceTags?.name || '')
-    .toLowerCase()
-    .replace(/\b(?:upper|lower)\s+(?:level|roadway)\b/g, '')
-    .replace(/\b(?:upper|lower)\b/g, '')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
-}
-
-function generalizedElevatedRoutePair(leftFeature, rightFeature) {
-  if (!generalizedPair(leftFeature, rightFeature) || !verticalCompatible(leftFeature, rightFeature)) return false;
-  if (
-    leftFeature?.structureSemantics?.terrainMode !== 'elevated' ||
-    rightFeature?.structureSemantics?.terrainMode !== 'elevated' ||
-    leftFeature?.structureSemantics?.isBridge !== true ||
-    rightFeature?.structureSemantics?.isBridge !== true
-  ) return false;
-  const families = new Set([roadFamily(leftFeature), roadFamily(rightFeature)]);
-  const leftStructureName = generalizedStructureRouteName(leftFeature);
-  const rightStructureName = generalizedStructureRouteName(rightFeature);
-  return families.size === 1 || (
-    families.size === 2 && families.has('high_speed') && families.has('arterial')
-  ) || (
-    leftStructureName.length >= 8 && leftStructureName === rightStructureName
-  );
-}
-
-function generalizedMappedBridgeTerminalPair(leftDescriptor, rightDescriptor, snapDistance) {
-  const leftFeature = leftDescriptor?.feature;
-  const rightFeature = rightDescriptor?.feature;
-  return generalizedPair(leftFeature, rightFeature) &&
-    verticalCompatible(leftFeature, rightFeature) &&
-    leftFeature?.structureSemantics?.terrainMode === 'elevated' &&
-    rightFeature?.structureSemantics?.terrainMode === 'elevated' &&
-    leftFeature?.structureSemantics?.isBridge === true &&
-    rightFeature?.structureSemantics?.isBridge === true &&
-    generalizedStructureRouteName(leftFeature).length >= 8 &&
-    generalizedStructureRouteName(leftFeature) === generalizedStructureRouteName(rightFeature) &&
-    finite(snapDistance, Infinity) <= 7 &&
-    finite(leftDescriptor?.totalDistance, Infinity) <= 12 &&
-    roadFamily(leftFeature) === 'local' &&
-    roadFamily(rightFeature) !== 'local';
-}
-
 function endpointDirection(descriptor, endpoint) {
   const points = descriptor?.points || [];
   if (points.length < 2) return null;
@@ -146,11 +102,7 @@ function crossProviderEndpointCompatible(leftDescriptor, leftEndpoint, rightDesc
   if (rightEndpoint !== 'start' && rightEndpoint !== 'end') return false;
   const leftFamily = roadFamily(leftDescriptor?.feature);
   const rightFamily = roadFamily(rightDescriptor?.feature);
-  if (
-    leftFamily !== rightFamily &&
-    !featureIsLink(leftDescriptor?.feature) &&
-    !featureIsLink(rightDescriptor?.feature)
-  ) {
+  if (leftFamily !== rightFamily && !featureIsLink(leftDescriptor?.feature) && !featureIsLink(rightDescriptor?.feature)) {
     return false;
   }
   const leftDirection = endpointDirection(leftDescriptor, leftEndpoint);
@@ -180,16 +132,10 @@ function crossProviderEndpointCompatible(leftDescriptor, leftEndpoint, rightDesc
 
 function generalizedEndpointCompatible(leftDescriptor, leftEndpoint, rightDescriptor, rightEndpoint) {
   if (!generalizedPair(leftDescriptor?.feature, rightDescriptor?.feature)) return false;
-  if (!verticalCompatible(leftDescriptor?.feature, rightDescriptor?.feature)) return false;
   if (rightEndpoint !== 'start' && rightEndpoint !== 'end') return false;
   const leftFamily = roadFamily(leftDescriptor?.feature);
   const rightFamily = roadFamily(rightDescriptor?.feature);
-  if (
-    leftFamily !== rightFamily &&
-    !featureIsLink(leftDescriptor?.feature) &&
-    !featureIsLink(rightDescriptor?.feature) &&
-    !generalizedElevatedRoutePair(leftDescriptor?.feature, rightDescriptor?.feature)
-  ) {
+  if (leftFamily !== rightFamily && !featureIsLink(leftDescriptor?.feature) && !featureIsLink(rightDescriptor?.feature)) {
     return false;
   }
   const leftDirection = endpointDirection(leftDescriptor, leftEndpoint);
@@ -220,14 +166,7 @@ function generalizedEndpointCompatible(leftDescriptor, leftEndpoint, rightDescri
   return alignment >= 0.82 && gapFollowsAlignment;
 }
 
-function generalizedEndpointInteriorCompatible(
-  leftDescriptor,
-  leftEndpoint,
-  candidate,
-  snapDistance = Infinity,
-  segmentT = 0,
-  requireGapApproach = false
-) {
+function generalizedEndpointInteriorCompatible(leftDescriptor, leftEndpoint, candidate) {
   const rightDescriptor = candidate?.descriptor;
   if (!generalizedPair(leftDescriptor?.feature, rightDescriptor?.feature)) return false;
   if (!verticalCompatible(leftDescriptor?.feature, rightDescriptor?.feature)) return false;
@@ -238,18 +177,14 @@ function generalizedEndpointInteriorCompatible(
     String(rightFeature?.structureSemantics?.terrainMode || 'at_grade') === 'at_grade'
   ) return false;
   const sameFamily = roadFamily(leftFeature) === roadFamily(rightFeature);
-  const elevatedRoutePair = generalizedElevatedRoutePair(leftFeature, rightFeature);
   // The display name falls back to labels such as "Residential" and
   // "Motorway". Only a provider-supplied route name can prove that two
   // generalized fragments belong to the same road.
   const leftName = String(leftFeature?.transportRecord?.sourceTags?.name || '').trim().toLowerCase();
   const rightName = String(rightFeature?.transportRecord?.sourceTags?.name || '').trim().toLowerCase();
   const sameNamedRoute = !!leftName && leftName === rightName && sameFamily;
-  const sameNamedStructureLevels =
-    generalizedStructureRouteName(leftFeature).length >= 8 &&
-    generalizedStructureRouteName(leftFeature) === generalizedStructureRouteName(rightFeature);
   const linkMerge = featureIsLink(leftFeature) && sameFamily;
-  if (!sameNamedRoute && !linkMerge && !elevatedRoutePair) return false;
+  if (!sameNamedRoute && !linkMerge) return false;
   const leftDirection = endpointDirection(leftDescriptor, leftEndpoint);
   if (!leftDirection) return false;
   const dx = candidate.b.x - candidate.a.x;
@@ -259,47 +194,11 @@ function generalizedEndpointInteriorCompatible(
   const alignment = Math.abs(
     leftDirection.x * dx / length + leftDirection.z * dz / length
   );
-  const mappedBridgeTerminal = generalizedMappedBridgeTerminalPair(
-    leftDescriptor,
-    rightDescriptor,
-    snapDistance
-  );
-  const endpointPoint = leftEndpoint === 'start'
-    ? leftDescriptor.points[0]
-    : leftDescriptor.points[leftDescriptor.points.length - 1];
-  const projectedPoint = {
-    x: candidate.a.x + dx * segmentT,
-    z: candidate.a.z + dz * segmentT
-  };
-  const gapX = projectedPoint.x - endpointPoint.x;
-  const gapZ = projectedPoint.z - endpointPoint.z;
-  const gapLength = Math.hypot(gapX, gapZ);
-  const outwardDirection = leftEndpoint === 'start'
-    ? { x: -leftDirection.x, z: -leftDirection.z }
-    : leftDirection;
-  const approachesInterior = gapLength <= 0.15 ||
-    (gapX * outwardDirection.x + gapZ * outwardDirection.z) / gapLength >= 0.25;
   // A generalized ramp merge may drift by a vector-tile quantization cell,
   // but it still has to approach the receiving carriageway in the same travel
   // direction. Perpendicular overpasses and nearby parallel roads remain
   // separate.
-  // Upper/lower carriageways of the same named bridge can be laterally and
-  // angularly quantized at a vector-tile boundary. A very short mapped bridge
-  // terminal may also meet its deck as a perpendicular T-junction. Accept
-  // that narrowly bounded endpoint-to-interior case; ordinary overpasses and
-  // longer nearby roads still require directional alignment.
-  return mappedBridgeTerminal || (
-    (!requireGapApproach || approachesInterior) &&
-    alignment >= (sameNamedRoute ? 0.82 : sameNamedStructureLevels ? 0.3 : 0.72)
-  );
-}
-
-function projectedFeaturePosition(candidate, segmentT) {
-  const segmentIndex = Number(candidate?.segmentIndex);
-  const lastSegmentIndex = Math.max(0, (candidate?.descriptor?.points?.length || 0) - 2);
-  if (segmentIndex === 0 && segmentT <= 0.001) return 'start';
-  if (segmentIndex === lastSegmentIndex && segmentT >= 0.999) return 'end';
-  return 'interior';
+  return alignment >= (sameNamedRoute ? 0.82 : 0.72);
 }
 
 function sampleCompiledSurface(feature, distance) {
@@ -673,7 +572,11 @@ function compileTransportNetworkModel(features = [], options = {}) {
           projected.x - endpoint.point.x,
           projected.z - endpoint.point.z
         );
-        const projectedEndpoint = projectedFeaturePosition(candidate, segmentT);
+        const projectedEndpoint = segmentT <= 0.001
+          ? 'start'
+          : segmentT >= 0.999
+            ? 'end'
+            : 'interior';
         const conflatedEndpoint = distance <= crossProviderTolerance &&
           crossProviderEndpointCompatible(
             descriptor,
@@ -681,39 +584,29 @@ function compileTransportNetworkModel(features = [], options = {}) {
             candidate.descriptor,
             projectedEndpoint
           );
-        const generalizedEndpointConflation = distance <= generalizedTolerance &&
+        const generalizedEndpointConflation = distance > tolerance &&
+          distance <= generalizedTolerance &&
           generalizedEndpointCompatible(
             descriptor,
             endpoint.endpoint,
             candidate.descriptor,
             projectedEndpoint
           );
-        const mappedBridgeTerminalConflation = projectedEndpoint === 'interior' &&
-          generalizedMappedBridgeTerminalPair(descriptor, candidate.descriptor, distance);
         const generalizedInteriorConflation = projectedEndpoint === 'interior' &&
-          (distance <= generalizedTolerance || mappedBridgeTerminalConflation) &&
+          distance <= generalizedTolerance &&
           generalizedEndpointInteriorCompatible(
             descriptor,
             endpoint.endpoint,
-            candidate,
-            distance,
-            segmentT,
-            false
+            candidate
           );
         const generalizedNamedRouteGap = distance > generalizedTolerance &&
           distance <= generalizedRouteGapTolerance &&
-          (
-            sameNamedGeneralizedRoute(descriptor.feature, candidate.descriptor.feature) ||
-            generalizedElevatedRoutePair(descriptor.feature, candidate.descriptor.feature)
-          ) &&
+          sameNamedGeneralizedRoute(descriptor.feature, candidate.descriptor.feature) &&
           (projectedEndpoint === 'interior'
             ? generalizedEndpointInteriorCompatible(
                 descriptor,
                 endpoint.endpoint,
-                candidate,
-                distance,
-                segmentT,
-                true
+                candidate
               )
             : generalizedEndpointCompatible(
                 descriptor,
@@ -751,7 +644,6 @@ function compileTransportNetworkModel(features = [], options = {}) {
             generalizedEndpointConflation,
             generalizedInteriorConflation,
             generalizedNamedRouteGap,
-            projectedEndpoint,
             acceptedTolerance
           });
         }
@@ -764,10 +656,14 @@ function compileTransportNetworkModel(features = [], options = {}) {
       for (const match of matches) {
         if (
             (match.generalizedInteriorConflation ||
-              (match.generalizedNamedRouteGap && match.projectedEndpoint === 'interior')) &&
+              (match.generalizedNamedRouteGap && match.segmentT > 0.001 && match.segmentT < 0.999)) &&
           match !== nearestExpandedInterior
         ) continue;
-        const otherEndpoint = match.projectedEndpoint;
+        const otherEndpoint = match.segmentT <= 0.001
+          ? 'start'
+          : match.segmentT >= 0.999
+            ? 'end'
+            : 'interior';
         const left = {
           featureId: descriptor.featureId,
           endpoint: endpoint.endpoint,
@@ -787,11 +683,7 @@ function compileTransportNetworkModel(features = [], options = {}) {
           endpoint: otherEndpoint,
           endpointIndex: otherEndpoint === 'end'
             ? match.candidate.segmentIndex + 1
-            : otherEndpoint === 'start'
-              ? 0
-              : match.segmentT >= 0.999
-                ? match.candidate.segmentIndex + 1
-                : match.candidate.segmentIndex,
+            : match.candidate.segmentIndex,
           segmentIndex: match.candidate.segmentIndex,
           segmentT: match.segmentT,
           distanceAlong: match.distanceAlong ?? match.candidate.distanceBefore + segmentLength * match.segmentT,

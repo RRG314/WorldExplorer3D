@@ -8,10 +8,10 @@ import {
   isPointWithinMappedWater,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=69";
-import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=17";
+} from "../structure-semantics.js?v=63";
+import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=15";
 import { compileTransportStructureModel } from "./compiler/transport-structure-model.js?v=1";
-import { compileTransportStructureAssemblies } from "./compiler/transport-structure-assembly.js?v=16";
+import { compileTransportStructureAssemblies } from "./compiler/transport-structure-assembly.js?v=14";
 import {
   auditTransportJunctionContinuity,
   buildExactTransportNodeFinalizationAnchors,
@@ -23,10 +23,10 @@ import {
   createDriveableRoadConflictIndex,
   supportPointConflictsWithDriveableRoad,
   supportSpanConflictsWithDriveableRoad
-} from "./bridge-safety.js?v=17";
-import { refreshStructureColliders } from "./structure-colliders.js?v=17";
+} from "./bridge-safety.js?v=13";
+import { refreshStructureColliders } from "./structure-colliders.js?v=13";
 import { yieldToMainThread } from "./cooperative-scheduling.js?v=1";
-import { compileSharedTransportSurfacePresentations } from './transport-surface-controls.js?v=3';
+import { compileSharedTransportSurfacePresentations } from './transport-surface-controls.js?v=2';
 
 const runtime = {
   enableLinearFeatures: () => false,
@@ -58,22 +58,18 @@ function structureAwareLinearFeatures() {
   );
 }
 
-export function publishAtGradeTerrainCorridors(roads = []) {
-  const sourceEligibleRoads = roads.filter((feature) =>
-    feature &&
-    feature?.structureSemantics?.terrainMode === 'at_grade' &&
-    Array.isArray(feature.pts) &&
-    feature.pts.length >= 2 &&
-    feature?.transportRecord?.access?.motorVehicle !== 'prohibited'
-  );
-  const indexedFeatures = sourceEligibleRoads.filter((feature) =>
-    feature.driveable !== false && feature?.transportSurfaceModel
-  );
-  if (indexedFeatures.length !== sourceEligibleRoads.length) {
-    throw new Error(
-      `Mapped driveable roads cannot publish without terrain corridors ` +
-      `(${indexedFeatures.length}/${sourceEligibleRoads.length}).`
-    );
+function publishAtGradeTerrainCorridors(roads = []) {
+  const indexedFeatures = [];
+  for (const feature of roads) {
+    if (
+      !feature ||
+      feature.driveable === false ||
+      feature?.structureSemantics?.terrainMode !== 'at_grade' ||
+      !feature?.transportSurfaceModel ||
+      !Array.isArray(feature.pts) ||
+      feature.pts.length < 2
+    ) continue;
+    indexedFeatures.push(feature);
   }
   // Retain only references to the canonical road objects. Per-road wrapper
   // records and a second feature map duplicated an entire metropolitan road
@@ -85,10 +81,7 @@ export function publishAtGradeTerrainCorridors(roads = []) {
   });
   appCtx.transportTerrainCorridorPublication = Object.freeze({
     authority: 'compiled_transport_surface',
-    eligibleRoadCount: sourceEligibleRoads.length,
     corridorCount: indexedFeatures.length,
-    incompleteRouteFragments: indexedFeatures.filter((feature) =>
-      feature?.transportRecord?.routeState === 'incomplete').length,
     index: appCtx.structureTerrainCutIndex.snapshot()
   });
   return appCtx.transportTerrainCorridorPublication;

@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { isRoadSurfaceReachable } from "../structure-semantics.js?v=69";
+import { isRoadSurfaceReachable } from "../structure-semantics.js?v=63";
 import { roadWidthAtProjection } from './road-cross-section-profile.js?v=1';
 import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=3';
 
