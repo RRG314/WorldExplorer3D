@@ -184,7 +184,16 @@ function derivedFleet(graph, options = {}) {
       anchorFacilityId: anchor.id,
       anchorFacilityType: anchor.type,
       standId: stand.id,
-      trafficIntent: index === 1 || index === Math.min(8, layout.stands.length - 1) ? 'circuit' : index % 6 === 3 ? 'taxi' : 'parked',
+      // Every published airport fleet with at least five stands puts a
+      // taxi-capable business/regional/airliner class in slot 2. Assigning
+      // taxi duty to slot 3 selected the expedition prop in every catalog
+      // pattern, so the motion authority correctly rejected it and airports
+      // appeared static.
+      trafficIntent: index === 2
+        ? 'taxi'
+        : index === 1 || index === Math.min(8, layout.stands.length - 1)
+          ? 'circuit'
+          : 'parked',
       mapped: false,
       generatedActivity: true,
       provenance: Object.freeze({

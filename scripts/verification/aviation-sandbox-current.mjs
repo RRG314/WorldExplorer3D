@@ -30,7 +30,7 @@ try {
   await page.getByRole('button', { name: 'Explore', exact: true }).click();
   await page.waitForFunction(() => {
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.();
-    return diagnostics?.gameStarted && !diagnostics.worldLoading && diagnostics.aviation?.fleetCount === 5;
+    return diagnostics?.gameStarted && !diagnostics.worldLoading && diagnostics.aviation?.fleetCount >= 5;
   }, null, { timeout: 360_000 });
 
   const initial = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.());
@@ -53,6 +53,7 @@ try {
   assert.equal(await page.evaluate((id) => globalThis.__WE3D_AVIATION_SUPPORT__?.moveNear(id), airliner.id), true);
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().aviation?.interaction?.data?.aircraftId?.includes('long-range-airliner'));
   await page.keyboard.press('KeyE');
+  await page.locator('dialog.airport-hub[open] .airport-hub__primary').click();
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().flightDynamics?.catalogId === 'long-range-airliner');
   await page.keyboard.down('Space');
   await page.keyboard.down('ArrowDown');
@@ -75,8 +76,9 @@ try {
     : false;
   assert.equal(aircraftRecovered, true);
   assert.equal(await page.evaluate((id) => globalThis.__WE3D_AVIATION_SUPPORT__?.moveNear(id), firstAircraft.id), true);
-  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().aviation?.interaction?.action === 'enter_aircraft');
+  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().aviation?.interaction?.action === 'aircraft_options');
   await page.keyboard.press('KeyE');
+  await page.locator('dialog.airport-hub[open] .airport-hub__primary').click();
   await page.waitForFunction(() => {
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.();
     return diagnostics?.modes?.plane === true && diagnostics.activeActor?.identity?.catalogId === 'expedition-prop';
@@ -128,7 +130,9 @@ try {
     Number(canopySteered.position.z) - Number(canopyStart.position.z)
   );
   const checks = Object.freeze({
-    catalogPublished: initial.aviation.fleetCount === 5 && initial.aviation.playableCount === 5,
+    catalogPublished: initial.aviation.fleetCount >= 5 && initial.aviation.playableCount === initial.aviation.fleetCount &&
+      ['expedition-prop', 'business-jet', 'regional-jet', 'long-range-airliner', 'utility-helicopter']
+        .every((catalogId) => initial.aviation.catalogIds.includes(catalogId)),
     mappedFacilityAnchors: initial.aviation.mappedAnchorCount > 0,
     disabledAircraftRecoveredAtFacility: aircraftRecovered === true,
     boundedTaxiTrafficMoved: trafficBefore.taxiingAircraftCount > 0 && taxiTravel > .25,

@@ -2360,6 +2360,11 @@ function enterSolisReachInterior(options = {}) {
     globalThis.__WE3D_SHIP_INTERIOR_SUPPORT__ = support;
   }
   if (session.incidentPresentation) playShipTone('alert');
+  // Ship entry can originate from a planner or Travel-menu button. Leaving
+  // either button focused makes the engine's form-control guard swallow
+  // movement keys, so the rendered interior appears unplayable until the
+  // player clicks elsewhere. Hand input back to gameplay on every entry path.
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
   appCtx.updateControlsModeUI?.();
   return true;
 }

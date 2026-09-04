@@ -58,8 +58,11 @@ function onKey(code, event) {
         return undefined;
       });
     };
-    const interiorPromptVisible = document.getElementById('interiorPrompt')?.classList.contains('show') === true;
-    if (interiorPromptVisible) {
+    // An active interior owns E before every world-level interaction. Using
+    // prompt visibility as the gate created a timing race: immediately after
+    // entry or a deck change, a door/lift/station could lose the same keypress
+    // to an unrelated scene handler before the prompt's next render update.
+    if (appCtx.activeInterior) {
       Promise.resolve(runInteriorFallback()).then((handled) => {
         if (handled !== true) return runPrimaryContext();
         return undefined;

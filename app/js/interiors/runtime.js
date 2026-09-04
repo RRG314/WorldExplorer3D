@@ -182,6 +182,12 @@ function nearestInteriorInteraction(active, walker) {
     )
   })).filter((interaction) => interaction.distance <= interaction.radius && interaction.verticalDistance <= 1.15)
     .sort((a, b) => {
+      // Moving crew can cross a doorway while the player is trying to use it.
+      // Conversation must not mask a nearby door, lift, exit, or workstation;
+      // the crew remains available once no fixed interaction is in range.
+      if ((a.kind === 'ship-crew') !== (b.kind === 'ship-crew')) {
+        return a.kind === 'ship-crew' ? 1 : -1;
+      }
       // Adjacent pressure doors and workstations have intentionally generous
       // touch radii. Prefer the clearly closer object so a doorway cannot
       // consume E while the player is standing directly at a console.

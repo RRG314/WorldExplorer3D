@@ -753,6 +753,7 @@ function initTitleScreenUi({
     // the title launch owns the final handoff to playable input.
     appCtx.hideLoad?.();
     appCtx.loadingScreenMode = 'earth';
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     return true;
   };
 
