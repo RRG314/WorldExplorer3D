@@ -371,12 +371,48 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 .hud-box::before { content: 'WORLD EXPLORER'; display: block; margin: 0 0 24px; padding-bottom: 9px; color: var(--wx-muted); border-bottom: 1px solid var(--wx-line-soft); font: 600 9px/1 Orbitron, sans-serif; }
 .hud-box::after { content: attr(data-build-label); position: absolute; top: 39px; left: 16px; max-width: 190px; overflow: hidden; color: var(--wx-blue); font: 600 9px/1 Orbitron, sans-serif; text-overflow: ellipsis; white-space: nowrap; }
-.hud-box:not([data-build-label])::after { content: 'V5.1.0 · SOURCE'; }
+.hud-box:not([data-build-label])::after { content: 'V5.2.0 · SOURCE'; }
 #hudToggleBtn { color: var(--wx-text); background: transparent; border: 1px solid var(--wx-line); border-radius: 50%; }
 #speed { color: var(--wx-text); font-family: Orbitron, sans-serif; }
 .hud-label, #weatherMetaLine, #locationLine, .indicators { color: var(--wx-muted); }
 #weatherLine, #street, #hudClockDisplay { color: var(--wx-text); }
 #hudClockDisplay { position: static; width: 100%; margin-top: 8px; padding-top: 6px; transform: none; border-top: 1px solid var(--wx-line-soft); }
+#worldQuickControls {
+  position: fixed;
+  top: 66px;
+  right: 16px;
+  z-index: 10019;
+  display: none;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin: 0;
+  pointer-events: auto;
+}
+#worldQuickControls.show { display: flex; }
+#worldQuickControls[hidden] { display: none !important; }
+body.space-flight-active #worldQuickControls,
+body.solid-world-active #worldQuickControls,
+body.activity-browser-open #worldQuickControls,
+body:has(#largeMap.show) #worldQuickControls,
+body:has(#propertyPanel.show) #worldQuickControls { display: none !important; }
+.worldQuickControl {
+  min-width: 30px;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: var(--wx-muted);
+  background: rgba(16,25,33,.88);
+  border: 1px solid var(--wx-line-soft);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.worldQuickControl svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.65; stroke-linecap: round; stroke-linejoin: round; }
+.worldQuickControl span { display: none; }
+.worldQuickControl:hover,.worldQuickControl:focus-visible,.worldQuickControl[aria-pressed="true"] { color: var(--wx-text); background: rgba(45,125,255,.13); border-color: rgba(90,151,255,.7); }
 #boostBar { background: #27323b; border-radius: 0; }
 #boostFill { background: var(--wx-blue); border-radius: 0; }
 #coords {
@@ -420,6 +456,26 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .floatMenuContainer.show { display: grid; }
 .floatMenuRow { display: contents; }
 .floatMenu { min-width: 0; }
+.contextualMenuControl {
+  position: absolute;
+  right: -58px;
+  bottom: 0;
+  width: 50px;
+}
+.contextualMenuControl .floatBtn {
+  width: 50px;
+  min-width: 50px;
+  border: 1px solid var(--wx-line);
+  background: var(--wx-panel);
+}
+.contextualMenuControl .btnText { display: none; }
+.contextualMenuControl .floatBtn::after {
+  content: 'Controls';
+  display: block;
+  color: inherit;
+  font: 600 7px/1 Orbitron, sans-serif;
+  text-transform: uppercase;
+}
 .floatBtn {
   height: 66px;
   padding: 7px 4px;
@@ -434,7 +490,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   box-shadow: none;
   font-size: 10px;
 }
-.floatBtn:hover, .floatMenu.open .floatBtn { color: var(--wx-text) !important; background: rgba(45, 125, 255, 0.1); border-bottom-color: var(--wx-blue); transform: none; box-shadow: none; }
+.floatBtn:hover, .floatBtn:focus-visible, .floatMenu.open .floatBtn { color: var(--wx-text) !important; background: rgba(45, 125, 255, 0.1); border-bottom-color: var(--wx-blue); transform: none; box-shadow: none; }
+.floatBtn:focus-visible { outline: 1px solid rgba(126,181,255,.82); outline-offset: -2px; }
 body.deflock-active .floatMenuContainer {
   left: 300px;
   right: 300px;
@@ -450,7 +507,7 @@ body.deflock-active .floatBtn::after {
   font: 600 8px/1 Orbitron,sans-serif;
   text-transform: uppercase;
 }
-.btnIcon { display: block; font-size: 23px; line-height: 1; filter: grayscale(1) brightness(2); }
+.btnIcon { display: block; width: auto; height: auto; font-size: 23px; line-height: 1; color: inherit; filter: grayscale(1) brightness(2); }
 .btnText { display: block; color: inherit; font: 600 9px/1 Orbitron, sans-serif; text-transform: uppercase; }
 .floatItems {
   top: 88px;
@@ -470,6 +527,7 @@ body.deflock-active .floatBtn::after {
 .floatItems::before { content: attr(data-menu-title); position: absolute; top: 20px; left: 16px; right: 16px; padding-bottom: 12px; color: var(--wx-blue); border-bottom: 1px solid var(--wx-line-soft); font: 600 10px/1 Orbitron, sans-serif; }
 .floatItems:not([data-menu-title])::before { content: 'SYSTEM CONTROLS'; }
 .floatItem {
+  width: 100%;
   min-height: 54px;
   box-sizing: border-box;
   display: flex;
@@ -482,6 +540,8 @@ body.deflock-active .floatBtn::after {
   border-radius: 0;
   box-shadow: none;
   font: 600 11px/1.3 Orbitron, sans-serif;
+  text-align: left;
+  cursor: pointer;
 }
 .floatItem:hover, .floatItem.on { color: var(--wx-text); background: rgba(45, 125, 255, 0.12); transform: none; box-shadow: inset 4px 0 var(--wx-blue); }
 .floatItemSection {
@@ -491,10 +551,10 @@ body.deflock-active .floatBtn::after {
   font: 600 9px/1 Orbitron, sans-serif;
   letter-spacing: 0.1em;
 }
-#gameMenu .floatItems { padding-bottom: 18px; }
-#gameMenu .floatItemSection { padding-top: 16px; }
-#gameMenu .floatItemSection:first-of-type { padding-top: 4px; }
-#gameMenu .floatItem { min-height: 50px; }
+#communityMenu .floatItems, #backpackMenu .floatItems, #exploreMenu .floatItems, #travelMenu .floatItems, #realEstateMenu .floatItems { padding-bottom: 18px; }
+#communityMenu .floatItemSection, #backpackMenu .floatItemSection, #exploreMenu .floatItemSection, #travelMenu .floatItemSection, #realEstateMenu .floatItemSection { padding-top: 16px; }
+#communityMenu .floatItemSection:first-of-type, #backpackMenu .floatItemSection:first-of-type, #exploreMenu .floatItemSection:first-of-type, #travelMenu .floatItemSection:first-of-type, #realEstateMenu .floatItemSection:first-of-type { padding-top: 4px; }
+#communityMenu .floatItem, #backpackMenu .floatItem, #exploreMenu .floatItem, #travelMenu .floatItem, #realEstateMenu .floatItem { min-height: 50px; }
 [hidden] { display: none !important; }
 .mainMenuBtn {
   top: 0;
@@ -517,7 +577,7 @@ body.deflock-active .floatBtn::after {
 #controlsTab.show { display: none; }
 #controlsTab.show.bar-open { display: block; }
 #ctrlHeader { display: none; color: var(--wx-blue); }
-#controlsBarBtn[aria-expanded="true"] { color: var(--wx-text) !important; background: rgba(45, 125, 255, 0.1); border-bottom-color: var(--wx-blue); }
+#controlsBarBtn[aria-expanded="true"] { color: var(--wx-text) !important; background: rgba(45, 125, 255, 0.1); box-shadow: inset 4px 0 var(--wx-blue); }
 
 /* Mobile play shell */
 @media (max-width: 760px), (pointer: coarse) {
@@ -565,14 +625,18 @@ body.deflock-active .floatBtn::after {
   #speed { font-size: 21px; }
   .hud-label { font-size: 8px; }
   .hud-label span:not(#speedUnitLabel) { display: none; }
-  #weatherPanel { grid-column: 3; min-width: 0; text-align: right; }
-  #weatherLine { font-size: 10px; }
+  #weatherPanel { display: contents !important; }
+  #weatherLine,#weatherTimeLine,#weatherMetaLine { display: none !important; }
+  #worldQuickControls { position: fixed; top: 74px; right: 8px; justify-content: flex-end; gap: 4px; margin: 0; padding: 0; border: 0; pointer-events: auto; }
+  .worldQuickControl { min-width: 34px; width: 34px; height: 34px; padding: 0; border-radius: 50%; }
+  .worldQuickControl svg { width: 15px; height: 15px; }
+  .worldQuickControl span { display: none; }
   #weatherTimeLine, #weatherMetaLine { display: none; }
   #hudDetails { display: contents; }
   #street { grid-column: 2; grid-row: 1; overflow: hidden; font: 600 10px/1.2 Orbitron, sans-serif; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
   .mainMenuBtn { width: 58px; height: 66px; padding: 0; overflow: hidden; font-size: 0; pointer-events: auto; z-index: 10020; }
   .mainMenuBtn::before { content: '☰'; font: 28px/1 Inter, sans-serif; }
-  #gameShareFloatBtn { top: 74px; right: 10px; width: 46px; height: 46px; border-radius: 50%; }
+  #gameShareFloatBtn { top: 74px; right: 88px; width: 46px; height: 46px; border-radius: 50%; }
   #minimap { top: 78px; bottom: auto; left: 10px; width: min(190px, 48vw); height: min(190px, 48vw); border-radius: 8px; }
   #coords { top: calc(78px + min(190px, 48vw) - 38px); bottom: auto !important; left: 10px !important; width: min(190px, 48vw); min-height: 38px; font-size: 9px; background: rgba(3, 9, 14, 0.86); border-radius: 0 0 8px 8px; }
   #coords { z-index: 102; }
@@ -593,7 +657,7 @@ body.deflock-active .floatBtn::after {
   }
   #multiplayerMenu { position: relative; left: auto; bottom: auto; z-index: auto; }
   .floatBtn { height: 78px; padding: 8px 2px 5px; }
-  .btnIcon { font-size: 23px; }
+  .btnIcon { width: auto; height: auto; font-size: 23px; }
   .btnText { display: none; }
   .floatBtn::after { content: attr(data-mobile-label); display: block; color: inherit; font: 600 8px/1 Orbitron, sans-serif; text-transform: uppercase; }
   .floatItems {
@@ -613,10 +677,27 @@ body.deflock-active .floatBtn::after {
   }
   .floatMenu.open .floatItems { display: grid; }
   .floatItem { min-height: 48px; padding: 8px; font-size: 9px; white-space: normal; }
-  #gameMenu .floatItemSection { grid-column: 1 / -1; padding: 10px 8px 6px; }
-  #gameMenu .floatItemSection:first-of-type { padding-top: 0; }
-  #gameMenu .floatItem { min-height: 48px; }
+  .floatItemSection { grid-column: 1 / -1; padding: 10px 8px 6px; }
+  .floatItemSection:first-of-type { padding-top: 0; }
+  #communityMenu .floatItem, #backpackMenu .floatItem, #exploreMenu .floatItem, #travelMenu .floatItem, #realEstateMenu .floatItem { min-height: 48px; }
+  .contextualMenuControl {
+    right: 8px;
+    bottom: calc(86px + env(safe-area-inset-bottom));
+    width: 44px;
+    z-index: 4;
+  }
+  .contextualMenuControl .floatBtn {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    padding: 0;
+    border-radius: 50%;
+  }
+  .contextualMenuControl .btnIcon { font-size: 18px; }
+  .contextualMenuControl .btnText,
+  .contextualMenuControl .floatBtn::after { display: none; }
   #controlsTab, #memoryFlowerFloatBtn { display: none !important; }
+  #controlsTab.bar-open { display: block !important; }
   body.deflock-active .floatMenuContainer { left: 0; right: 0; height: 58px; max-width: none; }
   body.deflock-active .floatBtn { height: 58px; padding: 5px 2px 3px; }
   body.deflock-active .floatItems { bottom: calc(58px + env(safe-area-inset-bottom)); }

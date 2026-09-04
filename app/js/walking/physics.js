@@ -1,11 +1,12 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { resolveMobileCameraRecenter } from "../controls/mobile-touch-authority.js?v=5";
 import { worldUnitsPerSecondToMph } from "../physics/vehicle-speed-units.js?v=2";
-import { integrateSkydivingDynamics, parachuteHorizontalSpeed } from "../urban-sandbox/parachute-model.js?v=5";
-import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=2';
+import { integrateSkydivingDynamics, parachuteHorizontalSpeed } from "../urban-sandbox/parachute-model.js?v=6";
+import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=3';
 import { samplePhysicalEnvironment } from '../planetary/runtime/physical-environment.js?v=2';
-import { getPlanetarySurfaceRegion } from '../planetary/runtime/surface-authority.js?v=3';
+import { getPlanetarySurfaceRegion } from '../planetary/runtime/surface-authority.js?v=4';
 import { resolvePlanetarySurfaceBoundary } from '../planetary/runtime/surface-boundary.js?v=1';
+import { queryPlanetaryObstacle } from '../planetary/runtime/obstacle-authority.js?v=1';
 import { resolveInteriorCeiling } from '../interiors/vertical-boundary.js?v=1';
 
 function wrapYaw(angle = 0) {
@@ -13,7 +14,7 @@ function wrapYaw(angle = 0) {
 }
 
 function isPlanetarySurface() {
-  return !!(appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId);
+  return !appCtx.activeInterior && !!(appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId);
 }
 
 function activePlanetaryBodyId() {
@@ -224,7 +225,11 @@ function createWalkingPhysicsHelpers({
       : Number(actions.sprint) > 0.05 ? CFG.runSpeed : CFG.walkSpeed;
     const lookSpeed = 2.5 * dt;
 
-    state.walker.yaw += (Number(actions.turn) || 0) * CFG.turnSpeed * dt;
+    // Skydiving owns heading below. Applying the walking turn a second time
+    // rotates the camera opposite the canopy and makes steering unreadable.
+    if (!skydiving) {
+      state.walker.yaw += (Number(actions.turn) || 0) * CFG.turnSpeed * dt;
+    }
     state.walker.lookYawOffset += (Number(actions.lookYaw) || 0) * lookSpeed;
     state.walker.pitch += (Number(actions.lookPitch) || 0) * lookSpeed;
 
@@ -270,8 +275,11 @@ function createWalkingPhysicsHelpers({
     let jumpAction = liveGpsOwnsTranslation ? 0 : Number(actions.jump) || 0;
     if (skydiving && appCtx.playerBackpackInventory?.equipped?.()?.id === 'parachute') jumpAction = 0;
     const planetaryBodyId = activePlanetaryBodyId();
+    const activeEnvironment = appCtx.activePlanetaryEnvironment?.bodyId === planetaryBodyId
+      ? appCtx.activePlanetaryEnvironment
+      : null;
     const gravityMagnitude = planetaryBodyId
-      ? samplePhysicalEnvironment(planetaryBodyId, { heightM: 0, timestampS: 0 }).gravityMagnitudeMps2
+      ? Number(activeEnvironment?.gravityMagnitudeMps2) || samplePhysicalEnvironment(planetaryBodyId, { heightM: 0, timestampS: 0 }).gravityMagnitudeMps2
       : 9.80665;
     const gravity = -gravityMagnitude;
     const jumpVelocity = planetaryBodyId
@@ -326,6 +334,15 @@ function createWalkingPhysicsHelpers({
       state.walker.skydivingFlight = skydivingFlight;
       state.walker.angle = skydivingFlight.heading;
       state.walker.vy = skydivingFlight.verticalSpeed;
+      const activeLook = actions.mobileLookActive === true ||
+        Math.abs(Number(actions.lookYaw) || 0) > .01;
+      if (!activeLook) {
+        const headingDelta = wrapYaw(skydivingFlight.heading - state.walker.yaw);
+        const followBlend = 1 - Math.exp(-dt * 6.2);
+        state.walker.yaw = wrapYaw(state.walker.yaw + headingDelta * followBlend);
+        state.walker.lookYawOffset *= Math.exp(-dt * 4.6);
+        if (Math.abs(state.walker.lookYawOffset) < .002) state.walker.lookYawOffset = 0;
+      }
     } else {
       state.walker.skydivingFlight = null;
       state.walker.vy += gravity * dt;
@@ -442,7 +459,8 @@ function createWalkingPhysicsHelpers({
         : null;
       const checkBuildingsFallback = !isPlanetarySurface() && !sharedBuildingCollision && (getBuildingsArray || getNearbyBuildings);
       const checkBuildBlocks = typeof appCtx.getBuildCollisionAtWorldXZ === "function";
-      if (sharedBuildingCollision || checkBuildingsFallback || checkBuildBlocks) {
+      const checkPlanetaryObstacles = isPlanetarySurface();
+      if (sharedBuildingCollision || checkBuildingsFallback || checkBuildBlocks || checkPlanetaryObstacles) {
         const allBuildings = checkBuildingsFallback ? queryBuildings(newX, newZ, 32) || [] : [];
         const walkerFeetY = state.walker.y - CFG.eyeHeight;
         const sampleRadius = 0.28;
@@ -455,6 +473,7 @@ function createWalkingPhysicsHelpers({
         ];
 
         function isBlockedByWorld(px, pz) {
+          if (checkPlanetaryObstacles && queryPlanetaryObstacle(px, pz, sampleRadius, planetaryBodyId)?.collision) return true;
           if (sharedBuildingCollision) {
             const collision = sharedBuildingCollision(px, pz, sampleRadius, {
               actorBaseY: walkerFeetY,

@@ -47,16 +47,21 @@ function pointInsideCollider(x, z, collider) {
 function interiorSpawnIsClear(point, footprint, colliders) {
   if (!pointInPolygonSafe(point.x, point.z, footprint)) return false;
   const radius = 0.34;
-  const samples = [
-    [0, 0],
-    [radius, 0],
-    [-radius, 0],
-    [0, radius],
-    [0, -radius]
-  ];
-  return !samples.some(([dx, dz]) =>
-    colliders.some((collider) => pointInsideCollider(point.x + dx, point.z + dz, collider))
-  );
+  return !colliders.some((collider) => {
+    if (!collider || collider.collisionDisabled) return false;
+    if (
+      point.x < collider.minX - radius || point.x > collider.maxX + radius ||
+      point.z < collider.minZ - radius || point.z > collider.maxZ + radius
+    ) return false;
+    if (pointInsideCollider(point.x, point.z, collider)) return true;
+    if (!Array.isArray(collider.pts) || collider.pts.length < 3) return true;
+    for (let index = 0; index < collider.pts.length; index += 1) {
+      const start = collider.pts[index];
+      const end = collider.pts[(index + 1) % collider.pts.length];
+      if (pointDistanceToSegment(point, start, end) < radius) return true;
+    }
+    return false;
+  });
 }
 
 function chooseClearInteriorSpawn(desired, center, footprint, colliders) {
@@ -75,6 +80,15 @@ function chooseClearInteriorSpawn(desired, center, footprint, colliders) {
       push(center.x + Math.cos(angle) * radius, center.z + Math.sin(angle) * radius);
     }
   });
+  const bounds = footprintBounds(footprint);
+  for (let row = 1; row < 12; row += 1) {
+    for (let column = 1; column < 12; column += 1) {
+      push(
+        bounds.minX + bounds.width * column / 12,
+        bounds.minZ + bounds.depth * row / 12
+      );
+    }
+  }
 
   for (let index = 0; index < candidates.length; index += 1) {
     const candidate = candidates[index];
@@ -88,7 +102,8 @@ function chooseClearInteriorSpawn(desired, center, footprint, colliders) {
     };
     if (interiorSpawnIsClear(forward, footprint, colliders)) return candidate;
   }
-  return center;
+  if (interiorSpawnIsClear(center, footprint, colliders)) return center;
+  return desired;
 }
 
 function pointDistanceToSegment(point, start, end) {

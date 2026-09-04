@@ -27,6 +27,7 @@ import {
 import { yieldToMainThread as defaultYieldToMainThread } from './cooperative-scheduling.js?v=1';
 import { isImplausibleTallBuildingFootprint } from './building-geometry-quality.js?v=1';
 import { publishBuildingFacadeEntrances } from './building-facade-entrances.js?v=3';
+import { mappedBuildingAddress } from '../real-estate/public-address.js?v=1';
 
 export function requiresLoadedRoadCoverageForBuilding(tags = {}) {
   return String(tags._geometrySource || '') === 'inferred_road_frontage';
@@ -338,6 +339,7 @@ export async function buildBuildingGeometryPass(options = {}) {
       way.id ||
       `osm-${Math.round(centerX * 10)}-${Math.round(centerZ * 10)}`
     );
+    const publicAddress = mappedBuildingAddress(way.tags || {});
     const roadAuthority = measureBuildingPhase('roadEligibility', () =>
       resolveFootprintTransportAuthority(pts, {
         allowsPassageBelow: buildingSemantics.allowsPassageBelow === true,
@@ -598,6 +600,7 @@ export async function buildBuildingGeometryPass(options = {}) {
       centerZ,
       sourceBuildingId,
       name: way.tags.name || '',
+      address: publicAddress,
       buildingType: bt,
       buildingPartKind: buildingSemantics.partKind,
       collisionKind: buildingSemantics.collisionKind,

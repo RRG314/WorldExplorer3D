@@ -4,8 +4,8 @@ import {
   getActivityTemplate,
   orderedRouteAnchors,
   sanitizeText
-} from '../activity-editor/schema.js?v=2';
-import { listStoredActivities } from './library.js?v=2';
+} from './schema-core.js?v=1';
+import { listStoredActivities } from './library.js?v=3';
 import {
   discoveryBadgeForActivity,
   discoveryCategoryForActivity,

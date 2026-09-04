@@ -5,7 +5,7 @@ function installOnDemandMars(appCtx) {
 
   async function ensureMarsRuntimeReady() {
     if (!modulePromise) {
-      modulePromise = import('../planetary/mars-world.js?v=17').catch((error) => {
+      modulePromise = import('../planetary/mars-world.js?v=18').catch((error) => {
         modulePromise = null;
         throw error;
       });

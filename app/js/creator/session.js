@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { loadCreatorProfileView } from './store.js?v=1';
+import { loadCreatorProfileView } from './store.js?v=2';
 
 const state = {
   initialized: false,
@@ -53,14 +53,14 @@ function creatorHeroSummary(profile = {}, data = {}) {
     return 'Curated routes, featured world experiences, and system-authored activities all point back to this creator record.';
   }
   if (data.isSelf) {
-    return 'Published overlays and attribution use this public creator card. Your Creator Library activity drafts remain on this browser and are visible only to you.';
+    return 'Past room activities and approved community contributions can be credited on this public card.';
   }
   const activityCount = Array.isArray(data.activities) ? data.activities.length : 0;
   const worldEditCount = Array.isArray(data.contributions) ? data.contributions.length : 0;
   if (activityCount || worldEditCount) {
-    return `${profile.username} currently has ${activityCount} visible activit${activityCount === 1 ? 'y' : 'ies'} and ${worldEditCount} published world edit${worldEditCount === 1 ? '' : 's'} surfaced here.`;
+    return `${profile.username} currently has ${activityCount} visible activit${activityCount === 1 ? 'y' : 'ies'} and ${worldEditCount} approved community contribution${worldEditCount === 1 ? '' : 's'} shown here.`;
   }
-  return `${profile.username} is credited here, but no shared room activities or published world edits are visible in this area yet.`;
+  return `${profile.username} is credited here, but no shared room activities or approved community contributions are visible yet.`;
 }
 
 function refs() {
@@ -87,17 +87,17 @@ function renderHeroBadges(profile = {}, data = {}) {
     creatorTierLabel(stats)
   ];
   const publishedEdits = finiteNumber(stats.publishedContributions, finiteNumber(stats.contributionsCount, 0));
-  if (publishedEdits > 0) badges.push(`${publishedEdits} world edits`);
+  if (publishedEdits > 0) badges.push(`${publishedEdits} contributions`);
   if (profile.spaces?.primaryRoomCode) badges.push(`Room ${profile.spaces.primaryRoomCode}`);
   return badges.map((badge) => `<span class="creatorProfileBadge">${escapeHtml(badge)}</span>`).join('');
 }
 
 function renderStats(stats = {}) {
   const items = [
-    ['Device Drafts', stats.activitiesCreated || 0],
+    ['Activities', stats.activitiesCreated || 0],
     ['Public Activities', 0],
     ['Plays', stats.totalPlays || 0],
-    ['World Edits', stats.publishedContributions || 0]
+    ['Contributions', stats.publishedContributions || 0]
   ];
   return items.map(([label, value]) => `
     <div class="creatorProfileStat">
@@ -111,8 +111,8 @@ function renderActivities(items = [], data = {}) {
   if (!items.length) {
     return `<div class="creatorProfileEmpty">${
       data.isSelf
-        ? 'No device-only activity drafts are saved yet. Activity Creator saves them on this browser.'
-        : 'No room-scoped activities are visible here. Device drafts are never shown to other players.'
+        ? 'No activity records are available on this browser.'
+        : 'No room activities are visible here.'
     }</div>`;
   }
   return items.map((activity) => `
@@ -186,7 +186,7 @@ function renderBody() {
           ${data.isSelf ? '<span class="creatorProfileSelfTag">You</span>' : ''}
         </div>
         <div class="creatorProfileMeta">Creator ID: ${escapeHtml(profile.userId || 'guest')} • Joined ${escapeHtml(formatDate(profile.createdAtMs))}</div>
-        <div class="creatorProfileBio">${escapeHtml(profile.bio || 'No public bio yet. This creator can still be credited on activities and world edits.')}</div>
+        <div class="creatorProfileBio">${escapeHtml(profile.bio || 'No public bio yet. This Explorer can still be credited on activities and community contributions.')}</div>
         <div class="creatorProfileHeroSummary">${escapeHtml(creatorHeroSummary(profile, data))}</div>
         <div class="creatorProfileBadgeRow">${renderHeroBadges(profile, data)}</div>
         <div class="creatorProfileHeroActions">

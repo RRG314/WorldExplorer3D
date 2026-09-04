@@ -299,6 +299,15 @@ function initShareUi({ bindTouchFriendlyPress, closeAllFloatMenus, getTitleLaunc
     gameShareMenu?.classList.remove('show');
     setGameShareStatus('');
   };
+  const openGameShareMenu = () => {
+    closeAllFloatMenus?.();
+    gameShareMenu?.classList.add('show');
+  };
+  const toggleGameShareMenu = () => {
+    const shouldOpen = !gameShareMenu?.classList.contains('show');
+    closeAllFloatMenus?.();
+    if (shouldOpen) gameShareMenu?.classList.add('show');
+  };
 
   async function copyShareLinkWithFallback(link) {
     if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
@@ -400,9 +409,7 @@ function initShareUi({ bindTouchFriendlyPress, closeAllFloatMenus, getTitleLaunc
   if (gameShareFloatBtn && gameShareMenu) {
     bindTouchFriendlyPress?.(gameShareFloatBtn, (event) => {
       event.stopPropagation();
-      const shouldOpen = !gameShareMenu.classList.contains('show');
-      closeAllFloatMenus?.();
-      if (shouldOpen) gameShareMenu.classList.add('show');
+      toggleGameShareMenu();
     });
     gameShareMenu.addEventListener('click', (event) => event.stopPropagation());
   }
@@ -496,6 +503,7 @@ function initShareUi({ bindTouchFriendlyPress, closeAllFloatMenus, getTitleLaunc
   return {
     applySharedRuntimeState,
     closeGameShareMenu,
+    openGameShareMenu,
     sharedExperienceParams: readSharedExperienceParams()
   };
 }

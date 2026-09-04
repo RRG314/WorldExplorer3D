@@ -11,7 +11,7 @@ import {
   signOut,
   updateProfile
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
-import { initFirebase } from './firebase-init.js?v=55';
+import { initFirebase } from './firebase-init.js?v=56';
 
 const provider = new GoogleAuthProvider();
 provider.setCustomParameters({ prompt: 'select_account' });

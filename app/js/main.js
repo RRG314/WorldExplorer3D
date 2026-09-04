@@ -1,5 +1,5 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
-import { createCoreFrameSystems } from './runtime/core-frame-systems.js?v=6';
+import { createCoreFrameSystems } from './runtime/core-frame-systems.js?v=8';
 import { createDebugPresentationSystem } from './runtime/debug-presentation.js?v=3';
 import { createRuntimeKernel } from './runtime/kernel.js?v=2';
 
@@ -31,14 +31,6 @@ function isVisibleRect(element) {
   return rect.width > 0 && rect.height > 0 ? rect : null;
 }
 
-function isEditorWorkspaceOpen() {
-  return !!document.body?.classList.contains('editor-workspace-open');
-}
-
-function isActivityCreatorOpen() {
-  return !!document.body?.classList.contains('activity-creator-open');
-}
-
 function positionOverlayBetween(overlay, leftRect, rightRect) {
   if (!overlay || !leftRect || !rightRect) return;
   const overlayRect = overlay.getBoundingClientRect();
@@ -55,7 +47,7 @@ function positionOverlayBetween(overlay, leftRect, rightRect) {
 }
 
 function positionTopOverlays() {
-  if (!appCtx.gameStarted || isEditorWorkspaceOpen() || isActivityCreatorOpen()) return;
+  if (!appCtx.gameStarted) return;
   const hudRect = isVisibleRect(document.getElementById('hud'));
   const menuRect = isVisibleRect(document.getElementById('mainMenuBtn'));
   if (!hudRect || !menuRect) return;
@@ -89,7 +81,7 @@ function dedicatedRendererActive() {
   return !!(
     appCtx.worldLoading ||
     appCtx.arSessionActive ||
-    appCtx.isEnv?.(appCtx.ENV?.SPACE_FLIGHT) ||
+    (appCtx.isEnv?.(appCtx.ENV?.SPACE_FLIGHT) && appCtx.activeShipInterior !== true) ||
     appCtx.spaceFlight?.active ||
     appCtx.oceanMode?.active
   );
@@ -121,11 +113,7 @@ const runtimeKernel = createRuntimeKernel({
 function registerRuntimeSystems() {
   if (runtimeSystemsRegistered) return;
   runtimeSystemsRegistered = true;
-  const systems = createCoreFrameSystems(appCtx, {
-    isActivityCreatorOpen,
-    isEditorWorkspaceOpen,
-    positionTopOverlays
-  });
+  const systems = createCoreFrameSystems(appCtx, { positionTopOverlays });
   systems.forEach((system) => runtimeKernel.registerSystem(system));
   runtimeKernel.registerSystem(createDebugPresentationSystem(appCtx));
   runtimeKernel.registerSystem({

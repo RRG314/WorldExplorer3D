@@ -1,22 +1,21 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { createLocalBackpackStore } from '../player/backpack-store.js?v=2';
 import { carSpeedToMph, mphToCarSpeed } from '../physics/vehicle-speed-units.js?v=2';
 import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleMassKg } from '../engine/vehicle-catalog.js?v=6';
 import { applyTransportDamage } from '../transport/damage-model.js?v=1';
-import { createCivicResponseModel } from './civic-response-model.js?v=2';
-import { createEquipmentInventory } from './equipment-model.js?v=8';
+import { createCivicResponseModel } from './civic-response-model.js?v=3';
+import { ensurePlayerBackpackInventory } from './equipment-model.js?v=9';
 import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=21';
 import { createEquipmentVisuals } from './equipment-visuals.js?v=3';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=7';
 import { nearestMappedFacility } from './facility-model.js?v=3';
 import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=4';
-import { createUrbanResponderRuntime } from './responder-runtime.js?v=17';
+import { createUrbanResponderRuntime } from './responder-runtime.js?v=19';
 import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=7';
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=9';
 import { applyConditionImpact } from './impact-model.js?v=1';
 import { dampCrashMotion, resolveCrashImpact } from './crash-physics.js?v=1';
 import { sampleSweptContact } from '../physics/swept-contact.js?v=1';
-import { createLocalCommerceModel, mappedConvenienceStores } from './commerce-model.js?v=1';
+import { createLocalCommerceModel, mappedCommercePlaces } from './commerce-model.js?v=3';
 import { emitProductTelemetry } from '../platform/product-telemetry.js?v=1';
 import { claimLootPickup, createLootPickup } from './loot-pickup-model.js?v=1';
 import { NPC_COMBAT_STATES, resolveNpcCombatState } from './npc-combat-policy.js?v=2';
@@ -590,7 +589,7 @@ function resolveUrbanActorCollision(from = {}, to = {}, options = {}) {
         showCrashFeedback(state, response.severity);
         setStatus(state, `${response.severity === 'minor' ? 'Impact' : 'Crash'} · ${Math.round(response.closingMph)} mph closing speed`, 1800);
         reportCivicEvent(state, {
-          kind: 'vehicle_collision',
+          kind: 'collision',
           severity: response.severity === 'severe' ? 3 : response.severity === 'major' ? 2 : 1,
           radius: 38,
           audibleRadius: 24,
@@ -785,15 +784,40 @@ function nearestStoreCandidate(state, radius = STORE_INTERACTION_DISTANCE) {
   if (!activeWorldMatches(state) || appCtx.Walk?.state?.mode !== 'walk' || state.storeOpen) return null;
   const walker = appCtx.Walk?.state?.walker;
   if (!walker) return null;
-  return state.stores.map((store) => ({
-    store,
-    distance: Math.hypot(store.interactionX - walker.x, store.interactionZ - walker.z)
-  })).filter((entry) => entry.distance <= radius)
+  // A mapped shop can sit inside its building footprint. Resolving every shop
+  // against every collider during world startup made dense cities wait more
+  // than a minute before becoming playable. Resolve only stores close enough
+  // to interact with and retain that result for the publication lifetime.
+  return state.stores
+    .filter((store) => Math.hypot(store.x - walker.x, store.z - walker.z) <= radius + 14)
+    .map((store) => {
+      const resolved = resolvedStoreApproach(state, store);
+      return {
+        store: resolved,
+        distance: Math.hypot(resolved.interactionX - walker.x, resolved.interactionZ - walker.z)
+      };
+    })
+    .filter((entry) => entry.distance <= radius)
     .sort((left, right) => left.distance - right.distance)[0] || null;
 }
 
+function storeInteractionCandidate(state) {
+  if (!activeWorldMatches(state) || state.transition || appCtx.activeInterior || state.storeOpen) return null;
+  const nearestStore = nearestStoreCandidate(state);
+  if (!nearestStore) return null;
+  return {
+    available: true,
+    action: 'visit_store',
+    label: 'Visit store',
+    detail: `${nearestStore.store.name} · today’s game stock`,
+    distance: nearestStore.distance,
+    data: { storeId: nearestStore.store.id }
+  };
+}
+
 function activeStore(state) {
-  return state.stores.find((store) => store.id === state.activeStoreId) || null;
+  const store = state.stores.find((entry) => entry.id === state.activeStoreId) || null;
+  return store ? resolvedStoreApproach(state, store) : null;
 }
 
 function resolveStoreApproach(store) {
@@ -811,7 +835,7 @@ function resolveStoreApproach(store) {
     const resolved = appCtx.resolveSafeWorldSpawn?.(candidate.x, candidate.z, {
       mode: 'walk',
       feetY: groundY,
-      source: 'mapped_convenience_store_approach',
+      source: 'mapped_commerce_place_approach',
       maxGroundRadius: 2
     });
     if (resolved?.valid === false) continue;
@@ -820,9 +844,19 @@ function resolveStoreApproach(store) {
   return Object.freeze({ ...store, interactionX: store.x, interactionZ: store.z });
 }
 
+function resolvedStoreApproach(state, store) {
+  if (!store) return null;
+  const cached = state.storeApproaches.get(store.id);
+  if (cached) return cached;
+  const resolved = resolveStoreApproach(store);
+  state.storeApproaches.set(store.id, resolved);
+  return resolved;
+}
+
 function moveNearStoreForSupport(state, storeId) {
   if (!appCtx.developerDiagnosticsEnabled || appCtx.Walk?.state?.mode !== 'walk') return null;
-  const store = state.stores.find((entry) => entry.id === String(storeId || ''));
+  const mappedStore = state.stores.find((entry) => entry.id === String(storeId || ''));
+  const store = mappedStore ? resolvedStoreApproach(state, mappedStore) : null;
   if (!store) return null;
   const resolved = appCtx.resolveSafeWorldSpawn?.(store.interactionX, store.interactionZ, {
     mode: 'walk',
@@ -841,6 +875,7 @@ function commerceFailureMessage(reason) {
     sold_out: 'That item is sold out here today.',
     not_enough_credits: 'Not enough Explorer Credits.',
     not_sellable: 'That Backpack item cannot be sold here.',
+    store_not_authorized_for_item: 'This business does not trade that type of item.',
     already_traded_today: 'This store’s rare trade is complete for today.',
     missing_trade_items: 'The Backpack does not have the requested trade items.',
     inventory_unavailable: 'The Backpack could not complete that exchange.'
@@ -856,7 +891,7 @@ function renderStore(state) {
   if (!visible) return;
   const view = state.commerce.snapshot(store);
   ui.name.textContent = store.name;
-  ui.source.textContent = `${store.attribution} · ${store.license}`;
+  ui.source.textContent = `${store.label} · game stock · ${store.attribution} · ${store.license}`;
   ui.credits.textContent = `${view.credits} Explorer Credits`;
   ui.stock.innerHTML = view.standard.map((item) => `
     <article class="urbanStoreCard">
@@ -1850,7 +1885,9 @@ function updateCivicResponse(state, dt) {
     const detected = (responderSnapshot?.responders || []).some((responder) =>
       Number(responder.distanceToActor) <= (responder.officer ? 46 : 58)
     );
-    state.civic.update(step, civicActorPosition(state), { detected });
+    const responseEnRoute = Number(responderSnapshot?.activeCount || 0) > 0 &&
+      ['dispatched', 'pursuit', 'searching'].includes(String(responderSnapshot?.phase || ''));
+    state.civic.update(step, civicActorPosition(state), { detected, responseEnRoute });
   }
   state.recklessEventCooldown = Math.max(0, state.recklessEventCooldown - step);
   if (state.activeVehicle?.attachedToPlayer && appCtx.Walk?.state?.mode !== 'walk') {
@@ -2373,7 +2410,13 @@ function snapshot(state) {
     backpackMigration: state.backpackStore?.migrationSnapshot?.() || null,
     commerce: Object.freeze({
       mappedStoreCount: state.stores.length,
-      stores: Object.freeze(state.stores.map((store) => Object.freeze({ ...store }))),
+      stores: Object.freeze(state.stores.map((store) => Object.freeze({
+        ...store,
+        ...(state.storeApproaches.get(store.id) || {
+          interactionX: store.x,
+          interactionZ: store.z
+        })
+      }))),
       open: state.storeOpen === true,
       activeStoreId: state.activeStoreId,
       current: activeStore(state) ? state.commerce.snapshot(activeStore(state)) : null,
@@ -2575,12 +2618,11 @@ function startUrbanSandboxRuntime(options = {}) {
     close: document.getElementById('urbanEquipmentCloseBtn'),
     reticle: document.getElementById('urbanWeaponReticle')
   };
-  const backpackStore = appCtx.playerBackpackStore || createLocalBackpackStore();
-  appCtx.playerBackpackStore = backpackStore;
-  const equipment = appCtx.playerBackpackInventory || createEquipmentInventory({ persistedState: backpackStore.load() });
-  appCtx.playerBackpackInventory = equipment;
-  const stores = mappedConvenienceStores(appCtx.pois).map(resolveStoreApproach);
-  const commerce = appCtx.localConvenienceStoreCommerce || createLocalCommerceModel({ inventory: equipment });
+  const equipment = ensurePlayerBackpackInventory(appCtx);
+  const backpackStore = appCtx.playerBackpackStore;
+  const stores = mappedCommercePlaces(appCtx.pois);
+  const commerce = appCtx.worldEconomy || appCtx.localConvenienceStoreCommerce || createLocalCommerceModel({ inventory: equipment });
+  appCtx.worldEconomy = commerce;
   appCtx.localConvenienceStoreCommerce = commerce;
   const storeUi = {
     root: document.getElementById('urbanStore'),
@@ -2673,6 +2715,7 @@ function startUrbanSandboxRuntime(options = {}) {
     equipment,
     backpackStore,
     stores,
+    storeApproaches: new Map(),
     commerce,
     storeOpen: false,
     activeStoreId: '',
@@ -2781,10 +2824,7 @@ function startUrbanSandboxRuntime(options = {}) {
   state.unregisterStoreInteraction = appCtx.registerContextInteraction?.({
     id: 'urban_store',
     priority: 90,
-    evaluate: () => {
-      const candidate = interactionCandidate(state);
-      return candidate?.action === 'visit_store' ? candidate : null;
-    },
+    evaluate: () => storeInteractionCandidate(state),
     perform: (candidate) => performInteraction(state, candidate)
   });
   state.unregisterInteraction = appCtx.registerContextInteraction?.({
@@ -2937,6 +2977,7 @@ function startUrbanSandboxRuntime(options = {}) {
     state.storeSupportHook = Object.freeze({
       context: () => appCtx.contextInteractionSnapshot?.() || null,
       moveNear: (storeId) => moveNearStoreForSupport(state, storeId),
+      perform: () => appCtx.handlePrimaryContextInteraction?.(),
       snapshot: () => snapshot(state)
     });
     globalThis.__WE3D_STORE_SUPPORT__ = state.storeSupportHook;

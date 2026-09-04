@@ -1,4 +1,4 @@
-import { getUniverseDestinations, icrsToCartesian } from './catalog.js?v=10';
+import { getUniverseDestinations, icrsToCartesian } from './catalog.js?v=11';
 
 const DEEP_SKY_RADIUS = 150000;
 

@@ -17,7 +17,7 @@ import {
   where
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { ensureGuestSession, getCurrentUser } from '../../../js/auth-ui.js?v=55';
-import { initFirebase } from '../../../js/firebase-init.js?v=55';
+import { initFirebase } from '../../../js/firebase-init.js?v=56';
 import {
   CITY_KEY_MAX_LEN,
   DEFAULT_MAX_PLAYERS,
@@ -638,6 +638,14 @@ async function deleteOwnedRoom(roomCode) {
   if (currentRoom && normalizeCode(currentRoom.code) === normalizedCode) {
     setCurrentRoom(null);
   }
+}
+
+if (new URLSearchParams(globalThis.location?.search || '').get('diagnostics') === '1') {
+  globalThis.__WE3D_ROOM_SUPPORT__ = Object.freeze({
+    create: (options) => createRoom(options),
+    join: (code) => joinRoomByCode(code),
+    current: () => getCurrentRoom()
+  });
 }
 
 export {

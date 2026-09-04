@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { activePlanetaryBodyId, planetarySurfaceYAtRenderXZ } from './runtime/surface-query.js?v=2';
+import { activePlanetaryBodyId, planetarySurfaceYAtRenderXZ } from './runtime/surface-query.js?v=3';
 
 const TRACK_CAPACITY = 320;
 const TRACK_SPACING = 2.1;

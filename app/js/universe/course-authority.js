@@ -1,4 +1,4 @@
-import { getUniverseFrame, resolveUniverseAddress } from './catalog.js?v=10';
+import { getUniverseFrame, resolveUniverseAddress } from './catalog.js?v=11';
 
 const UNIVERSE_GUIDANCE_MODE = Object.freeze({
   MANUAL: 'manual',

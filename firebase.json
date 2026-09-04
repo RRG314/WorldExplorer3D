@@ -103,6 +103,10 @@
     ],
     "rewrites": [
       {
+        "source": "/getPublicSiteStats",
+        "function": "getPublicSiteStats"
+      },
+      {
         "source": "/api/geospatial/deflock-cameras",
         "function": "getDeFlockCameras"
       },
@@ -161,6 +165,22 @@
       {
         "source": "/commitUrbanImpacts",
         "function": "commitUrbanImpacts"
+      },
+      {
+        "source": "/commitWorldPropertyAction",
+        "function": "commitWorldPropertyAction"
+      },
+      {
+        "source": "/commitUrbanCivicEvent",
+        "function": "commitUrbanCivicEvent"
+      },
+      {
+        "source": "/resolveUrbanCivicOutcome",
+        "function": "resolveUrbanCivicOutcome"
+      },
+      {
+        "source": "/mutateSharedExpedition",
+        "function": "mutateSharedExpedition"
       },
       {
         "source": "/submitContribution",
@@ -257,7 +277,10 @@
     ]
   },
   "functions": {
-    "source": "functions"
+    "source": "functions",
+    "predeploy": [
+      "npm run build:shared-expedition-engine"
+    ]
   },
   "firestore": {
     "rules": "firestore.rules",

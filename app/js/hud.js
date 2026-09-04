@@ -10,7 +10,7 @@ import {
 import { resolveChaseCameraTerrainCollision } from "./hud/chase-camera-terrain.js?v=1";
 import { resolveTunnelCameraState } from "./hud/tunnel-camera-controller.js?v=6";
 import { cameraSmoothingBlend } from "./controls/traversal-control-policy.js?v=8";
-import { planetarySurfaceYAtRenderXZ } from './planetary/runtime/surface-query.js?v=2';
+import { planetarySurfaceYAtRenderXZ } from './planetary/runtime/surface-query.js?v=3';
 // hud.js - HUD updates, camera system, sky positioning
 // ============================================================================
 
@@ -553,9 +553,6 @@ function updateCamera(dt = 1 / 60) {
 }
 
 function updateHUD() {
-  // Keep controls panel sections and header synchronized with the active mode.
-  if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
-
   if (appCtx.boatMode?.active) {
     const knots = Math.max(0, Math.round(Math.abs(worldUnitsPerSecondToKnots(
       appCtx.boat.forwardSpeed ?? appCtx.boat.speed,

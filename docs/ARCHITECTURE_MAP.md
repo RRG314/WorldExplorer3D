@@ -11,16 +11,20 @@ flowchart LR
     Session --> Earth[Bounded Earth world]
     Session --> Ocean[Ocean]
     Session --> Planetary[Moon, Mars, and space]
+    Planetary --> Expedition[Interstellar Expeditions]
     Earth --> World[Terrain, water, roads, buildings, and places]
     Earth --> Actors[Player, traffic, pedestrians, and wildlife]
     Earth --> Field[Field activities and progression]
     Earth --> Sandbox[Vehicles, companions, commerce, combat, and civic response]
-    Earth --> Editor[World Editor and Blocks]
+    Earth --> Build[Quick Build and Blocks]
     Earth --> Rooms[Multiplayer rooms]
     Field --> PlayerState[Backpack, Journal, Guide, and goals]
-    Editor --> LocalState[Local persistence]
-    Editor --> Rooms
+    Build --> LocalState[Local persistence]
+    Build --> Rooms
     Rooms --> Firebase[Authorized backend and Firestore]
+    Expedition --> PlayerState
+    Expedition --> Build
+    Expedition --> Rooms
 ```
 
 The session coordinator owns transitions. Only the active environment may own
@@ -36,7 +40,7 @@ flowchart LR
     Normalize --> Compile[Compile world layers]
     Compile --> Snapshot[Assembled world snapshot]
     Snapshot --> Publish[Visible scene and collision]
-    Publish --> Play[Traversal, field play, editor, and rooms]
+    Publish --> Play[Traversal, field play, Quick Build, and rooms]
 ```
 
 Provider responses do not attach competing final worlds directly to the scene.
@@ -134,6 +138,54 @@ travel state. Domestic animals, birds, and eligible livestock use one companion
 authority. Vehicle travel records an aboard state instead of leaving the
 companion to trail through the scene.
 
+## Economy and resource custody
+
+```mermaid
+flowchart LR
+    Place[Mapped place identity] --> Stock[Game stock and services]
+    Activity[Fieldwork, travel, and commissions] --> Wallet[Explorer Credits]
+    Wallet --> Stock
+    Stock --> Backpack[Character Backpack]
+    Surface[Earth or planetary gathering] --> Backpack
+    Backpack --> Cargo[Ship cargo]
+    Cargo --> Processing[Ship analysis and processing]
+    Processing --> Backpack
+    Backpack --> Trade[Eligible Earth sale or exchange]
+    Trade --> Wallet
+```
+
+`app/js/urban-sandbox/commerce-model.js` owns the current local Explorer Credits
+record, transaction history, stable game stock, and mapped-business exchange.
+The legacy storage key is retained so existing Credits survive the schema
+change. `app/js/resources/material-catalog.js` defines material identity, unit
+mass, and allowed cargo conversion. The Character Backpack remains the item
+owner; the economy does not maintain a second list of carried objects.
+
+Mapped place records provide identity, category, position, provider, licence,
+and attribution. They do not provide World Explorer stock, price, rarity,
+service availability, staffing, access, or a promise that a transaction can
+occur at the real place. Those are deterministic game rules and are labeled as
+game stock in the interface.
+
+Earth-to-ship material transfer is performed at the existing Solis Reach cargo
+station. It consumes the exact Backpack quantities, adds the declared mass to
+the existing Expedition resources, checks ship capacity, records the transfer,
+and restores the Backpack if persistence fails. Personal equipment, ship cargo,
+and outpost storage remain separate owners. Shared-room transfer is disabled
+until a server transaction can authorize the Backpack removal and cargo addition
+together.
+
+The return path uses the same owners in reverse without collapsing their roles.
+A planetary field interaction creates one Backpack sample; boarding the return
+pod transfers that exact lot into Solis Reach science cargo. Resource Processing
+documents and seals it, Analysis & Data approves eligible non-recovery evidence,
+and the Cargo Hold performs the only ship-to-Backpack export. The exported item
+retains its sample, body, contact, mass, truth-class, and review identifiers.
+Mapped businesses may buy it only when their game business class is authorized;
+the resulting Explorer Credits value is a game rule, not a real commodity price.
+Failed cargo persistence removes the tentative Backpack lot. Shared-room export
+remains locked until both ownership changes can use one server transaction.
+
 ## Field exploration and progression
 
 ```mermaid
@@ -167,6 +219,31 @@ Planetary play resolves bodies through one catalog and world-address model.
 Solid worlds publish an accepted traversable surface with collision and a
 separate non-colliding horizon presentation. Atmospheric giants use an explicit
 atmospheric journey rather than pretending they have a solid landing surface.
+All surface star layers switch to terrain-occluded rendering on planetary entry
+and restore their exact Earth material state on exit. Catalog and generated
+mission worlds use the same entry and cleanup path.
+
+`app/js/planetary/field-activities.js` owns the shared planetary photography,
+geology, and environment-survey sites. Their panorama camera, sample scanner,
+case, sensor mast, and sampling plate are presentation attached to the existing
+activity record; they do not own a second mission or evidence ledger. The same
+E/touch context interaction advances each three-step procedure. Only the final
+step calls the existing Journal record and, for geology, the existing Expedition
+sample transfer. Destination missions listen for that final field record rather
+than maintaining separate field objects.
+
+The surface return pod remains presentation inside
+`app/js/planetary/solid-world-runtime.js`; `app/js/expedition/pod-journey-authority.js`
+continues to own phase changes and `app/js/expedition/runtime.js` owns sample
+custody. Added shell, docking, thermal, landing, ramp, and hatch meshes therefore
+cannot bypass the established approach radius, return check, or rendezvous.
+`app/js/planetary/surface-pod-launch.js` provides the single visible liftoff
+handoff for Earth and modeled planetary surfaces. It moves the existing landed
+pod when one is present, creates only a temporary Earth presentation otherwise,
+and commits to the existing Space Flight authority after the surface ascent.
+`app/js/planetary/runtime/obstacle-authority.js` publishes the active pod hull
+to planetary walking only and clears it on departure. Earth building collision,
+interior collision, and Blocks remain separate owners and receive no pod record.
 
 Spacecraft state uses SI units for mass, velocity, thrust, propellant, gravity,
 collision, and landing checks. The rendered solar system uses declared
@@ -174,18 +251,71 @@ presentation scales so it remains playable. Manual input cancels assisted travel
 and swept body collision prevents a fast frame from passing through a planet or
 the Sun.
 
-## World Editor and persistent Blocks
+Interstellar Expeditions extend those authorities rather than replacing them.
+`app/js/expedition/model.js` owns one versioned mission record for ship, route,
+strategic time, crew, stores, systems, contacts, events, failures, samples, and
+field stations. `simulation.js` advances analytical time; rendered frames never
+stand in for years of travel. `runtime.js` presents the planner, ship work, and
+local-stop handoff. The walkable ship remains nested inside the active Space
+session and returns to that same session. A pending voyage event selects one
+existing ship room and station; the ship interior owns its warning beacon,
+route guidance, crew response, and physical interaction. The planner can report
+the incident but cannot resolve it outside the ship.
 
-The World Editor is the single entry point for two related workflows:
+The bridge and Observation Gallery sample the active local Space renderer into
+bounded viewport surfaces; they do not run a second universe simulation. Ship
+walls and closed pressure doors publish through the existing interior collision
+collection. Crew interactions also use that collection and the normal E/touch
+action. `expedition/runtime.js` derives phase-aware advice from the same voyage,
+destination mission, and contact records, while `ship-interior.js` sends the
+chosen station to the existing cross-deck map and lift route.
 
-- Reviewed overlays use drafts, validation, revisions, moderation, and a
-  published read-only projection.
-- Blocks use direct local or room persistence, placement/removal authority,
-  undo, reconnect handling, and collision integration.
+Earth–Solis Reach travel reuses that same ownership chain. The current Earth
+session supplies the geographic anchor, `space.js` and the Space runtime own
+manual Pathfinder motion, camera, gravity, collision, approach, and landing,
+and `expedition/pod-journey-authority.js` owns the ordered shuttle phases. The
+Solis Reach's docking target is the physical exterior collar in Earth orbit rather
+than a second Earth-world vehicle. Docking enters the existing ship interior;
+Earth descent returns through the existing Earth session loader at the saved
+location. Backpack, Journal, account, and multiplayer records are not copied at
+either boundary.
 
-These workflows share navigation and world ownership but not trust rules.
-Blocks do not become map-provider edits, and overlay drafts do not bypass
-moderation.
+At the affected station, a selected response starts one three-step physical
+procedure. `ship-interior.js` publishes only the current procedure node through
+the existing interior interaction collection; `interiors/runtime.js` routes the
+normal E/touch action back to the ship. The interior owns the console geometry,
+step lighting, prompt, and movement feedback. It does not alter mission state.
+After the third step, `expedition/runtime.js` asks the existing Voyage Director
+to apply crew, resource, system, delayed-consequence, and outcome changes to the
+same Expedition record. Failed persistence leaves the final verification step
+available instead of presenting an uncommitted repair as complete.
+
+Stable route contacts are promoted through `contact-authority.js` into the
+existing universe catalog and planetary surface authority. `archive.js` keeps
+discovered contacts and their field stations after the active mission ends.
+Space restores that catalog before Wayfinder is built, and the catalog map
+replaces records by stable ID, so reload and free-roam revisit do not create a
+second star system or planet. A modeled contact remains labeled as modeled game
+content and never impersonates an observed catalog object.
+
+Field stations use the existing Blocks renderer, shape catalog, collision, and
+world address. Their structure is protected as system-owned while player Blocks
+retain their own placement limit and ownership. Construction and service remove
+the exact transferred ship resources. The strategic clock advances station
+power, stores, condition, operating status, revision, and log. Single-player
+state is local and versioned; a room Expedition is server-owned and clients may
+only request validated mutations through the existing room backend.
+
+## Quick Build and persistent Blocks
+
+Quick Build is the single player-facing entry for Blocks. It uses the existing
+shape catalog, placement and removal authority, undo history, collision, and
+local or room persistence. Opening it does not create another world, editor
+scene, movement controller, or copy of the block store.
+
+Local builds remain device-local. Room builds use authenticated room ownership
+and Firestore rules. Blocks are game-created content and never become edits to
+OpenStreetMap or another map provider.
 
 ## Multiplayer and backend
 
@@ -201,6 +331,16 @@ Room presence is the source for player and room discovery. Future map-based
 discovery will aggregate privacy-safe activity areas and current counts from
 that authority; it will not publish precise coordinates from an unrelated
 client or infer online players from local scene objects.
+
+Firebase Analytics is a presentation and reporting consumer, not a gameplay
+authority. Session and bounded product events exclude exact GPS coordinates,
+room codes, names, messages, artifact text, and other free-form input. Standard
+first-party analytics storage is used when no preference has been recorded so
+visits and returning sessions can be counted reliably. An explicit limited
+analytics preference denies storage, removes the analytics cookies, and leaves
+only cookieless measurements. A signed-in account identifier is attached only
+after an explicit standard-analytics preference. Advertising storage, user
+data, and personalization remain denied in every state.
 
 ## Data classification
 
@@ -226,8 +366,8 @@ the selected Firebase environment configuration. Backend deployment is a
 separate operation from hosting deployment.
 
 Production promotion is intentionally separate from staging preview creation.
-The 5.1 release build is built once, preserved with its manifest and content
+The 5.2 release build is built once, preserved with its manifest and content
 hash, and exercised on desktop and mobile. Backend authorization, multiplayer,
-and creator checks run against local Firebase emulators. Production hosting and
+property, account, civic, and shared Expedition checks run against local Firebase emulators. Production hosting and
 backend services are not changed until that exact build is reviewed and
 explicitly approved.

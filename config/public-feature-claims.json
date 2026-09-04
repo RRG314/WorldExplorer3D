@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "targetVersion": "5.1.0",
+  "targetVersion": "5.2.0",
   "publicFiles": ["index.html", "about/index.html", "README.md", "github-pages/index.html", "app/index.html"],
   "allowedStatuses": ["review-required", "source-verified", "candidate-verified", "excluded"],
   "forbiddenPublicPatterns": [
@@ -8,7 +8,7 @@
     { "pattern": ">\\s*Missions\\s*<", "reason": "implies a separate mission system" },
     { "pattern": "Missions & Games", "reason": "implies a separate mission system" },
     { "pattern": "procedural encounter", "reason": "internal evidence wording is not player-facing game language" },
-    { "pattern": "\\b(unified economy|crafting system|earn currency|spend currency)\\b", "reason": "these systems are not current public features" },
+    { "pattern": "\\b(real-money economy|cash out|investment return)\\b", "reason": "Explorer Credits and virtual property have no real-money value" },
     { "pattern": "\\b(real-time wildlife presence|nearby animal detected)\\b", "reason": "regional field leads are not live-presence reports" }
   ],
   "claims": [
@@ -67,10 +67,10 @@
       "evidenceCommands": ["verify:multiplayer"]
     },
     {
-      "id": "reviewed-world-contributions",
+      "id": "quick-build",
       "status": "candidate-verified",
-      "source": { "file": "index.html", "pattern": "create staged World Explorer overlay drafts for places, buildings, and interiors" },
-      "evidenceCommands": ["verify:creator-flow"]
+      "source": { "file": "README.md", "pattern": "Quick Build is the single player-facing Blocks workspace" },
+      "evidenceCommands": ["verify:gameplay-menu", "verify:hotbar-actions", "verify:block-local-store", "verify:block-shared-sync"]
     },
     {
       "id": "fishing",
@@ -99,7 +99,7 @@
     {
       "id": "regional-field-guide",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "Eleven regional Field Guide packs provide 180 attainable entries" },
+      "source": { "file": "README.md", "pattern": "eleven regional Field Guide packs with 180 attainable entries" },
       "evidenceCommands": ["verify:regional-ecology", "verify:regional-world-richness", "verify:regional-guide-new-york"]
     },
     {
@@ -137,6 +137,18 @@
       "status": "candidate-verified",
       "source": { "file": "README.md", "pattern": "Leave Earth for the Moon, planets, the solar system, and selected deep-space\\s+destinations" },
       "evidenceCommands": ["verify:current-contracts", "verify:environments"]
+    },
+    {
+      "id": "interstellar-expeditions-alpha",
+      "status": "candidate-verified",
+      "source": { "file": "README.md", "pattern": "Try Interstellar Expeditions in Alpha" },
+      "evidenceCommands": ["verify:interstellar-expedition", "verify:interstellar-expedition-browser", "verify:expedition-pod", "verify:current-space-journey"]
+    },
+    {
+      "id": "connected-property-and-credits",
+      "status": "candidate-verified",
+      "source": { "file": "README.md", "pattern": "Claim a first virtual property" },
+      "evidenceCommands": ["verify:world-economy", "verify:connected-property-backend", "verify:connected-property-multiplayer"]
     }
   ]
 }

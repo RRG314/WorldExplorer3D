@@ -6,7 +6,7 @@ import {
   query
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { claimDeFlockVirtualDisable } from '../../../js/deflock-api.js?v=1';
-import { initFirebase } from '../../../js/firebase-init.js?v=55';
+import { initFirebase } from '../../../js/firebase-init.js?v=56';
 import { normalizeCode } from '../multiplayer/rooms.js?v=67';
 
 const DEFLOCK_STATE_COLLECTION = 'deflockStates';

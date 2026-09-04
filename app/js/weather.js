@@ -198,6 +198,9 @@ function positionHudClock() {
 
 function updateWeatherUi() {
   const btn = document.getElementById('fWeatherMode');
+  const quickControls = document.getElementById('worldQuickControls');
+  const quickBtn = document.getElementById('quickWeatherMode');
+  const quickState = document.getElementById('quickWeatherModeState');
   const panel = document.getElementById('weatherPanel');
   const clock = document.getElementById('hudClockDisplay');
   const line = document.getElementById('weatherLine');
@@ -206,6 +209,16 @@ function updateWeatherUi() {
   const mode = appCtx.weatherMode || 'live';
   const active = appCtx.weatherState || appCtx.liveWeatherState || null;
   const display = getWeatherModeDisplay(mode, active);
+  const quickLabel = display.label.replace(/^Weather:\s*/, '');
+  const worldControlsAvailable = !appCtx.onMoon && !appCtx.onMars && !appCtx.activePlanetaryBodyId && !appCtx.spaceFlight?.active;
+  if (quickControls) quickControls.hidden = !worldControlsAvailable;
+  if (quickBtn) {
+    quickBtn.setAttribute('aria-label', `Change weather. Current: ${quickLabel}`);
+    quickBtn.setAttribute('title', `Weather: ${quickLabel}`);
+    quickBtn.setAttribute('aria-pressed', String(mode !== 'live'));
+    quickBtn.dataset.mode = mode;
+  }
+  if (quickState) quickState.textContent = quickLabel;
   const tempF = Number.isFinite(active?.temperatureF) ? Math.round(active.temperatureF) : null;
   const tempC = Number.isFinite(active?.temperatureC) ? Math.round(active.temperatureC) : null;
   const buttonText = `${display.icon} ${display.label}`;

@@ -125,10 +125,18 @@ function getSkyModeDisplay(mode, phase = "day") {
 
 function updateTimeOfDayButton(phase = appCtx.timeOfDay || "day") {
   const button = document.getElementById("fTimeOfDay");
-  if (!button) return;
   const mode = appCtx.skyMode || "live";
   const display = getSkyModeDisplay(mode, phase);
-  button.textContent = `${display.icon} ${display.label}`;
+  if (button) button.textContent = `${display.icon} ${display.label}`;
+  const quickButton = document.getElementById("quickTimeOfDay");
+  const quickState = document.getElementById("quickTimeOfDayState");
+  if (quickButton) {
+    quickButton.setAttribute("aria-label", `Change time of day. Current: ${display.label}`);
+    quickButton.setAttribute("title", `Time of day: ${display.label}`);
+    quickButton.setAttribute("aria-pressed", String(mode !== "live"));
+    quickButton.dataset.mode = mode;
+  }
+  if (quickState) quickState.textContent = display.label;
 }
 
 function mixColorHex(colorA, colorB, t) {

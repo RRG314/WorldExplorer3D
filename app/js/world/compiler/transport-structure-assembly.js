@@ -248,7 +248,14 @@ function compileElevatedAssembly(feature, sampleTerrainY, options = {}) {
         width,
         baseThickness,
         sampleTerrainY,
-        options.supportConflict
+        options.supportConflict,
+        1.6,
+        // Generalized bridge centerlines can run directly above a mapped
+        // surface street or parallel carriageway. Trying only center/edge
+        // columns rejects every pier and leaves a long mapped deck visibly
+        // floating. Reuse the bounded clear-offset search already used for
+        // clipped terminals instead of placing a column in traffic.
+        generalized
       );
       if (columns.length === 0) continue;
       const capHalfSpan = Math.max(

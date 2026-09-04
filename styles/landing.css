@@ -255,6 +255,22 @@ h1 {
 
 .hero-notes li::before { margin-right: 7px; color: var(--world); content: '●'; font-size: 8px; }
 
+.community-count {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 9px;
+  margin-top: 14px;
+  padding: 8px 11px;
+  border: 1px solid rgba(85, 169, 130, 0.34);
+  color: var(--muted);
+  background: rgba(16, 37, 29, 0.48);
+  font-size: 12px;
+}
+
+.community-count[hidden] { display: none; }
+.community-count strong { color: #a9d8c2; font: 600 18px/1 'Orbitron', sans-serif; }
+.community-count-label { letter-spacing: 0.01em; }
+
 .perf-note {
   margin: 10px 0 0;
   color: var(--faint);

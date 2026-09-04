@@ -6,13 +6,19 @@ const baseUrl = String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:425
 const outputDir = 'output/verification/cross-platform-browser-current';
 await fs.mkdir(outputDir, { recursive: true });
 
-const engines = [
+const availableEngines = [
   { name: 'chromium', type: chromium },
   { name: 'firefox', type: firefox }
 ];
+const requestedEngine = String(process.env.WE3D_VERIFY_ENGINE || '').trim().toLowerCase();
+const engines = requestedEngine
+  ? availableEngines.filter((engine) => engine.name === requestedEngine)
+  : availableEngines;
+assert.ok(engines.length > 0, `Unsupported WE3D_VERIFY_ENGINE: ${requestedEngine}`);
 const reports = [];
 
 for (const engine of engines) {
+  console.log(`[cross-platform] starting ${engine.name}`);
   const browser = await engine.type.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 1366, height: 768 }, reducedMotion: 'reduce' });
   const page = await context.newPage();
@@ -76,8 +82,10 @@ for (const engine of engines) {
       report.aircraft >= 7 && report.runtimeErrors.length === 0 &&
       report.pageErrors.length === 0 && report.failedLocalResources.length === 0;
     reports.push(report);
+    await fs.writeFile(`${outputDir}/report-${engine.name}.json`, JSON.stringify(report, null, 2));
     await page.screenshot({ path: `${outputDir}/${engine.name}-bwi.png`, fullPage: true });
     assert.equal(report.ok, true, `${engine.name} gameplay smoke failed`);
+    console.log(`[cross-platform] ${engine.name} passed`);
   } finally {
     await context.close();
     await browser.close();

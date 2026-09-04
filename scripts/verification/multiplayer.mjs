@@ -107,6 +107,11 @@ async function launchRoomWorld(player) {
   const alreadyStarted = await player.page.evaluate(() =>
     globalThis.getWorldExplorerRuntimeDiagnostics?.().gameStarted === true);
   if (!alreadyStarted) {
+    const hubClose = player.page.locator('#globeHubOverlayCloseBtn');
+    if (await hubClose.isVisible().catch(() => false)) {
+      await hubClose.click();
+      await player.page.locator('#globeHubOverlay').waitFor({ state: 'hidden' });
+    }
     const start = player.page.locator('#globeSelectorStartBtn');
     if (!await start.isVisible().catch(() => false)) {
       const locationDestination = player.page.locator('[data-globe-destination="location"]:visible').first();

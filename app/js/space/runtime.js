@@ -3,10 +3,11 @@ import {
   getAstronomicalBody,
   LANDING_MODE,
   normalizeAstronomicalBodyId
-} from '../astronomy/body-catalog.js?v=2';
-import { SPACE_CONSTANTS } from "./constants.js?v=1";
+} from '../astronomy/body-catalog.js?v=3';
+import { SPACE_CONSTANTS } from "./constants.js?v=3";
 import { spacecraftOperationTuning } from '../character/spacecraft-assistance.js?v=1';
 import { resolveCelestialSceneCollision } from './celestial-collision.js?v=2';
+import { releaseAtmosphericFlightPresentation, updateAtmosphericFlightPresentation } from './atmospheric-flight-presentation.js?v=1';
 
 let injectedThree = null;
 let math = null;
@@ -96,13 +97,21 @@ export function startLandingSequence(targetMesh, targetRadius, targetName, deps 
   appCtx.spaceFlight.mode = 'landing';
   appCtx.spaceFlight._landingTarget = targetName;
   appCtx.spaceFlight._autopilotTarget = null;
+  appCtx.updateSpaceTravelSession?.({
+    phase: 'descent',
+    destination: { id: normalizeAstronomicalBodyId(targetName) || String(targetName).toLowerCase(), kind: 'body', name: targetName },
+    reason: 'descent-started'
+  });
   deps.showFlightMessage?.('LANDING SEQUENCE INITIATED', '#10b981');
 
   const startTime = Date.now();
   const startPos = appCtx.spaceFlight.rocket.position.clone();
-  const landPos = targetMesh.position.clone();
-  landPos.y += targetRadius + 10;
   const frozenTargetPos = targetMesh.position.clone();
+  const approachDirection = startPos.clone().sub(frozenTargetPos);
+  if (approachDirection.lengthSq() < 1e-6) approachDirection.set(0, 1, 0);
+  else approachDirection.normalize();
+  const landPos = frozenTargetPos.clone().addScaledVector(approachDirection, targetRadius + 10);
+  appCtx.spaceFlight._landingApproachDirection = approachDirection.clone();
   const duration = Math.max(1200, landingDuration);
   const landingAxis = new three.Vector3(0, -1, 0);
   const toTarget = new three.Vector3();
@@ -149,6 +158,10 @@ export function setSpaceFlightLandingTarget(target, options = {}, deps = {}) {
   appCtx.spaceFlight.destination = normalized.toLowerCase();
   appCtx.spaceFlight._manualLandingTarget = normalized;
   appCtx.spaceFlight._autopilotTarget = null;
+  appCtx.updateSpaceTravelSession?.({
+    destination: { id: normalized.toLowerCase(), kind: 'body', name: normalized },
+    reason: 'landing-target-selected'
+  });
 
   const dist = appCtx.spaceFlight.rocket.position.distanceTo(body.position);
   const canLandNow = dist < SPACE_CONSTANTS.LANDING_DISTANCE + body.radius;
@@ -259,32 +272,27 @@ function clampTotalGravity(sumVec) {
 
 function integrateGravityVelocity(gravitySum) {
   if (!appCtx.spaceFlight.gravityVelocity) return;
-
   const frameScale = appCtx.spaceFlight._frameScale || 1;
   appCtx.spaceFlight.gravityVelocity.addScaledVector(gravitySum, frameScale);
   appCtx.spaceFlight.gravityVelocity.multiplyScalar(Math.pow(SPACE_CONSTANTS.GRAVITY_DAMPING, frameScale));
   if (appCtx.spaceFlight.gravityVelocity.length() > SPACE_CONSTANTS.MAX_GRAVITY_SPEED) {
     appCtx.spaceFlight.gravityVelocity.setLength(SPACE_CONSTANTS.MAX_GRAVITY_SPEED);
   }
-
   if (appCtx.spaceFlight._gravityVec) appCtx.spaceFlight._gravityVec.copy(gravitySum);
   return true;
 }
 
 function getBodyGravityMu(body) {
-  const name = String(body?.name || '').toLowerCase();
-  if (name === 'sun') return 3200;
-  if (name === 'jupiter') return 5600;
-  if (name === 'saturn') return 3900;
-  if (name === 'neptune') return 2500;
-  if (name === 'uranus') return 2300;
-  if (name === 'earth') return 1800;
-  if (name === 'venus') return 1400;
-  if (name === 'mars') return 900;
-  if (name === 'mercury') return 700;
-  if (name === 'moon') return 300;
-  if (body?.landable) return 600;
-  return 0;
+  const bodyId = normalizeAstronomicalBodyId(body?.name || body?.bodyId);
+  const catalogBody = bodyId ? getAstronomicalBody(bodyId) : null;
+  const physicalMassKg = Number(catalogBody?.physical?.massKg);
+  const physicalRadiusM = Number(catalogBody?.physical?.meanRadiusM);
+  const sceneRadius = Number(body?.radius);
+  if (physicalMassKg > 0 && physicalRadiusM > 0 && sceneRadius > 0) {
+    const surfaceGravityMps2 = 6.67430e-11 * physicalMassKg / (physicalRadiusM ** 2);
+    return surfaceGravityMps2 * sceneRadius ** 2 * 0.0012;
+  }
+  return body?.landable && sceneRadius > 0 ? 0.006 * sceneRadius ** 2 : 0;
 }
 
 function shouldApplyGravityFromBody(body) {
@@ -331,12 +339,6 @@ function applyPlanetaryGravity(rocket, launchAssist, isThrusting) {
   } = getSpaceControlMath();
   if (!appCtx.spaceFlight.gravityVelocity) return;
 
-  if (launchAssist && !isThrusting) {
-    appCtx.spaceFlight.gravityVelocity.set(0, 0, 0);
-    if (appCtx.spaceFlight._gravityVec) appCtx.spaceFlight._gravityVec.set(0, 0, 0);
-    return;
-  }
-
   const bodies = getActiveSpaceBodies();
   const nearLandableDist = nearestLandableDistance(rocket, bodies);
   _sfGravitySum.set(0, 0, 0);
@@ -379,39 +381,6 @@ function applyPlanetaryGravity(rocket, launchAssist, isThrusting) {
 
   clampTotalGravity(_sfGravitySum);
   integrateGravityVelocity(_sfGravitySum);
-}
-
-function preserveManualEscapeAuthority(rocket, forward, isThrusting, frameScale) {
-  if (!isThrusting || !appCtx.spaceFlight.gravityVelocity) return;
-  const bodies = getActiveSpaceBodies();
-  let nearest = null;
-  let nearestSurfaceDistance = Infinity;
-  bodies.forEach((body) => {
-    if (!shouldApplyGravityFromBody(body) || !Number.isFinite(body.radius)) return;
-    const centerDistance = rocket.position.distanceTo(body.position);
-    const surfaceDistance = centerDistance - body.radius;
-    if (surfaceDistance < nearestSurfaceDistance && centerDistance <= bodyGravityRange(body, surfaceDistance) + body.radius) {
-      nearest = body;
-      nearestSurfaceDistance = surfaceDistance;
-    }
-  });
-  if (!nearest) return;
-  const outward = getSpaceControlMath().gravityTemporary.copy(rocket.position).sub(nearest.position);
-  if (outward.lengthSq() <= 1e-6) return;
-  outward.normalize();
-  const outwardAlignment = forward.dot(outward);
-  if (outwardAlignment <= 0.2) return;
-  const inwardVelocity = appCtx.spaceFlight.gravityVelocity.dot(outward);
-  if (inwardVelocity < 0) {
-    appCtx.spaceFlight.gravityVelocity.addScaledVector(outward, -inwardVelocity);
-  }
-  appCtx.spaceFlight.gravityVelocity.addScaledVector(
-    outward,
-    SPACE_CONSTANTS.LAUNCH_ASSIST_ACCEL * outwardAlignment * frameScale
-  );
-  if (appCtx.spaceFlight.gravityVelocity.length() > SPACE_CONSTANTS.MAX_GRAVITY_SPEED) {
-    appCtx.spaceFlight.gravityVelocity.setLength(SPACE_CONSTANTS.MAX_GRAVITY_SPEED);
-  }
 }
 
 export function updateSpaceFlightPhysics() {
@@ -466,7 +435,6 @@ export function updateSpaceFlightPhysics() {
     keys[' '] || keys['shift'] ||
     keys['arrowup'] || keys['arrowdown'] || keys['arrowleft'] || keys['arrowright']
   );
-  if (manualControl) appCtx.releaseRenderedJourneyToManualFlight?.();
 
   const siRuntimeActive = appCtx.updateRenderedSpaceJourney?.({
     realDtS: frameScale / 60,
@@ -509,9 +477,18 @@ export function updateSpaceFlightPhysics() {
       }
       appCtx.spaceFlight.scene.fog.color.setHex(fogColor);
       appCtx.spaceFlight.scene.fog.density = 0.00035 + pressureRatio * 0.0024;
+      if (appCtx.spaceJourney?.phase === 'atmospheric_exploration' && giantAtmosphere) {
+        updateAtmosphericFlightPresentation(environment.bodyId, {
+          radial: appCtx.spaceFlight.atmosphericRadialScene,
+          horizontalSpeedMps: appCtx.spaceAtmosphereExploration?.horizontalSpeedMps
+        });
+      } else {
+        releaseAtmosphericFlightPresentation();
+      }
     } else if (appCtx.spaceFlight._journeyFogActive && appCtx.spaceFlight.scene) {
       appCtx.spaceFlight.scene.fog = null;
       appCtx.spaceFlight._journeyFogActive = false;
+      releaseAtmosphericFlightPresentation();
     }
     const glow = rocket.getObjectByName('engineGlow');
     const exhaust = rocket.getObjectByName('exhaust');
@@ -540,10 +517,11 @@ export function updateSpaceFlightPhysics() {
     isThrusting = true;
   } else if (keys['shift']) {
     appCtx.spaceFlight.speed = Math.max(appCtx.spaceFlight.speed - SPACE_CONSTANTS.BRAKE * frameScale, 0);
-  } else if (appCtx.spaceFlight.speed > 0) {
-    if (appCtx.spaceFlight.speed > SPACE_CONSTANTS.CRUISE_SPEED) {
-      appCtx.spaceFlight.speed = Math.max(appCtx.spaceFlight.speed - SPACE_CONSTANTS.DRIFT_RATE * frameScale, SPACE_CONSTANTS.CRUISE_SPEED);
-    }
+  } else if (appCtx.spaceFlight.speed > SPACE_CONSTANTS.CRUISE_SPEED) {
+    appCtx.spaceFlight.speed = Math.max(
+      appCtx.spaceFlight.speed - SPACE_CONSTANTS.DRIFT_RATE * frameScale,
+      SPACE_CONSTANTS.CRUISE_SPEED
+    );
   }
 
   const nearBody = appCtx.spaceFlight._nearestBody;
@@ -554,15 +532,27 @@ export function updateSpaceFlightPhysics() {
       const inLandingZone = distToBody < SPACE_CONSTANTS.LANDING_DISTANCE + nearBody.radius;
       const targetSpeed = inLandingZone ? 0.8 : 2.0;
       if (appCtx.spaceFlight.speed > targetSpeed) {
-        appCtx.spaceFlight.speed = Math.max(targetSpeed, appCtx.spaceFlight.speed - SPACE_CONSTANTS.BRAKE * 1.2 * frameScale);
+        appCtx.spaceFlight.speed = Math.max(
+          targetSpeed,
+          appCtx.spaceFlight.speed - SPACE_CONSTANTS.BRAKE * 1.2 * frameScale
+        );
       }
     }
   }
 
   appCtx.spaceFlight._isThrusting = isThrusting;
-  applyPlanetaryGravity(rocket, launchAssist, isThrusting);
+  const sharedOrbitalRendezvous = appCtx.getSpaceTravelSession?.()?.phase === 'rendezvous'
+    && appCtx.getSolisReachDockTarget?.()?.position != null;
+  if (sharedOrbitalRendezvous) {
+    // The pod and Solis Reach share the same orbital free-fall frame. Applying
+    // planetary acceleration to the pod alone creates artificial relative
+    // speed and makes the final manual docking corridor impossible to hold.
+    appCtx.spaceFlight.gravityVelocity?.multiplyScalar?.(Math.pow(0.35, frameScale));
+    appCtx.spaceFlight._gravityVec?.set?.(0, 0, 0);
+  } else {
+    applyPlanetaryGravity(rocket, launchAssist, isThrusting);
+  }
   _sfForward.set(0, 1, 0).applyQuaternion(rocket.quaternion);
-  preserveManualEscapeAuthority(rocket, _sfForward, isThrusting, frameScale);
   appCtx.spaceFlight.velocity.copy(_sfForward).multiplyScalar(appCtx.spaceFlight.speed);
   if (appCtx.spaceFlight.gravityVelocity) {
     appCtx.spaceFlight.velocity.add(appCtx.spaceFlight.gravityVelocity);
@@ -577,8 +567,12 @@ export function updateSpaceFlightPhysics() {
   });
   rocket.position.set(collision.position.x, collision.position.y, collision.position.z);
   if (collision.collided) {
-    appCtx.spaceFlight.speed = Math.max(appCtx.spaceFlight.speed * 0.5, SPACE_CONSTANTS.MIN_SPEED);
-    if (appCtx.spaceFlight.gravityVelocity) appCtx.spaceFlight.gravityVelocity.multiplyScalar(0.2);
+    _sfTempVec.set(collision.normal.x, collision.normal.y, collision.normal.z);
+    const inwardSpeed = appCtx.spaceFlight.velocity.dot(_sfTempVec);
+    if (inwardSpeed < 0) appCtx.spaceFlight.velocity.addScaledVector(_sfTempVec, -inwardSpeed);
+    appCtx.spaceFlight.velocity.multiplyScalar(0.35);
+    appCtx.spaceFlight.speed = appCtx.spaceFlight.velocity.length();
+    appCtx.spaceFlight.gravityVelocity?.set?.(0, 0, 0);
     appCtx.spaceFlight.lastCelestialContact = Object.freeze({
       bodyId: collision.bodyId,
       bodyName: collision.bodyName,
@@ -662,14 +656,19 @@ export function updateSpaceFlightCamera() {
       .addScaledVector(_sfTempVec, 25);
   }
 
-  appCtx.spaceFlight.camera.position.lerp(_sfTargetPos, 0.1);
+  const snapCamera = appCtx.spaceFlight._snapCameraToCraft === true;
+  const atmosphericChase = appCtx.spaceJourney?.phase === 'atmospheric_exploration';
+  if (snapCamera) appCtx.spaceFlight.camera.position.copy(_sfTargetPos);
+  else appCtx.spaceFlight.camera.position.lerp(_sfTargetPos, atmosphericChase ? 0.18 : 0.1);
   // Follow the spacecraft's transported up vector rather than a fixed world-up
   // pole. Physics reads the resulting camera axes, so arrows retain the same
   // visible direction through every world-axis crossing.
   appCtx.spaceFlight.camera.up.copy(_sfTempVec);
   cameraLookMatrix.lookAt(appCtx.spaceFlight.camera.position, rocket.position, _sfTempVec);
   cameraQuaternion.setFromRotationMatrix(cameraLookMatrix);
-  appCtx.spaceFlight.camera.quaternion.slerp(cameraQuaternion, 0.045).normalize();
+  if (snapCamera) appCtx.spaceFlight.camera.quaternion.copy(cameraQuaternion).normalize();
+  else appCtx.spaceFlight.camera.quaternion.slerp(cameraQuaternion, atmosphericChase ? 0.12 : 0.045).normalize();
+  appCtx.spaceFlight._snapCameraToCraft = false;
 }
 
 export function animateSpaceFlight(deps = {}) {
@@ -710,10 +709,12 @@ export function animateSpaceFlight(deps = {}) {
     appCtx.updateSolarSystem();
   }
 
+  appCtx.tutorialUpdate?.(appCtx.spaceFlight._frameScale / 60);
   appCtx.updateUniverseRuntime?.(appCtx.spaceFlight._frameScale / 60);
   updateSpaceFlightPhysics();
   deps.updateSpaceFlightHUD?.(findLandableBodyByName);
   updateSpaceFlightCamera();
+  appCtx.updateExpeditionPodFlightPresentation?.(appCtx.spaceFlight._frameScale / 60);
 
   if (appCtx.spaceFlight.renderer && appCtx.spaceFlight.scene && appCtx.spaceFlight.camera) {
     appCtx.spaceFlight.renderer.render(appCtx.spaceFlight.scene, appCtx.spaceFlight.camera);
@@ -721,6 +722,39 @@ export function animateSpaceFlight(deps = {}) {
 }
 
 export function attemptLanding(deps = {}) {
+  const expeditionDock = appCtx.getExpeditionPodDockingTarget?.();
+  const pathfinderDock = expeditionDock?.position ? expeditionDock : appCtx.getSolisReachDockTarget?.();
+  if (pathfinderDock?.position) {
+    const starshipName = String(pathfinderDock.name || 'the starship').toUpperCase();
+    const accepted = expeditionDock?.position
+      ? appCtx.attemptExpeditionPodDocking?.() === true
+      : appCtx.completePathfinderDocking?.() === true;
+    deps.showFlightMessage?.(
+      accepted ? `PATHFINDER DOCKING · ${starshipName} HAS THE POD` : `MOVE CLOSER TO ${starshipName} AND MATCH SPEED`,
+      accepted ? '#10b981' : '#f59e0b'
+    );
+    return accepted;
+  }
+  const universeTarget = appCtx.getUniverseHudTarget?.();
+  if (universeTarget?.targetKind === 'exoplanet' && universeTarget.landable === true && universeTarget.position) {
+    const distance = appCtx.spaceFlight.rocket.position.distanceTo(universeTarget.position);
+    const descentDistance = Math.max(18, universeTarget.radius * 3);
+    if (distance >= descentDistance + universeTarget.radius) {
+      deps.showFlightMessage?.('MOVE CLOSER TO BEGIN SURVEY DESCENT', '#f59e0b');
+      return false;
+    }
+    if (appCtx.getActiveSpaceCraftId?.() === 'solis-reach') {
+      appCtx.setExpeditionPodFlightPresentation?.(true);
+    }
+    appCtx.spaceFlight._runtimeLandingTarget = universeTarget.destinationId;
+    return startLandingSequence(
+      { position: universeTarget.position },
+      universeTarget.radius,
+      universeTarget.destinationId,
+      deps,
+      2200
+    );
+  }
   if (
     appCtx.spaceJourney?.phase === 'atmospheric_exploration' &&
     typeof appCtx.requestRenderedAtmosphericDeparture === 'function'
@@ -738,11 +772,19 @@ export function attemptLanding(deps = {}) {
     );
     if (!targetName) return false;
     const targetBody = getAstronomicalBody(targetName);
+    if (appCtx.getActiveSpaceCraftId?.() === 'solis-reach') {
+      appCtx.setExpeditionPodFlightPresentation?.(true);
+    }
     if (
       targetBody?.exploration?.landingMode === LANDING_MODE.ATMOSPHERIC_DESCENT &&
       typeof appCtx.requestRenderedAtmosphericEntry === 'function'
     ) {
       const result = appCtx.requestRenderedAtmosphericEntry(targetName);
+      if (result.accepted) {
+        const atmosphereBody = findLandableBodyByName(targetName);
+        appCtx.orientActiveCraftForAtmosphere?.(atmosphereBody?.position);
+        deps.collapseFlightHud?.();
+      }
       deps.showFlightMessage?.(
         result.accepted ? 'ATMOSPHERIC FLIGHT ENGAGED' : String(result.reason || 'ATMOSPHERIC ENTRY NOT AVAILABLE').replaceAll('-', ' ').toUpperCase(),
         result.accepted ? '#10b981' : '#f59e0b'

@@ -1,7 +1,7 @@
 import {
   getAstronomicalBody,
   SOLAR_SYSTEM_EXPLORATION_DESTINATION_IDS
-} from '../astronomy/body-catalog.js?v=2';
+} from '../astronomy/body-catalog.js?v=3';
 
 function setInfoMetricBlock(metaLabel, metric1Label, metric1Value, metric2Label, metric2Value, metric3Label, metric3Value) {
   const metaEl = document.getElementById('ssInfoMetaLabel');
@@ -39,19 +39,36 @@ function hidePlanetInfo(ctx) {
   if (ctx.solarSystem.infoPanel) {
     ctx.solarSystem.infoPanel.style.display = 'none';
   }
+  document.body?.classList.remove('space-destination-details-open');
   ctx.solarSystem.selectedPlanet = null;
   ctx.solarSystem.selectedBodyId = null;
+}
+
+function openPlanetInfo(ctx) {
+  ctx.solarSystem.infoPanel.style.display = 'block';
+  document.body?.classList.add('space-destination-details-open');
 }
 
 function configureSetCourse(ctx, bodyId, label) {
   const setCourse = document.getElementById('ssInfoSetCourse');
   if (!setCourse) return;
   const selectable = SOLAR_SYSTEM_EXPLORATION_DESTINATION_IDS.includes(bodyId);
-  const canRetarget = selectable && ctx.appCtx.spaceJourney?.phase === 'parking_orbit' && bodyId !== 'earth';
+  const journey = ctx.appCtx.spaceJourney;
+  const currentDestination = journey?.destinationBodyId;
+  const canRetarget = selectable && bodyId !== 'earth' && (
+    !ctx.appCtx.spacecraftState ||
+    !['descent', 'home_descent', 'surface', 'complete'].includes(journey?.phase) ||
+    currentDestination === bodyId
+  );
+  const alreadySet = currentDestination === bodyId;
   setCourse.style.display = selectable && bodyId !== 'earth' ? 'block' : 'none';
   setCourse.disabled = !canRetarget;
   setCourse.style.opacity = canRetarget ? '1' : '0.55';
-  setCourse.textContent = canRetarget ? `SET COURSE TO ${label.toUpperCase()}` : 'CHANGE COURSE FROM PARKING ORBIT';
+  setCourse.textContent = alreadySet
+    ? `COURSE SET · ${label.toUpperCase()}`
+    : canRetarget
+      ? `SET COURSE TO ${label.toUpperCase()}`
+      : 'FINISH CURRENT APPROACH FIRST';
   ctx.solarSystem.selectedBodyId = selectable ? bodyId : null;
 }
 
@@ -75,7 +92,7 @@ function showPlanetInfo(ctx, entry) {
     distEarth.toFixed(3) + ' AU (' + formatKM(distEarthKM) + ' km)'
   );
 
-  ctx.solarSystem.infoPanel.style.display = 'block';
+  openPlanetInfo(ctx);
   ctx.solarSystem.selectedPlanet = entry;
   configureSetCourse(ctx, planet.bodyId, planet.name);
 
@@ -109,7 +126,7 @@ function showSunInfo(ctx) {
     distSun.toFixed(3) + ' AU (' + formatKM(distSunKM) + ' km)'
   );
 
-  ctx.solarSystem.infoPanel.style.display = 'block';
+  openPlanetInfo(ctx);
   ctx.solarSystem.selectedPlanet = null;
   configureSetCourse(ctx, null, '');
 }
@@ -134,7 +151,7 @@ function showAsteroidInfo(ctx, entry) {
     distEarth.toFixed(3) + ' AU (' + formatKM(distEarthKM) + ' km)'
   );
 
-  ctx.solarSystem.infoPanel.style.display = 'block';
+  openPlanetInfo(ctx);
   ctx.solarSystem.selectedPlanet = entry;
   const bodyId = getAstronomicalBody(asteroid.name)?.id || null;
   configureSetCourse(ctx, bodyId, asteroid.name);
@@ -158,7 +175,7 @@ function showMoonInfo(ctx, entry) {
     'Orbital period',
     `${Math.abs(body.physical.orbitalPeriodS / 86400).toFixed(2)} days`
   );
-  ctx.solarSystem.infoPanel.style.display = 'block';
+  openPlanetInfo(ctx);
   ctx.solarSystem.selectedPlanet = null;
   configureSetCourse(ctx, body.id, body.name);
 }
@@ -190,7 +207,7 @@ function showSpacecraftInfo(ctx, entry) {
     sceneDistText
   );
 
-  ctx.solarSystem.infoPanel.style.display = 'block';
+  openPlanetInfo(ctx);
   ctx.solarSystem.selectedPlanet = null;
   configureSetCourse(ctx, null, '');
 }
@@ -217,18 +234,9 @@ function showGalaxyInfo(ctx, entry) {
     sceneDistText
   );
 
-  ctx.solarSystem.infoPanel.style.display = 'block';
+  openPlanetInfo(ctx);
   ctx.solarSystem.selectedPlanet = null;
   configureSetCourse(ctx, null, '');
-}
-
-function triggerSpaceLanding(text) {
-  const landBtn = document.getElementById('sfLandBtn');
-  if (!landBtn) return;
-  landBtn.textContent = text;
-  landBtn.disabled = false;
-  landBtn.style.opacity = '1';
-  landBtn.click();
 }
 
 function handleSpaceReturnAction(ctx) {
@@ -249,16 +257,11 @@ function handleSpaceReturnAction(ctx) {
       const departure = ctx.appCtx.requestRenderedAtmosphericDeparture();
       if (departure?.accepted) return;
     }
-    if (typeof ctx.appCtx.forceSpaceFlightLanding === 'function') {
-      const forced = ctx.appCtx.forceSpaceFlightLanding('Earth');
-      if (forced) return;
-    }
-    if (typeof ctx.appCtx.setSpaceFlightLandingTarget === 'function') {
-      const handled = ctx.appCtx.setSpaceFlightLandingTarget('Earth', { force: true, autoLand: true });
-      if (handled) return;
-    }
-    ctx.appCtx.spaceFlight.destination = 'earth';
-    triggerSpaceLanding('LAND ON EARTH');
+    const course = ctx.appCtx.setSolarSystemCourse?.('earth');
+    ctx.appCtx.showSpaceFlightMessage?.(
+      course?.accepted ? 'EARTH COURSE SET · USE FLIGHT ASSIST OR FLY MANUALLY' : String(course?.reason || 'Earth course unavailable').replaceAll('-', ' ').toUpperCase(),
+      course?.accepted ? '#6fe8ff' : '#f59e0b'
+    );
     return;
   }
 
@@ -267,20 +270,11 @@ function handleSpaceReturnAction(ctx) {
 
 function handleMoonLandingAction(ctx) {
   if (ctx.appCtx.spaceFlight && ctx.appCtx.spaceFlight.active) {
-    if (ctx.appCtx.spaceJourney?.phase === 'parking_orbit') {
-      const retargeted = ctx.appCtx.retargetRenderedSpaceJourney?.('moon');
-      if (retargeted?.accepted) return;
-    }
-    if (typeof ctx.appCtx.forceSpaceFlightLanding === 'function') {
-      const forced = ctx.appCtx.forceSpaceFlightLanding('Moon');
-      if (forced) return;
-    }
-    if (typeof ctx.appCtx.setSpaceFlightLandingTarget === 'function') {
-      const handled = ctx.appCtx.setSpaceFlightLandingTarget('Moon', { force: true, autoLand: true });
-      if (handled) return;
-    }
-    ctx.appCtx.spaceFlight.destination = 'moon';
-    triggerSpaceLanding('LAND ON MOON');
+    const course = ctx.appCtx.setSolarSystemCourse?.('moon');
+    ctx.appCtx.showSpaceFlightMessage?.(
+      course?.accepted ? 'MOON COURSE SET · USE FLIGHT ASSIST OR FLY MANUALLY' : String(course?.reason || 'Moon course unavailable').replaceAll('-', ' ').toUpperCase(),
+      course?.accepted ? '#6fe8ff' : '#f59e0b'
+    );
     return;
   }
 
@@ -295,14 +289,11 @@ function handleMoonLandingAction(ctx) {
 function handleMarsLandingAction(ctx) {
   if (ctx.appCtx.onMars) return;
   if (ctx.appCtx.spaceFlight?.active) {
-    if (ctx.appCtx.spaceJourney?.phase === 'parking_orbit') {
-      const retargeted = ctx.appCtx.retargetRenderedSpaceJourney?.('mars');
-      if (retargeted?.accepted) return;
-    }
-    if (ctx.appCtx.forceSpaceFlightLanding?.('Mars')) return;
-    if (ctx.appCtx.setSpaceFlightLandingTarget?.('Mars', { force: true, autoLand: true })) return;
-    ctx.appCtx.spaceFlight.destination = 'mars';
-    triggerSpaceLanding('LAND ON MARS');
+    const course = ctx.appCtx.setSolarSystemCourse?.('mars');
+    ctx.appCtx.showSpaceFlightMessage?.(
+      course?.accepted ? 'MARS COURSE SET · USE FLIGHT ASSIST OR FLY MANUALLY' : String(course?.reason || 'Mars course unavailable').replaceAll('-', ' ').toUpperCase(),
+      course?.accepted ? '#6fe8ff' : '#f59e0b'
+    );
     return;
   }
   ctx.appCtx.startSpaceFlightToMars?.();

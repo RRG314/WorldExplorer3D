@@ -200,7 +200,7 @@ function updateBlackHoleVisual(group, camera, elapsedSeconds) {
   model.lowerLens.rotateZ(Math.PI);
 }
 
-function updateBlackHoleEncounter(group, rocket, gravityVelocity, frameScale = 1) {
+function updateBlackHoleEncounter(group, rocket, spacecraftVelocity, frameSeconds = 1 / 60) {
   const model = group?.userData?.blackHole;
   if (!model || !rocket) return null;
   _toHole.copy(group.position).sub(rocket.position);
@@ -209,15 +209,19 @@ function updateBlackHoleEncounter(group, rocket, gravityVelocity, frameScale = 1
   const timeDilation = radiusInRs <= 1 ? 0 : Math.sqrt(Math.max(0, 1 - 1 / radiusInRs));
   const safeDistanceSq = Math.max(model.visualRadius * model.visualRadius, distance * distance);
   const massScale = Math.max(1, Math.log10(Number(model.entity.physical?.massSolar || 1)));
-  const acceleration = Math.min(0.052, massScale * 30 / safeDistanceSq);
-  if (gravityVelocity && distance > 0) {
-    gravityVelocity.addScaledVector(_toHole.multiplyScalar(1 / distance), acceleration * frameScale);
+  const accelerationPerSecond = Math.min(3.12, massScale * 1800 / safeDistanceSq);
+  if (spacecraftVelocity && distance > 0) {
+    spacecraftVelocity.addScaledVector(
+      _toHole.multiplyScalar(1 / distance),
+      accelerationPerSecond * Math.max(0, Number(frameSeconds) || 0)
+    );
   }
   return {
     captured: distance <= model.visualRadius,
     distance,
     distanceInRs: radiusInRs,
     timeDilation,
+    accelerationPerSecond,
     schwarzschildRadiusKm: model.schwarzschildRadiusKm,
     photonSphereRadiusKm: model.photonSphereRadiusKm,
     iscoRadiusKm: model.iscoRadiusKm

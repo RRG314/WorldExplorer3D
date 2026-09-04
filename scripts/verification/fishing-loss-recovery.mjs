@@ -51,8 +51,8 @@ try {
   }, null, { timeout: 300_000 });
   await page.waitForTimeout(4_000);
 
-  await page.locator('#exploreBtn').click();
-  await page.waitForSelector('#exploreMenu.open #fBoat', { timeout: 10_000 });
+  await page.locator('#travelBtn').click();
+  await page.waitForSelector('#travelMenu.open #fBoat', { timeout: 10_000 });
   await page.locator('#fBoat').click();
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().modes?.boat === true, null, { timeout: 30_000 });
   const boatEntry = await page.evaluate(() => {
@@ -67,7 +67,9 @@ try {
   assert.equal(boatEntry.started, true, `Could not enter boat through the shared-link gameplay path: ${JSON.stringify(boatEntry)}`);
 
   const recordsBefore = await catchRecordCount();
-  await page.locator('#fishingDockBtn').click();
+  await page.locator('#exploreBtn').click();
+  await page.waitForSelector('#exploreMenu.open #fFishing', { timeout: 10_000 });
+  await page.locator('#fFishing').click();
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().fishing?.open === true, null, { timeout: 30_000 });
   const catchesBefore = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().fishing?.catches || 0);
 
@@ -128,7 +130,9 @@ try {
   await page.screenshot({ path: 'output/release-evidence/current/fishing-teardown-recovery-mobile.png', fullPage: true });
   const recordsAfterClose = await catchRecordCount();
 
-  await page.locator('#fishingDockBtn').click();
+  await page.locator('#exploreBtn').click();
+  await page.waitForSelector('#exploreMenu.open #fFishing', { timeout: 10_000 });
+  await page.locator('#fFishing').click();
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().fishing?.open === true, null, { timeout: 10_000 });
   const reopened = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().fishing || {});
   await page.locator('#fishingCloseBtn').click();

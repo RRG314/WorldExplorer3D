@@ -4,18 +4,21 @@ import assert from 'node:assert/strict';
 import { compileAirportOperationalLayout } from '../app/js/transport/airport-layout.js';
 import { derivedFleet } from '../app/js/transport/aviation-runtime.js';
 import { getAviationCatalogEntry } from '../app/js/transport/aviation-catalog.js';
+import { aircraftVisualSpecification } from '../app/js/transport/aircraft-visual-recipe.js';
 import { integrateFixedWingFlight } from '../app/js/plane/flight-dynamics.js';
 import { integrateSkydivingDynamics } from '../app/js/urban-sandbox/parachute-model.js';
 import { createCivicResponseModel } from '../app/js/urban-sandbox/civic-response-model.js';
 import { normalizeProviderResult } from '../app/js/places/place-search.js';
 
-function record(id, type, points, attributes = {}) {
+function record(id, type, points, attributes = {}, options = {}) {
   return Object.freeze({
     id,
     type,
     domain: 'aviation',
     mapped: true,
-    geometry: Object.freeze({ kind: points.length > 1 ? 'path' : 'point', points: Object.freeze(points), complete: true }),
+    geometry: Object.freeze({ kind: options.kind || (points.length > 1 ? 'path' : 'point'), points: Object.freeze(points), complete: true }),
+    geometryAuthority: options.geometryAuthority || 'exact-openstreetmap',
+    exactPhysicalGeometry: points.length > 1,
     attributes: Object.freeze(attributes),
     provenance: Object.freeze({ provider: 'test-map', license: 'ODbL-1.0' })
   });
@@ -29,29 +32,41 @@ function graph(records) {
   });
 }
 
-test('one airport layout supplies runway, stands, tower, and ticket hall without inventing mapped provenance', () => {
-  const source = graph([record('mapped:aerodrome', 'aerodrome', [{ x: 20, z: -10 }])]);
-  const layout = compileAirportOperationalLayout(source, { location: { name: 'Test Airport' }, mobile: false });
-  const mobileLayout = compileAirportOperationalLayout(source, { location: { name: 'Test Airport' }, mobile: true });
-  assert.equal(layout.authority, 'compiled-airport-operational-layout');
-  assert.equal(layout.mappedRunway, false);
-  assert.equal(layout.primaryRunway.mapped, false);
-  assert.equal(layout.primaryRunway.provenance.provider, 'World Explorer gameplay layout');
-  assert.equal(layout.stands.length, 14);
-  assert.equal(layout.ticketCounter.mapped, false);
-  assert.ok(Number.isFinite(layout.ticketCounter.entrance.x));
-  assert.equal(mobileLayout.mobile, true);
-  assert.equal(mobileLayout.stands.length, 7);
+test('generalized airport points remain informational and cannot publish physical airport infrastructure', () => {
+  const generalized = record('shortbread:aerodrome', 'aerodrome', [{ x: 20, z: -10 }], {}, {
+    geometryAuthority: 'generalized-vector'
+  });
+  const source = graph([generalized]);
+  assert.equal(compileAirportOperationalLayout(source, { location: { name: 'Test Airport' } }), null);
+  assert.deepEqual(derivedFleet(source, { mobile: false }), []);
+});
+
+test('standalone helipads never authorize a generated runway or fixed-wing airport fleet', () => {
+  const source = graph([
+    record('mapped:hospital-pad', 'helipad', [{ x: 20, z: -10 }]),
+    record('mapped:rooftop-pad', 'helipad', [{ x: -40, z: 35 }])
+  ]);
+  const layout = compileAirportOperationalLayout(source, { location: { name: 'Downtown' }, mobile: false });
+  assert.equal(layout, null);
+  assert.deepEqual(derivedFleet(source, { airportLayout: layout, mobile: false }), []);
 });
 
 test('mapped runway geometry remains the operational runway and dense fleet uses its stands', () => {
   const source = graph([
     record('mapped:runway', 'runway', [{ x: 0, z: -600 }, { x: 0, z: 600 }], { width: 46, ref: '15/33' }),
-    record('mapped:apron', 'apron', [{ x: 100, z: 0 }])
+    record('mapped:apron', 'apron', [
+      { x: 65, z: -260 }, { x: 240, z: -260 }, { x: 240, z: 260 }, { x: 65, z: 260 }, { x: 65, z: -260 }
+    ], {}, { kind: 'polygon' }),
+    record('mapped:stand:1', 'parking_position', [{ x: 120, z: -90 }]),
+    record('mapped:stand:2', 'parking_position', [{ x: 120, z: 90 }])
   ]);
   const layout = compileAirportOperationalLayout(source, { mobile: false });
   const fleet = derivedFleet(source, { airportLayout: layout, mobile: false });
   assert.equal(layout.primaryRunway.id, 'mapped:runway');
+  assert.equal(layout.generatedFallback, false);
+  assert.equal(layout.tower.generatedActivity, true);
+  assert.ok(layout.tower.x >= 65 && layout.tower.x <= 240);
+  assert.ok(layout.tower.z >= -260 && layout.tower.z <= 260);
   assert.equal(layout.runwayDesignator, '15/33');
   assert.equal(fleet.length, layout.stands.length);
   assert.equal(new Set(fleet.map(({ id }) => id)).size, fleet.length);
@@ -66,7 +81,10 @@ test('airport scale preserves presentation quality without putting international
   const majorSource = graph([
     record('major:runway:1', 'runway', [{ x: 0, z: -1400 }, { x: 0, z: 1400 }], { width: 50 }),
     record('major:runway:2', 'runway', [{ x: -300, z: -1300 }, { x: -300, z: 1300 }], { width: 50 }),
-    record('major:terminal', 'terminal', [{ x: 180, z: 0 }])
+    record('major:terminal', 'terminal', [{ x: 180, z: 0 }]),
+    record('major:apron', 'apron', [
+      { x: 70, z: -520 }, { x: 520, z: -520 }, { x: 520, z: 520 }, { x: 70, z: 520 }, { x: 70, z: -520 }
+    ], {}, { kind: 'polygon' })
   ]);
   const major = compileAirportOperationalLayout(majorSource, { location: { name: 'Example International Airport' } });
   const majorFleet = derivedFleet(majorSource, { airportLayout: major });
@@ -74,7 +92,12 @@ test('airport scale preserves presentation quality without putting international
   assert.equal(major.stands.length, 18);
   assert.ok(majorFleet.some(({ catalog }) => catalog.id === 'long-range-airliner'));
 
-  const localSource = graph([record('local:aerodrome', 'aerodrome', [{ x: 0, z: 0 }])]);
+  const localSource = graph([
+    record('local:runway', 'runway', [{ x: 0, z: -320 }, { x: 0, z: 320 }], { width: 28 }),
+    record('local:apron', 'apron', [
+      { x: 45, z: -160 }, { x: 180, z: -160 }, { x: 180, z: 160 }, { x: 45, z: 160 }, { x: 45, z: -160 }
+    ], {}, { kind: 'polygon' })
+  ]);
   const providerClassifiedMajor = compileAirportOperationalLayout(localSource, {
     location: { name: 'Heathrow Airport', locationDetails: { airportClass: 'international' } }
   });
@@ -95,10 +118,13 @@ test('place search retains mapped airport classification for the world session',
     type: 'aerodrome',
     name: 'London Heathrow Airport',
     display_name: 'London Heathrow Airport, United Kingdom',
+    boundingbox: ['51.45', '51.49', '-0.51', '-0.41'],
     extratags: { aerodrome: 'international', iata: 'LHR', icao: 'EGLL' },
     address: { country: 'United Kingdom', country_code: 'gb' }
   }, 0);
   assert.equal(result.airportClass, 'international');
+  assert.equal(result.isAirport, true);
+  assert.deepEqual(result.airportBounds, { minLat: 51.45, maxLat: 51.49, minLon: -0.51, maxLon: -0.41 });
   assert.equal(result.iata, 'LHR');
   assert.equal(result.icao, 'EGLL');
   assert.equal(result.kindLabel, 'Airport');
@@ -108,6 +134,10 @@ test('personal aircraft is an aerobatic jet with a continuous loop flight path',
   const jet = getAviationCatalogEntry('personal-prop');
   assert.equal(jet.role, 'aerobatic');
   assert.match(jet.label, /aerobatic jet/i);
+  const visual = aircraftVisualSpecification(jet, { mobile: false });
+  assert.equal(visual.engineCount, 2);
+  assert.equal(visual.canopyKind, 'flush-fuselage-panels');
+  assert.equal(visual.passengerWindowCount, 0);
   const top = integrateFixedWingFlight({ speed: 75, flightPathAngle: 1.45, pitch: Math.PI / 2, pitchRate: 1 }, { throttle: .85, powerFactor: 1, topSpeed: 150 }, jet, .05);
   const inverted = integrateFixedWingFlight({ speed: top.speed, flightPathAngle: 3.05, pitch: Math.PI, pitchRate: 1 }, { throttle: .85, powerFactor: 1, topSpeed: 150 }, jet, .05);
   assert.ok(top.climbRate > 0, 'top quarter of loop climbs');
@@ -142,4 +172,22 @@ test('civic response holds pursuit while responders see the actor and searches t
   for (let index = 0; index < 8; index += 1) snapshot = model.update(.25, { x: 70, z: 70 }, { detected: false });
   assert.equal(snapshot.pursuit, false);
   assert.equal(snapshot.status.title, 'Searching last known area');
+});
+
+test('an approaching response receives bounded arrival time without making incidents permanent', () => {
+  const model = createCivicResponseModel();
+  model.observe({ kind: 'assault', severity: 2, position: { x: 4, z: 8 } }, [{ id: 'witness:1', distance: 4 }]);
+  for (let index = 0; index < 25; index += 1) model.update(.25, { x: 4, z: 8 });
+  assert.equal(model.snapshot().phase, 'searching');
+
+  const beforeArrival = model.snapshot().phaseRemaining;
+  for (let index = 0; index < 40; index += 1) {
+    model.update(.25, { x: 4, z: 8 }, { responseEnRoute: true });
+  }
+  const duringArrival = model.snapshot();
+  assert.equal(duringArrival.phase, 'searching');
+  assert.ok(beforeArrival - duringArrival.phaseRemaining < 4, 'active response uses the bounded slow-decay arrival window');
+
+  for (let index = 0; index < 220; index += 1) model.update(.25, { x: 4, z: 8 });
+  assert.equal(model.snapshot().phase, 'clear', 'an abandoned response still reaches clear');
 });

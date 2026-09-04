@@ -59,6 +59,77 @@ test('landing target normalization follows the canonical body catalog', () => {
   assert.equal(normalizeLandingTargetName('not-a-world'), null);
 });
 
+test('Set Course starts one assisted journey from free flight and keeps that journey for the selected destination', () => {
+  const position = (x, y, z) => ({ x, y, z, set(nx, ny, nz) { this.x = nx; this.y = ny; this.z = nz; } });
+  const marsMesh = { position: position(260, 35, -20) };
+  const appContext = {
+    getAllSpaceBodies() {
+      return [{ name: 'Mars', mesh: marsMesh, position: marsMesh.position, radius: 28, landable: true }];
+    },
+    spaceFlight: {
+      active: true,
+      earth: { position: position(0, 0, 0) },
+      moon: { position: position(120, 20, 0) },
+      rocket: { position: position(58, 0, 0) },
+      velocity: position(0, 0, 0),
+      speed: 0,
+      mode: 'flying',
+      _nearestBody: { name: 'Earth' }
+    }
+  };
+  const runtime = installSpaceJourneyRuntime(appContext);
+  const selected = runtime.setSolarSystemCourse('mars');
+  assert.equal(selected.accepted, true, selected.reason);
+  assert.equal(selected.initialized, true);
+  assert.equal(appContext.spaceJourney.sourceBodyId, 'earth');
+  assert.equal(appContext.spaceJourney.destinationBodyId, 'mars');
+  assert.equal(appContext.spaceJourney.mode, JOURNEY_MODE.ASSISTED);
+  assert.equal(appContext.spaceJourneyAssistState.available, true);
+  const journeyId = appContext.spaceJourney.journeyId;
+
+  const selectedAgain = runtime.setSolarSystemCourse('mars');
+  assert.equal(selectedAgain.accepted, true, selectedAgain.reason);
+  assert.equal(selectedAgain.continued, true);
+  assert.equal(appContext.spaceJourney.journeyId, journeyId);
+
+  assert.equal(runtime.engageRenderedJourneyAssist().accepted, true);
+  advanceUntil(runtime, appContext, JOURNEY_PHASE.APPROACH, 400);
+  const approachCourse = runtime.setSolarSystemCourse('mars');
+  assert.equal(approachCourse.accepted, true, approachCourse.reason);
+  assert.equal(approachCourse.continued, true);
+  assert.equal(appContext.spaceJourney.phase, JOURNEY_PHASE.APPROACH);
+  assert.equal(appContext.spaceJourney.journeyId, journeyId);
+});
+
+test('interstellar handoff releases the local journey before another controller owns the craft', () => {
+  const position = (x, y, z) => ({ x, y, z, set(nx, ny, nz) { this.x = nx; this.y = ny; this.z = nz; } });
+  const appContext = {
+    spaceFlight: {
+      active: true,
+      earth: { position: position(0, 0, 0) },
+      moon: { position: position(120, 20, 0) },
+      rocket: { position: position(58, 0, 0) },
+      velocity: position(0, 0, 0),
+      speed: 0,
+      mode: 'flying'
+    }
+  };
+  const runtime = installSpaceJourneyRuntime(appContext);
+  assert.equal(runtime.beginRenderedSpaceJourney({
+    sourceBodyId: 'earth',
+    destinationBodyId: 'moon',
+    mode: JOURNEY_MODE.MANUAL
+  }), true);
+  assert.equal(runtime.updateRenderedSpaceJourney({ realDtS: 0.1 }), true);
+  assert.equal(runtime.releaseRenderedJourneyToManualFlight(), true);
+  assert.equal(runtime.updateRenderedSpaceJourney({ realDtS: 0.1 }), false);
+  assert.equal(appContext.spaceJourney, null);
+  assert.equal(appContext.spacecraftState, null);
+  assert.equal(appContext.spaceJourneyEphemeris, null);
+  assert.equal(appContext.spaceJourneyAssistState.active, false);
+  assert.equal(appContext.spaceJourneyAssistState.available, false);
+});
+
 test('Earth-Moon journey cannot skip evidence-gated phases', () => {
   let journey = createSpaceJourney({
     sourceBodyId: 'earth',
@@ -312,7 +383,7 @@ test('rendered journey controller makes the mesh a presentation of fuel-accounte
   assert.equal(appContext.spaceFlight.manualFlightRate, 100);
 });
 
-test('classic manual flight can take presentation ownership without a second position authority', () => {
+test('manual input cancels assist without creating a second position authority', () => {
   const position = (x, y, z) => ({
     x, y, z,
     set(nx, ny, nz) { this.x = nx; this.y = ny; this.z = nz; }
@@ -332,13 +403,17 @@ test('classic manual flight can take presentation ownership without a second pos
   });
   const scenePosition = { ...appContext.spaceFlight.rocket.position };
 
-  assert.equal(runtime.releaseRenderedJourneyToManualFlight(), true);
-  assert.equal(appContext.spaceFlight.presentationAuthority, 'classic');
-  assert.equal(appContext.spaceJourney, null);
-  assert.equal(appContext.spacecraftState, null);
-  assert.equal(appContext.spaceJourneyEphemeris, null);
-  assert.deepEqual(appContext.spaceFlight.rocket.position, scenePosition);
-  assert.equal(runtime.updateRenderedSpaceJourney({ realDtS: 0.1, throttle: 1 }), false);
+  assert.equal(runtime.updateRenderedSpaceJourney({
+    realDtS: 0.1,
+    throttle: 1,
+    thrustDirection: { x: 1, y: 0, z: 0 },
+    manualControl: true
+  }), true);
+  assert.equal(appContext.spaceFlight.presentationAuthority, 'si');
+  assert.ok(appContext.spaceJourney, 'manual takeover must preserve the active journey');
+  assert.ok(appContext.spacecraftState, 'manual takeover must preserve the authoritative spacecraft state');
+  assert.ok(appContext.spaceJourneyEphemeris, 'manual takeover must preserve the journey frame');
+  assert.notDeepEqual(appContext.spaceFlight.rocket.position, scenePosition);
 });
 
 test('rendered journey follows live body positions without changing physical spacecraft state', () => {

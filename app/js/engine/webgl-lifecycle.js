@@ -40,6 +40,7 @@ export function disposeThreeObjectTree(root) {
 
 export function disposeThreeRenderer(renderer) {
   if (!renderer) return null;
+  const canvas = renderer.domElement || null;
   try {
     renderer.setAnimationLoop?.(null);
   } catch {
@@ -54,6 +55,14 @@ export function disposeThreeRenderer(renderer) {
     renderer.dispose?.();
   } catch {
     // Ignore renderer disposal issues.
+  }
+  // Auxiliary Space, Ocean, and globe renderers are recreated on their
+  // existing canvas after an environment is entered again. Collapse the
+  // drawing buffer so an inactive full-screen renderer does not retain it,
+  // but keep the canvas context reusable for the next entry.
+  if (canvas) {
+    canvas.width = 1;
+    canvas.height = 1;
   }
   return null;
 }

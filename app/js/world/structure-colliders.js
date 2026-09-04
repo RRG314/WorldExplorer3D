@@ -5,7 +5,7 @@ import {
 import {
   addBuildingToSpatialIndex,
   removeBuildingsFromSpatialIndex
-} from "./building-spatial-index.js?v=6";
+} from "./building-spatial-index.js?v=7";
 
 const STRUCTURE_COLLIDER_POLICY = 'actor-height-bounded-lossless-tunnel-side-walls';
 

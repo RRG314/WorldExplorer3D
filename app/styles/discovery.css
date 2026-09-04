@@ -83,6 +83,16 @@ body:has(#urbanVehiclePrompt.show) #discoveryContextPrompt,body:has(#interiorPro
   .discoveryProfileHero span{display:block;color:#78909f;font:700 7px Orbitron,sans-serif;letter-spacing:.08em;text-transform:uppercase}
   .discoveryProfileHero strong{display:block;margin-top:5px;color:#e7f0f5;font:700 16px Orbitron,sans-serif;text-transform:uppercase}
   .discoveryProfileHero small,.discoveryProfileStrengths b{display:block;margin-top:5px;color:#91a3ae;font-size:9px}
+  .discoveryJourneyOverview{margin:0 0 12px;overflow:hidden;border:1px solid #293b48;background:#071018;box-shadow:0 12px 28px rgba(0,0,0,.18)}
+  .discoveryJourneyIntro{position:relative;padding:13px 14px 12px 16px;border-left:3px solid var(--wx-green);background:linear-gradient(110deg,rgba(53,210,114,.12),rgba(7,16,24,.96) 76%)}
+  .discoveryJourneyIntro::after{content:'⌖';position:absolute;right:14px;top:13px;width:34px;height:34px;display:grid;place-items:center;border:1px solid rgba(86,214,137,.22);border-radius:50%;box-shadow:inset 0 0 0 8px rgba(86,214,137,.035);color:rgba(120,221,160,.55);font:400 18px/1 Inter,sans-serif}
+  .discoveryJourneyIntro span,.discoveryJourneyIntro strong,.discoveryJourneyIntro small{display:block}.discoveryJourneyIntro span{color:#79dda0;font:700 7px Orbitron,sans-serif;letter-spacing:.11em}.discoveryJourneyIntro strong{margin-top:4px;color:#edf6f1;font:700 12px Orbitron,sans-serif;text-transform:uppercase}.discoveryJourneyIntro small{max-width:86%;margin-top:5px;color:#9aadb6;font-size:9px}.discoveryJourneyIntro b{display:inline-block;margin-top:8px;color:#bdeacf;font:700 7px Orbitron,sans-serif;letter-spacing:.06em;text-transform:uppercase}
+  .discoveryJourneyRoutes{display:grid;gap:1px;background:var(--wx-line-soft)}
+  .discoveryJourneyRoutes button{position:relative;display:grid;grid-template-columns:32px minmax(0,1fr) auto 12px;align-items:center;column-gap:10px;min-height:64px;border:0;padding:9px 11px;background:#09131b;color:#dce7ed;text-align:left;cursor:pointer;transition:background .14s ease}
+  .discoveryJourneyRoutes button:hover,.discoveryJourneyRoutes button:focus-visible{outline:1px solid var(--wx-blue);outline-offset:-1px;background:#0d1b26}.discoveryJourneyRoutes button.suggested{background:linear-gradient(90deg,rgba(53,210,114,.09),#09131b 42%);box-shadow:inset 2px 0 var(--wx-green)}
+  .discoveryJourneyRouteIcon{display:grid;place-items:center;width:30px;height:30px;border:1px solid #314b5e;border-radius:50%;color:#8fb5d0;background:#0a1822;font-style:normal}.discoveryJourneyRouteIcon svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}.suggested .discoveryJourneyRouteIcon{border-color:rgba(83,212,134,.45);color:#82daa5;background:rgba(53,210,114,.07)}
+  .discoveryJourneyRouteCopy{min-width:0}.discoveryJourneyRouteCopy strong{display:block;color:#e4edf2;font:700 9px Orbitron,sans-serif;text-transform:uppercase}.discoveryJourneyRouteCopy small{display:block;margin-top:4px;color:#8597a2;font:500 9px/1.3 Inter,sans-serif}
+  .discoveryJourneyRouteStatus{color:#7fa8e4;font:700 7px Orbitron,sans-serif;text-transform:uppercase;white-space:nowrap}.discoveryJourneyRouteArrow{color:#607889;font:400 18px/1 Inter,sans-serif;font-style:normal}.discoveryJourneyRoutes button:hover .discoveryJourneyRouteArrow{color:#9fc8ff;transform:translateX(1px)}
   .discoveryProfileGroup{width:100%;box-sizing:border-box;margin-top:7px}
   .discoveryProfileGroupGrid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
   .discoveryProgressGrid{display:block}
@@ -98,7 +108,7 @@ body:has(#urbanVehiclePrompt.show) #discoveryContextPrompt,body:has(#interiorPro
     #discoveryPanel{right:6px;height:min(74dvh,680px)}
     .discoveryHead{height:58px;padding:0 9px 0 11px}
     .discoveryHeadActions{gap:4px}
-    .discoveryProfileBtn{min-width:0;width:74px;height:32px;padding:0 5px;gap:4px}
+    .discoveryProfileBtn{min-width:0;width:86px;height:32px;padding:0 5px 0 7px;gap:4px}
     .discoveryProfileBtn span{font-size:6px}
     .discoveryProfileBtn b{min-width:20px;height:20px;font-size:8px}
     #discoveryCloseBtn,#discoveryHelpBtn{width:32px;height:32px}
@@ -115,6 +125,7 @@ body:has(#urbanVehiclePrompt.show) #discoveryContextPrompt,body:has(#interiorPro
     .discoveryBackpackEntry{grid-template-columns:26px minmax(0,1fr);margin-top:8px}.discoveryBackpackEntry>small{grid-column:2}
     .discoveryProfileHero{grid-template-columns:1fr}
     .discoveryProfileHero>div:first-child{grid-row:auto}
+    .discoveryJourneyRoutes button{grid-template-columns:30px minmax(0,1fr) 12px;grid-template-rows:auto auto;min-height:70px;padding:9px 10px;column-gap:9px;row-gap:4px}.discoveryJourneyRouteCopy{grid-column:2;grid-row:1}.discoveryJourneyRouteStatus{grid-column:2;grid-row:2;display:block}.discoveryJourneyRouteArrow{grid-column:3;grid-row:1/3}.discoveryJourneyRouteIcon{grid-column:1;grid-row:1/3}.discoveryJourneyIntro small{max-width:88%}
     .discoveryProfileGroupGrid{grid-template-columns:1fr}
     .discoveryGuideOverview{grid-template-columns:1fr 1fr}
     .discoveryGuideOverview article:last-child{grid-column:1/-1}

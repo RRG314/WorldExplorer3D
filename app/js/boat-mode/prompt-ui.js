@@ -26,11 +26,12 @@ export function createBoatPromptUi({ appCtx, getSeaStateConfig, getWaveIntensity
   function updateBoatMenuUi() {
     ensureBoatPromptRefs();
     if (boatButton) {
-      const visible = !!(appCtx.boatMode?.active || appCtx.boatMode?.available || appCtx.oceanMode?.active);
-      boatButton.style.display = visible ? '' : 'none';
       boatButton.textContent = appCtx.boatMode?.active ? '⛴ Exit Vessel' : appCtx.oceanMode?.active ? '🚤 Surface Boat' : '🚤 Boat Mode';
-      boatButton.classList.toggle('on', !!appCtx.boatMode?.active);
     }
+    // Travel owns mode-item availability and the hidden/display pair. Keeping
+    // a second visibility writer here allowed a stale hidden attribute to win
+    // even after the boat runtime had found a valid nearby vessel.
+    appCtx.syncTravelModeButtons?.();
     if (seaStateButton) {
       seaStateButton.style.display = appCtx.boatMode?.active ? '' : 'none';
       seaStateButton.textContent = `🌊 Sea State: ${getSeaStateConfig().label}`;

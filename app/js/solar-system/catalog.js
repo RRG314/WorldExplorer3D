@@ -2,7 +2,7 @@ import {
   getAstronomicalBody,
   METERS_PER_AU,
   SOLAR_SYSTEM_PLANET_IDS
-} from '../astronomy/body-catalog.js?v=2';
+} from '../astronomy/body-catalog.js?v=3';
 
 // Immutable solar-system rendering/orbit projection. Canonical body facts live
 // in astronomy/body-catalog.js; this module owns orbit approximation and visual

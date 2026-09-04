@@ -99,6 +99,11 @@ function normalizeProviderResult(result, index) {
   const category = String(result.category || result.class || 'place');
   const type = String(result.type || 'place');
   const water = category === 'natural' && ['bay', 'strait', 'sea', 'water'].includes(type);
+  const isAirport = category === 'aeroway' || type === 'aerodrome';
+  const rawBounds = Array.isArray(result.boundingbox) ? result.boundingbox.map(Number) : [];
+  const airportBounds = isAirport && rawBounds.length === 4 && rawBounds.every(Number.isFinite)
+    ? Object.freeze({ minLat: rawBounds[0], maxLat: rawBounds[1], minLon: rawBounds[2], maxLon: rawBounds[3] })
+    : null;
   const kindLabel = category === 'aeroway' || type === 'aerodrome' ? 'Airport' :
     category === 'place' ? (type === 'city' ? 'City' : type === 'town' ? 'Town' : 'Place') :
     type.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -114,7 +119,9 @@ function normalizeProviderResult(result, index) {
     region: firstText(address.state, address.region, address.county),
     country: firstText(address.country),
     countryCode: String(address.country_code || '').toLowerCase(),
-    airportClass: category === 'aeroway' || type === 'aerodrome'
+    isAirport,
+    airportBounds,
+    airportClass: isAirport
       ? firstText(extra.aerodrome, extra['aerodrome:type'], extra.passenger)
       : '',
     iata: String(extra.iata || '').trim().toUpperCase(),
