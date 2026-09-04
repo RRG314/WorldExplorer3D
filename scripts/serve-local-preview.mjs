@@ -38,6 +38,8 @@ const mime = new Map([
   ['.jpeg', 'image/jpeg'],
   ['.svg', 'image/svg+xml'],
   ['.webp', 'image/webp'],
+  ['.mp4', 'video/mp4'],
+  ['.webm', 'video/webm'],
   ['.ico', 'image/x-icon'],
   ['.map', 'application/json; charset=utf-8'],
   ['.glb', 'model/gltf-binary']
