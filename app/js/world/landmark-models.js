@@ -5,6 +5,7 @@ import { createMeasuredElizabethTower } from './elizabeth-tower-structure.js?v=1
 import { createMeasuredKhufuPyramid } from './giza-pyramid-structure.js?v=3';
 import { createMeasuredTenLightStreet } from './ten-light-street-structure.js?v=1';
 import { createMeasuredCommercePlace } from './commerce-place-structure.js?v=1';
+import { loadModelAssetInstance } from '../assets/model-asset-runtime.js?v=1';
 
 function disposeModel(root) {
   root?.traverse?.((object) => {
@@ -84,41 +85,6 @@ function hideGenericVisuals(landmark, world) {
   }
 }
 
-function loadModel(url, signal = null) {
-  return new Promise((resolve, reject) => {
-    if (!THREE.GLTFLoader) {
-      reject(new Error('GLTFLoader is unavailable'));
-      return;
-    }
-    let settled = false;
-    let request = null;
-    const cleanup = () => signal?.removeEventListener?.('abort', abort);
-    const complete = (callback, value) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      callback(value);
-    };
-    const abort = () => {
-      request?.abort?.();
-      complete(reject, signal?.reason instanceof Error
-        ? signal.reason
-        : new DOMException(String(signal?.reason || 'Landmark model load aborted'), 'AbortError'));
-    };
-    if (signal?.aborted) {
-      abort();
-      return;
-    }
-    signal?.addEventListener?.('abort', abort, { once: true });
-    request = new THREE.GLTFLoader().load(
-      url,
-      (gltf) => complete(resolve, gltf.scene),
-      undefined,
-      (error) => complete(reject, error)
-    );
-  });
-}
-
 async function loadCuratedLandmark(landmark, isActiveLoadContext, signal = null) {
   let model;
   if (landmark.builder === 'measured-eiffel-tower') model = createMeasuredEiffelTower();
@@ -126,7 +92,16 @@ async function loadCuratedLandmark(landmark, isActiveLoadContext, signal = null)
   else if (landmark.builder === 'measured-khufu-pyramid') model = createMeasuredKhufuPyramid();
   else if (landmark.builder === 'measured-ten-light-street') model = createMeasuredTenLightStreet();
   else if (landmark.builder === 'measured-commerce-place') model = createMeasuredCommercePlace();
-  else model = await loadModel(landmark.modelUrl, signal);
+  else {
+    const instance = await loadModelAssetInstance(THREE, landmark.assetId, {
+      signal,
+      name: `${landmark.name} curated source model`,
+      qualityTier: 'promoted',
+      receiveShadow: true
+    });
+    model = instance.root;
+    model.userData.curatedAssetRelease = instance.release;
+  }
   if (!isActiveLoadContext?.()) {
     disposeModel(model);
     return null;

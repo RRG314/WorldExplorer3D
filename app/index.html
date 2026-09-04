@@ -22,7 +22,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <script src="../js/firebase-project-config.js"></script>
 <style>@layer legacy, interface;</style>
 <link rel="stylesheet" href="styles/title-shell.css?v=95">
-<link rel="stylesheet" href="styles/runtime-shell.css?v=121">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=122">
 <link rel="stylesheet" href="styles/block-builder.css?v=8">
 <link rel="stylesheet" href="styles/universe.css?v=8">
 <link rel="stylesheet" href="styles/fishing-game.css?v=6">
@@ -843,6 +843,12 @@ How Connected Data Is Used
 </div>
 <aside id="urbanEquipment" aria-hidden="true" aria-label="Character Backpack">
   <div class="urbanEquipmentHead"><span>Backpack</span><div><small>I to close · 1–6 quick equip</small><button id="urbanEquipmentCloseBtn" type="button" aria-label="Close Backpack">×</button></div></div>
+  <div class="urbanBackpackLabel">Your Explorer</div>
+  <div id="urbanAppearanceChoices" class="urbanAppearanceChoices" role="group" aria-label="Choose your Explorer">
+    <button type="button" data-explorer-appearance="trail-hoodie"><strong>Trail Hoodie</strong><span>Hoodie and day pack</span></button>
+    <button type="button" data-explorer-appearance="field-jacket"><strong>Field Jacket</strong><span>Jacket and survey pack</span></button>
+    <button type="button" data-explorer-appearance="city-explorer"><strong>City Explorer</strong><span>Light shell and camera pack</span></button>
+  </div>
   <div class="urbanBackpackLabel">Quick access</div>
   <div id="urbanEquipmentSlots" class="urbanEquipmentSlots"></div>
   <div class="urbanBackpackLabel">Pack contents</div>

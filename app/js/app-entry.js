@@ -8,7 +8,7 @@ import { ctx as appCtx } from './shared-context.js?v=55';
 import { createAccountService } from './platform/account-service.js?v=1';
 import { createPlatformServiceRegistry } from './platform/service-registry.js?v=1';
 import { scheduleAfterFirstPlay } from './runtime/workload-policy.js?v=1';
-import './runtime-diagnostics.js?v=76';
+import './runtime-diagnostics.js?v=78';
 import './ui/legal-attribution.js?v=1';
 import './state.js?v=65';
 import './camera-mode.js?v=1';
@@ -26,7 +26,7 @@ import './planetary/scene-ownership.js?v=9';
 import './real-estate.js?v=55';
 import { init, tryEnablePostProcessing } from './engine.js?v=95';
 import './physics.js?v=127';
-import './walking.js?v=91';
+import './walking.js?v=92';
 import './travel-mode.js?v=27';
 import { initBoatMode } from './boat-mode.js?v=58';
 import './sky.js?v=89';
@@ -45,12 +45,12 @@ import './planetary/moon-sky.js?v=1';
 import './planetary/tracks.js?v=2';
 import './planetary/field-activities.js?v=10';
 import './game.js?v=67';
-import './input.js?v=75';
+import './input.js?v=76';
 import './hud.js?v=103';
 import './map.js?v=61';
 import { renderLoop } from './main.js?v=75';
 import './memory.js?v=55';
-import { setupUI } from './ui.js?v=166';
+import { setupUI } from './ui.js?v=167';
 import { initAccessibility } from './ui/accessibility.js?v=1';
 
 let _booted = false;
@@ -153,7 +153,7 @@ function ensurePlatformService(id) {
 
 function ensureInteriorsReady() {
     if (!_interiorsModulePromise) {
-        _interiorsModulePromise = import('./interiors.js?v=22').catch((error) => {
+        _interiorsModulePromise = import('./interiors.js?v=23').catch((error) => {
             _interiorsModulePromise = null;
             throw error;
         });

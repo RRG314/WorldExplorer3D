@@ -743,28 +743,48 @@ function addCrewMember(group, post, crew) {
   box(root, { x: 0.5, y: 0.07, z: 0.045 }, { x: 0, y: 1.43, z: -0.225 }, accent, `${crewId}:service-stripe`);
   [-0.24, 0.24].forEach((x, index) => box(root, { x: 0.18, y: 0.08, z: 0.07 }, { x, y: 1.64, z: -0.2 }, index ? trim : accent, `${crewId}:collar-tab`));
 
-  const legs = [-0.22, 0.22].map((x, index) => addCrewPart(root, new THREE.CylinderGeometry(0.105, 0.12, 0.72, 10), secondary, `${crewId}:leg:${index}`, { x, y: 0.42, z: 0 }));
-  [-0.22, 0.22].forEach((x, index) => addCrewPart(root, createBeveledVehicleBoxGeometry(THREE, 0.24, 0.19, 0.38, 0.05), dark, `${crewId}:boot:${index}`, { x, y: 0.09, z: -0.06 }));
+  const legs = [-0.22, 0.22].map((x, index) => {
+    const leg = addCrewPart(root, new THREE.CylinderGeometry(0.105, 0.12, 0.72, 14), secondary, `${crewId}:leg:${index}`, { x, y: 0.42, z: 0 });
+    addCrewPart(leg, new THREE.SphereGeometry(0.11, 12, 8), secondary, `${crewId}:knee:${index}`, { x: 0, y: -0.25, z: -0.035 }, { x: 1, y: 0.82, z: 0.72 });
+    return leg;
+  });
+  [-0.22, 0.22].forEach((x, index) => {
+    addCrewPart(root, createBeveledVehicleBoxGeometry(THREE, 0.24, 0.19, 0.38, 0.05), dark, `${crewId}:boot:${index}`, { x, y: 0.09, z: -0.06 });
+    box(root, { x: 0.22, y: 0.035, z: 0.41 }, { x, y: -0.015, z: -0.075 }, trim, `${crewId}:boot-sole:${index}`);
+  });
   const arms = [-1, 1].map((side, index) => {
     const armRoot = new THREE.Group();
     armRoot.name = `${crewId}:arm:${index}`;
     armRoot.position.set(side * 0.47, 1.48, 0);
-    addCrewPart(armRoot, new THREE.CylinderGeometry(0.085, 0.1, 0.58, 10), uniform, `${crewId}:upper-arm:${index}`, { x: 0, y: -0.25, z: 0 }, null, { z: side * -0.08 });
-    addCrewPart(armRoot, new THREE.CylinderGeometry(0.075, 0.085, 0.46, 10), secondary, `${crewId}:forearm:${index}`, { x: 0, y: -0.72, z: -0.02 });
-    addCrewPart(armRoot, new THREE.SphereGeometry(0.1, 12, 8), skin, `${crewId}:hand:${index}`, { x: 0, y: -0.99, z: -0.02 });
+    addCrewPart(armRoot, new THREE.SphereGeometry(0.13, 12, 8), uniform, `${crewId}:shoulder:${index}`, { x: 0, y: -0.02, z: 0 }, { x: 0.82, y: 1, z: 1 });
+    addCrewPart(armRoot, new THREE.CylinderGeometry(0.085, 0.1, 0.58, 14), uniform, `${crewId}:upper-arm:${index}`, { x: 0, y: -0.25, z: 0 }, null, { z: side * -0.08 });
+    addCrewPart(armRoot, new THREE.SphereGeometry(0.09, 12, 8), secondary, `${crewId}:elbow:${index}`, { x: 0, y: -0.49, z: -0.015 });
+    addCrewPart(armRoot, new THREE.CylinderGeometry(0.075, 0.085, 0.46, 14), secondary, `${crewId}:forearm:${index}`, { x: 0, y: -0.72, z: -0.02 });
+    addCrewPart(armRoot, new THREE.SphereGeometry(0.1, 14, 9), skin, `${crewId}:hand:${index}`, { x: 0, y: -0.99, z: -0.02 });
     root.add(armRoot);
     return armRoot;
   });
 
   addCrewPart(root, new THREE.CylinderGeometry(0.1, 0.12, 0.16, 12), skin, `${crewId}:neck`, { x: 0, y: 1.79, z: 0 });
-  addCrewPart(root, new THREE.SphereGeometry(0.25, 20, 14), skin, `${crewId}:head`, { x: 0, y: 2.02, z: 0 }, { x: 0.92, y: 1.08, z: 0.9 });
-  addCrewPart(root, new THREE.SphereGeometry(0.255, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.52), hair, `${crewId}:hair`, { x: 0, y: 2.12, z: 0.015 }, { x: 0.96, y: 0.8, z: 0.94 });
-  [-0.085, 0.085].forEach((x, index) => addCrewPart(root, new THREE.SphereGeometry(0.018, 8, 6), dark, `${crewId}:eye:${index}`, { x, y: 2.045, z: -0.223 }));
-  addCrewPart(root, new THREE.ConeGeometry(0.035, 0.09, 8), skin, `${crewId}:nose`, { x: 0, y: 1.995, z: -0.245 }, null, { x: Math.PI / 2 });
-  box(root, { x: 0.28, y: 0.045, z: 0.025 }, { x: 0, y: 1.92, z: -0.235 }, material(0x6e3c35, { roughness: 0.88, metalness: 0 }), `${crewId}:mouth`);
+  addCrewPart(root, new THREE.SphereGeometry(0.25, 22, 16), skin, `${crewId}:head`, { x: 0, y: 2.02, z: 0 }, { x: 0.92, y: 1.08, z: 0.9 });
+  addCrewPart(root, new THREE.SphereGeometry(0.205, 18, 12), skin, `${crewId}:jaw`, { x: 0, y: 1.96, z: -0.055 }, { x: 0.92, y: 0.8, z: 0.9 });
+  addCrewPart(root, new THREE.SphereGeometry(0.255, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.52), hair, `${crewId}:hair`, { x: 0, y: 2.12, z: 0.015 }, { x: 0.96, y: 0.8, z: 0.94 });
+  [-0.085, 0.085].forEach((x, index) => {
+    addCrewPart(root, new THREE.SphereGeometry(0.018, 10, 7), dark, `${crewId}:eye:${index}`, { x, y: 2.045, z: -0.223 }, { x: 1, y: 0.72, z: 0.55 });
+    box(root, { x: 0.075, y: 0.012, z: 0.012 }, { x, y: 2.088, z: -0.225 }, hair, `${crewId}:brow:${index}`);
+  });
+  [-0.235, 0.235].forEach((x, index) => addCrewPart(root, new THREE.SphereGeometry(0.045, 10, 7), skin, `${crewId}:ear:${index}`, { x, y: 2.02, z: 0 }, { x: 0.48, y: 1, z: 0.58 }));
+  addCrewPart(root, new THREE.ConeGeometry(0.035, 0.09, 10), skin, `${crewId}:nose`, { x: 0, y: 1.995, z: -0.245 }, null, { x: Math.PI / 2 });
+  box(root, { x: 0.13, y: 0.018, z: 0.018 }, { x: 0, y: 1.92, z: -0.235 }, dark, `${crewId}:mouth`);
 
   root.userData.animatedArms = arms;
   root.userData.animatedLegs = legs;
+  root.userData.characterVisual = Object.freeze({
+    authority: 'ship-interior-crew',
+    qualityTier: 'promoted-procedural',
+    collisionPolicy: 'crew-capsule',
+    behaviorAuthority: 'crew-operations'
+  });
   root.position.set(post.x, 0.05, post.z);
   root.rotation.y = post.yaw;
   group.add(root);
@@ -1960,11 +1980,15 @@ function showDeckLift() {
   }
   picker.innerHTML = `<div><span>DECK LIFT</span><strong>Choose a deck</strong>${SHIP_DECKS.map((deck) => `<button type="button" data-deck="${deck.id}" ${deck.id === session.activeDeckId ? 'disabled' : ''}>${deck.label}</button>`).join('')}<button type="button" data-close>Cancel</button></div>`;
   picker.classList.add('show');
-  picker.querySelectorAll('[data-deck]').forEach((button) => button.addEventListener('click', () => {
+  picker.querySelectorAll('[data-deck]').forEach((button) => button.addEventListener('click', (event) => {
     switchSolisReachDeck(button.dataset.deck);
     picker.classList.remove('show');
+    event.currentTarget?.blur?.();
   }));
-  picker.querySelector('[data-close]')?.addEventListener('click', () => picker.classList.remove('show'));
+  picker.querySelector('[data-close]')?.addEventListener('click', (event) => {
+    picker.classList.remove('show');
+    event.currentTarget?.blur?.();
+  });
   return true;
 }
 
@@ -2588,6 +2612,7 @@ function getShipInteriorSnapshot() {
     } : null,
     crewPresentation: activeSession.sceneState.crewMeshes.map((mesh) => ({
       crewId: mesh.userData.crewId,
+      visualQuality: mesh.userData.characterVisual || null,
       roomId: mesh.userData.currentRoomId,
       assignmentId: mesh.userData.assignmentId,
       task: mesh.userData.operationTask,

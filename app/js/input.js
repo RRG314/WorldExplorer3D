@@ -59,7 +59,8 @@ function onKey(code, event) {
       });
     };
     const interiorPromptVisible = document.getElementById('interiorPrompt')?.classList.contains('show') === true;
-    if (interiorPromptVisible) {
+    const interiorOwnsPrimaryAction = appCtx.activeInterior != null || interiorPromptVisible;
+    if (interiorOwnsPrimaryAction) {
       Promise.resolve(runInteriorFallback()).then((handled) => {
         if (handled !== true) return runPrimaryContext();
         return undefined;

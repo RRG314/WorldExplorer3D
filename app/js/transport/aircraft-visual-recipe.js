@@ -259,7 +259,9 @@ function wheel(THREE, radius, tireMat, hubMat) {
   tire.rotation.y = Math.PI / 2;
   const hub = new THREE.Mesh(new THREE.CylinderGeometry(radius * .36, radius * .36, radius * .42, 12), hubMat);
   hub.rotation.z = Math.PI / 2;
-  group.add(tire, hub);
+  const axleCap = new THREE.Mesh(new THREE.CylinderGeometry(radius * .14, radius * .14, radius * .46, 12), tireMat);
+  axleCap.rotation.z = Math.PI / 2;
+  group.add(tire, hub, axleCap);
   return group;
 }
 
@@ -530,6 +532,39 @@ function fixedWingVisual(THREE, entry, options, mats) {
     landingLight.position.set(side * span * .22, wing.position.y - height * .025, length * .08);
     group.add(landingLight);
   });
+  if (!options.mobile) {
+    for (const side of [-1, 1]) {
+      const door = new THREE.Mesh(flushFuselagePanelGeometry(
+        THREE,
+        side,
+        fuselageRadius,
+        fuselageRadiusY,
+        0,
+        Math.max(.38, Math.min(1.28, height * .16)),
+        length * (entry.role === 'airliner' ? .29 : .22),
+        Math.max(.48, Math.min(1.05, length * .055)),
+        length
+      ), mats.underside);
+      door.name = 'Aircraft entry door inset';
+      group.add(door);
+    }
+    for (const side of [-1, 1]) {
+      const aileron = new THREE.Mesh(
+        new THREE.BoxGeometry(span * .19, Math.max(.018, height * .006), Math.max(.028, length * .012)),
+        mats.trim
+      );
+      aileron.name = 'Aircraft aileron hinge';
+      aileron.position.set(side * span * .365, wing.position.y + height * .008, wing.position.z - length * .076);
+      group.add(aileron);
+    }
+    const antenna = new THREE.Mesh(
+      sweptFinGeometry(THREE, Math.max(.025, width * .014), Math.max(.12, height * .055), Math.max(.12, length * .012)),
+      mats.underside
+    );
+    antenna.name = 'Aircraft navigation antenna';
+    antenna.position.set(0, fuselageRadiusY * .92, -length * .08);
+    group.add(antenna);
+  }
   return group;
 }
 
@@ -630,6 +665,28 @@ function helicopterVisual(THREE, entry, options, mats) {
   tailRotor.position.set(width * .07, height * .31, -length * .505);
   tailRotor.userData.aircraftRotor = 'tail';
   group.add(tailRotor);
+  const tailRotorGuard = new THREE.Mesh(
+    new THREE.TorusGeometry(height * .31, Math.max(.025, width * .018), 8, options.mobile ? 16 : 24),
+    mats.metal
+  );
+  tailRotorGuard.name = 'Helicopter tail rotor guard';
+  tailRotorGuard.position.copy(tailRotor.position);
+  group.add(tailRotorGuard);
+
+  const exhaust = cylinderAlongZ(THREE, Math.max(.075, width * .045), Math.max(.28, length * .035), mats.underside, 12);
+  exhaust.name = 'Helicopter turbine exhaust';
+  exhaust.position.set(width * .28, height * .31, cabinCenterZ - cabinLength * .28);
+  group.add(exhaust);
+
+  const searchLight = new THREE.Mesh(new THREE.CylinderGeometry(.12, .16, .16, 12), mats.metal);
+  searchLight.name = 'Helicopter landing searchlight';
+  searchLight.rotation.x = Math.PI / 2;
+  searchLight.position.set(-width * .25, -height * .27, cabinCenterZ + cabinLength * .22);
+  group.add(searchLight);
+  const searchLens = new THREE.Mesh(new THREE.CircleGeometry(.115, 12), new THREE.MeshBasicMaterial({ color: 0xfff3cf }));
+  searchLens.name = 'Helicopter searchlight lens';
+  searchLens.position.set(searchLight.position.x, searchLight.position.y, searchLight.position.z + .085);
+  group.add(searchLens);
 
   [-1, 1].forEach((side) => {
     const skid = new THREE.Mesh(new THREE.CylinderGeometry(.065, .065, length * .36, 10), mats.metal);
@@ -678,6 +735,23 @@ function createAircraftVisual(THREE, entry, options = {}) {
   root.userData.enterable = true;
   root.userData.originalUnbrandedDesign = true;
   root.userData.referenceEvidence = entry.visual.referenceEvidence;
+  let meshCount = 0;
+  let triangleCount = 0;
+  root.traverse((object) => {
+    if (!object?.isMesh) return;
+    meshCount += 1;
+    const geometry = object.geometry;
+    triangleCount += geometry?.index
+      ? Math.floor(Number(geometry.index.count || 0) / 3)
+      : Math.floor(Number(geometry?.attributes?.position?.count || 0) / 3);
+  });
+  root.userData.performanceProfile = Object.freeze({
+    qualityTier: options.mobile ? 'mobile' : 'promoted',
+    visualAuthority: 'aircraft-visual-recipe',
+    collisionPolicy: 'aviation-catalog-envelope',
+    meshCount,
+    triangleCount
+  });
   const smoke = new THREE.Mesh(
     new THREE.SphereGeometry(Math.max(.25, entry.dimensions.width * .12), 8, 6),
     material(THREE, 0x202326, .95, 0, { transparent: true, opacity: 0 })
