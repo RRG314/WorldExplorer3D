@@ -4,7 +4,7 @@ import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleMassKg } from '../engine/vehicle-
 import { applyTransportDamage } from '../transport/damage-model.js?v=1';
 import { createCivicResponseModel } from './civic-response-model.js?v=3';
 import { ensurePlayerBackpackInventory } from './equipment-model.js?v=9';
-import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=21';
+import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=22';
 import { createEquipmentVisuals } from './equipment-visuals.js?v=3';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=7';
 import { nearestMappedFacility } from './facility-model.js?v=3';
@@ -20,6 +20,7 @@ import { emitProductTelemetry } from '../platform/product-telemetry.js?v=1';
 import { claimLootPickup, createLootPickup } from './loot-pickup-model.js?v=1';
 import { NPC_COMBAT_STATES, resolveNpcCombatState } from './npc-combat-policy.js?v=2';
 import { ENTITY_LIFECYCLE_MS, lifecycleExpired, markLifecycleStart } from '../runtime/entity-lifecycle-policy.js?v=1';
+import { saveExplorerAppearanceId } from '../characters/explorer-appearance.js?v=1';
 
 const ENTER_DISTANCE = 3.4;
 // Room clients can assemble slightly different collision envelopes when a live
@@ -2487,6 +2488,7 @@ function disposeRuntime(state, reason = 'disposed') {
   state.equipmentUi?.close?.removeEventListener('click', state.onEquipmentClose);
   state.equipmentUi?.slots?.removeEventListener('click', state.onEquipmentSlotClick);
   state.equipmentUi?.contents?.removeEventListener('click', state.onEquipmentSlotClick);
+  state.equipmentUi?.appearance?.removeEventListener('click', state.onAppearanceClick);
   state.equipmentUi?.filters?.removeEventListener('click', state.onBackpackFilterClick);
   state.equipmentUi?.detail?.removeEventListener('click', state.onBackpackDetailClick);
   state.storeUi?.close?.removeEventListener('click', state.onStoreClose);
@@ -2611,6 +2613,7 @@ function startUrbanSandboxRuntime(options = {}) {
     root: document.getElementById('urbanEquipment'),
     slots: document.getElementById('urbanEquipmentSlots'),
     contents: document.getElementById('urbanBackpackContents'),
+    appearance: document.getElementById('urbanAppearanceChoices'),
     filters: document.getElementById('urbanBackpackFilters'),
     detail: document.getElementById('urbanBackpackDetail'),
     status: document.getElementById('urbanEquipmentStatus'),
@@ -2870,6 +2873,13 @@ function startUrbanSandboxRuntime(options = {}) {
     if (!button || !state.equipmentUi.root.contains(button)) return;
     state.equipmentRuntime?.inspectItem?.(button.dataset.equipmentId);
   };
+  state.onAppearanceClick = (event) => {
+    const button = event.target?.closest?.('[data-explorer-appearance]');
+    if (!button || !state.equipmentUi.appearance?.contains(button)) return;
+    const appearance = saveExplorerAppearanceId(button.dataset.explorerAppearance);
+    state.equipmentRuntime?.render?.();
+    setStatus(state, `${appearance.label} selected.`, 1600);
+  };
   state.onBackpackFilterClick = (event) => {
     const button = event.target?.closest?.('[data-backpack-filter]');
     if (button) state.equipmentRuntime?.setFilter?.(button.dataset.backpackFilter);
@@ -2899,6 +2909,7 @@ function startUrbanSandboxRuntime(options = {}) {
   appCtx.handleUrbanCustodyContinue = state.onCustodyContinue;
   equipmentUi.slots?.addEventListener('click', state.onEquipmentSlotClick);
   equipmentUi.contents?.addEventListener('click', state.onEquipmentSlotClick);
+  equipmentUi.appearance?.addEventListener('click', state.onAppearanceClick);
   equipmentUi.filters?.addEventListener('click', state.onBackpackFilterClick);
   equipmentUi.detail?.addEventListener('click', state.onBackpackDetailClick);
   storeUi.close?.addEventListener('click', state.onStoreClose);

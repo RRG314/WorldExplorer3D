@@ -4,8 +4,7 @@ const ALLOWED_LICENSES = Object.freeze(new Set([
   'CC0-1.0',
   'CC-BY-2.0',
   'CC-BY-4.0',
-  'NASA-MEDIA',
-  'MIXAMO-EMBEDDED'
+  'NASA-MEDIA'
 ]));
 
 function finiteBudget(value, fallback) {
@@ -61,32 +60,6 @@ function defineModelAsset(definition = {}) {
 }
 
 const MODEL_ASSET_CATALOG = Object.freeze([
-  defineModelAsset({
-    id: 'character-field-navigator',
-    label: 'Field Navigator',
-    url: '/app/assets/models/soldier.glb',
-    roles: ['player-character'],
-    license: 'MIXAMO-EMBEDDED',
-    sourceUrl: 'https://github.com/mrdoob/three.js/blob/dev/examples/models/gltf/Soldier.glb',
-    attribution: 'Three.js Soldier example; character and animations by Adobe Mixamo',
-    animation: { rigged: true, clips: ['idle', 'walk', 'run'] },
-    scale: { targetHeightMeters: 1.72, authoritative: 'measured-height' },
-    collision: { policy: 'controller-capsule', walkable: false },
-    budgets: { desktopBytes: 4_000_000, mobileBytes: 4_000_000, desktopTriangles: 45_000, mobileTriangles: 45_000, maxInstances: 1 }
-  }),
-  defineModelAsset({
-    id: 'character-field-navigator-fallback',
-    label: 'Field Navigator fallback',
-    url: '/app/assets/models/Astronaut.glb',
-    roles: ['player-character-fallback'],
-    license: 'CC-BY-2.0',
-    sourceUrl: 'https://github.com/google/model-viewer/blob/master/packages/shared-assets/models/Astronaut.glb',
-    attribution: 'Astronaut by Poly',
-    animation: { rigged: false, clips: [] },
-    scale: { targetHeightMeters: 1.72, authoritative: 'measured-height' },
-    collision: { policy: 'controller-capsule', walkable: false },
-    budgets: { desktopBytes: 4_000_000, mobileBytes: 4_000_000, desktopTriangles: 45_000, mobileTriangles: 45_000, maxInstances: 1 }
-  }),
   defineModelAsset({
     id: 'planetary-rover-mars',
     label: 'Mars exploration rover',

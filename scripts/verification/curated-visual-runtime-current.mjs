@@ -43,10 +43,23 @@ try {
     }, null, { timeout: 240_000 });
     await page.waitForFunction(() => {
       const state = globalThis.getWorldExplorerRuntimeDiagnostics?.();
-      return state?.modelAssets?.playerAssetId === 'character-field-navigator';
+      return state?.modelAssets?.playerCharacterAuthority === 'explorer-character-visual';
     }, null, { timeout: 30_000 });
     beforeMove = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.() || null);
     await page.screenshot({ path: `${outputDir}/earth-character-ready-${profile}.png`, fullPage: true });
+    await page.locator('#backpackBtn').click();
+    await page.locator('#fBackpack').click();
+    await page.locator('#urbanEquipment.show').waitFor({ state: 'visible', timeout: 20_000 });
+    await page.screenshot({ path: `${outputDir}/explorer-choices-${profile}.png`, fullPage: true });
+    for (const id of ['field-jacket', 'city-explorer', 'trail-hoodie']) {
+      await page.locator(`[data-explorer-appearance="${id}"]`).click();
+      await page.waitForFunction((appearanceId) => {
+        const state = globalThis.getWorldExplorerRuntimeDiagnostics?.();
+        return state?.modelAssets?.playerAppearanceId === appearanceId;
+      }, id, { timeout: 5_000 });
+    }
+    await page.locator('#urbanEquipmentCloseBtn').click();
+    await page.screenshot({ path: `${outputDir}/earth-trail-hoodie-${profile}.png`, fullPage: true });
     await page.keyboard.down('ArrowUp');
     await page.waitForTimeout(1800);
     await page.keyboard.up('ArrowUp');
@@ -81,16 +94,18 @@ try {
   );
   const checks = Object.freeze({
     worldReachedPlayableState: diagnostics?.gameStarted === true && diagnostics?.worldLoading === false,
-    oneSharedModelLoaderServedPlayer: diagnostics?.modelAssets?.playerAssetId === 'character-field-navigator' && Number(diagnostics?.modelAssets?.loads || 0) >= 1,
-    boundedModelInstances: Number(diagnostics?.modelAssets?.activeInstances || 0) <= 2,
+    oneExplorerCharacterAuthority: diagnostics?.modelAssets?.playerCharacterAuthority === 'explorer-character-visual' &&
+      diagnostics?.modelAssets?.playerAppearanceId === 'trail-hoodie' &&
+      diagnostics?.modelAssets?.playerCharacterProfile?.qualityTier === 'smooth-promoted',
+    noObsoletePlayerAssetOverride: diagnostics?.modelAssets?.playerAssetId == null,
     currentWalkingInputMovesPlayer: movedMeters > 0.25,
     personalAircraftUsesQualityContract: aircraftEvidence?.performanceProfile?.visualAuthority === 'aircraft-visual-recipe' &&
       aircraftEvidence?.performanceProfile?.qualityTier === (mobile ? 'mobile' : 'promoted') &&
       Number(aircraftEvidence?.performanceProfile?.meshCount || 0) >= 30,
     activeAircraftUsesOneVisualAuthority: aircraftProfiles.length === 1 && aircraftProfiles.every((entry) =>
       entry.visualAuthority === 'aircraft-visual-recipe' && Number(entry.meshCount || 0) >= 30),
-    roadVehiclesUseQualityContract: vehicles.length === 0 || vehicles.every((entry) => entry.visualQuality?.visualAuthority === 'road-vehicle-visual-recipe'),
-    promotedNpcsUseQualityContract: npcs.length === 0 || npcs.every((entry) => entry.visualQuality?.qualityTier === 'promoted-procedural'),
+    roadVehiclesVisibleAndUseQualityContract: vehicles.length > 0 && vehicles.every((entry) => entry.visualQuality?.visualAuthority === 'road-vehicle-visual-recipe'),
+    promotedNpcsVisibleAndUseQualityContract: npcs.length > 0 && npcs.every((entry) => entry.visualQuality?.qualityTier === 'promoted-procedural'),
     noRuntimeErrors: (diagnostics?.runtimeErrors || []).length === 0,
     noPageErrors: pageErrors.length === 0,
     noFailedLocalResources: localFailures.length === 0

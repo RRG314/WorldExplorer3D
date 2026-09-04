@@ -1078,7 +1078,10 @@ function getWorldExplorerRuntimeDiagnostics() {
     worldDetail: appCtx.worldDetailState || null,
     modelAssets: {
       ...getModelAssetRuntimeMetrics(),
-      playerAssetId: appCtx.Walk?.state?.characterMesh?.userData?.characterAssetId || null
+      playerAssetId: appCtx.Walk?.state?.characterMesh?.userData?.characterAssetId || null,
+      playerAppearanceId: appCtx.Walk?.state?.characterMesh?.userData?.characterAppearanceId || null,
+      playerCharacterAuthority: appCtx.Walk?.state?.characterMesh?.userData?.performanceProfile?.authority || null,
+      playerCharacterProfile: appCtx.Walk?.state?.characterMesh?.userData?.performanceProfile || null
     },
     transportVisuals: {
       activeAircraft: appCtx.planeMode?.mesh?.userData?.performanceProfile || null
