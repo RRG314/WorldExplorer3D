@@ -127,6 +127,17 @@ function createUrbanVehicleVisual(THREE, definition = {}) {
     }
     add(new THREE.BoxGeometry(.035, cabinHeight * .72, height * .03), chrome, 'Van rear door seam', [0, cabinY - .02, -length * .488]);
   }
+  if (crossover || van) {
+    for (const side of [-1, 1]) {
+      add(new THREE.BoxGeometry(.045, .06, cabinLength * .72), trim, 'Urban roof rail', [side * width * .31, roofY + .025, cabinZ - .02]);
+    }
+  }
+  if (boxTruck || deliveryVan) {
+    for (let index = -2; index <= 2; index += 1) {
+      const z = (boxTruck ? -length * .17 : cabinZ) + index * cabinLength * .1;
+      add(new THREE.BoxGeometry(width * .965, .035, .035), chrome, 'Commercial body reinforcement rib', [0, roofY - .08, z]);
+    }
+  }
   if (taxi) {
     add(new THREE.BoxGeometry(0.48, 0.12, 0.22), service, 'Taxi roof lamp', [0, roofY - .06, cabinZ]);
   }
@@ -165,6 +176,7 @@ function createUrbanVehicleVisual(THREE, definition = {}) {
       add(new THREE.BoxGeometry(0.045, 0.035, 0.19), chrome, 'Urban rear door handle', [sideX + side * 0.02, cabinY - 0.02, cabinZ - cabinLength * 0.4]);
     }
     add(new THREE.BoxGeometry(.05, .12, Math.max(.45, length * .34)), trim, 'Urban integrated rocker trim', [side * width * .47, bodyY - bodyHeight * .23, -.03]);
+    add(new THREE.BoxGeometry(.035, .025, length * .62), chrome, 'Urban side character line', [side * width * .472, bodyY + bodyHeight * .18, 0]);
     add(new THREE.BoxGeometry(0.12, 0.1, 0.23), trim, 'Urban mirror', [side * width * 0.46, cabinY + 0.05, cabinZ + cabinLength * 0.3]);
   }
 
@@ -177,6 +189,7 @@ function createUrbanVehicleVisual(THREE, definition = {}) {
     const tire = add(new THREE.CylinderGeometry(wheelRadius, wheelRadius, Math.min(.25, width * 0.14), 24), rubber, 'Urban tire', [0, 0, 0], [0, 0, Math.PI / 2], wheel);
     tire.userData.vehicleWheelTire = true;
     add(new THREE.CylinderGeometry(wheelRadius * 0.52, wheelRadius * 0.52, Math.min(.26, width * 0.145), 20), chrome, 'Urban wheel hub', [0, 0, 0], [0, 0, Math.PI / 2], wheel);
+    add(new THREE.CylinderGeometry(wheelRadius * .18, wheelRadius * .18, Math.min(.275, width * .15), 12), trim, 'Urban wheel center cap', [0, 0, 0], [0, 0, Math.PI / 2], wheel);
     root.add(wheel);
     wheels.push(wheel);
     damageParts.wheels.push(wheel);
@@ -193,9 +206,22 @@ function createUrbanVehicleVisual(THREE, definition = {}) {
     }
   }
   add(new THREE.BoxGeometry(width * 0.58, 0.2, 0.05), trim, 'Urban grille', [0, bodyY + 0.02, length * .49 - .025]);
+  for (let index = -2; index <= 2; index += 1) {
+    add(new THREE.BoxGeometry(.025, .16, .058), chrome, 'Urban grille vane', [index * width * .092, bodyY + .02, length * .49 + .006]);
+  }
+  for (const side of [-1, 1]) {
+    add(new THREE.SphereGeometry(.065, 10, 7), headlight, 'Urban fog lamp', [side * width * .34, bodyY - .11, length * .492]);
+  }
+  if (!bus) {
+    const exhaust = add(new THREE.CylinderGeometry(.035, .035, .28, 10), chrome, 'Urban exhaust outlet', [width * .32, bodyY - .23, -length * .5], [Math.PI * .5, 0, 0]);
+    exhaust.castShadow = false;
+  }
 
   root.userData.performanceProfile = Object.freeze({
     style: `urban-${style}`,
+    qualityTier: 'promoted-procedural',
+    collisionPolicy: 'vehicle-catalog-envelope',
+    visualAuthority: 'road-vehicle-visual-recipe',
     transparentMaterials: 0
   });
   root.updateMatrixWorld(true);

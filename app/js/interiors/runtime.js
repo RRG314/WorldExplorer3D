@@ -182,6 +182,12 @@ function nearestInteriorInteraction(active, walker) {
     )
   })).filter((interaction) => interaction.distance <= interaction.radius && interaction.verticalDistance <= 1.15)
     .sort((a, b) => {
+      const aIsCrew = a.kind === 'ship-crew';
+      const bIsCrew = b.kind === 'ship-crew';
+      const aIsTraversal = ['ship-exit', 'ship-door', 'ship-lift'].includes(a.kind);
+      const bIsTraversal = ['ship-exit', 'ship-door', 'ship-lift'].includes(b.kind);
+      if (aIsCrew && bIsTraversal) return 1;
+      if (bIsCrew && aIsTraversal) return -1;
       // Adjacent pressure doors and workstations have intentionally generous
       // touch radii. Prefer the clearly closer object so a doorway cannot
       // consume E while the player is standing directly at a console.
