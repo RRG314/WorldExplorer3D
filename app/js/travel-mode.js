@@ -362,6 +362,7 @@ function setTravelMode(mode, options = {}) {
     appCtx.setCameraMode(0);
     if (appCtx.camera?.userData) appCtx.camera.userData.carLook = { yaw: 0, pitch: 0 };
     if (appCtx.carMesh) appCtx.carMesh.visible = true;
+    void appCtx.ensureCuratedPlayerCar?.();
   }
 
   if (typeof appCtx.clearStarSelection === 'function') {

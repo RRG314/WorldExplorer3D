@@ -1419,7 +1419,12 @@ function setDoorProgress(vehicle, progress) {
 }
 
 function resetPlayerVehicleVisual(state) {
-  state.defaultCarChildren.forEach((child) => { child.visible = true; });
+  state.defaultCarChildren.forEach((child) => {
+    child.visible = child.userData?.defaultPlayerVehicleFallback !== true || !appCtx.carMesh?.userData?.curatedVehicleVisual;
+  });
+  if (appCtx.carMesh?.userData?.curatedVehicleVisual) {
+    appCtx.carMesh.userData.curatedVehicleVisual.visible = true;
+  }
   appCtx.wheelMeshes = state.defaultWheelMeshes;
   if (appCtx.carMesh?.userData) {
     delete appCtx.carMesh.userData.activeUrbanVehicleId;
@@ -1522,6 +1527,9 @@ function updateServiceEquipment(state, dt) {
 function mountVehicleForDriving(state, vehicle) {
   const pose = vehiclePose(vehicle);
   state.defaultCarChildren.forEach((child) => { child.visible = false; });
+  if (appCtx.carMesh?.userData?.curatedVehicleVisual) {
+    appCtx.carMesh.userData.curatedVehicleVisual.visible = false;
+  }
   vehicle.visual.root.removeFromParent?.();
   vehicle.visual.root.position.set(0, 0, 0);
   vehicle.visual.root.rotation.set(0, 0, 0);

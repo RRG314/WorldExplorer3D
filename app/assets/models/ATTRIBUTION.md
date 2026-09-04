@@ -1,21 +1,13 @@
-Character Assets
+Curated Vehicle Assets
 
-- File: `soldier.glb`
-- Asset lineage: Three.js `Soldier.glb` example model, locally optimized for the web runtime.
-- Upstream: https://github.com/mrdoob/three.js/blob/dev/examples/models/gltf/Soldier.glb
-- Character and animations: Adobe Mixamo.
-- Terms: Adobe permits royalty-free use of Mixamo characters and animations in commercial video games. The raw asset must not be offered as a standalone asset product or download.
-- Adobe FAQ: https://helpx.adobe.com/creative-cloud/faq/mixamo-faq.html
-- Additional terms: https://wwwimages2.adobe.com/content/dam/cc/en/legal/servicetou/Mixamo-Addl-Terms-en_US-20210623.pdf
-- Notes: Loaded as the primary rigged character model in runtime and distributed only as an embedded game asset.
+BMW 525i E34 Player Vehicle
 
-- File: `Astronaut.glb`
-- Title/creator: Astronaut by Poly.
-- License: Creative Commons Attribution 2.0 (CC BY 2.0).
-- Upstream: https://github.com/google/model-viewer/blob/master/packages/shared-assets/models/Astronaut.glb
-- Attribution record: https://github.com/google/model-viewer/blob/master/packages/modelviewer.dev/ATTRIBUTIONS.md
-- License: https://creativecommons.org/licenses/by/2.0/
-- Notes: Used as the fallback walking character.
+- File: `vehicles/bmw-525i-e34.glb`
+- Title: BMW 525i E34 | Project Zomboid
+- Creator: Uralvagonzavod
+- Source: https://sketchfab.com/3d-models/bmw-525i-e34-project-zomboid-c65aa3b7687d4f5dbbabdfad0b7816bb
+- License: Creative Commons Attribution 4.0 (CC BY 4.0).
+- Notes: Used as the close player-vehicle visual. The existing World Explorer vehicle controller, collision envelope, headlights, damage rules, and procedural fallback remain authoritative.
 
 Mars Exploration Rover
 - File: `mars-exploration-rover.glb`
