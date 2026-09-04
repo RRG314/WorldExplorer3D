@@ -10,6 +10,8 @@ const server = await startStaticServer({ rootDir: servedRoot, ports: [4434, 4435
 const baseUrl = `http://127.0.0.1:${server.port}`;
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const outputRoot = path.join(root, 'output', 'verification', 'accessibility-release');
+const requestedProfile = String(process.env.WE3D_VERIFY_PROFILE || 'all').trim().toLowerCase();
+assert.ok(['all', 'desktop', 'mobile'].includes(requestedProfile), `Unsupported WE3D_VERIFY_PROFILE: ${requestedProfile}`);
 
 async function keyboardReach(page, predicate, maximumTabs = 180) {
   for (let index = 0; index < maximumTabs; index += 1) {
@@ -206,9 +208,22 @@ async function runMobile() {
 
 try {
   await mkdir(outputRoot, { recursive: true });
-  const desktop = await runDesktop();
-  const mobile = await runMobile();
-  const report = { ok: desktop.ok && mobile.ok, contract: 'minimum-5-accessibility-release-v1', generatedAt: new Date().toISOString(), writesProduction: false, desktop, mobile };
+  let desktop = null;
+  let mobile = null;
+  if (requestedProfile !== 'mobile') {
+    console.log('[accessibility] starting desktop');
+    desktop = await runDesktop();
+    await writeFile(path.join(outputRoot, 'report-desktop.json'), `${JSON.stringify(desktop, null, 2)}\n`);
+    console.log('[accessibility] desktop complete');
+  }
+  if (requestedProfile !== 'desktop') {
+    console.log('[accessibility] starting mobile');
+    mobile = await runMobile();
+    await writeFile(path.join(outputRoot, 'report-mobile.json'), `${JSON.stringify(mobile, null, 2)}\n`);
+    console.log('[accessibility] mobile complete');
+  }
+  const selectedReports = [desktop, mobile].filter(Boolean);
+  const report = { ok: selectedReports.every((entry) => entry.ok), contract: 'minimum-5-accessibility-release-v1', generatedAt: new Date().toISOString(), writesProduction: false, desktop, mobile };
   await writeFile(path.join(outputRoot, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify(report, null, 2));
   assert.equal(report.ok, true, 'Minimum-5 keyboard, semantic, focus, settings, or 390x844 accessibility boundary failed.');

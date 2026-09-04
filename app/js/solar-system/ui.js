@@ -8,11 +8,11 @@ import {
   showPlanetInfo,
   showSpacecraftInfo,
   showSunInfo
-} from "./info-panel.js?v=3";
+} from "./info-panel.js?v=5";
 import {
   getAstronomicalBody,
   SOLAR_SYSTEM_EXPLORATION_DESTINATION_IDS
-} from '../astronomy/body-catalog.js?v=2';
+} from '../astronomy/body-catalog.js?v=3';
 
 function formatKilometers(km) {
   if (km >= 1e9) return (km / 1e9).toFixed(1) + 'B';
@@ -105,77 +105,44 @@ export function onSolarSystemClick(ctx, event) {
 export function createInfoPanel(ctx) {
   const panel = document.createElement('div');
   panel.id = 'solarSystemInfo';
-  panel.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background: rgba(10, 10, 30, 0.95);
-    border: 2px solid #667eea;
-    border-radius: 12px;
-    padding: 20px;
-    color: #fff;
-    font-family: Orbitron, sans-serif;
-    font-size: 12px;
-    z-index: 10001;
-    display: none;
-    min-width: 280px;
-    max-width: 320px;
-    line-height: 1.6;
-    box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3);
-  `;
+  panel.className = 'solarSystemInfoCard';
   panel.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-      <div id="ssInfoTitle" style="font-size:18px;color:#667eea;font-weight:700;"></div>
-      <button id="ssInfoClose" style="background:none;border:none;color:#667eea;font-size:20px;cursor:pointer;padding:0 4px;">x</button>
+    <div class="solarSystemInfoHead">
+      <div id="ssInfoTitle"></div>
+      <button id="ssInfoClose" type="button" aria-label="Close destination details">×</button>
     </div>
-    <div id="ssInfoType" style="margin-bottom:8px;color:#10b981;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:1px;"></div>
-    <div id="ssInfoDesc" style="margin-bottom:12px;color:#94a3b8;font-family:Inter,sans-serif;font-size:12px;"></div>
-    <div style="background:rgba(102,126,234,0.15);border-radius:8px;padding:12px;margin-bottom:12px;">
-      <div id="ssInfoMetaLabel" style="font-size:10px;opacity:0.7;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">ORBITAL DATA</div>
-      <div style="margin-bottom:6px;"><span id="ssInfoMetric1Label">Mean Distance</span>: <span id="ssInfoDistAU" style="color:#fbbf24;font-weight:600;"></span></div>
-      <div style="margin-bottom:6px;"><span id="ssInfoMetric2Label">Mean Distance</span>: <span id="ssInfoDistKM" style="color:#fbbf24;font-weight:600;"></span></div>
-      <div><span id="ssInfoMetric3Label">Current from Earth</span>: <span id="ssInfoDistEarth" style="color:#0fc;font-weight:600;"></span></div>
+    <div id="ssInfoType" class="solarSystemInfoType"></div>
+    <div id="ssInfoDesc" class="solarSystemInfoDescription"></div>
+    <div class="solarSystemInfoMetrics">
+      <div id="ssInfoMetaLabel" class="solarSystemInfoMeta">ORBITAL DATA</div>
+      <div><span id="ssInfoMetric1Label">Mean Distance</span><strong id="ssInfoDistAU"></strong></div>
+      <div><span id="ssInfoMetric2Label">Mean Distance</span><strong id="ssInfoDistKM"></strong></div>
+      <div><span id="ssInfoMetric3Label">Current from Earth</span><strong id="ssInfoDistEarth"></strong></div>
     </div>
-    <button id="ssInfoSetCourse" style="display:none;width:100%;padding:10px;background:#315d9d;border:1px solid #8ab4ff;border-radius:7px;color:#fff;font:600 11px Orbitron,sans-serif;cursor:pointer;">SET COURSE</button>
+    <button id="ssInfoSetCourse" class="solarSystemPrimaryAction" type="button">SET COURSE</button>
   `;
   document.body.appendChild(panel);
   ctx.solarSystem.infoPanel = panel;
   document.getElementById('ssInfoClose').addEventListener('click', () => hidePlanetInfo(ctx));
   document.getElementById('ssInfoSetCourse').addEventListener('click', () => {
     const bodyId = ctx.solarSystem.selectedBodyId;
-    const result = ctx.appCtx.retargetRenderedSpaceJourney?.(bodyId);
+    const result = ctx.appCtx.setSolarSystemCourse?.(bodyId);
     if (result?.accepted) hidePlanetInfo(ctx);
+    else ctx.appCtx.showSpaceFlightMessage?.(
+      String(result?.reason || 'Course change unavailable').replaceAll('-', ' ').toUpperCase(),
+      '#f59e0b'
+    );
   });
 }
 
 export function createToggleButton(ctx) {
   const container = document.createElement('div');
   container.id = 'ssToggleContainer';
-  container.style.cssText = `
-    position: fixed;
-    top: 20px;
-    left: 20px;
-    display: none;
-    flex-direction: column;
-    gap: 6px;
-    z-index: 10001;
-  `;
+  container.className = 'solarSystemTravelBar';
 
   const btn = document.createElement('button');
   btn.id = 'solarSystemToggle';
   btn.className = 'ssToggleBtn';
-  btn.style.cssText = `
-    background: rgba(10, 10, 30, 0.9);
-    border: 2px solid #3b82f6;
-    border-radius: 8px;
-    padding: 8px 14px;
-    color: #fff;
-    font-family: Orbitron, sans-serif;
-    font-size: 11px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-  `;
   btn.textContent = 'RETURN TO EARTH';
   btn.addEventListener('click', () => handleSpaceReturnAction(ctx));
   container.appendChild(btn);
@@ -184,18 +151,6 @@ export function createToggleButton(ctx) {
   destinationSelect.id = 'spaceDestinationSelect';
   destinationSelect.className = 'ssToggleBtn';
   destinationSelect.setAttribute('aria-label', 'Choose a Solar System destination');
-  destinationSelect.style.cssText = `
-    background: rgba(10, 10, 30, 0.9);
-    border: 2px solid #10b981;
-    border-radius: 8px;
-    padding: 8px 14px;
-    color: #fff;
-    font-family: Orbitron, sans-serif;
-    font-size: 11px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-  `;
   destinationSelect.innerHTML = `
     <option value="">SET COURSE...</option>
     ${SOLAR_SYSTEM_EXPLORATION_DESTINATION_IDS
@@ -207,11 +162,23 @@ export function createToggleButton(ctx) {
   destinationSelect.addEventListener('change', () => {
     const bodyId = destinationSelect.value;
     if (!bodyId) return;
-    const result = ctx.appCtx.retargetRenderedSpaceJourney?.(bodyId);
+    const result = ctx.appCtx.setSolarSystemCourse?.(bodyId);
     if (!result?.accepted) {
       destinationSelect.value = '';
-      destinationSelect.title = 'Course changes are available from parking orbit.';
+      destinationSelect.title = 'Finish the current approach before changing course.';
+      ctx.appCtx.showSpaceFlightMessage?.(
+        String(result?.reason || 'Course change unavailable').replaceAll('-', ' ').toUpperCase(),
+        '#f59e0b'
+      );
+      return;
     }
+    destinationSelect.title = '';
+    const destination = getAstronomicalBody(bodyId);
+    const assisted = ctx.appCtx.spaceJourneyAssistState?.active === true;
+    ctx.appCtx.showSpaceFlightMessage?.(
+      `COURSE SET · ${String(destination?.name || bodyId).toUpperCase()} · ${assisted ? 'FLIGHT ASSIST ENGAGED' : 'PRESS FLIGHT ASSIST TO BEGIN'}`,
+      assisted ? '#10b981' : '#6fe8ff'
+    );
   });
   container.appendChild(destinationSelect);
 
@@ -316,6 +283,8 @@ export function hideSolarSystemUI(ctx) {
   if (ctx?.appCtx?.spaceFlight) ctx.appCtx.spaceFlight.overviewMode = false;
   const scale = document.getElementById('solarSystemScale');
   if (scale) scale.style.display = 'none';
+  const proximity = document.getElementById('ssProximity');
+  if (proximity) proximity.style.display = 'none';
   ctx?.appCtx?.hideUniverseUI?.();
   hidePlanetInfo(ctx);
 }

@@ -1,6 +1,9 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { nextPrimaryTravelMode } from "./controls/traversal-control-policy.js?v=8";
-import { planetarySurfaceYAtRenderXZ } from './planetary/runtime/surface-query.js?v=2';
+import { planetarySurfaceYAtRenderXZ } from './planetary/runtime/surface-query.js?v=3';
+import { resolveTravelMenuState } from './travel/menu-state.js?v=2';
+
+let lastTravelUiSignature = '';
 
 function getCurrentTravelMode() {
   if (appCtx.boatMode?.active) return 'boat';
@@ -17,32 +20,86 @@ function setDroneModeActive(active) {
 
 function syncTravelModeButtons() {
   const activeMode = getCurrentTravelMode();
-  const boatLocked = activeMode === 'boat';
   const drivingBtn = document.getElementById('fDriving');
   const walkingBtn = document.getElementById('fWalk');
   const droneBtn = document.getElementById('fDrone');
   const planeBtn = document.getElementById('fPlane');
   const boatBtn = document.getElementById('fBoat');
+  const planetaryCapabilities = appCtx.activePlanetaryBodyId ? appCtx.planetaryTravelCapabilities : null;
+  const currentEnvironment = appCtx.getEnv?.()
+    || (appCtx.oceanMode?.active ? appCtx.ENV?.OCEAN : appCtx.ENV?.EARTH);
+  const setAvailable = (button, available) => {
+    if (!button) return;
+    const hidden = available !== true;
+    if (button.hidden !== hidden) button.hidden = hidden;
+    const display = hidden ? 'none' : '';
+    if (button.style.display !== display) button.style.display = display;
+  };
+  const supports = (mode) => !planetaryCapabilities || planetaryCapabilities[mode] === true;
+  const oceanBtn = document.getElementById('fOceanMode');
+  const earthBtn = document.getElementById('fEarthMode');
+  const menuState = resolveTravelMenuState({
+    environment: currentEnvironment,
+    earthEnvironment: appCtx.ENV?.EARTH,
+    moonEnvironment: appCtx.ENV?.MOON,
+    marsEnvironment: appCtx.ENV?.MARS,
+    pathfinderStaged: appCtx.getStagedEarthPodSnapshot?.().active === true,
+    supports
+  });
+  const availability = {
+    drive: supports('drive'),
+    walk: supports('walk'),
+    drone: supports('drone'),
+    plane: supports('plane'),
+    // Boat visibility is contextual. The boat runtime owns whether a nearby
+    // vessel, an active vessel, or the ocean-to-surface transfer is available.
+    // Treating every Earth location as boat-ready made the hotbar advertise a
+    // mode that could silently do nothing inland.
+    boat: supports('boat') && !!(appCtx.boatMode?.active || appCtx.boatMode?.available || appCtx.oceanMode?.active)
+  };
+  const signature = JSON.stringify({
+    activeMode,
+    environment: currentEnvironment,
+    activePlanetaryBodyId: appCtx.activePlanetaryBodyId || '',
+    availability,
+    menuState
+  });
+  if (signature === lastTravelUiSignature) return activeMode;
+  lastTravelUiSignature = signature;
+
   if (drivingBtn) drivingBtn.classList.toggle('on', activeMode === 'drive');
   if (walkingBtn) walkingBtn.classList.toggle('on', activeMode === 'walk');
   if (droneBtn) droneBtn.classList.toggle('on', activeMode === 'drone');
   if (planeBtn) planeBtn.classList.toggle('on', activeMode === 'plane');
   if (boatBtn) boatBtn.classList.toggle('on', activeMode === 'boat');
-  const planetaryCapabilities = appCtx.activePlanetaryBodyId ? appCtx.planetaryTravelCapabilities : null;
-  [
-    [drivingBtn, 'drive'],
-    [walkingBtn, 'walk'],
-    [droneBtn, 'drone'],
-    [planeBtn, 'plane'],
-    [boatBtn, 'boat'],
-    [document.getElementById('fOceanMode'), 'ocean'],
-    [document.getElementById('fEarthMode'), 'earth'],
-    [document.getElementById('fSpaceDirect'), 'space'],
-    [document.getElementById('fSpaceRocket'), 'space'],
-    [document.getElementById('fSpaceMars'), 'space']
-  ].forEach(([button, mode]) => {
-    if (button) button.style.display = boatLocked || (planetaryCapabilities && planetaryCapabilities[mode] !== true) ? 'none' : '';
-  });
+  setAvailable(drivingBtn, availability.drive);
+  setAvailable(walkingBtn, availability.walk);
+  setAvailable(droneBtn, availability.drone);
+  setAvailable(planeBtn, availability.plane);
+  setAvailable(boatBtn, availability.boat);
+
+  // Environment choices have one owner and are published only when their
+  // underlying state changes. The HUD frame loop must never rewrite menus.
+  if (oceanBtn) {
+    oceanBtn.classList.remove('on');
+    oceanBtn.textContent = activeMode === 'boat' ? '🌊 Dive Underwater' : '🌊 Explore the Ocean';
+  }
+  if (earthBtn) {
+    earthBtn.classList.remove('on');
+    earthBtn.textContent = '🌍 Return to Earth';
+  }
+  setAvailable(oceanBtn, menuState.ocean.visible);
+  setAvailable(earthBtn, menuState.earth.visible);
+
+  const applyAction = (id, state) => {
+    const button = document.getElementById(id);
+    setAvailable(button, state.visible);
+    if (button && button.textContent !== state.label) button.textContent = state.label;
+  };
+  applyAction('fDeployPathfinder', menuState.pathfinder);
+  applyAction('fBoardSolisReach', menuState.boardStarship);
+  applyAction('fSpaceRocket', menuState.freeSpaceFlight);
+  applyAction('fSpaceDirect', menuState.quickTrip);
   return activeMode;
 }
 

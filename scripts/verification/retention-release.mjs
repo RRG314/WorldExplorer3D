@@ -39,6 +39,7 @@ assert.match(html, /class="globe-legal-strip"/);
 assert.match(html, /id="dataLicensesDialog"/);
 assert.match(html, /id="analyticsConsentBanner"/);
 assert.match(html, /id="analyticsConsentManageBtn"/);
+assert.match(consent, /return value !== CONSENT_DENIED/);
 assert.match(analytics, /readAnalyticsConsent\(\) !== 'granted'/);
 assert.match(analytics, /ad_personalization:\s*'denied'/);
 assert.match(consent, /MutationObserver\(syncTitleVisibility\)/);
@@ -67,5 +68,5 @@ console.log(JSON.stringify({
   ok: true,
   boards: Object.keys(catalogModule.LEADERBOARD_CATALOG),
   attributedModels: models,
-  privacy: 'explicit-opt-in; location, identity, room, and message fields rejected'
+  privacy: 'standard first-party measurement with explicit limited mode; account identity requires explicit standard preference; location, room, and message fields rejected'
 }, null, 2));

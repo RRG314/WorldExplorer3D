@@ -1,7 +1,7 @@
 import { getApp, getApps, initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
 import { connectAuthEmulator, getAuth } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
 import { connectFirestoreEmulator, getFirestore } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
-import { readAnalyticsConsent } from './analytics-consent.js?v=1';
+import { analyticsStorageAllowed } from './analytics-consent.js?v=3';
 
 const FIREBASE_CONFIG_STORAGE_KEY = 'worldExplorer3D.firebaseConfig';
 
@@ -98,7 +98,7 @@ export async function initFirebaseAnalytics() {
         return cachedAnalytics;
       }
       analyticsMod.setConsent?.({
-        analytics_storage: readAnalyticsConsent() === 'granted' ? 'granted' : 'denied',
+        analytics_storage: analyticsStorageAllowed() ? 'granted' : 'denied',
         ad_storage: 'denied',
         ad_user_data: 'denied',
         ad_personalization: 'denied'

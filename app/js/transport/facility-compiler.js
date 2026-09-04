@@ -81,6 +81,10 @@ function compileTransportFacilityGraph(data = {}, options = {}) {
     const geometry = geometryForElement(element, nodeById, location, scale);
     if (!geometry) continue;
     const tags = element.tags || {};
+    const generalizedVector = String(tags._sourceCompleteness || '').toLowerCase() === 'generalized' ||
+      String(tags._sourceFeatureId || '').startsWith('shortbread:');
+    const exactPhysicalGeometry = !generalizedVector && geometry.complete &&
+      ['path', 'polygon'].includes(geometry.kind);
     records.push(Object.freeze({
       id: `osm:${element.type}:${element.id}`,
       sourceElementType: String(element.type || ''),
@@ -90,6 +94,8 @@ function compileTransportFacilityGraph(data = {}, options = {}) {
       name: String(tags.name || tags.ref || '').trim(),
       geometry,
       mapped: true,
+      geometryAuthority: generalizedVector ? 'generalized-vector' : 'exact-openstreetmap',
+      exactPhysicalGeometry,
       generatedActivity: false,
       access: tags.access == null ? 'unknown' : String(tags.access),
       surface: tags.surface == null ? 'unknown' : String(tags.surface),
@@ -102,7 +108,9 @@ function compileTransportFacilityGraph(data = {}, options = {}) {
         buildingLevels: Number.isFinite(Number(tags['building:levels'])) ? Number(tags['building:levels']) : null,
         airportClass: String(tags.aerodrome || tags['aerodrome:type'] || tags.passenger || '').trim().toLowerCase()
       }),
-      completeness: geometry.complete ? 'mapped-geometry' : 'mapped-center-only',
+      completeness: generalizedVector
+        ? 'generalized-mapped-geometry'
+        : geometry.complete ? 'mapped-geometry' : 'mapped-center-only',
       provenance: Object.freeze({
         provider: 'OpenStreetMap',
         license: 'ODbL-1.0',

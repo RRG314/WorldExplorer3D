@@ -21,17 +21,17 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Orbitron:wght@500;700;900&family=Righteous&display=swap" rel="stylesheet">
 <script src="../js/firebase-project-config.js"></script>
 <style>@layer legacy, interface;</style>
-<link rel="stylesheet" href="styles/title-shell.css?v=94">
-<link rel="stylesheet" href="styles/runtime-shell.css?v=115">
-<link rel="stylesheet" href="styles/block-builder.css?v=7">
-<link rel="stylesheet" href="styles/universe.css?v=7">
-<link rel="stylesheet" href="styles/fishing-game.css?v=5">
-<link rel="stylesheet" href="styles/interface-v4.css?v=19">
-<link rel="stylesheet" href="styles/start-hub.css?v=17">
-<link rel="stylesheet" href="styles/discovery.css?v=14">
-<link rel="stylesheet" href="styles/tutorial.css?v=5">
+<link rel="stylesheet" href="styles/title-shell.css?v=95">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=121">
+<link rel="stylesheet" href="styles/block-builder.css?v=8">
+<link rel="stylesheet" href="styles/universe.css?v=8">
+<link rel="stylesheet" href="styles/fishing-game.css?v=6">
+<link rel="stylesheet" href="styles/interface-v4.css?v=29">
+<link rel="stylesheet" href="styles/start-hub.css?v=18">
+<link rel="stylesheet" href="styles/discovery.css?v=16">
+<link rel="stylesheet" href="styles/tutorial.css?v=14">
 <link rel="stylesheet" href="styles/ar.css?v=1">
-<link rel="stylesheet" href="styles/mobile-controls.css?v=1">
+<link rel="stylesheet" href="styles/mobile-controls.css?v=2">
 <link rel="stylesheet" href="styles/map-explorer.css?v=4">
 <link rel="stylesheet" href="styles/accessibility.css?v=1">
 </head>
@@ -90,7 +90,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <div id="titleScreen">
 <div class="logo">WORLD EXPLORER</div>
 <div class="sub">Explore Any Place on Earth and Beyond</div>
-<button id="flowerChallengeToggleBtn" class="flowerChallengeToggleBtn" type="button" aria-label="Toggle challenge leaderboard" aria-controls="flowerChallengePanel" aria-expanded="false">🏁 Leaderboard</button>
+<button id="flowerChallengeToggleBtn" class="flowerChallengeToggleBtn" type="button" aria-label="Open Community Board" aria-controls="flowerChallengePanel" aria-expanded="false">◉ Community Board</button>
 <div class="title-main-row">
 <div class="menu-container">
 <div class="tab-nav">
@@ -112,8 +112,16 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <div class="loc custom" data-loc="custom"><div class="loc-name">🌍 Custom</div><div class="loc-region">Any Location</div></div>
 </div>
 <div class="title-location-actions">
-<button id="titleLiveGpsBtn" class="title-live-gps-btn" type="button">📍 Start Live GPS Explore</button>
-<button id="titleUseMyLocationBtn" class="title-use-location-btn" type="button">Use My Location</button>
+<div class="location-entry-pair" aria-label="Choose how to use your location">
+<button id="titleUseMyLocationBtn" class="title-use-location-btn location-entry-card" type="button">
+  <span class="location-entry-icon" aria-hidden="true">◎</span>
+  <span class="location-entry-copy"><strong data-location-entry-label>Current Location</strong><small>Explore here once</small></span>
+</button>
+<button id="titleLiveGpsBtn" class="title-live-gps-btn location-entry-card" type="button">
+  <span class="location-entry-icon" aria-hidden="true">⌖</span>
+  <span class="location-entry-copy"><strong data-location-entry-label>Live GPS</strong><small>Follow as I move</small></span>
+</button>
+</div>
 <div id="titleUseMyLocationStatus" class="title-location-status" aria-live="polite"></div>
 </div>
 <div id="customPanel">
@@ -293,40 +301,22 @@ Graphics changes apply to the current session.
 </div>
 <div style="margin-bottom:24px">
 <div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin-bottom:12px;display:flex;align-items:center;gap:8px">
-🏠 Real Estate Mode
-</div>
-<label style="display:flex;align-items:center;gap:12px;cursor:pointer;padding:12px;background:#f8fafc;border-radius:8px;border:2px solid #e2e8f0;transition:all 0.2s" id="realEstateToggleLabel">
-<input type="checkbox" id="realEstateToggle" style="width:20px;height:20px;cursor:pointer">
-<div>
-<div style="font-size:13px;font-weight:600;color:#1e293b">Enable Real Estate Features</div>
-<div style="font-size:11px;color:#64748b;margin-top:2px">Show property listings and prices in 3D</div>
-</div>
-</label>
-</div>
-<div style="margin-bottom:24px">
-<div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin-bottom:12px;display:flex;align-items:center;gap:8px">
-🔑 API Configuration
+Optional Property Data
 </div>
 <div style="background:#f8fafc;border:2px solid #e2e8f0;border-radius:12px;padding:16px">
-<div style="margin-bottom:16px">
-<label style="display:block;font-size:12px;font-weight:600;color:#1e293b;margin-bottom:6px">Estated API Key (FREE - 1000/month) ⭐</label>
-<input type="text" id="estatedKeyInput" placeholder="Enter your Estated API key" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;font-family:'Inter',sans-serif;color:#1e293b;margin-bottom:4px">
-<div style="font-size:10px;color:#10b981;margin-bottom:8px">
-✓ Recommended: Highest free tier! Get key at <a href="https://estated.com" target="_blank" style="color:#10b981;font-weight:600">Estated.com</a>
-</div>
-</div>
+<div hidden><input type="password" id="estatedKeyInput" autocomplete="off"></div>
 <div style="margin-bottom:16px">
 <label style="display:block;font-size:12px;font-weight:600;color:#1e293b;margin-bottom:6px">ATTOM API Key</label>
-<input type="text" id="attomKeyInput" placeholder="Enter your ATTOM API key" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;font-family:'Inter',sans-serif;color:#1e293b;margin-bottom:4px">
+<input type="password" id="attomKeyInput" autocomplete="off" placeholder="Enter your ATTOM API key" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;font-family:'Inter',sans-serif;color:#1e293b;margin-bottom:4px">
 <div style="font-size:10px;color:#64748b;margin-bottom:8px">
-ℹ️ Premium data with free trial. Get key at <a href="https://www.attomdata.com" target="_blank" style="color:#667eea">ATTOM.com</a>
+Property records from your ATTOM account. <a href="https://api.developer.attomdata.com/docs" target="_blank" rel="noopener noreferrer" style="color:#667eea">ATTOM documentation</a>
 </div>
 </div>
 <div style="margin-bottom:12px">
-<label style="display:block;font-size:12px;font-weight:600;color:#1e293b;margin-bottom:6px">RentCast API Key (Optional)</label>
-<input type="text" id="rentcastKeyInput" placeholder="Enter your RentCast API key" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;font-family:'Inter',sans-serif;color:#1e293b;margin-bottom:4px">
+<label style="display:block;font-size:12px;font-weight:600;color:#1e293b;margin-bottom:6px">RentCast API Key</label>
+<input type="password" id="rentcastKeyInput" autocomplete="off" placeholder="Enter your RentCast API key" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;font-family:'Inter',sans-serif;color:#1e293b;margin-bottom:4px">
 <div style="font-size:10px;color:#64748b;margin-bottom:8px">
-ℹ️ 100 free requests/month. Get key at <a href="https://rentcast.io" target="_blank" style="color:#667eea">RentCast.io</a>
+Sale and rental listings from your RentCast account. <a href="https://developers.rentcast.io/reference/search-queries" target="_blank" rel="noopener noreferrer" style="color:#667eea">RentCast documentation</a>
 </div>
 </div>
 <button id="saveApiKey" style="background:#667eea;border:none;border-radius:8px;padding:10px 20px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;font-size:13px;transition:all 0.2s;width:100%">
@@ -336,13 +326,12 @@ Graphics changes apply to the current session.
 </div>
 <div>
 <div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin-bottom:12px;display:flex;align-items:center;gap:8px">
-ℹ️ About Real Estate APIs
+How Connected Data Is Used
 </div>
 <div style="background:#f0f4ff;border:2px solid #c7d2fe;border-radius:12px;padding:16px;font-size:12px;color:#475569;line-height:1.6">
-<p style="margin:0 0 8px 0"><strong>🌟 Estated (Recommended):</strong> 1000 free requests/month - highest free tier!</p>
-<p style="margin:0 0 8px 0"><strong>💎 ATTOM:</strong> Premium comprehensive data with free trial available.</p>
-<p style="margin:0 0 8px 0"><strong>🏠 RentCast:</strong> 100 free requests/month for listings with photos.</p>
-<p style="margin:0"><strong>Demo Mode:</strong> No API key needed - realistic simulated data for testing.</p>
+<p style="margin:0 0 8px 0">Connected records appear under <strong>Home &amp; Property → Property Data</strong> as optional reference information.</p>
+<p style="margin:0 0 8px 0">Provider terms, coverage, and request limits depend on your own account. Keys are stored only in this browser.</p>
+<p style="margin:0">Outside data never creates game buildings, changes in-game home prices, or grants ownership.</p>
 </div>
 </div>
 </div>
@@ -417,7 +406,7 @@ Graphics changes apply to the current session.
 </div>
 <aside id="flowerChallengePanel" class="flowerChallengePanel">
 <div class="flowerChallengeHeader">
-<div class="flowerChallengeTitle">Leaderboards</div>
+<div class="flowerChallengeTitle">Community Board</div>
 <div id="gameLeaderboardBadge" class="flowerChallengeBadge">Flower Sprint</div>
 </div>
 <div class="flowerChallengeBody">
@@ -428,7 +417,8 @@ Graphics changes apply to the current session.
 <button id="leaderboardTabFlower" class="flowerLeaderboardTab active" type="button">🌹 Flower</button>
 <button id="leaderboardTabPaintTown" class="flowerLeaderboardTab" type="button">🟥 Paint Town</button>
 <button id="leaderboardTabFishing" class="flowerLeaderboardTab" type="button">🎣 Fishing</button>
-<button id="leaderboardTabExplorer" class="flowerLeaderboardTab" type="button">🧭 Explorer</button>
+<button id="leaderboardTabExplorer" class="flowerLeaderboardTab" type="button">◎ Community</button>
+<button id="leaderboardTabProperty" class="flowerLeaderboardTab" type="button">⌂ Property</button>
 <button id="leaderboardTabDeFlock" class="flowerLeaderboardTab" type="button">📷 DeFlock</button>
 </div>
 <div class="flowerChallengeRow">
@@ -520,12 +510,12 @@ Graphics changes apply to the current session.
 <aside id="analyticsConsentBanner" class="analytics-consent-banner" hidden aria-hidden="true" aria-labelledby="analyticsConsentTitle">
   <div>
     <strong id="analyticsConsentTitle">Help improve World Explorer</strong>
-    <p>Optional Firebase Analytics measures sessions, game and activity outcomes, room use, and onboarding. It does not receive exact GPS coordinates, room codes, messages, or other free-form text.</p>
+    <p>World Explorer uses standard Firebase Analytics to count visits and understand which parts of the game are used. You can switch to limited cookieless analytics at any time. If you are signed in, choosing standard analytics also helps count repeat play across devices. Advertising remains off, and exact GPS coordinates, room codes, messages, and other free-form text are never included.</p>
     <a href="../legal/privacy" target="_blank" rel="noopener">Privacy details</a>
   </div>
   <div class="analytics-consent-actions">
-    <button id="analyticsConsentDenyBtn" class="secondary" type="button">Essential only</button>
-    <button id="analyticsConsentAllowBtn" type="button">Allow analytics</button>
+    <button id="analyticsConsentDenyBtn" class="secondary" type="button">Use limited analytics</button>
+    <button id="analyticsConsentAllowBtn" type="button">Keep standard analytics</button>
   </div>
 </aside>
 <div id="globeSelectorScreen" aria-hidden="true">
@@ -554,11 +544,20 @@ Graphics changes apply to the current session.
 </div>
 </div>
 <div class="globe-selector-side">
+<div class="globe-location-entry-pair" aria-label="Choose how to use your location">
+  <button id="globeSelectorLocateBtn" class="globe-location-entry-card globe-location-current" type="button">
+    <span class="location-entry-icon" aria-hidden="true">◎</span>
+    <span class="location-entry-copy"><strong data-location-entry-label>Current Location</strong><small>Explore here once</small></span>
+  </button>
+  <button id="globeSelectorLiveGpsBtn" class="globe-location-entry-card globe-selector-live-gps-btn" type="button">
+    <span class="location-entry-icon" aria-hidden="true">⌖</span>
+    <span class="location-entry-copy"><strong data-location-entry-label>Live GPS</strong><small>Follow as I move</small></span>
+  </button>
+</div>
 <div class="globe-mobile-search">
   <input id="globeMobileLocationSearch" type="text" placeholder="Search city or place" aria-label="Search city or place">
   <button id="globeMobileLocationSearchBtn" type="button">Search</button>
 </div>
-<button id="globeSelectorLiveGpsBtn" class="globe-selector-action-btn globe-selector-live-gps-btn" type="button">📍 Start Live GPS Explore</button>
 <div class="globe-selector-stat">
 <div class="globe-selector-stat-label">Selected Coordinates</div>
 <div id="globeSelectorLatLon" class="globe-selector-stat-value">No point selected</div>
@@ -574,7 +573,6 @@ Graphics changes apply to the current session.
 <button id="globeSelectorLiveEarthModeBtn" class="globe-selector-mode-tab" type="button">Live Earth</button>
 </div>
 <div id="globeSelectorExplorePanel" class="globe-selector-mode-panel active">
-<button id="globeSelectorLocateBtn" class="globe-selector-search-btn globe-selector-locate-btn" type="button">Use My Location</button>
 <div id="globeLocationSearchStatus" style="font-size:11px;min-height:14px;color:#64748b">Search for a place or choose one from the globe.</div>
 <div id="globeLocationSearchResults" class="globe-location-search-results" role="listbox" aria-label="Place search results" hidden></div>
 <div class="globe-selector-field-label">Manual Coordinates</div>
@@ -678,13 +676,18 @@ Graphics changes apply to the current session.
 <div id="boatPrompt" aria-live="polite"></div>
 <div id="discoveryContextPrompt" aria-live="polite"><span id="discoveryContextText">Explore what is possible here.</span><button id="discoveryContextOpenBtn" type="button">Explore</button></div>
 <button id="discoveryQuickToolBtn" type="button" aria-controls="discoveryPanel" aria-expanded="false"><span>⌁</span><strong>Resume Field Activity</strong><span id="discoveryQuickSignal">Ready</span></button>
-<aside id="discoveryPanel" aria-label="My Explorer" aria-hidden="true">
+<aside id="currentJourneyCard" aria-label="Current journey" aria-live="polite" hidden>
+  <span class="currentJourneyMark" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="m15.8 8.2-2.1 5.5-5.5 2.1 2.1-5.5 5.5-2.1Z"></path></svg></span>
+  <div class="currentJourneyCopy"><span id="currentJourneyEyebrow">CURRENT JOURNEY</span><strong id="currentJourneyTitle">Explore this place</strong><small id="currentJourneyDetail">Choose something nearby and begin when you are ready.</small></div>
+  <button id="currentJourneyAction" type="button">Open</button>
+</aside>
+<aside id="discoveryPanel" aria-label="Explorer fieldwork" aria-hidden="true">
   <header class="discoveryHead">
-    <div class="discoveryIdentity"><span class="discoveryMark" aria-hidden="true">⌖</span><div><span class="discoveryEyebrow">My Explorer</span><strong id="discoveryPanelTitle">Today</strong></div></div>
-    <div class="discoveryHeadActions"><button id="discoveryProfileBtn" class="discoveryProfileBtn" type="button" aria-label="Open My Explorer profile" aria-pressed="false"><span id="discoveryProfileRank">Trailhead</span><b id="discoveryProfilePoints">0</b></button><button id="discoveryHelpBtn" type="button" aria-label="Show help for this section">?</button><button id="discoveryCloseBtn" type="button" aria-label="Minimize My Explorer" title="Minimize during play">—</button></div>
+    <div class="discoveryIdentity"><span class="discoveryMark" aria-hidden="true">⌖</span><div><span class="discoveryEyebrow">Explorer Fieldwork</span><strong id="discoveryPanelTitle">Today</strong></div></div>
+    <div class="discoveryHeadActions"><button id="discoveryProfileBtn" class="discoveryProfileBtn" type="button" aria-label="Open Explorer Profile" aria-pressed="false"><span id="discoveryProfileRank">Trailhead</span><b id="discoveryProfilePoints">0</b></button><button id="discoveryHelpBtn" type="button" aria-label="Show help for this section">?</button><button id="discoveryCloseBtn" type="button" aria-label="Minimize fieldwork" title="Minimize during play">—</button></div>
   </header>
   <div class="discoveryWorkspace">
-    <nav class="discoveryTabs" aria-label="My Explorer sections">
+    <nav class="discoveryTabs" aria-label="Explorer fieldwork sections">
       <button class="discoveryTab active" data-discovery-tab="today" type="button"><span>⌖</span>Today</button>
       <button class="discoveryTab" data-discovery-tab="journal" type="button"><span>≡</span>Journal</button>
       <button class="discoveryTab" data-discovery-tab="guide" type="button"><span>▤</span>Guide</button>
@@ -730,8 +733,9 @@ Graphics changes apply to the current session.
         <div id="discoveryFieldGuideList" class="discoveryList"></div>
       </section>
       <section class="discoveryPane discoveryProfilePane" data-discovery-pane="profile">
-        <div class="discoverySectionHead"><span>MY EXPLORER</span><small>IDENTITY / SKILLS / COMPANIONS</small></div>
+        <div class="discoverySectionHead"><span>EXPLORER PROFILE</span><small>IDENTITY / SKILLS / COMPANIONS</small></div>
         <div id="discoveryProfileHero" class="discoveryProfileHero"></div>
+        <section id="discoveryJourneyOverview" class="discoveryJourneyOverview" aria-label="Ways to explore"></section>
         <div id="discoveryProgress" class="discoveryProgressGrid"></div>
         <section class="discoveryCompanionSection"><div class="discoverySectionHead"><span>COMPANIONS</span><small>ANIMALS YOU KNOW</small></div><p>Wild species belong in the Guide. Individual animals you befriend and care for live here.</p><div id="discoveryCompanionList" class="discoveryList"></div></section>
         <details class="discoveryOnlineService"><summary>Data and backup</summary><p>Your Journal, Guide, companions, and local Backpack history are stored in this browser. Signed-in receipts cover eligible collected items; the full Journal does not yet follow you between devices.</p><div class="discoveryResultActions"><button id="discoveryExportBtn" type="button">Download backup</button><button id="discoveryImportBtn" type="button">Restore backup</button><input id="discoveryImportFile" type="file" accept="application/json,.json" hidden></div><p id="discoveryBackupStatus" role="status" aria-live="polite"></p></details>
@@ -910,6 +914,12 @@ Graphics changes apply to the current session.
 <div id="largeMap">
 <header id="mapExplorerHeader">
   <div><span>WORLD MAP</span><strong id="mapExplorerStatus">Following your position</strong></div>
+  <form id="mapSearchForm" class="mapSearchForm" role="search">
+    <label class="sr-only" for="mapSearchInput">Search for a city, place, airport, or coordinates</label>
+    <input id="mapSearchInput" type="search" autocomplete="off" placeholder="City, place, airport, or coordinates">
+    <button id="mapSearchBtn" type="submit">Search</button>
+    <span id="mapSearchStatus" role="status" aria-live="polite"></span>
+  </form>
   <button id="mapRecenter" type="button">◎ My position</button>
 </header>
 <canvas id="largeMapCanvas" width="800" height="800"></canvas>
@@ -960,18 +970,6 @@ Graphics changes apply to the current session.
       <div id="enterableBuildingsStatus" style="margin-bottom:6px">Open the legend to scan nearby enterable buildings.</div>
       <div style="margin-bottom:6px;color:#8ef9ff">Press <strong>E</strong> near a listed building to enter or exit.</div>
       <div id="enterableBuildingsList" style="display:grid;gap:4px"></div>
-    </div>
-  </details>
-
-  <details class="mapLegendGroup">
-    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;color:#0ff;display:flex;align-items:center;gap:6px">
-      <input type="checkbox" id="filterContributions" checked style="cursor:pointer">
-      <label for="filterContributions" style="cursor:pointer">Community places</label>
-    </summary>
-    <div style="font-size:10px;line-height:1.5;padding-left:24px;opacity:0.9">
-      <div style="margin-bottom:3px"><span style="color:#14b8a6">●</span> Approved place info</div>
-      <div style="margin-bottom:3px"><span style="color:#a855f7">◆</span> Approved artifact markers</div>
-      <div style="margin-bottom:3px">Drafts and pending submissions stay private until approved.</div>
     </div>
   </details>
 
@@ -1171,63 +1169,66 @@ Explore the area
 <div id="poiDistance" style="font-size:12px;text-align:center;padding-top:8px;border-top:1px solid rgba(0,255,200,0.3)">50m ahead</div>
 </div>
 <div class="floatMenuContainer" id="floatMenuContainer">
-<!-- Top Row: Exploration and Environment -->
-<div class="floatMenuRow">
+<!-- Stable player goals. Detailed controls stay inside their owning panels. -->
 <div class="floatMenu" id="exploreMenu">
-<button class="floatBtn explore" id="exploreBtn" type="button" aria-label="Travel modes" data-mobile-label="Modes"><span class="btnIcon">🌍</span><span class="btnText">Exploration</span></button>
-<div class="floatItems">
-<div class="floatItem" id="fDriving">🚗 Driving Mode</div>
-<div class="floatItem" id="fWalk">🚶 Walk Mode</div>
-<div class="floatItem" id="fWorldDiscovery">⌖ My Explorer &amp; Activities</div>
-<div class="floatItem" id="fBackpack">🎒 Backpack &amp; Quick Slots</div>
-<div class="floatItem" id="fDrone">🚁 Drone Mode</div>
-<div class="floatItem" id="fPlane">✈️ Personal Plane</div>
-<div class="floatItem" id="fBoat" style="display:none">🚤 Boat Mode</div>
-<div class="floatItem" id="fOceanMode">🌊 Ocean Mode</div>
-<div class="floatItem" id="fEarthMode">🌍 Earth Mode</div>
-<div class="floatItem" id="fSpaceDirect">🌙 Direct to Moon</div>
-<div class="floatItem" id="fSpaceRocket">🚀 Rocket to Moon</div>
-<div class="floatItem" id="fSpaceMars">🔴 Rocket to Mars</div>
+<button class="floatBtn explore" id="exploreBtn" type="button" aria-label="Open Explore" aria-expanded="false" data-mobile-label="Explore"><span class="btnIcon">⌖</span><span class="btnText">Explore</span></button>
+<div class="floatItems" data-menu-title="EXPLORE">
+<div class="floatItemSection" role="separator">FIELDWORK</div>
+<div class="floatItem" id="fWorldDiscovery">⌖ Today &amp; Nearby</div>
+<div class="floatItem" id="fLiveGps">📍 Explore with Live GPS</div>
+<div class="floatItemSection" role="separator">ACTIVITIES</div>
+<div class="floatItem" id="fDeFlock">📷 DeFlock Hunt</div>
+<div class="floatItem" id="fFlowerChallenge">🔴 Find Red Flower</div>
+<div class="floatItem" id="fFishing" style="display:none">🎣 Fishing</div>
+<div class="floatItemSection" role="separator">PLACES</div>
+<div class="floatItem" id="fHistoric">⛩️ Historic Places</div>
+<div class="floatItem" id="fPOI">📍 Nearby Places</div>
 </div>
 </div>
 
 <div class="floatMenu" id="travelMenu">
-<button class="floatBtn travel" id="travelBtn" type="button" aria-label="Environment controls" data-mobile-label="World"><span class="btnIcon">🌿</span><span class="btnText">Environment</span></button>
-<div class="floatItems">
-<div class="floatItem" id="fSatellite">🛰️ Satellite</div>
-<div class="floatItem" id="fRoads">🛣️ Show Roads</div>
-<div class="floatItem" id="fPaths" hidden>🚶 Path Overlay</div>
-<div class="floatItem" id="fLandUse">🗺️ Land Use</div>
-<div class="floatItem" id="fTimeOfDay">☀️ Live Sky</div>
-<div class="floatItem" id="fWeatherMode">🌦️ Weather Live</div>
-<div class="floatItem" id="fSeaState" style="display:none">🌊 Sea State: Moderate</div>
-<div class="floatItem" id="fClouds">☁️ Clouds</div>
-<div class="floatItem" id="fConstellations">✨ Constellations</div>
-</div>
-</div>
-
-</div>
-
-<!-- Bottom Row: Games and Real Estate -->
-<div class="floatMenuRow">
-<div class="floatMenu" id="gameMenu">
-<button class="floatBtn game" id="gameBtn" type="button" aria-label="Open games" aria-expanded="false" data-mobile-label="Games"><span class="btnIcon">🎮</span><span class="btnText">Games</span></button>
-<div class="floatItems" data-menu-title="GAMES">
-<div class="floatItemSection" role="separator">PLAY</div>
-<div class="floatItem" id="fActivities">🎮 Choose a Game</div>
-<div class="floatItem" id="fDeFlock">📷 DeFlock Hunt</div>
-<div class="floatItem" id="fFlowerChallenge">🔴 Find Red Flower</div>
-<div class="floatItem" id="fFishing" style="display:none">🎣 Fishing</div>
-<div class="floatItemSection" role="separator">LIVE</div>
-<div class="floatItem" id="fLiveGps">📍 Live GPS Explore</div>
-<div class="floatItem" id="fMultiplayer">👥 Multiplayer</div>
+<button class="floatBtn travel" id="travelBtn" type="button" aria-label="Open Travel" aria-expanded="false" data-mobile-label="Travel"><span class="btnIcon">◈</span><span class="btnText">Travel</span></button>
+<div class="floatItems" data-menu-title="TRAVEL">
+<div class="floatItemSection" role="separator">MAP</div>
+<div class="floatItem" id="fWorldMap">🗺️ World Map &amp; Search</div>
+<div class="floatItemSection" role="separator">MOVE</div>
+<div class="floatItem" id="fWalk">🚶 Walk</div>
+<div class="floatItem" id="fDriving">🚗 Drive</div>
+<div class="floatItem" id="fDrone">🚁 Fly Drone</div>
+<div class="floatItem" id="fPlane">✈️ Fly Plane</div>
+<div class="floatItem" id="fBoat" style="display:none">🚤 Pilot Boat</div>
+<div class="floatItemSection" role="separator">WORLDS</div>
+<div class="floatItem" id="fEarthMode">🌍 Explore Earth</div>
+<div class="floatItem" id="fOceanMode">🌊 Explore the Ocean</div>
+<div class="floatItemSection" role="separator">SPACE</div>
+<div class="floatItem" id="fDeployPathfinder">🛸 Launch Pathfinder</div>
+<div class="floatItem" id="fBoardSolisReach">🛰️ Board Solis Reach</div>
+<div class="floatItem" id="fSpaceRocket">✦ Free Space Flight</div>
+<div class="floatItem" id="fSpaceDirect">🌙 Direct to Moon</div>
 <div class="floatItemSection" role="separator">RECOVERY</div>
 <div class="floatItem" id="fRespawn">🎯 Return to Safe Ground</div>
+</div>
+</div>
 
+<div class="floatMenu" id="backpackMenu">
+<button class="floatBtn backpack" id="backpackBtn" type="button" aria-label="Open Backpack" aria-expanded="false" data-mobile-label="Backpack"><span class="btnIcon">▣</span><span class="btnText">Backpack</span></button>
+<div class="floatItems" data-menu-title="BACKPACK">
+<div class="floatItem" id="fBackpack">🎒 Items &amp; Quick Slots</div>
+<div class="floatItem" id="fExplorerJournal">≡ Journal</div>
+<div class="floatItem" id="fExplorerGuide">▤ Field Guide</div>
+<div class="floatItem" id="fExplorerProfile">◎ Profile, Skills &amp; Companions</div>
+</div>
+</div>
+
+<div class="floatMenu" id="communityMenu">
+<button class="floatBtn community" id="communityBtn" type="button" aria-label="Open Community" aria-expanded="false" data-mobile-label="Community"><span class="btnIcon">◎</span><span class="btnText">Community</span></button>
+<div class="floatItems" data-menu-title="COMMUNITY">
+<div class="floatItem" id="fMultiplayer">👥 Multiplayer</div>
+<div class="floatItem" id="fCommunityBoard">◎ Community Board</div>
+<div class="floatItem" id="fMemoryFlower">🌸 Leave a Memory Marker</div>
+<div class="floatItem" id="fSharePlace">↗ Share This Place</div>
 <!-- Preserved for future product work, intentionally absent from production UI. -->
 <div class="floatItem" id="fRoomGames" hidden>👥 Room Games</div>
-<div class="floatItem" id="fActivityCreator" hidden>🧩 Create Game</div>
-<div class="floatItem" id="fMemoryFlower" hidden>🌸 Place Memory Flower</div>
 <div class="floatItem" id="fTrack" hidden>🏁 Record Track</div>
 <div class="floatItem" id="fEraseTrack" hidden>🗑️ Erase Track</div>
 <div class="floatItem" id="fRespawnRand" hidden>🎲 Random Respawn</div>
@@ -1241,24 +1242,31 @@ Explore the area
 </div>
 
 <div class="floatMenu" id="realEstateMenu">
-<button class="floatBtn realEstate" id="realEstateFloatBtn" type="button" aria-label="Build, land, and property" data-mobile-label="Build"><span class="btnIcon">🏘️</span><span class="btnText">Land &amp; Property</span></button>
-<div class="floatItems">
-<div class="floatItem" id="fEditorMode">🏗️ Edit This World</div>
-<div class="floatItem" id="fEditorMine" hidden>📬 My Submissions</div>
-<div class="floatItem" id="fModerationPanel" hidden>🛡️ Review Queue</div>
-<div class="floatItem" id="fRealEstate">🏘️ Land &amp; Property</div>
-<div class="floatItem" id="fHistoric">⛩️ Historic</div>
-<div class="floatItem" id="fPOI">📍 POI</div>
-<div class="floatItem" id="fLandUseRE">🗺️ Land Use</div>
+<button class="floatBtn realEstate" id="realEstateFloatBtn" type="button" aria-label="Open Real Estate" aria-expanded="false" data-mobile-label="Real Estate"><span class="btnIcon">⌂</span><span class="btnText">Real Estate</span></button>
+<div class="floatItems" data-menu-title="REAL ESTATE">
+<div class="floatItem" id="fRealEstate">⌂ Property Hub</div>
+<div class="floatItem" id="fQuickBuild">🧱 Quick Build</div>
 </div>
 </div>
-</div>
-<div class="floatMenuRow">
-<div class="floatMenu" id="controlsMenu">
-<button class="floatBtn controls" id="controlsBarBtn" type="button" aria-label="Open controls" aria-expanded="false" data-mobile-label="Controls"><span class="btnIcon">⚙️</span><span class="btnText">Driving Mode</span></button>
-</div>
+
+<div class="floatMenu contextualMenuControl" id="controlsMenu">
+<button class="floatBtn controls" id="controlsBarBtn" type="button" aria-label="Open current controls" aria-expanded="false" title="Current controls"><span class="btnIcon">⚙️</span><span class="btnText">Controls</span></button>
 </div>
 <div class="floatItem" id="fHome" style="display:none">🏠 Menu</div>
+
+<!-- Map display settings live with the map; weather and time live in the top quick controls. -->
+<div hidden aria-hidden="true">
+<div class="floatItem" id="fSatellite">🛰️ Satellite</div>
+<div class="floatItem" id="fRoads">🛣️ Show Roads</div>
+<div class="floatItem" id="fPaths">🚶 Path Overlay</div>
+<div class="floatItem" id="fLandUse">🗺️ Land Use</div>
+<div class="floatItem" id="fLandUseRE">🗺️ Land Use</div>
+<div class="floatItem" id="fTimeOfDay">☀️ Live Sky</div>
+<div class="floatItem" id="fWeatherMode">🌦️ Weather Live</div>
+<div class="floatItem" id="fSeaState">🌊 Sea State: Moderate</div>
+<div class="floatItem" id="fClouds">☁️ Clouds</div>
+<div class="floatItem" id="fConstellations">✨ Constellations</div>
+</div>
 </div>
 
 <div id="memoryComposer">
@@ -1290,355 +1298,6 @@ Explore the area
 </div>
 </div>
 
-<section id="editorPanel" aria-label="Overlay editor panel">
-  <div class="editorPanelHeader">
-    <div class="editorPanelTitleWrap">
-      <div id="editorPanelTitle">World Editor Beta</div>
-      <div id="editorPanelSubline">Create reviewed World Explorer overlays or switch to persistent block building. Neither workflow changes OpenStreetMap, Overture, or imported provider data.</div>
-      <div id="editorAuthBadge">Preview only • Sign in to save drafts</div>
-    </div>
-    <div class="editorHeaderActions">
-      <button id="editorHelpBtn" type="button">Guide</button>
-      <button id="editorViewModeBtn" type="button">2D Plan</button>
-      <button id="editorPeekBtn" type="button">Peek World</button>
-      <button id="editorCloseBtn" type="button">Close</button>
-    </div>
-  </div>
-  <div id="editorStatus" data-tone="info">Overlay editor is ready.</div>
-  <div id="editorToolbar" class="editorToolbar">
-    <button type="button" data-editor-tool="select">Select</button>
-    <button type="button" data-editor-tool="draw_point">Point</button>
-    <button type="button" data-editor-tool="draw_line">Line</button>
-    <button type="button" data-editor-tool="draw_polygon">Polygon</button>
-    <button type="button" data-editor-tool="add_vertex">Add Vertex</button>
-    <button type="button" data-editor-tool="delete_vertex">Delete Vertex</button>
-    <button type="button" data-editor-tool="split_line">Split</button>
-    <button type="button" data-editor-action="merge">Merge</button>
-    <div class="editorToolbarSpacer"></div>
-    <button type="button" data-editor-action="undo">Undo</button>
-    <button type="button" data-editor-action="redo">Redo</button>
-    <button type="button" data-editor-action="validate">Validate</button>
-    <button type="button" data-editor-action="preview">Preview</button>
-  </div>
-  <div class="editorTabRow">
-    <button id="editorTabWorkspace" class="editorTabBtn active" type="button">Workspace</button>
-    <button id="editorTabMine" class="editorTabBtn" type="button">My Features</button>
-    <button id="editorTabBlocks" class="editorTabBtn" type="button">Blocks</button>
-    <button id="editorTabModeration" class="editorTabBtn" type="button" hidden>Moderation</button>
-  </div>
-  <div class="editorPanelBody">
-    <div id="editorWorkspacePane" class="editorPane active">
-      <div class="editorWorkspaceShell">
-        <aside id="editorSidebarPanel" class="editorSidePanel">
-          <div class="editorPanelSwitch">
-            <button id="editorSidebarStartBtn" class="active" type="button">Start Here</button>
-            <button id="editorSidebarPresetsBtn" type="button">Presets</button>
-            <button id="editorSidebarSelectionBtn" type="button">Workspace</button>
-          </div>
-          <div id="editorSidebarStartView" class="editorSidebarView">
-            <div id="editorOnboardingCard" class="editorOnboardingCard"></div>
-            <div class="editorSectionBlock">
-              <div class="editorSectionTitle">Base Feature</div>
-              <div id="editorBaseSelection" class="editorTargetCard">Select a base world feature in the scene to clone it into a World Explorer overlay draft.</div>
-              <button id="editorCloneBaseBtn" class="editorActionBtn" type="button">Clone Base To Overlay</button>
-            </div>
-          </div>
-          <div id="editorSidebarPresetsView" class="editorSidebarView" hidden>
-            <div class="editorSectionTitle">Presets</div>
-            <label class="editorField">
-              <span class="editorFieldLabel">Search Presets</span>
-              <input id="editorPresetSearchInput" type="text" maxlength="80" placeholder="road, building, water, entrance">
-            </label>
-            <div id="editorPresetSummary" class="editorHintCard editorPresetSummaryCard">Road: LineString road. base_patch / local_replace.</div>
-            <div id="editorPresetList" class="editorPresetGrid"></div>
-          </div>
-          <div id="editorSidebarSelectionView" class="editorSidebarView" hidden>
-            <div class="editorSectionBlock">
-              <div class="editorSectionTitle">Workspace Features</div>
-              <div id="editorWorkspaceFeatureList" class="editorListStack"></div>
-            </div>
-            <div class="editorSectionBlock">
-              <div class="editorSectionTitle">Validation</div>
-              <div id="editorValidationIssues" class="editorTagList"></div>
-            </div>
-          </div>
-        </aside>
-        <section class="editorViewportPanel">
-          <div id="editorViewportHint" class="editorViewportHint">Select: select overlay or base features, move vertices, and inspect geometry.</div>
-          <div id="editorViewportMeta" class="editorViewportMeta"></div>
-        </section>
-        <aside id="editorInspectorPanel" class="editorSidePanel editorInspectorPanel">
-          <div class="editorInspectorTop">
-            <div id="editorSelectedFeatureTitle">No Overlay Selected</div>
-            <div id="editorSelectedFeatureMeta">Select a base feature or draw a new overlay.</div>
-            <div class="editorMetaRow"><span>Geometry</span><span id="editorGeometryTypeValue">n/a</span></div>
-            <div class="editorMetaRow"><span>Review State</span><span id="editorReviewStateBadge" class="editorSubmissionStatus">unsaved</span></div>
-          </div>
-          <div class="editorActionRow compact">
-            <button id="editorCenterFeatureBtn" type="button">Focus</button>
-            <button id="editorDeleteFeatureBtn" type="button">Delete</button>
-            <button id="editorAddEntranceBtn" type="button">Add Entrance</button>
-          </div>
-          <div class="editorSectionTitle">Guided Editing</div>
-          <div id="editorSelectedPresetCard" class="editorHintCard">Select a feature or preset to see guided fields and examples.</div>
-          <div id="editorGuidedFieldPanel" class="editorGuidedFieldPanel"></div>
-          <label class="editorAdvancedToggle">
-            <input id="editorAdvancedToggle" type="checkbox">
-            <span>Show advanced mapping and raw editing. Use this only when the guided fields are not enough.</span>
-          </label>
-          <div id="editorAdvancedPanel" class="editorAdvancedPanel" hidden>
-            <div class="editorAdvancedWarning">Advanced edits write raw overlay properties and can create moderation risk if they drift from the preset. Use them deliberately.</div>
-            <div class="editorSectionTitle">Advanced Fields</div>
-            <div id="editorAdvancedFieldPanel" class="editorGuidedFieldPanel"></div>
-            <div class="editorSectionTitle">Underlying Mapping</div>
-            <div id="editorAdvancedMapping" class="editorAdvancedMapping"></div>
-            <div class="editorSectionTitle">Raw Tags</div>
-            <div id="editorTagList" class="editorTagList"></div>
-            <div class="editorKeyValueComposer">
-              <input id="editorNewTagKeyInput" type="text" maxlength="64" placeholder="tag key">
-              <input id="editorNewTagValueInput" type="text" maxlength="180" placeholder="tag value">
-              <button id="editorAddTagBtn" type="button">Add</button>
-            </div>
-            <div class="editorSectionTitle">Manual 3D / Relations</div>
-            <div class="editorGridTwo">
-              <label class="editorField">
-                <span class="editorFieldLabel">Height</span>
-                <input id="editorHeightInput" type="number" step="0.1" placeholder="meters">
-              </label>
-              <label class="editorField">
-                <span class="editorFieldLabel">Building Levels</span>
-                <input id="editorLevelsInput" type="number" step="1" placeholder="levels">
-              </label>
-              <label class="editorField">
-                <span class="editorFieldLabel">Min Height</span>
-                <input id="editorMinHeightInput" type="number" step="0.1" value="0">
-              </label>
-              <label class="editorField">
-                <span class="editorFieldLabel">Roof Shape</span>
-                <select id="editorRoofShapeSelect">
-                  <option value="flat">Flat</option>
-                  <option value="gabled">Gabled</option>
-                  <option value="hipped">Hipped</option>
-                  <option value="shed">Shed</option>
-                  <option value="dome">Dome</option>
-                </select>
-              </label>
-              <label class="editorField">
-                <span class="editorFieldLabel">Layer</span>
-                <input id="editorLayerInput" type="number" step="1" value="0">
-              </label>
-              <label class="editorField">
-                <span class="editorFieldLabel">Surface</span>
-                <input id="editorSurfaceInput" type="text" maxlength="60" placeholder="asphalt, concrete, grass">
-              </label>
-            </div>
-            <div class="editorToggleRow">
-              <label><input id="editorBridgeCheckbox" type="checkbox"> Bridge</label>
-              <label><input id="editorTunnelCheckbox" type="checkbox"> Tunnel</label>
-            </div>
-            <div class="editorGridTwo">
-              <label class="editorField">
-                <span class="editorFieldLabel">Level Ref</span>
-                <input id="editorLevelRefInput" type="text" maxlength="40" placeholder="G, L2, B1">
-              </label>
-              <label class="editorField">
-                <span class="editorFieldLabel">Building Ref</span>
-                <input id="editorBuildingRefInput" type="text" maxlength="180" placeholder="building id">
-              </label>
-            </div>
-            <div class="editorSectionTitle">Entrance Anchors</div>
-            <div id="editorEntrancesList" class="editorListStack"></div>
-          </div>
-        </aside>
-      </div>
-      <div id="editorPreviewDrawer" class="editorPreviewDrawer">
-        <div class="editorPreviewHead">
-          <div class="editorSectionTitle">Submission Preview</div>
-          <span class="editorSubmissionStatus">Overlay</span>
-        </div>
-        <div id="editorPreviewSummary">Select a feature to preview submission details.</div>
-        <div id="editorPreviewHighlights"></div>
-        <div id="editorPreviewValidation"></div>
-        <div id="editorPreviewChecklist"></div>
-        <label class="editorField" style="margin-top:10px">
-          <span class="editorFieldLabel">Submission Note</span>
-          <textarea id="editorSubmissionNoteInput" maxlength="320" placeholder="Optional moderation note or context for reviewers."></textarea>
-        </label>
-        <div class="editorActionRow">
-          <button id="editorSaveDraftBtn" class="editorActionBtn" type="button">Save Draft</button>
-          <button id="editorPreviewBtn" class="editorActionBtn" type="button">Refresh Preview</button>
-          <button id="editorSubmitBtn" class="editorActionBtn" type="button">Submit For Review</button>
-        </div>
-      </div>
-    </div>
-    <div id="editorMinePane" class="editorPane">
-      <div class="editorPaneIntro">Saved drafts stay private until you submit them. Approved contributions can appear in World Explorer; they are not sent to OpenStreetMap.</div>
-      <div id="editorOwnFeatureList" class="editorSubmissionList"></div>
-    </div>
-    <div id="editorModerationPane" class="editorPane">
-      <div class="editorPaneIntro">Moderators review submitted contributions, request changes, reject them, or approve and publish them to the shared world.</div>
-      <div class="editorModerationControls">
-        <label class="editorField">
-          <span class="editorFieldLabel">Review State</span>
-          <select id="editorModerationStateFilter">
-            <option value="all">All</option>
-            <option value="submitted">Submitted</option>
-            <option value="approved">Approved</option>
-            <option value="needs_changes">Needs Changes</option>
-            <option value="rejected">Rejected</option>
-          </select>
-        </label>
-        <label class="editorField wide">
-          <span class="editorFieldLabel">Search</span>
-          <input id="editorModerationSearchInput" type="text" maxlength="80" placeholder="Search label, preset, or base feature">
-        </label>
-      </div>
-      <div class="editorModerationShell">
-        <div id="editorModerationList" class="editorListStack"></div>
-        <div id="editorModerationDetail">
-          <div class="editorEmptyState">Select a submitted overlay feature to inspect and moderate it.</div>
-        </div>
-      </div>
-      <label class="editorField">
-        <span class="editorFieldLabel">Moderation Note</span>
-        <textarea id="editorModerationNoteInput" maxlength="320" placeholder="Explain approval, rejection, or requested changes."></textarea>
-      </label>
-      <div class="editorActionRow">
-        <button id="editorModerationApproveBtn" class="editorActionBtn" type="button">Approve &amp; Publish</button>
-        <button id="editorModerationNeedsBtn" class="editorActionBtn" type="button">Needs Changes</button>
-        <button id="editorModerationRejectBtn" class="editorActionBtn" type="button">Reject</button>
-      </div>
-    </div>
-  </div>
-  <aside id="editorHelpDrawer" class="editorHelpDrawer" aria-hidden="true">
-    <div class="editorHelpHead">
-      <div>
-        <div class="editorSectionTitle">Contributor Guide</div>
-        <div id="editorHelpDrawerTitle" class="editorHelpTitle">How Editing Works</div>
-        <div id="editorHelpDrawerSummary" class="editorHelpSummary">Use presets and guided fields to contribute to World Explorer. Changes are reviewed here and are not sent to OpenStreetMap.</div>
-      </div>
-      <button id="editorHelpCloseBtn" type="button">Close</button>
-    </div>
-    <div id="editorHelpTopicList" class="editorHelpTopicList"></div>
-    <div id="editorHelpContent" class="editorHelpContent"></div>
-  </aside>
-</section>
-
-<div id="editorTutorialModal" aria-hidden="true">
-  <div class="editorTutorialCard">
-    <div class="editorTutorialTitle">World Editor Beta</div>
-    <div class="editorTutorialText">Add details to World Explorer without changing the original map source. Contributions are reviewed here and are not sent to OpenStreetMap.</div>
-    <div class="editorTutorialList">
-      <div>1. Select a base feature to patch, or choose a preset and draw a point, line, or polygon directly in the 3D world.</div>
-      <div>2. Edit vertices, tags, and 3D properties like height, levels, roof shape, bridges, tunnels, and entrances.</div>
-      <div>3. Validate the overlay, preview it locally, and save draft revisions without affecting the public world.</div>
-      <div>4. Submit the overlay for moderation. Admin review decides whether it needs changes, is rejected, or is approved and published.</div>
-      <div>5. Published contributions appear in the world while the original map data remains unchanged.</div>
-    </div>
-    <div class="editorTutorialActions">
-      <button id="editorTutorialCancelBtn" type="button">Cancel</button>
-      <button id="editorTutorialStartBtn" type="button">Start Editing</button>
-    </div>
-  </div>
-</div>
-
-<section id="activityCreatorPanel" aria-label="Activity creator panel">
-  <div class="activityCreatorTopBar">
-    <div class="activityCreatorTitleWrap">
-      <div id="activityCreatorTitle">Activity Creator Beta</div>
-      <div id="activityCreatorSubline">Place anchors directly in the 3D world for routes, zones, dock points, and collectibles.</div>
-    </div>
-    <div class="activityCreatorHeaderActions">
-      <button id="activityCreatorGuideBtn" type="button">Start Here</button>
-      <button id="activityCreatorViewModeBtn" type="button">2D Plan</button>
-      <button id="activityCreatorSaveBtn" type="button">Save Activity</button>
-      <button id="activityCreatorResetBtn" type="button">Clear Draft</button>
-      <button id="activityCreatorCloseBtn" type="button">Close</button>
-    </div>
-  </div>
-  <div id="activityCreatorStatus" data-tone="info">Activity creator is ready.</div>
-  <div class="activityCreatorWorkspaceShell">
-    <aside class="activityCreatorSidePanel activityCreatorLeftPanel">
-      <div id="activityCreatorGuideCard" class="activityCreatorGuideCard">
-        <div class="activityCreatorGuideHead">
-          <div>
-            <div class="activityCreatorSectionTitle">Creator Walkthrough</div>
-            <div id="activityCreatorGuideProgress" class="activityCreatorGuideProgress">Step 1 of 6</div>
-          </div>
-          <button id="activityCreatorGuideDismissBtn" type="button">Hide</button>
-        </div>
-        <div id="activityCreatorGuideTitle" class="activityCreatorGuideTitle">Start with a simple route</div>
-        <div id="activityCreatorGuideBody" class="activityCreatorGuideBody">Pick a template, place a start point, then build a route step by step.</div>
-        <div class="activityCreatorGuideActions">
-          <button id="activityCreatorGuideActionBtn" class="primary" type="button">Let's Build</button>
-          <button id="activityCreatorGuideRestartBtn" type="button">Restart Guide</button>
-        </div>
-      </div>
-      <div class="activityCreatorSectionTitle">Template</div>
-      <label class="activityCreatorField">
-        <span>Activity Template</span>
-        <select id="activityCreatorTemplateSelect"></select>
-      </label>
-      <div id="activityCreatorSummary" class="activityCreatorSummaryCard"></div>
-      <div id="activityCreatorTemplateHelp" class="activityCreatorHelpCard"></div>
-      <div class="activityCreatorSectionTitle">Game Details</div>
-      <label class="activityCreatorField">
-        <span>Title</span>
-        <input id="activityCreatorTitleInput" type="text" maxlength="120" placeholder="Give this activity a name">
-      </label>
-      <label class="activityCreatorField">
-        <span>Description</span>
-        <textarea id="activityCreatorDescriptionInput" maxlength="220" placeholder="Tell players what this activity is about"></textarea>
-      </label>
-      <label class="activityCreatorField">
-        <span>Save To</span>
-        <select id="activityCreatorAudienceSelect">
-          <option value="library">Creator Library</option>
-        </select>
-      </label>
-      <div id="activityCreatorAudienceHelp" class="activityCreatorHelpCard">Creator Library activities stay only on this browser. Public activity publishing is not available yet.</div>
-      <div class="activityCreatorFieldGrid">
-        <label class="activityCreatorField">
-          <span>Placement Offset</span>
-          <input id="activityCreatorPlacementOffset" type="number" step="0.5" value="0">
-        </label>
-        <label class="activityCreatorToggle">
-          <input id="activityCreatorSnapToggle" type="checkbox" checked>
-          <span>Snap</span>
-        </label>
-      </div>
-      <div class="activityCreatorSectionTitle">Required Anchors</div>
-      <div id="activityCreatorChecklist" class="activityCreatorChecklist"></div>
-      <div class="activityCreatorSectionTitle">Anchor Palette</div>
-      <div id="activityCreatorAnchorPalette" class="activityCreatorAnchorPalette"></div>
-      <div class="activityCreatorSectionTitle">Validation</div>
-      <div id="activityCreatorValidation" class="activityCreatorValidation"></div>
-    </aside>
-    <section class="activityCreatorViewportPanel" aria-hidden="true"></section>
-    <aside class="activityCreatorSidePanel activityCreatorRightPanel">
-      <div class="activityCreatorSectionTitle">Placed Anchors</div>
-      <div id="activityCreatorAnchorList" class="activityCreatorAnchorList"></div>
-      <div class="activityCreatorSectionTitle">Inspector</div>
-      <div id="activityCreatorInspectorBody" class="activityCreatorInspectorBody"></div>
-    </aside>
-  </div>
-  <div id="activityCreatorToolDock" class="activityCreatorToolDock">
-    <button type="button" data-activity-tool="select">Select</button>
-    <button type="button" data-activity-tool="place">Place</button>
-    <button type="button" data-activity-tool="move">Move</button>
-    <button type="button" data-activity-tool="height">Height</button>
-    <button type="button" data-activity-tool="rotate">Rotate</button>
-    <button type="button" data-activity-tool="scale">Scale</button>
-    <button type="button" data-activity-action="undo">Undo</button>
-    <button type="button" data-activity-action="redo">Redo</button>
-    <button type="button" data-activity-action="test" id="activityCreatorTestBtn">Test Activity</button>
-  </div>
-  <div id="activityCreatorTestBar" class="activityCreatorTestBar" hidden>
-    <div id="activityCreatorTestSummary">Testing activity</div>
-    <button id="activityCreatorStopTestBtn" type="button">Return To Creator</button>
-  </div>
-</section>
-
 <section id="activityDiscoveryPanel" aria-label="Activity browser panel">
   <div class="activityDiscoveryTopBar">
     <div class="activityDiscoveryTitleWrap">
@@ -1646,7 +1305,6 @@ Explore the area
       <div id="activityDiscoverySubline">Choose a ready-to-play activity tied to the current real-world location.</div>
     </div>
     <div class="activityDiscoveryHeaderActions">
-      <button id="activityDiscoveryOpenCreatorBtn" type="button" hidden>Create Game</button>
       <button id="activityDiscoveryCloseBtn" type="button">Close</button>
     </div>
   </div>
@@ -1679,7 +1337,7 @@ Explore the area
     <div class="creatorProfileTopBar">
       <div class="creatorProfileTitleWrap">
         <div id="creatorProfileTitle">Creator Profile</div>
-        <div id="creatorProfileSubline">Room activity credit, device drafts, and published world overlays.</div>
+        <div id="creatorProfileSubline">Room activities and approved community contributions.</div>
       </div>
       <button id="creatorProfileCloseBtn" type="button">Close</button>
     </div>
@@ -1710,6 +1368,16 @@ Explore the area
 </div>
 
 <button class="mainMenuBtn" id="mainMenuBtn">🏠 Main Menu</button>
+<div id="worldQuickControls" aria-label="Quick world controls">
+<button id="quickTimeOfDay" class="worldQuickControl" type="button" aria-label="Change time of day" title="Change time of day">
+<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"></circle><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"></path></svg>
+<span id="quickTimeOfDayState">Live</span>
+</button>
+<button id="quickWeatherMode" class="worldQuickControl" type="button" aria-label="Change weather" title="Change weather">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.2 18.2h10.3a3.6 3.6 0 0 0 .4-7.2 5.8 5.8 0 0 0-11-1.1 4.2 4.2 0 0 0 .3 8.3Z"></path></svg>
+<span id="quickWeatherModeState">Live</span>
+</button>
+</div>
 <button id="memoryFlowerFloatBtn" title="Place Flower Memory">🌸</button>
 <div id="flowerActionMenu" aria-label="Flower Actions">
 <button id="flowerActionMemoryBtn" class="flowerActionOption" type="button">🌸 Place Memory Flower</button>
@@ -1734,10 +1402,9 @@ Explore the area
 </div>
 <aside id="blockBuilderPanel" aria-label="Build with Blocks" aria-hidden="true">
   <header class="blockBuilderHeader">
-    <strong>World Editor · Blocks</strong>
+    <strong>Quick Build</strong>
     <div class="blockBuilderHeaderActions">
-      <button id="blockBuilderBack" type="button">Overlays</button>
-      <button id="blockBuilderClose" type="button" aria-label="Close World Editor" title="Close World Editor">×</button>
+      <button id="blockBuilderClose" type="button" aria-label="Close Quick Build" title="Close Quick Build">×</button>
     </div>
   </header>
   <p class="blockBuilderTruthNote">Blocks persist in this virtual location on this device or in the current shared room. They never change OpenStreetMap, Overture, or real-world data.</p>
@@ -1903,5 +1570,5 @@ Explore the area
 <!-- Real Estate System -->
 <script type="module" src="js/app-shell-fragments.js?v=86"></script>
 <script type="module" src="js/app-auth-shell.js?v=87"></script>
-<script type="module" src="js/bootstrap.js?v=553"></script>
+<script type="module" src="js/bootstrap.js?v=585"></script>
 </body></html>

@@ -1,6 +1,4 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { getOverlayPreset } from "../editor/preset-registry.js?v=1";
-import { geometryPolygonRings } from "../editor/schema.js?v=1";
 import { loadTile } from "./tiles.js?v=5";
 
 const ROAD_MAP_INDEX_CELL_SIZE = 256;
@@ -137,7 +135,6 @@ function drawEarthBaseLayers(ctx, w, h, isLarge, view) {
   drawLinearFeatureLayers(ctx, w, h, isLarge, worldToScreen, mx, my);
   drawRoadLayers(ctx, w, h, isLarge, view, worldToScreen);
   drawInteriorLayer(ctx, w, h, isLarge, worldToScreen, mx, my);
-  drawContributionOverlayLayer(ctx, w, h, isLarge, latLonToScreen, mx, my);
 }
 
 function drawWaterLayers(ctx, w, h, isLarge, worldToScreen, mx, my) {
@@ -342,81 +339,6 @@ function drawInteriorLayer(ctx, w, h, isLarge, worldToScreen, mx, my) {
     }
   });
 
-  ctx.restore();
-}
-
-function drawContributionOverlayLayer(ctx, w, h, isLarge, latLonToScreen, mx, my) {
-  const overlayMapFeatures = [];
-  if (Array.isArray(appCtx.overlayPublishedFeatures)) {
-    appCtx.overlayPublishedFeatures.forEach((feature) => overlayMapFeatures.push({ feature, draft: false }));
-  }
-  if (Array.isArray(appCtx.overlayDraftPreviewFeatures)) {
-    appCtx.overlayDraftPreviewFeatures.forEach((feature) => overlayMapFeatures.push({ feature, draft: true }));
-  }
-  if (!(appCtx.mapLayers.contributions !== false && overlayMapFeatures.length > 0)) return;
-
-  ctx.save();
-  overlayMapFeatures.forEach(({ feature, draft }) => {
-    if (!feature || feature.worldKind !== "earth") return;
-    const preset = getOverlayPreset(feature.presetId);
-    const stroke = draft ? "#fde047" : preset.color;
-    const fill = draft ? "rgba(253,224,71,0.22)" : `${preset.color}33`;
-    ctx.lineWidth = isLarge ? 2 : 1.3;
-    ctx.strokeStyle = stroke;
-    ctx.fillStyle = fill;
-
-    if (feature.geometryType === "Point") {
-      const lat = Number(feature.geometry?.coordinates?.lat);
-      const lon = Number(feature.geometry?.coordinates?.lon);
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
-      const pos = latLonToScreen(lat, lon);
-      if (Math.abs(pos.x - mx) >= w / 2 || Math.abs(pos.y - my) >= h / 2) return;
-      const radius = isLarge ? 6 : 4;
-      ctx.beginPath();
-      ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      if (isLarge) {
-        const label = String(feature.tags?.name || feature.summary || preset.label || "Overlay");
-        ctx.font = "bold 10px Arial";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "bottom";
-        ctx.strokeStyle = "#082032";
-        ctx.lineWidth = 3;
-        ctx.strokeText(label.slice(0, 32), pos.x, pos.y - radius - 4);
-        ctx.fillStyle = draft ? "#fef3c7" : "#e0f2fe";
-        ctx.fillText(label.slice(0, 32), pos.x, pos.y - radius - 4);
-      }
-      return;
-    }
-
-    if (feature.geometryType === "LineString") {
-      const coords = Array.isArray(feature.geometry?.coordinates) ? feature.geometry.coordinates : [];
-      if (coords.length < 2) return;
-      ctx.beginPath();
-      coords.forEach((point, index) => {
-        const pos = latLonToScreen(Number(point.lat), Number(point.lon));
-        if (index === 0) ctx.moveTo(pos.x, pos.y);
-        else ctx.lineTo(pos.x, pos.y);
-      });
-      ctx.stroke();
-      return;
-    }
-
-    if (feature.geometryType === "Polygon") {
-      const ring = geometryPolygonRings(feature.geometry || {})[0] || [];
-      if (ring.length < 3) return;
-      ctx.beginPath();
-      ring.forEach((point, index) => {
-        const pos = latLonToScreen(Number(point.lat), Number(point.lon));
-        if (index === 0) ctx.moveTo(pos.x, pos.y);
-        else ctx.lineTo(pos.x, pos.y);
-      });
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-    }
-  });
   ctx.restore();
 }
 

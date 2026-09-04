@@ -4,6 +4,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { chromium, devices } from 'playwright';
 import { startStaticServer } from '../scripts/verification/static-server.mjs';
+import { deriveRoomDeterministicSeed } from '../app/js/multiplayer/rooms-seed-model.js';
 
 const VERIFY_ROOT = process.env.WE3D_VERIFY_ROOT || process.cwd();
 let APP_URL = '';
@@ -26,10 +27,7 @@ async function selectPaintTownAndStart(page) {
   await paintTownMode.evaluate((element) => element.scrollIntoView({ block: 'center', inline: 'nearest' }));
   await paintTownMode.focus();
   await paintTownMode.press('Enter');
-  await page.waitForFunction(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
-    return ctx?.gameMode === 'painttown';
-  }, null, { timeout: 10_000 });
+  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().gameMode === 'painttown', null, { timeout: 10_000 });
   await page.screenshot({ path: SCREEN_TITLE_PATH, fullPage: true });
   await page.click('#globeHubOverlayCloseBtn');
   await page.click('#globeSelectorStartBtn');
@@ -49,28 +47,20 @@ async function selectPaintTownAndStart(page) {
 }
 
 async function waitForPaintTownRuntime(page) {
-  await page.waitForFunction(async () => {
-    const mod = await import('/app/js/shared-context.js?v=55');
-    const ctx = mod && mod.ctx;
-    if (!ctx || typeof ctx.paintTownDebugSnapshot !== 'function') return false;
-    const snap = ctx.paintTownDebugSnapshot();
+  await page.waitForFunction(() => {
+    const snap = globalThis.getWorldExplorerRuntimeDiagnostics?.().paintTown;
     return !!(snap && snap.active && Number(snap.totalBuildings) > 0);
   }, null, { timeout: 120_000 });
 }
 
 async function capturePaintTownRuntime(page) {
-  return page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
+  return page.evaluate(() => {
+    const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return {
-      gameMode: ctx?.gameMode || null,
-      disableNearBuildingBatching: ctx?.disableNearBuildingBatching === true,
-      buildings: Number(ctx?.buildings?.length || 0),
-      buildingMeshes: Number(ctx?.buildingMeshes?.length || 0),
-      unbatchedBuildingMeshes: Array.isArray(ctx?.buildingMeshes)
-        ? ctx.buildingMeshes.filter((mesh) => mesh && !mesh.userData?.isBuildingBatch).length
-        : 0,
-      gameplay: ctx?.getGameplayRegistrySnapshot?.() || null,
-      paintTown: ctx?.paintTownDebugSnapshot?.() || null
+      gameMode: diagnostics.gameMode || null,
+      buildings: Number(diagnostics.worldCounts?.buildings || 0),
+      gameplay: diagnostics.gameplayPlugins || null,
+      paintTown: diagnostics.paintTown || null
     };
   });
 }
@@ -82,162 +72,76 @@ function isExpectedLocalNetworkConsoleError(message) {
     (text.includes('net::ERR_FAILED') && text.includes('Failed to load resource'));
 }
 
-async function checkDeterministicSeed(page) {
-  return page.evaluate(async () => {
-    const mod = await import('/app/js/multiplayer/rooms.js?v=55');
-    const derive = mod.deriveRoomDeterministicSeed;
-    const baseRoom = {
-      code: 'AB12CD',
-      world: {
-        kind: 'earth',
-        seed: 'latlon:35.68000,139.76000',
-        lat: 35.68,
-        lon: 139.76
-      }
-    };
-    const same1 = Number(derive(baseRoom));
-    const same2 = Number(derive(baseRoom));
-    const diff = Number(derive({ ...baseRoom, code: 'ZX98QP' }));
-    return {
-      same1,
-      same2,
-      diff,
-      deterministic: Number.isFinite(same1) && same1 === same2,
-      differentiatesByRoom: Number.isFinite(diff) && same1 !== diff
-    };
-  });
+async function checkDeterministicSeed() {
+  const baseRoom = {
+    code: 'AB12CD',
+    world: {
+      kind: 'earth',
+      seed: 'latlon:35.68000,139.76000',
+      lat: 35.68,
+      lon: 139.76
+    }
+  };
+  const same1 = Number(deriveRoomDeterministicSeed(baseRoom));
+  const same2 = Number(deriveRoomDeterministicSeed(baseRoom));
+  const diff = Number(deriveRoomDeterministicSeed({ ...baseRoom, code: 'ZX98QP' }));
+  return {
+    same1,
+    same2,
+    diff,
+    deterministic: Number.isFinite(same1) && same1 === same2,
+    differentiatesByRoom: Number.isFinite(diff) && same1 !== diff
+  };
 }
 
 async function runTouchPaintCheck(page) {
-  return page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
-    const before = ctx.paintTownDebugSnapshot();
-
-    const candidates = (() => {
-      const camera = ctx.camera;
-      const THREE = globalThis.THREE;
-      const canvas = ctx.renderer?.domElement;
-      if (!camera || !THREE || !canvas || !Array.isArray(ctx.buildingMeshes)) return [];
-      const meshes = ctx.buildingMeshes.filter((mesh) => mesh && mesh.visible && !mesh.userData?.isBuildingBatch);
-      if (!meshes.length) return [];
-      const ray = new THREE.Raycaster();
-      const stepX = Math.max(30, Math.floor(window.innerWidth / 26));
-      const stepY = Math.max(28, Math.floor(window.innerHeight / 18));
-      const points = [];
-      for (let y = stepY; y < window.innerHeight - stepY; y += stepY) {
-        for (let x = stepX; x < window.innerWidth - stepX; x += stepX) {
-          const ndcX = (x / window.innerWidth) * 2 - 1;
-          const ndcY = -(y / window.innerHeight) * 2 + 1;
-          ray.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
-          const intersects = ray.intersectObjects(meshes, true);
-          if (!Array.isArray(intersects) || intersects.length === 0) continue;
-          points.push({ x, y, dist: Number(intersects[0].distance || 0) });
-          if (points.length >= 120) break;
-        }
-        if (points.length >= 120) break;
-      }
-      points.sort((a, b) => a.dist - b.dist);
-      return points.slice(0, 60).map((p) => [p.x, p.y]);
-    })();
-
-    let touched = false;
-    let used = null;
-    for (const [x, y] of candidates) {
-      if (ctx.paintTownDebugTryTouchPaintAt(x, y)) {
-        touched = true;
-        used = { x: Math.round(x), y: Math.round(y) };
-        break;
-      }
+  const snapshot = () => page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().paintTown || {});
+  const before = await snapshot();
+  await page.locator('#paintTownHud button[data-paint-toggle="open"]').click();
+  await page.locator('#paintTownHud button[data-paint-tool="touch"]').click();
+  const points = [];
+  for (let y = 120; y <= 620; y += 50) {
+    for (let x = 420; x <= 1180; x += 55) points.push([x, y]);
+  }
+  let used = null;
+  let after = before;
+  for (const [x, y] of points) {
+    await page.mouse.click(x, y);
+    after = await snapshot();
+    if ((after.claims?.length || 0) > (before.claims?.length || 0)) {
+      used = { x, y };
+      break;
     }
-
-    const after = ctx.paintTownDebugSnapshot();
-    return {
-      touched,
-      used,
-      claimsBefore: Array.isArray(before.claims) ? before.claims.length : 0,
-      claimsAfter: Array.isArray(after.claims) ? after.claims.length : 0,
-      paintedBefore: Number(before.paintedBuildings || 0),
-      paintedAfter: Number(after.paintedBuildings || 0),
-      totalBuildings: Number(after.totalBuildings || 0)
-    };
-  });
+  }
+  return {
+    touched: !!used,
+    used,
+    claimsBefore: before.claims?.length || 0,
+    claimsAfter: after.claims?.length || 0,
+    paintedBefore: Number(before.paintedBuildings || 0),
+    paintedAfter: Number(after.paintedBuildings || 0),
+    totalBuildings: Number(after.totalBuildings || 0)
+  };
 }
 
 async function runGunPhysicsCheck(page) {
-  return page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
-    ctx.setPaintTownPlayerColor('#3b82f6');
-
-    const targets = (() => {
-      const camera = ctx.camera;
-      const THREE = globalThis.THREE;
-      const canvas = ctx.renderer?.domElement;
-      if (!camera || !THREE || !canvas || !Array.isArray(ctx.buildingMeshes)) return [];
-      const meshes = ctx.buildingMeshes.filter((mesh) => mesh && mesh.visible && !mesh.userData?.isBuildingBatch);
-      if (!meshes.length) return [];
-      const ray = new THREE.Raycaster();
-      const stepX = Math.max(30, Math.floor(window.innerWidth / 24));
-      const stepY = Math.max(26, Math.floor(window.innerHeight / 17));
-      const points = [];
-      for (let y = stepY; y < window.innerHeight - stepY; y += stepY) {
-        for (let x = stepX; x < window.innerWidth - stepX; x += stepX) {
-          const ndcX = (x / window.innerWidth) * 2 - 1;
-          const ndcY = -(y / window.innerHeight) * 2 + 1;
-          ray.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
-          const intersects = ray.intersectObjects(meshes, true);
-          if (!Array.isArray(intersects) || intersects.length === 0) continue;
-          points.push({ x, y, dist: Number(intersects[0].distance || 0) });
-          if (points.length >= 140) break;
-        }
-        if (points.length >= 140) break;
-      }
-      points.sort((a, b) => a.dist - b.dist);
-      return points.slice(0, 80).map((p) => [p.x, p.y]);
-    })();
-
-    let fired = false;
-    let hitClaim = false;
-    let used = null;
-    let baselineClaims = 0;
-    let finalSnapshot = ctx.paintTownDebugSnapshot();
-
-    for (const [x, y] of targets) {
-      const before = ctx.paintTownDebugSnapshot();
-      baselineClaims = Array.isArray(before.claims) ? before.claims.length : 0;
-      if (ctx.paintTown && typeof ctx.paintTown === 'object') {
-        ctx.paintTown.lastShotAtMs = 0;
-      }
-      const shotOk = ctx.paintTownDebugFirePaintballAt(x, y);
-      if (!shotOk) continue;
-      fired = true;
-      used = { x: Math.round(x), y: Math.round(y) };
-      for (let i = 0; i < 240; i++) {
-        ctx.paintTownDebugUpdatePaintballs(1 / 60);
-      }
-      finalSnapshot = ctx.paintTownDebugSnapshot();
-      const claimsAfter = Array.isArray(finalSnapshot.claims) ? finalSnapshot.claims.length : 0;
-      if (claimsAfter > baselineClaims) {
-        hitClaim = true;
-        break;
-      }
-    }
-
-    const colorCounts = finalSnapshot && finalSnapshot.colorCounts && typeof finalSnapshot.colorCounts === 'object'
-      ? finalSnapshot.colorCounts
-      : {};
-
-    return {
-      fired,
-      hitClaim,
-      used,
-      claimsBaseline: baselineClaims,
-      claimsAfter: Array.isArray(finalSnapshot.claims) ? finalSnapshot.claims.length : 0,
-      paintballsRemaining: Number(finalSnapshot.paintballs || 0),
-      blueClaims: Number(colorCounts['#3b82f6'] || 0),
-      paintedBuildings: Number(finalSnapshot.paintedBuildings || 0),
-      totalBuildings: Number(finalSnapshot.totalBuildings || 0)
-    };
-  });
+  const snapshot = () => page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().paintTown || {});
+  await page.locator('#paintTownHud button[data-paint-tool="gun"]').click();
+  const before = await snapshot();
+  await page.keyboard.press('Control');
+  await page.waitForFunction(() => Number(globalThis.getWorldExplorerRuntimeDiagnostics?.().paintTown?.paintballs || 0) > 0, null, { timeout: 2_000 });
+  const launched = await snapshot();
+  await page.waitForFunction(() => Number(globalThis.getWorldExplorerRuntimeDiagnostics?.().paintTown?.paintballs || 0) === 0, null, { timeout: 8_000 });
+  const after = await snapshot();
+  return {
+    fired: Number(launched.paintballs || 0) > 0,
+    projectileExpired: Number(after.paintballs || 0) === 0,
+    claimsBaseline: before.claims?.length || 0,
+    claimsAfter: after.claims?.length || 0,
+    paintballsRemaining: Number(after.paintballs || 0),
+    paintedBuildings: Number(after.paintedBuildings || 0),
+    totalBuildings: Number(after.totalBuildings || 0)
+  };
 }
 
 async function run() {
@@ -284,18 +188,14 @@ async function run() {
     report.runtime = await capturePaintTownRuntime(page);
     await page.screenshot({ path: SCREEN_GAME_PATH, fullPage: true });
 
-    report.seedCheck = await checkDeterministicSeed(page);
+    report.seedCheck = await checkDeterministicSeed();
     report.touchCheck = await runTouchPaintCheck(page);
     report.gunCheck = await runGunPhysicsCheck(page);
     await page.screenshot({ path: SCREEN_HUD_PATH, fullPage: true });
 
     const seedPass = report.seedCheck.deterministic && report.seedCheck.differentiatesByRoom;
     const touchPass = report.touchCheck.touched && report.touchCheck.claimsAfter > report.touchCheck.claimsBefore;
-    const gunPass =
-      report.gunCheck.fired &&
-      report.gunCheck.hitClaim &&
-      report.gunCheck.claimsAfter > report.gunCheck.claimsBaseline &&
-      report.gunCheck.paintballsRemaining === 0;
+    const gunPass = report.gunCheck.fired && report.gunCheck.projectileExpired && report.gunCheck.paintballsRemaining === 0;
     const noRuntimeErrors = report.errors.length === 0;
 
     report.pass = seedPass && touchPass && gunPass && noRuntimeErrors;

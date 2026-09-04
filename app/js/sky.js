@@ -7,7 +7,7 @@ import {
   inspectAstronomicalSkyState,
   refreshAstronomicalSky as refreshAstronomicalSkyState,
   setTimeOfDay as setSkyTimeOfDay
-} from "./sky/astronomical-state.js?v=6";
+} from "./sky/astronomical-state.js?v=7";
 import {
   alignStarFieldToLocation,
   checkMoonClick as checkMoonSelection,
@@ -18,7 +18,7 @@ import {
   showStarInfo,
   ensureStarCatalogLoaded
 } from "./sky/starfield-ui.js?v=15";
-import { createMoonLandingUiApi } from "./sky/moon-landing-ui.js?v=3";
+import { createMoonLandingUiApi } from "./sky/moon-landing-ui.js?v=4";
 import {
   activateMoonSurface,
   createMoonSurface as createMoonSurfaceRuntime
@@ -255,11 +255,9 @@ function arriveAtMoon() {
   const walkBtn = document.getElementById('fWalk');
   if (walkBtn) walkBtn.classList.remove('on');
 
-  // Update space menu button labels
-  const directBtn = document.getElementById('fSpaceDirect');
-  const rocketBtn = document.getElementById('fSpaceRocket');
-  if (directBtn) directBtn.textContent = '🌍 Return to Earth';
-  if (rocketBtn) rocketBtn.textContent = '🌍 Return to Earth';
+  // Travel menu visibility and copy are rendered by travel-mode.js after the
+  // environment transition commits. Sky owns the world transition only.
+  appCtx.syncTravelModeButtons?.();
 
   // Hide moon sphere (we're on it now!)
   appCtx.moonSphere.visible = false;
@@ -391,11 +389,9 @@ async function arriveAtEarth(expectedSessionId = null) {
   const weatherPanel = document.getElementById('weatherPanel');
   if (weatherPanel) weatherPanel.style.display = '';
 
-  // Update space menu button labels
-  const directBtn = document.getElementById('fSpaceDirect');
-  const rocketBtn = document.getElementById('fSpaceRocket');
-  if (directBtn) directBtn.textContent = '🌙 Direct to Moon';
-  if (rocketBtn) rocketBtn.textContent = '🚀 Rocket to Moon';
+  // The Travel menu has one renderer. Publishing Earth is enough for it to
+  // expose the Earth-only actions without a second DOM writer.
+  appCtx.syncTravelModeButtons?.();
 
   // Restore Earth lighting
   if (appCtx.sun) {

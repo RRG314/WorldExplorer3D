@@ -13,6 +13,15 @@ function recordPoint(record) {
   const points = recordPoints(record);
   if (!points.length) return null;
   if (points.length === 1) return points[0];
+  if (record?.geometry?.kind === 'polygon') {
+    const unique = points.length > 2 && points[0].x === points.at(-1).x && points[0].z === points.at(-1).z
+      ? points.slice(0, -1)
+      : points;
+    return Object.freeze({
+      x: unique.reduce((sum, point) => sum + point.x, 0) / unique.length,
+      z: unique.reduce((sum, point) => sum + point.z, 0) / unique.length
+    });
+  }
   return points[Math.floor(points.length * .5)];
 }
 
@@ -40,24 +49,31 @@ function offsetPoint(origin, yaw, right, forward) {
   });
 }
 
-function generatedRunway(center, yaw, length, width) {
-  const start = offsetPoint(center, yaw, 0, -length * .5);
-  const end = offsetPoint(center, yaw, 0, length * .5);
-  return Object.freeze({
-    id: 'generated-airport-layout:runway',
-    domain: 'aviation',
-    type: 'runway',
-    name: '',
-    mapped: false,
-    generatedActivity: true,
-    geometry: Object.freeze({ kind: 'path', points: Object.freeze([start, end]), complete: true }),
-    attributes: Object.freeze({ width, ref: '', generatedFallback: true }),
-    provenance: Object.freeze({
-      provider: 'World Explorer gameplay layout',
-      license: 'original-game-design',
-      attribution: 'Generated airport presentation anchored to mapped aviation context'
-    })
-  });
+function isExactMapped(record) {
+  return record?.geometryAuthority === 'exact-openstreetmap' ||
+    (record?.geometryAuthority == null && record?.provenance?.provider !== 'openstreetmap-shortbread');
+}
+
+function distanceBetween(left, right) {
+  return left && right ? Math.hypot(left.x - right.x, left.z - right.z) : Infinity;
+}
+
+function pointInPolygon(point, polygon) {
+  let inside = false;
+  for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index++) {
+    const a = polygon[index];
+    const b = polygon[previous];
+    const crosses = ((a.z > point.z) !== (b.z > point.z)) &&
+      point.x < (b.x - a.x) * (point.z - a.z) / ((b.z - a.z) || Number.EPSILON) + a.x;
+    if (crosses) inside = !inside;
+  }
+  return inside;
+}
+
+function selectDistributed(records, limit) {
+  if (records.length <= limit) return records;
+  return Array.from({ length: limit }, (_unused, index) =>
+    records[Math.min(records.length - 1, Math.floor((index + .5) * records.length / limit))]);
 }
 
 function runwayDesignator(yaw) {
@@ -73,7 +89,7 @@ function airportScale({ locationLabel = '', airportClasses = [], mappedLength = 
   const majorInfrastructure = mappedLength >= 2200 &&
     (runways.length >= 2 || terminals.length >= 1 || mappedStands.length >= 4);
   if (majorLabel || majorInfrastructure || terminals.length >= 2 || mappedStands.length >= 8) return 'major';
-  if (mappedLength >= 900 || runways.length || terminals.length || aprons.length || mappedStands.length ||
+  if (mappedLength >= 900 || terminals.length ||
     /airport|aerodrome|airfield|regional/.test(label)) return 'regional';
   return 'local';
 }
@@ -81,28 +97,35 @@ function airportScale({ locationLabel = '', airportClasses = [], mappedLength = 
 function compileAirportOperationalLayout(graph, options = {}) {
   const aviation = Array.isArray(graph?.byDomain?.aviation) ? graph.byDomain.aviation : [];
   if (!aviation.length) return null;
-  const runways = aviation.filter((record) => record.type === 'runway' && recordPoints(record).length >= 2);
-  const terminals = aviation.filter((record) => record.type === 'terminal');
-  const aprons = aviation.filter((record) => record.type === 'apron');
-  const mappedStands = aviation.filter((record) => ['parking_position', 'gate'].includes(record.type));
-  const aerodrome = aviation.find((record) => ['aerodrome', 'heliport'].includes(record.type));
-  const centerRecord = terminals[0] || aprons[0] || aerodrome || runways[0] || aviation[0];
-  const center = recordPoint(centerRecord);
-  if (!center) return null;
-  const mappedPrimary = [...runways].sort((left, right) => recordLength(right) - recordLength(left))[0] || null;
-  const mappedLength = mappedPrimary ? recordLength(mappedPrimary) : 0;
-  const mappedYaw = mappedPrimary ? recordYaw(mappedPrimary) : recordYaw(centerRecord);
+  // Physical airport publication requires exact runway geometry. Generalized
+  // airport points remain useful to search/travel, but cannot safely determine
+  // runway heading, extent, elevation, or airport membership.
+  const runways = aviation.filter((record) => record.type === 'runway' &&
+    isExactMapped(record) && recordPoints(record).length >= 2);
+  if (!runways.length) return null;
+  const mappedPrimary = [...runways].sort((left, right) => recordLength(right) - recordLength(left))[0];
+  const primaryCenter = recordPoint(mappedPrimary);
+  if (!primaryCenter) return null;
+  const membershipRadius = Math.max(1800, Math.min(5200, recordLength(mappedPrimary) * 1.8));
+  const belongsToAirport = (record) => isExactMapped(record) &&
+    distanceBetween(recordPoint(record), primaryCenter) <= membershipRadius;
+  const airportRecords = aviation.filter(belongsToAirport);
+  const terminals = airportRecords.filter((record) => record.type === 'terminal');
+  const aprons = airportRecords.filter((record) => record.type === 'apron');
+  const aerodromes = airportRecords.filter((record) => record.type === 'aerodrome');
+  const mappedStands = airportRecords.filter((record) => ['parking_position', 'gate'].includes(record.type));
+  const centerRecord = terminals[0] || aprons[0] || aerodromes[0] || mappedPrimary;
+  const center = recordPoint(centerRecord) || primaryCenter;
+  const mappedLength = recordLength(mappedPrimary);
   const locationLabel = String(options.location?.name || options.location?.city || '').toLowerCase();
   const airportClasses = [
     options.location?.locationDetails?.airportClass,
     options.location?.airportClass,
-    ...aviation.map((record) => record.attributes?.airportClass)
+    ...airportRecords.map((record) => record.attributes?.airportClass)
   ].filter(Boolean);
   const scale = airportScale({ locationLabel, airportClasses, mappedLength, runways, terminals, aprons, mappedStands });
   const large = scale !== 'local';
-  const fallbackLength = scale === 'major' ? 1100 : scale === 'regional' ? 720 : 480;
-  const fallbackWidth = scale === 'major' ? 48 : scale === 'regional' ? 40 : 30;
-  const primaryRunway = mappedPrimary || generatedRunway(center, mappedYaw, fallbackLength, fallbackWidth);
+  const primaryRunway = mappedPrimary;
   const yaw = recordYaw(primaryRunway);
   const length = Math.max(180, recordLength(primaryRunway));
   const width = Math.max(20, finite(primaryRunway.attributes?.width, large ? 46 : 32));
@@ -114,7 +137,8 @@ function compileAirportOperationalLayout(graph, options = {}) {
     : scale === 'major' ? { min: 18, max: 24 } : scale === 'regional' ? { min: 14, max: 18 } : { min: 8, max: 10 };
   const standTarget = Math.max(standLimits.min,
     Math.min(standLimits.max, mappedStands.length + terminals.length * 4 + runways.length * 3));
-  const stands = mappedStands.map((record, index) => Object.freeze({
+  const publishedMappedStands = selectDistributed(mappedStands, standLimits.max);
+  const stands = publishedMappedStands.map((record, index) => Object.freeze({
     id: record.id,
     ...recordPoint(record),
     yaw: recordYaw(record) || yaw,
@@ -122,14 +146,18 @@ function compileAirportOperationalLayout(graph, options = {}) {
     sourceType: record.type,
     index
   })).filter((stand) => [stand.x, stand.z].every(Number.isFinite));
-  const standOrigin = recordPoint(aprons[0] || terminals[0]) || offsetPoint(center, yaw, width * 2.6, 0);
-  for (let index = stands.length; index < standTarget; index += 1) {
-    const row = Math.floor(index / 6);
-    const column = index % 6;
+  const standApron = aprons.find((record) => record.geometry?.kind === 'polygon' && recordPoints(record).length >= 4) || null;
+  const standEnvelope = standApron ? recordPoints(standApron) : [];
+  const standOrigin = recordPoint(standApron || terminals[0]);
+  for (let candidateIndex = 0; standOrigin && standEnvelope.length && stands.length < standTarget && candidateIndex < standTarget * 8; candidateIndex += 1) {
+    const row = Math.floor(candidateIndex / 6);
+    const column = candidateIndex % 6;
     const side = row % 2 === 0 ? 1 : -1;
-    const lateral = side * (width * 2.2 + row * 34);
+    const lateral = side * (16 + Math.floor(row / 2) * 24);
     const forward = (column - 2.5) * (scale === 'major' ? 38 : scale === 'regional' ? 30 : 22);
     const point = offsetPoint(standOrigin, yaw, lateral, forward);
+    if (!pointInPolygon(point, standEnvelope)) continue;
+    const index = stands.length;
     stands.push(Object.freeze({
       id: `generated-airport-layout:stand:${index}`,
       ...point,
@@ -140,25 +168,41 @@ function compileAirportOperationalLayout(graph, options = {}) {
       index
     }));
   }
-  const mappedTower = aviation.find((record) => record.type === 'control_tower');
-  const towerPoint = recordPoint(mappedTower) || offsetPoint(center, yaw, -width * 3.5, -length * .12);
-  const tower = Object.freeze({
-    id: mappedTower?.id || 'generated-airport-layout:control-tower',
+  const mappedTower = airportRecords.find((record) => record.type === 'control_tower');
+  const mappedTowerPoint = recordPoint(mappedTower);
+  const apronCenter = recordPoint(standApron);
+  const generatedTowerPoint = apronCenter && standEnvelope.length
+    ? [
+        apronCenter,
+        { x: apronCenter.x + 24, z: apronCenter.z },
+        { x: apronCenter.x - 24, z: apronCenter.z },
+        { x: apronCenter.x, z: apronCenter.z + 24 },
+        { x: apronCenter.x, z: apronCenter.z - 24 }
+      ].filter((point) => pointInPolygon(point, standEnvelope))
+        .sort((left, right) => {
+          const clearance = (point) => Math.min(...stands.map((stand) => distanceBetween(point, stand)), 999);
+          return clearance(right) - clearance(left);
+        })[0] || null
+    : null;
+  const towerPoint = mappedTowerPoint || generatedTowerPoint;
+  const tower = towerPoint ? Object.freeze({
+    id: mappedTower?.id || `generated-airport-layout:control-tower:${standApron?.id || mappedPrimary.id}`,
     ...towerPoint,
     mapped: !!mappedTower,
     generatedActivity: !mappedTower,
     height: scale === 'major' ? 38 : scale === 'regional' ? 30 : 22
-  });
-  const ticketPoint = recordPoint(terminals[0]) || offsetPoint(standOrigin, yaw, -width * 1.7, -length * .08);
-  const ticketCounter = Object.freeze({
-    id: terminals[0]?.id || 'generated-airport-layout:terminal',
+  }) : null;
+  const mappedTerminal = terminals[0] || null;
+  const ticketPoint = recordPoint(mappedTerminal);
+  const ticketCounter = mappedTerminal && ticketPoint ? Object.freeze({
+    id: mappedTerminal.id,
     x: ticketPoint.x,
     z: ticketPoint.z,
     yaw,
-    mapped: !!terminals[0],
-    generatedActivity: !terminals[0],
+    mapped: true,
+    generatedActivity: false,
     entrance: Object.freeze(offsetPoint(ticketPoint, yaw, 0, large ? 13 : 9))
-  });
+  }) : null;
   return Object.freeze({
     type: 'AirportOperationalLayout',
     authority: 'compiled-airport-operational-layout',
@@ -171,7 +215,7 @@ function compileAirportOperationalLayout(graph, options = {}) {
     runwayWidth: width,
     runwayDesignator: String(primaryRunway.attributes?.ref || '').trim() || runwayDesignator(yaw),
     primaryRunway,
-    runways: Object.freeze(runways.length ? runways : [primaryRunway]),
+    runways: Object.freeze(runways),
     runwayStart: Object.freeze({ x: runwayStart.x, z: runwayStart.z }),
     runwayEnd: Object.freeze({ x: runwayEnd.x, z: runwayEnd.z }),
     stands: Object.freeze(stands),
@@ -179,12 +223,18 @@ function compileAirportOperationalLayout(graph, options = {}) {
     ticketCounter,
     hasMappedTerminal: terminals.length > 0,
     mappedRunway: !!mappedPrimary,
-    generatedFallback: !mappedPrimary,
+    generatedFallback: false,
+    operationalEnvelope: Object.freeze({
+      center: Object.freeze({ x: primaryCenter.x, z: primaryCenter.z }),
+      radius: membershipRadius,
+      apronRecordId: standApron?.id || ''
+    }),
     provenance: Object.freeze({
-      mappedRecordCount: aviation.length,
+      mappedRecordCount: airportRecords.length,
       mappedStandCount: mappedStands.length,
       mappedRunwayCount: runways.length,
-      generatedStandCount: stands.filter((stand) => !stand.mapped).length
+      generatedStandCount: stands.filter((stand) => !stand.mapped).length,
+      physicalAuthority: 'exact-openstreetmap-runway-and-apron-membership'
     })
   });
 }

@@ -310,7 +310,7 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
     }
     if (!state.roomActivities.length) {
       refs.roomActivityList.innerHTML =
-        '<li class="mpRoomEmpty">No room games yet. Open Create Game to add one for this room.</li>';
+        '<li class="mpRoomEmpty">No room activities are available yet.</li>';
       return;
     }
     const activeId = sanitizeText(state.activeRoomActivity?.activityId || "", 120).toLowerCase();

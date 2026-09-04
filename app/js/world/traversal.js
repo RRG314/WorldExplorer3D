@@ -88,13 +88,6 @@ export function traversableFeaturesForMode(mode = 'walk') {
     }
   }
 
-  if (!drive && Array.isArray(appCtx.overlayRuntimeLinearFeatures)) {
-    for (let i = 0; i < appCtx.overlayRuntimeLinearFeatures.length; i++) {
-      const feature = appCtx.overlayRuntimeLinearFeatures[i];
-      if (isWalkSurface(feature)) features.push(feature);
-    }
-  }
-
   return features;
 }
 

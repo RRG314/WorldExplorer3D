@@ -1,4 +1,4 @@
-import { APOLLO11_SURFACE_REGION } from '../planetary/runtime/surface-authority.js?v=3';
+import { APOLLO11_SURFACE_REGION } from '../planetary/runtime/surface-authority.js?v=4';
 
 const heightAsset = APOLLO11_SURFACE_REGION.assets.find((asset) => asset.role === 'height');
 const albedoAsset = APOLLO11_SURFACE_REGION.assets.find((asset) => asset.role === 'albedo');

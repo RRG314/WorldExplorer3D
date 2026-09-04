@@ -115,15 +115,15 @@ const MOBILE_CONTROL_PROFILES = {
     ]
   },
   rocket: {
-    moveLabel: 'Move',
-    lookLabel: 'Steer',
-    move: null,
-    look: {
+    moveLabel: 'Flight',
+    lookLabel: 'Look',
+    move: {
       up: { channel: 'space', key: 'arrowup' },
       down: { channel: 'space', key: 'arrowdown' },
       left: { channel: 'space', key: 'arrowleft' },
       right: { channel: 'space', key: 'arrowright' }
     },
+    look: null,
     actions: [
       { label: 'Accelerate', binding: { channel: 'space', key: ' ' } },
       { label: 'Decelerate', binding: { channel: 'space', key: 'shift' } }
@@ -158,7 +158,7 @@ const MOBILE_CONTROL_GUIDANCE = {
   skydiving: ['Skydiving', 'Steer · flare', 'Look', 'Deploy parachute'],
   drone: ['Drone', 'Fly · turn', 'Look', 'Ascend · descend'],
   plane: ['Plane', 'Pitch · roll', 'Look', 'Throttle + · −'],
-  rocket: ['Rocket', '—', 'Steer', 'Accelerate · brake'],
+  rocket: ['Space Flight', 'Pitch · turn', 'Camera follows', 'Accelerate · brake'],
   ocean: ['Submersible', 'Thrust · turn', 'Look', 'Ascend · descend']
 };
 
@@ -485,6 +485,7 @@ function initMobileControls() {
   }
 
   function detectControlsMode() {
+    if (appCtx.activeShipInterior === true && appCtx.Walk?.state?.mode === 'walk') return 'walking';
     if ((typeof appCtx.isEnv === 'function' && typeof appCtx.ENV !== 'undefined' && appCtx.isEnv(appCtx.ENV.OCEAN)) || appCtx.oceanMode?.active) {
       return 'ocean';
     }
@@ -539,6 +540,12 @@ function initMobileControls() {
       actions = [
         ...(Array.isArray(profile.actions) ? profile.actions.slice(0, 1) : []),
         { label: 'Explore', binding: { channel: 'earth', key: 'KeyE' } }
+      ];
+    }
+    if (appCtx.activeShipInterior === true && mode === 'walking') {
+      actions = [
+        { label: 'Jump', binding: { channel: 'earth', key: 'Space' } },
+        { label: 'Interact', binding: { channel: 'earth', key: 'KeyE' } }
       ];
     }
     if (appCtx.gameMode === 'deflock' && ['driving', 'walking', 'drone', 'boat'].includes(mode)) {
@@ -608,17 +615,6 @@ function initMobileControls() {
     if (planeControls) planeControls.style.display = mode === 'plane' ? 'block' : 'none';
     if (rocketControls) rocketControls.style.display = mode === 'rocket' ? 'block' : 'none';
     if (oceanControls) oceanControls.style.display = mode === 'ocean' ? 'block' : 'none';
-    oceanModeMenuItem?.classList.toggle('on', mode === 'ocean');
-    earthModeMenuItem?.classList.toggle('on', mode !== 'ocean');
-    if (oceanModeMenuItem) {
-      oceanModeMenuItem.textContent =
-        mode === 'boat' ? '🌊 Dive Underwater' :
-        mode === 'ocean' ? '🌊 Submarine Mode' :
-        '🌊 Ocean Mode';
-    }
-    if (earthModeMenuItem) {
-      earthModeMenuItem.textContent = mode === 'ocean' ? '🌍 Return to Earth' : '🌍 Earth Mode';
-    }
     if (controlsTab && ctrlContent) {
       controlsTab.classList.toggle('compact', isTouchPreferredClient && ctrlContent.classList.contains('hidden'));
     }
@@ -633,12 +629,16 @@ function initMobileControls() {
         mode === 'ocean' ? 'Submarine Mode' :
         'Driving Mode';
       const arrow = ctrlContent?.classList.contains('hidden') ? '▼' : '▲';
-      ctrlHeader.textContent = `⚙️ ${modeLabel} ${arrow}`;
+      const controlsOpen = !ctrlContent?.classList.contains('hidden');
+      ctrlHeader.textContent = isTouchPreferredClient && controlsOpen
+        ? 'Close controls ×'
+        : `⚙️ ${modeLabel} ${arrow}`;
+      ctrlHeader.setAttribute('aria-expanded', String(controlsOpen));
       const controlsBarBtn = document.getElementById('controlsBarBtn');
       const controlsBarLabel = controlsBarBtn?.querySelector('.btnText');
-      if (controlsBarLabel) controlsBarLabel.textContent = modeLabel;
-      controlsBarBtn?.setAttribute('aria-expanded', String(!ctrlContent?.classList.contains('hidden')));
-      controlsTab?.classList.toggle('bar-open', !ctrlContent?.classList.contains('hidden'));
+      if (controlsBarLabel) controlsBarLabel.textContent = `⚙️ ${modeLabel} Controls`;
+      controlsBarBtn?.setAttribute('aria-expanded', String(controlsOpen));
+      controlsTab?.classList.toggle('bar-open', controlsOpen);
     }
     updateMobileTouchControls(mode);
   }

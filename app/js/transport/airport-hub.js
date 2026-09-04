@@ -1,4 +1,4 @@
-import { searchPlaces } from '../places/place-search.js?v=2';
+import { searchPlaces } from '../places/place-search.js?v=3';
 
 function escapeHtml(value = '') {
   return String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[character]);
@@ -47,7 +47,7 @@ function createAirportHub(options = {}) {
       <div class="airport-hub__search"><input id="airportDestinationSearch" autocomplete="off" placeholder="Try Chicago, Tokyo, or BWI Airport"><button type="button">Search</button></div>
       <div class="airport-hub__status" aria-live="polite">Search worldwide. These are game journeys, not real airline schedules.</div>
       <div class="airport-hub__results"></div>
-      <footer class="airport-hub__footer"><small class="airport-hub__progress">Airport arrivals are saved to My Explorer.</small><button class="airport-hub__travel" type="button" disabled>Choose a destination</button></footer>
+      <footer class="airport-hub__footer"><small class="airport-hub__progress">Airport arrivals are saved to your Journal.</small><button class="airport-hub__travel" type="button" disabled>Choose a destination</button></footer>
     </div>`;
   document.body.appendChild(dialog);
   const refs = {
@@ -130,6 +130,8 @@ function createAirportHub(options = {}) {
           country: destination.country,
           displayName: destination.displayName,
           airportClass: destination.airportClass || '',
+          isAirport: destination.isAirport === true,
+          airportBounds: destination.airportBounds || null,
           iata: destination.iata || '',
           icao: destination.icao || ''
         }

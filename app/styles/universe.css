@@ -177,6 +177,130 @@
   font-size: 11px;
 }
 
+.destination-mission-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 10020;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(1, 5, 14, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.destination-mission-panel[hidden] {
+  display: none;
+}
+
+.destination-mission-card {
+  width: min(680px, calc(100vw - 32px));
+  max-height: min(760px, calc(100vh - 32px));
+  overflow: auto;
+  padding: 22px;
+  color: #eef7ff;
+  background: linear-gradient(145deg, rgba(7, 20, 37, 0.98), rgba(10, 35, 48, 0.98));
+  border: 1px solid rgba(111, 232, 255, 0.72);
+  border-radius: 10px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.58), inset 0 0 38px rgba(57, 190, 214, 0.05);
+  font-family: Inter, sans-serif;
+}
+
+.destination-mission-card header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.destination-mission-card header span,
+.destination-mission-current span,
+.destination-mission-evidence span {
+  color: #73e7f6;
+  font: 700 9px Orbitron, sans-serif;
+  letter-spacing: 0.12em;
+}
+
+.destination-mission-card h2 {
+  margin: 5px 0 0;
+  font: 700 24px Orbitron, sans-serif;
+}
+
+.destination-mission-card > p {
+  margin: 16px 0;
+  color: #c9d8e7;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.destination-mission-evidence,
+.destination-mission-current {
+  display: grid;
+  gap: 5px;
+  margin: 12px 0;
+  padding: 12px 14px;
+  background: rgba(12, 50, 66, 0.62);
+  border: 1px solid rgba(99, 201, 222, 0.35);
+  border-radius: 7px;
+}
+
+.destination-mission-evidence strong,
+.destination-mission-current strong {
+  font-size: 13px;
+}
+
+.destination-mission-evidence small {
+  color: #aebfd0;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.destination-mission-card ol {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.destination-mission-card li {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 8px 10px;
+  color: #8193a8;
+  border: 1px solid rgba(121, 148, 179, 0.22);
+  border-radius: 6px;
+}
+
+.destination-mission-card li i {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.destination-mission-card li.current {
+  color: #eefcff;
+  background: rgba(29, 108, 129, 0.36);
+  border-color: rgba(111, 232, 255, 0.65);
+}
+
+.destination-mission-card li.complete {
+  color: #83e6a6;
+  border-color: rgba(87, 194, 126, 0.32);
+}
+
+.destination-mission-actions {
+  display: grid;
+}
+
 .universe-navigator.is-busy .universe-frame-name::after {
   content: ' · TRANSIT';
   color: #78c9ff;
@@ -305,6 +429,22 @@
   .universe-course-cue {
     max-width: min(180px, calc(100vw - 28px));
     padding: 6px 8px;
+  }
+
+  .destination-mission-panel {
+    align-items: end;
+    padding: 0;
+  }
+
+  .destination-mission-card {
+    width: 100vw;
+    max-height: 82vh;
+    padding: 18px;
+    border-radius: 10px 10px 0 0;
+  }
+
+  .destination-mission-card h2 {
+    font-size: 20px;
   }
 }
 }

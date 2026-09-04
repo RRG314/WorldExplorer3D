@@ -1,13 +1,16 @@
-import { normalizeAstronomicalBodyId } from '../../astronomy/body-catalog.js?v=2';
-import { getPlanetarySurfaceRegion } from './surface-authority.js?v=3';
+import { normalizeAstronomicalBodyId } from '../../astronomy/body-catalog.js?v=3';
+import { getPlanetarySurfaceRegion } from './surface-authority.js?v=4';
 
 function activePlanetaryBodyId(appContext) {
   if (appContext?.onMoon) return 'moon';
   if (appContext?.onMars) return 'mars';
-  const bodyId = normalizeAstronomicalBodyId(
-    appContext?.planetarySurfaceAuthority?.snapshot?.()?.active?.bodyId
-  );
-  return bodyId && bodyId !== 'earth' ? bodyId : null;
+  const activeBodyId = String(
+    appContext?.activePlanetaryBodyId || appContext?.planetarySurfaceAuthority?.snapshot?.()?.active?.bodyId || ''
+  ).trim().toLowerCase();
+  const bodyId = normalizeAstronomicalBodyId(activeBodyId) || activeBodyId;
+  return bodyId && bodyId !== 'earth' && getPlanetarySurfaceRegion(
+    appContext?.planetarySurfaceAuthority?.snapshot?.()?.active?.regionId
+  ) ? bodyId : null;
 }
 
 function samplePlanetarySurfaceAtRenderXZ(appContext, x, z, options = {}) {
@@ -21,9 +24,8 @@ function samplePlanetarySurfaceAtRenderXZ(appContext, x, z, options = {}) {
   if (!authority || !active) {
     return Object.freeze({ status: 'unavailable', reason: 'no-accepted-planetary-surface' });
   }
-  const expectedBodyId = normalizeAstronomicalBodyId(
-    options.bodyId || activePlanetaryBodyId(appContext)
-  );
+  const requestedBodyId = String(options.bodyId || activePlanetaryBodyId(appContext) || '').trim().toLowerCase();
+  const expectedBodyId = normalizeAstronomicalBodyId(requestedBodyId) || requestedBodyId;
   if (!expectedBodyId) {
     return Object.freeze({ status: 'unavailable', reason: 'planetary-body-not-active' });
   }

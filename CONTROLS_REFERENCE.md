@@ -1,6 +1,6 @@
 # Controls Reference
 
-Last reviewed: 2026-08-27 for World Explorer 3D 5.1.0.
+Last reviewed: 2026-09-03 for World Explorer 3D 5.2.0.
 
 Canonical control map for current runtime behavior.
 
@@ -28,7 +28,7 @@ Developer overlays only respond when developer diagnostics are enabled.
 - `J`: open/close the Journal / Field Guide
 - `1`–`6`: quick-equip a carried item (`6` selects the parachute)
 - `V`: use the equipped item
-- With the parachute equipped, press `V` while descending at least 3.25 m above the ground to deploy it. It repacks automatically on landing.
+- With the parachute equipped, press `Space` while descending at least 3.25 m above the ground to deploy it. It repacks automatically on landing.
 - `T`: take an available nearby item
 - `X`: currently unassigned; it no longer opens, advances, or cancels field activities
 

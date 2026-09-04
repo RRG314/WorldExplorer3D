@@ -9,15 +9,33 @@ function buildingVerticalRangeOverlap(building, actorBaseY, actorHeight, toleran
 
 function createBuildingCollisionQuery(appCtx) {
   return function checkBuildingCollision(x, z, carRadius = 2, options = {}) {
-    if (!Array.isArray(appCtx.buildings) || appCtx.buildings.length === 0) return { collision: false };
+    const hasBaseBuildings = Array.isArray(appCtx.buildings) && appCtx.buildings.length > 0;
+    const hasDynamicColliders = Array.isArray(appCtx.dynamicBuildingColliders) && appCtx.dynamicBuildingColliders.length > 0;
+    if (!hasBaseBuildings && !hasDynamicColliders) return { collision: false };
     const actorBaseY = Number.isFinite(options?.actorBaseY) ? Number(options.actorBaseY) : NaN;
     const actorHeight = Number.isFinite(options?.actorHeight) ? Number(options.actorHeight) : 1.9;
     const acceptCollision = typeof options?.acceptCollision === 'function'
       ? options.acceptCollision
       : null;
-    const candidates = typeof appCtx.getNearbyBuildings === 'function'
+    const indexedCandidates = typeof appCtx.getNearbyBuildings === 'function'
       ? appCtx.getNearbyBuildings(x, z, carRadius + 8)
       : appCtx.buildings;
+    // Authored interiors, Quick Builds and other active-world obstacles are
+    // intentionally kept out of the cached Earth building index. They still
+    // belong to this one collision authority. In particular, a ship interior
+    // can be entered before getNearbyBuildings is published on the shared
+    // context; falling back to only appCtx.buildings made every ship wall and
+    // closed pressure door non-solid even though their colliders existed.
+    const candidates = [];
+    const seenCandidates = new Set();
+    [
+      ...(Array.isArray(indexedCandidates) ? indexedCandidates : []),
+      ...(Array.isArray(appCtx.dynamicBuildingColliders) ? appCtx.dynamicBuildingColliders : [])
+    ].forEach((candidate) => {
+      if (!candidate || seenCandidates.has(candidate)) return;
+      seenCandidates.add(candidate);
+      candidates.push(candidate);
+    });
     if (!candidates?.length) return { collision: false };
 
     for (let i = 0; i < candidates.length; i += 1) {

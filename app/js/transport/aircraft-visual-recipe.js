@@ -14,6 +14,23 @@ function material(THREE, color, roughness = .58, metalness = .1, extra = {}) {
   return new THREE.MeshStandardMaterial({ color, roughness, metalness, ...extra });
 }
 
+function aircraftVisualSpecification(entry, options = {}) {
+  const role = String(entry?.role || '');
+  return Object.freeze({
+    canopyKind: role === 'aerobatic' ? 'flush-fuselage-panels' : 'raised-cabin-glazing',
+    engineCount: role === 'airliner'
+      ? 4
+      : ['aerobatic', 'regional', 'business'].includes(role)
+        ? 2
+        : 1,
+    passengerWindowCount: role === 'aerobatic'
+      ? 0
+      : options.mobile
+        ? Math.min(12, Math.max(3, Math.round(Number(entry?.dimensions?.length || 0) / 5)))
+        : Math.min(24, Math.max(4, Math.round(Number(entry?.dimensions?.length || 0) / 2.7)))
+  });
+}
+
 function aircraftGroundOffset(entry) {
   if (entry?.aircraftKind === 'rotorcraft') return Math.max(.8, Number(entry.dimensions.height) * .46);
   const width = Math.max(.8, Number(entry?.dimensions?.width) || 1.4);
@@ -281,6 +298,7 @@ function fixedWingVisual(THREE, entry, options, mats) {
   const fuselageRadius = Math.max(.42, width * .43);
   const fuselageRadiusY = Math.max(.4, width * .4);
   const segments = options.mobile ? 18 : 32;
+  const visualSpecification = aircraftVisualSpecification(entry, options);
   const fuselage = new THREE.Mesh(
     ellipticalFuselageGeometry(THREE, length, fuselageRadius, fuselageRadiusY, segments),
     mats.body
@@ -333,6 +351,53 @@ function fixedWingVisual(THREE, entry, options, mats) {
         length * .397, width * .36, length
       ), mats.glass));
     }
+  } else if (entry.role === 'aerobatic') {
+    // The personal aircraft uses flush cockpit glazing. A scaled sphere read as
+    // a separate windshield sitting on top of the fuselage, especially from
+    // the close traversal camera.
+    for (const [centerZ, panelLength, panelWidth] of [
+      [length * .31, length * .105, width * .46],
+      [length * .405, length * .075, width * .34]
+    ]) {
+      group.add(new THREE.Mesh(flushFuselageTopPanelGeometry(
+        THREE,
+        fuselageRadius,
+        fuselageRadiusY,
+        0,
+        panelWidth,
+        centerZ,
+        panelLength,
+        length
+      ), mats.glass));
+    }
+    for (const side of [-1, 1]) {
+      group.add(new THREE.Mesh(flushFuselageOvalPanelGeometry(
+        THREE,
+        side,
+        fuselageRadius,
+        fuselageRadiusY,
+        fuselageRadiusY * .22,
+        width * .19,
+        length * .345,
+        length * .18,
+        length,
+        options.mobile ? 10 : 16
+      ), mats.glass));
+    }
+    const canopyFrame = new THREE.Mesh(
+      flushFuselageTopPanelGeometry(
+        THREE,
+        fuselageRadius,
+        fuselageRadiusY,
+        0,
+        Math.max(.045, width * .028),
+        length * .35,
+        length * .19,
+        length
+      ),
+      mats.trim
+    );
+    group.add(canopyFrame);
   } else {
     const canopy = new THREE.Mesh(new THREE.SphereGeometry(1, segments, Math.max(10, segments / 2)), mats.glass);
     canopy.scale.set(width * .34, Math.max(.18, width * .17), Math.max(.34, length * .075));
@@ -350,7 +415,7 @@ function fixedWingVisual(THREE, entry, options, mats) {
       .035 * length, length * .46, length
     ), mats.accent));
   }
-  const windowCount = options.mobile ? Math.min(12, Math.max(3, Math.round(length / 5))) : Math.min(24, Math.max(4, Math.round(length / 2.7)));
+  const windowCount = visualSpecification.passengerWindowCount;
   for (let side = -1; side <= 1; side += 2) {
     for (let index = 0; index < windowCount; index += 1) {
       const windowHeight = Math.max(.14, Math.min(.3, width * .11));
@@ -382,7 +447,7 @@ function fixedWingVisual(THREE, entry, options, mats) {
     ), mats.accent);
     group.add(liveryAccent);
   }
-  const engineCount = entry.role === 'airliner' ? 4 : entry.role === 'regional' || entry.role === 'business' ? 2 : 1;
+  const engineCount = visualSpecification.engineCount;
   if (entry.role === 'bush') {
     const cowling = cylinderAlongZ(THREE, fuselageRadius * .76, length * .1, mats.body, segments);
     cowling.position.z = length * .51;
@@ -658,4 +723,9 @@ function updateAircraftVisual(visual, condition = 1, dt = 0) {
   });
 };
 
-export { aircraftGroundOffset, createAircraftVisual, updateAircraftVisual };
+export {
+  aircraftGroundOffset,
+  aircraftVisualSpecification,
+  createAircraftVisual,
+  updateAircraftVisual
+};

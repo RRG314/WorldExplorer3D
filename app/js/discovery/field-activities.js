@@ -308,6 +308,8 @@ function createFieldActivitySession(options = {}) {
       message: state.message, error: state.error,
       targetId: state.slot?.id || null,
       targetCatalogId: state.slot?.catalogId || null,
+      targetRegionalPackId: state.slot?.regionalPackId || null,
+      targetRegionalPackVersion: state.slot?.regionalPackVersion || null,
       targetName: ['revealed', 'recorded'].includes(state.phase) ? discovery?.names?.common || state.slot?.catalogId : null,
       evidenceClass: state.slot?.evidenceClass || null,
       evidenceContract: state.slot?.evidenceContract ? {

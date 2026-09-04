@@ -3,7 +3,7 @@ import {
   createAuxiliaryRenderer,
   disposeThreeRenderer,
   getPrimaryWorldCanvas
-} from "./engine/webgl-lifecycle.js?v=1";
+} from "./engine/webgl-lifecycle.js?v=2";
 import {
   createDeepOceanBackdrop as createDeepOceanBackdropAsset,
   createMarineParticles as createMarineParticlesAsset,

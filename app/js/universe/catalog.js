@@ -531,6 +531,36 @@ const CHILD_DESTINATIONS = Object.freeze(CATALOG.flatMap((parent) =>
 const ALL_DESTINATIONS = Object.freeze([...CATALOG, ...CHILD_DESTINATIONS]);
 const BY_ID = new Map(ALL_DESTINATIONS.map((item) => [item.id, item]));
 const BY_ADDRESS = new Map(ALL_DESTINATIONS.map((item) => [item.address, item]));
+const RUNTIME_DESTINATIONS = new Map();
+const RUNTIME_CHILD_IDS = new Map();
+
+function registerUniverseRuntimeDestination(definition) {
+  const id = String(definition?.id || '').trim();
+  if (!id) throw new TypeError('A runtime universe destination requires a stable id.');
+  if (ALL_DESTINATIONS.some((item) => item.id === id)) throw new Error(`Runtime universe destination cannot replace catalog entry: ${id}`);
+  for (const childId of RUNTIME_CHILD_IDS.get(id) || []) {
+    const child = RUNTIME_DESTINATIONS.get(childId);
+    if (child) BY_ADDRESS.delete(child.address);
+    RUNTIME_DESTINATIONS.delete(childId);
+    BY_ID.delete(childId);
+  }
+  const previous = RUNTIME_DESTINATIONS.get(id);
+  if (previous) BY_ADDRESS.delete(previous.address);
+  const parent = entity({ ...definition, id });
+  const children = parent.objectClass === 'planetary_system'
+    ? parent.children.map((child) => makeChildDestination(parent, child))
+    : [];
+  RUNTIME_DESTINATIONS.set(id, parent);
+  BY_ID.set(id, parent);
+  BY_ADDRESS.set(parent.address, parent);
+  children.forEach((child) => {
+    RUNTIME_DESTINATIONS.set(child.id, child);
+    BY_ID.set(child.id, child);
+    BY_ADDRESS.set(child.address, child);
+  });
+  RUNTIME_CHILD_IDS.set(id, Object.freeze(children.map((child) => child.id)));
+  return parent;
+}
 
 function distanceLightYears(item) {
   const canonical = item?.canonicalPosition || {};
@@ -557,7 +587,7 @@ function resolveUniverseAddress(addressOrId) {
 }
 
 function getUniverseDestinations() {
-  return ALL_DESTINATIONS.filter((item) => [
+  return [...ALL_DESTINATIONS, ...RUNTIME_DESTINATIONS.values()].filter((item) => [
     'planetary_system',
     'exoplanet',
     'nebula',
@@ -592,5 +622,6 @@ export {
   getUniverseDestinations,
   getUniverseFrame,
   icrsToCartesian,
+  registerUniverseRuntimeDestination,
   resolveUniverseAddress
 };

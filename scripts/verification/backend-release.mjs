@@ -12,21 +12,27 @@ for (const variable of ['FIREBASE_AUTH_EMULATOR_HOST', 'FIRESTORE_EMULATOR_HOST'
 const steps = [
   { id: 'firestore-rules', command: [process.execPath, '--test', 'tests/firestore.rules.security.test.mjs'] },
   { id: 'discovery-receipts', command: [process.execPath, '--test', 'tests/discovery-receipt-endpoint-current.test.mjs'] },
+  { id: 'public-user-count', command: [process.execPath, 'scripts/verification/public-user-count-backend-current.mjs'] },
+  { id: 'connected-property-backend', command: [process.execPath, 'scripts/verification/connected-property-backend-current.mjs'] },
+  { id: 'urban-civic-backend', command: [process.execPath, 'scripts/verification/urban-civic-backend-current.mjs'] },
+  { id: 'shared-expedition', command: [process.execPath, 'scripts/verification/interstellar-shared.mjs'] },
+  { id: 'connected-property-multiplayer', command: [process.execPath, 'scripts/verification/connected-property-multiplayer-current.mjs'] },
   { id: 'multiplayer', command: [process.execPath, 'scripts/verification/multiplayer.mjs'] },
-  { id: 'creator-flow', command: [process.execPath, 'scripts/verification/creator-flow.mjs'] },
-  ...['desktop', 'mobile', 'vehicle', 'room'].map((scope) => ({
-    id: `world-editor-blocks-${scope}`,
-    command: [process.execPath, 'scripts/verification/world-editor-blocks.mjs'],
-    environment: { WE3D_BLOCKS_SCOPE: scope, WE3D_REQUIRE_IMMUTABLE: '1' }
-  }))
+  { id: 'account-backend', command: [process.execPath, 'scripts/verification/account-backend-current.mjs'] },
 ];
 
+const requestedStart = String(process.env.WE3D_BACKEND_FROM || '').trim();
+const requestedIndex = requestedStart ? steps.findIndex((step) => step.id === requestedStart) : 0;
+if (requestedStart && requestedIndex < 0) {
+  throw new Error(`Unknown backend resume step: ${requestedStart}`);
+}
+const selectedSteps = steps.slice(Math.max(0, requestedIndex));
 const runId = new Date().toISOString().replace(/[:.]/g, '-');
 const outputDir = path.join('/tmp', 'worldexplorer3d-verification', 'backend-release', runId);
 mkdirSync(outputDir, { recursive: true });
 const results = [];
 
-for (const step of steps) {
+for (const step of selectedSteps) {
   console.log(`[backend-release] START ${step.id}`);
   const result = await runLoggedStep(step.command, {
     cwd: process.cwd(),
@@ -47,8 +53,10 @@ for (const step of steps) {
 }
 
 const report = {
-  ok: results.length === steps.length && results.every((entry) => entry.ok),
+  ok: results.length === selectedSteps.length && results.every((entry) => entry.ok),
   contract: 'world-explorer-backend-release-v1',
+  resumedFrom: requestedStart || null,
+  completeGate: requestedStart === '',
   artifactRoot: String(process.env.WE3D_VERIFY_ROOT || ''),
   outputDir,
   results

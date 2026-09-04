@@ -57,7 +57,6 @@ let mapLayers = {
   roads: true,
   paths: false,
   interiors: true,
-  contributions: true,
   // Memory markers
   memoryPins: true,
   memoryFlowers: true
@@ -154,12 +153,6 @@ let waterWaveVisuals = [];
 let streetFurnitureMeshes = [];
 let vegetationFeatures = [],vegetationMeshes = [];
 let activityDiscoveryCatalog = [], activityDiscoveryMapMarkers = [];
-let editorApprovedSubmissions = [], editorApprovedMeshes = [];
-let overlayPublishedFeatures = [], overlayDraftPreviewFeatures = [], overlayRuntimeRoads = [], overlayRuntimeLinearFeatures = [], overlayRuntimePois = [], overlayRuntimeBuildingColliders = [];
-let overlaySuppression = {
-  roadIds: new Set(),
-  buildingIds: new Set()
-};
 let activeInterior = null;
 let interiorHint = null;
 let nearestPOI = null;
@@ -234,17 +227,8 @@ Object.assign(appCtx, {
   buildingMeshes,
   buildings,
   dynamicBuildingColliders,
-  editorApprovedMeshes,
-  editorApprovedSubmissions,
   activityDiscoveryCatalog,
   activityDiscoveryMapMarkers,
-  overlayDraftPreviewFeatures,
-  overlayPublishedFeatures,
-  overlayRuntimeLinearFeatures,
-  overlayRuntimeBuildingColliders,
-  overlayRuntimePois,
-  overlayRuntimeRoads,
-  overlaySuppression,
   camMode,
   camera,
   car,
@@ -361,17 +345,8 @@ export {
   buildingMeshes,
   buildings,
   dynamicBuildingColliders,
-  editorApprovedMeshes,
-  editorApprovedSubmissions,
   activityDiscoveryCatalog,
   activityDiscoveryMapMarkers,
-  overlayDraftPreviewFeatures,
-  overlayPublishedFeatures,
-  overlayRuntimeLinearFeatures,
-  overlayRuntimeBuildingColliders,
-  overlayRuntimePois,
-  overlayRuntimeRoads,
-  overlaySuppression,
   camMode,
   camera,
   car,

@@ -1,4 +1,5 @@
 import { createBackpackModel } from '../player/backpack-model.js?v=4';
+import { createLocalBackpackStore } from '../player/backpack-store.js?v=2';
 
 const EQUIPMENT_DEFINITIONS = Object.freeze([
   Object.freeze({ id: 'hands', label: 'Hands', category: 'unarmed', slot: 1, range: 2.4, force: 12, cooldownMs: 520, actionLabel: 'Shove', icon: 'HAND', verbs: ['equip', 'use'] }),
@@ -174,4 +175,16 @@ function createEquipmentInventory(options = {}) {
   });
 }
 
-export { EQUIPMENT_DEFINITIONS, createEquipmentInventory, definitionFor };
+function ensurePlayerBackpackInventory(appContext, options = {}) {
+  if (!appContext || typeof appContext !== 'object') throw new TypeError('Application context is required.');
+  const store = appContext.playerBackpackStore || createLocalBackpackStore(options.storage);
+  appContext.playerBackpackStore = store;
+  const inventory = appContext.playerBackpackInventory || createEquipmentInventory({
+    persistedState: store.load(),
+    ...options.inventoryOptions
+  });
+  appContext.playerBackpackInventory = inventory;
+  return inventory;
+}
+
+export { EQUIPMENT_DEFINITIONS, createEquipmentInventory, definitionFor, ensurePlayerBackpackInventory };

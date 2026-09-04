@@ -1,4 +1,5 @@
 import { Timestamp, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
+import { deriveRoomDeterministicSeed, hashStringToUint32 } from './rooms-seed-model.js?v=1';
 
 const ROOM_CODE_LENGTH = 6;
 const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -274,30 +275,6 @@ function normalizeRoomRules(rawRules = {}) {
     allowPaintballGun: source.allowPaintballGun !== false,
     allowRoofAutoPaint: source.allowRoofAutoPaint !== false
   };
-}
-
-function hashStringToUint32(input) {
-  const text = String(input || '');
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < text.length; i++) {
-    hash ^= text.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193) >>> 0;
-  }
-  return hash >>> 0;
-}
-
-function deriveRoomDeterministicSeed(roomLike = {}) {
-  const roomId = normalizeCode(roomLike.code || roomLike.id || '');
-  const world = normalizeWorld(roomLike.world || {});
-  const rawSeed = String(world.seed || '').trim();
-  const numericSeed = Number(rawSeed);
-  if (Number.isFinite(numericSeed)) {
-    return (Math.floor(numericSeed) | 0) >>> 0;
-  }
-
-  const baseSeed = rawSeed || `${world.kind}:${world.lat.toFixed(6)},${world.lon.toFixed(6)}`;
-  const mixed = `${baseSeed}|${world.kind}|${world.lat.toFixed(6)}|${world.lon.toFixed(6)}|${roomId}`;
-  return hashStringToUint32(mixed) >>> 0;
 }
 
 function normalizeVisibility(raw) {

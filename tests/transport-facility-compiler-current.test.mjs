@@ -1,12 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { buildWorldOverpassPlan } from '../app/js/world/osm-loader.js';
+import { buildWorldOverpassPlan, fetchOverpassJSON } from '../app/js/world/osm-loader.js';
 import {
   compileTransportFacilityGraph,
   facilityClassification
 } from '../app/js/transport/facility-compiler.js';
 import { shortbreadFeatureTags } from '../app/js/world/shortbread-source.js';
+import {
+  TAXIWAY_MARKING_RENDER_POLICY,
+  physicalPublicationAllowed,
+  profileSurfaceYAt,
+  runwaySurfaceProfile
+} from '../app/js/transport/facility-visuals.js';
 
 const fixture = Object.freeze({
   _overpassSource: 'fixture',
@@ -26,7 +32,7 @@ const fixture = Object.freeze({
   ])
 });
 
-test('the worldwide bounded query requests supported aviation and maritime infrastructure once', () => {
+test('the single primary query requests exact airport, civic, commerce, road, and maritime geometry', () => {
   const plan = buildWorldOverpassPlan({
     location: { lat: 39, lon: -76 }, roadsRadius: .02,
     featureRadiusScale: 1, poiRadiusScale: 1, buildingVisibleRadiusWorld: 1200,
@@ -39,6 +45,11 @@ test('the worldwide bounded query requests supported aviation and maritime infra
   assert.match(plan.transportFacilityQuery, /\["route"="ferry"\]/);
   assert.match(plan.transportFacilityQuery, /\["seamark:type"~"\^\(harbour\|berth\)\$"\]/);
   assert.equal((plan.transportFacilityQuery.match(/\[out:json\]/g) || []).length, 1);
+  assert.match(plan.primaryQuery, /nwr\["aeroway"~"\^\(aerodrome\|heliport\|runway/);
+  assert.match(plan.primaryQuery, /nwr\["amenity"~"\^\(police\|hospital\)\$"\]/);
+  assert.match(plan.primaryQuery, /nwr\["shop"="convenience"\]/);
+  assert.equal((plan.primaryQuery.match(/\[out:json\]/g) || []).length, 1);
+  assert.ok(plan.transportFacilityCacheMeta.featureRadius >= .036, 'airport coverage cannot be clipped to a city-block radius');
 });
 
 test('the facility compiler preserves mapped geometry, provenance, completeness, and domains', () => {
@@ -52,6 +63,8 @@ test('the facility compiler preserves mapped geometry, provenance, completeness,
   assert.equal(runway.geometry.kind, 'path');
   assert.equal(runway.geometry.complete, true);
   assert.equal(runway.generatedActivity, false);
+  assert.equal(runway.geometryAuthority, 'exact-openstreetmap');
+  assert.equal(runway.exactPhysicalGeometry, true);
   assert.equal(runway.provenance.license, 'ODbL-1.0');
   const ferry = graph.records.find(({ type }) => type === 'ferry_route');
   assert.equal(ferry.geometry.kind, 'point');
@@ -87,11 +100,81 @@ test('the worldwide Shortbread fallback preserves aviation and maritime meaning'
 test('world lifecycle owns facility fetch, graph, visuals, and teardown', async () => {
   const loader = await readFile(new URL('../app/js/world/load-roads.js', import.meta.url), 'utf8');
   const reset = await readFile(new URL('../app/js/world/load-reset.js', import.meta.url), 'utf8');
-  assert.equal((loader.match(/'transport-facilities'/g) || []).length, 1);
+  assert.equal((loader.match(/'transport-facilities'/g) || []).length, 0,
+    'airport geometry must not launch a competing Overpass request');
+  assert.match(loader, /selectExactFacilityElements\(exactSupplementData\)/);
   assert.match(loader, /appCtx\.transportFacilityGraph = transportFacilityGraph/);
   assert.match(loader, /createTransportFacilityVisuals/);
   assert.match(loader, /runtimeState\.transportFacilities = loadMetrics\.transportFacilities/);
   assert.match(reset, /transportFacilityVisual\?\.dispose\?\.\(\)/);
   assert.match(reset, /transportFacilityGraph = null/);
   assert.doesNotMatch(loader, /live (ship|aircraft) occupancy/i);
+});
+
+test('generalized airport geometry is never physically published', () => {
+  assert.equal(physicalPublicationAllowed({
+    domain: 'aviation', geometryAuthority: 'generalized-vector', provenance: { provider: 'OpenStreetMap' }
+  }), false);
+  assert.equal(physicalPublicationAllowed({
+    domain: 'aviation', geometryAuthority: 'exact-openstreetmap', provenance: { provider: 'OpenStreetMap' }
+  }), true);
+});
+
+test('runway body, markings, and aircraft share a terrain-clearing surface profile', () => {
+  const runway = {
+    type: 'runway',
+    attributes: { width: 40 },
+    geometry: { points: [{ x: 0, z: 0 }, { x: 0, z: 120 }] }
+  };
+  const terrain = (x, z) => 2 + z * .01 + (Math.abs(x) > 15 ? 3 : 0);
+  const profile = runwaySurfaceProfile(runway, terrain, 10);
+  assert.ok(profile.length >= 13);
+  for (const point of profile) {
+    assert.ok(point.y >= terrain(20, point.z) + .089,
+      'profile must clear the highest sampled runway edge, not only its center');
+  }
+  const surfaceY = profileSurfaceYAt([{ profile, width: 40 }], 0, 60);
+  assert.ok(Number.isFinite(surfaceY));
+  assert.ok(surfaceY >= terrain(20, 60) + .089);
+  assert.equal(profileSurfaceYAt([{ profile, width: 40 }], 80, 60), null);
+});
+
+test('mapped taxiway centerlines retain a distance-stable surface render policy', () => {
+  assert.equal(TAXIWAY_MARKING_RENDER_POLICY.frustumCulled, false);
+  assert.equal(TAXIWAY_MARKING_RENDER_POLICY.depthWrite, false);
+  assert.ok(TAXIWAY_MARKING_RENDER_POLICY.desktopWidth >= .28);
+  assert.ok(TAXIWAY_MARKING_RENDER_POLICY.mobileWidth >= TAXIWAY_MARKING_RENDER_POLICY.desktopWidth);
+  assert.ok(TAXIWAY_MARKING_RENDER_POLICY.surfaceOffset >= .08);
+  assert.ok(TAXIWAY_MARKING_RENDER_POLICY.polygonOffsetFactor <= -4);
+  assert.ok(TAXIWAY_MARKING_RENDER_POLICY.polygonOffsetUnits <= -4);
+  assert.ok(TAXIWAY_MARKING_RENDER_POLICY.renderOrder > 8);
+});
+
+test('Overpass endpoint fallbacks are serial and never hedge concurrent requests', async () => {
+  let active = 0;
+  let maximumActive = 0;
+  const calls = [];
+  const fetchImpl = async (endpoint) => {
+    calls.push(endpoint);
+    active += 1;
+    maximumActive = Math.max(maximumActive, active);
+    await new Promise((resolve) => setTimeout(resolve, 8));
+    active -= 1;
+    if (endpoint === 'https://one.invalid') return { ok: false, status: 503 };
+    return { ok: true, text: async () => JSON.stringify({ elements: [] }) };
+  };
+  const result = await fetchOverpassJSON(
+    `[out:json];node(${Date.now()},0,0,0);out;`,
+    4000,
+    Infinity,
+    null,
+    {
+      endpoints: ['https://one.invalid', 'https://two.invalid'],
+      fetchImpl,
+      staggerMs: 0
+    }
+  );
+  assert.deepEqual(result.elements, []);
+  assert.deepEqual(calls, ['https://one.invalid', 'https://two.invalid']);
+  assert.equal(maximumActive, 1);
 });

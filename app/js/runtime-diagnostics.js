@@ -46,10 +46,62 @@ function vectorSnapshot(vector) {
   };
 }
 
+function spaceFlightSnapshot() {
+  const rocket = appCtx.spaceFlight?.rocket;
+  const travelSession = appCtx.getSpaceTravelSession?.() || null;
+  const Vector3 = globalThis.THREE?.Vector3;
+  const forward = rocket && Vector3 ? new Vector3(0, 1, 0).applyQuaternion(rocket.quaternion).normalize() : null;
+  const up = rocket && Vector3 ? new Vector3(0, 0, -1).applyQuaternion(rocket.quaternion).normalize() : null;
+  return {
+    active: appCtx.spaceFlight?.active === true,
+    controlMode: String(appCtx.spaceFlight?.mode || 'idle'),
+    presentationAuthority: String(appCtx.spaceFlight?.presentationAuthority || 'classic'),
+    travelSession: travelSession ? {
+      active: travelSession.active === true,
+      sequence: Number(travelSession.sequence || 0),
+      activeCraftId: travelSession.activeCraftId || null,
+      location: travelSession.location || null,
+      phase: travelSession.phase || null,
+      sourceBodyId: travelSession.sourceBodyId || null,
+      destinationId: travelSession.destination?.id || null,
+      guidance: travelSession.guidance || null,
+      reason: travelSession.reason || null
+    } : null,
+    destinationBodyId: appCtx.spaceJourney?.destinationBodyId || appCtx.spaceFlight?.destination || null,
+    phase: appCtx.spaceJourney?.phase || null,
+    assist: appCtx.spaceJourneyAssistState ? {
+      active: appCtx.spaceJourneyAssistState.active === true,
+      available: appCtx.spaceJourneyAssistState.available !== false,
+      kind: appCtx.spaceJourneyAssistState.kind || null,
+      progress: numberOrNull(appCtx.spaceJourneyAssistState.progress)
+    } : null,
+    cameraMode: String(appCtx.spaceFlight?.cameraMode || 'chase'),
+    earthLandingSelection: appCtx.getEarthLandingSelection?.() || null,
+    vehiclePresentation: appCtx.getActiveSpaceCraftId?.() || rocket?.userData?.spaceCraftId || null,
+    position: vectorSnapshot(rocket?.position),
+    forward: vectorSnapshot(forward),
+    up: vectorSnapshot(up)
+  };
+}
+
 function transportFacilitySnapshot() {
   const graph = appCtx.transportFacilityGraph;
   const visual = appCtx.transportFacilityVisual?.group;
   if (!graph) return { active: false, recordCount: 0, aviation: 0, maritime: 0 };
+  const taxiwayMarkings = [];
+  visual?.traverse?.((object) => {
+    if (object?.userData?.mappedAirportMarking !== true) return;
+    taxiwayMarkings.push({
+      visible: object.visible !== false,
+      frustumCulled: object.frustumCulled === true,
+      renderOrder: Number(object.renderOrder || 0),
+      depthWrite: object.material?.depthWrite !== false,
+      polygonOffset: object.material?.polygonOffset === true,
+      polygonOffsetFactor: Number(object.material?.polygonOffsetFactor || 0),
+      polygonOffsetUnits: Number(object.material?.polygonOffsetUnits || 0),
+      boundsReady: Boolean(object.geometry?.boundingBox && object.geometry?.boundingSphere)
+    });
+  });
   return {
     active: true,
     authority: String(graph.authority || ''),
@@ -60,7 +112,16 @@ function transportFacilitySnapshot() {
     typeCounts: graph.diagnostics?.typeCounts || {},
     visualAttached: Boolean(visual?.parent),
     visualCount: Number(visual?.children?.length || 0),
-    mappedOnly: (graph.records || []).every((record) => record.mapped === true && record.generatedActivity === false)
+    mappedOnly: (graph.records || []).every((record) => record.mapped === true && record.generatedActivity === false),
+    taxiwayMarkings: {
+      count: taxiwayMarkings.length,
+      distanceStableCount: taxiwayMarkings.filter((marking) =>
+        marking.visible && !marking.frustumCulled && marking.renderOrder >= 9 &&
+        !marking.depthWrite && marking.polygonOffset &&
+        marking.polygonOffsetFactor <= -4 && marking.polygonOffsetUnits <= -4 &&
+        marking.boundsReady
+      ).length
+    }
   };
 }
 
@@ -898,11 +959,17 @@ function getWorldExplorerRuntimeDiagnostics() {
       capturedErrors: runtimeErrors.length
     },
     runtimeKernel: appCtx.getRuntimeKernelSnapshot?.() || null,
+    performance: appCtx.perfStats ? {
+      mode: appCtx.perfStats.mode || null,
+      lastLoad: appCtx.perfStats.lastLoad ? { ...appCtx.perfStats.lastLoad } : null,
+      live: appCtx.perfStats.live ? { ...appCtx.perfStats.live } : null
+    } : null,
     runtimeErrors: [...runtimeErrors],
     sessionLifecycle: appCtx.getSessionCoordinatorDebugState?.() || null,
     account: appCtx.getAccountSnapshot?.() || null,
     platformServices: appCtx.getPlatformServicesSnapshot?.() || null,
     gameplayPlugins: appCtx.getGameplayRegistrySnapshot?.() || null,
+    paintTown: appCtx.paintTownDebugSnapshot?.() || { active: false },
     blockBuilder: {
       ...(appCtx.getBlockBuilderSnapshot?.() || { enabled: false, count: 0, shared: false }),
       persistence: appCtx.getBuildPersistenceStatus?.() || null
@@ -913,13 +980,6 @@ function getWorldExplorerRuntimeDiagnostics() {
     augmentedReality: appCtx.getArPlatformSnapshot?.() || { phase: 'idle', active: false },
     livingWorld: appCtx.livingWorldRuntimeSnapshot?.() || { active: false },
     worldDiscovery: appCtx.worldDiscoveryRuntimeSnapshot?.() || { active: false },
-    publishedOverlays: appCtx.getApprovedEditorContributionSnapshot?.() || {
-      activeAreaSignature: '',
-      publishedCount: 0,
-      featureIds: [],
-      renderedObjectCount: 0,
-      groupAttached: false
-    },
     fishing: appCtx.getFishingSnapshot?.() || { open: false, active: false },
     interior: activeInterior ? {
       active: true,
@@ -999,6 +1059,7 @@ function getWorldExplorerRuntimeDiagnostics() {
     surfaceChain: surfaceChainSnapshot(activeActor),
     environment: appCtx.getEnv?.() || null,
     gameStarted: !!appCtx.gameStarted,
+    gameMode: String(appCtx.gameMode || 'free'),
     paused: !!appCtx.paused,
     worldLoading: !!appCtx.worldLoading,
     worldLoad: appCtx.worldLoadRuntimeState || null,
@@ -1034,6 +1095,8 @@ function getWorldExplorerRuntimeDiagnostics() {
       onMoon: !!appCtx.onMoon,
       traveling: !!appCtx.travelingToMoon
     },
+    surfacePodLaunch: appCtx.surfacePodLaunchSnapshot || null,
+    stagedEarthPathfinder: appCtx.getStagedEarthPodSnapshot?.() || null,
     universeNavigation: appCtx.getUniverseCourseSnapshot?.() || (appCtx.universeRuntime ? {
       currentFrameId: appCtx.universeRuntime.current?.id || null,
       selectedDestinationId: appCtx.universeRuntime.selected?.id || null,
@@ -1212,11 +1275,18 @@ globalThis.render_game_to_text = () => JSON.stringify({
     space: !!appCtx.spaceFlight?.active,
     walking: appCtx.Walk?.state?.mode === 'walk'
   },
+  worldConditions: {
+    skyMode: appCtx.skyMode || 'live',
+    weatherMode: appCtx.weatherMode || 'live'
+  },
   planetary: {
     flightDestination: appCtx.spaceFlight?.destination || null,
     flightMode: appCtx.spaceFlight?.mode || null,
     nearestBody: appCtx.spaceFlight?._nearestBody?.name || null
   },
+  spaceFlight: spaceFlightSnapshot(),
+  surfacePodLaunch: appCtx.surfacePodLaunchSnapshot || null,
+  stagedEarthPathfinder: appCtx.getStagedEarthPodSnapshot?.() || null,
   universeNavigation: appCtx.getUniverseCourseSnapshot?.() || (appCtx.universeRuntime ? {
     currentFrameId: appCtx.universeRuntime.current?.id || null,
     selectedDestinationId: appCtx.universeRuntime.selected?.id || null,
@@ -1225,6 +1295,10 @@ globalThis.render_game_to_text = () => JSON.stringify({
     courseStatus: appCtx.universeRuntime.course?.status || null,
     transitionDestinationId: appCtx.universeRuntime.transition?.destination?.id || null
   } : null),
+  interstellarExpedition: appCtx.getInterstellarExpeditionSnapshot?.() || null,
+  destinationMission: appCtx.getDestinationMissionSnapshot?.() || null,
+  expeditionShipInterior: appCtx.getShipInteriorSnapshot?.() || null,
+  backpack: appCtx.playerBackpackInventory?.snapshot?.() || null,
   gameStarted: !!appCtx.gameStarted,
   paused: !!appCtx.paused,
   worldLoading: !!appCtx.worldLoading,
@@ -1259,12 +1333,6 @@ globalThis.render_game_to_text = () => JSON.stringify({
   } : { active: false },
   worldDiscovery: appCtx.worldDiscoveryRuntimeSnapshot?.() || { active: false },
   editableWorld: appCtx.editableWorldRuntimeSnapshot?.() || { active: false },
-  publishedOverlays: appCtx.getApprovedEditorContributionSnapshot?.() || {
-    publishedCount: 0,
-    featureIds: [],
-    renderedObjectCount: 0,
-    groupAttached: false
-  },
   transportStructures: transportStructureSnapshot(),
   worldCounts: {
     buildings: appCtx.buildings?.length ?? null,

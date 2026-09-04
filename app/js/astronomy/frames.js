@@ -1,4 +1,4 @@
-import { getAstronomicalBody } from './body-catalog.js?v=2';
+import { getAstronomicalBody } from './body-catalog.js?v=3';
 
 const DEG_TO_RAD = Math.PI / 180;
 const RAD_TO_DEG = 180 / Math.PI;

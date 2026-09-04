@@ -1,7 +1,7 @@
 import {
   createSpacecraftState,
   executePlannedBurn
-} from './spacecraft-authority.js?v=2';
+} from './spacecraft-authority.js?v=4';
 
 const ASSISTED_TRANSFER_PRESENTATION_SECONDS = Object.freeze({
   'earth:moon': 12,
@@ -39,6 +39,10 @@ function scale(value, amount) {
 
 function magnitude(value) {
   return Math.hypot(value.x, value.y, value.z);
+}
+
+function dot(a, b) {
+  return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
 function normalized(value, fallback = { x: 1, y: 0, z: 0 }) {
@@ -88,8 +92,12 @@ function replaceKinematics(state, positionM, velocityMps, epochMs, lastEvent) {
 function createAssistedTransferPlan(state, ephemeris, options = {}) {
   const routeKey = `${ephemeris.source.bodyId}:${ephemeris.destination.bodyId}`;
   const axis = normalized(subtract(ephemeris.destination.positionM, ephemeris.source.positionM));
+  const sourceRadial = normalized(subtract(state.positionM, ephemeris.source.positionM), axis);
+  const departureDirection = dot(sourceRadial, axis) < 0.35
+    ? normalized(add(axis, scale(sourceRadial, 1.35)), axis)
+    : axis;
   const cruiseSpeedMps = Number(options.cruiseSpeedMps) || ASSISTED_CRUISE_SPEED_MPS[routeKey] || 6_000;
-  const desiredDepartureVelocity = add(ephemeris.source.velocityMps, scale(axis, cruiseSpeedMps));
+  const desiredDepartureVelocity = add(ephemeris.source.velocityMps, scale(departureDirection, cruiseSpeedMps));
   const departureBurn = executePlannedBurn(state, subtract(desiredDepartureVelocity, state.velocityMps));
   if (!departureBurn.executed) {
     return Object.freeze({ accepted: false, reason: departureBurn.reason, departureBurn });

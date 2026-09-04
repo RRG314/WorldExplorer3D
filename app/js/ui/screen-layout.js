@@ -28,6 +28,7 @@ function createScreenLayoutService(documentRef = globalThis.document) {
       if (activityLayer) body.dataset.gameActivityLayer = activityLayer;
       else delete body.dataset.gameActivityLayer;
       body.querySelectorAll?.('.floatMenu.open').forEach((menu) => menu.classList.remove('open'));
+      body.querySelectorAll?.('.floatBtn[aria-expanded="true"]').forEach((button) => button.setAttribute('aria-expanded', 'false'));
     }
     return publish('activity-layer');
   }
@@ -46,6 +47,7 @@ function createScreenLayoutService(documentRef = globalThis.document) {
       if (panelLayer) body.dataset.gamePanelLayer = panelLayer;
       else delete body.dataset.gamePanelLayer;
       body.querySelectorAll?.('.floatMenu.open').forEach((menu) => menu.classList.remove('open'));
+      body.querySelectorAll?.('.floatBtn[aria-expanded="true"]').forEach((button) => button.setAttribute('aria-expanded', 'false'));
     }
     return publish('panel-layer');
   }

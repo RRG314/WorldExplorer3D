@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { getAstronomicalBody, LANDING_MODE } from '../astronomy/body-catalog.js?v=2';
+import { getAstronomicalBody, LANDING_MODE } from '../astronomy/body-catalog.js?v=3';
 
 let astronautGear = null;
 const earthMaterials = new Map();

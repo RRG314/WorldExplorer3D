@@ -1,12 +1,12 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { AVIATION_FLEET_CATALOG, getAviationCatalogEntry } from './aviation-catalog.js?v=4';
-import { aircraftGroundOffset, createAircraftVisual, updateAircraftVisual } from './aircraft-visual-recipe.js?v=10';
+import { aircraftGroundOffset, createAircraftVisual, updateAircraftVisual } from './aircraft-visual-recipe.js?v=11';
 import { applyTransportDamage } from './damage-model.js?v=1';
 import { ENTITY_LIFECYCLE_MS, lifecycleExpired, markLifecycleStart } from '../runtime/entity-lifecycle-policy.js?v=1';
-import { evaluateAircraftSkydivingExit } from '../urban-sandbox/parachute-model.js?v=5';
+import { evaluateAircraftSkydivingExit } from '../urban-sandbox/parachute-model.js?v=6';
 import { advanceAmbientRouteMotion, ambientRouteSnapshot, createAmbientRouteMotion } from './ambient-route-motion.js?v=1';
-import { compileAirportOperationalLayout, offsetPoint } from './airport-layout.js?v=3';
-import { createAirportHub } from './airport-hub.js?v=3';
+import { compileAirportOperationalLayout, offsetPoint } from './airport-layout.js?v=6';
+import { createAirportHub } from './airport-hub.js?v=4';
 
 const BOARDING_DISTANCE = 8;
 const EXIT_SPEED_LIMIT = 1.5;
@@ -199,6 +199,8 @@ function derivedFleet(graph, options = {}) {
 }
 
 function groundYAt(x, z) {
+  const airportSurface = appCtx.transportFacilityVisual?.surfaceYAt?.(x, z);
+  if (Number.isFinite(airportSurface)) return airportSurface;
   return Number(appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y ?? appCtx.elevationWorldYAtWorldXZ?.(x, z)) || 0;
 }
 
@@ -729,6 +731,13 @@ function startAviationRuntime(options = {}) {
     boardableAircraftCount: runtime.vehicles.filter((vehicle) => vehicle.boardable).length,
     airportLayoutAuthority: runtime.airportLayout?.authority || '',
     airportScale: runtime.airportLayout?.scale || '',
+    airportPhysicalAuthority: runtime.airportLayout?.provenance?.physicalAuthority || '',
+    mappedRunway: runtime.airportLayout?.mappedRunway === true,
+    generatedRunwayFallback: runtime.airportLayout?.generatedFallback === true,
+    mappedRunwayCount: Number(runtime.airportLayout?.provenance?.mappedRunwayCount || 0),
+    mappedStandCount: Number(runtime.airportLayout?.provenance?.mappedStandCount || 0),
+    publishedStandCount: Number(runtime.airportLayout?.stands?.length || 0),
+    generatedStandCount: Number(runtime.airportLayout?.provenance?.generatedStandCount || 0),
     airportHub: runtime.hub?.snapshot?.() || null,
     catalogIds: Object.freeze(runtime.vehicles.map(({ catalog }) => catalog.id)),
     vehicles: Object.freeze(runtime.vehicles.map((vehicle) => Object.freeze({
@@ -763,6 +772,30 @@ function startAviationRuntime(options = {}) {
         const entrance = runtime.airportLayout?.ticketCounter?.entrance;
         if (!entrance) return false;
         return moveWalkerForSupport(entrance.x, entrance.z, runtime.airportLayout?.yaw || 0);
+      },
+      moveNearRunway() {
+        const layout = runtime.airportLayout;
+        if (!layout?.runwayStart) return false;
+        const point = offsetPoint(layout.runwayStart, layout.yaw, 0, Math.min(70, layout.runwayLength * .08));
+        return moveWalkerForSupport(point.x, point.z, layout.yaw);
+      },
+      moveAlongTaxiway() {
+        const taxiways = (appCtx.transportFacilityGraph?.byDomain?.aviation || [])
+          .filter((record) => record.type === 'taxiway' && record.geometry?.points?.length >= 2)
+          .map((record) => ({
+            record,
+            length: record.geometry.points.slice(1).reduce((total, point, index) => {
+              const previous = record.geometry.points[index];
+              return total + Math.hypot(point.x - previous.x, point.z - previous.z);
+            }, 0)
+          }))
+          .sort((left, right) => right.length - left.length);
+        const points = taxiways[0]?.record?.geometry?.points;
+        if (!points?.length) return false;
+        const start = points[0];
+        const look = points.find((point) => Math.hypot(point.x - start.x, point.z - start.z) >= 18) || points[1];
+        const yaw = Math.atan2(look.x - start.x, look.z - start.z);
+        return moveWalkerForSupport(start.x, start.z, yaw);
       },
       openHub(source = 'ticket_hall', aircraftId = '') {
         const vehicle = aircraftId ? runtime.vehicles.find(({ id }) => id === String(aircraftId)) : null;

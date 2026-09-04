@@ -1,69 +1,25 @@
 const APP_SHELL_FRAGMENT_HTML = `
-<button id="realEstateBtn" title="Toggle Real Estate">🏠</button>
-<div id="propertyPanel">
-  <div class="panel-header">
+<button id="realEstateBtn" title="Open Real Estate">🏠</button>
+<div id="propertyPanel" aria-label="Real Estate">
+  <div class="propertyHubHeader">
     <div>
-      <div class="panel-title">Properties</div>
-      <div style="font-size:10px;opacity:0.9;margin-top:2px" id="dataSourceLabel">Source: Demo Data</div>
+      <span class="propertyHubEyebrow">YOUR PLACE IN THE WORLD</span>
+      <div class="panel-title">Real Estate</div>
     </div>
-    <button class="panel-close" id="closePropertyPanelBtn">×</button>
+    <button class="panel-close" id="closePropertyPanelBtn" aria-label="Close Real Estate">×</button>
   </div>
-  <div id="propertyFiltersToggle" style="padding:12px 16px;background:#f1f5f9;border-bottom:2px solid #e2e8f0;cursor:pointer">
-    <div style="display:flex;justify-content:space-between;align-items:center">
-      <div>
-        <span id="propertyCount" style="font-size:11px;color:#64748b;font-weight:600">0 Properties</span>
-        <span style="font-size:11px;color:#cbd5e1"> • </span>
-        <span id="propertySource" style="font-size:11px;color:#64748b;font-weight:600">Demo</span>
-      </div>
-      <div id="filterToggleIcon" style="font-size:16px;color:#667eea">▼</div>
-    </div>
-  </div>
-  <div id="propertyFilters" style="padding:16px;border-bottom:2px solid #e2e8f0;background:#f8fafc;display:none">
-    <div style="margin-bottom:12px">
-      <label style="display:block;font-size:11px;font-weight:600;color:#64748b;margin-bottom:6px">Property Type</label>
-      <div style="display:flex;gap:8px">
-        <button id="filterAll" class="property-type-btn active" data-type="all" style="flex:1;background:#667eea;border:none;border-radius:8px;padding:8px;color:#ffffff;font-size:11px;font-weight:600;cursor:pointer;transition:all 0.2s">
-          All
-        </button>
-        <button id="filterBuy" class="property-type-btn" data-type="sale" style="flex:1;background:#e2e8f0;border:none;border-radius:8px;padding:8px;color:#64748b;font-size:11px;font-weight:600;cursor:pointer;transition:all 0.2s">
-          Buy
-        </button>
-        <button id="filterRent" class="property-type-btn" data-type="rent" style="flex:1;background:#e2e8f0;border:none;border-radius:8px;padding:8px;color:#64748b;font-size:11px;font-weight:600;cursor:pointer;transition:all 0.2s">
-          Rent
-        </button>
-      </div>
-    </div>
-    <div style="margin-bottom:12px">
-      <label style="display:block;font-size:11px;font-weight:600;color:#64748b;margin-bottom:6px">
-        Search Radius: <span id="radiusValue">1.0 km</span>
-      </label>
-      <input type="range" id="radiusSlider" min="0.5" max="5" step="0.5" value="1" style="width:100%;cursor:pointer">
-    </div>
-    <div style="margin-bottom:12px">
-      <label style="display:block;font-size:11px;font-weight:600;color:#64748b;margin-bottom:6px">Sort By</label>
-      <select id="sortSelect" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:8px;font-size:12px;cursor:pointer">
-        <option value="distance">Nearest First</option>
-        <option value="price-low">Price: Low to High</option>
-        <option value="price-high">Price: High to Low</option>
-        <option value="beds">Most Bedrooms</option>
-        <option value="sqft">Largest Square Footage</option>
-      </select>
-    </div>
-    <div style="display:flex;gap:8px">
-      <button id="refreshProperties" style="flex:1;background:#667eea;border:none;border-radius:8px;padding:8px;color:#ffffff;font-size:11px;font-weight:600;cursor:pointer">
-        🔄 Refresh
-      </button>
-      <button id="clearPropertyFilter" style="flex:1;background:#64748b;border:none;border-radius:8px;padding:8px;color:#ffffff;font-size:11px;font-weight:600;cursor:pointer">
-        ✕ Clear Nav
-      </button>
-    </div>
+  <div class="propertyHubBalance"><span>Explorer Credits</span><strong id="propertyWalletBalance">0</strong></div>
+  <div class="propertyHubTabs" role="tablist" aria-label="Real Estate sections">
+    <button type="button" class="active" data-property-view="home">My Properties</button>
+    <button type="button" data-property-view="nearby">Find a Property</button>
   </div>
   <div class="panel-content" id="propertyList"></div>
+  <div id="propertyHubStatus" class="propertyHubStatus" role="status" aria-live="polite"></div>
 </div>
 
 <!-- Historic Sites System -->
 <button id="historicBtn" title="Toggle Historic Sites" style="position:fixed;bottom:150px;right:20px;width:56px;height:56px;background:linear-gradient(135deg,#f59e0b,#d97706);border:none;border-radius:50%;color:#ffffff;font-size:24px;cursor:pointer;box-shadow:0 8px 24px rgba(245,158,11,0.4);transition:all 0.2s;z-index:100;display:none">⛩️</button>
-<div id="historicPanel" style="position:fixed;top:20px;right:20px;width:380px;max-height:80vh;background:rgba(255,255,255,0.98);border:none;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:110;display:none;overflow:hidden;backdrop-filter:blur(10px);flex-direction:column">
+<div id="historicPanel" style="position:fixed;top:20px;right:20px;width:380px;max-height:80vh;background:rgba(255,255,255,0.98);border:none;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:110;overflow:hidden;backdrop-filter:blur(10px);flex-direction:column">
   <div class="panel-header" style="background:linear-gradient(135deg,#f59e0b,#d97706)">
     <div class="panel-title">Historic Sites</div>
     <button class="panel-close" id="closeHistoricPanelBtn">×</button>

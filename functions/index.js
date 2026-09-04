@@ -31,6 +31,21 @@ const {
   updateUrbanVehicleLease,
   urbanEntityDocumentId
 } = require('./urban-sandbox');
+const {
+  commitSharedExpedition,
+  createSharedExpedition,
+  joinSharedExpedition,
+  rescueIntoSharedExpedition,
+  setParticipantConnection,
+  setParticipantReady
+} = require('./expedition-authority');
+const {
+  PROPERTY_INTERACTION_RADIUS,
+  propertyDocumentId,
+  settlePropertyAction,
+  settlePropertyTrade,
+  validatePropertyProximity
+} = require('./property-authority');
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -42,6 +57,7 @@ const ALLOWED_PLANS = new Set(['support', 'supporter', 'pro']);
 const TRIAL_DURATION_MS = 48 * 60 * 60 * 1000;
 const DELETE_ACCOUNT_MAX_AUTH_AGE_SECONDS = 10 * 60;
 const ADMIN_TEST_ROOM_CREATE_LIMIT = 10000;
+const PUBLIC_SITE_STATS_CACHE_MS = 5 * 60 * 1000;
 const DEFAULT_ALLOWED_ORIGINS = Object.freeze([
   'https://rrg314.github.io',
   'https://worldexplorer.io',
@@ -66,6 +82,7 @@ const PARAM_RESEND_API_KEY = defineString('WE3D_RESEND_API_KEY', { default: '' }
 const PARAM_EMAIL_FROM = defineString('WE3D_EMAIL_FROM', { default: '' });
 const PARAM_ADMIN_NOTIFICATION_EMAIL = defineString('WE3D_ADMIN_NOTIFICATION_EMAIL', { default: '' });
 const PARAM_MODERATION_PANEL_URL = defineString('WE3D_MODERATION_PANEL_URL', { default: 'https://worldexplorer3d.io/account/admin.html?view=moderation' });
+let publicSiteStatsCache = null;
 
 const CONTRIBUTION_EDIT_TYPE_CONFIG = Object.freeze({
   place_info: Object.freeze({
@@ -654,6 +671,41 @@ function setCors(req, res) {
   return false;
 }
 
+function isRegisteredAuthUser(user) {
+  return Boolean(
+    user && (
+      String(user.email || '').trim() ||
+      String(user.phoneNumber || '').trim() ||
+      (Array.isArray(user.providerData) && user.providerData.length > 0)
+    )
+  );
+}
+
+async function countRegisteredAuthUsers() {
+  let totalUsers = 0;
+  let pageToken;
+  do {
+    const page = await admin.auth().listUsers(1000, pageToken);
+    totalUsers += (Array.isArray(page.users) ? page.users : []).filter(isRegisteredAuthUser).length;
+    pageToken = page.pageToken;
+  } while (pageToken);
+  return totalUsers;
+}
+
+async function getPublicSiteStatsSnapshot(nowMs = Date.now()) {
+  if (publicSiteStatsCache && publicSiteStatsCache.expiresAtMs > nowMs) {
+    return publicSiteStatsCache.payload;
+  }
+  const payload = Object.freeze({
+    totalUsers: await countRegisteredAuthUsers()
+  });
+  publicSiteStatsCache = Object.freeze({
+    payload,
+    expiresAtMs: nowMs + PUBLIC_SITE_STATS_CACHE_MS
+  });
+  return payload;
+}
+
 async function verifyAuth(req, res) {
   const header = req.get('authorization') || '';
   const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
@@ -760,6 +812,55 @@ async function deleteDocsByQuery(query, batchSize = 200, label = '') {
   }
 }
 
+async function updateDocsByQuery(query, updateForDoc, batchSize = 200, label = '') {
+  const limit = Math.max(10, Math.min(500, Number(batchSize) || 200));
+  for (;;) {
+    let snap;
+    try {
+      snap = await query.limit(limit).get();
+    } catch (err) {
+      if (isFailedPreconditionError(err)) {
+        const tag = label ? ` (${label})` : '';
+        console.warn(`[deleteAccount] Skipping query update${tag}: Firestore failed precondition.`, err && err.message ? err.message : err);
+        return;
+      }
+      throw err;
+    }
+    if (snap.empty) return;
+    const batch = db.batch();
+    snap.docs.forEach((doc) => batch.update(doc.ref, updateForDoc(doc)));
+    await batch.commit();
+    if (snap.size < limit) return;
+  }
+}
+
+async function releaseWorldPropertiesForUser(uid) {
+  await updateDocsByQuery(
+    db.collection('worldProperties').where('ownerUid', '==', uid),
+    () => ({
+      ownerUid: '', ownerName: '', tenantUid: '', tenantName: '',
+      status: 'available', purchasePrice: 0, acquiredAt: null,
+      salePrice: 0, rentPrice: 0, rentTermDays: 0,
+      leaseStartsAt: null, leaseEndsAt: null,
+      revision: FieldValue.increment(1), updatedAt: FieldValue.serverTimestamp()
+    }),
+    200,
+    'worldProperties(ownerUid)'
+  );
+  await updateDocsByQuery(
+    db.collection('worldProperties').where('tenantUid', '==', uid),
+    () => ({
+      tenantUid: '', tenantName: '', status: 'owned',
+      rentPrice: 0, rentTermDays: 0, leaseStartsAt: null, leaseEndsAt: null,
+      revision: FieldValue.increment(1), updatedAt: FieldValue.serverTimestamp()
+    }),
+    200,
+    'worldProperties(tenantUid)'
+  );
+  await deleteDocsByQuery(db.collection('propertyTradeOffers').where('proposerUid', '==', uid), 200, 'propertyTradeOffers(proposerUid)');
+  await deleteDocsByQuery(db.collection('propertyTradeOffers').where('recipientUid', '==', uid), 200, 'propertyTradeOffers(recipientUid)');
+}
+
 async function deleteRoomTree(roomRef) {
   if (db && typeof db.recursiveDelete === 'function') {
     await db.recursiveDelete(roomRef);
@@ -776,6 +877,7 @@ async function deleteRoomTree(roomRef) {
     'artifacts',
     'activities',
     'activityState',
+    'expeditions',
     'blocks',
     'worldModifications',
     'paintClaims',
@@ -853,6 +955,8 @@ async function deleteUserData(uid) {
   await deleteDocsByQuery(db.collection('deflockLeaderboard').where('uid', '==', uid), 200, 'deflockLeaderboard(uid)');
   await deleteDocsByQuery(db.collection('activityFeed').where('uid', '==', uid), 200, 'activityFeed(uid)');
   await db.collection('explorerLeaderboard').doc(uid).delete().catch(() => {});
+  await releaseWorldPropertiesForUser(uid);
+  await db.collection('propertyLeaderboard').doc(uid).delete().catch(() => {});
   await deleteDiscoveryTradesForUser(uid);
 
   if (db && typeof db.recursiveDelete === 'function') {
@@ -1021,6 +1125,19 @@ async function upsertPlanFromSubscription({ uid, customerId, subscriptionId, sta
     { merge: true }
   );
 }
+
+exports.getPublicSiteStats = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed.' });
+  try {
+    const payload = await getPublicSiteStatsSnapshot();
+    res.set('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=3600');
+    return res.status(200).json(payload);
+  } catch (error) {
+    console.error('[getPublicSiteStats] failed:', error);
+    return res.status(503).json({ error: 'Explorer count is temporarily unavailable.' });
+  }
+});
 
 exports.createCheckoutSession = functions.region('us-central1').https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
@@ -1809,6 +1926,115 @@ async function handleUrbanVehicleLeaseUpdate(req, res, release = false) {
 exports.updateUrbanVehicle = functions.region('us-central1').https.onRequest((req, res) => handleUrbanVehicleLeaseUpdate(req, res, false));
 exports.releaseUrbanVehicle = functions.region('us-central1').https.onRequest((req, res) => handleUrbanVehicleLeaseUpdate(req, res, true));
 
+exports.commitWorldPropertyAction = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+  try {
+    const input = req.body || {};
+    let context = null;
+    if (sanitizeText(input.roomCode, 12)) {
+      context = await requireUrbanRoomContext(req, res, auth);
+      if (!context) return;
+    } else {
+      const worldSeed = sanitizeText(input.worldSeed, 180);
+      if (!worldSeed) return res.status(400).json({ error: 'A loaded world is required.' });
+      const profile = (await db.collection('users').doc(auth.uid).get()).data() || {};
+      context = {
+        roomCode: 'WORLD',
+        worldSeed,
+        player: { displayName: profile.displayName || auth.name || 'Explorer' },
+        nowMs: Date.now()
+      };
+    }
+    const action = sanitizeText(input.action, 32).toLowerCase();
+    const requestId = sanitizeText(input.requestId, 120).replace(/[^A-Za-z0-9:._-]/g, '');
+    if (action.startsWith('trade_')) {
+      const offerId = sanitizeText(action === 'trade_offer' ? requestId : input.offerId, 120).replace(/[^A-Za-z0-9:._-]/g, '');
+      if (!offerId || !requestId) return res.status(400).json({ error: 'A valid trade offer is required.' });
+      const offerRef = db.collection('propertyTradeOffers').doc(offerId);
+      const existingOffer = action === 'trade_offer' ? null : (await offerRef.get()).data();
+      if (action !== 'trade_offer' && !existingOffer) return res.status(404).json({ error: 'This trade offer is no longer available.' });
+      const offeredPropertyId = action === 'trade_offer' ? input.offeredProperty?.propertyId : existingOffer.offeredPropertyId;
+      const requestedPropertyId = action === 'trade_offer' ? input.requestedProperty?.propertyId : existingOffer.requestedPropertyId;
+      const offeredDocumentId = propertyDocumentId(offeredPropertyId);
+      const requestedDocumentId = propertyDocumentId(requestedPropertyId);
+      if (!offeredDocumentId || !requestedDocumentId) return res.status(400).json({ error: 'Both properties are required for a trade.' });
+      const actorWalletRef = db.collection('users').doc(auth.uid).collection('economy').doc('wallet');
+      const proposerUid = existingOffer?.proposerUid || auth.uid;
+      const recipientUid = existingOffer?.recipientUid || '';
+      const result = await settlePropertyTrade({
+        runTransaction: (callback) => db.runTransaction(callback),
+        offerRef,
+        offeredPropertyRef: db.collection('worldProperties').doc(offeredDocumentId),
+        requestedPropertyRef: db.collection('worldProperties').doc(requestedDocumentId),
+        actorWalletRef,
+        proposerWalletRef: db.collection('users').doc(proposerUid).collection('economy').doc('wallet'),
+        recipientWalletRef: recipientUid ? db.collection('users').doc(recipientUid).collection('economy').doc('wallet') : null,
+        receiptRef: db.collection('users').doc(auth.uid).collection('propertyReceipts').doc(requestId),
+        actorBoardRef: db.collection('propertyLeaderboard').doc(auth.uid),
+        proposerBoardRef: db.collection('propertyLeaderboard').doc(proposerUid),
+        recipientBoardRef: recipientUid ? db.collection('propertyLeaderboard').doc(recipientUid) : null,
+        notificationRefForUid: (uid, id) => db.collection('users').doc(uid).collection('notifications').doc(id),
+        activityRef: db.collection('activityFeed').doc(`property-${requestId}`.slice(0, 160)),
+        uid: auth.uid,
+        displayName: sanitizeText(context.player.displayName || context.player.name || auth.name || 'Explorer', 80),
+        roomCode: context.roomCode,
+        input: { ...input, action, offerId, requestId },
+        nowMs: context.nowMs,
+        timestampFromMs: urbanTimestampFromMs
+      });
+      return res.status(200).json(result);
+    }
+    const property = input.property || {};
+    const documentId = propertyDocumentId(property.propertyId);
+    if (!documentId || !requestId) return res.status(400).json({ error: 'A valid property and request are required.' });
+    const visitRequired = new Set([
+      'starter_claim', 'buy', 'buy_listing', 'sell_world',
+      'list_sale', 'list_rent', 'rent', 'cancel_listing'
+    ]).has(action);
+    if (visitRequired) {
+      const actorPose = context.roomCode === 'WORLD' ? input.actorPose : context.player.pose;
+      const proximity = validatePropertyProximity(property, actorPose, PROPERTY_INTERACTION_RADIUS);
+      if (!proximity.valid) {
+        const message = proximity.reason === 'property_proximity_required'
+          ? 'Move near this building before using its property options.'
+          : 'This building is too far away. Travel to it before using its property options.';
+        return res.status(422).json({ error: message, reason: proximity.reason });
+      }
+    }
+    const userRef = db.collection('users').doc(auth.uid);
+    const result = await settlePropertyAction({
+      runTransaction: (callback) => db.runTransaction(callback),
+      propertyRef: db.collection('worldProperties').doc(documentId),
+      catalogRef: db.collection('worldPropertyCatalog').doc(documentId),
+      actorWalletRef: userRef.collection('economy').doc('wallet'),
+      receiptRef: userRef.collection('propertyReceipts').doc(requestId),
+      starterEntitlementRef: userRef.collection('propertyEntitlements').doc('starter'),
+      sellerWalletRefForUid: (uid) => db.collection('users').doc(uid).collection('economy').doc('wallet'),
+      notificationRefForUid: (uid, id) => db.collection('users').doc(uid).collection('notifications').doc(id),
+      actorBoardRef: db.collection('propertyLeaderboard').doc(auth.uid),
+      sellerBoardRefForUid: (uid) => db.collection('propertyLeaderboard').doc(uid),
+      activityRef: db.collection('activityFeed').doc(`property-${requestId}`.slice(0, 160)),
+      uid: auth.uid,
+      displayName: sanitizeText(context.player.displayName || context.player.name || auth.name || 'Explorer', 80),
+      roomCode: context.roomCode,
+      input: { ...input, requestId },
+      nowMs: context.nowMs,
+      timestampFromMs: urbanTimestampFromMs
+    });
+    res.status(200).json(result);
+  } catch (error) {
+    const code = String(error?.message || '');
+    if (['invalid_action', 'invalid_property', 'property_catalog_mismatch', 'property_identity_conflict', 'trade_offer_exists', 'trade_property_conflict'].includes(code)) {
+      return res.status(400).json({ error: 'This property action is not valid.' });
+    }
+    console.error('[commitWorldPropertyAction] failed:', error);
+    res.status(500).json({ error: 'Could not complete this property action right now.' });
+  }
+});
+
 exports.commitUrbanImpacts = functions.region('us-central1').https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
@@ -1917,6 +2143,115 @@ exports.resolveUrbanCivicOutcome = functions.region('us-central1').https.onReque
   } catch (error) {
     console.error('[resolveUrbanCivicOutcome] failed:', error);
     res.status(500).json({ error: 'Could not resolve this shared civic outcome right now.' });
+  }
+});
+
+async function requireExpeditionRoomContext(req, res, auth) {
+  const roomCode = sanitizeText(req.body && req.body.roomCode, 12).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!roomCode) {
+    res.status(400).json({ error: 'A valid multiplayer room is required.' });
+    return null;
+  }
+  const roomRef = db.collection('rooms').doc(roomCode);
+  const [roomSnap, memberSnap] = await Promise.all([
+    roomRef.get(),
+    roomRef.collection('players').doc(auth.uid).get()
+  ]);
+  if (!roomSnap.exists) {
+    res.status(404).json({ error: 'Room not found.' });
+    return null;
+  }
+  const room = roomSnap.data() || {};
+  if (room.ownerUid !== auth.uid && !memberSnap.exists) {
+    res.status(403).json({ error: 'Join this room before using its Expedition.' });
+    return null;
+  }
+  const playerSnap = memberSnap.exists ? memberSnap : await roomRef.collection('players').doc(auth.uid).get();
+  if (!playerSnap.exists) {
+    res.status(409).json({ error: 'Active room presence is required.' });
+    return null;
+  }
+  const player = playerSnap.data() || {};
+  const lastSeenMs = timestampToMillis(player.lastSeenAt);
+  if (!Number.isFinite(lastSeenMs) || Date.now() - lastSeenMs > 120_000) {
+    res.status(409).json({ error: 'Room presence is stale. Rejoin the room and try again.' });
+    return null;
+  }
+  return { roomCode, roomRef, room, player };
+}
+
+exports.mutateSharedExpedition = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+  try {
+    const context = await requireExpeditionRoomContext(req, res, auth);
+    if (!context) return;
+    const action = sanitizeText(req.body && req.body.action, 32).toLowerCase();
+    const nowMs = Date.now();
+    const authUser = await admin.auth().getUser(auth.uid);
+    const actor = {
+      uid: auth.uid,
+      displayName: sanitizeText(authUser.displayName || authUser.email || context.player.displayName || 'Explorer', 60),
+      role: sanitizeText(req.body && req.body.role, 32)
+    };
+    const expeditionRef = context.roomRef.collection('expeditions').doc('active');
+    const playersSnap = await context.roomRef.collection('players').get();
+    const activeUids = playersSnap.docs.filter((entry) => {
+      const data = entry.data() || {};
+      const lastSeen = timestampToMillis(data.lastSeenAt);
+      const expiresAt = timestampToMillis(data.expiresAt);
+      return Number.isFinite(lastSeen) && nowMs - lastSeen <= 120_000 &&
+        (!Number.isFinite(expiresAt) || expiresAt >= nowMs - 2_000);
+    }).map((entry) => entry.id);
+
+    const state = await db.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(expeditionRef);
+      const current = snapshot.exists ? snapshot.data() || null : null;
+      let next;
+      if (action === 'create') {
+        if (current && current.expedition?.state !== 'failed' && current.expedition?.state !== 'arrived') {
+          throw new Error('shared_expedition_already_active');
+        }
+        next = createSharedExpedition({ roomCode: context.roomCode, actor, configuration: req.body?.configuration, nowMs });
+      } else {
+        if (!current || current.type !== 'SharedInterstellarExpedition') throw new Error('shared_expedition_not_found');
+        if (action === 'join') next = joinSharedExpedition(current, { actor, requestedRole: req.body?.role, nowMs });
+        else if (action === 'ready') next = setParticipantReady(current, { uid: auth.uid, ready: req.body?.ready !== false, nowMs });
+        else if (action === 'connection') next = setParticipantConnection(current, { uid: auth.uid, connected: req.body?.connected !== false, nowMs });
+        else if (action === 'commit') next = commitSharedExpedition(current, {
+          uid: auth.uid,
+          expectedRevision: req.body?.expectedRevision,
+          command: req.body?.command,
+          activeUids,
+          nowMs
+        });
+        else if (action === 'rescue') next = rescueIntoSharedExpedition(current, {
+          uid: auth.uid,
+          manifestId: req.body?.manifestId,
+          nowMs
+        });
+        else throw new Error('invalid_shared_expedition_action');
+      }
+      transaction.set(expeditionRef, { ...next, updatedAt: FieldValue.serverTimestamp() });
+      return next;
+    });
+    res.status(200).json({ accepted: true, state });
+  } catch (error) {
+    const code = String(error && error.message || '');
+    const conflicts = new Set([
+      'shared_expedition_already_active', 'shared_expedition_not_found',
+      'stale_expedition_revision', 'two_connected_crew_required', 'connected_crew_not_ready',
+      'rescue_already_completed', 'expedition_command_not_available'
+    ]);
+    const invalid = code.startsWith('invalid_') || code.startsWith('advance_') ||
+      code === 'expedition_identity_is_immutable' || code === 'only_advance_changes_time' ||
+      code === 'progress_cannot_reverse' || code === 'expedition_record_too_large';
+    if (conflicts.has(code)) return res.status(409).json({ error: code.replaceAll('_', ' ') });
+    if (invalid) return res.status(422).json({ error: code.replaceAll('_', ' ') });
+    console.error('[mutateSharedExpedition] failed:', error);
+    return res.status(500).json({ error: 'Could not update the shared Expedition right now.' });
   }
 });
 

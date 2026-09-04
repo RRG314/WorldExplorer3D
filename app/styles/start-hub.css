@@ -78,7 +78,7 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 .globe-app-rail,
 .globe-destination-bar { background: var(--hub-bar); }
 .globe-selector-side { background: var(--hub-panel); }
-.globe-selector-side:has(#globeSelectorLiveEarthPanel.active) #globeSelectorLiveGpsBtn,
+.globe-selector-side:has(#globeSelectorLiveEarthPanel.active) .globe-location-entry-pair,
 .globe-selector-side:has(#globeSelectorLiveEarthPanel.active) .globe-selector-stat,
 .globe-selector-side:has(#globeSelectorLiveEarthPanel.active) .globe-selector-actions {
   display: none;
@@ -265,24 +265,57 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
   font: 700 12px/1 Inter, sans-serif;
   text-transform: uppercase;
 }
-.globe-selector-live-gps-btn {
+.globe-location-entry-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
   flex: 0 0 auto;
-  width: 100%;
-  min-height: 52px;
-  border: 1px solid #22d3ee !important;
-  border-radius: 2px !important;
-  background: linear-gradient(135deg,#0e7490,#155e75) !important;
-  color: #fff !important;
-  font: 800 12px/1 Inter, sans-serif !important;
-  letter-spacing: .03em;
-  text-transform: uppercase;
-  box-shadow: 0 7px 18px rgba(8,145,178,.22);
 }
+.globe-location-entry-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 54px;
+  padding: 8px 9px;
+  color: var(--hub-text);
+  text-align: left;
+  background: var(--hub-panel-2);
+  border: 1px solid var(--hub-line-strong);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.globe-location-entry-card:hover { background: var(--hub-hover); border-color: var(--hub-blue); }
+.globe-location-entry-card:disabled { opacity: .68; cursor: wait; }
+.globe-location-entry-card .location-entry-icon { color: #86b9ff; font-size: 19px; }
+.globe-location-entry-card .location-entry-copy strong {
+  display: block;
+  color: var(--hub-text);
+  font: 750 10px/1.15 Inter, sans-serif;
+  letter-spacing: .01em;
+}
+.globe-location-entry-card .location-entry-copy small {
+  display: block;
+  margin-top: 4px;
+  color: var(--hub-muted);
+  font: 500 8px/1.2 Inter, sans-serif;
+}
+.globe-selector-live-gps-btn {
+  width: auto;
+  border-color: #22d3ee;
+  background: linear-gradient(135deg,rgba(14,116,144,.34),rgba(21,94,117,.24));
+  box-shadow: none;
+}
+.globe-selector-live-gps-btn .location-entry-icon { color: #67e8f9; }
 .globe-selector-mode-tabs { margin-top: 0; }
 .globe-selector-mode-panel { min-height: 0; }
-.globe-selector-locate-btn { min-height: 36px; }
 .globe-mobile-search { display: none; }
-.globe-selector-city-list { max-height: min(31vh, 250px); }
+.globe-selector-city-list {
+  max-height: min(31vh, 250px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
 .globe-selector-city-section {
   display: flex;
   align-items: baseline;

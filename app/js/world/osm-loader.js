@@ -204,20 +204,6 @@ function delayMs(ms, signal = null) {
   });
 }
 
-function firstSuccessful(promises) {
-  return new Promise((resolve, reject) => {
-    const errors = new Array(promises.length);
-    let pending = promises.length;
-    promises.forEach((promise, idx) => {
-      Promise.resolve(promise).then(resolve).catch((err) => {
-        errors[idx] = err;
-        pending -= 1;
-        if (pending === 0) reject(errors);
-      });
-    });
-  });
-}
-
 function formatBounds(location, radius) {
   return `(${location.lat - radius},${location.lon - radius},${location.lat + radius},${location.lon + radius})`;
 }
@@ -304,6 +290,10 @@ export function buildWorldOverpassPlan({
   const featureBounds = formatBounds(location, featureRadius);
   const buildingBounds = formatCoverageBounds(buildingCoverageBounds);
   const waterStructureBounds = formatBounds(location, waterStructureRadius);
+  // Airports are often several kilometres wide. Keep the exact aviation query
+  // bounded, but do not clip runways to the smaller streets/land-use radius.
+  const transportFacilityRadius = Math.min(0.045, Math.max(featureRadius, 0.036));
+  const transportFacilityBounds = formatBounds(location, transportFacilityRadius);
   const buildingMetadataBounds = formatBounds(location, buildingMetadataRadius);
   const poiBounds = formatBounds(location, poiRadius);
   const queryTimeoutSeconds = Math.max(8, Math.floor(overpassTimeoutMs / 1000));
@@ -366,7 +356,7 @@ export function buildWorldOverpassPlan({
       lat: location.lat,
       lon: location.lon,
       roadsRadius,
-      featureRadius,
+      featureRadius: transportFacilityRadius,
       poiRadius,
       kind: 'transport-facilities-v1'
     },
@@ -378,11 +368,12 @@ export function buildWorldOverpassPlan({
     civicFacilityQuery: `[out:json][timeout:${queryTimeoutSeconds}];
             nwr["amenity"~"^(police|hospital)$"]${poiBounds};
             out body center qt;`,
-    commercePlaceQuery: `[out:json][timeout:${queryTimeoutSeconds}];
-            nwr["shop"="convenience"]${poiBounds};
-            out body center qt;`,
+    commercePlaceQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
+            nwr["shop"~"^(convenience|supermarket|hardware|doityourself|pawnbroker|second_hand|car_repair|car_parts|outdoor|fishing|boat|aviation)$"]${poiBounds};
+            nwr["amenity"~"^(fuel|charging_station)$"]${poiBounds};
+            );out body center qt;`,
     transportFacilityQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
-            nwr["aeroway"~"^(aerodrome|heliport|runway|taxiway|apron|terminal|helipad|hangar|parking_position|gate|control_tower)$"]${featureBounds};
+            nwr["aeroway"~"^(aerodrome|heliport|runway|taxiway|apron|terminal|helipad|hangar|parking_position|gate|control_tower)$"]${transportFacilityBounds};
             nwr["leisure"="marina"]${featureBounds};
             nwr["harbour"="yes"]${featureBounds};
             nwr["landuse"~"^(port|harbour)$"]${featureBounds};
@@ -423,6 +414,19 @@ export function buildWorldOverpassPlan({
                 way["building"="houseboat"]${waterStructureBounds};
                 way["waterway"~"^(river|stream|canal|drain|ditch)$"]${featureBounds};
                 way["leisure"~"^(park|garden|nature_reserve)$"]${featureBounds};
+                nwr["aeroway"~"^(aerodrome|heliport|runway|taxiway|apron|terminal|helipad|hangar|parking_position|gate|control_tower)$"]${transportFacilityBounds};
+                nwr["leisure"="marina"]${featureBounds};
+                nwr["harbour"="yes"]${featureBounds};
+                nwr["landuse"~"^(port|harbour)$"]${featureBounds};
+                nwr["man_made"~"^(pier|quay)$"]${featureBounds};
+                nwr["waterway"="dock"]${featureBounds};
+                nwr["amenity"="ferry_terminal"]${featureBounds};
+                nwr["route"="ferry"]${featureBounds};
+                nwr["mooring"]${featureBounds};
+                nwr["seamark:type"~"^(harbour|berth)$"]${featureBounds};
+                nwr["amenity"~"^(police|hospital)$"]${poiBounds};
+                nwr["shop"~"^(convenience|supermarket|hardware|doityourself|pawnbroker|second_hand|car_repair|car_parts|outdoor|fishing|boat|aviation)$"]${poiBounds};
+                nwr["amenity"~"^(fuel|charging_station)$"]${poiBounds};
             );out body;>;out skel qt;`,
     loadDeadline: loadStartedAt + maxTotalLoadMs
   };
@@ -464,7 +468,6 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
     throw error;
   }
 
-  const controllers = [];
   const errors = [];
   const configuredEndpoints = Array.isArray(options.endpoints)
     ? options.endpoints.map((endpoint) => String(endpoint || '').trim()).filter(Boolean)
@@ -472,12 +475,13 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
   const endpoints = configuredEndpoints.length > 0 ? configuredEndpoints : orderedOverpassEndpoints();
   const fetchImpl = typeof options.fetchImpl === 'function' ? options.fetchImpl : globalThis.fetch;
   if (typeof fetchImpl !== 'function') throw new TypeError('Overpass fetch implementation is unavailable');
-  const staggerIntervalMs = Math.max(0, Number.isFinite(Number(options.staggerMs))
+  const retryDelayMs = Math.max(0, Number.isFinite(Number(options.staggerMs))
     ? Number(options.staggerMs)
     : OVERPASS_STAGGER_MS);
-  // `timeoutMs` is the budget for the optional provider as a whole, not a
-  // separate allowance for every hedged endpoint. Otherwise a 3.5 second
-  // mobile probe can take nine seconds after endpoint staggering.
+  // `timeoutMs` is the budget for the provider as a whole. Endpoint fallbacks
+  // are deliberately serial: public Overpass instances prohibit parallel
+  // application probes and the world loader already consolidates its exact
+  // feature needs into one query.
   const requestedTimeoutMs = Math.max(1000, Number(timeoutMs) || OVERPASS_MIN_TIMEOUT_MS);
   const requestDeadlineMs = Math.min(
     Number.isFinite(deadlineMs) ? deadlineMs : Infinity,
@@ -486,40 +490,32 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
   const requestController = new AbortController();
   const abortRequest = () => requestController.abort(externalAbortError(externalSignal));
   externalSignal?.addEventListener?.('abort', abortRequest, { once: true });
-  let requestSettled = false;
-  const attempts = endpoints.map((endpoint, idx) => (async () => {
-    const staggerMs = idx * staggerIntervalMs;
-    if (staggerMs > 0) await delayMs(staggerMs, requestController.signal);
-    if (externalSignal?.aborted) throw externalAbortError(externalSignal);
-    if (requestController.signal.aborted) throw externalAbortError(requestController.signal);
-    if (requestSettled) throw new Error(`[${endpoint}] superseded by successful request`);
-
-    const now = performance.now();
-    if (now >= requestDeadlineMs - 300) {
-      throw new Error(`[${endpoint}] skipped: load budget exhausted`);
-    }
-
-    const timeLeftMs = requestDeadlineMs - now;
-    const timeoutForEndpointMs = Math.max(
-      500,
-      Math.min(
-        Math.max(
-          Math.min(OVERPASS_MIN_TIMEOUT_MS, requestedTimeoutMs),
-          requestedTimeoutMs - idx * 1200
-        ),
-        timeLeftMs - 250
-      )
-    );
-
-    const controller = new AbortController();
-    const relayAbort = () => controller.abort(externalAbortError(externalSignal));
-    const relayRequestAbort = () => controller.abort(externalAbortError(requestController.signal));
-    externalSignal?.addEventListener?.('abort', relayAbort, { once: true });
-    requestController.signal.addEventListener('abort', relayRequestAbort, { once: true });
-    controllers.push(controller);
-    const timeoutId = setTimeout(() => controller.abort(), timeoutForEndpointMs);
-
-    try {
+  try {
+    for (let idx = 0; idx < endpoints.length; idx += 1) {
+      const endpoint = endpoints[idx];
+      if (idx > 0 && retryDelayMs > 0) {
+        const remainingBeforeDelay = requestDeadlineMs - performance.now();
+        if (remainingBeforeDelay > retryDelayMs + 500) {
+          await delayMs(Math.min(retryDelayMs, 500), requestController.signal);
+        }
+      }
+      if (externalSignal?.aborted) throw externalAbortError(externalSignal);
+      if (requestController.signal.aborted) throw externalAbortError(requestController.signal);
+      const now = performance.now();
+      if (now >= requestDeadlineMs - 300) break;
+      const endpointsAfterThis = endpoints.length - idx - 1;
+      const timeLeftMs = requestDeadlineMs - now;
+      const timeoutForEndpointMs = Math.max(500, Math.min(
+        timeLeftMs - 250,
+        timeLeftMs - endpointsAfterThis * 750
+      ));
+      const controller = new AbortController();
+      const relayAbort = () => controller.abort(externalAbortError(externalSignal));
+      const relayRequestAbort = () => controller.abort(externalAbortError(requestController.signal));
+      externalSignal?.addEventListener?.('abort', relayAbort, { once: true });
+      requestController.signal.addEventListener('abort', relayRequestAbort, { once: true });
+      const timeoutId = setTimeout(() => controller.abort(), timeoutForEndpointMs);
+      try {
       const res = await fetchImpl(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
@@ -546,33 +542,24 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
       data._overpassEndpoint = endpoint;
       data._overpassSource = 'network';
       data._overpassCacheAgeMs = 0;
-      requestSettled = true;
       lastOverpassEndpoint = endpoint;
       if (usesDefaultProvider) markOverpassProviderAvailable();
       storeOverpassMemoryCache(cacheMeta, data, endpoint);
       void writePersistentOverpassCache(persistentCacheKey, data, endpoint, cacheMeta);
       return data;
-    } catch (err) {
-      if (externalSignal?.aborted) throw externalAbortError(externalSignal);
-      const reason = err?.name === 'AbortError' ?
-        `timeout after ${Math.floor(timeoutForEndpointMs)}ms` :
-        err?.message || String(err);
-      const wrapped = new Error(`[${endpoint}] ${reason}`);
-      errors.push(wrapped.message);
-      throw wrapped;
-    } finally {
-      clearTimeout(timeoutId);
-      externalSignal?.removeEventListener?.('abort', relayAbort);
-      requestController.signal.removeEventListener('abort', relayRequestAbort);
+      } catch (err) {
+        if (externalSignal?.aborted) throw externalAbortError(externalSignal);
+        const reason = err?.name === 'AbortError' ?
+          `timeout after ${Math.floor(timeoutForEndpointMs)}ms` :
+          err?.message || String(err);
+        errors.push(`[${endpoint}] ${reason}`);
+      } finally {
+        clearTimeout(timeoutId);
+        externalSignal?.removeEventListener?.('abort', relayAbort);
+        requestController.signal.removeEventListener('abort', relayRequestAbort);
+      }
     }
-  })());
-
-  try {
-    const data = await firstSuccessful(attempts);
-    requestSettled = true;
-    requestController.abort(new DOMException('Overpass request satisfied', 'AbortError'));
-    controllers.forEach((controller) => controller.abort());
-    return data;
+    throw new Error(`All Overpass endpoints failed: ${errors.join(' | ')}`);
   } catch (error) {
     if (externalSignal?.aborted) throw externalAbortError(externalSignal);
     const fallback = await readPersistentOverpassFallback(cacheMeta);

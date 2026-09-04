@@ -67,7 +67,7 @@ function explorerGoalSnapshot({ profile = {}, guide = [], items = [], events = [
   } else {
     const paths = progress.paths || {};
     if ((paths.activity?.firsts || 0) < 1) {
-      goal = { id: 'first-game', label: 'Complete a world activity', detail: 'Choose a game from Games & Activities and finish its route.', current: 0, target: 1, reward: 'Begin your Games path' };
+      goal = { id: 'first-game', label: 'Complete a world activity', detail: 'Start an activity and finish its route.', current: 0, target: 1, reward: 'Begin your Games path' };
     } else if ((paths.creation?.firsts || 0) < 1) {
       goal = { id: 'first-creation', label: 'Leave your mark on the world', detail: 'Save an Editor feature or reach your first Blocks milestone.', current: 0, target: 1, reward: 'Earn the World Maker badge' };
     } else if ((paths.travel?.records || 0) < 3) {

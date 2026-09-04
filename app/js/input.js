@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
-import { resolvePrimaryPlace } from './places/place-search.js?v=2';
+import { resolvePrimaryPlace } from './places/place-search.js?v=3';
 // input.js - Keyboard handling, track recording, city switching
 // ============================================================================
 
@@ -80,6 +80,17 @@ function onKey(code, event) {
     Promise.resolve(runGameplayFallback()).catch((err) => {
       console.warn('[interior] Interaction failed:', err);
     });
+    return;
+  }
+
+  if (appCtx.activeShipInterior === true && code === 'KeyM') {
+    if (!event?.repeat) appCtx.toggleExpeditionShipMap?.();
+    event?.preventDefault?.();
+    return;
+  }
+
+  if (appCtx.activeShipInterior === true && ['KeyF', 'KeyP', 'KeyG', 'KeyB'].includes(code)) {
+    if (!event?.repeat) appCtx.showToast?.('Return to flight before changing traversal modes.');
     return;
   }
 
@@ -322,24 +333,28 @@ function nextCity() {
   appCtx.loadRoads();
 }
 
-async function searchLocation() {
-  const input = document.getElementById('locationSearch');
-  const status = document.getElementById('locationSearchStatus');
-  const query = String(input?.value || '').trim();
-  if (!input || !status) return null;
+async function searchAndTravelToLocation(queryInput, options = {}) {
+  const query = String(queryInput || '').trim();
+  const status = options.statusElement || null;
   if (!query) {
-    status.textContent = 'Please enter a city, place, airport, or coordinates.';
-    status.style.color = '#dc2626';
+    if (status) {
+      status.textContent = 'Enter a city, place, airport, or coordinates.';
+      status.dataset.tone = 'error';
+    }
     return null;
   }
 
-  status.textContent = 'Searching places…';
-  status.style.color = '#6b7280';
+  if (status) {
+    status.textContent = 'Searching places…';
+    status.dataset.tone = 'working';
+  }
   try {
     const result = await resolvePrimaryPlace(query);
     if (!result) {
-      status.textContent = 'No matching place. Try a city, landmark, airport, or coordinates.';
-      status.style.color = '#dc2626';
+      if (status) {
+        status.textContent = 'No matching place. Try a city, landmark, airport, or coordinates.';
+        status.dataset.tone = 'error';
+      }
       return null;
     }
 
@@ -358,14 +373,23 @@ async function searchLocation() {
         displayName: result.displayName,
         kind: result.kindLabel,
         region: result.region,
-        country: result.country
+        country: result.country,
+        countryCode: result.countryCode,
+        airportClass: result.airportClass || '',
+        isAirport: result.isAirport === true,
+        airportBounds: result.airportBounds || null,
+        iata: result.iata || '',
+        icao: result.icao || ''
       }
     });
     appCtx.setTitleLocationMode?.('custom');
-    status.textContent = `Found: ${result.name}${result.country ? `, ${result.country}` : ''}`;
-    status.style.color = '#059669';
+    if (status) {
+      status.textContent = `Found: ${result.name}${result.country ? `, ${result.country}` : ''}`;
+      status.dataset.tone = 'success';
+    }
 
     if (appCtx.gameStarted) {
+      if (options.closeMap === true) appCtx.closeLargeMap?.();
       await appCtx.loadRoads();
       const currentMode = appCtx.Walk?.state?.mode === 'walk' ? 'walk' : 'drive';
       if (typeof appCtx.applyCustomLocationSpawn === 'function') {
@@ -378,16 +402,28 @@ async function searchLocation() {
     return result;
   } catch (error) {
     if (error?.name === 'AbortError') return null;
-    status.textContent = error?.message || 'Place search is unavailable right now.';
-    status.style.color = '#dc2626';
+    if (status) {
+      status.textContent = error?.message || 'Place search is unavailable right now.';
+      status.dataset.tone = 'error';
+    }
     return null;
   }
+}
+
+async function searchLocation() {
+  const input = document.getElementById('locationSearch');
+  const status = document.getElementById('locationSearchStatus');
+  if (!input || !status) return null;
+  const result = await searchAndTravelToLocation(input.value, { statusElement: status });
+  status.style.color = result ? '#059669' : '#dc2626';
+  return result;
 }
 Object.assign(appCtx, {
   appendTrackPoint,
   eraseTrack,
   nextCity,
   onKey,
+  searchAndTravelToLocation,
   searchLocation,
   toggleTrackRecording,
   updateTrack
@@ -398,6 +434,7 @@ export {
   eraseTrack,
   nextCity,
   onKey,
+  searchAndTravelToLocation,
   searchLocation,
   toggleTrackRecording,
   updateTrack };

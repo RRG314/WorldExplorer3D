@@ -59,12 +59,6 @@
   font-size: 22px;
   cursor: pointer;
 }
-.blockBuilderHeader #blockBuilderBack {
-  width: auto;
-  padding: 0 10px;
-  font-size: 11px;
-}
-
 .blockBuilderTools,
 .blockBuilderActions,
 .blockBuilderMapActions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }

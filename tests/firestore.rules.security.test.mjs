@@ -14,8 +14,10 @@ import {
   doc,
   getDoc,
   getDocs,
+  query,
   serverTimestamp,
   setDoc,
+  where,
   writeBatch
 } from 'firebase/firestore';
 
@@ -291,6 +293,37 @@ async function seedData(testEnv) {
       level: 1,
       resolved: false,
       updatedAt: Timestamp.fromMillis(Date.now() - 1_000)
+    });
+    await setDoc(doc(db, 'worldProperties', 'property-state-1'), {
+      authority: 'world-property-transaction-v1',
+      propertyId: 'world:osm-way:home-42',
+      sourceBuildingId: 'osm-way:home-42',
+      locationId: 'baltimore:39.29:-76.61',
+      ownerUid: OWNER_UID,
+      ownerName: 'Owner',
+      status: 'owned',
+      baseValue: 120,
+      revision: 1
+    });
+    await setDoc(doc(db, 'worldPropertyCatalog', 'property-state-1'), {
+      authority: 'world-property-catalog-v1',
+      propertyId: 'world:osm:way:42',
+      sourceBuildingId: 'osm:way:42',
+      sourceAuthority: 'openstreetmap'
+    });
+    await setDoc(doc(db, 'users', OWNER_UID, 'economy', 'wallet'), { credits: 380, revision: 1 });
+    await setDoc(doc(db, 'users', OWNER_UID, 'propertyEntitlements', 'starter'), { claimed: true, propertyId: 'world:osm-way:home-42' });
+    await setDoc(doc(db, 'users', OWNER_UID, 'propertyReceipts', 'receipt-1'), { action: 'starter_claim', propertyId: 'world:osm-way:home-42' });
+    await setDoc(doc(db, 'users', OWNER_UID, 'notifications', 'notice-1'), { type: 'property-sold', read: false });
+    await setDoc(doc(db, 'propertyLeaderboard', OWNER_UID), { uid: OWNER_UID, displayName: 'Owner', propertiesOwned: 1 });
+    await setDoc(doc(db, 'propertyTradeOffers', 'trade-offer-1'), {
+      authority: 'world-property-transaction-v1',
+      offerId: 'trade-offer-1',
+      status: 'pending',
+      proposerUid: OWNER_UID,
+      recipientUid: MEMBER_UID,
+      offeredPropertyId: 'world:osm-way:home-42',
+      requestedPropertyId: 'world:osm-way:home-99'
     });
 
     await setDoc(doc(db, 'users', OWNER_UID, 'friends', INVITEE_UID), {
@@ -572,6 +605,53 @@ await runCheck('room member can read shared civic state but cannot forge it', as
 
 await runCheck('non-member cannot read shared civic state', async () => {
   await assertFails(getDoc(doc(attackerDb, 'rooms', ROOM_ID, 'urbanCivic', 'current')));
+});
+
+await runCheck('signed-in explorers can read global property ownership but cannot forge it', async () => {
+  const reference = doc(memberDb, 'worldProperties', 'property-state-1');
+  await assertSucceeds(getDoc(reference));
+  await assertFails(setDoc(reference, { ownerUid: MEMBER_UID }, { merge: true }));
+  await assertFails(setDoc(doc(memberDb, 'worldProperties', 'forged-property'), {
+    propertyId: 'world:forged', ownerUid: MEMBER_UID, status: 'owned'
+  }));
+});
+
+await runCheck('anonymous visitors cannot read global property ownership', async () => {
+  await assertFails(getDoc(doc(anonDb, 'worldProperties', 'property-state-1')));
+});
+
+await runCheck('mapped property catalog is server-only', async () => {
+  const reference = doc(ownerDb, 'worldPropertyCatalog', 'property-state-1');
+  await assertFails(getDoc(reference));
+  await assertFails(setDoc(reference, { x: 999 }, { merge: true }));
+  await assertFails(getDoc(doc(anonDb, 'worldPropertyCatalog', 'property-state-1')));
+});
+
+await runCheck('players can read only their own wallet, receipts, deed, and notifications and cannot write them', async () => {
+  await assertSucceeds(getDoc(doc(ownerDb, 'users', OWNER_UID, 'economy', 'wallet')));
+  await assertSucceeds(getDoc(doc(ownerDb, 'users', OWNER_UID, 'propertyEntitlements', 'starter')));
+  await assertSucceeds(getDoc(doc(ownerDb, 'users', OWNER_UID, 'propertyReceipts', 'receipt-1')));
+  await assertSucceeds(getDoc(doc(ownerDb, 'users', OWNER_UID, 'notifications', 'notice-1')));
+  await assertFails(getDoc(doc(memberDb, 'users', OWNER_UID, 'economy', 'wallet')));
+  await assertFails(setDoc(doc(ownerDb, 'users', OWNER_UID, 'economy', 'wallet'), { credits: 999999 }, { merge: true }));
+  await assertFails(setDoc(doc(ownerDb, 'users', OWNER_UID, 'propertyEntitlements', 'starter'), { claimed: false }, { merge: true }));
+  await assertFails(setDoc(doc(ownerDb, 'users', OWNER_UID, 'propertyReceipts', 'forged'), { action: 'buy' }));
+});
+
+await runCheck('property Community Board summaries are public but server-owned', async () => {
+  await assertSucceeds(getDoc(doc(anonDb, 'propertyLeaderboard', OWNER_UID)));
+  await assertFails(setDoc(doc(ownerDb, 'propertyLeaderboard', OWNER_UID), { propertiesOwned: 999 }, { merge: true }));
+});
+
+await runCheck('property trade offers are private to both participants and server-owned', async () => {
+  const reference = doc(ownerDb, 'propertyTradeOffers', 'trade-offer-1');
+  await assertSucceeds(getDoc(reference));
+  await assertSucceeds(getDoc(doc(memberDb, 'propertyTradeOffers', 'trade-offer-1')));
+  await assertSucceeds(getDocs(query(collection(ownerDb, 'propertyTradeOffers'), where('proposerUid', '==', OWNER_UID))));
+  await assertSucceeds(getDocs(query(collection(memberDb, 'propertyTradeOffers'), where('recipientUid', '==', MEMBER_UID))));
+  await assertFails(getDoc(doc(attackerDb, 'propertyTradeOffers', 'trade-offer-1')));
+  await assertFails(getDoc(doc(anonDb, 'propertyTradeOffers', 'trade-offer-1')));
+  await assertFails(setDoc(reference, { status: 'accepted' }, { merge: true }));
 });
 
 await runCheck('room actor can read own server action clock but cannot write it', async () => {

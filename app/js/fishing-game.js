@@ -2,7 +2,7 @@ import { ctx as appCtx } from './shared-context.js?v=55';
 import { fishMetricText } from './fishing/catalog.js?v=2';
 import { normalizeDepthEvidence } from './geospatial/bathymetry-evidence.js?v=1';
 import { clearFishingScene, drawFishPortrait, updateFishingScene } from './fishing/visuals.js?v=5';
-import { getScreenLayoutService } from './ui/screen-layout.js?v=1';
+import { getScreenLayoutService } from './ui/screen-layout.js?v=2';
 import { evaluateShoreFishing } from './fishing/shore-authority.js?v=2';
 import { createFishPopulationContext, selectFishFromPopulation } from './fishing/population-authority.js?v=2';
 

@@ -65,27 +65,16 @@ const generateDemoProperties = (centerLat, centerLon, count = 20) => {
 
 // Property API Layer
 const PropertyAPI = {
+  async fetchConnectedProperties(lat, lon, radius = 1) {
+    let properties = [];
+    if (apiConfig.attom && !properties.length) properties = await this.fetchATTOM(lat, lon, radius);
+    if (apiConfig.rentcast && !properties.length) properties = await this.fetchRentCast(lat, lon, radius);
+    return properties;
+  },
+
   // Main fetch function - tries all available APIs
   async fetchProperties(lat, lon, radius = 1) {
-    let properties = [];
-
-    // Try Estated first (highest free tier - 1000/month)
-    if (apiConfig.estated && !properties.length) {
-      // Debug log removed
-      properties = await this.fetchEstated(lat, lon, radius);
-    }
-
-    // Try ATTOM next
-    if (apiConfig.attom && !properties.length) {
-      // Debug log removed
-      properties = await this.fetchATTOM(lat, lon, radius);
-    }
-
-    // Try RentCast as fallback
-    if (apiConfig.rentcast && !properties.length) {
-      // Debug log removed
-      properties = await this.fetchRentCast(lat, lon, radius);
-    }
+    let properties = await this.fetchConnectedProperties(lat, lon, radius);
 
     // Fall back to demo if no APIs configured or all failed
     if (!properties.length) {

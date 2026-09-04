@@ -1,3 +1,5 @@
+import { SPACE_CRAFT_IDENTITY } from './craft-identity.js?v=1';
+
 function phong(color, options = {}) {
   return new THREE.MeshPhongMaterial({
     color,
@@ -29,7 +31,9 @@ function addBox(parent, size, material, position, rotation = null) {
 
 function createExpeditionSpacecraftMesh() {
   const craft = new THREE.Group();
-  craft.name = 'Wayfinder Horizon-class Explorer';
+  craft.name = `${SPACE_CRAFT_IDENTITY.starship.name} Exploration Starship`;
+  craft.userData.playerFacingName = SPACE_CRAFT_IDENTITY.starship.name;
+  craft.userData.craftRole = SPACE_CRAFT_IDENTITY.starship.role;
   craft.userData.visualStyle = 'horizon-class-retro-futurist';
   craft.userData.originalDesign = true;
   craft.userData.visualOnly = true;

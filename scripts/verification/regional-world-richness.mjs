@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
+import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 
 const externalUrl = String(process.env.WE3D_VERIFY_BASE_URL || '').replace(/\/$/, '');
-const server = externalUrl ? null : await startStaticServer({ rootDir: process.cwd(), ports: [4497, 4498, 4499] });
+const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
+const servedRoot = requestedRoot ? path.resolve(process.cwd(), requestedRoot) : process.cwd();
+const server = externalUrl ? null : await startStaticServer({ rootDir: servedRoot, ports: [4497, 4498, 4499] });
 const baseUrl = externalUrl || `http://127.0.0.1:${server.port}`;
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const allJourneys = [
@@ -39,8 +42,8 @@ async function enterCoordinates(page, journey) {
 async function openRegionalGuide(page) {
   const analytics = page.locator('#analyticsConsentBanner');
   if (await analytics.isVisible()) await page.locator('#analyticsConsentDenyBtn').click();
-  await page.locator('#exploreBtn').click();
-  await page.waitForSelector('#exploreMenu.open', { timeout: 10_000 });
+  await page.locator('#travelBtn').click();
+  await page.waitForSelector('#travelMenu.open', { timeout: 10_000 });
   await page.locator('#fWalk').click();
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.mode === 'walk', null, { timeout: 20_000 });
   await page.locator('#exploreBtn').click();
@@ -54,6 +57,10 @@ async function openRegionalGuide(page) {
   const guideTutorial = page.locator('#discoverySectionTutorial:not([hidden])');
   if (await guideTutorial.isVisible()) await page.locator('#discoverySectionTutorialDoneBtn').click();
   await page.waitForFunction(() => /REGIONAL LIFE LIST/.test(document.getElementById('discoveryLifeList')?.textContent || ''), null, { timeout: 20_000 });
+  const regionalLifeDetails = page.locator('.discoveryGuideLifeDetails');
+  if (!await regionalLifeDetails.evaluate((element) => element.open)) {
+    await regionalLifeDetails.locator('summary').click();
+  }
   await page.locator('#discoveryLifeList').scrollIntoViewIfNeeded();
 }
 
@@ -78,16 +85,14 @@ async function startRegionalFieldLead(page, journey) {
     const interaction = globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery?.interaction;
     return interaction?.active === true && Boolean(interaction.targetCatalogId);
   }, null, { timeout: 20_000 });
-  const result = await page.evaluate(async (packId) => {
-    const { REGIONAL_ECOLOGY_PACKS } = await import('./js/discovery/ecology/regional-packs.js?v=1');
+  const result = await page.evaluate((packId) => {
     const interaction = globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery?.interaction || {};
-    const pack = REGIONAL_ECOLOGY_PACKS.find((entry) => entry.id === packId);
     return {
       activityId: interaction.activityId || null,
       targetCatalogId: interaction.targetCatalogId || null,
       evidenceClass: interaction.evidenceClass || null,
       phase: interaction.phase || null,
-      targetBelongsToRegionalPack: pack?.taxa?.some((taxon) => taxon.id === interaction.targetCatalogId) === true
+      targetBelongsToRegionalPack: interaction.targetRegionalPackId === packId
     };
   }, journey.packId);
   await page.screenshot({
@@ -160,7 +165,7 @@ async function inspectJourney(journey) {
       creatureBudgetHonest: snapshot.creatureTaxonCount === 12 && snapshot.referenceFallbacks === 12 && snapshot.promotionReadyCount === 0,
       guideOpenedByNormalInput: snapshot.activeGuide === true,
       lifeListShowsRegionalTarget: /0\s*\/\s*12/.test(snapshot.lifeListText),
-      lifeListExplainsTruth: /not a live-presence count/i.test(snapshot.lifeListText),
+      lifeListExplainsTruth: /not a live(?:-presence| wildlife) count/i.test(snapshot.lifeListText),
       panelFitsViewport: snapshot.panelVisible === true,
       lifeListVisible: snapshot.lifeListVisible === true,
       noBrowserErrors: pageErrors.length === 0,

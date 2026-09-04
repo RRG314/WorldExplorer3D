@@ -39,6 +39,7 @@ export function createWorldRoadLoaderSupport({
       colliderDetail: detail,
       sourceBuildingId: options.sourceBuildingId || null,
       name: String(options.name || '').trim(),
+      address: options.address && typeof options.address === 'object' ? { ...options.address } : null,
       buildingType: options.buildingType || 'yes',
       buildingPartKind: options.buildingPartKind || 'full',
       collisionKind: options.collisionKind || 'solid',

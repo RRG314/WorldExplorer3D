@@ -18,6 +18,7 @@ const SOURCE_ENTRIES = [
 ];
 const REPORT_EXTENSIONS = new Set(['.js', '.css']);
 const DECLARED_RUNTIME_ENTRIES = ['app/js/app-entry.js'];
+const DECLARED_BUILD_INPUTS = ['app/js/expedition/command-authority.js'];
 const strict = process.argv.includes('--strict');
 
 function normalize(value) {
@@ -82,6 +83,7 @@ function extractReferences(file, source) {
     patterns.push(/\bmoduleEntrypoint\s*=\s*[`"']([^`"']+)[`"']/g);
     patterns.push(/new\s+URL\(\s*["']([^"']+)["']\s*,\s*import\.meta\.url\s*\)/g);
     patterns.push(/fetch\(\s*["']([^"']+)["']/g);
+    patterns.push(/\b(?:href|src)\s*=\s*["']([^"']+)["']/g);
   } else if (extension === '.css') {
     patterns.push(/url\(\s*["']?([^"')]+)["']?\s*\)/g);
     patterns.push(/@import\s+["']([^"']+)["']/g);
@@ -96,7 +98,7 @@ function extractReferences(file, source) {
 
 const available = await sourceFiles();
 const htmlEntries = [...available].filter((file) => path.extname(file).toLowerCase() === '.html');
-const entrypoints = [...htmlEntries, ...DECLARED_RUNTIME_ENTRIES];
+const entrypoints = [...htmlEntries, ...DECLARED_RUNTIME_ENTRIES, ...DECLARED_BUILD_INPUTS];
 const reached = new Set(entrypoints);
 const pending = [...entrypoints];
 
