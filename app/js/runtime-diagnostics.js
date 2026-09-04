@@ -1080,6 +1080,9 @@ function getWorldExplorerRuntimeDiagnostics() {
       ...getModelAssetRuntimeMetrics(),
       playerAssetId: appCtx.Walk?.state?.characterMesh?.userData?.characterAssetId || null
     },
+    transportVisuals: {
+      activeAircraft: appCtx.planeMode?.mesh?.userData?.performanceProfile || null
+    },
     mappedTallBuildingVisuals: mappedTallBuildingVisualSnapshot(),
     modes: {
       boat: !!appCtx.boatMode?.active,

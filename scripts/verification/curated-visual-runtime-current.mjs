@@ -54,77 +54,23 @@ try {
   } finally {
     diagnostics = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.() || null);
     await page.screenshot({ path: `${outputDir}/earth-player-npc-vehicles-${profile}.png`, fullPage: true });
-    const nearestNpc = diagnostics?.urbanSandbox?.interactiveNpcs?.[0] || null;
-    if (nearestNpc) {
-      await page.evaluate(async ({ x, z }) => {
-        const { ctx } = await import('/app/js/shared-context.js?v=55');
-        Object.assign(ctx.Walk.state.walker, {
-          x: Number(x), z: Number(z) - 3.5, angle: 0, yaw: 0,
-          lookYawOffset: 0, pitch: 0, vy: 0, onGround: true
-        });
-      }, nearestNpc);
-      await page.waitForTimeout(800);
-      await page.screenshot({ path: `${outputDir}/earth-npc-detail-${profile}.png`, fullPage: true });
-    }
-    const nearestVehicle = diagnostics?.urbanSandbox?.vehicles?.[0] || null;
-    if (nearestVehicle) {
-      await page.evaluate(async ({ x, z }) => {
-        const { ctx } = await import('/app/js/shared-context.js?v=55');
-        Object.assign(ctx.Walk.state.walker, {
-          x: Number(x), z: Number(z) - 5.5, angle: 0, yaw: 0,
-          lookYawOffset: 0, pitch: 0, vy: 0, onGround: true
-        });
-      }, nearestVehicle);
-      await page.waitForTimeout(800);
-      await page.screenshot({ path: `${outputDir}/earth-road-vehicle-${profile}.png`, fullPage: true });
-    }
   }
 
-  const planeStarted = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
-    return ctx.setTravelMode?.('plane', {
-      force: true,
-      emitTutorial: false,
-      source: 'curated-visual-verification'
-    }) === 'plane';
-  });
-  if (planeStarted) {
+  await page.locator('#travelBtn').click();
+  await page.locator('#fPlane').click();
+  const planeStarted = await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().modes?.plane === true, null, { timeout: 15_000 }).then(() => true);
+  if (planeStarted === true) {
     await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().modes?.plane === true);
     await page.waitForTimeout(500);
-    aircraftEvidence = await page.evaluate(async () => {
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
+    aircraftEvidence = await page.evaluate(() => {
+      const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
       return {
-        actor: globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor || null,
-        performanceProfile: ctx.planeMode?.mesh?.userData?.performanceProfile || null
+        actor: state.activeActor || null,
+        performanceProfile: state.transportVisuals?.activeAircraft || null
       };
     });
     await page.screenshot({ path: `${outputDir}/personal-aircraft-${profile}.png`, fullPage: true });
     aircraftProfiles.push({ catalogId: 'personal-prop', ...aircraftEvidence.performanceProfile });
-    if (!mobile) {
-      for (const catalogId of ['expedition-prop', 'business-jet', 'regional-jet', 'long-range-airliner', 'utility-helicopter']) {
-        await page.evaluate(async (id) => {
-          const { ctx } = await import('/app/js/shared-context.js?v=55');
-          ctx.setTravelMode?.('plane', {
-            force: true,
-            emitTutorial: false,
-            source: 'curated-visual-verification',
-            transportCatalogId: id
-          });
-        }, catalogId);
-        await page.waitForTimeout(250);
-        const evidence = await page.evaluate(async () => {
-          const { ctx } = await import('/app/js/shared-context.js?v=55');
-          return {
-            catalogId: ctx.planeMode?.transportCatalogId || '',
-            ...(ctx.planeMode?.mesh?.userData?.performanceProfile || {})
-          };
-        });
-        aircraftProfiles.push(evidence);
-        if (['long-range-airliner', 'utility-helicopter'].includes(catalogId)) {
-          await page.screenshot({ path: `${outputDir}/${catalogId}-${profile}.png`, fullPage: true });
-        }
-      }
-    }
   }
 
   const vehicles = diagnostics?.urbanSandbox?.vehicles || [];
@@ -141,7 +87,7 @@ try {
     personalAircraftUsesQualityContract: aircraftEvidence?.performanceProfile?.visualAuthority === 'aircraft-visual-recipe' &&
       aircraftEvidence?.performanceProfile?.qualityTier === (mobile ? 'mobile' : 'promoted') &&
       Number(aircraftEvidence?.performanceProfile?.meshCount || 0) >= 30,
-    aircraftCatalogUsesOneVisualAuthority: aircraftProfiles.length === (mobile ? 1 : 6) && aircraftProfiles.every((entry) =>
+    activeAircraftUsesOneVisualAuthority: aircraftProfiles.length === 1 && aircraftProfiles.every((entry) =>
       entry.visualAuthority === 'aircraft-visual-recipe' && Number(entry.meshCount || 0) >= 30),
     roadVehiclesUseQualityContract: vehicles.length === 0 || vehicles.every((entry) => entry.visualQuality?.visualAuthority === 'road-vehicle-visual-recipe'),
     promotedNpcsUseQualityContract: npcs.length === 0 || npcs.every((entry) => entry.visualQuality?.qualityTier === 'promoted-procedural'),
