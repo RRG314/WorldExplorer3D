@@ -1119,7 +1119,9 @@ function renderMission() {
 }
 
 function closeShipStationPanel() {
-  document.getElementById('shipStationPanel')?.classList.remove('show');
+  const panel = document.getElementById('shipStationPanel');
+  panel?.classList.remove('show');
+  if (panel?.contains(document.activeElement)) document.activeElement?.blur?.();
 }
 
 function crewPortraitPosition(crewId) {
@@ -1543,7 +1545,7 @@ async function enterActiveShip() {
     reason: 'solis-reach-interior-entered'
   });
   ensureStylesheet();
-  const ship = await import('./ship-interior.js?v=20');
+  const ship = await import('./ship-interior.js?v=21');
   closeExpeditionPlanner();
   const entered = ship.enterSolisReachInterior({
     expedition: activeExpedition,

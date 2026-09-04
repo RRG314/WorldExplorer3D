@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { createWalkingCharacterHelpers } from "./walking/character.js?v=2";
+import { createWalkingCharacterHelpers } from "./walking/character.js?v=3";
 import { createWalkingGeometryHelpers } from "./walking/geometry.js?v=1";
 import { createWalkingPhysicsHelpers } from "./walking/physics.js?v=28";
 import { createWalkingRuntimeHelpers } from "./walking/runtime.js?v=4";
@@ -50,7 +50,7 @@ function createWalkingModule(opts) {
     blockStepHeight: 0.65 // Max step-up without jumping
   };
 
-  const { animateCharacterWalk, createCharacterMesh } = createWalkingCharacterHelpers({ THREE, scene });
+  const { animateCharacterWalk, attachHeroCharacter, createCharacterMesh } = createWalkingCharacterHelpers({ THREE, scene });
   const { clampPointInsideFootprint, pointInPolygonSafe } = createWalkingGeometryHelpers();
   const {
     finiteOr,
@@ -95,6 +95,7 @@ function createWalkingModule(opts) {
   });
 
   state.characterMesh = createCharacterMesh();
+  attachHeroCharacter(state.characterMesh);
   syncWalkerFromCar();
 
   return {

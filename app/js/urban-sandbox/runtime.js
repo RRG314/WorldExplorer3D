@@ -2346,6 +2346,7 @@ function snapshot(state) {
         }),
         dimensionsMeters: vehicle.visual?.root?.userData?.vehicleDimensionsMeters || null,
         visualEnvelopeMeters: vehicle.visual?.root?.userData?.vehicleVisualEnvelopeMeters || null,
+        visualQuality: vehicle.visual?.root?.userData?.performanceProfile || null,
         parking: vehicle.source === 'deterministic-parked-vehicle' ? Object.freeze({
           roadHalfWidth: Number(vehicle.roadHalfWidth || 0),
           laneOffset: Number(vehicle.laneOffset || 0),
@@ -2378,7 +2379,8 @@ function snapshot(state) {
         let count = 0;
         npc.visual?.root?.traverse?.((object) => { if (object?.isMesh) count += 1; });
         return count;
-      })()
+      })(),
+      visualQuality: npc.visual?.root?.userData?.performanceProfile || null
     }))),
     ambientPedestrians: Object.freeze(ambientPedestrians),
     lootPickups: Object.freeze(state.pickups.map((pickup) => Object.freeze({

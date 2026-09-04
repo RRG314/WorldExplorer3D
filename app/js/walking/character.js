@@ -1,4 +1,5 @@
 import { createFieldNavigatorMesh } from './field-navigator-mesh.js?v=1';
+import { loadFirstAvailableModelAsset } from '../assets/model-asset-runtime.js?v=1';
 
 function createWalkingCharacterHelpers({ THREE, scene }) {
   function createCharacterMesh() {
@@ -50,94 +51,56 @@ function createWalkingCharacterHelpers({ THREE, scene }) {
     }
   }
 
-  function normalizeCharacterModel(root) {
-    if (!root) return;
-    root.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(root);
-    const size = new THREE.Vector3();
-    box.getSize(size);
-    const sourceHeight = Math.max(0.01, size.y);
-    const targetHeight = 1.72;
-    const scale = targetHeight / sourceHeight;
-    root.scale.multiplyScalar(scale);
-    root.updateMatrixWorld(true);
-    box.setFromObject(root);
-    const center = new THREE.Vector3();
-    box.getCenter(center);
-    root.position.x -= center.x;
-    root.position.z -= center.z;
-    root.position.y -= box.min.y;
-    root.updateMatrixWorld(true);
-  }
-
-  function applyCharacterMaterialBudget(root, tier = "high") {
-    const high = {
-      skin: new THREE.MeshStandardMaterial({ color: 0xe0c2a8, roughness: 0.62, metalness: 0.02 }),
-      cloth: new THREE.MeshStandardMaterial({ color: 0x5e7489, roughness: 0.84, metalness: 0.04 }),
-      gear: new THREE.MeshStandardMaterial({ color: 0x2a2f37, roughness: 0.76, metalness: 0.08 })
-    };
-    const low = {
-      skin: new THREE.MeshStandardMaterial({ color: 0xd6b79c, roughness: 0.75, metalness: 0 }),
-      cloth: new THREE.MeshStandardMaterial({ color: 0x667684, roughness: 0.9, metalness: 0 }),
-      gear: new THREE.MeshStandardMaterial({ color: 0x32363b, roughness: 0.88, metalness: 0.02 })
-    };
-    const mats = tier === "low" ? low : high;
+  function tuneCharacterMaterials(root, tier = 'high') {
     root.traverse((obj) => {
-      if (!obj || !obj.isMesh) return;
-      const id = String(obj.name || "").toLowerCase();
-      let bucket = "cloth";
-      if (id.includes("head") || id.includes("face") || id.includes("skin") || id.includes("hand")) {
-        bucket = "skin";
-      } else if (id.includes("shoe") || id.includes("boot") || id.includes("belt") || id.includes("bag") || id.includes("helmet")) {
-        bucket = "gear";
-      }
-      obj.material = mats[bucket];
-      obj.castShadow = tier !== "low";
+      if (!obj?.isMesh) return;
+      const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
+      materials.forEach((entry) => {
+        if (!entry) return;
+        if ('roughness' in entry) entry.roughness = Math.max(.48, Math.min(.9, Number(entry.roughness) || .72));
+        if ('metalness' in entry) entry.metalness = Math.min(.18, Number(entry.metalness) || 0);
+        if (entry.map) {
+          entry.map.anisotropy = Math.min(4, Number(entry.map.anisotropy || 1) * 2);
+          entry.map.needsUpdate = true;
+        }
+        entry.needsUpdate = true;
+      });
+      obj.castShadow = tier === 'high';
       obj.receiveShadow = false;
     });
   }
 
   function attachHeroCharacter(characterMesh) {
-    if (!characterMesh || typeof THREE.GLTFLoader === "undefined") return;
-    const loader = new THREE.GLTFLoader();
-    if (typeof THREE.DRACOLoader !== "undefined") {
-      try {
-        const draco = new THREE.DRACOLoader();
-        draco.setDecoderPath("https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/draco/");
-        loader.setDRACOLoader(draco);
-      } catch (err) {
-        console.warn("Character DRACO loader unavailable:", err);
+    if (!characterMesh || typeof THREE.GLTFLoader === 'undefined') return;
+    loadFirstAvailableModelAsset(THREE, [
+      'character-field-navigator',
+      'character-field-navigator-fallback'
+    ], {
+      name: 'Field Navigator promoted model',
+      qualityTier: 'promoted',
+      targetHeightMeters: 1.72
+    }).then((instance) => {
+      if (!characterMesh.parent) {
+        instance.release();
+        return;
       }
-    }
+      const root = instance.root;
+      tuneCharacterMaterials(root, 'high');
+      root.rotation.y += Math.PI;
 
-    const onLoaded = (gltf) => {
-      const root = gltf?.scene || gltf?.scenes?.[0];
-      if (!root) return;
-      normalizeCharacterModel(root);
-      applyCharacterMaterialBudget(root, "high");
-
-      const lod1 = root.clone(true);
-      applyCharacterMaterialBudget(lod1, "low");
-
-      const lod = new THREE.LOD();
-      lod.addLevel(root, 0);
-      lod.addLevel(lod1, 24);
-      lod.autoUpdate = true;
-
-      characterMesh.add(lod);
-      characterMesh.userData.characterLod = lod;
+      for (const fallbackPart of characterMesh.children) fallbackPart.visible = false;
+      characterMesh.add(root);
+      characterMesh.userData.characterLod = null;
       characterMesh.userData.characterRoot = root;
+      characterMesh.userData.characterAssetId = instance.record.id;
+      characterMesh.userData.characterAssetRelease = instance.release;
 
-      characterMesh.traverse((obj) => {
-        if (obj?.userData?.fallbackPart) obj.visible = false;
-      });
-
-      if (Array.isArray(gltf.animations) && gltf.animations.length > 0) {
+      if (Array.isArray(instance.animations) && instance.animations.length > 0) {
         const mixer = new THREE.AnimationMixer(root);
         const pickClip = (token) =>
-          gltf.animations.find((clip) => String(clip.name || "").toLowerCase().includes(token));
-        const idleClip = pickClip("idle") || gltf.animations[0];
-        const walkClip = pickClip("walk") || pickClip("run") || gltf.animations[Math.min(1, gltf.animations.length - 1)] || idleClip;
+          instance.animations.find((clip) => String(clip.name || '').toLowerCase().includes(token));
+        const idleClip = pickClip('idle') || instance.animations[0];
+        const walkClip = pickClip('walk') || pickClip('run') || instance.animations[Math.min(1, instance.animations.length - 1)] || idleClip;
         const idleAction = mixer.clipAction(idleClip);
         const walkAction = mixer.clipAction(walkClip);
         idleAction.play();
@@ -146,14 +109,7 @@ function createWalkingCharacterHelpers({ THREE, scene }) {
         characterMesh.userData.characterMixer = mixer;
         characterMesh.userData.characterActions = { idle: idleAction, walk: walkAction };
       }
-    };
-
-    const tryUrls = ["assets/models/soldier.glb", "assets/models/Astronaut.glb"];
-    const tryNext = (idx) => {
-      if (idx >= tryUrls.length) return;
-      loader.load(tryUrls[idx], onLoaded, undefined, () => tryNext(idx + 1));
-    };
-    tryNext(0);
+    }).catch((error) => console.warn('Curated character model unavailable; using the local field navigator.', error));
   }
 
   return {

@@ -66,9 +66,15 @@ async function capture(page, name, pose) {
 async function openDoor(page, pose) {
   const before = (await snapshot(page)).expeditionShipInterior.openDoorCount;
   await placeCamera(page, pose);
+  const beforeInput = await page.evaluate(() => ({
+    stationPanelVisible: document.getElementById('shipStationPanel')?.classList.contains('show') === true,
+    stationTitle: document.getElementById('shipStationTitle')?.textContent || '',
+    activeElement: `${document.activeElement?.tagName || ''}#${document.activeElement?.id || ''}.${document.activeElement?.className || ''}`,
+    prompt: document.getElementById('interiorPrompt')?.textContent || ''
+  }));
   await page.keyboard.press('KeyE');
   try {
-    await page.waitForFunction((expected) => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.openDoorCount === expected, before + 1, { timeout: 3_000 });
+    await page.waitForFunction((previous) => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.openDoorCount !== previous, before, { timeout: 3_000 });
   } catch (error) {
     const diagnostics = await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
@@ -77,10 +83,16 @@ async function openDoor(page, pose) {
         activeDeckId: ctx.getShipInteriorSnapshot?.()?.deckId || null,
         activeLevel: ctx.activeInterior?.activeLevel,
         walker: walker ? { x: walker.x, y: walker.y, z: walker.z } : null,
+        prompt: {
+          text: document.getElementById('interiorPrompt')?.textContent || '',
+          className: document.getElementById('interiorPrompt')?.className || ''
+        },
+        primaryContext: ctx.contextInteractionSnapshot?.() || null,
+        stationPanelVisible: document.getElementById('shipStationPanel')?.classList.contains('show') === true,
         nearby: (ctx.activeInterior?.interactions || []).map((entry) => ({ id: entry.id, kind: entry.kind, x: entry.x, z: entry.z, radius: entry.radius, level: entry.level, distance: walker ? Math.hypot(entry.x - walker.x, entry.z - walker.z) : null })).filter((entry) => entry.distance < 4)
       };
     });
-    throw new Error(`Door interaction failed: ${JSON.stringify({ before, pose, diagnostics })}`, { cause: error });
+    throw new Error(`Door interaction failed: ${JSON.stringify({ before, beforeInput, pose, diagnostics })}`, { cause: error });
   }
 }
 
@@ -106,6 +118,10 @@ async function runViewport(name, viewport) {
     assert.equal(contract.doorThresholdCount, 25);
     assert.ok(contract.consoleDisplayCount >= 10);
     assert.ok(contract.equipmentGroupCount >= 25);
+    assert.equal(state.expeditionShipInterior.crewPresentation.length, state.expeditionShipInterior.totalCrewCount);
+    assert.ok(state.expeditionShipInterior.crewPresentation.every((entry) =>
+      entry.visualQuality?.qualityTier === 'promoted-procedural' &&
+      entry.visualQuality?.behaviorAuthority === 'crew-operations'));
 
     const sceneEvidence = await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
@@ -157,7 +173,7 @@ async function runViewport(name, viewport) {
     await placeCamera(page, { x: -3.4, z: 0.5, yaw: -Math.PI / 2 });
     await page.keyboard.press('KeyE');
     state = await snapshot(page);
-    assert.equal(state.expeditionShipInterior.openDoorCount, beforeExtraDoor + 1, 'The existing pressure-door interaction must still operate after the visual pass.');
+    assert.equal(Math.abs(state.expeditionShipInterior.openDoorCount - beforeExtraDoor), 1, 'The existing pressure-door interaction must still toggle exactly one door after the visual pass.');
 
     await useLift(page, 'engineering');
     await openDoor(page, { x: 0, z: 22.4, yaw: 0 });

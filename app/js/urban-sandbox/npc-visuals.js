@@ -12,12 +12,13 @@ function createUrbanNpcVisual(THREE, definition = {}) {
   const outfitDark = outfit.clone();
   outfitDark.color.multiplyScalar(.68);
   const pants = new THREE.MeshStandardMaterial({ color: Number(definition.pantsColor || 0x29333d), roughness: .9, metalness: .01, flatShading: true });
-  const skin = new THREE.MeshStandardMaterial({ color: Number(definition.skinColor || 0x9a6d52), roughness: .9, metalness: 0, flatShading: true });
-  const hair = new THREE.MeshStandardMaterial({ color: Number(definition.hairColor || 0x241d18), roughness: .94, metalness: 0, flatShading: true });
+  const skin = new THREE.MeshStandardMaterial({ color: Number(definition.skinColor || 0x9a6d52), roughness: .82, metalness: 0 });
+  const hair = new THREE.MeshStandardMaterial({ color: Number(definition.hairColor || 0x241d18), roughness: .9, metalness: 0 });
+  const eye = new THREE.MeshStandardMaterial({ color: 0x171b1c, roughness: .42, metalness: 0 });
   const shoe = new THREE.MeshStandardMaterial({ color: 0x3b474d, emissive: 0x182126, emissiveIntensity: .24, roughness: .92, metalness: .03, flatShading: true });
   const trim = new THREE.MeshStandardMaterial({ color: 0xb7a86b, roughness: .76, metalness: .08, flatShading: true });
   const device = new THREE.MeshStandardMaterial({ color: 0x18252d, emissive: 0x257cad, emissiveIntensity: .42, roughness: .42, metalness: .26, flatShading: true });
-  const materials = [outfit, outfitDark, pants, skin, hair, shoe, trim, device];
+  const materials = [outfit, outfitDark, pants, skin, hair, shoe, trim, device, eye];
   const geometries = new Set();
   const add = (geometry, material, name, position, rotation = null, parent = root) => {
     geometries.add(geometry);
@@ -37,12 +38,25 @@ function createUrbanNpcVisual(THREE, definition = {}) {
   add(createTaperedPrismGeometry(THREE, {
     widthBottom: .38, widthTop: .42, height: .12, length: .3, frontInset: .02, rearInset: .02
   }), outfitDark, 'NPC fitted waist layer', [0, .75, 0]);
-  add(new THREE.CylinderGeometry(.105, .12, .12, 8), skin, 'NPC neck', [0, 1.43, 0]);
-  add(new THREE.SphereGeometry(.23, 12, 8), skin, 'NPC head', [0, 1.61, 0]);
-  add(new THREE.SphereGeometry(.185, 10, 7), skin, 'NPC face plane', [0, 1.59, .105]);
-  add(new THREE.SphereGeometry(.035, 7, 5), skin, 'NPC nose', [0, 1.59, .225]);
-  add(new THREE.SphereGeometry(.235, 12, 6, 0, Math.PI * 2, 0, Math.PI * .52), hair, 'NPC hair', [0, 1.68, -.01]);
+  add(new THREE.CylinderGeometry(.105, .12, .12, 12), skin, 'NPC neck', [0, 1.43, 0]);
+  const head = add(new THREE.SphereGeometry(.23, 18, 12), skin, 'NPC head', [0, 1.61, 0]);
+  head.scale.set(.92, 1.08, .94);
+  const jaw = add(new THREE.SphereGeometry(.19, 16, 10), skin, 'NPC jaw and cheeks', [0, 1.555, .055]);
+  jaw.scale.set(.94, .82, .92);
+  add(new THREE.SphereGeometry(.036, 10, 7), skin, 'NPC nose', [0, 1.6, .222]);
+  add(new THREE.SphereGeometry(.235, 18, 9, 0, Math.PI * 2, 0, Math.PI * .52), hair, 'NPC hair', [0, 1.69, -.01]);
+  for (const side of [-1, 1]) {
+    const eyeMesh = add(new THREE.SphereGeometry(.021, 10, 7), eye, side < 0 ? 'NPC left eye' : 'NPC right eye', [side * .074, 1.635, .213]);
+    eyeMesh.scale.set(1, .72, .5);
+    add(new THREE.BoxGeometry(.07, .012, .012), hair, 'NPC eyebrow', [side * .075, 1.678, .215], [0, 0, side * -.07]);
+    const ear = add(new THREE.SphereGeometry(.04, 10, 7), skin, 'NPC ear', [side * .215, 1.615, 0]);
+    ear.scale.set(.48, 1, .55);
+  }
+  add(new THREE.BoxGeometry(.1, .014, .012), hair, 'NPC mouth', [0, 1.53, .218]);
   add(new THREE.BoxGeometry(.24, .035, .035), trim, 'NPC collar detail', [0, 1.36, .17]);
+  for (const side of [-1, 1]) {
+    add(createTaperedPrismGeometry(THREE, { widthBottom: .13, widthTop: .06, height: .24, length: .025, frontInset: 0, rearInset: 0 }), outfitDark, 'NPC jacket lapel', [side * .095, 1.285, .166], [0, 0, side * -.2]);
+  }
 
   const armPivots = {};
   for (const side of [-1, 1]) {
@@ -50,8 +64,9 @@ function createUrbanNpcVisual(THREE, definition = {}) {
     arm.name = side < 0 ? 'NPC left arm rig' : 'NPC right arm rig';
     arm.position.set(side * .31, 1.31, 0);
     root.add(arm);
-    add(new THREE.CylinderGeometry(.07, .06, .42, 8), outfit, 'NPC jacket sleeve', [0, -.2, 0], null, arm);
-    add(new THREE.SphereGeometry(.075, 8, 6), skin, 'NPC hand', [0, -.43, 0], null, arm);
+    add(new THREE.CylinderGeometry(.07, .06, .42, 12), outfit, 'NPC jacket sleeve', [0, -.2, 0], null, arm);
+    add(new THREE.SphereGeometry(.072, 10, 7), outfitDark, 'NPC elbow seam', [0, -.39, 0], null, arm);
+    add(new THREE.SphereGeometry(.075, 12, 8), skin, 'NPC hand', [0, -.47, .01], null, arm);
     armPivots[side < 0 ? 'left' : 'right'] = arm;
   }
 
@@ -61,8 +76,10 @@ function createUrbanNpcVisual(THREE, definition = {}) {
     leg.name = 'NPC leg rig';
     leg.position.set(side * .12, .73, 0);
     root.add(leg);
-    add(new THREE.CylinderGeometry(.09, .075, .55, 8), pants, 'NPC trouser leg', [0, -.27, 0], null, leg);
+    add(new THREE.CylinderGeometry(.09, .075, .55, 12), pants, 'NPC trouser leg', [0, -.27, 0], null, leg);
+    add(new THREE.SphereGeometry(.083, 10, 7), pants, 'NPC knee', [0, -.49, .025], null, leg);
     add(createBeveledVehicleBoxGeometry(THREE, .18, .13, .32, .035), shoe, 'NPC shaped shoe', [0, -.58, .07], null, leg);
+    add(new THREE.BoxGeometry(.17, .025, .34), outfitDark, 'NPC shoe sole', [0, -.652, .075], null, leg);
     legPivots.push(leg);
   }
 
@@ -110,7 +127,10 @@ function createUrbanNpcVisual(THREE, definition = {}) {
   setReaction(definition.reaction);
   root.userData.performanceProfile = Object.freeze({
     style: root.userData.characterStyle,
-    transparentMaterials: 0
+    qualityTier: 'promoted-procedural',
+    collisionPolicy: 'actor-capsule',
+    transparentMaterials: 0,
+    meshBudget: geometries.size
   });
 
   return Object.freeze({

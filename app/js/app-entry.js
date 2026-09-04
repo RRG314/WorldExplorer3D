@@ -45,12 +45,12 @@ import './planetary/moon-sky.js?v=1';
 import './planetary/tracks.js?v=2';
 import './planetary/field-activities.js?v=10';
 import './game.js?v=67';
-import './input.js?v=75';
+import './input.js?v=76';
 import './hud.js?v=103';
 import './map.js?v=61';
 import { renderLoop } from './main.js?v=75';
 import './memory.js?v=55';
-import { setupUI } from './ui.js?v=166';
+import { setupUI } from './ui.js?v=167';
 import { initAccessibility } from './ui/accessibility.js?v=1';
 
 let _booted = false;
@@ -153,7 +153,7 @@ function ensurePlatformService(id) {
 
 function ensureInteriorsReady() {
     if (!_interiorsModulePromise) {
-        _interiorsModulePromise = import('./interiors.js?v=22').catch((error) => {
+        _interiorsModulePromise = import('./interiors.js?v=23').catch((error) => {
             _interiorsModulePromise = null;
             throw error;
         });
