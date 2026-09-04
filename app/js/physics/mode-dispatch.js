@@ -8,6 +8,10 @@ function updateWalkController(appCtx, dt) {
 }
 
 function updateWalkAuxiliaries(appCtx, dt) {
+  if (appCtx.activeShipInterior === true) {
+    appCtx.updateInteriorInteraction?.();
+    return;
+  }
   appCtx.Walk.syncTerrain?.(false);
   appCtx.appendTrackPoint?.(appCtx.Walk.state.walker.x, appCtx.Walk.state.walker.z);
 

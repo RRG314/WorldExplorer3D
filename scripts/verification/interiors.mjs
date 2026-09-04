@@ -582,10 +582,29 @@ try {
   bindPageEvidence(page);
   await page.goto(`${baseUrl}/app/?${mobileParams}`, { waitUntil: 'load', timeout: 120_000 });
   await waitForWorld();
-  await page.waitForFunction(() => {
+  const mobilePromptRestored = await page.waitForFunction(() => {
     const prompt = document.querySelector('#interiorPrompt');
     return prompt?.classList.contains('show') === true && /enter/i.test(prompt.textContent || '');
-  }, null, { timeout: 10_000 });
+  }, null, { timeout: 2_500 }).then(() => true).catch(() => false);
+  let mobileApproach = null;
+  if (!mobilePromptRestored) {
+    const mobileTarget = await page.evaluate((sourceBuildingId) => {
+      const candidates = globalThis.getWorldExplorerRuntimeDiagnostics?.().interior?.candidates || [];
+      const support = candidates.find((candidate) => candidate.sourceBuildingId === sourceBuildingId);
+      return support ? {
+        key: support.key,
+        approachTarget: support.approachTarget,
+        sourceBuildingId: support.sourceBuildingId
+      } : null;
+    }, target.sourceBuildingId);
+    assert.ok(mobileTarget, 'The same enterable building was not published after the mobile reload.');
+    mobileApproach = await walkToInteriorPrompt(mobileTarget, 500);
+    assert.equal(
+      mobileApproach.reached,
+      true,
+      `Could not return to the interior prompt after the safe mobile spawn adjustment: ${JSON.stringify(mobileApproach)}`
+    );
+  }
   const mobileEnterBounds = await page.locator('#interiorPrompt.show').evaluate((element) => {
     const bounds = element.getBoundingClientRect();
     return { left: bounds.left, right: bounds.right, top: bounds.top, bottom: bounds.bottom };
@@ -671,6 +690,8 @@ try {
     elevatorUpperArrival,
     wallRecovery,
     afterExit,
+    mobilePromptRestored,
+    mobileApproach,
     mobileEnterBounds,
     mobileEntered,
     mobileExited,

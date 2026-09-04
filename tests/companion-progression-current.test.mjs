@@ -95,12 +95,12 @@ test('legacy records migrate without deleting owned animals', () => {
   assert.equal('fullness' in migrated.care, false);
 });
 
-test('travel policy keeps road companions safely inside instead of rendering through the car', () => {
+test('travel policy keeps companions safely inside enclosed vehicles instead of rendering through them', () => {
   const companion = createCompanionInstance('trail-hound', { worldIdentity: 'baltimore', discoveryId: 'encounter:a' });
   assert.deepEqual(resolveCompanionTravelPolicy(companion, 'walk', 'EARTH'), { visible: true, state: 'following' });
   assert.deepEqual(resolveCompanionTravelPolicy(companion, 'car', 'EARTH'), { visible: false, state: 'vehicle-occupant', positionMode: 'interior' });
   assert.deepEqual(resolveCompanionTravelPolicy(companion, 'boat', 'EARTH'), { visible: true, state: 'aboard', positionMode: 'aboard' });
-  assert.deepEqual(resolveCompanionTravelPolicy(companion, 'plane', 'EARTH'), { visible: false, state: 'waiting' });
+  assert.deepEqual(resolveCompanionTravelPolicy(companion, 'plane', 'EARTH'), { visible: false, state: 'vehicle-occupant', positionMode: 'interior' });
   assert.deepEqual(resolveCompanionTravelPolicy(companion, 'walk', 'MOON'), { visible: false, state: 'waiting' });
 });
 

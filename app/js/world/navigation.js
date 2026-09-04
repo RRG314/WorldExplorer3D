@@ -24,8 +24,6 @@ let roadSearchIndex = new Map();
 let roadSearchFeatureSet = new Set();
 let roadSearchBaseRef = null;
 let roadSearchBaseCount = -1;
-let roadSearchOverlayRef = null;
-let roadSearchOverlayCount = -1;
 
 export function initWorldNavigation(deps = {}) {
   if (typeof deps.applySpawnTarget === 'function') runtime.applySpawnTarget = deps.applySpawnTarget;
@@ -64,35 +62,21 @@ export function runtimeRoadFeatures() {
       if (!runtime.isSuppressedBaseRoad(road)) features.push(road);
     }
   }
-  if (Array.isArray(appCtx.overlayRuntimeRoads)) {
-    for (let i = 0; i < appCtx.overlayRuntimeRoads.length; i++) {
-      features.push(appCtx.overlayRuntimeRoads[i]);
-    }
-  }
   return features;
 }
 
 function rawRuntimeRoadFeatures() {
   const features = [];
   if (Array.isArray(appCtx.roads)) features.push(...appCtx.roads);
-  if (Array.isArray(appCtx.overlayRuntimeRoads)) {
-    features.push(...appCtx.overlayRuntimeRoads);
-  }
   return features;
 }
 
 function rebuildRoadSearchIndexIfNeeded() {
   const baseRef = Array.isArray(appCtx.roads) ? appCtx.roads : null;
-  const overlayRef = Array.isArray(appCtx.overlayRuntimeRoads)
-    ? appCtx.overlayRuntimeRoads
-    : null;
   const baseCount = baseRef?.length || 0;
-  const overlayCount = overlayRef?.length || 0;
   if (
     roadSearchBaseRef === baseRef &&
-    roadSearchBaseCount === baseCount &&
-    roadSearchOverlayRef === overlayRef &&
-    roadSearchOverlayCount === overlayCount
+    roadSearchBaseCount === baseCount
   ) {
     return;
   }
@@ -135,8 +119,6 @@ function rebuildRoadSearchIndexIfNeeded() {
   }
   roadSearchBaseRef = baseRef;
   roadSearchBaseCount = baseCount;
-  roadSearchOverlayRef = overlayRef;
-  roadSearchOverlayCount = overlayCount;
 }
 
 function indexedRoadCandidates(x, z, radius) {

@@ -30,12 +30,9 @@ export function updateDrone(dt) {
   appCtx.drone.cameraPitchOffset = Math.max(-1.2, Math.min(1.2,
     (Number(appCtx.drone.cameraPitchOffset) || 0) + lookPitch * turnSpeed
   ));
-  appCtx.drone.cameraLookTimer = manualCameraInput ? 1.15 : Math.max(0, Number(appCtx.drone.cameraLookTimer || 0) - dt);
-  if (!manualCameraInput && appCtx.drone.cameraLookTimer <= 0) {
-    const recenterBlend = 1 - Math.exp(-dt * 3.4);
-    appCtx.drone.cameraYawOffset = wrapYaw(appCtx.drone.cameraYawOffset * (1 - recenterBlend));
-    appCtx.drone.cameraPitchOffset *= 1 - recenterBlend;
-  }
+  // Drone view direction is player-owned. It remains where the player leaves
+  // it, including while hovering, instead of automatically facing forward.
+  appCtx.drone.cameraLookTimer = manualCameraInput ? 1.15 : 0;
 
   appCtx.drone.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, appCtx.drone.pitch));
   appCtx.drone.roll = 0;

@@ -38,10 +38,10 @@ function clamp(value, min, max) {
 
 function normalizePose(input = {}) {
   return Object.freeze({
-    x: clamp(input.x, -25_000, 25_000),
-    y: clamp(input.y, -2_000, 20_000),
-    z: clamp(input.z, -25_000, 25_000),
-    yaw: clamp(input.yaw, -Math.PI * 4, Math.PI * 4)
+    x: clamp(finiteNumber(input.x, 0), -25_000, 25_000),
+    y: clamp(finiteNumber(input.y, 0), -2_000, 20_000),
+    z: clamp(finiteNumber(input.z, 0), -25_000, 25_000),
+    yaw: clamp(finiteNumber(input.yaw, 0), -Math.PI * 4, Math.PI * 4)
   });
 }
 

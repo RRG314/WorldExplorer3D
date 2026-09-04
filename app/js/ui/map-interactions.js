@@ -206,6 +206,10 @@ function bindMapControls() {
   const largeMap = document.getElementById('largeMap');
   const mapClose = document.getElementById('mapClose');
   const mapRecenter = document.getElementById('mapRecenter');
+  const mapSearchForm = document.getElementById('mapSearchForm');
+  const mapSearchInput = document.getElementById('mapSearchInput');
+  const mapSearchBtn = document.getElementById('mapSearchBtn');
+  const mapSearchStatus = document.getElementById('mapSearchStatus');
   const mapLegend = document.getElementById('mapLegend');
   const mapSatelliteToggle = document.getElementById('mapSatelliteToggle');
   const mapRoadsToggle = document.getElementById('mapRoadsToggle');
@@ -241,6 +245,7 @@ function bindMapControls() {
     appCtx.clearControlInputState?.('large-map-open');
     appCtx.showLargeMap = true;
     largeMap?.classList.add('show');
+    appCtx.updateControlsModeUI?.();
     if (typeof appCtx.renderInteriorLegend === 'function') appCtx.renderInteriorLegend();
     appCtx.drawLargeMap?.();
   };
@@ -250,6 +255,7 @@ function bindMapControls() {
     largeMap?.classList.remove('show');
     document.getElementById('legendPanel')?.style.setProperty('display', 'none');
     appCtx.closeMapInfo?.();
+    appCtx.updateControlsModeUI?.();
   };
   appCtx.openLargeMap = openLargeMap;
   appCtx.closeLargeMap = closeLargeMap;
@@ -287,6 +293,26 @@ function bindMapControls() {
   mapRecenter?.addEventListener('click', () => {
     resetLargeMapBrowsing();
     appCtx.drawLargeMap?.();
+  });
+  mapSearchForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (typeof appCtx.searchAndTravelToLocation !== 'function') {
+      if (mapSearchStatus) {
+        mapSearchStatus.textContent = 'Place search is still loading. Try again in a moment.';
+        mapSearchStatus.dataset.tone = 'error';
+      }
+      return;
+    }
+    if (mapSearchBtn) mapSearchBtn.disabled = true;
+    try {
+      await appCtx.searchAndTravelToLocation(mapSearchInput?.value, {
+        statusElement: mapSearchStatus,
+        closeMap: true
+      });
+    } finally {
+      if (mapSearchBtn) mapSearchBtn.disabled = false;
+    }
   });
 
   mapLegend?.addEventListener('click', (event) => {

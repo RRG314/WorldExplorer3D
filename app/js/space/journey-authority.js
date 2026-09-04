@@ -1,5 +1,5 @@
-import { getAstronomicalBody, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=2';
-import { createBodyEphemerisState } from './spacecraft-authority.js?v=2';
+import { getAstronomicalBody, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=3';
+import { createBodyEphemerisState } from './spacecraft-authority.js?v=4';
 
 const SPACE_JOURNEY_SCHEMA_VERSION = 2;
 const EARTH_MOON_MEAN_DISTANCE_M = 384_400_000;

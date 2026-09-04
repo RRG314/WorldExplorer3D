@@ -1,19 +1,19 @@
 // ES module entrypoint with explicit application boot contract.
 // Import order mirrors legacy runtime dependencies.
 import { getCurrentUser, observeAuth } from '../../js/auth-ui.js?v=55';
-import { setupAnalyticsConsentUi } from '../../js/analytics-consent.js?v=1';
+import { setupAnalyticsConsentUi } from '../../js/analytics-consent.js?v=3';
 import './rdt.js?v=55';
-import './config.js?v=61';
+import './config.js?v=62';
 import { ctx as appCtx } from './shared-context.js?v=55';
 import { createAccountService } from './platform/account-service.js?v=1';
 import { createPlatformServiceRegistry } from './platform/service-registry.js?v=1';
 import { scheduleAfterFirstPlay } from './runtime/workload-policy.js?v=1';
-import './runtime-diagnostics.js?v=66';
+import './runtime-diagnostics.js?v=76';
 import './ui/legal-attribution.js?v=1';
 import './state.js?v=65';
 import './camera-mode.js?v=1';
 import './pause-state.js?v=1';
-import './location-session.js?v=6';
+import './location-session.js?v=7';
 import './controls/action-input.js?v=10';
 import './interaction/context-router.js?v=4';
 import './transport/actor-contract.js?v=6';
@@ -25,39 +25,37 @@ import './session-coordinator.js?v=2';
 import './planetary/scene-ownership.js?v=9';
 import './real-estate.js?v=55';
 import { init, tryEnablePostProcessing } from './engine.js?v=95';
-import './physics.js?v=122';
-import './walking.js?v=87';
-import './travel-mode.js?v=23';
-import { initBoatMode } from './boat-mode.js?v=57';
-import './sky.js?v=88';
-import './weather.js?v=10';
-import './runtime/on-demand-modes.js?v=12';
-import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=167';
+import './physics.js?v=127';
+import './walking.js?v=91';
+import './travel-mode.js?v=27';
+import { initBoatMode } from './boat-mode.js?v=58';
+import './sky.js?v=89';
+import './weather.js?v=11';
+import './runtime/on-demand-modes.js?v=46';
+import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=174';
 import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=10';
 import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=1';
-import { installOnDemandLiveEarth } from './runtime/on-demand-live-earth.js?v=5';
+import { installOnDemandLiveEarth } from './runtime/on-demand-live-earth.js?v=6';
 import { installOnDemandMars } from './runtime/on-demand-mars.js?v=1';
-import './planetary/solid-world-runtime.js?v=7';
+import './planetary/solid-world-runtime.js?v=19';
 import './planetary/vehicles.js?v=3';
 import './planetary/astronaut.js?v=2';
-import './planetary/sky-orientation.js?v=13';
+import './planetary/sky-orientation.js?v=14';
 import './planetary/moon-sky.js?v=1';
 import './planetary/tracks.js?v=2';
-import './planetary/field-activities.js?v=8';
-import './game.js?v=63';
-import './input.js?v=72';
-import './hud.js?v=102';
+import './planetary/field-activities.js?v=10';
+import './game.js?v=67';
+import './input.js?v=75';
+import './hud.js?v=103';
 import './map.js?v=61';
-import { renderLoop } from './main.js?v=72';
+import { renderLoop } from './main.js?v=75';
 import './memory.js?v=55';
-import { setupUI } from './ui.js?v=145';
+import { setupUI } from './ui.js?v=166';
 import { initAccessibility } from './ui/accessibility.js?v=1';
 
 let _booted = false;
 let _lastObservedAuthUser = null;
 let _tutorialInitPromise = null;
-let _optionalRuntimeBootScheduled = false;
-let _editorWarmupScheduled = false;
 let _activityDiscoveryWarmupScheduled = false;
 let _analyticsWarmupScheduled = false;
 let _platformServicesRegistered = false;
@@ -103,25 +101,9 @@ function registerPlatformServices() {
         }
     });
     platformServices.register({
-        id: 'editor', category: 'authoring',
-        load: async () => {
-            const mod = await import('./editor/session.js?v=10');
-            mod.initEditorSession?.();
-            return mod;
-        }
-    });
-    platformServices.register({
-        id: 'activity-creator', category: 'gameplay-authoring',
-        load: async () => {
-            const mod = await import('./activity-editor/session.js?v=11');
-            mod.initActivityCreator?.();
-            return mod;
-        }
-    });
-    platformServices.register({
         id: 'activity-discovery', category: 'discovery',
         load: async () => {
-            const mod = await import('./activity-discovery/session.js?v=7');
+            const mod = await import('./activity-discovery/session.js?v=8');
             mod.initActivityDiscovery?.();
             return mod;
         }
@@ -129,7 +111,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'creator-profile', category: 'identity',
         load: async () => {
-            const mod = await import('./creator/session.js?v=2');
+            const mod = await import('./creator/session.js?v=4');
             mod.initCreatorProfileSession?.();
             return mod;
         }
@@ -137,19 +119,11 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'analytics', category: 'telemetry',
         load: async () => {
-            const mod = await import('../../js/analytics.js?v=1');
+            const mod = await import('../../js/analytics.js?v=3');
             if (typeof mod.getAnalyticsSessionSnapshot === 'function') {
                 appCtx.getAnalyticsSessionSnapshot = () => mod.getAnalyticsSessionSnapshot(appCtx);
             }
             mod.startAnalyticsTracking?.(appCtx);
-            return mod;
-        }
-    });
-    platformServices.register({
-        id: 'editor-overlay', category: 'world-content',
-        load: async () => {
-            const mod = await import('./editor/public-layer.js?v=6');
-            mod.initEditorPublicLayer?.();
             return mod;
         }
     });
@@ -179,7 +153,7 @@ function ensurePlatformService(id) {
 
 function ensureInteriorsReady() {
     if (!_interiorsModulePromise) {
-        _interiorsModulePromise = import('./interiors.js?v=17').catch((error) => {
+        _interiorsModulePromise = import('./interiors.js?v=22').catch((error) => {
             _interiorsModulePromise = null;
             throw error;
         });
@@ -223,19 +197,9 @@ function registerLazyFishingEntrypoints() {
     menuButton?.addEventListener('click', activate);
 }
 
-const ensureEditorSessionModule = () => ensurePlatformService('editor');
-const ensureActivityCreatorModule = () => ensurePlatformService('activity-creator');
 const ensureActivityDiscoveryModule = () => ensurePlatformService('activity-discovery');
 const ensureCreatorProfileModule = () => ensurePlatformService('creator-profile');
 const ensureAnalyticsModule = () => ensurePlatformService('analytics');
-
-function scheduleEditorSessionWarmup(timeout = 900) {
-    if (_editorWarmupScheduled || platformServices.isReady('editor')) return;
-    _editorWarmupScheduled = true;
-    scheduleIdleTask(() => {
-        void ensureEditorSessionModule();
-    }, timeout);
-}
 
 function scheduleActivityDiscoveryWarmup(timeout = 2600) {
     if (_activityDiscoveryWarmupScheduled || platformServices.isReady('activity-discovery')) return;
@@ -256,34 +220,6 @@ function scheduleAnalyticsWarmup(timeout = 2800) {
     }, { timeout });
 }
 
-async function ensureOverlayRuntimeLayer() {
-    await ensurePlatformService('editor-overlay');
-    return true;
-}
-
-function shouldBootOverlayRuntime() {
-    // The public editor overlay is optional for first play. Starting it from
-    // the early gameStarted flag made its network/parse work overlap the
-    // blocking Earth compiler before a publication existed.
-    if (!appCtx.gameStarted || appCtx.worldLoading || appCtx.initialEarthWorldReady !== true) return false;
-    if (appCtx.onMoon || appCtx.activePlanetaryBodyId || appCtx.oceanMode?.active || appCtx.spaceFlight?.active) return false;
-    if (typeof appCtx.isEnv === 'function' && appCtx.ENV) {
-        if (appCtx.isEnv(appCtx.ENV.MOON) || appCtx.isEnv(appCtx.ENV.PLANETARY) || appCtx.isEnv(appCtx.ENV.SPACE_FLIGHT)) return false;
-    }
-    return true;
-}
-
-function kickOptionalRuntimeBoot(reason = 'runtime') {
-    if (platformServices.isReady('editor-overlay') || _optionalRuntimeBootScheduled || !shouldBootOverlayRuntime()) return false;
-    _optionalRuntimeBootScheduled = true;
-    scheduleIdleTask(() => {
-        _optionalRuntimeBootScheduled = false;
-        if (!shouldBootOverlayRuntime()) return;
-        void ensureOverlayRuntimeLayer();
-    }, reason === 'boot' ? 1500 : 700);
-    return true;
-}
-
 async function ensureMultiplayerPlatformReady() {
     return ensurePlatformService('multiplayer');
 }
@@ -296,7 +232,7 @@ function scheduleTutorialInit() {
             if (started) return;
             started = true;
             try {
-                const mod = await import('./tutorial/tutorial.js?v=8');
+                const mod = await import('./tutorial/tutorial.js?v=9');
                 if (typeof mod.initTutorial === 'function') mod.initTutorial();
             } catch (error) {
                 console.warn('[boot] Tutorial init deferred import failed.', error);
@@ -351,75 +287,6 @@ function registerLazySubsystemEntrypoints() {
         return false;
     };
     appCtx.clearActiveInterior = () => false;
-    if (typeof appCtx.getEditorSnapshot !== 'function') {
-        appCtx.getEditorSnapshot = () => ({
-            active: false,
-            tab: 'workspace',
-            tool: 'select',
-            activePresetId: 'road',
-            workspaceCount: 0,
-            selectedFeatureId: '',
-            ownFeatureCount: 0,
-            moderationCount: 0,
-            userIsAdmin: false,
-            previewOpen: false,
-            peekWorld: false,
-            backendReady: false,
-            capturedTarget: false,
-            draftEditType: '',
-            draftPreviewVisible: false,
-            supportedEditTypes: []
-        });
-    }
-    appCtx.captureEditorHereTarget = (...args) => {
-        const editor = platformServices.peek('editor');
-        if (typeof editor?.captureEditorHereTarget === 'function') {
-            return editor.captureEditorHereTarget(...args);
-        }
-        scheduleEditorSessionWarmup();
-        return null;
-    };
-    appCtx.setEditorDraft = (...args) => {
-        const editor = platformServices.peek('editor');
-        if (typeof editor?.setEditorDraft === 'function') {
-            return editor.setEditorDraft(...args);
-        }
-        scheduleEditorSessionWarmup();
-        return null;
-    };
-    appCtx.previewEditorDraft = (...args) => {
-        const editor = platformServices.peek('editor');
-        if (typeof editor?.previewEditorDraft === 'function') {
-            return editor.previewEditorDraft(...args);
-        }
-        scheduleEditorSessionWarmup();
-        return null;
-    };
-    appCtx.openEditorSession = async (options = {}) => {
-        const mod = await ensureEditorSessionModule();
-        return typeof mod.openEditorSession === 'function' ? mod.openEditorSession(options) : false;
-    };
-    appCtx.closeEditorSession = async (options = {}) => {
-        const editor = platformServices.peek('editor');
-        return typeof editor?.closeEditorSession === 'function' ? editor.closeEditorSession(options) : false;
-    };
-    appCtx.toggleEditorSession = async () => {
-        const mod = await ensureEditorSessionModule();
-        const snapshot = typeof mod.getEditorSnapshot === 'function' ? mod.getEditorSnapshot() : { active: false };
-        return snapshot.active ? mod.closeEditorSession() : mod.openEditorSession();
-    };
-    if (typeof appCtx.getActivityCreatorSnapshot !== 'function') {
-        appCtx.getActivityCreatorSnapshot = () => ({
-            active: false,
-            templateId: '',
-            anchorTypeId: '',
-            tool: 'place',
-            anchorCount: 0,
-            selectedAnchorId: '',
-            testing: false,
-            valid: false
-        });
-    }
     if (typeof appCtx.getActivityDiscoverySnapshot !== 'function') {
         appCtx.getActivityDiscoverySnapshot = () => ({
             active: false,
@@ -439,7 +306,9 @@ function registerLazySubsystemEntrypoints() {
         appCtx.getAnalyticsSessionSnapshot = () => ({
             enabled: false,
             ready: false,
+            disabledReason: 'not_started',
             measurementId: '',
+            consent: 'unset',
             currentUserId: '',
             trackingStarted: false,
             runtimeAgeSec: 0,
@@ -447,6 +316,10 @@ function registerLazySubsystemEntrypoints() {
             worldSessionAgeSec: 0,
             worldSessionCount: 0,
             flushCount: 0,
+            productEventCount: 0,
+            eventLoggedCount: 0,
+            recentEvents: [],
+            deliveryState: 'warmup_pending',
             currentMode: '',
             currentEnvironment: '',
             lastLocationKey: '',
@@ -454,19 +327,7 @@ function registerLazySubsystemEntrypoints() {
             errors: []
         });
     }
-    appCtx.openActivityCreator = async (options = {}) => {
-        const mod = await ensureActivityCreatorModule();
-        return typeof mod.openActivityCreator === 'function' ? mod.openActivityCreator(options) : false;
-    };
-    appCtx.closeActivityCreator = async () => {
-        const creator = platformServices.peek('activity-creator');
-        return typeof creator?.closeActivityCreator === 'function' ? creator.closeActivityCreator() : false;
-    };
-    appCtx.toggleActivityCreator = async () => {
-        const mod = await ensureActivityCreatorModule();
-        const snapshot = typeof mod.getActivityCreatorSnapshot === 'function' ? mod.getActivityCreatorSnapshot() : { active: false };
-        return snapshot.active ? mod.closeActivityCreator() : mod.openActivityCreator();
-    };
+    globalThis.getWorldExplorerAnalyticsSnapshot = () => appCtx.getAnalyticsSessionSnapshot();
     appCtx.openActivityBrowser = async (options = {}) => {
         const mod = await ensureActivityDiscoveryModule();
         return typeof mod.openActivityBrowser === 'function' ? mod.openActivityBrowser(options) : false;
@@ -494,8 +355,6 @@ function registerLazySubsystemEntrypoints() {
             : appCtx.getAnalyticsSessionSnapshot();
     };
     appCtx.scheduleActivityDiscoveryWarmup = scheduleActivityDiscoveryWarmup;
-    appCtx.ensureOverlayRuntimeReady = ensureOverlayRuntimeLayer;
-    appCtx.kickOptionalRuntimeBoot = kickOptionalRuntimeBoot;
     appCtx.ensurePlatformService = ensurePlatformService;
     appCtx.openArExperience = async (request = {}) => {
         const mod = await ensurePlatformService('augmented-reality');
@@ -551,32 +410,6 @@ function registerLazySubsystemEntrypoints() {
         if (typeof api?.stopRoomActivity !== 'function') return false;
         return api.stopRoomActivity();
     };
-    if (typeof appCtx.getApprovedEditorContributionSnapshot !== 'function') {
-        appCtx.getApprovedEditorContributionSnapshot = () => ({
-            activeAreaSignature: '',
-            publishedCount: Array.isArray(appCtx.overlayPublishedFeatures) ? appCtx.overlayPublishedFeatures.length : 0,
-            runtimeRoadCount: Array.isArray(appCtx.overlayRuntimeRoads) ? appCtx.overlayRuntimeRoads.length : 0,
-            runtimeLinearCount: Array.isArray(appCtx.overlayRuntimeLinearFeatures) ? appCtx.overlayRuntimeLinearFeatures.length : 0,
-            runtimePoiCount: Array.isArray(appCtx.overlayRuntimePois) ? appCtx.overlayRuntimePois.length : 0,
-            runtimeBuildingCount: Array.isArray(appCtx.overlayRuntimeBuildingColliders) ? appCtx.overlayRuntimeBuildingColliders.length : 0,
-            visible: appCtx.mapLayers?.contributions !== false
-        });
-    }
-    if (typeof appCtx.refreshApprovedEditorContributions !== 'function') {
-        appCtx.refreshApprovedEditorContributions = () => {
-            kickOptionalRuntimeBoot('manual_refresh');
-            return appCtx.getApprovedEditorContributionSnapshot();
-        };
-    }
-    if (typeof appCtx.refreshOverlayRuntimeLayer !== 'function') {
-        appCtx.refreshOverlayRuntimeLayer = () => {
-            kickOptionalRuntimeBoot('manual_refresh');
-            return appCtx.getApprovedEditorContributionSnapshot();
-        };
-    }
-    if (typeof appCtx.syncApprovedEditorContributionVisibility !== 'function') {
-        appCtx.syncApprovedEditorContributionVisibility = () => appCtx.mapLayers?.contributions !== false;
-    }
 }
 
 function startMultiplayerAfterAuthReady() {
@@ -624,6 +457,9 @@ function bootApp() {
         globalThis.dispatchEvent?.(new CustomEvent('we3d:runtime-ready'));
     });
     runBootStep('scheduleAnalyticsWarmup', () => scheduleAnalyticsWarmup(2800));
+    runBootStep('schedulePlaneVisualWarmup', () => {
+        scheduleAfterFirstPlay('plane-visual', () => appCtx.preparePlaneModeVisual?.(), { timeout: 9000 });
+    });
     _booted = true;
     return { tryEnablePostProcessing };
 }

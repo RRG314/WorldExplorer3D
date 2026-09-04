@@ -1,7 +1,7 @@
-import { getAstronomicalBody, LANDING_MODE, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=2';
+import { getAstronomicalBody, LANDING_MODE, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=3';
 import { getPhysicalEnvironmentProfile, samplePhysicalEnvironment } from '../planetary/runtime/physical-environment.js?v=2';
 
-const ATMOSPHERIC_EXPLORATION_SCHEMA_VERSION = 1;
+const ATMOSPHERIC_EXPLORATION_SCHEMA_VERSION = 2;
 const MAX_ENTRY_ALTITUDE_M = 150_000;
 const MAX_ENTRY_SPEED_MPS = 250;
 const PRESSURE_LIMIT_PA = 600_000;
@@ -68,6 +68,8 @@ function createAtmosphericExploration(bodyInput, options = {}) {
     minimumAltitudeM: profile.minimumAltitudeM,
     pressureLimitPa: profile.pressureLimitPa,
     phase: altitudeM <= profile.minimumAltitudeM + 1 ? 'depth_limit' : 'descending',
+    horizontalSpeedMps: 0,
+    groundTrackM: 0,
     elapsedS: 0,
     timestampS,
     environment: samplePhysicalEnvironment(profile.bodyId, { heightM: altitudeM, timestampS })
@@ -80,6 +82,10 @@ function advanceAtmosphericExploration(stateInput, realDtS, command = {}) {
   const dtS = Math.max(0, Math.min(0.1, Number(realDtS) || 0));
   const climb = command.climb === true;
   const descent = command.descend !== false && !climb;
+  const throttle = Math.max(0, Math.min(1, Number(command.throttle) || 0));
+  const priorHorizontalSpeed = Math.max(0, Number(stateInput.horizontalSpeedMps) || 0);
+  const horizontalAccelerationMps2 = throttle > 0 ? 420 * throttle : -180;
+  const horizontalSpeedMps = Math.max(0, Math.min(2_400, priorHorizontalSpeed + horizontalAccelerationMps2 * dtS));
   const rate = climb ? profile.ascentRateMps : descent ? -profile.descentRateMps : 0;
   const altitudeM = Math.max(profile.minimumAltitudeM, Math.min(MAX_ENTRY_ALTITUDE_M, stateInput.altitudeM + rate * dtS));
   const timestampS = Number(stateInput.timestampS) + dtS;
@@ -87,6 +93,8 @@ function advanceAtmosphericExploration(stateInput, realDtS, command = {}) {
     ...stateInput,
     altitudeM,
     phase: altitudeM <= profile.minimumAltitudeM + 1 ? 'depth_limit' : climb ? 'ascending' : 'descending',
+    horizontalSpeedMps,
+    groundTrackM: Math.max(0, Number(stateInput.groundTrackM) || 0) + horizontalSpeedMps * dtS,
     elapsedS: Number(stateInput.elapsedS) + dtS,
     timestampS,
     environment: samplePhysicalEnvironment(profile.bodyId, { heightM: altitudeM, timestampS })

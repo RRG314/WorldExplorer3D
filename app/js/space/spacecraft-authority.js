@@ -1,4 +1,4 @@
-import { getAstronomicalBody, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=2';
+import { getAstronomicalBody, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=3';
 
 const SPACECRAFT_SCHEMA_VERSION = 1;
 const GRAVITATIONAL_CONSTANT = 6.67430e-11;
@@ -253,25 +253,36 @@ function propagateSpacecraft(stateInput, command = {}, bodies = [], realDtS = 0)
   const massFlowKgps = throttle > 0
     ? state.maxThrustN * throttle / (state.specificImpulseS * STANDARD_GRAVITY_MPS2)
     : 0;
-  const poweredDurationS = massFlowKgps > 0 ? Math.min(dtS, state.propellantKg / massFlowKgps) : 0;
-  const propellantUsedKg = massFlowKgps * poweredDurationS;
-  const averageThrottle = dtS > 0 ? throttle * poweredDurationS / dtS : 0;
-  const averageMassKg = state.dryMassKg + Math.max(0, state.propellantKg - propellantUsedKg * 0.5);
   const thrustDirection = normalized(command.thrustDirection || { x: 0, y: 1, z: 0 });
   const thrustAuthority = state.subsystems.propulsion === SUBSYSTEM_STATUS.DEGRADED ? 0.45 : 1;
-  const thrustAcceleration = scale(
-    thrustDirection,
-    state.maxThrustN * averageThrottle * thrustAuthority / averageMassKg
-  );
-  const gravityStart = gravityAccelerationAt(state.positionM, bodies, state.epochMs);
-  const accelerationStart = add(gravityStart, thrustAcceleration);
-  const positionM = add(
-    add(state.positionM, scale(state.velocityMps, dtS)),
-    scale(accelerationStart, 0.5 * dtS * dtS)
-  );
-  const gravityEnd = gravityAccelerationAt(positionM, bodies, state.epochMs + dtS * 1000);
-  const accelerationEnd = add(gravityEnd, thrustAcceleration);
-  const velocityMps = add(state.velocityMps, scale(add(accelerationStart, accelerationEnd), 0.5 * dtS));
+  const substepCount = Math.max(1, Math.min(600, Math.ceil(dtS / 1.5)));
+  const substepS = dtS / substepCount;
+  let positionM = state.positionM;
+  let velocityMps = state.velocityMps;
+  let propellantKg = state.propellantKg;
+  let epochMs = state.epochMs;
+  for (let step = 0; step < substepCount; step += 1) {
+    const poweredStepS = massFlowKgps > 0 ? Math.min(substepS, propellantKg / massFlowKgps) : 0;
+    const stepThrottle = substepS > 0 ? throttle * poweredStepS / substepS : 0;
+    const massKg = state.dryMassKg + Math.max(0, propellantKg - massFlowKgps * poweredStepS * 0.5);
+    const thrustAcceleration = scale(
+      thrustDirection,
+      state.maxThrustN * stepThrottle * thrustAuthority / massKg
+    );
+    const gravityStart = gravityAccelerationAt(positionM, bodies, epochMs);
+    const accelerationStart = add(gravityStart, thrustAcceleration);
+    const nextPosition = add(
+      add(positionM, scale(velocityMps, substepS)),
+      scale(accelerationStart, 0.5 * substepS * substepS)
+    );
+    const nextEpochMs = state.epochMs + (step + 1) * substepS * 1000;
+    const gravityEnd = gravityAccelerationAt(nextPosition, bodies, nextEpochMs);
+    const accelerationEnd = add(gravityEnd, thrustAcceleration);
+    velocityMps = add(velocityMps, scale(add(accelerationStart, accelerationEnd), 0.5 * substepS));
+    positionM = nextPosition;
+    epochMs = nextEpochMs;
+    propellantKg = Math.max(0, propellantKg - massFlowKgps * poweredStepS);
+  }
   const angularVelocityRadps = applyAngularCommand(state, command, dtS);
   const attitude = integrateAttitude(state.attitude, angularVelocityRadps, dtS);
 
@@ -282,7 +293,7 @@ function propagateSpacecraft(stateInput, command = {}, bodies = [], realDtS = 0)
     velocityMps,
     attitude,
     angularVelocityRadps,
-    propellantKg: state.propellantKg - propellantUsedKg,
+    propellantKg,
     timeScale,
     lastEvent: throttle > 0 ? 'powered-flight' : 'coast'
   });

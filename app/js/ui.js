@@ -3,12 +3,12 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 // ============================================================================
 import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=17";
 import { prepareTitleEnvironment } from "./planetary/entry.js?v=9";
-import { initMapInteractions } from "./ui/map-interactions.js?v=60";
-import { initMobileControls } from "./ui/mobile-controls.js?v=77";
+import { initMapInteractions } from "./ui/map-interactions.js?v=61";
+import { initMobileControls } from "./ui/mobile-controls.js?v=83";
 import { initShareUi } from "./ui/share-links.js?v=64";
 import { setupSettingsUi } from "./ui/settings.js?v=2";
-import { bindSpaceActions } from "./ui/space-actions.js?v=1";
-import { initTitleScreenUi } from "./ui/title-screen.js?v=112";
+import { bindSpaceActions } from "./ui/space-actions.js?v=12";
+import { initTitleScreenUi } from "./ui/title-screen.js?v=117";
 import { commitEnvironment, exitCurrentEnvironmentSync } from './session-coordinator.js?v=2';
 
 function emitTutorialEvent(eventName, payload = {}) {
@@ -180,7 +180,7 @@ function setupUI() {
     document.getElementById('titleScreen').classList.remove('hidden');
     window.requestAnimationFrame(() => appCtx.openGlobeSelector?.());
     if (typeof appCtx.closeFlowerChallengeTitlePanel === 'function') appCtx.closeFlowerChallengeTitlePanel();
-    ['hud', 'minimap', 'minimapZoomControls', 'police', 'floatMenuContainer', 'mainMenuBtn', 'pauseScreen', 'resultScreen', 'caughtScreen', 'controlsTab', 'coords', 'flowerChallengeHud', 'paintTownHud', 'deFlockHud', 'deFlockPrompt', 'deFlockHelp', 'liveGpsHud', 'liveGpsPermissionPanel', 'realEstateBtn', 'historicBtn', 'memoryFlowerFloatBtn', 'gameShareFloatBtn', 'gameShareMenu', 'mobileTouchControls'].forEach((id) => {
+    ['hud', 'minimap', 'minimapZoomControls', 'police', 'floatMenuContainer', 'mainMenuBtn', 'worldQuickControls', 'pauseScreen', 'resultScreen', 'caughtScreen', 'controlsTab', 'coords', 'flowerChallengeHud', 'paintTownHud', 'deFlockHud', 'deFlockPrompt', 'deFlockHelp', 'liveGpsHud', 'liveGpsPermissionPanel', 'realEstateBtn', 'historicBtn', 'memoryFlowerFloatBtn', 'gameShareFloatBtn', 'gameShareMenu', 'mobileTouchControls'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.classList.remove('show');
     });
@@ -207,7 +207,8 @@ function setupUI() {
     travelBtn: 'travelMenu',
     realEstateFloatBtn: 'realEstateMenu',
     exploreBtn: 'exploreMenu',
-    gameBtn: 'gameMenu'
+    backpackBtn: 'backpackMenu',
+    communityBtn: 'communityMenu'
   };
 
   const toggleFloatMenuByButton = (buttonId) => {
@@ -235,61 +236,52 @@ function setupUI() {
   // Native click is the single menu input authority on mouse and touch. A
   // second touchend dispatcher used to invoke the same toggle twice on some
   // mobile browsers, making a menu appear to switch rapidly between states.
-  document.getElementById('travelBtn').addEventListener('click', () => toggleFloatMenuByButton('travelBtn'));
-  document.getElementById('realEstateFloatBtn').addEventListener('click', () => toggleFloatMenuByButton('realEstateFloatBtn'));
-  document.getElementById('exploreBtn').addEventListener('click', () => toggleFloatMenuByButton('exploreBtn'));
-  document.getElementById('gameBtn').addEventListener('click', () => {
-    toggleFloatMenuByButton('gameBtn');
+  document.getElementById('travelBtn').onclick = () => toggleFloatMenuByButton('travelBtn');
+  document.getElementById('realEstateFloatBtn').onclick = () => toggleFloatMenuByButton('realEstateFloatBtn');
+  document.getElementById('exploreBtn').onclick = () => toggleFloatMenuByButton('exploreBtn');
+  document.getElementById('backpackBtn').onclick = () => toggleFloatMenuByButton('backpackBtn');
+  document.getElementById('communityBtn').onclick = () => {
+    toggleFloatMenuByButton('communityBtn');
     void titleUi.primeMultiplayerUi?.();
-  });
+  };
 
   const homeMenuItem = document.getElementById('fHome');
   if (homeMenuItem) homeMenuItem.addEventListener('click', goToMainMenu);
+  document.getElementById('fWorldMap')?.addEventListener('click', () => {
+    closeAllFloatMenus();
+    appCtx.openLargeMap?.();
+  });
   document.getElementById('fBackpack')?.addEventListener('click', () => {
     appCtx.toggleWorldDiscoveryJournal?.(false);
     appCtx.toggleUrbanEquipment?.(true);
-    emitTutorialEvent('opened_backpack', { source: 'exploration_menu' });
+    emitTutorialEvent('opened_backpack', { source: 'backpack_menu' });
     closeAllFloatMenus();
   });
-  document.getElementById('fEditorMode')?.addEventListener('click', () => {
+  let pendingExplorerSection = null;
+  const openExplorerSection = (section) => {
+    if (typeof appCtx.openWorldDiscoverySection === 'function') {
+      pendingExplorerSection = null;
+      appCtx.openWorldDiscoverySection(section);
+    } else {
+      pendingExplorerSection = section;
+      appCtx.showToast?.('Opening Explorer Fieldwork…');
+    }
+    closeAllFloatMenus();
+  };
+  globalThis.addEventListener('we3d:world-discovery-ready', () => {
+    if (!pendingExplorerSection || typeof appCtx.openWorldDiscoverySection !== 'function') return;
+    const section = pendingExplorerSection;
+    pendingExplorerSection = null;
+    appCtx.openWorldDiscoverySection(section);
+  });
+  document.getElementById('fWorldDiscovery')?.addEventListener('click', () => openExplorerSection('today'));
+  document.getElementById('fExplorerJournal')?.addEventListener('click', () => openExplorerSection('journal'));
+  document.getElementById('fExplorerGuide')?.addEventListener('click', () => openExplorerSection('guide'));
+  document.getElementById('fExplorerProfile')?.addEventListener('click', () => openExplorerSection('profile'));
+  document.getElementById('fQuickBuild')?.addEventListener('click', () => {
     if (typeof appCtx.closeActivityBrowser === 'function') appCtx.closeActivityBrowser();
-    if (typeof appCtx.closeBlockBuilder === 'function') appCtx.closeBlockBuilder();
-    if (typeof appCtx.openEditorSession === 'function') {
-      void appCtx.openEditorSession({ initialTab: 'workspace' });
-    }
-    closeAllFloatMenus();
-  });
-  document.getElementById('fEditorMine')?.addEventListener('click', () => {
-    if (typeof appCtx.closeActivityBrowser === 'function') appCtx.closeActivityBrowser();
-    if (typeof appCtx.openEditorSession === 'function') {
-      appCtx.openEditorSession({ initialTab: 'mine', skipTutorial: true });
-    } else if (typeof appCtx.toggleEditorSession === 'function') {
-      appCtx.toggleEditorSession();
-    }
-    closeAllFloatMenus();
-  });
-  document.getElementById('fModerationPanel')?.addEventListener('click', () => {
-    if (typeof appCtx.closeActivityBrowser === 'function') appCtx.closeActivityBrowser();
-    if (typeof appCtx.openEditorSession === 'function') {
-      appCtx.openEditorSession({ initialTab: 'moderation', skipTutorial: true });
-    }
-    closeAllFloatMenus();
-  });
-  document.getElementById('fActivityCreator')?.addEventListener('click', () => {
-    if (typeof appCtx.closeActivityBrowser === 'function') appCtx.closeActivityBrowser();
-    if (typeof appCtx.toggleActivityCreator === 'function') {
-      appCtx.toggleActivityCreator();
-    } else if (typeof appCtx.openActivityCreator === 'function') {
-      appCtx.openActivityCreator();
-    }
-    closeAllFloatMenus();
-  });
-  document.getElementById('fActivities')?.addEventListener('click', () => {
-    if (typeof appCtx.openActivityBrowser === 'function') {
-      appCtx.openActivityBrowser({ scope: 'all' });
-    } else if (typeof appCtx.toggleActivityBrowser === 'function') {
-      appCtx.toggleActivityBrowser({ scope: 'all' });
-    }
+    if (typeof appCtx.openBlockBuilder === 'function') appCtx.openBlockBuilder();
+    else appCtx.showToast?.('Quick Build is still loading. Try again in a moment.');
     closeAllFloatMenus();
   });
   document.getElementById('fRoomGames')?.addEventListener('click', () => {
@@ -306,6 +298,21 @@ function setupUI() {
       console.error('[multiplayer] Could not open the room panel.', error);
       appCtx.showToast?.('Multiplayer is unavailable right now.');
     });
+  });
+  document.getElementById('fCommunityBoard')?.addEventListener('click', async () => {
+    closeAllFloatMenus();
+    try {
+      await appCtx.ensureFlowerChallengeReady?.();
+      await appCtx.setChallengeLeaderboardView?.('explorer');
+      const panel = document.getElementById('flowerChallengePanel');
+      if (!panel?.classList.contains('open')) document.getElementById('flowerChallengeToggleBtn')?.click();
+    } catch (error) {
+      console.error('[community-board] Could not open the board.', error);
+      appCtx.showToast?.('The Community Board is unavailable right now.');
+    }
+  });
+  document.getElementById('fSharePlace')?.addEventListener('click', () => {
+    shareUi?.openGameShareMenu?.();
   });
   document.getElementById('fDeFlock')?.addEventListener('click', () => {
     if (appCtx.onMoon || appCtx.onMars || appCtx.spaceFlight?.active || appCtx.oceanMode?.active) {
@@ -394,6 +401,9 @@ function setupUI() {
     if (typeof appCtx.cycleTimeOfDay === 'function') appCtx.cycleTimeOfDay();
     closeAllFloatMenus();
   });
+  document.getElementById('quickTimeOfDay')?.addEventListener('click', () => {
+    if (typeof appCtx.cycleTimeOfDay === 'function') appCtx.cycleTimeOfDay();
+  });
   const weatherModeItem = document.getElementById('fWeatherMode');
   if (weatherModeItem) {
     weatherModeItem.addEventListener('click', () => {
@@ -401,6 +411,9 @@ function setupUI() {
       closeAllFloatMenus();
     });
   }
+  document.getElementById('quickWeatherMode')?.addEventListener('click', () => {
+    if (typeof appCtx.cycleWeatherMode === 'function') appCtx.cycleWeatherMode();
+  });
   const seaStateItem = document.getElementById('fSeaState');
   if (seaStateItem) {
     seaStateItem.addEventListener('click', () => {

@@ -1854,6 +1854,26 @@ service cloud.firestore {
           request.resource.data.createdAt == resource.data.createdAt;
         allow delete: if isSelf(userId);
       }
+
+      match /economy/{documentId} {
+        allow read: if isSelf(userId) && documentId == 'wallet';
+        allow create, update, delete: if false;
+      }
+
+      match /propertyReceipts/{receiptId} {
+        allow read: if isSelf(userId);
+        allow create, update, delete: if false;
+      }
+
+      match /propertyEntitlements/{entitlementId} {
+        allow read: if isSelf(userId);
+        allow create, update, delete: if false;
+      }
+
+      match /notifications/{notificationId} {
+        allow read: if isSelf(userId);
+        allow create, update, delete: if false;
+      }
     }
 
     match /creatorProfiles/{userId} {
@@ -1978,6 +1998,26 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /propertyLeaderboard/{uid} {
+      allow read: if true;
+      allow create, update, delete: if false;
+    }
+
+    match /worldProperties/{propertyId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if false;
+    }
+
+    match /worldPropertyCatalog/{propertyId} {
+      allow read, create, update, delete: if false;
+    }
+
+    match /propertyTradeOffers/{offerId} {
+      allow read: if isSignedIn() &&
+        (resource.data.proposerUid == request.auth.uid || resource.data.recipientUid == request.auth.uid);
+      allow create, update, delete: if false;
+    }
+
     match /rooms/{roomId} {
       allow get: if (
         resource.data.visibility == 'public' ||
@@ -2054,6 +2094,13 @@ service cloud.firestore {
           request.resource.data.roomCode == roomId &&
           validRoomActivityState();
         allow delete: if false;
+      }
+
+      match /expeditions/{expeditionId} {
+        // The room may observe its current Expedition directly, but all
+        // mutations pass through the server authority and its revision check.
+        allow read: if isMultiplayerEntitled() && isRoomMember(roomId);
+        allow create, update, delete: if false;
       }
 
       match /blocks/{blockId} {

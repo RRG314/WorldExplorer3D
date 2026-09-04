@@ -1,4 +1,6 @@
-const COMMERCE_SCHEMA_VERSION = 1;
+import { TRANSFERABLE_MATERIAL_DEFINITIONS } from '../resources/material-catalog.js?v=2';
+
+const COMMERCE_SCHEMA_VERSION = 2;
 const COMMERCE_STORAGE_KEY = 'world-explorer:local-commerce:v1';
 const STARTING_EXPLORER_CREDITS = 120;
 const STANDARD_DAILY_QUANTITY = 3;
@@ -13,10 +15,35 @@ const COMMERCE_ITEM_DEFINITIONS = Object.freeze([
   Object.freeze({ id: 'route-patch', label: 'Route patch', category: 'rare-find', icon: 'PATCH', verbs: ['inspect'], sellPrice: 28, description: 'A rare counter find from a local store visit.' }),
   Object.freeze({ id: 'transit-token', label: 'Explorer transit token', category: 'rare-find', icon: 'TOKEN', verbs: ['inspect'], sellPrice: 32, description: 'A collectible game token inspired by city travel.' }),
   Object.freeze({ id: 'night-walk-pin', label: 'Night walk pin', category: 'rare-find', icon: 'PIN', verbs: ['inspect'], sellPrice: 30, description: 'A rare pin for evening explorer kits.' }),
-  Object.freeze({ id: 'harbor-compass-charm', label: 'Compass charm', category: 'rare-find', icon: 'CHARM', verbs: ['inspect'], sellPrice: 35, description: 'A small rare find for a travel pack.' })
+  Object.freeze({ id: 'harbor-compass-charm', label: 'Compass charm', category: 'rare-find', icon: 'CHARM', verbs: ['inspect'], sellPrice: 35, description: 'A small rare find for a travel pack.' }),
+  ...TRANSFERABLE_MATERIAL_DEFINITIONS
 ]);
 
-const STANDARD_ITEMS = Object.freeze(COMMERCE_ITEM_DEFINITIONS.filter((item) => item.buyPrice));
+const MAPPED_COMMERCE_PLACE_TYPES = Object.freeze({
+  'shop=convenience': Object.freeze({ kind: 'convenience', label: 'Convenience store' }),
+  'shop=supermarket': Object.freeze({ kind: 'market', label: 'Market' }),
+  'amenity=fuel': Object.freeze({ kind: 'fuel', label: 'Fuel station' }),
+  'amenity=charging_station': Object.freeze({ kind: 'fuel', label: 'Charging station' }),
+  'shop=hardware': Object.freeze({ kind: 'hardware', label: 'Hardware store' }),
+  'shop=doityourself': Object.freeze({ kind: 'hardware', label: 'Home and building supply' }),
+  'shop=pawnbroker': Object.freeze({ kind: 'pawn', label: 'Pawn shop' }),
+  'shop=second_hand': Object.freeze({ kind: 'pawn', label: 'Second-hand shop' }),
+  'shop=car_repair': Object.freeze({ kind: 'mechanic', label: 'Repair shop' }),
+  'shop=car_parts': Object.freeze({ kind: 'mechanic', label: 'Vehicle parts shop' }),
+  'shop=outdoor': Object.freeze({ kind: 'outdoor', label: 'Outdoor shop' }),
+  'shop=fishing': Object.freeze({ kind: 'outdoor', label: 'Fishing shop' }),
+  'shop=boat': Object.freeze({ kind: 'outdoor', label: 'Boat shop' }),
+  'shop=aviation': Object.freeze({ kind: 'outdoor', label: 'Aviation shop' })
+});
+const STOCK_IDS_BY_KIND = Object.freeze({
+  convenience: Object.freeze(['trail-water', 'route-snack', 'battery-pack', 'first-aid-pouch', 'city-postcard', 'field-notebook']),
+  market: Object.freeze(['trail-water', 'route-snack', 'first-aid-pouch', 'city-postcard', 'field-notebook']),
+  fuel: Object.freeze(['trail-water', 'route-snack', 'battery-pack', 'copper-wire-coil', 'repair-sealant-case']),
+  hardware: Object.freeze(['battery-pack', 'field-notebook', 'reclaimed-aluminum-stock', 'ceramic-repair-stock', 'copper-wire-coil', 'repair-sealant-case']),
+  mechanic: Object.freeze(['battery-pack', 'reclaimed-aluminum-stock', 'copper-wire-coil', 'sealed-bearing-kit', 'repair-sealant-case']),
+  pawn: Object.freeze(['city-postcard', 'field-notebook', 'reclaimed-aluminum-stock', 'copper-wire-coil', 'sealed-bearing-kit']),
+  outdoor: Object.freeze(['trail-water', 'route-snack', 'battery-pack', 'first-aid-pouch', 'field-notebook'])
+});
 const RARE_TRADES = Object.freeze([
   Object.freeze({ itemId: 'route-patch', credits: 20, requirementId: 'city-postcard', requirementQuantity: 2 }),
   Object.freeze({ itemId: 'transit-token', credits: 18, requirementId: 'field-notebook', requirementQuantity: 2 }),
@@ -40,13 +67,15 @@ function commerceDayKey(at = Date.now()) {
   return date.toISOString().slice(0, 10);
 }
 
-function mappedConvenienceStores(pois = []) {
+function mappedCommercePlaces(pois = []) {
   return (Array.isArray(pois) ? pois : []).filter((poi) =>
-    String(poi?.type || '').toLowerCase() === 'shop=convenience' &&
+    MAPPED_COMMERCE_PLACE_TYPES[String(poi?.type || '').toLowerCase()] &&
     Number.isFinite(Number(poi?.x)) && Number.isFinite(Number(poi?.z))
   ).map((poi) => Object.freeze({
+    ...MAPPED_COMMERCE_PLACE_TYPES[String(poi.type).toLowerCase()],
     id: String(poi.sourceFeatureId || `${poi.sourceElementType || 'poi'}:${poi.sourceElementId || `${poi.x}:${poi.z}`}`),
-    name: String(poi.name || 'Mapped convenience store'),
+    name: String(poi.name || MAPPED_COMMERCE_PLACE_TYPES[String(poi.type).toLowerCase()].label),
+    mappedType: String(poi.type).toLowerCase(),
     x: Number(poi.x),
     z: Number(poi.z),
     provider: String(poi.provider || 'OpenStreetMap'),
@@ -58,11 +87,17 @@ function mappedConvenienceStores(pois = []) {
   }));
 }
 
+function mappedConvenienceStores(pois = []) {
+  return mappedCommercePlaces(pois).filter((place) => place.kind === 'convenience');
+}
+
 function stockForStore(store = {}, dayKey = commerceDayKey()) {
   const seed = hashText(`${store.id || 'store'}:${dayKey}`);
-  const start = seed % STANDARD_ITEMS.length;
+  const stockIds = STOCK_IDS_BY_KIND[store.kind] || STOCK_IDS_BY_KIND.convenience;
+  const standardItems = stockIds.map((id) => ITEM_BY_ID.get(id)).filter(Boolean);
+  const start = seed % standardItems.length;
   const rare = RARE_TRADES[(seed >>> 8) % RARE_TRADES.length];
-  const standard = Array.from({ length: 4 }, (_, index) => STANDARD_ITEMS[(start + index) % STANDARD_ITEMS.length]);
+  const standard = Array.from({ length: Math.min(4, standardItems.length) }, (_, index) => standardItems[(start + index) % standardItems.length]);
   if (!standard.some((item) => item.id === rare.requirementId)) {
     standard[standard.length - 1] = ITEM_BY_ID.get(rare.requirementId);
   }
@@ -121,6 +156,34 @@ function createLocalCommerceModel(options = {}) {
     save();
   }
 
+  function wallet() {
+    return Object.freeze({
+      type: 'ExplorerWallet',
+      schemaVersion: COMMERCE_SCHEMA_VERSION,
+      credits: state.credits,
+      transactions: Object.freeze(state.transactions.slice())
+    });
+  }
+
+  function debit(amount, detail = {}) {
+    const credits = Math.max(0, Math.floor(Number(amount) || 0));
+    if (credits <= 0) return Object.freeze({ ok: false, reason: 'invalid_amount', credits: state.credits });
+    if (state.credits < credits) return Object.freeze({ ok: false, reason: 'not_enough_credits', credits: state.credits });
+    const { type = 'debit', ...transactionDetail } = detail;
+    state.credits -= credits;
+    record(String(type), { ...transactionDetail, credits });
+    return Object.freeze({ ok: true, amount: credits, credits: state.credits });
+  }
+
+  function credit(amount, detail = {}) {
+    const credits = Math.max(0, Math.floor(Number(amount) || 0));
+    if (credits <= 0) return Object.freeze({ ok: false, reason: 'invalid_amount', credits: state.credits });
+    const { type = 'credit', ...transactionDetail } = detail;
+    state.credits += credits;
+    record(String(type), { ...transactionDetail, credits });
+    return Object.freeze({ ok: true, amount: credits, credits: state.credits });
+  }
+
   function inventoryItem(catalogId) {
     return inventory?.snapshot?.().items?.find((item) => item.catalogId === catalogId) || null;
   }
@@ -165,7 +228,9 @@ function createLocalCommerceModel(options = {}) {
       .filter((item) => item.catalogId === stock.rare.requirementId)
       .reduce((sum, item) => sum + Number(item.quantity || 0), 0);
     const sellable = inventorySnapshot.items.filter((item) =>
-      item.tradeable === true && Number(item.metadata?.commerceSellValue || 0) > 0
+      item.tradeable === true && Number(item.metadata?.commerceSellValue || 0) > 0 && (
+        !Array.isArray(item.metadata?.allowedCommerceKinds) || item.metadata.allowedCommerceKinds.includes(store.kind)
+      )
     ).map((item) => Object.freeze({
       instanceId: item.instanceId,
       catalogId: item.catalogId,
@@ -211,6 +276,9 @@ function createLocalCommerceModel(options = {}) {
     const item = inventory?.snapshot?.().items?.find((entry) => entry.instanceId === String(instanceId || ''));
     const sellPrice = Number(item?.metadata?.commerceSellValue || 0);
     if (!item || item.tradeable !== true || sellPrice <= 0) return Object.freeze({ ok: false, reason: 'not_sellable' });
+    if (Array.isArray(item.metadata?.allowedCommerceKinds) && !item.metadata.allowedCommerceKinds.includes(store.kind)) {
+      return Object.freeze({ ok: false, reason: 'store_not_authorized_for_item' });
+    }
     if (!inventory?.consumeItem?.(item.instanceId, 1)) return Object.freeze({ ok: false, reason: 'inventory_unavailable' });
     state.credits += sellPrice;
     record('sell', { storeId: store.id, catalogId: item.catalogId, credits: sellPrice });
@@ -241,11 +309,14 @@ function createLocalCommerceModel(options = {}) {
 
   save();
   return Object.freeze({
-    type: 'LocalConvenienceStoreCommerce',
+    type: 'WorldExplorerEconomy',
     buy,
+    credit,
+    debit,
     sell,
     snapshot: storeSnapshot,
-    trade
+    trade,
+    wallet
   });
 }
 
@@ -256,6 +327,8 @@ export {
   STARTING_EXPLORER_CREDITS,
   commerceDayKey,
   createLocalCommerceModel,
+  mappedCommercePlaces,
   mappedConvenienceStores,
+  MAPPED_COMMERCE_PLACE_TYPES,
   stockForStore
 };

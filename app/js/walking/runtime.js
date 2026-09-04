@@ -191,8 +191,8 @@ function createWalkingRuntimeHelpers({
     const interiorFootprint = Array.isArray(activeInterior?.usableFootprint) ? activeInterior.usableFootprint : null;
     const interiorCamera = !!(activeInterior && interiorFootprint && interiorFootprint.length >= 3);
     const baseY = walker.y;
-    const back = interiorCamera ? Math.min(1.05, CFG.thirdPersonDist * 0.24) : CFG.thirdPersonDist;
-    const up = interiorCamera ? Math.min(0.78, CFG.thirdPersonHeight * 0.34) : CFG.thirdPersonHeight;
+    const back = interiorCamera ? Math.min(2.6, Math.max(1.8, CFG.thirdPersonDist * 0.55)) : CFG.thirdPersonDist;
+    const up = interiorCamera ? Math.min(1.45, Math.max(1.05, CFG.thirdPersonHeight * 0.52)) : CFG.thirdPersonHeight;
     const pitchBackScale = Math.max(0.46, Math.cos(walker.pitch));
     const camX = walker.x - Math.sin(cameraYaw) * pitchBackScale * back;
     const camZ = walker.z - Math.cos(cameraYaw) * pitchBackScale * back;
@@ -206,21 +206,22 @@ function createWalkingRuntimeHelpers({
       resolvedCamZ = clamped.z;
     }
 
-    if (!interiorCamera) {
-      const collisionSafeCamera = resolveThirdPersonCameraCollision({
-        anchor: { x: walker.x, y: baseY + 1.35, z: walker.z },
-        target: { x: resolvedCamX, y: camY, z: resolvedCamZ },
-        checkBuildingCollision: appCtx.checkBuildingCollision
-      });
-      resolvedCamX = collisionSafeCamera.x;
-      resolvedCamZ = collisionSafeCamera.z;
-      camera.position.set(resolvedCamX, collisionSafeCamera.y, resolvedCamZ);
-    } else {
-      camera.position.set(resolvedCamX, camY, resolvedCamZ);
-    }
+    const collisionSafeCamera = resolveThirdPersonCameraCollision({
+      anchor: { x: walker.x, y: baseY + 1.35, z: walker.z },
+      target: { x: resolvedCamX, y: camY, z: resolvedCamZ },
+      checkBuildingCollision: appCtx.checkBuildingCollision,
+      probeSpacing: interiorCamera ? 0.24 : 0.45,
+      clearance: interiorCamera ? 0.22 : 0.32
+    });
+    resolvedCamX = collisionSafeCamera.x;
+    resolvedCamZ = collisionSafeCamera.z;
+    camera.position.set(resolvedCamX, collisionSafeCamera.y, resolvedCamZ);
 
     if (state.characterMesh && state.view === "third") {
-      state.characterMesh.visible = walker.pitch < 0.98;
+      // When a tight corridor forces the camera almost onto the avatar, hide
+      // the avatar instead of letting either model or camera clip through a
+      // pressure wall.
+      state.characterMesh.visible = walker.pitch < 0.98 && (!interiorCamera || collisionSafeCamera.ratio > 0.22);
     }
 
     const lookAhead = interiorCamera ? Math.min(1.45, CFG.thirdPersonLookAhead * 0.24) : CFG.thirdPersonLookAhead;

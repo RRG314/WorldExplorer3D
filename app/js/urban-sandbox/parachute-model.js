@@ -89,6 +89,8 @@ function integrateSkydivingDynamics(previous = {}, input = {}, dt = 0) {
   const turnRate = deployed
     ? bank / Math.max(.1, PARACHUTE_POLICY.canopyBankLimit) * PARACHUTE_POLICY.canopyTurnRate
     : turn * .74;
+  // Preserve the established traversal convention used by aircraft and the
+  // world camera: positive turn input advances positive world heading.
   const heading = initialHeading + turnRate * step;
   let verticalSpeed = finite(input.verticalVelocity, -1.2);
   let horizontalSpeed;

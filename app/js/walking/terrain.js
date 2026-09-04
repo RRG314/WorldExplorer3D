@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=2';
+import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=3';
 
 function createWalkingTerrainHelpers({ car, state, CFG }) {
   function finiteOr(value, fallback) {
@@ -29,7 +29,7 @@ function createWalkingTerrainHelpers({ car, state, CFG }) {
 
   function getSafeDriveY(x, z, fallbackY) {
     let y = fallbackY;
-    if (appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId) {
+    if (!appCtx.activeInterior && (appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId)) {
       const surfaceY = planetarySurfaceYAtRenderXZ(appCtx, x, z);
       if (Number.isFinite(surfaceY)) y = surfaceY + 1.2;
     } else if (appCtx.SurfaceQuery) {
@@ -41,7 +41,7 @@ function createWalkingTerrainHelpers({ car, state, CFG }) {
   }
 
   function getWalkGroundY(x, z, fallbackY = 0) {
-    if (appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId) {
+    if (!appCtx.activeInterior && (appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId)) {
       const surfaceY = planetarySurfaceYAtRenderXZ(appCtx, x, z);
       return Number.isFinite(surfaceY) ? surfaceY : fallbackY;
     }

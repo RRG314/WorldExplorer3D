@@ -1,6 +1,6 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { orderedRouteAnchors, sanitizeText } from '../activity-editor/schema.js?v=2';
-import { getStoredActivityById } from './library.js?v=2';
+import { orderedRouteAnchors, sanitizeText } from './schema-core.js?v=1';
+import { getStoredActivityById } from './library.js?v=3';
 
 const COMPLETION_STORAGE_KEY = 'worldExplorer3D.activityCompletions.v1';
 

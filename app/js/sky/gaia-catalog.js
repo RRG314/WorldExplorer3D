@@ -100,6 +100,7 @@ function createGaiaSkyLayers(options = {}) {
   group.name = options.name || 'ESA Gaia DR3 sky';
   const state = {
     group,
+    disposed: false,
     radius: Number(options.radius) || 5000,
     brightMagnitude: Number(options.brightMagnitude) || 5.2,
     brightPoints: createPointLayer(options.brightName || 'Gaia DR3 bright stars', options.brightSize || 5.2, 0.98),
@@ -113,6 +114,7 @@ function createGaiaSkyLayers(options = {}) {
     if (state.loadStarted) return state.ready;
     state.loadStarted = true;
     state.ready = loadGaiaCatalog().then((stars) => {
+      if (state.disposed) return 0;
       state.stars = stars;
       rebuildGaiaSkyLayers(state);
       return stars.length;
@@ -127,7 +129,7 @@ function createGaiaSkyLayers(options = {}) {
 }
 
 function rebuildGaiaSkyLayers(state, observer = null) {
-  if (!state?.stars?.length) return 0;
+  if (state?.disposed || !state?.stars?.length) return 0;
   const origin = observer?.isVector3 ? observer : new THREE.Vector3();
   const layers = {
     bright: { positions: [], colors: [] },
@@ -153,4 +155,14 @@ function rebuildGaiaSkyLayers(state, observer = null) {
   return state.stars.length;
 }
 
-export { createGaiaSkyLayers, loadGaiaCatalog, rebuildGaiaSkyLayers };
+function releaseGaiaSkyLayers(state) {
+  if (!state) return false;
+  state.disposed = true;
+  state.stars = [];
+  state.group = null;
+  state.brightPoints = null;
+  state.faintPoints = null;
+  return true;
+}
+
+export { createGaiaSkyLayers, loadGaiaCatalog, rebuildGaiaSkyLayers, releaseGaiaSkyLayers };

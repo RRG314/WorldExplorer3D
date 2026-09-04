@@ -1,5 +1,5 @@
-import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=2';
-import { getPlanetarySurfaceRegion } from '../planetary/runtime/surface-authority.js?v=3';
+import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=3';
+import { getPlanetarySurfaceRegion } from '../planetary/runtime/surface-authority.js?v=4';
 import { resolvePlanetarySurfaceBoundary } from '../planetary/runtime/surface-boundary.js?v=1';
 
 export function updatePlanetaryVehicleHeight(appCtx, dt, options = {}) {

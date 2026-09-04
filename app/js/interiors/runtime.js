@@ -165,14 +165,29 @@ function replaceActiveInteriorFloor(active, targetLevel, deps) {
 function nearestInteriorInteraction(active, walker) {
   if (!active || !walker || !Array.isArray(active.interactions)) return null;
   const feetY = walker.y - (appCtx.Walk?.CFG?.eyeHeight || 1.7);
+  const traversalPriority = {
+    'ship-exit': 0,
+    'ship-door': 1,
+    'ship-lift': 2,
+    'ship-incident-step': 3,
+    'ship-station': 4,
+    'ship-crew': 5
+  };
   return active.interactions.map((interaction) => ({
     ...interaction,
+    interactionPriority: traversalPriority[interaction.kind] ?? 4,
     distance: Math.hypot(interaction.x - walker.x, interaction.z - walker.z),
     verticalDistance: Math.abs(
       active.floorBaseY + interaction.level * active.floorPlan.storyHeight - feetY
     )
   })).filter((interaction) => interaction.distance <= interaction.radius && interaction.verticalDistance <= 1.15)
-    .sort((a, b) => a.distance - b.distance)[0] || null;
+    .sort((a, b) => {
+      // Adjacent pressure doors and workstations have intentionally generous
+      // touch radii. Prefer the clearly closer object so a doorway cannot
+      // consume E while the player is standing directly at a console.
+      if (Math.abs(a.distance - b.distance) > 0.35) return a.distance - b.distance;
+      return a.interactionPriority - b.interactionPriority || a.distance - b.distance;
+    })[0] || null;
 }
 
 function closeElevatorFloorPicker(active = appCtx.activeInterior) {
@@ -432,6 +447,9 @@ export async function enterInteriorForSupport(support, deps) {
 
 export function clearActiveInterior(options = {}, deps) {
   const active = appCtx.activeInterior;
+  if (active?.environmentKind === 'expedition-ship' && options.shipInternal !== true) {
+    return appCtx.exitExpeditionShipInterior?.() === true;
+  }
   if (!active) {
     closeElevatorFloorPicker(null);
     appCtx.replaceWorldCollection('dynamicBuildingColliders');
@@ -568,6 +586,9 @@ export async function handleInteriorAction(deps) {
   if (appCtx.activeInterior) {
     const active = appCtx.activeInterior;
     const interaction = nearestInteriorInteraction(active, appCtx.Walk?.state?.walker);
+    if (['ship-station', 'ship-exit', 'ship-door', 'ship-lift', 'ship-incident-step', 'ship-crew'].includes(interaction?.kind)) {
+      return (await appCtx.handleShipInteriorInteraction?.(interaction)) !== false;
+    }
     if (interaction?.kind === 'exit') {
       clearActiveInterior({ restorePlayer: true, preserveCache: true }, deps);
       return true;

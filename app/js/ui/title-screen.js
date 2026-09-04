@@ -1,10 +1,10 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { ENV, getEnv } from "../env.js?v=58";
 import { commitEnvironment } from '../session-coordinator.js?v=2';
-import { createGlobeSelector } from "./globe-selector.js?v=91";
+import { createGlobeSelector } from "./globe-selector.js?v=93";
 import { readSharedExperienceParams } from "./share-links.js?v=64";
 import { prepareTitleEnvironment } from "../planetary/entry.js?v=9";
-import { scheduleAfterFirstPlay } from '../runtime/workload-policy.js?v=1';
+import { markFirstPlayReady, scheduleAfterFirstPlay } from '../runtime/workload-policy.js?v=1';
 import { setupGlobeHub } from './title-screen/globe-hub.js?v=5';
 import {
   clampDetectedCoords,
@@ -46,6 +46,7 @@ function initTitleScreenUi({
   let liveGpsLaunchBusy = false;
   let oceanEntryHadEarthWorld = false;
   let multiplayerWarmupPromise = null;
+  let pendingForcedLaunchMode = '';
   let requestTitleStart = () => Promise.resolve(false);
 
   const primeMultiplayerUi = () => {
@@ -249,16 +250,29 @@ function initTitleScreenUi({
     titleUseMyLocationStatus.textContent = message || '';
     titleUseMyLocationStatus.style.color = color || '#6b7280';
   };
+  const setLocationEntryLabel = (button, label) => {
+    if (!button) return;
+    const labelElement = button.querySelector('[data-location-entry-label]');
+    if (labelElement) labelElement.textContent = label;
+    else button.textContent = label;
+  };
   const setUseMyLocationBusy = (isBusy) => {
     geolocationBusy = !!isBusy;
     if (titleUseMyLocationBtn) {
       titleUseMyLocationBtn.disabled = geolocationBusy;
-      titleUseMyLocationBtn.textContent = geolocationBusy ? 'Locating…' : 'Use My Location';
+      setLocationEntryLabel(titleUseMyLocationBtn, geolocationBusy ? 'Locating…' : 'Current Location');
     }
     if (globeSelector && typeof globeSelector.setLocateButtonBusy === 'function') globeSelector.setLocateButtonBusy(geolocationBusy);
   };
+  const selectCurrentLocationMode = () => {
+    document.querySelectorAll('.mode').forEach((element) => element.classList.remove('sel'));
+    document.querySelector('.mode[data-mode="free"]')?.classList.add('sel');
+    appCtx.gameMode = 'free';
+    setLaunchMode('earth');
+  };
   const runUseMyLocation = async (source = 'menu') => {
     if (geolocationBusy) return;
+    selectCurrentLocationMode();
     if (globeSelector && typeof globeSelector.isOpen === 'function' && !globeSelector.isOpen()) {
       setTitleLocationMode('custom');
       globeSelector.open();
@@ -313,7 +327,7 @@ function initTitleScreenUi({
       if (!button) return;
       button.disabled = liveGpsLaunchBusy;
       button.setAttribute('aria-busy', liveGpsLaunchBusy ? 'true' : 'false');
-      button.textContent = liveGpsLaunchBusy ? 'Starting Live GPS…' : '📍 Start Live GPS Explore';
+      setLocationEntryLabel(button, liveGpsLaunchBusy ? 'Starting…' : 'Live GPS');
     });
   };
   const runLiveGpsExplore = async () => {
@@ -341,6 +355,13 @@ function initTitleScreenUi({
   };
 
   appCtx.triggerTitleStart = (options = {}) => {
+    const forcedLaunchMode = ['earth', 'ocean', 'moon', 'mars', 'space'].includes(options?.launchMode)
+      ? options.launchMode
+      : '';
+    if (forcedLaunchMode) {
+      pendingForcedLaunchMode = forcedLaunchMode;
+      setLaunchMode(forcedLaunchMode);
+    }
     if (options?.bypassCustomGate) {
       skipGlobeGateOnce = true;
       appCtx.pendingCustomLaunchBypass = true;
@@ -367,7 +388,7 @@ function initTitleScreenUi({
       emitTutorialEvent('location_selected', selection || {});
       setTitleLocationMode('custom');
       if (!appCtx.gameStarted) {
-        return appCtx.triggerTitleStart({ bypassCustomGate: true });
+        return appCtx.triggerTitleStart({ bypassCustomGate: true, launchMode: 'earth' });
       } else if (typeof appCtx.loadRoads === 'function') {
         await ensureEarthWorldRuntime();
         resetTitleEarthTravelMode('globe_location_change');
@@ -393,7 +414,7 @@ function initTitleScreenUi({
       }, { transient: false });
       if (!appCtx.gameStarted) {
         setLaunchMode('ocean');
-        return appCtx.triggerTitleStart({ bypassCustomGate: true });
+        return appCtx.triggerTitleStart({ bypassCustomGate: true, launchMode: 'ocean' });
       }
       if (typeof appCtx.startOceanMode !== 'function') return false;
       if (typeof appCtx.showTransitionLoad === 'function') await appCtx.showTransitionLoad('ocean', 700);
@@ -409,7 +430,7 @@ function initTitleScreenUi({
     onMoonShortcut: async () => {
       if (!appCtx.gameStarted) {
         setLaunchMode('moon');
-        return appCtx.triggerTitleStart({ bypassCustomGate: true });
+        return appCtx.triggerTitleStart({ bypassCustomGate: true, launchMode: 'moon' });
       } else if (!appCtx.onMoon && !appCtx.travelingToMoon && typeof appCtx.directTravelToMoon === 'function') {
         return appCtx.directTravelToMoon();
       }
@@ -418,7 +439,7 @@ function initTitleScreenUi({
     onSpaceShortcut: async () => {
       if (!appCtx.gameStarted) {
         setLaunchMode('space');
-        return appCtx.triggerTitleStart({ bypassCustomGate: true });
+        return appCtx.triggerTitleStart({ bypassCustomGate: true, launchMode: 'space' });
       } else if (!appCtx.onMoon && !appCtx.travelingToMoon && typeof appCtx.travelToMoon === 'function') {
         return appCtx.travelToMoon();
       }
@@ -431,7 +452,7 @@ function initTitleScreenUi({
     onEarthMode: () => setTitleLocationMode('custom'),
     onLaunchMode: (mode) => {
       setLaunchMode(mode);
-      void appCtx.triggerTitleStart({ bypassCustomGate: true }).catch((error) => {
+      void appCtx.triggerTitleStart({ bypassCustomGate: true, launchMode: mode }).catch((error) => {
         console.error(`[title] ${mode} launch failed:`, error);
       });
     },
@@ -556,7 +577,9 @@ function initTitleScreenUi({
 
   const runTitleStart = async () => {
     if (appCtx.runtimeReady !== true) return false;
-    const requestedLaunchMode = Object.entries(launchModeButtons)
+    const forcedLaunchMode = pendingForcedLaunchMode;
+    pendingForcedLaunchMode = '';
+    const requestedLaunchMode = forcedLaunchMode || Object.entries(launchModeButtons)
       .find(([, button]) => button?.classList.contains('active'))?.[0] || titleLaunchMode;
     setLaunchMode(requestedLaunchMode);
     if (requestedLaunchMode === 'earth' && appCtx.gameMode === 'livegps') {
@@ -601,6 +624,7 @@ function initTitleScreenUi({
     document.getElementById('minimapZoomControls')?.classList.add('show');
     document.getElementById('floatMenuContainer')?.classList.add('show');
     document.getElementById('mainMenuBtn')?.classList.add('show');
+    document.getElementById('worldQuickControls')?.classList.add('show');
     document.getElementById('controlsTab')?.classList.add('show');
     const accessibilitySettings = document.getElementById('accessibilitySettings');
     const mobileControlSettings = document.getElementById('mobileControlSettings');
@@ -611,7 +635,6 @@ function initTitleScreenUi({
     gameShareFloatBtn?.classList.add('show');
     closeGameShareMenu?.();
     appCtx.gameStarted = true;
-    appCtx.kickOptionalRuntimeBoot?.('boot');
     if (requestedLaunchMode !== 'ocean' && requestedLaunchMode !== 'earth') {
       void appCtx.ensureStarCatalogLoaded?.();
     }
@@ -637,10 +660,18 @@ function initTitleScreenUi({
       await new Promise((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve)));
       appCtx.hideLoad?.();
       appCtx.loadingScreenMode = 'earth';
+      markFirstPlayReady({ environment: 'ocean', launchMode: 'ocean', source: 'title_launch' });
       return true;
     }
 
-    if (await startPlanetaryTitleLaunch(requestedLaunchMode)) return true;
+    if (await startPlanetaryTitleLaunch(requestedLaunchMode)) {
+      markFirstPlayReady({
+        environment: requestedLaunchMode === 'space' ? 'space' : requestedLaunchMode,
+        launchMode: requestedLaunchMode,
+        source: 'title_launch'
+      });
+      return true;
+    }
 
     await ensureEarthWorldRuntime();
     appCtx.ensureEnginePbrTextures?.();

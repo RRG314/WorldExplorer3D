@@ -1,6 +1,6 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { buildActivityCatalog, currentReferencePose } from './catalog.js?v=4';
-import { getStoredActivityById, listStoredActivities, removeStoredActivity } from './library.js?v=2';
+import { buildActivityCatalog, currentReferencePose } from './catalog.js?v=5';
+import { getStoredActivityById, listStoredActivities, removeStoredActivity } from './library.js?v=3';
 import { bindMarkerClicks, refreshWorldMarkers } from './markers.js?v=3';
 import {
   distanceToStart,
@@ -12,7 +12,7 @@ import {
   startActivity,
   stopActivity,
   updateActivityRuntime
-} from './runtime.js?v=6';
+} from './runtime.js?v=7';
 import {
   discoveryActionLabel,
   discoveryBadgeForActivity,
@@ -383,11 +383,6 @@ function bindEvents() {
     }
     if (target.id === 'activityDiscoveryCloseBtn') {
       closeActivityBrowser();
-      return;
-    }
-    if (target.id === 'activityDiscoveryOpenCreatorBtn') {
-      closeActivityBrowser();
-      if (typeof appCtx.openActivityCreator === 'function') appCtx.openActivityCreator();
       return;
     }
     if (target.id === 'activityDiscoveryPrimaryAction') {

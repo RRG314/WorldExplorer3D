@@ -2,7 +2,7 @@ import {
   createAuxiliaryRenderer,
   disposeThreeObjectTree,
   disposeThreeRenderer
-} from '../../engine/webgl-lifecycle.js?v=1';
+} from '../../engine/webgl-lifecycle.js?v=2';
 import { latLonToLocalPoint, localPointToLatLon } from './helpers.js?v=9';
 import { createGlobeBasemapTiles } from './basemap-tiles.js?v=4';
 

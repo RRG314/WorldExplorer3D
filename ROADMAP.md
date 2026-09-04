@@ -1,6 +1,6 @@
 # World Explorer 3D Roadmap
 
-Last updated: 2026-08-30.
+Last updated: 2026-09-03.
 
 World Explorer 3D is growing toward a connected world sandbox: choose a real
 place, build an Explorer, travel by land, water, air, or space, and make a
@@ -21,38 +21,41 @@ The long-term game is organized around five connected parts:
    vehicles, homes, and expedition capabilities.
 4. **Belong:** establish homes and base camps, decorate them, return to familiar
    places, and contribute to persistent local or multiplayer worlds.
-5. **Create:** use one World Editor and Blocks workflow to make structures,
-   interiors, activities, and shared places without competing building systems.
+5. **Create:** use Quick Build for persistent Blocks today, then grow that same
+   object and ownership path into richer structures, interiors, activities, and
+   shared places without restoring a competing editor.
 
 Real-world context makes the sandbox recognizable, but it does not turn the
 game into a navigation, appraisal, ownership, wildlife-presence, or safety
 service. Unknown source data remains unknown.
 
-## Current release: 5.1
+## Current release: 5.2
 
-Version 5.1 connects the systems introduced in 5.0 and substantially expands
-travel and sandbox play.
+Version 5.2 preserves the established 5.1 world and traversal experience while
+adding a connected Interstellar Expeditions Alpha, virtual property and Credits,
+a clearer gameplay menu, and stronger transition, backend, and memory ownership.
 
-| Area | 5.1 capability | Continuing work |
+| Area | 5.2 capability | Continuing work |
 | --- | --- | --- |
 | Explorer | One Profile, Journal, Field Guide, Backpack, quick-slot loadout, Field Today, Expeditions, specialties, and seasonal surveys | Cross-device progression and more ways to use specialties |
 | Regional field play | Eleven regional packs with 180 attainable entries across every built-in Earth destination | Independent scientific review, more regions, and more promoted creature models |
 | Character and companions | Attributes, skills, condition, equipment, companion care, trust, levels, livestock, and vehicle travel | Player-selectable Explorer identities, richer appearance, training, and ability growth |
 | Earth travel | Walking, distinct road vehicles, responder vehicles, drone, personal aircraft, airport aircraft, boats, ships, and skydiving | More vehicle classes, facilities, damage presentation, and physical-device tuning |
 | Water | Shore visibility, mapped vessel identity, marinas, ports, playable boat and ship classes, shore/boat/underwater fishing | Wider port coverage, water traffic, maritime activities, and reviewed bathymetry |
-| Space | Manual and assisted flight, selectable courses, celestial collision, planetary entry, accepted surfaces, landing, and return | Optional long-distance Expeditions, more complete planetary activities, destinations, spacecraft, and visual review |
-| World construction | One World Editor containing persistent local and room Blocks | Terrain shaping, building materials, interiors, decoration, and creator publishing |
+| Space | Manual and assisted flight, selectable courses, celestial collision, planetary entry, accepted surfaces, landing, and return; Interstellar Expeditions Alpha adds Solis Reach, crew work, voyage events, Pathfinder surface travel, sample return, long-duration journeys, and shared state | Expand Alpha mission and destination variety, room and crew presentation, planetary activities, spacecraft, audio, and visual review |
+| Property and economy | One Credits record, mapped-business exchange, conserved planetary samples, one free first virtual property claim, listings, purchases, public-address display, and server-authorized shared ownership | Rentals, direct player offers, decoration, home services, broader account sync, valuation licensing, and economic tuning |
+| World construction | Quick Build with persistent local and room Blocks | Terrain shaping, building materials, interiors, decoration, and a future creator workspace built on the same Block authority |
 | Community | Bounded rooms, presence, chat, activities, shared Blocks, persistent room vehicles, and public game leaderboards | Larger-room review, moderation depth, clubs, events, and shared settlements |
 | Access and performance | Keyboard, touch, mobile layouts, accessibility settings, bounded loading, and lifecycle cleanup | Broader phone, browser, assistive-technology, battery, and thermal review |
 
-The 5.1 release is complete when the exact release build passes owner review on
-desktop and phone, its account and public leaderboard paths are available, and
-that approved build is published without being rebuilt.
+The 5.2 release is published from the exact owner-reviewed build after desktop
+and phone review, account and public leaderboard availability checks, and the
+production release gates pass.
 
 ## Next foundation: persistent player life
 
-These systems come before a larger virtual property economy because they define
-who owns progress and how it remains recoverable.
+These systems extend the first connected property and Credits slice because they
+define who owns progress and how it remains recoverable across devices.
 
 ### Explorer identities and character growth
 
@@ -83,13 +86,85 @@ Completion means a player can sign in on another supported device, recover the
 same supported progression, understand any conflict, and continue without a
 duplicate profile.
 
+## Shared economy, trade, and materials
+
+Explorer Credits are the single game currency for ordinary sandbox play. They
+have no cash value, cannot be withdrawn, and do not represent a real price or
+account balance. The existing Credits record will expand with account-backed
+progression rather than being replaced by separate store, property, vehicle,
+or space currencies.
+
+### One connected resource loop
+
+- Let players earn Credits through supported field contracts, travel,
+  activities, discoveries, commissions, and the sale of eligible game items.
+  Repeated actions, client-only claims, and duplicated room events must not
+  create unbounded rewards.
+- Use Credits for equipment, supplies, repairs, vehicle services, tickets,
+  storage, decoration, homes, base camps, and other understandable game
+  services. Prices and stock are game rules, not claims about a real business.
+- Use mapped convenience stores, markets, fuel and charging stations, hardware
+  stores, pawn and second-hand shops, repair and parts shops, and relevant
+  outdoor, fishing, boat, and aviation shops as place anchors when the provider
+  supplies an eligible record. A mapped category never proves current hours,
+  inventory, price, staff, access, or willingness to trade.
+- Give each business class a clear role. Markets cover ordinary supplies;
+  hardware and parts shops cover material and repair bundles; mechanics cover
+  vehicle service; pawn and second-hand shops accept a wider range of eligible
+  finds; specialist shops support their related travel and field activities.
+- Keep equipment and carried goods in the Backpack, vehicle supplies on the
+  vehicle, voyage resources in ship cargo, and settlement resources in the
+  home, camp, or outpost record. Transfers must identify both owners, conserve
+  quantity or mass, survive interruption, and roll back when the destination
+  cannot accept them.
+- Let suitable Earth materials support later fabrication and Expedition
+  preparation. Space samples remain mission or science cargo until custody,
+  analysis, and processing make a resulting item eligible for use or sale.
+  Finding a planet never creates a valuable material by itself.
+- Give returned material a stable source, world address, collection method,
+  truth class, quantity, mass, processing history, and rights policy. Catalog
+  facts and game-generated composition remain visibly distinct.
+- Keep shared-room wallets, rewards, sales, cargo transfer, and persistent
+  ownership server-authorized. Until one transaction can validate both sides,
+  consequential local-to-room transfers remain unavailable.
+
+### Staged delivery
+
+1. **Foundation — implemented locally:** one Credits wallet, one Backpack item catalog, typed mapped
+   businesses, stable game stock, Earth material bundles, and exact
+   Backpack-to-ship transfer through the existing cargo station.
+2. **Services and gathering:** vehicle repair and energy services, Earth
+   salvage and gathering activities, commissions, specialist shops, and clear
+   earning and spending history.
+3. **Return trade — first complete single-player custody path:** conserved ship-to-Backpack unloading, sample analysis,
+   material processing, legal sale categories, rare exchanges, collection
+   records, and home or camp storage. A collected planetary geology sample can
+   now return by pod, remain in Solis Reach science cargo, be processed and
+   approved at separate ship stations, move to the shared Backpack, and sell
+   only at an eligible mapped business. Rare exchanges, broader material
+   classes, collection records, and home or camp storage remain staged work.
+4. **Persistent economy:** account recovery, server-authorized multiplayer
+   trade, inflation controls, property and decoration sinks, progression
+   rewards, migration, and rollback.
+
+Completion means a player can earn, buy, gather, carry, transfer, use, return,
+sell, and review an item through one recoverable chain without a duplicate
+wallet, inventory, cargo record, or invented claim about a real business.
+
 ## Homes, base camps, and virtual real estate
 
-Property will become a progression system built on the existing mapped building,
-interior, Editor, Blocks, room, and account systems. It will not be a second
-building game.
+Property is a progression system built on the existing mapped building,
+interior, Quick Build, Blocks, room, and account systems. The current slice
+supports a first claim, listing, purchase, and Community Board record. It will
+not become a second building game.
 
 ### Stage 1: homes and base camps
+
+Current foundation: a signed-in player may claim one eligible first virtual
+property without Credits, retains stable mapped identity and a public address
+when available, and cannot claim a property already owned in the same shared
+authority. Home interiors, storage, services, decoration, and base camps remain
+the work of this stage.
 
 - Let a player choose one primary home and establish a limited number of base
   camps for longer expeditions.
@@ -99,7 +174,7 @@ building game.
   care, and expedition recovery without pretending the player owns real land.
 - Home and camp placement must respect mapped access, protected places,
   sensitive-species rules, room permissions, world bounds, and collision.
-- Decoration uses the World Editor and Blocks object authority, with furniture,
+- Decoration uses the Quick Build and Blocks object authority, with furniture,
   materials, placement limits, undo, persistence, and room sharing.
 - Interiors retain stable floor and building identity so saved decoration does
   not move to another structure after a later world load.
@@ -107,7 +182,12 @@ building game.
 Completion means a home or camp can be entered, decorated, saved, revisited,
 shared when permitted, migrated, and recovered after an interrupted session.
 
-### Stage 2: virtual property market
+### Stage 2: virtual property market expansion
+
+Current foundation: owners can create a listing, another eligible player can
+purchase it through the server transaction, balances remain conserved, and the
+result appears in the Community Board. Renting, direct offers, trades, broader
+market discovery, and licensed value sources remain in this stage.
 
 - Create virtual property records from stable mapped building identity and
   licensed property data where coverage permits. A game property is never a
@@ -216,7 +296,7 @@ three choices through the same universe and destination catalog:
 Mars, a discovered world, a player base, and an outpost remain the same places
 regardless of how the player reaches them. Expedition work will extend the
 existing body catalog, world addresses, Space Flight, Character, Backpack,
-Journal, geology, World Editor, Blocks, rooms, and persistence. It will not
+Journal, geology, Quick Build, Blocks, rooms, and persistence. It will not
 create Expedition-only copies of those systems.
 
 ### Stage 1: research and system decisions
@@ -264,9 +344,10 @@ alternatives.
   strategic time, crew, supplies, system condition, cargo, discoveries, major
   events, and mission state. Stable ship identity includes its class,
   configuration, upgrades, condition, crew association, and history.
-- Add an interim mission allocation for initial provisioning without embedding
-  a temporary currency throughout the game. It must be replaceable by the
-  future shared World Explorer economy.
+- Retire the interim mission-allocation concept in favor of the shared World
+  Explorer economy. Initial provisioning may still provide a bounded starter
+  manifest, while later purchases and transfers use Explorer Credits, the
+  Backpack, and conserved ship cargo rather than an Expedition-only wallet.
 
 The first implementation proves a complete representative journey: prepare,
 board, depart, advance time, consume supplies, respond to a real ship problem,
@@ -274,6 +355,103 @@ record a discovery, arrive, leave the Expedition ship, and continue as the same
 Explorer through the existing local Space and planetary systems.
 
 ### Stage 3: the ship, crew, and voyage
+
+Implementation design: `docs/SURVEYOR_EXPEDITION_SHIP.md` defines the original
+three-deck ship, compact and expanded maps, pressure-door and route graph,
+room-specific activities, connected voyage loop, science/fiction boundary,
+failure recovery, shared authorities, and staged acceptance journeys.
+
+Alpha design and release gate: `docs/SPACE_EXPEDITION_ALPHA.md` defines the
+Voyage Director, 36-event minimum content budget, delayed consequence chains,
+physically suitable destination exploration, resource-stop custody, generated
+room/item/UI references, modular rendering plan, animation and sound coverage,
+and the gameplay evidence required before the feature can ship as an alpha.
+
+Current status: the Solis Reach has three bounded walkable decks, 25 mapped rooms,
+pressure doors, a deck lift, compact and expanded ship maps, visible crew
+assignments, shared walking and collision, mobile controls, Captain's Log and
+Journal handoff, and return to the same Space session. Room work changes the
+same crew, resources, systems, and log used by the strategic voyage. The Voyage
+Director selects 14 paced chapters from 36 authored event families with
+state-gated responses, three outcome bands, remembered decisions, delayed
+consequences, responsible rooms, visible action, and restrained audio. Local
+contacts now open in ordinary Space, accept supported planetary landing and
+field collection, return exact sample custody to Solis Reach, process material,
+and resume the same voyage. Further room art, animation, audio, and interaction
+variety remain continuing quality work rather than missing system authorities.
+The current ship pass also gives the bridge and Observation Gallery a live view
+from the active local Space renderer, seals authored walls through the shared
+interior collision authority, routes objectives across decks to exact stations,
+and lets crew members provide phase-aware advice through that same map. The pod
+route has been rechecked as one conserved journey from Solis Reach launch to
+manual local flight, surface work, return, rendezvous, ship processing, and
+Earth trade. These verified mechanics define the connected Alpha foundation;
+they do not make the remaining art, animation, mission, destination, audio, or
+performance work complete.
+Voyage responses now begin at the affected station and require three visible,
+role-specific interactions at a connected service console before the existing
+Voyage Director commits its success, partial, or setback outcome. This closes
+the button-only gap for the shared incident path, but event-specific tools,
+crew animation, damaged-component variants, and broader room art still remain
+part of the alpha quality gate.
+
+Planetary photography, geology, and environmental survey points now have
+distinct physical equipment rather than sharing a bare beacon: a stabilized
+panorama camera, exposed outcrop with scanner and sample case, and a braced
+sensor mast with sampling plate. Each uses a three-step in-world procedure
+through the normal interaction input, and only the final step may commit the
+existing Journal evidence or geology sample. This improves the shared field
+action standard, but it does not complete surface life, NPC behavior, rover and
+pod art, or destination-specific resource-site variety. The return pod has also
+received a first close-range structure pass—segmented shell longerons, docking
+hardware, heat tiles, four landing struts, ramp rails, and a framed hatch—while
+retaining the same journey and boarding authority. Final materials, vehicle
+contact, entry/launch effects, and interior presentation remain in the quality gate. The
+pod hull now blocks planetary walking through a dedicated active-world obstacle
+authority; it does not reuse Earth buildings or player-created Blocks.
+
+Earth joins this loop through the existing authorities rather than a parallel
+travel mode. The roadmap route is selected/current Earth location → Pathfinder
+manual ascent → visible Solis Reach docking → walkable ship → Pod Bay departure →
+manual Earth approach and descent → the same saved Earth world session. Globe
+search owns arbitrary Earth destinations, Space Flight owns all flight and
+landing behavior, the pod journey owns shuttle state, and the Earth session owns
+the final geographic handoff. The first accepted slice must work from the
+currently loaded location in both directions before Pod Bay destination search
+or saved-location expansion is claimed.
+
+The current connected slice is mechanically ahead of its presentation. It is
+not yet the intended visual or activity standard for a public Space alpha.
+Primary pods, rooms, crew, field tools, surface life, resource sites, and mission
+actions need authored form, readable animation, contact and collision, material
+variation, lighting, sound, and visible state change. Text may explain a result,
+but it cannot stand in for the action that produced it.
+
+Before Interstellar Expeditions can graduate beyond Alpha:
+
+- solid terrain must occlude the lower sky, support contact from both sides of
+  the normal play envelope, continue to the visible horizon, and keep the pod,
+  Explorer, vehicles, samples, and field markers on the same surface authority;
+- pod boarding, bay departure, manual approach, atmospheric entry where
+  applicable, landing, surface work, launch, rendezvous, and recovery must be
+  visible connected states rather than unrelated screens or instant results;
+- every featured mission needs a navigable objective chain with at least three
+  distinct 3D actions, a meaningful crew or ship dependency, more than one
+  supported outcome, Journal evidence, and a return consequence;
+- crew must visibly travel to work, use the relevant station or equipment,
+  respond to hazards, rest, and recover. A label beside a stationary figure is
+  not a finished NPC action;
+- surface materials, landforms, weather, lighting, gravity response, life, and
+  resource sites must follow the destination profile and quality tier. Unknown
+  real conditions remain unknown; original game worlds may use authored life
+  and weather with an explicit game-world classification;
+- hero assets and rooms need reviewed reference, scale, collision, close-view
+  geometry, materials, animation, mobile level of detail, rights, and visual
+  acceptance captures. Repeated primitive assemblies remain acceptable only
+  for distant or low-priority detail; and
+- desktop and 390×844 journeys must prove objective guidance, interaction,
+  failure recovery, save and reload, memory cleanup, and unchanged Free Flight
+  without relying on a source-only or button-only check.
 
 - Make each Expedition ship a bounded, high-quality, walkable place assembled
   from validated class-specific layouts. Required rooms must exist, remain
@@ -306,15 +484,67 @@ Explorer through the existing local Space and planetary systems.
   and unresolved problems can form an understandable failure chain. A prepared
   Expedition normally has backups, warnings, repair, diversion, and rescue
   opportunities before it can be lost.
+- Continue the data-driven Voyage Director now used in place of the fixed
+  nine-beat foundation. Its 36 authored event families provide state-dependent
+  options, immediate and delayed outcomes, cooldowns, incompatibilities, and
+  responsible rooms and crew. Complete the visible room action, audio, local
+  stop, and consequence presentation for those families before alpha.
+  Parameter variations do not count as distinct authored families.
 - Record departures, arrivals, repairs, losses, discoveries, route changes,
   resupply, rescue, outposts, and outcomes in a Captain's Log presentation
   backed by the existing Journal and progression authority.
+
+### The voyage is the game
+
+An Expedition is not a short chain of confirmation dialogs. It is a persistent
+journey lived aboard the ship and through the existing Space world:
+
+- Divide each leg into visible departure, watch, cruise, survey, resource,
+  hazard, approach, and arrival phases. Nearby stars still require several
+  meaningful watches and events; longer routes add variation without inflating
+  the UI with filler.
+- Give crew members real overlapping jobs. Navigation, flight, engineering,
+  life support, medical, science, and systems watches respond in their actual
+  rooms, while the player may inspect, assist, repair, scan, rest, fabricate,
+  shelter, or continue flying.
+- Let quiet watches, scientific observations, equipment wear, particle damage,
+  radiation, fatigue, power loss, and discoveries emerge from route, ship,
+  crew, and resource state. Events must have causes, consequences, and more
+  than one reasonable response.
+- Detect stable uncharted systems and worlds along suitable routes. Player
+  presentation uses natural names such as “survey contact” and “uncharted
+  world.” Their save data retains a stable seed and an internal truth label so
+  they are never confused with observed catalog objects.
+- Let an optional stop pause strategic travel and enter the existing local
+  Space and planetary play. The player flies or deploys the local craft, lands,
+  walks or drives, scans, mines or collects a supported material, returns to
+  the ship, transfers the declared cargo, and processes it. A menu never grants
+  fuel, food, water, parts, or raw material merely because a world was found.
+- Match local challenges to the actual need without guaranteeing an easy
+  solution. A repair diversion may reveal metal or ceramic feedstock; a water
+  shortage requires evidence of accessible volatiles; power recovery may need
+  parts, deployed collection equipment, or load reduction. Findings retain
+  uncertainty until the player scans and samples them.
+- Keep food production, water recovery, power collection, fabrication, and
+  repairs constrained by energy, material, equipment condition, crew time, and
+  losses. Local solar collection depends on the current star and cannot be
+  treated as a constant interstellar power source.
+- Make catalog black holes valid Expedition destinations. They are explored
+  through local flight, sensors, safe navigation limits, observations, and the
+  ship rather than a fictional solid surface or survivable event horizon.
+- Preserve manual free flight at every local stop and destination. Assistance
+  may guide the player, but it does not replace piloting or silently teleport
+  the Expedition through its story.
 
 ### Stage 4: stops, discoveries, and long-duration missions
 
 - Let a route include known planets, moons, small bodies, bases, outposts, and
   stable game-generated destinations. Reachability comes from distance, ship,
   propulsion, supplies, and valid stops rather than an arbitrary player level.
+- Use one route-contact record to promote a detection into a surveyed system,
+  optional stop, physically entered local frame, completed surface operation,
+  processed cargo, and resumed voyage. Do not build parallel “story planet” and
+  ordinary planet systems.
 - Make resource recovery use the existing planetary flight, geology, mining,
   rover, Backpack, and cargo paths. A player may land and gather, deploy a
   capable rover, trade with a stocked location, salvage a valid object, or
@@ -349,7 +579,7 @@ Explorer through the existing local Space and planetary systems.
   cargo from the assisting ship before adding it to the receiving ship, and
   both Captain's Logs record the rescue.
 - Let a suitable Expedition establish a bounded outpost at an existing
-  planetary destination using the existing World Editor and Blocks. Its crew,
+  planetary destination using the existing Quick Build and Blocks authority. Its crew,
   habitat, power, food, water, life support, medical capacity, maintenance,
   production, and storage determine what survives or becomes available later.
 - Keep an outpost present for ordinary Free-Roam visits and future Expeditions.
@@ -357,6 +587,22 @@ Explorer through the existing local Space and planetary systems.
   duplicate planetary world.
 
 ### Completion and release gates
+
+Implementation status: the connected alpha slice now includes the planner,
+walkable Solis Reach, active crew work, 36-family Voyage Director, causal failure
+and recovery, physical local stops, conserved sample processing and repair,
+cryogenic reserve replacement, generation continuity, relativistic time,
+shared room crew and rescue, and a bounded field station. Stable discoveries
+and field stations are retained in one durable discovery catalog and register
+once in Wayfinder before normal Space navigation begins. The field station
+uses the existing planetary address and Blocks authority, advances power,
+stores, condition, and operating status with strategic time, and remains
+visitable after the active mission slot is cleared.
+
+This is a release candidate, not an automatic production release. The exact
+artifact still requires owner review on desktop and phone, and the shared
+Expedition Functions and Firestore rules must be promoted with the compatible
+client when that release is approved.
 
 Interstellar Expeditions are complete only when the following connected
 journeys work from planning through persistence, not merely as menus or meters:
@@ -397,8 +643,9 @@ or reachable by every ship.
 
 ## Creation and community
 
-- Extend the World Editor with terrain-safe voxel and material tools while
-  retaining Blocks as its immediate persistent construction workflow.
+- Extend Quick Build with terrain-safe voxel and material tools, then add richer
+  creation screens only when they reuse the same Block placement, ownership,
+  collision, persistence, and room authority.
 - Add reusable interiors, decoration sets, vehicles, activities, routes, and
   field programs through reviewed catalogs and clear rights metadata.
 - Improve drafts, validation, version history, moderation, rollback, discovery,

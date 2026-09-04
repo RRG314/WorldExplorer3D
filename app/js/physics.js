@@ -1,15 +1,15 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { isRoadSurfaceReachable } from "./structure-semantics.js?v=63";
-import { updateDrone } from "./physics/drone-flight.js?v=9";
-import { updatePlane } from "./plane-mode.js?v=30";
+import { updateDrone } from "./physics/drone-flight.js?v=10";
+import { updatePlane } from "./plane-mode.js?v=34";
 import {
   createEarthVehicleGroundContactSampler,
   stabilizeEarthVehicleSurfaceY,
   updateVehicleSurface
 } from "./physics/vehicle-surface.js?v=6";
-import { createBuildingCollisionQuery } from "./physics/building-collision.js?v=2";
+import { createBuildingCollisionQuery } from "./physics/building-collision.js?v=4";
 import { resolveVehicleBuildingCollision } from "./physics/building-collision-response.js?v=8";
-import { getEarthTransportControllerSnapshot, updateAlternateTravelMode } from "./physics/mode-dispatch.js?v=3";
+import { getEarthTransportControllerSnapshot, updateAlternateTravelMode } from "./physics/mode-dispatch.js?v=4";
 import { updatePlanetaryVehicleHeight } from "./physics/planetary-vehicle.js?v=3";
 import {
   arcadeSteeringYawTarget,
@@ -57,6 +57,9 @@ function getPlanetarySurfaceMesh() {
 
 function getPlanetaryGravity() {
   const bodyId = appCtx.activePlanetaryBodyId || (appCtx.onMars ? 'mars' : appCtx.onMoon ? 'moon' : 'earth');
+  if (appCtx.activePlanetaryEnvironment?.bodyId === bodyId && Number.isFinite(Number(appCtx.activePlanetaryEnvironment.gravityMagnitudeMps2))) {
+    return -Number(appCtx.activePlanetaryEnvironment.gravityMagnitudeMps2);
+  }
   return -samplePhysicalEnvironment(bodyId, {
     heightM: 0,
     timestampS: Number(appCtx.astronomicalSkyState?.timestampMs || Date.now()) / 1000

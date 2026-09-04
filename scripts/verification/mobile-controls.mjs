@@ -96,9 +96,19 @@ async function touchStraightnessProbe(selector) {
 }
 
 async function mode(mode, selector) {
-  await page.locator('#exploreBtn').click();
-  await page.waitForSelector('#exploreMenu.open', { timeout: 10_000 });
-  await page.locator(selector).click();
+  const item = page.locator(selector);
+  const owningMenu = item.locator('xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " floatMenu ")]').first();
+  const owningButton = owningMenu.locator(':scope > .floatBtn');
+  assert.equal(await owningMenu.count(), 1, `${selector} must have one visible menu authority.`);
+  assert.equal(await owningButton.count(), 1, `${selector} menu must have one toggle.`);
+  if (!(await owningMenu.evaluate((element) => element.classList.contains('open')))) {
+    await owningButton.click();
+  }
+  await assert.doesNotReject(
+    item.waitFor({ state: 'visible', timeout: 10_000 }),
+    `${selector} must be visible after opening its owning menu.`
+  );
+  await item.click();
   await page.waitForFunction((expected) => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.mode === expected, mode, { timeout: 20_000 });
   await page.waitForTimeout(250);
   const visibility = await page.evaluate(() => {
@@ -242,11 +252,22 @@ try {
   await page.locator('#mobileControlsHandedness').selectOption('southpaw');
   const settingsLayout = await page.evaluate(() => ({
     summary: document.getElementById('mobileControlModeSummary')?.innerText || '',
+    close: (() => {
+      const element = document.getElementById('ctrlHeader');
+      const rect = element?.getBoundingClientRect();
+      const hit = rect ? document.elementFromPoint(rect.left + 36, rect.top + rect.height / 2) : null;
+      return {
+        text: element?.textContent?.trim() || '',
+        width: rect?.width || 0,
+        height: rect?.height || 0,
+        hitId: hit?.closest?.('#ctrlHeader')?.id || hit?.id || ''
+      };
+    })(),
     desktopInstructionsVisible: ['drivingControls', 'boatControls', 'walkingControls', 'droneControls', 'planeControls', 'rocketControls', 'oceanControls']
       .some((id) => getComputedStyle(document.getElementById(id)).display !== 'none')
   }));
   await page.screenshot({ path: 'output/verification/mobile-controls/settings-mobile.png', fullPage: true });
-  await page.locator('#controlsBarBtn').click();
+  await page.locator('#ctrlHeader').click();
   const southpawLayout = await layoutSnapshot();
   const savedSouthpawSettings = await page.evaluate(() => JSON.parse(localStorage.getItem('world-explorer-mobile-controls-v1') || 'null'));
 
@@ -289,7 +310,7 @@ try {
   const reloadedWalkState = await diagnostics();
   await page.locator('#controlsBarBtn').click();
   await page.locator('#mobileControlsReset').click();
-  await page.locator('#controlsBarBtn').click();
+  await page.locator('#ctrlHeader').click();
   const resetLayout = await layoutSnapshot();
   const resetWalkState = await diagnostics();
 
@@ -307,6 +328,8 @@ try {
     backpackCloseIsTouchable: openPackUi.closeWidth >= 44 && openPackUi.closeHeight >= 44 && openPackUi.closeHitId === 'urbanEquipmentCloseBtn',
     vehiclePackHidden: drivePackVisible === false,
     mobileSettingsAreModeSpecific: /walking/i.test(settingsLayout.summary) && /jump/i.test(settingsLayout.summary) && settingsLayout.desktopInstructionsVisible === false,
+    mobileControlsHaveVisibleClose: /close controls/i.test(settingsLayout.close.text) &&
+      settingsLayout.close.width >= 44 && settingsLayout.close.height >= 44 && settingsLayout.close.hitId === 'ctrlHeader',
     expandedMapStartsFollowingPlayer: mapFollowState.browsing === false && /following/i.test(mapFollowState.status),
     expandedMapOwnsTheScreen: mapFollowState.tutorialVisible === false,
     expandedMapSuspendsGameplayMovement: distance(mapActorBefore.activeActor?.position, mapActorAfterBlockedInput.activeActor?.position) < 0.5,
@@ -322,15 +345,17 @@ try {
       walkStraightness.firstDistance + walkStraightness.secondDistance > 0.9 &&
       walkStraightness.turnDegrees < 5,
     walkAnalogMoves: distance(walkBefore.activeActor?.position, walkMoved.activeActor?.position) > MIN_WALK_DISTANCE_1250_MS,
-    walkRightLookTurnsRight: Number(walkLooked.cameraFollow?.signedHeadingOffsetDegrees) > 8,
+    // Camera yaw uses the established right-drag convention: a rightward
+    // pointer delta produces a negative yaw offset in the world frame.
+    walkRightLookTurnsRight: Number(walkLooked.cameraFollow?.signedHeadingOffsetDegrees) < -8,
     walkCameraRecenters: Number(walkRecentered.cameraFollow?.headingAlignmentDegrees) < 5 && Number(walkRecentered.cameraFollow?.trailingDistance) > 1,
     driveAnalogMoves: distance(driveBefore.activeActor?.position, driveMoved.activeActor?.position) > 0.4,
-    driveRightLookTurnsRight: Number(driveLooked.cameraFollow?.signedHeadingOffsetDegrees) > 8,
+    driveRightLookTurnsRight: Number(driveLooked.cameraFollow?.signedHeadingOffsetDegrees) < -8,
     driveCameraRecenters: Number(driveRecentered.cameraFollow?.headingAlignmentDegrees) < 6 && Number(driveRecentered.cameraFollow?.trailingDistance) > 2,
     droneTransitionAndAnalogControl: droneBefore.activeActor?.mode === 'drone' && droneControlled.activeActor?.mode === 'drone' &&
       distance(droneBefore.activeActor?.position, droneControlled.activeActor?.position) > 0.4,
     planeAnalogChangesAttitude: Math.abs(Number(planeControlled.activeActor?.orientation?.pitch) - Number(planeBefore.activeActor?.orientation?.pitch)) > 0.05 || Math.abs(Number(planeControlled.activeActor?.orientation?.roll) - Number(planeBefore.activeActor?.orientation?.roll)) > 0.05,
-    planeRightLookTurnsRight: Number(planeLooked.cameraFollow?.signedHeadingOffsetDegrees) > 8,
+    planeRightLookTurnsRight: Number(planeLooked.cameraFollow?.signedHeadingOffsetDegrees) < -8,
     planeCameraRecenters: Number(planeRecentered.cameraFollow?.headingAlignmentDegrees) < 7 && Number(planeRecentered.cameraFollow?.trailingDistance) > 2,
     returnToWalkClearsInput: reloadedWalkState.activeActor?.mode === 'walk' &&
       reloadedWalkState.mobileControls?.move?.active !== true && reloadedWalkState.mobileControls?.look?.active !== true &&

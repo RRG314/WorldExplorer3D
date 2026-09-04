@@ -27,6 +27,18 @@ function outcomeForLevel(level) {
   return Object.freeze({ type: 'warning', label: 'Warning issued' });
 }
 
+function responderApproachSpeed(input = {}) {
+  const distance = Math.max(0, Number(input.distance) || 0);
+  const level = clamp(input.level, 1, 3);
+  const stopDistance = Math.max(0, Number(input.stopDistance) || 0);
+  if (distance <= stopDistance) return 0;
+  const normalSpeed = Math.min(22 + level * 2, 7 + distance * .24);
+  const headingError = Math.min(Math.PI, Math.abs(Number(input.headingError) || 0));
+  const forwardAlignment = Math.max(0, Math.cos(headingError));
+  const maneuverSpeed = 4.5 + normalSpeed * forwardAlignment;
+  return Math.min(normalSpeed, maneuverSpeed);
+}
+
 function createResponderResponseModel(options = {}) {
   const state = {
     phase: 'idle',
@@ -138,6 +150,7 @@ export {
   CONTACT_RESOLUTION_SECONDS,
   createResponderResponseModel,
   outcomeForLevel,
+  responderApproachSpeed,
   responderAgencyProfile,
   responderCountForLevel
 };

@@ -30,7 +30,7 @@ function installOnDemandBlockBuilder(appCtx) {
   async function ensureBlockBuilderReady() {
     if (!modulePromise) {
       modulePromise = import('../blocks.js?v=69').then(async (blocks) => {
-        const ui = await import('../block-builder/ui.js?v=7');
+        const ui = await import('../block-builder/ui.js?v=8');
         if (pendingSharedConfig) blocks.configureSharedBuildSync?.(pendingSharedConfig);
         blocks.setSharedBuildConnectionState?.(pendingSharedConnected);
         if (pendingSharedEntries) blocks.setSharedBuildEntries?.(pendingSharedEntries);

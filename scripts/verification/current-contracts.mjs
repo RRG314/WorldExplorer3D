@@ -14,7 +14,7 @@ const tests = [
   'tests/character-progression-current.test.mjs',
   'tests/combat-backpack-current.test.mjs',
   'tests/companion-progression-current.test.mjs',
-  'tests/convenience-commerce-current.test.mjs',
+  'tests/world-economy-current.test.mjs',
   'tests/crash-physics-current.test.mjs',
   'tests/creature-quality.test.mjs',
   'tests/deflock-data-contract.test.mjs',

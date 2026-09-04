@@ -1,8 +1,9 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { disposeThreeObjectTree } from '../engine/webgl-lifecycle.js?v=1';
-import { getGalaxyEntryDestination, getUniverseFrame, resolveUniverseAddress } from './catalog.js?v=10';
-import { updateBlackHoleEncounter, updateBlackHoleVisual } from './black-hole.js?v=3';
-import { createDeepSkyLayer, setDeepSkyFrame, updateDeepSkyLayer } from './deep-sky.js?v=2';
+import { getAstronomicalBody, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=3';
+import { disposeThreeObjectTree } from '../engine/webgl-lifecycle.js?v=2';
+import { getGalaxyEntryDestination, getUniverseFrame, resolveUniverseAddress } from './catalog.js?v=11';
+import { updateBlackHoleEncounter, updateBlackHoleVisual } from './black-hole.js?v=4';
+import { createDeepSkyLayer, setDeepSkyFrame, updateDeepSkyLayer } from './deep-sky.js?v=3';
 import { createRegionEncounter, fireEncounterPulse, updateRegionEncounter } from './encounters.js?v=1';
 import { getUniverseNavigationMetrics } from './navigation-scale.js?v=1';
 import {
@@ -10,15 +11,17 @@ import {
   setUniverseCourseGuidance,
   setUniverseCourseStatus,
   UNIVERSE_GUIDANCE_MODE
-} from './course-authority.js?v=2';
-import { SPACE_CONSTANTS } from '../space/constants.js?v=1';
-import { createUniverseSky, setUniverseSkyFrame, updateUniverseSky } from './sky-field.js?v=5';
+} from './course-authority.js?v=3';
+import { SPACE_CONSTANTS } from '../space/constants.js?v=3';
+import { initDestinationMissionRuntime, updateDestinationMissionRuntime } from './mission-runtime.js?v=7';
+import { createUniverseSky, setUniverseSkyFrame, updateUniverseSky } from './sky-field.js?v=6';
+import { releaseGaiaSkyLayers } from '../sky/gaia-catalog.js?v=4';
 import {
   createUniverseFrameVisual,
   getUniverseDestinationMesh,
   setUniverseCourseMarker,
   updateUniverseFrameVisual
-} from './visuals.js?v=18';
+} from './visuals.js?v=19';
 import {
   closeUniverseNavigator,
   createUniverseNavigator,
@@ -27,7 +30,7 @@ import {
   showUniverseNavigator,
   updateUniverseCourseCue,
   updateUniverseNavigator
-} from './ui.js?v=5';
+} from './ui.js?v=8';
 import {
   createWormholeVisual,
   getWormholeRoute,
@@ -48,6 +51,7 @@ const _courseCameraLocal = new THREE.Vector3();
 const _courseCameraInverse = new THREE.Quaternion();
 const _courseDesiredRotation = new THREE.Quaternion();
 const _courseProjected = new THREE.Vector3();
+const _courseDesiredVelocity = new THREE.Vector3();
 const _courseForwardAxis = new THREE.Vector3(0, 1, 0);
 const _localCourseTarget = {
   destination: null,
@@ -66,6 +70,7 @@ const _localCourseCue = {
   ndcX: 0,
   ndcY: 0
 };
+const missionScanEffects = [];
 
 const universeRuntime = {
   initialized: false,
@@ -111,11 +116,121 @@ function setSolVisibility(visible) {
 
 function disposeActiveFrame() {
   if (!universeRuntime.frameGroup) return;
+  missionScanEffects.length = 0;
   universeRuntime.scene?.remove(universeRuntime.frameGroup);
   disposeThreeObjectTree(universeRuntime.frameGroup);
   universeRuntime.frameGroup = null;
   universeRuntime.encounter = null;
   universeRuntime.galaxyEntry = null;
+}
+
+function releaseUniverseRuntimeScene(scene = universeRuntime.scene, options = {}) {
+  if (scene && universeRuntime.scene && scene !== universeRuntime.scene) return false;
+  if (options.disposeObjects === true) {
+    const ownedRoots = new Set([
+      universeRuntime.frameGroup,
+      universeRuntime.transitGroup,
+      universeRuntime.wormholeGroup,
+      universeRuntime.sky?.group,
+      universeRuntime.deepSky?.group
+    ].filter(Boolean));
+    ownedRoots.forEach((root) => {
+      root.parent?.remove?.(root);
+      disposeThreeObjectTree(root);
+      root.clear?.();
+    });
+  }
+  missionScanEffects.length = 0;
+  if (universeRuntime.sky) {
+    universeRuntime.sky.disposed = true;
+    releaseGaiaSkyLayers(universeRuntime.sky.gaiaSky);
+  }
+  if (universeRuntime.deepSky) {
+    universeRuntime.deepSky.sprites = [];
+    universeRuntime.deepSky.currentEntity = null;
+  }
+  Object.assign(universeRuntime, {
+    initialized: false,
+    scene: null,
+    frameGroup: null,
+    transitGroup: null,
+    wormholeGroup: null,
+    sky: null,
+    deepSky: null,
+    current: resolveUniverseAddress('sol'),
+    selected: resolveUniverseAddress('sol'),
+    course: null,
+    transition: null,
+    pendingEarthReturn: false,
+    elapsedSeconds: 0,
+    encounter: null,
+    captureRecoveryAt: 0,
+    galaxyEntry: null
+  });
+  universeRuntime.canonicalFrameOffset.set(0, 0, 0);
+  return true;
+}
+
+function playDestinationMissionScan(destinationId, operation = 'survey') {
+  const mesh = getUniverseDestinationMesh(universeRuntime.frameGroup, destinationId);
+  if (!mesh) return false;
+  const radius = Number(mesh.geometry?.parameters?.radius) || 12;
+  const thermalScale = operation.includes('thermal') ? 3.4 : 1;
+  const group = new THREE.Group();
+  group.name = `destination-mission-scan:${destinationId}`;
+  const scanColor = operation.includes('nightside') ? 0x739dff
+    : operation.includes('thermal') ? 0xffa35c
+      : operation.includes('biosignature') ? 0x76f0c7 : 0x6fe8ff;
+  const shellMaterial = new THREE.MeshBasicMaterial({
+    color: scanColor,
+    transparent: true,
+    opacity: 0.68,
+    wireframe: true,
+    depthTest: false,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending
+  });
+  const shell = new THREE.Mesh(new THREE.SphereGeometry(radius * 1.16 * thermalScale, 24, 16), shellMaterial);
+  group.add(shell);
+  for (let index = 0; index < 3; index += 1) {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(radius * (1.25 + index * 0.18) * thermalScale, Math.max(0.12, radius * 0.018 * thermalScale), 8, 48),
+      shellMaterial.clone()
+    );
+    ring.rotation.set(index * 0.73, index * 1.05, index * 0.41);
+    group.add(ring);
+  }
+  if (operation.includes('thermal')) {
+    for (let index = 0; index < 7; index += 1) {
+      const band = new THREE.Mesh(
+        new THREE.BoxGeometry(radius * 0.065 * thermalScale, radius * (0.45 + index * 0.12) * thermalScale, radius * 0.04 * thermalScale),
+        shellMaterial.clone()
+      );
+      band.position.x = (index - 3) * radius * 0.19 * thermalScale;
+      band.position.z = radius * 1.22 * thermalScale;
+      group.add(band);
+    }
+  }
+  mesh.add(group);
+  missionScanEffects.push({ group, startedAt: performance.now(), durationMs: 2200 });
+  return true;
+}
+
+function updateMissionScanEffects(nowMs = performance.now()) {
+  for (let index = missionScanEffects.length - 1; index >= 0; index -= 1) {
+    const effect = missionScanEffects[index];
+    const progress = Math.min(1, Math.max(0, (nowMs - effect.startedAt) / effect.durationMs));
+    effect.group.rotation.y += 0.018;
+    effect.group.rotation.x += 0.006;
+    effect.group.scale.setScalar(1 + progress * 1.8);
+    effect.group.children.forEach((child) => {
+      if (child.material) child.material.opacity = Math.max(0, 0.72 * (1 - progress));
+    });
+    if (progress < 1) continue;
+    effect.group.parent?.remove(effect.group);
+    disposeThreeObjectTree(effect.group);
+    missionScanEffects.splice(index, 1);
+  }
 }
 
 function resetFlightMotion() {
@@ -240,10 +355,17 @@ function travelToUniverseDestination(addressOrId, options = {}) {
   if (!destination || !destinationFrame) return false;
   universeRuntime.selected = destination;
   universeRuntime.course = createUniverseCourse(destination, universeRuntime.current.id, performance.now());
-  // Wayfinder owns the active deep-space course. Release the Solar System's
-  // optional SI journey so it cannot continue moving or reorienting the ship
-  // toward the Moon behind the player's selected interstellar destination.
+  // Interstellar frames and the local Solar System use different physical
+  // scales. End the local transfer once, then keep Wayfinder as navigation;
+  // the active craft and its travel session remain unchanged.
   appCtx.releaseRenderedJourneyToManualFlight?.();
+  appCtx.updateSpaceTravelSession?.({
+    location: 'deep-space',
+    phase: 'transfer',
+    destination: { id: destination.id, kind: destination.objectClass === 'planetary_system' ? 'system' : 'contact', name: destination.name },
+    guidance: 'manual',
+    reason: 'wayfinder-interstellar-course-set'
+  });
   if (destination.objectClass === 'exoplanet' && destinationFrame.id === universeRuntime.current.id) {
     setUniverseCourseMarker(universeRuntime.frameGroup, destination.id, true);
     showMessage(`COURSE SET · ${destination.name.toUpperCase()}`, '#6fe8ff');
@@ -307,6 +429,7 @@ function returnUniverseToSolImmediate() {
   if (universeRuntime.transitGroup) universeRuntime.transitGroup.visible = false;
   stopWormholeVisual(universeRuntime.wormholeGroup);
   universeRuntime.course = null;
+  updateUniverseCourseCue(null);
   universeRuntime.selected = resolveUniverseAddress('sol');
   if (universeRuntime.scene) installFrame(resolveUniverseAddress('sol'));
   return true;
@@ -373,6 +496,12 @@ function updateTransition(nowMs) {
     universeRuntime.course = setUniverseCourseStatus(universeRuntime.course, 'active');
   }
   positionRocketForCourseDestination(transition.destination);
+  appCtx.updateSpaceTravelSession?.({
+    location: 'deep-space',
+    phase: 'approach',
+    guidance: universeRuntime.course?.guidance || 'manual',
+    reason: 'wayfinder-destination-frame-arrived'
+  });
   updateUniverseNavigator(universeRuntime);
   showMessage(`${transition.destination?.name || transition.to.name} APPROACH ACQUIRED`, '#68d8c0');
   if (universeRuntime.pendingEarthReturn && transition.to.id === 'sol') {
@@ -404,8 +533,8 @@ function updateBlackHole(frameScale) {
   universeRuntime.encounter = updateBlackHoleEncounter(
     group,
     appCtx.spaceFlight.rocket,
-    appCtx.spaceFlight.gravityVelocity,
-    frameScale
+    appCtx.spaceFlight.velocity,
+    frameScale / 60
   );
   if (!universeRuntime.encounter?.captured || performance.now() < universeRuntime.captureRecoveryAt) return;
   const route = getWormholeRoute(universeRuntime.current.id);
@@ -448,12 +577,18 @@ function getUniverseHudTarget() {
     : universeRuntime.current.objectClass === 'planetary_system' ? 24
       : universeRuntime.current.objectClass === 'nebula' ? 240
         : universeRuntime.current.objectClass === 'stellar_region' ? 180 : 80;
+  const activeDestination = courseBody ? courseDestination : courseInTransit ? courseDestination : universeRuntime.current;
+  const missionSurface = courseBody && appCtx.isDestinationMissionSurfaceTarget?.(activeDestination?.id) === true;
+  const solidSurface = courseBody && (activeDestination?.exploration?.landingMode === 'solid_surface' || missionSurface);
   return {
     name: courseBody || courseInTransit ? courseDestination.name : universeRuntime.current.name,
     position: courseBody ? coursePosition : group?.position || new THREE.Vector3(),
     radius: courseBody ? Number(courseBody.geometry?.parameters?.radius) || 6 : radius,
     physicalRadiusKm: courseBody ? Number(courseBody.userData?.physicalRadiusKm) || null : null,
-    landable: false,
+    mesh: courseBody || null,
+    destinationId: activeDestination?.id || null,
+    exploration: activeDestination?.exploration || null,
+    landable: Boolean(solidSurface),
     objectClass: courseBody ? 'exoplanet' : universeRuntime.current.objectClass,
     address: courseBody || courseInTransit ? courseDestination.address : universeRuntime.current.address,
     course: universeRuntime.course,
@@ -468,8 +603,56 @@ function getUniverseHudTarget() {
   };
 }
 
+function restoreUniverseLocalFrame(frameId, courseDestinationId = '') {
+  if (!universeRuntime.initialized || !universeRuntime.scene) return false;
+  const frame = resolveUniverseAddress(frameId);
+  const destination = resolveUniverseAddress(courseDestinationId);
+  if (!frame || frame.objectClass !== 'planetary_system') return false;
+  universeRuntime.transition = null;
+  universeRuntime.pendingEarthReturn = false;
+  universeRuntime.selected = destination || frame;
+  universeRuntime.course = destination ? createUniverseCourse(destination, frame.id, performance.now()) : null;
+  if (!destination) updateUniverseCourseCue(null);
+  installFrame(frame);
+  if (destination?.parentFrameId === frame.id) positionRocketForCourseDestination(destination);
+  updateUniverseNavigator(universeRuntime);
+  return true;
+}
+
 function getLocalCourseTarget() {
+  const travelSession = appCtx.getSpaceTravelSession?.();
+  if (
+    travelSession?.phase === 'rendezvous' &&
+    travelSession?.destination?.id === 'solis-reach'
+  ) {
+    const dockTarget = appCtx.getSolisReachDockTarget?.();
+    if (dockTarget?.position) {
+      _localCourseTarget.position.copy(dockTarget.position);
+      _localCourseTarget.destination = {
+        id: 'solis-reach',
+        name: travelSession.destination.name || 'Solis Reach'
+      };
+      _localCourseTarget.radius = Number(dockTarget.radius) || 18;
+      _localCourseTarget.mesh = dockTarget.mesh || null;
+      return _localCourseTarget;
+    }
+  }
   const course = universeRuntime.course;
+  if (!course && universeRuntime.current?.id === 'sol' && !universeRuntime.transition) {
+    const destinationBodyId = normalizeAstronomicalBodyId(appCtx.spaceJourney?.destinationBodyId);
+    const body = destinationBodyId && appCtx.getAllSpaceBodies?.().find((entry) =>
+      normalizeAstronomicalBodyId(entry?.name) === destinationBodyId
+    );
+    if (!body?.position) return null;
+    _localCourseTarget.position.copy(body.position);
+    _localCourseTarget.destination = {
+      id: destinationBodyId,
+      name: getAstronomicalBody(destinationBodyId)?.name || body.name || destinationBodyId
+    };
+    _localCourseTarget.radius = Number(body.radius) || 20;
+    _localCourseTarget.mesh = body.mesh || null;
+    return _localCourseTarget;
+  }
   if (
     universeRuntime.transition ||
     course?.status !== 'active' ||
@@ -498,6 +681,10 @@ function toggleUniverseCourseAssist() {
     universeRuntime.course,
     active ? UNIVERSE_GUIDANCE_MODE.ASSISTED : UNIVERSE_GUIDANCE_MODE.MANUAL
   );
+  appCtx.updateSpaceTravelSession?.({
+    guidance: active ? 'assisted' : 'manual',
+    reason: active ? 'wayfinder-assist-engaged' : 'manual-flight-resumed'
+  });
   updateUniverseNavigator(universeRuntime);
   showMessage(
     active ? `FLIGHT ASSIST · ${target.destination.name.toUpperCase()}` : 'MANUAL FLIGHT',
@@ -517,6 +704,7 @@ function updateLocalCourseAssist(frameSeconds) {
   if (manualInput) {
     universeRuntime.course = setUniverseCourseGuidance(universeRuntime.course, UNIVERSE_GUIDANCE_MODE.MANUAL);
     updateUniverseNavigator(universeRuntime);
+    appCtx.updateSpaceTravelSession?.({ guidance: 'manual', reason: 'manual-flight-resumed' });
     showMessage('MANUAL FLIGHT', '#60a5fa');
     return target;
   }
@@ -536,12 +724,11 @@ function updateLocalCourseAssist(frameSeconds) {
   const desiredSpeed = remaining <= 2
     ? 0
     : Math.min(SPACE_CONSTANTS.MAX_SPEED * 0.72, Math.max(SPACE_CONSTANTS.CRUISE_SPEED, remaining / 55)) * alignment;
-  const response = desiredSpeed > appCtx.spaceFlight.speed ? SPACE_CONSTANTS.BOOST * 0.65 : SPACE_CONSTANTS.BRAKE * 0.8;
-  const maxChange = response * (appCtx.spaceFlight._frameScale || 1);
-  appCtx.spaceFlight.speed += Math.max(-maxChange, Math.min(maxChange, desiredSpeed - appCtx.spaceFlight.speed));
-  if (remaining <= 2 && appCtx.spaceFlight.gravityVelocity) {
-    appCtx.spaceFlight.gravityVelocity.multiplyScalar(Math.max(0, 1 - frameSeconds * 3));
-  }
+  const targetVelocity = _courseDesiredVelocity.copy(_courseDirection).multiplyScalar(desiredSpeed);
+  const velocityBlend = 1 - Math.exp(-Math.max(0, frameSeconds) * (desiredSpeed > appCtx.spaceFlight.speed ? 1.8 : 3.2));
+  appCtx.spaceFlight.velocity?.lerp?.(targetVelocity, velocityBlend);
+  appCtx.spaceFlight.speed = appCtx.spaceFlight.velocity?.length?.() || 0;
+  if (remaining <= 2) appCtx.spaceFlight.velocity?.multiplyScalar?.(Math.max(0, 1 - frameSeconds * 3));
   return target;
 }
 
@@ -599,7 +786,8 @@ function updateLocalCourseCue(target = getLocalCourseTarget()) {
   _localCourseCue.y = halfHeight + directionY * edgeScale;
   _localCourseCue.angleDeg = Math.atan2(directionY, directionX) * 180 / Math.PI + 90;
   _localCourseCue.label = target.destination.name;
-  _localCourseCue.assisted = universeRuntime.course?.guidance === UNIVERSE_GUIDANCE_MODE.ASSISTED;
+  _localCourseCue.assisted = universeRuntime.course?.guidance === UNIVERSE_GUIDANCE_MODE.ASSISTED
+    || appCtx.spaceJourneyAssistState?.active === true;
   _localCourseCue.ndcX = _courseProjected.x;
   _localCourseCue.ndcY = _courseProjected.y;
   updateUniverseCourseCue(_localCourseCue);
@@ -664,7 +852,7 @@ function getUniverseGravityBodies() {
       massKg: mesh.userData.massKg,
       physicalRadiusKm: mesh.userData.physicalRadiusKm,
       mesh,
-      landable: false
+      landable: appCtx.isDestinationMissionSurfaceTarget?.(planet?.id) === true
     };
   });
 }
@@ -681,6 +869,8 @@ function updateUniverseRuntime(frameSeconds = 1 / 60) {
   }
   const localCourseTarget = updateLocalCourseAssist(frameSeconds);
   updateLocalCourseCue(localCourseTarget);
+  updateMissionScanEffects();
+  updateDestinationMissionRuntime();
   rebaseActiveFrame();
   updateUniverseSky(universeRuntime.sky, appCtx.spaceFlight.rocket);
   updateDeepSkyLayer(
@@ -693,7 +883,9 @@ function updateUniverseRuntime(frameSeconds = 1 / 60) {
 function initUniverseRuntime(scene) {
   if (!scene) return null;
   if (universeRuntime.scene !== scene) {
-    disposeActiveFrame();
+    if (universeRuntime.scene) {
+      releaseUniverseRuntimeScene(universeRuntime.scene, { disposeObjects: true });
+    }
     universeRuntime.scene = scene;
     universeRuntime.transitGroup = createTransitVisual(scene);
     universeRuntime.wormholeGroup = createWormholeVisual(scene);
@@ -710,7 +902,9 @@ function initUniverseRuntime(scene) {
     setDeepSkyFrame(universeRuntime.deepSky, universeRuntime.current, false);
   }
   setupUniverseInput();
+  initDestinationMissionRuntime(appCtx);
   createUniverseNavigator({
+    onMission: (destinationId) => appCtx.openDestinationMission?.(destinationId),
     onSelection: setSelectedDestination,
     onTravel: travelToUniverseDestination,
     onEnterGalaxy: enterCurrentGalaxy,
@@ -737,9 +931,12 @@ Object.assign(appCtx, {
   getUniverseGravityBodies,
   hideUniverseUI,
   initUniverseRuntime,
+  playDestinationMissionScan,
+  releaseUniverseRuntimeScene,
   returnToEarthFromUniverse,
   returnUniverseToSol,
   returnUniverseToSolImmediate,
+  restoreUniverseLocalFrame,
   setUniverseDestination: setSelectedDestination,
   showUniverseUI,
   toggleUniverseCourseAssist,
@@ -754,9 +951,11 @@ export {
   getUniverseGravityBodies,
   hideUniverseUI,
   initUniverseRuntime,
+  releaseUniverseRuntimeScene,
   returnToEarthFromUniverse,
   returnUniverseToSol,
   returnUniverseToSolImmediate,
+  restoreUniverseLocalFrame,
   showUniverseUI,
   toggleUniverseCourseAssist,
   travelToUniverseDestination,

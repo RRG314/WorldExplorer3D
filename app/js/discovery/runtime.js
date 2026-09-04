@@ -6,7 +6,7 @@ import { createWalkingEncounterDirector } from './encounter-director.js?v=1';
 import { resolveRegionalEcologyPack } from './ecology/regional-packs.js?v=2';
 import { compileEnvironmentContext } from './environment-context.js?v=2';
 import { createFieldRetentionSnapshot } from './field-retention.js?v=2';
-import { compileFieldActivityPlan, createFieldActivitySession } from './field-activities.js?v=3';
+import { compileFieldActivityPlan, createFieldActivitySession } from './field-activities.js?v=4';
 import { createFieldExpedition } from './field-expedition.js?v=1';
 import { ACTIVITY_TOOL, createFieldEquipmentPresentation } from './field-equipment.js?v=1';
 import { explorerProgressSnapshot } from './explorer-events.js?v=3';
@@ -15,7 +15,7 @@ import {
   explorerGoalSnapshot,
   explorerToolProgress,
   regionalProgressSnapshot
-} from './explorer-goals.js?v=1';
+} from './explorer-goals.js?v=2';
 import {
   compileEncounterPlan,
   compileGeographicEligibility,
@@ -34,7 +34,7 @@ import { visualForCatalogId } from './visual-content.js?v=1';
 import { compileAmbientWildlifePlan, createAmbientWildlifeRuntime } from './wildlife-runtime.js?v=4';
 import { createStableWorldIdentity } from '../living-world/model.js?v=1';
 import { evaluateArEligibility } from '../ar/eligibility.js?v=2';
-import { getScreenLayoutService } from '../ui/screen-layout.js?v=1';
+import { getScreenLayoutService } from '../ui/screen-layout.js?v=2';
 import { ATTRIBUTE_DEFINITIONS, BACKGROUND_DEFINITIONS, SPECIALTY_DEFINITIONS, SPECIALTY_RANKS, definitionById, rankForXp } from '../character/catalog.js?v=1';
 import { createCapabilityResolver } from '../character/capability-resolver.js?v=2';
 import { companionHandlingTuning, wildlifeObservationTuning } from '../character/wildlife-assistance.js?v=1';
@@ -157,7 +157,7 @@ const EXPLORER_SECTION_TUTORIALS = Object.freeze({
     'Choose an activity in Today. The first option is the best fit for this place; the next two are alternatives.',
     'Begin, then return to the world so your tool and the nearby clues can guide you.',
     'Finish the activity to add a memory to your Journal. Identifications also update the Guide, and objects you keep enter your Pack.',
-    'Open My Explorer when you want to see your rank, specialties, and companions.'
+    'Open your Explorer Profile when you want to see your rank, specialties, and companions.'
   ]) }),
   journal: Object.freeze({ id: 'explorer-journal-v1', title: 'Journal', steps: Object.freeze([
     'The Journal is the shared story of your fieldwork, games, creations, travel, rooms, and companions.',
@@ -169,7 +169,7 @@ const EXPLORER_SECTION_TUTORIALS = Object.freeze({
     'Unidentified groups show how much is left and which field methods can help. Search and category filters narrow the Guide.',
     'Reference photographs help identification but do not claim the subject exists at an exact real-world point.'
   ]) }),
-  profile: Object.freeze({ id: 'my-explorer-profile-v1', title: 'My Explorer', steps: Object.freeze([
+  profile: Object.freeze({ id: 'my-explorer-profile-v1', title: 'Explorer Profile', steps: Object.freeze([
     'This is your identity: Explorer rank, developing specialties, and the companions you have met.',
     'Detailed progress stays grouped here instead of competing with the activities you can do today.',
     'Wild species belong in the Field Guide. Individual animals you befriend belong with your Explorer profile.'
@@ -256,7 +256,7 @@ function createDiscoveryUi(state) {
     guideOverview: byId('discoveryGuideOverview'), guideSearch: byId('discoveryGuideSearch'), guideScope: byId('discoveryGuideScope'),
     lifeList: byId('discoveryLifeList'), retention: byId('discoveryRetentionDashboard'),
     guideCategory: byId('discoveryGuideCategory'), guideHelp: byId('discoveryGuideHelp'), guideHelpButton: byId('discoveryGuideHelpBtn'),
-    companions: byId('discoveryCompanionList'), tools: byId('discoveryToolList'), progress: byId('discoveryProgress'),
+    companions: byId('discoveryCompanionList'), tools: byId('discoveryToolList'), progress: byId('discoveryProgress'), journeyOverview: byId('discoveryJourneyOverview'),
     equipped: byId('discoveryEquippedSummary'), openBackpack: byId('discoveryOpenBackpackBtn'),
     profileButton: byId('discoveryProfileBtn'), profileRank: byId('discoveryProfileRank'), profilePoints: byId('discoveryProfilePoints'), profileHero: byId('discoveryProfileHero'),
     tutorial: byId('discoveryTutorial'), tutorialTitle: byId('discoveryTutorialTitle'),
@@ -526,6 +526,17 @@ function createDiscoveryUi(state) {
       if (elements.profileHero) {
         elements.profileHero.innerHTML = `<div><span>${escapeHtml(background.label)}</span><strong>${escapeHtml(progress.rankLabel)}</strong><small>${progress.points} Explorer points · ${progress.totalRecords || 0} Journal memories</small></div><div class="discoveryProfileStrengths"><span>Current strengths</span><b>${strengths.map((entry) => escapeHtml(entry.label)).join(' · ')}</b></div>${activeCompanion ? `<div class="discoveryProfileCompanion"><span>Exploring with</span><strong>${escapeHtml(activeCompanion.name)}</strong><small>Level ${activeCompanion.progression?.level || 1} · ${escapeHtml(activeCompanion.progression?.trustState || 'Comfortable')}</small></div>` : ''}`;
       }
+      if (elements.journeyOverview) {
+        const routeCards = [
+          { id: 'today', label: 'Discover', detail: 'Observe, photograph, survey, and save what you learn.', records: Number(progress.paths?.field?.records || 0) + Number(progress.paths?.activity?.records || 0), icon: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="m15.8 8.2-2.1 5.5-5.5 2.1 2.1-5.5 5.5-2.1Z"></path></svg>' },
+          { id: 'travel', label: 'Travel', detail: 'Cross cities, oceans, planets, and the journeys between them.', records: Number(progress.paths?.travel?.records || 0), icon: '<svg viewBox="0 0 24 24"><circle cx="6" cy="17" r="2.5"></circle><circle cx="18" cy="7" r="2.5"></circle><path d="M8.5 17c5.5 0 1.5-10 7-10"></path></svg>' },
+          { id: 'create', label: 'Create', detail: 'Build, shape places, and make part of the world your own.', records: Number(progress.paths?.creation?.records || 0), icon: '<svg viewBox="0 0 24 24"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z"></path><path d="m4 7.5 8 4.5 8-4.5M12 12v9"></path></svg>' },
+          { id: 'community', label: 'Explore Together', detail: 'Join rooms, share expeditions, and compare discoveries.', records: Number(progress.paths?.community?.records || 0), icon: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"></circle><circle cx="17" cy="9" r="2.25"></circle><path d="M3.5 19c.4-3.5 2.2-5.2 5.5-5.2s5.1 1.7 5.5 5.2M14.5 14.3c3.6-.8 5.7.8 6 4.2"></path></svg>' },
+          { id: 'companion', label: 'Companions', detail: 'Meet, befriend, care for, and train animals that travel with you.', records: Number(progress.paths?.companion?.records || 0), icon: '<svg viewBox="0 0 24 24"><path d="M8.5 12.5c-2.3 0-4.5 2.1-4.5 4.4 0 2 1.8 3.1 3.6 2.6 1.4-.4 2.6-1.4 4.4-1.4s3 1 4.4 1.4c1.8.5 3.6-.6 3.6-2.6 0-2.3-2.2-4.4-4.5-4.4-1.3 0-2.2.8-3.5.8s-2.2-.8-3.5-.8Z"></path><circle cx="7" cy="8" r="2"></circle><circle cx="12" cy="6.5" r="2"></circle><circle cx="17" cy="8" r="2"></circle></svg>' }
+        ];
+        const nextRoute = routeCards.reduce((lowest, route) => route.records < lowest.records ? route : lowest, routeCards[0]);
+        elements.journeyOverview.innerHTML = `<div class="discoveryJourneyIntro"><span>YOUR WORLD</span><strong>Choose your next direction</strong><small>Everything you discover, make, and share becomes part of one Explorer story.</small><b>Suggested next · ${escapeHtml(nextRoute.label)}</b></div><div class="discoveryJourneyRoutes">${routeCards.map((route) => `<button type="button" data-explorer-route="${escapeHtml(route.id)}"${route.id === nextRoute.id ? ' class="suggested"' : ''}><i class="discoveryJourneyRouteIcon" aria-hidden="true">${route.icon}</i><span class="discoveryJourneyRouteCopy"><strong>${escapeHtml(route.label)}</strong><small>${escapeHtml(route.detail)}</small></span><b class="discoveryJourneyRouteStatus">${route.records ? `${route.records} ${route.records === 1 ? 'memory' : 'memories'}` : 'Begin'}</b><i class="discoveryJourneyRouteArrow" aria-hidden="true">›</i></button>`).join('')}</div>`;
+      }
       const specialtyMarkup = specialties.length
         ? specialties.map(([id, specialty]) => { const definition = definitionById(SPECIALTY_DEFINITIONS, id); const specialtyRank = rankForXp(SPECIALTY_RANKS, specialty.xp); return `<article class="discoveryProgressCard"><strong>${specialtyRank.rank}</strong>${escapeHtml(definition?.label || displayDiscoveryLabel(id))}<small>${escapeHtml(specialtyRank.label)} · ${specialty.meaningfulEvents || 0} meaningful activities</small></article>`; }).join('')
         : '<div class="discoveryEmpty">Complete meaningful activities to begin developing specialties.</div>';
@@ -555,15 +566,16 @@ function createDiscoveryUi(state) {
   function setTab(tab) {
     const normalizedTab = tab === 'gear' || tab === 'progress' ? 'profile' : tab === 'collection' ? 'journal' : tab;
     activeTab = ['today', 'journal', 'guide', 'profile'].includes(normalizedTab) ? normalizedTab : 'today';
-    const tabTitles = { today: 'Today', journal: 'Journal', guide: 'Field Guide', profile: 'My Explorer' };
+    const tabTitles = { today: 'Today', journal: 'Journal', guide: 'Field Guide', profile: 'Explorer Profile' };
     if (elements.title) elements.title.textContent = tabTitles[activeTab] || 'Today';
     document.querySelectorAll('[data-discovery-tab]').forEach((button) => button.classList.toggle('active', button.dataset.discoveryTab === activeTab));
     elements.profileButton?.classList.toggle('active', activeTab === 'profile');
     elements.profileButton?.setAttribute('aria-pressed', activeTab === 'profile' ? 'true' : 'false');
-    elements.profileButton?.setAttribute('aria-label', activeTab === 'profile' ? 'Return to Today' : 'Open My Explorer profile');
+    elements.profileButton?.setAttribute('aria-label', activeTab === 'profile' ? 'Return to Today' : 'Open Explorer Profile');
     document.querySelectorAll('.discoveryPane').forEach((pane) => pane.classList.toggle('active', pane.dataset.discoveryPane === activeTab));
     const activePane = document.querySelector(`.discoveryPane[data-discovery-pane="${activeTab}"]`);
     if (activePane) activePane.scrollTop = 0;
+    globalThis.dispatchEvent?.(new CustomEvent('we3d:explorer-section-opened', { detail: { section: activeTab } }));
     if (activeTab !== 'today') void refreshData();
   }
 
@@ -584,7 +596,7 @@ function createDiscoveryUi(state) {
     }).join(' · ');
     const rewardSummary = [points > 0 ? `Explorer +${points}` : '', specialtySummary].filter(Boolean).join(' · ');
     elements.result.hidden = false;
-    elements.result.innerHTML = `<span class="discoveryResultEyebrow">FIELD RESULT SAVED</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><p>${escapeHtml(collection ? 'Journal updated · Field Guide updated · Added to Backpack' : 'Journal and Field Guide updated')}</p><div class="discoveryResultProgress">${escapeHtml(rewardSummary || 'Observation saved · already credited here')}</div><div class="discoveryResultActions"><button data-result-tab="guide" type="button">Open Field Guide</button>${collection ? '<button data-open-backpack="true" type="button">Open Backpack</button>' : ''}<button data-result-tab="profile" type="button">My Explorer</button></div>`;
+    elements.result.innerHTML = `<span class="discoveryResultEyebrow">FIELD RESULT SAVED</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><p>${escapeHtml(collection ? 'Journal updated · Field Guide updated · Added to Backpack' : 'Journal and Field Guide updated')}</p><div class="discoveryResultProgress">${escapeHtml(rewardSummary || 'Observation saved · already credited here')}</div><div class="discoveryResultActions"><button data-result-tab="guide" type="button">Open Field Guide</button>${collection ? '<button data-open-backpack="true" type="button">Open Backpack</button>' : ''}<button data-result-tab="profile" type="button">Explorer Profile</button></div>`;
     document.querySelector('.discoveryPane[data-discovery-pane="today"]')?.scrollTo?.({ top: 0 });
     return true;
   }
@@ -604,6 +616,28 @@ function createDiscoveryUi(state) {
     document.querySelectorAll('.floatMenu').forEach((menu) => menu.classList.remove('open'));
     setTab('today');
     setOpen(true);
+  });
+  listen(elements.journeyOverview, 'click', (event) => {
+    const button = event.target instanceof Element ? event.target.closest('[data-explorer-route]') : null;
+    if (!button) return;
+    const route = String(button.dataset.explorerRoute || 'today');
+    if (route === 'today') {
+      setTab('today');
+      return;
+    }
+    if (route === 'companion') {
+      setTab('profile');
+      requestAnimationFrame(() => document.querySelector('.discoveryCompanionSection')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }));
+      return;
+    }
+    const destination = {
+      travel: 'travelBtn',
+      create: 'realEstateFloatBtn',
+      community: 'communityBtn'
+    }[route];
+    if (!destination) return;
+    setOpen(false);
+    requestAnimationFrame(() => document.getElementById(destination)?.click());
   });
   listen(elements.promptOpen, 'click', () => {
     if (state.encounterLead?.available) void state.startEncounterLead?.();
@@ -1010,6 +1044,7 @@ function disposeWorldDiscoveryRuntime(appCtx, reason = 'world-reload') {
   appCtx.worldDiscoveryPublication = null;
   appCtx.worldDiscoveryRuntime = null;
   appCtx.toggleWorldDiscoveryJournal = null;
+  appCtx.openWorldDiscoverySection = null;
   appCtx.handleWorldDiscoveryQuickAction = null;
   appCtx.handleWorldDiscoveryToolUse = null;
   if (appCtx.recordFishingExplorerCatch === state.recordFishingExplorerCatch) appCtx.recordFishingExplorerCatch = null;
@@ -1253,11 +1288,11 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     void state.recordExplorerEvent({
       eventId: `event:creation:${detail.worldId}:${detail.revision || Date.now()}`,
       eventType: 'world-edited',
-      sourceSystem: 'world-editor',
+      sourceSystem: 'quick-build',
       sourceId: `${detail.worldId}:${detail.revision || ''}`,
       pathId: 'creation',
       name: 'World edit saved',
-      detail: 'A change to this place was saved in the World Editor.',
+      detail: 'A change to this place was saved with Quick Build.',
       points: 0,
       progressReason: 'creative-history'
     });
@@ -1927,7 +1962,16 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     state.ui.showResult(null);
     state.ui.setTab('today');
     state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
-    if (began) state.ui.setOpen(false);
+    if (began) {
+      state.ui.setOpen(false);
+      emitDiscoveryTelemetry('activity_started', {
+        activityId,
+        discipline: state.actions.find((action) => action.id === activityId)?.discipline,
+        contextBands: telemetryContextBands(),
+        liveGps: appCtx.liveGpsActive === true,
+        result: 'today-route'
+      });
+    }
     return began;
   };
   state.startEncounterLead = async () => {
@@ -2105,6 +2149,13 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
     return true;
   };
+  appCtx.openWorldDiscoverySection = (section = 'today') => {
+    state.ui.setTab(section);
+    state.ui.setOpen(true);
+    state.ui.render(state.actions, state.lastSnapshot, state.activeActivityId);
+    return true;
+  };
+  globalThis.dispatchEvent?.(new CustomEvent('we3d:world-discovery-ready'));
   appCtx.handleWorldDiscoveryToolUse = (toolId) => state.useEquippedFieldTool(toolId);
   state.unregisterCompanionTrainingInteraction = appCtx.registerContextInteraction?.({
     id: 'world_discovery_companion_training',

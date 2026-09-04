@@ -43,6 +43,11 @@ function normalizeLeaderboardEntry(raw, forcedChallengeType = null) {
   const roomsJoined = Number(raw.roomsJoined);
   const artifactsShared = Number(raw.artifactsShared);
   const friendsAdded = Number(raw.friendsAdded);
+  const propertiesOwned = Number(raw.propertiesOwned);
+  const propertiesSold = Number(raw.propertiesSold);
+  const rentalsStarted = Number(raw.rentalsStarted);
+  const rentalsHosted = Number(raw.rentalsHosted);
+  const propertyValue = Number(raw.propertyValue);
   const rankLabel = String(raw.rankLabel || '').slice(0, 48);
   const totalRecords = Number(raw.totalRecords);
   const uniqueDiscoveries = Number(raw.uniqueDiscoveries);
@@ -61,6 +66,8 @@ function normalizeLeaderboardEntry(raw, forcedChallengeType = null) {
     const hasCount = Number.isFinite(paintedBuildings) && paintedBuildings >= 0;
     const hasPct = Number.isFinite(paintedPct) && paintedPct >= 0;
     if (!hasCount && !hasPct) return null;
+  } else if (challenge === 'property') {
+    if (![propertiesOwned, propertiesSold, rentalsStarted, rentalsHosted, propertyValue].some((value) => Number.isFinite(value) && value >= 0)) return null;
   } else if (!Number.isFinite(score) || score < 0) {
     return null;
   }
@@ -90,6 +97,11 @@ function normalizeLeaderboardEntry(raw, forcedChallengeType = null) {
     roomsJoined: Number.isFinite(roomsJoined) ? Math.max(0, Math.round(roomsJoined)) : 0,
     artifactsShared: Number.isFinite(artifactsShared) ? Math.max(0, Math.round(artifactsShared)) : 0,
     friendsAdded: Number.isFinite(friendsAdded) ? Math.max(0, Math.round(friendsAdded)) : 0,
+    propertiesOwned: Number.isFinite(propertiesOwned) ? Math.max(0, Math.round(propertiesOwned)) : 0,
+    propertiesSold: Number.isFinite(propertiesSold) ? Math.max(0, Math.round(propertiesSold)) : 0,
+    rentalsStarted: Number.isFinite(rentalsStarted) ? Math.max(0, Math.round(rentalsStarted)) : 0,
+    rentalsHosted: Number.isFinite(rentalsHosted) ? Math.max(0, Math.round(rentalsHosted)) : 0,
+    propertyValue: Number.isFinite(propertyValue) ? Math.max(0, Math.round(propertyValue)) : 0,
     rankLabel,
     totalRecords: Number.isFinite(totalRecords) ? Math.max(0, Math.round(totalRecords)) : 0,
     uniqueDiscoveries: Number.isFinite(uniqueDiscoveries) ? Math.max(0, Math.round(uniqueDiscoveries)) : 0,
@@ -158,7 +170,10 @@ function renderLeaderboard(entries) {
       locationLine = `${safeText(entry.species || 'Fish')} | ${Number(entry.weightKg || 0).toFixed(2)} kg | ${Number(entry.lengthCm || 0).toFixed(1)} cm | ${safeText(entry.location)}`;
     } else if (challengeType === 'explorer') {
       metric = `${Math.max(0, Number(entry.score) || 0)} pts`;
-      locationLine = `${safeText(entry.rankLabel || 'Trailhead')} | ${entry.totalRecords || 0} journal records | ${entry.uniqueDiscoveries || 0} discoveries | ${entry.regionsVisited || 0} regions`;
+      locationLine = `${entry.roomsJoined || 0} rooms | ${entry.artifactsShared || 0} shared finds | ${entry.friendsAdded || 0} connections`;
+    } else if (challengeType === 'property') {
+      metric = `${Math.max(0, Number(entry.propertyValue) || 0).toLocaleString()} cr`;
+      locationLine = `${entry.propertiesOwned || 0} owned | ${entry.propertiesSold || 0} sold | ${entry.rentalsHosted || 0} rentals hosted`;
     } else if (challengeType === 'deflock') {
       metric = `${Math.max(0, Number(entry.score) || 0)} pts`;
       locationLine = `${entry.disabledCameras || 0}/${entry.totalCameras || 0} virtual cameras | ${((Number(entry.timeMs) || 0) / 1000).toFixed(1)}s | ${safeText(entry.location)}`;

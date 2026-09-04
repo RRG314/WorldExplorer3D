@@ -1,4 +1,4 @@
-import { getAstronomicalBody, normalizeAstronomicalBodyId } from '../../astronomy/body-catalog.js?v=2';
+import { getAstronomicalBody, normalizeAstronomicalBodyId } from '../../astronomy/body-catalog.js?v=3';
 import {
   bodyFixedFrameId,
   normalizeLatitudeDeg,
