@@ -13,7 +13,7 @@ import {
   UNIVERSE_GUIDANCE_MODE
 } from './course-authority.js?v=3';
 import { SPACE_CONSTANTS } from '../space/constants.js?v=3';
-import { initDestinationMissionRuntime, updateDestinationMissionRuntime } from './mission-runtime.js?v=7';
+import { initDestinationMissionRuntime, updateDestinationMissionRuntime } from './mission-runtime.js?v=8';
 import { createUniverseSky, setUniverseSkyFrame, updateUniverseSky } from './sky-field.js?v=6';
 import { releaseGaiaSkyLayers } from '../sky/gaia-catalog.js?v=4';
 import {

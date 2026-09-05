@@ -4,7 +4,7 @@ import {
   attachCuratedAnimalVisual,
   disposeCuratedAnimal,
   updateCuratedAnimalAnimation
-} from './curated-animal-visual.js?v=1';
+} from './curated-animal-visual.js?v=2';
 import { sampleDiscoverySurfaceY } from './surface.js?v=1';
 import { COMPANION_CATALOG } from './catalog.js?v=4';
 

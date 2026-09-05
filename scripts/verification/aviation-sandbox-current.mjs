@@ -115,6 +115,7 @@ try {
   const freefall = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.());
   await page.keyboard.press('Space');
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.parachute?.deployed === true);
+  const deployed = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.());
   const canopyStart = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor);
   await page.keyboard.down('ArrowUp');
   await page.keyboard.down('ArrowLeft');
@@ -141,14 +142,18 @@ try {
       aerodynamicRotation?.pitch > aerodynamicRotation?.flightPathAngle,
     enteredThroughVisiblePrompt: beforeJump?.identity?.catalogId === 'expedition-prop',
     manualTakeoffReachedSafeHeight: beforeJump?.contact?.grounded === false && beforeJump.position.y > 20,
-    airbornePoseHandoff: Math.hypot(
-      Number(freefall.activeActor?.position?.x) - Number(exitStart.position.x),
-      Number(freefall.activeActor?.position?.z) - Number(exitStart.position.z)
-    ) < 8,
+    airbornePoseHandoff: freefall.urbanSandbox?.parachute?.handoffSource === 'aircraft_exit' &&
+      Number(freefall.urbanSandbox?.parachute?.handoffDistance) < .1,
     parachuteAutoEquipped: freefall.urbanSandbox?.equipment?.equippedId === 'parachute',
+    parachutePackReadyInFreefall: freefall.urbanSandbox?.parachute?.visuals?.ready === true &&
+      freefall.urbanSandbox?.parachute?.visuals?.packVisible === true,
+    parachuteCanopyVisibleWhenDeployed: deployed.urbanSandbox?.parachute?.visuals?.canopyVisible === true,
     unmannedAircraftContinued: freefall.aviation?.unmannedAircraftCount === 1,
     canopySteered: horizontalCanopyTravel > 1,
     landedBackInWalking: landed.modes?.walking === true && landed.urbanSandbox?.parachute?.skydiving === false,
+    parachuteHiddenAfterLanding: landed.urbanSandbox?.parachute?.visuals?.ready === false &&
+      landed.urbanSandbox?.parachute?.visuals?.packVisible === false &&
+      landed.urbanSandbox?.parachute?.visuals?.canopyVisible === false,
     noRuntimeErrors: (landed.runtimeErrors || []).length === 0,
     noPageErrors: pageErrors.length === 0,
     noFailedLocalResources: localFailures.length === 0
@@ -166,6 +171,7 @@ try {
     beforeJump,
     exitStart,
     freefall: { actor: freefall.activeActor, parachute: freefall.urbanSandbox?.parachute, aviation: freefall.aviation },
+    deployed: { actor: deployed.activeActor, parachute: deployed.urbanSandbox?.parachute },
     canopyStart,
     canopySteered,
     horizontalCanopyTravel,

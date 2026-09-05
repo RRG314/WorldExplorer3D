@@ -112,7 +112,9 @@ test('aviation, parachute, companion, and world lifecycle use existing shared au
   assert.match(walking, /source: 'building_drop'/);
   assert.match(urban, /setParachuteReady\?\.\(false\)/);
   assert.match(urban, /setParachuteDeployed\?\.\(false\)/);
+  assert.match(urban, /handoffDistance/);
   assert.match(visuals, /parachutePack\.visible = parachuteReady \|\| parachuteCanopy\.visible/);
+  assert.match(visuals, /parachuteSnapshot\(\)/);
   assert.match(companion, /mode === 'plane'.*vehicle-occupant/);
   assert.match(lifecycle, /startAviationRuntime/);
   assert.match(lifecycle, /disposeAviationRuntime/);

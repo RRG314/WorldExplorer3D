@@ -2,7 +2,7 @@ import { createLifecycleScope } from '../runtime/lifecycle-scope.js?v=2';
 import { describeArCapability, detectArCapabilities } from './capabilities.js?v=1';
 import { evaluateArEligibility, getArEligibilityRegistrySnapshot } from './eligibility.js?v=2';
 import { compileWaterfowlChallenge, createWaterfowlChallengeSession } from './field-challenge.js?v=2';
-import { createArPresentation } from './presentation.js?v=6';
+import { createArPresentation } from './presentation.js?v=7';
 
 let activePlatform = null;
 

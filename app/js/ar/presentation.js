@@ -5,7 +5,7 @@ import {
   attachCuratedAnimalVisual,
   disposeCuratedAnimal,
   updateCuratedAnimalAnimation
-} from '../discovery/curated-animal-visual.js?v=1';
+} from '../discovery/curated-animal-visual.js?v=2';
 
 const ANIMAL_RECORD_SPECIES = Object.freeze({
   'wetland-waterbird-clue': 'mallard',

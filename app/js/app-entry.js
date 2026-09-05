@@ -31,7 +31,7 @@ import './travel-mode.js?v=28';
 import { initBoatMode } from './boat-mode.js?v=58';
 import './sky.js?v=89';
 import './weather.js?v=11';
-import './runtime/on-demand-modes.js?v=50';
+import './runtime/on-demand-modes.js?v=51';
 import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=179';
 import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=10';
 import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=1';
@@ -43,7 +43,7 @@ import './planetary/astronaut.js?v=2';
 import './planetary/sky-orientation.js?v=14';
 import './planetary/moon-sky.js?v=1';
 import './planetary/tracks.js?v=2';
-import './planetary/field-activities.js?v=10';
+import './planetary/field-activities.js?v=11';
 import './game.js?v=69';
 import './input.js?v=75';
 import './hud.js?v=103';
@@ -139,7 +139,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'augmented-reality', category: 'presentation',
         load: async () => {
-            const mod = await import('./ar/session-service.js?v=8');
+            const mod = await import('./ar/session-service.js?v=9');
             mod.initArPlatform?.(appCtx);
             return mod;
         }

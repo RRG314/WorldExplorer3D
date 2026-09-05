@@ -4,7 +4,7 @@ import {
   attachCuratedAnimalVisual,
   disposeCuratedAnimal,
   updateCuratedAnimalAnimation
-} from './curated-animal-visual.js?v=1';
+} from './curated-animal-visual.js?v=2';
 import { sampleDiscoverySurfaceY } from './surface.js?v=1';
 
 const ACTIVITY_TOOL = Object.freeze({

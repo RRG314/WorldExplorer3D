@@ -311,7 +311,7 @@ const MODEL_ASSET_CATALOG = Object.freeze([
     label: 'Trail Hound Husky',
     url: '/app/assets/models/animals/trail-hound-husky-v1.glb',
     roles: Object.freeze(['active-companion-animal', 'nearby-wildlife-animal']),
-    speciesIds: Object.freeze(['trail-hound', 'field-retriever']),
+    speciesIds: Object.freeze(['trail-hound', 'field-retriever', 'park-terrier']),
     license: 'CC0-1.0',
     sourceUrl: 'https://quaternius.com/packs/ultimateanimatedanimals.html',
     attribution: 'Ultimate Animated Animal Pack — Husky by Quaternius',
@@ -322,24 +322,6 @@ const MODEL_ASSET_CATALOG = Object.freeze([
     animationClips: Object.freeze({ idle: 'Idle', walk: 'Walk', run: 'Gallop', eat: 'Eating', jump: 'Gallop_Jump' }),
     instancePolicy: Object.freeze({ geometry: 'shared', materials: 'clone' }),
     budgets: Object.freeze({ bytes: 1_850_000, triangles: 2_000, maxInstances: 4, textureEdgePixels: 0 })
-  }),
-  Object.freeze({
-    schemaVersion: MODEL_ASSET_SCHEMA_VERSION,
-    id: 'animal-park-terrier-shiba-inu-v1',
-    label: 'Park Terrier Shiba Inu',
-    url: '/app/assets/models/animals/park-terrier-shiba-inu-v1.glb',
-    roles: Object.freeze(['active-companion-animal', 'nearby-wildlife-animal']),
-    speciesIds: Object.freeze(['park-terrier']),
-    license: 'CC0-1.0',
-    sourceUrl: 'https://quaternius.com/packs/ultimateanimatedanimals.html',
-    attribution: 'Ultimate Animated Animal Pack — Shiba Inu by Quaternius',
-    dimensionsMeters: Object.freeze({ height: 1.05 }),
-    sourceUpAxis: 'y',
-    sourceForwardAxis: 'z',
-    collisionPolicy: 'existing-animal-interaction-envelope',
-    animationClips: Object.freeze({ idle: 'Idle', walk: 'Walk', run: 'Gallop', eat: 'Eating', jump: 'Gallop_Jump' }),
-    instancePolicy: Object.freeze({ geometry: 'shared', materials: 'clone' }),
-    budgets: Object.freeze({ bytes: 1_750_000, triangles: 2_050, maxInstances: 4, textureEdgePixels: 0 })
   }),
   Object.freeze({
     schemaVersion: MODEL_ASSET_SCHEMA_VERSION,

@@ -208,11 +208,10 @@ test('curated characters attach beneath existing gameplay roots and retain proce
   assert.match(loader, /removeFromParent/);
 });
 
-test('seven bundled animal models provide species-correct companion and wildlife upgrades', () => {
+test('six bundled animal models provide cohesive companion and wildlife upgrades', () => {
   const assets = modelAssetsForRole('nearby-wildlife-animal');
   assert.deepEqual(assets.map((asset) => asset.id), [
     'animal-trail-hound-husky-v1',
-    'animal-park-terrier-shiba-inu-v1',
     'animal-pasture-cow-v1',
     'animal-field-horse-v1',
     'animal-heritage-pig-v1',
@@ -222,7 +221,7 @@ test('seven bundled animal models provide species-correct companion and wildlife
   assert.deepEqual(CURATED_ANIMAL_ASSET_BY_SPECIES, {
     'trail-hound': 'animal-trail-hound-husky-v1',
     'field-retriever': 'animal-trail-hound-husky-v1',
-    'park-terrier': 'animal-park-terrier-shiba-inu-v1',
+    'park-terrier': 'animal-trail-hound-husky-v1',
     'pasture-cow': 'animal-pasture-cow-v1',
     'heritage-pig': 'animal-heritage-pig-v1',
     'field-horse': 'animal-field-horse-v1',
@@ -231,7 +230,6 @@ test('seven bundled animal models provide species-correct companion and wildlife
   });
   const expectations = new Map([
     ['animal-trail-hound-husky-v1', { hash: 'b29929034d1cdb3dca8c57e92d7cdb9b89bbaa0b8489561b904692995648d79e', triangles: 1920, meshes: ['Cube'] }],
-    ['animal-park-terrier-shiba-inu-v1', { hash: 'c92467b05e0e9491c9bc46292422d4fa3f5892ce2635148332b82519e63b81be', triangles: 1950, meshes: ['Cube'] }],
     ['animal-pasture-cow-v1', { hash: '357383dcbd435cf7089f985487bb65f0b3aa1f713aefc6223e383ee9f9d2aca0', triangles: 2450, meshes: ['Cube'] }],
     ['animal-field-horse-v1', { hash: '0470f0b4d26f2533d461705c4ba3a4dc9754d95d815428bfb274ba85b7597cce', triangles: 2182, meshes: ['Cube'] }],
     ['animal-heritage-pig-v1', { hash: 'ed0697fed906a25a4ecec0d620c90757f6685cfc2067a7370d66bb819788d88b', triangles: 562, meshes: [null] }],
@@ -269,6 +267,7 @@ test('curated animals remain visual adapters over companion and wildlife authori
   assert.match(procedural, /defaultAnimalFallback\s*=\s*true/);
   assert.match(adapter, /setFallbackVisible\(host, false\)/);
   assert.match(adapter, /setFallbackVisible\(host, true\)/);
+  assert.ok(adapter.indexOf('setFallbackVisible(host, false)') < adapter.indexOf('await loadModelAsset'));
   assert.match(adapter, /curatedAnimalLoadToken/);
   assert.match(adapter, /disposeCuratedAnimal/);
   assert.equal(CURATED_ANIMAL_ASSET_BY_SPECIES['harbor-cat'], undefined);

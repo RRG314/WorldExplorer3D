@@ -3,7 +3,7 @@ import { loadModelAsset } from '../assets/model-asset-runtime.js?v=9';
 const CURATED_ANIMAL_ASSET_BY_SPECIES = Object.freeze({
   'trail-hound': 'animal-trail-hound-husky-v1',
   'field-retriever': 'animal-trail-hound-husky-v1',
-  'park-terrier': 'animal-park-terrier-shiba-inu-v1',
+  'park-terrier': 'animal-trail-hound-husky-v1',
   'pasture-cow': 'animal-pasture-cow-v1',
   'heritage-pig': 'animal-heritage-pig-v1',
   'field-horse': 'animal-field-horse-v1',
@@ -116,6 +116,10 @@ async function attachCuratedAnimalVisual(THREE, host, options = {}) {
   const loadToken = {};
   host.userData.curatedAnimalLoadStarted = true;
   host.userData.curatedAnimalLoadToken = loadToken;
+  // Curated species own normal presentation from the start of the request.
+  // The procedural animal is a load-error safety net, not a visible loading
+  // style that flashes before the approved model arrives.
+  setFallbackVisible(host, false);
   try {
     const instance = await loadModelAsset(THREE, assetId, { signal: options.signal });
     if (options.isCurrent && !options.isCurrent()) {
@@ -123,6 +127,7 @@ async function attachCuratedAnimalVisual(THREE, host, options = {}) {
       if (host.userData.curatedAnimalLoadToken === loadToken) {
         host.userData.curatedAnimalLoadStarted = false;
         delete host.userData.curatedAnimalLoadToken;
+        setFallbackVisible(host, true);
       }
       return false;
     }

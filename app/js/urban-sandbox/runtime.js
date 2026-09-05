@@ -5,7 +5,7 @@ import { applyTransportDamage } from '../transport/damage-model.js?v=1';
 import { createCivicResponseModel } from './civic-response-model.js?v=3';
 import { ensurePlayerBackpackInventory } from './equipment-model.js?v=9';
 import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=22';
-import { createEquipmentVisuals } from './equipment-visuals.js?v=5';
+import { createEquipmentVisuals } from './equipment-visuals.js?v=6';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=8';
 import { nearestMappedFacility } from './facility-model.js?v=3';
 import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=4';
@@ -2528,7 +2528,16 @@ function snapshot(state) {
       bank: Number(appCtx.Walk?.state?.walker?.skydivingFlight?.bank || 0),
       horizontalSpeed: Number(appCtx.Walk?.state?.walker?.skydivingFlight?.horizontalSpeed || 0),
       verticalSpeed: Number(appCtx.Walk?.state?.walker?.skydivingFlight?.verticalSpeed || 0),
-      profileId: String(appCtx.Walk?.state?.walker?.skydivingFlight?.profileId || '')
+      profileId: String(appCtx.Walk?.state?.walker?.skydivingFlight?.profileId || ''),
+      handoffSource: String(state.parachute?.handoffSource || ''),
+      handoffDistance: Number.isFinite(state.parachute?.handoffDistance)
+        ? Number(state.parachute.handoffDistance)
+        : null,
+      visuals: state.equipmentVisual?.parachuteSnapshot?.() || Object.freeze({
+        ready: false,
+        packVisible: false,
+        canopyVisible: false
+      })
     }),
     civicResponse: civicSnapshot(state),
     responders: state.responders?.snapshot?.() || null,
@@ -2829,7 +2838,15 @@ function startUrbanSandboxRuntime(options = {}) {
     equipmentVisual: createEquipmentVisuals(THREE, appCtx.Walk?.state?.characterMesh),
     equipmentRuntime: null,
     equipmentOpen: false,
-    parachute: { deployed: false, deployedAt: 0, landedAt: 0, skydiving: false, automaticEquip: false },
+    parachute: {
+      deployed: false,
+      deployedAt: 0,
+      landedAt: 0,
+      skydiving: false,
+      automaticEquip: false,
+      handoffSource: '',
+      handoffDistance: null
+    },
     playerCondition: 1,
     custody: null,
     flashlight,
@@ -3071,6 +3088,16 @@ function startUrbanSandboxRuntime(options = {}) {
   appCtx.equipUrbanEquipmentSlot = (slot) => equipSlot(state, slot);
   appCtx.handleUrbanEquipmentUse = () => useEquipped(state);
   state.prepareAirborneParachute = (options = {}) => {
+    const sourcePosition = options.sourcePosition;
+    const walker = appCtx.Walk?.state?.walker;
+    state.parachute.handoffSource = String(options.source || '');
+    state.parachute.handoffDistance = sourcePosition && walker
+      ? Math.hypot(
+        Number(walker.x || 0) - Number(sourcePosition.x || 0),
+        Number(walker.y || 0) - Number(sourcePosition.y || 0),
+        Number(walker.z || 0) - Number(sourcePosition.z || 0)
+      )
+      : null;
     state.parachute.skydiving = true;
     state.parachute.automaticEquip = options.autoEquip === true;
     if (options.autoEquip === true && state.equipment.has?.('parachute')) {

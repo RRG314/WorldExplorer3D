@@ -202,6 +202,13 @@ function createEquipmentVisuals(THREE, characterMesh) {
     actionSnapshot() {
       return useAction ? Object.freeze({ id: useAction.id, category: useAction.category, progress: Math.min(1, useAction.elapsed / useAction.duration) }) : null;
     },
+    parachuteSnapshot() {
+      return Object.freeze({
+        ready: parachuteReady,
+        packVisible: parachutePack.visible === true,
+        canopyVisible: parachuteCanopy.visible === true
+      });
+    },
     dispose() {
       root.userData.disposed = true;
       items.forEach((group) => disposeCuratedEquipmentVisual(group));

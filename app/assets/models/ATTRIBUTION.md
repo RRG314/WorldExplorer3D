@@ -129,15 +129,15 @@ Curated Companion and Wildlife Animals
 
 The Ultimate Animated Animal Pack is published by Quaternius under CC0 1.0. Its `License.txt` is Google Drive file ID `1F2uy8T2fRpdc6gZ4mnS02_C2E63WvKtn`: https://creativecommons.org/publicdomain/zero/1.0/
 
-- Files: `animals/trail-hound-husky-v1.glb`, `animals/park-terrier-shiba-inu-v1.glb`, `animals/pasture-cow-v1.glb`, `animals/field-horse-v1.glb`, `animals/white-tailed-deer-v1.glb`, and `animals/woodland-fox-v1.glb`
-- Upstream titles: Ultimate Animated Animal Pack — Husky, Shiba Inu, Cow, Horse, Deer, and Fox
+- Files: `animals/trail-hound-husky-v1.glb`, `animals/pasture-cow-v1.glb`, `animals/field-horse-v1.glb`, `animals/white-tailed-deer-v1.glb`, and `animals/woodland-fox-v1.glb`
+- Upstream titles: Ultimate Animated Animal Pack — Husky, Cow, Horse, Deer, and Fox
 - Creator: Quaternius
 - Source: https://quaternius.com/packs/ultimateanimatedanimals.html
-- Source file identities: Google Drive glTF file IDs `1oYn47mfq9JAdkJJDcUftbhHNsgQ_CWdt`, `1XWUVbmMbiG9E90OqrumueD_pBdnYdyHZ`, `1lS3t1Sof0FVne1C1WXfdX48qaHES_pDG`, `1hbtY8kxnXiPdwYGVY7rWRgU0jl_-Q-LG`, `1iGpXKrqYGyZCPGHPPSuDAoKnOXLhXJ0q`, and `1z-CWoUC2vJxrqgGFTYlMaywpE1ooV-bA`, respectively.
+- Source file identities: Google Drive glTF file IDs `1oYn47mfq9JAdkJJDcUftbhHNsgQ_CWdt`, `1lS3t1Sof0FVne1C1WXfdX48qaHES_pDG`, `1hbtY8kxnXiPdwYGVY7rWRgU0jl_-Q-LG`, `1iGpXKrqYGyZCPGHPPSuDAoKnOXLhXJ0q`, and `1z-CWoUC2vJxrqgGFTYlMaywpE1ooV-bA`, respectively.
 - License: Creative Commons Zero v1.0 Universal (CC0 1.0).
-- Bundled SHA-256 values: `b29929034d1cdb3dca8c57e92d7cdb9b89bbaa0b8489561b904692995648d79e`, `c92467b05e0e9491c9bc46292422d4fa3f5892ce2635148332b82519e63b81be`, `357383dcbd435cf7089f985487bb65f0b3aa1f713aefc6223e383ee9f9d2aca0`, `0470f0b4d26f2533d461705c4ba3a4dc9754d95d815428bfb274ba85b7597cce`, `75d88a0aa2f0569f8fbde28e4f8b0746b0adcab03018bac88e9326071dcdd1d6`, and `71e28dc471e8d0018ed2935273e63517860bb4ff84e6784320d6c5c650161086`, respectively.
+- Bundled SHA-256 values: `b29929034d1cdb3dca8c57e92d7cdb9b89bbaa0b8489561b904692995648d79e`, `357383dcbd435cf7089f985487bb65f0b3aa1f713aefc6223e383ee9f9d2aca0`, `0470f0b4d26f2533d461705c4ba3a4dc9754d95d815428bfb274ba85b7597cce`, `75d88a0aa2f0569f8fbde28e4f8b0746b0adcab03018bac88e9326071dcdd1d6`, and `71e28dc471e8d0018ed2935273e63517860bb4ff84e6784320d6c5c650161086`, respectively.
 - Processing: repacked from embedded-buffer glTF to extension-free, texture-free GLB with glTF-Transform 4.5.0. Geometry, materials, skinning, and all supplied animation clips were retained.
-- Roles: Husky serves Trail Hound and Field Retriever; Shiba Inu serves Park Terrier; Cow, Horse, Deer, and Fox serve their matching catalog species. Existing companion identity, taming, care, following, progression, vehicle travel, ambient ecology, movement, interaction, collision, and lifecycle systems remain authoritative. Curated files only replace their visual and animation presentation.
+- Roles: the approved Husky presentation serves every dog identity (Trail Hound, Field Retriever, and Park Terrier); Cow, Horse, Deer, and Fox serve their matching catalog species. Existing companion identity, taming, care, following, progression, vehicle travel, ambient ecology, movement, interaction, collision, and lifecycle systems remain authoritative. Curated files only replace their visual and animation presentation.
 
 The Farm Animal Pack is published by Quaternius under CC0 1.0. Its `License.txt` is Google Drive file ID `1tOEbeiWqvuTIfFzyZTe92NUdGNAZSOHL`: https://creativecommons.org/publicdomain/zero/1.0/
 

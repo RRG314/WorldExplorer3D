@@ -3,7 +3,7 @@ import { AVIATION_FLEET_CATALOG, getAviationCatalogEntry } from './aviation-cata
 import { aircraftGroundOffset, createAircraftVisual, updateAircraftVisual } from './aircraft-visual-recipe.js?v=11';
 import { applyTransportDamage } from './damage-model.js?v=1';
 import { ENTITY_LIFECYCLE_MS, lifecycleExpired, markLifecycleStart } from '../runtime/entity-lifecycle-policy.js?v=1';
-import { evaluateAircraftSkydivingExit } from '../urban-sandbox/parachute-model.js?v=6';
+import { evaluateAircraftSkydivingExit } from '../urban-sandbox/parachute-model.js?v=7';
 import { advanceAmbientRouteMotion, ambientRouteSnapshot, createAmbientRouteMotion } from './ambient-route-motion.js?v=1';
 import { compileAirportOperationalLayout, offsetPoint } from './airport-layout.js?v=6';
 import { createAirportHub } from './airport-hub.js?v=4';
@@ -569,7 +569,8 @@ function beginSkydiving(runtime, candidate) {
   appCtx.prepareAirborneParachute?.({
     autoEquip: eligibility.autoEquip,
     clearance: eligibility.clearance,
-    source: 'aircraft_exit'
+    source: 'aircraft_exit',
+    sourcePosition: { x: snapshot.x, y: snapshot.y, z: snapshot.z }
   });
   appCtx.updateControlsModeUI?.();
   return true;

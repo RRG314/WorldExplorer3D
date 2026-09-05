@@ -106,7 +106,7 @@ function analysisOutcomeOptions(mission, state = missionStore?.get?.(mission)) {
 
 async function recordDestinationExplorerEvent(record) {
   if (typeof activeContext?.recordExplorerEvent === 'function') return activeContext.recordExplorerEvent(record);
-  const { createIndexedDbDiscoveryProfileStore } = await import('../discovery/profile-store.js?v=4');
+  const { createIndexedDbDiscoveryProfileStore } = await import('../discovery/profile-store.js?v=5');
   const store = activeContext?.discoveryProfileStore || createIndexedDbDiscoveryProfileStore();
   if (activeContext) activeContext.discoveryProfileStore = store;
   return store.recordExplorerEvent(record);
