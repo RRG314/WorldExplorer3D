@@ -149,6 +149,8 @@ export function resetWorldForReload(options = {}) {
   appCtx.curatedLandmarkMetrics = null;
   appCtx.mappedLandmarkMetrics = null;
   appCtx.deferredTransportLandmarkPublishers = [];
+  appCtx.pendingPublishedTransportSurfaceControls = [];
+  appCtx.publishedTransportSurfaceControlApplication = null;
 
   disposeSceneMeshes(appCtx.streetFurnitureMeshes);
   appCtx.replaceWorldCollection('streetFurnitureMeshes');

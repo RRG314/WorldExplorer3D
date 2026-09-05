@@ -10,7 +10,7 @@ import {
 import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=27";
 import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=7";
 import { createWorldLoadPlan } from "../earth-core/world-load-plan.js?v=1";
-import { diagnoseDistrictGroundSource, prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=15";
+import { diagnoseDistrictGroundSource, prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=16";
 import { shouldLoadDetailedBuildings } from "./settlement-density-policy.js?v=1";
 import {
   waitForInitialTerrain,
@@ -31,7 +31,7 @@ import {
 import {
   beginFixedRegionalStructureLoad,
   completeFixedRegionalStructureLoad
-} from "./fixed-regional-structures.js?v=15";
+} from "./fixed-regional-structures.js?v=16";
 import { reviewedCivicFacilitiesForLocation } from "./regional-civic-facilities.js?v=2";
 import { compileTransportFacilityGraph } from "../transport/facility-compiler.js?v=4";
 import { createTransportFacilityVisuals } from "../transport/facility-visuals.js?v=7";

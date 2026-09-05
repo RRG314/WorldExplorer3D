@@ -720,6 +720,27 @@ function transportStructureSnapshot() {
         z: numberOrNull(Number(point?.z)),
         terrainMode: String(road?.structureSemantics?.terrainMode || ''),
         verticalOrder: Number(road?.structureSemantics?.verticalOrder || 0),
+        assembly: {
+          width: numberOrNull(Number(road?.transportStructureAssembly?.width)),
+          total: numberOrNull(Number(road?.transportStructureAssembly?.total)),
+          baseThickness: numberOrNull(Number(road?.transportStructureAssembly?.baseThickness)),
+          surfaceSamples: Number(road?.transportStructureAssembly?.surfaceSamples?.length || 0),
+          supportStations: Number(road?.transportStructureAssembly?.supportStations?.length || 0),
+          terminalSupports: Number(road?.transportStructureAssembly?.terminalSupports?.length || 0),
+          abutments: Number(road?.transportStructureAssembly?.abutments?.length || 0),
+          endpointSamples: (road?.transportStructureAssembly?.surfaceSamples || [])
+            .filter((sample) => atStart
+              ? Number(sample?.distance) <= 18
+              : Number(road?.transportStructureAssembly?.total) - Number(sample?.distance) <= 18)
+            .map((sample) => ({
+              distance: numberOrNull(Number(sample?.distance)),
+              surfaceY: numberOrNull(Number(sample?.y)),
+              terrainY: numberOrNull(Number(sample?.terrainY)),
+              clearance: numberOrNull(Number(sample?.undersideClearance)),
+              thickness: numberOrNull(Number(sample?.thickness)),
+              onMappedWater: sample?.onMappedWater === true
+            }))
+        },
         abutmentPublished,
         terminalSupportPublished,
         supportWithinEndpointRun,

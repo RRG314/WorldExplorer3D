@@ -271,8 +271,14 @@ export function buildFixedRegionalStructureQuery(bounds, timeoutSeconds = 20) {
 
 export function retainExactRegionalStructures(data) {
   const elements = Array.isArray(data?.elements) ? data.elements : [];
+  const publishedSurfaceControlsByFeatureId = new Map();
+  for (const control of data?._transportSurfaceControls || []) {
+    for (const sourceFeatureId of control?.match?.sourceFeatureIds || []) {
+      publishedSurfaceControlsByFeatureId.set(String(sourceFeatureId), String(control?.id || ''));
+    }
+  }
   const structureWays = elements
-    .filter(isDriveableStructureWay)
+    .filter(isDriveableStructureWay);
   const structuresByEndpoint = new Map();
   for (const way of structureWays) {
     for (const nodeId of [way.nodes[0], way.nodes.at(-1)]) {
@@ -315,7 +321,10 @@ export function retainExactRegionalStructures(data) {
     if (candidates[0]) connectorSet.add(candidates[0]);
   }
   const connectorWays = [...connectorSet];
-  const ways = [...structureWays, ...connectorWays].map((way) => ({
+  const ways = [...structureWays, ...connectorWays].map((way) => {
+    const sourceFeatureId = String(way.tags?._sourceFeatureId || `osm:way:${way.id}`);
+    const publishedSurfaceControlId = publishedSurfaceControlsByFeatureId.get(sourceFeatureId) || '';
+    return ({
       ...way,
       tags: {
         ...way.tags,
@@ -324,9 +333,13 @@ export function retainExactRegionalStructures(data) {
           ? { _fixedRegionalStructure: 'exact' }
           : { _fixedRegionalStructureConnector: 'exact' }),
         _regionalContext: 'fixed-location',
-        _sourceFeatureId: way.tags?._sourceFeatureId || `osm:way:${way.id}`
+        _sourceFeatureId: sourceFeatureId,
+        ...(publishedSurfaceControlId
+          ? { _publishedTransportSurfaceControlId: publishedSurfaceControlId }
+          : {})
       }
-    }));
+    });
+  });
   const nodeIds = new Set(ways.flatMap((way) => way.nodes));
   const nodes = elements.filter(
     (element) => element?.type === 'node' && nodeIds.has(element.id)

@@ -321,6 +321,17 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     }
     await yieldToMainThread();
   }
+  // Water masks and compiled cut/fill corridors change the physical terrain
+  // beneath bridge ends. Refresh support geometry against that final surface
+  // before publishing meshes so a road cannot become unsupported only after
+  // the terrain rebuild lowers the ground below it.
+  if (typeof appCtx.refreshTransportStructureAssembliesForPublishedTerrain === 'function') {
+    measure(
+      'refreshPublishedTerrainStructureAssemblies',
+      () => appCtx.refreshTransportStructureAssembliesForPublishedTerrain()
+    );
+    await yieldToMainThread();
+  }
 
   measure('disposePreviousMeshes', () => {
     appCtx.roadMeshes.forEach((mesh) => {

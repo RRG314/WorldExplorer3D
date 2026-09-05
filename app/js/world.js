@@ -63,7 +63,7 @@ import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
   resetWorldForReload
-} from "./world/load-reset.js?v=18";
+} from "./world/load-reset.js?v=19";
 import {
   prepareWorldFeatureSelections
 } from "./world/load-budgeting.js?v=19";
@@ -100,7 +100,7 @@ import {
   limitWaysByDistance,
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
-import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=39";
+import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=40";
 import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=55";
 import {
   batchLanduseMeshes,
@@ -159,10 +159,11 @@ import {
   initWorldStructureAwareness,
   refreshStructureAwareFeatureProfiles,
   refreshStructureAwareFeatureProfilesCooperatively,
+  refreshTransportStructureAssembliesForPublishedTerrain,
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
-} from "./world/structure-aware.js?v=50";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=221";
+} from "./world/structure-aware.js?v=51";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=222";
 import {
   fetchShortbreadBuildingData,
   fetchShortbreadWorldData,
@@ -269,6 +270,7 @@ const { loadRoads: loadOsmRoads, isVehicleRoad, isInsideWaterArea } = createWorl
   recordWorldLoadWarning,
   refreshStructureAwareFeatureProfiles,
   refreshStructureAwareFeatureProfilesCooperatively,
+  refreshTransportStructureAssembliesForPublishedTerrain,
   registerWaterWaveMaterial,
   resetWorldForReload,
   resetWorldFurnitureCaches,
@@ -457,6 +459,7 @@ Object.assign(appCtx, {
   registerWaterWaveMaterial,
   refreshStructureAwareFeatureProfiles,
   refreshStructureAwareFeatureProfilesCooperatively,
+  refreshTransportStructureAssembliesForPublishedTerrain,
   refreshAuthoritativeMapData,
   releaseEarthWorldForTitle,
   resolveSafeWorldSpawn,
@@ -491,6 +494,7 @@ export {
   registerWaterWaveMaterial,
   refreshStructureAwareFeatureProfiles,
   refreshStructureAwareFeatureProfilesCooperatively,
+  refreshTransportStructureAssembliesForPublishedTerrain,
   refreshAuthoritativeMapData,
   resolveSafeWorldSpawn,
   sampleFeatureSurfaceY,
