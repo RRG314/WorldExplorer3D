@@ -6,6 +6,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { getModelAsset, modelAssetsForRole } from '../app/js/assets/model-asset-catalog.js';
+import { CURATED_ANIMAL_ASSET_BY_SPECIES } from '../app/js/discovery/curated-animal-visual.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -17,6 +18,14 @@ function readGlbAssetMetadata(file) {
     bytes,
     json: JSON.parse(bytes.subarray(20, 20 + jsonLength).toString('utf8').replace(/\0+$/, ''))
   };
+}
+
+function triangleCount(json) {
+  return (json.meshes || []).reduce((total, mesh) => total + (mesh.primitives || []).reduce((meshTotal, primitive) => {
+    const accessorIndex = primitive.indices ?? primitive.attributes?.POSITION;
+    const count = json.accessors?.[accessorIndex]?.count || 0;
+    return meshTotal + count / 3;
+  }, 0), 0);
 }
 
 test('the player road vehicle has one bundled curated model and keeps the existing collision authority', () => {
@@ -197,6 +206,90 @@ test('curated characters attach beneath existing gameplay roots and retain proce
   assert.match(loader, /object\.skeleton\s*=\s*sourceMesh\.skeleton\.clone\(\)/);
   assert.match(loader, /instancePolicy/);
   assert.match(loader, /removeFromParent/);
+});
+
+test('seven bundled animal models provide species-correct companion and wildlife upgrades', () => {
+  const assets = modelAssetsForRole('nearby-wildlife-animal');
+  assert.deepEqual(assets.map((asset) => asset.id), [
+    'animal-trail-hound-husky-v1',
+    'animal-park-terrier-shiba-inu-v1',
+    'animal-pasture-cow-v1',
+    'animal-field-horse-v1',
+    'animal-heritage-pig-v1',
+    'animal-white-tailed-deer-v1',
+    'animal-woodland-fox-v1'
+  ]);
+  assert.deepEqual(CURATED_ANIMAL_ASSET_BY_SPECIES, {
+    'trail-hound': 'animal-trail-hound-husky-v1',
+    'field-retriever': 'animal-trail-hound-husky-v1',
+    'park-terrier': 'animal-park-terrier-shiba-inu-v1',
+    'pasture-cow': 'animal-pasture-cow-v1',
+    'heritage-pig': 'animal-heritage-pig-v1',
+    'field-horse': 'animal-field-horse-v1',
+    'white-tailed-deer': 'animal-white-tailed-deer-v1',
+    'woodland-fox': 'animal-woodland-fox-v1'
+  });
+  const expectations = new Map([
+    ['animal-trail-hound-husky-v1', { hash: 'b29929034d1cdb3dca8c57e92d7cdb9b89bbaa0b8489561b904692995648d79e', triangles: 1920, meshes: ['Cube'] }],
+    ['animal-park-terrier-shiba-inu-v1', { hash: 'c92467b05e0e9491c9bc46292422d4fa3f5892ce2635148332b82519e63b81be', triangles: 1950, meshes: ['Cube'] }],
+    ['animal-pasture-cow-v1', { hash: '357383dcbd435cf7089f985487bb65f0b3aa1f713aefc6223e383ee9f9d2aca0', triangles: 2450, meshes: ['Cube'] }],
+    ['animal-field-horse-v1', { hash: '0470f0b4d26f2533d461705c4ba3a4dc9754d95d815428bfb274ba85b7597cce', triangles: 2182, meshes: ['Cube'] }],
+    ['animal-heritage-pig-v1', { hash: 'ed0697fed906a25a4ecec0d620c90757f6685cfc2067a7370d66bb819788d88b', triangles: 562, meshes: [null] }],
+    ['animal-white-tailed-deer-v1', { hash: '75d88a0aa2f0569f8fbde28e4f8b0746b0adcab03018bac88e9326071dcdd1d6', triangles: 2098, meshes: ['Cube'] }],
+    ['animal-woodland-fox-v1', { hash: '71e28dc471e8d0018ed2935273e63517860bb4ff84e6784320d6c5c650161086', triangles: 1848, meshes: ['Cube'] }]
+  ]);
+  for (const asset of assets) {
+    const expected = expectations.get(asset.id);
+    assert.ok(expected);
+    assert.equal(asset.collisionPolicy, 'existing-animal-interaction-envelope');
+    assert.deepEqual(asset.instancePolicy, { geometry: 'shared', materials: 'clone' });
+    assert.equal(asset.license, 'CC0-1.0');
+    assert.match(asset.sourceUrl, /^https:\/\/quaternius\.com\/packs\//);
+    const file = path.join(root, asset.url.replace(/^\/app\//, 'app/'));
+    const { bytes, json } = readGlbAssetMetadata(file);
+    assert.ok(bytes.length <= asset.budgets.bytes);
+    assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'), expected.hash);
+    assert.deepEqual(json.extensionsRequired || [], []);
+    assert.equal(json.skins?.length, 1);
+    assert.deepEqual(json.meshes.map((mesh) => mesh.name || null), expected.meshes);
+    assert.equal(triangleCount(json), expected.triangles);
+    assert.ok(triangleCount(json) <= asset.budgets.triangles);
+    assert.ok(Object.values(asset.animationClips).every((name) => json.animations.some((clip) => clip.name === name)));
+    assert.equal(json.images?.length || 0, 0);
+  }
+});
+
+test('curated animals remain visual adapters over companion and wildlife authority with safe fallbacks', () => {
+  const procedural = fs.readFileSync(path.join(root, 'app/js/discovery/animal-models.js'), 'utf8');
+  const adapter = fs.readFileSync(path.join(root, 'app/js/discovery/curated-animal-visual.js'), 'utf8');
+  const companions = fs.readFileSync(path.join(root, 'app/js/discovery/companion-runtime.js'), 'utf8');
+  const wildlife = fs.readFileSync(path.join(root, 'app/js/discovery/wildlife-runtime.js'), 'utf8');
+  const fieldEquipment = fs.readFileSync(path.join(root, 'app/js/discovery/field-equipment.js'), 'utf8');
+  const arPresentation = fs.readFileSync(path.join(root, 'app/js/ar/presentation.js'), 'utf8');
+  assert.match(procedural, /defaultAnimalFallback\s*=\s*true/);
+  assert.match(adapter, /setFallbackVisible\(host, false\)/);
+  assert.match(adapter, /setFallbackVisible\(host, true\)/);
+  assert.match(adapter, /curatedAnimalLoadToken/);
+  assert.match(adapter, /disposeCuratedAnimal/);
+  assert.equal(CURATED_ANIMAL_ASSET_BY_SPECIES['harbor-cat'], undefined);
+  assert.equal(CURATED_ANIMAL_ASSET_BY_SPECIES['hill-goat'], undefined);
+  assert.equal(CURATED_ANIMAL_ASSET_BY_SPECIES['wool-sheep'], undefined);
+  assert.equal(CURATED_ANIMAL_ASSET_BY_SPECIES['yard-chicken'], undefined);
+  assert.equal(CURATED_ANIMAL_ASSET_BY_SPECIES['city-pigeon'], undefined);
+  assert.match(companions, /createAnimalModel\(THREE, catalogId/);
+  assert.match(companions, /attachCuratedAnimalVisual\(THREE, group/);
+  assert.match(companions, /interaction === 'feed' \? 'eat' : 'idle'/);
+  assert.match(companions, /resolveCompanionTravelPolicy\(active, mode, environment\)/);
+  assert.match(companions, /visibleFallbackMeshCount/);
+  assert.match(wildlife, /compileAmbientWildlifePlan/);
+  assert.match(wildlife, /attachCuratedAnimalVisual\(THREE, mesh\.group/);
+  assert.match(wildlife, /sampleDiscoverySurfaceY/);
+  assert.match(wildlife, /visibleFallbackMeshCount/);
+  assert.match(fieldEquipment, /attachCuratedAnimalVisual\(THREE, curatedHost/);
+  assert.match(fieldEquipment, /updateCuratedAnimalAnimation\(fieldReveal, dt, 'idle'\)/);
+  assert.match(arPresentation, /addAnimal\(model, request\.companion\.catalogId\)/);
+  assert.match(arPresentation, /addAnimal\(model, animalSpecies\)/);
+  assert.match(arPresentation, /disposeCuratedAnimals/);
 });
 
 test('player gender choice persists and every promoted nearby NPC receives a balanced family asset', () => {

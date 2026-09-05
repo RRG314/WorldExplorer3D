@@ -1,5 +1,10 @@
-import { createNaturalHistoryModel } from './natural-history-models.js?v=1';
-import { animateAnimalModel } from './animal-models.js?v=2';
+import { createNaturalHistoryModel } from './natural-history-models.js?v=2';
+import { animateAnimalModel } from './animal-models.js?v=3';
+import {
+  attachCuratedAnimalVisual,
+  disposeCuratedAnimal,
+  updateCuratedAnimalAnimation
+} from './curated-animal-visual.js?v=1';
 import { sampleDiscoverySurfaceY } from './surface.js?v=1';
 
 const ACTIVITY_TOOL = Object.freeze({
@@ -14,6 +19,7 @@ const ACTIVITY_TOOL = Object.freeze({
 });
 
 function disposeObject(object) {
+  object?.userData?.disposeCuratedAnimal?.();
   object?.parent?.remove?.(object);
   object?.traverse?.((child) => {
     child.geometry?.dispose?.();
@@ -236,7 +242,10 @@ function createFieldEquipmentPresentation(appCtx) {
       soilRing.rotation.z += Math.max(0, Number(dt) || 0) * .05;
       excavation.scale.setScalar(.96 + Math.sin(elapsed * 5) * .015);
     }
-    if (fieldReveal?.visible && fieldReveal.userData?.worldDiscoveryAnimal) animateAnimalModel(fieldReveal, elapsed, .42);
+    if (fieldReveal?.visible && fieldReveal.userData?.worldDiscoveryAnimal &&
+      !updateCuratedAnimalAnimation(fieldReveal, dt, 'idle')) {
+      animateAnimalModel(fieldReveal, elapsed, .42);
+    }
   }
 
   function previewUse(toolId) {
@@ -292,6 +301,17 @@ function createFieldEquipmentPresentation(appCtx) {
       disposeObject(fieldReveal);
       fieldReveal = createNaturalHistoryModel(THREE, slot.catalogId);
       appCtx.addEarthWorldObject?.(fieldReveal);
+      const speciesId = fieldReveal.userData?.worldDiscoveryNaturalHistory?.speciesId;
+      if (speciesId) {
+        const curatedHost = fieldReveal;
+        const rawHeight = new THREE.Box3().setFromObject(curatedHost).getSize(new THREE.Vector3()).y;
+        curatedHost.userData.disposeCuratedAnimal = () => disposeCuratedAnimal(curatedHost);
+        void attachCuratedAnimalVisual(THREE, curatedHost, {
+          speciesId,
+          targetLocalHeight: rawHeight,
+          isCurrent: () => fieldReveal === curatedHost && curatedHost.parent != null
+        });
+      }
     }
     fieldReveal.visible = true;
     const isAnimal = !!fieldReveal.userData?.worldDiscoveryAnimal;

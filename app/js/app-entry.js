@@ -24,15 +24,15 @@ import './env.js?v=58';
 import './session-coordinator.js?v=2';
 import './planetary/scene-ownership.js?v=9';
 import './real-estate.js?v=55';
-import { init, tryEnablePostProcessing } from './engine.js?v=98';
+import { init, tryEnablePostProcessing } from './engine.js?v=99';
 import './physics.js?v=127';
-import './walking.js?v=95';
+import './walking.js?v=96';
 import './travel-mode.js?v=28';
 import { initBoatMode } from './boat-mode.js?v=58';
 import './sky.js?v=89';
 import './weather.js?v=11';
-import './runtime/on-demand-modes.js?v=49';
-import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=177';
+import './runtime/on-demand-modes.js?v=50';
+import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=179';
 import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=10';
 import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=1';
 import { installOnDemandLiveEarth } from './runtime/on-demand-live-earth.js?v=6';
@@ -50,7 +50,7 @@ import './hud.js?v=103';
 import './map.js?v=61';
 import { renderLoop } from './main.js?v=75';
 import './memory.js?v=55';
-import { setupUI } from './ui.js?v=169';
+import { setupUI } from './ui.js?v=170';
 import { initAccessibility } from './ui/accessibility.js?v=1';
 
 let _booted = false;
@@ -139,7 +139,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'augmented-reality', category: 'presentation',
         load: async () => {
-            const mod = await import('./ar/session-service.js?v=6');
+            const mod = await import('./ar/session-service.js?v=8');
             mod.initArPlatform?.(appCtx);
             return mod;
         }

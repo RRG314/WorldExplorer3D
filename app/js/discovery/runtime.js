@@ -1,5 +1,5 @@
 import { BUILTIN_DISCOVERY_CATALOGS, COMPANION_CATALOG, TOOL_CATALOG, validateDiscoveryCatalogs } from './catalog.js?v=4';
-import { createCompanionRuntime } from './companion-runtime.js?v=7';
+import { createCompanionRuntime } from './companion-runtime.js?v=8';
 import { auditRegionalCreatureQuality } from './creature-quality.js?v=1';
 import { createDetectorSession } from './detector-session.js?v=3';
 import { createWalkingEncounterDirector } from './encounter-director.js?v=1';
@@ -8,7 +8,7 @@ import { compileEnvironmentContext } from './environment-context.js?v=2';
 import { createFieldRetentionSnapshot } from './field-retention.js?v=2';
 import { compileFieldActivityPlan, createFieldActivitySession } from './field-activities.js?v=4';
 import { createFieldExpedition } from './field-expedition.js?v=1';
-import { ACTIVITY_TOOL, createFieldEquipmentPresentation } from './field-equipment.js?v=1';
+import { ACTIVITY_TOOL, createFieldEquipmentPresentation } from './field-equipment.js?v=3';
 import { explorerProgressSnapshot } from './explorer-events.js?v=3';
 import {
   RELEASED_EXPLORER_TOOLS,
@@ -31,7 +31,7 @@ import { sampleDiscoverySurfaceY } from './surface.js?v=1';
 import { createExplorationEntitlementService } from './tools.js?v=1';
 import { tutorialForActivity } from './tutorials.js?v=1';
 import { visualForCatalogId } from './visual-content.js?v=1';
-import { compileAmbientWildlifePlan, createAmbientWildlifeRuntime } from './wildlife-runtime.js?v=4';
+import { compileAmbientWildlifePlan, createAmbientWildlifeRuntime } from './wildlife-runtime.js?v=5';
 import { createStableWorldIdentity } from '../living-world/model.js?v=1';
 import { evaluateArEligibility } from '../ar/eligibility.js?v=2';
 import { getScreenLayoutService } from '../ui/screen-layout.js?v=2';
@@ -1498,6 +1498,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     state.companionSupportHook = Object.freeze({
       adopt: (catalogId, options = {}) => state.companionRuntime.adopt(catalogId, options),
       awardXp: (receiptId, reasonId) => state.companionRuntime.awardXp({ receiptId, reasonId }),
+      care: (instanceId, interaction = 'feed') => state.companionRuntime.care(instanceId, interaction),
       encounters: () => Object.freeze([...state.companionEncounters.values()].map((entry) => Object.freeze({ ...entry }))),
       encounterExercise: () => state.companionExercise ? Object.freeze({
         type: state.companionExercise.type,

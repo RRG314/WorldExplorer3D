@@ -6,10 +6,16 @@ import {
   normalizeCompanionInstance,
   resolveCompanionTravelPolicy,
 } from './companions.js?v=6';
-import { animateAnimalModel, createAnimalModel } from './animal-models.js?v=2';
+import { animateAnimalModel, createAnimalModel } from './animal-models.js?v=3';
+import {
+  attachCuratedAnimalVisual,
+  disposeCuratedAnimal,
+  updateCuratedAnimalAnimation
+} from './curated-animal-visual.js?v=1';
 import { sampleDiscoverySurfaceY } from './surface.js?v=1';
 
 function disposeObject(object) {
+  object?.userData?.disposeCuratedAnimal?.();
   object?.parent?.remove?.(object);
   object?.traverse?.((child) => {
     child.geometry?.dispose?.();
@@ -27,8 +33,14 @@ function createCompanionMesh(appCtx, catalogId) {
   group.visible = false;
   group.userData.worldDiscoveryCompanion = true;
   const rawHeight = new THREE.Box3().setFromObject(group).getSize(new THREE.Vector3()).y;
+  group.userData.disposeCuratedAnimal = () => disposeCuratedAnimal(group);
   appCtx.addEarthWorldObject?.(group);
-  return { group, catalogId, catalog, rawHeight, scale: 1, clearance: 0, profile: group.userData.performanceProfile || {} };
+  void attachCuratedAnimalVisual(THREE, group, {
+    speciesId: catalogId,
+    targetLocalHeight: rawHeight,
+    isCurrent: () => group.parent != null && group.userData.worldDiscoveryCompanion === true
+  });
+  return { group, catalogId, catalog, rawHeight, scale: 1, clearance: 0, profile: group.userData.performanceProfile || {}, activityUntil: 0, activity: 'idle' };
 }
 
 function resolveCompanionFollowTarget(actor, { archetype = 'dog' } = {}) {
@@ -193,6 +205,10 @@ async function createCompanionRuntime(appCtx, options = {}) {
     if (!current) return false;
     await profileStore.saveCompanion(careForCompanion(current, interaction));
     await refresh();
+    if (presentation) {
+      presentation.activity = interaction === 'feed' ? 'eat' : 'idle';
+      presentation.activityUntil = elapsed + 1.8;
+    }
     return true;
   }
 
@@ -245,7 +261,9 @@ async function createCompanionRuntime(appCtx, options = {}) {
       presentation.group.scale.setScalar(presentation.scale * .72);
       presentation.clearance = 0;
       positionInitialized = true;
-      animateAnimalModel(presentation.group, elapsed, .18);
+      if (!updateCuratedAnimalAnimation(presentation.group, dt, 'idle')) {
+        animateAnimalModel(presentation.group, elapsed, .18);
+      }
       return;
     }
     presentation.group.scale.setScalar(presentation.scale);
@@ -273,7 +291,11 @@ async function createCompanionRuntime(appCtx, options = {}) {
       : surfaceY;
     presentation.clearance = presentation.group.position.y - surfaceY;
     presentation.group.rotation.y = Math.atan2(Number(actor.x || 0) - presentation.group.position.x, Number(actor.z || 0) - presentation.group.position.z);
-    animateAnimalModel(presentation.group, elapsed, (airborne ? 1.35 : .8) + Number(active?.personality?.energy || 0) * .35);
+    const motionActivity = separation > 5 ? 'run' : separation > .45 ? 'walk' : 'idle';
+    const activity = presentation.activityUntil > elapsed ? presentation.activity : motionActivity;
+    if (!updateCuratedAnimalAnimation(presentation.group, dt, activity)) {
+      animateAnimalModel(presentation.group, elapsed, (airborne ? 1.35 : .8) + Number(active?.personality?.energy || 0) * .35);
+    }
     if (exercise?.type === 'recall' && exercise.phase === 'returning' && separation < 1.4) completeRecallExercise();
   }
 
@@ -295,6 +317,15 @@ async function createCompanionRuntime(appCtx, options = {}) {
         triangles: presentation?.profile?.triangles || 0,
         materials: presentation?.profile?.materials || 0,
         distinctSpeciesModel: active?.catalogId || null,
+        curatedAssetId: presentation?.group?.userData?.curatedAnimalAssetId || null,
+        curatedActivity: presentation?.group?.userData?.curatedAnimalActivity || null,
+        visibleFallbackMeshCount: (() => {
+          let count = 0;
+          presentation?.group?.traverse?.((object) => {
+            if (object?.isMesh && object.userData?.defaultAnimalFallback === true && object.visible !== false) count += 1;
+          });
+          return count;
+        })(),
         behaviorArchetype: presentation?.catalog?.behaviorArchetype || null,
         travelState,
         vehicleOccupant: travelState === 'vehicle-occupant' || travelState === 'aboard',

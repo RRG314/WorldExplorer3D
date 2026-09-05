@@ -1543,7 +1543,7 @@ async function enterActiveShip() {
     reason: 'solis-reach-interior-entered'
   });
   ensureStylesheet();
-  const ship = await import('./ship-interior.js?v=23');
+  const ship = await import('./ship-interior.js?v=24');
   closeExpeditionPlanner();
   const entered = ship.enterSolisReachInterior({
     expedition: activeExpedition,

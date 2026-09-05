@@ -4,7 +4,7 @@ import {
   disposeCuratedCharacter,
   EXPLORER_ASSET_BY_GENDER,
   updateCuratedCharacterAnimation
-} from './curated-explorer-character.js?v=4';
+} from './curated-explorer-character.js?v=5';
 import {
   getPlayerCharacterGender,
   setPlayerCharacterGender as savePlayerCharacterGender

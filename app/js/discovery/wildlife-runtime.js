@@ -1,5 +1,10 @@
 import { deterministicUnit } from './model.js?v=1';
-import { animateAnimalModel, createAnimalModel } from './animal-models.js?v=2';
+import { animateAnimalModel, createAnimalModel } from './animal-models.js?v=3';
+import {
+  attachCuratedAnimalVisual,
+  disposeCuratedAnimal,
+  updateCuratedAnimalAnimation
+} from './curated-animal-visual.js?v=1';
 import { sampleDiscoverySurfaceY } from './surface.js?v=1';
 import { COMPANION_CATALOG } from './catalog.js?v=4';
 
@@ -107,6 +112,7 @@ function compileAmbientWildlifePlan(environment, options = {}) {
 }
 
 function disposeObject(object) {
+  object?.userData?.disposeCuratedAnimal?.();
   object?.parent?.remove?.(object);
   object?.traverse?.((child) => {
     child.geometry?.dispose?.();
@@ -118,24 +124,33 @@ function disposeObject(object) {
 function createActorMesh(THREE, actor) {
   const group = createAnimalModel(THREE, actor.speciesId);
   group.name = `World Discovery ${actor.label}`;
+  const rawHeight = new THREE.Box3().setFromObject(group).getSize(new THREE.Vector3()).y;
   const companionScale = COMPANION_CATALOG.find((entry) => entry.id === actor.speciesId)?.worldScale;
   group.scale.setScalar(Number(companionScale || (actor.archetype === 'small-mammal' ? .4 : actor.archetype === 'waterbird' ? .38 : .28)));
   group.userData.worldDiscoveryWildlife = { id: actor.id, evidenceClass: actor.evidenceClass };
-  return { group, profile: group.userData.performanceProfile || {} };
+  group.userData.disposeCuratedAnimal = () => disposeCuratedAnimal(group);
+  return { group, rawHeight, profile: group.userData.performanceProfile || {} };
 }
 
 function createAmbientWildlifeRuntime(appCtx, plan) {
   const THREE = globalThis.THREE;
   if (!THREE || plan?.type !== 'AmbientWildlifePlan') return Object.freeze({ update() {}, dispose() {}, snapshot: () => ({ active: 0, logical: plan?.actors?.length || 0 }) });
+  let disposed = false;
   const presentations = plan.actors.map((actor) => {
     const mesh = createActorMesh(THREE, actor);
     const surfaceY = sampleDiscoverySurfaceY(appCtx, actor.home.x, actor.home.z);
     appCtx.addEarthWorldObject?.(mesh.group);
-    return {
+    const entry = {
       actor, ...mesh, surfaceY: Number.isFinite(surfaceY) ? surfaceY : 0,
       active: false, completed: false, interactionUntil: 0, completeAfter: 0,
       lastInteraction: ''
     };
+    void attachCuratedAnimalVisual(THREE, mesh.group, {
+      speciesId: actor.speciesId,
+      targetLocalHeight: mesh.rawHeight,
+      isCurrent: () => !disposed && mesh.group.parent != null && !entry.completed
+    });
+    return entry;
   });
   let elapsed = 0;
   let active = 0;
@@ -172,7 +187,10 @@ function createAmbientWildlifeRuntime(appCtx, plan) {
           : .2 * response;
         group.rotation.y += Math.sin(elapsed * 8) * .22 * response;
       }
-      animateAnimalModel(group, elapsed + index * .31, actor.archetype.includes('bird') ? 1 : .7);
+      const activity = entry.interactionUntil > elapsed ? 'idle' : 'walk';
+      if (!updateCuratedAnimalAnimation(group, dt, activity)) {
+        animateAnimalModel(group, elapsed + index * .31, actor.archetype.includes('bird') ? 1 : .7);
+      }
     });
   }
   function nearest(player, radius = 5.2) {
@@ -208,10 +226,26 @@ function createAmbientWildlifeRuntime(appCtx, plan) {
       logical: plan.actors.length,
       completed: presentations.filter((entry) => entry.completed).length,
       maxActors: plan.diagnostics.maxActors,
-      models: presentations.map((entry) => ({ speciesId: entry.actor.speciesId, interaction: entry.lastInteraction, ...entry.profile })),
+      models: presentations.map((entry) => ({
+        speciesId: entry.actor.speciesId,
+        interaction: entry.lastInteraction,
+        curatedAssetId: entry.group.userData.curatedAnimalAssetId || null,
+        curatedActivity: entry.group.userData.curatedAnimalActivity || null,
+        visibleFallbackMeshCount: (() => {
+          let count = 0;
+          entry.group.traverse((object) => {
+            if (object?.isMesh && object.userData?.defaultAnimalFallback === true && object.visible !== false) count += 1;
+          });
+          return count;
+        })(),
+        ...entry.profile
+      })),
       generatedWithAdditionalProviderQueries: false
     }),
-    dispose() { presentations.forEach((entry) => disposeObject(entry.group)); }
+    dispose() {
+      disposed = true;
+      presentations.forEach((entry) => disposeObject(entry.group));
+    }
   });
 }
 

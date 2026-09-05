@@ -71,7 +71,7 @@ const spaceModuleScope = createLifecycleScope('space-module');
 let expeditionRuntimeModulePromise = null;
 
 function prepareSolisReachSurfaceRendezvous(bodyId) {
-  expeditionRuntimeModulePromise ||= import('./expedition/runtime.js?v=46');
+  expeditionRuntimeModulePromise ||= import('./expedition/runtime.js?v=47');
   return expeditionRuntimeModulePromise.then((runtime) => runtime.prepareSolisReachSurfaceRendezvous?.(appCtx, bodyId) === true);
 }
 
