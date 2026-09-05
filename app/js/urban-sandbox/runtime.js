@@ -9,9 +9,14 @@ import { createEquipmentVisuals } from './equipment-visuals.js?v=3';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=8';
 import { nearestMappedFacility } from './facility-model.js?v=3';
 import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=4';
-import { createUrbanResponderRuntime } from './responder-runtime.js?v=21';
+import { createUrbanResponderRuntime } from './responder-runtime.js?v=22';
 import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=7';
-import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=9';
+import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=10';
+import {
+  attachCuratedTrafficVehicle,
+  CURATED_TRAFFIC_ASSET_BY_VARIANT,
+  disposeCuratedTrafficVehicle
+} from './curated-traffic-vehicle.js?v=1';
 import { applyConditionImpact } from './impact-model.js?v=1';
 import { dampCrashMotion, resolveCrashImpact } from './crash-physics.js?v=1';
 import { sampleSweptContact } from '../physics/swept-contact.js?v=1';
@@ -25,7 +30,7 @@ import {
   disposeCuratedCharacter,
   NEARBY_NPC_ASSET_IDS,
   updateCuratedCharacterAnimation
-} from '../walking/curated-explorer-character.js?v=2';
+} from '../walking/curated-explorer-character.js?v=3';
 
 const ENTER_DISTANCE = 3.4;
 // Room clients can assemble slightly different collision envelopes when a live
@@ -1105,6 +1110,32 @@ function releaseDetailedTrafficVehicle(state, vehicle) {
   return true;
 }
 
+function attachCuratedTrafficDetail(state, vehicle) {
+  if (!vehicle?.visual?.root || vehicle.serviceType === 'responder' || vehicle.playerClaimed) return false;
+  const assetId = CURATED_TRAFFIC_ASSET_BY_VARIANT[String(vehicle.variant?.id || '')];
+  const limit = state.mobile ? 2 : Object.keys(CURATED_TRAFFIC_ASSET_BY_VARIANT).length;
+  if (!assetId || state.curatedTrafficAssetOwners.has(assetId) || state.curatedTrafficAssetOwners.size >= limit) return false;
+  state.curatedTrafficAssetOwners.set(assetId, vehicle.id);
+  const root = vehicle.visual.root;
+  root.userData.onCuratedTrafficDetached = (detachedAssetId) => {
+    if (state.curatedTrafficAssetOwners.get(detachedAssetId) === vehicle.id) {
+      state.curatedTrafficAssetOwners.delete(detachedAssetId);
+    }
+  };
+  root.userData.disposeCuratedTrafficVehicle = () => disposeCuratedTrafficVehicle(root);
+  void attachCuratedTrafficVehicle(THREE, root, {
+    assetId,
+    variantId: vehicle.variant.id,
+    color: vehicle.color,
+    isCurrent: () => activeWorldMatches(state) && state.vehicles.includes(vehicle) && !vehicle.playerClaimed
+  }).then((attached) => {
+    if (!attached && state.curatedTrafficAssetOwners.get(assetId) === vehicle.id) {
+      state.curatedTrafficAssetOwners.delete(assetId);
+    }
+  });
+  return true;
+}
+
 function retireDetailedTrafficVehicle(state, vehicle) {
   if (!vehicle?.ambientTraffic || vehicle.attachedToPlayer || vehicle.occupied) return false;
   const index = state.vehicles.indexOf(vehicle);
@@ -1246,6 +1277,7 @@ function promoteTrafficVehicleDetail(state, trafficAgentId) {
   syncVehiclePose(vehicle, definition);
   state.group.add(visual.root);
   state.vehicles.push(vehicle);
+  attachCuratedTrafficDetail(state, vehicle);
   return vehicle;
 }
 
@@ -1667,6 +1699,7 @@ function beginEnter(state, vehicle) {
   if (vehicle.ambientTraffic === true && vehicle.trafficAgentId) {
     const promoted = state.population?.promoteVehicle?.(vehicle.trafficAgentId);
     if (!promoted) return false;
+    vehicle.visual?.root?.userData?.disposeCuratedTrafficVehicle?.();
     vehicle.ambientTraffic = false;
     vehicle.driver = '';
     vehicle.speed = 0;
@@ -1680,6 +1713,8 @@ function beginEnter(state, vehicle) {
       roll: promoted.roll,
       wheelContact: promoted.wheelContact
     });
+  } else {
+    vehicle.visual?.root?.userData?.disposeCuratedTrafficVehicle?.();
   }
   state.transition = { kind: 'enter', vehicle, elapsed: 0, duration: TRANSITION_DURATION, handoffComplete: false };
   appCtx.clearControlInputState?.('urban_vehicle_enter');
@@ -2357,6 +2392,7 @@ function snapshot(state) {
         y: Number(pose.y.toFixed(2)),
         z: Number(pose.z.toFixed(2)),
         yaw: Number(pose.yaw.toFixed(4)),
+        curatedAssetId: String(vehicle.visual?.root?.userData?.curatedTrafficAssetId || ''),
         pitch: Number(Number(pose.pitch || 0).toFixed(4)),
         roll: Number(Number(pose.roll || 0).toFixed(4)),
         renderedPitch: Number(Number(vehicle.visual?.root?.rotation?.x || 0).toFixed(4)),
@@ -2566,6 +2602,7 @@ function disposeRuntime(state, reason = 'disposed') {
   state.vehicles.length = 0;
   state.npcs.length = 0;
   state.curatedNpcAssetOwners.clear();
+  state.curatedTrafficAssetOwners.clear();
   state.pickups.length = 0;
   state.activeVehicle = null;
   state.civic?.clear?.();
@@ -2708,6 +2745,7 @@ function startUrbanSandboxRuntime(options = {}) {
     // block-to-character swap this runtime is meant to prevent.
     npcBudget: mobile ? 9 : 16,
     curatedNpcAssetOwners: new Map(),
+    curatedTrafficAssetOwners: new Map(),
     mobile,
     population: livingWorld.population,
     worldIdentity,
@@ -2987,6 +3025,7 @@ function startUrbanSandboxRuntime(options = {}) {
   });
   activeRuntime = state;
   appCtx.urbanSandboxRuntime = state;
+  state.vehicles.forEach((vehicle) => attachCuratedTrafficDetail(state, vehicle));
   appCtx.disposeUrbanSandboxRuntime = (reason = 'world-reload') => disposeRuntime(activeRuntime, reason);
   appCtx.urbanSandboxRuntimeSnapshot = () => snapshot(activeRuntime);
   appCtx.resolveUrbanActorCollision = resolveUrbanActorCollision;

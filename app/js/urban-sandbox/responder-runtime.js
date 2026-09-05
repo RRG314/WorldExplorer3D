@@ -1,14 +1,14 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { carSpeedToMph } from '../physics/vehicle-speed-units.js?v=2';
 import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleDefinitionById } from '../engine/vehicle-catalog.js?v=6';
-import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=9';
+import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=10';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=8';
 import {
   attachCuratedExplorerCharacter,
   disposeCuratedCharacter,
   RESPONDER_ASSET_ID,
   updateCuratedCharacterAnimation
-} from '../walking/curated-explorer-character.js?v=2';
+} from '../walking/curated-explorer-character.js?v=3';
 import { createResponderResponseModel, responderAgencyProfile, responderApproachSpeed } from './responder-model.js?v=4';
 import { vehicleDoorPosition } from './vehicle-model.js?v=7';
 import { applyConditionImpact } from './impact-model.js?v=1';

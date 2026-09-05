@@ -238,6 +238,7 @@ function createUrbanVehicleVisual(THREE, definition = {}) {
   })]));
   const setCondition = (condition = 1) => {
     const damage = transportDamagePresentation(condition);
+    if (damage.condition < .98) root.userData.disposeCuratedTrafficVehicle?.();
     root.userData.condition = damage.condition;
     root.userData.damageState = damage;
     paint.color.setHex(Number(definition.color || variant.color || 0x466579)).multiplyScalar(1 - damage.dirt * .38);
@@ -289,11 +290,15 @@ function createUrbanVehicleVisual(THREE, definition = {}) {
       responderBlue.emissiveIntensity = active && !redActive ? 2.2 : .12;
     },
     dispose() {
+      root.userData.disposeCuratedTrafficVehicle?.();
       root.removeFromParent?.();
       ownedGeometries.forEach((geometry) => geometry.dispose?.());
       materials.forEach((material) => material.dispose?.());
     }
   };
+  root.traverse((object) => {
+    if (object?.isMesh) object.userData.defaultTrafficVehicleFallback = true;
+  });
   setCondition(definition.condition ?? 1);
   return Object.freeze(api);
 }

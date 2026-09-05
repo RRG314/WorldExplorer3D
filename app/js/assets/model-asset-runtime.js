@@ -1,4 +1,4 @@
-import { getModelAsset } from './model-asset-catalog.js?v=4';
+import { getModelAsset } from './model-asset-catalog.js?v=5';
 
 const templateLoads = new Map();
 

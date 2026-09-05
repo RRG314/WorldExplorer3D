@@ -9,6 +9,20 @@ BMW 525i E34 Player Vehicle
 - License: Creative Commons Attribution 4.0 (CC BY 4.0).
 - Notes: Used as the close player-vehicle visual. The existing World Explorer vehicle controller, collision envelope, headlights, damage rules, and procedural fallback remain authoritative.
 
+Quaternius Close-Traffic Vehicle Family
+
+The upstream Cars Pack is published by Quaternius under CC0 1.0. Its `License.txt` is Google Drive file ID `1CqsvhpIzBNSDlZsBWdJcJNC1B-TE3cXK`: https://creativecommons.org/publicdomain/zero/1.0/
+
+- Files: `vehicles/traffic/compact-hatchback-v1.glb`, `vehicles/traffic/four-door-sedan-v1.glb`, `vehicles/traffic/trail-suv-v1.glb`, and `vehicles/traffic/city-taxi-v1.glb`
+- Upstream titles: Cars Pack — NormalCar2, NormalCar1, SUV, and Taxi
+- Creator: Quaternius
+- Source: https://quaternius.com/packs/cars.html
+- Source file identities: Google Drive OBJ file IDs `1Msv8m0vli0YGLLEHIx_ojM6grpmD_ygz`, `1dfatafHMRRxI3WE5srluI4Y4WD72pCD6`, `1_26j_0vooPFidwFSlHRWlF1ifphQZemK`, and `1UMriCC_JWsDfpTh5tBjQdhAj9_lJeuR2`, respectively.
+- License: Creative Commons Zero v1.0 Universal (CC0 1.0).
+- Bundled SHA-256 values: `e5f5fa41c4434383b20287725c0e9d757cbd0f059eedc342ec265d32a195fe39`, `bf00f2f0386a25aa310abc0424d22586e46a59ee6c737e6b375c97c9f01bd462`, `1a9ce2bba813dca5005abab09715b01b8b5f4a9c48d7260463afdfeb876aa8b6`, and `14b2f982f8a501565702ecb56f917c82e9abae914fa3f76d2f622a8670598af1`, respectively.
+- Processing: converted from OBJ to extension-free, texture-free GLB with `obj2gltf`; original geometry and named materials were retained.
+- Notes: Used only for the bounded close-detail traffic layer: at most four distinct curated cars on desktop and two on mobile. The existing articulated instanced traffic remains authoritative at mid/far distance. Existing routes, motion, collisions, entry, doors, damage, and cleanup remain authoritative; the procedural close vehicle returns during entry, damage, load failure, or disposal. The BMW E34 remains the sole player-car model.
+
 Curated Character Assets
 
 The upstream pack's `License.txt` is Google Drive file ID `1TTvylHa1CsiJuHFWWiv6PFGhLM-aAH5z` and declares CC0 1.0: https://creativecommons.org/publicdomain/zero/1.0/

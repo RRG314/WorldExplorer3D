@@ -1,4 +1,4 @@
-import { loadModelAsset } from '../assets/model-asset-runtime.js?v=4';
+import { loadModelAsset } from '../assets/model-asset-runtime.js?v=5';
 
 const EXPLORER_ASSET_ID = 'character-field-explorer-v1';
 const NEARBY_NPC_ASSET_ID = 'character-city-explorer-v1';
