@@ -358,6 +358,11 @@ export function compileTrafficGraph(options = {}) {
       laneProvenance: record?.crossSection?.lanesSource ? 'mapped' : 'inferred',
       direction: directionName,
       sourceDirection: String(segment.direction || 'both'),
+      // Preserve the exact source segment that owns this lane. Runtime wheel
+      // samples must not re-project onto a nearby hairpin or crossing segment.
+      sourceSegIndex: Number(segment.segIndex),
+      sourceTStart: Number(segment.sourceTStart),
+      sourceTEnd: Number(segment.sourceTEnd),
       structure: structureState(segment.feature),
       surfacePitch: directedSurfacePitch(p1, p2),
       provenance: record?.completeness === 'lossless' ? 'mapped_transport' : 'compiled_transport'

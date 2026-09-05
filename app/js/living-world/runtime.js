@@ -6,7 +6,7 @@ import {
   isLivingWorldPublicationActive
 } from './model.js?v=1';
 import { compileEntranceCatalog } from './entrance-catalog.js?v=6';
-import { compilePedestrianGraph, compileTrafficGraph, resolveDrivingSide } from './navigation-graphs.js?v=10';
+import { compilePedestrianGraph, compileTrafficGraph, resolveDrivingSide } from './navigation-graphs.js?v=11';
 import { createLivingWorldPopulation } from './population.js?v=18';
 
 function livingWorldTier(appCtx) {
@@ -34,6 +34,46 @@ function pedestrianPointBlocked(appCtx, x, z) {
     if (Array.isArray(building?.pts) && appCtx.pointInPolygon?.(x, z, building.pts)) return true;
   }
   return false;
+}
+
+function sampleEdgeTransitionPlane(edge, x, z) {
+  const p1 = edge?.p1;
+  const p2 = edge?.p2;
+  if (![p1?.x, p1?.y, p1?.z, p2?.x, p2?.y, p2?.z].every(Number.isFinite)) return NaN;
+  const dx = p2.x - p1.x;
+  const dz = p2.z - p1.z;
+  const lengthSquared = dx * dx + dz * dz;
+  if (!(lengthSquared > 1e-6)) return Number(p1.y);
+  const t = Math.max(0, Math.min(1, ((Number(x) - p1.x) * dx + (Number(z) - p1.z) * dz) / lengthSquared));
+  return p1.y + (p2.y - p1.y) * t;
+}
+
+function sourceSegmentProjection(feature, edge, x, z) {
+  const segIndex = Number(edge?.sourceSegIndex);
+  if (!Number.isInteger(segIndex) || segIndex < 0 || segIndex >= (feature?.pts?.length || 0) - 1) return null;
+  const p1 = feature.pts[segIndex];
+  const p2 = feature.pts[segIndex + 1];
+  const dx = Number(p2?.x) - Number(p1?.x);
+  const dz = Number(p2?.z) - Number(p1?.z);
+  const lengthSquared = dx * dx + dz * dz;
+  if (!(lengthSquared > 1e-6)) return null;
+  const t = Math.max(0, Math.min(1, ((Number(x) - Number(p1.x)) * dx + (Number(z) - Number(p1.z)) * dz) / lengthSquared));
+  const projectedX = Number(p1.x) + dx * t;
+  const projectedZ = Number(p1.z) + dz * t;
+  return { segIndex, t, x: projectedX, z: projectedZ, pt: { x: projectedX, z: projectedZ } };
+}
+
+export function createTrafficVehicleSurfaceSampler(appCtx, trafficCompilation) {
+  return (edge, x, z) => {
+    const feature = trafficCompilation?.runtimeFeatureByEdge?.get(edge?.id);
+    const projection = feature ? sourceSegmentProjection(feature, edge, x, z) : null;
+    const surfaceY = Number(appCtx?.sampleFeatureSurfaceY?.(feature, x, z, projection));
+    // Graph lane endpoints already include the presentation clearance. A
+    // short inferred connector therefore uses its own continuous plane rather
+    // than dropping vehicles to an unrelated terrain or road surface.
+    if (!Number.isFinite(surfaceY)) return sampleEdgeTransitionPlane(edge, x, z);
+    return surfaceY + 0.08;
+  };
 }
 
 function disposeRuntimeState(appCtx, state, reason = 'disposed') {
@@ -109,13 +149,7 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     driveOnLeft: drivingSide.driveOnLeft,
     tier
   });
-  const sampleVehicleSurface = (edge, x, z) => {
-    const feature = trafficCompilation.runtimeFeatureByEdge.get(edge?.id);
-    const surfaceY = Number(appCtx.sampleFeatureSurfaceY?.(feature, x, z));
-    // Traffic graph nodes historically carry this small presentation clearance;
-    // keep it while replacing the endpoint plane with final-surface sampling.
-    return Number.isFinite(surfaceY) ? surfaceY + 0.08 : NaN;
-  };
+  const sampleVehicleSurface = createTrafficVehicleSurfaceSampler(appCtx, trafficCompilation);
   const population = createLivingWorldPopulation({
     pedestrianGraph: pedestrianCompilation.publication,
     trafficGraph: trafficCompilation.publication,
