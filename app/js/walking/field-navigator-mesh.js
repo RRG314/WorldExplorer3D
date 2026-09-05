@@ -20,6 +20,7 @@ function createFieldNavigatorMesh(THREE) {
     if (rotation) mesh.rotation.set(rotation[0], rotation[1], rotation[2]);
     mesh.castShadow = true;
     mesh.receiveShadow = false;
+    mesh.userData.defaultCharacterFallback = true;
     parent.add(mesh);
     return mesh;
   };

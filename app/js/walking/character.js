@@ -1,30 +1,21 @@
-import { createFieldNavigatorMesh } from './field-navigator-mesh.js?v=1';
+import { createFieldNavigatorMesh } from './field-navigator-mesh.js?v=2';
+import { attachCuratedExplorerCharacter, updateCuratedCharacterAnimation } from './curated-explorer-character.js?v=1';
 
 function createWalkingCharacterHelpers({ THREE, scene }) {
   function createCharacterMesh() {
     const character = createFieldNavigatorMesh(THREE);
     scene.add(character);
+    void attachCuratedExplorerCharacter(THREE, character, {
+      role: 'player-character',
+      isCurrent: () => character.parent === scene
+    });
     return character;
   }
 
-  function animateCharacterWalk(characterMesh, isMoving, deltaTime) {
+  function animateCharacterWalk(characterMesh, isMoving, deltaTime, isRunning = false) {
     if (!characterMesh || !characterMesh.userData.limbs) return;
 
-    const mixer = characterMesh.userData.characterMixer;
-    if (mixer) {
-      mixer.update(deltaTime);
-      const actions = characterMesh.userData.characterActions || {};
-      const idleAction = actions.idle || null;
-      const walkAction = actions.walk || null;
-      if (idleAction && walkAction) {
-        const blend = isMoving ? 1 : 0;
-        walkAction.enabled = true;
-        idleAction.enabled = true;
-        walkAction.setEffectiveWeight(blend);
-        idleAction.setEffectiveWeight(1 - blend);
-      }
-      return;
-    }
+    if (updateCuratedCharacterAnimation(characterMesh, isMoving, deltaTime, isRunning)) return;
 
     const limbs = characterMesh.userData.limbs;
     const scale = limbs.scale;

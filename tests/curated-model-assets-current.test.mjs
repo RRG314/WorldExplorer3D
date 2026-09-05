@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
@@ -33,6 +34,59 @@ test('the curated model loader does not depend on a third-party runtime decoder'
   const source = fs.readFileSync(path.join(root, 'app/js/assets/model-asset-runtime.js'), 'utf8');
   assert.doesNotMatch(source, /setDecoderPath\s*\(/);
   assert.doesNotMatch(source, /https?:\/\//);
+});
+
+test('one locally bundled skinned Explorer family serves the player and one nearby NPC', () => {
+  const playerAssets = modelAssetsForRole('player-character');
+  const npcAssets = modelAssetsForRole('nearby-npc-character');
+  assert.equal(playerAssets.length, 1);
+  assert.equal(npcAssets.length, 1);
+  assert.equal(playerAssets[0].id, 'character-field-explorer-v1');
+  assert.equal(npcAssets[0].id, 'character-city-explorer-v1');
+  const expectations = new Map([
+    ['character-field-explorer-v1', {
+      hash: '84b8cc2f07abe4b48bae8155a79868bfac5216b4b0a1b4d624f39f3698d6e0c4',
+      meshes: ['Cube.063', 'Cube.052', 'Cube.039', 'Cube.020', 'Plane']
+    }],
+    ['character-city-explorer-v1', {
+      hash: '0dba57f454956ca5886a2d72e6c5a65f6dc9d45987dc3d47bfe419ff0d0b82b4',
+      meshes: ['Cube.008', 'Cube.000', 'Cube.014', 'Cube.005']
+    }]
+  ]);
+  for (const asset of [...playerAssets, ...npcAssets]) {
+    assert.equal(asset.collisionPolicy, 'existing-character-envelope');
+    assert.equal(asset.budgets.maxInstances, 1);
+    assert.equal(asset.instancePolicy.geometry, 'shared');
+    assert.equal(asset.instancePolicy.materials, 'clone');
+    assert.equal(asset.license, 'CC0-1.0');
+    assert.match(asset.sourceUrl, /^https:\/\/quaternius\.com\//);
+    const file = path.join(root, asset.url.replace(/^\/app\//, 'app/'));
+    const { bytes, json } = readGlbAssetMetadata(file);
+    assert.ok(bytes.length <= asset.budgets.bytes);
+    assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'), expectations.get(asset.id).hash);
+    assert.deepEqual(json.extensionsRequired || [], []);
+    assert.equal(json.skins?.length, 1);
+    assert.deepEqual(json.meshes.map((mesh) => mesh.name), expectations.get(asset.id).meshes);
+    assert.ok(['Idle', 'Walk', 'Run', 'Wave'].every((name) => json.animations.some((clip) => clip.name === name)));
+    assert.equal(json.images?.length || 0, 0);
+  }
+});
+
+test('curated characters attach beneath existing gameplay roots and retain procedural fallbacks', () => {
+  const walking = fs.readFileSync(path.join(root, 'app/js/walking/character.js'), 'utf8');
+  const playerFallback = fs.readFileSync(path.join(root, 'app/js/walking/field-navigator-mesh.js'), 'utf8');
+  const walkingPhysics = fs.readFileSync(path.join(root, 'app/js/walking/physics.js'), 'utf8');
+  const npcFallback = fs.readFileSync(path.join(root, 'app/js/urban-sandbox/npc-visuals.js'), 'utf8');
+  const urbanRuntime = fs.readFileSync(path.join(root, 'app/js/urban-sandbox/runtime.js'), 'utf8');
+  const loader = fs.readFileSync(path.join(root, 'app/js/assets/model-asset-runtime.js'), 'utf8');
+  assert.match(walking, /attachCuratedExplorerCharacter\(THREE, character/);
+  assert.match(walkingPhysics, /Number\(actions\.sprint\)\s*>\s*0\.05/);
+  assert.match(playerFallback, /defaultCharacterFallback\s*=\s*true/);
+  assert.match(npcFallback, /defaultCharacterFallback\s*=\s*true/);
+  assert.match(urbanRuntime, /curatedNpcOwnerId/);
+  assert.match(loader, /object\.skeleton\s*=\s*sourceMesh\.skeleton\.clone\(\)/);
+  assert.match(loader, /instancePolicy/);
+  assert.match(loader, /removeFromParent/);
 });
 
 test('the curated car is requested by the existing drive-mode authority, not by a parallel controller', () => {

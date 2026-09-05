@@ -484,7 +484,7 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
       worldDiscoveryModule
     ] = await Promise.all([
       import('../living-world/runtime.js?v=26'),
-      import('../urban-sandbox/runtime.js?v=68'),
+      import('../urban-sandbox/runtime.js?v=69'),
       import('../transport/aviation-runtime.js?v=17'),
       import('../transport/maritime-runtime.js?v=16'),
       import('../discovery/runtime.js?v=30')

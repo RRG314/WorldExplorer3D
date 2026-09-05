@@ -598,7 +598,12 @@ function createWalkingPhysicsHelpers({
       state.characterMesh.rotation.y = state.walker.angle;
       state.characterMesh.rotation.x = skydivingFlight?.bodyPitch || 0;
       state.characterMesh.rotation.z = skydivingFlight ? -skydivingFlight.bank : 0;
-      animateCharacterWalk(state.characterMesh, !skydivingFlight && state.walker.speedMph > 0, dt);
+      animateCharacterWalk(
+        state.characterMesh,
+        !skydivingFlight && state.walker.speedMph > 0,
+        dt,
+        !skydivingFlight && Number(actions.sprint) > 0.05
+      );
     }
 
     if (profileEnabled) {

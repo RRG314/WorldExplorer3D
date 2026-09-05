@@ -27,6 +27,7 @@ function createUrbanNpcVisual(THREE, definition = {}) {
     if (rotation) mesh.rotation.set(...rotation);
     mesh.castShadow = true;
     mesh.receiveShadow = false;
+    mesh.userData.defaultCharacterFallback = true;
     parent.add(mesh);
     return mesh;
   };
@@ -84,6 +85,7 @@ function createUrbanNpcVisual(THREE, definition = {}) {
   }
 
   const phone = add(new THREE.BoxGeometry(.09, .17, .035), device, 'NPC reporting phone', [0, -.48, .065], [-.15, 0, 0], armPivots.right);
+  phone.userData.defaultCharacterFallback = false;
   let heldEquipment = null;
   if (definition.heldEquipment) {
     heldEquipment = new THREE.Group();
@@ -93,6 +95,9 @@ function createUrbanNpcVisual(THREE, definition = {}) {
     add(new THREE.BoxGeometry(.11, .14, .3), device, 'NPC equipment body', [0, 0, .12], null, heldEquipment);
     add(new THREE.BoxGeometry(.08, .2, .1), outfitDark, 'NPC equipment grip', [0, -.13, .04], [-.2, 0, 0], heldEquipment);
     add(new THREE.CylinderGeometry(.03, .03, .18, 8), trim, 'NPC equipment barrel', [0, 0, .34], [Math.PI * .5, 0, 0], heldEquipment);
+    heldEquipment.traverse((object) => {
+      if (object?.isMesh) object.userData.defaultCharacterFallback = false;
+    });
   }
   const setReaction = (reaction = '') => {
     const reporting = reaction === 'reporting';
@@ -121,7 +126,11 @@ function createUrbanNpcVisual(THREE, definition = {}) {
     heldEquipment,
     materials: Object.freeze(materials),
     setReaction,
+    updateAnimation(deltaTime, moving = false, running = false) {
+      return root.userData.updateCuratedCharacterAnimation?.(moving, deltaTime, running) === true;
+    },
     dispose() {
+      root.userData.disposeCuratedCharacter?.();
       root.removeFromParent?.();
       geometries.forEach((geometry) => geometry.dispose?.());
       materials.forEach((material) => material.dispose?.());

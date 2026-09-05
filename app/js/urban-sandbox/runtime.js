@@ -6,10 +6,10 @@ import { createCivicResponseModel } from './civic-response-model.js?v=3';
 import { ensurePlayerBackpackInventory } from './equipment-model.js?v=9';
 import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=21';
 import { createEquipmentVisuals } from './equipment-visuals.js?v=3';
-import { createUrbanNpcVisual } from './npc-visuals.js?v=7';
+import { createUrbanNpcVisual } from './npc-visuals.js?v=8';
 import { nearestMappedFacility } from './facility-model.js?v=3';
 import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=4';
-import { createUrbanResponderRuntime } from './responder-runtime.js?v=19';
+import { createUrbanResponderRuntime } from './responder-runtime.js?v=20';
 import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=7';
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=9';
 import { applyConditionImpact } from './impact-model.js?v=1';
@@ -20,6 +20,11 @@ import { emitProductTelemetry } from '../platform/product-telemetry.js?v=1';
 import { claimLootPickup, createLootPickup } from './loot-pickup-model.js?v=1';
 import { NPC_COMBAT_STATES, resolveNpcCombatState } from './npc-combat-policy.js?v=2';
 import { ENTITY_LIFECYCLE_MS, lifecycleExpired, markLifecycleStart } from '../runtime/entity-lifecycle-policy.js?v=1';
+import {
+  attachCuratedExplorerCharacter,
+  disposeCuratedCharacter,
+  updateCuratedCharacterAnimation
+} from '../walking/curated-explorer-character.js?v=1';
 
 const ENTER_DISTANCE = 3.4;
 // Room clients can assemble slightly different collision envelopes when a live
@@ -974,6 +979,7 @@ function releasePromotedNpc(state, npc, options = {}) {
   if (options.retire === true) state.population?.retirePedestrian?.(npc.sourceAgentId);
   else state.population?.releasePedestrian?.(npc.sourceAgentId);
   npc.visual.dispose();
+  if (state.curatedNpcOwnerId === npc.id) state.curatedNpcOwnerId = '';
   state.npcs.splice(index, 1);
   return true;
 }
@@ -1028,6 +1034,19 @@ function promotePedestrian(state, source) {
   visual.root.rotation.set(0, promoted.yaw, 0);
   state.group.add(visual.root);
   state.npcs.push(npc);
+  if (!state.curatedNpcOwnerId) {
+    state.curatedNpcOwnerId = npc.id;
+    visual.root.userData.disposeCuratedCharacter = () => disposeCuratedCharacter(visual.root);
+    visual.root.userData.updateCuratedCharacterAnimation = (moving, deltaTime, running) =>
+      updateCuratedCharacterAnimation(visual.root, moving, deltaTime, running);
+    void attachCuratedExplorerCharacter(THREE, visual.root, {
+      role: 'nearby-npc-character',
+      variation: 'nearby-npc',
+      isCurrent: () => activeWorldMatches(state) && state.npcs.includes(npc)
+    }).then((attached) => {
+      if (!attached && state.curatedNpcOwnerId === npc.id) state.curatedNpcOwnerId = '';
+    });
+  }
   return npc;
 }
 
@@ -2676,6 +2695,7 @@ function startUrbanSandboxRuntime(options = {}) {
     // remain an instanced silhouette until interaction, which is the visible
     // block-to-character swap this runtime is meant to prevent.
     npcBudget: mobile ? 9 : 16,
+    curatedNpcOwnerId: '',
     mobile,
     population: livingWorld.population,
     worldIdentity,
@@ -2930,6 +2950,11 @@ function startUrbanSandboxRuntime(options = {}) {
       updateEquipmentEffects(state, frame.dt);
       updateLootPickups(state, frame.dt);
       updateCrashBodies(state, frame.dt);
+      state.npcs.forEach((npc) => npc.visual.updateAnimation(
+        frame.dt,
+        npc.reaction === 'fleeing' || !!npc.crashMotion,
+        npc.reaction === 'fleeing'
+      ));
       updateEntityLifecycle(state);
       state.npcPromotionElapsed += frame.dt;
       if (state.npcPromotionElapsed >= .25) {

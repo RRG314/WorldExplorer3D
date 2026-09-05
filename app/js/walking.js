@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { createWalkingCharacterHelpers } from "./walking/character.js?v=2";
+import { createWalkingCharacterHelpers } from "./walking/character.js?v=3";
 import { createWalkingGeometryHelpers } from "./walking/geometry.js?v=1";
-import { createWalkingPhysicsHelpers } from "./walking/physics.js?v=28";
+import { createWalkingPhysicsHelpers } from "./walking/physics.js?v=29";
 import { createWalkingRuntimeHelpers } from "./walking/runtime.js?v=4";
 import { createWalkingTerrainHelpers } from "./walking/terrain.js?v=5";
 
