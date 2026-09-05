@@ -9,6 +9,34 @@ BMW 525i E34 Player Vehicle
 - License: Creative Commons Attribution 4.0 (CC BY 4.0).
 - Notes: Used as the close player-vehicle visual. The existing World Explorer vehicle controller, collision envelope, headlights, damage rules, and procedural fallback remain authoritative.
 
+Curated Character Assets
+
+The upstream pack's `License.txt` is Google Drive file ID `1TTvylHa1CsiJuHFWWiv6PFGhLM-aAH5z` and declares CC0 1.0: https://creativecommons.org/publicdomain/zero/1.0/
+
+Field Explorer
+
+- File: `characters/field-explorer-v1.glb`
+- Upstream title: Ultimate Modular Men — Adventurer
+- Creator: Quaternius
+- Source: https://quaternius.com/packs/ultimatemodularcharacters.html
+- Source file identity: Google Drive `Adventurer.gltf`, file ID `1fzSq1Rr037f7QkfXPWEAzmbLMNx-FpPA`
+- License: Creative Commons Zero v1.0 Universal (CC0 1.0).
+- Bundled SHA-256: `84b8cc2f07abe4b48bae8155a79868bfac5216b4b0a1b4d624f39f3698d6e0c4`
+- Processing: repacked from embedded-buffer glTF to an extension-free GLB with glTF-Transform 4.5.0. Geometry, materials, skinning, modeled backpack, and all 24 animation clips were retained.
+- Notes: Used for the close walking player. The existing movement, collision, interaction, equipment, vehicle, and world-state systems remain authoritative. The procedural Field Navigator remains the load-failure fallback.
+
+City Explorer
+
+- File: `characters/city-explorer-v1.glb`
+- Upstream title: Ultimate Modular Men — Casual Hoodie
+- Creator: Quaternius
+- Source: https://quaternius.com/packs/ultimatemodularcharacters.html
+- Source file identity: Google Drive `Casual_Hoodie.gltf`, file ID `1em1So1xwwQNfHJYMvzKcXkZllvtxpKP5`
+- License: Creative Commons Zero v1.0 Universal (CC0 1.0).
+- Bundled SHA-256: `0dba57f454956ca5886a2d72e6c5a65f6dc9d45987dc3d47bfe419ff0d0b82b4`
+- Processing: repacked from embedded-buffer glTF to an extension-free GLB with glTF-Transform 4.5.0. Geometry, materials, skinning, and all 24 animation clips were retained.
+- Notes: Used for at most one nearby detailed NPC while the existing procedural urban NPC remains the load-failure and broader-population fallback.
+
 Mars Exploration Rover
 - File: `mars-exploration-rover.glb`
 - Source: NASA Mars Exploration Rover 3D model

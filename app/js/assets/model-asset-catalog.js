@@ -14,10 +14,55 @@ const MODEL_ASSET_CATALOG = Object.freeze([
     sourceUpAxis: 'z',
     sourceLengthAxis: 'y',
     collisionPolicy: 'existing-player-vehicle-envelope',
+    instancePolicy: Object.freeze({ geometry: 'clone', materials: 'clone' }),
     budgets: Object.freeze({
       bytes: 4_900_000,
       triangles: 40_000,
       maxInstances: 1
+    })
+  }),
+  Object.freeze({
+    schemaVersion: MODEL_ASSET_SCHEMA_VERSION,
+    id: 'character-field-explorer-v1',
+    label: 'Field Explorer Adventurer',
+    url: '/app/assets/models/characters/field-explorer-v1.glb',
+    roles: Object.freeze(['player-character']),
+    license: 'CC0-1.0',
+    sourceUrl: 'https://quaternius.com/packs/ultimatemodularcharacters.html',
+    attribution: 'Ultimate Modular Men — Adventurer by Quaternius',
+    dimensionsMeters: Object.freeze({ height: 1.78 }),
+    sourceUpAxis: 'y',
+    sourceForwardAxis: 'z',
+    collisionPolicy: 'existing-character-envelope',
+    animationClips: Object.freeze({ idle: 'Idle', walk: 'Walk', run: 'Run', wave: 'Wave' }),
+    instancePolicy: Object.freeze({ geometry: 'shared', materials: 'clone' }),
+    budgets: Object.freeze({
+      bytes: 2_000_000,
+      triangles: 30_700,
+      maxInstances: 1,
+      textureEdgePixels: 0
+    })
+  }),
+  Object.freeze({
+    schemaVersion: MODEL_ASSET_SCHEMA_VERSION,
+    id: 'character-city-explorer-v1',
+    label: 'City Explorer Hoodie',
+    url: '/app/assets/models/characters/city-explorer-v1.glb',
+    roles: Object.freeze(['nearby-npc-character']),
+    license: 'CC0-1.0',
+    sourceUrl: 'https://quaternius.com/packs/ultimatemodularcharacters.html',
+    attribution: 'Ultimate Modular Men — Casual Hoodie by Quaternius',
+    dimensionsMeters: Object.freeze({ height: 1.74 }),
+    sourceUpAxis: 'y',
+    sourceForwardAxis: 'z',
+    collisionPolicy: 'existing-character-envelope',
+    animationClips: Object.freeze({ idle: 'Idle', walk: 'Walk', run: 'Run', wave: 'Wave' }),
+    instancePolicy: Object.freeze({ geometry: 'shared', materials: 'clone' }),
+    budgets: Object.freeze({
+      bytes: 1_600_000,
+      triangles: 18_700,
+      maxInstances: 1,
+      textureEdgePixels: 0
     })
   })
 ]);

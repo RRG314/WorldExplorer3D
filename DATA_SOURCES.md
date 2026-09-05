@@ -87,6 +87,10 @@ Marine traffic is currently a labeled reference layer, not observed AIS. No synt
 
 When authoritative coverage is missing or a provider is unavailable, the app may use procedural materials, inferred building massing, generated interiors, vegetation placement, modeled routes, or cached data. These paths are bounded and labeled where surfaced to the user; they are not claims of observation or survey accuracy.
 
+## Curated Visual Assets
+
+Curated GLBs are presentation assets, not world-data or gameplay authorities. They are bundled locally, selected through `app/js/assets/model-asset-catalog.js`, and retain the existing collision and controller envelopes. The BMW E34 source is CC BY 4.0. The Field Explorer and City Explorer come from Quaternius' CC0 Ultimate Modular Men pack. File-level credits, hashes, processing notes, and source links are recorded in `app/assets/models/ATTRIBUTION.md`.
+
 ## Provider Boundaries
 
 - Browser clients do not receive private provider credentials.

@@ -1,4 +1,4 @@
-import { getModelAsset } from './model-asset-catalog.js?v=2';
+import { getModelAsset } from './model-asset-catalog.js?v=3';
 
 const templateLoads = new Map();
 
@@ -21,7 +21,7 @@ function loadTemplate(THREE, record) {
           reject(new Error(`${record.label} does not contain a scene.`));
           return;
         }
-        resolve(root);
+        resolve(Object.freeze({ root, animations: Object.freeze([...(gltf?.animations || [])]) }));
       },
       undefined,
       reject
@@ -34,23 +34,66 @@ function loadTemplate(THREE, record) {
   return pending;
 }
 
-function cloneModelGraph(source) {
+function parallelTraverse(source, clone, visit) {
+  visit(source, clone);
+  for (let index = 0; index < source.children.length; index += 1) {
+    parallelTraverse(source.children[index], clone.children[index], visit);
+  }
+}
+
+function cloneModelGraph(source, policy = {}) {
   const clone = source.clone(true);
+  const sourceToClone = new Map();
+  const cloneToSource = new Map();
+  parallelTraverse(source, clone, (sourceNode, cloneNode) => {
+    sourceToClone.set(sourceNode, cloneNode);
+    cloneToSource.set(cloneNode, sourceNode);
+  });
   clone.traverse((object) => {
     if (!object?.isMesh) return;
-    object.geometry = object.geometry?.clone?.() || object.geometry;
-    object.material = Array.isArray(object.material)
-      ? object.material.map((material) => material?.clone?.() || material)
-      : object.material?.clone?.() || object.material;
+    if (policy.geometry === 'clone') {
+      object.geometry = object.geometry?.clone?.() || object.geometry;
+    }
+    if (policy.materials === 'clone') {
+      object.material = Array.isArray(object.material)
+        ? object.material.map((material) => material?.clone?.() || material)
+        : object.material?.clone?.() || object.material;
+    }
+    if (!object.isSkinnedMesh) return;
+    const sourceMesh = cloneToSource.get(object);
+    object.skeleton = sourceMesh.skeleton.clone();
+    object.bindMatrix.copy(sourceMesh.bindMatrix);
+    object.skeleton.bones = sourceMesh.skeleton.bones.map((bone) => sourceToClone.get(bone));
+    object.bind(object.skeleton, object.bindMatrix);
   });
   return clone;
 }
 
-async function loadModelAsset(THREE, assetId) {
+function abortError(assetId) {
+  const error = new Error(`Model asset load was cancelled: ${assetId}`);
+  error.name = 'AbortError';
+  return error;
+}
+
+function disposeModelInstance(root, policy = {}) {
+  root?.removeFromParent?.();
+  root?.traverse?.((object) => {
+    if (!object?.isMesh) return;
+    if (policy.geometry === 'clone') object.geometry?.dispose?.();
+    if (policy.materials !== 'clone') return;
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    materials.forEach((material) => material?.dispose?.());
+  });
+}
+
+async function loadModelAsset(THREE, assetId, options = {}) {
   const record = getModelAsset(assetId);
   if (!record) throw new Error(`Unknown model asset: ${assetId}`);
+  if (options.signal?.aborted) throw abortError(assetId);
   const template = await loadTemplate(THREE, record);
-  const root = cloneModelGraph(template);
+  if (options.signal?.aborted) throw abortError(assetId);
+  const policy = record.instancePolicy || Object.freeze({ geometry: 'clone', materials: 'clone' });
+  const root = cloneModelGraph(template.root, policy);
   root.userData.modelAsset = Object.freeze({
     id: record.id,
     label: record.label,
@@ -65,7 +108,17 @@ async function loadModelAsset(THREE, assetId) {
     object.receiveShadow = false;
     object.frustumCulled = true;
   });
-  return Object.freeze({ record, root });
+  let disposed = false;
+  return Object.freeze({
+    record,
+    root,
+    animations: template.animations,
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      disposeModelInstance(root, policy);
+    }
+  });
 }
 
 export { loadModelAsset };
