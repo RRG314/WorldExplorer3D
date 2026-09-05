@@ -114,6 +114,10 @@ function snapshot() {
   return Object.freeze({ ...view, authRequired: !getCurrentUser() });
 }
 
+// Interiors consume only this read-only ownership view. The furnishing layer
+// never grants, transfers, or mutates a property deed.
+appCtx.getExplorerPropertySnapshot = snapshot;
+
 function credits(value) {
   return `${Math.max(0, Math.round(Number(value) || 0)).toLocaleString()} credits`;
 }
@@ -159,7 +163,7 @@ function homeSummaryCard(home, view, options = {}) {
   return `<article class="propertyHomeCard${primary ? ' primary' : ''}">
     <div class="propertyHomeVisual" aria-hidden="true"><span>⌂</span><small>${escapeHtml(home.kind)}</small></div>
     <div class="propertyHomeInfo"><span class="propertyHomeKicker">${rental ? 'RENTED HOME' : primary ? 'PRIMARY HOME' : 'OWNED HOME'}</span><strong>${escapeHtml(home.label)}</strong>
-      <small>${escapeHtml(home.address?.formatted || home.locationLabel)} · ${Math.round(home.area).toLocaleString()} m² footprint · ${home.levels} level${home.levels === 1 ? '' : 's'}</small><small>${view.shared ? rental ? `Rented from ${escapeHtml(home.ownerName || 'another explorer')}` : `Owned by ${escapeHtml(home.ownerName || 'you')}` : `${used}/${home.storageCapacity} storage spaces used`}</small></div>
+      <small>${escapeHtml(home.address?.formatted || home.locationLabel)} · ${Math.round(home.area).toLocaleString()} m² footprint · ${home.levels} level${home.levels === 1 ? '' : 's'}</small><small>Move-in ready · furnished residential interior · companion home</small><small>${view.shared ? rental ? `Rented from ${escapeHtml(home.ownerName || 'another explorer')}` : `Owned by ${escapeHtml(home.ownerName || 'you')}` : `${used}/${home.storageCapacity} storage spaces used`}</small></div>
     <div class="propertyCardActions">${samePlace ? `<button type="button" data-property-action="navigate" data-property-id="${escapeHtml(home.id)}">Set Route</button>` : `<span class="propertyPlaceNote">Return to ${escapeHtml(home.locationLabel)} to set a route</span>`}
       ${primary || view.shared ? '' : `<button type="button" data-property-action="primary" data-property-id="${escapeHtml(home.id)}">Make Primary</button>`}
       ${options.allowSell && ownedByMe ? (view.shared ? connectedActions : `<button type="button" class="danger" data-property-action="sell" data-property-id="${escapeHtml(home.id)}">Sell · ${credits(Math.floor(Math.min(home.purchasePrice, home.currentValue) * .85))}</button>`) : ''}</div>
@@ -197,7 +201,7 @@ export function createPropertyCard(property, suppliedView = null) {
   return `<article class="propertyHomeCard candidate${owned ? ' owned' : ''}">
     <div class="propertyHomeVisual" aria-hidden="true"><span>⌂</span><small>${escapeHtml(property.kind)}</small></div>
     <div class="propertyHomeInfo"><span class="propertyHomeKicker">${escapeHtml(statusLabel)}</span><strong>${escapeHtml(property.label)}</strong>
-      ${property.address?.formatted ? `<small>${escapeHtml(property.address.formatted)}</small>` : ''}<small>${Math.round(property.area).toLocaleString()} m² footprint · ${property.levels} level${property.levels === 1 ? '' : 's'}</small><small>${property.storageCapacity} storage spaces · ${escapeHtml(describeDestinationEntrySupport(property))}</small><b>${credits(property.price)}</b></div>
+      ${property.address?.formatted ? `<small>${escapeHtml(property.address.formatted)}</small>` : ''}<small>${Math.round(property.area).toLocaleString()} m² footprint · ${property.levels} level${property.levels === 1 ? '' : 's'}</small><small>${property.mappedResidential ? 'Move-in ready furnished interior · ' : ''}${property.storageCapacity} storage spaces · ${escapeHtml(describeDestinationEntrySupport(property))}</small><b>${credits(property.price)}</b></div>
     <div class="propertyCardActions"><button type="button" data-property-action="navigate" data-property-id="${escapeHtml(property.id)}">Set Route</button><button type="button" data-property-action="details" data-property-id="${escapeHtml(property.id)}">Details</button>
       ${transactionAction}</div>
   </article>`;
@@ -500,7 +504,7 @@ async function handlePropertyAction(button) {
   }
   const label = propertyById(propertyId)?.label || 'Property';
   let success = 'Saved.';
-  if (action === 'buy') success = `${label} is now yours.`;
+  if (action === 'buy') success = `${label} is now yours. Your furnished home and companion home base are ready.`;
   else if (action === 'sell') success = `${result.home?.label || label} sold for ${credits(result.salePrice)}.`;
   else if (action === 'sell-world') success = `${label} was sold back to the world.`;
   else if (action === 'list-sale') success = `${label} is listed for sale.`;

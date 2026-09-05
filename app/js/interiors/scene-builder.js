@@ -383,7 +383,7 @@ function buildInteriorLevelScene(definition, options = {}) {
     }
   }
 
-  const acceptedPartitions = featurePlan.partitions.filter((segment) =>
+  const acceptedPartitions = options.suppressPartitions === true ? [] : featurePlan.partitions.filter((segment) =>
     !segmentOverlapsConnectorCore(segment, options.connectorLayout, 0.7));
   acceptedPartitions.forEach((segment) => {
     if (!Array.isArray(segment) || segment.length < 2) return;
@@ -729,6 +729,7 @@ export function buildInteriorScene(definition, options = {}) {
   const levelStates = loadedLevels.map((level) => {
     const state = buildInteriorLevelScene(floorDefinition(definition, level), {
       suppressLights: level !== activeLevel,
+      suppressPartitions: options.curatedHome === true,
       connectorLayout: connector,
       storyHeight: floorPlan.storyHeight,
       floorBaseY: Number.isFinite(options.floorBaseY) ? Number(options.floorBaseY) : undefined

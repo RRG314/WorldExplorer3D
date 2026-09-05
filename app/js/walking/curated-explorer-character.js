@@ -1,4 +1,4 @@
-import { loadModelAsset } from '../assets/model-asset-runtime.js?v=7';
+import { loadModelAsset } from '../assets/model-asset-runtime.js?v=8';
 
 const EXPLORER_ASSET_ID = 'character-field-explorer-v1';
 const EXPLORER_WOMAN_ASSET_ID = 'character-field-explorer-woman-v1';

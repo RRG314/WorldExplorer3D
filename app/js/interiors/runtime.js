@@ -149,12 +149,15 @@ function replaceActiveInteriorFloor(active, targetLevel, deps) {
   try {
     const sceneState = deps.buildInteriorScene(active.definition, {
       activeLevel: nextLevel,
-      floorBaseY: active.floorBaseY
+      floorBaseY: active.floorBaseY,
+      curatedHome: !!active.ownedHome
     });
+    deps.disposeCuratedHomeFurnishing?.(active);
     appCtx.scene.add(sceneState.group);
     appCtx.replaceWorldCollection('dynamicBuildingColliders', sceneState.dynamicColliders.slice());
     applyInteriorSceneState(active, sceneState);
     disposeObject3D(previousGroup);
+    void deps.attachCuratedHomeFurnishing?.(active);
     resetInteriorInteractionCache();
     return true;
   } finally {
@@ -359,7 +362,8 @@ export async function enterInteriorForSupport(support, deps) {
     return false;
   }
 
-  const sceneState = deps.buildInteriorScene(definition);
+  const ownedHome = deps.findOwnedHomeForInteriorSupport?.(support) || null;
+  const sceneState = deps.buildInteriorScene(definition, { curatedHome: !!ownedHome });
   appCtx.scene.add(sceneState.group);
   appCtx.replaceWorldCollection('dynamicBuildingColliders', sceneState.dynamicColliders.slice());
 
@@ -414,6 +418,7 @@ export async function enterInteriorForSupport(support, deps) {
     definition,
     support,
     building: support.building,
+    ownedHome,
     group: sceneState.group,
     exteriorShellState,
     suppressedWorldMeshes,
@@ -441,6 +446,7 @@ export async function enterInteriorForSupport(support, deps) {
     floorTransitionPending: false
   };
   applyInteriorSceneState(appCtx.activeInterior, sceneState);
+  void deps.attachCuratedHomeFurnishing?.(appCtx.activeInterior);
   appCtx.interiorHint = {
     state: "inside",
     label: definition.label,
@@ -494,6 +500,7 @@ export function clearActiveInterior(options = {}, deps) {
   restoreExteriorShellState(active.exteriorShellState);
   restoreInteriorWorldSuppression(active.suppressedWorldMeshes);
   appCtx.replaceWorldCollection('dynamicBuildingColliders');
+  deps.disposeCuratedHomeFurnishing?.(active);
   disposeObject3D(active.group);
   appCtx.activeInterior = null;
   appCtx.interiorHint = null;

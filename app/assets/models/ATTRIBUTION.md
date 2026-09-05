@@ -162,3 +162,16 @@ Curated Earth Landmarks
 - `landmarks/elizabeth-tower.glb`: "Big Ben.stl" by Microsoft, sourced from Wikimedia Commons and converted to GLB. CC BY 4.0. https://commons.wikimedia.org/wiki/File:Big_Ben.stl
 - `landmarks/pyramid-khufu.glb`: "Pyramid of Khufu.stl" by Drummyfish, sourced from Wikimedia Commons and converted to GLB. CC0 1.0. https://commons.wikimedia.org/wiki/File:Pyramid_of_Khufu.stl
 - Placement and scale use real geographic coordinates and published landmark dimensions; OSM/Overture remain the sources for surrounding world geometry and collision.
+
+Furnished Explorer Home
+
+- File: `interiors/furnished-explorer-home-v1.glb`
+- Upstream title: Low Poly House Interior
+- Creator: Paolo Mercogliano (`paolo.mercoglia`)
+- Source: https://sketchfab.com/3d-models/low-poly-house-interior-62b1714ef66f4e0d9f42dcd12efb3f52
+- License: Creative Commons Attribution 4.0 International (CC BY 4.0), https://creativecommons.org/licenses/by/4.0/
+- Original download SHA-256: `72d3742042e8fd5f85242116fd2430f394aee1ba347b500736687191896a6beb`
+- Bundled SHA-256: `a3c6c77e7ba695eaebe45da4d2163e948099eb5bb1188ca73081190985249323`
+- Processing: optimized locally with glTF-Transform 4.5.0 using deduplication, instancing, palette consolidation, flattening, joining, welding, conservative simplification (`ratio 0.72`, `error 0.0005`), pruning, and sparse-accessor optimization. The self-contained GLB has no required extensions or remote textures.
+- Contents: a complete multi-level house presentation with kitchen, living space, bedrooms, bathrooms, stairs, lighting fixtures, and household props.
+- Runtime policy: at most one copy is loaded, and only inside the matching owned residential property. World Explorer's measured building footprint, walk surfaces, exterior shell, stairs/elevator authority, entry/exit interaction, and collision proxies remain authoritative. The functional generated interior remains available while this presentation loads and on failure.

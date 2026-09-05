@@ -23,6 +23,20 @@ const MODEL_ASSET_CATALOG = Object.freeze([
   }),
   Object.freeze({
     schemaVersion: MODEL_ASSET_SCHEMA_VERSION,
+    id: 'interior-furnished-explorer-home-v1',
+    label: 'Furnished Explorer Home',
+    url: '/app/assets/models/interiors/furnished-explorer-home-v1.glb',
+    roles: Object.freeze(['owned-residential-interior-presentation']),
+    license: 'CC-BY-4.0',
+    sourceUrl: 'https://sketchfab.com/3d-models/low-poly-house-interior-62b1714ef66f4e0d9f42dcd12efb3f52',
+    attribution: 'Low Poly House Interior by Paolo Mercogliano',
+    sourceUpAxis: 'z',
+    collisionPolicy: 'world-explorer-interior-shell-and-proxy-colliders',
+    instancePolicy: Object.freeze({ geometry: 'clone', materials: 'clone' }),
+    budgets: Object.freeze({ bytes: 2_700_000, triangles: 72_000, maxInstances: 1, textureEdgePixels: 256 })
+  }),
+  Object.freeze({
+    schemaVersion: MODEL_ASSET_SCHEMA_VERSION,
     id: 'traffic-compact-hatchback-v1',
     label: 'Compact Hatchback',
     url: '/app/assets/models/vehicles/traffic/compact-hatchback-v1.glb',

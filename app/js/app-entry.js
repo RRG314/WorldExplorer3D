@@ -44,7 +44,7 @@ import './planetary/sky-orientation.js?v=14';
 import './planetary/moon-sky.js?v=1';
 import './planetary/tracks.js?v=2';
 import './planetary/field-activities.js?v=10';
-import './game.js?v=68';
+import './game.js?v=69';
 import './input.js?v=75';
 import './hud.js?v=103';
 import './map.js?v=61';
@@ -153,7 +153,7 @@ function ensurePlatformService(id) {
 
 function ensureInteriorsReady() {
     if (!_interiorsModulePromise) {
-        _interiorsModulePromise = import('./interiors.js?v=22').catch((error) => {
+        _interiorsModulePromise = import('./interiors.js?v=23').catch((error) => {
             _interiorsModulePromise = null;
             throw error;
         });
