@@ -1,4 +1,4 @@
-import { loadModelAsset } from '../assets/model-asset-runtime.js?v=8';
+import { loadModelAsset } from '../assets/model-asset-runtime.js?v=9';
 import { VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=6';
 
 const CURATED_TRAFFIC_ASSET_BY_VARIANT = Object.freeze({

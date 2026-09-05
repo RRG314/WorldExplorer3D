@@ -1,3 +1,9 @@
+import {
+  attachCuratedEquipmentVisual,
+  curatedEquipmentAssetForId,
+  disposeCuratedEquipmentVisual
+} from './curated-equipment-visual.js?v=1';
+
 function createEquipmentVisuals(THREE, characterMesh) {
   const hand = characterMesh?.userData?.limbs?.arm2;
   const offHand = characterMesh?.userData?.limbs?.arm1;
@@ -35,6 +41,7 @@ function createEquipmentVisuals(THREE, characterMesh) {
     mesh.position.set(...position);
     if (rotation) mesh.rotation.set(...rotation);
     mesh.castShadow = true;
+    mesh.userData.defaultEquipmentFallback = true;
     parent.add(mesh);
     return mesh;
   };
@@ -125,6 +132,7 @@ function createEquipmentVisuals(THREE, characterMesh) {
   const setEquipped = (id) => {
     const visualId = visualIdFor(id);
     items.forEach((group, itemId) => { group.visible = itemId === visualId; });
+    if (curatedEquipmentAssetForId(id)) void attachCuratedEquipmentVisual(THREE, items.get(visualId), id);
     parachutePack.visible = parachuteReady || parachuteCanopy.visible;
     root.userData.equippedId = String(id || 'hands');
     resetRootPose();
@@ -195,6 +203,8 @@ function createEquipmentVisuals(THREE, characterMesh) {
       return useAction ? Object.freeze({ id: useAction.id, category: useAction.category, progress: Math.min(1, useAction.elapsed / useAction.duration) }) : null;
     },
     dispose() {
+      root.userData.disposed = true;
+      items.forEach((group) => disposeCuratedEquipmentVisual(group));
       root.removeFromParent?.();
       parachutePack.removeFromParent?.();
       parachuteCanopy.removeFromParent?.();

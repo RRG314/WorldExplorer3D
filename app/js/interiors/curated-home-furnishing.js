@@ -1,4 +1,4 @@
-import { loadModelAsset } from '../assets/model-asset-runtime.js?v=8';
+import { loadModelAsset } from '../assets/model-asset-runtime.js?v=9';
 
 const RESIDENTIAL_HOME_PATTERN = /house|residential|apartments|terrace|townhouse|detached|semidetached|bungalow|dormitory|condo/i;
 

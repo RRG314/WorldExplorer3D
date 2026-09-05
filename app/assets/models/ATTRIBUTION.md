@@ -175,3 +175,17 @@ Furnished Explorer Home
 - Processing: optimized locally with glTF-Transform 4.5.0 using deduplication, instancing, palette consolidation, flattening, joining, welding, conservative simplification (`ratio 0.72`, `error 0.0005`), pruning, and sparse-accessor optimization. The self-contained GLB has no required extensions or remote textures.
 - Contents: a complete multi-level house presentation with kitchen, living space, bedrooms, bathrooms, stairs, lighting fixtures, and household props.
 - Runtime policy: at most one copy is loaded, and only inside the matching owned residential property. World Explorer's measured building footprint, walk surfaces, exterior shell, stairs/elevator authority, entry/exit interaction, and collision proxies remain authoritative. The functional generated interior remains available while this presentation loads and on failure.
+
+Explorer Pulse Sidearm and Laser Rifle
+
+- Files: `equipment/explorer-pulse-sidearm-v1.glb` and `equipment/explorer-laser-rifle-v1.glb`
+- Upstream titles: Sci-Fi Modular Gun Pack — `Pistol_2` and `AR_3`
+- Creator: Quaternius
+- Source: https://quaternius.com/packs/scifimodularguns.html
+- Source folder: Google Drive `1P5j8xZyIEmZGHjGYmIgYCev9SVmB-IHC`
+- Source file identities: `Pistol_2.obj` (`1zHb_ge1hHMrRb8c1ZEevNxyvKI6yctm6`), `Pistol_2.mtl` (`1PI4EF2FXb_hUnzGhBxYxgNOnLroKp-y5`), `AR_3.obj` (`1O_9SbpctbwUO8U3Qqnky0uhPR_INIIlk`), and `AR_3.mtl` (`1Uk3msdvhugJr_YPrfEDQP_tCQrF0yyAE`).
+- License: Creative Commons Zero v1.0 Universal (CC0 1.0). Source `License.txt` is Google Drive file `1ni87azxuEJdzWLhBPxNcg6Y2lC_j4Cq8`.
+- Source SHA-256 values: `7cd3d206de92b68d804760b9a54f9a0b8fe8a491cacca346709fb5c81d1a0b9b`, `8810589b7a8cf78353c70550c723be25e5412c4c3af8b389a58b548248daa316`, `57052eda3d1836120aa10dc16f445c7e9218ee244c5d52b3f6111d92967cafc2`, and `096882bbf4f9389eefd9f4c22b81f4c9ba4eace8e0c01cf1323b3bda33ae0c94`, in the same order.
+- Bundled SHA-256 values: `c7e5e28636c18a09c9129cbf9f2d8132eea97c7d142477978c086d8c876b04ca` and `5482cf683aad4f08526764db0697894d17cc45b8c18e189d23facaba55a72441`.
+- Processing: converted from OBJ/MTL to self-contained GLB with obj2gltf, then deduplicated, palette-consolidated, flattened, joined, welded, pruned, and sparse-optimized with glTF-Transform 4.5.0. No external textures or runtime decoder are required.
+- Runtime policy: these are held-item presentation only. Existing Backpack identity, acquisition, ammo, cooldowns, firing, projectiles, hit response, damage, police response, persistence, and cleanup remain authoritative. Procedural equipment is retained only while loading and after a confirmed load failure.
