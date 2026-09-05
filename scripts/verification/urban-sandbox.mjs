@@ -73,7 +73,11 @@ async function turnToward(page, target, tolerance = 0.11, maxSteps = 160, option
     const delta = wrapYaw(desired - state.yaw);
     if (Math.abs(delta) <= tolerance) return state;
     if (options.keepMoving === true) await page.keyboard.down('ArrowUp');
-    await inputStep(page, delta > 0 ? 'ArrowLeft' : 'ArrowRight', 55);
+    // Use coarse real-input turns while far away, then shorten the input burst
+    // near the target. A fixed 55 ms burst can straddle the tolerance forever
+    // on a busy renderer even though the interaction is already available.
+    const turnDurationMs = Math.abs(delta) > 0.7 ? 55 : Math.abs(delta) > 0.3 ? 32 : 16;
+    await inputStep(page, delta > 0 ? 'ArrowLeft' : 'ArrowRight', turnDurationMs);
     if (options.keepMoving === true) await page.keyboard.up('ArrowUp');
   }
   const final = await actorState(page, target);
