@@ -8,7 +8,7 @@ import {
 import {
   getPlayerCharacterGender,
   setPlayerCharacterGender as savePlayerCharacterGender
-} from './player-character-preference.js?v=1';
+} from '../../../js/player-character-preference.js?v=1';
 
 function createWalkingCharacterHelpers({ THREE, scene }) {
   function attachSelectedCharacter(character, gender = getPlayerCharacterGender()) {
