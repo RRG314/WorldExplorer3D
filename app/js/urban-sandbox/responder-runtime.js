@@ -3,6 +3,12 @@ import { carSpeedToMph } from '../physics/vehicle-speed-units.js?v=2';
 import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleDefinitionById } from '../engine/vehicle-catalog.js?v=6';
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=9';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=8';
+import {
+  attachCuratedExplorerCharacter,
+  disposeCuratedCharacter,
+  RESPONDER_ASSET_ID,
+  updateCuratedCharacterAnimation
+} from '../walking/curated-explorer-character.js?v=2';
 import { createResponderResponseModel, responderAgencyProfile, responderApproachSpeed } from './responder-model.js?v=4';
 import { vehicleDoorPosition } from './vehicle-model.js?v=7';
 import { applyConditionImpact } from './impact-model.js?v=1';
@@ -27,6 +33,21 @@ function angleDelta(target, current) {
   while (delta > Math.PI) delta -= Math.PI * 2;
   while (delta < -Math.PI) delta += Math.PI * 2;
   return delta;
+}
+
+function characterPresentation(root) {
+  let fallbackMeshCount = 0;
+  let visibleFallbackMeshCount = 0;
+  root?.traverse?.((object) => {
+    if (object?.userData?.defaultCharacterFallback !== true) return;
+    fallbackMeshCount += 1;
+    if (object.visible !== false) visibleFallbackMeshCount += 1;
+  });
+  return Object.freeze({
+    curatedAssetId: String(root?.userData?.curatedCharacterAssetId || ''),
+    fallbackMeshCount,
+    visibleFallbackMeshCount
+  });
 }
 
 function copyRoadAnchor(hit, fallback = {}) {
@@ -210,6 +231,14 @@ function createUrbanResponderRuntime(options = {}) {
       resistance: 105,
       lootClaimed: false
     };
+    visual.root.userData.disposeCuratedCharacter = () => disposeCuratedCharacter(visual.root);
+    visual.root.userData.updateCuratedCharacterAnimation = (moving, deltaTime, running) =>
+      updateCuratedCharacterAnimation(visual.root, moving, deltaTime, running);
+    void attachCuratedExplorerCharacter(THREE, visual.root, {
+      assetId: RESPONDER_ASSET_ID,
+      role: 'civic-responder-character',
+      isCurrent: () => active() && responder.officer?.visual?.root === visual.root
+    });
     return responder.officer;
   }
 
@@ -249,7 +278,8 @@ function createUrbanResponderRuntime(options = {}) {
     const dz = finite(actor?.z) - officer.z;
     const distance = Math.hypot(dx, dz);
     officer.yaw = Math.atan2(dx, dz);
-    if (!returning && distance > OFFICER_CONTACT_DISTANCE && distance < OFFICER_APPROACH_DISTANCE) {
+    const approaching = !returning && distance > OFFICER_CONTACT_DISTANCE && distance < OFFICER_APPROACH_DISTANCE;
+    if (approaching) {
       const speed = Math.min(3.2, Math.max(0, distance - OFFICER_CONTACT_DISTANCE + .35) * .9);
       officer.x += Math.sin(officer.yaw) * speed * dt;
       officer.z += Math.cos(officer.yaw) * speed * dt;
@@ -257,6 +287,7 @@ function createUrbanResponderRuntime(options = {}) {
     }
     officer.visual.root.position.set(officer.x, officer.y, officer.z);
     officer.visual.root.rotation.y = officer.yaw;
+    officer.visual.updateAnimation(dt, approaching, approaching);
     const armedIncident = ['weapon_discharge', 'explosive_use'].includes(String(civic?.lastEvent?.kind || ''));
     const mayFire = !returning && armedIncident && Number(civic?.level || 0) >= 2 &&
       officer.activeElapsed >= 1.25 && distance >= 4 && distance <= 32;
@@ -561,7 +592,8 @@ function createUrbanResponderRuntime(options = {}) {
           y: Number(responder.officer.y.toFixed(2)),
           z: Number(responder.officer.z.toFixed(2)),
           armed: true,
-          shotsFired: responder.officer.shotsFired
+          shotsFired: responder.officer.shotsFired,
+          ...characterPresentation(responder.officer.visual?.root)
         }) : null
       })))
     });

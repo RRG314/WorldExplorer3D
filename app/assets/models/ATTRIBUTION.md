@@ -25,7 +25,7 @@ Field Explorer
 - Processing: repacked from embedded-buffer glTF to an extension-free GLB with glTF-Transform 4.5.0. Geometry, materials, skinning, modeled backpack, and all 24 animation clips were retained.
 - Notes: Used for the close walking player. The existing movement, collision, interaction, equipment, vehicle, and world-state systems remain authoritative. The procedural Field Navigator remains the load-failure fallback.
 
-City Explorer
+City Explorer — Hoodie
 
 - File: `characters/city-explorer-v1.glb`
 - Upstream title: Ultimate Modular Men — Casual Hoodie
@@ -36,6 +36,42 @@ City Explorer
 - Bundled SHA-256: `0dba57f454956ca5886a2d72e6c5a65f6dc9d45987dc3d47bfe419ff0d0b82b4`
 - Processing: repacked from embedded-buffer glTF to an extension-free GLB with glTF-Transform 4.5.0. Geometry, materials, skinning, and all 24 animation clips were retained.
 - Notes: Used for at most one nearby detailed NPC while the existing procedural urban NPC remains the load-failure and broader-population fallback.
+
+City Explorer — Casual
+
+- File: `characters/city-explorer-casual-v1.glb`
+- Upstream title: Ultimate Modular Men — Casual 2
+- Creator: Quaternius
+- Source: https://quaternius.com/packs/ultimatemodularcharacters.html
+- Source file identity: Google Drive `Casual_2.gltf`, file ID `1Jn7kULNmrtqP8BUUL19h8MhbdOnwPFhv`
+- License: Creative Commons Zero v1.0 Universal (CC0 1.0).
+- Bundled SHA-256: `d6a8fc4ad8ef22104773eba260f211c6ec8d797f1f15c87207e0e4edf942d83d`
+- Processing: repacked from embedded-buffer glTF to an extension-free GLB with glTF-Transform 4.5.0. Geometry, materials, skinning, and all 24 animation clips were retained.
+- Notes: Used for one additional nearby detailed pedestrian on desktop. Mobile keeps one curated nearby pedestrian; the broader population stays on the articulated instanced/procedural paths.
+
+Civic Responder
+
+- File: `characters/civic-responder-v1.glb`
+- Upstream title: Ultimate Modular Men — SWAT
+- Creator: Quaternius
+- Source: https://quaternius.com/packs/ultimatemodularcharacters.html
+- Source file identity: Google Drive `Swat.gltf`, file ID `1VGmU5f8a43NBT22JWB507NDSLbmNxzF9`
+- License: Creative Commons Zero v1.0 Universal (CC0 1.0).
+- Bundled SHA-256: `0cd2b3876e5f20f3c85ffc5dcccd05dccb7aaec86235434f7f449f3b44417b7c`
+- Processing: repacked from embedded-buffer glTF to an extension-free GLB with glTF-Transform 4.5.0. Geometry, materials, skinning, and all 24 animation clips were retained.
+- Notes: Used for at most two deployed civic officers on desktop and one on mobile. Existing responder dispatch, approach, arrest, combat, equipment, condition, and cleanup remain authoritative; the procedural officer remains the loading/error fallback.
+
+Expedition Ship Crew
+
+- File: `characters/ship-crew-v1.glb`
+- Upstream title: Ultimate Modular Men — Spacesuit
+- Creator: Quaternius
+- Source: https://quaternius.com/packs/ultimatemodularcharacters.html
+- Source file identity: Google Drive `Spacesuit.gltf`, file ID `1B6zZMmjGYzk38bIgv8a0hEodH2sgbKnw`
+- License: Creative Commons Zero v1.0 Universal (CC0 1.0).
+- Bundled SHA-256: `42454123d38585e901b3e28fd1415e6764f12d7e2f43eb29c4d6b3bc37c13b0c`
+- Processing: repacked from embedded-buffer glTF to an extension-free GLB with glTF-Transform 4.5.0. Geometry, materials, skinning, and all 24 animation clips were retained. Per-instance cloned materials are role-tinted at runtime; geometry remains shared.
+- Notes: Used for the seven established moving ship-crew roots. Existing crew identity, assignments, routes, rooms, interactions, deck visibility, and cleanup remain authoritative; the procedural crew remains the loading/error fallback.
 
 Mars Exploration Rover
 - File: `mars-exploration-rover.glb`

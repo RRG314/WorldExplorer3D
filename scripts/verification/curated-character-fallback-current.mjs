@@ -57,8 +57,83 @@ try {
   assert.ok(result.npcs.length > 0);
   assert.ok(result.npcs.every((npc) => npc.parts > 0 && npc.visible === npc.parts));
   assert.equal(result.curatedNpcCount, 0);
+
+  const incidentAccepted = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const actor = ctx.Walk?.state?.walker;
+    return ctx.urbanSandboxRuntime?.reportCivicEvent?.({
+      kind: 'vehicle_collision',
+      position: { x: Number(actor?.x || 0), y: Number(actor?.y || 0), z: Number(actor?.z || 0) },
+      radius: 500,
+      audibleRadius: 500,
+      maximumWitnesses: 3,
+      forceWitness: true
+    })?.accepted === true;
+  });
+  assert.equal(incidentAccepted, true);
+  let responderFallback = null;
+  for (let attempt = 0; attempt < 220; attempt += 1) {
+    responderFallback = await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const officer = ctx.urbanSandboxRuntime?.responders?.snapshot?.()?.responders?.find((entry) => entry.officer)?.officer;
+      if (!officer) return null;
+      const root = ctx.urbanSandboxRuntime.responders.targets().find((entry) => entry.kind === 'responder_officer')?.ref?.visual?.root;
+      if (!root || root.userData.curatedCharacterLoadStarted !== false) return null;
+      const parts = [];
+      root.traverse((child) => { if (child.userData?.defaultCharacterFallback === true) parts.push(child); });
+      return {
+        curatedAssetId: root.userData.curatedCharacterAssetId || '',
+        parts: parts.length,
+        visible: parts.filter((part) => part.visible).length
+      };
+    });
+    if (responderFallback) break;
+    await page.evaluate(() => globalThis.advanceTime?.(240));
+    await page.waitForTimeout(40);
+  }
+  assert.ok(responderFallback?.parts > 0, 'The responder fallback did not recover after its curated GLB failed.');
+  assert.equal(responderFallback.visible, responderFallback.parts);
+  assert.equal(responderFallback.curatedAssetId, '');
+
+  await page.goto(`${baseUrl}/app/?launch=space&curated-character-fallback-ship=${Date.now()}`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 120_000
+  });
+  await page.waitForFunction(() => document.getElementById('startBtn')?.disabled === false, null, { timeout: 120_000 });
+  await page.evaluate(() => {
+    document.getElementById('spaceLaunchToggle')?.click();
+    document.getElementById('startBtn')?.click();
+  });
+  await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').modes?.space === true, null, { timeout: 120_000 });
+  if (await page.locator('#spaceFlightHUD').evaluate((element) => element.classList.contains('collapsed'))) await page.locator('#sfHudToggle').click();
+  await page.locator('#sfExpeditionBtn').click();
+  await page.locator('#expeditionOverlay').waitFor({ state: 'visible' });
+  await page.locator('#expeditionPlan').click();
+  await page.waitForFunction(() => document.querySelector('.expeditionSummary .is-ready')?.textContent?.includes('READY'));
+  await page.locator('#expeditionEnterShip').click();
+  await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.active === true);
+  await page.waitForFunction(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const layer = ctx.scene?.getObjectByName?.('solis-reach-crew-layer');
+    return layer?.children?.length === 7 && layer.children.every((root) => root.userData.curatedCharacterLoadStarted === false);
+  }, null, { timeout: 60_000 });
+  const crewFallback = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const roots = ctx.scene?.getObjectByName?.('solis-reach-crew-layer')?.children || [];
+    return roots.map((root) => {
+      const parts = [];
+      root.traverse((child) => { if (child.userData?.defaultCharacterFallback === true) parts.push(child); });
+      return {
+        curatedAssetId: root.userData.curatedCharacterAssetId || '',
+        parts: parts.length,
+        visible: parts.filter((part) => part.visible).length
+      };
+    });
+  });
+  assert.equal(crewFallback.length, 7);
+  assert.ok(crewFallback.every((crew) => crew.parts > 0 && crew.visible === crew.parts && crew.curatedAssetId === ''));
   assert.deepEqual(failures, []);
-  console.log(JSON.stringify({ ok: true, ...result }, null, 2));
+  console.log(JSON.stringify({ ok: true, ...result, responderFallback, crewFallback }, null, 2));
 } finally {
   await browser.close();
 }

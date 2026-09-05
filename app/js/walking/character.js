@@ -1,5 +1,5 @@
 import { createFieldNavigatorMesh } from './field-navigator-mesh.js?v=2';
-import { attachCuratedExplorerCharacter, updateCuratedCharacterAnimation } from './curated-explorer-character.js?v=1';
+import { attachCuratedExplorerCharacter, updateCuratedCharacterAnimation } from './curated-explorer-character.js?v=2';
 
 function createWalkingCharacterHelpers({ THREE, scene }) {
   function createCharacterMesh() {

@@ -14,6 +14,12 @@ import { deriveCrewOperations, summarizeCrewOperations } from './crew-operations
 import { shipAlertState } from './failure-authority.js?v=2';
 import { createBeveledVehicleBoxGeometry, createTaperedPrismGeometry } from '../engine/classic-utility-car.js?v=3';
 import { SPACE_CRAFT_IDENTITY } from '../space/craft-identity.js?v=1';
+import {
+  attachCuratedExplorerCharacter,
+  disposeCuratedCharacter,
+  SHIP_CREW_ASSET_ID,
+  updateCuratedCharacterAnimation
+} from '../walking/curated-explorer-character.js?v=2';
 
 const STARSHIP_NAME = SPACE_CRAFT_IDENTITY.starship.name;
 
@@ -765,9 +771,26 @@ function addCrewMember(group, post, crew) {
 
   root.userData.animatedArms = arms;
   root.userData.animatedLegs = legs;
+  root.traverse((object) => {
+    if (object?.isMesh) object.userData.defaultCharacterFallback = true;
+  });
+  root.userData.disposeCuratedCharacter = () => disposeCuratedCharacter(root);
+  root.userData.updateCuratedCharacterAnimation = (moving, deltaTime, running) =>
+    updateCuratedCharacterAnimation(root, moving, deltaTime, running);
   root.position.set(post.x, 0.05, post.z);
   root.rotation.y = post.yaw;
   group.add(root);
+  void attachCuratedExplorerCharacter(THREE, root, {
+    assetId: SHIP_CREW_ASSET_ID,
+    role: 'ship-crew-character',
+    palette: {
+      uniform: appearance.uniform,
+      secondary: appearance.secondary,
+      accent: appearance.accent
+    },
+    isCurrent: () => activeSession?.sceneState?.crewLayer === group &&
+      activeSession.sceneState.crewMeshes.includes(root)
+  });
   return root;
 }
 
@@ -781,11 +804,27 @@ function postForCrewMember(crew, index = 0) {
 }
 
 function disposeObject(root) {
+  root?.userData?.disposeCuratedCharacter?.();
   root?.traverse?.((child) => {
     child.geometry?.dispose?.();
     if (Array.isArray(child.material)) child.material.forEach((entry) => entry?.dispose?.());
     else child.material?.dispose?.();
   });
+}
+
+function curatedCrewPresentation(root) {
+  let fallbackMeshCount = 0;
+  let visibleFallbackMeshCount = 0;
+  root?.traverse?.((object) => {
+    if (object?.userData?.defaultCharacterFallback !== true) return;
+    fallbackMeshCount += 1;
+    if (object.visible !== false) visibleFallbackMeshCount += 1;
+  });
+  return {
+    curatedAssetId: String(root?.userData?.curatedCharacterAssetId || ''),
+    fallbackMeshCount,
+    visibleFallbackMeshCount
+  };
 }
 
 function syncCrewMeshes(session, expedition) {
@@ -937,6 +976,7 @@ function updateCrewMotion(session, dt) {
         arm.rotation.x = basePose + Math.sin(session.visualClock * 2.4 + index + armIndex * 0.7) * workMotion;
       });
       (mesh.userData.animatedLegs || []).forEach((leg) => { leg.rotation.x *= 0.78; });
+      mesh.userData.updateCuratedCharacterAnimation?.(false, step, false);
       return;
     }
     const dx = waypoint.x - mesh.position.x;
@@ -960,6 +1000,7 @@ function updateCrewMotion(session, dt) {
     const stride = Math.sin(session.visualClock * 8.2 + index) * 0.34;
     (mesh.userData.animatedArms || []).forEach((arm, armIndex) => { arm.rotation.x = armIndex === 0 ? stride : -stride; });
     (mesh.userData.animatedLegs || []).forEach((leg, legIndex) => { leg.rotation.x = legIndex === 0 ? -stride : stride; });
+    mesh.userData.updateCuratedCharacterAnimation?.(true, step, false);
   });
   const interactions = appCtx.activeInterior?.interactions || [];
   session.sceneState.crewMeshes.forEach((mesh) => {
@@ -2390,6 +2431,7 @@ function exitSolisReachInterior() {
   if (!session.bodyHadShipInteriorClass) document.body.classList.remove('expedition-ship-interior-open');
   appCtx.replaceWorldCollection('dynamicBuildingColliders', session.dynamicBuildingColliders);
   session.sceneState.root.parent?.remove?.(session.sceneState.root);
+  session.sceneState.crewMeshes.forEach((mesh) => mesh.userData.disposeCuratedCharacter?.());
   session.sceneState.root.traverse((child) => {
     child.geometry?.dispose?.();
     if (Array.isArray(child.material)) child.material.forEach((entry) => { entry?.map?.dispose?.(); entry?.dispose?.(); });
@@ -2555,7 +2597,8 @@ function getShipInteriorSnapshot() {
       z: Number(mesh.position.z.toFixed(2)),
       moving: Array.isArray(mesh.userData.route) && mesh.userData.route.length > 0,
       routeRemaining: Number(mesh.userData.route?.length || 0),
-      workDwellS: Number(Number(mesh.userData.workDwell || 0).toFixed(2))
+      workDwellS: Number(Number(mesh.userData.workDwell || 0).toFixed(2)),
+      ...curatedCrewPresentation(mesh)
     })),
     crewOperations: activeSession.operations.map((operation) => ({ ...operation })),
     crewOperationSummary: { ...activeSession.operationSummary },
@@ -2598,7 +2641,8 @@ function getShipInteriorSnapshot() {
       task: mesh.userData.operationTask,
       x: Number(mesh.position.x.toFixed(3)),
       z: Number(mesh.position.z.toFixed(3)),
-      moving: (mesh.userData.route?.length || 0) > 0
+      moving: (mesh.userData.route?.length || 0) > 0,
+      ...curatedCrewPresentation(mesh)
     })),
     parentEnvironment: 'SPACE_FLIGHT',
     movementAuthority: 'Walk',

@@ -64,6 +64,72 @@ const MODEL_ASSET_CATALOG = Object.freeze([
       maxInstances: 1,
       textureEdgePixels: 0
     })
+  }),
+  Object.freeze({
+    schemaVersion: MODEL_ASSET_SCHEMA_VERSION,
+    id: 'character-city-explorer-casual-v1',
+    label: 'City Explorer Casual',
+    url: '/app/assets/models/characters/city-explorer-casual-v1.glb',
+    roles: Object.freeze(['nearby-npc-character']),
+    license: 'CC0-1.0',
+    sourceUrl: 'https://quaternius.com/packs/ultimatemodularcharacters.html',
+    attribution: 'Ultimate Modular Men — Casual 2 by Quaternius',
+    dimensionsMeters: Object.freeze({ height: 1.76 }),
+    sourceUpAxis: 'y',
+    sourceForwardAxis: 'z',
+    collisionPolicy: 'existing-character-envelope',
+    animationClips: Object.freeze({ idle: 'Idle', walk: 'Walk', run: 'Run', wave: 'Wave' }),
+    instancePolicy: Object.freeze({ geometry: 'shared', materials: 'clone' }),
+    budgets: Object.freeze({
+      bytes: 1_550_000,
+      triangles: 17_400,
+      maxInstances: 1,
+      textureEdgePixels: 0
+    })
+  }),
+  Object.freeze({
+    schemaVersion: MODEL_ASSET_SCHEMA_VERSION,
+    id: 'character-civic-responder-v1',
+    label: 'Civic Responder',
+    url: '/app/assets/models/characters/civic-responder-v1.glb',
+    roles: Object.freeze(['civic-responder-character']),
+    license: 'CC0-1.0',
+    sourceUrl: 'https://quaternius.com/packs/ultimatemodularcharacters.html',
+    attribution: 'Ultimate Modular Men — SWAT by Quaternius',
+    dimensionsMeters: Object.freeze({ height: 1.8 }),
+    sourceUpAxis: 'y',
+    sourceForwardAxis: 'z',
+    collisionPolicy: 'existing-character-envelope',
+    animationClips: Object.freeze({ idle: 'Idle', walk: 'Walk', run: 'Run', wave: 'Wave' }),
+    instancePolicy: Object.freeze({ geometry: 'shared', materials: 'clone' }),
+    budgets: Object.freeze({
+      bytes: 1_780_000,
+      triangles: 26_400,
+      maxInstances: 2,
+      textureEdgePixels: 0
+    })
+  }),
+  Object.freeze({
+    schemaVersion: MODEL_ASSET_SCHEMA_VERSION,
+    id: 'character-ship-crew-v1',
+    label: 'Expedition Ship Crew',
+    url: '/app/assets/models/characters/ship-crew-v1.glb',
+    roles: Object.freeze(['ship-crew-character']),
+    license: 'CC0-1.0',
+    sourceUrl: 'https://quaternius.com/packs/ultimatemodularcharacters.html',
+    attribution: 'Ultimate Modular Men — Spacesuit by Quaternius',
+    dimensionsMeters: Object.freeze({ height: 1.82 }),
+    sourceUpAxis: 'y',
+    sourceForwardAxis: 'z',
+    collisionPolicy: 'existing-character-envelope',
+    animationClips: Object.freeze({ idle: 'Idle', walk: 'Walk', run: 'Run', wave: 'Wave' }),
+    instancePolicy: Object.freeze({ geometry: 'shared', materials: 'clone' }),
+    budgets: Object.freeze({
+      bytes: 2_050_000,
+      triangles: 31_700,
+      maxInstances: 7,
+      textureEdgePixels: 0
+    })
   })
 ]);
 

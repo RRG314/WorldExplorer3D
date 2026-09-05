@@ -4,7 +4,7 @@ import { captureEarthWorldSession } from "./earth-session.js?v=17";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
 import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=30";
 import { createSpaceFlightScene, destroySpaceFlightScene, ensureSolisReachDockTarget, ensureExtendedSpaceScene, getSolisReachDockTarget, orientActiveCraftForAtmosphere, orientActiveCraftTowardSolisReach, positionSpacecraftAtSolisReachDock, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon, setExpeditionPodFlightPresentation, setSolisReachFlightPresentation, updateExpeditionPodFlightPresentation } from "./space/scene.js?v=47";
-import { hideGameUI, initSpaceFlightUI, prepareSpaceFlightHudForEntry, setSpaceFlightHudCollapsed, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=50";
+import { hideGameUI, initSpaceFlightUI, prepareSpaceFlightHudForEntry, setSpaceFlightHudCollapsed, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=51";
 import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 import {
   beginEnvironmentTransition,
@@ -71,7 +71,7 @@ const spaceModuleScope = createLifecycleScope('space-module');
 let expeditionRuntimeModulePromise = null;
 
 function prepareSolisReachSurfaceRendezvous(bodyId) {
-  expeditionRuntimeModulePromise ||= import('./expedition/runtime.js?v=43');
+  expeditionRuntimeModulePromise ||= import('./expedition/runtime.js?v=44');
   return expeditionRuntimeModulePromise.then((runtime) => runtime.prepareSolisReachSurfaceRendezvous?.(appCtx, bodyId) === true);
 }
 

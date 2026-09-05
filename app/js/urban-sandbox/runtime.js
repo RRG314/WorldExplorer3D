@@ -9,7 +9,7 @@ import { createEquipmentVisuals } from './equipment-visuals.js?v=3';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=8';
 import { nearestMappedFacility } from './facility-model.js?v=3';
 import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=4';
-import { createUrbanResponderRuntime } from './responder-runtime.js?v=20';
+import { createUrbanResponderRuntime } from './responder-runtime.js?v=21';
 import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=7';
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=9';
 import { applyConditionImpact } from './impact-model.js?v=1';
@@ -23,8 +23,9 @@ import { ENTITY_LIFECYCLE_MS, lifecycleExpired, markLifecycleStart } from '../ru
 import {
   attachCuratedExplorerCharacter,
   disposeCuratedCharacter,
+  NEARBY_NPC_ASSET_IDS,
   updateCuratedCharacterAnimation
-} from '../walking/curated-explorer-character.js?v=1';
+} from '../walking/curated-explorer-character.js?v=2';
 
 const ENTER_DISTANCE = 3.4;
 // Room clients can assemble slightly different collision envelopes when a live
@@ -979,7 +980,9 @@ function releasePromotedNpc(state, npc, options = {}) {
   if (options.retire === true) state.population?.retirePedestrian?.(npc.sourceAgentId);
   else state.population?.releasePedestrian?.(npc.sourceAgentId);
   npc.visual.dispose();
-  if (state.curatedNpcOwnerId === npc.id) state.curatedNpcOwnerId = '';
+  for (const [assetId, ownerId] of state.curatedNpcAssetOwners) {
+    if (ownerId === npc.id) state.curatedNpcAssetOwners.delete(assetId);
+  }
   state.npcs.splice(index, 1);
   return true;
 }
@@ -1034,17 +1037,24 @@ function promotePedestrian(state, source) {
   visual.root.rotation.set(0, promoted.yaw, 0);
   state.group.add(visual.root);
   state.npcs.push(npc);
-  if (!state.curatedNpcOwnerId) {
-    state.curatedNpcOwnerId = npc.id;
+  const curatedLimit = state.mobile ? 1 : NEARBY_NPC_ASSET_IDS.length;
+  const curatedAssetId = state.curatedNpcAssetOwners.size < curatedLimit
+    ? NEARBY_NPC_ASSET_IDS.find((assetId) => !state.curatedNpcAssetOwners.has(assetId))
+    : null;
+  if (curatedAssetId) {
+    state.curatedNpcAssetOwners.set(curatedAssetId, npc.id);
     visual.root.userData.disposeCuratedCharacter = () => disposeCuratedCharacter(visual.root);
     visual.root.userData.updateCuratedCharacterAnimation = (moving, deltaTime, running) =>
       updateCuratedCharacterAnimation(visual.root, moving, deltaTime, running);
     void attachCuratedExplorerCharacter(THREE, visual.root, {
+      assetId: curatedAssetId,
       role: 'nearby-npc-character',
       variation: 'nearby-npc',
       isCurrent: () => activeWorldMatches(state) && state.npcs.includes(npc)
     }).then((attached) => {
-      if (!attached && state.curatedNpcOwnerId === npc.id) state.curatedNpcOwnerId = '';
+      if (!attached && state.curatedNpcAssetOwners.get(curatedAssetId) === npc.id) {
+        state.curatedNpcAssetOwners.delete(curatedAssetId);
+      }
     });
   }
   return npc;
@@ -2401,6 +2411,7 @@ function snapshot(state) {
       y: Number(npc.y.toFixed(2)),
       z: Number(npc.z.toFixed(2)),
       yaw: Number(npc.yaw.toFixed(4)),
+      curatedAssetId: String(npc.visual?.root?.userData?.curatedCharacterAssetId || ''),
       renderedMeshCount: (() => {
         let count = 0;
         npc.visual?.root?.traverse?.((object) => { if (object?.isMesh) count += 1; });
@@ -2554,6 +2565,7 @@ function disposeRuntime(state, reason = 'disposed') {
   state.group.removeFromParent?.();
   state.vehicles.length = 0;
   state.npcs.length = 0;
+  state.curatedNpcAssetOwners.clear();
   state.pickups.length = 0;
   state.activeVehicle = null;
   state.civic?.clear?.();
@@ -2695,7 +2707,7 @@ function startUrbanSandboxRuntime(options = {}) {
     // remain an instanced silhouette until interaction, which is the visible
     // block-to-character swap this runtime is meant to prevent.
     npcBudget: mobile ? 9 : 16,
-    curatedNpcOwnerId: '',
+    curatedNpcAssetOwners: new Map(),
     mobile,
     population: livingWorld.population,
     worldIdentity,

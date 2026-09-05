@@ -1,12 +1,46 @@
-import { loadModelAsset } from '../assets/model-asset-runtime.js?v=3';
+import { loadModelAsset } from '../assets/model-asset-runtime.js?v=4';
 
 const EXPLORER_ASSET_ID = 'character-field-explorer-v1';
 const NEARBY_NPC_ASSET_ID = 'character-city-explorer-v1';
+const NEARBY_NPC_ASSET_IDS = Object.freeze([
+  NEARBY_NPC_ASSET_ID,
+  'character-city-explorer-casual-v1'
+]);
+const RESPONDER_ASSET_ID = 'character-civic-responder-v1';
+const SHIP_CREW_ASSET_ID = 'character-ship-crew-v1';
+
+const ASSET_BY_ROLE = Object.freeze({
+  'player-character': EXPLORER_ASSET_ID,
+  'nearby-npc-character': NEARBY_NPC_ASSET_ID,
+  'civic-responder-character': RESPONDER_ASSET_ID,
+  'ship-crew-character': SHIP_CREW_ASSET_ID
+});
 
 function setFallbackVisible(host, visible) {
   host?.traverse?.((object) => {
     if (object?.userData?.defaultCharacterFallback === true) object.visible = visible;
   });
+}
+
+function applyMaterialPalette(material, palette = {}) {
+  const name = String(material?.name || '');
+  const color = /SciFi_Light_Accent/i.test(name)
+    ? palette.accent
+    : /SciFi_MainDark/i.test(name)
+      ? palette.secondary
+      : /SciFi_Main/i.test(name)
+        ? palette.uniform
+        : /SciFi_Light/i.test(name)
+          ? palette.shell
+          : null;
+  if (Number.isFinite(color)) material.color?.setHex?.(color);
+}
+
+function styleForRole(role = '') {
+  if (role === 'nearby-npc-character') return 'licensed-stylized-city-explorer';
+  if (role === 'civic-responder-character') return 'licensed-stylized-civic-responder';
+  if (role === 'ship-crew-character') return 'licensed-stylized-expedition-crew';
+  return 'licensed-stylized-field-explorer';
 }
 
 function prepareExplorerVisual(THREE, instance, options = {}) {
@@ -38,13 +72,14 @@ function prepareExplorerVisual(THREE, instance, options = {}) {
     materials.forEach((material) => {
       if (!material) return;
       material.depthWrite = true;
+      applyMaterialPalette(material, options.palette);
     });
   });
   visual.userData.curatedCharacterAssetId = record.id;
   visual.userData.characterRole = options.role || 'player-character';
   visual.userData.collisionPolicy = record.collisionPolicy;
   visual.userData.performanceProfile = Object.freeze({
-    style: options.variation === 'nearby-npc' ? 'licensed-stylized-city-explorer' : 'licensed-stylized-field-explorer',
+    style: styleForRole(visual.userData.characterRole),
     sourceBytes: record.budgets.bytes,
     triangles: record.budgets.triangles,
     maxInstances: record.budgets.maxInstances,
@@ -99,7 +134,7 @@ async function attachCuratedExplorerCharacter(THREE, host, options = {}) {
   if (!host || host.userData.curatedCharacterLoadStarted) return false;
   host.userData.curatedCharacterLoadStarted = true;
   try {
-    const assetId = options.assetId || (options.role === 'nearby-npc-character' ? NEARBY_NPC_ASSET_ID : EXPLORER_ASSET_ID);
+    const assetId = options.assetId || ASSET_BY_ROLE[options.role] || EXPLORER_ASSET_ID;
     const instance = await loadModelAsset(THREE, assetId, { signal: options.signal });
     if (options.isCurrent && !options.isCurrent()) {
       instance.dispose();
@@ -118,7 +153,7 @@ async function attachCuratedExplorerCharacter(THREE, host, options = {}) {
     host.userData.curatedCharacterLoadStarted = false;
     setFallbackVisible(host, true);
     if (error?.name !== 'AbortError') {
-      console.warn('Curated Explorer unavailable; keeping the built-in character.', error);
+      console.warn('Curated character unavailable; keeping the built-in character.', error);
     }
     return false;
   }
@@ -127,6 +162,9 @@ async function attachCuratedExplorerCharacter(THREE, host, options = {}) {
 export {
   EXPLORER_ASSET_ID,
   NEARBY_NPC_ASSET_ID,
+  NEARBY_NPC_ASSET_IDS,
+  RESPONDER_ASSET_ID,
+  SHIP_CREW_ASSET_ID,
   attachCuratedExplorerCharacter,
   disposeCuratedCharacter,
   updateCuratedCharacterAnimation
