@@ -487,7 +487,7 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
       import('../urban-sandbox/runtime.js?v=87'),
       import('../transport/aviation-runtime.js?v=19'),
       import('../transport/maritime-runtime.js?v=16'),
-      import('../discovery/runtime.js?v=35')
+      import('../discovery/runtime.js?v=36')
     ]);
     gameplayStartupDurationsMs.moduleLoad = Math.round(performance.now() - moduleLoadStartedAt);
     if (!startupIsCurrent()) {

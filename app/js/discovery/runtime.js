@@ -2096,13 +2096,6 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
         const resultRecord = item || outcome?.event || null;
         applyDiscoveryWorldEdit(appCtx, resultRecord, position);
         void syncTrustedReceipt(appCtx, profileStore, item);
-        if (recorded) emitDiscoveryTelemetry('discovery_recorded', {
-          activityId: state.activeActivityId,
-          catalogFamily: resultRecord?.family,
-          discipline: resultRecord?.specialtyId || resultRecord?.discipline,
-          contextBands: telemetryContextBands(),
-          result: outcome?.collected ? 'collected' : 'recorded'
-        });
         if (recorded) {
           await state.awardActiveCompanionForField?.(
             resultRecord?.eventId || resultRecord?.claimId || resultRecord?.instanceId || completedSlot?.claimId,
@@ -2110,6 +2103,17 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
           );
           discoveryHaptic([18, 36, 28]);
           state.ui.showResult(outcome);
+          // Publish onboarding/progression only after its visible result is in
+          // the DOM. Otherwise the tutorial can advance to “review” while the
+          // awaited companion reward is still resolving, leaving an empty
+          // completion card for the player.
+          emitDiscoveryTelemetry('discovery_recorded', {
+            activityId: state.activeActivityId,
+            catalogFamily: resultRecord?.family,
+            discipline: resultRecord?.specialtyId || resultRecord?.discipline,
+            contextBands: telemetryContextBands(),
+            result: outcome?.collected ? 'collected' : 'recorded'
+          });
         }
       }
       state.lastSnapshot = state.fieldSession.snapshot(position);
@@ -2141,17 +2145,17 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       const instanceId = state.session.snapshot(position).collectionResult?.instanceId;
       const item = (await profileStore.listItems(200)).find((entry) => entry.instanceId === instanceId);
       void syncTrustedReceipt(appCtx, profileStore, item);
-      if (recorded) emitDiscoveryTelemetry('discovery_recorded', {
-        activityId: 'metal-detect',
-        catalogFamily: item?.family,
-        discipline: item?.discipline,
-        contextBands: telemetryContextBands(),
-        result: 'collected'
-      });
       if (recorded) {
         await state.awardActiveCompanionForField?.(item?.eventId || item?.claimId || item?.instanceId, item?.firstIdentification === true);
         discoveryHaptic([20, 35, 40]);
         state.ui.showResult(state.session.snapshot(position).collectionResult);
+        emitDiscoveryTelemetry('discovery_recorded', {
+          activityId: 'metal-detect',
+          catalogFamily: item?.family,
+          discipline: item?.discipline,
+          contextBands: telemetryContextBands(),
+          result: 'collected'
+        });
       }
     }
     state.detectorSnapshot = state.session.snapshot(position);
