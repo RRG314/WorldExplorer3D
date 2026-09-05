@@ -1,7 +1,17 @@
-import { selectVehicleVariant } from '../engine/vehicle-catalog.js?v=6';
-import { roadVehicleVisualRecipe } from '../transport/road-vehicle-visual-recipe.js?v=1';
+import { selectVehicleVariant, VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=6';
 import { resolveVehicleRoadContactPose } from '../engine/vehicle-road-attitude.js?v=2';
-import { createBeveledVehicleBoxGeometry, createTaperedPrismGeometry } from '../engine/classic-utility-car.js?v=3';
+import {
+  attachCuratedTrafficVehicle,
+  disposeCuratedTrafficVehicle
+} from '../urban-sandbox/curated-traffic-vehicle.js?v=4';
+import {
+  attachCuratedExplorerCharacter,
+  disposeCuratedCharacter,
+  NEARBY_NPC_ASSET_IDS,
+  updateCuratedCharacterAnimation
+} from '../walking/curated-explorer-character.js?v=7';
+
+const POPULATION_STEP_SECONDS = 1 / 30;
 
 const POPULATION_BUDGET_BY_TIER = Object.freeze({
   low: Object.freeze({ pedestrians: 6, vehicles: 4 }),
@@ -36,20 +46,7 @@ const PANTS_PALETTE = Object.freeze([0x202832, 0x34393d, 0x3e4854, 0x443b36, 0x2
 const HAIR_PALETTE = Object.freeze([0x171513, 0x38271d, 0x6b4a2f, 0x8b735b, 0x2d2422]);
 const VEHICLE_PALETTE = Object.freeze([0x4f7588, 0x718269, 0xa64b41, 0xbdb59d, 0x536270, 0x886d50, 0x705d85, 0xc5b94d]);
 
-function createMesh(geometry, material, count, name) {
-  if (count <= 0) return null;
-  const mesh = new THREE.InstancedMesh(geometry, material, count);
-  mesh.name = name;
-  mesh.castShadow = false;
-  mesh.receiveShadow = true;
-  // Population instances move continuously. Static automatic instance bounds can
-  // otherwise leave the group culled after actors have moved out of the old bound.
-  mesh.frustumCulled = false;
-  mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  return mesh;
-}
-
-function edgeLookup(graph) {
+function edgeLookup(graph, options = {}) {
   const outgoing = new Map();
   if (!Array.isArray(graph?.edges)) return outgoing;
   for (let index = 0; index < graph.edges.length; index += 1) {
@@ -57,6 +54,21 @@ function edgeLookup(graph) {
     const list = outgoing.get(edge.from) || [];
     list.push(index);
     outgoing.set(edge.from, list);
+  }
+  if (options.connectNearby !== true) return outgoing;
+  for (let index = 0; index < graph.edges.length; index += 1) {
+    const edge = graph.edges[index];
+    if ((outgoing.get(edge.to) || []).length) continue;
+    const heading = Math.atan2(edge.p2.x - edge.p1.x, edge.p2.z - edge.p1.z);
+    const candidates = graph.edges.map((candidate, candidateIndex) => {
+      if (candidateIndex === index) return null;
+      const distance = Math.hypot(candidate.p1.x - edge.p2.x, candidate.p1.z - edge.p2.z);
+      if (distance > 18) return null;
+      const candidateHeading = Math.atan2(candidate.p2.x - candidate.p1.x, candidate.p2.z - candidate.p1.z);
+      const headingDelta = Math.abs(Math.atan2(Math.sin(candidateHeading - heading), Math.cos(candidateHeading - heading)));
+      return { candidateIndex, score: distance + headingDelta * 3.5 };
+    }).filter(Boolean).sort((left, right) => left.score - right.score);
+    if (candidates.length) outgoing.set(edge.to, candidates.slice(0, 3).map((candidate) => candidate.candidateIndex));
   }
   return outgoing;
 }
@@ -136,6 +148,7 @@ function createAgents(count, graph, random, kind, reference = null) {
       promoted: false,
       detailPromoted: false,
       currentSpeed: null,
+      bridge: null,
       reaction: '',
       reactionRemaining: 0,
       reactionTarget: null
@@ -145,7 +158,7 @@ function createAgents(count, graph, random, kind, reference = null) {
 }
 
 function agentPose(agent, graph, sampleVehicleSurface = null) {
-  const edge = graph.edges[agent.edgeIndex];
+  const edge = agent.bridge || graph.edges[agent.edgeIndex];
   if (!edge) return null;
   const t = Math.max(0, Math.min(1, agent.progress / Math.max(.01, edge.length)));
   const x = edge.p1.x + (edge.p2.x - edge.p1.x) * t;
@@ -204,12 +217,25 @@ function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {})
       continue;
     }
     agent.relocationCooldown = Math.max(0, agent.relocationCooldown - dt);
+    if (agent.bridge) {
+      const bridgeSpeed = agent.speed * .72;
+      agent.currentSpeed = bridgeSpeed;
+      agent.motionTime += bridgeSpeed * dt * (kind === 'vehicle' ? .42 : 3.1);
+      agent.bridge.progress += bridgeSpeed * dt;
+      if (agent.bridge.progress >= agent.bridge.length) {
+        const overflow = agent.bridge.progress - agent.bridge.length;
+        agent.edgeIndex = agent.bridge.nextEdgeIndex;
+        agent.progress = overflow;
+        agent.bridge = null;
+      }
+      continue;
+    }
     const edge = graph.edges[agent.edgeIndex];
     if (!edge) continue;
     const pose = agentPose(agent, graph, kind === 'vehicle' ? behavior.sampleVehicleSurface : null);
     const reference = behavior.reference;
     const distance = pose && reference ? Math.hypot(pose.x - reference.x, pose.z - reference.z) : 0;
-    const stride = distance > 900 ? 8 : distance > 480 ? 4 : distance > 220 ? 2 : 1;
+    const stride = kind === 'vehicle' ? 1 : distance > 900 ? 8 : distance > 480 ? 4 : distance > 220 ? 2 : 1;
     if (behavior.tick % stride !== 0) continue;
     let speed = agent.speed;
     if (kind === 'vehicle') {
@@ -248,8 +274,21 @@ function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {})
         relocateAgent(agent, graph, random, kind, reference);
         break;
       }
-      agent.edgeIndex = next[Math.floor(random() * next.length) % next.length];
-      const nextEdge = graph.edges[agent.edgeIndex];
+      const nextEdgeIndex = next[Math.floor(random() * next.length) % next.length];
+      const nextEdge = graph.edges[nextEdgeIndex];
+      const gap = nextEdge ? Math.hypot(nextEdge.p1.x - edge.p2.x, nextEdge.p1.z - edge.p2.z) : 0;
+      if (nextEdge && gap > .08) {
+        agent.bridge = {
+          p1: { x: edge.p2.x, y: edge.p2.y, z: edge.p2.z },
+          p2: { x: nextEdge.p1.x, y: nextEdge.p1.y, z: nextEdge.p1.z },
+          length: gap,
+          progress: Math.min(gap, agent.progress),
+          nextEdgeIndex
+        };
+        agent.progress = 0;
+        break;
+      }
+      agent.edgeIndex = nextEdgeIndex;
       if (!nextEdge || agent.progress < nextEdge.length) break;
     }
   }
@@ -266,174 +305,6 @@ function updateAgentVisibility(agent, distance, activeRatio, dt) {
   else if (agent.visibility > target) agent.visibility = Math.max(target, agent.visibility - rate * dt);
 }
 
-function localTransform(pose, transform, visibility, output) {
-  const yaw = pose.yaw;
-  const x = Number(transform.x || 0);
-  const y = Number(transform.y || 0);
-  const z = Number(transform.z || 0);
-  output.baseQuaternion.setFromEuler(output.baseEuler.set(
-    Number(pose.pitch || 0),
-    yaw,
-    Number(pose.roll || 0),
-    'YXZ'
-  ));
-  output.position.set(x, y, z).applyQuaternion(output.baseQuaternion);
-  output.position.add(output.posePosition.set(pose.x, pose.y, pose.z));
-  output.localQuaternion.setFromEuler(output.euler.set(Number(transform.rx || 0), Number(transform.ry || 0), Number(transform.rz || 0), 'XYZ'));
-  output.quaternion.multiplyQuaternions(output.baseQuaternion, output.localQuaternion);
-  const visibleScale = Math.max(.001, visibility);
-  output.scale.set(Number(transform.sx || 1) * visibleScale, Number(transform.sy || 1) * visibleScale, Number(transform.sz || 1) * visibleScale);
-  output.matrix.compose(output.position, output.quaternion, output.scale);
-  return output.matrix;
-}
-
-function pedestrianTransform(role, agent, slot = 0) {
-  const h = agent.heightScale;
-  const swing = agent.waiting ? 0 : Math.sin(agent.motionTime) * .55;
-  const side = slot === 0 ? -1 : 1;
-  const torso = agent.archetype.torso;
-  if (role === 'torso') return { y: .97 * h, sx: .44 * torso, sy: .64 * h, sz: .28 };
-  if (role === 'head') return { y: 1.51 * h, sx: .34, sy: .38, sz: .34 };
-  if (role === 'face') return { y: 1.49 * h, z: .16, sx: .23, sy: .27, sz: .055 };
-  if (role === 'eyes') {
-    const side = slot === 0 ? -1 : 1;
-    return { x: side * .085, y: 1.54 * h, z: .206, sx: .032, sy: .038, sz: .022 };
-  }
-  if (role === 'hair') return { y: 1.66 * h, sx: .35, sy: .14, sz: .35 };
-  if (role === 'waist') return { y: .7 * h, sx: .4 * torso, sy: .12 * h, sz: .29 };
-  if (role === 'arms') {
-    if (agent.reaction === 'reporting' && side > 0) return { x: .28 * torso, y: 1.08 * h, z: .12, sx: .115, sy: .5 * h, sz: .115, rx: -1.12 };
-    return { x: side * .29 * torso, y: .98 * h, sx: .115, sy: .5 * h, sz: .115, rx: -side * swing };
-  }
-  if (role === 'hands') {
-    if (agent.reaction === 'reporting' && side > 0) return { x: .29 * torso, y: 1.18 * h, z: .27, sx: .12, sy: .13, sz: .12 };
-    return { x: side * .29 * torso, y: .69 * h, z: side * swing * .11, sx: .12, sy: .13, sz: .12 };
-  }
-  if (role === 'legs') return { x: side * .12, y: .42 * h, z: side * swing * .09, sx: .16, sy: .58 * h * agent.archetype.leg, sz: .17, rx: side * swing };
-  if (role === 'shoes') return { x: side * .12, y: .1, z: .07 + side * swing * .11, sx: .2, sy: .14, sz: .34 };
-  if (role === 'phone') return agent.reaction === 'reporting'
-    ? { x: .3 * torso, y: 1.2 * h, z: .33, sx: .075, sy: .15, sz: .035, rx: -.2 }
-    : { sx: 0, sy: 0, sz: 0 };
-  return { y: 1.02 * h, z: -.2, sx: .36 * agent.archetype.pack, sy: .48 * h * agent.archetype.pack, sz: .16 * agent.archetype.pack };
-}
-
-function vehicleLayout(agent) {
-  const recipe = roadVehicleVisualRecipe(agent.variant);
-  return {
-    ...recipe,
-    variant: agent.variant,
-    truck: recipe.flags.boxTruck,
-    bus: recipe.flags.bus,
-    pickup: recipe.flags.pickup,
-    van: recipe.flags.van,
-    suv: recipe.flags.crossover
-  };
-}
-
-function vehicleTransform(role, agent, slot = 0) {
-  const l = vehicleLayout(agent);
-  const width = l.variant.width;
-  const wheelLayout = l.wheelLayout;
-  const wheelRadius = l.wheelRadius;
-  const { bodyBottom, bodyTop, bodyHeight, cabinBottom, cabinHeight, cabinY } = l;
-  if (role === 'body') return { y: bodyBottom + bodyHeight * .5, sx: width, sy: bodyHeight, sz: l.length };
-  if (role === 'cabin') return { y: cabinY, z: l.cabinZ, sx: width * .86, sy: cabinHeight, sz: l.cabinLength };
-  if (role === 'glass') return { y: cabinY + cabinHeight * .04, z: l.cabinZ + (l.truck ? .04 : 0), sx: width * .875, sy: Math.max(.24, cabinHeight * .48), sz: l.cabinLength * .82 };
-  if (role === 'detail') {
-    if (l.bus) return slot === 0
-      ? { y: l.height - .045, sx: width * .82, sy: .09, sz: l.length * .78 }
-      : { y: bodyTop - .08, z: -l.length * .49, sx: width * .86, sy: .12, sz: .08 };
-    if (l.truck) return slot === 0
-      ? { y: cabinBottom + (l.height - cabinBottom - .055) * .5, z: -l.length * .15, sx: width * .95, sy: l.height - cabinBottom - .055, sz: l.length * .58 }
-      : { y: bodyTop - .08, z: l.length * .47, sx: width * .9, sy: .16, sz: l.length * .1 };
-    if (l.pickup) return slot === 0
-      ? { y: bodyTop - bodyHeight * .25, z: -l.length * .33, sx: width * .92, sy: bodyHeight * .5, sz: l.length * .34 }
-      : { y: bodyTop - bodyHeight * .18, z: l.length * .39, sx: width * .88, sy: bodyHeight * .36, sz: l.length * .19 };
-    return slot === 0
-      ? { y: bodyTop - bodyHeight * .19, z: l.length * .39, sx: width * .88, sy: bodyHeight * .38, sz: l.length * .2 }
-      : { y: bodyTop - bodyHeight * .2, z: -l.length * .43, sx: width * .86, sy: bodyHeight * .34, sz: l.length * .13 };
-  }
-  if (role === 'wheels') {
-    const side = slot % 2 === 0 ? -1 : 1;
-    const front = slot < 2 ? 1 : -1;
-    return { x: side * wheelLayout.halfTrack, y: wheelRadius, z: front * wheelLayout.halfWheelbase, sx: wheelRadius, sy: width * .12, sz: wheelRadius, rz: Math.PI / 2, rx: agent.motionTime };
-  }
-  if (role === 'bumpers') {
-    const front = slot === 0 ? 1 : -1;
-    return { y: bodyTop - bodyHeight * .62, z: front * (l.length * .49 - .08), sx: width * .96, sy: .16, sz: .16 };
-  }
-  if (role === 'mirrors') {
-    const side = slot === 0 ? -1 : 1;
-    return {
-      x: side * width * .46,
-      y: cabinY + cabinHeight * .08,
-      z: l.cabinZ + l.cabinLength * .27,
-      sx: .11,
-      sy: .13,
-      sz: .2
-    };
-  }
-  if (role === 'headlights' || role === 'taillights') {
-    const side = slot === 0 ? -1 : 1;
-    const front = role === 'headlights' ? 1 : -1;
-    return { x: side * width * .3, y: bodyTop - bodyHeight * .34, z: front * (l.length * .49 - .0275), sx: .22, sy: .14, sz: .055 };
-  }
-  return { y: 0, sx: 0, sy: 0, sz: 0 };
-}
-
-function createPart(spec, material, agentCount, name) {
-  const repeats = spec.repeats || 1;
-  const mesh = createMesh(spec.geometry, material, agentCount * repeats, name);
-  return mesh ? { ...spec, mesh, repeats } : null;
-}
-
-function updateInstances(agents, graph, parts, kind, options = {}) {
-  const output = {
-    position: new THREE.Vector3(), quaternion: new THREE.Quaternion(), baseQuaternion: new THREE.Quaternion(),
-    localQuaternion: new THREE.Quaternion(), scale: new THREE.Vector3(), matrix: new THREE.Matrix4(),
-    posePosition: new THREE.Vector3(), euler: new THREE.Euler(), baseEuler: new THREE.Euler()
-  };
-  const reference = options.reference;
-  const activeRatio = Number(options.activeRatio ?? 1);
-  const dt = Math.max(.016, Number(options.dt) || .1);
-  agents.forEach((agent, agentIndex) => {
-    const pose = agentPose(agent, graph, kind === 'vehicle' ? options.sampleVehicleSurface : null);
-    if (!pose) return;
-    if (kind === 'vehicle') {
-      agent.renderedPitch = Number(pose.pitch || 0);
-      agent.renderedRoll = Number(pose.roll || 0);
-      agent.renderedGroundY = Number(pose.y || 0);
-      agent.wheelContact = Object.freeze({
-        authority: String(pose.authority || 'edge-plane-fallback'),
-        sampledWheelContacts: Number(pose.sampledWheelContacts || 0),
-        maximumWheelPenetration: Number(pose.maximumWheelPenetration || 0),
-        maximumWheelGap: Number(pose.maximumWheelGap || 0),
-        previousMaximumWheelPenetration: Number(pose.previousMaximumWheelPenetration || 0)
-      });
-    }
-    const distance = reference ? Math.hypot(pose.x - reference.x, pose.z - reference.z) : 0;
-    if (agent.promoted) {
-      agent.visibleTarget = false;
-      agent.visibility = 0;
-    } else {
-      updateAgentVisibility(agent, distance, activeRatio, dt);
-    }
-    for (const part of parts) {
-      for (let slot = 0; slot < part.repeats; slot += 1) {
-        const instanceIndex = agentIndex * part.repeats + slot;
-        const transform = kind === 'pedestrian' ? pedestrianTransform(part.role, agent, slot) : vehicleTransform(part.role, agent, slot);
-        part.mesh.setMatrixAt(instanceIndex, localTransform(pose, transform, agent.visibility, output));
-        const color = part.colorKey ? agent[part.colorKey] : null;
-        if (color) part.mesh.setColorAt(instanceIndex, color);
-      }
-    }
-  });
-  parts.forEach((part) => {
-    part.mesh.instanceMatrix.needsUpdate = true;
-    if (part.mesh.instanceColor) part.mesh.instanceColor.needsUpdate = true;
-  });
-}
-
 export function createLivingWorldPopulation(options = {}) {
   const tier = String(options.tier || 'balanced').toLowerCase();
   const budget = POPULATION_BUDGET_BY_TIER[tier] || POPULATION_BUDGET_BY_TIER.balanced;
@@ -446,53 +317,50 @@ export function createLivingWorldPopulation(options = {}) {
   const vehicles = createAgents(budget.vehicles, trafficGraph, random, 'vehicle', initialReference);
   const group = new THREE.Group();
   group.name = 'Living World Population';
-
-  const materials = {
-    // Ambient people must remain readable before close-detail promotion. A
-    // modest light floor prevents daylight shadows/night lighting from
-    // collapsing the articulated instanced character into a black two-block
-    // silhouette while retaining per-instance outfit and skin colors.
-    outfit: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x31434a, emissiveIntensity: .42, roughness: .86, metalness: .02, vertexColors: true }),
-    skin: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x4b2c21, emissiveIntensity: .38, roughness: .9, vertexColors: true }),
-    cloth: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x2b343a, emissiveIntensity: .34, roughness: .92, metalness: .01, vertexColors: true }),
-    hair: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x211915, emissiveIntensity: .3, roughness: .94, vertexColors: true }),
-    gear: new THREE.MeshStandardMaterial({ color: 0x53636a, emissive: 0x25343a, emissiveIntensity: .28, roughness: .88, metalness: .03, flatShading: true }),
-    device: new THREE.MeshStandardMaterial({ color: 0x18242b, emissive: 0x1c5d82, emissiveIntensity: .38, roughness: .48, metalness: .2, flatShading: true }),
-    vehicle: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x26343d, emissiveIntensity: .24, roughness: .54, metalness: .24, vertexColors: true }),
-    glass: new THREE.MeshStandardMaterial({ color: 0x2d4b59, emissive: 0x101a1f, emissiveIntensity: .18, roughness: .26, metalness: .3 }),
-    rubber: new THREE.MeshStandardMaterial({ color: 0x151819, roughness: .96, metalness: .01 }),
-    trim: new THREE.MeshStandardMaterial({ color: 0x3d4549, roughness: .74, metalness: .34 }),
-    headlight: new THREE.MeshStandardMaterial({ color: 0xfff2c8, emissive: 0xffd37a, emissiveIntensity: .38, roughness: .28 }),
-    taillight: new THREE.MeshStandardMaterial({ color: 0xb72e2a, emissive: 0x87120f, emissiveIntensity: .42, roughness: .32 })
-  };
-  const pedestrianParts = [
-    createPart({ role: 'torso', geometry: createTaperedPrismGeometry(THREE, { widthBottom: 1, widthTop: .86, height: 1, length: 1, frontInset: .03, rearInset: .03 }), colorKey: 'color' }, materials.outfit, pedestrians.length, 'Living World Pedestrian Bodies'),
-    createPart({ role: 'head', geometry: new THREE.SphereGeometry(.5, 8, 6), colorKey: 'skinColor' }, materials.skin, pedestrians.length, 'Living World Pedestrian Heads'),
-    createPart({ role: 'face', geometry: new THREE.SphereGeometry(.5, 8, 5), colorKey: 'skinColor' }, materials.skin, pedestrians.length, 'Living World Pedestrian Faces'),
-    createPart({ role: 'eyes', repeats: 2, geometry: new THREE.SphereGeometry(.5, 6, 4) }, materials.device, pedestrians.length, 'Living World Pedestrian Eyes'),
-    createPart({ role: 'hair', geometry: new THREE.SphereGeometry(.5, 8, 4), colorKey: 'hairColor' }, materials.hair, pedestrians.length, 'Living World Pedestrian Hair'),
-    createPart({ role: 'waist', geometry: createTaperedPrismGeometry(THREE, { widthBottom: .9, widthTop: 1, height: 1, length: .92, frontInset: .03, rearInset: .03 }), colorKey: 'secondaryColor' }, materials.cloth, pedestrians.length, 'Living World Pedestrian Waist Details'),
-    createPart({ role: 'arms', repeats: 2, geometry: new THREE.CylinderGeometry(.5, .43, 1, 6), colorKey: 'color' }, materials.outfit, pedestrians.length, 'Living World Pedestrian Arms'),
-    createPart({ role: 'hands', repeats: 2, geometry: new THREE.SphereGeometry(.5, 6, 4), colorKey: 'skinColor' }, materials.skin, pedestrians.length, 'Living World Pedestrian Hands'),
-    createPart({ role: 'legs', repeats: 2, geometry: new THREE.CylinderGeometry(.48, .42, 1, 6), colorKey: 'secondaryColor' }, materials.cloth, pedestrians.length, 'Living World Pedestrian Legs'),
-    createPart({ role: 'shoes', repeats: 2, geometry: createBeveledVehicleBoxGeometry(THREE, 1, 1, 1, .18) }, materials.gear, pedestrians.length, 'Living World Pedestrian Shoes'),
-    createPart({ role: 'gear', geometry: createTaperedPrismGeometry(THREE, { widthBottom: .92, widthTop: .82, height: 1, length: 1, frontInset: .06, rearInset: .06 }) }, materials.gear, pedestrians.length, 'Living World Pedestrian Gear'),
-    createPart({ role: 'phone', geometry: new THREE.BoxGeometry(1, 1, 1) }, materials.device, pedestrians.length, 'Living World Pedestrian Reaction Props')
-  ].filter(Boolean);
-  const vehicleParts = [
-    createPart({ role: 'body', geometry: createBeveledVehicleBoxGeometry(THREE, 1, 1, 1, .15), colorKey: 'color' }, materials.vehicle, vehicles.length, 'Living World Traffic Rounded Bodies'),
-    createPart({ role: 'cabin', geometry: createTaperedPrismGeometry(THREE, { widthBottom: 1, widthTop: .82, height: 1, length: 1, frontInset: .13, rearInset: .08 }), colorKey: 'color' }, materials.vehicle, vehicles.length, 'Living World Traffic Cabins'),
-    createPart({ role: 'glass', geometry: new THREE.BoxGeometry(1, 1, 1) }, materials.glass, vehicles.length, 'Living World Traffic Windows'),
-    createPart({ role: 'detail', repeats: 2, geometry: new THREE.BoxGeometry(1, 1, 1), colorKey: 'color' }, materials.vehicle, vehicles.length, 'Living World Traffic Body Details'),
-    createPart({ role: 'wheels', repeats: 4, geometry: new THREE.CylinderGeometry(1, 1, 1, 16) }, materials.rubber, vehicles.length, 'Living World Traffic Wheels'),
-    createPart({ role: 'bumpers', repeats: 2, geometry: new THREE.BoxGeometry(1, 1, 1) }, materials.trim, vehicles.length, 'Living World Traffic Bumpers'),
-    createPart({ role: 'mirrors', repeats: 2, geometry: new THREE.BoxGeometry(1, 1, 1) }, materials.trim, vehicles.length, 'Living World Traffic Mirrors'),
-    createPart({ role: 'headlights', repeats: 2, geometry: new THREE.BoxGeometry(1, 1, 1) }, materials.headlight, vehicles.length, 'Living World Traffic Headlights'),
-    createPart({ role: 'taillights', repeats: 2, geometry: new THREE.BoxGeometry(1, 1, 1) }, materials.taillight, vehicles.length, 'Living World Traffic Taillights')
-  ].filter(Boolean);
-  [...pedestrianParts, ...vehicleParts].forEach((part) => group.add(part.mesh));
+  let disposed = false;
+  const pedestrianHosts = pedestrians.map((agent, index) => {
+    const host = new THREE.Group();
+    const assetId = NEARBY_NPC_ASSET_IDS[index % NEARBY_NPC_ASSET_IDS.length];
+    host.name = `${agent.archetype.label} curated pedestrian host`;
+    host.userData.characterStyle = 'curated-only-local-model';
+    host.userData.proceduralCharacterMeshCount = 0;
+    host.userData.disposeCuratedCharacter = () => disposeCuratedCharacter(host);
+    host.userData.updateCuratedCharacterAnimation = (moving, deltaTime, running) =>
+      updateCuratedCharacterAnimation(host, moving, deltaTime, running);
+    agent.visualHost = host;
+    agent.curatedAssetId = assetId;
+    group.add(host);
+    void attachCuratedExplorerCharacter(THREE, host, {
+      assetId,
+      role: 'nearby-npc-character',
+      variation: 'ambient-pedestrian',
+      failClosed: true,
+      palette: {
+        uniform: agent.color?.getHex?.(),
+        secondary: agent.secondaryColor?.getHex?.()
+      },
+      isCurrent: () => !disposed && agent.visualHost === host
+    });
+    return host;
+  });
+  const vehicleHosts = vehicles.map((agent) => {
+    const host = new THREE.Group();
+    host.name = `${agent.variant.label || agent.variant.id} curated traffic host`;
+    host.userData.vehiclePresentation = 'curated-only-local-model';
+    host.userData.proceduralVehicleMeshCount = 0;
+    host.userData.disposeCuratedTrafficVehicle = () => disposeCuratedTrafficVehicle(host);
+    agent.visualHost = host;
+    group.add(host);
+    void attachCuratedTrafficVehicle(THREE, host, {
+      variantId: agent.variant.id,
+      color: agent.color?.getHex?.() ?? 0x566675,
+      dimensionsMeters: agent.variant,
+      isCurrent: () => !disposed && agent.visualHost === host
+    });
+    return host;
+  });
   const pedestrianOutgoing = edgeLookup(pedestrianGraph);
-  const trafficOutgoing = edgeLookup(trafficGraph);
+  const trafficOutgoing = edgeLookup(trafficGraph, { connectNearby: true });
   let accumulator = 0;
   let tick = 0;
   const referencePosition = () => options.getReferencePosition?.() || null;
@@ -500,10 +368,6 @@ export function createLivingWorldPopulation(options = {}) {
     const phase = String(options.getTimePhase?.() || 'day');
     return phase === 'night' ? .58 : phase === 'sunrise' || phase === 'sunset' ? .76 : 1;
   };
-  updateInstances(pedestrians, pedestrianGraph, pedestrianParts, 'pedestrian', { reference: referencePosition(), activeRatio: activeRatio(), dt: .1 });
-  updateInstances(vehicles, trafficGraph, vehicleParts, 'vehicle', {
-    reference: referencePosition(), activeRatio: activeRatio(), dt: .1, sampleVehicleSurface
-  });
 
   const vehicleSnapshot = (agent) => {
     const pose = agentPose(agent, trafficGraph, sampleVehicleSurface);
@@ -551,13 +415,71 @@ export function createLivingWorldPopulation(options = {}) {
     });
   };
 
-  const refreshVehiclePresentation = () => updateInstances(
-    vehicles,
-    trafficGraph,
-    vehicleParts,
-    'vehicle',
-    { reference: referencePosition(), activeRatio: activeRatio(), dt: .1, sampleVehicleSurface }
-  );
+  const updateCuratedPedestrianHosts = (dt = POPULATION_STEP_SECONDS) => {
+    const reference = referencePosition();
+    const ratio = activeRatio();
+    pedestrians.forEach((agent) => {
+      const pose = agentPose(agent, pedestrianGraph);
+      const host = agent.visualHost;
+      if (!pose || !host) return;
+      const distance = reference ? Math.hypot(pose.x - reference.x, pose.z - reference.z) : 0;
+      if (agent.promoted) {
+        agent.visibleTarget = false;
+        agent.visibility = 0;
+      } else {
+        updateAgentVisibility(agent, distance, ratio, dt);
+      }
+      host.position.set(pose.x, pose.y, pose.z);
+      host.rotation.set(0, pose.yaw, 0);
+      host.scale.setScalar(Math.max(.001, Number(agent.heightScale || 1) * agent.visibility));
+      host.visible = agent.visibility > .01 && agent.promoted !== true;
+      host.userData.reaction = String(agent.reaction || '');
+      if (host.visible) {
+        updateCuratedCharacterAnimation(
+          host,
+          Number(agent.currentSpeed || 0) > .05,
+          dt,
+          Number(agent.currentSpeed || 0) > 1.45
+        );
+      }
+    });
+  };
+
+  const updateCuratedVehicleHosts = (dt = POPULATION_STEP_SECONDS) => {
+    const reference = referencePosition();
+    const ratio = activeRatio();
+    vehicles.forEach((agent) => {
+      const pose = agentPose(agent, trafficGraph, sampleVehicleSurface);
+      const host = agent.visualHost;
+      if (!pose || !host) return;
+      const distance = reference ? Math.hypot(pose.x - reference.x, pose.z - reference.z) : 0;
+      if (agent.promoted) {
+        agent.visibleTarget = false;
+        agent.visibility = 0;
+      } else {
+        updateAgentVisibility(agent, distance, ratio, dt);
+      }
+      agent.renderedPitch = Number(pose.pitch || 0);
+      agent.renderedRoll = Number(pose.roll || 0);
+      agent.renderedGroundY = Number(pose.y || 0);
+      agent.wheelContact = Object.freeze({
+        authority: String(pose.authority || 'edge-plane-fallback'),
+        sampledWheelContacts: Number(pose.sampledWheelContacts || 0),
+        maximumWheelPenetration: Number(pose.maximumWheelPenetration || 0),
+        maximumWheelGap: Number(pose.maximumWheelGap || 0),
+        previousMaximumWheelPenetration: Number(pose.previousMaximumWheelPenetration || 0)
+      });
+      host.position.set(pose.x, pose.y + VEHICLE_ROOT_TO_GROUND_METERS, pose.z);
+      host.rotation.order = 'YXZ';
+      host.rotation.set(Number(pose.pitch || 0), pose.yaw, Number(pose.roll || 0));
+      host.visible = agent.visibility > .01 && agent.promoted !== true;
+      host.scale.setScalar(Math.max(.001, agent.visibility));
+    });
+  };
+
+  const refreshVehiclePresentation = () => updateCuratedVehicleHosts(POPULATION_STEP_SECONDS);
+  updateCuratedPedestrianHosts(.1);
+  refreshVehiclePresentation();
 
   return Object.freeze({
     group,
@@ -565,13 +487,18 @@ export function createLivingWorldPopulation(options = {}) {
       tier,
       pedestrians: pedestrians.length,
       vehicles: vehicles.length,
-      drawCalls: pedestrianParts.length + vehicleParts.length,
-      pedestrianRenderedParts: pedestrianParts.reduce((sum, part) => sum + Number(part.repeats || 1), 0),
-      pedestrianRepresentation: 'articulated-instanced-character-v2',
+      drawCalls: pedestrianHosts.length + vehicles.length,
+      pedestrianRenderedParts: 0,
+      pedestrianRepresentation: 'curated-only-local-models',
       pedestrianLegacyBlockFallback: false,
-      pedestrianPartRoles: Object.freeze(pedestrianParts.map((part) => part.role)),
-      vehicleRenderedParts: vehicleParts.reduce((sum, part) => sum + Number(part.repeats || 1), 0),
-      simulationHz: 10,
+      proceduralPedestrianMeshes: 0,
+      curatedPedestrianHosts: pedestrianHosts.length,
+      pedestrianPartRoles: Object.freeze([]),
+      vehicleRenderedParts: 0,
+      vehiclePresentation: 'curated-only-local-models',
+      proceduralVehicleMeshes: 0,
+      curatedVehicleHosts: vehicleHosts.length,
+      simulationHz: 30,
       vehicleAttitudeAuthority: 'published-road-four-wheel-contact',
       visibilityPolicy: POPULATION_VISIBILITY_POLICY,
       characterArchetypes: Object.freeze([...new Set(pedestrians.map((agent) => agent.archetype.id))].sort()),
@@ -618,9 +545,7 @@ export function createLivingWorldPopulation(options = {}) {
       agent.promoted = true;
       agent.visibility = 0;
       agent.visibleTarget = false;
-      updateInstances(pedestrians, pedestrianGraph, pedestrianParts, 'pedestrian', {
-        reference: referencePosition(), activeRatio: activeRatio(), dt: .1
-      });
+      updateCuratedPedestrianHosts(.1);
       return promoted ? Object.freeze({ ...promoted, promoted: true }) : null;
     },
     releasePedestrian(agentId) {
@@ -630,14 +555,11 @@ export function createLivingWorldPopulation(options = {}) {
       agent.reaction = '';
       agent.reactionRemaining = 0;
       agent.reactionTarget = null;
-      // Restore the already-positioned instanced actor immediately so a LOD
-      // release cannot create a visible empty beat.
+      // Restore the same curated actor immediately after close-detail release.
       agent.relocationCooldown = 0;
       agent.visibility = 1;
       agent.visibleTarget = true;
-      updateInstances(pedestrians, pedestrianGraph, pedestrianParts, 'pedestrian', {
-        reference: referencePosition(), activeRatio: activeRatio(), dt: .1
-      });
+      updateCuratedPedestrianHosts(.1);
       return true;
     },
     retirePedestrian(agentId) {
@@ -649,9 +571,7 @@ export function createLivingWorldPopulation(options = {}) {
       agent.reactionTarget = null;
       relocateAgent(agent, pedestrianGraph, random, 'pedestrian', referencePosition());
       agent.visibility = 0;
-      updateInstances(pedestrians, pedestrianGraph, pedestrianParts, 'pedestrian', {
-        reference: referencePosition(), activeRatio: activeRatio(), dt: .1
-      });
+      updateCuratedPedestrianHosts(.1);
       return true;
     },
     witnessEvent(event = {}) {
@@ -679,9 +599,7 @@ export function createLivingWorldPopulation(options = {}) {
         agent.waiting = agent.reaction !== 'startled';
       });
       if (candidates.length) {
-        updateInstances(pedestrians, pedestrianGraph, pedestrianParts, 'pedestrian', {
-          reference: referencePosition(), activeRatio: activeRatio(), dt: .1
-        });
+        updateCuratedPedestrianHosts(.1);
       }
       return Object.freeze(candidates.map(({ agent, distance }) => Object.freeze({
         ...pedestrianSnapshot(agent),
@@ -736,27 +654,26 @@ export function createLivingWorldPopulation(options = {}) {
     },
     fixedUpdate(dt) {
       accumulator += dt;
-      if (accumulator < .1) return;
-      const step = Math.min(.2, accumulator);
-      accumulator = 0;
-      tick += 1;
-      const reference = referencePosition();
-      advanceAgents(vehicles, trafficGraph, trafficOutgoing, random, step, 'vehicle', { reference, tick });
-      const vehiclePoses = vehicles.map((agent) => agentPose(agent, trafficGraph, sampleVehicleSurface)).filter(Boolean);
-      advanceAgents(pedestrians, pedestrianGraph, pedestrianOutgoing, random, step, 'pedestrian', {
-        reference,
-        tick,
-        crossingBlocked: (edge) => {
-          const x = (edge.p1.x + edge.p2.x) * .5;
-          const z = (edge.p1.z + edge.p2.z) * .5;
-          return vehiclePoses.some((pose) => Math.hypot(pose.x - x, pose.z - z) < 9);
-        }
-      });
-      const ratio = activeRatio();
-      updateInstances(pedestrians, pedestrianGraph, pedestrianParts, 'pedestrian', { reference, activeRatio: ratio, dt: step });
-      updateInstances(vehicles, trafficGraph, vehicleParts, 'vehicle', {
-        reference, activeRatio: ratio, dt: step, sampleVehicleSurface
-      });
+      if (accumulator < POPULATION_STEP_SECONDS) return;
+      const stepCount = Math.min(4, Math.floor(accumulator / POPULATION_STEP_SECONDS));
+      accumulator -= stepCount * POPULATION_STEP_SECONDS;
+      for (let stepIndex = 0; stepIndex < stepCount; stepIndex += 1) {
+        tick += 1;
+        const reference = referencePosition();
+        advanceAgents(vehicles, trafficGraph, trafficOutgoing, random, POPULATION_STEP_SECONDS, 'vehicle', { reference, tick, sampleVehicleSurface });
+        const vehiclePoses = vehicles.map((agent) => agentPose(agent, trafficGraph, sampleVehicleSurface)).filter(Boolean);
+        advanceAgents(pedestrians, pedestrianGraph, pedestrianOutgoing, random, POPULATION_STEP_SECONDS, 'pedestrian', {
+          reference,
+          tick,
+          crossingBlocked: (edge) => {
+            const x = (edge.p1.x + edge.p2.x) * .5;
+            const z = (edge.p1.z + edge.p2.z) * .5;
+            return vehiclePoses.some((pose) => Math.hypot(pose.x - x, pose.z - z) < 9);
+          }
+        });
+      }
+      updateCuratedPedestrianHosts(stepCount * POPULATION_STEP_SECONDS);
+      updateCuratedVehicleHosts(stepCount * POPULATION_STEP_SECONDS);
     },
     activeCounts() {
       const vehicleAttitudeMismatches = vehicles.filter((agent) => {
@@ -787,9 +704,16 @@ export function createLivingWorldPopulation(options = {}) {
       });
     },
     dispose() {
+      disposed = true;
       group.removeFromParent?.();
-      [...pedestrianParts, ...vehicleParts].forEach((part) => part.mesh.geometry?.dispose?.());
-      Object.values(materials).forEach((material) => material.dispose());
+      vehicles.forEach((agent) => {
+        disposeCuratedTrafficVehicle(agent.visualHost);
+        agent.visualHost = null;
+      });
+      pedestrians.forEach((agent) => {
+        disposeCuratedCharacter(agent.visualHost);
+        agent.visualHost = null;
+      });
     }
   });
 }

@@ -376,7 +376,7 @@ function createUrbanEquipmentRuntime(options = {}) {
     const blast = radius > 1.2;
     const color = style === 'paintball' ? 0xff4f9a : style === 'laser' ? 0x64fff4 : 0xbbe8ff;
     const root = new THREE.Group();
-    root.name = blast ? 'Concussion impact ring' : `${style} impact mark`;
+    root.name = blast ? 'Grenade impact ring' : `${style} impact mark`;
     const geometries = [];
     const materials = [];
     if (blast) {
@@ -455,9 +455,31 @@ function createUrbanEquipmentRuntime(options = {}) {
   }
 
   function createProjectileVisual(kind) {
-    const geometry = kind === 'thrown-charge'
-      ? new THREE.IcosahedronGeometry(.16, 1)
-      : kind === 'paintball'
+    if (kind === 'thrown-charge') {
+      const root = new THREE.Group();
+      root.name = 'thrown-grenade world projectile';
+      const bodyGeometry = new THREE.SphereGeometry(.14, 12, 8);
+      const capGeometry = new THREE.CylinderGeometry(.065, .08, .09, 10);
+      const leverGeometry = new THREE.BoxGeometry(.075, .035, .17);
+      const material = projectileMaterial(kind);
+      const body = new THREE.Mesh(bodyGeometry, material);
+      body.name = 'grenade-body';
+      body.scale.set(.82, 1.28, .82);
+      body.castShadow = true;
+      root.add(body);
+      const cap = new THREE.Mesh(capGeometry, material);
+      cap.name = 'grenade-fuse-housing';
+      cap.position.y = .2;
+      root.add(cap);
+      const lever = new THREE.Mesh(leverGeometry, material);
+      lever.name = 'grenade-safety-lever';
+      lever.position.set(.08, .21, 0);
+      lever.rotation.z = -.16;
+      root.add(lever);
+      state.group.add(root);
+      return { root, geometries: [bodyGeometry, capGeometry, leverGeometry], materials: [material] };
+    }
+    const geometry = kind === 'paintball'
         ? new THREE.SphereGeometry(.075, 8, 6)
         : kind === 'laser'
           ? new THREE.CylinderGeometry(.022, .022, .34, 7)
@@ -465,7 +487,7 @@ function createUrbanEquipmentRuntime(options = {}) {
     const material = projectileMaterial(kind);
     const mesh = new THREE.Mesh(geometry, material);
     mesh.name = `${kind} world projectile`;
-    mesh.castShadow = kind === 'thrown-charge' || kind === 'paintball';
+    mesh.castShadow = kind === 'paintball';
     state.group.add(mesh);
     return { root: mesh, geometries: [geometry], materials: [material] };
   }
@@ -654,7 +676,7 @@ function createUrbanEquipmentRuntime(options = {}) {
         radius: 38, audibleRadius: kind === 'paintball' ? 18 : 34, maximumWitnesses: 4
       });
     }
-    setStatus(kind === 'thrown-charge' ? 'Charge thrown.' : `${equipment.label} fired.`);
+    setStatus(kind === 'thrown-charge' ? 'Grenade thrown.' : `${equipment.label} fired.`);
   }
 
   function fireNpcProjectile(options = {}) {

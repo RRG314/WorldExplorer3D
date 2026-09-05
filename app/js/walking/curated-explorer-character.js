@@ -1,4 +1,4 @@
-import { loadModelAsset } from '../assets/model-asset-runtime.js?v=9';
+import { loadModelAsset } from '../assets/model-asset-runtime.js?v=14';
 
 const EXPLORER_ASSET_ID = 'character-field-explorer-v1';
 const EXPLORER_WOMAN_ASSET_ID = 'character-field-explorer-woman-v1';
@@ -73,6 +73,11 @@ function prepareExplorerVisual(THREE, instance, options = {}) {
   visual.add(normalized);
   source.traverse((object) => {
     if (!object?.isMesh) return;
+    if (options.hideAuthoredWeapons === true && /pistol|rifle|gun|weapon/i.test(String(object.name || ''))) {
+      object.visible = false;
+      object.userData.retiredAuthoredWeapon = true;
+      return;
+    }
     object.castShadow = true;
     object.receiveShadow = false;
     const materials = Array.isArray(object.material) ? object.material : [object.material];
@@ -115,7 +120,10 @@ function updateCuratedCharacterAnimation(host, isMoving, deltaTime, isRunning = 
   if (!mixer) return false;
   mixer.update(Math.max(0, Number(deltaTime) || 0));
   const actions = host.userData.characterActions || {};
-  const target = isRunning && actions.run ? 'run' : isMoving && actions.walk ? 'walk' : 'idle';
+  const armed = !!host?.userData?.heldEquipmentId;
+  const target = armed
+    ? isMoving && actions.armedRun ? 'armedRun' : actions.armedIdle ? 'armedIdle' : 'idle'
+    : isRunning && actions.run ? 'run' : isMoving && actions.walk ? 'walk' : 'idle';
   for (const [name, action] of Object.entries(actions)) {
     action.enabled = true;
     action.setEffectiveWeight(name === target ? 1 : 0);
@@ -168,10 +176,12 @@ async function attachCuratedExplorerCharacter(THREE, host, options = {}) {
     if (host.userData.curatedCharacterLoadToken === loadToken) {
       host.userData.curatedCharacterLoadStarted = false;
       delete host.userData.curatedCharacterLoadToken;
-      setFallbackVisible(host, true);
+      setFallbackVisible(host, options.failClosed !== true);
     }
     if (error?.name !== 'AbortError') {
-      console.warn('Curated character unavailable; keeping the built-in character.', error);
+      console.warn(options.failClosed === true
+        ? 'Curated character unavailable; leaving the character host empty.'
+        : 'Curated character unavailable; keeping the built-in character.', error);
     }
     return false;
   }

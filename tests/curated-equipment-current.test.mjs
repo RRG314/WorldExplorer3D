@@ -35,19 +35,24 @@ test('two cohesive CC0 models cover Explorer energy sidearms without changing it
     'pulse-sidearm': 'equipment-explorer-pulse-sidearm-v1',
     'compact-sidearm': 'equipment-explorer-pulse-sidearm-v1',
     'responder-sidearm': 'equipment-explorer-pulse-sidearm-v1',
+    'paintball-gun': 'equipment-explorer-pulse-sidearm-v1',
     'laser-gun': 'equipment-explorer-laser-rifle-v1'
   });
-  assert.equal(curatedEquipmentAssetForId('paintball-gun'), null);
+  assert.equal(curatedEquipmentAssetForId('paintball-gun'), 'equipment-explorer-pulse-sidearm-v1');
 
   const expectedHashes = {
     'equipment-explorer-pulse-sidearm-v1': 'c7e5e28636c18a09c9129cbf9f2d8132eea97c7d142477978c086d8c876b04ca',
     'equipment-explorer-laser-rifle-v1': '5482cf683aad4f08526764db0697894d17cc45b8c18e189d23facaba55a72441'
   };
+  const expectedMaxInstances = {
+    'equipment-explorer-pulse-sidearm-v1': 24,
+    'equipment-explorer-laser-rifle-v1': 16
+  };
   for (const asset of assets) {
     assert.equal(asset.license, 'CC0-1.0');
     assert.equal(asset.sourceUrl, 'https://quaternius.com/packs/scifimodularguns.html');
     assert.equal(asset.collisionPolicy, 'existing-equipment-and-projectile-authority');
-    assert.equal(asset.budgets.maxInstances, 1);
+    assert.equal(asset.budgets.maxInstances, expectedMaxInstances[asset.id]);
     const { bytes, json } = readGlb(asset);
     assert.ok(bytes.length <= asset.budgets.bytes);
     assert.ok(triangleCount(json) <= asset.budgets.triangles);
@@ -57,7 +62,7 @@ test('two cohesive CC0 models cover Explorer energy sidearms without changing it
   }
 });
 
-test('curated weapons remain visual adapters with loading and confirmed-error fallback', () => {
+test('curated weapons remain visual adapters and fail closed without revealing old fallback models', () => {
   const adapter = fs.readFileSync(path.join(root, 'app/js/urban-sandbox/curated-equipment-visual.js'), 'utf8');
   const visuals = fs.readFileSync(path.join(root, 'app/js/urban-sandbox/equipment-visuals.js'), 'utf8');
   const model = fs.readFileSync(path.join(root, 'app/js/urban-sandbox/equipment-model.js'), 'utf8');
@@ -65,7 +70,8 @@ test('curated weapons remain visual adapters with loading and confirmed-error fa
   assert.match(adapter, /presentationOnly\s*=\s*true/);
   assert.match(adapter, /existing-equipment-and-projectile-authority|gameplayAuthority/);
   assert.match(adapter, /setEquipmentFallbackVisible\(host, false\)/);
-  assert.match(adapter, /catch \(error\)[\s\S]*setEquipmentFallbackVisible\(host, true\)/);
+  assert.match(adapter, /catch \(error\)[\s\S]*setEquipmentFallbackVisible\(host, false\)/);
+  assert.doesNotMatch(adapter, /catch \(error\)[\s\S]*setEquipmentFallbackVisible\(host, true\)/);
   assert.match(visuals, /defaultEquipmentFallback\s*=\s*true/);
   assert.match(visuals, /attachCuratedEquipmentVisual/);
   assert.match(visuals, /disposeCuratedEquipmentVisual/);

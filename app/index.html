@@ -843,13 +843,7 @@ How Connected Data Is Used
 </div>
 <aside id="urbanEquipment" aria-hidden="true" aria-label="Character Backpack">
   <div class="urbanEquipmentHead"><span>Backpack</span><div><small>I to close · 1–6 quick equip</small><button id="urbanEquipmentCloseBtn" type="button" aria-label="Close Backpack">×</button></div></div>
-  <section id="explorerCharacterChoice" class="explorerCharacterChoice" aria-label="Explorer character">
-    <div><strong>Explorer character</strong><small>Choose the character that represents you.</small></div>
-    <div class="explorerCharacterChoiceButtons" role="group" aria-label="Choose man or woman">
-      <button type="button" data-player-character-gender="man" aria-pressed="false">Man</button>
-      <button type="button" data-player-character-gender="woman" aria-pressed="false">Woman</button>
-    </div>
-  </section>
+  <section class="urbanBackpackWallet" aria-label="Explorer wallet"><span>Explorer wallet</span><strong id="urbanBackpackWallet">$0</strong></section>
   <div class="urbanBackpackLabel">Quick access</div>
   <div id="urbanEquipmentSlots" class="urbanEquipmentSlots"></div>
   <div class="urbanBackpackLabel">Pack contents</div>
@@ -861,7 +855,7 @@ How Connected Data Is Used
 </aside>
 <aside id="urbanStore" role="dialog" aria-modal="true" aria-labelledby="urbanStoreName" aria-hidden="true">
   <div class="urbanStoreHead"><div><small>MAPPED LOCAL STORE</small><strong id="urbanStoreName">Convenience store</strong></div><button id="urbanStoreCloseBtn" type="button" aria-label="Close store">×</button></div>
-  <div class="urbanStoreMeta"><span id="urbanStoreSource">OpenStreetMap place</span><strong id="urbanStoreCredits">120 Explorer Credits</strong></div>
+  <div class="urbanStoreMeta"><span id="urbanStoreSource">OpenStreetMap place</span><strong id="urbanStoreCredits">$0</strong></div>
   <p class="urbanStoreAuthority">Each shop reflects a place on the local map, with rotating stock, prices, and trades.</p>
   <section><h3>Today’s stock</h3><div id="urbanStoreStock" class="urbanStoreGrid"></div></section>
   <section><h3>Sell from Backpack</h3><div id="urbanStoreSell" class="urbanStoreGrid"></div></section>
@@ -1577,5 +1571,5 @@ Explore the area
 <!-- Real Estate System -->
 <script type="module" src="js/app-shell-fragments.js?v=86"></script>
 <script type="module" src="js/app-auth-shell.js?v=87"></script>
-<script type="module" src="js/bootstrap.js?v=587"></script>
+<script type="module" src="js/bootstrap.js?v=589"></script>
 </body></html>

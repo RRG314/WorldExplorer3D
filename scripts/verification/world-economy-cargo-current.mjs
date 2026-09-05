@@ -47,7 +47,10 @@ async function buyEarthMaterial(context) {
       const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
       return snapshot.urbanSandbox?.commerce?.stores || [];
     });
-    const materialStores = places.filter((place) => ['fuel', 'hardware', 'mechanic', 'pawn'].includes(place.kind));
+    const materialStorePriority = new Map([['hardware', 0], ['mechanic', 1], ['pawn', 2], ['fuel', 3]]);
+    const materialStores = places
+      .filter((place) => materialStorePriority.has(place.kind))
+      .sort((left, right) => materialStorePriority.get(left.kind) - materialStorePriority.get(right.kind));
     assert.ok(materialStores.length > 0, 'The built Earth world did not publish a mapped material seller.');
     const opened = await page.evaluate(async (orderedPlaces) => {
       for (const place of orderedPlaces) {
@@ -61,7 +64,10 @@ async function buyEarthMaterial(context) {
     }, materialStores);
     assert.ok(opened, 'No mapped material seller opened through its published player interaction.');
     await page.locator('#urbanStore.show').waitFor({ state: 'visible' });
-    const materialCatalogId = opened.kind === 'fuel' ? 'copper-wire-coil' : 'reclaimed-aluminum-stock';
+    const openStoreState = await state(page);
+    const materialCatalogId = openStoreState.urbanSandbox?.commerce?.current?.standard
+      ?.find((item) => item.category === 'material')?.id || '';
+    assert.ok(materialCatalogId, `Mapped material seller ${opened.name} did not publish a transferable material in today's stock.`);
     const buy = page.locator(`#urbanStoreStock [data-store-action="buy"][data-store-item="${materialCatalogId}"]`);
     await buy.waitFor({ state: 'visible' });
     const before = await state(page);

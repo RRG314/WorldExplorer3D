@@ -24,7 +24,7 @@ import {
   parentTerrainTile,
   resolveFarFieldFallbackDatum,
   sampleFarFieldGridWorldY
-} from './far-field-geometry.js?v=17';
+} from './far-field-geometry.js?v=18';
 import {
   classifyWorldCoverSurface,
   loadWorldCoverBaseline
@@ -71,6 +71,7 @@ function createFarFieldTerrainApi(deps = {}) {
     getOrLoadTerrainTile,
     latLonToTileXY,
     sampleAcceptedGroundAtLatLon,
+    sampleDetailedTerrainMetersAtLatLon,
     sampleTileElevationMeters,
     terrainTileDeps,
     tileXYToLatLonBounds,
@@ -174,6 +175,7 @@ function createFarFieldTerrainApi(deps = {}) {
     farFieldSeamBlendMeters: FAR_FIELD_SEAM_BLEND_METERS,
     latLonToTileXY,
     sampleAcceptedGroundAtLatLon,
+    sampleDetailedTerrainMetersAtLatLon,
     sampleTileElevationMeters,
     terrainTileDeps,
     tileXYToLatLonBounds,

@@ -1,18 +1,19 @@
-import { loadModelAsset } from '../assets/model-asset-runtime.js?v=9';
+import { loadModelAsset } from '../assets/model-asset-runtime.js?v=14';
 import { VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=6';
 
 const CURATED_TRAFFIC_ASSET_BY_VARIANT = Object.freeze({
   compact: 'traffic-compact-hatchback-v1',
   sedan: 'traffic-four-door-sedan-v1',
   suv: 'traffic-trail-suv-v1',
-  taxi: 'traffic-city-taxi-v1'
+  pickup: 'traffic-utility-pickup-v1',
+  van: 'traffic-city-van-v1',
+  delivery_van: 'traffic-city-van-v1',
+  taxi: 'traffic-city-taxi-v1',
+  box_truck: 'traffic-service-truck-v1',
+  city_bus: 'traffic-city-bus-v1'
 });
 
-function setTrafficFallbackVisible(host, visible) {
-  host?.traverse?.((object) => {
-    if (object?.userData?.defaultTrafficVehicleFallback === true) object.visible = visible;
-  });
-}
+const CURATED_RESPONDER_ASSET_ID = 'traffic-police-response-v1';
 
 function prepareTrafficVisual(THREE, instance, options = {}) {
   const { record, root: source } = instance;
@@ -20,7 +21,12 @@ function prepareTrafficVisual(THREE, instance, options = {}) {
   const bounds = new THREE.Box3().setFromObject(source);
   const size = bounds.getSize(new THREE.Vector3());
   const center = bounds.getCenter(new THREE.Vector3());
-  const target = record.dimensionsMeters;
+  const requested = options.dimensionsMeters || {};
+  const target = {
+    width: Number(requested.width || record.dimensionsMeters.width),
+    height: Number(requested.height || record.dimensionsMeters.height),
+    length: Number(requested.length || record.dimensionsMeters.length)
+  };
   source.position.x -= center.x;
   source.position.y -= bounds.min.y;
   source.position.z -= center.z;
@@ -68,7 +74,7 @@ function prepareTrafficVisual(THREE, instance, options = {}) {
   visual.userData.curatedTrafficAssetId = record.id;
   visual.userData.collisionPolicy = record.collisionPolicy;
   visual.userData.performanceProfile = Object.freeze({
-    style: 'licensed-stylized-close-traffic',
+    style: 'licensed-curated-world-traffic',
     sourceBytes: record.budgets.bytes,
     triangles: record.budgets.triangles,
     maxInstances: record.budgets.maxInstances,
@@ -85,14 +91,15 @@ function disposeCuratedTrafficVehicle(host) {
   attachment.instance.dispose();
   delete host.userData.curatedTrafficVehicleAttachment;
   delete host.userData.curatedTrafficAssetId;
-  setTrafficFallbackVisible(host, true);
   host.userData.onCuratedTrafficDetached?.(assetId);
   return true;
 }
 
 async function attachCuratedTrafficVehicle(THREE, host, options = {}) {
   if (!host || host.userData.curatedTrafficVehicleLoadStarted) return false;
-  const assetId = options.assetId || CURATED_TRAFFIC_ASSET_BY_VARIANT[String(options.variantId || '')];
+  const assetId = options.assetId || (options.responder
+    ? CURATED_RESPONDER_ASSET_ID
+    : CURATED_TRAFFIC_ASSET_BY_VARIANT[String(options.variantId || '')]);
   if (!assetId) return false;
   host.userData.curatedTrafficVehicleLoadStarted = true;
   try {
@@ -103,21 +110,23 @@ async function attachCuratedTrafficVehicle(THREE, host, options = {}) {
       return false;
     }
     const visual = prepareTrafficVisual(THREE, instance, options);
-    setTrafficFallbackVisible(host, false);
     host.add(visual);
     host.userData.curatedTrafficAssetId = instance.record.id;
+    host.userData.curatedTrafficVehicleLoadFailed = false;
     host.userData.curatedTrafficVehicleAttachment = Object.freeze({ instance, visual });
+    host.userData.onCuratedTrafficAttached?.(instance.record.id);
     return true;
   } catch (error) {
     host.userData.curatedTrafficVehicleLoadStarted = false;
-    setTrafficFallbackVisible(host, true);
-    if (error?.name !== 'AbortError') console.warn('Curated traffic vehicle unavailable; keeping the built-in vehicle.', error);
+    host.userData.curatedTrafficVehicleLoadFailed = error?.name !== 'AbortError';
+    if (error?.name !== 'AbortError') console.warn('Curated traffic vehicle unavailable; vehicle remains hidden.', error);
     return false;
   }
 }
 
 export {
   CURATED_TRAFFIC_ASSET_BY_VARIANT,
+  CURATED_RESPONDER_ASSET_ID,
   attachCuratedTrafficVehicle,
   disposeCuratedTrafficVehicle
 };

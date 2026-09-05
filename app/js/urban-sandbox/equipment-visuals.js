@@ -2,7 +2,11 @@ import {
   attachCuratedEquipmentVisual,
   curatedEquipmentAssetForId,
   disposeCuratedEquipmentVisual
-} from './curated-equipment-visual.js?v=1';
+} from './curated-equipment-visual.js?v=2';
+import {
+  attachCuratedParachuteVisual,
+  disposeCuratedParachuteVisual
+} from './curated-parachute-visual.js?v=1';
 
 function createEquipmentVisuals(THREE, characterMesh) {
   const hand = characterMesh?.userData?.limbs?.arm2;
@@ -61,9 +65,12 @@ function createEquipmentVisuals(THREE, characterMesh) {
   add(sidearm, new THREE.CylinderGeometry(.052, .052, .22, 10), accent, 'Pulse sidearm emitter', [0, .02, .46], [Math.PI * .5, 0, 0]);
   add(sidearm, new THREE.BoxGeometry(.06, .045, .12), safety, 'Pulse sidearm sight', [0, .12, .18]);
 
-  const charge = makeItem('concussion-charge');
-  add(charge, new THREE.IcosahedronGeometry(.16, 1), dark, 'Concussion charge shell', [0, 0, .16]);
-  add(charge, new THREE.TorusGeometry(.115, .025, 6, 12), accent, 'Concussion charge status ring', [0, 0, .17]);
+  const grenade = makeItem('concussion-charge');
+  const grenadeBody = add(grenade, new THREE.SphereGeometry(.13, 12, 8), dark, 'Explorer grenade body', [0, 0, .18]);
+  grenadeBody.scale.set(.82, .76, 1.28);
+  add(grenade, new THREE.CylinderGeometry(.065, .08, .09, 10), metal, 'Explorer grenade fuse housing', [0, 0, .34], [Math.PI * .5, 0, 0]);
+  add(grenade, new THREE.BoxGeometry(.075, .035, .16), safety, 'Explorer grenade safety lever', [.085, .025, .31], [0, 0, -.16]);
+  add(grenade, new THREE.TorusGeometry(.065, .009, 6, 16), metal, 'Explorer grenade pull ring', [-.07, .01, .385], [0, Math.PI * .5, 0]);
 
   const laser = makeItem('laser-gun');
   add(laser, new THREE.BoxGeometry(.15, .16, .43), dark, 'Laser gun body', [0, .02, .22]);
@@ -81,8 +88,11 @@ function createEquipmentVisuals(THREE, characterMesh) {
   parachutePack.name = 'Explorer parachute pack';
   parachutePack.visible = false;
   characterMesh.add(parachutePack);
-  add(parachutePack, new THREE.BoxGeometry(.43, .55, .2), dark, 'Parachute pack body', [0, 1.08, -.3]);
-  add(parachutePack, new THREE.BoxGeometry(.34, .09, .025), safety, 'Parachute pack deployment stripe', [0, 1.13, -.414]);
+  const packBody = add(parachutePack, new THREE.SphereGeometry(.3, 16, 10), dark, 'Parachute pack body', [0, 1.08, -.29]);
+  packBody.scale.set(.68, 1, .34);
+  const packFlap = add(parachutePack, new THREE.SphereGeometry(.16, 14, 8), accent, 'Parachute pack deployment flap', [0, 1.18, -.385]);
+  packFlap.scale.set(1.02, .7, .22);
+  add(parachutePack, new THREE.TorusGeometry(.045, .009, 6, 14, Math.PI * 1.55), safety, 'Parachute deployment handle', [.22, 1.03, -.27], [Math.PI * .5, 0, Math.PI * .18]);
   [-1, 1].forEach((side) => add(
     parachutePack,
     new THREE.CylinderGeometry(.018, .018, .64, 6),
@@ -121,13 +131,44 @@ function createEquipmentVisuals(THREE, characterMesh) {
   geometries.add(lineGeometry);
   const suspensionLines = new THREE.LineSegments(lineGeometry, lineMaterial);
   suspensionLines.name = 'Parachute suspension lines';
+  suspensionLines.userData.defaultEquipmentFallback = true;
   parachuteCanopy.add(suspensionLines);
+  void attachCuratedParachuteVisual(THREE, parachuteCanopy);
 
   const visualIdFor = (id) => ['compact-sidearm', 'responder-sidearm'].includes(String(id || '')) ? 'pulse-sidearm' : String(id || 'hands');
+  const curatedRightWrist = () => {
+    const visual = characterMesh?.userData?.curatedCharacterAttachment?.visual;
+    if (!visual) return null;
+    let match = null;
+    visual.traverse?.((object) => {
+      if (match) return;
+      const normalizedName = String(object?.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (normalizedName === 'wristr' || normalizedName === 'rightwrist') match = object;
+    });
+    return match;
+  };
+  const syncCuratedHandAnchor = () => {
+    // GLTFLoader sanitizes punctuation in imported node names in some Three.js
+    // releases, so match the stable semantic name instead of one spelling.
+    const wrist = curatedRightWrist();
+    if (!wrist || !characterMesh?.parent) return false;
+    if (root.parent !== characterMesh) characterMesh.attach(root);
+    const wristWorld = wrist.getWorldPosition(new THREE.Vector3());
+    root.position.copy(characterMesh.worldToLocal(wristWorld));
+    root.position.add(new THREE.Vector3(.015, -.025, .035));
+    root.rotation.set(0, 0, 0);
+    root.scale.setScalar(1);
+    root.userData.attachment = 'curated-right-wrist';
+    return true;
+  };
   const resetRootPose = () => {
+    if (syncCuratedHandAnchor()) return true;
+    if (root.parent !== hand) hand.attach(root);
     root.position.set(0, -.52, .08);
     root.rotation.set(-Math.PI * .48, 0, 0);
     root.scale.setScalar(1);
+    root.userData.attachment = 'fallback-right-arm';
+    return false;
   };
   const setEquipped = (id) => {
     const visualId = visualIdFor(id);
@@ -160,37 +201,47 @@ function createEquipmentVisuals(THREE, characterMesh) {
       return true;
     },
     update(dt = 0) {
+      const curatedGrip = resetRootPose();
       if (!useAction) return;
       useAction.elapsed += Math.max(0, Number(dt) || 0);
       const progress = Math.min(1, useAction.elapsed / useAction.duration);
       const motion = Math.sin(progress * Math.PI);
-      resetRootPose();
       if (useAction.category === 'unarmed') {
-        hand.rotation.x = -1.35 * motion;
-        hand.rotation.z = -.12 * motion;
-        if (offHand) {
+        if (!curatedGrip) {
+          hand.rotation.x = -1.35 * motion;
+          hand.rotation.z = -.12 * motion;
+        }
+        if (offHand && !curatedGrip) {
           offHand.rotation.x = -1.12 * motion;
           offHand.rotation.z = .12 * motion;
         }
       } else if (useAction.category === 'melee') {
-        hand.rotation.x = -.55 - motion * 1.15;
-        hand.rotation.z = -.18 - motion * .46;
+        if (!curatedGrip) {
+          hand.rotation.x = -.55 - motion * 1.15;
+          hand.rotation.z = -.18 - motion * .46;
+        }
         root.rotation.z = -motion * 1.15;
         root.rotation.y = motion * .28;
       } else if (useAction.category === 'sidearm') {
-        hand.rotation.x = -1.12;
-        hand.rotation.z = -.12;
+        if (!curatedGrip) {
+          hand.rotation.x = -1.12;
+          hand.rotation.z = -.12;
+        }
         root.position.z -= motion * .11;
         root.position.y += motion * .035;
-        root.rotation.x += motion * .28;
+        root.rotation.x -= motion * .16;
       } else if (useAction.category === 'explosive') {
-        hand.rotation.x = -motion * 2.05;
-        hand.rotation.z = -motion * .32;
-        root.rotation.x += motion * .65;
+        if (!curatedGrip) {
+          hand.rotation.x = -motion * 2.05;
+          hand.rotation.z = -motion * .32;
+        }
+        root.rotation.x -= motion * .8;
         root.rotation.z -= motion * .3;
       } else {
-        hand.rotation.x = -motion * 1.05;
-        hand.rotation.z = -motion * .14;
+        if (!curatedGrip) {
+          hand.rotation.x = -motion * 1.05;
+          hand.rotation.z = -motion * .14;
+        }
         root.position.y += motion * .06;
       }
       root.scale.setScalar(1 + motion * .06);
@@ -202,11 +253,23 @@ function createEquipmentVisuals(THREE, characterMesh) {
     actionSnapshot() {
       return useAction ? Object.freeze({ id: useAction.id, category: useAction.category, progress: Math.min(1, useAction.elapsed / useAction.duration) }) : null;
     },
+    equipmentSnapshot() {
+      const equippedId = String(root.userData.equippedId || 'hands');
+      const visualId = visualIdFor(equippedId);
+      const group = items.get(visualId);
+      return Object.freeze({
+        equippedId,
+        attachment: String(root.userData.attachment || ''),
+        curatedAssetId: String(group?.userData?.curatedEquipmentAssetId || ''),
+        fallbackVisible: group?.children?.some?.((child) => child?.userData?.defaultEquipmentFallback === true && child.visible !== false) === true
+      });
+    },
     parachuteSnapshot() {
       return Object.freeze({
         ready: parachuteReady,
         packVisible: parachutePack.visible === true,
-        canopyVisible: parachuteCanopy.visible === true
+        canopyVisible: parachuteCanopy.visible === true,
+        curatedAssetId: String(parachuteCanopy.userData.curatedParachuteAssetId || '')
       });
     },
     dispose() {
@@ -214,6 +277,7 @@ function createEquipmentVisuals(THREE, characterMesh) {
       items.forEach((group) => disposeCuratedEquipmentVisual(group));
       root.removeFromParent?.();
       parachutePack.removeFromParent?.();
+      disposeCuratedParachuteVisual(parachuteCanopy);
       parachuteCanopy.removeFromParent?.();
       geometries.forEach((geometry) => geometry.dispose?.());
       materials.forEach((material) => material.dispose?.());

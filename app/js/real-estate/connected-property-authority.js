@@ -11,6 +11,9 @@ import { initFirebase } from '../../../js/firebase-init.js?v=56';
 import { commitWorldPropertyAction, commitWorldPropertyTradeAction } from '../../../js/property-api.js?v=3';
 
 const LOCATION_PROPERTY_LIMIT = 320;
+const STARTING_WALLET_DOLLARS = 1000000;
+const CURRENCY_VERSION = 2;
+const LEGACY_CURRENCY_SCALE = 2000;
 
 function finite(value, fallback = 0) {
   const number = Number(value);
@@ -75,7 +78,7 @@ function createConnectedPropertyAuthority(options = {}) {
   const services = initFirebase();
   if (!worldSeed || !locationId || !user?.uid || !services?.db) return null;
   let disposed = false;
-  let wallet = Object.freeze({ credits: 500, pending: true });
+  let wallet = Object.freeze({ credits: STARTING_WALLET_DOLLARS, pending: true, currencyVersion: CURRENCY_VERSION });
   let records = new Map();
   let portfolioRecords = new Map();
   let rentalRecords = new Map();
@@ -102,7 +105,13 @@ function createConnectedPropertyAuthority(options = {}) {
   const stopWallet = onSnapshot(doc(services.db, 'users', user.uid, 'economy', 'wallet'), (snapshot) => {
     if (disposed) return;
     const data = snapshot.exists() ? snapshot.data() : {};
-    wallet = Object.freeze({ credits: Math.max(0, finite(data.credits, 500)), pending: false, revision: Math.max(0, finite(data.revision)) });
+    const scale = snapshot.exists() && finite(data.currencyVersion) < CURRENCY_VERSION ? LEGACY_CURRENCY_SCALE : 1;
+    wallet = Object.freeze({
+      credits: Math.max(0, finite(data.credits, STARTING_WALLET_DOLLARS) * scale),
+      pending: false,
+      revision: Math.max(0, finite(data.revision)),
+      currencyVersion: CURRENCY_VERSION
+    });
     emit();
   }, (error) => options.onError?.(error));
   const stopStarter = onSnapshot(doc(services.db, 'users', user.uid, 'propertyEntitlements', 'starter'), (snapshot) => {

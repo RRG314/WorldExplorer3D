@@ -200,6 +200,20 @@
       background: rgba(5, 17, 32, 0.45);
     }
 
+    .character-choice {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .character-choice button[aria-pressed="true"] {
+      color: #fff;
+      background: var(--accent);
+      border-color: #7ab1ff;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.14);
+    }
+
     .mono {
       font-family: 'Chakra Petch', sans-serif;
       font-size: 16px;
@@ -788,6 +802,15 @@
       <h2 class="section-title">Identity</h2>
       <div class="identity-grid">
         <article class="identity-card">
+          <span class="label">Explorer Character</span>
+          <p class="mono" id="explorerCharacterValue">Man</p>
+          <p class="hint">Choose the character that represents you during play. Your Backpack stays focused on equipment.</p>
+          <div id="accountCharacterChoice" class="character-choice" role="group" aria-label="Choose explorer character">
+            <button class="btn-ghost" type="button" data-account-character-gender="man" aria-pressed="false">Man</button>
+            <button class="btn-ghost" type="button" data-account-character-gender="woman" aria-pressed="false">Woman</button>
+          </div>
+        </article>
+        <article class="identity-card">
           <span class="label">Username</span>
           <p id="usernameValue" class="mono">Explorer</p>
           <div class="inline-field">
@@ -998,6 +1021,10 @@
       removeFriend,
       sendInviteToFriend
     } from '../app/js/multiplayer/social.js?v=55';
+    import {
+      getPlayerCharacterGender,
+      setPlayerCharacterGender
+    } from '../app/js/walking/player-character-preference.js?v=1';
 
     const authPrompt = document.getElementById('authPrompt');
     const accountPanel = document.getElementById('accountPanel');
@@ -1054,6 +1081,8 @@
     const creatorAvatarInput = document.getElementById('creatorAvatarInput');
     const creatorBioInput = document.getElementById('creatorBioInput');
     const saveCreatorProfileBtn = document.getElementById('saveCreatorProfileBtn');
+    const explorerCharacterValue = document.getElementById('explorerCharacterValue');
+    const accountCharacterChoice = document.getElementById('accountCharacterChoice');
 
     let unsubscribeEntitlements = null;
     let unsubscribeFriends = null;
@@ -1071,6 +1100,23 @@
       if (type === 'ok') statusLine.classList.add('ok');
       if (type === 'warn') statusLine.classList.add('warn');
     }
+
+    function renderExplorerCharacterChoice() {
+      const gender = getPlayerCharacterGender();
+      explorerCharacterValue.textContent = gender === 'woman' ? 'Woman' : 'Man';
+      accountCharacterChoice?.querySelectorAll?.('[data-account-character-gender]').forEach((button) => {
+        button.setAttribute('aria-pressed', String(button.dataset.accountCharacterGender === gender));
+      });
+    }
+
+    accountCharacterChoice?.addEventListener('click', (event) => {
+      const button = event.target?.closest?.('[data-account-character-gender]');
+      if (!button) return;
+      const gender = setPlayerCharacterGender(button.dataset.accountCharacterGender);
+      renderExplorerCharacterChoice();
+      setStatus(`${gender === 'woman' ? 'Woman' : 'Man'} Explorer selected. The choice applies when you return to the app.`, 'ok');
+    });
+    renderExplorerCharacterChoice();
 
     function setSocialStatus(message, type = 'neutral') {
       if (!socialStatus) return;

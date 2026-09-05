@@ -4,6 +4,7 @@ const ENTRY_EXCLUDED_BUILDING_TYPES = new Set(['roof', 'canopy', 'carport', 'bri
 const DEFAULT_DESTINATION_MATCH_RADIUS = 42;
 const DEFAULT_ENTRY_RADIUS = 8.5;
 const SYNTHETIC_INTERIOR_HEIGHT = 3.4;
+const destinationSupportCache = new WeakMap();
 
 function finiteNumber(value, fallback = 0) {
   const n = Number(value);
@@ -376,21 +377,16 @@ function resolveDestinationBuilding(destination, options = {}) {
 function cacheDestinationSupport(destination, support) {
   if (!destination || typeof destination !== 'object') return support;
   const signature = `${finiteNumber(appCtx.LOC?.lat, 0).toFixed(4)},${finiteNumber(appCtx.LOC?.lon, 0).toFixed(4)}:${Array.isArray(appCtx.buildings) ? appCtx.buildings.length : 0}`;
-  destination._buildingEntrySupport = support;
-  destination._buildingEntrySignature = signature;
-  destination.entryBuildingKey = support?.enterable ? support.key : '';
-  destination.entryBuildingLabel = support?.enterable ? support.label : '';
-  destination.entryBuildingKind = support?.enterable ? summarizeSupportType(support) : '';
-  destination.entryBuildingPoint = support?.enterable && support.entryAnchor ? { ...support.entryAnchor } : null;
+  destinationSupportCache.set(destination, { signature, support });
   return support;
 }
 
 function readCachedDestinationSupport(destination) {
   if (!destination || typeof destination !== 'object') return null;
-  const cached = destination._buildingEntrySupport || null;
+  const cached = destinationSupportCache.get(destination) || null;
   const signature = `${finiteNumber(appCtx.LOC?.lat, 0).toFixed(4)},${finiteNumber(appCtx.LOC?.lon, 0).toFixed(4)}:${Array.isArray(appCtx.buildings) ? appCtx.buildings.length : 0}`;
-  if (!cached || destination._buildingEntrySignature !== signature) return null;
-  return cached;
+  if (!cached || cached.signature !== signature) return null;
+  return cached.support;
 }
 
 function resolveBuildingEntrySupport(input, options = {}) {

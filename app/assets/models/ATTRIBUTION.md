@@ -9,7 +9,7 @@ BMW 525i E34 Player Vehicle
 - License: Creative Commons Attribution 4.0 (CC BY 4.0).
 - Notes: Used as the close player-vehicle visual. The existing World Explorer vehicle controller, collision envelope, headlights, damage rules, and procedural fallback remain authoritative.
 
-Quaternius Close-Traffic Vehicle Family
+Curated World Traffic and Response Fleet
 
 The upstream Cars Pack is published by Quaternius under CC0 1.0. Its `License.txt` is Google Drive file ID `1CqsvhpIzBNSDlZsBWdJcJNC1B-TE3cXK`: https://creativecommons.org/publicdomain/zero/1.0/
 
@@ -21,7 +21,16 @@ The upstream Cars Pack is published by Quaternius under CC0 1.0. Its `License.tx
 - License: Creative Commons Zero v1.0 Universal (CC0 1.0).
 - Bundled SHA-256 values: `e5f5fa41c4434383b20287725c0e9d757cbd0f059eedc342ec265d32a195fe39`, `bf00f2f0386a25aa310abc0424d22586e46a59ee6c737e6b375c97c9f01bd462`, `1a9ce2bba813dca5005abab09715b01b8b5f4a9c48d7260463afdfeb876aa8b6`, and `14b2f982f8a501565702ecb56f917c82e9abae914fa3f76d2f622a8670598af1`, respectively.
 - Processing: converted from OBJ to extension-free, texture-free GLB with `obj2gltf`; original geometry and named materials were retained.
-- Notes: Used only for the bounded close-detail traffic layer: at most four distinct curated cars on desktop and two on mobile. The existing articulated instanced traffic remains authoritative at mid/far distance. Existing routes, motion, collisions, entry, doors, damage, and cleanup remain authoritative; the procedural close vehicle returns during entry, damage, load failure, or disposal. The BMW E34 remains the sole player-car model.
+- Notes: Used across near, mid, and far ambient traffic. Existing routes, motion, collisions, entry, and damage rules remain authoritative. Curated assets fail closed; no retired procedural road-vehicle mesh is loaded or revealed as fallback. The BMW E34 remains the sole player-car model.
+
+Additional Traffic and Response Vehicles
+
+- `vehicles/traffic/utility-pickup-v1.glb` — Pickup Truck by Quaternius — CC0 1.0 — https://poly.pizza/m/qn4grQgHm8 — SHA-256 `9d6b2e33af0d37bf42b2e7af850949f4efd0ddbb9a88077812d152d8b4c1c3eb`
+- `vehicles/traffic/service-truck-v1.glb` — Truck by Quaternius — CC0 1.0 — https://poly.pizza/m/cXw6oiFtZ8 — SHA-256 `a5d107b5b06f8ca2d8d7e66ae6309f2e1a25cac577c5db8ebb661b3f0ca5ed8f`
+- `vehicles/traffic/police-response-v1.glb` — Police Car by Quaternius — CC0 1.0 — https://poly.pizza/m/BwwnUrWGmV — SHA-256 `2ad6705f58bae2acf806eddb28acd9fc2ff6dc65a726575be5c180631b3132d0`
+- `vehicles/traffic/city-van-v1.glb` — Van by Poly by Google — CC BY 3.0 — https://poly.pizza/m/aT_24cDaW1a — SHA-256 `21e57a7be6afbea279ed9acd91e2e0bb0ea0543100778386363eec9ccf9f6f5d`
+- `vehicles/traffic/city-bus-v1.glb` — Bus by Poly by Google — CC BY 3.0 — https://poly.pizza/m/4CPpvEmrMoF — SHA-256 `594f1e515bd1882467f50bbc3588df5009338e2ec8bbc31eee36c85774207a76`
+- Notes: These local GLBs complete all active road-vehicle categories and the police response fleet. They are presentation-only; the established World Explorer simulation and collision authorities remain unchanged.
 
 Curated Character Assets
 
@@ -51,7 +60,7 @@ Field Explorer — Woman
 - License: Creative Commons Zero v1.0 Universal (CC0 1.0).
 - Bundled SHA-256: `b76cf5acefdbb213add675bd1b822ebd41d232c6f0cb21969c981122d3b86a32`
 - Processing: repacked from embedded-buffer glTF to an extension-free GLB with glTF-Transform 4.5.0. Geometry, materials, skinning, modeled backpack, and all 24 animation clips were retained.
-- Notes: Available alongside the Field Explorer man through the persistent Backpack character choice. Both choices retain the same existing player movement, collision, interaction, equipment, vehicle, and world-state authority; the procedural Field Navigator remains the loading/error fallback.
+- Notes: Available alongside the Field Explorer man through the persistent Account Center → Profile character choice. Both choices retain the same existing player movement, collision, interaction, equipment, vehicle, and world-state authority; the procedural Field Navigator remains the loading/error fallback.
 
 City Explorer — Hoodie
 
@@ -189,3 +198,28 @@ Explorer Pulse Sidearm and Laser Rifle
 - Bundled SHA-256 values: `c7e5e28636c18a09c9129cbf9f2d8132eea97c7d142477978c086d8c876b04ca` and `5482cf683aad4f08526764db0697894d17cc45b8c18e189d23facaba55a72441`.
 - Processing: converted from OBJ/MTL to self-contained GLB with obj2gltf, then deduplicated, palette-consolidated, flattened, joined, welded, pruned, and sparse-optimized with glTF-Transform 4.5.0. No external textures or runtime decoder are required.
 - Runtime policy: these are held-item presentation only. Existing Backpack identity, acquisition, ammo, cooldowns, firing, projectiles, hit response, damage, police response, persistence, and cleanup remain authoritative. Procedural equipment is retained only while loading and after a confirmed load failure.
+
+Explorer Ram-air Parachute
+
+- File: `equipment/explorer-parachute-v1.glb`
+- Upstream title: Parachute - Low Poly
+- Creator: calebcram
+- Source: https://sketchfab.com/3d-models/parachute-low-poly-c6208b577e6b4d83a8bd5d5402ee485e
+- License: Creative Commons Attribution 4.0 International (CC BY 4.0), https://creativecommons.org/licenses/by/4.0/
+- Bundled SHA-256: `63f9af1d963509e5a9b440a615b5946fc6ca66c909d000f39cbfc903f7c1f9e6`
+- Download profile: official Sketchfab optimized GLB with 1K textures; 1,304 triangles and 704 vertices according to the source listing.
+- Runtime policy: deployed-canopy presentation only. Existing high-drop offer, manual deployment, flight physics, landing/repack state, input, and cleanup remain authoritative. The generated canopy remains available while loading and on failure.
+
+Solis Reach and Pathfinder Spacecraft Family
+
+- Files: `space/solis-reach-exterior-v1.glb` and `space/pathfinder-transfer-pod-v2.glb`
+- Upstream models: Ultimate Spaceships Pack — Challenger and Dispatcher
+- Creator: Quaternius
+- Source: https://quaternius.com/packs/ultimatespaceships.html
+- Source folder: Google Drive `1NpfT3wqe2k3Jwue2xryi7tzxP4bWzETu`
+- Source file identities: `Challenger.gltf` (`1t-fA25DrO2v48m_PSPnz6cvMU0VLzeoR`) and `Dispatcher.gltf` (`1oAFY-NWo0Icqfstijhk-5U_9PPNW6kUD`).
+- License: Creative Commons Zero v1.0 Universal (CC0 1.0). Source `License.txt` is Google Drive file `16iPJQOxZQgJB6UBiutO-PU35YROyGEL8`.
+- Source SHA-256 values: `c600b39fd587c323557c682e7aae2e976b62fff2984929163b7ee12a0e4323fd` and `e76c42a694ac602152ee0c8a897f6c79a894da716d22410838892df0d04e8d5c`.
+- Bundled SHA-256 values: `67e1962f65c2cf7a6d9bc2f9ee3e3d9d4550bfe63bb5f60b27a6217814ffb233` and `1c7e5a363fbf766dd19fa45bb045f99bef5278dceb4afd6a94384527ffd4a489`.
+- Processing: converted from the self-contained source glTF files to GLB, resized the embedded textures to 512px, then deduplicated, flattened, joined, welded, pruned, sparse-optimized, and quantized with glTF-Transform 4.5.0. No external texture or runtime decoder is required.
+- Runtime policy: presentation only. Existing Space flight, collision, launch, atmospheric entry, landing, docking, transitions, effects, and cleanup remain authoritative. The generated craft is hidden before loading begins and restored only after a confirmed load failure.

@@ -6,7 +6,7 @@ import {
   listEnterableBuildingSupportsNear,
   pickNearbyEnterableBuildingSupport,
   summarizeSupportType
-} from "../building-entry.js?v=7";
+} from "../building-entry.js?v=8";
 import { createInteriorRuntimeUiApi } from "./runtime-ui.js?v=3";
 import { elevatorFloorChoices } from './elevator-authority.js?v=1';
 

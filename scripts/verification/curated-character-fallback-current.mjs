@@ -30,7 +30,7 @@ try {
     });
     if (!fallbackReady) await page.waitForTimeout(250);
   }
-  assert.equal(fallbackReady, true, 'The built-in characters did not recover after curated assets failed.');
+  assert.equal(fallbackReady, true, 'Character asset failure states did not settle.');
 
   const result = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
@@ -46,7 +46,10 @@ try {
     return {
       player: inspectFallback(character),
       playerCuratedAssetId: character.userData.curatedCharacterAssetId || '',
-      npcs: npcRoots.map(inspectFallback),
+      npcs: npcRoots.map((root) => ({
+        ...inspectFallback(root),
+        proceduralCharacterMeshes: Number(root.userData.proceduralCharacterMeshCount || 0)
+      })),
       curatedNpcCount: npcRoots.filter((root) => root.userData.curatedCharacterAssetId).length
     };
   });
@@ -55,7 +58,7 @@ try {
   assert.equal(result.player.visible, result.player.parts);
   assert.equal(result.playerCuratedAssetId, '');
   assert.ok(result.npcs.length > 0);
-  assert.ok(result.npcs.every((npc) => npc.parts > 0 && npc.visible === npc.parts));
+  assert.ok(result.npcs.every((npc) => npc.parts === 0 && npc.visible === 0 && npc.proceduralCharacterMeshes === 0));
   assert.equal(result.curatedNpcCount, 0);
 
   const incidentAccepted = await page.evaluate(async () => {
@@ -91,8 +94,9 @@ try {
     await page.evaluate(() => globalThis.advanceTime?.(240));
     await page.waitForTimeout(40);
   }
-  assert.ok(responderFallback?.parts > 0, 'The responder fallback did not recover after its curated GLB failed.');
-  assert.equal(responderFallback.visible, responderFallback.parts);
+  assert.ok(responderFallback, 'The responder failure state did not settle.');
+  assert.equal(responderFallback.parts, 0);
+  assert.equal(responderFallback.visible, 0);
   assert.equal(responderFallback.curatedAssetId, '');
 
   await page.goto(`${baseUrl}/app/?launch=space&curated-character-fallback-ship=${Date.now()}`, {
@@ -126,12 +130,13 @@ try {
       return {
         curatedAssetId: root.userData.curatedCharacterAssetId || '',
         parts: parts.length,
-        visible: parts.filter((part) => part.visible).length
+        visible: parts.filter((part) => part.visible).length,
+        proceduralCharacterMeshes: Number(root.userData.proceduralCharacterMeshCount || 0)
       };
     });
   });
   assert.equal(crewFallback.length, 7);
-  assert.ok(crewFallback.every((crew) => crew.parts > 0 && crew.visible === crew.parts && crew.curatedAssetId === ''));
+  assert.ok(crewFallback.every((crew) => crew.parts === 0 && crew.visible === 0 && crew.curatedAssetId === '' && crew.proceduralCharacterMeshes === 0));
   assert.deepEqual(failures, []);
   console.log(JSON.stringify({ ok: true, ...result, responderFallback, crewFallback }, null, 2));
 } finally {

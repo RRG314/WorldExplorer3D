@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { buildingFootprintPoints } from "../building-entry.js?v=7";
+import { buildingFootprintPoints } from "../building-entry.js?v=8";
 import {
   INTERIOR_FLOOR_OFFSET,
   INTERIOR_LEVEL_HEIGHT,

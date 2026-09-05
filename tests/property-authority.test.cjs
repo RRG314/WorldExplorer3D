@@ -173,16 +173,17 @@ test('the first accepted action registers immutable mapped property geometry', a
 test('a listed sale moves ownership and credits in one transaction', async () => {
   const state = transactionStore();
   const bought = await settlePropertyAction(actionOptions(state, 'one', 'buy', 'owner-buy'));
-  const listed = await settlePropertyAction(actionOptions(state, 'one', 'list_sale', 'owner-list', { salePrice: 140 }));
+  const salePrice = normalizeProperty(property()).baseValue;
+  const listed = await settlePropertyAction(actionOptions(state, 'one', 'list_sale', 'owner-list', { salePrice }));
   assert.equal(listed.property.status, 'listed_for_sale');
-  assert.equal(listed.property.salePrice, 140);
+  assert.equal(listed.property.salePrice, salePrice);
 
   const purchased = await settlePropertyAction(actionOptions(state, 'two', 'buy_listing', 'buyer-purchase'));
   assert.equal(purchased.accepted, true);
   assert.equal(purchased.property.ownerUid, 'two');
-  assert.equal(purchased.credits, STARTING_CREDITS - 140);
+  assert.equal(purchased.credits, STARTING_CREDITS - salePrice);
   const sellerWallet = state.store.get('users/one/economy/wallet');
-  assert.equal(sellerWallet.credits, bought.credits + 140);
+  assert.equal(sellerWallet.credits, bought.credits + salePrice);
   assert.equal(state.store.get('propertyLeaderboard/one').propertiesOwned, 0);
   assert.equal(state.store.get('propertyLeaderboard/one').propertiesSold, 1);
   assert.equal(state.store.get('propertyLeaderboard/two').propertiesOwned, 1);

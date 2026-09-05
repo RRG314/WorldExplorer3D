@@ -36,7 +36,16 @@ try {
   const initial = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.());
   const firstAircraft = initial.aviation.vehicles.find((vehicle) => vehicle.catalogId === 'expedition-prop');
   assert.ok(firstAircraft, 'The expedition aircraft was not published.');
-  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().aviation?.taxiingAircraftCount > 0, null, { timeout: 15_000 });
+  // Headless Chrome can heavily throttle requestAnimationFrame while the
+  // high-detail airport finishes streaming. Advance the same runtime kernel
+  // used by gameplay so the bounded taxi dwell elapses deterministically.
+  await page.evaluate(() => globalThis.advanceTime?.(6_000));
+  try {
+    await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().aviation?.taxiingAircraftCount > 0, null, { timeout: 5_000 });
+  } catch (error) {
+    const stalledTraffic = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().aviation);
+    throw new Error(`Airport traffic did not start: ${JSON.stringify({ active: stalledTraffic?.active, vehicles: stalledTraffic?.vehicles?.map(({ catalogId, traffic, flightTrafficState }) => ({ catalogId, traffic, flightTrafficState })) })}`, { cause: error });
+  }
   const trafficBefore = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().aviation);
   const movingAircraft = trafficBefore.vehicles.find((vehicle) => vehicle.traffic?.state === 'underway');
   assert.ok(movingAircraft, 'No aircraft entered the bounded airport taxi route.');
@@ -57,13 +66,13 @@ try {
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().flightDynamics?.catalogId === 'long-range-airliner');
   await page.keyboard.down('Space');
   await page.keyboard.down('ArrowDown');
-  await page.waitForTimeout(3200);
+  await page.evaluate(() => globalThis.advanceTime?.(3_200));
   await page.keyboard.up('ArrowDown');
   await page.keyboard.up('Space');
   const largeAircraftGroundResponse = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().flightDynamics);
   await page.keyboard.down('ShiftLeft');
   await page.keyboard.down('ControlLeft');
-  await page.waitForTimeout(4200);
+  await page.evaluate(() => globalThis.advanceTime?.(4_200));
   await page.keyboard.up('ControlLeft');
   await page.keyboard.up('ShiftLeft');
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().aviation?.interaction?.data?.canExit === true, null, { timeout: 15_000 });
@@ -86,13 +95,22 @@ try {
 
   await page.keyboard.down('Space');
   await page.keyboard.down('ArrowDown');
+  for (let step = 0; step < 45; step += 1) {
+    await page.evaluate(() => globalThis.advanceTime?.(1_000));
+    const jumpReady = await page.evaluate(() => {
+      const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.();
+      return diagnostics?.activeActor?.contact?.grounded === false &&
+        diagnostics?.aviation?.interaction?.data?.canJump === true;
+    });
+    if (jumpReady) break;
+  }
   await page.waitForFunction(() => {
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.();
     const plane = diagnostics?.activeActor;
     const interaction = diagnostics?.aviation?.interaction;
     return diagnostics?.modes?.plane === true && plane?.contact?.grounded === false &&
       interaction?.action === 'exit_aircraft' && interaction?.data?.canJump === true && interaction?.data?.autoEquip === true;
-  }, null, { timeout: 30_000 });
+  }, null, { timeout: 5_000 });
   const aerodynamicRotation = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().flightDynamics);
   await page.keyboard.up('ArrowDown');
   await page.keyboard.up('Space');
@@ -114,17 +132,25 @@ try {
   });
   const freefall = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.());
   await page.keyboard.press('Space');
-  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.parachute?.deployed === true);
+  await page.waitForFunction(() => {
+    const parachute = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.parachute;
+    return parachute?.deployed === true && parachute?.visuals?.curatedAssetId === 'equipment-explorer-parachute-v1';
+  });
   const deployed = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.());
   const canopyStart = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor);
   await page.keyboard.down('ArrowUp');
   await page.keyboard.down('ArrowLeft');
-  await page.waitForTimeout(1200);
+  await page.evaluate(() => globalThis.advanceTime?.(1_200));
   await page.keyboard.up('ArrowLeft');
   await page.keyboard.up('ArrowUp');
   const canopySteered = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor);
   await page.screenshot({ path: `${outputDir}/bwi-canopy.png`, fullPage: true });
-  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.parachute?.skydiving === false, null, { timeout: 45_000 });
+  for (let step = 0; step < 36; step += 1) {
+    await page.evaluate(() => globalThis.advanceTime?.(5_000));
+    const landedNow = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.parachute?.skydiving === false);
+    if (landedNow) break;
+  }
+  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.parachute?.skydiving === false, null, { timeout: 5_000 });
   const landed = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.());
   const horizontalCanopyTravel = Math.hypot(
     Number(canopySteered.position.x) - Number(canopyStart.position.x),
@@ -147,7 +173,8 @@ try {
     parachuteAutoEquipped: freefall.urbanSandbox?.equipment?.equippedId === 'parachute',
     parachutePackReadyInFreefall: freefall.urbanSandbox?.parachute?.visuals?.ready === true &&
       freefall.urbanSandbox?.parachute?.visuals?.packVisible === true,
-    parachuteCanopyVisibleWhenDeployed: deployed.urbanSandbox?.parachute?.visuals?.canopyVisible === true,
+    parachuteCanopyVisibleWhenDeployed: deployed.urbanSandbox?.parachute?.visuals?.canopyVisible === true &&
+      deployed.urbanSandbox?.parachute?.visuals?.curatedAssetId === 'equipment-explorer-parachute-v1',
     unmannedAircraftContinued: freefall.aviation?.unmannedAircraftCount === 1,
     canopySteered: horizontalCanopyTravel > 1,
     landedBackInWalking: landed.modes?.walking === true && landed.urbanSandbox?.parachute?.skydiving === false,

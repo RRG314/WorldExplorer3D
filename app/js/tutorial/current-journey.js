@@ -71,6 +71,8 @@ function deriveFieldJourney(appCtx) {
 
 function deriveSpaceJourney(appCtx) {
   const expedition = safeSnapshot(appCtx.getInterstellarExpeditionSnapshot);
+  const destinationMission = safeSnapshot(appCtx.getDestinationMissionSnapshot);
+  const openExpedition = () => document.getElementById('sfExpeditionBtn')?.click();
   const podPhase = text(expedition?.podJourney?.phase);
   if (podPhase && POD_PHASE_COPY[podPhase]) {
     const [title, detail] = POD_PHASE_COPY[podPhase];
@@ -93,13 +95,60 @@ function deriveSpaceJourney(appCtx) {
     }
     return {
       eyebrow: 'ABOARD SURVEYOR',
-      title: expedition.state === 'planned' ? 'Prepare the Expedition' : `Continue toward ${titleCase(expedition.destinationId, 'the destination')}`,
-      detail: 'Check the current watch, speak with the crew, or use the marked station.',
+      title: expedition.state === 'completed' ? 'First Light mission complete' : expedition.state === 'planned' ? 'Prepare the Expedition' : `Continue toward ${titleCase(expedition.destinationId, 'the destination')}`,
+      detail: expedition.state === 'completed' ? 'The destination report has been published. Review the mission result or continue exploring.' : 'Check the current watch, speak with the crew, or use the marked station.',
       actionLabel: 'Ship Map',
       action: () => appCtx.toggleExpeditionShipMap?.(true)
     };
   }
   if (!appCtx.spaceFlight?.active) return null;
+  if (expedition?.state === 'completed') {
+    return {
+      eyebrow: 'MISSION SUCCESS',
+      title: 'First Light: Proxima complete',
+      detail: `${Number(expedition.campaignResult?.totalPoints || 100)} total points. Review the report or continue in Free Space Flight.`,
+      actionLabel: 'Expedition',
+      action: openExpedition
+    };
+  }
+  if (expedition?.state === 'failed') {
+    return {
+      eyebrow: 'MISSION ENDED',
+      title: text(expedition.failureReport?.summary, 'The expedition could not continue'),
+      detail: 'The mission record is preserved. Review it before explicitly preparing a new expedition.',
+      actionLabel: 'Review',
+      action: openExpedition
+    };
+  }
+  if (expedition?.state === 'arrived') {
+    const conductingMission = destinationMission && destinationMission.systemId === expedition.destinationId;
+    return {
+      eyebrow: conductingMission ? 'DESTINATION OPERATIONS' : 'FINAL APPROACH',
+      title: conductingMission ? text(destinationMission.title, 'Complete the destination survey') : `Enter ${titleCase(expedition.destinationId)}`,
+      detail: conductingMission ? text(destinationMission.currentObjective, 'Complete the required science work and return the evidence to the ship.') : 'Complete the system transfer, then begin the required Proxima b survey.',
+      actionLabel: 'Expedition',
+      action: openExpedition
+    };
+  }
+  if (expedition?.state === 'traveling') {
+    const watch = Math.min(14, Number(expedition.voyageDirector?.nextSlotIndex || 0) + (expedition.pendingEvent ? 0 : 1));
+    return {
+      eyebrow: `INTERSTELLAR TRANSIT · WATCH ${watch}/14`,
+      title: expedition.pendingEvent ? text(expedition.pendingEvent.title, 'Ship response needed') : `Continue toward ${titleCase(expedition.destinationId)}`,
+      detail: expedition.pendingEvent ? text(expedition.pendingEvent.message) : 'Advance the next watch while protecting the crew, ship systems, and arrival reserves.',
+      actionLabel: 'Expedition',
+      action: openExpedition
+    };
+  }
+  if (expedition?.state === 'planned') {
+    return {
+      eyebrow: 'FIRST LIGHT CAMPAIGN',
+      title: 'Prepare the Proxima expedition',
+      detail: 'Assess the crew, ship, propulsion, and supply reserve before departure.',
+      actionLabel: 'Expedition',
+      action: openExpedition
+    };
+  }
   const target = safeSnapshot(appCtx.getUniverseHudTarget);
   const course = target?.course;
   if (course?.destination) {

@@ -5,7 +5,7 @@ import {
   rebuildStructureVisualMeshesCooperatively,
   updateStructureVisualVisibility
 } from "./terrain/structure-visuals.js?v=58";
-import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=14";
+import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=15";
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=3";
 import { stitchTerrainGroupEdges } from "./terrain/seams.js?v=2";
 import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=22";
@@ -66,7 +66,7 @@ import {
 } from "./terrain/debug-tools.js?v=15";
 import { createLocationTerrainApi } from "./terrain/location-world.js?v=4";
 import { buildPolarCryosphereSurface } from "./terrain/polar-cryosphere-surface.js?v=1";
-import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=73";
+import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=74";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 import { waterBedDepthAtShorelineDistance } from "./terrain/water-terrain-mask.js?v=1";
 import {
@@ -388,6 +388,12 @@ const {
   clampElevationMeters,
   getOrLoadTerrainTile,
   latLonToTileXY,
+  sampleDetailedTerrainMetersAtLatLon: (lat, lon) => {
+    const sample = peekTerrainSourceSampleAtLatLon(lat, lon, terrainTileDeps);
+    return sample?.status === 'available' && Number.isFinite(Number(sample.elevationMeters))
+      ? Number(sample.elevationMeters)
+      : null;
+  },
   sampleAcceptedGroundAtLatLon,
   sampleTileElevationMeters,
   terrainTileDeps,

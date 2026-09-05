@@ -1,8 +1,9 @@
 import { TRANSFERABLE_MATERIAL_DEFINITIONS } from '../resources/material-catalog.js?v=2';
 
-const COMMERCE_SCHEMA_VERSION = 2;
+const COMMERCE_SCHEMA_VERSION = 3;
 const COMMERCE_STORAGE_KEY = 'world-explorer:local-commerce:v1';
-const STARTING_EXPLORER_CREDITS = 120;
+const STARTING_EXPLORER_CREDITS = 1000000;
+const LEGACY_CURRENCY_SCALE = 2000;
 const STANDARD_DAILY_QUANTITY = 3;
 
 const COMMERCE_ITEM_DEFINITIONS = Object.freeze([
@@ -116,9 +117,10 @@ function parseState(storage) {
   try {
     const parsed = JSON.parse(storage?.getItem?.(COMMERCE_STORAGE_KEY) || 'null');
     if (!parsed || typeof parsed !== 'object') return null;
+    const legacyScale = Number(parsed.schemaVersion || 1) < COMMERCE_SCHEMA_VERSION ? LEGACY_CURRENCY_SCALE : 1;
     return {
       schemaVersion: COMMERCE_SCHEMA_VERSION,
-      credits: Math.max(0, Math.floor(Number(parsed.credits) || 0)),
+      credits: Math.max(0, Math.floor((Number(parsed.credits) || 0) * legacyScale)),
       purchases: parsed.purchases && typeof parsed.purchases === 'object' ? { ...parsed.purchases } : {},
       claimedTrades: parsed.claimedTrades && typeof parsed.claimedTrades === 'object' ? { ...parsed.claimedTrades } : {},
       transactions: Array.isArray(parsed.transactions) ? parsed.transactions.slice(-60) : []

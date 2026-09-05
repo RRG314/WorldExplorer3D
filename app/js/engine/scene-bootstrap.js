@@ -1,7 +1,6 @@
 import { setupEngineInputHandlers } from "./input-handlers.js?v=11";
 import { createVehicleHeadlightRig } from "./night-lighting.js?v=8";
-import { createClassicUtilityCar } from './classic-utility-car.js?v=3';
-import { attachCuratedPlayerCar } from './curated-player-car.js?v=6';
+import { attachCuratedPlayerCar } from './curated-player-car.js?v=7';
 import { applyDirectionalShadowPolicy } from "./shadow-policy.js?v=1";
 import {
   buildEarthAtmosphereProfile,
@@ -366,14 +365,13 @@ function addSkyVisuals(appCtx, gpuTier) {
 
 function createDefaultCarMesh(ctx) {
   const { appCtx, state } = ctx;
-  const visual = createClassicUtilityCar(THREE);
-  appCtx.carMesh = visual.car;
-  appCtx.wheelMeshes = visual.wheels;
-  state.carPaintMaterial = visual.paintMaterial;
-  appCtx.carMesh.children.forEach((child) => {
-    child.userData.defaultPlayerVehicleVisual = true;
-    child.userData.defaultPlayerVehicleFallback = true;
-  });
+  appCtx.carMesh = new THREE.Group();
+  appCtx.carMesh.name = 'Curated BMW player vehicle host';
+  appCtx.carMesh.userData.vehicleStyle = 'curated-bmw-e34';
+  appCtx.carMesh.userData.vehiclePresentation = 'curated-only-local-model';
+  appCtx.carMesh.userData.proceduralVehicleMeshCount = 0;
+  appCtx.wheelMeshes = [];
+  state.carPaintMaterial = null;
   createVehicleHeadlightRig(appCtx.carMesh);
 
   appCtx.scene.add(appCtx.carMesh);
@@ -384,8 +382,8 @@ function createDefaultCarMesh(ctx) {
       child.receiveShadow = false;
     }
   });
-  // Begin decoding the local BMW during engine initialization. The adapter
-  // keeps the procedural safety car hidden unless this local request fails.
+  // Begin decoding the local BMW during engine initialization. Until it is
+  // ready the host stays empty; a retired procedural car is never constructed.
   appCtx.ensureCuratedPlayerCar = () => attachCuratedPlayerCar(THREE, appCtx);
   void appCtx.ensureCuratedPlayerCar();
 }

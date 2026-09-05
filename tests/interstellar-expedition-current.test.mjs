@@ -14,6 +14,7 @@ import {
 import {
   advanceExpedition,
   advanceToNextMilestone,
+  resourceDemandMultipliers,
   resolveExpeditionEvent,
   startExpedition,
   VOYAGE_MILESTONES
@@ -25,6 +26,7 @@ import { availabilityForResponse } from '../app/js/expedition/voyage-director.js
 import { VOYAGE_EVENT_COUNTS, VOYAGE_EVENT_FAMILIES } from '../app/js/expedition/voyage-events.js';
 import { applyShipOperation, getShipStationView } from '../app/js/expedition/ship-operations.js';
 import { createExpeditionStore } from '../app/js/expedition/store.js';
+import { campaignObjective, campaignPhase, completeCampaign } from '../app/js/expedition/campaign.js';
 import { createExpeditionArchive, EXPEDITION_DISCOVERY_KEY } from '../app/js/expedition/archive.js';
 import { deriveCrewOperations, summarizeCrewOperations } from '../app/js/expedition/crew-operations.js';
 import { SHIP_CREW_POSTS, SHIP_DECKS, SHIP_DOORS, SHIP_ROOMS, SHIP_STATIONS, validateShipLayout } from '../app/js/expedition/ship-layout.js';
@@ -125,6 +127,8 @@ test('readiness is derived from role coverage, supplies, compatibility, and capa
   const ready = createExpeditionPlan({ destinationId: 'proxima-centauri', crew: DEFAULT_CREW });
   assert.equal(ready.readiness.status, 'ready');
   assert.deepEqual(ready.readiness.failures, []);
+  assert.equal(ready.reserveMargin, 0.15);
+  assert.equal(ready.readiness.roleCoverage.flight, 2);
 
   const missingMedical = DEFAULT_CREW.filter((member) => !member.roles.includes('medical'));
   const ship = getShipProfile(ready.ship.profileId);
@@ -138,6 +142,43 @@ test('readiness is derived from role coverage, supplies, compatibility, and capa
   });
   assert.equal(readiness.status, 'insufficient');
   assert.ok(readiness.failures.includes('Crew coverage is missing: medical.'));
+});
+
+test('resource pressure responds to crew and ship state instead of staying linear', () => {
+  const expedition = createExpeditionPlan({ destinationId: 'proxima-centauri', crew: DEFAULT_CREW, createdAtMs: 1300 });
+  const nominal = resourceDemandMultipliers(expedition);
+  const stressed = resourceDemandMultipliers({
+    ...expedition,
+    crew: expedition.crew.map((member) => ({ ...member, fatigue: 0.9, health: 0.62 })),
+    systems: {
+      ...expedition.systems,
+      'life-support': { condition: 0.46, status: 'critical' },
+      power: { condition: 0.51, status: 'damaged' },
+      propulsion: { condition: 0.55, status: 'damaged' }
+    }
+  });
+  assert.ok(stressed.foodKg > nominal.foodKg);
+  assert.ok(stressed.waterKg > nominal.waterKg);
+  assert.ok(stressed.powerMWh > nominal.powerMWh);
+  assert.ok(stressed.propellantKg > nominal.propellantKg);
+});
+
+test('First Light has one explicit destination objective and one final victory state', () => {
+  const expedition = { ...createExpeditionPlan({ destinationId: 'proxima-centauri', crew: DEFAULT_CREW, createdAtMs: 1400 }), state: 'arrived', progress: 1 };
+  assert.equal(campaignPhase(expedition, null, 'sol'), 'destination-arrival');
+  assert.match(campaignObjective(expedition, null, 'sol'), /final approach/i);
+  assert.equal(campaignPhase(expedition, { systemId: 'proxima-centauri', phase: 'analysis', currentObjective: 'Publish the returned record.' }, 'proxima-centauri'), 'shipboard-analysis');
+  const completed = completeCampaign(expedition, {
+    missionId: 'mission:proxima-centauri-b',
+    destinationId: 'proxima-centauri-b',
+    title: 'Under a Restless Sun',
+    outcomeLabel: 'Publish a cautious baseline',
+    points: 30
+  }, 1500);
+  assert.equal(completed.state, 'completed');
+  assert.equal(completed.campaignResult.totalPoints, 130);
+  assert.equal(campaignPhase(completed, null, 'proxima-centauri'), 'mission-complete');
+  assert.match(campaignObjective(completed), /accomplished/i);
 });
 
 test('the Voyage Director publishes 36 authored families with the required category budget and response contract', () => {

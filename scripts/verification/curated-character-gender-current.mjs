@@ -93,19 +93,41 @@ async function inspectCharacters(page) {
   }, { allowed: familyAssetIds, femaleIds: femaleNpcAssetIds, maleIds: maleNpcAssetIds });
 }
 
-async function selectCharacter(page, gender) {
-  await page.evaluate(() => {
-    void import('/app/js/shared-context.js?v=55').then(({ ctx }) => ctx.toggleUrbanEquipment?.(true));
+async function selectCharacter(page, gender, label) {
+  assert.equal(await page.locator('[data-player-character-gender]').count(), 0, 'character choice must not be duplicated in the in-play Backpack');
+  await page.goto(`${baseUrl}/account/?curated-character-gender=${label}-${gender}-${Date.now()}`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 120_000
   });
-  await page.locator('#urbanEquipment.show').waitFor({ state: 'visible', timeout: 10_000 });
-  await page.locator(`[data-player-character-gender="${gender}"]`).click();
+  const selector = `[data-account-character-gender="${gender}"]`;
+  await page.waitForFunction((value) => {
+    const button = document.querySelector(`[data-account-character-gender="${value}"]`);
+    return button && button.closest('[data-account-view="profile"]');
+  }, gender, { timeout: 30_000 });
+  await page.waitForFunction(() => (
+    [...document.querySelectorAll('[data-account-character-gender]')]
+      .some((button) => button.getAttribute('aria-pressed') === 'true')
+  ), null, { timeout: 30_000 });
+  await page.locator(selector).evaluate((button) => button.click());
+  await page.waitForFunction((value) => (
+    document.querySelector(`[data-account-character-gender="${value}"]`)?.getAttribute('aria-pressed') === 'true'
+  ), gender);
+  const accountChoice = await page.locator('[data-account-character-gender]').evaluateAll((buttons) => buttons.map((button) => ({
+    gender: button.dataset.accountCharacterGender,
+    pressed: button.getAttribute('aria-pressed')
+  })));
+  await page.goto(`${baseUrl}/app/?curated-character-gender=${label}-${gender}-return-${Date.now()}`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 120_000
+  });
+  await startCurrentEarth(page);
   const assetId = gender === 'woman' ? 'character-field-explorer-woman-v1' : 'character-field-explorer-v1';
   await page.waitForFunction((expected) => {
     const root = globalThis.Walk?.state?.characterMesh;
     return root?.userData?.curatedCharacterAssetId === expected;
   }, assetId, { timeout: 120_000 });
-  await page.waitForFunction((selected) => document.querySelector(`[data-player-character-gender="${selected}"]`)?.getAttribute('aria-pressed') === 'true', gender);
-  return assetId;
+  await waitForDetailedFamily(page);
+  return { assetId, accountChoice };
 }
 
 async function positionFamilyForEvidence(page) {
@@ -146,17 +168,18 @@ async function normalJourney(viewport, label, verifyPersistence = false) {
     assert.ok(initial.maleNpcCount > 0, JSON.stringify(initial));
     assert.equal(initial.visibleNpcFallbackCount, 0);
 
-    await selectCharacter(page, 'woman');
+    const womanSelection = await selectCharacter(page, 'woman', label);
     const woman = await inspectCharacters(page);
     assert.equal(woman.preference, 'woman');
     assert.equal(woman.playerAssetId, 'character-field-explorer-woman-v1');
     assert.equal(woman.playerFallback.visibleFallbackMeshCount, 0);
     assert.equal(woman.playerActions.idle, 1);
-    assert.deepEqual(woman.choice, [
+    assert.deepEqual(womanSelection.accountChoice, [
       { gender: 'man', pressed: 'false' },
       { gender: 'woman', pressed: 'true' }
     ]);
-    await page.screenshot({ path: path.join(evidenceDir, `${label}-woman-choice.png`), fullPage: false });
+    assert.deepEqual(woman.choice, []);
+    await page.screenshot({ path: path.join(evidenceDir, `${label}-woman-character.png`), fullPage: false });
     await positionFamilyForEvidence(page);
     await page.screenshot({ path: path.join(evidenceDir, `${label}-woman-and-npc-family.png`), fullPage: false });
 
@@ -171,7 +194,7 @@ async function normalJourney(viewport, label, verifyPersistence = false) {
       assert.equal(persisted.playerAssetId, 'character-field-explorer-woman-v1');
       assert.equal(persisted.allNpcsCurated, true);
       assert.equal(persisted.visibleNpcFallbackCount, 0);
-      await selectCharacter(page, 'man');
+      await selectCharacter(page, 'man', label);
       const switchedBack = await inspectCharacters(page);
       assert.equal(switchedBack.preference, 'man');
       assert.equal(switchedBack.playerAssetId, 'character-field-explorer-v1');

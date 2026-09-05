@@ -97,6 +97,21 @@ async function runViewport(name, viewport) {
 
   try {
     await openShip(page);
+    await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      globalThis.__we3dVerificationContext = ctx;
+    });
+    await page.waitForFunction(() => globalThis.__we3dVerificationContext?.scene?.getObjectByName('expedition-landing-pod')?.userData?.curatedPodAssetId === 'space-pathfinder-transfer-pod-v2', null, { timeout: 15000 });
+    const dockedPod = await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const pod = ctx.scene?.getObjectByName('expedition-landing-pod');
+      let fallbackVisible = false;
+      pod?.traverse?.((object) => {
+        if (object?.userData?.defaultPodFallback === true && object.visible !== false) fallbackVisible = true;
+      });
+      return { assetId: pod?.userData?.curatedPodAssetId || null, fallbackVisible };
+    });
+    assert.deepEqual(dockedPod, { assetId: 'space-pathfinder-transfer-pod-v2', fallbackVisible: false });
     let state = await snapshot(page);
     const contract = state.expeditionShipInterior?.visualContract;
     assert.ok(contract, 'The rendered ship must publish its visual contract through render_game_to_text.');

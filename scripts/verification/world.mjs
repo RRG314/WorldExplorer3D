@@ -331,9 +331,9 @@ try {
     pedestrianPopulationRequiresSafePaths:
       Number(pedestrianGraph.provenance?.mappedPaths || 0) + Number(pedestrianGraph.provenance?.inferredSidewalks || 0) > 0
         ? Number(population.pedestrians || 0) > 0 &&
-          Number(population.pedestrianRenderedParts || 0) >= 17 &&
-          population.pedestrianRepresentation === 'articulated-instanced-character-v2' &&
-          population.pedestrianLegacyBlockFallback === false
+          population.pedestrianRepresentation === 'curated-only-local-models' &&
+          Number(population.proceduralPedestrianMeshes || 0) === 0 &&
+          Number(population.curatedPedestrianHosts || 0) === Number(population.pedestrians || 0)
         : Number(population.pedestrians || 0) === 0 &&
           activePedestrianCount === 0 &&
           Number(pedestrianGraph.vehicleTransportEdges || 0) === 0 &&
@@ -350,7 +350,9 @@ try {
       Number(urbanSandbox.lodPolicy?.npcReleaseDistance || 0) >
         Number(urbanSandbox.lodPolicy?.npcPreloadDistance || Infinity),
     trafficUsesRecognizablePersistentLod:
-      Number(population.vehicleRenderedParts || 0) >= 16 &&
+      population.vehiclePresentation === 'curated-only-local-models' &&
+      Number(population.proceduralVehicleMeshes || 0) === 0 &&
+      Number(population.curatedVehicleHosts || 0) === Number(population.vehicles || 0) &&
       Number(population.visibilityPolicy?.enterDistance || 0) >= 900 &&
       Number(population.visibilityPolicy?.exitDistance || 0) >
         Number(population.visibilityPolicy?.enterDistance || Infinity) &&

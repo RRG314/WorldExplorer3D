@@ -25,12 +25,47 @@ async function openSpace(page) {
 }
 
 async function beginProximaBMission(page) {
-  await page.locator('#universeToggle').click();
-  await page.locator('#universeDestinationSelect').selectOption('proxima-centauri-b');
-  await page.locator('#universeMissionBtn').click();
+  await page.evaluate(async () => {
+    const [{ DEFAULT_CREW }, { createExpeditionPlan, withExpeditionChanges }, { startExpedition }, { createExpeditionStore }] = await Promise.all([
+      import('/app/js/expedition/catalog.js?v=2'),
+      import('/app/js/expedition/model.js?v=11'),
+      import('/app/js/expedition/simulation.js?v=8'),
+      import('/app/js/expedition/store.js?v=11')
+    ]);
+    const planned = createExpeditionPlan({ destinationId: 'proxima-centauri', crew: DEFAULT_CREW, id: 'first-light-surface-verification', createdAtMs: 91_000 });
+    createExpeditionStore().save(withExpeditionChanges(startExpedition(planned, 91_100), {
+      state: 'arrived', progress: 1, voyagePhase: 'arrival', arrivalTransferState: 'pending'
+    }));
+  });
+  await page.locator('#sfExpeditionBtn').click();
+  await page.locator('#expeditionOverlay').waitFor({ state: 'visible' });
+  await page.locator('#expeditionArrive').click();
+  await page.waitForFunction(() => {
+    const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+    return state.universeNavigation?.currentFrameId === 'proxima-centauri'
+      && state.universeNavigation?.transitionDestinationId == null
+      && state.interstellarExpedition?.arrivalTransferState === 'complete';
+  }, null, { timeout: 30_000 });
+  await page.locator('#destinationMissionPanel').waitFor({ state: 'visible' });
   await page.locator('[data-mission-begin]').click();
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').destinationMission?.phase === 'approach');
   await page.locator('[data-mission-course]').click();
+  await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').universeNavigation?.courseDestinationId === 'proxima-centauri-b');
+  const planetApproachReady = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const target = ctx.getUniverseHudTarget?.();
+    if (!target?.position || !ctx.spaceFlight?.rocket) return false;
+    ctx.spaceFlight.rocket.position.set(
+      target.position.x,
+      target.position.y,
+      target.position.z + Math.max(90, Number(target.radius || 6) * 12)
+    );
+    ctx.spaceFlight.velocity?.set?.(0, 0, 0);
+    ctx.spaceFlight.gravityVelocity?.set?.(0, 0, 0);
+    ctx.spaceFlight.speed = 0;
+    return true;
+  });
+  assert.equal(planetApproachReady, true);
   await page.waitForFunction(() => {
     const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
     return state.universeNavigation?.currentFrameId === 'proxima-centauri'
@@ -300,13 +335,24 @@ async function run() {
     await page.locator('[data-complete-destination-analysis="cautious-baseline"]').waitFor({ state: 'visible' });
     await page.screenshot({ path: path.join(outputDir, 'desktop-proxima-b-analysis.png'), fullPage: true });
     await page.locator('[data-complete-destination-analysis="cautious-baseline"]').click();
-    await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').destinationMission?.phase === 'complete');
+    await page.waitForFunction(() => {
+      const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+      return state.destinationMission?.phase === 'complete'
+        && state.interstellarExpedition?.state === 'completed';
+    });
     const final = await snapshot(page);
+    assert.equal(final.interstellarExpedition.state, 'completed');
+    assert.equal(final.interstellarExpedition.campaignResult.totalPoints, 130);
+    if (await page.locator('#shipStationPanel').isVisible()) await page.locator('#shipStationPanel [data-close-station]').click();
+    await page.locator('#shipExitButton').click();
+    await page.locator('#expeditionOverlay').waitFor({ state: 'visible' });
+    await page.locator('.expeditionVictory').waitFor({ state: 'visible' });
+    await page.screenshot({ path: path.join(outputDir, 'desktop-first-light-mission-success.png'), fullPage: true });
+    await page.locator('#expeditionClose').click();
     const fictionalWorldProfile = await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
       const { resolveUniverseAddress } = await import('/app/js/universe/catalog.js?v=11');
       const { arriveAtSolidWorld, registerExpeditionSolidWorld } = await import('/app/js/planetary/solid-world-runtime.js?v=14');
-      ctx.exitExpeditionShipInterior?.();
       const destination = resolveUniverseAddress('andromeda-explorer-a-b');
       const system = resolveUniverseAddress(destination.parentFrameId);
       let seed = 2166136261;
@@ -352,6 +398,8 @@ async function run() {
     await page.screenshot({ path: path.join(outputDir, 'desktop-andromeda-copper-dawn-weather.png'), fullPage: true });
     return {
       missionPhase: final.destinationMission.phase,
+      campaignState: final.interstellarExpedition.state,
+      campaignPoints: final.interstellarExpedition.campaignResult.totalPoints,
       evidence: final.destinationMission.evidence,
       podPhase: final.interstellarExpedition.podJourney.phase,
       frameId: final.universeNavigation.currentFrameId,

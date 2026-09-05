@@ -74,7 +74,14 @@ function createTerrainHeightSamplingApi(deps = {}) {
       return interpolateRenderedTerrainCell(sx, sz, y00, y10, y01, y11);
     }
 
-    return elevationWorldYAtWorldXZ(x, z, terrainTileDeps);
+    // Outside the detailed tile ring the fixed-location LOD is the rendered
+    // ground. Its coarser source and seam blend can differ from a direct z15
+    // elevation lookup by several metres, so physics must consume that exact
+    // triangle surface instead of letting vehicles pass underneath it.
+    const farTerrainY = appCtx.sampleFarTerrainWorldYAt?.(x, z);
+    return Number.isFinite(farTerrainY)
+      ? Number(farTerrainY)
+      : elevationWorldYAtWorldXZ(x, z, terrainTileDeps);
   }
 
   function baseTerrainHeightAt(x, z) {

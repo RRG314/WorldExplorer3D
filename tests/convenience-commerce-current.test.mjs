@@ -4,6 +4,7 @@ import test from 'node:test';
 import { createEquipmentInventory } from '../app/js/urban-sandbox/equipment-model.js';
 import {
   COMMERCE_STORAGE_KEY,
+  STARTING_EXPLORER_CREDITS,
   createLocalCommerceModel,
   mappedConvenienceStores,
   stockForStore
@@ -86,19 +87,19 @@ test('buy, sell, daily rare trade, and Explorer Credits persist locally', () => 
   const now = () => Date.parse('2026-08-27T15:00:00Z');
   const commerce = createLocalCommerceModel({ storage, inventory, now });
   const initial = commerce.snapshot(store);
-  assert.equal(initial.credits, 120);
+  assert.equal(initial.credits, STARTING_EXPLORER_CREDITS);
   assert.equal(initial.inventoryAuthority, 'world-explorer-gameplay');
   assert.equal(initial.placeAuthority, 'loaded-map-poi');
 
   const purchased = commerce.buy(store, initial.standard[0].id);
   assert.equal(purchased.ok, true);
   assert.equal(inventory.snapshot().items.find((item) => item.catalogId === initial.standard[0].id)?.tradeable, true);
-  assert.equal(commerce.snapshot(store).credits, 120 - initial.standard[0].buyPrice);
+  assert.equal(commerce.snapshot(store).credits, STARTING_EXPLORER_CREDITS - initial.standard[0].buyPrice);
 
   const boughtItem = inventory.snapshot().items.find((item) => item.catalogId === initial.standard[0].id);
   const sold = commerce.sell(store, boughtItem.instanceId);
   assert.equal(sold.ok, true);
-  assert.equal(commerce.snapshot(store).credits, 120 - initial.standard[0].buyPrice + initial.standard[0].sellPrice);
+  assert.equal(commerce.snapshot(store).credits, STARTING_EXPLORER_CREDITS - initial.standard[0].buyPrice + initial.standard[0].sellPrice);
 
   const rare = commerce.snapshot(store).rare;
   for (let index = 0; index < rare.requirementQuantity; index += 1) {

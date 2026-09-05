@@ -117,24 +117,44 @@ async function activeJourney(viewport, label) {
   observe(page, label);
   try {
     await openEarth(page, label);
+    const populationContract = await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const snapshot = ctx.livingWorldRuntimeSnapshot();
+      return {
+        vehiclePresentation: snapshot.population.vehiclePresentation,
+        proceduralVehicleMeshes: snapshot.population.proceduralVehicleMeshes,
+        curatedVehicleHosts: snapshot.population.curatedVehicleHosts,
+        simulationHz: snapshot.population.simulationHz
+      };
+    });
+    assert.equal(populationContract.vehiclePresentation, 'curated-only-local-models');
+    assert.equal(populationContract.proceduralVehicleMeshes, 0);
+    assert.ok(populationContract.curatedVehicleHosts >= 4);
+    assert.equal(populationContract.simulationHz, 30);
+    await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const first = ctx.livingWorldRuntime?.population?.vehicleSnapshots?.()[0];
+      const walker = ctx.Walk?.state?.walker;
+      if (!first || !walker) return;
+      Object.assign(walker, { x: first.x, y: first.y, z: first.z, vy: 0, onGround: true });
+    });
+    await page.waitForTimeout(650);
     let presentation = [];
-    for (let attempt = 0; attempt < 480 && presentation.length === 0; attempt += 1) {
+    for (let attempt = 0; attempt < 80 && presentation.length === 0; attempt += 1) {
       presentation = await curatedPresentation(page);
       if (presentation.length === 0) await page.waitForTimeout(250);
     }
     assert.ok(presentation.length >= 1);
-    assert.ok(presentation.length <= (mobile ? 2 : 4));
-    assert.equal(new Set(presentation.map((entry) => entry.assetId)).size, presentation.length);
     for (const entry of presentation) {
       assert.equal(entry.collisionPolicy, 'existing-road-vehicle-envelope');
-      assert.ok(entry.fallbackMeshCount > 0);
+      assert.equal(entry.fallbackMeshCount, 0);
       assert.equal(entry.visibleFallbackMeshCount, 0);
       assert.equal(entry.curatedVisualCount, 1);
-      assert.equal(entry.performanceProfile.maxInstances, 1);
-      assert.ok(entry.size.y > 1.2 && entry.size.y < 1.9, JSON.stringify(entry));
+      assert.ok(entry.performanceProfile.maxInstances >= 8);
+      assert.ok(entry.size.y > .8 && entry.size.y < 3.5, JSON.stringify(entry));
       const horizontalExtents = [entry.size.x, entry.size.z].sort((left, right) => left - right);
-      assert.ok(horizontalExtents[0] > 1.4 && horizontalExtents[0] < 3.4, JSON.stringify(entry));
-      assert.ok(horizontalExtents[1] > 3.4 && horizontalExtents[1] < 5.1, JSON.stringify(entry));
+      assert.ok(horizontalExtents[0] > 1.2 && horizontalExtents[0] < 3.4, JSON.stringify(entry));
+      assert.ok(horizontalExtents[1] > 3.3 && horizontalExtents[1] < 12, JSON.stringify(entry));
     }
 
     await frameVehicle(page, presentation[0].id);
@@ -157,9 +177,9 @@ async function activeJourney(viewport, label) {
       };
     }, damageTarget.id) : null;
     if (damageResult) {
-      assert.equal(damageResult.curatedAssetId, '');
-      assert.equal(damageResult.attachmentPresent, false);
-      assert.ok(damageResult.visibleFallbackMeshCount > 0);
+      assert.equal(damageResult.curatedAssetId, damageTarget.assetId);
+      assert.equal(damageResult.attachmentPresent, true);
+      assert.equal(damageResult.visibleFallbackMeshCount, 0);
       assert.equal(damageResult.condition, .72);
     }
 
@@ -197,9 +217,9 @@ async function activeJourney(viewport, label) {
     assert.equal(enterResult.accepted, true);
     assert.equal(enterResult.phase, 'driving');
     assert.equal(enterResult.activeVehicleId, presentation[0].id);
-    assert.equal(enterResult.curatedAssetId, '');
-    assert.equal(enterResult.attachmentPresent, false);
-    assert.ok(enterResult.visibleFallbackMeshCount > 0);
+    assert.equal(enterResult.curatedAssetId, presentation[0].assetId);
+    assert.equal(enterResult.attachmentPresent, true);
+    assert.equal(enterResult.visibleFallbackMeshCount, 0);
     assert.equal(enterResult.mountedUnderPlayerCar, true);
     assert.equal(enterResult.e34Visible, false);
     assert.equal(enterResult.carVariantId, presentation[0].variantId);
@@ -225,7 +245,7 @@ async function activeJourney(viewport, label) {
       };
     });
     assert.deepEqual(teardown, { active: false, attachmentCount: 0, curatedIdCount: 0 });
-    return { label, mobile, presentation, damageResult, enterResult, exitResult, teardown };
+    return { label, mobile, populationContract, presentation, damageResult, enterResult, exitResult, teardown };
   } finally {
     await context.close();
   }
@@ -255,15 +275,21 @@ async function fallbackJourney() {
             fallbackMeshCount += 1;
             if (object.visible !== false) visibleFallbackMeshCount += 1;
           });
-          return { id: vehicle.id, fallbackMeshCount, visibleFallbackMeshCount };
+          return {
+            id: vehicle.id,
+            fallbackMeshCount,
+            visibleFallbackMeshCount,
+            loadFailed: vehicle.visual.root.userData.curatedTrafficVehicleLoadFailed === true
+          };
         })
       };
     });
     assert.equal(result.curatedCount, 0);
     assert.ok(blockedRequests > 0);
     assert.ok(result.vehicles.length > 0);
-    assert.ok(result.vehicles.every((vehicle) => vehicle.fallbackMeshCount > 0 && vehicle.visibleFallbackMeshCount === vehicle.fallbackMeshCount));
-    await page.screenshot({ path: path.join(evidenceDir, 'mobile-load-fallback.png'), fullPage: false });
+    assert.ok(result.vehicles.every((vehicle) => vehicle.fallbackMeshCount === 0 && vehicle.visibleFallbackMeshCount === 0));
+    assert.ok(result.vehicles.some((vehicle) => vehicle.loadFailed));
+    await page.screenshot({ path: path.join(evidenceDir, 'mobile-load-fail-closed.png'), fullPage: false });
     return { ...result, blockedRequests };
   } finally {
     await context.close();
@@ -278,7 +304,7 @@ try {
   const fallback = await fallbackJourney();
   assert.deepEqual(failures, []);
   assert.ok(assetRequests.size >= 1);
-  assert.ok([...assetRequests.values()].every((count) => count <= 3));
+  assert.ok([...assetRequests.values()].every((count) => count <= 12));
   const report = { ok: true, results, fallback, assetRequests: Object.fromEntries([...assetRequests].sort()), failures };
   await fs.writeFile(path.join(evidenceDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify(report, null, 2));

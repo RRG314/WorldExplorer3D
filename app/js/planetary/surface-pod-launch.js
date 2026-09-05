@@ -1,4 +1,4 @@
-import { createExpeditionPodMesh } from '../space/expedition-pod-mesh.js?v=3';
+import { createExpeditionPodMesh } from '../space/expedition-pod-mesh.js?v=7';
 
 const ASCENT_HANDOFF_ALTITUDE = 165;
 const SURFACE_CAMERA_MODES = Object.freeze(['chase', 'side', 'cockpit']);
@@ -38,6 +38,11 @@ function terrainHeightAt(appCtx, x, z, actorY = 0) {
 function solidPodBounds(pod) {
   const bounds = new THREE.Box3();
   pod.traverse((child) => {
+    let ancestor = child;
+    while (ancestor && ancestor !== pod) {
+      if (ancestor.userData?.presentationOnly === true) return;
+      ancestor = ancestor.parent;
+    }
     if (!child.isMesh || /plume|exhaust|plasma|docking|touchdown/i.test(child.name || '')) return;
     child.geometry?.computeBoundingBox?.();
     if (!child.geometry?.boundingBox) return;

@@ -1,9 +1,10 @@
-import { loadModelAsset } from '../assets/model-asset-runtime.js?v=9';
+import { loadModelAsset } from '../assets/model-asset-runtime.js?v=14';
 
 const CURATED_EQUIPMENT_ASSET_BY_ID = Object.freeze({
   'pulse-sidearm': 'equipment-explorer-pulse-sidearm-v1',
   'compact-sidearm': 'equipment-explorer-pulse-sidearm-v1',
   'responder-sidearm': 'equipment-explorer-pulse-sidearm-v1',
+  'paintball-gun': 'equipment-explorer-pulse-sidearm-v1',
   'laser-gun': 'equipment-explorer-laser-rifle-v1'
 });
 
@@ -69,8 +70,8 @@ async function attachCuratedEquipmentVisual(THREE, host, equipmentId) {
       setEquipmentFallbackVisible(host, false);
       return true;
     } catch (error) {
-      setEquipmentFallbackVisible(host, true);
-      console.warn(`Curated equipment unavailable for ${equipmentId}; keeping the built-in visual.`, error);
+      setEquipmentFallbackVisible(host, false);
+      console.warn(`Curated equipment unavailable for ${equipmentId}; leaving the equipment host empty.`, error);
       return false;
     } finally {
       delete host.userData.curatedEquipmentLoadPromise;
@@ -88,7 +89,7 @@ function disposeCuratedEquipmentVisual(host) {
   attachment.instance.dispose();
   delete host.userData.curatedEquipmentAttachment;
   delete host.userData.curatedEquipmentAssetId;
-  setEquipmentFallbackVisible(host, true);
+  setEquipmentFallbackVisible(host, false);
   return true;
 }
 

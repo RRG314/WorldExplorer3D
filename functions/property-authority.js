@@ -2,8 +2,10 @@
 
 const crypto = require('node:crypto');
 
-const STARTING_CREDITS = 500;
-const MAX_CREDITS = 1_000_000_000;
+const STARTING_CREDITS = 1_000_000;
+const MAX_CREDITS = 2_000_000_000;
+const CURRENCY_VERSION = 2;
+const LEGACY_CURRENCY_SCALE = 2000;
 const VALID_ACTIONS = new Set(['starter_claim', 'buy', 'sell_world', 'list_sale', 'buy_listing', 'list_rent', 'rent', 'cancel_listing']);
 const VALID_TRADE_ACTIONS = new Set(['trade_offer', 'trade_accept', 'trade_decline', 'trade_cancel']);
 const PROPERTY_STATUS = Object.freeze({
@@ -94,16 +96,21 @@ function hashAdjustment(value) {
     hash ^= character.charCodeAt(0);
     hash = Math.imul(hash, 16777619);
   }
-  return (hash >>> 0) % 17;
+  return hash >>> 0;
 }
 
 function propertyBaseValue(input = {}) {
   const area = Math.max(16, Math.min(250_000, finite(input.area, 16)));
   const levels = integer(input.levels, 1, 180, 1);
   const category = categoryFor(input.buildingType);
-  const categoryAdjustment = { residential: -10, retail: 35, office: 45, industrial: 25, agricultural: 5, civic: 20, mixed: 12 }[category];
-  const raw = 45 + Math.sqrt(area) * 2 + area * .02 + levels * 10 + hashAdjustment(input.propertyId) + categoryAdjustment;
-  return integer(Math.round(raw / 5) * 5, 75, 250_000, 75);
+  const floorArea = area * levels;
+  const rate = { residential: 2300, retail: 3100, office: 3600, industrial: 1400, agricultural: 900, civic: 2800, mixed: 2600 }[category];
+  const minimum = { residential: 120000, retail: 180000, office: 240000, industrial: 160000, agricultural: 90000, civic: 250000, mixed: 160000 }[category];
+  const locationFactor = .82 + (hashAdjustment(input.propertyId) % 37) / 100;
+  const sizePremium = floorArea > 5000 ? 1.12 + Math.min(.28, Math.log10(floorArea / 5000) * .12) : 1;
+  const estimate = Math.max(minimum, (floorArea * rate + area * 350) * locationFactor * sizePremium);
+  const rounding = estimate >= 10000000 ? 100000 : estimate >= 1000000 ? 25000 : 5000;
+  return integer(Math.round(estimate / rounding) * rounding, minimum, 1_500_000_000, minimum);
 }
 
 function normalizeProperty(input = {}) {
@@ -187,11 +194,14 @@ function clearExpiredLease(property, nowMs) {
 }
 
 function walletData(raw = {}) {
+  const legacy = finite(raw.currencyVersion) < CURRENCY_VERSION;
+  const scale = legacy && Object.keys(raw).length ? LEGACY_CURRENCY_SCALE : 1;
   return {
-    credits: integer(raw.credits, 0, MAX_CREDITS, STARTING_CREDITS),
-    lifetimeEarned: integer(raw.lifetimeEarned, 0, MAX_CREDITS, STARTING_CREDITS),
-    lifetimeSpent: integer(raw.lifetimeSpent, 0, MAX_CREDITS, 0),
-    revision: integer(raw.revision, 0, MAX_CREDITS, 0)
+    credits: integer(finite(raw.credits, STARTING_CREDITS) * scale, 0, MAX_CREDITS, STARTING_CREDITS),
+    lifetimeEarned: integer(finite(raw.lifetimeEarned, finite(raw.credits, STARTING_CREDITS)) * scale, 0, MAX_CREDITS, STARTING_CREDITS),
+    lifetimeSpent: integer(finite(raw.lifetimeSpent) * scale, 0, MAX_CREDITS, 0),
+    revision: integer(raw.revision, 0, MAX_CREDITS, 0),
+    currencyVersion: CURRENCY_VERSION
   };
 }
 
@@ -208,8 +218,8 @@ function publicResult(property, wallet, receiptId) {
       tenantName: text(property.tenantName, 80),
       status: property.status,
       baseValue: property.baseValue,
-      salePrice: integer(property.salePrice, 0, 500_000, 0),
-      rentPrice: integer(property.rentPrice, 0, 100_000, 0),
+      salePrice: integer(property.salePrice, 0, 2_000_000_000, 0),
+      rentPrice: integer(property.rentPrice, 0, 100_000_000, 0),
       rentTermDays: integer(property.rentTermDays, 0, 30, 0),
       leaseEndsAtMs: timestampMillis(property.leaseEndsAt, 0),
       revision: property.revision
@@ -256,7 +266,7 @@ function tradePublicResult(offer, receiptId) {
       offeredPropertyLabel: text(offer.offeredPropertyLabel, 100),
       requestedPropertyId: text(offer.requestedPropertyId, 420),
       requestedPropertyLabel: text(offer.requestedPropertyLabel, 100),
-      creditOffer: integer(offer.creditOffer, 0, 500_000, 0),
+      creditOffer: integer(offer.creditOffer, 0, 1_500_000_000, 0),
       expiresAtMs: timestampMillis(offer.expiresAt, 0)
     })
   });
@@ -308,7 +318,7 @@ async function settlePropertyTrade(options = {}) {
       if (!offered || offered.propertyId !== submittedOffered.propertyId || offered.ownerUid !== uid) return Object.freeze({ accepted: false, reason: 'offered_property_unavailable' });
       if (!requested || requested.propertyId !== submittedRequested.propertyId || !requested.ownerUid || requested.ownerUid === uid) return Object.freeze({ accepted: false, reason: 'requested_property_unavailable' });
       if (offered.status !== PROPERTY_STATUS.owned || requested.status !== PROPERTY_STATUS.owned) return Object.freeze({ accepted: false, reason: 'property_not_tradeable' });
-      const creditOffer = integer(input?.creditOffer, 0, 500_000, 0);
+      const creditOffer = integer(input?.creditOffer, 0, 1_500_000_000, 0);
       const actorWallet = walletData(dataFor(actorWalletRef) || {});
       if (actorWallet.credits < creditOffer) return Object.freeze({ accepted: false, reason: 'not_enough_credits', credits: actorWallet.credits });
       nextOffer = {
@@ -354,7 +364,7 @@ async function settlePropertyTrade(options = {}) {
         if (offered.status !== PROPERTY_STATUS.owned || requested.status !== PROPERTY_STATUS.owned) return Object.freeze({ accepted: false, reason: 'property_not_tradeable' });
         const proposerWallet = walletData(dataFor(proposerWalletRef) || {});
         const recipientWallet = walletData(dataFor(recipientWalletRef) || {});
-        const creditOffer = integer(currentOffer.creditOffer, 0, 500_000, 0);
+        const creditOffer = integer(currentOffer.creditOffer, 0, 1_500_000_000, 0);
         if (proposerWallet.credits < creditOffer) return Object.freeze({ accepted: false, reason: 'offer_funds_unavailable' });
         const nextOffered = { ...offered, ownerUid: currentOffer.recipientUid, ownerName: currentOffer.recipientName, revision: integer(offered.revision, 0, MAX_CREDITS, 0) + 1, updatedAt: timestampFromMs(nowMs) };
         const nextRequested = { ...requested, ownerUid: currentOffer.proposerUid, ownerName: currentOffer.proposerName, revision: integer(requested.revision, 0, MAX_CREDITS, 0) + 1, updatedAt: timestampFromMs(nowMs) };
@@ -480,12 +490,12 @@ async function settlePropertyAction(options = {}) {
     } else if (action === 'list_sale') {
       if (base.ownerUid !== uid) return Object.freeze({ accepted: false, reason: 'not_owner' });
       if (leaseActive) return Object.freeze({ accepted: false, reason: 'lease_active' });
-      const salePrice = integer(input?.salePrice, Math.ceil(base.baseValue * .5), Math.floor(base.baseValue * 2), base.baseValue);
+      const salePrice = integer(input?.salePrice, Math.ceil(base.baseValue * .5), Math.min(MAX_CREDITS, Math.floor(base.baseValue * 2)), base.baseValue);
       next = { ...base, status: PROPERTY_STATUS.sale, salePrice, rentPrice: 0, rentTermDays: 0 };
     } else if (action === 'buy_listing') {
       if (base.status !== PROPERTY_STATUS.sale || !base.ownerUid) return Object.freeze({ accepted: false, reason: 'not_for_sale' });
       if (base.ownerUid === uid) return Object.freeze({ accepted: false, reason: 'own_listing' });
-      debit = integer(base.salePrice, 1, 500_000, base.baseValue);
+      debit = integer(base.salePrice, 1, 1_500_000_000, base.baseValue);
       if (actorWallet.credits < debit) return Object.freeze({ accepted: false, reason: 'not_enough_credits', credits: actorWallet.credits });
       sellerUid = base.ownerUid;
       sellerWalletRef = sellerWalletRefForUid?.(sellerUid);
@@ -503,7 +513,7 @@ async function settlePropertyAction(options = {}) {
     } else if (action === 'rent') {
       if (base.status !== PROPERTY_STATUS.rent || !base.ownerUid) return Object.freeze({ accepted: false, reason: 'not_for_rent' });
       if (base.ownerUid === uid) return Object.freeze({ accepted: false, reason: 'own_listing' });
-      debit = integer(base.rentPrice, 1, 100_000, 1);
+      debit = integer(base.rentPrice, 1, 100_000_000, 1);
       if (actorWallet.credits < debit) return Object.freeze({ accepted: false, reason: 'not_enough_credits', credits: actorWallet.credits });
       sellerUid = base.ownerUid;
       sellerWalletRef = sellerWalletRefForUid?.(sellerUid);

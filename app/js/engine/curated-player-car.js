@@ -1,4 +1,4 @@
-import { loadModelAsset } from '../assets/model-asset-runtime.js?v=9';
+import { loadModelAsset } from '../assets/model-asset-runtime.js?v=14';
 
 function retainPrimaryE34Variant(THREE, root) {
   let triangles = 0;
@@ -105,10 +105,6 @@ async function attachCuratedPlayerCar(THREE, appCtx) {
   if (!carMesh) return false;
   if (carMesh.userData.curatedVehicleVisual) return true;
   if (carMesh.userData.curatedVehicleLoadPromise) return carMesh.userData.curatedVehicleLoadPromise;
-  const fallbackParts = carMesh.children.filter((child) => child.userData?.defaultPlayerVehicleFallback === true);
-  // The fallback remains a recovery mechanism, but it must never flash while
-  // the bundled BMW is decoding during a normal mode transition.
-  fallbackParts.forEach((child) => { child.visible = false; });
   carMesh.userData.curatedVehicleLoadStarted = true;
   carMesh.userData.curatedVehicleLoading = true;
   const loadPromise = (async () => {
@@ -116,16 +112,15 @@ async function attachCuratedPlayerCar(THREE, appCtx) {
       const instance = await loadModelAsset(THREE, 'vehicle-bmw-525i-e34');
       if (!carMesh.parent) return false;
       const visual = prepareE34Model(THREE, instance.root, instance.record);
-      fallbackParts.forEach((child) => { child.visible = false; });
       visual.visible = !carMesh.userData.activeUrbanVehicleId;
       carMesh.add(visual);
       carMesh.userData.curatedVehicleAssetId = instance.record.id;
       carMesh.userData.curatedVehicleVisual = visual;
       return true;
     } catch (error) {
-      fallbackParts.forEach((child) => { child.visible = true; });
       carMesh.userData.curatedVehicleLoadStarted = false;
-      console.warn('Curated player car unavailable; keeping the built-in vehicle.', error);
+      carMesh.userData.curatedVehicleLoadFailed = true;
+      console.warn('Curated player car unavailable; player vehicle remains hidden.', error);
       return false;
     } finally {
       carMesh.userData.curatedVehicleLoading = false;

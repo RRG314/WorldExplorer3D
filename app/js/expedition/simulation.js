@@ -32,12 +32,41 @@ function startExpedition(expedition, atMs = Date.now()) {
   });
 }
 
-function consumeResources(resources, expectedResources, deltaS, totalS) {
+function resourceDemandMultipliers(expedition) {
+  const systems = expedition?.systems || {};
+  const crew = expedition?.crew || [];
+  const condition = (id) => Math.max(0.05, Math.min(1, Number(systems[id]?.condition ?? 1)));
+  const averageFatigue = crew.length
+    ? crew.reduce((sum, member) => sum + Number(member.fatigue || 0), 0) / crew.length
+    : 0;
+  const averageHealth = crew.length
+    ? crew.reduce((sum, member) => sum + Number(member.health ?? 1), 0) / crew.length
+    : 1;
+  const survivalPressure = expedition?.survival === 'severe' ? 1.1 : 1;
+  const wearPressure = Object.values(systems).length
+    ? 1 + Object.values(systems).reduce((sum, system) => sum + Math.max(0, 1 - Number(system?.condition ?? 1)), 0) / Object.values(systems).length * 0.6
+    : 1;
+  return Object.freeze({
+    foodKg: survivalPressure * (1 + averageFatigue * 0.08 + (1 - condition('food-production')) * 0.28),
+    waterKg: survivalPressure * (1 + (1 - condition('life-support')) * 0.42),
+    powerMWh: 1 + (1 - condition('power')) * 0.24 + (1 - condition('thermal')) * 0.16,
+    propellantKg: 1 + (1 - condition('propulsion')) * 0.32 + (1 - condition('navigation')) * 0.12,
+    medicalUnits: 1 + Math.max(0, 1 - averageHealth) * 0.8 + averageFatigue * 0.12,
+    maintenanceKg: wearPressure,
+    feedstockKg: 1 + (wearPressure - 1) * 0.45,
+    processingResidueKg: 1
+  });
+}
+
+function consumeResources(expedition, deltaS, totalS) {
+  const resources = expedition.resources;
+  const expectedResources = expedition.calculation.expectedResources;
   const next = clone(resources);
   const fraction = totalS > 0 ? deltaS / totalS : 0;
+  const multipliers = resourceDemandMultipliers(expedition);
   for (const key of RESOURCE_KEYS) {
     if (key === 'scienceCargoKg') continue;
-    next[key] = Math.max(0, Number(next[key] || 0) - Number(expectedResources?.[key] || 0) * fraction);
+    next[key] = Math.max(0, Number(next[key] || 0) - Number(expectedResources?.[key] || 0) * fraction * Number(multipliers[key] || 1));
   }
   return Object.freeze(next);
 }
@@ -95,7 +124,7 @@ function advanceExpedition(expedition, requestedDeltaS) {
   let next = withExpeditionChanges(prepared, {
     strategicElapsedS: elapsed,
     progress: totalS > 0 ? Math.min(1, elapsed / totalS) : 0,
-    resources: consumeResources(prepared.resources, prepared.calculation.expectedResources, deltaS, totalS),
+    resources: consumeResources(prepared, deltaS, totalS),
     systems: degradeSystems(prepared.systems, deltaS, totalS),
     crew: advanceCrew(prepared.crew, deltaS, prepared.systems),
     outposts: advanceOutposts(prepared, elapsed)
@@ -159,9 +188,12 @@ function resolveExpeditionEvent(expedition, choice) {
     state: 'failed', voyagePhase: 'mission-loss', failureReport: failure,
     log: appendLog(next.log, { atMissionS: next.strategicElapsedS, kind: 'mission-loss', message: failure.summary })
   });
+  if (!failure && expedition.pendingEvent?.slotId === 'final-approach') {
+    next = advanceExpedition(next, next.calculation.properElapsedS);
+  }
   return next;
 }
 
 const VOYAGE_MILESTONES = VOYAGE_SLOTS;
 
-export { advanceExpedition, advanceToNextMilestone, resolveExpeditionEvent, startExpedition, VOYAGE_MILESTONES, VOYAGE_SLOTS };
+export { advanceExpedition, advanceToNextMilestone, resolveExpeditionEvent, resourceDemandMultipliers, startExpedition, VOYAGE_MILESTONES, VOYAGE_SLOTS };

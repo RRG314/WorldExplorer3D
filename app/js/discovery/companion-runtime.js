@@ -51,8 +51,8 @@ function resolveCompanionFollowTarget(actor, { archetype = 'dog' } = {}) {
   const airborne = archetype === 'bird';
   const largeLivestock = ['livestock-cattle', 'livestock-horse'].includes(archetype);
   const smallLivestock = archetype.startsWith('livestock-');
-  const followBack = airborne ? .45 : largeLivestock ? 2.4 : smallLivestock ? 1.45 : archetype === 'cat' ? 1.05 : .85;
-  const followSide = airborne ? 2.6 : largeLivestock ? 2.8 : smallLivestock ? 1.8 : archetype === 'cat' ? 1.15 : 1.8;
+  const followBack = airborne ? .45 : largeLivestock ? 2.4 : smallLivestock ? 1.45 : archetype === 'cat' ? .72 : .42;
+  const followSide = airborne ? 2.6 : largeLivestock ? 2.8 : smallLivestock ? 1.8 : archetype === 'cat' ? 1.02 : 1.08;
   return Object.freeze({
     x: Number(actor?.x || 0) - Math.sin(angle) * followBack + Math.cos(angle) * followSide,
     z: Number(actor?.z || 0) - Math.cos(angle) * followBack - Math.sin(angle) * followSide

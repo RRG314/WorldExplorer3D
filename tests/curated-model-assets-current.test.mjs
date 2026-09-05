@@ -45,68 +45,52 @@ test('the curated model loader does not depend on a third-party runtime decoder'
   assert.doesNotMatch(source, /https?:\/\//);
 });
 
-test('four local Quaternius cars cover common close traffic without replacing traffic authority', () => {
-  const assets = modelAssetsForRole('close-traffic-vehicle');
-  assert.deepEqual(assets.map((asset) => asset.id), [
-    'traffic-compact-hatchback-v1',
-    'traffic-four-door-sedan-v1',
-    'traffic-trail-suv-v1',
-    'traffic-city-taxi-v1'
+test('local curated models cover every road-traffic variant and the response fleet', () => {
+  const assets = modelAssetsForRole('road-vehicle-presentation');
+  const coveredVariants = [...new Set(assets.flatMap((asset) => asset.vehicleVariantIds || []))].sort();
+  assert.deepEqual(coveredVariants, [
+    'box_truck', 'city_bus', 'compact', 'delivery_van', 'pickup', 'responder', 'sedan', 'suv', 'taxi', 'van'
   ]);
-  const expectations = new Map([
-    ['traffic-compact-hatchback-v1', {
-      variantId: 'compact',
-      hash: 'e5f5fa41c4434383b20287725c0e9d757cbd0f059eedc342ec265d32a195fe39',
-      meshes: ['NormalCar2_Cube.002-Mesh', 'NormalCar2_BackWheels_Cylinder.003-Mesh', 'NormalCar2_FrontLeftWheel_Cylinder.015-Mesh', 'NormalCar2_FrontRightWheel_Cylinder.016-Mesh']
-    }],
-    ['traffic-four-door-sedan-v1', {
-      variantId: 'sedan',
-      hash: 'bf00f2f0386a25aa310abc0424d22586e46a59ee6c737e6b375c97c9f01bd462',
-      meshes: ['NormalCar1_Cube.012-Mesh', 'NormalCar1_BackWheels_Cube.011-Mesh', 'NormalCar1_FrontLeftWheel_Cube.007-Mesh', 'NormalCar1_FrontRightWheel_Cube.008-Mesh']
-    }],
-    ['traffic-trail-suv-v1', {
-      variantId: 'suv',
-      hash: '1a9ce2bba813dca5005abab09715b01b8b5f4a9c48d7260463afdfeb876aa8b6',
-      meshes: ['SUV_Cube-Mesh', 'SUV_BackWheels_Cylinder.009-Mesh', 'SUV_FrontLeftWheel_Cylinder.010-Mesh', 'SUV_FrontRightWheel_Cylinder.005-Mesh']
-    }],
-    ['traffic-city-taxi-v1', {
-      variantId: 'taxi',
-      hash: '14b2f982f8a501565702ecb56f917c82e9abae914fa3f76d2f622a8670598af1',
-      meshes: ['Taxi_Cube.009-Mesh', 'Taxi_BackWheels_Cube.010-Mesh', 'Taxi_FrontLeftWheel_Cube.013-Mesh', 'Taxi_FrontRightWheel_Cube.014-Mesh']
-    }]
-  ]);
+  assert.equal(modelAssetsForRole('responder-road-vehicle').length, 1);
   for (const asset of assets) {
-    const expected = expectations.get(asset.id);
-    assert.deepEqual(asset.vehicleVariantIds, [expected.variantId]);
-    assert.equal(asset.collisionPolicy, 'existing-road-vehicle-envelope');
+    assert.ok(['existing-road-vehicle-envelope', 'existing-responder-vehicle-envelope'].includes(asset.collisionPolicy));
     assert.deepEqual(asset.instancePolicy, { geometry: 'shared', materials: 'clone' });
-    assert.equal(asset.budgets.maxInstances, 1);
-    assert.equal(asset.license, 'CC0-1.0');
-    assert.equal(asset.sourceUrl, 'https://quaternius.com/packs/cars.html');
+    assert.ok(asset.budgets.maxInstances >= 8);
+    assert.match(asset.url, /^\/app\/assets\/models\/vehicles\/traffic\//);
     const file = path.join(root, asset.url.replace(/^\/app\//, 'app/'));
     const { bytes, json } = readGlbAssetMetadata(file);
     assert.ok(bytes.length <= asset.budgets.bytes);
-    assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'), expected.hash);
     assert.deepEqual(json.extensionsRequired || [], []);
-    assert.deepEqual(json.meshes.map((mesh) => mesh.name), expected.meshes);
-    assert.equal(json.images?.length || 0, 0);
   }
 });
 
-test('curated traffic shells remain a bounded visual adapter over procedural vehicle behavior', () => {
+test('traffic, responder, and player cars are curated-only and fail closed', () => {
   const adapter = fs.readFileSync(path.join(root, 'app/js/urban-sandbox/curated-traffic-vehicle.js'), 'utf8');
   const visual = fs.readFileSync(path.join(root, 'app/js/urban-sandbox/vehicle-visuals.js'), 'utf8');
   const runtime = fs.readFileSync(path.join(root, 'app/js/urban-sandbox/runtime.js'), 'utf8');
-  assert.match(adapter, /defaultTrafficVehicleFallback/);
+  const population = fs.readFileSync(path.join(root, 'app/js/living-world/population.js'), 'utf8');
+  const responder = fs.readFileSync(path.join(root, 'app/js/urban-sandbox/responder-runtime.js'), 'utf8');
+  const sceneBootstrap = fs.readFileSync(path.join(root, 'app/js/engine/scene-bootstrap.js'), 'utf8');
+  assert.doesNotMatch(adapter, /defaultTrafficVehicleFallback|keeping the built-in vehicle/);
   assert.match(adapter, /existing-road-vehicle-envelope|collisionPolicy/);
   assert.match(adapter, /disposeCuratedTrafficVehicle/);
-  assert.match(visual, /defaultTrafficVehicleFallback\s*=\s*true/);
-  assert.match(visual, /condition\s*<\s*\.98/);
-  assert.match(runtime, /curatedTrafficAssetOwners/);
-  assert.match(runtime, /state\.mobile\s*\?\s*2\s*:\s*Object\.keys\(CURATED_TRAFFIC_ASSET_BY_VARIANT\)\.length/);
+  assert.match(adapter, /vehicle remains hidden/);
+  assert.match(visual, /proceduralVehicleMeshCount\s*=\s*0/);
+  assert.doesNotMatch(visual, /new THREE\.Mesh\s*\(/);
+  assert.doesNotMatch(population, /vehicleParts|Living World Traffic Rounded Bodies|Living World Traffic Cabins/);
+  assert.match(population, /vehiclePresentation:\s*'curated-only-local-models'/);
+  assert.match(population, /proceduralVehicleMeshes:\s*0/);
+  assert.match(population, /POPULATION_STEP_SECONDS\s*=\s*1\s*\/\s*30/);
+  assert.match(population, /connectNearby:\s*true/);
+  assert.match(population, /agent\.bridge\s*=\s*\{/);
+  assert.doesNotMatch(runtime, /curatedTrafficAssetOwners/);
   assert.match(runtime, /promoteVehicle\?\.\(vehicle\.trafficAgentId\)/);
-  assert.match(runtime, /disposeCuratedTrafficVehicle\?\.\(\)/);
   assert.match(runtime, /curatedAssetId:/);
+  assert.match(responder, /CURATED_RESPONDER_ASSET_ID/);
+  assert.match(responder, /pursuitMode:\s*'cross-terrain-direct'/);
+  assert.match(responder, /OFFICER_DEPLOY_DISTANCE\s*=\s*10/);
+  assert.match(sceneBootstrap, /proceduralVehicleMeshCount\s*=\s*0/);
+  assert.doesNotMatch(sceneBootstrap, /createClassicUtilityCar/);
 });
 
 test('locally bundled skinned Explorer families serve player choices, nearby NPCs, responders, and ship crew', () => {
@@ -185,11 +169,12 @@ test('locally bundled skinned Explorer families serve player choices, nearby NPC
   }
 });
 
-test('curated characters attach beneath existing gameplay roots and retain procedural fallbacks', () => {
+test('player retains recovery while every NPC role is curated-only', () => {
   const walking = fs.readFileSync(path.join(root, 'app/js/walking/character.js'), 'utf8');
   const playerFallback = fs.readFileSync(path.join(root, 'app/js/walking/field-navigator-mesh.js'), 'utf8');
   const walkingPhysics = fs.readFileSync(path.join(root, 'app/js/walking/physics.js'), 'utf8');
-  const npcFallback = fs.readFileSync(path.join(root, 'app/js/urban-sandbox/npc-visuals.js'), 'utf8');
+  const npcVisuals = fs.readFileSync(path.join(root, 'app/js/urban-sandbox/npc-visuals.js'), 'utf8');
+  const population = fs.readFileSync(path.join(root, 'app/js/living-world/population.js'), 'utf8');
   const urbanRuntime = fs.readFileSync(path.join(root, 'app/js/urban-sandbox/runtime.js'), 'utf8');
   const responderRuntime = fs.readFileSync(path.join(root, 'app/js/urban-sandbox/responder-runtime.js'), 'utf8');
   const shipInterior = fs.readFileSync(path.join(root, 'app/js/expedition/ship-interior.js'), 'utf8');
@@ -197,11 +182,18 @@ test('curated characters attach beneath existing gameplay roots and retain proce
   assert.match(walking, /attachCuratedExplorerCharacter\(THREE, character/);
   assert.match(walkingPhysics, /Number\(actions\.sprint\)\s*>\s*0\.05/);
   assert.match(playerFallback, /defaultCharacterFallback\s*=\s*true/);
-  assert.match(npcFallback, /defaultCharacterFallback\s*=\s*true/);
+  assert.match(npcVisuals, /characterStyle\s*=\s*'curated-only-local-model'/);
+  assert.match(npcVisuals, /proceduralCharacterMeshCount\s*=\s*0/);
+  assert.match(npcVisuals, /proceduralEquipmentMeshCount\s*=\s*0/);
+  assert.doesNotMatch(npcVisuals, /new THREE\.(?:Box|Cylinder|Sphere|Capsule|Cone)Geometry/);
+  assert.match(population, /pedestrianRepresentation:\s*'curated-only-local-models'/);
+  assert.match(population, /proceduralPedestrianMeshes:\s*0/);
   assert.match(urbanRuntime, /curatedNpcAssetOwners/);
   assert.match(responderRuntime, /RESPONDER_ASSET_ID/);
   assert.match(shipInterior, /SHIP_CREW_ASSET_ID/);
   assert.match(shipInterior, /activeSession\?\.sceneState\?\.crewLayer === group/);
+  assert.match(shipInterior, /proceduralCharacterMeshCount\s*=\s*0/);
+  assert.match(shipInterior, /failClosed:\s*true/);
   assert.match(shipInterior, /crewMeshes\.forEach\(\(mesh\) => mesh\.userData\.disposeCuratedCharacter/);
   assert.match(loader, /object\.skeleton\s*=\s*sourceMesh\.skeleton\.clone\(\)/);
   assert.match(loader, /instancePolicy/);
@@ -295,6 +287,7 @@ test('player gender choice persists and every promoted nearby NPC receives a bal
   const preference = fs.readFileSync(path.join(root, 'app/js/walking/player-character-preference.js'), 'utf8');
   const walking = fs.readFileSync(path.join(root, 'app/js/walking/character.js'), 'utf8');
   const shell = fs.readFileSync(path.join(root, 'app/index.html'), 'utf8');
+  const account = fs.readFileSync(path.join(root, 'account/index.html'), 'utf8');
   const urbanRuntime = fs.readFileSync(path.join(root, 'app/js/urban-sandbox/runtime.js'), 'utf8');
   assert.match(preference, /we3d\.player-character-gender\.v1/);
   assert.match(preference, /\['man', 'woman'\]/);
@@ -302,10 +295,11 @@ test('player gender choice persists and every promoted nearby NPC receives a bal
   assert.match(walking, /EXPLORER_ASSET_BY_GENDER/);
   assert.match(walking, /requestedCuratedCharacterAssetId/);
   assert.match(fs.readFileSync(path.join(root, 'app/js/walking/curated-explorer-character.js'), 'utf8'), /curatedCharacterLoadToken/);
-  assert.match(shell, /data-player-character-gender="man"/);
-  assert.match(shell, /data-player-character-gender="woman"/);
+  assert.doesNotMatch(shell, /data-player-character-gender=/);
+  assert.match(account, /data-account-character-gender="man"/);
+  assert.match(account, /data-account-character-gender="woman"/);
   assert.match(urbanRuntime, /function selectCuratedNpcAsset/);
-  assert.match(urbanRuntime, /Math\.ceil\(state\.npcBudget\s*\/\s*NEARBY_NPC_ASSET_IDS\.length\)/);
+  assert.match(urbanRuntime, /state\.curatedNpcAssetCursor\s*=\s*\(start\s*\+\s*1\)\s*%\s*NEARBY_NPC_ASSET_IDS\.length/);
   assert.match(urbanRuntime, /state\.curatedNpcAssetOwners\.set\(npc\.id, curatedAssetId\)/);
   assert.doesNotMatch(urbanRuntime, /curatedLimit/);
 });
@@ -316,7 +310,8 @@ test('the curated car is requested by the existing drive-mode authority, not by 
   const travelMode = fs.readFileSync(path.join(root, 'app/js/travel-mode.js'), 'utf8');
   assert.match(sceneBootstrap, /ensureCuratedPlayerCar\s*=\s*\(\)\s*=>\s*attachCuratedPlayerCar/);
   assert.match(sceneBootstrap, /void appCtx\.ensureCuratedPlayerCar\(\)/);
-  assert.match(adapter, /fallbackParts\.forEach\(\(child\) => \{ child\.visible = false; \}\)/);
+  assert.doesNotMatch(adapter, /fallbackParts|built-in vehicle/);
+  assert.match(adapter, /player vehicle remains hidden/);
   assert.match(adapter, /curatedVehicleLoadPromise/);
   assert.match(travelMode, /ensureCuratedPlayerCar\?\.\(\)/);
   assert.doesNotMatch(sceneBootstrap, /^\s*attachCuratedPlayerCar\(THREE, appCtx\);\s*$/m);

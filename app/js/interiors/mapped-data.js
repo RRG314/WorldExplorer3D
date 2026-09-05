@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { buildingLabel, distanceToFootprint } from "../building-entry.js?v=7";
+import { buildingLabel, distanceToFootprint } from "../building-entry.js?v=8";
 import { INTERIOR_FAST_ENTRY_WAIT_MS, INTERIOR_FETCH_TIMEOUT_MS } from "./constants.js?v=1";
 import {
   buildingGeoBounds,

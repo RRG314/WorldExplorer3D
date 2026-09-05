@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { buildingKey, pointToSegmentDistance, summarizeSupportType } from "../building-entry.js?v=7";
+import { buildingKey, pointToSegmentDistance, summarizeSupportType } from "../building-entry.js?v=8";
 
 function createInteriorRuntimeUiApi() {
   let transientHint = { text: "", until: 0 };

@@ -8,7 +8,7 @@ const evidenceDir = path.resolve('output/release-evidence/current/curated-animal
 const supported = Object.freeze({
   'trail-hound': 'animal-trail-hound-husky-v1',
   'field-retriever': 'animal-trail-hound-husky-v1',
-  'park-terrier': 'animal-park-terrier-shiba-inu-v1',
+  'park-terrier': 'animal-trail-hound-husky-v1',
   'pasture-cow': 'animal-pasture-cow-v1',
   'heritage-pig': 'animal-heritage-pig-v1',
   'field-horse': 'animal-field-horse-v1',
@@ -61,7 +61,9 @@ async function startEarth(page, label) {
       !!globalThis.__WE3D_COMPANION_SUPPORT__ && !!globalThis.__WE3D_URBAN_CRASH_SUPPORT__;
   }, null, { timeout: 360_000 });
   const turnOffTips = page.getByRole('button', { name: 'Turn off tips', exact: true });
-  if (await turnOffTips.isVisible().catch(() => false)) await turnOffTips.click();
+  if (await turnOffTips.isVisible().catch(() => false)) {
+    await turnOffTips.click({ timeout: 2_000 }).catch(() => {});
+  }
 }
 
 async function adoptAndWait(page, speciesId, name) {
@@ -69,12 +71,17 @@ async function adoptAndWait(page, speciesId, name) {
     name,
     discoveryId: `curated-animal-verification:${speciesId}:${Date.now()}`
   }), { speciesId, name });
-  await page.waitForFunction(({ speciesId, assetId }) => {
-    const snapshot = globalThis.__WE3D_COMPANION_SUPPORT__?.snapshot?.();
-    return snapshot?.activeCatalogId === speciesId &&
-      snapshot?.presentation?.curatedAssetId === assetId &&
-      snapshot?.presentation?.visibleFallbackMeshCount === 0;
-  }, { speciesId, assetId: supported[speciesId] }, { timeout: 120_000 });
+  try {
+    await page.waitForFunction(({ speciesId, assetId }) => {
+      const snapshot = globalThis.__WE3D_COMPANION_SUPPORT__?.snapshot?.();
+      return snapshot?.activeCatalogId === speciesId &&
+        snapshot?.presentation?.curatedAssetId === assetId &&
+        snapshot?.presentation?.visibleFallbackMeshCount === 0;
+    }, { speciesId, assetId: supported[speciesId] }, { timeout: 120_000 });
+  } catch (error) {
+    const snapshot = await page.evaluate(() => globalThis.__WE3D_COMPANION_SUPPORT__?.snapshot?.() || null);
+    assert.fail(`Curated companion ${speciesId} did not become ready: ${JSON.stringify({ snapshot, browserFailures: failures, cause: error?.message })}`);
+  }
   return page.evaluate(() => globalThis.__WE3D_COMPANION_SUPPORT__.snapshot());
 }
 
@@ -138,11 +145,15 @@ async function desktopJourney() {
       const presentation = globalThis.__WE3D_COMPANION_SUPPORT__?.snapshot?.().presentation;
       return presentation?.travelState === 'vehicle-occupant' && presentation.visible === false;
     }, null, { timeout: 15_000 });
+    await page.waitForFunction(() => (
+      globalThis.__WE3D_URBAN_CRASH_SUPPORT__?.snapshot?.().phase === 'driving'
+    ), null, { timeout: 15_000 });
     const inVehicle = await page.evaluate(() => globalThis.__WE3D_COMPANION_SUPPORT__.snapshot());
-    await page.evaluate(async () => {
+    const exitStarted = await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
-      ctx.exitUrbanVehicleForSupport?.();
+      return ctx.exitUrbanVehicleForSupport?.() === true;
     });
+    assert.equal(exitStarted, true, 'The completed vehicle entry did not permit a companion-aware exit.');
     await page.waitForFunction(() => {
       const presentation = globalThis.__WE3D_COMPANION_SUPPORT__?.snapshot?.().presentation;
       return presentation?.travelState === 'following' && presentation.visible === true;
@@ -221,7 +232,7 @@ try {
   assert.equal(desktop.inVehicle.presentation.visible, false);
   assert.ok(desktop.progressed.companions.find((entry) => entry.active).progression.totalXp > 0);
   assert.equal(desktop.afterReload.activeName, 'Scout');
-  assert.equal(mobile.presentation.curatedAssetId, 'animal-park-terrier-shiba-inu-v1');
+  assert.equal(mobile.presentation.curatedAssetId, 'animal-trail-hound-husky-v1');
   assert.equal(mobile.presentation.visibleFallbackMeshCount, 0);
   assert.equal(blockedFallback.presentation.curatedAssetId, null);
   assert.ok(blockedFallback.presentation.visibleFallbackMeshCount > 0);

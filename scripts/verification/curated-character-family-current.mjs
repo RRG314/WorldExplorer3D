@@ -95,8 +95,11 @@ async function earthJourney(viewport, label) {
     }
     const officer = responderState?.responders?.find((entry) => entry.officer)?.officer || null;
     assert.equal(officer?.curatedAssetId, 'character-civic-responder-v1', JSON.stringify(responderState));
-    assert.ok(officer.fallbackMeshCount > 0);
+    assert.equal(officer.fallbackMeshCount, 0);
     assert.equal(officer.visibleFallbackMeshCount, 0);
+    assert.equal(officer.proceduralCharacterMeshes, 0);
+    assert.equal(officer.proceduralEquipmentMeshes, 0);
+    assert.equal(officer.curatedEquipmentAssetId, 'equipment-explorer-pulse-sidearm-v1');
 
     await page.evaluate(async (officerPose) => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
@@ -174,7 +177,11 @@ async function shipJourney(viewport, label) {
     });
     assert.equal(presentation.members.length, 7);
     assert.ok(presentation.members.every((member) => member.curatedAssetId === 'character-ship-crew-v1'));
-    assert.ok(presentation.snapshot.crewPresentation.every((member) => member.fallbackMeshCount > 0 && member.visibleFallbackMeshCount === 0));
+    assert.ok(presentation.snapshot.crewPresentation.every((member) =>
+      member.fallbackMeshCount === 0 &&
+      member.visibleFallbackMeshCount === 0 &&
+      member.proceduralCharacterMeshes === 0
+    ));
     assert.ok(presentation.members.every((member) => JSON.stringify(member.geometryIds) === JSON.stringify(presentation.members[0].geometryIds)));
     assert.ok(presentation.members.slice(1).every((member) => JSON.stringify(member.materialIds) !== JSON.stringify(presentation.members[0].materialIds)));
     assert.ok(presentation.members.every((member) => Number(member.actions.idle || 0) + Number(member.actions.walk || 0) > 0.99));

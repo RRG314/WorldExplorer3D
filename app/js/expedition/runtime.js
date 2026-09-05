@@ -9,15 +9,16 @@ import {
 import { createExpeditionStore } from './store.js?v=11';
 import { applyShipOperation, getShipStationView } from './ship-operations.js?v=7';
 import { getUniverseDestinations, resolveUniverseAddress } from '../universe/catalog.js?v=11';
-import { ensurePlayerBackpackInventory } from '../urban-sandbox/equipment-model.js?v=9';
+import { ensurePlayerBackpackInventory } from '../urban-sandbox/equipment-model.js?v=10';
 import { constructOutpost, constructionAvailability, createOutpostSite, serviceOutpost } from './outpost.js?v=1';
 import { registerExpeditionDiscovery } from './contact-authority.js?v=4';
 import { createPodJourney, POD_PHASE, POD_ROUTE_KIND, transitionPodJourney } from './pod-journey-authority.js?v=2';
 import { approvedSampleTradeValue, summarizeExpeditionTransfers } from '../resources/material-catalog.js?v=2';
 import { SHIP_STATIONS } from './ship-layout.js?v=5';
-import { consumeStagedEarthPod, getStagedEarthPodSnapshot, playSurfacePodLaunch, stageEarthPod } from '../planetary/surface-pod-launch.js?v=8';
+import { consumeStagedEarthPod, getStagedEarthPodSnapshot, playSurfacePodLaunch, stageEarthPod } from '../planetary/surface-pod-launch.js?v=11';
 import { SPACE_CRAFT_IDENTITY } from '../space/craft-identity.js?v=1';
 import { SPACE_TRAVEL_LOCATION, SPACE_TRAVEL_PHASE } from '../space/travel-session.js?v=1';
+import { campaignMissionDestinationId, campaignObjective, campaignPhase, completeCampaign } from './campaign.js?v=1';
 
 const STARSHIP_NAME = SPACE_CRAFT_IDENTITY.starship.name;
 
@@ -32,6 +33,7 @@ let sharedState = null;
 let activePodJourney = null;
 let podCourseTimer = 0;
 let podRecoveryTimer = 0;
+let campaignEventsBound = false;
 
 function bindRuntimeContext(appContext) {
   activeContext = appContext || activeContext;
@@ -43,6 +45,7 @@ function bindRuntimeContext(appContext) {
     getExpeditionPodDockingTarget,
     getInterstellarExpeditionSnapshot: getExpeditionSnapshot,
     getStagedEarthPodSnapshot,
+    openExpeditionPlanner: () => openExpeditionPlanner(activeContext),
     leaveExpeditionSurface,
     leaveDestinationMissionSurface,
     launchEarthPathfinderToSolisReach,
@@ -51,6 +54,7 @@ function bindRuntimeContext(appContext) {
     markExpeditionPodSurfaceLaunch,
     stageEarthPathfinder
   });
+  bindCampaignEvents();
   return activeContext;
 }
 
@@ -149,7 +153,7 @@ function currentEarthAnchorId() {
 function ensureTransitExpedition() {
   store ||= createExpeditionStore();
   activeExpedition = store.load();
-  if (!activeExpedition || activeExpedition.state === 'failed') {
+  if (!activeExpedition) {
     activeExpedition = createExpeditionPlan({
       destinationId: 'proxima-centauri',
       shipId: 'long-range-research-vessel',
@@ -165,6 +169,105 @@ function ensureTransitExpedition() {
     : null;
   syncExpeditionContacts(activeExpedition);
   return activeExpedition;
+}
+
+function currentUniverseFrameId() {
+  return String(activeContext?.universeRuntime?.current?.id || 'sol');
+}
+
+function activeCampaignMission() {
+  const mission = activeContext?.getDestinationMissionSnapshot?.();
+  if (!mission || !activeExpedition) return null;
+  return mission.systemId === activeExpedition.destinationId || mission.destinationId === activeExpedition.destinationId ? mission : null;
+}
+
+function persistActiveExpedition(next) {
+  if (!next || !store) return false;
+  activeExpedition = next;
+  store.save(activeExpedition);
+  activeContext?.updateExpeditionShipRecord?.(activeExpedition);
+  return true;
+}
+
+function openCampaignDestinationMission() {
+  if (!activeExpedition || currentUniverseFrameId() !== activeExpedition.destinationId) return false;
+  const missionDestinationId = campaignMissionDestinationId(activeExpedition.destinationId);
+  return activeContext?.openDestinationMission?.(missionDestinationId) === true;
+}
+
+function markArrivalTransferComplete() {
+  if (!activeExpedition || activeExpedition.state !== 'arrived') return false;
+  const firstArrival = activeExpedition.arrivalTransferState !== 'complete';
+  if (firstArrival) {
+    persistActiveExpedition(withExpeditionChanges(activeExpedition, {
+      arrivalTransferState: 'complete',
+      arrivedFrameId: activeExpedition.destinationId,
+      arrivedFrameAtMs: Date.now()
+    }));
+  }
+  if (firstArrival) {
+    activeContext?.showSpaceFlightMessage?.(`FIRST LIGHT ARRIVAL · ${String(activeExpedition.destinationId).replaceAll('-', ' ').toUpperCase()} · BEGIN THE DESTINATION SURVEY`, '#68d8c0');
+    window.setTimeout(openCampaignDestinationMission, 450);
+  }
+  return true;
+}
+
+function beginExpeditionArrivalTransfer() {
+  if (!activeExpedition || activeExpedition.state !== 'arrived' || activeContext?.universeRuntime?.transition) return false;
+  if (activeContext?.activeShipInterior) {
+    activeContext?.showToast?.('Final approach is ready. Return to flight controls to enter the destination system.');
+    return false;
+  }
+  if (currentUniverseFrameId() === activeExpedition.destinationId) return markArrivalTransferComplete();
+  closeExpeditionPlanner();
+  const accepted = activeContext?.travelToUniverseDestination?.(activeExpedition.destinationId, {
+    kind: 'expedition-arrival',
+    routeLabel: `${STARSHIP_NAME} First Light arrival`
+  });
+  if (!accepted) {
+    activeContext?.showSpaceFlightMessage?.('Final approach is waiting for the current Space transition to finish.', '#f59e0b');
+    return false;
+  }
+  persistActiveExpedition(withExpeditionChanges(activeExpedition, { arrivalTransferState: 'in-progress' }));
+  activeContext?.showSpaceFlightMessage?.(`FINAL APPROACH · LEAVING SOL FOR ${String(activeExpedition.destinationId).replaceAll('-', ' ').toUpperCase()}`, '#8ab4ff');
+  return true;
+}
+
+async function completeActiveCampaign(detail = {}) {
+  if (!activeExpedition || activeExpedition.state === 'completed' || activeExpedition.state === 'failed') return false;
+  if (detail.systemId !== activeExpedition.destinationId && detail.destinationId !== activeExpedition.destinationId) return false;
+  persistActiveExpedition(completeCampaign(activeExpedition, detail));
+  await activeContext?.recordExplorerEvent?.({
+    eventId: `event:interstellar-campaign:${activeExpedition.id}`,
+    eventType: 'interstellar-expedition-complete',
+    sourceSystem: 'interstellar-expedition',
+    sourceId: activeExpedition.id,
+    pathId: 'space-science',
+    name: 'First Light: Proxima',
+    detail: `${detail.title || 'Destination science'} completed after the interstellar voyage.`,
+    regionId: activeExpedition.destinationId,
+    regionLabel: String(activeExpedition.destinationId).replaceAll('-', ' '),
+    worldIdentity: detail.destinationId || activeExpedition.destinationId,
+    environment: 'SPACE_FLIGHT',
+    points: 100,
+    firstCompletion: true,
+    projections: { journal: true, profile: true, place: false, fieldGuide: true }
+  });
+  activeContext?.showToast?.(`MISSION SUCCESS · First Light complete · ${activeExpedition.campaignResult.totalPoints} total points.`);
+  if (!activeContext?.activeShipInterior) window.setTimeout(() => openExpeditionPlanner(activeContext), 500);
+  return true;
+}
+
+function bindCampaignEvents() {
+  if (campaignEventsBound) return;
+  campaignEventsBound = true;
+  globalThis.addEventListener?.('we3d:space-travel-session', (event) => {
+    if (event?.detail?.reason !== 'wayfinder-destination-frame-arrived') return;
+    if (!activeExpedition || activeExpedition.state !== 'arrived') return;
+    if (event.detail.destination?.id !== activeExpedition.destinationId && currentUniverseFrameId() !== activeExpedition.destinationId) return;
+    markArrivalTransferComplete();
+  });
+  globalThis.addEventListener?.('we3d:destination-mission-complete', (event) => void completeActiveCampaign(event?.detail || {}));
 }
 
 async function launchEarthPathfinderToSolisReach(options = {}) {
@@ -431,7 +534,7 @@ function ensureStylesheet() {
   const link = document.createElement('link');
   link.id = 'expeditionStyles';
   link.rel = 'stylesheet';
-  link.href = '/app/styles/expedition.css?v=8';
+  link.href = '/app/styles/expedition.css?v=9';
   document.head.appendChild(link);
 }
 
@@ -826,15 +929,16 @@ function renderPlanner() {
   root.innerHTML = `
     <section class="expeditionPanel" role="dialog" aria-modal="true" aria-labelledby="expeditionTitle">
       <header class="expeditionHeader">
-        <div style="min-width:0"><span>SPACE EXPLORER</span><h2 id="expeditionTitle" style="max-width:270px">Interstellar Expedition</h2><small class="expeditionReleaseStatus">Alpha preview</small></div>
+        <div style="min-width:0"><span>SPACE EXPLORER CAMPAIGN</span><h2 id="expeditionTitle" style="max-width:420px">First Light: Proxima</h2><small class="expeditionReleaseStatus">Playable campaign</small></div>
         <button id="expeditionClose" type="button" aria-label="Close Expedition" style="flex:0 0 42px">×</button>
       </header>
-      <p class="expeditionIntro">Begin an evolving long-range voyage aboard ${STARSHIP_NAME}. Progress is saved, and ordinary Space Flight remains available when this panel is closed.</p>
+      <p class="expeditionIntro">Your first complete Space campaign: prepare ${STARSHIP_NAME}, survive the interstellar voyage, survey Proxima b, return the evidence to the ship, and publish the report. <strong>Free Space Flight</strong> is the sandbox; <strong>Wayfinder</strong> sets courses; <strong>Expedition</strong> tracks this mission.</p>
       <div class="expeditionPlannerGrid">
         <label>Destination<select id="expeditionDestination">${destinationOptions}</select></label>
         <label>Travel model<select id="expeditionRealism"><option value="science-inspired">Science-inspired</option><option value="custom">Custom</option></select></label>
         <label>Survival<select id="expeditionSurvival"><option value="forgiving">Forgiving</option><option value="severe">Severe</option></select></label>
         <label>Ship<select id="expeditionShip">${shipOptions}</select></label>
+        <label>Supply reserve<select id="expeditionReserveMargin"><option value="0.08">Lean · 8%</option><option value="0.15" selected>Standard · 15%</option><option value="0.25">Deep reserve · 25%</option></select></label>
         <label class="expeditionWide">Propulsion<select id="expeditionPropulsion">${propulsionOptions}</select></label>
       </div>
       <button id="expeditionPlan" class="expeditionPrimary" type="button">Assess expedition</button>
@@ -842,6 +946,7 @@ function renderPlanner() {
     </section>`;
   root.querySelector('#expeditionDestination').value = 'proxima-centauri';
   root.querySelector('#expeditionPropulsion').value = 'radiant-plasma-field-drive';
+  if (activeExpedition?.reserveMargin != null) root.querySelector('#expeditionReserveMargin').value = String(activeExpedition.reserveMargin);
   root.querySelector('#expeditionShip').addEventListener('change', (event) => {
     const ship = getShipProfile(event.target.value);
     const propulsion = root.querySelector('#expeditionPropulsion');
@@ -855,6 +960,7 @@ function renderPlanner() {
       propulsionId: selectedValue('expeditionPropulsion', 'radiant-plasma-field-drive'),
       realism: selectedValue('expeditionRealism', 'science-inspired'),
       survival: selectedValue('expeditionSurvival', 'forgiving'),
+      reserveMargin: Number(selectedValue('expeditionReserveMargin', '0.15')),
       crew: DEFAULT_CREW
     });
     store.save(activeExpedition);
@@ -871,8 +977,10 @@ function readinessMarkup(expedition) {
     ? readiness.status.toUpperCase()
     : expedition.state === 'failed'
       ? 'MISSION LOST'
-      : expedition.state === 'arrived' ? 'ARRIVED' : 'UNDERWAY';
-  const assessmentClass = expedition.state === 'failed' ? 'insufficient' : readiness.status;
+      : expedition.state === 'completed'
+        ? 'MISSION SUCCESS'
+        : expedition.state === 'arrived' ? 'ARRIVED' : 'UNDERWAY';
+  const assessmentClass = expedition.state === 'failed' ? 'insufficient' : expedition.state === 'completed' ? 'ready' : readiness.status;
   const ship = getShipProfile(expedition.ship?.profileId);
   const longDuration = expedition.longDuration || { kind: 'standard' };
   const populationCopy = longDuration.kind === 'generation'
@@ -895,8 +1003,8 @@ function readinessMarkup(expedition) {
       <div><span>Status</span><strong class="is-${assessmentClass}">${assessment}</strong></div>
     </div>
     <div class="expeditionManifest">
-      <section><h3>Crew</h3><p>${populationCopy} · command, navigation, engineering, medical, life support, and science covered.</p></section>
-      <section><h3>Supplies</h3><p>${formatMass(expedition.resources.foodKg)} food · ${formatMass(expedition.resources.waterKg)} water reserve · ${formatMass(expedition.resources.maintenanceKg)} maintenance material.</p></section>
+      <section><h3>Crew</h3><p>${populationCopy} · command, flight, navigation, engineering, medical, life support, and science covered.</p></section>
+      <section><h3>Supplies</h3><p>${formatMass(expedition.resources.foodKg)} food · ${formatMass(expedition.resources.waterKg)} water · ${formatMass(expedition.resources.maintenanceKg)} maintenance · ${Math.round(Number(expedition.reserveMargin || 0) * 100)}% planned reserve.</p></section>
       <section><h3>Ship</h3><p>${expedition.ship?.name || ship?.name} · ${ship?.name || 'expedition vessel'} · bounded walkable operations decks connect crew and ship work.</p></section>
     </div>
     ${architecture}
@@ -922,6 +1030,7 @@ function sharedMissionMarkup() {
 
 async function applyExpeditionMutation(next, mutationKind, command = null) {
   if (!next || next === activeExpedition) return false;
+  const previousState = activeExpedition?.state;
   if (sharedState) {
     if (!sharedParticipant()) throw new Error('Join the room crew before changing its Expedition.');
     if (!command) throw new Error('That shared Expedition action is not available yet.');
@@ -935,6 +1044,7 @@ async function applyExpeditionMutation(next, mutationKind, command = null) {
   }
   store.save(activeExpedition);
   activeContext?.updateExpeditionShipRecord?.(activeExpedition);
+  if (activeExpedition.state === 'arrived' && previousState !== 'arrived') window.setTimeout(beginExpeditionArrivalTransfer, 0);
   return true;
 }
 
@@ -973,6 +1083,10 @@ function renderMission() {
     localTransitRefreshTimer = 0;
   }
   const expedition = activeExpedition;
+  const destinationMission = activeCampaignMission();
+  const phase = campaignPhase(expedition, destinationMission, currentUniverseFrameId());
+  const objective = campaignObjective(expedition, destinationMission, currentUniverseFrameId());
+  const destinationName = resolveUniverseAddress(expedition.destinationId)?.name || expedition.destinationId.replaceAll('-', ' ');
   let action = '';
   if (expedition.activeLocalContactId) {
     const activeContact = expedition.routeContacts?.find((contact) => contact.id === expedition.activeLocalContactId);
@@ -994,12 +1108,17 @@ function renderMission() {
     const responseRoom = String(expedition.pendingEvent.roomId || 'the ship').replaceAll('-', ' ');
     action = `<div class="expeditionEvent"><span>${expedition.pendingEvent.kind}</span><h3>${expedition.pendingEvent.title}</h3><p>${expedition.pendingEvent.message}</p><small>Response location: ${responseRoom}. Enter ${STARSHIP_NAME}; the ship map and warning beacon are already set to the affected station.</small></div>`;
   } else if (expedition.state === 'traveling') {
-    action = `<button id="expeditionAdvance" class="expeditionPrimary" type="button">Continue to next watch or event</button>`;
+    action = `<button id="expeditionAdvance" class="expeditionPrimary" type="button">Advance next transit watch</button>`;
   } else if (expedition.state === 'arrived') {
-    action = `<button id="expeditionArrive" class="expeditionPrimary" type="button">Continue in local Space</button>`;
+    action = currentUniverseFrameId() === expedition.destinationId
+      ? `<button id="expeditionCampaignMission" class="expeditionPrimary" type="button">Begin required ${campaignMissionDestinationId(expedition.destinationId).replaceAll('-', ' ')} survey</button>`
+      : `<button id="expeditionArrive" class="expeditionPrimary" type="button">Begin final approach to ${destinationName}</button>`;
+  } else if (expedition.state === 'completed') {
+    const result = expedition.campaignResult || {};
+    action = `<section class="expeditionVictory"><span>MISSION SUCCESS</span><h3>First Light: Proxima complete</h3><p>${result.outcomeLabel || 'The expedition science report was published.'}</p><strong>${Number(result.totalPoints || 100)} total points · crew and ship returned mission-capable</strong></section>`;
   } else if (expedition.state === 'failed') {
     const report = expedition.failureReport;
-    action = `<div class="expeditionEvent expeditionFailure"><span>MISSION ENDED</span><h3>${report?.summary || `${STARSHIP_NAME} could not continue.`}</h3>${report?.causes?.length ? `<ol>${report.causes.map((cause) => `<li>${cause}</li>`).join('')}</ol>` : '<p>The Captain’s Log retains the mission record.</p>'}</div>`;
+    action = `<div class="expeditionEvent expeditionFailure"><span>MISSION ENDED · RECORD PRESERVED</span><h3>${report?.summary || `${STARSHIP_NAME} could not continue.`}</h3>${report?.causes?.length ? `<ol>${report.causes.map((cause) => `<li>${cause}</li>`).join('')}</ol>` : '<p>The Captain’s Log retains the mission record.</p>'}<small>Change the preparation settings above and choose Assess Expedition when you are ready to explicitly begin a new mission.</small></div>`;
   }
   const log = [...(expedition.log || [])].reverse().slice(0, 6);
   const reachedCount = Math.min(VOYAGE_MILESTONES.length, Number(expedition.voyageDirector?.nextSlotIndex || 0));
@@ -1014,8 +1133,9 @@ function renderMission() {
   host.innerHTML = `
     ${readinessMarkup(expedition)}
     ${sharedMissionMarkup()}
+    <section class="expeditionCampaignStatus"><span>${String(phase).replaceAll('-', ' ')}</span><h3>Current objective</h3><p>${objective}</p><small>WIN CONDITION · Complete the Proxima b survey, return its evidence to ${STARSHIP_NAME}, and publish the analysis.</small></section>
     ${expedition.state !== 'planned' ? `<div class="expeditionProgress"><span style="width:${Math.round(expedition.progress * 100)}%"></span></div><p class="expeditionProgressCopy">${Math.round(expedition.progress * 100)}% of crew-experienced travel complete · ${expedition.state}</p>` : ''}
-    ${expedition.state !== 'planned' ? `<section class="expeditionVoyage"><header><span>VOYAGE</span><strong>${String(expedition.voyagePhase || 'departure').replaceAll('-', ' ')}</strong></header><div>${VOYAGE_MILESTONES.map((milestone, index) => `<i class="${index < reachedCount ? 'reached' : index === reachedCount ? 'next' : ''}" title="${String(milestone.phase || milestone.id).replaceAll('-', ' ')}"></i>`).join('')}</div><small>${reachedCount} of ${VOYAGE_MILESTONES.length} voyage chapters reached</small></section>` : ''}
+    ${expedition.state !== 'planned' ? `<section class="expeditionVoyage"><header><span>INTERSTELLAR TRANSIT</span><strong>${String(expedition.voyagePhase || 'departure').replaceAll('-', ' ')}</strong></header><div>${VOYAGE_MILESTONES.map((milestone, index) => `<i class="${index < reachedCount ? 'reached' : index === reachedCount ? 'next' : ''}" title="${String(milestone.phase || milestone.id).replaceAll('-', ' ')}"></i>`).join('')}</div><small>${reachedCount} of ${VOYAGE_MILESTONES.length} transit watches completed</small></section>` : ''}
     ${action}
     ${shipAction}
     ${contacts.length ? `<section class="expeditionContacts"><h3>Route Contacts</h3>${contacts.map((contact) => `<p><strong>${contact.designation}</strong><span>${contact.spectralClass} · ${contact.worldClass} · ${String(contact.status).replaceAll('-', ' ')}</span>${!expedition.activeLocalContactId && ['available', 'returned'].includes(contact.localOperationState) ? `<button type="button" data-enter-contact="${contact.id}">Enter local Space</button>` : ''}</p>`).join('')}</section>` : ''}
@@ -1065,13 +1185,11 @@ function renderMission() {
     } catch (error) { reportSharedMutationError(error); }
   });
   document.getElementById('expeditionArrive')?.addEventListener('click', () => {
-    const destinationId = activeExpedition.destinationId;
+    beginExpeditionArrivalTransfer();
+  });
+  document.getElementById('expeditionCampaignMission')?.addEventListener('click', () => {
     closeExpeditionPlanner();
-    const accepted = activeContext?.travelToUniverseDestination?.(destinationId, {
-      kind: 'expedition-arrival',
-      routeLabel: `${STARSHIP_NAME} arrival`
-    });
-    if (!accepted) activeContext?.showSpaceFlightMessage?.('Open Wayfinder to continue at the destination.', '#8ab4ff');
+    if (!openCampaignDestinationMission()) activeContext?.showToast?.('The required destination survey is not available in this system yet.');
   });
   document.getElementById('expeditionReturnFromContact')?.addEventListener('click', returnFromLocalContact);
   document.getElementById('expeditionEarthPod')?.addEventListener('click', async () => {
@@ -1523,6 +1641,7 @@ function markExpeditionPodSurfaceLaunch(bodyId) {
 async function handleShipInteraction(interaction) {
   if (interaction?.kind === 'ship-crew') return renderCrewInteractionPanel(interaction);
   if (interaction?.id === 'bridge-flight') {
+    if (activeExpedition?.pendingEvent?.roomId === 'bridge') return renderShipStationPanel(interaction);
     closeShipStationPanel();
     return activeContext?.exitExpeditionShipInterior?.() === true;
   }
@@ -1543,11 +1662,19 @@ async function enterActiveShip() {
     reason: 'solis-reach-interior-entered'
   });
   ensureStylesheet();
-  const ship = await import('./ship-interior.js?v=24');
+  const ship = await import('./ship-interior.js?v=27');
   closeExpeditionPlanner();
   const entered = ship.enterSolisReachInterior({
     expedition: activeExpedition,
-    onInteraction: handleShipInteraction
+    onInteraction: handleShipInteraction,
+    onExit: () => {
+      if (activeExpedition?.state === 'arrived') window.setTimeout(beginExpeditionArrivalTransfer, 150);
+      const podFlightActive = activePodJourney
+        && ![POD_PHASE.ABOARD, POD_PHASE.RECOVERED, POD_PHASE.FAILED].includes(activePodJourney.phase);
+      if (activeExpedition?.state === 'completed' && !podFlightActive) {
+        window.setTimeout(() => openExpeditionPlanner(activeContext), 250);
+      }
+    }
   });
   if (!entered) {
     openExpeditionPlanner(activeContext);
@@ -1564,6 +1691,7 @@ function openExpeditionPlanner(appContext) {
     ? Object.freeze({ ...activeExpedition.podJourney })
     : null;
   syncExpeditionContacts(activeExpedition);
+  if (activeExpedition?.state === 'arrived' && currentUniverseFrameId() === activeExpedition.destinationId) markArrivalTransferComplete();
   void ensureSharedAuthority();
   ensureStylesheet();
   let root = overlay();

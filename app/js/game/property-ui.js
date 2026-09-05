@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { ensurePlayerBackpackInventory } from '../urban-sandbox/equipment-model.js?v=9';
+import { ensurePlayerBackpackInventory } from '../urban-sandbox/equipment-model.js?v=10';
 import { createLocalCommerceModel } from '../urban-sandbox/commerce-model.js?v=3';
 import { createHousingModel, makeHomeCandidates } from '../real-estate/housing-model.js?v=2';
 import { createConnectedPropertyAuthority } from '../real-estate/connected-property-authority.js?v=2';
@@ -119,7 +119,8 @@ function snapshot() {
 appCtx.getExplorerPropertySnapshot = snapshot;
 
 function credits(value) {
-  return `${Math.max(0, Math.round(Number(value) || 0)).toLocaleString()} credits`;
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+    .format(Math.max(0, Math.round(Number(value) || 0)));
 }
 
 function distance(value) {
@@ -138,7 +139,7 @@ function updateHeader(view = snapshot()) {
   const balance = document.getElementById('propertyWalletBalance');
   if (balance) balance.textContent = view.authRequired
     ? '—'
-    : Math.max(0, Number(view.credits) || 0).toLocaleString();
+    : credits(view.credits);
   document.querySelectorAll('[data-property-view]').forEach((button) => {
     const buttonView = button.dataset.propertyView;
     const selected = button.closest('.propertyHubTabs')
@@ -174,11 +175,11 @@ function renderHome(view) {
   if (!view.homes.length) {
     return `<section class="propertyEmptyState"><span class="propertyEmptyIcon">⌂</span><h3>Choose your first home</h3>
       <p>A home gives you a saved place and, as the feature expands, a place for finds from Earth, the ocean, and space.</p><button type="button" data-property-view="nearby">See Properties Nearby</button></section>
-      ${view.authRequired ? '<section class="propertyHowItWorks"><strong>Sign in when you are ready to choose</strong><p>You can explore and compare buildings as a guest. A free account keeps ownership, Credits, storage, and shared play connected wherever you return.</p><button type="button" data-property-action="sign-in">Sign In or Create an Account</button></section>' : ''}
-      <section class="propertyHowItWorks"><strong>One connected economy</strong><p>Explorer Credits earned from field finds, trade, travel, and missions can be used here. Items stay in the same Backpack until you move them into home storage.</p></section>`;
+      ${view.authRequired ? '<section class="propertyHowItWorks"><strong>Sign in when you are ready to choose</strong><p>You can explore and compare buildings as a guest. A free account keeps ownership, your Explorer wallet, storage, and shared play connected wherever you return.</p><button type="button" data-property-action="sign-in">Sign In or Create an Account</button></section>' : ''}
+      <section class="propertyHowItWorks"><strong>One connected economy</strong><p>Explorer dollars earned from field finds, trade, travel, and missions can be used here. Your first property deed is free; later purchases use market-scale values. Items stay in the same Backpack until you move them into home storage.</p></section>`;
   }
   const openOffers = (view.incomingTrades || []).filter((offer) => offer.status === 'pending' && offer.expiresAtMs > Date.now()).length;
-  return `<section class="propertySectionIntro"><span>${view.shared ? 'CONNECTED WORLD' : 'MY PLACES'}</span><strong>${view.homes.length} propert${view.homes.length === 1 ? 'y' : 'ies'} ${view.shared ? 'owned or rented' : 'owned'}</strong><p>${view.shared ? 'Your ownership, listings, rentals, and Credits follow your account across the world and every room.' : 'Your primary home is shown first for routes and storage.'}</p></section>
+  return `<section class="propertySectionIntro"><span>${view.shared ? 'CONNECTED WORLD' : 'MY PLACES'}</span><strong>${view.homes.length} propert${view.homes.length === 1 ? 'y' : 'ies'} ${view.shared ? 'owned or rented' : 'owned'}</strong><p>${view.shared ? 'Your ownership, listings, rentals, and Explorer wallet follow your account across the world and every room.' : 'Your primary home is shown first for routes and storage.'}</p></section>
     <div class="propertyHubShortcuts"><button type="button" data-property-view="storage">Home Storage</button><button type="button" data-property-view="offers">${openOffers ? `${openOffers} New ` : ''}Property Offers</button></div>
     ${view.homes.map((home) => homeSummaryCard(home, view, { allowSell: true })).join('')}<button class="propertyWideAction" type="button" data-property-view="nearby">Find another property</button>`;
 }
@@ -201,7 +202,7 @@ export function createPropertyCard(property, suppliedView = null) {
   return `<article class="propertyHomeCard candidate${owned ? ' owned' : ''}">
     <div class="propertyHomeVisual" aria-hidden="true"><span>⌂</span><small>${escapeHtml(property.kind)}</small></div>
     <div class="propertyHomeInfo"><span class="propertyHomeKicker">${escapeHtml(statusLabel)}</span><strong>${escapeHtml(property.label)}</strong>
-      ${property.address?.formatted ? `<small>${escapeHtml(property.address.formatted)}</small>` : ''}<small>${Math.round(property.area).toLocaleString()} m² footprint · ${property.levels} level${property.levels === 1 ? '' : 's'}</small><small>${property.mappedResidential ? 'Move-in ready furnished interior · ' : ''}${property.storageCapacity} storage spaces · ${escapeHtml(describeDestinationEntrySupport(property))}</small><b>${credits(property.price)}</b></div>
+      ${property.address?.formatted ? `<small>${escapeHtml(property.address.formatted)}</small>` : ''}<small>${Math.round(property.area).toLocaleString()} m² footprint · ${property.levels} level${property.levels === 1 ? '' : 's'}</small><small>${property.mappedResidential ? 'Move-in ready furnished interior · ' : ''}${property.storageCapacity} storage spaces · ${escapeHtml(describeDestinationEntrySupport(property))}</small><small>Estimated market value</small><b>${credits(property.price)}</b></div>
     <div class="propertyCardActions"><button type="button" data-property-action="navigate" data-property-id="${escapeHtml(property.id)}">Set Route</button><button type="button" data-property-action="details" data-property-id="${escapeHtml(property.id)}">Details</button>
       ${transactionAction}</div>
   </article>`;
@@ -305,7 +306,7 @@ export function openModalById(id) {
   appCtx.PropertyUI.modalTitle.textContent = property.label || 'Home';
   appCtx.PropertyUI.modalBody.innerHTML = `<section class="propertyModalHome"><span class="propertyHomeKicker">${owned ? 'OWNED HOME' : 'AVAILABLE HOME'}</span><h3>${escapeHtml(property.kind || 'Home')}</h3>
     <p>This home is attached to a building in the current world. Route guidance leads to that building${describeDestinationEntrySupport(property) === 'Exterior only' ? '; a furnished interior is not available here yet' : ' and its supported entrance'}.</p>
-    <dl><div><dt>Game price</dt><dd>${credits(property.price || property.purchasePrice)}</dd></div><div><dt>Footprint</dt><dd>${Math.round(property.area).toLocaleString()} m²</dd></div><div><dt>Levels</dt><dd>${property.levels}</dd></div><div><dt>Storage</dt><dd>${property.storageCapacity} spaces</dd></div></dl>
+    <dl><div><dt>Estimated market value</dt><dd>${credits(property.price || property.purchasePrice)}</dd></div><div><dt>Footprint</dt><dd>${Math.round(property.area).toLocaleString()} m²</dd></div><div><dt>Levels</dt><dd>${property.levels}</dd></div><div><dt>Storage</dt><dd>${property.storageCapacity} spaces</dd></div></dl>
     <div class="propertyCardActions"><button type="button" data-property-action="navigate" data-property-id="${escapeHtml(property.id)}">Set Route</button>${owned ? '' : view.authRequired ? '<button type="button" data-property-action="sign-in">Sign In to Choose This Property</button>' : `<button type="button" class="buy" data-property-action="buy" data-property-id="${escapeHtml(property.id)}">${view.shared && view.starterAvailable ? 'Claim as Free First Property' : 'Buy Property'}</button>`}</div></section>`;
   appCtx.PropertyUI.modal.classList.add('show');
 }
@@ -433,7 +434,34 @@ async function recordPropertyProgress(result, action, candidate = null) {
 }
 
 function reasonMessage(reason) {
-  return ({ starter_already_used: 'Your free first-property deed has already been used.', already_owned: 'Another explorer already owns this property.', not_owner: 'Only the owner can change this property.', own_listing: 'You cannot buy or rent your own listing.', not_for_sale: 'This property is no longer for sale.', not_for_rent: 'This property is no longer for rent.', not_listed: 'This property is not listed.', lease_active: 'This property has an active rental.', not_enough_credits: 'You need more Explorer Credits for this property.', storage_not_empty: 'Move everything out of this home before selling it.', storage_full: 'This home is out of storage space.', item_equipped: 'Equip something else before storing that item.', item_unavailable: 'That item is no longer available.', not_owned: 'This home is not in your portfolio.', home_too_far: 'Go to your home before moving items in or out of storage.', home_in_another_place: 'Return to that home’s location before using its storage.', save_failed: 'The change could not be saved on this device.', wallet_unavailable: 'Explorer Credits are unavailable right now.', offered_property_unavailable: 'The property you offered is no longer available to trade.', requested_property_unavailable: 'The requested property is no longer available to trade.', property_not_tradeable: 'One of these properties is currently listed, rented, or otherwise unavailable.', trade_offer_unavailable: 'This trade offer is no longer available.', trade_offer_closed: 'This trade offer has already been closed.', trade_offer_expired: 'This trade offer has expired.', trade_ownership_changed: 'Ownership changed before the trade could be completed.', offer_funds_unavailable: 'The offered Explorer Credits are no longer available.' })[reason] || 'That action could not be completed.';
+  return ({
+    starter_already_used: 'Your free first-property deed has already been used.',
+    already_owned: 'Another explorer already owns this property.',
+    not_owner: 'Only the owner can change this property.',
+    own_listing: 'You cannot buy or rent your own listing.',
+    not_for_sale: 'This property is no longer for sale.',
+    not_for_rent: 'This property is no longer for rent.',
+    not_listed: 'This property is not listed.',
+    lease_active: 'This property has an active rental.',
+    not_enough_credits: 'You need more money in your Explorer wallet for this property.',
+    storage_not_empty: 'Move everything out of this home before selling it.',
+    storage_full: 'This home is out of storage space.',
+    item_equipped: 'Equip something else before storing that item.',
+    item_unavailable: 'That item is no longer available.',
+    not_owned: 'This home is not in your portfolio.',
+    home_too_far: 'Go to your home before moving items in or out of storage.',
+    home_in_another_place: 'Return to that home’s location before using its storage.',
+    save_failed: 'The change could not be saved on this device.',
+    wallet_unavailable: 'Your Explorer wallet is unavailable right now.',
+    offered_property_unavailable: 'The property you offered is no longer available to trade.',
+    requested_property_unavailable: 'The property you requested is no longer available to trade.',
+    property_not_tradeable: 'One of these properties is currently listed, rented, or otherwise unavailable.',
+    trade_offer_unavailable: 'This trade offer is no longer available.',
+    trade_offer_closed: 'This trade offer has already been closed.',
+    trade_offer_expired: 'This trade offer has expired.',
+    trade_ownership_changed: 'Ownership changed before the trade could be completed.',
+    offer_funds_unavailable: 'The offered wallet funds are no longer available.'
+  })[reason] || 'That action could not be completed.';
 }
 
 async function loadConnectedMarket() {
@@ -465,7 +493,7 @@ async function handlePropertyAction(button) {
     return true;
   }
   if (!getCurrentUser() && ['buy', 'sell', 'sell-world', 'list-sale', 'list-rent', 'rent', 'cancel-listing', 'primary', 'store', 'withdraw', 'propose-trade', 'accept-trade', 'decline-trade', 'cancel-trade'].includes(action)) {
-    setStatus('Sign in to save property, Credits, storage, and shared play to your account.', 'error');
+    setStatus('Sign in to save property, your Explorer wallet, storage, and shared play to your account.', 'error');
     return false;
   }
   const model = ensureAuthority();

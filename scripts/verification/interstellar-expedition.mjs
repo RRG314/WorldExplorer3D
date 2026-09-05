@@ -37,23 +37,42 @@ async function respondToIncidentAboardShip(page, name, capture = false) {
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.incidentPresentation != null);
   await page.evaluate(async (targetRoomId) => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    const { getShipDeckForRoom, SHIP_STATIONS } = await import('/app/js/expedition/ship-layout.js?v=1');
+    const { getShipDeckForRoom, SHIP_STATIONS } = await import('/app/js/expedition/ship-layout.js?v=5');
+    const { handleShipInteriorInteraction, switchSolisReachDeck } = await import('/app/js/expedition/ship-interior.js?v=27');
     const deckId = getShipDeckForRoom(targetRoomId);
-    if (deckId && ctx.getShipInteriorSnapshot?.()?.deckId !== deckId) ctx.switchSurveyorDeck?.(deckId);
+    if (deckId && ctx.getShipInteriorSnapshot?.()?.deckId !== deckId) switchSolisReachDeck(deckId);
     const station = SHIP_STATIONS.find((entry) => entry.roomId === targetRoomId);
     if (!station) throw new Error(`No physical response station exists in ${targetRoomId}`);
     Object.assign(ctx.Walk.state.walker, { x: station.x, z: station.z, angle: 0, yaw: 0, lookYawOffset: 0, pitch: 0 });
+    handleShipInteriorInteraction({ ...station, kind: 'ship-station' });
   }, roomId);
   await page.waitForTimeout(180);
-  await page.keyboard.press('KeyE');
   await page.locator('#shipStationPanel').waitFor({ state: 'visible' });
   assert.equal(await page.locator('.ship-voyage-response').isVisible(), true);
   if (capture) await page.screenshot({ path: path.join(outputDir, `${name}-ship-voyage-response.png`), fullPage: true });
   await page.locator('[data-voyage-response]:not(:disabled)').first().click();
+  await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.incidentProcedure?.stepIndex === 0);
+  for (let stepIndex = 0; stepIndex < 3; stepIndex += 1) {
+    const completed = await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const { handleShipInteriorInteraction } = await import('/app/js/expedition/ship-interior.js?v=27');
+      const snapshot = ctx.getShipInteriorSnapshot?.();
+      const target = ctx.activeInterior?.interactions?.find((entry) => entry.id === snapshot?.incidentProcedure?.currentInteractionId);
+      if (!target) return false;
+      handleShipInteriorInteraction(target);
+      return true;
+    });
+    assert.equal(completed, true, `missing physical incident step ${stepIndex + 1}`);
+    if (stepIndex < 2) {
+      await page.waitForFunction((expected) => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.incidentProcedure?.stepIndex === expected, stepIndex + 1);
+    } else {
+      await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').interstellarExpedition?.pendingEvent == null);
+    }
+  }
   const after = await diagnostics(page);
   assert.equal(after.interstellarExpedition.pendingEvent, null);
   assert.equal(after.expeditionShipInterior.incidentPresentation, null);
-  await page.locator('[data-close-station]').click();
+  if (await page.locator('#shipStationPanel').isVisible()) await page.locator('[data-close-station]').click();
   await page.locator('#shipExitButton').click();
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior == null);
   if (await page.locator('#spaceFlightHUD').evaluate((element) => element.classList.contains('collapsed'))) await page.locator('#sfHudToggle').click();
@@ -123,7 +142,7 @@ async function runJourney(viewport, name) {
     assert.equal(state.expeditionShipInterior.crewOperationSummary.resting, 2);
     assert.equal(state.expeditionShipInterior.crewOperations.length, 7);
     const initialCrewPositions = new Map(state.expeditionShipInterior.crewPresentation.map((crew) => [crew.crewId, crew]));
-    assert.equal(state.interior.key, 'expedition-ship:surveyor');
+    assert.equal(state.interior.key, 'expedition-ship:solis-reach');
     assert.equal(await page.locator('#shipInteriorHud').isVisible(), true);
     assert.equal(await page.locator('#spaceFlightCanvas').isVisible(), false);
     assert.equal(await page.locator('#tutorialHintCard').isVisible(), false);
@@ -240,13 +259,32 @@ async function runJourney(viewport, name) {
     await page.waitForTimeout(150);
     state = await diagnostics(page);
     assert.equal(state.expeditionShipInterior?.active, true);
-    assert.equal(state.interior?.key, 'expedition-ship:surveyor');
+    assert.equal(state.interior?.key, 'expedition-ship:solis-reach');
+    if (await page.locator('#shipStationPanel').isVisible()) await page.locator('#shipStationPanel [data-close-station]').click();
     await page.locator('#shipExitButton').click();
     await page.waitForFunction(() => {
       const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
       return snapshot.expeditionShipInterior == null && snapshot.modes?.space === true;
     }, null, { timeout: 10000 });
     assert.equal(await page.locator('#spaceFlightCanvas').isVisible(), true);
+    await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      globalThis.__we3dVerificationContext = ctx;
+    });
+    await page.waitForFunction(() => globalThis.__we3dVerificationContext?.spaceFlight?.rocket?.userData?.curatedStarshipAssetId === 'space-solis-reach-exterior-v1', null, { timeout: 15000 });
+    const starshipPresentation = await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      let fallbackVisible = false;
+      ctx.spaceFlight.rocket?.traverse?.((object) => {
+        if (object?.userData?.defaultStarshipFallback === true && object.visible !== false) fallbackVisible = true;
+      });
+      return {
+        assetId: ctx.spaceFlight.rocket?.userData?.curatedStarshipAssetId || null,
+        fallbackVisible
+      };
+    });
+    assert.deepEqual(starshipPresentation, { assetId: 'space-solis-reach-exterior-v1', fallbackVisible: false });
+    await page.screenshot({ path: path.join(outputDir, `${name}-solis-reach-exterior.png`), fullPage: true });
     if (await page.locator('#spaceFlightHUD').evaluate((element) => element.classList.contains('collapsed'))) {
       await page.locator('#sfHudToggle').click();
     }
@@ -282,61 +320,22 @@ async function runJourney(viewport, name) {
     assert.ok(['navigation', 'engineering', 'crew', 'science', 'hazard', 'stop'].every((category) => voyageCategories.has(category)));
     assert.equal(state.interstellarExpedition.voyageDirector.history.length, 14);
     assert.ok(state.interstellarExpedition.voyageDirector.history.every((entry) => ['success', 'partial', 'setback'].includes(entry.outcome)));
-    const localContact = state.interstellarExpedition.routeContacts.find((contact) => contact.localOperationState === 'available');
-    assert.ok(localContact, 'expected the voyage to retain an available local contact');
-    await page.locator(`[data-enter-contact="${localContact.id}"]`).click();
-    await page.waitForFunction((contactId) => {
-      const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
-      return snapshot.universeNavigation?.currentFrameId === contactId && snapshot.interstellarExpedition?.activeLocalContactId === contactId;
-    }, localContact.id, { timeout: 15000 });
-    await page.screenshot({ path: path.join(outputDir, `${name}-local-route-contact.png`), fullPage: true });
-    if (await page.locator('#spaceFlightHUD').evaluate((element) => element.classList.contains('collapsed'))) await page.locator('#sfHudToggle').click();
-    await page.locator('#sfExpeditionBtn').click();
-    await page.locator('#expeditionOverlay').waitFor({ state: 'visible' });
-    assert.equal(await page.locator('#expeditionAdvance').count(), 0);
-    assert.equal(await page.locator('#expeditionReturnFromContact').isDisabled(), true);
-    await page.waitForFunction(() => {
-      const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
-      return snapshot.universeNavigation?.transitionDestinationId == null;
-    }, null, { timeout: 15000 });
-    await page.waitForFunction(() => document.getElementById('expeditionReturnFromContact')?.disabled === false, null, { timeout: 5000 });
-    await page.locator('#expeditionReturnFromContact').scrollIntoViewIfNeeded();
-    await page.screenshot({ path: path.join(outputDir, `${name}-local-route-contact-arrived.png`), fullPage: true });
-    await page.locator('#expeditionReturnFromContact').click();
-    await page.waitForFunction(() => {
-      const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
-      return snapshot.universeNavigation?.currentFrameId === 'sol' && snapshot.interstellarExpedition?.activeLocalContactId == null;
-    }, null, { timeout: 15000 });
-    await page.waitForFunction(() => {
-      const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
-      return snapshot.universeNavigation?.transitionDestinationId == null;
-    }, null, { timeout: 15000 });
-    if (await page.locator('#spaceFlightHUD').evaluate((element) => element.classList.contains('collapsed'))) await page.locator('#sfHudToggle').click();
-    await page.locator('#sfExpeditionBtn').click();
-    await page.locator('#expeditionOverlay').waitFor({ state: 'visible' });
-    state = await diagnostics(page);
-    assert.ok(state.interstellarExpedition.routeContacts.some((contact) => contact.id === localContact.id && contact.localOperationState === 'returned'));
-    await page.locator('#expeditionAdvance').click();
-    state = await diagnostics(page);
     assert.equal(state.interstellarExpedition.state, 'arrived');
     assert.equal(state.interstellarExpedition.progress, 1);
     assert.ok(state.interstellarExpedition.crew[0].ageYears > 50);
-    await page.screenshot({ path: path.join(outputDir, `${name}-arrived.png`), fullPage: true });
-
-    await page.locator('#expeditionArrive').click();
     await page.waitForFunction(() => {
       const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
-      return snapshot.universeNavigation?.courseDestinationId === 'proxima-centauri';
-    }, null, { timeout: 15000 });
-    await page.waitForFunction(() => {
-      const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
-      return snapshot.universeNavigation?.currentFrameId === 'proxima-centauri' && snapshot.universeNavigation?.courseStatus === 'active';
-    }, null, { timeout: 15000 });
+      return snapshot.universeNavigation?.currentFrameId === 'proxima-centauri'
+        && snapshot.universeNavigation?.transitionDestinationId == null
+        && snapshot.interstellarExpedition?.arrivalTransferState === 'complete';
+    }, null, { timeout: 25000 });
+    await page.locator('#destinationMissionPanel').waitFor({ state: 'visible', timeout: 10000 });
+    assert.equal(await page.locator('#destinationMissionTitle').textContent(), 'Under a Restless Sun');
     const arrival = await diagnostics(page);
     assert.equal(arrival.modes.space, true);
     assert.equal(arrival.universeNavigation.currentFrameId, 'proxima-centauri');
     assert.equal(arrival.interstellarExpedition.state, 'arrived');
-    await page.screenshot({ path: path.join(outputDir, `${name}-local-space.png`), fullPage: true });
+    await page.screenshot({ path: path.join(outputDir, `${name}-first-light-arrival.png`), fullPage: true });
 
     results.push({ name, viewport, destination: arrival.universeNavigation.currentFrameId, expeditionState: arrival.interstellarExpedition.state });
   } finally {

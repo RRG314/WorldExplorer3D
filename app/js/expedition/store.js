@@ -32,6 +32,10 @@ function parseRecord(value) {
       record.ship = { ...record.ship, name: SPACE_CRAFT_IDENTITY.starship.name };
     }
     record.voyagePhase ||= record.state === 'arrived' ? 'arrival' : 'departure';
+    record.reserveMargin = Math.max(0, Math.min(0.4, Number.isFinite(Number(record.reserveMargin)) ? Number(record.reserveMargin) : 0.15));
+    record.arrivalTransferState ||= record.state === 'completed' ? 'complete' : 'pending';
+    record.campaignCompletedAtMs ||= null;
+    record.campaignResult ||= null;
     record.eventFlags = { ...(record.eventFlags || {}) };
     record.operationFlags = { ...(record.operationFlags || {}) };
     record.routeContacts = Array.isArray(record.routeContacts) ? record.routeContacts : [];

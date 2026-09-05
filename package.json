@@ -46,6 +46,7 @@
     "verify:assembled-locations": "node scripts/verification/assembled-locations.mjs",
     "verify:assembled-locations-fallback": "WE3D_FORCE_TRANSPORT_FALLBACK=1 node scripts/verification/assembled-locations.mjs",
     "verify:actors-vehicles": "node scripts/verification/actors-vehicles.mjs",
+    "verify:terrain-boundary": "node scripts/verification/terrain-boundary-current.mjs",
     "verify:live-gps": "node scripts/verification/live-gps.mjs",
     "verify:live-gps-authority": "node --test tests/live-gps-field-session.test.mjs",
     "verify:location-entry-pair": "node scripts/verification/location-entry-pair-current.mjs",

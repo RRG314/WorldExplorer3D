@@ -70,6 +70,7 @@ function createExpeditionPlan({
   propulsionId = 'radiant-plasma-field-drive',
   crew = [],
   resources = null,
+  reserveMargin = null,
   realism = 'science-inspired',
   survival = 'forgiving',
   createdAtMs = Date.now(),
@@ -79,7 +80,10 @@ function createExpeditionPlan({
   const propulsion = getPropulsionProfile(propulsionId);
   const crewPopulation = crewPopulationForShip(shipId, crew.length);
   const calculation = calculateExpeditionTravel({ destinationId, ship, propulsion, crewCount: crewPopulation });
-  const provisioned = resources ? clone(resources) : recommendedResources(calculation.expectedResources, survival === 'severe' ? 0.08 : 0.25);
+  const selectedReserveMargin = Math.max(0, Math.min(0.4, reserveMargin != null && Number.isFinite(Number(reserveMargin))
+    ? Number(reserveMargin)
+    : survival === 'severe' ? 0.08 : 0.15));
+  const provisioned = resources ? clone(resources) : recommendedResources(calculation.expectedResources, selectedReserveMargin);
   if (!resources && ship) {
     provisioned.propellantKg = Math.min(Number(provisioned.propellantKg || 0), Number(ship.propellantCapacityKg || 0));
   }
@@ -95,6 +99,7 @@ function createExpeditionPlan({
     destinationId,
     realism,
     survival,
+    reserveMargin: selectedReserveMargin,
     state: 'planned',
     ship: Object.freeze({
       id: `${id}-ship`,

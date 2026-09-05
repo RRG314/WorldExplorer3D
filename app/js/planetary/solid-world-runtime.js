@@ -7,7 +7,7 @@ import {
 } from '../session-coordinator.js?v=2';
 import { suspendEarthModesForPlanetaryEntry } from './entry.js?v=9';
 import { configureColorTexture } from './catalog.js?v=1';
-import { playSurfacePodLaunch } from './surface-pod-launch.js?v=8';
+import { playSurfacePodLaunch } from './surface-pod-launch.js?v=11';
 import { samplePhysicalEnvironment } from './runtime/physical-environment.js?v=2';
 import { clearActivePlanetaryObstacles, setActivePlanetaryObstacles } from './runtime/obstacle-authority.js?v=1';
 import {
