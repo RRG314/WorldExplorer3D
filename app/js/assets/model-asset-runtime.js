@@ -77,13 +77,19 @@ function abortError(assetId) {
 
 function disposeModelInstance(root, policy = {}) {
   root?.removeFromParent?.();
+  const skeletons = new Set();
   root?.traverse?.((object) => {
     if (!object?.isMesh) return;
+    if (object.isSkinnedMesh && object.skeleton) skeletons.add(object.skeleton);
     if (policy.geometry === 'clone') object.geometry?.dispose?.();
     if (policy.materials !== 'clone') return;
     const materials = Array.isArray(object.material) ? object.material : [object.material];
     materials.forEach((material) => material?.dispose?.());
   });
+  // WebGLRenderer creates one floating-point bone texture for every cloned
+  // Skeleton. Geometry/material disposal does not release it, so repeated
+  // world sessions otherwise retain hundreds of GPU textures per cycle.
+  skeletons.forEach((skeleton) => skeleton.dispose?.());
 }
 
 async function loadModelAsset(THREE, assetId, options = {}) {

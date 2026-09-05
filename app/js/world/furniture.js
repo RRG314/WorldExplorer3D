@@ -584,7 +584,12 @@ export function flushWorldCoverVegetationRefresh() {
 export function resetWorldFurnitureCaches() {
   if (worldCoverVegetationTimer) globalThis.clearTimeout(worldCoverVegetationTimer);
   worldCoverVegetationTimer = null;
+  signTextureCache.forEach((material) => {
+    material?.map?.dispose?.();
+    material?.dispose?.();
+  });
   signTextureCache.clear();
+  signTextGeometry?.dispose?.();
   signTextGeometry = null;
 }
 

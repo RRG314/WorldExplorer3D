@@ -1,4 +1,4 @@
-import { loadModelAsset } from '../assets/model-asset-runtime.js?v=14';
+import { loadModelAsset } from '../assets/model-asset-runtime.js?v=15';
 
 const EXPEDITION_STARSHIP_ASSET_ID = 'space-solis-reach-exterior-v1';
 

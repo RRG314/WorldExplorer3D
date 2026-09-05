@@ -63,7 +63,7 @@ import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
   resetWorldForReload
-} from "./world/load-reset.js?v=19";
+} from "./world/load-reset.js?v=20";
 import {
   prepareWorldFeatureSelections
 } from "./world/load-budgeting.js?v=19";
@@ -145,7 +145,7 @@ import {
 import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=32";
 import {
   resetWorldFurnitureCaches
-} from "./world/furniture.js?v=18";
+} from "./world/furniture.js?v=19";
 import {
   addBuildingToSpatialIndex,
   clearBuildingSpatialIndex,

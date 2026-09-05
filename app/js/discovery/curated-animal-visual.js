@@ -1,4 +1,4 @@
-import { loadModelAsset } from '../assets/model-asset-runtime.js?v=14';
+import { loadModelAsset } from '../assets/model-asset-runtime.js?v=15';
 
 const CURATED_ANIMAL_ASSET_BY_SPECIES = Object.freeze({
   'trail-hound': 'animal-trail-hound-husky-v1',

@@ -159,7 +159,6 @@ async function selectMode(page, expected, selector) {
 
 async function measureMode(client, id, sampleMs = 5_000) {
   const raw = await client.page.evaluate(async (durationMs) => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
     return new Promise((resolve) => {
     const deltas = [];
     const startedAt = performance.now();
@@ -170,30 +169,15 @@ async function measureMode(client, id, sampleMs = 5_000) {
       if (now - startedAt < durationMs) requestAnimationFrame(frame);
       else {
         const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
-        const drawCallsByRoot = new Map();
-        ctx.scene?.traverse?.((object) => {
-          if (!object?.isMesh) return;
-          let visible = object.visible !== false;
-          for (let parent = object.parent; visible && parent; parent = parent.parent) visible = parent.visible !== false;
-          if (!visible) return;
-          let root = object;
-          while (root.parent && root.parent !== ctx.scene) root = root.parent;
-          const label = String(root.name || object.name || root.type || 'unnamed');
-          const estimatedCalls = Math.max(1, Number(object.geometry?.groups?.length || 0));
-          const current = drawCallsByRoot.get(label) || { meshes: 0, estimatedCalls: 0 };
-          current.meshes += 1;
-          current.estimatedCalls += estimatedCalls;
-          drawCallsByRoot.set(label, current);
-        });
         resolve({
           deltas,
           diagnostics: {
             renderer: diagnostics.renderer || {},
             worldCounts: diagnostics.worldCounts || null,
-            drawCallBreakdown: [...drawCallsByRoot.entries()]
-              .map(([label, value]) => ({ label, ...value }))
-              .sort((left, right) => right.estimatedCalls - left.estimatedCalls)
-              .slice(0, 24)
+            // Production artifacts bundle the module graph, so source-only module
+            // URLs are intentionally absent. Keep the release measurement on the
+            // public diagnostics contract instead of importing private source.
+            drawCallBreakdown: diagnostics.performance?.drawCallBreakdown || []
           }
         });
       }
@@ -268,7 +252,13 @@ async function runDesktop() {
     const baselineCounts = walk.worldCounts;
     const releases = [];
     const reloadCounts = [];
-    const environmentCycles = auditOnly ? 0 : budgets.retention.minimumEnvironmentCycles;
+    const requestedRetentionCycles = Number(process.env.WE3D_VERIFY_RETENTION_CYCLES);
+    const environmentCycles = auditOnly
+      ? 0
+      : Math.max(
+          budgets.retention.minimumEnvironmentCycles,
+          Number.isFinite(requestedRetentionCycles) ? Math.floor(requestedRetentionCycles) : 0
+        );
     for (let cycle = 0; cycle < environmentCycles; cycle += 1) {
       await client.page.locator('#mainMenuBtn').click();
       await client.page.waitForFunction(() => {
