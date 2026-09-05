@@ -1,7 +1,7 @@
 import { setupEngineInputHandlers } from "./input-handlers.js?v=11";
 import { createVehicleHeadlightRig } from "./night-lighting.js?v=8";
 import { createClassicUtilityCar } from './classic-utility-car.js?v=3';
-import { attachCuratedPlayerCar } from './curated-player-car.js?v=3';
+import { attachCuratedPlayerCar } from './curated-player-car.js?v=4';
 import { applyDirectionalShadowPolicy } from "./shadow-policy.js?v=1";
 import {
   buildEarthAtmosphereProfile,
@@ -407,6 +407,8 @@ function initWalkingModule(appCtx) {
       isPointInPolygon: appCtx.pointInPolygon
     });
     window.Walk = appCtx.Walk;
+    appCtx.getPlayerCharacterGender = () => appCtx.Walk?.getPlayerCharacterGender?.() || 'man';
+    appCtx.setPlayerCharacterGender = (value) => appCtx.Walk?.setPlayerCharacterGender?.(value) || 'man';
     appCtx.Walk.setModeWalk();
   } catch (error) {
     console.error('Walking module initialization failed:', error);

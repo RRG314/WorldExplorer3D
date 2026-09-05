@@ -9,14 +9,14 @@ import { createEquipmentVisuals } from './equipment-visuals.js?v=3';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=8';
 import { nearestMappedFacility } from './facility-model.js?v=3';
 import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=4';
-import { createUrbanResponderRuntime } from './responder-runtime.js?v=22';
+import { createUrbanResponderRuntime } from './responder-runtime.js?v=23';
 import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=7';
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=10';
 import {
   attachCuratedTrafficVehicle,
   CURATED_TRAFFIC_ASSET_BY_VARIANT,
   disposeCuratedTrafficVehicle
-} from './curated-traffic-vehicle.js?v=1';
+} from './curated-traffic-vehicle.js?v=2';
 import { applyConditionImpact } from './impact-model.js?v=1';
 import { dampCrashMotion, resolveCrashImpact } from './crash-physics.js?v=1';
 import { sampleSweptContact } from '../physics/swept-contact.js?v=1';
@@ -30,7 +30,7 @@ import {
   disposeCuratedCharacter,
   NEARBY_NPC_ASSET_IDS,
   updateCuratedCharacterAnimation
-} from '../walking/curated-explorer-character.js?v=3';
+} from '../walking/curated-explorer-character.js?v=4';
 
 const ENTER_DISTANCE = 3.4;
 // Room clients can assemble slightly different collision envelopes when a live
@@ -985,11 +985,26 @@ function releasePromotedNpc(state, npc, options = {}) {
   if (options.retire === true) state.population?.retirePedestrian?.(npc.sourceAgentId);
   else state.population?.releasePedestrian?.(npc.sourceAgentId);
   npc.visual.dispose();
-  for (const [assetId, ownerId] of state.curatedNpcAssetOwners) {
-    if (ownerId === npc.id) state.curatedNpcAssetOwners.delete(assetId);
-  }
+  state.curatedNpcAssetOwners.delete(npc.id);
   state.npcs.splice(index, 1);
   return true;
+}
+
+function selectCuratedNpcAsset(state) {
+  const perAssetLimit = Math.ceil(state.npcBudget / NEARBY_NPC_ASSET_IDS.length);
+  const usage = new Map(NEARBY_NPC_ASSET_IDS.map((assetId) => [assetId, 0]));
+  for (const assetId of state.curatedNpcAssetOwners.values()) {
+    usage.set(assetId, Number(usage.get(assetId) || 0) + 1);
+  }
+  const start = state.curatedNpcAssetCursor % NEARBY_NPC_ASSET_IDS.length;
+  for (let offset = 0; offset < NEARBY_NPC_ASSET_IDS.length; offset += 1) {
+    const assetId = NEARBY_NPC_ASSET_IDS[(start + offset) % NEARBY_NPC_ASSET_IDS.length];
+    if (Number(usage.get(assetId) || 0) < perAssetLimit) {
+      state.curatedNpcAssetCursor = (start + offset + 1) % NEARBY_NPC_ASSET_IDS.length;
+      return assetId;
+    }
+  }
+  return null;
 }
 
 function promotePedestrian(state, source) {
@@ -1042,12 +1057,9 @@ function promotePedestrian(state, source) {
   visual.root.rotation.set(0, promoted.yaw, 0);
   state.group.add(visual.root);
   state.npcs.push(npc);
-  const curatedLimit = state.mobile ? 1 : NEARBY_NPC_ASSET_IDS.length;
-  const curatedAssetId = state.curatedNpcAssetOwners.size < curatedLimit
-    ? NEARBY_NPC_ASSET_IDS.find((assetId) => !state.curatedNpcAssetOwners.has(assetId))
-    : null;
+  const curatedAssetId = selectCuratedNpcAsset(state);
   if (curatedAssetId) {
-    state.curatedNpcAssetOwners.set(curatedAssetId, npc.id);
+    state.curatedNpcAssetOwners.set(npc.id, curatedAssetId);
     visual.root.userData.disposeCuratedCharacter = () => disposeCuratedCharacter(visual.root);
     visual.root.userData.updateCuratedCharacterAnimation = (moving, deltaTime, running) =>
       updateCuratedCharacterAnimation(visual.root, moving, deltaTime, running);
@@ -1057,8 +1069,8 @@ function promotePedestrian(state, source) {
       variation: 'nearby-npc',
       isCurrent: () => activeWorldMatches(state) && state.npcs.includes(npc)
     }).then((attached) => {
-      if (!attached && state.curatedNpcAssetOwners.get(curatedAssetId) === npc.id) {
-        state.curatedNpcAssetOwners.delete(curatedAssetId);
+      if (!attached && state.curatedNpcAssetOwners.get(npc.id) === curatedAssetId) {
+        state.curatedNpcAssetOwners.delete(npc.id);
       }
     });
   }
@@ -2195,6 +2207,10 @@ function performResponderLoot(state, candidate) {
 
 function renderEquipment(state) {
   state.equipmentRuntime?.render();
+  const selectedGender = appCtx.getPlayerCharacterGender?.() || 'man';
+  state.equipmentUi?.characterButtons?.forEach?.((button) => {
+    button.setAttribute('aria-pressed', String(button.dataset.playerCharacterGender === selectedGender));
+  });
   const condition = Math.max(0, Math.min(1, Number(state.playerCondition ?? 1)));
   if (state.equipmentUi?.conditionText) {
     state.equipmentUi.conditionText.textContent = `${Math.round(condition * 100)}%`;
@@ -2538,6 +2554,11 @@ function snapshot(state) {
       inventoryAuthority: 'character-backpack',
       reloadFromReserve: true,
       recoverFromFallenActors: true
+    }),
+    playerCharacter: Object.freeze({
+      gender: String(appCtx.getPlayerCharacterGender?.() || 'man'),
+      assetId: String(appCtx.Walk?.state?.characterMesh?.userData?.curatedCharacterAssetId || ''),
+      choiceAvailable: !!state.equipmentUi?.characterChoice
     })
   });
 }
@@ -2561,6 +2582,7 @@ function disposeRuntime(state, reason = 'disposed') {
   state.equipmentUi?.contents?.removeEventListener('click', state.onEquipmentSlotClick);
   state.equipmentUi?.filters?.removeEventListener('click', state.onBackpackFilterClick);
   state.equipmentUi?.detail?.removeEventListener('click', state.onBackpackDetailClick);
+  state.equipmentUi?.characterChoice?.removeEventListener('click', state.onCharacterChoiceClick);
   state.storeUi?.close?.removeEventListener('click', state.onStoreClose);
   state.storeUi?.root?.removeEventListener('click', state.onStoreAction);
   document.removeEventListener('keydown', state.onStoreKeyDown);
@@ -2690,6 +2712,8 @@ function startUrbanSandboxRuntime(options = {}) {
     status: document.getElementById('urbanEquipmentStatus'),
     conditionText: document.getElementById('urbanPlayerConditionText'),
     conditionFill: document.getElementById('urbanPlayerConditionFill'),
+    characterChoice: document.getElementById('explorerCharacterChoice'),
+    characterButtons: [...document.querySelectorAll('[data-player-character-gender]')],
     toggle: document.getElementById('urbanEquipmentToggle'),
     close: document.getElementById('urbanEquipmentCloseBtn'),
     reticle: document.getElementById('urbanWeaponReticle')
@@ -2745,6 +2769,7 @@ function startUrbanSandboxRuntime(options = {}) {
     // block-to-character swap this runtime is meant to prevent.
     npcBudget: mobile ? 9 : 16,
     curatedNpcAssetOwners: new Map(),
+    curatedNpcAssetCursor: 0,
     curatedTrafficAssetOwners: new Map(),
     mobile,
     population: livingWorld.population,
@@ -2959,6 +2984,13 @@ function startUrbanSandboxRuntime(options = {}) {
       button.dataset.backpackSlot || null
     );
   };
+  state.onCharacterChoiceClick = (event) => {
+    const button = event.target?.closest?.('[data-player-character-gender]');
+    if (!button || !state.equipmentUi.characterChoice?.contains(button)) return;
+    const gender = appCtx.setPlayerCharacterGender?.(button.dataset.playerCharacterGender) || 'man';
+    renderEquipment(state);
+    setStatus(state, `${gender === 'woman' ? 'Woman' : 'Man'} Explorer selected.`, 1800);
+  };
   state.onStoreClose = () => closeStore(state);
   state.onStoreAction = (event) => handleStoreAction(state, event);
   state.onStoreKeyDown = (event) => {
@@ -2977,6 +3009,7 @@ function startUrbanSandboxRuntime(options = {}) {
   equipmentUi.contents?.addEventListener('click', state.onEquipmentSlotClick);
   equipmentUi.filters?.addEventListener('click', state.onBackpackFilterClick);
   equipmentUi.detail?.addEventListener('click', state.onBackpackDetailClick);
+  equipmentUi.characterChoice?.addEventListener('click', state.onCharacterChoiceClick);
   storeUi.close?.addEventListener('click', state.onStoreClose);
   storeUi.root?.addEventListener('click', state.onStoreAction);
   document.addEventListener('keydown', state.onStoreKeyDown);

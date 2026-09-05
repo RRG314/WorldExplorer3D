@@ -27,6 +27,8 @@ Curated Character Assets
 
 The upstream pack's `License.txt` is Google Drive file ID `1TTvylHa1CsiJuHFWWiv6PFGhLM-aAH5z` and declares CC0 1.0: https://creativecommons.org/publicdomain/zero/1.0/
 
+The Ultimate Modular Women pack's `License.txt` is Google Drive file ID `1lIFL16xEpoPbr0j_HUATgmcEnAmYoIK2` and declares CC0 1.0: https://creativecommons.org/publicdomain/zero/1.0/
+
 Field Explorer
 
 - File: `characters/field-explorer-v1.glb`
@@ -39,6 +41,18 @@ Field Explorer
 - Processing: repacked from embedded-buffer glTF to an extension-free GLB with glTF-Transform 4.5.0. Geometry, materials, skinning, modeled backpack, and all 24 animation clips were retained.
 - Notes: Used for the close walking player. The existing movement, collision, interaction, equipment, vehicle, and world-state systems remain authoritative. The procedural Field Navigator remains the load-failure fallback.
 
+Field Explorer — Woman
+
+- File: `characters/field-explorer-woman-v1.glb`
+- Upstream title: Ultimate Modular Women — Adventurer
+- Creator: Quaternius
+- Source: https://quaternius.com/packs/ultimatemodularwomen.html
+- Source file identity: Google Drive `Adventurer.gltf`, file ID `1uxAFnDp73NO1c16LvHHjAYh1-deMNk5I`
+- License: Creative Commons Zero v1.0 Universal (CC0 1.0).
+- Bundled SHA-256: `b76cf5acefdbb213add675bd1b822ebd41d232c6f0cb21969c981122d3b86a32`
+- Processing: repacked from embedded-buffer glTF to an extension-free GLB with glTF-Transform 4.5.0. Geometry, materials, skinning, modeled backpack, and all 24 animation clips were retained.
+- Notes: Available alongside the Field Explorer man through the persistent Backpack character choice. Both choices retain the same existing player movement, collision, interaction, equipment, vehicle, and world-state authority; the procedural Field Navigator remains the loading/error fallback.
+
 City Explorer — Hoodie
 
 - File: `characters/city-explorer-v1.glb`
@@ -49,7 +63,7 @@ City Explorer — Hoodie
 - License: Creative Commons Zero v1.0 Universal (CC0 1.0).
 - Bundled SHA-256: `0dba57f454956ca5886a2d72e6c5a65f6dc9d45987dc3d47bfe419ff0d0b82b4`
 - Processing: repacked from embedded-buffer glTF to an extension-free GLB with glTF-Transform 4.5.0. Geometry, materials, skinning, and all 24 animation clips were retained.
-- Notes: Used for at most one nearby detailed NPC while the existing procedural urban NPC remains the load-failure and broader-population fallback.
+- Notes: One member of the balanced nearby NPC family. Detailed pedestrians use the four bundled men/women variants; the procedural urban NPC remains the loading/error and broader-population fallback.
 
 City Explorer — Casual
 
@@ -61,7 +75,31 @@ City Explorer — Casual
 - License: Creative Commons Zero v1.0 Universal (CC0 1.0).
 - Bundled SHA-256: `d6a8fc4ad8ef22104773eba260f211c6ec8d797f1f15c87207e0e4edf942d83d`
 - Processing: repacked from embedded-buffer glTF to an extension-free GLB with glTF-Transform 4.5.0. Geometry, materials, skinning, and all 24 animation clips were retained.
-- Notes: Used for one additional nearby detailed pedestrian on desktop. Mobile keeps one curated nearby pedestrian; the broader population stays on the articulated instanced/procedural paths.
+- Notes: One member of the balanced nearby NPC family. The broader mid/far population stays on the articulated instanced path.
+
+City Explorer — Casual Woman
+
+- File: `characters/city-explorer-woman-casual-v1.glb`
+- Upstream title: Ultimate Modular Women — Casual
+- Creator: Quaternius
+- Source: https://quaternius.com/packs/ultimatemodularwomen.html
+- Source file identity: Google Drive `Casual.gltf`, file ID `18b3WwlrwrFYWAM7BcnjWeIxKJyxAQiGh`
+- License: Creative Commons Zero v1.0 Universal (CC0 1.0).
+- Bundled SHA-256: `e406f91a5fc6f94cc2ee0df0bfcfcc4c8c4e3949412daeac586201b75df244a6`
+- Processing: repacked from embedded-buffer glTF to an extension-free GLB with glTF-Transform 4.5.0. Geometry, materials, skinning, and all 24 animation clips were retained.
+- Notes: One of the two women in the balanced nearby NPC family. Existing pedestrian motion, collision, reactions, interactions, combat state, and cleanup remain authoritative.
+
+City Explorer — Worker Woman
+
+- File: `characters/city-explorer-woman-worker-v1.glb`
+- Upstream title: Ultimate Modular Women — Worker
+- Creator: Quaternius
+- Source: https://quaternius.com/packs/ultimatemodularwomen.html
+- Source file identity: Google Drive `Worker.gltf`, file ID `1iwF_fqDErPH9uyol6NmS-MnzGgsZ5ejV`
+- License: Creative Commons Zero v1.0 Universal (CC0 1.0).
+- Bundled SHA-256: `7ce26118c4ec96b06a920519982d1118d86600712261b19d4936e7c6135b40db`
+- Processing: repacked from embedded-buffer glTF to an extension-free GLB with glTF-Transform 4.5.0. Geometry, materials, skinning, and all 24 animation clips were retained.
+- Notes: One of the two women in the balanced nearby NPC family. Every promoted close pedestrian is assigned one of the four cohesive family assets, bounded to three instances per variant on mobile and four on desktop; the procedural model appears only while loading or on failure.
 
 Civic Responder
 

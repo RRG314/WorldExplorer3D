@@ -1,12 +1,12 @@
 export function bindSpaceActions(appCtx, closeAllFloatMenus) {
   document.getElementById('fDeployPathfinder')?.addEventListener('click', async () => {
     closeAllFloatMenus();
-    const { stageEarthPathfinder } = await import('../expedition/runtime.js?v=45');
+    const { stageEarthPathfinder } = await import('../expedition/runtime.js?v=46');
     stageEarthPathfinder(appCtx);
   });
   document.getElementById('fBoardSolisReach')?.addEventListener('click', async () => {
     closeAllFloatMenus();
-    const { boardSolisReachDirect } = await import('../expedition/runtime.js?v=45');
+    const { boardSolisReachDirect } = await import('../expedition/runtime.js?v=46');
     if (!await boardSolisReachDirect(appCtx)) appCtx.showToast?.('Direct Solis Reach boarding is unavailable from here.');
   });
   document.getElementById('fSpaceDirect')?.addEventListener('click', async () => {

@@ -1,4 +1,4 @@
-import { loadModelAsset } from '../assets/model-asset-runtime.js?v=5';
+import { loadModelAsset } from '../assets/model-asset-runtime.js?v=6';
 
 function retainPrimaryE34Variant(THREE, root) {
   let triangles = 0;

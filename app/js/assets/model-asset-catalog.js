@@ -117,6 +117,28 @@ const MODEL_ASSET_CATALOG = Object.freeze([
   }),
   Object.freeze({
     schemaVersion: MODEL_ASSET_SCHEMA_VERSION,
+    id: 'character-field-explorer-woman-v1',
+    label: 'Field Explorer Adventurer — Woman',
+    url: '/app/assets/models/characters/field-explorer-woman-v1.glb',
+    roles: Object.freeze(['player-character']),
+    license: 'CC0-1.0',
+    sourceUrl: 'https://quaternius.com/packs/ultimatemodularwomen.html',
+    attribution: 'Ultimate Modular Women — Adventurer by Quaternius',
+    dimensionsMeters: Object.freeze({ height: 1.74 }),
+    sourceUpAxis: 'y',
+    sourceForwardAxis: 'z',
+    collisionPolicy: 'existing-character-envelope',
+    animationClips: Object.freeze({ idle: 'Idle', walk: 'Walk', run: 'Run', wave: 'Wave' }),
+    instancePolicy: Object.freeze({ geometry: 'shared', materials: 'clone' }),
+    budgets: Object.freeze({
+      bytes: 1_700_000,
+      triangles: 7_000,
+      maxInstances: 1,
+      textureEdgePixels: 0
+    })
+  }),
+  Object.freeze({
+    schemaVersion: MODEL_ASSET_SCHEMA_VERSION,
     id: 'character-city-explorer-v1',
     label: 'City Explorer Hoodie',
     url: '/app/assets/models/characters/city-explorer-v1.glb',
@@ -133,7 +155,7 @@ const MODEL_ASSET_CATALOG = Object.freeze([
     budgets: Object.freeze({
       bytes: 1_600_000,
       triangles: 18_700,
-      maxInstances: 1,
+      maxInstances: 4,
       textureEdgePixels: 0
     })
   }),
@@ -155,9 +177,43 @@ const MODEL_ASSET_CATALOG = Object.freeze([
     budgets: Object.freeze({
       bytes: 1_550_000,
       triangles: 17_400,
-      maxInstances: 1,
+      maxInstances: 4,
       textureEdgePixels: 0
     })
+  }),
+  Object.freeze({
+    schemaVersion: MODEL_ASSET_SCHEMA_VERSION,
+    id: 'character-city-explorer-woman-casual-v1',
+    label: 'City Explorer Casual — Woman',
+    url: '/app/assets/models/characters/city-explorer-woman-casual-v1.glb',
+    roles: Object.freeze(['nearby-npc-character']),
+    license: 'CC0-1.0',
+    sourceUrl: 'https://quaternius.com/packs/ultimatemodularwomen.html',
+    attribution: 'Ultimate Modular Women — Casual by Quaternius',
+    dimensionsMeters: Object.freeze({ height: 1.72 }),
+    sourceUpAxis: 'y',
+    sourceForwardAxis: 'z',
+    collisionPolicy: 'existing-character-envelope',
+    animationClips: Object.freeze({ idle: 'Idle', walk: 'Walk', run: 'Run', wave: 'Wave' }),
+    instancePolicy: Object.freeze({ geometry: 'shared', materials: 'clone' }),
+    budgets: Object.freeze({ bytes: 1_650_000, triangles: 6_500, maxInstances: 4, textureEdgePixels: 0 })
+  }),
+  Object.freeze({
+    schemaVersion: MODEL_ASSET_SCHEMA_VERSION,
+    id: 'character-city-explorer-woman-worker-v1',
+    label: 'City Explorer Worker — Woman',
+    url: '/app/assets/models/characters/city-explorer-woman-worker-v1.glb',
+    roles: Object.freeze(['nearby-npc-character']),
+    license: 'CC0-1.0',
+    sourceUrl: 'https://quaternius.com/packs/ultimatemodularwomen.html',
+    attribution: 'Ultimate Modular Women — Worker by Quaternius',
+    dimensionsMeters: Object.freeze({ height: 1.74 }),
+    sourceUpAxis: 'y',
+    sourceForwardAxis: 'z',
+    collisionPolicy: 'existing-character-envelope',
+    animationClips: Object.freeze({ idle: 'Idle', walk: 'Walk', run: 'Run', wave: 'Wave' }),
+    instancePolicy: Object.freeze({ geometry: 'shared', materials: 'clone' }),
+    budgets: Object.freeze({ bytes: 1_650_000, triangles: 6_200, maxInstances: 4, textureEdgePixels: 0 })
   }),
   Object.freeze({
     schemaVersion: MODEL_ASSET_SCHEMA_VERSION,

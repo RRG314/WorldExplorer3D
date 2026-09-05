@@ -10,6 +10,12 @@ await fs.mkdir(evidenceDir, { recursive: true });
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const failures = [];
 const assetRequests = new Map();
+const nearbyFamilyAssetIds = [
+  'character-city-explorer-v1',
+  'character-city-explorer-woman-casual-v1',
+  'character-city-explorer-casual-v1',
+  'character-city-explorer-woman-worker-v1'
+];
 
 function observe(page, label) {
   page.on('pageerror', (error) => failures.push(`${label} pageerror: ${error.stack || error}`));
@@ -47,11 +53,11 @@ async function earthJourney(viewport, label) {
   observe(page, label);
   try {
     await openEarth(page);
-    const expectedNpcCount = viewport.width < 600 ? 1 : 2;
-    await page.waitForFunction((expected) => {
+    await page.waitForFunction((allowed) => {
       const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
-      return (state.urbanSandbox?.interactiveNpcs || []).filter((npc) => npc.curatedAssetId).length === expected;
-    }, expectedNpcCount, { timeout: 120_000 });
+      const npcs = state.urbanSandbox?.interactiveNpcs || [];
+      return npcs.length >= 4 && npcs.every((npc) => allowed.includes(npc.curatedAssetId));
+    }, nearbyFamilyAssetIds, { timeout: 120_000 });
 
     const beforeIncident = await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
@@ -73,9 +79,10 @@ async function earthJourney(viewport, label) {
       };
     });
     assert.equal(beforeIncident.playerAssetId, 'character-field-explorer-v1');
-    assert.deepEqual(beforeIncident.npcAssetIds, expectedNpcCount === 1
-      ? ['character-city-explorer-v1']
-      : ['character-city-explorer-casual-v1', 'character-city-explorer-v1']);
+    assert.ok(beforeIncident.npcAssetIds.length >= 4);
+    assert.ok(beforeIncident.npcAssetIds.every((id) => nearbyFamilyAssetIds.includes(id)));
+    assert.ok(beforeIncident.npcAssetIds.some((id) => id.includes('-woman-')));
+    assert.ok(beforeIncident.npcAssetIds.some((id) => !id.includes('-woman-')));
     assert.equal(beforeIncident.incidentAccepted, true);
 
     let responderState = null;
@@ -100,7 +107,7 @@ async function earthJourney(viewport, label) {
     }, officer);
     await page.waitForTimeout(250);
     await page.screenshot({ path: path.join(evidenceDir, `${label}-earth-family.png`), fullPage: false });
-    return { label, expectedNpcCount, beforeIncident, officer };
+    return { label, expectedNpcCount: beforeIncident.npcAssetIds.length, beforeIncident, officer };
   } finally {
     await context.close();
   }

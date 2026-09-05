@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { createWalkingCharacterHelpers } from "./walking/character.js?v=5";
+import { createWalkingCharacterHelpers } from "./walking/character.js?v=6";
 import { createWalkingGeometryHelpers } from "./walking/geometry.js?v=1";
 import { createWalkingPhysicsHelpers } from "./walking/physics.js?v=29";
 import { createWalkingRuntimeHelpers } from "./walking/runtime.js?v=4";
@@ -50,7 +50,12 @@ function createWalkingModule(opts) {
     blockStepHeight: 0.65 // Max step-up without jumping
   };
 
-  const { animateCharacterWalk, createCharacterMesh } = createWalkingCharacterHelpers({ THREE, scene });
+  const {
+    animateCharacterWalk,
+    createCharacterMesh,
+    getPlayerCharacterGender,
+    setPlayerCharacterGender
+  } = createWalkingCharacterHelpers({ THREE, scene });
   const { clampPointInsideFootprint, pointInPolygonSafe } = createWalkingGeometryHelpers();
   const {
     finiteOr,
@@ -111,7 +116,11 @@ function createWalkingModule(opts) {
     applyCameraIfWalking() {
       return updateWalkCamera();
     },
-    getMapRefPosition
+    getMapRefPosition,
+    getPlayerCharacterGender,
+    setPlayerCharacterGender(value) {
+      return setPlayerCharacterGender(state.characterMesh, value);
+    }
   };
 }
 

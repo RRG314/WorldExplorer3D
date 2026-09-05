@@ -8,7 +8,7 @@ import {
   disposeCuratedCharacter,
   RESPONDER_ASSET_ID,
   updateCuratedCharacterAnimation
-} from '../walking/curated-explorer-character.js?v=3';
+} from '../walking/curated-explorer-character.js?v=4';
 import { createResponderResponseModel, responderAgencyProfile, responderApproachSpeed } from './responder-model.js?v=4';
 import { vehicleDoorPosition } from './vehicle-model.js?v=7';
 import { applyConditionImpact } from './impact-model.js?v=1';

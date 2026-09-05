@@ -100,19 +100,24 @@ test('curated traffic shells remain a bounded visual adapter over procedural veh
   assert.match(runtime, /curatedAssetId:/);
 });
 
-test('one locally bundled skinned Explorer family serves player, nearby NPCs, responders, and ship crew', () => {
+test('locally bundled skinned Explorer families serve player choices, nearby NPCs, responders, and ship crew', () => {
   const playerAssets = modelAssetsForRole('player-character');
   const npcAssets = modelAssetsForRole('nearby-npc-character');
   const responderAssets = modelAssetsForRole('civic-responder-character');
   const crewAssets = modelAssetsForRole('ship-crew-character');
-  assert.equal(playerAssets.length, 1);
-  assert.equal(npcAssets.length, 2);
+  assert.equal(playerAssets.length, 2);
+  assert.equal(npcAssets.length, 4);
   assert.equal(responderAssets.length, 1);
   assert.equal(crewAssets.length, 1);
-  assert.equal(playerAssets[0].id, 'character-field-explorer-v1');
+  assert.deepEqual(playerAssets.map((asset) => asset.id), [
+    'character-field-explorer-v1',
+    'character-field-explorer-woman-v1'
+  ]);
   assert.deepEqual(npcAssets.map((asset) => asset.id), [
     'character-city-explorer-v1',
-    'character-city-explorer-casual-v1'
+    'character-city-explorer-casual-v1',
+    'character-city-explorer-woman-casual-v1',
+    'character-city-explorer-woman-worker-v1'
   ]);
   assert.equal(responderAssets[0].id, 'character-civic-responder-v1');
   assert.equal(responderAssets[0].budgets.maxInstances, 2);
@@ -123,6 +128,10 @@ test('one locally bundled skinned Explorer family serves player, nearby NPCs, re
       hash: '84b8cc2f07abe4b48bae8155a79868bfac5216b4b0a1b4d624f39f3698d6e0c4',
       meshes: ['Cube.063', 'Cube.052', 'Cube.039', 'Cube.020', 'Plane']
     }],
+    ['character-field-explorer-woman-v1', {
+      hash: 'b76cf5acefdbb213add675bd1b822ebd41d232c6f0cb21969c981122d3b86a32',
+      meshes: ['Cube.051', 'Cube.027', 'Cube.032', 'Cube.052']
+    }],
     ['character-city-explorer-v1', {
       hash: '0dba57f454956ca5886a2d72e6c5a65f6dc9d45987dc3d47bfe419ff0d0b82b4',
       meshes: ['Cube.008', 'Cube.000', 'Cube.014', 'Cube.005']
@@ -130,6 +139,14 @@ test('one locally bundled skinned Explorer family serves player, nearby NPCs, re
     ['character-city-explorer-casual-v1', {
       hash: 'd6a8fc4ad8ef22104773eba260f211c6ec8d797f1f15c87207e0e4edf942d83d',
       meshes: ['Cube.010', 'Cube.003', 'Cube.015', 'Cube.019']
+    }],
+    ['character-city-explorer-woman-casual-v1', {
+      hash: 'e406f91a5fc6f94cc2ee0df0bfcfcc4c8c4e3949412daeac586201b75df244a6',
+      meshes: ['Cube.037', 'Cube.070', 'Cube.001', 'Cube.038']
+    }],
+    ['character-city-explorer-woman-worker-v1', {
+      hash: '7ce26118c4ec96b06a920519982d1118d86600712261b19d4936e7c6135b40db',
+      meshes: ['Cube.009', 'Cube.055', 'Cube.035', 'Cube.056']
     }],
     ['character-civic-responder-v1', {
       hash: '0cd2b3876e5f20f3c85ffc5dcccd05dccb7aaec86235434f7f449f3b44417b7c',
@@ -180,6 +197,25 @@ test('curated characters attach beneath existing gameplay roots and retain proce
   assert.match(loader, /object\.skeleton\s*=\s*sourceMesh\.skeleton\.clone\(\)/);
   assert.match(loader, /instancePolicy/);
   assert.match(loader, /removeFromParent/);
+});
+
+test('player gender choice persists and every promoted nearby NPC receives a balanced family asset', () => {
+  const preference = fs.readFileSync(path.join(root, 'app/js/walking/player-character-preference.js'), 'utf8');
+  const walking = fs.readFileSync(path.join(root, 'app/js/walking/character.js'), 'utf8');
+  const shell = fs.readFileSync(path.join(root, 'app/index.html'), 'utf8');
+  const urbanRuntime = fs.readFileSync(path.join(root, 'app/js/urban-sandbox/runtime.js'), 'utf8');
+  assert.match(preference, /we3d\.player-character-gender\.v1/);
+  assert.match(preference, /\['man', 'woman'\]/);
+  assert.match(preference, /localStorage\.setItem/);
+  assert.match(walking, /EXPLORER_ASSET_BY_GENDER/);
+  assert.match(walking, /requestedCuratedCharacterAssetId/);
+  assert.match(fs.readFileSync(path.join(root, 'app/js/walking/curated-explorer-character.js'), 'utf8'), /curatedCharacterLoadToken/);
+  assert.match(shell, /data-player-character-gender="man"/);
+  assert.match(shell, /data-player-character-gender="woman"/);
+  assert.match(urbanRuntime, /function selectCuratedNpcAsset/);
+  assert.match(urbanRuntime, /Math\.ceil\(state\.npcBudget\s*\/\s*NEARBY_NPC_ASSET_IDS\.length\)/);
+  assert.match(urbanRuntime, /state\.curatedNpcAssetOwners\.set\(npc\.id, curatedAssetId\)/);
+  assert.doesNotMatch(urbanRuntime, /curatedLimit/);
 });
 
 test('the curated car is requested by the existing drive-mode authority, not by a parallel controller', () => {

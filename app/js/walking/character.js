@@ -1,15 +1,46 @@
 import { createFieldNavigatorMesh } from './field-navigator-mesh.js?v=2';
-import { attachCuratedExplorerCharacter, updateCuratedCharacterAnimation } from './curated-explorer-character.js?v=3';
+import {
+  attachCuratedExplorerCharacter,
+  disposeCuratedCharacter,
+  EXPLORER_ASSET_BY_GENDER,
+  updateCuratedCharacterAnimation
+} from './curated-explorer-character.js?v=4';
+import {
+  getPlayerCharacterGender,
+  setPlayerCharacterGender as savePlayerCharacterGender
+} from './player-character-preference.js?v=1';
 
 function createWalkingCharacterHelpers({ THREE, scene }) {
+  function attachSelectedCharacter(character, gender = getPlayerCharacterGender()) {
+    const assetId = EXPLORER_ASSET_BY_GENDER[gender] || EXPLORER_ASSET_BY_GENDER.man;
+    character.userData.playerCharacterGender = gender;
+    character.userData.requestedCuratedCharacterAssetId = assetId;
+    disposeCuratedCharacter(character);
+    delete character.userData.curatedCharacterLoadStarted;
+    void attachCuratedExplorerCharacter(THREE, character, {
+      assetId,
+      role: 'player-character',
+      isCurrent: () => character.parent === scene && character.userData.requestedCuratedCharacterAssetId === assetId
+    });
+    return gender;
+  }
+
   function createCharacterMesh() {
     const character = createFieldNavigatorMesh(THREE);
     scene.add(character);
-    void attachCuratedExplorerCharacter(THREE, character, {
-      role: 'player-character',
-      isCurrent: () => character.parent === scene
-    });
+    attachSelectedCharacter(character);
     return character;
+  }
+
+  function setPlayerCharacterGender(character, value) {
+    const gender = savePlayerCharacterGender(value);
+    const assetId = EXPLORER_ASSET_BY_GENDER[gender];
+    if (character?.userData?.curatedCharacterAssetId === assetId) {
+      character.userData.playerCharacterGender = gender;
+      return gender;
+    }
+    if (character) attachSelectedCharacter(character, gender);
+    return gender;
   }
 
   function animateCharacterWalk(characterMesh, isMoving, deltaTime, isRunning = false) {
@@ -43,7 +74,9 @@ function createWalkingCharacterHelpers({ THREE, scene }) {
 
   return {
     animateCharacterWalk,
-    createCharacterMesh
+    createCharacterMesh,
+    getPlayerCharacterGender,
+    setPlayerCharacterGender
   };
 }
 

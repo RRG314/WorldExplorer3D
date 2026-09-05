@@ -19,7 +19,7 @@ import {
   disposeCuratedCharacter,
   SHIP_CREW_ASSET_ID,
   updateCuratedCharacterAnimation
-} from '../walking/curated-explorer-character.js?v=3';
+} from '../walking/curated-explorer-character.js?v=4';
 
 const STARSHIP_NAME = SPACE_CRAFT_IDENTITY.starship.name;
 

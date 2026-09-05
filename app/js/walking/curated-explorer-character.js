@@ -1,10 +1,17 @@
-import { loadModelAsset } from '../assets/model-asset-runtime.js?v=5';
+import { loadModelAsset } from '../assets/model-asset-runtime.js?v=6';
 
 const EXPLORER_ASSET_ID = 'character-field-explorer-v1';
+const EXPLORER_WOMAN_ASSET_ID = 'character-field-explorer-woman-v1';
+const EXPLORER_ASSET_BY_GENDER = Object.freeze({
+  man: EXPLORER_ASSET_ID,
+  woman: EXPLORER_WOMAN_ASSET_ID
+});
 const NEARBY_NPC_ASSET_ID = 'character-city-explorer-v1';
 const NEARBY_NPC_ASSET_IDS = Object.freeze([
   NEARBY_NPC_ASSET_ID,
-  'character-city-explorer-casual-v1'
+  'character-city-explorer-woman-casual-v1',
+  'character-city-explorer-casual-v1',
+  'character-city-explorer-woman-worker-v1'
 ]);
 const RESPONDER_ASSET_ID = 'character-civic-responder-v1';
 const SHIP_CREW_ASSET_ID = 'character-ship-crew-v1';
@@ -126,18 +133,26 @@ function disposeCuratedCharacter(host) {
   host.userData.characterMixer = null;
   host.userData.characterActions = null;
   delete host.userData.curatedCharacterAssetId;
+  delete host.userData.curatedCharacterLoadStarted;
+  delete host.userData.curatedCharacterLoadToken;
   setFallbackVisible(host, true);
   return true;
 }
 
 async function attachCuratedExplorerCharacter(THREE, host, options = {}) {
   if (!host || host.userData.curatedCharacterLoadStarted) return false;
+  const loadToken = {};
   host.userData.curatedCharacterLoadStarted = true;
+  host.userData.curatedCharacterLoadToken = loadToken;
   try {
     const assetId = options.assetId || ASSET_BY_ROLE[options.role] || EXPLORER_ASSET_ID;
     const instance = await loadModelAsset(THREE, assetId, { signal: options.signal });
     if (options.isCurrent && !options.isCurrent()) {
       instance.dispose();
+      if (host.userData.curatedCharacterLoadToken === loadToken) {
+        host.userData.curatedCharacterLoadStarted = false;
+        delete host.userData.curatedCharacterLoadToken;
+      }
       return false;
     }
     const visual = prepareExplorerVisual(THREE, instance, options);
@@ -150,8 +165,11 @@ async function attachCuratedExplorerCharacter(THREE, host, options = {}) {
     host.userData.curatedCharacterAttachment = Object.freeze({ instance, visual, ...animation });
     return true;
   } catch (error) {
-    host.userData.curatedCharacterLoadStarted = false;
-    setFallbackVisible(host, true);
+    if (host.userData.curatedCharacterLoadToken === loadToken) {
+      host.userData.curatedCharacterLoadStarted = false;
+      delete host.userData.curatedCharacterLoadToken;
+      setFallbackVisible(host, true);
+    }
     if (error?.name !== 'AbortError') {
       console.warn('Curated character unavailable; keeping the built-in character.', error);
     }
@@ -161,6 +179,8 @@ async function attachCuratedExplorerCharacter(THREE, host, options = {}) {
 
 export {
   EXPLORER_ASSET_ID,
+  EXPLORER_ASSET_BY_GENDER,
+  EXPLORER_WOMAN_ASSET_ID,
   NEARBY_NPC_ASSET_ID,
   NEARBY_NPC_ASSET_IDS,
   RESPONDER_ASSET_ID,
