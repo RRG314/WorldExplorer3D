@@ -1,5 +1,5 @@
 import { BUILTIN_DISCOVERY_CATALOGS, COMPANION_CATALOG, TOOL_CATALOG, validateDiscoveryCatalogs } from './catalog.js?v=4';
-import { createCompanionRuntime } from './companion-runtime.js?v=8';
+import { createCompanionRuntime } from './companion-runtime.js?v=9';
 import { auditRegionalCreatureQuality } from './creature-quality.js?v=1';
 import { createDetectorSession } from './detector-session.js?v=3';
 import { createWalkingEncounterDirector } from './encounter-director.js?v=1';
@@ -24,7 +24,7 @@ import {
   createDiscoveryPublicationStore,
   resolveContextActions
 } from './model.js?v=1';
-import { createIndexedDbDiscoveryProfileStore } from './profile-store.js?v=4';
+import { createIndexedDbDiscoveryProfileStore } from './profile-store.js?v=5';
 import { fieldProgress, slotAvailableAtProgress } from './pacing.js?v=2';
 import { emitDiscoveryTelemetry } from './telemetry.js?v=2';
 import { sampleDiscoverySurfaceY } from './surface.js?v=1';
@@ -466,7 +466,8 @@ function createDiscoveryUi(state) {
       const owned = ownedCompanions;
       const activeTravelLabel = ['aboard', 'vehicle-occupant'].includes(companionSnapshot.presentation?.travelState)
         ? 'Riding with you'
-        : companionSnapshot.presentation?.travelState === 'waiting' ? 'Waiting for you' : 'Following';
+        : companionSnapshot.presentation?.travelState === 'protected-quarters' ? 'Traveling safely with you'
+          : companionSnapshot.presentation?.travelState === 'safe-during-exposed-travel' ? 'Rejoining after this activity' : 'Following';
       const localSuggestions = COMPANION_CATALOG.filter((catalog) =>
         FIRST_RELEASE_COMPANION_IDS.has(catalog.id) &&
         !owned.some((companion) => companion.catalogId === catalog.id) &&
@@ -503,7 +504,13 @@ function createDiscoveryUi(state) {
           ? ` · Last: +${companion.progression.lastAward.points} ${companion.progression.lastAward.label}`
           : '';
         const specialty = companion.training?.specialization ? ` · Specialty: ${companion.training.specialization}` : '';
-        return `<article class="discoveryItem${visual ? ' discoveryItemVisual' : ''}">${visual ? `<img src="${escapeHtml(visual.image)}" alt="${escapeHtml(visual.alt)}" loading="lazy"><div>` : ''}<strong>${escapeHtml(companion.name)}${companion.active ? ' · Active' : ''}</strong><small>${escapeHtml(`Level ${level} · ${companion.progression?.trustState || 'Comfortable'} · ${nextLevel}${specialty}${lastAward}`)}</small><div class="discoveryCompanionActions"><button class="${companion.active ? 'active' : ''}" data-companion-action="activate" data-companion-id="${escapeHtml(companion.instanceId)}" type="button" ${companion.active ? 'disabled' : ''}>${companion.active ? activeTravelLabel : 'Set active'}</button><button data-companion-action="care" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Care</button>${level >= 2 ? `<button data-companion-action="recall-training" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Practice Recall</button>` : ''}<button class="discoveryArLaunch" data-companion-action="ar" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">View in AR</button></div>${visual ? '</div>' : ''}</article>`;
+        const residence = companion.active
+          ? activeTravelLabel
+          : companion.residence?.state === 'at-home' ? 'At home'
+            : companion.residence?.state === 'home-pending' ? 'Home not chosen yet' : 'Safe with the companion care network';
+        const starterLabel = companion.isStarterCompanion ? ' · First companion' : '';
+        const rename = `<div class="discoveryCompanionName"><label>${companion.nameStatus === 'default' ? 'Name your dog' : 'Companion name'}<input data-companion-name maxlength="24" autocomplete="off" value="${escapeHtml(companion.name)}"></label><button data-companion-action="rename" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">${companion.nameStatus === 'default' ? 'Choose Name' : 'Rename'}</button></div>`;
+        return `<article class="discoveryItem${visual ? ' discoveryItemVisual' : ''}">${visual ? `<img src="${escapeHtml(visual.image)}" alt="${escapeHtml(visual.alt)}" loading="lazy"><div>` : ''}<strong>${escapeHtml(companion.name)}${companion.active ? ' · Active' : ''}${starterLabel}</strong><small>${escapeHtml(`Level ${level} · ${companion.progression?.trustState || 'Comfortable'} · ${residence} · ${nextLevel}${specialty}${lastAward}`)}</small>${rename}<div class="discoveryCompanionActions"><button class="${companion.active ? 'active' : ''}" data-companion-action="activate" data-companion-id="${escapeHtml(companion.instanceId)}" type="button" ${companion.active ? 'disabled' : ''}>${companion.active ? activeTravelLabel : 'Travel together'}</button>${companion.active ? `<button data-companion-action="leave-home" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Leave at home</button>` : ''}<button data-companion-action="care" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Care</button>${level >= 2 ? `<button data-companion-action="recall-training" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Practice Recall</button>` : ''}<button class="discoveryArLaunch" data-companion-action="ar" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">View in AR</button></div>${visual ? '</div>' : ''}</article>`;
       }).join('') : '<div class="discoveryEmpty">Explore animal-friendly places to meet a potential companion.</div>';
     }
     if (elements.progress) {
@@ -1049,6 +1056,7 @@ function disposeWorldDiscoveryRuntime(appCtx, reason = 'world-reload') {
   appCtx.handleWorldDiscoveryToolUse = null;
   if (appCtx.recordFishingExplorerCatch === state.recordFishingExplorerCatch) appCtx.recordFishingExplorerCatch = null;
   if (appCtx.recordExplorerEvent === state.recordExplorerEvent) appCtx.recordExplorerEvent = null;
+  if (appCtx.assignCompanionPrimaryHome === state.assignCompanionPrimaryHome) appCtx.assignCompanionPrimaryHome = null;
   if (appCtx.resolveCharacterCapability === state.resolveCharacterCapability) appCtx.resolveCharacterCapability = null;
   return true;
 }
@@ -1494,11 +1502,16 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       });
     }
   });
+  state.assignCompanionPrimaryHome = (homeId) => state.companionRuntime.assignPrimaryHome(homeId);
+  appCtx.assignCompanionPrimaryHome = state.assignCompanionPrimaryHome;
   if (appCtx.developerDiagnosticsEnabled) {
     state.companionSupportHook = Object.freeze({
       adopt: (catalogId, options = {}) => state.companionRuntime.adopt(catalogId, options),
       awardXp: (receiptId, reasonId) => state.companionRuntime.awardXp({ receiptId, reasonId }),
       care: (instanceId, interaction = 'feed') => state.companionRuntime.care(instanceId, interaction),
+      assignPrimaryHome: (homeId) => state.companionRuntime.assignPrimaryHome(homeId),
+      leaveAtHome: (instanceId) => state.companionRuntime.leaveAtHome(instanceId),
+      rename: (instanceId, name) => state.companionRuntime.rename(instanceId, name),
       encounters: () => Object.freeze([...state.companionEncounters.values()].map((entry) => Object.freeze({ ...entry }))),
       encounterExercise: () => state.companionExercise ? Object.freeze({
         type: state.companionExercise.type,
@@ -1746,7 +1759,35 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       emitDiscoveryTelemetry('companion_adopted', { result: 'befriended', contextBands: telemetryContextBands() });
       appCtx.showToast?.(`${companion.name} joined you.`);
     }
-    else if (action === 'activate') await state.companionRuntime.setActive(instanceId);
+    else if (action === 'activate') {
+      await state.companionRuntime.setActive(instanceId);
+      const active = state.companionRuntime.snapshot().companions.find((entry) => entry.active);
+      if (active) appCtx.showToast?.(`${active.name} is traveling with you.`);
+    }
+    else if (action === 'leave-home') {
+      const companion = state.companionRuntime.snapshot().companions.find((entry) => entry.instanceId === String(instanceId));
+      if (!companion || !await state.companionRuntime.leaveAtHome(instanceId)) return false;
+      appCtx.showToast?.(companion.residence?.homeId ? `${companion.name} is safe at home.` : `${companion.name} is safe with the companion care network until you choose a home.`);
+    }
+    else if (action === 'rename') {
+      const result = await state.companionRuntime.rename(instanceId, requestedName);
+      if (!result?.renamed) {
+        appCtx.showToast?.(result?.reason === 'unchanged' ? 'That is already this companion’s name.' : 'Choose a name first.');
+        return false;
+      }
+      if (result.firstStarterNaming) {
+        await state.recordExplorerEvent({
+          eventId: 'event:achievement:starter-dog-named:v1',
+          eventType: 'achievement-earned', sourceSystem: 'companions',
+          sourceId: result.companion.instanceId, pathId: 'companion',
+          name: 'Best Friend',
+          detail: `Named the first dog ${result.companion.name}.`,
+          firstCompletion: true, points: 1, progressReason: 'first-dog-named',
+          metadata: { achievementId: 'best-friend', companionInstanceId: result.companion.instanceId }
+        });
+        appCtx.showToast?.(`Achievement unlocked · Best Friend · ${result.companion.name}`);
+      } else appCtx.showToast?.(`Companion renamed ${result.companion.name}.`);
+    }
     else if (action === 'care') {
       const companion = state.companionRuntime.snapshot().companions.find((entry) => entry.instanceId === String(instanceId));
       if (!companion) return false;

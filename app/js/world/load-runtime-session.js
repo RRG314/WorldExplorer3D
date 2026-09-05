@@ -484,10 +484,10 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
       worldDiscoveryModule
     ] = await Promise.all([
       import('../living-world/runtime.js?v=26'),
-      import('../urban-sandbox/runtime.js?v=73'),
+      import('../urban-sandbox/runtime.js?v=74'),
       import('../transport/aviation-runtime.js?v=17'),
       import('../transport/maritime-runtime.js?v=16'),
-      import('../discovery/runtime.js?v=32')
+      import('../discovery/runtime.js?v=33')
     ]);
     gameplayStartupDurationsMs.moduleLoad = Math.round(performance.now() - moduleLoadStartedAt);
     if (!startupIsCurrent()) {

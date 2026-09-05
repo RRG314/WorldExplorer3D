@@ -1,7 +1,7 @@
 import { setupEngineInputHandlers } from "./input-handlers.js?v=11";
 import { createVehicleHeadlightRig } from "./night-lighting.js?v=8";
 import { createClassicUtilityCar } from './classic-utility-car.js?v=3';
-import { attachCuratedPlayerCar } from './curated-player-car.js?v=5';
+import { attachCuratedPlayerCar } from './curated-player-car.js?v=6';
 import { applyDirectionalShadowPolicy } from "./shadow-policy.js?v=1";
 import {
   buildEarthAtmosphereProfile,
@@ -384,10 +384,10 @@ function createDefaultCarMesh(ctx) {
       child.receiveShadow = false;
     }
   });
-  // Keep the first screen and world bootstrap light. Drive mode asks for the
-  // bundled visual once; the built-in car remains immediately available while
-  // the local GLB is decoded or if it cannot be decoded.
+  // Begin decoding the local BMW during engine initialization. The adapter
+  // keeps the procedural safety car hidden unless this local request fails.
   appCtx.ensureCuratedPlayerCar = () => attachCuratedPlayerCar(THREE, appCtx);
+  void appCtx.ensureCuratedPlayerCar();
 }
 
 function initWalkingModule(appCtx) {

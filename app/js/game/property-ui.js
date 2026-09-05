@@ -398,18 +398,34 @@ export function navigateToProperty(propertyId) {
   return true;
 }
 
-async function recordPropertyProgress(result, action) {
-  if (!result?.home) return;
-  const home = result.home;
+async function recordPropertyProgress(result, action, candidate = null) {
+  const home = result?.home || (candidate ? {
+    ...candidate,
+    id: result?.property?.propertyId || candidate.id,
+    purchasedAt: Date.now()
+  } : null);
+  if (!home?.id) return { recorded: false, reason: 'home-unavailable' };
+  let storyResult = null;
   if (typeof appCtx.recordExplorerEvent === 'function') {
-    await appCtx.recordExplorerEvent({
-      eventId: `event:property:${action}:${home.id}:${action === 'bought' ? home.purchasedAt : Date.now()}`,
-      eventType: action === 'bought' ? 'home-purchased' : 'home-sold', sourceSystem: 'home-and-property', sourceId: home.id, pathId: 'creation',
-      name: action === 'bought' ? `Bought ${home.label}` : `Sold ${home.label}`,
-      detail: action === 'bought' ? 'Added a saved place with home storage.' : 'Completed a home sale.', projections: { journal: true, profile: true, place: true }
+    storyResult = await appCtx.recordExplorerEvent({
+      eventId: action === 'bought'
+        ? 'event:achievement:first-home:v1'
+        : `event:property:sold:${home.id}:${Date.now()}`,
+      eventType: action === 'bought' ? 'achievement-earned' : 'home-sold', sourceSystem: 'home-and-property', sourceId: home.id, pathId: 'creation',
+      name: action === 'bought' ? 'A Place of Our Own' : `Sold ${home.label}`,
+      detail: action === 'bought' ? `Chose ${home.label} as the first Explorer home.` : 'Completed a home sale.',
+      firstCompletion: action === 'bought', points: action === 'bought' ? 1 : 0,
+      progressReason: action === 'bought' ? 'first-home' : 'home-sold',
+      metadata: action === 'bought' ? { achievementId: 'a-place-of-our-own', propertyId: home.id, receiptId: result?.receiptId || '' } : {},
+      projections: { journal: true, profile: true, place: true }
     });
   }
+  if (action === 'bought' && storyResult?.recorded) {
+    await appCtx.assignCompanionPrimaryHome?.(home.id);
+    appCtx.showToast?.('Achievement unlocked · A Place of Our Own');
+  }
   void postActivity('home-base-updated', { city: runtimeLocation().label, text: action === 'bought' ? `Bought a home in ${runtimeLocation().label}` : `Sold a home in ${runtimeLocation().label}` }).catch(() => {});
+  return storyResult;
 }
 
 function reasonMessage(reason) {
@@ -475,7 +491,13 @@ async function handlePropertyAction(button) {
   else if (action === 'withdraw') result = model.withdrawItem(propertyId, itemId, 1);
   if (!result) return false;
   if (!(shared ? result.accepted : result.ok)) { setStatus(reasonMessage(result.reason), 'error'); return false; }
-  if (!shared && (action === 'buy' || action === 'sell')) await recordPropertyProgress(result, action === 'buy' ? 'bought' : 'sold');
+  if (action === 'buy') await recordPropertyProgress(result, 'bought', selectedProperty);
+  else if (!shared && action === 'sell') await recordPropertyProgress(result, 'sold', selectedProperty);
+  if (action === 'primary') await appCtx.assignCompanionPrimaryHome?.(result.home?.id || propertyId);
+  if (['sell', 'sell-world'].includes(action)) {
+    const nextPrimaryHomeId = model.snapshot(appCtx.properties || []).primaryHomeId || '';
+    await appCtx.assignCompanionPrimaryHome?.(nextPrimaryHomeId);
+  }
   const label = propertyById(propertyId)?.label || 'Property';
   let success = 'Saved.';
   if (action === 'buy') success = `${label} is now yours.`;

@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { resolveMobileCameraRecenter } from "../controls/mobile-touch-authority.js?v=5";
 import { worldUnitsPerSecondToMph } from "../physics/vehicle-speed-units.js?v=2";
-import { integrateSkydivingDynamics, parachuteHorizontalSpeed } from "../urban-sandbox/parachute-model.js?v=6";
+import { evaluateHighDropParachuteOffer, integrateSkydivingDynamics, parachuteHorizontalSpeed } from "../urban-sandbox/parachute-model.js?v=7";
 import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=3';
 import { samplePhysicalEnvironment } from '../planetary/runtime/physical-environment.js?v=2';
 import { getPlanetarySurfaceRegion } from '../planetary/runtime/surface-authority.js?v=4';
@@ -219,6 +219,7 @@ function createWalkingPhysicsHelpers({
       ? appCtx.resolveLiveGpsWalkerTarget?.(dt, { x: state.walker.x, z: state.walker.z }) || null
       : null;
     const skydiving = appCtx.urbanSandboxRuntime?.parachute?.skydiving === true;
+    const wasOnBuilding = state.walker.onBuilding === true;
     const parachuteDeployedAtFrameStart = appCtx.isUrbanParachuteDeployed?.() === true;
     const speed = skydiving
       ? parachuteHorizontalSpeed(parachuteDeployedAtFrameStart)
@@ -297,6 +298,35 @@ function createWalkingPhysicsHelpers({
     let finalGroundState = groundState;
     state.walker.onBuilding = groundState.onBuilding;
     state.walker.onGround = Math.abs(state.walker.y - (effectiveGroundY + CFG.eyeHeight)) < 0.3;
+
+    const offerParachuteForHighDrop = (surfaceState) => {
+      if (wasOnBuilding && !surfaceState.onBuilding && !Number.isFinite(state.walker.parachuteDropOriginY)) {
+        state.walker.parachuteDropOriginY = state.walker.y;
+      }
+      if (state.walker.onGround) {
+        state.walker.parachuteDropOriginY = null;
+        return false;
+      }
+      const highDropOffer = evaluateHighDropParachuteOffer({
+        environment: isPlanetarySurface() ? 'SPACE' : 'EARTH',
+        travelMode: state.walker.mode || 'walk',
+        alreadySkydiving: appCtx.urbanSandboxRuntime?.parachute?.skydiving === true,
+        leftElevatedSupport: Number.isFinite(state.walker.parachuteDropOriginY),
+        onGround: state.walker.onGround,
+        feetY: state.walker.y - CFG.eyeHeight,
+        groundY: surfaceState.effectiveGroundY,
+        verticalVelocity: state.walker.vy
+      });
+      if (!highDropOffer.allowed) return false;
+      state.walker.parachuteDropOriginY = null;
+      appCtx.prepareAirborneParachute?.({
+        autoEquip: true,
+        clearance: highDropOffer.clearance,
+        source: 'building_drop'
+      });
+      return true;
+    };
+    offerParachuteForHighDrop(groundState);
 
     if (state.walker.wallJumpTimer > 0) {
       state.walker.wallJumpTimer -= dt;
@@ -578,6 +608,7 @@ function createWalkingPhysicsHelpers({
         }
       }
       state.walker.onBuilding = postGroundState.onBuilding;
+      offerParachuteForHighDrop(postGroundState);
       state.walker.speedMph = worldUnitsPerSecondToMph(
         Math.hypot(state.walker.x - startX, state.walker.z - startZ) / Math.max(0.001, dt),
         appCtx.METERS_PER_WORLD_UNIT

@@ -2,7 +2,7 @@ import { ctx as appCtx } from '../shared-context.js?v=55';
 import { applyConditionImpact, blastTargets } from './impact-model.js?v=1';
 import { applyTransportDamage } from '../transport/damage-model.js?v=1';
 import { sampleSweptContact } from '../physics/swept-contact.js?v=1';
-import { evaluateParachuteDeployment } from './parachute-model.js?v=6';
+import { evaluateParachuteDeployment } from './parachute-model.js?v=7';
 import { getScreenLayoutService } from '../ui/screen-layout.js?v=2';
 import { NPC_COMBAT_STATES, beginNpcResponse, npcFireDecision } from './npc-combat-policy.js?v=2';
 import { reticlePresentation } from './weapon-reticle-authority.js?v=1';
@@ -892,6 +892,7 @@ function createUrbanEquipmentRuntime(options = {}) {
       }
       state.parachute.deployed = true;
       state.parachute.deployedAt = clock();
+      state.equipmentVisual?.setParachuteReady?.(true);
       state.equipmentVisual?.setParachuteDeployed?.(true);
       setStatus(`Parachute deployed · ${deployment.clearance.toFixed(1)} m clearance`, 2200);
       render();

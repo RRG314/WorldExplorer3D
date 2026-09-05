@@ -102,24 +102,38 @@ function prepareE34Model(THREE, source, record) {
 
 async function attachCuratedPlayerCar(THREE, appCtx) {
   const carMesh = appCtx?.carMesh;
-  if (!carMesh || carMesh.userData.curatedVehicleLoadStarted) return false;
+  if (!carMesh) return false;
+  if (carMesh.userData.curatedVehicleVisual) return true;
+  if (carMesh.userData.curatedVehicleLoadPromise) return carMesh.userData.curatedVehicleLoadPromise;
+  const fallbackParts = carMesh.children.filter((child) => child.userData?.defaultPlayerVehicleFallback === true);
+  // The fallback remains a recovery mechanism, but it must never flash while
+  // the bundled BMW is decoding during a normal mode transition.
+  fallbackParts.forEach((child) => { child.visible = false; });
   carMesh.userData.curatedVehicleLoadStarted = true;
-  try {
-    const instance = await loadModelAsset(THREE, 'vehicle-bmw-525i-e34');
-    if (!carMesh.parent) return false;
-    const visual = prepareE34Model(THREE, instance.root, instance.record);
-    const fallbackParts = carMesh.children.filter((child) => child.userData?.defaultPlayerVehicleFallback === true);
-    fallbackParts.forEach((child) => { child.visible = false; });
-    visual.visible = !carMesh.userData.activeUrbanVehicleId;
-    carMesh.add(visual);
-    carMesh.userData.curatedVehicleAssetId = instance.record.id;
-    carMesh.userData.curatedVehicleVisual = visual;
-    return true;
-  } catch (error) {
-    carMesh.userData.curatedVehicleLoadStarted = false;
-    console.warn('Curated player car unavailable; keeping the built-in vehicle.', error);
-    return false;
-  }
+  carMesh.userData.curatedVehicleLoading = true;
+  const loadPromise = (async () => {
+    try {
+      const instance = await loadModelAsset(THREE, 'vehicle-bmw-525i-e34');
+      if (!carMesh.parent) return false;
+      const visual = prepareE34Model(THREE, instance.root, instance.record);
+      fallbackParts.forEach((child) => { child.visible = false; });
+      visual.visible = !carMesh.userData.activeUrbanVehicleId;
+      carMesh.add(visual);
+      carMesh.userData.curatedVehicleAssetId = instance.record.id;
+      carMesh.userData.curatedVehicleVisual = visual;
+      return true;
+    } catch (error) {
+      fallbackParts.forEach((child) => { child.visible = true; });
+      carMesh.userData.curatedVehicleLoadStarted = false;
+      console.warn('Curated player car unavailable; keeping the built-in vehicle.', error);
+      return false;
+    } finally {
+      carMesh.userData.curatedVehicleLoading = false;
+      delete carMesh.userData.curatedVehicleLoadPromise;
+    }
+  })();
+  carMesh.userData.curatedVehicleLoadPromise = loadPromise;
+  return loadPromise;
 }
 
 export { attachCuratedPlayerCar };

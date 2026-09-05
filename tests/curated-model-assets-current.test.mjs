@@ -313,8 +313,12 @@ test('player gender choice persists and every promoted nearby NPC receives a bal
 
 test('the curated car is requested by the existing drive-mode authority, not by a parallel controller', () => {
   const sceneBootstrap = fs.readFileSync(path.join(root, 'app/js/engine/scene-bootstrap.js'), 'utf8');
+  const adapter = fs.readFileSync(path.join(root, 'app/js/engine/curated-player-car.js'), 'utf8');
   const travelMode = fs.readFileSync(path.join(root, 'app/js/travel-mode.js'), 'utf8');
   assert.match(sceneBootstrap, /ensureCuratedPlayerCar\s*=\s*\(\)\s*=>\s*attachCuratedPlayerCar/);
+  assert.match(sceneBootstrap, /void appCtx\.ensureCuratedPlayerCar\(\)/);
+  assert.match(adapter, /fallbackParts\.forEach\(\(child\) => \{ child\.visible = false; \}\)/);
+  assert.match(adapter, /curatedVehicleLoadPromise/);
   assert.match(travelMode, /ensureCuratedPlayerCar\?\.\(\)/);
   assert.doesNotMatch(sceneBootstrap, /^\s*attachCuratedPlayerCar\(THREE, appCtx\);\s*$/m);
 });

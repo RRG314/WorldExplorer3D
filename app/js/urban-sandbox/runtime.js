@@ -4,8 +4,8 @@ import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleMassKg } from '../engine/vehicle-
 import { applyTransportDamage } from '../transport/damage-model.js?v=1';
 import { createCivicResponseModel } from './civic-response-model.js?v=3';
 import { ensurePlayerBackpackInventory } from './equipment-model.js?v=9';
-import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=21';
-import { createEquipmentVisuals } from './equipment-visuals.js?v=3';
+import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=22';
+import { createEquipmentVisuals } from './equipment-visuals.js?v=4';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=8';
 import { nearestMappedFacility } from './facility-model.js?v=3';
 import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=4';
@@ -1493,7 +1493,10 @@ function setDoorProgress(vehicle, progress) {
 
 function resetPlayerVehicleVisual(state) {
   state.defaultCarChildren.forEach((child) => {
-    child.visible = child.userData?.defaultPlayerVehicleFallback !== true || !appCtx.carMesh?.userData?.curatedVehicleVisual;
+    child.visible = child.userData?.defaultPlayerVehicleFallback !== true || (
+      !appCtx.carMesh?.userData?.curatedVehicleVisual &&
+      appCtx.carMesh?.userData?.curatedVehicleLoading !== true
+    );
   });
   if (appCtx.carMesh?.userData?.curatedVehicleVisual) {
     appCtx.carMesh.userData.curatedVehicleVisual.visible = true;
@@ -3078,6 +3081,7 @@ function startUrbanSandboxRuntime(options = {}) {
     } else {
       setStatus(state, 'Freefall · select the parachute and press Space to deploy.', 2600);
     }
+    state.equipmentVisual?.setParachuteReady?.(true);
     return state.equipment.equipped?.()?.id === 'parachute';
   };
   appCtx.prepareAirborneParachute = state.prepareAirborneParachute;
@@ -3106,6 +3110,7 @@ function startUrbanSandboxRuntime(options = {}) {
     state.parachute.skydiving = false;
     state.parachute.automaticEquip = false;
     state.parachute.landedAt = now();
+    state.equipmentVisual?.setParachuteReady?.(false);
     state.equipmentVisual?.setParachuteDeployed?.(false);
     setStatus(state, 'Landed safely · parachute repacked.', 1800);
     state.equipmentRuntime?.render?.();

@@ -19,6 +19,7 @@ function createEquipmentVisuals(THREE, characterMesh) {
   const geometries = new Set();
   const items = new Map();
   let useAction = null;
+  let parachuteReady = false;
   const makeItem = (id) => {
     const group = new THREE.Group();
     group.name = `${id} equipped visual`;
@@ -124,7 +125,7 @@ function createEquipmentVisuals(THREE, characterMesh) {
   const setEquipped = (id) => {
     const visualId = visualIdFor(id);
     items.forEach((group, itemId) => { group.visible = itemId === visualId; });
-    parachutePack.visible = id === 'parachute' || parachuteCanopy.visible;
+    parachutePack.visible = parachuteReady || parachuteCanopy.visible;
     root.userData.equippedId = String(id || 'hands');
     resetRootPose();
   };
@@ -132,9 +133,13 @@ function createEquipmentVisuals(THREE, characterMesh) {
   return Object.freeze({
     root,
     setEquipped,
+    setParachuteReady(ready = false) {
+      parachuteReady = ready === true;
+      parachutePack.visible = parachuteReady || parachuteCanopy.visible;
+    },
     setParachuteDeployed(deployed = false) {
       parachuteCanopy.visible = deployed === true;
-      parachutePack.visible = deployed === true || root.userData.equippedId === 'parachute';
+      parachutePack.visible = deployed === true || parachuteReady;
     },
     playUse(definition = {}) {
       const category = String(definition.category || 'utility');

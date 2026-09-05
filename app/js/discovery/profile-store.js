@@ -15,6 +15,17 @@ const DISCOVERY_DB_VERSION = 3;
 const PROFILE_ID = 'local-explorer';
 const CHARACTER_MIGRATION_BACKUP_ID = 'character-v1:local-explorer';
 
+function normalizeCompanionOnboarding(source = {}) {
+  return {
+    schemaVersion: 1,
+    starterDogGranted: source.starterDogGranted === true,
+    starterDogInstanceId: String(source.starterDogInstanceId || '').slice(0, 180),
+    starterDogGrantedAt: Math.max(0, Number(source.starterDogGrantedAt) || 0),
+    starterDogFirstNamedAt: Math.max(0, Number(source.starterDogFirstNamedAt) || 0),
+    primaryHomeId: String(source.primaryHomeId || '').slice(0, 420)
+  };
+}
+
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
 }
@@ -58,6 +69,7 @@ function createDefaultProfile() {
     equippedToolId: 'metal-detector',
     favoriteToolIds: ['metal-detector', 'field-lens', 'field-camera'],
     activeCompanionId: null,
+    companionOnboarding: normalizeCompanionOnboarding(),
     tutorials: {},
     disciplineProgress: {
       exploration: { discoveries: 0, regions: [] },
@@ -83,6 +95,7 @@ function normalizeProfile(profile) {
     tutorials: { ...base.tutorials, ...(profile?.tutorials || {}) },
     disciplineProgress: { ...base.disciplineProgress, ...(profile?.disciplineProgress || {}) },
     toolMastery: { ...(profile?.toolMastery || {}) },
+    companionOnboarding: normalizeCompanionOnboarding(profile?.companionOnboarding),
     explorerProgress: normalizeExplorerProgress(profile?.explorerProgress),
     characterState: normalizeCharacterState(profile?.characterState),
     schemaVersion: DISCOVERY_DB_VERSION,
@@ -473,7 +486,7 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
     }
   }
 
-  async function setActiveCompanion(instanceId = null) {
+  async function setActiveCompanion(instanceId = null, options = {}) {
     const db = await open();
     try {
       await ensureCharacterMigration(db);
@@ -486,7 +499,19 @@ function createIndexedDbDiscoveryProfileStore(options = {}) {
         transaction.abort();
         throw new Error('Active companion must be owned.');
       }
-      companions.forEach((entry) => companionsStore.put({ ...entry, active: entry.instanceId === target }));
+      const now = Math.max(1, Number(options.now) || Date.now());
+      const defaultHomeId = String(options.homeId || '').slice(0, 420);
+      companions.forEach((entry) => {
+        const becomesActive = entry.instanceId === target;
+        const wasActive = entry.active === true;
+        const assignedHomeId = String(entry.residence?.homeId || defaultHomeId).slice(0, 420);
+        const residence = becomesActive
+          ? { state: 'traveling', homeId: assignedHomeId, updatedAt: now }
+          : wasActive
+            ? { state: assignedHomeId ? 'at-home' : 'care-network', homeId: assignedHomeId, updatedAt: now }
+            : entry.residence;
+        companionsStore.put({ ...entry, active: becomesActive, residence });
+      });
       const profile = normalizeProfile(await requestPromise(profilesStore.get(PROFILE_ID)));
       profile.activeCompanionId = target;
       profilesStore.put(profile);
@@ -736,10 +761,21 @@ function createMemoryDiscoveryProfileStore(seed = {}) {
       items.set(String(instanceId), updated);
       return clone(updated);
     },
-    async setActiveCompanion(instanceId = null) {
+    async setActiveCompanion(instanceId = null, options = {}) {
       const target = instanceId == null ? null : String(instanceId);
       if (target && !companions.has(target)) throw new Error('Active companion must be owned.');
-      for (const [id, entry] of companions) companions.set(id, { ...entry, active: id === target });
+      const now = Math.max(1, Number(options.now) || Date.now());
+      const defaultHomeId = String(options.homeId || '').slice(0, 420);
+      for (const [id, entry] of companions) {
+        const becomesActive = id === target;
+        const assignedHomeId = String(entry.residence?.homeId || defaultHomeId).slice(0, 420);
+        const residence = becomesActive
+          ? { state: 'traveling', homeId: assignedHomeId, updatedAt: now }
+          : entry.active === true
+            ? { state: assignedHomeId ? 'at-home' : 'care-network', homeId: assignedHomeId, updatedAt: now }
+            : entry.residence;
+        companions.set(id, { ...entry, active: becomesActive, residence });
+      }
       profile = normalizeProfile({ ...profile, activeCompanionId: target });
       return [...companions.values()].map(clone);
     },
