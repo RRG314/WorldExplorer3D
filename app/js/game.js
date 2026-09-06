@@ -25,7 +25,7 @@ import {
   stopPaintTownMode,
   tryTouchPaintAt,
   updatePaintballProjectiles
-} from "./game/paint-town.js?v=1";
+} from "./game/paint-town.js?v=2";
 import {
   clearNavigation,
   closeLegend,
