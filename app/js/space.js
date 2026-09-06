@@ -2,8 +2,8 @@ import { ctx as appCtx } from "./shared-context.js?v=55";
 import { getPrimaryWorldCanvas } from "./engine/webgl-lifecycle.js?v=2";
 import { captureEarthWorldSession } from "./earth-session.js?v=17";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
-import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=33";
-import { createSpaceFlightScene, destroySpaceFlightScene, ensureSolisReachDockTarget, ensureExtendedSpaceScene, getSolisReachDockTarget, orientActiveCraftForAtmosphere, orientActiveCraftTowardSolisReach, positionSpacecraftAtSolisReachDock, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon, setExpeditionPodFlightPresentation, setSolisReachFlightPresentation, updateExpeditionPodFlightPresentation } from "./space/scene.js?v=53";
+import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime, updateSpaceFlightPhysics } from "./space/runtime.js?v=33";
+import { createSpaceFlightScene, destroySpaceFlightScene, ensureSolisReachDockTarget, ensureExtendedSpaceScene, getSolisReachDockTarget, orientActiveCraftForAtmosphere, orientActiveCraftTowardSolisReach, positionSpacecraftAtSolisReachDock, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon, setExpeditionPodFlightPresentation, setSolisReachFlightPresentation, updateExpeditionPodFlightPresentation } from "./space/scene.js?v=54";
 import { hideGameUI, initSpaceFlightUI, prepareSpaceFlightHudForEntry, setSpaceFlightHudCollapsed, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=52";
 import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 import {
@@ -771,7 +771,8 @@ Object.assign(appCtx, {
   startSpaceFlightToSolisReach,
   startExpeditionPirateInterception,
   startFreeSpaceFlight,
-  startSpaceFlightToMoon
+  startSpaceFlightToMoon,
+  updateSpaceFlightPhysics
 });
 
 export {

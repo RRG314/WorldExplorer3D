@@ -18,11 +18,10 @@ try {
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').modes?.space === true, null, { timeout: 180_000 });
 
   const result = await page.evaluate(async () => {
-    const [{ ctx }, { updateSpaceFlightPhysics }, { updateBlackHoleEncounter }] = await Promise.all([
-      import('/app/js/shared-context.js?v=55'),
-      import('/app/js/space/runtime.js?v=27'),
-      import('/app/js/universe/black-hole.js?v=4')
-    ]);
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    if (typeof ctx.updateSpaceFlightPhysics !== 'function' || typeof ctx.updateBlackHoleEncounter !== 'function') {
+      throw new Error('The bundled space runtime did not publish its active physics authorities.');
+    }
     cancelAnimationFrame(ctx.spaceFlight.animationId);
     ctx.spaceFlight.animationId = null;
     ctx.clearRenderedSpaceJourney?.();
@@ -43,7 +42,7 @@ try {
     ctx.spaceFlight.velocity.set(1, 0.2, -0.1);
     const velocityBeforeTurn = ctx.spaceFlight.velocity.clone();
     ctx.spaceFlight.keys.arrowleft = true;
-    updateSpaceFlightPhysics();
+    ctx.updateSpaceFlightPhysics();
     ctx.spaceFlight.keys = {};
     const velocityAfterTurn = ctx.spaceFlight.velocity.clone();
     const forwardAfterTurn = new THREE.Vector3(0, 1, 0).applyQuaternion(ctx.spaceFlight.rocket.quaternion).normalize();
@@ -59,7 +58,7 @@ try {
       ctx.spaceFlight.speed = 0;
       ctx.spaceFlight.velocity.set(0, 0, 0);
       ctx.spaceFlight.gravityVelocity.set(0, 0, 0);
-      for (let step = 0; step < 6; step += 1) updateSpaceFlightPhysics();
+      for (let step = 0; step < 6; step += 1) ctx.updateSpaceFlightPhysics();
       const toward = body.position.clone().sub(ctx.spaceFlight.rocket.position).normalize();
       samples[bodyName.toLowerCase()] = {
         speed: ctx.spaceFlight.velocity.length(),
@@ -78,7 +77,7 @@ try {
     const blackHoleRocket = new THREE.Object3D();
     blackHoleRocket.position.set(0, 0, 500);
     const blackHoleVelocity = new THREE.Vector3();
-    const blackHole = updateBlackHoleEncounter(blackHoleGroup, blackHoleRocket, blackHoleVelocity, 1);
+    const blackHole = ctx.updateBlackHoleEncounter(blackHoleGroup, blackHoleRocket, blackHoleVelocity, 1);
 
     return {
       inertialVelocityBefore: velocityBeforeTurn.toArray(),

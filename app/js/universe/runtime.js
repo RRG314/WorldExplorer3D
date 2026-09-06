@@ -950,6 +950,7 @@ Object.assign(appCtx, {
   toggleUniverseCourseAssist,
   travelToUniverseDestination,
   universeRuntime,
+  updateBlackHoleEncounter,
   updateUniverseRuntime
 });
 
