@@ -1,7 +1,7 @@
 import { setupEngineInputHandlers } from "./input-handlers.js?v=13";
 import { createVehicleHeadlightRig } from "./night-lighting.js?v=8";
 import { attachCuratedPlayerCar } from './curated-player-car.js?v=7';
-import { applyDirectionalShadowPolicy } from "./shadow-policy.js?v=1";
+import { applyDirectionalShadowPolicy } from "./shadow-policy.js?v=2";
 import {
   buildEarthAtmosphereProfile,
   createEarthAtmosphereVisual
