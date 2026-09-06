@@ -9,9 +9,19 @@ await fs.mkdir(evidenceDir, { recursive: true });
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 const failures = [];
+const optionalExternalFailures = [];
+const isOptionalExternalUrl = (url) => /(?:overpass-api\.de|overpass\.private\.coffee|google-analytics\.com)\//i.test(String(url || ''));
 page.on('pageerror', (error) => failures.push(`pageerror: ${error.stack || error}`));
 page.on('console', (message) => {
-  if (message.type() === 'error') failures.push(`console.error: ${message.text()}`);
+  if (message.type() !== 'error') return;
+  const location = message.location();
+  const source = location?.url ? ` (${location.url}${location.lineNumber ? `:${location.lineNumber}` : ''})` : '';
+  const entry = `console.error: ${message.text()}${source}`;
+  (isOptionalExternalUrl(location?.url) ? optionalExternalFailures : failures).push(entry);
+});
+page.on('requestfailed', (request) => {
+  const entry = `requestfailed: ${request.failure()?.errorText || 'unknown'} ${request.url()}`;
+  (isOptionalExternalUrl(request.url()) ? optionalExternalFailures : failures).push(entry);
 });
 
 try {
@@ -75,7 +85,7 @@ try {
   ) <= 0.02, JSON.stringify(state.surfaceChain));
   assert.deepEqual(failures, []);
   await page.screenshot({ path: path.join(evidenceDir, 'manchester-car-over-boundary.png'), fullPage: false });
-  const report = { ok: true, samples, surfaceChain: state.surfaceChain, failures };
+  const report = { ok: true, samples, surfaceChain: state.surfaceChain, failures, optionalExternalFailures };
   await fs.writeFile(path.join(evidenceDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify(report, null, 2));
 } finally {
