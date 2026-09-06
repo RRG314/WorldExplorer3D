@@ -7,7 +7,7 @@ import { geometryHasFinitePositions } from "./geometry-batching.js?v=6";
 import {
   fetchShortbreadTile,
   vectorTileRangeForBounds
-} from "./shortbread-source.js?v=19";
+} from "./shortbread-source.js?v=20";
 
 const WATER_VECTOR_TILE_ZOOM = 13;
 const FEATURE_CLIP_RADIUS_SCALE = 1.75;

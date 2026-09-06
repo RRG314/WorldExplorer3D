@@ -15,6 +15,15 @@ let signTextureCache = new Map();
 let signTextGeometry = null;
 let worldCoverVegetationTimer = null;
 
+const STREET_FURNITURE_VISIBILITY = Object.freeze({
+  street_lamp: Object.freeze({ enter: 360, exit: 430 }),
+  traffic_signal: Object.freeze({ enter: 300, exit: 360 }),
+  stop_sign: Object.freeze({ enter: 280, exit: 340 }),
+  street_name_sign: Object.freeze({ enter: 250, exit: 310 }),
+  waste_basket: Object.freeze({ enter: 190, exit: 240 }),
+  default: Object.freeze({ enter: 240, exit: 300 })
+});
+
 let matPole;
 let matSignBg;
 let matTreeShades;
@@ -247,6 +256,56 @@ function markFurniture(group, kind, provenance = 'inferred') {
     hash = Math.imul(hash, 16777619);
   }
   group.userData.urbanEntityId = `furniture:${kind}:${(hash >>> 0).toString(16)}`;
+  group.userData.furnitureLodVisible = true;
+}
+
+function activeFurnitureReference() {
+  const contracted = appCtx.activeEarthActorPosition?.();
+  if (Number.isFinite(contracted?.x) && Number.isFinite(contracted?.z)) return contracted;
+  if (appCtx.boatMode?.active && Number.isFinite(appCtx.boat?.x) && Number.isFinite(appCtx.boat?.z)) return appCtx.boat;
+  if (appCtx.planeMode?.active && Number.isFinite(appCtx.planeMode?.x) && Number.isFinite(appCtx.planeMode?.z)) return appCtx.planeMode;
+  if (appCtx.droneMode && Number.isFinite(appCtx.drone?.x) && Number.isFinite(appCtx.drone?.z)) return appCtx.drone;
+  if (appCtx.Walk?.state?.mode === 'walk' && Number.isFinite(appCtx.Walk.state.walker?.x) && Number.isFinite(appCtx.Walk.state.walker?.z)) {
+    return appCtx.Walk.state.walker;
+  }
+  if (Number.isFinite(appCtx.car?.x) && Number.isFinite(appCtx.car?.z)) return appCtx.car;
+  return null;
+}
+
+export function updateStreetFurnitureVisibility(reference = activeFurnitureReference(), options = {}) {
+  const objects = appCtx.streetFurnitureMeshes || [];
+  // Interior entry temporarily suppresses overlapping world meshes and the
+  // planetary scene owner suppresses the entire Earth root. Do not compete
+  // with either authority by re-showing individual fixtures from this LOD pass.
+  if (appCtx.activeInterior || appCtx.earthSceneVisible === false || !reference ||
+      !Number.isFinite(reference.x) || !Number.isFinite(reference.z)) {
+    return appCtx.streetFurnitureVisibility || Object.freeze({ total: objects.length, visible: 0, culled: objects.length });
+  }
+  let visible = 0;
+  for (const object of objects) {
+    if (!object) continue;
+    const threshold = STREET_FURNITURE_VISIBILITY[object.userData?.furnitureKind] || STREET_FURNITURE_VISIBILITY.default;
+    const wasVisible = object.userData?.furnitureLodVisible !== false;
+    const radius = wasVisible ? threshold.exit : threshold.enter;
+    const dx = Number(object.position?.x) - Number(reference.x);
+    const dz = Number(object.position?.z) - Number(reference.z);
+    const lodVisible = Number.isFinite(dx) && Number.isFinite(dz) && dx * dx + dz * dz <= radius * radius;
+    object.userData.furnitureLodVisible = lodVisible;
+    object.visible = lodVisible;
+    if (lodVisible) visible += 1;
+  }
+  const snapshot = Object.freeze({
+    total: objects.length,
+    visible,
+    culled: Math.max(0, objects.length - visible),
+    referenceX: Number(reference.x),
+    referenceZ: Number(reference.z),
+    initialized: true,
+    source: String(options.source || 'runtime-lod')
+  });
+  appCtx.streetFurnitureVisibility = snapshot;
+  appCtx.setPerfLiveStat?.('streetFurnitureVisibility', snapshot);
+  return snapshot;
 }
 
 function createLightPost(x, z, provenance = 'inferred', roadTarget = null) {
@@ -653,9 +712,11 @@ export function resetWorldFurnitureCaches() {
   signTextureCache.clear();
   signTextGeometry?.dispose?.();
   signTextGeometry = null;
+  appCtx.streetFurnitureVisibility = Object.freeze({ total: 0, visible: 0, culled: 0, initialized: false });
 }
 
 Object.assign(appCtx, {
   flushWorldCoverVegetationRefresh,
-  scheduleWorldCoverVegetationRefresh
+  scheduleWorldCoverVegetationRefresh,
+  updateStreetFurnitureVisibility
 });

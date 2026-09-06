@@ -58,7 +58,7 @@ import {
   finalizeLoadedWorld,
   recordWorldLoadWarning,
   safeWorldLoadCall
-} from "./world/load-support.js?v=43";
+} from "./world/load-support.js?v=44";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
@@ -145,7 +145,7 @@ import {
 import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=32";
 import {
   resetWorldFurnitureCaches
-} from "./world/furniture.js?v=21";
+} from "./world/furniture.js?v=22";
 import {
   addBuildingToSpatialIndex,
   clearBuildingSpatialIndex,
@@ -168,7 +168,7 @@ import {
   fetchShortbreadBuildingData,
   fetchShortbreadWorldData,
   releaseShortbreadRuntimeCache
-} from "./world/shortbread-source.js?v=19";
+} from "./world/shortbread-source.js?v=20";
 import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=14";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=2";
 import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=36";
@@ -314,6 +314,7 @@ async function refreshAuthoritativeMapData() {
     throw new Error('OpenStreetMap refresh is available on Earth.');
   }
   await invalidateOverpassCaches(appCtx.LOC, ['core', 'buildings', 'building-metadata']);
+  releaseShortbreadRuntimeCache({ includeRaw: true });
   return loadRoads();
 }
 
