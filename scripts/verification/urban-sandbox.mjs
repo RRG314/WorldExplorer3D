@@ -65,7 +65,7 @@ async function actorState(page, target = null) {
   }, target);
 }
 
-async function turnToward(page, target, tolerance = 0.11, maxSteps = 160, options = {}) {
+async function turnToward(page, target, tolerance = 0.16, maxSteps = 160, options = {}) {
   for (let step = 0; step < maxSteps; step += 1) {
     const state = await actorState(page, target);
     if (state.custody?.active) return state;
@@ -85,13 +85,17 @@ async function turnToward(page, target, tolerance = 0.11, maxSteps = 160, option
   throw new Error(`Could not face target ${JSON.stringify(target)} with normal walking input: ${JSON.stringify({ final, desired, delta: wrapYaw(desired - final.yaw) })}`);
 }
 
-async function turnCameraToward(page, target, tolerance = 0.11, maxSteps = 160) {
+async function turnCameraToward(page, target, tolerance = 0.16, maxSteps = 160) {
   for (let step = 0; step < maxSteps; step += 1) {
     const state = await actorState(page, target);
     const desired = Math.atan2(Number(target.x) - state.x, Number(target.z) - state.z);
     const delta = wrapYaw(desired - state.cameraYaw);
     if (Math.abs(delta) <= tolerance) return state;
-    await inputStep(page, delta > 0 ? 'KeyA' : 'KeyD', 55);
+    // A/D are conventional strafing bindings on foot. Arrow keys are the
+    // supported keyboard-only turn control and rotate the camera with the
+    // explorer when no independent mouse-look offset is active.
+    const turnDurationMs = Math.abs(delta) > 0.7 ? 55 : Math.abs(delta) > 0.3 ? 32 : 16;
+    await inputStep(page, delta > 0 ? 'ArrowLeft' : 'ArrowRight', turnDurationMs);
   }
   const final = await actorState(page, target);
   const desired = Math.atan2(Number(target.x) - final.x, Number(target.z) - final.z);
@@ -513,6 +517,10 @@ async function runVehicleEquipmentJourney() {
     const enteredVehicle = entered.urbanSandbox.vehicles.find((entry) => entry.id === vehicle.id);
     const drivenVehicle = driven.urbanSandbox.vehicles.find((entry) => entry.id === vehicle.id);
     const drivenMeters = Math.hypot(drivenVehicle.x - enteredVehicle.x, drivenVehicle.z - enteredVehicle.z);
+    await page.waitForFunction(() => {
+      const urban = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox;
+      return urban?.interaction?.action === 'exit_vehicle' && Number(urban.interaction?.data?.speed || 0) <= 1.25;
+    }, null, { timeout: 6_000 });
     await page.keyboard.press('KeyE');
     await page.waitForFunction((vehicleId) => {
       const urban = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox;
