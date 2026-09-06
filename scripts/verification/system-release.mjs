@@ -3,6 +3,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { runLoggedStep } from './run-logged-step.mjs';
 import { currentBaseline, evidencePath } from './execution-evidence.mjs';
+import { startStaticServer } from './static-server.mjs';
 
 const root = process.cwd();
 const config = JSON.parse(readFileSync(path.join(root, 'config/system-release-gates.json'), 'utf8'));
@@ -82,6 +83,14 @@ mkdirSync(outputDir, { recursive: true });
 const results = [];
 const startedAt = new Date().toISOString();
 const baseline = currentBaseline(root);
+const artifactServer = shouldRun && selected.some(([, gate]) => gate.artifactRequired)
+  ? await startStaticServer({ rootDir: path.resolve(root, artifactRoot), ports: [4481, 4482, 4483] })
+  : null;
+const verificationEnvironment = {
+  ...process.env,
+  WE3D_VERIFY_ROOT: artifactRoot,
+  ...(artifactServer ? { WE3D_VERIFY_BASE_URL: `http://127.0.0.1:${artifactServer.port}` } : {})
+};
 
 function gateEvidencePath(id) {
   return path.join(root, 'output', 'release-evidence', 'current', 'gates', requestedScope, `${id}.json`);
@@ -120,44 +129,48 @@ function writeGateEvidence(id, gate, record) {
   }, null, 2)}\n`, 'utf8');
 }
 
-for (const [id, gate] of selected) {
-  const prior = reusableGateEvidence(id, gate);
-  if (prior) {
+try {
+  for (const [id, gate] of selected) {
+    const prior = reusableGateEvidence(id, gate);
+    if (prior) {
+      const record = {
+        id,
+        ok: true,
+        durationMs: Number(prior.durationMs || 0),
+        status: 0,
+        signal: '',
+        error: '',
+        reused: true,
+        completedAt: prior.completedAt
+      };
+      results.push(record);
+      console.log(`[system-release] REUSE ${id} (current baseline, ${record.durationMs} ms)`);
+      continue;
+    }
+    console.log(`[system-release] START ${id} (${results.length + 1}/${selected.length})`);
+    const result = await runLoggedStep(gate.command, {
+      cwd: root,
+      env: verificationEnvironment,
+      logPath: path.join(outputDir, `${id}.log`),
+      timeoutMs: gate.timeoutMs
+    });
     const record = {
       id,
-      ok: true,
-      durationMs: Number(prior.durationMs || 0),
-      status: 0,
-      signal: '',
-      error: '',
-      reused: true,
-      completedAt: prior.completedAt
+      ok: result.ok,
+      durationMs: result.durationMs,
+      status: result.status,
+      signal: result.signal,
+      error: result.error,
+      timedOut: result.timedOut,
+      reused: false
     };
     results.push(record);
-    console.log(`[system-release] REUSE ${id} (current baseline, ${record.durationMs} ms)`);
-    continue;
+    writeGateEvidence(id, gate, record);
+    console.log(`[system-release] ${record.ok ? 'PASS' : 'FAIL'} ${id} (${record.durationMs} ms)`);
+    if (!record.ok) break;
   }
-  console.log(`[system-release] START ${id} (${results.length + 1}/${selected.length})`);
-  const result = await runLoggedStep(gate.command, {
-    cwd: root,
-    env: { ...process.env, WE3D_VERIFY_ROOT: artifactRoot },
-    logPath: path.join(outputDir, `${id}.log`),
-    timeoutMs: gate.timeoutMs
-  });
-  const record = {
-    id,
-    ok: result.ok,
-    durationMs: result.durationMs,
-    status: result.status,
-    signal: result.signal,
-    error: result.error,
-    timedOut: result.timedOut,
-    reused: false
-  };
-  results.push(record);
-  writeGateEvidence(id, gate, record);
-  console.log(`[system-release] ${record.ok ? 'PASS' : 'FAIL'} ${id} (${record.durationMs} ms)`);
-  if (!record.ok) break;
+} finally {
+  await artifactServer?.close?.();
 }
 
 const report = {
@@ -166,6 +179,7 @@ const report = {
   targetVersion: config.targetVersion,
   scope: requestedScope,
   artifactRoot,
+  artifactBaseUrl: artifactServer ? `http://127.0.0.1:${artifactServer.port}` : null,
   outputDir,
   startedAt,
   completedAt: new Date().toISOString(),

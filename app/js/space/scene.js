@@ -7,7 +7,7 @@ import {
 import { SPACE_CONSTANTS } from "./constants.js?v=3";
 import { PLANETARY_BODIES, configureColorTexture } from "../planetary/catalog.js?v=1";
 import { createSpaceCelestialCatalog } from "./celestial-catalog.js?v=5";
-import { initUniverseRuntime, releaseUniverseRuntimeScene } from "../universe/runtime.js?v=35";
+import { initUniverseRuntime, releaseUniverseRuntimeScene } from "../universe/runtime.js?v=36";
 import { releaseGaiaSkyLayers } from '../sky/gaia-catalog.js?v=4';
 import { createExpeditionSpacecraftMesh } from "./expedition-spacecraft-mesh.js?v=5";
 import { createExpeditionPodMesh } from './expedition-pod-mesh.js?v=7';
