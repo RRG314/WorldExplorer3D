@@ -378,7 +378,7 @@ export function updatePropertyPanel() {
   else if (activeView === 'offers') appCtx.PropertyUI.list.innerHTML = renderOffers(view);
   else if (activeView === 'market') appCtx.PropertyUI.list.innerHTML = renderMarket();
   else appCtx.PropertyUI.list.innerHTML = renderHome(view);
-  appCtx.PropertyUI.panel?.classList.add('show');
+  appCtx.PropertyUI.panel?.classList.toggle('show', appCtx.realEstateMode === true);
 }
 
 function propertyById(id) {
@@ -404,7 +404,18 @@ export function openModalById(id) {
 }
 
 export function closeModal() { appCtx.PropertyUI.modal?.classList.remove('show'); }
-export function closePropertyPanel() { appCtx.PropertyUI.panel?.classList.remove('show'); }
+export function closePropertyPanel() {
+  // Closing Real Estate is a mode transition, not just a visual hide. Pending
+  // parcel responses must not reopen the panel over an unrelated hotbar action.
+  parcelRequestSequence += 1;
+  appCtx.realEstateMode = false;
+  appCtx.PropertyUI.button?.classList.remove('active');
+  document.getElementById('fRealEstate')?.classList.remove('on');
+  appCtx.PropertyUI.panel?.classList.remove('show');
+  closeModal();
+  clearPropertyMarkers();
+  clearParcelBoundary();
+}
 export function togglePropertyFilters() { activeView = activeView === 'nearby' ? 'home' : 'nearby'; updatePropertyPanel(); }
 
 export function toggleRealEstate(force) {
@@ -412,7 +423,7 @@ export function toggleRealEstate(force) {
   appCtx.realEstateMode = shouldOpen;
   appCtx.PropertyUI.button?.classList.toggle('active', shouldOpen);
   if (shouldOpen) loadPropertiesAtCurrentLocation();
-  else { closePropertyPanel(); closeModal(); clearPropertyMarkers(); clearParcelBoundary(); }
+  else closePropertyPanel();
 }
 
 export async function loadPropertiesAtCurrentLocation() {
