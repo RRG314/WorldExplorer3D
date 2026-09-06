@@ -6,6 +6,7 @@ import { sampleSweptContact } from './physics/swept-contact.js?v=1';
 import { getAviationCatalogEntry } from './transport/aviation-catalog.js?v=5';
 import { aircraftGroundOffset, createAircraftVisual, updateAircraftVisual } from './transport/aircraft-visual-recipe.js?v=11';
 import { applyTransportDamage } from './transport/damage-model.js?v=1';
+import { resolveMobileCameraRecenter } from './controls/mobile-touch-authority.js?v=5';
 
 const PLANE_MAX_SPEED_MPS = 84;
 
@@ -712,9 +713,29 @@ function applyPlaneCamera(dt) {
   else state.cameraLookTimer = Math.max(0, state.cameraLookTimer - dt);
   state.cameraYaw += lookYaw * lookSpeed;
   state.cameraPitch += lookPitch * lookSpeed;
-  if (!manualLook && state.cameraLookTimer <= 0 && appCtx.camMode === 0) {
-    state.cameraYaw = damp(state.cameraYaw, 0, 2.7, dt);
-    state.cameraPitch = damp(state.cameraPitch, 0, 2.7, dt);
+  if (!manualLook && appCtx.camMode === 0) {
+    if (actions.mobileTouch === true) {
+      // Mobile camera settings are one cross-mode contract. Use the saved
+      // wall-clock idle delay here as walking does, rather than a fixed timer
+      // advanced only by rendered frame time. On a busy phone the latter made
+      // the plane camera appear to remain detached long after touch release.
+      const recenter = resolveMobileCameraRecenter({
+        cameraYaw: state.cameraYaw,
+        actorYaw: 0,
+        dt,
+        idleMs: performance.now() - Number(actions.mobileLastLookInputAt || 0),
+        lookActive: actions.mobileLookActive,
+        settings: actions.mobileSettings,
+        followRate: 4.2
+      });
+      if (recenter.active) {
+        state.cameraYaw = recenter.yaw;
+        state.cameraPitch = damp(state.cameraPitch, 0, 4.2, dt);
+      }
+    } else if (state.cameraLookTimer <= 0) {
+      state.cameraYaw = damp(state.cameraYaw, 0, 2.7, dt);
+      state.cameraPitch = damp(state.cameraPitch, 0, 2.7, dt);
+    }
   }
   state.cameraYaw = Math.atan2(Math.sin(state.cameraYaw), Math.cos(state.cameraYaw));
   state.cameraPitch = clamp(state.cameraPitch, -0.5, 0.55);
