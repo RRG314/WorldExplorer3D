@@ -1,4 +1,4 @@
-import { postProtectedFunction } from './function-api.js?v=1';
+import { postProtectedFunction } from './function-api.js?v=3';
 
 function sanitizeText(value, max = 120) {
   return String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);

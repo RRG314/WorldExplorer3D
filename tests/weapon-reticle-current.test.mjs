@@ -5,6 +5,7 @@ import { isRoadSurfaceReachable } from '../app/js/structure-semantics.js';
 import { EQUIPMENT_DEFINITIONS } from '../app/js/urban-sandbox/equipment-model.js';
 import { resolvePlayerProjectileLaunch } from '../app/js/urban-sandbox/projectile-ballistics.js';
 import { reticlePresentation } from '../app/js/urban-sandbox/weapon-reticle-authority.js';
+import { resolveNpcAimPoint } from '../app/js/urban-sandbox/npc-combat-policy.js';
 
 test('reticle spread honestly opens with movement and recoil then recovers', () => {
   const settled = reticlePresentation({ kind: 'pulse', speedMph: 0, firedAgoMs: 1000 });
@@ -120,4 +121,16 @@ test('player ranged equipment has enough travel budget to reach visible world ta
   assert.ok(byId.get('paintball-gun').range >= 50);
   assert.ok(byId.get('concussion-charge').range >= 24);
   assert.ok(byId.get('concussion-charge').fuseSeconds >= 2);
+});
+
+test('NPC projectile aim leads a moving explorer without becoming perfectly accurate', () => {
+  const target = resolveNpcAimPoint(
+    { id: 'npc:aim-test', x: 0, z: 0 },
+    { x: 0, y: 1.7, z: 25, vx: 4, vz: 0 },
+    { projectileSpeed: 50, range: 40, intervalMs: 1200 },
+    1000
+  );
+  assert.ok(target.leadSeconds > 0 && target.leadSeconds <= .65);
+  assert.ok(target.x > 0, 'aim should lead the moving target');
+  assert.ok(target.accuracy < 1 && target.accuracy >= .25);
 });

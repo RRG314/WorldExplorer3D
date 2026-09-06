@@ -4,6 +4,15 @@ import {
   resolveMobileSemanticActions,
   saveMobileTouchSettings
 } from './mobile-touch-authority.js?v=5';
+import {
+  keyMatchesKeyboardAction,
+  keyboardActionPressed,
+  keyboardBindingCode,
+  keyboardBindingLabel,
+  keyboardBindingsSnapshot,
+  resetKeyboardBindings,
+  setKeyboardBinding
+} from './keyboard-bindings.js?v=2';
 
 const DEAD_ZONE = 0.16;
 const inputState = {
@@ -25,7 +34,7 @@ const PLANE_DOUBLE_TAP_WINDOW_MS = 340;
 const HELD_CONTROL_CODES = Object.freeze([
   'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
   'Space', 'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight',
-  'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyH', 'KeyR', 'KeyX', 'KeyZ'
+  'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyH', 'KeyQ', 'KeyR', 'KeyX', 'KeyZ'
 ]);
 
 function clamp(value, min = -1, max = 1) {
@@ -68,36 +77,54 @@ function buttonValue(gamepad, index) {
 
 function keyboardControlActions(keys = {}, mode = 'drive') {
   const planeControls = mode === 'plane';
-  const droneControls = mode === 'drone';
-  // Preserve the v3.1 Earth controls: arrows move/steer and WASD looks.
-  // Plane and drone controls intentionally retain their existing mappings.
-  const move = digital(pressed(keys, 'ArrowUp'), pressed(keys, 'ArrowDown'));
-  const turn = digital(pressed(keys, 'ArrowLeft'), pressed(keys, 'ArrowRight'));
-  const lookYaw = digital(pressed(keys, 'KeyA'), pressed(keys, 'KeyD'));
-  const lookPitch = digital(pressed(keys, 'KeyW'), pressed(keys, 'KeyS'));
-  const ascend = pressed(keys, 'Space', 'KeyR');
-  const descend = pressed(keys, 'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight');
-  const planeRollModifier = planeControls && pressed(keys, 'ControlLeft', 'ControlRight');
+  const walking = mode === 'walk';
+  // The shared layer is action-based: WASD is the conventional primary
+  // binding and arrows remain a complete alternate. On foot, A/D strafe while
+  // the arrows retain keyboard-only turning; vehicles use A/D to steer.
+  const move = digital(
+    keyboardActionPressed(keys, 'move_forward', ['ArrowUp']),
+    keyboardActionPressed(keys, 'move_backward', ['ArrowDown'])
+  );
+  const turn = walking
+    ? digital(pressed(keys, 'ArrowLeft'), pressed(keys, 'ArrowRight'))
+    : digital(
+      keyboardActionPressed(keys, 'move_left', ['ArrowLeft']),
+      keyboardActionPressed(keys, 'move_right', ['ArrowRight'])
+    );
+  const strafe = walking
+    ? digital(keyboardActionPressed(keys, 'move_right'), keyboardActionPressed(keys, 'move_left'))
+    : 0;
+  const lookYaw = 0;
+  const lookPitch = 0;
+  const ascend = keyboardActionPressed(keys, 'primary_action');
+  const descend = keyboardActionPressed(keys, 'modifier_action', ['ShiftRight', 'ControlLeft', 'ControlRight']);
+  const boostAction = keyboardActionPressed(keys, 'boost_action', ['ControlRight']);
+  const planeRollModifier = planeControls && boostAction;
   return {
     mode,
     move,
     turn,
     steer: turn,
-    strafe: 0,
+    strafe,
     lookYaw,
     lookPitch,
     throttle: Math.max(0, move),
     reverse: Math.max(0, -move),
-    brake: pressed(keys, planeControls ? 'ControlLeft' : 'Space', planeControls ? 'ControlRight' : 'Space') ? 1 : 0,
-    boost: pressed(keys, 'ControlLeft', 'ControlRight') ? 1 : 0,
-    jump: pressed(keys, 'Space') ? 1 : 0,
-    sprint: pressed(keys, 'ShiftLeft', 'ShiftRight') ? 1 : 0,
+    brake: (planeControls
+      ? boostAction
+      : keyboardActionPressed(keys, 'primary_action')) ? 1 : 0,
+    boost: boostAction ? 1 : 0,
+    jump: keyboardActionPressed(keys, 'primary_action') ? 1 : 0,
+    sprint: keyboardActionPressed(keys, 'modifier_action', ['ShiftRight']) ? 1 : 0,
     vertical: digital(ascend, descend),
     pitch: mode === 'plane' ? -move : lookPitch,
     roll: turn,
     aerobaticRoll: planeRollModifier ? turn : 0,
     throttleAdjust: planeControls
-      ? digital(pressed(keys, 'Space'), pressed(keys, 'ShiftLeft', 'ShiftRight'))
+      ? digital(
+        keyboardActionPressed(keys, 'primary_action'),
+        keyboardActionPressed(keys, 'modifier_action', ['ShiftRight'])
+      )
       : 0
   };
 }
@@ -135,7 +162,6 @@ function mergeGamepad(actions, gamepad) {
   const leftTrigger = buttonValue(gamepad, 6);
   const rightTrigger = buttonValue(gamepad, 7);
   const south = buttonValue(gamepad, 0);
-  const west = buttonValue(gamepad, 2);
   const north = buttonValue(gamepad, 3);
   const leftShoulder = buttonValue(gamepad, 4);
   const rightShoulder = buttonValue(gamepad, 5);
@@ -145,7 +171,7 @@ function mergeGamepad(actions, gamepad) {
   actions.steer = actions.turn;
   actions.lookYaw = Math.abs(rightX) > Math.abs(actions.lookYaw) ? rightX : actions.lookYaw;
   actions.lookPitch = Math.abs(rightY) > Math.abs(actions.lookPitch) ? rightY : actions.lookPitch;
-  actions.brake = Math.max(actions.brake, west, leftTrigger);
+  actions.brake = Math.max(actions.brake, leftTrigger);
   actions.jump = Math.max(actions.jump, south);
   actions.sprint = Math.max(actions.sprint, rightShoulder);
   actions.boost = Math.max(actions.boost, north, rightShoulder);
@@ -244,6 +270,27 @@ function buttonRising(gamepad, index) {
   return current && !previous;
 }
 
+function runGamepadContextAction() {
+  const runInterior = () => Promise.resolve(appCtx.handleInteriorAction?.()).then((handled) => handled === true);
+  const runGameplay = () => Promise.resolve(appCtx.handleGameplayInteraction?.()).then((handled) => (
+    handled === true ? true : runInterior()
+  ));
+  return Promise.resolve(appCtx.handlePrimaryContextInteraction?.()).then((handled) => (
+    handled === true ? true : runGameplay()
+  )).catch((error) => {
+    console.warn('[controls] Gamepad context action failed.', error);
+    return false;
+  });
+}
+
+function controlPromptLabel(actionId) {
+  if (inputState.gamepad?.connected) {
+    const labels = { interact: 'X', primary_action: 'A', inventory: 'D-pad Up', map: 'View', camera: 'LB' };
+    if (labels[actionId]) return labels[actionId];
+  }
+  return keyboardBindingLabel(actionId);
+}
+
 function updateControlInput() {
   const gamepad = connectedGamepad();
   inputState.gamepad = gamepad;
@@ -252,14 +299,24 @@ function updateControlInput() {
     inputState.previousButtons = [];
     return false;
   }
-  if (buttonRising(gamepad, 9)) appCtx.cyclePrimaryTravelMode?.({ source: 'gamepad' });
-  if (buttonRising(gamepad, 8)) appCtx.cycleCameraMode?.();
+  if (buttonRising(gamepad, 2)) void runGamepadContextAction();
+  if (buttonRising(gamepad, 12)) appCtx.toggleUrbanEquipment?.();
+  if (buttonRising(gamepad, 8)) {
+    if (appCtx.showLargeMap) appCtx.closeLargeMap?.();
+    else appCtx.openLargeMap?.();
+  }
+  if (buttonRising(gamepad, 9)) {
+    const paused = appCtx.togglePauseReason?.('manual_pause') ?? appCtx.paused;
+    document.getElementById('pauseScreen')?.classList.toggle('show', paused);
+  }
+  if (buttonRising(gamepad, 4)) appCtx.cycleCameraMode?.();
   return true;
 }
 
 function clearControlInputState(reason = 'runtime') {
   const keys = appCtx.keys || {};
-  HELD_CONTROL_CODES.forEach((code) => {
+  const configuredCodes = Object.values(keyboardBindingsSnapshot().bindings || {});
+  new Set([...HELD_CONTROL_CODES, ...configuredCodes]).forEach((code) => {
     keys[code] = false;
   });
   inputState.gamepad = null;
@@ -287,8 +344,15 @@ Object.assign(appCtx, {
   getMobileTouchInputSnapshot,
   clearControlInputState,
   consumePlaneBarrelRollTrigger,
+  getControlBindingCode: keyboardBindingCode,
+  getControlBindingLabel: keyboardBindingLabel,
+  getControlPromptLabel: controlPromptLabel,
+  getKeyboardBindingsSnapshot: keyboardBindingsSnapshot,
+  keyMatchesControlAction: keyMatchesKeyboardAction,
   readControlActions,
   registerPlaneTurnTap,
+  resetKeyboardBindings,
+  setKeyboardBinding,
   setMobileTouchEnabled,
   setMobileTouchPad,
   updateMobileTouchSettings,

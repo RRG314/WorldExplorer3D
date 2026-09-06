@@ -50,6 +50,7 @@ function createUrbanEquipmentRuntime(options = {}) {
   const reportCivicEvent = options.reportCivicEvent;
   const onNpcShot = options.onNpcShot;
   const onNpcDowned = options.onNpcDowned;
+  const onConsume = options.onConsume;
   const setStatus = options.setStatus;
   const clock = options.now || (() => performance.now());
   const effects = [];
@@ -104,6 +105,7 @@ function createUrbanEquipmentRuntime(options = {}) {
     if (item.hotbarSlot != null) actions.push(`<button data-backpack-action="clear-slot" data-equipment-id="${escapeHtml(item.instanceId)}" type="button">Remove from slot ${item.hotbarSlot}</button>`);
     if (item.verbs?.includes('use-context')) actions.push(`<button data-backpack-action="field" data-equipment-id="${escapeHtml(item.instanceId)}" type="button">Use for fieldwork</button>`);
     if (item.verbs?.includes('inspect')) actions.push(`<button data-backpack-action="inspect" data-equipment-id="${escapeHtml(item.instanceId)}" type="button">Inspect</button>`);
+    if (item.verbs?.includes('consume')) actions.unshift(`<button data-backpack-action="consume" data-equipment-id="${escapeHtml(item.instanceId)}" type="button">${escapeHtml(item.metadata?.consumeLabel || item.consumeLabel || 'Use')}</button>`);
     const slots = item.verbs?.includes('equip')
       ? Array.from({ length: 6 }, (_, index) => `<button data-backpack-slot="${index + 1}" data-equipment-id="${escapeHtml(item.instanceId)}" type="button">Slot ${index + 1}</button>`).join('')
       : '';
@@ -207,6 +209,14 @@ function createUrbanEquipmentRuntime(options = {}) {
       if (changed) setStatus(`${item.label} equipped.`, 1200);
       render();
       return changed;
+    }
+    if (action === 'consume') {
+      const result = onConsume?.(item) || { ok: false, reason: 'unavailable' };
+      if (result.ok) setStatus(`${item.label} used · explorer health ${Math.round(Number(result.condition || 0) * 100)}%`, 1800);
+      else if (result.reason === 'full_health') setStatus('Explorer health is already full.', 1600);
+      else setStatus(`${item.label} could not be used.`, 1600);
+      render();
+      return true;
     }
     if (action === 'field') {
       const result = appCtx.worldDiscoveryRuntime?.equipTool?.(item.catalogId);
@@ -864,7 +874,7 @@ function createUrbanEquipmentRuntime(options = {}) {
         equipmentId: npc.heldEquipment,
         ...decision.profile,
         origin: { x: pose.x, y: pose.y + 1.34, z: pose.z },
-        target: { x: Number(actor.x), y: Number(actor.y) - .5, z: Number(actor.z) },
+        target: decision.target,
         onPlayerImpact: onNpcShot
       });
       if (!fired) return;
@@ -993,11 +1003,23 @@ function createUrbanEquipmentRuntime(options = {}) {
   }
 
   function update(dt) {
+    const actor = appCtx.Walk?.state?.walker;
+    const equipped = state.equipment?.equipped?.();
+    if (actor && equipped?.projectileKind && appCtx.Walk?.state?.mode === 'walk') {
+      const aimDirection = new THREE.Vector3();
+      appCtx.camera?.getWorldDirection?.(aimDirection);
+      if (aimDirection.lengthSq() > .001) {
+        aimDirection.normalize();
+        alignActorToAim(actor, aimDirection);
+        state.equipmentVisual?.setAimDirection?.(aimDirection, true);
+      }
+    } else {
+      state.equipmentVisual?.setAimDirection?.(null, false);
+    }
     state.equipmentVisual?.update?.(dt);
     updateProjectiles(dt);
     updateArmedNpcResponse();
     updateReticlePresentation();
-    const actor = appCtx.Walk?.state?.walker;
     if (actor && state.flashlight.visible) {
       const direction = new THREE.Vector3();
       appCtx.camera?.getWorldDirection?.(direction);

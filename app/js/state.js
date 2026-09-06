@@ -79,7 +79,8 @@ const car = {
   condition: 1,
   durabilityPolicy: 'exploration_unlimited',
   resistance: 175,
-  transportCatalogId: 'sedan'
+  transportCatalogId: 'sedan',
+  vehicleIdentity: 'player-default:sedan'
 };
 const boat = {
   x: 0,

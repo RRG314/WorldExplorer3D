@@ -1,4 +1,4 @@
-import { RESOURCE_KEYS, withExpeditionChanges } from './model.js?v=11';
+import { RESOURCE_KEYS, withExpeditionChanges } from './model.js?v=12';
 import { JULIAN_YEAR_S } from './travel-calculator.js?v=2';
 import {
   applyDueConsequences,
@@ -7,9 +7,10 @@ import {
   resolveDirectedEvent,
   VOYAGE_SLOTS
 } from './voyage-director.js?v=2';
-import { appendSystemTransitions, assessCausalFailure } from './failure-authority.js?v=2';
+import { appendSystemTransitions, assessCausalFailure } from './failure-authority.js?v=3';
 import { advanceLongDurationState } from './long-duration.js?v=1';
 import { advanceOutposts } from './outpost.js?v=1';
+import { createPirateInterception, INTERCEPTION_PHASE } from './hostile-interception.js?v=1';
 
 function clone(value) {
   return globalThis.structuredClone ? globalThis.structuredClone(value) : JSON.parse(JSON.stringify(value));
@@ -113,7 +114,7 @@ function incorporateDueConsequences(expedition) {
 }
 
 function advanceExpedition(expedition, requestedDeltaS) {
-  if (!expedition || expedition.state !== 'traveling' || expedition.pendingEvent) return expedition;
+  if (!expedition || expedition.state !== 'traveling' || expedition.pendingEvent || (expedition.activeEncounter && expedition.activeEncounter.phase !== INTERCEPTION_PHASE.COMPLETE)) return expedition;
   const prepared = incorporateDueConsequences(expedition);
   const totalS = prepared.calculation.properElapsedS;
   const remainingS = Math.max(0, totalS - prepared.strategicElapsedS);
@@ -148,6 +149,8 @@ function advanceExpedition(expedition, requestedDeltaS) {
     log: appendLog(next.log, { atMissionS: elapsed, kind: 'mission-loss', message: failure.summary })
   });
   if (slot && elapsed + 1 >= totalS * slot.progress) {
+    const interception = createPirateInterception(next, slot);
+    if (interception) return interception;
     const event = createDirectedEvent(next, slot);
     if (event) return withExpeditionChanges(next, {
       systems: event.systems,
@@ -166,7 +169,7 @@ function advanceExpedition(expedition, requestedDeltaS) {
 }
 
 function advanceToNextMilestone(expedition) {
-  if (!expedition || expedition.state !== 'traveling' || expedition.pendingEvent) return expedition;
+  if (!expedition || expedition.state !== 'traveling' || expedition.pendingEvent || (expedition.activeEncounter && expedition.activeEncounter.phase !== INTERCEPTION_PHASE.COMPLETE)) return expedition;
   return advanceExpedition(expedition, expedition.calculation.properElapsedS);
 }
 

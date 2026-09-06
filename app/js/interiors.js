@@ -29,7 +29,12 @@ import {
   sampleInteriorWalkSurface as sampleInteriorWalkSurfaceRuntime,
   scanNearbyInteriorSupport as scanNearbyInteriorSupportRuntime,
   updateInteriorInteraction as updateInteriorInteractionRuntime
-} from "./interiors/runtime.js?v=18";
+} from "./interiors/runtime.js?v=19";
+import {
+  attachCommunityInteriorRepresentation,
+  requestCommunityInteriorAccess,
+  resolveCommunityInteriorDefinition
+} from './reality-capture/interior-runtime.js?v=2';
 
 const interiorCache = new Map();
 const mappedInteriorWarmPromises = new Map();
@@ -45,6 +50,7 @@ const interiorRuntimeDeps = {
     isCurrent: (candidate) => appCtx.activeInterior === candidate && candidate.group?.parent === appCtx.scene
   }),
   disposeCuratedHomeFurnishing,
+  attachCommunityInteriorRepresentation: (active) => attachCommunityInteriorRepresentation(appCtx, active),
   findOwnedHomeForInteriorSupport: (support) => findOwnedHomeForInteriorSupport(
     support,
     appCtx.getExplorerPropertySnapshot?.()
@@ -53,8 +59,12 @@ const interiorRuntimeDeps = {
   interiorCache,
   isWalkModeActive,
   pointInPolygonSafe,
-  resolveInteriorDefinitionForEntry: (support) =>
-    resolveInteriorDefinitionForEntry(support, interiorCache, mappedInteriorWarmPromises),
+  requestCommunityInteriorAccess: (definition) => requestCommunityInteriorAccess(appCtx, definition),
+  resolveInteriorDefinitionForEntry: (support) => resolveCommunityInteriorDefinition(
+    appCtx,
+    support,
+    (candidate) => resolveInteriorDefinitionForEntry(candidate, interiorCache, mappedInteriorWarmPromises)
+  ),
   sampleSurfaceY,
   warmMappedInteriorDefinition: (support) =>
     warmMappedInteriorDefinition(support, interiorCache, mappedInteriorWarmPromises)

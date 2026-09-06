@@ -11,7 +11,7 @@ import {
   SHIP_STATIONS
 } from './ship-layout.js?v=5';
 import { deriveCrewOperations, summarizeCrewOperations } from './crew-operations.js?v=1';
-import { shipAlertState } from './failure-authority.js?v=2';
+import { shipAlertState } from './failure-authority.js?v=3';
 import { SPACE_CRAFT_IDENTITY } from '../space/craft-identity.js?v=1';
 import { attachCuratedExpeditionPod } from '../space/curated-expedition-pod.js?v=4';
 import {

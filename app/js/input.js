@@ -14,6 +14,11 @@ function isPerfToggleKey(code) {
   return code === 'F8';
 }
 
+function matchesControlAction(code, actionId, fallbackCode) {
+  if (typeof appCtx.keyMatchesControlAction === 'function') return appCtx.keyMatchesControlAction(code, actionId);
+  return code === fallbackCode;
+}
+
 function toggleLargeMap() {
   if (appCtx.showLargeMap) appCtx.closeLargeMap?.();
   else appCtx.openLargeMap?.();
@@ -35,10 +40,19 @@ function onKey(code, event) {
       appCtx.closeFishingGame?.();
       return;
     }
-    if (['KeyE', 'Space', 'KeyQ', 'KeyJ', 'KeyK', 'KeyL', 'ArrowLeft', 'ArrowRight'].includes(code)) return;
+    const fishingOwnedCode = ['KeyE', 'Space', 'KeyQ', 'KeyJ', 'KeyK', 'KeyL', 'ArrowLeft', 'ArrowRight'].includes(code);
+    const worldActionCode = [
+      ['interact', 'KeyE'], ['primary_action', 'Space'], ['inventory', 'KeyI'], ['journal', 'KeyJ'],
+      ['map', 'KeyM'], ['facility_action', 'KeyF'], ['plane', 'KeyP'], ['boat', 'KeyG'],
+      ['build', 'KeyB'], ['camera', 'KeyC'], ['track', 'KeyR'], ['use_item', 'KeyV'], ['take_item', 'KeyT']
+    ].some(([actionId, fallback]) => matchesControlAction(code, actionId, fallback));
+    // Fishing is a focused activity with its own input layer. Swapping a
+    // world binding must not let that key open a panel or replace the vehicle
+    // behind the minigame.
+    if (fishingOwnedCode || worldActionCode) return;
   }
 
-  if (code === 'KeyE') {
+  if (matchesControlAction(code, 'interact', 'KeyE')) {
     if (event?.repeat) return;
     const runInteriorFallback = () => {
       if (typeof appCtx.handleInteriorAction !== 'function') return;
@@ -86,19 +100,21 @@ function onKey(code, event) {
     return;
   }
 
-  if (appCtx.activeShipInterior === true && code === 'KeyM') {
+  if (appCtx.activeShipInterior === true && matchesControlAction(code, 'map', 'KeyM')) {
     if (!event?.repeat) appCtx.toggleExpeditionShipMap?.();
     event?.preventDefault?.();
     return;
   }
 
-  if (appCtx.activeShipInterior === true && ['KeyF', 'KeyP', 'KeyG', 'KeyB'].includes(code)) {
+  if (appCtx.activeShipInterior === true && [
+    ['facility_action', 'KeyF'], ['plane', 'KeyP'], ['boat', 'KeyG'], ['build', 'KeyB']
+  ].some(([actionId, fallback]) => matchesControlAction(code, actionId, fallback))) {
     if (!event?.repeat) appCtx.showToast?.('Return to flight before changing traversal modes.');
     return;
   }
 
   if (
-    code === 'Space' &&
+    matchesControlAction(code, 'primary_action', 'Space') &&
     !event?.repeat &&
     appCtx.Walk?.state?.mode === 'walk' &&
     (appCtx.urbanSandboxRuntime?.parachute?.skydiving === true || appCtx.Walk?.state?.walker?.onGround === false) &&
@@ -110,13 +126,13 @@ function onKey(code, event) {
     }
   }
 
-  if (code === 'KeyI' && typeof appCtx.toggleUrbanEquipment === 'function') {
+  if (matchesControlAction(code, 'inventory', 'KeyI') && typeof appCtx.toggleUrbanEquipment === 'function') {
     if (event?.repeat) return;
     appCtx.toggleWorldDiscoveryJournal?.(false);
     if (appCtx.toggleUrbanEquipment()) return;
   }
 
-  if (code === 'KeyJ' && typeof appCtx.toggleWorldDiscoveryJournal === 'function') {
+  if (matchesControlAction(code, 'journal', 'KeyJ') && typeof appCtx.toggleWorldDiscoveryJournal === 'function') {
     if (event?.repeat) return;
     appCtx.toggleUrbanEquipment?.(false);
     if (appCtx.toggleWorldDiscoveryJournal()) return;
@@ -127,32 +143,30 @@ function onKey(code, event) {
     if (appCtx.equipUrbanEquipmentSlot(Number(code.slice(-1)))) return;
   }
 
-  if (code === 'KeyV' && typeof appCtx.handleUrbanEquipmentUse === 'function') {
+  if (matchesControlAction(code, 'use_item', 'KeyV') && typeof appCtx.handleUrbanEquipmentUse === 'function') {
     if (event?.repeat) return;
     if (appCtx.handleUrbanEquipmentUse()) return;
   }
 
-  if (code === 'KeyT' && typeof appCtx.handleUrbanNpcTake === 'function') {
+  if (matchesControlAction(code, 'take_item', 'KeyT') && typeof appCtx.handleUrbanNpcTake === 'function') {
     if (event?.repeat) return;
     if (appCtx.handleUrbanNpcTake()) return;
   }
 
-  // Primary travel mode cycle (F key)
-  if (code === 'KeyF') {
+  // F is reserved for an explicit nearby facility action. Travel changes live
+  // in the visible Travel menu (with P/G as optional direct shortcuts), so a
+  // missed interaction can never unexpectedly replace the player's vehicle.
+  if (matchesControlAction(code, 'facility_action', 'KeyF')) {
     if (event?.repeat) return;
-    if (appCtx.activeInterior && typeof appCtx.clearActiveInterior === 'function') {
-      appCtx.clearActiveInterior({ restorePlayer: true, preserveCache: true });
+    if (typeof appCtx.handleMechanicInteraction === 'function' && appCtx.handleMechanicInteraction()) {
+      event?.preventDefault?.();
+      return;
     }
-    if (typeof appCtx.cyclePrimaryTravelMode === 'function') {
-      appCtx.cyclePrimaryTravelMode({ source: 'keyboard_f' });
-    } else {
-      console.error('Travel mode controller is unavailable.');
-    }
-    if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
+    appCtx.showToast?.('Move closer to a mapped mechanic, or open Travel to change vehicles.');
     return;
   }
 
-  if (code === 'KeyP') {
+  if (matchesControlAction(code, 'plane', 'KeyP')) {
     if (event?.repeat) return;
     appCtx.togglePlaneMode?.({ source: 'keyboard_p' });
     appCtx.updateControlsModeUI?.();
@@ -160,14 +174,14 @@ function onKey(code, event) {
   }
 
   // Builder mode toggle (B key)
-  if (code === 'KeyB') {
+  if (matchesControlAction(code, 'build', 'KeyB')) {
     if (typeof appCtx.toggleBlockBuildMode === 'function') {
       appCtx.toggleBlockBuildMode();
     }
     return;
   }
 
-  if (code === 'KeyG') {
+  if (matchesControlAction(code, 'boat', 'KeyG')) {
     if (event?.repeat) return;
     if (typeof appCtx.handleBoatAction === 'function') {
       appCtx.handleBoatAction();
@@ -177,7 +191,7 @@ function onKey(code, event) {
   }
 
   // Camera view toggle when walking (C key) - first/third person
-  if (code === 'KeyC') {
+  if (matchesControlAction(code, 'camera', 'KeyC')) {
     if (appCtx.Walk && appCtx.Walk.state.mode === 'walk') {
       appCtx.Walk.toggleView();
     } else {
@@ -232,7 +246,7 @@ function onKey(code, event) {
     return;
   }
 
-  if (code === 'KeyR') {
+  if (matchesControlAction(code, 'track', 'KeyR')) {
     // Shift+R: Toggle Road Debug Mode (terrain conformance visualization)
     // R: Toggle track recording (default)
     if (
@@ -248,9 +262,9 @@ function onKey(code, event) {
   }
   if (code === 'KeyN') {
     if (event?.repeat) return;
-    nextCity();
+    if (event?.shiftKey) nextCity();
   }
-  if (code === 'KeyM') {
+  if (matchesControlAction(code, 'map', 'KeyM')) {
     if (event?.repeat) return;
     toggleLargeMap();
   }

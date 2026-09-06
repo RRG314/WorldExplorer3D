@@ -1,5 +1,16 @@
 # World Explorer 3D Architecture
 
+> POI work in progress (2026-09-05):
+> [FUNCTIONAL_POI_SYSTEM.md](../FUNCTIONAL_POI_SYSTEM.md) defines the new
+> normalization and capability boundary. Semantic publication, safe building
+> association, and the shared wallet boundary are now live; interior and full
+> family acceptance gates remain in progress.
+
+> Community Reality Capture local V1 (2026-09-06): capture, processing,
+> moderation, presentation replacement, and generic private-space access now
+> have explicit owners. It is intentionally not deployed or described as
+> production-ready; provisioning and controlled reconstruction proofs remain.
+
 World Explorer 3D is a browser game organized around explicit ownership of the
 active environment, assembled world, player state, and shared services.
 
@@ -17,10 +28,16 @@ flowchart LR
     Earth --> Field[Field activities and progression]
     Earth --> Sandbox[Vehicles, companions, commerce, combat, and civic response]
     Earth --> Build[Quick Build and Blocks]
+    Earth --> Property[Real Estate and Maryland parcel context]
+    Earth --> Capture[Approved community building presentation]
     Earth --> Rooms[Multiplayer rooms]
     Field --> PlayerState[Backpack, Journal, Guide, and goals]
     Build --> LocalState[Local persistence]
     Build --> Rooms
+    Property --> Firebase
+    Property --> Build
+    Capture --> Firebase
+    Capture --> World
     Rooms --> Firebase[Authorized backend and Firestore]
     Expedition --> PlayerState
     Expedition --> Build
@@ -55,6 +72,98 @@ Primary ownership areas:
 - `app/js/buildings/` and `app/js/interiors/` own structures and indoor play.
 - `app/js/world/water-*`, `app/js/boat-mode/`, and `app/js/ocean/` own water.
 
+### Community Reality Capture flow
+
+```mermaid
+flowchart LR
+    Target[Stable mapped building] --> Draft[Authenticated guided draft]
+    Draft --> Normalize[Client normalization and EXIF removal]
+    Normalize --> Quarantine[Write-once private quarantine]
+    Quarantine --> Validate[Server signature, count, size, and state validation]
+    Validate --> Worker[Isolated reconstruction and GLB optimization]
+    Worker --> Review[Administrator photo, model, footprint, and alignment review]
+    Review -->|approved exterior| Exterior[Presentation overlay]
+    Review -->|approved interior| Interior[Authorized private-space resolver]
+    Exterior --> Canonical[Existing mapped identity, terrain, collision, POI, and property]
+    Interior --> Proxy[Existing interior proxy collision, navigation, and interactions]
+    Review -->|rejected or failed| Fallback[Existing procedural presentation]
+```
+
+The capture system never creates a second building authority. Exterior models
+are presentation-only and suppress procedural massing only after the approved
+GLB loads successfully. Interior models replace visible room dressing while the
+existing proxy shell remains authoritative for collision, navigation, doors,
+and gameplay interactions.
+
+Raw uploads, processed private interiors, capture records, review decisions,
+grants, and access requests are server-owned. Browser code can request an action
+but cannot approve a capture, mint an asset URL, or infer permission from a
+visible button. `PRIVATE`, `INVITE_ONLY`, `GUEST_LIST`, `SESSION_GUESTS`, and
+`PUBLIC` are generic space modes; every new interior starts `PRIVATE` regardless
+of contribution intent. Exterior visibility is stored and resolved separately.
+
+### Streetscape flow
+
+```mermaid
+flowchart LR
+    Roads[Published roads and width profiles] --> Street[Versioned streetscape model]
+    Terrain[Rendered terrain height] --> Street
+    Context[Buildings, entrances, land use, parking, driveways] --> Street
+    Safety[Intersection and structure exclusions] --> Street
+    Street --> Batches[Concrete-top and curb-face batches]
+    Batches --> Walk[Walking surface recognition]
+    Roads --> Drive[Existing driving surface]
+    Roads --> Traffic[Existing traffic and navigation]
+```
+
+`app/js/streetscape/model.js` consumes the existing transport facts after road
+and terrain reconciliation. `app/js/streetscape/presentation.js` owns only the
+two optional render batches. It does not feed the road compiler, terrain
+corridors, vehicle collision, traffic graph, or living-world pedestrian graph.
+`app/js/ground.js` recognizes the published sidewalk footprint for walking only;
+the drive-surface path is unchanged. See
+[STREETSCAPE_SYSTEM.md](../STREETSCAPE_SYSTEM.md).
+
+## Property and Maryland parcel flow
+
+```mermaid
+flowchart LR
+    Hub[Existing Real Estate UI] --> Buildings[Loaded mapped buildings]
+    Hub -->|Maryland only, on demand| MD[Official statewide MD iMAP parcel layer]
+    MD --> Normalize[Privacy allowlist, CRS 4326, geometry validation]
+    Buildings --> Associate[Point-in-polygon building association]
+    Normalize --> Associate
+    Associate --> Candidate[One virtual property candidate per parcel]
+    Candidate --> Existing[Existing property transaction authority]
+    Existing --> Wallet[One Explorer Wallet]
+    Existing --> Registry[Global worldProperties registry]
+    Existing --> Build[Quick Build permission]
+    MD -. unavailable/outside coverage .-> Fallback[Existing building-backed property]
+```
+
+`gis/maryland-parcel-core.js` is the normalized parcel contract and 24-code
+jurisdiction resolver. `gis/maryland-parcel-provider.js` owns bounded requests,
+pagination, cancellation, timeout, simplification, and the small memory cache.
+`real-estate/parcel-property-model.js` groups all currently loaded buildings
+whose centers fall inside a parcel, retains land-only parcels, calculates the
+documented game estimate, and answers parcel-aware build permission. The UI does
+not start these requests during ordinary traversal.
+
+Parcel-backed records use `parcel:md:{jurisdiction}:{hash(public POLYID)}` as
+their canonical world property identity. The public source polygon ID remains in
+the immutable catalog for verification but is not displayed as ownership data.
+Existing building IDs remain the fallback everywhere and are retained as legacy
+join aliases when a Maryland building becomes parcel-backed. Transactions still
+settle through `functions/property-authority.js`; balances still settle through
+the one economy wallet. Parcel geometry is never accepted as a client-authored
+Firestore ownership boundary.
+
+World Explorer keeps every mapped building available for exploration under the
+existing entry rules. Buying a virtual parcel does not assert control over a real
+building or lock the public exploration copy. Ownership controls the player's
+private saved property state and Maryland Quick Build permission. If the parcel
+provider is unavailable, pre-existing entry and build behavior remains usable.
+
 ## Player movement and cameras
 
 Keyboard, touch, and gamepad input are translated into mode-specific actions by
@@ -76,6 +185,15 @@ profiles change acceleration, steering response, braking, grip, mass, and
 damage response without creating separate vehicle loops. Responder vehicles,
 traffic, claimed vehicles, cameras, HUD units, crash state, and companions all
 consume that same contract.
+
+`app/js/physics/road-vehicle-airborne.js` is the road-vehicle vertical-motion
+authority. It detects actual ramp crests and support loss, integrates Earth
+gravity while airborne, reconciles newly streamed terrain contact, and reports
+landing impact to the existing transport-damage contract. The permanent BMW
+uses the explicit `exploration_unlimited` durability policy: it stays at full
+condition and remains drivable, while other vehicles can take damage. Persistent
+BMW upgrades are owned by `app/js/transport/vehicle-upgrades.js` and alter the
+same acceleration, braking, grip, recovery, and landing calculations.
 
 Aircraft and maritime fleets adapt the existing Plane and Boat controllers
 rather than creating competing movement systems. Mapped airports, helipads,
@@ -126,6 +244,26 @@ population owner. Downed-actor items become bounded world pickups before the
 Backpack can receive them. Mapped stores use exact eligible place records and a
 stable per-store exchange model.
 
+`app/js/living-world/demand-model.js` bounds logical population by performance
+tier and independently varies pedestrian and vehicle activity by time band.
+One canonical POI lifecycle normalizes mapped identity and capabilities once,
+associates safe building tenancy and a published entrance once, and publishes a
+bounded nearby set. Commerce and building entry consume that record rather than
+reclassifying provider tags independently. Mapped POIs and building entrances weight existing route edges, so activity
+collects around plausible destinations without inventing geography.
+`traffic-control-system.js` projects mapped or inferred controls onto those
+lane edges, owns stop dwell and deterministic two-axis signal phases, and feeds
+the existing population motor. `world/furniture.js` may render a physical pole
+only after finding a point outside the published road envelope; the semantic
+control remains usable if no safe fixture position exists.
+
+`app/js/interaction/world-click-router.js` is the click-only semantic picking
+owner for pedestrians, traffic, POIs, street furniture, and both individual
+and batched building meshes. Existing gameplay owners decide the action after
+selection. Weapons, Quick Build, and specialized activity panels keep input
+precedence. Selection feedback is one short bottom-right card and does not add
+another persistent HUD surface.
+
 Temporary effects and entities follow one lifecycle policy. Projectiles and
 impact effects dispose after impact or a short maximum flight. Unclaimed loot,
 downed local actors, disabled road vehicles, responders, aircraft, and vessels
@@ -154,12 +292,26 @@ flowchart LR
     Trade --> Wallet
 ```
 
-`app/js/urban-sandbox/commerce-model.js` owns the current local Explorer Credits
-record, transaction history, stable game stock, and mapped-business exchange.
+`app/js/urban-sandbox/commerce-model.js` owns anonymous/offline Explorer Credits
+state, transaction history, stable game stock, and mapped-business presentation.
+Signed-in transactions use the connected wallet authority. A service charge
+creates an effect-pending receipt; the client records durable recovery state,
+applies the existing gameplay authority, and then settles the receipt. A failed
+effect compensates the same wallet once, so payment and effect cannot drift.
 The legacy storage key is retained so existing Credits survive the schema
 change. `app/js/resources/material-catalog.js` defines material identity, unit
 mass, and allowed cargo conversion. The Character Backpack remains the item
 owner; the economy does not maintain a second list of carried objects.
+
+`app/js/player/condition-model.js` owns explorer health. Anonymous play persists
+locally; signed-in play hydrates and saves the same condition through the player
+state authority. Mechanic upgrade settlement writes owned-vehicle levels on the
+server and the client hydrates those levels without echo writes.
+The unchanged blue HUD slot displays that condition while walking, the active
+vehicle's condition while traveling, and the protected full condition of the
+permanent BMW and personal plane. Backpack food, water, first aid, and medicine
+call this one owner when consumed. Mapped mechanics expose sequential, fixed
+vehicle upgrade services through the same Explorer Wallet and transaction log.
 
 Mapped place records provide identity, category, position, provider, licence,
 and attribution. They do not provide World Explorer stock, price, rarity,
@@ -280,6 +432,25 @@ Earth descent returns through the existing Earth session loader at the saved
 location. Backpack, Journal, account, and multiplayer records are not copied at
 either boundary.
 
+The pirate boarding interception is a bounded middle-voyage branch inside that
+same ownership chain. `expedition/hostile-interception.js` owns its deterministic
+trigger, one-time flag, phase machine, checkpoint, consequences, failure check,
+history, and return to the Voyage Director. `space/pirate-interception-runtime.js`
+owns the temporary formation, target assist, enemy flight states, projectile and
+impact pools, combat HUD, and audio presentation. It flies the established
+Pathfinder through the established Space controller and never invents another
+craft or mission record. The render result is submitted back to the Expedition
+authority, which applies damage to the existing Solis Reach systems, stores, and
+crew before persistence. Shared-room clients request the same encounter commands
+through the generated Expedition command engine.
+
+Solar-system selection, celestial collision, landing zones, universe navigation,
+and their prompts are suspended while the local combat frame owns presentation;
+they are restored when the encounter exits. Reloading an unresolved fight retains
+the saved pre-combat checkpoint and can resume defensive control. See
+`../EXPEDITION_PIRATE_INTERCEPTION.md` for rules, asset budgets, verification, and
+the explicit interior-boarding boundary.
+
 At the affected station, a selected response starts one three-step physical
 procedure. `ship-interior.js` publishes only the current procedure node through
 the existing interior interaction collection; `interiors/runtime.js` routes the
@@ -306,6 +477,28 @@ power, stores, condition, operating status, revision, and log. Single-player
 state is local and versioned; a room Expedition is server-owned and clients may
 only request validated mutations through the existing room backend.
 
+## Onboarding, input, and notification authority
+
+`controls/keyboard-bindings.js` is the saved desktop action authority.
+`controls/action-input.js` resolves those actions together with touch and gamepad
+state for walking, driving, boats, aircraft, drones, underwater travel, and Space.
+Mode-specific camera modules consume look axes independently, so a remapped
+movement key cannot become a camera command. Custom held keys are cleared with the
+rest of input whenever a panel, pause, or travel transition takes control.
+
+`tutorial/tutorial.js` owns the optional three-step First Journey.
+`interaction/context-router.js` chooses the single immediate usable world action
+and records familiarity by action family. `tutorial/current-journey.js` is a lower
+priority active-task or nearby-suggestion layer. CSS and runtime gates ensure an
+immediate action, open panel, or activity suppresses less urgent guidance instead
+of stacking over the player.
+
+`ui/accessibility.js` owns device-local interface preferences and publishes the
+resolved notice duration used by tutorial, journey, and field-lead consumers.
+Accessibility preferences alter presentation only; they do not grant items,
+advance progression, change authoritative physics, or write multiplayer state.
+See `docs/ONBOARDING_CONTROLS_ACCESSIBILITY.md` for the implemented policy.
+
 ## Quick Build and persistent Blocks
 
 Quick Build is the single player-facing entry for Blocks. It uses the existing
@@ -317,6 +510,11 @@ Local builds remain device-local. Room builds use authenticated room ownership
 and Firestore rules. Blocks are game-created content and never become edits to
 OpenStreetMap or another map provider.
 
+When verified Maryland parcel evidence is loaded, a new block placement also
+checks whether the current Explorer owns the containing virtual parcel. Removal
+still follows block ownership. Outside Maryland and during source failure, Quick
+Build uses its existing rules so an external GIS outage cannot disable the game.
+
 ## Multiplayer and backend
 
 Multiplayer rooms are bounded to one location. Firestore stores room metadata,
@@ -326,6 +524,21 @@ Firebase Functions handle operations that require server authorization.
 Client code may request an action, but authentication, membership, ownership,
 moderation, and payload checks are enforced at the backend or in Firestore
 rules. Production credentials are never part of the public source tree.
+
+Reality Capture adds App Check to its HTTP boundary, Firebase Authentication to
+owner/reviewer/private-space actions, deny-by-default direct Firestore access,
+write-once normalized upload rules, and short-lived brokered Storage URLs.
+One-time grants are atomically consumed; session grants are bound to the current
+room. Whether an owner is available for an access request is derived from fresh
+backend room presence for both people, never from a browser-supplied flag. A
+near-door entry attempt submits the request only when that server decision says
+it is available. Owner deletion of unapproved work recursively removes its uploads and
+related access records. Production still requires an isolated reconstruction
+job with malware/content controls and provisioned Storage/App Check services.
+Until both staging provisioning and publication are explicitly enabled, the
+Earth and interior runtimes skip Reality Capture endpoint calls and publish no
+captured presentation. Room access uses the canonical multiplayer-room resolver,
+and capture eligibility requires a current stable mapped building.
 
 Room presence is the source for player and room discovery. Future map-based
 discovery will aggregate privacy-safe activity areas and current counts from
@@ -371,3 +584,10 @@ hash, and exercised on desktop and mobile. Backend authorization, multiplayer,
 property, account, civic, and shared Expedition checks run against local Firebase emulators. Production hosting and
 backend services are not changed until that exact build is reviewed and
 explicitly approved.
+
+Checkpoint completion is derived from candidate and backend execution manifests,
+not hand-edited status fields. Each manifest records the HEAD commit and a hash of
+the current tracked and untracked source state. The release boundary rejects
+missing, failed, partial, or stale evidence. Individual passing gates may be
+reused only when their command and that complete fingerprint still match; a
+source or gate-command change invalidates the reuse automatically.

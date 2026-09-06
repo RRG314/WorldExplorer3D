@@ -199,6 +199,66 @@
         "function": "moderateContributionSubmission"
       },
       {
+        "source": "/createRealityCaptureDraft",
+        "function": "createRealityCaptureDraft"
+      },
+      {
+        "source": "/listMyRealityCaptures",
+        "function": "listMyRealityCaptures"
+      },
+      {
+        "source": "/finalizeRealityCaptureUpload",
+        "function": "finalizeRealityCaptureUpload"
+      },
+      {
+        "source": "/deleteRealityCapture",
+        "function": "deleteRealityCapture"
+      },
+      {
+        "source": "/resolvePrivateSpaceEntry",
+        "function": "resolvePrivateSpaceEntry"
+      },
+      {
+        "source": "/resolveBuildingInteriorRepresentation",
+        "function": "resolveBuildingInteriorRepresentation"
+      },
+    {
+      "source": "/resolveBuildingExteriorRepresentation",
+      "function": "resolveBuildingExteriorRepresentation"
+    },
+    {
+      "source": "/listApprovedExteriorRepresentations",
+      "function": "listApprovedExteriorRepresentations"
+    },
+      {
+        "source": "/updatePrivateSpaceAccess",
+        "function": "updatePrivateSpaceAccess"
+      },
+      {
+        "source": "/requestPrivateSpaceAccess",
+        "function": "requestPrivateSpaceAccess"
+      },
+      {
+        "source": "/decidePrivateSpaceAccessRequest",
+        "function": "decidePrivateSpaceAccessRequest"
+      },
+    {
+      "source": "/moderateRealityCapture",
+      "function": "moderateRealityCapture"
+    },
+    {
+      "source": "/listRealityCaptureModeration",
+      "function": "listRealityCaptureModeration"
+    },
+    {
+      "source": "/getRealityCaptureModerationDetail",
+      "function": "getRealityCaptureModerationDetail"
+    },
+      {
+        "source": "/getRealityCaptureAssetAccess",
+        "function": "getRealityCaptureAssetAccess"
+      },
+      {
         "source": "/saveOverlayFeatureDraft",
         "function": "saveOverlayFeatureDraft"
       },
@@ -286,6 +346,9 @@
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
+  "storage": {
+    "rules": "storage.rules"
+  },
   "emulators": {
     "auth": {
       "host": "127.0.0.1",
@@ -298,6 +361,10 @@
     "functions": {
       "host": "127.0.0.1",
       "port": 5001
+    },
+    "storage": {
+      "host": "127.0.0.1",
+      "port": 9199
     }
   }
 }

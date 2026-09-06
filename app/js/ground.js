@@ -362,6 +362,24 @@ const GroundHeight = {
       };
     }
 
+    // The road-nearness query deliberately includes a little lateral padding,
+    // which also covers a curb and narrow sidewalk. Let the versioned
+    // streetscape footprint claim only its own published concrete before that
+    // padded road result is considered. Driving continues through driveAt and
+    // never consults urban surfaces.
+    if (appCtx.streetscapeContainsPoint?.(x, z) === true) {
+      const sidewalkY = this.urbanSurfaceMeshY(x, z);
+      if (Number.isFinite(sidewalkY) && sidewalkY > terrainY + 0.08) {
+        return {
+          y: sidewalkY + 0.02,
+          source: 'sidewalk',
+          feature: null,
+          dist: 0,
+          pt: { x, z }
+        };
+      }
+    }
+
     if (roadOnSurface) {
       const sampleX = Number.isFinite(nr?.pt?.x) ? nr.pt.x : x;
       const sampleZ = Number.isFinite(nr?.pt?.z) ? nr.pt.z : z;

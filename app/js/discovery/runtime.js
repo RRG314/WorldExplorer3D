@@ -794,7 +794,8 @@ function createDiscoveryUi(state) {
     }
     // A field lead is an invitation, not a permanent HUD layer. Keep the
     // underlying lead available in Explorer after this short notice expires.
-    const showEncounterLead = encounterPromptEligible && promptNow - encounterPromptShownAt < 7000;
+    const preferredNoticeMs = globalThis.getWorldExplorerAccessibilityNoticeMs?.(7000) ?? 7000;
+    const showEncounterLead = encounterPromptEligible && (!Number.isFinite(preferredNoticeMs) || promptNow - encounterPromptShownAt < preferredNoticeMs);
     elements.prompt?.classList.toggle('show', showEncounterLead);
     if (elements.prompt) {
       elements.prompt.dataset.tone = encounterLead?.tone || 'field';
@@ -971,7 +972,8 @@ async function syncTrustedReceipt(appCtx, profileStore, item) {
       catalogVersion: BUILTIN_DISCOVERY_CATALOGS.version
     });
     const updated = await profileStore.applyTrustedReceipt?.(item.instanceId, receipt);
-    appCtx.worldDiscoveryRuntime?.ui?.refreshData?.();
+    const discoveryUi = appCtx.worldDiscoveryRuntime?.ui;
+    if (discoveryUi?.open) void discoveryUi.refreshData?.();
     return updated;
   } catch (error) {
     console.warn('[world-discovery] Trusted receipt sync deferred:', error?.message || error);
@@ -1259,7 +1261,10 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     });
     if (result?.recorded) {
       await state.refreshToolProgress?.();
-      await state.ui?.refreshData?.();
+      // The Explorer panel reloads current data whenever it opens. Rebuilding
+      // all hidden Journal, Guide, companion, and profile markup here made a
+      // background world-visit receipt compete with first-play rendering.
+      if (state.ui?.open) await state.ui.refreshData?.();
     }
     return result || { recorded: false, reason: 'event-store-unavailable' };
   };
@@ -2188,7 +2193,10 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   appCtx.worldDiscoveryPublication = publication;
   appCtx.worldDiscoveryRuntime = state;
   appCtx.worldDiscoveryRuntimeSnapshot = () => worldDiscoveryRuntimeSnapshot(appCtx);
-  void hydrateSignedInReceipts(appCtx, profileStore, claimedIds).then(() => state.ui?.refreshData?.());
+  void hydrateSignedInReceipts(appCtx, profileStore, claimedIds).then(() => {
+    if (state.ui?.open) return state.ui.refreshData?.();
+    return null;
+  });
   appCtx.toggleWorldDiscoveryJournal = (force) => {
     const next = typeof force === 'boolean' ? force : !state.ui.open;
     state.ui.setOpen(next);

@@ -408,7 +408,10 @@ try {
     noFailedLocalResources: localFailures.length === 0
   };
 
-  await page.keyboard.press('KeyF');
+  // F is the conventional nearby-facility action now; it must never swap the
+  // player's vehicle. P is the current configurable direct travel shortcut and
+  // proves that normal input can still hand ownership to another actor mode.
+  await page.keyboard.press('KeyP');
   await page.waitForTimeout(1800);
   const afterInput = await publicSnapshot();
   checks.realPlayerModeInput = String(afterInput.diagnostics.activeActor?.mode || '') !== initialMode;

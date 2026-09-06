@@ -16,6 +16,10 @@ import {
 } from "./road-junctions.js?v=11";
 import { appendSolidAtGradeRoadGeometry } from "./road-surface-geometry.js?v=2";
 import { roadWidthAtSegment } from "../world/road-cross-section-profile.js?v=1";
+import {
+  clearStreetscapePresentation,
+  publishStreetscapePresentation
+} from "../streetscape/presentation.js?v=1";
 
 const ROAD_SURFACE_BIAS = 0.18;
 const MAX_ROAD_BATCH_VERTICES = 60000;
@@ -217,13 +221,103 @@ export function resolveRoadRibbonSubdivisionStep(road) {
 export function createCompiledRoadSurfaceSampler(feature, fallbackSampler, diagnostics = null) {
   return (x, z) => {
     const compiledY = sampleFeatureSurfaceY(feature, x, z);
-    if (Number.isFinite(compiledY)) return compiledY;
+    if (Number.isFinite(compiledY)) {
+      // Detailed terrain is rebuilt to the compiled transport corridor, but
+      // the lower-resolution fixed-location terrain outside that ring is not.
+      // Reconcile only at-grade surfaces against the terrain that is actually
+      // rendered at this coordinate. This prevents a regional street from
+      // sinking below the outer LOD without lifting bridges or exposing
+      // tunnels, whose vertical profiles must remain structure-owned.
+      if (
+        feature?.structureSemantics?.terrainMode === 'at_grade' &&
+        typeof fallbackSampler === 'function'
+      ) {
+        const renderedTerrainY = Number(fallbackSampler(x, z));
+        if (Number.isFinite(renderedTerrainY) && renderedTerrainY > compiledY) {
+          if (diagnostics && typeof diagnostics === 'object') {
+            diagnostics.renderedTerrainClamps =
+              Number(diagnostics.renderedTerrainClamps || 0) + 1;
+          }
+          return renderedTerrainY;
+        }
+      }
+      return compiledY;
+    }
     if (diagnostics && typeof diagnostics === 'object') {
       diagnostics.compiledSurfaceFallbacks =
         Number(diagnostics.compiledSurfaceFallbacks || 0) + 1;
     }
     return typeof fallbackSampler === 'function' ? fallbackSampler(x, z) : NaN;
   };
+}
+
+export function createRoadTerrainConformanceAudit() {
+  return {
+    authority: 'published-at-grade-road-geometry-versus-rendered-terrain',
+    totalSamples: 0,
+    issuesFound: 0,
+    minimumDelta: Infinity,
+    worstDeltas: []
+  };
+}
+
+export function recordAtGradeRoadTerrainConformance(
+  audit,
+  feature,
+  verts,
+  terrainHeightAt,
+  worldToLatLon = null
+) {
+  if (
+    !audit ||
+    feature?.structureSemantics?.terrainMode !== 'at_grade' ||
+    !Array.isArray(verts) ||
+    typeof terrainHeightAt !== 'function'
+  ) return audit;
+
+  // Bound audit cost per road while covering both edges along its full path.
+  const vertexCount = Math.floor(verts.length / 3);
+  const stride = Math.max(1, Math.floor(vertexCount / 96));
+  for (let vertexIndex = 0; vertexIndex < vertexCount; vertexIndex += stride) {
+    const offset = vertexIndex * 3;
+    const x = Number(verts[offset]);
+    const y = Number(verts[offset + 1]);
+    const z = Number(verts[offset + 2]);
+    const terrainY = Number(terrainHeightAt(x, z));
+    if (![x, y, z, terrainY].every(Number.isFinite)) continue;
+    const delta = y - terrainY;
+    audit.totalSamples += 1;
+    audit.minimumDelta = Math.min(audit.minimumDelta, delta);
+    if (delta >= -0.05) continue;
+    audit.issuesFound += 1;
+    const geographic = typeof worldToLatLon === 'function'
+      ? worldToLatLon(x, z)
+      : null;
+    audit.worstDeltas.push({
+      sourceFeatureId: String(feature?.sourceFeatureId || feature?.id || ''),
+      roadName: String(feature?.name || feature?.tags?.name || 'Unnamed road'),
+      delta: Number(delta.toFixed(3)),
+      lat: Number.isFinite(geographic?.lat) ? Number(geographic.lat.toFixed(6)) : null,
+      lon: Number.isFinite(geographic?.lon) ? Number(geographic.lon.toFixed(6)) : null,
+      x: Number(x.toFixed(1)),
+      z: Number(z.toFixed(1))
+    });
+  }
+  return audit;
+}
+
+export function finalizeRoadTerrainConformanceAudit(audit) {
+  const result = audit || createRoadTerrainConformanceAudit();
+  result.worstDeltas.sort((left, right) => left.delta - right.delta);
+  return Object.freeze({
+    authority: result.authority,
+    totalSamples: Number(result.totalSamples || 0),
+    issuesFound: Number(result.issuesFound || 0),
+    minimumDelta: Number.isFinite(result.minimumDelta)
+      ? Number(result.minimumDelta.toFixed(4))
+      : null,
+    worstDeltas: Object.freeze(result.worstDeltas.slice(0, 10).map(Object.freeze))
+  });
 }
 
 function mapPublishedPointsToCrossSectionWidths(feature, publishedPoints) {
@@ -270,7 +364,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     polylineCurvatureMetric,
     rebuildStructureVisualMeshes,
     rebuildStructureVisualMeshesCooperatively,
-    validateRoadTerrainConformance
+    worldToLatLon
   } = deps;
 
   if (!appCtx.terrainEnabled || appCtx.roads.length === 0 || appCtx.onMoon) return;
@@ -357,6 +451,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       }
     });
     appCtx.replaceWorldCollection('urbanSurfaceMeshes');
+    clearStreetscapePresentation(appCtx);
   });
   appCtx.urbanSurfaceStats = {
     sidewalkBatchCount: 0,
@@ -390,8 +485,10 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     foldedTriangles: 0,
     degenerateTriangles: 0,
     junctionCoverageGaps: 0,
-    compiledSurfaceFallbacks: 0
+    compiledSurfaceFallbacks: 0,
+    renderedTerrainClamps: 0
   };
+  const roadTerrainAudit = createRoadTerrainConformanceAudit();
   const flushRoadMainBatch = () => {
     if (roadMainBatchVerts.length > 0 && roadMainBatchIdx.length > 0) {
       roadMainBatches.push({ verts: roadMainBatchVerts, indices: roadMainBatchIdx });
@@ -482,6 +579,13 @@ export async function publishCompiledTransportMeshes(deps = {}) {
         rightEdge.push(...ribbonEdges.rightEdge);
         appendUpwardRibbonGeometry(leftEdge, rightEdge, verts, indices);
       }
+      recordAtGradeRoadTerrainConformance(
+        roadTerrainAudit,
+        renderRoad,
+        verts,
+        cachedTerrainHeight,
+        worldToLatLon
+      );
       appendRoadMainGeometry(verts, indices);
       appendRoadCenterMarkings(
         renderRoad,
@@ -577,6 +681,20 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     });
   });
   await yieldToMainThread();
+  const streetscapePublication = measure('publishStreetscape', () =>
+    publishStreetscapePresentation(appCtx, {
+      roads: baseRoads,
+      intersections,
+      sampleTerrainY: cachedTerrainHeight,
+      // Road vertices are published with their existing visual bias. Reading
+      // that same value keeps curb height relative to the visible carriageway
+      // without changing its geometry or terrain corridor.
+      sampleRoadY: (road, x, z) =>
+        sampleFeatureSurfaceY(road, x, z) +
+        (Number.isFinite(Number(road?.surfaceBias)) ? Number(road.surfaceBias) : ROAD_SURFACE_BIAS)
+    })
+  );
+  await yieldToMainThread();
   await measureAsync('rebuildStructureVisuals', () => (
     typeof rebuildStructureVisualMeshesCooperatively === 'function'
       ? rebuildStructureVisualMeshesCooperatively
@@ -587,6 +705,8 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     pointAlongPolyline,
     polylineCurvatureMetric
   }));
+
+  const roadTerrainConformance = finalizeRoadTerrainConformanceAudit(roadTerrainAudit);
 
   appCtx.transportSurfacePublication = Object.freeze({
     authority: "compiled_transport_surface",
@@ -608,6 +728,11 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       roadSkirtBatchIdx.length / 3 +
       roadMarkBatchIdx.length / 3,
     roadSurfaceIntegrity: Object.freeze({ ...roadSurfaceIntegrity }),
+    roadTerrainConformance,
+    streetscape: streetscapePublication ? Object.freeze({
+      generatorVersion: streetscapePublication.generatorVersion,
+      ...streetscapePublication.diagnostics
+    }) : null,
     phaseDurationsMs: Object.freeze({
       ...phaseDurationsMs,
       total: Number((now() - publicationStartedAt).toFixed(2))

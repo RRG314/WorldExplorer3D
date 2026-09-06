@@ -940,6 +940,8 @@ function transportStructureSnapshot() {
       allMappedRoadsSteepest: gradeProfiles.slice(0, 24)
     },
     roadSurfaceIntegrity: appCtx.transportSurfacePublication?.roadSurfaceIntegrity || null,
+    roadTerrainConformance: appCtx.transportSurfacePublication?.roadTerrainConformance || null,
+    streetscape: appCtx.streetscapePublication?.diagnostics || null,
     atGradeTerrainAuthority,
     visualMeshes: visuals.length,
     attachedVisualMeshes: visuals.filter((mesh) => !!mesh?.parent).length,
@@ -1091,6 +1093,7 @@ function getWorldExplorerRuntimeDiagnostics() {
     transportCompilation: appCtx.transportSurfacePublication ? {
       roadCount: Number(appCtx.transportSurfacePublication.roadCount || 0),
       meshCount: Number(appCtx.transportSurfacePublication.meshCount || 0),
+      streetscape: appCtx.transportSurfacePublication.streetscape || null,
       phaseDurationsMs: appCtx.transportSurfacePublication.phaseDurationsMs || null
     } : null,
     terrainSurfaceCompilation: appCtx.terrainSurfaceProfileStats || null,
@@ -1306,6 +1309,7 @@ globalThis.render_game_to_text = () => JSON.stringify({
     nearestBody: appCtx.spaceFlight?._nearestBody?.name || null
   },
   spaceFlight: spaceFlightSnapshot(),
+  pirateInterception: appCtx.getPirateInterceptionSnapshot?.() || { active: false, phase: 'INACTIVE' },
   surfacePodLaunch: appCtx.surfacePodLaunchSnapshot || null,
   stagedEarthPathfinder: appCtx.getStagedEarthPodSnapshot?.() || null,
   universeNavigation: appCtx.getUniverseCourseSnapshot?.() || (appCtx.universeRuntime ? {
@@ -1342,6 +1346,7 @@ globalThis.render_game_to_text = () => JSON.stringify({
     ...(appCtx.getBlockBuilderSnapshot?.() || { enabled: false, count: 0, shared: false }),
     persistence: appCtx.getBuildPersistenceStatus?.() || null
   },
+  marylandParcels: appCtx.marylandParcelRuntimeSnapshot?.() || { status: 'idle', parcelCount: 0 },
   interior: appCtx.activeInterior ? {
     active: true,
     key: String(appCtx.activeInterior.key || ''),
@@ -1355,6 +1360,7 @@ globalThis.render_game_to_text = () => JSON.stringify({
   worldDiscovery: appCtx.worldDiscoveryRuntimeSnapshot?.() || { active: false },
   editableWorld: appCtx.editableWorldRuntimeSnapshot?.() || { active: false },
   transportStructures: transportStructureSnapshot(),
+  streetscape: appCtx.streetscapePublication?.diagnostics || null,
   worldCounts: {
     buildings: appCtx.buildings?.length ?? null,
     roads: appCtx.roads?.length ?? null,

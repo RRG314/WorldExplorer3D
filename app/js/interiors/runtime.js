@@ -6,8 +6,8 @@ import {
   listEnterableBuildingSupportsNear,
   pickNearbyEnterableBuildingSupport,
   summarizeSupportType
-} from "../building-entry.js?v=8";
-import { createInteriorRuntimeUiApi } from "./runtime-ui.js?v=3";
+} from "../building-entry.js?v=9";
+import { createInteriorRuntimeUiApi } from "./runtime-ui.js?v=4";
 import { elevatorFloorChoices } from './elevator-authority.js?v=1';
 
 let nearbyInteriorScanPromise = null;
@@ -361,6 +361,20 @@ export async function enterInteriorForSupport(support, deps) {
     setTransientHint(`${support.label || "This building"} is not enterable right now.`, deps.INTERIOR_NOTICE_MS, deps);
     return false;
   }
+  if (definition.accessDenied) {
+    if (definition.requestable && definition.spaceId && deps.requestCommunityInteriorAccess) {
+      try {
+        await deps.requestCommunityInteriorAccess(definition);
+        setTransientHint('Access request sent to the owner.', deps.INTERIOR_NOTICE_MS, deps);
+      } catch (error) {
+        console.warn('[Interior] Access request failed:', error);
+        setTransientHint('Private Residence. The access request could not be sent.', deps.INTERIOR_NOTICE_MS, deps);
+      }
+    } else {
+      setTransientHint(`${definition.label || 'Private Residence'}.`, deps.INTERIOR_NOTICE_MS, deps);
+    }
+    return false;
+  }
 
   const ownedHome = deps.findOwnedHomeForInteriorSupport?.(support) || null;
   const sceneState = deps.buildInteriorScene(definition, { curatedHome: !!ownedHome });
@@ -446,7 +460,8 @@ export async function enterInteriorForSupport(support, deps) {
     floorTransitionPending: false
   };
   applyInteriorSceneState(appCtx.activeInterior, sceneState);
-  void deps.attachCuratedHomeFurnishing?.(appCtx.activeInterior);
+  if (!definition.communityRealityCapture) void deps.attachCuratedHomeFurnishing?.(appCtx.activeInterior);
+  void deps.attachCommunityInteriorRepresentation?.(appCtx.activeInterior);
   appCtx.interiorHint = {
     state: "inside",
     label: definition.label,
@@ -581,6 +596,10 @@ function pickNearbyBuildingCandidate(force = false, deps) {
   const candidate = pickNearbyEnterableBuildingSupport(walker.x, walker.z, {
     radius: deps.INTERIOR_ENTRY_RADIUS,
     allowSynthetic: true,
+    // World entry is a door interaction, not a building-footprint proximity
+    // test. Buildings without a published exterior entrance remain available
+    // through property/place planning, but do not shout an ambient E prompt.
+    requireExteriorEntrance: true,
     actorBaseY: Number.isFinite(walker.y) ?
       walker.y - (appCtx.Walk?.CFG?.eyeHeight || 1.7) :
       NaN,
@@ -604,6 +623,7 @@ export async function handleInteriorAction(deps) {
     }
     if (interaction?.kind === 'exit') {
       clearActiveInterior({ restorePlayer: true, preserveCache: true }, deps);
+      appCtx.notifyContextInteractionCompleted?.('exit_interior', { interiorId: active.id || active.key || '' });
       return true;
     }
     if (interaction?.kind === 'elevator') return openElevatorFloorPicker(active, deps);
@@ -612,6 +632,7 @@ export async function handleInteriorAction(deps) {
   const candidate = pickNearbyBuildingCandidate(true, deps);
   if (!candidate?.support?.enterable) return false;
   await enterInteriorForSupport(candidate.support, deps);
+  appCtx.notifyContextInteractionCompleted?.('enter_building', { buildingKey: candidate.support.key || '' });
   return true;
 }
 
@@ -646,8 +667,9 @@ export function updateInteriorInteraction(deps) {
       loadedLevels: active.loadedLevels || []
     };
     resetInteriorInteractionCache();
+    const interactKey = appCtx.getControlPromptLabel?.('interact') || appCtx.getControlBindingLabel?.('interact') || 'E';
     if (interaction) setPrompt(
-      interaction.kind === 'elevator' ? 'E Choose elevator floor' : `E ${interaction.label}`,
+      interaction.kind === 'elevator' ? `${interactKey} Choose elevator floor` : `${interactKey} ${interaction.label}`,
       interaction.kind === 'elevator' ? 'supported' : 'active'
     );
     else clearPrompt();
@@ -667,7 +689,12 @@ export function updateInteriorInteraction(deps) {
       type,
       distance: candidate.distance
     };
-    setPrompt(`E Enter ${shortLabel(label, 24)}`, type === "Mapped" ? "supported" : "inspect");
+    const familiar = appCtx.isInteractionFamiliar?.('enter_building') === true;
+    const interactKey = appCtx.getControlPromptLabel?.('interact') || appCtx.getControlBindingLabel?.('interact') || 'E';
+    setPrompt(
+      familiar ? `${interactKey} · ${shortLabel(label, 24)}` : `${interactKey} Enter ${shortLabel(label, 24)}`,
+      familiar ? "familiar" : type === "Mapped" ? "supported" : "inspect"
+    );
     return;
   }
 

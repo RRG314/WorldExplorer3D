@@ -324,13 +324,14 @@ function resolveSupportRecord(building, options = {}) {
   const destination = options.destination || null;
   const key = buildingKey(building);
   const exteriorEntrance = appCtx.buildingEntranceByBuilding?.get?.(key) || null;
+  const poiTenancies = appCtx.poiTenanciesByBuilding?.get?.(key) || [];
   const originPoint = destination && Number.isFinite(destination.x) && Number.isFinite(destination.z) ?
     { x: Number(destination.x), z: Number(destination.z) } :
     exteriorEntrance ? { x: exteriorEntrance.x, z: exteriorEntrance.z } : center;
 
   return {
     key,
-    label: options.label || buildingLabel(destination || building),
+    label: options.label || poiTenancies[0]?.source?.name || buildingLabel(destination || building),
     enterable: true,
     synthetic: !!building.syntheticInteriorOnly,
     building,
@@ -341,6 +342,8 @@ function resolveSupportRecord(building, options = {}) {
     center,
     entryAnchor: buildEntryAnchor(building, originPoint),
     exteriorEntrance,
+    poiTenancies,
+    interiorArchetype: String(poiTenancies[0]?.semantic?.interiorArchetype || ''),
     allowMappedData: !building.syntheticInteriorOnly,
     allowGeneratedInterior: true
   };
@@ -436,6 +439,7 @@ function resolveActiveDestinationBuildingSupport(options = {}) {
 
 function pickNearbyEnterableBuildingSupport(x, z, options = {}) {
   const radius = Math.max(2, finiteNumber(options.radius, DEFAULT_ENTRY_RADIUS));
+  const requireExteriorEntrance = options.requireExteriorEntrance === true;
   const actorBaseY = finiteNumber(options.actorBaseY, NaN);
   const actorHeight = Math.max(0.5, finiteNumber(options.actorHeight, 1.65));
   const nearby = typeof appCtx.getNearbyBuildings === 'function' ?
@@ -450,6 +454,7 @@ function pickNearbyEnterableBuildingSupport(x, z, options = {}) {
     if (!support.enterable) continue;
     const footprintHit = distanceToFootprint(x, z, support.building);
     const entrance = support.exteriorEntrance;
+    if (requireExteriorEntrance && !entrance) continue;
     const interactionDistance = entrance
       ? Math.hypot(x - finiteNumber(entrance.approachX, entrance.x), z - finiteNumber(entrance.approachZ, entrance.z))
       : footprintHit.dist;
@@ -470,6 +475,7 @@ function pickNearbyEnterableBuildingSupport(x, z, options = {}) {
   const destinationSupport = resolveActiveDestinationBuildingSupport(options);
   if (
     destinationSupport?.enterable &&
+    (!requireExteriorEntrance || destinationSupport.exteriorEntrance) &&
     buildingOccupiesActorHeight(destinationSupport.building, actorBaseY, actorHeight)
   ) {
     const entrance = destinationSupport.exteriorEntrance;

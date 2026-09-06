@@ -36,7 +36,11 @@ try {
   await launchEarth();
   const tracked = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    const vehicle = ctx.livingWorldRuntime.population.vehicleSnapshots()[0];
+    // Time-of-day demand intentionally virtualizes part of the fixed pool.
+    // Track an actor that is currently published, not an arbitrary inactive
+    // pool member whose activity affinity may be outside the current band.
+    const vehicle = ctx.livingWorldRuntime.population.vehicleSnapshots().find((entry) => entry.visible);
+    if (!vehicle) throw new Error('No visible traffic vehicle available to track');
     const walker = ctx.Walk.state.walker;
     Object.assign(walker, { x: vehicle.x - 5, y: vehicle.y, z: vehicle.z - 5, vx: 0, vz: 0, vy: 0, onGround: true });
     return { id: vehicle.id, variantId: vehicle.variant.id };

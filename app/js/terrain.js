@@ -58,12 +58,12 @@ import {
   buildRoadSkirts,
   detectRoadIntersections,
   publishCompiledTransportMeshes
-} from "./terrain/rebuild.js?v=51";
+} from "./terrain/rebuild.js?v=54";
 import {
   disableRoadDebugMode as disableRoadDebugModeInternal,
   toggleRoadDebugMode as toggleRoadDebugModeInternal,
   validateRoadTerrainConformance as validateRoadTerrainConformanceInternal
-} from "./terrain/debug-tools.js?v=16";
+} from "./terrain/debug-tools.js?v=17";
 import { createLocationTerrainApi } from "./terrain/location-world.js?v=4";
 import { buildPolarCryosphereSurface } from "./terrain/polar-cryosphere-surface.js?v=1";
 import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=74";
@@ -373,7 +373,7 @@ const transportPublicationDeps = {
   polylineCurvatureMetric,
   rebuildStructureVisualMeshes,
   rebuildStructureVisualMeshesCooperatively,
-  validateRoadTerrainConformance
+  worldToLatLon
 };
 
 const {

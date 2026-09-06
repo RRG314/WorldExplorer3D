@@ -35,7 +35,7 @@ import {
   invalidateOverpassCaches,
   releaseOverpassRuntimeCache,
   sameLocation
-} from "./world/osm-loader.js?v=28";
+} from "./world/osm-loader.js?v=29";
 import {
   clampNumber,
   featureTileKeyForLatLon,
@@ -58,15 +58,15 @@ import {
   finalizeLoadedWorld,
   recordWorldLoadWarning,
   safeWorldLoadCall
-} from "./world/load-support.js?v=38";
+} from "./world/load-support.js?v=43";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
   resetWorldForReload
-} from "./world/load-reset.js?v=20";
+} from "./world/load-reset.js?v=21";
 import {
   prepareWorldFeatureSelections
-} from "./world/load-budgeting.js?v=19";
+} from "./world/load-budgeting.js?v=20";
 import {
   buildBuildingGeometryGuards,
   buildFeatureGeometryGuards,
@@ -94,7 +94,7 @@ import {
   poiKeyFromTags,
   roadTypePriority,
   classifyLinearFeatureTags as classifyLinearFeatureTagsBase
-} from "./world/load-style.js?v=4";
+} from "./world/load-style.js?v=5";
 import {
   limitNodesByDistance,
   limitWaysByDistance,
@@ -145,7 +145,7 @@ import {
 import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=32";
 import {
   resetWorldFurnitureCaches
-} from "./world/furniture.js?v=19";
+} from "./world/furniture.js?v=21";
 import {
   addBuildingToSpatialIndex,
   clearBuildingSpatialIndex,
@@ -163,7 +163,7 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=51";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=222";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=225";
 import {
   fetchShortbreadBuildingData,
   fetchShortbreadWorldData,
@@ -172,7 +172,7 @@ import {
 import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=14";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=2";
 import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=36";
-import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=117";
+import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=120";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
 
@@ -387,7 +387,7 @@ initWorldNavigation({
 let editableWorldRuntimePromise = null;
 appCtx.ensureEditableWorldRuntime = () => {
   if (typeof appCtx.getSuppressedEditableBuildingIds === 'function') return Promise.resolve(true);
-  editableWorldRuntimePromise ||= import('./editable-world/runtime.js?v=2')
+  editableWorldRuntimePromise ||= import('./editable-world/runtime.js?v=4')
     .then(({ initEditableWorldRuntime }) => {
       initEditableWorldRuntime(appCtx);
       return true;

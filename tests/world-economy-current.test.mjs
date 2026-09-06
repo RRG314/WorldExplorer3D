@@ -58,7 +58,7 @@ test('one persistent Explorer wallet migrates legacy balances and serves every m
   const material = snapshot.standard.find((item) => item.category === 'material' || item.category === 'repair-supply');
   assert.ok(material);
   assert.equal(economy.buy(hardware, material.id).ok, true);
-  assert.equal(JSON.parse(storage.getItem(COMMERCE_STORAGE_KEY)).schemaVersion, 3);
+  assert.equal(JSON.parse(storage.getItem(COMMERCE_STORAGE_KEY)).schemaVersion, 4);
 });
 
 test('Earth material bundles keep exact mass when prepared for Surveyor cargo', () => {

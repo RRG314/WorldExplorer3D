@@ -121,6 +121,8 @@ function createExpeditionPlan({
     voyagePhase: 'departure',
     voyageDirector: createVoyageDirector({ id, destinationId, createdAtMs }),
     eventFlags: Object.freeze({}),
+    activeEncounter: null,
+    encounterHistory: Object.freeze([]),
     operationFlags: Object.freeze({}),
     routeContacts: Object.freeze([]),
     activeLocalContactId: null,

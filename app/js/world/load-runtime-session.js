@@ -12,6 +12,7 @@ import { createWorldLoadSession } from '../earth-core/world-load-session.js?v=1'
 import { WORLD_COLLECTION_NAMES } from './collection-registry.js?v=1';
 import { compileWorldLayerProducts } from './compiler/world-layer-products.js?v=4';
 import { publishWorldPublicationSnapshot } from './world-snapshot-adapter.js?v=4';
+import { compilePoiLifecycle } from '../poi/lifecycle.js?v=1';
 
 export function createWorldLoadRuntimeSession(options = {}) {
   const {
@@ -130,6 +131,11 @@ export function createWorldLoadRuntimeSession(options = {}) {
   appCtx.waterSurfaceRegistry = null;
   appCtx.waterSurfaceRegistrySnapshot = null;
   appCtx.transportFacilityGraph = null;
+  appCtx.poiLifecycle = null;
+  appCtx.functionalPoiRecords = [];
+  appCtx.activeFunctionalPois = [];
+  appCtx.poiTenanciesByBuilding = new Map();
+  appCtx.refreshActiveFunctionalPois = null;
 
   if (!loadRequest) {
     appCtx.showLoad('Choose a valid location');
@@ -415,6 +421,20 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
   appCtx.waterSurfaceRegistrySnapshot =
     appCtx.waterSurfaceRegistry?.snapshot?.() || null;
   appCtx.reconcileActorsAfterSurfaceRebuild?.();
+  appCtx.poiLifecycle = compilePoiLifecycle(appCtx.pois, appCtx.buildings, {
+    entranceByBuilding: appCtx.buildingEntranceByBuilding,
+    actor: appCtx.Walk?.state?.walker || appCtx.car || { x: 0, z: 0 },
+    activation: { radiusMeters: 240, limit: 12 }
+  });
+  appCtx.functionalPoiRecords = appCtx.poiLifecycle.functional;
+  appCtx.activeFunctionalPois = appCtx.poiLifecycle.active;
+  appCtx.poiTenanciesByBuilding = appCtx.poiLifecycle.byBuilding;
+  appCtx.refreshActiveFunctionalPois = (actor) => {
+    const reference = actor || appCtx.Walk?.state?.walker || appCtx.car || { x: 0, z: 0 };
+    appCtx.activeFunctionalPois = appCtx.poiLifecycle?.activeFor?.(reference) || [];
+    return appCtx.activeFunctionalPois;
+  };
+  loadMetrics.poiLifecycle = appCtx.poiLifecycle.metrics;
   const publicationCounts = worldPublicationCounts(appCtx);
   const terrainCount = Array.isArray(appCtx.terrainGroup?.children)
     ? appCtx.terrainGroup.children.filter((mesh) => mesh?.userData?.isTerrainMesh).length
@@ -483,11 +503,11 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
       maritimeModule,
       worldDiscoveryModule
     ] = await Promise.all([
-      import('../living-world/runtime.js?v=30'),
-      import('../urban-sandbox/runtime.js?v=87'),
-      import('../transport/aviation-runtime.js?v=19'),
+      import('../living-world/runtime.js?v=33'),
+      import('../urban-sandbox/runtime.js?v=89'),
+      import('../transport/aviation-runtime.js?v=20'),
       import('../transport/maritime-runtime.js?v=16'),
-      import('../discovery/runtime.js?v=36')
+      import('../discovery/runtime.js?v=37')
     ]);
     gameplayStartupDurationsMs.moduleLoad = Math.round(performance.now() - moduleLoadStartedAt);
     if (!startupIsCurrent()) {
@@ -575,6 +595,7 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
   appCtx.worldLoading = false;
   appCtx.enforceEnvironmentSceneOwnership?.();
   appCtx.hideLoad?.();
+  void appCtx.refreshCommunityRealityCapturePresentation?.();
   scheduleAfterFirstPlay(`earth-ambient-state-${publication.sequence}`, () => {
     appCtx.refreshAstronomicalSky?.(true);
     return appCtx.refreshLiveWeather?.(true);

@@ -1,4 +1,5 @@
 import { createLifecycleScope } from '../runtime/lifecycle-scope.js?v=2';
+import { handleWorldCanvasClick } from '../interaction/world-click-router.js?v=2';
 
 export function setupEngineInputHandlers(appCtx) {
   const inputScope = createLifecycleScope('engine-input');
@@ -121,11 +122,25 @@ export function setupEngineInputHandlers(appCtx) {
       appCtx.Walk.state.walker.lookYawOffset = wrapYaw((Number(appCtx.Walk.state.walker.lookYawOffset) || 0) - deltaX * sensitivity);
       appCtx.Walk.state.walker.pitch += deltaY * sensitivity;
       appCtx.Walk.state.walker.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, appCtx.Walk.state.walker.pitch));
+    } else if (appCtx.planeMode?.active) {
+      appCtx.planeMode.cameraYaw = wrapYaw((Number(appCtx.planeMode.cameraYaw) || 0) - deltaX * sensitivity);
+      appCtx.planeMode.cameraPitch = Math.max(-0.5, Math.min(0.55, (Number(appCtx.planeMode.cameraPitch) || 0) + deltaY * sensitivity));
+      appCtx.planeMode.cameraLookTimer = 1.6;
+    } else if (appCtx.boatMode?.active) {
+      appCtx.boatMode.cameraYawOffset = wrapYaw((Number(appCtx.boatMode.cameraYawOffset) || 0) - deltaX * sensitivity);
+      appCtx.boatMode.cameraPitch = Math.max(-0.62, Math.min(0.62, (Number(appCtx.boatMode.cameraPitch) || 0) + deltaY * sensitivity));
+      appCtx.boatMode.cameraLookTimer = 1.15;
+    } else if (appCtx.camera) {
+      const carLook = appCtx.camera.userData.carLook || { yaw: 0, pitch: 0 };
+      carLook.yaw = wrapYaw((Number(carLook.yaw) || 0) - deltaX * sensitivity);
+      carLook.pitch = Math.max(-0.62, Math.min(0.62, (Number(carLook.pitch) || 0) + deltaY * sensitivity));
+      carLook.lastInputAt = performance.now();
+      appCtx.camera.userData.carLook = carLook;
     }
   });
 
   inputScope.listen(globalThis, 'contextmenu', (e) => {
-    if (appCtx.gameStarted && (appCtx.droneMode || appCtx.Walk && appCtx.Walk.state.mode === 'walk')) {
+    if (appCtx.gameStarted) {
       e.preventDefault();
     }
   });
@@ -141,6 +156,7 @@ export function setupEngineInputHandlers(appCtx) {
     if (typeof appCtx.handleBlockBuilderClick === 'function' && appCtx.handleBlockBuilderClick(e)) {
       return;
     }
+    if (handleWorldCanvasClick(appCtx, e)) return;
     if (appCtx.checkMoonClick(e.clientX, e.clientY)) return;
     appCtx.checkStarClick(e.clientX, e.clientY);
   });

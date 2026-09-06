@@ -29,6 +29,7 @@ import { createExpeditionStore } from '../app/js/expedition/store.js';
 import { campaignObjective, campaignPhase, completeCampaign } from '../app/js/expedition/campaign.js';
 import { createExpeditionArchive, EXPEDITION_DISCOVERY_KEY } from '../app/js/expedition/archive.js';
 import { deriveCrewOperations, summarizeCrewOperations } from '../app/js/expedition/crew-operations.js';
+import { completePirateAftermath, resolvePirateInterception, transitionPirateInterception } from '../app/js/expedition/hostile-interception.js';
 import { SHIP_CREW_POSTS, SHIP_DECKS, SHIP_DOORS, SHIP_ROOMS, SHIP_STATIONS, validateShipLayout } from '../app/js/expedition/ship-layout.js';
 import {
   calculateExpeditionTravel,
@@ -219,6 +220,17 @@ test('one seeded strategic journey selects varied families, records outcomes and
   const progress = [];
   while (expedition.state === 'traveling') {
     expedition = advanceToNextMilestone(expedition);
+    if (expedition.activeEncounter && expedition.activeEncounter.phase !== 'COMPLETE') {
+      expedition = transitionPirateInterception(expedition, 'confirm_hostility');
+      expedition = transitionPirateInterception(expedition, 'prepare_defense');
+      expedition = transitionPirateInterception(expedition, 'begin_combat');
+      expedition = resolvePirateInterception(expedition, {
+        outcome: 'repelled', enemiesDestroyed: 3, enemiesRepelled: 4,
+        boardingPrevented: true, pathfinderCondition: 0.8, solisReachHitCount: 2, elapsedS: 70
+      });
+      expedition = completePirateAftermath(expedition);
+      continue;
+    }
     if (!expedition.pendingEvent) break;
     const event = expedition.pendingEvent;
     assert.ok(event.options.some((option) => option.enabled));
@@ -232,7 +244,7 @@ test('one seeded strategic journey selects varied families, records outcomes and
     outcomes.push(expedition.voyageDirector.history.at(-1).outcome);
   }
   if (expedition.state === 'traveling') expedition = advanceToNextMilestone(expedition);
-  assert.equal(families.length, VOYAGE_MILESTONES.length);
+  assert.equal(families.length, VOYAGE_MILESTONES.length - 1);
   assert.equal(families[0], 'departure-handoff');
   assert.equal(families.at(-1), 'final-approach');
   assert.equal(new Set(families).size, families.length);
@@ -246,6 +258,7 @@ test('one seeded strategic journey selects varied families, records outcomes and
   assert.ok(expedition.resources.maintenanceKg <= initialMaintenance);
   assert.ok(expedition.crew.find((member) => member.id === 'crew-eng').experienceYears >= initialEngineeringExperience);
   assert.equal(expedition.voyageDirector.history.length, VOYAGE_MILESTONES.length);
+  assert.equal(expedition.encounterHistory.length, 1);
   assert.ok(expedition.log.some((entry) => entry.kind === 'science' || entry.kind === 'engineering'));
   assert.ok(expedition.log.some((entry) => entry.kind === 'arrival'));
   assert.ok(expedition.routeContacts.some((contact) => ['available', 'returned'].includes(contact.localOperationState)));

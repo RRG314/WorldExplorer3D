@@ -30,6 +30,8 @@ function createEquipmentVisuals(THREE, characterMesh) {
   const items = new Map();
   let useAction = null;
   let parachuteReady = false;
+  let aimPitch = 0;
+  let aiming = false;
   const makeItem = (id) => {
     const group = new THREE.Group();
     group.name = `${id} equipped visual`;
@@ -182,6 +184,12 @@ function createEquipmentVisuals(THREE, characterMesh) {
   return Object.freeze({
     root,
     setEquipped,
+    setAimDirection(direction, active = true) {
+      aiming = active === true && direction && [direction.x, direction.y, direction.z].every(Number.isFinite);
+      const horizontal = aiming ? Math.hypot(direction.x, direction.z) : 0;
+      aimPitch = aiming ? Math.max(-.72, Math.min(.72, -Math.atan2(direction.y, Math.max(.001, horizontal)))) : 0;
+      return aiming;
+    },
     setParachuteReady(ready = false) {
       parachuteReady = ready === true;
       parachutePack.visible = parachuteReady || parachuteCanopy.visible;
@@ -202,6 +210,7 @@ function createEquipmentVisuals(THREE, characterMesh) {
     },
     update(dt = 0) {
       const curatedGrip = resetRootPose();
+      if (aiming) root.rotation.x += aimPitch;
       if (!useAction) return;
       useAction.elapsed += Math.max(0, Number(dt) || 0);
       const progress = Math.min(1, useAction.elapsed / useAction.duration);
@@ -262,6 +271,8 @@ function createEquipmentVisuals(THREE, characterMesh) {
         attachment: String(root.userData.attachment || ''),
         curatedAssetId: String(group?.userData?.curatedEquipmentAssetId || ''),
         fallbackVisible: group?.children?.some?.((child) => child?.userData?.defaultEquipmentFallback === true && child.visible !== false) === true
+        ,aiming
+        ,aimPitch: Number(aimPitch.toFixed(4))
       });
     },
     parachuteSnapshot() {

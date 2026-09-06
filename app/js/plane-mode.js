@@ -3,7 +3,7 @@ import { aircraftBankTurnFactor, aircraftChaseOffset, aircraftForwardVector, cam
 import { aircraftGearSamplePoints } from './plane/roof-contact.js?v=2';
 import { applyAircraftHeadingTurn, classicAircraftBankTurnRate, integrateFixedWingFlight, resolveAircraftFlightTuning } from './plane/flight-dynamics.js?v=4';
 import { sampleSweptContact } from './physics/swept-contact.js?v=1';
-import { getAviationCatalogEntry } from './transport/aviation-catalog.js?v=4';
+import { getAviationCatalogEntry } from './transport/aviation-catalog.js?v=5';
 import { aircraftGroundOffset, createAircraftVisual, updateAircraftVisual } from './transport/aircraft-visual-recipe.js?v=11';
 import { applyTransportDamage } from './transport/damage-model.js?v=1';
 
@@ -48,7 +48,7 @@ const state = {
   transportEntityId: 'direct-flight:personal-prop',
   transportCatalogId: 'personal-prop',
   condition: 1,
-  durabilityPolicy: 'standard',
+  durabilityPolicy: 'exploration_unlimited',
   resistance: 150,
   passengerMode: false,
   passengerElapsed: 0,
@@ -266,8 +266,10 @@ function startPlaneMode(options = {}) {
   const reference = referencePosition();
   state.transportEntityId = String(options.transportEntityId || `direct-flight:${catalog.id}`);
   state.transportCatalogId = catalog.id;
-  state.condition = Math.max(0, Math.min(1, Number(options.condition ?? 1)));
   state.durabilityPolicy = catalog.damage.durabilityPolicy;
+  state.condition = state.durabilityPolicy === 'exploration_unlimited'
+    ? 1
+    : Math.max(0, Math.min(1, Number(options.condition ?? 1)));
   state.resistance = catalog.damage.resistance;
   state.x = Number.isFinite(options.x) ? options.x : Number(reference?.x) || 0;
   state.z = Number.isFinite(options.z) ? options.z : Number(reference?.z) || 0;

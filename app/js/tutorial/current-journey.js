@@ -1,6 +1,8 @@
 const ACTIVE_FIELD_PHASES = new Set([
   'sweeping', 'signal', 'classified', 'excavating', 'seeking', 'observing', 'revealed'
 ]);
+const AMBIENT_JOURNEY_RADIUS_METERS = 45;
+const AMBIENT_JOURNEY_VISIBLE_MS = 6500;
 
 const POD_PHASE_COPY = Object.freeze({
   ship_launch: ['Leave Solis Reach', 'Fly Pathfinder clear of the ship and acquire your local course.'],
@@ -49,24 +51,19 @@ function deriveFieldJourney(appCtx) {
   }
   const expedition = field.fieldExpedition;
   const next = expedition?.objectives?.find?.((entry) => !entry.complete);
-  if (next) {
+  if (next && Number.isFinite(Number(next.distanceMeters)) && Number(next.distanceMeters) <= AMBIENT_JOURNEY_RADIUS_METERS) {
     const distance = Number(next.distanceMeters);
     const route = Number.isFinite(distance) ? `${Math.ceil(distance)} m away` : 'Ready when you are';
     return {
-      eyebrow: expedition.completedCount > 0 ? `TODAY'S ROUTE · ${expedition.completedCount}/${expedition.objectiveCount}` : "TODAY'S ROUTE",
+      eyebrow: 'NEARBY',
       title: text(next.targetLabel, 'Choose a nearby activity'),
-      detail: `${route}. Open Today to begin this stop or choose another activity.`,
+      detail: `${route}. Open Today if you want to explore it.`,
       actionLabel: 'Open Today',
-      action: () => appCtx.openWorldDiscoverySection?.('today')
+      action: () => appCtx.openWorldDiscoverySection?.('today'),
+      transient: true
     };
   }
-  return {
-    eyebrow: 'EXPLORE THIS PLACE',
-    title: 'Choose what interests you',
-    detail: 'Find a nearby activity, continue your Journal, or plan where to travel next.',
-    actionLabel: 'Explore',
-    action: () => appCtx.openWorldDiscoverySection?.('today')
-  };
+  return null;
 }
 
 function deriveSpaceJourney(appCtx) {
@@ -176,11 +173,18 @@ function createCurrentJourneyUi(appCtx, options = {}) {
   const title = document.getElementById('currentJourneyTitle');
   const detail = document.getElementById('currentJourneyDetail');
   const action = document.getElementById('currentJourneyAction');
+  const dismiss = document.getElementById('currentJourneyDismiss');
   let currentAction = null;
   let elapsed = 1;
   let signature = '';
+  let dismissedSignature = '';
+  let shownAt = 0;
 
   action?.addEventListener('click', () => currentAction?.());
+  dismiss?.addEventListener('click', () => {
+    dismissedSignature = signature;
+    if (card) card.hidden = true;
+  });
 
   function update(dt = 0) {
     elapsed += Math.max(0, Number(dt) || 0);
@@ -200,16 +204,26 @@ function createCurrentJourneyUi(appCtx, options = {}) {
     const nextSignature = [journey.eyebrow, journey.title, journey.detail, journey.actionLabel].join('|');
     if (nextSignature !== signature) {
       signature = nextSignature;
+      shownAt = Date.now();
       if (eyebrow) eyebrow.textContent = journey.eyebrow;
       if (title) title.textContent = journey.title;
       if (detail) detail.textContent = journey.detail;
       if (action) action.textContent = journey.actionLabel;
     }
     currentAction = journey.action;
-    if (card) card.hidden = false;
+    const preferredVisibleMs = globalThis.getWorldExplorerAccessibilityNoticeMs?.(AMBIENT_JOURNEY_VISIBLE_MS)
+      ?? AMBIENT_JOURNEY_VISIBLE_MS;
+    const expired = journey.transient === true && Number.isFinite(preferredVisibleMs) && Date.now() - shownAt >= preferredVisibleMs;
+    if (card) card.hidden = dismissedSignature === signature || expired;
   }
 
   return Object.freeze({ update });
 }
 
-export { createCurrentJourneyUi };
+export {
+  AMBIENT_JOURNEY_RADIUS_METERS,
+  AMBIENT_JOURNEY_VISIBLE_MS,
+  createCurrentJourneyUi,
+  deriveFieldJourney,
+  deriveSpaceJourney
+};

@@ -1,26 +1,24 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { createTutorialUi } from './ui.js?v=5';
-import { createCurrentJourneyUi } from './current-journey.js?v=1';
+import { createCurrentJourneyUi } from './current-journey.js?v=4';
+import { panelIsVisiblyOpen } from './visibility-contract.js?v=1';
 
-const STORAGE_KEY = 'worldExplorer3D.tutorialState.v4';
-const PREVIOUS_STORAGE_KEY = 'worldExplorer3D.tutorialState.v3';
-const LEGACY_STORAGE_KEY = 'worldExplorer3D.tutorialState.v2';
-const TUTORIAL_VERSION = 4;
+const STORAGE_KEY = 'worldExplorer3D.tutorialState.v5';
+const PREVIOUS_STORAGE_KEY = 'worldExplorer3D.tutorialState.v4';
+const LEGACY_STORAGE_KEY = 'worldExplorer3D.tutorialState.v3';
+const TUTORIAL_VERSION = 5;
 const CORE_JOURNEY_ID = 'first-journey';
-const MOVE_TARGET_METERS = 8;
+const MOVE_TARGET_METERS = 6;
 
 const STAGES = Object.freeze({
   MOVE: 'move',
-  PACK: 'pack',
-  EXPLORER: 'explorer',
-  ACTIVITY: 'activity',
-  RECORD: 'record',
-  REVIEW: 'review',
+  INTERACT: 'interact',
+  EXPLORE: 'explore',
   COMPLETE: 'complete'
 });
-const STAGE_ORDER = [STAGES.MOVE, STAGES.PACK, STAGES.EXPLORER, STAGES.ACTIVITY, STAGES.RECORD, STAGES.REVIEW, STAGES.COMPLETE];
-const STAGE_NUMBER = Object.freeze({ move: 1, pack: 2, explorer: 3, activity: 4, record: 5, review: 6, complete: 6 });
-const CORE_STAGE_COUNT = 6;
+const STAGE_ORDER = [STAGES.MOVE, STAGES.INTERACT, STAGES.EXPLORE, STAGES.COMPLETE];
+const STAGE_NUMBER = Object.freeze({ move: 1, interact: 2, explore: 3, complete: 3 });
+const CORE_STAGE_COUNT = 3;
 
 function safeCall(fn, ...args) {
   if (typeof fn !== 'function') return undefined;
@@ -67,6 +65,8 @@ const runtime = {
   lastPosition: null,
   discoveryListener: null,
   explorerSectionListener: null,
+  interactionListener: null,
+  bindingListener: null,
   currentJourneyUi: null,
   card: null,
   eyebrowEl: null,
@@ -89,13 +89,22 @@ const runtime = {
     roomPanelOpen: false,
     buildModeOn: false,
     backpackOpen: false,
-    explorerOpen: false
+    explorerOpen: false,
+    travelMode: ''
   }
 };
 
 function normalizeState(input) {
   const base = defaultState();
-  const stage = STAGE_ORDER.includes(input?.stage) ? input.stage : STAGES.MOVE;
+  const legacyStage = String(input?.stage || '');
+  const migratedStage = legacyStage === 'move'
+    ? STAGES.MOVE
+    : ['pack', 'interact'].includes(legacyStage)
+      ? STAGES.INTERACT
+      : ['explorer', 'activity', 'record', 'review', 'choose'].includes(legacyStage)
+        ? STAGES.EXPLORE
+        : STAGES.MOVE;
+  const stage = STAGE_ORDER.includes(input?.stage) ? input.stage : migratedStage;
   return {
     ...base,
     enabled: input?.enabled !== false,
@@ -116,11 +125,7 @@ function loadState() {
     if (current && typeof current === 'object') return normalizeState(current);
     const previous = JSON.parse(localStorage.getItem(PREVIOUS_STORAGE_KEY) || 'null');
     if (previous && typeof previous === 'object') {
-      return normalizeState({
-        ...previous,
-        stage: previous.completed ? STAGES.COMPLETE : previous.stage === 'choose' ? STAGES.ACTIVITY : previous.stage,
-        contextSeen: previous.contextSeen
-      });
+      return normalizeState(previous);
     }
     const legacy = JSON.parse(localStorage.getItem(LEGACY_STORAGE_KEY) || 'null');
     if (legacy && typeof legacy === 'object') return normalizeState({
@@ -188,7 +193,11 @@ function showPrompt(stage, config = {}) {
   if (runtime.dismissTimer) clearTimeout(runtime.dismissTimer);
   runtime.dismissTimer = 0;
   if (config.contextual) {
-    runtime.dismissTimer = window.setTimeout(() => dismissCurrentPrompt('auto_hidden'), Math.max(6000, Number(config.autoHideMs) || 10000));
+    const preferredMs = globalThis.getWorldExplorerAccessibilityNoticeMs?.(Math.max(6000, Number(config.autoHideMs) || 10000))
+      ?? Math.max(6000, Number(config.autoHideMs) || 10000);
+    if (Number.isFinite(preferredMs)) {
+      runtime.dismissTimer = window.setTimeout(() => dismissCurrentPrompt('auto_hidden'), preferredMs);
+    }
   }
   return true;
 }
@@ -223,56 +232,39 @@ function presentCurrentStage() {
   }
   if (runtime.state.stage === STAGES.MOVE) {
     const touchControls = appCtx.getMobileTouchInputSnapshot?.().enabled === true;
+    const moveKeys = ['move_forward', 'move_left', 'move_backward', 'move_right']
+      .map((action) => appCtx.getControlBindingLabel?.(action))
+      .filter(Boolean)
+      .join('');
     showPrompt(STAGES.MOVE, {
-      title: 'Move and look around',
+      title: touchControls ? 'Move left · Look right' : `${moveKeys || 'WASD'} to move · Mouse to look`,
       body: touchControls
-        ? 'Use the left control to move and the right control to look. Travel a short distance so the camera and movement feel familiar.'
-        : 'Use the arrow keys to move and turn. WASD looks around, and Shift runs.',
-      progress: 16,
-      expanded: true
+        ? 'Move a short distance with the left control. Use the right control to look around; action buttons change with what you are doing.'
+        : `${moveKeys || 'WASD'} moves your explorer. Drag with the right mouse button to look, ${appCtx.getControlBindingLabel?.('modifier_action') || 'Shift'} runs, and ${appCtx.getControlBindingLabel?.('primary_action') || 'Space'} jumps. Arrow keys remain an alternate.`,
+      progress: 33,
+      expanded: false
     });
-  } else if (runtime.state.stage === STAGES.PACK) {
-    showPrompt(STAGES.PACK, {
-      title: 'Open your Backpack',
-      body: 'Your tools, finds, gear, and six quick slots live in one place. Open it now; you do not need to equip anything yet.',
-      actionLabel: 'Open Backpack',
-      onAction: openBackpack,
-      progress: 32,
-      expanded: true
+  } else if (runtime.state.stage === STAGES.INTERACT) {
+    const interactKey = appCtx.getControlPromptLabel?.('interact') || appCtx.getControlBindingLabel?.('interact') || 'E';
+    showPrompt(STAGES.INTERACT, {
+      title: 'Try one nearby action',
+      body: `Walk close to a visible door, person, parked vehicle, or usable object. Its small action prompt appears only when you can actually use it; press ${interactKey} or tap the action.`,
+      actionLabel: 'Skip to adventures',
+      onAction: () => {
+        setStage(STAGES.EXPLORE, 'interaction_skipped');
+        openExplorer();
+      },
+      progress: 66,
+      expanded: false
     });
-  } else if (runtime.state.stage === STAGES.EXPLORER) {
-    showPrompt(STAGES.EXPLORER, {
-      title: 'Open Explorer Fieldwork',
-      body: 'This is the home for Field Today, activities, Journal records, the Field Guide, companions, and your Explorer progress.',
-      actionLabel: 'Open Fieldwork',
+  } else if (runtime.state.stage === STAGES.EXPLORE) {
+    showPrompt(STAGES.EXPLORE, {
+      title: 'Choose your next adventure',
+      body: 'You are ready. Drive the world, start nearby fieldwork, build, take to the water, or open Travel for aircraft and Space. Explorer keeps the deeper guides available when you want them.',
+      actionLabel: 'Open Explorer',
       onAction: openExplorer,
-      progress: 48,
-      expanded: true
-    });
-  } else if (runtime.state.stage === STAGES.ACTIVITY) {
-    showPrompt(STAGES.ACTIVITY, {
-      title: 'Choose your first activity',
-      body: 'Pick one nearby activity in Today. Your field tool and the world cue will show where to go and what to do.',
-      actionLabel: 'Open Today',
-      onAction: openExplorer,
-      progress: 64,
-      expanded: true
-    });
-  } else if (runtime.state.stage === STAGES.RECORD) {
-    showPrompt(STAGES.RECORD, {
-      title: 'Complete one field record',
-      body: 'Follow the bearing or signal in the world. Use the action when you reach the site, finish the visible steps, and save the result.',
-      progress: 80,
-      expanded: true
-    });
-  } else if (runtime.state.stage === STAGES.REVIEW) {
-    showPrompt(STAGES.REVIEW, {
-      title: 'See what changed',
-      body: 'Your Journal now holds the story of what you did. The Guide remembers what you identified, and any collected item stays in your Backpack.',
-      actionLabel: 'Open Journal',
-      onAction: openExplorerJournal,
-      progress: 96,
-      expanded: true
+      progress: 100,
+      expanded: false
     });
   }
 }
@@ -305,11 +297,11 @@ function completeTutorial(reason = 'path_chosen') {
   showPrompt('core_complete', {
     contextual: true,
     eyebrow: 'First Journey complete',
-    title: 'Explore your way',
-    body: 'Your Journal and Field Guide remember what you learn. Your Backpack carries what you use. Travel changes how you move through the same world.',
+    title: 'The whole world is open',
+    body: 'Drive, explore, build, fly, or follow an activity. Deeper guidance stays in Explorer and Controls, so play is not interrupted.',
     progress: 100,
-    expanded: true,
-    autoHideMs: 12000
+    expanded: false,
+    autoHideMs: 6500
   });
 }
 
@@ -324,7 +316,7 @@ function disableTutorial() {
 
 function showContextTip(id, config) {
   if (!runtime.state.completed || !runtime.state.enabled || runtime.state.contextSeen[id]) return;
-  const presented = showPrompt(`context_${id}`, { ...config, contextual: true, progress: 100, autoHideMs: 9000 });
+  const presented = showPrompt(`context_${id}`, { ...config, contextual: true, progress: 100, expanded: false, autoHideMs: 6500 });
   if (presented) {
     runtime.state.contextSeen[id] = true;
     saveState();
@@ -338,11 +330,10 @@ function tutorialOnEvent(eventName, payload = {}) {
     runtime.movementOrigin = playerPosition();
     runtime.lastPosition = runtime.movementOrigin;
     presentCurrentStage();
-  } else if (name === 'opened_backpack' && runtime.state.stage === STAGES.PACK) {
-    setStage(STAGES.EXPLORER, 'backpack_opened');
-  } else if (name === 'opened_explorer' && runtime.state.stage === STAGES.EXPLORER) {
-    setStage(STAGES.ACTIVITY, 'explorer_opened');
+  } else if (['opened_explorer', 'opened_backpack', 'travel_mode_changed'].includes(name) && runtime.state.stage === STAGES.EXPLORE) {
+    completeTutorial('explorer_opened');
   } else if (name === 'build_mode_entered') {
+    if (runtime.state.stage === STAGES.EXPLORE) completeTutorial('build_mode_entered');
     showContextTip('building', {
       eyebrow: 'Building tip',
       title: 'Build in this world',
@@ -355,10 +346,11 @@ function tutorialOnEvent(eventName, payload = {}) {
       body: 'Create or join a room when you want company. Room roles decide who can edit or moderate shared work.'
     });
   } else if (name === 'entered_space') {
+    if (runtime.state.stage === STAGES.EXPLORE) completeTutorial('space_entered');
     showContextTip('space', {
       eyebrow: 'Spaceflight tip',
       title: 'Fly your own course',
-      body: 'Use the Wayfinder for direction or fly manually. Arrow keys steer, Space adds thrust, and Shift slows the ship.'
+      body: `Use the Wayfinder for direction or fly manually. Your movement keys steer, ${appCtx.getControlBindingLabel?.('primary_action') || 'Space'} adds thrust, and ${appCtx.getControlBindingLabel?.('modifier_action') || 'Shift'} slows the ship; arrow keys remain an alternate.`
     });
   }
   if (payload?.forceStage && STAGE_ORDER.includes(payload.forceStage)) setStage(payload.forceStage, 'forced');
@@ -367,28 +359,36 @@ function tutorialOnEvent(eventName, payload = {}) {
 function onDiscoveryTelemetry(event) {
   if (!runtime.initialized || !runtime.state.enabled || runtime.state.completed) return;
   const type = String(event?.detail?.type || '');
-  if (type === 'activity_started') {
-    if (runtime.state.stage === STAGES.EXPLORER || runtime.state.stage === STAGES.ACTIVITY) setStage(STAGES.RECORD, 'activity_selected');
-    return;
-  }
-  if (type === 'discovery_recorded' && [STAGES.ACTIVITY, STAGES.RECORD].includes(runtime.state.stage)) {
-    setStage(STAGES.REVIEW, 'field_record_saved');
-  }
+  if (type === 'activity_started' && runtime.state.stage === STAGES.EXPLORE) completeTutorial('activity_selected');
 }
 
 function onExplorerSectionOpened(event) {
   if (!runtime.initialized || !runtime.state.enabled || runtime.state.completed) return;
-  if (runtime.state.stage === STAGES.REVIEW && event?.detail?.section === 'journal') completeTutorial('journal_reviewed');
+  if (runtime.state.stage === STAGES.EXPLORE && event?.detail?.section) completeTutorial('explorer_opened');
+}
+
+function onContextInteractionCompleted(event) {
+  if (!runtime.initialized || !runtime.state.enabled || runtime.state.completed) return;
+  if (runtime.state.stage !== STAGES.INTERACT) return;
+  setStage(STAGES.EXPLORE, String(event?.detail?.family || 'world_interaction'));
+}
+
+function onKeyboardBindingsChanged() {
+  if (!runtime.initialized || runtime.state.completed || runtime.state.skipped) return;
+  runtime.sessionPresented.delete(runtime.state.stage);
+  hidePrompt();
+  presentCurrentStage();
 }
 
 function panelIsOpen(id) {
   const element = document.getElementById(id);
-  return !!element && (element.classList.contains('show') || element.getAttribute('aria-hidden') === 'false');
+  const content = id === 'controlsTab' ? document.getElementById('ctrlContent') : null;
+  return panelIsVisiblyOpen(element, content);
 }
 
 function uiBlocksTutorial() {
   return panelIsOpen('discoveryPanel') || panelIsOpen('urbanEquipment') ||
-    panelIsOpen('roomPanelModal') || !!document.querySelector('.floatMenu.open');
+    panelIsOpen('roomPanelModal') || panelIsOpen('controlsTab') || !!document.querySelector('.floatMenu.open');
 }
 
 function detectContextTransitions() {
@@ -398,6 +398,7 @@ function detectContextTransitions() {
   const buildModeOn = !!document.getElementById('fBlockBuild')?.classList.contains('on');
   const backpackOpen = panelIsOpen('urbanEquipment');
   const explorerOpen = panelIsOpen('discoveryPanel');
+  const travelMode = String(appCtx.getCurrentTravelMode?.() || appCtx.Walk?.state?.mode || '');
   if (!runtime.previous.gameStarted && appCtx.gameStarted) tutorialOnEvent('spawned_in_world');
   if (!runtime.previous.inSpace && inSpace) tutorialOnEvent('entered_space');
   if (!runtime.previous.inMoon && inMoon) showContextTip('moon', {
@@ -409,6 +410,7 @@ function detectContextTransitions() {
   if (!runtime.previous.buildModeOn && buildModeOn) tutorialOnEvent('build_mode_entered');
   if (!runtime.previous.backpackOpen && backpackOpen) tutorialOnEvent('opened_backpack', { source: 'panel_state' });
   if (!runtime.previous.explorerOpen && explorerOpen) tutorialOnEvent('opened_explorer', { source: 'panel_state' });
+  if (runtime.previous.travelMode && runtime.previous.travelMode !== travelMode) tutorialOnEvent('travel_mode_changed', { travelMode });
   runtime.previous = {
     gameStarted: !!appCtx.gameStarted,
     inSpace,
@@ -416,7 +418,8 @@ function detectContextTransitions() {
     roomPanelOpen,
     buildModeOn,
     backpackOpen,
-    explorerOpen
+    explorerOpen,
+    travelMode
   };
 }
 
@@ -442,7 +445,7 @@ function tutorialUpdate(dt = 0) {
   runtime.lastPosition = current;
   if (runtime.state.distanceMoved >= MOVE_TARGET_METERS) {
     saveState();
-    setStage(STAGES.PACK, 'moved_8m');
+    setStage(STAGES.INTERACT, 'moved_6m');
   }
 }
 
@@ -498,14 +501,19 @@ function initTutorial(appContext = null) {
     roomPanelOpen: panelIsOpen('roomPanelModal'),
     buildModeOn: !!document.getElementById('fBlockBuild')?.classList.contains('on'),
     backpackOpen: panelIsOpen('urbanEquipment'),
-    explorerOpen: panelIsOpen('discoveryPanel')
+    explorerOpen: panelIsOpen('discoveryPanel'),
+    travelMode: String(appCtx.getCurrentTravelMode?.() || appCtx.Walk?.state?.mode || '')
   };
   runtime.movementOrigin = playerPosition();
   runtime.lastPosition = runtime.movementOrigin;
   runtime.discoveryListener = onDiscoveryTelemetry;
   runtime.explorerSectionListener = onExplorerSectionOpened;
+  runtime.interactionListener = onContextInteractionCompleted;
+  runtime.bindingListener = onKeyboardBindingsChanged;
   globalThis.addEventListener?.('we3d:discovery-telemetry', runtime.discoveryListener);
   globalThis.addEventListener?.('we3d:explorer-section-opened', runtime.explorerSectionListener);
+  globalThis.addEventListener?.('we3d:context-interaction-completed', runtime.interactionListener);
+  globalThis.addEventListener?.('we3d:keyboard-bindings-changed', runtime.bindingListener);
   runtime.initialized = true;
   runtime.currentJourneyUi = createCurrentJourneyUi(appCtx, { getTutorialSnapshot });
 

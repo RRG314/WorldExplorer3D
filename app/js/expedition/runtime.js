@@ -1,12 +1,12 @@
 import { DEFAULT_CREW, getPropulsionProfile, getShipProfile, PROPULSION_PROFILES, SHIP_PROFILES } from './catalog.js?v=2';
-import { assessExpeditionReadiness, createExpeditionPlan, totalCargoMass, withExpeditionChanges } from './model.js?v=11';
+import { assessExpeditionReadiness, createExpeditionPlan, totalCargoMass, withExpeditionChanges } from './model.js?v=12';
 import {
   advanceToNextMilestone,
   resolveExpeditionEvent,
   startExpedition,
   VOYAGE_MILESTONES
-} from './simulation.js?v=8';
-import { createExpeditionStore } from './store.js?v=11';
+} from './simulation.js?v=9';
+import { createExpeditionStore } from './store.js?v=12';
 import { applyShipOperation, getShipStationView } from './ship-operations.js?v=7';
 import { getUniverseDestinations, resolveUniverseAddress } from '../universe/catalog.js?v=11';
 import { ensurePlayerBackpackInventory } from '../urban-sandbox/equipment-model.js?v=10';
@@ -19,6 +19,12 @@ import { consumeStagedEarthPod, getStagedEarthPodSnapshot, playSurfacePodLaunch,
 import { SPACE_CRAFT_IDENTITY } from '../space/craft-identity.js?v=1';
 import { SPACE_TRAVEL_LOCATION, SPACE_TRAVEL_PHASE } from '../space/travel-session.js?v=1';
 import { campaignMissionDestinationId, campaignObjective, campaignPhase, completeCampaign } from './campaign.js?v=1';
+import {
+  completePirateAftermath,
+  INTERCEPTION_PHASE,
+  resolvePirateInterception,
+  transitionPirateInterception
+} from './hostile-interception.js?v=1';
 
 const STARSHIP_NAME = SPACE_CRAFT_IDENTITY.starship.name;
 
@@ -34,6 +40,7 @@ let activePodJourney = null;
 let podCourseTimer = 0;
 let podRecoveryTimer = 0;
 let campaignEventsBound = false;
+let pirateMutationChain = Promise.resolve();
 
 function bindRuntimeContext(appContext) {
   activeContext = appContext || activeContext;
@@ -567,6 +574,51 @@ function updateContact(contactId, changes) {
 
 function appendMissionLog(expedition, kind, message) {
   return Object.freeze([...(expedition?.log || []), Object.freeze({ atMissionS: Number(expedition?.strategicElapsedS || 0), kind, message })]);
+}
+
+function activePirateEncounter() {
+  const encounter = activeExpedition?.activeEncounter;
+  return encounter?.type === 'HOSTILE_INTERCEPTION' && encounter?.scenarioId === 'pirate-boarding-interception'
+    ? encounter
+    : null;
+}
+
+function enqueuePirateMutation(work) {
+  pirateMutationChain = pirateMutationChain.catch(() => {}).then(work);
+  return pirateMutationChain;
+}
+
+async function beginActivePirateInterception() {
+  const encounter = activePirateEncounter();
+  if (!encounter || [INTERCEPTION_PHASE.AFTERMATH, INTERCEPTION_PHASE.COMPLETE].includes(encounter.phase)) return false;
+  closeExpeditionPlanner();
+  const started = await activeContext?.startExpeditionPirateInterception?.(encounter, {
+    onPhase: (encounterEvent) => enqueuePirateMutation(async () => {
+      const next = transitionPirateInterception(activeExpedition, encounterEvent);
+      if (!next || next === activeExpedition) return activeExpedition;
+      await applyExpeditionMutation(next, 'encounter', { type: 'encounter-transition', encounterEvent });
+      return activeExpedition;
+    }),
+    onResolve: (encounterResult) => enqueuePirateMutation(async () => {
+      const next = resolvePirateInterception(activeExpedition, encounterResult);
+      if (!next || next === activeExpedition) return activeExpedition;
+      await applyExpeditionMutation(next, 'encounter', { type: 'encounter-resolve', encounterResult });
+      return activeExpedition;
+    }),
+    onComplete: () => enqueuePirateMutation(async () => {
+      const next = completePirateAftermath(activeExpedition);
+      if (next && next !== activeExpedition) {
+        await applyExpeditionMutation(next, 'encounter', { type: 'encounter-complete' });
+      }
+      openExpeditionPlanner(activeContext);
+      return activeExpedition;
+    })
+  });
+  if (!started) {
+    activeContext?.showToast?.('Pathfinder defense could not launch. The pre-combat checkpoint is safe; retry from the Expedition panel.');
+    openExpeditionPlanner(activeContext);
+  }
+  return started === true;
 }
 
 function recoveryRequirement(expedition) {
@@ -1104,6 +1156,15 @@ function renderMission() {
     }
   } else if (expedition.state === 'planned') {
     action = `<button id="expeditionDepart" class="expeditionPrimary" type="button" ${expedition.readiness.status === 'insufficient' ? 'disabled' : ''}>Depart on ${STARSHIP_NAME}</button>`;
+  } else if (activePirateEncounter() && activePirateEncounter().phase !== INTERCEPTION_PHASE.COMPLETE) {
+    const encounter = activePirateEncounter();
+    if (encounter.phase === INTERCEPTION_PHASE.AFTERMATH) {
+      const result = encounter.result || {};
+      action = `<div class="expeditionEvent expeditionInterceptionAftermath"><span>HOSTILE INTERCEPTION · AFTERMATH</span><h3>${result.boarded ? 'Boarding party contained' : 'Pirate attack repelled'}</h3><p>${result.summary || 'Damage control is assessing Solis Reach.'}</p><small>${Number(result.enemiesDestroyed || 0)} hostile craft destroyed · Pathfinder ${Math.round(Number(result.pathfinderCondition || 0) * 100)}% · resulting damage and resource use are already in the Expedition record.</small><button id="expeditionCompleteInterception" class="expeditionPrimary" type="button">Resume original course</button></div>`;
+    } else {
+      const resume = [INTERCEPTION_PHASE.COMBAT_ACTIVE, INTERCEPTION_PHASE.BOARDING_THREAT].includes(encounter.phase);
+      action = `<div class="expeditionEvent expeditionInterceptionAlert"><span>PRIORITY CONTACT · ${String(encounter.phase).replaceAll('_', ' ')}</span><h3>Pirate boarding interception</h3><p>${encounter.objective}</p><small>Pathfinder is the ship's established defensive craft. Combat restarts from the safe pre-combat checkpoint if this session was interrupted.</small><button id="expeditionBeginInterception" class="expeditionPrimary" type="button">${resume ? 'Resume defensive control' : 'Take defensive control'}</button></div>`;
+    }
   } else if (expedition.pendingEvent) {
     const responseRoom = String(expedition.pendingEvent.roomId || 'the ship').replaceAll('-', ' ');
     action = `<div class="expeditionEvent"><span>${expedition.pendingEvent.kind}</span><h3>${expedition.pendingEvent.title}</h3><p>${expedition.pendingEvent.message}</p><small>Response location: ${responseRoom}. Enter ${STARSHIP_NAME}; the ship map and warning beacon are already set to the affected station.</small></div>`;
@@ -1125,7 +1186,8 @@ function renderMission() {
   const contacts = expedition.routeContacts || [];
   const onEarth = activeContext?.getEnv?.() === activeContext?.ENV?.EARTH;
   const earthPodReady = earthShuttleJourney()?.phase === POD_PHASE.SURFACE;
-  const shipAction = expedition.readiness.status !== 'insufficient' && expedition.state !== 'failed'
+  const unresolvedInterception = activePirateEncounter() && activePirateEncounter().phase !== INTERCEPTION_PHASE.COMPLETE;
+  const shipAction = expedition.readiness.status !== 'insufficient' && expedition.state !== 'failed' && !unresolvedInterception
     ? onEarth
       ? `<div class="expeditionShipAction"><button id="expeditionEarthPod" class="expeditionPrimary" type="button">${earthPodReady ? `Return to ${STARSHIP_NAME} in Pathfinder` : `Launch Pathfinder to ${STARSHIP_NAME}`}</button><small>Depart from the currently loaded Earth location, fly manually to ${STARSHIP_NAME}, and dock with the same saved Expedition.</small></div>`
       : `<div class="expeditionShipAction"><button id="expeditionEnterShip" class="expeditionPrimary" type="button">${expedition.pendingEvent ? `Respond aboard ${STARSHIP_NAME}` : `Enter ${STARSHIP_NAME}`}</button><small>${expedition.pendingEvent ? `Follow the highlighted route to ${String(expedition.pendingEvent.roomId || 'the affected station').replaceAll('-', ' ')} and interact with the equipment there.` : 'Walk the ship, meet the crew, inspect systems, and return to the same flight.'}</small></div>`
@@ -1181,6 +1243,14 @@ function renderMission() {
   document.getElementById('expeditionAdvance')?.addEventListener('click', async () => {
     try {
       await applyExpeditionMutation(advanceToNextMilestone(activeExpedition), 'advance', { type: 'advance' });
+      if (!await beginActivePirateInterception()) renderMission();
+    } catch (error) { reportSharedMutationError(error); }
+  });
+  document.getElementById('expeditionBeginInterception')?.addEventListener('click', () => void beginActivePirateInterception());
+  document.getElementById('expeditionCompleteInterception')?.addEventListener('click', async () => {
+    try {
+      const next = completePirateAftermath(activeExpedition);
+      await applyExpeditionMutation(next, 'encounter', { type: 'encounter-complete' });
       renderMission();
     } catch (error) { reportSharedMutationError(error); }
   });

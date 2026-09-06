@@ -305,7 +305,7 @@ function createTrashCan(x, z, provenance = 'inferred') {
   appCtx.streetFurnitureMeshes.push(group);
 }
 
-function createTrafficSignal(x, z, yaw = 0, provenance = 'inferred') {
+function createTrafficSignal(x, z, yaw = 0, provenance = 'inferred', control = {}) {
   const group = new THREE.Group();
   const pole = new THREE.Mesh(geoLampPole, matPole);
   pole.scale.set(.8, .83, .8);
@@ -314,20 +314,35 @@ function createTrafficSignal(x, z, yaw = 0, provenance = 'inferred') {
   const housing = new THREE.Mesh(geoSignalHousing, matSignalHousing);
   housing.position.set(0, 4.85, 0);
   group.add(housing);
+  const lenses = {};
   [
     { y: 5.32, material: matSignalRed },
     { y: 4.85, material: matSignalAmber },
     { y: 4.38, material: matSignalGreen }
-  ].forEach((entry) => {
-    const lens = new THREE.Mesh(geoSignalLens, entry.material);
+  ].forEach((entry, index) => {
+    const material = entry.material.clone();
+    const aspect = ['red', 'amber', 'green'][index];
+    const lens = new THREE.Mesh(geoSignalLens, material);
     lens.position.set(0, entry.y, .23);
     lens.scale.z = .45;
+    lens.userData.signalAspect = aspect;
+    lenses[aspect] = lens;
     group.add(lens);
   });
   group.position.set(x, terrainHeightAt(x, z), z);
   group.rotation.y = yaw;
   group.userData.furniturePos = { x, z };
   markFurniture(group, 'traffic_signal', provenance);
+  group.userData.trafficControlId = String(control.id || '');
+  group.userData.trafficControlCenter = { x: Number(control.x ?? x), z: Number(control.z ?? z) };
+  group.userData.setTrafficSignalState = (activeAspect = 'red') => {
+    const resolved = ['red', 'amber', 'green'].includes(activeAspect) ? activeAspect : 'red';
+    Object.entries(lenses).forEach(([aspect, lens]) => {
+      lens.material.emissiveIntensity = aspect === resolved ? 2.4 : .12;
+    });
+    group.userData.trafficSignalState = resolved;
+  };
+  group.userData.setTrafficSignalState('red');
   appCtx.addEarthWorldObject(group);
   appCtx.streetFurnitureMeshes.push(group);
 }
@@ -383,7 +398,10 @@ function nearestRoadsidePoint(point) {
         z: z + (dx / length) * offset * side,
         centerX: x,
         centerZ: z,
-        distance
+        distance,
+        yaw: Math.atan2(dx, dz),
+        road,
+        segmentIndex: index
       };
     }
   }
@@ -403,7 +421,14 @@ function trafficControlPlacements(mappedFurnitureNodes = [], roads = appCtx.road
           : amenity === 'waste_basket' ? 'waste_basket' : '';
     if (!kind) continue;
     const position = appCtx.geoToWorld(node.lat, node.lon);
-    exact.push({ kind, x: position.x, z: position.z, yaw: 0, provenance: 'mapped' });
+    exact.push({
+      id: `mapped-control:${node.type || 'node'}:${node.id || `${node.lat}:${node.lon}`}`,
+      kind,
+      x: position.x,
+      z: position.z,
+      yaw: 0,
+      provenance: 'mapped'
+    });
     if (kind === 'traffic_signal' || kind === 'stop_sign') exactPositions.push(position);
   }
   const topology = new Map();
@@ -416,12 +441,13 @@ function trafficControlPlacements(mappedFurnitureNodes = [], roads = appCtx.road
       topology.set(key, record);
     }
   }
-  const inferred = [...topology.values()].filter((entry) => entry.roads.length >= 3).map((entry) => {
+  const inferred = [...topology.entries()].filter(([, entry]) => entry.roads.length >= 3).map(([key, entry]) => {
     const significant = entry.roads.filter((road) => /primary|secondary|tertiary/i.test(String(road.type || ''))).length;
     const first = entry.roads[0]?.pts || [];
     const p1 = first[0] || entry;
     const p2 = first[1] || entry;
     return {
+      id: `inferred-control:${key}`,
       kind: significant >= 2 ? 'traffic_signal' : 'stop_sign',
       x: entry.x,
       z: entry.z,
@@ -439,8 +465,15 @@ export function generateStreetFurniture(options = {}) {
 
   const budget = getStreetFurnitureBudget();
   const semanticPlacements = trafficControlPlacements(options.mappedFurnitureNodes);
+  const orderedPlacements = [...semanticPlacements].sort((left, right) => {
+    const leftControl = left.kind === 'traffic_signal' || left.kind === 'stop_sign';
+    const rightControl = right.kind === 'traffic_signal' || right.kind === 'stop_sign';
+    if (leftControl !== rightControl) return leftControl ? -1 : 1;
+    return Math.hypot(left.x, left.z) - Math.hypot(right.x, right.z);
+  });
+  const publishedTrafficControls = [];
   let totalControls = 0;
-  semanticPlacements.forEach((placement) => {
+  orderedPlacements.forEach((placement) => {
     if (placement.kind === 'street_lamp') {
       const roadside = nearestRoadsidePoint(placement);
       return createLightPost(placement.x, placement.z, placement.provenance, roadside
@@ -449,11 +482,40 @@ export function generateStreetFurniture(options = {}) {
     }
     if (placement.kind === 'waste_basket') return createTrashCan(placement.x, placement.z, placement.provenance);
     if (totalControls >= budget.maxTrafficControls) return;
-    const roadside = nearestRoadsidePoint(placement) || placement;
-    if (placement.kind === 'traffic_signal') createTrafficSignal(roadside.x, roadside.z, placement.yaw, placement.provenance);
-    else createStopSign(roadside.x, roadside.z, placement.yaw, placement.provenance);
+    const roadside = nearestRoadsidePoint(placement);
+    // OSM control nodes often sit on the road centerline because they describe
+    // routing semantics. Never turn that logical point into a physical pole in
+    // the travel lane. An unmatched control remains semantic-only.
+    if (!roadside) {
+      publishedTrafficControls.push(Object.freeze({
+        ...placement,
+        fixtureX: null,
+        fixtureZ: null,
+        fixtureYaw: null,
+        placement: 'semantic-only'
+      }));
+      totalControls += 1;
+      return;
+    }
+    const published = Object.freeze({
+      ...placement,
+      fixtureX: roadside.x,
+      fixtureZ: roadside.z,
+      fixtureYaw: roadside.yaw,
+      placement: 'outside-road-envelope'
+    });
+    if (placement.kind === 'traffic_signal') createTrafficSignal(
+      roadside.x,
+      roadside.z,
+      roadside.yaw,
+      placement.provenance,
+      published
+    );
+    else createStopSign(roadside.x, roadside.z, roadside.yaw, placement.provenance);
+    publishedTrafficControls.push(published);
     totalControls += 1;
   });
+  appCtx.trafficControlPlacements = Object.freeze(publishedTrafficControls);
   const signSpacing = budget.signSpacing;
   const signedRoads = new Set();
   let totalSigns = 0;

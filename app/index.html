@@ -22,18 +22,19 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <script src="../js/firebase-project-config.js"></script>
 <style>@layer legacy, interface;</style>
 <link rel="stylesheet" href="styles/title-shell.css?v=95">
-<link rel="stylesheet" href="styles/runtime-shell.css?v=121">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=124">
 <link rel="stylesheet" href="styles/block-builder.css?v=8">
 <link rel="stylesheet" href="styles/universe.css?v=8">
 <link rel="stylesheet" href="styles/fishing-game.css?v=6">
-<link rel="stylesheet" href="styles/interface-v4.css?v=29">
+<link rel="stylesheet" href="styles/interface-v4.css?v=30">
 <link rel="stylesheet" href="styles/start-hub.css?v=18">
-<link rel="stylesheet" href="styles/discovery.css?v=16">
-<link rel="stylesheet" href="styles/tutorial.css?v=14">
+<link rel="stylesheet" href="styles/discovery.css?v=17">
+<link rel="stylesheet" href="styles/tutorial.css?v=15">
 <link rel="stylesheet" href="styles/ar.css?v=1">
 <link rel="stylesheet" href="styles/mobile-controls.css?v=2">
 <link rel="stylesheet" href="styles/map-explorer.css?v=4">
-<link rel="stylesheet" href="styles/accessibility.css?v=1">
+<link rel="stylesheet" href="styles/accessibility.css?v=3">
+<link rel="stylesheet" href="styles/reality-capture.css?v=1">
 </head>
 <body>
 <a class="we3d-skip-link" href="#globeSelectorStartBtn">Skip to world controls</a>
@@ -339,14 +340,15 @@ How Connected Data Is Used
 <div class="tab-content" id="tab-controls">
 <div class="ctrl-grid">
 <div class="ctrl-section">Driving</div>
-<div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Drive / Steer</span></div>
-<div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Look Around</span></div>
+<div class="ctrl-row"><span class="ctrl-key">W / S</span><span class="ctrl-action">Accelerate / Brake &amp; Reverse</span></div>
+<div class="ctrl-row"><span class="ctrl-key">A / D</span><span class="ctrl-action">Steer</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Alternate drive controls</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Right Drag</span><span class="ctrl-action">Look Around</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Handbrake</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Ctrl</span><span class="ctrl-action">Boost</span></div>
 <div class="ctrl-section">Walking Mode</div>
-<div class="ctrl-row"><span class="ctrl-key">Arrow Up / Down</span><span class="ctrl-action">Walk Forward / Back</span></div>
-<div class="ctrl-row"><span class="ctrl-key">Arrow Left / Right</span><span class="ctrl-action">Turn Left / Right</span></div>
-<div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Look Around</span></div>
+<div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Move / Strafe</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Alternate move / turn</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Jump</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Space at Wall</span><span class="ctrl-action">Climb / Wall Jump</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Shift</span><span class="ctrl-action">Run (2x speed)</span></div>
@@ -357,45 +359,56 @@ How Connected Data Is Used
 <div class="ctrl-row"><span class="ctrl-key">1–6</span><span class="ctrl-action">Quick-equip a carried item</span></div>
 <div class="ctrl-row"><span class="ctrl-key">V</span><span class="ctrl-action">Use equipped item</span></div>
 <div class="ctrl-row"><span class="ctrl-key">T</span><span class="ctrl-action">Take an available nearby item</span></div>
-<div class="ctrl-row"><span class="ctrl-key">X</span><span class="ctrl-action">Resume the current field activity</span></div>
 <div class="ctrl-section">Drone Controls</div>
-<div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Fly Forward / Back / Turn</span></div>
-<div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Look Around</span></div>
+<div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Fly Forward / Back / Turn</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Alternate flight controls</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Move Up</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Shift/Ctrl</span><span class="ctrl-action">Move Down</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Mouse</span><span class="ctrl-action">Look Around</span></div>
 <div class="ctrl-section">Personal Plane</div>
-<div class="ctrl-row"><span class="ctrl-key">↑ / ↓</span><span class="ctrl-action">Nose Down / Pull Up (Inverted)</span></div>
-<div class="ctrl-row"><span class="ctrl-key">← / →</span><span class="ctrl-action">Bank / Ground Steer</span></div>
+<div class="ctrl-row"><span class="ctrl-key">W / S</span><span class="ctrl-action">Nose Down / Pull Up (Inverted)</span></div>
+<div class="ctrl-row"><span class="ctrl-key">A / D</span><span class="ctrl-action">Bank / Ground Steer</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Alternate flight controls</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Double-tap ← / →</span><span class="ctrl-action">Barrel Roll while airborne</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Space / Shift</span><span class="ctrl-action">Increase / Reduce Throttle</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Full Throttle</span><span class="ctrl-action">About 150 MPH; boarded aircraft differ</span></div>
-<div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Look Around</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Right Drag</span><span class="ctrl-action">Look Around</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Ctrl</span><span class="ctrl-action">Wheel Brake (Ground)</span></div>
 <div class="ctrl-row"><span class="ctrl-key">C</span><span class="ctrl-action">Chase / Cockpit / Overhead</span></div>
 <div class="ctrl-row"><span class="ctrl-key">P</span><span class="ctrl-action">Enter / Exit Personal Plane</span></div>
 <div class="ctrl-section">Camera & View</div>
 <div class="ctrl-row"><span class="ctrl-key">C</span><span class="ctrl-action">Cycle Camera (3rd/1st/Overhead)</span></div>
-<div class="ctrl-row"><span class="ctrl-key">V</span><span class="ctrl-action">Look Back</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Q</span><span class="ctrl-action">Look Back while driving</span></div>
 <div class="ctrl-section">Mode Switching</div>
-<div class="ctrl-row"><span class="ctrl-key">F</span><span class="ctrl-action">Cycle Character / Car / Plane / Drone</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Travel Menu</span><span class="ctrl-action">Choose Character / Car / Plane / Drone</span></div>
+<div class="ctrl-row"><span class="ctrl-key">P / G</span><span class="ctrl-action">Personal plane / boat shortcuts</span></div>
 <div class="ctrl-row"><span class="ctrl-key">B</span><span class="ctrl-action">Open / Close Build with Blocks</span></div>
 <div class="ctrl-section">Navigation & Map</div>
 <div class="ctrl-row"><span class="ctrl-key">M</span><span class="ctrl-action">Toggle Map</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Right Click on Map</span><span class="ctrl-action">Teleport to Location</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Left Click on Map</span><span class="ctrl-action">View Property/POI Info</span></div>
-<div class="ctrl-row"><span class="ctrl-key">N</span><span class="ctrl-action">Next City (Teleport)</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Shift + N</span><span class="ctrl-action">Next City (Teleport)</span></div>
 <div class="ctrl-section">Space Exploration</div>
 <div class="ctrl-row"><span class="ctrl-key">Click on Moon</span><span class="ctrl-action">Travel to Moon</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Click on Stars</span><span class="ctrl-action">View Constellation Info</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Click Apollo 11 Flag</span><span class="ctrl-action">View Mission Info (on Moon)</span></div>
 <div class="ctrl-section">Space Flight Controls</div>
-<div class="ctrl-row"><span class="ctrl-key">←/→</span><span class="ctrl-action">Yaw Left/Right</span></div>
-<div class="ctrl-row"><span class="ctrl-key">↑/↓</span><span class="ctrl-action">Pitch Up/Down</span></div>
-<div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Thrust / Boost</span></div>
-<div class="ctrl-row"><span class="ctrl-key">Shift</span><span class="ctrl-action">Brake / Decelerate</span></div>
+<div class="ctrl-row"><span class="ctrl-key">A/D or ←/→</span><span class="ctrl-action">Yaw Left/Right</span></div>
+<div class="ctrl-row"><span class="ctrl-key">W/S or ↑/↓</span><span class="ctrl-action">Pitch Up/Down</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Primary / Space</span><span class="ctrl-action">Thrust / Boost</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Modifier / Shift</span><span class="ctrl-action">Brake / Decelerate</span></div>
 <div class="ctrl-row"><span class="ctrl-key">LAND ON ... Button</span><span class="ctrl-action">Land when in range</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Click Planets/Asteroids/Galaxies</span><span class="ctrl-action">Inspect deep-space object info</span></div>
+<div class="ctrl-section">Gamepad</div>
+<div class="ctrl-row"><span class="ctrl-key">Left Stick</span><span class="ctrl-action">Move / steer / flight control</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Right Stick</span><span class="ctrl-action">Look around</span></div>
+<div class="ctrl-row"><span class="ctrl-key">A / X</span><span class="ctrl-action">Primary movement action / context action</span></div>
+<div class="ctrl-row"><span class="ctrl-key">D-pad Up / LB</span><span class="ctrl-action">Backpack / change camera</span></div>
+<div class="ctrl-row"><span class="ctrl-key">View / Menu</span><span class="ctrl-action">Map / pause</span></div>
+<div class="ctrl-section">Phone &amp; Tablet</div>
+<div class="ctrl-row"><span class="ctrl-key">Left Pad</span><span class="ctrl-action">Move; can swap sides in Mobile Controls</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Right Pad</span><span class="ctrl-action">Analog camera; sensitivity and recenter are adjustable</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Action Buttons</span><span class="ctrl-action">Change for walking, driving, flight, water, and Space</span></div>
 <div class="ctrl-section">Other</div>
 <div class="ctrl-row"><span class="ctrl-key">Connect Menu</span><span class="ctrl-action">Rooms, share tools, and memory markers</span></div>
 <div class="ctrl-row"><span class="ctrl-key">R</span><span class="ctrl-action">Record/Stop Track</span></div>
@@ -665,7 +678,7 @@ How Connected Data Is Used
 </div>
 <div id="hudClockDisplay"></div>
 <div id="hudDetails">
-<div id="boostBar"><div id="boostFill"></div></div>
+<div id="conditionBar" role="progressbar" aria-label="Explorer health" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" title="Explorer health · 100%"><div id="conditionFill" data-state="healthy"></div></div>
 <div id="street">Loading...</div>
 <div id="locationLine"></div>
 <div class="indicators"><span class="ind" id="indBrake">BRK</span><span class="ind" id="indBoost">BOOST</span><span class="ind" id="indDrift">DRIFT</span></div>
@@ -676,10 +689,11 @@ How Connected Data Is Used
 <div id="boatPrompt" aria-live="polite"></div>
 <div id="discoveryContextPrompt" aria-live="polite"><span id="discoveryContextText">Explore what is possible here.</span><button id="discoveryContextOpenBtn" type="button">Explore</button></div>
 <button id="discoveryQuickToolBtn" type="button" aria-controls="discoveryPanel" aria-expanded="false"><span>⌁</span><strong>Resume Field Activity</strong><span id="discoveryQuickSignal">Ready</span></button>
-<aside id="currentJourneyCard" aria-label="Current journey" aria-live="polite" hidden>
+<aside id="currentJourneyCard" role="status" aria-label="Current journey" aria-live="polite" aria-atomic="true" hidden>
   <span class="currentJourneyMark" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="m15.8 8.2-2.1 5.5-5.5 2.1 2.1-5.5 5.5-2.1Z"></path></svg></span>
   <div class="currentJourneyCopy"><span id="currentJourneyEyebrow">CURRENT JOURNEY</span><strong id="currentJourneyTitle">Explore this place</strong><small id="currentJourneyDetail">Choose something nearby and begin when you are ready.</small></div>
   <button id="currentJourneyAction" type="button">Open</button>
+  <button id="currentJourneyDismiss" type="button" aria-label="Dismiss this notice" title="Dismiss">×</button>
 </aside>
 <aside id="discoveryPanel" aria-label="Explorer fieldwork" aria-hidden="true">
   <header class="discoveryHead">
@@ -854,9 +868,10 @@ How Connected Data Is Used
   <details class="urbanConditionDetails"><summary>Character condition <span id="urbanPlayerConditionText">100%</span></summary><div id="urbanPlayerCondition" class="urbanPlayerCondition" role="status" aria-label="Character health"><i aria-hidden="true"><b id="urbanPlayerConditionFill"></b></i></div></details>
 </aside>
 <aside id="urbanStore" role="dialog" aria-modal="true" aria-labelledby="urbanStoreName" aria-hidden="true">
-  <div class="urbanStoreHead"><div><small>MAPPED LOCAL STORE</small><strong id="urbanStoreName">Convenience store</strong></div><button id="urbanStoreCloseBtn" type="button" aria-label="Close store">×</button></div>
+  <div class="urbanStoreHead"><div><small>MAPPED LOCAL PLACE</small><strong id="urbanStoreName">Convenience store</strong></div><button id="urbanStoreCloseBtn" type="button" aria-label="Close place">×</button></div>
   <div class="urbanStoreMeta"><span id="urbanStoreSource">OpenStreetMap place</span><strong id="urbanStoreCredits">$0</strong></div>
-  <p class="urbanStoreAuthority">Each shop reflects a place on the local map, with rotating stock, prices, and trades.</p>
+  <p class="urbanStoreAuthority">The mapped place determines where this opportunity exists. Stock, services, and prices are World Explorer gameplay.</p>
+  <section id="urbanStoreServicesSection"><h3>Available services</h3><div id="urbanStoreServices" class="urbanStoreGrid"></div></section>
   <section><h3>Today’s stock</h3><div id="urbanStoreStock" class="urbanStoreGrid"></div></section>
   <section><h3>Sell from Backpack</h3><div id="urbanStoreSell" class="urbanStoreGrid"></div></section>
   <section><h3>Rare counter find</h3><div id="urbanStoreRare"></div></section>
@@ -1439,7 +1454,7 @@ Explore the area
   <div id="blockBuilderCount"></div>
   <div id="blockBuilderStatus" role="status" aria-live="polite"></div>
 </aside>
-<div id="controlsTab"><div id="ctrlHeader">⚙️ Driving Mode ▼</div><div id="ctrlContent" class="hidden">
+<div id="controlsTab" aria-hidden="true"><div id="ctrlHeader" aria-expanded="false" aria-controls="ctrlContent">⚙️ Driving Mode ▼</div><div id="ctrlContent" class="hidden" aria-hidden="true">
 <section id="mobileControlSettings" aria-label="Mobile control settings">
 <div class="mobileControlSettingsHead"><strong>Mobile Controls</strong><button id="mobileControlsReset" type="button">Reset</button></div>
 <label><span>Layout</span><select id="mobileControlsHandedness"><option value="standard">Standard · move left</option><option value="southpaw">Southpaw · move right</option></select></label>
@@ -1453,32 +1468,38 @@ Explore the area
 </div>
 </section>
 <section id="accessibilitySettings" aria-label="Accessibility settings">
-<strong>Accessibility</strong>
-<label><span>Text size</span><select id="accessibilityTextScale"><option value="100">Standard</option><option value="115">Large · 115%</option><option value="130">Extra large · 130%</option></select></label>
+<div class="accessibilitySettingsHead"><strong>Accessibility</strong><button id="accessibilityReset" type="button">Reset</button></div>
+<p class="accessibilitySettingsIntro">Readable controls, calmer effects, and guidance that stays long enough for you.</p>
+<label><span>Text size</span><select id="accessibilityTextScale"><option value="100">Standard · 100%</option><option value="115">Large · 115%</option><option value="130">Extra large · 130%</option><option value="160">Very large · 160%</option><option value="200">Maximum · 200%</option></select></label>
+<label><span>Nearby notice time</span><select id="accessibilityNoticeDuration"><option value="standard">Standard · 7 seconds</option><option value="long">Longer · 15 seconds</option><option value="persistent">Until dismissed</option></select></label>
+<label><span>Aim reticle</span><select id="accessibilityReticleSize"><option value="standard">Standard</option><option value="large">Large</option></select></label>
 <label><input id="accessibilityReducedMotion" type="checkbox"><span>Reduce interface motion</span></label>
+<label><input id="accessibilityReducedEffects" type="checkbox"><span>Reduce flashes and screen pulses</span></label>
 <label><input id="accessibilityHighContrast" type="checkbox"><span>Increase interface contrast</span></label>
+<label><input id="accessibilityActionDetails" type="checkbox"><span>Keep full nearby-action descriptions</span></label>
 <p id="accessibilitySettingsStatus" role="status" aria-live="polite">100% text · system motion · standard contrast</p>
 </section>
 <div id="drivingControls">
-<b>🚗 Driving Mode:</b><br>
-• Arrow Up/Down - Drive forward / reverse<br>
-• Arrow Left/Right - Steer left / right<br>
-• WASD - Look around; chase view recenters automatically<br>
+<b>🚗 Driving Mode · default layout:</b><br>
+• W/S - Accelerate / brake and reverse<br>
+• A/D - Steer left / right; arrow keys are an alternate<br>
+• Right-click + drag - Look around; chase view recenters automatically<br>
 • Space - Handbrake<br>
 • Ctrl - Boost<br>
 • E - Context action: enter / exit a nearby vehicle or use an object<br>
 • C - Camera view<br>
-• F - Cycle character / car / plane / drone<br>
+• Q - Look behind while held<br>
+• F - Open a mapped mechanic only when you are close enough<br>
+• Travel menu - Choose character / car / plane / drone<br>
 • M - Toggle map<br>
-• N - Next city<br>
+• Shift+N - Next city<br>
 • B - Open / close Build with Blocks<br>
-• X - Open / use discovery tool<br>
 </div>
 <div id="boatControls" style="display:none">
-<b>🚤 Boat Mode:</b><br>
-• Arrow Up/Down - Throttle / Reverse<br>
-• Arrow Left/Right - Steer<br>
-• WASD - Look around<br>
+<b>🚤 Boat Mode · default layout:</b><br>
+• W/S - Throttle / Reverse; A/D - Steer<br>
+• Arrow keys - Alternate boat controls<br>
+• Right-click + drag - Look around<br>
 • Space - Brake / Hold position<br>
 • G - Enter / exit boat travel<br>
 • C - Camera view<br>
@@ -1488,61 +1509,59 @@ Explore the area
 • Use the bottom Wave Intensity slider for calm, moderate, or rough water
 </div>
 <div id="walkingControls" style="display:none">
-<b>🚶 Walking Mode:</b><br>
-• Arrow Up/Down - Move forward / back<br>
-• Arrow Left/Right - Turn left / right<br>
-• WASD - Look around<br>
+<b>🚶 Walking Mode · default layout:</b><br>
+• WASD - Move forward / back and strafe<br>
+• Arrow Up/Down - Alternate forward / back; Arrow Left/Right - turn<br>
 • E - Context action at a visible door, vehicle, person, or object<br>
 • I - Open / close carried equipment; 1–6 quick-equip<br>
 • V - Use equipped item; T - take an available nearby item<br>
-• X - Resume the current field activity<br>
 • Space - Jump<br>
 • Space at a wall - Climb / wall jump<br>
 • Shift - Run (2x speed)<br>
 • Right Click + Drag - Mouse look<br>
 • C - Camera view<br>
-• F - Cycle character / car / plane / drone<br>
+• F - Open a mapped mechanic only when you are close enough<br>
+• Travel menu - Choose character / car / plane / drone<br>
 • B - Open / close Build with Blocks<br>
 </div>
 <div id="droneControls" style="display:none">
-<b>🚁 Drone Mode:</b><br>
-• Arrow Up/Down - Fly forward / back relative to the drone<br>
-• Arrow Left/Right - Turn the drone<br>
-• WASD - Look around independently<br>
-• Mouse - Look around independently<br>
+<b>🚁 Drone Mode · default layout:</b><br>
+• W/S - Fly forward / back; A/D - turn<br>
+• Arrow keys - Alternate flight controls<br>
+• Right-click + drag - Look around independently<br>
 • Space - Fly up<br>
 • Shift/Ctrl - Fly down<br>
-• F - Cycle character / car / plane / drone<br>
+• Travel menu - Choose another travel mode<br>
 • B - Open / close Build with Blocks<br>
 </div>
 <div id="planeControls" style="display:none">
-<b>✈️ Personal Plane:</b><br>
-• Arrow Up/Down - Nose down / pull up (inverted)<br>
-• Arrow Left/Right - Bank or ground steer<br>
+<b>✈️ Personal Plane · default layout:</b><br>
+• W/S - Nose down / pull up (inverted)<br>
+• A/D - Bank or ground steer; arrow keys are an alternate<br>
 • Double-tap Arrow Left/Right - Deliberate barrel roll while airborne<br>
 • Space/Shift - Increase / reduce throttle<br>
 • Full throttle - About 150 MPH; boarded aircraft differ<br>
 • Hold pitch for loops; ordinary left/right banks into a coordinated turn<br>
 • Ctrl - Wheel brake on the ground<br>
-• WASD - Look around<br>
+• Right-click + drag - Look around<br>
 • C - Chase / cockpit / overhead camera<br>
 • P - Enter / exit your personal plane<br>
 </div>
 <div id="rocketControls" style="display:none">
-<b>🚀 Rocket Mode:</b><br>
-• Arrow Keys - Steer rocket (yaw/pitch)<br>
+<b>🚀 Rocket Mode · default layout:</b><br>
+• WASD or Arrow Keys - Steer rocket (yaw/pitch)<br>
 • Space - Thrust / Boost<br>
 • Shift - Brake / Decelerate<br>
-• X - Mining pulse in generated asteroid regions<br>
+• Configured Use Item key (default V) or left-click - Fire Pathfinder cannons during an interception<br>
+• Gamepad X or the mobile FIRE action - Fire Pathfinder cannons<br>
 • LAND ON ... Button - Land when in range
 </div>
 <div id="oceanControls" style="display:none">
-<b>🌊 Submarine Mode:</b><br>
-• Arrow Up/Down - Forward / Reverse thrust<br>
-• Arrow Left/Right - Turn left / right<br>
+<b>🌊 Submarine Mode · default layout:</b><br>
+• W/S - Forward / Reverse thrust<br>
+• A/D - Turn left / right; arrow keys are an alternate<br>
 • Space - Ascend<br>
 • Shift/Ctrl - Descend<br>
-• WASD - Look around<br>
 • Explore the reef shelf and open deep ocean
 </div>
 </div></div>
@@ -1571,5 +1590,5 @@ Explore the area
 <!-- Real Estate System -->
 <script type="module" src="js/app-shell-fragments.js?v=86"></script>
 <script type="module" src="js/app-auth-shell.js?v=87"></script>
-<script type="module" src="js/bootstrap.js?v=589"></script>
+<script type="module" src="js/bootstrap.js?v=600"></script>
 </body></html>

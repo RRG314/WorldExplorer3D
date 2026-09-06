@@ -98,6 +98,26 @@ export function partitionFixedRegionalRoads(regionalRoadWays = []) {
   });
 }
 
+function mappedWayIdentity(way) {
+  const type = String(way?.type || 'way');
+  const id = String(way?.id ?? way?.tags?._sourceElementId ?? '');
+  return id ? `${type}:${id}` : null;
+}
+
+export function uniqueMappedWays(ways = [], excludedIdentities = null) {
+  const identities = excludedIdentities instanceof Set
+    ? new Set(excludedIdentities)
+    : new Set();
+  const unique = [];
+  for (const way of ways) {
+    const identity = mappedWayIdentity(way);
+    if (identity && identities.has(identity)) continue;
+    if (identity) identities.add(identity);
+    unique.push(way);
+  }
+  return unique;
+}
+
 export function prepareWorldFeatureSelections(options = {}) {
   const data = options.data || {};
   const nodes = options.nodes || {};
@@ -193,11 +213,6 @@ export function prepareWorldFeatureSelections(options = {}) {
   );
   const mobileLike = typeof appCtx.isLikelyMobileDevice === 'function' &&
     appCtx.isLikelyMobileDevice();
-  const regionalRoadCap = regionalRoadWays.length > 0
-    ? mobileLike
-      ? Math.min(900, Math.max(650, Math.floor(maxRoadWays * 0.45)))
-      : Math.min(7200, Math.max(4800, Math.floor(maxRoadWays * 0.9)))
-    : 0;
   const regionalPartition = partitionFixedRegionalRoads(regionalRoadWays);
   const exactRegionalEngineered = regionalPartition.engineered.filter((way) =>
     way?.tags?._fixedRegionalStructure === 'exact' ||
@@ -224,10 +239,10 @@ export function prepareWorldFeatureSelections(options = {}) {
       compareFn: (a, b) => roadTypePriority(b.tags?.highway) - roadTypePriority(a.tags?.highway)
     }
   );
-  const selectedRegionalEngineered = [
+  const selectedRegionalEngineered = uniqueMappedWays([
     ...exactRegionalEngineered,
     ...selectedGeneralizedEngineered
-  ];
+  ]);
   const regionalConnectorCap = Math.min(
     mobileLike ? 240 : 1200,
     Math.max(mobileLike ? 80 : 160, Math.ceil(regionalPartition.engineered.length * (mobileLike ? 0.25 : 0.5)))
@@ -240,17 +255,6 @@ export function prepareWorldFeatureSelections(options = {}) {
     minPerTile: tileBudgetCfg.roadsMinPerTile,
     tileDegrees: tileBudgetCfg.tileDegrees,
     useRdt: useRdtBudgeting,
-    compareFn: (a, b) => roadTypePriority(b.tags?.highway) - roadTypePriority(a.tags?.highway)
-  });
-  const regionalPerTile = Math.max(mobileLike ? 8 : 16, Math.floor(regionalRoadCap / 64));
-  const selectedRegionalRoadWays = limitWaysByTileBudget(regionalPartition.general, nodes, {
-    globalCap: regionalRoadCap,
-    basePerTile: regionalPerTile,
-    minPerTile: Math.max(mobileLike ? 5 : 12, Math.floor(regionalPerTile * 0.65)),
-    tileDegrees: tileBudgetCfg.tileDegrees,
-    useRdt: false,
-    spreadAcrossArea: true,
-    coreRatio: 0.2,
     compareFn: (a, b) => roadTypePriority(b.tags?.highway) - roadTypePriority(a.tags?.highway)
   });
   const selectedRegionalConnectors = limitWaysByTileBudget(regionalPartition.connectors, nodes, {
@@ -267,15 +271,53 @@ export function prepareWorldFeatureSelections(options = {}) {
       return bLink - aLink || roadTypePriority(b.tags?.highway) - roadTypePriority(a.tags?.highway);
     }
   });
-  const roadWays = [
+  // `maxRoadWays` is the complete transport budget for this client. The old
+  // fixed 7,200 desktop / 650 mobile regional cap sat inside that budget and
+  // discarded otherwise affordable OSM streets. Its spread-across-area mode
+  // then selected unrelated fragments from distant tiles, producing the
+  // isolated road slabs players saw in dense cities. Protect exact structures
+  // and their approaches first, then spend every remaining road slot on the
+  // ordinary regional network. When the complete mapped result fits (for
+  // example Baltimore's ~17k ways in the 20k desktop budget), no road is
+  // removed. When a client really is budget-bound, distance ordering keeps a
+  // contiguous playable district while road priority preserves major routes.
+  const protectedRoadWays = uniqueMappedWays([
     ...selectedCoreRoadWays,
     ...selectedRegionalEngineered,
     ...regionalPartition.exactConnectors,
-    ...selectedRegionalConnectors,
+    ...selectedRegionalConnectors
+  ]);
+  const protectedRoadIdentities = new Set(
+    protectedRoadWays.map(mappedWayIdentity).filter(Boolean)
+  );
+  const regionalGeneralCandidates = uniqueMappedWays(
+    regionalPartition.general,
+    protectedRoadIdentities
+  );
+  const protectedRoadCount = protectedRoadWays.length;
+  const regionalRoadCap = regionalRoadWays.length > 0
+    ? Math.max(0, maxRoadWays - protectedRoadCount)
+    : 0;
+  // Do not spend the global budget as dozens of smaller independent tile
+  // lotteries. Let the final priority/distance ordering choose one coherent
+  // network from the complete regional candidate set.
+  const regionalPerTile = Math.max(1, regionalRoadCap);
+  const selectedRegionalRoadWays = limitWaysByTileBudget(regionalGeneralCandidates, nodes, {
+    globalCap: regionalRoadCap,
+    basePerTile: regionalPerTile,
+    minPerTile: regionalPerTile,
+    tileDegrees: tileBudgetCfg.tileDegrees,
+    useRdt: false,
+    compareFn: (a, b) => roadTypePriority(b.tags?.highway) - roadTypePriority(a.tags?.highway)
+  });
+  const roadWays = uniqueMappedWays([
+    ...protectedRoadWays,
     ...selectedRegionalRoadWays
-  ];
+  ]);
   loadMetrics.regionalTransportSelection = {
     available: regionalRoadWays.length,
+    uniqueSelected: roadWays.length,
+    unusedRoadBudget: Math.max(0, maxRoadWays - roadWays.length),
     regionalCap: regionalRoadCap,
     engineeredAvailable: regionalPartition.engineered.length,
     exactEngineered: exactRegionalEngineered.length,

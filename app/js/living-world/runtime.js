@@ -6,8 +6,8 @@ import {
   isLivingWorldPublicationActive
 } from './model.js?v=1';
 import { compileEntranceCatalog } from './entrance-catalog.js?v=6';
-import { compilePedestrianGraph, compileTrafficGraph, resolveDrivingSide } from './navigation-graphs.js?v=11';
-import { createLivingWorldPopulation } from './population.js?v=18';
+import { compilePedestrianGraph, compileTrafficGraph, resolveDrivingSide } from './navigation-graphs.js?v=12';
+import { createLivingWorldPopulation } from './population.js?v=21';
 
 function livingWorldTier(appCtx) {
   const requested = String(appCtx?.getDynamicBudgetState?.().tier || 'balanced').toLowerCase();
@@ -34,6 +34,22 @@ function pedestrianPointBlocked(appCtx, x, z) {
     if (Array.isArray(building?.pts) && appCtx.pointInPolygon?.(x, z, building.pts)) return true;
   }
   return false;
+}
+
+function livingWorldActivityAnchors(appCtx) {
+  return Object.freeze((appCtx.pois || []).filter((poi) => (
+    Number.isFinite(Number(poi?.x)) && Number.isFinite(Number(poi?.z))
+  )).map((poi) => {
+    const text = [poi.type, poi.category, poi.tags?.amenity, poi.tags?.shop, poi.tags?.leisure, poi.tags?.tourism]
+      .filter(Boolean).join(' ').toLowerCase();
+    const kind = /station|terminal|bus|transit|subway|rail/.test(text) ? 'transit'
+      : /school|college|university/.test(text) ? 'education'
+        : /hospital|clinic|doctor|pharmacy/.test(text) ? 'medical'
+          : /park|garden|playground|attraction|museum/.test(text) ? 'leisure'
+            : /shop|store|retail|market|mall|cafe|restaurant/.test(text) ? 'retail' : 'local-place';
+    const weight = kind === 'transit' ? 6 : kind === 'retail' ? 5 : kind === 'education' || kind === 'medical' ? 4.5 : kind === 'leisure' ? 3.5 : 2;
+    return Object.freeze({ x: Number(poi.x), z: Number(poi.z), kind, weight, sourceFeatureId: String(poi.sourceFeatureId || '') });
+  }));
 }
 
 function sampleEdgeTransitionPlane(edge, x, z) {
@@ -82,6 +98,7 @@ function disposeRuntimeState(appCtx, state, reason = 'disposed') {
   state.reason = String(reason || 'disposed');
   appCtx?.unregisterRuntimeOwner?.(state.owner);
   state.population?.dispose?.();
+  if (appCtx?.handleLivingWorldSelection === state.handleWorldSelection) delete appCtx.handleLivingWorldSelection;
   if (appCtx?.livingWorldRuntime === state) appCtx.livingWorldRuntime = null;
   return true;
 }
@@ -135,11 +152,13 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     })
   });
   const traversal = appCtx.buildTraversalNetworks?.() || { walk: null, drive: null };
+  const activityAnchors = livingWorldActivityAnchors(appCtx);
   const pedestrianCompilation = compilePedestrianGraph({
     traversal: traversal.walk,
     entrances: catalog.entrances,
     sampleSurface: appCtx.sampleFeatureSurfaceY,
     isBlockedPoint: (x, z) => pedestrianPointBlocked(appCtx, x, z),
+    activityAnchors,
     tier
   });
   const drivingSide = resolveDrivingSide(request.selection || request.location || {});
@@ -147,6 +166,7 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     traversal: traversal.drive,
     sampleSurface: appCtx.sampleFeatureSurfaceY,
     driveOnLeft: drivingSide.driveOnLeft,
+    activityAnchors,
     tier
   });
   const sampleVehicleSurface = createTrafficVehicleSurfaceSampler(appCtx, trafficCompilation);
@@ -158,6 +178,16 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
       ? appCtx.Walk.state.walker
       : appCtx.droneMode ? appCtx.drone : appCtx.car,
     getTimePhase: () => appCtx.timeOfDay,
+    getTrafficFlow: () => appCtx.currentTrafficFlowProfile || null,
+    trafficControls: appCtx.trafficControlPlacements,
+    updateTrafficSignalVisuals(states) {
+      const byId = new Map(states.map((entry) => [entry.id, entry]));
+      (appCtx.streetFurnitureMeshes || []).forEach((object) => {
+        const controlId = String(object?.userData?.trafficControlId || '');
+        const state = byId.get(controlId);
+        if (state) object.userData.setTrafficSignalState?.(state.group0);
+      });
+    },
     sampleVehicleSurface,
     hasPedestrianLineOfSight(from, to) {
       const samples = [.33, .66];
@@ -193,7 +223,8 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     diagnostics: {
       entrances: catalog.diagnostics,
       facades: facades.diagnostics,
-      population: population.diagnostics
+      population: population.diagnostics,
+      activityAnchors: activityAnchors.length
     }
   });
   if (!appCtx.livingWorldPublicationStore) {
@@ -224,8 +255,35 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     disposed: false,
     reason: null
   };
+  state.handleWorldSelection = (target) => {
+    const reference = appCtx.Walk?.state?.walker || appCtx.car || { x: 0, z: 0 };
+    if (target?.kind === 'living-pedestrian') {
+      const pedestrian = population.pedestrianSnapshots().find((entry) => entry.id === target.id);
+      if (!pedestrian) return false;
+      const distance = Math.round(Math.hypot(pedestrian.x - Number(reference.x || 0), pedestrian.z - Number(reference.z || 0)));
+      appCtx.showWorldSelectionNotice?.(
+        target.label || 'Local person',
+        `${pedestrian.activity} · ${distance}m away`
+      );
+      if (distance <= 12) appCtx.urbanSandboxRuntime?.promoteNpc?.(pedestrian);
+      return true;
+    }
+    if (target?.kind === 'living-vehicle') {
+      const vehicle = population.vehicleSnapshots().find((entry) => entry.id === target.id);
+      if (!vehicle) return false;
+      const distance = Math.round(Math.hypot(vehicle.x - Number(reference.x || 0), vehicle.z - Number(reference.z || 0)));
+      const speedKph = Math.round(Math.max(0, Number(vehicle.speed || 0)) * 3.6);
+      appCtx.showWorldSelectionNotice?.(
+        target.label || 'Road vehicle',
+        `${vehicle.waiting ? vehicle.waitReason.replaceAll('_', ' ') : `${speedKph} km/h`} · ${distance}m away`
+      );
+      return true;
+    }
+    return false;
+  };
   appCtx.livingWorldPublication = publication;
   appCtx.livingWorldRuntime = state;
+  appCtx.handleLivingWorldSelection = state.handleWorldSelection;
   appCtx.registerRuntimeSystem?.({
     id: `${owner}:presentation`,
     owner,

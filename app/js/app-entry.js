@@ -3,19 +3,20 @@
 import { getCurrentUser, observeAuth } from '../../js/auth-ui.js?v=55';
 import { setupAnalyticsConsentUi } from '../../js/analytics-consent.js?v=3';
 import './rdt.js?v=55';
-import './config.js?v=62';
+import './config.js?v=63';
 import { ctx as appCtx } from './shared-context.js?v=55';
 import { createAccountService } from './platform/account-service.js?v=1';
 import { createPlatformServiceRegistry } from './platform/service-registry.js?v=1';
 import { scheduleAfterFirstPlay } from './runtime/workload-policy.js?v=1';
-import './runtime-diagnostics.js?v=77';
+import './runtime-diagnostics.js?v=82';
 import './ui/legal-attribution.js?v=1';
 import './state.js?v=65';
 import './camera-mode.js?v=1';
 import './pause-state.js?v=1';
 import './location-session.js?v=7';
-import './controls/action-input.js?v=10';
-import './interaction/context-router.js?v=4';
+import './controls/action-input.js?v=12';
+import './controls/keyboard-binding-ui.js?v=2';
+import './interaction/context-router.js?v=5';
 import './transport/actor-contract.js?v=6';
 import './world/collection-registry.js?v=1';
 import './world/water-environment.js?v=2';
@@ -24,15 +25,15 @@ import './env.js?v=58';
 import './session-coordinator.js?v=2';
 import './planetary/scene-ownership.js?v=9';
 import './real-estate.js?v=55';
-import { init, tryEnablePostProcessing } from './engine.js?v=101';
-import './physics.js?v=127';
+import { init, tryEnablePostProcessing } from './engine.js?v=103';
+import './physics.js?v=128';
 import './walking.js?v=97';
 import './travel-mode.js?v=28';
 import { initBoatMode } from './boat-mode.js?v=58';
 import './sky.js?v=89';
 import './weather.js?v=11';
 import './runtime/on-demand-modes.js?v=52';
-import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=181';
+import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=189';
 import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=10';
 import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=1';
 import { installOnDemandLiveEarth } from './runtime/on-demand-live-earth.js?v=6';
@@ -44,14 +45,14 @@ import './planetary/sky-orientation.js?v=14';
 import './planetary/moon-sky.js?v=1';
 import './planetary/tracks.js?v=2';
 import './planetary/field-activities.js?v=11';
-import './game.js?v=69';
-import './input.js?v=75';
-import './hud.js?v=103';
+import './game.js?v=70';
+import './input.js?v=78';
+import './hud.js?v=105';
 import './map.js?v=61';
 import { renderLoop } from './main.js?v=75';
 import './memory.js?v=55';
-import { setupUI } from './ui.js?v=171';
-import { initAccessibility } from './ui/accessibility.js?v=1';
+import { setupUI } from './ui.js?v=172';
+import { initAccessibility } from './ui/accessibility.js?v=2';
 
 let _booted = false;
 let _lastObservedAuthUser = null;
@@ -153,7 +154,7 @@ function ensurePlatformService(id) {
 
 function ensureInteriorsReady() {
     if (!_interiorsModulePromise) {
-        _interiorsModulePromise = import('./interiors.js?v=23').catch((error) => {
+        _interiorsModulePromise = import('./interiors.js?v=24').catch((error) => {
             _interiorsModulePromise = null;
             throw error;
         });
@@ -232,7 +233,7 @@ function scheduleTutorialInit() {
             if (started) return;
             started = true;
             try {
-                const mod = await import('./tutorial/tutorial.js?v=9');
+                const mod = await import('./tutorial/tutorial.js?v=12');
                 if (typeof mod.initTutorial === 'function') mod.initTutorial();
             } catch (error) {
                 console.warn('[boot] Tutorial init deferred import failed.', error);

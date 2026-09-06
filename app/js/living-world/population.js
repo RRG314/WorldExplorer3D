@@ -10,19 +10,24 @@ import {
   NEARBY_NPC_ASSET_IDS,
   updateCuratedCharacterAnimation
 } from '../walking/curated-explorer-character.js?v=7';
+import {
+  activityLabelForEdge,
+  LIVING_WORLD_DEMAND_BY_TIER,
+  populationEdgeWeight,
+  resolveLivingWorldDemand
+} from './demand-model.js?v=2';
+import { compileTrafficControlSystem } from './traffic-control-system.js?v=2';
 
 const POPULATION_STEP_SECONDS = 1 / 30;
 
-const POPULATION_BUDGET_BY_TIER = Object.freeze({
-  low: Object.freeze({ pedestrians: 6, vehicles: 4 }),
-  performance: Object.freeze({ pedestrians: 12, vehicles: 8 }),
-  balanced: Object.freeze({ pedestrians: 24, vehicles: 14 }),
-  quality: Object.freeze({ pedestrians: 38, vehicles: 24 })
-});
+const POPULATION_BUDGET_BY_TIER = LIVING_WORLD_DEMAND_BY_TIER;
 
 const POPULATION_VISIBILITY_POLICY = Object.freeze({
-  enterDistance: 980,
-  exitDistance: 1380,
+  // Traffic stays resident well beyond the immediate interaction bubble so
+  // recognizable vehicles continue along the road instead of popping out as
+  // the player approaches or looks back down a long street.
+  enterDistance: 900,
+  exitDistance: 1180,
   fadeInPerSecond: 1.7,
   fadeOutPerSecond: 1.05,
   relocationHideSeconds: 1.25
@@ -74,17 +79,7 @@ function edgeLookup(graph, options = {}) {
 }
 
 function edgeSpawnWeight(edge, kind) {
-  if (kind === 'pedestrian') {
-    if (edge.role === 'entrance') return edge.commercial ? 4 : 2;
-    if (edge.provenance === 'mapped_path') return 2.2;
-    if (edge.role === 'crossing') return .55;
-    return 1;
-  }
-  const roadClass = String(edge.roadClass || '').toLowerCase();
-  if (/motorway|trunk|primary/.test(roadClass)) return 2.8;
-  if (/secondary|tertiary/.test(roadClass)) return 1.8;
-  if (/service|track/.test(roadClass)) return .45;
-  return 1;
+  return populationEdgeWeight(edge, kind);
 }
 
 function selectSpawnEdgeIndex(graph, random, kind, reference = null) {
@@ -93,7 +88,7 @@ function selectSpawnEdgeIndex(graph, random, kind, reference = null) {
     const edge = graph.edges[index];
     const x = (Number(edge?.p1?.x || 0) + Number(edge?.p2?.x || 0)) * .5;
     const z = (Number(edge?.p1?.z || 0) + Number(edge?.p2?.z || 0)) * .5;
-    return Math.hypot(x - Number(reference.x || 0), z - Number(reference.z || 0)) <= 720;
+    return Math.hypot(x - Number(reference.x || 0), z - Number(reference.z || 0)) <= 520;
   }) : [];
   const indexes = localIndexes.length ? localIndexes : allIndexes;
   const weights = indexes.map((index) => edgeSpawnWeight(graph.edges[index], kind));
@@ -151,7 +146,12 @@ function createAgents(count, graph, random, kind, reference = null) {
       bridge: null,
       reaction: '',
       reactionRemaining: 0,
-      reactionTarget: null
+      reactionTarget: null,
+      signalAspect: 'none',
+      waitReason: '',
+      routeEndHold: 0,
+      stopWaitSeconds: 0,
+      clearedControlId: ''
     });
   }
   return agents;
@@ -160,7 +160,8 @@ function createAgents(count, graph, random, kind, reference = null) {
 function agentPose(agent, graph, sampleVehicleSurface = null) {
   const edge = agent.bridge || graph.edges[agent.edgeIndex];
   if (!edge) return null;
-  const t = Math.max(0, Math.min(1, agent.progress / Math.max(.01, edge.length)));
+  const progress = agent.bridge ? agent.bridge.progress : agent.progress;
+  const t = Math.max(0, Math.min(1, progress / Math.max(.01, edge.length)));
   const x = edge.p1.x + (edge.p2.x - edge.p1.x) * t;
   const y = edge.p1.y + (edge.p2.y - edge.p1.y) * t;
   const z = edge.p1.z + (edge.p2.z - edge.p1.z) * t;
@@ -185,12 +186,23 @@ function agentPose(agent, graph, sampleVehicleSurface = null) {
 }
 
 function selectSafeRelocationEdge(graph, random, kind, reference) {
-  const distant = reference ? graph.edges.map((edge, index) => ({ edge, index })).filter(({ edge }) => {
+  const minimumDistance = kind === 'vehicle' ? 170 : 85;
+  const maximumDistance = kind === 'vehicle' ? 720 : 460;
+  const local = reference ? graph.edges.map((edge, index) => ({ edge, index })).filter(({ edge }) => {
     const x = (edge.p1.x + edge.p2.x) * .5;
     const z = (edge.p1.z + edge.p2.z) * .5;
-    return Math.hypot(x - reference.x, z - reference.z) > 420;
+    const distance = Math.hypot(x - reference.x, z - reference.z);
+    return distance >= minimumDistance && distance <= maximumDistance;
   }) : [];
-  if (distant.length) return distant[Math.floor(random() * distant.length) % distant.length].index;
+  if (local.length) {
+    const total = local.reduce((sum, entry) => sum + edgeSpawnWeight(entry.edge, kind), 0);
+    let target = random() * total;
+    for (const entry of local) {
+      target -= edgeSpawnWeight(entry.edge, kind);
+      if (target <= 0) return entry.index;
+    }
+    return local[0].index;
+  }
   return selectSpawnEdgeIndex(graph, random, kind);
 }
 
@@ -217,6 +229,21 @@ function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {})
       continue;
     }
     agent.relocationCooldown = Math.max(0, agent.relocationCooldown - dt);
+    if (kind === 'vehicle' && agent.routeEndHold > 0) {
+      const heldPose = agentPose(agent, graph, behavior.sampleVehicleSurface);
+      const heldDistance = heldPose && behavior.reference
+        ? Math.hypot(heldPose.x - behavior.reference.x, heldPose.z - behavior.reference.z)
+        : 0;
+      agent.routeEndHold = Math.max(0, agent.routeEndHold - dt);
+      agent.currentSpeed = 0;
+      agent.waiting = true;
+      agent.waitReason = 'route_end';
+      if (heldDistance > POPULATION_VISIBILITY_POLICY.exitDistance) {
+        relocateAgent(agent, graph, random, kind, behavior.reference);
+        agent.routeEndHold = 0;
+      }
+      continue;
+    }
     if (agent.bridge) {
       const bridgeSpeed = agent.speed * .72;
       agent.currentSpeed = bridgeSpeed;
@@ -242,10 +269,42 @@ function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {})
       const sameEdge = occupancy.get(agent.edgeIndex) || [];
       const rank = sameEdge.indexOf(agent);
       const leader = rank > 0 ? sameEdge[rank - 1] : null;
-      if (leader && leader.progress - agent.progress < 7.5) speed *= .12;
+      const followingGap = 3.2 + Math.max(0, Number(agent.currentSpeed ?? speed)) * .82;
+      if (leader && leader.progress - agent.progress < followingGap) {
+        const availableGap = Math.max(0, leader.progress - agent.progress - 2.8);
+        speed *= Math.max(0, Math.min(1, availableGap / Math.max(1, followingGap - 2.8)));
+        agent.waitReason = 'traffic_queue';
+      } else {
+        agent.waitReason = '';
+      }
       if (edge.structure?.terrainMode === 'subgrade') speed *= .82;
       if (agent.progress > edge.length * .78 && (outgoing.get(edge.to)?.length || 0) > 1) speed *= .55;
       if (reference && pose && Math.hypot(pose.x - reference.x, pose.z - reference.z) < 7) speed *= .12;
+      const signal = behavior.signalDirective?.(agent.edgeIndex, agent.progress, speed) || null;
+      agent.signalAspect = signal?.aspect || 'none';
+      if (signal?.controlled !== true) {
+        agent.clearedControlId = '';
+        agent.stopWaitSeconds = 0;
+      } else if (signal.kind === 'stop_sign') {
+        const alreadyCleared = agent.clearedControlId === signal.controllerId;
+        if (!alreadyCleared && signal.remaining <= 3.45 && Number(agent.currentSpeed ?? speed) <= .4) {
+          agent.stopWaitSeconds += dt * stride;
+        }
+        if (!alreadyCleared && agent.stopWaitSeconds >= .8) {
+          agent.clearedControlId = signal.controllerId;
+          agent.stopWaitSeconds = 0;
+          speed = Math.max(speed, agent.speed * .28);
+          agent.waitReason = '';
+        } else if (!alreadyCleared && signal.speedScale < 1) {
+          speed *= signal.speedScale;
+          agent.waitReason = 'stop_sign';
+        }
+      } else if (signal?.mustStop && signal.speedScale < 1) {
+        agent.stopWaitSeconds = 0;
+        speed *= signal.speedScale;
+        agent.waitReason = `signal_${signal.aspect}`;
+      }
+      speed *= Math.max(.12, Number(behavior.speedScale) || 1);
     } else {
       if (agent.reactionRemaining > 0) {
         agent.reactionRemaining = Math.max(0, agent.reactionRemaining - dt * stride);
@@ -262,24 +321,36 @@ function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {})
     agent.currentSpeed = speed;
     agent.motionTime += speed * dt * stride * (kind === 'vehicle' ? .42 : 3.1);
     agent.progress += speed * dt * stride;
-    while (agent.progress >= edge.length) {
-      agent.progress -= edge.length;
-      const next = outgoing.get(edge.to) || [];
-      if (kind === 'pedestrian' && edge.role === 'entrance' && graph.nodes?.[edge.to]?.role === 'entrance') {
+    let transitionEdge = edge;
+    while (transitionEdge && agent.progress >= transitionEdge.length) {
+      agent.progress -= transitionEdge.length;
+      const next = outgoing.get(transitionEdge.to) || [];
+      if (kind === 'pedestrian' && transitionEdge.role === 'entrance' && graph.nodes?.[transitionEdge.to]?.role === 'entrance') {
         relocateAgent(agent, graph, random, kind, reference);
         agent.virtualizedEntries = Number(agent.virtualizedEntries || 0) + 1;
         break;
       }
       if (next.length === 0) {
+        if (kind === 'vehicle') {
+          agent.progress = Math.max(0, edge.length - .05);
+          agent.routeEndHold = 18;
+          agent.currentSpeed = 0;
+          agent.waiting = true;
+          agent.waitReason = 'route_end';
+          break;
+        }
         relocateAgent(agent, graph, random, kind, reference);
         break;
       }
       const nextEdgeIndex = next[Math.floor(random() * next.length) % next.length];
       const nextEdge = graph.edges[nextEdgeIndex];
-      const gap = nextEdge ? Math.hypot(nextEdge.p1.x - edge.p2.x, nextEdge.p1.z - edge.p2.z) : 0;
+      const gap = nextEdge ? Math.hypot(
+        nextEdge.p1.x - transitionEdge.p2.x,
+        nextEdge.p1.z - transitionEdge.p2.z
+      ) : 0;
       if (nextEdge && gap > .08) {
         agent.bridge = {
-          p1: { x: edge.p2.x, y: edge.p2.y, z: edge.p2.z },
+          p1: { x: transitionEdge.p2.x, y: transitionEdge.p2.y, z: transitionEdge.p2.z },
           p2: { x: nextEdge.p1.x, y: nextEdge.p1.y, z: nextEdge.p1.z },
           length: gap,
           progress: Math.min(gap, agent.progress),
@@ -289,15 +360,16 @@ function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {})
         break;
       }
       agent.edgeIndex = nextEdgeIndex;
+      transitionEdge = nextEdge;
       if (!nextEdge || agent.progress < nextEdge.length) break;
     }
   }
 }
 
-function updateAgentVisibility(agent, distance, activeRatio, dt) {
+function updateAgentVisibility(agent, distance, activeRatio, dt, policy = POPULATION_VISIBILITY_POLICY) {
   const withinDistance = agent.visibleTarget
-    ? distance <= POPULATION_VISIBILITY_POLICY.exitDistance
-    : distance <= POPULATION_VISIBILITY_POLICY.enterDistance;
+    ? distance <= policy.exitDistance
+    : distance <= policy.enterDistance;
   agent.visibleTarget = agent.relocationCooldown <= 0 && withinDistance && agent.activityAffinity <= activeRatio;
   const rate = agent.visibleTarget ? POPULATION_VISIBILITY_POLICY.fadeInPerSecond : POPULATION_VISIBILITY_POLICY.fadeOutPerSecond;
   const target = agent.visibleTarget ? 1 : 0;
@@ -307,7 +379,8 @@ function updateAgentVisibility(agent, distance, activeRatio, dt) {
 
 export function createLivingWorldPopulation(options = {}) {
   const tier = String(options.tier || 'balanced').toLowerCase();
-  const budget = POPULATION_BUDGET_BY_TIER[tier] || POPULATION_BUDGET_BY_TIER.balanced;
+  const initialDemand = resolveLivingWorldDemand({ tier, timePhase: options.getTimePhase?.(), liveFlow: options.getTrafficFlow?.() });
+  const budget = initialDemand;
   const pedestrianGraph = options.pedestrianGraph;
   const trafficGraph = options.trafficGraph;
   const random = typeof options.random === 'function' ? options.random : Math.random;
@@ -327,6 +400,11 @@ export function createLivingWorldPopulation(options = {}) {
     host.userData.disposeCuratedCharacter = () => disposeCuratedCharacter(host);
     host.userData.updateCuratedCharacterAnimation = (moving, deltaTime, running) =>
       updateCuratedCharacterAnimation(host, moving, deltaTime, running);
+    host.userData.worldClickTarget = () => ({
+      kind: 'living-pedestrian',
+      id: agent.id,
+      label: agent.archetype?.label || 'Local person'
+    });
     agent.visualHost = host;
     agent.curatedAssetId = assetId;
     group.add(host);
@@ -349,6 +427,11 @@ export function createLivingWorldPopulation(options = {}) {
     host.userData.vehiclePresentation = 'curated-only-local-model';
     host.userData.proceduralVehicleMeshCount = 0;
     host.userData.disposeCuratedTrafficVehicle = () => disposeCuratedTrafficVehicle(host);
+    host.userData.worldClickTarget = () => ({
+      kind: 'living-vehicle',
+      id: agent.id,
+      label: agent.variant?.label || 'Road vehicle'
+    });
     agent.visualHost = host;
     group.add(host);
     void attachCuratedTrafficVehicle(THREE, host, {
@@ -361,13 +444,16 @@ export function createLivingWorldPopulation(options = {}) {
   });
   const pedestrianOutgoing = edgeLookup(pedestrianGraph);
   const trafficOutgoing = edgeLookup(trafficGraph, { connectNearby: true });
+  const trafficControls = compileTrafficControlSystem({ graph: trafficGraph, controls: options.trafficControls });
   let accumulator = 0;
   let tick = 0;
+  let elapsedSeconds = 0;
   const referencePosition = () => options.getReferencePosition?.() || null;
-  const activeRatio = () => {
-    const phase = String(options.getTimePhase?.() || 'day');
-    return phase === 'night' ? .58 : phase === 'sunrise' || phase === 'sunset' ? .76 : 1;
-  };
+  const currentDemand = () => resolveLivingWorldDemand({
+    tier,
+    timePhase: options.getTimePhase?.(),
+    liveFlow: options.getTrafficFlow?.()
+  });
 
   const vehicleSnapshot = (agent) => {
     const pose = agentPose(agent, trafficGraph, sampleVehicleSurface);
@@ -389,7 +475,11 @@ export function createLivingWorldPopulation(options = {}) {
       promoted: agent.promoted === true,
       detailPromoted: agent.detailPromoted === true,
       variant: agent.variant,
-      color: agent.color?.getHex?.() ?? 0x566675
+      color: agent.color?.getHex?.() ?? 0x566675,
+      activity: activityLabelForEdge(trafficGraph.edges[agent.edgeIndex], 'vehicle'),
+      waiting: agent.waiting === true,
+      waitReason: agent.waitReason || '',
+      signalAspect: agent.signalAspect || 'none'
     });
   };
 
@@ -411,13 +501,17 @@ export function createLivingWorldPopulation(options = {}) {
       skinColor: agent.skinColor?.getHex?.() ?? 0x9a6d52,
       heightScale: Number(agent.heightScale || 1),
       reaction: agent.reaction || '',
-      reactionRemaining: Number(Math.max(0, agent.reactionRemaining || 0).toFixed(2))
+      reactionRemaining: Number(Math.max(0, agent.reactionRemaining || 0).toFixed(2)),
+      activity: activityLabelForEdge(pedestrianGraph.edges[agent.edgeIndex], 'pedestrian'),
+      waiting: agent.waiting === true
     });
   };
 
   const updateCuratedPedestrianHosts = (dt = POPULATION_STEP_SECONDS) => {
     const reference = referencePosition();
-    const ratio = activeRatio();
+    const demand = currentDemand();
+    const ratio = demand.pedestrianActiveRatio;
+    const visibilityPolicy = { enterDistance: demand.pedestrianRadius, exitDistance: demand.pedestrianExitRadius };
     pedestrians.forEach((agent) => {
       const pose = agentPose(agent, pedestrianGraph);
       const host = agent.visualHost;
@@ -427,7 +521,7 @@ export function createLivingWorldPopulation(options = {}) {
         agent.visibleTarget = false;
         agent.visibility = 0;
       } else {
-        updateAgentVisibility(agent, distance, ratio, dt);
+        updateAgentVisibility(agent, distance, ratio, dt, visibilityPolicy);
       }
       host.position.set(pose.x, pose.y, pose.z);
       host.rotation.set(0, pose.yaw, 0);
@@ -447,7 +541,9 @@ export function createLivingWorldPopulation(options = {}) {
 
   const updateCuratedVehicleHosts = (dt = POPULATION_STEP_SECONDS) => {
     const reference = referencePosition();
-    const ratio = activeRatio();
+    const demand = currentDemand();
+    const ratio = demand.vehicleActiveRatio;
+    const visibilityPolicy = { enterDistance: demand.vehicleRadius, exitDistance: demand.vehicleExitRadius };
     vehicles.forEach((agent) => {
       const pose = agentPose(agent, trafficGraph, sampleVehicleSurface);
       const host = agent.visualHost;
@@ -457,7 +553,7 @@ export function createLivingWorldPopulation(options = {}) {
         agent.visibleTarget = false;
         agent.visibility = 0;
       } else {
-        updateAgentVisibility(agent, distance, ratio, dt);
+        updateAgentVisibility(agent, distance, ratio, dt, visibilityPolicy);
       }
       agent.renderedPitch = Number(pose.pitch || 0);
       agent.renderedRoll = Number(pose.roll || 0);
@@ -500,6 +596,9 @@ export function createLivingWorldPopulation(options = {}) {
       curatedVehicleHosts: vehicleHosts.length,
       simulationHz: 30,
       vehicleAttitudeAuthority: 'published-road-four-wheel-contact',
+      demandAuthority: 'mapped-activity-time-and-optional-aggregate-flow',
+      controlledJunctions: trafficControls.controllers.length,
+      controlledApproaches: trafficControls.controlledApproaches,
       visibilityPolicy: POPULATION_VISIBILITY_POLICY,
       characterArchetypes: Object.freeze([...new Set(pedestrians.map((agent) => agent.archetype.id))].sort()),
       vehicleCategories: Object.freeze([...new Set(vehicles.map((agent) => agent.variant.id))].sort()),
@@ -537,6 +636,9 @@ export function createLivingWorldPopulation(options = {}) {
     },
     pedestrianSnapshots() {
       return Object.freeze(pedestrians.map(pedestrianSnapshot).filter(Boolean));
+    },
+    pickableRoots() {
+      return Object.freeze([...pedestrianHosts, ...vehicleHosts].filter((host) => host?.visible));
     },
     promotePedestrian(agentId) {
       const agent = pedestrians.find((entry) => entry.id === String(agentId || ''));
@@ -659,8 +761,16 @@ export function createLivingWorldPopulation(options = {}) {
       accumulator -= stepCount * POPULATION_STEP_SECONDS;
       for (let stepIndex = 0; stepIndex < stepCount; stepIndex += 1) {
         tick += 1;
+        elapsedSeconds += POPULATION_STEP_SECONDS;
         const reference = referencePosition();
-        advanceAgents(vehicles, trafficGraph, trafficOutgoing, random, POPULATION_STEP_SECONDS, 'vehicle', { reference, tick, sampleVehicleSurface });
+        const demand = currentDemand();
+        advanceAgents(vehicles, trafficGraph, trafficOutgoing, random, POPULATION_STEP_SECONDS, 'vehicle', {
+          reference,
+          tick,
+          sampleVehicleSurface,
+          speedScale: demand.vehicleSpeedScale,
+          signalDirective: (edgeIndex, progress, speed) => trafficControls.directive(edgeIndex, progress, speed, elapsedSeconds)
+        });
         const vehiclePoses = vehicles.map((agent) => agentPose(agent, trafficGraph, sampleVehicleSurface)).filter(Boolean);
         advanceAgents(pedestrians, pedestrianGraph, pedestrianOutgoing, random, POPULATION_STEP_SECONDS, 'pedestrian', {
           reference,
@@ -672,6 +782,7 @@ export function createLivingWorldPopulation(options = {}) {
           }
         });
       }
+      options.updateTrafficSignalVisuals?.(trafficControls.states(elapsedSeconds));
       updateCuratedPedestrianHosts(stepCount * POPULATION_STEP_SECONDS);
       updateCuratedVehicleHosts(stepCount * POPULATION_STEP_SECONDS);
     },

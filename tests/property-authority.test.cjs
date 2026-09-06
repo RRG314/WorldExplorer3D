@@ -62,6 +62,35 @@ function property() {
   };
 }
 
+function marylandParcelProperty() {
+  return {
+    propertyId: 'parcel:md:baci:sjv39y',
+    parcelId: 'md:baci:sjv39y',
+    sourceParcelId: '03-0000123456789',
+    parcelAuthority: 'maryland-imap-parcels',
+    jurisdictionCode: 'BACI',
+    jurisdictionName: 'Baltimore City',
+    locationId: 'baltimore:39.2904:-76.6122',
+    locationLabel: 'Baltimore',
+    label: '100 Test Street',
+    kind: 'Residential parcel',
+    buildingType: 'house',
+    area: 80,
+    footprintArea: 110,
+    levels: 2,
+    parcelAreaSqM: 1012,
+    reportedAcres: 0.25,
+    sourceAssessment: 315000,
+    landUseCode: 'R',
+    landUseDescription: 'Residential',
+    geometryDate: '2024DEC',
+    assessmentDate: '2026Q1',
+    associatedBuildingIds: ['osm:way:1', 'osm:way:2'],
+    x: 20,
+    z: 28
+  };
+}
+
 function actionOptions(state, uid, action, requestId, extra = {}) {
   const selectedProperty = extra.property || property();
   const propertyId = propertyDocumentId(selectedProperty.propertyId);
@@ -131,6 +160,24 @@ test('a world property can only be bought once and retries do not charge twice',
   assert.equal(conflict.accepted, false);
   assert.equal(conflict.reason, 'already_owned');
   assert.equal(state.store.get('users/two/economy/wallet'), undefined);
+});
+
+test('a Maryland parcel purchase uses the same Explorer Wallet and property registry', async () => {
+  const state = transactionStore();
+  const selected = marylandParcelProperty();
+  const result = await settlePropertyAction(actionOptions(state, 'one', 'buy', 'parcel-buy-one', {
+    property: selected
+  }));
+  const id = propertyDocumentId(selected.propertyId);
+  const catalog = state.store.get(`worldPropertyCatalog/${id}`);
+
+  assert.equal(result.accepted, true);
+  assert.equal(result.property.propertyId, selected.propertyId);
+  assert.equal(result.credits, STARTING_CREDITS - result.property.baseValue);
+  assert.equal(state.store.get('users/one/economy/wallet').credits, result.credits);
+  assert.equal(catalog.parcelId, selected.parcelId);
+  assert.deepEqual(catalog.associatedBuildingIds, selected.associatedBuildingIds);
+  assert.equal([...state.store.keys()].some((path) => /parcel.*wallet/i.test(path)), false);
 });
 
 test('generated scene pieces are rejected by the world property authority', () => {

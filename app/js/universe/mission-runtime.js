@@ -2,7 +2,7 @@ import { getDestinationMission } from './mission-catalog.js?v=3';
 import { createDestinationMissionStore, DESTINATION_MISSION_PHASE } from './mission-authority.js?v=3';
 import { resolveUniverseAddress } from './catalog.js?v=11';
 import { DEFAULT_CREW } from '../expedition/catalog.js?v=2';
-import { createExpeditionStore } from '../expedition/store.js?v=11';
+import { createExpeditionStore } from '../expedition/store.js?v=12';
 
 let activeContext = null;
 let missionStore = null;

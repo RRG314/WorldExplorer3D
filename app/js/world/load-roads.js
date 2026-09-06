@@ -6,7 +6,7 @@ import {
   createWorldLoadRuntimeSession,
   finishSupersededWorldLoadRuntimeSession,
   finishWorldLoadRuntimeSession
-} from "./load-runtime-session.js?v=117";
+} from "./load-runtime-session.js?v=120";
 import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=27";
 import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=7";
 import { createWorldLoadPlan } from "../earth-core/world-load-plan.js?v=1";
@@ -642,14 +642,16 @@ export function createWorldRoadLoader(deps = {}) {
           mapped: exactCivicElements.length,
           status: exactTransportLoaded ? (exactCivicElements.length ? 'loaded' : 'authoritative-empty') : 'unavailable'
         };
-        const commerceShopTypes = new Set(['convenience', 'supermarket', 'hardware', 'doityourself', 'pawnbroker', 'second_hand', 'car_repair', 'car_parts', 'outdoor', 'fishing', 'boat', 'aviation']);
+        const commerceShopTypes = new Set(['convenience', 'supermarket', 'general', 'kiosk', 'department_store', 'hardware', 'doityourself', 'pawnbroker', 'second_hand', 'car_repair', 'car_parts', 'tyres', 'pet', 'outdoor', 'sports', 'fishing', 'hunting', 'scuba_diving', 'boat', 'aviation', 'clothes', 'shoes']);
+        const commerceAmenityTypes = new Set(['marketplace', 'fuel', 'charging_station', 'veterinary', 'veterinary_pharmacy', 'hospital', 'clinic', 'doctors', 'pharmacy', 'dive_centre']);
+        const commerceHealthcareTypes = new Set(['hospital', 'clinic', 'doctor', 'doctors', 'pharmacy']);
         const mappedCommerceCount = (data?.elements || []).filter((element) =>
-          (commerceShopTypes.has(String(element?.tags?.shop || '').toLowerCase()) || ['fuel', 'charging_station'].includes(String(element?.tags?.amenity || '').toLowerCase())) &&
+          (commerceShopTypes.has(String(element?.tags?.shop || '').toLowerCase()) || commerceAmenityTypes.has(String(element?.tags?.amenity || '').toLowerCase()) || commerceHealthcareTypes.has(String(element?.tags?.healthcare || '').toLowerCase()) || String(element?.tags?.leisure || '').toLowerCase() === 'marina') &&
           Number.isFinite(Number(element.lat ?? element.center?.lat)) &&
           Number.isFinite(Number(element.lon ?? element.center?.lon))
         ).length;
         const shortbreadCommerceCount = (data?.elements || []).filter((element) =>
-          (commerceShopTypes.has(String(element?.tags?.shop || '').toLowerCase()) || ['fuel', 'charging_station'].includes(String(element?.tags?.amenity || '').toLowerCase())) &&
+          (commerceShopTypes.has(String(element?.tags?.shop || '').toLowerCase()) || commerceAmenityTypes.has(String(element?.tags?.amenity || '').toLowerCase()) || commerceHealthcareTypes.has(String(element?.tags?.healthcare || '').toLowerCase()) || String(element?.tags?.leisure || '').toLowerCase() === 'marina') &&
           String(element?.tags?._sourceFeatureId || '').startsWith('shortbread:pois:')
         ).length;
         loadMetrics.commercePlaces = {

@@ -4,8 +4,8 @@ import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleMassKg } from '../engine/vehicle-
 import { applyTransportDamage } from '../transport/damage-model.js?v=1';
 import { createCivicResponseModel } from './civic-response-model.js?v=3';
 import { ensurePlayerBackpackInventory } from './equipment-model.js?v=10';
-import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=23';
-import { createEquipmentVisuals } from './equipment-visuals.js?v=9';
+import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=24';
+import { createEquipmentVisuals } from './equipment-visuals.js?v=10';
 import {
   attachCuratedEquipmentVisual,
   disposeCuratedEquipmentVisual
@@ -24,7 +24,12 @@ import {
 import { applyConditionImpact } from './impact-model.js?v=1';
 import { dampCrashMotion, resolveCrashImpact } from './crash-physics.js?v=1';
 import { sampleSweptContact } from '../physics/swept-contact.js?v=1';
-import { createLocalCommerceModel, mappedCommercePlaces } from './commerce-model.js?v=3';
+import { createLocalCommerceModel, mappedCommercePlaces } from './commerce-model.js?v=5';
+import { createConnectedExplorerWallet } from '../economy/connected-wallet-authority.js?v=2';
+import { ensurePlayerConditionAuthority } from '../player/condition-model.js?v=1';
+import { createConnectedPlayerState } from '../player/connected-player-state.js?v=1';
+import { ensureVehicleUpgradeStore, parseUpgradeServiceId, stableVehicleIdentity } from '../transport/vehicle-upgrades.js?v=1';
+import { getCurrentUser } from '../../../js/auth-ui.js?v=55';
 import { emitProductTelemetry } from '../platform/product-telemetry.js?v=1';
 import { claimLootPickup, createLootPickup } from './loot-pickup-model.js?v=1';
 import { NPC_COMBAT_STATES, resolveNpcCombatState } from './npc-combat-policy.js?v=2';
@@ -36,7 +41,7 @@ import {
   updateCuratedCharacterAnimation
 } from '../walking/curated-explorer-character.js?v=7';
 
-const ENTER_DISTANCE = 3.4;
+const ENTER_DISTANCE = 2.8;
 // Room clients can assemble slightly different collision envelopes when a live
 // map-provider request succeeds for one player and falls back for another. A
 // released authoritative vehicle keeps its shared pose, but the receiving
@@ -804,6 +809,23 @@ function nearestStoreCandidate(state, radius = STORE_INTERACTION_DISTANCE) {
     .sort((left, right) => left.distance - right.distance)[0] || null;
 }
 
+function nearestMechanicCandidate(state, radius = STORE_INTERACTION_DISTANCE) {
+  if (!activeWorldMatches(state) || state.transition || appCtx.activeInterior || state.storeOpen) return null;
+  const actor = state.activeVehicle && appCtx.Walk?.state?.mode !== 'walk' ? appCtx.car : appCtx.Walk?.state?.walker;
+  if (!actor || (state.activeVehicle && Math.abs(Number(appCtx.car?.speed || 0)) > EXIT_SPEED_LIMIT)) return null;
+  return state.stores
+    .filter((store) => store.kind === 'mechanic')
+    .map((store) => ({ store, distance: Math.hypot(store.x - Number(actor.x || 0), store.z - Number(actor.z || 0)) }))
+    .filter((entry) => entry.distance <= radius)
+    .sort((left, right) => left.distance - right.distance || left.store.id.localeCompare(right.store.id))[0] || null;
+}
+
+function openNearbyMechanic(state) {
+  const nearest = nearestMechanicCandidate(state);
+  if (!nearest) return false;
+  return openStore(state, nearest.store.id, { allowVehicle: true });
+}
+
 function storeInteractionCandidate(state) {
   if (!activeWorldMatches(state) || state.transition || appCtx.activeInterior || state.storeOpen) return null;
   const nearestStore = nearestStoreCandidate(state);
@@ -895,8 +917,25 @@ function commerceFailureMessage(reason) {
     store_not_authorized_for_item: 'This business does not trade that type of item.',
     already_traded_today: 'This store’s rare trade is complete for today.',
     missing_trade_items: 'The Backpack does not have the requested trade items.',
-    inventory_unavailable: 'The Backpack could not complete that exchange.'
+    inventory_unavailable: 'The Backpack could not complete that exchange.',
+    item_not_wallet_verified: 'Only items recorded by your Explorer Wallet can be sold while signed in.',
+    connected_trade_unavailable: 'Rare counter trades are paused while their one-wallet receipt flow is completed.',
+    service_not_available: 'That service is not available at this mapped place.',
+    service_target_unavailable: 'Bring the relevant vehicle or companion into the world before using that service.',
+    service_effect_failed_refunded: 'The service could not be applied, so the Explorer Wallet charge was refunded.',
+    settlement_recovery_required: 'The service is safely recorded and will finish recovery when the Explorer Wallet reconnects.',
+    delivery_recovery_required: 'The wallet record is safe, but the Backpack is still syncing this item.',
+    wallet_unavailable: 'Your Explorer Wallet is reconnecting. Nothing was charged.'
   }[String(reason || '')] || 'That exchange could not be completed.';
+}
+
+function poiServiceTargetAvailable(state, serviceId) {
+  if (serviceId === 'companion-wellness') return Boolean(appCtx.worldDiscoveryRuntime?.companionRuntime?.snapshot?.().activeInstanceId);
+  if (serviceId === 'player-treatment') return Number(state.playerCondition ?? 1) < .999;
+  if (serviceId === 'vehicle-full-repair') return Number((state.activeVehicle || appCtx.car)?.condition ?? 1) < .999;
+  if (serviceId === 'vessel-full-repair') return Boolean(appCtx.boatMode?.transportEntityId) && Number(appCtx.boatMode?.condition ?? 1) < .999;
+  if (parseUpgradeServiceId(serviceId)) return state.vehicleUpgradeStore.canApply(state.activeVehicle || appCtx.car, serviceId);
+  return false;
 }
 
 function renderStore(state) {
@@ -910,6 +949,18 @@ function renderStore(state) {
   ui.name.textContent = store.name;
   ui.source.textContent = `${store.label} · game stock · ${store.attribution} · ${store.license}`;
   ui.credits.textContent = formatExplorerDollars(view.credits);
+  const availableServices = view.services.filter((service) => (
+    !parseUpgradeServiceId(service.id) || state.vehicleUpgradeStore.canApply(state.activeVehicle || appCtx.car, service.id)
+  ));
+  ui.servicesSection.hidden = availableServices.length === 0;
+  ui.services.innerHTML = availableServices.map((service) => {
+    const eligible = poiServiceTargetAvailable(state, service.id);
+    return `<article class="urbanStoreCard service">
+      <strong>${escapeHtml(service.label)}</strong>
+      <small>${escapeHtml(service.description)}${eligible ? '' : ' · No service needed or target available.'}</small>
+      <button type="button" data-store-action="service" data-store-item="${escapeHtml(service.id)}"${!eligible || view.credits < service.price ? ' disabled' : ''}>Use service · ${formatExplorerDollars(service.price)}</button>
+    </article>`;
+  }).join('');
   ui.stock.innerHTML = view.standard.map((item) => `
     <article class="urbanStoreCard">
       <strong>${escapeHtml(item.label)}</strong>
@@ -931,9 +982,10 @@ function renderStore(state) {
   ui.status.textContent = state.storeStatus;
 }
 
-function openStore(state, storeId) {
+function openStore(state, storeId, options = {}) {
   const store = state.stores.find((entry) => entry.id === String(storeId || ''));
-  if (!store || appCtx.Walk?.state?.mode !== 'walk') return false;
+  const walking = appCtx.Walk?.state?.mode === 'walk';
+  if (!store || (!walking && !(options.allowVehicle === true && store.kind === 'mechanic'))) return false;
   state.equipmentRuntime?.toggle?.(false);
   state.activeStoreId = store.id;
   state.storeOpen = true;
@@ -956,22 +1008,39 @@ function closeStore(state) {
   return true;
 }
 
-function handleStoreAction(state, event) {
+async function handleStoreAction(state, event) {
   const button = event.target?.closest?.('[data-store-action]');
   const store = activeStore(state);
   if (!button || !store) return false;
   const action = button.dataset.storeAction;
-  const result = action === 'buy'
+  if (action === 'service' && !poiServiceTargetAvailable(state, button.dataset.storeItem)) {
+    state.storeStatus = commerceFailureMessage('service_target_unavailable');
+    renderStore(state);
+    return true;
+  }
+  state.storeStatus = 'Completing wallet transaction…';
+  renderStore(state);
+  const result = await (action === 'buy'
     ? state.commerce.buy(store, button.dataset.storeItem)
     : action === 'sell'
       ? state.commerce.sell(store, button.dataset.storeItem)
-      : action === 'trade' ? state.commerce.trade(store) : null;
+      : action === 'trade' ? state.commerce.trade(store)
+        : action === 'service' ? state.commerce.service(
+          store,
+          button.dataset.storeItem,
+          (service, receiptId) => applyPoiService(state, service, receiptId),
+          parseUpgradeServiceId(button.dataset.storeItem)
+            ? { targetId: stableVehicleIdentity(state.activeVehicle || appCtx.car) }
+            : {}
+        ) : null);
   if (!result) return false;
   state.storeStatus = result.ok
     ? action === 'sell'
       ? `${result.item.label} sold · ${formatExplorerDollars(result.credits)} available`
       : action === 'trade'
         ? `${result.item.label} added to Backpack · rare trade complete`
+        : action === 'service'
+          ? `${result.service.label} complete · ${formatExplorerDollars(result.credits)} available`
         : `${result.item.label} added to Backpack · ${formatExplorerDollars(result.credits)} available`
     : commerceFailureMessage(result.reason);
   if (result.ok) {
@@ -983,6 +1052,49 @@ function handleStoreAction(state, event) {
   renderStore(state);
   renderEquipment(state);
   return true;
+}
+
+async function applyPoiService(state, service, receiptId = '') {
+  if (service?.id === 'player-treatment' && Number(state.playerCondition ?? 1) < .999) {
+    state.playerCondition = 1;
+    return true;
+  }
+  if (service?.id === 'vehicle-full-repair') {
+    const vehicle = state.activeVehicle || appCtx.car;
+    if (!vehicle || Number(vehicle.condition ?? 1) >= .999) return false;
+    vehicle.condition = 1;
+    if (state.activeVehicle) state.activeVehicle.visual?.setCondition?.(1);
+    if (appCtx.car) appCtx.car.condition = 1;
+    return true;
+  }
+  if (service?.id === 'vessel-full-repair' && appCtx.boatMode?.transportEntityId && Number(appCtx.boatMode?.condition ?? 1) < .999) {
+    appCtx.boatMode.condition = 1;
+    return true;
+  }
+  if (service?.id === 'companion-wellness') {
+    const runtime = appCtx.worldDiscoveryRuntime?.companionRuntime;
+    const activeId = runtime?.snapshot?.().activeInstanceId;
+    if (!runtime || !activeId) return false;
+    await runtime.care(activeId, 'feed');
+    await runtime.awardXp({ receiptId: `poi-care:${receiptId || Date.now()}`, reasonId: 'care-after-outing' });
+    return true;
+  }
+  if (parseUpgradeServiceId(service?.id)) {
+    const target = state.activeVehicle || appCtx.car;
+    const result = state.vehicleUpgradeStore.apply(target, service.id);
+    if (!result.ok) return false;
+    appCtx.car.upgradeState = state.vehicleUpgradeStore.snapshot(target);
+    state.lastAction = Object.freeze({
+      type: 'vehicle_upgrade_installed',
+      vehicleId: result.vehicleId,
+      upgradeId: result.upgradeId,
+      level: result.level,
+      receiptId,
+      at: now()
+    });
+    return true;
+  }
+  return false;
 }
 
 function releasePromotedNpc(state, npc, options = {}) {
@@ -1161,6 +1273,10 @@ function retireDisabledRoadVehicle(state, vehicle) {
 function updateEntityLifecycle(state) {
   if (!activeWorldMatches(state)) return;
   const current = now();
+  if (current - Number(state.lastPoiActivationAt || 0) >= 500) {
+    appCtx.refreshActiveFunctionalPois?.(appCtx.Walk?.state?.walker || appCtx.car);
+    state.lastPoiActivationAt = current;
+  }
   state.npcs.slice().forEach((npc) => {
     if (Number(npc.condition ?? 1) > .05) {
       npc.downedAt = 0;
@@ -1361,10 +1477,16 @@ function interactionCandidate(state) {
   if (!activeWorldMatches(state) || state.transition || appCtx.activeInterior || state.storeOpen) return null;
   if (state.activeVehicle && appCtx.Walk?.state?.mode !== 'walk') {
     const speed = Math.abs(Number(appCtx.car?.speed || 0));
+    if (speed > 1.25) {
+      state.vehicleExitPromptEligibleAt = now() + 450;
+      return null;
+    }
+    if (!Number.isFinite(state.vehicleExitPromptEligibleAt)) state.vehicleExitPromptEligibleAt = now() + 450;
+    if (now() < state.vehicleExitPromptEligibleAt) return null;
     return {
       available: true,
       action: 'exit_vehicle',
-      label: speed <= EXIT_SPEED_LIMIT ? 'Exit vehicle' : 'Stop to exit',
+      label: 'Exit vehicle',
       detail: state.activeVehicle.variant.label,
       distance: 0,
       data: { vehicleId: state.activeVehicle.id, speed }
@@ -1499,6 +1621,7 @@ function resetPlayerVehicleVisual(state) {
   appCtx.car.durabilityPolicy = state.defaultCarDurabilityPolicy;
   appCtx.car.resistance = state.defaultCarResistance;
   appCtx.car.transportCatalogId = 'sedan';
+  appCtx.car.vehicleIdentity = 'player-default:sedan';
 }
 
 function stopServiceSiren(state) {
@@ -1609,6 +1732,7 @@ function mountVehicleForDriving(state, vehicle) {
   appCtx.car.durabilityPolicy = vehicle.durabilityPolicy || vehicle.variant?.durabilityPolicy || 'standard';
   appCtx.car.resistance = Number(vehicle.resistance || vehicle.variant?.resistance || 160);
   appCtx.car.transportCatalogId = vehicle.variant.id;
+  appCtx.car.vehicleIdentity = vehicle.id;
   appCtx.car.x = pose.x;
   appCtx.car.y = pose.y;
   appCtx.car.z = pose.z;
@@ -2194,10 +2318,7 @@ function performResponderLoot(state, candidate) {
 
 function renderEquipment(state) {
   state.equipmentRuntime?.render();
-  const propertyWallet = appCtx.getExplorerPropertySnapshot?.();
-  const walletAmount = propertyWallet?.authRequired === false && Number.isFinite(Number(propertyWallet.credits))
-    ? Number(propertyWallet.credits)
-    : Number(state.commerce?.wallet?.().credits || 0);
+  const walletAmount = Number(state.commerce?.wallet?.().credits || 0);
   if (state.equipmentUi?.wallet) {
     state.equipmentUi.wallet.textContent = formatExplorerDollars(walletAmount);
   }
@@ -2315,6 +2436,7 @@ function updatePrompt(state) {
   const candidate = appCtx.resolvePrimaryContextInteraction?.() || interactionCandidate(state);
   const transientStatus = state.statusUntil > now() ? state.statusMessage : '';
   if (!candidate && !transientStatus) {
+    prompt.root.classList.remove('familiar');
     prompt.secondaryKey.hidden = true;
     prompt.secondaryButton.hidden = true;
     prompt.takeKey.hidden = true;
@@ -2324,12 +2446,13 @@ function updatePrompt(state) {
     return;
   }
   prompt.root.classList.add('show');
+  prompt.root.classList.toggle('familiar', !transientStatus && candidate?.familiar === true);
   prompt.root.setAttribute('aria-hidden', 'false');
   prompt.title.textContent = transientStatus || candidate.label;
-  prompt.meta.textContent = transientStatus
+  prompt.meta.textContent = transientStatus || candidate?.familiar === true
     ? ''
     : `${candidate.detail}${candidate.distance ? ` • ${candidate.distance.toFixed(1)} m` : ''}`;
-  prompt.key.textContent = candidate?.action === 'exit_vehicle' ? 'E' : 'E';
+  prompt.key.textContent = appCtx.getControlPromptLabel?.('interact') || appCtx.getControlBindingLabel?.('interact') || 'E';
   prompt.button.textContent = candidate?.label || (candidate?.action === 'exit_vehicle' ? 'Exit' : 'Enter');
   if (candidate?.action === 'talk_npc') prompt.button.textContent = 'Talk';
   if (candidate?.action === 'loot_npc') prompt.button.textContent = 'Search';
@@ -2380,7 +2503,12 @@ function snapshot(state) {
     defaultPlayerVehicle: Object.freeze({
       curatedAssetId: String(appCtx.carMesh?.userData?.curatedVehicleAssetId || ''),
       presentation: String(appCtx.carMesh?.userData?.vehiclePresentation || ''),
-      proceduralVehicleMeshes: Number(appCtx.carMesh?.userData?.proceduralVehicleMeshCount || 0)
+      proceduralVehicleMeshes: Number(appCtx.carMesh?.userData?.proceduralVehicleMeshCount || 0),
+      condition: Number(Number(appCtx.car?.condition ?? 1).toFixed(3)),
+      alwaysDrivable: appCtx.car?.durabilityPolicy === 'exploration_unlimited',
+      airborne: appCtx.car?.isAirborne === true,
+      verticalVelocity: Number(Number(appCtx.car?.vy || 0).toFixed(3)),
+      upgrades: state.vehicleUpgradeStore.snapshot(state.activeVehicle || appCtx.car)
     }),
     activeVehicleId: state.activeVehicle?.id || '',
     playerVehicle: state.activeVehicle ? Object.freeze({
@@ -2604,6 +2732,7 @@ function disposeRuntime(state, reason = 'disposed') {
   document.getElementById('caughtBtn')?.removeEventListener('click', state.onCustodyContinue);
   if (appCtx.handleUrbanCustodyContinue === state.onCustodyContinue) delete appCtx.handleUrbanCustodyContinue;
   if (appCtx.toggleUrbanResponderEquipment === state.toggleServiceEquipment) delete appCtx.toggleUrbanResponderEquipment;
+  if (appCtx.handleMechanicInteraction === state.handleMechanicInteraction) delete appCtx.handleMechanicInteraction;
   const caughtMessage = document.getElementById('caughtScreen')?.querySelector?.('.caughtText');
   if (caughtMessage) caughtMessage.textContent = 'You were caught. Continue from the nearest safe location.';
   const caughtTitle = document.getElementById('caughtScreen')?.querySelector?.('.caughtTitle');
@@ -2611,6 +2740,7 @@ function disposeRuntime(state, reason = 'disposed') {
   const caughtButton = document.getElementById('caughtBtn');
   if (caughtButton) caughtButton.textContent = 'Try Again';
   state.unsubscribeBackpack?.();
+  state.stopWalletSubscription?.();
   appCtx.screenLayout?.setPanelLayer?.('backpack', false);
   state.prompt?.root?.classList.remove('show');
   state.equipmentUi?.root?.classList.remove('show');
@@ -2733,15 +2863,50 @@ function startUrbanSandboxRuntime(options = {}) {
   };
   const equipment = ensurePlayerBackpackInventory(appCtx);
   const backpackStore = appCtx.playerBackpackStore;
-  const stores = mappedCommercePlaces(appCtx.pois);
-  const commerce = appCtx.worldEconomy || appCtx.localConvenienceStoreCommerce || createLocalCommerceModel({ inventory: equipment });
+  const stores = mappedCommercePlaces(appCtx.functionalPoiRecords || appCtx.pois, {
+    buildings: appCtx.buildings,
+    entranceByBuilding: appCtx.buildingEntranceByBuilding
+  });
+  const currentUser = getCurrentUser();
+  if (appCtx.connectedExplorerWallet && appCtx.connectedExplorerWallet.uid !== currentUser?.uid) {
+    appCtx.connectedExplorerWallet.dispose?.();
+    appCtx.connectedExplorerWallet = null;
+  }
+  const connectedWallet = appCtx.connectedExplorerWallet || createConnectedExplorerWallet({
+    onError: () => appCtx.urbanSandboxRuntime && setStatus(appCtx.urbanSandboxRuntime, 'Explorer Wallet is reconnecting.', 2200)
+  });
+  if (connectedWallet) appCtx.connectedExplorerWallet = connectedWallet;
+  const stopWalletSubscription = connectedWallet?.subscribe?.(() => {
+    if (!appCtx.urbanSandboxRuntime) return;
+    renderEquipment(appCtx.urbanSandboxRuntime);
+    if (appCtx.urbanSandboxRuntime.storeOpen) renderStore(appCtx.urbanSandboxRuntime);
+  }) || null;
+  const commerce = connectedWallet
+    ? createLocalCommerceModel({ inventory: equipment, transactionAuthority: connectedWallet })
+    : appCtx.worldEconomy || appCtx.localConvenienceStoreCommerce || createLocalCommerceModel({ inventory: equipment });
   appCtx.worldEconomy = commerce;
   appCtx.localConvenienceStoreCommerce = commerce;
+  const playerConditionAuthority = ensurePlayerConditionAuthority(appCtx);
+  const vehicleUpgradeStore = ensureVehicleUpgradeStore(appCtx);
+  if (appCtx.connectedExplorerPlayerState && appCtx.connectedExplorerPlayerState.uid !== currentUser?.uid) {
+    appCtx.connectedExplorerPlayerState.dispose?.();
+    appCtx.connectedExplorerPlayerState = null;
+  }
+  if (!appCtx.connectedExplorerPlayerState && currentUser?.uid) {
+    appCtx.connectedExplorerPlayerState = createConnectedPlayerState({
+      conditionAuthority: playerConditionAuthority,
+      vehicleUpgradeStore,
+      onError: () => appCtx.urbanSandboxRuntime && setStatus(appCtx.urbanSandboxRuntime, 'Explorer health and upgrades are reconnecting.', 2200),
+      onChange: () => appCtx.urbanSandboxRuntime && renderEquipment(appCtx.urbanSandboxRuntime)
+    });
+  }
   const storeUi = {
     root: document.getElementById('urbanStore'),
     name: document.getElementById('urbanStoreName'),
     source: document.getElementById('urbanStoreSource'),
     credits: document.getElementById('urbanStoreCredits'),
+    servicesSection: document.getElementById('urbanStoreServicesSection'),
+    services: document.getElementById('urbanStoreServices'),
     stock: document.getElementById('urbanStoreStock'),
     sell: document.getElementById('urbanStoreSell'),
     rare: document.getElementById('urbanStoreRare'),
@@ -2821,6 +2986,7 @@ function startUrbanSandboxRuntime(options = {}) {
     promptElapsed: 0,
     npcPromotionElapsed: 0,
     vehiclePromotionElapsed: 0,
+    vehicleExitPromptEligibleAt: NaN,
     recklessElapsed: 0,
     recklessEventCooldown: 0,
     civicUiElapsed: 0,
@@ -2829,9 +2995,12 @@ function startUrbanSandboxRuntime(options = {}) {
     responders: null,
     equipment,
     backpackStore,
+    stopWalletSubscription,
     stores,
     storeApproaches: new Map(),
     commerce,
+    playerConditionAuthority,
+    vehicleUpgradeStore,
     storeOpen: false,
     activeStoreId: '',
     storeStatus: '',
@@ -2847,7 +3016,6 @@ function startUrbanSandboxRuntime(options = {}) {
       handoffSource: '',
       handoffDistance: null
     },
-    playerCondition: 1,
     custody: null,
     flashlight,
     authority: null,
@@ -2855,6 +3023,17 @@ function startUrbanSandboxRuntime(options = {}) {
     remoteEntities: new Map(),
     roomAuthorityRuntime: null
   };
+  Object.defineProperty(state, 'playerCondition', {
+    configurable: true,
+    enumerable: true,
+    get: () => state.playerConditionAuthority.snapshot().condition,
+    set: (value) => { state.playerConditionAuthority.set(value, 'urban-runtime'); }
+  });
+  void state.commerce.recoverPending?.((service, receiptId) => applyPoiService(state, service, receiptId)).then((result) => {
+    if (result?.recovered > 0 && activeWorldMatches(state)) {
+      setStatus(state, `${result.recovered} Explorer Wallet service ${result.recovered === 1 ? 'receipt' : 'receipts'} recovered.`, 2600);
+    }
+  });
   state.civic = createCivicResponseModel({
     request: options.request,
     getActorPosition: () => civicActorPosition(state)
@@ -2941,6 +3120,15 @@ function startUrbanSandboxRuntime(options = {}) {
     reportCivicEvent: (event) => reportCivicEvent(state, event),
     onNpcShot: (impact) => applyArmedNpcImpact(state, impact),
     onNpcDowned: (npc) => dropNpcLoot(state, npc),
+    onConsume: (item) => {
+      const restore = Math.max(0, Number(item?.metadata?.conditionRestore || item?.conditionRestore || 0));
+      if (!restore) return Object.freeze({ ok: false, reason: 'not_consumable' });
+      if (state.playerCondition >= .999) return Object.freeze({ ok: false, reason: 'full_health' });
+      if (!state.equipment.consumeItem(item.instanceId, 1)) return Object.freeze({ ok: false, reason: 'inventory_unavailable' });
+      const result = state.playerConditionAuthority.restore(restore, `consumed:${item.catalogId}`);
+      renderEquipment(state);
+      return Object.freeze({ ok: true, condition: result.after });
+    },
     setStatus: (message, duration) => setStatus(state, message, duration),
     now
   });
@@ -3015,7 +3203,7 @@ function startUrbanSandboxRuntime(options = {}) {
     );
   };
   state.onStoreClose = () => closeStore(state);
-  state.onStoreAction = (event) => handleStoreAction(state, event);
+  state.onStoreAction = (event) => { void handleStoreAction(state, event); };
   state.onStoreKeyDown = (event) => {
     if (event.key === 'Escape' && state.storeOpen) {
       event.preventDefault();
@@ -3089,6 +3277,8 @@ function startUrbanSandboxRuntime(options = {}) {
   appCtx.toggleUrbanEquipment = (force) => toggleEquipment(state, force);
   appCtx.equipUrbanEquipmentSlot = (slot) => equipSlot(state, slot);
   appCtx.handleUrbanEquipmentUse = () => useEquipped(state);
+  state.handleMechanicInteraction = () => openNearbyMechanic(state);
+  appCtx.handleMechanicInteraction = state.handleMechanicInteraction;
   state.prepareAirborneParachute = (options = {}) => {
     const sourcePosition = options.sourcePosition;
     const walker = appCtx.Walk?.state?.walker;

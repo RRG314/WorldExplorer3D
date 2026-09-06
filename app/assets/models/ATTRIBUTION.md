@@ -216,6 +216,7 @@ Solis Reach and Pathfinder Spacecraft Family
 - Upstream models: Ultimate Spaceships Pack — Challenger and Dispatcher
 - Creator: Quaternius
 - Source: https://quaternius.com/packs/ultimatespaceships.html
+
 - Source folder: Google Drive `1NpfT3wqe2k3Jwue2xryi7tzxP4bWzETu`
 - Source file identities: `Challenger.gltf` (`1t-fA25DrO2v48m_PSPnz6cvMU0VLzeoR`) and `Dispatcher.gltf` (`1oAFY-NWo0Icqfstijhk-5U_9PPNW6kUD`).
 - License: Creative Commons Zero v1.0 Universal (CC0 1.0). Source `License.txt` is Google Drive file `16iPJQOxZQgJB6UBiutO-PU35YROyGEL8`.
@@ -223,3 +224,15 @@ Solis Reach and Pathfinder Spacecraft Family
 - Bundled SHA-256 values: `67e1962f65c2cf7a6d9bc2f9ee3e3d9d4550bfe63bb5f60b27a6217814ffb233` and `1c7e5a363fbf766dd19fa45bb045f99bef5278dceb4afd6a94384527ffd4a489`.
 - Processing: converted from the self-contained source glTF files to GLB, resized the embedded textures to 512px, then deduplicated, flattened, joined, welded, pruned, sparse-optimized, and quantized with glTF-Transform 4.5.0. No external texture or runtime decoder is required.
 - Runtime policy: presentation only. Existing Space flight, collision, launch, atmospheric entry, landing, docking, transitions, effects, and cleanup remain authoritative. The generated craft is hidden before loading begins and restored only after a confirmed load failure.
+
+Pirate Interception Raider
+
+- File: `space/pirate-insurgent-raider-v1.glb`
+- Upstream title: Ultimate Spaceships Pack — Insurgent
+- Creator: Quaternius
+- Source: https://quaternius.com/packs/ultimatespaceships.html
+- Source file identity: Google Drive `Insurgent.gltf`, file ID `1p_-EZ9OzTMEIOOcW3O2NDAi2pB4nRPP2`
+- License: Creative Commons Zero v1.0 Universal (CC0 1.0).
+- Bundled SHA-256: `42aae3c61667d05024d3636649592b40f963ef08133f2329271a876962c0b7ba`
+- Processing: repacked from self-contained glTF to extension-free GLB with glTF-Transform 4.5.0; the embedded texture was reduced from 2048 px to 512 px. The 8,292-triangle source geometry and original orange hull presentation were retained.
+- Notes: One shared model family presents the bounded interceptor, attacker, and boarding-craft roles. Role, health, collision, movement, weapons, boarding progress, damage, and cleanup remain owned by the pirate-interception runtime; this file is presentation only.
