@@ -102,27 +102,13 @@ visible button. `PRIVATE`, `INVITE_ONLY`, `GUEST_LIST`, `SESSION_GUESTS`, and
 `PUBLIC` are generic space modes; every new interior starts `PRIVATE` regardless
 of contribution intent. Exterior visibility is stored and resolved separately.
 
-### Streetscape flow
+### Streetscape boundary
 
-```mermaid
-flowchart LR
-    Roads[Published roads and width profiles] --> Street[Versioned streetscape model]
-    Terrain[Rendered terrain height] --> Street
-    Context[Buildings, entrances, land use, parking, driveways] --> Street
-    Safety[Intersection and structure exclusions] --> Street
-    Street --> Batches[Concrete-top and curb-face batches]
-    Batches --> Walk[Walking surface recognition]
-    Roads --> Drive[Existing driving surface]
-    Roads --> Traffic[Existing traffic and navigation]
-```
-
-`app/js/streetscape/model.js` consumes the existing transport facts after road
-and terrain reconciliation. `app/js/streetscape/presentation.js` owns only the
-two optional render batches. It does not feed the road compiler, terrain
-corridors, vehicle collision, traffic graph, or living-world pedestrian graph.
-`app/js/ground.js` recognizes the published sidewalk footprint for walking only;
-the drive-surface path is unchanged. See
-[STREETSCAPE_SYSTEM.md](../STREETSCAPE_SYSTEM.md).
+The rejected September 6 offset-ribbon sidewalk presentation is not part of the
+runtime. Earth retains the established mapped footway and pedestrian graph plus
+the compiled road/terrain authority. A future streetscape implementation must
+derive coherent road-edge and block polygons with joined intersections before
+it can return. See [STREETSCAPE_SYSTEM.md](../STREETSCAPE_SYSTEM.md).
 
 ## Property and Maryland parcel flow
 

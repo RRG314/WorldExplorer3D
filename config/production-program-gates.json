@@ -14,7 +14,7 @@
   "executionGateRequirements": {
     "CP0": ["source-graph", "artifact-world", "explorer-browser"],
     "CP1": ["assembled-worlds", "assembled-fallback", "provider-release"],
-    "CP2": ["assembled-worlds", "actors-vehicles", "terrain-boundary", "streetscape"],
+    "CP2": ["assembled-worlds", "actors-vehicles", "terrain-boundary"],
     "CP3": ["interiors", "poi-lifecycle"],
     "CP4": ["tutorial-controls", "mobile-controls", "commerce-coherence"],
     "CP5": ["urban-sandbox", "urban-equipment", "actors-vehicles"],

@@ -271,19 +271,19 @@ async function runJourney(viewport, name) {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
       globalThis.__we3dVerificationContext = ctx;
     });
-    await page.waitForFunction(() => globalThis.__we3dVerificationContext?.spaceFlight?.rocket?.userData?.curatedStarshipAssetId === 'space-solis-reach-exterior-v1', null, { timeout: 15000 });
     const starshipPresentation = await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
-      let fallbackVisible = false;
+      let originalHullVisible = false;
       ctx.spaceFlight.rocket?.traverse?.((object) => {
-        if (object?.userData?.defaultStarshipFallback === true && object.visible !== false) fallbackVisible = true;
+        if (object?.userData?.defaultStarshipFallback === true && object.visible !== false) originalHullVisible = true;
       });
       return {
         assetId: ctx.spaceFlight.rocket?.userData?.curatedStarshipAssetId || null,
-        fallbackVisible
+        originalDesign: ctx.spaceFlight.rocket?.userData?.originalDesign === true,
+        originalHullVisible
       };
     });
-    assert.deepEqual(starshipPresentation, { assetId: 'space-solis-reach-exterior-v1', fallbackVisible: false });
+    assert.deepEqual(starshipPresentation, { assetId: null, originalDesign: true, originalHullVisible: true });
     await page.screenshot({ path: path.join(outputDir, `${name}-solis-reach-exterior.png`), fullPage: true });
     if (await page.locator('#spaceFlightHUD').evaluate((element) => element.classList.contains('collapsed'))) {
       await page.locator('#sfHudToggle').click();

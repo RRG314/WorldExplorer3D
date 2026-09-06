@@ -137,8 +137,6 @@ export function resetWorldForReload(options = {}) {
 
   disposeSceneMeshes(appCtx.urbanSurfaceMeshes, { skipSharedUrbanSurfaceMaterial: true });
   appCtx.replaceWorldCollection('urbanSurfaceMeshes');
-  appCtx.streetscapePublication = null;
-  appCtx.streetscapeContainsPoint = null;
   invalidateTraversalNetworks('world_reload_reset');
   appCtx.navigationRoutePoints = [];
   appCtx.navigationRouteDistance = 0;

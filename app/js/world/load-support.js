@@ -180,8 +180,6 @@ export function createSyntheticFallbackWorld(options = {}) {
 
   disposeMeshList(appCtx.roadMeshes);
   disposeMeshList(appCtx.urbanSurfaceMeshes);
-  appCtx.streetscapePublication = null;
-  appCtx.streetscapeContainsPoint = null;
   disposeMeshList(appCtx.structureVisualMeshes);
   disposeMeshList(appCtx.buildingMeshes);
   disposeMeshList(appCtx.landuseMeshes);

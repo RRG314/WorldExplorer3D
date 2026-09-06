@@ -66,6 +66,31 @@ try {
       };
     }
 
+    const earth = ctx.getAllSpaceBodies().find((entry) => String(entry.name) === 'Earth');
+    const launchOutward = new THREE.Vector3(0.61, 0.52, 0.6).normalize();
+    ctx.spaceFlight.rocket.position.copy(earth.position).addScaledVector(launchOutward, Number(earth.radius) + 8);
+    ctx.spaceFlight.rocket.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), launchOutward);
+    ctx.spaceFlight.speed = 0;
+    ctx.spaceFlight.velocity.set(0, 0, 0);
+    ctx.spaceFlight.gravityVelocity.set(0, 0, 0);
+    ctx.spaceFlight._launchSource = 'Earth';
+    ctx.spaceFlight.launchStartMs = Date.now();
+    ctx.spaceFlight.keys = {};
+    const idleLaunchDistance = ctx.spaceFlight.rocket.position.distanceTo(earth.position);
+    ctx.updateSpaceFlightPhysics();
+    const idleLaunchGravity = ctx.spaceFlight.gravityVelocity.length();
+    ctx.spaceFlight.gravityVelocity.copy(launchOutward).multiplyScalar(-2.5);
+    ctx.spaceFlight.keys = { ' ': true };
+    ctx.updateSpaceFlightPhysics();
+    ctx.spaceFlight.keys = {};
+    const launchEscape = {
+      idleDistance: idleLaunchDistance,
+      idleGravity: idleLaunchGravity,
+      distanceAfterThrust: ctx.spaceFlight.rocket.position.distanceTo(earth.position),
+      radialGravityAfterThrust: ctx.spaceFlight.gravityVelocity.dot(launchOutward)
+    };
+    ctx.spaceFlight._launchSource = null;
+
     const blackHoleGroup = new THREE.Group();
     blackHoleGroup.userData.blackHole = {
       visualRadius: 100,
@@ -87,6 +112,7 @@ try {
       inertialPositionAfter: positionAfterTurn.toArray(),
       cameraModeButtonPresent: Boolean(document.getElementById('sfCameraBtn')),
       samples,
+      launchEscape,
       blackHole: {
         velocity: blackHoleVelocity.toArray(),
         accelerationPerSecond: blackHole.accelerationPerSecond,
@@ -102,6 +128,9 @@ try {
   assert.ok(result.samples.moon.inwardSpeed > 0, JSON.stringify(result.samples));
   assert.ok(result.samples.earth.inwardSpeed > result.samples.moon.inwardSpeed, JSON.stringify(result.samples));
   assert.ok(result.samples.jupiter.inwardSpeed > result.samples.earth.inwardSpeed, JSON.stringify(result.samples));
+  assert.equal(result.launchEscape.idleGravity, 0, JSON.stringify(result.launchEscape));
+  assert.ok(result.launchEscape.distanceAfterThrust > result.launchEscape.idleDistance, JSON.stringify(result.launchEscape));
+  assert.ok(result.launchEscape.radialGravityAfterThrust >= 0, JSON.stringify(result.launchEscape));
   assert.ok(result.blackHole.velocity[2] < 0, JSON.stringify(result.blackHole));
   assert.equal(result.blackHole.captured, false);
   assert.deepEqual(pageErrors, []);

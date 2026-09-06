@@ -53,23 +53,6 @@ const MODEL_ASSET_CATALOG = Object.freeze([
   }),
   Object.freeze({
     schemaVersion: MODEL_ASSET_SCHEMA_VERSION,
-    id: 'space-solis-reach-exterior-v1',
-    label: 'Solis Reach Expedition Starship',
-    url: '/app/assets/models/space/solis-reach-exterior-v1.glb',
-    roles: Object.freeze(['expedition-starship-presentation']),
-    license: 'CC0-1.0',
-    sourceUrl: 'https://quaternius.com/packs/ultimatespaceships.html',
-    attribution: 'Ultimate Spaceships Pack — Challenger by Quaternius',
-    sourceUpAxis: 'y',
-    sourceForwardAxis: 'z',
-    sourceLengthAxis: 'z',
-    targetLengthMeters: 15,
-    collisionPolicy: 'existing-spacecraft-flight-and-docking-authority',
-    instancePolicy: Object.freeze({ geometry: 'shared', materials: 'clone' }),
-    budgets: Object.freeze({ bytes: 566_000, triangles: 5_244, maxInstances: 2, textureEdgePixels: 512 })
-  }),
-  Object.freeze({
-    schemaVersion: MODEL_ASSET_SCHEMA_VERSION,
     id: 'space-pathfinder-transfer-pod-v2',
     label: 'Pathfinder Expedition Shuttle',
     url: '/app/assets/models/space/pathfinder-transfer-pod-v2.glb',

@@ -941,7 +941,6 @@ function transportStructureSnapshot() {
     },
     roadSurfaceIntegrity: appCtx.transportSurfacePublication?.roadSurfaceIntegrity || null,
     roadTerrainConformance: appCtx.transportSurfacePublication?.roadTerrainConformance || null,
-    streetscape: appCtx.streetscapePublication?.diagnostics || null,
     atGradeTerrainAuthority,
     visualMeshes: visuals.length,
     attachedVisualMeshes: visuals.filter((mesh) => !!mesh?.parent).length,
@@ -1093,7 +1092,6 @@ function getWorldExplorerRuntimeDiagnostics() {
     transportCompilation: appCtx.transportSurfacePublication ? {
       roadCount: Number(appCtx.transportSurfacePublication.roadCount || 0),
       meshCount: Number(appCtx.transportSurfacePublication.meshCount || 0),
-      streetscape: appCtx.transportSurfacePublication.streetscape || null,
       phaseDurationsMs: appCtx.transportSurfacePublication.phaseDurationsMs || null
     } : null,
     terrainSurfaceCompilation: appCtx.terrainSurfaceProfileStats || null,
@@ -1360,7 +1358,6 @@ globalThis.render_game_to_text = () => JSON.stringify({
   worldDiscovery: appCtx.worldDiscoveryRuntimeSnapshot?.() || { active: false },
   editableWorld: appCtx.editableWorldRuntimeSnapshot?.() || { active: false },
   transportStructures: transportStructureSnapshot(),
-  streetscape: appCtx.streetscapePublication?.diagnostics || null,
   worldCounts: {
     buildings: appCtx.buildings?.length ?? null,
     roads: appCtx.roads?.length ?? null,

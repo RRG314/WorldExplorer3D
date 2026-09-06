@@ -16,11 +16,11 @@ transactions, Explorer Wallet, building/interior routes, and Quick Build system;
 there is no second economy or general-purpose GIS warehouse. See
 [MARYLAND_PARCEL_PROPERTY_SYSTEM.md](MARYLAND_PARCEL_PROPERTY_SYSTEM.md).
 
-Streetscape note (2026-09-06): eligible ordinary at-grade streets now receive
-context-sized, terrain-conforming concrete sidewalks, curb caps/faces, driveway
-cuts, and bounded entrance approaches after the existing road publication. Road
-geometry, terrain corridors, traffic, vehicle collision, and navigation remain
-unchanged. See [STREETSCAPE_SYSTEM.md](../STREETSCAPE_SYSTEM.md).
+Streetscape note (2026-09-06): the rejected offset-ribbon sidewalk presentation
+has been removed from runtime. Existing mapped footways, pedestrian navigation,
+compiled roads, and terrain remain. A replacement must solve coherent block
+edges and junction joins before release. See
+[STREETSCAPE_SYSTEM.md](../STREETSCAPE_SYSTEM.md).
 
 Community Reality Capture note (2026-09-06): a local, not-yet-provisioned V1
 adds guided photo contribution for stable mapped-building exteriors and one
@@ -74,7 +74,6 @@ with explicit entry and exit lifecycles.
 | Earth compilation | `app/js/world/`, `app/js/earth-core/`, `app/js/terrain/` | Selects providers and publishes one assembled world |
 | Terrain and ground | `app/js/terrain.js`, `app/js/terrain/`, `data/ground-attestations/` | Ground height, land cover, seams, collision, and regional fallbacks |
 | Roads and structures | `app/js/world/compiler/`, `app/js/world/transport-structures/` | Roads, bridges, ramps, elevated ways, underpasses, and tunnels |
-| Streetscape | `app/js/streetscape/`, `app/js/terrain/rebuild.js`, `app/js/ground.js` | Versioned, batched sidewalk/curb presentation downstream of the road authority; walking recognition without road, terrain, traffic, or vehicle mutation |
 | Buildings and interiors | `app/js/buildings/`, `app/js/interiors/`, `app/js/reality-capture/` | Building form, facades, entrances, generated floors, mapped indoor detail, and approved community presentation overlays that retain canonical collision/navigation and fail back to the procedural world |
 | Water | `app/js/world/water-*`, `app/js/boat-mode/`, `app/js/ocean/`, `app/js/transport/maritime-*` | Surface water, near-shore rendering, channel camera framing, playable vessel fleets, mapped ship identity, underwater play, and fish life |
 | Aviation | `app/js/plane-mode.js`, `app/js/plane/`, `app/js/transport/airport-*`, `app/js/transport/aviation-*` | One flight controller and airport layout authority; map-informed major, regional, and local layouts; scale-appropriate playable fleets; class-specific flight response; parked, taxi, and bounded circuit activity; aircraft collision; pilot/passenger travel; airport arrivals; skydiving handoff; presentation; and recovery |

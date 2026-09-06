@@ -11,7 +11,7 @@ import {
   setKeyboardBinding
 } from '../app/js/controls/keyboard-bindings.js?v=2';
 import { interactionFamily } from '../app/js/interaction/context-router.js?v=5';
-import { resolveSpaceControlInput } from '../app/js/space/runtime.js?v=31';
+import { resolveSpaceControlInput } from '../app/js/space/runtime.js?v=34';
 
 if (typeof globalThis.CustomEvent !== 'function') {
   globalThis.CustomEvent = class CustomEvent extends Event {

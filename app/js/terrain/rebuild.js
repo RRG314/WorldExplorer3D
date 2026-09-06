@@ -16,10 +16,6 @@ import {
 } from "./road-junctions.js?v=11";
 import { appendSolidAtGradeRoadGeometry } from "./road-surface-geometry.js?v=2";
 import { roadWidthAtSegment } from "../world/road-cross-section-profile.js?v=1";
-import {
-  clearStreetscapePresentation,
-  publishStreetscapePresentation
-} from "../streetscape/presentation.js?v=1";
 
 const ROAD_SURFACE_BIAS = 0.18;
 const MAX_ROAD_BATCH_VERTICES = 60000;
@@ -451,7 +447,6 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       }
     });
     appCtx.replaceWorldCollection('urbanSurfaceMeshes');
-    clearStreetscapePresentation(appCtx);
   });
   appCtx.urbanSurfaceStats = {
     sidewalkBatchCount: 0,
@@ -681,20 +676,6 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     });
   });
   await yieldToMainThread();
-  const streetscapePublication = measure('publishStreetscape', () =>
-    publishStreetscapePresentation(appCtx, {
-      roads: baseRoads,
-      intersections,
-      sampleTerrainY: cachedTerrainHeight,
-      // Road vertices are published with their existing visual bias. Reading
-      // that same value keeps curb height relative to the visible carriageway
-      // without changing its geometry or terrain corridor.
-      sampleRoadY: (road, x, z) =>
-        sampleFeatureSurfaceY(road, x, z) +
-        (Number.isFinite(Number(road?.surfaceBias)) ? Number(road.surfaceBias) : ROAD_SURFACE_BIAS)
-    })
-  );
-  await yieldToMainThread();
   await measureAsync('rebuildStructureVisuals', () => (
     typeof rebuildStructureVisualMeshesCooperatively === 'function'
       ? rebuildStructureVisualMeshesCooperatively
@@ -729,10 +710,6 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       roadMarkBatchIdx.length / 3,
     roadSurfaceIntegrity: Object.freeze({ ...roadSurfaceIntegrity }),
     roadTerrainConformance,
-    streetscape: streetscapePublication ? Object.freeze({
-      generatorVersion: streetscapePublication.generatorVersion,
-      ...streetscapePublication.diagnostics
-    }) : null,
     phaseDurationsMs: Object.freeze({
       ...phaseDurationsMs,
       total: Number((now() - publicationStartedAt).toFixed(2))

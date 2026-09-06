@@ -9,7 +9,7 @@ import { PLANETARY_BODIES, configureColorTexture } from "../planetary/catalog.js
 import { createSpaceCelestialCatalog } from "./celestial-catalog.js?v=5";
 import { initUniverseRuntime, releaseUniverseRuntimeScene } from "../universe/runtime.js?v=37";
 import { releaseGaiaSkyLayers } from '../sky/gaia-catalog.js?v=4';
-import { createExpeditionSpacecraftMesh } from "./expedition-spacecraft-mesh.js?v=5";
+import { createExpeditionSpacecraftMesh } from "./expedition-spacecraft-mesh.js?v=6";
 import { createExpeditionPodMesh } from './expedition-pod-mesh.js?v=7';
 import { createSolisReachExteriorMesh } from './solis-reach-exterior-mesh.js?v=1';
 import { SPACE_CRAFT_IDENTITY } from './craft-identity.js?v=1';

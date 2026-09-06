@@ -1,5 +1,5 @@
 import { SPACE_CRAFT_IDENTITY } from './craft-identity.js?v=1';
-import { createExpeditionSpacecraftMesh } from './expedition-spacecraft-mesh.js?v=5';
+import { createExpeditionSpacecraftMesh } from './expedition-spacecraft-mesh.js?v=6';
 
 function dockMaterial(color, emissive = 0x000000) {
   return new THREE.MeshPhongMaterial({

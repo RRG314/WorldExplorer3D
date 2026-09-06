@@ -50,7 +50,6 @@
     "verify:assembled-locations-fallback": "WE3D_FORCE_TRANSPORT_FALLBACK=1 node scripts/verification/assembled-locations.mjs",
     "verify:actors-vehicles": "node scripts/verification/actors-vehicles.mjs",
     "verify:terrain-boundary": "node scripts/verification/terrain-boundary-current.mjs",
-    "verify:streetscape": "node --test tests/streetscape-model-current.test.mjs && node scripts/verification/streetscape-current.mjs",
     "verify:tutorial-controls": "node --test tests/tutorial-controls-interaction-current.test.mjs tests/runtime-publication-tutorial-visibility-current.test.mjs",
     "verify:commerce-coherence": "node --test tests/economy-authority-current.test.cjs tests/convenience-commerce-current.test.mjs tests/player-condition-current.test.mjs tests/player-state-authority-current.test.cjs tests/vehicle-upgrades-current.test.mjs tests/world-economy-current.test.mjs",
     "verify:poi-lifecycle": "node --test tests/functional-poi-semantics-current.test.mjs tests/poi-building-association-current.test.mjs tests/poi-lifecycle-current.test.mjs",

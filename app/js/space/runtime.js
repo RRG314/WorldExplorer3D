@@ -349,6 +349,15 @@ function applyPlanetaryGravity(rocket, launchAssist, isThrusting) {
   } = getSpaceControlMath();
   if (!appCtx.spaceFlight.gravityVelocity) return;
 
+  // A surface departure waits for deliberate player input. Do not let the
+  // craft accumulate an invisible inward velocity while the player is still
+  // reading the launch HUD or deciding where to steer.
+  if (launchAssist && !isThrusting) {
+    appCtx.spaceFlight.gravityVelocity.set(0, 0, 0);
+    if (appCtx.spaceFlight._gravityVec) appCtx.spaceFlight._gravityVec.set(0, 0, 0);
+    return;
+  }
+
   const bodies = getActiveSpaceBodies();
   const nearLandableDist = nearestLandableDistance(rocket, bodies);
   _sfGravitySum.set(0, 0, 0);
@@ -391,6 +400,46 @@ function applyPlanetaryGravity(rocket, launchAssist, isThrusting) {
 
   clampTotalGravity(_sfGravitySum);
   integrateGravityVelocity(_sfGravitySum);
+}
+
+function preserveManualEscapeAuthority(rocket, forward, isThrusting, frameScale) {
+  if (!isThrusting || !appCtx.spaceFlight.gravityVelocity) return;
+  const bodies = getActiveSpaceBodies();
+  let nearest = null;
+  let nearestSurfaceDistance = Infinity;
+  for (const body of bodies) {
+    if (!shouldApplyGravityFromBody(body) || !Number.isFinite(body.radius)) continue;
+    const centerDistance = rocket.position.distanceTo(body.position);
+    const surfaceDistance = centerDistance - body.radius;
+    if (
+      surfaceDistance < nearestSurfaceDistance &&
+      centerDistance <= bodyGravityRange(body, surfaceDistance) + body.radius
+    ) {
+      nearest = body;
+      nearestSurfaceDistance = surfaceDistance;
+    }
+  }
+  if (!nearest) return;
+
+  const outward = getSpaceControlMath().gravityTemporary.copy(rocket.position).sub(nearest.position);
+  if (outward.lengthSq() <= 1e-6) return;
+  outward.normalize();
+  const outwardAlignment = forward.dot(outward);
+  if (outwardAlignment <= 0.2) return;
+
+  // Forward thrust aimed away from a body always remains an escape control.
+  // Clear accumulated inward pull first, then add a small outward launch term.
+  const radialVelocity = appCtx.spaceFlight.gravityVelocity.dot(outward);
+  if (radialVelocity < 0) {
+    appCtx.spaceFlight.gravityVelocity.addScaledVector(outward, -radialVelocity);
+  }
+  appCtx.spaceFlight.gravityVelocity.addScaledVector(
+    outward,
+    SPACE_CONSTANTS.LAUNCH_ASSIST_ACCEL * outwardAlignment * frameScale
+  );
+  if (appCtx.spaceFlight.gravityVelocity.length() > SPACE_CONSTANTS.MAX_GRAVITY_SPEED) {
+    appCtx.spaceFlight.gravityVelocity.setLength(SPACE_CONSTANTS.MAX_GRAVITY_SPEED);
+  }
 }
 
 export function updateSpaceFlightPhysics() {
@@ -570,6 +619,7 @@ export function updateSpaceFlightPhysics() {
     applyPlanetaryGravity(rocket, launchAssist, isThrusting);
   }
   _sfForward.set(0, 1, 0).applyQuaternion(rocket.quaternion);
+  preserveManualEscapeAuthority(rocket, _sfForward, isThrusting, frameScale);
   appCtx.spaceFlight.velocity.copy(_sfForward).multiplyScalar(appCtx.spaceFlight.speed);
   if (appCtx.spaceFlight.gravityVelocity) {
     appCtx.spaceFlight.velocity.add(appCtx.spaceFlight.gravityVelocity);

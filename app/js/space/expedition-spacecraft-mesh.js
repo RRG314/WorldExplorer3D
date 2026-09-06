@@ -1,5 +1,4 @@
 import { SPACE_CRAFT_IDENTITY } from './craft-identity.js?v=1';
-import { attachCuratedExpeditionStarship } from './curated-expedition-starship.js?v=1';
 
 function phong(color, options = {}) {
   return new THREE.MeshPhongMaterial({
@@ -140,7 +139,6 @@ function createExpeditionSpacecraftMesh() {
     const visualEffect = object.parent?.name === 'engineGlow' || object.parent?.name === 'exhaust';
     if (!visualEffect) object.userData.defaultStarshipFallback = true;
   });
-  void attachCuratedExpeditionStarship(THREE, craft);
   return craft;
 }
 
