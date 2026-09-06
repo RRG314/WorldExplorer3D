@@ -12,6 +12,7 @@ import { elevatorFloorChoices } from './elevator-authority.js?v=1';
 
 let nearbyInteriorScanPromise = null;
 let elevatorFloorPicker = null;
+let exteriorContextInteractionRegistered = false;
 const {
   clearPrompt,
   collectInteriorWorldSuppressionStates,
@@ -614,7 +615,38 @@ function pickNearbyBuildingCandidate(force = false, deps) {
   return candidate;
 }
 
+async function enterNearbyBuilding(deps, resolvedCandidate = null) {
+  const candidate = resolvedCandidate || pickNearbyBuildingCandidate(true, deps);
+  if (!candidate?.support?.enterable) return false;
+  await enterInteriorForSupport(candidate.support, deps);
+  return true;
+}
+
+function ensureExteriorContextInteraction(deps) {
+  if (exteriorContextInteractionRegistered || typeof appCtx.registerContextInteraction !== 'function') return;
+  exteriorContextInteractionRegistered = true;
+  appCtx.registerContextInteraction({
+    id: 'building_entrance',
+    priority: 100,
+    evaluate() {
+      if (appCtx.activeInterior) return null;
+      const candidate = pickNearbyBuildingCandidate(false, deps);
+      if (!candidate?.support?.enterable) return null;
+      const support = candidate.support;
+      return {
+        available: true,
+        action: 'enter_building',
+        label: `Enter ${shortLabel(support.label || buildingLabel(support.building || support.destination), 32)}`,
+        distance: candidate.distance,
+        data: { buildingKey: support.key || '' }
+      };
+    },
+    perform: () => enterNearbyBuilding(deps)
+  });
+}
+
 export async function handleInteriorAction(deps) {
+  ensureExteriorContextInteraction(deps);
   if (appCtx.activeInterior) {
     const active = appCtx.activeInterior;
     const interaction = nearestInteriorInteraction(active, appCtx.Walk?.state?.walker);
@@ -631,12 +663,13 @@ export async function handleInteriorAction(deps) {
   }
   const candidate = pickNearbyBuildingCandidate(true, deps);
   if (!candidate?.support?.enterable) return false;
-  await enterInteriorForSupport(candidate.support, deps);
-  appCtx.notifyContextInteractionCompleted?.('enter_building', { buildingKey: candidate.support.key || '' });
-  return true;
+  const handled = await enterNearbyBuilding(deps, candidate);
+  if (handled) appCtx.notifyContextInteractionCompleted?.('enter_building', { buildingKey: candidate.support.key || '' });
+  return handled;
 }
 
 export function updateInteriorInteraction(deps) {
+  ensureExteriorContextInteraction(deps);
   const now = performance.now();
 
   if (!deps.isWalkModeActive()) {

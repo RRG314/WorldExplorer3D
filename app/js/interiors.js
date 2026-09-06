@@ -29,7 +29,7 @@ import {
   sampleInteriorWalkSurface as sampleInteriorWalkSurfaceRuntime,
   scanNearbyInteriorSupport as scanNearbyInteriorSupportRuntime,
   updateInteriorInteraction as updateInteriorInteractionRuntime
-} from "./interiors/runtime.js?v=19";
+} from "./interiors/runtime.js?v=20";
 import {
   attachCommunityInteriorRepresentation,
   requestCommunityInteriorAccess,
