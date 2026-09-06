@@ -258,10 +258,17 @@ export function createWorldLoadRuntimeSession(options = {}) {
   appCtx.rdtComplexity = useRdtBudgeting ? rawRdtComplexity : 0;
 
   const dynamicBudgetState = getRuntimeDynamicBudget(perfModeNow);
+  // Automatic presentation quality may change after a demanding first load.
+  // That must not change which mapped roads/buildings exist when the same
+  // desktop location is rebuilt. Mobile keeps its explicit device-class cap;
+  // desktop quality tiers affect rendering LOD, never authoritative coverage.
+  const authorityBudgetScale = dynamicBudgetState.deviceClass === 'mobile'
+    ? dynamicBudgetState.budgetScale
+    : 1;
   const loadProfile = getAdaptiveLoadProfile(
     rdtLoadComplexity,
     perfModeNow,
-    dynamicBudgetState.budgetScale,
+    authorityBudgetScale,
     dynamicBudgetState.deviceClass
   );
   const lodThresholds = getWorldLodThresholds(rdtLoadComplexity, perfModeNow, dynamicBudgetState.lodScale);
@@ -269,7 +276,7 @@ export function createWorldLoadRuntimeSession(options = {}) {
   appCtx.plannedEarthDetailRadiusWorld = Number.isFinite(plannedDetailRadiusDeg)
     ? Math.max(800, Math.round(plannedDetailRadiusDeg * (appCtx.SCALE || 100000) * 0.92))
     : 1050;
-  appCtx.dynamicBudgetScale = dynamicBudgetState.budgetScale;
+  appCtx.dynamicBudgetScale = authorityBudgetScale;
   appCtx.dynamicLodScale = dynamicBudgetState.lodScale;
 
   loadMetrics.rdtLoadComplexity = rdtLoadComplexity;
@@ -278,7 +285,8 @@ export function createWorldLoadRuntimeSession(options = {}) {
   loadMetrics.radii = loadProfile.radii.slice();
   loadMetrics.lodThresholds = lodThresholds;
   loadMetrics.loadProfile = {
-    dynamicBudgetScale: dynamicBudgetState.budgetScale,
+    dynamicBudgetScale: authorityBudgetScale,
+    presentationBudgetScale: dynamicBudgetState.budgetScale,
     dynamicLodScale: dynamicBudgetState.lodScale,
     maxRoadWays: loadProfile.maxRoadWays,
     maxBuildingWays: loadProfile.maxBuildingWays,
@@ -295,7 +303,8 @@ export function createWorldLoadRuntimeSession(options = {}) {
   loadMetrics.dynamicBudget = {
     auto: !!dynamicBudgetState.auto,
     tier: dynamicBudgetState.tier || 'balanced',
-    budgetScale: dynamicBudgetState.budgetScale,
+    budgetScale: authorityBudgetScale,
+    presentationBudgetScale: dynamicBudgetState.budgetScale,
     lodScale: dynamicBudgetState.lodScale,
     reason: dynamicBudgetState.reason || null
   };
