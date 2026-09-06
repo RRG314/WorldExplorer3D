@@ -303,7 +303,7 @@ var SHIP_PROFILES = Object.freeze([
     foodProductionFraction: 0.82,
     interiorSeed: 5100821,
     supportedPropulsionIds: ["fusion-pulse-interstellar", "radiant-plasma-field-drive"],
-    requiredRoles: ["command", "navigation", "engineering", "medical", "life-support", "science"],
+    requiredRoles: ["command", "flight", "navigation", "engineering", "medical", "life-support", "science"],
     requiredRooms: ["bridge", "engineering", "life-support", "quarters", "medical", "cargo-fabrication", "science", "local-craft-bay"],
     systems: ["propulsion", "power", "life-support", "navigation", "thermal", "medical", "fabrication", "food-production", "sensors", "hull"]
   }),
@@ -320,7 +320,7 @@ var SHIP_PROFILES = Object.freeze([
     foodProductionFraction: 0.88,
     interiorSeed: 5100947,
     supportedPropulsionIds: ["fusion-pulse-interstellar", "radiant-plasma-field-drive"],
-    requiredRoles: ["command", "navigation", "engineering", "medical", "life-support", "science"],
+    requiredRoles: ["command", "flight", "navigation", "engineering", "medical", "life-support", "science"],
     requiredRooms: ["bridge", "engineering", "life-support", "quarters", "medical", "cargo-fabrication", "science", "cryogenic-bay", "local-craft-bay"],
     systems: ["propulsion", "power", "life-support", "navigation", "thermal", "medical", "fabrication", "food-production", "cryogenic", "sensors", "hull"]
   }),
@@ -337,19 +337,19 @@ var SHIP_PROFILES = Object.freeze([
     foodProductionFraction: 0.995,
     interiorSeed: 5101103,
     supportedPropulsionIds: ["fusion-pulse-interstellar"],
-    requiredRoles: ["command", "navigation", "engineering", "medical", "life-support", "science", "education"],
+    requiredRoles: ["command", "flight", "navigation", "engineering", "medical", "life-support", "science", "education"],
     requiredRooms: ["bridge", "engineering", "life-support", "habitat", "medical", "agriculture", "fabrication", "science", "education", "local-craft-bay"],
     systems: ["propulsion", "power", "life-support", "navigation", "thermal", "medical", "fabrication", "food-production", "education", "sensors", "hull"]
   })
 ]);
 var DEFAULT_CREW = Object.freeze([
-  Object.freeze({ id: "player", name: "Explorer", ageYears: 34, experienceYears: 6, health: 1, fatigue: 0.08, assignment: "expedition-lead", roles: Object.freeze(["command", "science"]), status: "active" }),
+  Object.freeze({ id: "player", name: "Explorer", ageYears: 34, experienceYears: 6, health: 1, fatigue: 0.08, assignment: "expedition-lead", roles: Object.freeze(["command", "science", "flight"]), status: "active" }),
   Object.freeze({ id: "crew-nav", name: "Mara Velez", ageYears: 39, experienceYears: 14, health: 0.98, fatigue: 0.11, assignment: "navigation-watch", roles: Object.freeze(["navigation", "command"]), status: "active" }),
   Object.freeze({ id: "crew-eng", name: "Dev Malik", ageYears: 42, experienceYears: 17, health: 0.97, fatigue: 0.13, assignment: "engineering-watch", roles: Object.freeze(["engineering", "fabrication"]), status: "active" }),
   Object.freeze({ id: "crew-life", name: "Avery Okafor", ageYears: 36, experienceYears: 11, health: 0.99, fatigue: 0.1, assignment: "life-support-watch", roles: Object.freeze(["life-support", "engineering"]), status: "active" }),
   Object.freeze({ id: "crew-med", name: "Jules Park", ageYears: 41, experienceYears: 16, health: 0.98, fatigue: 0.09, assignment: "medical-watch", roles: Object.freeze(["medical", "life-support"]), status: "active" }),
   Object.freeze({ id: "crew-science", name: "Noor Haddad", ageYears: 33, experienceYears: 9, health: 0.99, fatigue: 0.12, assignment: "science-watch", roles: Object.freeze(["science", "navigation", "education"]), status: "active" }),
-  Object.freeze({ id: "crew-flight", name: "Tessa Morgan", ageYears: 38, experienceYears: 13, health: 0.98, fatigue: 0.1, assignment: "flight-watch", roles: Object.freeze(["navigation", "command"]), status: "active" }),
+  Object.freeze({ id: "crew-flight", name: "Tessa Morgan", ageYears: 38, experienceYears: 13, health: 0.98, fatigue: 0.1, assignment: "flight-watch", roles: Object.freeze(["flight", "navigation", "command"]), status: "active" }),
   Object.freeze({ id: "crew-systems", name: "Eli Chen", ageYears: 45, experienceYears: 20, health: 0.96, fatigue: 0.14, assignment: "systems-watch", roles: Object.freeze(["engineering", "medical"]), status: "active" })
 ]);
 function getShipProfile(id) {
@@ -1744,6 +1744,7 @@ function createExpeditionPlan({
   propulsionId = "radiant-plasma-field-drive",
   crew = [],
   resources = null,
+  reserveMargin = null,
   realism = "science-inspired",
   survival = "forgiving",
   createdAtMs = Date.now(),
@@ -1753,7 +1754,8 @@ function createExpeditionPlan({
   const propulsion = getPropulsionProfile(propulsionId);
   const crewPopulation = crewPopulationForShip(shipId, crew.length);
   const calculation = calculateExpeditionTravel({ destinationId, ship, propulsion, crewCount: crewPopulation });
-  const provisioned = resources ? clone4(resources) : recommendedResources(calculation.expectedResources, survival === "severe" ? 0.08 : 0.25);
+  const selectedReserveMargin = Math.max(0, Math.min(0.4, reserveMargin != null && Number.isFinite(Number(reserveMargin)) ? Number(reserveMargin) : survival === "severe" ? 0.08 : 0.15));
+  const provisioned = resources ? clone4(resources) : recommendedResources(calculation.expectedResources, selectedReserveMargin);
   if (!resources && ship) {
     provisioned.propellantKg = Math.min(Number(provisioned.propellantKg || 0), Number(ship.propellantCapacityKg || 0));
   }
@@ -1769,6 +1771,7 @@ function createExpeditionPlan({
     destinationId,
     realism,
     survival,
+    reserveMargin: selectedReserveMargin,
     state: "planned",
     ship: Object.freeze({
       id: `${id}-ship`,
@@ -2193,12 +2196,34 @@ function startExpedition(expedition, atMs = Date.now()) {
     log: appendLog(expedition.log, { atMissionS: 0, kind: "departure", message: `${expedition.ship?.name || "Solis Reach"} departed the Solar System.` })
   });
 }
-function consumeResources(resources, expectedResources, deltaS, totalS) {
+function resourceDemandMultipliers(expedition) {
+  const systems = expedition?.systems || {};
+  const crew = expedition?.crew || [];
+  const condition = (id) => Math.max(0.05, Math.min(1, Number(systems[id]?.condition ?? 1)));
+  const averageFatigue = crew.length ? crew.reduce((sum, member) => sum + Number(member.fatigue || 0), 0) / crew.length : 0;
+  const averageHealth = crew.length ? crew.reduce((sum, member) => sum + Number(member.health ?? 1), 0) / crew.length : 1;
+  const survivalPressure = expedition?.survival === "severe" ? 1.1 : 1;
+  const wearPressure = Object.values(systems).length ? 1 + Object.values(systems).reduce((sum, system) => sum + Math.max(0, 1 - Number(system?.condition ?? 1)), 0) / Object.values(systems).length * 0.6 : 1;
+  return Object.freeze({
+    foodKg: survivalPressure * (1 + averageFatigue * 0.08 + (1 - condition("food-production")) * 0.28),
+    waterKg: survivalPressure * (1 + (1 - condition("life-support")) * 0.42),
+    powerMWh: 1 + (1 - condition("power")) * 0.24 + (1 - condition("thermal")) * 0.16,
+    propellantKg: 1 + (1 - condition("propulsion")) * 0.32 + (1 - condition("navigation")) * 0.12,
+    medicalUnits: 1 + Math.max(0, 1 - averageHealth) * 0.8 + averageFatigue * 0.12,
+    maintenanceKg: wearPressure,
+    feedstockKg: 1 + (wearPressure - 1) * 0.45,
+    processingResidueKg: 1
+  });
+}
+function consumeResources(expedition, deltaS, totalS) {
+  const resources = expedition.resources;
+  const expectedResources = expedition.calculation.expectedResources;
   const next = clone6(resources);
   const fraction = totalS > 0 ? deltaS / totalS : 0;
+  const multipliers = resourceDemandMultipliers(expedition);
   for (const key of RESOURCE_KEYS) {
     if (key === "scienceCargoKg") continue;
-    next[key] = Math.max(0, Number(next[key] || 0) - Number(expectedResources?.[key] || 0) * fraction);
+    next[key] = Math.max(0, Number(next[key] || 0) - Number(expectedResources?.[key] || 0) * fraction * Number(multipliers[key] || 1));
   }
   return Object.freeze(next);
 }
@@ -2251,7 +2276,7 @@ function advanceExpedition(expedition, requestedDeltaS) {
   let next = withExpeditionChanges(prepared, {
     strategicElapsedS: elapsed,
     progress: totalS > 0 ? Math.min(1, elapsed / totalS) : 0,
-    resources: consumeResources(prepared.resources, prepared.calculation.expectedResources, deltaS, totalS),
+    resources: consumeResources(prepared, deltaS, totalS),
     systems: degradeSystems(prepared.systems, deltaS, totalS),
     crew: advanceCrew(prepared.crew, deltaS, prepared.systems),
     outposts: advanceOutposts(prepared, elapsed)
@@ -2317,6 +2342,9 @@ function resolveExpeditionEvent(expedition, choice) {
     failureReport: failure,
     log: appendLog(next.log, { atMissionS: next.strategicElapsedS, kind: "mission-loss", message: failure.summary })
   });
+  if (!failure && expedition.pendingEvent?.slotId === "final-approach") {
+    next = advanceExpedition(next, next.calculation.properElapsedS);
+  }
   return next;
 }
 
