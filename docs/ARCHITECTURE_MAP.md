@@ -580,10 +580,18 @@ near-door entry attempt submits the request only when that server decision says
 it is available. Owner deletion of unapproved work recursively removes its uploads and
 related access records. Production still requires an isolated reconstruction
 job with malware/content controls and provisioned Storage/App Check services.
-Until both staging provisioning and publication are explicitly enabled, the
-Earth and interior runtimes skip Reality Capture endpoint calls and publish no
-captured presentation. Room access uses the canonical multiplayer-room resolver,
+Earth and interior runtimes now allow capture presentation without a staging-only
+unlock; normal server authorization/review and service-error procedural fallback
+remain. An explicit operator disable is supported, not required. Room access uses the canonical multiplayer-room resolver,
 and capture eligibility requires a current stable mapped building.
+
+The existing capture worker selects Meshroom, TRELLIS.2 image generation or
+TRELLIS.2 mesh texturing and feeds one Blender/GLB inspection/review path.
+Attempt-specific output and transactional completion prevent stale workers from
+recreating deleted captures. AR session ownership/cancellation remains separate
+from photo submission and reconstruction. Actual remote GPU reconstruction and
+physical-device AR acceptance remain unverified; see
+[the integration audit](REALITY_CAPTURE_AR_INTEGRATION_PLAN.md).
 
 Room presence is the source for player and room discovery. Future map-based
 discovery will aggregate privacy-safe activity areas and current counts from
