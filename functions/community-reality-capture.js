@@ -72,6 +72,8 @@ function serializeCapture(snapshot) {
     room: data.room || null,
     spaceId: clean(data.spaceId, 180),
     uploadSummary: data.uploadSummary || null,
+    reconstructionSourceCaptureId: data.testRun?.reusesFrozenSourceManifest === true
+      ? clean(data.testRun.sourceCaptureId, 180) : '',
     quality: data.quality || null,
     failure: data.failure || null,
     review: data.review || null,

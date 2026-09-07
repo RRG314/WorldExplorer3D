@@ -12,6 +12,7 @@ await mkdir(out, { recursive: true });
 const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
 const errors = [], captures = new Map(), uploaded = new Map();
 let serial = 0, failNextUpload = false, failNextProgress = false, releaseProgress = null;
+let savedPhotoDataUrl='';
 const authModule = `let user=null;const listeners=new Set();
 export const getCurrentUser=()=>user;
 export const observeAuth=cb=>{listeners.add(cb);queueMicrotask(()=>cb(user));return()=>listeners.delete(cb)};
@@ -54,6 +55,7 @@ async function makePage(viewport, mobile = false) {
         return json({ capture, photos: uploaded.get(input.captureId) || [] });
       }
       if (action === 'retryRealityCapture') { capture.status = 'queued'; failNextProgress = true; return json({ status: 'queued' }); }
+      if (action === 'getRealityCaptureAssetAccess') return json({url:savedPhotoDataUrl});
       if (action === 'reserveRealityCapturePhoto') return json({ reserved: true });
       if (action === 'finalizeRealityCaptureUpload') { capture.status = 'queued'; return json({ status: 'queued' }); }
       if (action === 'deleteRealityCapture') { captures.delete(input.captureId); return json({ deleted: true }); }
@@ -136,11 +138,12 @@ try {
     return c.toDataURL('image/png').split(',')[1];
   });
   const file = { name: 'capture-fixture.png', mimeType: 'image/png', buffer: Buffer.from(photo, 'base64') };
+  savedPhotoDataUrl='data:image/png;base64,'+photo;
   await phone.locator('[data-capture-input]').setInputFiles([file, file, file]);
   await statusContains(phone, '3 photos are saved');
   assert.match(await phone.locator('[data-capture-sectors] button.active').innerText(), /Front/);
   assert.equal(await phone.locator('[data-capture-sectors] button.covered').count(), 1);
-  await phone.getByText('Review photos on this device', { exact: true }).click();
+  await phone.getByText('View saved and new photos', { exact: true }).click();
   assert.equal(await phone.locator('[data-capture-photo-grid] img').count(), 3);
   await phone.waitForFunction(() => [...document.querySelectorAll('[data-capture-photo-grid] img')].every(image => image.naturalWidth > 0));
   await phone.locator('[data-capture-photo-grid]').scrollIntoViewIfNeeded();
@@ -149,7 +152,7 @@ try {
   await phone.waitForFunction(() => document.querySelector('[data-capture-count]').textContent.startsWith('2 /'));
   await phone.locator('[data-capture-input]').setInputFiles(file);
   await phone.waitForFunction(() => document.querySelector('[data-capture-count]').textContent.startsWith('3 /'));
-  await phone.getByText('Review photos on this device', { exact: true }).click();
+  await phone.getByText('View saved and new photos', { exact: true }).click();
   failNextUpload = true; await phone.click('[data-capture-save]'); await statusContains(phone, 'interrupted');
   await phone.click('[data-capture-save]'); await statusContains(phone, 'Photos saved privately to your account');
   assert.equal(uploaded.get('capture-1').length, 3);
@@ -224,6 +227,17 @@ try {
   await phone.click('[data-capture-refresh]');
   await phone.waitForFunction(() => document.querySelector('[data-capture-registration]').textContent.includes('20 of 20'));
   assert.match(await phone.locator('[data-capture-registration]').textContent(), /does not confirm/);
+  const returning=await makePage({width:412,height:915},true);
+  await returning.goto(`${origin}/app/capture.html#capture=capture-1`);await returning.click('#googleSignIn');
+  await returning.locator('#realityCapturePanel.show').waitFor();
+  await returning.locator('[data-capture-gallery] summary').click();
+  await returning.waitForFunction(()=>document.querySelectorAll('[data-capture-photo-grid] img').length===6&&[...document.querySelectorAll('[data-capture-photo-grid] img')].every(x=>x.naturalWidth>0));
+  assert.match(await returning.locator('[data-photo-page]').textContent(),/1–6 of 20/);
+  await returning.click('[data-photo-next]');
+  await returning.waitForFunction(()=>[...document.querySelectorAll('[data-capture-photo-grid] img')].every(x=>x.naturalWidth>0));
+  assert.match(await returning.locator('[data-photo-page]').textContent(),/7–12 of 20/);
+  await returning.screenshot({path:`${out}/returning-phone-saved-photos.png`});
+  await returning.context().close();
   captures.get('capture-1').status = 'queued';
   delete captures.get('capture-1').processed;
   // An exterior handoff must not strand the desktop user: a separate room can still be started.
@@ -242,6 +256,9 @@ try {
   // A fragment-only handoff keeps the existing signed-in browser session.
   if (await phone.locator('#googleSignIn').isVisible()) await phone.click('#googleSignIn');
   await phone.locator('#realityCapturePanel.show').waitFor();
+  // A fragment navigation can leave the previous panel visible while the
+  // authenticated handoff resolves. Wait for this room, not any open dialog.
+  await phone.waitForFunction(()=>document.querySelector('[data-room-label]')?.value==='Kitchen');
   assert.equal(await phone.locator('[data-room-label]').inputValue(), 'Kitchen');
   assert.equal(await phone.locator('[data-room-width]').inputValue(), '5.5');
   assert.equal(await phone.locator('[data-room-permission]').isChecked(), true);
@@ -331,6 +348,20 @@ try {
   await phone.screenshot({ path: `${out}/mobile-placement-review.png` });
   await phone.evaluate(() => reviewAbort.abort());
   assert.equal(await phone.locator('#review canvas').count(), 0);
+  captures.get('capture-1').status='review_required';
+  const continuation=await makePage({width:412,height:915},true);
+  await continuation.goto(`${origin}/app/capture.html#capture=capture-1`);await continuation.click('#googleSignIn');
+  await continuation.locator('#realityCapturePanel.show').waitFor();
+  await continuation.click('[data-capture-new-set]');
+  await statusContains(continuation,'New photo set ready');
+  assert.equal(captures.get('capture-1').status,'review_required');
+  assert.equal(uploaded.get('capture-1').length,20);
+  assert.equal(await continuation.locator('[data-capture-video]').isEnabled(),true);
+  await continuation.click('[data-capture-live-camera]');
+  await continuation.waitForFunction(()=>document.querySelector('[data-camera-shutter]')&&!document.querySelector('[data-camera-shutter]').disabled);
+  await continuation.screenshot({path:`${out}/returning-phone-new-camera.png`});
+  await continuation.click('[data-camera-done]');
+  await continuation.context().close();
   assert.deepEqual(errors, []);
   await writeFile(`${out}/report.json`, JSON.stringify({ ok: true, checks: [
     'desktop QR and exact capture link', 'same account required', 'wrong account denied',

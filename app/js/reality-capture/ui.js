@@ -89,6 +89,7 @@ function renderProgress(session) {
     : status === 'processing_failed' ? 'Processing needs attention' : 'Photos saved';
   panel.querySelector('[data-capture-server-status]').textContent = session.progressError
     ? 'The status could not be refreshed. This does not mean your upload was lost. Check again when your connection returns.'
+    : session.serverCapture.reconstructionSourceCaptureId ? 'This reconstruction test reused your earlier photo set. Choose Open my original photos below to view them or take more.'
     : `${session.remotePhotos.length} photos uploaded · ${processingDescription(session.serverCapture)}`;
   const stamp = session.lastCheckedAt ? new Date(session.lastCheckedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) : '';
   panel.querySelector('[data-capture-checked]').textContent = stamp ? `Last successful check: ${stamp}` : '';
@@ -126,6 +127,8 @@ function ensurePanel() {
           <p data-capture-progress-help></p>
         </section>
         <button type="button" data-capture-retry hidden>Retry reconstruction with my saved photos</button>
+        <button type="button" class="captureGuidedCameraButton" data-capture-source hidden>Open my original photos</button>
+        <section data-capture-additional hidden><p>This submitted photo set is preserved. To take more photos or video for this building, start another photo set. Nothing is processed until you choose to upload for processing.</p><button type="button" class="captureGuidedCameraButton" data-capture-new-set>Take more photos for this building</button></section>
       </section>
       <section data-capture-result hidden aria-label="Your reconstruction">
         <h2>Reconstruction preview</h2>
@@ -187,7 +190,7 @@ function ensurePanel() {
           <span>Add photos from your library</span>
         </label>
         <p class="realityCaptureQuality" data-capture-quality>No photos leave this device until you save or upload them.</p>
-        <details><summary>Review photos on this device</summary><div data-capture-photo-grid></div></details>
+        <details data-capture-gallery><summary>View saved and new photos</summary><div data-capture-photo-grid></div><button type="button" class="captureGuidedCameraButton" data-photo-prev>Previous photos</button><span data-photo-page></span><button type="button" class="captureGuidedCameraButton" data-photo-next>Next photos</button></details>
       </section>
       <label class="realityCaptureConsent"><input data-public-contribution type="checkbox"> <span>After review, I want this capture considered as a public visual improvement. This never makes a residential interior public.</span></label>
       <section class="realityCaptureActions">
@@ -236,6 +239,26 @@ function ensurePanel() {
   });
   panel.querySelector('[data-capture-phone]').addEventListener('click', continueOnPhone);
   panel.querySelector('[data-capture-refresh]').addEventListener('click', refreshCapture);
+  panel.querySelector('[data-capture-source]').addEventListener('click', () => {
+    const id=current?.serverCapture?.reconstructionSourceCaptureId;
+    if(id)void openRealityCaptureSession(id).then(()=>{
+      if(location.pathname.endsWith('/capture.html'))history.replaceState(null,'',`#capture=${encodeURIComponent(id)}`);
+    }).catch(error=>{panel.querySelector('[data-capture-status]').textContent=error.message;});
+  });
+  panel.querySelector('[data-capture-new-set]').addEventListener('click', async () => {
+    const session=current;if(!session||session.busy)return;
+    setBusy(session,true);
+    try {
+      const response=await createRealityCaptureDraft({...draftInput(session),publicContributionRequested:false});
+      assertCurrent(session);
+      await openRealityCaptureSession(response.capture.captureId);
+      if(location.pathname.endsWith('/capture.html'))history.replaceState(null,'',`#capture=${encodeURIComponent(response.capture.captureId)}`);
+      ensurePanel().querySelector('[data-capture-status]').textContent='New photo set ready. Your previous photos and result are unchanged. Open the camera, choose a video, or add photos below.';
+    }catch(error){if(isCurrent(session))panel.querySelector('[data-capture-status]').textContent=error.message;}
+    finally{setBusy(session,false);}
+  });
+  panel.querySelector('[data-capture-gallery]').addEventListener('toggle',()=>{if(current)render();});
+  for(const [selector,delta] of [['[data-photo-prev]',-1],['[data-photo-next]',1]])panel.querySelector(selector).addEventListener('click',()=>{if(current){current.photoPage=Math.max(0,(current.photoPage||0)+delta);render();}});
   panel.querySelector('[data-capture-retry]').addEventListener('click', async () => {
     const session = current;
     if (!session || session.busy) return;
@@ -360,21 +383,52 @@ function minimumPhotos() {
   return current?.kind === 'interior_room' ? 18 : 20;
 }
 
+async function loadSavedThumbnail(session,photo,image) {
+  session.thumbnailRequests ||= new Map();
+  try {
+    if(!session.thumbnailRequests.has(photo.id))session.thumbnailRequests.set(photo.id,(async()=>{
+      const path=photo.path||`reality-captures/${session.uid}/${session.serverCapture.captureId}/originals/${photo.id}.jpg`;
+      const access=await getRealityCaptureAssetAccess(session.serverCapture.captureId,'original',path);assertCurrent(session);
+      const response=await fetch(access.url,{cache:'no-store',signal:session.abort.signal});
+      if(!response.ok)throw Error('Saved photo unavailable. Close and reopen the photo list to retry.');
+      const bitmap=await createImageBitmap(await response.blob());
+      try {
+        const canvas=document.createElement('canvas'),scale=Math.min(1,240/Math.max(bitmap.width,bitmap.height));
+        canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));
+        canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);
+        return await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.8));
+      }finally{bitmap.close();}
+    })());
+    const blob=await session.thumbnailRequests.get(photo.id);assertCurrent(session);
+    if(!image.isConnected||!blob)return;
+    if(!session.thumbnailUrls.has(photo.id))session.thumbnailUrls.set(photo.id,URL.createObjectURL(blob));
+    image.src=session.thumbnailUrls.get(photo.id);image.alt='Saved photo';
+  }catch(error){if(isCurrent(session)&&image.isConnected)image.alt=error.message||'Could not load saved photo';}
+  finally{session.thumbnailRequests.delete(photo.id);}
+}
+
 function render() {
   const panel = ensurePanel();
   if (!current) return;
   panel.dataset.captureStatus = current.serverCapture?.status || 'draft';
   current.thumbnailUrls ||= new Map();
-  const ids = new Set(current.photos.map(photo => photo.id));
+  const galleryPhotos=allPhotos();
+  current.photoPage=Math.min(current.photoPage||0,Math.max(0,Math.ceil(galleryPhotos.length/6)-1));
+  const pagePhotos=galleryPhotos.slice(current.photoPage*6,current.photoPage*6+6);
+  const ids = new Set(pagePhotos.map(photo => photo.id));
   for (const [id, url] of current.thumbnailUrls) if (!ids.has(id)) { URL.revokeObjectURL(url); current.thumbnailUrls.delete(id); }
   const gallery = panel.querySelector('[data-capture-photo-grid]');
   gallery.replaceChildren();
-  current.photos.forEach((photo, index) => {
+  pagePhotos.forEach((photo, offset) => {
+    const index=current.photoPage*6+offset;
     const item = document.createElement('div');
-    if (photo.thumbnail instanceof Blob) {
+    if (photo.thumbnail instanceof Blob || current.thumbnailUrls.has(photo.id)) {
       if (!current.thumbnailUrls.has(photo.id)) current.thumbnailUrls.set(photo.id, URL.createObjectURL(photo.thumbnail));
       const image = document.createElement('img');
       image.src = current.thumbnailUrls.get(photo.id); image.alt = `Photo ${index + 1}`; image.loading = 'lazy'; item.appendChild(image);
+    } else if(panel.querySelector('[data-capture-gallery]').open) {
+      const image=document.createElement('img');image.alt=`Loading saved photo ${index+1}`;item.appendChild(image);
+      void loadSavedThumbnail(current,photo,image);
     }
     const label = document.createElement('span'); label.textContent = `Photo ${index + 1} · ${photo.quality?.focus || 'saved'}`; item.appendChild(label);
     if (!current.uploadedPhotoIds.has(photo.id) && captureIsEditable(current.serverCapture)) {
@@ -393,9 +447,16 @@ function render() {
   panel.querySelector('[data-capture-refresh]').hidden = !current.serverCapture;
   panel.querySelector('[data-capture-retry]').hidden = current.serverCapture?.status !== 'processing_failed' || !current.serverCapture?.uploadSummary;
   const locked = !captureIsEditable(current.serverCapture);
+  panel.querySelector('[data-capture-live-camera]').style.display=locked?'none':'';
+  for(const selector of ['[data-capture-input]','[data-capture-video]'])panel.querySelector(selector).closest('label').style.display=locked?'none':'';
+  panel.querySelector('[data-capture-source]').hidden=!current.serverCapture?.reconstructionSourceCaptureId;
+  panel.querySelector('[data-capture-additional]').hidden=!locked||!!current.serverCapture?.reconstructionSourceCaptureId;
   panel.querySelectorAll('button:not([data-capture-close]), input, select').forEach((element) => {
-    element.disabled = current.busy || (locked && !element.matches('[data-capture-refresh], [data-capture-copy], [data-capture-phone], [data-capture-preview], [data-capture-hybrid], [data-viewer-action], [data-capture-cancel], [data-capture-retry]'));
+    element.disabled = current.busy || (locked && !element.matches('[data-capture-refresh], [data-capture-copy], [data-capture-phone], [data-capture-preview], [data-capture-hybrid], [data-viewer-action], [data-capture-cancel], [data-capture-retry], [data-capture-source], [data-capture-new-set], [data-photo-prev], [data-photo-next]'));
   });
+  panel.querySelector('[data-photo-prev]').disabled=current.busy||current.photoPage===0;
+  panel.querySelector('[data-photo-next]').disabled=current.busy||(current.photoPage+1)*6>=galleryPhotos.length;
+  panel.querySelector('[data-photo-page]').textContent=galleryPhotos.length?` ${current.photoPage*6+1}–${Math.min((current.photoPage+1)*6,galleryPhotos.length)} of ${galleryPhotos.length} `:'No photos in this set.';
   panel.querySelector('[data-capture-hybrid]').hidden = current.kind !== 'exterior' || !current.remotePhotos.length || !current.serverCapture?.building?.spatialContext?.footprint?.length;
   panel.querySelector('[data-capture-result]').hidden = !current.serverCapture?.processed?.optimizedModelPath;
   const registration = current.serverCapture?.processed?.registration;
