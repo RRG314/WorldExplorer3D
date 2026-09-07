@@ -191,6 +191,7 @@
     "esbuild": "^0.25.12",
     "firebase": "^12.9.0",
     "geotiff": "^3.0.5",
+    "manifold-3d": "3.5.3",
     "playwright": "^1.61.0"
   }
 }

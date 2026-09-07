@@ -34,7 +34,8 @@ const GAME_RUNTIME_ENTRYPOINTS = Object.freeze({
   'app-entry': 'app/js/app-entry.js',
   'account-social': 'app/js/multiplayer/social.js',
   'multiplayer-rooms': 'app/js/multiplayer/rooms.js',
-  'multiplayer-artifacts': 'app/js/multiplayer/artifacts.js'
+  'multiplayer-artifacts': 'app/js/multiplayer/artifacts.js',
+  'tunnel-solid-worker': 'app/js/world/compiler/tunnel-solid-worker.js'
 });
 const ROOT_SHARED_MODULE_DIR = path.join(ROOT, 'js');
 const GAME_SHARED_CONTEXT_MODULE = 'app/js/shared-context.js';
@@ -189,7 +190,7 @@ async function buildGameRuntime() {
     legalComments: 'none',
     entryNames: 'bundles/[name]-[hash]',
     chunkNames: 'bundles/chunk-[hash]',
-    external: ['https://*'],
+    external: ['https://*', '/app/vendor/manifold/manifold.js'],
     plugins: [rootSharedModulePlugin],
     metafile: true,
     write: true,
@@ -225,6 +226,7 @@ async function rewriteGameHtml(runtime, groundData) {
   let html = await fs.readFile(htmlPath, 'utf8');
   const productionConfig = canonicalJson({
     appEntrypoint: `./${runtime.entries['app-entry'].replace(/^js\/bundles\//, '')}`,
+    tunnelSolidWorkerUrl: `/app/${runtime.entries['tunnel-solid-worker']}`,
     groundCatalogUrl: groundData.catalogUrl,
     groundReleaseId: groundData.releaseId
   }).trim();

@@ -241,8 +241,9 @@ export function normalizeTransportSource(source = {}, tags = {}) {
   const access = normalizedAccess(tags);
   const explicitlyIncomplete = source.incomplete === true || tags._sourceTruncated === 'yes';
   // Attribute generalization is not missing route geometry. Shortbread's
-  // complete tile coverage preserves mapped road centerlines and explicit
-  // bridge/tunnel/layer fields, so it remains a valid drive surface. Only an
+  // complete tile coverage preserves mapped road centerlines, so it remains
+  // a valid drive surface. The schema's covered indication does not guarantee
+  // a bored tunnel subtype, surveyed elevation, or explicit layer. Only an
   // actually truncated feature or prohibited access makes the route unsafe.
   const safeForDriving = access.motorVehicle !== 'prohibited' && !explicitlyIncomplete;
 
@@ -261,6 +262,12 @@ export function normalizeTransportSource(source = {}, tags = {}) {
     maxHeightMeters: parseMeters(tags.maxheight),
     routeState: explicitlyIncomplete ? 'incomplete' : 'complete',
     safeForDriving,
+    capabilities: Object.freeze({
+      sourceNodeTopology: sourceCompleteness === 'lossless',
+      explicitLayer: sourceString(tags.layer).trim() !== '',
+      tunnelSubtype: sourceCompleteness === 'lossless' ? 'source-tag' : 'covered-indication',
+      routeName: tags._nameProvenance === 'spatial-label-association' ? 'display-only' : 'source-tag'
+    }),
     provenance: Object.freeze({
       geometry: String(source.geometryProvenance || source.retrieval || 'osm'),
       semantics: sourceCompleteness === 'lossless' ? 'source-tags' : 'generalized-schema'

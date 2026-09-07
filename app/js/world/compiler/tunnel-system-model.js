@@ -3,11 +3,12 @@ import {
   segmentIntersection2D
 } from '../../structure-semantics/geometry.js?v=2';
 import { sampleTransportSurfaceAtDistance } from './transport-surface-model.js?v=25';
+import { tunnelClearance, TUNNEL_ROOF_THICKNESS, MINIMUM_TUNNEL_ROOF_COVER } from './tunnel-envelope.js';
+import { compileTunnelWallOpenings } from './tunnel-junction-openings.js';
 
 // A shell roof that merely touches the sampled terrain is visibly exposed by
 // interpolation and precision differences. Require physical soil/road cover
 // before publishing the enclosed shell.
-const MINIMUM_TUNNEL_ROOF_COVER = 0.75;
 
 function compatibleTunnelFeature(feature) {
   const semantics = feature?.structureSemantics;
@@ -217,7 +218,7 @@ function compilePortalZones(shellRanges, total, width, portalDistances = [], ter
         terrainSamples,
         range.start,
         'start',
-        Math.max(0, range.start - transitionLength)
+        terrainSamples.length ? 0 : Math.max(0, range.start - transitionLength)
       );
       zones.push(Object.freeze({
         distance: range.start,
@@ -233,7 +234,7 @@ function compilePortalZones(shellRanges, total, width, portalDistances = [], ter
         terrainSamples,
         range.end,
         'end',
-        Math.min(total, range.end + transitionLength)
+        terrainSamples.length ? total : Math.min(total, range.end + transitionLength)
       );
       zones.push(Object.freeze({
         distance: range.end,
@@ -259,11 +260,8 @@ export function compileTunnelSystemModel(feature, sampleTerrainY, options = {}) 
 
   const width = Math.max(3.4, Number(feature.width) || 6);
   const junctionZones = compileTunnelJunctionZones(feature, total, width);
-  const clearance = Math.max(
-    3.2,
-    Math.min(5.2, (Number(feature?.structureSemantics?.cutDepth) || 4.6) - 0.25)
-  );
-  const roofThickness = 0.32;
+  const clearance = tunnelClearance(feature.structureSemantics);
+  const roofThickness = TUNNEL_ROOF_THICKNESS;
   // Include the outside face of the published wall, not merely the interior
   // roof edge, so a shell cannot escape from a steep downhill cross-slope.
   const roofHalfWidth = width * 0.5 + 0.95;
@@ -290,7 +288,9 @@ export function compileTunnelSystemModel(feature, sampleTerrainY, options = {}) 
     samples.push({
       distance,
       cover: terrainY - (roadY + clearance + roofThickness) - MINIMUM_TUNNEL_ROOF_COVER,
-      terrainGap: terrainY - roadY
+      // An approach is clear only when the entire road cross-section clears
+      // the ground. The low edge alone left a central terrain wedge in lane.
+      terrainGap: Math.max(...terrainSamples) - roadY
     });
   }
 
@@ -368,7 +368,14 @@ export function compileTunnelSystemModel(feature, sampleTerrainY, options = {}) 
     };
   }
 
-  const shellRanges = contiguousCoveredRanges(samples, total, continuesAtStart, continuesAtEnd);
+  const coveredRanges = contiguousCoveredRanges(samples, total, continuesAtStart, continuesAtEnd);
+  // Cover locates the two external transitions; it is not a license to tear
+  // holes in the middle of a mapped tunnel. The structural liner must bridge
+  // internal DEM dips between confirmed covered stations. An entirely
+  // uncovered way still follows the explicit no-shell policy above.
+  const shellRanges = coveredRanges.length > 1
+    ? [{ start: coveredRanges[0].start, end: coveredRanges[coveredRanges.length - 1].end }]
+    : coveredRanges;
   if (shellRanges.length === 0) {
     return {
       version: 3,
@@ -426,6 +433,9 @@ export function compileTunnelSystemModel(feature, sampleTerrainY, options = {}) 
 export function compileTunnelSystemModels(features = [], sampleTerrainY) {
   for (const feature of features) {
     feature.tunnelSystemModel = compileTunnelSystemModel(feature, sampleTerrainY, { features });
+  }
+  for (const feature of features) {
+    if (feature.tunnelSystemModel) feature.tunnelSystemModel.wallOpenings = compileTunnelWallOpenings(feature);
   }
 }
 

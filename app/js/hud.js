@@ -9,6 +9,8 @@ import {
 } from "./physics/vehicle-speed-units.js?v=2";
 import { resolveChaseCameraTerrainCollision } from "./hud/chase-camera-terrain.js?v=1";
 import { resolveTunnelCameraState } from "./hud/tunnel-camera-controller.js?v=6";
+import { resolveTunnelCameraBoom } from './hud/tunnel-camera-boom.js';
+import { createVehicleCameraBody, selectBodySafeCamera, vehicleCameraProbeRadius } from './hud/vehicle-camera-body.js';
 import { cameraSmoothingBlend } from "./controls/traversal-control-policy.js?v=8";
 import { planetarySurfaceYAtRenderXZ } from './planetary/runtime/surface-query.js?v=3';
 // hud.js - HUD updates, camera system, sky positioning
@@ -37,6 +39,7 @@ let chaseCameraCollisionTargetRatio = 1;
 let chaseCameraCollisionCacheValid = false;
 let chaseCameraCollisionLookX = NaN;
 let chaseCameraCollisionLookZ = NaN;
+let chaseCameraCollisionDirection = { x: NaN, y: NaN, z: NaN };
 
 function resolveChaseCameraStructureCollision(lookX, lookY, lookZ, targetX, targetY, targetZ, dt = 1 / 60) {
   if (typeof appCtx.checkBuildingCollision !== 'function') {
@@ -58,6 +61,8 @@ function resolveChaseCameraStructureCollision(lookX, lookY, lookZ, targetX, targ
   const shouldProbe =
     !chaseCameraCollisionCacheValid ||
     movedSinceProbe > 3 ||
+    Math.hypot(deltaX - chaseCameraCollisionDirection.x, deltaY - chaseCameraCollisionDirection.y,
+      deltaZ - chaseCameraCollisionDirection.z) > 0.15 ||
     chaseCameraCollisionFrame % 8 === 0;
   if (!shouldProbe) {
     const ratioBlend = cameraSmoothingBlend(
@@ -99,12 +104,15 @@ function resolveChaseCameraStructureCollision(lookX, lookY, lookZ, targetX, targ
   chaseCameraCollisionCacheValid = true;
   chaseCameraCollisionLookX = lookX;
   chaseCameraCollisionLookZ = lookZ;
+  chaseCameraCollisionDirection = { x: deltaX, y: deltaY, z: deltaZ };
   chaseCameraCollisionTargetRatio = blockedRatio;
   const ratioBlend = cameraSmoothingBlend(
     chaseCameraCollisionTargetRatio < chaseCameraCollisionRatio ? 42 : 22,
     dt
   );
   chaseCameraCollisionRatio += (chaseCameraCollisionTargetRatio - chaseCameraCollisionRatio) * ratioBlend;
+  // Retraction is immediate; only restoration may ease out through free space.
+  chaseCameraCollisionRatio = Math.min(chaseCameraCollisionRatio, blockedRatio);
   return {
     x: lookX + deltaX * chaseCameraCollisionRatio,
     y: lookY + deltaY * chaseCameraCollisionRatio,
@@ -417,6 +425,7 @@ function updateCamera(dt = 1 / 60) {
 
   const carLook = appCtx.camera.userData.carLook || { yaw: 0, pitch: 0 };
   const presentationCar = appCtx.presentationPose?.car || appCtx.car;
+  const cameraRadius = vehicleCameraProbeRadius(appCtx.camera);
   appCtx.camera.userData.carLook = carLook;
   const cameraLookSpeed = 1.8 * clampValue(dt, 1 / 240, 0.05);
   const cameraActions = appCtx.readControlActions?.('drive') || {};
@@ -453,6 +462,7 @@ function updateCamera(dt = 1 / 60) {
     disabled: planetaryChase,
     road: appCtx.car?.road || null,
     x: carX,
+    y: carGroundY + 1,
     z: carZ,
     angle: carAngle,
     lookYaw: carLook.yaw,
@@ -475,7 +485,7 @@ function updateCamera(dt = 1 / 60) {
     appCtx.carMesh.visible = true;
   }
 
-  if (appCtx.camMode === 0) {
+  if (appCtx.camMode === 0 || (insideTunnel && appCtx.camMode === 2)) {
     // Chase camera - follow behind car at terrain height
     const horizontalDistance = d * Math.cos(carLook.pitch * 0.55);
     const ox = -Math.sin(viewAngle) * horizontalDistance;
@@ -520,6 +530,14 @@ function updateCamera(dt = 1 / 60) {
     targetX = collisionTarget.x;
     targetY = collisionTarget.y;
     targetZ = collisionTarget.z;
+    if (insideTunnel) {
+      const safe = resolveTunnelCameraBoom(tunnelCameraState.road,
+        { x: lookX, y: lookY, z: lookZ }, { x: targetX, y: targetY, z: targetZ }, cameraRadius);
+      targetX = safe.x;
+      targetY = safe.y;
+      targetZ = safe.z;
+      collisionTarget.collided ||= safe.collided;
+    }
 
     // Smooth both camera position and lookAt target together
     // Higher factor = camera stays more rigidly fixed to car
@@ -531,10 +549,10 @@ function updateCamera(dt = 1 / 60) {
     appCtx.camera.position.y += (targetY - appCtx.camera.position.y) * smoothFactor;
     appCtx.camera.position.z += (targetZ - appCtx.camera.position.z) * smoothFactor;
     if (insideTunnel) {
-      appCtx.camera.position.y = Math.max(
-        tunnelCameraEnvelope.floorY + 0.35,
-        Math.min(tunnelCameraEnvelope.ceilingY - 0.28, appCtx.camera.position.y)
-      );
+      // Smoothing can cross a curved wall even when both target poses are safe.
+      const safe = resolveTunnelCameraBoom(tunnelCameraState.road,
+        { x: lookX, y: lookY, z: lookZ }, appCtx.camera.position, cameraRadius);
+      appCtx.camera.position.set(safe.x, safe.y, safe.z);
     }
 
     // Initialize lookAt target if needed
@@ -548,7 +566,41 @@ function updateCamera(dt = 1 / 60) {
     appCtx.camera.userData.lookTarget.z += (lookZ - appCtx.camera.userData.lookTarget.z) * smoothFactor;
 
     appCtx.camera.lookAt(appCtx.camera.userData.lookTarget.x, appCtx.camera.userData.lookTarget.y, appCtx.camera.userData.lookTarget.z);
+    // Collision retraction and smoothing are allowed to shorten the boom, but
+    // not to put the camera inside the actual attached vehicle. Prefer an
+    // outside-body roof view; a genuinely confined space uses first person
+    // temporarily without changing the player's selected camera mode.
+    const body = createVehicleCameraBody(typeof THREE === 'undefined' ? null : THREE, appCtx.carMesh, cameraRadius);
+    const anchor = { x: lookX, y: lookY, z: lookZ };
+    const isClear = point => {
+      if (insideTunnel) {
+        const probe = resolveTunnelCameraBoom(tunnelCameraState.road, anchor, point, cameraRadius);
+        if (probe.collided) return false;
+      } else {
+        const terrain = planetaryChase
+          ? planetarySurfaceYAtRenderXZ(appCtx, point.x, point.z)
+          : appCtx.SurfaceQuery?.terrainAt?.(point.x, point.z)?.position?.y;
+        if (Number.isFinite(terrain) && point.y < terrain + cameraRadius) return false;
+      }
+      return appCtx.checkBuildingCollision?.(point.x, point.z, cameraRadius,
+        { actorBaseY: point.y - cameraRadius, actorHeight: cameraRadius * 2 })?.collision !== true;
+    };
+    const roof = body?.contains(appCtx.camera.position) ? body.roofPoint() : null;
+    const choice = selectBodySafeCamera(appCtx.camera.position, roof ? [roof] : [], body, isClear);
+    appCtx.camera.userData.vehicleClearanceMode = choice.mode;
+    if (choice.mode === 'clearance-chase') {
+      appCtx.camera.position.copy(choice.point);
+      appCtx.camera.lookAt(lookX + Math.sin(viewAngle) * 4, lookY, lookZ + Math.cos(viewAngle) * 4);
+    } else if (choice.mode === 'clearance-first-person') {
+      const eye = { x: carX, y: carGroundY + HOOD_CAMERA_HEIGHT, z: carZ };
+      const safe = insideTunnel ? resolveTunnelCameraBoom(tunnelCameraState.road, anchor, eye, cameraRadius) : eye;
+      appCtx.camera.position.set(safe.x, safe.y, safe.z);
+      appCtx.camera.lookAt(carX + Math.sin(viewAngle) * HOOD_LOOK_DISTANCE,
+        safe.y + Math.sin(carLook.pitch) * HOOD_LOOK_DISTANCE, carZ + Math.cos(viewAngle) * HOOD_LOOK_DISTANCE);
+      appCtx.carMesh.visible = false;
+    }
   } else if (appCtx.camMode === 1) {
+    appCtx.camera.userData.vehicleClearanceMode = 'selected-first-person';
     // Hood camera - positioned at front of car looking forward over the hood
     // Move camera forward to the hood area (1.2 units ahead of car center)
     const fwdX = Math.sin(carAngle) * HOOD_FORWARD_OFFSET;
@@ -562,6 +614,7 @@ function updateCamera(dt = 1 / 60) {
     // Hide car mesh in first-person so you don't see tires/body
     if (appCtx.carMesh) appCtx.carMesh.visible = false;
   } else {
+    appCtx.camera.userData.vehicleClearanceMode = 'overhead';
     // Overhead camera - high above car
     appCtx.camera.position.set(carX, carGroundY + OVERHEAD_CAMERA_HEIGHT, carZ + OVERHEAD_CAMERA_Z_OFFSET);
     appCtx.camera.lookAt(carX, carGroundY, carZ);

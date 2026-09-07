@@ -1475,11 +1475,13 @@ const productionDebugDefaultOff = diagnosticsSource.includes("diagnosticsParams.
 const outputFiles = await filesUnder(path.join(root, 'output')).catch(() => []);
 // Gameplay journeys create their candidate evidence before the closing source
 // gate. Those captures are expected verification output, not stale source-tree
-// artwork; continue rejecting generated images in every other output location.
+// artwork. Playwright skill captures have the same evidence role; their
+// existence does not make current application source stale.
 const staleGeneratedImages = outputFiles
   .map((filePath) => path.relative(root, filePath).split(path.sep).join('/'))
   .filter((relative) => /\.(?:png|jpe?g|webp)$/i.test(relative) &&
     !relative.startsWith('output/verification/') &&
+    !relative.startsWith('output/playwright/') &&
     !relative.startsWith('output/release-evidence/current/'));
 
 const report = {

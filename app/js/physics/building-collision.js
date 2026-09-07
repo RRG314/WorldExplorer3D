@@ -11,7 +11,8 @@ function createBuildingCollisionQuery(appCtx) {
   return function checkBuildingCollision(x, z, carRadius = 2, options = {}) {
     const hasBaseBuildings = Array.isArray(appCtx.buildings) && appCtx.buildings.length > 0;
     const hasDynamicColliders = Array.isArray(appCtx.dynamicBuildingColliders) && appCtx.dynamicBuildingColliders.length > 0;
-    if (!hasBaseBuildings && !hasDynamicColliders) return { collision: false };
+    const hasTransportColliders = appCtx.transportStructureColliders?.length > 0;
+    if (!hasBaseBuildings && !hasDynamicColliders && !hasTransportColliders) return { collision: false };
     const actorBaseY = Number.isFinite(options?.actorBaseY) ? Number(options.actorBaseY) : NaN;
     const actorHeight = Number.isFinite(options?.actorHeight) ? Number(options.actorHeight) : 1.9;
     const acceptCollision = typeof options?.acceptCollision === 'function'
@@ -19,7 +20,7 @@ function createBuildingCollisionQuery(appCtx) {
       : null;
     const indexedCandidates = typeof appCtx.getNearbyBuildings === 'function'
       ? appCtx.getNearbyBuildings(x, z, carRadius + 8)
-      : appCtx.buildings;
+      : [...(appCtx.buildings || []), ...(appCtx.transportStructureColliders || [])];
     // Authored interiors, Quick Builds and other active-world obstacles are
     // intentionally kept out of the cached Earth building index. They still
     // belong to this one collision authority. In particular, a ship interior

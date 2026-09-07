@@ -13,6 +13,7 @@ import {
 import { resolveFarBuildingMassing } from './far-building-massing.js?v=2';
 import { applyFarBuildingFacadeDetail } from './far-building-facade-material.js?v=4';
 import { loadFarTerrainElevationWithParentFallback } from './far-field-elevation-loader.js?v=2';
+import { applyTerrainPortalMasksForContext, terrainHeightWithPortalCuts } from './structure-terrain-portals.js?v=1';
 import {
   cellInsideDetailedCoverage,
   cellInsideHole
@@ -142,6 +143,7 @@ function createFarFieldTerrainApi(deps = {}) {
   }
 
   function resetFarTerrainClipmap() {
+    appCtx.structureTerrainPortalDescriptors = [];
     const retiringBuildPromise = pendingBuildPromise;
     generation += 1;
     elevationAbortController?.abort?.('far-terrain-generation-reset');
@@ -663,6 +665,9 @@ function createFarFieldTerrainApi(deps = {}) {
 
     farFieldMesh = mesh;
     appCtx.terrainGroup.add(mesh);
+    if (appCtx.structureTerrainPortalDescriptors?.length) {
+      applyTerrainPortalMasksForContext(appCtx, appCtx.structureTerrainPortalDescriptors);
+    }
     if (builtBuildings) {
       const buildingMaterial = applyFarBuildingFacadeDetail(new THREE.MeshStandardMaterial({
         color: 0xffffff,
@@ -841,13 +846,15 @@ function createFarFieldTerrainApi(deps = {}) {
     return true;
   }
 
-  function sampleFarTerrainWorldYAt(x, z) {
+  function sampleFarTerrainWorldYAt(x, z, options = {}) {
     if (!farFieldMesh || !farFieldSurfaceState || farFieldMesh.userData?.farFieldDisposed) return null;
-    return sampleFarFieldGridWorldY(
+    const height = sampleFarFieldGridWorldY(
       Number(x),
       Number(z),
       farFieldSurfaceState.surfaceGrid
     );
+    return options.ignorePortalCuts ? height :
+      terrainHeightWithPortalCuts(farFieldMesh.userData.structureTerrainPortalDescriptors, x, z, height);
   }
 
   function scheduleFarTerrainSurfaceRefresh() {

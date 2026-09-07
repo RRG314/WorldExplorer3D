@@ -1,3 +1,6 @@
+import { TUNNEL_SECTION_LATERAL, TUNNEL_SECTION_HEIGHT } from '../world/compiler/tunnel-envelope.js';
+import { tunnelWallIsOpen } from '../world/compiler/tunnel-junction-openings.js';
+
 export function clearStructureVisualMeshesForContext(appCtx) {
   if (!Array.isArray(appCtx.structureVisualMeshes)) appCtx.replaceWorldCollection('structureVisualMeshes');
   const disposedGeometries = new Set();
@@ -18,8 +21,8 @@ export function clearStructureVisualMeshesForContext(appCtx) {
 }
 
 // Only the compiled tunnel system may publish tunnel enclosure geometry. Its
-// shell ranges are limited to portions with measured terrain cover and its
-// portal approaches are tied to the accepted terrain at both road edges.
+// exterior portals are located from measured terrain cover; interior DEM dips
+// do not split a mapped lining. Approaches use the accepted terrain edges.
 export const PUBLISH_TUNNEL_STRUCTURE_VISUALS = true;
 const SUPPORT_VISIBILITY_RADIUS = 2200;
 const SUPPORT_VISIBILITY_MOVE_THRESHOLD = 120;
@@ -146,26 +149,41 @@ function createStructureVisualMaterial(hex, roughness, metalness) {
   });
 }
 
+let tunnelConcreteTextures;
+function applyTunnelConcrete(material) {
+  if (!tunnelConcreteTextures) {
+    const loader = new THREE.TextureLoader();
+    tunnelConcreteTextures = ['diffuse', 'normal', 'roughness'].map(kind => {
+      const texture = loader.load(new URL(`../../assets/textures/earth/concrete_${kind}.jpg`, import.meta.url).href);
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      if (kind === 'diffuse') texture.encoding = THREE.sRGBEncoding;
+      return texture;
+    });
+  }
+  [material.map, material.normalMap, material.roughnessMap] = tunnelConcreteTextures;
+  material.normalScale = new THREE.Vector2(0.22, 0.22);
+  // The instanced ceiling strips have no per-strip dynamic light. A restrained
+  // ambient contribution keeps this enclosed material readable without adding
+  // hundreds of PointLights to the regional scene.
+  material.emissive.setHex(0x555550);
+  material.emissiveIntensity = 0.4;
+}
+
 export function shouldPublishTunnelShellSection(shell, section, segmentDistance) {
-  const junctionZones = Array.isArray(shell?.junctionZones) ? shell.junctionZones : [];
-  const insideJunction = Number.isFinite(segmentDistance) && junctionZones.some((zone) => (
-    segmentDistance >= Number(zone?.start) && segmentDistance <= Number(zone?.end)
-  ));
-  if (!insideJunction) return true;
-  // Seven-point cross-section: 0-1 and 4-5 are the independent side
-  // walls/shoulders. Sections 2-3 retain the crown across the graph chamber.
-  return section > 1 && section < 4;
+  const side = section < 2 ? -1 : section >= 4 ? 1 : 0;
+  return !side || !tunnelWallIsOpen(shell, side, segmentDistance);
 }
 
 function buildTunnelShellMeshForContext(appCtx, shellDescriptors = []) {
   if (!Array.isArray(shellDescriptors) || shellDescriptors.length === 0 || typeof THREE === "undefined") return null;
   const positions = [];
   const colors = [];
+  const uvs = [];
   const indices = [];
   // A continuous seven-point section gives vertical walls, shoulders, and an
   // arched crown without fragment seams or exposed box ends on curves.
-  const lateralFactors = [-1, -1, -0.76, 0, 0.76, 1, 1];
-  const heightFactors = [0.02, 0.56, 0.84, 1, 0.84, 0.56, 0.02];
+  const lateralFactors = TUNNEL_SECTION_LATERAL;
+  const heightFactors = TUNNEL_SECTION_HEIGHT;
   const sectionColors = [
     [0.33, 0.35, 0.35],
     [0.58, 0.59, 0.56],
@@ -175,10 +193,32 @@ function buildTunnelShellMeshForContext(appCtx, shellDescriptors = []) {
     [0.58, 0.59, 0.56],
     [0.33, 0.35, 0.35]
   ];
+  const publishedSolids = new Set();
   for (const shell of shellDescriptors) {
     const rings = Array.isArray(shell?.rings) ? shell.rings : [];
     if (rings.length < 2) continue;
     const baseVertex = positions.length / 3;
+    const solid = shell.solidBoundary;
+    if (solid && shell.publishSolidBoundary && !publishedSolids.has(solid)) {
+      publishedSolids.add(solid);
+      for (const triangle of solid.render) {
+        const base = positions.length / 3;
+        for (const point of triangle.points) {
+          const x = point[0] + solid.origin.x, y = point[1], z = point[2] + solid.origin.z;
+          positions.push(x, y, z);
+          colors.push(0.52, 0.53, 0.51);
+          // Dominant-axis planar mapping must use two DISTINCT axes. Mapping
+          // both roof coordinates to z collapsed the texture into stripes.
+          const [nx, ny, nz] = triangle.normal.map(Math.abs);
+          if (ny >= nx && ny >= nz) uvs.push(x / 3, z / 3);
+          else if (nx >= nz) uvs.push(z / 3, y / 3);
+          else uvs.push(x / 3, y / 3);
+        }
+        indices.push(base, base + 1, base + 2);
+      }
+    }
+    // The solid is the enclosure, not an overlay on the old independent tubes.
+    if (!solid) {
     for (const ring of rings) {
       const nx = -Number(ring.tangentZ || 0);
       const nz = Number(ring.tangentX || 0);
@@ -190,21 +230,63 @@ function buildTunnelShellMeshForContext(appCtx, shellDescriptors = []) {
           ring.z + nz * lateral
         );
         colors.push(...sectionColors[section]);
+        uvs.push((Number(ring.distance) || 0) / 3, (section * shell.halfWidth / 3) / 3);
       }
     }
     const sectionSize = lateralFactors.length;
     for (let ringIndex = 0; ringIndex < rings.length - 1; ringIndex += 1) {
       const segmentDistance = (Number(rings[ringIndex]?.distance) + Number(rings[ringIndex + 1]?.distance)) * 0.5;
       for (let section = 0; section < sectionSize - 1; section += 1) {
-        // In a graph-owned branch chamber the overlapping tunnel crowns remain
-        // as one continuous cover, but the independent side walls and shoulders
-        // must open so they cannot cross a splitting drive lane.
+        // Open only graph-connected branch-facing walls and shoulders. Crowns
+        // remain covered; this is not a Boolean union of the branch roof meshes.
         if (!shouldPublishTunnelShellSection(shell, section, segmentDistance)) continue;
         const a = baseVertex + ringIndex * sectionSize + section;
         const b = a + 1;
         const c = a + sectionSize;
         const d = c + 1;
         indices.push(a, c, b, b, c, d);
+      }
+    }
+    }
+    const sectionSize = lateralFactors.length;
+    for (const ring of shell.portalFrames || []) {
+      const nx = -ring.tangentZ;
+      const nz = ring.tangentX;
+      const thickness = Math.max(0.35, shell.roofThickness);
+      const copingY = Math.max(ring.y + shell.clearance + thickness,
+        ...(ring.terrainHeights || []).filter(Number.isFinite).map(y => y + 0.08));
+      const frameVertices = [];
+      for (const depth of [-0.18, 0.18]) {
+        for (const outer of [0, 1]) {
+          for (let j = 0; j < sectionSize; j += 1) {
+            const lateral = lateralFactors[j] * (shell.halfWidth + outer * thickness);
+            const archY = ring.y + heightFactors[j] * (shell.clearance + outer * thickness);
+            const topY = outer && j > 0 && j < sectionSize - 1 ? copingY : archY;
+            frameVertices.push([ring.x + nx * lateral + ring.tangentX * depth,
+              topY,
+              ring.z + nz * lateral + ring.tangentZ * depth]);
+          }
+        }
+      }
+      const frameQuad = (a, b, c, d) => {
+        const base = positions.length / 3;
+        for (const index of [a, b, c, d]) {
+          const vertex = frameVertices[index];
+          positions.push(...vertex);
+          colors.push(0.70, 0.69, 0.65);
+          uvs.push(((vertex[0] - ring.x) * nx + (vertex[2] - ring.z) * nz) / 3, vertex[1] / 3);
+        }
+        indices.push(base, base + 2, base + 1, base + 1, base + 2, base + 3);
+      };
+      for (let j = 0; j < sectionSize - 1; j += 1) {
+        for (const offset of [0, sectionSize * 2]) {
+          const a = offset + j, b = a + 1, c = a + sectionSize, d = c + 1;
+          frameQuad(a, b, c, d);
+        }
+        for (const offset of [0, sectionSize]) {
+          const a = offset + j, b = a + 1, c = a + sectionSize * 2, d = c + 1;
+          frameQuad(a, b, c, d);
+        }
       }
     }
     for (const approach of shell.approaches || []) {
@@ -228,6 +310,7 @@ function buildTunnelShellMeshForContext(appCtx, shellDescriptors = []) {
           // Portal retaining walls use the same warm concrete tone as the
           // lower tunnel lining so the approach reads as one built structure.
           colors.push(0.5, 0.51, 0.49, 0.5, 0.51, 0.49);
+          uvs.push(ring.distance / 3, ring.y / 3, ring.distance / 3, terrainY / 3);
         }
       }
       for (let ringIndex = 0; ringIndex < approachRings.length - 1; ringIndex += 1) {
@@ -245,15 +328,18 @@ function buildTunnelShellMeshForContext(appCtx, shellDescriptors = []) {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   const material = createStructureVisualMaterial(0xffffff, 0.93, 0.02);
   material.vertexColors = true;
   material.side = THREE.DoubleSide;
+  applyTunnelConcrete(material);
   const mesh = new THREE.Mesh(geometry, material);
   mesh.castShadow = false;
   mesh.receiveShadow = true;
-  mesh.frustumCulled = false;
+  geometry.computeBoundingSphere();
+  mesh.frustumCulled = true;
   Object.assign(mesh.userData, {
     isStructureVisual: true,
     structureVisualType: "tunnel_shells",

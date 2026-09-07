@@ -1012,7 +1012,9 @@ export function buildTransportJunctionProfileAnchors(
       (left.feature?.transportRecord?.completeness === 'lossless' ? 1 : 0)
     )[0] || null;
     const controllingCompleteness = String(
-      controllingBridge?.feature?.transportRecord?.completeness || 'lossless'
+      controllingBridge?.feature?.transportRecord?.completeness ||
+      (connectedCandidates.some(({ feature }) => feature?.transportRecord?.completeness === 'lossless')
+        ? 'lossless' : 'generalized')
     );
     const candidates = connectedCandidates.filter(({ feature }) =>
       String(feature?.transportRecord?.completeness || 'generalized') === controllingCompleteness

@@ -416,7 +416,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   // before publishing meshes so a road cannot become unsupported only after
   // the terrain rebuild lowers the ground below it.
   if (typeof appCtx.refreshTransportStructureAssembliesForPublishedTerrain === 'function') {
-    measure(
+    await measureAsync(
       'refreshPublishedTerrainStructureAssemblies',
       () => appCtx.refreshTransportStructureAssembliesForPublishedTerrain()
     );

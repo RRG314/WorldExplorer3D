@@ -1,4 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
+import { resolveTunnelCameraEnvelope } from '../hud/tunnel-camera-envelope.js?v=6';
+import { resolveTunnelCameraBoom } from '../hud/tunnel-camera-boom.js';
+import { resolveChaseCameraTerrainCollision } from '../hud/chase-camera-terrain.js?v=1';
 
 function createWalkingRuntimeHelpers({
   CFG,
@@ -39,6 +42,8 @@ function createWalkingRuntimeHelpers({
           mode: "walk",
           angle: finiteOr(car.angle, state.walker.angle),
           feetY: finiteOr(car.y, 1.2) - 1.2,
+          preserveCurrentSupport: true,
+          preferredRoad: car.road || null,
           source: "walk_mode_switch"
         }
       );
@@ -92,6 +97,8 @@ function createWalkingRuntimeHelpers({
         mode: "drive",
         angle: targetAngle,
         feetY: wasWalk ? walkerFeetY : finiteOr(car.y, 1.2) - 1.2,
+        preserveCurrentSupport: true,
+        preferredRoad: car.road || null,
         source: "drive_mode_switch"
       });
       appCtx.applyResolvedWorldSpawn(resolvedDriveSpawn, {
@@ -153,6 +160,10 @@ function createWalkingRuntimeHelpers({
       ? appCtx.presentationPose.walk
       : state.walker;
     const cameraYaw = walker.yaw + (Number(walker.lookYawOffset) || 0);
+    const groundSample = !appCtx.activeInterior && !appCtx.activePlanetaryBodyId &&
+      appCtx.SurfaceQuery?.walkAt?.(walker.x, walker.z, { currentY: walker.y - CFG.eyeHeight });
+    const tunnelRoad = groundSample?.feature || null;
+    const tunnelEnvelope = resolveTunnelCameraEnvelope(tunnelRoad, walker.x, walker.z, walker.y);
 
     if (state.view === "first") {
       const y = walker.y;
@@ -167,7 +178,7 @@ function createWalkingRuntimeHelpers({
       return true;
     }
 
-    if (state.view === "overhead") {
+    if (state.view === "overhead" && !tunnelEnvelope.inside) {
       const terrainY = getWalkGroundY(walker.x, walker.z, 0);
       const height = 45;
       const offsetBack = 8;
@@ -206,13 +217,22 @@ function createWalkingRuntimeHelpers({
       resolvedCamZ = clamped.z;
     }
 
-    const collisionSafeCamera = resolveThirdPersonCameraCollision({
-      anchor: { x: walker.x, y: baseY + 1.35, z: walker.z },
+    const cameraAnchor = { x: walker.x, y: tunnelEnvelope.inside ? baseY : baseY + 1.35, z: walker.z };
+    let collisionSafeCamera = resolveThirdPersonCameraCollision({
+      anchor: cameraAnchor,
       target: { x: resolvedCamX, y: camY, z: resolvedCamZ },
       checkBuildingCollision: appCtx.checkBuildingCollision,
       probeSpacing: interiorCamera ? 0.24 : 0.45,
       clearance: interiorCamera ? 0.22 : 0.32
     });
+    if (tunnelEnvelope.inside) {
+      collisionSafeCamera = { ...collisionSafeCamera,
+        ...resolveTunnelCameraBoom(tunnelRoad, cameraAnchor, collisionSafeCamera) };
+    } else if (!activeInterior && !appCtx.activePlanetaryBodyId && !appCtx.onMoon && !appCtx.onMars) {
+      collisionSafeCamera = { ...collisionSafeCamera,
+        ...resolveChaseCameraTerrainCollision(cameraAnchor, collisionSafeCamera,
+          (x, z) => appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y) };
+    }
     resolvedCamX = collisionSafeCamera.x;
     resolvedCamZ = collisionSafeCamera.z;
     camera.position.set(resolvedCamX, collisionSafeCamera.y, resolvedCamZ);
