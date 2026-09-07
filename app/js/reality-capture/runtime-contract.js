@@ -7,10 +7,12 @@ function text(value) {
 
 function runtimePublicationState(appCtx = {}) {
   const config = appCtx.realityCaptureRuntimeConfig || globalThis.__WE3D_REALITY_CAPTURE_RUNTIME__ || {};
-  const enabled = config.publicationEnabled === true && config.stagingProvisioned === true;
+  // Runtime availability is not a licensing decision. Publication and private
+  // asset access remain server-authorized; unavailable services fall back normally.
+  const enabled = config.publicationEnabled !== false;
   return Object.freeze({
     enabled,
-    reason: enabled ? 'staging_provisioned' : 'staging_not_provisioned'
+    reason: enabled ? 'available' : 'explicitly_disabled'
   });
 }
 

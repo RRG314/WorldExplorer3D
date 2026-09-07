@@ -234,17 +234,18 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     const auth = await guard(req, res);
     if (!auth) return;
     const captureId = clean(req.body?.captureId, 180);
-    const ref = db.collection(CAPTURES).doc(captureId);
+    let ref = null;
+    let validatedSnapshot = null;
     try {
+      if (!captureId || captureId.includes('/')) throw new Error('invalid_capture_id');
+      ref = db.collection(CAPTURES).doc(captureId);
       const snap = await ref.get();
       if (!snap.exists) throw new Error('capture_not_found');
       const capture = snap.data() || {};
       if (capture.ownerUid !== auth.uid) throw new Error('capture_owner_required');
       if (!['draft', 'uploading'].includes(capture.status)) throw new Error('invalid_capture_state_transition');
-      if (capture.status === 'draft') {
-        assertCaptureTransition('draft', 'uploading');
-        await ref.set({ status: 'uploading', updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-      }
+      validatedSnapshot = snap;
+      if (capture.status === 'draft') assertCaptureTransition('draft', 'uploading');
       const prefix = `reality-captures/${auth.uid}/${captureId}/originals/`;
       const [files] = await bucket.getFiles({ prefix });
       const rows = [];
@@ -263,17 +264,36 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       }
       const uploadSummary = validateUploadedPhotoSet(capture, rows);
       assertCaptureTransition('uploading', 'uploaded');
-      await ref.set({ status: 'uploaded', uploadSummary, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
       assertCaptureTransition('uploaded', 'queued');
-      await ref.set({ status: 'queued', queuedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      // Commit validation and queue admission together; never regress another
+      // finalizer, moderator or deletion that won while storage was being read.
+      await db.runTransaction(async (transaction) => {
+        const current = await transaction.get(ref);
+        if (!current.exists) throw new Error('capture_not_found');
+        if (current.data()?.ownerUid !== auth.uid) throw new Error('capture_owner_required');
+        if (!['draft', 'uploading'].includes(current.data()?.status) ||
+            current.updateTime?.isEqual(snap.updateTime) !== true) {
+          throw new Error('invalid_capture_state_transition');
+        }
+        transaction.update(ref, {
+          status: 'queued', uploadSummary,
+          queuedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()
+        });
+      });
       res.status(200).json({ captureId, status: 'queued', uploadSummary });
     } catch (error) {
       console.error('[finalizeRealityCaptureUpload]', error);
-      if (captureId) await ref.set({
-        status: 'processing_failed',
-        failure: { code: clean(error?.message || error, 100), stage: 'upload_validation' },
-        updatedAt: FieldValue.serverTimestamp()
-      }, { merge: true }).catch(() => {});
+      if (validatedSnapshot) await db.runTransaction(async (transaction) => {
+        const current = await transaction.get(ref);
+        if (!current.exists || current.data()?.ownerUid !== auth.uid ||
+            !['draft', 'uploading'].includes(current.data()?.status) ||
+            current.updateTime?.isEqual(validatedSnapshot.updateTime) !== true) return;
+        transaction.update(ref, {
+          status: 'processing_failed',
+          failure: { code: clean(error?.message || error, 100), stage: 'upload_validation' },
+          updatedAt: FieldValue.serverTimestamp()
+        });
+      }).catch(() => {});
       sendKnownError(res, error);
     }
   });
@@ -748,14 +768,18 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     try {
       const captureId = clean(req.body?.captureId, 180);
       const assetKind = clean(req.body?.assetKind || 'processed', 30).toLowerCase();
+      if (!['original', 'processed'].includes(assetKind)) throw new Error('asset_access_denied');
       const captureSnap = await db.collection(CAPTURES).doc(captureId).get();
       if (!captureSnap.exists) throw new Error('capture_not_found');
       const capture = captureSnap.data() || {};
       let allowed = capture.ownerUid === auth.uid;
+      // Viewing a published representation never grants access to source photos.
+      if (assetKind === 'original' && !allowed) throw new Error('asset_access_denied');
+      if (!allowed && capture.status !== 'approved') throw new Error('asset_access_denied');
       if (!allowed && capture.captureKind === 'interior_room' && capture.spaceId) {
         const spaceSnap = await db.collection(SPACES).doc(capture.spaceId).get();
         const memberSnap = await db.collection(SPACES).doc(capture.spaceId).collection('members').doc(auth.uid).get();
-        allowed = spaceSnap.exists && resolveSpaceAccess({
+        allowed = spaceSnap.exists && spaceSnap.data()?.captureId === captureId && resolveSpaceAccess({
           space: spaceSnap.data(), requesterUid: auth.uid,
           member: memberSnap.exists ? memberSnap.data() : null
         }).allowed;
@@ -766,8 +790,13 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       const path = assetKind === 'original'
         ? clean(req.body?.path, 500)
         : clean(capture.processed?.optimizedModelPath, 500);
-      const expectedPrefix = `reality-captures/${capture.ownerUid}/${captureId}/`;
-      if (!path.startsWith(expectedPrefix)) throw new Error('asset_access_denied');
+      const expectedPrefix = `reality-captures/${capture.ownerUid}/${captureId}/${assetKind === 'original' ? 'originals' : 'processed'}/`;
+      if (!path.startsWith(expectedPrefix) || path.split('/').some((part) => part === '..' || part === '.') || path.includes('\\')) {
+        throw new Error('asset_access_denied');
+      }
+      if (assetKind === 'original' && !/^[a-f0-9]{32}\.(jpg|webp)$/.test(path.slice(expectedPrefix.length))) {
+        throw new Error('asset_access_denied');
+      }
       const file = bucket.file(path);
       const [exists] = await file.exists();
       if (!exists) throw new Error('asset_not_found');

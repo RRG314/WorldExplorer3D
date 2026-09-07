@@ -17,12 +17,13 @@ function element(classes = [], attributes = {}, hidden = false) {
   };
 }
 
-test('Reality Capture publication fails closed until staging is explicitly provisioned', () => {
-  assert.deepEqual(runtimePublicationState({}), { enabled: false, reason: 'staging_not_provisioned' });
-  assert.equal(runtimePublicationState({ realityCaptureRuntimeConfig: { publicationEnabled: true } }).enabled, false);
+test('Reality Capture availability does not require a staging or licensing unlock', () => {
+  assert.deepEqual(runtimePublicationState({}), { enabled: true, reason: 'available' });
+  assert.equal(runtimePublicationState({ realityCaptureRuntimeConfig: { publicationEnabled: true } }).enabled, true);
   assert.equal(runtimePublicationState({
     realityCaptureRuntimeConfig: { publicationEnabled: true, stagingProvisioned: true }
   }).enabled, true);
+  assert.equal(runtimePublicationState({ realityCaptureRuntimeConfig: { publicationEnabled: false } }).enabled, false);
 });
 
 test('Reality Capture uses the canonical multiplayer room instead of orphan context fields', () => {

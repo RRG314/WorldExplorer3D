@@ -1,7 +1,7 @@
 import { listApprovedExteriorRepresentations } from '../../../js/community-reality-capture-api.js?v=3';
 import { worldModificationIdentityForLocation } from '../editable-world/model.js?v=1';
 import { setBuildingPresentationSuppressed } from '../editable-world/runtime.js?v=4';
-import { runtimePublicationState } from './runtime-contract.js?v=1';
+import { runtimePublicationState } from './runtime-contract.js?v=2';
 
 const MAX_RUNTIME_VERTICES = 1_500_000;
 const instances = new Map();

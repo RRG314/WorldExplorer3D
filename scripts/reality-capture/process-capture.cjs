@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 
-const { spawn } = require('node:child_process');
+const { randomUUID } = require('node:crypto');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
@@ -14,37 +14,18 @@ const admin = (() => {
 })();
 const { FieldValue } = admin.firestore;
 const {
-  PROCESSING_PIPELINE_VERSION,
+  CAPTURE_LIMITS,
   assertCaptureTransition,
   imageSignatureMatches,
   validateUploadedPhotoSet
 } = require('../../functions/reality-capture-authority.js');
 const { inspectGlb } = require('./glb-inspection.cjs');
+const { providerOptions, reconstruct } = require('./reconstruction-providers.cjs');
 
 const MAX_OUTPUT_BYTES = 20 * 1024 * 1024;
 const MAX_OUTPUT_TRIANGLES = 500_000;
 
-function run(command, args, options = {}) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { ...options, stdio: 'inherit', shell: false });
-    child.once('error', reject);
-    child.once('exit', (code, signal) => code === 0 ? resolve() : reject(new Error(`${command}_failed_${code ?? signal}`)));
-  });
-}
-
-async function findFirst(directory, fileName) {
-  const entries = await fs.readdir(directory, { withFileTypes: true });
-  for (const entry of entries) {
-    const candidate = path.join(directory, entry.name);
-    if (entry.isDirectory()) {
-      const nested = await findFirst(candidate, fileName);
-      if (nested) return nested;
-    } else if (entry.name === fileName) return candidate;
-  }
-  return '';
-}
-
-async function claimCapture(db, captureId) {
+async function claimCapture(db, captureId, processingAttemptId, pipelineVersion) {
   const ref = db.collection('realityCaptures').doc(captureId);
   return db.runTransaction(async (transaction) => {
     const snap = await transaction.get(ref);
@@ -53,7 +34,8 @@ async function claimCapture(db, captureId) {
     assertCaptureTransition(capture.status, 'processing');
     transaction.set(ref, {
       status: 'processing',
-      processingPipelineVersion: PROCESSING_PIPELINE_VERSION,
+      processingPipelineVersion: pipelineVersion,
+      processingAttemptId,
       processingStartedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
       failure: FieldValue.delete()
@@ -62,31 +44,50 @@ async function claimCapture(db, captureId) {
   });
 }
 
+async function finishAttempt(db, captureId, attemptId, patch) {
+  const ref = db.collection('realityCaptures').doc(captureId);
+  return db.runTransaction(async (transaction) => {
+    const snap = await transaction.get(ref);
+    if (!snap.exists || snap.data()?.status !== 'processing' || snap.data()?.processingAttemptId !== attemptId) return false;
+    transaction.update(ref, patch);
+    return true;
+  });
+}
+
 async function main() {
   const captureId = String(process.argv[2] || '').trim();
   if (!captureId) throw new Error('Usage: node scripts/reality-capture/process-capture.cjs CAPTURE_ID [--fixture-glb /path/model.glb]');
   const fixtureIndex = process.argv.indexOf('--fixture-glb');
-  const fixtureGlb = fixtureIndex >= 0 ? path.resolve(process.argv[fixtureIndex + 1] || '') : '';
+  if (fixtureIndex >= 0 && !process.argv[fixtureIndex + 1]) throw Error('fixture_path_required');
+  const fixtureGlb = fixtureIndex >= 0 ? path.resolve(process.argv[fixtureIndex + 1]) : '';
+  const provider = providerOptions(process.argv.slice(3));
+  const attemptId = randomUUID();
   if (!admin.apps.length) admin.initializeApp();
   const db = admin.firestore();
   const bucket = admin.storage().bucket();
-  const capture = await claimCapture(db, captureId);
   const work = await fs.mkdtemp(path.join(os.tmpdir(), `we3d-capture-${captureId.slice(0, 12)}-`));
   const images = path.join(work, 'images');
   const output = path.join(work, 'output');
   const cache = path.join(work, 'cache');
   const finalGlb = path.join(work, 'capture.glb');
-  await Promise.all([fs.mkdir(images), fs.mkdir(output), fs.mkdir(cache)]);
+  let destination = '';
+  let uploaded = false;
   try {
+    await Promise.all([fs.mkdir(images), fs.mkdir(output), fs.mkdir(cache)]);
+    const capture = await claimCapture(db, captureId, attemptId, provider.pipelineVersion);
     const prefix = `reality-captures/${capture.ownerUid}/${captureId}/originals/`;
     const [objects] = await bucket.getFiles({ prefix });
+    if (objects.length > CAPTURE_LIMITS[capture.captureKind].maxPhotos) throw Error('too_many_photos');
     const rows = [];
     for (let index = 0; index < objects.length; index += 1) {
       const object = objects[index];
       const [metadata] = await object.getMetadata();
+      if (!CAPTURE_LIMITS.allowedMimeTypes.includes(metadata.contentType) || Number(metadata.size) > CAPTURE_LIMITS.maxFileBytes) throw Error('invalid_photo_metadata');
       const bytes = await object.download().then((result) => result[0]);
+      if (bytes.length > CAPTURE_LIMITS.maxFileBytes) throw Error('photo_size_exceeded');
       if (!imageSignatureMatches(bytes.subarray(0, 16), metadata.contentType)) throw new Error('photo_signature_mismatch');
-      const fileName = `${String(index).padStart(3, '0')}.jpg`;
+      const fileName = object.name.slice(prefix.length);
+      if (!/^[a-f0-9]{32}\.(jpg|webp)$/.test(fileName)) throw Error('invalid_photo_name');
       await fs.writeFile(path.join(images, fileName), bytes, { flag: 'wx', mode: 0o600 });
       rows.push({
         name: fileName,
@@ -97,58 +98,58 @@ async function main() {
       });
     }
     const inputSummary = validateUploadedPhotoSet(capture, rows);
+    let provenance;
     if (fixtureGlb) {
       await fs.copyFile(fixtureGlb, finalGlb);
+      provenance = { provider: 'fixture', evidenceClass: 'fixture', realReconstructionAcceptance: false };
     } else {
-      const meshroom = process.env.MESHROOM_BATCH_BIN || 'meshroom_batch';
-      const blender = process.env.BLENDER_BIN || 'blender';
-      await run(meshroom, ['--input', images, '--output', output, '--cache', cache], { cwd: work });
-      const texturedObj = await findFirst(output, 'texturedMesh.obj') || await findFirst(cache, 'texturedMesh.obj');
-      if (!texturedObj) throw new Error('meshroom_textured_mesh_missing');
-      await run(blender, [
-        '--background', '--factory-startup', '--python', path.resolve(__dirname, 'blender-export-glb.py'), '--',
-        '--input', texturedObj, '--output', finalGlb
-      ], { cwd: path.dirname(texturedObj) });
+      provenance = await reconstruct(provider, { images, output, cache, work, finalGlb });
     }
     const modelBytes = await fs.readFile(finalGlb);
     if (modelBytes.length > MAX_OUTPUT_BYTES) throw new Error('optimized_model_budget_exceeded');
     const modelInspection = inspectGlb(modelBytes);
     if (modelInspection.triangles > MAX_OUTPUT_TRIANGLES) throw new Error('optimized_triangle_budget_exceeded');
-    const destination = `reality-captures/${capture.ownerUid}/${captureId}/processed/${PROCESSING_PIPELINE_VERSION}/capture.glb`;
+    destination = `reality-captures/${capture.ownerUid}/${captureId}/processed/${provider.pipelineVersion}/${attemptId}/capture.glb`;
     await bucket.file(destination).save(modelBytes, {
       resumable: false,
       validation: 'crc32c',
       metadata: {
         contentType: 'model/gltf-binary',
         cacheControl: 'private, no-store, max-age=0',
-        metadata: { captureId, ownerUid: capture.ownerUid, pipelineVersion: PROCESSING_PIPELINE_VERSION }
+        metadata: { captureId, ownerUid: capture.ownerUid, pipelineVersion: provider.pipelineVersion, attemptId, provider: provenance.provider }
       }
     });
+    uploaded = true;
     assertCaptureTransition('processing', 'review_required');
-    await db.collection('realityCaptures').doc(captureId).set({
+    const finished = await finishAttempt(db, captureId, attemptId, {
       status: 'review_required',
       processed: {
         optimizedModelPath: destination,
         inputSummary,
         modelInspection,
+        provenance,
         rawCollisionAllowed: false,
         rawNavigationAllowed: false
       },
       processingCompletedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp()
-    }, { merge: true });
+    });
+    if (!finished) throw Error('capture_attempt_superseded');
     process.stdout.write(`${JSON.stringify({ captureId, status: 'review_required', destination, inputSummary, modelInspection }, null, 2)}\n`);
   } catch (error) {
-    await db.collection('realityCaptures').doc(captureId).set({
+    if (uploaded) await bucket.file(destination).delete({ ignoreNotFound: true }).catch(() => {});
+    await finishAttempt(db, captureId, attemptId, {
       status: 'processing_failed',
       failure: { code: String(error?.message || error).slice(0, 120), stage: 'reconstruction' },
       updatedAt: FieldValue.serverTimestamp()
-    }, { merge: true });
+    });
     throw error;
   } finally {
     await fs.rm(work, { recursive: true, force: true });
   }
 }
+
+module.exports = { claimCapture, finishAttempt };
 
 if (require.main === module) {
   main().catch((error) => {

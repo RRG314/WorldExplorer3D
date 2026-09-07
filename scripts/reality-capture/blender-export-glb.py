@@ -1,6 +1,7 @@
 import bpy
 import bmesh
 import sys
+from pathlib import Path
 
 
 def argument_value(flag):
@@ -14,7 +15,10 @@ source = argument_value("--input")
 target = argument_value("--output")
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
-bpy.ops.wm.obj_import(filepath=source)
+if Path(source).suffix.lower() in (".glb", ".gltf"):
+    bpy.ops.import_scene.gltf(filepath=source)
+else:
+    bpy.ops.wm.obj_import(filepath=source)
 
 mesh_objects = [obj for obj in bpy.context.scene.objects if obj.type == "MESH"]
 for obj in mesh_objects:

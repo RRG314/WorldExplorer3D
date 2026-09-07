@@ -7,7 +7,7 @@ import {
   canonicalRoomId,
   resolveCanonicalMappedBuilding,
   runtimePublicationState
-} from './runtime-contract.js?v=1';
+} from './runtime-contract.js?v=2';
 
 const MAX_RUNTIME_VERTICES = 1_500_000;
 
