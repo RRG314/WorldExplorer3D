@@ -20,6 +20,12 @@ The actual owner's saved front-wall photo was decoded and projected locally onto
 
 Still not implemented: automatic whole-building photo registration, photo-supported roof patches, arbitrary polygon masks/occluder removal, cross-capture surface aggregation, global manifest migration, public hybrid publication and in-world partial-patch attachment. This checkpoint is a private testable editor, not completion of the entire roadmap. The retained private revision history is not yet a user-facing history browser. Unknown roof/height inputs remain visibly provisional.
 
+### Staging availability and executed evidence
+
+Staging hosting build `5.2.0+8f581231ab43.f20011f689e3b7e6.staging` and the five scoped capture endpoints deployed successfully. Production, GitHub, the owner's original capture/photos and the previous mesh were not changed. The owner can reopen the existing capture and choose **Build a photo + procedural preview** without another upload.
+
+`scripts/verification/reality-capture-hybrid-staging.mjs` executed real staging sign-in/App Check, private save, stale-revision rejection, get/reload persistence and cleanup with a disposable empty-shell fixture. It did not fabricate a validated photo manifest or queue reconstruction. The first fixture lacked the required spatial-frame schema and was correctly rejected; the fixture was corrected. Actual photo projection was exercised separately against the owner's local photo and stored footprint using `reality-capture-hybrid-ui.mjs`. Forty-one Node tests and the existing capture browser suite passed. The generic game-client entry screenshot shows the real sign-in page; its browser logged `requestStorageAccess: Permission denied`, while the separate real email-sign-in/persistence test succeeded. This is not a physical iPhone/Android acceptance claim.
+
 Planar correction reference: [OpenCV homography tutorial](https://docs.opencv.org/4.13.0/d9/dab/tutorial_homography.html). This method applies to one plane; it does not reconstruct depth or reveal unphotographed surfaces.
 
 ## Implementation sequence and gates
