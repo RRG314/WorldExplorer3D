@@ -21,7 +21,7 @@ import {
 import { resolveCanonicalMappedBuilding } from './runtime-contract.js?v=2';
 import { captureBuildingContext } from './alignment.js?v=1';
 import { photoGuideMarkup } from './photo-guide.js?v=1';
-import { getScreenLayoutService } from '../ui/screen-layout.js?v=1';
+import { getScreenLayoutService } from '../ui/screen-layout.js?v=2';
 
 const EXTERIOR_SECTORS = Object.freeze(['Front', 'Front right', 'Right', 'Back right', 'Back', 'Back left', 'Left', 'Front left']);
 const INTERIOR_SECTORS = Object.freeze(['Door', 'Wall 1', 'Corner 1', 'Wall 2', 'Corner 2', 'Opposite door']);
