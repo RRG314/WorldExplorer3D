@@ -7,7 +7,9 @@ Owner clarification: integrate into the app without licensing locks or staging-o
 
 ## Current deployment direction (owner clarification, 2026-09-07)
 
-Use the existing **separate staging project** `we3d-staging-20260712` for all test hosting, Auth, database, photo storage, functions and processing. Do not deploy the new capture endpoints, storage rules or game release to production. No production changes have been made. Production billing is enabled; staging billing is not. These are project-specific settings, not evidence that the owner lacks a Blaze plan. Linking staging to the existing billing account requires explicit confirmation because it enables pay-as-you-go charges there; no linkage or paid processor has been enabled.
+Use the existing **separate staging project** `we3d-staging-20260712` for all test hosting, Auth, database, photo storage, functions and processing. Do not deploy the new capture endpoints, storage rules or game release to production. No production changes have been made.
+
+Billing update (2026-09-07): the owner explicitly approved linking staging to the existing production billing account. The staging billing link was applied and independently read back: `billingEnabled: true`, same billing account as production. Production billing was read before and after and was unchanged. This enables staging pay-as-you-go usage; it is not a fixed-price allowance or a hard spending cap. No GPU job, capture service or app deployment was started by this operation. Earlier unprovisioned-state findings below are historical; storage, App Check, capture endpoints and a real reconstruction worker still need setup and verification.
 
 Phone and desktop must use the same staging URL and staging account during testing. The owner may use the same Google identity, but staging has separate account records and game data; do not copy production users/saves or point staging to live data to avoid that separation. This follows [Firebase's separate-environment guidance](https://firebase.google.com/docs/projects/dev-workflows/overview-environments).
 
