@@ -21,7 +21,7 @@ import {
   getRealityCaptureModerationDetail,
   listRealityCaptureModeration,
   moderateRealityCapture
-} from './community-reality-capture-api.js?v=3';
+} from './community-reality-capture-api.js?v=4';
 import {
   LANDING_PAGE_ENTRY_ID,
   cloneLandingContent,

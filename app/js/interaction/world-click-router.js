@@ -1,4 +1,4 @@
-import { openRealityCaptureForBuilding } from '../reality-capture/ui.js?v=1';
+import { openRealityCaptureForBuilding } from '../reality-capture/ui.js?v=2';
 
 function uniqueVisibleRoots(groups = []) {
   const seen = new Set();

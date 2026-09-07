@@ -230,6 +230,32 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     }
   });
 
+  // A handoff URL identifies a capture; it is never a bearer credential.
+  const getMyRealityCapture = functions.region('us-central1').https.onRequest(async (req, res) => {
+    const auth = await guard(req, res);
+    if (!auth) return;
+    try {
+      const captureId = clean(req.body?.captureId, 180);
+      if (!/^[a-zA-Z0-9_-]{1,180}$/.test(captureId)) throw new Error('invalid_capture_id');
+      const snap = await db.collection(CAPTURES).doc(captureId).get();
+      if (!snap.exists || snap.data()?.ownerUid !== auth.uid) throw new Error('capture_not_found');
+      const prefix = `reality-captures/${auth.uid}/${captureId}/originals/`;
+      const [files] = await bucket.getFiles({ prefix, maxResults: 49, autoPaginate: false });
+      const photos = await Promise.all(files.slice(0, 49).filter((file) =>
+        /^[a-f0-9]{32}\.(jpg|webp)$/.test(file.name.slice(prefix.length))
+      ).map(async (file) => {
+        const [metadata] = await file.getMetadata();
+        const sector = Number(metadata.metadata?.sector);
+        return { id: file.name.slice(prefix.length).split('.')[0],
+          sector: Number.isInteger(sector) && sector >= 0 && sector < 8 ? sector : -1 };
+      }));
+      res.set('Cache-Control', 'private, no-store');
+      res.status(200).json({ capture: { ...serializeCapture(snap), captureId, ownerUid: auth.uid }, photos });
+    } catch (error) {
+      sendKnownError(res, error);
+    }
+  });
+
   const finalizeRealityCaptureUpload = functions.region('us-central1').https.onRequest(async (req, res) => {
     const auth = await guard(req, res);
     if (!auth) return;
@@ -812,6 +838,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
 
   return {
     createRealityCaptureDraft,
+    getMyRealityCapture,
     decidePrivateSpaceAccessRequest,
     deleteRealityCapture,
     finalizeRealityCaptureUpload,

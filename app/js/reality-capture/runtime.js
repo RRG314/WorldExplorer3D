@@ -1,4 +1,4 @@
-import { listApprovedExteriorRepresentations } from '../../../js/community-reality-capture-api.js?v=3';
+import { listApprovedExteriorRepresentations } from '../../../js/community-reality-capture-api.js?v=4';
 import { worldModificationIdentityForLocation } from '../editable-world/model.js?v=1';
 import { setBuildingPresentationSuppressed } from '../editable-world/runtime.js?v=4';
 import { runtimePublicationState } from './runtime-contract.js?v=2';

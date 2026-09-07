@@ -1,7 +1,7 @@
 import {
   requestPrivateSpaceAccess,
   resolveBuildingInteriorRepresentation
-} from '../../../js/community-reality-capture-api.js?v=3';
+} from '../../../js/community-reality-capture-api.js?v=4';
 import { worldModificationIdentityForLocation } from '../editable-world/model.js?v=1';
 import {
   canonicalRoomId,

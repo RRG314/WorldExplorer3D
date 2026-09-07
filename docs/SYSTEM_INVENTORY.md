@@ -41,6 +41,13 @@ requires processing and moderator approval before presentation, and keeps every
 new interior private until its owner separately changes a reusable private-space
 policy. See [COMMUNITY_REALITY_CAPTURE_V1.md](../COMMUNITY_REALITY_CAPTURE_V1.md).
 
+Phone handoff follow-up (2026-09-07, local): Account now links to a lightweight
+capture page. Desktop QR → same Firebase account → same owner-authorized capture,
+with partial upload, retry and explicit cross-device progress refresh. Local
+drafts are UID-scoped and session cancellation prevents account-switch leakage.
+Staging billing, Storage and Functions are not provisioned; real reconstruction
+and physical-phone acceptance remain open. See `REALITY_CAPTURE_AR_INTEGRATION_PLAN.md`.
+
 Building exterior note (2026-09-06): the mapped building renderer now has one
 deterministic semantic exterior catalog, shared CC0 wall surfaces, procedural
 window/storefront treatment, and a six-batch near-detail layer. Footprints,

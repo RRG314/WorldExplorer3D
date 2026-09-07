@@ -1,11 +1,14 @@
 import { worldModificationIdentityForLocation } from '../editable-world/model.js?v=1';
 import {
   createRealityCaptureDraft,
+  getMyRealityCapture,
   deleteRealityCapture,
   finalizeRealityCaptureUpload,
   normalizeCapturePhoto,
   uploadRealityCapturePhoto
-} from '../../../js/community-reality-capture-api.js?v=3';
+} from '../../../js/community-reality-capture-api.js?v=4';
+import { getCurrentUser, observeAuth } from '../../../js/auth-ui.js?v=55';
+import { captureDraftKey, capturePhoneUrl, mergedCapturePhotos, captureIsEditable } from './capture-session.js?v=1';
 import {
   deleteLocalCaptureDraft,
   loadLocalCaptureDraft,
@@ -18,6 +21,7 @@ const EXTERIOR_SECTORS = Object.freeze(['Front', 'Front right', 'Right', 'Back r
 const INTERIOR_SECTORS = Object.freeze(['Door', 'Wall 1', 'Corner 1', 'Wall 2', 'Corner 2', 'Opposite door']);
 const MAX_PHOTOS = 48;
 let current = null;
+let openGeneration = 0;
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
@@ -28,8 +32,21 @@ function finite(value, fallback = 0) {
   return Number.isFinite(number) ? number : fallback;
 }
 
-function draftIdFor(target, kind) {
-  return `capture:${kind}:${target.worldId}:${target.sourceBuildingId}`;
+function isCurrent(session) {
+  return current === session && getCurrentUser()?.uid === session.uid && !session.abort.signal.aborted;
+}
+
+function assertCurrent(session) {
+  if (!isCurrent(session)) throw new Error('Capture paused. Reopen it using the same account to continue.');
+}
+
+function setBusy(session, busy) {
+  session.busy = busy;
+  if (isCurrent(session)) render();
+}
+
+function allPhotos() {
+  return mergedCapturePhotos(current?.photos, current?.remotePhotos);
 }
 
 function ensurePanel() {
@@ -44,6 +61,14 @@ function ensurePanel() {
     <header><div><span>COMMUNITY REALITY CAPTURE</span><strong>Improve this place</strong></div><button type="button" data-capture-close aria-label="Close">×</button></header>
     <div class="realityCaptureScroll">
       <section class="realityCaptureTarget"><span>SELECTED MAPPED BUILDING</span><strong data-capture-label></strong><small data-capture-id></small></section>
+      <section class="realityCaptureHandoff">
+        <strong data-capture-account></strong>
+        <p>Use this same account on your phone. Your building, room and uploaded photos stay together.</p>
+        <button type="button" data-capture-phone>Continue on phone</button>
+        <div data-capture-link-box hidden><canvas data-capture-qr aria-label="Scan to continue this capture on your phone"></canvas><a data-capture-link></a><button type="button" data-capture-copy>Copy phone link</button></div>
+        <button type="button" data-capture-refresh hidden>Check uploaded photos and progress</button>
+        <p data-capture-server-status role="status"></p>
+      </section>
       <div class="realityCaptureKinds" role="tablist" aria-label="Capture type">
         <button type="button" data-capture-kind="exterior" role="tab">Exterior</button>
         <button type="button" data-capture-kind="interior_room" role="tab">One room</button>
@@ -76,6 +101,7 @@ function ensurePanel() {
       <label class="realityCaptureConsent"><input data-public-contribution type="checkbox"> <span>After review, I want this capture considered as a public visual improvement. This never makes a residential interior public.</span></label>
       <section class="realityCaptureActions">
         <button type="button" data-capture-cancel>Delete draft</button>
+        <button type="button" data-capture-save>Save photos to account</button>
         <button type="button" data-capture-upload class="primary">Upload for processing</button>
       </section>
       <div class="realityCaptureProgress" data-capture-progress hidden><span></span><i></i></div>
@@ -84,12 +110,21 @@ function ensurePanel() {
   document.body.appendChild(panel);
   panel.querySelector('[data-capture-close]').addEventListener('click', closeRealityCapture);
   panel.querySelector('[data-capture-cancel]').addEventListener('click', clearDraft);
-  panel.querySelector('[data-capture-upload]').addEventListener('click', uploadDraft);
+  panel.querySelector('[data-capture-upload]').addEventListener('click', () => uploadDraft(true));
+  panel.querySelector('[data-capture-save]').addEventListener('click', () => uploadDraft(false));
   panel.querySelector('[data-capture-input]').addEventListener('change', addPhotos);
+  panel.querySelector('[data-capture-phone]').addEventListener('click', continueOnPhone);
+  panel.querySelector('[data-capture-refresh]').addEventListener('click', refreshCapture);
+  panel.querySelector('[data-capture-copy]').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(panel.querySelector('[data-capture-link]').href);
+      panel.querySelector('[data-capture-status]').textContent = 'Phone link copied. Sign in with the same account on your phone.';
+    } catch { panel.querySelector('[data-capture-status]').textContent = 'Select and copy the link above.'; }
+  });
   panel.querySelectorAll('[data-capture-kind]').forEach((button) => button.addEventListener('click', () => switchKind(button.dataset.captureKind)));
   panel.addEventListener('click', (event) => {
     const sectorButton = event.target.closest('[data-sector-index]');
-    if (!sectorButton || !current) return;
+    if (!sectorButton || !current || current.busy) return;
     current.activeSector = Number(sectorButton.dataset.sectorIndex) || 0;
     render();
   });
@@ -118,15 +153,30 @@ function buildTarget(appCtx, target) {
   });
 }
 
-async function restore(kind) {
-  const draftId = draftIdFor(current.target, kind);
+async function restore(kind, session = current, capture = null) {
+  const draftId = captureDraftKey(session.uid, session.target, kind, capture?.captureId);
   const restored = await loadLocalCaptureDraft(draftId).catch(() => ({ draft: null, photos: [] }));
-  current.kind = kind;
-  current.draftId = draftId;
-  current.activeSector = finite(restored.draft?.activeSector, 0);
-  current.photos = restored.photos || [];
-  current.serverCapture = restored.draft?.serverCapture || null;
-  current.uploadedPhotoIds = new Set(restored.draft?.uploadedPhotoIds || []);
+  assertCurrent(session);
+  session.kind = kind;
+  session.draftId = draftId;
+  session.activeSector = Math.max(0, Math.min(kind === 'interior_room' ? 5 : 7, finite(restored.draft?.activeSector, 0)));
+  session.photos = restored.photos || [];
+  session.serverCapture = capture || restored.draft?.serverCapture || null;
+  session.remotePhotos = [];
+  session.uploadedPhotoIds = new Set(restored.draft?.uploadedPhotoIds || []);
+  const panel = ensurePanel();
+  const room = capture?.room || restored.draft?.room || {};
+  for (const [selector, value] of Object.entries({
+    label: room.label || 'Living room', type: room.type || 'living_room', width: room.widthMeters || 4,
+    length: room.lengthMeters || 6, height: room.heightMeters || 2.7, direction: room.entranceDirectionDegrees || 0
+  })) panel.querySelector(`[data-room-${selector}]`).value = value;
+  panel.querySelector('[data-room-permission]').checked = restored.draft?.permissionConfirmed === true;
+  panel.querySelector('[data-public-contribution]').checked = session.serverCapture?.publicContributionRequested === true || restored.draft?.publicContributionRequested === true;
+  panel.querySelector('[data-capture-link-box]').hidden = true;
+  panel.querySelector('[data-capture-server-status]').textContent = '';
+  panel.querySelector('[data-capture-status]').textContent = '';
+  panel.querySelector('[data-capture-progress]').hidden = true;
+  panel.querySelector('.realityCaptureScroll').scrollTop = 0;
   render();
 }
 
@@ -141,11 +191,21 @@ function minimumPhotos() {
 function render() {
   const panel = ensurePanel();
   if (!current) return;
+  const photos = allPhotos();
   const sectorList = sectors();
-  const bySector = new Map(sectorList.map((_, index) => [index, current.photos.filter((photo) => photo.sector === index).length]));
+  const bySector = new Map(sectorList.map((_, index) => [index, photos.filter((photo) => photo.sector === index).length]));
   panel.querySelector('[data-capture-label]').textContent = current.target.label;
   panel.querySelector('[data-capture-id]').textContent = current.target.sourceBuildingId;
-  panel.querySelector('[data-capture-count]').textContent = `${current.photos.length} / ${minimumPhotos()} minimum`;
+  panel.querySelector('[data-capture-count]').textContent = `${photos.length} / ${minimumPhotos()} minimum`;
+  panel.querySelector('[data-capture-account]').textContent = `Account: ${getCurrentUser()?.email || getCurrentUser()?.displayName || 'Signed-in explorer'}`;
+  panel.querySelector('[data-capture-refresh]').hidden = !current.serverCapture;
+  const locked = !captureIsEditable(current.serverCapture);
+  panel.querySelectorAll('button:not([data-capture-close]), input, select').forEach((element) => {
+    element.disabled = current.busy || (locked && !element.matches('[data-capture-refresh], [data-capture-copy], [data-capture-phone]'));
+  });
+  panel.querySelectorAll('[data-capture-kind], .realityCaptureRoom input:not([data-room-permission]), .realityCaptureRoom select, [data-public-contribution]').forEach((element) => {
+    element.disabled = current.busy || (element.matches('[data-capture-kind]') ? !!current.resumed : !!current.serverCapture);
+  });
   panel.querySelector('[data-capture-instruction]').textContent = current.kind === 'interior_room'
     ? `Stand near ${sectorList[current.activeSector]}. Keep each wall in several neighboring photos and include floor-to-wall and wall-to-ceiling edges.`
     : `Photograph the ${sectorList[current.activeSector].toLowerCase()} side. Walk safely; keep about two-thirds of the previous view in the next photo.`;
@@ -166,76 +226,162 @@ function render() {
     : 'No photos leave this device until you choose Upload for processing.';
 }
 
-async function persist() {
-  if (!current) return;
+async function persist(session = current) {
+  if (!session?.draftId) return;
+  if (isCurrent(session)) session.form = draftInput(session);
+  const input = session.form || {};
   await saveLocalCaptureDraft({
-    id: current.draftId,
-    kind: current.kind,
-    target: current.target,
-    activeSector: current.activeSector,
-    photoCount: current.photos.length,
-    serverCapture: current.serverCapture,
-    uploadedPhotoIds: [...(current.uploadedPhotoIds || [])]
-  }).catch(() => {});
+    id: session.draftId, ownerUid: session.uid,
+    kind: session.kind, target: session.target,
+    activeSector: session.activeSector, photoCount: session.photos.length,
+    serverCapture: session.serverCapture,
+    uploadedPhotoIds: [...(session.uploadedPhotoIds || [])],
+    room: input.room, permissionConfirmed: input.permissionConfirmed,
+    publicContributionRequested: input.publicContributionRequested
+  });
 }
 
 async function switchKind(kind) {
-  if (!current || kind === current.kind) return;
-  await persist();
-  await restore(kind);
+  const session = current;
+  if (!session || session.busy || session.resumed || kind === session.kind) return;
+  setBusy(session, true);
+  try { await persist(session); assertCurrent(session); await restore(kind, session); }
+  catch (error) { if (isCurrent(session)) ensurePanel().querySelector('[data-capture-status]').textContent = error.message; }
+  finally { setBusy(session, false); }
 }
 
 async function addPhotos(event) {
   const panel = ensurePanel();
   const files = [...(event.target.files || [])];
   event.target.value = '';
-  if (!current || files.length === 0) return;
+  const session = current;
+  if (!session || session.busy || !captureIsEditable(session.serverCapture) || files.length === 0) return;
+  const sector = session.activeSector;
+  setBusy(session, true);
   const status = panel.querySelector('[data-capture-status]');
   let lastErrorMessage = '';
   let accepted = 0;
   for (let index = 0; index < files.length; index += 1) {
-    if (current.photos.length >= MAX_PHOTOS) {
+    if (!isCurrent(session)) break;
+    if (allPhotos().length >= MAX_PHOTOS) {
       status.textContent = `This V1 capture is limited to ${MAX_PHOTOS} photos. Remove this draft and start again if you need a different set.`;
       break;
     }
     try {
       status.textContent = `Checking photo ${index + 1} of ${files.length}…`;
       const photo = await normalizeCapturePhoto(files[index]);
-      const saved = { ...photo, sector: current.activeSector };
-      current.photos.push(saved);
+      assertCurrent(session);
+      const saved = { ...photo, sector };
+      await saveLocalCapturePhoto(session.draftId, saved, sector);
+      assertCurrent(session);
+      session.photos.push(saved);
       accepted += 1;
-      await saveLocalCapturePhoto(current.draftId, saved, current.activeSector);
-      if ((current.photos.filter((entry) => entry.sector === current.activeSector).length >= 3) && current.activeSector < sectors().length - 1) {
-        current.activeSector += 1;
-      }
       render();
       await persist();
     } catch (error) {
       lastErrorMessage = error.message || 'That photo could not be used.';
-      status.textContent = lastErrorMessage;
+      if (isCurrent(session)) status.textContent = lastErrorMessage;
     }
   }
-  status.textContent = accepted > 0
-    ? `${current.photos.length} photos are saved on this device. Review warnings before upload.${lastErrorMessage ? ` Last issue: ${lastErrorMessage}` : ''}`
+  if (isCurrent(session)) status.textContent = accepted > 0
+    ? `${session.photos.length} photos are saved on this device. Select the next side yourself when you move.${lastErrorMessage ? ` Last issue: ${lastErrorMessage}` : ''}`
     : (lastErrorMessage || 'No photos were added.');
+  setBusy(session, false);
 }
 
 function roomInput(panel, selector, fallback) {
   return panel.querySelector(selector)?.value || fallback;
 }
 
-async function uploadDraft() {
+function draftInput(session) {
   const panel = ensurePanel();
-  if (!current) return;
+  const permissionConfirmed = panel.querySelector('[data-room-permission]').checked;
+  return {
+    captureKind: session.kind, building: session.target, permissionConfirmed,
+    propertyPermissionConfirmed: permissionConfirmed,
+    publicContributionRequested: panel.querySelector('[data-public-contribution]').checked,
+    termsVersion: 'reality-capture-v1',
+    room: session.kind === 'interior_room' ? {
+      label: roomInput(panel, '[data-room-label]', 'Room'), type: roomInput(panel, '[data-room-type]', 'room'),
+      widthMeters: finite(roomInput(panel, '[data-room-width]', 4), 4),
+      lengthMeters: finite(roomInput(panel, '[data-room-length]', 6), 6),
+      heightMeters: finite(roomInput(panel, '[data-room-height]', 2.7), 2.7),
+      entranceDirectionDegrees: finite(roomInput(panel, '[data-room-direction]', 0), 0)
+    } : null
+  };
+}
+
+async function ensureServerCapture(session) {
+  assertCurrent(session);
+  if (session.serverCapture) return;
+  const input = draftInput(session);
+  if (session.kind === 'interior_room' && !input.permissionConfirmed) throw new Error('Confirm permission for this interior first.');
+  const response = await createRealityCaptureDraft(input);
+  // Keep the response tied to its original account/draft even if the panel closed.
+  session.serverCapture = response.capture;
+  await persist(session);
+  assertCurrent(session);
+}
+
+async function fetchProgress(session) {
+  const result = await getMyRealityCapture(session.serverCapture.captureId);
+  assertCurrent(session);
+  session.serverCapture = result.capture;
+  session.remotePhotos = result.photos || [];
+  // The server listing, not a previous device's local receipt, is authoritative.
+  session.uploadedPhotoIds = new Set(session.remotePhotos.map((photo) => photo.id));
+  await persist(session);
+  assertCurrent(session);
+  ensurePanel().querySelector('[data-capture-server-status]').textContent =
+    `${session.remotePhotos.length} photos uploaded · ${result.capture.status.replaceAll('_', ' ')}${result.capture.failure ? ' · Processing needs attention.' : ''}`;
+  render();
+}
+
+async function refreshCapture() {
+  const session = current;
+  if (!session?.serverCapture || session.busy) return;
+  setBusy(session, true);
+  try { await fetchProgress(session); }
+  catch (error) { if (isCurrent(session)) ensurePanel().querySelector('[data-capture-status]').textContent = error.message; }
+  finally { setBusy(session, false); }
+}
+
+async function continueOnPhone() {
+  const session = current;
+  if (!session || session.busy) return;
+  const panel = ensurePanel();
+  setBusy(session, true);
+  try {
+    // Check reachability before creating a remote draft. Never share loopback URLs.
+    capturePhoneUrl('preflight', location.href);
+    await ensureServerCapture(session);
+    const url = capturePhoneUrl(session.serverCapture.captureId, location.href);
+    const { default: qr } = await import('../../vendor/qrcode/qrcode.js');
+    assertCurrent(session);
+    await qr.toCanvas(panel.querySelector('[data-capture-qr]'), url, { width: 208, margin: 4 });
+    assertCurrent(session);
+    const link = panel.querySelector('[data-capture-link]');
+    link.href = url;
+    link.textContent = url;
+    panel.querySelector('[data-capture-link-box]').hidden = false;
+    panel.querySelector('[data-capture-status]').textContent = 'Scan with your phone camera, then sign in with this same account. Photos saved only on this device are not transferred by the link.';
+  } catch (error) {
+    if (isCurrent(session)) panel.querySelector('[data-capture-status]').textContent = error.message;
+  } finally { setBusy(session, false); }
+}
+
+async function uploadDraft(submit = true) {
+  const panel = ensurePanel();
+  const session = current;
+  if (!session || session.busy || !captureIsEditable(session.serverCapture)) return;
   const status = panel.querySelector('[data-capture-status]');
-  const button = panel.querySelector('[data-capture-upload]');
   const progress = panel.querySelector('[data-capture-progress]');
-  if (current.photos.length < minimumPhotos()) {
+  if (submit && allPhotos().length < minimumPhotos()) {
     status.textContent = `Add at least ${minimumPhotos()} overlapping photos before upload.`;
     return;
   }
-  const underCovered = sectors().filter((_, index) => current.photos.filter((photo) => photo.sector === index).length < 2);
-  if (underCovered.length) {
+  const underCovered = sectors().filter((_, index) => allPhotos().filter((photo) => photo.sector === index).length < 2);
+  if (submit && underCovered.length) {
     status.textContent = `Add at least two photos for every coverage section. Missing: ${underCovered.join(', ')}.`;
     return;
   }
@@ -244,71 +390,81 @@ async function uploadDraft() {
     status.textContent = 'Interior upload requires confirmation that you have permission.';
     return;
   }
-  button.disabled = true;
+  setBusy(session, true);
   progress.hidden = false;
   try {
-    if (!current.serverCapture) {
-      status.textContent = 'Creating a private server-authorized capture…';
-      const response = await createRealityCaptureDraft({
-        captureKind: current.kind,
-        building: current.target,
-        permissionConfirmed,
-        propertyPermissionConfirmed: permissionConfirmed,
-        publicContributionRequested: panel.querySelector('[data-public-contribution]').checked,
-        termsVersion: 'reality-capture-v1',
-        room: current.kind === 'interior_room' ? {
-          label: roomInput(panel, '[data-room-label]', 'Room'),
-          type: roomInput(panel, '[data-room-type]', 'room'),
-          widthMeters: finite(roomInput(panel, '[data-room-width]', 4), 4),
-          lengthMeters: finite(roomInput(panel, '[data-room-length]', 6), 6),
-          heightMeters: finite(roomInput(panel, '[data-room-height]', 2.7), 2.7),
-          entranceDirectionDegrees: finite(roomInput(panel, '[data-room-direction]', 0), 0)
-        } : null
-      });
-      current.serverCapture = response.capture;
-      await persist();
-    }
-    for (let index = 0; index < current.photos.length; index += 1) {
-      if (current.uploadedPhotoIds?.has(current.photos[index].id)) continue;
-      status.textContent = `Uploading protected photo ${index + 1} of ${current.photos.length}…`;
-      await uploadRealityCapturePhoto(current.serverCapture, current.photos[index], (fraction) => {
-        const overall = (index + fraction) / current.photos.length;
+    await ensureServerCapture(session);
+    await fetchProgress(session);
+    if (!captureIsEditable(session.serverCapture)) throw new Error('This capture has already been submitted. Check its progress above.');
+    for (let index = 0; index < session.photos.length; index += 1) {
+      assertCurrent(session);
+      if (session.uploadedPhotoIds.has(session.photos[index].id)) continue;
+      status.textContent = `Uploading protected photo ${index + 1} of ${session.photos.length}…`;
+      await uploadRealityCapturePhoto(session.serverCapture, session.photos[index], (fraction) => {
+        if (!isCurrent(session)) return;
+        const overall = (index + fraction) / session.photos.length;
         progress.querySelector('i').style.width = `${Math.round(overall * 100)}%`;
         progress.querySelector('span').textContent = `${Math.round(overall * 100)}%`;
-      });
-      current.uploadedPhotoIds ||= new Set();
-      current.uploadedPhotoIds.add(current.photos[index].id);
-      await persist();
+      }, session.abort.signal);
+      assertCurrent(session);
+      session.uploadedPhotoIds.add(session.photos[index].id);
+      await persist(session);
+    }
+    if (!submit) {
+      await fetchProgress(session);
+      status.textContent = 'Photos saved privately to your account. Open the same capture on either device to continue. Processing has not started.';
+      return;
     }
     status.textContent = 'Validating file signatures and queueing reconstruction…';
-    const result = await finalizeRealityCaptureUpload(current.serverCapture.captureId);
+    assertCurrent(session);
+    const result = await finalizeRealityCaptureUpload(session.serverCapture.captureId);
+    assertCurrent(session);
     status.textContent = `Upload complete. Status: ${result.status}. Originals remain private.`;
-    await deleteLocalCaptureDraft(current.draftId);
-    current.photos = [];
-    current.serverCapture = null;
-    current.uploadedPhotoIds = new Set();
+    await deleteLocalCaptureDraft(session.draftId);
+    assertCurrent(session);
+    session.photos = [];
+    session.serverCapture.status = result.status;
+    await fetchProgress(session);
     render();
   } catch (error) {
-    status.textContent = error.message || 'Upload stopped safely. Your local draft is still available.';
+    if (isCurrent(session)) status.textContent = error.message || 'Upload stopped safely. Your local draft is still available.';
   } finally {
-    button.disabled = false;
+    setBusy(session, false);
   }
 }
 
 async function clearDraft() {
-  if (!current || !globalThis.confirm('Delete this capture draft and its photos from this device?')) return;
+  const session = current;
+  if (!session || session.busy || !globalThis.confirm('Delete this capture and its uploaded photos on all devices, plus the local draft here?')) return;
   const panel = ensurePanel();
+  setBusy(session, true);
   try {
-    if (current.serverCapture?.captureId) await deleteRealityCapture(current.serverCapture.captureId);
-    await deleteLocalCaptureDraft(current.draftId);
-    current.photos = [];
-    current.serverCapture = null;
-    current.uploadedPhotoIds = new Set();
+    if (session.serverCapture?.captureId) await deleteRealityCapture(session.serverCapture.captureId);
+    await deleteLocalCaptureDraft(session.draftId);
+    assertCurrent(session);
+    session.photos = [];
+    session.remotePhotos = [];
+    session.serverCapture = null;
+    session.uploadedPhotoIds = new Set();
+    panel.querySelector('[data-capture-link-box]').hidden = true;
     panel.querySelector('[data-capture-status]').textContent = 'Draft deleted.';
     render();
   } catch (error) {
-    panel.querySelector('[data-capture-status]').textContent = error.message || 'Could not delete the draft.';
-  }
+    if (isCurrent(session)) panel.querySelector('[data-capture-status]').textContent = error.message || 'Could not delete the draft.';
+  } finally { setBusy(session, false); }
+}
+
+function startSession(appCtx, target) {
+  const user = getCurrentUser();
+  if (!user || user.isAnonymous) throw new Error('Sign in to your World Explorer account before capturing. Use that same account on your phone.');
+  if (current) closeRealityCapture();
+  const session = { appCtx, uid: user.uid, target, kind: 'exterior', draftId: '', activeSector: 0,
+    photos: [], remotePhotos: [], serverCapture: null, uploadedPhotoIds: new Set(), abort: new AbortController(), busy: false };
+  current = session;
+  session.unsubscribe = observeAuth((next) => {
+    if (current === session && next?.uid !== session.uid) closeRealityCapture();
+  });
+  return session;
 }
 
 export async function openRealityCaptureForBuilding(appCtx, buildingTarget) {
@@ -318,17 +474,54 @@ export async function openRealityCaptureForBuilding(appCtx, buildingTarget) {
     appCtx.showWorldSelectionNotice?.('Capture unavailable', 'Reality capture attaches only to a stable mapped building identity.');
     return false;
   }
-  current = { appCtx, target, kind: 'exterior', draftId: '', activeSector: 0, photos: [], serverCapture: null, uploadedPhotoIds: new Set() };
-  await restore('exterior');
+  let session;
+  try {
+    session = startSession(appCtx, target);
+    await restore('exterior', session);
+  } catch (error) {
+    appCtx.showWorldSelectionNotice?.('Sign in to capture', error.message);
+    return false;
+  }
   panel.classList.add('show');
   panel.setAttribute('aria-hidden', 'false');
   panel.querySelector('[data-capture-close]').focus();
   return true;
 }
 
-export function closeRealityCapture() {
+// Server-resolved identity is used on the phone; do not instantiate the Earth renderer.
+export async function openRealityCaptureSession(captureId) {
+  const generation = ++openGeneration;
+  const user = getCurrentUser();
+  if (!user || user.isAnonymous) throw new Error('Sign in with the account that started this capture.');
+  const result = await getMyRealityCapture(captureId);
+  if (generation !== openGeneration || getCurrentUser()?.uid !== user.uid) throw new Error('Account changed. Open the capture again.');
+  const session = startSession(null, result.capture.building);
+  session.resumed = true;
+  await restore(result.capture.captureKind, session, result.capture);
+  assertCurrent(session);
+  session.remotePhotos = result.photos || [];
+  session.uploadedPhotoIds = new Set(session.remotePhotos.map((photo) => photo.id));
   const panel = ensurePanel();
-  void persist();
+  panel.classList.add('show');
+  panel.setAttribute('aria-hidden', 'false');
+  panel.querySelector('[data-capture-server-status]').textContent = `${session.remotePhotos.length} photos uploaded · ${result.capture.status.replaceAll('_', ' ')}`;
+  render();
+  return true;
+}
+
+export function closeRealityCapture() {
+  openGeneration++;
+  const panel = ensurePanel();
+  if (current) {
+    const session = current;
+    void persist(session).catch(() => {});
+    session.abort.abort();
+    session.unsubscribe?.();
+    current = null;
+  }
   panel.classList.remove('show');
   panel.setAttribute('aria-hidden', 'true');
+  panel.querySelector('[data-capture-link]').removeAttribute('href');
+  panel.querySelector('[data-capture-link]').textContent = '';
+  panel.querySelector('[data-capture-link-box]').hidden = true;
 }

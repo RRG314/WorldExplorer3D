@@ -119,6 +119,10 @@ export function listMyRealityCaptures() {
   return endpoint('/listMyRealityCaptures');
 }
 
+export function getMyRealityCapture(captureId) {
+  return endpoint('/getMyRealityCapture', { captureId });
+}
+
 export function finalizeRealityCaptureUpload(captureId) {
   return endpoint('/finalizeRealityCaptureUpload', { captureId });
 }
@@ -167,12 +171,14 @@ export function moderateRealityCapture(captureId, decision, note = '', alignment
   return endpoint('/moderateRealityCapture', { captureId, decision, note, alignment });
 }
 
-export function uploadRealityCapturePhoto(capture, photo, onProgress = null) {
+export function uploadRealityCapturePhoto(capture, photo, onProgress = null, signal = null) {
   const services = initFirebase();
   if (!services?.storage) throw new Error('Secure capture storage is not configured for this app.');
   const ownerUid = String(capture?.ownerUid || '');
   const captureId = String(capture?.captureId || '');
   if (!ownerUid || !captureId || !(photo?.blob instanceof Blob)) throw new Error('Capture upload identity is incomplete.');
+  if (services.auth?.currentUser?.uid !== ownerUid) throw new Error('Sign in to the account that started this capture.');
+  signal?.throwIfAborted();
   const path = `reality-captures/${ownerUid}/${captureId}/originals/${photo.id}.jpg`;
   const task = uploadBytesResumable(storageRef(services.storage, path), photo.blob, {
     contentType: 'image/jpeg',
@@ -180,6 +186,7 @@ export function uploadRealityCapturePhoto(capture, photo, onProgress = null) {
     customMetadata: {
       ownerUid,
       captureId,
+      sector: String(photo.sector ?? -1),
       captureSchemaVersion: '1',
       width: String(photo.width),
       height: String(photo.height),
@@ -187,12 +194,16 @@ export function uploadRealityCapturePhoto(capture, photo, onProgress = null) {
       clientExposure: String(photo.quality?.exposure || 'unknown')
     }
   });
-  return new Promise((resolve, reject) => task.on(
-    'state_changed',
-    (snapshot) => onProgress?.(snapshot.totalBytes ? snapshot.bytesTransferred / snapshot.totalBytes : 0),
-    reject,
-    () => resolve({ path, bytes: task.snapshot.totalBytes })
-  ));
+  return new Promise((resolve, reject) => {
+    const cancel = () => task.cancel();
+    const cleanup = () => signal?.removeEventListener('abort', cancel);
+    signal?.addEventListener('abort', cancel, { once: true });
+    task.on('state_changed',
+      (snapshot) => onProgress?.(snapshot.totalBytes ? snapshot.bytesTransferred / snapshot.totalBytes : 0),
+      (error) => { cleanup(); reject(error); },
+      () => { cleanup(); resolve({ path, bytes: task.snapshot.totalBytes }); });
+    if (signal?.aborted) cancel();
+  });
 }
 
 export { CLIENT_LIMITS };

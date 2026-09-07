@@ -203,6 +203,10 @@
         "function": "createRealityCaptureDraft"
       },
       {
+        "source": "/getMyRealityCapture",
+        "function": "getMyRealityCapture"
+      },
+      {
         "source": "/listMyRealityCaptures",
         "function": "listMyRealityCaptures"
       },

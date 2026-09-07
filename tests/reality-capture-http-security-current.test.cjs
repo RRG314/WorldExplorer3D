@@ -99,6 +99,31 @@ function validPhotos() {
     createReadStream: () => Readable.from([Buffer.from([255, 216, 255, 224, 0, 0, 0, 0, 0, 0, 0, 0])]) }));
 }
 
+test('phone handoff returns the same owned capture and uploaded photo IDs, never media URLs', async (t) => {
+  const h = harness(t, { ...base, status: 'draft', building: { sourceBuildingId: 'osm:way:42' } });
+  h.bucket.getFiles = async (options) => {
+    assert.equal(options.prefix, `${prefix}originals/`);
+    assert.equal(options.autoPaginate, false);
+    return [validPhotos()];
+  };
+  const response = await h.call('getMyRealityCapture', 'owner');
+  assert.equal(response.code, 200);
+  assert.equal(response.body.capture.captureId, id);
+  assert.equal(response.body.capture.ownerUid, 'owner');
+  assert.equal(response.body.photos.length, 20);
+  assert.equal(response.headers['Cache-Control'], 'private, no-store');
+  assert.deepEqual(Object.keys(response.body.photos[0]).sort(), ['id', 'sector']);
+  assert.deepEqual(h.writes, []);
+});
+
+test('possession of handoff link does not grant access or enumerate another owner photos', async (t) => {
+  const h = harness(t);
+  h.bucket.getFiles = async () => { throw Error('Storage must not be read'); };
+  assert.equal((await h.call('getMyRealityCapture', 'visitor')).code, 404);
+  assert.equal((await h.call('getMyRealityCapture', 'owner', { captureId: '../secret' })).code, 422);
+  assert.deepEqual(h.writes, []);
+});
+
 test('owned valid set queues atomically and repeat finalization cannot regress it', async (t) => {
   const h = harness(t, { ...base, status: 'draft' });
   h.bucket.getFiles = async () => [validPhotos()];

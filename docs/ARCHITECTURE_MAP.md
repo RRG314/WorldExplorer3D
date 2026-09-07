@@ -133,6 +133,8 @@ attributes so distant buildings do not allocate unique materials.
 
 ### Community Reality Capture flow
 
+Phone/desktop continuation (local, 2026-09-07): `app/capture.html` → existing Firebase Auth → owner-only `getMyRealityCapture` → existing capture UI/uploader and capture document. Account links to this lightweight page. Desktop QR contains a capture ID, never credentials; phone resolves identity from the backend, not a new world renderer. Local drafts are UID-scoped; uploaded IDs support retry/deduplication across devices. `capture-phone` is a normal bundled hosting entry. Real test infrastructure and GPU reconstruction remain unprovisioned; see `REALITY_CAPTURE_AR_INTEGRATION_PLAN.md`.
+
 ```mermaid
 flowchart LR
     Target[Stable mapped building] --> Draft[Authenticated guided draft]

@@ -7,6 +7,36 @@ Owner clarification: integrate into the app without licensing locks or staging-o
 
 ## Implemented in this checkpoint
 
+### Phone / desktop continuation (local follow-up, 2026-09-07)
+
+The same Firebase UID owns a capture on both devices. There is no second account, wallet, pairing identity or capture database. Desktop creates the existing private capture, displays a locally rendered QR/link, and the phone signs into the same account before the owner-only `getMyRealityCapture` endpoint resolves building, room and uploaded-photo IDs. The URL contains only a capture ID in its fragment, not a login token, email, photo URL or grant. Wrong-account and nonexistent captures both return 404. Localhost/insecure phone links are rejected because they cannot deliver this computer's app to a phone.
+
+`app/capture.html` is a lightweight capture/account page without the Earth renderer, reachable from Account. It uses the existing capture panel, Firebase Auth and upload API. Partial photo sets can be saved without starting processing; explicit refresh sees progress on either device. Upload retries reconcile against uploaded IDs. Local drafts are UID-scoped; account changes close the panel and cancel active upload work. Async photo work is fenced to its originating session. Unowned legacy local drafts are preserved but are not silently adopted by another signed-in user. Batch import no longer falsely advances coverage sectors.
+
+Actual phone-test provisioning findings (authenticated read-only Google APIs, 2026-09-07):
+
+- Staging web app exists: `we3d-staging-20260712`.
+- Cloud Functions API returns 403 `SERVICE_DISABLED`.
+- Default Firebase Storage bucket lookup returns 404.
+- Billing API returns `billingEnabled: false` and no linked billing account.
+- No cloud resources, billing changes or hosting deployment were made. No real reconstruction worker is running.
+
+Execution order to reach the requested outdoor test:
+
+1. **Local cross-device flow:** implement and browser-check desktop → phone sign-in → exact capture → partial upload/retry → desktop progress; test owner-only HTTP boundary separately. Implemented; verification scope below is explicit.
+2. **Private test infrastructure:** obtain a spend ceiling and billing-account choice; provision storage/functions/App Check and a reachable HTTPS preview in the same test project. Both devices must use that preview/project. Production accounts and staging accounts are separate environments; do not pretend a localhost production-config session is that preview.
+3. **Trusted processing:** freeze decoded upload inputs, bounded job admission/dispatch, restricted processing credentials, timeout and retry budgets. Connect the existing worker to a real GPU and verify on permitted exterior photos. An adapter script is not a running processor.
+4. **Playable room:** build the reviewed, measured collision/door/floor representation through the existing interior authority, then validate a real room scan. Current visual overlay does not establish matching room collision and cannot be described as a completed walkable reconstruction.
+5. **Physical acceptance:** one actual phone exterior and one actual private room, upload interruption, cross-device resume, private-media denial, real processing result, review and in-world use. Only then call the full feature ready for the owner to test outside.
+
+Remaining limitations: uploaded-photo progress is refreshed explicitly rather than continuously watched; simultaneous device writes still need immutable finalization/job admission hardening; server photo metadata is not decoded-image proof. Video frame extraction, automatic GPU dispatch, private access-grant expiry/revocation and scan-matching room collision remain open. No new licensing gate was introduced.
+
+Local verification: 37 focused Node checks passed, including actual owner-only HTTP handler execution against isolated storage/Firestore doubles. The repaired capture browser test passed 12 checks: desktop QR/link, phone same-account sign-in, wrong-account denial, real JPEG normalization/IndexedDB, honest sector selection, interrupted upload/retry, cross-device progress, reload deduplication, logout cleanup, phone-width layout, 20-photo fixture submission and exact room handoff/permission. Auth and upload transports are explicit doubles; these are not Firebase deployment or GPU acceptance. Desktop, phone and room screenshots were inspected. Source-graph verification found and corrected a duplicated API module-version identity. The old obsolete-startup-selector UI test was replaced, not accepted as evidence.
+
+Research: [Firebase browser authentication persistence](https://firebase.google.com/docs/auth/web/auth-state-persistence) is device/origin scoped; sign into the same account on each device rather than transferring credentials in a QR. [node-qrcode](https://github.com/soldair/node-qrcode), pinned at 1.5.4 and locally bundled with its MIT license, creates the handoff QR without a third-party QR web service.
+
+### Earlier integration checkpoint
+
 - Raw-photo access is separated from shared model access in the actual HTTP handler. Interior sharing checks the current approved capture. Finalization queue/failure writes check owner, state and document version transactionally; invalid requests cannot create/regress captures.
 - AR operations are cancellation-aware across capability, camera and XR awaits; late camera streams are stopped; backgrounding includes startup; missing hit testing offers explicit 3D fallback. Disposal releases singleton ownership. Existing curated assets and game suspension remain.
 - Removed the old `stagingProvisioned` runtime prerequisite; presentation is available by default with normal service-error/procedural fallback. An explicit operator `publicationEnabled: false` remains an operational override, not a license gate.
