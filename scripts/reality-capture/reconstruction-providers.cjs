@@ -62,7 +62,9 @@ async function reconstruct(options, job, dependencies = {}) {
   const env = dependencies.env || process.env;
   let source;
   if (options.provider === 'meshroom') {
-    await execute(env.MESHROOM_BATCH_BIN || 'meshroom_batch', ['--input', job.images, '--output', job.output, '--cache', job.cache], { cwd: job.work });
+    await execute(env.MESHROOM_BATCH_BIN || 'meshroom_batch', ['--input', job.images, '--output', job.output, '--cache', job.cache,
+      '--verbose', 'info', '--paramOverrides', 'FeatureExtraction:describerTypes=sift',
+      'FeatureExtraction:forceCpuExtraction=false', 'FeatureExtraction:maxThreads=4'], { cwd: job.work });
     source = await findFirst(job.output, 'texturedMesh.obj') || await findFirst(job.cache, 'texturedMesh.obj');
     if (!source) throw Error('meshroom_textured_mesh_missing');
   } else {

@@ -99,9 +99,15 @@ export async function normalizeCapturePhoto(file) {
   // Re-encoding strips EXIF/GPS/device metadata before data leaves the device.
   const blob = await canvasBlob(canvas);
   if (blob.size > 12 * 1024 * 1024) throw new Error('The normalized photo is still too large to upload.');
+  const preview = document.createElement('canvas');
+  preview.width = 160;
+  preview.height = Math.max(1, Math.round(160 * height / width));
+  preview.getContext('2d').drawImage(canvas, 0, 0, preview.width, preview.height);
+  const thumbnail = await canvasBlob(preview, 'image/jpeg', 0.7);
   return Object.freeze({
     id: randomHex(),
     blob,
+    thumbnail,
     width,
     height,
     contentType: 'image/jpeg',
@@ -125,6 +131,10 @@ export function getMyRealityCapture(captureId) {
 
 export function finalizeRealityCaptureUpload(captureId) {
   return endpoint('/finalizeRealityCaptureUpload', { captureId });
+}
+
+export function retryRealityCapture(captureId) {
+  return endpoint('/retryRealityCapture', { captureId });
 }
 
 export function deleteRealityCapture(captureId) {

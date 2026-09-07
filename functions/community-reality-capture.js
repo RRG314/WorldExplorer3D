@@ -239,6 +239,25 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     } catch (error) { sendKnownError(res, error); }
   });
 
+  const retryRealityCapture = functions.region('us-central1').https.onRequest(async (req, res) => {
+    const auth = await guard(req, res);
+    if (!auth) return;
+    try {
+      const captureId = clean(req.body?.captureId, 180);
+      if (!/^[\w-]{1,180}$/.test(captureId)) throw Error('invalid_capture_id');
+      const ref = db.collection(CAPTURES).doc(captureId);
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists || snap.data().ownerUid !== auth.uid) throw Error('capture_not_found');
+        if (snap.data().status !== 'processing_failed') throw Error('invalid_capture_state_transition');
+        assertCaptureTransition(snap.data().status, 'queued');
+        if (!snap.data().inputManifest?.length) throw Error('validated_photos_required');
+        tx.update(ref, { status: 'queued', failure: FieldValue.delete(), queuedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+      });
+      res.json({ captureId, status: 'queued' });
+    } catch (error) { sendKnownError(res, error); }
+  });
+
   const listMyRealityCaptures = functions.region('us-central1').https.onRequest(async (req, res) => {
     const auth = await guard(req, res);
     if (!auth) return;
@@ -707,12 +726,11 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
         moderatorName: moderator.displayName,
         reviewedAt: FieldValue.serverTimestamp()
       };
-      const batch = db.batch();
-      batch.set(ref, { status: decision, review, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      const writes = [[ref, { status: decision, review, updatedAt: FieldValue.serverTimestamp() }]];
       let representationId = '';
       if (decision === 'approved' && capture.captureKind === 'exterior' && capture.publicContributionRequested === true) {
         representationId = stableId('representation', capture.building?.worldId, capture.building?.sourceBuildingId, capture.processingPipelineVersion);
-        batch.set(db.collection(REPRESENTATIONS).doc(representationId), {
+        writes.push([db.collection(REPRESENTATIONS).doc(representationId), {
           representationId,
           captureId,
           captureKind: 'exterior',
@@ -725,16 +743,27 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
           processingPipelineVersion: capture.processingPipelineVersion,
           approvedAt: FieldValue.serverTimestamp(),
           approvedBy: moderator.auth.uid
-        }, { merge: true });
+        }]);
       }
       if (decision === 'approved' && capture.captureKind === 'interior_room' && capture.spaceId) {
-        batch.set(db.collection(SPACES).doc(capture.spaceId), {
+        writes.push([db.collection(SPACES).doc(capture.spaceId), {
           captureId,
           pendingCaptureId: FieldValue.delete(),
           updatedAt: FieldValue.serverTimestamp()
-        }, { merge: true });
+        }]);
       }
-      await batch.commit();
+      await db.runTransaction(async tx => {
+        const current = await tx.get(ref);
+        if (!current.exists || !snap.updateTime.isEqual(current.updateTime)) throw Error('invalid_capture_state_transition');
+        assertCaptureTransition(current.data().status, decision);
+        if (decision === 'approved' && capture.captureKind === 'interior_room' && capture.spaceId) {
+          const space = await tx.get(db.collection(SPACES).doc(capture.spaceId));
+          if (!space.exists || space.data().ownerUid !== capture.ownerUid || space.data().pendingCaptureId !== captureId) {
+            throw Error('invalid_capture_state_transition');
+          }
+        }
+        for (const [target, patch] of writes) tx.set(target, patch, { merge: true });
+      });
       await logAdminActivity({
         actorUid: moderator.auth.uid, actorName: moderator.displayName,
         actionType: `reality_capture.${decision}`, targetType: 'reality_capture', targetId: captureId,
@@ -854,6 +883,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
   return {
     createRealityCaptureDraft,
     reserveRealityCapturePhoto,
+    retryRealityCapture,
     getMyRealityCapture,
     decidePrivateSpaceAccessRequest,
     deleteRealityCapture,

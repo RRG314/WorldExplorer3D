@@ -23,6 +23,7 @@ function harness(t, capture = base, extras = {}) {
   const versions = new Map();
   const writes = [];
   const reads = [];
+  const hooks = {};
   let generation = 1;
   function version(path) { return versions.get(path) || 0; }
   function snapshot(path) {
@@ -43,9 +44,11 @@ function harness(t, capture = base, extras = {}) {
     versions.set(path, generation++);
   }
   const db = { collection, runTransaction: async (callback) => {
+    hooks.beforeTransaction?.();
     const staged = [];
     await callback({ get: async (reference) => snapshot(reference.path),
-      update: (reference, patch) => staged.push([reference.path, patch]) });
+      update: (reference, patch) => staged.push([reference.path, patch]),
+      set: (reference, patch) => staged.push([reference.path, patch]) });
     for (const [path, patch] of staged) { mutate(path, patch); writes.push(path); }
   } };
   const bucket = {
@@ -56,6 +59,7 @@ function harness(t, capture = base, extras = {}) {
     }; }
   };
   const api = buildCommunityRealityCaptureExports({ db, bucket, setCors: () => false,
+    requireModerator: async req => req.uid === 'moderator' ? { auth: { uid: req.uid }, displayName: 'Moderator' } : null,
     verifyAuth: async (req) => ({ uid: req.uid }), verifyAppCheck: async () => true });
   async function call(name, uid, body = {}) {
     const res = { headers: {}, status(code) { this.code = code; return this; },
@@ -64,8 +68,43 @@ function harness(t, capture = base, extras = {}) {
     await api[name]({ method: 'POST', uid, body: { captureId: id, ...body } }, res);
     return res;
   }
-  return { call, bucket, records, reads, writes, mutate };
+  return { call, bucket, records, reads, writes, mutate, hooks };
 }
+
+test('only the owner can retry a failed, validated capture without another upload', async t => {
+  const h = harness(t, { ...base, status: 'processing_failed', inputManifest: [{ name: photoPath, generation: '1' }] });
+  assert.equal((await h.call('retryRealityCapture', 'visitor')).code, 404);
+  assert.equal((await h.call('retryRealityCapture', 'owner')).body.status, 'queued');
+  assert.equal(h.writes.length, 1);
+  assert.equal((await h.call('retryRealityCapture', 'owner')).code, 409);
+  assert.equal(h.reads.length, 0);
+  const empty = harness(t, { ...base, status: 'processing_failed' });
+  assert.equal((await empty.call('retryRealityCapture', 'owner')).code, 422);
+  assert.equal(empty.writes.length, 0);
+});
+
+test('moderation commits approval and representation together, never revives deleted captures', async t => {
+  const capture = { ...base, status: 'review_required', building: { sourceBuildingId: 'osm:42', worldId: 'earth' } };
+  const ok = harness(t, capture);
+  assert.equal((await ok.call('moderateRealityCapture', 'moderator', { decision: 'approved' })).code, 200);
+  assert.equal(ok.writes.length, 2);
+  for (const mutation of [null, { status: 'rejected' }, { label: 'changed while reviewing' }]) {
+    const h = harness(t, capture);
+    h.hooks.beforeTransaction = () => h.mutate(`realityCaptures/${id}`, mutation);
+    assert.equal((await h.call('moderateRealityCapture', 'moderator', { decision: 'approved' })).code, 409);
+    assert.equal(h.writes.length, 0);
+  }
+});
+
+test('an older room review cannot replace a newer pending capture', async t => {
+  const capture = { ...base, captureKind: 'interior_room', status: 'review_required', spaceId: 'room' };
+  const h = harness(t, capture, { 'privateSpaces/room': { ownerUid: 'owner', pendingCaptureId: 'newer-capture' } });
+  assert.equal((await h.call('moderateRealityCapture', 'moderator', { decision: 'approved' })).code, 409);
+  assert.equal(h.writes.length, 0);
+  h.mutate('privateSpaces/room', { pendingCaptureId: id });
+  assert.equal((await h.call('moderateRealityCapture', 'moderator', { decision: 'approved' })).code, 200);
+  assert.equal(h.records.get('privateSpaces/room').captureId, id);
+});
 
 for (const [label, capture, uid, status] of [
   ['another owner', { ...base, status: 'draft' }, 'attacker', 403],

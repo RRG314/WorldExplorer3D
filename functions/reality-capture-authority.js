@@ -70,6 +70,20 @@ function normalizeAccessMode(value, captureKind = 'interior_room') {
   return captureKind === 'interior_room' ? 'PRIVATE' : requested;
 }
 
+function normalizeSpatialContext(raw) {
+  if (!raw || raw.schemaVersion !== 1 || raw.frame !== 'building-local-x-east-y-up-z-south') return null;
+  const validPoint = p => Number.isFinite(p?.x) && Number.isFinite(p?.z) && Math.abs(p.x) <= 2000 && Math.abs(p.z) <= 2000;
+  if (!Array.isArray(raw.footprint) || raw.footprint.length < 3 || raw.footprint.length > 256 || !raw.footprint.every(validPoint)) return null;
+  const height = raw.height;
+  return {
+    schemaVersion: 1, frame: raw.frame, authority: 'client-snapshot-of-existing-building',
+    footprint: raw.footprint.map(({ x, z }) => ({ x, z })),
+    height: height && Number.isFinite(height.meters) && height.meters > 0 && height.meters <= 1200 && ['mapped', 'inferred'].includes(height.evidence)
+      ? { meters: height.meters, evidence: height.evidence } : null,
+    entrance: validPoint(raw.entrance) ? { x: raw.entrance.x, z: raw.entrance.z } : null
+  };
+}
+
 function normalizeCanonicalBuilding(raw = {}) {
   const sourceBuildingId = cleanText(raw.sourceBuildingId, 220);
   const worldId = cleanText(raw.worldId, 220);
@@ -101,7 +115,8 @@ function normalizeCanonicalBuilding(raw = {}) {
     lat,
     lon,
     footprintGeo: Object.freeze(footprintGeo),
-    entranceGeo: entranceGeo ? Object.freeze(entranceGeo) : null
+    entranceGeo: entranceGeo ? Object.freeze(entranceGeo) : null,
+    spatialContext: normalizeSpatialContext(raw.spatialContext)
   });
 }
 

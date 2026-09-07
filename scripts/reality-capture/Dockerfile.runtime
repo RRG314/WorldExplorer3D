@@ -1,0 +1,5 @@
+# Reuse the tested, immutable toolchain; only the scoped worker code changes.
+FROM us-central1-docker.pkg.dev/we3d-staging-20260712/capture-processing/meshroom@sha256:c891a72ba300ed6675ba4b6b9a8a26827011415beb13ab5cc5384b01e38a79c4
+ENV OMP_NUM_THREADS=4 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 PYTHONUNBUFFERED=1 WE3D_RECONSTRUCTION_REVISION=meshroom-2023.3.0-gpu-sift-v2
+COPY scripts/reality-capture/ /worker/
+COPY functions/reality-capture-glb.js /worker/glb-inspection.cjs

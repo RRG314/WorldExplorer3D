@@ -2,6 +2,7 @@ import { listApprovedExteriorRepresentations } from '../../../js/community-reali
 import { worldModificationIdentityForLocation } from '../editable-world/model.js?v=1';
 import { setBuildingPresentationSuppressed } from '../editable-world/runtime.js?v=4';
 import { runtimePublicationState } from './runtime-contract.js?v=2';
+import { applyCaptureAlignment } from './alignment.js?v=1';
 
 const MAX_RUNTIME_VERTICES = 1_500_000;
 const instances = new Map();
@@ -95,12 +96,8 @@ async function attachRepresentation(appCtx, representation, worldId, sequence, s
     }
     const center = buildingCenter(building);
     const alignment = representation.alignment || {};
-    const offset = alignment.positionOffset || {};
     const baseY = finite(building.baseY, finite(building.minY, appCtx.sampleFeatureSurfaceY?.(center.x, center.z)));
-    const scale = Math.max(0.05, Math.min(20, finite(alignment.scale, 1)));
-    root.position.set(center.x + finite(offset.x), baseY + finite(offset.y), center.z + finite(offset.z));
-    root.rotation.y = finite(alignment.rotationYDegrees) * Math.PI / 180;
-    root.scale.setScalar(scale);
+    applyCaptureAlignment(root, alignment, { x: center.x, y: baseY, z: center.z });
     root.userData.communityRealityCapture = Object.freeze({
       representationId: String(representation.representationId || ''),
       sourceBuildingId,

@@ -97,7 +97,9 @@ function buildCaptureProcessingExports({ db, bucket }) {
           return { ...photo, name: photo.name.split('/').pop(), url };
         }));
         const [uploadUrl] = await bucket.file(destination).getSignedUrl({ version: 'v4', action: 'write', expires, contentType: 'model/gltf-binary' });
-        return res.json({ captureKind: capture.captureKind, photos, uploadUrl });
+        return res.json({ captureKind: capture.captureKind, photos, uploadUrl,
+          worldContext: { building: capture.building, room: capture.room || null,
+            trust: 'capture-context-requires-registration-review' } });
       }
       if (action === 'failed') {
         await finish(captureId, attemptId, { status: 'processing_failed', failure: { code: 'reconstruction_failed', stage: 'reconstruction' } });

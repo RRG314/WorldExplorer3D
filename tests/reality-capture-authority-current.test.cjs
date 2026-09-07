@@ -23,6 +23,18 @@ const building = Object.freeze({
   lon: -76.6122
 });
 
+test('capture preserves bounded local world context without promoting it to trusted geography', () => {
+  const context = { schemaVersion: 1, frame: 'building-local-x-east-y-up-z-south', authority: 'trusted-server',
+    footprint: [{ x: -4, z: -3 }, { x: 4, z: -3 }, { x: 4, z: 3 }],
+    height: { meters: 12, evidence: 'inferred' }, entrance: { x: 0, z: -3 } };
+  const draft = createCaptureDraft({ captureKind: 'exterior', building: { ...building, spatialContext: context } }, { uid: 'owner' });
+  assert.deepEqual(draft.building.spatialContext.footprint, context.footprint);
+  assert.equal(draft.building.spatialContext.height.evidence, 'inferred');
+  assert.equal(draft.building.spatialContext.authority, 'client-snapshot-of-existing-building');
+  context.footprint[0].x = Infinity;
+  assert.equal(createCaptureDraft({ captureKind: 'exterior', building: { ...building, spatialContext: context } }, { uid: 'owner' }).building.spatialContext, null);
+});
+
 test('reviewed transforms are finite and bounded before publication', () => {
   assert.deepEqual(normalizeReviewedAlignment({
     positionOffset: { x: 500, y: -500, z: 'not-a-number' },

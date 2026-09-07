@@ -39,6 +39,10 @@ test('all real provider paths converge on the same optimizer (command contract, 
       assert.equal(calls[1].args.at(-1), job.finalGlb);
       assert.equal(result.provider, provider);
       assert.equal(result.realReconstructionAcceptance, false);
+      if (provider === 'meshroom') {
+        assert.ok(calls[0].args.includes('FeatureExtraction:forceCpuExtraction=false'));
+        assert.ok(calls[0].args.includes('FeatureExtraction:maxThreads=4'));
+      }
       if (provider !== 'meshroom') assert.ok(calls[0].args.includes(path.join(job.images, referencePhoto)));
     }
   } finally { await fs.rm(work, { recursive: true, force: true }); }

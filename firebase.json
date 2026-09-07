@@ -211,6 +211,10 @@
         "function": "reserveRealityCapturePhoto"
       },
       {
+        "source": "/retryRealityCapture",
+        "function": "retryRealityCapture"
+      },
+      {
         "source": "/listMyRealityCaptures",
         "function": "listMyRealityCaptures"
       },

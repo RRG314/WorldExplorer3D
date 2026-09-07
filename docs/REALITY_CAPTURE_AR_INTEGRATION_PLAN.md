@@ -1,7 +1,15 @@
 # Reality Capture and AR: audit and implementation gates
 
 Date: 2026-09-07. Audited baseline: `9565df35`, branch `steven/building-exteriors-local`.
-Status: staging capture infrastructure and real upload/dispatch are now deployed. Full real-house/room acceptance is still open. Production and GitHub have not been changed.
+Status: staging capture infrastructure and real upload/dispatch are deployed. Full real-house/room acceptance is still open. Production and GitHub have not been changed.
+
+## Superseding development direction — September 7, 2026
+
+Use [Reality Reconstruction Development Plan](REALITY_RECONSTRUCTION_DEVELOPMENT_PLAN.md) as the current product roadmap and [Reconstruction Decision](REALITY_RECONSTRUCTION_DECISION.md) for the provider evaluation. The owner now requests a serious exterior/interior product plan, with TRELLIS reserved for individual object creation. Do not interpret historical milestones below as completed functionality.
+
+The first public benchmark execution `capture-meshroom-vgwdk` was cancelled at 18:07:36 UTC after roughly 18 minutes of container time without an output. Cancellation was verified; only its matching capture/lease was marked failed/released. No GPU job was restarted during the planning pass. The revised GPU-feature image built successfully (`sha256:2a03f1b5c74b0ae4625867283b7d2d0cc18d3e2862964d359d4f979bcc62c53b`), but it has not established reconstruction quality.
+
+Local, not yet staging-synced: photo thumbnails/removal and failed-job retry; one shared placement helper across the private viewer, moderation and world renderers; captured building-local footprint/entrance/height-evidence snapshot; broker passes context without declaring it server-verified geography; moderation uses a revision-checked transaction and rejects superseded room reviews. The separate continuously spinning/recentered moderation renderer was removed. Current checks: 45 local tests, 14 browser UI checks (labelled transport doubles and synthetic GLB), source/import validation, and inspected phone-sized photo/placement screenshots. These are integration checks, not a real-house/room or physical-phone acceptance claim.
 
 ## Staging implementation — current on 2026-09-07
 

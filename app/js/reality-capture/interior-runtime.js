@@ -3,6 +3,7 @@ import {
   resolveBuildingInteriorRepresentation
 } from '../../../js/community-reality-capture-api.js?v=4';
 import { worldModificationIdentityForLocation } from '../editable-world/model.js?v=1';
+import { applyCaptureAlignment } from './alignment.js?v=1';
 import {
   canonicalRoomId,
   resolveCanonicalMappedBuilding,
@@ -110,15 +111,7 @@ export async function attachCommunityInteriorRepresentation(appCtx, active) {
       return false;
     }
     const alignment = representation.alignment || {};
-    const offset = alignment.positionOffset || {};
-    const scale = Math.max(0.05, Math.min(20, finite(alignment.scale, 1)));
-    root.position.set(
-      finite(active.center?.x) + finite(offset.x),
-      finite(active.floorBaseY) + finite(offset.y),
-      finite(active.center?.z) + finite(offset.z)
-    );
-    root.rotation.y = finite(alignment.rotationYDegrees) * Math.PI / 180;
-    root.scale.setScalar(scale);
+    applyCaptureAlignment(root, alignment, { x: finite(active.center?.x), y: finite(active.floorBaseY), z: finite(active.center?.z) });
     root.userData.communityRealityCapture = Object.freeze({
       captureId: String(representation.captureId || ''),
       spaceId: String(representation.spaceId || ''),

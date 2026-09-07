@@ -55,6 +55,7 @@ async function makePage(viewport, mobile = false) {
       return json({ error: 'Unexpected test endpoint' }, 500);
     }
     if (url.origin === origin) return route.fulfill({ response: await route.fetch({ url: `http://127.0.0.1:${server.port}${url.pathname}${url.search}` }) });
+    if (['cdnjs.cloudflare.com', 'cdn.jsdelivr.net'].includes(url.hostname) && /three/.test(url.pathname)) return route.continue();
     return route.abort();
   });
   const page = await context.newPage(); page.setDefaultTimeout(10_000);
@@ -102,6 +103,16 @@ try {
   await statusContains(phone, '3 photos are saved');
   assert.match(await phone.locator('[data-capture-sectors] button.active').innerText(), /Front/);
   assert.equal(await phone.locator('[data-capture-sectors] button.covered').count(), 1);
+  await phone.locator('.realityCaptureGuide summary').click();
+  assert.equal(await phone.locator('[data-capture-photo-grid] img').count(), 3);
+  await phone.waitForFunction(() => [...document.querySelectorAll('[data-capture-photo-grid] img')].every(image => image.naturalWidth > 0));
+  await phone.locator('[data-capture-photo-grid]').scrollIntoViewIfNeeded();
+  await phone.screenshot({ path: `${out}/mobile-photo-review.png` });
+  await phone.locator('[data-remove-photo]').first().click();
+  await phone.waitForFunction(() => document.querySelector('[data-capture-count]').textContent.startsWith('2 /'));
+  await phone.locator('[data-capture-input]').setInputFiles(file);
+  await phone.waitForFunction(() => document.querySelector('[data-capture-count]').textContent.startsWith('3 /'));
+  await phone.locator('.realityCaptureGuide summary').click();
   failNextUpload = true; await phone.click('[data-capture-save]'); await statusContains(phone, 'interrupted');
   await phone.click('[data-capture-save]'); await statusContains(phone, 'Photos saved privately to your account');
   assert.equal(uploaded.get('capture-1').length, 3);
@@ -151,14 +162,53 @@ try {
   await phone.evaluate(async () => (await import('/js/auth-ui.js?v=55')).setUser('other'));
   assert.equal(await phone.locator('#realityCapturePanel.show').count(), 0);
   await phone.waitForFunction(() => document.getElementById('phoneStatus').textContent.includes('unavailable for this account'));
+  // Exercise the actual shared Three.js review renderer. This deliberately
+  // labelled box verifies transforms/controls, NOT reconstruction fidelity.
+  await phone.evaluate(async () => {
+    document.body.innerHTML = '<main style="padding:12px;color:white;background:#102b36"><h1>Placement check</h1><p>Synthetic box · viewer test only</p><div id="review"></div><button id="move">Move model 2 m</button><button id="rotate">Rotate view</button></main>';
+    const { loadClassicScript } = await import('/app/js/modules/script-loader.js?v=56');
+    await loadClassicScript('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js');
+    const geometry = new THREE.BoxGeometry(6, 4, 8); geometry.translate(0, 2, 0);
+    const positions = geometry.attributes.position.array;
+    const indices = geometry.index.array;
+    const bin = new Uint8Array(positions.byteLength + indices.byteLength);
+    bin.set(new Uint8Array(positions.buffer)); bin.set(new Uint8Array(indices.buffer), positions.byteLength);
+    const json = { asset: { version: '2.0' }, scene: 0, scenes: [{ nodes: [0] }], nodes: [{ mesh: 0 }],
+      meshes: [{ primitives: [{ attributes: { POSITION: 0 }, indices: 1, material: 0 }] }],
+      materials: [{ pbrMetallicRoughness: { baseColorFactor: [0.72, 0.48, 0.25, 1], metallicFactor: 0 } }],
+      buffers: [{ byteLength: bin.length }], bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: positions.byteLength }, { buffer: 0, byteOffset: positions.byteLength, byteLength: indices.byteLength }],
+      accessors: [{ bufferView: 0, componentType: 5126, count: positions.length / 3, type: 'VEC3', min: [-3, 0, -4], max: [3, 4, 4] }, { bufferView: 1, componentType: 5123, count: indices.length, type: 'SCALAR' }] };
+    const text = new TextEncoder().encode(JSON.stringify(json)); const padded = Math.ceil(text.length / 4) * 4;
+    const bytes = new ArrayBuffer(28 + padded + bin.length), view = new DataView(bytes);
+    view.setUint32(0, 0x46546c67, true); view.setUint32(4, 2, true); view.setUint32(8, bytes.byteLength, true);
+    view.setUint32(12, padded, true); view.setUint32(16, 0x4e4f534a, true);
+    new Uint8Array(bytes, 20, padded).fill(32); new Uint8Array(bytes, 20, text.length).set(text);
+    view.setUint32(20 + padded, bin.length, true); view.setUint32(24 + padded, 0x004e4942, true); new Uint8Array(bytes, 28 + padded).set(bin);
+    const { createCaptureViewer } = await import('/app/js/reality-capture/result-viewer.js?v=1');
+    window.reviewAbort = new AbortController();
+    window.reviewViewer = await createCaptureViewer(document.getElementById('review'), bytes, reviewAbort.signal, {
+      alignment: {}, spatialContext: { footprint: [{ x: -3, z: -4 }, { x: 3, z: -4 }, { x: 3, z: 4 }, { x: -3, z: 4 }], height: { meters: 4 }, entrance: { x: 0, z: 4 } }
+    });
+    document.getElementById('move').onclick = () => reviewViewer.updateAlignment({ positionOffset: { x: 2 }, rotationYDegrees: 0, scale: 1 });
+    document.getElementById('rotate').onclick = () => reviewViewer.rotate();
+    window.render_game_to_text = () => JSON.stringify({ mode: 'capture-placement-fixture', ...reviewViewer.getPlacement() });
+  });
+  assert.deepEqual(await phone.evaluate(() => reviewViewer.getPlacement().position), [0, 0, 0]);
+  await phone.click('#move'); await phone.click('#rotate');
+  assert.deepEqual(await phone.evaluate(() => reviewViewer.getPlacement().position), [2, 0, 0]);
+  assert.equal(await phone.evaluate(() => reviewViewer.getPlacement().rotationY), 0, 'view rotation must not alter published placement');
+  await phone.screenshot({ path: `${out}/mobile-placement-review.png` });
+  await phone.evaluate(() => reviewAbort.abort());
+  assert.equal(await phone.locator('#review canvas').count(), 0);
   assert.deepEqual(errors, []);
   await writeFile(`${out}/report.json`, JSON.stringify({ ok: true, checks: [
     'desktop QR and exact capture link', 'same account required', 'wrong account denied',
     'real normalization and IndexedDB', 'no fabricated sector coverage', 'interrupted upload retry',
     'desktop sees phone uploads', 'reload deduplicates', 'account change closes private session', '390px layout fits',
-    '20-photo submission and cross-device queued status', 'room permission and exact room handoff'
+    '20-photo submission and cross-device queued status', 'room permission and exact room handoff', 'decoded thumbnail review and removal before upload',
+    'actual GLB viewer preserves placement while camera rotates; abort releases canvas'
   ], errors, limitation: 'Auth/storage transport doubles; no real GPU or physical phone reconstruction.' }, null, 2));
-  console.log('Capture UI: 12 focused checks passed; transport doubles, not reconstruction acceptance.');
+  console.log('Capture UI: 14 focused checks passed; transport doubles and synthetic GLB, not reconstruction acceptance.');
 } catch (error) {
   console.error('Capture UI browser errors:', errors);
   for (const [index, context] of browser.contexts().entries()) {
