@@ -5,6 +5,16 @@ Status: local integration checkpoint; NOT a completed capture service, physical-
 
 Owner clarification: integrate into the app without licensing locks or staging-only feature restrictions; the owner will decide when publication permissions are sufficient. The milestones below are work/verification tracking, not software unlocks. Normal account authorization, capture review and private-home protections remain.
 
+## Current deployment direction (owner clarification, 2026-09-07)
+
+Use the existing **separate staging project** `we3d-staging-20260712` for all test hosting, Auth, database, photo storage, functions and processing. Do not deploy the new capture endpoints, storage rules or game release to production. No production changes have been made. Production billing is enabled; staging billing is not. These are project-specific settings, not evidence that the owner lacks a Blaze plan. Linking staging to the existing billing account requires explicit confirmation because it enables pay-as-you-go charges there; no linkage or paid processor has been enabled.
+
+Phone and desktop must use the same staging URL and staging account during testing. The owner may use the same Google identity, but staging has separate account records and game data; do not copy production users/saves or point staging to live data to avoid that separation. This follows [Firebase's separate-environment guidance](https://firebase.google.com/docs/projects/dev-workflows/overview-environments).
+
+Real local Storage/Firestore emulator verification now runs with installed Java 21 at `/opt/homebrew/opt/openjdk@21/bin/java`. The previous test failed before touching rules because it called a nonexistent `.app()` method on `RulesTestContext`. Replaced it with the supported `.storage()` API and tightened denied assertions to require `storage/unauthorized` rather than any exception. Both emulator cases pass: own write-once upload succeeds; original reads/overwrites, wrong owner/metadata, unsafe MIME and client processed-output writes are denied. Emulators were shut down after the check. This is actual rule execution, not cloud App Check, GPU or physical-phone acceptance.
+
+Additional predeployment findings: current shared CORS helper does not include `X-Firebase-AppCheck` in allowed request headers; correct and test this before direct cross-origin capture requests. Production also has no deployed capture functions; its Firebase Storage API and Cloud Run Admin API are disabled. These findings do not authorize enabling production services.
+
 ## Implemented in this checkpoint
 
 ### Phone / desktop continuation (local follow-up, 2026-09-07)
