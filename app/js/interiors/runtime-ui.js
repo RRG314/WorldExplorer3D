@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { buildingKey, pointToSegmentDistance, summarizeSupportType } from "../building-entry.js?v=7";
+import { buildingKey, pointToSegmentDistance, summarizeSupportType } from "../building-entry.js?v=9";
 
 function createInteriorRuntimeUiApi() {
   let transientHint = { text: "", until: 0 };
@@ -41,8 +41,8 @@ function createInteriorRuntimeUiApi() {
         return false;
       }
     })();
-    el.textContent = touchPreferred && /^E\s+/.test(message)
-      ? message.replace(/^E\s+/, 'Tap · ')
+    el.textContent = touchPreferred && /^\S+\s+/.test(message)
+      ? message.replace(/^\S+\s+/, 'Tap · ')
       : message;
     el.dataset.variant = variant;
     el.classList.add("show");

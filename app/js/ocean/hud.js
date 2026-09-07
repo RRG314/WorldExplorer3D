@@ -86,12 +86,14 @@ export function updateOceanHud(appCtx, oceanMode, nowSeconds = 0) {
   const indBrake = document.getElementById('indBrake');
   const indBoost = document.getElementById('indBoost');
   const indDrift = document.getElementById('indDrift');
-  const boostFill = document.getElementById('boostFill');
+  const conditionBar = document.getElementById('conditionBar');
+  const conditionFill = document.getElementById('conditionFill');
   const sub = oceanMode.submarine;
 
   const speedKnots = Math.abs(worldUnitsPerSecondToKnots(sub.speed, appCtx.METERS_PER_WORLD_UNIT));
   const depth = Math.max(0, Math.round(-sub.position.y));
-  const batteryPct = Math.round(76 + Math.sin(nowSeconds * 0.09) * 7);
+  const condition = Math.max(0, Math.min(1, Number(oceanMode.condition ?? sub.condition ?? 1)));
+  const conditionPct = Math.round(condition * 100);
 
   if (speedUnitLabel) speedUnitLabel.textContent = 'KTS';
   if (limitLabel) limitLabel.textContent = 'DEPTH';
@@ -118,9 +120,14 @@ export function updateOceanHud(appCtx, oceanMode, nowSeconds = 0) {
   });
   drawOceanNavigationMap(oceanMode, depth);
 
-  if (boostFill) {
-    boostFill.style.width = `${batteryPct}%`;
-    boostFill.classList.add('active');
+  if (conditionFill) {
+    conditionFill.style.width = `${conditionPct}%`;
+    conditionFill.dataset.state = condition <= .25 ? 'critical' : condition <= .6 ? 'injured' : 'healthy';
+  }
+  if (conditionBar) {
+    conditionBar.setAttribute('aria-label', 'Submarine health');
+    conditionBar.setAttribute('aria-valuenow', String(conditionPct));
+    conditionBar.title = `Submarine health · ${conditionPct}%`;
   }
   if (indBrake) {
     indBrake.textContent = 'ASC';

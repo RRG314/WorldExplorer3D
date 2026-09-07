@@ -6,6 +6,19 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
 
 ### Added
 
+- A permanent default dog companion with close following, supported vehicle
+  travel, naming and progression, plus account-level man or woman Explorer
+  presentation.
+- A bounded living-world population with activity-aware pedestrians, longer-lived
+  traffic, road controls, queues, click interaction, and current vehicle assets.
+- Functional mapped convenience, mechanic, pet/veterinary, field-equipment,
+  medical, and marine place families connected to existing gameplay systems.
+- Explorer and vehicle health, useful consumables, and ordered mechanic upgrades
+  with visible handling effects and signed-in persistence.
+- A short optional First Journey, saved keyboard remapping, shared touch action
+  rules, proximity and familiarity prompts, and expanded accessibility settings.
+- A one-time mid-voyage pirate interception with manual defense, hostile boarding
+  pressure, persistent damage and consequences, and course recovery.
 - Interstellar Expeditions Alpha aboard Solis Reach, including a walkable
   three-deck ship, crew work, voyage events, persistent journey state, long-term
   travel, discoveries, failures, recovery, shared Expeditions, and outposts.
@@ -22,6 +35,13 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
 
 ### Changed
 
+- Consolidated purchases, services, upgrades, materials, and property around one
+  Explorer Wallet with recoverable transaction settlement.
+- Unified roads, terrain, bridge endpoints, junctions, sidewalks, curbs, building
+  clearance, and vehicle contact around the final published surface without
+  replacing the mapped-road authority.
+- Retired old blocky character, animal, weapon, pod, and road-vehicle runtime
+  fallbacks where their current curated replacements are available.
 - Reorganized the gameplay bar around Explore, Travel, Backpack, Community,
   Real Estate, Quick Build, and current controls.
 - Kept Quick Build as the player-facing Blocks workflow and removed the
@@ -34,8 +54,12 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
 
 ### Fixed
 
-- Retained the established 5.1 Earth terrain, road, bridge, and building
-  publication behavior while keeping the new 5.2 systems layered above it.
+- Kept prompts near their actual door, vehicle, or nearby discovery and prevented
+  familiar interactions from repeatedly covering the center of play.
+- Kept the parachute available for valid falls while hiding it after landing,
+  and removed the retired car flash during driving-mode entry.
+- Corrected plane touch-camera recentering to use the saved mobile camera
+  preferences shared with walking.
 - Preserved one Pathfinder and one Solis Reach identity across launch, landing,
   surface return, rendezvous, docking, ship entry, and Earth return.
 - Prevented Wayfinder assistance and manual input from competing during
@@ -44,8 +68,6 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
   supported landing worlds.
 - Completed route-dependent civic response approaches and prevented a completed
   custody incident from immediately repeating.
-- Kept the Featured Cities list scrollable so every destination remains usable
-  without overlapping the data and legal links.
 - Added missing Hosting routes for property, civic-response, and shared
   Expedition actions.
 

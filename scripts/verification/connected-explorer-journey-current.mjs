@@ -22,8 +22,14 @@ page.on('response', (response) => {
   }
 });
 
+await context.addInitScript(() => {
+  localStorage.removeItem('worldExplorer3D.tutorialState.v5');
+  localStorage.removeItem('worldExplorer3D.tutorialState.v4');
+  localStorage.removeItem('worldExplorer3D.keyboardBindings.v1');
+});
+
 function tutorialState() {
-  return page.evaluate(() => JSON.parse(localStorage.getItem('worldExplorer3D.tutorialState.v4') || 'null'));
+  return page.evaluate(() => JSON.parse(localStorage.getItem('worldExplorer3D.tutorialState.v5') || 'null'));
 }
 
 async function hold(code, durationMs, modifiers = []) {
@@ -34,58 +40,18 @@ async function hold(code, durationMs, modifiers = []) {
   for (const modifier of [...modifiers].reverse()) await page.keyboard.up(modifier);
 }
 
-function signedAngle(from, to) {
-  return Math.atan2(Math.sin(to - from), Math.cos(to - from));
-}
-
-async function followActiveFieldBearing() {
-  let previousDistance = Infinity;
-  let blockedSteps = 0;
-  let latest = null;
-  for (let attempt = 0; attempt < 80; attempt += 1) {
-    const state = await page.evaluate(() => {
-      const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
-      return {
-        interaction: diagnostics.worldDiscovery?.interaction || null,
-        yaw: Number(diagnostics.activeActor?.orientation?.yaw || 0)
-      };
-    });
-    latest = state;
-    if (['observing', 'revealed'].includes(state.interaction?.phase)) return state.interaction;
-    assert.equal(state.interaction?.phase, 'seeking', `Unexpected field phase while following the bearing: ${state.interaction?.phase}`);
-    const distance = Number(state.interaction.distanceMeters);
-    blockedSteps = Number.isFinite(distance) && distance >= previousDistance - 0.35 ? blockedSteps + 1 : 0;
-    previousDistance = distance;
-    if (blockedSteps >= 3) {
-      await hold(attempt % 2 === 0 ? 'ArrowLeft' : 'ArrowRight', 620);
-      await hold('ArrowUp', 900, ['Shift']);
-      blockedSteps = 0;
-      continue;
-    }
-    const desired = Number(state.interaction.bearingDegrees) * Math.PI / 180;
-    const delta = signedAngle(state.yaw, desired);
-    if (Math.abs(delta) > 0.09) {
-      const turnKey = delta > 0 ? 'ArrowLeft' : 'ArrowRight';
-      await hold(turnKey, Math.min(420, Math.max(45, Math.abs(delta) / 2.6 * 1000)));
-    }
-    await hold('ArrowUp', 650, ['Shift']);
-  }
-  throw new Error(`The Explorer did not reach the active field site through normal movement controls: ${JSON.stringify(latest)}`);
-}
-
-async function completeFirstMovementStep() {
-  const turnPattern = ['ArrowLeft', 'ArrowRight', 'ArrowRight', 'ArrowLeft', 'ArrowLeft', 'ArrowRight'];
-  for (const turnKey of turnPattern) {
-    await hold(turnKey, 420);
-    await hold('ArrowUp', 1100, ['Shift']);
+async function moveWithRemappedForwardKey() {
+  const before = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor || null);
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    await hold('KeyZ', 900, ['Shift']);
     const state = await tutorialState();
-    if (state?.stage === 'pack') return true;
+    if (state?.stage === 'interact') {
+      const after = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor || null);
+      return { before, after };
+    }
+    await hold(attempt % 2 === 0 ? 'KeyA' : 'KeyD', 160);
   }
-  const evidence = await page.evaluate(() => ({
-    tutorial: JSON.parse(localStorage.getItem('worldExplorer3D.tutorialState.v4') || 'null'),
-    actor: globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor || null
-  }));
-  throw new Error(`First Journey movement did not advance through normal controls: ${JSON.stringify(evidence)}`);
+  throw new Error(`Remapped forward key did not advance the live tutorial: ${JSON.stringify(await tutorialState())}`);
 }
 
 try {
@@ -93,88 +59,113 @@ try {
   await page.goto(`${baseUrl}/app/`, { waitUntil: 'load', timeout: 120_000 });
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   await page.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
+
+  // Configure an actual action before entering the world. This verifies the
+  // player-facing settings, saved authority, and runtime consumer together.
+  await page.locator('[data-globe-destination="controls"]').first().click();
+  await page.waitForSelector('#keyboardBindingSettings');
+  await page.locator('#keyboardBindingSettings summary').click();
+  await page.locator('[data-binding-action="move_forward"]').click();
+  await page.keyboard.press('KeyZ');
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('worldExplorer3D.keyboardBindings.v1') || '{}').move_forward === 'KeyZ');
+  assert.match(await page.locator('#keyboardBindingSettings').textContent(), /Move \/ accelerate\s*Z\s*Change/is);
+  await page.screenshot({ path: `${evidenceDir}/01-configurable-controls-desktop.png` });
+  await page.locator('[data-globe-destination="location"]').first().click();
+
   await page.locator('#globeSelectorStartBtn').click();
   await page.waitForFunction(() => {
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.();
-    return diagnostics?.gameStarted === true && diagnostics.worldLoading === false && diagnostics.worldDiscovery?.active === true;
+    return diagnostics?.gameStarted === true && diagnostics.worldLoading === false;
   }, null, { timeout: 360_000 });
+  await page.waitForFunction(() => !document.getElementById('loading')?.classList.contains('show'), null, { timeout: 120_000 });
 
   await page.waitForSelector('#tutorialHintCard:not([hidden])', { timeout: 20_000 });
-  assert.match(await page.locator('#tutorialHintCard').textContent(), /First Journey.*Move and look around/is);
-  assert.equal(await page.locator('#tutorialHintCard').evaluate((element) => element.classList.contains('compact')), false);
-  await page.screenshot({ path: `${evidenceDir}/01-first-step-desktop.png` });
+  const firstStepText = await page.locator('#tutorialHintCard').textContent();
+  assert.match(firstStepText, /First Journey.*ZASD to move.*Mouse to look/is);
+  assert.equal(await page.locator('#tutorialHintCard').evaluate((element) => element.classList.contains('compact')), true);
+  await page.locator('#tutorialHintCard .tutorial-details-btn').click();
+  assert.match(await page.locator('#tutorialHintCard').textContent(), /Right mouse button to look|Drag with the right mouse button to look/i);
+  await page.screenshot({ path: `${evidenceDir}/02-first-journey-details-desktop.png` });
+  await page.locator('#tutorialHintCard .tutorial-details-btn').click();
 
-  await completeFirstMovementStep();
-  assert.match(await page.locator('#tutorialHintCard').textContent(), /Open your Backpack/i);
-  await page.locator('#tutorialHintCard .tutorial-primary').click();
-  await page.waitForSelector('#urbanEquipment.show');
-  await page.locator('#urbanEquipmentCloseBtn').click();
+  const moved = await moveWithRemappedForwardKey();
+  assert.equal((await tutorialState())?.stage, 'interact');
+  const beforePosition = moved.before?.position || moved.before;
+  const afterPosition = moved.after?.position || moved.after;
+  assert.notDeepEqual(afterPosition, beforePosition, 'The remapped key must move the active actor in the live world.');
+  assert.match(await page.locator('#tutorialHintCard').textContent(), /Try one nearby action/i);
+  assert.match(await page.locator('#tutorialHintCard').textContent(), /visible door, person, parked vehicle, or usable object/i);
+  await page.waitForSelector('#urbanVehiclePrompt.show', { timeout: 20_000 });
+  const promptPriority = await page.evaluate(() => {
+    const prompt = document.getElementById('urbanVehiclePrompt');
+    const tutorial = document.getElementById('tutorialHintCard');
+    const journey = document.getElementById('currentJourneyCard');
+    const rect = prompt?.getBoundingClientRect();
+    return {
+      promptRightAligned: !!rect && rect.left > innerWidth / 2,
+      tutorialSuppressed: !!tutorial && getComputedStyle(tutorial).display === 'none',
+      currentJourneySuppressed: !!journey && (journey.hidden || getComputedStyle(journey).display === 'none')
+    };
+  });
+  assert.deepEqual(promptPriority, { promptRightAligned: true, tutorialSuppressed: true, currentJourneySuppressed: true });
+  await page.screenshot({ path: `${evidenceDir}/03-context-action-priority-desktop.png` });
 
-  await page.waitForFunction(() => JSON.parse(localStorage.getItem('worldExplorer3D.tutorialState.v4') || '{}').stage === 'explorer', null, { timeout: 20_000 });
-  await page.waitForSelector('#tutorialHintCard:not([hidden])');
-  await page.locator('#tutorialHintCard .tutorial-primary').click();
-  await page.waitForSelector('#discoveryPanel.show');
-  await page.waitForFunction(() => JSON.parse(localStorage.getItem('worldExplorer3D.tutorialState.v4') || '{}').stage === 'activity', null, { timeout: 20_000 });
-
-  await page.locator('.discoveryTodayRoute summary').click();
-  await page.locator('#discoveryExpeditionList [data-field-objective]:not(:disabled)').first().click();
-  await page.waitForFunction(() => JSON.parse(localStorage.getItem('worldExplorer3D.tutorialState.v4') || '{}').stage === 'record', null, { timeout: 20_000 });
-  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery?.interaction?.phase === 'seeking', null, { timeout: 20_000 });
-  await followActiveFieldBearing();
-  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery?.interaction?.phase === 'revealed', null, { timeout: 30_000 });
-
-  await page.locator('#discoveryQuickToolBtn').click();
-  await page.waitForSelector('#discoveryPanel.show');
-  await page.waitForFunction(() => document.getElementById('discoveryPrimaryBtn')?.textContent === 'Record');
-  await page.locator('#discoveryPrimaryBtn').click();
-  await page.waitForFunction(() => JSON.parse(localStorage.getItem('worldExplorer3D.tutorialState.v4') || '{}').stage === 'review', null, { timeout: 30_000 });
-  assert.match(await page.locator('#discoveryResultCard').textContent(), /Field result saved.*Journal.*Field Guide/is);
+  await page.keyboard.press('KeyE');
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('worldExplorer3D.tutorialState.v5') || '{}').stage === 'explore', null, { timeout: 20_000 });
+  await page.evaluate(() => document.getElementById('fWorldDiscovery')?.click());
+  await page.waitForSelector('#discoveryPanel.show', { timeout: 20_000 });
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('worldExplorer3D.tutorialState.v5') || '{}').completed === true, null, { timeout: 20_000 });
   await page.locator('#discoveryCloseBtn').click();
 
-  await page.waitForSelector('#tutorialHintCard:not([hidden])');
-  assert.match(await page.locator('#tutorialHintCard').textContent(), /See what changed.*Open Journal/is);
-  await page.locator('#tutorialHintCard .tutorial-primary').click();
-  await page.waitForSelector('.discoveryPane[data-discovery-pane="journal"].active');
-  await page.waitForFunction(() => JSON.parse(localStorage.getItem('worldExplorer3D.tutorialState.v4') || '{}').completed === true, null, { timeout: 20_000 });
-  assert.match(await page.locator('#discoveryJournalList').textContent(), /Inspect|Survey|Field/i);
-  await page.screenshot({ path: `${evidenceDir}/02-first-record-journal-desktop.png` });
-
-  await page.locator('#discoveryCloseBtn').click();
-  await page.waitForSelector('#currentJourneyCard:not([hidden])');
-  const currentJourneyCopy = await page.locator('#currentJourneyCard').textContent();
-  assert.match(currentJourneyCopy, /Today's Route|Explore This Place/i);
-  assert.doesNotMatch(currentJourneyCopy, /authority|schema|pipeline|procedural|generated/i);
-  await page.screenshot({ path: `${evidenceDir}/03-current-journey-desktop.png` });
+  const statusSemantics = await page.evaluate(() => ({
+    tutorialRole: document.getElementById('tutorialHintCard')?.getAttribute('role'),
+    tutorialLive: document.getElementById('tutorialHintCard')?.getAttribute('aria-live'),
+    journeyRole: document.getElementById('currentJourneyCard')?.getAttribute('role'),
+    journeyLive: document.getElementById('currentJourneyCard')?.getAttribute('aria-live')
+  }));
+  assert.deepEqual(statusSemantics, {
+    tutorialRole: 'status', tutorialLive: 'polite', journeyRole: 'status', journeyLive: 'polite'
+  });
 
   await page.setViewportSize({ width: 390, height: 844 });
-  const mobileBox = await page.locator('#currentJourneyCard').boundingBox();
-  assert.ok(mobileBox && mobileBox.x >= 0 && mobileBox.y >= 0 && mobileBox.x + mobileBox.width <= 390);
-  const overlaps = await page.evaluate(() => {
-    const card = document.getElementById('currentJourneyCard')?.getBoundingClientRect();
-    const controls = document.getElementById('floatMenuContainer')?.getBoundingClientRect();
-    return !!card && !!controls && card.left < controls.right && card.right > controls.left && card.top < controls.bottom && card.bottom > controls.top;
+  await page.waitForTimeout(500);
+  const touchLayout = await page.evaluate(() => {
+    const tutorial = document.getElementById('tutorialHintCard');
+    const touch = document.getElementById('mobileControls') || document.getElementById('touchControls');
+    const card = tutorial && !tutorial.hidden ? tutorial.getBoundingClientRect() : null;
+    const controls = touch && getComputedStyle(touch).display !== 'none' ? touch.getBoundingClientRect() : null;
+    const overlap = !!card && !!controls && card.left < controls.right && card.right > controls.left && card.top < controls.bottom && card.bottom > controls.top;
+    return {
+      viewport: { width: innerWidth, height: innerHeight },
+      tutorialWithinViewport: !card || (card.left >= 0 && card.right <= innerWidth && card.top >= 0 && card.bottom <= innerHeight),
+      tutorialClearsTouchControls: !overlap,
+      touchSnapshot: globalThis.getWorldExplorerRuntimeDiagnostics?.().input?.touch || null
+    };
   });
-  assert.equal(overlaps, false, 'Current Journey must not cover the bottom controls.');
-  await page.screenshot({ path: `${evidenceDir}/04-current-journey-mobile.png` });
+  assert.equal(touchLayout.tutorialWithinViewport, true);
+  assert.equal(touchLayout.tutorialClearsTouchControls, true);
+  await page.screenshot({ path: `${evidenceDir}/04-mobile-world-layout.png` });
 
-  const state = await tutorialState();
+  const finalState = await tutorialState();
   const report = {
     ok: browserErrors.length === 0 && failedLocalResources.length === 0,
-    journey: 'connected-first-explorer-journey-v4',
+    journey: 'optional-first-journey-v5',
     checks: {
-      movementUsedActualControls: true,
-      backpackOpened: true,
-      activitySelected: true,
-      fieldSiteReachedWithActualControls: true,
-      fieldResultRecorded: true,
-      journalReviewed: true,
-      firstJourneyCompleted: state?.completed === true,
-      currentJourneyContinuesAfterOnboarding: /Today's Route|Explore This Place/i.test(currentJourneyCopy || ''),
-      naturalPlayerLanguage: !/authority|schema|pipeline|procedural|generated/i.test(currentJourneyCopy || ''),
-      mobileCardClearsControls: overlaps === false,
+      controlsUiVisibleAndSaved: true,
+      remappedKeyMovedLiveActor: true,
+      tutorialUsesCurrentBindingLabel: /ZASD/.test(firstStepText || ''),
+      tutorialStartsCompact: true,
+      tutorialHasThreeCoreSteps: finalState?.completed === true && finalState?.stage === 'complete',
+      nearbyInteractionExplainedOnDemand: true,
+      immediateActionHasVisualPriority: Object.values(promptPriority).every(Boolean),
+      notificationsUsePoliteStatusSemantics: true,
+      mobileTutorialWithinViewport: touchLayout.tutorialWithinViewport,
+      mobileTutorialClearsTouchControls: touchLayout.tutorialClearsTouchControls,
       noBrowserErrors: browserErrors.length === 0,
       noFailedLocalResources: failedLocalResources.length === 0
     },
+    statusSemantics,
+    touchLayout,
     browserErrors,
     failedLocalResources
   };

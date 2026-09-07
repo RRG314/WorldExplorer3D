@@ -112,6 +112,14 @@ function compileSupportColumns(
   const remoteOffset = width * 0.5 + pierWidth + 4.5;
   const farRemoteOffset = width * 0.5 + pierWidth + Math.max(12, width);
   const outerRemoteOffset = width * 0.5 + pierWidth + Math.max(22, width * 1.8);
+  const progressiveRemoteLayouts = [];
+  if (allowRemoteOffsets) {
+    const startOffset = Math.max(outerRemoteOffset + 4, width * 2.5);
+    const maximumOffset = Math.max(64, width * 6);
+    for (let offset = startOffset; offset <= maximumOffset; offset += 4) {
+      progressiveRemoteLayouts.push([-offset, offset], [-offset], [offset]);
+    }
+  }
   const layouts = (width >= 8
     ? [[-internalOffset, internalOffset], [-externalOffset, externalOffset], [0]]
     : [[0], [-externalOffset, externalOffset]])
@@ -119,7 +127,8 @@ function compileSupportColumns(
       ? [
           [-remoteOffset, remoteOffset], [-remoteOffset], [remoteOffset],
           [-farRemoteOffset, farRemoteOffset], [-farRemoteOffset], [farRemoteOffset],
-          [-outerRemoteOffset, outerRemoteOffset], [-outerRemoteOffset], [outerRemoteOffset]
+          [-outerRemoteOffset, outerRemoteOffset], [-outerRemoteOffset], [outerRemoteOffset],
+          ...progressiveRemoteLayouts
         ]
       : []);
   for (const offsets of layouts) {
@@ -310,8 +319,8 @@ function compileElevatedAssembly(feature, sampleTerrainY, options = {}) {
     };
     const hasEndpointSupport = (endpoint) => supportStations.some((station) =>
       endpoint === 'start'
-        ? station.distance <= Math.max(18, width * 1.8)
-        : total - station.distance <= Math.max(18, width * 1.8));
+        ? station.distance <= 18
+        : total - station.distance <= 18);
     const publishTerminalSupport = (endpoint) => {
       if (endpointHasCompiledConnection(feature, endpoint) || hasEndpointSupport(endpoint)) return true;
       const maximumSetback = Math.max(18, width * 1.8);
@@ -340,7 +349,7 @@ function compileElevatedAssembly(feature, sampleTerrainY, options = {}) {
           feature,
           station,
           width,
-          baseThickness,
+          sample.thickness,
           sampleTerrainY,
           options.supportConflict,
           0.18,

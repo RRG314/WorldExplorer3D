@@ -1,6 +1,6 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 import { updateNightLighting } from "./engine/night-lighting.js?v=8";
-import { updateStableDirectionalShadow } from "./engine/shadow-policy.js?v=1";
+import { updateStableDirectionalShadow } from "./engine/shadow-policy.js?v=2";
 import { clampValue, normalizeHeading, updateBoatCamera } from "./hud/boat-camera.js?v=5";
 import {
   carSpeedToMph,
@@ -160,6 +160,24 @@ function setStreetAndLocation(roadLabel, locationLabel) {
     locationEl.textContent = clampText(normalizedLocation, 52);
     locationEl.style.display = normalizedLocation ? '' : 'none';
   }
+}
+
+function updateConditionBar(condition = 1, label = 'Explorer') {
+  const bar = document.getElementById('conditionBar');
+  const fill = document.getElementById('conditionFill');
+  if (!bar || !fill) return;
+  const value = clampValue(Number(condition), 0, 1);
+  const percent = Math.round(value * 100);
+  const state = value <= .25 ? 'critical' : value <= .6 ? 'injured' : 'healthy';
+  fill.style.width = `${percent}%`;
+  fill.dataset.state = state;
+  bar.setAttribute('aria-label', `${label} health`);
+  bar.setAttribute('aria-valuenow', String(percent));
+  bar.title = `${label} health · ${percent}%`;
+}
+
+function explorerCondition() {
+  return Number(appCtx.playerConditionAuthority?.snapshot?.().condition ?? 1);
 }
 
 function geoFromWorldXZ(worldX, worldZ) {
@@ -422,7 +440,8 @@ function updateCamera(dt = 1 / 60) {
   carLook.pitch = clampValue(carLook.pitch, -0.62, 0.62);
 
   // Normal car camera modes
-  const lb = appCtx.keys.KeyV;
+  const lookBackCode = appCtx.getControlBindingCode?.('look_back') || 'KeyQ';
+  const lb = appCtx.keys[lookBackCode];
   const planetaryChase = !!(appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId);
 
   // Get car's actual Y position (follows terrain)
@@ -567,9 +586,7 @@ function updateHUD() {
     document.getElementById('speed').classList.toggle('fast', knots >= 18);
     document.getElementById('limit').textContent = getSeaStateLabel();
     setStreetAndLocation(seaLabel, shoreline != null ? `${locationName()} • ${shoreline}m to shore` : locationName());
-    const bf = document.getElementById('boostFill');
-    bf.style.width = `${Math.max(0, Math.min(100, Math.abs(appCtx.boat.speed) / 24 * 100))}%`;
-    bf.classList.toggle('active', Math.abs(appCtx.boat.speed) > 12);
+    updateConditionBar(appCtx.boatMode?.condition ?? 1, 'Vessel');
     document.getElementById('indBrake').classList.toggle('on', !!appCtx.keys.Space);
     document.getElementById('indBoost').classList.toggle('on', Math.abs(appCtx.boat.speed) > 18);
     document.getElementById('indBoost').textContent = 'WAKE';
@@ -589,9 +606,8 @@ function updateHUD() {
     document.getElementById('speed').classList.toggle('fast', knots > 120);
     document.getElementById('limit').textContent = `${altitude}`;
     setStreetAndLocation(plane.airborne ? 'Flight' : 'Taxi', locationName());
-    const bf = document.getElementById('boostFill');
-    bf.style.width = `${Math.round(clampValue(plane.throttle, 0, 1) * 100)}%`;
-    bf.classList.toggle('active', plane.throttle > 0.82);
+    const planeIsUnlimited = plane.durabilityPolicy === 'exploration_unlimited';
+    updateConditionBar(plane.condition ?? 1, planeIsUnlimited ? 'Player plane' : 'Aircraft');
     document.getElementById('indBrake').classList.toggle('on', Number(appCtx.readControlActions?.('plane')?.brake) > 0.05 && !plane.airborne);
     document.getElementById('indBoost').classList.toggle('on', plane.throttle > 0.82);
     document.getElementById('indBoost').textContent = 'PWR';
@@ -623,9 +639,7 @@ function updateHUD() {
     document.getElementById('speed').classList.remove('fast');
     document.getElementById('limit').textContent = `${altitudeMeters}m`;
     setStreetAndLocation('Drone View', locationName());
-    const bf = document.getElementById('boostFill');
-    bf.style.width = '0%';
-    bf.classList.remove('active');
+    updateConditionBar(explorerCondition(), 'Explorer');
     document.getElementById('indBrake').classList.remove('on');
     document.getElementById('indBoost').classList.remove('on');
     document.getElementById('indDrift').classList.remove('on');
@@ -687,9 +701,7 @@ function updateHUD() {
         walkLabel,
       activeInterior ? `${locName} • On-demand` : locName
     );
-    const bf = document.getElementById('boostFill');
-    bf.style.width = '0%';
-    bf.classList.remove('active');
+    updateConditionBar(explorerCondition(), 'Explorer');
     document.getElementById('indBrake').classList.remove('on');
     document.getElementById('indBoost').classList.remove('on');
     document.getElementById('indDrift').textContent = running ? 'RUN' : 'WALK';
@@ -715,9 +727,7 @@ function updateHUD() {
   document.getElementById('limit').textContent = limit;
   const planetarySurfaceLabel = appCtx.onMars ? 'Martian Surface' : appCtx.onMoon ? 'Lunar Surface' : null;
   setStreetAndLocation(planetarySurfaceLabel || appCtx.car.road?.name || 'Exploring', locName);
-  const bf = document.getElementById('boostFill');
-  bf.style.width = appCtx.car.boost ? appCtx.car.boostTime / appCtx.CFG.boostDur * 100 + '%' : appCtx.car.boostReady ? '100%' : '0%';
-  bf.classList.toggle('active', appCtx.car.boost);
+  updateConditionBar(appCtx.car.condition ?? 1, appCtx.car.durabilityPolicy === 'exploration_unlimited' ? 'BMW' : 'Vehicle');
   document.getElementById('indBrake').classList.toggle('on', appCtx.keys.Space);
   document.getElementById('indBoost').classList.toggle('on', appCtx.car.boost);
   const isDrifting = appCtx.car.isDrifting === true && Math.abs(appCtx.car.driftAngle) > 0.08;

@@ -18,11 +18,10 @@ try {
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').modes?.space === true, null, { timeout: 180_000 });
 
   const result = await page.evaluate(async () => {
-    const [{ ctx }, { updateSpaceFlightPhysics }, { updateBlackHoleEncounter }] = await Promise.all([
-      import('/app/js/shared-context.js?v=55'),
-      import('/app/js/space/runtime.js?v=27'),
-      import('/app/js/universe/black-hole.js?v=4')
-    ]);
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    if (typeof ctx.updateSpaceFlightPhysics !== 'function' || typeof ctx.updateBlackHoleEncounter !== 'function') {
+      throw new Error('The bundled space runtime did not publish its active physics authorities.');
+    }
     cancelAnimationFrame(ctx.spaceFlight.animationId);
     ctx.spaceFlight.animationId = null;
     ctx.clearRenderedSpaceJourney?.();
@@ -43,7 +42,7 @@ try {
     ctx.spaceFlight.velocity.set(1, 0.2, -0.1);
     const velocityBeforeTurn = ctx.spaceFlight.velocity.clone();
     ctx.spaceFlight.keys.arrowleft = true;
-    updateSpaceFlightPhysics();
+    ctx.updateSpaceFlightPhysics();
     ctx.spaceFlight.keys = {};
     const velocityAfterTurn = ctx.spaceFlight.velocity.clone();
     const forwardAfterTurn = new THREE.Vector3(0, 1, 0).applyQuaternion(ctx.spaceFlight.rocket.quaternion).normalize();
@@ -59,13 +58,38 @@ try {
       ctx.spaceFlight.speed = 0;
       ctx.spaceFlight.velocity.set(0, 0, 0);
       ctx.spaceFlight.gravityVelocity.set(0, 0, 0);
-      for (let step = 0; step < 6; step += 1) updateSpaceFlightPhysics();
+      for (let step = 0; step < 6; step += 1) ctx.updateSpaceFlightPhysics();
       const toward = body.position.clone().sub(ctx.spaceFlight.rocket.position).normalize();
       samples[bodyName.toLowerCase()] = {
         speed: ctx.spaceFlight.velocity.length(),
         inwardSpeed: ctx.spaceFlight.velocity.dot(toward)
       };
     }
+
+    const earth = ctx.getAllSpaceBodies().find((entry) => String(entry.name) === 'Earth');
+    const launchOutward = new THREE.Vector3(0.61, 0.52, 0.6).normalize();
+    ctx.spaceFlight.rocket.position.copy(earth.position).addScaledVector(launchOutward, Number(earth.radius) + 8);
+    ctx.spaceFlight.rocket.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), launchOutward);
+    ctx.spaceFlight.speed = 0;
+    ctx.spaceFlight.velocity.set(0, 0, 0);
+    ctx.spaceFlight.gravityVelocity.set(0, 0, 0);
+    ctx.spaceFlight._launchSource = 'Earth';
+    ctx.spaceFlight.launchStartMs = Date.now();
+    ctx.spaceFlight.keys = {};
+    const idleLaunchDistance = ctx.spaceFlight.rocket.position.distanceTo(earth.position);
+    ctx.updateSpaceFlightPhysics();
+    const idleLaunchGravity = ctx.spaceFlight.gravityVelocity.length();
+    ctx.spaceFlight.gravityVelocity.copy(launchOutward).multiplyScalar(-2.5);
+    ctx.spaceFlight.keys = { ' ': true };
+    ctx.updateSpaceFlightPhysics();
+    ctx.spaceFlight.keys = {};
+    const launchEscape = {
+      idleDistance: idleLaunchDistance,
+      idleGravity: idleLaunchGravity,
+      distanceAfterThrust: ctx.spaceFlight.rocket.position.distanceTo(earth.position),
+      radialGravityAfterThrust: ctx.spaceFlight.gravityVelocity.dot(launchOutward)
+    };
+    ctx.spaceFlight._launchSource = null;
 
     const blackHoleGroup = new THREE.Group();
     blackHoleGroup.userData.blackHole = {
@@ -78,7 +102,7 @@ try {
     const blackHoleRocket = new THREE.Object3D();
     blackHoleRocket.position.set(0, 0, 500);
     const blackHoleVelocity = new THREE.Vector3();
-    const blackHole = updateBlackHoleEncounter(blackHoleGroup, blackHoleRocket, blackHoleVelocity, 1);
+    const blackHole = ctx.updateBlackHoleEncounter(blackHoleGroup, blackHoleRocket, blackHoleVelocity, 1);
 
     return {
       inertialVelocityBefore: velocityBeforeTurn.toArray(),
@@ -88,6 +112,7 @@ try {
       inertialPositionAfter: positionAfterTurn.toArray(),
       cameraModeButtonPresent: Boolean(document.getElementById('sfCameraBtn')),
       samples,
+      launchEscape,
       blackHole: {
         velocity: blackHoleVelocity.toArray(),
         accelerationPerSecond: blackHole.accelerationPerSecond,
@@ -103,6 +128,9 @@ try {
   assert.ok(result.samples.moon.inwardSpeed > 0, JSON.stringify(result.samples));
   assert.ok(result.samples.earth.inwardSpeed > result.samples.moon.inwardSpeed, JSON.stringify(result.samples));
   assert.ok(result.samples.jupiter.inwardSpeed > result.samples.earth.inwardSpeed, JSON.stringify(result.samples));
+  assert.equal(result.launchEscape.idleGravity, 0, JSON.stringify(result.launchEscape));
+  assert.ok(result.launchEscape.distanceAfterThrust > result.launchEscape.idleDistance, JSON.stringify(result.launchEscape));
+  assert.ok(result.launchEscape.radialGravityAfterThrust >= 0, JSON.stringify(result.launchEscape));
   assert.ok(result.blackHole.velocity[2] < 0, JSON.stringify(result.blackHole));
   assert.equal(result.blackHole.captured, false);
   assert.deepEqual(pageErrors, []);

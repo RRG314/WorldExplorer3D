@@ -1,6 +1,8 @@
 const ACTIVE_FIELD_PHASES = new Set([
   'sweeping', 'signal', 'classified', 'excavating', 'seeking', 'observing', 'revealed'
 ]);
+const AMBIENT_JOURNEY_RADIUS_METERS = 45;
+const AMBIENT_JOURNEY_VISIBLE_MS = 6500;
 
 const POD_PHASE_COPY = Object.freeze({
   ship_launch: ['Leave Solis Reach', 'Fly Pathfinder clear of the ship and acquire your local course.'],
@@ -49,28 +51,25 @@ function deriveFieldJourney(appCtx) {
   }
   const expedition = field.fieldExpedition;
   const next = expedition?.objectives?.find?.((entry) => !entry.complete);
-  if (next) {
+  if (next && Number.isFinite(Number(next.distanceMeters)) && Number(next.distanceMeters) <= AMBIENT_JOURNEY_RADIUS_METERS) {
     const distance = Number(next.distanceMeters);
     const route = Number.isFinite(distance) ? `${Math.ceil(distance)} m away` : 'Ready when you are';
     return {
-      eyebrow: expedition.completedCount > 0 ? `TODAY'S ROUTE · ${expedition.completedCount}/${expedition.objectiveCount}` : "TODAY'S ROUTE",
+      eyebrow: 'NEARBY',
       title: text(next.targetLabel, 'Choose a nearby activity'),
-      detail: `${route}. Open Today to begin this stop or choose another activity.`,
+      detail: `${route}. Open Today if you want to explore it.`,
       actionLabel: 'Open Today',
-      action: () => appCtx.openWorldDiscoverySection?.('today')
+      action: () => appCtx.openWorldDiscoverySection?.('today'),
+      transient: true
     };
   }
-  return {
-    eyebrow: 'EXPLORE THIS PLACE',
-    title: 'Choose what interests you',
-    detail: 'Find a nearby activity, continue your Journal, or plan where to travel next.',
-    actionLabel: 'Explore',
-    action: () => appCtx.openWorldDiscoverySection?.('today')
-  };
+  return null;
 }
 
 function deriveSpaceJourney(appCtx) {
   const expedition = safeSnapshot(appCtx.getInterstellarExpeditionSnapshot);
+  const destinationMission = safeSnapshot(appCtx.getDestinationMissionSnapshot);
+  const openExpedition = () => document.getElementById('sfExpeditionBtn')?.click();
   const podPhase = text(expedition?.podJourney?.phase);
   if (podPhase && POD_PHASE_COPY[podPhase]) {
     const [title, detail] = POD_PHASE_COPY[podPhase];
@@ -93,13 +92,60 @@ function deriveSpaceJourney(appCtx) {
     }
     return {
       eyebrow: 'ABOARD SURVEYOR',
-      title: expedition.state === 'planned' ? 'Prepare the Expedition' : `Continue toward ${titleCase(expedition.destinationId, 'the destination')}`,
-      detail: 'Check the current watch, speak with the crew, or use the marked station.',
+      title: expedition.state === 'completed' ? 'First Light mission complete' : expedition.state === 'planned' ? 'Prepare the Expedition' : `Continue toward ${titleCase(expedition.destinationId, 'the destination')}`,
+      detail: expedition.state === 'completed' ? 'The destination report has been published. Review the mission result or continue exploring.' : 'Check the current watch, speak with the crew, or use the marked station.',
       actionLabel: 'Ship Map',
       action: () => appCtx.toggleExpeditionShipMap?.(true)
     };
   }
   if (!appCtx.spaceFlight?.active) return null;
+  if (expedition?.state === 'completed') {
+    return {
+      eyebrow: 'MISSION SUCCESS',
+      title: 'First Light: Proxima complete',
+      detail: `${Number(expedition.campaignResult?.totalPoints || 100)} total points. Review the report or continue in Free Space Flight.`,
+      actionLabel: 'Expedition',
+      action: openExpedition
+    };
+  }
+  if (expedition?.state === 'failed') {
+    return {
+      eyebrow: 'MISSION ENDED',
+      title: text(expedition.failureReport?.summary, 'The expedition could not continue'),
+      detail: 'The mission record is preserved. Review it before explicitly preparing a new expedition.',
+      actionLabel: 'Review',
+      action: openExpedition
+    };
+  }
+  if (expedition?.state === 'arrived') {
+    const conductingMission = destinationMission && destinationMission.systemId === expedition.destinationId;
+    return {
+      eyebrow: conductingMission ? 'DESTINATION OPERATIONS' : 'FINAL APPROACH',
+      title: conductingMission ? text(destinationMission.title, 'Complete the destination survey') : `Enter ${titleCase(expedition.destinationId)}`,
+      detail: conductingMission ? text(destinationMission.currentObjective, 'Complete the required science work and return the evidence to the ship.') : 'Complete the system transfer, then begin the required Proxima b survey.',
+      actionLabel: 'Expedition',
+      action: openExpedition
+    };
+  }
+  if (expedition?.state === 'traveling') {
+    const watch = Math.min(14, Number(expedition.voyageDirector?.nextSlotIndex || 0) + (expedition.pendingEvent ? 0 : 1));
+    return {
+      eyebrow: `INTERSTELLAR TRANSIT · WATCH ${watch}/14`,
+      title: expedition.pendingEvent ? text(expedition.pendingEvent.title, 'Ship response needed') : `Continue toward ${titleCase(expedition.destinationId)}`,
+      detail: expedition.pendingEvent ? text(expedition.pendingEvent.message) : 'Advance the next watch while protecting the crew, ship systems, and arrival reserves.',
+      actionLabel: 'Expedition',
+      action: openExpedition
+    };
+  }
+  if (expedition?.state === 'planned') {
+    return {
+      eyebrow: 'FIRST LIGHT CAMPAIGN',
+      title: 'Prepare the Proxima expedition',
+      detail: 'Assess the crew, ship, propulsion, and supply reserve before departure.',
+      actionLabel: 'Expedition',
+      action: openExpedition
+    };
+  }
   const target = safeSnapshot(appCtx.getUniverseHudTarget);
   const course = target?.course;
   if (course?.destination) {
@@ -127,11 +173,18 @@ function createCurrentJourneyUi(appCtx, options = {}) {
   const title = document.getElementById('currentJourneyTitle');
   const detail = document.getElementById('currentJourneyDetail');
   const action = document.getElementById('currentJourneyAction');
+  const dismiss = document.getElementById('currentJourneyDismiss');
   let currentAction = null;
   let elapsed = 1;
   let signature = '';
+  let dismissedSignature = '';
+  let shownAt = 0;
 
   action?.addEventListener('click', () => currentAction?.());
+  dismiss?.addEventListener('click', () => {
+    dismissedSignature = signature;
+    if (card) card.hidden = true;
+  });
 
   function update(dt = 0) {
     elapsed += Math.max(0, Number(dt) || 0);
@@ -151,16 +204,26 @@ function createCurrentJourneyUi(appCtx, options = {}) {
     const nextSignature = [journey.eyebrow, journey.title, journey.detail, journey.actionLabel].join('|');
     if (nextSignature !== signature) {
       signature = nextSignature;
+      shownAt = Date.now();
       if (eyebrow) eyebrow.textContent = journey.eyebrow;
       if (title) title.textContent = journey.title;
       if (detail) detail.textContent = journey.detail;
       if (action) action.textContent = journey.actionLabel;
     }
     currentAction = journey.action;
-    if (card) card.hidden = false;
+    const preferredVisibleMs = globalThis.getWorldExplorerAccessibilityNoticeMs?.(AMBIENT_JOURNEY_VISIBLE_MS)
+      ?? AMBIENT_JOURNEY_VISIBLE_MS;
+    const expired = journey.transient === true && Number.isFinite(preferredVisibleMs) && Date.now() - shownAt >= preferredVisibleMs;
+    if (card) card.hidden = dismissedSignature === signature || expired;
   }
 
   return Object.freeze({ update });
 }
 
-export { createCurrentJourneyUi };
+export {
+  AMBIENT_JOURNEY_RADIUS_METERS,
+  AMBIENT_JOURNEY_VISIBLE_MS,
+  createCurrentJourneyUi,
+  deriveFieldJourney,
+  deriveSpaceJourney
+};

@@ -1,5 +1,5 @@
 import { getCurrentUserToken } from './auth-ui.js?v=55';
-import { readFirebaseConfig } from './firebase-init.js?v=56';
+import { getFirebaseAppCheckToken, readFirebaseConfig } from './firebase-init.js?v=57';
 
 const DEFAULT_FUNCTIONS_REGION = 'us-central1';
 const RETRYABLE_STATUS_CODES = new Set([404, 405, 406, 501, 502, 503, 504]);
@@ -83,8 +83,54 @@ function unavailableFunctionError(path, attempts = [], label = 'API') {
   );
 }
 
+export async function postAppCheckedFunction(path, body = {}, options = {}) {
+  const appCheckToken = await getFirebaseAppCheckToken();
+  const candidates = buildFunctionCandidates(path);
+  const attempts = [];
+  const label = String(options.label || 'API');
+  for (let i = 0; i < candidates.length; i += 1) {
+    const url = candidates[i];
+    const isLast = i === candidates.length - 1;
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(appCheckToken ? { 'X-Firebase-AppCheck': appCheckToken } : {}),
+          ...(options.headers || {})
+        },
+        body: JSON.stringify(body)
+      });
+      const rawText = await res.text();
+      let payload = null;
+      if (rawText) {
+        try { payload = JSON.parse(rawText); } catch { payload = null; }
+      }
+      attempts.push({ url, status: res.status });
+      if (!isJsonResponse(res, rawText)) {
+        if (!isLast) continue;
+        throw unavailableFunctionError(path, attempts, label);
+      }
+      if (isRetryableFunctionStatus(res.status) && !isLast) continue;
+      if (!res.ok) {
+        if (isRetryableFunctionStatus(res.status)) throw unavailableFunctionError(path, attempts, label);
+        const error = new Error(payload?.error || `Request failed (${res.status})`);
+        error.status = res.status;
+        error.payload = payload;
+        throw error;
+      }
+      return payload || {};
+    } catch (error) {
+      if (!isLast && !error?.status) continue;
+      throw error;
+    }
+  }
+  throw unavailableFunctionError(path, attempts, label);
+}
+
 export async function postProtectedFunction(path, body = {}, options = {}) {
   const token = await getCurrentUserToken(options.forceRefreshToken !== false);
+  const appCheckToken = await getFirebaseAppCheckToken();
   const candidates = buildFunctionCandidates(path);
   let lastError = null;
   const attempts = [];
@@ -101,6 +147,7 @@ export async function postProtectedFunction(path, body = {}, options = {}) {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
+          ...(appCheckToken ? { 'X-Firebase-AppCheck': appCheckToken } : {}),
           ...(options.headers || {})
         },
         body: JSON.stringify(body)
@@ -130,8 +177,10 @@ export async function postProtectedFunction(path, body = {}, options = {}) {
         if (isRetryableFunctionStatus(res.status)) {
           throw unavailableFunctionError(path, attempts, label);
         }
-        const message = payload && payload.error ? payload.error : `Request failed (${res.status})`;
-        throw new Error(message);
+        const error = new Error(payload?.error || `Request failed (${res.status})`);
+        error.status = res.status;
+        error.payload = payload;
+        throw error;
       }
 
       return payload || {};

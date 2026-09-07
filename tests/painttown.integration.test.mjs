@@ -128,13 +128,22 @@ async function runGunPhysicsCheck(page) {
   const snapshot = () => page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().paintTown || {});
   await page.locator('#paintTownHud button[data-paint-tool="gun"]').click();
   const before = await snapshot();
-  await page.keyboard.press('Control');
-  await page.waitForFunction(() => Number(globalThis.getWorldExplorerRuntimeDiagnostics?.().paintTown?.paintballs || 0) > 0, null, { timeout: 2_000 });
-  const launched = await snapshot();
+  let launched;
+  await page.keyboard.down('ControlLeft');
+  try {
+    await page.waitForFunction((previousShotAt) =>
+      Number(globalThis.getWorldExplorerRuntimeDiagnostics?.().paintTown?.lastShotAtMs || 0) > Number(previousShotAt || 0),
+    Number(before.lastShotAtMs || 0), { timeout: 2_000 });
+    launched = await snapshot();
+  } finally {
+    await page.keyboard.up('ControlLeft');
+  }
   await page.waitForFunction(() => Number(globalThis.getWorldExplorerRuntimeDiagnostics?.().paintTown?.paintballs || 0) === 0, null, { timeout: 8_000 });
   const after = await snapshot();
   return {
-    fired: Number(launched.paintballs || 0) > 0,
+    fired: Number(launched.lastShotAtMs || 0) > Number(before.lastShotAtMs || 0),
+    lastShotAtBefore: Number(before.lastShotAtMs || 0),
+    lastShotAtAfter: Number(launched.lastShotAtMs || 0),
     projectileExpired: Number(after.paintballs || 0) === 0,
     claimsBaseline: before.claims?.length || 0,
     claimsAfter: after.claims?.length || 0,
@@ -206,6 +215,8 @@ async function run() {
     await server?.close();
     fs.writeFileSync(REPORT_PATH, JSON.stringify(report, null, 2));
   }
+
+  console.log(JSON.stringify(report, null, 2));
 
   if (!report.pass) {
     process.exitCode = 1;

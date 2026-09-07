@@ -2,9 +2,9 @@ import { ctx as appCtx } from "./shared-context.js?v=55";
 import { getPrimaryWorldCanvas } from "./engine/webgl-lifecycle.js?v=2";
 import { captureEarthWorldSession } from "./earth-session.js?v=17";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
-import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=30";
-import { createSpaceFlightScene, destroySpaceFlightScene, ensureSolisReachDockTarget, ensureExtendedSpaceScene, getSolisReachDockTarget, orientActiveCraftForAtmosphere, orientActiveCraftTowardSolisReach, positionSpacecraftAtSolisReachDock, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon, setExpeditionPodFlightPresentation, setSolisReachFlightPresentation, updateExpeditionPodFlightPresentation } from "./space/scene.js?v=47";
-import { hideGameUI, initSpaceFlightUI, prepareSpaceFlightHudForEntry, setSpaceFlightHudCollapsed, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=50";
+import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime, updateSpaceFlightPhysics } from "./space/runtime.js?v=34";
+import { createSpaceFlightScene, destroySpaceFlightScene, ensureSolisReachDockTarget, ensureExtendedSpaceScene, getSolisReachDockTarget, orientActiveCraftForAtmosphere, orientActiveCraftTowardSolisReach, positionSpacecraftAtSolisReachDock, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon, setExpeditionPodFlightPresentation, setSolisReachFlightPresentation, updateExpeditionPodFlightPresentation } from "./space/scene.js?v=54";
+import { hideGameUI, initSpaceFlightUI, prepareSpaceFlightHudForEntry, setSpaceFlightHudCollapsed, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=52";
 import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 import {
   beginEnvironmentTransition,
@@ -13,7 +13,7 @@ import {
 } from './session-coordinator.js?v=2';
 import { installSpaceJourneyRuntime } from './space/journey-runtime.js?v=11';
 import { resolveCompletedLandingTarget } from './space/landing-target.js?v=2';
-import { playSurfacePodLaunch } from './planetary/surface-pod-launch.js?v=8';
+import { playSurfacePodLaunch } from './planetary/surface-pod-launch.js?v=11';
 import { SPACE_CRAFT_IDENTITY } from './space/craft-identity.js?v=1';
 import {
   installSpaceTravelSession,
@@ -21,6 +21,7 @@ import {
   SPACE_TRAVEL_LOCATION,
   SPACE_TRAVEL_PHASE
 } from './space/travel-session.js?v=1';
+import { createPirateInterceptionRuntime } from './space/pirate-interception-runtime.js?v=1';
 
 function emitTutorialEvent(eventName, payload = {}) {
   if (typeof appCtx.tutorialOnEvent === 'function') {
@@ -69,9 +70,10 @@ installSpaceJourneyRuntime(appCtx);
 let spaceSessionScope = null;
 const spaceModuleScope = createLifecycleScope('space-module');
 let expeditionRuntimeModulePromise = null;
+let pirateInterceptionRuntime = null;
 
 function prepareSolisReachSurfaceRendezvous(bodyId) {
-  expeditionRuntimeModulePromise ||= import('./expedition/runtime.js?v=44');
+  expeditionRuntimeModulePromise ||= import('./expedition/runtime.js?v=51');
   return expeditionRuntimeModulePromise.then((runtime) => runtime.prepareSolisReachSurfaceRendezvous?.(appCtx, bodyId) === true);
 }
 
@@ -272,6 +274,7 @@ function startSpaceFlightToMoon(options = {}) {
       phase: freeFlight ? SPACE_TRAVEL_PHASE.FREE_FLIGHT : SPACE_TRAVEL_PHASE.ASCENT,
       reason: freeFlight ? 'free-flight-ready' : 'earth-ascent-ready'
     });
+    appCtx.setPauseReason?.('planetary_transition', false);
     showFlightMessage(freeFlight ? 'FREE SPACE FLIGHT READY · OPEN WAYFINDER TO SET A COURSE' : 'SPACE FLIGHT READY', '#10b981');
   }, 1000);
   return true;
@@ -279,6 +282,34 @@ function startSpaceFlightToMoon(options = {}) {
 
 function startFreeSpaceFlight() {
   return startSpaceFlightToMoon({ freeFlight: true });
+}
+
+async function startExpeditionPirateInterception(encounter, hooks = {}) {
+  if (!encounter) return false;
+  if (appCtx.activeShipInterior) appCtx.exitExpeditionShipInterior?.();
+  if (!appCtx.spaceFlight.active) {
+    if (!startFreeSpaceFlight()) return false;
+    await new Promise((resolve) => spaceModuleScope.timeout(resolve, 1050));
+  }
+  if (!appCtx.spaceFlight.scene || !appCtx.spaceFlight.rocket || !pirateInterceptionRuntime) return false;
+  appCtx.releaseRenderedJourneyToManualFlight?.();
+  appCtx.hideSolarSystemUI?.();
+  appCtx.hideUniverseUI?.();
+  appCtx.updateSpaceTravelSession?.({
+    activeCraftId: SPACE_CRAFT_IDENTITY.pod.id,
+    location: SPACE_TRAVEL_LOCATION.LOCAL_SPACE,
+    phase: SPACE_TRAVEL_PHASE.FREE_FLIGHT,
+    guidance: SPACE_GUIDANCE_MODE.MANUAL,
+    destination: { id: SPACE_CRAFT_IDENTITY.starship.id, kind: 'defense', name: `${SPACE_CRAFT_IDENTITY.starship.name} defense perimeter` },
+    reason: 'pirate-interception-defense-launched'
+  });
+  setExpeditionPodFlightPresentation(true);
+  appCtx.spaceFlight.mode = 'flying';
+  appCtx.spaceFlight._manualLandingTarget = null;
+  appCtx.spaceFlight._autopilotTarget = null;
+  appCtx.spaceFlight._launchSource = null;
+  if (appCtx.spaceFlight.solisReachDockTarget) appCtx.spaceFlight.solisReachDockTarget.visible = false;
+  return pirateInterceptionRuntime.begin(encounter, hooks);
 }
 
 function startSpaceFlightToSolisReach(options = {}) {
@@ -646,6 +677,8 @@ function completeLanding(sessionId = appCtx.spaceFlight._sessionId) {
 function exitSpaceFlight(source = 'runtime') {
   console.log('Exiting space flight...', String(source || 'runtime'));
 
+  pirateInterceptionRuntime?.stop?.('space-flight-exit');
+
   appCtx.spaceFlight.active = false;
   appCtx.endSpaceTravelSession?.(source || 'space-flight-exit');
   spaceSessionScope?.dispose('space-flight-exit');
@@ -706,6 +739,11 @@ function initSpaceFlightWhenReady() {
     configureSpaceRuntimeDependencies({ THREE: globalThis.THREE });
     console.log("Space Flight module loaded!");
     initSpaceFlightUI(attemptLanding, spaceModuleScope);
+    pirateInterceptionRuntime ||= createPirateInterceptionRuntime(appCtx);
+    appCtx.pirateInterceptionRuntime = pirateInterceptionRuntime;
+    appCtx.startExpeditionPirateInterception = startExpeditionPirateInterception;
+    appCtx.updatePirateInterception = (dtS) => pirateInterceptionRuntime?.update?.(dtS) === true;
+    appCtx.getPirateInterceptionSnapshot = () => pirateInterceptionRuntime?.snapshot?.() || { active: false, phase: 'INACTIVE' };
   } else {
     spaceModuleScope.timeout(initSpaceFlightWhenReady, 100);
   }
@@ -732,8 +770,10 @@ Object.assign(appCtx, {
   startSpaceFlightFromExpeditionSurface,
   startSpaceFlightToMars,
   startSpaceFlightToSolisReach,
+  startExpeditionPirateInterception,
   startFreeSpaceFlight,
-  startSpaceFlightToMoon
+  startSpaceFlightToMoon,
+  updateSpaceFlightPhysics
 });
 
 export {
@@ -755,6 +795,7 @@ export {
   startSpaceFlightFromExpeditionSurface,
   startSpaceFlightToMars,
   startSpaceFlightToSolisReach,
+  startExpeditionPirateInterception,
   startFreeSpaceFlight,
   startSpaceFlightToMoon
 };

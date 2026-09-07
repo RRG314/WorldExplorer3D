@@ -3,26 +3,45 @@ import { carSpeedToMph, mphToCarSpeed } from '../physics/vehicle-speed-units.js?
 import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleMassKg } from '../engine/vehicle-catalog.js?v=6';
 import { applyTransportDamage } from '../transport/damage-model.js?v=1';
 import { createCivicResponseModel } from './civic-response-model.js?v=3';
-import { ensurePlayerBackpackInventory } from './equipment-model.js?v=9';
-import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=22';
-import { createEquipmentVisuals } from './equipment-visuals.js?v=3';
-import { createUrbanNpcVisual } from './npc-visuals.js?v=7';
+import { ensurePlayerBackpackInventory } from './equipment-model.js?v=10';
+import { createUrbanEquipmentRuntime } from './equipment-runtime.js?v=24';
+import { createEquipmentVisuals } from './equipment-visuals.js?v=10';
+import {
+  attachCuratedEquipmentVisual,
+  disposeCuratedEquipmentVisual
+} from './curated-equipment-visual.js?v=2';
+import { createUrbanNpcVisual } from './npc-visuals.js?v=9';
 import { nearestMappedFacility } from './facility-model.js?v=3';
 import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=4';
-import { createUrbanResponderRuntime } from './responder-runtime.js?v=19';
+import { createUrbanResponderRuntime } from './responder-runtime.js?v=29';
 import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=7';
-import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=9';
+import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=11';
+import {
+  attachCuratedTrafficVehicle,
+  CURATED_TRAFFIC_ASSET_BY_VARIANT,
+  disposeCuratedTrafficVehicle
+} from './curated-traffic-vehicle.js?v=4';
 import { applyConditionImpact } from './impact-model.js?v=1';
 import { dampCrashMotion, resolveCrashImpact } from './crash-physics.js?v=1';
 import { sampleSweptContact } from '../physics/swept-contact.js?v=1';
-import { createLocalCommerceModel, mappedCommercePlaces } from './commerce-model.js?v=3';
+import { createLocalCommerceModel, mappedCommercePlaces } from './commerce-model.js?v=5';
+import { createConnectedExplorerWallet } from '../economy/connected-wallet-authority.js?v=2';
+import { ensurePlayerConditionAuthority } from '../player/condition-model.js?v=1';
+import { createConnectedPlayerState } from '../player/connected-player-state.js?v=1';
+import { ensureVehicleUpgradeStore, parseUpgradeServiceId, stableVehicleIdentity } from '../transport/vehicle-upgrades.js?v=1';
+import { getCurrentUser } from '../../../js/auth-ui.js?v=55';
 import { emitProductTelemetry } from '../platform/product-telemetry.js?v=1';
 import { claimLootPickup, createLootPickup } from './loot-pickup-model.js?v=1';
 import { NPC_COMBAT_STATES, resolveNpcCombatState } from './npc-combat-policy.js?v=2';
 import { ENTITY_LIFECYCLE_MS, lifecycleExpired, markLifecycleStart } from '../runtime/entity-lifecycle-policy.js?v=1';
-import { saveExplorerAppearanceId } from '../characters/explorer-appearance.js?v=1';
+import {
+  attachCuratedExplorerCharacter,
+  disposeCuratedCharacter,
+  NEARBY_NPC_ASSET_IDS,
+  updateCuratedCharacterAnimation
+} from '../walking/curated-explorer-character.js?v=8';
 
-const ENTER_DISTANCE = 3.4;
+const ENTER_DISTANCE = 2.8;
 // Room clients can assemble slightly different collision envelopes when a live
 // map-provider request succeeds for one player and falls back for another. A
 // released authoritative vehicle keeps its shared pose, but the receiving
@@ -32,7 +51,7 @@ const ROOM_RECONCILIATION_ENTER_DISTANCE = 6.5;
 const EXIT_SPEED_LIMIT = 4;
 const TRANSITION_DURATION = 0.56;
 const NPC_INTERACTION_DISTANCE = 3.2;
-// The instanced population remains the single far/mid-distance owner. Promote
+// The curated ambient population remains the single far/mid-distance owner. Promote
 // the closest people before they enter conversational range so the player
 // never sees the old coarse silhouette switch only after pressing Interact.
 // Keep the authoritative instanced population for the long-range world, but
@@ -41,6 +60,8 @@ const NPC_INTERACTION_DISTANCE = 3.2;
 // for too long before the detailed actor took ownership.
 const NPC_DETAIL_PRELOAD_DISTANCE = 140;
 const NPC_DETAIL_RELEASE_DISTANCE = 174;
+const NPC_DRIVING_PRELOAD_DISTANCE = 280;
+const NPC_DRIVING_RELEASE_DISTANCE = 330;
 const VEHICLE_DETAIL_PRELOAD_DISTANCE = 120;
 const VEHICLE_DETAIL_RELEASE_DISTANCE = 180;
 const STORE_INTERACTION_DISTANCE = 4.8;
@@ -55,6 +76,11 @@ function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>'"]/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
   })[char]);
+}
+
+function formatExplorerDollars(value) {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+    .format(Math.max(0, Math.round(Number(value) || 0)));
 }
 
 function isTouchClient() {
@@ -661,35 +687,16 @@ function createLootPickupVisual(THREE, pickup) {
   const root = new THREE.Group();
   root.name = `World loot pickup ${pickup.catalogId}`;
   root.userData.worldLootPickupId = pickup.id;
-  const geometries = [
-    new THREE.TorusGeometry(.34, .035, 8, 24),
-    new THREE.BoxGeometry(.12, .12, .38),
-    new THREE.BoxGeometry(.09, .19, .12),
-    new THREE.BoxGeometry(.28, .13, .2)
-  ];
-  const materials = [
-    new THREE.MeshBasicMaterial({ color: 0x76c9ff, transparent: true, opacity: .72, depthWrite: false }),
-    new THREE.MeshStandardMaterial({ color: 0x263944, emissive: 0x16394d, emissiveIntensity: .65, roughness: .46, metalness: .34 }),
-    new THREE.MeshStandardMaterial({ color: 0x796a48, roughness: .74, metalness: .08 })
-  ];
-  const ring = new THREE.Mesh(geometries[0], materials[0]);
-  ring.rotation.x = -Math.PI * .5;
-  const body = new THREE.Mesh(geometries[1], materials[1]);
-  body.position.set(0, .18, 0);
-  body.rotation.x = Math.PI * .5;
-  const grip = new THREE.Mesh(geometries[2], materials[1]);
-  grip.position.set(-.03, .08, -.08);
-  grip.rotation.x = -.18;
-  const ammo = new THREE.Mesh(geometries[3], materials[2]);
-  ammo.position.set(.28, .08, .05);
-  root.add(ring, body, grip, ammo);
+  root.userData.equipmentPresentation = 'curated-only-local-model';
+  root.userData.proceduralEquipmentMeshCount = 0;
   root.position.set(pickup.position.x, pickup.position.y + .12, pickup.position.z);
+  root.rotation.set(0, 0, Math.PI * .5);
+  void attachCuratedEquipmentVisual(THREE, root, pickup.catalogId);
   return Object.freeze({
     root,
     dispose() {
+      disposeCuratedEquipmentVisual(root);
       root.removeFromParent?.();
-      geometries.forEach((geometry) => geometry.dispose?.());
-      materials.forEach((material) => material.dispose?.());
     }
   });
 }
@@ -802,6 +809,23 @@ function nearestStoreCandidate(state, radius = STORE_INTERACTION_DISTANCE) {
     .sort((left, right) => left.distance - right.distance)[0] || null;
 }
 
+function nearestMechanicCandidate(state, radius = STORE_INTERACTION_DISTANCE) {
+  if (!activeWorldMatches(state) || state.transition || appCtx.activeInterior || state.storeOpen) return null;
+  const actor = state.activeVehicle && appCtx.Walk?.state?.mode !== 'walk' ? appCtx.car : appCtx.Walk?.state?.walker;
+  if (!actor || (state.activeVehicle && Math.abs(Number(appCtx.car?.speed || 0)) > EXIT_SPEED_LIMIT)) return null;
+  return state.stores
+    .filter((store) => store.kind === 'mechanic')
+    .map((store) => ({ store, distance: Math.hypot(store.x - Number(actor.x || 0), store.z - Number(actor.z || 0)) }))
+    .filter((entry) => entry.distance <= radius)
+    .sort((left, right) => left.distance - right.distance || left.store.id.localeCompare(right.store.id))[0] || null;
+}
+
+function openNearbyMechanic(state) {
+  const nearest = nearestMechanicCandidate(state);
+  if (!nearest) return false;
+  return openStore(state, nearest.store.id, { allowVehicle: true });
+}
+
 function storeInteractionCandidate(state) {
   if (!activeWorldMatches(state) || state.transition || appCtx.activeInterior || state.storeOpen) return null;
   const nearestStore = nearestStoreCandidate(state);
@@ -821,11 +845,25 @@ function activeStore(state) {
   return store ? resolvedStoreApproach(state, store) : null;
 }
 
-function resolveStoreApproach(store) {
-  const candidates = [{ x: store.x, z: store.z }];
-  [3, 5, 7, 9, 12].forEach((radius) => {
-    for (let index = 0; index < 12; index += 1) {
-      const angle = index / 12 * Math.PI * 2;
+function stableStoreApproachAngle(storeId) {
+  let hash = 2166136261;
+  for (const character of String(storeId || '')) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return ((hash >>> 0) / 0xffffffff) * Math.PI * 2;
+}
+
+function resolveStoreApproach(state, store) {
+  const nearbyStoreCount = state.stores.filter((candidate) => (
+    candidate.id !== store.id && Math.hypot(candidate.x - store.x, candidate.z - store.z) < STORE_INTERACTION_DISTANCE * 1.5
+  )).length;
+  const candidates = nearbyStoreCount === 0 ? [{ x: store.x, z: store.z }] : [];
+  const angleOffset = stableStoreApproachAngle(store.id);
+  [3, 5, 7, 9, 12, 16, 22, 30, 42, 60].forEach((radius) => {
+    const sampleCount = radius >= 16 ? 24 : 12;
+    for (let index = 0; index < sampleCount; index += 1) {
+      const angle = angleOffset + index / sampleCount * Math.PI * 2;
       candidates.push({ x: store.x + Math.cos(angle) * radius, z: store.z + Math.sin(angle) * radius });
     }
   });
@@ -849,7 +887,7 @@ function resolvedStoreApproach(state, store) {
   if (!store) return null;
   const cached = state.storeApproaches.get(store.id);
   if (cached) return cached;
-  const resolved = resolveStoreApproach(store);
+  const resolved = resolveStoreApproach(state, store);
   state.storeApproaches.set(store.id, resolved);
   return resolved;
 }
@@ -874,13 +912,30 @@ function commerceFailureMessage(reason) {
   return {
     not_in_today_stock: 'That item is not in today’s stock.',
     sold_out: 'That item is sold out here today.',
-    not_enough_credits: 'Not enough Explorer Credits.',
+    not_enough_credits: 'Not enough money in your Explorer wallet.',
     not_sellable: 'That Backpack item cannot be sold here.',
     store_not_authorized_for_item: 'This business does not trade that type of item.',
     already_traded_today: 'This store’s rare trade is complete for today.',
     missing_trade_items: 'The Backpack does not have the requested trade items.',
-    inventory_unavailable: 'The Backpack could not complete that exchange.'
+    inventory_unavailable: 'The Backpack could not complete that exchange.',
+    item_not_wallet_verified: 'Only items recorded by your Explorer Wallet can be sold while signed in.',
+    connected_trade_unavailable: 'Rare counter trades are paused while their one-wallet receipt flow is completed.',
+    service_not_available: 'That service is not available at this mapped place.',
+    service_target_unavailable: 'Bring the relevant vehicle or companion into the world before using that service.',
+    service_effect_failed_refunded: 'The service could not be applied, so the Explorer Wallet charge was refunded.',
+    settlement_recovery_required: 'The service is safely recorded and will finish recovery when the Explorer Wallet reconnects.',
+    delivery_recovery_required: 'The wallet record is safe, but the Backpack is still syncing this item.',
+    wallet_unavailable: 'Your Explorer Wallet is reconnecting. Nothing was charged.'
   }[String(reason || '')] || 'That exchange could not be completed.';
+}
+
+function poiServiceTargetAvailable(state, serviceId) {
+  if (serviceId === 'companion-wellness') return Boolean(appCtx.worldDiscoveryRuntime?.companionRuntime?.snapshot?.().activeInstanceId);
+  if (serviceId === 'player-treatment') return Number(state.playerCondition ?? 1) < .999;
+  if (serviceId === 'vehicle-full-repair') return Number((state.activeVehicle || appCtx.car)?.condition ?? 1) < .999;
+  if (serviceId === 'vessel-full-repair') return Boolean(appCtx.boatMode?.transportEntityId) && Number(appCtx.boatMode?.condition ?? 1) < .999;
+  if (parseUpgradeServiceId(serviceId)) return state.vehicleUpgradeStore.canApply(state.activeVehicle || appCtx.car, serviceId);
+  return false;
 }
 
 function renderStore(state) {
@@ -893,31 +948,44 @@ function renderStore(state) {
   const view = state.commerce.snapshot(store);
   ui.name.textContent = store.name;
   ui.source.textContent = `${store.label} · game stock · ${store.attribution} · ${store.license}`;
-  ui.credits.textContent = `${view.credits} Explorer Credits`;
+  ui.credits.textContent = formatExplorerDollars(view.credits);
+  const availableServices = view.services.filter((service) => (
+    !parseUpgradeServiceId(service.id) || state.vehicleUpgradeStore.canApply(state.activeVehicle || appCtx.car, service.id)
+  ));
+  ui.servicesSection.hidden = availableServices.length === 0;
+  ui.services.innerHTML = availableServices.map((service) => {
+    const eligible = poiServiceTargetAvailable(state, service.id);
+    return `<article class="urbanStoreCard service">
+      <strong>${escapeHtml(service.label)}</strong>
+      <small>${escapeHtml(service.description)}${eligible ? '' : ' · No service needed or target available.'}</small>
+      <button type="button" data-store-action="service" data-store-item="${escapeHtml(service.id)}"${!eligible || view.credits < service.price ? ' disabled' : ''}>Use service · ${formatExplorerDollars(service.price)}</button>
+    </article>`;
+  }).join('');
   ui.stock.innerHTML = view.standard.map((item) => `
     <article class="urbanStoreCard">
       <strong>${escapeHtml(item.label)}</strong>
       <small>${escapeHtml(item.description)} · ${item.remaining} left today</small>
-      <button type="button" data-store-action="buy" data-store-item="${escapeHtml(item.id)}"${item.remaining <= 0 || view.credits < item.buyPrice ? ' disabled' : ''}>Buy · ${item.buyPrice} credits</button>
+      <button type="button" data-store-action="buy" data-store-item="${escapeHtml(item.id)}"${item.remaining <= 0 || view.credits < item.buyPrice ? ' disabled' : ''}>Buy · ${formatExplorerDollars(item.buyPrice)}</button>
     </article>`).join('');
   ui.sell.innerHTML = view.sellable.length ? view.sellable.map((item) => `
     <article class="urbanStoreCard">
       <strong>${escapeHtml(item.label)}</strong>
       <small>${item.quantity} in Backpack</small>
-      <button type="button" data-store-action="sell" data-store-item="${escapeHtml(item.instanceId)}">Sell one · ${item.sellPrice} credits</button>
+      <button type="button" data-store-action="sell" data-store-item="${escapeHtml(item.instanceId)}">Sell one · ${formatExplorerDollars(item.sellPrice)}</button>
     </article>`).join('') : '<div class="urbanBackpackEmpty">No store goods available to sell</div>';
   const rare = view.rare;
   ui.rare.innerHTML = `<article class="urbanStoreCard rare">
     <strong>${escapeHtml(rare.item.label)}</strong>
-    <small>One trade per store today · ${rare.requirementQuantity} ${escapeHtml(rare.requirement.label)} + ${rare.credits} credits · carrying ${rare.requirementCarried}</small>
+    <small>One trade per store today · ${rare.requirementQuantity} ${escapeHtml(rare.requirement.label)} + ${formatExplorerDollars(rare.credits)} · carrying ${rare.requirementCarried}</small>
     <button type="button" data-store-action="trade"${rare.available ? '' : ' disabled'}>${rare.claimed ? 'Trade complete today' : 'Make rare trade'}</button>
   </article>`;
   ui.status.textContent = state.storeStatus;
 }
 
-function openStore(state, storeId) {
+function openStore(state, storeId, options = {}) {
   const store = state.stores.find((entry) => entry.id === String(storeId || ''));
-  if (!store || appCtx.Walk?.state?.mode !== 'walk') return false;
+  const walking = appCtx.Walk?.state?.mode === 'walk';
+  if (!store || (!walking && !(options.allowVehicle === true && store.kind === 'mechanic'))) return false;
   state.equipmentRuntime?.toggle?.(false);
   state.activeStoreId = store.id;
   state.storeOpen = true;
@@ -940,23 +1008,40 @@ function closeStore(state) {
   return true;
 }
 
-function handleStoreAction(state, event) {
+async function handleStoreAction(state, event) {
   const button = event.target?.closest?.('[data-store-action]');
   const store = activeStore(state);
   if (!button || !store) return false;
   const action = button.dataset.storeAction;
-  const result = action === 'buy'
+  if (action === 'service' && !poiServiceTargetAvailable(state, button.dataset.storeItem)) {
+    state.storeStatus = commerceFailureMessage('service_target_unavailable');
+    renderStore(state);
+    return true;
+  }
+  state.storeStatus = 'Completing wallet transaction…';
+  renderStore(state);
+  const result = await (action === 'buy'
     ? state.commerce.buy(store, button.dataset.storeItem)
     : action === 'sell'
       ? state.commerce.sell(store, button.dataset.storeItem)
-      : action === 'trade' ? state.commerce.trade(store) : null;
+      : action === 'trade' ? state.commerce.trade(store)
+        : action === 'service' ? state.commerce.service(
+          store,
+          button.dataset.storeItem,
+          (service, receiptId) => applyPoiService(state, service, receiptId),
+          parseUpgradeServiceId(button.dataset.storeItem)
+            ? { targetId: stableVehicleIdentity(state.activeVehicle || appCtx.car) }
+            : {}
+        ) : null);
   if (!result) return false;
   state.storeStatus = result.ok
     ? action === 'sell'
-      ? `${result.item.label} sold · ${result.credits} credits available`
+      ? `${result.item.label} sold · ${formatExplorerDollars(result.credits)} available`
       : action === 'trade'
         ? `${result.item.label} added to Backpack · rare trade complete`
-        : `${result.item.label} added to Backpack · ${result.credits} credits available`
+        : action === 'service'
+          ? `${result.service.label} complete · ${formatExplorerDollars(result.credits)} available`
+        : `${result.item.label} added to Backpack · ${formatExplorerDollars(result.credits)} available`
     : commerceFailureMessage(result.reason);
   if (result.ok) {
     emitProductTelemetry('local_store_exchange', {
@@ -969,14 +1054,64 @@ function handleStoreAction(state, event) {
   return true;
 }
 
+async function applyPoiService(state, service, receiptId = '') {
+  if (service?.id === 'player-treatment' && Number(state.playerCondition ?? 1) < .999) {
+    state.playerCondition = 1;
+    return true;
+  }
+  if (service?.id === 'vehicle-full-repair') {
+    const vehicle = state.activeVehicle || appCtx.car;
+    if (!vehicle || Number(vehicle.condition ?? 1) >= .999) return false;
+    vehicle.condition = 1;
+    if (state.activeVehicle) state.activeVehicle.visual?.setCondition?.(1);
+    if (appCtx.car) appCtx.car.condition = 1;
+    return true;
+  }
+  if (service?.id === 'vessel-full-repair' && appCtx.boatMode?.transportEntityId && Number(appCtx.boatMode?.condition ?? 1) < .999) {
+    appCtx.boatMode.condition = 1;
+    return true;
+  }
+  if (service?.id === 'companion-wellness') {
+    const runtime = appCtx.worldDiscoveryRuntime?.companionRuntime;
+    const activeId = runtime?.snapshot?.().activeInstanceId;
+    if (!runtime || !activeId) return false;
+    await runtime.care(activeId, 'feed');
+    await runtime.awardXp({ receiptId: `poi-care:${receiptId || Date.now()}`, reasonId: 'care-after-outing' });
+    return true;
+  }
+  if (parseUpgradeServiceId(service?.id)) {
+    const target = state.activeVehicle || appCtx.car;
+    const result = state.vehicleUpgradeStore.apply(target, service.id);
+    if (!result.ok) return false;
+    appCtx.car.upgradeState = state.vehicleUpgradeStore.snapshot(target);
+    state.lastAction = Object.freeze({
+      type: 'vehicle_upgrade_installed',
+      vehicleId: result.vehicleId,
+      upgradeId: result.upgradeId,
+      level: result.level,
+      receiptId,
+      at: now()
+    });
+    return true;
+  }
+  return false;
+}
+
 function releasePromotedNpc(state, npc, options = {}) {
   const index = state.npcs.indexOf(npc);
   if (index < 0) return false;
   if (options.retire === true) state.population?.retirePedestrian?.(npc.sourceAgentId);
   else state.population?.releasePedestrian?.(npc.sourceAgentId);
   npc.visual.dispose();
+  state.curatedNpcAssetOwners.delete(npc.id);
   state.npcs.splice(index, 1);
   return true;
+}
+
+function selectCuratedNpcAsset(state) {
+  const start = state.curatedNpcAssetCursor % NEARBY_NPC_ASSET_IDS.length;
+  state.curatedNpcAssetCursor = (start + 1) % NEARBY_NPC_ASSET_IDS.length;
+  return NEARBY_NPC_ASSET_IDS[start] || null;
 }
 
 function promotePedestrian(state, source) {
@@ -1029,6 +1164,24 @@ function promotePedestrian(state, source) {
   visual.root.rotation.set(0, promoted.yaw, 0);
   state.group.add(visual.root);
   state.npcs.push(npc);
+  const curatedAssetId = selectCuratedNpcAsset(state);
+  if (curatedAssetId) {
+    state.curatedNpcAssetOwners.set(npc.id, curatedAssetId);
+    visual.root.userData.disposeCuratedCharacter = () => disposeCuratedCharacter(visual.root);
+    visual.root.userData.updateCuratedCharacterAnimation = (moving, deltaTime, running) =>
+      updateCuratedCharacterAnimation(visual.root, moving, deltaTime, running);
+    void attachCuratedExplorerCharacter(THREE, visual.root, {
+      assetId: curatedAssetId,
+      role: 'nearby-npc-character',
+      variation: 'nearby-npc',
+      failClosed: true,
+      isCurrent: () => activeWorldMatches(state) && state.npcs.includes(npc)
+    }).then((attached) => {
+      if (!attached && state.curatedNpcAssetOwners.get(npc.id) === curatedAssetId) {
+        state.curatedNpcAssetOwners.delete(npc.id);
+      }
+    });
+  }
   return npc;
 }
 
@@ -1036,7 +1189,10 @@ function maintainNearbyNpcDetails(state) {
   if (!activeWorldMatches(state) || state.transition) return;
   const actor = civicActorPosition(state);
   if (!actor) return;
-  const nearby = (state.population?.nearbyPedestrians?.(actor, NPC_DETAIL_PRELOAD_DISTANCE) || [])
+  const driving = state.activeVehicle && appCtx.Walk?.state?.mode !== 'walk';
+  const preloadDistance = driving ? NPC_DRIVING_PRELOAD_DISTANCE : NPC_DETAIL_PRELOAD_DISTANCE;
+  const releaseDistance = driving ? NPC_DRIVING_RELEASE_DISTANCE : NPC_DETAIL_RELEASE_DISTANCE;
+  const nearby = (state.population?.nearbyPedestrians?.(actor, preloadDistance) || [])
     .map((pedestrian) => ({
       pedestrian,
       distance: Math.hypot(pedestrian.x - actor.x, pedestrian.z - actor.z)
@@ -1048,7 +1204,7 @@ function maintainNearbyNpcDetails(state) {
   const detailCandidates = state.npcs.map((npc) => {
     const pose = npcPose(npc);
     return { id: npc.sourceAgentId, distance: Math.hypot(pose.x - actor.x, pose.z - actor.z) };
-  }).filter((entry) => entry.distance <= NPC_DETAIL_RELEASE_DISTANCE);
+  }).filter((entry) => entry.distance <= releaseDistance);
   const desiredIds = new Set([
     ...detailCandidates,
     ...nearby.map((entry) => ({ id: entry.pedestrian.id, distance: entry.distance }))
@@ -1057,7 +1213,7 @@ function maintainNearbyNpcDetails(state) {
     if (npc.reaction || npc.reactionUntil === Infinity) return;
     const pose = npcPose(npc);
     const distance = Math.hypot(pose.x - actor.x, pose.z - actor.z);
-    if (distance > NPC_DETAIL_RELEASE_DISTANCE || !desiredIds.has(npc.sourceAgentId)) {
+    if (distance > releaseDistance || !desiredIds.has(npc.sourceAgentId)) {
       releasePromotedNpc(state, npc);
     }
   });
@@ -1074,6 +1230,22 @@ function releaseDetailedTrafficVehicle(state, vehicle) {
   state.population?.releaseVehicleDetail?.(vehicle.trafficAgentId);
   vehicle.visual.dispose();
   state.vehicles.splice(index, 1);
+  return true;
+}
+
+function attachCuratedTrafficDetail(state, vehicle) {
+  if (!vehicle?.visual?.root || vehicle.serviceType === 'responder' || vehicle.playerClaimed) return false;
+  const assetId = CURATED_TRAFFIC_ASSET_BY_VARIANT[String(vehicle.variant?.id || '')];
+  if (!assetId) return false;
+  const root = vehicle.visual.root;
+  root.userData.disposeCuratedTrafficVehicle = () => disposeCuratedTrafficVehicle(root);
+  void attachCuratedTrafficVehicle(THREE, root, {
+    assetId,
+    variantId: vehicle.variant.id,
+    color: vehicle.color,
+    dimensionsMeters: vehicle.variant,
+    isCurrent: () => activeWorldMatches(state) && state.vehicles.includes(vehicle)
+  });
   return true;
 }
 
@@ -1101,6 +1273,10 @@ function retireDisabledRoadVehicle(state, vehicle) {
 function updateEntityLifecycle(state) {
   if (!activeWorldMatches(state)) return;
   const current = now();
+  if (current - Number(state.lastPoiActivationAt || 0) >= 500) {
+    appCtx.refreshActiveFunctionalPois?.(appCtx.Walk?.state?.walker || appCtx.car);
+    state.lastPoiActivationAt = current;
+  }
   state.npcs.slice().forEach((npc) => {
     if (Number(npc.condition ?? 1) > .05) {
       npc.downedAt = 0;
@@ -1218,6 +1394,7 @@ function promoteTrafficVehicleDetail(state, trafficAgentId) {
   syncVehiclePose(vehicle, definition);
   state.group.add(visual.root);
   state.vehicles.push(vehicle);
+  attachCuratedTrafficDetail(state, vehicle);
   return vehicle;
 }
 
@@ -1300,10 +1477,16 @@ function interactionCandidate(state) {
   if (!activeWorldMatches(state) || state.transition || appCtx.activeInterior || state.storeOpen) return null;
   if (state.activeVehicle && appCtx.Walk?.state?.mode !== 'walk') {
     const speed = Math.abs(Number(appCtx.car?.speed || 0));
+    if (speed > 1.25) {
+      state.vehicleExitPromptEligibleAt = now() + 450;
+      return null;
+    }
+    if (!Number.isFinite(state.vehicleExitPromptEligibleAt)) state.vehicleExitPromptEligibleAt = now() + 450;
+    if (now() < state.vehicleExitPromptEligibleAt) return null;
     return {
       available: true,
       action: 'exit_vehicle',
-      label: speed <= EXIT_SPEED_LIMIT ? 'Exit vehicle' : 'Stop to exit',
+      label: 'Exit vehicle',
       detail: state.activeVehicle.variant.label,
       distance: 0,
       data: { vehicleId: state.activeVehicle.id, speed }
@@ -1420,7 +1603,12 @@ function setDoorProgress(vehicle, progress) {
 }
 
 function resetPlayerVehicleVisual(state) {
-  state.defaultCarChildren.forEach((child) => { child.visible = true; });
+  state.defaultCarChildren.forEach((child) => {
+    child.visible = true;
+  });
+  if (appCtx.carMesh?.userData?.curatedVehicleVisual) {
+    appCtx.carMesh.userData.curatedVehicleVisual.visible = true;
+  }
   appCtx.wheelMeshes = state.defaultWheelMeshes;
   if (appCtx.carMesh?.userData) {
     delete appCtx.carMesh.userData.activeUrbanVehicleId;
@@ -1433,6 +1621,7 @@ function resetPlayerVehicleVisual(state) {
   appCtx.car.durabilityPolicy = state.defaultCarDurabilityPolicy;
   appCtx.car.resistance = state.defaultCarResistance;
   appCtx.car.transportCatalogId = 'sedan';
+  appCtx.car.vehicleIdentity = 'player-default:sedan';
 }
 
 function stopServiceSiren(state) {
@@ -1523,6 +1712,9 @@ function updateServiceEquipment(state, dt) {
 function mountVehicleForDriving(state, vehicle) {
   const pose = vehiclePose(vehicle);
   state.defaultCarChildren.forEach((child) => { child.visible = false; });
+  if (appCtx.carMesh?.userData?.curatedVehicleVisual) {
+    appCtx.carMesh.userData.curatedVehicleVisual.visible = false;
+  }
   vehicle.visual.root.removeFromParent?.();
   vehicle.visual.root.position.set(0, 0, 0);
   vehicle.visual.root.rotation.set(0, 0, 0);
@@ -1540,6 +1732,7 @@ function mountVehicleForDriving(state, vehicle) {
   appCtx.car.durabilityPolicy = vehicle.durabilityPolicy || vehicle.variant?.durabilityPolicy || 'standard';
   appCtx.car.resistance = Number(vehicle.resistance || vehicle.variant?.resistance || 160);
   appCtx.car.transportCatalogId = vehicle.variant.id;
+  appCtx.car.vehicleIdentity = vehicle.id;
   appCtx.car.x = pose.x;
   appCtx.car.y = pose.y;
   appCtx.car.z = pose.z;
@@ -2024,6 +2217,7 @@ function promoteTrafficVehicle(state, trafficAgentId, vehicleId = '') {
   syncVehiclePose(vehicle, definition);
   state.group.add(visual.root);
   state.vehicles.push(vehicle);
+  attachCuratedTrafficDetail(state, vehicle);
   return vehicle;
 }
 
@@ -2124,6 +2318,10 @@ function performResponderLoot(state, candidate) {
 
 function renderEquipment(state) {
   state.equipmentRuntime?.render();
+  const walletAmount = Number(state.commerce?.wallet?.().credits || 0);
+  if (state.equipmentUi?.wallet) {
+    state.equipmentUi.wallet.textContent = formatExplorerDollars(walletAmount);
+  }
   const condition = Math.max(0, Math.min(1, Number(state.playerCondition ?? 1)));
   if (state.equipmentUi?.conditionText) {
     state.equipmentUi.conditionText.textContent = `${Math.round(condition * 100)}%`;
@@ -2238,6 +2436,7 @@ function updatePrompt(state) {
   const candidate = appCtx.resolvePrimaryContextInteraction?.() || interactionCandidate(state);
   const transientStatus = state.statusUntil > now() ? state.statusMessage : '';
   if (!candidate && !transientStatus) {
+    prompt.root.classList.remove('familiar');
     prompt.secondaryKey.hidden = true;
     prompt.secondaryButton.hidden = true;
     prompt.takeKey.hidden = true;
@@ -2247,12 +2446,13 @@ function updatePrompt(state) {
     return;
   }
   prompt.root.classList.add('show');
+  prompt.root.classList.toggle('familiar', !transientStatus && candidate?.familiar === true);
   prompt.root.setAttribute('aria-hidden', 'false');
   prompt.title.textContent = transientStatus || candidate.label;
-  prompt.meta.textContent = transientStatus
+  prompt.meta.textContent = transientStatus || candidate?.familiar === true
     ? ''
     : `${candidate.detail}${candidate.distance ? ` • ${candidate.distance.toFixed(1)} m` : ''}`;
-  prompt.key.textContent = candidate?.action === 'exit_vehicle' ? 'E' : 'E';
+  prompt.key.textContent = appCtx.getControlPromptLabel?.('interact') || appCtx.getControlBindingLabel?.('interact') || 'E';
   prompt.button.textContent = candidate?.label || (candidate?.action === 'exit_vehicle' ? 'Exit' : 'Enter');
   if (candidate?.action === 'talk_npc') prompt.button.textContent = 'Talk';
   if (candidate?.action === 'loot_npc') prompt.button.textContent = 'Search';
@@ -2296,6 +2496,20 @@ function snapshot(state) {
     sequence: state.sequence,
     phase: state.transition?.kind || (state.activeVehicle ? 'driving' : 'walking'),
     vehicleCount: state.vehicles.length,
+    vehiclePresentation: 'curated-only-local-models',
+    proceduralVehicleMeshes: state.vehicles.reduce((sum, vehicle) => (
+      sum + Number(vehicle.visual?.root?.userData?.proceduralVehicleMeshCount || 0)
+    ), Number(appCtx.carMesh?.userData?.proceduralVehicleMeshCount || 0)),
+    defaultPlayerVehicle: Object.freeze({
+      curatedAssetId: String(appCtx.carMesh?.userData?.curatedVehicleAssetId || ''),
+      presentation: String(appCtx.carMesh?.userData?.vehiclePresentation || ''),
+      proceduralVehicleMeshes: Number(appCtx.carMesh?.userData?.proceduralVehicleMeshCount || 0),
+      condition: Number(Number(appCtx.car?.condition ?? 1).toFixed(3)),
+      alwaysDrivable: appCtx.car?.durabilityPolicy === 'exploration_unlimited',
+      airborne: appCtx.car?.isAirborne === true,
+      verticalVelocity: Number(Number(appCtx.car?.vy || 0).toFixed(3)),
+      upgrades: state.vehicleUpgradeStore.snapshot(state.activeVehicle || appCtx.car)
+    }),
     activeVehicleId: state.activeVehicle?.id || '',
     playerVehicle: state.activeVehicle ? Object.freeze({
       id: state.activeVehicle.id,
@@ -2321,6 +2535,9 @@ function snapshot(state) {
         y: Number(pose.y.toFixed(2)),
         z: Number(pose.z.toFixed(2)),
         yaw: Number(pose.yaw.toFixed(4)),
+        curatedAssetId: String(vehicle.visual?.root?.userData?.curatedTrafficAssetId || ''),
+        vehiclePresentation: String(vehicle.visual?.root?.userData?.vehiclePresentation || ''),
+        proceduralVehicleMeshes: Number(vehicle.visual?.root?.userData?.proceduralVehicleMeshCount || 0),
         pitch: Number(Number(pose.pitch || 0).toFixed(4)),
         roll: Number(Number(pose.roll || 0).toFixed(4)),
         renderedPitch: Number(Number(vehicle.visual?.root?.rotation?.x || 0).toFixed(4)),
@@ -2347,7 +2564,6 @@ function snapshot(state) {
         }),
         dimensionsMeters: vehicle.visual?.root?.userData?.vehicleDimensionsMeters || null,
         visualEnvelopeMeters: vehicle.visual?.root?.userData?.vehicleVisualEnvelopeMeters || null,
-        visualQuality: vehicle.visual?.root?.userData?.performanceProfile || null,
         parking: vehicle.source === 'deterministic-parked-vehicle' ? Object.freeze({
           roadHalfWidth: Number(vehicle.roadHalfWidth || 0),
           laneOffset: Number(vehicle.laneOffset || 0),
@@ -2376,12 +2592,17 @@ function snapshot(state) {
       y: Number(npc.y.toFixed(2)),
       z: Number(npc.z.toFixed(2)),
       yaw: Number(npc.yaw.toFixed(4)),
+      curatedAssetId: String(npc.visual?.root?.userData?.curatedCharacterAssetId || ''),
+      characterPresentation: String(npc.visual?.root?.userData?.characterStyle || ''),
+      proceduralCharacterMeshes: Number(npc.visual?.root?.userData?.proceduralCharacterMeshCount || 0),
+      curatedEquipmentAssetId: String(npc.visual?.heldEquipment?.userData?.curatedEquipmentAssetId || ''),
+      equipmentAttachment: String(npc.visual?.heldEquipment?.userData?.attachment || ''),
+      proceduralEquipmentMeshes: Number(npc.visual?.heldEquipment?.userData?.proceduralEquipmentMeshCount || 0),
       renderedMeshCount: (() => {
         let count = 0;
         npc.visual?.root?.traverse?.((object) => { if (object?.isMesh) count += 1; });
         return count;
-      })(),
-      visualQuality: npc.visual?.root?.userData?.performanceProfile || null
+      })()
     }))),
     ambientPedestrians: Object.freeze(ambientPedestrians),
     lootPickups: Object.freeze(state.pickups.map((pickup) => Object.freeze({
@@ -2410,6 +2631,7 @@ function snapshot(state) {
     }) : null,
     authority: state.roomAuthorityRuntime?.snapshot?.() || Object.freeze({ mode: 'local' }),
     equipment: state.equipment?.snapshot?.() || null,
+    equipmentPresentation: state.equipmentVisual?.equipmentSnapshot?.() || null,
     backpackMigration: state.backpackStore?.migrationSnapshot?.() || null,
     commerce: Object.freeze({
       mappedStoreCount: state.stores.length,
@@ -2438,7 +2660,16 @@ function snapshot(state) {
       bank: Number(appCtx.Walk?.state?.walker?.skydivingFlight?.bank || 0),
       horizontalSpeed: Number(appCtx.Walk?.state?.walker?.skydivingFlight?.horizontalSpeed || 0),
       verticalSpeed: Number(appCtx.Walk?.state?.walker?.skydivingFlight?.verticalSpeed || 0),
-      profileId: String(appCtx.Walk?.state?.walker?.skydivingFlight?.profileId || '')
+      profileId: String(appCtx.Walk?.state?.walker?.skydivingFlight?.profileId || ''),
+      handoffSource: String(state.parachute?.handoffSource || ''),
+      handoffDistance: Number.isFinite(state.parachute?.handoffDistance)
+        ? Number(state.parachute.handoffDistance)
+        : null,
+      visuals: state.equipmentVisual?.parachuteSnapshot?.() || Object.freeze({
+        ready: false,
+        packVisible: false,
+        canopyVisible: false
+      })
     }),
     civicResponse: civicSnapshot(state),
     responders: state.responders?.snapshot?.() || null,
@@ -2446,8 +2677,8 @@ function snapshot(state) {
     budgets: Object.freeze({ interactiveVehicles: state.budget, interactiveNpcs: state.npcBudget, mobile: state.mobile }),
     lodPolicy: Object.freeze({
       npcInteractionDistance: NPC_INTERACTION_DISTANCE,
-      npcPreloadDistance: NPC_DETAIL_PRELOAD_DISTANCE,
-      npcReleaseDistance: NPC_DETAIL_RELEASE_DISTANCE,
+      npcPreloadDistance: state.activeVehicle ? NPC_DRIVING_PRELOAD_DISTANCE : NPC_DETAIL_PRELOAD_DISTANCE,
+      npcReleaseDistance: state.activeVehicle ? NPC_DRIVING_RELEASE_DISTANCE : NPC_DETAIL_RELEASE_DISTANCE,
       vehiclePreloadDistance: VEHICLE_DETAIL_PRELOAD_DISTANCE,
       vehicleReleaseDistance: VEHICLE_DETAIL_RELEASE_DISTANCE
     }),
@@ -2467,6 +2698,11 @@ function snapshot(state) {
       inventoryAuthority: 'character-backpack',
       reloadFromReserve: true,
       recoverFromFallenActors: true
+    }),
+    playerCharacter: Object.freeze({
+      gender: String(appCtx.getPlayerCharacterGender?.() || 'man'),
+      assetId: String(appCtx.Walk?.state?.characterMesh?.userData?.curatedCharacterAssetId || ''),
+      choiceAvailable: !!state.equipmentUi?.characterChoice
     })
   });
 }
@@ -2488,7 +2724,6 @@ function disposeRuntime(state, reason = 'disposed') {
   state.equipmentUi?.close?.removeEventListener('click', state.onEquipmentClose);
   state.equipmentUi?.slots?.removeEventListener('click', state.onEquipmentSlotClick);
   state.equipmentUi?.contents?.removeEventListener('click', state.onEquipmentSlotClick);
-  state.equipmentUi?.appearance?.removeEventListener('click', state.onAppearanceClick);
   state.equipmentUi?.filters?.removeEventListener('click', state.onBackpackFilterClick);
   state.equipmentUi?.detail?.removeEventListener('click', state.onBackpackDetailClick);
   state.storeUi?.close?.removeEventListener('click', state.onStoreClose);
@@ -2497,6 +2732,7 @@ function disposeRuntime(state, reason = 'disposed') {
   document.getElementById('caughtBtn')?.removeEventListener('click', state.onCustodyContinue);
   if (appCtx.handleUrbanCustodyContinue === state.onCustodyContinue) delete appCtx.handleUrbanCustodyContinue;
   if (appCtx.toggleUrbanResponderEquipment === state.toggleServiceEquipment) delete appCtx.toggleUrbanResponderEquipment;
+  if (appCtx.handleMechanicInteraction === state.handleMechanicInteraction) delete appCtx.handleMechanicInteraction;
   const caughtMessage = document.getElementById('caughtScreen')?.querySelector?.('.caughtText');
   if (caughtMessage) caughtMessage.textContent = 'You were caught. Continue from the nearest safe location.';
   const caughtTitle = document.getElementById('caughtScreen')?.querySelector?.('.caughtTitle');
@@ -2504,6 +2740,7 @@ function disposeRuntime(state, reason = 'disposed') {
   const caughtButton = document.getElementById('caughtBtn');
   if (caughtButton) caughtButton.textContent = 'Try Again';
   state.unsubscribeBackpack?.();
+  state.stopWalletSubscription?.();
   appCtx.screenLayout?.setPanelLayer?.('backpack', false);
   state.prompt?.root?.classList.remove('show');
   state.equipmentUi?.root?.classList.remove('show');
@@ -2531,6 +2768,7 @@ function disposeRuntime(state, reason = 'disposed') {
   state.group.removeFromParent?.();
   state.vehicles.length = 0;
   state.npcs.length = 0;
+  state.curatedNpcAssetOwners.clear();
   state.pickups.length = 0;
   state.activeVehicle = null;
   state.civic?.clear?.();
@@ -2613,27 +2851,62 @@ function startUrbanSandboxRuntime(options = {}) {
     root: document.getElementById('urbanEquipment'),
     slots: document.getElementById('urbanEquipmentSlots'),
     contents: document.getElementById('urbanBackpackContents'),
-    appearance: document.getElementById('urbanAppearanceChoices'),
     filters: document.getElementById('urbanBackpackFilters'),
     detail: document.getElementById('urbanBackpackDetail'),
     status: document.getElementById('urbanEquipmentStatus'),
     conditionText: document.getElementById('urbanPlayerConditionText'),
     conditionFill: document.getElementById('urbanPlayerConditionFill'),
+    wallet: document.getElementById('urbanBackpackWallet'),
     toggle: document.getElementById('urbanEquipmentToggle'),
     close: document.getElementById('urbanEquipmentCloseBtn'),
     reticle: document.getElementById('urbanWeaponReticle')
   };
   const equipment = ensurePlayerBackpackInventory(appCtx);
   const backpackStore = appCtx.playerBackpackStore;
-  const stores = mappedCommercePlaces(appCtx.pois);
-  const commerce = appCtx.worldEconomy || appCtx.localConvenienceStoreCommerce || createLocalCommerceModel({ inventory: equipment });
+  const stores = mappedCommercePlaces(appCtx.functionalPoiRecords || appCtx.pois, {
+    buildings: appCtx.buildings,
+    entranceByBuilding: appCtx.buildingEntranceByBuilding
+  });
+  const currentUser = getCurrentUser();
+  if (appCtx.connectedExplorerWallet && appCtx.connectedExplorerWallet.uid !== currentUser?.uid) {
+    appCtx.connectedExplorerWallet.dispose?.();
+    appCtx.connectedExplorerWallet = null;
+  }
+  const connectedWallet = appCtx.connectedExplorerWallet || createConnectedExplorerWallet({
+    onError: () => appCtx.urbanSandboxRuntime && setStatus(appCtx.urbanSandboxRuntime, 'Explorer Wallet is reconnecting.', 2200)
+  });
+  if (connectedWallet) appCtx.connectedExplorerWallet = connectedWallet;
+  const stopWalletSubscription = connectedWallet?.subscribe?.(() => {
+    if (!appCtx.urbanSandboxRuntime) return;
+    renderEquipment(appCtx.urbanSandboxRuntime);
+    if (appCtx.urbanSandboxRuntime.storeOpen) renderStore(appCtx.urbanSandboxRuntime);
+  }) || null;
+  const commerce = connectedWallet
+    ? createLocalCommerceModel({ inventory: equipment, transactionAuthority: connectedWallet })
+    : appCtx.worldEconomy || appCtx.localConvenienceStoreCommerce || createLocalCommerceModel({ inventory: equipment });
   appCtx.worldEconomy = commerce;
   appCtx.localConvenienceStoreCommerce = commerce;
+  const playerConditionAuthority = ensurePlayerConditionAuthority(appCtx);
+  const vehicleUpgradeStore = ensureVehicleUpgradeStore(appCtx);
+  if (appCtx.connectedExplorerPlayerState && appCtx.connectedExplorerPlayerState.uid !== currentUser?.uid) {
+    appCtx.connectedExplorerPlayerState.dispose?.();
+    appCtx.connectedExplorerPlayerState = null;
+  }
+  if (!appCtx.connectedExplorerPlayerState && currentUser?.uid) {
+    appCtx.connectedExplorerPlayerState = createConnectedPlayerState({
+      conditionAuthority: playerConditionAuthority,
+      vehicleUpgradeStore,
+      onError: () => appCtx.urbanSandboxRuntime && setStatus(appCtx.urbanSandboxRuntime, 'Explorer health and upgrades are reconnecting.', 2200),
+      onChange: () => appCtx.urbanSandboxRuntime && renderEquipment(appCtx.urbanSandboxRuntime)
+    });
+  }
   const storeUi = {
     root: document.getElementById('urbanStore'),
     name: document.getElementById('urbanStoreName'),
     source: document.getElementById('urbanStoreSource'),
     credits: document.getElementById('urbanStoreCredits'),
+    servicesSection: document.getElementById('urbanStoreServicesSection'),
+    services: document.getElementById('urbanStoreServices'),
     stock: document.getElementById('urbanStoreStock'),
     sell: document.getElementById('urbanStoreSell'),
     rare: document.getElementById('urbanStoreRare'),
@@ -2672,7 +2945,9 @@ function startUrbanSandboxRuntime(options = {}) {
     // path. Four slots allowed a fifth person in a normal sidewalk cluster to
     // remain an instanced silhouette until interaction, which is the visible
     // block-to-character swap this runtime is meant to prevent.
-    npcBudget: mobile ? 9 : 16,
+    npcBudget: mobile ? 10 : 20,
+    curatedNpcAssetOwners: new Map(),
+    curatedNpcAssetCursor: 0,
     mobile,
     population: livingWorld.population,
     worldIdentity,
@@ -2685,7 +2960,7 @@ function startUrbanSandboxRuntime(options = {}) {
     backpackFilter: 'all',
     backpackSelectedId: '',
     defaultWheelMeshes: [...(appCtx.wheelMeshes || [])],
-    defaultVehicleStyle: String(appCtx.carMesh?.userData?.vehicleStyle || 'classic-utility-d'),
+    defaultVehicleStyle: String(appCtx.carMesh?.userData?.vehicleStyle || 'curated-bmw-e34'),
     defaultCarCondition: Math.max(0, Math.min(1, Number(appCtx.car?.condition ?? 1))),
     defaultCarDurabilityPolicy: String(appCtx.car?.durabilityPolicy || 'exploration_unlimited'),
     defaultCarResistance: Number(appCtx.car?.resistance || 175),
@@ -2711,6 +2986,7 @@ function startUrbanSandboxRuntime(options = {}) {
     promptElapsed: 0,
     npcPromotionElapsed: 0,
     vehiclePromotionElapsed: 0,
+    vehicleExitPromptEligibleAt: NaN,
     recklessElapsed: 0,
     recklessEventCooldown: 0,
     civicUiElapsed: 0,
@@ -2719,17 +2995,27 @@ function startUrbanSandboxRuntime(options = {}) {
     responders: null,
     equipment,
     backpackStore,
+    stopWalletSubscription,
     stores,
     storeApproaches: new Map(),
     commerce,
+    playerConditionAuthority,
+    vehicleUpgradeStore,
     storeOpen: false,
     activeStoreId: '',
     storeStatus: '',
     equipmentVisual: createEquipmentVisuals(THREE, appCtx.Walk?.state?.characterMesh),
     equipmentRuntime: null,
     equipmentOpen: false,
-    parachute: { deployed: false, deployedAt: 0, landedAt: 0, skydiving: false, automaticEquip: false },
-    playerCondition: 1,
+    parachute: {
+      deployed: false,
+      deployedAt: 0,
+      landedAt: 0,
+      skydiving: false,
+      automaticEquip: false,
+      handoffSource: '',
+      handoffDistance: null
+    },
     custody: null,
     flashlight,
     authority: null,
@@ -2737,6 +3023,17 @@ function startUrbanSandboxRuntime(options = {}) {
     remoteEntities: new Map(),
     roomAuthorityRuntime: null
   };
+  Object.defineProperty(state, 'playerCondition', {
+    configurable: true,
+    enumerable: true,
+    get: () => state.playerConditionAuthority.snapshot().condition,
+    set: (value) => { state.playerConditionAuthority.set(value, 'urban-runtime'); }
+  });
+  void state.commerce.recoverPending?.((service, receiptId) => applyPoiService(state, service, receiptId)).then((result) => {
+    if (result?.recovered > 0 && activeWorldMatches(state)) {
+      setStatus(state, `${result.recovered} Explorer Wallet service ${result.recovered === 1 ? 'receipt' : 'receipts'} recovered.`, 2600);
+    }
+  });
   state.civic = createCivicResponseModel({
     request: options.request,
     getActorPosition: () => civicActorPosition(state)
@@ -2749,6 +3046,16 @@ function startUrbanSandboxRuntime(options = {}) {
     isActive: () => activeWorldMatches(state),
     getActor: () => civicActorPosition(state),
     getVehicles: () => state.vehicles,
+    isBlockedPoint: (x, z, variant) => {
+      const y = appCtx.SurfaceQuery?.driveAt?.(x, z)?.position?.y
+        ?? appCtx.elevationWorldYAtWorldXZ?.(x, z)
+        ?? 0;
+      const collision = appCtx.checkBuildingCollision?.(x, z, Math.max(.9, Number(variant?.width || 1.9) * .48), {
+        actorBaseY: Number(y),
+        actorHeight: Number(variant?.height || 1.6)
+      });
+      return collision?.collision === true || appCtx.isInsideWaterArea?.(x, z) === true;
+    },
     fireNpcProjectile: (settings) => state.equipmentRuntime?.fireNpcProjectile?.(settings) === true,
     onOfficerShot: (impact) => applyOfficerImpact(state, impact),
     onArrest: () => {
@@ -2813,6 +3120,15 @@ function startUrbanSandboxRuntime(options = {}) {
     reportCivicEvent: (event) => reportCivicEvent(state, event),
     onNpcShot: (impact) => applyArmedNpcImpact(state, impact),
     onNpcDowned: (npc) => dropNpcLoot(state, npc),
+    onConsume: (item) => {
+      const restore = Math.max(0, Number(item?.metadata?.conditionRestore || item?.conditionRestore || 0));
+      if (!restore) return Object.freeze({ ok: false, reason: 'not_consumable' });
+      if (state.playerCondition >= .999) return Object.freeze({ ok: false, reason: 'full_health' });
+      if (!state.equipment.consumeItem(item.instanceId, 1)) return Object.freeze({ ok: false, reason: 'inventory_unavailable' });
+      const result = state.playerConditionAuthority.restore(restore, `consumed:${item.catalogId}`);
+      renderEquipment(state);
+      return Object.freeze({ ok: true, condition: result.after });
+    },
     setStatus: (message, duration) => setStatus(state, message, duration),
     now
   });
@@ -2873,13 +3189,6 @@ function startUrbanSandboxRuntime(options = {}) {
     if (!button || !state.equipmentUi.root.contains(button)) return;
     state.equipmentRuntime?.inspectItem?.(button.dataset.equipmentId);
   };
-  state.onAppearanceClick = (event) => {
-    const button = event.target?.closest?.('[data-explorer-appearance]');
-    if (!button || !state.equipmentUi.appearance?.contains(button)) return;
-    const appearance = saveExplorerAppearanceId(button.dataset.explorerAppearance);
-    state.equipmentRuntime?.render?.();
-    setStatus(state, `${appearance.label} selected.`, 1600);
-  };
   state.onBackpackFilterClick = (event) => {
     const button = event.target?.closest?.('[data-backpack-filter]');
     if (button) state.equipmentRuntime?.setFilter?.(button.dataset.backpackFilter);
@@ -2894,7 +3203,7 @@ function startUrbanSandboxRuntime(options = {}) {
     );
   };
   state.onStoreClose = () => closeStore(state);
-  state.onStoreAction = (event) => handleStoreAction(state, event);
+  state.onStoreAction = (event) => { void handleStoreAction(state, event); };
   state.onStoreKeyDown = (event) => {
     if (event.key === 'Escape' && state.storeOpen) {
       event.preventDefault();
@@ -2909,7 +3218,6 @@ function startUrbanSandboxRuntime(options = {}) {
   appCtx.handleUrbanCustodyContinue = state.onCustodyContinue;
   equipmentUi.slots?.addEventListener('click', state.onEquipmentSlotClick);
   equipmentUi.contents?.addEventListener('click', state.onEquipmentSlotClick);
-  equipmentUi.appearance?.addEventListener('click', state.onAppearanceClick);
   equipmentUi.filters?.addEventListener('click', state.onBackpackFilterClick);
   equipmentUi.detail?.addEventListener('click', state.onBackpackDetailClick);
   storeUi.close?.addEventListener('click', state.onStoreClose);
@@ -2935,6 +3243,11 @@ function startUrbanSandboxRuntime(options = {}) {
       updateEquipmentEffects(state, frame.dt);
       updateLootPickups(state, frame.dt);
       updateCrashBodies(state, frame.dt);
+      state.npcs.forEach((npc) => npc.visual.updateAnimation(
+        frame.dt,
+        npc.reaction === 'fleeing' || !!npc.crashMotion,
+        npc.reaction === 'fleeing'
+      ));
       updateEntityLifecycle(state);
       state.npcPromotionElapsed += frame.dt;
       if (state.npcPromotionElapsed >= .25) {
@@ -2942,7 +3255,7 @@ function startUrbanSandboxRuntime(options = {}) {
         maintainNearbyNpcDetails(state);
       }
       state.vehiclePromotionElapsed += frame.dt;
-      if (state.vehiclePromotionElapsed >= .1) {
+      if (state.vehiclePromotionElapsed >= 1 / 30) {
         state.vehiclePromotionElapsed = 0;
         maintainNearbyVehicleDetails(state);
       }
@@ -2955,6 +3268,7 @@ function startUrbanSandboxRuntime(options = {}) {
   });
   activeRuntime = state;
   appCtx.urbanSandboxRuntime = state;
+  state.vehicles.forEach((vehicle) => attachCuratedTrafficDetail(state, vehicle));
   appCtx.disposeUrbanSandboxRuntime = (reason = 'world-reload') => disposeRuntime(activeRuntime, reason);
   appCtx.urbanSandboxRuntimeSnapshot = () => snapshot(activeRuntime);
   appCtx.resolveUrbanActorCollision = resolveUrbanActorCollision;
@@ -2963,7 +3277,19 @@ function startUrbanSandboxRuntime(options = {}) {
   appCtx.toggleUrbanEquipment = (force) => toggleEquipment(state, force);
   appCtx.equipUrbanEquipmentSlot = (slot) => equipSlot(state, slot);
   appCtx.handleUrbanEquipmentUse = () => useEquipped(state);
+  state.handleMechanicInteraction = () => openNearbyMechanic(state);
+  appCtx.handleMechanicInteraction = state.handleMechanicInteraction;
   state.prepareAirborneParachute = (options = {}) => {
+    const sourcePosition = options.sourcePosition;
+    const walker = appCtx.Walk?.state?.walker;
+    state.parachute.handoffSource = String(options.source || '');
+    state.parachute.handoffDistance = sourcePosition && walker
+      ? Math.hypot(
+        Number(walker.x || 0) - Number(sourcePosition.x || 0),
+        Number(walker.y || 0) - Number(sourcePosition.y || 0),
+        Number(walker.z || 0) - Number(sourcePosition.z || 0)
+      )
+      : null;
     state.parachute.skydiving = true;
     state.parachute.automaticEquip = options.autoEquip === true;
     if (options.autoEquip === true && state.equipment.has?.('parachute')) {
@@ -2974,6 +3300,7 @@ function startUrbanSandboxRuntime(options = {}) {
     } else {
       setStatus(state, 'Freefall · select the parachute and press Space to deploy.', 2600);
     }
+    state.equipmentVisual?.setParachuteReady?.(true);
     return state.equipment.equipped?.()?.id === 'parachute';
   };
   appCtx.prepareAirborneParachute = state.prepareAirborneParachute;
@@ -3002,6 +3329,7 @@ function startUrbanSandboxRuntime(options = {}) {
     state.parachute.skydiving = false;
     state.parachute.automaticEquip = false;
     state.parachute.landedAt = now();
+    state.equipmentVisual?.setParachuteReady?.(false);
     state.equipmentVisual?.setParachuteDeployed?.(false);
     setStatus(state, 'Landed safely · parachute repacked.', 1800);
     state.equipmentRuntime?.render?.();

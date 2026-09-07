@@ -218,6 +218,7 @@ function updateUniverseCourseCue(cueState = null) {
   cue.style.top = `${Math.round(Number(cueState.y) || 0)}px`;
   cue.style.setProperty('--course-cue-angle', `${Number(cueState.angleDeg) || 0}deg`);
   cue.classList.toggle('is-assisted', cueState.assisted === true);
+  cue.classList.toggle('is-onscreen', cueState.onScreen === true);
   cue.querySelector('strong').textContent = cueState.assisted ? 'FLIGHT ASSIST' : 'COURSE';
   cue.querySelector('small').textContent = cueState.label || 'Destination';
 }

@@ -1,150 +1,100 @@
-import { createBeveledVehicleBoxGeometry, createTaperedPrismGeometry } from '../engine/classic-utility-car.js?v=3';
+import {
+  attachCuratedEquipmentVisual,
+  disposeCuratedEquipmentVisual
+} from './curated-equipment-visual.js?v=2';
 
+function normalizedNodeName(object) {
+  return String(object?.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function curatedRightWrist(root) {
+  const visual = root?.userData?.curatedCharacterAttachment?.visual;
+  if (!visual) return null;
+  let match = null;
+  visual.traverse?.((object) => {
+    if (match) return;
+    const name = normalizedNodeName(object);
+    if (name === 'wristr' || name === 'rightwrist') match = object;
+  });
+  return match;
+}
+
+// Interactive NPCs deliberately have no generated body or generated weapon.
+// The host owns gameplay pose and interaction state while locally bundled,
+// curated assets own every visible character/equipment mesh. A failed asset
+// load therefore leaves an empty host instead of reviving the retired style.
 function createUrbanNpcVisual(THREE, definition = {}) {
   const scale = Math.max(.86, Math.min(1.14, Number(definition.heightScale) || 1));
   const root = new THREE.Group();
-  root.name = `Interactive ${definition.archetype || 'city'} NPC`;
+  root.name = `Curated-only interactive ${definition.archetype || 'city'} NPC host`;
   root.scale.setScalar(scale);
   root.userData.actorId = String(definition.id || '');
-  root.userData.characterStyle = `urban-${definition.archetype || 'pedestrian'}`;
+  root.userData.characterStyle = 'curated-only-local-model';
+  root.userData.proceduralCharacterMeshCount = 0;
+  root.userData.proceduralEquipmentMeshCount = 0;
+  root.userData.heldEquipmentId = String(definition.heldEquipment || '');
 
-  const outfit = new THREE.MeshStandardMaterial({ color: Number(definition.outfitColor || 0x496673), roughness: .82, metalness: .02, flatShading: true });
-  const outfitDark = outfit.clone();
-  outfitDark.color.multiplyScalar(.68);
-  const pants = new THREE.MeshStandardMaterial({ color: Number(definition.pantsColor || 0x29333d), roughness: .9, metalness: .01, flatShading: true });
-  const skin = new THREE.MeshStandardMaterial({ color: Number(definition.skinColor || 0x9a6d52), roughness: .82, metalness: 0 });
-  const hair = new THREE.MeshStandardMaterial({ color: Number(definition.hairColor || 0x241d18), roughness: .9, metalness: 0 });
-  const eye = new THREE.MeshStandardMaterial({ color: 0x171b1c, roughness: .42, metalness: 0 });
-  const shoe = new THREE.MeshStandardMaterial({ color: 0x3b474d, emissive: 0x182126, emissiveIntensity: .24, roughness: .92, metalness: .03, flatShading: true });
-  const trim = new THREE.MeshStandardMaterial({ color: 0xb7a86b, roughness: .76, metalness: .08, flatShading: true });
-  const device = new THREE.MeshStandardMaterial({ color: 0x18252d, emissive: 0x257cad, emissiveIntensity: .42, roughness: .42, metalness: .26, flatShading: true });
-  const materials = [outfit, outfitDark, pants, skin, hair, shoe, trim, device, eye];
-  const geometries = new Set();
-  const add = (geometry, material, name, position, rotation = null, parent = root) => {
-    geometries.add(geometry);
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.name = name;
-    mesh.position.set(...position);
-    if (rotation) mesh.rotation.set(...rotation);
-    mesh.castShadow = true;
-    mesh.receiveShadow = false;
-    parent.add(mesh);
-    return mesh;
-  };
-
-  add(createTaperedPrismGeometry(THREE, {
-    widthBottom: .43, widthTop: .52, height: .62, length: .3, frontInset: .02, rearInset: .02
-  }), outfit, 'NPC tailored torso', [0, 1.08, 0]);
-  add(createTaperedPrismGeometry(THREE, {
-    widthBottom: .38, widthTop: .42, height: .12, length: .3, frontInset: .02, rearInset: .02
-  }), outfitDark, 'NPC fitted waist layer', [0, .75, 0]);
-  add(new THREE.CylinderGeometry(.105, .12, .12, 12), skin, 'NPC neck', [0, 1.43, 0]);
-  const head = add(new THREE.SphereGeometry(.23, 18, 12), skin, 'NPC head', [0, 1.61, 0]);
-  head.scale.set(.92, 1.08, .94);
-  const jaw = add(new THREE.SphereGeometry(.19, 16, 10), skin, 'NPC jaw and cheeks', [0, 1.555, .055]);
-  jaw.scale.set(.94, .82, .92);
-  add(new THREE.SphereGeometry(.036, 10, 7), skin, 'NPC nose', [0, 1.6, .222]);
-  add(new THREE.SphereGeometry(.235, 18, 9, 0, Math.PI * 2, 0, Math.PI * .52), hair, 'NPC hair', [0, 1.69, -.01]);
-  for (const side of [-1, 1]) {
-    const eyeMesh = add(new THREE.SphereGeometry(.021, 10, 7), eye, side < 0 ? 'NPC left eye' : 'NPC right eye', [side * .074, 1.635, .213]);
-    eyeMesh.scale.set(1, .72, .5);
-    add(new THREE.BoxGeometry(.07, .012, .012), hair, 'NPC eyebrow', [side * .075, 1.678, .215], [0, 0, side * -.07]);
-    const ear = add(new THREE.SphereGeometry(.04, 10, 7), skin, 'NPC ear', [side * .215, 1.615, 0]);
-    ear.scale.set(.48, 1, .55);
-  }
-  add(new THREE.BoxGeometry(.1, .014, .012), hair, 'NPC mouth', [0, 1.53, .218]);
-  add(new THREE.BoxGeometry(.24, .035, .035), trim, 'NPC collar detail', [0, 1.36, .17]);
-  for (const side of [-1, 1]) {
-    add(createTaperedPrismGeometry(THREE, { widthBottom: .13, widthTop: .06, height: .24, length: .025, frontInset: 0, rearInset: 0 }), outfitDark, 'NPC jacket lapel', [side * .095, 1.285, .166], [0, 0, side * -.2]);
+  const heldEquipment = definition.heldEquipment ? new THREE.Group() : null;
+  if (heldEquipment) {
+    heldEquipment.name = `Curated NPC held ${definition.heldEquipment} host`;
+    heldEquipment.visible = false;
+    heldEquipment.userData.equipmentPresentation = 'curated-only-local-model';
+    heldEquipment.userData.proceduralEquipmentMeshCount = 0;
+    root.add(heldEquipment);
+    void attachCuratedEquipmentVisual(THREE, heldEquipment, definition.heldEquipment);
   }
 
-  const armPivots = {};
-  for (const side of [-1, 1]) {
-    const arm = new THREE.Group();
-    arm.name = side < 0 ? 'NPC left arm rig' : 'NPC right arm rig';
-    arm.position.set(side * .31, 1.31, 0);
-    root.add(arm);
-    add(new THREE.CylinderGeometry(.07, .06, .42, 12), outfit, 'NPC jacket sleeve', [0, -.2, 0], null, arm);
-    add(new THREE.SphereGeometry(.072, 10, 7), outfitDark, 'NPC elbow seam', [0, -.39, 0], null, arm);
-    add(new THREE.SphereGeometry(.075, 12, 8), skin, 'NPC hand', [0, -.47, .01], null, arm);
-    armPivots[side < 0 ? 'left' : 'right'] = arm;
+  function syncHeldEquipment() {
+    if (!heldEquipment) return false;
+    const wrist = curatedRightWrist(root);
+    const loaded = !!heldEquipment.userData.curatedEquipmentAssetId;
+    if (!wrist || !loaded) {
+      heldEquipment.visible = false;
+      return false;
+    }
+    root.updateMatrixWorld?.(true);
+    const wristWorld = wrist.getWorldPosition(new THREE.Vector3());
+    heldEquipment.position.copy(root.worldToLocal(wristWorld));
+    // Curated equipment is normalized to point along the character's +Z
+    // heading. Retaining the character frame avoids inheriting the wrist
+    // bone's imported twist, which was turning guns sideways/downward.
+    heldEquipment.position.add(new THREE.Vector3(.018, -.018, .045));
+    heldEquipment.rotation.set(0, 0, 0);
+    heldEquipment.scale.setScalar(1);
+    heldEquipment.visible = true;
+    heldEquipment.userData.attachment = 'curated-right-wrist-position-character-heading';
+    return true;
   }
 
-  const legPivots = [];
-  for (const side of [-1, 1]) {
-    const leg = new THREE.Group();
-    leg.name = 'NPC leg rig';
-    leg.position.set(side * .12, .73, 0);
-    root.add(leg);
-    add(new THREE.CylinderGeometry(.09, .075, .55, 12), pants, 'NPC trouser leg', [0, -.27, 0], null, leg);
-    add(new THREE.SphereGeometry(.083, 10, 7), pants, 'NPC knee', [0, -.49, .025], null, leg);
-    add(createBeveledVehicleBoxGeometry(THREE, .18, .13, .32, .035), shoe, 'NPC shaped shoe', [0, -.58, .07], null, leg);
-    add(new THREE.BoxGeometry(.17, .025, .34), outfitDark, 'NPC shoe sole', [0, -.652, .075], null, leg);
-    legPivots.push(leg);
-  }
-
-  const gearStyle = String(definition.archetype || '');
-  if (/field|weekend|student/.test(gearStyle)) {
-    add(createTaperedPrismGeometry(THREE, { widthBottom: .35, widthTop: .3, height: .46, length: .16, frontInset: .02, rearInset: .02 }), outfitDark, 'NPC day pack', [0, 1.08, -.2]);
-    add(new THREE.BoxGeometry(.28, .05, .17), trim, 'NPC pack accent', [0, .93, -.29]);
-  } else if (/service-worker/.test(gearStyle)) {
-    add(new THREE.BoxGeometry(.5, .08, .31), trim, 'NPC reflective vest band', [0, 1.06, .165]);
-    add(new THREE.CylinderGeometry(.24, .24, .08, 10), outfitDark, 'NPC work cap', [0, 1.84, 0]);
-  } else if (/traveler/.test(gearStyle)) {
-    add(createTaperedPrismGeometry(THREE, { widthBottom: .36, widthTop: .31, height: .5, length: .18, frontInset: .02, rearInset: .02 }), outfitDark, 'NPC travel pack', [0, 1.08, -.2]);
-    add(new THREE.BoxGeometry(.2, .28, .12), trim, 'NPC travel pouch', [.3, .82, -.05]);
-  } else if (/office|commuter/.test(gearStyle)) {
-    add(createBeveledVehicleBoxGeometry(THREE, .28, .36, .12, .035), outfitDark, 'NPC work satchel', [-.33, .86, -.06]);
-    add(new THREE.BoxGeometry(.04, .72, .04), trim, 'NPC satchel strap', [-.18, 1.1, .02], [0, 0, -.34]);
-  } else {
-    add(createBeveledVehicleBoxGeometry(THREE, .24, .31, .11, .035), outfitDark, 'NPC shoulder bag', [-.32, .88, -.06]);
-  }
-
-  const phone = add(new THREE.BoxGeometry(.09, .17, .035), device, 'NPC reporting phone', [0, -.48, .065], [-.15, 0, 0], armPivots.right);
-  let heldEquipment = null;
-  if (definition.heldEquipment) {
-    heldEquipment = new THREE.Group();
-    heldEquipment.name = `NPC held ${definition.heldEquipment}`;
-    heldEquipment.position.set(0, -.48, .08);
-    armPivots.right.add(heldEquipment);
-    add(new THREE.BoxGeometry(.11, .14, .3), device, 'NPC equipment body', [0, 0, .12], null, heldEquipment);
-    add(new THREE.BoxGeometry(.08, .2, .1), outfitDark, 'NPC equipment grip', [0, -.13, .04], [-.2, 0, 0], heldEquipment);
-    add(new THREE.CylinderGeometry(.03, .03, .18, 8), trim, 'NPC equipment barrel', [0, 0, .34], [Math.PI * .5, 0, 0], heldEquipment);
-  }
   const setReaction = (reaction = '') => {
-    const reporting = reaction === 'reporting';
-    const watching = reaction === 'watching';
-    const talking = reaction === 'talking';
-    const startled = reaction === 'startled' || reaction === 'hit' || reaction === 'fleeing';
-    const downed = reaction === 'downed' || reaction === 'knocked-down';
-    const armed = reaction === 'armed' || reaction === 'defending';
-    armPivots.right.rotation.x = reporting ? -1.42 : armed ? -1.18 : startled ? -1.05 : talking ? -.5 : watching ? -.35 : .04;
-    armPivots.left.rotation.x = startled ? -1.05 : talking ? .38 : watching ? .2 : -.04;
-    phone.visible = reporting;
-    root.rotation.z = downed ? Math.PI * .5 : 0;
-    root.userData.reaction = reaction;
+    root.userData.reaction = String(reaction || '');
+    root.userData.weaponPose = heldEquipment ? 'curated-forward-ready' : 'unarmed';
   };
   setReaction(definition.reaction);
   root.userData.performanceProfile = Object.freeze({
-    style: root.userData.characterStyle,
-    qualityTier: 'promoted-procedural',
-    collisionPolicy: 'actor-capsule',
+    style: 'curated-only-local-model',
     transparentMaterials: 0,
-    meshBudget: geometries.size
+    proceduralCharacterMeshes: 0,
+    proceduralEquipmentMeshes: 0
   });
 
   return Object.freeze({
     root,
-    armPivots: Object.freeze(armPivots),
-    legPivots: Object.freeze(legPivots),
-    phone,
+    armPivots: Object.freeze({ left: null, right: null }),
+    legPivots: Object.freeze([]),
+    phone: null,
     heldEquipment,
-    materials: Object.freeze(materials),
+    materials: Object.freeze([]),
     setReaction,
+    updateAnimation(deltaTime, moving = false, running = false) {
+      const animated = root.userData.updateCuratedCharacterAnimation?.(moving, deltaTime, running) === true;
+      syncHeldEquipment();
+      return animated;
+    },
     dispose() {
+      if (heldEquipment) disposeCuratedEquipmentVisual(heldEquipment);
+      root.userData.disposeCuratedCharacter?.();
       root.removeFromParent?.();
-      geometries.forEach((geometry) => geometry.dispose?.());
-      materials.forEach((material) => material.dispose?.());
     }
   });
 }

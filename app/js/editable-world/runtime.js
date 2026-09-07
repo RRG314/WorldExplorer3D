@@ -40,15 +40,19 @@ function emitChange(appCtx, detail) {
   appCtx?.invalidateTraversalNetworks?.('editable_world_change');
 }
 
-function setBatchedBuildingSuppressed(mesh, sourceFeatureId, suppressed) {
+function setBatchedBuildingSuppressed(mesh, sourceFeatureId, suppressed, reason = 'editable-world') {
   const index = mesh?.geometry?.index;
   const ranges = mesh?.userData?.editableBuildingIndexRanges;
   if (!index?.array || !Array.isArray(ranges) || ranges.length === 0) return false;
   const matching = ranges.filter((range) => range.sourceBuildingId === sourceFeatureId);
   if (matching.length === 0) return false;
   let savedBySource = mesh.userData.editableBuildingSavedIndices;
+  const reasonsBySource = mesh.userData.buildingSuppressionReasons ||= new Map();
+  const reasons = reasonsBySource.get(sourceFeatureId) || new Set();
 
   if (suppressed) {
+    reasons.add(reason);
+    reasonsBySource.set(sourceFeatureId, reasons);
     savedBySource ||= mesh.userData.editableBuildingSavedIndices = new Map();
     if (savedBySource.has(sourceFeatureId)) return false;
     const saved = matching.map((range) => ({
@@ -65,6 +69,9 @@ function setBatchedBuildingSuppressed(mesh, sourceFeatureId, suppressed) {
     });
     savedBySource.set(sourceFeatureId, saved);
   } else {
+    reasons.delete(reason);
+    if (reasons.size > 0) return false;
+    reasonsBySource.delete(sourceFeatureId);
     if (!savedBySource) return false;
     const saved = savedBySource.get(sourceFeatureId);
     if (!saved) return false;
@@ -73,6 +80,32 @@ function setBatchedBuildingSuppressed(mesh, sourceFeatureId, suppressed) {
   }
   index.needsUpdate = true;
   return true;
+}
+
+export function setBuildingPresentationSuppressed(appCtx, sourceFeatureId, suppressed, reason = 'external-presentation') {
+  const sourceId = String(sourceFeatureId || '');
+  if (!sourceId) return Object.freeze({ directMeshes: 0, batchUpdates: 0 });
+  let directMeshes = 0;
+  let batchUpdates = 0;
+  const meshes = [
+    ...(Array.isArray(appCtx?.buildingMeshes) ? appCtx.buildingMeshes : []),
+    ...(Array.isArray(appCtx?.landuseMeshes) ? appCtx.landuseMeshes : [])
+  ];
+  for (const mesh of meshes) {
+    if (!mesh) continue;
+    const ranges = mesh.userData?.editableBuildingIndexRanges || [];
+    if (ranges.some((range) => range.sourceBuildingId === sourceId)) {
+      if (setBatchedBuildingSuppressed(mesh, sourceId, suppressed, reason)) batchUpdates += 1;
+      continue;
+    }
+    if (String(mesh.userData?.sourceBuildingId || '') !== sourceId) continue;
+    const reasons = mesh.userData.buildingSuppressionReasons ||= new Set();
+    if (suppressed) reasons.add(reason);
+    else reasons.delete(reason);
+    mesh.visible = reasons.size === 0;
+    directMeshes += 1;
+  }
+  return Object.freeze({ directMeshes, batchUpdates });
 }
 
 export function refreshEditableBuildingVisibility(appCtx) {
@@ -89,7 +122,7 @@ export function refreshEditableBuildingVisibility(appCtx) {
     if (ranges.length > 0) {
       const sourceIds = new Set(ranges.map((range) => range.sourceBuildingId).filter(Boolean));
       sourceIds.forEach((sourceFeatureId) => {
-        if (setBatchedBuildingSuppressed(mesh, sourceFeatureId, suppressedIds.has(sourceFeatureId))) {
+        if (setBatchedBuildingSuppressed(mesh, sourceFeatureId, suppressedIds.has(sourceFeatureId), 'editable-world')) {
           batchUpdates += 1;
         }
       });
@@ -97,7 +130,10 @@ export function refreshEditableBuildingVisibility(appCtx) {
     }
     const sourceFeatureId = String(mesh.userData?.sourceBuildingId || '');
     if (!sourceFeatureId) continue;
-    mesh.visible = !suppressedIds.has(sourceFeatureId);
+    const reasons = mesh.userData.buildingSuppressionReasons ||= new Set();
+    if (suppressedIds.has(sourceFeatureId)) reasons.add('editable-world');
+    else reasons.delete('editable-world');
+    mesh.visible = reasons.size === 0;
     directMeshes += 1;
   }
   appCtx.invalidateTraversalNetworks?.('editable_building_visibility');

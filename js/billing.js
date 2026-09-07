@@ -1,4 +1,4 @@
-import { getReturnUrlBase, postProtectedFunction } from './function-api.js?v=1';
+import { getReturnUrlBase, postProtectedFunction } from './function-api.js?v=3';
 
 export async function createCheckoutSession(plan) {
   const payload = await postProtectedFunction(

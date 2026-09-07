@@ -572,8 +572,10 @@ try {
           Number(second?.surfaceChain?.actor?.vehicleContact?.chassisClearance) >= -0.002 &&
           Number(second?.surfaceChain?.actor?.vehicleContact?.chassisClearance) <= 0.12,
         canonicalFarNpc: Number(population.pedestrians || 0) === 0 ||
-          population.pedestrianRepresentation === 'articulated-instanced-character-v2' && population.pedestrianLegacyBlockFallback === false,
-        articulatedFarNpc: Number(population.pedestrians || 0) === 0 || Number(population.pedestrianRenderedParts || 0) >= 17,
+          population.pedestrianRepresentation === 'curated-only-local-models' &&
+          Number(population.proceduralPedestrianMeshes || 0) === 0,
+        curatedFarNpc: Number(population.pedestrians || 0) === 0 ||
+          Number(population.curatedPedestrianHosts || 0) === Number(population.pedestrians || 0),
         pedestrianPopulationRequiresSafePaths:
           Number(pedestrianGraph.provenance?.mappedPaths || 0) + Number(pedestrianGraph.provenance?.inferredSidewalks || 0) > 0
             ? firstVisiblePeople > 0 && secondVisiblePeople > 0
@@ -583,12 +585,15 @@ try {
           vehicles.length > 0 ||
           (
             firstVisibleVehicles > 0 && secondVisibleVehicles > 0 &&
-            Number(population.vehicleRenderedParts || 0) >= 17 &&
+            population.vehiclePresentation === 'curated-only-local-models' &&
+            Number(population.proceduralVehicleMeshes || 0) === 0 &&
+            Number(population.curatedVehicleHosts || 0) === Number(population.vehicles || 0) &&
             Array.isArray(population.vehicleDimensions) && population.vehicleDimensions.length > 0
           ),
-        articulatedTrafficVehicles:
+        curatedTrafficVehicles:
           Number(population.vehicles || 0) === 0 ||
-          Number(population.vehicleRenderedParts || 0) >= 17,
+          population.vehiclePresentation === 'curated-only-local-models' &&
+          Number(population.proceduralVehicleMeshes || 0) === 0,
         parkedCarsOutsideTravelLane: vehicles.filter((vehicle) => vehicle.parking).every((vehicle) => vehicle.parking.fullyOutsideTravelLane === true),
         vehicleRoadAttitudeMatches:
           Number(activePopulation.vehicleAttitudeMismatches || 0) === 0 &&

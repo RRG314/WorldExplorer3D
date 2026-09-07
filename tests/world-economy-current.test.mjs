@@ -10,6 +10,7 @@ import {
   COMMERCE_STORAGE_KEY,
   createLocalCommerceModel,
   mappedCommercePlaces,
+  STARTING_EXPLORER_CREDITS,
   stockForStore
 } from '../app/js/urban-sandbox/commerce-model.js';
 
@@ -44,7 +45,7 @@ test('business classes have stable, distinct game stock and no immediate buy-sel
   assert.equal([...hardware.standard, ...convenience.standard].every((item) => item.buyPrice > item.sellPrice), true);
 });
 
-test('one persistent Explorer Credits wallet serves every mapped business class', () => {
+test('one persistent Explorer wallet migrates legacy balances and serves every mapped business class', () => {
   const storage = memoryStorage({
     [COMMERCE_STORAGE_KEY]: JSON.stringify({ schemaVersion: 1, credits: 73, purchases: {}, claimedTrades: {}, transactions: [] })
   });
@@ -53,11 +54,11 @@ test('one persistent Explorer Credits wallet serves every mapped business class'
   const hardware = { id: 'node:hardware', name: 'Hardware', kind: 'hardware', provenance: 'loaded-map-poi' };
   const snapshot = economy.snapshot(hardware);
   assert.equal(economy.type, 'WorldExplorerEconomy');
-  assert.equal(snapshot.credits, 73);
+  assert.equal(snapshot.credits, 146000);
   const material = snapshot.standard.find((item) => item.category === 'material' || item.category === 'repair-supply');
   assert.ok(material);
   assert.equal(economy.buy(hardware, material.id).ok, true);
-  assert.equal(JSON.parse(storage.getItem(COMMERCE_STORAGE_KEY)).schemaVersion, 2);
+  assert.equal(JSON.parse(storage.getItem(COMMERCE_STORAGE_KEY)).schemaVersion, 4);
 });
 
 test('Earth material bundles keep exact mass when prepared for Surveyor cargo', () => {
@@ -100,5 +101,5 @@ test('approved research lots are sellable only to their game-authorized business
   assert.equal(convenience.sellable.some((item) => item.instanceId === 'approved:sample:lot'), false);
   assert.equal(pawn.sellable.some((item) => item.instanceId === 'approved:sample:lot'), true);
   assert.equal(economy.sell({ id: 'store:convenience', name: 'Corner shop', kind: 'convenience' }, 'approved:sample:lot').reason, 'store_not_authorized_for_item');
-  assert.equal(economy.sell({ id: 'store:pawn', name: 'Research exchange', kind: 'pawn' }, 'approved:sample:lot').credits, 172);
+  assert.equal(economy.sell({ id: 'store:pawn', name: 'Research exchange', kind: 'pawn' }, 'approved:sample:lot').credits, STARTING_EXPLORER_CREDITS + 52);
 });

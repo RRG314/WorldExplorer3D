@@ -1,4 +1,4 @@
-import { hasFirebaseConfig } from './firebase-init.js?v=56';
+import { hasFirebaseConfig } from './firebase-init.js?v=57';
 import { ensureSignedIn, observeAuth, signOutUser } from './auth-ui.js?v=55';
 import { enableAdminTester, getAccountOverview } from './billing.js?v=58';
 import {
@@ -17,6 +17,11 @@ import {
 } from './admin-dashboard-api.js?v=1';
 import { listContributionSubmissions, moderateContributionSubmission } from './contribution-api.js?v=1';
 import { moderateOverlayFeature } from './overlay-api.js?v=1';
+import {
+  getRealityCaptureModerationDetail,
+  listRealityCaptureModeration,
+  moderateRealityCapture
+} from './community-reality-capture-api.js?v=3';
 import {
   LANDING_PAGE_ENTRY_ID,
   cloneLandingContent,
@@ -119,6 +124,10 @@ const state = {
   legacyReviewer: null,
   legacyNotifications: null,
   legacySelectedId: '',
+  realityFilters: { status: 'review_required' },
+  realityItems: [],
+  realitySelectedId: '',
+  realityDetails: new Map(),
   userFilters: {
     search: '',
     role: 'all',
@@ -275,6 +284,10 @@ function selectedOverlayItem() {
 
 function selectedLegacyItem() {
   return state.legacyItems.find((item) => item.id === state.legacySelectedId) || null;
+}
+
+function selectedRealityItem() {
+  return state.realityItems.find((item) => item.captureId === state.realitySelectedId) || null;
 }
 
 function selectedUserItem() {
@@ -507,6 +520,26 @@ function renderModerationFilters() {
     return;
   }
 
+  if (state.currentModerationMode === 'reality') {
+    refs.moderationFilters.innerHTML = `
+      <label>
+        Status
+        <select id="realityStatusFilter">
+          ${optionMarkup([
+            ['review_required', 'Ready for review'],
+            ['processing_failed', 'Processing failed'],
+            ['processing', 'Processing'],
+            ['queued', 'Queued'],
+            ['approved', 'Approved'],
+            ['rejected', 'Rejected'],
+            ['all', 'All statuses']
+          ], state.realityFilters.status)}
+        </select>
+      </label>
+      <div class="filter-actions"><button type="button" class="secondary-btn" id="realityApplyFilters">Apply Filter</button></div>`;
+    return;
+  }
+
   refs.moderationFilters.innerHTML = `
     <label>
       Status
@@ -543,6 +576,18 @@ function renderModerationSummary() {
       <article class="metric-card"><span class="metric-label">Rejected</span><strong class="metric-value">${escapeHtml(String(summary.rejected || 0))}</strong></article>
       <article class="metric-card"><span class="metric-label">Published</span><strong class="metric-value">${escapeHtml(String(summary.published || 0))}</strong></article>
     `;
+    return;
+  }
+  if (state.currentModerationMode === 'reality') {
+    const counts = state.realityItems.reduce((summary, item) => {
+      summary[item.status] = Number(summary[item.status] || 0) + 1;
+      return summary;
+    }, {});
+    refs.moderationSummary.innerHTML = `
+      <article class="metric-card"><span class="metric-label">Review Ready</span><strong class="metric-value">${escapeHtml(String(counts.review_required || 0))}</strong></article>
+      <article class="metric-card"><span class="metric-label">Approved</span><strong class="metric-value">${escapeHtml(String(counts.approved || 0))}</strong></article>
+      <article class="metric-card"><span class="metric-label">Failed</span><strong class="metric-value">${escapeHtml(String(counts.processing_failed || 0))}</strong></article>
+      <article class="metric-card"><span class="metric-label">Privacy</span><strong class="metric-value">Brokered only</strong></article>`;
     return;
   }
   const summary = state.legacySummary || {};
@@ -749,18 +794,157 @@ function renderLegacyDetail() {
   `;
 }
 
+let disposeRealityModelPreview = null;
+
+function captureFootprintMarkup(points = []) {
+  const rows = Array.isArray(points) ? points.filter((point) => Number.isFinite(Number(point?.lat)) && Number.isFinite(Number(point?.lon))) : [];
+  if (rows.length < 3) return '<div class="detail-note">No mapped footprint snapshot was attached to this draft.</div>';
+  const lats = rows.map((point) => Number(point.lat));
+  const lons = rows.map((point) => Number(point.lon));
+  const minLat = Math.min(...lats);
+  const maxLat = Math.max(...lats);
+  const minLon = Math.min(...lons);
+  const maxLon = Math.max(...lons);
+  const width = Math.max(1e-9, maxLon - minLon);
+  const height = Math.max(1e-9, maxLat - minLat);
+  const svgPoints = rows.map((point) => {
+    const x = 12 + (Number(point.lon) - minLon) / width * 276;
+    const y = 168 - (Number(point.lat) - minLat) / height * 156;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  return `<svg class="capture-footprint" viewBox="0 0 300 180" role="img" aria-label="Mapped building footprint"><polygon points="${escapeHtml(svgPoints)}" fill="rgba(90,208,255,.18)" stroke="#5ad0ff" stroke-width="2"/></svg>`;
+}
+
+function mountRealityModelPreview(url) {
+  disposeRealityModelPreview?.();
+  disposeRealityModelPreview = null;
+  const canvas = document.getElementById('realityCaptureModelPreview');
+  if (!canvas || !url || !globalThis.THREE?.GLTFLoader) return;
+  const THREE = globalThis.THREE;
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(2, globalThis.devicePixelRatio || 1));
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x020811);
+  const camera = new THREE.PerspectiveCamera(42, 1, 0.01, 5000);
+  scene.add(new THREE.HemisphereLight(0xe8f7ff, 0x263544, 1.2));
+  const key = new THREE.DirectionalLight(0xffffff, 1.25);
+  key.position.set(4, 8, 5);
+  scene.add(key);
+  let root = null;
+  let frame = 0;
+  let disposed = false;
+  const resize = () => {
+    const width = Math.max(1, canvas.clientWidth);
+    const height = Math.max(1, canvas.clientHeight || 320);
+    renderer.setSize(width, height, false);
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+  };
+  resize();
+  const animate = () => {
+    if (disposed) return;
+    frame = requestAnimationFrame(animate);
+    if (root) root.rotation.y += 0.003;
+    renderer.render(scene, camera);
+  };
+  new THREE.GLTFLoader().load(url, (gltf) => {
+    if (disposed) return;
+    root = gltf.scene || gltf.scenes?.[0];
+    if (!root) return;
+    scene.add(root);
+    const box = new THREE.Box3().setFromObject(root);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    root.position.sub(center);
+    const radius = Math.max(size.x, size.y, size.z, 1);
+    camera.position.set(radius * 1.35, radius * 0.9, radius * 1.7);
+    camera.lookAt(0, 0, 0);
+    camera.near = Math.max(0.01, radius / 1000);
+    camera.far = radius * 20;
+    camera.updateProjectionMatrix();
+  }, undefined, () => {
+    const note = document.getElementById('realityCaptureModelStatus');
+    if (note) note.textContent = 'The protected preview could not load. Keep this capture unapproved until the model is inspected.';
+  });
+  animate();
+  disposeRealityModelPreview = () => {
+    disposed = true;
+    cancelAnimationFrame(frame);
+    root?.traverse?.((object) => {
+      if (!object?.isMesh) return;
+      object.geometry?.dispose?.();
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      materials.forEach((material) => material?.dispose?.());
+    });
+    renderer.dispose();
+  };
+}
+
+function renderRealityList() {
+  refs.moderationList.innerHTML = state.realityItems.map((item) => `
+    <article class="queue-card${item.captureId === state.realitySelectedId ? ' selected' : ''}" data-reality-id="${escapeHtml(item.captureId)}">
+      <div class="queue-card-top"><strong>${escapeHtml(item.building?.label || 'Mapped building')}</strong><span class="status-pill" data-status="${escapeHtml(item.status)}">${escapeHtml(item.status)}</span></div>
+      <div class="queue-card-meta">${escapeHtml(item.captureKind === 'interior_room' ? 'Interior room' : 'Exterior')} • ${escapeHtml(item.building?.locationLabel || item.building?.worldId || 'Earth')}</div>
+      <p>${escapeHtml(item.ownerDisplayName || 'Explorer')} • ${escapeHtml(item.processingPipelineVersion || 'pipeline pending')}</p>
+      <div class="queue-card-footer"><span>${escapeHtml(String(item.uploadSummary?.photoCount || 0))} photos</span><span>${escapeHtml(formatRelative(item.updatedAtMs))}</span></div>
+    </article>`).join('') || '<div class="empty-card">No reality captures match this status.</div>';
+}
+
+function renderRealityDetail() {
+  disposeRealityModelPreview?.();
+  disposeRealityModelPreview = null;
+  const item = selectedRealityItem();
+  if (!item) {
+    refs.moderationDetail.innerHTML = '<div class="empty-card">Select a capture to inspect its protected photos, model, footprint, quality, and alignment.</div>';
+    return;
+  }
+  const detail = state.realityDetails.get(item.captureId);
+  if (!detail) {
+    refs.moderationDetail.innerHTML = '<div class="empty-card">Loading protected capture detail…</div>';
+    return;
+  }
+  const capture = detail.capture || item;
+  const alignment = capture.review?.alignment || { positionOffset: { x: 0, y: 0, z: 0 }, rotationYDegrees: 0, scale: 1 };
+  const canModerate = capture.status === 'review_required' && !!detail.model?.url;
+  refs.moderationDetail.innerHTML = `
+    <div class="detail-header"><div><h3>${escapeHtml(capture.building?.label || 'Reality capture')}</h3><p>${escapeHtml(capture.captureKind === 'interior_room' ? capture.room?.label || 'Interior room' : 'Building exterior')} • ${escapeHtml(capture.building?.sourceBuildingId || '')}</p></div><span class="status-pill" data-status="${escapeHtml(capture.status)}">${escapeHtml(capture.status)}</span></div>
+    <div class="detail-grid">
+      <article class="detail-card"><span class="detail-label">Contributor</span><strong>${escapeHtml(capture.ownerDisplayName || 'Explorer')}</strong><p>Originals remain private</p></article>
+      <article class="detail-card"><span class="detail-label">Photos</span><strong>${escapeHtml(String(capture.uploadSummary?.photoCount || detail.thumbnails?.length || 0))}</strong><p>${escapeHtml(String(capture.uploadSummary?.totalBytes || 0))} bytes</p></article>
+      <article class="detail-card"><span class="detail-label">Pipeline</span><strong>${escapeHtml(capture.processingPipelineVersion || 'Pending')}</strong><p>Schema ${escapeHtml(String(capture.captureSchemaVersion || 1))}</p></article>
+      <article class="detail-card"><span class="detail-label">Runtime policy</span><strong>Visual only</strong><p>Canonical proxy collision/navigation</p></article>
+    </div>
+    <div class="capture-review-media">
+      <section class="detail-section"><div class="detail-section-title">Generated model</div>${detail.model?.url ? '<canvas id="realityCaptureModelPreview" class="capture-review-canvas"></canvas><p id="realityCaptureModelStatus" class="muted-inline">Drag-free review preview rotates automatically. Inspect alignment before approval.</p>' : '<div class="detail-note">No processed GLB is available. Approval is disabled.</div>'}</section>
+      <section class="detail-section"><div class="detail-section-title">Mapped footprint</div>${captureFootprintMarkup(capture.building?.footprintGeo)}</section>
+    </div>
+    <section class="detail-section"><div class="detail-section-title">Protected photo samples</div><div class="capture-photo-grid">${(detail.thumbnails || []).map((photo) => `<img src="${escapeHtml(photo.url)}" alt="Protected capture review photo" referrerpolicy="no-referrer">`).join('') || '<div class="detail-note">No review thumbnails are available.</div>'}</div></section>
+    <section class="detail-section"><div class="detail-section-title">Reviewed alignment</div><div class="capture-alignment-grid">
+      <label>X offset (m)<input id="captureAlignX" type="number" step="0.1" value="${escapeHtml(String(alignment.positionOffset?.x || 0))}"></label>
+      <label>Y offset (m)<input id="captureAlignY" type="number" step="0.1" value="${escapeHtml(String(alignment.positionOffset?.y || 0))}"></label>
+      <label>Z offset (m)<input id="captureAlignZ" type="number" step="0.1" value="${escapeHtml(String(alignment.positionOffset?.z || 0))}"></label>
+      <label>Rotation Y°<input id="captureAlignRotation" type="number" step="1" value="${escapeHtml(String(alignment.rotationYDegrees || 0))}"></label>
+      <label>Scale<input id="captureAlignScale" type="number" min="0.05" max="20" step="0.01" value="${escapeHtml(String(alignment.scale || 1))}"></label>
+    </div></section>
+    <section class="detail-section"><div class="detail-section-title">Moderation decision</div><textarea id="captureDecisionNote" maxlength="400" placeholder="Record visible privacy, quality, cleanup, or alignment issues.">${escapeHtml(capture.review?.note || '')}</textarea><div class="action-row"><a class="secondary-btn" target="_blank" rel="noreferrer" href="${escapeHtml(buildWorldUrl(capture.building?.lat, capture.building?.lon, capture.building?.label || 'Capture review'))}">Open mapped building</a><button id="captureApproveBtn" type="button" class="primary-btn" ${canModerate ? '' : 'disabled'}>Approve visual</button><button id="captureRejectBtn" type="button" class="danger-btn" ${capture.status === 'review_required' ? '' : 'disabled'}>Reject</button></div></section>`;
+  if (detail.model?.url) mountRealityModelPreview(detail.model.url);
+}
+
 function renderModeration() {
   refs.moderationTabs.querySelectorAll('button').forEach((button) => {
-    button.classList.toggle('active', button.dataset.mode === state.currentModerationMode);
+    button.classList.toggle('active', button.dataset.moderationMode === state.currentModerationMode);
   });
   renderModerationFilters();
   renderModerationSummary();
   if (state.currentModerationMode === 'overlay') {
     renderOverlayList();
     renderOverlayDetail();
-  } else {
+  } else if (state.currentModerationMode === 'legacy') {
     renderLegacyList();
     renderLegacyDetail();
+  } else {
+    renderRealityList();
+    renderRealityDetail();
   }
 }
 
@@ -1303,6 +1487,20 @@ async function loadLegacyQueue() {
   }
 }
 
+async function ensureRealityDetail(captureId) {
+  if (!captureId || state.realityDetails.has(captureId)) return;
+  state.realityDetails.set(captureId, await getRealityCaptureModerationDetail(captureId));
+}
+
+async function loadRealityQueue() {
+  const payload = await listRealityCaptureModeration(state.realityFilters.status);
+  state.realityItems = Array.isArray(payload.items) ? payload.items : [];
+  if (!state.realityItems.some((item) => item.captureId === state.realitySelectedId)) {
+    state.realitySelectedId = state.realityItems[0]?.captureId || '';
+  }
+  if (state.realitySelectedId) await ensureRealityDetail(state.realitySelectedId);
+}
+
 async function loadUsers() {
   const payload = await listAdminUsers(state.userFilters);
   state.users = Array.isArray(payload.items) ? payload.items : [];
@@ -1348,8 +1546,10 @@ async function ensureViewLoaded(view) {
   if (view === 'moderation') {
     if (state.currentModerationMode === 'overlay') {
       await loadOverlayQueue();
-    } else {
+    } else if (state.currentModerationMode === 'legacy') {
       await loadLegacyQueue();
+    } else {
+      await loadRealityQueue();
     }
     return;
   }
@@ -1492,6 +1692,43 @@ async function handleLegacyDecision(status) {
   } catch (error) {
     console.error('[admin-dashboard] Legacy moderation failed:', error);
     setStatus(error?.message || 'Could not update legacy moderation state.', 'warn');
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function handleRealityDecision(decision) {
+  const item = selectedRealityItem();
+  if (!item) return;
+  const numberValue = (id, fallback) => {
+    const value = Number(document.getElementById(id)?.value);
+    return Number.isFinite(value) ? value : fallback;
+  };
+  const alignment = {
+    positionOffset: {
+      x: numberValue('captureAlignX', 0),
+      y: numberValue('captureAlignY', 0),
+      z: numberValue('captureAlignZ', 0)
+    },
+    rotationYDegrees: numberValue('captureAlignRotation', 0),
+    scale: numberValue('captureAlignScale', 1)
+  };
+  setBusy(true);
+  setStatus(decision === 'approved' ? 'Approving reviewed capture visual…' : 'Rejecting capture…');
+  try {
+    await moderateRealityCapture(
+      item.captureId,
+      decision,
+      sanitizeLongText(document.getElementById('captureDecisionNote')?.value || '', 400),
+      alignment
+    );
+    state.realityDetails.delete(item.captureId);
+    await Promise.all([loadRealityQueue(), loadActivity()]);
+    renderModeration();
+    setStatus(decision === 'approved' ? 'Capture visual approved. Existing identity and proxy collision remain authoritative.' : 'Capture rejected and kept out of runtime presentation.', 'ok');
+  } catch (error) {
+    console.error('[admin-dashboard] Reality capture moderation failed:', error);
+    setStatus(error?.message || 'Could not moderate this capture.', 'warn');
   } finally {
     setBusy(false);
   }
@@ -1685,6 +1922,20 @@ document.addEventListener('click', async (event) => {
     return;
   }
 
+  const realityCard = target.closest('[data-reality-id]');
+  if (realityCard) {
+    state.realitySelectedId = realityCard.getAttribute('data-reality-id') || '';
+    renderRealityList();
+    renderRealityDetail();
+    try {
+      await ensureRealityDetail(state.realitySelectedId);
+      renderRealityDetail();
+    } catch (error) {
+      setStatus(error?.message || 'Could not load protected capture detail.', 'warn');
+    }
+    return;
+  }
+
   const userCard = target.closest('[data-user-id]');
   if (userCard) {
     state.selectedUserId = userCard.getAttribute('data-user-id') || '';
@@ -1750,6 +2001,23 @@ document.addEventListener('click', async (event) => {
     return;
   }
 
+  if (target.id === 'realityApplyFilters') {
+    state.realityFilters.status = sanitizeText(document.getElementById('realityStatusFilter')?.value || 'review_required', 40).toLowerCase();
+    setBusy(true);
+    setStatus('Loading reality capture queue…');
+    try {
+      state.realityDetails.clear();
+      await loadRealityQueue();
+      renderModeration();
+      setStatus('Reality capture queue updated.', 'ok');
+    } catch (error) {
+      setStatus(error?.message || 'Could not filter the reality capture queue.', 'warn');
+    } finally {
+      setBusy(false);
+    }
+    return;
+  }
+
   if (target.id === 'overlayApproveBtn') {
     await handleOverlayDecision('approve');
     return;
@@ -1768,6 +2036,14 @@ document.addEventListener('click', async (event) => {
   }
   if (target.id === 'legacyRejectBtn') {
     await handleLegacyDecision('rejected');
+    return;
+  }
+  if (target.id === 'captureApproveBtn') {
+    await handleRealityDecision('approved');
+    return;
+  }
+  if (target.id === 'captureRejectBtn') {
+    await handleRealityDecision('rejected');
     return;
   }
 

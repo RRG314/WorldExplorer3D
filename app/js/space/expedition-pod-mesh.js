@@ -1,3 +1,5 @@
+import { attachCuratedExpeditionPod } from './curated-expedition-pod.js?v=4';
+
 function podMaterial(color, options = {}) {
   return new THREE.MeshPhongMaterial({
     color,
@@ -81,6 +83,10 @@ function createExpeditionPodMesh() {
     ring.scale.z = 0.9;
   }
 
+  pod.traverse((object) => {
+    if (object?.isMesh) object.userData.defaultPodFallback = true;
+  });
+
   const entryPlasma = new THREE.Group();
   entryPlasma.name = 'podEntryPlasma';
   entryPlasma.visible = false;
@@ -130,6 +136,7 @@ function createExpeditionPodMesh() {
   });
   pod.add(exhaust);
   pod.scale.setScalar(1.18);
+  void attachCuratedExpeditionPod(THREE, pod);
   return pod;
 }
 

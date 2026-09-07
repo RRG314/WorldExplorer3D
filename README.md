@@ -17,10 +17,10 @@ space.
   · <a href="ROADMAP.md">Roadmap</a>
 </p>
 
-![Walking beside USS Constellation in Baltimore's Inner Harbor](assets/readme/baltimore-harbor.webp)
+![An explorer and dog beside the current BMW, pedestrians, and traffic in World Explorer 3D](assets/readme/living-world-update-current.webp)
 
-*Baltimore’s Inner Harbor, with the mapped USS Constellation identified as a
-sloop-of-war museum ship.*
+*The current living-world build: a redesigned Explorer, permanent dog companion,
+BMW, pedestrians, and traffic sharing the same playable world.*
 
 ## A world you can play in
 
@@ -53,7 +53,8 @@ active world.*
 ## What you can do
 
 - Explore on foot, by car, drone, plane, helicopter, boat, ship, rover,
-  astronaut, or spacecraft, or use optional Live GPS play while walking.
+  astronaut on solid planetary surfaces, or spacecraft; or use optional Live
+  GPS play while walking.
 - Drive vehicle families with distinct vehicle handling, visible condition, and
   enterable responder vehicles.
 - Visit supported mapped airports to board aircraft, choose pilot or passenger
@@ -83,11 +84,18 @@ active world.*
 
 ## Version 5.2
 
-Version 5.2 extends the 5.1 sandbox with the Interstellar Expeditions Alpha,
-connected virtual property and Explorer Credits, a clearer gameplay menu, and
-faster cleanup when moving between worlds. The established 5.1 Earth,
-Ocean, vehicle, flight, fieldwork, Backpack, Journal, and multiplayer paths
-remain part of the release.
+Version 5.2 makes the sandbox feel more alive and more connected. The current
+Explorer and companion travel together, roads carry denser traffic and
+pedestrians, mapped businesses connect to useful supplies and services, and one
+wallet follows the player through property, fieldwork, vehicle upgrades, and
+space. A shorter optional First Journey, configurable controls, calmer nearby
+prompts, and rebuilt touch and accessibility settings make it easier to start
+playing without covering the screen in instructions.
+
+Beyond Earth, Interstellar Expeditions Alpha now connects shipboard life,
+planetary fieldwork, Pathfinder travel, and a surprise pirate interception in
+one continuing voyage. The established Earth, Ocean, vehicle, flight,
+Backpack, Journal, multiplayer, and free-exploration paths remain available.
 
 Interstellar Expeditions are intentionally labeled Alpha. They provide a
 connected playable journey and saved progression, while ship art, crew motion,

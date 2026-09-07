@@ -112,10 +112,12 @@ export function supportPointConflictsWithDriveableRoad(feature, options = {}) {
     if (distanceToRoadCenterline(road, x, z) > corridorRadius) continue;
     const otherY = sampleFeatureSurfaceY(road, x, z);
     if (!Number.isFinite(otherY)) continue;
-    // A pier occupies the complete vertical interval below its deck. Reject a
-    // placement when any other driveable surface crosses that interval, with
-    // enough headroom that the column cannot visually intrude into traffic.
-    if (otherY >= supportBottomY - 0.35 && otherY <= supportTopY + 2.2) return true;
+    // A pier occupies the vertical interval below its deck. Reject a placement
+    // only when another driveable surface crosses that interval. A parallel
+    // carriageway at the same deck elevation sits above the pier top and can
+    // legitimately share the bent; treating vehicle headroom above the pier as
+    // a collision left clipped dual-carriageway bridge ends floating.
+    if (otherY >= supportBottomY - 0.35 && otherY <= supportTopY + 0.2) return true;
   }
   return false;
 }

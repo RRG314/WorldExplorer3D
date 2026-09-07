@@ -1,8 +1,19 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { carSpeedToMph } from '../physics/vehicle-speed-units.js?v=2';
 import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleDefinitionById } from '../engine/vehicle-catalog.js?v=6';
-import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=9';
-import { createUrbanNpcVisual } from './npc-visuals.js?v=7';
+import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=11';
+import {
+  attachCuratedTrafficVehicle,
+  CURATED_RESPONDER_ASSET_ID,
+  disposeCuratedTrafficVehicle
+} from './curated-traffic-vehicle.js?v=4';
+import { createUrbanNpcVisual } from './npc-visuals.js?v=9';
+import {
+  attachCuratedExplorerCharacter,
+  disposeCuratedCharacter,
+  RESPONDER_ASSET_ID,
+  updateCuratedCharacterAnimation
+} from '../walking/curated-explorer-character.js?v=8';
 import { createResponderResponseModel, responderAgencyProfile, responderApproachSpeed } from './responder-model.js?v=4';
 import { vehicleDoorPosition } from './vehicle-model.js?v=7';
 import { applyConditionImpact } from './impact-model.js?v=1';
@@ -13,8 +24,9 @@ import { ENTITY_LIFECYCLE_MS, lifecycleExpired, markLifecycleStart } from '../ru
 
 const RESPONDER_BASE_Y = VEHICLE_ROOT_TO_GROUND_METERS;
 const RESPONDER_DESPAWN_DISTANCE = 58;
-const OFFICER_CONTACT_DISTANCE = 3.2;
-const OFFICER_DEPLOY_DISTANCE = 75;
+const OFFICER_CONTACT_DISTANCE = 3.6;
+const OFFICER_ARREST_HOLD_SECONDS = 2;
+const OFFICER_DEPLOY_DISTANCE = 10;
 const OFFICER_APPROACH_DISTANCE = 80;
 
 function finite(value, fallback = 0) {
@@ -27,6 +39,25 @@ function angleDelta(target, current) {
   while (delta > Math.PI) delta -= Math.PI * 2;
   while (delta < -Math.PI) delta += Math.PI * 2;
   return delta;
+}
+
+function characterPresentation(root) {
+  let fallbackMeshCount = 0;
+  let visibleFallbackMeshCount = 0;
+  root?.traverse?.((object) => {
+    if (object?.userData?.defaultCharacterFallback !== true) return;
+    fallbackMeshCount += 1;
+    if (object.visible !== false) visibleFallbackMeshCount += 1;
+  });
+  return Object.freeze({
+    curatedAssetId: String(root?.userData?.curatedCharacterAssetId || ''),
+    fallbackMeshCount,
+    visibleFallbackMeshCount,
+    proceduralCharacterMeshes: Number(root?.userData?.proceduralCharacterMeshCount || 0),
+    curatedEquipmentAssetId: String(root?.userData?.curatedEquipmentAssetId ||
+      root?.children?.find?.((child) => child?.userData?.equipmentPresentation)?.userData?.curatedEquipmentAssetId || ''),
+    proceduralEquipmentMeshes: Number(root?.userData?.proceduralEquipmentMeshCount || 0)
+  });
 }
 
 function copyRoadAnchor(hit, fallback = {}) {
@@ -55,6 +86,19 @@ function roadContactPoseAtHeading(x, z, y, yaw, variant, preferredRoad = null, f
       const road = roadAnchorNear(sampleX, sampleZ, y, preferredRoad);
       return Number.isFinite(road?.y) ? Number(road.y) : NaN;
     }
+  });
+}
+
+function terrainContactPoseAtHeading(x, z, y, yaw, variant, fallback = {}) {
+  return resolveVehicleRoadContactPose({
+    x,
+    y,
+    z,
+    yaw,
+    pitch: fallback.pitch,
+    roll: fallback.roll,
+    variant,
+    sampleSurface: (sampleX, sampleZ) => surfaceY(sampleX, sampleZ, y)
   });
 }
 
@@ -176,6 +220,14 @@ function createUrbanResponderRuntime(options = {}) {
     visual.root.rotation.set(responder.pitch, responder.yaw, responder.roll);
     group.add(visual.root);
     responders.push(responder);
+    visual.root.userData.disposeCuratedTrafficVehicle = () => disposeCuratedTrafficVehicle(visual.root);
+    void attachCuratedTrafficVehicle(THREE, visual.root, {
+      assetId: CURATED_RESPONDER_ASSET_ID,
+      responder: true,
+      color: profile.color,
+      dimensionsMeters: variant,
+      isCurrent: () => active() && responders.includes(responder)
+    });
     return responder;
   }
 
@@ -204,21 +256,35 @@ function createUrbanResponderRuntime(options = {}) {
       z,
       yaw: responder.yaw,
       activeElapsed: 0,
+      contactElapsed: 0,
+      arrestRequested: false,
       fireCooldown: .9,
       shotsFired: 0,
       condition: 1,
       resistance: 105,
       lootClaimed: false
     };
+    visual.root.userData.disposeCuratedCharacter = () => disposeCuratedCharacter(visual.root);
+    visual.root.userData.updateCuratedCharacterAnimation = (moving, deltaTime, running) =>
+      updateCuratedCharacterAnimation(visual.root, moving, deltaTime, running);
+    void attachCuratedExplorerCharacter(THREE, visual.root, {
+      assetId: RESPONDER_ASSET_ID,
+      role: 'civic-responder-character',
+      failClosed: true,
+      hideAuthoredWeapons: true,
+      isCurrent: () => active() && responder.officer?.visual?.root === visual.root
+    });
     return responder.officer;
   }
 
   function updateOfficer(responder, dt, civic, actor, returning) {
     const distanceToActor = actor ? Math.hypot(responder.x - finite(actor.x), responder.z - finite(actor.z)) : Infinity;
-    // A mapped road can legitimately end tens of metres from the reported
-    // location. Once the response vehicle stops, continue the approach on
-    // foot instead of leaving the unit parked indefinitely on that road.
-    if (!responder.officer && !returning && responder.speed <= 2.8 && distanceToActor <= OFFICER_DEPLOY_DISTANCE) spawnOfficer(responder);
+    const armedIncident = ['weapon_discharge', 'explosive_use'].includes(String(civic?.lastEvent?.kind || ''));
+    const deployDistance = armedIncident ? 30 : OFFICER_DEPLOY_DISTANCE;
+    // Keep the unit in its vehicle for the pursuit. The officer deploys only
+    // after the curated response car has closed on the actor; armed incidents
+    // use a safer tactical stand-off so the ranged-response path still works.
+    if (!responder.officer && !returning && responder.speed <= 2.8 && distanceToActor <= deployDistance) spawnOfficer(responder);
     const officer = responder.officer;
     if (!officer) return;
     if (Number(officer.condition ?? 1) <= .05) {
@@ -249,7 +315,8 @@ function createUrbanResponderRuntime(options = {}) {
     const dz = finite(actor?.z) - officer.z;
     const distance = Math.hypot(dx, dz);
     officer.yaw = Math.atan2(dx, dz);
-    if (!returning && distance > OFFICER_CONTACT_DISTANCE && distance < OFFICER_APPROACH_DISTANCE) {
+    const approaching = !returning && distance > OFFICER_CONTACT_DISTANCE && distance < OFFICER_APPROACH_DISTANCE;
+    if (approaching) {
       const speed = Math.min(3.2, Math.max(0, distance - OFFICER_CONTACT_DISTANCE + .35) * .9);
       officer.x += Math.sin(officer.yaw) * speed * dt;
       officer.z += Math.cos(officer.yaw) * speed * dt;
@@ -257,7 +324,7 @@ function createUrbanResponderRuntime(options = {}) {
     }
     officer.visual.root.position.set(officer.x, officer.y, officer.z);
     officer.visual.root.rotation.y = officer.yaw;
-    const armedIncident = ['weapon_discharge', 'explosive_use'].includes(String(civic?.lastEvent?.kind || ''));
+    officer.visual.updateAnimation(dt, approaching, approaching);
     const mayFire = !returning && armedIncident && Number(civic?.level || 0) >= 2 &&
       officer.activeElapsed >= 1.25 && distance >= 4 && distance <= 32;
     officer.visual.setReaction(mayFire ? 'armed' : distance <= 7 ? 'watching' : 'armed');
@@ -279,8 +346,18 @@ function createUrbanResponderRuntime(options = {}) {
         officer.fireCooldown = 1.35;
       }
     }
-    if (!returning && Number(civic?.level || 0) >= 2 && appCtx.Walk?.state?.mode === 'walk' && distance <= OFFICER_CONTACT_DISTANCE && officer.activeElapsed >= 1.2) {
-      options.onArrest?.({ officerId: officer.id, responderId: responder.id });
+    const arrestContact = !returning && Number(civic?.level || 0) >= 2 &&
+      appCtx.Walk?.state?.mode === 'walk' && distance <= OFFICER_CONTACT_DISTANCE;
+    officer.contactElapsed = arrestContact
+      ? Math.min(OFFICER_ARREST_HOLD_SECONDS, Number(officer.contactElapsed || 0) + dt)
+      : 0;
+    if (arrestContact && !officer.arrestRequested && officer.contactElapsed >= OFFICER_ARREST_HOLD_SECONDS) {
+      officer.arrestRequested = true;
+      options.onArrest?.({
+        officerId: officer.id,
+        responderId: responder.id,
+        continuousContactSeconds: officer.contactElapsed
+      });
     }
   }
 
@@ -289,11 +366,16 @@ function createUrbanResponderRuntime(options = {}) {
       ? responder.origin
       : actorWithinSearch ? actor : civic.searchCenter || actor;
     if (!raw) return responder.origin;
+    if (!returning && actorWithinSearch) {
+      return {
+        x: finite(raw.x),
+        z: finite(raw.z),
+        y: surfaceY(raw.x, raw.z, responder.y - RESPONDER_BASE_Y),
+        road: null,
+        pursuitMode: 'cross-terrain-direct'
+      };
+    }
     const road = roadAnchorNear(raw.x, raw.z, raw.y, responder.road);
-    // Stay on the mapped road even when its nearest endpoint is a block from
-    // the incident. The vehicle stops at that endpoint and the officer covers
-    // the remaining distance on foot; using the raw off-road point here made
-    // road contact pull the moving vehicle back to the endpoint forever.
     if (road && road.distance <= OFFICER_DEPLOY_DISTANCE) return road;
     return { x: finite(raw.x), z: finite(raw.z), y: surfaceY(raw.x, raw.z, responder.y - RESPONDER_BASE_Y), road: responder.road };
   }
@@ -326,6 +408,7 @@ function createUrbanResponderRuntime(options = {}) {
       responder.navigationTarget = movementTarget(responder, civic, actor, returning, actorWithinSearch);
     }
     const target = responder.navigationTarget;
+    const crossTerrainPursuit = !returning && target?.pursuitMode === 'cross-terrain-direct';
     const dx = target.x - responder.x;
     const dz = target.z - responder.z;
     const distance = Math.hypot(dx, dz);
@@ -336,7 +419,8 @@ function createUrbanResponderRuntime(options = {}) {
     const steeringRate = 2.8 + Math.min(2.7, headingError * 1.35);
     responder.yaw += angleDelta(steeringTargetYaw, responder.yaw) * Math.min(1, dt * steeringRate);
     const civicLevel = Math.max(1, Number(civic.level) || 1);
-    const stopDistance = returning ? 4 : actorWithinSearch ? 9 : 15;
+    const armedIncident = ['weapon_discharge', 'explosive_use'].includes(String(civic?.lastEvent?.kind || ''));
+    const stopDistance = returning ? 4 : armedIncident ? 27 : actorWithinSearch ? 9 : 15;
     const targetSpeed = responderApproachSpeed({
       distance,
       level: civicLevel,
@@ -345,9 +429,17 @@ function createUrbanResponderRuntime(options = {}) {
     });
     const acceleration = targetSpeed > responder.speed ? 7.5 : 11;
     responder.speed += Math.sign(targetSpeed - responder.speed) * Math.min(Math.abs(targetSpeed - responder.speed), acceleration * dt);
+    // Response units need deterministic convoy right-of-way. If every unit
+    // yields to every other unit while converging on one off-road target, a
+    // pair can deadlock at the spawn point. Earlier dispatched units lead;
+    // later units avoid them and retain separation.
+    const responderIndex = responders.indexOf(responder);
     const vehicleBlockers = [
-      ...responders.filter((entry) => entry !== responder),
-      ...(options.getVehicles?.() || []).filter((entry) => !entry.attachedToPlayer)
+      ...responders.slice(0, Math.max(0, responderIndex)),
+      // Ambient road traffic is expected to yield to an active emergency
+      // response. Keeping its road-lane blockers active during a direct
+      // cross-terrain pursuit can pin the lead unit to the dispatch point.
+      ...(crossTerrainPursuit ? [] : (options.getVehicles?.() || []).filter((entry) => !entry.attachedToPlayer))
     ];
     const travelSpeed = responder.avoidanceRemaining > 0 ? Math.min(responder.speed, 5.5) : responder.speed;
     let nextX = responder.x + Math.sin(responder.yaw) * travelSpeed * dt;
@@ -390,8 +482,31 @@ function createUrbanResponderRuntime(options = {}) {
         nextZ = responder.z;
       }
     }
+    if (crossTerrainPursuit && options.isBlockedPoint?.(nextX, nextZ, responder.variant) === true) {
+      const side = responder.avoidanceSide || 1;
+      const offsets = [side, -side];
+      const alternate = offsets.map((direction) => {
+        const yaw = responder.yaw + direction * .72;
+        return {
+          yaw,
+          x: responder.x + Math.sin(yaw) * Math.min(travelSpeed, 4.6) * dt,
+          z: responder.z + Math.cos(yaw) * Math.min(travelSpeed, 4.6) * dt
+        };
+      }).find((candidate) => options.isBlockedPoint?.(candidate.x, candidate.z, responder.variant) !== true);
+      if (alternate) {
+        responder.yaw = alternate.yaw;
+        nextX = alternate.x;
+        nextZ = alternate.z;
+        responder.avoidanceSide = side;
+        responder.avoidanceRemaining = 1.1;
+      } else {
+        responder.speed = 0;
+        nextX = responder.x;
+        nextZ = responder.z;
+      }
+    }
     const road = roadAnchorNear(nextX, nextZ, responder.y - RESPONDER_BASE_Y, responder.road);
-    if (road && road.distance <= 14) {
+    if (!crossTerrainPursuit && road && road.distance <= 14) {
       const roadGrip = Math.min(.72, dt * 4.5);
       responder.x = nextX + (road.x - nextX) * roadGrip;
       responder.z = nextZ + (road.z - nextZ) * roadGrip;
@@ -408,15 +523,15 @@ function createUrbanResponderRuntime(options = {}) {
         responder.y = surfaceY(responder.x, responder.z, responder.y - RESPONDER_BASE_Y) + RESPONDER_BASE_Y;
       }
     }
-    const contactPose = roadContactPoseAtHeading(
-      responder.x,
-      responder.z,
-      responder.y - RESPONDER_BASE_Y,
-      responder.yaw,
-      responder.variant,
-      responder.road,
-      responder
-    );
+    const contactPose = crossTerrainPursuit
+      ? terrainContactPoseAtHeading(
+        responder.x, responder.z, responder.y - RESPONDER_BASE_Y,
+        responder.yaw, responder.variant, responder
+      )
+      : roadContactPoseAtHeading(
+        responder.x, responder.z, responder.y - RESPONDER_BASE_Y,
+        responder.yaw, responder.variant, responder.road, responder
+      );
     responder.y = contactPose.y + RESPONDER_BASE_Y;
     responder.pitch = contactPose.pitch;
     responder.roll = contactPose.roll;
@@ -548,12 +663,16 @@ function createUrbanResponderRuntime(options = {}) {
         z: Number(responder.z.toFixed(2)),
         yaw: Number(responder.yaw.toFixed(4)),
         speed: Number(responder.speed.toFixed(2)),
+        curatedAssetId: String(responder.visual.root.userData.curatedTrafficAssetId || ''),
+        vehiclePresentation: String(responder.visual.root.userData.vehiclePresentation || ''),
+        proceduralVehicleMeshes: Number(responder.visual.root.userData.proceduralVehicleMeshCount || 0),
         distanceToActor: actor ? Number(Math.hypot(responder.x - finite(actor.x), responder.z - finite(actor.z)).toFixed(2)) : null,
         navigationTarget: responder.navigationTarget ? Object.freeze({
           x: Number(responder.navigationTarget.x.toFixed(2)),
           z: Number(responder.navigationTarget.z.toFixed(2)),
           distance: Number(Math.hypot(responder.navigationTarget.x - responder.x, responder.navigationTarget.z - responder.z).toFixed(2)),
-          roadBound: !!responder.navigationTarget.road
+          roadBound: !!responder.navigationTarget.road,
+          pursuitMode: String(responder.navigationTarget.pursuitMode || (responder.navigationTarget.road ? 'mapped-road' : 'surface'))
         }) : null,
         officer: responder.officer ? Object.freeze({
           id: responder.officer.id,
@@ -561,7 +680,11 @@ function createUrbanResponderRuntime(options = {}) {
           y: Number(responder.officer.y.toFixed(2)),
           z: Number(responder.officer.z.toFixed(2)),
           armed: true,
-          shotsFired: responder.officer.shotsFired
+          shotsFired: responder.officer.shotsFired,
+          contactElapsed: Number(responder.officer.contactElapsed.toFixed(2)),
+          contactRequiredSeconds: OFFICER_ARREST_HOLD_SECONDS,
+          arrestRequested: responder.officer.arrestRequested === true,
+          ...characterPresentation(responder.officer.visual?.root)
         }) : null
       })))
     });

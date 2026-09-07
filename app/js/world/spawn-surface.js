@@ -27,7 +27,7 @@ function createWorldSpawnSurfaceApi(context) {
   }
 
   function terrainYAtWorld(x, z) {
-    if (appCtx.onMoon || appCtx.onMars) {
+    if (appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId) {
       const surfaceY = planetarySurfaceYAtRenderXZ(appCtx, x, z);
       if (Number.isFinite(surfaceY)) return surfaceY;
     }
@@ -37,14 +37,14 @@ function createWorldSpawnSurfaceApi(context) {
   }
 
   function driveCenterYAtWorld(x, z, preferRoad = false) {
-    if (appCtx.onMoon || appCtx.onMars) return terrainYAtWorld(x, z) + 1.2;
+    if (appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId) return terrainYAtWorld(x, z) + 1.2;
     const sample = appCtx.SurfaceQuery?.driveAt?.(x, z, { preferRoad });
     if (Number.isFinite(sample?.position?.y)) return sample.position.y + 1.2;
     return terrainYAtWorld(x, z) + 1.2;
   }
 
   function walkBaseYAtWorld(x, z) {
-    if (appCtx.onMoon || appCtx.onMars) return terrainYAtWorld(x, z);
+    if (appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId) return terrainYAtWorld(x, z);
     const sample = appCtx.SurfaceQuery?.walkAt?.(x, z);
     if (Number.isFinite(sample?.position?.y)) return sample.position.y;
     return terrainYAtWorld(x, z);

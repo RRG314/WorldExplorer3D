@@ -1,5 +1,5 @@
-import { withExpeditionChanges } from './model.js?v=11';
-import { resolveSystemFailure } from './failure-authority.js?v=2';
+import { withExpeditionChanges } from './model.js?v=12';
+import { resolveSystemFailure } from './failure-authority.js?v=3';
 import { reinforceGenerationTraining, wakeReserveSpecialist } from './long-duration.js?v=1';
 
 const STATION_VIEWS = Object.freeze({

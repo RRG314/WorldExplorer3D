@@ -9,7 +9,12 @@ const server = externalUrl ? null : await startStaticServer({
   ports: [4397, 4398, 4399]
 });
 const baseUrl = externalUrl || `http://127.0.0.1:${server.port}`;
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+// Own the browser process explicitly. Installed Chrome can occasionally stop
+// answering the graceful close command after consecutive WebGL contexts even
+// though those contexts have closed. BrowserServer gives this bounded verifier
+// a supported kill fallback instead of leaving an orphaned process behind.
+const browserServer = await chromium.launchServer({ headless: true, channel: 'chrome' });
+const browser = await chromium.connect(browserServer.wsEndpoint());
 
 async function createMobilePage() {
   const context = await browser.newContext({
@@ -142,6 +147,43 @@ async function runLiveGpsJourney() {
   }
 }
 
+async function closeWithin(label, close, timeoutMs = 8_000) {
+  let timer = null;
+  const timedOut = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(false), timeoutMs);
+  });
+  const closed = Promise.resolve().then(close).then(() => true, (error) => {
+    console.error(`[mobile-load] ${label} cleanup failed:`, error?.stack || error);
+    return false;
+  });
+  const ok = await Promise.race([closed, timedOut]);
+  clearTimeout(timer);
+  if (!ok) console.error(`[mobile-load] ${label} cleanup did not finish within ${timeoutMs} ms.`);
+  return ok;
+}
+
+async function terminateOwnedBrowserProcess(browserServer, timeoutMs = 4_000) {
+  const child = browserServer?.process?.();
+  if (!child || child.exitCode !== null || child.signalCode) return true;
+  const waitForExit = (durationMs) => new Promise((resolve) => {
+    let timer = null;
+    const done = () => {
+      clearTimeout(timer);
+      resolve(true);
+    };
+    child.once('exit', done);
+    timer = setTimeout(() => {
+      child.off('exit', done);
+      resolve(false);
+    }, durationMs);
+  });
+  child.kill('SIGTERM');
+  if (await waitForExit(timeoutMs)) return true;
+  child.kill('SIGKILL');
+  return waitForExit(2_000);
+}
+
+let verificationError = null;
 try {
   const standard = await runStandardJourney();
   const liveGps = await runLiveGpsJourney();
@@ -155,7 +197,12 @@ try {
       standard.loadProfile?.overpassTimeoutMs <= 12_000 &&
       standard.loadProfile?.maxTotalLoadMs <= 32_000,
     regionalContextRespectsMobileBudget:
-      Number(standard.regionalTransportSelection?.regionalCap || Infinity) <= 900,
+      Number(standard.regionalTransportSelection?.uniqueSelected || Infinity) <=
+        Number(standard.loadProfile?.maxRoadWays || 0) &&
+      Number(standard.regionalTransportSelection?.regionalCap || Infinity) <=
+        Number(standard.loadProfile?.maxRoadWays || 0) &&
+      Number(standard.regionalTransportSelection?.generalSelected || Infinity) <=
+        Number(standard.regionalTransportSelection?.regionalCap || 0),
     standardMappedWorldPresent:
       Number(standard.worldCounts?.roads || 0) >= 900 &&
       Number(standard.worldCounts?.buildings || 0) >= 2400,
@@ -176,7 +223,19 @@ try {
   };
   console.log(JSON.stringify(report, null, 2));
   assert.equal(report.ok, true, 'Mobile cold-start and Live GPS timing journey failed.');
+} catch (error) {
+  verificationError = error;
+  console.error(error?.stack || error);
 } finally {
-  await browser.close();
-  await server?.close();
+  const browserProcessClosed = await terminateOwnedBrowserProcess(browserServer);
+  const serverClosed = !server || await closeWithin('server', () => server.close(), 3_000);
+  if ((!browserProcessClosed || !serverClosed) && !verificationError) {
+    verificationError = new Error('Mobile verification passed its gameplay assertions but did not release its runtime resources.');
+  }
 }
+
+// This is a bounded command-line verifier. Explicit termination prevents a
+// disconnected Playwright transport or third-party browser handle from
+// outliving a completed gate and contaminating the next performance run.
+await new Promise((resolve) => setImmediate(resolve));
+process.exit(verificationError ? 1 : 0);

@@ -1,8 +1,9 @@
 import { constructOutpost, createOutpostSite, serviceOutpost } from './outpost.js?v=1';
 import { DEFAULT_CREW, getPropulsionProfile, getShipProfile } from './catalog.js?v=2';
-import { createExpeditionPlan } from './model.js?v=11';
+import { createExpeditionPlan } from './model.js?v=12';
 import { applyShipOperation } from './ship-operations.js?v=7';
-import { advanceToNextMilestone, resolveExpeditionEvent, startExpedition } from './simulation.js?v=8';
+import { advanceToNextMilestone, resolveExpeditionEvent, startExpedition } from './simulation.js?v=9';
+import { completePirateAftermath, resolvePirateInterception, transitionPirateInterception } from './hostile-interception.js?v=1';
 
 const COMMAND_TYPES = Object.freeze([
   'start',
@@ -11,7 +12,10 @@ const COMMAND_TYPES = Object.freeze([
   'ship-operation',
   'outpost-plan',
   'outpost-build',
-  'outpost-service'
+  'outpost-service',
+  'encounter-transition',
+  'encounter-resolve',
+  'encounter-complete'
 ]);
 
 function cleanText(value, max = 160) {
@@ -26,7 +30,11 @@ function normalizeExpeditionCommand(input = {}) {
     choiceId: cleanText(input.choiceId, 120),
     operationId: cleanText(input.operationId, 120),
     contactId: cleanText(input.contactId, 180),
-    outpostId: cleanText(input.outpostId, 220)
+    outpostId: cleanText(input.outpostId, 220),
+    encounterEvent: cleanText(input.encounterEvent, 80),
+    encounterResult: input.encounterResult && typeof input.encounterResult === 'object'
+      ? Object.freeze({ ...input.encounterResult })
+      : null
   });
 }
 
@@ -76,6 +84,12 @@ function executeExpeditionCommand(expedition, input = {}, options = {}) {
     result = constructOutpost(expedition, command.outpostId, nowMs);
   } else if (command.type === 'outpost-service') {
     result = serviceOutpost(expedition, command.outpostId, nowMs);
+  } else if (command.type === 'encounter-transition') {
+    result = { expedition: transitionPirateInterception(expedition, command.encounterEvent), message: 'Hostile interception advanced.' };
+  } else if (command.type === 'encounter-resolve') {
+    result = { expedition: resolvePirateInterception(expedition, command.encounterResult), message: 'Hostile interception resolved.' };
+  } else if (command.type === 'encounter-complete') {
+    result = { expedition: completePirateAftermath(expedition), message: 'The Expedition resumed course.' };
   }
   const next = result?.expedition;
   if (!next || next === expedition || result?.changed === false) {

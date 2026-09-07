@@ -1,15 +1,24 @@
 import { COMPANION_CATALOG } from './catalog.js?v=4';
 import {
+  assignCompanionHome,
   awardCompanionXp,
   careForCompanion,
   createCompanionInstance,
+  createStarterCompanionInstance,
   normalizeCompanionInstance,
+  renameCompanion,
   resolveCompanionTravelPolicy,
-} from './companions.js?v=6';
-import { animateAnimalModel, createAnimalModel } from './animal-models.js?v=2';
+} from './companions.js?v=7';
+import { animateAnimalModel, createAnimalModel } from './animal-models.js?v=3';
+import {
+  attachCuratedAnimalVisual,
+  disposeCuratedAnimal,
+  updateCuratedAnimalAnimation
+} from './curated-animal-visual.js?v=2';
 import { sampleDiscoverySurfaceY } from './surface.js?v=1';
 
 function disposeObject(object) {
+  object?.userData?.disposeCuratedAnimal?.();
   object?.parent?.remove?.(object);
   object?.traverse?.((child) => {
     child.geometry?.dispose?.();
@@ -27,8 +36,14 @@ function createCompanionMesh(appCtx, catalogId) {
   group.visible = false;
   group.userData.worldDiscoveryCompanion = true;
   const rawHeight = new THREE.Box3().setFromObject(group).getSize(new THREE.Vector3()).y;
+  group.userData.disposeCuratedAnimal = () => disposeCuratedAnimal(group);
   appCtx.addEarthWorldObject?.(group);
-  return { group, catalogId, catalog, rawHeight, scale: 1, clearance: 0, profile: group.userData.performanceProfile || {} };
+  void attachCuratedAnimalVisual(THREE, group, {
+    speciesId: catalogId,
+    targetLocalHeight: rawHeight,
+    isCurrent: () => group.parent != null && group.userData.worldDiscoveryCompanion === true
+  });
+  return { group, catalogId, catalog, rawHeight, scale: 1, clearance: 0, profile: group.userData.performanceProfile || {}, activityUntil: 0, activity: 'idle' };
 }
 
 function resolveCompanionFollowTarget(actor, { archetype = 'dog' } = {}) {
@@ -36,8 +51,8 @@ function resolveCompanionFollowTarget(actor, { archetype = 'dog' } = {}) {
   const airborne = archetype === 'bird';
   const largeLivestock = ['livestock-cattle', 'livestock-horse'].includes(archetype);
   const smallLivestock = archetype.startsWith('livestock-');
-  const followBack = airborne ? .45 : largeLivestock ? 2.4 : smallLivestock ? 1.45 : archetype === 'cat' ? 1.05 : .85;
-  const followSide = airborne ? 2.6 : largeLivestock ? 2.8 : smallLivestock ? 1.8 : archetype === 'cat' ? 1.15 : 1.8;
+  const followBack = airborne ? .45 : largeLivestock ? 2.4 : smallLivestock ? 1.45 : archetype === 'cat' ? .72 : .42;
+  const followSide = airborne ? 2.6 : largeLivestock ? 2.8 : smallLivestock ? 1.8 : archetype === 'cat' ? 1.02 : 1.08;
   return Object.freeze({
     x: Number(actor?.x || 0) - Math.sin(angle) * followBack + Math.cos(angle) * followSide,
     z: Number(actor?.z || 0) - Math.cos(angle) * followBack - Math.sin(angle) * followSide
@@ -60,9 +75,68 @@ function normalizedCompanion(instance = {}) {
   return normalizeCompanionInstance(instance);
 }
 
+async function ensureStarterCompanion(profileStore, options = {}) {
+  if (!profileStore?.listCompanions || !profileStore?.saveCompanion) {
+    throw new TypeError('Starter companion bootstrap requires companion persistence.');
+  }
+  const now = Math.max(1, Number(options.now) || Date.now());
+  let profile = null;
+  try {
+    if (profileStore.getProfile) profile = await profileStore.getProfile();
+  } catch (_) {
+    profile = null;
+  }
+  const stored = await profileStore.listCompanions();
+  const companions = stored.map(normalizedCompanion).filter(Boolean);
+  const marker = profile?.companionOnboarding || {};
+  let starter = companions.find((entry) => entry.isStarterCompanion) || null;
+  if (!starter) {
+    const created = createStarterCompanionInstance({
+      profileIdentity: profile?.id || options.profileIdentity || 'local-explorer',
+      adoptedAt: marker.starterDogGrantedAt || now
+    });
+    starter = normalizeCompanionInstance(marker.starterDogInstanceId
+      ? { ...created, instanceId: marker.starterDogInstanceId }
+      : created);
+    await profileStore.saveCompanion(starter);
+    companions.push(starter);
+  }
+  const active = companions.find((entry) => entry.active) || null;
+  const primaryHomeId = String(marker.primaryHomeId || '').slice(0, 420);
+  if (!active) {
+    await profileStore.setActiveCompanion(starter.instanceId, { homeId: primaryHomeId, now });
+    starter = normalizeCompanionInstance({
+      ...starter,
+      active: true,
+      residence: { state: 'traveling', homeId: primaryHomeId, updatedAt: now }
+    });
+  }
+  if (profileStore.saveProfile && profile) {
+    await profileStore.saveProfile({
+      ...profile,
+      activeCompanionId: active?.instanceId || starter.instanceId,
+      companionOnboarding: {
+        ...marker,
+        schemaVersion: 1,
+        starterDogGranted: true,
+        starterDogInstanceId: starter.instanceId,
+        starterDogGrantedAt: Number(marker.starterDogGrantedAt) || starter.adoptedAt || now,
+        starterDogFirstNamedAt: Number(marker.starterDogFirstNamedAt) || 0,
+        primaryHomeId
+      }
+    });
+  }
+  return Object.freeze({ starter, created: !stored.some((entry) => entry.instanceId === starter.instanceId), activeInstanceId: active?.instanceId || starter.instanceId, primaryHomeId });
+}
+
 async function createCompanionRuntime(appCtx, options = {}) {
   const profileStore = options.profileStore;
   if (!profileStore?.listCompanions) throw new TypeError('Companion runtime requires the discovery profile store.');
+  const starterBootstrap = await ensureStarterCompanion(profileStore, {
+    profileIdentity: options.profileIdentity,
+    now: options.now?.()
+  });
+  let primaryHomeId = starterBootstrap.primaryHomeId;
   const storedCompanions = await profileStore.listCompanions();
   let companions = storedCompanions.map(normalizedCompanion).filter(Boolean);
   for (const companion of companions) {
@@ -91,6 +165,7 @@ async function createCompanionRuntime(appCtx, options = {}) {
       disposeObject(presentation?.group);
       presentation = createCompanionMesh(appCtx, active.catalogId);
     }
+    if (!presentation) return;
     presentation.scale = Number(active?.visualVariation?.size || 1) * Number(presentation.catalog?.worldScale || .42);
     presentation.group.scale.setScalar(presentation.scale);
     positionInitialized = false;
@@ -118,8 +193,58 @@ async function createCompanionRuntime(appCtx, options = {}) {
   }
 
   async function setActive(instanceId) {
-    await profileStore.setActiveCompanion(instanceId);
+    await profileStore.setActiveCompanion(instanceId, { homeId: primaryHomeId });
     return refresh();
+  }
+
+  async function leaveAtHome(instanceId) {
+    const target = companions.find((entry) => entry.instanceId === String(instanceId));
+    if (!target) return false;
+    if (target.active) await profileStore.setActiveCompanion(null, { homeId: target.residence?.homeId || primaryHomeId });
+    else await profileStore.saveCompanion(assignCompanionHome(target, target.residence?.homeId || primaryHomeId));
+    await refresh();
+    return true;
+  }
+
+  async function rename(instanceId, requestedName) {
+    const current = companions.find((entry) => entry.instanceId === String(instanceId));
+    const result = renameCompanion(current, requestedName);
+    if (!result.renamed) return result;
+    await profileStore.saveCompanion(result.companion);
+    if (result.firstStarterNaming && profileStore.getProfile && profileStore.saveProfile) {
+      const profile = await profileStore.getProfile();
+      await profileStore.saveProfile({
+        ...profile,
+        companionOnboarding: {
+          ...(profile.companionOnboarding || {}),
+          starterDogGranted: true,
+          starterDogInstanceId: result.companion.instanceId,
+          starterDogFirstNamedAt: result.companion.namedAt
+        }
+      });
+    }
+    await refresh();
+    options.onRename?.(result.companion, result);
+    return result;
+  }
+
+  async function assignPrimaryHome(homeId) {
+    primaryHomeId = String(homeId || '').trim().slice(0, 420);
+    const now = Date.now();
+    const updates = companions
+      .filter((entry) => entry.isStarterCompanion || !entry.residence?.homeId)
+      .map((entry) => assignCompanionHome(entry, primaryHomeId, now))
+      .filter(Boolean);
+    await Promise.all(updates.map((entry) => profileStore.saveCompanion(entry)));
+    if (profileStore.getProfile && profileStore.saveProfile) {
+      const profile = await profileStore.getProfile();
+      await profileStore.saveProfile({
+        ...profile,
+        companionOnboarding: { ...(profile.companionOnboarding || {}), primaryHomeId }
+      });
+    }
+    await refresh();
+    return primaryHomeId;
   }
 
   function beginRecallExercise(instanceId, actor = {}) {
@@ -193,6 +318,10 @@ async function createCompanionRuntime(appCtx, options = {}) {
     if (!current) return false;
     await profileStore.saveCompanion(careForCompanion(current, interaction));
     await refresh();
+    if (presentation) {
+      presentation.activity = interaction === 'feed' ? 'eat' : 'idle';
+      presentation.activityUntil = elapsed + 1.8;
+    }
     return true;
   }
 
@@ -245,7 +374,9 @@ async function createCompanionRuntime(appCtx, options = {}) {
       presentation.group.scale.setScalar(presentation.scale * .72);
       presentation.clearance = 0;
       positionInitialized = true;
-      animateAnimalModel(presentation.group, elapsed, .18);
+      if (!updateCuratedAnimalAnimation(presentation.group, dt, 'idle')) {
+        animateAnimalModel(presentation.group, elapsed, .18);
+      }
       return;
     }
     presentation.group.scale.setScalar(presentation.scale);
@@ -273,7 +404,11 @@ async function createCompanionRuntime(appCtx, options = {}) {
       : surfaceY;
     presentation.clearance = presentation.group.position.y - surfaceY;
     presentation.group.rotation.y = Math.atan2(Number(actor.x || 0) - presentation.group.position.x, Number(actor.z || 0) - presentation.group.position.z);
-    animateAnimalModel(presentation.group, elapsed, (airborne ? 1.35 : .8) + Number(active?.personality?.energy || 0) * .35);
+    const motionActivity = separation > 5 ? 'run' : separation > .45 ? 'walk' : 'idle';
+    const activity = presentation.activityUntil > elapsed ? presentation.activity : motionActivity;
+    if (!updateCuratedAnimalAnimation(presentation.group, dt, activity)) {
+      animateAnimalModel(presentation.group, elapsed, (airborne ? 1.35 : .8) + Number(active?.personality?.energy || 0) * .35);
+    }
     if (exercise?.type === 'recall' && exercise.phase === 'returning' && separation < 1.4) completeRecallExercise();
   }
 
@@ -287,6 +422,8 @@ async function createCompanionRuntime(appCtx, options = {}) {
         instanceId: entry.instanceId, catalogId: entry.catalogId, name: entry.name,
         active: !!entry.active, care: entry.care, training: entry.training,
         progression: entry.progression, speciesArchetype: entry.speciesArchetype,
+        originKind: entry.originKind, isStarterCompanion: entry.isStarterCompanion,
+        nameStatus: entry.nameStatus, namedAt: entry.namedAt, residence: entry.residence,
         personality: entry.personality, visualVariation: entry.visualVariation,
         favorite: entry.favorite, archived: entry.archived, legacyContent: entry.legacyContent, tradeable: false
       })),
@@ -295,6 +432,15 @@ async function createCompanionRuntime(appCtx, options = {}) {
         triangles: presentation?.profile?.triangles || 0,
         materials: presentation?.profile?.materials || 0,
         distinctSpeciesModel: active?.catalogId || null,
+        curatedAssetId: presentation?.group?.userData?.curatedAnimalAssetId || null,
+        curatedActivity: presentation?.group?.userData?.curatedAnimalActivity || null,
+        visibleFallbackMeshCount: (() => {
+          let count = 0;
+          presentation?.group?.traverse?.((object) => {
+            if (object?.isMesh && object.userData?.defaultAnimalFallback === true && object.visible !== false) count += 1;
+          });
+          return count;
+        })(),
         behaviorArchetype: presentation?.catalog?.behaviorArchetype || null,
         travelState,
         vehicleOccupant: travelState === 'vehicle-occupant' || travelState === 'aboard',
@@ -315,7 +461,7 @@ async function createCompanionRuntime(appCtx, options = {}) {
 
   syncPresentation();
   return Object.freeze({
-    adopt, awardXp, beginRecallExercise, callRecall, care, exerciseSnapshot, refresh, setActive, snapshot, update,
+    adopt, assignPrimaryHome, awardXp, beginRecallExercise, callRecall, care, exerciseSnapshot, leaveAtHome, refresh, rename, setActive, snapshot, update,
     dispose() {
       disposed = true;
       disposeObject(presentation?.group);
@@ -323,4 +469,4 @@ async function createCompanionRuntime(appCtx, options = {}) {
   });
 }
 
-export { createCompanionRuntime, resolveCompanionFollowTarget, resolveCompanionVehicleTarget };
+export { createCompanionRuntime, ensureStarterCompanion, resolveCompanionFollowTarget, resolveCompanionVehicleTarget };

@@ -1,35 +1,55 @@
 import { createFieldNavigatorMesh } from './field-navigator-mesh.js?v=2';
-import { readExplorerAppearanceId } from '../characters/explorer-appearance.js?v=1';
+import {
+  attachCuratedExplorerCharacter,
+  disposeCuratedCharacter,
+  EXPLORER_ASSET_BY_GENDER,
+  updateCuratedCharacterAnimation
+} from './curated-explorer-character.js?v=8';
+import {
+  getPlayerCharacterGender,
+  setPlayerCharacterGender as savePlayerCharacterGender
+} from '../../../js/player-character-preference.js?v=1';
 
 function createWalkingCharacterHelpers({ THREE, scene }) {
+  function attachSelectedCharacter(character, gender = getPlayerCharacterGender()) {
+    const assetId = EXPLORER_ASSET_BY_GENDER[gender] || EXPLORER_ASSET_BY_GENDER.man;
+    character.userData.playerCharacterGender = gender;
+    character.userData.requestedCuratedCharacterAssetId = assetId;
+    disposeCuratedCharacter(character);
+    delete character.userData.curatedCharacterLoadStarted;
+    void attachCuratedExplorerCharacter(THREE, character, {
+      assetId,
+      role: 'player-character',
+      isCurrent: () => character.parent === scene && character.userData.requestedCuratedCharacterAssetId === assetId
+    });
+    return gender;
+  }
+
   function createCharacterMesh() {
     const character = createFieldNavigatorMesh(THREE);
     scene.add(character);
+    attachSelectedCharacter(character);
     return character;
   }
 
-  function animateCharacterWalk(characterMesh, isMoving, deltaTime) {
+  function setPlayerCharacterGender(character, value) {
+    const gender = savePlayerCharacterGender(value);
+    const assetId = EXPLORER_ASSET_BY_GENDER[gender];
+    if (character?.userData?.curatedCharacterAssetId === assetId) {
+      character.userData.playerCharacterGender = gender;
+      return gender;
+    }
+    if (character) attachSelectedCharacter(character, gender);
+    return gender;
+  }
+
+  function animateCharacterWalk(characterMesh, isMoving, deltaTime, isRunning = false) {
     if (!characterMesh || !characterMesh.userData.limbs) return;
 
-    const mixer = characterMesh.userData.characterMixer;
-    if (mixer) {
-      mixer.update(deltaTime);
-      const actions = characterMesh.userData.characterActions || {};
-      const idleAction = actions.idle || null;
-      const walkAction = actions.walk || null;
-      if (idleAction && walkAction) {
-        const blend = isMoving ? 1 : 0;
-        walkAction.enabled = true;
-        idleAction.enabled = true;
-        walkAction.setEffectiveWeight(blend);
-        idleAction.setEffectiveWeight(1 - blend);
-      }
-      return;
-    }
+    if (updateCuratedCharacterAnimation(characterMesh, isMoving, deltaTime, isRunning)) return;
 
     const limbs = characterMesh.userData.limbs;
     const scale = limbs.scale;
-    const bodyBaseY = Number(limbs.bodyBaseY ?? 1.0) * scale;
 
     if (isMoving) {
       characterMesh.userData.walkTime += deltaTime * 8;
@@ -41,32 +61,22 @@ function createWalkingCharacterHelpers({ THREE, scene }) {
       limbs.leg2.rotation.x = -legSwing;
       limbs.arm1.rotation.x = -armSwing;
       limbs.arm2.rotation.x = armSwing;
-      limbs.body.position.y = bodyBaseY + Math.abs(Math.sin(t * 2)) * 0.05 * scale;
+      limbs.body.position.y = 1.0 * scale + Math.abs(Math.sin(t * 2)) * 0.05 * scale;
     } else {
       const resetSpeed = deltaTime * 5;
       limbs.leg1.rotation.x *= 1 - resetSpeed;
       limbs.leg2.rotation.x *= 1 - resetSpeed;
       limbs.arm1.rotation.x *= 1 - resetSpeed;
       limbs.arm2.rotation.x *= 1 - resetSpeed;
-      limbs.body.position.y = bodyBaseY;
+      limbs.body.position.y = 1.0 * scale;
     }
-  }
-
-  function attachHeroCharacter(characterMesh) {
-    if (!characterMesh?.userData?.applyAppearance) return;
-    const applySelectedAppearance = (event) => {
-      const id = event?.detail?.id || readExplorerAppearanceId();
-      characterMesh.userData.applyAppearance(id);
-    };
-    document.addEventListener('world-explorer:appearance-changed', applySelectedAppearance);
-    characterMesh.userData.characterAppearanceListener = applySelectedAppearance;
-    applySelectedAppearance();
   }
 
   return {
     animateCharacterWalk,
-    attachHeroCharacter,
-    createCharacterMesh
+    createCharacterMesh,
+    getPlayerCharacterGender,
+    setPlayerCharacterGender
   };
 }
 

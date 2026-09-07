@@ -124,7 +124,7 @@ test('failed purchases do not mint a home or change the wallet', () => {
   const inventory = createEquipmentInventory();
   const economy = createLocalCommerceModel({ storage, inventory });
   const model = createHousingModel({ storage, economy, inventory });
-  const expensive = { ...makeHomeCandidates([mappedBuilding()], { locationId: 'expensive' })[0], price: 9999 };
+  const expensive = { ...makeHomeCandidates([mappedBuilding()], { locationId: 'expensive' })[0], price: STARTING_EXPLORER_CREDITS + 1 };
 
   const result = model.buy(expensive);
   assert.equal(result.ok, false);

@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { isRoadSurfaceReachable } from "./structure-semantics.js?v=63";
-import { updateDrone } from "./physics/drone-flight.js?v=10";
-import { updatePlane } from "./plane-mode.js?v=34";
+import { updateDrone } from "./physics/drone-flight.js?v=11";
+import { updatePlane } from "./plane-mode.js?v=36";
 import {
   createEarthVehicleGroundContactSampler,
   stabilizeEarthVehicleSurfaceY,
@@ -22,6 +22,9 @@ import {
   mphToCarSpeed
 } from "./physics/vehicle-speed-units.js?v=2";
 import { vehicleConditionDynamics, vehicleHandlingProfile } from "./engine/vehicle-catalog.js?v=6";
+import { applyTransportDamage } from './transport/damage-model.js?v=1';
+import { updateRoadVehicleVerticalState } from './physics/road-vehicle-airborne.js?v=1';
+import { ensureVehicleUpgradeStore, vehicleUpgradeDynamics } from './transport/vehicle-upgrades.js?v=1';
 import { samplePhysicalEnvironment } from './planetary/runtime/physical-environment.js?v=2';
 import { groundVehicleTuning } from './character/vehicle-assistance.js?v=1';
 // RDT-based adaptive throttling state
@@ -181,6 +184,7 @@ function update(dt) {
   if (appCtx.car._driftHoldTimer === undefined) appCtx.car._driftHoldTimer = 0;
   if (appCtx.car.vy === undefined) appCtx.car.vy = 0;
   if (appCtx.car._lastSurfaceY === undefined) appCtx.car._lastSurfaceY = null;
+  if (appCtx.car._lastRawSurfaceY === undefined) appCtx.car._lastRawSurfaceY = null;
   if (appCtx.car._terrainAirTimer === undefined) appCtx.car._terrainAirTimer = 0;
   if (appCtx.car._roadContinuityTimer === undefined) appCtx.car._roadContinuityTimer = 0;
   if (appCtx.car._driveDirection === undefined) appCtx.car._driveDirection = 1;
@@ -211,12 +215,16 @@ function update(dt) {
     serviceType: appCtx.car.vehicleServiceType || ''
   });
   const vehicleCondition = vehicleConditionDynamics(appCtx.car.condition ?? 1);
+  const vehicleUpgradeStore = ensureVehicleUpgradeStore(appCtx);
+  const vehicleUpgradeState = vehicleUpgradeStore.snapshot(appCtx.car);
+  const vehicleUpgrades = vehicleUpgradeDynamics(vehicleUpgradeState.levels);
   const characterVehicle = groundVehicleTuning(appCtx.resolveCharacterCapability?.('ground-vehicle', {
     vehicleAvailable: true,
     environment: appCtx.getEnv?.() || (isPlanetarySurface() ? 'PLANETARY' : 'EARTH')
   }));
   appCtx.car.handlingProfile = vehicleHandling;
   appCtx.car.characterHandling = characterVehicle;
+  appCtx.car.upgradeState = vehicleUpgradeState;
   let maxSpd, friction, accel;
   const planetaryBodyId = appCtx.activePlanetaryBodyId || (appCtx.onMars ? 'mars' : appCtx.onMoon ? 'moon' : null);
   const planetaryDriveProfile = {
@@ -289,6 +297,7 @@ function update(dt) {
     accel *= vehicleCondition.accelerationScale;
   }
   accel *= characterVehicle.accelerationScale;
+  accel *= vehicleUpgrades.accelerationScale;
 
   const spd = Math.abs(appCtx.car.speed);
   const hasGroundControl = !appCtx.car.isAirborne;
@@ -299,7 +308,7 @@ function update(dt) {
   if (driveCommand.serviceBrake && hasGroundControl) {
     const stopRate = Math.max(6, Number(appCtx.CFG.brake) || 18) *
       (isPlanetarySurface() ? 1 : vehicleHandling.brakeScale * vehicleCondition.brakeScale) *
-      characterVehicle.brakingScale;
+      characterVehicle.brakingScale * vehicleUpgrades.brakeScale;
     const nextMagnitude = Math.max(0, Math.abs(appCtx.car.speed) - stopRate * dt);
     appCtx.car.speed = Math.sign(appCtx.car.speed) * nextMagnitude;
     if (nextMagnitude < 0.5) appCtx.car.speed = 0;
@@ -421,7 +430,7 @@ function update(dt) {
   const isDrifting = driftStartIntent || !!appCtx.car.isDrifting && driftCanSustain;
 
   // Surface grip baseline using existing runtime config values.
-  let gripBase = Number(appCtx.CFG.gripRoad || 0.88) * surfaceDynamics.grip * (isPlanetarySurface() ? 1 : vehicleHandling.gripScale * vehicleCondition.gripScale);
+  let gripBase = Number(appCtx.CFG.gripRoad || 0.88) * surfaceDynamics.grip * (isPlanetarySurface() ? 1 : vehicleHandling.gripScale * vehicleCondition.gripScale * vehicleUpgrades.gripScale);
 
   // Moon handling remains unchanged by drift tuning.
   if (isPlanetarySurface()) gripBase = 1.0;
@@ -462,7 +471,7 @@ function update(dt) {
   }
 
   if (!isDrifting) {
-    latDamp *= characterVehicle.recoveryScale;
+    latDamp *= characterVehicle.recoveryScale * vehicleUpgrades.recoveryScale;
     yawResponse *= characterVehicle.steeringResponseScale;
   }
 
@@ -696,8 +705,10 @@ function update(dt) {
       nearestRoad: appCtx.car.onRoad ? nr : null
     }, dt, Number.isFinite(appCtx.lastTime) ? appCtx.lastTime : undefined);
     appCtx.car.groundContact = groundContact;
+    let rawSurfaceY = Number(groundContact?.supportY);
+    if (!Number.isFinite(rawSurfaceY)) rawSurfaceY = Number(appCtx.car._lastRawSurfaceY || 0);
     let surfaceY = stabilizeEarthVehicleSurfaceY(
-      groundContact?.supportY,
+      rawSurfaceY,
       appCtx.car._lastSurfaceY,
       dt,
       appCtx.car.speed
@@ -706,10 +717,15 @@ function update(dt) {
     if (typeof appCtx.getBuildVehicleSurfaceAtWorldXZ === 'function') {
       const carFeetY = Number.isFinite(appCtx.car.y) ? appCtx.car.y - 1.2 : surfaceY;
       const buildSurfaceY = appCtx.getBuildVehicleSurfaceAtWorldXZ(appCtx.car.x, appCtx.car.z, carFeetY);
-      if (Number.isFinite(buildSurfaceY)) surfaceY = Math.max(surfaceY, buildSurfaceY);
+      if (Number.isFinite(buildSurfaceY)) {
+        rawSurfaceY = Math.max(rawSurfaceY, buildSurfaceY);
+        surfaceY = Math.max(surfaceY, buildSurfaceY);
+      }
     }
 
+    const previousRawSurfaceY = appCtx.car._lastRawSurfaceY;
     appCtx.car._lastSurfaceY = surfaceY;
+    appCtx.car._lastRawSurfaceY = rawSurfaceY;
     const targetY = surfaceY + 1.21;
     const speedAbs = Math.abs(appCtx.car.speed || 0);
     if (appCtx.car.y === undefined || appCtx.car.y === 0) {
@@ -732,13 +748,42 @@ function update(dt) {
     if (Number.isFinite(targetY) && carY < targetY) {
       carY = targetY;
     }
+    const verticalState = updateRoadVehicleVerticalState({
+      bodyY: appCtx.car.y,
+      groundedBodyY: carY,
+      supportY: rawSurfaceY,
+      previousSupportY: previousRawSurfaceY,
+      verticalVelocity: appCtx.car.vy,
+      isAirborne: appCtx.car.isAirborne,
+      airborneTime: appCtx.car._terrainAirTimer,
+      surfacePitch: Number(groundContact?.pitch || 0),
+      previousPitch: Number(appCtx.car.terrainPitch || 0),
+      horizontalSpeedMps: Math.hypot(appCtx.car.vx || 0, appCtx.car.vz || 0) * appCtx.METERS_PER_WORLD_UNIT,
+      metersPerWorldUnit: appCtx.METERS_PER_WORLD_UNIT,
+      suspensionResistance: vehicleUpgrades.suspensionResistance,
+      dt
+    });
+    carY = verticalState.y;
     appCtx.car.y = carY;
-    appCtx.car.vy = 0;
-    appCtx.car.isAirborne = false;
-    appCtx.car._terrainAirTimer = 0;
+    appCtx.car.vy = verticalState.verticalVelocity;
+    appCtx.car.isAirborne = verticalState.isAirborne;
+    appCtx.car._terrainAirTimer = verticalState.airborneTime;
+    appCtx.car.lastAirborneReason = verticalState.launchReason || appCtx.car.lastAirborneReason || '';
+    if (verticalState.landed && verticalState.landingDamageForce > 0) {
+      const damage = applyTransportDamage(appCtx.car, verticalState.landingDamageForce);
+      appCtx.car.lastLanding = Object.freeze({
+        impactMps: verticalState.landingImpactMps,
+        damage: damage.delta,
+        condition: damage.after,
+        at: Date.now()
+      });
+      if (damage.delta > 0) {
+        appCtx.showToast?.(`Hard landing · vehicle health ${Math.round(damage.after * 100)}%`);
+      }
+    }
     const attitudeBlend = 1 - Math.exp(-dt * 10);
     appCtx.car.terrainPitch = Number(appCtx.car.terrainPitch || 0) +
-      (Number(groundContact?.pitch || 0) - Number(appCtx.car.terrainPitch || 0)) * attitudeBlend;
+      (Number(verticalState.pitch || 0) - Number(appCtx.car.terrainPitch || 0)) * attitudeBlend;
     appCtx.car.terrainRoll = Number(appCtx.car.terrainRoll || 0) +
       (Number(groundContact?.roll || 0) - Number(appCtx.car.terrainRoll || 0)) * attitudeBlend;
   }

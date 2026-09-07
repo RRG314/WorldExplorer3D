@@ -9,27 +9,66 @@ const SHORTBREAD_TILE_CONCURRENCY = 8;
 // Retain one complete London-sized set so the in-flight/cache owner can prevent
 // a second provider pass instead of evicting early tiles during publication.
 const SHORTBREAD_DECODED_TILE_CACHE_LIMIT = 544;
+const SHORTBREAD_RAW_TILE_CACHE_LIMIT = 544;
+const SHORTBREAD_RAW_TILE_CACHE_BYTES = 64 * 1024 * 1024;
 const DEFAULT_TILE_TEMPLATE =
   'https://vector.openstreetmap.org/shortbread_v1/{z}/{x}/{y}.mvt';
 
 let vectorTileLibPromise = null;
 const decodedTileCache = new Map();
+const rawTileCache = new Map();
 const pendingTileRequests = new Map();
+let rawTileCacheBytes = 0;
+
+function cacheRawTile(cacheKey, bytes) {
+  const previous = rawTileCache.get(cacheKey);
+  if (previous) rawTileCacheBytes -= previous.byteLength;
+  rawTileCache.delete(cacheKey);
+  const record = { bytes, byteLength: bytes.byteLength };
+  rawTileCache.set(cacheKey, record);
+  rawTileCacheBytes += record.byteLength;
+  while (rawTileCache.size > SHORTBREAD_RAW_TILE_CACHE_LIMIT || rawTileCacheBytes > SHORTBREAD_RAW_TILE_CACHE_BYTES) {
+    const oldestKey = rawTileCache.keys().next().value;
+    const oldest = rawTileCache.get(oldestKey);
+    rawTileCache.delete(oldestKey);
+    rawTileCacheBytes -= Number(oldest?.byteLength || 0);
+  }
+  return record;
+}
+
+function clearRawTileCache() {
+  const releasedRawTileCount = rawTileCache.size;
+  const releasedRawTileBytes = rawTileCacheBytes;
+  rawTileCache.clear();
+  rawTileCacheBytes = 0;
+  return { releasedRawTileCount, releasedRawTileBytes };
+}
 
 export function getShortbreadRuntimeCacheStats() {
   return Object.freeze({
     decodedTileCount: decodedTileCache.size,
+    rawTileCount: rawTileCache.size,
+    rawTileBytes: rawTileCacheBytes,
     pendingTileCount: pendingTileRequests.size,
-    decodedTileLimit: SHORTBREAD_DECODED_TILE_CACHE_LIMIT
+    decodedTileLimit: SHORTBREAD_DECODED_TILE_CACHE_LIMIT,
+    rawTileLimit: SHORTBREAD_RAW_TILE_CACHE_LIMIT,
+    rawTileByteLimit: SHORTBREAD_RAW_TILE_CACHE_BYTES
   });
 }
 
-export function releaseShortbreadRuntimeCache() {
+export function releaseShortbreadRuntimeCache(options = {}) {
   const releasedTileCount = decodedTileCache.size;
   decodedTileCache.clear();
+  const releasedRaw = options.includeRaw === true ? clearRawTileCache() : {
+    releasedRawTileCount: 0,
+    releasedRawTileBytes: 0
+  };
   return Object.freeze({
     releasedTileCount,
-    pendingTileCount: pendingTileRequests.size
+    pendingTileCount: pendingTileRequests.size,
+    retainedRawTileCount: rawTileCache.size,
+    retainedRawTileBytes: rawTileCacheBytes,
+    ...releasedRaw
   });
 }
 
@@ -116,6 +155,18 @@ export async function fetchShortbreadTile(z, x, y, options = {}) {
     decodedTileCache.set(cacheKey, cached);
     return cached;
   }
+  const rawCached = rawTileCache.get(cacheKey);
+  if (rawCached) {
+    rawTileCache.delete(cacheKey);
+    rawTileCache.set(cacheKey, rawCached);
+    const { Pbf, VectorTile } = await getVectorTileLib();
+    const record = { tile: new VectorTile(new Pbf(rawCached.bytes)), z, x, y };
+    decodedTileCache.set(cacheKey, record);
+    while (decodedTileCache.size > SHORTBREAD_DECODED_TILE_CACHE_LIMIT) {
+      decodedTileCache.delete(decodedTileCache.keys().next().value);
+    }
+    return record;
+  }
   const externalSignal = options.signal || null;
   if (externalSignal?.aborted) throw shortbreadAbortError(z, x, y);
   let entry = pendingTileRequests.get(cacheKey);
@@ -130,8 +181,9 @@ export async function fetchShortbreadTile(z, x, y, options = {}) {
         cache: 'default'
       });
       if (!response.ok) throw new Error(`Shortbread tile ${z}/${x}/${y}: HTTP ${response.status}`);
-      const buffer = await response.arrayBuffer();
-      const record = { tile: new VectorTile(new Pbf(new Uint8Array(buffer))), z, x, y };
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      cacheRawTile(cacheKey, bytes);
+      const record = { tile: new VectorTile(new Pbf(bytes)), z, x, y };
       decodedTileCache.set(cacheKey, record);
       while (decodedTileCache.size > SHORTBREAD_DECODED_TILE_CACHE_LIMIT) {
         decodedTileCache.delete(decodedTileCache.keys().next().value);
@@ -666,6 +718,8 @@ export async function fetchShortbreadBuildingData(options = {}) {
 export {
   featureTags as shortbreadFeatureTags,
   SHORTBREAD_DECODED_TILE_CACHE_LIMIT,
+  SHORTBREAD_RAW_TILE_CACHE_BYTES,
+  SHORTBREAD_RAW_TILE_CACHE_LIMIT,
   SHORTBREAD_TILE_CONCURRENCY,
   SHORTBREAD_ZOOM
 };

@@ -1,241 +1,130 @@
-import { getModelAsset } from './model-asset-catalog.js?v=1';
+import { getModelAsset } from './model-asset-catalog.js?v=16';
 
-const templateCache = new Map();
-const instanceCounts = new Map();
-const runtimeMetrics = {
-  requests: 0,
-  cacheHits: 0,
-  loads: 0,
-  failures: 0,
-  activeInstances: 0
-};
+const templateLoads = new Map();
 
-let loader = null;
-let dracoLoader = null;
-
-function getLoader(THREE) {
-  if (loader) return loader;
+function loaderFor(THREE) {
   if (!THREE?.GLTFLoader) throw new Error('GLTFLoader is unavailable.');
-  loader = new THREE.GLTFLoader();
-  if (THREE.DRACOLoader) {
-    dracoLoader = new THREE.DRACOLoader();
-    dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/draco/');
-    loader.setDRACOLoader(dracoLoader);
-  }
-  return loader;
+  // Curated runtime assets are stored as self-contained, non-Draco GLBs.
+  // Keeping decoding local prevents a vehicle or character from disappearing
+  // because a third-party CDN is slow, blocked, or offline.
+  return new THREE.GLTFLoader();
 }
 
-function abortError(signal, label) {
-  return signal?.reason instanceof Error
-    ? signal.reason
-    : new DOMException(String(signal?.reason || `${label} load aborted`), 'AbortError');
-}
-
-function loadTemplate(THREE, record, signal = null) {
-  runtimeMetrics.requests += 1;
-  if (templateCache.has(record.id)) {
-    runtimeMetrics.cacheHits += 1;
-    return templateCache.get(record.id);
-  }
-  const promise = new Promise((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(abortError(signal, record.label));
-      return;
-    }
-    let settled = false;
-    let request = null;
-    const cleanup = () => signal?.removeEventListener?.('abort', abort);
-    const finish = (callback, value) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      callback(value);
-    };
-    const abort = () => {
-      request?.abort?.();
-      templateCache.delete(record.id);
-      finish(reject, abortError(signal, record.label));
-    };
-    signal?.addEventListener?.('abort', abort, { once: true });
-    request = getLoader(THREE).load(
+function loadTemplate(THREE, record) {
+  if (templateLoads.has(record.id)) return templateLoads.get(record.id);
+  const pending = new Promise((resolve, reject) => {
+    loaderFor(THREE).load(
       record.url,
       (gltf) => {
-        runtimeMetrics.loads += 1;
-        finish(resolve, Object.freeze({
-          root: gltf?.scene || gltf?.scenes?.[0],
-          animations: Object.freeze([...(gltf?.animations || [])])
-        }));
+        const root = gltf?.scene || gltf?.scenes?.[0];
+        if (!root) {
+          reject(new Error(`${record.label} does not contain a scene.`));
+          return;
+        }
+        resolve(Object.freeze({ root, animations: Object.freeze([...(gltf?.animations || [])]) }));
       },
       undefined,
-      (error) => {
-        runtimeMetrics.failures += 1;
-        templateCache.delete(record.id);
-        finish(reject, error);
-      }
+      reject
     );
+  }).catch((error) => {
+    templateLoads.delete(record.id);
+    throw error;
   });
-  templateCache.set(record.id, promise);
-  return promise;
+  templateLoads.set(record.id, pending);
+  return pending;
 }
 
-function cloneInstanceResources(root) {
-  root?.traverse?.((object) => {
-    if (!object?.isMesh) return;
-    if (object.geometry?.clone) object.geometry = object.geometry.clone();
-    if (!object.material) return;
-    object.material = Array.isArray(object.material)
-      ? object.material.map((material) => material?.clone?.() || material)
-      : object.material?.clone?.() || object.material;
-  });
+function parallelTraverse(source, clone, visit) {
+  visit(source, clone);
+  for (let index = 0; index < source.children.length; index += 1) {
+    parallelTraverse(source.children[index], clone.children[index], visit);
+  }
 }
 
-function cloneModelGraph(source) {
-  const sourceByClone = new Map();
-  const cloneBySource = new Map();
+function cloneModelGraph(source, policy = {}) {
   const clone = source.clone(true);
-  const pair = (sourceNode, cloneNode) => {
-    sourceByClone.set(cloneNode, sourceNode);
-    cloneBySource.set(sourceNode, cloneNode);
-    for (let index = 0; index < sourceNode.children.length; index += 1) {
-      pair(sourceNode.children[index], cloneNode.children[index]);
+  const sourceToClone = new Map();
+  const cloneToSource = new Map();
+  parallelTraverse(source, clone, (sourceNode, cloneNode) => {
+    sourceToClone.set(sourceNode, cloneNode);
+    cloneToSource.set(cloneNode, sourceNode);
+  });
+  clone.traverse((object) => {
+    if (!object?.isMesh) return;
+    if (policy.geometry === 'clone') {
+      object.geometry = object.geometry?.clone?.() || object.geometry;
     }
-  };
-  pair(source, clone);
-  clone.traverse((node) => {
-    if (!node?.isSkinnedMesh) return;
-    const sourceMesh = sourceByClone.get(node);
-    const skeleton = sourceMesh?.skeleton?.clone?.();
-    if (!sourceMesh || !skeleton) return;
-    skeleton.bones = sourceMesh.skeleton.bones.map((bone) => cloneBySource.get(bone));
-    node.skeleton = skeleton;
-    node.bindMatrix.copy(sourceMesh.bindMatrix);
-    node.bind(node.skeleton, node.bindMatrix);
+    if (policy.materials === 'clone') {
+      object.material = Array.isArray(object.material)
+        ? object.material.map((material) => material?.clone?.() || material)
+        : object.material?.clone?.() || object.material;
+    }
+    if (!object.isSkinnedMesh) return;
+    const sourceMesh = cloneToSource.get(object);
+    object.skeleton = sourceMesh.skeleton.clone();
+    object.bindMatrix.copy(sourceMesh.bindMatrix);
+    object.skeleton.bones = sourceMesh.skeleton.bones.map((bone) => sourceToClone.get(bone));
+    object.bind(object.skeleton, object.bindMatrix);
   });
   return clone;
 }
 
-function normalizeHeight(THREE, root, targetHeightMeters) {
-  if (!Number.isFinite(Number(targetHeightMeters)) || Number(targetHeightMeters) <= 0) return;
-  root.updateMatrixWorld(true);
-  const bounds = new THREE.Box3().setFromObject(root);
-  const size = bounds.getSize(new THREE.Vector3());
-  root.scale.multiplyScalar(Number(targetHeightMeters) / Math.max(.001, size.y));
-  root.updateMatrixWorld(true);
-  bounds.setFromObject(root);
-  const center = bounds.getCenter(new THREE.Vector3());
-  root.position.x -= center.x;
-  root.position.y -= bounds.min.y;
-  root.position.z -= center.z;
-  root.updateMatrixWorld(true);
+function abortError(assetId) {
+  const error = new Error(`Model asset load was cancelled: ${assetId}`);
+  error.name = 'AbortError';
+  return error;
 }
 
-async function loadModelAssetInstance(THREE, assetId, options = {}) {
+function disposeModelInstance(root, policy = {}) {
+  root?.removeFromParent?.();
+  const skeletons = new Set();
+  root?.traverse?.((object) => {
+    if (!object?.isMesh) return;
+    if (object.isSkinnedMesh && object.skeleton) skeletons.add(object.skeleton);
+    if (policy.geometry === 'clone') object.geometry?.dispose?.();
+    if (policy.materials !== 'clone') return;
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    materials.forEach((material) => material?.dispose?.());
+  });
+  // WebGLRenderer creates one floating-point bone texture for every cloned
+  // Skeleton. Geometry/material disposal does not release it, so repeated
+  // world sessions otherwise retain hundreds of GPU textures per cycle.
+  skeletons.forEach((skeleton) => skeleton.dispose?.());
+}
+
+async function loadModelAsset(THREE, assetId, options = {}) {
   const record = getModelAsset(assetId);
-  if (!record) throw new Error(`Unknown curated model asset: ${assetId}`);
-  const template = await loadTemplate(THREE, record, options.signal || null);
-  if (!template.root) throw new Error(`${record.label} did not contain a scene.`);
-  if (options.signal?.aborted) throw abortError(options.signal, record.label);
-  const root = cloneModelGraph(template.root);
-  cloneInstanceResources(root);
-  normalizeHeight(THREE, root, options.targetHeightMeters ?? record.scale.targetHeightMeters);
-  root.name = options.name || record.label;
-  root.userData.curatedModelAsset = Object.freeze({
+  if (!record) throw new Error(`Unknown model asset: ${assetId}`);
+  if (options.signal?.aborted) throw abortError(assetId);
+  const template = await loadTemplate(THREE, record);
+  if (options.signal?.aborted) throw abortError(assetId);
+  const policy = record.instancePolicy || Object.freeze({ geometry: 'clone', materials: 'clone' });
+  const root = cloneModelGraph(template.root, policy);
+  root.userData.modelAsset = Object.freeze({
     id: record.id,
+    label: record.label,
     license: record.license,
     sourceUrl: record.sourceUrl,
     attribution: record.attribution,
-    collisionPolicy: record.collision.policy,
-    qualityTier: options.qualityTier || 'promoted'
+    collisionPolicy: record.collisionPolicy
   });
   root.traverse((object) => {
     if (!object?.isMesh) return;
-    object.castShadow = options.castShadow !== false;
-    object.receiveShadow = options.receiveShadow === true;
+    object.castShadow = true;
+    object.receiveShadow = false;
     object.frustumCulled = true;
   });
-  instanceCounts.set(record.id, Number(instanceCounts.get(record.id) || 0) + 1);
-  runtimeMetrics.activeInstances += 1;
-  let released = false;
+  let disposed = false;
   return Object.freeze({
+    record,
     root,
     animations: template.animations,
-    record,
-    release() {
-      if (released) return false;
-      released = true;
-      root.removeFromParent?.();
-      root.traverse((object) => {
-        object.geometry?.dispose?.();
-        const materials = Array.isArray(object?.material) ? object.material : [object?.material];
-        materials.forEach((material) => material?.dispose?.());
-      });
-      runtimeMetrics.activeInstances = Math.max(0, runtimeMetrics.activeInstances - 1);
-      const remaining = Math.max(0, Number(instanceCounts.get(record.id) || 0) - 1);
-      if (remaining) instanceCounts.set(record.id, remaining);
-      else instanceCounts.delete(record.id);
-      if (!remaining && options.cachePolicy === 'while-in-use') evictModelAsset(record.id);
-      return true;
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      disposeModelInstance(root, policy);
     }
   });
 }
 
-async function loadFirstAvailableModelAsset(THREE, assetIds = [], options = {}) {
-  const failures = [];
-  for (const assetId of assetIds) {
-    try {
-      return await loadModelAssetInstance(THREE, assetId, options);
-    } catch (error) {
-      if (error?.name === 'AbortError' || options.signal?.aborted) throw error;
-      failures.push(`${assetId}: ${String(error?.message || error)}`);
-    }
-  }
-  throw new Error(`No curated model asset could be loaded (${failures.join('; ')})`);
-}
-
-function getModelAssetRuntimeMetrics() {
-  return Object.freeze({
-    ...runtimeMetrics,
-    cachedTemplates: templateCache.size,
-    instancesByAsset: Object.freeze(Object.fromEntries(instanceCounts))
-  });
-}
-
-function evictModelAsset(assetId) {
-  const id = String(assetId || '');
-  const pending = templateCache.get(id);
-  if (!pending || Number(instanceCounts.get(id) || 0) > 0) return false;
-  templateCache.delete(id);
-  Promise.resolve(pending).then(({ root }) => {
-    root?.traverse?.((object) => {
-      object.geometry?.dispose?.();
-      const materials = Array.isArray(object?.material) ? object.material : [object?.material];
-      materials.forEach((material) => material?.dispose?.());
-    });
-  }).catch(() => {});
-  return true;
-}
-
-function clearModelAssetCache() {
-  for (const pending of templateCache.values()) {
-    Promise.resolve(pending).then(({ root }) => {
-      root?.traverse?.((object) => {
-        object.geometry?.dispose?.();
-        const materials = Array.isArray(object?.material) ? object.material : [object?.material];
-        materials.forEach((material) => material?.dispose?.());
-      });
-    }).catch(() => {});
-  }
-  templateCache.clear();
-  instanceCounts.clear();
-  dracoLoader?.dispose?.();
-  dracoLoader = null;
-  loader = null;
-}
-
-export {
-  clearModelAssetCache,
-  evictModelAsset,
-  getModelAssetRuntimeMetrics,
-  loadFirstAvailableModelAsset,
-  loadModelAssetInstance
-};
+export { loadModelAsset };
