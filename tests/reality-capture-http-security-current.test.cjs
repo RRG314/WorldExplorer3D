@@ -99,7 +99,8 @@ test('moderation commits approval and representation together, never revives del
 test('a facade candidate cannot accidentally replace the entire mapped exterior', async t => {
   const h = harness(t, { ...base, exteriorScope: 'facade', status: 'review_required', building: { sourceBuildingId: 'osm:42', worldId: 'earth' } });
   const result = await h.call('moderateRealityCapture', 'moderator', { decision: 'approved' });
-  assert.equal(result.body.error, 'facade_patch_registration_required');
+  assert.equal(result.code, 422);
+  assert.equal(result.body.error, 'facade patch registration required');
   assert.equal(h.writes.length, 0);
 });
 

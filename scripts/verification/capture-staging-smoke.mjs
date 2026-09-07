@@ -75,8 +75,11 @@ try {
   if (resumeId) {
     const current = await page.evaluate(async id => (await import('/js/community-reality-capture-api.js?v=4')).getMyRealityCapture(id), id);
     if (current.capture.status === 'processing_failed' && process.argv.includes('--retry')) {
+      const acknowledged = page.waitForResponse(response => new URL(response.url()).pathname === '/retryRealityCapture' && response.request().method() === 'POST');
       await page.locator('[data-capture-retry]').click();
-      await page.waitForFunction(() => /queued|processing/i.test(document.querySelector('[data-capture-server-status]')?.textContent || ''), null, { timeout: 60000 });
+      const response = await acknowledged;
+      if (!response.ok()) throw Error(`Retry rejected: HTTP ${response.status()}`);
+      await page.waitForFunction(() => ['queued', 'processing', 'review_required'].includes(document.querySelector('#realityCapturePanel')?.dataset.captureStatus), null, { timeout: 60000 });
       console.log(JSON.stringify({ phase: 'retried-via-ui-with-saved-photos', captureId: id }));
     }
   } else {
@@ -98,10 +101,10 @@ try {
   }
   await page.screenshot({ path: `${output}/photos-ready.png`, fullPage: false });
   await page.locator('[data-capture-upload]').click();
-  await page.waitForFunction(() => /queued|processing|reconstruction is ready/i.test(document.querySelector('[data-capture-server-status]')?.textContent || '') ||
+  await page.waitForFunction(() => ['queued', 'processing', 'review_required'].includes(document.querySelector('#realityCapturePanel')?.dataset.captureStatus) ||
     !document.querySelector('[data-capture-upload]')?.disabled, null, { timeout: 240000 });
-  const submission = await page.locator('[data-capture-server-status]').textContent();
-  if (!/queued|processing|reconstruction is ready/i.test(submission)) throw Error(await page.locator('[data-capture-status]').textContent());
+  const submission = await page.locator('#realityCapturePanel').getAttribute('data-capture-status');
+  if (!['queued', 'processing', 'review_required'].includes(submission)) throw Error(await page.locator('[data-capture-status]').textContent());
   }
   console.log(JSON.stringify({ phase: resumeId ? 'resumed-saved-benchmark' : 'uploaded-via-ui', photos: 24, captureId: id }));
   await page.screenshot({ path: `${output}/processing.png` });
@@ -121,14 +124,18 @@ try {
       await page.locator('[data-capture-viewer] canvas').waitFor({ timeout: 60000 });
       await page.locator('[data-viewer-action=rotate]').click();
       await page.screenshot({ path: `${output}/private-result.png` });
-      const desktop = await page.context().newPage();
-      await desktop.setViewportSize({ width: 1440, height: 960 });
+      // Separate desktop input profile. Keep authentication state in memory,
+      // including Firebase's IndexedDB, never in a token-bearing disk artifact.
+      const desktopContext = await browser.newContext({ viewport: { width: 1440, height: 960 }, isMobile: false, hasTouch: false,
+        storageState: await page.context().storageState({ indexedDB: true }) });
+      const desktop = await desktopContext.newPage();
+      desktop.on('pageerror', error => errors.push(error.message));
       await desktop.goto(origin + '/app/capture.html#capture=' + id);
       await desktop.locator('[data-capture-preview]').click();
       await desktop.locator('[data-capture-viewer] canvas').waitFor({ timeout: 60000 });
       await desktop.locator('[data-viewer-action=closer]').click();
       await desktop.screenshot({ path: `${output}/private-result-desktop.png` });
-      await desktop.close();
+      await desktopContext.close();
       await writeFile(`${output}/report.json`, JSON.stringify({ ok: true, actualCloudReconstruction: true, captureId: id,
         processed: state.capture.processed, errors, limitation: 'Public benchmark, not a real house/room or physical phone acceptance.' }, null, 2));
       console.log('Private cloud reconstruction visible in the phone-sized UI.');

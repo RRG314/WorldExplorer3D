@@ -16,7 +16,7 @@ const PROJECT = 'we3d-staging-20260712';
 const NUMBER = '524178734996';
 const REGION = 'us-central1';
 const SOURCE_BUCKET = `${PROJECT}-capture-build`;
-const IMAGE = `${REGION}-docker.pkg.dev/${PROJECT}/capture-processing/meshroom:2023.3.0-v3`;
+const IMAGE = `${REGION}-docker.pkg.dev/${PROJECT}/capture-processing/meshroom:2023.3.0-v4`;
 const client = (urlPrefix) => new Client({ urlPrefix, auth: true });
 
 async function ensure(url, route, createRoute, body, options) {

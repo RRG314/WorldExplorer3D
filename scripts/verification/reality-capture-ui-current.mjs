@@ -71,12 +71,15 @@ try {
   await desktop.goto(`${origin}/app/capture.html`, { waitUntil: 'networkidle' });
   await desktop.click('#googleSignIn');
   await desktop.evaluate(async () => {
+    globalThis.capturePauseEvents = [];
     const { openRealityCaptureForBuilding } = await import('/app/js/reality-capture/ui.js?v=2');
     await openRealityCaptureForBuilding({ LOC: { lat: 39.29, lon: -76.61 },
+      setPauseReason: (reason, active) => capturePauseEvents.push([reason, active]),
       buildings: [{ sourceBuildingId: 'osm:way:424242', geometrySource: 'osm', minX: 0, maxX: 10, minZ: 0, maxZ: 10 }],
       worldToLatLon: () => ({ lat: 39.29, lon: -76.61 })
     }, { id: 'osm:way:424242', label: 'Selected test house', position: { x: 5, z: 5 } });
   });
+  assert.deepEqual(await desktop.evaluate(() => capturePauseEvents), [['reality_capture', true]]);
   await desktop.click('[data-capture-phone]');
   await desktop.locator('[data-capture-link-box]').waitFor({ state: 'visible' });
   const link = await desktop.locator('[data-capture-link]').getAttribute('href');
@@ -188,6 +191,9 @@ try {
   assert.equal(await phone.locator('[data-room-permission]').isChecked(), true);
   assert.equal(await phone.locator('[data-public-contribution]').isChecked(), false);
   assert.equal(await phone.locator('[data-capture-sectors] button').count(), 6);
+  await desktop.keyboard.press('Escape');
+  assert.equal(await desktop.locator('#realityCapturePanel.show').count(), 0);
+  assert.deepEqual(await desktop.evaluate(() => capturePauseEvents.at(-1)), ['reality_capture', false]);
   assert.match(await phone.locator('[data-capture-photo-guide]').innerText(), /one room at a time/);
   if (!await phone.locator('.captureVisualGuide').getAttribute('open').then(value => value !== null)) await phone.locator('.captureVisualGuide summary').click();
   assert.equal(await phone.locator('[data-capture-photo-guide] svg').isVisible(), true);

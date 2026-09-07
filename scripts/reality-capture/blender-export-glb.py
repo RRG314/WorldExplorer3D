@@ -75,10 +75,19 @@ if triangle_count > target_triangles:
         bpy.ops.object.modifier_apply(modifier=modifier.name)
         obj.select_set(False)
 
-for image in bpy.data.images:
+for index, image in enumerate(bpy.data.images):
     if image.size[0] > 2048 or image.size[1] > 2048:
         scale = min(2048 / image.size[0], 2048 / image.size[1])
         image.scale(max(1, int(image.size[0] * scale)), max(1, int(image.size[1] * scale)))
+    if image.source == 'FILE' and image.size[0] > 0 and image.size[1] > 0:
+        # Blender 3.0's glTF exporter copies FILE images from their disk source.
+        # A scaled in-memory EXR still points to the old dimensions, producing a
+        # pixels.foreach_set size mismatch. Persist and reload the exact resized
+        # derivative before export; never overwrite the reconstruction source.
+        image.filepath_raw = str(Path(target).parent / f"runtime-texture-{index}.png")
+        image.file_format = 'PNG'
+        image.save()
+        image.reload()
 
 bpy.ops.object.select_all(action="SELECT")
 if bpy.app.version >= (4, 1, 0):

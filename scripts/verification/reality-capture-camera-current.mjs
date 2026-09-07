@@ -47,6 +47,35 @@ try {
   assert.match(await page.locator('[data-camera-status]').textContent(), /permission was not granted/);
   assert.equal(await page.locator('[data-camera-shutter]').isDisabled(), true);
   await page.click('[data-camera-close]');
+  await page.evaluate(async () => {
+    const { setupEngineInputHandlers } = await import('/app/js/engine/input-handlers.js');
+    globalThis.inputProbe = { captureFocused: true, keys: {}, gameStarted: true, calls: 0,
+      hasPauseReason(reason) { return reason === 'reality_capture' && this.captureFocused; }, onKey() { this.calls++; } };
+    globalThis.inputProbeScope = setupEngineInputHandlers(inputProbe);
+    document.body.tabIndex = -1; document.body.focus();
+  });
+  await page.keyboard.press('w');
+  assert.equal(await page.evaluate(() => inputProbe.calls), 0);
+  await page.evaluate(() => { inputProbe.captureFocused = false; });
+  await page.keyboard.press('w');
+  assert.equal(await page.evaluate(() => inputProbe.calls), 1);
+  await page.evaluate(async () => {
+    inputProbeScope.dispose();
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { updateControlInput } = await import('/app/js/controls/action-input.js');
+    let focused = true, calls = 0;
+    const pad = { connected: true, mapping: 'standard', axes: [0, 0, 0, 0], buttons: Array.from({ length: 16 }, () => ({ value: 0 })) };
+    Object.defineProperty(navigator, 'getGamepads', { configurable: true, value: () => [pad] });
+    ctx.hasPauseReason = reason => reason === 'reality_capture' && focused;
+    ctx.handlePrimaryContextInteraction = () => { calls++; return true; };
+    pad.buttons[2].value = 1; updateControlInput();
+    if (calls) throw Error('Gamepad action leaked behind capture');
+    focused = false; updateControlInput();
+    if (calls) throw Error('Held gamepad action fired after closing capture');
+    pad.buttons[2].value = 0; updateControlInput();
+    pad.buttons[2].value = 1; updateControlInput();
+    if (calls !== 1) throw Error('Gamepad did not resume after release and press');
+  });
   assert.deepEqual(errors, []);
-  console.log('Guided camera: real media/canvas capture, overlay, mobile fit, stop tracks, abort and denied-permission fallback passed; synthetic camera only.');
+  console.log('Guided camera: media/canvas, overlay, mobile fit, track cleanup, permission fallback and keyboard/gamepad isolation passed; synthetic camera/gamepad only.');
 } finally { await browser.close(); await server.close(); }

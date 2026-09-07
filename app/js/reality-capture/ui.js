@@ -21,6 +21,7 @@ import {
 import { resolveCanonicalMappedBuilding } from './runtime-contract.js?v=2';
 import { captureBuildingContext } from './alignment.js?v=1';
 import { photoGuideMarkup } from './photo-guide.js?v=1';
+import { getScreenLayoutService } from '../ui/screen-layout.js?v=1';
 
 const EXTERIOR_SECTORS = Object.freeze(['Front', 'Front right', 'Right', 'Back right', 'Back', 'Back left', 'Left', 'Front left']);
 const INTERIOR_SECTORS = Object.freeze(['Door', 'Wall 1', 'Corner 1', 'Wall 2', 'Corner 2', 'Opposite door']);
@@ -68,11 +69,12 @@ function processingDescription(capture) {
 function ensurePanel() {
   let panel = document.getElementById('realityCapturePanel');
   if (panel) return panel;
-  panel = document.createElement('section');
+  panel = document.createElement('dialog');
   panel.id = 'realityCapturePanel';
   panel.className = 'realityCapturePanel';
   panel.setAttribute('aria-hidden', 'true');
   panel.setAttribute('aria-label', 'Improve this place with photos');
+  panel.setAttribute('role', 'dialog');
   panel.innerHTML = `
     <header><div><span>COMMUNITY REALITY CAPTURE</span><strong>Improve this place</strong></div><button type="button" data-capture-close aria-label="Close">×</button></header>
     <div class="realityCaptureScroll">
@@ -141,6 +143,7 @@ function ensurePanel() {
       <p class="realityCaptureStatus" data-capture-status role="status" aria-live="polite"></p>
     </div>`;
   document.body.appendChild(panel);
+  panel.addEventListener('cancel', event => { event.preventDefault(); closeRealityCapture(); });
   panel.querySelector('[data-capture-close]').addEventListener('click', closeRealityCapture);
   panel.querySelector('[data-capture-cancel]').addEventListener('click', clearDraft);
   panel.querySelector('[data-capture-upload]').addEventListener('click', () => uploadDraft(true));
@@ -654,7 +657,14 @@ export async function openRealityCaptureForBuilding(appCtx, buildingTarget) {
     return false;
   }
   panel.classList.add('show');
+  panel.showModal();
   panel.setAttribute('aria-hidden', 'false');
+  panel.setAttribute('aria-modal', 'true');
+  appCtx.setPauseReason?.('reality_capture', true);
+  appCtx.clearControlInputState?.('reality-capture-open');
+  document.exitPointerLock?.();
+  appCtx.screenLayout ||= getScreenLayoutService();
+  appCtx.screenLayout.setPanelLayer('reality-capture', true);
   panel.querySelector('[data-capture-close]').focus();
   if (session.serverCapture) void fetchProgress(session).catch(() => {
     if (isCurrent(session)) panel.querySelector('[data-capture-status]').textContent = 'Your saved capture is open. Use Check progress when the connection returns.';
@@ -677,7 +687,9 @@ export async function openRealityCaptureSession(captureId) {
   session.uploadedPhotoIds = new Set(session.remotePhotos.map((photo) => photo.id));
   const panel = ensurePanel();
   panel.classList.add('show');
+  panel.showModal();
   panel.setAttribute('aria-hidden', 'false');
+  panel.setAttribute('aria-modal', 'true');
   panel.querySelector('[data-capture-server-status]').textContent = `${session.remotePhotos.length} photos uploaded · ${processingDescription(result.capture)}`;
   render();
   scheduleProgress(session);
@@ -696,9 +708,14 @@ export function closeRealityCapture() {
     for (const url of session.thumbnailUrls?.values() || []) URL.revokeObjectURL(url);
     session.thumbnailUrls?.clear();
     session.unsubscribe?.();
+    session.appCtx?.setPauseReason?.('reality_capture', false);
+    session.appCtx?.clearControlInputState?.('reality-capture-close');
+    session.appCtx?.screenLayout?.setPanelLayer('reality-capture', false);
     current = null;
   }
   panel.classList.remove('show');
+  panel.close();
+  panel.removeAttribute('aria-modal');
   panel.setAttribute('aria-hidden', 'true');
   panel.querySelector('[data-capture-link]').removeAttribute('href');
   panel.querySelector('[data-capture-link]').textContent = '';
