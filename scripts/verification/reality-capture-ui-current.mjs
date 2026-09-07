@@ -11,7 +11,7 @@ const out = 'output/verification/reality-capture-ui';
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
 const errors = [], captures = new Map(), uploaded = new Map();
-let serial = 0, failNextUpload = false, failNextProgress = false;
+let serial = 0, failNextUpload = false, failNextProgress = false, releaseProgress = null;
 const authModule = `let user=null;const listeners=new Set();
 export const getCurrentUser=()=>user;
 export const observeAuth=cb=>{listeners.add(cb);queueMicrotask(()=>cb(user));return()=>listeners.delete(cb)};
@@ -49,6 +49,7 @@ async function makePage(viewport, mobile = false) {
       const capture = captures.get(input.captureId);
       if (!capture || capture.ownerUid !== input.uid) return json({ error: 'Capture not found' }, 404);
       if (action === 'getMyRealityCapture') {
+        if (releaseProgress) await releaseProgress;
         if (failNextProgress) { failNextProgress = false; return json({ error: 'Temporary connection failure' }, 503); }
         return json({ capture, photos: uploaded.get(input.captureId) || [] });
       }
@@ -170,6 +171,36 @@ try {
   assert.equal(await phone.locator('[data-capture-retry]').isVisible(), false);
   await desktop.click('[data-capture-refresh]');
   await desktop.waitForFunction(() => document.querySelector('[data-capture-server-status]').textContent.toLowerCase().includes('queued'));
+  // Hold an actual request to observe immediate CTA feedback, not a fast-response snapshot.
+  let release;
+  releaseProgress = new Promise(resolve => { release = resolve; });
+  await phone.click('[data-capture-refresh]');
+  assert.equal(await phone.locator('[data-capture-refresh]').textContent(), 'Checking…');
+  assert.equal(await phone.locator('[data-capture-refresh]').isDisabled(), true);
+  assert.equal(await phone.locator('[data-capture-processing-status]').getAttribute('aria-busy'), 'true');
+  await phone.screenshot({ path: `${out}/mobile-checking-progress.png` });
+  releaseProgress = null; release();
+  await phone.waitForFunction(() => !document.querySelector('[data-capture-refresh]').disabled);
+  assert.match(await phone.locator('[data-capture-checked]').textContent(), /Last successful check:/);
+  const lastChecked = await phone.locator('[data-capture-checked]').textContent();
+  failNextProgress = true;
+  await phone.click('[data-capture-refresh]');
+  await phone.waitForFunction(() => document.querySelector('[data-capture-processing-status]').dataset.state === 'error');
+  assert.match(await phone.locator('[data-capture-server-status]').textContent(), /could not be refreshed/);
+  assert.equal(await phone.locator('[data-capture-checked]').textContent(), lastChecked);
+  await phone.click('[data-capture-refresh]');
+  await phone.waitForFunction(() => document.querySelector('[data-capture-processing-status]').dataset.state === 'queued');
+  await phone.waitForFunction(() => !document.querySelector('[data-capture-refresh]').disabled);
+  await phone.screenshot({ path: `${out}/mobile-checked-progress.png` });
+  // A ready check reveals the actual next action, without silently downloading a model.
+  captures.get('capture-1').status = 'review_required';
+  captures.get('capture-1').processed = { optimizedModelPath: 'fixture/private-result.glb' };
+  await phone.click('[data-capture-refresh]');
+  await phone.waitForFunction(() => document.activeElement?.matches('[data-capture-preview]'));
+  assert.equal(await phone.locator('[data-capture-result]').isVisible(), true);
+  assert.equal(await phone.locator('[data-capture-viewer] canvas').count(), 0);
+  captures.get('capture-1').status = 'queued';
+  delete captures.get('capture-1').processed;
   // An exterior handoff must not strand the desktop user: a separate room can still be started.
   await desktop.click('[data-capture-kind="interior_room"]');
   await desktop.locator('.realityCaptureRoom').waitFor({ state: 'visible' });
@@ -252,7 +283,7 @@ try {
     'exterior and room framing templates follow selected view and disclose coverage limits',
     'guided camera saves through existing normalization and local store; retake removes the exact local photo'
   ], errors, limitation: 'Auth/storage transport doubles; no real GPU or physical phone reconstruction.' }, null, 2));
-  console.log('Capture UI: 17 focused checks passed; transport doubles, synthetic camera and GLB, not reconstruction acceptance.');
+  console.log('Capture UI: 17 existing checks plus manual-check pending, unchanged, failure/recovery and ready-action scenarios passed; transport doubles, synthetic camera and GLB, not reconstruction acceptance.');
 } catch (error) {
   console.error('Capture UI browser errors:', errors);
   for (const [index, context] of browser.contexts().entries()) {

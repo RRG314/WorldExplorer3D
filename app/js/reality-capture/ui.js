@@ -66,6 +66,38 @@ function processingDescription(capture) {
   return String(capture?.status || 'draft').replaceAll('_', ' ');
 }
 
+function renderProgress(session) {
+  if (!isCurrent(session)) return;
+  const panel = ensurePanel();
+  const box = panel.querySelector('[data-capture-processing-status]');
+  box.hidden = !session.serverCapture;
+  if (!session.serverCapture) return;
+  const status = session.serverCapture.status;
+  const active = ['queued', 'processing'].includes(status);
+  const ready = !!session.serverCapture.processed?.optimizedModelPath;
+  const checking = !!session.checkingProgress;
+  box.dataset.state = session.progressError ? 'error' : ready ? 'ready' : status;
+  box.setAttribute('aria-busy', String(checking));
+  panel.querySelector('[data-capture-refresh]').textContent = checking ? 'Checking…' : 'Check uploaded photos and progress';
+  panel.querySelector('[data-capture-refresh]').disabled = session.busy || checking;
+  panel.querySelector('[data-capture-progress-title]').textContent = checking ? 'Checking your capture…'
+    : session.progressError ? 'Could not check right now'
+    : ready ? 'Your 3D result is ready'
+    : status === 'processing' ? 'Reconstruction in progress'
+    : status === 'queued' ? 'Waiting to start'
+    : status === 'processing_failed' ? 'Processing needs attention' : 'Photos saved';
+  panel.querySelector('[data-capture-server-status]').textContent = session.progressError
+    ? 'The status could not be refreshed. This does not mean your upload was lost. Check again when your connection returns.'
+    : `${session.remotePhotos.length} photos uploaded · ${processingDescription(session.serverCapture)}`;
+  const stamp = session.lastCheckedAt ? new Date(session.lastCheckedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) : '';
+  panel.querySelector('[data-capture-checked]').textContent = stamp ? `Last successful check: ${stamp}` : '';
+  panel.querySelector('[data-capture-progress-help]').textContent = ready ? 'Choose View my 3D result below to inspect it.'
+    : active ? 'This page checks every 15 seconds while visible. You can close it and return later. No reliable percentage or finish time is available yet.'
+    : status === 'processing_failed' ? 'Use Retry below to try again with your saved photos.'
+    : 'Saving photos does not start reconstruction. Choose Upload for processing when your photo set is ready.';
+  panel.querySelector('[data-capture-progress-meter]').hidden = !active || !!session.progressError;
+}
+
 function ensurePanel() {
   let panel = document.getElementById('realityCapturePanel');
   if (panel) return panel;
@@ -85,7 +117,13 @@ function ensurePanel() {
         <button type="button" data-capture-phone>Continue on phone</button>
         <div data-capture-link-box hidden><canvas data-capture-qr aria-label="Scan to continue this capture on your phone"></canvas><a data-capture-link></a><button type="button" data-capture-copy>Copy phone link</button></div>
         <button type="button" data-capture-refresh hidden>Check uploaded photos and progress</button>
-        <p data-capture-server-status role="status"></p>
+        <section data-capture-processing-status class="realityCaptureProcessingStatus" role="status" aria-live="polite" aria-atomic="true" hidden>
+          <strong data-capture-progress-title></strong>
+          <p data-capture-server-status></p>
+          <progress data-capture-progress-meter aria-label="Reconstruction in progress; completion percentage unavailable" hidden></progress>
+          <small data-capture-checked></small>
+          <p data-capture-progress-help></p>
+        </section>
         <button type="button" data-capture-retry hidden>Retry reconstruction with my saved photos</button>
       </section>
       <section data-capture-result hidden aria-label="Your reconstruction">
@@ -357,6 +395,7 @@ function render() {
   panel.querySelector('[data-capture-quality]').textContent = current.photos.length
     ? `${current.photos.length} normalized photos saved privately on this device · ${blurry} soft/blurry · ${exposure} exposure warnings`
     : 'No photos leave this device until you choose Upload for processing.';
+  renderProgress(current);
 }
 
 async function persist(session = current) {
@@ -459,10 +498,15 @@ async function ensureServerCapture(session) {
 }
 
 async function fetchProgress(session) {
+  // A manual check can join an in-flight poll; do not issue duplicate requests.
+  if (session.progressRequest) return session.progressRequest;
+  const request = (async () => {
   const result = await getMyRealityCapture(session.serverCapture.captureId);
   assertCurrent(session);
   session.serverCapture = result.capture;
   session.remotePhotos = result.photos || [];
+  session.lastCheckedAt = Date.now();
+  session.progressError = false;
   // The server listing, not a previous device's local receipt, is authoritative.
   session.uploadedPhotoIds = new Set(session.remotePhotos.map((photo) => photo.id));
   await persist(session);
@@ -471,6 +515,10 @@ async function fetchProgress(session) {
     `${session.remotePhotos.length} photos uploaded · ${processingDescription(result.capture)}`;
   render();
   scheduleProgress(session);
+  })();
+  session.progressRequest = request;
+  try { return await request; }
+  finally { if (session.progressRequest === request) session.progressRequest = null; }
 }
 
 function scheduleProgress(session) {
@@ -480,7 +528,7 @@ function scheduleProgress(session) {
     if (!isCurrent(session)) return;
     if (!document.hidden && !session.busy) {
       try { await fetchProgress(session); }
-      catch { if (isCurrent(session)) ensurePanel().querySelector('[data-capture-server-status]').textContent = 'Connection interrupted. Your uploaded photos are saved; checking again shortly.'; }
+      catch { if (isCurrent(session)) { session.progressError = true; renderProgress(session); } }
     }
     scheduleProgress(session);
   }, 15000);
@@ -514,10 +562,18 @@ async function previewResult() {
 async function refreshCapture() {
   const session = current;
   if (!session?.serverCapture || session.busy) return;
+  session.checkingProgress = true;
+  session.progressError = false;
   setBusy(session, true);
+  const panel = ensurePanel();
+  panel.querySelector('[data-capture-processing-status]').scrollIntoView({ block: 'nearest' });
   try { await fetchProgress(session); }
-  catch (error) { if (isCurrent(session)) ensurePanel().querySelector('[data-capture-status]').textContent = error.message; }
-  finally { setBusy(session, false); }
+  catch { if (isCurrent(session)) session.progressError = true; }
+  finally { session.checkingProgress = false; setBusy(session, false); }
+  if (isCurrent(session) && !session.progressError && session.serverCapture?.processed?.optimizedModelPath) {
+    panel.querySelector('[data-capture-result]').scrollIntoView({ block: 'nearest' });
+    panel.querySelector('[data-capture-preview]').focus({ preventScroll: true });
+  }
 }
 
 async function continueOnPhone() {
@@ -684,6 +740,7 @@ export async function openRealityCaptureSession(captureId) {
   await restore(result.capture.captureKind, session, result.capture);
   assertCurrent(session);
   session.remotePhotos = result.photos || [];
+  session.lastCheckedAt = Date.now();
   session.uploadedPhotoIds = new Set(session.remotePhotos.map((photo) => photo.id));
   const panel = ensurePanel();
   panel.classList.add('show');
