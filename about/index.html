@@ -3,188 +3,250 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>About | World Explorer</title>
-  <meta name="description" content="About World Explorer and its founder, Steven Reid.">
+  <title>About World Explorer 3D</title>
+  <meta name="description" content="The story, ideas, and independent work behind World Explorer 3D, a playable browser world built from real places.">
+  <meta name="theme-color" content="#070b0e">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700;800&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg-0: #071324;
-      --bg-1: #0f2742;
-      --bg-2: #1f4f73;
-      --ink: #e6f2ff;
-      --muted: #b7cde0;
-      --card: rgba(7, 19, 36, 0.72);
-      --line: rgba(183, 205, 224, 0.24);
-      --accent: #53c4ff;
-    }
-
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      color: var(--ink);
-      background:
-        radial-gradient(circle at 20% 20%, rgba(83, 196, 255, 0.2), transparent 45%),
-        radial-gradient(circle at 80% 10%, rgba(255, 200, 87, 0.16), transparent 40%),
-        linear-gradient(170deg, var(--bg-2), var(--bg-1) 52%, var(--bg-0));
-      min-height: 100vh;
-      font-family: 'Barlow', sans-serif;
-      line-height: 1.55;
-    }
-
-    a { color: inherit; }
-
-    .shell {
-      width: min(980px, 92vw);
-      margin: 0 auto;
-      padding: 24px 0 44px;
-    }
-
-    .top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-
-    .brand {
-      margin: 0;
-      font-family: 'Chakra Petch', sans-serif;
-      letter-spacing: 0.03em;
-      font-size: clamp(24px, 4vw, 40px);
-    }
-
-    .links {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-
-    .links a {
-      text-decoration: none;
-      border: 1px solid var(--line);
-      background: rgba(9, 24, 44, 0.7);
-      border-radius: 999px;
-      padding: 8px 14px;
-      font-weight: 700;
-      font-size: 14px;
-    }
-
-    .intro {
-      margin: 0 0 16px;
-      color: var(--muted);
-      font-size: 15px;
-    }
-
-    section {
-      border: 1px solid var(--line);
-      border-radius: 18px;
-      background: var(--card);
-      padding: 20px;
-      margin-bottom: 16px;
-      backdrop-filter: blur(6px);
-    }
-
-    h2 {
-      margin: 0 0 12px;
-      font-family: 'Chakra Petch', sans-serif;
-      letter-spacing: 0.02em;
-      font-size: clamp(24px, 3vw, 30px);
-      color: #dff0ff;
-    }
-
-    p {
-      margin: 0 0 12px;
-      color: #d7e8f8;
-      font-size: 17px;
-    }
-
-    p:last-child { margin-bottom: 0; }
-
-    ul {
-      margin: 8px 0 14px;
-      padding-left: 20px;
-    }
-
-    li {
-      margin: 0 0 8px;
-      color: #d7e8f8;
-      font-size: 17px;
-    }
-
-    .founder-name {
-      font-weight: 800;
-      color: var(--accent);
-    }
-
-    footer {
-      margin-top: 20px;
-      border-top: 1px solid var(--line);
-      padding-top: 14px;
-      font-size: 14px;
-      color: var(--muted);
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px 12px;
-    }
-
-    @media (max-width: 780px) {
-      .top { flex-direction: column; align-items: flex-start; }
-      .links { width: 100%; }
-      .links a { flex: 1 1 auto; text-align: center; }
-      p, li { font-size: 16px; }
-    }
-  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles/landing.css?v=4">
+  <link rel="stylesheet" href="../styles/about.css?v=1">
 </head>
-<body>
-  <div class="shell">
-    <div class="top">
-      <h1 class="brand">About World Explorer</h1>
-      <div class="links">
-        <a href="../">Home</a>
-        <a href="../app/">Open App</a>
-        <a href="../account/">Account</a>
-      </div>
+<body class="about-page">
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="landing-masthead" aria-label="Main navigation">
+    <a class="landing-brand" href="../" aria-label="World Explorer 3D home">
+      <span class="brand-mark" aria-hidden="true"><span>W</span></span>
+      <span>World Explorer 3D</span>
+    </a>
+    <nav class="landing-nav" aria-label="About page sections">
+      <a href="#project">The project</a>
+      <a href="#world-building">How it works</a>
+      <a href="#origin">The story</a>
+      <a href="#development">Development</a>
+    </nav>
+    <div class="masthead-actions">
+      <a class="account-link" href="../account/">Account</a>
+      <a class="nav-launch" href="../app/">Enter world</a>
     </div>
+  </header>
 
-    <p class="intro">World Explorer is an independent browser platform for real-world exploration, Live Earth context, multiplayer sessions, and long-term digital-Earth expansion.</p>
+  <main id="main">
+    <section class="about-opening" id="project" aria-labelledby="about-title">
+      <div class="about-opening-grid">
+        <div class="about-opening-copy">
+          <span class="about-kicker">The project and the person behind it</span>
+          <h1 id="about-title">About<br>World Explorer</h1>
+          <p class="about-deck">World Explorer started with a simple question: how much of the real world could I turn into a world you can actually explore?</p>
+        </div>
 
-    <section>
-      <h2>About</h2>
-      <p>World Explorer is a browser-native platform built around real places. It lets people move from neighborhoods and coastlines to orbit and the Moon, open Live Earth layers on the globe, and stay inside one connected runtime instead of bouncing between separate tools.</p>
-      <p>Unlike a traditional map viewer, World Explorer is meant to feel inhabited. Real coordinates, local weather, local time of day, sky state, water travel, buildings, and shared rooms all connect to the same place-based experience in the browser.</p>
-      <p>Users can:</p>
-      <ul>
-        <li>Explore preset or custom locations on Earth.</li>
-        <li>Drive, walk, drone, boat, and travel into orbit or onto the Moon.</li>
-        <li>See real local weather, local time, and selected Live Earth layers.</li>
-        <li>Enter supported buildings and Land & Property destinations.</li>
-        <li>Join multiplayer rooms, place memories, and share discoveries.</li>
-        <li>Submit staged world contributions for review.</li>
-      </ul>
-      <p>The platform is designed to expand in layers. Live Earth, local-world exploration, rooms, interiors, Land & Property, and contributor editing are all part of the same long-term direction: a lightweight, place-aware digital Earth experience that still feels approachable.</p>
-      <p>World Explorer is independently developed and maintained, with a focus on clarity, scalability, and long-term expandability. It is being built step by step as a real-world world platform, not just a map and not just a game.</p>
+        <figure class="about-hero-figure">
+          <img src="../assets/about/earth-explorer-current.webp" width="1440" height="900" alt="The current World Explorer character and dog companion standing on a rendered Baltimore street" fetchpriority="high">
+          <figcaption>
+            <strong>Exploring Baltimore</strong>
+            <span>The current Explorer and companion in a world assembled from real map data.</span>
+          </figcaption>
+        </figure>
+      </div>
+
+      <div class="about-introduction about-prose">
+        <p>Instead of building a fictional map, World Explorer uses real geographic data as the foundation for an interactive 3D environment that runs in the browser. Roads, buildings, terrain, points of interest and other features come from real-world data where it is available. From there, procedural systems fill in what the underlying data does not describe.</p>
+        <p>That distinction is important. A map may tell World Explorer where a building is and what its footprint looks like without knowing what every window, wall or room looks like. The goal is to preserve what is actually known while generating enough of what is missing to make the place usable as an interactive world.</p>
+        <p>The result is somewhere between a world explorer, sandbox, simulation and game. I am still figuring out exactly where those boundaries belong.</p>
+      </div>
     </section>
 
-    <section>
-      <h2>Founder</h2>
-      <p><span class="founder-name">World Explorer is created and maintained by Steven Reid.</span></p>
-      <p>My interest has always been understanding how systems work at a foundational level. Not just using tools, but rebuilding them to understand their mechanics. Much of what powers World Explorer comes from that mindset.</p>
-      <p>Rather than relying only on existing abstractions, I often approach problems by implementing my own versions of the components I want to understand, from deterministic procedural systems to custom pseudo-random number generators and performance-aware spatial logic. Building from first principles has been my way to learn deeply and to shape the architecture intentionally.</p>
-      <p>My interests span physics, machine learning, spatial computation, and large-scale systems. I am especially drawn to ideas at the edges of conventional boundaries, not for novelty, but to explore how unconventional approaches can become practical and scalable.</p>
-      <p>World Explorer reflects that curiosity. It is an evolving platform built from the ground up, designed to be expandable, structurally coherent, and technically deliberate.</p>
-      <p>This is an independent project developed step by step, with a focus on clarity, experimentation, and long-term architectural vision.</p>
+    <section class="about-section about-experience" aria-labelledby="experience-title">
+      <div class="about-section-heading">
+        <span class="about-index" aria-hidden="true">01</span>
+        <div>
+          <span class="about-kicker">A world you can do things in</span>
+          <h2 id="experience-title">Geographic space should be interactive, not just viewable.</h2>
+        </div>
+      </div>
+
+      <div class="about-split about-split-experience">
+        <div class="about-prose">
+          <p>You can move through real locations on foot and use different forms of transportation. Roads become places to drive rather than lines on a map. Buildings and points of interest can become places to interact with rather than markers. Airports can connect travel between locations. Water, terrain and environmental information become parts of the environment itself.</p>
+          <p>The project has expanded into traffic, pedestrians, interiors, property and land systems, wildlife and collecting, marine exploration, aircraft, environmental systems, multiplayer features and other ways of interacting with the world.</p>
+          <p>It has also expanded beyond Earth. The Expedition side of World Explorer carries the same idea into space, with spacecraft, travel, exploration and mission-based systems.</p>
+          <p>Not every part of the world has the same level of detail, and the underlying data varies enormously from place to place. World Explorer is an ongoing attempt to make all of those different systems work together without requiring every location on Earth to be built by hand.</p>
+        </div>
+
+        <figure class="about-inline-figure about-driving-figure">
+          <img src="../assets/about/bmw-earth-drive.webp" width="1440" height="900" loading="lazy" alt="A black BMW being driven through a rendered Baltimore street in World Explorer">
+          <figcaption>
+            <strong>From map line to road</strong>
+            <span>The current BMW driving through mapped Baltimore.</span>
+          </figcaption>
+        </figure>
+      </div>
     </section>
 
-    <footer>
-      <a href="mailto:mail@worldexplorer3d.io">Contact</a>
-      <a href="../legal/privacy">Privacy</a>
-      <a href="../legal/terms">Terms</a>
-      <span>© 2026 Steven Reid. All Rights Reserved.</span>
-    </footer>
-  </div>
+    <section class="about-section about-world-building" id="world-building" aria-labelledby="world-building-title">
+      <div class="about-section-heading">
+        <span class="about-index" aria-hidden="true">02</span>
+        <div>
+          <span class="about-kicker">How the world is built</span>
+          <h2 id="world-building-title">No single dataset contains a complete 3D world.</h2>
+        </div>
+      </div>
+
+      <div class="about-prose about-prose-wide">
+        <p>One source might know where a road is. Another might contain building information. Another may describe elevation, land use, weather or a point of interest. Sometimes two sources describe the same thing differently. Sometimes important information simply does not exist.</p>
+        <p>World Explorer has to assemble those pieces into one environment.</p>
+      </div>
+
+      <ol class="synthesis-sequence" aria-label="How real-world information becomes an interactive world">
+        <li>
+          <span class="sequence-number">01</span>
+          <strong>Real-world sources</strong>
+          <span>Roads, footprints, elevation, land use and places</span>
+        </li>
+        <li>
+          <span class="sequence-number">02</span>
+          <strong>World synthesis</strong>
+          <span>Normalize, reconcile, preserve evidence and identify gaps</span>
+        </li>
+        <li>
+          <span class="sequence-number">03</span>
+          <strong>Interactive world</strong>
+          <span>Terrain, structures, travel, interiors and activities</span>
+        </li>
+      </ol>
+
+      <div class="about-prose about-prose-offset">
+        <p>Where reliable source information exists, the system tries to preserve it. Other properties can be derived from available information, inferred when there is enough context, or generated procedurally when something needs a representation but the real information is unknown.</p>
+        <p>That means the world is intentionally a mixture of real geographic evidence and generated representation. World Explorer should know the difference between the two rather than quietly treating something it generated as measured reality.</p>
+        <p class="about-note">Detail and accuracy vary by location and source coverage. Generated representation makes missing parts playable; it does not turn invented detail into measured fact.</p>
+        <p>This problem eventually became large enough to become a separate project of its own.</p>
+      </div>
+    </section>
+
+    <section class="about-section about-gws" aria-labelledby="gws-title">
+      <div class="about-gws-grid">
+        <figure class="about-inline-figure about-gws-figure">
+          <img src="../assets/about/geospatial-world-synthesis-viewer.webp" width="1440" height="1100" loading="lazy" alt="Geospatial World Synthesis viewer comparing source geometry, a canonical result and the recorded reconciliation decision">
+          <figcaption>
+            <strong>Geospatial World Synthesis viewer</strong>
+            <span>Source evidence, reconciliation decisions and preserved conflicts remain inspectable.</span>
+          </figcaption>
+        </figure>
+
+        <div class="about-gws-copy">
+          <span class="about-kicker">Separate open-source project</span>
+          <h2 id="gws-title">Geospatial World Synthesis</h2>
+          <div class="about-prose">
+            <p>While building World Explorer, I kept running into the same underlying problem: different geographic sources can describe different pieces of the same place, disagree with one another, or leave gaps that still have to be dealt with.</p>
+            <p>That work became Geospatial World Synthesis, a separate open-source project.</p>
+            <p>Geospatial World Synthesis takes bounded records from different geospatial sources and turns them into a common, renderer-neutral representation. It keeps the original source identities and provenance, can reconcile records that appear to describe the same real-world entity, preserves disagreements instead of silently overwriting them, and keeps evidence separate from derived or generated information.</p>
+            <p>In simpler terms, it is an attempt to let software assemble a useful description of a place while still being able to answer: Where did this information come from? What do we actually know? What was calculated? What conflicts? And what did the software have to fill in?</p>
+            <p>The project grew out of problems I encountered while building World Explorer, but it is being developed independently so World Explorer and other applications can use and evaluate the same underlying approach.</p>
+          </div>
+          <a class="about-action" href="https://github.com/RRG314/geospatial-world-synthesis" target="_blank" rel="noopener noreferrer">View Geospatial World Synthesis on GitHub <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a>
+        </div>
+      </div>
+    </section>
+
+    <section class="about-section about-origin" id="origin" aria-labelledby="origin-title">
+      <div class="about-origin-grid">
+        <div class="about-section-heading about-origin-heading">
+          <span class="about-index" aria-hidden="true">03</span>
+          <div>
+            <span class="about-kicker">How this started</span>
+            <h2 id="origin-title">It began as a small map-based racing idea.</h2>
+          </div>
+        </div>
+
+        <div class="about-prose about-origin-copy">
+          <p>World Explorer did not begin as an attempt to build all of this.</p>
+          <p>Near the beginning of 2026, I started working on a small map-based racing idea with my son. I began wondering whether the map itself could become more than a background—whether real geographic information could be used to construct a 3D environment that you could actually drive through.</p>
+          <p>Once I got that working at a basic level, one question kept leading to another.</p>
+          <p>If you can drive the roads, what happens when you get out of the car? If the buildings are there, can you use them? If airports exist in the data, can they actually take you somewhere? What about boats and water? Wildlife? Property? Other players? And if the project is about exploring the world, where does the world actually end?</p>
+        </div>
+      </div>
+
+      <blockquote class="about-pullquote">
+        <p>The original little racing idea got away from me.</p>
+        <footer>World Explorer is what happened next.</footer>
+      </blockquote>
+    </section>
+
+    <section class="about-section about-person" aria-labelledby="person-title">
+      <div class="about-person-layout">
+        <div class="about-person-aside">
+          <span class="about-index" aria-hidden="true">04</span>
+          <span class="about-kicker">About me</span>
+          <h2 id="person-title">I’m Steven Reid.</h2>
+          <p class="about-person-summary">World Explorer is something I create and maintain for fun. There is no large development studio behind it.</p>
+        </div>
+
+        <div class="about-prose about-person-copy">
+          <p>I started the project without a background in game development or professional software engineering.</p>
+          <p>I use AI-assisted development tools extensively to help turn my designs and specifications into working code, test implementations, investigate problems, and work through areas I am still learning. The direction of the project, the systems I choose to pursue, and the decisions about how they fit together come from that continuing process of experimentation and learning.</p>
+          <p>As the project became more complicated, I also became too interested in what was happening underneath it to be satisfied with letting AI handle everything I did not understand. I want to understand why these systems work, what the code is actually doing, and enough of the underlying science and mathematics to make better decisions myself.</p>
+          <p>That is part of what led me back to school. I am currently enrolled in a physics program and plan to take programming courses as electives while I continue working on World Explorer.</p>
+          <p>Working on the project has pushed me into 3D graphics, geospatial data, procedural generation, simulation, physics, networking, asset pipelines, software architecture and plenty of subjects I knew almost nothing about when I started.</p>
+          <p>I am also neurodivergent and have ADHD and autism. Outside of World Explorer, some of my interests include playing drums and dog training. I tend to get deeply interested in figuring out how things work, which probably explains at least some of how a little racing map turned into this.</p>
+          <p>World Explorer is still something I do for fun. I am learning as I build it, and I expect both the project and my understanding of it to keep changing.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="about-section about-development" id="development" aria-labelledby="development-title">
+      <div class="about-section-heading">
+        <span class="about-index" aria-hidden="true">05</span>
+        <div>
+          <span class="about-kicker">Built in the open</span>
+          <h2 id="development-title">The work is public and the sources stay visible.</h2>
+        </div>
+      </div>
+
+      <div class="about-development-grid">
+        <div class="about-prose">
+          <p>World Explorer is developed publicly on GitHub. The repository contains the application source, project history and the systems that make the world work.</p>
+          <p>Geospatial World Synthesis is maintained separately so the underlying geospatial work can be used and evaluated without needing the rest of World Explorer.</p>
+          <p>World Explorer’s own repository is publicly viewable under its source-available license. Geospatial World Synthesis is open-source software under the MIT License.</p>
+          <p>For third-party data, models, libraries and other material used by World Explorer, the project’s attribution and acknowledgements remain the authoritative lists.</p>
+        </div>
+
+        <nav class="about-project-links" aria-label="Public project links">
+          <a href="https://github.com/RRG314/WorldExplorer3D" target="_blank" rel="noopener noreferrer"><span>World Explorer on GitHub</span><span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a>
+          <a href="https://github.com/RRG314/geospatial-world-synthesis" target="_blank" rel="noopener noreferrer"><span>Geospatial World Synthesis</span><span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a>
+          <a href="https://github.com/RRG314/WorldExplorer3D/blob/stable/ATTRIBUTION.md" target="_blank" rel="noopener noreferrer"><span>Attribution</span><span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a>
+          <a href="https://github.com/RRG314/WorldExplorer3D/blob/stable/ACKNOWLEDGEMENTS.md" target="_blank" rel="noopener noreferrer"><span>Acknowledgements</span><span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a>
+          <a href="https://github.com/RRG314/WorldExplorer3D/blob/stable/KNOWN_ISSUES.md" target="_blank" rel="noopener noreferrer"><span>Known issues</span><span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a>
+        </nav>
+      </div>
+    </section>
+
+    <section class="about-support" aria-labelledby="support-title">
+      <div>
+        <span class="about-kicker">Support World Explorer</span>
+        <h2 id="support-title">Help keep the world growing.</h2>
+        <div class="about-prose">
+          <p>World Explorer is free to explore and is still an independent project. As it has grown, so have the costs of hosting, data services, assets and the tools I use to keep developing it.</p>
+          <p>If you enjoy World Explorer and want to help me keep building it, donations are welcome. Support helps cover those costs and gives me more room to keep experimenting with the project.</p>
+          <p>It started as a map racing project with my son. It has gotten a little bigger since then.</p>
+          <p class="support-closing">It is an entire world, after all.</p>
+        </div>
+      </div>
+      <a class="about-action about-support-action" href="../account/?section=support">Donate securely with Stripe</a>
+    </section>
+  </main>
+
+  <footer class="about-footer">
+    <span>World Explorer 3D</span>
+    <a href="../">Home</a>
+    <a href="../app/">Enter world</a>
+    <a href="../legal/privacy">Privacy</a>
+    <a href="../legal/terms">Terms</a>
+    <a href="mailto:mail@worldexplorer3d.io">Contact</a>
+    <a href="https://github.com/RRG314/WorldExplorer3D" target="_blank" rel="noopener noreferrer">GitHub<span class="sr-only"> (opens in a new tab)</span></a>
+    <span>OpenStreetMap data © OpenStreetMap contributors (ODbL)</span>
+    <span>© 2026 Steven Reid. All Rights Reserved.</span>
+  </footer>
 </body>
 </html>

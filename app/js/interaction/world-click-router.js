@@ -130,15 +130,15 @@ function handleWorldCanvasClick(appCtx, event) {
   if (!globalThis.THREE || event?.button !== 0 || event?.target !== appCtx.renderer?.domElement) return false;
   if (!appCtx.gameStarted || appCtx.paused || appCtx.blockBuildMode || appCtx.fishingGame?.open) return false;
   if (appCtx.worldDiscoveryRuntime?.ui?.open || appCtx.urbanSandboxRuntime?.equipmentOpen) return false;
-  if (appCtx.Walk?.state?.mode !== 'walk') return false;
+  const onFoot = appCtx.Walk?.state?.mode === 'walk';
   const equipmentCategory = appCtx.urbanSandboxRuntime?.equipment?.equipped?.()?.category;
   if (equipmentCategory === 'sidearm' || equipmentCategory === 'explosive') return false;
   const populationRoots = appCtx.livingWorldRuntime?.population?.pickableRoots?.() || [];
   const roots = uniqueVisibleRoots([
     populationRoots,
-    appCtx.poiMeshes || [],
-    appCtx.streetFurnitureMeshes || [],
-    appCtx.buildingMeshes || []
+    onFoot ? appCtx.poiMeshes || [] : [],
+    onFoot ? appCtx.streetFurnitureMeshes || [] : [],
+    onFoot ? appCtx.buildingMeshes || [] : []
   ]);
   if (!roots.length) return false;
   const rect = appCtx.renderer.domElement.getBoundingClientRect();

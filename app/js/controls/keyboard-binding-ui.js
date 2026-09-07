@@ -4,7 +4,7 @@ import {
   keyboardBindingLabel,
   resetKeyboardBindings,
   setKeyboardBinding
-} from './keyboard-bindings.js?v=2';
+} from './keyboard-bindings.js?v=3';
 
 let initialized = false;
 let captureActionId = '';

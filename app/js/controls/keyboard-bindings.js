@@ -9,7 +9,8 @@ const ACTIONS = Object.freeze([
   Object.freeze({ id: 'primary_action', label: 'Jump / vehicle brake', defaultCode: 'Space' }),
   Object.freeze({ id: 'modifier_action', label: 'Run / descend', defaultCode: 'ShiftLeft' }),
   Object.freeze({ id: 'boost_action', label: 'Boost / wheel brake', defaultCode: 'ControlLeft' }),
-  Object.freeze({ id: 'facility_action', label: 'Nearby mechanic', defaultCode: 'KeyF' }),
+  Object.freeze({ id: 'traversal_mode', label: 'Cycle walk / car / plane / drone', defaultCode: 'KeyF' }),
+  Object.freeze({ id: 'facility_action', label: 'Nearby mechanic', defaultCode: 'KeyH' }),
   Object.freeze({ id: 'camera', label: 'Change camera', defaultCode: 'KeyC' }),
   Object.freeze({ id: 'look_back', label: 'Look behind vehicle', defaultCode: 'KeyQ' }),
   Object.freeze({ id: 'inventory', label: 'Backpack', defaultCode: 'KeyI' }),
@@ -45,7 +46,11 @@ function normalizeKeyboardBindings(input = {}) {
 
 function loadKeyboardBindings(storage = globalThis.localStorage) {
   try {
-    return normalizeKeyboardBindings(JSON.parse(storage?.getItem(STORAGE_KEY) || '{}'));
+    const saved = JSON.parse(storage?.getItem(STORAGE_KEY) || '{}');
+    // F used to be stored as the mechanic shortcut. When the traversal toggle
+    // returned, preserving that legacy value silently moved travel off F.
+    if (saved?.facility_action === 'KeyF' && !saved?.traversal_mode) delete saved.facility_action;
+    return normalizeKeyboardBindings(saved);
   } catch {
     return defaultKeyboardBindings();
   }

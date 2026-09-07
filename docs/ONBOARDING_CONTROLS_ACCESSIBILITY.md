@@ -46,11 +46,12 @@ aircraft, boats, Space flight, and touch-button fallbacks. Reassigning an occupi
 key swaps the two actions, preventing ambiguous double bindings. Reserved pause,
 diagnostic, and quick-slot keys cannot be captured.
 
-Defaults use WASD movement, right-drag camera, E context action, Space primary,
+Defaults use WASD movement, world-drag camera while walking, E context action, Space primary,
 Shift modifier, C camera, Q rear view, and visible Travel controls. Arrow keys
-remain a complete movement/flight alternate. F performs only the nearby mechanic
-action; it never silently cycles travel modes. Shift+N retains the deliberate
-next-city shortcut.
+remain a complete movement/flight alternate. F cycles the primary Character,
+BMW, Plane, and Drone modes; H opens a mapped mechanic only when one is nearby.
+The Travel menu remains the direct mode chooser, and Shift+N retains the
+deliberate next-city shortcut.
 
 Gamepad input is action-based: left stick moves or steers, right stick looks, A is
 the primary movement action, X is context interaction, D-pad Up opens the Backpack,

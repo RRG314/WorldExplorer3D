@@ -39,7 +39,7 @@ import {
   disposeCuratedCharacter,
   NEARBY_NPC_ASSET_IDS,
   updateCuratedCharacterAnimation
-} from '../walking/curated-explorer-character.js?v=7';
+} from '../walking/curated-explorer-character.js?v=8';
 
 const ENTER_DISTANCE = 2.8;
 // Room clients can assemble slightly different collision envelopes when a live

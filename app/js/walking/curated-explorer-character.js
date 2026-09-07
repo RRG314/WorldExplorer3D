@@ -20,7 +20,8 @@ const ASSET_BY_ROLE = Object.freeze({
   'player-character': EXPLORER_ASSET_ID,
   'nearby-npc-character': NEARBY_NPC_ASSET_ID,
   'civic-responder-character': RESPONDER_ASSET_ID,
-  'ship-crew-character': SHIP_CREW_ASSET_ID
+  'ship-crew-character': SHIP_CREW_ASSET_ID,
+  'planetary-player-character': SHIP_CREW_ASSET_ID
 });
 
 function setFallbackVisible(host, visible) {
@@ -47,6 +48,7 @@ function styleForRole(role = '') {
   if (role === 'nearby-npc-character') return 'licensed-stylized-city-explorer';
   if (role === 'civic-responder-character') return 'licensed-stylized-civic-responder';
   if (role === 'ship-crew-character') return 'licensed-stylized-expedition-crew';
+  if (role === 'planetary-player-character') return 'licensed-stylized-planetary-explorer';
   return 'licensed-stylized-field-explorer';
 }
 
@@ -143,23 +145,27 @@ function disposeCuratedCharacter(host) {
   delete host.userData.curatedCharacterAssetId;
   delete host.userData.curatedCharacterLoadStarted;
   delete host.userData.curatedCharacterLoadToken;
+  delete host.userData.curatedCharacterLoadingAssetId;
   setFallbackVisible(host, true);
   return true;
 }
 
 async function attachCuratedExplorerCharacter(THREE, host, options = {}) {
-  if (!host || host.userData.curatedCharacterLoadStarted) return false;
+  if (!host) return false;
+  const assetId = options.assetId || ASSET_BY_ROLE[options.role] || EXPLORER_ASSET_ID;
+  if (host.userData.curatedCharacterLoadStarted && host.userData.curatedCharacterLoadingAssetId === assetId) return false;
   const loadToken = {};
   host.userData.curatedCharacterLoadStarted = true;
   host.userData.curatedCharacterLoadToken = loadToken;
+  host.userData.curatedCharacterLoadingAssetId = assetId;
   try {
-    const assetId = options.assetId || ASSET_BY_ROLE[options.role] || EXPLORER_ASSET_ID;
     const instance = await loadModelAsset(THREE, assetId, { signal: options.signal });
     if (options.isCurrent && !options.isCurrent()) {
       instance.dispose();
       if (host.userData.curatedCharacterLoadToken === loadToken) {
         host.userData.curatedCharacterLoadStarted = false;
         delete host.userData.curatedCharacterLoadToken;
+        delete host.userData.curatedCharacterLoadingAssetId;
       }
       return false;
     }
@@ -171,11 +177,17 @@ async function attachCuratedExplorerCharacter(THREE, host, options = {}) {
     host.userData.characterMixer = animation.mixer;
     host.userData.characterActions = animation.actions;
     host.userData.curatedCharacterAttachment = Object.freeze({ instance, visual, ...animation });
+    if (host.userData.curatedCharacterLoadToken === loadToken) {
+      host.userData.curatedCharacterLoadStarted = false;
+      delete host.userData.curatedCharacterLoadToken;
+      delete host.userData.curatedCharacterLoadingAssetId;
+    }
     return true;
   } catch (error) {
     if (host.userData.curatedCharacterLoadToken === loadToken) {
       host.userData.curatedCharacterLoadStarted = false;
       delete host.userData.curatedCharacterLoadToken;
+      delete host.userData.curatedCharacterLoadingAssetId;
       setFallbackVisible(host, options.failClosed !== true);
     }
     if (error?.name !== 'AbortError') {

@@ -10,6 +10,7 @@ import { configureColorTexture } from './catalog.js?v=1';
 import { playSurfacePodLaunch } from './surface-pod-launch.js?v=11';
 import { samplePhysicalEnvironment } from './runtime/physical-environment.js?v=2';
 import { clearActivePlanetaryObstacles, setActivePlanetaryObstacles } from './runtime/obstacle-authority.js?v=1';
+import { SOLID_SURFACE_TRAVEL_CAPABILITIES } from './traversal-capabilities.js?v=1';
 import {
   CALORIS_PLANITIA_SURFACE_REGION,
   CERES_OCCATOR_SURFACE_REGION,
@@ -25,9 +26,6 @@ import {
   VESTA_RHEASILVIA_SURFACE_REGION
 } from './runtime/surface-authority.js?v=4';
 
-const WALK_AND_DRIVE = Object.freeze({ drive: true, walk: true, drone: false, plane: false, boat: false, ocean: false, earth: false, space: false });
-const PROTECTED_DRIVE = Object.freeze({ drive: true, walk: false, drone: false, plane: false, boat: false, ocean: false, earth: false, space: false });
-
 function worldPack(input) {
   return Object.freeze({
     terrainSize: 16_000,
@@ -38,7 +36,7 @@ function worldPack(input) {
     fillIntensity: 0.2,
     rockCount: 520,
     rockScale: 4,
-    capabilities: WALK_AND_DRIVE,
+    capabilities: SOLID_SURFACE_TRAVEL_CAPABILITIES,
     ...input,
     spawn: Object.freeze(input.spawn),
     material: Object.freeze(input.material),
@@ -81,9 +79,9 @@ const SOLID_WORLD_PACKS = Object.freeze({
     sunIntensity: 0.8,
     ambientIntensity: 0.58,
     fillIntensity: 0.4,
-    capabilities: PROTECTED_DRIVE,
+    capabilities: SOLID_SURFACE_TRAVEL_CAPABILITIES,
     title: 'Maxwell Montes, Venus',
-    context: 'Protected vehicle · dense CO₂ atmosphere · 0.90g',
+    context: 'Sealed suit or protected rover · dense CO₂ atmosphere · 0.90g',
     representation: 'Magellan radar context · modeled local relief'
   }),
   io: worldPack({
@@ -497,6 +495,10 @@ function addVisualSurfaceHorizon(pack, world) {
     material.polygonOffset = true;
     material.polygonOffsetFactor = 1;
     material.polygonOffsetUnits = 1;
+    material.transparent = false;
+    material.opacity = 1;
+    material.depthTest = true;
+    material.depthWrite = true;
     const horizon = new THREE.Mesh(geometry, material);
     horizon.name = `${pack.bodyId} modeled horizon ${region.id}`;
     horizon.position.set(
@@ -509,6 +511,7 @@ function addVisualSurfaceHorizon(pack, world) {
     horizon.userData.planetaryBody = pack.bodyId;
     horizon.userData.truthClass = 'generated_game_detail';
     horizon.userData.collisionAuthority = false;
+    horizon.userData.occludesPlanetarySky = true;
     horizon.userData.description = 'Modeled visual continuation outside the accepted traversable surface region.';
     world.objects.push(horizon);
     appCtx.scene.add(horizon);
@@ -778,7 +781,11 @@ async function createSolidWorld(pack) {
       roughness: pack.material.roughness,
       metalness: 0,
       bumpMap: texture,
-      bumpScale: pack.material.bumpScale
+      bumpScale: pack.material.bumpScale,
+      transparent: false,
+      opacity: 1,
+      depthTest: true,
+      depthWrite: true
     });
     surface = new THREE.Mesh(geometry, material);
     surface.name = `${pack.title} modeled surface`;
@@ -795,6 +802,7 @@ async function createSolidWorld(pack) {
     surface.userData.worldAddress = pack.manifest.address;
     surface.userData.worldAddressKey = pack.manifest.addressKey;
     surface.userData.terrainTruthClass = 'modeled';
+    surface.userData.occludesPlanetarySky = true;
     surface.userData.textureTruthClass = pack.runtimeModeled ? 'generated_model_material' : 'derived_from_observations';
     return {
       sampleHeight: (x, z) => sampleRenderedRelief(pack, x, z),
@@ -840,13 +848,29 @@ function positionPlayer(pack) {
     Object.assign(appCtx.Walk.state.walker, {
       x: pack.spawn.x,
       z: pack.spawn.z,
-      y: ground + 1.2,
+      y: ground + 1.7,
       angle: pack.spawn.angle,
       yaw: pack.spawn.angle,
       lookYawOffset: 0,
       pitch: 0,
       vy: 0,
       onGround: true
+    });
+  }
+  if (appCtx.drone) {
+    Object.assign(appCtx.drone, {
+      x: pack.spawn.x,
+      y: ground + 12,
+      z: pack.spawn.z,
+      yaw: pack.spawn.angle,
+      pitch: -0.2,
+      roll: 0,
+      vx: 0,
+      vy: 0,
+      vz: 0,
+      cameraYawOffset: 0,
+      cameraPitchOffset: 0,
+      cameraLookTimer: 0
     });
   }
   appCtx.camera?.position.set(pack.spawn.x + 18, ground + 10, pack.spawn.z + 22);

@@ -284,7 +284,7 @@ test('curated animals remain visual adapters over companion and wildlife authori
 });
 
 test('player gender choice persists and every promoted nearby NPC receives a balanced family asset', () => {
-  const preference = fs.readFileSync(path.join(root, 'app/js/walking/player-character-preference.js'), 'utf8');
+  const preference = fs.readFileSync(path.join(root, 'js/player-character-preference.js'), 'utf8');
   const walking = fs.readFileSync(path.join(root, 'app/js/walking/character.js'), 'utf8');
   const shell = fs.readFileSync(path.join(root, 'app/index.html'), 'utf8');
   const account = fs.readFileSync(path.join(root, 'account/index.html'), 'utf8');

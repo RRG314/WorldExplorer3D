@@ -109,7 +109,7 @@ try {
 
   const selection = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    const { performWorldClickTarget } = await import('/app/js/interaction/world-click-router.js?v=2');
+    const { performWorldClickTarget } = await import('/app/js/interaction/world-click-router.js?v=3');
     const pedestrian = ctx.livingWorldRuntime.population.pedestrianSnapshots().find((entry) => entry.visible);
     if (!pedestrian) throw new Error('No visible pedestrian available for selection');
     performWorldClickTarget(ctx, { kind: 'living-pedestrian', id: pedestrian.id, label: 'Local explorer' });

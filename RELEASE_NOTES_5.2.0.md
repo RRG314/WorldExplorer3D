@@ -49,9 +49,12 @@ blocky character and vehicle stand-ins.
 
 ## Start playing sooner
 
-- The First Journey is now a short, optional three-step introduction: move,
-  interact with something nearby, and open the Backpack. Everything else is
-  discovered through play instead of an endless tutorial.
+- The First Journey is now a short, optional three-step introduction: move and
+  look, interact with something nearby, then choose an adventure. Everything
+  else is discovered through play instead of an endless tutorial.
+- Walking uses complete WASD movement, world-drag camera control, and the same
+  configurable actions shown in Controls. F cycles Character, BMW, Plane, and
+  Drone, while H is the separate nearby-mechanic shortcut.
 - Keyboard actions can be remapped and actually drive the runtime action map.
   Touch controls and camera behavior follow the same action rules on phones and
   tablets.
@@ -117,6 +120,8 @@ audio, and mobile presentation remain active areas of improvement.
   flight, landing, surface return, rendezvous, docking, and ship entry.
 - Prevent solid planetary terrain from exposing or dropping the player beneath
   the playable surface.
+- Restore the account-selected Earth Explorer after returning from a solid
+  planetary surface instead of leaving the spacesuit active.
 - Preserve the selected journey when moving between a planet, local Space,
   Solis Reach, and Earth.
 - Release inactive Space and Ocean drawing buffers and scene resources when

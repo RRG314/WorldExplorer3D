@@ -21,7 +21,7 @@
     {
       "id": "earth-traversal",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "Explore on foot, by car, drone, plane, helicopter, boat, ship, rover,\\s+astronaut, or spacecraft" },
+      "source": { "file": "README.md", "pattern": "Explore on foot, by car, drone, plane, helicopter, boat, ship, rover,\\s+astronaut on solid planetary surfaces, or spacecraft" },
       "evidenceCommands": ["verify:actors-vehicles", "verify:environments"]
     },
     {
@@ -87,7 +87,7 @@
     {
       "id": "live-gps",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "optional Live GPS play while walking" },
+      "source": { "file": "README.md", "pattern": "optional Live\\s+GPS play while walking" },
       "evidenceCommands": ["verify:live-gps", "verify:walking-encounters", "verify:shore-fishing"]
     },
     {

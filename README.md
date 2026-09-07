@@ -53,7 +53,8 @@ active world.*
 ## What you can do
 
 - Explore on foot, by car, drone, plane, helicopter, boat, ship, rover,
-  astronaut, or spacecraft, or use optional Live GPS play while walking.
+  astronaut on solid planetary surfaces, or spacecraft; or use optional Live
+  GPS play while walking.
 - Drive vehicle families with distinct vehicle handling, visible condition, and
   enterable responder vehicles.
 - Visit supported mapped airports to board aircraft, choose pilot or passenger

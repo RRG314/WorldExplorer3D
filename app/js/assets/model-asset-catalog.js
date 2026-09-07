@@ -429,7 +429,7 @@ const MODEL_ASSET_CATALOG = Object.freeze([
     id: 'character-ship-crew-v1',
     label: 'Expedition Ship Crew',
     url: '/app/assets/models/characters/ship-crew-v1.glb',
-    roles: Object.freeze(['ship-crew-character']),
+    roles: Object.freeze(['ship-crew-character', 'planetary-player-character']),
     license: 'CC0-1.0',
     sourceUrl: 'https://quaternius.com/packs/ultimatemodularcharacters.html',
     attribution: 'Ultimate Modular Men — Spacesuit by Quaternius',

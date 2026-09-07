@@ -1,8 +1,8 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { getAstronomicalBody, LANDING_MODE } from '../astronomy/body-catalog.js?v=3';
-import { alignStarFieldToBody } from '../sky/starfield-ui.js?v=15';
+import { alignStarFieldToBody } from '../sky/starfield-ui.js?v=16';
 import { ensurePlanetaryAtmosphere, updatePlanetaryAtmosphere } from './atmosphere-dome.js?v=1';
-import { setPlanetaryStarOcclusion } from './star-occlusion.js?v=1';
+import { setPlanetaryStarOcclusion, updatePlanetaryStarHorizon } from './star-occlusion.js?v=2';
 
 const J2000_MS = Date.UTC(2000, 0, 1, 12, 0, 0);
 const DAY_MS = 86400000;
@@ -74,6 +74,10 @@ function setPlanetarySky(body, date = new Date(), options = {}) {
   if (orientation) alignStarFieldToBody(orientation);
   else appCtx.starField.userData.observerBody = normalizedBody || 'planetary';
   setPlanetaryStarOcclusion(appCtx.starField, true);
+  if (appCtx.renderer) {
+    appCtx.starField.userData.earthLocalClippingEnabled ??= appCtx.renderer.localClippingEnabled === true;
+    appCtx.renderer.localClippingEnabled = true;
+  }
   appCtx.starField.visible = true;
   const requestedOpacity = Number(options.starOpacity);
   const starOpacity = orientation?.starOpacity ?? (Number.isFinite(requestedOpacity) ? requestedOpacity : 0.9);
@@ -100,6 +104,10 @@ function clearPlanetarySky() {
   const marsAtmosphere = appCtx.scene?.getObjectByName('Planetary atmosphere: mars');
   if (marsAtmosphere) marsAtmosphere.visible = false;
   setPlanetaryStarOcclusion(appCtx.starField, false);
+  if (appCtx.renderer && appCtx.starField?.userData && 'earthLocalClippingEnabled' in appCtx.starField.userData) {
+    appCtx.renderer.localClippingEnabled = appCtx.starField.userData.earthLocalClippingEnabled;
+    delete appCtx.starField.userData.earthLocalClippingEnabled;
+  }
   appCtx.planetarySkyOrientation = null;
   // Planetary modes directly restyle the shared star materials. Invalidate
   // Earth's cached sky signature so the next forced astronomical refresh
@@ -113,6 +121,7 @@ function updatePlanetarySky() {
   if (!appCtx.starField || !appCtx.camera) return;
   if (env === appCtx.ENV?.MOON || env === appCtx.ENV?.MARS || env === appCtx.ENV?.PLANETARY) {
     appCtx.starField.position.copy(appCtx.camera.position);
+    updatePlanetaryStarHorizon(appCtx.starField, appCtx.camera.position.y);
   }
   const marsAtmosphere = appCtx.scene?.getObjectByName('Planetary atmosphere: mars');
   updatePlanetaryAtmosphere(marsAtmosphere, appCtx.camera, appCtx.sun?.position);

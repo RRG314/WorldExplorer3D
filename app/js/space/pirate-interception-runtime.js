@@ -1,5 +1,5 @@
 import { loadModelAsset } from '../assets/model-asset-runtime.js?v=15';
-import { keyboardBindingCode, keyboardBindingLabel, keyMatchesKeyboardAction } from '../controls/keyboard-bindings.js?v=2';
+import { keyboardBindingCode, keyboardBindingLabel, keyMatchesKeyboardAction } from '../controls/keyboard-bindings.js?v=3';
 import { createSolisReachExteriorMesh } from './solis-reach-exterior-mesh.js?v=1';
 
 const PIRATE_ASSET_ID = 'space-pirate-insurgent-raider-v1';

@@ -13,6 +13,22 @@ function wrapYaw(angle = 0) {
   return Math.atan2(Math.sin(angle), Math.cos(angle));
 }
 
+function resolveWalkingMoveVector({ forward = 0, strafe = 0, yaw = 0, speed = 0, dt = 0 } = {}) {
+  let resolvedForward = Number(forward) || 0;
+  let resolvedStrafe = Number(strafe) || 0;
+  const inputMagnitude = Math.hypot(resolvedForward, resolvedStrafe);
+  if (inputMagnitude > 1) {
+    resolvedForward /= inputMagnitude;
+    resolvedStrafe /= inputMagnitude;
+  }
+  const distance = Math.max(0, Number(speed) || 0) * Math.max(0, Number(dt) || 0);
+  const resolvedYaw = Number(yaw) || 0;
+  return {
+    x: (Math.sin(resolvedYaw) * resolvedForward - Math.cos(resolvedYaw) * resolvedStrafe) * distance,
+    z: (Math.cos(resolvedYaw) * resolvedForward + Math.sin(resolvedYaw) * resolvedStrafe) * distance
+  };
+}
+
 function isPlanetarySurface() {
   return !appCtx.activeInterior && !!(appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId);
 }
@@ -444,16 +460,15 @@ function createWalkingPhysicsHelpers({
       const cameraYaw = mobileTouch && Number.isFinite(state.walker.mobileMoveBasisYaw)
         ? state.walker.mobileMoveBasisYaw
         : wrapYaw(state.walker.yaw + state.walker.lookYawOffset);
-      const moveX = skydivingFlight
-        ? skydivingFlight.vx * dt
-        : mobileTouch && !liveGpsMoved
-        ? (Math.sin(cameraYaw) * forward - Math.cos(cameraYaw) * strafe) * adjustedSpeed * dt
-        : Math.sin(state.walker.angle) * forward * adjustedSpeed * dt;
-      const moveZ = skydivingFlight
-        ? skydivingFlight.vz * dt
-        : mobileTouch && !liveGpsMoved
-        ? (Math.cos(cameraYaw) * forward + Math.sin(cameraYaw) * strafe) * adjustedSpeed * dt
-        : Math.cos(state.walker.angle) * forward * adjustedSpeed * dt;
+      const movement = resolveWalkingMoveVector({
+        forward,
+        strafe,
+        yaw: mobileTouch && !liveGpsMoved ? cameraYaw : state.walker.angle,
+        speed: adjustedSpeed,
+        dt
+      });
+      const moveX = skydivingFlight ? skydivingFlight.vx * dt : movement.x;
+      const moveZ = skydivingFlight ? skydivingFlight.vz * dt : movement.z;
       if (mobileTouch && !liveGpsMoved && Math.hypot(moveX, moveZ) > 0.0001) {
         state.walker.angle = Math.atan2(moveX, moveZ);
       }
@@ -662,4 +677,4 @@ function createWalkingPhysicsHelpers({
   };
 }
 
-export { createWalkingPhysicsHelpers };
+export { createWalkingPhysicsHelpers, resolveWalkingMoveVector };

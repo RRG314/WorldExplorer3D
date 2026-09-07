@@ -182,7 +182,7 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <div class="mode" data-mode="checkpoint"><div class="mode-icon">🏁</div><div><div class="mode-name">Checkpoints</div><div class="mode-desc">Collect all markers scattered across the map</div></div><div class="mode-check">✓</div></div>
 <div class="mode" data-mode="painttown"><div class="mode-icon">🟥</div><div><div class="mode-name">Paint the Town Red</div><div class="mode-desc">Use touch paint or paintball gun to claim buildings. Room rules can enforce roof-only or gun-only rounds.</div></div><div class="mode-check">✓</div></div>
 <div class="mode" data-mode="flower"><div class="mode-icon">🌹</div><div><div class="mode-name">Find the Flower</div><div class="mode-desc">Instantly start the red flower hunt and race for the fastest time.</div></div><div class="mode-check">✓</div></div>
-<div style="grid-column:1/-1;padding:12px 0;text-align:center;font-size:11px;color:#64748b;border-top:2px solid #e8eef5;margin-top:8px;">💡 Toggle walking mode anytime with <b>F</b> key or float menu</div>
+<div style="grid-column:1/-1;padding:12px 0;text-align:center;font-size:11px;color:#64748b;border-top:2px solid #e8eef5;margin-top:8px;">💡 Cycle through walking, the BMW, the plane, and the drone with <b>F</b>, or choose a mode directly from Travel</div>
 </div>
 </div>
 </div>
@@ -352,7 +352,7 @@ How Connected Data Is Used
 <div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Jump</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Space at Wall</span><span class="ctrl-action">Climb / Wall Jump</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Shift</span><span class="ctrl-action">Run (2x speed)</span></div>
-<div class="ctrl-row"><span class="ctrl-key">Right Click + Drag</span><span class="ctrl-action">Mouse Look</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Drag World</span><span class="ctrl-action">Look Around (left or right mouse)</span></div>
 <div class="ctrl-section">World Interaction</div>
 <div class="ctrl-row"><span class="ctrl-key">E / Action</span><span class="ctrl-action">Use the visible nearby door, vehicle, person, or object</span></div>
 <div class="ctrl-row"><span class="ctrl-key">I</span><span class="ctrl-action">Open / close carried equipment</span></div>
@@ -380,6 +380,7 @@ How Connected Data Is Used
 <div class="ctrl-row"><span class="ctrl-key">C</span><span class="ctrl-action">Cycle Camera (3rd/1st/Overhead)</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Q</span><span class="ctrl-action">Look Back while driving</span></div>
 <div class="ctrl-section">Mode Switching</div>
+<div class="ctrl-row"><span class="ctrl-key">F</span><span class="ctrl-action">Cycle Character → BMW → Plane → Drone</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Travel Menu</span><span class="ctrl-action">Choose Character / Car / Plane / Drone</span></div>
 <div class="ctrl-row"><span class="ctrl-key">P / G</span><span class="ctrl-action">Personal plane / boat shortcuts</span></div>
 <div class="ctrl-row"><span class="ctrl-key">B</span><span class="ctrl-action">Open / Close Build with Blocks</span></div>
@@ -1489,8 +1490,9 @@ Explore the area
 • E - Context action: enter / exit a nearby vehicle or use an object<br>
 • C - Camera view<br>
 • Q - Look behind while held<br>
-• F - Open a mapped mechanic only when you are close enough<br>
-• Travel menu - Choose character / car / plane / drone<br>
+• F - Cycle character / BMW / plane / drone<br>
+• H - Open a mapped mechanic only when you are close enough<br>
+• Travel menu - Choose a travel mode directly<br>
 • M - Toggle map<br>
 • Shift+N - Next city<br>
 • B - Open / close Build with Blocks<br>
@@ -1518,10 +1520,11 @@ Explore the area
 • Space - Jump<br>
 • Space at a wall - Climb / wall jump<br>
 • Shift - Run (2x speed)<br>
-• Right Click + Drag - Mouse look<br>
+• Drag on the world with either mouse button - Look around<br>
 • C - Camera view<br>
-• F - Open a mapped mechanic only when you are close enough<br>
-• Travel menu - Choose character / car / plane / drone<br>
+• F - Cycle character / BMW / plane / drone<br>
+• H - Open a mapped mechanic only when you are close enough<br>
+• Travel menu - Choose a travel mode directly<br>
 • B - Open / close Build with Blocks<br>
 </div>
 <div id="droneControls" style="display:none">
@@ -1590,5 +1593,5 @@ Explore the area
 <!-- Real Estate System -->
 <script type="module" src="js/app-shell-fragments.js?v=86"></script>
 <script type="module" src="js/app-auth-shell.js?v=87"></script>
-<script type="module" src="js/bootstrap.js?v=600"></script>
+<script type="module" src="js/bootstrap.js?v=601"></script>
 </body></html>

@@ -17,7 +17,7 @@ import {
   highlightConstellation,
   showStarInfo,
   ensureStarCatalogLoaded
-} from "./sky/starfield-ui.js?v=15";
+} from "./sky/starfield-ui.js?v=16";
 import { createMoonLandingUiApi } from "./sky/moon-landing-ui.js?v=4";
 import {
   activateMoonSurface,

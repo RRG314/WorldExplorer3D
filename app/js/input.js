@@ -43,7 +43,7 @@ function onKey(code, event) {
     const fishingOwnedCode = ['KeyE', 'Space', 'KeyQ', 'KeyJ', 'KeyK', 'KeyL', 'ArrowLeft', 'ArrowRight'].includes(code);
     const worldActionCode = [
       ['interact', 'KeyE'], ['primary_action', 'Space'], ['inventory', 'KeyI'], ['journal', 'KeyJ'],
-      ['map', 'KeyM'], ['facility_action', 'KeyF'], ['plane', 'KeyP'], ['boat', 'KeyG'],
+      ['map', 'KeyM'], ['traversal_mode', 'KeyF'], ['facility_action', 'KeyH'], ['plane', 'KeyP'], ['boat', 'KeyG'],
       ['build', 'KeyB'], ['camera', 'KeyC'], ['track', 'KeyR'], ['use_item', 'KeyV'], ['take_item', 'KeyT']
     ].some(([actionId, fallback]) => matchesControlAction(code, actionId, fallback));
     // Fishing is a focused activity with its own input layer. Swapping a
@@ -107,7 +107,7 @@ function onKey(code, event) {
   }
 
   if (appCtx.activeShipInterior === true && [
-    ['facility_action', 'KeyF'], ['plane', 'KeyP'], ['boat', 'KeyG'], ['build', 'KeyB']
+    ['traversal_mode', 'KeyF'], ['facility_action', 'KeyH'], ['plane', 'KeyP'], ['boat', 'KeyG'], ['build', 'KeyB']
   ].some(([actionId, fallback]) => matchesControlAction(code, actionId, fallback))) {
     if (!event?.repeat) appCtx.showToast?.('Return to flight before changing traversal modes.');
     return;
@@ -153,16 +153,23 @@ function onKey(code, event) {
     if (appCtx.handleUrbanNpcTake()) return;
   }
 
-  // F is reserved for an explicit nearby facility action. Travel changes live
-  // in the visible Travel menu (with P/G as optional direct shortcuts), so a
-  // missed interaction can never unexpectedly replace the player's vehicle.
-  if (matchesControlAction(code, 'facility_action', 'KeyF')) {
+  // The configurable traversal action and the visible Travel menu resolve
+  // through the same mode authority. F keeps the familiar four-mode cycle.
+  if (matchesControlAction(code, 'traversal_mode', 'KeyF')) {
+    if (event?.repeat) return;
+    appCtx.cyclePrimaryTravelMode?.({ source: 'keyboard_traversal' });
+    appCtx.updateControlsModeUI?.();
+    event?.preventDefault?.();
+    return;
+  }
+
+  if (matchesControlAction(code, 'facility_action', 'KeyH')) {
     if (event?.repeat) return;
     if (typeof appCtx.handleMechanicInteraction === 'function' && appCtx.handleMechanicInteraction()) {
       event?.preventDefault?.();
       return;
     }
-    appCtx.showToast?.('Move closer to a mapped mechanic, or open Travel to change vehicles.');
+    appCtx.showToast?.('Move closer to a mapped mechanic.');
     return;
   }
 

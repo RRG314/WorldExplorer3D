@@ -1,6 +1,10 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { nextPrimaryTravelMode } from "./controls/traversal-control-policy.js?v=8";
 import { planetarySurfaceYAtRenderXZ } from './planetary/runtime/surface-query.js?v=3';
+import {
+  isPlanetarySurfaceActive,
+  resolvePlanetaryTravelCapabilities
+} from './planetary/traversal-capabilities.js?v=1';
 import { resolveTravelMenuState } from './travel/menu-state.js?v=2';
 
 let lastTravelUiSignature = '';
@@ -25,7 +29,7 @@ function syncTravelModeButtons() {
   const droneBtn = document.getElementById('fDrone');
   const planeBtn = document.getElementById('fPlane');
   const boatBtn = document.getElementById('fBoat');
-  const planetaryCapabilities = appCtx.activePlanetaryBodyId ? appCtx.planetaryTravelCapabilities : null;
+  const planetaryCapabilities = resolvePlanetaryTravelCapabilities(appCtx);
   const currentEnvironment = appCtx.getEnv?.()
     || (appCtx.oceanMode?.active ? appCtx.ENV?.OCEAN : appCtx.ENV?.EARTH);
   const setAvailable = (button, available) => {
@@ -149,7 +153,7 @@ function applyDroneRoofClearance(x, z, groundY, desiredY) {
 }
 
 function sampleDroneSpawnHeight(x, z) {
-  if (appCtx.onMars || appCtx.onMoon) {
+  if (isPlanetarySurfaceActive(appCtx)) {
     const surfaceY = planetarySurfaceYAtRenderXZ(appCtx, x, z);
     if (Number.isFinite(surfaceY)) return surfaceY + 10;
     return 10;
@@ -180,7 +184,7 @@ function syncDronePositionFromReference(options = {}) {
   appCtx.drone.roll = 0;
   const safeLaunchY = sampleDroneSpawnHeight(ref.x, ref.z);
   appCtx.drone.y = options.preserveAltitude && Number.isFinite(ref?.y) ? Math.max(safeLaunchY, ref.y) : safeLaunchY;
-  appCtx.drone.pitch = Number.isFinite(ref?.pitch) ? ref.pitch : appCtx.onMoon || appCtx.onMars ? -0.2 : -0.3;
+  appCtx.drone.pitch = Number.isFinite(ref?.pitch) ? ref.pitch : isPlanetarySurfaceActive(appCtx) ? -0.2 : -0.3;
 }
 
 function resetCameraForDroneMode() {
@@ -241,6 +245,18 @@ function handoffAirPositionToGround(reference, targetMode) {
     (targetMode !== 'walk' && targetMode !== 'drive')
   ) return false;
 
+  if (isPlanetarySurfaceActive(appCtx)) {
+    const groundY = planetarySurfaceYAtRenderXZ(appCtx, reference.x, reference.z);
+    if (!Number.isFinite(groundY)) return false;
+    const angle = Number(reference.angle) || 0;
+    if (appCtx.car) {
+      Object.assign(appCtx.car, { x: reference.x, y: groundY + 1.2, z: reference.z, angle, speed: 0, vy: 0 });
+    }
+    const walker = appCtx.Walk?.state?.walker;
+    if (walker) Object.assign(walker, { x: reference.x, y: groundY + 1.7, z: reference.z, angle, vy: 0 });
+    return true;
+  }
+
   const resolved = appCtx.resolveSafeWorldSpawn?.(reference.x, reference.z, {
     mode: targetMode,
     angle: reference.angle,
@@ -261,7 +277,7 @@ function handoffAirPositionToGround(reference, targetMode) {
 function setTravelMode(mode, options = {}) {
   const targetMode = mode === 'walk' || mode === 'drone' || mode === 'boat' || mode === 'plane' ? mode : 'drive';
   const currentMode = getCurrentTravelMode();
-  const planetaryCapabilities = appCtx.activePlanetaryBodyId ? appCtx.planetaryTravelCapabilities : null;
+  const planetaryCapabilities = resolvePlanetaryTravelCapabilities(appCtx);
   if (planetaryCapabilities && planetaryCapabilities[targetMode] !== true) {
     return syncTravelModeButtons();
   }
@@ -303,7 +319,7 @@ function setTravelMode(mode, options = {}) {
   }
 
   if (targetMode === 'plane') {
-    if (appCtx.onMoon || appCtx.onMars || !appCtx.startPlaneMode?.(options)) {
+    if (isPlanetarySurfaceActive(appCtx) || !appCtx.startPlaneMode?.(options)) {
       return syncTravelModeButtons();
     }
     setDroneModeActive(false);
@@ -355,9 +371,9 @@ function setTravelMode(mode, options = {}) {
     }
   } else {
     setDroneModeActive(false);
-    handoffAirPositionToGround(modeReference, 'drive');
+    const preservedCurrentPosition = handoffAirPositionToGround(modeReference, 'drive');
     if (appCtx.Walk?.state?.mode === 'walk') {
-      appCtx.Walk.setModeDrive();
+      appCtx.Walk.setModeDrive({ preserveResolvedSpawn: preservedCurrentPosition });
     }
     appCtx.setCameraMode(0);
     if (appCtx.camera?.userData) appCtx.camera.userData.carLook = { yaw: 0, pitch: 0 };

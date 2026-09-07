@@ -9,7 +9,7 @@ import {
   disposeCuratedCharacter,
   NEARBY_NPC_ASSET_IDS,
   updateCuratedCharacterAnimation
-} from '../walking/curated-explorer-character.js?v=7';
+} from '../walking/curated-explorer-character.js?v=8';
 import {
   activityLabelForEdge,
   LIVING_WORLD_DEMAND_BY_TIER,
@@ -31,6 +31,15 @@ const POPULATION_VISIBILITY_POLICY = Object.freeze({
   fadeInPerSecond: 1.7,
   fadeOutPerSecond: 1.05,
   relocationHideSeconds: 1.25
+});
+
+const LIVING_PEDESTRIAN_CAPABILITIES = Object.freeze({
+  selectable: true,
+  conversational: true,
+  collisionTarget: true,
+  projectileTarget: true,
+  vehicleImpactTarget: true,
+  damageable: true
 });
 
 const PEDESTRIAN_ARCHETYPES = Object.freeze([
@@ -100,6 +109,75 @@ function selectSpawnEdgeIndex(graph, random, kind, reference = null) {
   return indexes[0] || 0;
 }
 
+function edgePoint(edge, progress, pathOffset = 0) {
+  const t = Math.max(0, Math.min(1, Number(progress || 0) / Math.max(.01, Number(edge?.length || 0))));
+  const dx = Number(edge?.p2?.x || 0) - Number(edge?.p1?.x || 0);
+  const dz = Number(edge?.p2?.z || 0) - Number(edge?.p1?.z || 0);
+  const length = Math.max(.01, Math.hypot(dx, dz));
+  return {
+    x: Number(edge?.p1?.x || 0) + dx * t - dz / length * pathOffset,
+    z: Number(edge?.p1?.z || 0) + dz * t + dx / length * pathOffset
+  };
+}
+
+function physicalEdgeKey(edge) {
+  const keyFor = (point) => `${Math.round(Number(point?.x || 0) * 2)}:${Math.round(Number(point?.z || 0) * 2)}`;
+  const first = keyFor(edge?.p1);
+  const second = keyFor(edge?.p2);
+  return first < second ? `${first}|${second}` : `${second}|${first}`;
+}
+
+function pedestrianPathOffset(edge, random) {
+  const spread = edge?.role === 'entrance' ? .22 : edge?.role === 'crossing' ? .3 : .62;
+  const raw = (random() * 2 - 1) * spread;
+  return Math.abs(raw) < .12 ? (raw < 0 ? -.12 : .12) : raw;
+}
+
+function spawnCandidate(graph, random, kind, reference) {
+  const edgeIndex = selectSpawnEdgeIndex(graph, random, kind, reference);
+  const edge = graph.edges[edgeIndex];
+  const progress = (.06 + random() * .88) * edge.length;
+  const pathOffset = kind === 'pedestrian' ? pedestrianPathOffset(edge, random) : 0;
+  const point = edgePoint(edge, progress, pathOffset);
+  return { edgeIndex, progress, pathOffset, x: point.x, z: point.z, corridorKey: physicalEdgeKey(edge) };
+}
+
+function spawnCandidateScore(candidate, placements, graph, kind) {
+  if (kind !== 'pedestrian') return 0;
+  const sameCorridor = placements.filter((entry) => entry.corridorKey === candidate.corridorKey).length;
+  const nearest = placements.reduce((distance, entry) => (
+    Math.min(distance, Math.hypot(candidate.x - entry.x, candidate.z - entry.z))
+  ), Infinity);
+  const edge = graph.edges[candidate.edgeIndex];
+  const personalSpacePenalty = Number.isFinite(nearest) && nearest < 7.5
+    ? Math.pow(7.5 - nearest, 2) * 12
+    : 0;
+  const corridorPenalty = sameCorridor * sameCorridor * 38;
+  const entrancePenalty = edge?.role === 'entrance' ? sameCorridor * 95 : 0;
+  return corridorPenalty + entrancePenalty + personalSpacePenalty;
+}
+
+function planAgentSpawns(count, graph, random, kind, reference = null) {
+  if (!graph?.edges?.length) return [];
+  const placements = [];
+  const attempts = kind === 'pedestrian' ? Math.min(28, Math.max(12, graph.edges.length * 2)) : 1;
+  for (let index = 0; index < count; index += 1) {
+    let best = null;
+    let bestScore = Infinity;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      const candidate = spawnCandidate(graph, random, kind, reference);
+      const score = spawnCandidateScore(candidate, placements, graph, kind) + random() * .01;
+      if (score < bestScore) {
+        best = candidate;
+        bestScore = score;
+      }
+      if (kind === 'pedestrian' && score < .01) break;
+    }
+    placements.push(best);
+  }
+  return placements;
+}
+
 function paletteColor(palette, random) {
   return new THREE.Color(palette[Math.floor(random() * palette.length) % palette.length]);
 }
@@ -111,9 +189,11 @@ function vehicleColor(variant, random) {
 
 function createAgents(count, graph, random, kind, reference = null) {
   if (!graph?.edges?.length) return [];
+  const spawnPlan = planAgentSpawns(count, graph, random, kind, reference);
   const agents = [];
   for (let index = 0; index < count; index += 1) {
-    const edgeIndex = selectSpawnEdgeIndex(graph, random, kind, reference);
+    const spawn = spawnPlan[index];
+    const edgeIndex = spawn.edgeIndex;
     const edge = graph.edges[edgeIndex];
     const variant = kind === 'vehicle'
       ? selectVehicleVariant(random, { majorRoad: /motorway|trunk|primary|secondary/i.test(edge.roadClass || '') })
@@ -123,7 +203,8 @@ function createAgents(count, graph, random, kind, reference = null) {
     agents.push({
       id: `${kind}:${index}`,
       edgeIndex,
-      progress: (.08 + random() * .78) * edge.length,
+      progress: spawn.progress,
+      pathOffset: spawn.pathOffset,
       speed: kind === 'vehicle'
         ? Math.min(edge.speedLimit || 12, (6.5 + random() * 5.5) * variant.speedFactor)
         : .8 + random() * .65,
@@ -162,9 +243,13 @@ function agentPose(agent, graph, sampleVehicleSurface = null) {
   if (!edge) return null;
   const progress = agent.bridge ? agent.bridge.progress : agent.progress;
   const t = Math.max(0, Math.min(1, progress / Math.max(.01, edge.length)));
-  const x = edge.p1.x + (edge.p2.x - edge.p1.x) * t;
+  const dx = edge.p2.x - edge.p1.x;
+  const dz = edge.p2.z - edge.p1.z;
+  const edgeLength = Math.max(.01, Math.hypot(dx, dz));
+  const pathOffset = agent.variant ? 0 : Number(agent.pathOffset || 0);
+  const x = edge.p1.x + dx * t - dz / edgeLength * pathOffset;
   const y = edge.p1.y + (edge.p2.y - edge.p1.y) * t;
-  const z = edge.p1.z + (edge.p2.z - edge.p1.z) * t;
+  const z = edge.p1.z + dz * t + dx / edgeLength * pathOffset;
   let yaw = Math.atan2(edge.p2.x - edge.p1.x, edge.p2.z - edge.p1.z);
   if (agent.reactionRemaining > 0 && agent.reactionTarget) {
     yaw = Math.atan2(agent.reactionTarget.x - x, agent.reactionTarget.z - z);
@@ -209,6 +294,7 @@ function selectSafeRelocationEdge(graph, random, kind, reference) {
 function relocateAgent(agent, graph, random, kind, reference) {
   agent.edgeIndex = selectSafeRelocationEdge(graph, random, kind, reference);
   agent.progress = Math.max(.05, random() * .3) * (graph.edges[agent.edgeIndex]?.length || 1);
+  if (kind === 'pedestrian') agent.pathOffset = pedestrianPathOffset(graph.edges[agent.edgeIndex], random);
   agent.visibleTarget = false;
   agent.relocationCooldown = POPULATION_VISIBILITY_POLICY.relocationHideSeconds;
 }
@@ -403,8 +489,10 @@ export function createLivingWorldPopulation(options = {}) {
     host.userData.worldClickTarget = () => ({
       kind: 'living-pedestrian',
       id: agent.id,
-      label: agent.archetype?.label || 'Local person'
+      label: agent.archetype?.label || 'Local person',
+      capabilities: LIVING_PEDESTRIAN_CAPABILITIES
     });
+    host.userData.interactionCapabilities = LIVING_PEDESTRIAN_CAPABILITIES;
     agent.visualHost = host;
     agent.curatedAssetId = assetId;
     group.add(host);
@@ -503,7 +591,8 @@ export function createLivingWorldPopulation(options = {}) {
       reaction: agent.reaction || '',
       reactionRemaining: Number(Math.max(0, agent.reactionRemaining || 0).toFixed(2)),
       activity: activityLabelForEdge(pedestrianGraph.edges[agent.edgeIndex], 'pedestrian'),
-      waiting: agent.waiting === true
+      waiting: agent.waiting === true,
+      capabilities: LIVING_PEDESTRIAN_CAPABILITIES
     });
   };
 
@@ -829,4 +918,11 @@ export function createLivingWorldPopulation(options = {}) {
   });
 }
 
-export { PEDESTRIAN_ARCHETYPES, POPULATION_BUDGET_BY_TIER, POPULATION_VISIBILITY_POLICY };
+export {
+  LIVING_PEDESTRIAN_CAPABILITIES,
+  PEDESTRIAN_ARCHETYPES,
+  POPULATION_BUDGET_BY_TIER,
+  POPULATION_VISIBILITY_POLICY,
+  physicalEdgeKey,
+  planAgentSpawns
+};

@@ -1,5 +1,5 @@
 import { createLifecycleScope } from '../runtime/lifecycle-scope.js?v=2';
-import { handleWorldCanvasClick } from '../interaction/world-click-router.js?v=2';
+import { handleWorldCanvasClick } from '../interaction/world-click-router.js?v=3';
 
 export function setupEngineInputHandlers(appCtx) {
   const inputScope = createLifecycleScope('engine-input');
@@ -49,6 +49,9 @@ export function setupEngineInputHandlers(appCtx) {
   const clearHeldInput = () => {
     appCtx.clearControlInputState?.('focus-lost');
     if (appCtx.spaceFlight?.keys) appCtx.spaceFlight.keys = {};
+    mouseActive = false;
+    primaryLookCandidate = null;
+    primaryLookDrag = false;
   };
   inputScope.listen(globalThis, 'blur', clearHeldInput);
   inputScope.listen(document, 'visibilitychange', () => {
@@ -58,7 +61,17 @@ export function setupEngineInputHandlers(appCtx) {
   let lastMouseX = 0;
   let lastMouseY = 0;
   let mouseActive = false;
+  let primaryLookCandidate = null;
+  let primaryLookDrag = false;
+  let suppressNextWorldClick = false;
   window.walkMouseLookActive = false;
+
+  const canStartPrimaryWalkLook = (event) => {
+    if (event.target !== appCtx.renderer?.domElement || appCtx.Walk?.state?.mode !== 'walk') return false;
+    if (appCtx.paused || appCtx.blockBuildMode || appCtx.urbanSandboxRuntime?.equipmentOpen) return false;
+    const category = appCtx.urbanSandboxRuntime?.equipment?.equipped?.()?.category;
+    return category !== 'sidearm' && category !== 'explosive';
+  };
 
   inputScope.listen(globalThis, 'mousedown', (e) => {
     if (!appCtx.gameStarted) return;
@@ -78,6 +91,13 @@ export function setupEngineInputHandlers(appCtx) {
       }
     }
 
+    if (e.button === 0 && canStartPrimaryWalkLook(e)) {
+      primaryLookCandidate = { x: e.clientX, y: e.clientY };
+      primaryLookDrag = false;
+      lastMouseX = e.clientX;
+      lastMouseY = e.clientY;
+    }
+
     if (e.button === 2 || e.button === 1) {
       mouseActive = true;
       lastMouseX = e.clientX;
@@ -87,6 +107,12 @@ export function setupEngineInputHandlers(appCtx) {
   });
 
   inputScope.listen(globalThis, 'mouseup', (e) => {
+    if (e.button === 0 && primaryLookCandidate) {
+      suppressNextWorldClick = primaryLookDrag;
+      primaryLookCandidate = null;
+      primaryLookDrag = false;
+      mouseActive = false;
+    }
     if (e.button === 2 || e.button === 1) {
       mouseActive = false;
     }
@@ -105,6 +131,17 @@ export function setupEngineInputHandlers(appCtx) {
 
   inputScope.listen(globalThis, 'mousemove', (e) => {
     if (!appCtx.gameStarted) return;
+
+    if (primaryLookCandidate && !primaryLookDrag) {
+      const dragDistance = Math.hypot(
+        e.clientX - primaryLookCandidate.x,
+        e.clientY - primaryLookCandidate.y
+      );
+      if (dragDistance >= 5) {
+        primaryLookDrag = true;
+        mouseActive = true;
+      }
+    }
 
     const walkLookActive = appCtx.Walk && appCtx.Walk.state.mode === 'walk' && window.walkMouseLookActive;
     if (!mouseActive && !walkLookActive) return;
@@ -147,6 +184,14 @@ export function setupEngineInputHandlers(appCtx) {
 
   inputScope.listen(globalThis, 'click', (e) => {
     if (!appCtx.gameStarted) return;
+
+    if (suppressNextWorldClick) {
+      suppressNextWorldClick = false;
+      if (e.target === appCtx.renderer?.domElement) {
+        e.preventDefault();
+        return;
+      }
+    }
 
     // Moon/star picking is a world-canvas action. Letting bubbled UI clicks
     // reach these pickers can create a selection card above the panel that was

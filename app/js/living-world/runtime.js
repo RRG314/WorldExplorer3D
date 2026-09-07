@@ -7,7 +7,7 @@ import {
 } from './model.js?v=1';
 import { compileEntranceCatalog } from './entrance-catalog.js?v=6';
 import { compilePedestrianGraph, compileTrafficGraph, resolveDrivingSide } from './navigation-graphs.js?v=12';
-import { createLivingWorldPopulation } from './population.js?v=21';
+import { createLivingWorldPopulation } from './population.js?v=22';
 
 function livingWorldTier(appCtx) {
   const requested = String(appCtx?.getDynamicBudgetState?.().tier || 'balanced').toLowerCase();
@@ -256,14 +256,18 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     reason: null
   };
   state.handleWorldSelection = (target) => {
-    const reference = appCtx.Walk?.state?.walker || appCtx.car || { x: 0, z: 0 };
+    const activeActor = appCtx.activeTransportActor?.();
+    const reference = activeActor?.position || (appCtx.Walk?.state?.mode === 'walk'
+      ? appCtx.Walk?.state?.walker
+      : appCtx.car) || { x: 0, z: 0 };
     if (target?.kind === 'living-pedestrian') {
       const pedestrian = population.pedestrianSnapshots().find((entry) => entry.id === target.id);
       if (!pedestrian) return false;
       const distance = Math.round(Math.hypot(pedestrian.x - Number(reference.x || 0), pedestrian.z - Number(reference.z || 0)));
+      const onFoot = appCtx.Walk?.state?.mode === 'walk';
       appCtx.showWorldSelectionNotice?.(
         target.label || 'Local person',
-        `${pedestrian.activity} · ${distance}m away`
+        `${pedestrian.activity} · ${distance}m away${onFoot && distance <= 12 ? ' · E to talk' : onFoot ? '' : ' · exit nearby to talk'}`
       );
       if (distance <= 12) appCtx.urbanSandboxRuntime?.promoteNpc?.(pedestrian);
       return true;

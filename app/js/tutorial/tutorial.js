@@ -240,7 +240,7 @@ function presentCurrentStage() {
       title: touchControls ? 'Move left · Look right' : `${moveKeys || 'WASD'} to move · Mouse to look`,
       body: touchControls
         ? 'Move a short distance with the left control. Use the right control to look around; action buttons change with what you are doing.'
-        : `${moveKeys || 'WASD'} moves your explorer. Drag with the right mouse button to look, ${appCtx.getControlBindingLabel?.('modifier_action') || 'Shift'} runs, and ${appCtx.getControlBindingLabel?.('primary_action') || 'Space'} jumps. Arrow keys remain an alternate.`,
+        : `${moveKeys || 'WASD'} moves your explorer. Drag on the world with either mouse button to look, ${appCtx.getControlBindingLabel?.('modifier_action') || 'Shift'} runs, and ${appCtx.getControlBindingLabel?.('primary_action') || 'Space'} jumps. Arrow keys remain an alternate.`,
       progress: 33,
       expanded: false
     });

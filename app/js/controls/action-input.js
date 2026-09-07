@@ -12,7 +12,7 @@ import {
   keyboardBindingsSnapshot,
   resetKeyboardBindings,
   setKeyboardBinding
-} from './keyboard-bindings.js?v=2';
+} from './keyboard-bindings.js?v=3';
 
 const DEAD_ZONE = 0.16;
 const inputState = {
