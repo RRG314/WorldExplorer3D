@@ -2,6 +2,18 @@
 
 Last updated: 2026-09-06 for World Explorer 3D 5.2.
 
+Local transport follow-up (2026-09-07, not deployed): shared tunnel floor,
+ceiling, portal, and wall-collision ownership has been extended with compiled
+connected closed-volume tunnel boundaries, continuous lining across interior
+terrain dips, generalized-junction height constraints, concrete presentation,
+bridge approach depth taper preservation, and actual-vehicle camera exclusion.
+Display labels are no longer route topology. Thirty-one focused execution checks
+(including browser worker bundling) pass; see the local checkpoint for visual
+evidence and unfinished gates. Oversized retaining-wall/portal presentation,
+exact-provider coverage, broader bridge transitions and physical-phone
+performance are not accepted as complete. This is not a production readiness
+claim. [Local transport checkpoint](TRANSPORT_LOCAL_CHECKPOINT.md).
+
 POI integration note (2026-09-06): one publication lifecycle now owns normalized
 identity, six-family semantics, safe building tenancy, published-door association,
 bounded activation, and exterior fallback. Commerce consumes that lifecycle

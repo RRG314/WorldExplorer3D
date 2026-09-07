@@ -16,6 +16,42 @@ active environment, assembled world, player state, and shared services.
 
 ## Application overview
 
+### Local bridge/tunnel transition work (2026-09-07; not release-approved)
+
+Transport graph/profile compilation owns connected floor heights, including
+wholly generalized junctions. Exact and generalized source families remain
+separate. `tunnel-system-model` owns cover-derived external portal locations and
+continuous internal lining. Its final compilation samples the published terrain
+without feeding portal cuts back into cover detection.
+
+`world/compiler/tunnel-solid-model.js` collects compatible graph-connected
+mouths and constructs indexed closed clearance sweeps. `tunnel-solid-kernel.js`
+unions them with pinned Manifold 3.5.3 in a short-lived worker. Publication runs
+after final floor/cover compilation, before visual/collision assembly. One
+boundary feeds rendering, wall collision and indexed camera/ceiling queries;
+successful components do not also publish independent tube skins. Worker and
+station budgets report failures through `ctx.tunnelSolidCompilation`. Simple
+unjoined tunnels and failed components retain the existing shell path; failures
+are not accepted geometry. `tunnel-junction-openings.js` remains that path's
+bounded interval helper, not a second overlay on compiled solids.
+
+Inferred Shortbread street labels remain display-only and cannot establish
+route-gap connectivity. Explicit source layer and topology capabilities remain
+distinguishable from absent/generalized attributes.
+
+`hud/vehicle-camera-body.js` measures attached visual bounds once per asset
+change, transforms the camera into that body's frame, and rejects collision-
+shortened chase poses inside it. A clear roof pose is preferred; confined-space
+first person is temporary and does not rewrite the player's selected mode.
+The production packager emits a hashed worker entry and publishes its URL in
+the existing runtime configuration; local JS/WASM/license files are vendored.
+
+Bridge deck presentation consumes the assembly's sampled thickness, retaining
+its approach taper. Tunnel concrete textures are shared across world rebuilds;
+no per-light dynamic light population was added. Complex portal/branch visual
+acceptance remains open. Ordinary road footprints and mapped buildings are not
+removed to conceal structure conflicts.
+
 ```mermaid
 flowchart LR
     Start[Globe and destination hub] --> Session[Session coordinator]
