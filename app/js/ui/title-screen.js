@@ -175,8 +175,8 @@ function initTitleScreenUi({
       if (launchMode === 'mars' && typeof appCtx.directTravelToMars === 'function') {
         return () => appCtx.directTravelToMars();
       }
-      if (launchMode === 'space' && typeof appCtx.travelToMoon === 'function') {
-        return () => appCtx.travelToMoon();
+      if (launchMode === 'space' && typeof appCtx.startFreeSpaceFlight === 'function') {
+        return () => appCtx.startFreeSpaceFlight();
       }
       return null;
     };
@@ -440,8 +440,8 @@ function initTitleScreenUi({
       if (!appCtx.gameStarted) {
         setLaunchMode('space');
         return appCtx.triggerTitleStart({ bypassCustomGate: true, launchMode: 'space' });
-      } else if (!appCtx.onMoon && !appCtx.travelingToMoon && typeof appCtx.travelToMoon === 'function') {
-        return appCtx.travelToMoon();
+      } else if (!appCtx.onMoon && !appCtx.travelingToMoon && typeof appCtx.startFreeSpaceFlight === 'function') {
+        return appCtx.startFreeSpaceFlight();
       }
       return false;
     }
@@ -665,6 +665,11 @@ function initTitleScreenUi({
     }
 
     if (await startPlanetaryTitleLaunch(requestedLaunchMode)) {
+      // Dedicated planetary/space renderers are now authoritative. Remove the
+      // title transition cover before returning so the player can see and use
+      // the controls immediately instead of flying behind an opaque overlay.
+      appCtx.hideLoad?.();
+      appCtx.loadingScreenMode = 'earth';
       markFirstPlayReady({
         environment: requestedLaunchMode === 'space' ? 'space' : requestedLaunchMode,
         launchMode: requestedLaunchMode,
@@ -753,6 +758,7 @@ function initTitleScreenUi({
     // the title launch owns the final handoff to playable input.
     appCtx.hideLoad?.();
     appCtx.loadingScreenMode = 'earth';
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     return true;
   };
 

@@ -1,5 +1,4 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { detectRoadIntersections } from "./rebuild.js?v=50";
 
 let roadDebugMode = false;
 let roadDebugMeshes = [];
@@ -123,70 +122,63 @@ export function toggleRoadDebugMode(deps = {}) {
 
 export function validateRoadTerrainConformance(deps = {}) {
   const { terrainMeshHeightAt, worldToLatLon } = deps;
-  if (!appCtx.terrainEnabled || appCtx.roads.length === 0 || appCtx.onMoon) return;
-  if (typeof terrainMeshHeightAt !== "function" || typeof worldToLatLon !== "function") return;
-
-  console.log("🔬 Validating road-terrain conformance...");
+  if (!appCtx.terrainEnabled || appCtx.roads.length === 0 || appCtx.onMoon) return null;
+  if (typeof terrainMeshHeightAt !== "function") return null;
 
   let totalSamples = 0;
   let issuesFound = 0;
+  let minimumDelta = Infinity;
   const worstDeltas = [];
 
   appCtx.roadMeshes.forEach((mesh) => {
-    if (mesh.userData.isRoadSkirt) return;
+    if (
+      mesh.userData?.isRoadSkirt ||
+      mesh.userData?.isRoadMarking ||
+      mesh.userData?.isStructureVisual
+    ) return;
 
     const pos = mesh.geometry.attributes.position;
     if (!pos) return;
 
-    const roadIdx = mesh.userData.roadIdx;
-    const road = appCtx.roads[roadIdx];
-    if (!road) return;
-
-    for (let i = 0; i < pos.count; i += 5) {
-      const x = pos.getX(i);
-      const y = pos.getY(i);
-      const z = pos.getZ(i);
+    // Road publication uses indexed batches, not one mesh per road. The old
+    // validator required `roadIdx`, so it skipped every current road surface
+    // and could report zero problems without sampling a single vertex.
+    const sampleStride = Math.max(1, Math.floor(pos.count / 12000));
+    for (let i = 0; i < pos.count; i += sampleStride) {
+      const x = pos.getX(i) + Number(mesh.position?.x || 0);
+      const y = pos.getY(i) + Number(mesh.position?.y || 0);
+      const z = pos.getZ(i) + Number(mesh.position?.z || 0);
 
       const terrainY = terrainMeshHeightAt(x, z);
+      if (!Number.isFinite(terrainY)) continue;
       const delta = y - terrainY;
 
       totalSamples++;
+      minimumDelta = Math.min(minimumDelta, delta);
 
       if (delta < -0.05) {
         issuesFound++;
-        const { lat, lon } = worldToLatLon(x, z);
+        const geographic = typeof worldToLatLon === 'function'
+          ? worldToLatLon(x, z)
+          : null;
         worstDeltas.push({
-          roadName: road.name || `Road ${roadIdx}`,
-          delta: delta.toFixed(3),
-          lat: lat.toFixed(6),
-          lon: lon.toFixed(6),
-          worldPos: `(${x.toFixed(1)}, ${z.toFixed(1)})`
+          batchIndex: Number(mesh.userData?.roadBatchIndex ?? -1),
+          delta: Number(delta.toFixed(3)),
+          lat: Number.isFinite(geographic?.lat) ? Number(geographic.lat.toFixed(6)) : null,
+          lon: Number.isFinite(geographic?.lon) ? Number(geographic.lon.toFixed(6)) : null,
+          x: Number(x.toFixed(1)),
+          z: Number(z.toFixed(1))
         });
       }
     }
   });
 
-  worstDeltas.sort((a, b) => parseFloat(a.delta) - parseFloat(b.delta));
-
-  console.log(`✅ Validation complete: ${totalSamples} samples checked`);
-
-  if (issuesFound > 0) {
-    console.warn(`⚠️  Found ${issuesFound} points where road is below terrain (delta < -0.05)`);
-    console.warn("Worst 10 deltas:");
-    worstDeltas.slice(0, 10).forEach((d) => {
-      console.warn(`  ${d.roadName}: delta=${d.delta}m at ${d.worldPos} (${d.lat}, ${d.lon})`);
-    });
-  } else {
-    console.log("✅ No issues found - all roads conform to terrain!");
-  }
-
-  const intersections = detectRoadIntersections(appCtx.roads);
-  console.log(`📍 Detected ${intersections.length} intersections`);
-
-  return {
+  worstDeltas.sort((a, b) => a.delta - b.delta);
+  return Object.freeze({
+    authority: 'published-road-mesh-versus-rendered-terrain',
     totalSamples,
     issuesFound,
-    worstDeltas: worstDeltas.slice(0, 10),
-    intersectionCount: intersections.length
-  };
+    minimumDelta: Number.isFinite(minimumDelta) ? Number(minimumDelta.toFixed(4)) : null,
+    worstDeltas: Object.freeze(worstDeltas.slice(0, 10).map(Object.freeze))
+  });
 }

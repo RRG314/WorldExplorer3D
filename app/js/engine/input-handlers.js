@@ -1,4 +1,5 @@
 import { createLifecycleScope } from '../runtime/lifecycle-scope.js?v=2';
+import { handleWorldCanvasClick } from '../interaction/world-click-router.js?v=3';
 
 export function setupEngineInputHandlers(appCtx) {
   const inputScope = createLifecycleScope('engine-input');
@@ -48,6 +49,9 @@ export function setupEngineInputHandlers(appCtx) {
   const clearHeldInput = () => {
     appCtx.clearControlInputState?.('focus-lost');
     if (appCtx.spaceFlight?.keys) appCtx.spaceFlight.keys = {};
+    mouseActive = false;
+    primaryLookCandidate = null;
+    primaryLookDrag = false;
   };
   inputScope.listen(globalThis, 'blur', clearHeldInput);
   inputScope.listen(document, 'visibilitychange', () => {
@@ -57,7 +61,17 @@ export function setupEngineInputHandlers(appCtx) {
   let lastMouseX = 0;
   let lastMouseY = 0;
   let mouseActive = false;
+  let primaryLookCandidate = null;
+  let primaryLookDrag = false;
+  let suppressNextWorldClick = false;
   window.walkMouseLookActive = false;
+
+  const canStartPrimaryWalkLook = (event) => {
+    if (event.target !== appCtx.renderer?.domElement || appCtx.Walk?.state?.mode !== 'walk') return false;
+    if (appCtx.paused || appCtx.blockBuildMode || appCtx.urbanSandboxRuntime?.equipmentOpen) return false;
+    const category = appCtx.urbanSandboxRuntime?.equipment?.equipped?.()?.category;
+    return category !== 'sidearm' && category !== 'explosive';
+  };
 
   inputScope.listen(globalThis, 'mousedown', (e) => {
     if (!appCtx.gameStarted) return;
@@ -77,6 +91,13 @@ export function setupEngineInputHandlers(appCtx) {
       }
     }
 
+    if (e.button === 0 && canStartPrimaryWalkLook(e)) {
+      primaryLookCandidate = { x: e.clientX, y: e.clientY };
+      primaryLookDrag = false;
+      lastMouseX = e.clientX;
+      lastMouseY = e.clientY;
+    }
+
     if (e.button === 2 || e.button === 1) {
       mouseActive = true;
       lastMouseX = e.clientX;
@@ -86,6 +107,12 @@ export function setupEngineInputHandlers(appCtx) {
   });
 
   inputScope.listen(globalThis, 'mouseup', (e) => {
+    if (e.button === 0 && primaryLookCandidate) {
+      suppressNextWorldClick = primaryLookDrag;
+      primaryLookCandidate = null;
+      primaryLookDrag = false;
+      mouseActive = false;
+    }
     if (e.button === 2 || e.button === 1) {
       mouseActive = false;
     }
@@ -105,6 +132,17 @@ export function setupEngineInputHandlers(appCtx) {
   inputScope.listen(globalThis, 'mousemove', (e) => {
     if (!appCtx.gameStarted) return;
 
+    if (primaryLookCandidate && !primaryLookDrag) {
+      const dragDistance = Math.hypot(
+        e.clientX - primaryLookCandidate.x,
+        e.clientY - primaryLookCandidate.y
+      );
+      if (dragDistance >= 5) {
+        primaryLookDrag = true;
+        mouseActive = true;
+      }
+    }
+
     const walkLookActive = appCtx.Walk && appCtx.Walk.state.mode === 'walk' && window.walkMouseLookActive;
     if (!mouseActive && !walkLookActive) return;
 
@@ -121,17 +159,39 @@ export function setupEngineInputHandlers(appCtx) {
       appCtx.Walk.state.walker.lookYawOffset = wrapYaw((Number(appCtx.Walk.state.walker.lookYawOffset) || 0) - deltaX * sensitivity);
       appCtx.Walk.state.walker.pitch += deltaY * sensitivity;
       appCtx.Walk.state.walker.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, appCtx.Walk.state.walker.pitch));
+    } else if (appCtx.planeMode?.active) {
+      appCtx.planeMode.cameraYaw = wrapYaw((Number(appCtx.planeMode.cameraYaw) || 0) - deltaX * sensitivity);
+      appCtx.planeMode.cameraPitch = Math.max(-0.5, Math.min(0.55, (Number(appCtx.planeMode.cameraPitch) || 0) + deltaY * sensitivity));
+      appCtx.planeMode.cameraLookTimer = 1.6;
+    } else if (appCtx.boatMode?.active) {
+      appCtx.boatMode.cameraYawOffset = wrapYaw((Number(appCtx.boatMode.cameraYawOffset) || 0) - deltaX * sensitivity);
+      appCtx.boatMode.cameraPitch = Math.max(-0.62, Math.min(0.62, (Number(appCtx.boatMode.cameraPitch) || 0) + deltaY * sensitivity));
+      appCtx.boatMode.cameraLookTimer = 1.15;
+    } else if (appCtx.camera) {
+      const carLook = appCtx.camera.userData.carLook || { yaw: 0, pitch: 0 };
+      carLook.yaw = wrapYaw((Number(carLook.yaw) || 0) - deltaX * sensitivity);
+      carLook.pitch = Math.max(-0.62, Math.min(0.62, (Number(carLook.pitch) || 0) + deltaY * sensitivity));
+      carLook.lastInputAt = performance.now();
+      appCtx.camera.userData.carLook = carLook;
     }
   });
 
   inputScope.listen(globalThis, 'contextmenu', (e) => {
-    if (appCtx.gameStarted && (appCtx.droneMode || appCtx.Walk && appCtx.Walk.state.mode === 'walk')) {
+    if (appCtx.gameStarted) {
       e.preventDefault();
     }
   });
 
   inputScope.listen(globalThis, 'click', (e) => {
     if (!appCtx.gameStarted) return;
+
+    if (suppressNextWorldClick) {
+      suppressNextWorldClick = false;
+      if (e.target === appCtx.renderer?.domElement) {
+        e.preventDefault();
+        return;
+      }
+    }
 
     // Moon/star picking is a world-canvas action. Letting bubbled UI clicks
     // reach these pickers can create a selection card above the panel that was
@@ -141,6 +201,7 @@ export function setupEngineInputHandlers(appCtx) {
     if (typeof appCtx.handleBlockBuilderClick === 'function' && appCtx.handleBlockBuilderClick(e)) {
       return;
     }
+    if (handleWorldCanvasClick(appCtx, e)) return;
     if (appCtx.checkMoonClick(e.clientX, e.clientY)) return;
     appCtx.checkStarClick(e.clientX, e.clientY);
   });

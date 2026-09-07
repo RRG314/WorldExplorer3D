@@ -385,6 +385,11 @@
   color: #7af0c9;
 }
 
+.universe-course-cue.is-onscreen .universe-course-cue-arrow {
+  opacity: 0.55;
+  transform: none;
+}
+
 .solar-system-scale {
   display: none;
   position: fixed;

@@ -1,8 +1,8 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { createWalkingCharacterHelpers } from "./walking/character.js?v=4";
+import { createWalkingCharacterHelpers } from "./walking/character.js?v=7";
 import { createWalkingGeometryHelpers } from "./walking/geometry.js?v=1";
-import { createWalkingPhysicsHelpers } from "./walking/physics.js?v=28";
-import { createWalkingRuntimeHelpers } from "./walking/runtime.js?v=4";
+import { createWalkingPhysicsHelpers } from "./walking/physics.js?v=31";
+import { createWalkingRuntimeHelpers } from "./walking/runtime.js?v=5";
 import { createWalkingTerrainHelpers } from "./walking/terrain.js?v=5";
 
 const DEFAULT_WALKING_SPEEDS = Object.freeze({ walk: 2.8, run: 5.6 });
@@ -50,7 +50,12 @@ function createWalkingModule(opts) {
     blockStepHeight: 0.65 // Max step-up without jumping
   };
 
-  const { animateCharacterWalk, attachHeroCharacter, createCharacterMesh } = createWalkingCharacterHelpers({ THREE, scene });
+  const {
+    animateCharacterWalk,
+    createCharacterMesh,
+    getPlayerCharacterGender,
+    setPlayerCharacterGender
+  } = createWalkingCharacterHelpers({ THREE, scene });
   const { clampPointInsideFootprint, pointInPolygonSafe } = createWalkingGeometryHelpers();
   const {
     finiteOr,
@@ -95,7 +100,6 @@ function createWalkingModule(opts) {
   });
 
   state.characterMesh = createCharacterMesh();
-  attachHeroCharacter(state.characterMesh);
   syncWalkerFromCar();
 
   return {
@@ -112,7 +116,11 @@ function createWalkingModule(opts) {
     applyCameraIfWalking() {
       return updateWalkCamera();
     },
-    getMapRefPosition
+    getMapRefPosition,
+    getPlayerCharacterGender,
+    setPlayerCharacterGender(value) {
+      return setPlayerCharacterGender(state.characterMesh, value);
+    }
   };
 }
 

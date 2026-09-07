@@ -2,9 +2,7 @@ import { getDestinationMission } from './mission-catalog.js?v=3';
 import { createDestinationMissionStore, DESTINATION_MISSION_PHASE } from './mission-authority.js?v=3';
 import { resolveUniverseAddress } from './catalog.js?v=11';
 import { DEFAULT_CREW } from '../expedition/catalog.js?v=2';
-import { createExpeditionPlan } from '../expedition/model.js?v=11';
-import { startExpedition } from '../expedition/simulation.js?v=8';
-import { createExpeditionStore } from '../expedition/store.js?v=11';
+import { createExpeditionStore } from '../expedition/store.js?v=12';
 
 let activeContext = null;
 let missionStore = null;
@@ -106,7 +104,7 @@ function analysisOutcomeOptions(mission, state = missionStore?.get?.(mission)) {
 
 async function recordDestinationExplorerEvent(record) {
   if (typeof activeContext?.recordExplorerEvent === 'function') return activeContext.recordExplorerEvent(record);
-  const { createIndexedDbDiscoveryProfileStore } = await import('../discovery/profile-store.js?v=4');
+  const { createIndexedDbDiscoveryProfileStore } = await import('../discovery/profile-store.js?v=5');
   const store = activeContext?.discoveryProfileStore || createIndexedDbDiscoveryProfileStore();
   if (activeContext) activeContext.discoveryProfileStore = store;
   return store.recordExplorerEvent(record);
@@ -179,19 +177,12 @@ function stableSeed(value) {
 }
 
 function ensureDestinationExpedition(mission) {
-  const store = createExpeditionStore();
-  const current = store.load();
-  if (current) return current;
-  const now = Date.now();
-  const planned = createExpeditionPlan({
-    destinationId: mission.systemId,
-    crew: DEFAULT_CREW,
-    createdAtMs: now,
-    id: `destination-expedition-${mission.systemId}-${now}`
-  });
-  const started = startExpedition(planned, now + 1);
-  store.save(started);
-  return started;
+  if (mission?.systemId === 'sol') return true;
+  const expedition = createExpeditionStore().load();
+  if (!expedition || expedition.destinationId !== mission?.systemId) return null;
+  if (!['arrived', 'completed'].includes(expedition.state)) return null;
+  if (activeContext?.universeRuntime?.current?.id !== mission.systemId) return null;
+  return expedition;
 }
 
 function prepareDestinationMissionSurface(destinationId = currentDefinition()?.destinationId) {
@@ -343,7 +334,12 @@ function renderDestinationMission(destinationId = '') {
   panel.hidden = false;
   panel.querySelector('[data-mission-close]')?.addEventListener('click', closeDestinationMission);
   panel.querySelector('[data-mission-begin]')?.addEventListener('click', () => {
-    ensureDestinationExpedition(mission);
+    if (!ensureDestinationExpedition(mission)) {
+      closeDestinationMission();
+      activeContext?.showToast?.(`Complete an Interstellar Expedition to ${destinationLabel(mission.systemId)} before beginning this mission.`);
+      activeContext?.openExpeditionPlanner?.();
+      return;
+    }
     missionStore.activate(mission);
     missionStore.advance(mission, 'review_briefing', { evidenceId: `${mission.id}:briefing` });
     activeContext?.showSpaceFlightMessage?.(`MISSION READY · ${mission.title.toUpperCase()}`, '#6fe8ff');
@@ -468,6 +464,17 @@ async function completeDestinationMissionAnalysis(outcomeId = 'cautious-baseline
     firstCompletion: true,
     projections: { journal: true, profile: true, place: false, fieldGuide: true }
   });
+  globalThis.dispatchEvent?.(new CustomEvent('we3d:destination-mission-complete', {
+    detail: {
+      missionId: mission.id,
+      destinationId: mission.destinationId,
+      systemId: mission.systemId,
+      title: mission.title,
+      outcomeId: outcome.id,
+      outcomeLabel: outcome.label,
+      points: outcome.points
+    }
+  }));
   activeContext?.showToast?.(`${mission.title} completed · ${outcome.label}.`);
   return true;
 }

@@ -219,6 +219,7 @@ function createFarFieldGeometryPlanner(deps = {}) {
     farFieldSeamBlendMeters,
     latLonToTileXY,
     sampleAcceptedGroundAtLatLon,
+    sampleDetailedTerrainMetersAtLatLon,
     sampleTileElevationMeters,
     pointInMappedWaterArea,
     pointInMappedLandArea,
@@ -404,11 +405,17 @@ function createFarFieldGeometryPlanner(deps = {}) {
       const seamBlendWorld = farFieldSeamBlendMeters * Number(appCtx.WORLD_UNITS_PER_METER || 1);
       const distanceFromSeam = distanceOutsideInnerBounds(x, z, spec.inner);
       if (distanceFromSeam <= seamBlendWorld) {
-        const seamAccepted = sampleAcceptedGroundAtLatLon(lat, lon);
-        const seamAcceptedMeters = Number(seamAccepted?.groundElevationMeters);
-        if (seamAccepted?.status === 'available' && Number.isFinite(seamAcceptedMeters)) {
+        const detailedSample = sampleDetailedTerrainMetersAtLatLon?.(lat, lon);
+        const detailedMeters = detailedSample === null || detailedSample === undefined
+          ? NaN
+          : Number(detailedSample);
+        const seamAccepted = Number.isFinite(detailedMeters) ? null : sampleAcceptedGroundAtLatLon(lat, lon);
+        const seamMeters = Number.isFinite(detailedMeters)
+          ? detailedMeters
+          : Number(seamAccepted?.groundElevationMeters);
+        if (Number.isFinite(seamMeters)) {
           const blend = smoothstep01(distanceFromSeam / Math.max(1, seamBlendWorld));
-          meters = seamAcceptedMeters + (meters - seamAcceptedMeters) * blend;
+          meters = seamMeters + (meters - seamMeters) * blend;
         }
       }
     }

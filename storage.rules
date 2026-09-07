@@ -1,0 +1,51 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function capture(captureId) {
+      return firestore.get(/databases/(default)/documents/realityCaptures/$(captureId)).data;
+    }
+
+    function ownsWritableCapture(uid, captureId) {
+      let record = capture(captureId);
+      return signedIn() && request.auth.uid == uid &&
+        record.ownerUid == request.auth.uid &&
+        record.captureId == captureId &&
+        record.status in ['draft', 'uploading'];
+    }
+
+    function validNormalizedPhoto(uid, captureId, fileName) {
+      return fileName.matches('^[a-f0-9]{32}\\.(jpg|webp)$') &&
+        request.resource.size > 0 &&
+        request.resource.size <= 12 * 1024 * 1024 &&
+        request.resource.contentType in ['image/jpeg', 'image/webp'] &&
+        request.resource.metadata.ownerUid == uid &&
+        request.resource.metadata.captureId == captureId &&
+        request.resource.metadata.captureSchemaVersion == '1';
+    }
+
+    // Client uploads are write-once, normalized raster images in quarantine.
+    // Reads, replacements, metadata changes, and deletes go through the trusted
+    // backend so a leaked object path is never sufficient to retrieve a photo.
+    match /reality-captures/{uid}/{captureId}/originals/{fileName} {
+      allow create: if ownsWritableCapture(uid, captureId) &&
+        validNormalizedPhoto(uid, captureId, fileName) &&
+        resource == null;
+      allow get, list, update, delete: if false;
+    }
+
+    // Processing outputs and reviewed publications are written only through
+    // Admin SDK workers. Public exterior delivery is brokered or copied to the
+    // ordinary curated release artifact after approval; interiors stay here.
+    match /reality-captures/{uid}/{captureId}/{remaining=**} {
+      allow read, write: if false;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

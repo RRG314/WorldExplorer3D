@@ -19,9 +19,9 @@ async function startEarth(page) {
   else await page.locator('#startBtn').click();
   await page.locator('#loading.show').waitFor({ state: 'visible', timeout: 30_000 });
   await page.locator('#loading.show').waitFor({ state: 'hidden', timeout: 180_000 });
-  await page.waitForFunction(() => {
-    const state = globalThis.getWorldExplorerRuntimeDiagnostics?.();
-    return !!(state?.gameStarted && !state?.worldLoading && state?.urbanSandbox?.active && state?.worldDiscovery?.active);
+  await page.waitForFunction(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return !!(ctx.gameStarted && ctx.initialEarthWorldReady && !ctx.worldLoading && ctx.worldDiscoveryRuntime && ctx.urbanSandboxRuntime && ctx.openWorldDiscoverySection);
   }, null, { timeout: 180_000 });
 }
 

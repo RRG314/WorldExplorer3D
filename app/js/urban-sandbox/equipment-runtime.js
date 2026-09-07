@@ -2,12 +2,11 @@ import { ctx as appCtx } from '../shared-context.js?v=55';
 import { applyConditionImpact, blastTargets } from './impact-model.js?v=1';
 import { applyTransportDamage } from '../transport/damage-model.js?v=1';
 import { sampleSweptContact } from '../physics/swept-contact.js?v=1';
-import { evaluateParachuteDeployment } from './parachute-model.js?v=6';
+import { evaluateParachuteDeployment } from './parachute-model.js?v=7';
 import { getScreenLayoutService } from '../ui/screen-layout.js?v=2';
 import { NPC_COMBAT_STATES, beginNpcResponse, npcFireDecision } from './npc-combat-policy.js?v=2';
 import { reticlePresentation } from './weapon-reticle-authority.js?v=1';
 import { resolvePlayerProjectileLaunch } from './projectile-ballistics.js?v=1';
-import { readExplorerAppearanceId } from '../characters/explorer-appearance.js?v=1';
 
 const ITEM_ICON_PATHS = Object.freeze({
   hands: '<path d="M18 31v-9a4 4 0 0 1 8 0v6-12a4 4 0 0 1 8 0v12-10a4 4 0 0 1 8 0v12-6a4 4 0 0 1 8 0v13c0 12-7 20-18 20-8 0-13-4-17-10l-7-11a4 4 0 0 1 7-4l3 4Z"/>',
@@ -51,6 +50,7 @@ function createUrbanEquipmentRuntime(options = {}) {
   const reportCivicEvent = options.reportCivicEvent;
   const onNpcShot = options.onNpcShot;
   const onNpcDowned = options.onNpcDowned;
+  const onConsume = options.onConsume;
   const setStatus = options.setStatus;
   const clock = options.now || (() => performance.now());
   const effects = [];
@@ -105,6 +105,7 @@ function createUrbanEquipmentRuntime(options = {}) {
     if (item.hotbarSlot != null) actions.push(`<button data-backpack-action="clear-slot" data-equipment-id="${escapeHtml(item.instanceId)}" type="button">Remove from slot ${item.hotbarSlot}</button>`);
     if (item.verbs?.includes('use-context')) actions.push(`<button data-backpack-action="field" data-equipment-id="${escapeHtml(item.instanceId)}" type="button">Use for fieldwork</button>`);
     if (item.verbs?.includes('inspect')) actions.push(`<button data-backpack-action="inspect" data-equipment-id="${escapeHtml(item.instanceId)}" type="button">Inspect</button>`);
+    if (item.verbs?.includes('consume')) actions.unshift(`<button data-backpack-action="consume" data-equipment-id="${escapeHtml(item.instanceId)}" type="button">${escapeHtml(item.metadata?.consumeLabel || item.consumeLabel || 'Use')}</button>`);
     const slots = item.verbs?.includes('equip')
       ? Array.from({ length: 6 }, (_, index) => `<button data-backpack-slot="${index + 1}" data-equipment-id="${escapeHtml(item.instanceId)}" type="button">Slot ${index + 1}</button>`).join('')
       : '';
@@ -125,11 +126,6 @@ function createUrbanEquipmentRuntime(options = {}) {
     ui.toggle.hidden = !state.mobile;
     ui.filters?.querySelectorAll?.('[data-backpack-filter]').forEach((button) => {
       button.classList.toggle('active', button.dataset.backpackFilter === (state.backpackFilter || 'all'));
-    });
-    ui.appearance?.querySelectorAll?.('[data-explorer-appearance]').forEach((button) => {
-      const selected = button.dataset.explorerAppearance === readExplorerAppearanceId();
-      button.classList.toggle('active', selected);
-      button.setAttribute('aria-pressed', selected ? 'true' : 'false');
     });
     const hotbarItems = new Map(inventory.items.filter((item) => item.hotbarSlot != null).map((item) => [item.hotbarSlot, item]));
     ui.slots.innerHTML = Array.from({ length: 6 }, (_, index) => {
@@ -213,6 +209,14 @@ function createUrbanEquipmentRuntime(options = {}) {
       if (changed) setStatus(`${item.label} equipped.`, 1200);
       render();
       return changed;
+    }
+    if (action === 'consume') {
+      const result = onConsume?.(item) || { ok: false, reason: 'unavailable' };
+      if (result.ok) setStatus(`${item.label} used · explorer health ${Math.round(Number(result.condition || 0) * 100)}%`, 1800);
+      else if (result.reason === 'full_health') setStatus('Explorer health is already full.', 1600);
+      else setStatus(`${item.label} could not be used.`, 1600);
+      render();
+      return true;
     }
     if (action === 'field') {
       const result = appCtx.worldDiscoveryRuntime?.equipTool?.(item.catalogId);
@@ -382,7 +386,7 @@ function createUrbanEquipmentRuntime(options = {}) {
     const blast = radius > 1.2;
     const color = style === 'paintball' ? 0xff4f9a : style === 'laser' ? 0x64fff4 : 0xbbe8ff;
     const root = new THREE.Group();
-    root.name = blast ? 'Concussion impact ring' : `${style} impact mark`;
+    root.name = blast ? 'Grenade impact ring' : `${style} impact mark`;
     const geometries = [];
     const materials = [];
     if (blast) {
@@ -461,9 +465,31 @@ function createUrbanEquipmentRuntime(options = {}) {
   }
 
   function createProjectileVisual(kind) {
-    const geometry = kind === 'thrown-charge'
-      ? new THREE.IcosahedronGeometry(.16, 1)
-      : kind === 'paintball'
+    if (kind === 'thrown-charge') {
+      const root = new THREE.Group();
+      root.name = 'thrown-grenade world projectile';
+      const bodyGeometry = new THREE.SphereGeometry(.14, 12, 8);
+      const capGeometry = new THREE.CylinderGeometry(.065, .08, .09, 10);
+      const leverGeometry = new THREE.BoxGeometry(.075, .035, .17);
+      const material = projectileMaterial(kind);
+      const body = new THREE.Mesh(bodyGeometry, material);
+      body.name = 'grenade-body';
+      body.scale.set(.82, 1.28, .82);
+      body.castShadow = true;
+      root.add(body);
+      const cap = new THREE.Mesh(capGeometry, material);
+      cap.name = 'grenade-fuse-housing';
+      cap.position.y = .2;
+      root.add(cap);
+      const lever = new THREE.Mesh(leverGeometry, material);
+      lever.name = 'grenade-safety-lever';
+      lever.position.set(.08, .21, 0);
+      lever.rotation.z = -.16;
+      root.add(lever);
+      state.group.add(root);
+      return { root, geometries: [bodyGeometry, capGeometry, leverGeometry], materials: [material] };
+    }
+    const geometry = kind === 'paintball'
         ? new THREE.SphereGeometry(.075, 8, 6)
         : kind === 'laser'
           ? new THREE.CylinderGeometry(.022, .022, .34, 7)
@@ -471,7 +497,7 @@ function createUrbanEquipmentRuntime(options = {}) {
     const material = projectileMaterial(kind);
     const mesh = new THREE.Mesh(geometry, material);
     mesh.name = `${kind} world projectile`;
-    mesh.castShadow = kind === 'thrown-charge' || kind === 'paintball';
+    mesh.castShadow = kind === 'paintball';
     state.group.add(mesh);
     return { root: mesh, geometries: [geometry], materials: [material] };
   }
@@ -660,7 +686,7 @@ function createUrbanEquipmentRuntime(options = {}) {
         radius: 38, audibleRadius: kind === 'paintball' ? 18 : 34, maximumWitnesses: 4
       });
     }
-    setStatus(kind === 'thrown-charge' ? 'Charge thrown.' : `${equipment.label} fired.`);
+    setStatus(kind === 'thrown-charge' ? 'Grenade thrown.' : `${equipment.label} fired.`);
   }
 
   function fireNpcProjectile(options = {}) {
@@ -848,7 +874,7 @@ function createUrbanEquipmentRuntime(options = {}) {
         equipmentId: npc.heldEquipment,
         ...decision.profile,
         origin: { x: pose.x, y: pose.y + 1.34, z: pose.z },
-        target: { x: Number(actor.x), y: Number(actor.y) - .5, z: Number(actor.z) },
+        target: decision.target,
         onPlayerImpact: onNpcShot
       });
       if (!fired) return;
@@ -898,6 +924,7 @@ function createUrbanEquipmentRuntime(options = {}) {
       }
       state.parachute.deployed = true;
       state.parachute.deployedAt = clock();
+      state.equipmentVisual?.setParachuteReady?.(true);
       state.equipmentVisual?.setParachuteDeployed?.(true);
       setStatus(`Parachute deployed · ${deployment.clearance.toFixed(1)} m clearance`, 2200);
       render();
@@ -976,11 +1003,23 @@ function createUrbanEquipmentRuntime(options = {}) {
   }
 
   function update(dt) {
+    const actor = appCtx.Walk?.state?.walker;
+    const equipped = state.equipment?.equipped?.();
+    if (actor && equipped?.projectileKind && appCtx.Walk?.state?.mode === 'walk') {
+      const aimDirection = new THREE.Vector3();
+      appCtx.camera?.getWorldDirection?.(aimDirection);
+      if (aimDirection.lengthSq() > .001) {
+        aimDirection.normalize();
+        alignActorToAim(actor, aimDirection);
+        state.equipmentVisual?.setAimDirection?.(aimDirection, true);
+      }
+    } else {
+      state.equipmentVisual?.setAimDirection?.(null, false);
+    }
     state.equipmentVisual?.update?.(dt);
     updateProjectiles(dt);
     updateArmedNpcResponse();
     updateReticlePresentation();
-    const actor = appCtx.Walk?.state?.walker;
     if (actor && state.flashlight.visible) {
       const direction = new THREE.Vector3();
       appCtx.camera?.getWorldDirection?.(direction);

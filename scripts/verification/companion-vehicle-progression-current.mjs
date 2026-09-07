@@ -24,6 +24,10 @@ function bindEvidence(page, label) {
   });
 }
 
+function activeCompanion(snapshot) {
+  return snapshot?.companions?.find((entry) => entry.instanceId === snapshot.activeInstanceId || entry.active) || null;
+}
+
 async function launch(page, { reset = true } = {}) {
   const params = new URLSearchParams({
     loc: 'custom', lat: '39.2904', lon: '-76.6122', lname: 'Baltimore Inner Harbor',
@@ -60,7 +64,9 @@ async function openCompanions(page) {
     }
   }
   await page.waitForSelector('#discoveryPanel.show', { timeout: 10_000 });
-  await page.locator('#discoveryProfileBtn').click();
+  if (!await page.locator('.discoveryPane[data-discovery-pane="profile"].active').isVisible().catch(() => false)) {
+    await page.locator('#discoveryProfileBtn').click();
+  }
   await page.waitForSelector('.discoveryPane[data-discovery-pane="profile"].active');
 }
 
@@ -109,26 +115,23 @@ async function clickContextAction(page, expectedLabel, holdPosition = null) {
 
 async function exercise(page, label) {
   await launch(page);
-  const actor = await page.evaluate(() => globalThis.__WE3D_COMPANION_SUPPORT__.worldActors()
-    .find((entry) => entry.companionPolicy === 'trust-sequence-required' && ['trail-hound', 'field-retriever', 'park-terrier'].includes(entry.speciesId)) || null);
-  assert.ok(actor, 'No dog companion encounter was generated for the Baltimore journey.');
+  const starter = await page.evaluate(() => globalThis.__WE3D_COMPANION_SUPPORT__.snapshot().companions
+    .find((entry) => entry.isStarterCompanion) || null);
+  assert.ok(starter, 'The permanent starter dog was not created for a new Explorer.');
+  assert.equal(starter.active, true, 'The starter dog must begin as the active companion.');
 
-  await moveWalker(page, actor.home.x, actor.home.z);
-  await clickContextAction(page, 'Watch', actor.home);
-  await page.waitForFunction(() => globalThis.__WE3D_COMPANION_SUPPORT__.encounters().some((entry) => entry.trustState === 'Curious' && entry.step === 1));
-  await moveWalker(page, actor.home.x, actor.home.z);
-  await clickContextAction(page, 'Wait', actor.home);
-  await page.waitForTimeout(4000);
-  await page.waitForFunction(() => globalThis.__WE3D_COMPANION_SUPPORT__.encounters().some((entry) => entry.step === 2), null, { timeout: 10_000 });
-  await moveWalker(page, actor.home.x, actor.home.z);
-  await clickContextAction(page, 'Greet', actor.home);
-  await page.waitForFunction(() => globalThis.__WE3D_COMPANION_SUPPORT__.encounters().some((entry) => entry.trustState === 'Comfortable' && entry.step === 3));
-
-  await page.waitForSelector('#discoveryPanel.show');
-  const namingCard = page.locator('#discoveryCompanionList .discoveryItem').filter({ has: page.locator(`[data-companion-catalog="${actor.speciesId}"]`) });
+  await openCompanions(page);
+  const namingCard = page.locator('#discoveryCompanionList .discoveryItem').filter({
+    has: page.locator(`[data-companion-action="rename"][data-companion-id="${starter.instanceId}"]`)
+  });
   await namingCard.locator('[data-companion-name]').fill('Copper');
-  await namingCard.getByRole('button', { name: 'Befriend', exact: true }).click();
-  await page.waitForFunction(() => globalThis.__WE3D_COMPANION_SUPPORT__?.snapshot?.().activeName === 'Copper');
+  await namingCard.getByRole('button', { name: 'Choose Name', exact: true }).click();
+  await page.waitForFunction(() => {
+    const snapshot = globalThis.__WE3D_COMPANION_SUPPORT__?.snapshot?.();
+    const active = snapshot?.companions?.find((entry) => entry.instanceId === snapshot.activeInstanceId);
+    return snapshot?.activeName === 'Copper' && active?.nameStatus === 'player-chosen';
+  });
+  const actor = { speciesId: starter.catalogId, starterCompanion: true };
 
   if (stage === 'encounter' || stage === 'mobile') {
     const companion = await page.evaluate(() => globalThis.__WE3D_COMPANION_SUPPORT__.snapshot());
@@ -139,7 +142,10 @@ async function exercise(page, label) {
   for (let index = 0; index < 4; index += 1) {
     await page.evaluate((receipt) => globalThis.__WE3D_COMPANION_SUPPORT__.awardXp(receipt, 'field-activity'), `browser-field-${label}-${index}`);
   }
-  await page.waitForFunction(() => globalThis.__WE3D_COMPANION_SUPPORT__.snapshot().companions[0].progression.level >= 2);
+  await page.waitForFunction(() => {
+    const snapshot = globalThis.__WE3D_COMPANION_SUPPORT__.snapshot();
+    return snapshot.companions.find((entry) => entry.instanceId === snapshot.activeInstanceId)?.progression?.level >= 2;
+  });
   await openCompanions(page);
   const textBeforeTraining = await page.locator('#discoveryCompanionList').innerText();
   assert.match(textBeforeTraining, /Copper/);
@@ -156,40 +162,45 @@ async function exercise(page, label) {
   await clickContextAction(page, 'Call');
   await page.waitForFunction(() => {
     const snapshot = globalThis.__WE3D_COMPANION_SUPPORT__.snapshot();
-    return snapshot.exercise.active === false && snapshot.companions[0].training.learnedCommands.includes('recall');
+    const active = snapshot.companions.find((entry) => entry.instanceId === snapshot.activeInstanceId);
+    return snapshot.exercise.active === false && active?.training?.learnedCommands.includes('recall');
   }, null, { timeout: 20_000 });
 
   const vehicleId = await page.evaluate(() => globalThis.__WE3D_URBAN_CRASH_SUPPORT__?.snapshot?.().vehicles?.find((vehicle) => !vehicle.occupied)?.id || '');
   assert.ok(vehicleId, 'No enterable vehicle was available.');
   await page.evaluate((id) => globalThis.__WE3D_URBAN_CRASH_SUPPORT__.enterVehicle(id), vehicleId);
-  await page.waitForFunction(() => globalThis.__WE3D_COMPANION_SUPPORT__?.snapshot?.().presentation?.travelState === 'aboard', null, { timeout: 15_000 });
+  await page.waitForFunction(() => globalThis.__WE3D_COMPANION_SUPPORT__?.snapshot?.().presentation?.travelState === 'vehicle-occupant', null, { timeout: 15_000 });
   const aboard = await page.evaluate(() => {
     const urban = globalThis.__WE3D_URBAN_CRASH_SUPPORT__.snapshot();
     const companion = globalThis.__WE3D_COMPANION_SUPPORT__.snapshot();
     const car = urban.vehicles.find((vehicle) => vehicle.id === urban.activeVehicleId);
     return { companion, separation: Math.hypot(companion.presentation.position.x - car.x, companion.presentation.position.z - car.z) };
   });
-  assert.ok(aboard.separation < 1.5, `Companion is ${aboard.separation.toFixed(2)} m from the occupied car.`);
+  assert.equal(aboard.companion.presentation.vehicleOccupant, true, 'Companion did not enter the safe vehicle-occupant state.');
+  assert.equal(aboard.companion.presentation.visible, false, 'Companion should be hidden inside an enclosed road vehicle.');
 
   await page.reload({ waitUntil: 'load', timeout: 120_000 });
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   await page.getByRole('button', { name: 'Explore', exact: true }).click();
   await page.waitForFunction(() => globalThis.__WE3D_COMPANION_SUPPORT__?.snapshot?.().activeName === 'Copper', null, { timeout: 360_000 });
   const reloaded = await page.evaluate(() => globalThis.__WE3D_COMPANION_SUPPORT__.snapshot());
-  assert.ok(reloaded.companions[0].training.learnedCommands.includes('recall'));
-  assert.ok(reloaded.companions[0].progression.totalXp >= 63);
+  const reloadedActive = activeCompanion(reloaded);
+  assert.ok(reloadedActive?.training.learnedCommands.includes('recall'));
+  assert.ok(reloadedActive?.progression.totalXp >= 63);
 
   await openCompanions(page);
+  const reloadedCompanionText = await page.locator('#discoveryCompanionList').innerText();
+  assert.match(reloadedCompanionText, /Copper/);
+  assert.match(reloadedCompanionText, /First companion/);
   await page.locator('[data-discovery-tab="journal"]').click();
   const journalText = await page.locator('#discoveryJournalList').innerText();
-  assert.match(journalText, /Copper joined the journey/);
+  assert.match(journalText, /Best Friend/);
   assert.match(journalText, /Copper learned Recall/);
   await page.locator('[data-discovery-tab="guide"]').click();
   const guideText = await page.locator('#discoveryFieldGuideList').innerText();
-  assert.match(guideText, /companion owned/i);
   await page.screenshot({ path: path.join(outputDir, `${label}-guide-after-reload.png`) });
 
-  return { actor, aboard, reloaded, textBeforeTraining, journalText, guideText };
+  return { actor, aboard, reloaded, textBeforeTraining, reloadedCompanionText, journalText, guideText };
 }
 
 async function seedLevelTwoCompanion(page, receiptPrefix) {
@@ -202,7 +213,8 @@ async function seedLevelTwoCompanion(page, receiptPrefix) {
   }, { receiptPrefix });
   await page.waitForFunction(() => {
     const snapshot = globalThis.__WE3D_COMPANION_SUPPORT__?.snapshot?.();
-    return snapshot?.activeName === 'Copper' && snapshot.companions[0]?.progression?.level >= 2;
+    const active = snapshot?.companions?.find((entry) => entry.instanceId === snapshot.activeInstanceId);
+    return snapshot?.activeName === 'Copper' && active?.progression?.level >= 2;
   });
 }
 
@@ -223,7 +235,8 @@ async function exerciseProgressionAndRecall(page, label) {
   await clickContextAction(page, 'Call');
   await page.waitForFunction(() => {
     const snapshot = globalThis.__WE3D_COMPANION_SUPPORT__.snapshot();
-    return snapshot.exercise.active === false && snapshot.companions[0].training.learnedCommands.includes('recall');
+    const active = snapshot.companions.find((entry) => entry.instanceId === snapshot.activeInstanceId);
+    return snapshot.exercise.active === false && active?.training?.learnedCommands.includes('recall');
   }, null, { timeout: 20_000 });
   const after = await page.evaluate(() => globalThis.__WE3D_COMPANION_SUPPORT__.snapshot());
   await openCompanions(page);
@@ -239,7 +252,7 @@ async function exerciseVehicleTravel(page) {
   const vehicleId = await page.evaluate(() => globalThis.__WE3D_URBAN_CRASH_SUPPORT__?.snapshot?.().vehicles?.find((vehicle) => !vehicle.occupied)?.id || '');
   assert.ok(vehicleId, 'No enterable vehicle was available.');
   await page.evaluate((id) => globalThis.__WE3D_URBAN_CRASH_SUPPORT__.enterVehicle(id), vehicleId);
-  await page.waitForFunction(() => globalThis.__WE3D_COMPANION_SUPPORT__?.snapshot?.().presentation?.travelState === 'aboard', null, { timeout: 15_000 });
+  await page.waitForFunction(() => globalThis.__WE3D_COMPANION_SUPPORT__?.snapshot?.().presentation?.travelState === 'vehicle-occupant', null, { timeout: 15_000 });
   return page.evaluate(() => {
     const urban = globalThis.__WE3D_URBAN_CRASH_SUPPORT__.snapshot();
     const companion = globalThis.__WE3D_COMPANION_SUPPORT__.snapshot();
@@ -276,7 +289,7 @@ try {
     bindEvidence(page, 'progression');
     const result = await exerciseProgressionAndRecall(page, 'desktop');
     await context.close();
-    const companion = result.after.companions[0];
+    const companion = activeCompanion(result.after);
     const checks = {
       reachedLevelTwo: companion.progression.level >= 2,
       explicitXpReason: companion.progression.lastAward?.reasonId === 'training-first-clear',
@@ -302,12 +315,19 @@ try {
     const result = await exerciseVehicleTravel(page);
     await context.close();
     const checks = {
-      boardedOccupiedCar: result.companion.presentation.travelState === 'aboard',
-      presentationAnchoredToCar: result.separation < 1.5,
+      boardedOccupiedCar: result.companion.presentation.vehicleOccupant === true,
+      presentationHiddenInsideCar: result.companion.presentation.visible === false,
       noBrowserErrors: browserErrors.length === 0,
       noFailedLocalResources: localFailures.length === 0
     };
-    report = { ok: Object.values(checks).every(Boolean), contract: 'companion-vehicle-current-v2', checks, evidence: { separation: Number(result.separation.toFixed(3)) }, browserErrors, localFailures };
+    report = {
+      ok: Object.values(checks).every(Boolean),
+      contract: 'companion-vehicle-current-v2',
+      checks,
+      evidence: { travelState: result.companion.presentation.travelState, visible: result.companion.presentation.visible },
+      browserErrors,
+      localFailures
+    };
     await writeFile(path.join(outputDir, 'vehicle-report.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
     console.log(JSON.stringify(report, null, 2));
     assert.equal(report.ok, true, 'Companion vehicle stage failed.');
@@ -319,14 +339,14 @@ try {
     await context.close();
     const checks = {
       namePersists: result.after.activeName === 'Copper',
-      xpPersists: result.after.companions[0].progression.totalXp === result.before.companions[0].progression.totalXp,
+      xpPersists: activeCompanion(result.after)?.progression.totalXp === activeCompanion(result.before)?.progression.totalXp,
       uiProjectsSavedLevel: /Copper/.test(result.text) && /Level 2/.test(result.text),
       currentJournalPanel: result.journalPanelExists,
       currentGuidePanel: result.guidePanelExists,
       noBrowserErrors: browserErrors.length === 0,
       noFailedLocalResources: localFailures.length === 0
     };
-    report = { ok: Object.values(checks).every(Boolean), contract: 'companion-persistence-current-v2', checks, evidence: { xp: result.after.companions[0].progression.totalXp }, browserErrors, localFailures };
+    report = { ok: Object.values(checks).every(Boolean), contract: 'companion-persistence-current-v2', checks, evidence: { xp: activeCompanion(result.after)?.progression.totalXp }, browserErrors, localFailures };
     await writeFile(path.join(outputDir, 'persistence-report.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
     console.log(JSON.stringify(report, null, 2));
     assert.equal(report.ok, true, 'Companion persistence stage failed.');
@@ -379,12 +399,12 @@ try {
 
     const checks = {
     namedAfterTrust: desktop.reloaded.activeName === 'Copper',
-    receiptXpPersists: desktop.reloaded.companions[0].progression.totalXp >= 63,
-    recallTrainingPersists: desktop.reloaded.companions[0].training.learnedCommands.includes('recall'),
-    vehicleBoarding: desktop.aboard.companion.presentation.travelState === 'aboard' && desktop.aboard.separation < 1.5,
-    journalProjection: /Copper joined the journey/.test(desktop.journalText) && /Copper learned Recall/.test(desktop.journalText),
-    guideProjection: /companion owned/i.test(desktop.guideText),
-    mobileJourney: mobile.reloaded.activeName === 'Copper' && mobile.reloaded.companions[0].training.learnedCommands.includes('recall'),
+    receiptXpPersists: activeCompanion(desktop.reloaded)?.progression.totalXp >= 63,
+    recallTrainingPersists: activeCompanion(desktop.reloaded)?.training.learnedCommands.includes('recall'),
+    vehicleBoarding: desktop.aboard.companion.presentation.vehicleOccupant === true && desktop.aboard.companion.presentation.visible === false,
+    journalProjection: /Best Friend/.test(desktop.journalText) && /Copper learned Recall/.test(desktop.journalText),
+    profileProjection: /Copper/.test(desktop.reloadedCompanionText) && /First companion/.test(desktop.reloadedCompanionText),
+    mobileJourney: mobile.reloaded.activeName === 'Copper' && activeCompanion(mobile.reloaded)?.training.learnedCommands.includes('recall'),
     noBrowserErrors: browserErrors.length === 0,
     noFailedLocalResources: localFailures.length === 0
   };
@@ -394,11 +414,11 @@ try {
     checks,
     evidence: {
       desktopSpecies: desktop.actor.speciesId,
-      desktopXp: desktop.reloaded.companions[0].progression.totalXp,
-      desktopLevel: desktop.reloaded.companions[0].progression.level,
-      desktopVehicleSeparation: Number(desktop.aboard.separation.toFixed(3)),
+      desktopXp: activeCompanion(desktop.reloaded)?.progression.totalXp,
+      desktopLevel: activeCompanion(desktop.reloaded)?.progression.level,
+      desktopVehicleState: desktop.aboard.companion.presentation.travelState,
       mobileSpecies: mobile.actor.speciesId,
-      mobileXp: mobile.reloaded.companions[0].progression.totalXp
+      mobileXp: activeCompanion(mobile.reloaded)?.progression.totalXp
     },
     browserErrors,
     localFailures

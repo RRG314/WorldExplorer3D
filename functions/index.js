@@ -1,5 +1,6 @@
 const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
+const crypto = require('node:crypto');
 const { FieldValue, Timestamp: AdminTimestamp } = require('firebase-admin/firestore');
 const { defineString } = require('firebase-functions/params');
 const Stripe = require('stripe');
@@ -15,6 +16,7 @@ const {
 const { buildOverlayExports } = require('./overlay');
 const { buildGeospatialExports } = require('./geospatial');
 const { buildDiscoveryExports } = require('./discovery');
+const { buildCommunityRealityCaptureExports } = require('./community-reality-capture');
 const {
   claimImmutableDeFlockState,
   isMappedCameraTags,
@@ -46,6 +48,8 @@ const {
   settlePropertyTrade,
   validatePropertyProximity
 } = require('./property-authority');
+const { settleCommerceOutcome, settleCommerceTransaction } = require('./economy-authority');
+const { normalizePlayerConditionInput } = require('./player-state-authority');
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -726,6 +730,25 @@ async function verifyAuth(req, res) {
   }
 }
 
+async function verifyAppCheck(req, res, options = {}) {
+  const required = options.required !== false;
+  const emulator = process.env.FUNCTIONS_EMULATOR === 'true';
+  const explicitlyDisabled = process.env.WE3D_CAPTURE_APP_CHECK_DISABLED === 'true';
+  if (!required || emulator || explicitlyDisabled) return { emulator: emulator || explicitlyDisabled };
+  const token = String(req.get('X-Firebase-AppCheck') || '').trim();
+  if (!token) {
+    res.status(401).json({ error: 'Missing App Check token.' });
+    return null;
+  }
+  try {
+    return await admin.appCheck().verifyToken(token);
+  } catch (error) {
+    console.error('[app-check] verification failed:', error);
+    res.status(401).json({ error: 'Invalid App Check token.' });
+    return null;
+  }
+}
+
 function currentBaseUrl(req) {
   const explicitOrigin = req.get('origin');
   if (explicitOrigin) return explicitOrigin.replace(/\/$/, '');
@@ -966,6 +989,12 @@ async function deleteUserData(uid) {
     await deleteDocsByQuery(userRef.collection('recentPlayers'), 200, 'users/{uid}/recentPlayers');
     await deleteDocsByQuery(userRef.collection('incomingInvites'), 200, 'users/{uid}/incomingInvites');
     await deleteDocsByQuery(userRef.collection('myRooms'), 200, 'users/{uid}/myRooms');
+    await deleteDocsByQuery(userRef.collection('economy'), 200, 'users/{uid}/economy');
+    await deleteDocsByQuery(userRef.collection('commerceReceipts'), 200, 'users/{uid}/commerceReceipts');
+    await deleteDocsByQuery(userRef.collection('commerceItems'), 200, 'users/{uid}/commerceItems');
+    await deleteDocsByQuery(userRef.collection('commerceStock'), 200, 'users/{uid}/commerceStock');
+    await deleteDocsByQuery(userRef.collection('gameplay'), 200, 'users/{uid}/gameplay');
+    await deleteDocsByQuery(userRef.collection('propertyEntitlements'), 200, 'users/{uid}/propertyEntitlements');
     await userRef.delete().catch(() => {});
   }
   await creatorProfileRef.delete().catch(() => {});
@@ -2035,6 +2064,94 @@ exports.commitWorldPropertyAction = functions.region('us-central1').https.onRequ
   }
 });
 
+exports.commitExplorerCommerceAction = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+  try {
+    const input = req.body || {};
+    const requestId = sanitizeText(input.requestId, 120).replace(/[^A-Za-z0-9:._-]/g, '');
+    const storeId = sanitizeText(input.storeId, 420);
+    const catalogId = sanitizeText(input.catalogId, 100).toLowerCase();
+    const targetId = sanitizeText(input.targetId, 180);
+    const dayKey = sanitizeText(input.dayKey, 10);
+    if (!requestId || !storeId || !catalogId || !/^\d{4}-\d{2}-\d{2}$/.test(dayKey)) return res.status(400).json({ error: 'A valid store transaction is required.' });
+    const digest = (value) => crypto.createHash('sha256').update(value).digest('hex').slice(0, 40);
+    const userRef = db.collection('users').doc(auth.uid);
+    const result = await settleCommerceTransaction({
+      runTransaction: (callback) => db.runTransaction(callback),
+      walletRef: userRef.collection('economy').doc('wallet'),
+      receiptRef: userRef.collection('commerceReceipts').doc(digest(requestId)),
+      itemRef: userRef.collection('commerceItems').doc(digest(catalogId)),
+      stockRef: userRef.collection('commerceStock').doc(digest(`${dayKey}:${storeId}:${catalogId}`)),
+      uid: auth.uid,
+      input: { ...input, requestId, storeId, catalogId, targetId, dayKey },
+      nowMs: Date.now(),
+      timestampFromMs: urbanTimestampFromMs
+    });
+    res.status(200).json(result);
+  } catch (error) {
+    if (String(error?.message || '') === 'invalid_commerce_transaction') {
+      return res.status(400).json({ error: 'This store transaction is not valid.' });
+    }
+    console.error('[commitExplorerCommerceAction] failed:', error);
+    res.status(500).json({ error: 'The Explorer Wallet could not complete this transaction.' });
+  }
+});
+
+exports.settleExplorerCommerceOutcome = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+  try {
+    const requestId = sanitizeText(req.body?.requestId, 120).replace(/[^A-Za-z0-9:._-]/g, '');
+    const outcome = sanitizeText(req.body?.outcome, 24).toLowerCase();
+    const reason = sanitizeText(req.body?.reason, 120);
+    if (!requestId || !['applied', 'failed'].includes(outcome)) return res.status(400).json({ error: 'A valid service outcome is required.' });
+    const digest = (value) => crypto.createHash('sha256').update(value).digest('hex').slice(0, 40);
+    const userRef = db.collection('users').doc(auth.uid);
+    const result = await settleCommerceOutcome({
+      runTransaction: (callback) => db.runTransaction(callback),
+      walletRef: userRef.collection('economy').doc('wallet'),
+      receiptRef: userRef.collection('commerceReceipts').doc(digest(requestId)),
+      playerProgressRef: userRef.collection('gameplay').doc('vehicleUpgrades'),
+      input: { requestId, outcome, reason },
+      nowMs: Date.now(),
+      timestampFromMs: urbanTimestampFromMs
+    });
+    res.status(200).json(result);
+  } catch (error) {
+    if (['invalid_commerce_outcome', 'commerce_receipt_not_found'].includes(String(error?.message || ''))) {
+      return res.status(400).json({ error: 'This service settlement is not valid.' });
+    }
+    console.error('[settleExplorerCommerceOutcome] failed:', error);
+    res.status(500).json({ error: 'The Explorer Wallet could not settle this service.' });
+  }
+});
+
+exports.saveExplorerPlayerCondition = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+  try {
+    const state = normalizePlayerConditionInput(req.body || {});
+    await db.collection('users').doc(auth.uid).collection('gameplay').doc('condition').set({
+      ...state,
+      updatedAt: AdminTimestamp.now()
+    }, { merge: false });
+    res.status(200).json(state);
+  } catch (error) {
+    if (String(error?.message || '') === 'invalid_player_condition') {
+      return res.status(400).json({ error: 'Player condition must be between 0 and 1.' });
+    }
+    console.error('[saveExplorerPlayerCondition] failed:', error);
+    res.status(500).json({ error: 'Explorer health could not be saved.' });
+  }
+});
+
 exports.commitUrbanImpacts = functions.region('us-central1').https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
@@ -2636,4 +2753,13 @@ Object.assign(exports, buildDiscoveryExports({
   verifyAuth,
   db,
   admin
+}));
+
+Object.assign(exports, buildCommunityRealityCaptureExports({
+  db,
+  setCors,
+  verifyAuth,
+  verifyAppCheck,
+  requireModerator,
+  logAdminActivity
 }));

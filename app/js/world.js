@@ -35,7 +35,7 @@ import {
   invalidateOverpassCaches,
   releaseOverpassRuntimeCache,
   sameLocation
-} from "./world/osm-loader.js?v=28";
+} from "./world/osm-loader.js?v=29";
 import {
   clampNumber,
   featureTileKeyForLatLon,
@@ -58,15 +58,15 @@ import {
   finalizeLoadedWorld,
   recordWorldLoadWarning,
   safeWorldLoadCall
-} from "./world/load-support.js?v=38";
+} from "./world/load-support.js?v=44";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
   resetWorldForReload
-} from "./world/load-reset.js?v=18";
+} from "./world/load-reset.js?v=21";
 import {
   prepareWorldFeatureSelections
-} from "./world/load-budgeting.js?v=19";
+} from "./world/load-budgeting.js?v=20";
 import {
   buildBuildingGeometryGuards,
   buildFeatureGeometryGuards,
@@ -94,13 +94,13 @@ import {
   poiKeyFromTags,
   roadTypePriority,
   classifyLinearFeatureTags as classifyLinearFeatureTagsBase
-} from "./world/load-style.js?v=4";
+} from "./world/load-style.js?v=5";
 import {
   limitNodesByDistance,
   limitWaysByDistance,
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
-import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=39";
+import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=40";
 import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=55";
 import {
   batchLanduseMeshes,
@@ -145,7 +145,7 @@ import {
 import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=32";
 import {
   resetWorldFurnitureCaches
-} from "./world/furniture.js?v=18";
+} from "./world/furniture.js?v=22";
 import {
   addBuildingToSpatialIndex,
   clearBuildingSpatialIndex,
@@ -159,19 +159,20 @@ import {
   initWorldStructureAwareness,
   refreshStructureAwareFeatureProfiles,
   refreshStructureAwareFeatureProfilesCooperatively,
+  refreshTransportStructureAssembliesForPublishedTerrain,
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
-} from "./world/structure-aware.js?v=50";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=213";
+} from "./world/structure-aware.js?v=51";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=226";
 import {
   fetchShortbreadBuildingData,
   fetchShortbreadWorldData,
   releaseShortbreadRuntimeCache
-} from "./world/shortbread-source.js?v=19";
+} from "./world/shortbread-source.js?v=20";
 import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=14";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=2";
 import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=36";
-import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=108";
+import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=122";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
 
@@ -269,6 +270,7 @@ const { loadRoads: loadOsmRoads, isVehicleRoad, isInsideWaterArea } = createWorl
   recordWorldLoadWarning,
   refreshStructureAwareFeatureProfiles,
   refreshStructureAwareFeatureProfilesCooperatively,
+  refreshTransportStructureAssembliesForPublishedTerrain,
   registerWaterWaveMaterial,
   resetWorldForReload,
   resetWorldFurnitureCaches,
@@ -312,6 +314,7 @@ async function refreshAuthoritativeMapData() {
     throw new Error('OpenStreetMap refresh is available on Earth.');
   }
   await invalidateOverpassCaches(appCtx.LOC, ['core', 'buildings', 'building-metadata']);
+  releaseShortbreadRuntimeCache({ includeRaw: true });
   return loadRoads();
 }
 
@@ -385,7 +388,7 @@ initWorldNavigation({
 let editableWorldRuntimePromise = null;
 appCtx.ensureEditableWorldRuntime = () => {
   if (typeof appCtx.getSuppressedEditableBuildingIds === 'function') return Promise.resolve(true);
-  editableWorldRuntimePromise ||= import('./editable-world/runtime.js?v=2')
+  editableWorldRuntimePromise ||= import('./editable-world/runtime.js?v=4')
     .then(({ initEditableWorldRuntime }) => {
       initEditableWorldRuntime(appCtx);
       return true;
@@ -457,6 +460,7 @@ Object.assign(appCtx, {
   registerWaterWaveMaterial,
   refreshStructureAwareFeatureProfiles,
   refreshStructureAwareFeatureProfilesCooperatively,
+  refreshTransportStructureAssembliesForPublishedTerrain,
   refreshAuthoritativeMapData,
   releaseEarthWorldForTitle,
   resolveSafeWorldSpawn,
@@ -491,6 +495,7 @@ export {
   registerWaterWaveMaterial,
   refreshStructureAwareFeatureProfiles,
   refreshStructureAwareFeatureProfilesCooperatively,
+  refreshTransportStructureAssembliesForPublishedTerrain,
   refreshAuthoritativeMapData,
   resolveSafeWorldSpawn,
   sampleFeatureSurfaceY,

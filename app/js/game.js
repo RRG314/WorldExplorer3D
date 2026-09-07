@@ -25,7 +25,7 @@ import {
   stopPaintTownMode,
   tryTouchPaintAt,
   updatePaintballProjectiles
-} from "./game/paint-town.js?v=1";
+} from "./game/paint-town.js?v=2";
 import {
   clearNavigation,
   closeLegend,
@@ -56,7 +56,7 @@ import {
   togglePropertyFilters,
   toggleRealEstate,
   updatePropertyPanel
-} from "./game/property-ui.js?v=4";
+} from "./game/property-ui.js?v=8";
 import {
   closeHistoricPanel,
   createHistoricCard,

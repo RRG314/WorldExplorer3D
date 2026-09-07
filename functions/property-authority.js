@@ -1,9 +1,7 @@
 'use strict';
 
 const crypto = require('node:crypto');
-
-const STARTING_CREDITS = 500;
-const MAX_CREDITS = 1_000_000_000;
+const { STARTING_CREDITS, MAX_CREDITS, walletData } = require('./economy-authority');
 const VALID_ACTIONS = new Set(['starter_claim', 'buy', 'sell_world', 'list_sale', 'buy_listing', 'list_rent', 'rent', 'cancel_listing']);
 const VALID_TRADE_ACTIONS = new Set(['trade_offer', 'trade_accept', 'trade_decline', 'trade_cancel']);
 const PROPERTY_STATUS = Object.freeze({
@@ -19,6 +17,10 @@ const MAPPED_SOURCE_PATTERNS = Object.freeze([
   /^shortbread:buildings:\d+:\d+:\d+:[^:]+:\d+$/i,
   /^(?:osm:)?(?:node|way|relation)[:/]\d+$/i,
   /^\d+$/
+]);
+const MARYLAND_JURISDICTIONS = new Set([
+  'ALLE', 'ANNE', 'BACI', 'BACO', 'CALV', 'CARO', 'CARR', 'CECI', 'CHAR', 'DORC', 'FRED', 'GARR',
+  'HARF', 'HOWA', 'KENT', 'MONT', 'PRIN', 'QUEE', 'SOME', 'STMA', 'TALB', 'WASH', 'WICO', 'WORC'
 ]);
 const PROPERTY_INTERACTION_RADIUS = 55;
 
@@ -94,16 +96,38 @@ function hashAdjustment(value) {
     hash ^= character.charCodeAt(0);
     hash = Math.imul(hash, 16777619);
   }
-  return (hash >>> 0) % 17;
+  return hash >>> 0;
+}
+
+function shortStableHash(value) {
+  return hashAdjustment(value).toString(36);
 }
 
 function propertyBaseValue(input = {}) {
+  if (input.parcelAuthority === 'maryland-imap-parcels' && input.parcelId) {
+    const parcelArea = Math.max(0, Math.min(50_000_000, finite(input.parcelAreaSqM)));
+    const footprintArea = Math.max(0, Math.min(250_000, finite(input.footprintArea || input.area)));
+    const levels = integer(input.levels, 1, 180, 1);
+    const use = `${text(input.landUseCode, 24)} ${text(input.landUseDescription, 100)} ${text(input.buildingType, 60)}`.toLowerCase();
+    const landRate = /agric|farm|resource|forest/.test(use) ? 12 : /commercial|industrial|office|retail/.test(use) ? 180 : /residential|town|condo|apartment/.test(use) ? 105 : 55;
+    const structureRate = /commercial|office|retail/.test(use) ? 3200 : /industrial|warehouse/.test(use) ? 1550 : 2350;
+    const modelValue = Math.max(25000, parcelArea * landRate + footprintArea * levels * structureRate);
+    const assessment = Math.max(0, Math.min(2_000_000_000, finite(input.sourceAssessment)));
+    const estimate = assessment >= 1000 ? assessment * .82 + modelValue * .18 : modelValue;
+    const rounding = estimate >= 10000000 ? 100000 : estimate >= 1000000 ? 25000 : 5000;
+    return integer(Math.round(estimate / rounding) * rounding, 25000, 1_500_000_000, 25000);
+  }
   const area = Math.max(16, Math.min(250_000, finite(input.area, 16)));
   const levels = integer(input.levels, 1, 180, 1);
   const category = categoryFor(input.buildingType);
-  const categoryAdjustment = { residential: -10, retail: 35, office: 45, industrial: 25, agricultural: 5, civic: 20, mixed: 12 }[category];
-  const raw = 45 + Math.sqrt(area) * 2 + area * .02 + levels * 10 + hashAdjustment(input.propertyId) + categoryAdjustment;
-  return integer(Math.round(raw / 5) * 5, 75, 250_000, 75);
+  const floorArea = area * levels;
+  const rate = { residential: 2300, retail: 3100, office: 3600, industrial: 1400, agricultural: 900, civic: 2800, mixed: 2600 }[category];
+  const minimum = { residential: 120000, retail: 180000, office: 240000, industrial: 160000, agricultural: 90000, civic: 250000, mixed: 160000 }[category];
+  const locationFactor = .82 + (hashAdjustment(input.propertyId) % 37) / 100;
+  const sizePremium = floorArea > 5000 ? 1.12 + Math.min(.28, Math.log10(floorArea / 5000) * .12) : 1;
+  const estimate = Math.max(minimum, (floorArea * rate + area * 350) * locationFactor * sizePremium);
+  const rounding = estimate >= 10000000 ? 100000 : estimate >= 1000000 ? 25000 : 5000;
+  return integer(Math.round(estimate / rounding) * rounding, minimum, 1_500_000_000, minimum);
 }
 
 function normalizeProperty(input = {}) {
@@ -111,7 +135,15 @@ function normalizeProperty(input = {}) {
   const sourceBuildingId = text(input.sourceBuildingId, 220);
   const locationId = text(input.locationId, 180);
   const sourceAuthority = sourceAuthorityFor(sourceBuildingId);
-  if (!propertyId || !sourceBuildingId || !locationId || !propertyId.includes(sourceBuildingId) || NON_OWNABLE_SOURCE.test(sourceBuildingId) || !sourceAuthority) throw new Error('invalid_property');
+  const sourceParcelId = text(input.sourceParcelId, 120);
+  const parcelAuthority = text(input.parcelAuthority, 60);
+  const jurisdictionCode = text(input.jurisdictionCode, 8).toUpperCase();
+  const parcelId = text(input.parcelId, 120);
+  const expectedParcelId = sourceParcelId && jurisdictionCode ? `md:${jurisdictionCode.toLowerCase()}:${shortStableHash(sourceParcelId)}` : '';
+  const validParcel = parcelAuthority === 'maryland-imap-parcels' && MARYLAND_JURISDICTIONS.has(jurisdictionCode) &&
+    parcelId === expectedParcelId && propertyId === `parcel:${expectedParcelId}`;
+  const validBuilding = !!sourceBuildingId && propertyId.includes(sourceBuildingId) && !NON_OWNABLE_SOURCE.test(sourceBuildingId) && !!sourceAuthority;
+  if (!propertyId || !locationId || (!validParcel && !validBuilding)) throw new Error('invalid_property');
   const buildingType = text(input.buildingType || 'building', 60).toLowerCase();
   const area = Math.max(16, Math.min(250_000, finite(input.area, 16)));
   const levels = integer(input.levels, 1, 180, 1);
@@ -119,6 +151,11 @@ function normalizeProperty(input = {}) {
     propertyId,
     sourceBuildingId,
     sourceAuthority,
+    sourceParcelId: validParcel ? sourceParcelId : '',
+    parcelId: validParcel ? parcelId : '',
+    parcelAuthority: validParcel ? parcelAuthority : '',
+    jurisdictionCode: validParcel ? jurisdictionCode : '',
+    jurisdictionName: validParcel ? text(input.jurisdictionName, 80) : '',
     locationId,
     locationLabel: text(input.locationLabel || 'Saved location', 80),
     label: text(input.label || 'World property', 100),
@@ -129,12 +166,23 @@ function normalizeProperty(input = {}) {
       postalCode: text(input.address.postalCode, 24),
       country: text(input.address.country, 48),
       formatted: text(input.address.formatted, 240),
-      source: 'mapped-building-tags'
+      source: validParcel ? 'maryland-imap-parcels' : 'mapped-building-tags'
     }) : null,
     kind: text(input.kind || 'Property', 40),
     buildingType,
     category: categoryFor(buildingType),
     area,
+    footprintArea: Math.max(0, Math.min(250_000, finite(input.footprintArea || (validParcel ? 0 : area)))),
+    parcelAreaSqM: validParcel ? Math.max(0, Math.min(50_000_000, finite(input.parcelAreaSqM))) : 0,
+    reportedAcres: validParcel ? Math.max(0, Math.min(12_355, finite(input.reportedAcres))) : 0,
+    sourceAssessment: validParcel ? Math.max(0, Math.min(2_000_000_000, finite(input.sourceAssessment))) : 0,
+    landUseCode: validParcel ? text(input.landUseCode, 24) : '',
+    landUseDescription: validParcel ? text(input.landUseDescription, 100) : '',
+    zoning: validParcel ? text(input.zoning, 60) : '',
+    geometryDate: validParcel ? text(input.geometryDate, 24) : '',
+    assessmentDate: validParcel ? text(input.assessmentDate, 24) : '',
+    associatedBuildingIds: validParcel ? Object.freeze((Array.isArray(input.associatedBuildingIds) ? input.associatedBuildingIds : [])
+      .slice(0, 40).map((value) => text(value, 220)).filter((value) => sourceAuthorityFor(value))) : Object.freeze([]),
     levels,
     x: Math.max(-25_000, Math.min(25_000, finite(input.x))),
     z: Math.max(-25_000, Math.min(25_000, finite(input.z)))
@@ -147,10 +195,16 @@ function catalogFingerprint(property = {}) {
     text(property.propertyId, 420),
     text(property.sourceBuildingId, 220),
     text(property.sourceAuthority, 40),
+    text(property.parcelId, 120),
+    text(property.parcelAuthority, 60),
+    text(property.jurisdictionCode, 8),
     text(property.locationId, 180),
     text(property.buildingType, 60),
     integer(property.area, 16, 250_000, 16),
     integer(property.levels, 1, 180, 1),
+    integer(property.parcelAreaSqM, 0, 50_000_000, 0),
+    integer(property.sourceAssessment, 0, 2_000_000_000, 0),
+    text(property.landUseCode, 24),
     Math.round(finite(property.x) * 10) / 10,
     Math.round(finite(property.z) * 10) / 10
   ].join('|');
@@ -186,15 +240,6 @@ function clearExpiredLease(property, nowMs) {
   };
 }
 
-function walletData(raw = {}) {
-  return {
-    credits: integer(raw.credits, 0, MAX_CREDITS, STARTING_CREDITS),
-    lifetimeEarned: integer(raw.lifetimeEarned, 0, MAX_CREDITS, STARTING_CREDITS),
-    lifetimeSpent: integer(raw.lifetimeSpent, 0, MAX_CREDITS, 0),
-    revision: integer(raw.revision, 0, MAX_CREDITS, 0)
-  };
-}
-
 function publicResult(property, wallet, receiptId) {
   return Object.freeze({
     accepted: true,
@@ -208,8 +253,8 @@ function publicResult(property, wallet, receiptId) {
       tenantName: text(property.tenantName, 80),
       status: property.status,
       baseValue: property.baseValue,
-      salePrice: integer(property.salePrice, 0, 500_000, 0),
-      rentPrice: integer(property.rentPrice, 0, 100_000, 0),
+      salePrice: integer(property.salePrice, 0, 2_000_000_000, 0),
+      rentPrice: integer(property.rentPrice, 0, 100_000_000, 0),
       rentTermDays: integer(property.rentTermDays, 0, 30, 0),
       leaseEndsAtMs: timestampMillis(property.leaseEndsAt, 0),
       revision: property.revision
@@ -256,7 +301,7 @@ function tradePublicResult(offer, receiptId) {
       offeredPropertyLabel: text(offer.offeredPropertyLabel, 100),
       requestedPropertyId: text(offer.requestedPropertyId, 420),
       requestedPropertyLabel: text(offer.requestedPropertyLabel, 100),
-      creditOffer: integer(offer.creditOffer, 0, 500_000, 0),
+      creditOffer: integer(offer.creditOffer, 0, 1_500_000_000, 0),
       expiresAtMs: timestampMillis(offer.expiresAt, 0)
     })
   });
@@ -308,7 +353,7 @@ async function settlePropertyTrade(options = {}) {
       if (!offered || offered.propertyId !== submittedOffered.propertyId || offered.ownerUid !== uid) return Object.freeze({ accepted: false, reason: 'offered_property_unavailable' });
       if (!requested || requested.propertyId !== submittedRequested.propertyId || !requested.ownerUid || requested.ownerUid === uid) return Object.freeze({ accepted: false, reason: 'requested_property_unavailable' });
       if (offered.status !== PROPERTY_STATUS.owned || requested.status !== PROPERTY_STATUS.owned) return Object.freeze({ accepted: false, reason: 'property_not_tradeable' });
-      const creditOffer = integer(input?.creditOffer, 0, 500_000, 0);
+      const creditOffer = integer(input?.creditOffer, 0, 1_500_000_000, 0);
       const actorWallet = walletData(dataFor(actorWalletRef) || {});
       if (actorWallet.credits < creditOffer) return Object.freeze({ accepted: false, reason: 'not_enough_credits', credits: actorWallet.credits });
       nextOffer = {
@@ -354,7 +399,7 @@ async function settlePropertyTrade(options = {}) {
         if (offered.status !== PROPERTY_STATUS.owned || requested.status !== PROPERTY_STATUS.owned) return Object.freeze({ accepted: false, reason: 'property_not_tradeable' });
         const proposerWallet = walletData(dataFor(proposerWalletRef) || {});
         const recipientWallet = walletData(dataFor(recipientWalletRef) || {});
-        const creditOffer = integer(currentOffer.creditOffer, 0, 500_000, 0);
+        const creditOffer = integer(currentOffer.creditOffer, 0, 1_500_000_000, 0);
         if (proposerWallet.credits < creditOffer) return Object.freeze({ accepted: false, reason: 'offer_funds_unavailable' });
         const nextOffered = { ...offered, ownerUid: currentOffer.recipientUid, ownerName: currentOffer.recipientName, revision: integer(offered.revision, 0, MAX_CREDITS, 0) + 1, updatedAt: timestampFromMs(nowMs) };
         const nextRequested = { ...requested, ownerUid: currentOffer.proposerUid, ownerName: currentOffer.proposerName, revision: integer(requested.revision, 0, MAX_CREDITS, 0) + 1, updatedAt: timestampFromMs(nowMs) };
@@ -480,12 +525,12 @@ async function settlePropertyAction(options = {}) {
     } else if (action === 'list_sale') {
       if (base.ownerUid !== uid) return Object.freeze({ accepted: false, reason: 'not_owner' });
       if (leaseActive) return Object.freeze({ accepted: false, reason: 'lease_active' });
-      const salePrice = integer(input?.salePrice, Math.ceil(base.baseValue * .5), Math.floor(base.baseValue * 2), base.baseValue);
+      const salePrice = integer(input?.salePrice, Math.ceil(base.baseValue * .5), Math.min(MAX_CREDITS, Math.floor(base.baseValue * 2)), base.baseValue);
       next = { ...base, status: PROPERTY_STATUS.sale, salePrice, rentPrice: 0, rentTermDays: 0 };
     } else if (action === 'buy_listing') {
       if (base.status !== PROPERTY_STATUS.sale || !base.ownerUid) return Object.freeze({ accepted: false, reason: 'not_for_sale' });
       if (base.ownerUid === uid) return Object.freeze({ accepted: false, reason: 'own_listing' });
-      debit = integer(base.salePrice, 1, 500_000, base.baseValue);
+      debit = integer(base.salePrice, 1, 1_500_000_000, base.baseValue);
       if (actorWallet.credits < debit) return Object.freeze({ accepted: false, reason: 'not_enough_credits', credits: actorWallet.credits });
       sellerUid = base.ownerUid;
       sellerWalletRef = sellerWalletRefForUid?.(sellerUid);
@@ -503,7 +548,7 @@ async function settlePropertyAction(options = {}) {
     } else if (action === 'rent') {
       if (base.status !== PROPERTY_STATUS.rent || !base.ownerUid) return Object.freeze({ accepted: false, reason: 'not_for_rent' });
       if (base.ownerUid === uid) return Object.freeze({ accepted: false, reason: 'own_listing' });
-      debit = integer(base.rentPrice, 1, 100_000, 1);
+      debit = integer(base.rentPrice, 1, 100_000_000, 1);
       if (actorWallet.credits < debit) return Object.freeze({ accepted: false, reason: 'not_enough_credits', credits: actorWallet.credits });
       sellerUid = base.ownerUid;
       sellerWalletRef = sellerWalletRefForUid?.(sellerUid);

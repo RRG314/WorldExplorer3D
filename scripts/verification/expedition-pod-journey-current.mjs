@@ -133,19 +133,15 @@ async function sellReturnedSampleOnEarth(page, expectedCatalogId) {
     return state.gameStarted && !state.worldLoading && state.urbanSandbox?.active;
   }, null, { timeout: 120_000 });
   const hardwareStores = await page.evaluate(async () => {
-    const [{ ctx }, commerce] = await Promise.all([
-      import('/app/js/shared-context.js?v=55'),
-      import('/app/js/urban-sandbox/commerce-model.js?v=3')
-    ]);
-    const published = new Map((ctx.urbanSandboxRuntimeSnapshot?.().commerce?.stores || []).map((store) => [store.id, store]));
-    return commerce.mappedCommercePlaces(ctx.pois)
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return (ctx.urbanSandboxRuntimeSnapshot?.().commerce?.stores || [])
       .filter((place) => place.kind === 'hardware')
       .map((place) => ({
         id: place.id,
         name: place.name,
         kind: place.kind,
-        interactionX: published.get(place.id)?.interactionX ?? place.x,
-        interactionZ: published.get(place.id)?.interactionZ ?? place.z
+        interactionX: place.interactionX,
+        interactionZ: place.interactionZ
       }));
   });
   assert.ok(hardwareStores.length > 0, 'The loaded Earth world did not publish an eligible mapped hardware business.');
@@ -155,10 +151,10 @@ async function sellReturnedSampleOnEarth(page, expectedCatalogId) {
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     for (const store of stores) {
       if (!globalThis.__WE3D_STORE_SUPPORT__?.moveNear(store.id)) continue;
-      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-      const candidate = ctx.resolvePrimaryContextInteraction?.();
-      if (candidate?.action !== 'visit_store' || candidate?.data?.storeId !== store.id) continue;
-      if (await ctx.handlePrimaryContextInteraction?.() === true) return store.id;
+      await globalThis.advanceTime?.(160);
+      if (await globalThis.__WE3D_STORE_SUPPORT__?.perform?.() !== true) continue;
+      const commerce = globalThis.__WE3D_STORE_SUPPORT__?.snapshot?.().commerce;
+      if (commerce?.open === true && commerce.activeStoreId === store.id) return store.id;
     }
     return '';
   }, hardwareStores);
@@ -166,14 +162,14 @@ async function sellReturnedSampleOnEarth(page, expectedCatalogId) {
   await page.locator('#urbanStore.show').waitFor({ state: 'visible' });
   const sellButton = page.locator(`#urbanStoreSell [data-store-action="sell"][data-store-item="${expectedCatalogId}:lot"]`);
   await sellButton.waitFor({ state: 'visible' });
-  const beforeCredits = Number((await page.locator('#urbanStoreCredits').textContent()).match(/\d+/)?.[0] || 0);
+  const beforeCredits = Number(String(await page.locator('#urbanStoreCredits').textContent()).replace(/[^\d]/g, '') || 0);
   await page.screenshot({ path: path.join(outputDir, 'desktop-earth-sample-sale-ready.png'), fullPage: true });
   await sellButton.click();
-  await page.waitForFunction((credits) => Number((document.getElementById('urbanStoreCredits')?.textContent || '').match(/\d+/)?.[0] || 0) > credits, beforeCredits);
+  await page.waitForFunction((credits) => Number((document.getElementById('urbanStoreCredits')?.textContent || '').replace(/[^\d]/g, '') || 0) > credits, beforeCredits);
   const sale = await page.evaluate(async (catalogId) => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     return {
-      credits: Number((document.getElementById('urbanStoreCredits')?.textContent || '').match(/\d+/)?.[0] || 0),
+      credits: Number((document.getElementById('urbanStoreCredits')?.textContent || '').replace(/[^\d]/g, '') || 0),
       status: document.getElementById('urbanStoreStatus')?.textContent || '',
       source: document.getElementById('urbanStoreSource')?.textContent || '',
       stillCarried: ctx.playerBackpackInventory.snapshot().items.some((item) => item.catalogId === catalogId)
@@ -233,14 +229,24 @@ async function run() {
         && state.spaceFlight?.travelSession?.phase === 'approach'
         && document.getElementById('sfFlightTitle')?.textContent === 'PATHFINDER POD';
     });
+    await page.waitForFunction(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      return ctx.spaceFlight.rocket?.userData?.curatedPodAssetId === 'space-pathfinder-transfer-pod-v2';
+    }, null, { timeout: 15_000 });
     const outboundPodPresentation = await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
       const pod = ctx.spaceFlight.rocket?.userData?.spaceCraftId === 'pathfinder-pod'
         ? ctx.spaceFlight.rocket
         : null;
+      let fallbackVisible = false;
+      pod?.traverse?.((object) => {
+        if (object?.userData?.defaultPodFallback === true && object.visible !== false) fallbackVisible = true;
+      });
       return {
         visible: pod?.visible === true,
         authority: pod?.userData?.authority || null,
+        curatedAssetId: pod?.userData?.curatedPodAssetId || null,
+        fallbackVisible,
         wayfinderVisible: ctx.spaceFlight.rocket?.userData?.spaceCraftId === 'solis-reach',
         entryEffectReady: pod?.getObjectByName('podEntryPlasma') != null,
         dockingGuideReady: pod?.getObjectByName('podDockingGuide') != null,
@@ -251,6 +257,8 @@ async function run() {
     assert.deepEqual(outboundPodPresentation, {
       visible: true,
       authority: 'expedition-pod-journey',
+      curatedAssetId: 'space-pathfinder-transfer-pod-v2',
+      fallbackVisible: false,
       wayfinderVisible: false,
       entryEffectReady: true,
       dockingGuideReady: true,

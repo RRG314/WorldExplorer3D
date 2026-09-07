@@ -195,7 +195,12 @@ export function ensurePaintTownInputBindings() {
   const handleKeyDown = (event) => {
     const paintState = ensurePaintTownState();
     if (!paintState.active || appCtx.paused || !appCtx.gameStarted || appCtx.gameMode !== "painttown") return;
-    if (shouldIgnorePaintTownInput(document.activeElement) || event.repeat) return;
+    const focused = document.activeElement;
+    const focusInsidePaintHud = focused instanceof Element && !!focused.closest('#paintTownHud');
+    // Selecting a tool leaves keyboard focus on its HUD button. The shortcuts
+    // advertised by that same HUD must remain usable from there, while text
+    // fields and unrelated modal panels continue to own their input.
+    if ((shouldIgnorePaintTownInput(focused) && !focusInsidePaintHud) || event.repeat) return;
 
     const key = String(event.key || "").toLowerCase();
     const code = String(event.code || "");

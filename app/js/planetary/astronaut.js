@@ -1,125 +1,67 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { getAstronomicalBody, LANDING_MODE } from '../astronomy/body-catalog.js?v=3';
+import {
+  attachCuratedExplorerCharacter,
+  disposeCuratedCharacter,
+  EXPLORER_ASSET_BY_GENDER,
+  SHIP_CREW_ASSET_ID
+} from '../walking/curated-explorer-character.js?v=8';
 
-let astronautGear = null;
-const earthMaterials = new Map();
-const planetaryMaterials = {};
+let characterRequestId = 0;
 
-function suitMaterial(color, metalness = 0.08, roughness = 0.72) {
-  return new THREE.MeshStandardMaterial({ color, metalness, roughness });
+function isPlanetaryCharacterRequestCurrent({
+  requestId,
+  currentRequestId = characterRequestId,
+  character,
+  currentCharacter = appCtx.Walk?.state?.characterMesh,
+  assetId
+} = {}) {
+  return requestId === currentRequestId &&
+    currentCharacter === character &&
+    character?.userData?.requestedCuratedCharacterAssetId === assetId;
 }
 
-function createAstronautGear() {
-  const gear = new THREE.Group();
-  gear.name = 'Planetary Astronaut Gear';
-  gear.userData.planetaryCharacterGear = true;
-
-  const helmet = new THREE.Mesh(
-    new THREE.SphereGeometry(0.31, 20, 14),
-    new THREE.MeshPhysicalMaterial({
-      color: 0xeaf3f7,
-      transparent: true,
-      opacity: 0.38,
-      roughness: 0.12,
-      metalness: 0.04,
-      transmission: 0.22,
-      depthWrite: false
-    })
-  );
-  helmet.position.set(0, 1.68, 0);
-  helmet.scale.set(1, 1.08, 1);
-  helmet.castShadow = true;
-  gear.add(helmet);
-
-  const visor = new THREE.Mesh(
-    new THREE.SphereGeometry(0.27, 18, 12, 0, Math.PI),
-    new THREE.MeshStandardMaterial({
-      color: 0x8b6331,
-      metalness: 0.72,
-      roughness: 0.24,
-      transparent: true,
-      opacity: 0.82,
-      side: THREE.DoubleSide
-    })
-  );
-  visor.position.set(0, 1.68, 0.04);
-  visor.rotation.y = Math.PI;
-  gear.add(visor);
-
-  const backpack = new THREE.Mesh(
-    new THREE.BoxGeometry(0.5, 0.7, 0.24),
-    suitMaterial(0xd7d9d5, 0.18, 0.64)
-  );
-  backpack.position.set(0, 1.13, -0.24);
-  backpack.castShadow = true;
-  gear.add(backpack);
-
-  const controlPack = new THREE.Mesh(
-    new THREE.BoxGeometry(0.38, 0.22, 0.14),
-    suitMaterial(0xbfc4c4, 0.24, 0.55)
-  );
-  controlPack.position.set(0, 1.04, 0.21);
-  gear.add(controlPack);
-  return gear;
-}
-
-function isGearMesh(object) {
-  let current = object;
-  while (current) {
-    if (current.userData?.planetaryCharacterGear) return true;
-    current = current.parent;
+function desiredPlanetaryCharacter(body = 'earth') {
+  const astronomicalBody = getAstronomicalBody(body);
+  const planetary = astronomicalBody?.id !== 'earth' &&
+    astronomicalBody?.exploration?.landingMode === LANDING_MODE.SOLID_SURFACE;
+  if (planetary) {
+    return Object.freeze({ assetId: SHIP_CREW_ASSET_ID, role: 'planetary-player-character', bodyId: astronomicalBody.id });
   }
-  return false;
-}
-
-function materialsForBody(body) {
-  if (!planetaryMaterials[body]) {
-    const suitColor = body === 'mars' ? 0xe7ddd2 : 0xe6e8e5;
-    planetaryMaterials[body] = {
-      suit: suitMaterial(suitColor),
-      accent: suitMaterial(0xb8b9b5, 0.12, 0.78)
-    };
-  }
-  return planetaryMaterials[body];
-}
-
-function applySuitMaterials(character, body) {
-  const materials = materialsForBody(body);
-  character.traverse((object) => {
-    if (!object.isMesh || isGearMesh(object) || object.material?.visible === false) return;
-    if (!earthMaterials.has(object)) earthMaterials.set(object, object.material);
-    const name = String(object.name || '').toLowerCase();
-    const accent = name.includes('boot') || name.includes('shoe') || name.includes('glove');
-    object.material = accent ? materials.accent : materials.suit;
+  const gender = String(appCtx.getPlayerCharacterGender?.() || 'man');
+  return Object.freeze({
+    assetId: EXPLORER_ASSET_BY_GENDER[gender] || EXPLORER_ASSET_BY_GENDER.man,
+    role: 'player-character',
+    bodyId: 'earth'
   });
-}
-
-function restoreEarthMaterials() {
-  earthMaterials.forEach((material, object) => {
-    if (object) object.material = material;
-  });
-  earthMaterials.clear();
 }
 
 function setPlanetaryCharacter(body = 'earth') {
   const character = appCtx.Walk?.state?.characterMesh;
-  if (!character) return null;
-  const astronomicalBody = getAstronomicalBody(body);
-  const planetary = astronomicalBody?.id !== 'earth' &&
-    astronomicalBody?.exploration?.landingMode === LANDING_MODE.SOLID_SURFACE;
-  if (!astronautGear) astronautGear = createAstronautGear();
-  if (astronautGear.parent !== character) character.add(astronautGear);
-  astronautGear.visible = planetary;
+  if (!character) return false;
+  const desired = desiredPlanetaryCharacter(body);
+  const requestId = ++characterRequestId;
+  character.userData.requestedCuratedCharacterAssetId = desired.assetId;
+  character.userData.requestedCharacterRole = desired.role;
+  character.userData.planetaryCharacterBodyId = desired.bodyId;
+  if (character.userData.curatedCharacterAssetId === desired.assetId) return true;
 
-  if (planetary) {
-    applySuitMaterials(character, body);
-    astronautGear.userData.body = body;
-  } else {
-    restoreEarthMaterials();
-  }
-  return astronautGear;
+  disposeCuratedCharacter(character);
+  void attachCuratedExplorerCharacter(THREE, character, {
+    assetId: desired.assetId,
+    role: desired.role,
+    // Environment transitions temporarily detach the character host while the
+    // Earth scene is restored. The request remains valid as long as this is
+    // still the authoritative player host and desired asset.
+    isCurrent: () => isPlanetaryCharacterRequestCurrent({
+      requestId,
+      character,
+      assetId: desired.assetId
+    })
+  });
+  return true;
 }
 
 Object.assign(appCtx, { setPlanetaryCharacter });
 
-export { setPlanetaryCharacter };
+export { desiredPlanetaryCharacter, isPlanetaryCharacterRequestCurrent, setPlanetaryCharacter };

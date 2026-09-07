@@ -303,7 +303,7 @@ var SHIP_PROFILES = Object.freeze([
     foodProductionFraction: 0.82,
     interiorSeed: 5100821,
     supportedPropulsionIds: ["fusion-pulse-interstellar", "radiant-plasma-field-drive"],
-    requiredRoles: ["command", "navigation", "engineering", "medical", "life-support", "science"],
+    requiredRoles: ["command", "flight", "navigation", "engineering", "medical", "life-support", "science"],
     requiredRooms: ["bridge", "engineering", "life-support", "quarters", "medical", "cargo-fabrication", "science", "local-craft-bay"],
     systems: ["propulsion", "power", "life-support", "navigation", "thermal", "medical", "fabrication", "food-production", "sensors", "hull"]
   }),
@@ -320,7 +320,7 @@ var SHIP_PROFILES = Object.freeze([
     foodProductionFraction: 0.88,
     interiorSeed: 5100947,
     supportedPropulsionIds: ["fusion-pulse-interstellar", "radiant-plasma-field-drive"],
-    requiredRoles: ["command", "navigation", "engineering", "medical", "life-support", "science"],
+    requiredRoles: ["command", "flight", "navigation", "engineering", "medical", "life-support", "science"],
     requiredRooms: ["bridge", "engineering", "life-support", "quarters", "medical", "cargo-fabrication", "science", "cryogenic-bay", "local-craft-bay"],
     systems: ["propulsion", "power", "life-support", "navigation", "thermal", "medical", "fabrication", "food-production", "cryogenic", "sensors", "hull"]
   }),
@@ -337,19 +337,19 @@ var SHIP_PROFILES = Object.freeze([
     foodProductionFraction: 0.995,
     interiorSeed: 5101103,
     supportedPropulsionIds: ["fusion-pulse-interstellar"],
-    requiredRoles: ["command", "navigation", "engineering", "medical", "life-support", "science", "education"],
+    requiredRoles: ["command", "flight", "navigation", "engineering", "medical", "life-support", "science", "education"],
     requiredRooms: ["bridge", "engineering", "life-support", "habitat", "medical", "agriculture", "fabrication", "science", "education", "local-craft-bay"],
     systems: ["propulsion", "power", "life-support", "navigation", "thermal", "medical", "fabrication", "food-production", "education", "sensors", "hull"]
   })
 ]);
 var DEFAULT_CREW = Object.freeze([
-  Object.freeze({ id: "player", name: "Explorer", ageYears: 34, experienceYears: 6, health: 1, fatigue: 0.08, assignment: "expedition-lead", roles: Object.freeze(["command", "science"]), status: "active" }),
+  Object.freeze({ id: "player", name: "Explorer", ageYears: 34, experienceYears: 6, health: 1, fatigue: 0.08, assignment: "expedition-lead", roles: Object.freeze(["command", "science", "flight"]), status: "active" }),
   Object.freeze({ id: "crew-nav", name: "Mara Velez", ageYears: 39, experienceYears: 14, health: 0.98, fatigue: 0.11, assignment: "navigation-watch", roles: Object.freeze(["navigation", "command"]), status: "active" }),
   Object.freeze({ id: "crew-eng", name: "Dev Malik", ageYears: 42, experienceYears: 17, health: 0.97, fatigue: 0.13, assignment: "engineering-watch", roles: Object.freeze(["engineering", "fabrication"]), status: "active" }),
   Object.freeze({ id: "crew-life", name: "Avery Okafor", ageYears: 36, experienceYears: 11, health: 0.99, fatigue: 0.1, assignment: "life-support-watch", roles: Object.freeze(["life-support", "engineering"]), status: "active" }),
   Object.freeze({ id: "crew-med", name: "Jules Park", ageYears: 41, experienceYears: 16, health: 0.98, fatigue: 0.09, assignment: "medical-watch", roles: Object.freeze(["medical", "life-support"]), status: "active" }),
   Object.freeze({ id: "crew-science", name: "Noor Haddad", ageYears: 33, experienceYears: 9, health: 0.99, fatigue: 0.12, assignment: "science-watch", roles: Object.freeze(["science", "navigation", "education"]), status: "active" }),
-  Object.freeze({ id: "crew-flight", name: "Tessa Morgan", ageYears: 38, experienceYears: 13, health: 0.98, fatigue: 0.1, assignment: "flight-watch", roles: Object.freeze(["navigation", "command"]), status: "active" }),
+  Object.freeze({ id: "crew-flight", name: "Tessa Morgan", ageYears: 38, experienceYears: 13, health: 0.98, fatigue: 0.1, assignment: "flight-watch", roles: Object.freeze(["flight", "navigation", "command"]), status: "active" }),
   Object.freeze({ id: "crew-systems", name: "Eli Chen", ageYears: 45, experienceYears: 20, health: 0.96, fatigue: 0.14, assignment: "systems-watch", roles: Object.freeze(["engineering", "medical"]), status: "active" })
 ]);
 function getShipProfile(id) {
@@ -1676,7 +1676,7 @@ var SPACE_CRAFT_IDENTITY = Object.freeze({
   })
 });
 
-// app/js/expedition/model.js?v=11
+// app/js/expedition/model.js?v=12
 var EXPEDITION_SCHEMA_VERSION = 1;
 var RESOURCE_KEYS = Object.freeze([
   "foodKg",
@@ -1744,6 +1744,7 @@ function createExpeditionPlan({
   propulsionId = "radiant-plasma-field-drive",
   crew = [],
   resources = null,
+  reserveMargin = null,
   realism = "science-inspired",
   survival = "forgiving",
   createdAtMs = Date.now(),
@@ -1753,7 +1754,8 @@ function createExpeditionPlan({
   const propulsion = getPropulsionProfile(propulsionId);
   const crewPopulation = crewPopulationForShip(shipId, crew.length);
   const calculation = calculateExpeditionTravel({ destinationId, ship, propulsion, crewCount: crewPopulation });
-  const provisioned = resources ? clone4(resources) : recommendedResources(calculation.expectedResources, survival === "severe" ? 0.08 : 0.25);
+  const selectedReserveMargin = Math.max(0, Math.min(0.4, reserveMargin != null && Number.isFinite(Number(reserveMargin)) ? Number(reserveMargin) : survival === "severe" ? 0.08 : 0.15));
+  const provisioned = resources ? clone4(resources) : recommendedResources(calculation.expectedResources, selectedReserveMargin);
   if (!resources && ship) {
     provisioned.propellantKg = Math.min(Number(provisioned.propellantKg || 0), Number(ship.propellantCapacityKg || 0));
   }
@@ -1769,6 +1771,7 @@ function createExpeditionPlan({
     destinationId,
     realism,
     survival,
+    reserveMargin: selectedReserveMargin,
     state: "planned",
     ship: Object.freeze({
       id: `${id}-ship`,
@@ -1790,6 +1793,8 @@ function createExpeditionPlan({
     voyagePhase: "departure",
     voyageDirector: createVoyageDirector({ id, destinationId, createdAtMs }),
     eventFlags: Object.freeze({}),
+    activeEncounter: null,
+    encounterHistory: Object.freeze([]),
     operationFlags: Object.freeze({}),
     routeContacts: Object.freeze([]),
     activeLocalContactId: null,
@@ -1808,7 +1813,7 @@ function withExpeditionChanges(expedition, changes) {
   return Object.freeze({ ...expedition, ...changes, updatedAtMs: Number(changes.updatedAtMs) || Date.now() });
 }
 
-// app/js/expedition/failure-authority.js?v=2
+// app/js/expedition/failure-authority.js?v=3
 var ESSENTIAL_SYSTEMS = Object.freeze(["life-support", "power", "propulsion"]);
 var THRESHOLDS = Object.freeze([
   Object.freeze({ id: "degraded", condition: 0.55 }),
@@ -2172,8 +2177,231 @@ function applyShipOperation(expedition, actionId) {
   return Object.freeze({ expedition: next, changed: true, message });
 }
 
-// app/js/expedition/simulation.js?v=8
+// app/js/expedition/hostile-interception.js?v=1
+var HOSTILE_ENCOUNTER_TYPE = "HOSTILE_INTERCEPTION";
+var PIRATE_INTERCEPTION_ID = "pirate-boarding-interception";
+var PIRATE_TRIGGER_SLOT_ID = "long-watch";
+var INTERCEPTION_PHASE = Object.freeze({
+  INACTIVE: "INACTIVE",
+  CONTACT_DETECTED: "CONTACT_DETECTED",
+  HOSTILITY_CONFIRMED: "HOSTILITY_CONFIRMED",
+  DEFENSE_PREPARATION: "DEFENSE_PREPARATION",
+  COMBAT_ACTIVE: "COMBAT_ACTIVE",
+  BOARDING_THREAT: "BOARDING_THREAT",
+  COMBAT_RESOLVING: "COMBAT_RESOLVING",
+  AFTERMATH: "AFTERMATH",
+  COMPLETE: "COMPLETE"
+});
 function clone6(value) {
+  return globalThis.structuredClone ? globalThis.structuredClone(value) : JSON.parse(JSON.stringify(value));
+}
+function clamp01(value) {
+  return Math.max(0, Math.min(1, Number(value) || 0));
+}
+function hashText2(text) {
+  let hash = 2166136261;
+  for (const char of String(text)) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0;
+  return hash >>> 0;
+}
+function conditionStatus3(condition) {
+  const value = clamp01(condition);
+  return value < 0.25 ? "critical" : value < 0.55 ? "degraded" : value < 0.85 ? "operational" : "optimal";
+}
+function encounterDifficulty(expedition) {
+  const severe = expedition?.survival === "severe";
+  const seed = hashText2(`${expedition?.id}:${PIRATE_INTERCEPTION_ID}`);
+  return Object.freeze({
+    enemyCount: severe ? 6 : 4 + seed % 2,
+    boardingDurationS: severe ? 22 : 34,
+    enemyAccuracy: severe ? 0.72 : 0.48,
+    enemyDamage: severe ? 1.35 : 0.78,
+    aimAssist: severe ? 0.42 : 0.72
+  });
+}
+function pirateInterceptionEligible(expedition, slot = null) {
+  if (!expedition || expedition.state !== "traveling") return false;
+  if (slot && slot.id !== PIRATE_TRIGGER_SLOT_ID) return false;
+  if (expedition.pendingEvent || expedition.activeLocalContactId || expedition.failureReport) return false;
+  if (expedition.eventFlags?.[PIRATE_INTERCEPTION_ID]) return false;
+  if (expedition.activeEncounter && expedition.activeEncounter.phase !== INTERCEPTION_PHASE.COMPLETE) return false;
+  if (Number(expedition.progress || 0) < 0.45 || Number(expedition.progress || 0) > 0.78) return false;
+  const survivable = ["hull", "power", "propulsion"].every((id) => Number(expedition.systems?.[id]?.condition ?? 1) >= 0.32);
+  return survivable && !["departure", "arrival", "approach", "surface", "docking", "mission-loss"].includes(expedition.voyagePhase);
+}
+function createPirateInterception(expedition, slot) {
+  if (!pirateInterceptionEligible(expedition, slot)) return null;
+  const director = expedition.voyageDirector || {};
+  const seed = hashText2(`${director.seed || expedition.id}:${PIRATE_INTERCEPTION_ID}:${director.step || 0}`);
+  const encounter = Object.freeze({
+    id: `${expedition.id}:${PIRATE_INTERCEPTION_ID}`,
+    type: HOSTILE_ENCOUNTER_TYPE,
+    scenarioId: PIRATE_INTERCEPTION_ID,
+    phase: INTERCEPTION_PHASE.CONTACT_DETECTED,
+    slotId: slot.id,
+    seed,
+    attempt: 0,
+    checkpointPolicy: "restart-combat-from-precombat-state",
+    startedAtMissionS: Number(expedition.strategicElapsedS || 0),
+    difficulty: encounterDifficulty(expedition),
+    objective: "Repel the attackers and stop the boarding craft from reaching Solis Reach.",
+    phaseHistory: Object.freeze([INTERCEPTION_PHASE.CONTACT_DETECTED]),
+    result: null
+  });
+  return withExpeditionChanges(expedition, {
+    activeEncounter: encounter,
+    eventFlags: Object.freeze({ ...expedition.eventFlags || {}, [PIRATE_INTERCEPTION_ID]: true }),
+    voyagePhase: "hostile-interception",
+    voyageDirector: Object.freeze({
+      ...director,
+      nextSlotIndex: Number(director.nextSlotIndex || 0) + 1
+    }),
+    log: Object.freeze([...expedition.log || [], Object.freeze({
+      atMissionS: Number(expedition.strategicElapsedS || 0),
+      kind: "contact",
+      message: "Long-range sensors detected unidentified craft altering course toward Solis Reach."
+    })])
+  });
+}
+function transitionPirateInterception(expedition, event2) {
+  const encounter = expedition?.activeEncounter;
+  if (!encounter || encounter.type !== HOSTILE_ENCOUNTER_TYPE || encounter.phase === INTERCEPTION_PHASE.COMPLETE) return expedition;
+  const transitions = {
+    confirm_hostility: [INTERCEPTION_PHASE.CONTACT_DETECTED, INTERCEPTION_PHASE.HOSTILITY_CONFIRMED],
+    prepare_defense: [INTERCEPTION_PHASE.HOSTILITY_CONFIRMED, INTERCEPTION_PHASE.DEFENSE_PREPARATION],
+    begin_combat: [INTERCEPTION_PHASE.DEFENSE_PREPARATION, INTERCEPTION_PHASE.COMBAT_ACTIVE],
+    boarding_threat: [INTERCEPTION_PHASE.COMBAT_ACTIVE, INTERCEPTION_PHASE.BOARDING_THREAT]
+  };
+  const [from, to] = transitions[event2] || [];
+  if (encounter.phase !== from || !to) return expedition;
+  return withExpeditionChanges(expedition, {
+    activeEncounter: Object.freeze({
+      ...encounter,
+      phase: to,
+      attempt: to === INTERCEPTION_PHASE.COMBAT_ACTIVE ? Number(encounter.attempt || 0) + 1 : encounter.attempt,
+      phaseHistory: Object.freeze([...encounter.phaseHistory || [], to])
+    })
+  });
+}
+function normalizedCombatResult(result = {}) {
+  const outcome = ["repelled", "boarded", "defensive-craft-disabled"].includes(result.outcome) ? result.outcome : "defensive-craft-disabled";
+  return Object.freeze({
+    outcome,
+    enemiesRepelled: Math.max(0, Math.min(6, Math.round(Number(result.enemiesRepelled) || 0))),
+    enemiesDestroyed: Math.max(0, Math.min(6, Math.round(Number(result.enemiesDestroyed) || 0))),
+    boardingPrevented: result.boardingPrevented === true,
+    boardingProgress: clamp01(result.boardingProgress),
+    pathfinderCondition: clamp01(result.pathfinderCondition),
+    solisReachHitCount: Math.max(0, Math.min(30, Math.round(Number(result.solisReachHitCount) || 0))),
+    elapsedS: Math.max(1, Math.min(600, Number(result.elapsedS) || 1))
+  });
+}
+function resolvePirateInterception(expedition, input = {}) {
+  const encounter = expedition?.activeEncounter;
+  if (!encounter || ![INTERCEPTION_PHASE.COMBAT_ACTIVE, INTERCEPTION_PHASE.BOARDING_THREAT].includes(encounter.phase)) return expedition;
+  const result = normalizedCombatResult(input);
+  const boarded = result.outcome === "boarded" || result.boardingPrevented === false;
+  const disabled = result.outcome === "defensive-craft-disabled";
+  const severe = expedition.survival === "severe";
+  const hitPressure = Math.min(1, result.solisReachHitCount / (severe ? 9 : 13));
+  const consequence = boarded ? 1 : disabled ? 0.72 : 0.32 + hitPressure * 0.32;
+  const systems = clone6(expedition.systems || {});
+  const damage = {
+    hull: 0.035 + consequence * 0.12,
+    power: 0.018 + consequence * 0.07,
+    sensors: 0.025 + consequence * 0.08,
+    propulsion: boarded ? 0.095 : consequence * 0.035
+  };
+  for (const [id, amount] of Object.entries(damage)) {
+    if (!systems[id]) continue;
+    systems[id].condition = clamp01(Number(systems[id].condition ?? 1) - amount * (severe ? 1.18 : 1));
+    systems[id].status = conditionStatus3(systems[id].condition);
+  }
+  const resources = clone6(expedition.resources || {});
+  resources.powerMWh = Math.max(0, Number(resources.powerMWh || 0) - (boarded ? 1.1 : 0.45 + hitPressure * 0.35));
+  resources.maintenanceKg = Math.max(0, Number(resources.maintenanceKg || 0) - (boarded ? 34 : disabled ? 22 : 8 + hitPressure * 12));
+  resources.medicalUnits = Math.max(0, Number(resources.medicalUnits || 0) - (boarded ? 3 : disabled ? 1 : 0));
+  const crew = clone6(expedition.crew || []).map((member, index) => {
+    const affected = boarded ? index > 0 && index <= 2 : disabled ? index === 6 : false;
+    return Object.freeze({
+      ...member,
+      health: clamp01(Number(member.health ?? 1) - (affected ? severe ? 0.12 : 0.07 : 0)),
+      fatigue: clamp01(Number(member.fatigue || 0) + (boarded ? 0.08 : 0.035)),
+      status: affected ? "injured" : member.status
+    });
+  });
+  const summary = boarded ? "Pirates breached an outer service lock before ship security contained the boarding party." : disabled ? "Pathfinder was disabled; Solis Reach security forced the attackers to disengage after taking damage." : "Pathfinder broke the attack formation and forced the surviving pirate craft to retreat.";
+  let next = withExpeditionChanges(expedition, {
+    systems: Object.freeze(systems),
+    resources: Object.freeze(resources),
+    crew: Object.freeze(crew),
+    failureChain: appendSystemTransitions(expedition.failureChain, expedition.systems, systems, expedition.strategicElapsedS),
+    voyagePhase: "combat-aftermath",
+    activeEncounter: Object.freeze({
+      ...encounter,
+      phase: INTERCEPTION_PHASE.AFTERMATH,
+      phaseHistory: Object.freeze([...encounter.phaseHistory || [], INTERCEPTION_PHASE.COMBAT_RESOLVING, INTERCEPTION_PHASE.AFTERMATH]),
+      result: Object.freeze({ ...result, summary, boarded, systemsDamaged: Object.freeze(Object.keys(damage)) })
+    }),
+    log: Object.freeze([...expedition.log || [], Object.freeze({
+      atMissionS: Number(expedition.strategicElapsedS || 0),
+      kind: "hostile-interception",
+      message: `${summary} ${result.enemiesDestroyed} hostile craft destroyed; ${result.enemiesRepelled} total repelled.`
+    })])
+  });
+  const failure = assessCausalFailure(next);
+  if (failure) next = withExpeditionChanges(next, {
+    state: "failed",
+    voyagePhase: "mission-loss",
+    failureReport: failure,
+    log: Object.freeze([...next.log || [], Object.freeze({ atMissionS: next.strategicElapsedS, kind: "mission-loss", message: failure.summary })])
+  });
+  return next;
+}
+function completePirateAftermath(expedition) {
+  const encounter = expedition?.activeEncounter;
+  if (!encounter || encounter.phase !== INTERCEPTION_PHASE.AFTERMATH) return expedition;
+  const director = expedition.voyageDirector || {};
+  const historyEntry = Object.freeze({
+    eventId: encounter.id,
+    familyId: encounter.scenarioId,
+    slotId: encounter.slotId,
+    choiceId: "direct-defense",
+    outcome: encounter.result?.outcome || "resolved",
+    atMissionS: Number(expedition.strategicElapsedS || 0),
+    tagsAdded: Object.freeze(["hostile-interception-resolved"])
+  });
+  return withExpeditionChanges(expedition, {
+    activeEncounter: Object.freeze({
+      ...encounter,
+      phase: INTERCEPTION_PHASE.COMPLETE,
+      completedAtMissionS: Number(expedition.strategicElapsedS || 0),
+      phaseHistory: Object.freeze([...encounter.phaseHistory || [], INTERCEPTION_PHASE.COMPLETE])
+    }),
+    encounterHistory: Object.freeze([...expedition.encounterHistory || [], Object.freeze({
+      id: encounter.id,
+      scenarioId: encounter.scenarioId,
+      type: encounter.type,
+      result: encounter.result,
+      completedAtMissionS: Number(expedition.strategicElapsedS || 0)
+    })]),
+    voyageDirector: Object.freeze({
+      ...director,
+      step: Number(director.step || 0) + 1,
+      encounteredIds: Object.freeze([.../* @__PURE__ */ new Set([...director.encounteredIds || [], encounter.scenarioId])]),
+      tags: Object.freeze({ ...director.tags || {}, hostileInterceptionResolved: true }),
+      history: Object.freeze([...director.history || [], historyEntry])
+    }),
+    voyagePhase: expedition.state === "failed" ? "mission-loss" : "long-watch-recovery",
+    log: Object.freeze([...expedition.log || [], Object.freeze({
+      atMissionS: Number(expedition.strategicElapsedS || 0),
+      kind: "course-restored",
+      message: expedition.state === "failed" ? "The hostile-interception record was sealed in the Captain\u2019s Log." : "Damage control stabilized Solis Reach and the Expedition resumed its original course."
+    })])
+  });
+}
+
+// app/js/expedition/simulation.js?v=9
+function clone7(value) {
   return globalThis.structuredClone ? globalThis.structuredClone(value) : JSON.parse(JSON.stringify(value));
 }
 function appendLog(log, entry) {
@@ -2193,26 +2421,48 @@ function startExpedition(expedition, atMs = Date.now()) {
     log: appendLog(expedition.log, { atMissionS: 0, kind: "departure", message: `${expedition.ship?.name || "Solis Reach"} departed the Solar System.` })
   });
 }
-function consumeResources(resources, expectedResources, deltaS, totalS) {
-  const next = clone6(resources);
+function resourceDemandMultipliers(expedition) {
+  const systems = expedition?.systems || {};
+  const crew = expedition?.crew || [];
+  const condition = (id) => Math.max(0.05, Math.min(1, Number(systems[id]?.condition ?? 1)));
+  const averageFatigue = crew.length ? crew.reduce((sum, member) => sum + Number(member.fatigue || 0), 0) / crew.length : 0;
+  const averageHealth = crew.length ? crew.reduce((sum, member) => sum + Number(member.health ?? 1), 0) / crew.length : 1;
+  const survivalPressure = expedition?.survival === "severe" ? 1.1 : 1;
+  const wearPressure = Object.values(systems).length ? 1 + Object.values(systems).reduce((sum, system) => sum + Math.max(0, 1 - Number(system?.condition ?? 1)), 0) / Object.values(systems).length * 0.6 : 1;
+  return Object.freeze({
+    foodKg: survivalPressure * (1 + averageFatigue * 0.08 + (1 - condition("food-production")) * 0.28),
+    waterKg: survivalPressure * (1 + (1 - condition("life-support")) * 0.42),
+    powerMWh: 1 + (1 - condition("power")) * 0.24 + (1 - condition("thermal")) * 0.16,
+    propellantKg: 1 + (1 - condition("propulsion")) * 0.32 + (1 - condition("navigation")) * 0.12,
+    medicalUnits: 1 + Math.max(0, 1 - averageHealth) * 0.8 + averageFatigue * 0.12,
+    maintenanceKg: wearPressure,
+    feedstockKg: 1 + (wearPressure - 1) * 0.45,
+    processingResidueKg: 1
+  });
+}
+function consumeResources(expedition, deltaS, totalS) {
+  const resources = expedition.resources;
+  const expectedResources = expedition.calculation.expectedResources;
+  const next = clone7(resources);
   const fraction = totalS > 0 ? deltaS / totalS : 0;
+  const multipliers = resourceDemandMultipliers(expedition);
   for (const key of RESOURCE_KEYS) {
     if (key === "scienceCargoKg") continue;
-    next[key] = Math.max(0, Number(next[key] || 0) - Number(expectedResources?.[key] || 0) * fraction);
+    next[key] = Math.max(0, Number(next[key] || 0) - Number(expectedResources?.[key] || 0) * fraction * Number(multipliers[key] || 1));
   }
   return Object.freeze(next);
 }
-function conditionStatus3(condition) {
+function conditionStatus4(condition) {
   const value = Math.max(0, Math.min(1, Number(condition) || 0));
   return value < 0.25 ? "critical" : value < 0.55 ? "degraded" : value < 0.85 ? "operational" : "optimal";
 }
 function degradeSystems(systems, deltaS, totalS) {
-  const next = clone6(systems);
+  const next = clone7(systems);
   const fraction = totalS > 0 ? deltaS / totalS : 0;
   for (const [id, system] of Object.entries(next)) {
     const wearRate = id === "hull" ? 0.08 : id === "life-support" ? 0.12 : 0.1;
     system.condition = Math.max(0, Number(system.condition || 0) - wearRate * fraction);
-    system.status = conditionStatus3(system.condition);
+    system.status = conditionStatus4(system.condition);
   }
   return Object.freeze(next);
 }
@@ -2240,7 +2490,7 @@ function incorporateDueConsequences(expedition) {
   });
 }
 function advanceExpedition(expedition, requestedDeltaS) {
-  if (!expedition || expedition.state !== "traveling" || expedition.pendingEvent) return expedition;
+  if (!expedition || expedition.state !== "traveling" || expedition.pendingEvent || expedition.activeEncounter && expedition.activeEncounter.phase !== INTERCEPTION_PHASE.COMPLETE) return expedition;
   const prepared = incorporateDueConsequences(expedition);
   const totalS = prepared.calculation.properElapsedS;
   const remainingS = Math.max(0, totalS - prepared.strategicElapsedS);
@@ -2251,7 +2501,7 @@ function advanceExpedition(expedition, requestedDeltaS) {
   let next = withExpeditionChanges(prepared, {
     strategicElapsedS: elapsed,
     progress: totalS > 0 ? Math.min(1, elapsed / totalS) : 0,
-    resources: consumeResources(prepared.resources, prepared.calculation.expectedResources, deltaS, totalS),
+    resources: consumeResources(prepared, deltaS, totalS),
     systems: degradeSystems(prepared.systems, deltaS, totalS),
     crew: advanceCrew(prepared.crew, deltaS, prepared.systems),
     outposts: advanceOutposts(prepared, elapsed)
@@ -2275,6 +2525,8 @@ function advanceExpedition(expedition, requestedDeltaS) {
     log: appendLog(next.log, { atMissionS: elapsed, kind: "mission-loss", message: failure.summary })
   });
   if (slot && elapsed + 1 >= totalS * slot.progress) {
+    const interception = createPirateInterception(next, slot);
+    if (interception) return interception;
     const event2 = createDirectedEvent(next, slot);
     if (event2) return withExpeditionChanges(next, {
       systems: event2.systems,
@@ -2294,7 +2546,7 @@ function advanceExpedition(expedition, requestedDeltaS) {
   return next;
 }
 function advanceToNextMilestone(expedition) {
-  if (!expedition || expedition.state !== "traveling" || expedition.pendingEvent) return expedition;
+  if (!expedition || expedition.state !== "traveling" || expedition.pendingEvent || expedition.activeEncounter && expedition.activeEncounter.phase !== INTERCEPTION_PHASE.COMPLETE) return expedition;
   return advanceExpedition(expedition, expedition.calculation.properElapsedS);
 }
 function resolveExpeditionEvent(expedition, choice) {
@@ -2317,6 +2569,9 @@ function resolveExpeditionEvent(expedition, choice) {
     failureReport: failure,
     log: appendLog(next.log, { atMissionS: next.strategicElapsedS, kind: "mission-loss", message: failure.summary })
   });
+  if (!failure && expedition.pendingEvent?.slotId === "final-approach") {
+    next = advanceExpedition(next, next.calculation.properElapsedS);
+  }
   return next;
 }
 
@@ -2328,7 +2583,10 @@ var COMMAND_TYPES = Object.freeze([
   "ship-operation",
   "outpost-plan",
   "outpost-build",
-  "outpost-service"
+  "outpost-service",
+  "encounter-transition",
+  "encounter-resolve",
+  "encounter-complete"
 ]);
 function cleanText(value, max = 160) {
   return String(value || "").replace(/\s+/g, " ").trim().slice(0, max);
@@ -2341,7 +2599,9 @@ function normalizeExpeditionCommand(input = {}) {
     choiceId: cleanText(input.choiceId, 120),
     operationId: cleanText(input.operationId, 120),
     contactId: cleanText(input.contactId, 180),
-    outpostId: cleanText(input.outpostId, 220)
+    outpostId: cleanText(input.outpostId, 220),
+    encounterEvent: cleanText(input.encounterEvent, 80),
+    encounterResult: input.encounterResult && typeof input.encounterResult === "object" ? Object.freeze({ ...input.encounterResult }) : null
   });
 }
 function createAuthorizedExpeditionPlan(input = {}, options = {}) {
@@ -2389,6 +2649,12 @@ function executeExpeditionCommand(expedition, input = {}, options = {}) {
     result = constructOutpost(expedition, command.outpostId, nowMs);
   } else if (command.type === "outpost-service") {
     result = serviceOutpost(expedition, command.outpostId, nowMs);
+  } else if (command.type === "encounter-transition") {
+    result = { expedition: transitionPirateInterception(expedition, command.encounterEvent), message: "Hostile interception advanced." };
+  } else if (command.type === "encounter-resolve") {
+    result = { expedition: resolvePirateInterception(expedition, command.encounterResult), message: "Hostile interception resolved." };
+  } else if (command.type === "encounter-complete") {
+    result = { expedition: completePirateAftermath(expedition), message: "The Expedition resumed course." };
   }
   const next = result?.expedition;
   if (!next || next === expedition || result?.changed === false) {

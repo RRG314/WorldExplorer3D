@@ -136,6 +136,8 @@ function createExpeditionSpacecraftMesh() {
     if (!object.isMesh) return;
     object.castShadow = true;
     object.receiveShadow = true;
+    const visualEffect = object.parent?.name === 'engineGlow' || object.parent?.name === 'exhaust';
+    if (!visualEffect) object.userData.defaultStarshipFallback = true;
   });
   return craft;
 }

@@ -11,9 +11,15 @@ import {
   SHIP_STATIONS
 } from './ship-layout.js?v=5';
 import { deriveCrewOperations, summarizeCrewOperations } from './crew-operations.js?v=1';
-import { shipAlertState } from './failure-authority.js?v=2';
-import { createBeveledVehicleBoxGeometry, createTaperedPrismGeometry } from '../engine/classic-utility-car.js?v=3';
+import { shipAlertState } from './failure-authority.js?v=3';
 import { SPACE_CRAFT_IDENTITY } from '../space/craft-identity.js?v=1';
+import { attachCuratedExpeditionPod } from '../space/curated-expedition-pod.js?v=4';
+import {
+  attachCuratedExplorerCharacter,
+  disposeCuratedCharacter,
+  SHIP_CREW_ASSET_ID,
+  updateCuratedCharacterAnimation
+} from '../walking/curated-explorer-character.js?v=8';
 
 const STARSHIP_NAME = SPACE_CRAFT_IDENTITY.starship.name;
 
@@ -704,17 +710,6 @@ const CREW_APPEARANCE = Object.freeze({
   'crew-systems': Object.freeze({ uniform: 0x9a5728, secondary: 0x51372a, skin: 0xc28d69, hair: 0x201a18, accent: 0xffca82 })
 });
 
-function addCrewPart(root, geometry, surface, name, position, scale = null, rotation = null) {
-  const mesh = new THREE.Mesh(geometry, surface);
-  mesh.name = name;
-  mesh.position.set(position.x || 0, position.y || 0, position.z || 0);
-  if (scale) mesh.scale.set(scale.x ?? 1, scale.y ?? 1, scale.z ?? 1);
-  if (rotation) mesh.rotation.set(rotation.x || 0, rotation.y || 0, rotation.z || 0);
-  mesh.castShadow = true;
-  root.add(mesh);
-  return mesh;
-}
-
 function addCrewMember(group, post, crew) {
   const root = new THREE.Group();
   const crewId = crew?.id || post.crewId;
@@ -728,66 +723,26 @@ function addCrewMember(group, post, crew) {
   root.userData.deckId = post.deckId;
   root.userData.route = [];
   root.userData.assignmentId = null;
-  const uniform = material(appearance.uniform, { roughness: 0.78, metalness: 0.03 });
-  const secondary = material(appearance.secondary, { roughness: 0.86, metalness: 0.02 });
-  const skin = material(appearance.skin, { roughness: 0.86, metalness: 0 });
-  const hair = material(appearance.hair, { roughness: 0.94, metalness: 0 });
-  const trim = material(0xaebdc6, { roughness: 0.52, metalness: 0.28 });
-  const accent = material(appearance.accent, { emissive: appearance.accent, emissiveIntensity: 0.35, roughness: 0.42, metalness: 0.1 });
-  const dark = material(0x151d24, { roughness: 0.78, metalness: 0.12 });
-
-  addCrewPart(root, createTaperedPrismGeometry(THREE, { widthBottom: 0.78, widthTop: 0.66, height: 1, length: 0.42, frontInset: 0.03, rearInset: 0.03 }), uniform, `${crewId}:torso`, { x: 0, y: 1.27, z: 0 });
-  addCrewPart(root, createTaperedPrismGeometry(THREE, { widthBottom: 0.68, widthTop: 0.76, height: 0.42, length: 0.38, frontInset: 0.02, rearInset: 0.02 }), secondary, `${crewId}:waist`, { x: 0, y: 0.83, z: 0 });
-  box(root, { x: 0.72, y: 0.09, z: 0.44 }, { x: 0, y: 0.93, z: 0 }, trim, `${crewId}:utility-belt`);
-  box(root, { x: 0.18, y: 0.26, z: 0.12 }, { x: 0.31, y: 0.77, z: -0.23 }, dark, `${crewId}:belt-pouch`);
-  box(root, { x: 0.5, y: 0.07, z: 0.045 }, { x: 0, y: 1.43, z: -0.225 }, accent, `${crewId}:service-stripe`);
-  [-0.24, 0.24].forEach((x, index) => box(root, { x: 0.18, y: 0.08, z: 0.07 }, { x, y: 1.64, z: -0.2 }, index ? trim : accent, `${crewId}:collar-tab`));
-
-  const legs = [-0.22, 0.22].map((x, index) => {
-    const leg = addCrewPart(root, new THREE.CylinderGeometry(0.105, 0.12, 0.72, 14), secondary, `${crewId}:leg:${index}`, { x, y: 0.42, z: 0 });
-    addCrewPart(leg, new THREE.SphereGeometry(0.11, 12, 8), secondary, `${crewId}:knee:${index}`, { x: 0, y: -0.25, z: -0.035 }, { x: 1, y: 0.82, z: 0.72 });
-    return leg;
-  });
-  [-0.22, 0.22].forEach((x, index) => {
-    addCrewPart(root, createBeveledVehicleBoxGeometry(THREE, 0.24, 0.19, 0.38, 0.05), dark, `${crewId}:boot:${index}`, { x, y: 0.09, z: -0.06 });
-    box(root, { x: 0.22, y: 0.035, z: 0.41 }, { x, y: -0.015, z: -0.075 }, trim, `${crewId}:boot-sole:${index}`);
-  });
-  const arms = [-1, 1].map((side, index) => {
-    const armRoot = new THREE.Group();
-    armRoot.name = `${crewId}:arm:${index}`;
-    armRoot.position.set(side * 0.47, 1.48, 0);
-    addCrewPart(armRoot, new THREE.SphereGeometry(0.13, 12, 8), uniform, `${crewId}:shoulder:${index}`, { x: 0, y: -0.02, z: 0 }, { x: 0.82, y: 1, z: 1 });
-    addCrewPart(armRoot, new THREE.CylinderGeometry(0.085, 0.1, 0.58, 14), uniform, `${crewId}:upper-arm:${index}`, { x: 0, y: -0.25, z: 0 }, null, { z: side * -0.08 });
-    addCrewPart(armRoot, new THREE.SphereGeometry(0.09, 12, 8), secondary, `${crewId}:elbow:${index}`, { x: 0, y: -0.49, z: -0.015 });
-    addCrewPart(armRoot, new THREE.CylinderGeometry(0.075, 0.085, 0.46, 14), secondary, `${crewId}:forearm:${index}`, { x: 0, y: -0.72, z: -0.02 });
-    addCrewPart(armRoot, new THREE.SphereGeometry(0.1, 14, 9), skin, `${crewId}:hand:${index}`, { x: 0, y: -0.99, z: -0.02 });
-    root.add(armRoot);
-    return armRoot;
-  });
-
-  addCrewPart(root, new THREE.CylinderGeometry(0.1, 0.12, 0.16, 12), skin, `${crewId}:neck`, { x: 0, y: 1.79, z: 0 });
-  addCrewPart(root, new THREE.SphereGeometry(0.25, 22, 16), skin, `${crewId}:head`, { x: 0, y: 2.02, z: 0 }, { x: 0.92, y: 1.08, z: 0.9 });
-  addCrewPart(root, new THREE.SphereGeometry(0.205, 18, 12), skin, `${crewId}:jaw`, { x: 0, y: 1.96, z: -0.055 }, { x: 0.92, y: 0.8, z: 0.9 });
-  addCrewPart(root, new THREE.SphereGeometry(0.255, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.52), hair, `${crewId}:hair`, { x: 0, y: 2.12, z: 0.015 }, { x: 0.96, y: 0.8, z: 0.94 });
-  [-0.085, 0.085].forEach((x, index) => {
-    addCrewPart(root, new THREE.SphereGeometry(0.018, 10, 7), dark, `${crewId}:eye:${index}`, { x, y: 2.045, z: -0.223 }, { x: 1, y: 0.72, z: 0.55 });
-    box(root, { x: 0.075, y: 0.012, z: 0.012 }, { x, y: 2.088, z: -0.225 }, hair, `${crewId}:brow:${index}`);
-  });
-  [-0.235, 0.235].forEach((x, index) => addCrewPart(root, new THREE.SphereGeometry(0.045, 10, 7), skin, `${crewId}:ear:${index}`, { x, y: 2.02, z: 0 }, { x: 0.48, y: 1, z: 0.58 }));
-  addCrewPart(root, new THREE.ConeGeometry(0.035, 0.09, 10), skin, `${crewId}:nose`, { x: 0, y: 1.995, z: -0.245 }, null, { x: Math.PI / 2 });
-  box(root, { x: 0.13, y: 0.018, z: 0.018 }, { x: 0, y: 1.92, z: -0.235 }, dark, `${crewId}:mouth`);
-
-  root.userData.animatedArms = arms;
-  root.userData.animatedLegs = legs;
-  root.userData.characterVisual = Object.freeze({
-    authority: 'ship-interior-crew',
-    qualityTier: 'promoted-procedural',
-    collisionPolicy: 'crew-capsule',
-    behaviorAuthority: 'crew-operations'
-  });
+  root.userData.characterStyle = 'curated-only-local-model';
+  root.userData.proceduralCharacterMeshCount = 0;
+  root.userData.disposeCuratedCharacter = () => disposeCuratedCharacter(root);
+  root.userData.updateCuratedCharacterAnimation = (moving, deltaTime, running) =>
+    updateCuratedCharacterAnimation(root, moving, deltaTime, running);
   root.position.set(post.x, 0.05, post.z);
   root.rotation.y = post.yaw;
   group.add(root);
+  void attachCuratedExplorerCharacter(THREE, root, {
+    assetId: SHIP_CREW_ASSET_ID,
+    role: 'ship-crew-character',
+    palette: {
+      uniform: appearance.uniform,
+      secondary: appearance.secondary,
+      accent: appearance.accent
+    },
+    failClosed: true,
+    isCurrent: () => activeSession?.sceneState?.crewLayer === group &&
+      activeSession.sceneState.crewMeshes.includes(root)
+  });
   return root;
 }
 
@@ -801,11 +756,28 @@ function postForCrewMember(crew, index = 0) {
 }
 
 function disposeObject(root) {
+  root?.userData?.disposeCuratedCharacter?.();
   root?.traverse?.((child) => {
     child.geometry?.dispose?.();
     if (Array.isArray(child.material)) child.material.forEach((entry) => entry?.dispose?.());
     else child.material?.dispose?.();
   });
+}
+
+function curatedCrewPresentation(root) {
+  let fallbackMeshCount = 0;
+  let visibleFallbackMeshCount = 0;
+  root?.traverse?.((object) => {
+    if (object?.userData?.defaultCharacterFallback !== true) return;
+    fallbackMeshCount += 1;
+    if (object.visible !== false) visibleFallbackMeshCount += 1;
+  });
+  return {
+    curatedAssetId: String(root?.userData?.curatedCharacterAssetId || ''),
+    fallbackMeshCount,
+    visibleFallbackMeshCount,
+    proceduralCharacterMeshes: Number(root?.userData?.proceduralCharacterMeshCount || 0)
+  };
 }
 
 function syncCrewMeshes(session, expedition) {
@@ -957,6 +929,7 @@ function updateCrewMotion(session, dt) {
         arm.rotation.x = basePose + Math.sin(session.visualClock * 2.4 + index + armIndex * 0.7) * workMotion;
       });
       (mesh.userData.animatedLegs || []).forEach((leg) => { leg.rotation.x *= 0.78; });
+      mesh.userData.updateCuratedCharacterAnimation?.(false, step, false);
       return;
     }
     const dx = waypoint.x - mesh.position.x;
@@ -980,6 +953,7 @@ function updateCrewMotion(session, dt) {
     const stride = Math.sin(session.visualClock * 8.2 + index) * 0.34;
     (mesh.userData.animatedArms || []).forEach((arm, armIndex) => { arm.rotation.x = armIndex === 0 ? stride : -stride; });
     (mesh.userData.animatedLegs || []).forEach((leg, legIndex) => { leg.rotation.x = legIndex === 0 ? -stride : stride; });
+    mesh.userData.updateCuratedCharacterAnimation?.(true, step, false);
   });
   const interactions = appCtx.activeInterior?.interactions || [];
   session.sceneState.crewMeshes.forEach((mesh) => {
@@ -1114,6 +1088,7 @@ function addDeckDetails(group, deckId) {
     addEvaSuit(group, 10.2, -14.5, 0, 0xdfa14a, 'eva-three');
     const shuttle = new THREE.Group();
     shuttle.name = 'expedition-landing-pod';
+    shuttle.userData.curatedPodTargetForwardAxis = 'z';
     const hull = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.65, 7.2, 22), steel);
     hull.rotation.x = Math.PI / 2;
     shuttle.add(hull);
@@ -1152,7 +1127,11 @@ function addDeckDetails(group, deckId) {
     const boardingRamp = box(shuttle, { x: 2.75, y: 0.12, z: 1.22 }, { x: 2.9, y: -0.58, z: 1.12 }, material(0x566a77, { metalness: 0.62, roughness: 0.32 }), 'survey-craft-boarding-ramp');
     boardingRamp.rotation.z = -0.16;
     shuttle.position.set(0, 1.45, -29.5);
+    shuttle.traverse((object) => {
+      if (object?.isMesh) object.userData.defaultPodFallback = true;
+    });
     group.add(shuttle);
+    void attachCuratedExpeditionPod(THREE, shuttle);
     [-3.35, 3.35].forEach((side) => {
       box(group, { x: 0.34, y: 0.3, z: 9.4 }, { x: side, y: 0.18, z: -29.5 }, dark, 'pod-launch-rail');
       [-33.2, -25.8].forEach((z) => box(group, { x: 0.62, y: 0.72, z: 0.5 }, { x: side, y: 0.38, z }, steel, 'pod-magnetic-clamp'));
@@ -1980,15 +1959,11 @@ function showDeckLift() {
   }
   picker.innerHTML = `<div><span>DECK LIFT</span><strong>Choose a deck</strong>${SHIP_DECKS.map((deck) => `<button type="button" data-deck="${deck.id}" ${deck.id === session.activeDeckId ? 'disabled' : ''}>${deck.label}</button>`).join('')}<button type="button" data-close>Cancel</button></div>`;
   picker.classList.add('show');
-  picker.querySelectorAll('[data-deck]').forEach((button) => button.addEventListener('click', (event) => {
+  picker.querySelectorAll('[data-deck]').forEach((button) => button.addEventListener('click', () => {
     switchSolisReachDeck(button.dataset.deck);
     picker.classList.remove('show');
-    event.currentTarget?.blur?.();
   }));
-  picker.querySelector('[data-close]')?.addEventListener('click', (event) => {
-    picker.classList.remove('show');
-    event.currentTarget?.blur?.();
-  });
+  picker.querySelector('[data-close]')?.addEventListener('click', () => picker.classList.remove('show'));
   return true;
 }
 
@@ -2384,6 +2359,11 @@ function enterSolisReachInterior(options = {}) {
     globalThis.__WE3D_SHIP_INTERIOR_SUPPORT__ = support;
   }
   if (session.incidentPresentation) playShipTone('alert');
+  // Ship entry can originate from a planner or Travel-menu button. Leaving
+  // either button focused makes the engine's form-control guard swallow
+  // movement keys, so the rendered interior appears unplayable until the
+  // player clicks elsewhere. Hand input back to gameplay on every entry path.
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
   appCtx.updateControlsModeUI?.();
   return true;
 }
@@ -2409,6 +2389,7 @@ function exitSolisReachInterior() {
   if (!session.bodyHadShipInteriorClass) document.body.classList.remove('expedition-ship-interior-open');
   appCtx.replaceWorldCollection('dynamicBuildingColliders', session.dynamicBuildingColliders);
   session.sceneState.root.parent?.remove?.(session.sceneState.root);
+  session.sceneState.crewMeshes.forEach((mesh) => mesh.userData.disposeCuratedCharacter?.());
   session.sceneState.root.traverse((child) => {
     child.geometry?.dispose?.();
     if (Array.isArray(child.material)) child.material.forEach((entry) => { entry?.map?.dispose?.(); entry?.dispose?.(); });
@@ -2574,7 +2555,8 @@ function getShipInteriorSnapshot() {
       z: Number(mesh.position.z.toFixed(2)),
       moving: Array.isArray(mesh.userData.route) && mesh.userData.route.length > 0,
       routeRemaining: Number(mesh.userData.route?.length || 0),
-      workDwellS: Number(Number(mesh.userData.workDwell || 0).toFixed(2))
+      workDwellS: Number(Number(mesh.userData.workDwell || 0).toFixed(2)),
+      ...curatedCrewPresentation(mesh)
     })),
     crewOperations: activeSession.operations.map((operation) => ({ ...operation })),
     crewOperationSummary: { ...activeSession.operationSummary },
@@ -2612,13 +2594,13 @@ function getShipInteriorSnapshot() {
     } : null,
     crewPresentation: activeSession.sceneState.crewMeshes.map((mesh) => ({
       crewId: mesh.userData.crewId,
-      visualQuality: mesh.userData.characterVisual || null,
       roomId: mesh.userData.currentRoomId,
       assignmentId: mesh.userData.assignmentId,
       task: mesh.userData.operationTask,
       x: Number(mesh.position.x.toFixed(3)),
       z: Number(mesh.position.z.toFixed(3)),
-      moving: (mesh.userData.route?.length || 0) > 0
+      moving: (mesh.userData.route?.length || 0) > 0,
+      ...curatedCrewPresentation(mesh)
     })),
     parentEnvironment: 'SPACE_FLIGHT',
     movementAuthority: 'Walk',

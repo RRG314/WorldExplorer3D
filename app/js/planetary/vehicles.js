@@ -1,5 +1,4 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { loadModelAssetInstance } from '../assets/model-asset-runtime.js?v=1';
 
 let activeVehicle = null;
 let earthChildVisibility = null;
@@ -287,23 +286,17 @@ function alignVehicleToSurface(root) {
 
 function loadMarsRoverModel() {
   if (marsModelPromise) return marsModelPromise;
-  const touchClient = globalThis.matchMedia?.('(pointer: coarse)')?.matches === true || Number(globalThis.navigator?.maxTouchPoints || 0) > 0;
-  if (touchClient) {
-    marsModelPromise = Promise.resolve(null);
-    return marsModelPromise;
-  }
-  marsModelPromise = loadModelAssetInstance(THREE, 'planetary-rover-mars', {
-    name: 'Mars Exploration Rover promoted model',
-    qualityTier: 'promoted',
-    receiveShadow: true,
-    cachePolicy: 'while-in-use'
-  }).then((instance) => {
-    const root = fitLoadedRover(instance.root);
-    root.userData.curatedAssetRelease = instance.release;
-    return root;
-  }).catch((error) => {
-    console.warn('[planetary] NASA Mars rover model failed to load; using local fallback.', error);
-    return null;
+  marsModelPromise = new Promise((resolve) => {
+    if (!THREE.GLTFLoader) return resolve(null);
+    new THREE.GLTFLoader().load(
+      '/app/assets/models/mars-exploration-rover.glb',
+      (gltf) => resolve(fitLoadedRover(gltf.scene)),
+      undefined,
+      (error) => {
+        console.warn('[planetary] NASA Mars rover model failed to load; using local fallback.', error);
+        resolve(null);
+      }
+    );
   });
   return marsModelPromise;
 }
@@ -311,10 +304,6 @@ function loadMarsRoverModel() {
 async function setPlanetaryVehicle(kind) {
   const requestId = ++vehicleRequestSequence;
   if (!appCtx.carMesh) return null;
-  if (activeVehicle?.userData?.curatedAssetRelease && kind !== 'mars') {
-    activeVehicle.userData.curatedAssetRelease();
-    marsModelPromise = null;
-  }
   if (activeVehicle?.parent) activeVehicle.parent.remove(activeVehicle);
   activeVehicle = null;
 

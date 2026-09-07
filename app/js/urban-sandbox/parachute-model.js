@@ -1,5 +1,6 @@
 const PARACHUTE_POLICY = Object.freeze({
   minimumClearance: 3.25,
+  minimumAutomaticOfferClearance: 8,
   minimumAircraftExitClearance: 12,
   automaticEquipClearance: 18,
   minimumDescentSpeed: 0.8,
@@ -38,6 +39,29 @@ function evaluateParachuteDeployment(input = {}) {
     return Object.freeze({ allowed: false, reason: 'too-low', clearance });
   }
   return Object.freeze({ allowed: true, reason: '', clearance });
+}
+
+function evaluateHighDropParachuteOffer(input = {}) {
+  const clearance = Math.max(0, finite(input.feetY) - finite(input.groundY));
+  if (String(input.environment || 'EARTH').toUpperCase() !== 'EARTH') {
+    return Object.freeze({ allowed: false, reason: 'earth-only', clearance });
+  }
+  if (String(input.travelMode || 'walk') !== 'walk') {
+    return Object.freeze({ allowed: false, reason: 'walking-only', clearance });
+  }
+  if (input.alreadySkydiving === true || input.onGround === true) {
+    return Object.freeze({ allowed: false, reason: 'already-resolved', clearance });
+  }
+  if (input.leftElevatedSupport !== true) {
+    return Object.freeze({ allowed: false, reason: 'not-an-elevated-drop', clearance });
+  }
+  if (finite(input.verticalVelocity) >= 0) {
+    return Object.freeze({ allowed: false, reason: 'not-descending', clearance });
+  }
+  if (clearance < PARACHUTE_POLICY.minimumAutomaticOfferClearance) {
+    return Object.freeze({ allowed: false, reason: 'too-low', clearance });
+  }
+  return Object.freeze({ allowed: true, reason: '', clearance, autoEquip: true });
 }
 
 function integrateParachuteFall(verticalVelocity, dt, deployed = false, flaring = false) {
@@ -125,6 +149,7 @@ function integrateSkydivingDynamics(previous = {}, input = {}, dt = 0) {
 export {
   PARACHUTE_POLICY,
   evaluateAircraftSkydivingExit,
+  evaluateHighDropParachuteOffer,
   evaluateParachuteDeployment,
   integrateParachuteFall,
   integrateSkydivingDynamics,

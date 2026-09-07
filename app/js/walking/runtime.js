@@ -71,7 +71,7 @@ function createWalkingRuntimeHelpers({
     }
   }
 
-  function setModeDrive() {
+  function setModeDrive(options = {}) {
     if (appCtx.boatMode?.active && !appCtx.boatMode?.manualExitPending) {
       if (typeof appCtx.setTravelMode === "function") {
         appCtx.setTravelMode("drive", { source: "drive_mode_direct" });
@@ -83,7 +83,7 @@ function createWalkingRuntimeHelpers({
     state.mode = "drive";
     state.walker._resolvedGroundState = null;
     let resolvedDriveSpawn = null;
-    if (typeof appCtx.resolveSafeWorldSpawn === "function" && typeof appCtx.applyResolvedWorldSpawn === "function") {
+    if (options.preserveResolvedSpawn !== true && typeof appCtx.resolveSafeWorldSpawn === "function" && typeof appCtx.applyResolvedWorldSpawn === "function") {
       const targetX = wasWalk ? finiteOr(state.walker.x, car.x) : finiteOr(car.x, state.walker.x);
       const targetZ = wasWalk ? finiteOr(state.walker.z, car.z) : finiteOr(car.z, state.walker.z);
       const targetAngle = wasWalk ? finiteOr(state.walker.angle, car.angle) : finiteOr(car.angle, state.walker.angle);

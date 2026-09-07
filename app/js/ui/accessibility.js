@@ -1,6 +1,16 @@
 const STORAGE_KEY = 'worldExplorer3D.accessibility.v1';
-const TEXT_SCALES = new Set(['100', '115', '130']);
-const DEFAULTS = Object.freeze({ textScale: '100', reducedMotion: false, highContrast: false });
+const TEXT_SCALES = new Set(['100', '115', '130', '160', '200']);
+const NOTICE_DURATIONS = new Set(['standard', 'long', 'persistent']);
+const RETICLE_SIZES = new Set(['standard', 'large']);
+const DEFAULTS = Object.freeze({
+  textScale: '100',
+  noticeDuration: 'standard',
+  reticleSize: 'standard',
+  reducedMotion: false,
+  reducedEffects: false,
+  highContrast: false,
+  alwaysShowActionDetails: false
+});
 const FOCUSABLE = [
   'a[href]', 'button:not([disabled])', 'input:not([disabled])',
   'select:not([disabled])', 'textarea:not([disabled])',
@@ -19,8 +29,12 @@ function loadSettings() {
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
     return {
       textScale: TEXT_SCALES.has(String(parsed?.textScale)) ? String(parsed.textScale) : DEFAULTS.textScale,
+      noticeDuration: NOTICE_DURATIONS.has(String(parsed?.noticeDuration)) ? String(parsed.noticeDuration) : DEFAULTS.noticeDuration,
+      reticleSize: RETICLE_SIZES.has(String(parsed?.reticleSize)) ? String(parsed.reticleSize) : DEFAULTS.reticleSize,
       reducedMotion: parsed?.reducedMotion === true,
-      highContrast: parsed?.highContrast === true
+      reducedEffects: parsed?.reducedEffects === true,
+      highContrast: parsed?.highContrast === true,
+      alwaysShowActionDetails: parsed?.alwaysShowActionDetails === true
     };
   } catch {
     return { ...DEFAULTS };
@@ -35,8 +49,13 @@ function initAccessibility() {
   const root = document.documentElement;
   const announceRegion = document.getElementById('accessibilityAnnouncements');
   const textScale = document.getElementById('accessibilityTextScale');
+  const noticeDuration = document.getElementById('accessibilityNoticeDuration');
+  const reticleSize = document.getElementById('accessibilityReticleSize');
   const reducedMotion = document.getElementById('accessibilityReducedMotion');
+  const reducedEffects = document.getElementById('accessibilityReducedEffects');
   const highContrast = document.getElementById('accessibilityHighContrast');
+  const actionDetails = document.getElementById('accessibilityActionDetails');
+  const resetButton = document.getElementById('accessibilityReset');
   const status = document.getElementById('accessibilitySettingsStatus');
   let settings = loadSettings();
   let activeModal = null;
@@ -82,11 +101,19 @@ function initAccessibility() {
   const apply = ({ persist = true, announce = true } = {}) => {
     root.dataset.we3dTextScale = settings.textScale;
     root.dataset.we3dMotion = settings.reducedMotion ? 'reduce' : 'system';
+    root.dataset.we3dEffects = settings.reducedEffects ? 'reduce' : 'standard';
     root.dataset.we3dContrast = settings.highContrast ? 'more' : 'standard';
+    root.dataset.we3dReticle = settings.reticleSize;
+    root.dataset.we3dActionDetails = settings.alwaysShowActionDetails ? 'always' : 'familiar';
     if (textScale) textScale.value = settings.textScale;
+    if (noticeDuration) noticeDuration.value = settings.noticeDuration;
+    if (reticleSize) reticleSize.value = settings.reticleSize;
     if (reducedMotion) reducedMotion.checked = settings.reducedMotion;
+    if (reducedEffects) reducedEffects.checked = settings.reducedEffects;
     if (highContrast) highContrast.checked = settings.highContrast;
-    const summary = `${settings.textScale}% text · ${settings.reducedMotion ? 'reduced motion' : 'system motion'} · ${settings.highContrast ? 'higher contrast' : 'standard contrast'}`;
+    if (actionDetails) actionDetails.checked = settings.alwaysShowActionDetails;
+    const noticeLabel = settings.noticeDuration === 'persistent' ? 'persistent notices' : settings.noticeDuration === 'long' ? 'longer notices' : 'standard notices';
+    const summary = `${settings.textScale}% text · ${settings.reducedMotion ? 'reduced motion' : 'system motion'} · ${settings.highContrast ? 'higher contrast' : 'standard contrast'} · ${noticeLabel}`;
     if (status) status.textContent = summary;
     if (persist) saveSettings(settings);
     if (announce && announceRegion) announceRegion.textContent = `Accessibility settings updated: ${summary}.`;
@@ -99,9 +126,13 @@ function initAccessibility() {
   };
 
   textScale?.addEventListener('change', () => update({ textScale: TEXT_SCALES.has(textScale.value) ? textScale.value : '100' }));
+  noticeDuration?.addEventListener('change', () => update({ noticeDuration: NOTICE_DURATIONS.has(noticeDuration.value) ? noticeDuration.value : 'standard' }));
+  reticleSize?.addEventListener('change', () => update({ reticleSize: RETICLE_SIZES.has(reticleSize.value) ? reticleSize.value : 'standard' }));
   reducedMotion?.addEventListener('change', () => update({ reducedMotion: reducedMotion.checked }));
+  reducedEffects?.addEventListener('change', () => update({ reducedEffects: reducedEffects.checked }));
   highContrast?.addEventListener('change', () => update({ highContrast: highContrast.checked }));
-  document.getElementById('mobileControlsReset')?.addEventListener('click', () => {
+  actionDetails?.addEventListener('change', () => update({ alwaysShowActionDetails: actionDetails.checked }));
+  resetButton?.addEventListener('click', () => {
     settings = { ...DEFAULTS };
     apply();
   });
@@ -172,8 +203,13 @@ function initAccessibility() {
   upgradeSemantics();
   syncModal();
 
+  const noticeDurationMs = (standardMs = 7000) => {
+    if (settings.noticeDuration === 'persistent') return Infinity;
+    if (settings.noticeDuration === 'long') return Math.max(15000, Number(standardMs) * 2);
+    return Math.max(1000, Number(standardMs) || 7000);
+  };
   const snapshot = () => Object.freeze({
-    schemaVersion: 1,
+    schemaVersion: 2,
     settings: { ...settings },
     browserZoomAllowed: !/user-scalable\s*=\s*no|maximum-scale\s*=\s*1/i.test(document.querySelector('meta[name="viewport"]')?.content || ''),
     reducedMotionSystem: matchMedia('(prefers-reduced-motion: reduce)').matches,
@@ -182,6 +218,7 @@ function initAccessibility() {
     liveRegionReady: announceRegion?.getAttribute('aria-live') === 'polite'
   });
   globalThis.getWorldExplorerAccessibilitySnapshot = snapshot;
+  globalThis.getWorldExplorerAccessibilityNoticeMs = noticeDurationMs;
   return { snapshot, update, announce(message) { if (announceRegion) announceRegion.textContent = String(message || ''); } };
 }
 

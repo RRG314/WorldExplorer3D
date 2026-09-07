@@ -1,10 +1,66 @@
 # World Explorer 3D 5.2.0
 
-World Explorer 3D 5.2 adds a connected Interstellar Expeditions Alpha, virtual
-property and Explorer Credits, a clearer gameplay menu, and more dependable
-travel between Earth, space, and planetary surfaces.
+## The world feels alive
 
-![Wayfinder approach to Sagittarius A star](assets/readme/space-wayfinder-sagittarius.webp)
+World Explorer 3D 5.2 brings the sandbox much closer to the world it is meant to
+be: somewhere you can arrive, explore, drive, shop, improve your vehicle, care
+for a companion, own a place, and keep traveling all the way into deep space.
+
+![An explorer and dog beside the current BMW, pedestrians, and traffic in World Explorer 3D](assets/readme/living-world-update-current.webp)
+
+The redesigned Explorer, permanent dog companion, BMW, pedestrians, traffic,
+and current world presentation now appear together instead of mixing in the old
+blocky character and vehicle stand-ins.
+
+## More life on the ground
+
+- A permanent dog companion joins the Explorer from the beginning, follows
+  more closely, travels in supported vehicles, earns progress, and returns home
+  safely when another companion is active.
+- The Explorer’s man or woman presentation is selected from the account profile
+  and carries into play without adding an intrusive in-game switch.
+- Denser pedestrians and longer-lived traffic respond to the kind of place and
+  time of day. Signals, stops, queues, and road following use one bounded living
+  world rather than competing traffic systems.
+- Current vehicle and character assets remain visible from spawn onward; the
+  retired blocky fallbacks no longer flash into view or keep consuming runtime
+  resources.
+- Roads, terrain, bridges, junctions, curbs, sidewalks, buildings, and vehicle
+  contact share the same published surface rules across the tested world set.
+
+## A world that responds
+
+- Nearby mapped convenience stores, mechanics, pet and veterinary services,
+  field suppliers, medical locations, and marine services can connect to the
+  systems they are actually useful for. Generated game inventory and services
+  stay clearly separate from real mapped facts.
+- One Explorer Wallet now pays for supplies, services, vehicle upgrades, and
+  virtual property. Purchases recover cleanly if delivery cannot finish.
+- Food, water, first aid, and medicine affect the Explorer’s health. The HUD
+  health bar represents the active Explorer or vehicle without making the HUD
+  larger.
+- Mapped mechanics offer ordered, visible upgrades with real handling effects,
+  saved to the signed-in player’s owned vehicle.
+- Property values use a broader market-style scale, while the first eligible
+  home claim remains an accessible introduction to ownership.
+- Building and vehicle prompts appear at the relevant entrance or interaction
+  point. Observation and exploration notices stay quieter, respect familiarity,
+  and move out of the center of play.
+
+## Start playing sooner
+
+- The First Journey is now a short, optional three-step introduction: move and
+  look, interact with something nearby, then choose an adventure. Everything
+  else is discovered through play instead of an endless tutorial.
+- Walking uses complete WASD movement, world-drag camera control, and the same
+  configurable actions shown in Controls. F cycles Character, BMW, Plane, and
+  Drone, while H is the separate nearby-mechanic shortcut.
+- Keyboard actions can be remapped and actually drive the runtime action map.
+  Touch controls and camera behavior follow the same action rules on phones and
+  tablets.
+- Accessibility settings now share the game’s visual language and cover larger
+  text and targets, contrast, reduced motion, focus visibility, notice timing,
+  camera assistance, and control preferences.
 
 ## Interstellar Expeditions Alpha
 
@@ -22,6 +78,10 @@ travel between Earth, space, and planetary surfaces.
   Pathfinder, Space Flight, planetary, and saved-journey systems.
 - Continue ordinary manual or Wayfinder-assisted Space Flight without starting
   an Expedition.
+- Survive a surprise pirate interception during an eligible voyage: take manual
+  control, distinguish friendly and hostile energy fire, protect Solis Reach,
+  withstand boarding pressure and damage, then recover course through the same
+  voyage state instead of entering a disconnected minigame.
 
 Interstellar Expeditions are labeled Alpha in the game. The connected journey
 is playable, while ship art, crew motion, planetary variety, mission variety,
@@ -60,6 +120,8 @@ audio, and mobile presentation remain active areas of improvement.
   flight, landing, surface return, rendezvous, docking, and ship entry.
 - Prevent solid planetary terrain from exposing or dropping the player beneath
   the playable surface.
+- Restore the account-selected Earth Explorer after returning from a solid
+  planetary surface instead of leaving the spacesuit active.
 - Preserve the selected journey when moving between a planet, local Space,
   Solis Reach, and Earth.
 - Release inactive Space and Ocean drawing buffers and scene resources when
@@ -69,12 +131,15 @@ audio, and mobile presentation remain active areas of improvement.
 - Restore the public explorer total, standard first-party analytics collection,
   and privacy-safe event boundaries.
 
+Community Reality Capture remains a staged, fail-closed capability. Private
+capture publication is not enabled in production until protected storage, App
+Check, moderation, and reconstruction infrastructure pass their own deployment
+gate.
+
 ## Existing 5.1 play retained
 
 The 5.1 Earth, Ocean, airport, aircraft, maritime, vehicle, fieldwork, regional
 Field Guide, Backpack, Journal, companion, quick-slot, multiplayer, accessibility,
-and mobile-control features remain part of this release. The new 5.2 systems use
-the established Earth terrain, road, bridge, building, and traversal authorities
-rather than replacing them.
+and mobile-control features remain part of this release.
 
 See [Known Issues](KNOWN_ISSUES.md) for current boundaries and continuing work.

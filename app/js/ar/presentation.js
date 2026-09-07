@@ -1,6 +1,11 @@
-import { animateAnimalModel, createAnimalModel } from '../discovery/animal-models.js?v=2';
+import { animateAnimalModel, createAnimalModel } from '../discovery/animal-models.js?v=3';
 import { COMPANION_CATALOG } from '../discovery/catalog.js?v=4';
-import { createNaturalHistoryModel } from '../discovery/natural-history-models.js?v=1';
+import { createNaturalHistoryModel } from '../discovery/natural-history-models.js?v=2';
+import {
+  attachCuratedAnimalVisual,
+  disposeCuratedAnimal,
+  updateCuratedAnimalAnimation
+} from '../discovery/curated-animal-visual.js?v=2';
 
 const ANIMAL_RECORD_SPECIES = Object.freeze({
   'wetland-waterbird-clue': 'mallard',
@@ -9,6 +14,8 @@ const ANIMAL_RECORD_SPECIES = Object.freeze({
 });
 
 function disposeObject(root) {
+  root?.userData?.disposeCuratedAnimals?.();
+  root?.userData?.disposeCuratedAnimal?.();
   root?.traverse?.((child) => {
     child.geometry?.dispose?.();
     const materials = Array.isArray(child.material) ? child.material : [child.material];
@@ -20,22 +27,36 @@ function disposeObject(root) {
 function createContent(THREE, request, plan) {
   const root = new THREE.Group();
   root.name = `AR ${request.type || 'content'}`;
+  root.userData.arContentActive = true;
   const animated = [];
   let retriever = null;
+  const curatedAnimals = [];
+  const addAnimal = (model, speciesId, includeInAnimated = true) => {
+    const rawHeight = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3()).y;
+    model.userData.disposeCuratedAnimal = () => disposeCuratedAnimal(model);
+    void attachCuratedAnimalVisual(THREE, model, {
+      speciesId,
+      targetLocalHeight: rawHeight,
+      isCurrent: () => root.userData.arContentActive === true && model.parent != null
+    });
+    curatedAnimals.push(model);
+    if (includeInAnimated) animated.push(model);
+    return model;
+  };
   if (request.type === 'companion') {
     const model = createAnimalModel(THREE, request.companion.catalogId);
     const size = Number(request.companion.visualVariation?.size || 1);
     const catalog = COMPANION_CATALOG.find((entry) => entry.id === request.companion.catalogId);
     model.scale.setScalar(size * Number(catalog?.arScale || .66));
     root.add(model);
-    animated.push(model);
+    addAnimal(model, request.companion.catalogId);
   } else if (request.type === 'specimen') {
     const catalogId = request.record.catalogId;
     const animalSpecies = ANIMAL_RECORD_SPECIES[catalogId];
     const model = animalSpecies ? createAnimalModel(THREE, animalSpecies) : createNaturalHistoryModel(THREE, catalogId);
     model.scale.setScalar(animalSpecies ? .78 : 1.08);
     root.add(model);
-    if (animalSpecies) animated.push(model);
+    if (animalSpecies) addAnimal(model, animalSpecies);
   } else if (request.type === 'field-challenge') {
     plan.actors.forEach((actor, index) => {
       const model = createAnimalModel(THREE, actor.speciesId);
@@ -43,7 +64,7 @@ function createContent(THREE, request, plan) {
       model.userData.arActorId = actor.id;
       model.traverse((child) => { child.userData.arActorId = actor.id; });
       root.add(model);
-      animated.push(model);
+      addAnimal(model, actor.speciesId);
       model.position.set((index - 1.5) * .7, actor.height, -index * .12);
     });
     if (request.companion?.catalogId === 'trail-hound') {
@@ -54,8 +75,13 @@ function createContent(THREE, request, plan) {
       retriever.rotation.y = Math.PI;
       retriever.visible = false;
       root.add(retriever);
+      addAnimal(retriever, 'trail-hound', false);
     }
   }
+  root.userData.disposeCuratedAnimals = () => {
+    root.userData.arContentActive = false;
+    curatedAnimals.forEach((model) => disposeCuratedAnimal(model));
+  };
   return { root, animated, retriever };
 }
 
@@ -140,15 +166,17 @@ function createArPresentation(options = {}) {
         model.position.z = -.35 - index * .2;
         model.rotation.y = actor.direction > 0 ? Math.PI / 2 : -Math.PI / 2;
         model.visible = !captured.has(actor.id);
-        animateAnimalModel(model, elapsed + actor.phase, 1.15);
+        if (!updateCuratedAnimalAnimation(model, dt, 'walk')) animateAnimalModel(model, elapsed + actor.phase, 1.15);
       });
       if (content.retriever?.visible) {
         content.retriever.position.y = Math.abs(Math.sin(elapsed * 3.1)) * .035;
-        animateAnimalModel(content.retriever, elapsed, .8);
+        if (!updateCuratedAnimalAnimation(content.retriever, dt, 'idle')) animateAnimalModel(content.retriever, elapsed, .8);
       }
     } else {
       content.root.rotation.y += dt * .16;
-      content.animated.forEach((model, index) => animateAnimalModel(model, elapsed + index * .2, .45));
+      content.animated.forEach((model, index) => {
+        if (!updateCuratedAnimalAnimation(model, dt, 'idle')) animateAnimalModel(model, elapsed + index * .2, .45);
+      });
     }
     renderer.render(scene, camera);
   }

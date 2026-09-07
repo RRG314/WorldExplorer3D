@@ -17,7 +17,7 @@ import {
   createDriveableRoadConflictIndex,
   elevatedSegmentSafety,
   supportPointConflictsWithDriveableRoad
-} from "../world/bridge-safety.js?v=13";
+} from "../world/bridge-safety.js?v=14";
 import { applyTerrainPortalMasksForContext } from './structure-terrain-portals.js?v=1';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
 

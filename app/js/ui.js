@@ -4,11 +4,11 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=17";
 import { prepareTitleEnvironment } from "./planetary/entry.js?v=9";
 import { initMapInteractions } from "./ui/map-interactions.js?v=61";
-import { initMobileControls } from "./ui/mobile-controls.js?v=84";
+import { initMobileControls } from "./ui/mobile-controls.js?v=86";
 import { initShareUi } from "./ui/share-links.js?v=64";
 import { setupSettingsUi } from "./ui/settings.js?v=2";
-import { bindSpaceActions } from "./ui/space-actions.js?v=12";
-import { initTitleScreenUi } from "./ui/title-screen.js?v=117";
+import { bindSpaceActions } from "./ui/space-actions.js?v=17";
+import { initTitleScreenUi } from "./ui/title-screen.js?v=118";
 import { commitEnvironment, exitCurrentEnvironmentSync } from './session-coordinator.js?v=2';
 
 function emitTutorialEvent(eventName, payload = {}) {

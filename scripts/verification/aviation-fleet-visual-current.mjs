@@ -30,7 +30,7 @@ try {
   await page.getByRole('button', { name: 'Explore', exact: true }).click();
   await page.waitForFunction(() => {
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.();
-    return diagnostics?.gameStarted && !diagnostics.worldLoading && diagnostics.aviation?.fleetCount === 5;
+    return diagnostics?.gameStarted && !diagnostics.worldLoading && diagnostics.aviation?.fleetCount >= 5;
   }, null, { timeout: 360_000 });
   const later = page.getByRole('button', { name: 'Later', exact: true }).first();
   if (await later.isVisible().catch(() => false)) await later.click();
@@ -44,6 +44,7 @@ try {
     assert.equal(await page.evaluate((id) => globalThis.__WE3D_AVIATION_SUPPORT__?.moveNear(id), aircraft.id), true);
     await page.waitForFunction((id) => globalThis.getWorldExplorerRuntimeDiagnostics?.().aviation?.interaction?.data?.aircraftId === id, aircraft.id);
     await page.keyboard.press('KeyE');
+    await page.locator('dialog.airport-hub[open] .airport-hub__primary').click();
     await page.waitForFunction((id) => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.identity?.catalogId === id, catalogId);
     await page.keyboard.down('KeyA');
     await page.waitForTimeout(420);
@@ -59,7 +60,7 @@ try {
   const diagnostics = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.());
   const checks = Object.freeze({
     allFiveEnteredAndCaptured: captures.length === 5 && captures.every(({ actor, catalogId }) => actor?.identity?.catalogId === catalogId),
-    allReturnedToFleet: diagnostics.aviation?.vehicles?.filter(({ available }) => available).length === 5,
+    allReturnedToFleet: diagnostics.aviation?.vehicles?.filter(({ available }) => available).length === diagnostics.aviation?.fleetCount,
     noRuntimeErrors: (diagnostics.runtimeErrors || []).length === 0,
     noPageErrors: pageErrors.length === 0,
     noFailedLocalResources: localFailures.length === 0

@@ -11,7 +11,7 @@ import {
   where
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { getCurrentUser } from './auth-ui.js?v=55';
-import { initFirebase } from './firebase-init.js?v=56';
+import { initFirebase } from './firebase-init.js?v=57';
 
 const CREATOR_PROFILES_COLLECTION = 'creatorProfiles';
 const OVERLAY_PUBLISHED_COLLECTION = 'overlayPublished';

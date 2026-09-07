@@ -31,7 +31,15 @@ await page.addInitScript(() => {
 const requests = new Map();
 page.on('request', (request) => {
   const url = request.url();
-  requests.set(url, (requests.get(url) || 0) + 1);
+  const method = request.method();
+  const range = request.headers().range || '';
+  // PMTiles deliberately reads several byte ranges from one archive URL.
+  // Treating those distinct ranges as duplicate requests produced a false
+  // performance warning and obscured actual repeated fetches.
+  const identity = `${method}\n${url}\n${range}`;
+  const current = requests.get(identity) || { url, method, range, count: 0 };
+  current.count += 1;
+  requests.set(identity, current);
 });
 
 const navigationStartedAt = performance.now();
@@ -122,9 +130,9 @@ if (auditRevisit) {
   };
 }
 
-const duplicateRequests = [...requests.entries()]
-  .filter(([, count]) => count > 1)
-  .map(([url, count]) => ({ url, count }))
+const duplicateRequests = [...requests.values()]
+  .filter((request) => request.count > 1)
+  .map(({ url, method, range, count }) => ({ url, method, ...(range ? { range } : {}), count }))
   .sort((a, b) => b.count - a.count)
   .slice(0, 40);
 const slowResources = browserState.resources
@@ -137,7 +145,7 @@ const blockingLongTasks = browserState.longTasks
   .slice(0, 30);
 
 const report = {
-  contract: 'first-play-load-audit-v1',
+  contract: 'first-play-load-audit-v2',
   cacheDisabled,
   viewport: { width: 390, height: 844 },
   titleReadyMs,
@@ -149,7 +157,7 @@ const report = {
   transportCompilation: browserState.transportCompilation,
   terrainSurfaceCompilation: browserState.terrainSurfaceCompilation,
   workload: browserState.workload,
-  requestCount: [...requests.values()].reduce((sum, count) => sum + count, 0),
+  requestCount: [...requests.values()].reduce((sum, request) => sum + request.count, 0),
   uniqueRequestCount: requests.size,
   duplicateRequests,
   slowResources,

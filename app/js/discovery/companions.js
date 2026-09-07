@@ -1,7 +1,10 @@
 import { COMPANION_CATALOG } from './catalog.js?v=4';
 import { deterministicUnit } from './model.js?v=1';
 
-const COMPANION_SCHEMA_VERSION = 2;
+const COMPANION_SCHEMA_VERSION = 3;
+const STARTER_COMPANION_CATALOG_ID = 'trail-hound';
+const STARTER_COMPANION_DEFAULT_NAME = 'Scout';
+const STARTER_COMPANION_DISCOVERY_ID = 'starter-companion:v1';
 const COMPANION_LEVEL_THRESHOLDS = Object.freeze([0, 40, 100, 180, 280, 400, 550, 730, 940, 1180, 1450, 1750]);
 const COMPANION_XP_REASONS = Object.freeze({
   'field-activity': Object.freeze({ points: 12, label: 'Field record completed together' }),
@@ -146,11 +149,28 @@ function normalizeCare(source = {}) {
   });
 }
 
+function normalizeCompanionResidence(source = {}, fallbackState = 'care-network') {
+  const allowedStates = new Set(['traveling', 'at-home', 'home-pending', 'care-network']);
+  const homeId = String(source.homeId || '').trim().slice(0, 420);
+  const requestedState = String(source.state || fallbackState);
+  const state = allowedStates.has(requestedState) ? requestedState : fallbackState;
+  return Object.freeze({
+    state: state === 'at-home' && !homeId ? 'home-pending' : state,
+    homeId,
+    updatedAt: Math.max(0, Number(source.updatedAt) || 0)
+  });
+}
+
 function normalizeCompanionInstance(instance = {}) {
   const catalog = COMPANION_CATALOG.find((entry) => entry.id === String(instance.catalogId));
   if (!catalog || !instance.instanceId) return null;
   const legacyTrust = Number(instance.care?.trust || 0);
   const progressionSeed = instance.progression || (legacyTrust >= 60 ? { totalXp: 100 } : {});
+  const isStarterCompanion = instance.isStarterCompanion === true || instance.originKind === 'starter-companion';
+  const originKind = isStarterCompanion
+    ? 'starter-companion'
+    : ['encounter', 'legacy'].includes(instance.originKind) ? instance.originKind : 'legacy';
+  const nameStatus = instance.nameStatus === 'default' && isStarterCompanion ? 'default' : 'player-chosen';
   return Object.freeze({
     schemaVersion: COMPANION_SCHEMA_VERSION,
     instanceId: String(instance.instanceId),
@@ -160,6 +180,10 @@ function normalizeCompanionInstance(instance = {}) {
     adoptedAt: Math.max(0, Number(instance.adoptedAt) || Date.now()),
     originWorldIdentity: String(instance.originWorldIdentity || 'local').slice(0, 160),
     discoveryId: String(instance.discoveryId || '').slice(0, 180),
+    originKind,
+    isStarterCompanion,
+    nameStatus,
+    namedAt: nameStatus === 'player-chosen' ? Math.max(0, Number(instance.namedAt) || 0) : 0,
     behaviorArchetype: catalog.behaviorArchetype,
     personality: Object.freeze({
       curiosity: Math.max(0, Math.min(1, Number(instance.personality?.curiosity) || .5)),
@@ -176,6 +200,10 @@ function normalizeCompanionInstance(instance = {}) {
     favorite: instance.favorite === true,
     archived: instance.archived === true,
     active: instance.active === true,
+    residence: normalizeCompanionResidence(
+      instance.residence,
+      instance.active === true ? 'traveling' : isStarterCompanion ? 'home-pending' : 'care-network'
+    ),
     tradeable: false,
     legacyContent: !FIRST_RELEASE_COMPANION_IDS.includes(catalog.id)
   });
@@ -198,6 +226,10 @@ function createCompanionInstance(catalogId, options = {}) {
     adoptedAt: Number(options.adoptedAt) || Date.now(),
     originWorldIdentity: String(options.worldIdentity || 'local'),
     discoveryId,
+    originKind: options.originKind === 'starter-companion' ? 'starter-companion' : 'encounter',
+    isStarterCompanion: options.originKind === 'starter-companion',
+    nameStatus: options.nameStatus === 'default' ? 'default' : 'player-chosen',
+    namedAt: options.nameStatus === 'default' ? 0 : Number(options.namedAt) || Date.now(),
     behaviorArchetype: catalog.behaviorArchetype,
     personality: {
       curiosity: Number((0.35 + deterministicUnit(`${identitySeed}:curiosity`) * 0.6).toFixed(2)),
@@ -208,7 +240,51 @@ function createCompanionInstance(catalogId, options = {}) {
     care: {},
     training: { learnedCommands: ['follow'] },
     progression: {},
-    active: false
+    active: false,
+    residence: options.residence || { state: options.originKind === 'starter-companion' ? 'home-pending' : 'care-network', homeId: '', updatedAt: Number(options.adoptedAt) || Date.now() }
+  });
+}
+
+function createStarterCompanionInstance(options = {}) {
+  return createCompanionInstance(STARTER_COMPANION_CATALOG_ID, {
+    worldIdentity: String(options.profileIdentity || 'local-explorer'),
+    discoveryId: STARTER_COMPANION_DISCOVERY_ID,
+    name: options.name || STARTER_COMPANION_DEFAULT_NAME,
+    adoptedAt: Number(options.adoptedAt) || Date.now(),
+    originKind: 'starter-companion',
+    nameStatus: 'default',
+    residence: { state: 'home-pending', homeId: '', updatedAt: Number(options.adoptedAt) || Date.now() }
+  });
+}
+
+function renameCompanion(instance, requestedName, now = Date.now()) {
+  const current = normalizeCompanionInstance(instance);
+  if (!current) return Object.freeze({ renamed: false, reason: 'unknown-companion', companion: null, firstStarterNaming: false });
+  const name = sanitizeCompanionName(requestedName, current.name);
+  if (name === current.name && current.nameStatus === 'player-chosen') {
+    return Object.freeze({ renamed: false, reason: 'unchanged', companion: current, firstStarterNaming: false });
+  }
+  const firstStarterNaming = current.isStarterCompanion && current.nameStatus !== 'player-chosen';
+  const companion = normalizeCompanionInstance({
+    ...current,
+    name,
+    nameStatus: 'player-chosen',
+    namedAt: current.namedAt || Math.max(1, Number(now) || Date.now())
+  });
+  return Object.freeze({ renamed: true, companion, firstStarterNaming });
+}
+
+function assignCompanionHome(instance, homeId, now = Date.now()) {
+  const current = normalizeCompanionInstance(instance);
+  if (!current) return null;
+  const assignedHomeId = String(homeId || '').trim().slice(0, 420);
+  return normalizeCompanionInstance({
+    ...current,
+    residence: {
+      state: current.active ? 'traveling' : assignedHomeId ? 'at-home' : 'care-network',
+      homeId: assignedHomeId,
+      updatedAt: Math.max(1, Number(now) || Date.now())
+    }
   });
 }
 
@@ -220,7 +296,8 @@ function careForCompanion(instance, interaction = 'pet', now = Date.now()) {
 
 function resolveCompanionTravelPolicy(instance, mode = 'walk', environment = 'EARTH') {
   if (!instance) return Object.freeze({ visible: false, state: 'none' });
-  if (environment !== 'EARTH' || mode === 'drone' || mode === 'skydive') return Object.freeze({ visible: false, state: 'waiting' });
+  if (environment !== 'EARTH') return Object.freeze({ visible: false, state: 'protected-quarters' });
+  if (mode === 'drone' || mode === 'skydive') return Object.freeze({ visible: false, state: 'safe-during-exposed-travel' });
   if (String(instance.speciesArchetype || '').startsWith('livestock-') && ['car', 'boat'].includes(mode)) {
     return Object.freeze({ visible: false, state: 'waiting' });
   }
@@ -239,14 +316,21 @@ export {
   COMPANION_SCHEMA_VERSION,
   COMPANION_XP_REASONS,
   FIRST_RELEASE_COMPANION_IDS,
+  STARTER_COMPANION_CATALOG_ID,
+  STARTER_COMPANION_DEFAULT_NAME,
+  STARTER_COMPANION_DISCOVERY_ID,
+  assignCompanionHome,
   awardCompanionXp,
   careForCompanion,
   companionArchetype,
   companionLevelForXp,
   companionTrustForLevel,
   createCompanionInstance,
+  createStarterCompanionInstance,
   normalizeCompanionInstance,
   normalizeCompanionProgression,
+  normalizeCompanionResidence,
+  renameCompanion,
   resolveCompanionTravelPolicy,
   sanitizeCompanionName
 };

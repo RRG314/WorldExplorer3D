@@ -11,6 +11,8 @@ import { carSpeedToMph } from '../app/js/physics/vehicle-speed-units.js';
 import { createCharacter } from '../app/js/character/model.js';
 import { resolveCharacterCapability } from '../app/js/character/capability-resolver.js';
 import { groundVehicleTuning } from '../app/js/character/vehicle-assistance.js';
+import { compileTrafficGraph } from '../app/js/living-world/navigation-graphs.js';
+import { createTrafficVehicleSurfaceSampler } from '../app/js/living-world/runtime.js';
 
 test('the normal road-car ceiling is the advertised 120 mph', () => {
   assert.equal(carSpeedToMph(ROAD_CAR_CONFIG.maxSpd), 120);
@@ -82,4 +84,64 @@ test('Piloting assists the existing vehicle identity without changing its speed 
     vehicleHandlingProfile('compact').steeringScale * pilot.steeringAngleScale >
     vehicleHandlingProfile('pickup').steeringScale * pilot.steeringAngleScale
   );
+});
+
+test('traffic wheel samples stay bound to their published source segment', () => {
+  const feature = {
+    id: 'hairpin-road',
+    pts: [
+      { x: 0, z: 0 },
+      { x: 0, z: 20 },
+      { x: 1, z: 0 }
+    ],
+    width: 8,
+    driveable: true,
+    type: 'residential',
+    structureSemantics: { terrainMode: 'at_grade' },
+    transportRecord: {
+      identity: 'fixture:hairpin',
+      completeness: 'lossless',
+      crossSection: { widthMeters: 8 },
+      speed: { metersPerSecond: 8 }
+    }
+  };
+  const compiled = compileTrafficGraph({
+    traversal: {
+      authority: 'fixture',
+      segments: [{
+        feature,
+        direction: 'forward',
+        segIndex: 0,
+        sourceTStart: 0,
+        sourceTEnd: 1,
+        p1: feature.pts[0],
+        p2: feature.pts[1]
+      }]
+    },
+    sampleSurface: () => 4
+  });
+  const edge = compiled.publication.edges[0];
+  let receivedProjection = null;
+  const sample = createTrafficVehicleSurfaceSampler({
+    sampleFeatureSurfaceY(_feature, _x, _z, projection) {
+      receivedProjection = projection;
+      return projection.segIndex === 0 ? 4 : 40;
+    }
+  }, compiled);
+
+  assert.equal(edge.sourceSegIndex, 0);
+  assert.equal(sample(edge, 0.6, 1), 4.08);
+  assert.equal(receivedProjection.segIndex, 0);
+});
+
+test('traffic transition connectors publish a continuous four-wheel surface', () => {
+  const sample = createTrafficVehicleSurfaceSampler({ sampleFeatureSurfaceY: () => NaN }, {
+    runtimeFeatureByEdge: new Map()
+  });
+  const connector = {
+    p1: { x: 0, y: 2, z: 0 },
+    p2: { x: 0, y: 4, z: 10 }
+  };
+  assert.equal(sample(connector, 1, 5), 3);
+  assert.equal(sample(connector, -1, 7.5), 3.5);
 });

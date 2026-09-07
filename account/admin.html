@@ -664,6 +664,14 @@
       font-size: 14px;
     }
 
+    .capture-review-media { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(280px, 1fr); gap: 12px; }
+    .capture-review-canvas { width: 100%; min-height: 320px; display: block; background: #020811; border: 1px solid var(--line); }
+    .capture-photo-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .capture-photo-grid img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border: 1px solid var(--line); background: #020811; }
+    .capture-footprint { width: 100%; height: 180px; border: 1px solid var(--line); background: #07111f; }
+    .capture-alignment-grid { display: grid; grid-template-columns: repeat(5, minmax(80px, 1fr)); gap: 8px; }
+    .capture-alignment-grid label { display: grid; gap: 5px; color: var(--muted); font-size: 12px; }
+
     .muted-inline {
       color: var(--muted);
       font-size: 13px;
@@ -957,6 +965,11 @@
         grid-template-columns: 1fr;
       }
 
+      .capture-review-media,
+      .capture-alignment-grid {
+        grid-template-columns: 1fr;
+      }
+
       .field-wide,
       .filter-wide {
         grid-column: auto;
@@ -1145,6 +1158,7 @@
             <div id="moderationModeTabs" class="action-row">
               <button type="button" class="secondary-btn active" data-moderation-mode="overlay">Overlay Editor Queue</button>
               <button type="button" class="secondary-btn" data-moderation-mode="legacy">Legacy Contributions</button>
+              <button type="button" class="secondary-btn" data-moderation-mode="reality">Reality Captures</button>
             </div>
           </div>
           <div id="moderationSummary" class="section-grid"></div>
@@ -1285,6 +1299,8 @@
     </main>
   </div>
 
-  <script type="module" src="../js/admin-dashboard.js?v=1"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script type="module" src="../js/admin-dashboard.js?v=2"></script>
 </body>
 </html>

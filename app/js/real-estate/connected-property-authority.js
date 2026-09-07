@@ -7,10 +7,13 @@ import {
   where
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { getCurrentUser } from '../../../js/auth-ui.js?v=55';
-import { initFirebase } from '../../../js/firebase-init.js?v=56';
+import { initFirebase } from '../../../js/firebase-init.js?v=57';
 import { commitWorldPropertyAction, commitWorldPropertyTradeAction } from '../../../js/property-api.js?v=3';
 
 const LOCATION_PROPERTY_LIMIT = 320;
+const STARTING_WALLET_DOLLARS = 1000000;
+const CURRENCY_VERSION = 2;
+const LEGACY_CURRENCY_SCALE = 2000;
 
 function finite(value, fallback = 0) {
   const number = Number(value);
@@ -75,7 +78,14 @@ function createConnectedPropertyAuthority(options = {}) {
   const services = initFirebase();
   if (!worldSeed || !locationId || !user?.uid || !services?.db) return null;
   let disposed = false;
-  let wallet = Object.freeze({ credits: 500, pending: true });
+  const walletAuthority = options.walletAuthority || null;
+  const initialWallet = walletAuthority?.snapshot?.() || {};
+  let wallet = Object.freeze({
+    credits: Math.max(0, finite(initialWallet.credits, STARTING_WALLET_DOLLARS)),
+    pending: initialWallet.pending !== false,
+    revision: Math.max(0, finite(initialWallet.revision)),
+    currencyVersion: CURRENCY_VERSION
+  });
   let records = new Map();
   let portfolioRecords = new Map();
   let rentalRecords = new Map();
@@ -99,12 +109,29 @@ function createConnectedPropertyAuthority(options = {}) {
     rentalRecords = new Map(snapshot.docs.map(normalizeRecord).filter((record) => record && record.leaseEndsAtMs > Date.now()).map((record) => [record.propertyId, record]));
     emit();
   }, (error) => options.onError?.(error));
-  const stopWallet = onSnapshot(doc(services.db, 'users', user.uid, 'economy', 'wallet'), (snapshot) => {
-    if (disposed) return;
-    const data = snapshot.exists() ? snapshot.data() : {};
-    wallet = Object.freeze({ credits: Math.max(0, finite(data.credits, 500)), pending: false, revision: Math.max(0, finite(data.revision)) });
-    emit();
-  }, (error) => options.onError?.(error));
+  const stopWallet = walletAuthority?.subscribe
+    ? walletAuthority.subscribe((next) => {
+      if (disposed) return;
+      wallet = Object.freeze({
+        credits: Math.max(0, finite(next?.credits, STARTING_WALLET_DOLLARS)),
+        pending: next?.pending === true,
+        revision: Math.max(0, finite(next?.revision)),
+        currencyVersion: CURRENCY_VERSION
+      });
+      emit();
+    })
+    : onSnapshot(doc(services.db, 'users', user.uid, 'economy', 'wallet'), (snapshot) => {
+      if (disposed) return;
+      const data = snapshot.exists() ? snapshot.data() : {};
+      const scale = snapshot.exists() && finite(data.currencyVersion) < CURRENCY_VERSION ? LEGACY_CURRENCY_SCALE : 1;
+      wallet = Object.freeze({
+        credits: Math.max(0, finite(data.credits, STARTING_WALLET_DOLLARS) * scale),
+        pending: false,
+        revision: Math.max(0, finite(data.revision)),
+        currencyVersion: CURRENCY_VERSION
+      });
+      emit();
+    }, (error) => options.onError?.(error));
   const stopStarter = onSnapshot(doc(services.db, 'users', user.uid, 'propertyEntitlements', 'starter'), (snapshot) => {
     if (disposed) return;
     starterAvailable = !snapshot.exists() || snapshot.data()?.claimed !== true;
@@ -123,11 +150,14 @@ function createConnectedPropertyAuthority(options = {}) {
 
   function joinCandidates(candidates = []) {
     return candidates.map((candidate) => {
-      const shared = records.get(candidate.worldPropertyId);
+      const shared = records.get(candidate.worldPropertyId) ||
+        (candidate.legacyWorldPropertyIds || []).map((id) => records.get(id)).find(Boolean);
       return Object.freeze({
         ...candidate,
         ...(shared || {}),
         id: candidate.id,
+        canonicalWorldPropertyId: candidate.worldPropertyId,
+        worldPropertyId: shared?.propertyId || candidate.worldPropertyId,
         price: shared?.status === 'listed_for_sale' ? shared.salePrice : shared?.baseValue || candidate.price,
         owned: shared?.ownerUid === user.uid,
         rentedByMe: shared?.tenantUid === user.uid && shared.leaseEndsAtMs > Date.now(),

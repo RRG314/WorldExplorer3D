@@ -37,9 +37,11 @@ const GAME_RUNTIME_ENTRYPOINTS = Object.freeze({
   'multiplayer-artifacts': 'app/js/multiplayer/artifacts.js'
 });
 const ROOT_SHARED_MODULE_DIR = path.join(ROOT, 'js');
+const GAME_SHARED_CONTEXT_MODULE = 'app/js/shared-context.js';
 const REQUIRED_EXTERNAL_ROOT_MODULES = Object.freeze([
-  '/js/firebase-init.js?v=56',
-  '/js/auth-ui.js?v=55'
+  '/js/firebase-init.js?v=57',
+  '/js/auth-ui.js?v=55',
+  '/app/js/shared-context.js?v=55'
 ]);
 const INDIRECT_RUNTIME_ENTRYPOINTS = new Set([
   'app-entry',
@@ -113,7 +115,7 @@ function isGroundDataSource(relative) {
 async function copySources(sourceFiles) {
   await fs.rm(OUTPUT_DIR, { recursive: true, force: true });
   for (const [relative, source] of sourceFiles) {
-    if (isGameRuntimeSource(relative) || isGroundDataSource(relative)) continue;
+    if ((isGameRuntimeSource(relative) && relative !== GAME_SHARED_CONTEXT_MODULE) || isGroundDataSource(relative)) continue;
     const target = path.join(OUTPUT_DIR, relative);
     await fs.mkdir(path.dirname(target), { recursive: true });
     await fs.copyFile(source, target);
@@ -161,6 +163,11 @@ async function buildGameRuntime() {
         const sourcePath = queryIndex >= 0 ? args.path.slice(0, queryIndex) : args.path;
         const query = queryIndex >= 0 ? args.path.slice(queryIndex) : '';
         const resolved = path.resolve(args.resolveDir, sourcePath);
+        if (resolved === path.join(ROOT, GAME_SHARED_CONTEXT_MODULE)) {
+          const externalPath = `/app/js/shared-context.js${query}`;
+          externalRootModules.add(externalPath);
+          return { path: externalPath, external: true };
+        }
         const relative = path.relative(ROOT_SHARED_MODULE_DIR, resolved);
         if (relative.startsWith('..') || path.isAbsolute(relative)) return null;
         const externalPath = `/js/${normalizePath(relative)}${query}`;
@@ -417,7 +424,7 @@ async function verifyArtifact() {
   const sourceReleases = await sourceReleaseFingerprint(sourceFiles);
   for (const [relative, source] of sourceFiles) {
     if (GENERATED_PATHS.has(relative)) continue;
-    if (isGameRuntimeSource(relative) || relative === 'app/index.html' || relative === 'account/index.html') continue;
+    if ((isGameRuntimeSource(relative) && relative !== GAME_SHARED_CONTEXT_MODULE) || relative === 'app/index.html' || relative === 'account/index.html') continue;
     const outputRelative = isGroundDataSource(relative)
       ? `location-data/ground/${sourceReleases.sha256.slice(0, 16)}/${relative.slice('app/assets/ground/'.length)}`
       : relative;
@@ -437,7 +444,8 @@ async function verifyArtifact() {
     ) ||
     runtimePackaging.entryFileCount !== Object.keys(GAME_RUNTIME_ENTRYPOINTS).length ||
     runtimePackaging.fileCount !== runtimeFiles.length ||
-    expectedNames.some((relative) => relative.startsWith('app/js/') && !relative.startsWith('app/js/bundles/'))
+    expectedNames.some((relative) => relative.startsWith('app/js/') &&
+      !relative.startsWith('app/js/bundles/') && relative !== GAME_SHARED_CONTEXT_MODULE)
   ) {
     throw new Error('Hosting artifact runtime packaging no longer matches the bundled-runtime contract.');
   }

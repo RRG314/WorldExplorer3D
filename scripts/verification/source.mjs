@@ -1320,10 +1320,11 @@ const compiledAtGradeSurfaceSampler = createCompiledRoadSurfaceSampler(
   () => 99,
   compiledAtGradeSurfaceDiagnostics
 );
-if (compiledAtGradeSurfaceSampler(5, 0) !== 4 ||
-    compiledAtGradeSurfaceDiagnostics.compiledSurfaceFallbacks !== 0) {
+if (compiledAtGradeSurfaceSampler(5, 0) !== 99 ||
+    compiledAtGradeSurfaceDiagnostics.compiledSurfaceFallbacks !== 0 ||
+    compiledAtGradeSurfaceDiagnostics.renderedTerrainClamps !== 1) {
   roadSurfaceFootprintFailures.push(
-    'final at-grade road vertices did not consume the compiled transport surface profile'
+    'final at-grade road vertices did not reconcile the compiled profile with rendered terrain'
   );
 }
 const indexedSurfaceContainsPoint = (verts, indices, point) => {

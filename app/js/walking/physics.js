@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { resolveMobileCameraRecenter } from "../controls/mobile-touch-authority.js?v=5";
 import { worldUnitsPerSecondToMph } from "../physics/vehicle-speed-units.js?v=2";
-import { integrateSkydivingDynamics, parachuteHorizontalSpeed } from "../urban-sandbox/parachute-model.js?v=6";
+import { evaluateHighDropParachuteOffer, integrateSkydivingDynamics, parachuteHorizontalSpeed } from "../urban-sandbox/parachute-model.js?v=7";
 import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=3';
 import { samplePhysicalEnvironment } from '../planetary/runtime/physical-environment.js?v=2';
 import { getPlanetarySurfaceRegion } from '../planetary/runtime/surface-authority.js?v=4';
@@ -11,6 +11,22 @@ import { resolveInteriorCeiling } from '../interiors/vertical-boundary.js?v=1';
 
 function wrapYaw(angle = 0) {
   return Math.atan2(Math.sin(angle), Math.cos(angle));
+}
+
+function resolveWalkingMoveVector({ forward = 0, strafe = 0, yaw = 0, speed = 0, dt = 0 } = {}) {
+  let resolvedForward = Number(forward) || 0;
+  let resolvedStrafe = Number(strafe) || 0;
+  const inputMagnitude = Math.hypot(resolvedForward, resolvedStrafe);
+  if (inputMagnitude > 1) {
+    resolvedForward /= inputMagnitude;
+    resolvedStrafe /= inputMagnitude;
+  }
+  const distance = Math.max(0, Number(speed) || 0) * Math.max(0, Number(dt) || 0);
+  const resolvedYaw = Number(yaw) || 0;
+  return {
+    x: (Math.sin(resolvedYaw) * resolvedForward - Math.cos(resolvedYaw) * resolvedStrafe) * distance,
+    z: (Math.cos(resolvedYaw) * resolvedForward + Math.sin(resolvedYaw) * resolvedStrafe) * distance
+  };
 }
 
 function isPlanetarySurface() {
@@ -219,6 +235,7 @@ function createWalkingPhysicsHelpers({
       ? appCtx.resolveLiveGpsWalkerTarget?.(dt, { x: state.walker.x, z: state.walker.z }) || null
       : null;
     const skydiving = appCtx.urbanSandboxRuntime?.parachute?.skydiving === true;
+    const wasOnBuilding = state.walker.onBuilding === true;
     const parachuteDeployedAtFrameStart = appCtx.isUrbanParachuteDeployed?.() === true;
     const speed = skydiving
       ? parachuteHorizontalSpeed(parachuteDeployedAtFrameStart)
@@ -297,6 +314,35 @@ function createWalkingPhysicsHelpers({
     let finalGroundState = groundState;
     state.walker.onBuilding = groundState.onBuilding;
     state.walker.onGround = Math.abs(state.walker.y - (effectiveGroundY + CFG.eyeHeight)) < 0.3;
+
+    const offerParachuteForHighDrop = (surfaceState) => {
+      if (wasOnBuilding && !surfaceState.onBuilding && !Number.isFinite(state.walker.parachuteDropOriginY)) {
+        state.walker.parachuteDropOriginY = state.walker.y;
+      }
+      if (state.walker.onGround) {
+        state.walker.parachuteDropOriginY = null;
+        return false;
+      }
+      const highDropOffer = evaluateHighDropParachuteOffer({
+        environment: isPlanetarySurface() ? 'SPACE' : 'EARTH',
+        travelMode: state.walker.mode || 'walk',
+        alreadySkydiving: appCtx.urbanSandboxRuntime?.parachute?.skydiving === true,
+        leftElevatedSupport: Number.isFinite(state.walker.parachuteDropOriginY),
+        onGround: state.walker.onGround,
+        feetY: state.walker.y - CFG.eyeHeight,
+        groundY: surfaceState.effectiveGroundY,
+        verticalVelocity: state.walker.vy
+      });
+      if (!highDropOffer.allowed) return false;
+      state.walker.parachuteDropOriginY = null;
+      appCtx.prepareAirborneParachute?.({
+        autoEquip: true,
+        clearance: highDropOffer.clearance,
+        source: 'building_drop'
+      });
+      return true;
+    };
+    offerParachuteForHighDrop(groundState);
 
     if (state.walker.wallJumpTimer > 0) {
       state.walker.wallJumpTimer -= dt;
@@ -414,16 +460,15 @@ function createWalkingPhysicsHelpers({
       const cameraYaw = mobileTouch && Number.isFinite(state.walker.mobileMoveBasisYaw)
         ? state.walker.mobileMoveBasisYaw
         : wrapYaw(state.walker.yaw + state.walker.lookYawOffset);
-      const moveX = skydivingFlight
-        ? skydivingFlight.vx * dt
-        : mobileTouch && !liveGpsMoved
-        ? (Math.sin(cameraYaw) * forward - Math.cos(cameraYaw) * strafe) * adjustedSpeed * dt
-        : Math.sin(state.walker.angle) * forward * adjustedSpeed * dt;
-      const moveZ = skydivingFlight
-        ? skydivingFlight.vz * dt
-        : mobileTouch && !liveGpsMoved
-        ? (Math.cos(cameraYaw) * forward + Math.sin(cameraYaw) * strafe) * adjustedSpeed * dt
-        : Math.cos(state.walker.angle) * forward * adjustedSpeed * dt;
+      const movement = resolveWalkingMoveVector({
+        forward,
+        strafe,
+        yaw: mobileTouch && !liveGpsMoved ? cameraYaw : state.walker.angle,
+        speed: adjustedSpeed,
+        dt
+      });
+      const moveX = skydivingFlight ? skydivingFlight.vx * dt : movement.x;
+      const moveZ = skydivingFlight ? skydivingFlight.vz * dt : movement.z;
       if (mobileTouch && !liveGpsMoved && Math.hypot(moveX, moveZ) > 0.0001) {
         state.walker.angle = Math.atan2(moveX, moveZ);
       }
@@ -578,6 +623,7 @@ function createWalkingPhysicsHelpers({
         }
       }
       state.walker.onBuilding = postGroundState.onBuilding;
+      offerParachuteForHighDrop(postGroundState);
       state.walker.speedMph = worldUnitsPerSecondToMph(
         Math.hypot(state.walker.x - startX, state.walker.z - startZ) / Math.max(0.001, dt),
         appCtx.METERS_PER_WORLD_UNIT
@@ -598,7 +644,12 @@ function createWalkingPhysicsHelpers({
       state.characterMesh.rotation.y = state.walker.angle;
       state.characterMesh.rotation.x = skydivingFlight?.bodyPitch || 0;
       state.characterMesh.rotation.z = skydivingFlight ? -skydivingFlight.bank : 0;
-      animateCharacterWalk(state.characterMesh, !skydivingFlight && state.walker.speedMph > 0, dt);
+      animateCharacterWalk(
+        state.characterMesh,
+        !skydivingFlight && state.walker.speedMph > 0,
+        dt,
+        !skydivingFlight && Number(actions.sprint) > 0.05
+      );
     }
 
     if (profileEnabled) {
@@ -626,4 +677,4 @@ function createWalkingPhysicsHelpers({
   };
 }
 
-export { createWalkingPhysicsHelpers };
+export { createWalkingPhysicsHelpers, resolveWalkingMoveVector };

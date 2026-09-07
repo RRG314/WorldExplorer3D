@@ -22,6 +22,7 @@ const context = await browser.newContext({ viewport: { width: 1440, height: 900 
 const page = await context.newPage();
 const browserErrors = [];
 const localFailures = [];
+const visualEvidence = [];
 
 page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
 page.on('response', (response) => {
@@ -56,6 +57,7 @@ async function snapshot() {
       runtimeErrors: diagnostics.runtimeErrors || [],
       capturedErrors: Number(diagnostics.developerDiagnostics?.capturedErrors || 0),
       equipment,
+      equipmentPresentation: diagnostics.urbanSandbox?.equipmentPresentation || null,
       backpackMigration: diagnostics.urbanSandbox?.backpackMigration || null,
       projectile: diagnostics.urbanSandbox?.projectileRuntime || null,
       ui: {
@@ -143,13 +145,24 @@ try {
     const selected = document.querySelector('#urbanBackpackContents [data-equipment-id][aria-current="true"]');
     return detail?.querySelector('strong')?.textContent?.trim() === 'Laser gun' &&
       selected?.textContent?.includes('Laser gun') === true;
-  }, null, { timeout: 5000 });
+  }, null, { timeout: 30000 });
   await page.locator('#urbanBackpackDetail').getByRole('button', { name: 'Equip', exact: true }).click();
   await page.waitForFunction(() => {
-    const equipment = globalThis.getWorldExplorerRuntimeDiagnostics?.()?.urbanSandbox?.equipment;
-    return equipment?.equippedId === 'laser-gun';
+    const sandbox = globalThis.getWorldExplorerRuntimeDiagnostics?.()?.urbanSandbox;
+    return sandbox?.equipment?.equippedId === 'laser-gun';
   }, null, { timeout: 5000 });
+  await page.waitForTimeout(4000);
   const laserEquipped = await snapshot();
+  if (captureRequested) {
+    await fs.mkdir(evidenceDir, { recursive: true });
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => document.querySelector('#urbanEquipment')?.classList.contains('show') !== true);
+    const laserImage = path.join(evidenceDir, 'urban-equipment-laser-pose.png');
+    await page.screenshot({ path: laserImage, fullPage: false, timeout: 120000 });
+    visualEvidence.push(path.relative(root, laserImage));
+    await page.keyboard.press('KeyI');
+    await page.waitForSelector('#urbanEquipment.show', { timeout: 5000 });
+  }
   const laserMagazineBefore = Number(item(laserEquipped, 'laser-gun')?.magazine);
 
   await page.keyboard.press('KeyV');
@@ -205,7 +218,10 @@ try {
     pointerInspectsThenExplicitlyEquipsExistingLooseItem:
       laserEquipped.equipment?.equippedId === 'laser-gun' &&
       item(laserEquipped, 'laser-gun')?.equipped === true &&
-      laserEquipped.equipment?.items?.length === readyItems.length,
+      laserEquipped.equipment?.items?.length === readyItems.length &&
+      laserEquipped.equipmentPresentation?.attachment === 'curated-right-wrist' &&
+      laserEquipped.equipmentPresentation?.curatedAssetId === 'equipment-explorer-laser-rifle-v1' &&
+      laserEquipped.equipmentPresentation?.fallbackVisible === false,
     equipmentUseConsumesOneAuthoritativeRound:
       Number(item(laserUsed, 'laser-gun')?.magazine) === laserMagazineBefore - 1 &&
       Number(item(laserUsed, 'laser-gun')?.reserve) === Number(item(laserEquipped, 'laser-gun')?.reserve) &&
@@ -235,7 +251,7 @@ try {
     baseUrl,
     servedRoot,
     captureRequested,
-    screenshotsWritten: [],
+    screenshotsWritten: visualEvidence,
     checks,
     expectedCatalogIds,
     ready,

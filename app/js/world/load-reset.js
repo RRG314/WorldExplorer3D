@@ -1,4 +1,19 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
+import { clearBuildingExteriorMaterialPool } from "../engine/building-facade-materials.js?v=15";
+
+const MATERIAL_TEXTURE_KEYS = Object.freeze([
+  'map', 'alphaMap', 'aoMap', 'bumpMap', 'displacementMap', 'emissiveMap',
+  'envMap', 'lightMap', 'metalnessMap', 'normalMap', 'roughnessMap', 'specularMap'
+]);
+
+function disposeOwnedMaterialTextures(material) {
+  if (!material) return;
+  MATERIAL_TEXTURE_KEYS.forEach((key) => {
+    const texture = material[key];
+    if (!texture || texture.userData?.sharedRuntimeTexture === true) return;
+    texture.dispose?.();
+  });
+}
 
 function disposeSceneMeshes(meshes, options = {}) {
   if (!Array.isArray(meshes)) return;
@@ -11,8 +26,15 @@ function disposeSceneMeshes(meshes, options = {}) {
       object.geometry?.dispose?.();
       if (!object.material) return;
       if (skipSharedUrbanSurfaceMaterial && object.userData?.sharedUrbanSurfaceMaterial) return;
-      if (Array.isArray(object.material)) object.material.forEach((material) => material?.dispose?.());
-      else object.material.dispose?.();
+      if (Array.isArray(object.material)) {
+        object.material.forEach((material) => {
+          disposeOwnedMaterialTextures(material);
+          material?.dispose?.();
+        });
+      } else {
+        disposeOwnedMaterialTextures(object.material);
+        object.material.dispose?.();
+      }
     });
   });
 }
@@ -52,6 +74,7 @@ export function resetWorldForReload(options = {}) {
   const resetWorldFurnitureCaches = typeof options.resetWorldFurnitureCaches === 'function' ? options.resetWorldFurnitureCaches : () => {};
 
   appCtx.disposeLivingWorldRuntime?.('world_reload');
+  appCtx.clearCommunityRealityCapturePresentation?.();
   appCtx.buildingEntranceCatalog = null;
   appCtx.buildingEntranceByBuilding = null;
   appCtx.buildingFacadeEntrances = null;
@@ -120,6 +143,10 @@ export function resetWorldForReload(options = {}) {
 
   disposeSceneMeshes(appCtx.buildingMeshes);
   appCtx.clearWorldCollections(['buildingMeshes', 'buildings', 'dynamicBuildingColliders']);
+  // Exterior materials and atlases are world-publication resources. Keeping
+  // disposed materials in these pools makes the renderer allocate another GPU
+  // texture set on every location rebuild while the old set remains counted.
+  clearBuildingExteriorMaterialPool();
   clearBuildingSpatialIndex();
 
   disposeSceneMeshes(appCtx.landuseMeshes);
@@ -149,6 +176,8 @@ export function resetWorldForReload(options = {}) {
   appCtx.curatedLandmarkMetrics = null;
   appCtx.mappedLandmarkMetrics = null;
   appCtx.deferredTransportLandmarkPublishers = [];
+  appCtx.pendingPublishedTransportSurfaceControls = [];
+  appCtx.publishedTransportSurfaceControlApplication = null;
 
   disposeSceneMeshes(appCtx.streetFurnitureMeshes);
   appCtx.replaceWorldCollection('streetFurnitureMeshes');

@@ -20,6 +20,30 @@ async function openSpace(page) {
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').modes?.space === true, null, { timeout: 120_000 });
 }
 
+async function arriveAtProxima(page) {
+  await page.evaluate(async () => {
+    const [{ DEFAULT_CREW }, { createExpeditionPlan, withExpeditionChanges }, { startExpedition }, { createExpeditionStore }] = await Promise.all([
+      import('/app/js/expedition/catalog.js?v=2'),
+      import('/app/js/expedition/model.js?v=11'),
+      import('/app/js/expedition/simulation.js?v=8'),
+      import('/app/js/expedition/store.js?v=11')
+    ]);
+    const planned = createExpeditionPlan({ destinationId: 'proxima-centauri', crew: DEFAULT_CREW, id: 'thermal-mission-verification', createdAtMs: 93_000 });
+    createExpeditionStore().save(withExpeditionChanges(startExpedition(planned, 93_100), {
+      state: 'arrived', progress: 1, voyagePhase: 'arrival', arrivalTransferState: 'pending'
+    }));
+  });
+  await page.locator('#sfExpeditionBtn').click();
+  await page.locator('#expeditionArrive').click();
+  await page.waitForFunction(() => {
+    const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+    return state.universeNavigation?.currentFrameId === 'proxima-centauri'
+      && state.universeNavigation?.transitionDestinationId == null
+      && state.interstellarExpedition?.arrivalTransferState === 'complete';
+  }, null, { timeout: 30_000 });
+  if (await page.locator('[data-mission-close]').isVisible()) await page.locator('[data-mission-close]').click();
+}
+
 async function setThermalAngle(page, zone) {
   return page.evaluate(async (requestedZone) => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
@@ -68,12 +92,25 @@ async function run() {
   page.on('response', (response) => { if (response.url().startsWith(baseUrl) && response.status() >= 400) failures.push(`${response.status()} ${response.url()}`); });
   try {
     await openSpace(page);
+    await arriveAtProxima(page);
     await page.locator('#universeToggle').click();
     await page.locator('#universeDestinationSelect').selectOption('proxima-centauri-d');
     await page.locator('#universeMissionBtn').click();
     assert.equal(await page.locator('#destinationMissionTitle').textContent(), 'The Inner Furnace');
     await page.locator('[data-mission-begin]').click();
-    await page.locator('[data-mission-course]').click();
+    const courseAction = page.locator('[data-mission-course]');
+    if (await courseAction.isVisible()) await courseAction.click();
+    await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').universeNavigation?.courseDestinationId === 'proxima-centauri-d');
+    assert.equal(await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const target = ctx.getUniverseHudTarget?.();
+      if (!target?.position || !ctx.spaceFlight?.rocket) return false;
+      ctx.spaceFlight.rocket.position.set(target.position.x, target.position.y, target.position.z + Math.max(90, Number(target.radius || 6) * 12));
+      ctx.spaceFlight.velocity?.set?.(0, 0, 0);
+      ctx.spaceFlight.gravityVelocity?.set?.(0, 0, 0);
+      ctx.spaceFlight.speed = 0;
+      return true;
+    }), true);
     await page.waitForFunction(() => {
       const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
       return state.universeNavigation?.courseDestinationId === 'proxima-centauri-d' && state.destinationMission?.phase === 'fieldwork';
