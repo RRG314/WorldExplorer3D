@@ -199,6 +199,17 @@ try {
   await phone.waitForFunction(() => document.activeElement?.matches('[data-capture-preview]'));
   assert.equal(await phone.locator('[data-capture-result]').isVisible(), true);
   assert.equal(await phone.locator('[data-capture-viewer] canvas').count(), 0);
+  assert.match(await phone.locator('[data-capture-registration]').textContent(), /no retained photo-matching report/);
+  captures.get('capture-1').processed.registration = {status:'available',registeredCount:7,submittedCount:20};
+  await phone.click('[data-capture-refresh]');
+  await phone.waitForFunction(() => document.querySelector('[data-capture-registration]').textContent.includes('7 of 20'));
+  assert.match(await phone.locator('[data-capture-registration]').textContent(), /may be incomplete/);
+  await phone.waitForFunction(() => !document.querySelector('[data-capture-refresh]').disabled);
+  await phone.screenshot({path:`${out}/mobile-partial-reconstruction-warning.png`});
+  captures.get('capture-1').processed.registration.registeredCount = 20;
+  await phone.click('[data-capture-refresh]');
+  await phone.waitForFunction(() => document.querySelector('[data-capture-registration]').textContent.includes('20 of 20'));
+  assert.match(await phone.locator('[data-capture-registration]').textContent(), /does not confirm/);
   captures.get('capture-1').status = 'queued';
   delete captures.get('capture-1').processed;
   // An exterior handoff must not strand the desktop user: a separate room can still be started.
@@ -283,7 +294,7 @@ try {
     'exterior and room framing templates follow selected view and disclose coverage limits',
     'guided camera saves through existing normalization and local store; retake removes the exact local photo'
   ], errors, limitation: 'Auth/storage transport doubles; no real GPU or physical phone reconstruction.' }, null, 2));
-  console.log('Capture UI: 17 existing checks plus manual-check pending, unchanged, failure/recovery and ready-action scenarios passed; transport doubles, synthetic camera and GLB, not reconstruction acceptance.');
+  console.log('Capture UI: 17 existing checks plus manual-check and unavailable/partial/all-registered warning scenarios passed; transport doubles, synthetic camera and GLB, not reconstruction acceptance.');
 } catch (error) {
   console.error('Capture UI browser errors:', errors);
   for (const [index, context] of browser.contexts().entries()) {

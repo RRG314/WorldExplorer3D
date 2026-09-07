@@ -4,6 +4,7 @@ const functions = require('firebase-functions/v1');
 const { GoogleAuth, OAuth2Client } = require('google-auth-library');
 const { randomUUID } = require('node:crypto');
 const { FieldValue } = require('firebase-admin/firestore');
+const { validateRegistrationReport } = require('./reality-capture-diagnostics');
 
 const PIPELINE = 'we3d-meshroom-blender-v2';
 const LEASE_MS = 40 * 60_000;
@@ -112,10 +113,11 @@ function buildCaptureProcessingExports({ db, bucket }) {
       const [bytes] = await file.download();
       const { inspectGlb } = require('./reality-capture-glb');
       const modelInspection = inspectGlb(bytes);
+      const registration = validateRegistrationReport(req.body.registration, capture.inputManifest.map(photo => photo.name));
       if (modelInspection.triangles < 1 || modelInspection.triangles > 500000) throw Error('model_triangles');
       await file.setMetadata({ cacheControl: 'private, no-store, max-age=0', contentType: 'model/gltf-binary' });
       const saved = await finish(captureId, attemptId, { status: 'review_required', processingCompletedAt: FieldValue.serverTimestamp(),
-        processed: { optimizedModelPath: destination, inputSummary: capture.uploadSummary, modelInspection,
+        processed: { optimizedModelPath: destination, inputSummary: capture.uploadSummary, modelInspection, registration,
           provenance: { provider: 'meshroom', pipelineVersion: PIPELINE, evidenceClass: 'observation-derived', usesFullPhotoSet: true,
             realReconstructionAcceptance: false, runtimeRevision: String(req.body.revision || '').slice(0, 100) },
           rawCollisionAllowed: false, rawNavigationAllowed: false } });

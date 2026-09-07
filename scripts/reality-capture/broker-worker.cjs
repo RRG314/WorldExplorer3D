@@ -32,13 +32,13 @@ async function main() {
       if (bytes.length !== photo.size) throw Error('photo_size_mismatch');
       await fs.writeFile(path.join(job.images, photo.name), bytes, { flag: 'wx', mode: 0o600 });
     }
-    await reconstruct(providerOptions([]), job);
+    const reconstruction = await reconstruct(providerOptions([]), job);
     const bytes = await fs.readFile(job.finalGlb);
     const inspection = inspectGlb(bytes);
     if (bytes.length > 20 * 1024 * 1024 || inspection.triangles > 500000) throw Error('output_budget');
     const upload = await fetch(manifest.uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'model/gltf-binary' }, body: bytes, signal: AbortSignal.timeout(120000) });
     if (!upload.ok) throw Error(`output_upload_${upload.status}`);
-    await post('complete', { revision: process.env.WE3D_RECONSTRUCTION_REVISION });
+    await post('complete', { revision: process.env.WE3D_RECONSTRUCTION_REVISION, registration: reconstruction.registration });
     console.log('Capture reconstruction completed', inspection);
   } catch (error) {
     await post('failed').catch(() => {});

@@ -16,7 +16,7 @@ const PROJECT = 'we3d-staging-20260712';
 const NUMBER = '524178734996';
 const REGION = 'us-central1';
 const SOURCE_BUCKET = `${PROJECT}-capture-build`;
-const IMAGE = `${REGION}-docker.pkg.dev/${PROJECT}/capture-processing/meshroom:2023.3.0-v4`;
+const IMAGE = `${REGION}-docker.pkg.dev/${PROJECT}/capture-processing/meshroom:2023.3.0-v5`;
 const client = (urlPrefix) => new Client({ urlPrefix, auth: true });
 
 async function ensure(url, route, createRoute, body, options) {
@@ -62,7 +62,7 @@ async function build() {
   const work = await fs.mkdtemp(path.join(os.tmpdir(), 'we3d-capture-build-'));
   try {
     const archive = path.join(work, 'source.tgz');
-    execFileSync('tar', ['-czf', archive, 'scripts/reality-capture', 'functions/reality-capture-glb.js'], { cwd: root });
+    execFileSync('tar', ['-czf', archive, 'scripts/reality-capture', 'functions/reality-capture-glb.js', 'functions/reality-capture-diagnostics.js'], { cwd: root });
     const bytes = await fs.readFile(archive);
     const name = `source-${require('node:crypto').createHash('sha256').update(bytes).digest('hex').slice(0, 16)}.tgz`;
     const token = await getAccessToken();

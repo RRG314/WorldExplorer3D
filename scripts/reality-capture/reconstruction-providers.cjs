@@ -3,6 +3,25 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
+const { registrationReport, unavailable } = require('./registration-diagnostics.cjs');
+
+async function readRegistrationReport(job) {
+  const names = (await fs.readdir(job.images)).filter(name => /\.(jpg|webp)$/i.test(name));
+  const root = path.join(job.cache, 'StructureFromMotion');
+  const entries = await fs.readdir(root, { withFileTypes: true }).catch(error => { if (error.code === 'ENOENT') return []; throw error; });
+  const files = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const file = path.join(root, entry.name, 'cameras.sfm');
+    const stat = await fs.lstat(file).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
+    if (stat?.isFile()) files.push({ file, bytes: stat.size });
+  }
+  if (!files.length) return unavailable(names);
+  if (files.length !== 1) return unavailable(names, 'ambiguous_camera_report');
+  if (files[0].bytes > 4 * 1024 * 1024) return unavailable(names, 'invalid_camera_report');
+  try { return registrationReport(JSON.parse(await fs.readFile(files[0].file, 'utf8')), names); }
+  catch { return unavailable(names, 'invalid_camera_report'); }
+}
 
 const PROVIDERS = Object.freeze(['meshroom', 'trellis2-image', 'trellis2-texture']);
 
@@ -61,12 +80,14 @@ async function reconstruct(options, job, dependencies = {}) {
   const execute = dependencies.run || run;
   const env = dependencies.env || process.env;
   let source;
+  let registration = null;
   if (options.provider === 'meshroom') {
     await execute(env.MESHROOM_BATCH_BIN || 'meshroom_batch', ['--input', job.images, '--output', job.output, '--cache', job.cache,
       '--verbose', 'info', '--paramOverrides', 'FeatureExtraction:describerTypes=sift',
       'FeatureExtraction:forceCpuExtraction=false', 'FeatureExtraction:maxThreads=4'], { cwd: job.work });
     source = await findFirst(job.output, 'texturedMesh.obj') || await findFirst(job.cache, 'texturedMesh.obj');
     if (!source) throw Error('meshroom_textured_mesh_missing');
+    registration = await readRegistrationReport(job);
   } else {
     const image = path.join(job.images, options.referencePhoto);
     await fs.access(image);
@@ -81,6 +102,7 @@ async function reconstruct(options, job, dependencies = {}) {
   await execute(env.BLENDER_BIN || 'blender', ['--background', '--factory-startup', '--python-exit-code', '1', '--python',
     path.join(__dirname, 'blender-export-glb.py'), '--', '--input', source, '--output', job.finalGlb], { cwd: path.dirname(source) });
   return { provider: options.provider, pipelineVersion: options.pipelineVersion, evidenceClass: options.evidenceClass,
+    registration,
     referencePhoto: options.referencePhoto || null,
     model: options.provider.startsWith('trellis2') ? (env.WE3D_TRELLIS_MODEL || 'microsoft/TRELLIS.2-4B') : null,
     runtimeRevision: env.WE3D_RECONSTRUCTION_REVISION || 'unrecorded',
@@ -89,4 +111,4 @@ async function reconstruct(options, job, dependencies = {}) {
     realReconstructionAcceptance: false };
 }
 
-module.exports = { PROVIDERS, providerOptions, reconstruct, run };
+module.exports = { PROVIDERS, providerOptions, reconstruct, run, readRegistrationReport };

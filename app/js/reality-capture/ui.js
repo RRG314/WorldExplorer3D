@@ -82,7 +82,7 @@ function renderProgress(session) {
   panel.querySelector('[data-capture-refresh]').disabled = session.busy || checking;
   panel.querySelector('[data-capture-progress-title]').textContent = checking ? 'Checking your capture…'
     : session.progressError ? 'Could not check right now'
-    : ready ? 'Your 3D result is ready'
+    : ready ? 'Preview ready · coverage needs review'
     : status === 'processing' ? 'Reconstruction in progress'
     : status === 'queued' ? 'Waiting to start'
     : status === 'processing_failed' ? 'Processing needs attention' : 'Photos saved';
@@ -127,8 +127,9 @@ function ensurePanel() {
         <button type="button" data-capture-retry hidden>Retry reconstruction with my saved photos</button>
       </section>
       <section data-capture-result hidden aria-label="Your reconstruction">
-        <h2>Your reconstruction</h2>
+        <h2>Reconstruction preview</h2>
         <p>This is your private result. Inspect coverage before it is reviewed for use in the world. Missing surfaces are not automatically filled with invented details.</p>
+        <p data-capture-registration role="status"></p>
         <button type="button" data-capture-preview>View my 3D result</button>
         <div data-capture-viewer></div>
         <div data-capture-viewer-controls hidden>
@@ -370,6 +371,11 @@ function render() {
     element.disabled = current.busy || (locked && !element.matches('[data-capture-refresh], [data-capture-copy], [data-capture-phone], [data-capture-preview], [data-viewer-action], [data-capture-cancel], [data-capture-retry]'));
   });
   panel.querySelector('[data-capture-result]').hidden = !current.serverCapture?.processed?.optimizedModelPath;
+  const registration = current.serverCapture?.processed?.registration;
+  panel.querySelector('[data-capture-registration]').textContent = registration?.status === 'available'
+    ? `${registration.registeredCount} of ${registration.submittedCount} photos positioned in 3D. ${registration.registeredCount < registration.submittedCount
+      ? 'Some photos could not be positioned; this preview may be incomplete.' : 'Photo matching alone does not confirm that every wall and the roof were reconstructed.'}`
+    : 'Coverage unverified: this result has no retained photo-matching report. A finished processing job does not mean a complete building.';
   panel.querySelector('[data-facade-choice]').hidden = current.kind !== 'exterior';
   panel.querySelector('[data-exterior-facade]').checked = current.exteriorScope === 'facade';
   panel.querySelector('[data-exterior-facade]').disabled = current.busy || !!current.serverCapture;

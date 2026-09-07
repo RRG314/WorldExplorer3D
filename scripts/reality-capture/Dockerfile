@@ -8,6 +8,7 @@ ENV MESHROOM_BATCH_BIN=/opt/meshroom/meshroom_batch WE3D_RECONSTRUCTION_PROVIDER
 WORKDIR /worker
 COPY scripts/reality-capture/ /worker/
 COPY functions/reality-capture-glb.js /worker/glb-inspection.cjs
+COPY functions/reality-capture-diagnostics.js /worker/registration-diagnostics.cjs
 RUN useradd --uid 10001 --create-home capture
 USER 10001
 RUN node /worker/blender-export-selftest.cjs

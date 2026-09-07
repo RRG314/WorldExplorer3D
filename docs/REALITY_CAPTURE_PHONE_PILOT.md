@@ -47,6 +47,24 @@ Reference dimensions supplied by the owner: brick-to-brick door opening 40 inche
 
 Next reconstruction work: retain private per-attempt camera-registration and component diagnostics; distinguish submitted from matched photos; preserve useful non-location calibration metadata under the existing privacy policy; compare raw and optimized results; report partial/unverified coverage visibly; support supplemental views without replacing saved inputs. Full-building coverage requires a geometry/observed-surface check, not only a minimum photo count or valid GLB.
 
+### Local-first validation checkpoint (not deployed)
+
+The worker now reads the `StructureFromMotion/.../cameras.sfm` report before temporary cleanup and passes a bounded registration summary through the existing authenticated completion callback. The backend checks it against the immutable submitted photo names, discards extra fields, and retains no source paths, camera coordinates, EXIF or URLs in that summary. Missing, malformed or ambiguous reports remain explicitly unavailable. This is a photo-registration diagnostic, not a complete surface/component report. It does not retroactively recover the owner's discarded diagnostics.
+
+The local UI shows unavailable, partial or all-registered evidence while keeping building coverage unverified. Thirty-four focused Node tests passed; the existing browser suite plus registration-warning cases passed, and the phone-width warning was visually inspected. These use schema fixtures and explicit auth/storage doubles, not a new reconstruction of the owner's building.
+
+`node scripts/reality-capture/local-preflight.cjs` performs no cloud calls and never starts reconstruction. It checks the shared diagnostic contract, local tool availability and, when Blender is available, the existing textured export self-test. On this machine it returned exit 2: no Blender or Meshroom CLI available, so installed-toolchain validation is NOT passed. Do not relabel this outcome as success. No new cloud build, GPU execution, or reconstruction retry was started for these changes. The v5 worker image definition is prepared but not built/deployed.
+
+Before a new paid experiment:
+
+1. Validate the actual reconstruction/export executables, not just mocked commands. A local installation or controlled compatible toolchain is required; the current Mac CLI check cannot certify the Linux/NVIDIA worker.
+2. Preserve private per-attempt camera/component and pre/post-cleanup evidence, including failures, with bounded retention and authenticated access. The summary added here alone does not satisfy this full checkpoint requirement.
+3. Test registration coverage before dense meshing, so an obviously partial camera solution can request supplemental views without spending the full dense-reconstruction budget. Verify the real Meshroom CLI/resume behavior before enabling this split; it is not implemented here.
+4. Preserve useful, explicitly allowlisted camera calibration evidence without reintroducing location/serial/private EXIF fields. Existing stripped inputs cannot magically regain that metadata.
+5. Run one same-input comparison with a named hypothesis and stop criterion only after those gates pass. Do not retry the existing 21 photos unchanged or claim an algorithm change fixes all locations before testing.
+
+Geometry filtering is intentionally unchanged until raw/optimized evidence can establish whether it removed valid surfaces. Background notifications and full facade/room completion remain unfinished.
+
 ### Check feedback and notification plan
 
 The manual check now gives immediate busy feedback, last successful check time, in-place network failure/recovery, and reveals/focuses the preview action when a model exists. Concurrent manual checks join an existing poll. There is no fabricated percentage or completion estimate. Browser scenarios cover pending, unchanged, failed/recovered and ready states; auth/storage are explicit test doubles.
