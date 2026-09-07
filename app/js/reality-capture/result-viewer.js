@@ -61,6 +61,28 @@ export async function createCaptureViewer(host, bytes, signal, options = {}) {
   controls.minDistance = radius * 0.04;
   controls.maxDistance = radius * 10;
   let disposed = false;
+  const events = new AbortController();
+  // A tap selects; an orbit/pinch never selects a surface accidentally.
+  let press = null;
+  const pointers = new Set();
+  canvas.addEventListener('pointerdown', e => {
+    pointers.add(e.pointerId);
+    if (pointers.size !== 1) { press = null; return; }
+    press = {id:e.pointerId,x:e.clientX,y:e.clientY,moved:false};
+  }, {signal:events.signal});
+  canvas.addEventListener('pointermove', e => {
+    if (press && Math.hypot(e.clientX-press.x,e.clientY-press.y)>8) press.moved=true;
+  }, {signal:events.signal});
+  canvas.addEventListener('pointerup', e => {
+    pointers.delete(e.pointerId);
+    const tap=press;press=null;
+    if (!options.onPick || !tap || tap.moved || tap.id!==e.pointerId || disposed) return;
+    const rect=canvas.getBoundingClientRect(), ray=new T.Raycaster();
+    ray.setFromCamera(new T.Vector2((e.clientX-rect.left)/rect.width*2-1,1-(e.clientY-rect.top)/rect.height*2),camera);
+    const hit=ray.intersectObject(model,true).find(h=>h.object.isMesh);
+    if(hit)options.onPick({point:model.worldToLocal(hit.point.clone()),object:hit.object});
+  }, {signal:events.signal});
+  canvas.addEventListener('pointercancel', e=>{pointers.delete(e.pointerId);press=null;}, {signal:events.signal});
   const draw = () => { if (!disposed && !document.hidden) renderer.render(scene, camera); };
   const reset = () => {
     const box = new T.Box3().setFromObject(model);
@@ -78,14 +100,17 @@ export async function createCaptureViewer(host, bytes, signal, options = {}) {
   const observer = new ResizeObserver(resize); observer.observe(host);
   document.addEventListener('visibilitychange', draw, { signal });
   reset(); resize();
+  if(options.view){camera.position.fromArray(options.view.position);controls.target.fromArray(options.view.target);controls.update();draw();}
   const dispose = () => {
     if (disposed) return;
-    disposed = true; observer.disconnect(); controls.dispose(); disposeModel();
+    disposed = true; events.abort(); signal.removeEventListener('abort',dispose); document.removeEventListener('visibilitychange',draw); observer.disconnect(); controls.dispose(); disposeModel();
     reference.traverse(object => { object.geometry?.dispose(); object.material?.dispose(); });
     renderer.dispose(); renderer.forceContextLoss(); host.replaceChildren();
   };
   signal.addEventListener('abort', dispose, { once: true });
   return { dispose, reset,
+    redraw: draw,
+    getView: () => ({position:camera.position.toArray(),target:controls.target.toArray()}),
     updateAlignment: alignment => { if (!placementReview || disposed) return; applyCaptureAlignment(model, alignment); draw(); },
     getPlacement: () => ({ position: model.position.toArray(), scale: model.scale.toArray(), rotationY: model.rotation.y }),
     rotate: () => {

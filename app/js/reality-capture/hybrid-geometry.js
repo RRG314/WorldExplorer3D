@@ -10,38 +10,10 @@ export function wallFootprint(building) {
   return pts;
 }
 
-export function validateQuad(quad) {
-  if (!Array.isArray(quad) || quad.length !== 4 || quad.some(p => !Array.isArray(p) || p.length !== 2 || p.some(n=>!Number.isFinite(n)||n<0||n>1))) throw Error('Mark four corners inside the photo.');
-  for(let i=0;i<4;i++) {
-    const a=quad[i], b=quad[(i+1)%4], c=quad[(i+2)%4];
-    if ((b[0]-a[0])*(c[1]-b[1])-(b[1]-a[1])*(c[0]-b[0]) < .0001) throw Error('Corners must follow top-left, top-right, bottom-right, bottom-left without crossing.');
-  }
-  return quad;
-}
+import {validateQuad,photoHomography,projectPhoto} from '../../../functions/capture-projectivity.mjs';
+export {validateQuad,photoHomography,projectPhoto};
 
-// Solve destination unit-square -> source-photo projectivity with pivoting.
-export function photoHomography(quad) {
-  validateQuad(quad);
-  const rows=[];
-  [[0,0],[1,0],[1,1],[0,1]].forEach(([x,y],i)=>{
-    const [u,v]=quad[i]; rows.push([x,y,1,0,0,0,-u*x,-u*y,u],[0,0,0,x,y,1,-v*x,-v*y,v]);
-  });
-  for(let col=0;col<8;col++) {
-    let pivot=col; for(let r=col+1;r<8;r++) if(Math.abs(rows[r][col])>Math.abs(rows[pivot][col])) pivot=r;
-    [rows[col],rows[pivot]]=[rows[pivot],rows[col]];
-    const n=rows[col][col]; if(Math.abs(n)<1e-10) throw Error('These corners cannot define a stable wall projection.');
-    for(let j=col;j<9;j++) rows[col][j]/=n;
-    for(let r=0;r<8;r++) if(r!==col) {const f=rows[r][col];for(let j=col;j<9;j++) rows[r][j]-=f*rows[col][j];}
-  }
-  return [...rows.map(r=>r[8]),1];
-}
-
-export function projectPhoto(h,x,y) {
-  const d=h[6]*x+h[7]*y+1;
-  return [(h[0]*x+h[1]*y+h[2])/d,(h[3]*x+h[4]*y+h[5])/d];
-}
-
-export function rectifyPhoto(bitmap, quad, aspect=1) {
+export function rectifyPhoto(bitmap, quad, aspect=1, maxSize=1024) {
   const h=photoHomography(quad), source=document.createElement('canvas');
   // Bound decoded working copies and output texture independently of input size.
   const scale=Math.min(1,2048/Math.max(bitmap.width,bitmap.height));
@@ -49,8 +21,9 @@ export function rectifyPhoto(bitmap, quad, aspect=1) {
   const sc=source.getContext('2d',{willReadFrequently:true}); sc.drawImage(bitmap,0,0,source.width,source.height);
   const src=sc.getImageData(0,0,source.width,source.height).data;
   const result=document.createElement('canvas');
-  result.width=Math.max(32,Math.round(1024*Math.min(1,aspect)));
-  result.height=Math.max(32,Math.round(1024*Math.min(1,1/aspect)));
+  const limit=Math.max(32,Math.min(1024,maxSize));
+  result.width=Math.max(32,Math.round(limit*Math.min(1,aspect)));
+  result.height=Math.max(32,Math.round(limit*Math.min(1,1/aspect)));
   const ctx=result.getContext('2d'), out=ctx.createImageData(result.width,result.height);
   for(let y=0;y<result.height;y++) for(let x=0;x<result.width;x++) {
     const [u,v]=projectPhoto(h,(x+.5)/result.width,(y+.5)/result.height);

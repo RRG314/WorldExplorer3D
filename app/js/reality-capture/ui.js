@@ -140,13 +140,13 @@ function ensurePanel() {
           <button type="button" data-viewer-action="reset">Reset view</button>
         </div>
       </section>
-      <button type="button" data-capture-hybrid hidden>Build a photo + procedural preview</button>
+      <button type="button" data-capture-hybrid hidden>Match photos to building sides</button>
       <div class="realityCaptureKinds" role="tablist" aria-label="Capture type">
         <button type="button" data-capture-kind="exterior" role="tab">Exterior</button>
         <button type="button" data-capture-kind="interior_room" role="tab">One room</button>
       </div>
       <label class="realityCaptureConsent" data-facade-choice><input data-exterior-facade type="checkbox" checked> <span>One facade / accessible wall only. Reconstruct what I can see, not the entire building.</span></label>
-      <details data-building-details class="captureVisualGuide"><summary>Building details and measurements (optional)</summary>
+      <details data-building-details class="captureVisualGuide"><summary>Advanced · building details and measurements (optional)</summary>
         <p>Leave unknown details blank. These are your observations, not verified map data. They do not automatically resize the building or reconstruction.</p>
         <div class="realityCaptureGrid">
           <label>Floors<input data-building-floors type="number" min="1" max="200" step="1"></label>
