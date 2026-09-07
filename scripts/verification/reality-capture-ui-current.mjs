@@ -9,7 +9,7 @@ const server = await startStaticServer({ rootDir: process.cwd(), ports: [4487, 4
 const origin = 'https://capture.test';
 const out = 'output/verification/reality-capture-ui';
 await mkdir(out, { recursive: true });
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
 const errors = [], captures = new Map(), uploaded = new Map();
 let serial = 0, failNextUpload = false, failNextProgress = false;
 const authModule = `let user=null;const listeners=new Set();
@@ -96,6 +96,14 @@ try {
   await phone.click('#switchAccount'); await phone.click('#googleSignIn');
   await phone.locator('#realityCapturePanel.show').waitFor();
   assert.equal(await phone.locator('[data-capture-label]').innerText(), 'Selected test house');
+  await phone.click('[data-capture-live-camera]');
+  await phone.locator('[data-camera-shutter]:enabled').waitFor();
+  await phone.click('[data-camera-shutter]');
+  await phone.waitForFunction(() => document.querySelector('[data-camera-status]').textContent.includes('1 photo saved'));
+  await phone.click('[data-camera-retake]');
+  await phone.waitForFunction(() => document.querySelector('[data-camera-status]').textContent.includes('Last local photo removed'));
+  await phone.click('[data-camera-done]');
+  assert.match(await phone.locator('[data-capture-count]').textContent(), /^0 /);
   assert.match(await phone.locator('[data-capture-photo-guide]').innerText(), /70%/);
   await phone.click('[data-sector-index="2"]');
   assert.match(await phone.locator('[data-capture-photo-guide] svg').getAttribute('aria-label'), /Position 3 selected/);
@@ -235,9 +243,10 @@ try {
     '20-photo submission and cross-device queued status', 'room permission and exact room handoff', 'decoded thumbnail review and removal before upload',
     'actual GLB viewer preserves placement while camera rotates; abort releases canvas',
     'acknowledged retry remains queued when progress connection fails',
-    'exterior and room framing templates follow selected view and disclose coverage limits'
+    'exterior and room framing templates follow selected view and disclose coverage limits',
+    'guided camera saves through existing normalization and local store; retake removes the exact local photo'
   ], errors, limitation: 'Auth/storage transport doubles; no real GPU or physical phone reconstruction.' }, null, 2));
-  console.log('Capture UI: 16 focused checks passed; transport doubles and synthetic GLB, not reconstruction acceptance.');
+  console.log('Capture UI: 17 focused checks passed; transport doubles, synthetic camera and GLB, not reconstruction acceptance.');
 } catch (error) {
   console.error('Capture UI browser errors:', errors);
   for (const [index, context] of browser.contexts().entries()) {

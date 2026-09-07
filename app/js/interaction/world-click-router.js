@@ -1,5 +1,3 @@
-import { openRealityCaptureForBuilding } from '../reality-capture/ui.js?v=2';
-
 function uniqueVisibleRoots(groups = []) {
   const seen = new Set();
   return groups.flat().filter((object) => {
@@ -28,10 +26,11 @@ function targetFromObject(object) {
       };
     }
     if (current.userData?.sourceBuildingId || current.userData?.buildingFootprint) {
+      const type = String(current.userData.buildingType || '').replaceAll('_', ' ');
       return {
         kind: 'building',
         id: String(current.userData.sourceBuildingId || current.uuid),
-        label: String(current.userData.buildingName || current.userData.buildingType || 'building').replaceAll('_', ' '),
+        label: String(current.userData.buildingName || (/^(yes|true|1|no)?$/i.test(type) ? 'mapped building' : type)).replaceAll('_', ' '),
         object: current
       };
     }
@@ -86,7 +85,9 @@ function showWorldSelectionNotice(title, detail = '', action = null) {
   actionButton.onclick = action?.onClick || null;
   card.hidden = false;
   clearTimeout(Number(card._hideTimer) || 0);
-  card._hideTimer = setTimeout(() => { card.hidden = true; }, 5500);
+  // Explicitly selected actions remain until dismissed; do not race a user
+  // trying to read the building identity or start a capture on a phone.
+  card._hideTimer = actionButton.hidden ? setTimeout(() => { card.hidden = true; }, 5500) : 0;
   return true;
 }
 
@@ -117,7 +118,9 @@ function performWorldClickTarget(appCtx, target) {
         label: 'Improve this place',
         onClick: () => {
           document.getElementById('worldSelectionNotice')?.setAttribute('hidden', '');
-          void openRealityCaptureForBuilding(appCtx, target);
+          void import('../reality-capture/ui.js?v=2')
+            .then(({ openRealityCaptureForBuilding }) => openRealityCaptureForBuilding(appCtx, target))
+            .catch(() => showWorldSelectionNotice('Capture could not open', 'Check your connection and select this building again.'));
         }
       }
     );

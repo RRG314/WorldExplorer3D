@@ -13,7 +13,7 @@ You can also return to https://we3d-staging-20260712.web.app/app/capture.html on
 
 ## Take photos
 
-**Open guided camera** opens the rear camera in the app with framing corners and a grid over the live image. After the first saved shot, **Show previous photo** overlays that frame translucently to help overlap. It does not estimate camera pose or certify coverage. **Done**, closing the dialog, changing accounts or leaving the page stops the camera. If permission is denied or the camera is unavailable, **Add photos from camera or library** remains available.
+**Open guided camera** opens the rear camera in the app with framing corners and a grid over the live image. After the first saved shot, **Show previous photo** overlays that frame translucently to help overlap. Blur/exposure warnings appear after capture; **Retake last** removes that local photo so you can replace it. These warnings are estimates, not a reconstruction-quality certificate. **Done**, closing the dialog, changing accounts or leaving the page stops the camera. If permission is denied or the camera is unavailable, **Add photos from camera or library** remains available.
 
 The expandable diagram explains example positions and the direction to face. It is not a measured map. The live camera uses the selected view label; close it to change that label before photographing a different side.
 
@@ -37,7 +37,8 @@ When a real output is ready, **View my 3D result** opens a private interactive p
 
 ## Evidence and unfinished acceptance
 
-- Current local browser exercise: 16 focused checks, real DOM/canvas/IndexedDB/QR/viewer, deliberately doubled auth/storage transports. Mobile exterior/room guide screenshots visually inspected. Separate actual media/canvas/dialog checks use Chromium's synthetic camera, including frame capture, previous-frame overlay, closing/stopping tracks, session abort and denied permission. A physical phone has not been tested.
+- Current local browser exercise: 17 focused checks, real DOM/canvas/IndexedDB/QR/viewer, deliberately doubled auth/storage transports. Includes live-camera saving through the existing local capture store and exact-photo retake. Mobile exterior/room guide screenshots visually inspected. Separate actual media/canvas/dialog checks use Chromium's synthetic camera, including frame capture, previous-frame overlay, closing/stopping tracks, session abort and denied permission. A physical phone has not been tested.
+- Actual staging Earth selection reached a mapped building. The selection button's overflow and tutorial overlap were then corrected and visually checked at phone width. An explicit selection persists until dismissed; unknown OSM presence tags no longer appear as a building name. Capture loads on demand from the world click router.
 - Current HTTP/decoder exercise: 25 checks passed, including owner isolation, immutable upload validation, retry and private result access. Submitted progress reads use the frozen manifest instead of rereading every photo's Storage metadata.
 - Actual staging sign-in/App Check, private benchmark upload and revised worker launch have run. A 24-photo public AliceVision sample is the processing benchmark; it is not the owner's house or room.
 - No physical phone capture, real-house fidelity, full registration, scan-derived room collision or automatic shared-world replacement has been accepted. TRELLIS object inference is not accepted. None of those gaps is closed by the interface tests.

@@ -60,7 +60,7 @@ function processingDescription(capture) {
   if (capture?.status === 'review_required') return 'Your reconstruction is ready to inspect below.';
   if (capture?.status === 'processing_failed') {
     const capacity = /capacity/.test(capture.failure?.code || '');
-    return capacity ? 'Today’s processing capacity is full. Your photos are still saved.' : 'Reconstruction could not finish. Your photos are still saved. A new set may need more overlap and sharper details.';
+    return capacity ? 'Today’s processing capacity is full. Your photos are still saved.' : 'Processing stopped before a usable model was saved. Your photos are still saved; you can retry without uploading again. This message does not mean your photos were the cause.';
   }
   return String(capture?.status || 'draft').replaceAll('_', ' ');
 }
@@ -125,8 +125,8 @@ function ensurePanel() {
         <div class="realityCaptureSectors" data-capture-sectors></div>
         <button type="button" class="captureGuidedCameraButton" data-capture-live-camera>Open guided camera</button>
         <label class="realityCaptureCamera">
-          <input data-capture-input type="file" accept="image/*" capture="environment" multiple>
-          <span>Add photos from camera or library</span>
+          <input data-capture-input type="file" accept="image/*" multiple>
+          <span>Add photos from your library</span>
         </label>
         <p class="realityCaptureQuality" data-capture-quality>No photos leave this device until you save or upload them.</p>
         <details><summary>Review photos on this device</summary><div data-capture-photo-grid></div></details>
@@ -158,7 +158,20 @@ function ensurePanel() {
       const { openCaptureCamera } = await import('./live-camera.js?v=1');
       assertCurrent(session);
       await openCaptureCamera({ kind: session.kind, viewLabel: sectors()[session.activeSector], signal: session.abort.signal,
-        onPhoto: file => isCurrent(session) ? addPhotos({ target: { files: [file], value: '' } }) : 0 });
+        onPhoto: async file => {
+          if (!isCurrent(session)) return 0;
+          const accepted = await addPhotos({ target: { files: [file], value: '' } });
+          const last = session.photos.at(-1);
+          return { accepted, id: accepted ? last?.id : '', quality: accepted ? last?.quality : null };
+        },
+        onRetake: async id => {
+          assertCurrent(session);
+          if (session.uploadedPhotoIds.has(id) || !captureIsEditable(session.serverCapture)) throw Error('This photo is already uploaded and cannot be retaken here.');
+          await deleteLocalCapturePhoto(session.draftId, id);
+          assertCurrent(session);
+          session.photos = session.photos.filter(photo => photo.id !== id);
+          await persist(session); render();
+        } });
     } catch (error) { if (isCurrent(session)) panel.querySelector('[data-capture-status]').textContent = error.message; }
   });
   panel.querySelector('[data-capture-phone]').addEventListener('click', continueOnPhone);

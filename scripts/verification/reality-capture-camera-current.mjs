@@ -19,12 +19,14 @@ try {
     const { openCaptureCamera } = await import('/app/js/reality-capture/live-camera.js');
     globalThis.cameraAbort = new AbortController(); globalThis.cameraPhotos = [];
     document.querySelector('#start').onclick = () => openCaptureCamera({ kind: 'exterior', viewLabel: 'Front', signal: cameraAbort.signal,
-      onPhoto: async file => { cameraPhotos.push({ size: file.size, type: file.type }); return 1; } });
+      onPhoto: async file => { cameraPhotos.push({ size: file.size, type: file.type }); return { accepted: 1, id: 'local-test-photo', quality: { focus: 'soft' } }; },
+      onRetake: async id => { if (id !== 'local-test-photo') throw Error('Wrong retake target'); cameraPhotos.pop(); } });
   });
   await page.click('#start');
   await page.locator('[data-camera-shutter]:enabled').waitFor();
   await page.click('[data-camera-shutter]');
   await page.waitForFunction(() => document.querySelector('[data-camera-status]').textContent.includes('1 photo saved'));
+  assert.match(await page.locator('[data-camera-status]').textContent(), /soft or blurry/);
   assert.ok(await page.evaluate(() => cameraPhotos[0].size > 1000 && cameraPhotos[0].type === 'image/jpeg'));
   await page.check('[data-camera-ghost]');
   assert.equal(await page.locator('.capturePreviousFrame').isVisible(), true);
