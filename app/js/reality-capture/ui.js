@@ -144,6 +144,19 @@ function ensurePanel() {
         <button type="button" data-capture-kind="interior_room" role="tab">One room</button>
       </div>
       <label class="realityCaptureConsent" data-facade-choice><input data-exterior-facade type="checkbox" checked> <span>One facade / accessible wall only. Reconstruct what I can see, not the entire building.</span></label>
+      <details data-building-details class="captureVisualGuide"><summary>Building details and measurements (optional)</summary>
+        <p>Leave unknown details blank. These are your observations, not verified map data. They do not automatically resize the building or reconstruction.</p>
+        <div class="realityCaptureGrid">
+          <label>Floors<input data-building-floors type="number" min="1" max="200" step="1"></label>
+          <label>Units<input data-building-units type="number" min="1" max="2000" step="1"></label>
+          <label>Building height (m)<input data-building-heightMeters type="number" min="1" max="1200" step="0.01"></label>
+          <label>Roof shape<select data-building-roofShape><option value="unknown">Not sure</option><option value="flat">Flat</option><option value="gabled">Pitched / gabled</option><option value="hipped">Hipped</option><option value="other">Other</option></select></label>
+          <label>What did you measure?<input data-building-referenceLabel maxlength="100" placeholder="Door frame, brick to brick"></label>
+          <label>Reference width (m)<input data-building-referenceWidthMeters type="number" min="0.01" max="2000" step="0.001"></label>
+          <label>Reference height (m)<input data-building-referenceHeightMeters type="number" min="0.01" max="2000" step="0.001"></label>
+        </div>
+        <p>Measurements are saved with this capture. After it is shared to your phone, these details are read-only for this draft.</p>
+      </details>
       <section class="realityCaptureSafety">
         <strong data-capture-safety-title>Capture only from places you may legally access.</strong>
         <p data-capture-safety-copy>Stay on safe public access, do not photograph people, license plates, screens, documents, or security details. Photos are normalized on this device to remove EXIF and GPS metadata before upload.</p>
@@ -165,6 +178,8 @@ function ensurePanel() {
         <details class="captureVisualGuide" open><summary>Where to stand and how to frame photos</summary><div data-capture-photo-guide></div></details>
         <div class="realityCaptureSectors" data-capture-sectors></div>
         <button type="button" class="captureGuidedCameraButton" data-capture-live-camera>Open guided camera</button>
+        <label class="realityCaptureCamera"><input data-capture-video type="file" accept="video/*" capture="environment"><span>Record or choose a short video</span></label>
+        <p>Video: up to 90 seconds / 150 MB. Keep one lens and walk slowly around corners. Frames stay on this device until you upload them; no video or audio is uploaded. Review the extracted photos—frame count does not prove complete coverage.</p>
         <label class="realityCaptureCamera">
           <input data-capture-input type="file" accept="image/*" multiple>
           <span>Add photos from your library</span>
@@ -188,6 +203,7 @@ function ensurePanel() {
   panel.querySelector('[data-capture-upload]').addEventListener('click', () => uploadDraft(true));
   panel.querySelector('[data-capture-save]').addEventListener('click', () => uploadDraft(false));
   panel.querySelector('[data-capture-input]').addEventListener('change', addPhotos);
+  panel.querySelector('[data-capture-video]').addEventListener('change', importVideo);
   panel.querySelector('[data-exterior-facade]').addEventListener('change', () => {
     if (!current || current.serverCapture) return;
     current.exteriorScope = panel.querySelector('[data-exterior-facade]').checked ? 'facade' : 'building';
@@ -312,6 +328,13 @@ async function restore(kind, session = current, capture = null) {
   const panel = ensurePanel();
   panel.querySelector('[data-capture-viewer-controls]').hidden = true;
   const room = capture?.room || restored.draft?.room || {};
+  const buildingDetails = capture?.buildingDetails || restored.draft?.buildingDetails || {};
+  panel.querySelectorAll('[data-building-details] input, [data-building-details] select').forEach(element => {
+    const key = element.getAttributeNames().find(name => name.startsWith('data-building-')).slice('data-building-'.length);
+    // HTML attribute names are lowercase; map back to the API field spelling.
+    const field = ['floors','units','heightMeters','roofShape','referenceLabel','referenceWidthMeters','referenceHeightMeters'].find(name => name.toLowerCase() === key);
+    element.value = buildingDetails[field] ?? (field === 'roofShape' ? 'unknown' : '');
+  });
   for (const [selector, value] of Object.entries({
     label: room.label || 'Living room', type: room.type || 'living_room', width: room.widthMeters || 4,
     length: room.lengthMeters || 6, height: room.heightMeters || 2.7, direction: room.entranceDirectionDegrees || 0
@@ -377,6 +400,8 @@ function render() {
       ? 'Some photos could not be positioned; this preview may be incomplete.' : 'Photo matching alone does not confirm that every wall and the roof were reconstructed.'}`
     : 'Coverage unverified: this result has no retained photo-matching report. A finished processing job does not mean a complete building.';
   panel.querySelector('[data-facade-choice]').hidden = current.kind !== 'exterior';
+  panel.querySelector('[data-building-details]').hidden = current.kind !== 'exterior';
+  panel.querySelectorAll('[data-building-details] input, [data-building-details] select').forEach(element => { element.disabled = current.busy || !!current.serverCapture; });
   panel.querySelector('[data-exterior-facade]').checked = current.exteriorScope === 'facade';
   panel.querySelector('[data-exterior-facade]').disabled = current.busy || !!current.serverCapture;
   panel.querySelectorAll('[data-capture-kind], .realityCaptureRoom input:not([data-room-permission]), .realityCaptureRoom select, [data-public-contribution]').forEach((element) => {
@@ -415,6 +440,7 @@ async function persist(session = current) {
     serverCapture: session.serverCapture,
     uploadedPhotoIds: [...(session.uploadedPhotoIds || [])],
     room: input.room, permissionConfirmed: input.permissionConfirmed,
+    buildingDetails: input.buildingDetails,
     publicContributionRequested: input.publicContributionRequested
   });
 }
@@ -468,6 +494,33 @@ async function addPhotos(event) {
   return accepted;
 }
 
+async function importVideo(event) {
+  const file = event.target.files?.[0]; event.target.value = '';
+  const session = current;
+  if (!file || !session || session.busy || !captureIsEditable(session.serverCapture)) return;
+  const remaining = MAX_PHOTOS - allPhotos().length;
+  const status = ensurePanel().querySelector('[data-capture-status]');
+  if (remaining <= 0) { status.textContent = 'This capture already has 48 photos. No video frames were added.'; return; }
+  setBusy(session, true);
+  const sector = session.activeSector;
+  try {
+    const {extractVideoFrames} = await import('./video-frames.js?v=1');
+    status.textContent = 'Reading video on this device…';
+    const result = await extractVideoFrames(file, {signal:session.abort.signal, maxFrames:Math.min(remaining,48),
+      onFrame: async (frame, metadata) => {
+        const photo = await normalizeCapturePhoto(frame); assertCurrent(session);
+        const saved = {...photo, sector, inputOrigin:{kind:'video-frame',timestampSeconds:metadata.timestampSeconds}};
+        await saveLocalCapturePhoto(session.draftId, saved, sector); assertCurrent(session);
+        session.photos.push(saved);
+      },
+      onProgress: progress => {if(isCurrent(session)) status.textContent = `Checking video frames ${progress.checked}/${progress.total} · ${progress.kept} saved on this device`;}
+    });
+    await persist(session); assertCurrent(session);
+    status.textContent = `${result.kept} video frames saved locally; ${result.duplicates} near-duplicates skipped. Review photos and remove blurred or unwanted frames before uploading. No reconstruction has started.`;
+  } catch(error) { if(isCurrent(session)) status.textContent = `${error.message} Frames already saved remain in this draft.`; }
+  finally { setBusy(session,false); }
+}
+
 function roomInput(panel, selector, fallback) {
   return panel.querySelector(selector)?.value || fallback;
 }
@@ -478,6 +531,7 @@ function draftInput(session) {
   return {
     captureKind: session.kind, building: session.target, permissionConfirmed,
     exteriorScope: session.exteriorScope,
+    buildingDetails: session.serverCapture?.buildingDetails || Object.fromEntries(['floors','units','heightMeters','roofShape','referenceLabel','referenceWidthMeters','referenceHeightMeters'].map(key => [key, panel.querySelector(`[data-building-${key}]`).value])),
     propertyPermissionConfirmed: permissionConfirmed,
     publicContributionRequested: panel.querySelector('[data-public-contribution]').checked,
     termsVersion: 'reality-capture-v1',

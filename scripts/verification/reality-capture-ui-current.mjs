@@ -81,11 +81,19 @@ try {
     }, { id: 'osm:way:424242', label: 'Selected test house', position: { x: 5, z: 5 } });
   });
   assert.deepEqual(await desktop.evaluate(() => capturePauseEvents), [['reality_capture', true]]);
+  await desktop.locator('[data-building-details] summary').click();
+  await desktop.fill('[data-building-floors]','2');
+  await desktop.fill('[data-building-units]','5');
+  await desktop.selectOption('[data-building-roofShape]','gabled');
+  await desktop.fill('[data-building-referenceLabel]','Door frame, brick to brick');
+  await desktop.fill('[data-building-referenceWidthMeters]','1.016');
+  await desktop.fill('[data-building-referenceHeightMeters]','2.0828');
   await desktop.click('[data-capture-phone]');
   await desktop.locator('[data-capture-link-box]').waitFor({ state: 'visible' });
   const link = await desktop.locator('[data-capture-link]').getAttribute('href');
   assert.equal(link, `${origin}/app/capture.html#capture=capture-1`);
   assert.equal(captures.size, 1);
+  assert.equal(captures.get('capture-1').buildingDetails.units,'5');
   assert.ok(await desktop.locator('[data-capture-qr]').evaluate(c => c.getContext('2d').getImageData(0, 0, c.width, c.height).data.some(v => v > 0)));
   await desktop.screenshot({ path: `${out}/desktop-phone-handoff.png` });
   const phone = await makePage({ width: 390, height: 844 }, true);
@@ -99,6 +107,12 @@ try {
   assert.equal(await phone.locator('#realityCapturePanel.show').count(), 0);
   await phone.click('#switchAccount'); await phone.click('#googleSignIn');
   await phone.locator('#realityCapturePanel.show').waitFor();
+  await phone.locator('[data-building-details] summary').click();
+  assert.equal(await phone.locator('[data-building-referenceWidthMeters]').inputValue(),'1.016');
+  assert.equal(await phone.locator('[data-building-referenceWidthMeters]').isDisabled(),true);
+  await phone.screenshot({path:`${out}/mobile-building-measurements.png`});
+  await phone.locator('[data-building-details] summary').click();
+  await phone.locator('#realityCapturePanel.show').waitFor();
   assert.equal(await phone.locator('[data-capture-label]').innerText(), 'Selected test house');
   await phone.click('[data-capture-live-camera]');
   await phone.locator('[data-camera-shutter]:enabled').waitFor();
@@ -111,10 +125,10 @@ try {
   assert.match(await phone.locator('[data-capture-photo-guide]').innerText(), /70%/);
   await phone.click('[data-sector-index="2"]');
   assert.match(await phone.locator('[data-capture-photo-guide] svg').getAttribute('aria-label'), /Position 3 selected/);
-  await phone.locator('.captureVisualGuide').scrollIntoViewIfNeeded();
+  await phone.locator('.captureVisualGuide:has([data-capture-photo-guide])').scrollIntoViewIfNeeded();
   await phone.screenshot({ path: `${out}/mobile-exterior-guide.png` });
   await phone.click('[data-sector-index="0"]');
-  await phone.locator('.captureVisualGuide summary').click();
+  await phone.locator('.captureVisualGuide:has([data-capture-photo-guide]) summary').click();
   const photo = await phone.evaluate(() => {
     const c=document.createElement('canvas');c.width=1600;c.height=1200;const x=c.getContext('2d');
     x.fillStyle='#c6985a';x.fillRect(0,0,1600,1200);x.fillStyle='#173e52';
@@ -237,11 +251,45 @@ try {
   assert.equal(await desktop.locator('#realityCapturePanel.show').count(), 0);
   assert.deepEqual(await desktop.evaluate(() => capturePauseEvents.at(-1)), ['reality_capture', false]);
   assert.match(await phone.locator('[data-capture-photo-guide]').innerText(), /one room at a time/);
-  if (!await phone.locator('.captureVisualGuide').getAttribute('open').then(value => value !== null)) await phone.locator('.captureVisualGuide summary').click();
+  if (!await phone.locator('.captureVisualGuide:has([data-capture-photo-guide])').getAttribute('open').then(value => value !== null)) await phone.locator('.captureVisualGuide:has([data-capture-photo-guide]) summary').click();
   assert.equal(await phone.locator('[data-capture-photo-guide] svg').isVisible(), true);
-  await phone.locator('.captureVisualGuide').scrollIntoViewIfNeeded();
+  await phone.locator('.captureVisualGuide:has([data-capture-photo-guide])').scrollIntoViewIfNeeded();
   await phone.screenshot({ path: `${out}/mobile-room-guide.png` });
   await phone.screenshot({ path: `${out}/mobile-private-room.png` });
+  // Actual encoded MP4 → browser decode → normalization → existing local store.
+  // The moving pattern is a media fixture, not building reconstruction evidence.
+  await phone.evaluate(async () => {
+    const canvas=document.createElement('canvas'); canvas.width=1280; canvas.height=720;
+    const ctx=canvas.getContext('2d'); let frame=0;
+    const draw=()=>{for(let x=0;x<1280;x+=40){ctx.fillStyle=`hsl(${(x+frame*7)%360} 85% 50%)`;ctx.fillRect(x,0,40,720);}frame++;};
+    draw(); const stream=canvas.captureStream(15);
+    const chunks=[]; const recorder=new MediaRecorder(stream,{mimeType:'video/mp4;codecs=avc1.42001E'});
+    recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
+    const stopped=new Promise(resolve=>recorder.onstop=resolve);
+    recorder.start(); const timer=setInterval(draw,70);
+    await new Promise(resolve=>setTimeout(resolve,2200));recorder.stop();await stopped;
+    clearInterval(timer);stream.getTracks().forEach(t=>t.stop());
+    window.captureVideoFixture=new File(chunks,'local-test.mp4',{type:'video/mp4'});
+    const transfer=new DataTransfer();transfer.items.add(captureVideoFixture);
+    const input=document.querySelector('[data-capture-video]');input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));
+  });
+  await statusContains(phone,'video frames saved locally');
+  const videoCount=await phone.locator('[data-capture-count]').textContent();
+  assert.match(videoCount,/^[12] \/18|^[12] \/ 18/);
+  const videoChecks=await phone.evaluate(async()=>{
+    const {extractVideoFrames}=await import('/app/js/reality-capture/video-frames.js?v=1');
+    const aborted=new AbortController();aborted.abort();let stopped=false;
+    try{await extractVideoFrames(captureVideoFixture,{signal:aborted.signal,onFrame:()=>{throw Error('must not save');}});}catch(e){stopped=e.name==='AbortError';}
+    let invalid=false;try{await extractVideoFrames(new File(['bad'],'bad.txt',{type:'text/plain'}),{signal:new AbortController().signal,onFrame:()=>{}});}catch{invalid=true;}
+    return{stopped,invalid};
+  });
+  assert.deepEqual(videoChecks,{stopped:true,invalid:true});
+  await phone.locator('[data-capture-video]').locator('..').scrollIntoViewIfNeeded();
+  await phone.screenshot({path:`${out}/mobile-video-import.png`});
+  await phone.reload();
+  if(await phone.locator('#googleSignIn').isVisible())await phone.click('#googleSignIn');
+  await phone.locator('#realityCapturePanel.show').waitFor();
+  assert.equal(await phone.locator('[data-capture-count]').textContent(),videoCount);
   await phone.evaluate(async () => (await import('/js/auth-ui.js?v=55')).setUser('other'));
   assert.equal(await phone.locator('#realityCapturePanel.show').count(), 0);
   await phone.waitForFunction(() => document.getElementById('phoneStatus').textContent.includes('unavailable for this account'));
@@ -292,9 +340,12 @@ try {
     'actual GLB viewer preserves placement while camera rotates; abort releases canvas',
     'acknowledged retry remains queued when progress connection fails',
     'exterior and room framing templates follow selected view and disclose coverage limits',
-    'guided camera saves through existing normalization and local store; retake removes the exact local photo'
+    'guided camera saves through existing normalization and local store; retake removes the exact local photo',
+    'manual progress check and unavailable/partial/all-registered coverage warnings',
+    'user-reported building details survive desktop-to-phone handoff',
+    'real encoded MP4 decodes into normalized local photos and survives reload; cancellation and invalid input rejected'
   ], errors, limitation: 'Auth/storage transport doubles; no real GPU or physical phone reconstruction.' }, null, 2));
-  console.log('Capture UI: 17 existing checks plus manual-check and unavailable/partial/all-registered warning scenarios passed; transport doubles, synthetic camera and GLB, not reconstruction acceptance.');
+  console.log('Capture UI passed, including progress, coverage warnings, building details and real MP4 import/reload; transport doubles, synthetic camera and GLB, not physical-phone or reconstruction acceptance.');
 } catch (error) {
   console.error('Capture UI browser errors:', errors);
   for (const [index, context] of browser.contexts().entries()) {

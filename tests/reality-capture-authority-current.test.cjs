@@ -28,6 +28,20 @@ test('facade scope is explicit and legacy captures keep whole-building semantics
   assert.equal(createCaptureDraft({ captureKind: 'exterior', building }, { uid: 'owner' }).exteriorScope, 'building');
 });
 
+test('building measurements remain optional unverified evidence and cannot rewrite mapped geometry', () => {
+  const details = {floors:'2', units:5, roofShape:'gabled', referenceLabel:'Brick-to-brick door frame', referenceWidthMeters:1.016, referenceHeightMeters:2.0828, authority:'mapped'};
+  const draft = createCaptureDraft({captureKind:'exterior',building,buildingDetails:details},{uid:'owner'});
+  assert.equal(draft.buildingDetails.floors,2);
+  assert.equal(draft.buildingDetails.evidence,'user-reported-unverified');
+  assert.equal(draft.buildingDetails.referenceWidthMeters,1.016);
+  assert.equal(draft.buildingDetails.heightMeters,null);
+  assert.equal(draft.buildingDetails.authority,undefined);
+  assert.equal(draft.building.sourceBuildingId,building.sourceBuildingId);
+  for (const invalid of [{floors:2.5},{units:-1},{heightMeters:Infinity},{roofShape:'invented'},{floors:true}]) {
+    assert.throws(()=>createCaptureDraft({captureKind:'exterior',building,buildingDetails:invalid},{uid:'owner'}),/invalid_building_details/);
+  }
+});
+
 test('capture preserves bounded local world context without promoting it to trusted geography', () => {
   const context = { schemaVersion: 1, frame: 'building-local-x-east-y-up-z-south', authority: 'trusted-server',
     footprint: [{ x: -4, z: -3 }, { x: 4, z: -3 }, { x: 4, z: 3 }],

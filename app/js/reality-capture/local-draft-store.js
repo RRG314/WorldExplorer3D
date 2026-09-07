@@ -56,6 +56,8 @@ export async function saveLocalCapturePhoto(draftId, photo, sector) {
     quality: photo.quality,
     sourceBytes: photo.sourceBytes,
     normalizedBytes: photo.normalizedBytes,
+    inputOrigin: photo.inputOrigin?.kind === 'video-frame' && Number.isFinite(photo.inputOrigin.timestampSeconds)
+      ? {kind:'video-frame',timestampSeconds:photo.inputOrigin.timestampSeconds} : null,
     createdAtMs: Date.now()
   }));
 }

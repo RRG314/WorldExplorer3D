@@ -173,6 +173,7 @@ function createCaptureDraft(input = {}, actor = {}, nowMs = Date.now()) {
     captureKind,
     exteriorScope: captureKind === 'exterior' && input.exteriorScope === 'facade' ? 'facade' : 'building',
     building,
+    buildingDetails: normalizeBuildingDetails(input.buildingDetails),
     room,
     spaceId,
     status: 'draft',
@@ -188,6 +189,25 @@ function createCaptureDraft(input = {}, actor = {}, nowMs = Date.now()) {
     createdAtMs: Math.floor(finite(nowMs, Date.now())),
     updatedAtMs: Math.floor(finite(nowMs, Date.now()))
   });
+}
+
+function normalizeBuildingDetails(raw = {}) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw Error('invalid_building_details');
+  const optionalNumber = (key, min, max, integer = false) => {
+    if (raw[key] === '' || raw[key] === undefined || raw[key] === null) return null;
+    if (!['number', 'string'].includes(typeof raw[key])) throw Error('invalid_building_details');
+    const value = Number(raw[key]);
+    if (!Number.isFinite(value) || value < min || value > max || integer && !Number.isInteger(value)) throw Error('invalid_building_details');
+    return value;
+  };
+  const roofShape = cleanText(raw.roofShape || 'unknown', 30);
+  if (!['unknown', 'flat', 'gabled', 'hipped', 'other'].includes(roofShape)) throw Error('invalid_building_details');
+  return { schemaVersion: 1, evidence: 'user-reported-unverified',
+    floors: optionalNumber('floors', 1, 200, true), units: optionalNumber('units', 1, 2000, true),
+    heightMeters: optionalNumber('heightMeters', 1, 1200), roofShape,
+    referenceLabel: cleanText(raw.referenceLabel, 100),
+    referenceWidthMeters: optionalNumber('referenceWidthMeters', .01, 2000),
+    referenceHeightMeters: optionalNumber('referenceHeightMeters', .01, 2000) };
 }
 
 function canTransitionCapture(from, to) {
@@ -295,6 +315,7 @@ module.exports = {
   isDeletableByOwner,
   normalizeAccessMode,
   normalizeCanonicalBuilding,
+  normalizeBuildingDetails,
   normalizeReviewedAlignment,
   resolveSpaceAccess,
   spaceIdForCapture,

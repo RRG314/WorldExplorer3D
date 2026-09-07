@@ -65,6 +65,7 @@ function serializeCapture(snapshot) {
     accessMode: clean(data.accessMode || 'PRIVATE', 40),
     publicContributionRequested: data.publicContributionRequested === true,
     building: data.building || {},
+    buildingDetails: data.buildingDetails || null,
     room: data.room || null,
     spaceId: clean(data.spaceId, 180),
     uploadSummary: data.uploadSummary || null,
