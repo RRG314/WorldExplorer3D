@@ -24,7 +24,8 @@ test.before(async () => {
       captureId: CAPTURE_ID,
       ownerUid: OWNER,
       captureKind: 'exterior',
-      status: 'draft'
+      status: 'draft',
+      uploadSlots: { [FILE_NAME]: true, ['2'.repeat(32) + '.jpg']: true, ['3'.repeat(32) + '.jpg']: true }
     });
   });
 });
@@ -58,6 +59,8 @@ test('another account, wrong metadata, unsafe type, and processed path are denie
   await assert.rejects(() => uploadBytes(attackerPath, new Uint8Array([1, 2, 3]), photoMetadata(ATTACKER)), denied);
 
   const ownerStorage = environment.authenticatedContext(OWNER).storage();
+  const unreserved = ref(ownerStorage, `reality-captures/${OWNER}/${CAPTURE_ID}/originals/${'4'.repeat(32)}.jpg`);
+  await assert.rejects(() => uploadBytes(unreserved, new Uint8Array([1, 2, 3]), photoMetadata()), denied);
   const wrongMetadata = ref(ownerStorage, `reality-captures/${OWNER}/${CAPTURE_ID}/originals/22222222222222222222222222222222.jpg`);
   await assert.rejects(() => uploadBytes(wrongMetadata, new Uint8Array([1, 2, 3]), photoMetadata(ATTACKER)), denied);
 

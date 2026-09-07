@@ -5,7 +5,7 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const { providerOptions, reconstruct, run } = require('../scripts/reality-capture/reconstruction-providers.cjs');
-const { finishAttempt } = require('../scripts/reality-capture/process-capture.cjs');
+const { finishCaptureAttempt } = require('../functions/reality-capture-processing');
 
 test('provider selection preserves Meshroom default and explicitly identifies generated candidates', () => {
   assert.equal(providerOptions([], {}).provider, 'meshroom');
@@ -53,12 +53,14 @@ test('process runner reports success, failure and timeout from actual child proc
 test('stale worker completion cannot recreate deleted or superseded captures', async () => {
   for (const data of [null, { status: 'approved', processingAttemptId: 'mine' }, { status: 'processing', processingAttemptId: 'newer' }, { status: 'processing', processingAttemptId: 'mine' }]) {
     const updates = [];
-    const ref = {};
-    const db = { collection: () => ({ doc: () => ref }), runTransaction: async (callback) => callback({
-      get: async () => ({ exists: data !== null, data: () => data }), update: (reference, patch) => updates.push({ reference, patch })
+    const ref = {}, lease = {};
+    const db = { doc: () => lease, collection: () => ({ doc: () => ref }), runTransaction: async (callback) => callback({
+      get: async (reference) => reference === lease ? { exists: true, data: () => ({ captureId: 'capture', attemptId: 'mine' }) } :
+        { exists: data !== null, data: () => data }, update: (reference, patch) => updates.push({ reference, patch })
     }) };
     const allowed = data?.status === 'processing' && data.processingAttemptId === 'mine';
-    assert.equal(await finishAttempt(db, 'capture', 'mine', { status: 'review_required' }), allowed);
-    assert.equal(updates.length, allowed ? 1 : 0);
+    assert.equal(await finishCaptureAttempt(db, 'capture', 'mine', { status: 'review_required' }), allowed);
+    assert.equal(updates.filter(row => row.reference === ref).length, allowed ? 1 : 0);
+    assert.equal(updates.filter(row => row.reference === lease).length, 1);
   }
 });

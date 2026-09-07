@@ -32,6 +32,7 @@ service firebase.storage {
     // backend so a leaked object path is never sufficient to retrieve a photo.
     match /reality-captures/{uid}/{captureId}/originals/{fileName} {
       allow create: if ownsWritableCapture(uid, captureId) &&
+        capture(captureId).uploadSlots.get(fileName, false) == true &&
         validNormalizedPhoto(uid, captureId, fileName) &&
         resource == null;
       allow get, list, update, delete: if false;

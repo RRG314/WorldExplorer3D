@@ -49,6 +49,7 @@ async function makePage(viewport, mobile = false) {
       const capture = captures.get(input.captureId);
       if (!capture || capture.ownerUid !== input.uid) return json({ error: 'Capture not found' }, 404);
       if (action === 'getMyRealityCapture') return json({ capture, photos: uploaded.get(input.captureId) || [] });
+      if (action === 'reserveRealityCapturePhoto') return json({ reserved: true });
       if (action === 'finalizeRealityCaptureUpload') { capture.status = 'queued'; return json({ status: 'queued' }); }
       if (action === 'deleteRealityCapture') { captures.delete(input.captureId); return json({ deleted: true }); }
       return json({ error: 'Unexpected test endpoint' }, 500);
@@ -125,7 +126,7 @@ try {
   assert.equal(uploaded.get('capture-1').length, 20);
   assert.equal(await phone.locator('[data-capture-upload]').isDisabled(), true);
   await desktop.click('[data-capture-refresh]');
-  await desktop.waitForFunction(() => document.querySelector('[data-capture-server-status]').textContent.includes('queued'));
+  await desktop.waitForFunction(() => document.querySelector('[data-capture-server-status]').textContent.toLowerCase().includes('queued'));
   // An exterior handoff must not strand the desktop user: a separate room can still be started.
   await desktop.click('[data-capture-kind="interior_room"]');
   await desktop.locator('.realityCaptureRoom').waitFor({ state: 'visible' });
@@ -158,4 +159,11 @@ try {
     '20-photo submission and cross-device queued status', 'room permission and exact room handoff'
   ], errors, limitation: 'Auth/storage transport doubles; no real GPU or physical phone reconstruction.' }, null, 2));
   console.log('Capture UI: 12 focused checks passed; transport doubles, not reconstruction acceptance.');
+} catch (error) {
+  console.error('Capture UI browser errors:', errors);
+  for (const [index, context] of browser.contexts().entries()) {
+    const page = context.pages()[0];
+    if (page) await page.screenshot({ path: `${out}/failure-${index}.png` }).catch(() => {});
+  }
+  throw error;
 } finally { await browser.close(); await server.close(); }

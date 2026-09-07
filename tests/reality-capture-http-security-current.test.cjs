@@ -2,8 +2,10 @@
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { Readable } = require('node:stream');
+const sharp = require('../functions/node_modules/sharp');
 const { buildCommunityRealityCaptureExports } = require('../functions/community-reality-capture.js');
+let realJpeg;
+test.before(async () => { realJpeg = await sharp({ create: { width: 1280, height: 720, channels: 3, background: '#8aa8b7' } }).jpeg().toBuffer(); });
 
 // Execute actual HTTP handlers with isolated storage/Firestore doubles. These
 // check endpoint effects, not source strings; they do not replace emulator IAM tests.
@@ -49,7 +51,8 @@ function harness(t, capture = base, extras = {}) {
   const bucket = {
     getFiles: async () => [[]],
     file: (path) => { reads.push(path); return {
-      exists: async () => [true], getSignedUrl: async () => ['https://example.invalid/private-test-url']
+      exists: async () => [true], getSignedUrl: async () => ['https://example.invalid/private-test-url'],
+      download: async () => [realJpeg]
     }; }
   };
   const api = buildCommunityRealityCaptureExports({ db, bucket, setCors: () => false,
@@ -95,8 +98,7 @@ test('owned invalid photo set records failure without losing capture fields', as
 
 function validPhotos() {
   return Array.from({ length: 20 }, (_, i) => ({ name: `${prefix}originals/${String(i).padStart(32, '0')}.jpg`,
-    getMetadata: async () => [{ size: 1024, contentType: 'image/jpeg', metadata: { width: 1920, height: 1080 } }],
-    createReadStream: () => Readable.from([Buffer.from([255, 216, 255, 224, 0, 0, 0, 0, 0, 0, 0, 0])]) }));
+    getMetadata: async () => [{ generation: '1234', size: realJpeg.length, contentType: 'image/jpeg', metadata: { width: 1920, height: 1080 } }] }));
 }
 
 test('phone handoff returns the same owned capture and uploaded photo IDs, never media URLs', async (t) => {
@@ -131,6 +133,8 @@ test('owned valid set queues atomically and repeat finalization cannot regress i
   const capture = h.records.get(`realityCaptures/${id}`);
   assert.equal(capture.status, 'queued');
   assert.equal(capture.uploadSummary.photoCount, 20);
+  assert.equal(capture.inputManifest[0].generation, '1234');
+  assert.equal(capture.inputManifest[0].width, 1280, 'decoded pixels override untrusted metadata');
   assert.equal(h.writes.length, 1);
   assert.equal((await h.call('finalizeRealityCaptureUpload', 'owner')).code, 409);
   assert.equal(h.records.get(`realityCaptures/${id}`).status, 'queued');

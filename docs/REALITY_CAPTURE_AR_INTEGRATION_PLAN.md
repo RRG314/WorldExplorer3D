@@ -1,7 +1,24 @@
 # Reality Capture and AR: audit and implementation gates
 
 Date: 2026-09-07. Audited baseline: `9565df35`, branch `steven/building-exteriors-local`.
-Status: local integration checkpoint; NOT a completed capture service, physical-phone verification, or production approval. No cloud resources provisioned, images uploaded, or deployment performed.
+Status: staging capture infrastructure and real upload/dispatch are now deployed. Full real-house/room acceptance is still open. Production and GitHub have not been changed.
+
+## Staging implementation — current on 2026-09-07
+
+- Test site: `https://we3d-staging-20260712.web.app/app/capture.html`; desktop world uses the same staging host at `/app/`.
+- Staging has its own Auth, Firestore, private default Storage bucket, reCAPTCHA Enterprise App Check, capture HTTP endpoints, queue trigger and recovery scheduler. Google sign-in was already enabled; actual email/password sign-in and App Check attestation have now been exercised without debug tokens or auth doubles.
+- `reserveRealityCapturePhoto` authorizes at most 48 write-once original names per capture. Storage rules enforce that reservation and owner identity. Backend submission fully decodes the pinned object generation, checks real dimensions/count/bytes, and commits an immutable input manifest with queue admission. Eight drafts/account/day and 32 drafts/project/day bound staging intake; processing admits at most 12 jobs/project/day. These are operational budgets, not licensing locks or a guaranteed dollar cap.
+- One lease coordinates queued → processing → review-required/failed. Recovery releases expired work. Cloud Run uses one L4, 4 CPU, 16 GiB, one task, 30-minute timeout and zero task retries. There is no always-on GPU service. The worker identity has no broad Firestore or photo-bucket role: an authenticated backend broker supplies capture-scoped, generation-pinned URLs and a single output upload URL. The old broad-Admin fixture worker entry point now delegates to that worker instead of maintaining a second runtime path.
+- `staging-cloud.cjs` is explicitly locked to the existing staging project. Worker build `0c364172-a169-4063-bdf5-b36a9a362446` succeeded. Image digest: `sha256:c891a72ba300ed6675ba4b6b9a8a26827011415beb13ab5cc5384b01e38a79c4` (Meshroom 2023.3.0 and Blender on Ubuntu 22.04). The stable 2025.1.0 GitHub release had no downloadable assets; the existing released 2023.3.0 binary was used, not a silently changing nightly.
+- The live browser test exposed missing cross-service IAM despite passing local rules tests. Added the Firebase Rules Firestore Service Agent role to the **staging Storage service agent**, then verified actual uploads. No anonymous/public storage rule was introduced. Shared CORS now accepts App Check headers; private model CORS permits only staging hosts.
+- The live phone-sized browser has uploaded 24 normalized images from AliceVision's public `dataset_monstree` benchmark, passed real backend validation, and started execution `capture-meshroom-vgwdk` automatically. This is a private benchmark under a clearly labelled test identity, not a mapped-house or room acceptance claim. Reconstruction/result inspection is still in progress at this checkpoint.
+- UI adds a lazy private GLB viewer (orbit, touch zoom, keyboard buttons), automatic 15-second progress checks only while active, cancellation/account-change cleanup, and narrow-screen error wrapping. It never starts a second Earth renderer. Pending captures resume on either device under the same Firebase UID.
+- Temporary room grants now expire; returning to PRIVATE blocks old grants; revocation invalidates temporary grants too. These changes have focused execution tests and require the final staging source sync.
+- Current focused tests: 40 Node checks; 12 browser UI checks using explicitly labelled transport doubles; two real Storage/Firestore emulator cases. The live cloud path is a separate test and is not replaced by those results. A generic browser check rendered the real staging sign-in page; Chrome reported a third-party `requestStorageAccess` denial, but real sign-in and App Check still succeeded.
+
+Still not accepted: one real house and private room from a physical phone; reconstructed-room wall/floor/door collision alignment; video-tour extraction; private owner review/in-world use/withdrawal as a complete user journey; TRELLIS inference. The private viewer is not evidence that a generated collision proxy matches a scan. Do not call the entire capture/AR feature complete on the basis of this staging upload test.
+
+The earlier dated audit/checkpoint sections below are historical findings. This section supersedes their former “not provisioned” statements; it does not retroactively turn their fixture tests into cloud reconstruction evidence.
 
 Owner clarification: integrate into the app without licensing locks or staging-only feature restrictions; the owner will decide when publication permissions are sufficient. The milestones below are work/verification tracking, not software unlocks. Normal account authorization, capture review and private-home protections remain.
 
@@ -15,7 +32,7 @@ Phone and desktop must use the same staging URL and staging account during testi
 
 Real local Storage/Firestore emulator verification now runs with installed Java 21 at `/opt/homebrew/opt/openjdk@21/bin/java`. The previous test failed before touching rules because it called a nonexistent `.app()` method on `RulesTestContext`. Replaced it with the supported `.storage()` API and tightened denied assertions to require `storage/unauthorized` rather than any exception. Both emulator cases pass: own write-once upload succeeds; original reads/overwrites, wrong owner/metadata, unsafe MIME and client processed-output writes are denied. Emulators were shut down after the check. This is actual rule execution, not cloud App Check, GPU or physical-phone acceptance.
 
-Additional predeployment findings: current shared CORS helper does not include `X-Firebase-AppCheck` in allowed request headers; correct and test this before direct cross-origin capture requests. Production also has no deployed capture functions; its Firebase Storage API and Cloud Run Admin API are disabled. These findings do not authorize enabling production services.
+Earlier predeployment findings: the missing `X-Firebase-AppCheck` CORS header is now repaired. Production has not been provisioned for capture; its earlier API findings do not authorize enabling production services.
 
 ## Implemented in this checkpoint
 

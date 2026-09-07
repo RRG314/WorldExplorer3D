@@ -3,16 +3,15 @@
 const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
 const { FieldValue } = require('firebase-admin/firestore');
+const { validateCaptureObjects } = require('./reality-capture-upload-validation');
 const {
   ACCESS_MODES,
   assertCaptureTransition,
   createCaptureDraft,
-  imageSignatureMatches,
   isDeletableByOwner,
   normalizeReviewedAlignment,
   resolveSpaceAccess,
-  stableId,
-  validateUploadedPhotoSet
+  stableId
 } = require('./reality-capture-authority');
 
 const CAPTURES = 'realityCaptures';
@@ -49,16 +48,6 @@ function actorFromAuth(auth, authUser) {
     email: authUser?.email || auth.email || '',
     displayName: authUser?.displayName || auth.name || auth.email || 'Explorer'
   };
-}
-
-async function readObjectPrefix(file, bytes = 16) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    file.createReadStream({ start: 0, end: Math.max(0, bytes - 1) })
-      .on('data', (chunk) => chunks.push(chunk))
-      .on('error', reject)
-      .on('end', () => resolve(Buffer.concat(chunks)));
-  });
 }
 
 function serializeCapture(snapshot) {
@@ -184,11 +173,22 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     if (!auth) return;
     try {
       const authUser = await admin.auth().getUser(auth.uid);
+      if (auth.firebase?.sign_in_provider === 'anonymous') throw Error('authentication_required');
       const draft = createCaptureDraft(req.body || {}, actorFromAuth(auth, authUser));
       const ref = db.collection(CAPTURES).doc(draft.captureId);
       await db.runTransaction(async (transaction) => {
         const spaceRef = draft.spaceId ? db.collection(SPACES).doc(draft.spaceId) : null;
         const existing = spaceRef ? await transaction.get(spaceRef) : null;
+        const quotaRef = db.collection('captureAdmission').doc(auth.uid);
+        const quota = await transaction.get(quotaRef);
+        const globalQuotaRef = db.collection('captureAdmission').doc('_daily_total');
+        const globalQuota = await transaction.get(globalQuotaRef);
+        const day = new Date().toISOString().slice(0, 10);
+        const count = quota.data()?.day === day ? Number(quota.data().count || 0) : 0;
+        const total = globalQuota.data()?.day === day ? Number(globalQuota.data().count || 0) : 0;
+        if (count >= 8 || total >= 32) throw Error('daily_capture_capacity');
+        transaction.set(quotaRef, { day, count: count + 1 });
+        transaction.set(globalQuotaRef, { day, count: total + 1 });
         transaction.create(ref, { ...draft, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
         if (!spaceRef) return;
         if (existing.exists && existing.data()?.ownerUid !== auth.uid) throw new Error('space_owner_required');
@@ -215,6 +215,28 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       console.error('[createRealityCaptureDraft]', error);
       sendKnownError(res, error);
     }
+  });
+
+  const reserveRealityCapturePhoto = functions.region('us-central1').https.onRequest(async (req, res) => {
+    const auth = await guard(req, res);
+    if (!auth) return;
+    try {
+      const captureId = clean(req.body?.captureId, 180);
+      const photoId = clean(req.body?.photoId, 40);
+      if (!/^[\w-]{1,180}$/.test(captureId) || !/^[a-f0-9]{32}$/.test(photoId)) throw Error('invalid_photo_identity');
+      const ref = db.collection(CAPTURES).doc(captureId);
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists || snap.data().ownerUid !== auth.uid) throw Error('capture_not_found');
+        if (!['draft', 'uploading'].includes(snap.data().status)) throw Error('invalid_capture_state_transition');
+        const slots = snap.data().uploadSlots || {};
+        if (slots[`${photoId}.jpg`] === true) return;
+        if (Object.keys(slots).length >= 48) throw Error('too_many_photos');
+        slots[`${photoId}.jpg`] = true;
+        tx.update(ref, { uploadSlots: slots });
+      });
+      res.json({ reserved: true });
+    } catch (error) { sendKnownError(res, error); }
   });
 
   const listMyRealityCaptures = functions.region('us-central1').https.onRequest(async (req, res) => {
@@ -256,7 +278,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     }
   });
 
-  const finalizeRealityCaptureUpload = functions.region('us-central1').https.onRequest(async (req, res) => {
+  const finalizeRealityCaptureUpload = functions.region('us-central1').runWith({ memory: '512MB', timeoutSeconds: 300, maxInstances: 2 }).https.onRequest(async (req, res) => {
     const auth = await guard(req, res);
     if (!auth) return;
     const captureId = clean(req.body?.captureId, 180);
@@ -273,22 +295,8 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       validatedSnapshot = snap;
       if (capture.status === 'draft') assertCaptureTransition('draft', 'uploading');
       const prefix = `reality-captures/${auth.uid}/${captureId}/originals/`;
-      const [files] = await bucket.getFiles({ prefix });
-      const rows = [];
-      for (const file of files) {
-        const [metadata] = await file.getMetadata();
-        const contentType = clean(metadata.contentType, 80).toLowerCase();
-        const signature = await readObjectPrefix(file, 16);
-        if (!imageSignatureMatches(signature, contentType)) throw new Error('photo_signature_mismatch');
-        rows.push({
-          name: file.name,
-          size: Number(metadata.size),
-          contentType,
-          width: Number(metadata.metadata?.width || 0),
-          height: Number(metadata.metadata?.height || 0)
-        });
-      }
-      const uploadSummary = validateUploadedPhotoSet(capture, rows);
+      const [files] = await bucket.getFiles({ prefix, maxResults: 49, autoPaginate: false });
+      const { manifest: inputManifest, summary: uploadSummary } = await validateCaptureObjects(bucket, { ...capture, captureId }, files);
       assertCaptureTransition('uploading', 'uploaded');
       assertCaptureTransition('uploaded', 'queued');
       // Commit validation and queue admission together; never regress another
@@ -302,7 +310,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
           throw new Error('invalid_capture_state_transition');
         }
         transaction.update(ref, {
-          status: 'queued', uploadSummary,
+          status: 'queued', uploadSummary, inputManifest,
           queuedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()
         });
       });
@@ -564,7 +572,11 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       if (!targetUid || targetUid === auth.uid) throw new Error('invalid_guest_identity');
       const memberRef = spaceRef.collection('members').doc(targetUid);
       if (action === 'revoke') {
-        await memberRef.delete();
+        // Preserve a revocation fence so an older temporary grant cannot revive
+        // access, even if a concurrent request still holds its previous record.
+        await memberRef.set({ uid: targetUid, active: false, revokedAtMs: Date.now() }, { merge: true });
+        await deleteQueryDocuments(db, spaceRef.collection('sessionGrants').where('uid', '==', targetUid));
+        await deleteQueryDocuments(db, spaceRef.collection('oneTimeGrants').where('uid', '==', targetUid));
         res.status(200).json({ spaceId, targetUid, revoked: true });
         return;
       }
@@ -632,7 +644,8 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       if (accessRequest.status !== 'pending') throw new Error('access_request_already_decided');
       const spaceRef = db.collection(SPACES).doc(accessRequest.spaceId);
       if (decision === 'allow_once') {
-        await spaceRef.collection('oneTimeGrants').doc(stableId('once', requestId)).set({ uid: accessRequest.requesterUid, active: true, createdAt: FieldValue.serverTimestamp() });
+        await spaceRef.collection('oneTimeGrants').doc(stableId('once', requestId)).set({ uid: accessRequest.requesterUid,
+          active: true, createdAtMs: Date.now(), expiresAtMs: Date.now() + 5 * 60_000, createdAt: FieldValue.serverTimestamp() });
       } else if (decision === 'allow_session') {
         const requestedRoomId = clean(accessRequest.roomId, 180);
         if (!requestedRoomId || (roomId && roomId !== requestedRoomId)) throw new Error('room_required_for_session_access');
@@ -651,6 +664,8 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
           uid: accessRequest.requesterUid,
           roomId: requestedRoomId,
           active: true,
+          createdAtMs: Date.now(),
+          expiresAtMs: Date.now() + 2 * 60 * 60_000,
           createdAt: FieldValue.serverTimestamp()
         });
       } else if (decision === 'add_guest') {
@@ -838,6 +853,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
 
   return {
     createRealityCaptureDraft,
+    reserveRealityCapturePhoto,
     getMyRealityCapture,
     decidePrivateSpaceAccessRequest,
     deleteRealityCapture,

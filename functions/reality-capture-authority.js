@@ -236,7 +236,11 @@ function resolveSpaceAccess(input = {}) {
   if (input.isAdmin === true) return Object.freeze({ allowed: true, reason: 'moderator', scope: 'review' });
   if (mode === 'PUBLIC') return Object.freeze({ allowed: true, reason: 'public', scope: 'public' });
   if (!requesterUid) return Object.freeze({ allowed: false, reason: 'authentication_required' });
-  if (input.oneTimeGrant?.active === true && input.oneTimeGrant?.uid === requesterUid) {
+  if (mode === 'PRIVATE') return Object.freeze({ allowed: false, reason: 'private_residence', requestable: false });
+  const now = Number.isFinite(input.nowMs) ? input.nowMs : Date.now();
+  const freshGrant = grant => grant?.active === true && grant?.uid === requesterUid &&
+    Number(grant.expiresAtMs) > now && Number(grant.createdAtMs) > Number(input.member?.revokedAtMs || 0);
+  if (freshGrant(input.oneTimeGrant)) {
     return Object.freeze({ allowed: true, reason: 'allow_once', scope: 'one_time' });
   }
   if (['INVITE_ONLY', 'GUEST_LIST', 'SESSION_GUESTS'].includes(mode) &&
@@ -244,8 +248,8 @@ function resolveSpaceAccess(input = {}) {
       ['co_owner', 'household', 'guest'].includes(cleanText(input.member.role, 24).toLowerCase())) {
     return Object.freeze({ allowed: true, reason: input.member.role, scope: 'persistent' });
   }
-  if (mode === 'SESSION_GUESTS' && input.sessionGrant?.active === true &&
-      input.sessionGrant?.uid === requesterUid && input.sessionGrant?.roomId === input.roomId) {
+  if (mode === 'SESSION_GUESTS' && freshGrant(input.sessionGrant) && input.ownerOnline === true &&
+      input.sessionGrant?.roomId === input.roomId) {
     return Object.freeze({ allowed: true, reason: 'session_guest', scope: 'session' });
   }
   return Object.freeze({

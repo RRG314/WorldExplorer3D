@@ -2,6 +2,7 @@ import { worldModificationIdentityForLocation } from '../editable-world/model.js
 import {
   createRealityCaptureDraft,
   getMyRealityCapture,
+  getRealityCaptureAssetAccess,
   deleteRealityCapture,
   finalizeRealityCaptureUpload,
   normalizeCapturePhoto,
@@ -49,6 +50,17 @@ function allPhotos() {
   return mergedCapturePhotos(current?.photos, current?.remotePhotos);
 }
 
+function processingDescription(capture) {
+  if (capture?.status === 'queued') return 'Queued for reconstruction. You can close this page and return later.';
+  if (capture?.status === 'processing') return 'Processing your 3D model. Your photos are saved; you can return on either device.';
+  if (capture?.status === 'review_required') return 'Your reconstruction is ready to inspect below.';
+  if (capture?.status === 'processing_failed') {
+    const capacity = /capacity/.test(capture.failure?.code || '');
+    return capacity ? 'Today’s processing capacity is full. Your photos are still saved.' : 'Reconstruction could not finish. Your photos are still saved. A new set may need more overlap and sharper details.';
+  }
+  return String(capture?.status || 'draft').replaceAll('_', ' ');
+}
+
 function ensurePanel() {
   let panel = document.getElementById('realityCapturePanel');
   if (panel) return panel;
@@ -68,6 +80,18 @@ function ensurePanel() {
         <div data-capture-link-box hidden><canvas data-capture-qr aria-label="Scan to continue this capture on your phone"></canvas><a data-capture-link></a><button type="button" data-capture-copy>Copy phone link</button></div>
         <button type="button" data-capture-refresh hidden>Check uploaded photos and progress</button>
         <p data-capture-server-status role="status"></p>
+      </section>
+      <section data-capture-result hidden aria-label="Your reconstruction">
+        <h2>Your reconstruction</h2>
+        <p>This is your private result. Inspect coverage before it is reviewed for use in the world. Missing surfaces are not automatically filled with invented details.</p>
+        <button type="button" data-capture-preview>View my 3D result</button>
+        <div data-capture-viewer></div>
+        <div data-capture-viewer-controls hidden>
+          <button type="button" data-viewer-action="rotate">Rotate</button>
+          <button type="button" data-viewer-action="closer">Zoom in</button>
+          <button type="button" data-viewer-action="farther">Zoom out</button>
+          <button type="button" data-viewer-action="reset">Reset view</button>
+        </div>
       </section>
       <div class="realityCaptureKinds" role="tablist" aria-label="Capture type">
         <button type="button" data-capture-kind="exterior" role="tab">Exterior</button>
@@ -96,7 +120,7 @@ function ensurePanel() {
           <input data-capture-input type="file" accept="image/*" capture="environment" multiple>
           <span>Take or add photos</span>
         </label>
-        <p class="realityCaptureQuality" data-capture-quality>No photos leave this device until you choose Upload for review.</p>
+        <p class="realityCaptureQuality" data-capture-quality>No photos leave this device until you save or upload them.</p>
       </section>
       <label class="realityCaptureConsent"><input data-public-contribution type="checkbox"> <span>After review, I want this capture considered as a public visual improvement. This never makes a residential interior public.</span></label>
       <section class="realityCaptureActions">
@@ -115,6 +139,14 @@ function ensurePanel() {
   panel.querySelector('[data-capture-input]').addEventListener('change', addPhotos);
   panel.querySelector('[data-capture-phone]').addEventListener('click', continueOnPhone);
   panel.querySelector('[data-capture-refresh]').addEventListener('click', refreshCapture);
+  panel.querySelector('[data-capture-preview]').addEventListener('click', previewResult);
+  panel.querySelectorAll('[data-viewer-action]').forEach(button => button.addEventListener('click', () => {
+    const viewer = current?.viewer;
+    if (button.dataset.viewerAction === 'rotate') viewer?.rotate();
+    if (button.dataset.viewerAction === 'closer') viewer?.zoom(0.8);
+    if (button.dataset.viewerAction === 'farther') viewer?.zoom(1.25);
+    if (button.dataset.viewerAction === 'reset') viewer?.reset();
+  }));
   panel.querySelector('[data-capture-copy]').addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(panel.querySelector('[data-capture-link]').href);
@@ -154,6 +186,9 @@ function buildTarget(appCtx, target) {
 }
 
 async function restore(kind, session = current, capture = null) {
+  clearTimeout(session.pollTimer);
+  session.viewer?.dispose();
+  session.viewer = null;
   const draftId = captureDraftKey(session.uid, session.target, kind, capture?.captureId);
   const restored = await loadLocalCaptureDraft(draftId).catch(() => ({ draft: null, photos: [] }));
   assertCurrent(session);
@@ -165,6 +200,7 @@ async function restore(kind, session = current, capture = null) {
   session.remotePhotos = [];
   session.uploadedPhotoIds = new Set(restored.draft?.uploadedPhotoIds || []);
   const panel = ensurePanel();
+  panel.querySelector('[data-capture-viewer-controls]').hidden = true;
   const room = capture?.room || restored.draft?.room || {};
   for (const [selector, value] of Object.entries({
     label: room.label || 'Living room', type: room.type || 'living_room', width: room.widthMeters || 4,
@@ -191,6 +227,7 @@ function minimumPhotos() {
 function render() {
   const panel = ensurePanel();
   if (!current) return;
+  panel.dataset.captureStatus = current.serverCapture?.status || 'draft';
   const photos = allPhotos();
   const sectorList = sectors();
   const bySector = new Map(sectorList.map((_, index) => [index, photos.filter((photo) => photo.sector === index).length]));
@@ -201,8 +238,9 @@ function render() {
   panel.querySelector('[data-capture-refresh]').hidden = !current.serverCapture;
   const locked = !captureIsEditable(current.serverCapture);
   panel.querySelectorAll('button:not([data-capture-close]), input, select').forEach((element) => {
-    element.disabled = current.busy || (locked && !element.matches('[data-capture-refresh], [data-capture-copy], [data-capture-phone]'));
+    element.disabled = current.busy || (locked && !element.matches('[data-capture-refresh], [data-capture-copy], [data-capture-phone], [data-capture-preview], [data-viewer-action], [data-capture-cancel]'));
   });
+  panel.querySelector('[data-capture-result]').hidden = !current.serverCapture?.processed?.optimizedModelPath;
   panel.querySelectorAll('[data-capture-kind], .realityCaptureRoom input:not([data-room-permission]), .realityCaptureRoom select, [data-public-contribution]').forEach((element) => {
     element.disabled = current.busy || (element.matches('[data-capture-kind]') ? !!current.resumed : !!current.serverCapture);
   });
@@ -333,8 +371,47 @@ async function fetchProgress(session) {
   await persist(session);
   assertCurrent(session);
   ensurePanel().querySelector('[data-capture-server-status]').textContent =
-    `${session.remotePhotos.length} photos uploaded · ${result.capture.status.replaceAll('_', ' ')}${result.capture.failure ? ' · Processing needs attention.' : ''}`;
+    `${session.remotePhotos.length} photos uploaded · ${processingDescription(result.capture)}`;
   render();
+  scheduleProgress(session);
+}
+
+function scheduleProgress(session) {
+  clearTimeout(session.pollTimer);
+  if (!isCurrent(session) || !['queued', 'processing'].includes(session.serverCapture?.status)) return;
+  session.pollTimer = setTimeout(async () => {
+    if (!isCurrent(session)) return;
+    if (!document.hidden && !session.busy) {
+      try { await fetchProgress(session); }
+      catch { if (isCurrent(session)) ensurePanel().querySelector('[data-capture-server-status]').textContent = 'Connection interrupted. Your uploaded photos are saved; checking again shortly.'; }
+    }
+    scheduleProgress(session);
+  }, 15000);
+}
+
+async function previewResult() {
+  const session = current;
+  if (!session || session.busy || !session.serverCapture?.processed?.optimizedModelPath) return;
+  setBusy(session, true);
+  const panel = ensurePanel();
+  panel.querySelector('[data-capture-status]').textContent = 'Opening your private reconstruction…';
+  try {
+    const access = await getRealityCaptureAssetAccess(session.serverCapture.captureId);
+    assertCurrent(session);
+    const response = await fetch(access.url, { cache: 'no-store', signal: session.abort.signal });
+    if (!response.ok) throw Error('The model could not be downloaded. Please try again.');
+    const bytes = await response.arrayBuffer();
+    assertCurrent(session);
+    if (bytes.byteLength > 20 * 1024 * 1024) throw Error('This model exceeds the preview limit.');
+    const { createCaptureViewer } = await import('./result-viewer.js?v=1');
+    assertCurrent(session);
+    session.viewer?.dispose();
+    session.viewer = await createCaptureViewer(panel.querySelector('[data-capture-viewer]'), bytes, session.abort.signal);
+    assertCurrent(session);
+    panel.querySelector('[data-capture-viewer-controls]').hidden = false;
+    panel.querySelector('[data-capture-status]').textContent = 'Drag to rotate. Pinch or scroll to zoom. This preview does not change the public world.';
+  } catch (error) { if (isCurrent(session)) panel.querySelector('[data-capture-status]').textContent = error.message; }
+  finally { setBusy(session, false); }
 }
 
 async function refreshCapture() {
@@ -485,6 +562,9 @@ export async function openRealityCaptureForBuilding(appCtx, buildingTarget) {
   panel.classList.add('show');
   panel.setAttribute('aria-hidden', 'false');
   panel.querySelector('[data-capture-close]').focus();
+  if (session.serverCapture) void fetchProgress(session).catch(() => {
+    if (isCurrent(session)) panel.querySelector('[data-capture-status]').textContent = 'Your saved capture is open. Use Check progress when the connection returns.';
+  });
   return true;
 }
 
@@ -504,8 +584,9 @@ export async function openRealityCaptureSession(captureId) {
   const panel = ensurePanel();
   panel.classList.add('show');
   panel.setAttribute('aria-hidden', 'false');
-  panel.querySelector('[data-capture-server-status]').textContent = `${session.remotePhotos.length} photos uploaded · ${result.capture.status.replaceAll('_', ' ')}`;
+  panel.querySelector('[data-capture-server-status]').textContent = `${session.remotePhotos.length} photos uploaded · ${processingDescription(result.capture)}`;
   render();
+  scheduleProgress(session);
   return true;
 }
 
@@ -516,6 +597,8 @@ export function closeRealityCapture() {
     const session = current;
     void persist(session).catch(() => {});
     session.abort.abort();
+    clearTimeout(session.pollTimer);
+    session.viewer?.dispose();
     session.unsubscribe?.();
     current = null;
   }
@@ -524,4 +607,5 @@ export function closeRealityCapture() {
   panel.querySelector('[data-capture-link]').removeAttribute('href');
   panel.querySelector('[data-capture-link]').textContent = '';
   panel.querySelector('[data-capture-link-box]').hidden = true;
+  panel.querySelector('[data-capture-viewer-controls]').hidden = true;
 }

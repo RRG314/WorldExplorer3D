@@ -171,7 +171,7 @@ export function moderateRealityCapture(captureId, decision, note = '', alignment
   return endpoint('/moderateRealityCapture', { captureId, decision, note, alignment });
 }
 
-export function uploadRealityCapturePhoto(capture, photo, onProgress = null, signal = null) {
+export async function uploadRealityCapturePhoto(capture, photo, onProgress = null, signal = null) {
   const services = initFirebase();
   if (!services?.storage) throw new Error('Secure capture storage is not configured for this app.');
   const ownerUid = String(capture?.ownerUid || '');
@@ -179,6 +179,9 @@ export function uploadRealityCapturePhoto(capture, photo, onProgress = null, sig
   if (!ownerUid || !captureId || !(photo?.blob instanceof Blob)) throw new Error('Capture upload identity is incomplete.');
   if (services.auth?.currentUser?.uid !== ownerUid) throw new Error('Sign in to the account that started this capture.');
   signal?.throwIfAborted();
+  await endpoint('/reserveRealityCapturePhoto', { captureId, photoId: photo.id });
+  signal?.throwIfAborted();
+  if (services.auth?.currentUser?.uid !== ownerUid) throw new Error('The signed-in account changed.');
   const path = `reality-captures/${ownerUid}/${captureId}/originals/${photo.id}.jpg`;
   const task = uploadBytesResumable(storageRef(services.storage, path), photo.blob, {
     contentType: 'image/jpeg',

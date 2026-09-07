@@ -124,8 +124,8 @@ test('space access keeps public exterior visibility separate from private interi
   }).allowed, true);
   assert.equal(resolveSpaceAccess({
     space: { ...space, accessMode: 'SESSION_GUESTS' },
-    requesterUid: 'visitor', roomId: 'ROOM1',
-    sessionGrant: { uid: 'visitor', roomId: 'ROOM1', active: true }
+    requesterUid: 'visitor', roomId: 'ROOM1', ownerOnline: true, nowMs: 500,
+    sessionGrant: { uid: 'visitor', roomId: 'ROOM1', active: true, createdAtMs: 100, expiresAtMs: 1000 }
   }).allowed, true);
 });
 
@@ -134,4 +134,16 @@ test('owners may delete private/unapproved work but approval requires admin work
   assert.equal(isDeletableByOwner({ ownerUid: 'owner', status: 'review_required' }, 'owner'), true);
   assert.equal(isDeletableByOwner({ ownerUid: 'owner', status: 'approved' }, 'owner'), false);
   assert.equal(isDeletableByOwner({ ownerUid: 'owner', status: 'draft' }, 'attacker'), false);
+});
+
+test('temporary interior grants expire, respect revocation and cannot bypass owner-only mode', () => {
+  const grant = { uid: 'guest', active: true, createdAtMs: 100, expiresAtMs: 1000, roomId: 'room' };
+  const input = { space: { ownerUid: 'owner', accessMode: 'SESSION_GUESTS' }, requesterUid: 'guest',
+    sessionGrant: grant, roomId: 'room', ownerOnline: true, nowMs: 500 };
+  assert.equal(resolveSpaceAccess(input).allowed, true);
+  assert.equal(resolveSpaceAccess({ ...input, nowMs: 1000 }).allowed, false);
+  assert.equal(resolveSpaceAccess({ ...input, ownerOnline: false }).allowed, false);
+  assert.equal(resolveSpaceAccess({ ...input, member: { revokedAtMs: 200 } }).allowed, false);
+  assert.equal(resolveSpaceAccess({ ...input, space: { ...input.space, accessMode: 'PRIVATE' }, oneTimeGrant: grant }).allowed, false);
+  assert.equal(resolveSpaceAccess({ ...input, sessionGrant: { ...grant, expiresAtMs: undefined } }).allowed, false);
 });

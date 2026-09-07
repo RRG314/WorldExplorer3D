@@ -18,7 +18,7 @@
     "verify:painttown": "node tests/painttown.integration.test.mjs",
     "verify:provider-release": "node scripts/verification/provider-release.mjs",
     "verify:firestore-rules": "firebase emulators:exec --only firestore --project we3d-staging-20260712 \"node --test tests/firestore.rules.security.test.mjs\"",
-    "verify:reality-capture:local": "node --test tests/capture-session-current.test.mjs tests/reality-capture-authority-current.test.cjs tests/reality-capture-glb-current.test.cjs tests/reality-capture-presentation-current.test.mjs tests/reality-capture-http-security-current.test.cjs tests/reality-capture-providers-current.test.cjs",
+    "verify:reality-capture:local": "node --test tests/capture-session-current.test.mjs tests/reality-capture-authority-current.test.cjs tests/reality-capture-glb-current.test.cjs tests/reality-capture-presentation-current.test.mjs tests/reality-capture-http-security-current.test.cjs tests/reality-capture-providers-current.test.cjs tests/reality-capture-decoder-current.test.cjs",
     "vendor:capture-qr": "node scripts/vendor-capture-qrcode.mjs",
     "verify:ar-lifecycle": "node scripts/verification/ar-lifecycle-current.mjs",
     "verify:reality-capture:ui": "node scripts/verification/reality-capture-ui-current.mjs",

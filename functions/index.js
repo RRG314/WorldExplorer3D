@@ -664,7 +664,7 @@ function setCors(req, res) {
   const allowOrigin = requestOrigin || '*';
   res.set('Access-Control-Allow-Origin', allowOrigin);
   res.set('Vary', 'Origin');
-  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Firebase-AppCheck');
   res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
 
   if (req.method === 'OPTIONS') {
@@ -2762,4 +2762,8 @@ Object.assign(exports, buildCommunityRealityCaptureExports({
   verifyAppCheck,
   requireModerator,
   logAdminActivity
+}));
+
+Object.assign(exports, require('./reality-capture-processing').buildCaptureProcessingExports({
+  db, bucket: admin.storage().bucket()
 }));
