@@ -20,6 +20,7 @@ import {
 } from './local-draft-store.js?v=1';
 import { resolveCanonicalMappedBuilding } from './runtime-contract.js?v=2';
 import { captureBuildingContext } from './alignment.js?v=1';
+import { photoGuideMarkup } from './photo-guide.js?v=1';
 
 const EXTERIOR_SECTORS = Object.freeze(['Front', 'Front right', 'Right', 'Back right', 'Back', 'Back left', 'Left', 'Front left']);
 const INTERIOR_SECTORS = Object.freeze(['Door', 'Wall 1', 'Corner 1', 'Wall 2', 'Corner 2', 'Opposite door']);
@@ -101,6 +102,7 @@ function ensurePanel() {
         <button type="button" data-capture-kind="exterior" role="tab">Exterior</button>
         <button type="button" data-capture-kind="interior_room" role="tab">One room</button>
       </div>
+      <label class="realityCaptureConsent" data-facade-choice><input data-exterior-facade type="checkbox" checked> <span>One facade / accessible wall only. Reconstruct what I can see, not the entire building.</span></label>
       <section class="realityCaptureSafety">
         <strong data-capture-safety-title>Capture only from places you may legally access.</strong>
         <p data-capture-safety-copy>Stay on safe public access, do not photograph people, license plates, screens, documents, or security details. Photos are normalized on this device to remove EXIF and GPS metadata before upload.</p>
@@ -119,10 +121,12 @@ function ensurePanel() {
       <section class="realityCaptureGuide">
         <div><span>GUIDED COVERAGE</span><strong data-capture-count>0 photos</strong></div>
         <p data-capture-instruction></p>
+        <details class="captureVisualGuide" open><summary>Where to stand and how to frame photos</summary><div data-capture-photo-guide></div></details>
         <div class="realityCaptureSectors" data-capture-sectors></div>
+        <button type="button" class="captureGuidedCameraButton" data-capture-live-camera>Open guided camera</button>
         <label class="realityCaptureCamera">
           <input data-capture-input type="file" accept="image/*" capture="environment" multiple>
-          <span>Take or add photos</span>
+          <span>Add photos from camera or library</span>
         </label>
         <p class="realityCaptureQuality" data-capture-quality>No photos leave this device until you save or upload them.</p>
         <details><summary>Review photos on this device</summary><div data-capture-photo-grid></div></details>
@@ -142,13 +146,38 @@ function ensurePanel() {
   panel.querySelector('[data-capture-upload]').addEventListener('click', () => uploadDraft(true));
   panel.querySelector('[data-capture-save]').addEventListener('click', () => uploadDraft(false));
   panel.querySelector('[data-capture-input]').addEventListener('change', addPhotos);
+  panel.querySelector('[data-exterior-facade]').addEventListener('change', () => {
+    if (!current || current.serverCapture) return;
+    current.exteriorScope = panel.querySelector('[data-exterior-facade]').checked ? 'facade' : 'building';
+    render(); persist().catch(error => { panel.querySelector('[data-capture-status]').textContent = error.message; });
+  });
+  panel.querySelector('[data-capture-live-camera]').addEventListener('click', async () => {
+    const session = current;
+    if (!session || session.busy || !captureIsEditable(session.serverCapture)) return;
+    try {
+      const { openCaptureCamera } = await import('./live-camera.js?v=1');
+      assertCurrent(session);
+      await openCaptureCamera({ kind: session.kind, viewLabel: sectors()[session.activeSector], signal: session.abort.signal,
+        onPhoto: file => isCurrent(session) ? addPhotos({ target: { files: [file], value: '' } }) : 0 });
+    } catch (error) { if (isCurrent(session)) panel.querySelector('[data-capture-status]').textContent = error.message; }
+  });
   panel.querySelector('[data-capture-phone]').addEventListener('click', continueOnPhone);
   panel.querySelector('[data-capture-refresh]').addEventListener('click', refreshCapture);
   panel.querySelector('[data-capture-retry]').addEventListener('click', async () => {
     const session = current;
     if (!session || session.busy) return;
     setBusy(session, true);
-    try { await retryRealityCapture(session.serverCapture.captureId); await fetchProgress(session); }
+    try {
+      const acknowledgement = await retryRealityCapture(session.serverCapture.captureId);
+      assertCurrent(session);
+      // Once the server accepts a retry, do not leave the previous failure on
+      // screen if the following progress request is delayed or disconnected.
+      session.serverCapture = { ...session.serverCapture, status: acknowledgement.status, failure: null };
+      panel.querySelector('[data-capture-server-status]').textContent = processingDescription(session.serverCapture);
+      render(); scheduleProgress(session);
+      try { await fetchProgress(session); }
+      catch (error) { if (isCurrent(session)) panel.querySelector('[data-capture-status]').textContent = 'Retry accepted. Your photos are saved; progress will reconnect automatically.'; }
+    }
     catch (error) { if (isCurrent(session)) panel.querySelector('[data-capture-status]').textContent = error.message; }
     finally { setBusy(session, false); }
   });
@@ -218,6 +247,7 @@ async function restore(kind, session = current, capture = null) {
   const restored = await loadLocalCaptureDraft(draftId).catch(() => ({ draft: null, photos: [] }));
   assertCurrent(session);
   session.kind = kind;
+  session.exteriorScope = capture?.exteriorScope || restored.draft?.exteriorScope || (capture ? 'building' : 'facade');
   session.draftId = draftId;
   session.activeSector = Math.max(0, Math.min(kind === 'interior_room' ? 5 : 7, finite(restored.draft?.activeSector, 0)));
   session.photos = restored.photos || [];
@@ -231,7 +261,7 @@ async function restore(kind, session = current, capture = null) {
     label: room.label || 'Living room', type: room.type || 'living_room', width: room.widthMeters || 4,
     length: room.lengthMeters || 6, height: room.heightMeters || 2.7, direction: room.entranceDirectionDegrees || 0
   })) panel.querySelector(`[data-room-${selector}]`).value = value;
-  panel.querySelector('[data-room-permission]').checked = restored.draft?.permissionConfirmed === true;
+  panel.querySelector('[data-room-permission]').checked = session.serverCapture?.permissionConfirmed === true || restored.draft?.permissionConfirmed === true;
   panel.querySelector('[data-public-contribution]').checked = session.serverCapture?.publicContributionRequested === true || restored.draft?.publicContributionRequested === true;
   panel.querySelector('[data-capture-link-box]').hidden = true;
   panel.querySelector('[data-capture-server-status]').textContent = '';
@@ -286,12 +316,16 @@ function render() {
     element.disabled = current.busy || (locked && !element.matches('[data-capture-refresh], [data-capture-copy], [data-capture-phone], [data-capture-preview], [data-viewer-action], [data-capture-cancel], [data-capture-retry]'));
   });
   panel.querySelector('[data-capture-result]').hidden = !current.serverCapture?.processed?.optimizedModelPath;
+  panel.querySelector('[data-facade-choice]').hidden = current.kind !== 'exterior';
+  panel.querySelector('[data-exterior-facade]').checked = current.exteriorScope === 'facade';
+  panel.querySelector('[data-exterior-facade]').disabled = current.busy || !!current.serverCapture;
   panel.querySelectorAll('[data-capture-kind], .realityCaptureRoom input:not([data-room-permission]), .realityCaptureRoom select, [data-public-contribution]').forEach((element) => {
     element.disabled = current.busy || (element.matches('[data-capture-kind]') ? !!current.resumed : !!current.serverCapture);
   });
   panel.querySelector('[data-capture-instruction]').textContent = current.kind === 'interior_room'
     ? `Stand near ${sectorList[current.activeSector]}. Keep each wall in several neighboring photos and include floor-to-wall and wall-to-ceiling edges.`
     : `Photograph the ${sectorList[current.activeSector].toLowerCase()} side. Walk safely; keep about two-thirds of the previous view in the next photo.`;
+  panel.querySelector('[data-capture-photo-guide]').innerHTML = photoGuideMarkup(current.kind, current.activeSector, current.exteriorScope);
   panel.querySelector('[data-capture-sectors]').innerHTML = sectorList.map((label, index) => `
     <button type="button" data-sector-index="${index}" class="${index === current.activeSector ? 'active' : ''} ${bySector.get(index) >= 2 ? 'covered' : ''}">
       <span>${escapeHtml(label)}</span><b>${bySector.get(index)}</b>
@@ -315,7 +349,7 @@ async function persist(session = current) {
   const input = session.form || {};
   await saveLocalCaptureDraft({
     id: session.draftId, ownerUid: session.uid,
-    kind: session.kind, target: session.target,
+    kind: session.kind, target: session.target, exteriorScope: session.exteriorScope,
     activeSector: session.activeSector, photoCount: session.photos.length,
     serverCapture: session.serverCapture,
     uploadedPhotoIds: [...(session.uploadedPhotoIds || [])],
@@ -370,6 +404,7 @@ async function addPhotos(event) {
     ? `${session.photos.length} photos are saved on this device. Select the next side yourself when you move.${lastErrorMessage ? ` Last issue: ${lastErrorMessage}` : ''}`
     : (lastErrorMessage || 'No photos were added.');
   setBusy(session, false);
+  return accepted;
 }
 
 function roomInput(panel, selector, fallback) {
@@ -381,6 +416,7 @@ function draftInput(session) {
   const permissionConfirmed = panel.querySelector('[data-room-permission]').checked;
   return {
     captureKind: session.kind, building: session.target, permissionConfirmed,
+    exteriorScope: session.exteriorScope,
     propertyPermissionConfirmed: permissionConfirmed,
     publicContributionRequested: panel.querySelector('[data-public-contribution]').checked,
     termsVersion: 'reality-capture-v1',
@@ -503,7 +539,7 @@ async function uploadDraft(submit = true) {
     return;
   }
   const underCovered = sectors().filter((_, index) => allPhotos().filter((photo) => photo.sector === index).length < 2);
-  if (submit && underCovered.length) {
+  if (submit && underCovered.length && !(session.kind === 'exterior' && session.exteriorScope === 'facade')) {
     status.textContent = `Add at least two photos for every coverage section. Missing: ${underCovered.join(', ')}.`;
     return;
   }

@@ -1,6 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { createHash } = require('node:crypto');
 const sharp = require('../functions/node_modules/sharp');
 const { validateCaptureObjects } = require('../functions/reality-capture-upload-validation');
 const capture = { ownerUid: 'owner', captureId: 'capture-test', captureKind: 'exterior' };
@@ -19,6 +20,8 @@ test('real decoding pins generations and does not trust claimed pixel dimensions
   assert.equal(result.manifest.length, 20);
   assert.equal(result.manifest[0].width, 1280);
   assert.equal(result.manifest[0].generation, '987');
+  assert.equal(result.manifest[0].sha256, createHash('sha256').update(bytes).digest('hex'));
+  assert.equal(result.manifest[0].sector, -1, 'Missing view metadata must not become fabricated front coverage');
 });
 
 test('truncated JPEG, disguised PNG, undersized raster and missing generation are rejected before queuing', async () => {

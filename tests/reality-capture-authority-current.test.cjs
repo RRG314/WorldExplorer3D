@@ -23,6 +23,11 @@ const building = Object.freeze({
   lon: -76.6122
 });
 
+test('facade scope is explicit and legacy captures keep whole-building semantics', () => {
+  assert.equal(createCaptureDraft({ captureKind: 'exterior', exteriorScope: 'facade', building }, { uid: 'owner' }).exteriorScope, 'facade');
+  assert.equal(createCaptureDraft({ captureKind: 'exterior', building }, { uid: 'owner' }).exteriorScope, 'building');
+});
+
 test('capture preserves bounded local world context without promoting it to trusted geography', () => {
   const context = { schemaVersion: 1, frame: 'building-local-x-east-y-up-z-south', authority: 'trusted-server',
     footprint: [{ x: -4, z: -3 }, { x: 4, z: -3 }, { x: 4, z: 3 }],

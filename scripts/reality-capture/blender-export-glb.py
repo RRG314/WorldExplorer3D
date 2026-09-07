@@ -18,7 +18,9 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 if Path(source).suffix.lower() in (".glb", ".gltf"):
     bpy.ops.import_scene.gltf(filepath=source)
 else:
-    if hasattr(bpy.ops.wm, "obj_import"):
+    # bpy.ops dynamically synthesizes attributes; hasattr reports operators that
+    # do not exist in Blender 3.0. Use the actual runtime version instead.
+    if bpy.app.version >= (3, 3, 0):
         bpy.ops.wm.obj_import(filepath=source)
     else:
         bpy.ops.import_scene.obj(filepath=source)
@@ -79,7 +81,7 @@ for image in bpy.data.images:
         image.scale(max(1, int(image.size[0] * scale)), max(1, int(image.size[1] * scale)))
 
 bpy.ops.object.select_all(action="SELECT")
-if hasattr(bpy.ops.object, "shade_smooth_by_angle"):
+if bpy.app.version >= (4, 1, 0):
     bpy.ops.object.shade_smooth_by_angle()
 else:
     bpy.ops.object.shade_smooth()
@@ -88,7 +90,7 @@ bpy.ops.export_scene.gltf(
     export_format="GLB",
     export_apply=True,
     export_materials="EXPORT",
-    export_images="AUTO",
+    export_image_format="AUTO",
     export_cameras=False,
     export_lights=False,
     export_animations=False,

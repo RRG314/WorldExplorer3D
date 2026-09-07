@@ -171,6 +171,7 @@ function createCaptureDraft(input = {}, actor = {}, nowMs = Date.now()) {
     ownerUid,
     ownerDisplayName: cleanText(actor.displayName || actor.email || 'Explorer', 80),
     captureKind,
+    exteriorScope: captureKind === 'exterior' && input.exteriorScope === 'facade' ? 'facade' : 'building',
     building,
     room,
     spaceId,

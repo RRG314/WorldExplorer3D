@@ -6,6 +6,8 @@ September 7, 2026 · Owner-directed planning baseline · Current branch: `steven
 
 **This document describes the product to build, not functionality already completed.** Implementation status and research evidence are separated below. No production deployment, public-repository update, or destructive restart is part of this plan.
 
+Implementation continuation, September 7: see [Phone pilot](REALITY_CAPTURE_PHONE_PILOT.md). Live guided-camera capture, previous-frame overlay, explicit facade-only intake, frozen-manifest polling and retry recovery are implemented. Physical-phone/house acceptance, registered facade patch publication, scan-derived interior collision, and TRELLIS inference remain open. Do not equate this pilot with all M0–M8 milestones passing.
+
 ### The product decision
 
 Build a World Explorer reconstruction product around established reconstruction tools. Its distinctive job is to improve **the same real building already in the world**, preserve its identity and gameplay, and make approved improvements available to other players.

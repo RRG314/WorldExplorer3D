@@ -96,6 +96,13 @@ test('moderation commits approval and representation together, never revives del
   }
 });
 
+test('a facade candidate cannot accidentally replace the entire mapped exterior', async t => {
+  const h = harness(t, { ...base, exteriorScope: 'facade', status: 'review_required', building: { sourceBuildingId: 'osm:42', worldId: 'earth' } });
+  const result = await h.call('moderateRealityCapture', 'moderator', { decision: 'approved' });
+  assert.equal(result.body.error, 'facade_patch_registration_required');
+  assert.equal(h.writes.length, 0);
+});
+
 test('an older room review cannot replace a newer pending capture', async t => {
   const capture = { ...base, captureKind: 'interior_room', status: 'review_required', spaceId: 'room' };
   const h = harness(t, capture, { 'privateSpaces/room': { ownerUid: 'owner', pendingCaptureId: 'newer-capture' } });
@@ -163,6 +170,15 @@ test('possession of handoff link does not grant access or enumerate another owne
   assert.equal((await h.call('getMyRealityCapture', 'visitor')).code, 404);
   assert.equal((await h.call('getMyRealityCapture', 'owner', { captureId: '../secret' })).code, 422);
   assert.deepEqual(h.writes, []);
+});
+
+test('processing progress uses frozen photo manifest without per-photo storage reads', async t => {
+  const h = harness(t, { ...base, status: 'processing', inputManifest: [{ name: photoPath, generation: '1', sector: 2 }] });
+  h.bucket.getFiles = async () => { throw Error('Submitted inputs must not be relisted'); };
+  const result = await h.call('getMyRealityCapture', 'owner');
+  assert.equal(result.code, 200);
+  assert.deepEqual(result.body.photos, [{ id: 'a'.repeat(32), sector: 2 }]);
+  assert.deepEqual(h.reads, []);
 });
 
 test('owned valid set queues atomically and repeat finalization cannot regress it', async (t) => {

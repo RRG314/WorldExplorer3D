@@ -78,7 +78,7 @@ async function reconstruct(options, job, dependencies = {}) {
     await execute(env.WE3D_RECONSTRUCTION_PYTHON || 'python3', args, { cwd: job.work });
   }
   // All providers converge on the same optimization and GLB inspection path.
-  await execute(env.BLENDER_BIN || 'blender', ['--background', '--factory-startup', '--python',
+  await execute(env.BLENDER_BIN || 'blender', ['--background', '--factory-startup', '--python-exit-code', '1', '--python',
     path.join(__dirname, 'blender-export-glb.py'), '--', '--input', source, '--output', job.finalGlb], { cwd: path.dirname(source) });
   return { provider: options.provider, pipelineVersion: options.pipelineVersion, evidenceClass: options.evidenceClass,
     referencePhoto: options.referencePhoto || null,

@@ -58,6 +58,8 @@ function serializeCapture(snapshot) {
     captureSchemaVersion: Number(data.captureSchemaVersion) || 1,
     processingPipelineVersion: clean(data.processingPipelineVersion, 100),
     captureKind: clean(data.captureKind, 40),
+    exteriorScope: data.exteriorScope === 'facade' ? 'facade' : 'building',
+    permissionConfirmed: data.consent?.propertyPermissionConfirmed === true,
     status: clean(data.status, 40),
     capturePrivacy: clean(data.capturePrivacy || 'PRIVATE', 40),
     accessMode: clean(data.accessMode || 'PRIVATE', 40),
@@ -281,8 +283,19 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       const snap = await db.collection(CAPTURES).doc(captureId).get();
       if (!snap.exists || snap.data()?.ownerUid !== auth.uid) throw new Error('capture_not_found');
       const prefix = `reality-captures/${auth.uid}/${captureId}/originals/`;
-      const [files] = await bucket.getFiles({ prefix, maxResults: 49, autoPaginate: false });
-      const photos = await Promise.all(files.slice(0, 49).filter((file) =>
+      const capture = snap.data();
+      let photos;
+      if (Array.isArray(capture.inputManifest) && !['draft', 'uploading'].includes(capture.status)) {
+        // Submitted inputs are immutable. Progress polling must not relist the
+        // bucket and issue one metadata request per photo every 15 seconds.
+        photos = capture.inputManifest.slice(0, 48).filter(photo => photo.name?.startsWith(prefix) &&
+          /^[a-f0-9]{32}\.(jpg|webp)$/.test(photo.name.slice(prefix.length))).map(photo => ({
+          id: photo.name.slice(prefix.length).split('.')[0],
+          sector: Number.isInteger(photo.sector) && photo.sector >= 0 && photo.sector < 8 ? photo.sector : -1
+        }));
+      } else {
+        const [files] = await bucket.getFiles({ prefix, maxResults: 49, autoPaginate: false });
+        photos = await Promise.all(files.slice(0, 49).filter((file) =>
         /^[a-f0-9]{32}\.(jpg|webp)$/.test(file.name.slice(prefix.length))
       ).map(async (file) => {
         const [metadata] = await file.getMetadata();
@@ -290,6 +303,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
         return { id: file.name.slice(prefix.length).split('.')[0],
           sector: Number.isInteger(sector) && sector >= 0 && sector < 8 ? sector : -1 };
       }));
+      }
       res.set('Cache-Control', 'private, no-store');
       res.status(200).json({ capture: { ...serializeCapture(snap), captureId, ownerUid: auth.uid }, photos });
     } catch (error) {
@@ -729,6 +743,9 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       const writes = [[ref, { status: decision, review, updatedAt: FieldValue.serverTimestamp() }]];
       let representationId = '';
       if (decision === 'approved' && capture.captureKind === 'exterior' && capture.publicContributionRequested === true) {
+        // A single observed wall must never hide the full mapped building. The
+        // existing publication format replaces whole exteriors, not facade patches.
+        if (capture.exteriorScope === 'facade') throw new Error('facade_patch_registration_required');
         representationId = stableId('representation', capture.building?.worldId, capture.building?.sourceBuildingId, capture.processingPipelineVersion);
         writes.push([db.collection(REPRESENTATIONS).doc(representationId), {
           representationId,

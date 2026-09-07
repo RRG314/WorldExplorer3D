@@ -1,6 +1,7 @@
 'use strict';
 
 const sharp = require('sharp');
+const { createHash } = require('node:crypto');
 const { CAPTURE_LIMITS, validateUploadedPhotoSet } = require('./reality-capture-authority');
 
 // Storage metadata is supplied by the client. Decode the actual pinned object,
@@ -27,8 +28,10 @@ async function validateCaptureObjects(bucket, capture, files) {
     if (!type || type !== metadata.contentType || (image.pages || 1) !== 1) throw Error('unsupported_photo_type');
     // metadata() alone accepts truncated JPEGs; force a complete decode.
     await decoder.stats();
+    const sector = Number(metadata.metadata?.sector);
     manifest.push({ name: file.name, generation: String(metadata.generation), size, contentType: type,
-      width: image.width, height: image.height });
+      width: image.width, height: image.height, sha256: createHash('sha256').update(bytes).digest('hex'),
+      sector: Number.isInteger(sector) && sector >= 0 && sector < 8 ? sector : -1 });
   }
   return { manifest, summary: validateUploadedPhotoSet(capture, manifest) };
 }

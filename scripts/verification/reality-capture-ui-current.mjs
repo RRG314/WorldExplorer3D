@@ -11,7 +11,7 @@ const out = 'output/verification/reality-capture-ui';
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const errors = [], captures = new Map(), uploaded = new Map();
-let serial = 0, failNextUpload = false;
+let serial = 0, failNextUpload = false, failNextProgress = false;
 const authModule = `let user=null;const listeners=new Set();
 export const getCurrentUser=()=>user;
 export const observeAuth=cb=>{listeners.add(cb);queueMicrotask(()=>cb(user));return()=>listeners.delete(cb)};
@@ -48,7 +48,11 @@ async function makePage(viewport, mobile = false) {
       if (action === 'listMyRealityCaptures') return json({ captures: [...captures.values()].filter(c => c.ownerUid === input.uid) });
       const capture = captures.get(input.captureId);
       if (!capture || capture.ownerUid !== input.uid) return json({ error: 'Capture not found' }, 404);
-      if (action === 'getMyRealityCapture') return json({ capture, photos: uploaded.get(input.captureId) || [] });
+      if (action === 'getMyRealityCapture') {
+        if (failNextProgress) { failNextProgress = false; return json({ error: 'Temporary connection failure' }, 503); }
+        return json({ capture, photos: uploaded.get(input.captureId) || [] });
+      }
+      if (action === 'retryRealityCapture') { capture.status = 'queued'; failNextProgress = true; return json({ status: 'queued' }); }
       if (action === 'reserveRealityCapturePhoto') return json({ reserved: true });
       if (action === 'finalizeRealityCaptureUpload') { capture.status = 'queued'; return json({ status: 'queued' }); }
       if (action === 'deleteRealityCapture') { captures.delete(input.captureId); return json({ deleted: true }); }
@@ -92,6 +96,13 @@ try {
   await phone.click('#switchAccount'); await phone.click('#googleSignIn');
   await phone.locator('#realityCapturePanel.show').waitFor();
   assert.equal(await phone.locator('[data-capture-label]').innerText(), 'Selected test house');
+  assert.match(await phone.locator('[data-capture-photo-guide]').innerText(), /70%/);
+  await phone.click('[data-sector-index="2"]');
+  assert.match(await phone.locator('[data-capture-photo-guide] svg').getAttribute('aria-label'), /Position 3 selected/);
+  await phone.locator('.captureVisualGuide').scrollIntoViewIfNeeded();
+  await phone.screenshot({ path: `${out}/mobile-exterior-guide.png` });
+  await phone.click('[data-sector-index="0"]');
+  await phone.locator('.captureVisualGuide summary').click();
   const photo = await phone.evaluate(() => {
     const c=document.createElement('canvas');c.width=1600;c.height=1200;const x=c.getContext('2d');
     x.fillStyle='#c6985a';x.fillRect(0,0,1600,1200);x.fillStyle='#173e52';
@@ -103,7 +114,7 @@ try {
   await statusContains(phone, '3 photos are saved');
   assert.match(await phone.locator('[data-capture-sectors] button.active').innerText(), /Front/);
   assert.equal(await phone.locator('[data-capture-sectors] button.covered').count(), 1);
-  await phone.locator('.realityCaptureGuide summary').click();
+  await phone.getByText('Review photos on this device', { exact: true }).click();
   assert.equal(await phone.locator('[data-capture-photo-grid] img').count(), 3);
   await phone.waitForFunction(() => [...document.querySelectorAll('[data-capture-photo-grid] img')].every(image => image.naturalWidth > 0));
   await phone.locator('[data-capture-photo-grid]').scrollIntoViewIfNeeded();
@@ -112,7 +123,7 @@ try {
   await phone.waitForFunction(() => document.querySelector('[data-capture-count]').textContent.startsWith('2 /'));
   await phone.locator('[data-capture-input]').setInputFiles(file);
   await phone.waitForFunction(() => document.querySelector('[data-capture-count]').textContent.startsWith('3 /'));
-  await phone.locator('.realityCaptureGuide summary').click();
+  await phone.getByText('Review photos on this device', { exact: true }).click();
   failNextUpload = true; await phone.click('[data-capture-save]'); await statusContains(phone, 'interrupted');
   await phone.click('[data-capture-save]'); await statusContains(phone, 'Photos saved privately to your account');
   assert.equal(uploaded.get('capture-1').length, 3);
@@ -127,15 +138,25 @@ try {
   // Complete a fixture set through the visible controls; this tests submission, not reconstruction.
   await phone.locator('[data-capture-input]').setInputFiles([file, file, file]);
   await statusContains(phone, '6 photos are saved');
+  assert.equal(captures.get('capture-1').exteriorScope, 'facade');
   for (let sector = 1; sector < 8; sector++) {
-    await phone.click(`[data-sector-index="${sector}"]`);
+    // A single accessible facade must not require invented hidden-side labels.
     await phone.locator('[data-capture-input]').setInputFiles([file, file]);
     await statusContains(phone, `${6 + sector * 2} photos are saved`);
   }
   await phone.click('[data-capture-upload]');
   await statusContains(phone, 'Upload complete. Status: queued');
   assert.equal(uploaded.get('capture-1').length, 20);
+  assert.ok(uploaded.get('capture-1').every(photo => photo.sector === 0));
   assert.equal(await phone.locator('[data-capture-upload]').isDisabled(), true);
+  captures.get('capture-1').status = 'processing_failed';
+  captures.get('capture-1').uploadSummary = { photoCount: 20 };
+  await phone.click('[data-capture-refresh]');
+  await phone.locator('[data-capture-retry]').waitFor({ state: 'visible' });
+  await phone.click('[data-capture-retry]');
+  await statusContains(phone, 'Retry accepted.');
+  assert.match(await phone.locator('[data-capture-server-status]').textContent(), /Queued/);
+  assert.equal(await phone.locator('[data-capture-retry]').isVisible(), false);
   await desktop.click('[data-capture-refresh]');
   await desktop.waitForFunction(() => document.querySelector('[data-capture-server-status]').textContent.toLowerCase().includes('queued'));
   // An exterior handoff must not strand the desktop user: a separate room can still be started.
@@ -156,8 +177,14 @@ try {
   await phone.locator('#realityCapturePanel.show').waitFor();
   assert.equal(await phone.locator('[data-room-label]').inputValue(), 'Kitchen');
   assert.equal(await phone.locator('[data-room-width]').inputValue(), '5.5');
+  assert.equal(await phone.locator('[data-room-permission]').isChecked(), true);
   assert.equal(await phone.locator('[data-public-contribution]').isChecked(), false);
   assert.equal(await phone.locator('[data-capture-sectors] button').count(), 6);
+  assert.match(await phone.locator('[data-capture-photo-guide]').innerText(), /one room at a time/);
+  if (!await phone.locator('.captureVisualGuide').getAttribute('open').then(value => value !== null)) await phone.locator('.captureVisualGuide summary').click();
+  assert.equal(await phone.locator('[data-capture-photo-guide] svg').isVisible(), true);
+  await phone.locator('.captureVisualGuide').scrollIntoViewIfNeeded();
+  await phone.screenshot({ path: `${out}/mobile-room-guide.png` });
   await phone.screenshot({ path: `${out}/mobile-private-room.png` });
   await phone.evaluate(async () => (await import('/js/auth-ui.js?v=55')).setUser('other'));
   assert.equal(await phone.locator('#realityCapturePanel.show').count(), 0);
@@ -206,9 +233,11 @@ try {
     'real normalization and IndexedDB', 'no fabricated sector coverage', 'interrupted upload retry',
     'desktop sees phone uploads', 'reload deduplicates', 'account change closes private session', '390px layout fits',
     '20-photo submission and cross-device queued status', 'room permission and exact room handoff', 'decoded thumbnail review and removal before upload',
-    'actual GLB viewer preserves placement while camera rotates; abort releases canvas'
+    'actual GLB viewer preserves placement while camera rotates; abort releases canvas',
+    'acknowledged retry remains queued when progress connection fails',
+    'exterior and room framing templates follow selected view and disclose coverage limits'
   ], errors, limitation: 'Auth/storage transport doubles; no real GPU or physical phone reconstruction.' }, null, 2));
-  console.log('Capture UI: 14 focused checks passed; transport doubles and synthetic GLB, not reconstruction acceptance.');
+  console.log('Capture UI: 16 focused checks passed; transport doubles and synthetic GLB, not reconstruction acceptance.');
 } catch (error) {
   console.error('Capture UI browser errors:', errors);
   for (const [index, context] of browser.contexts().entries()) {
