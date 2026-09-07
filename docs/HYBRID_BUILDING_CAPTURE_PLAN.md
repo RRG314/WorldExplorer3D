@@ -12,6 +12,16 @@ A local CPU audit of those actual 21 images used OpenCV 4.11 SIFT, reciprocal ra
 
 One real mapped building has one evolving presentation record. Observed contributions apply only to their registered surface regions. Unobserved regions keep their procedural presentation. Better future evidence can supersede a region without destroying other regions or history. An observed wall must never become a shared material used by unrelated buildings.
 
+## Testable private hybrid preview — September 7 checkpoint
+
+The existing capture panel now opens a photo/footprint editor for saved exterior captures with mapped footprints. It reuses owner-authenticated original access (pinned to validated storage generations), the current 3D viewer, and the existing mapped-roof generator. Four explicitly selected photo corners are rectified with a planar homography and placed on a selected wall region. Other surfaces remain procedural. Users can add, adjust, remove and undo patches, change provisional wall/roof dimensions, orbit/zoom, and save private revisions to the same capture/account. The API checks the owner, footprint signature, input manifest, geometry bounds and expected revision. It preserves the previous ten private revisions; it never changes the original reconstruction, canonical footprint, public representation, door or collision state.
+
+The actual owner's saved front-wall photo was decoded and projected locally onto their saved footprint. Manual correspondence is an example requiring owner review, not solved camera registration or a complete reconstruction. The first visual test exposed a numeric-field blur bug that changed corner coordinates; this was fixed and an exact-coordinate assertion added. Desktop and 390px preview, save/reopen, remove/undo and abort disposal passed. HTTP tests execute the real handler with explicit infrastructure doubles. Physical phone performance and live account save must be distinguished from these local checks.
+
+Still not implemented: automatic whole-building photo registration, photo-supported roof patches, arbitrary polygon masks/occluder removal, cross-capture surface aggregation, global manifest migration, public hybrid publication and in-world partial-patch attachment. This checkpoint is a private testable editor, not completion of the entire roadmap. The retained private revision history is not yet a user-facing history browser. Unknown roof/height inputs remain visibly provisional.
+
+Planar correction reference: [OpenCV homography tutorial](https://docs.opencv.org/4.13.0/d9/dab/tutorial_homography.html). This method applies to one plane; it does not reconstruct depth or reveal unphotographed surfaces.
+
 ## Implementation sequence and gates
 
 1. **Evidence first.** Preserve private per-attempt solved cameras, matching statistics, component summaries and pre/post-optimizer geometry with bounded retention, including failed attempts. The existing new bounded registration summary is only the first part. Split camera registration from dense meshing only after executing the actual Meshroom CLI/resume behavior. Flag disconnected inputs before dense processing; keep them available for augmentation.

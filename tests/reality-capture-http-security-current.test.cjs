@@ -71,6 +71,18 @@ function harness(t, capture = base, extras = {}) {
   return { call, bucket, records, reads, writes, mutate, hooks };
 }
 
+test('hybrid preview HTTP save is owner-only, revision-checked and cannot publish or change geometry',async t=>{
+  const {footprintSignature}=require('../functions/reality-capture-hybrid');
+  const building={sourceAuthority:'osm',sourceBuildingId:'osm:way:1',spatialContext:{footprint:[{x:0,z:0},{x:10,z:0},{x:10,z:8},{x:0,z:8}]}};
+  const h=harness(t,{...base,building,inputManifest:[{name:photoPath,generation:'1'}]});
+  const preview={baseRevision:0,footprintSignature:footprintSignature(building),heightMeters:6,patches:[{id:'one',photoId:'a'.repeat(32),wall:0,region:[0,0,1,1],quad:[[0,0],[1,0],[1,1],[0,1]]}],visibility:'PUBLIC'};
+  assert.equal((await h.call('saveRealityCaptureHybridPreview','visitor',{preview})).code,404);assert.equal(h.writes.length,0);
+  assert.equal((await h.call('saveRealityCaptureHybridPreview','owner',{preview})).code,200);
+  const saved=h.records.get(`realityCaptures/${id}`);assert.equal(saved.hybridPreview.visibility,'PRIVATE');assert.deepEqual(saved.building,building);assert.deepEqual(saved.processed,base.processed);assert.equal(saved.status,'approved');
+  assert.equal((await h.call('saveRealityCaptureHybridPreview','owner',{preview})).code,409);assert.equal(h.writes.length,1);
+  assert.equal((await h.call('saveRealityCaptureHybridPreview','owner',{preview:{...preview,baseRevision:1}})).code,200);assert.equal(h.records.get(`realityCaptures/${id}`).hybridHistory.length,1);
+});
+
 test('only the owner can retry a failed, validated capture without another upload', async t => {
   const h = harness(t, { ...base, status: 'processing_failed', inputManifest: [{ name: photoPath, generation: '1' }] });
   assert.equal((await h.call('retryRealityCapture', 'visitor')).code, 404);
@@ -178,7 +190,7 @@ test('processing progress uses frozen photo manifest without per-photo storage r
   h.bucket.getFiles = async () => { throw Error('Submitted inputs must not be relisted'); };
   const result = await h.call('getMyRealityCapture', 'owner');
   assert.equal(result.code, 200);
-  assert.deepEqual(result.body.photos, [{ id: 'a'.repeat(32), sector: 2 }]);
+  assert.deepEqual(result.body.photos, [{ id: 'a'.repeat(32), path: photoPath, sector: 2 }]);
   assert.deepEqual(h.reads, []);
 });
 

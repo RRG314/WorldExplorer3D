@@ -3,6 +3,7 @@ import {
   createRealityCaptureDraft,
   getMyRealityCapture,
   getRealityCaptureAssetAccess,
+  saveRealityCaptureHybridPreview,
   retryRealityCapture,
   deleteRealityCapture,
   finalizeRealityCaptureUpload,
@@ -139,6 +140,7 @@ function ensurePanel() {
           <button type="button" data-viewer-action="reset">Reset view</button>
         </div>
       </section>
+      <button type="button" data-capture-hybrid hidden>Build a photo + procedural preview</button>
       <div class="realityCaptureKinds" role="tablist" aria-label="Capture type">
         <button type="button" data-capture-kind="exterior" role="tab">Exterior</button>
         <button type="button" data-capture-kind="interior_room" role="tab">One room</button>
@@ -253,6 +255,7 @@ function ensurePanel() {
     finally { setBusy(session, false); }
   });
   panel.querySelector('[data-capture-preview]').addEventListener('click', previewResult);
+  panel.querySelector('[data-capture-hybrid]').addEventListener('click', previewHybrid);
   panel.querySelectorAll('[data-viewer-action]').forEach(button => button.addEventListener('click', () => {
     const viewer = current?.viewer;
     if (button.dataset.viewerAction === 'rotate') viewer?.rotate();
@@ -391,8 +394,9 @@ function render() {
   panel.querySelector('[data-capture-retry]').hidden = current.serverCapture?.status !== 'processing_failed' || !current.serverCapture?.uploadSummary;
   const locked = !captureIsEditable(current.serverCapture);
   panel.querySelectorAll('button:not([data-capture-close]), input, select').forEach((element) => {
-    element.disabled = current.busy || (locked && !element.matches('[data-capture-refresh], [data-capture-copy], [data-capture-phone], [data-capture-preview], [data-viewer-action], [data-capture-cancel], [data-capture-retry]'));
+    element.disabled = current.busy || (locked && !element.matches('[data-capture-refresh], [data-capture-copy], [data-capture-phone], [data-capture-preview], [data-capture-hybrid], [data-viewer-action], [data-capture-cancel], [data-capture-retry]'));
   });
+  panel.querySelector('[data-capture-hybrid]').hidden = current.kind !== 'exterior' || !current.remotePhotos.length || !current.serverCapture?.building?.spatialContext?.footprint?.length;
   panel.querySelector('[data-capture-result]').hidden = !current.serverCapture?.processed?.optimizedModelPath;
   const registration = current.serverCapture?.processed?.registration;
   panel.querySelector('[data-capture-registration]').textContent = registration?.status === 'available'
@@ -592,6 +596,27 @@ function scheduleProgress(session) {
     }
     scheduleProgress(session);
   }, 15000);
+}
+
+async function previewHybrid() {
+  const session=current;if(!session||session.busy||!session.serverCapture)return;
+  setBusy(session,true);
+  try {
+    const {openHybridEditor}=await import('./hybrid-editor.js?v=1');assertCurrent(session);
+    session.hybridEditor?.close();
+    session.hybridEditor=await openHybridEditor({capture:session.serverCapture,photos:session.remotePhotos,signal:session.abort.signal,
+      loadPhoto:async(id,signal)=>{
+        assertCurrent(session);const item=session.remotePhotos.find(p=>p.id===id);if(!item)throw Error('Unknown capture photo.');
+        const path=item.path||`reality-captures/${session.uid}/${session.serverCapture.captureId}/originals/${id}.jpg`;
+        const access=await getRealityCaptureAssetAccess(session.serverCapture.captureId,'original',path);assertCurrent(session);
+        const response=await fetch(access.url,{cache:'no-store',signal});if(!response.ok)throw Error('Unable to open this saved photo.');
+        const blob=await response.blob();assertCurrent(session);return blob;
+      },save:async preview=>{
+        assertCurrent(session);const result=await saveRealityCaptureHybridPreview(session.serverCapture.captureId,preview);assertCurrent(session);
+        session.serverCapture.hybridPreview=result.preview;await persist(session);return result;
+      }});
+  }catch(error){if(isCurrent(session))ensurePanel().querySelector('[data-capture-status]').textContent=error.message;}
+  finally{setBusy(session,false);}
 }
 
 async function previewResult() {

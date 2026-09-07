@@ -4,12 +4,11 @@ import { applyCaptureAlignment } from './alignment.js?v=1';
 
 export async function createCaptureViewer(host, bytes, signal, options = {}) {
   if (!globalThis.THREE) await loadClassicScript(vendorScriptsCritical[0]);
-  if (!globalThis.THREE.GLTFLoader) await loadClassicScript(vendorScriptsCritical[3]);
+  if (!options.model && !globalThis.THREE.GLTFLoader) await loadClassicScript(vendorScriptsCritical[3]);
   if (!globalThis.THREE.OrbitControls) await loadClassicScript('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js');
   if (signal.aborted) return null;
   const T = globalThis.THREE;
-  const gltf = await new Promise((resolve, reject) => new T.GLTFLoader().parse(bytes, '', resolve, reject));
-  const model = gltf.scene;
+  const model = options.model || (await new Promise((resolve, reject) => new T.GLTFLoader().parse(bytes, '', resolve, reject))).scene;
   const disposeModel = () => model.traverse(object => {
     object.geometry?.dispose();
     for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
@@ -54,7 +53,7 @@ export async function createCaptureViewer(host, bytes, signal, options = {}) {
   renderer.outputEncoding = T.sRGBEncoding;
   const canvas = renderer.domElement;
   canvas.tabIndex = 0;
-  canvas.setAttribute('aria-label', 'Your reconstructed model. Drag to rotate, pinch or scroll to zoom. Use the buttons below for keyboard control.');
+  canvas.setAttribute('aria-label', options.label || 'Your reconstructed model. Drag to rotate, pinch or scroll to zoom. Use the buttons below for keyboard control.');
   canvas.style.cssText = 'display:block;width:100%;height:280px;touch-action:none';
   host.replaceChildren(canvas);
   const controls = new T.OrbitControls(camera, canvas);
@@ -68,7 +67,8 @@ export async function createCaptureViewer(host, bytes, signal, options = {}) {
     if (reference.children.length) box.union(new T.Box3().setFromObject(reference));
     const target = box.getCenter(new T.Vector3());
     const distance = Math.max(...box.getSize(new T.Vector3()).toArray(), 1);
-    camera.position.copy(target).add(new T.Vector3(distance, distance * 0.6, distance * 1.5));
+    const fitScale=Number.isFinite(options.fitScale)?Math.max(.5,Math.min(2,options.fitScale)):1;
+    camera.position.copy(target).add(new T.Vector3(distance, distance * 0.6, distance * 1.5).multiplyScalar(fitScale));
     camera.near = Math.max(0.001, distance / 1000); camera.far = distance * 100;
     camera.updateProjectionMatrix(); controls.minDistance = distance * 0.04; controls.maxDistance = distance * 10;
     controls.target.copy(target); controls.update(); draw();

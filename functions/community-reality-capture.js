@@ -4,6 +4,7 @@ const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
 const { FieldValue } = require('firebase-admin/firestore');
 const { validateCaptureObjects } = require('./reality-capture-upload-validation');
+const { footprintSignature, normalizeHybridPreview } = require('./reality-capture-hybrid');
 const {
   ACCESS_MODES,
   assertCaptureTransition,
@@ -66,6 +67,8 @@ function serializeCapture(snapshot) {
     publicContributionRequested: data.publicContributionRequested === true,
     building: data.building || {},
     buildingDetails: data.buildingDetails || null,
+    hybridPreview: data.hybridPreview || null,
+    footprintSignature: footprintSignature(data.building),
     room: data.room || null,
     spaceId: clean(data.spaceId, 180),
     uploadSummary: data.uploadSummary || null,
@@ -291,7 +294,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
         // bucket and issue one metadata request per photo every 15 seconds.
         photos = capture.inputManifest.slice(0, 48).filter(photo => photo.name?.startsWith(prefix) &&
           /^[a-f0-9]{32}\.(jpg|webp)$/.test(photo.name.slice(prefix.length))).map(photo => ({
-          id: photo.name.slice(prefix.length).split('.')[0],
+          id: photo.name.slice(prefix.length).split('.')[0], path: photo.name,
           sector: Number.isInteger(photo.sector) && photo.sector >= 0 && photo.sector < 8 ? photo.sector : -1
         }));
       } else {
@@ -310,6 +313,25 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     } catch (error) {
       sendKnownError(res, error);
     }
+  });
+
+  const saveRealityCaptureHybridPreview = functions.region('us-central1').https.onRequest(async (req,res)=>{
+    const auth=await guard(req,res); if(!auth)return;
+    try {
+      const captureId=clean(req.body?.captureId,180);
+      if(!/^[a-zA-Z0-9_-]{1,180}$/.test(captureId))throw Error('invalid_capture_id');
+      const ref=db.collection(CAPTURES).doc(captureId); let saved;
+      await db.runTransaction(async tx=>{
+        const snap=await tx.get(ref), capture=snap.data();
+        if(!snap.exists||capture.ownerUid!==auth.uid)throw Error('capture_not_found');
+        saved=normalizeHybridPreview({...capture,captureId},req.body?.preview);
+        // Only private preview state changes. Existing processed assets, review,
+        // public representations, collision and canonical building stay intact.
+        const history=[...(capture.hybridHistory||[]),...(capture.hybridPreview?[capture.hybridPreview]:[])].slice(-10);
+        tx.update(ref,{hybridPreview:saved,hybridHistory:history,updatedAt:FieldValue.serverTimestamp()});
+      });
+      res.set('Cache-Control','private, no-store');res.status(200).json({preview:saved});
+    }catch(error){sendKnownError(res,error);}
   });
 
   const finalizeRealityCaptureUpload = functions.region('us-central1').runWith({ memory: '512MB', timeoutSeconds: 300, maxInstances: 2 }).https.onRequest(async (req, res) => {
@@ -885,7 +907,9 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       if (assetKind === 'original' && !/^[a-f0-9]{32}\.(jpg|webp)$/.test(path.slice(expectedPrefix.length))) {
         throw new Error('asset_access_denied');
       }
-      const file = bucket.file(path);
+      const source = assetKind === 'original' ? capture.inputManifest?.find(item => item.name === path) : null;
+      if (assetKind === 'original' && capture.inputManifest?.length && !source?.generation) throw Error('asset_access_denied');
+      const file = bucket.file(path, source?.generation ? {generation:source.generation} : undefined);
       const [exists] = await file.exists();
       if (!exists) throw new Error('asset_not_found');
       const expiresAtMs = Date.now() + SIGNED_URL_TTL_MS;
@@ -903,6 +927,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     reserveRealityCapturePhoto,
     retryRealityCapture,
     getMyRealityCapture,
+    saveRealityCaptureHybridPreview,
     decidePrivateSpaceAccessRequest,
     deleteRealityCapture,
     finalizeRealityCaptureUpload,

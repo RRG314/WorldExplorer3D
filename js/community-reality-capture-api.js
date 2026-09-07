@@ -169,6 +169,10 @@ export function getRealityCaptureAssetAccess(captureId, assetKind = 'processed',
   return endpoint('/getRealityCaptureAssetAccess', { captureId, assetKind, path });
 }
 
+export function saveRealityCaptureHybridPreview(captureId, preview) {
+  return endpoint('/saveRealityCaptureHybridPreview', {captureId, preview});
+}
+
 export function listRealityCaptureModeration(status = 'review_required') {
   return endpoint('/listRealityCaptureModeration', { status });
 }
