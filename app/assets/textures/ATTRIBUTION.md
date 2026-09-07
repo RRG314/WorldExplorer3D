@@ -52,6 +52,21 @@ The diffuse, OpenGL normal, and roughness maps under `earth/` are resized local 
 - `concrete_*`: Concrete. Source: https://polyhaven.com/a/concrete
 - `brick_wall_001_*`: Brick Wall 001. Source: https://polyhaven.com/a/brick_wall_001
 
+## Building Exterior Surfaces
+
+The following 1024 px diffuse maps are unmodified runtime-sized copies of Poly Haven CC0 materials. They are shared by the deterministic building-exterior generator; no texture is duplicated per building. Poly Haven confirms that its assets are CC0 and may be used, modified, and redistributed commercially: https://polyhaven.com/license
+
+| Local file | Source asset | Creator credit | Source MD5 | Bytes | Intended use |
+| --- | --- | --- | --- | ---: | --- |
+| `facades/polyhaven-brick-wall-07-diff-1k.jpg` | [Brick Wall 07](https://polyhaven.com/a/brick_wall_07) | Dimitrios Savva | `7715ed235e20cd8ebe412b925797f408` | 1,050,189 | Warm brick residential, mixed-use, and civic walls |
+| `facades/polyhaven-brick-wall-10-diff-1k.jpg` | [Brick Wall 10](https://polyhaven.com/a/brick_wall_10) | Dimitrios Savva | `31bed4677b97c5feb8773a9198e6aa25` | 772,402 | Dark brick apartments, warehouses, and industrial walls |
+| `facades/polyhaven-brick-wall-12-diff-1k.jpg` | [Brick Wall 12](https://polyhaven.com/a/brick_wall_12) | Dimitrios Savva | `94b59608a0ccb8ba64bd9d394f630fa1` | 908,813 | Brown and tan masonry walls |
+| `facades/polyhaven-corrugated-iron-diff-1k.jpg` | [Corrugated Iron](https://polyhaven.com/a/corrugated_iron) | Dimitrios Savva (photography), Jenelle van Heerden (processing) | `fabb629c5ad6f427e6862bb4043564bd` | 719,557 | Metal warehouses, farm structures, and industrial panels |
+| `facades/polyhaven-plastered-wall-02-diff-1k.jpg` | [Plastered Wall 02](https://polyhaven.com/a/plastered_wall_02) | Charlotte Baglioni | `3ca0d02e87ad5c6eb21efa4b05b7748e` | 436,395 | Stucco, plaster, and generated siding variants |
+| `facades/polyhaven-rectangular-facade-tiles-02-diff-1k.jpg` | [Rectangular Facade Tiles 02](https://polyhaven.com/a/rectangular_facade_tiles_02) | Charlotte Baglioni | `08259e4a5a4b0d0ce997a2288082c483` | 700,098 | Stone, concrete-panel, and modern facade variants |
+
+Each source is a two-dimensional material surface with no triangle count. Runtime suitability comes from 1K resolution, shared texture pooling, mipmaps, bounded anisotropy, and compatibility with merged near/mid LOD geometry. The procedural window, door, storefront, trim, balcony, porch, step, railing, fire-escape, loading, and cornice treatments are World Explorer render code and are labeled as generated visual representation rather than mapped fact.
+
 ## Live Data Providers
 
 - Aircraft state vectors: The OpenSky Network live API, used under OpenSky terms for research and non-commercial use. Source: https://openskynetwork.github.io/opensky-api/

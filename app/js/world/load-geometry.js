@@ -4,6 +4,7 @@ import {
   normalizeLanduseSurfaceType
 } from "../surface-rules.js?v=18";
 import { geometryHasFinitePositions } from "./geometry-batching.js?v=6";
+import { resolveBuildingExteriorPresentation } from '../engine/building-facade-materials.js?v=16';
 import {
   fetchShortbreadTile,
   vectorTileRangeForBounds
@@ -24,6 +25,48 @@ let sanitizeWorldPathPointsFn = () => [];
 let decimatePointsFn = (pts) => pts;
 let clampNumberFn = (value) => value;
 let featureMinPolygonArea = 8;
+
+function midFacadeMaterial(buildingType, buildingSeed, colorHex, dimensions, options = {}) {
+  if (typeof appCtx.getBuildingMaterial !== 'function') {
+    return {
+      material: new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.9, metalness: 0.02 }),
+      exteriorPresentation: null
+    };
+  }
+  const materialOptions = {
+    lodTier: 'mid',
+    heightMeters: dimensions.height,
+    footprintWidth: dimensions.width,
+    footprintDepth: dimensions.depth,
+    footprintArea: dimensions.area,
+    denseUrban: options.denseUrban === true,
+    facadeMaterial: options.facadeMaterial || '',
+    roofMaterial: options.roofMaterial || '',
+    roofColor: options.roofColor || '',
+    facadeColorMapped: options.facadeColorMapped === true,
+    buildingSemantics: options.buildingSemantics || null,
+    buildingIdentity: options.buildingIdentity,
+    levels: options.levels,
+    centerX: options.centerX,
+    centerZ: options.centerZ,
+    location: options.location,
+    tags: options.tags || {}
+  };
+  const resolved = resolveBuildingExteriorPresentation(appCtx, buildingType, buildingSeed, colorHex, materialOptions);
+  return {
+    material: appCtx.getBuildingMaterial(buildingType, buildingSeed, colorHex, {
+      ...materialOptions,
+      resolvedPresentation: resolved
+    }),
+    exteriorPresentation: Object.freeze({
+      wallColor: resolved.tintHex,
+      roofColorA: resolved.roof.colorA,
+      roofColorB: resolved.roof.colorB,
+      roofGrainScale: resolved.roof.grainScale,
+      exteriorProfile: resolved.exteriorProfile
+    })
+  };
+}
 
 export function initWorldLoadGeometry(options = {}) {
   if (typeof options.sanitizeWorldFootprintPoints === 'function') {
@@ -71,25 +114,14 @@ function fallbackMidLodBuildingMesh(pts, height, avgElevation, colorHex = '#7f8c
     steps: 1
   });
   geo.rotateX(-Math.PI / 2);
-  const mat = typeof appCtx.getBuildingMaterial === 'function'
-    ? appCtx.getBuildingMaterial(options.buildingType || 'yes', options.buildingSeed || 0, colorHex, {
-      lodTier: 'mid',
-      heightMeters: h,
-      footprintWidth: w,
-      footprintDepth: d,
-      footprintArea: w * d,
-      denseUrban: options.denseUrban === true,
-      facadeMaterial: options.facadeMaterial || '',
-      roofMaterial: options.roofMaterial || '',
-      roofColor: options.roofColor || '',
-      facadeColorMapped: options.facadeColorMapped === true,
-      buildingSemantics: options.buildingSemantics || null
-    })
-    : new THREE.MeshStandardMaterial({
-      color: colorHex,
-      roughness: 0.92,
-      metalness: 0.02
-    });
+  const facade = midFacadeMaterial(
+    options.buildingType || 'yes',
+    options.buildingSeed || 0,
+    colorHex,
+    { width: w, depth: d, area: w * d, height: h },
+    options
+  );
+  const mat = facade.material;
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.y = avgElevation;
   mesh.userData.buildingFootprint = pts;
@@ -99,6 +131,7 @@ function fallbackMidLodBuildingMesh(pts, height, avgElevation, colorHex = '#7f8c
   mesh.userData.midLodColor = colorHex;
   mesh.userData.avgElevation = avgElevation;
   mesh.userData.lodTier = 'mid';
+  mesh.userData.exteriorPresentation = facade.exteriorPresentation;
   mesh.castShadow = false;
   mesh.receiveShadow = true;
   return mesh;
@@ -175,25 +208,14 @@ export function createMidLodBuildingMesh(pts, height, avgElevation, options = {}
       return fallbackMidLodBuildingMesh(pts, h, avgElevation, colorHex, options);
     }
 
-    const mat = typeof appCtx.getBuildingMaterial === 'function'
-      ? appCtx.getBuildingMaterial(buildingType, buildingSeed, colorHex, {
-        lodTier: 'mid',
-        heightMeters: h,
-        footprintWidth: metrics.width,
-        footprintDepth: metrics.depth,
-        footprintArea: metrics.area,
-        denseUrban: options.denseUrban === true,
-        facadeMaterial: options.facadeMaterial || '',
-        roofMaterial: options.roofMaterial || '',
-        roofColor: options.roofColor || '',
-        facadeColorMapped: options.facadeColorMapped === true,
-        buildingSemantics: options.buildingSemantics || null
-      })
-      : new THREE.MeshStandardMaterial({
-        color: colorHex,
-        roughness: 0.88,
-        metalness: 0.03
-      });
+    const facade = midFacadeMaterial(
+      buildingType,
+      buildingSeed,
+      colorHex,
+      { width: metrics.width, depth: metrics.depth, area: metrics.area, height: h },
+      options
+    );
+    const mat = facade.material;
     geo.computeBoundingBox();
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.y = avgElevation;
@@ -208,6 +230,7 @@ export function createMidLodBuildingMesh(pts, height, avgElevation, options = {}
     mesh.userData.midLodColor = colorHex;
     mesh.userData.avgElevation = avgElevation;
     mesh.userData.lodTier = 'mid';
+    mesh.userData.exteriorPresentation = facade.exteriorPresentation;
     // Mid-LOD skyline geometry never occupies the near shadow field.
     mesh.castShadow = false;
     mesh.receiveShadow = true;

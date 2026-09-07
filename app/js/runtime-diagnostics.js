@@ -1,4 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
+import { buildingExteriorMaterialPoolSnapshot } from './engine/building-facade-materials.js?v=16';
 
 const diagnosticsParams = new URLSearchParams(globalThis.location?.search || '');
 // Production-like local runs must behave exactly like the deployed build.
@@ -1175,6 +1176,8 @@ function getWorldExplorerRuntimeDiagnostics() {
       }
     },
     transportStructures: transportStructureSnapshot(),
+    buildingExteriors: appCtx.buildingExteriorDetailPublication || null,
+    buildingExteriorMaterials: buildingExteriorMaterialPoolSnapshot(),
     farTerrainClipmap: appCtx.farTerrainClipmapState || null,
     quality: appCtx.renderQualityLevel || null,
     earthOrigin: {
@@ -1358,6 +1361,8 @@ globalThis.render_game_to_text = () => JSON.stringify({
   worldDiscovery: appCtx.worldDiscoveryRuntimeSnapshot?.() || { active: false },
   editableWorld: appCtx.editableWorldRuntimeSnapshot?.() || { active: false },
   transportStructures: transportStructureSnapshot(),
+  buildingExteriors: appCtx.buildingExteriorDetailPublication || null,
+  buildingExteriorMaterials: buildingExteriorMaterialPoolSnapshot(),
   worldCounts: {
     buildings: appCtx.buildings?.length ?? null,
     roads: appCtx.roads?.length ?? null,

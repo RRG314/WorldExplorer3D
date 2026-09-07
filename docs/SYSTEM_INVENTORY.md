@@ -29,6 +29,13 @@ requires processing and moderator approval before presentation, and keeps every
 new interior private until its owner separately changes a reusable private-space
 policy. See [COMMUNITY_REALITY_CAPTURE_V1.md](../COMMUNITY_REALITY_CAPTURE_V1.md).
 
+Building exterior note (2026-09-06): the mapped building renderer now has one
+deterministic semantic exterior catalog, shared CC0 wall surfaces, procedural
+window/storefront treatment, and a six-batch near-detail layer. Footprints,
+height, roofs, terrain alignment, collision, entrances, POIs, property, and
+interiors retain their existing authorities. See
+[BUILDING_EXTERIOR_UPGRADE.md](BUILDING_EXTERIOR_UPGRADE.md).
+
 This inventory describes the systems present in the current source tree and
 their honest product boundaries. See [ARCHITECTURE_MAP.md](ARCHITECTURE_MAP.md)
 for ownership and data flow.
@@ -74,7 +81,7 @@ with explicit entry and exit lifecycles.
 | Earth compilation | `app/js/world/`, `app/js/earth-core/`, `app/js/terrain/` | Selects providers and publishes one assembled world |
 | Terrain and ground | `app/js/terrain.js`, `app/js/terrain/`, `data/ground-attestations/` | Ground height, land cover, seams, collision, and regional fallbacks |
 | Roads and structures | `app/js/world/compiler/`, `app/js/world/transport-structures/` | Roads, bridges, ramps, elevated ways, underpasses, and tunnels |
-| Buildings and interiors | `app/js/buildings/`, `app/js/interiors/`, `app/js/reality-capture/` | Building form, facades, entrances, generated floors, mapped indoor detail, and approved community presentation overlays that retain canonical collision/navigation and fail back to the procedural world |
+| Buildings and interiors | `app/js/buildings/`, `app/js/world/building-exterior-*`, `app/js/engine/building-facade-materials.js`, `app/js/interiors/`, `app/js/reality-capture/` | Authoritative mapped form and collision; deterministic generated exterior families, shared wall/window/door/storefront presentation, bounded near-detail batches, functional entrances, generated floors, mapped indoor detail, and approved community overlays that retain canonical collision/navigation and fail back to the procedural world |
 | Water | `app/js/world/water-*`, `app/js/boat-mode/`, `app/js/ocean/`, `app/js/transport/maritime-*` | Surface water, near-shore rendering, channel camera framing, playable vessel fleets, mapped ship identity, underwater play, and fish life |
 | Aviation | `app/js/plane-mode.js`, `app/js/plane/`, `app/js/transport/airport-*`, `app/js/transport/aviation-*` | One flight controller and airport layout authority; map-informed major, regional, and local layouts; scale-appropriate playable fleets; class-specific flight response; parked, taxi, and bounded circuit activity; aircraft collision; pilot/passenger travel; airport arrivals; skydiving handoff; presentation; and recovery |
 | Maritime transport | `app/js/boat-mode/`, `app/js/transport/maritime-*` | One vessel controller, displacement-aware handling, generated playable port fleets, bounded harbor traffic, mapped vessel identity, presentation, and recovery |

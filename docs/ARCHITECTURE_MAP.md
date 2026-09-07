@@ -72,6 +72,29 @@ Primary ownership areas:
 - `app/js/buildings/` and `app/js/interiors/` own structures and indoor play.
 - `app/js/world/water-*`, `app/js/boat-mode/`, and `app/js/ocean/` own water.
 
+### Building exterior presentation flow
+
+```mermaid
+flowchart LR
+    Building[Mapped building identity, tags, footprint, height, roof] --> Catalog[Deterministic exterior profile]
+    Catalog --> Near[Near wall surface, windows, storefront, integrated door]
+    Catalog --> Mid[Mid facade atlas plus per-building batch attributes]
+    Catalog --> Details[Bounded shared detail batches]
+    Building --> Collision[Existing collision and interior authority]
+    Building --> Entrance[Existing published entrance]
+    Entrance --> Near
+    Entrance --> Details
+```
+
+`world/building-exterior-catalog.js` is the sole generated-style selector.
+`engine/building-facade-materials.js` owns shared wall textures and facade
+shaders. `world/building-exterior-details.js` adds presentation-only geometry
+to its own disposable collection with a maximum of six material batches. The
+catalog can infer appearance, but it cannot move a footprint, alter terrain,
+replace collision, create an entrance, change a POI or property identity, or
+override an interior. Mid-LOD colors and roof appearance travel as merged
+attributes so distant buildings do not allocate unique materials.
+
 ### Community Reality Capture flow
 
 ```mermaid

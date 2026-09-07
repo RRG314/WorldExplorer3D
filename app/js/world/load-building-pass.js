@@ -27,6 +27,8 @@ import {
 import { yieldToMainThread as defaultYieldToMainThread } from './cooperative-scheduling.js?v=1';
 import { isImplausibleTallBuildingFootprint } from './building-geometry-quality.js?v=1';
 import { publishBuildingFacadeEntrances } from './building-facade-entrances.js?v=3';
+import { publishBuildingExteriorDetails } from './building-exterior-details.js?v=1';
+import { resolveBuildingExteriorPresentation } from '../engine/building-facade-materials.js?v=16';
 import { mappedBuildingAddress } from '../real-estate/public-address.js?v=1';
 
 export function requiresLoadedRoadCoverageForBuilding(tags = {}) {
@@ -497,6 +499,7 @@ export async function buildBuildingGeometryPass(options = {}) {
       new THREE.Color(mappedFacadeColor).getHex() :
       fallbackBaseColor;
     let mesh = null;
+    let resolvedExteriorPresentation = null;
 
     if (lodTier === 'mid') {
       mesh = measureBuildingPhase('meshCreation', () => createMidLodBuildingMesh(pts, bodyHeight, baseElevation, {
@@ -508,7 +511,13 @@ export async function buildBuildingGeometryPass(options = {}) {
         roofMaterial: way.tags['roof:material'] || '',
         roofColor: way.tags['roof:colour'] || way.tags['roof:color'] || '',
         facadeColorMapped: /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(mappedFacadeColor),
-        buildingSemantics
+        buildingSemantics,
+        buildingIdentity: sourceBuildingId,
+        levels: resolvedLevels,
+        centerX,
+        centerZ,
+        location: appCtx.LOC,
+        tags: way.tags || {}
       }));
     } else {
       const meshCreationStartedAt = now();
@@ -524,8 +533,7 @@ export async function buildBuildingGeometryPass(options = {}) {
         geo.dispose();
         continue;
       }
-      const bldgMat = typeof appCtx.getBuildingMaterial === 'function' ?
-        appCtx.getBuildingMaterial(bt, bSeed, baseColor, {
+      const materialOptions = {
           lodTier: 'near',
           heightMeters: bodyHeight,
           footprintWidth,
@@ -537,9 +545,24 @@ export async function buildBuildingGeometryPass(options = {}) {
           roofColor: way.tags['roof:colour'] || way.tags['roof:color'] || '',
           facadeColorMapped: /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(mappedFacadeColor),
           structureSemantics,
-          buildingSemantics
-        }) :
-        new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.85, metalness: 0.05 });
+          buildingSemantics,
+          buildingIdentity: sourceBuildingId,
+          levels: resolvedLevels,
+          centerX,
+          centerZ,
+          location: appCtx.LOC,
+          tags: way.tags || {}
+      };
+      let bldgMat;
+      if (typeof appCtx.getBuildingMaterial === 'function') {
+        resolvedExteriorPresentation = resolveBuildingExteriorPresentation(appCtx, bt, bSeed, baseColor, materialOptions);
+        bldgMat = appCtx.getBuildingMaterial(bt, bSeed, baseColor, {
+          ...materialOptions,
+          resolvedPresentation: resolvedExteriorPresentation
+        });
+      } else {
+        bldgMat = new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.85, metalness: 0.05 });
+      }
 
       mesh = new THREE.Mesh(geo, bldgMat);
       mesh.position.y = baseElevation;
@@ -590,6 +613,9 @@ export async function buildBuildingGeometryPass(options = {}) {
     mesh.userData.buildingSemantics = buildingSemantics;
     mesh.userData.structureBaseOffset = structureBaseOffset;
     mesh.userData.structureSemantics = structureSemantics;
+    mesh.userData.exteriorProfile = resolvedExteriorPresentation?.exteriorProfile || mesh.userData?.exteriorPresentation?.exteriorProfile || mesh.material?.userData?.exteriorProfile || null;
+    mesh.userData.exteriorFamilyId = mesh.material?.userData?.exteriorFamilyId || null;
+    mesh.userData.exteriorGeneratorVersion = mesh.material?.userData?.exteriorGeneratorVersion || null;
 
     // The rendered body owns the downhill foundation segment. Publish that
     // same vertical extent to collision so a visible wall cannot be traversed
@@ -770,6 +796,9 @@ export async function buildBuildingGeometryPass(options = {}) {
   const facadeEntrances = publishBuildingFacadeEntrances(appCtx);
   loadMetrics.buildingFacadeEntrances = { ...facadeEntrances.diagnostics };
   endLoadPhase('publishBuildingFacadeEntrances');
+  startLoadPhase('publishBuildingExteriorDetails');
+  loadMetrics.buildingExteriors = publishBuildingExteriorDetails(appCtx);
+  endLoadPhase('publishBuildingExteriorDetails');
   startLoadPhase('batchBuildingGeometry');
   const batchScheduling = { yieldToMainThread };
   const batchedNearCount = appCtx.disableNearBuildingBatching
