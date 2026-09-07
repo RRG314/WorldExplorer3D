@@ -267,6 +267,7 @@ function createArPlatform(appCtx, options = {}) {
             : 'Interactive 3D viewer active. Drag to rotate and use the size controls.';
         runViewerLoop();
       }
+      assertCurrent(token);
       state.phase = 'active';
       renderUi();
       updateChallengeUi();
