@@ -1,4 +1,5 @@
 import { smoothstep01 } from '../../structure-semantics/geometry.js?v=2';
+import { tunnelMinimumDepth } from './tunnel-envelope.js';
 
 const TRANSPORT_SURFACE_SCHEMA_VERSION = 1;
 const DEFAULT_SURFACE_BIAS = 0.08;
@@ -101,9 +102,9 @@ function normalizeAnchors(feature, semantics, totalDistance) {
     semantics?.isBridge === true &&
     (feature?.structureStations || []).some((station) =>
       String(station?.source || '').includes('water_crossing'));
-  const tunnelRoofCover = semantics?.structureKind === 'tunnel' || semantics?.isTunnel === true
-    ? 0.4
-    : 0;
+  const tunnelDepth = semantics?.structureKind === 'tunnel' || semantics?.isTunnel === true
+    ? tunnelMinimumDepth(semantics)
+    : finiteNumber(semantics?.cutDepth);
   const defaultOffset =
     semantics?.terrainMode === 'subgrade'
       // cutDepth describes the usable interior envelope. Keep a physical
@@ -111,8 +112,7 @@ function normalizeAnchors(feature, semantics, totalDistance) {
       // sits on the terrain plane and flickers/exposes across hills.
       ? -Math.max(
           0,
-          finiteNumber(semantics?.cutDepth) +
-            tunnelRoofCover +
+          tunnelDepth +
             finiteNumber(feature?.structureStackOffset)
         )
       : semantics?.terrainMode === 'elevated'

@@ -56,6 +56,15 @@ function prepareE34Model(THREE, source, record) {
   const oriented = new THREE.Group();
   oriented.name = `${record.label} visual`;
   const triangles = retainPrimaryE34Variant(THREE, source);
+  // The exterior atlas includes opaque window polygons. They are outward
+  // facing shell surfaces, not cabin walls; double-sided rendering blocked
+  // the driver's view. Retain the separate inward-facing interior geometry.
+  source.traverse(object => {
+    if (object.isMesh && object.material?.name === '.001') {
+      object.material.side = THREE.FrontSide;
+      object.material.needsUpdate = true;
+    }
+  });
   source.updateMatrixWorld(true);
   // GLTFLoader has already converted this Z-up Sketchfab source to Three.js'
   // Y-up space in the imported hierarchy. Measure and center that hierarchy

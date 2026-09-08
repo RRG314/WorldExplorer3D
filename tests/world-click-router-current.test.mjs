@@ -7,6 +7,11 @@ import {
   targetFromObject
 } from '../app/js/interaction/world-click-router.js';
 
+test('mapped building presence tags are not displayed as a building name', () => {
+  assert.equal(targetFromObject({ userData: { sourceBuildingId: 'osm:1', buildingType: 'yes' } }).label, 'mapped building');
+  assert.equal(targetFromObject({ userData: { sourceBuildingId: 'osm:1', buildingType: 'yes', buildingName: 'Town Hall' } }).label, 'Town Hall');
+});
+
 test('semantic targets are inherited from an actor root', () => {
   const root = { userData: { worldClickTarget: () => ({ kind: 'living-pedestrian', id: 'pedestrian:4' }) }, parent: null };
   const child = { userData: {}, parent: root };

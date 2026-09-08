@@ -70,6 +70,21 @@ function normalizeAccessMode(value, captureKind = 'interior_room') {
   return captureKind === 'interior_room' ? 'PRIVATE' : requested;
 }
 
+function normalizeSpatialContext(raw) {
+  if (!raw || raw.schemaVersion !== 1 || raw.frame !== 'building-local-x-east-y-up-z-south') return null;
+  const validPoint = p => Number.isFinite(p?.x) && Number.isFinite(p?.z) && Math.abs(p.x) <= 2000 && Math.abs(p.z) <= 2000;
+  if (!Array.isArray(raw.footprint) || raw.footprint.length < 3 || raw.footprint.length > 256 || !raw.footprint.every(validPoint)) return null;
+  const height = raw.height;
+  return {
+    schemaVersion: 1, frame: raw.frame, authority: 'client-snapshot-of-existing-building',
+    footprint: raw.footprint.map(({ x, z }) => ({ x, z })),
+    wallHeightMeters: Number.isFinite(raw.wallHeightMeters) && raw.wallHeightMeters > 0 && raw.wallHeightMeters <= 1212 ? raw.wallHeightMeters : null,
+    height: height && Number.isFinite(height.meters) && height.meters > 0 && height.meters <= 1200 && ['mapped', 'inferred'].includes(height.evidence)
+      ? { meters: height.meters, evidence: height.evidence } : null,
+    entrance: validPoint(raw.entrance) ? { x: raw.entrance.x, z: raw.entrance.z } : null
+  };
+}
+
 function normalizeCanonicalBuilding(raw = {}) {
   const sourceBuildingId = cleanText(raw.sourceBuildingId, 220);
   const worldId = cleanText(raw.worldId, 220);
@@ -101,7 +116,8 @@ function normalizeCanonicalBuilding(raw = {}) {
     lat,
     lon,
     footprintGeo: Object.freeze(footprintGeo),
-    entranceGeo: entranceGeo ? Object.freeze(entranceGeo) : null
+    entranceGeo: entranceGeo ? Object.freeze(entranceGeo) : null,
+    spatialContext: normalizeSpatialContext(raw.spatialContext)
   });
 }
 
@@ -156,7 +172,9 @@ function createCaptureDraft(input = {}, actor = {}, nowMs = Date.now()) {
     ownerUid,
     ownerDisplayName: cleanText(actor.displayName || actor.email || 'Explorer', 80),
     captureKind,
+    exteriorScope: captureKind === 'exterior' && input.exteriorScope === 'facade' ? 'facade' : 'building',
     building,
+    buildingDetails: normalizeBuildingDetails(input.buildingDetails),
     room,
     spaceId,
     status: 'draft',
@@ -174,6 +192,25 @@ function createCaptureDraft(input = {}, actor = {}, nowMs = Date.now()) {
   });
 }
 
+function normalizeBuildingDetails(raw = {}) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw Error('invalid_building_details');
+  const optionalNumber = (key, min, max, integer = false) => {
+    if (raw[key] === '' || raw[key] === undefined || raw[key] === null) return null;
+    if (!['number', 'string'].includes(typeof raw[key])) throw Error('invalid_building_details');
+    const value = Number(raw[key]);
+    if (!Number.isFinite(value) || value < min || value > max || integer && !Number.isInteger(value)) throw Error('invalid_building_details');
+    return value;
+  };
+  const roofShape = cleanText(raw.roofShape || 'unknown', 30);
+  if (!['unknown', 'flat', 'gabled', 'hipped', 'other'].includes(roofShape)) throw Error('invalid_building_details');
+  return { schemaVersion: 1, evidence: 'user-reported-unverified',
+    floors: optionalNumber('floors', 1, 200, true), units: optionalNumber('units', 1, 2000, true),
+    heightMeters: optionalNumber('heightMeters', 1, 1200), roofShape,
+    referenceLabel: cleanText(raw.referenceLabel, 100),
+    referenceWidthMeters: optionalNumber('referenceWidthMeters', .01, 2000),
+    referenceHeightMeters: optionalNumber('referenceHeightMeters', .01, 2000) };
+}
+
 function canTransitionCapture(from, to) {
   const source = cleanText(from, 40).toLowerCase();
   const target = cleanText(to, 40).toLowerCase();
@@ -186,11 +223,12 @@ function assertCaptureTransition(from, to) {
   return to;
 }
 
-function validateUploadedPhotoSet(capture = {}, files = []) {
+function validateUploadedPhotoSet(capture = {}, files = [], options = {}) {
   const kind = normalizeCaptureKind(capture.captureKind);
   const limits = CAPTURE_LIMITS[kind];
   const rows = Array.isArray(files) ? files : [];
-  if (rows.length < limits.minPhotos) throw new Error('too_few_photos');
+  const minimum = options.manual === true && kind === 'exterior' ? 1 : limits.minPhotos;
+  if (rows.length < minimum) throw new Error('too_few_photos');
   if (rows.length > limits.maxPhotos) throw new Error('too_many_photos');
   let totalBytes = 0;
   const seenNames = new Set();
@@ -234,9 +272,20 @@ function resolveSpaceAccess(input = {}) {
   if (!ACCESS_MODES.includes(mode)) return Object.freeze({ allowed: false, reason: 'invalid_policy' });
   if (requesterUid && requesterUid === ownerUid) return Object.freeze({ allowed: true, reason: 'owner', scope: 'persistent' });
   if (input.isAdmin === true) return Object.freeze({ allowed: true, reason: 'moderator', scope: 'review' });
-  if (mode === 'PUBLIC') return Object.freeze({ allowed: true, reason: 'public', scope: 'public' });
+  if (mode === 'PUBLIC') {
+    // Sharing preference is not publication authority. A reviewed interior
+    // must be the exact capture currently installed in this private space.
+    const reviewed = !!space.captureId && space.publicApproval?.captureId === space.captureId;
+    return Object.freeze(reviewed
+      ? { allowed: true, reason: 'public', scope: 'public' }
+      : { allowed: false, reason: 'public_review_required', requestable: false });
+  }
   if (!requesterUid) return Object.freeze({ allowed: false, reason: 'authentication_required' });
-  if (input.oneTimeGrant?.active === true && input.oneTimeGrant?.uid === requesterUid) {
+  if (mode === 'PRIVATE') return Object.freeze({ allowed: false, reason: 'private_residence', requestable: false });
+  const now = Number.isFinite(input.nowMs) ? input.nowMs : Date.now();
+  const freshGrant = grant => grant?.active === true && grant?.uid === requesterUid &&
+    Number(grant.expiresAtMs) > now && Number(grant.createdAtMs) > Number(input.member?.revokedAtMs || 0);
+  if (freshGrant(input.oneTimeGrant)) {
     return Object.freeze({ allowed: true, reason: 'allow_once', scope: 'one_time' });
   }
   if (['INVITE_ONLY', 'GUEST_LIST', 'SESSION_GUESTS'].includes(mode) &&
@@ -244,8 +293,8 @@ function resolveSpaceAccess(input = {}) {
       ['co_owner', 'household', 'guest'].includes(cleanText(input.member.role, 24).toLowerCase())) {
     return Object.freeze({ allowed: true, reason: input.member.role, scope: 'persistent' });
   }
-  if (mode === 'SESSION_GUESTS' && input.sessionGrant?.active === true &&
-      input.sessionGrant?.uid === requesterUid && input.sessionGrant?.roomId === input.roomId) {
+  if (mode === 'SESSION_GUESTS' && freshGrant(input.sessionGrant) && input.ownerOnline === true &&
+      input.sessionGrant?.roomId === input.roomId) {
     return Object.freeze({ allowed: true, reason: 'session_guest', scope: 'session' });
   }
   return Object.freeze({
@@ -275,6 +324,7 @@ module.exports = {
   isDeletableByOwner,
   normalizeAccessMode,
   normalizeCanonicalBuilding,
+  normalizeBuildingDetails,
   normalizeReviewedAlignment,
   resolveSpaceAccess,
   spaceIdForCapture,

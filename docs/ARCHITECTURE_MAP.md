@@ -1,20 +1,119 @@
 # World Explorer 3D Architecture
 
+September 8 camera ownership: `hud.js` keeps mode selection, collision-aware chase
+and overhead routing. `hud/driving-cabin-camera.js` owns the BMW local driver-eye
+transform and temporary near-plane adjustment; it does not add a second camera
+or input loop. `engine/curated-player-car.js` presents the exterior shell outward
+so its opaque backfaces do not obscure the separate interior from the driver.
+
+Earth reset also owns location-relative road grading state: corridor references,
+spatial index, publication metadata and height caches are released before the
+next terrain is sampled. This includes roadless destinations that skip transport
+compilation. Cooperative structure work cannot publish after its world sequence,
+road collection or ground release has been replaced.
+
+Terrain boundary update: `detail-boundary.js` reads published detailed mesh edges;
+the existing far-field geometry builder refines only adjoining cells and records
+their triangles in its existing surface grid. Rendering and height queries share
+those triangles. Water/transport terrain rebuilds refresh the bound edge heights
+before clearing the height cache. No second terrain mesh, skirt or collision
+authority is introduced. Inland water sampling excludes unavailable DEM values;
+terrain beds use the canonical water-body/profile resolver.
+
+Local ground update,2026-09-08: `worldcover-categorical.js` validates bounded
+numeric rasters; existing `worldcover-baseline.js` owns queue/cache/fallback;
+`worldcover-biome-state.js` selects nearest local evidence. Surface material
+blending changes presentation only. `vegetation.js` owns placement;
+`vegetation-models.js` consumes the existing model catalog/runtime and publishes
+cell LOD batches into the existing vegetation collection. The existing obstacle
+solver consumes a nearby trunk index; no parallel physics or world authority.
+Old generated sphere-canopy rendering/allocation has been removed. Global
+appearance, terrain seams and physical-device acceptance remain open.
+
+Updated 2026-09-07 against source `c801c19f`. This map identifies ownership and
+integration, not universal release acceptance. [Current test guide](CURRENT_TEST_GUIDE.md)
+records the deployed boundary; [project description](PROJECT_DESCRIPTION.md)
+explains the app as a whole.
+
 > POI work in progress (2026-09-05):
 > [FUNCTIONAL_POI_SYSTEM.md](../FUNCTIONAL_POI_SYSTEM.md) defines the new
 > normalization and capability boundary. Semantic publication, safe building
 > association, and the shared wallet boundary are now live; interior and full
 > family acceptance gates remain in progress.
 
-> Community Reality Capture local V1 (2026-09-06): capture, processing,
-> moderation, presentation replacement, and generic private-space access now
-> have explicit owners. It is intentionally not deployed or described as
-> production-ready; provisioning and controlled reconstruction proofs remain.
+> Community Reality Capture (2026-09-07): staging is provisioned and the
+> phone → manual facade → approval → mapped-house loop has worked. Latest
+> manual-first and privacy hardening is source-only; playable manual rooms,
+> contributor-world previews and community rewards are not complete.
 
 World Explorer 3D is a browser game organized around explicit ownership of the
 active environment, assembled world, player state, and shared services.
 
 ## Application overview
+
+### Product entry points and shared services
+
+| Entry / subsystem | Ownership and connection |
+| --- | --- |
+| Public site / About | Static product pages lead into the app and existing account/support routes; they do not own gameplay state |
+| Account | `account/account-center.js` connects Firebase identity, profile/creator settings, friends, security and receipts; phone and desktop use the same UID |
+| Capture page | Lightweight authenticated client of the existing capture backend, not another world instance or building database |
+| Admin | Role-authorized actions call backend moderation; successful publication is distinct from refreshing dashboard widgets |
+| Live Earth | `app/js/live-earth/registry.js` and provider-specific modules own data layers and health; they do not become the road-traffic simulation or terrain authority |
+| AR | `app/js/ar/session-service.js` owns AR lifecycle; capability detection chooses spatial AR, camera or 3D fallback. It does not own uploaded capture reconstruction or persistent anchors |
+| Activities / rankings | Existing activity authorities and leaderboard catalog own results; capture awards and featured contribution rooms are not implemented by merely adding a new label |
+| Support | Stripe payment/receipt flow remains separate from the single gameplay economy |
+
+### Persistence boundaries
+
+Firebase Auth identifies a user; it is not itself an authorization decision.
+Backend authorities validate purchases, property, player state and capture
+actions. Firestore stores their structured records; Storage holds media.
+Browser settings and recovery drafts are convenience state, not trusted shared
+ownership. Multiplayer rooms have their own membership/session lifecycle and
+must not implicitly publish a private capture. Approved exterior presentation
+is global by building identity; private interior delivery checks space access.
+
+See the capture schema table below for actual collection names. Proposed names
+such as `captureSessions`, `representationRevisions` and `reviews` must not be
+documented as deployed collections when the current implementation stores those
+states on existing records.
+
+### Local bridge/tunnel transition work (2026-09-07; not release-approved)
+
+Transport graph/profile compilation owns connected floor heights, including
+wholly generalized junctions. Exact and generalized source families remain
+separate. `tunnel-system-model` owns cover-derived external portal locations and
+continuous internal lining. Its final compilation samples the published terrain
+without feeding portal cuts back into cover detection.
+
+`world/compiler/tunnel-solid-model.js` collects compatible graph-connected
+mouths and constructs indexed closed clearance sweeps. `tunnel-solid-kernel.js`
+unions them with pinned Manifold 3.5.3 in a short-lived worker. Publication runs
+after final floor/cover compilation, before visual/collision assembly. One
+boundary feeds rendering, wall collision and indexed camera/ceiling queries;
+successful components do not also publish independent tube skins. Worker and
+station budgets report failures through `ctx.tunnelSolidCompilation`. Simple
+unjoined tunnels and failed components retain the existing shell path; failures
+are not accepted geometry. `tunnel-junction-openings.js` remains that path's
+bounded interval helper, not a second overlay on compiled solids.
+
+Inferred Shortbread street labels remain display-only and cannot establish
+route-gap connectivity. Explicit source layer and topology capabilities remain
+distinguishable from absent/generalized attributes.
+
+`hud/vehicle-camera-body.js` measures attached visual bounds once per asset
+change, transforms the camera into that body's frame, and rejects collision-
+shortened chase poses inside it. A clear roof pose is preferred; confined-space
+first person is temporary and does not rewrite the player's selected mode.
+The production packager emits a hashed worker entry and publishes its URL in
+the existing runtime configuration; local JS/WASM/license files are vendored.
+
+Bridge deck presentation consumes the assembly's sampled thickness, retaining
+its approach taper. Tunnel concrete textures are shared across world rebuilds;
+no per-light dynamic light population was added. Complex portal/branch visual
+acceptance remains open. Ordinary road footprints and mapped buildings are not
+removed to conceal structure conflicts.
 
 ```mermaid
 flowchart LR
@@ -72,7 +171,36 @@ Primary ownership areas:
 - `app/js/buildings/` and `app/js/interiors/` own structures and indoor play.
 - `app/js/world/water-*`, `app/js/boat-mode/`, and `app/js/ocean/` own water.
 
+### Building exterior presentation flow
+
+```mermaid
+flowchart LR
+    Building[Mapped building identity, tags, footprint, height, roof] --> Catalog[Deterministic exterior profile]
+    Catalog --> Near[Near wall surface, windows, storefront, integrated door]
+    Catalog --> Mid[Mid facade atlas plus per-building batch attributes]
+    Catalog --> Details[Bounded shared detail batches]
+    Building --> Collision[Existing collision and interior authority]
+    Building --> Entrance[Existing published entrance]
+    Entrance --> Near
+    Entrance --> Details
+```
+
+`world/building-exterior-catalog.js` is the sole generated-style selector.
+`engine/building-facade-materials.js` owns shared wall textures and facade
+shaders. `world/building-exterior-details.js` adds presentation-only geometry
+to its own disposable collection with a maximum of six material batches. The
+catalog can infer appearance, but it cannot move a footprint, alter terrain,
+replace collision, create an entrance, change a POI or property identity, or
+override an interior. Mid-LOD colors and roof appearance travel as merged
+attributes so distant buildings do not allocate unique materials.
+
 ### Community Reality Capture flow
+
+`app/capture.html` → existing Firebase Auth → owner-authorized capture API →
+the same capture record and upload gallery. Account links and desktop QR open
+this lightweight page without booting a second world. QR carries a capture ID,
+not credentials. Local drafts are UID-scoped; server uploads survive device
+changes. Staging Storage, Functions and worker infrastructure are provisioned.
 
 ```mermaid
 flowchart LR
@@ -80,20 +208,60 @@ flowchart LR
     Draft --> Normalize[Client normalization and EXIF removal]
     Normalize --> Quarantine[Write-once private quarantine]
     Quarantine --> Validate[Server signature, count, size, and state validation]
-    Validate --> Worker[Isolated reconstruction and GLB optimization]
-    Worker --> Review[Administrator photo, model, footprint, and alignment review]
+    Validate --> Manual[Select mapped wall, crop and place photos]
+    Manual --> Save[Owner revisioned save]
+    Save --> Submit[Immutable cropped-photo GLB submission]
+    Submit --> Review[Administrator photo, model, footprint, and alignment review]
+    Validate -. restricted development path .-> Worker[Reconstruction and GLB optimization]
+    Worker --> Review
     Review -->|approved exterior| Exterior[Presentation overlay]
     Review -->|approved interior| Interior[Authorized private-space resolver]
     Exterior --> Canonical[Existing mapped identity, terrain, collision, POI, and property]
-    Interior --> Proxy[Existing interior proxy collision, navigation, and interactions]
+    Interior --> Proxy[Existing interior proxy; layout alignment still requires acceptance]
     Review -->|rejected or failed| Fallback[Existing procedural presentation]
 ```
 
-The capture system never creates a second building authority. Exterior models
-are presentation-only and suppress procedural massing only after the approved
-GLB loads successfully. Interior models replace visible room dressing while the
-existing proxy shell remains authoritative for collision, navigation, doors,
-and gameplay interactions.
+The capture system never creates a second building authority. Manual wall
+patches cover selected regions of the actual mapped footprint; uncovered surfaces
+remain procedural. They do not suppress the building or alter its collision.
+Whole-model reconstruction is a separate representation kind that can suppress
+generated visuals after load. Do not apply that whole-model behavior to patches.
+
+`alignment.js` snapshots mapped geometry and wall height; `hybrid-editor.js`
+owns crop/placement editing; server save checks owner and revision. Submission
+builds an immutable cropped-image GLB. Approval publishes the exact submitted
+revision with its region manifest. `runtime.js` resolves approved exterior
+representations by canonical building ID, with bounded activation and procedural
+fallback. The latest facade fix uses body height rather than roof-inclusive
+height and fixes the local-X orientation of generated trim.
+
+Interior model presentation currently retains an existing proxy shell for
+collision and interactions. An arbitrary reconstructed layout is **not** thereby
+a correctly playable interior. The manual room editor, dimensions, doors,
+collision agreement and owner-world preview are remaining implementation work.
+
+### Capture records, media and authority
+
+| Record or media | Current owner and purpose |
+| --- | --- |
+| Existing canonical building identity | World/provider identity remains the target; geometry snapshots document alignment rather than becoming another building registry |
+| `realityCaptures/{captureId}` | Owner UID, target, uploads/manifest, processing status/attempt identity, hybrid preview/submission and review; these are currently fields on the capture, not invented separate `captureSessions` or `reviews` collections |
+| `buildingRepresentations` | Approved exterior publication records, immutable model reference and region/height metadata |
+| `buildingPatchManifests` | Building-specific published patch regions and overlap conflict checks |
+| `privateSpaces` | Interior owner, installed/pending capture, access mode, members and temporary grants |
+| `privateSpaceAccessRequests` | Visitor requests, separate from a grant or public publication |
+| `captureAdmission` | Admission/quota bookkeeping; processing also uses a lease and attempt ID, not client-controlled worker state |
+| Storage `reality-captures/{uid}/{captureId}/originals/…` | Private original media; Firestore contains metadata, not photo blobs |
+| Storage `…/processed/manual-v1/r{revision}-{hash}/capture.glb` | Immutable manual derivative; only the chosen cropped photos are embedded |
+| Storage processing-attempt paths | Reconstruction outputs tied to the attempt, separate from manual derivatives |
+| UID/capture-scoped local draft store | Recoverable editing convenience, never publication or permission authority |
+
+The new source public-access guard requires a matching reviewed capture before
+`PUBLIC` grants interior access. Owner/admin access and explicit private grants
+are distinct. A public exterior cannot change an interior policy. This guard is
+not yet part of the deployed facade-only update. Changing an already-private
+approved capture into a public contribution still needs a complete reviewed UI
+flow; policy enum values alone are not proof of that feature.
 
 Raw uploads, processed private interiors, capture records, review decisions,
 grants, and access requests are server-owned. Browser code can request an action
@@ -521,10 +689,18 @@ near-door entry attempt submits the request only when that server decision says
 it is available. Owner deletion of unapproved work recursively removes its uploads and
 related access records. Production still requires an isolated reconstruction
 job with malware/content controls and provisioned Storage/App Check services.
-Until both staging provisioning and publication are explicitly enabled, the
-Earth and interior runtimes skip Reality Capture endpoint calls and publish no
-captured presentation. Room access uses the canonical multiplayer-room resolver,
+Earth and interior runtimes now allow capture presentation without a staging-only
+unlock; normal server authorization/review and service-error procedural fallback
+remain. An explicit operator disable is supported, not required. Room access uses the canonical multiplayer-room resolver,
 and capture eligibility requires a current stable mapped building.
+
+The existing capture worker selects Meshroom, TRELLIS.2 image generation or
+TRELLIS.2 mesh texturing and feeds one Blender/GLB inspection/review path.
+Attempt-specific output and transactional completion prevent stale workers from
+recreating deleted captures. AR session ownership/cancellation remains separate
+from photo submission and reconstruction. Actual remote GPU reconstruction and
+physical-device AR acceptance remain unverified; see
+[the integration audit](REALITY_CAPTURE_AR_INTEGRATION_PLAN.md).
 
 Room presence is the source for player and room discovery. Future map-based
 discovery will aggregate privacy-safe activity areas and current counts from
@@ -532,7 +708,14 @@ that authority; it will not publish precise coordinates from an unrelated
 client or infer online players from local scene objects.
 
 Firebase Analytics is a presentation and reporting consumer, not a gameplay
-authority. Session and bounded product events exclude exact GPS coordinates,
+authority. `js/analytics-service.js` owns its singleton independently of game
+startup. `js/site-analytics.js` owns canonical page views and arrival-to-first-play
+events; `js/analytics.js` retains world sessions, auth association, and bounded
+gameplay events using the same instance through `firebase-init.js`. This local
+repair is not deployed yet. Initialization does not import the game or require
+sign-in, Firestore, Storage, or App Check. Manual page views replace the default
+automatic page view, preventing duplicate counts. Query strings and fragments
+are excluded; referrers retain only the origin. Session and bounded product events exclude exact GPS coordinates,
 room codes, names, messages, artifact text, and other free-form input. Standard
 first-party analytics storage is used when no preference has been recorded so
 visits and returning sessions can be counted reliably. An explicit limited

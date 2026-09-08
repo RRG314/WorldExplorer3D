@@ -1,4 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
+import { constrainTunnelActorCeiling } from './world/compiler/tunnel-space-query.js';
 import { isRoadSurfaceReachable } from "./structure-semantics.js?v=63";
 import { updateDrone } from "./physics/drone-flight.js?v=11";
 import { updatePlane } from "./plane-mode.js?v=36";
@@ -684,6 +685,7 @@ function update(dt) {
   }
 
   let carY = 1.2;
+  const previousCarBodyY = appCtx.car.y;
 
   const planetarySurface = getPlanetarySurfaceMesh();
   if (planetarySurface) {
@@ -788,6 +790,15 @@ function update(dt) {
       (Number(groundContact?.roll || 0) - Number(appCtx.car.terrainRoll || 0)) * attitudeBlend;
   }
 
+  if (!isPlanetarySurface()) {
+    const ceiling = constrainTunnelActorCeiling(appCtx.car.road,
+      { x: appCtx.car.x, y: previousCarBodyY, z: appCtx.car.z }, carY, 0.75);
+    if (ceiling.collided) {
+      carY = ceiling.y;
+      appCtx.car.y = carY;
+      appCtx.car.vy = Math.min(0, Number(appCtx.car.vy) || 0);
+    }
+  }
   appCtx.carMesh.position.set(appCtx.car.x, carY, appCtx.car.z);
   appCtx.carMesh.rotation.order = 'YXZ';
   appCtx.carMesh.rotation.set(

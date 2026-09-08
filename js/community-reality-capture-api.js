@@ -99,9 +99,15 @@ export async function normalizeCapturePhoto(file) {
   // Re-encoding strips EXIF/GPS/device metadata before data leaves the device.
   const blob = await canvasBlob(canvas);
   if (blob.size > 12 * 1024 * 1024) throw new Error('The normalized photo is still too large to upload.');
+  const preview = document.createElement('canvas');
+  preview.width = 160;
+  preview.height = Math.max(1, Math.round(160 * height / width));
+  preview.getContext('2d').drawImage(canvas, 0, 0, preview.width, preview.height);
+  const thumbnail = await canvasBlob(preview, 'image/jpeg', 0.7);
   return Object.freeze({
     id: randomHex(),
     blob,
+    thumbnail,
     width,
     height,
     contentType: 'image/jpeg',
@@ -119,8 +125,16 @@ export function listMyRealityCaptures() {
   return endpoint('/listMyRealityCaptures');
 }
 
-export function finalizeRealityCaptureUpload(captureId) {
-  return endpoint('/finalizeRealityCaptureUpload', { captureId });
+export function getMyRealityCapture(captureId) {
+  return endpoint('/getMyRealityCapture', { captureId });
+}
+
+export function finalizeRealityCaptureUpload(captureId, mode = 'manual') {
+  return endpoint('/finalizeRealityCaptureUpload', { captureId, mode });
+}
+
+export function retryRealityCapture(captureId) {
+  return endpoint('/retryRealityCapture', { captureId });
 }
 
 export function deleteRealityCapture(captureId) {
@@ -139,8 +153,8 @@ export function resolveBuildingExteriorRepresentation(sourceBuildingId, worldId)
   return postAppCheckedFunction('/resolveBuildingExteriorRepresentation', { sourceBuildingId, worldId }, { label: 'Reality Capture' });
 }
 
-export function listApprovedExteriorRepresentations(worldId) {
-  return postAppCheckedFunction('/listApprovedExteriorRepresentations', { worldId }, { label: 'Reality Capture' });
+export function listApprovedExteriorRepresentations(worldId, sourceBuildingIds) {
+  return postAppCheckedFunction('/listApprovedExteriorRepresentations', { worldId, ...(sourceBuildingIds?{sourceBuildingIds}:{}) }, { label: 'Reality Capture' });
 }
 
 export function requestPrivateSpaceAccess(spaceId, roomId = '', message = '') {
@@ -155,6 +169,13 @@ export function getRealityCaptureAssetAccess(captureId, assetKind = 'processed',
   return endpoint('/getRealityCaptureAssetAccess', { captureId, assetKind, path });
 }
 
+export function saveRealityCaptureHybridPreview(captureId, preview) {
+  return endpoint('/saveRealityCaptureHybridPreview', {captureId, preview});
+}
+export function submitRealityCaptureHybrid(captureId, revision, consent) {
+  return endpoint('/submitRealityCaptureHybrid', {captureId,revision,consent});
+}
+
 export function listRealityCaptureModeration(status = 'review_required') {
   return endpoint('/listRealityCaptureModeration', { status });
 }
@@ -163,16 +184,21 @@ export function getRealityCaptureModerationDetail(captureId) {
   return endpoint('/getRealityCaptureModerationDetail', { captureId });
 }
 
-export function moderateRealityCapture(captureId, decision, note = '', alignment = {}) {
-  return endpoint('/moderateRealityCapture', { captureId, decision, note, alignment });
+export function moderateRealityCapture(captureId, decision, note = '', alignment = {}, revision) {
+  return endpoint('/moderateRealityCapture', { captureId, decision, note, alignment, ...(revision!==undefined?{revision}:{}) });
 }
 
-export function uploadRealityCapturePhoto(capture, photo, onProgress = null) {
+export async function uploadRealityCapturePhoto(capture, photo, onProgress = null, signal = null) {
   const services = initFirebase();
   if (!services?.storage) throw new Error('Secure capture storage is not configured for this app.');
   const ownerUid = String(capture?.ownerUid || '');
   const captureId = String(capture?.captureId || '');
   if (!ownerUid || !captureId || !(photo?.blob instanceof Blob)) throw new Error('Capture upload identity is incomplete.');
+  if (services.auth?.currentUser?.uid !== ownerUid) throw new Error('Sign in to the account that started this capture.');
+  signal?.throwIfAborted();
+  await endpoint('/reserveRealityCapturePhoto', { captureId, photoId: photo.id });
+  signal?.throwIfAborted();
+  if (services.auth?.currentUser?.uid !== ownerUid) throw new Error('The signed-in account changed.');
   const path = `reality-captures/${ownerUid}/${captureId}/originals/${photo.id}.jpg`;
   const task = uploadBytesResumable(storageRef(services.storage, path), photo.blob, {
     contentType: 'image/jpeg',
@@ -180,6 +206,7 @@ export function uploadRealityCapturePhoto(capture, photo, onProgress = null) {
     customMetadata: {
       ownerUid,
       captureId,
+      sector: String(photo.sector ?? -1),
       captureSchemaVersion: '1',
       width: String(photo.width),
       height: String(photo.height),
@@ -187,12 +214,16 @@ export function uploadRealityCapturePhoto(capture, photo, onProgress = null) {
       clientExposure: String(photo.quality?.exposure || 'unknown')
     }
   });
-  return new Promise((resolve, reject) => task.on(
-    'state_changed',
-    (snapshot) => onProgress?.(snapshot.totalBytes ? snapshot.bytesTransferred / snapshot.totalBytes : 0),
-    reject,
-    () => resolve({ path, bytes: task.snapshot.totalBytes })
-  ));
+  return new Promise((resolve, reject) => {
+    const cancel = () => task.cancel();
+    const cleanup = () => signal?.removeEventListener('abort', cancel);
+    signal?.addEventListener('abort', cancel, { once: true });
+    task.on('state_changed',
+      (snapshot) => onProgress?.(snapshot.totalBytes ? snapshot.bytesTransferred / snapshot.totalBytes : 0),
+      (error) => { cleanup(); reject(error); },
+      () => { cleanup(); resolve({ path, bytes: task.snapshot.totalBytes }); });
+    if (signal?.aborted) cancel();
+  });
 }
 
 export { CLIENT_LIMITS };

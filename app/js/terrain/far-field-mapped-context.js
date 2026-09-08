@@ -341,7 +341,7 @@ async function fetchWithConcurrency(items, concurrency, worker, signal = null) {
   const { settled, metrics } = await runBoundedProviderBatch(
     items,
     (item, _index, batchSignal) => worker(item, batchSignal),
-    { signal, concurrency, abortMessage: 'Far mapped context aborted' }
+    { signal, concurrency, maxElapsedMs:30000, abortMessage: 'Far mapped context aborted' }
   );
   return {
     values: settled
@@ -413,6 +413,7 @@ async function loadFarMappedWaterContext(bounds, options = {}) {
     waterTilesLoaded: tiles.length,
     waterTilesRequested: coordinates.length,
     waterMaxInFlight: waterBatch.metrics.maxInFlight,
+    waterBatchMetrics:waterBatch.metrics,
     waterZoom
   };
 }
@@ -559,6 +560,7 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
     loadedTiles: tiles.length,
     requestedTiles: coordinates.length,
     contextMaxInFlight: contextBatch.metrics.maxInFlight,
+    contextBatchMetrics:contextBatch.metrics,
     landAreas,
     landAreasByTile,
     landAreaSpatialByTile,

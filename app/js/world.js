@@ -101,7 +101,7 @@ import {
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
 import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=40";
-import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=55";
+import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=56";
 import {
   batchLanduseMeshes,
   initWorldRenderSupport,
@@ -111,6 +111,7 @@ import {
   buildingContainingPoint,
   findNearestRoad,
   initWorldNavigation,
+  cameraRoadSurfaceCollision,
   largeMapScreenToWorld,
   minimapScreenToWorld,
   pointInPolygon,
@@ -440,6 +441,7 @@ initWorldLoadGeometry({
 });
 
 Object.assign(appCtx, {
+  cameraRoadSurfaceCollision,
   areRoadsConnected,
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,

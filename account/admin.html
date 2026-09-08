@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
   <script src="../js/firebase-project-config.js"></script>
+  <script type="module" src="../js/site-analytics.js?v=1"></script>
   <style>
     :root {
       --bg: #05101d;
@@ -1218,15 +1219,15 @@
           <div class="view-head">
             <div>
               <h2>Product Analytics</h2>
-              <p>Retention, engagement, and onboarding are measured in the linked Google Analytics property. Player coordinates and free-form text are not included in the product event contract.</p>
+              <p>Open Google Analytics and choose Realtime to see recently measured visitors. Standard reports can take 24–48 hours to finish processing. Registered accounts, site visitors, and players are different counts; blocked requests and limited analytics mean this is not a census of everyone online.</p>
             </div>
             <a class="primary-btn analytics-link" href="https://analytics.google.com/analytics/web/#/p524797711/reports/dashboard?r=firebase-overview" target="_blank" rel="noopener noreferrer">Open Live Analytics</a>
           </div>
           <div class="ops-grid analytics-contract-grid">
             <article class="ops-card">
               <span class="label">Core engagement</span>
-              <strong>World sessions</strong>
-              <p>Runtime ready, world start/end, duration, travel-mode changes, environment changes, and multiplayer state.</p>
+              <strong>Arrival → Play → World ready</strong>
+              <p>page_view counts page arrivals before the game loads. we3d_play_click records the homepage Play button; we3d_destination_select records the chosen destination; we3d_first_play_ready records the first playable world. Existing world sessions measure actual play. Compare these events to find loading drop-off; do not add them together as visitors.</p>
             </article>
             <article class="ops-card">
               <span class="label">Onboarding funnel</span>
@@ -1250,8 +1251,8 @@
             </article>
             <article class="ops-card">
               <span class="label">Consent boundary</span>
-              <strong>Denied until allowed</strong>
-              <p>Analytics storage requires the player's explicit choice. Advertising storage, user data, and personalization remain denied.</p>
+              <strong>Standard or limited</strong>
+              <p>The existing standard setting supports repeat-visitor measurement. Players can choose limited cookieless analytics. Advertising remains off. URLs exclude coordinates, capture tokens, room codes, and other query or fragment values. SDK event counts indicate queued events, not confirmed receipt by Google.</p>
             </article>
             <article class="ops-card">
               <span class="label">Validation</span>

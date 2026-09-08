@@ -67,9 +67,16 @@ function sameNamedGeneralizedRoute(leftFeature, rightFeature) {
   if (!generalizedPair(leftFeature, rightFeature) || !verticalCompatible(leftFeature, rightFeature)) {
     return false;
   }
-  const leftName = String(leftFeature?.transportRecord?.sourceTags?.name || '').trim().toLowerCase();
-  const rightName = String(rightFeature?.transportRecord?.sourceTags?.name || '').trim().toLowerCase();
+  const leftName = sourceRouteName(leftFeature);
+  const rightName = sourceRouteName(rightFeature);
   return !!leftName && leftName === rightName && roadFamily(leftFeature) === roadFamily(rightFeature);
+}
+
+function sourceRouteName(feature) {
+  const record = feature?.transportRecord;
+  if (record?.capabilities?.routeName === 'display-only' ||
+      record?.sourceTags?._nameProvenance === 'spatial-label-association') return '';
+  return String(record?.sourceTags?.name || '').trim().toLowerCase();
 }
 
 function roadFamily(feature) {
@@ -180,8 +187,8 @@ function generalizedEndpointInteriorCompatible(leftDescriptor, leftEndpoint, can
   // The display name falls back to labels such as "Residential" and
   // "Motorway". Only a provider-supplied route name can prove that two
   // generalized fragments belong to the same road.
-  const leftName = String(leftFeature?.transportRecord?.sourceTags?.name || '').trim().toLowerCase();
-  const rightName = String(rightFeature?.transportRecord?.sourceTags?.name || '').trim().toLowerCase();
+  const leftName = sourceRouteName(leftFeature);
+  const rightName = sourceRouteName(rightFeature);
   const sameNamedRoute = !!leftName && leftName === rightName && sameFamily;
   const linkMerge = featureIsLink(leftFeature) && sameFamily;
   if (!sameNamedRoute && !linkMerge) return false;

@@ -1,4 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
+import {disposeVegetationBatch} from './vegetation-models.js';
 import {
   buildWorldVegetationInstancing,
   collectWorldVegetationPlacements
@@ -14,6 +15,7 @@ let furnitureGeometriesReady = false;
 let signTextureCache = new Map();
 let signTextGeometry = null;
 let worldCoverVegetationTimer = null;
+let vegetationFocus = null;
 
 const STREET_FURNITURE_VISIBILITY = Object.freeze({
   street_lamp: Object.freeze({ enter: 360, exit: 430 }),
@@ -27,7 +29,6 @@ const STREET_FURNITURE_VISIBILITY = Object.freeze({
 let matPole;
 let matSignBg;
 let matTreeShades;
-let matTrunk;
 let matLampHead;
 let matTrashBody;
 let matTrashLid;
@@ -39,8 +40,6 @@ let matStopSign;
 
 let geoSignPole;
 let geoSignBoard;
-let geoTreeCanopy;
-let geoTreeTrunk;
 let geoLampPole;
 let geoLampHead;
 let geoTrashBody;
@@ -106,7 +105,6 @@ function initFurnitureMaterials() {
     new THREE.MeshStandardMaterial({ color: 0x2a6b3e, roughness: 0.94, metalness: 0.0 }),
     new THREE.MeshStandardMaterial({ color: 0x1f6e2f, roughness: 0.94, metalness: 0.0 })
   ];
-  matTrunk = new THREE.MeshStandardMaterial({ color: 0x5c3a1e, roughness: 0.97, metalness: 0.0 });
   matLampHead = new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.5, metalness: 0.12, emissive: 0xffffaa, emissiveIntensity: 0.5 });
   appCtx.streetLampHeadMaterial = matLampHead;
   matTrashBody = new THREE.MeshStandardMaterial({ color: 0x3a5a3a, roughness: 0.9, metalness: 0.04 });
@@ -119,40 +117,11 @@ function initFurnitureMaterials() {
   furnitureMaterialsReady = true;
 }
 
-function createOrganicTreeCanopyGeometry() {
-  const geometry = new THREE.IcosahedronGeometry(2.9, 2);
-  const position = geometry.attributes.position;
-  const vertex = new THREE.Vector3();
-
-  for (let i = 0; i < position.count; i++) {
-    vertex.fromBufferAttribute(position, i);
-    const len = Math.max(1e-4, vertex.length());
-    const nx = vertex.x / len;
-    const ny = vertex.y / len;
-    const nz = vertex.z / len;
-    const ripple =
-      1 +
-      0.1 * Math.sin(nx * 3.6 + nz * 2.9) +
-      0.08 * Math.cos(nx * 5.2 - ny * 2.4 + nz * 4.1) +
-      0.06 * (ny > 0 ? 1 : -0.45);
-
-    vertex.x *= ripple * 1.04;
-    vertex.y *= ripple * (ny > 0 ? 1.18 : 0.9);
-    vertex.z *= ripple;
-    position.setXYZ(i, vertex.x, vertex.y + 0.45, vertex.z);
-  }
-
-  position.needsUpdate = true;
-  geometry.computeVertexNormals();
-  return geometry;
-}
 
 function initFurnitureGeometries() {
   if (furnitureGeometriesReady) return;
   geoSignPole = new THREE.CylinderGeometry(0.1, 0.1, 3.5, 6);
   geoSignBoard = new THREE.BoxGeometry(4, 0.8, 0.1);
-  geoTreeTrunk = new THREE.CylinderGeometry(0.24, 0.42, 4.6, 7);
-  geoTreeCanopy = createOrganicTreeCanopyGeometry();
   geoLampPole = new THREE.CylinderGeometry(0.12, 0.17, 7, 8);
   geoLampHead = new THREE.BoxGeometry(1.2, 0.22, 0.55);
   geoTrashBody = new THREE.CylinderGeometry(0.4, 0.35, 1.0, 8);
@@ -666,22 +635,21 @@ export function generateStreetFurniture(options = {}) {
 }
 
 export function refreshWorldCoverVegetation() {
-  (appCtx.vegetationMeshes || []).forEach((mesh) => {
-    mesh?.parent?.remove?.(mesh);
-    if (Array.isArray(mesh?.material)) {
-      mesh.material.forEach((material) => {
-        if (material !== matTrunk) material?.dispose?.();
-      });
-    } else if (mesh?.material !== matTrunk) {
-      mesh?.material?.dispose?.();
-    }
-  });
+  const point=appCtx.activeTransportActor?.()?.position || {x:0,z:0};
+  vegetationFocus={x:point.x,z:point.z};
+  (appCtx.vegetationMeshes || []).forEach(disposeVegetationBatch);
   appCtx.clearWorldCollections?.(['vegetationMeshes', 'vegetationFeatures']);
-  return buildWorldVegetationInstancing(collectWorldVegetationPlacements(), {
-    initFurnitureMaterials,
-    initFurnitureGeometries,
-    getResources: () => ({ geoTreeTrunk, geoTreeCanopy, matTrunk })
-  });
+  return buildWorldVegetationInstancing(collectWorldVegetationPlacements());
+}
+
+export function updateVegetationFocus() {
+  if(appCtx.worldLoading || !appCtx.gameStarted || (appCtx.isEnv && appCtx.ENV && !appCtx.isEnv(appCtx.ENV.EARTH))) return;
+  const point=appCtx.activeTransportActor?.()?.position;
+  if(!point || !Number.isFinite(point.x) || !Number.isFinite(point.z)) return;
+  const refreshDistance=appCtx.worldSurfaceProfile?.biome?.id==='wetland'?60:450;
+  if(vegetationFocus && Math.hypot(point.x-vegetationFocus.x,point.z-vegetationFocus.z)<refreshDistance) return;
+  vegetationFocus={x:point.x,z:point.z};
+  scheduleWorldCoverVegetationRefresh();
 }
 
 export function scheduleWorldCoverVegetationRefresh() {
@@ -690,8 +658,15 @@ export function scheduleWorldCoverVegetationRefresh() {
   worldCoverVegetationTimer = globalThis.setTimeout(() => {
     worldCoverVegetationTimer = null;
     if (loadSequence !== appCtx._worldLoadSequence) return;
+    // Tile and model completions must not repeatedly rebuild a whole forest
+    // while roads/buildings/terrain are still being assembled. The finalizer
+    // can explicitly flush; ordinary completions coalesce after assembly.
+    if (appCtx.worldLoading) {
+      scheduleWorldCoverVegetationRefresh();
+      return;
+    }
     refreshWorldCoverVegetation();
-  }, 500);
+  }, 800);
 }
 
 export function flushWorldCoverVegetationRefresh() {
@@ -703,6 +678,7 @@ export function flushWorldCoverVegetationRefresh() {
 }
 
 export function resetWorldFurnitureCaches() {
+  vegetationFocus = null;
   if (worldCoverVegetationTimer) globalThis.clearTimeout(worldCoverVegetationTimer);
   worldCoverVegetationTimer = null;
   signTextureCache.forEach((material) => {
@@ -716,6 +692,7 @@ export function resetWorldFurnitureCaches() {
 }
 
 Object.assign(appCtx, {
+  updateVegetationFocus,
   flushWorldCoverVegetationRefresh,
   scheduleWorldCoverVegetationRefresh,
   updateStreetFurnitureVisibility

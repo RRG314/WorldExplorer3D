@@ -8,6 +8,7 @@ import { getPlanetarySurfaceRegion } from '../planetary/runtime/surface-authorit
 import { resolvePlanetarySurfaceBoundary } from '../planetary/runtime/surface-boundary.js?v=1';
 import { queryPlanetaryObstacle } from '../planetary/runtime/obstacle-authority.js?v=1';
 import { resolveInteriorCeiling } from '../interiors/vertical-boundary.js?v=1';
+import { constrainTunnelActorCeiling, resolveTunnelSpace } from '../world/compiler/tunnel-space-query.js';
 
 function wrapYaw(angle = 0) {
   return Math.atan2(Math.sin(angle), Math.cos(angle));
@@ -167,7 +168,7 @@ function createWalkingPhysicsHelpers({
     let bestRoof = null;
     for (let i = 0; i < allBuildings.length; i += 1) {
       const b = allBuildings[i];
-      if (!b || b.collisionDisabled || b.isInteriorCollider) continue;
+      if (!b || b.collisionDisabled || b.isInteriorCollider || b.isTransportCollider) continue;
       if (x < b.minX || x > b.maxX || z < b.minZ || z > b.maxZ) continue;
 
       const roofY = buildingRoofYAt(b, x, z);
@@ -393,7 +394,16 @@ function createWalkingPhysicsHelpers({
       state.walker.skydivingFlight = null;
       state.walker.vy += gravity * dt;
     }
+    const previousEyeY = state.walker.y;
+    const tunnelFeature = state.walker._walkSupportFeature;
+    const activeTunnelSpace = resolveTunnelSpace(tunnelFeature, state.walker.x, state.walker.z, previousEyeY);
     state.walker.y += state.walker.vy * dt;
+    const tunnelCeiling = constrainTunnelActorCeiling(tunnelFeature,
+      { x: state.walker.x, y: previousEyeY, z: state.walker.z }, state.walker.y);
+    if (tunnelCeiling.collided) {
+      state.walker.y = tunnelCeiling.y;
+      state.walker.vy = Math.min(0, state.walker.vy);
+    }
 
     if (appCtx.activeInterior) {
       const ceiling = resolveInteriorCeiling({
@@ -518,6 +528,10 @@ function createWalkingPhysicsHelpers({
         ];
 
         function isBlockedByWorld(px, pz) {
+          if (activeTunnelSpace.inside) {
+            const targetSpace = resolveTunnelSpace(tunnelFeature, px, pz);
+            if (targetSpace.inside && state.walker.y + 0.25 > targetSpace.ceilingY) return true;
+          }
           if (checkPlanetaryObstacles && queryPlanetaryObstacle(px, pz, sampleRadius, planetaryBodyId)?.collision) return true;
           if (sharedBuildingCollision) {
             const collision = sharedBuildingCollision(px, pz, sampleRadius, {
@@ -527,7 +541,7 @@ function createWalkingPhysicsHelpers({
               // query owns a roof beneath the actor's feet. Once the walker
               // has reached that roof, the same solid must not block every
               // horizontal step across it.
-              acceptCollision: (candidate) => !walkerIsAtOrAboveRoof(
+              acceptCollision: (candidate) => candidate?.building?.isTransportCollider || !walkerIsAtOrAboveRoof(
                 candidate?.building,
                 walkerFeetY
               )

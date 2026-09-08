@@ -1,6 +1,23 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { setBuildingPresentationSuppressed } from '../app/js/editable-world/runtime.js';
+import { applyCaptureAlignment, captureBuildingContext } from '../app/js/reality-capture/alignment.js';
+
+test('review and runtime share origin-relative placement, not model recentering', () => {
+  const vector = () => ({ set(...values) { this.values = values; }, setScalar(value) { this.values = [value, value, value]; } });
+  const root = { position: vector(), scale: vector(), rotation: { y: 0 } };
+  applyCaptureAlignment(root, { positionOffset: { x: 2, y: 3, z: -1 }, scale: 2, rotationYDegrees: 90 }, { x: 100, y: 5, z: 200 });
+  assert.deepEqual(root.position.values, [102, 8, 199]);
+  assert.deepEqual(root.scale.values, [2, 2, 2]);
+  assert.equal(root.rotation.y, Math.PI / 2);
+  const context = captureBuildingContext({ centerX: 100, centerZ: 200,
+    pts: [{ x: 98, z: 198 }, { x: 102, z: 198 }, { x: 102, z: 202 }],
+    buildingProvenance: { fields: { heightMeters: { value: 9, status: 'inferred' } } }
+  }, { x: 100, z: 198 });
+  assert.deepEqual(context.footprint[0], { x: -2, z: -2 });
+  assert.deepEqual(context.entrance, { x: 0, z: -2 });
+  assert.equal(context.height.evidence, 'inferred');
+});
 
 test('community replacement and world editing share suppression ownership safely', () => {
   const direct = { visible: true, userData: { sourceBuildingId: 'osm:1' } };

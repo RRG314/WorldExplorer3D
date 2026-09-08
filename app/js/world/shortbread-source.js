@@ -513,7 +513,10 @@ async function convertTilesToElements(tiles, layerNames, bounds = null) {
           };
           if (layerName === 'streets' && resolveRoadName) {
             const roadName = resolveRoadName(projectLine(part.coords), geojson.properties?.kind);
-            if (roadName) resolvedTags.name = roadName;
+            if (roadName && !resolvedTags.name) {
+              resolvedTags.name = roadName;
+              resolvedTags._nameProvenance = 'spatial-label-association';
+            }
           }
           const signature = geometrySignature(layerName, part, resolvedTags);
           if (featureSignatures.has(signature)) continue;

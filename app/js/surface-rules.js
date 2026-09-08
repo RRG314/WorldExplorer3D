@@ -310,7 +310,7 @@ function classifyTerrainSurfaceProfile({
     (mappedUrbanGround || denseUrbanFallback);
   const useSoil = !useSnow && !useSand && !useRock && !useBuilt && (norm.soil >= 0.2 || (norm.soil >= 0.1 && norm.grass < 0.24));
   const mode = useSnow ?
-    ((polar || useRock || steepTerrain) ? 'snowRock' : 'snow') :
+    ((useRock || steepTerrain) ? 'snowRock' : 'snow') :
     useSand ? 'sand' :
     useRock ? 'rock' :
     useBuilt ? 'built' :

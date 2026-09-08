@@ -10,6 +10,7 @@ import {
   updateFeatureSurfaceProfile
 } from "../structure-semantics.js?v=63";
 import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=15";
+import { compileTunnelSolidBoundaries } from './compiler/tunnel-solid-publication.js';
 import { compileTransportStructureModel } from "./compiler/transport-structure-model.js?v=1";
 import { compileTransportStructureAssemblies } from "./compiler/transport-structure-assembly.js?v=15";
 import {
@@ -685,16 +686,23 @@ export function refreshStructureAwareFeatureProfiles() {
 }
 
 export async function refreshStructureAwareFeatureProfilesCooperatively() {
+  const sequence = appCtx._worldLoadSequence;
+  const roads = appCtx.roads;
+  const groundRelease = appCtx.lastEarthStreamingRelease;
   const steps = compileStructureAwareFeatureProfileSteps();
   let result = steps.next();
   while (!result.done) {
     await yieldToMainThread();
+    if (appCtx._worldLoadSequence !== sequence || appCtx.roads !== roads || appCtx.lastEarthStreamingRelease !== groundRelease) {
+      steps.return();
+      throw new DOMException('Transport compilation belongs to a previous world', 'AbortError');
+    }
     result = steps.next();
   }
   return result.value;
 }
 
-export function refreshTransportStructureAssembliesForPublishedTerrain() {
+export async function refreshTransportStructureAssembliesForPublishedTerrain() {
   const roadFeatures = Array.isArray(appCtx.roads) ? appCtx.roads : [];
   const transportFeatures = roadFeatures.concat(structureAwareLinearFeatures());
   const structureWaterAreas = []
@@ -702,9 +710,14 @@ export function refreshTransportStructureAssembliesForPublishedTerrain() {
     .concat(Array.isArray(appCtx.waterways) ? appCtx.waterways : []);
   const nearbyPublishedWaterAreas = createWaterAreaBoundsFilter(structureWaterAreas);
   const samplePublishedTerrainY = (x, z) => {
-    const renderedY = Number(appCtx.terrainMeshHeightAt?.(x, z));
+    const renderedY = appCtx.terrainMeshHeightAt?.(x, z, { ignorePortalCuts: true });
     return Number.isFinite(renderedY) ? renderedY : worldBaseTerrainY(x, z);
   };
+  // The portal/cover product must be finalized against the same uncut terrain
+  // the mesh adapter sees, after road grading and both terrain LODs publish.
+  // The road floor remains owned by its already compiled transport profile.
+  compileTunnelSystemModels(transportFeatures, samplePublishedTerrainY);
+  appCtx.tunnelSolidCompilation = await compileTunnelSolidBoundaries(transportFeatures);
   const supportRoadIndex = createDriveableRoadConflictIndex(roadFeatures);
   appCtx.transportStructureAssembly = compileTransportStructureAssemblies(
     transportFeatures,

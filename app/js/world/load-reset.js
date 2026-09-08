@@ -1,5 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { clearBuildingExteriorMaterialPool } from "../engine/building-facade-materials.js?v=15";
+import { clearBuildingExteriorMaterialPool } from "../engine/building-facade-materials.js?v=16";
+import { clearBuildingExteriorDetails } from './building-exterior-details.js?v=1';
 
 const MATERIAL_TEXTURE_KEYS = Object.freeze([
   'map', 'alphaMap', 'aoMap', 'bumpMap', 'displacementMap', 'emissiveMap',
@@ -59,6 +60,7 @@ export function hideEarthSceneMeshes() {
   hideList(appCtx.roadMeshes);
   hideList(appCtx.urbanSurfaceMeshes);
   hideList(appCtx.structureVisualMeshes);
+  hideList(appCtx.buildingExteriorDetailMeshes);
   hideList(appCtx.buildingMeshes);
   hideList(appCtx.landuseMeshes);
   hideList(appCtx.poiMeshes);
@@ -78,6 +80,7 @@ export function resetWorldForReload(options = {}) {
   appCtx.buildingEntranceCatalog = null;
   appCtx.buildingEntranceByBuilding = null;
   appCtx.buildingFacadeEntrances = null;
+  clearBuildingExteriorDetails(appCtx);
   appCtx.disposeWorldDiscoveryRuntime?.('world_reload');
   appCtx.closeArExperience?.('world_reload');
   appCtx.disposeEditableWorldPresentation?.();

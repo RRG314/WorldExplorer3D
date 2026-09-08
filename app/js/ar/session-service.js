@@ -27,6 +27,11 @@ function requestTitle(request = {}) {
 
 function createArPlatform(appCtx, options = {}) {
   const scope = createLifecycleScope('ar-platform');
+  let operation = 0;
+  let disposed = false;
+  function assertCurrent(token) {
+    if (disposed || token !== operation) throw new DOMException('AR request cancelled.', 'AbortError');
+  }
   const byId = (id) => document.getElementById(id);
   const ui = {
     shell: byId('arExperience'), video: byId('arCameraFeed'), canvas: byId('arCanvas'), close: byId('arCloseBtn'),
@@ -101,13 +106,13 @@ function createArPlatform(appCtx, options = {}) {
   }
 
   async function end(reason = 'user-exit') {
-    if (state.phase === 'idle' || state.phase === 'ending') return false;
+    const token = ++operation;
+    if (state.phase === 'idle') return false;
     state.phase = 'ending';
     renderUi();
     cancelAnimation();
     const session = state.xrSession;
     state.xrSession = null;
-    try { if (session?.visibilityState !== 'ended') await session?.end?.(); } catch (_) {}
     stopStream();
     state.presentation?.dispose?.();
     state.presentation = null;
@@ -119,6 +124,8 @@ function createArPlatform(appCtx, options = {}) {
     state.eligibility = null;
     state.error = '';
     state.lastReason = String(reason);
+    try { await session?.end?.(); } catch (_) {}
+    if (token !== operation) return true;
     state.phase = 'idle';
     renderUi();
     globalThis.dispatchEvent?.(new CustomEvent('we3d:ar-session-ended', { detail: { reason } }));
@@ -146,12 +153,21 @@ function createArPlatform(appCtx, options = {}) {
     state.raf = globalThis.requestAnimationFrame(frame);
   }
 
-  async function startCamera() {
+  async function startCamera(token) {
     const mediaDevices = (options.navigatorObject || navigator).mediaDevices;
-    const request = Promise.resolve().then(() => mediaDevices.getUserMedia({
+    const request = Promise.resolve().then(() => {
+      assertCurrent(token);
+      return mediaDevices.getUserMedia({
       audio: false,
       video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
-    }));
+      });
+    }).then((stream) => {
+      if (disposed || token !== operation) {
+        stream?.getTracks?.().forEach((track) => track.stop());
+        assertCurrent(token);
+      }
+      return stream;
+    });
     let timeoutId = null;
     let timedOut = false;
     const timeout = new Promise((_, reject) => {
@@ -163,7 +179,10 @@ function createArPlatform(appCtx, options = {}) {
       }, 8_000);
     });
     try {
-      state.stream = await Promise.race([request, timeout]);
+      const stream = await Promise.race([request, timeout]);
+      if (disposed || token !== operation) stream?.getTracks?.().forEach((track) => track.stop());
+      assertCurrent(token);
+      state.stream = stream;
     } catch (error) {
       if (timedOut) {
         void request.then((lateStream) => lateStream?.getTracks?.().forEach((track) => track.stop())).catch(() => {});
@@ -175,19 +194,26 @@ function createArPlatform(appCtx, options = {}) {
     if (ui.video) {
       ui.video.srcObject = state.stream;
       await ui.video.play();
+      assertCurrent(token);
     }
   }
 
-  async function startSpatial() {
+  async function startSpatial(token) {
     const xr = (options.navigatorObject || navigator).xr;
     const sessionInit = { requiredFeatures: ['local-floor'], optionalFeatures: ['hit-test', 'anchors', 'dom-overlay'] };
     if (ui.shell) sessionInit.domOverlay = { root: ui.shell };
     const session = await xr.requestSession('immersive-ar', sessionInit);
+    if (disposed || token !== operation) {
+      try { await session.end(); } catch (_) {}
+      assertCurrent(token);
+    }
     state.xrSession = session;
     state.presentation.setSpatialMode?.(true);
     state.presentation.renderer.xr.enabled = true;
     await state.presentation.renderer.xr.setSession(session);
+    assertCurrent(token);
     const referenceSpace = await session.requestReferenceSpace('local-floor');
+    assertCurrent(token);
     let hitTestSource = null;
     if (session.enabledFeatures?.has?.('hit-test') || typeof session.requestHitTestSource === 'function') {
       try {
@@ -195,8 +221,11 @@ function createArPlatform(appCtx, options = {}) {
         hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
       } catch (_) {}
     }
-    session.addEventListener('end', () => { if (state.phase !== 'idle' && state.phase !== 'ending') void end('xr-session-ended'); }, { once: true });
+    assertCurrent(token);
+    if (!hitTestSource) throw new Error('Surface placement is unavailable. Open interactive 3D instead.');
+    session.addEventListener('end', () => { if (state.xrSession === session && state.phase !== 'ending') void end('xr-session-ended'); }, { once: true });
     session.addEventListener('select', () => {
+      if (token !== operation) return;
       if (!state.hitTestAvailable) return;
       if (state.presentation?.placeAtReticle?.()) {
         state.lastReason = 'Placed. Move around slowly and keep the area clear.';
@@ -209,7 +238,9 @@ function createArPlatform(appCtx, options = {}) {
   }
 
   async function begin() {
+    if (disposed) return false;
     if (state.phase !== 'preview' && state.phase !== 'error') return false;
+    const token = ++operation;
     if (state.error && state.capability) state.capability = { ...state.capability, level: 'interactive-3d' };
     state.phase = 'starting';
     state.error = '';
@@ -224,10 +255,11 @@ function createArPlatform(appCtx, options = {}) {
       }) : null;
       if (state.challengePlan && !state.challengePlan.eligible) throw new Error('This habitat is no longer eligible for the waterfowl survey.');
       state.challengeSession = state.challengePlan ? createWaterfowlChallengeSession(state.challengePlan) : null;
-      state.presentation = createArPresentation({ canvas: ui.canvas, request: state.request, challengePlan: state.challengePlan });
-      if (state.capability.level === 'spatial-ar') await startSpatial();
+      state.presentation = (options.createPresentation || createArPresentation)({ canvas: ui.canvas, request: state.request, challengePlan: state.challengePlan });
+      if (state.capability.level === 'spatial-ar') await startSpatial(token);
       else {
-        if (state.capability.level === 'camera-overlay') await startCamera();
+        if (state.capability.level === 'camera-overlay') await startCamera(token);
+        assertCurrent(token);
         state.lastReason = state.request.type === 'field-challenge'
           ? 'Virtual waterfowl survey active. Tap only the rendered targets.'
           : state.capability.level === 'camera-overlay'
@@ -235,16 +267,20 @@ function createArPlatform(appCtx, options = {}) {
             : 'Interactive 3D viewer active. Drag to rotate and use the size controls.';
         runViewerLoop();
       }
+      assertCurrent(token);
       state.phase = 'active';
       renderUi();
       updateChallengeUi();
       globalThis.dispatchEvent?.(new CustomEvent('we3d:ar-session-started', { detail: { type: state.request.type, level: state.capability.level } }));
       return true;
     } catch (error) {
+      if (disposed || token !== operation) return false;
       cancelAnimation();
       stopStream();
-      try { await state.xrSession?.end?.(); } catch (_) {}
+      const failedSession = state.xrSession;
       state.xrSession = null;
+      try { await failedSession?.end?.(); } catch (_) {}
+      if (disposed || token !== operation) return false;
       state.presentation?.dispose?.();
       state.presentation = null;
       state.challengeSession = null;
@@ -262,7 +298,13 @@ function createArPlatform(appCtx, options = {}) {
   }
 
   async function open(request = {}) {
-    await end('replaced');
+    if (disposed) return Object.freeze({ opened: false, reason: 'platform-disposed' });
+    const closing = end('replaced');
+    const token = ++operation;
+    await closing;
+    if (disposed || token !== operation) return Object.freeze({ opened: false, reason: 'cancelled' });
+    state.phase = 'idle';
+    renderUi();
     const context = contextForRequest();
     const eligibility = evaluateArEligibility(request, context);
     if (!eligibility.allowed) {
@@ -275,7 +317,9 @@ function createArPlatform(appCtx, options = {}) {
     state.phase = 'preview';
     state.request = request;
     state.eligibility = eligibility;
-    state.capability = await detectArCapabilities({ navigatorObject: options.navigatorObject });
+    const capability = await detectArCapabilities({ navigatorObject: options.navigatorObject });
+    if (disposed || token !== operation) return Object.freeze({ opened: false, reason: 'cancelled' });
+    state.capability = capability;
     if (request.type === 'field-challenge' && state.capability.level === 'spatial-ar') {
       state.capability = Object.freeze({
         ...state.capability,
@@ -330,9 +374,10 @@ function createArPlatform(appCtx, options = {}) {
   scope.listen(ui.canvas, 'pointerdown', handlePointerDown);
   scope.listen(ui.canvas, 'pointermove', handlePointerMove);
   scope.listen(ui.canvas, 'pointerup', handlePointerUp);
+  scope.listen(ui.canvas, 'pointercancel', () => { state.input.pointerId = null; });
   scope.listen(globalThis, 'resize', () => state.presentation?.resize?.(), { passive: true });
   scope.listen(document, 'visibilitychange', () => {
-    if (document.visibilityState === 'hidden' && state.phase === 'active') void end('page-hidden');
+    if (document.visibilityState === 'hidden' && state.phase !== 'idle') void end('page-hidden');
   });
 
   function snapshot() {
@@ -349,13 +394,21 @@ function createArPlatform(appCtx, options = {}) {
   renderUi();
   return Object.freeze({
     begin, end, open, snapshot,
-    dispose() { void end('platform-disposed'); scope.dispose('platform-disposed'); }
+    dispose() {
+      disposed = true;
+      void end('platform-disposed');
+      scope.dispose('platform-disposed');
+      options.onDispose?.();
+    }
   });
 }
 
 function initArPlatform(appCtx, options = {}) {
   if (activePlatform) return activePlatform;
-  activePlatform = createArPlatform(appCtx, options);
+  activePlatform = createArPlatform(appCtx, { ...options, onDispose() {
+    activePlatform = null;
+    options.onDispose?.();
+  } });
   appCtx.openArExperience = activePlatform.open;
   appCtx.closeArExperience = activePlatform.end;
   appCtx.getArPlatformSnapshot = activePlatform.snapshot;

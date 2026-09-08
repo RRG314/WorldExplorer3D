@@ -15,7 +15,7 @@ import {
   createProceduralGrassTexture,
   createRoughnessMap
 } from "./procedural-textures.js?v=2";
-import { getBuildingMaterial } from "./building-facade-materials.js?v=15";
+import { getBuildingMaterial } from "./building-facade-materials.js?v=16";
 
 const EARTH_TEXTURE_ROOT = 'assets/textures/earth';
 export const LOCAL_PBR_ASSET_IDS = Object.freeze({
@@ -27,7 +27,7 @@ export const LOCAL_PBR_ASSET_IDS = Object.freeze({
   sand: 'sand_01',
   soil: 'dirt',
   rock: 'rock_ground',
-  snow: 'snow_01'
+  snow: 'snow_02'
 });
 
 function localPbrUrls(assetId) {

@@ -299,6 +299,10 @@ function updateControlInput() {
     inputState.previousButtons = [];
     return false;
   }
+  if (appCtx.hasPauseReason?.('reality_capture')) {
+    inputState.previousButtons = gamepad.buttons.map(button => button.value > 0.55);
+    return false;
+  }
   if (buttonRising(gamepad, 2)) void runGamepadContextAction();
   if (buttonRising(gamepad, 12)) appCtx.toggleUrbanEquipment?.();
   if (buttonRising(gamepad, 8)) {

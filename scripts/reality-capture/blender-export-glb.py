@@ -1,6 +1,7 @@
 import bpy
 import bmesh
 import sys
+from pathlib import Path
 
 
 def argument_value(flag):
@@ -14,7 +15,15 @@ source = argument_value("--input")
 target = argument_value("--output")
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
-bpy.ops.wm.obj_import(filepath=source)
+if Path(source).suffix.lower() in (".glb", ".gltf"):
+    bpy.ops.import_scene.gltf(filepath=source)
+else:
+    # bpy.ops dynamically synthesizes attributes; hasattr reports operators that
+    # do not exist in Blender 3.0. Use the actual runtime version instead.
+    if bpy.app.version >= (3, 3, 0):
+        bpy.ops.wm.obj_import(filepath=source)
+    else:
+        bpy.ops.import_scene.obj(filepath=source)
 
 mesh_objects = [obj for obj in bpy.context.scene.objects if obj.type == "MESH"]
 for obj in mesh_objects:
@@ -66,13 +75,22 @@ if triangle_count > target_triangles:
         bpy.ops.object.modifier_apply(modifier=modifier.name)
         obj.select_set(False)
 
-for image in bpy.data.images:
+for index, image in enumerate(bpy.data.images):
     if image.size[0] > 2048 or image.size[1] > 2048:
         scale = min(2048 / image.size[0], 2048 / image.size[1])
         image.scale(max(1, int(image.size[0] * scale)), max(1, int(image.size[1] * scale)))
+    if image.source == 'FILE' and image.size[0] > 0 and image.size[1] > 0:
+        # Blender 3.0's glTF exporter copies FILE images from their disk source.
+        # A scaled in-memory EXR still points to the old dimensions, producing a
+        # pixels.foreach_set size mismatch. Persist and reload the exact resized
+        # derivative before export; never overwrite the reconstruction source.
+        image.filepath_raw = str(Path(target).parent / f"runtime-texture-{index}.png")
+        image.file_format = 'PNG'
+        image.save()
+        image.reload()
 
 bpy.ops.object.select_all(action="SELECT")
-if hasattr(bpy.ops.object, "shade_smooth_by_angle"):
+if bpy.app.version >= (4, 1, 0):
     bpy.ops.object.shade_smooth_by_angle()
 else:
     bpy.ops.object.shade_smooth()
@@ -81,7 +99,7 @@ bpy.ops.export_scene.gltf(
     export_format="GLB",
     export_apply=True,
     export_materials="EXPORT",
-    export_images="AUTO",
+    export_image_format="AUTO",
     export_cameras=False,
     export_lights=False,
     export_animations=False,

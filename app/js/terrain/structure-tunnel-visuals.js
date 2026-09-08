@@ -1,19 +1,12 @@
 import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=63";
+import { tunnelCeilingHeight, TUNNEL_SECTION_LATERAL, canPublishTunnelGeometry } from '../world/compiler/tunnel-envelope.js';
 
 function beam(x, y, z, scaleX, scaleY, scaleZ, rotationY) {
   return { x, y, z, scaleX, scaleY, scaleZ, rotationY };
 }
 
 export function canPublishTunnelVisual(feature) {
-  const model = feature?.tunnelSystemModel;
-  const record = feature?.transportRecord;
-  if (feature?.structureSemantics?.terrainMode !== 'subgrade') return false;
-  if (record?.routeState !== 'complete' || record?.safeForDriving === false) return false;
-  if (record?.completeness === 'lossless') return true;
-  // Generalized geometry cannot own collision or engineered bridge details,
-  // but a mapped tunnel centerline plus measured terrain cover can own a
-  // non-colliding shell. Without it fallback routes render beneath raw terrain.
-  return record?.completeness === 'generalized' && model?.visualKind === 'tunnel';
+  return canPublishTunnelGeometry(feature);
 }
 
 export function collectTunnelVisualInstances(feature, structurePts, total, deps = {}) {
@@ -69,7 +62,7 @@ export function collectTunnelVisualInstances(feature, structurePts, total, deps 
         for (const side of [-1, 1]) {
           lights.push(beam(
             point.x + nx * lightOffset * side,
-            roadY + clearance - 0.1,
+            roadY + tunnelCeilingHeight(clearance, interiorHalfWidth, lightOffset) - 0.1,
             point.z + nz * lightOffset * side,
             Math.min(0.46, width * 0.08),
             0.07,
@@ -96,8 +89,9 @@ export function collectTunnelVisualInstances(feature, structurePts, total, deps 
       tangentZ: point.tangentZ
     };
   };
-  const distancesWithin = (startDistance, endDistance) => {
+  const distancesWithin = (startDistance, endDistance, maxStep = Infinity) => {
     const distances = [startDistance];
+    for (let d = startDistance + maxStep; d < endDistance; d += maxStep) distances.push(d);
     let cumulative = 0;
     for (let index = 0; index < structurePts.length - 1; index += 1) {
       cumulative += Math.hypot(
@@ -113,6 +107,11 @@ export function collectTunnelVisualInstances(feature, structurePts, total, deps 
         if (boundary > startDistance + 0.15 && boundary < endDistance - 0.15) {
           distances.push(boundary);
         }
+      }
+    }
+    for (const opening of model.wallOpenings || []) {
+      for (const boundary of [opening.start, opening.end]) {
+        if (boundary > startDistance && boundary < endDistance) distances.push(boundary);
       }
     }
     distances.push(endDistance);
@@ -178,16 +177,14 @@ export function collectTunnelVisualInstances(feature, structurePts, total, deps 
         Math.abs(Number(zone.distance) - Number(range.start)) < 0.2 ||
         Math.abs(Number(zone.distance) - Number(range.end)) < 0.2;
       if (!belongsToRange) continue;
-      const cutStart = zone.endpoint === 'start'
-        ? zone.approachStart
-        : zone.shellInsetStart;
-      const cutEnd = zone.endpoint === 'start'
-        ? zone.shellInsetEnd
-        : zone.approachEnd;
+      // The headwall closes the excavation at the portal. Cutting past that
+      // face exposed the shell roof and left protruding ends beside the road.
+      const cutStart = zone.approachStart;
+      const cutEnd = zone.approachEnd;
       const cutRings = distancesWithin(cutStart, cutEnd)
         .map((distance) => pointRing(distance))
         .filter(Boolean);
-      const linedRings = cutRings.map((ring) => {
+      const linedRings = distancesWithin(cutStart, cutEnd, 2).map((d) => pointRing(d)).filter(Boolean).map((ring) => {
         const nx = -Number(ring.tangentZ);
         const nz = Number(ring.tangentX);
         const leftTerrainY = Number(sampleTerrain(
@@ -219,64 +216,40 @@ export function collectTunnelVisualInstances(feature, structurePts, total, deps 
           tangentZ: dz / length,
           roadY: (start.y + end.y) * 0.5,
           grade: (end.y - start.y) / length,
-          halfWidth: interiorHalfWidth + 0.18,
-          halfDepth: length * 0.5 + 1.2
+          halfWidth: interiorHalfWidth,
+          halfDepth: length * 0.5 + 0.02,
+          cutHeight: Math.max(clearance + roofThickness,
+            ...linedRings.filter((r) => r.distance >= start.distance - 0.1 && r.distance <= end.distance + 0.1)
+              .map((r) => Math.max(r.leftTerrainY, r.rightTerrainY,
+                Number(sampleTerrain(r.x, r.z))) - r.y + 0.2))
         });
       }
     }
     shells.push({
       rings,
+      solidBoundary: feature.tunnelSolidBoundary || null,
+      publishSolidBoundary: feature.tunnelSolidBoundary?.publisher === feature,
       approaches,
+      portalFrames: (model.portalDistances || [])
+        .filter((distance) => Math.abs(distance - range.start) < 0.2 || Math.abs(distance - range.end) < 0.2)
+        .map((distance) => {
+          const ring = pointRing(distance);
+          if (!ring) return null;
+          const outerHalfWidth = interiorHalfWidth + Math.max(0.35, roofThickness);
+          return { ...ring, terrainHeights: TUNNEL_SECTION_LATERAL.map((lateral) =>
+            Number(sampleTerrain(ring.x - ring.tangentZ * lateral * outerHalfWidth,
+              ring.z + ring.tangentX * lateral * outerHalfWidth))) };
+        }).filter(Boolean),
       halfWidth: interiorHalfWidth,
       clearance,
       roofThickness,
       visualKind: model.visualKind,
-      junctionZones
+      junctionZones,
+      wallOpenings: model.wallOpenings || []
     });
   }
 
-  const portalDistances = Array.isArray(model.portalDistances)
-    ? model.portalDistances
-    : [model.portalStart, model.portalEnd];
-  for (const distance of portalDistances) {
-    if (!Number.isFinite(distance)) continue;
-    const point = samplePoint(feature.pts, distance);
-    if (!point) continue;
-    const roadY = sampleFeatureSurfaceY(feature, point.x, point.z);
-    const openingHeight = clearance;
-    if (!Number.isFinite(roadY) || !(openingHeight > 2.6)) continue;
-    const tangentX = Number(point.tangentX);
-    const tangentZ = Number(point.tangentZ);
-    const tangentLength = Math.hypot(tangentX, tangentZ);
-    if (!(tangentLength > 0.1)) continue;
-    const tx = tangentX / tangentLength;
-    const tz = tangentZ / tangentLength;
-    const nx = -tz;
-    const nz = tx;
-    const rotationY = Math.atan2(tx, tz);
-    const pillarWidth = Math.max(0.58, Math.min(1.15, width * 0.12));
-    const portalDepth = Math.max(0.9, Math.min(2.4, width * 0.24));
-    const sideOffset = width * 0.5 + pillarWidth * 0.62;
-    for (const side of [-1, 1]) {
-      portals.push(beam(
-        point.x + nx * sideOffset * side,
-        roadY + openingHeight * 0.5,
-        point.z + nz * sideOffset * side,
-        pillarWidth,
-        openingHeight,
-        portalDepth,
-        rotationY
-      ));
-    }
-    portals.push(beam(
-      point.x,
-      roadY + openingHeight + roofThickness * 0.75,
-      point.z,
-      width + pillarWidth * 2.25,
-      Math.max(0.42, roofThickness * 1.8),
-      portalDepth,
-      rotationY
-    ));
-  }
+  // Portal rims are emitted with the shell's actual arched cross-section.
+  // Three independent boxes left visible gaps above the curved shoulders.
   return { portals, walls, roofs, lights, shells, portalMasks };
 }

@@ -1,4 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
+import { buildingExteriorMaterialPoolSnapshot } from './engine/building-facade-materials.js?v=16';
 
 const diagnosticsParams = new URLSearchParams(globalThis.location?.search || '');
 // Production-like local runs must behave exactly like the deployed build.
@@ -950,6 +951,32 @@ function transportStructureSnapshot() {
   };
 }
 
+function environmentEvidenceSnapshot() {
+  const counts = {};
+  const failures = {};
+  for (const mesh of appCtx.terrainGroup?.children || []) {
+    const kind = mesh.userData?.worldCoverResult?.dataAuthority || mesh.userData?.worldCoverStatus || 'pending';
+    counts[kind] = (counts[kind] || 0) + 1;
+    const reason = mesh.userData?.worldCoverFailureReason;
+    if (kind === 'unavailable' && reason) failures[reason] = (failures[reason] || 0) + 1;
+  }
+  const trees = appCtx.vegetationFeatures || [];
+  const focus=appCtx.activeTransportActor?.()?.position || {x:0,z:0};
+  return {
+    biome: appCtx.worldSurfaceProfile?.biome || null,
+    biomeEvidence: appCtx.worldSurfaceProfile?.biomeEvidence || null,
+    owner: appCtx.worldCoverStats?.biomeOwner || null,
+    landCoverTiles: counts,
+    landCoverFailures: failures,
+    vegetationCount: trees.length,
+    vegetationNearPlayer: trees.filter(tree=>Math.hypot(tree.x-focus.x,tree.z-focus.z)<100).length,
+    vegetationBatches: appCtx.vegetationMeshes?.length || 0,
+    vegetationModels: appCtx.vegetationModelStatus || {},
+    rendererWork: appCtx.renderer?.info ? {calls:appCtx.renderer.info.render.calls,triangles:appCtx.renderer.info.render.triangles,geometries:appCtx.renderer.info.memory.geometries,textures:appCtx.renderer.info.memory.textures} : null,
+    nearestTreeToOrigin: trees.length ? trees.reduce((nearest, tree)=>Math.min(nearest, Math.hypot(tree.x,tree.z)), Infinity) : null
+  };
+}
+
 function getWorldExplorerRuntimeDiagnostics() {
   const activeActor = appCtx.activeTransportActor?.() || null;
   const interiorCandidates = !appCtx.activeInterior && activeActor?.position &&
@@ -1175,6 +1202,8 @@ function getWorldExplorerRuntimeDiagnostics() {
       }
     },
     transportStructures: transportStructureSnapshot(),
+    buildingExteriors: appCtx.buildingExteriorDetailPublication || null,
+    buildingExteriorMaterials: buildingExteriorMaterialPoolSnapshot(),
     farTerrainClipmap: appCtx.farTerrainClipmapState || null,
     quality: appCtx.renderQualityLevel || null,
     earthOrigin: {
@@ -1182,6 +1211,7 @@ function getWorldExplorerRuntimeDiagnostics() {
       lon: numberOrNull(appCtx.LOC?.lon)
     },
     terrainCache: appCtx.terrainTileCacheSnapshot?.() || null,
+    environmentEvidence: environmentEvidenceSnapshot(),
     mapTileCache: appCtx.mapTileCacheSnapshot?.() || null,
     minimapView: appCtx.getMinimapViewSnapshot?.() || null,
     groundProviderCatalog:
@@ -1329,6 +1359,7 @@ globalThis.render_game_to_text = () => JSON.stringify({
     !document.getElementById("titleScreen").classList.contains("hidden"),
   surfaceChain: surfaceChainSnapshot(),
   terrainCache: appCtx.terrainTileCacheSnapshot?.() || null,
+  environmentEvidence: environmentEvidenceSnapshot(),
   mapTileCache: appCtx.mapTileCacheSnapshot?.() || null,
   minimapView: appCtx.getMinimapViewSnapshot?.() || null,
   liveGps: appCtx.getLiveGpsSnapshot?.() || { active: false },
@@ -1358,6 +1389,8 @@ globalThis.render_game_to_text = () => JSON.stringify({
   worldDiscovery: appCtx.worldDiscoveryRuntimeSnapshot?.() || { active: false },
   editableWorld: appCtx.editableWorldRuntimeSnapshot?.() || { active: false },
   transportStructures: transportStructureSnapshot(),
+  buildingExteriors: appCtx.buildingExteriorDetailPublication || null,
+  buildingExteriorMaterials: buildingExteriorMaterialPoolSnapshot(),
   worldCounts: {
     buildings: appCtx.buildings?.length ?? null,
     roads: appCtx.roads?.length ?? null,

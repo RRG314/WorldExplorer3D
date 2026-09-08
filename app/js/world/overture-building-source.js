@@ -151,11 +151,13 @@ function convertTilesToElements(tiles, bounds, options = {}) {
         const properties = geojson.properties || {};
         const stableId = firstValue(properties, ['id', '@id']) || String(feature.id ?? index);
         const parentId = firstValue(properties, ['building_id', 'buildingId']);
-        if (layerName === 'building_part' && parentId) parentIdsWithParts.add(parentId);
         const rings = geometryParts(geojson.geometry);
         for (let partIndex = 0; partIndex < rings.length; partIndex++) {
           const coords = rings[partIndex];
           if (!Array.isArray(coords) || coords.length < 4 || !partIntersectsBounds(coords, bounds)) continue;
+          // A rejected or out-of-window part cannot replace its parent shell.
+          if (!coords.every((point) => Array.isArray(point) && Number.isFinite(point[0]) && Number.isFinite(point[1]))) continue;
+          if (layerName === 'building_part' && parentId) parentIdsWithParts.add(parentId);
           const signature = geometrySignature(layerName, stableId, coords);
           if (signatures.has(signature)) continue;
           signatures.add(signature);
@@ -396,6 +398,7 @@ export async function fetchGlobalBuildingData(options = {}) {
 }
 
 export {
+  convertTilesToElements,
   OVERTURE_BUILDING_ZOOM,
   OVERTURE_TILE_CONCURRENCY,
   OVERTURE_RELEASE,

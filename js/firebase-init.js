@@ -7,13 +7,11 @@ import {
   getToken as getAppCheckToken,
   initializeAppCheck
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app-check.js';
-import { analyticsStorageAllowed } from './analytics-consent.js?v=3';
+import { getAnalyticsTools } from './analytics-service.js?v=1';
 
 const FIREBASE_CONFIG_STORAGE_KEY = 'worldExplorer3D.firebaseConfig';
 
 let cachedServices = null;
-let cachedAnalytics = undefined;
-let cachedAnalyticsPromise = null;
 let cachedAppCheck = null;
 
 function readEmulatorConfig() {
@@ -105,43 +103,8 @@ export async function getFirebaseAppCheckToken() {
 }
 
 export async function initFirebaseAnalytics() {
-  if (cachedAnalytics !== undefined) return cachedAnalytics;
-  if (cachedAnalyticsPromise) return cachedAnalyticsPromise;
-
-  cachedAnalyticsPromise = (async () => {
-    const services = initFirebase();
-    const measurementId = String(services?.config?.measurementId || '').trim();
-    if (!services?.app || !measurementId || typeof window === 'undefined') {
-      cachedAnalytics = null;
-      return cachedAnalytics;
-    }
-
-    try {
-      const analyticsMod = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-analytics.js');
-      const supported = typeof analyticsMod.isSupported === 'function'
-        ? await analyticsMod.isSupported().catch(() => false)
-        : false;
-      if (!supported) {
-        cachedAnalytics = null;
-        return cachedAnalytics;
-      }
-      analyticsMod.setConsent?.({
-        analytics_storage: analyticsStorageAllowed() ? 'granted' : 'denied',
-        ad_storage: 'denied',
-        ad_user_data: 'denied',
-        ad_personalization: 'denied'
-      });
-      cachedAnalytics = analyticsMod.getAnalytics(services.app);
-      return cachedAnalytics;
-    } catch (_) {
-      cachedAnalytics = null;
-      return cachedAnalytics;
-    }
-  })().finally(() => {
-    cachedAnalyticsPromise = null;
-  });
-
-  return cachedAnalyticsPromise;
+  if (typeof window === 'undefined') return null;
+  return (await getAnalyticsTools(readFirebaseConfig()))?.analytics || null;
 }
 
 export function setFirebaseConfig(config) {

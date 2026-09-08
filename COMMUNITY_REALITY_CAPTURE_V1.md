@@ -1,5 +1,40 @@
 # Community Reality Capture V1 — Local Test Guide
 
+## September 7 integration checkpoint
+
+The current worker supports `meshroom` (default), `trellis2-image` and
+`trellis2-texture`, sharing optimization, review and existing world presentation.
+There is no licensing unlock or staging-only presentation prerequisite. Model
+licenses remain documented for the owner's publishing decision; private-photo
+access, authenticated ownership and normal moderation remain enforced.
+
+These commands run in the configured remote processing environment, not the
+browser or phone. Replace placeholders with an owned queued capture and its
+uploaded photo filename. TRELLIS needs its CUDA environment/dependencies and
+Blender; `--help` success is not inference verification.
+
+```sh
+node scripts/reality-capture/process-capture.cjs CAPTURE_ID --provider meshroom
+node scripts/reality-capture/process-capture.cjs CAPTURE_ID --provider trellis2-image --reference-photo UPLOADED_32_HEX_NAME.jpg
+node scripts/reality-capture/process-capture.cjs CAPTURE_ID --provider trellis2-texture --reference-photo UPLOADED_32_HEX_NAME.jpg --base-mesh /absolute/path/to/mapped-building.glb
+```
+
+TRELLIS modes use the explicitly selected single photo; they do not silently
+claim to reconstruct all sides from a submitted multi-view set. Meshroom uses
+the full photo set. Texture mode needs a base mesh exported/aligned from the
+existing building; automatic export/dispatch is not implemented yet. Set
+`WE3D_RECONSTRUCTION_PYTHON` to the TRELLIS environment's Python executable,
+`BLENDER_BIN` / `MESHROOM_BATCH_BIN` as needed, `WE3D_TRELLIS_MODEL` to a pinned
+model snapshot when available, and `WE3D_RECONSTRUCTION_REVISION` to the worker
+image/source revision. No dependencies are downloaded by the browser.
+
+Current evidence: 36 focused checks, actual AR phone-width viewer inspection,
+and source graph verification. Remote GPU inference, real house/room captures,
+private-space grant expiry/revocation, local draft account isolation, and a
+matching playable interior proxy remain unfinished. Historical implementation
+descriptions below do not override these limitations. Full audit and ordered
+work: [Reality Capture + AR integration](docs/REALITY_CAPTURE_AR_INTEGRATION_PLAN.md).
+
 Status: implemented locally but not provisioned or proven end to end. Do not deploy this feature or describe it as complete until the two-proof gate passes.
 
 ## What currently works locally

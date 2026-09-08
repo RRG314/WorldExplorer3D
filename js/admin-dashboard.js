@@ -21,7 +21,7 @@ import {
   getRealityCaptureModerationDetail,
   listRealityCaptureModeration,
   moderateRealityCapture
-} from './community-reality-capture-api.js?v=3';
+} from './community-reality-capture-api.js?v=4';
 import {
   LANDING_PAGE_ENTRY_ID,
   cloneLandingContent,
@@ -815,69 +815,41 @@ function captureFootprintMarkup(points = []) {
   return `<svg class="capture-footprint" viewBox="0 0 300 180" role="img" aria-label="Mapped building footprint"><polygon points="${escapeHtml(svgPoints)}" fill="rgba(90,208,255,.18)" stroke="#5ad0ff" stroke-width="2"/></svg>`;
 }
 
-function mountRealityModelPreview(url) {
+async function mountRealityModelPreview(url, capture) {
   disposeRealityModelPreview?.();
-  disposeRealityModelPreview = null;
-  const canvas = document.getElementById('realityCaptureModelPreview');
-  if (!canvas || !url || !globalThis.THREE?.GLTFLoader) return;
-  const THREE = globalThis.THREE;
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
-  renderer.setPixelRatio(Math.min(2, globalThis.devicePixelRatio || 1));
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x020811);
-  const camera = new THREE.PerspectiveCamera(42, 1, 0.01, 5000);
-  scene.add(new THREE.HemisphereLight(0xe8f7ff, 0x263544, 1.2));
-  const key = new THREE.DirectionalLight(0xffffff, 1.25);
-  key.position.set(4, 8, 5);
-  scene.add(key);
-  let root = null;
-  let frame = 0;
-  let disposed = false;
-  const resize = () => {
-    const width = Math.max(1, canvas.clientWidth);
-    const height = Math.max(1, canvas.clientHeight || 320);
-    renderer.setSize(width, height, false);
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
-  };
-  resize();
-  const animate = () => {
-    if (disposed) return;
-    frame = requestAnimationFrame(animate);
-    if (root) root.rotation.y += 0.003;
-    renderer.render(scene, camera);
-  };
-  new THREE.GLTFLoader().load(url, (gltf) => {
-    if (disposed) return;
-    root = gltf.scene || gltf.scenes?.[0];
-    if (!root) return;
-    scene.add(root);
-    const box = new THREE.Box3().setFromObject(root);
-    const size = box.getSize(new THREE.Vector3());
-    const center = box.getCenter(new THREE.Vector3());
-    root.position.sub(center);
-    const radius = Math.max(size.x, size.y, size.z, 1);
-    camera.position.set(radius * 1.35, radius * 0.9, radius * 1.7);
-    camera.lookAt(0, 0, 0);
-    camera.near = Math.max(0.01, radius / 1000);
-    camera.far = radius * 20;
-    camera.updateProjectionMatrix();
-  }, undefined, () => {
+  const controller = new AbortController();
+  let viewer;
+  disposeRealityModelPreview = () => { controller.abort(); viewer?.dispose(); };
+  const host = document.getElementById('realityCaptureModelPreview');
+  const approve = document.getElementById('captureApproveBtn');
+  if (approve) approve.disabled = true;
+  try {
+    const { createCaptureViewer } = await import('../app/js/reality-capture/result-viewer.js?v=1');
+    const response = await fetch(url, { signal: controller.signal, cache: 'no-store', credentials: 'omit' });
+    if (!response.ok) throw Error('protected_model_unavailable');
+    viewer = await createCaptureViewer(host, await response.arrayBuffer(), controller.signal, {
+      alignment: capture.review?.alignment || {},
+      spatialContext: capture.captureKind === 'exterior' ? capture.building?.spatialContext : null
+    });
+    if (controller.signal.aborted || !viewer) return;
+    const readAlignment = () => ({
+      positionOffset: { x: Number(document.getElementById('captureAlignX').value), y: Number(document.getElementById('captureAlignY').value), z: Number(document.getElementById('captureAlignZ').value) },
+      rotationYDegrees: Number(document.getElementById('captureAlignRotation').value),
+      scale: Number(document.getElementById('captureAlignScale').value)
+    });
+    document.querySelectorAll('.capture-alignment-grid input').forEach(input => input.addEventListener('input', () => viewer.updateAlignment(readAlignment()), { signal: controller.signal }));
+    document.getElementById('captureReviewReset')?.addEventListener('click', () => viewer.reset(), { signal: controller.signal });
+    document.getElementById('captureReviewRotate')?.addEventListener('click', () => viewer.rotate(), { signal: controller.signal });
+    const note = document.getElementById('realityCaptureModelStatus');
+    if (note) note.textContent = capture.building?.spatialContext && capture.captureKind === 'exterior'
+      ? `Blue: captured world footprint/height reference (${capture.building.spatialContext.height?.evidence || 'height unknown'}). Yellow: entrance. Placement fields update this view in world units; this is manual review, not solved registration.`
+      : 'Placement fields update this view without recentering the model. No mapped reference is available here; inspect the actual building/room before approval.';
+    if (approve && capture.status === 'review_required') approve.disabled = false;
+  } catch (error) {
+    if (controller.signal.aborted) return;
     const note = document.getElementById('realityCaptureModelStatus');
     if (note) note.textContent = 'The protected preview could not load. Keep this capture unapproved until the model is inspected.';
-  });
-  animate();
-  disposeRealityModelPreview = () => {
-    disposed = true;
-    cancelAnimationFrame(frame);
-    root?.traverse?.((object) => {
-      if (!object?.isMesh) return;
-      object.geometry?.dispose?.();
-      const materials = Array.isArray(object.material) ? object.material : [object.material];
-      materials.forEach((material) => material?.dispose?.());
-    });
-    renderer.dispose();
-  };
+  }
 }
 
 function renderRealityList() {
@@ -915,7 +887,7 @@ function renderRealityDetail() {
       <article class="detail-card"><span class="detail-label">Runtime policy</span><strong>Visual only</strong><p>Canonical proxy collision/navigation</p></article>
     </div>
     <div class="capture-review-media">
-      <section class="detail-section"><div class="detail-section-title">Generated model</div>${detail.model?.url ? '<canvas id="realityCaptureModelPreview" class="capture-review-canvas"></canvas><p id="realityCaptureModelStatus" class="muted-inline">Drag-free review preview rotates automatically. Inspect alignment before approval.</p>' : '<div class="detail-note">No processed GLB is available. Approval is disabled.</div>'}</section>
+      <section class="detail-section"><div class="detail-section-title">Reconstruction placement</div>${detail.model?.url ? '<div id="realityCaptureModelPreview"></div><div class="action-row"><button id="captureReviewRotate" type="button" class="secondary-btn">Rotate view</button><button id="captureReviewReset" type="button" class="secondary-btn">Frame model and reference</button></div><p id="realityCaptureModelStatus" class="muted-inline">Loading protected placement preview…</p>' : '<div class="detail-note">No processed GLB is available. Approval is disabled.</div>'}</section>
       <section class="detail-section"><div class="detail-section-title">Mapped footprint</div>${captureFootprintMarkup(capture.building?.footprintGeo)}</section>
     </div>
     <section class="detail-section"><div class="detail-section-title">Protected photo samples</div><div class="capture-photo-grid">${(detail.thumbnails || []).map((photo) => `<img src="${escapeHtml(photo.url)}" alt="Protected capture review photo" referrerpolicy="no-referrer">`).join('') || '<div class="detail-note">No review thumbnails are available.</div>'}</div></section>
@@ -927,7 +899,14 @@ function renderRealityDetail() {
       <label>Scale<input id="captureAlignScale" type="number" min="0.05" max="20" step="0.01" value="${escapeHtml(String(alignment.scale || 1))}"></label>
     </div></section>
     <section class="detail-section"><div class="detail-section-title">Moderation decision</div><textarea id="captureDecisionNote" maxlength="400" placeholder="Record visible privacy, quality, cleanup, or alignment issues.">${escapeHtml(capture.review?.note || '')}</textarea><div class="action-row"><a class="secondary-btn" target="_blank" rel="noreferrer" href="${escapeHtml(buildWorldUrl(capture.building?.lat, capture.building?.lon, capture.building?.label || 'Capture review'))}">Open mapped building</a><button id="captureApproveBtn" type="button" class="primary-btn" ${canModerate ? '' : 'disabled'}>Approve visual</button><button id="captureRejectBtn" type="button" class="danger-btn" ${capture.status === 'review_required' ? '' : 'disabled'}>Reject</button></div></section>`;
-  if (detail.model?.url) mountRealityModelPreview(detail.model.url);
+  if(capture.hybridSubmission){
+    const revision=capture.hybridSubmission.revision;
+    refs.moderationDetail.querySelectorAll('.capture-alignment-grid input').forEach(input=>{input.disabled=true;});
+    const label=document.createElement('p');
+    label.className='detail-note';label.textContent=`Saved photo walls · revision ${revision} · ${capture.hybridSubmission.patches?.length||0} patches. Placement is fixed to the submitted mapped walls; uncovered geometry remains unchanged.`;
+    refs.moderationDetail.prepend(label);
+  }
+  if (detail.model?.url) void mountRealityModelPreview(detail.model.url, capture);
 }
 
 function renderModeration() {
@@ -1720,12 +1699,15 @@ async function handleRealityDecision(decision) {
       item.captureId,
       decision,
       sanitizeLongText(document.getElementById('captureDecisionNote')?.value || '', 400),
-      alignment
+      alignment,
+      (state.realityDetails.get(item.captureId)?.capture || item).hybridSubmission?.revision
     );
     state.realityDetails.delete(item.captureId);
-    await Promise.all([loadRealityQueue(), loadActivity()]);
+    const refreshes = await Promise.allSettled([loadRealityQueue(), loadActivity()]);
     renderModeration();
-    setStatus(decision === 'approved' ? 'Capture visual approved. Existing identity and proxy collision remain authoritative.' : 'Capture rejected and kept out of runtime presentation.', 'ok');
+    const message = decision === 'approved' ? 'Photo improvement approved.' : 'Contribution rejected.';
+    const refreshFailed = refreshes.some(result => result.status === 'rejected');
+    setStatus(message + (refreshFailed ? ' The decision was saved, but the dashboard could not fully refresh. Reload to see the updated list; do not approve again.' : ''), refreshFailed ? 'warn' : 'ok');
   } catch (error) {
     console.error('[admin-dashboard] Reality capture moderation failed:', error);
     setStatus(error?.message || 'Could not moderate this capture.', 'warn');

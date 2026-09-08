@@ -49,14 +49,25 @@ export async function saveLocalCapturePhoto(draftId, photo, sector) {
     draftId,
     sector,
     blob: photo.blob,
+    thumbnail: photo.thumbnail || null,
     width: photo.width,
     height: photo.height,
     contentType: photo.contentType,
     quality: photo.quality,
     sourceBytes: photo.sourceBytes,
     normalizedBytes: photo.normalizedBytes,
+    inputOrigin: photo.inputOrigin?.kind === 'video-frame' && Number.isFinite(photo.inputOrigin.timestampSeconds)
+      ? {kind:'video-frame',timestampSeconds:photo.inputOrigin.timestampSeconds} : null,
     createdAtMs: Date.now()
   }));
+}
+
+export async function deleteLocalCapturePhoto(draftId, photoId) {
+  await transact([PHOTOS], 'readwrite', transaction => {
+    const store = transaction.objectStore(PHOTOS);
+    const request = store.get(photoId);
+    request.onsuccess = () => { if (request.result?.draftId === draftId) store.delete(photoId); };
+  });
 }
 
 export async function loadLocalCaptureDraft(draftId) {

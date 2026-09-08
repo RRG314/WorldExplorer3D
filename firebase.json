@@ -203,6 +203,26 @@
         "function": "createRealityCaptureDraft"
       },
       {
+        "source": "/getMyRealityCapture",
+        "function": "getMyRealityCapture"
+      },
+      {
+        "source": "/saveRealityCaptureHybridPreview",
+        "function": "saveRealityCaptureHybridPreview"
+      },
+      {
+        "source": "/submitRealityCaptureHybrid",
+        "function": "submitRealityCaptureHybrid"
+      },
+      {
+        "source": "/reserveRealityCapturePhoto",
+        "function": "reserveRealityCapturePhoto"
+      },
+      {
+        "source": "/retryRealityCapture",
+        "function": "retryRealityCapture"
+      },
+      {
         "source": "/listMyRealityCaptures",
         "function": "listMyRealityCaptures"
       },

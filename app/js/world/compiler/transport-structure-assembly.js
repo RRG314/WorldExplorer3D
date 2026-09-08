@@ -6,6 +6,21 @@ import {
 
 const TRANSPORT_STRUCTURE_ASSEMBLY_SCHEMA_VERSION = 1;
 
+export function sampleStructureAssemblyThicknessAt(assembly, x, z) {
+  const samples = assembly?.surfaceSamples || [];
+  let bestDistance = Infinity, thickness = Number(assembly?.baseThickness) || 0.18;
+  for (let i = 0; i < samples.length - 1; i++) {
+    const a = samples[i], b = samples[i + 1];
+    const dx = b.x - a.x, dz = b.z - a.z;
+    const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / (dx * dx + dz * dz || 1)));
+    const distance = Math.hypot(x - a.x - dx * t, z - a.z - dz * t);
+    if (distance >= bestDistance) continue;
+    bestDistance = distance;
+    thickness = a.thickness + (b.thickness - a.thickness) * t;
+  }
+  return thickness;
+}
+
 function finite(value, fallback = 0) {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;

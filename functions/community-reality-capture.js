@@ -3,16 +3,17 @@
 const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
 const { FieldValue } = require('firebase-admin/firestore');
+const { validateCaptureObjects } = require('./reality-capture-upload-validation');
+const { footprintSignature, normalizeHybridPreview, encodeHybridPreview, decodeHybridPreview } = require('./reality-capture-hybrid');
+const { createPatchGlb } = require('./reality-capture-patch-derivative');
 const {
   ACCESS_MODES,
   assertCaptureTransition,
   createCaptureDraft,
-  imageSignatureMatches,
   isDeletableByOwner,
   normalizeReviewedAlignment,
   resolveSpaceAccess,
-  stableId,
-  validateUploadedPhotoSet
+  stableId
 } = require('./reality-capture-authority');
 
 const CAPTURES = 'realityCaptures';
@@ -51,16 +52,6 @@ function actorFromAuth(auth, authUser) {
   };
 }
 
-async function readObjectPrefix(file, bytes = 16) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    file.createReadStream({ start: 0, end: Math.max(0, bytes - 1) })
-      .on('data', (chunk) => chunks.push(chunk))
-      .on('error', reject)
-      .on('end', () => resolve(Buffer.concat(chunks)));
-  });
-}
-
 function serializeCapture(snapshot) {
   const data = snapshot.data() || {};
   return {
@@ -69,14 +60,22 @@ function serializeCapture(snapshot) {
     captureSchemaVersion: Number(data.captureSchemaVersion) || 1,
     processingPipelineVersion: clean(data.processingPipelineVersion, 100),
     captureKind: clean(data.captureKind, 40),
+    exteriorScope: data.exteriorScope === 'facade' ? 'facade' : 'building',
+    permissionConfirmed: data.consent?.propertyPermissionConfirmed === true,
     status: clean(data.status, 40),
     capturePrivacy: clean(data.capturePrivacy || 'PRIVATE', 40),
     accessMode: clean(data.accessMode || 'PRIVATE', 40),
     publicContributionRequested: data.publicContributionRequested === true,
     building: data.building || {},
+    buildingDetails: data.buildingDetails || null,
+    hybridPreview: decodeHybridPreview(data.hybridPreview),
+    hybridSubmission: decodeHybridPreview(data.hybridSubmission),
+    footprintSignature: footprintSignature(data.building),
     room: data.room || null,
     spaceId: clean(data.spaceId, 180),
     uploadSummary: data.uploadSummary || null,
+    reconstructionSourceCaptureId: data.testRun?.reusesFrozenSourceManifest === true
+      ? clean(data.testRun.sourceCaptureId, 180) : '',
     quality: data.quality || null,
     failure: data.failure || null,
     review: data.review || null,
@@ -182,13 +181,27 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
   const createRealityCaptureDraft = functions.region('us-central1').https.onRequest(async (req, res) => {
     const auth = await guard(req, res);
     if (!auth) return;
+    if (req.body?.captureKind === 'interior_room' && auth.realityCaptureReconstruction !== true) {
+      return res.status(403).json({error: 'Room capture is not available in this release. Existing private photos are preserved.'});
+    }
     try {
       const authUser = await admin.auth().getUser(auth.uid);
+      if (auth.firebase?.sign_in_provider === 'anonymous') throw Error('authentication_required');
       const draft = createCaptureDraft(req.body || {}, actorFromAuth(auth, authUser));
       const ref = db.collection(CAPTURES).doc(draft.captureId);
       await db.runTransaction(async (transaction) => {
         const spaceRef = draft.spaceId ? db.collection(SPACES).doc(draft.spaceId) : null;
         const existing = spaceRef ? await transaction.get(spaceRef) : null;
+        const quotaRef = db.collection('captureAdmission').doc(auth.uid);
+        const quota = await transaction.get(quotaRef);
+        const globalQuotaRef = db.collection('captureAdmission').doc('_daily_total');
+        const globalQuota = await transaction.get(globalQuotaRef);
+        const day = new Date().toISOString().slice(0, 10);
+        const count = quota.data()?.day === day ? Number(quota.data().count || 0) : 0;
+        const total = globalQuota.data()?.day === day ? Number(globalQuota.data().count || 0) : 0;
+        if (count >= 8 || total >= 32) throw Error('daily_capture_capacity');
+        transaction.set(quotaRef, { day, count: count + 1 });
+        transaction.set(globalQuotaRef, { day, count: total + 1 });
         transaction.create(ref, { ...draft, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
         if (!spaceRef) return;
         if (existing.exists && existing.data()?.ownerUid !== auth.uid) throw new Error('space_owner_required');
@@ -217,6 +230,50 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     }
   });
 
+  const reserveRealityCapturePhoto = functions.region('us-central1').https.onRequest(async (req, res) => {
+    const auth = await guard(req, res);
+    if (!auth) return;
+    try {
+      const captureId = clean(req.body?.captureId, 180);
+      const photoId = clean(req.body?.photoId, 40);
+      if (!/^[\w-]{1,180}$/.test(captureId) || !/^[a-f0-9]{32}$/.test(photoId)) throw Error('invalid_photo_identity');
+      const ref = db.collection(CAPTURES).doc(captureId);
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists || snap.data().ownerUid !== auth.uid) throw Error('capture_not_found');
+        if (!['draft', 'uploading'].includes(snap.data().status)) throw Error('invalid_capture_state_transition');
+        const slots = snap.data().uploadSlots || {};
+        if (slots[`${photoId}.jpg`] === true) return;
+        if (Object.keys(slots).length >= 48) throw Error('too_many_photos');
+        slots[`${photoId}.jpg`] = true;
+        tx.update(ref, { uploadSlots: slots });
+      });
+      res.json({ reserved: true });
+    } catch (error) { sendKnownError(res, error); }
+  });
+
+  const retryRealityCapture = functions.region('us-central1').https.onRequest(async (req, res) => {
+    const auth = await guard(req, res);
+    if (!auth) return;
+    // Paid reconstruction is a development capability, not public admission.
+    // Only a trusted Firebase custom claim can grant it; request fields cannot.
+    if (auth.realityCaptureReconstruction !== true) return res.status(403).json({ error: '3D reconstruction is not publicly available. Your photos can still be used in the manual editor.' });
+    try {
+      const captureId = clean(req.body?.captureId, 180);
+      if (!/^[\w-]{1,180}$/.test(captureId)) throw Error('invalid_capture_id');
+      const ref = db.collection(CAPTURES).doc(captureId);
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists || snap.data().ownerUid !== auth.uid) throw Error('capture_not_found');
+        if (snap.data().status !== 'processing_failed') throw Error('invalid_capture_state_transition');
+        assertCaptureTransition(snap.data().status, 'queued');
+        if (!snap.data().inputManifest?.length) throw Error('validated_photos_required');
+        tx.update(ref, { status: 'queued', failure: FieldValue.delete(), queuedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+      });
+      res.json({ captureId, status: 'queued' });
+    } catch (error) { sendKnownError(res, error); }
+  });
+
   const listMyRealityCaptures = functions.region('us-central1').https.onRequest(async (req, res) => {
     const auth = await guard(req, res);
     if (!auth) return;
@@ -230,52 +287,145 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     }
   });
 
-  const finalizeRealityCaptureUpload = functions.region('us-central1').https.onRequest(async (req, res) => {
+  // A handoff URL identifies a capture; it is never a bearer credential.
+  const getMyRealityCapture = functions.region('us-central1').https.onRequest(async (req, res) => {
     const auth = await guard(req, res);
     if (!auth) return;
-    const captureId = clean(req.body?.captureId, 180);
-    const ref = db.collection(CAPTURES).doc(captureId);
     try {
+      const captureId = clean(req.body?.captureId, 180);
+      if (!/^[a-zA-Z0-9_-]{1,180}$/.test(captureId)) throw new Error('invalid_capture_id');
+      const snap = await db.collection(CAPTURES).doc(captureId).get();
+      if (!snap.exists || snap.data()?.ownerUid !== auth.uid) throw new Error('capture_not_found');
+      const prefix = `reality-captures/${auth.uid}/${captureId}/originals/`;
+      const capture = snap.data();
+      let photos;
+      if (Array.isArray(capture.inputManifest) && !['draft', 'uploading'].includes(capture.status)) {
+        // Submitted inputs are immutable. Progress polling must not relist the
+        // bucket and issue one metadata request per photo every 15 seconds.
+        photos = capture.inputManifest.slice(0, 48).filter(photo => photo.name?.startsWith(prefix) &&
+          /^[a-f0-9]{32}\.(jpg|webp)$/.test(photo.name.slice(prefix.length))).map(photo => ({
+          id: photo.name.slice(prefix.length).split('.')[0], path: photo.name,
+          sector: Number.isInteger(photo.sector) && photo.sector >= 0 && photo.sector < 8 ? photo.sector : -1
+        }));
+      } else {
+        const [files] = await bucket.getFiles({ prefix, maxResults: 49, autoPaginate: false });
+        photos = await Promise.all(files.slice(0, 49).filter((file) =>
+        /^[a-f0-9]{32}\.(jpg|webp)$/.test(file.name.slice(prefix.length))
+      ).map(async (file) => {
+        const [metadata] = await file.getMetadata();
+        const sector = Number(metadata.metadata?.sector);
+        return { id: file.name.slice(prefix.length).split('.')[0],
+          sector: Number.isInteger(sector) && sector >= 0 && sector < 8 ? sector : -1 };
+      }));
+      }
+      res.set('Cache-Control', 'private, no-store');
+      res.status(200).json({ capture: { ...serializeCapture(snap), captureId, ownerUid: auth.uid }, photos });
+    } catch (error) {
+      sendKnownError(res, error);
+    }
+  });
+
+  const saveRealityCaptureHybridPreview = functions.region('us-central1').https.onRequest(async (req,res)=>{
+    const auth=await guard(req,res); if(!auth)return;
+    try {
+      const captureId=clean(req.body?.captureId,180);
+      if(!/^[a-zA-Z0-9_-]{1,180}$/.test(captureId))throw Error('invalid_capture_id');
+      const ref=db.collection(CAPTURES).doc(captureId); let saved;
+      await db.runTransaction(async tx=>{
+        const snap=await tx.get(ref), capture=snap.data();
+        if(!snap.exists||capture.ownerUid!==auth.uid)throw Error('capture_not_found');
+        if(capture.status === 'deleting')throw Error('invalid_capture_state_transition');
+        saved=normalizeHybridPreview({...capture,captureId},req.body?.preview);
+        // Only private preview state changes. Existing processed assets, review,
+        // public representations, collision and canonical building stay intact.
+        const history=[...(capture.hybridHistory||[]),...(capture.hybridPreview?[capture.hybridPreview]:[])].slice(-10).map(encodeHybridPreview);
+        tx.update(ref,{hybridPreview:encodeHybridPreview(saved),hybridHistory:history,updatedAt:FieldValue.serverTimestamp()});
+      });
+      res.set('Cache-Control','private, no-store');res.status(200).json({preview:saved});
+    }catch(error){sendKnownError(res,error);}
+  });
+
+  const finalizeRealityCaptureUpload = functions.region('us-central1').runWith({ memory: '512MB', timeoutSeconds: 300, maxInstances: 2 }).https.onRequest(async (req, res) => {
+    const auth = await guard(req, res);
+    if (!auth) return;
+    const mode = req.body?.mode || 'manual';
+    if (!['manual', 'reconstruction'].includes(mode)) return res.status(422).json({ error: 'Invalid capture mode.' });
+    if (mode === 'reconstruction' && auth.realityCaptureReconstruction !== true) return res.status(403).json({ error: '3D reconstruction is not publicly available. Choose manual photo placement.' });
+    const captureId = clean(req.body?.captureId, 180);
+    let ref = null;
+    let validatedSnapshot = null;
+    try {
+      if (!captureId || captureId.includes('/')) throw new Error('invalid_capture_id');
+      ref = db.collection(CAPTURES).doc(captureId);
       const snap = await ref.get();
       if (!snap.exists) throw new Error('capture_not_found');
       const capture = snap.data() || {};
       if (capture.ownerUid !== auth.uid) throw new Error('capture_owner_required');
       if (!['draft', 'uploading'].includes(capture.status)) throw new Error('invalid_capture_state_transition');
-      if (capture.status === 'draft') {
-        assertCaptureTransition('draft', 'uploading');
-        await ref.set({ status: 'uploading', updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-      }
+      validatedSnapshot = snap;
+      if (capture.status === 'draft') assertCaptureTransition('draft', 'uploading');
       const prefix = `reality-captures/${auth.uid}/${captureId}/originals/`;
-      const [files] = await bucket.getFiles({ prefix });
-      const rows = [];
-      for (const file of files) {
-        const [metadata] = await file.getMetadata();
-        const contentType = clean(metadata.contentType, 80).toLowerCase();
-        const signature = await readObjectPrefix(file, 16);
-        if (!imageSignatureMatches(signature, contentType)) throw new Error('photo_signature_mismatch');
-        rows.push({
-          name: file.name,
-          size: Number(metadata.size),
-          contentType,
-          width: Number(metadata.metadata?.width || 0),
-          height: Number(metadata.metadata?.height || 0)
-        });
-      }
-      const uploadSummary = validateUploadedPhotoSet(capture, rows);
+      const [files] = await bucket.getFiles({ prefix, maxResults: 49, autoPaginate: false });
+      const manual = mode === 'manual';
+      if(manual && capture.captureKind !== 'exterior')throw Error('manual_exterior_required');
+      const { manifest: inputManifest, summary: uploadSummary } = await validateCaptureObjects(bucket, { ...capture, captureId }, files, {manual});
       assertCaptureTransition('uploading', 'uploaded');
-      await ref.set({ status: 'uploaded', uploadSummary, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
       assertCaptureTransition('uploaded', 'queued');
-      await ref.set({ status: 'queued', queuedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-      res.status(200).json({ captureId, status: 'queued', uploadSummary });
+      // Commit validation and queue admission together; never regress another
+      // finalizer, moderator or deletion that won while storage was being read.
+      await db.runTransaction(async (transaction) => {
+        const current = await transaction.get(ref);
+        if (!current.exists) throw new Error('capture_not_found');
+        if (current.data()?.ownerUid !== auth.uid) throw new Error('capture_owner_required');
+        if (!['draft', 'uploading'].includes(current.data()?.status) ||
+            current.updateTime?.isEqual(snap.updateTime) !== true) {
+          throw new Error('invalid_capture_state_transition');
+        }
+        transaction.update(ref, {
+          status: manual ? 'uploaded' : 'queued', uploadSummary, inputManifest,
+          ...(manual ? {} : {queuedAt: FieldValue.serverTimestamp()}), updatedAt: FieldValue.serverTimestamp()
+        });
+      });
+      res.status(200).json({ captureId, status: manual ? 'uploaded' : 'queued', uploadSummary });
     } catch (error) {
       console.error('[finalizeRealityCaptureUpload]', error);
-      if (captureId) await ref.set({
-        status: 'processing_failed',
-        failure: { code: clean(error?.message || error, 100), stage: 'upload_validation' },
-        updatedAt: FieldValue.serverTimestamp()
-      }, { merge: true }).catch(() => {});
+      if (validatedSnapshot) await db.runTransaction(async (transaction) => {
+        const current = await transaction.get(ref);
+        if (!current.exists || current.data()?.ownerUid !== auth.uid ||
+            !['draft', 'uploading'].includes(current.data()?.status) ||
+            current.updateTime?.isEqual(validatedSnapshot.updateTime) !== true) return;
+        transaction.update(ref, {
+          status: 'processing_failed',
+          failure: { code: clean(error?.message || error, 100), stage: 'upload_validation' },
+          updatedAt: FieldValue.serverTimestamp()
+        });
+      }).catch(() => {});
       sendKnownError(res, error);
     }
+  });
+
+  const submitRealityCaptureHybrid = functions.region('us-central1').runWith({memory:'1GB',timeoutSeconds:120,maxInstances:2}).https.onRequest(async(req,res)=>{
+    const auth=await guard(req,res);if(!auth)return;
+    try{
+      const captureId=clean(req.body?.captureId,180);if(!/^[a-zA-Z0-9_-]{1,180}$/.test(captureId))throw Error('invalid_capture_id');
+      const ref=db.collection(CAPTURES).doc(captureId),snap=await ref.get(),capture={...snap.data(),captureId};
+      if(!snap.exists||capture.ownerUid!==auth.uid)throw Error('capture_not_found');
+      if(req.body?.consent!==true)throw Error('public_contribution_permission_required');
+      if(!['uploaded','processing_failed','review_required','rejected','approved'].includes(capture.status))throw Error('invalid_capture_state_transition');
+      if(capture.hybridPreview?.revision!==req.body?.revision)throw Error('hybrid_state_transition_conflict');
+      if(capture.hybridSubmission?.revision===req.body.revision)return res.status(200).json({status:capture.hybridSubmission.status,revision:req.body.revision,existing:true});
+      const preview=normalizeHybridPreview(capture,{...decodeHybridPreview(capture.hybridPreview),baseRevision:capture.hybridPreview.revision});
+      preview.revision=capture.hybridPreview.revision;
+      if(!preview.patches.length)throw Error('photo_patch_required');
+      const bytes=await createPatchGlb(capture,preview,async p=>(await bucket.file(p.name,{generation:p.generation}).download())[0]);
+      const digest=require('node:crypto').createHash('sha256').update(bytes).digest('hex');
+      const modelPath=`reality-captures/${auth.uid}/${captureId}/processed/manual-v1/r${preview.revision}-${digest.slice(0,16)}/capture.glb`;
+      const file=bucket.file(modelPath);try{await file.save(bytes,{resumable:false,preconditionOpts:{ifGenerationMatch:0},metadata:{contentType:'model/gltf-binary',cacheControl:'private,no-store'}});}catch(e){if(Number(e.code)!==412)throw e;}
+      const [metadata]=await file.getMetadata();
+      const submission={revision:preview.revision,status:'review_required',kind:'facade-patches',modelPath,modelGeneration:String(metadata.generation),sha256:digest,footprintSignature:preview.footprintSignature,footprint:capture.building.spatialContext.footprint,heightMeters:preview.heightMeters,patches:preview.patches,submittedAtMs:Date.now()};
+      await db.runTransaction(async tx=>{const now=await tx.get(ref);if(!now.exists||!snap.updateTime.isEqual(now.updateTime))throw Error('hybrid_state_transition_conflict');tx.update(ref,{hybridSubmission:encodeHybridPreview(submission),status:'review_required',publicContributionRequested:true,updatedAt:FieldValue.serverTimestamp()});});
+      res.status(200).json({status:'review_required',revision:preview.revision});
+    }catch(e){sendKnownError(res,e);}
   });
 
   const deleteRealityCapture = functions.region('us-central1').https.onRequest(async (req, res) => {
@@ -284,10 +434,20 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     const captureId = clean(req.body?.captureId, 180);
     try {
       const ref = db.collection(CAPTURES).doc(captureId);
-      const snap = await ref.get();
-      if (!snap.exists) throw new Error('capture_not_found');
-      const capture = snap.data() || {};
-      if (!isDeletableByOwner(capture, auth.uid)) throw new Error(capture.status === 'approved' ? 'approved_capture_admin_workflow_required' : 'capture_owner_required');
+      let capture;
+      // Claim deletion before touching Storage. Approval/submission transactions
+      // observe the tombstone and cannot publish files being removed. Published
+      // revisions remain protected even while a newer revision awaits review.
+      await db.runTransaction(async tx => {
+        const snap = await tx.get(ref);
+        if (!snap.exists) throw new Error('capture_not_found');
+        capture = snap.data() || {};
+        if (!isDeletableByOwner(capture, auth.uid)) throw new Error(capture.status === 'approved' ? 'approved_capture_admin_workflow_required' : 'capture_owner_required');
+        const published = await tx.get(db.collection(REPRESENTATIONS).where('captureId', '==', captureId).limit(1));
+        const space = capture.spaceId ? await tx.get(db.collection(SPACES).doc(capture.spaceId)) : null;
+        if (!published.empty || space?.data()?.captureId === captureId) throw Error('approved_capture_admin_workflow_required');
+        tx.update(ref, {status: 'deleting', updatedAt: FieldValue.serverTimestamp()});
+      });
       const [files] = await bucket.getFiles({ prefix: `reality-captures/${auth.uid}/${captureId}/` });
       await Promise.all(files.map((file) => file.delete({ ignoreNotFound: true })));
       let deletedRelatedDocuments = 0;
@@ -386,7 +546,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
         if (!captureSnap.exists) continue;
         const capture = captureSnap.data() || {};
         if (capture.status !== 'approved' || !capture.processed?.optimizedModelPath) continue;
-        const file = bucket.file(capture.processed.optimizedModelPath);
+        const file = bucket.file(capture.processed.optimizedModelPath,capture.processed.modelGeneration?{generation:capture.processed.modelGeneration}:undefined);
         const [exists] = await file.exists();
         if (!exists) continue;
         const expiresAtMs = Date.now() + SIGNED_URL_TTL_MS;
@@ -437,7 +597,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       });
       if (!match) return res.status(200).json({ available: false });
       const representation = match.data() || {};
-      const file = bucket.file(representation.modelPath);
+      const file = bucket.file(representation.modelPath,representation.modelGeneration?{generation:representation.modelGeneration}:undefined);
       const [exists] = await file.exists();
       if (!exists) return res.status(200).json({ available: false, reason: 'approved_asset_missing' });
       const expiresAtMs = Date.now() + 10 * 60 * 1000;
@@ -464,7 +624,14 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     try {
       const worldId = clean(req.body?.worldId, 220);
       if (!worldId) throw new Error('canonical_building_required');
-      const snapshot = await db.collection(REPRESENTATIONS)
+      const sourceIds=req.body?.sourceBuildingIds;
+      if(sourceIds!==undefined && (!Array.isArray(sourceIds)||sourceIds.length>60||sourceIds.some(id=>typeof id!=='string'||!id||id.length>220)))throw Error('invalid_building_ids');
+      let snapshot;
+      if(sourceIds?.length){
+        const ids=[...new Set(sourceIds)],pages=[];
+        for(let i=0;i<ids.length;i+=30)pages.push(await db.collection(REPRESENTATIONS).where('canonicalBuilding.sourceBuildingId','in',ids.slice(i,i+30)).limit(120).get());
+        snapshot={docs:pages.flatMap(page=>page.docs).filter(row=>row.data().status==='approved'&&row.data().visibility==='public')};
+      }else snapshot = await db.collection(REPRESENTATIONS)
         .where('canonicalBuilding.worldId', '==', worldId)
         .where('status', '==', 'approved')
         .where('visibility', '==', 'public')
@@ -474,13 +641,25 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       for (const row of snapshot.docs) {
         const data = row.data() || {};
         if (data.captureKind !== 'exterior' || !data.modelPath) continue;
-        const file = bucket.file(data.modelPath);
+        let patchHeightMeters = data.patchHeightMeters;
+        // Legacy approved wall revisions predate an explicit height field.
+        // Read their exact matching submission; never guess from a partial mesh.
+        if (data.representationKind === 'facade-patches' && !patchHeightMeters && data.captureId) {
+          const source = await db.collection(CAPTURES).doc(data.captureId).get();
+          const submitted = source.data()?.hybridSubmission;
+          if (submitted?.modelPath === data.modelPath && submitted.revision === data.revision) patchHeightMeters = submitted.heightMeters;
+        }
+        const file = bucket.file(data.modelPath,data.modelGeneration?{generation:data.modelGeneration}:undefined);
         const [exists] = await file.exists();
         if (!exists) continue;
         const expiresAtMs = Date.now() + 10 * 60 * 1000;
         const [url] = await file.getSignedUrl({ version: 'v4', action: 'read', expires: expiresAtMs });
         representations.push({
           representationId: row.id,
+          representationKind: data.representationKind || 'complete-model',
+          revision: data.revision || 0,
+          footprint: data.representationKind === 'facade-patches' ? data.footprint : null,
+          patchHeightMeters: patchHeightMeters || null,
           sourceBuildingId: clean(data.canonicalBuilding?.sourceBuildingId, 220),
           model: { url, expiresAtMs },
           alignment: data.alignment || null,
@@ -488,7 +667,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
           processingPipelineVersion: data.processingPipelineVersion
         });
       }
-      res.set('Cache-Control', 'private, max-age=120');
+      res.set('Cache-Control', 'private, no-store');
       res.status(200).json({ worldId, representations });
     } catch (error) {
       console.error('[listApprovedExteriorRepresentations]', error);
@@ -510,7 +689,13 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       if (action === 'set_mode') {
         const accessMode = clean(req.body?.accessMode, 32).toUpperCase();
         if (!ACCESS_MODES.includes(accessMode)) throw new Error('invalid_access_mode');
-        await spaceRef.set({ accessMode, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+        await db.runTransaction(async tx => {
+          const current = await tx.get(spaceRef);
+          if (!current.exists || current.data()?.ownerUid !== auth.uid) throw Error('space_owner_required');
+          const value = current.data();
+          if (accessMode === 'PUBLIC' && (!value.captureId || value.publicApproval?.captureId !== value.captureId)) throw Error('interior_public_review_required');
+          tx.update(spaceRef, { accessMode, updatedAt: FieldValue.serverTimestamp() });
+        });
         res.status(200).json({ spaceId, accessMode });
         return;
       }
@@ -518,7 +703,11 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       if (!targetUid || targetUid === auth.uid) throw new Error('invalid_guest_identity');
       const memberRef = spaceRef.collection('members').doc(targetUid);
       if (action === 'revoke') {
-        await memberRef.delete();
+        // Preserve a revocation fence so an older temporary grant cannot revive
+        // access, even if a concurrent request still holds its previous record.
+        await memberRef.set({ uid: targetUid, active: false, revokedAtMs: Date.now() }, { merge: true });
+        await deleteQueryDocuments(db, spaceRef.collection('sessionGrants').where('uid', '==', targetUid));
+        await deleteQueryDocuments(db, spaceRef.collection('oneTimeGrants').where('uid', '==', targetUid));
         res.status(200).json({ spaceId, targetUid, revoked: true });
         return;
       }
@@ -586,7 +775,8 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       if (accessRequest.status !== 'pending') throw new Error('access_request_already_decided');
       const spaceRef = db.collection(SPACES).doc(accessRequest.spaceId);
       if (decision === 'allow_once') {
-        await spaceRef.collection('oneTimeGrants').doc(stableId('once', requestId)).set({ uid: accessRequest.requesterUid, active: true, createdAt: FieldValue.serverTimestamp() });
+        await spaceRef.collection('oneTimeGrants').doc(stableId('once', requestId)).set({ uid: accessRequest.requesterUid,
+          active: true, createdAtMs: Date.now(), expiresAtMs: Date.now() + 5 * 60_000, createdAt: FieldValue.serverTimestamp() });
       } else if (decision === 'allow_session') {
         const requestedRoomId = clean(accessRequest.roomId, 180);
         if (!requestedRoomId || (roomId && roomId !== requestedRoomId)) throw new Error('room_required_for_session_access');
@@ -605,6 +795,8 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
           uid: accessRequest.requesterUid,
           roomId: requestedRoomId,
           active: true,
+          createdAtMs: Date.now(),
+          expiresAtMs: Date.now() + 2 * 60 * 60_000,
           createdAt: FieldValue.serverTimestamp()
         });
       } else if (decision === 'add_guest') {
@@ -634,29 +826,37 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       const snap = await ref.get();
       if (!snap.exists) throw new Error('capture_not_found');
       const capture = snap.data() || {};
+      const hybrid = capture.hybridSubmission?.status === 'review_required' ? capture.hybridSubmission : null;
+      if(hybrid && req.body?.revision !== hybrid.revision)throw Error('hybrid_state_transition_conflict');
       assertCaptureTransition(capture.status, decision);
-      if (decision === 'approved' && !clean(capture.processed?.optimizedModelPath, 500)) {
+      if (decision === 'approved' && !clean(hybrid?.modelPath || capture.processed?.optimizedModelPath, 500)) {
         throw new Error('processed_asset_required_for_approval');
       }
+      if(hybrid && decision==='approved' && !(await bucket.file(hybrid.modelPath,{generation:hybrid.modelGeneration}).exists())[0])throw Error('asset_not_found');
       const review = {
         decision,
         note: multiline(req.body?.note, 400),
-        alignment: normalizeReviewedAlignment(req.body?.alignment || {}, capture.captureKind),
+        alignment: normalizeReviewedAlignment(hybrid ? {} : req.body?.alignment || {}, capture.captureKind),
         moderatorUid: moderator.auth.uid,
         moderatorName: moderator.displayName,
         reviewedAt: FieldValue.serverTimestamp()
       };
-      const batch = db.batch();
-      batch.set(ref, { status: decision, review, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      const writes = [[ref, { status: decision, review, ...(hybrid?{hybridSubmission:{...hybrid,status:decision}}:{}), updatedAt: FieldValue.serverTimestamp() }]];
       let representationId = '';
       if (decision === 'approved' && capture.captureKind === 'exterior' && capture.publicContributionRequested === true) {
-        representationId = stableId('representation', capture.building?.worldId, capture.building?.sourceBuildingId, capture.processingPipelineVersion);
-        batch.set(db.collection(REPRESENTATIONS).doc(representationId), {
+        // A single observed wall must never hide the full mapped building. The
+        // existing publication format replaces whole exteriors, not facade patches.
+        if (capture.exteriorScope === 'facade' && !hybrid) throw new Error('facade_patch_registration_required');
+        representationId = hybrid ? stableId('patch-representation',capture.building?.sourceBuildingId,captureId) : stableId('representation', capture.building?.worldId, capture.building?.sourceBuildingId, capture.processingPipelineVersion);
+        writes.push([db.collection(REPRESENTATIONS).doc(representationId), {
           representationId,
           captureId,
           captureKind: 'exterior',
           canonicalBuilding: capture.building,
-          modelPath: capture.processed?.optimizedModelPath || '',
+          modelPath: hybrid?.modelPath || capture.processed?.optimizedModelPath || '',
+          modelGeneration:hybrid?.modelGeneration || capture.processed?.modelGeneration || '',
+          sha256:hybrid?.sha256 || capture.processed?.sha256 || '',
+          ...(hybrid?{representationKind:'facade-patches',revision:hybrid.revision,modelGeneration:hybrid.modelGeneration,footprint:hybrid.footprint,patchHeightMeters:hybrid.heightMeters,patchCount:hybrid.patches.length}:{}),
           alignment: review.alignment,
           status: 'approved',
           visibility: 'public',
@@ -664,20 +864,50 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
           processingPipelineVersion: capture.processingPipelineVersion,
           approvedAt: FieldValue.serverTimestamp(),
           approvedBy: moderator.auth.uid
-        }, { merge: true });
+        }]);
       }
       if (decision === 'approved' && capture.captureKind === 'interior_room' && capture.spaceId) {
-        batch.set(db.collection(SPACES).doc(capture.spaceId), {
+        writes.push([db.collection(SPACES).doc(capture.spaceId), {
           captureId,
+          publicApproval: capture.publicContributionRequested === true ? {
+            captureId,
+            modelPath: capture.processed.optimizedModelPath,
+            modelGeneration: capture.processed.modelGeneration || '',
+            moderatorUid: moderator.auth.uid
+          } : null,
           pendingCaptureId: FieldValue.delete(),
           updatedAt: FieldValue.serverTimestamp()
-        }, { merge: true });
+        }]);
       }
-      await batch.commit();
+      await db.runTransaction(async tx => {
+        const current = await tx.get(ref);
+        if (!current.exists || !snap.updateTime.isEqual(current.updateTime)) throw Error('invalid_capture_state_transition');
+        assertCaptureTransition(current.data().status, decision);
+        if(hybrid && decision==='approved'){
+          const manifestRef=db.collection('buildingPatchManifests').doc(stableId('building-patches',capture.building.sourceBuildingId));
+          const manifest=await tx.get(manifestRef),previous=manifest.exists?manifest.data().regions||[]:[];
+          const regions=hybrid.patches.map(p=>{const a=hybrid.footprint[p.wall],b=hybrid.footprint[(p.wall+1)%hybrid.footprint.length];const one=[a.x,a.z].map(n=>n.toFixed(2)).join(','),two=[b.x,b.z].map(n=>n.toFixed(2)).join(',');return {captureId,edge:[one,two].sort().join('|'),left:one<two?p.region[0]:1-p.region[2],right:one<two?p.region[2]:1-p.region[0],bottom:p.region[1]*hybrid.heightMeters,top:p.region[3]*hybrid.heightMeters};});
+          const retained=previous.filter(p=>p.captureId!==captureId);
+          if(retained.some(a=>regions.some(b=>a.edge===b.edge && Math.min(a.right,b.right)-Math.max(a.left,b.left)>.001 && Math.min(a.top,b.top)-Math.max(a.bottom,b.bottom)>.01)))throw Error('approved_patch_overlap_requires_resolution');
+          if(retained.length+regions.length>128)throw Error('building_patch_budget_exceeded');
+          writes.push([manifestRef,{sourceBuildingId:capture.building.sourceBuildingId,regions:[...retained,...regions],updatedAt:FieldValue.serverTimestamp()}]);
+        }
+        if (decision === 'approved' && capture.captureKind === 'interior_room' && capture.spaceId) {
+          const space = await tx.get(db.collection(SPACES).doc(capture.spaceId));
+          if (!space.exists || space.data().ownerUid !== capture.ownerUid || space.data().pendingCaptureId !== captureId) {
+            throw Error('invalid_capture_state_transition');
+          }
+        }
+        for (const [target, patch] of writes) tx.set(target, patch, { merge: true });
+      });
       await logAdminActivity({
         actorUid: moderator.auth.uid, actorName: moderator.displayName,
         actionType: `reality_capture.${decision}`, targetType: 'reality_capture', targetId: captureId,
         title: `Reality capture ${decision}`, summary: clean(capture.building?.label || captureId, 140)
+      }).catch(error => {
+        // Publication is already committed. Never report it as failed because
+        // the secondary activity feed is unavailable; review remains durable.
+        console.error('[realityCaptureActivityAfterCommit]', captureId, error?.code || 'activity_log_failed');
       });
       res.status(200).json({ captureId, status: decision, representationId });
     } catch (error) {
@@ -726,12 +956,14 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
         thumbnails.push({ name: file.name.split('/').pop(), url, expiresAtMs });
       }
       let model = null;
-      if (capture.processed?.optimizedModelPath) {
-        const file = bucket.file(capture.processed.optimizedModelPath);
+      const reviewPath=capture.hybridSubmission?.modelPath || capture.processed?.optimizedModelPath;
+      if (reviewPath) {
+        const generation=capture.hybridSubmission?.modelGeneration||capture.processed?.modelGeneration;
+        const file = bucket.file(reviewPath,generation?{generation}:undefined);
         const [exists] = await file.exists();
         if (exists) {
           const [url] = await file.getSignedUrl({ version: 'v4', action: 'read', expires: expiresAtMs });
-          model = { url, expiresAtMs, path: capture.processed.optimizedModelPath };
+          model = { url, expiresAtMs, path: reviewPath };
         }
       }
       res.set('Cache-Control', 'private, no-store');
@@ -748,14 +980,18 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     try {
       const captureId = clean(req.body?.captureId, 180);
       const assetKind = clean(req.body?.assetKind || 'processed', 30).toLowerCase();
+      if (!['original', 'processed'].includes(assetKind)) throw new Error('asset_access_denied');
       const captureSnap = await db.collection(CAPTURES).doc(captureId).get();
       if (!captureSnap.exists) throw new Error('capture_not_found');
       const capture = captureSnap.data() || {};
       let allowed = capture.ownerUid === auth.uid;
+      // Viewing a published representation never grants access to source photos.
+      if (assetKind === 'original' && !allowed) throw new Error('asset_access_denied');
+      if (!allowed && capture.status !== 'approved') throw new Error('asset_access_denied');
       if (!allowed && capture.captureKind === 'interior_room' && capture.spaceId) {
         const spaceSnap = await db.collection(SPACES).doc(capture.spaceId).get();
         const memberSnap = await db.collection(SPACES).doc(capture.spaceId).collection('members').doc(auth.uid).get();
-        allowed = spaceSnap.exists && resolveSpaceAccess({
+        allowed = spaceSnap.exists && spaceSnap.data()?.captureId === captureId && resolveSpaceAccess({
           space: spaceSnap.data(), requesterUid: auth.uid,
           member: memberSnap.exists ? memberSnap.data() : null
         }).allowed;
@@ -763,12 +999,22 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       if (!allowed && !(capture.captureKind === 'exterior' && capture.status === 'approved' && capture.publicContributionRequested === true)) {
         throw new Error('asset_access_denied');
       }
+      // Approving wall patches does not approve the separate reconstruction.
+      const approvedHybrid = capture.ownerUid !== auth.uid && capture.hybridSubmission?.status === 'approved'
+        ? capture.hybridSubmission : null;
       const path = assetKind === 'original'
         ? clean(req.body?.path, 500)
-        : clean(capture.processed?.optimizedModelPath, 500);
-      const expectedPrefix = `reality-captures/${capture.ownerUid}/${captureId}/`;
-      if (!path.startsWith(expectedPrefix)) throw new Error('asset_access_denied');
-      const file = bucket.file(path);
+        : clean(approvedHybrid?.modelPath || capture.processed?.optimizedModelPath, 500);
+      const expectedPrefix = `reality-captures/${capture.ownerUid}/${captureId}/${assetKind === 'original' ? 'originals' : 'processed'}/`;
+      if (!path.startsWith(expectedPrefix) || path.split('/').some((part) => part === '..' || part === '.') || path.includes('\\')) {
+        throw new Error('asset_access_denied');
+      }
+      if (assetKind === 'original' && !/^[a-f0-9]{32}\.(jpg|webp)$/.test(path.slice(expectedPrefix.length))) {
+        throw new Error('asset_access_denied');
+      }
+      const source = assetKind === 'original' ? capture.inputManifest?.find(item => item.name === path) : {generation:approvedHybrid?.modelGeneration || capture.processed?.modelGeneration};
+      if (assetKind === 'original' && capture.inputManifest?.length && !source?.generation) throw Error('asset_access_denied');
+      const file = bucket.file(path, source?.generation ? {generation:source.generation} : undefined);
       const [exists] = await file.exists();
       if (!exists) throw new Error('asset_not_found');
       const expiresAtMs = Date.now() + SIGNED_URL_TTL_MS;
@@ -783,6 +1029,11 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
 
   return {
     createRealityCaptureDraft,
+    reserveRealityCapturePhoto,
+    retryRealityCapture,
+    getMyRealityCapture,
+    saveRealityCaptureHybridPreview,
+    submitRealityCaptureHybrid,
     decidePrivateSpaceAccessRequest,
     deleteRealityCapture,
     finalizeRealityCaptureUpload,

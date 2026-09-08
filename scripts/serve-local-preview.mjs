@@ -40,7 +40,8 @@ const mime = new Map([
   ['.webp', 'image/webp'],
   ['.ico', 'image/x-icon'],
   ['.map', 'application/json; charset=utf-8'],
-  ['.glb', 'model/gltf-binary']
+  ['.glb', 'model/gltf-binary'],
+  ['.wasm', 'application/wasm']
 ]);
 
 async function exists(filePath) {

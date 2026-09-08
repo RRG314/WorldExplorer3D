@@ -140,7 +140,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'augmented-reality', category: 'presentation',
         load: async () => {
-            const mod = await import('./ar/session-service.js?v=9');
+            const mod = await import('./ar/session-service.js?v=10');
             mod.initArPlatform?.(appCtx);
             return mod;
         }
