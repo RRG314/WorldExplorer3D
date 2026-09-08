@@ -150,10 +150,19 @@ export function applyWorldCoverSurfaceMaterialMix(mesh, result) {
 
 export function setTerrainSurfaceMaterialMixAt(attributes, index, mode) {
   if (!attributes?.mixA || !attributes?.mixB) return false;
-  const mix = terrainSurfaceMixForClass(terrainSurfaceClassForMappedMode(mode));
+  const mix = terrainSurfaceMixForProfile(mode);
   setNormalizedTerrainAttribute(attributes.mixA, index, mix.mixA);
   setNormalizedTerrainAttribute(attributes.mixB, index, mix.mixB);
   return true;
+}
+
+// Mixed alpine snow is a real material combination, not an unknown mode
+// falling through to the base (which may itself be a rock texture).
+export function terrainSurfaceMixForProfile(mode = 'grass') {
+  if (String(mode).toLowerCase() === 'snowrock') {
+    return {mixA: [0, 0, 0, 0], mixB: [0.35, 0.65]};
+  }
+  return terrainSurfaceMixForClass(terrainSurfaceClassForMappedMode(mode));
 }
 
 export function applyTerrainProfileSurfaceMaterialMix(mesh, mode = 'grass') {
@@ -162,7 +171,7 @@ export function applyTerrainProfileSurfaceMaterialMix(mesh, mode = 'grass') {
   const attributes = ensureTerrainSurfaceMixAttributes(geometry);
   if (!positions || !attributes) return 0;
   const surfaceClass = terrainSurfaceClassForMappedMode(mode);
-  const mix = terrainSurfaceMixForClass(surfaceClass);
+  const mix = terrainSurfaceMixForProfile(mode);
   const colors = geometry.attributes.color;
   for (let index = 0; index < positions.count; index += 1) {
     setNormalizedTerrainAttribute(attributes.mixA, index, mix.mixA);

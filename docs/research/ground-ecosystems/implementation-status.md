@@ -3,6 +3,29 @@
 The research plan is not fully implemented. This is local work, not a production
 acceptance statement. No hosting deployment was performed.
 
+## Antarctic snow and material fallback
+
+The September 8 Antarctic report at -83.1664,-99.4784 exposed a material
+contract defect: polar latitude unconditionally selected snowRock, the registered
+texture resolved that to rock, and snowRock had no semantic blend mapping.
+Flat polar fallback now selects snow; mixed alpine snowRock explicitly retains
+65% snow / 35% rock rather than falling through to the base texture. This is
+representative fallback styling, not a measured snow-coverage percentage.
+Distant terrain now publishes its selected fallback material when WorldCover
+is unavailable, before applying any exact mapped surface overrides.
+
+ESA WorldCover excludes Antarctica, so satellite land-cover recovery cannot fix
+this location: https://worldcover2021.esa.int/data/docs/WorldCover_PUM_V2.0.pdf
+The existing polar fallback is not surveyed Antarctic elevation or seasonal
+snow mapping. Ground geometry, road grading and water ownership were not changed.
+17 focused biome/material, categorical-data and road checks pass. These cover
+all supported land-cover class mappings, not every location on Earth.
+Actual Antarctic gameplay was inspected after loading and again after a 15-second
+settling interval: snow remains visible rather than the gravel fallback.
+Evidence: output/verification/antarctica-snow-final. The flat surface reflects
+the existing polar elevation limitation; this fix does not claim to add a
+surveyed Antarctic elevation provider. Local production-service CORS remains.
+
 ## Cross-location terrain corruption
 
 Reproduced the user's Niger terraces through the actual Main Menu transition

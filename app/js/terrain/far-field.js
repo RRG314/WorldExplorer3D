@@ -40,7 +40,8 @@ import {
   applyWorldCoverSurfaceMaterialMix,
   setNormalizedTerrainAttribute,
   ensureTerrainSurfaceMixAttributes,
-  setTerrainSurfaceMaterialMixAt
+  setTerrainSurfaceMaterialMixAt,
+  applyTerrainProfileSurfaceMaterialMix
 } from './surface-material-blend.js?v=2';
 import { resolveWorldCoverDetailMode } from './worldcover-detail-mode.js?v=1';
 import {
@@ -268,6 +269,7 @@ function createFarFieldTerrainApi(deps = {}) {
       ? applyWorldCoverVertexTints(mesh, worldCoverResult)
       : false;
     if (worldCoverResult) applyWorldCoverSurfaceMaterialMix(mesh, worldCoverResult);
+    else applyTerrainProfileSurfaceMaterialMix(mesh, detailMode);
     applyMappedSurfaceTintOwnership(mesh);
     applyTerrainSemanticMaterialBlend(mesh, repeats);
     material.color.setHex(0xffffff);
