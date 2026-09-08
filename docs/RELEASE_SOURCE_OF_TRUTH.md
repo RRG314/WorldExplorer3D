@@ -1,5 +1,27 @@
 # One working branch, two deployment environments
 
+## September 8 production publication
+
+With owner approval, production Hosting now serves
+`5.2.0+1207f341322a.ea1852a7d5fd7648.production`. The live manifest confirms clean
+source `1207f341322a`; later documentation and promotion-tool commits do not
+change that artifact. The camera build includes the inspected East Pratt views.
+
+Production now has its own domain-restricted Enterprise App Check registration,
+Firebase Storage bucket in us-central1, 20 capture handlers and current access
+rules. Billing handlers and paid reconstruction workers were not deployed.
+The existing approved manual house was promoted from staging: 50 objects
+(48 originals and two derivatives), 97,725,447 bytes, and three capture/
+representation/patch-manifest records. Destination objects matched source size,
+CRC32C and MD5, with no permanent download tokens. Ownership paths and object
+generations were remapped to the existing production account. Staging is intact.
+
+Live photo-workflow verification initially found missing cross-service Storage
+rule permissions; the Storage service agent now has its prescribed Firestore
+rules role. The backend can sign short-lived media URLs as its own service account.
+Current live verification and repository integration status belong in the release
+audit. Earlier reconciliation entries below are historical, not current blockers.
+
 Reconciled September 7, 2026 against `c226b291`.
 
 ## Current candidate update

@@ -1,5 +1,23 @@
 # Production audit — September 8
 
+## Owner-authorized publication
+
+Production Hosting deployment completed and its public manifest was checked:
+`5.2.0+1207f341322a.ea1852a7d5fd7648.production`. This is publication authorization,
+not a claim that every worldwide/device quality gate below has passed.
+Production App Check and Storage have been provisioned; the twenty capture
+handlers and Firestore/Storage rules are deployed. The approved house's media
+and three publication records were copied with checksums and owner/generation
+remapping. Original staging records remain intact. Forty-five focused capture
+security/hybrid/camera tests pass. A live production photo test is being completed
+after correcting the missing Storage-to-Firestore rules role.
+
+The entries below record findings during preparation; App Check provisioning
+and the selected house migration are no longer pending. Physical Android,
+complex tunnel passage, cold-start latency and global visual completeness remain
+known limits. GitHub source publication uses the repository's protected-branch PR
+workflow; production is deployed directly through Firebase, not GitHub.
+
 Status: incomplete, not release approval. Camera/snow candidate
 5.2.0+0761b370b3e7.abd395f67b79e0b9.production is served locally on port 4198.
 No production deployment or main/stable update performed.
