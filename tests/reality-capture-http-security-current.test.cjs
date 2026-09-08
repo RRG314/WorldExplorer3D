@@ -88,6 +88,11 @@ function harness(t, capture = base, extras = {}) {
   return { call, bucket, records, reads, fileRequests, writes, mutate, hooks, authClaims };
 }
 
+test('public users cannot start roadmap-only room captures',async t=>{
+  const h=harness(t);
+  assert.equal((await h.call('createRealityCaptureDraft','owner',{captureKind:'interior_room'})).code,403);
+  assert.equal(h.writes.length,0);
+});
 test('pending edits cannot delete an earlier published representation',async t=>{
   const h=harness(t,{...base,status:'review_required'}, {'buildingRepresentations/published':{captureId:id,status:'approved'}});
   let touched=false;h.bucket.getFiles=async()=>{touched=true;return [[]];};

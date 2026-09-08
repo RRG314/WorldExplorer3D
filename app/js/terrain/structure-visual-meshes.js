@@ -174,6 +174,10 @@ export function shouldPublishTunnelShellSection(shell, section, segmentDistance)
   return !side || !tunnelWallIsOpen(shell, side, segmentDistance);
 }
 
+export function portalCopingHeight(archY, terrainY) {
+  return Math.max(archY, Number.isFinite(terrainY) ? terrainY + 0.08 : archY);
+}
+
 function buildTunnelShellMeshForContext(appCtx, shellDescriptors = []) {
   if (!Array.isArray(shellDescriptors) || shellDescriptors.length === 0 || typeof THREE === "undefined") return null;
   const positions = [];
@@ -253,15 +257,19 @@ function buildTunnelShellMeshForContext(appCtx, shellDescriptors = []) {
       const nx = -ring.tangentZ;
       const nz = ring.tangentX;
       const thickness = Math.max(0.35, shell.roofThickness);
-      const copingY = Math.max(ring.y + shell.clearance + thickness,
-        ...(ring.terrainHeights || []).filter(Number.isFinite).map(y => y + 0.08));
       const frameVertices = [];
       for (const depth of [-0.18, 0.18]) {
         for (const outer of [0, 1]) {
           for (let j = 0; j < sectionSize; j += 1) {
             const lateral = lateralFactors[j] * (shell.halfWidth + outer * thickness);
             const archY = ring.y + heightFactors[j] * (shell.clearance + outer * thickness);
-            const topY = outer && j > 0 && j < sectionSize - 1 ? copingY : archY;
+            // Match this part of the portal to its own ground sample. Using
+            // the maximum across the mouth made the downhill side a giant
+            // rectangular wall on cross-slopes. Never intrude into clearance.
+            const terrainY = ring.terrainHeights?.[j];
+            const topY = outer && j > 0 && j < sectionSize - 1
+              ? portalCopingHeight(archY, terrainY)
+              : archY;
             frameVertices.push([ring.x + nx * lateral + ring.tangentX * depth,
               topY,
               ring.z + nz * lateral + ring.tangentZ * depth]);

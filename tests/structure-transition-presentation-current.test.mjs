@@ -3,11 +3,20 @@ import assert from 'node:assert/strict';
 import { compileTransportSurfaceModel } from '../app/js/world/compiler/transport-surface-model.js';
 import { compileTunnelSystemModels, compileTunnelSystemModel } from '../app/js/world/compiler/tunnel-system-model.js';
 import { tunnelWallIsOpen } from '../app/js/world/compiler/tunnel-junction-openings.js';
-import { shouldPublishTunnelShellSection } from '../app/js/terrain/structure-visual-meshes.js';
+import { shouldPublishTunnelShellSection, portalCopingHeight } from '../app/js/terrain/structure-visual-meshes.js';
 import { compileStructureColliderDescriptors } from '../app/js/world/structure-colliders.js';
 import { sampleStructureAssemblyThicknessAt } from '../app/js/world/compiler/transport-structure-assembly.js';
 import { buildTransportJunctionProfileAnchors } from '../app/js/world/compiler/transport-junction-profile.js';
 import { sampleFeatureSurfaceY } from '../app/js/structure-semantics.js';
+
+test('portal coping follows cross-slope locally without shrinking the clearance arch',()=>{
+  assert.equal(portalCopingHeight(4.8,3),4.8);
+  assert.equal(portalCopingHeight(4.8,12),12.08);
+  assert.equal(portalCopingHeight(4.8,NaN),4.8);
+  const terrain=[12,9,5,3,2];
+  const heights=terrain.map(y=>portalCopingHeight(4.8,y));
+  assert.deepEqual(heights,[12.08,9.08,5.08,4.8,4.8]);
+});
 
 function road(id, pts, layer = -1) {
   const result = { sourceFeatureId: id, width: 8, pts,

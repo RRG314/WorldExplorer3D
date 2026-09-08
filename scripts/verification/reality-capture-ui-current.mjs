@@ -239,19 +239,11 @@ try {
   await returning.context().close();
   captures.get('capture-1').status = 'queued';
   delete captures.get('capture-1').processed;
-  // An exterior handoff must not strand the desktop user: a separate room can still be started.
-  await desktop.click('[data-capture-kind="interior_room"]');
-  await desktop.locator('.realityCaptureRoom').waitFor({ state: 'visible' });
-  await desktop.fill('[data-room-label]', 'Kitchen');
-  await desktop.fill('[data-room-width]', '5.5');
-  await desktop.click('[data-capture-phone]');
-  await statusContains(desktop, 'Confirm permission');
-  assert.equal(captures.size, 1);
-  await desktop.check('[data-room-permission]');
-  await desktop.click('[data-capture-phone]');
-  await desktop.locator('[data-capture-link-box]').waitFor({ state: 'visible' });
-  assert.equal(captures.size, 2);
-  await phone.goto(await desktop.locator('[data-capture-link]').getAttribute('href'), { waitUntil: 'networkidle' });
+  // New room editing is roadmap-only. Existing private records still reopen.
+  assert.equal(await desktop.locator('[data-capture-kind="interior_room"]').isVisible(),false);
+  captures.set('capture-2',{...captures.get('capture-1'),captureId:'capture-2',captureKind:'interior_room',status:'draft',permissionConfirmed:true,publicContributionRequested:false,room:{label:'Kitchen',widthMeters:5.5,lengthMeters:6,heightMeters:2.7}});
+  serial=2;
+  await phone.goto(`${origin}/app/capture.html#capture=capture-2`, { waitUntil: 'networkidle' });
   // A fragment-only handoff keeps the existing signed-in browser session.
   if (await phone.locator('#googleSignIn').isVisible()) await phone.click('#googleSignIn');
   await phone.locator('#realityCapturePanel.show').waitFor();

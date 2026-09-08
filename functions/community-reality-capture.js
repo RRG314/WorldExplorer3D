@@ -181,6 +181,9 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
   const createRealityCaptureDraft = functions.region('us-central1').https.onRequest(async (req, res) => {
     const auth = await guard(req, res);
     if (!auth) return;
+    if (req.body?.captureKind === 'interior_room' && auth.realityCaptureReconstruction !== true) {
+      return res.status(403).json({error: 'Room capture is not available in this release. Existing private photos are preserved.'});
+    }
     try {
       const authUser = await admin.auth().getUser(auth.uid);
       if (auth.firebase?.sign_in_provider === 'anonymous') throw Error('authentication_required');

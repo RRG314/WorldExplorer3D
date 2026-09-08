@@ -150,7 +150,7 @@ function ensurePanel() {
       <button type="button" data-capture-hybrid hidden>Match photos to building sides</button>
       <div class="realityCaptureKinds" role="tablist" aria-label="Capture type">
         <button type="button" data-capture-kind="exterior" role="tab">Exterior</button>
-        <button type="button" data-capture-kind="interior_room" role="tab">One room</button>
+        <button type="button" data-capture-kind="interior_room" role="tab" hidden>One room</button>
       </div>
       <label class="realityCaptureConsent" data-facade-choice hidden><input data-exterior-facade type="checkbox" checked> <span>Photograph only the sides you can safely access.</span></label>
       <details data-building-details class="captureVisualGuide"><summary>Advanced · building details and measurements (optional)</summary>
@@ -516,6 +516,9 @@ async function persist(session = current) {
 }
 
 async function switchKind(kind) {
+  // Existing private room records remain reopenable, but new room editing is
+  // not part of the public manual-exterior release.
+  if (kind !== 'exterior') return;
   const session = current;
   if (!session || session.busy || session.resumed || kind === session.kind) return;
   setBusy(session, true);
