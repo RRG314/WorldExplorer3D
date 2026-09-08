@@ -22,6 +22,12 @@ const building = Object.freeze({
   lat: 39.2904,
   lon: -76.6122
 });
+test('manual interiors accept one photograph without weakening reconstruction requirements',()=>{
+  const capture={captureKind:'interior_room'};
+  assert.doesNotThrow(()=>validateUploadedPhotoSet(capture,[jpeg(0)],{manual:true}));
+  assert.throws(()=>validateUploadedPhotoSet(capture,[jpeg(0)]),/too_few/);
+  assert.throws(()=>validateUploadedPhotoSet(capture,[],{manual:true}),/too_few/);
+});
 
 test('facade scope is explicit and legacy captures keep whole-building semantics', () => {
   assert.equal(createCaptureDraft({ captureKind: 'exterior', exteriorScope: 'facade', building }, { uid: 'owner' }).exteriorScope, 'facade');

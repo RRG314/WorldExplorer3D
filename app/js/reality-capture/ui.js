@@ -465,8 +465,11 @@ function render() {
   panel.querySelector('[data-capture-hybrid]').hidden = current.kind === 'exterior' && (!current.remotePhotos.length || !current.serverCapture?.building?.spatialContext?.footprint?.length);
   panel.querySelector('[data-capture-hybrid]').textContent = current.kind === 'interior_room' ? 'Design my interior floor plan' : 'Match photos to building sides';
   panel.querySelector('[data-capture-result]').hidden = !(current.serverCapture?.hybridSubmission?.modelPath||current.serverCapture?.processed?.optimizedModelPath);
+  const manualHome=current.serverCapture?.hybridSubmission?.kind==='home-layout';
+  panel.querySelector('[data-capture-result] h2').textContent=manualHome?'Your photo-supported home':'Reconstruction preview';
+  panel.querySelector('[data-capture-result] h2 + p').textContent=manualHome?'Your saved floor plan with the photos you placed. Uncovered surfaces stay plain. Your interior remains private unless you explicitly request public access and it is approved.':'This is your private result. Inspect coverage before it is reviewed for use in the world. Missing surfaces are not automatically filled with invented details.';
   const registration = current.serverCapture?.processed?.registration;
-  panel.querySelector('[data-capture-registration]').textContent = registration?.status === 'available'
+  panel.querySelector('[data-capture-registration]').textContent = manualHome?'Manual photo placement · no paid reconstruction was started.':registration?.status === 'available'
     ? `${registration.registeredCount} of ${registration.submittedCount} photos positioned in 3D. ${registration.registeredCount < registration.submittedCount
       ? 'Some photos could not be positioned; this preview may be incomplete.' : 'Photo matching alone does not confirm that every wall and the roof were reconstructed.'}`
     : 'Coverage unverified: this result has no retained photo-matching report. A finished processing job does not mean a complete building.';
@@ -684,7 +687,7 @@ async function previewHybrid() {
       },submit:async (revision,publicSharing=false)=>{
         assertCurrent(session);
         const result=await submitRealityCaptureHybrid(session.serverCapture.captureId,revision,session.kind==='interior_room'?publicSharing===true:true);
-        assertCurrent(session);return result;
+        assertCurrent(session);await fetchProgress(session);return result;
       },save:async preview=>{
         assertCurrent(session);const result=await saveRealityCaptureHybridPreview(session.serverCapture.captureId,preview);assertCurrent(session);
         session.serverCapture.hybridPreview=result.preview;await persist(session);return result;
