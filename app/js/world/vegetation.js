@@ -356,7 +356,7 @@ export function collectWorldVegetationPlacements() {
 
   const terrainMeshes = tropicalCanopy ? [] : (appCtx.terrainGroup?.children || []).filter(
     (mesh) => mesh?.userData?.worldCoverResult?.vegetationSamples?.length
-  ).sort((a,b)=>Math.hypot(a.position.x,a.position.z)-Math.hypot(b.position.x,b.position.z));
+  ).sort((a,b)=>Math.hypot(a.position.x-focus.x,a.position.z-focus.z)-Math.hypot(b.position.x-focus.x,b.position.z-focus.z));
   for (let tileIndex = 0; tileIndex < terrainMeshes.length && placements.length < maxTrees; tileIndex++) {
     const mesh = terrainMeshes[tileIndex];
     const bounds = mesh.userData?.terrainTile?.bounds;
@@ -396,7 +396,7 @@ export function collectWorldVegetationPlacements() {
     const positions = mesh?.geometry?.attributes?.position;
     const mixA = mesh?.geometry?.attributes?.terrainSurfaceMixA;
     return positions && mixA && positions.count === mixA.count;
-  }).sort((a,b)=>Math.hypot(a.position.x,a.position.z)-Math.hypot(b.position.x,b.position.z));
+  }).sort((a,b)=>Math.hypot(a.position.x-focus.x,a.position.z-focus.z)-Math.hypot(b.position.x-focus.x,b.position.z-focus.z));
   const hasWorldCoverPlacements = placements.some((placement) => placement.source === 'worldcover');
   if (!hasWorldCoverPlacements || tropicalCanopy) {
     for (let meshIndex = 0; meshIndex < semanticMeshes.length && placements.length < maxTrees; meshIndex += 1) {
@@ -418,7 +418,6 @@ export function collectWorldVegetationPlacements() {
         const cluster=appCtx.rand01FromInt(vegetationIdentitySeed(`${Math.floor(cx/5)}:${Math.floor(cz/5)}`));
         if(appCtx.rand01FromInt(seed^0x27d4eb2f)>.6+.35*cluster) continue;
         const mappedLanduse = mappedLanduseAt(x, z);
-        if (semanticForestWeightAt(mesh,x,z) < (tropicalCanopy ? 0.34 : 0.58)) continue;
         if (mappedLanduse?.type && !VEGETATION_ELIGIBLE_TYPES.has(mappedLanduse.type)) continue;
         const layerRoll = appCtx.rand01FromInt(seed ^ 0xd3a2646c);
         const layer = tropicalCanopy

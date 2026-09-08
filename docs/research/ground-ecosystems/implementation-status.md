@@ -5,6 +5,15 @@ acceptance statement. No hosting deployment was performed.
 
 ## Curated vegetation checkpoint
 
+Player-relative refresh: both terrain candidate lists now prioritize the current
+player, not the original world origin. A real browser relocation check at 500m,
+1,000m and back retained 327, 330 and 235 plants within 100m respectively;
+previous batches were removed, world sequence stayed unchanged and no runtime
+exceptions occurred. The original test exposed zero nearby plants at 1,000m;
+that result was rejected and the ordering corrected. Screenshots at 1,000m and
+on return were inspected. This is a bounded relocation/lifecycle check, not a
+sustained-driving or physical-phone performance claim.
+
 Wetland follow-up: numeric class90 now remains a distinct low-vegetation biome
 and soil/grass material mix. Bounded nearby tall-grass clumps use the same CC0
 Quaternius pack, existing instance publisher and placement exclusions; soft

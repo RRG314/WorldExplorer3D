@@ -18,8 +18,10 @@ The existing terrain, road, water, building and collision authorities remain own
 5. [ ] Vegetation: stable spatial identities, accepted placement limits, valid
    crown locations, regional forms/assets, bounded culling/LOD and shared trunk
    collision. Curated models replace old procedural trees. Actual BMW contact,
-   reversing and walking contact passed with inspected screenshots. Physical-phone,
-   follow-player and broader regional acceptance remain outstanding.
+   reversing and walking contact passed with inspected screenshots. Player-relative
+   regeneration passed 500m/1,000m/return relocations with old batches removed and
+   nearby vegetation retained. Physical-phone, sustained travel and broader
+   regional acceptance remain outstanding.
 6. [ ] Acceptance: Maryland/Baltimore, Yosemite, Everglades, Amazon, Sahara,
    tundra, coast, Alps/Monaco; cache/failure/recovery, movement, disposal and
    mobile quality. Record real screenshots and performance, not source-only flags.
