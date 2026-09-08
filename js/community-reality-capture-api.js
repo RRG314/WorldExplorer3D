@@ -129,7 +129,7 @@ export function getMyRealityCapture(captureId) {
   return endpoint('/getMyRealityCapture', { captureId });
 }
 
-export function finalizeRealityCaptureUpload(captureId, mode = 'reconstruction') {
+export function finalizeRealityCaptureUpload(captureId, mode = 'manual') {
   return endpoint('/finalizeRealityCaptureUpload', { captureId, mode });
 }
 

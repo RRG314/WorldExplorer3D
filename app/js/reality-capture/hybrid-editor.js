@@ -2,6 +2,7 @@ import {loadClassicScript} from '../modules/script-loader.js?v=56';
 import {vendorScriptsCritical} from '../modules/manifest.js?v=597';
 import {createCaptureViewer} from './result-viewer.js?v=1';
 import {wallFootprint,validateQuad,rectifyPhoto,buildHybridShell,buildWallPatch} from './hybrid-geometry.js?v=1';
+import {loadLocalCaptureDraft,saveLocalCaptureDraft,deleteLocalCaptureDraft} from './local-draft-store.js?v=1';
 
 // The host supplies the existing authenticated asset/save APIs. No public URLs,
 // alternate uploader, reconstruction queue, or world-geometry authority here.
@@ -66,22 +67,40 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
     <p>This places the visible photo on a flat wall; it does not recover hidden detail or remove objects in the photo. Rotate the building to check your work.</p>
   </section></div><button data-save>Save private preview to account</button>
     <p data-saved role="status"></p>
+    <section data-recovery hidden><p data-recovery-copy></p><button data-recover>Restore unsaved placements</button><button data-discard-recovery>Discard device draft</button></section>
     <section data-publication hidden><h3>Send these walls for approval</h3>
     <p>Only the cropped wall images are submitted. Your original photos stay private. Approval adds these patches to this mapped building; uncovered areas remain unchanged.</p>
     <button data-submit>Submit saved walls for approval</button><p data-submission role="status"></p></section>
   `;
   const $=s=>dialog.querySelector(s), cache=new Map(), snapshots=[], thumbs=new Map(),patchThumbs=new Map();
-  let preview=structuredClone(capture.hybridPreview||{revision:0,footprintSignature:capture.footprintSignature,heightMeters:capture.buildingDetails?.heightMeters||capture.building?.spatialContext?.height?.meters||6,roofShape:['flat','gabled','hipped'].includes(capture.buildingDetails?.roofShape)?capture.buildingDetails.roofShape:'unknown',roofRiseMeters:2,patches:[]});
+  let preview=structuredClone(capture.hybridPreview||{revision:0,footprintSignature:capture.footprintSignature,heightMeters:capture.building?.spatialContext?.wallHeightMeters||capture.buildingDetails?.heightMeters||capture.building?.spatialContext?.height?.meters||6,roofShape:['flat','gabled','hipped'].includes(capture.buildingDetails?.roofShape)?capture.buildingDetails.roofShape:'unknown',roofRiseMeters:2,patches:[]});
   let quad=[],selected=0,bitmap=null,viewer=null,busy=false,closed=false,editId=null,drag=false,dirty=false,highlight=null,photoPage=0,thumbnailBusy=false;
+  const localKey=JSON.stringify(['capture-wall-edit-v1',capture.ownerUid,capture.captureId]);
+  let recovery=null;
+  try { recovery=(await loadLocalCaptureDraft(localKey)).draft; } catch { /* Account Save still works when device storage is unavailable. */ }
   const status=t=>{$('[data-status]').textContent=t;};
   $('[data-publication]').hidden=typeof submit!=='function';
   if(preview.revision)$('[data-saved]').textContent=`Saved to account · revision ${preview.revision} · ${preview.patches.length} photo patches.`;
   const active=()=>{abort.signal.throwIfAborted();signal.throwIfAborted();};
   function setBusy(value){busy=value;dialog.querySelectorAll('button:not([data-close]),input,select').forEach(e=>e.disabled=value);pageButtons();}
   function pageButtons(){$('[data-prev-photos]').disabled=busy||thumbnailBusy||photoPage===0;$('[data-next-photos]').disabled=busy||thumbnailBusy||(photoPage+1)*6>=photos.length;}
-  async function run(fn){if(busy||closed)return;setBusy(true);try{await fn();}catch(e){if(!closed)status(e.message);}finally{if(!closed)setBusy(false);}}
+  async function run(fn){if(busy||closed)return;setBusy(true);try{await fn();}catch(e){if(!closed)status(e.message);}finally{
+    if(dirty&&!closed){
+      try { await saveLocalCaptureDraft({id:localKey,baseRevision:preview.revision,preview:structuredClone(preview)});$('[data-saved]').textContent='Placements saved on this device for recovery. Save to account to use them on your other devices.'; }
+      catch { $('[data-saved]').textContent='Unsaved changes. Device recovery is unavailable; save to account before closing.'; }
+    }
+    if(!closed)setBusy(false);
+  }}
   function close(){if(closed)return;closed=true;abort.abort();viewer?.dispose();for(const b of cache.values())b.close?.();cache.clear();thumbs.clear();signal.removeEventListener('abort',close);dialog.close();dialog.remove();}
   signal.addEventListener('abort',close,{once:true});
+  if(recovery?.preview){
+    $('[data-recovery]').hidden=false;
+    const same=recovery.baseRevision===preview.revision&&recovery.preview.footprintSignature===preview.footprintSignature;
+    $('[data-recover]').hidden=!same;
+    $('[data-recovery-copy]').textContent=same?'This device has unsaved photo placements from your last visit. Restore them or keep the account version.':'A newer account revision exists. The older device draft will not overwrite it.';
+  }
+  $('[data-recover]').onclick=()=>run(async()=>{if(recovery?.baseRevision!==preview.revision||recovery.preview.footprintSignature!==preview.footprintSignature)throw Error('The account version changed. Reopen this editor.');preview=structuredClone(recovery.preview);dirty=true;$('[data-height]').value=preview.heightMeters;$('[data-roof]').value=preview.roofShape;$('[data-rise]').value=preview.roofRiseMeters;$('[data-recovery]').hidden=true;await rebuild();status('Recovered placements. Save to account when ready.');});
+  $('[data-discard-recovery]').onclick=()=>run(async()=>{await deleteLocalCaptureDraft(localKey);recovery=null;$('[data-recovery]').hidden=true;});
   $('[data-close]').onclick=close;dialog.addEventListener('cancel',e=>{e.preventDefault();close();});
   const photoSelect=$('[data-photo-choice]');
   photos.forEach((p,i)=>photoSelect.add(new Option(`Photo ${i+1}`,p.id)));
@@ -217,7 +236,7 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
   $('[data-undo]').onclick=()=>run(async()=>{if(!snapshots.length)return;const revision=preview.revision;preview=snapshots.pop();preview.revision=revision;dirty=true;$('[data-height]').value=preview.heightMeters;editId=null;await rebuild();status('Last preview edit undone. Save to keep this version.');});
   $('[data-save]').onclick=()=>run(async()=>{
     $('[data-saved]').textContent='Saving your photo placements…';
-    try {const result=await save({...preview,baseRevision:preview.revision});active();preview=structuredClone(result.preview);dirty=false;$('[data-saved]').textContent=`Saved to account · revision ${preview.revision} · ${preview.patches.length} photo patches.`;status('Saved. Submit these walls when you are ready for approval.');}
+    try {const result=await save({...preview,baseRevision:preview.revision});active();preview=structuredClone(result.preview);dirty=false;await deleteLocalCaptureDraft(localKey).catch(()=>{});$('[data-recovery]').hidden=true;$('[data-saved]').textContent=`Saved to account · revision ${preview.revision} · ${preview.patches.length} photo patches.`;status('Saved. Submit these walls when you are ready for approval.');}
     catch(error){$('[data-saved]').textContent=`Not saved: ${error.message}. Keep this editor open and retry.`;throw error;}
   });
   $('[data-submit]').onclick=()=>run(async()=>{

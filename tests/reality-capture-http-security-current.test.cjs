@@ -68,9 +68,10 @@ function harness(t, capture = base, extras = {}) {
       getMetadata: async () => [{generation:'123'}]
     }; }
   };
+  const authClaims = {};
   const api = buildCommunityRealityCaptureExports({ db, bucket, setCors: () => false,
     requireModerator: async req => req.uid === 'moderator' ? { auth: { uid: req.uid }, displayName: 'Moderator' } : null,
-    verifyAuth: async (req) => ({ uid: req.uid }), verifyAppCheck: async () => true });
+    verifyAuth: async (req) => ({ uid: req.uid, ...authClaims }), verifyAppCheck: async () => true });
   async function call(name, uid, body = {}) {
     const res = { headers: {}, status(code) { this.code = code; return this; },
       set(key, value) { this.headers[key] = value; return this; },
@@ -78,8 +79,33 @@ function harness(t, capture = base, extras = {}) {
     await api[name]({ method: 'POST', uid, body: { captureId: id, ...body } }, res);
     return res;
   }
-  return { call, bucket, records, reads, fileRequests, writes, mutate, hooks };
+  return { call, bucket, records, reads, fileRequests, writes, mutate, hooks, authClaims };
 }
+
+test('public interior preference cannot bypass approval, and owners can make it private again',async t=>{
+  const h=harness(t,base,{'privateSpaces/room':{ownerUid:'owner',captureId:id,accessMode:'PRIVATE'}});
+  const body={spaceId:'room',action:'set_mode',accessMode:'PUBLIC'};
+  assert.notEqual((await h.call('updatePrivateSpaceAccess','owner',body)).code,200);
+  assert.equal(h.writes.length,0);
+  h.mutate('privateSpaces/room',{publicApproval:{captureId:id}});
+  assert.equal((await h.call('updatePrivateSpaceAccess','owner',body)).code,200);
+  assert.equal(h.records.get('privateSpaces/room').accessMode,'PUBLIC');
+  assert.equal((await h.call('updatePrivateSpaceAccess','owner',{...body,accessMode:'PRIVATE'})).code,200);
+  assert.equal(h.records.get('privateSpaces/room').accessMode,'PRIVATE');
+  const writes=h.writes.length;
+  assert.notEqual((await h.call('updatePrivateSpaceAccess','visitor',body)).code,200);
+  assert.equal(h.writes.length,writes);
+});
+
+test('one photo defaults to manual validation without admitting a GPU job',async t=>{
+  const h=harness(t,{...base,status:'draft'});
+  h.bucket.getFiles=async()=>[validPhotos().slice(0,1)];
+  const result=await h.call('finalizeRealityCaptureUpload','owner');
+  assert.equal(result.code,200);
+  const stored=h.records.get(`realityCaptures/${id}`);
+  assert.equal(stored.status,'uploaded');assert.equal(stored.inputManifest.length,1);
+  assert.equal(stored.queuedAt,undefined);
+});
 
 test('processed asset delivery pins the inspected generation, not the latest path',async t=>{
   const h=harness(t,{...base,processed:{...base.processed,modelGeneration:'12345',sha256:'a'.repeat(64)}});
@@ -100,14 +126,18 @@ test('hybrid preview HTTP save is owner-only, revision-checked and cannot publis
   assert.equal((await h.call('saveRealityCaptureHybridPreview','owner',{preview:{...preview,baseRevision:1}})).code,200);assert.equal(h.records.get(`realityCaptures/${id}`).hybridHistory.length,1);
 });
 
-test('only the owner can retry a failed, validated capture without another upload', async t => {
+test('only a development-authorized owner can retry a failed validated capture', async t => {
   const h = harness(t, { ...base, status: 'processing_failed', inputManifest: [{ name: photoPath, generation: '1' }] });
+  assert.equal((await h.call('retryRealityCapture', 'owner', {realityCaptureReconstruction:true})).code,403);
+  assert.equal(h.writes.length,0);
+  h.authClaims.realityCaptureReconstruction=true;
   assert.equal((await h.call('retryRealityCapture', 'visitor')).code, 404);
   assert.equal((await h.call('retryRealityCapture', 'owner')).body.status, 'queued');
   assert.equal(h.writes.length, 1);
   assert.equal((await h.call('retryRealityCapture', 'owner')).code, 409);
   assert.equal(h.reads.length, 0);
   const empty = harness(t, { ...base, status: 'processing_failed' });
+  empty.authClaims.realityCaptureReconstruction=true;
   assert.equal((await empty.call('retryRealityCapture', 'owner')).code, 422);
   assert.equal(empty.writes.length, 0);
 });
@@ -233,7 +263,10 @@ test('processing progress uses frozen photo manifest without per-photo storage r
 test('owned valid set queues atomically and repeat finalization cannot regress it', async (t) => {
   const h = harness(t, { ...base, status: 'draft' });
   h.bucket.getFiles = async () => [validPhotos()];
-  assert.equal((await h.call('finalizeRealityCaptureUpload', 'owner')).code, 200);
+  assert.equal((await h.call('finalizeRealityCaptureUpload', 'owner', {mode:'reconstruction'})).code,403);
+  assert.equal(h.writes.length,0);
+  h.authClaims.realityCaptureReconstruction=true;
+  assert.equal((await h.call('finalizeRealityCaptureUpload', 'owner', {mode:'reconstruction'})).code, 200);
   const capture = h.records.get(`realityCaptures/${id}`);
   assert.equal(capture.status, 'queued');
   assert.equal(capture.uploadSummary.photoCount, 20);

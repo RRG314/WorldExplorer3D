@@ -58,12 +58,15 @@ function allPhotos() {
 }
 
 function processingDescription(capture) {
+  if (capture?.hybridSubmission?.status === 'approved') return 'Your submitted photo walls were approved.';
+  if (capture?.hybridSubmission?.status === 'review_required') return 'Your saved photo walls are awaiting approval.';
+  if (capture?.status === 'uploaded') return 'Ready to match photos to walls. No reconstruction was started.';
   if (capture?.status === 'queued') return 'Queued for reconstruction. You can close this page and return later.';
   if (capture?.status === 'processing') return 'Processing your 3D model. Your photos are saved; you can return on either device.';
   if (capture?.status === 'review_required') return 'Your reconstruction is ready to inspect below.';
   if (capture?.status === 'processing_failed') {
     const capacity = /capacity/.test(capture.failure?.code || '');
-    return capacity ? 'Today’s processing capacity is full. Your photos are still saved.' : 'Processing stopped before a usable model was saved. Your photos are still saved; you can retry without uploading again. This message does not mean your photos were the cause.';
+    return capacity ? 'Processing capacity was unavailable. Your photos are still saved for manual placement.' : 'The earlier reconstruction stopped. Your saved photos can still be used for manual placement.';
   }
   return String(capture?.status || 'draft').replaceAll('_', ' ');
 }
@@ -96,8 +99,8 @@ function renderProgress(session) {
   panel.querySelector('[data-capture-checked]').textContent = stamp ? `Last successful check: ${stamp}` : '';
   panel.querySelector('[data-capture-progress-help]').textContent = ready ? 'Choose View my 3D result below to inspect it.'
     : active ? 'This page checks every 15 seconds while visible. You can close it and return later. No reliable percentage or finish time is available yet.'
-    : status === 'processing_failed' ? 'Use Retry below to try again with your saved photos.'
-    : 'Saving photos does not start reconstruction. Choose Upload for processing when your photo set is ready.';
+    : status === 'processing_failed' ? 'Use Match photos to building sides below. Public reconstruction is not available.'
+    : 'Choose Save and place photos to match your pictures to this building. No 3D reconstruction is started.';
   panel.querySelector('[data-capture-progress-meter]').hidden = !active || !!session.progressError;
 }
 
@@ -149,7 +152,7 @@ function ensurePanel() {
         <button type="button" data-capture-kind="exterior" role="tab">Exterior</button>
         <button type="button" data-capture-kind="interior_room" role="tab">One room</button>
       </div>
-      <label class="realityCaptureConsent" data-facade-choice><input data-exterior-facade type="checkbox" checked> <span>One facade / accessible wall only. Reconstruct what I can see, not the entire building.</span></label>
+      <label class="realityCaptureConsent" data-facade-choice hidden><input data-exterior-facade type="checkbox" checked> <span>Photograph only the sides you can safely access.</span></label>
       <details data-building-details class="captureVisualGuide"><summary>Advanced · building details and measurements (optional)</summary>
         <p>Leave unknown details blank. These are your observations, not verified map data. They do not automatically resize the building or reconstruction.</p>
         <div class="realityCaptureGrid">
@@ -197,7 +200,7 @@ function ensurePanel() {
       <section class="realityCaptureActions">
         <button type="button" data-capture-cancel>Delete draft</button>
         <button type="button" data-capture-save>Save photos to account</button>
-        <button type="button" data-capture-upload class="primary">Upload for processing</button>
+        <button type="button" data-capture-upload class="primary">Save and place photos</button>
       </section>
       <div class="realityCaptureProgress" data-capture-progress hidden><span></span><i></i></div>
       <p class="realityCaptureStatus" data-capture-status role="status" aria-live="polite"></p>
@@ -206,7 +209,7 @@ function ensurePanel() {
   panel.addEventListener('cancel', event => { event.preventDefault(); closeRealityCapture(); });
   panel.querySelector('[data-capture-close]').addEventListener('click', closeRealityCapture);
   panel.querySelector('[data-capture-cancel]').addEventListener('click', clearDraft);
-  panel.querySelector('[data-capture-upload]').addEventListener('click', () => uploadDraft(true));
+  panel.querySelector('[data-capture-upload]').addEventListener('click', () => uploadDraft(current?.kind !== 'interior_room'));
   panel.querySelector('[data-capture-save]').addEventListener('click', () => uploadDraft(false));
   panel.querySelector('[data-capture-input]').addEventListener('change', addPhotos);
   panel.querySelector('[data-capture-video]').addEventListener('change', importVideo);
@@ -381,7 +384,7 @@ function sectors() {
 }
 
 function minimumPhotos() {
-  return current?.kind === 'interior_room' ? 18 : 20;
+  return 1;
 }
 
 async function loadSavedThumbnail(session,photo,image) {
@@ -444,9 +447,10 @@ function render() {
   panel.querySelector('[data-capture-label]').textContent = current.target.label;
   panel.querySelector('[data-capture-id]').textContent = current.target.sourceBuildingId;
   panel.querySelector('[data-capture-count]').textContent = `${photos.length} / ${minimumPhotos()} minimum`;
+  panel.querySelector('[data-capture-upload]').textContent = current.kind === 'interior_room' ? 'Save room photos' : 'Save and place photos';
   panel.querySelector('[data-capture-account]').textContent = `Account: ${getCurrentUser()?.email || getCurrentUser()?.displayName || 'Signed-in explorer'}`;
   panel.querySelector('[data-capture-refresh]').hidden = !current.serverCapture;
-  panel.querySelector('[data-capture-retry]').hidden = current.serverCapture?.status !== 'processing_failed' || !current.serverCapture?.uploadSummary;
+  panel.querySelector('[data-capture-retry]').hidden = true;
   const locked = !captureIsEditable(current.serverCapture);
   panel.querySelector('[data-capture-live-camera]').style.display=locked?'none':'';
   for(const selector of ['[data-capture-input]','[data-capture-video]'])panel.querySelector(selector).closest('label').style.display=locked?'none':'';
@@ -465,7 +469,7 @@ function render() {
     ? `${registration.registeredCount} of ${registration.submittedCount} photos positioned in 3D. ${registration.registeredCount < registration.submittedCount
       ? 'Some photos could not be positioned; this preview may be incomplete.' : 'Photo matching alone does not confirm that every wall and the roof were reconstructed.'}`
     : 'Coverage unverified: this result has no retained photo-matching report. A finished processing job does not mean a complete building.';
-  panel.querySelector('[data-facade-choice]').hidden = current.kind !== 'exterior';
+  panel.querySelector('[data-facade-choice]').hidden = true;
   panel.querySelector('[data-building-details]').hidden = current.kind !== 'exterior';
   panel.querySelectorAll('[data-building-details] input, [data-building-details] select').forEach(element => { element.disabled = current.busy || !!current.serverCapture; });
   panel.querySelector('[data-exterior-facade]').checked = current.exteriorScope === 'facade';
@@ -475,7 +479,7 @@ function render() {
   });
   panel.querySelector('[data-capture-instruction]').textContent = current.kind === 'interior_room'
     ? `Stand near ${sectorList[current.activeSector]}. Keep each wall in several neighboring photos and include floor-to-wall and wall-to-ceiling edges.`
-    : `Photograph the ${sectorList[current.activeSector].toLowerCase()} side. Walk safely; keep about two-thirds of the previous view in the next photo.`;
+    : `Photograph the ${sectorList[current.activeSector].toLowerCase()} side. Include the wall edges where possible. One clear photo is enough to start; add other sides later.`;
   panel.querySelector('[data-capture-photo-guide]').innerHTML = photoGuideMarkup(current.kind, current.activeSector, current.exteriorScope);
   panel.querySelector('[data-capture-sectors]').innerHTML = sectorList.map((label, index) => `
     <button type="button" data-sector-index="${index}" class="${index === current.activeSector ? 'active' : ''} ${bySector.get(index) >= 2 ? 'covered' : ''}">
@@ -758,12 +762,7 @@ async function uploadDraft(submit = true) {
   const status = panel.querySelector('[data-capture-status]');
   const progress = panel.querySelector('[data-capture-progress]');
   if (submit && allPhotos().length < minimumPhotos()) {
-    status.textContent = `Add at least ${minimumPhotos()} overlapping photos before upload.`;
-    return;
-  }
-  const underCovered = sectors().filter((_, index) => allPhotos().filter((photo) => photo.sector === index).length < 2);
-  if (submit && underCovered.length && !(session.kind === 'exterior' && session.exteriorScope === 'facade')) {
-    status.textContent = `Add at least two photos for every coverage section. Missing: ${underCovered.join(', ')}.`;
+    status.textContent = 'Add at least one clear photo to start.';
     return;
   }
   const permissionConfirmed = panel.querySelector('[data-room-permission]').checked;
@@ -796,9 +795,9 @@ async function uploadDraft(submit = true) {
       status.textContent = 'Photos saved privately to your account. Open the same capture on either device to continue. Processing has not started.';
       return;
     }
-    status.textContent = 'Validating file signatures and queueing reconstruction…';
+    status.textContent = 'Checking your photos for manual placement…';
     assertCurrent(session);
-    const result = await finalizeRealityCaptureUpload(session.serverCapture.captureId);
+    const result = await finalizeRealityCaptureUpload(session.serverCapture.captureId, 'manual');
     assertCurrent(session);
     status.textContent = `Upload complete. Status: ${result.status}. Originals remain private.`;
     await deleteLocalCaptureDraft(session.draftId);
@@ -812,6 +811,7 @@ async function uploadDraft(submit = true) {
   } finally {
     setBusy(session, false);
   }
+  if (submit && isCurrent(session) && session.serverCapture?.status === 'uploaded' && session.kind === 'exterior') await previewHybrid();
 }
 
 async function clearDraft() {

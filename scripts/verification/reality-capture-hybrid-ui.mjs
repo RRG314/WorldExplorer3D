@@ -83,6 +83,13 @@ try{
     await page.locator('[data-undo]').click();await page.waitForFunction(()=>window.editor.getState().patches===1);
     await page.locator('[data-close]').click();assert.equal(await page.locator('.captureHybridEditor').count(),0);
     await page.evaluate(()=>openReplay());assert.equal(await page.evaluate(()=>editor.getState().patches),1);
+    await page.locator('[data-recovery]').waitFor({state:'visible'});
+    await page.locator('[data-recover]').click();
+    await page.waitForFunction(()=>editor.getState().dirty);
+    await page.locator('[data-save]:enabled').waitFor();
+    await page.locator('[data-save]').click();
+    await page.waitForFunction(()=>editor.getState().revision===2&&!editor.getState().dirty);
+    assert.equal(saved.hybridPreview.revision,2);
     const dimensions=await page.evaluate(()=>({w:innerWidth,scroll:document.querySelector('.captureHybridEditor').scrollWidth,client:document.querySelector('.captureHybridEditor').clientWidth}));assert.ok(dimensions.scroll<=dimensions.client+2);
     await page.evaluate(()=>replayAbort.abort());assert.equal(await page.locator('.captureHybridEditor').count(),0);
     await context.close();

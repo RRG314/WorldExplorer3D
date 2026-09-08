@@ -78,6 +78,7 @@ function normalizeSpatialContext(raw) {
   return {
     schemaVersion: 1, frame: raw.frame, authority: 'client-snapshot-of-existing-building',
     footprint: raw.footprint.map(({ x, z }) => ({ x, z })),
+    wallHeightMeters: Number.isFinite(raw.wallHeightMeters) && raw.wallHeightMeters > 0 && raw.wallHeightMeters <= 1212 ? raw.wallHeightMeters : null,
     height: height && Number.isFinite(height.meters) && height.meters > 0 && height.meters <= 1200 && ['mapped', 'inferred'].includes(height.evidence)
       ? { meters: height.meters, evidence: height.evidence } : null,
     entrance: validPoint(raw.entrance) ? { x: raw.entrance.x, z: raw.entrance.z } : null
@@ -271,7 +272,14 @@ function resolveSpaceAccess(input = {}) {
   if (!ACCESS_MODES.includes(mode)) return Object.freeze({ allowed: false, reason: 'invalid_policy' });
   if (requesterUid && requesterUid === ownerUid) return Object.freeze({ allowed: true, reason: 'owner', scope: 'persistent' });
   if (input.isAdmin === true) return Object.freeze({ allowed: true, reason: 'moderator', scope: 'review' });
-  if (mode === 'PUBLIC') return Object.freeze({ allowed: true, reason: 'public', scope: 'public' });
+  if (mode === 'PUBLIC') {
+    // Sharing preference is not publication authority. A reviewed interior
+    // must be the exact capture currently installed in this private space.
+    const reviewed = !!space.captureId && space.publicApproval?.captureId === space.captureId;
+    return Object.freeze(reviewed
+      ? { allowed: true, reason: 'public', scope: 'public' }
+      : { allowed: false, reason: 'public_review_required', requestable: false });
+  }
   if (!requesterUid) return Object.freeze({ allowed: false, reason: 'authentication_required' });
   if (mode === 'PRIVATE') return Object.freeze({ allowed: false, reason: 'private_residence', requestable: false });
   const now = Number.isFinite(input.nowMs) ? input.nowMs : Date.now();

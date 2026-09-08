@@ -80,7 +80,9 @@ function facadeEdgeForMesh(appCtx, mesh, entrance) {
         tangentZ: dz / length,
         normalX,
         normalZ,
-        yaw: Math.atan2(dx / length, dz / length)
+        // Detail boxes use local X for width. A Y rotation maps it to
+        // (cos(yaw), -sin(yaw)) in world X/Z, not the local-Z heading.
+        yaw: Math.atan2(-dz, dx)
       };
     }
   }

@@ -652,6 +652,7 @@ export async function buildBuildingGeometryPass(options = {}) {
     if (colliderDetail === 'full') loadMetrics.colliders.full += 1;
     else loadMetrics.colliders.simplified += 1;
     if (colliderRef) {
+      colliderRef.bodyHeightMeters = bodyHeight;
       colliderRef.baseY = baseElevation;
       colliderRef.minY = baseElevation;
       colliderRef.maxY = baseElevation + renderedHeight;

@@ -54,10 +54,10 @@ async function makePage(viewport, mobile = false) {
         if (failNextProgress) { failNextProgress = false; return json({ error: 'Temporary connection failure' }, 503); }
         return json({ capture, photos: uploaded.get(input.captureId) || [] });
       }
-      if (action === 'retryRealityCapture') { capture.status = 'queued'; failNextProgress = true; return json({ status: 'queued' }); }
+      if (action === 'retryRealityCapture') return json({error:'Reconstruction is development-only.'},403);
       if (action === 'getRealityCaptureAssetAccess') return json({url:savedPhotoDataUrl});
       if (action === 'reserveRealityCapturePhoto') return json({ reserved: true });
-      if (action === 'finalizeRealityCaptureUpload') { capture.status = 'queued'; return json({ status: 'queued' }); }
+      if (action === 'finalizeRealityCaptureUpload') { assert.equal(input.mode,'manual'); capture.status = 'uploaded'; return json({ status: 'uploaded' }); }
       if (action === 'deleteRealityCapture') { captures.delete(input.captureId); return json({ deleted: true }); }
       return json({ error: 'Unexpected test endpoint' }, 500);
     }
@@ -174,18 +174,17 @@ try {
     await statusContains(phone, `${6 + sector * 2} photos are saved`);
   }
   await phone.click('[data-capture-upload]');
-  await statusContains(phone, 'Upload complete. Status: queued');
+  await statusContains(phone, 'Upload complete. Status: uploaded');
   assert.equal(uploaded.get('capture-1').length, 20);
   assert.ok(uploaded.get('capture-1').every(photo => photo.sector === 0));
   assert.equal(await phone.locator('[data-capture-upload]').isDisabled(), true);
   captures.get('capture-1').status = 'processing_failed';
   captures.get('capture-1').uploadSummary = { photoCount: 20 };
   await phone.click('[data-capture-refresh]');
-  await phone.locator('[data-capture-retry]').waitFor({ state: 'visible' });
-  await phone.click('[data-capture-retry]');
-  await statusContains(phone, 'Retry accepted.');
-  assert.match(await phone.locator('[data-capture-server-status]').textContent(), /Queued/);
   assert.equal(await phone.locator('[data-capture-retry]').isVisible(), false);
+  // Old jobs may still be viewed, but the public UI cannot launch a retry.
+  captures.get('capture-1').status='queued';
+  await phone.click('[data-capture-refresh]');
   await desktop.click('[data-capture-refresh]');
   await desktop.waitForFunction(() => document.querySelector('[data-capture-server-status]').textContent.toLowerCase().includes('queued'));
   // Hold an actual request to observe immediate CTA feedback, not a fast-response snapshot.
@@ -292,7 +291,7 @@ try {
   });
   await statusContains(phone,'video frames saved locally');
   const videoCount=await phone.locator('[data-capture-count]').textContent();
-  assert.match(videoCount,/^[12] \/18|^[12] \/ 18/);
+  assert.match(videoCount,/^[12] \/ 1 minimum/);
   const videoChecks=await phone.evaluate(async()=>{
     const {extractVideoFrames}=await import('/app/js/reality-capture/video-frames.js?v=1');
     const aborted=new AbortController();aborted.abort();let stopped=false;

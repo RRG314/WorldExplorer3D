@@ -252,6 +252,9 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
   const retryRealityCapture = functions.region('us-central1').https.onRequest(async (req, res) => {
     const auth = await guard(req, res);
     if (!auth) return;
+    // Paid reconstruction is a development capability, not public admission.
+    // Only a trusted Firebase custom claim can grant it; request fields cannot.
+    if (auth.realityCaptureReconstruction !== true) return res.status(403).json({ error: '3D reconstruction is not publicly available. Your photos can still be used in the manual editor.' });
     try {
       const captureId = clean(req.body?.captureId, 180);
       if (!/^[\w-]{1,180}$/.test(captureId)) throw Error('invalid_capture_id');
@@ -341,6 +344,9 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
   const finalizeRealityCaptureUpload = functions.region('us-central1').runWith({ memory: '512MB', timeoutSeconds: 300, maxInstances: 2 }).https.onRequest(async (req, res) => {
     const auth = await guard(req, res);
     if (!auth) return;
+    const mode = req.body?.mode || 'manual';
+    if (!['manual', 'reconstruction'].includes(mode)) return res.status(422).json({ error: 'Invalid capture mode.' });
+    if (mode === 'reconstruction' && auth.realityCaptureReconstruction !== true) return res.status(403).json({ error: '3D reconstruction is not publicly available. Choose manual photo placement.' });
     const captureId = clean(req.body?.captureId, 180);
     let ref = null;
     let validatedSnapshot = null;
@@ -356,7 +362,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       if (capture.status === 'draft') assertCaptureTransition('draft', 'uploading');
       const prefix = `reality-captures/${auth.uid}/${captureId}/originals/`;
       const [files] = await bucket.getFiles({ prefix, maxResults: 49, autoPaginate: false });
-      const manual = req.body?.mode === 'manual';
+      const manual = mode === 'manual';
       if(manual && capture.captureKind !== 'exterior')throw Error('manual_exterior_required');
       const { manifest: inputManifest, summary: uploadSummary } = await validateCaptureObjects(bucket, { ...capture, captureId }, files, {manual});
       assertCaptureTransition('uploading', 'uploaded');
@@ -621,6 +627,14 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       for (const row of snapshot.docs) {
         const data = row.data() || {};
         if (data.captureKind !== 'exterior' || !data.modelPath) continue;
+        let patchHeightMeters = data.patchHeightMeters;
+        // Legacy approved wall revisions predate an explicit height field.
+        // Read their exact matching submission; never guess from a partial mesh.
+        if (data.representationKind === 'facade-patches' && !patchHeightMeters && data.captureId) {
+          const source = await db.collection(CAPTURES).doc(data.captureId).get();
+          const submitted = source.data()?.hybridSubmission;
+          if (submitted?.modelPath === data.modelPath && submitted.revision === data.revision) patchHeightMeters = submitted.heightMeters;
+        }
         const file = bucket.file(data.modelPath,data.modelGeneration?{generation:data.modelGeneration}:undefined);
         const [exists] = await file.exists();
         if (!exists) continue;
@@ -631,6 +645,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
           representationKind: data.representationKind || 'complete-model',
           revision: data.revision || 0,
           footprint: data.representationKind === 'facade-patches' ? data.footprint : null,
+          patchHeightMeters: patchHeightMeters || null,
           sourceBuildingId: clean(data.canonicalBuilding?.sourceBuildingId, 220),
           model: { url, expiresAtMs },
           alignment: data.alignment || null,
@@ -660,7 +675,13 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       if (action === 'set_mode') {
         const accessMode = clean(req.body?.accessMode, 32).toUpperCase();
         if (!ACCESS_MODES.includes(accessMode)) throw new Error('invalid_access_mode');
-        await spaceRef.set({ accessMode, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+        await db.runTransaction(async tx => {
+          const current = await tx.get(spaceRef);
+          if (!current.exists || current.data()?.ownerUid !== auth.uid) throw Error('space_owner_required');
+          const value = current.data();
+          if (accessMode === 'PUBLIC' && (!value.captureId || value.publicApproval?.captureId !== value.captureId)) throw Error('interior_public_review_required');
+          tx.update(spaceRef, { accessMode, updatedAt: FieldValue.serverTimestamp() });
+        });
         res.status(200).json({ spaceId, accessMode });
         return;
       }
@@ -821,7 +842,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
           modelPath: hybrid?.modelPath || capture.processed?.optimizedModelPath || '',
           modelGeneration:hybrid?.modelGeneration || capture.processed?.modelGeneration || '',
           sha256:hybrid?.sha256 || capture.processed?.sha256 || '',
-          ...(hybrid?{representationKind:'facade-patches',revision:hybrid.revision,modelGeneration:hybrid.modelGeneration,footprint:hybrid.footprint,patchCount:hybrid.patches.length}:{}),
+          ...(hybrid?{representationKind:'facade-patches',revision:hybrid.revision,modelGeneration:hybrid.modelGeneration,footprint:hybrid.footprint,patchHeightMeters:hybrid.heightMeters,patchCount:hybrid.patches.length}:{}),
           alignment: review.alignment,
           status: 'approved',
           visibility: 'public',
@@ -834,6 +855,12 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       if (decision === 'approved' && capture.captureKind === 'interior_room' && capture.spaceId) {
         writes.push([db.collection(SPACES).doc(capture.spaceId), {
           captureId,
+          publicApproval: capture.publicContributionRequested === true ? {
+            captureId,
+            modelPath: capture.processed.optimizedModelPath,
+            modelGeneration: capture.processed.modelGeneration || '',
+            moderatorUid: moderator.auth.uid
+          } : null,
           pendingCaptureId: FieldValue.delete(),
           updatedAt: FieldValue.serverTimestamp()
         }]);

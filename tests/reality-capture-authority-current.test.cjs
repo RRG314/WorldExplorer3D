@@ -139,7 +139,9 @@ test('space access keeps public exterior visibility separate from private interi
   assert.deepEqual(resolveSpaceAccess({ space, requesterUid: 'visitor', ownerOnline: true }), {
     allowed: false, reason: 'private_residence', requestable: false
   });
-  assert.equal(resolveSpaceAccess({ space: { ...space, accessMode: 'PUBLIC' }, requesterUid: '' }).allowed, true);
+  assert.equal(resolveSpaceAccess({ space: { ...space, accessMode: 'PUBLIC' }, requesterUid: '' }).allowed, false);
+  assert.equal(resolveSpaceAccess({ space: { ...space, accessMode: 'PUBLIC', captureId:'room-v2', publicApproval:{captureId:'room-v1'} }, requesterUid: 'visitor' }).allowed, false);
+  assert.equal(resolveSpaceAccess({ space: { ...space, accessMode: 'PUBLIC', captureId:'room-v2', publicApproval:{captureId:'room-v2'} }, requesterUid: 'visitor' }).allowed, true);
   assert.deepEqual(resolveSpaceAccess({
     space: { ...space, accessMode: 'INVITE_ONLY' },
     requesterUid: 'visitor', ownerOnline: false

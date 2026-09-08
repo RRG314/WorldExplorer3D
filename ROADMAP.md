@@ -1,6 +1,6 @@
 # World Explorer 3D Roadmap
 
-Last updated: 2026-09-03.
+Last updated: 2026-09-07.
 
 World Explorer 3D is growing toward a connected world sandbox: choose a real
 place, build an Explorer, travel by land, water, air, or space, and make a
@@ -9,6 +9,23 @@ of adding another disconnected menu or duplicate version of an existing
 feature.
 
 ## Product direction
+
+### Improve real places with photos
+
+Manual photo placement is the first contribution path: match pictures to the
+actual building sides, save the work, and submit it for review. The exterior
+pilot is being refined in staging. Private single-room editing, playable
+personal previews, shared contribution rooms, attribution and featured places
+are the next connected milestones—not released capabilities yet.
+
+Interiors start private. An owner must deliberately request public sharing,
+and the submitted interior must be approved before others can access it
+publicly. Exterior approval never opens an interior.
+
+Automated 3D reconstruction remains a development track, including future
+interior reconstruction and individual objects. It is not the public capture
+path while processing cost and reconstruction quality are being evaluated.
+
 
 The long-term game is organized around five connected parts:
 

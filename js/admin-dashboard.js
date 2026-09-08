@@ -1703,9 +1703,11 @@ async function handleRealityDecision(decision) {
       (state.realityDetails.get(item.captureId)?.capture || item).hybridSubmission?.revision
     );
     state.realityDetails.delete(item.captureId);
-    await Promise.all([loadRealityQueue(), loadActivity()]);
+    const refreshes = await Promise.allSettled([loadRealityQueue(), loadActivity()]);
     renderModeration();
-    setStatus(decision === 'approved' ? 'Capture visual approved. Existing identity and proxy collision remain authoritative.' : 'Capture rejected and kept out of runtime presentation.', 'ok');
+    const message = decision === 'approved' ? 'Photo improvement approved.' : 'Contribution rejected.';
+    const refreshFailed = refreshes.some(result => result.status === 'rejected');
+    setStatus(message + (refreshFailed ? ' The decision was saved, but the dashboard could not fully refresh. Reload to see the updated list; do not approve again.' : ''), refreshFailed ? 'warn' : 'ok');
   } catch (error) {
     console.error('[admin-dashboard] Reality capture moderation failed:', error);
     setStatus(error?.message || 'Could not moderate this capture.', 'warn');
