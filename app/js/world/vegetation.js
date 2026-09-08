@@ -304,7 +304,8 @@ export function collectWorldVegetationPlacements() {
       Math.max(4, Math.floor(cfg.maxPerPolygon * budgetScale * densityScale))
     );
     const polySeed = vegetationSeed((appCtx.rdtSeed ^ (i + 1) ^ Math.floor(area * 10)) >>> 0);
-    for (let attempt = 0; attempt < desired * 8 && placements.length < maxTrees; attempt++) {
+    const polygonStartCount = placements.length;
+    for (let attempt = 0; attempt < desired * 8 && placements.length < maxTrees && placements.length-polygonStartCount < desired; attempt++) {
       const seed = vegetationSeed(polySeed ^ attempt);
       const tx = minX + appCtx.rand01FromInt(seed ^ 0x7f4a7c15) * width;
       const tz = minZ + appCtx.rand01FromInt(seed ^ 0x165667b1) * depth;
@@ -506,6 +507,7 @@ export function buildWorldVegetationInstancing(
       appCtx.terrainMeshHeightAt(placement.x, placement.z) :
       appCtx.elevationWorldYAtWorldXZ(placement.x, placement.z);
     const trunkScale = Math.max(0.65, Number(placement.scale) || 1);
+    placement.baseY = baseY;
     const canopyStretch = Math.max(0.72, Number(placement.canopyStretch) || 1);
     euler.set(0, Number(placement.rotation) || 0, 0);
     quat.setFromEuler(euler);

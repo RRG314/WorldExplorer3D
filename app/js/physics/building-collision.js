@@ -1,3 +1,5 @@
+import { nearbyVegetationObstacles } from '../world/vegetation-obstacle-index.js';
+
 function buildingVerticalRangeOverlap(building, actorBaseY, actorHeight, tolerance = 0.45) {
   if (!Number.isFinite(actorBaseY)) return true;
   const actorTopY = actorBaseY + (Number.isFinite(actorHeight) ? Math.max(0.5, actorHeight) : 1.8);
@@ -12,7 +14,8 @@ function createBuildingCollisionQuery(appCtx) {
     const hasBaseBuildings = Array.isArray(appCtx.buildings) && appCtx.buildings.length > 0;
     const hasDynamicColliders = Array.isArray(appCtx.dynamicBuildingColliders) && appCtx.dynamicBuildingColliders.length > 0;
     const hasTransportColliders = appCtx.transportStructureColliders?.length > 0;
-    if (!hasBaseBuildings && !hasDynamicColliders && !hasTransportColliders) return { collision: false };
+    const vegetationCandidates = nearbyVegetationObstacles(appCtx, x, z, carRadius + 1);
+    if (!hasBaseBuildings && !hasDynamicColliders && !hasTransportColliders && !vegetationCandidates.length) return { collision: false };
     const actorBaseY = Number.isFinite(options?.actorBaseY) ? Number(options.actorBaseY) : NaN;
     const actorHeight = Number.isFinite(options?.actorHeight) ? Number(options.actorHeight) : 1.9;
     const acceptCollision = typeof options?.acceptCollision === 'function'
@@ -30,6 +33,7 @@ function createBuildingCollisionQuery(appCtx) {
     const candidates = [];
     const seenCandidates = new Set();
     [
+      ...vegetationCandidates,
       ...(Array.isArray(indexedCandidates) ? indexedCandidates : []),
       ...(Array.isArray(appCtx.dynamicBuildingColliders) ? appCtx.dynamicBuildingColliders : [])
     ].forEach((candidate) => {
