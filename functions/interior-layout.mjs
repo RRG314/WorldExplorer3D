@@ -33,6 +33,11 @@ export function containsRegion(outer, inner, holes=[]) {
   return multiArea(polygons.difference(region(inner),[pairs(outer),...holes.map(pairs)]))<EPS;
 }
 export function pointInRoom(point,ring){let inside=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){const a=ring[i],b=ring[j];if((a.z>point.z)!==(b.z>point.z)&&point.x<(b.x-a.x)*(point.z-a.z)/(b.z-a.z)+a.x)inside=!inside;}return inside;}
+export function roomInteriorPoint(ring){
+  const minX=Math.min(...ring.map(p=>p.x)),minZ=Math.min(...ring.map(p=>p.z)),width=Math.max(...ring.map(p=>p.x))-minX,depth=Math.max(...ring.map(p=>p.z))-minZ;let best=null,clearance=0;
+  for(let ix=0;ix<25;ix++)for(let iz=0;iz<25;iz++){const p={x:minX+width*(ix+.5)/25,z:minZ+depth*(iz+.5)/25};if(!pointInRoom(p,ring))continue;const distance=Math.min(...ring.map((a,i)=>{const b=ring[(i+1)%ring.length],dx=b.x-a.x,dz=b.z-a.z,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.z-a.z)*dz)/(dx*dx+dz*dz)));return Math.hypot(p.x-a.x-dx*t,p.z-a.z-dz*t);}));if(distance>clearance){clearance=distance;best=p;}}
+  return clearance>=.34?best:null;
+}
 export function assertPlayableLayout(layout){
   const links=new Map(layout.floors.flatMap(f=>f.rooms.map(r=>[r.id,new Set()]))),entries=[];
   for(const floor of layout.floors)for(const door of floor.doors){const wall=floorWalls(floor).find(w=>w.id===door.wall);if(door.entry)entries.push(wall.rooms[0]);if(wall.rooms.length===2){links.get(wall.rooms[0]).add(wall.rooms[1]);links.get(wall.rooms[1]).add(wall.rooms[0]);}}
@@ -86,6 +91,26 @@ export function floorWalls(floor) {
   });
   return [...walls.values()];
 }
+export function splitRoom(floor,roomId,axis,coordinate){
+  if(!['x','z'].includes(axis)||!Number.isFinite(coordinate))fail('Choose a valid room split line.');
+  const room=floor.rooms.find(r=>r.id===roomId);if(!room)fail('Select a room first.');
+  const oldWalls=floorWalls(floor),oldDoors=floor.doors.map(d=>{const w=oldWalls.find(w=>w.id===d.wall),length=Math.hypot(w.b.x-w.a.x,w.b.z-w.a.z);return {...d,point:{x:w.a.x+(w.b.x-w.a.x)*d.offset/length,z:w.a.z+(w.b.z-w.a.z)*d.offset/length}};});
+  const ring=roomRing(floor,room),low=-10001,high=10001;
+  const clip=upper=>axis==='x'?[[upper?coordinate:low,low],[upper?high:coordinate,low],[upper?high:coordinate,high],[upper?coordinate:low,high]]:[[low,upper?coordinate:low],[high,upper?coordinate:low],[high,upper?high:coordinate],[low,upper?high:coordinate]];
+  const pieces=[false,true].map(upper=>polygons.intersection(region(ring),[clip(upper)]));
+  if(pieces.some(p=>p.length!==1||p[0].length!==1))fail('This line does not divide the room into two connected rooms. Choose another position.');
+  const pointId=([x,z])=>{const known=Object.entries(floor.vertices).find(([,p])=>Math.hypot(p.x-x,p.z-z)<EPS);if(known)return known[0];const id=`v_${crypto.randomUUID().replaceAll('-','')}`;floor.vertices[id]={x,z};return id;};
+  const loops=pieces.map(p=>{const pts=p[0][0];if(Math.hypot(pts[0][0]-pts.at(-1)[0],pts[0][1]-pts.at(-1)[1])<EPS)pts.pop();return pts.map(pointId);});
+  room.vertices=loops[0];const newRoom={...room,id:`room_${crypto.randomUUID().replaceAll('-','')}`,label:'New room',vertices:loops[1]};floor.rooms.push(newRoom);
+  // Split adjoining wall loops at the same vertex, keeping a single shared wall.
+  for(const r of floor.rooms)r.vertices=r.vertices.flatMap((id,i)=>{const next=r.vertices[(i+1)%r.vertices.length],a=floor.vertices[id],b=floor.vertices[next],dx=b.x-a.x,dz=b.z-a.z,length2=dx*dx+dz*dz;const middle=Object.entries(floor.vertices).filter(([key,p])=>key!==id&&key!==next&&Math.abs(cross(a,b,p))<EPS).map(([key,p])=>({key,t:((p.x-a.x)*dx+(p.z-a.z)*dz)/length2})).filter(p=>p.t>EPS&&p.t<1-EPS).sort((a,b)=>a.t-b.t);return [id,...middle.map(p=>p.key)];});
+  const walls=floorWalls(floor);
+  floor.doors=oldDoors.map(({point,...door})=>{const host=walls.find(w=>{const length=Math.hypot(w.b.x-w.a.x,w.b.z-w.a.z);return Math.abs(cross(w.a,w.b,point))<EPS&&Math.hypot(point.x-w.a.x,point.z-w.a.z)+Math.hypot(point.x-w.b.x,point.z-w.b.z)<length+EPS;});if(!host)fail('A doorway crosses this split. Move the doorway first.');return {...door,wall:host.id,offset:Math.hypot(point.x-host.a.x,point.z-host.a.z)};});
+  const connecting=walls.find(w=>w.rooms.includes(roomId)&&w.rooms.includes(newRoom.id)&&Math.hypot(w.b.x-w.a.x,w.b.z-w.a.z)>1.2);
+  if(!connecting)fail('The new shared wall needs enough space for a doorway.');
+  floor.doors.push({id:`door_${crypto.randomUUID().replaceAll('-','')}`,wall:connecting.id,offset:Math.hypot(connecting.b.x-connecting.a.x,connecting.b.z-connecting.a.z)/2,width:.9,height:Math.min(2.05,floor.height),entry:false});
+  return newRoom.id;
+}
 export function normalizeLayout(input,envelope) {
   if(input?.schemaVersion!==LAYOUT_VERSION)fail('Unsupported home layout version.');
   const mappedBoundary=validateRing(envelope.footprint),holes=(envelope.holes||[]).map(validateRing);
@@ -128,6 +153,7 @@ export function normalizeLayout(input,envelope) {
     layout.floors.push(floor);
   }
   const sorted=[...layout.floors].sort((a,b)=>a.elevation-b.elevation);
+  layout.floors=sorted;
   for(let i=1;i<sorted.length;i++)if(sorted[i].elevation<sorted[i-1].elevation+sorted[i-1].height+sorted[i-1].slab-EPS)fail('Floors overlap vertically.');
   if(!Array.isArray(input.stairs)||input.stairs.length>16)fail('Too many stairs.');
   for(const s of input.stairs){

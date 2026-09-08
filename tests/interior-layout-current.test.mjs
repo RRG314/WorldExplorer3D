@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {makeStarterLayout,normalizeLayout,compileLayout,containsRegion,validateRing,floorWalls,assertPlayableLayout} from '../functions/interior-layout.mjs';
+import {makeStarterLayout,normalizeLayout,compileLayout,containsRegion,validateRing,floorWalls,assertPlayableLayout,splitRoom} from '../functions/interior-layout.mjs';
 const envelope={revision:'mapped-v1',footprint:[{x:0,z:0},{x:10,z:0},{x:10,z:12},{x:0,z:12}],heightMeters:6};
 test('starter produces connected rooms and shared walls, not duplicate boxes',()=>{
   const layout=makeStarterLayout(envelope),floor=layout.floors[0],compiled=compileLayout(layout);
@@ -47,4 +47,9 @@ test('L and U stairs have flat full-width landings and reject shallow turns',()=
 test('a declared unit stays within the building without changing canonical footprint',()=>{
   const unitOutline=[{x:.1,z:.1},{x:5,z:.1},{x:5,z:11.9},{x:.1,z:11.9}],layout=makeStarterLayout(envelope,{unitOutline});assert.deepEqual(layout.unitOutline,unitOutline);
   layout.unitOutline[0].x=-1;assert.throws(()=>normalizeLayout(layout,envelope),/boundary/);
+});
+test('dividing a room joins adjacent wall vertices and preserves existing door routes',()=>{
+  const layout=makeStarterLayout(envelope),floor=layout.floors[0],oldDoors=floor.doors.map(d=>d.id);splitRoom(floor,floor.rooms[0].id,'x',3);
+  assert.equal(assertPlayableLayout(normalizeLayout(layout,envelope)),true);assert.equal(floor.rooms.length,4);assert.ok(oldDoors.every(id=>floor.doors.some(d=>d.id===id)));
+  assert.throws(()=>splitRoom(floor,floor.rooms[0].id,'x',-1),/divide/);
 });
