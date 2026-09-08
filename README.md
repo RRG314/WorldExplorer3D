@@ -15,14 +15,19 @@ space.
 <p align="center">
   <a href="https://worldexplorer3d.io/app/"><strong>Play World Explorer 3D</strong></a>
   · <a href="CONTROLS_REFERENCE.md">Controls</a>
-  · <a href="RELEASE_NOTES_5.2.0.md">What’s new</a>
+  · <a href="RELEASE_NOTES_2026_09_08.md">What’s new</a>
   · <a href="ROADMAP.md">Roadmap</a>
 </p>
 
-![An explorer and dog beside the current BMW, pedestrians, and traffic in World Explorer 3D](assets/readme/living-world-update-current.webp)
+![The current BMW chase view on East Pratt Street in World Explorer 3D](assets/readme/bmw-chase-september-2026.webp)
 
-*The current living-world build: a redesigned Explorer, permanent dog companion,
-BMW, pedestrians, and traffic sharing the same playable world.*
+*Explore real places—and help make them your own. September's update brings
+manual building-photo contributions, richer ground and building detail, and
+restored BMW chase and driver-seat views.*
+
+Read [A world worth making your own](RELEASE_NOTES_2026_09_08.md) for the latest
+changes, or the [full project description](docs/PROJECT_DESCRIPTION.md) for how
+travel, discovery, property, building, community and space fit together.
 
 ## A world you can play in
 

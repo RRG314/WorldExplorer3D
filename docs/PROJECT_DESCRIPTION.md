@@ -1,7 +1,7 @@
 # World Explorer 3D
 
-Updated September 7, 2026. Product description grounded in source `c801c19f`.
-For deployment status, use the [current test guide](CURRENT_TEST_GUIDE.md).
+Updated September 8, 2026. For rollout status and remaining limitations, see
+the [release status](RELEASE_AUDIT_2026_09_08.md).
 
 World Explorer 3D is a browser-based sandbox that turns mapped places into
 playable worlds. You can explore a neighborhood on foot, drive its streets,
@@ -23,6 +23,12 @@ land cover and place information. Buildings receive generated walls, windows,
 roofs and entrances where data supports them. Vegetation, people and traffic
 give those areas activity.
 
+Ground appearance uses categorical land-cover evidence and mapped context,
+with snow, dry ground, wetlands and forest surfaces instead of one universal
+grass texture. Trees use curated models and nearby collision obstacles, with
+distance-based detail. Available elevation still limits the shape of the world,
+especially where high-quality ground data is missing.
+
 This is not a continuously streamed, full-scale Earth. A session loads one
 bounded Earth location; travel switches location or environment. Mapped facts
 and generated gameplay remain distinct. A procedural storefront does not claim
@@ -43,6 +49,9 @@ vehicle entry, interaction and camera controls share the controls system rather
 than requiring unrelated interfaces for every activity. Controls can be
 configured; touch movement/look and action controls adapt the experience for
 phones. Consult the in-app Controls panel for the current bindings.
+
+The BMW offers a rear chase camera and a driver-seat view showing its actual
+interior. The default C binding cycles views, including overhead.
 
 The permanent BMW and personal plane remain free exploration options with full
 condition. Other vehicle gameplay includes condition, impacts and recovery.
@@ -152,9 +161,10 @@ media belongs in protected Storage; record metadata and decisions belong in
 Firestore. Saving an edit is not approval, and approving an exterior does not
 publish its interior.
 
-The newest source makes manual editing the default, adds device edit recovery
-and restricts paid generation. Those changes are not all in the deployed staging
-build yet. The current test guide states the exact boundary.
+Manual editing is the release path, with device edit recovery and revision-safe
+saves. Paid generation is retained for development rather than offered as the
+ordinary public workflow. The release status distinguishes tested behavior from
+production availability.
 
 Interior captures start private. Broader sharing must be an explicit choice
 and still pass review. A stretchable, photo-textured playable room is planned;

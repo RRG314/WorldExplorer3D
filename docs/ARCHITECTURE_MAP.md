@@ -1,5 +1,11 @@
 # World Explorer 3D Architecture
 
+September 8 camera ownership: `hud.js` keeps mode selection, collision-aware chase
+and overhead routing. `hud/driving-cabin-camera.js` owns the BMW local driver-eye
+transform and temporary near-plane adjustment; it does not add a second camera
+or input loop. `engine/curated-player-car.js` presents the exterior shell outward
+so its opaque backfaces do not obscure the separate interior from the driver.
+
 Earth reset also owns location-relative road grading state: corridor references,
 spatial index, publication metadata and height caches are released before the
 next terrain is sampled. This includes roadless destinations that skip transport

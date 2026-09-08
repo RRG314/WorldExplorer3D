@@ -1,5 +1,13 @@
 # World Explorer 3D System Inventory
 
+September 8 release follow-up: driving uses the existing camera-mode controller
+with a model-visible E34 driver seat and restored rear-target recovery. Cabin
+near clipping is scoped and restored on exit. Seven focused tests and inspected
+East Pratt C-key cycling screenshots support this change. Snow uses licensed
+Snow02 diffuse/normal/roughness textures; polar fallback classification remains
+separate from unavailable polar elevation. See the release audit for deployment
+status; physical Android and complex tunnel acceptance are not inferred here.
+
 World-transition terrain correction: old city road-grading profiles no longer
 carve a subsequently loaded desert/roadless region. Cleanup is part of the
 existing Earth ground reset, not a second terrain authority. Monaco→Niger
