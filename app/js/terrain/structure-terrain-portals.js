@@ -1,4 +1,34 @@
-const MAX_PORTAL_MASKS_PER_TERRAIN_MESH = 32;
+// Texture-backed descriptors avoid the former silent 32-opening truncation.
+const MAX_PORTAL_MASKS_PER_TERRAIN_MESH = Infinity;
+// The aperture must remove terrain at the pavement too. Leaving twelve
+// centimetres above it produces grass bands across shallow graded approaches.
+// Keep the same bounded volume for rendering, raycasts and support queries.
+const PORTAL_FLOOR_MARGIN = -0.02;
+
+export function portalFloorAt(mask, x, z) {
+  const dx = x - mask.x;
+  const dz = z - mask.z;
+  const along = dx * mask.tangentX + dz * mask.tangentZ;
+  const across = -dx * mask.tangentZ + dz * mask.tangentX;
+  if (Math.abs(across) > mask.halfWidth || Math.abs(along) > mask.halfDepth) return NaN;
+  return mask.roadY + along * (mask.grade || 0);
+}
+
+export function terrainPointRemovedByPortal(mask, point) {
+  const floor = portalFloorAt(mask, point.x, point.z);
+  return Number.isFinite(floor) && point.y > floor + PORTAL_FLOOR_MARGIN &&
+    point.y < floor + (Number(mask.cutHeight) || 6);
+}
+
+export function terrainHeightWithPortalCuts(masks, x, z, terrainY) {
+  let height = terrainY;
+  for (const mask of masks || []) {
+    if (terrainPointRemovedByPortal(mask, { x, y: terrainY, z })) {
+      height = Math.min(height, portalFloorAt(mask, x, z));
+    }
+  }
+  return height;
+}
 
 function maskRadius(mask) {
   return Math.hypot(Number(mask?.halfWidth) || 0, Number(mask?.halfDepth) || 0) + 2;
@@ -20,7 +50,7 @@ export function selectPortalMasksForBounds(bounds, masks = [], limit = MAX_PORTA
       Math.hypot(Number(left.x) - centerX, Number(left.z) - centerZ) -
       Math.hypot(Number(right.x) - centerX, Number(right.z) - centerZ)
     )
-    .slice(0, Math.max(1, Math.floor(Number(limit) || MAX_PORTAL_MASKS_PER_TERRAIN_MESH)));
+    .slice(0, Number.isFinite(limit) ? Math.max(1, Math.floor(limit)) : undefined);
 }
 
 function terrainMeshBounds(mesh) {
@@ -50,23 +80,24 @@ function installPortalMaskShader(material, masks) {
   }
   const previousOnBeforeCompile = material.userData.structurePortalOriginalHooks.onBeforeCompile;
   const previousProgramCacheKey = material.userData.structurePortalOriginalHooks.programCacheKey;
-  const maskA = masks.map((mask) => new THREE.Vector4(
-    Number(mask.x),
-    Number(mask.z),
-    Number(mask.tangentX),
-    Number(mask.tangentZ)
-  ));
-  const maskB = masks.map((mask) => new THREE.Vector4(
-    Number(mask.roadY),
-    Number(mask.grade) || 0,
-    Number(mask.halfWidth),
-    Number(mask.halfDepth)
-  ));
+  material.userData.structurePortalTexture?.dispose();
+  const data = new Float32Array(masks.length * 12);
+  masks.forEach((mask, index) => data.set([
+    mask.x, mask.z, mask.tangentX, mask.tangentZ,
+    mask.roadY, mask.grade || 0, mask.halfWidth, mask.halfDepth,
+    Number(mask.cutHeight) || 6, 0, 0, 0
+  ], index * 12));
+  const texture = new THREE.DataTexture(data, 3, masks.length, THREE.RGBAFormat, THREE.FloatType);
+  texture.needsUpdate = true;
+  material.userData.structurePortalTexture = texture;
+  if (!material.userData.structurePortalDisposeBound) {
+    material.addEventListener('dispose', () => material.userData.structurePortalTexture?.dispose());
+    material.userData.structurePortalDisposeBound = true;
+  }
   material.userData.structurePortalMaskCount = masks.length;
   material.onBeforeCompile = (shader, renderer) => {
     previousOnBeforeCompile?.(shader, renderer);
-    shader.uniforms.structurePortalMaskA = { value: maskA };
-    shader.uniforms.structurePortalMaskB = { value: maskB };
+    shader.uniforms.structurePortalMasks = { value: texture };
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',
@@ -79,19 +110,20 @@ function installPortalMaskShader(material, masks) {
     const fragmentPrelude = [
       '#include <common>',
       'varying vec3 vStructurePortalWorldPosition;',
-      `uniform vec4 structurePortalMaskA[${masks.length}];`,
-      `uniform vec4 structurePortalMaskB[${masks.length}];`
+      'uniform sampler2D structurePortalMasks;'
     ].join('\n');
     const fragmentCut = [
       '#include <clipping_planes_fragment>',
       `for (int structurePortalIndex = 0; structurePortalIndex < ${masks.length}; structurePortalIndex++) {`,
-      '  vec4 portalA = structurePortalMaskA[structurePortalIndex];',
-      '  vec4 portalB = structurePortalMaskB[structurePortalIndex];',
+      `  float portalRow = (float(structurePortalIndex) + 0.5) / ${masks.length}.0;`,
+      '  vec4 portalA = texture2D(structurePortalMasks, vec2(0.16666667, portalRow));',
+      '  vec4 portalB = texture2D(structurePortalMasks, vec2(0.5, portalRow));',
+      '  float cutHeight = texture2D(structurePortalMasks, vec2(0.83333333, portalRow)).x;',
       '  vec2 portalDelta = vStructurePortalWorldPosition.xz - portalA.xy;',
       '  float portalAlong = dot(portalDelta, portalA.zw);',
       '  float portalAcross = dot(portalDelta, vec2(-portalA.w, portalA.z));',
       '  float portalRoadY = portalB.x + portalAlong * portalB.y;',
-      '  if (abs(portalAcross) <= portalB.z && abs(portalAlong) <= portalB.w && vStructurePortalWorldPosition.y > portalRoadY + 0.12) discard;',
+      `  if (abs(portalAcross) <= portalB.z && abs(portalAlong) <= portalB.w && vStructurePortalWorldPosition.y > portalRoadY + ${PORTAL_FLOOR_MARGIN} && vStructurePortalWorldPosition.y < portalRoadY + cutHeight) discard;`,
       '}'
     ].join('\n');
     shader.fragmentShader = shader.fragmentShader
@@ -100,21 +132,45 @@ function installPortalMaskShader(material, masks) {
   };
   material.customProgramCacheKey = () => [
     previousProgramCacheKey?.() || '',
-    `structure-terrain-portals-v1:${masks.length}`
+    `structure-terrain-portals-v3:${masks.length}`
   ].join(':');
   material.needsUpdate = true;
   return true;
 }
 
 export function applyTerrainPortalMasksForContext(appCtx, masks = []) {
+  appCtx.structureTerrainPortalDescriptors = masks;
   const terrainMeshes = (appCtx?.terrainGroup?.children || []).filter(
-    (mesh) => mesh?.userData?.isTerrainMesh === true && mesh?.material && !Array.isArray(mesh.material)
+    (mesh) => (mesh?.userData?.isTerrainMesh === true || mesh?.userData?.isFarTerrainClipmap === true) &&
+      mesh?.material && !Array.isArray(mesh.material)
   );
   let maskedMeshes = 0;
   let publishedMasks = 0;
   for (const mesh of terrainMeshes) {
     const selected = selectPortalMasksForBounds(terrainMeshBounds(mesh), masks);
-    if (selected.length === 0) continue;
+    mesh.userData.structureTerrainPortalDescriptors = selected;
+    if (!mesh.userData.structurePortalOriginalRaycast) {
+      mesh.userData.structurePortalOriginalRaycast = mesh.raycast;
+      mesh.raycast = function (raycaster, intersects) {
+        const hits = [];
+        this.userData.structurePortalOriginalRaycast.call(this, raycaster, hits);
+        intersects.push(...hits.filter((hit) => !(this.userData.structureTerrainPortalDescriptors || [])
+          .some((mask) => terrainPointRemovedByPortal(mask, hit.point))));
+      };
+    }
+    if (selected.length === 0) {
+      const hooks = mesh.material.userData?.structurePortalOriginalHooks;
+      if (hooks) {
+        mesh.material.onBeforeCompile = hooks.onBeforeCompile;
+        mesh.material.customProgramCacheKey = hooks.programCacheKey;
+        mesh.material.userData.structurePortalTexture?.dispose();
+        mesh.material.userData.structurePortalTexture = null;
+        mesh.material.userData.structurePortalMaskCount = 0;
+        mesh.material.needsUpdate = true;
+      }
+      mesh.userData.structureTerrainPortalMasks = 0;
+      continue;
+    }
     if (installPortalMaskShader(mesh.material, selected)) {
       mesh.userData.structureTerrainPortalMasks = selected.length;
       maskedMeshes += 1;

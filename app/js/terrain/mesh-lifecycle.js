@@ -1,4 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
+import { cancelWorldCoverRecovery } from './worldcover-recovery.js';
 
 function ensureTerrainGroup() {
   if (!appCtx.terrainGroup) {
@@ -21,6 +22,7 @@ function getTerrainMeshKey(mesh) {
 function disposeTerrainMesh(mesh) {
   if (!mesh) return;
   if (mesh.userData) mesh.userData.terrainDisposed = true;
+  cancelWorldCoverRecovery(mesh);
   mesh?.userData?.worldCoverAbortController?.abort?.();
   const ownedTextures = new Set();
   const registerTexture = (texture) => {

@@ -41,8 +41,11 @@ body:has(#urbanVehiclePrompt.show) #discoveryContextPrompt,body:has(#interiorPro
 
 @media(min-width:761px){
   body:has(#floatMenuContainer.show) #discoveryQuickToolBtn{bottom:94px}
-  body:has(#floatMenuContainer.show) #discoveryContextPrompt{bottom:140px}
+  #discoveryContextPrompt{left:auto;right:16px;bottom:88px;transform:none;max-width:min(380px,calc(100vw - 32px))}
+  body:has(#floatMenuContainer.show) #discoveryContextPrompt{bottom:94px}
 }
+
+@media(max-width:760px){#discoveryContextPrompt{left:auto;right:12px;transform:none}}
 
 @layer interface {
   #discoveryPanel{width:min(500px,calc(100vw - 32px))}

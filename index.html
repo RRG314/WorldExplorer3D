@@ -12,6 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./styles/landing.css?v=4">
   <script src="./js/firebase-project-config.js"></script>
+  <script type="module" src="./js/site-analytics.js?v=1"></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -266,7 +267,7 @@
   </footer>
 
   <script type="module">
-    import { hasFirebaseConfig } from './js/firebase-init.js?v=56';
+    import { hasFirebaseConfig } from './js/firebase-init.js?v=57';
     import { ensureSignedIn } from './js/auth-ui.js?v=55';
     import { redirectToCheckout } from './js/billing.js?v=58';
     import { hydratePublicExplorerCount } from './js/public-site-stats.js?v=1';

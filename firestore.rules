@@ -1860,6 +1860,11 @@ service cloud.firestore {
         allow create, update, delete: if false;
       }
 
+      match /gameplay/{documentId} {
+        allow read: if isSelf(userId) && documentId in ['condition', 'vehicleUpgrades'];
+        allow create, update, delete: if false;
+      }
+
       match /propertyReceipts/{receiptId} {
         allow read: if isSelf(userId);
         allow create, update, delete: if false;
@@ -2015,6 +2020,54 @@ service cloud.firestore {
     match /propertyTradeOffers/{offerId} {
       allow read: if isSignedIn() &&
         (resource.data.proposerUid == request.auth.uid || resource.data.recipientUid == request.auth.uid);
+      allow create, update, delete: if false;
+    }
+
+    match /realityCaptures/{captureId} {
+      // Capture metadata is private until the trusted review pipeline creates a
+      // separate public exterior representation. Client state mutations are
+      // intentionally prohibited; Cloud Functions own every transition.
+      allow read: if isAdminToken() ||
+        (isSignedIn() && resource.data.ownerUid == request.auth.uid);
+      allow create, update, delete: if false;
+    }
+
+    match /privateSpaces/{spaceId} {
+      // Canonical private-space policy and guest lists are resolved by the
+      // backend. A public mapped building is not evidence of interior access.
+      allow read: if isAdminToken() ||
+        (isSignedIn() && resource.data.ownerUid == request.auth.uid);
+      allow create, update, delete: if false;
+
+      match /members/{memberUid} {
+        allow read: if isAdminToken() || isSelf(memberUid) ||
+          (isSignedIn() &&
+            get(/databases/$(database)/documents/privateSpaces/$(spaceId)).data.ownerUid == request.auth.uid);
+        allow create, update, delete: if false;
+      }
+
+      match /sessionGrants/{grantId} {
+        allow read, create, update, delete: if false;
+      }
+
+      match /oneTimeGrants/{grantId} {
+        allow read, create, update, delete: if false;
+      }
+    }
+
+    match /privateSpaceAccessRequests/{requestId} {
+      allow read: if isAdminToken() ||
+        (isSignedIn() &&
+          (resource.data.requesterUid == request.auth.uid || resource.data.ownerUid == request.auth.uid));
+      allow create, update, delete: if false;
+    }
+
+    match /buildingRepresentations/{representationId} {
+      // This registry contains public, approved EXTERIORS only. Private room
+      // resolution is always an authenticated backend operation.
+      allow read: if resource.data.status == 'approved' &&
+        resource.data.visibility == 'public' &&
+        resource.data.captureKind == 'exterior';
       allow create, update, delete: if false;
     }
 

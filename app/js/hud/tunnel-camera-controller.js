@@ -24,11 +24,11 @@ export function resolveTunnelCameraState(options = {}) {
   const angle = Number(options.angle) || 0;
   const lookYaw = Number(options.lookYaw) || 0;
   let road = options.road || null;
-  let envelope = resolveTunnelCameraEnvelope(road, x, z);
+  let envelope = resolveTunnelCameraEnvelope(road, x, z, options.y);
   let transitionOnly = false;
 
   if (!envelope.inside && activeRoad) {
-    const retainedAtActor = resolveTunnelCameraEnvelope(activeRoad, x, z);
+    const retainedAtActor = resolveTunnelCameraEnvelope(activeRoad, x, z, options.y);
     if (retainedAtActor.inside) {
       envelope = retainedAtActor;
       road = activeRoad;
@@ -45,7 +45,8 @@ export function resolveTunnelCameraState(options = {}) {
     const retainedAtCamera = resolveTunnelCameraEnvelope(
       activeRoad,
       x - Math.sin(trailingAngle) * trailingDistance,
-      z - Math.cos(trailingAngle) * trailingDistance
+      z - Math.cos(trailingAngle) * trailingDistance,
+      options.y
     );
     if (retainedAtCamera.inside) {
       envelope = retainedAtCamera;

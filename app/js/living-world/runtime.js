@@ -6,8 +6,8 @@ import {
   isLivingWorldPublicationActive
 } from './model.js?v=1';
 import { compileEntranceCatalog } from './entrance-catalog.js?v=6';
-import { compilePedestrianGraph, compileTrafficGraph, resolveDrivingSide } from './navigation-graphs.js?v=10';
-import { createLivingWorldPopulation } from './population.js?v=15';
+import { compilePedestrianGraph, compileTrafficGraph, resolveDrivingSide } from './navigation-graphs.js?v=12';
+import { createLivingWorldPopulation } from './population.js?v=22';
 
 function livingWorldTier(appCtx) {
   const requested = String(appCtx?.getDynamicBudgetState?.().tier || 'balanced').toLowerCase();
@@ -36,12 +36,69 @@ function pedestrianPointBlocked(appCtx, x, z) {
   return false;
 }
 
+function livingWorldActivityAnchors(appCtx) {
+  return Object.freeze((appCtx.pois || []).filter((poi) => (
+    Number.isFinite(Number(poi?.x)) && Number.isFinite(Number(poi?.z))
+  )).map((poi) => {
+    const text = [poi.type, poi.category, poi.tags?.amenity, poi.tags?.shop, poi.tags?.leisure, poi.tags?.tourism]
+      .filter(Boolean).join(' ').toLowerCase();
+    const kind = /station|terminal|bus|transit|subway|rail/.test(text) ? 'transit'
+      : /school|college|university/.test(text) ? 'education'
+        : /hospital|clinic|doctor|pharmacy/.test(text) ? 'medical'
+          : /park|garden|playground|attraction|museum/.test(text) ? 'leisure'
+            : /shop|store|retail|market|mall|cafe|restaurant/.test(text) ? 'retail' : 'local-place';
+    const weight = kind === 'transit' ? 6 : kind === 'retail' ? 5 : kind === 'education' || kind === 'medical' ? 4.5 : kind === 'leisure' ? 3.5 : 2;
+    return Object.freeze({ x: Number(poi.x), z: Number(poi.z), kind, weight, sourceFeatureId: String(poi.sourceFeatureId || '') });
+  }));
+}
+
+function sampleEdgeTransitionPlane(edge, x, z) {
+  const p1 = edge?.p1;
+  const p2 = edge?.p2;
+  if (![p1?.x, p1?.y, p1?.z, p2?.x, p2?.y, p2?.z].every(Number.isFinite)) return NaN;
+  const dx = p2.x - p1.x;
+  const dz = p2.z - p1.z;
+  const lengthSquared = dx * dx + dz * dz;
+  if (!(lengthSquared > 1e-6)) return Number(p1.y);
+  const t = Math.max(0, Math.min(1, ((Number(x) - p1.x) * dx + (Number(z) - p1.z) * dz) / lengthSquared));
+  return p1.y + (p2.y - p1.y) * t;
+}
+
+function sourceSegmentProjection(feature, edge, x, z) {
+  const segIndex = Number(edge?.sourceSegIndex);
+  if (!Number.isInteger(segIndex) || segIndex < 0 || segIndex >= (feature?.pts?.length || 0) - 1) return null;
+  const p1 = feature.pts[segIndex];
+  const p2 = feature.pts[segIndex + 1];
+  const dx = Number(p2?.x) - Number(p1?.x);
+  const dz = Number(p2?.z) - Number(p1?.z);
+  const lengthSquared = dx * dx + dz * dz;
+  if (!(lengthSquared > 1e-6)) return null;
+  const t = Math.max(0, Math.min(1, ((Number(x) - Number(p1.x)) * dx + (Number(z) - Number(p1.z)) * dz) / lengthSquared));
+  const projectedX = Number(p1.x) + dx * t;
+  const projectedZ = Number(p1.z) + dz * t;
+  return { segIndex, t, x: projectedX, z: projectedZ, pt: { x: projectedX, z: projectedZ } };
+}
+
+export function createTrafficVehicleSurfaceSampler(appCtx, trafficCompilation) {
+  return (edge, x, z) => {
+    const feature = trafficCompilation?.runtimeFeatureByEdge?.get(edge?.id);
+    const projection = feature ? sourceSegmentProjection(feature, edge, x, z) : null;
+    const surfaceY = Number(appCtx?.sampleFeatureSurfaceY?.(feature, x, z, projection));
+    // Graph lane endpoints already include the presentation clearance. A
+    // short inferred connector therefore uses its own continuous plane rather
+    // than dropping vehicles to an unrelated terrain or road surface.
+    if (!Number.isFinite(surfaceY)) return sampleEdgeTransitionPlane(edge, x, z);
+    return surfaceY + 0.08;
+  };
+}
+
 function disposeRuntimeState(appCtx, state, reason = 'disposed') {
   if (!state || state.disposed) return false;
   state.disposed = true;
   state.reason = String(reason || 'disposed');
   appCtx?.unregisterRuntimeOwner?.(state.owner);
   state.population?.dispose?.();
+  if (appCtx?.handleLivingWorldSelection === state.handleWorldSelection) delete appCtx.handleLivingWorldSelection;
   if (appCtx?.livingWorldRuntime === state) appCtx.livingWorldRuntime = null;
   return true;
 }
@@ -95,11 +152,13 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     })
   });
   const traversal = appCtx.buildTraversalNetworks?.() || { walk: null, drive: null };
+  const activityAnchors = livingWorldActivityAnchors(appCtx);
   const pedestrianCompilation = compilePedestrianGraph({
     traversal: traversal.walk,
     entrances: catalog.entrances,
     sampleSurface: appCtx.sampleFeatureSurfaceY,
     isBlockedPoint: (x, z) => pedestrianPointBlocked(appCtx, x, z),
+    activityAnchors,
     tier
   });
   const drivingSide = resolveDrivingSide(request.selection || request.location || {});
@@ -107,15 +166,10 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     traversal: traversal.drive,
     sampleSurface: appCtx.sampleFeatureSurfaceY,
     driveOnLeft: drivingSide.driveOnLeft,
+    activityAnchors,
     tier
   });
-  const sampleVehicleSurface = (edge, x, z) => {
-    const feature = trafficCompilation.runtimeFeatureByEdge.get(edge?.id);
-    const surfaceY = Number(appCtx.sampleFeatureSurfaceY?.(feature, x, z));
-    // Traffic graph nodes historically carry this small presentation clearance;
-    // keep it while replacing the endpoint plane with final-surface sampling.
-    return Number.isFinite(surfaceY) ? surfaceY + 0.08 : NaN;
-  };
+  const sampleVehicleSurface = createTrafficVehicleSurfaceSampler(appCtx, trafficCompilation);
   const population = createLivingWorldPopulation({
     pedestrianGraph: pedestrianCompilation.publication,
     trafficGraph: trafficCompilation.publication,
@@ -124,6 +178,16 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
       ? appCtx.Walk.state.walker
       : appCtx.droneMode ? appCtx.drone : appCtx.car,
     getTimePhase: () => appCtx.timeOfDay,
+    getTrafficFlow: () => appCtx.currentTrafficFlowProfile || null,
+    trafficControls: appCtx.trafficControlPlacements,
+    updateTrafficSignalVisuals(states) {
+      const byId = new Map(states.map((entry) => [entry.id, entry]));
+      (appCtx.streetFurnitureMeshes || []).forEach((object) => {
+        const controlId = String(object?.userData?.trafficControlId || '');
+        const state = byId.get(controlId);
+        if (state) object.userData.setTrafficSignalState?.(state.group0);
+      });
+    },
     sampleVehicleSurface,
     hasPedestrianLineOfSight(from, to) {
       const samples = [.33, .66];
@@ -159,7 +223,8 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     diagnostics: {
       entrances: catalog.diagnostics,
       facades: facades.diagnostics,
-      population: population.diagnostics
+      population: population.diagnostics,
+      activityAnchors: activityAnchors.length
     }
   });
   if (!appCtx.livingWorldPublicationStore) {
@@ -190,8 +255,39 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
     disposed: false,
     reason: null
   };
+  state.handleWorldSelection = (target) => {
+    const activeActor = appCtx.activeTransportActor?.();
+    const reference = activeActor?.position || (appCtx.Walk?.state?.mode === 'walk'
+      ? appCtx.Walk?.state?.walker
+      : appCtx.car) || { x: 0, z: 0 };
+    if (target?.kind === 'living-pedestrian') {
+      const pedestrian = population.pedestrianSnapshots().find((entry) => entry.id === target.id);
+      if (!pedestrian) return false;
+      const distance = Math.round(Math.hypot(pedestrian.x - Number(reference.x || 0), pedestrian.z - Number(reference.z || 0)));
+      const onFoot = appCtx.Walk?.state?.mode === 'walk';
+      appCtx.showWorldSelectionNotice?.(
+        target.label || 'Local person',
+        `${pedestrian.activity} · ${distance}m away${onFoot && distance <= 12 ? ' · E to talk' : onFoot ? '' : ' · exit nearby to talk'}`
+      );
+      if (distance <= 12) appCtx.urbanSandboxRuntime?.promoteNpc?.(pedestrian);
+      return true;
+    }
+    if (target?.kind === 'living-vehicle') {
+      const vehicle = population.vehicleSnapshots().find((entry) => entry.id === target.id);
+      if (!vehicle) return false;
+      const distance = Math.round(Math.hypot(vehicle.x - Number(reference.x || 0), vehicle.z - Number(reference.z || 0)));
+      const speedKph = Math.round(Math.max(0, Number(vehicle.speed || 0)) * 3.6);
+      appCtx.showWorldSelectionNotice?.(
+        target.label || 'Road vehicle',
+        `${vehicle.waiting ? vehicle.waitReason.replaceAll('_', ' ') : `${speedKph} km/h`} · ${distance}m away`
+      );
+      return true;
+    }
+    return false;
+  };
   appCtx.livingWorldPublication = publication;
   appCtx.livingWorldRuntime = state;
+  appCtx.handleLivingWorldSelection = state.handleWorldSelection;
   appCtx.registerRuntimeSystem?.({
     id: `${owner}:presentation`,
     owner,

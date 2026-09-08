@@ -131,6 +131,8 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
         lodTimer += frame.dt;
         if (lodTimer > 0.2) {
           lodTimer = 0;
+          appCtx.updateStreetFurnitureVisibility?.();
+          appCtx.updateVegetationFocus?.();
           appCtx.updateStructureVisualVisibility?.();
           appCtx.enforceEnvironmentSceneOwnership?.();
         }

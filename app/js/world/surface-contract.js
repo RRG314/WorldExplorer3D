@@ -278,7 +278,11 @@ function createSurfaceQuery(appCtx, GroundHeight) {
   const units = () => Math.max(0.000001, finiteOr(appCtx.METERS_PER_WORLD_UNIT, 1));
   const traversalBounds = () => earthTraversalBounds(profile(), appCtx);
   const airportSurfaceYAt = (x, z) => {
-    const y = Number(appCtx.transportFacilityVisual?.surfaceYAt?.(Number(x), Number(z)));
+    const raw = appCtx.transportFacilityVisual?.surfaceYAt?.(Number(x), Number(z));
+    // No airport contact is NOT a sea-level runway. Number(null) lifted every
+    // below-sea-level tunnel/road to zero whenever the facility sampler existed.
+    if (raw === null || raw === undefined || raw === '') return null;
+    const y = Number(raw);
     return Number.isFinite(y) ? y : null;
   };
   const airportSurfaceProvenance = Object.freeze({

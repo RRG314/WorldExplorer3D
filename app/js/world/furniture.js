@@ -1,4 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
+import {disposeVegetationBatch} from './vegetation-models.js';
 import {
   buildWorldVegetationInstancing,
   collectWorldVegetationPlacements
@@ -14,11 +15,20 @@ let furnitureGeometriesReady = false;
 let signTextureCache = new Map();
 let signTextGeometry = null;
 let worldCoverVegetationTimer = null;
+let vegetationFocus = null;
+
+const STREET_FURNITURE_VISIBILITY = Object.freeze({
+  street_lamp: Object.freeze({ enter: 360, exit: 430 }),
+  traffic_signal: Object.freeze({ enter: 300, exit: 360 }),
+  stop_sign: Object.freeze({ enter: 280, exit: 340 }),
+  street_name_sign: Object.freeze({ enter: 250, exit: 310 }),
+  waste_basket: Object.freeze({ enter: 190, exit: 240 }),
+  default: Object.freeze({ enter: 240, exit: 300 })
+});
 
 let matPole;
 let matSignBg;
 let matTreeShades;
-let matTrunk;
 let matLampHead;
 let matTrashBody;
 let matTrashLid;
@@ -30,8 +40,6 @@ let matStopSign;
 
 let geoSignPole;
 let geoSignBoard;
-let geoTreeCanopy;
-let geoTreeTrunk;
 let geoLampPole;
 let geoLampHead;
 let geoTrashBody;
@@ -97,7 +105,6 @@ function initFurnitureMaterials() {
     new THREE.MeshStandardMaterial({ color: 0x2a6b3e, roughness: 0.94, metalness: 0.0 }),
     new THREE.MeshStandardMaterial({ color: 0x1f6e2f, roughness: 0.94, metalness: 0.0 })
   ];
-  matTrunk = new THREE.MeshStandardMaterial({ color: 0x5c3a1e, roughness: 0.97, metalness: 0.0 });
   matLampHead = new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.5, metalness: 0.12, emissive: 0xffffaa, emissiveIntensity: 0.5 });
   appCtx.streetLampHeadMaterial = matLampHead;
   matTrashBody = new THREE.MeshStandardMaterial({ color: 0x3a5a3a, roughness: 0.9, metalness: 0.04 });
@@ -110,40 +117,11 @@ function initFurnitureMaterials() {
   furnitureMaterialsReady = true;
 }
 
-function createOrganicTreeCanopyGeometry() {
-  const geometry = new THREE.IcosahedronGeometry(2.9, 2);
-  const position = geometry.attributes.position;
-  const vertex = new THREE.Vector3();
-
-  for (let i = 0; i < position.count; i++) {
-    vertex.fromBufferAttribute(position, i);
-    const len = Math.max(1e-4, vertex.length());
-    const nx = vertex.x / len;
-    const ny = vertex.y / len;
-    const nz = vertex.z / len;
-    const ripple =
-      1 +
-      0.1 * Math.sin(nx * 3.6 + nz * 2.9) +
-      0.08 * Math.cos(nx * 5.2 - ny * 2.4 + nz * 4.1) +
-      0.06 * (ny > 0 ? 1 : -0.45);
-
-    vertex.x *= ripple * 1.04;
-    vertex.y *= ripple * (ny > 0 ? 1.18 : 0.9);
-    vertex.z *= ripple;
-    position.setXYZ(i, vertex.x, vertex.y + 0.45, vertex.z);
-  }
-
-  position.needsUpdate = true;
-  geometry.computeVertexNormals();
-  return geometry;
-}
 
 function initFurnitureGeometries() {
   if (furnitureGeometriesReady) return;
   geoSignPole = new THREE.CylinderGeometry(0.1, 0.1, 3.5, 6);
   geoSignBoard = new THREE.BoxGeometry(4, 0.8, 0.1);
-  geoTreeTrunk = new THREE.CylinderGeometry(0.24, 0.42, 4.6, 7);
-  geoTreeCanopy = createOrganicTreeCanopyGeometry();
   geoLampPole = new THREE.CylinderGeometry(0.12, 0.17, 7, 8);
   geoLampHead = new THREE.BoxGeometry(1.2, 0.22, 0.55);
   geoTrashBody = new THREE.CylinderGeometry(0.4, 0.35, 1.0, 8);
@@ -247,6 +225,56 @@ function markFurniture(group, kind, provenance = 'inferred') {
     hash = Math.imul(hash, 16777619);
   }
   group.userData.urbanEntityId = `furniture:${kind}:${(hash >>> 0).toString(16)}`;
+  group.userData.furnitureLodVisible = true;
+}
+
+function activeFurnitureReference() {
+  const contracted = appCtx.activeEarthActorPosition?.();
+  if (Number.isFinite(contracted?.x) && Number.isFinite(contracted?.z)) return contracted;
+  if (appCtx.boatMode?.active && Number.isFinite(appCtx.boat?.x) && Number.isFinite(appCtx.boat?.z)) return appCtx.boat;
+  if (appCtx.planeMode?.active && Number.isFinite(appCtx.planeMode?.x) && Number.isFinite(appCtx.planeMode?.z)) return appCtx.planeMode;
+  if (appCtx.droneMode && Number.isFinite(appCtx.drone?.x) && Number.isFinite(appCtx.drone?.z)) return appCtx.drone;
+  if (appCtx.Walk?.state?.mode === 'walk' && Number.isFinite(appCtx.Walk.state.walker?.x) && Number.isFinite(appCtx.Walk.state.walker?.z)) {
+    return appCtx.Walk.state.walker;
+  }
+  if (Number.isFinite(appCtx.car?.x) && Number.isFinite(appCtx.car?.z)) return appCtx.car;
+  return null;
+}
+
+export function updateStreetFurnitureVisibility(reference = activeFurnitureReference(), options = {}) {
+  const objects = appCtx.streetFurnitureMeshes || [];
+  // Interior entry temporarily suppresses overlapping world meshes and the
+  // planetary scene owner suppresses the entire Earth root. Do not compete
+  // with either authority by re-showing individual fixtures from this LOD pass.
+  if (appCtx.activeInterior || appCtx.earthSceneVisible === false || !reference ||
+      !Number.isFinite(reference.x) || !Number.isFinite(reference.z)) {
+    return appCtx.streetFurnitureVisibility || Object.freeze({ total: objects.length, visible: 0, culled: objects.length });
+  }
+  let visible = 0;
+  for (const object of objects) {
+    if (!object) continue;
+    const threshold = STREET_FURNITURE_VISIBILITY[object.userData?.furnitureKind] || STREET_FURNITURE_VISIBILITY.default;
+    const wasVisible = object.userData?.furnitureLodVisible !== false;
+    const radius = wasVisible ? threshold.exit : threshold.enter;
+    const dx = Number(object.position?.x) - Number(reference.x);
+    const dz = Number(object.position?.z) - Number(reference.z);
+    const lodVisible = Number.isFinite(dx) && Number.isFinite(dz) && dx * dx + dz * dz <= radius * radius;
+    object.userData.furnitureLodVisible = lodVisible;
+    object.visible = lodVisible;
+    if (lodVisible) visible += 1;
+  }
+  const snapshot = Object.freeze({
+    total: objects.length,
+    visible,
+    culled: Math.max(0, objects.length - visible),
+    referenceX: Number(reference.x),
+    referenceZ: Number(reference.z),
+    initialized: true,
+    source: String(options.source || 'runtime-lod')
+  });
+  appCtx.streetFurnitureVisibility = snapshot;
+  appCtx.setPerfLiveStat?.('streetFurnitureVisibility', snapshot);
+  return snapshot;
 }
 
 function createLightPost(x, z, provenance = 'inferred', roadTarget = null) {
@@ -305,7 +333,7 @@ function createTrashCan(x, z, provenance = 'inferred') {
   appCtx.streetFurnitureMeshes.push(group);
 }
 
-function createTrafficSignal(x, z, yaw = 0, provenance = 'inferred') {
+function createTrafficSignal(x, z, yaw = 0, provenance = 'inferred', control = {}) {
   const group = new THREE.Group();
   const pole = new THREE.Mesh(geoLampPole, matPole);
   pole.scale.set(.8, .83, .8);
@@ -314,20 +342,35 @@ function createTrafficSignal(x, z, yaw = 0, provenance = 'inferred') {
   const housing = new THREE.Mesh(geoSignalHousing, matSignalHousing);
   housing.position.set(0, 4.85, 0);
   group.add(housing);
+  const lenses = {};
   [
     { y: 5.32, material: matSignalRed },
     { y: 4.85, material: matSignalAmber },
     { y: 4.38, material: matSignalGreen }
-  ].forEach((entry) => {
-    const lens = new THREE.Mesh(geoSignalLens, entry.material);
+  ].forEach((entry, index) => {
+    const material = entry.material.clone();
+    const aspect = ['red', 'amber', 'green'][index];
+    const lens = new THREE.Mesh(geoSignalLens, material);
     lens.position.set(0, entry.y, .23);
     lens.scale.z = .45;
+    lens.userData.signalAspect = aspect;
+    lenses[aspect] = lens;
     group.add(lens);
   });
   group.position.set(x, terrainHeightAt(x, z), z);
   group.rotation.y = yaw;
   group.userData.furniturePos = { x, z };
   markFurniture(group, 'traffic_signal', provenance);
+  group.userData.trafficControlId = String(control.id || '');
+  group.userData.trafficControlCenter = { x: Number(control.x ?? x), z: Number(control.z ?? z) };
+  group.userData.setTrafficSignalState = (activeAspect = 'red') => {
+    const resolved = ['red', 'amber', 'green'].includes(activeAspect) ? activeAspect : 'red';
+    Object.entries(lenses).forEach(([aspect, lens]) => {
+      lens.material.emissiveIntensity = aspect === resolved ? 2.4 : .12;
+    });
+    group.userData.trafficSignalState = resolved;
+  };
+  group.userData.setTrafficSignalState('red');
   appCtx.addEarthWorldObject(group);
   appCtx.streetFurnitureMeshes.push(group);
 }
@@ -383,7 +426,10 @@ function nearestRoadsidePoint(point) {
         z: z + (dx / length) * offset * side,
         centerX: x,
         centerZ: z,
-        distance
+        distance,
+        yaw: Math.atan2(dx, dz),
+        road,
+        segmentIndex: index
       };
     }
   }
@@ -403,7 +449,14 @@ function trafficControlPlacements(mappedFurnitureNodes = [], roads = appCtx.road
           : amenity === 'waste_basket' ? 'waste_basket' : '';
     if (!kind) continue;
     const position = appCtx.geoToWorld(node.lat, node.lon);
-    exact.push({ kind, x: position.x, z: position.z, yaw: 0, provenance: 'mapped' });
+    exact.push({
+      id: `mapped-control:${node.type || 'node'}:${node.id || `${node.lat}:${node.lon}`}`,
+      kind,
+      x: position.x,
+      z: position.z,
+      yaw: 0,
+      provenance: 'mapped'
+    });
     if (kind === 'traffic_signal' || kind === 'stop_sign') exactPositions.push(position);
   }
   const topology = new Map();
@@ -416,12 +469,13 @@ function trafficControlPlacements(mappedFurnitureNodes = [], roads = appCtx.road
       topology.set(key, record);
     }
   }
-  const inferred = [...topology.values()].filter((entry) => entry.roads.length >= 3).map((entry) => {
+  const inferred = [...topology.entries()].filter(([, entry]) => entry.roads.length >= 3).map(([key, entry]) => {
     const significant = entry.roads.filter((road) => /primary|secondary|tertiary/i.test(String(road.type || ''))).length;
     const first = entry.roads[0]?.pts || [];
     const p1 = first[0] || entry;
     const p2 = first[1] || entry;
     return {
+      id: `inferred-control:${key}`,
       kind: significant >= 2 ? 'traffic_signal' : 'stop_sign',
       x: entry.x,
       z: entry.z,
@@ -439,8 +493,15 @@ export function generateStreetFurniture(options = {}) {
 
   const budget = getStreetFurnitureBudget();
   const semanticPlacements = trafficControlPlacements(options.mappedFurnitureNodes);
+  const orderedPlacements = [...semanticPlacements].sort((left, right) => {
+    const leftControl = left.kind === 'traffic_signal' || left.kind === 'stop_sign';
+    const rightControl = right.kind === 'traffic_signal' || right.kind === 'stop_sign';
+    if (leftControl !== rightControl) return leftControl ? -1 : 1;
+    return Math.hypot(left.x, left.z) - Math.hypot(right.x, right.z);
+  });
+  const publishedTrafficControls = [];
   let totalControls = 0;
-  semanticPlacements.forEach((placement) => {
+  orderedPlacements.forEach((placement) => {
     if (placement.kind === 'street_lamp') {
       const roadside = nearestRoadsidePoint(placement);
       return createLightPost(placement.x, placement.z, placement.provenance, roadside
@@ -449,11 +510,40 @@ export function generateStreetFurniture(options = {}) {
     }
     if (placement.kind === 'waste_basket') return createTrashCan(placement.x, placement.z, placement.provenance);
     if (totalControls >= budget.maxTrafficControls) return;
-    const roadside = nearestRoadsidePoint(placement) || placement;
-    if (placement.kind === 'traffic_signal') createTrafficSignal(roadside.x, roadside.z, placement.yaw, placement.provenance);
-    else createStopSign(roadside.x, roadside.z, placement.yaw, placement.provenance);
+    const roadside = nearestRoadsidePoint(placement);
+    // OSM control nodes often sit on the road centerline because they describe
+    // routing semantics. Never turn that logical point into a physical pole in
+    // the travel lane. An unmatched control remains semantic-only.
+    if (!roadside) {
+      publishedTrafficControls.push(Object.freeze({
+        ...placement,
+        fixtureX: null,
+        fixtureZ: null,
+        fixtureYaw: null,
+        placement: 'semantic-only'
+      }));
+      totalControls += 1;
+      return;
+    }
+    const published = Object.freeze({
+      ...placement,
+      fixtureX: roadside.x,
+      fixtureZ: roadside.z,
+      fixtureYaw: roadside.yaw,
+      placement: 'outside-road-envelope'
+    });
+    if (placement.kind === 'traffic_signal') createTrafficSignal(
+      roadside.x,
+      roadside.z,
+      roadside.yaw,
+      placement.provenance,
+      published
+    );
+    else createStopSign(roadside.x, roadside.z, roadside.yaw, placement.provenance);
+    publishedTrafficControls.push(published);
     totalControls += 1;
   });
+  appCtx.trafficControlPlacements = Object.freeze(publishedTrafficControls);
   const signSpacing = budget.signSpacing;
   const signedRoads = new Set();
   let totalSigns = 0;
@@ -545,22 +635,21 @@ export function generateStreetFurniture(options = {}) {
 }
 
 export function refreshWorldCoverVegetation() {
-  (appCtx.vegetationMeshes || []).forEach((mesh) => {
-    mesh?.parent?.remove?.(mesh);
-    if (Array.isArray(mesh?.material)) {
-      mesh.material.forEach((material) => {
-        if (material !== matTrunk) material?.dispose?.();
-      });
-    } else if (mesh?.material !== matTrunk) {
-      mesh?.material?.dispose?.();
-    }
-  });
+  const point=appCtx.activeTransportActor?.()?.position || {x:0,z:0};
+  vegetationFocus={x:point.x,z:point.z};
+  (appCtx.vegetationMeshes || []).forEach(disposeVegetationBatch);
   appCtx.clearWorldCollections?.(['vegetationMeshes', 'vegetationFeatures']);
-  return buildWorldVegetationInstancing(collectWorldVegetationPlacements(), {
-    initFurnitureMaterials,
-    initFurnitureGeometries,
-    getResources: () => ({ geoTreeTrunk, geoTreeCanopy, matTrunk })
-  });
+  return buildWorldVegetationInstancing(collectWorldVegetationPlacements());
+}
+
+export function updateVegetationFocus() {
+  if(appCtx.worldLoading || !appCtx.gameStarted || (appCtx.isEnv && appCtx.ENV && !appCtx.isEnv(appCtx.ENV.EARTH))) return;
+  const point=appCtx.activeTransportActor?.()?.position;
+  if(!point || !Number.isFinite(point.x) || !Number.isFinite(point.z)) return;
+  const refreshDistance=appCtx.worldSurfaceProfile?.biome?.id==='wetland'?60:450;
+  if(vegetationFocus && Math.hypot(point.x-vegetationFocus.x,point.z-vegetationFocus.z)<refreshDistance) return;
+  vegetationFocus={x:point.x,z:point.z};
+  scheduleWorldCoverVegetationRefresh();
 }
 
 export function scheduleWorldCoverVegetationRefresh() {
@@ -569,8 +658,15 @@ export function scheduleWorldCoverVegetationRefresh() {
   worldCoverVegetationTimer = globalThis.setTimeout(() => {
     worldCoverVegetationTimer = null;
     if (loadSequence !== appCtx._worldLoadSequence) return;
+    // Tile and model completions must not repeatedly rebuild a whole forest
+    // while roads/buildings/terrain are still being assembled. The finalizer
+    // can explicitly flush; ordinary completions coalesce after assembly.
+    if (appCtx.worldLoading) {
+      scheduleWorldCoverVegetationRefresh();
+      return;
+    }
     refreshWorldCoverVegetation();
-  }, 500);
+  }, 800);
 }
 
 export function flushWorldCoverVegetationRefresh() {
@@ -582,13 +678,22 @@ export function flushWorldCoverVegetationRefresh() {
 }
 
 export function resetWorldFurnitureCaches() {
+  vegetationFocus = null;
   if (worldCoverVegetationTimer) globalThis.clearTimeout(worldCoverVegetationTimer);
   worldCoverVegetationTimer = null;
+  signTextureCache.forEach((material) => {
+    material?.map?.dispose?.();
+    material?.dispose?.();
+  });
   signTextureCache.clear();
+  signTextGeometry?.dispose?.();
   signTextGeometry = null;
+  appCtx.streetFurnitureVisibility = Object.freeze({ total: 0, visible: 0, culled: 0, initialized: false });
 }
 
 Object.assign(appCtx, {
+  updateVegetationFocus,
   flushWorldCoverVegetationRefresh,
-  scheduleWorldCoverVegetationRefresh
+  scheduleWorldCoverVegetationRefresh,
+  updateStreetFurnitureVisibility
 });

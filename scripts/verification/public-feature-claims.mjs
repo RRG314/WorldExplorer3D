@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import {
+  compareEvidenceToBaseline,
+  currentBaseline,
+  readExecutionEvidence
+} from './execution-evidence.mjs';
 
 const root = process.cwd();
 const requireReady = process.argv.includes('--require-ready');
@@ -14,6 +19,13 @@ const failures = [];
 const forbiddenMatches = [];
 const missingClaimSources = [];
 const missingEvidenceCommands = [];
+const current = currentBaseline(root);
+const candidateEvidence = readExecutionEvidence(root, 'candidate');
+const backendEvidence = readExecutionEvidence(root, 'backend');
+const executionEvidenceFailures = {
+  candidate: compareEvidenceToBaseline(candidateEvidence, current, 'candidate'),
+  backend: compareEvidenceToBaseline(backendEvidence, current, 'backend')
+};
 
 if (manifest.schemaVersion !== 1) failures.push('schemaVersion must be 1');
 if (manifest.targetVersion !== packageJson.version) failures.push(`targetVersion must match package version ${packageJson.version}`);
@@ -36,13 +48,16 @@ for (const claim of manifest.claims || []) {
 if (forbiddenMatches.length) failures.push('forbidden public claims remain');
 if (missingClaimSources.length) failures.push(`claim sources missing: ${missingClaimSources.join(', ')}`);
 const candidateVerified = (manifest.claims || []).filter((claim) => claim.status === 'candidate-verified');
+const executionEvidenceCurrent = Object.values(executionEvidenceFailures).every((entries) => entries.length === 0);
 const releaseReady = failures.length === 0 && missingEvidenceCommands.length === 0 &&
-  candidateVerified.length === (manifest.claims || []).length;
+  candidateVerified.length === (manifest.claims || []).length && executionEvidenceCurrent;
 const report = {
   ok: failures.length === 0 && (!requireReady || releaseReady),
   contract: `world-explorer-${manifest.targetVersion}-public-feature-claims-v1`,
   structurallyValid: failures.length === 0,
   releaseReady,
+  executionEvidenceCurrent,
+  executionEvidenceFailures,
   claimCount: (manifest.claims || []).length,
   statusCounts: Object.fromEntries((manifest.allowedStatuses || []).map((status) => [
     status,

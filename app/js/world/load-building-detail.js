@@ -6,6 +6,7 @@ import {
   mergeMappedWaterStructures
 } from './water-structure-source.js?v=3';
 import { reviewedMappedVesselDataNear } from './reviewed-mapped-vessels.js?v=1';
+import { completeBuildingPublicationGroups } from './building-publication-groups.js';
 
 const COMPLETE_BUILDING_TILE_CAP = 1200;
 const BUILDING_COVERAGE_TARGET = 0.85;
@@ -313,7 +314,7 @@ export async function loadBuildingDetailForPublication(options = {}) {
         requestedBuildingWays: requested.length
       });
       const provenancePublicationCap = publicationSelection.globalCap;
-      const buildingWays = options.limitWaysByTileBudget(requested, nodes, {
+      const selectedWays = options.limitWaysByTileBudget(requested, nodes, {
         ...publicationSelection,
         tileDegrees: options.tileBudgetCfg.tileDegrees,
         // Mapped vessels and mapped tall-building identities are sparse,
@@ -322,6 +323,13 @@ export async function loadBuildingDetailForPublication(options = {}) {
         compareFn: (a, b) =>
           buildingPublicationPriority(b?.tags || {}) - buildingPublicationPriority(a?.tags || {})
       });
+
+      const groupedSelection = completeBuildingPublicationGroups(requested, selectedWays, provenancePublicationCap);
+      const buildingWays = groupedSelection.ways;
+      options.loadMetrics.buildings.groupSelection = {
+        restoredParts: groupedSelection.restoredParts,
+        deferredGroups: groupedSelection.deferredGroups
+      };
 
       options.loadMetrics.buildings.providerRequested = providerRequested.length;
       options.loadMetrics.buildings.requested = requested.length;
@@ -369,6 +377,7 @@ export async function loadBuildingDetailForPublication(options = {}) {
           ? appCtx.buildingProvenanceRecords.length
           : 0,
         publicationDiagnostics: {
+          groupSelection: options.loadMetrics.buildings.groupSelection,
           ...(options.loadMetrics.buildingPublication || {}),
           buildingDimensions: { ...(options.loadMetrics.buildingDimensions || {}) }
         },

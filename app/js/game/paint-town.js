@@ -1,5 +1,5 @@
 export { normalizePaintColorHex, ensurePaintTownState, setPaintTownPlayerColor } from "./paint-town/core.js?v=1";
-export { firePaintball, tryTouchPaintAt, updatePaintballProjectiles } from "./paint-town/projectiles.js?v=1";
+export { firePaintball, tryTouchPaintAt, updatePaintballProjectiles } from "./paint-town/projectiles.js?v=2";
 export {
   resetPaintTownMode,
   startPaintTownMode,
@@ -9,4 +9,4 @@ export {
   clearPaintTownMultiplayerConfig,
   applyPaintTownRemoteClaimsFromSync,
   paintTownDebugSnapshot
-} from "./paint-town/runtime.js?v=1";
+} from "./paint-town/runtime.js?v=2";

@@ -15,6 +15,7 @@ export function isSuppressedBaseBuilding(building) {
 
 export function clearBuildingSpatialIndex() {
   buildingSpatialIndex = new Map();
+  appCtx.transportStructureColliders = [];
 }
 
 export function addBuildingToSpatialIndex(building) {
@@ -78,7 +79,8 @@ export function getNearbyBuildings(x, z, radius = 80) {
   if (appCtx.activeShipInterior === true) return dynamicColliders;
 
   if (!Number.isFinite(x) || !Number.isFinite(z) || !buildingSpatialIndex || buildingSpatialIndex.size === 0) {
-    return baseBuildings.filter((building) => !isSuppressedBaseBuilding(building)).concat(dynamicColliders);
+    return baseBuildings.filter((building) => !isSuppressedBaseBuilding(building))
+      .concat(dynamicColliders, appCtx.transportStructureColliders || []);
   }
 
   const queryRadius = Math.max(20, radius);

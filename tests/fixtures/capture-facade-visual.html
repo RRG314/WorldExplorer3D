@@ -1,0 +1,27 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Facade alignment regression inspection</title>
+<style>body{margin:0;background:#14232d;color:white;font:16px system-ui}p{padding:0 20px}canvas{display:block;width:100%}</style>
+<p>Local regression scene · actual facade-detail publisher · photo coverage follows rendered walls. No uploads or publication.</p>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script type="module">
+import {publishBuildingExteriorDetails} from '/app/js/world/building-exterior-details.js';
+import {buildHybridShell,buildWallPatch} from '/app/js/reality-capture/hybrid-geometry.js';
+import {photoWallVerticalScale} from '/app/js/reality-capture/alignment.js';
+const T=THREE,scene=new T.Scene();scene.background=new T.Color('#b4ccda');
+const camera=new T.PerspectiveCamera(45,innerWidth/600,.1,400);camera.position.set(32,29,40);camera.lookAt(0,3,0);
+const renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(innerWidth,600);renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));document.body.append(renderer.domElement);
+scene.add(new T.HemisphereLight(0xffffff,0x6b7780,1));const sun=new T.DirectionalLight(0xffffff,.7);sun.position.set(10,40,20);scene.add(sun);
+const building={spatialContext:{footprint:[{x:-15,z:-5},{x:15,z:-5},{x:15,z:3},{x:3,z:3},{x:3,z:7},{x:-15,z:7}]}};
+const shell=buildHybridShell(T,building,8.5,{});scene.add(shell);
+const body=shell.children.find(o=>o.isMesh);body.material.userData.buildingExterior=true;
+body.userData={lodTier:'near',buildingFootprint:building.spatialContext.footprint,bodyHeightMeters:8.5,sourceBuildingId:'local-geometry-fixture',exteriorProfile:{familyId:'fixture',details:['masonry_cornice'],door:{width:1},storefrontStyle:'none'}};
+const ctx={buildingMeshes:[body],buildingEntranceByBuilding:new Map([['local-geometry-fixture',{x:0,z:-5}]]),addEarthWorldObject:o=>scene.add(o)};
+publishBuildingExteriorDetails(ctx);
+const image=document.createElement('canvas');image.width=512;image.height=256;const g=image.getContext('2d');g.fillStyle='#ae694f';g.fillRect(0,0,512,256);g.strokeStyle='#ebc4a6';g.lineWidth=3;
+for(let y=0;y<256;y+=24){g.beginPath();g.moveTo(0,y);g.lineTo(512,y);g.stroke();for(let x=(y%48?0:32);x<512;x+=64){g.beginPath();g.moveTo(x,y);g.lineTo(x,y+24);g.stroke();}}
+const tex=new T.CanvasTexture(image),patches=new T.Group();
+for(let wall=0;wall<6;wall++)patches.add(buildWallPatch(T,building,8,{wall,region:[0,0,1,1]},tex));
+patches.scale.y=photoWallVerticalScale({bodyHeightMeters:8.5},8);scene.add(patches);
+const ground=new T.Mesh(new T.PlaneGeometry(120,120),new T.MeshStandardMaterial({color:'#77866d'}));ground.rotation.x=-Math.PI/2;ground.position.y=-.02;scene.add(ground);
+const draw=()=>renderer.render(scene,camera);draw();
+window.advanceTime=async()=>draw();window.render_game_to_text=()=>JSON.stringify({ready:true,wallHeight:8.5,photoTop:8*patches.scale.y,mappedSides:6,detailBoxes:ctx.buildingExteriorDetailPublication?.boxes,cloudWrites:0});
+</script></html>

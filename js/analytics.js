@@ -1,5 +1,5 @@
 import { observeAuth } from './auth-ui.js?v=55';
-import { initFirebaseAnalytics, readFirebaseConfig } from './firebase-init.js?v=56';
+import { initFirebaseAnalytics, readFirebaseConfig } from './firebase-init.js?v=57';
 import { analyticsStorageAllowed, readAnalyticsConsent } from './analytics-consent.js?v=3';
 
 const ANALYTICS_EVENT_WORLD_START = 'we3d_world_session_start';

@@ -5,7 +5,7 @@ import { createFlowerMarkerRuntime } from "./flower-challenge/marker-runtime.js?
 import { normalizeLeaderboardId } from "./leaderboards/catalog.js?v=2";
 import { emitProductTelemetry } from "./platform/product-telemetry.js?v=1";
 import { getCurrentUser } from "../../js/auth-ui.js?v=55";
-import { initFirebase } from "../../js/firebase-init.js?v=56";
+import { initFirebase } from "../../js/firebase-init.js?v=57";
 
 const LOCAL_LEADERBOARD_KEY = 'worldExplorer3D.flowerChallenge.localLeaderboard.v1';
 const LOCAL_PAINT_LEADERBOARD_KEY = 'worldExplorer3D.paintTown.localLeaderboard.v1';

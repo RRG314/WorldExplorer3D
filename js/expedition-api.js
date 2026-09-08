@@ -1,4 +1,4 @@
-import { postProtectedFunction } from './function-api.js?v=1';
+import { postProtectedFunction } from './function-api.js?v=3';
 
 function roomCode(value) {
   const code = String(value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);

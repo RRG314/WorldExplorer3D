@@ -22,6 +22,7 @@ import {
   setTerrainSurfaceMaterialMixAt
 } from './surface-material-blend.js?v=2';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
+import { scheduleWorldCoverRecovery } from './worldcover-recovery.js';
 
 const SNOW_COLOR_HEX = 0xffffff; const ALPINE_SNOW_COLOR_HEX = 0xe5ebf2;
 const SAND_COLOR_HEX = 0xd7c08a;
@@ -315,6 +316,10 @@ function ensureTerrainSemanticTextureSets(mesh, repeats) {
     forest: terrainTextureSource('forest'),
     soil: terrainTextureSource('soil'),
     rock: terrainTextureSource('rock'),
+    snow: terrainTextureSource('snow'),
+    snowTextureSupported: Number(appCtx.renderer?.capabilities?.maxTextures || 0) >= 16,
+    snowUvScale: 1 / (2 * (Number(appCtx.WORLD_UNITS_PER_METER) || 1)),
+    baseSnowNormal: mesh.userData?.terrainVisualProfile?.mode === 'snow' && !mesh.userData?.worldCoverResult && !mesh.userData?.isFixedLocationTerrainLod,
     biomeId: String(appCtx.worldSurfaceProfile?.biome?.id || '')
   };
 }
@@ -556,6 +561,15 @@ function applyLoadedWorldCoverBaseline(mesh) {
   const result = mesh?.userData?.worldCoverResult;
   const material = mesh?.material;
   if (!result || !material || Array.isArray(material) || mesh.userData?.terrainDisposed) return false;
+  const bounds = mesh.userData?.terrainTile?.bounds;
+  if (bounds) refreshWorldBiomeFromWorldCoverStats(appCtx, worldCoverStatsForLocation(appCtx), {
+    key: result.key,
+    bounds,
+    counts: result.counts,
+    elevationMeters: typeof appCtx.elevationMetersAtLatLon === 'function'
+      ? appCtx.elevationMetersAtLatLon((bounds.latN + bounds.latS) / 2, (bounds.lonE + bounds.lonW) / 2)
+      : undefined
+  });
   mesh.userData.worldCoverStatus = 'ready';
   mesh.userData.worldCoverSummary = {
     key: result.key,
@@ -692,15 +706,16 @@ function queueWorldCoverBaseline(mesh, bounds) {
       Object.entries(result.counts || {}).forEach(([className, count]) => {
         stats.classes[className] = Number(stats.classes[className] || 0) + Number(count || 0);
       });
-      refreshWorldBiomeFromWorldCoverStats(appCtx, stats);
       applyLoadedWorldCoverBaseline(mesh);
     })
-    .catch(() => {
+    .catch((error) => {
       mesh.userData.worldCoverPromise = null;
       mesh.userData.worldCoverAbortController = null;
       if (mesh.userData.terrainDisposed) return;
       mesh.userData.worldCoverStatus = 'unavailable';
+      mesh.userData.worldCoverFailureReason = String(error?.message || error).slice(0,240);
       stats.failed += 1;
+      scheduleWorldCoverRecovery(mesh, () => queueWorldCoverBaseline(mesh, bounds));
     });
 }
 
@@ -726,19 +741,19 @@ export function applyTerrainVisualProfile(mesh, profile, repeats = null, options
   mesh.userData.terrainTextureRepeats = textureRepeats;
 
   if (nextMode === "snow" || nextMode === "snowRock") {
-    const textures = ensureTerrainTextureSet(mesh, textureRepeats, nextMode);
-    // Snow uses clean material response instead of the registered repeating
-    // ground scan. On large alpine slopes that directional scan produced
-    // visible diagonal bands and moire that read as terrain geometry.
-    mat.map = nextMode === "snow" ? null : textures?.map || null;
-    mat.normalMap = nextMode === "snow" ? null : textures?.normalMap || null;
-    mat.roughnessMap = nextMode === "snow" ? null : textures?.roughnessMap || null;
+    mesh.geometry.computeBoundingBox();
+    const span = mesh.geometry.boundingBox.max.x - mesh.geometry.boundingBox.min.x;
+    const snowRepeats = span / (2 * (Number(appCtx.WORLD_UNITS_PER_METER) || 1));
+    const textures = ensureTerrainTextureSet(mesh, nextMode === 'snow' ? snowRepeats : textureRepeats, nextMode);
+    mat.map = textures?.map || null;
+    mat.normalMap = textures?.normalMap || null;
+    mat.roughnessMap = textures?.roughnessMap || null;
     mat.color.setHex(nextMode === "snow" ? SNOW_COLOR_HEX : ALPINE_SNOW_COLOR_HEX);
     if (mat.emissive) mat.emissive.setHex(0x000000);
     mat.emissiveIntensity = 0;
     mat.roughness = nextMode === "snow" ? 0.94 : 0.86;
     mat.metalness = 0.01;
-    mat.normalScale = nextMode === "snow" ? new THREE.Vector2(0, 0) : new THREE.Vector2(0.2, 0.2);
+    mat.normalScale = nextMode === "snow" ? new THREE.Vector2(0.16, 0.16) : new THREE.Vector2(0.2, 0.2);
   } else if (nextMode === "sand") {
     const textures = ensureTerrainTextureSet(mesh, textureRepeats * 1.3, "sand");
     mat.map = textures?.map || null;

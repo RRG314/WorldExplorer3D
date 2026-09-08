@@ -1,6 +1,6 @@
 # World Explorer 3D Roadmap
 
-Last updated: 2026-09-03.
+Last updated: 2026-09-07.
 
 World Explorer 3D is growing toward a connected world sandbox: choose a real
 place, build an Explorer, travel by land, water, air, or space, and make a
@@ -9,6 +9,23 @@ of adding another disconnected menu or duplicate version of an existing
 feature.
 
 ## Product direction
+
+### Improve real places with photos
+
+Manual photo placement is the first contribution path: match pictures to the
+actual building sides, save the work, and submit it for review. The exterior
+pilot is being refined in staging. Private single-room editing, playable
+personal previews, shared contribution rooms, attribution and featured places
+are the next connected milestones—not released capabilities yet.
+
+Interiors start private. An owner must deliberately request public sharing,
+and the submitted interior must be approved before others can access it
+publicly. Exterior approval never opens an interior.
+
+Automated 3D reconstruction remains a development track, including future
+interior reconstruction and individual objects. It is not the public capture
+path while processing cost and reconstruction quality are being evaluated.
+
 
 The long-term game is organized around five connected parts:
 
@@ -29,7 +46,7 @@ Real-world context makes the sandbox recognizable, but it does not turn the
 game into a navigation, appraisal, ownership, wildlife-presence, or safety
 service. Unknown source data remains unknown.
 
-## Current release: 5.2
+## Current release candidate: 5.2
 
 Version 5.2 preserves the established 5.1 world and traversal experience while
 adding a connected Interstellar Expeditions Alpha, virtual property and Credits,
@@ -48,9 +65,9 @@ a clearer gameplay menu, and stronger transition, backend, and memory ownership.
 | Community | Bounded rooms, presence, chat, activities, shared Blocks, persistent room vehicles, and public game leaderboards | Larger-room review, moderation depth, clubs, events, and shared settlements |
 | Access and performance | Keyboard, touch, mobile layouts, accessibility settings, bounded loading, and lifecycle cleanup | Broader phone, browser, assistive-technology, battery, and thermal review |
 
-The 5.2 release is published from the exact owner-reviewed build after desktop
-and phone review, account and public leaderboard availability checks, and the
-production release gates pass.
+The 5.2 release is complete when the exact release build passes owner review on
+desktop and phone, its account and public leaderboard paths are available, and
+that approved build is published without being rebuilt.
 
 ## Next foundation: persistent player life
 
@@ -427,7 +444,7 @@ actions need authored form, readable animation, contact and collision, material
 variation, lighting, sound, and visible state change. Text may explain a result,
 but it cannot stand in for the action that produced it.
 
-Before Interstellar Expeditions can graduate beyond Alpha:
+Before a Space alpha can ship:
 
 - solid terrain must occlude the lower sky, support contact from both sides of
   the normal play envelope, continue to the visible horizon, and keep the pod,

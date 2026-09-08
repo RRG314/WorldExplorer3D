@@ -1,7 +1,7 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { sampleFeatureSurfaceY } from '../structure-semantics.js?v=63';
 import { createBridgeStructuralDetails } from './bridge-landmark-structure.js?v=1';
-import { applyPublishedTransportSurfaceControls } from './transport-surface-controls.js?v=2';
+import { applyPublishedTransportSurfaceControls } from './transport-surface-controls.js?v=3';
 
 const BRIDGE_COLOR = 0xbf4e3b;
 const MIN_SUSPENSION_SPAN_METERS = 600;
@@ -389,7 +389,7 @@ export function renderSuspensionBridgeLandmark(data) {
   const path = pathPoints(spanWay, nodes);
   const metrics = polylineMetrics(path);
   if (path.length < 3 || metrics.total < MIN_SUSPENSION_SPAN_METERS) return null;
-  const surfaceControl = applyPublishedTransportSurfaceControls({
+  let surfaceControl = applyPublishedTransportSurfaceControls({
     controls: data?._transportSurfaceControls,
     roads: appCtx.roads,
     referencePath: path
@@ -420,6 +420,29 @@ export function renderSuspensionBridgeLandmark(data) {
       spanMeters: Number(metrics.total.toFixed(1))
     }
   };
+  if (!Array.isArray(appCtx.pendingPublishedTransportSurfaceControls)) {
+    appCtx.pendingPublishedTransportSurfaceControls = [];
+  }
+  appCtx.pendingPublishedTransportSurfaceControls.push({
+    controls: data?._transportSurfaceControls,
+    referencePath: path,
+    onApplied(publication) {
+      surfaceControl = publication;
+      Object.assign(result.metrics, {
+        controlledRoads: publication.appliedRoads,
+        surfaceControlAuthority: publication.authority,
+        surfaceControlCandidates: Object.freeze((appCtx.roads || [])
+          .filter((road) => /golden gate bridge/i.test(String(road?.name || '')))
+          .map((road) => Object.freeze({
+            sourceFeatureId: String(road?.sourceFeatureId || ''),
+            name: String(road?.name || ''),
+            terrainMode: String(road?.structureSemantics?.terrainMode || ''),
+            sourceCompleteness: String(road?.sourceCompleteness || road?.tags?._sourceCompleteness || ''),
+            pointCount: Number(road?.pts?.length || 0)
+          })))
+      });
+    }
+  });
 
   const publishFromCompiledTransport = () => {
     const compiledSharedSurface = (appCtx.roads || []).map((road) =>

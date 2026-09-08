@@ -1,4 +1,4 @@
-const HOUSING_SCHEMA_VERSION = 1;
+const HOUSING_SCHEMA_VERSION = 2;
 const HOUSING_STORAGE_KEY = 'world-explorer:homes:v1';
 
 const RESIDENTIAL_TYPES = /house|residential|apartments|terrace|townhouse|detached|semidetached|bungalow|dormitory/;
@@ -72,14 +72,20 @@ function homeKind(buildingType = '') {
 
 function gamePrice(area, levels, identity, buildingType) {
   const type = String(buildingType || '').toLowerCase();
-  const adjustment = RESIDENTIAL_TYPES.test(type) ? -10
-    : /retail|commercial|supermarket|shop|kiosk/.test(type) ? 35
-      : /office/.test(type) ? 45
-        : /industrial|warehouse|factory|hangar/.test(type) ? 25
-          : /farm|barn|stable|agricultural/.test(type) ? 5
-            : /civic|school|hospital|church|government|public/.test(type) ? 20 : 12;
-  const value = 45 + Math.sqrt(Math.max(16, area)) * 2 + area * 0.02 + Math.max(1, levels) * 10 + (hashText(identity) % 17) + adjustment;
-  return Math.max(75, Math.min(250000, Math.round(value / 5) * 5));
+  const category = RESIDENTIAL_TYPES.test(type) ? 'residential'
+    : /retail|commercial|supermarket|shop|kiosk/.test(type) ? 'retail'
+      : /office/.test(type) ? 'office'
+        : /industrial|warehouse|factory|hangar/.test(type) ? 'industrial'
+          : /farm|barn|stable|agricultural/.test(type) ? 'agricultural'
+            : /civic|school|hospital|church|government|public/.test(type) ? 'civic' : 'mixed';
+  const floorArea = Math.max(16, area) * Math.max(1, levels);
+  const rate = { residential: 2300, retail: 3100, office: 3600, industrial: 1400, agricultural: 900, civic: 2800, mixed: 2600 }[category];
+  const minimum = { residential: 120000, retail: 180000, office: 240000, industrial: 160000, agricultural: 90000, civic: 250000, mixed: 160000 }[category];
+  const locationFactor = .82 + (hashText(identity) % 37) / 100;
+  const sizePremium = floorArea > 5000 ? 1.12 + Math.min(.28, Math.log10(floorArea / 5000) * .12) : 1;
+  const estimate = Math.max(minimum, (floorArea * rate + Math.max(16, area) * 350) * locationFactor * sizePremium);
+  const rounding = estimate >= 10000000 ? 100000 : estimate >= 1000000 ? 25000 : 5000;
+  return Math.max(minimum, Math.min(1500000000, Math.round(estimate / rounding) * rounding));
 }
 
 function storageCapacity(area, levels) {
@@ -140,7 +146,7 @@ function normalizeCandidate(building, options = {}, index = 0) {
     area: Math.round(area),
     levels,
     distance,
-    price: gamePrice(area, levels, id, buildingType),
+    price: gamePrice(area, levels, `world:${sourceId}`, buildingType),
     storageCapacity: storageCapacity(area, levels),
     mappedResidential: RESIDENTIAL_TYPES.test(buildingType),
     entryAnchor: null,
@@ -212,7 +218,12 @@ function parseState(storage) {
   try {
     const parsed = JSON.parse(storage?.getItem?.(HOUSING_STORAGE_KEY) || 'null');
     if (!parsed || typeof parsed !== 'object') return null;
-    const homes = (Array.isArray(parsed.homes) ? parsed.homes : []).map(normalizeHome).filter((home) => home.id);
+    const legacy = Number(parsed.schemaVersion || 1) < HOUSING_SCHEMA_VERSION;
+    const homes = (Array.isArray(parsed.homes) ? parsed.homes : []).map((home) => {
+      if (!legacy) return normalizeHome(home);
+      const migratedValue = gamePrice(finite(home.area, 16), finite(home.levels, 1), clean(home.id), clean(home.buildingType, 'building'));
+      return normalizeHome({ ...home, purchasePrice: migratedValue, currentValue: migratedValue });
+    }).filter((home) => home.id);
     return {
       schemaVersion: HOUSING_SCHEMA_VERSION,
       primaryHomeId: homes.some((home) => home.id === parsed.primaryHomeId) ? parsed.primaryHomeId : homes[0]?.id || '',

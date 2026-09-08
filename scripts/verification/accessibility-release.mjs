@@ -77,12 +77,24 @@ async function runDesktop() {
     await page.waitForSelector('#globeHubOverlay:not([hidden]) #accessibilitySettings', { timeout: 10_000 });
     const textTarget = await keyboardReach(page, (focused) => focused.id === 'accessibilityTextScale');
     assert.ok(textTarget, 'Keyboard Tab must reach text-size control.');
-    await page.keyboard.type('Extra');
-    await page.keyboard.press('Tab');
-    assert.equal(await page.evaluate(() => document.activeElement?.id), 'accessibilityReducedMotion');
+    await page.locator('#accessibilityTextScale').selectOption('200');
+    const noticeTarget = await keyboardReach(page, (focused) => focused.id === 'accessibilityNoticeDuration');
+    assert.ok(noticeTarget, 'Keyboard Tab must reach notice-duration control.');
+    await page.locator('#accessibilityNoticeDuration').selectOption('long');
+    const reticleTarget = await keyboardReach(page, (focused) => focused.id === 'accessibilityReticleSize');
+    assert.ok(reticleTarget, 'Keyboard Tab must reach reticle-size control.');
+    await page.locator('#accessibilityReticleSize').selectOption('large');
+    const motionTarget = await keyboardReach(page, (focused) => focused.id === 'accessibilityReducedMotion');
+    assert.ok(motionTarget, 'Keyboard Tab must reach reduced-motion control.');
     await page.keyboard.press('Space');
-    await page.keyboard.press('Tab');
-    assert.equal(await page.evaluate(() => document.activeElement?.id), 'accessibilityHighContrast');
+    const effectsTarget = await keyboardReach(page, (focused) => focused.id === 'accessibilityReducedEffects');
+    assert.ok(effectsTarget, 'Keyboard Tab must reach reduced-effects control.');
+    await page.keyboard.press('Space');
+    const contrastTarget = await keyboardReach(page, (focused) => focused.id === 'accessibilityHighContrast');
+    assert.ok(contrastTarget, 'Keyboard Tab must reach contrast control.');
+    await page.keyboard.press('Space');
+    const detailsTarget = await keyboardReach(page, (focused) => focused.id === 'accessibilityActionDetails');
+    assert.ok(detailsTarget, 'Keyboard Tab must reach persistent action-detail control.');
     await page.keyboard.press('Space');
     const settingsApplied = await page.evaluate(() => globalThis.getWorldExplorerAccessibilitySnapshot?.() || null);
     const trappedIds = [];
@@ -135,7 +147,13 @@ async function runDesktop() {
       noDuplicateIds: titleAudit.duplicateIds.length === 0 && worldAudit.duplicateIds.length === 0,
       liveRegionsPresent: titleAudit.liveRegions > 0 && worldAudit.liveRegions > 0,
       keyboardReachesControlsAndExplore: !!controlsTarget && !!startTarget,
-      accessibilitySettingsPersisted: settingsApplied?.settings?.textScale === '130' && settingsApplied?.settings?.reducedMotion === true && settingsApplied?.settings?.highContrast === true,
+      accessibilitySettingsPersisted: settingsApplied?.settings?.textScale === '200' &&
+        settingsApplied?.settings?.noticeDuration === 'long' &&
+        settingsApplied?.settings?.reticleSize === 'large' &&
+        settingsApplied?.settings?.reducedMotion === true &&
+        settingsApplied?.settings?.reducedEffects === true &&
+        settingsApplied?.settings?.highContrast === true &&
+        settingsApplied?.settings?.alwaysShowActionDetails === true,
       focusTrappedInModal: trappedIds.length === 24 && trappedIds.every((entry) => entry.inside),
       focusRestored: restoredFocus === 'controls',
       normalKeyboardWalking: walkedMeters >= 0.25,
@@ -173,15 +191,19 @@ async function runMobile() {
     await page.waitForTimeout(2_000);
     await page.locator('#controlsBarBtn').tap();
     await page.waitForSelector('#controlsTab.bar-open #accessibilitySettings', { timeout: 10_000 });
-    await page.locator('#accessibilityTextScale').selectOption('130');
+    await page.locator('#accessibilityTextScale').selectOption('160');
+    await page.locator('#accessibilityNoticeDuration').selectOption('persistent');
+    await page.locator('#accessibilityReticleSize').selectOption('large');
     await page.locator('#accessibilityReducedMotion').check();
+    await page.locator('#accessibilityReducedEffects').check();
     await page.locator('#accessibilityHighContrast').check();
+    await page.locator('#accessibilityActionDetails').check();
     const snapshot = await page.evaluate(() => globalThis.getWorldExplorerAccessibilitySnapshot?.() || null);
     const touchTargets = await page.evaluate(() => {
-      const ids = ['controlsBarBtn', 'mobileActionPrimary', 'mobileActionSecondary', 'mobileControlsReset', 'accessibilityTextScale', 'accessibilityReducedMotion', 'accessibilityHighContrast'];
+      const ids = ['controlsBarBtn', 'mobileActionPrimary', 'mobileActionSecondary', 'mobileControlsReset', 'accessibilityReset', 'accessibilityTextScale', 'accessibilityNoticeDuration', 'accessibilityReticleSize', 'accessibilityReducedMotion', 'accessibilityReducedEffects', 'accessibilityHighContrast', 'accessibilityActionDetails'];
       return ids.map((id) => {
         const control = document.getElementById(id);
-        const element = ['accessibilityReducedMotion', 'accessibilityHighContrast'].includes(id)
+        const element = ['accessibilityReducedMotion', 'accessibilityReducedEffects', 'accessibilityHighContrast', 'accessibilityActionDetails'].includes(id)
           ? control?.closest('label')
           : control;
         const rect = element?.getBoundingClientRect();
@@ -193,7 +215,13 @@ async function runMobile() {
     const checks = {
       viewport390x844: await page.evaluate(() => innerWidth === 390 && innerHeight === 844),
       liveGpsRemainsUnderActivities: liveGpsUnderActivities,
-      settingsApplied: snapshot?.settings?.textScale === '130' && snapshot?.settings?.reducedMotion === true && snapshot?.settings?.highContrast === true,
+      settingsApplied: snapshot?.settings?.textScale === '160' &&
+        snapshot?.settings?.noticeDuration === 'persistent' &&
+        snapshot?.settings?.reticleSize === 'large' &&
+        snapshot?.settings?.reducedMotion === true &&
+        snapshot?.settings?.reducedEffects === true &&
+        snapshot?.settings?.highContrast === true &&
+        snapshot?.settings?.alwaysShowActionDetails === true,
       touchTargetsAtLeast44: touchTargets.filter((entry) => entry.visible).every((entry) => entry.width >= 44 && entry.height >= 44),
       interactiveNames: audit.missingNames.length === 0,
       noDuplicateIds: audit.duplicateIds.length === 0,

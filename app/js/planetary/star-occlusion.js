@@ -1,5 +1,16 @@
 const MATERIAL_STATE_KEY = 'planetarySurfaceSkyState';
 const OBJECT_STATE_KEY = 'planetarySurfaceSkyObjectState';
+let planetaryHorizonPlane = null;
+
+function ensurePlanetaryHorizonPlane() {
+  if (planetaryHorizonPlane) return planetaryHorizonPlane;
+  if (globalThis.THREE?.Plane && globalThis.THREE?.Vector3) {
+    planetaryHorizonPlane = new globalThis.THREE.Plane(new globalThis.THREE.Vector3(0, 1, 0), 0);
+  } else {
+    planetaryHorizonPlane = { isPlane: true, normal: { x: 0, y: 1, z: 0 }, constant: 0 };
+  }
+  return planetaryHorizonPlane;
+}
 
 function drawableSkyObject(object) {
   return object?.isPoints === true || object?.isLine === true || object?.isLineSegments === true;
@@ -18,18 +29,27 @@ function setPlanetaryStarOcclusion(starField, active) {
           material.userData[MATERIAL_STATE_KEY] = Object.freeze({
             depthTest: material.depthTest,
             depthWrite: material.depthWrite,
-            transparent: material.transparent
+            transparent: material.transparent,
+            clippingPlanes: material.clippingPlanes,
+            clipIntersection: material.clipIntersection,
+            clipShadows: material.clipShadows
           });
         }
         material.depthTest = true;
         material.depthWrite = false;
         material.transparent = true;
+        material.clippingPlanes = [ensurePlanetaryHorizonPlane()];
+        material.clipIntersection = false;
+        material.clipShadows = false;
       } else {
         const state = material.userData[MATERIAL_STATE_KEY];
         if (!state) return;
         material.depthTest = state.depthTest;
         material.depthWrite = state.depthWrite;
         material.transparent = state.transparent;
+        material.clippingPlanes = state.clippingPlanes;
+        material.clipIntersection = state.clipIntersection;
+        material.clipShadows = state.clipShadows;
         delete material.userData[MATERIAL_STATE_KEY];
       }
       material.needsUpdate = true;
@@ -53,4 +73,10 @@ function setPlanetaryStarOcclusion(starField, active) {
   return changed;
 }
 
-export { setPlanetaryStarOcclusion };
+function updatePlanetaryStarHorizon(starField, cameraY) {
+  if (starField?.userData?.planetarySurfaceOcclusion !== true || !Number.isFinite(Number(cameraY))) return false;
+  ensurePlanetaryHorizonPlane().constant = -Number(cameraY) + 0.04;
+  return true;
+}
+
+export { setPlanetaryStarOcclusion, updatePlanetaryStarHorizon };

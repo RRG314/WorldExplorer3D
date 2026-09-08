@@ -1,9 +1,9 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { AVIATION_FLEET_CATALOG, getAviationCatalogEntry } from './aviation-catalog.js?v=4';
+import { AVIATION_FLEET_CATALOG, getAviationCatalogEntry } from './aviation-catalog.js?v=5';
 import { aircraftGroundOffset, createAircraftVisual, updateAircraftVisual } from './aircraft-visual-recipe.js?v=11';
 import { applyTransportDamage } from './damage-model.js?v=1';
 import { ENTITY_LIFECYCLE_MS, lifecycleExpired, markLifecycleStart } from '../runtime/entity-lifecycle-policy.js?v=1';
-import { evaluateAircraftSkydivingExit } from '../urban-sandbox/parachute-model.js?v=6';
+import { evaluateAircraftSkydivingExit } from '../urban-sandbox/parachute-model.js?v=7';
 import { advanceAmbientRouteMotion, ambientRouteSnapshot, createAmbientRouteMotion } from './ambient-route-motion.js?v=1';
 import { compileAirportOperationalLayout, offsetPoint } from './airport-layout.js?v=6';
 import { createAirportHub } from './airport-hub.js?v=4';
@@ -184,7 +184,16 @@ function derivedFleet(graph, options = {}) {
       anchorFacilityId: anchor.id,
       anchorFacilityType: anchor.type,
       standId: stand.id,
-      trafficIntent: index === 1 || index === Math.min(8, layout.stands.length - 1) ? 'circuit' : index % 6 === 3 ? 'taxi' : 'parked',
+      // Every published airport fleet with at least five stands puts a
+      // taxi-capable business/regional/airliner class in slot 2. Assigning
+      // taxi duty to slot 3 selected the expedition prop in every catalog
+      // pattern, so the motion authority correctly rejected it and airports
+      // appeared static.
+      trafficIntent: index === 2
+        ? 'taxi'
+        : index === 1 || index === Math.min(8, layout.stands.length - 1)
+          ? 'circuit'
+          : 'parked',
       mapped: false,
       generatedActivity: true,
       provenance: Object.freeze({
@@ -560,7 +569,8 @@ function beginSkydiving(runtime, candidate) {
   appCtx.prepareAirborneParachute?.({
     autoEquip: eligibility.autoEquip,
     clearance: eligibility.clearance,
-    source: 'aircraft_exit'
+    source: 'aircraft_exit',
+    sourcePosition: { x: snapshot.x, y: snapshot.y, z: snapshot.z }
   });
   appCtx.updateControlsModeUI?.();
   return true;

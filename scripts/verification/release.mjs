@@ -2,8 +2,8 @@ import { spawnSync } from 'node:child_process';
 
 const steps = [
   {
-    name: 'Current release scope and public claims',
-    command: [process.execPath, 'scripts/verification/release-scope.mjs', '--require-ready']
+    name: 'Validate release scope structure',
+    command: [process.execPath, 'scripts/verification/release-scope.mjs']
   },
   {
     name: 'Firebase Functions syntax',
@@ -29,8 +29,16 @@ const steps = [
   },
   {
     name: 'Run the complete backend authority matrix',
-    command: ['npm', 'run', 'verify:backend-release'],
+    command: [process.execPath, 'scripts/verification/system-release.mjs', '--run', '--scope=backend'],
     environment: { WE3D_VERIFY_ROOT: 'dist' }
+  },
+  {
+    name: 'Require current execution-backed release readiness',
+    command: [process.execPath, 'scripts/verification/release-scope.mjs', '--require-ready']
+  },
+  {
+    name: 'Require current execution-backed public claims',
+    command: [process.execPath, 'scripts/verification/public-feature-claims.mjs', '--require-ready']
   }
 ];
 

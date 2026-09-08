@@ -1,13 +1,18 @@
 import { getApp, getApps, initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
 import { connectAuthEmulator, getAuth } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
 import { connectFirestoreEmulator, getFirestore } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
-import { analyticsStorageAllowed } from './analytics-consent.js?v=3';
+import { connectStorageEmulator, getStorage } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-storage.js';
+import {
+  ReCaptchaEnterpriseProvider,
+  getToken as getAppCheckToken,
+  initializeAppCheck
+} from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app-check.js';
+import { getAnalyticsTools } from './analytics-service.js?v=1';
 
 const FIREBASE_CONFIG_STORAGE_KEY = 'worldExplorer3D.firebaseConfig';
 
 let cachedServices = null;
-let cachedAnalytics = undefined;
-let cachedAnalyticsPromise = null;
+let cachedAppCheck = null;
 
 function readEmulatorConfig() {
   const raw = globalThis.WORLD_EXPLORER_FIREBASE_EMULATORS;
@@ -15,7 +20,8 @@ function readEmulatorConfig() {
   const host = String(raw.host || '127.0.0.1').trim() || '127.0.0.1';
   const authPort = Math.max(1, Math.min(65535, Math.floor(Number(raw.authPort || 9099))));
   const firestorePort = Math.max(1, Math.min(65535, Math.floor(Number(raw.firestorePort || 8080))));
-  return { host, authPort, firestorePort };
+  const storagePort = Math.max(1, Math.min(65535, Math.floor(Number(raw.storagePort || 9199))));
+  return { host, authPort, firestorePort, storagePort };
 }
 
 function normalizeConfig(raw) {
@@ -28,7 +34,8 @@ function normalizeConfig(raw) {
     storageBucket: String(raw.storageBucket || '').trim(),
     messagingSenderId: String(raw.messagingSenderId || '').trim(),
     appId: String(raw.appId || '').trim(),
-    measurementId: String(raw.measurementId || '').trim()
+    measurementId: String(raw.measurementId || '').trim(),
+    appCheckSiteKey: String(raw.appCheckSiteKey || '').trim()
   };
 
   if (!cfg.apiKey || !cfg.projectId || !cfg.appId) return null;
@@ -66,54 +73,38 @@ export function initFirebase() {
   const app = getApps().length > 0 ? getApp() : initializeApp(config);
   const auth = getAuth(app);
   const db = getFirestore(app);
+  const storage = getStorage(app);
+  if (!cachedAppCheck && config.appCheckSiteKey) {
+    cachedAppCheck = initializeAppCheck(app, {
+      provider: new ReCaptchaEnterpriseProvider(config.appCheckSiteKey),
+      isTokenAutoRefreshEnabled: true
+    });
+  }
   const emulator = readEmulatorConfig();
   if (emulator) {
     connectAuthEmulator(auth, `http://${emulator.host}:${emulator.authPort}`, { disableWarnings: true });
     connectFirestoreEmulator(db, emulator.host, emulator.firestorePort);
+    connectStorageEmulator(storage, emulator.host, emulator.storagePort);
   }
 
-  cachedServices = { app, auth, db, config, emulator };
+  cachedServices = { app, auth, db, storage, appCheck: cachedAppCheck, config, emulator };
   return cachedServices;
 }
 
+export async function getFirebaseAppCheckToken() {
+  const services = initFirebase();
+  if (!services?.appCheck) return '';
+  try {
+    const result = await getAppCheckToken(services.appCheck, false);
+    return String(result?.token || '');
+  } catch (_) {
+    return '';
+  }
+}
+
 export async function initFirebaseAnalytics() {
-  if (cachedAnalytics !== undefined) return cachedAnalytics;
-  if (cachedAnalyticsPromise) return cachedAnalyticsPromise;
-
-  cachedAnalyticsPromise = (async () => {
-    const services = initFirebase();
-    const measurementId = String(services?.config?.measurementId || '').trim();
-    if (!services?.app || !measurementId || typeof window === 'undefined') {
-      cachedAnalytics = null;
-      return cachedAnalytics;
-    }
-
-    try {
-      const analyticsMod = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-analytics.js');
-      const supported = typeof analyticsMod.isSupported === 'function'
-        ? await analyticsMod.isSupported().catch(() => false)
-        : false;
-      if (!supported) {
-        cachedAnalytics = null;
-        return cachedAnalytics;
-      }
-      analyticsMod.setConsent?.({
-        analytics_storage: analyticsStorageAllowed() ? 'granted' : 'denied',
-        ad_storage: 'denied',
-        ad_user_data: 'denied',
-        ad_personalization: 'denied'
-      });
-      cachedAnalytics = analyticsMod.getAnalytics(services.app);
-      return cachedAnalytics;
-    } catch (_) {
-      cachedAnalytics = null;
-      return cachedAnalytics;
-    }
-  })().finally(() => {
-    cachedAnalyticsPromise = null;
-  });
-
-  return cachedAnalyticsPromise;
+  if (typeof window === 'undefined') return null;
+  return (await getAnalyticsTools(readFirebaseConfig()))?.analytics || null;
 }
 
 export function setFirebaseConfig(config) {

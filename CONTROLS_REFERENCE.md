@@ -1,12 +1,13 @@
 # Controls Reference
 
-Last reviewed: 2026-09-03 for World Explorer 3D 5.2.0.
+Last reviewed: 2026-09-06 for World Explorer 3D 5.2.0.
 
 Canonical control map for current runtime behavior.
 
 ## Global Controls
 
 - `F`: cycle character / car / plane / drone
+- `H`: use a nearby mapped mechanic when one is in range
 - `P`: enter or leave plane mode directly
 - `G`: enter or leave boat travel when available
 - `C`: cycle camera mode
@@ -37,9 +38,10 @@ distant target, and mobile uses the matching on-screen Action button.
 
 ## Driving Mode
 
-- `ArrowUp` / `ArrowDown`: accelerate / reverse
-- `ArrowLeft` / `ArrowRight`: steer left / right
-- `W` / `A` / `S` / `D`: look around; chase view recenters automatically
+- `W` / `S`: accelerate / brake and reverse
+- `A` / `D`: steer left / right
+- Arrow keys: complete alternate driving controls
+- `Right Click + Drag` or `Middle Click + Drag`: look around; chase view recenters automatically
 - `Space`: handbrake / drift trigger at speed
 - `Ctrl`: boost
 - `E`: exit the current vehicle when stopped safely, or use the visible context action
@@ -50,13 +52,14 @@ Handling note:
 
 ## Walking Mode
 
-- `ArrowUp` / `ArrowDown`: move forward/back
+- `W` / `S`: move forward/back
+- `A` / `D`: strafe left/right
+- `ArrowUp` / `ArrowDown`: alternate forward/back
 - `ArrowLeft` / `ArrowRight`: turn left/right
-- `W` / `A` / `S` / `D`: look around
 - `E`: use the visible contextual door, vehicle, person, or object
 - `Space`: jump
 - `Shift`: run
-- `Right Click + Drag` or `Middle Click + Drag`: mouse look
+- Drag on the world with the left, right, or middle mouse button: look around
 
 Walking/navigation note:
 
@@ -66,11 +69,12 @@ Walking/navigation note:
 
 ## Drone Mode
 
-- `ArrowUp` / `ArrowDown`: fly forward/back relative to the drone
-- `ArrowLeft` / `ArrowRight`: turn the drone
-- `W` / `A` / `S` / `D`: look around independently
+- `W` / `S`: fly forward/back relative to the drone
+- `A` / `D`: turn the drone
+- Arrow keys: complete alternate flight controls
 - `Space`: ascend
 - `Shift` or `Ctrl`: descend
+- `Right Click + Drag` or `Middle Click + Drag`: look around independently
 
 ## Rocket/Space Flight Mode
 
@@ -81,9 +85,9 @@ Walking/navigation note:
 
 ## Camera and Mouse
 
-- right-click hold: camera look
-- middle-click hold: camera look
-- left click: gameplay interaction by mode
+- right-click or middle-click drag: camera look in every traversal mode
+- left drag on the world: camera look while walking when no weapon or build tool owns the pointer
+- left click without dragging: gameplay interaction by mode
 - double-left-click camera toggle: disabled
 
 ## Paint the Town

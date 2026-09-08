@@ -67,6 +67,9 @@ export const VEHICLE_COLLISION_PROFILE = Object.freeze({
 });
 
 function isRoadGhostCollision(buildingCheck, nearestRoad) {
+  // Solid tunnel lining must not be waived merely because the car is still
+  // near a road centerline (including a neighboring/overlying carriageway).
+  if (buildingCheck?.building?.geometrySource === 'compiled_transport_structures') return false;
   const roadDist = Number.isFinite(nearestRoad?.dist)
     ? nearestRoad.dist
     : Infinity;
@@ -92,9 +95,6 @@ function isRoadGhostCollision(buildingCheck, nearestRoad) {
     partKind === 'canopy' ||
     building.collisionKind === 'thin_part' ||
     building.allowsPassageBelow === true;
-  const neighboringTunnelShellOnRoadCore =
-    onRoadCore &&
-    building.geometrySource === 'compiled_transport_structures';
   const shallowRoadsideCollision =
     !!buildingCheck?.collision &&
     onRoadCenter &&
@@ -107,8 +107,7 @@ function isRoadGhostCollision(buildingCheck, nearestRoad) {
     (
       (onRoadCenter && colliderDetail !== 'full') ||
       (onRoadCore && buildingCheck.inside && colliderDetail !== 'full') ||
-      (onRoadCenter && roofLikeCollider) ||
-      neighboringTunnelShellOnRoadCore
+      (onRoadCenter && roofLikeCollider)
     );
   return shallowRoadsideCollision || likelyRoadGhostCollision;
 }

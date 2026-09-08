@@ -30,6 +30,8 @@ function airportSelection(overrides = {}) {
 test('only an explicit airport selection authorizes the bounded exact airport source', () => {
   assert.equal(isAirportSelection({ lat: 39.29, lon: -76.61, locationDetails: { kind: 'City' } }), false);
   assert.equal(normalizeAirportBounds({ lat: 39.29, lon: -76.61, locationDetails: { kind: 'City' } }), null);
+  assert.equal(isAirportSelection({ lat: 39.1774, lon: -76.6684, name: 'BWI Airport' }), true);
+  assert.ok(normalizeAirportBounds({ lat: 39.1774, lon: -76.6684, name: 'BWI Airport' }));
   assert.equal(isAirportSelection(airportSelection()), true);
   const bounds = normalizeAirportBounds(airportSelection());
   assert.ok(bounds.minLat < 39.1747 && bounds.maxLat > 39.1747);

@@ -6,6 +6,9 @@
   "functions": {
     "source": "functions"
   },
+  "storage": {
+    "rules": "storage.rules"
+  },
   "emulators": {
     "auth": {
       "host": "127.0.0.1",
@@ -19,6 +22,10 @@
     "functions": {
       "host": "127.0.0.1",
       "port": 5101
+    },
+    "storage": {
+      "host": "127.0.0.1",
+      "port": 9299
     },
     "ui": {
       "enabled": false

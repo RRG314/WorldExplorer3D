@@ -7,6 +7,10 @@
       "physicalSurfaceKind": "bridge_deck",
       "match": {
         "mappedName": "Golden Gate Bridge",
+        "sourceFeatureIds": [
+          "osm:way:537838948",
+          "osm:way:595194543"
+        ],
         "terrainMode": "elevated",
         "maximumDistanceFromReferencePathMeters": 45
       },

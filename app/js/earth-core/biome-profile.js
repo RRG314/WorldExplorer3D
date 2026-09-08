@@ -7,6 +7,9 @@ export function classifyBiomeProfile(options = {}) {
   const absLatitude = Math.abs(latitude);
   const signals = options.signals || {};
   const vegetated = boundedRatio(signals.vegetated);
+  // Older mapped summaries lack tree-specific coverage. Keep that legacy
+  // input usable, but never reinterpret known grass/crop/moss cover as trees.
+  const woody = Number.isFinite(signals.woody) ? boundedRatio(signals.woody) : vegetated;
   const water = boundedRatio(signals.water);
   const arid = boundedRatio(signals.arid);
   const cryo = boundedRatio(signals.cryo);
@@ -15,14 +18,15 @@ export function classifyBiomeProfile(options = {}) {
   const reliefMeters = Math.max(0, Number(options.reliefMeters) || 0);
 
   let id = 'temperate-mosaic';
-  if (absLatitude >= 86 || cryo >= 0.08) id = 'polar-cryosphere';
+  if (absLatitude >= 86 || (absLatitude >= 60 && cryo >= 0.5)) id = 'polar-cryosphere';
   else if (absLatitude >= 66) id = vegetated >= 0.12 ? 'tundra' : 'polar-desert';
-  else if (Number.isFinite(elevationMeters) && elevationMeters >= 3200) id = 'alpine';
-  else if (absLatitude <= 24 && vegetated >= 0.2 && water >= 0.015) id = 'tropical-rainforest';
-  else if (absLatitude <= 24 && vegetated >= 0.28) id = 'tropical-seasonal-forest';
+  else if ((Number.isFinite(elevationMeters) && elevationMeters >= 3200) || cryo >= 0.5) id = 'alpine';
+  else if (boundedRatio(signals.wetland)>=0.2 && woody<0.25) id = 'wetland';
+  else if (absLatitude <= 24 && woody >= 0.2 && water >= 0.015) id = 'tropical-rainforest';
+  else if (absLatitude <= 24 && woody >= 0.28) id = 'tropical-seasonal-forest';
   else if (arid >= 0.16 || (absLatitude >= 12 && absLatitude <= 35 && vegetated < 0.12)) id = 'hot-desert';
   else if (scrub >= 0.12 && vegetated < 0.34) id = 'shrubland';
-  else if (vegetated >= 0.42) id = 'temperate-forest';
+  else if (woody >= 0.42) id = 'temperate-forest';
   else if (reliefMeters >= 700) id = 'montane-mosaic';
   else if (vegetated >= 0.18) id = 'grassland-woodland';
 
@@ -31,7 +35,7 @@ export function classifyBiomeProfile(options = {}) {
     id === 'tropical-seasonal-forest' ? 'open-tropical-canopy' :
     id === 'temperate-forest' ? 'temperate-canopy' :
     id === 'grassland-woodland' ? 'scattered-woodland' :
-    id === 'shrubland' || id === 'tundra' ? 'low-vegetation' :
+    id === 'shrubland' || id === 'tundra' || id==='wetland' ? 'low-vegetation' :
     'sparse-or-none';
   const surfacePalette =
     id === 'polar-cryosphere' ? 'snow-ice' :
@@ -39,6 +43,7 @@ export function classifyBiomeProfile(options = {}) {
     id === 'hot-desert' ? 'sand-rock' :
     id === 'tropical-rainforest' || id === 'tropical-seasonal-forest' ? 'forest-soil' :
     id === 'temperate-forest' ? 'forest-grass-soil' :
+    id === 'wetland' ? 'wetland-soil-vegetation' :
     'grass-soil-rock';
 
   return Object.freeze({

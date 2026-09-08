@@ -13,7 +13,7 @@ import {
   UNIVERSE_GUIDANCE_MODE
 } from './course-authority.js?v=3';
 import { SPACE_CONSTANTS } from '../space/constants.js?v=3';
-import { initDestinationMissionRuntime, updateDestinationMissionRuntime } from './mission-runtime.js?v=7';
+import { initDestinationMissionRuntime, updateDestinationMissionRuntime } from './mission-runtime.js?v=8';
 import { createUniverseSky, setUniverseSkyFrame, updateUniverseSky } from './sky-field.js?v=6';
 import { releaseGaiaSkyLayers } from '../sky/gaia-catalog.js?v=4';
 import {
@@ -30,7 +30,7 @@ import {
   showUniverseNavigator,
   updateUniverseCourseCue,
   updateUniverseNavigator
-} from './ui.js?v=8';
+} from './ui.js?v=9';
 import {
   createWormholeVisual,
   getWormholeRoute,
@@ -751,11 +751,19 @@ function updateLocalCourseCue(target = getLocalCourseTarget()) {
   const inFront = _courseCameraDirection.dot(_courseDirection) > 0;
   const onScreen = inFront && Math.abs(_courseProjected.x) < 0.78 && Math.abs(_courseProjected.y) < 0.68;
   if (onScreen) {
-    _localCourseCue.visible = false;
+    const width = Math.max(320, window.innerWidth || 320);
+    const height = Math.max(480, window.innerHeight || 480);
+    _localCourseCue.visible = true;
     _localCourseCue.onScreen = true;
     _localCourseCue.ndcX = _courseProjected.x;
     _localCourseCue.ndcY = _courseProjected.y;
-    updateUniverseCourseCue(null);
+    _localCourseCue.x = Math.max(78, Math.min(width - 78, (_courseProjected.x * 0.5 + 0.5) * width));
+    _localCourseCue.y = Math.max(54, Math.min(height - 54, (-_courseProjected.y * 0.5 + 0.5) * height - 42));
+    _localCourseCue.angleDeg = 0;
+    _localCourseCue.label = target.destination.name;
+    _localCourseCue.assisted = universeRuntime.course?.guidance === UNIVERSE_GUIDANCE_MODE.ASSISTED
+      || appCtx.spaceJourneyAssistState?.active === true;
+    updateUniverseCourseCue(_localCourseCue);
     return _localCourseCue;
   }
 
@@ -942,6 +950,7 @@ Object.assign(appCtx, {
   toggleUniverseCourseAssist,
   travelToUniverseDestination,
   universeRuntime,
+  updateBlackHoleEncounter,
   updateUniverseRuntime
 });
 

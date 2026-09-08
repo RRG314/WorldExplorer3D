@@ -17,9 +17,10 @@ import {
   createDriveableRoadConflictIndex,
   elevatedSegmentSafety,
   supportPointConflictsWithDriveableRoad
-} from "../world/bridge-safety.js?v=13";
+} from "../world/bridge-safety.js?v=14";
 import { applyTerrainPortalMasksForContext } from './structure-terrain-portals.js?v=1';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
+import { sampleStructureAssemblyThicknessAt } from '../world/compiler/transport-structure-assembly.js?v=15';
 
 export function canPublishElevatedStructureVisual(feature) {
   if (feature?.structureSemantics?.terrainMode !== 'elevated') return false;
@@ -430,7 +431,7 @@ export function collectStructureVisualInstances(deps = {}) {
               x: sample.x,
               y: sample.y,
               z: sample.z,
-              thickness: structureAssembly.baseThickness
+              thickness: sampleStructureAssemblyThicknessAt(structureAssembly, sample.x, sample.z)
             }))
           : (structureAssembly.surfaceSamples || []).map((sample) => ({
               x: sample.x,
@@ -587,7 +588,11 @@ export function collectStructureVisualInstances(deps = {}) {
     } else if (semantics.terrainMode === "subgrade") {
       const tunnel = collectTunnelVisualInstances(feature, structurePts, total, {
         samplePointAlongPolyline,
-        sampleTerrainHeight
+        // Fit retaining walls to the actual published terrain triangles, but
+        // never feed a previous aperture's lowered floor back into their tops.
+        sampleTerrainHeight: typeof appCtx.terrainMeshHeightAt === 'function'
+          ? (x, z) => appCtx.terrainMeshHeightAt(x, z, { ignorePortalCuts: true })
+          : sampleTerrainHeight
       });
       portalInstances.push(...tunnel.portals);
       wallInstances.push(...tunnel.walls);

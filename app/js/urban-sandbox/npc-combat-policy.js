@@ -81,8 +81,30 @@ function npcFireDecision(npc = {}, actor = null, at = 0, options = {}) {
     distance,
     ready,
     yaw: Math.atan2(Number(actor.x || 0) - x, Number(actor.z || 0) - z),
+    target: resolveNpcAimPoint(npc, actor, profile, current, distance),
     nextShotAt: current + profile.intervalMs + cadenceOffset
   });
 }
 
-export { NPC_COMBAT_STATES, NPC_WEAPON_PROFILES, beginNpcDefense, beginNpcResponse, npcFireDecision, resolveNpcCombatState };
+function resolveNpcAimPoint(npc = {}, actor = {}, profile = {}, at = 0, distanceOverride = null) {
+  const x = Number(npc.x || 0);
+  const z = Number(npc.z || 0);
+  const distance = distanceOverride !== null && distanceOverride !== undefined && Number.isFinite(Number(distanceOverride))
+    ? Number(distanceOverride)
+    : Math.hypot(Number(actor.x || 0) - x, Number(actor.z || 0) - z);
+  const projectileSpeed = Math.max(1, Number(profile.projectileSpeed) || 55);
+  const leadSeconds = Math.max(0, Math.min(.65, distance / projectileSpeed));
+  const accuracy = Math.max(.25, Math.min(1, .88 - distance / Math.max(1, Number(profile.range) || 40) * .18));
+  const phaseSeed = [...String(npc.id || '')].reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  const phase = phaseSeed * .37 + Number(at || 0) / Math.max(700, Number(profile.intervalMs || 1200));
+  const missRadius = (1 - accuracy) * (.35 + distance * .018);
+  return Object.freeze({
+    x: Number(actor.x || 0) + Number(actor.vx || 0) * leadSeconds + Math.sin(phase) * missRadius,
+    y: Number(actor.y || 0) - .5 + Math.cos(phase * .73) * missRadius * .28,
+    z: Number(actor.z || 0) + Number(actor.vz || 0) * leadSeconds + Math.cos(phase) * missRadius,
+    leadSeconds,
+    accuracy
+  });
+}
+
+export { NPC_COMBAT_STATES, NPC_WEAPON_PROFILES, beginNpcDefense, beginNpcResponse, npcFireDecision, resolveNpcAimPoint, resolveNpcCombatState };

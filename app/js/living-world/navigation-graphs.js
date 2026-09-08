@@ -128,6 +128,19 @@ function segmentPriority(segment) {
   return Math.hypot(midpointX, midpointZ);
 }
 
+function nearestActivity(segment, anchors = []) {
+  const x = (segment.p1.x + segment.p2.x) * .5;
+  const z = (segment.p1.z + segment.p2.z) * .5;
+  let best = null;
+  for (const anchor of anchors) {
+    const distance = Math.hypot(finite(anchor?.x) - x, finite(anchor?.z) - z);
+    if (distance > 180) continue;
+    const score = Math.max(0, finite(anchor?.weight, 1)) * (1 - distance / 220);
+    if (!best || score > best.score) best = { score, kind: String(anchor?.kind || 'local-place') };
+  }
+  return best || { score: 0, kind: '' };
+}
+
 function roadHighwayClass(feature) {
   return String(
     feature?.transportRecord?.sourceTags?.highway ||
@@ -185,6 +198,7 @@ export function compilePedestrianGraph(options = {}) {
     const from = store.upsert(fromPoint, role);
     const to = store.upsert(toPoint, role);
     const id = `ped:${featureId(segment.feature, 'feature')}:${segment.segIndex}:${suffix}:${edges.length}`;
+    const activity = nearestActivity(segment, options.activityAnchors);
     edges.push(Object.freeze({
       id,
       from,
@@ -194,6 +208,8 @@ export function compilePedestrianGraph(options = {}) {
       length: Math.hypot(toPoint.x - fromPoint.x, toPoint.z - fromPoint.z),
       role,
       provenance,
+      activityScore: Number(activity.score.toFixed(3)),
+      activityKind: activity.kind,
       structure: structureState(segment.feature)
     }));
     runtimeFeatureByEdge.set(id, segment.feature);
@@ -247,6 +263,8 @@ export function compilePedestrianGraph(options = {}) {
     const edgeBase = {
       buildingSourceId: entrance.buildingSourceId,
       commercial: entrance.commercial === true,
+      activityScore: entrance.commercial === true ? 6 : 2.5,
+      activityKind: entrance.commercial === true ? 'storefront' : 'building-entrance',
       role: 'entrance',
       provenance: entrance.provenance
     };
@@ -337,6 +355,7 @@ export function compileTrafficGraph(options = {}) {
     const record = segment.feature?.transportRecord;
     const id = `traffic:${featureId(segment.feature, 'feature')}:${segment.segIndex}:${directionName}:${edges.length}`;
     const outwardSign = laneOffset < 0 ? -1 : 1;
+    const activity = nearestActivity(segment, options.activityAnchors);
     edges.push(Object.freeze({
       id,
       from,
@@ -355,9 +374,17 @@ export function compileTrafficGraph(options = {}) {
       curbNormalZ: pair.normalZ * outwardSign,
       laneCount: Math.max(1, Math.round(finite(record?.crossSection?.lanes, 1))),
       roadClass: String(segment.feature?.type || segment.feature?.networkKind || record?.classification?.highway || 'road'),
+      sourceFeatureId: featureId(segment.feature, 'feature'),
+      activityScore: Number(activity.score.toFixed(3)),
+      activityKind: activity.kind,
       laneProvenance: record?.crossSection?.lanesSource ? 'mapped' : 'inferred',
       direction: directionName,
       sourceDirection: String(segment.direction || 'both'),
+      // Preserve the exact source segment that owns this lane. Runtime wheel
+      // samples must not re-project onto a nearby hairpin or crossing segment.
+      sourceSegIndex: Number(segment.segIndex),
+      sourceTStart: Number(segment.sourceTStart),
+      sourceTEnd: Number(segment.sourceTEnd),
       structure: structureState(segment.feature),
       surfacePitch: directedSurfacePitch(p1, p2),
       provenance: record?.completeness === 'lossless' ? 'mapped_transport' : 'compiled_transport'

@@ -13,6 +13,7 @@ import {
 import { resolveFarBuildingMassing } from './far-building-massing.js?v=2';
 import { applyFarBuildingFacadeDetail } from './far-building-facade-material.js?v=4';
 import { loadFarTerrainElevationWithParentFallback } from './far-field-elevation-loader.js?v=2';
+import { applyTerrainPortalMasksForContext, terrainHeightWithPortalCuts } from './structure-terrain-portals.js?v=1';
 import {
   cellInsideDetailedCoverage,
   cellInsideHole
@@ -24,7 +25,7 @@ import {
   parentTerrainTile,
   resolveFarFieldFallbackDatum,
   sampleFarFieldGridWorldY
-} from './far-field-geometry.js?v=17';
+} from './far-field-geometry.js?v=18';
 import {
   classifyWorldCoverSurface,
   loadWorldCoverBaseline
@@ -39,7 +40,8 @@ import {
   applyWorldCoverSurfaceMaterialMix,
   setNormalizedTerrainAttribute,
   ensureTerrainSurfaceMixAttributes,
-  setTerrainSurfaceMaterialMixAt
+  setTerrainSurfaceMaterialMixAt,
+  applyTerrainProfileSurfaceMaterialMix
 } from './surface-material-blend.js?v=2';
 import { resolveWorldCoverDetailMode } from './worldcover-detail-mode.js?v=1';
 import {
@@ -71,6 +73,7 @@ function createFarFieldTerrainApi(deps = {}) {
     getOrLoadTerrainTile,
     latLonToTileXY,
     sampleAcceptedGroundAtLatLon,
+    sampleDetailedTerrainMetersAtLatLon,
     sampleTileElevationMeters,
     terrainTileDeps,
     tileXYToLatLonBounds,
@@ -141,6 +144,7 @@ function createFarFieldTerrainApi(deps = {}) {
   }
 
   function resetFarTerrainClipmap() {
+    appCtx.structureTerrainPortalDescriptors = [];
     const retiringBuildPromise = pendingBuildPromise;
     generation += 1;
     elevationAbortController?.abort?.('far-terrain-generation-reset');
@@ -174,6 +178,7 @@ function createFarFieldTerrainApi(deps = {}) {
     farFieldSeamBlendMeters: FAR_FIELD_SEAM_BLEND_METERS,
     latLonToTileXY,
     sampleAcceptedGroundAtLatLon,
+    sampleDetailedTerrainMetersAtLatLon,
     sampleTileElevationMeters,
     terrainTileDeps,
     tileXYToLatLonBounds,
@@ -264,6 +269,7 @@ function createFarFieldTerrainApi(deps = {}) {
       ? applyWorldCoverVertexTints(mesh, worldCoverResult)
       : false;
     if (worldCoverResult) applyWorldCoverSurfaceMaterialMix(mesh, worldCoverResult);
+    else applyTerrainProfileSurfaceMaterialMix(mesh, detailMode);
     applyMappedSurfaceTintOwnership(mesh);
     applyTerrainSemanticMaterialBlend(mesh, repeats);
     material.color.setHex(0xffffff);
@@ -451,13 +457,19 @@ function createFarFieldTerrainApi(deps = {}) {
   }
 
   async function buildAndPublish(spec, requestGeneration, signal) {
+    const dependencyStartedAt=performance.now();
+    const dependencyDurationsMs={};
+    const measureDependency=(name,promise)=>Promise.resolve(promise).finally(()=>{
+      dependencyDurationsMs[name]=Math.round(performance.now()-dependencyStartedAt);
+      if(requestGeneration===generation) setState({...appCtx.farTerrainClipmapState,dependencyDurationsMs:{...dependencyDurationsMs}});
+    });
     const acceptedRegionalGround = acceptedGroundCoversBounds(spec.geographic);
     const sourceTiles = acceptedRegionalGround
       ? []
       : sourceTileRange(spec.geographic, spec.sourceZoom);
     setState({ status: 'loading-elevation-and-context', sourceZoom: spec.sourceZoom, sourceTiles: sourceTiles.length });
     const [elevation, mappedContext, worldCoverContext] = await Promise.all([
-      acceptedRegionalGround
+      measureDependency('elevation', acceptedRegionalGround
         ? Promise.resolve({
             ready: true,
             missingSourceTiles: [],
@@ -472,8 +484,8 @@ function createFarFieldTerrainApi(deps = {}) {
             loadTile: (tile) => waitForTerrainTileReadyAtZoom(
               tile.z, tile.tx, tile.ty, 10000, deps, { signal }
             )
-          }),
-      loadFarMappedContext(
+          })),
+      measureDependency('mappedContext', loadFarMappedContext(
         spec.contextGeographic,
         spec.detailExclusionGeographic,
         spec.geographic,
@@ -485,13 +497,13 @@ function createFarFieldTerrainApi(deps = {}) {
           // not resolvable on a phone screen.
           contextZoom: appCtx.isLikelyMobileDevice?.() ? 13 : undefined
         }
-      ),
-      loadWorldCoverBaseline(spec.geographic, {
+      )),
+      measureDependency('worldCover', loadWorldCoverBaseline(spec.geographic, {
         size: FAR_FIELD_WORLDCOVER_SIZE,
         key: `far-field:${activeKey}`,
         signal,
         priority: -10
-      }).catch(() => null)
+      }).catch(() => null))
     ]);
     if (requestGeneration !== generation) return;
     appCtx.fixedLocationMappedSurfaceContext = mappedContext;
@@ -621,7 +633,8 @@ function createFarFieldTerrainApi(deps = {}) {
     farFieldSurfaceState = {
       spec,
       worldCoverResult: worldCoverContext,
-      surfaceGrid: built.surfaceGrid
+      surfaceGrid: built.surfaceGrid,
+      refreshBoundaryHeights:built.refreshBoundaryHeights
     };
     applyFixedLocationSurfaceMaterial(mesh, worldCoverContext, spec);
     applyMappedSurfaceTintOwnership(mesh);
@@ -661,6 +674,9 @@ function createFarFieldTerrainApi(deps = {}) {
 
     farFieldMesh = mesh;
     appCtx.terrainGroup.add(mesh);
+    if (appCtx.structureTerrainPortalDescriptors?.length) {
+      applyTerrainPortalMasksForContext(appCtx, appCtx.structureTerrainPortalDescriptors);
+    }
     if (builtBuildings) {
       const buildingMaterial = applyFarBuildingFacadeDetail(new THREE.MeshStandardMaterial({
         color: 0xffffff,
@@ -738,6 +754,9 @@ function createFarFieldTerrainApi(deps = {}) {
     }
     setState({
       status: 'ready',
+      dependencyDurationsMs,
+      contextBatchMetrics:mappedContext.contextBatchMetrics,
+      waterBatchMetrics:mappedContext.waterBatchMetrics,
       sourceZoom: spec.sourceZoom,
       preferredSourceZoom: spec.preferredSourceZoom,
       sourceTiles: sourceTiles.length,
@@ -839,13 +858,20 @@ function createFarFieldTerrainApi(deps = {}) {
     return true;
   }
 
-  function sampleFarTerrainWorldYAt(x, z) {
+  function sampleFarTerrainWorldYAt(x, z, options = {}) {
     if (!farFieldMesh || !farFieldSurfaceState || farFieldMesh.userData?.farFieldDisposed) return null;
-    return sampleFarFieldGridWorldY(
+    const height = sampleFarFieldGridWorldY(
       Number(x),
       Number(z),
       farFieldSurfaceState.surfaceGrid
     );
+    return options.ignorePortalCuts ? height :
+      terrainHeightWithPortalCuts(farFieldMesh.userData.structureTerrainPortalDescriptors, x, z, height);
+  }
+
+  function refreshFarTerrainBoundaryHeights() {
+    if(!farFieldMesh || !farFieldSurfaceState)return 0;
+    return farFieldSurfaceState.refreshBoundaryHeights?.(appCtx.terrainGroup?.children)||0;
   }
 
   function scheduleFarTerrainSurfaceRefresh() {
@@ -957,6 +983,7 @@ function createFarFieldTerrainApi(deps = {}) {
 
   return {
     refreshFarTerrainSurfaceColors,
+    refreshFarTerrainBoundaryHeights,
     resetFarTerrainClipmap,
     sampleFarTerrainWorldYAt,
     scheduleFarTerrainSurfaceRefresh,

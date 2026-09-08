@@ -6,12 +6,13 @@ import {
   listEnterableBuildingSupportsNear,
   pickNearbyEnterableBuildingSupport,
   summarizeSupportType
-} from "../building-entry.js?v=7";
-import { createInteriorRuntimeUiApi } from "./runtime-ui.js?v=3";
+} from "../building-entry.js?v=9";
+import { createInteriorRuntimeUiApi } from "./runtime-ui.js?v=4";
 import { elevatorFloorChoices } from './elevator-authority.js?v=1';
 
 let nearbyInteriorScanPromise = null;
 let elevatorFloorPicker = null;
+let exteriorContextInteractionRegistered = false;
 const {
   clearPrompt,
   collectInteriorWorldSuppressionStates,
@@ -149,12 +150,15 @@ function replaceActiveInteriorFloor(active, targetLevel, deps) {
   try {
     const sceneState = deps.buildInteriorScene(active.definition, {
       activeLevel: nextLevel,
-      floorBaseY: active.floorBaseY
+      floorBaseY: active.floorBaseY,
+      curatedHome: !!active.ownedHome
     });
+    deps.disposeCuratedHomeFurnishing?.(active);
     appCtx.scene.add(sceneState.group);
     appCtx.replaceWorldCollection('dynamicBuildingColliders', sceneState.dynamicColliders.slice());
     applyInteriorSceneState(active, sceneState);
     disposeObject3D(previousGroup);
+    void deps.attachCuratedHomeFurnishing?.(active);
     resetInteriorInteractionCache();
     return true;
   } finally {
@@ -182,12 +186,12 @@ function nearestInteriorInteraction(active, walker) {
     )
   })).filter((interaction) => interaction.distance <= interaction.radius && interaction.verticalDistance <= 1.15)
     .sort((a, b) => {
-      const aIsCrew = a.kind === 'ship-crew';
-      const bIsCrew = b.kind === 'ship-crew';
-      const aIsTraversal = ['ship-exit', 'ship-door', 'ship-lift'].includes(a.kind);
-      const bIsTraversal = ['ship-exit', 'ship-door', 'ship-lift'].includes(b.kind);
-      if (aIsCrew && bIsTraversal) return 1;
-      if (bIsCrew && aIsTraversal) return -1;
+      // Moving crew can cross a doorway while the player is trying to use it.
+      // Conversation must not mask a nearby door, lift, exit, or workstation;
+      // the crew remains available once no fixed interaction is in range.
+      if ((a.kind === 'ship-crew') !== (b.kind === 'ship-crew')) {
+        return a.kind === 'ship-crew' ? 1 : -1;
+      }
       // Adjacent pressure doors and workstations have intentionally generous
       // touch radii. Prefer the clearly closer object so a doorway cannot
       // consume E while the player is standing directly at a console.
@@ -358,8 +362,23 @@ export async function enterInteriorForSupport(support, deps) {
     setTransientHint(`${support.label || "This building"} is not enterable right now.`, deps.INTERIOR_NOTICE_MS, deps);
     return false;
   }
+  if (definition.accessDenied) {
+    if (definition.requestable && definition.spaceId && deps.requestCommunityInteriorAccess) {
+      try {
+        await deps.requestCommunityInteriorAccess(definition);
+        setTransientHint('Access request sent to the owner.', deps.INTERIOR_NOTICE_MS, deps);
+      } catch (error) {
+        console.warn('[Interior] Access request failed:', error);
+        setTransientHint('Private Residence. The access request could not be sent.', deps.INTERIOR_NOTICE_MS, deps);
+      }
+    } else {
+      setTransientHint(`${definition.label || 'Private Residence'}.`, deps.INTERIOR_NOTICE_MS, deps);
+    }
+    return false;
+  }
 
-  const sceneState = deps.buildInteriorScene(definition);
+  const ownedHome = deps.findOwnedHomeForInteriorSupport?.(support) || null;
+  const sceneState = deps.buildInteriorScene(definition, { curatedHome: !!ownedHome });
   appCtx.scene.add(sceneState.group);
   appCtx.replaceWorldCollection('dynamicBuildingColliders', sceneState.dynamicColliders.slice());
 
@@ -414,6 +433,7 @@ export async function enterInteriorForSupport(support, deps) {
     definition,
     support,
     building: support.building,
+    ownedHome,
     group: sceneState.group,
     exteriorShellState,
     suppressedWorldMeshes,
@@ -441,6 +461,8 @@ export async function enterInteriorForSupport(support, deps) {
     floorTransitionPending: false
   };
   applyInteriorSceneState(appCtx.activeInterior, sceneState);
+  if (!definition.communityRealityCapture) void deps.attachCuratedHomeFurnishing?.(appCtx.activeInterior);
+  void deps.attachCommunityInteriorRepresentation?.(appCtx.activeInterior);
   appCtx.interiorHint = {
     state: "inside",
     label: definition.label,
@@ -494,6 +516,7 @@ export function clearActiveInterior(options = {}, deps) {
   restoreExteriorShellState(active.exteriorShellState);
   restoreInteriorWorldSuppression(active.suppressedWorldMeshes);
   appCtx.replaceWorldCollection('dynamicBuildingColliders');
+  deps.disposeCuratedHomeFurnishing?.(active);
   disposeObject3D(active.group);
   appCtx.activeInterior = null;
   appCtx.interiorHint = null;
@@ -574,6 +597,10 @@ function pickNearbyBuildingCandidate(force = false, deps) {
   const candidate = pickNearbyEnterableBuildingSupport(walker.x, walker.z, {
     radius: deps.INTERIOR_ENTRY_RADIUS,
     allowSynthetic: true,
+    // World entry is a door interaction, not a building-footprint proximity
+    // test. Buildings without a published exterior entrance remain available
+    // through property/place planning, but do not shout an ambient E prompt.
+    requireExteriorEntrance: true,
     actorBaseY: Number.isFinite(walker.y) ?
       walker.y - (appCtx.Walk?.CFG?.eyeHeight || 1.7) :
       NaN,
@@ -588,7 +615,38 @@ function pickNearbyBuildingCandidate(force = false, deps) {
   return candidate;
 }
 
+async function enterNearbyBuilding(deps, resolvedCandidate = null) {
+  const candidate = resolvedCandidate || pickNearbyBuildingCandidate(true, deps);
+  if (!candidate?.support?.enterable) return false;
+  await enterInteriorForSupport(candidate.support, deps);
+  return true;
+}
+
+function ensureExteriorContextInteraction(deps) {
+  if (exteriorContextInteractionRegistered || typeof appCtx.registerContextInteraction !== 'function') return;
+  exteriorContextInteractionRegistered = true;
+  appCtx.registerContextInteraction({
+    id: 'building_entrance',
+    priority: 100,
+    evaluate() {
+      if (appCtx.activeInterior) return null;
+      const candidate = pickNearbyBuildingCandidate(false, deps);
+      if (!candidate?.support?.enterable) return null;
+      const support = candidate.support;
+      return {
+        available: true,
+        action: 'enter_building',
+        label: `Enter ${shortLabel(support.label || buildingLabel(support.building || support.destination), 32)}`,
+        distance: candidate.distance,
+        data: { buildingKey: support.key || '' }
+      };
+    },
+    perform: () => enterNearbyBuilding(deps)
+  });
+}
+
 export async function handleInteriorAction(deps) {
+  ensureExteriorContextInteraction(deps);
   if (appCtx.activeInterior) {
     const active = appCtx.activeInterior;
     const interaction = nearestInteriorInteraction(active, appCtx.Walk?.state?.walker);
@@ -597,6 +655,7 @@ export async function handleInteriorAction(deps) {
     }
     if (interaction?.kind === 'exit') {
       clearActiveInterior({ restorePlayer: true, preserveCache: true }, deps);
+      appCtx.notifyContextInteractionCompleted?.('exit_interior', { interiorId: active.id || active.key || '' });
       return true;
     }
     if (interaction?.kind === 'elevator') return openElevatorFloorPicker(active, deps);
@@ -604,11 +663,13 @@ export async function handleInteriorAction(deps) {
   }
   const candidate = pickNearbyBuildingCandidate(true, deps);
   if (!candidate?.support?.enterable) return false;
-  await enterInteriorForSupport(candidate.support, deps);
-  return true;
+  const handled = await enterNearbyBuilding(deps, candidate);
+  if (handled) appCtx.notifyContextInteractionCompleted?.('enter_building', { buildingKey: candidate.support.key || '' });
+  return handled;
 }
 
 export function updateInteriorInteraction(deps) {
+  ensureExteriorContextInteraction(deps);
   const now = performance.now();
 
   if (!deps.isWalkModeActive()) {
@@ -639,8 +700,9 @@ export function updateInteriorInteraction(deps) {
       loadedLevels: active.loadedLevels || []
     };
     resetInteriorInteractionCache();
+    const interactKey = appCtx.getControlPromptLabel?.('interact') || appCtx.getControlBindingLabel?.('interact') || 'E';
     if (interaction) setPrompt(
-      interaction.kind === 'elevator' ? 'E Choose elevator floor' : `E ${interaction.label}`,
+      interaction.kind === 'elevator' ? `${interactKey} Choose elevator floor` : `${interactKey} ${interaction.label}`,
       interaction.kind === 'elevator' ? 'supported' : 'active'
     );
     else clearPrompt();
@@ -660,7 +722,12 @@ export function updateInteriorInteraction(deps) {
       type,
       distance: candidate.distance
     };
-    setPrompt(`E Enter ${shortLabel(label, 24)}`, type === "Mapped" ? "supported" : "inspect");
+    const familiar = appCtx.isInteractionFamiliar?.('enter_building') === true;
+    const interactKey = appCtx.getControlPromptLabel?.('interact') || appCtx.getControlBindingLabel?.('interact') || 'E';
+    setPrompt(
+      familiar ? `${interactKey} · ${shortLabel(label, 24)}` : `${interactKey} Enter ${shortLabel(label, 24)}`,
+      familiar ? "familiar" : type === "Mapped" ? "supported" : "inspect"
+    );
     return;
   }
 

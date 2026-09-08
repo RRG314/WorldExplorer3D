@@ -30,7 +30,7 @@ function pointInRing(x, z, ring = []) {
   return inside;
 }
 
-function sampleWaterPolygonInteriorHeights(appCtx, ring, holes, bounds) {
+export function sampleWaterPolygonInteriorHeights(appCtx, ring, holes, bounds) {
   if (!bounds || !Array.isArray(ring) || ring.length < 3) return [];
   const samples = [];
   const gridSteps = 7;
@@ -40,7 +40,8 @@ function sampleWaterPolygonInteriorHeights(appCtx, ring, holes, bounds) {
       const z = bounds.minZ + (bounds.maxZ - bounds.minZ) * (zi / gridSteps);
       if (!pointInRing(x, z, ring)) continue;
       if ((holes || []).some((hole) => pointInRing(x, z, hole))) continue;
-      const height = Number(appCtx.elevationWorldYAtWorldXZ(x, z));
+      // Unloaded neighboring DEM samples are not sea-level measurements.
+      const height = appCtx.elevationWorldYAtWorldXZ(x, z);
       if (Number.isFinite(height)) samples.push(height);
     }
   }
@@ -324,6 +325,7 @@ export function createWorldLandusePass(options = {}) {
     appCtx.landuses.push({
       type: landuseType,
       pts: ring,
+      sourceFeatureId: featureMeta.sourceFeatureId || null,
       bounds: { minX, maxX, minZ, maxZ }
     });
 

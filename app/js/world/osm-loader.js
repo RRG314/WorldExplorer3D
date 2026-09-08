@@ -369,8 +369,10 @@ export function buildWorldOverpassPlan({
             nwr["amenity"~"^(police|hospital)$"]${poiBounds};
             out body center qt;`,
     commercePlaceQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
-            nwr["shop"~"^(convenience|supermarket|hardware|doityourself|pawnbroker|second_hand|car_repair|car_parts|outdoor|fishing|boat|aviation)$"]${poiBounds};
-            nwr["amenity"~"^(fuel|charging_station)$"]${poiBounds};
+            nwr["shop"~"^(convenience|supermarket|general|kiosk|department_store|hardware|doityourself|pawnbroker|second_hand|car_repair|car_parts|tyres|pet|outdoor|sports|fishing|hunting|scuba_diving|boat|aviation|clothes|shoes)$"]${poiBounds};
+            nwr["amenity"~"^(marketplace|fuel|charging_station|veterinary|veterinary_pharmacy|hospital|clinic|doctors|pharmacy|dive_centre)$"]${poiBounds};
+            nwr["healthcare"~"^(hospital|clinic|doctor|doctors|pharmacy)$"]${poiBounds};
+            nwr["leisure"="marina"]${poiBounds};
             );out body center qt;`,
     transportFacilityQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
             nwr["aeroway"~"^(aerodrome|heliport|runway|taxiway|apron|terminal|helipad|hangar|parking_position|gate|control_tower)$"]${transportFacilityBounds};
@@ -425,8 +427,9 @@ export function buildWorldOverpassPlan({
                 nwr["mooring"]${featureBounds};
                 nwr["seamark:type"~"^(harbour|berth)$"]${featureBounds};
                 nwr["amenity"~"^(police|hospital)$"]${poiBounds};
-                nwr["shop"~"^(convenience|supermarket|hardware|doityourself|pawnbroker|second_hand|car_repair|car_parts|outdoor|fishing|boat|aviation)$"]${poiBounds};
-                nwr["amenity"~"^(fuel|charging_station)$"]${poiBounds};
+                nwr["shop"~"^(convenience|supermarket|general|kiosk|department_store|hardware|doityourself|pawnbroker|second_hand|car_repair|car_parts|tyres|pet|outdoor|sports|fishing|hunting|scuba_diving|boat|aviation|clothes|shoes)$"]${poiBounds};
+                nwr["amenity"~"^(marketplace|fuel|charging_station|veterinary|veterinary_pharmacy|hospital|clinic|doctors|pharmacy|dive_centre)$"]${poiBounds};
+                nwr["healthcare"~"^(hospital|clinic|doctor|doctors|pharmacy)$"]${poiBounds};
             );out body;>;out skel qt;`,
     loadDeadline: loadStartedAt + maxTotalLoadMs
   };

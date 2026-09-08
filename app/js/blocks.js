@@ -854,6 +854,8 @@ const { handleBlockBuilderClick } = createBlockBuilderInteraction({
   getMaterialIndex: () => buildMaterialIndex,
   getRotation: () => buildRotation,
   getSurfaceYAt,
+  canPlaceAt: (point) => appCtx.canPlaceQuickBuildAt?.(point) || { allowed: true, authority: 'existing-build-rules' },
+  onBlocked: (permission) => showBuildTransientMessage(permission?.reason || 'You cannot build at this location.'),
   isEnabled: () => buildModeEnabled,
   getMaxDistance: () => BUILD_MAX_DISTANCE * getConstructionAssistance().placementRangeScale,
   maxDistance: BUILD_MAX_DISTANCE,

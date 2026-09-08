@@ -8,6 +8,7 @@ import { startStaticServer } from './static-server.mjs';
 const root = process.cwd();
 const require = createRequire(import.meta.url);
 const admin = require('../../functions/node_modules/firebase-admin');
+const { STARTING_CREDITS } = require('../../functions/property-authority.js');
 const outputDir = path.join(root, 'output', 'verification', 'connected-property-multiplayer');
 await fs.mkdir(outputDir, { recursive: true });
 const artifactRoot = path.resolve(process.env.WE3D_VERIFY_ROOT || root);
@@ -166,6 +167,24 @@ try {
   await owner.page.locator(`[data-property-action="list-sale"][data-property-id="${property.id}"]`).click();
   await waitForStatus(owner.page, /listed for sale/);
 
+  const listedPropertySnapshot = await adminDb.collection('worldProperties')
+    .where('propertyId', '==', property.worldPropertyId)
+    .limit(1)
+    .get();
+  const listedProperty = listedPropertySnapshot.docs[0]?.data() || null;
+  const salePrice = Number(listedProperty?.salePrice);
+  assert.ok(Number.isFinite(salePrice) && salePrice > 0, 'The UI sale listing must persist a positive market-scale price.');
+  // A realistic mapped home can cost more than the new-player balance. Seed
+  // earned progression funds so this test exercises a normal paid resale
+  // instead of making its controlled building artificially cheap.
+  const buyerFundingCredits = salePrice + 250_000;
+  await adminDb.collection('users').doc(buyer.identity.uid).collection('economy').doc('wallet').set({
+    credits: buyerFundingCredits,
+    currencyVersion: 2,
+    revision: 0,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  }, { merge: true });
+
   await buyer.page.waitForFunction((id) => {
     const button = document.querySelector(`[data-property-action="buy"][data-property-id="${CSS.escape(id)}"]`);
     return !!button && /buy/i.test(button.textContent || '');
@@ -190,7 +209,9 @@ try {
   assert.equal(persisted.property.ownerUid, buyer.identity.uid);
   assert.equal(persisted.property.status, 'owned');
   assert.equal(persisted.board.propertiesOwned, 1);
-  assert.ok(Number(persisted.wallet.credits) < 500);
+  assert.equal(Number(persisted.wallet.credits), buyerFundingCredits - salePrice);
+  assert.ok(Number(persisted.wallet.credits) > 0 && Number(persisted.wallet.credits) < STARTING_CREDITS);
+  assert.equal(Number(persisted.wallet.currencyVersion), 2);
 
   await Promise.all([
     owner.page.screenshot({ path: path.join(outputDir, 'desktop-owner-after-sale.png'), fullPage: true }),
@@ -201,6 +222,8 @@ try {
     roomCode: room.code,
     property,
     finalOwnerUid: persisted.property.ownerUid,
+    salePrice,
+    buyerFundingCredits,
     buyerCredits: persisted.wallet.credits,
     buyerPropertiesOwned: persisted.board.propertiesOwned,
     checks: {

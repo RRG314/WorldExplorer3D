@@ -25,6 +25,30 @@ async function openSpace(page) {
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').modes?.space === true, null, { timeout: 120_000 });
 }
 
+async function arriveAtTrappist(page) {
+  await page.evaluate(async () => {
+    const [{ DEFAULT_CREW }, { createExpeditionPlan, withExpeditionChanges }, { startExpedition }, { createExpeditionStore }] = await Promise.all([
+      import('/app/js/expedition/catalog.js?v=2'),
+      import('/app/js/expedition/model.js?v=11'),
+      import('/app/js/expedition/simulation.js?v=8'),
+      import('/app/js/expedition/store.js?v=11')
+    ]);
+    const planned = createExpeditionPlan({ destinationId: 'trappist-1', crew: DEFAULT_CREW, id: 'trappist-mission-verification', createdAtMs: 94_000 });
+    createExpeditionStore().save(withExpeditionChanges(startExpedition(planned, 94_100), {
+      state: 'arrived', progress: 1, voyagePhase: 'arrival', arrivalTransferState: 'pending'
+    }));
+  });
+  await page.locator('#sfExpeditionBtn').click();
+  await page.locator('#expeditionArrive').click();
+  await page.waitForFunction(() => {
+    const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+    return state.universeNavigation?.currentFrameId === 'trappist-1'
+      && state.universeNavigation?.transitionDestinationId == null
+      && state.interstellarExpedition?.arrivalTransferState === 'complete';
+  }, null, { timeout: 30_000 });
+  if (await page.locator('[data-mission-close]').isVisible()) await page.locator('[data-mission-close]').click();
+}
+
 async function selectMission(page, destinationId) {
   const navigator = page.locator('#universeNavigator');
   if (!(await navigator.isVisible())) await page.locator('#universeToggle').click();
@@ -99,6 +123,8 @@ async function completeAnalysisAndExit(page) {
   });
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.active !== true);
   await page.waitForFunction(() => document.getElementById('universeToggle')?.offsetParent !== null);
+  await page.waitForTimeout(350);
+  if (await page.locator('#expeditionOverlay').isVisible()) await page.locator('#expeditionClose').click();
   await page.evaluate(async (destinationId) => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     ctx.openDestinationMission(destinationId);
@@ -114,7 +140,8 @@ async function runTransitNetwork(page) {
   await selectMission(page, 'trappist-1');
   assert.equal(await page.locator('#destinationMissionTitle').textContent(), 'Seven Shadows');
   await page.locator('[data-mission-begin]').click();
-  await page.locator('[data-mission-course]').click();
+  const courseAction = page.locator('[data-mission-course]');
+  if (await courseAction.isVisible()) await courseAction.click();
   await page.waitForFunction(() => {
     const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
     return state.universeNavigation?.currentFrameId === 'trappist-1' && state.destinationMission?.phase === 'fieldwork';
@@ -286,6 +313,7 @@ async function run() {
   page.on('response', (response) => { if (response.url().startsWith(baseUrl) && response.status() >= 400) failures.push(`${response.status()} ${response.url()}`); });
   try {
     await openSpace(page);
+    await arriveAtTrappist(page);
     if (sliceOnly) {
       const e = await runSurfaceMission(page, 'trappist-1-e', ['terminator-panorama', 'surface-chemistry', 'climate-boundary'], 'desktop-trappist-1-e-surface.png');
       return { sliceOnly: true, e };

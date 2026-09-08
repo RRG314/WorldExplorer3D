@@ -3,6 +3,8 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const admin = require('../../functions/node_modules/firebase-admin');
+const { STARTING_CREDITS } = require('../../functions/property-authority.js');
+const LISTING_REQUEST = 140;
 const projectId = String(process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || 'we3d-staging-20260712');
 const authOrigin = 'http://127.0.0.1:9099';
 const functionsOrigin = `http://127.0.0.1:5001/${projectId}/us-central1`;
@@ -79,11 +81,14 @@ await setPresence(owner, 0, 0);
 const claimed = await post(owner, { ...common, action: 'starter_claim', requestId: `claim-${now}` });
 assert.equal(claimed.status, 200, JSON.stringify(claimed.body));
 assert.equal(claimed.body.accepted, true);
-assert.equal(claimed.body.credits, 500);
+assert.equal(claimed.body.credits, STARTING_CREDITS);
 
-const listed = await post(owner, { ...common, action: 'list_sale', requestId: `list-${now}`, salePrice: 140 });
+const listed = await post(owner, { ...common, action: 'list_sale', requestId: `list-${now}`, salePrice: LISTING_REQUEST });
 assert.equal(listed.status, 200, JSON.stringify(listed.body));
 assert.equal(listed.body.property.status, 'listed_for_sale');
+const salePrice = Number(listed.body.property.salePrice);
+assert.ok(salePrice > LISTING_REQUEST && salePrice < STARTING_CREDITS,
+  `The server must normalize an unrealistic listing request to a purchasable market-scale value: ${salePrice}`);
 
 const mutated = await post(owner, {
   ...common,
@@ -97,7 +102,7 @@ const purchased = await post(buyer, { ...common, action: 'buy_listing', requestI
 assert.equal(purchased.status, 200, JSON.stringify(purchased.body));
 assert.equal(purchased.body.accepted, true);
 assert.equal(purchased.body.property.ownerUid, buyer.uid);
-assert.equal(purchased.body.credits, 360);
+assert.equal(purchased.body.credits, STARTING_CREDITS - salePrice);
 
 const propertyDocs = await db.collection('worldProperties').where('propertyId', '==', property.propertyId).get();
 assert.equal(propertyDocs.size, 1);
@@ -114,8 +119,11 @@ assert.equal(finalProperty.ownerUid, buyer.uid);
 assert.equal(finalProperty.status, 'owned');
 assert.equal(catalog.data().x, 0);
 assert.equal(catalog.data().area, 256);
-assert.equal(ownerWallet.data().credits, 640);
-assert.equal(buyerWallet.data().credits, 360);
+assert.equal(ownerWallet.data().credits, STARTING_CREDITS + salePrice);
+assert.equal(buyerWallet.data().credits, STARTING_CREDITS - salePrice);
+assert.equal(ownerWallet.data().credits + buyerWallet.data().credits, STARTING_CREDITS * 2);
+assert.equal(ownerWallet.data().currencyVersion, 2);
+assert.equal(buyerWallet.data().currencyVersion, 2);
 assert.equal(ownerBoard.data().propertiesOwned, 0);
 assert.equal(ownerBoard.data().propertiesSold, 1);
 assert.equal(buyerBoard.data().propertiesOwned, 1);

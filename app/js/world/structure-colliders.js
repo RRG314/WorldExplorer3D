@@ -6,8 +6,10 @@ import {
   addBuildingToSpatialIndex,
   removeBuildingsFromSpatialIndex
 } from "./building-spatial-index.js?v=7";
+import { canPublishTunnelGeometry } from './compiler/tunnel-envelope.js';
+import { tunnelWallIsOpen } from './compiler/tunnel-junction-openings.js';
 
-const STRUCTURE_COLLIDER_POLICY = 'actor-height-bounded-lossless-tunnel-side-walls';
+const STRUCTURE_COLLIDER_POLICY = 'published-tunnel-geometry-solid-on-all-provider-paths';
 
 function pointAtDistance(feature, profile, distance) {
   const points = feature?.pts;
@@ -78,6 +80,7 @@ function descriptor(feature, kind, points, minY, maxY, index) {
     maxY,
     height: Math.max(0, maxY - minY),
     buildingType: 'transport_structure_collider',
+    isTransportCollider: true,
     collisionKind: 'barrier',
     geometrySource: 'compiled_transport_structures',
     heightSource: 'compiled_transport_surface',
@@ -97,37 +100,28 @@ function colliderRanges(feature, profile) {
   const shellRanges = Array.isArray(tunnel?.shellRanges)
     ? tunnel.shellRanges.filter((range) => Number(range?.end) - Number(range?.start) > 0.5)
     : [];
-  const junctionZones = Array.isArray(tunnel?.junctionZones) ? tunnel.junctionZones : [];
-  let ranges = shellRanges.map((range) => ({
+  const ranges = shellRanges.map((range) => ({
     start: Math.max(0, Number(range.start)),
     end: Math.min(profile.total, Number(range.end))
   }));
-  for (const zone of junctionZones) {
-    const zoneStart = Math.max(0, Number(zone?.start));
-    const zoneEnd = Math.min(profile.total, Number(zone?.end));
-    if (!(zoneEnd > zoneStart)) continue;
-    ranges = ranges.flatMap((range) => {
-      if (zoneEnd <= range.start || zoneStart >= range.end) return [range];
-      const pieces = [];
-      if (zoneStart - range.start > 0.5) pieces.push({ start: range.start, end: zoneStart });
-      if (range.end - zoneEnd > 0.5) pieces.push({ start: zoneEnd, end: range.end });
-      return pieces;
-    });
-  }
+  // Excavation retaining walls are part of the same traversable enclosure.
+  ranges.push(...(tunnel?.portalZones || []).map((zone) => ({
+    start: Math.max(0, zone.approachStart), end: Math.min(profile.total, zone.approachEnd), approach: true
+  })));
   return ranges;
 }
 
-export function compileStructureColliderDescriptors(features = []) {
+export function compileStructureColliderDescriptors(features = [], options = {}) {
   const colliders = [];
+  const publishedSolids = new Set();
   for (const feature of features) {
     if (!Array.isArray(feature?.pts) || feature.pts.length < 2) continue;
     const semantics = feature.structureSemantics || {};
-    // Only lossless source geometry with a compiled tunnel system may own
-    // tunnel collision. Generalized centerlines remain non-colliding because
-    // their walls and portal boundaries are not exact enough for traversal.
+    // A published representative tunnel is still solid gameplay geometry.
+    // Provider precision affects provenance, not whether its walls exist.
     const tunnelLike =
       semantics.terrainMode === 'subgrade' &&
-      feature?.transportRecord?.completeness === 'lossless' &&
+      canPublishTunnelGeometry(feature) &&
       feature?.tunnelSystemModel?.visualKind === 'tunnel' &&
       Array.isArray(feature?.tunnelSystemModel?.shellRanges) &&
       feature.tunnelSystemModel.shellRanges.length > 0;
@@ -140,17 +134,37 @@ export function compileStructureColliderDescriptors(features = []) {
       3,
       Number(feature?.tunnelSystemModel?.clearance) || Number(specification.tunnelClearance) || 4.2
     );
-    const wallOffset = Number(specification.tunnelWallOffset) || width * 0.5 + 0.72;
+    // Inner collision face must coincide with the visible lower lining.
+    const wallOffset = width * 0.5 + 0.02 + 0.16;
     const enclosedSides = tunnelLike || semantics.buildingPassage || semantics.indoor;
     let colliderIndex = 0;
+    const solid = feature.tunnelSolidBoundary;
+    if (solid && !publishedSolids.has(solid)) {
+      publishedSolids.add(solid);
+      for (const wall of solid.walls) {
+        const normalLength = Math.hypot(wall.normal[0], wall.normal[2]);
+        const nx = wall.normal[0] / normalLength * .32, nz = wall.normal[2] / normalLength * .32;
+        const a = { x: wall.a[0] + solid.origin.x, z: wall.a[2] + solid.origin.z };
+        const b = { x: wall.b[0] + solid.origin.x, z: wall.b[2] + solid.origin.z };
+        colliders.push(descriptor(feature, 'side_wall', [a, b,
+          {x:b.x+nx,z:b.z+nz},{x:a.x+nx,z:a.z+nz}], wall.minY-.05, wall.maxY+.05, colliderIndex++));
+      }
+    }
     for (const range of colliderRanges(feature, profile)) {
+      if (solid && !range.approach) continue;
       const startDistance = Math.max(0, Number(range.start) || 0);
       const endDistance = Math.min(profile.total, Number(range.end) || 0);
       if (!(endDistance - startDistance > 0.5)) continue;
-      const stationCount = Math.max(1, Math.ceil((endDistance - startDistance) / 8));
-      for (let station = 0; station < stationCount; station += 1) {
-        const distanceA = startDistance + (endDistance - startDistance) * station / stationCount;
-        const distanceB = startDistance + (endDistance - startDistance) * (station + 1) / stationCount;
+      const stationCount = Math.max(1, Math.ceil((endDistance - startDistance) / 4));
+      const stations = [...Array.from({ length: stationCount + 1 }, (_, i) =>
+        startDistance + (endDistance - startDistance) * i / stationCount),
+        ...(feature.tunnelSystemModel.wallOpenings || []).flatMap(o => [o.start, o.end])
+          .filter(d => d > startDistance && d < endDistance),
+        ...Array.from(profile.distances).filter((d) => d > startDistance && d < endDistance)]
+        .sort((a, b) => a - b);
+      for (let station = 0; station < stations.length - 1; station += 1) {
+        const distanceA = stations[station];
+        const distanceB = stations[station + 1];
         const start = pointAtDistance(feature, profile, distanceA);
         const end = pointAtDistance(feature, profile, distanceB);
         if (!start || !end) continue;
@@ -160,14 +174,22 @@ export function compileStructureColliderDescriptors(features = []) {
         if (!Number.isFinite(roadY)) continue;
         if (enclosedSides) {
           for (const side of [-1, 1]) {
+            if (tunnelWallIsOpen(feature.tunnelSystemModel, side, (distanceA + distanceB) * 0.5)) continue;
             const footprint = rectangleFootprint(start, end, wallOffset * side, 0.16);
             if (!footprint) continue;
+            let wallTop = roadY + clearance;
+            if (range.approach && typeof options.sampleTerrain === 'function') {
+              const edgeX = midX - start.tangentZ * (width * 0.5 + 0.02) * side;
+              const edgeZ = midZ + start.tangentX * (width * 0.5 + 0.02) * side;
+              const terrainY = options.sampleTerrain(edgeX, edgeZ);
+              if (Number.isFinite(terrainY)) wallTop = Math.max(roadY + 0.18, terrainY + 0.08);
+            }
             colliders.push(descriptor(
               feature,
               'side_wall',
               footprint,
               roadY - 0.2,
-              roadY + Math.min(2.35, Math.max(2.05, clearance - 0.8)),
+              wallTop,
               colliderIndex++
             ));
           }
@@ -197,10 +219,11 @@ export function refreshStructureColliders(appCtx, features = []) {
     removeBuildingsFromSpatialIndex(previous);
     removeArrayItems(appCtx.buildings, removed);
   }
-  const colliders = compileStructureColliderDescriptors(features);
-  if (!Array.isArray(appCtx.buildings)) appCtx.replaceWorldCollection?.('buildings');
+  const colliders = compileStructureColliderDescriptors(features, {
+    sampleTerrain: (x, z) => appCtx.terrainMeshHeightAt?.(x, z, { ignorePortalCuts: true })
+  });
   for (const collider of colliders) {
-    appCtx.buildings.push(collider);
+    // Obstacles share the collision broadphase, not the mapped-property list.
     addBuildingToSpatialIndex(collider);
   }
   appCtx.transportStructureColliders = colliders;

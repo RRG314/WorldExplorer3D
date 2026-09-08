@@ -1,16 +1,18 @@
 #tutorialHintCard[hidden]{display:none!important}
 #currentJourneyCard[hidden]{display:none!important}
-#currentJourneyCard{position:fixed;top:112px;right:16px;z-index:138;display:flex;align-items:center;gap:9px;width:min(340px,calc(100vw - 30px));box-sizing:border-box;padding:8px 8px 8px 10px;border:1px solid rgba(91,132,163,.48);border-left:3px solid #5ca7e8;border-radius:3px;background:linear-gradient(110deg,rgba(9,21,30,.97),rgba(5,12,18,.94));box-shadow:0 12px 28px rgba(0,0,0,.32);color:#edf5fb;backdrop-filter:blur(12px)}
-.space-flight-active #currentJourneyCard{right:260px;z-index:10002}
+#currentJourneyCard{position:fixed;right:16px;bottom:88px;z-index:138;display:flex;align-items:center;gap:9px;width:min(340px,calc(100vw - 30px));box-sizing:border-box;padding:8px 32px 8px 10px;border:1px solid rgba(91,132,163,.48);border-left:3px solid #5ca7e8;border-radius:3px;background:linear-gradient(110deg,rgba(9,21,30,.97),rgba(5,12,18,.94));box-shadow:0 12px 28px rgba(0,0,0,.32);color:#edf5fb;backdrop-filter:blur(12px)}
+.space-flight-active #currentJourneyCard{right:260px;bottom:18px;z-index:10002}
 .currentJourneyMark{display:none}.currentJourneyMark svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.55;stroke-linecap:round;stroke-linejoin:round}
 .currentJourneyCopy{min-width:0;flex:1}.currentJourneyCopy span,.currentJourneyCopy strong,.currentJourneyCopy small{display:block}.currentJourneyCopy span{color:#75b8f1;font:700 7px/1.2 Orbitron,sans-serif;letter-spacing:.13em}.currentJourneyCopy strong{margin-top:4px;overflow:hidden;color:#f3f8fb;font:700 11px/1.25 Orbitron,sans-serif;text-overflow:ellipsis;white-space:nowrap}.currentJourneyCopy small{margin-top:3px;overflow:hidden;color:#a8b8c2;font:500 9px/1.35 Inter,sans-serif;white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}#currentJourneyAction{position:relative;flex:0 0 auto;min-height:34px;border:1px solid #4f91ca;border-radius:2px;padding:0 22px 0 10px;background:#153f63;color:#f4f9ff;font:700 8px/1 Orbitron,sans-serif;cursor:pointer}#currentJourneyAction::after{content:'›';position:absolute;right:8px;top:50%;transform:translateY(-52%);font:500 15px/1 Inter,sans-serif}#currentJourneyAction:hover,#currentJourneyAction:focus-visible{border-color:#83c2f8;background:#1b527f;outline:none}
-.tutorial-card{position:fixed;top:86px;right:16px;z-index:250;width:min(344px,calc(100vw - 30px));padding:13px;border:1px solid var(--wx-line-soft);border-left:2px solid var(--wx-blue);border-radius:3px;background:rgba(5,12,18,.96);color:var(--wx-text);box-shadow:0 18px 44px rgba(0,0,0,.46);font:500 12px/1.45 Inter,sans-serif;backdrop-filter:blur(12px);pointer-events:none;transition:width .16s ease,padding .16s ease}
+#currentJourneyDismiss{position:absolute;top:3px;right:3px;width:24px;height:24px;border:0;background:transparent;color:#8fa4b3;font:500 17px/1 Inter,sans-serif;cursor:pointer}#currentJourneyDismiss:hover,#currentJourneyDismiss:focus-visible{color:#fff;outline:1px solid rgba(131,194,248,.7)}
+.tutorial-card{position:fixed;right:16px;bottom:88px;z-index:250;width:min(344px,calc(100vw - 30px));padding:13px;border:1px solid var(--wx-line-soft);border-left:2px solid var(--wx-blue);border-radius:3px;background:rgba(5,12,18,.96);color:var(--wx-text);box-shadow:0 18px 44px rgba(0,0,0,.46);font:500 12px/1.45 Inter,sans-serif;backdrop-filter:blur(12px);pointer-events:none;transition:width .16s ease,padding .16s ease}
 .tutorial-card button{pointer-events:auto}
 .tutorial-card.compact{width:min(292px,calc(100vw - 24px));padding:10px 11px}
 .tutorial-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
 .tutorial-card-head>div:first-child{min-width:0}
 .tutorial-eyebrow,.tutorial-settings-eyebrow{display:block;color:var(--wx-blue);font:600 8px/1.2 Orbitron,sans-serif;letter-spacing:.13em;text-transform:uppercase}
 .tutorial-title{display:block;margin-top:5px;overflow:hidden;color:var(--wx-text);font:700 13px/1.25 Orbitron,sans-serif;text-overflow:ellipsis;text-transform:uppercase;white-space:nowrap}
+.tutorial-card:not(.compact) .tutorial-title{white-space:normal}
 .tutorial-head-actions{display:flex;flex:0 0 auto;gap:5px}
 .tutorial-details-btn,.tutorial-icon-btn{height:27px;border:1px solid var(--wx-line-soft);border-radius:2px;background:#101921;color:var(--wx-muted);font:600 9px/1 Inter,sans-serif;cursor:pointer}
 .tutorial-details-btn{padding:0 8px}
@@ -32,6 +34,9 @@
 .tutorial-settings-actions{margin-top:12px}
 .tutorial-settings-actions button{border:1px solid rgba(157,174,186,.28);border-radius:2px;padding:8px 11px;background:#101921;color:#f4f7f9;font:600 10px Inter,sans-serif;cursor:pointer}
 #tutorialSettingsStatus{min-height:16px;margin-top:9px;color:#9aa8b2;font-size:10px}
+.keyboard-binding-settings{grid-column:1/-1;margin:0 0 10px;border:1px solid rgba(91,132,163,.38);border-radius:3px;background:rgba(7,16,24,.92);color:#f4f7f9;font:500 11px/1.4 Inter,sans-serif}
+.keyboard-binding-settings details{padding:0}.keyboard-binding-settings summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 13px;cursor:pointer;list-style:none}.keyboard-binding-settings summary::-webkit-details-marker{display:none}.keyboard-binding-settings summary span{display:flex;flex-direction:column}.keyboard-binding-settings summary b{font:700 11px/1.2 Orbitron,sans-serif;text-transform:uppercase}.keyboard-binding-settings summary small{margin-top:3px;color:#9aa8b2;font-size:9px}.keyboard-binding-settings summary i{color:#75b8f1;font-size:18px;transform:rotate(0);transition:transform .16s ease}.keyboard-binding-settings details[open] summary i{transform:rotate(90deg)}
+.keyboard-binding-settings>details>p{margin:0;padding:0 13px 11px;color:#9aa8b2}.keyboard-binding-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;padding:1px;background:rgba(91,132,163,.18)}.keyboard-binding-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:8px;min-height:42px;padding:7px 9px;background:#08131c}.keyboard-binding-row span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.keyboard-binding-row kbd{min-width:48px;padding:5px 7px;border:1px solid rgba(117,184,241,.5);border-radius:2px;background:#10243b;color:#dbeafe;text-align:center;font:700 9px Orbitron,sans-serif}.keyboard-binding-row button,.keyboard-binding-settings footer button{border:1px solid rgba(157,174,186,.35);border-radius:2px;padding:6px 8px;background:#101921;color:#f4f7f9;font:600 9px Inter,sans-serif;cursor:pointer}.keyboard-binding-row button.listening{border-color:#75b8f1;background:#153f63}.keyboard-binding-settings footer{display:flex;align-items:center;gap:10px;padding:11px 13px}.keyboard-binding-settings footer span{color:#9aa8b2;font-size:9px}
 body:has(.floatMenu.open) #tutorialHintCard,
 body:has(#discoveryPanel.show) #tutorialHintCard,
 body:has(#urbanEquipment[aria-hidden="false"]) #tutorialHintCard{display:none!important}
@@ -39,14 +44,25 @@ body:has(#tutorialHintCard:not([hidden])) #currentJourneyCard,
 body:has(.floatMenu.open) #currentJourneyCard,
 body:has(#discoveryPanel.show) #currentJourneyCard,
 body:has(#urbanEquipment[aria-hidden="false"]) #currentJourneyCard,
+body:has(#controlsTab.bar-open) #currentJourneyCard,
+body:has(#urbanVehiclePrompt.show) #currentJourneyCard,
+body:has(#interiorPrompt.show) #currentJourneyCard,
+body:has(#boatPrompt.show) #currentJourneyCard,
+body:has(#discoveryContextPrompt.show) #currentJourneyCard,
 body.game-panel-layer-open #currentJourneyCard,
 body.game-activity-layer-open #currentJourneyCard,
 body:has(#largeMap.show) #currentJourneyCard{display:none!important}
 body:has(#universeNavigator:not([hidden])) #currentJourneyCard{display:none!important}
+body:has(#urbanVehiclePrompt.show) #tutorialHintCard,
+body:has(#interiorPrompt.show) #tutorialHintCard,
+body:has(#boatPrompt.show) #tutorialHintCard,
+body:has(#discoveryContextPrompt.show) #tutorialHintCard{display:none!important}
+body:has(#controlsTab.bar-open) #tutorialHintCard{display:none!important}
 @media(max-width:700px){
-  .tutorial-card{top:max(164px,calc(env(safe-area-inset-top) + 154px));right:max(9px,env(safe-area-inset-right));bottom:auto;width:min(330px,calc(100vw - 18px));max-height:calc(100dvh - 250px);overflow:auto;padding:11px}
+  .tutorial-card{top:auto;right:max(9px,env(safe-area-inset-right));bottom:max(330px,calc(env(safe-area-inset-bottom) + 322px));width:min(330px,calc(100vw - 18px));max-height:calc(100dvh - 360px);overflow:auto;padding:11px}
   .tutorial-card.compact{width:min(286px,calc(100vw - 18px));padding:9px 10px}
   .tutorial-body{margin:8px 0}.tutorial-actions{margin-top:9px;flex-wrap:wrap}.tutorial-text-btn{margin-left:auto}
-  body:not(.space-flight-active) #currentJourneyCard{top:max(132px,calc(env(safe-area-inset-top) + 124px));right:max(8px,env(safe-area-inset-right));width:min(240px,calc(50vw - 18px));min-height:104px;display:flex;flex-direction:column;align-items:stretch;justify-content:space-between;gap:7px;padding:9px}body:not(.space-flight-active) .currentJourneyCopy strong{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}body:not(.space-flight-active) .currentJourneyCopy small{display:none}body:not(.space-flight-active) #currentJourneyAction{width:100%;min-height:31px;padding-left:8px;text-align:left}
+  body:not(.space-flight-active) #currentJourneyCard{right:max(8px,env(safe-area-inset-right));bottom:max(82px,calc(env(safe-area-inset-bottom) + 74px));width:min(270px,calc(100vw - 18px));min-height:0;display:flex;flex-direction:column;align-items:stretch;justify-content:space-between;gap:7px;padding:9px 32px 9px 9px}body:not(.space-flight-active) .currentJourneyCopy strong{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}body:not(.space-flight-active) .currentJourneyCopy small{display:none}body:not(.space-flight-active) #currentJourneyAction{width:100%;min-height:31px;padding-left:8px;text-align:left}
   .space-flight-active #currentJourneyCard{display:none!important}
+  .keyboard-binding-list{grid-template-columns:1fr}.keyboard-binding-row{grid-template-columns:minmax(0,1fr) 58px 58px}.keyboard-binding-settings footer{align-items:flex-start;flex-direction:column}
 }

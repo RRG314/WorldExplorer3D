@@ -146,10 +146,12 @@ function fallbackFullBuildingHeightCap(buildingType = '', footprintArea = 0, foo
 
 function inferBuildingPartKind(tags = {}) {
   const part = normalizedTagValue(tags?.['building:part']);
+  const building = normalizedTagValue(tags?.building);
+  const semantic = part || building;
+  if (semantic === 'roof') return 'roof';
+  if (semantic === 'balcony') return 'balcony';
+  if (semantic === 'canopy' || semantic === 'awning') return 'canopy';
   if (!part) return 'full';
-  if (part === 'roof') return 'roof';
-  if (part === 'balcony') return 'balcony';
-  if (part === 'canopy' || part === 'awning') return 'canopy';
   return 'part';
 }
 
@@ -308,7 +310,7 @@ function interpretBuildingSemantics(tags = {}, options = {}) {
   const heightSource =
     Number.isFinite(explicitHeight) ? 'explicit_height' :
     Number.isFinite(buildingLevels) ? 'levels' :
-    normalizedTagValue(tags?.['building:part']) ? 'fallback_part' :
+    partKind !== 'full' ? 'fallback_part' :
     'fallback';
   const constrainedHeight = constrainBuildingHeightMeters(tags, rawHeightMeters, {
     partKind,

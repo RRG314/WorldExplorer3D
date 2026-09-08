@@ -34,25 +34,29 @@
   }
 
   #tab-controls #accessibilitySettings {
-    color: #1e293b;
-    background: #f8fafc;
+    color: #eef5f8;
+    background: linear-gradient(135deg, #0a1721, #071018);
+    border-color: rgba(91, 132, 163, .42);
   }
 
-  #tab-controls #accessibilitySettingsStatus { color: #475569; }
+  #tab-controls #accessibilitySettingsStatus { color: #9eb1bd; }
 
   #accessibilitySettings {
     display: grid;
     gap: 10px;
     margin: 10px 0;
     padding: 12px;
-    border: 1px solid currentColor;
-    border-radius: 8px;
+    border: 1px solid rgba(137, 165, 184, .46);
+    border-radius: 3px;
   }
 
-  #accessibilitySettings > strong { color: inherit; }
+  .accessibilitySettingsHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .accessibilitySettingsHead strong { color: inherit; font: 700 12px/1.2 Orbitron, sans-serif; text-transform: uppercase; }
+  .accessibilitySettingsHead button { min-height: 34px; border: 1px solid rgba(137, 165, 184, .42); border-radius: 2px; padding: 0 11px; background: #101d27; color: #edf5fa; cursor: pointer; }
+  .accessibilitySettingsIntro { margin: -3px 0 2px; color: #9eb1bd; font-size: 11px; }
   #accessibilitySettings label { display: flex; align-items: center; gap: 9px; }
   #accessibilitySettings label:has(select) { display: grid; grid-template-columns: 1fr minmax(120px, 1.2fr); }
-  #accessibilitySettings select { min-height: 40px; }
+  #accessibilitySettings select { min-height: 40px; border: 1px solid rgba(137, 165, 184, .46); border-radius: 2px; padding: 0 9px; background: #061019; color: #f3f7f9; }
   #accessibilitySettings input[type="checkbox"] { width: 20px; height: 20px; }
 
   :where(button, a, input, select, textarea, [tabindex]):focus-visible {
@@ -72,6 +76,18 @@
     #resultScreen, #caughtScreen, #urbanEquipment, #discoveryPanel,
     #roomPanelModal, #liveGpsPermissionPanel, #arExperience
   ) { font-size: 130%; }
+
+  html[data-we3d-text-scale="160"] :where(
+    #globeSelectorScreen, #globeHubOverlay, #controlsTab, #pauseScreen,
+    #resultScreen, #caughtScreen, #urbanEquipment, #discoveryPanel,
+    #roomPanelModal, #liveGpsPermissionPanel, #arExperience
+  ) { font-size: 160%; }
+
+  html[data-we3d-text-scale="200"] :where(
+    #globeSelectorScreen, #globeHubOverlay, #controlsTab, #pauseScreen,
+    #resultScreen, #caughtScreen, #urbanEquipment, #discoveryPanel,
+    #roomPanelModal, #liveGpsPermissionPanel, #arExperience
+  ) { font-size: 200%; }
 
   html[data-we3d-contrast="more"] :where(
     #globeSelectorScreen, #globeHubOverlay, #controlsTab, #pauseScreen,
@@ -97,6 +113,15 @@
     transition-duration: .01ms !important;
   }
 
+  html[data-we3d-effects="reduce"] #urbanCrashFeedback,
+  html[data-we3d-effects="reduce"] .pirateCombatHud::before { display: none !important; }
+  html[data-we3d-reticle="large"] #urbanWeaponReticle { --reticle-gap: 13px; width: 74px; height: 74px; }
+  html[data-we3d-reticle="large"] #urbanWeaponReticle i,
+  html[data-we3d-reticle="large"] #urbanWeaponReticle b { left: 36px; height: 11px; }
+  html[data-we3d-reticle="large"] #urbanWeaponReticle span,
+  html[data-we3d-reticle="large"] #urbanWeaponReticle em { top: 36px; width: 11px; }
+  html[data-we3d-action-details="always"] #urbanVehiclePrompt.familiar #urbanVehiclePromptMeta { display: block; }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       scroll-behavior: auto !important;
@@ -119,6 +144,6 @@
       min-height: 44px;
     }
     #accessibilitySettings select { min-height: 44px; }
-    #accessibilitySettings label, #mobileControlsReset { min-height: 44px !important; }
+    #accessibilitySettings label, #mobileControlsReset, #accessibilityReset { min-height: 44px !important; }
   }
 }

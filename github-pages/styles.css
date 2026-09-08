@@ -22,7 +22,7 @@ nav a, .text-links a { color: var(--muted); text-decoration: none; }
 nav a:hover, .text-links a:hover { color: var(--ink); }
 .header-action { justify-self: end; padding: 10px 15px; border: 1px solid rgba(255, 255, 255, .55); border-radius: 5px; text-decoration: none; font-weight: 700; }
 
-.hero { min-height: min(86vh, 880px); display: flex; align-items: flex-end; padding: 150px 7vw 8vh; background: linear-gradient(90deg, rgba(4, 8, 9, .9) 0%, rgba(4, 8, 9, .44) 55%, rgba(4, 8, 9, .12) 100%), linear-gradient(0deg, var(--night), transparent 34%), url("assets/showcase/baltimore-harbor.webp") center 52% / cover no-repeat; }
+.hero { min-height: min(86vh, 880px); display: flex; align-items: flex-end; padding: 150px 7vw 8vh; background: linear-gradient(90deg, rgba(4, 8, 9, .9) 0%, rgba(4, 8, 9, .44) 55%, rgba(4, 8, 9, .12) 100%), linear-gradient(0deg, var(--night), transparent 34%), url("assets/showcase/living-world-update-current.webp") center 52% / cover no-repeat; }
 .hero-content { max-width: 780px; }
 .eyebrow, .section-kicker, .feature-number { margin: 0 0 14px; color: var(--aqua); font-size: .78rem; font-weight: 800; text-transform: uppercase; }
 h1, h2, h3, p { letter-spacing: 0; }

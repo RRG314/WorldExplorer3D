@@ -1,5 +1,7 @@
 # World Explorer 3D
 
+[Full project description](docs/PROJECT_DESCRIPTION.md) · [System inventory](docs/SYSTEM_INVENTORY.md) · [Architecture map](docs/ARCHITECTURE_MAP.md)
+
 [![Runtime Verify](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml/badge.svg?branch=stable)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml)
 [![Secret Scan](https://github.com/RRG314/WorldExplorer3D/actions/workflows/secret-scan.yml/badge.svg?branch=stable)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/secret-scan.yml)
 [![GitHub Pages](https://github.com/RRG314/WorldExplorer3D/actions/workflows/deploy-pages-public.yml/badge.svg?branch=stable)](https://rrg314.github.io/WorldExplorer3D/)
@@ -13,14 +15,19 @@ space.
 <p align="center">
   <a href="https://worldexplorer3d.io/app/"><strong>Play World Explorer 3D</strong></a>
   · <a href="CONTROLS_REFERENCE.md">Controls</a>
-  · <a href="RELEASE_NOTES_5.2.0.md">What’s new</a>
+  · <a href="RELEASE_NOTES_2026_09_08.md">What’s new</a>
   · <a href="ROADMAP.md">Roadmap</a>
 </p>
 
-![Walking beside USS Constellation in Baltimore's Inner Harbor](assets/readme/baltimore-harbor.webp)
+![The current BMW chase view on East Pratt Street in World Explorer 3D](assets/readme/bmw-chase-september-2026.webp)
 
-*Baltimore’s Inner Harbor, with the mapped USS Constellation identified as a
-sloop-of-war museum ship.*
+*Explore real places—and help make them your own. September's update brings
+manual building-photo contributions, richer ground and building detail, and
+restored BMW chase and driver-seat views.*
+
+Read [A world worth making your own](RELEASE_NOTES_2026_09_08.md) for the latest
+changes, or the [full project description](docs/PROJECT_DESCRIPTION.md) for how
+travel, discovery, property, building, community and space fit together.
 
 ## A world you can play in
 
@@ -53,7 +60,8 @@ active world.*
 ## What you can do
 
 - Explore on foot, by car, drone, plane, helicopter, boat, ship, rover,
-  astronaut, or spacecraft, or use optional Live GPS play while walking.
+  astronaut on solid planetary surfaces, or spacecraft; or use optional Live
+  GPS play while walking.
 - Drive vehicle families with distinct vehicle handling, visible condition, and
   enterable responder vehicles.
 - Visit supported mapped airports to board aircraft, choose pilot or passenger
@@ -83,11 +91,18 @@ active world.*
 
 ## Version 5.2
 
-Version 5.2 extends the 5.1 sandbox with the Interstellar Expeditions Alpha,
-connected virtual property and Explorer Credits, a clearer gameplay menu, and
-faster cleanup when moving between worlds. The established 5.1 Earth,
-Ocean, vehicle, flight, fieldwork, Backpack, Journal, and multiplayer paths
-remain part of the release.
+Version 5.2 makes the sandbox feel more alive and more connected. The current
+Explorer and companion travel together, roads carry denser traffic and
+pedestrians, mapped businesses connect to useful supplies and services, and one
+wallet follows the player through property, fieldwork, vehicle upgrades, and
+space. A shorter optional First Journey, configurable controls, calmer nearby
+prompts, and rebuilt touch and accessibility settings make it easier to start
+playing without covering the screen in instructions.
+
+Beyond Earth, Interstellar Expeditions Alpha now connects shipboard life,
+planetary fieldwork, Pathfinder travel, and a surprise pirate interception in
+one continuing voyage. The established Earth, Ocean, vehicle, flight,
+Backpack, Journal, multiplayer, and free-exploration paths remain available.
 
 Interstellar Expeditions are intentionally labeled Alpha. They provide a
 connected playable journey and saved progression, while ship art, crew motion,

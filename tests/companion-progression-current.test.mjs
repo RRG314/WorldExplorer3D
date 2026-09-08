@@ -7,11 +7,14 @@ import { compileAmbientWildlifePlan } from '../app/js/discovery/wildlife-runtime
 
 import {
   COMPANION_LEVEL_THRESHOLDS,
+  assignCompanionHome,
   awardCompanionXp,
   careForCompanion,
   companionLevelForXp,
   createCompanionInstance,
+  createStarterCompanionInstance,
   normalizeCompanionInstance,
+  renameCompanion,
   resolveCompanionTravelPolicy,
   sanitizeCompanionName
 } from '../app/js/discovery/companions.js';
@@ -34,7 +37,7 @@ test('individual identity is stable per encounter and permits meaningful duplica
   assert.equal(first.instanceId, same.instanceId);
   assert.notEqual(first.instanceId, second.instanceId);
   assert.equal(first.name, 'Copper');
-  assert.equal(first.schemaVersion, 2);
+  assert.equal(first.schemaVersion, 3);
   assert.equal(first.speciesArchetype, 'dog');
   assert.equal(first.progression.trustState, 'Comfortable');
   assert.equal(first.tradeable, false);
@@ -101,7 +104,41 @@ test('travel policy keeps companions safely inside enclosed vehicles instead of 
   assert.deepEqual(resolveCompanionTravelPolicy(companion, 'car', 'EARTH'), { visible: false, state: 'vehicle-occupant', positionMode: 'interior' });
   assert.deepEqual(resolveCompanionTravelPolicy(companion, 'boat', 'EARTH'), { visible: true, state: 'aboard', positionMode: 'aboard' });
   assert.deepEqual(resolveCompanionTravelPolicy(companion, 'plane', 'EARTH'), { visible: false, state: 'vehicle-occupant', positionMode: 'interior' });
-  assert.deepEqual(resolveCompanionTravelPolicy(companion, 'walk', 'MOON'), { visible: false, state: 'waiting' });
+  assert.deepEqual(resolveCompanionTravelPolicy(companion, 'walk', 'MOON'), { visible: false, state: 'protected-quarters' });
+  assert.deepEqual(resolveCompanionTravelPolicy(companion, 'skydive', 'EARTH'), { visible: false, state: 'safe-during-exposed-travel' });
+});
+
+test('the starter dog has stable identity, a temporary name, and a durable first naming transition', () => {
+  const first = createStarterCompanionInstance({ profileIdentity: 'local-explorer', adoptedAt: 100 });
+  const retry = createStarterCompanionInstance({ profileIdentity: 'local-explorer', adoptedAt: 100 });
+  assert.equal(first.instanceId, retry.instanceId);
+  assert.equal(first.catalogId, 'trail-hound');
+  assert.equal(first.name, 'Scout');
+  assert.equal(first.isStarterCompanion, true);
+  assert.equal(first.originKind, 'starter-companion');
+  assert.equal(first.nameStatus, 'default');
+  assert.deepEqual(first.residence, { state: 'home-pending', homeId: '', updatedAt: 100 });
+
+  const named = renameCompanion(first, '  Maple  ', 200);
+  assert.equal(named.renamed, true);
+  assert.equal(named.firstStarterNaming, true);
+  assert.equal(named.companion.name, 'Maple');
+  assert.equal(named.companion.nameStatus, 'player-chosen');
+  assert.equal(named.companion.namedAt, 200);
+
+  const later = renameCompanion(named.companion, 'Juniper', 300);
+  assert.equal(later.renamed, true);
+  assert.equal(later.firstStarterNaming, false);
+  assert.equal(later.companion.namedAt, 200);
+});
+
+test('home assignment retains a traveling companion home base and parks inactive companions there', () => {
+  const starter = createStarterCompanionInstance({ adoptedAt: 100 });
+  const atHome = assignCompanionHome(starter, 'world:home:one', 200);
+  assert.deepEqual(atHome.residence, { state: 'at-home', homeId: 'world:home:one', updatedAt: 200 });
+  const active = normalizeCompanionInstance({ ...atHome, active: true });
+  const traveling = assignCompanionHome(active, 'world:home:two', 300);
+  assert.deepEqual(traveling.residence, { state: 'traveling', homeId: 'world:home:two', updatedAt: 300 });
 });
 
 test('names are bounded, normalized, and safe for display escaping', () => {

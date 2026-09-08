@@ -26,15 +26,34 @@ async function openSpace(page) {
 
 async function seedExpedition(page) {
   await page.evaluate(async () => {
-    const [{ DEFAULT_CREW }, { createExpeditionPlan }, { startExpedition }, { createExpeditionStore }] = await Promise.all([
+    const [{ DEFAULT_CREW }, { createExpeditionPlan, withExpeditionChanges }, { startExpedition }, { createExpeditionStore }] = await Promise.all([
       import('/app/js/expedition/catalog.js?v=2'),
-      import('/app/js/expedition/model.js?v=8'),
-      import('/app/js/expedition/simulation.js?v=7'),
-      import('/app/js/expedition/store.js?v=8')
+      import('/app/js/expedition/model.js?v=11'),
+      import('/app/js/expedition/simulation.js?v=8'),
+      import('/app/js/expedition/store.js?v=11')
     ]);
     const planned = createExpeditionPlan({ destinationId: 'proxima-centauri', crew: DEFAULT_CREW, id: 'destination-mission-verification', createdAtMs: 88_000 });
-    createExpeditionStore().save(startExpedition(planned, 88_100));
+    const started = startExpedition(planned, 88_100);
+    createExpeditionStore().save(withExpeditionChanges(started, {
+      state: 'arrived',
+      progress: 1,
+      voyagePhase: 'arrival',
+      arrivalTransferState: 'complete',
+      arrivedFrameId: 'proxima-centauri'
+    }));
   });
+}
+
+async function enterProximaFrame(page) {
+  await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    ctx.travelToUniverseDestination('proxima-centauri', { kind: 'verification-arrival', routeLabel: 'Verified Expedition arrival' });
+  });
+  await page.waitForFunction(() => {
+    const current = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+    return current.universeNavigation?.currentFrameId === 'proxima-centauri'
+      && current.universeNavigation?.transitionDestinationId == null;
+  }, null, { timeout: 25_000 });
 }
 
 async function selectMission(page, destinationId) {
@@ -54,19 +73,14 @@ async function desktopJourney() {
   try {
     await openSpace(page);
     await seedExpedition(page);
+    await enterProximaFrame(page);
     await selectMission(page, 'proxima-centauri');
     assert.equal(await page.locator('#destinationMissionTitle').textContent(), 'The Flare Watch');
     assert.match(await page.locator('.destination-mission-evidence').textContent(), /Stellar-system mission/);
     await page.screenshot({ path: path.join(outputDir, 'desktop-proxima-briefing.png'), fullPage: true });
     await page.locator('[data-mission-begin]').click();
-    assert.equal((await state(page)).destinationMission.phase, 'approach');
-    await page.locator('[data-mission-course]').click();
-    await page.waitForFunction(() => {
-      const current = JSON.parse(globalThis.render_game_to_text?.() || '{}');
-      return current.universeNavigation?.currentFrameId === 'proxima-centauri'
-        && current.universeNavigation?.transitionDestinationId == null
-        && current.destinationMission?.phase === 'fieldwork';
-    }, null, { timeout: 25_000 });
+    await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').destinationMission?.phase === 'fieldwork', null, { timeout: 8_000 });
+    assert.equal((await state(page)).destinationMission.phase, 'fieldwork');
     await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
       ctx.openDestinationMission('proxima-centauri');

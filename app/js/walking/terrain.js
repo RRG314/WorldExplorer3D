@@ -30,6 +30,7 @@ function createWalkingTerrainHelpers({ car, state, CFG }) {
   function getSafeDriveY(x, z, fallbackY) {
     let y = fallbackY;
     if (!appCtx.activeInterior && (appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId)) {
+      state.walker._walkSupportFeature = null;
       const surfaceY = planetarySurfaceYAtRenderXZ(appCtx, x, z);
       if (Number.isFinite(surfaceY)) y = surfaceY + 1.2;
     } else if (appCtx.SurfaceQuery) {
@@ -41,6 +42,7 @@ function createWalkingTerrainHelpers({ car, state, CFG }) {
   }
 
   function getWalkGroundY(x, z, fallbackY = 0) {
+    state.walker._walkSupportFeature = null;
     if (!appCtx.activeInterior && (appCtx.onMoon || appCtx.onMars || appCtx.activePlanetaryBodyId)) {
       const surfaceY = planetarySurfaceYAtRenderXZ(appCtx, x, z);
       return Number.isFinite(surfaceY) ? surfaceY : fallbackY;
@@ -48,10 +50,12 @@ function createWalkingTerrainHelpers({ car, state, CFG }) {
 
     if (appCtx.SurfaceQuery) {
       const walkerFeetY = Number.isFinite(state.walker?.y) ? state.walker.y - CFG.eyeHeight : NaN;
-      const surfaceY = appCtx.SurfaceQuery.walkAt(x, z, {
+      const surface = appCtx.SurfaceQuery.walkAt(x, z, {
         currentY: walkerFeetY,
         sampleRenderedMesh: false
-      }).position.y;
+      });
+      state.walker._walkSupportFeature = surface.feature || null;
+      const surfaceY = surface.position.y;
       if (Number.isFinite(surfaceY)) return surfaceY;
     }
     return finiteOr(fallbackY, 0);

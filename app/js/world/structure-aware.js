@@ -10,8 +10,9 @@ import {
   updateFeatureSurfaceProfile
 } from "../structure-semantics.js?v=63";
 import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=15";
+import { compileTunnelSolidBoundaries } from './compiler/tunnel-solid-publication.js';
 import { compileTransportStructureModel } from "./compiler/transport-structure-model.js?v=1";
-import { compileTransportStructureAssemblies } from "./compiler/transport-structure-assembly.js?v=14";
+import { compileTransportStructureAssemblies } from "./compiler/transport-structure-assembly.js?v=15";
 import {
   auditTransportJunctionContinuity,
   buildExactTransportNodeFinalizationAnchors,
@@ -23,10 +24,13 @@ import {
   createDriveableRoadConflictIndex,
   supportPointConflictsWithDriveableRoad,
   supportSpanConflictsWithDriveableRoad
-} from "./bridge-safety.js?v=13";
+} from "./bridge-safety.js?v=14";
 import { refreshStructureColliders } from "./structure-colliders.js?v=13";
 import { yieldToMainThread } from "./cooperative-scheduling.js?v=1";
-import { compileSharedTransportSurfacePresentations } from './transport-surface-controls.js?v=2';
+import {
+  applyPendingPublishedTransportSurfaceControls,
+  compileSharedTransportSurfacePresentations
+} from './transport-surface-controls.js?v=3';
 
 const runtime = {
   enableLinearFeatures: () => false,
@@ -617,6 +621,10 @@ function* compileStructureAwareFeatureProfileSteps() {
   measure('compileTunnels', () => compileTunnelSystemModels(transportFeatures, worldBaseTerrainY));
   yield;
   measure('compileSharedPhysicalSurfaces', () => {
+    appCtx.publishedTransportSurfaceControlApplication = applyPendingPublishedTransportSurfaceControls(
+      appCtx.pendingPublishedTransportSurfaceControls,
+      roadFeatures
+    );
     appCtx.sharedTransportSurfacePresentation = compileSharedTransportSurfacePresentations(
       roadFeatures,
       sampleFeatureSurfaceY
@@ -678,13 +686,61 @@ export function refreshStructureAwareFeatureProfiles() {
 }
 
 export async function refreshStructureAwareFeatureProfilesCooperatively() {
+  const sequence = appCtx._worldLoadSequence;
+  const roads = appCtx.roads;
+  const groundRelease = appCtx.lastEarthStreamingRelease;
   const steps = compileStructureAwareFeatureProfileSteps();
   let result = steps.next();
   while (!result.done) {
     await yieldToMainThread();
+    if (appCtx._worldLoadSequence !== sequence || appCtx.roads !== roads || appCtx.lastEarthStreamingRelease !== groundRelease) {
+      steps.return();
+      throw new DOMException('Transport compilation belongs to a previous world', 'AbortError');
+    }
     result = steps.next();
   }
   return result.value;
+}
+
+export async function refreshTransportStructureAssembliesForPublishedTerrain() {
+  const roadFeatures = Array.isArray(appCtx.roads) ? appCtx.roads : [];
+  const transportFeatures = roadFeatures.concat(structureAwareLinearFeatures());
+  const structureWaterAreas = []
+    .concat(Array.isArray(appCtx.waterAreas) ? appCtx.waterAreas : [])
+    .concat(Array.isArray(appCtx.waterways) ? appCtx.waterways : []);
+  const nearbyPublishedWaterAreas = createWaterAreaBoundsFilter(structureWaterAreas);
+  const samplePublishedTerrainY = (x, z) => {
+    const renderedY = appCtx.terrainMeshHeightAt?.(x, z, { ignorePortalCuts: true });
+    return Number.isFinite(renderedY) ? renderedY : worldBaseTerrainY(x, z);
+  };
+  // The portal/cover product must be finalized against the same uncut terrain
+  // the mesh adapter sees, after road grading and both terrain LODs publish.
+  // The road floor remains owned by its already compiled transport profile.
+  compileTunnelSystemModels(transportFeatures, samplePublishedTerrainY);
+  appCtx.tunnelSolidCompilation = await compileTunnelSolidBoundaries(transportFeatures);
+  const supportRoadIndex = createDriveableRoadConflictIndex(roadFeatures);
+  appCtx.transportStructureAssembly = compileTransportStructureAssemblies(
+    transportFeatures,
+    samplePublishedTerrainY,
+    {
+      pointInMappedWater: (feature, x, z) =>
+        nearbyPublishedWaterAreas(feature).some((area) => isPointWithinMappedWater(area, x, z)),
+      supportConflict: (feature, column) => supportPointConflictsWithDriveableRoad(feature, {
+        x: column.x,
+        z: column.z,
+        supportBottomY: column.terrainY,
+        supportTopY: column.topY,
+        columnRadius: column.width * 0.5,
+        roadIndex: supportRoadIndex
+      }),
+      supportSpanConflict: (feature, span) => supportSpanConflictsWithDriveableRoad(feature, {
+        ...span,
+        roadIndex: supportRoadIndex
+      })
+    }
+  );
+  refreshStructureColliders(appCtx, transportFeatures);
+  return appCtx.transportStructureAssembly;
 }
 
 export function syncLinearFeatureOverlayVisibility() {

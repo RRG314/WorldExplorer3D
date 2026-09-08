@@ -86,7 +86,12 @@ function shipAlertState(expedition) {
   const systems = Object.entries(expedition?.systems || {}).sort((a, b) => Number(a[1]?.condition ?? 1) - Number(b[1]?.condition ?? 1));
   const [systemId, system] = systems[0] || ['ship', { condition: 1, status: 'optimal' }];
   const condition = Number(system?.condition ?? 1);
-  const pending = expedition?.pendingEvent;
+  const encounter = expedition?.activeEncounter;
+  const encounterPending = encounter && encounter.phase !== 'COMPLETE';
+  const pending = expedition?.pendingEvent || (encounterPending ? {
+    title: 'Pirate boarding interception',
+    roomId: 'Pathfinder defensive control'
+  } : null);
   const level = condition < 0.25 ? 'critical' : condition < 0.55 || pending ? 'attention' : 'normal';
   return Object.freeze({
     level,
