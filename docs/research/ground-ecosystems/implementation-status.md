@@ -26,6 +26,16 @@ Provider recovery and the remaining regional matrix are not fully accepted.
 
 ## Terrain boundary investigation
 
+Adaptive boundary geometry is now implemented locally: only adjoining far-field
+cells acquire detailed edge vertices, and height queries use their exact triangle
+fans. Water/transport rebuilds update the bound heights before cache invalidation.
+Yosemite's worst measured difference is0.04155m and Chamonix's0.04476m, sampled
+0.02m outside the detailed edge on steep slopes. Added vertices:4,250 and4,176
+respectively. Both actual gameplay screenshots were inspected; no runtime
+exceptions were recorded. Evidence: yosemite-edge-lifecycle-current and
+alpine-edge-lifecycle-current. This supersedes the earlier gap measurements below,
+not the outstanding global/device acceptance gates.
+
 Actual boundary sampling found a separate inland-water defect: missing DEM
 samples were coerced to zero in sampleWaterPolygonInteriorHeights (introduced
 in f7d040231 on August 6). A Chamonix mapped water polygon was consequently

@@ -1,5 +1,12 @@
 # World Explorer 3D System Inventory
 
+Local terrain continuity: far-field boundary cells now retain detailed edge
+vertices, including intermediate cliff heights; shared height queries and later
+water/transport rebuilds consume the same transition geometry. Yosemite's sampled
+boundary difference fell from about95m to0.042m at a0.02m outward offset, with
+4,250 added vertices rather than a denser entire regional grid. Broader acceptance
+is still tracked separately. Missing inland DEM samples no longer become sea level.
+
 Local update,2026-09-08 (not deployed): numeric ESA2021 land-cover delivery,
 nearest-tile biome evidence, slope-projected rock/class roughness/snow texture,
 bounded forest placement and curated tree/shrub/fern cell rendering now replace

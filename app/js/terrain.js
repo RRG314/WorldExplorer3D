@@ -287,6 +287,7 @@ function applyWaterTerrainMask(options = {}) {
     maskedVertices += Number(mesh.userData?.waterMaskedVertices || 0);
   }
   const terrainSeams = stitchTerrainGroupEdges(appCtx);
+  refreshFarTerrainBoundaryHeights();
   clearTerrainHeightCache();
   const stats = {
     terrainMeshes: meshes.length,
@@ -313,6 +314,7 @@ function applyTransportTerrainCorridors(options = {}) {
     waterMaskedVertices += Number(mesh.userData?.waterMaskedVertices || 0);
   }
   const terrainSeams = stitchTerrainGroupEdges(appCtx);
+  refreshFarTerrainBoundaryHeights();
   clearTerrainHeightCache();
   const stats = Object.freeze({
     authority: 'compiled_transport_surface',
@@ -379,6 +381,7 @@ const transportPublicationDeps = {
 
 const {
   refreshFarTerrainSurfaceColors,
+  refreshFarTerrainBoundaryHeights,
   resetFarTerrainClipmap,
   sampleFarTerrainWorldYAt,
   scheduleFarTerrainSurfaceRefresh,

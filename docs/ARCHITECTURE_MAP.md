@@ -1,5 +1,13 @@
 # World Explorer 3D Architecture
 
+Terrain boundary update: `detail-boundary.js` reads published detailed mesh edges;
+the existing far-field geometry builder refines only adjoining cells and records
+their triangles in its existing surface grid. Rendering and height queries share
+those triangles. Water/transport terrain rebuilds refresh the bound edge heights
+before clearing the height cache. No second terrain mesh, skirt or collision
+authority is introduced. Inland water sampling excludes unavailable DEM values;
+terrain beds use the canonical water-body/profile resolver.
+
 Local ground update,2026-09-08: `worldcover-categorical.js` validates bounded
 numeric rasters; existing `worldcover-baseline.js` owns queue/cache/fallback;
 `worldcover-biome-state.js` selects nearest local evidence. Surface material

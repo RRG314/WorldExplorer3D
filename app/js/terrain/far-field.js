@@ -631,7 +631,8 @@ function createFarFieldTerrainApi(deps = {}) {
     farFieldSurfaceState = {
       spec,
       worldCoverResult: worldCoverContext,
-      surfaceGrid: built.surfaceGrid
+      surfaceGrid: built.surfaceGrid,
+      refreshBoundaryHeights:built.refreshBoundaryHeights
     };
     applyFixedLocationSurfaceMaterial(mesh, worldCoverContext, spec);
     applyMappedSurfaceTintOwnership(mesh);
@@ -864,6 +865,11 @@ function createFarFieldTerrainApi(deps = {}) {
       terrainHeightWithPortalCuts(farFieldMesh.userData.structureTerrainPortalDescriptors, x, z, height);
   }
 
+  function refreshFarTerrainBoundaryHeights() {
+    if(!farFieldMesh || !farFieldSurfaceState)return 0;
+    return farFieldSurfaceState.refreshBoundaryHeights?.(appCtx.terrainGroup?.children)||0;
+  }
+
   function scheduleFarTerrainSurfaceRefresh() {
     if (!farFieldMesh || !farFieldSurfaceState) return;
     if (surfaceRefreshTimer !== null) clearTimeout(surfaceRefreshTimer);
@@ -973,6 +979,7 @@ function createFarFieldTerrainApi(deps = {}) {
 
   return {
     refreshFarTerrainSurfaceColors,
+    refreshFarTerrainBoundaryHeights,
     resetFarTerrainClipmap,
     sampleFarTerrainWorldYAt,
     scheduleFarTerrainSurfaceRefresh,
