@@ -14,9 +14,9 @@ Start on your phone or continue from your computer with the account handoff.
 You do not need to run paid 3D reconstruction to contribute an exterior.
 Original photos stay protected; saving a draft does not publish it.
 
-Production availability depends on the capture backend and account configuration,
-not just the game download. See [release status](docs/RELEASE_AUDIT_2026_09_08.md)
-for the current rollout boundary.
+The manual exterior workflow is now deployed, including protected uploads and
+review. Interiors and paid reconstruction are not part of the public workflow.
+See [release status](docs/RELEASE_AUDIT_2026_09_08.md) for remaining limitations.
 
 ## More character in the landscape
 

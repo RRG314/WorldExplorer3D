@@ -145,11 +145,14 @@ contribution-preview rooms are planned additions, not existing finished features
 
 ## Improving a real building with photos
 
-The working staging path lets an authenticated contributor upload photos,
+The manual contribution path lets an authenticated contributor upload photos,
 select mapped building sides, crop and place images, save a revision and submit
 it for review. Approval makes that contribution available on that particular
 mapped building. The owner has completed this loop and seen the updated house
-in the staging world.
+in the staging world. That approved contribution has now been promoted to
+production with its originals, building identity and review retained. Production
+upload, save, reload and submission have also passed a real authenticated smoke
+check; physical-phone and every-location acceptance remain separate.
 
 This manual approach does not need a paid 3D reconstruction job. Available
 photos cover selected surfaces while unmapped or unphotographed parts retain

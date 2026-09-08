@@ -9,8 +9,12 @@ Production App Check and Storage have been provisioned; the twenty capture
 handlers and Firestore/Storage rules are deployed. The approved house's media
 and three publication records were copied with checksums and owner/generation
 remapping. Original staging records remain intact. Forty-five focused capture
-security/hybrid/camera tests pass. A live production photo test is being completed
-after correcting the missing Storage-to-Firestore rules role.
+security/hybrid/camera tests pass. The live production photo test passed after
+correcting the missing Storage-to-Firestore rules role: actual sign-in, real
+App Check (no debug bypass), one synthetic photo upload/validation, preview save,
+reload, stale revision rejection, CPU manual submission for review, and denial
+of paid/room admission. Fixture and account were removed. Approved-media browser
+delivery additionally required exact-origin bucket CORS, now configured.
 
 The entries below record findings during preparation; App Check provisioning
 and the selected house migration are no longer pending. Physical Android,
