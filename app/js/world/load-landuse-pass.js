@@ -324,6 +324,7 @@ export function createWorldLandusePass(options = {}) {
     appCtx.landuses.push({
       type: landuseType,
       pts: ring,
+      sourceFeatureId: featureMeta.sourceFeatureId || null,
       bounds: { minX, maxX, minZ, maxZ }
     });
 

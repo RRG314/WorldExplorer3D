@@ -951,6 +951,28 @@ function transportStructureSnapshot() {
   };
 }
 
+function environmentEvidenceSnapshot() {
+  const counts = {};
+  const failures = {};
+  for (const mesh of appCtx.terrainGroup?.children || []) {
+    const kind = mesh.userData?.worldCoverResult?.dataAuthority || mesh.userData?.worldCoverStatus || 'pending';
+    counts[kind] = (counts[kind] || 0) + 1;
+    const reason = mesh.userData?.worldCoverFailureReason;
+    if (kind === 'unavailable' && reason) failures[reason] = (failures[reason] || 0) + 1;
+  }
+  const trees = appCtx.vegetationFeatures || [];
+  return {
+    biome: appCtx.worldSurfaceProfile?.biome || null,
+    biomeEvidence: appCtx.worldSurfaceProfile?.biomeEvidence || null,
+    owner: appCtx.worldCoverStats?.biomeOwner || null,
+    landCoverTiles: counts,
+    landCoverFailures: failures,
+    vegetationCount: trees.length,
+    vegetationBatches: appCtx.vegetationMeshes?.length || 0,
+    nearestTreeToOrigin: trees.length ? trees.reduce((nearest, tree)=>Math.min(nearest, Math.hypot(tree.x,tree.z)), Infinity) : null
+  };
+}
+
 function getWorldExplorerRuntimeDiagnostics() {
   const activeActor = appCtx.activeTransportActor?.() || null;
   const interiorCandidates = !appCtx.activeInterior && activeActor?.position &&
@@ -1185,6 +1207,7 @@ function getWorldExplorerRuntimeDiagnostics() {
       lon: numberOrNull(appCtx.LOC?.lon)
     },
     terrainCache: appCtx.terrainTileCacheSnapshot?.() || null,
+    environmentEvidence: environmentEvidenceSnapshot(),
     mapTileCache: appCtx.mapTileCacheSnapshot?.() || null,
     minimapView: appCtx.getMinimapViewSnapshot?.() || null,
     groundProviderCatalog:
@@ -1332,6 +1355,7 @@ globalThis.render_game_to_text = () => JSON.stringify({
     !document.getElementById("titleScreen").classList.contains("hidden"),
   surfaceChain: surfaceChainSnapshot(),
   terrainCache: appCtx.terrainTileCacheSnapshot?.() || null,
+  environmentEvidence: environmentEvidenceSnapshot(),
   mapTileCache: appCtx.mapTileCacheSnapshot?.() || null,
   minimapView: appCtx.getMinimapViewSnapshot?.() || null,
   liveGps: appCtx.getLiveGpsSnapshot?.() || { active: false },

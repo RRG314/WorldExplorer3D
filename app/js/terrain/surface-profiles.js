@@ -22,6 +22,7 @@ import {
   setTerrainSurfaceMaterialMixAt
 } from './surface-material-blend.js?v=2';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
+import { scheduleWorldCoverRecovery } from './worldcover-recovery.js';
 
 const SNOW_COLOR_HEX = 0xffffff; const ALPINE_SNOW_COLOR_HEX = 0xe5ebf2;
 const SAND_COLOR_HEX = 0xd7c08a;
@@ -315,6 +316,8 @@ function ensureTerrainSemanticTextureSets(mesh, repeats) {
     forest: terrainTextureSource('forest'),
     soil: terrainTextureSource('soil'),
     rock: terrainTextureSource('rock'),
+    snow: terrainTextureSource('snow'),
+    snowTextureSupported: Number(appCtx.renderer?.capabilities?.maxTextures || 0) >= 16,
     biomeId: String(appCtx.worldSurfaceProfile?.biome?.id || '')
   };
 }
@@ -556,6 +559,15 @@ function applyLoadedWorldCoverBaseline(mesh) {
   const result = mesh?.userData?.worldCoverResult;
   const material = mesh?.material;
   if (!result || !material || Array.isArray(material) || mesh.userData?.terrainDisposed) return false;
+  const bounds = mesh.userData?.terrainTile?.bounds;
+  if (bounds) refreshWorldBiomeFromWorldCoverStats(appCtx, worldCoverStatsForLocation(appCtx), {
+    key: result.key,
+    bounds,
+    counts: result.counts,
+    elevationMeters: typeof appCtx.elevationMetersAtLatLon === 'function'
+      ? appCtx.elevationMetersAtLatLon((bounds.latN + bounds.latS) / 2, (bounds.lonE + bounds.lonW) / 2)
+      : undefined
+  });
   mesh.userData.worldCoverStatus = 'ready';
   mesh.userData.worldCoverSummary = {
     key: result.key,
@@ -692,15 +704,16 @@ function queueWorldCoverBaseline(mesh, bounds) {
       Object.entries(result.counts || {}).forEach(([className, count]) => {
         stats.classes[className] = Number(stats.classes[className] || 0) + Number(count || 0);
       });
-      refreshWorldBiomeFromWorldCoverStats(appCtx, stats);
       applyLoadedWorldCoverBaseline(mesh);
     })
-    .catch(() => {
+    .catch((error) => {
       mesh.userData.worldCoverPromise = null;
       mesh.userData.worldCoverAbortController = null;
       if (mesh.userData.terrainDisposed) return;
       mesh.userData.worldCoverStatus = 'unavailable';
+      mesh.userData.worldCoverFailureReason = String(error?.message || error).slice(0,240);
       stats.failed += 1;
+      scheduleWorldCoverRecovery(mesh, () => queueWorldCoverBaseline(mesh, bounds));
     });
 }
 

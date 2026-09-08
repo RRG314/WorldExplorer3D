@@ -242,6 +242,7 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
         terrainForestMap: { value: null },
         terrainSoilMap: { value: null },
         terrainRockMap: { value: null },
+        terrainSnowMap: { value: null },
         terrainAridWarmth: { value: 0 }
       }
     };
@@ -249,6 +250,13 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
     material.onBeforeCompile = (shader, renderer) => {
       previousOnBeforeCompile?.(shader, renderer);
       Object.assign(shader.uniforms, state.uniforms);
+      shader.fragmentShader = '#ifdef WE3D_TERRAIN_SNOW_MAP\nuniform sampler2D terrainSnowMap;\n#endif\n' + shader.fragmentShader;
+      // Rock on steep faces needs vertical projection, not stretched ground UVs.
+      // Reuse the same rock sampler; this does not alter surface geometry.
+      shader.vertexShader = 'varying vec3 vTerrainDetailPosition;\nvarying vec3 vTerrainDetailNormal;\n' + shader.vertexShader;
+      shader.fragmentShader = 'varying vec3 vTerrainDetailPosition;\nvarying vec3 vTerrainDetailNormal;\n' + shader.fragmentShader;
+      shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>',
+        '#include <begin_vertex>\nvTerrainDetailPosition = (modelMatrix * vec4(position, 1.0)).xyz;\nvTerrainDetailNormal = normalize(mat3(modelMatrix) * normal);');
       shader.vertexShader = shader.vertexShader
         .replace(
           '#include <common>',
@@ -272,13 +280,22 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
             'vec4 terrainForestColor = vec4(0.18, 0.33, 0.14, 1.0);',
             'vec4 terrainSoilColor = vec4(0.49, 0.37, 0.24, 1.0);',
             'vec4 terrainRockColor = vec4(0.48, 0.42, 0.36, 1.0);',
+            'vec4 terrainSnowColor = vec4(0.94, 0.96, 1.0, 1.0);',
             '#ifdef USE_MAP',
             '  terrainGrassColor = mapTexelToLinear(texture2D(map, vUv));',
             '  terrainUrbanColor = mapTexelToLinear(texture2D(terrainUrbanMap, vUv));',
             '  terrainSandColor = mapTexelToLinear(texture2D(terrainSandMap, vUv));',
             '  terrainForestColor = mapTexelToLinear(texture2D(terrainForestMap, vUv));',
             '  terrainSoilColor = mapTexelToLinear(texture2D(terrainSoilMap, vUv));',
-            '  terrainRockColor = mapTexelToLinear(texture2D(terrainRockMap, vUv));',
+            '  vec3 rockAxes = pow(abs(normalize(vTerrainDetailNormal)), vec3(4.0));',
+            '  rockAxes /= max(dot(rockAxes, vec3(1.0)), 0.0001);',
+            '  vec3 rockPoint = vTerrainDetailPosition * 0.125;',
+            '  terrainRockColor = mapTexelToLinear(texture2D(terrainRockMap, rockPoint.yz)) * rockAxes.x;',
+            '  terrainRockColor += mapTexelToLinear(texture2D(terrainRockMap, rockPoint.xz)) * rockAxes.y;',
+            '  terrainRockColor += mapTexelToLinear(texture2D(terrainRockMap, rockPoint.xy)) * rockAxes.z;',
+            '  #ifdef WE3D_TERRAIN_SNOW_MAP',
+            '    terrainSnowColor = mapTexelToLinear(texture2D(terrainSnowMap, vUv));',
+            '  #endif',
             '#endif',
             'terrainGrassColor.rgb = mix(terrainGrassColor.rgb, vec3(0.42, 0.36, 0.22), terrainAridWarmth * 0.72);',
             'terrainRockColor.rgb = mix(terrainRockColor.rgb, vec3(0.58, 0.31, 0.15), terrainAridWarmth);',
@@ -292,18 +309,18 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
             'terrainSurfaceColor += terrainForestColor * max(0.0, vTerrainSurfaceMixA.z);',
             'terrainSurfaceColor += terrainSoilColor * max(0.0, vTerrainSurfaceMixA.w);',
             'terrainSurfaceColor += terrainRockColor * max(0.0, vTerrainSurfaceMixB.x);',
-            'terrainSurfaceColor += vec4(0.94, 0.96, 1.0, 1.0) * terrainSnowWeight;',
+            'terrainSurfaceColor += terrainSnowColor * terrainSnowWeight;',
             'diffuseColor *= terrainSurfaceColor;'
           ].join('\n')
         )
         .replace(
           '#include <roughnessmap_fragment>',
-          '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.84, clamp(vTerrainSurfaceMixA.x, 0.0, 1.0));'
+          '#include <roughnessmap_fragment>\nfloat groundClassTotal = clamp(dot(vTerrainSurfaceMixA, vec4(1.0)) + dot(vTerrainSurfaceMixB, vec2(1.0)), 0.0, 1.0);\nroughnessFactor = roughnessFactor * (1.0 - groundClassTotal) + dot(vTerrainSurfaceMixA, vec4(0.84, 0.96, 0.97, 0.94)) + dot(vTerrainSurfaceMixB, vec2(0.90, 0.82));\nroughnessFactor = clamp(roughnessFactor, 0.04, 1.0);'
         );
     };
     material.customProgramCacheKey = () => [
       previousProgramCacheKey?.() || '',
-      'terrain-semantic-pbr-material-mix-v4'
+      'terrain-semantic-pbr-material-mix-v6'
     ].join(':');
   }
   state.uniforms.terrainUrbanMap.value = textureSets.urban?.map || material.map;
@@ -311,6 +328,10 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
   state.uniforms.terrainForestMap.value = textureSets.forest?.map || material.map;
   state.uniforms.terrainSoilMap.value = textureSets.soil?.map || material.map;
   state.uniforms.terrainRockMap.value = textureSets.rock?.map || material.map;
+  state.uniforms.terrainSnowMap.value = textureSets.snow?.map || material.map;
+  material.defines = {...material.defines};
+  if (textureSets.snowTextureSupported && textureSets.snow?.map) material.defines.WE3D_TERRAIN_SNOW_MAP = 1;
+  else delete material.defines.WE3D_TERRAIN_SNOW_MAP;
   state.uniforms.terrainAridWarmth.value = textureSets.biomeId === 'hot-desert' ? 1 : 0;
   material.needsUpdate = true;
   mesh.userData.terrainSurfaceMaterialBlend = {
