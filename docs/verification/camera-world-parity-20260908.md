@@ -1,7 +1,11 @@
 # Camera and world consistency correction — local evidence
 
-Production remains on the prior Hosting release. This correction has not been
-deployed, restored, or pushed to the public branches.
+The owner subsequently approved this correction after local testing. Hosting-only
+production deployment of `5.2.0+db62593ba377.6342cddaba06fc68.production` succeeded
+on September 8. The public build manifest matches the tested candidate exactly.
+Normal entry without `mode=driving` was visually verified to start on foot with
+the explorer and dog, with the BMW hidden. No default-mode code change was needed.
+This deployment did not change backend data or push the public Git branches.
 
 ## Corrected causes
 
