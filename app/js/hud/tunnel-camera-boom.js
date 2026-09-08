@@ -2,7 +2,7 @@ import { resolveTunnelCameraEnvelope } from './tunnel-camera-envelope.js?v=6';
 
 // Probe a finite-radius camera along its arm, including the curved shoulders.
 // Use the actor's vertical layer to avoid capturing a person ABOVE a tunnel.
-export function resolveTunnelCameraBoom(feature, actorAnchor, target, radius = 0.38) {
+export function resolveTunnelCameraBoom(feature, actorAnchor, target, radius = 0.38, sampleOutsideTerrainY = null) {
   const actor = resolveTunnelCameraEnvelope(feature, actorAnchor.x, actorAnchor.z, actorAnchor.y);
   if (!actor.inside) return { ...target, collided: false };
   // The look target may be below the near-plane sphere. Start the collision
@@ -19,13 +19,19 @@ export function resolveTunnelCameraBoom(feature, actorAnchor, target, radius = 0
     const point = { x: anchor.x + dx * t, y: anchor.y + dy * t, z: anchor.z + dz * t };
     const envelope = resolveTunnelCameraEnvelope(feature, point.x, point.z, point.y);
     const outsideWall = envelope.reason === 'outside_cross_section';
+    // Leaving this shell is not automatically open air. A portal/way boundary
+    // can still be below a hillside. Only query terrain outside the enclosure;
+    // querying it inside would mistake the intentional tunnel roof for a wall.
+    const outsideTerrain = !envelope.inside && envelope.reason === 'outside_shell_interval' &&
+      typeof sampleOutsideTerrainY === 'function' ? sampleOutsideTerrainY(point.x,point.z) : NaN;
+    const terrainBlocked = Number.isFinite(outsideTerrain) && point.y-radius < outsideTerrain;
     const solidBlocked = feature?.tunnelSolidBoundary && [
       [radius, 0, 0], [-radius, 0, 0], [0, radius, 0], [0, -radius, 0], [0, 0, radius], [0, 0, -radius]
     ].some(([x,y,z]) => {
       const probe = resolveTunnelCameraEnvelope(feature, point.x+x, point.z+z, point.y+y);
       return probe.reason === 'outside_cross_section' || probe.reason === 'outside_vertical_layer';
     });
-    const blocked = outsideWall || solidBlocked || (envelope.inside && (
+    const blocked = outsideWall || terrainBlocked || solidBlocked || (envelope.inside && (
       point.y < envelope.floorY + radius || point.y > envelope.ceilingY - radius ||
       envelope.lateralDistance + radius > envelope.halfWidth));
     if (!blocked) continue;

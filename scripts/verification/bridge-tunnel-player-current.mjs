@@ -20,7 +20,7 @@ await page.route('**/listApprovedExteriorRepresentations', route => route.fulfil
 async function closeOwnedBrowser() {
   let timer;
   const closed=await Promise.race([
-    browser.close().then(()=>true,()=>false),
+    browserServer.close().then(()=>true,()=>false),
     new Promise(resolve=>{timer=setTimeout(()=>resolve(false),8000);})
   ]);
   clearTimeout(timer);
@@ -162,7 +162,14 @@ try {
   report.expectedProviderErrors = report.errors.filter(error =>
     error?.message === 'Failed to load resource: net::ERR_FAILED' &&
     /^https:\/\/[^/]*overpass[^/]*\/.*interpreter$/i.test(error?.location?.url || ''));
-  report.unexpectedErrors = report.errors.filter(error => !report.expectedProviderErrors.includes(error));
+  // WorldCover is an optional biome hint with a handled null fallback. Preserve
+  // its actual network failure separately; it is neither an induced Overpass
+  // failure nor a JavaScript/runtime crash in tunnel movement.
+  report.optionalBiomeNetworkErrors = report.errors.filter(error =>
+    error?.message === 'Failed to load resource: net::ERR_HTTP2_PROTOCOL_ERROR' &&
+    String(error?.location?.url || '').startsWith('https://titiler.terrascope.be/wms?'));
+  report.unexpectedErrors = report.errors.filter(error =>
+    !report.expectedProviderErrors.includes(error) && !report.optionalBiomeNetworkErrors.includes(error));
   report.checks.noRuntimeErrors = report.unexpectedErrors.length === 0 && report.frames.every(f => f.runtimeErrors.length === 0);
   report.checks.noVisibleVehicleCameraClipping = report.frames.every(f => !f.visibleVehicleCameraClipping);
   assert.deepEqual(Object.entries(report.checks).filter(([, passed]) => !passed), []);

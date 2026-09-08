@@ -111,6 +111,7 @@ import {
   buildingContainingPoint,
   findNearestRoad,
   initWorldNavigation,
+  cameraRoadSurfaceCollision,
   largeMapScreenToWorld,
   minimapScreenToWorld,
   pointInPolygon,
@@ -440,6 +441,7 @@ initWorldLoadGeometry({
 });
 
 Object.assign(appCtx, {
+  cameraRoadSurfaceCollision,
   areRoadsConnected,
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,

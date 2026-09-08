@@ -96,7 +96,11 @@ function resolveChaseCameraStructureCollision(lookX, lookY, lookZ, targetX, targ
         acceptCollision: (candidate) => candidate?.building?.buildingType !== 'bridge_guardrail'
       }
     );
-    if (collision?.collision === true) {
+    const roadBlocked = appCtx.cameraRoadSurfaceCollision?.(
+      lookX + deltaX * ratio, y, lookZ + deltaZ * ratio,
+      vehicleCameraProbeRadius(appCtx.camera)
+    ) === true;
+    if (collision?.collision === true || roadBlocked) {
       blockedRatio = Math.max(0.12, ratio - 1.2 / probeCount);
       break;
     }
@@ -472,6 +476,7 @@ function updateCamera(dt = 1 / 60) {
   const tunnelCameraEnvelope = tunnelCameraState.envelope;
   const tunnelCameraTransitionOnly = tunnelCameraState.transitionOnly;
   const insideTunnel = tunnelCameraState.inside;
+  const sampleOutsideTunnelTerrain = (x,z) => appCtx.SurfaceQuery?.terrainAt?.(x,z)?.position?.y;
   const d = insideTunnel
     ? tunnelCameraEnvelope.chaseDistance
     : planetaryChase ? 12 : CHASE_CAMERA_DISTANCE;
@@ -532,7 +537,7 @@ function updateCamera(dt = 1 / 60) {
     targetZ = collisionTarget.z;
     if (insideTunnel) {
       const safe = resolveTunnelCameraBoom(tunnelCameraState.road,
-        { x: lookX, y: lookY, z: lookZ }, { x: targetX, y: targetY, z: targetZ }, cameraRadius);
+        { x: lookX, y: lookY, z: lookZ }, { x: targetX, y: targetY, z: targetZ }, cameraRadius, sampleOutsideTunnelTerrain);
       targetX = safe.x;
       targetY = safe.y;
       targetZ = safe.z;
@@ -551,7 +556,7 @@ function updateCamera(dt = 1 / 60) {
     if (insideTunnel) {
       // Smoothing can cross a curved wall even when both target poses are safe.
       const safe = resolveTunnelCameraBoom(tunnelCameraState.road,
-        { x: lookX, y: lookY, z: lookZ }, appCtx.camera.position, cameraRadius);
+        { x: lookX, y: lookY, z: lookZ }, appCtx.camera.position, cameraRadius, sampleOutsideTunnelTerrain);
       appCtx.camera.position.set(safe.x, safe.y, safe.z);
     } else {
       // A safe target does not make the interpolated pose safe on a hillside.
@@ -586,7 +591,7 @@ function updateCamera(dt = 1 / 60) {
     const anchor = { x: lookX, y: lookY, z: lookZ };
     const isClear = point => {
       if (insideTunnel) {
-        const probe = resolveTunnelCameraBoom(tunnelCameraState.road, anchor, point, cameraRadius);
+        const probe = resolveTunnelCameraBoom(tunnelCameraState.road, anchor, point, cameraRadius, sampleOutsideTunnelTerrain);
         if (probe.collided) return false;
       } else {
         const terrain = planetaryChase
@@ -594,6 +599,7 @@ function updateCamera(dt = 1 / 60) {
           : appCtx.SurfaceQuery?.terrainAt?.(point.x, point.z)?.position?.y;
         if (Number.isFinite(terrain) && point.y < terrain + cameraRadius) return false;
       }
+      if (!planetaryChase && appCtx.cameraRoadSurfaceCollision?.(point.x,point.y,point.z,cameraRadius)) return false;
       return appCtx.checkBuildingCollision?.(point.x, point.z, cameraRadius,
         { actorBaseY: point.y - cameraRadius, actorHeight: cameraRadius * 2 })?.collision !== true;
     };
@@ -605,7 +611,7 @@ function updateCamera(dt = 1 / 60) {
       appCtx.camera.lookAt(lookX + Math.sin(viewAngle) * 4, lookY, lookZ + Math.cos(viewAngle) * 4);
     } else if (choice.mode === 'clearance-first-person') {
       const eye = { x: carX, y: carGroundY + HOOD_CAMERA_HEIGHT, z: carZ };
-      const safe = insideTunnel ? resolveTunnelCameraBoom(tunnelCameraState.road, anchor, eye, cameraRadius) : eye;
+      const safe = insideTunnel ? resolveTunnelCameraBoom(tunnelCameraState.road, anchor, eye, cameraRadius, sampleOutsideTunnelTerrain) : eye;
       appCtx.camera.position.set(safe.x, safe.y, safe.z);
       appCtx.camera.lookAt(carX + Math.sin(viewAngle) * HOOD_LOOK_DISTANCE,
         safe.y + Math.sin(carLook.pitch) * HOOD_LOOK_DISTANCE, carZ + Math.cos(viewAngle) * HOOD_LOOK_DISTANCE);

@@ -24,6 +24,19 @@ function tunnel() {
   return feature;
 }
 
+test('camera cannot leave an underground shell into hillside but can exit into clear air',()=>{
+  const feature=tunnel(), floor=feature.transportSurfaceModel.centerHeights[0];
+  const anchor={x:0,y:floor+2,z:1},target={x:0,y:floor+2,z:-6};
+  const blocked=resolveTunnelCameraBoom(feature,anchor,target,.6,()=>20);
+  assert.equal(blocked.collided,true);
+  assert.ok(blocked.z>=0,'retract before unsupported outside interval');
+  const open=resolveTunnelCameraBoom(feature,anchor,target,.6,()=>floor);
+  assert.equal(open.collided,false);
+  assert.equal(open.z,-6);
+  const interior=resolveTunnelCameraBoom(feature,{...anchor,z:60},{...target,z:55},.6,()=>20);
+  assert.equal(interior.collided,false,'terrain above a valid enclosure is not an obstruction');
+});
+
 test('default floor depth actually satisfies the roof publication contract', () => {
   const feature = tunnel();
   assert.equal(feature.tunnelSystemModel.shellRanges.length, 1);

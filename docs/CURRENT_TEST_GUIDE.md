@@ -26,7 +26,10 @@ Deployed staging hosting build:
 This is a clean build of the production-bound branch, not the earlier isolated
 snapshot. The production-configured artifact from the same source has matching
 runtime bundles; Firebase accounts, media and backend configuration are separate.
-The latest phone-font polish is local until the next candidate is built.
+Later local fixes align the phone capture fonts, correct portal frame texture
+projection, and keep the camera clear of road surfaces and terrain when it
+leaves a tunnel. Read the candidate manifest to distinguish this newer build
+from the staged `93470acb` baseline recorded here.
 
 The staged update includes facade alignment, manual-first UI, placed-edit
 recovery, protected publication/deletion, public-interior approval guards and
@@ -79,6 +82,10 @@ This is a concise user replay route, not a claim that every row has just passed.
   discontinuities, grade violations or runtime errors. Its street screenshot
   does not by itself establish tunnel-entrance visual quality.
 - The exact corrected house top edge still needs owner visual acceptance.
+- A direct recheck of Monaco way `155081313` reproduced a road crossing the
+  camera within0.74m. The indexed surface probe and enclosure-exit terrain check
+  then produced a clear entrance view at that same way. Generalized-data portal
+  endpoint appearance is still a limitation; this is not worldwide visual proof.
 
 These checks are scoped evidence, not proof of every gameplay feature. Before
 promotion, production App Check must be configured and the selected approved
