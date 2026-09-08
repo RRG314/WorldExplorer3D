@@ -1,4 +1,4 @@
-import { postProtectedFunction } from './function-api.js?v=1';
+import { postProtectedFunction } from './function-api.js?v=3';
 
 export async function claimExplorerDiscovery(input = {}) {
   return postProtectedFunction('/claimExplorerDiscovery', input, { label: 'World Discovery API' });

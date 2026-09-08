@@ -1,4 +1,4 @@
-import { hasFirebaseConfig } from '../../js/firebase-init.js?v=56';
+import { hasFirebaseConfig } from '../../js/firebase-init.js?v=57';
 import {
   observeAuth,
   requestPasswordReset,

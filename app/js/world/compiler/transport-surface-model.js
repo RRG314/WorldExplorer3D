@@ -173,6 +173,11 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     ? Number(options.width)
     : finiteNumber(feature.width, 4);
   const halfWidth = Math.max(0.6, compiledWidth * 0.5);
+  // Tunnel containment must sample the SAME outer roof extent as its shell
+  // compiler, not just the carriageway edges on a steep cross-slope.
+  const groundProbeHalfWidth = semantics.terrainMode === 'subgrade' && semantics.isTunnel
+    ? Math.max(3.4, compiledWidth) * 0.5 + 0.95
+    : halfWidth;
   const corridorCenterOffset = finiteNumber(
     feature?.transportRecord?.crossSection?.placement?.centerlineOffsetMeters
   );
@@ -216,13 +221,13 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     );
     const leftY = sampleTerrainOrThrow(
       sampleTerrainY,
-      point.x + normalX * (halfWidth + corridorCenterOffset),
-      point.z + normalZ * (halfWidth + corridorCenterOffset)
+      point.x + normalX * (groundProbeHalfWidth + corridorCenterOffset),
+      point.z + normalZ * (groundProbeHalfWidth + corridorCenterOffset)
     );
     const rightY = sampleTerrainOrThrow(
       sampleTerrainY,
-      point.x + normalX * (-halfWidth + corridorCenterOffset),
-      point.z + normalZ * (-halfWidth + corridorCenterOffset)
+      point.x + normalX * (-groundProbeHalfWidth + corridorCenterOffset),
+      point.z + normalZ * (-groundProbeHalfWidth + corridorCenterOffset)
     );
     const progress = total > 1e-6 ? distance / total : 0;
     const approachReference = endpointGroundStart + (endpointGroundEnd - endpointGroundStart) * progress;

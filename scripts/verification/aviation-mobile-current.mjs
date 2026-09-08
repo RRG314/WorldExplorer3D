@@ -58,15 +58,16 @@ try {
   await page.getByRole('button', { name: 'Explore', exact: true }).click();
   await page.waitForFunction(() => {
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.();
-    return diagnostics?.gameStarted && !diagnostics.worldLoading && diagnostics.aviation?.fleetCount === 5;
+    return diagnostics?.gameStarted && !diagnostics.worldLoading && diagnostics.aviation?.fleetCount >= 5;
   }, null, { timeout: 360_000 });
 
   const initial = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.());
   const aircraft = initial.aviation.vehicles.find(({ catalogId }) => catalogId === 'expedition-prop');
   assert.ok(aircraft, 'The expedition aircraft was not published on mobile.');
   assert.equal(await page.evaluate((id) => globalThis.__WE3D_AVIATION_SUPPORT__?.moveNear(id), aircraft.id), true);
-  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().aviation?.interaction?.action === 'enter_aircraft');
+  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().aviation?.interaction?.action === 'aircraft_options');
   await page.locator('#urbanVehiclePromptButton').click();
+  await page.locator('dialog.airport-hub[open] .airport-hub__primary').click();
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().modes?.plane === true);
 
   const planeActionLabel = (await page.locator('#mobileActionPrimary').textContent())?.trim();

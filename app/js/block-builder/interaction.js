@@ -172,6 +172,16 @@ export function createBlockBuilderInteraction(options) {
     if (action.kind === 'remove') {
       changed = removeBuildBlock(action.gx, action.gy, action.gz);
     } else {
+      const permission = options.canPlaceAt?.({
+        x: toWorldCoord(action.gx),
+        y: toWorldCoord(action.gy),
+        z: toWorldCoord(action.gz),
+        gx: action.gx, gy: action.gy, gz: action.gz
+      });
+      if (permission?.allowed === false) {
+        options.onBlocked?.(permission);
+        return true;
+      }
       action.shape = getBuildShape();
       action.rotation = getRotation();
       changed = placeBuildBlock(action.gx, action.gy, action.gz, getMaterialIndex(), {

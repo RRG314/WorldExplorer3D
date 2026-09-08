@@ -328,10 +328,8 @@ export function decimateRoadCenterlineByDepth(pts, roadType, tileDepth, mode = g
 export function poiKeyFromTags(tags = {}) {
   if (!tags || typeof tags !== 'object') return null;
   if (tags.amenity) return `amenity=${tags.amenity}`;
-  if (tags.shop === 'supermarket') return 'shop=supermarket';
-  if (tags.shop === 'mall') return 'shop=mall';
-  if (tags.shop === 'convenience') return 'shop=convenience';
-  if (['hardware', 'doityourself', 'pawnbroker', 'second_hand', 'car_repair', 'car_parts', 'outdoor', 'fishing', 'boat', 'aviation'].includes(tags.shop)) return `shop=${tags.shop}`;
+  if (tags.healthcare) return `healthcare=${tags.healthcare}`;
+  if (tags.shop) return `shop=${tags.shop}`;
   if (tags.tourism) return `tourism=${tags.tourism}`;
   if (tags.historic) return tags.historic === 'monument' ? 'historic=monument' : 'historic=memorial';
   if (tags.leisure) return `leisure=${tags.leisure}`;

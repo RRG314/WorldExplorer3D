@@ -1,4 +1,4 @@
-import { pruneSupersededGeneralizedStructures } from '../fixed-regional-structures.js?v=15';
+import { pruneSupersededGeneralizedStructures } from '../fixed-regional-structures.js?v=16';
 
 const WAY_COLLECTION_KEYS = Object.freeze([
   'roadWays',
@@ -86,6 +86,7 @@ export function filterSelectionToAcceptedGround(
       // does not apply to generalized roads, tunnels, or a bridge with an
       // unsupported endpoint.
       if (isReviewedBridgeSpan(way)) {
+        if (String(way?.tags?._publishedTransportSurfaceControlId || '').trim()) return true;
         return acceptsRegionalNode(way.nodes[0]) &&
           acceptsRegionalNode(way.nodes[way.nodes.length - 1]);
       }
@@ -98,6 +99,7 @@ export function filterSelectionToAcceptedGround(
   let rejectedWays = 0;
   let rejectedPointFeatures = 0;
   let reviewedBridgeSpansAcceptedByEndpoints = 0;
+  let publishedControlBridgeSpansAccepted = 0;
 
   for (const key of WAY_COLLECTION_KEYS) {
     if (!Array.isArray(selection[key])) continue;
@@ -105,7 +107,11 @@ export function filterSelectionToAcceptedGround(
       const accepted = acceptsWay(way);
       if (accepted && isReviewedBridgeSpan(way) &&
           way.tags?._regionalContext === 'fixed-location') {
-        reviewedBridgeSpansAcceptedByEndpoints += 1;
+        if (String(way?.tags?._publishedTransportSurfaceControlId || '').trim()) {
+          publishedControlBridgeSpansAccepted += 1;
+        } else {
+          reviewedBridgeSpansAcceptedByEndpoints += 1;
+        }
       }
       if (!accepted) rejectedWays += 1;
       return accepted;
@@ -136,6 +142,7 @@ export function filterSelectionToAcceptedGround(
       rejectedPointFeatureCount: rejectedPointFeatures,
       exactStructureAuthorities: structureAuthority.exactStructures,
       reviewedBridgeSpansAcceptedByEndpoints,
+      publishedControlBridgeSpansAccepted,
       supersededGeneralizedStructures:
         structureAuthority.supersededGeneralizedStructures,
       retainedGeneralizedStructureFallbacks: filtered.roadWays.filter((way) =>

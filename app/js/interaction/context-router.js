@@ -1,6 +1,48 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 
 const handlers = new Map();
+const FAMILIARITY_STORAGE_KEY = 'worldExplorer3D.interactionFamiliarity.v1';
+const familiarFamilies = new Set();
+let familiarityLoaded = false;
+
+function interactionFamily(action = '') {
+  const value = String(action || '').toLowerCase();
+  if (value.includes('building') || value === 'enter_interior' || value === 'exit_interior') return 'building';
+  if (value.includes('vehicle') || value.includes('aircraft') || value.includes('vessel')) return 'vehicle';
+  if (value.includes('npc') || value === 'talk') return 'person';
+  if (value.includes('loot') || value.includes('collect')) return 'collect';
+  if (value.includes('store') || value.includes('mechanic') || value.includes('airport_hub')) return 'place';
+  if (value.includes('inspect')) return 'inspect';
+  return value || 'interaction';
+}
+
+function loadFamiliarity() {
+  if (familiarityLoaded) return;
+  familiarityLoaded = true;
+  try {
+    const values = JSON.parse(globalThis.localStorage?.getItem(FAMILIARITY_STORAGE_KEY) || '[]');
+    if (Array.isArray(values)) values.forEach((value) => familiarFamilies.add(String(value)));
+  } catch { /* storage is optional */ }
+}
+
+function isInteractionFamiliar(action) {
+  loadFamiliarity();
+  return familiarFamilies.has(interactionFamily(action));
+}
+
+function notifyContextInteractionCompleted(action, data = null) {
+  loadFamiliarity();
+  const family = interactionFamily(action);
+  const firstForFamily = !familiarFamilies.has(family);
+  familiarFamilies.add(family);
+  try {
+    globalThis.localStorage?.setItem(FAMILIARITY_STORAGE_KEY, JSON.stringify([...familiarFamilies].sort()));
+  } catch { /* storage is optional */ }
+  globalThis.dispatchEvent?.(new CustomEvent('we3d:context-interaction-completed', {
+    detail: { action: String(action || 'interaction'), family, firstForFamily, data }
+  }));
+  return Object.freeze({ family, firstForFamily });
+}
 
 function normalizeCandidate(handler, candidate) {
   if (!candidate || candidate.available === false) return null;
@@ -12,6 +54,7 @@ function normalizeCandidate(handler, candidate) {
     label: String(candidate.label || 'Interact'),
     detail: String(candidate.detail || ''),
     distance: Number.isFinite(candidate.distance) ? candidate.distance : null,
+    familiar: isInteractionFamiliar(candidate.action || handler.id),
     secondaryLabel: candidate.secondaryLabel ? String(candidate.secondaryLabel) : '',
     takeLabel: candidate.takeLabel ? String(candidate.takeLabel) : '',
     data: candidate.data || null
@@ -46,6 +89,7 @@ async function handlePrimaryContextInteraction() {
   if (!handler?.perform) return false;
   try {
     const result = await handler.perform(candidate);
+    if (result !== false) notifyContextInteractionCompleted(candidate.action, candidate.data);
     return result !== false;
   } catch (error) {
     console.warn(`[interaction] ${candidate.id} action failed.`, error);
@@ -82,6 +126,8 @@ function contextInteractionSnapshot() {
 Object.assign(appCtx, {
   contextInteractionSnapshot,
   handlePrimaryContextInteraction,
+  isInteractionFamiliar,
+  notifyContextInteractionCompleted,
   registerContextInteraction,
   resolvePrimaryContextInteraction
 });
@@ -89,6 +135,9 @@ Object.assign(appCtx, {
 export {
   contextInteractionSnapshot,
   handlePrimaryContextInteraction,
+  interactionFamily,
+  isInteractionFamiliar,
+  notifyContextInteractionCompleted,
   registerContextInteraction,
   resolvePrimaryContextInteraction
 };

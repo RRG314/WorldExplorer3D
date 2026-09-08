@@ -40,11 +40,56 @@ assert.ok(locations.length > 0, 'No assembled verification locations matched WE3
 
 await fs.mkdir(path.dirname(reportPath), { recursive: true });
 if (capture) await fs.mkdir(evidenceDir, { recursive: true });
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+// Own the installed-Chrome process explicitly. A long sequence of WebGL
+// contexts can occasionally stop answering Playwright's graceful close even
+// after every context has closed. BrowserServer gives this verifier a bounded
+// process fallback instead of leaking Chrome into later performance gates.
+const browserServer = await chromium.launchServer({ headless: true, channel: 'chrome' });
+const browser = await chromium.connect(browserServer.wsEndpoint());
 const results = [];
+
+async function closeWithin(label, close, timeoutMs = 8_000) {
+  let timer = null;
+  const timedOut = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(false), timeoutMs);
+  });
+  const closed = Promise.resolve().then(close).then(() => true, (error) => {
+    console.error(`[assembled-locations] ${label} cleanup failed:`, error?.stack || error);
+    return false;
+  });
+  const ok = await Promise.race([closed, timedOut]);
+  clearTimeout(timer);
+  if (!ok) console.error(`[assembled-locations] ${label} cleanup did not finish within ${timeoutMs} ms.`);
+  return ok;
+}
+
+async function terminateOwnedBrowserProcess(timeoutMs = 4_000) {
+  const child = browserServer?.process?.();
+  if (!child || child.exitCode !== null || child.signalCode) return true;
+  const waitForExit = (durationMs) => new Promise((resolve) => {
+    let timer = null;
+    const done = () => {
+      clearTimeout(timer);
+      resolve(true);
+    };
+    child.once('exit', done);
+    timer = setTimeout(() => {
+      child.off('exit', done);
+      resolve(false);
+    }, durationMs);
+  });
+  child.kill('SIGTERM');
+  if (await waitForExit(timeoutMs)) return true;
+  child.kill('SIGKILL');
+  return waitForExit(2_000);
+}
+
+let cleanupError = null;
 
 try {
   for (const location of locations) {
+    const locationStartedAt = performance.now();
+    console.error(`[assembled-locations] START ${location.id}`);
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     const page = await context.newPage();
     const browserErrors = [];
@@ -337,6 +382,7 @@ try {
       results.push({
         ...location,
         ok: Object.values(checks).every(Boolean),
+        durationMs: Math.round(performance.now() - locationStartedAt),
         checks,
         verifierEvidence: {
           directAtGradeContactAligned,
@@ -351,6 +397,7 @@ try {
       results.push({
         ...location,
         ok: false,
+        durationMs: Math.round(performance.now() - locationStartedAt),
         error: String(error?.stack || error),
         browserErrors,
         browserConsole,
@@ -358,19 +405,28 @@ try {
       });
     } finally {
       await context.close().catch(() => {});
+      const latest = results.at(-1);
+      console.error(
+        `[assembled-locations] ${latest?.ok ? 'PASS' : 'FAIL'} ${location.id} ` +
+        `(${Math.round(performance.now() - locationStartedAt)} ms)`
+      );
     }
   }
 } finally {
-  await browser.close().catch(() => {});
-  await server.close().catch(() => {});
+  const browserProcessClosed = await terminateOwnedBrowserProcess();
+  const serverClosed = await closeWithin('server', () => server.close(), 3_000);
+  if (!browserProcessClosed || !serverClosed) {
+    cleanupError = 'assembled location verification did not release its owned runtime resources';
+  }
 }
 
 const report = {
-  ok: results.every((result) => result.ok),
+  ok: results.every((result) => result.ok) && cleanupError === null,
   generatedAt: new Date().toISOString(),
   contract: 'complete-assembled-gameplay-representative-location-matrix',
   captureEnabled: capture,
   forceTransportFallback,
+  cleanupError,
   results
 };
 await fs.writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
@@ -381,6 +437,7 @@ console.log(JSON.stringify({
   results: report.results.map((result) => ({
     id: result.id,
     ok: result.ok,
+    durationMs: result.durationMs,
     checks: result.checks || null,
     transportProvider: result.snapshot?.worldLoad?.transportSource?.provider || null,
     transportProviderDecision: result.snapshot?.worldLoad?.transportProviderDecision || null,

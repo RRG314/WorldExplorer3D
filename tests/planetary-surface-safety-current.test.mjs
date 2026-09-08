@@ -49,3 +49,13 @@ test('planetary chase-camera terrain collision stops the view before an interven
   assert.ok(resolved.z > -4);
   assert.equal(resolved.y, 4);
 });
+
+test('a clear camera target can have an obstructed smoothed pose which must be constrained again',()=>{
+  const origin={x:0,y:10,z:0},target={x:0,y:10,z:-12};
+  const terrain=(_x,z)=>z < -4 && z > -8 ? 8 : 0;
+  assert.equal(resolveChaseCameraTerrainCollision(origin,target,terrain).collided,false);
+  const rendered={x:0,y:2+(target.y-2)*.1,z:-12};
+  const safe=resolveChaseCameraTerrainCollision(origin,rendered,terrain,{clearance:.9});
+  assert.equal(safe.collided,true);
+  assert.ok(safe.z > -4,'rendered boom retracts before the hillside');
+});

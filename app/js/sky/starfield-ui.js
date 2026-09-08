@@ -23,7 +23,7 @@ const FAINT_STAR_LAYER_NAME = 'Faint Star Background';
 function setStarFieldObserverVisuals(observerBody = 'earth') {
   if (!appCtx.starField) return;
   const body = String(observerBody || 'earth').toLowerCase();
-  const planetary = body === 'moon' || body === 'mars';
+  const planetary = body !== 'earth';
   const earthSkyOpacity = Math.max(0, Math.min(1, Number(appCtx.skyState?.starsOpacity) || 0));
   const brightStars = appCtx.starField.getObjectByName(BRIGHT_STAR_LAYER_NAME);
   const faintStars = appCtx.starField.getObjectByName(FAINT_STAR_LAYER_NAME);

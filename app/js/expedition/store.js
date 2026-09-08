@@ -1,4 +1,4 @@
-import { EXPEDITION_SCHEMA_VERSION } from './model.js?v=11';
+import { EXPEDITION_SCHEMA_VERSION } from './model.js?v=12';
 import { DEFAULT_CREW } from './catalog.js?v=2';
 import { normalizeVoyageDirector, VOYAGE_SLOTS } from './voyage-director.js?v=2';
 import { createLongDurationState, crewPopulationForShip } from './long-duration.js?v=1';
@@ -32,7 +32,13 @@ function parseRecord(value) {
       record.ship = { ...record.ship, name: SPACE_CRAFT_IDENTITY.starship.name };
     }
     record.voyagePhase ||= record.state === 'arrived' ? 'arrival' : 'departure';
+    record.reserveMargin = Math.max(0, Math.min(0.4, Number.isFinite(Number(record.reserveMargin)) ? Number(record.reserveMargin) : 0.15));
+    record.arrivalTransferState ||= record.state === 'completed' ? 'complete' : 'pending';
+    record.campaignCompletedAtMs ||= null;
+    record.campaignResult ||= null;
     record.eventFlags = { ...(record.eventFlags || {}) };
+    record.activeEncounter ||= null;
+    record.encounterHistory = Array.isArray(record.encounterHistory) ? record.encounterHistory : [];
     record.operationFlags = { ...(record.operationFlags || {}) };
     record.routeContacts = Array.isArray(record.routeContacts) ? record.routeContacts : [];
     record.activeLocalContactId ||= null;

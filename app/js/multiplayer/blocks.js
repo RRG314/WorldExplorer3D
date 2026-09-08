@@ -13,7 +13,7 @@ import {
   writeBatch
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { getCurrentUser } from '../../../js/auth-ui.js?v=55';
-import { initFirebase } from '../../../js/firebase-init.js?v=56';
+import { initFirebase } from '../../../js/firebase-init.js?v=57';
 import {
   BLOCK_MATERIALS,
   blockDocumentIdFromCoords,

@@ -205,6 +205,9 @@ function createAnimalModel(THREE, species) {
     'city-pigeon': () => createBird(THREE, species, false)
   };
   const model = (variants[species] || variants['small-mammal'])();
+  model.traverse((object) => {
+    if (object?.isMesh) object.userData.defaultAnimalFallback = true;
+  });
   model.userData.worldDiscoveryAnimal = { species, budget: ANIMAL_VISUAL_BUDGET };
   return model;
 }

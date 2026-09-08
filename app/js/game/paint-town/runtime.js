@@ -28,7 +28,7 @@ import {
   ensurePaintTownInputBindings,
   firePaintball,
   updatePaintballProjectiles
-} from "./projectiles.js?v=1";
+} from "./projectiles.js?v=2";
 
 function showPaintTownSummary(title, stats) {
   if (typeof appCtx.showResult === "function") {
@@ -237,6 +237,7 @@ export function paintTownDebugSnapshot() {
     paintedBuildings: Number(state.paintedBuildings || 0),
     paintballs: Array.isArray(state.paintballs) ? state.paintballs.length : 0,
     paintSplats: Array.isArray(state.paintSplats) ? state.paintSplats.length : 0,
+    lastShotAtMs: Number(state.lastShotAtMs || 0),
     playerColorHex: normalizePaintColorHex(state.playerColorHex, PAINT_TOWN_DEFAULT_COLOR.hex),
     activeTool: String(state.activeTool || ""),
     hudExpanded: state.hudExpanded === true,

@@ -171,7 +171,15 @@ function roadMatchesControl(road, control, referencePath) {
     String(road?.structureSemantics?.terrainMode || '') !== String(match.terrainMode)
   ) return false;
   const mappedName = String(match.mappedName || '').trim().toLowerCase();
-  if (mappedName && String(road.name || '').trim().toLowerCase() !== mappedName) return false;
+  const sourceFeatureIds = new Set((match.sourceFeatureIds || []).map(String));
+  const sourceFeatureId = String(road.sourceFeatureId || '');
+  const exactSource = road?.transportRecord?.completeness === 'lossless';
+  if (sourceFeatureIds.size > 0 && exactSource && !sourceFeatureIds.has(sourceFeatureId)) return false;
+  if (
+    !sourceFeatureIds.has(sourceFeatureId) &&
+    mappedName &&
+    String(road.name || '').trim().toLowerCase() !== mappedName
+  ) return false;
   const maximumDistance = Math.max(
     1,
     finiteNumber(match.maximumDistanceFromReferencePathMeters, 30)
@@ -209,6 +217,30 @@ function applyPublishedTransportSurfaceControls({ controls = [], roads = [], ref
     authority: 'published_transport_surface_control',
     appliedRoads: applied.length,
     controls: Object.freeze(applied)
+  });
+}
+
+function applyPendingPublishedTransportSurfaceControls(requests = [], roads = []) {
+  if (!Array.isArray(requests) || !Array.isArray(roads)) {
+    return Object.freeze({ authority: 'published_transport_surface_control', requests: 0, appliedRoads: 0 });
+  }
+  let appliedRoads = 0;
+  let requestCount = 0;
+  for (const request of requests) {
+    if (!request || !Array.isArray(request.referencePath) || request.referencePath.length < 2) continue;
+    const publication = applyPublishedTransportSurfaceControls({
+      controls: request.controls,
+      roads,
+      referencePath: request.referencePath
+    });
+    requestCount += 1;
+    appliedRoads += publication.appliedRoads;
+    request.onApplied?.(publication);
+  }
+  return Object.freeze({
+    authority: 'published_transport_surface_control',
+    requests: requestCount,
+    appliedRoads
   });
 }
 
@@ -288,6 +320,7 @@ function compileSharedTransportSurfacePresentations(
 }
 
 export {
+  applyPendingPublishedTransportSurfaceControls,
   applyPublishedTransportSurfaceControls,
   compileSharedTransportSurfacePresentations
 };

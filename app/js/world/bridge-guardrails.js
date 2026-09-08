@@ -6,7 +6,7 @@ import {
   createDriveableRoadConflictIndex,
   elevatedSegmentSafety,
   isProtectedRoadFeature
-} from "./bridge-safety.js?v=13";
+} from "./bridge-safety.js?v=14";
 
 function removeArrayItemsInPlace(source, removed) {
   if (!Array.isArray(source) || !(removed instanceof Set) || removed.size === 0) return source || [];

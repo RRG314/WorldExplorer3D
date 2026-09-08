@@ -63,14 +63,14 @@ async function run() {
     assert.match(ui.source, /OpenStreetMap/i);
     assert.ok(ui.buyCount > 0);
     await page.screenshot({ path: path.join(outputDir, 'mapped-business-open.png'), fullPage: true });
-    const beforeCredits = Number(ui.credits.match(/\d+/)?.[0] || 0);
+    const beforeCredits = Number(ui.credits.replace(/[^\d]/g, '') || 0);
     const buy = page.locator('#urbanStoreStock [data-store-action="buy"]:not([disabled])').first();
     const itemLabel = String(await buy.locator('xpath=..').locator('strong').textContent());
     await buy.click();
     const after = await page.evaluate(() => {
       const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
       return {
-        credits: Number((document.getElementById('urbanStoreCredits')?.textContent || '').match(/\d+/)?.[0] || 0),
+        credits: Number((document.getElementById('urbanStoreCredits')?.textContent || '').replace(/[^\d]/g, '') || 0),
         backpackLabels: (snapshot.urbanSandbox?.equipment?.items || []).map((item) => item.label)
       };
     });

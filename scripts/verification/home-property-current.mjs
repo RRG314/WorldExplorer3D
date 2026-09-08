@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { chromium } from 'playwright';
 
 const baseUrl = String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4192').replace(/\/$/, '');
+const outputDir = path.resolve('output/verification/home-property-current');
+await fs.mkdir(outputDir, { recursive: true });
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await context.newPage();
@@ -45,7 +49,7 @@ try {
 
   await page.evaluate(() => document.getElementById('fRealEstate')?.click());
   await page.waitForSelector('#propertyPanel.show', { timeout: 30_000 });
-  assert.match(await page.locator('#propertyPanel').innerText(), /Home & Property/);
+  assert.match(await page.locator('#propertyPanel').innerText(), /Real Estate/);
   assert.doesNotMatch(await page.locator('#propertyPanel').innerText(), /Demo Property|Demo Data/);
 
   await page.locator('[data-property-view="nearby"]').first().click();
@@ -68,6 +72,7 @@ try {
   });
   propertyDebug.pageErrors = pageErrors.slice();
   assert.ok(await page.locator('.propertyHomeCard.candidate').count() > 0, `No mapped property candidates were visible: ${JSON.stringify(propertyDebug)}`);
+  assert.match(await page.locator('#propertyList').innerText(), /Estimated market value/);
   assert.match(await page.locator('#propertyList').innerText(), /Explore first, then sign in to choose/);
   assert.equal(await page.locator('[data-property-action="buy"]').count(), 0);
   assert.ok(await page.locator('[data-property-action="sign-in"]').count() > 0);
@@ -80,23 +85,19 @@ try {
     return ctx.showNavigation === true && !!ctx.selectedProperty;
   }, null, { timeout: 20_000 });
 
-  await page.locator('[data-property-view="offers"]').first().click();
-  assert.match(await page.locator('#propertyList').innerText(), /Property offers follow your account/);
-
-  await page.screenshot({ path: 'output/home-property-desktop.png', fullPage: true });
+  await page.screenshot({ path: path.join(outputDir, 'home-property-desktop.png'), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForTimeout(300);
   const panelBox = await page.locator('#propertyPanel').boundingBox();
   assert.ok(panelBox && panelBox.x >= 0 && panelBox.width <= 390 && panelBox.height <= 844);
-  assert.equal(await page.locator('.propertyHubTabs button').count(), 5);
-  await page.screenshot({ path: 'output/home-property-mobile.png', fullPage: true });
+  assert.equal(await page.locator('.propertyHubTabs button').count(), 2);
+  await page.screenshot({ path: path.join(outputDir, 'home-property-mobile.png'), fullPage: true });
 
   assert.deepEqual(pageErrors, []);
   console.log(JSON.stringify({
     communityBoard: 'property',
     candidateId: routeTarget,
     guestBoundary: 'passed',
-    accountOfferBoundary: 'passed',
     route: 'visible',
     mobile: '390x844',
     staleLoadingOverlay

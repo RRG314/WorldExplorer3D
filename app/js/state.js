@@ -79,7 +79,8 @@ const car = {
   condition: 1,
   durabilityPolicy: 'exploration_unlimited',
   resistance: 175,
-  transportCatalogId: 'sedan'
+  transportCatalogId: 'sedan',
+  vehicleIdentity: 'player-default:sedan'
 };
 const boat = {
   x: 0,
@@ -157,7 +158,7 @@ let activeInterior = null;
 let interiorHint = null;
 let nearestPOI = null;
 let traversalNetworks = { walk: null, drive: null };
-let gameStarted = false,paused = false,gameMode = 'free',gameTimer = 0,camMode = 0,selLoc = 'baltimore'; // camMode: 0=chase/third-person, 1=hood, 2=overhead
+let gameStarted = false,paused = false,gameMode = 'free',gameTimer = 0,camMode = 0,selLoc = 'baltimore'; // camMode: 0=chase/third-person, 1=first-person, 2=overhead
 let onMoon = false; // Are we on the moon?
 let travelingToMoon = false; // Currently traveling animation
 let moonSurface = null; // Moon terrain mesh

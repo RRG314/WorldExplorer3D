@@ -12,6 +12,7 @@ const definitions = [
     width: 1.48, height: 2.35, length: 9.4, wingspan: 7.8, massKg: 3650,
     topSpeedMph: 310, performance: { topSpeed: 310, topSpeedUnit: 'knots-ias', accelerationScale: 1.42, steeringScale: 1.34, gripScale: 1, brakeScale: 1.16, turningRadius: 7.2 },
     seatCount: 2, boardingPoints: ['left', 'right'], resistance: 135,
+    durabilityPolicy: TRANSPORT_DURABILITY_POLICIES.EXPLORATION_UNLIMITED,
     damageZones: ['nose', 'fuselage', 'left-wing', 'right-wing', 'tail', 'landing-gear'],
     visualRecipeId: 'aviation:explorer-aerobatic-jet'
   },

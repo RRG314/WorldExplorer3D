@@ -1,10 +1,13 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
+import { planetarySurfaceYAtRenderXZ } from '../planetary/runtime/surface-query.js?v=3';
+import { isPlanetarySurfaceActive } from '../planetary/traversal-capabilities.js?v=1';
 
 function wrapYaw(angle = 0) {
   return Math.atan2(Math.sin(angle), Math.cos(angle));
 }
 
 function planetarySurface() {
+  if (appCtx.activePlanetaryBodyId && appCtx.activeSolidWorldSurface) return appCtx.activeSolidWorldSurface;
   if (appCtx.onMars && appCtx.marsSurface) return appCtx.marsSurface;
   if (appCtx.onMoon && appCtx.moonSurface) return appCtx.moonSurface;
   return null;
@@ -43,17 +46,14 @@ export function updateDrone(dt) {
 
   let groundY = 0;
   const surface = planetarySurface();
-  if (surface) {
-    const raycaster = appCtx._getPhysRaycaster();
-    appCtx._physRayStart.set(appCtx.drone.x, 2000, appCtx.drone.z);
-    raycaster.set(appCtx._physRayStart, appCtx._physRayDir);
-    const hit = raycaster.intersectObject(surface, false)[0];
-    if (Number.isFinite(hit?.point?.y)) groundY = hit.point.y;
+  const planetary = isPlanetarySurfaceActive(appCtx);
+  if (planetary) {
+    const sampledY = planetarySurfaceYAtRenderXZ(appCtx, appCtx.drone.x, appCtx.drone.z);
+    if (Number.isFinite(sampledY)) groundY = sampledY;
   } else if (appCtx.terrainEnabled) {
     groundY = appCtx.SurfaceQuery?.terrainAt?.(appCtx.drone.x, appCtx.drone.z)?.position?.y ?? 0;
   }
 
-  const planetary = !!surface;
   const minAltitude = groundY + 5;
   const maxAltitude = planetary ? groundY + 2000 : groundY + 400;
   appCtx.drone.y = Math.max(minAltitude, Math.min(maxAltitude, appCtx.drone.y));

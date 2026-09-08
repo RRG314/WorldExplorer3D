@@ -9,7 +9,28 @@ import {
   limitNodesByTileBudget,
   limitWaysByTileBudget
 } from '../app/js/world/budgets.js';
-import { prepareWorldFeatureSelections } from '../app/js/world/load-budgeting.js';
+import {
+  prepareWorldFeatureSelections,
+  uniqueMappedWays
+} from '../app/js/world/load-budgeting.js';
+
+test('road identity deduplication does not spend regional budget twice', () => {
+  const core = { type: 'way', id: 42, tags: { highway: 'primary' } };
+  const overlappingRegional = {
+    type: 'way',
+    id: 42,
+    tags: { highway: 'primary', _regionalContext: 'fixed-location' }
+  };
+  const distinctRegional = {
+    type: 'way',
+    id: 43,
+    tags: { highway: 'residential', _regionalContext: 'fixed-location' }
+  };
+  assert.deepEqual(uniqueMappedWays([core, overlappingRegional, distinctRegional]), [
+    core,
+    distinctRegional
+  ]);
+});
 
 test('mobile world load policy bounds provider time and geometry without changing desktop policy', () => {
   const previousMobileDetector = appCtx.isLikelyMobileDevice;
@@ -110,9 +131,76 @@ test('fixed regional roads cannot overwhelm the mobile core-road budget', () => 
       roadTypePriority: () => 1
     });
 
-    assert.equal(loadMetrics.regionalTransportSelection.regionalCap, 650);
-    assert.ok(loadMetrics.regionalTransportSelection.generalSelected <= 650);
-    assert.ok(selection.roadWays.length <= 650);
+    assert.equal(loadMetrics.regionalTransportSelection.regionalCap, 1_100);
+    assert.equal(loadMetrics.regionalTransportSelection.generalSelected, 1_100);
+    assert.ok(selection.roadWays.length <= 1_100);
+  } finally {
+    appCtx.isLikelyMobileDevice = previousMobileDetector;
+    appCtx.worldSurfaceProfile = previousSurfaceProfile;
+  }
+});
+
+test('a complete regional road result is retained when it fits the client road budget', () => {
+  const previousMobileDetector = appCtx.isLikelyMobileDevice;
+  const previousSurfaceProfile = appCtx.worldSurfaceProfile;
+  try {
+    appCtx.isLikelyMobileDevice = () => false;
+    initWorldBudgets({
+      getPerfModeValue: () => 'baseline',
+      limitNodesByDistance: (nodes, limit) => nodes.slice(0, limit),
+      limitWaysByDistance: (ways, _nodes, limit) => ways.slice(0, limit),
+      nodeDistanceSq: () => 0
+    });
+    const nodes = {};
+    const elements = [];
+    for (let index = 0; index < 120; index += 1) {
+      const nodeA = index * 2 + 1;
+      const nodeB = nodeA + 1;
+      nodes[nodeA] = { type: 'node', id: nodeA, lat: 39.30, lon: -76.61 + index * 0.000001 };
+      nodes[nodeB] = { type: 'node', id: nodeB, lat: 39.30001, lon: -76.61 + index * 0.000001 };
+      elements.push(nodes[nodeA], nodes[nodeB], {
+        type: 'way',
+        id: `regional-${index}`,
+        nodes: [nodeA, nodeB],
+        tags: { highway: 'residential', _regionalContext: 'fixed-location' }
+      });
+    }
+    const loadMetrics = {
+      roads: {}, buildings: {}, landuse: {}, linearFeatures: {
+        railway: {}, footway: {}, cycleway: {}
+      }, vegetation: {}, pois: {}
+    };
+    const selection = prepareWorldFeatureSelections({
+      data: { elements }, nodes, loadMetrics,
+      tileBudgetCfg: {
+        tileDegrees: .002,
+        roadsPerTile: 2, roadsMinPerTile: 1,
+        buildingsPerTile: 2, buildingsMinPerTile: 1,
+        landusePerTile: 2, landuseMinPerTile: 1,
+        poiPerTile: 2, poiMinPerTile: 1
+      },
+      useRdtBudgeting: false,
+      enableLinearFeatures: false,
+      maxRoadWays: 200,
+      maxBuildingWays: 10,
+      maxLanduseWays: 10,
+      maxPoiNodes: 10,
+      maxTreeNodes: 0,
+      maxTreeRowWays: 0,
+      classifyLinearFeatureTags: () => null,
+      classifyStructureSemantics: () => ({}),
+      classifyWorldSurfaceProfile: () => ({ reason: 'test', signals: { normalized: {} } }),
+      isDriveableHighwayTag: (value) => Boolean(value),
+      limitNodesByTileBudget,
+      limitWaysByTileBudget,
+      linearFeaturePriority: () => 0,
+      poiKeyFromTags: () => '',
+      roadTypePriority: () => 1
+    });
+
+    assert.equal(selection.requestedCounts.roads, 120);
+    assert.equal(selection.roadWays.length, 120);
+    assert.equal(loadMetrics.regionalTransportSelection.generalSelected, 120);
   } finally {
     appCtx.isLikelyMobileDevice = previousMobileDetector;
     appCtx.worldSurfaceProfile = previousSurfaceProfile;

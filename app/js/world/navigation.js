@@ -1,4 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
+import { roadWidthAtProjection } from './road-cross-section-profile.js?v=1';
 
 const runtime = {
   applySpawnTarget: () => null,
@@ -390,6 +391,20 @@ function evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, pre
     cumulativeDistance += segLen;
   }
   return best;
+}
+
+// Camera probes reuse the road-search index and compiled surface/width. This is
+// a thin surface test, not a solid column: cameras below an overpass stay free.
+export function cameraRoadSurfaceCollision(x, y, z, radius = 0.38) {
+  if (![x,y,z,radius].every(Number.isFinite)) return false;
+  rebuildRoadSearchIndexIfNeeded();
+  for (const road of indexedRoadCandidates(x,z,32+radius)) {
+    if (runtime.isSuppressedBaseRoad(road)) continue;
+    const hit=evaluateNearestRoadCandidate(road,x,z,NaN,Infinity,null);
+    if (!hit || hit.dist>roadWidthAtProjection(road,hit)*.5+radius) continue;
+    if (Number.isFinite(hit.y) && Math.abs(y-hit.y)<=radius+.12) return true;
+  }
+  return false;
 }
 
 export function findNearestRoad(x, z, options = {}) {

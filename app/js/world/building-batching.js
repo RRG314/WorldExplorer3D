@@ -19,13 +19,15 @@ function midFacadeBatchKey(material) {
   return `building-mid-facade:${atlas}:${roughness}:${metalness}`;
 }
 
-function appendMidFacadeAttributes(batch, material, vertexStart, vertexCount) {
-  const wallColor = material?.color instanceof THREE.Color
+function appendMidFacadeAttributes(batch, material, exteriorPresentation, vertexStart, vertexCount) {
+  const wallColor = Number.isFinite(Number(exteriorPresentation?.wallColor))
+    ? new THREE.Color(Number(exteriorPresentation.wallColor))
+    : material?.color instanceof THREE.Color
     ? material.color
     : new THREE.Color(0x8d9292);
-  const roofColorA = new THREE.Color(material?.userData?.roofSurfaceColorA ?? wallColor.getHex());
-  const roofColorB = new THREE.Color(material?.userData?.roofSurfaceColorB ?? wallColor.getHex());
-  const roofGrainScale = Number(material?.userData?.roofSurfaceGrainScale || 0.6);
+  const roofColorA = new THREE.Color(exteriorPresentation?.roofColorA ?? material?.userData?.roofSurfaceColorA ?? wallColor.getHex());
+  const roofColorB = new THREE.Color(exteriorPresentation?.roofColorB ?? material?.userData?.roofSurfaceColorB ?? wallColor.getHex());
+  const roofGrainScale = Number(exteriorPresentation?.roofGrainScale || material?.userData?.roofSurfaceGrainScale || 0.6);
   const repeatX = Number(material?.map?.repeat?.x || 0.08);
   const repeatY = Number(material?.map?.repeat?.y || (1 / 16));
   const offsetX = Number(material?.map?.offset?.x || 0);
@@ -252,7 +254,7 @@ async function batchBuildingMeshesByTier(tiers = ['near'], options = {}) {
           continue;
         }
         if (group.midFacadeBatch) {
-          appendMidFacadeAttributes(batch, mesh.material, vertexStart, appendCount);
+          appendMidFacadeAttributes(batch, mesh.material, mesh.userData?.exteriorPresentation, vertexStart, appendCount);
         }
         sourceMeshes.push(mesh);
         const provenance = mesh.userData?.buildingProvenance;

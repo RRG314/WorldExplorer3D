@@ -433,7 +433,6 @@ function initMobileControls() {
       beginHold(`${btn.id}:p:${pointerId}`, btn.dataset.channel || 'earth', btn.dataset.key);
       if (
         btn === mobileActionPrimary &&
-        btn.dataset.key === 'Space' &&
         detectControlsMode() === 'skydiving'
       ) {
         appCtx.handleUrbanEquipmentUse?.();
@@ -455,7 +454,6 @@ function initMobileControls() {
       }
       if (
         btn === mobileActionPrimary &&
-        btn.dataset.key === 'Space' &&
         detectControlsMode() === 'skydiving'
       ) {
         appCtx.handleUrbanEquipmentUse?.();
@@ -527,6 +525,12 @@ function initMobileControls() {
 
     const profile = MOBILE_CONTROL_PROFILES[mode] || MOBILE_CONTROL_PROFILES.driving;
     let actions = profile.actions;
+    if (mode === 'rocket' && appCtx.pirateInterceptionRuntime?.active === true) {
+      actions = [
+        { label: 'Thrust', binding: { channel: 'space', key: ' ' } },
+        { label: 'Fire', binding: { channel: 'space', key: 'fire' } }
+      ];
+    }
     if (mode === 'skydiving' && appCtx.isUrbanParachuteDeployed?.() === true) {
       actions = [{ label: 'Flare', binding: { channel: 'earth', key: 'Space' } }];
     }
@@ -553,7 +557,22 @@ function initMobileControls() {
       actions.push({ label: 'DeFlock', binding: { channel: 'earth', key: 'KeyE' } });
     }
     applyPadProfile('mobileMove', mobileMovePad, profile.move, mobileMoveLabel, profile.moveLabel || 'Move');
-    applyPadProfile('mobileLook', mobileLookPad, profile.look, mobileLookLabel, profile.lookLabel || 'Look');
+    // Camera input is gesture-owned on touch. Directional look buttons used
+    // keyboard key codes and could begin moving after a desktop remap; keeping
+    // the full analog look pad makes the phone layout independent and stable.
+    const touchLookPad = profile.look ? { up: null, down: null, left: null, right: null } : null;
+    applyPadProfile('mobileLook', mobileLookPad, touchLookPad, mobileLookLabel, profile.lookLabel || 'Look');
+    if (mode !== 'rocket' && Array.isArray(actions)) {
+      const actionBindingIds = { Space: 'primary_action', ShiftLeft: 'modifier_action', KeyE: 'interact' };
+      actions = actions.map((action) => {
+        const actionId = actionBindingIds[action?.binding?.key];
+        if (!actionId || action?.binding?.channel === 'space') return action;
+        return {
+          ...action,
+          binding: { ...action.binding, key: appCtx.getControlBindingCode?.(actionId) || action.binding.key }
+        };
+      });
+    }
     applyActionProfile(actions);
     const showPackAction = mode === 'walking' && urbanEquipmentToggle && !urbanEquipmentToggle.hidden;
     const equipped = appCtx.playerBackpackInventory?.equipped?.() || null;
@@ -630,6 +649,7 @@ function initMobileControls() {
         'Driving Mode';
       const arrow = ctrlContent?.classList.contains('hidden') ? '▼' : '▲';
       const controlsOpen = !ctrlContent?.classList.contains('hidden');
+      ctrlContent?.setAttribute('aria-hidden', String(!controlsOpen));
       ctrlHeader.textContent = isTouchPreferredClient && controlsOpen
         ? 'Close controls ×'
         : `⚙️ ${modeLabel} ${arrow}`;
@@ -639,6 +659,7 @@ function initMobileControls() {
       if (controlsBarLabel) controlsBarLabel.textContent = `⚙️ ${modeLabel} Controls`;
       controlsBarBtn?.setAttribute('aria-expanded', String(controlsOpen));
       controlsTab?.classList.toggle('bar-open', controlsOpen);
+      controlsTab?.setAttribute('aria-hidden', String(!controlsOpen));
     }
     updateMobileTouchControls(mode);
   }
@@ -671,7 +692,6 @@ function initMobileControls() {
   installMobileUiPointerShield();
   appCtx.updateControlsModeUI = updateControlsModeUI;
   appCtx.updateMobileTouchControls = updateMobileTouchControls;
-  appCtx.isTouchPreferredClient = isTouchPreferredClient;
 
   const dispose = (reason = 'mobile-controls-disposed') => {
     clearVirtualHeldInputs();

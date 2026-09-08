@@ -1,4 +1,4 @@
-import { createAnimalModel } from './animal-models.js?v=2';
+import { createAnimalModel } from './animal-models.js?v=3';
 
 function makeMaterials(THREE) {
   return {

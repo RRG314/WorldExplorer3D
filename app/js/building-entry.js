@@ -4,6 +4,7 @@ const ENTRY_EXCLUDED_BUILDING_TYPES = new Set(['roof', 'canopy', 'carport', 'bri
 const DEFAULT_DESTINATION_MATCH_RADIUS = 42;
 const DEFAULT_ENTRY_RADIUS = 8.5;
 const SYNTHETIC_INTERIOR_HEIGHT = 3.4;
+const destinationSupportCache = new WeakMap();
 
 function finiteNumber(value, fallback = 0) {
   const n = Number(value);
@@ -323,13 +324,14 @@ function resolveSupportRecord(building, options = {}) {
   const destination = options.destination || null;
   const key = buildingKey(building);
   const exteriorEntrance = appCtx.buildingEntranceByBuilding?.get?.(key) || null;
+  const poiTenancies = appCtx.poiTenanciesByBuilding?.get?.(key) || [];
   const originPoint = destination && Number.isFinite(destination.x) && Number.isFinite(destination.z) ?
     { x: Number(destination.x), z: Number(destination.z) } :
     exteriorEntrance ? { x: exteriorEntrance.x, z: exteriorEntrance.z } : center;
 
   return {
     key,
-    label: options.label || buildingLabel(destination || building),
+    label: options.label || poiTenancies[0]?.source?.name || buildingLabel(destination || building),
     enterable: true,
     synthetic: !!building.syntheticInteriorOnly,
     building,
@@ -340,6 +342,8 @@ function resolveSupportRecord(building, options = {}) {
     center,
     entryAnchor: buildEntryAnchor(building, originPoint),
     exteriorEntrance,
+    poiTenancies,
+    interiorArchetype: String(poiTenancies[0]?.semantic?.interiorArchetype || ''),
     allowMappedData: !building.syntheticInteriorOnly,
     allowGeneratedInterior: true
   };
@@ -376,21 +380,16 @@ function resolveDestinationBuilding(destination, options = {}) {
 function cacheDestinationSupport(destination, support) {
   if (!destination || typeof destination !== 'object') return support;
   const signature = `${finiteNumber(appCtx.LOC?.lat, 0).toFixed(4)},${finiteNumber(appCtx.LOC?.lon, 0).toFixed(4)}:${Array.isArray(appCtx.buildings) ? appCtx.buildings.length : 0}`;
-  destination._buildingEntrySupport = support;
-  destination._buildingEntrySignature = signature;
-  destination.entryBuildingKey = support?.enterable ? support.key : '';
-  destination.entryBuildingLabel = support?.enterable ? support.label : '';
-  destination.entryBuildingKind = support?.enterable ? summarizeSupportType(support) : '';
-  destination.entryBuildingPoint = support?.enterable && support.entryAnchor ? { ...support.entryAnchor } : null;
+  destinationSupportCache.set(destination, { signature, support });
   return support;
 }
 
 function readCachedDestinationSupport(destination) {
   if (!destination || typeof destination !== 'object') return null;
-  const cached = destination._buildingEntrySupport || null;
+  const cached = destinationSupportCache.get(destination) || null;
   const signature = `${finiteNumber(appCtx.LOC?.lat, 0).toFixed(4)},${finiteNumber(appCtx.LOC?.lon, 0).toFixed(4)}:${Array.isArray(appCtx.buildings) ? appCtx.buildings.length : 0}`;
-  if (!cached || destination._buildingEntrySignature !== signature) return null;
-  return cached;
+  if (!cached || cached.signature !== signature) return null;
+  return cached.support;
 }
 
 function resolveBuildingEntrySupport(input, options = {}) {
@@ -440,6 +439,7 @@ function resolveActiveDestinationBuildingSupport(options = {}) {
 
 function pickNearbyEnterableBuildingSupport(x, z, options = {}) {
   const radius = Math.max(2, finiteNumber(options.radius, DEFAULT_ENTRY_RADIUS));
+  const requireExteriorEntrance = options.requireExteriorEntrance === true;
   const actorBaseY = finiteNumber(options.actorBaseY, NaN);
   const actorHeight = Math.max(0.5, finiteNumber(options.actorHeight, 1.65));
   const nearby = typeof appCtx.getNearbyBuildings === 'function' ?
@@ -454,6 +454,7 @@ function pickNearbyEnterableBuildingSupport(x, z, options = {}) {
     if (!support.enterable) continue;
     const footprintHit = distanceToFootprint(x, z, support.building);
     const entrance = support.exteriorEntrance;
+    if (requireExteriorEntrance && !entrance) continue;
     const interactionDistance = entrance
       ? Math.hypot(x - finiteNumber(entrance.approachX, entrance.x), z - finiteNumber(entrance.approachZ, entrance.z))
       : footprintHit.dist;
@@ -474,6 +475,7 @@ function pickNearbyEnterableBuildingSupport(x, z, options = {}) {
   const destinationSupport = resolveActiveDestinationBuildingSupport(options);
   if (
     destinationSupport?.enterable &&
+    (!requireExteriorEntrance || destinationSupport.exteriorEntrance) &&
     buildingOccupiesActorHeight(destinationSupport.building, actorBaseY, actorHeight)
   ) {
     const entrance = destinationSupport.exteriorEntrance;

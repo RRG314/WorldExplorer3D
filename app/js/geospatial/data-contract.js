@@ -132,6 +132,16 @@ const DATA_SOURCES = Object.freeze({
     licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
     homepage: 'https://esa-worldcover.org/',
     description: 'Satellite-derived global land-cover classification.'
+  }),
+  'maryland-imap-parcels': Object.freeze({
+    id: 'maryland-imap-parcels',
+    label: 'Maryland Parcel Boundaries',
+    operator: 'Maryland Department of Planning / MD iMAP / SDAT',
+    truthType: 'authoritative',
+    licenseId: 'Maryland spatial-data terms',
+    licenseUrl: 'https://www.arcgis.com/home/item.html?id=b33e5f03d50844b8819a4046ecfe0d97',
+    homepage: 'https://mdgeodata.md.gov/imap/rest/services/PlanningCadastre/MD_ParcelBoundaries/MapServer/0',
+    description: 'Statewide public parcel geometry and selected non-owner attributes used as Maryland property context.'
   })
 });
 

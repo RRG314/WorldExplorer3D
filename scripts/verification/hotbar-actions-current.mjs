@@ -286,6 +286,13 @@ async function verifyEarthActions(page) {
   await page.locator('.propertyHubTabs [data-property-view="home"]').click();
   assert.equal(await page.locator('.propertyHubTabs [data-property-view="home"]').getAttribute('aria-selected'), 'true');
   await page.locator('#closePropertyPanelBtn').click();
+  await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    // Reproduce a late parcel/ownership refresh after dismissal. It may update
+    // data, but must not reopen Real Estate over the next gameplay action.
+    ctx.updatePropertyPanel?.();
+  });
+  assert.equal(await page.locator('#propertyPanel').evaluate((element) => element.classList.contains('show')), false);
   mark('Real Estate · Property Hub', 'both public root views usable');
 
   await clickMenuItem(page, 'realEstateFloatBtn', 'realEstateMenu', 'fQuickBuild');

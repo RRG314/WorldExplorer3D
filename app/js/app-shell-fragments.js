@@ -8,7 +8,7 @@ const APP_SHELL_FRAGMENT_HTML = `
     </div>
     <button class="panel-close" id="closePropertyPanelBtn" aria-label="Close Real Estate">×</button>
   </div>
-  <div class="propertyHubBalance"><span>Explorer Credits</span><strong id="propertyWalletBalance">0</strong></div>
+  <div class="propertyHubBalance"><span>Explorer Wallet</span><strong id="propertyWalletBalance">$0</strong></div>
   <div class="propertyHubTabs" role="tablist" aria-label="Real Estate sections">
     <button type="button" class="active" data-property-view="home">My Properties</button>
     <button type="button" data-property-view="nearby">Find a Property</button>

@@ -3,6 +3,7 @@ import {
   sampleFeatureSurfaceY
 } from "../structure-semantics.js?v=63";
 import { roadWidthAtProjection } from '../world/road-cross-section-profile.js?v=1';
+import { terrainHeightWithPortalCuts } from './structure-terrain-portals.js?v=1';
 
 // THREE.PlaneGeometry splits each grid cell along the bottom-left to
 // top-right diagonal. Runtime ground queries must use those same two planes;
@@ -27,7 +28,7 @@ function createTerrainHeightSamplingApi(deps = {}) {
   const baseTerrainHeightCache = new Map();
   let terrainHeightCacheEnabled = true;
 
-  function terrainMeshHeightAt(x, z) {
+  function terrainMeshHeightAt(x, z, options = {}) {
     if (appCtx.worldLoadRuntimeState?.groundMode === 'polar-cryosphere-local') {
       const polarY = appCtx.samplePolarCryosphereWorldYAt?.(x, z);
       return Number.isFinite(polarY) ? polarY : elevationWorldYAtWorldXZ(x, z);
@@ -71,10 +72,19 @@ function createTerrainHeightSamplingApi(deps = {}) {
       const y10 = pos.getY(row * vps + col + 1) + baseY;
       const y01 = pos.getY((row + 1) * vps + col) + baseY;
       const y11 = pos.getY((row + 1) * vps + col + 1) + baseY;
-      return interpolateRenderedTerrainCell(sx, sz, y00, y10, y01, y11);
+      const height = interpolateRenderedTerrainCell(sx, sz, y00, y10, y01, y11);
+      if (options.ignorePortalCuts) return height;
+      return terrainHeightWithPortalCuts(mesh.userData.structureTerrainPortalDescriptors, x, z, height);
     }
 
-    return elevationWorldYAtWorldXZ(x, z, terrainTileDeps);
+    // Outside the detailed tile ring the fixed-location LOD is the rendered
+    // ground. Its coarser source and seam blend can differ from a direct z15
+    // elevation lookup by several metres, so physics must consume that exact
+    // triangle surface instead of letting vehicles pass underneath it.
+    const farTerrainY = appCtx.sampleFarTerrainWorldYAt?.(x, z, options);
+    return Number.isFinite(farTerrainY)
+      ? Number(farTerrainY)
+      : elevationWorldYAtWorldXZ(x, z, terrainTileDeps);
   }
 
   function baseTerrainHeightAt(x, z) {

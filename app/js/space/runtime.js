@@ -226,6 +226,16 @@ function getActiveSpaceBodies() {
   return appCtx.getAllSpaceBodies?.() || [];
 }
 
+export function resolveSpaceControlInput(keys = {}, sharedActions = {}) {
+  const legacyYaw = keys.arrowleft ? -1 : keys.arrowright ? 1 : 0;
+  const legacyPitch = keys.arrowup ? 1 : keys.arrowdown ? -1 : 0;
+  const yaw = legacyYaw || -(Number(sharedActions.turn) || 0);
+  const pitch = legacyPitch || (Number(sharedActions.move) || 0);
+  const thrust = !!keys[' '] || Number(sharedActions.jump) > 0.05;
+  const brake = !!keys.shift || Number(sharedActions.sprint) > 0.05;
+  return Object.freeze({ yaw, pitch, thrust, brake });
+}
+
 function sunGravityWeightByLocalBodies(nearestLandableDist) {
   if (!Number.isFinite(nearestLandableDist)) return 1.0;
   if (nearestLandableDist <= 2200) return 0;
@@ -339,6 +349,15 @@ function applyPlanetaryGravity(rocket, launchAssist, isThrusting) {
   } = getSpaceControlMath();
   if (!appCtx.spaceFlight.gravityVelocity) return;
 
+  // A surface departure waits for deliberate player input. Do not let the
+  // craft accumulate an invisible inward velocity while the player is still
+  // reading the launch HUD or deciding where to steer.
+  if (launchAssist && !isThrusting) {
+    appCtx.spaceFlight.gravityVelocity.set(0, 0, 0);
+    if (appCtx.spaceFlight._gravityVec) appCtx.spaceFlight._gravityVec.set(0, 0, 0);
+    return;
+  }
+
   const bodies = getActiveSpaceBodies();
   const nearLandableDist = nearestLandableDistance(rocket, bodies);
   _sfGravitySum.set(0, 0, 0);
@@ -383,6 +402,46 @@ function applyPlanetaryGravity(rocket, launchAssist, isThrusting) {
   integrateGravityVelocity(_sfGravitySum);
 }
 
+function preserveManualEscapeAuthority(rocket, forward, isThrusting, frameScale) {
+  if (!isThrusting || !appCtx.spaceFlight.gravityVelocity) return;
+  const bodies = getActiveSpaceBodies();
+  let nearest = null;
+  let nearestSurfaceDistance = Infinity;
+  for (const body of bodies) {
+    if (!shouldApplyGravityFromBody(body) || !Number.isFinite(body.radius)) continue;
+    const centerDistance = rocket.position.distanceTo(body.position);
+    const surfaceDistance = centerDistance - body.radius;
+    if (
+      surfaceDistance < nearestSurfaceDistance &&
+      centerDistance <= bodyGravityRange(body, surfaceDistance) + body.radius
+    ) {
+      nearest = body;
+      nearestSurfaceDistance = surfaceDistance;
+    }
+  }
+  if (!nearest) return;
+
+  const outward = getSpaceControlMath().gravityTemporary.copy(rocket.position).sub(nearest.position);
+  if (outward.lengthSq() <= 1e-6) return;
+  outward.normalize();
+  const outwardAlignment = forward.dot(outward);
+  if (outwardAlignment <= 0.2) return;
+
+  // Forward thrust aimed away from a body always remains an escape control.
+  // Clear accumulated inward pull first, then add a small outward launch term.
+  const radialVelocity = appCtx.spaceFlight.gravityVelocity.dot(outward);
+  if (radialVelocity < 0) {
+    appCtx.spaceFlight.gravityVelocity.addScaledVector(outward, -radialVelocity);
+  }
+  appCtx.spaceFlight.gravityVelocity.addScaledVector(
+    outward,
+    SPACE_CONSTANTS.LAUNCH_ASSIST_ACCEL * outwardAlignment * frameScale
+  );
+  if (appCtx.spaceFlight.gravityVelocity.length() > SPACE_CONSTANTS.MAX_GRAVITY_SPEED) {
+    appCtx.spaceFlight.gravityVelocity.setLength(SPACE_CONSTANTS.MAX_GRAVITY_SPEED);
+  }
+}
+
 export function updateSpaceFlightPhysics() {
   if (appCtx.spaceFlight.mode !== 'flying') return;
   const {
@@ -399,6 +458,12 @@ export function updateSpaceFlightPhysics() {
 
   const rocket = appCtx.spaceFlight.rocket;
   const keys = appCtx.spaceFlight.keys;
+  const sharedActions = appCtx.readControlActions?.('rocket') || {};
+  const controls = resolveSpaceControlInput(keys, sharedActions);
+  const yawInput = controls.yaw;
+  const pitchInput = controls.pitch;
+  const thrustInput = controls.thrust;
+  const brakeInput = controls.brake;
   const launchAssist = getLaunchAssistState(rocket);
   const frameScale = appCtx.spaceFlight._frameScale || 1;
   const characterFlight = spacecraftOperationTuning(appCtx.resolveCharacterCapability?.('spacecraft', {
@@ -417,33 +482,31 @@ export function updateSpaceFlightPhysics() {
   _sfControlYawAxis.crossVectors(_sfForward, _sfControlRight).normalize();
   _sfControlPitchAxis.crossVectors(_sfForward, _sfControlUp).normalize();
 
-  if (keys['arrowleft'] || keys['arrowright']) {
-    const yawDir = keys['arrowleft'] ? -1 : 1;
-    _sfTempQuat.setFromAxisAngle(_sfControlYawAxis, SPACE_CONSTANTS.TURN_SPEED * yawDir * frameScale);
+  if (Math.abs(yawInput) > 0.05) {
+    _sfTempQuat.setFromAxisAngle(_sfControlYawAxis, SPACE_CONSTANTS.TURN_SPEED * yawInput * frameScale);
     rocket.quaternion.premultiply(_sfTempQuat);
   }
 
-  if (keys['arrowup'] || keys['arrowdown']) {
-    const pitchDir = keys['arrowup'] ? 1 : -1;
-    _sfTempQuat.setFromAxisAngle(_sfControlPitchAxis, SPACE_CONSTANTS.PITCH_SPEED * pitchDir * frameScale);
+  if (Math.abs(pitchInput) > 0.05) {
+    _sfTempQuat.setFromAxisAngle(_sfControlPitchAxis, SPACE_CONSTANTS.PITCH_SPEED * pitchInput * frameScale);
     rocket.quaternion.premultiply(_sfTempQuat);
   }
 
   rocket.quaternion.normalize();
 
   const manualControl = !!(
-    keys[' '] || keys['shift'] ||
-    keys['arrowup'] || keys['arrowdown'] || keys['arrowleft'] || keys['arrowright']
+    thrustInput || brakeInput || Math.abs(pitchInput) > 0.05 || Math.abs(yawInput) > 0.05
   );
 
-  const siRuntimeActive = appCtx.updateRenderedSpaceJourney?.({
+  const hostileInterceptionActive = appCtx.pirateInterceptionRuntime?.active === true;
+  const siRuntimeActive = !hostileInterceptionActive && appCtx.updateRenderedSpaceJourney?.({
     realDtS: frameScale / 60,
-    throttle: keys[' '] ? 1 : 0,
-    braking: !!keys['shift'] || appCtx.spaceFlight._atmosphericClimbRequested === true,
+    throttle: thrustInput ? 1 : 0,
+    braking: brakeInput || appCtx.spaceFlight._atmosphericClimbRequested === true,
     thrustDirection: { x: _sfForward.x, y: _sfForward.y, z: _sfForward.z },
     angular: {
-      x: keys['arrowup'] ? 1 : keys['arrowdown'] ? -1 : 0,
-      y: keys['arrowright'] ? 1 : keys['arrowleft'] ? -1 : 0,
+      x: pitchInput,
+      y: yawInput,
       z: 0
     },
     manualControl,
@@ -508,14 +571,14 @@ export function updateSpaceFlightPhysics() {
   }
 
   let isThrusting = false;
-  if (keys[' ']) {
+  if (thrustInput) {
     const launchBoostMult = launchAssist ? SPACE_CONSTANTS.LAUNCH_BOOST_MULTIPLIER : 1;
     appCtx.spaceFlight.speed = Math.min(appCtx.spaceFlight.speed + SPACE_CONSTANTS.BOOST * launchBoostMult * frameScale, SPACE_CONSTANTS.MAX_SPEED);
     if (launchAssist) {
       appCtx.spaceFlight.speed = Math.max(appCtx.spaceFlight.speed, SPACE_CONSTANTS.LAUNCH_MIN_SPEED);
     }
     isThrusting = true;
-  } else if (keys['shift']) {
+  } else if (brakeInput) {
     appCtx.spaceFlight.speed = Math.max(appCtx.spaceFlight.speed - SPACE_CONSTANTS.BRAKE * frameScale, 0);
   } else if (appCtx.spaceFlight.speed > SPACE_CONSTANTS.CRUISE_SPEED) {
     appCtx.spaceFlight.speed = Math.max(
@@ -524,7 +587,7 @@ export function updateSpaceFlightPhysics() {
     );
   }
 
-  const nearBody = appCtx.spaceFlight._nearestBody;
+  const nearBody = hostileInterceptionActive ? null : appCtx.spaceFlight._nearestBody;
   if (nearBody && nearBody.landable && nearBody.position) {
     const distToBody = rocket.position.distanceTo(nearBody.position);
     const inSlowZone = distToBody < SPACE_CONSTANTS.LANDING_DISTANCE + nearBody.radius + 180;
@@ -543,7 +606,10 @@ export function updateSpaceFlightPhysics() {
   appCtx.spaceFlight._isThrusting = isThrusting;
   const sharedOrbitalRendezvous = appCtx.getSpaceTravelSession?.()?.phase === 'rendezvous'
     && appCtx.getSolisReachDockTarget?.()?.position != null;
-  if (sharedOrbitalRendezvous) {
+  if (hostileInterceptionActive) {
+    appCtx.spaceFlight.gravityVelocity?.set?.(0, 0, 0);
+    appCtx.spaceFlight._gravityVec?.set?.(0, 0, 0);
+  } else if (sharedOrbitalRendezvous) {
     // The pod and Solis Reach share the same orbital free-fall frame. Applying
     // planetary acceleration to the pod alone creates artificial relative
     // speed and makes the final manual docking corridor impossible to hold.
@@ -553,13 +619,14 @@ export function updateSpaceFlightPhysics() {
     applyPlanetaryGravity(rocket, launchAssist, isThrusting);
   }
   _sfForward.set(0, 1, 0).applyQuaternion(rocket.quaternion);
+  preserveManualEscapeAuthority(rocket, _sfForward, isThrusting, frameScale);
   appCtx.spaceFlight.velocity.copy(_sfForward).multiplyScalar(appCtx.spaceFlight.speed);
   if (appCtx.spaceFlight.gravityVelocity) {
     appCtx.spaceFlight.velocity.add(appCtx.spaceFlight.gravityVelocity);
   }
   const previousPosition = rocket.position.clone();
   const nextPosition = previousPosition.clone().addScaledVector(appCtx.spaceFlight.velocity, frameScale);
-  const collisionBodies = getActiveSpaceBodies();
+  const collisionBodies = hostileInterceptionActive ? [] : getActiveSpaceBodies();
   const collision = resolveCelestialSceneCollision(previousPosition, nextPosition, collisionBodies, {
     clearance: 5,
     padding: 0.08,
@@ -705,14 +772,16 @@ export function animateSpaceFlight(deps = {}) {
     }
   }
 
-  if (typeof appCtx.updateSolarSystem === 'function') {
+  const hostileInterceptionActive = appCtx.pirateInterceptionRuntime?.active === true;
+  if (!hostileInterceptionActive && typeof appCtx.updateSolarSystem === 'function') {
     appCtx.updateSolarSystem();
   }
 
   appCtx.tutorialUpdate?.(appCtx.spaceFlight._frameScale / 60);
-  appCtx.updateUniverseRuntime?.(appCtx.spaceFlight._frameScale / 60);
+  if (!hostileInterceptionActive) appCtx.updateUniverseRuntime?.(appCtx.spaceFlight._frameScale / 60);
   updateSpaceFlightPhysics();
-  deps.updateSpaceFlightHUD?.(findLandableBodyByName);
+  appCtx.updatePirateInterception?.(appCtx.spaceFlight._frameScale / 60);
+  if (!hostileInterceptionActive) deps.updateSpaceFlightHUD?.(findLandableBodyByName);
   updateSpaceFlightCamera();
   appCtx.updateExpeditionPodFlightPresentation?.(appCtx.spaceFlight._frameScale / 60);
 

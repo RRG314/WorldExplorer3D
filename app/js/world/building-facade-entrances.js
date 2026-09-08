@@ -3,10 +3,21 @@ import { compileEntranceCatalog } from '../living-world/entrance-catalog.js?v=6'
 const STYLE_CODE = Object.freeze({
   paneled: 0,
   paneled_glass: 1,
-  glass_double: 2,
-  metal_glass: 3,
+  glass_double: 3,
+  metal_glass: 2,
   civic_transom: 4,
-  steel_service: 5
+  steel_service: 5,
+  townhouse_panel: 0,
+  residential_glass: 1,
+  residential_double: 0,
+  apartment_lobby: 3,
+  commercial_glass: 2,
+  commercial_double: 3,
+  office_metal_glass: 2,
+  institutional_double: 4,
+  industrial_steel: 5,
+  garage_rollup: 5,
+  loading_dock: 5
 });
 
 function finite(value, fallback = 0) {
@@ -52,7 +63,7 @@ function attachEntranceAttribute(mesh, entrance) {
   // Keep the mask selector in the stable [0, 1) interpolant range and pack the
   // 3x2 atlas cell into sixteenth steps. Large integer varyings were not
   // reliable after dense-city geometry merging on every WebGL path.
-  const atlasCell = styleCode === 2 ? 3 : styleCode === 3 ? 2 : styleCode;
+  const atlasCell = styleCode;
   const encodedStyle = atlasCell / 16;
   const bottomLocalY = finite(entrance?.y) - finite(mesh?.position?.y);
   const attributed = new Set();
@@ -133,6 +144,12 @@ export function publishBuildingFacadeEntrances(appCtx, options = {}) {
   const compiledByBuilding = new Map(
     compiledCatalog.entrances.map((entrance) => [String(entrance.buildingSourceId), entrance])
   );
+  const exteriorProfileByBuilding = new Map(
+    nearFacadeMeshes.map((mesh) => [
+      String(mesh.userData?.sourceBuildingId || ''),
+      mesh.userData?.exteriorProfile || mesh.material?.userData?.exteriorProfile || null
+    ]).filter(([buildingId, profile]) => buildingId && profile)
+  );
   const integratedEntrances = [];
   let facadeMeshes = 0;
   let attributedVertices = 0;
@@ -148,10 +165,20 @@ export function publishBuildingFacadeEntrances(appCtx, options = {}) {
     facadeMeshes += 1;
     facadeVertexCapacity += Number(mesh.geometry?.attributes?.position?.count || 0);
     if (!entrance) continue;
-    const result = attachEntranceAttribute(mesh, entrance);
+    const exteriorProfile = exteriorProfileByBuilding.get(String(entrance.buildingSourceId || '')) || null;
+    const resolvedEntrance = exteriorProfile
+      ? Object.freeze({
+        ...entrance,
+        archetype: exteriorProfile.category,
+        doorStyle: exteriorProfile.doorStyle,
+        exteriorFamilyId: exteriorProfile.familyId,
+        exteriorGeneratorVersion: exteriorProfile.generatorVersion
+      })
+      : entrance;
+    const result = attachEntranceAttribute(mesh, resolvedEntrance);
     attributedVertices += result.attributedVertices;
     attributeBytes += result.bytes;
-    if (result.attributedVertices >= 4 && directEntrance) integratedEntrances.push(entrance);
+    if (result.attributedVertices >= 4 && directEntrance) integratedEntrances.push(resolvedEntrance);
     else if (result.attributedVertices >= 4) coincidentWallBindings += 1;
   }
 

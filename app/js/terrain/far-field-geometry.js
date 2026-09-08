@@ -6,6 +6,7 @@ import {
 } from './far-field-coverage.js?v=2';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
 import { createNormalizedTerrainAttribute } from './surface-material-blend.js?v=2';
+import {collectDetailBoundaryLines,detailPointsOnEdge,detailHeightAt,triangleHeightAt} from './detail-boundary.js';
 
 function median(values) {
   const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
@@ -155,6 +156,12 @@ function sampleFarFieldGridWorldY(x, z, surfaceGrid) {
     surfaceGrid.detailedCoverage
   )) return null;
 
+  const transition=surfaceGrid.boundaryTriangles?.get(row*xValues.length+column);
+  if(transition) {
+    const height=triangleHeightAt(Number(x),Number(z),transition);
+    if(Number.isFinite(height))return height;
+  }
+
   const columns = xValues.length;
   const a = row * columns + column;
   const b = a + 1;
@@ -219,6 +226,7 @@ function createFarFieldGeometryPlanner(deps = {}) {
     farFieldSeamBlendMeters,
     latLonToTileXY,
     sampleAcceptedGroundAtLatLon,
+    sampleDetailedTerrainMetersAtLatLon,
     sampleTileElevationMeters,
     pointInMappedWaterArea,
     pointInMappedLandArea,
@@ -404,11 +412,17 @@ function createFarFieldGeometryPlanner(deps = {}) {
       const seamBlendWorld = farFieldSeamBlendMeters * Number(appCtx.WORLD_UNITS_PER_METER || 1);
       const distanceFromSeam = distanceOutsideInnerBounds(x, z, spec.inner);
       if (distanceFromSeam <= seamBlendWorld) {
-        const seamAccepted = sampleAcceptedGroundAtLatLon(lat, lon);
-        const seamAcceptedMeters = Number(seamAccepted?.groundElevationMeters);
-        if (seamAccepted?.status === 'available' && Number.isFinite(seamAcceptedMeters)) {
+        const detailedSample = sampleDetailedTerrainMetersAtLatLon?.(lat, lon);
+        const detailedMeters = detailedSample === null || detailedSample === undefined
+          ? NaN
+          : Number(detailedSample);
+        const seamAccepted = Number.isFinite(detailedMeters) ? null : sampleAcceptedGroundAtLatLon(lat, lon);
+        const seamMeters = Number.isFinite(detailedMeters)
+          ? detailedMeters
+          : Number(seamAccepted?.groundElevationMeters);
+        if (Number.isFinite(seamMeters)) {
           const blend = smoothstep01(distanceFromSeam / Math.max(1, seamBlendWorld));
-          meters = seamAcceptedMeters + (meters - seamAcceptedMeters) * blend;
+          meters = seamMeters + (meters - seamMeters) * blend;
         }
       }
     }
@@ -463,6 +477,13 @@ function createFarFieldGeometryPlanner(deps = {}) {
     const mappedSurfaceModes = [];
     const uvs = [];
     const indices = [];
+    const boundaryLines=collectDetailBoundaryLines(appCtx.terrainGroup?.children);
+    const boundaryTriangles=new Map();
+    const boundaryBindings=new Map(),pointsByIndex=new Map();
+    const point=index=>{
+      if(!pointsByIndex.has(index))pointsByIndex.set(index,{x:positions[index*3],y:positions[index*3+1],z:positions[index*3+2]});
+      return pointsByIndex.get(index);
+    };
     const xRange = spec.outer.maxX - spec.outer.minX || 1;
     const zRange = spec.outer.maxZ - spec.outer.minZ || 1;
     let farOwnedCells = 0;
@@ -544,7 +565,45 @@ function createFarFieldGeometryPlanner(deps = {}) {
         const b = a + 1;
         const c = a + width;
         const d = c + 1;
-        indices.push(a, c, b, b, c, d);
+        const corners=[a,c,d,b];
+        const edges=corners.map((index,i)=>detailPointsOnEdge(boundaryLines,point(index),point(corners[(i+1)%4])));
+        if(!edges.some(edge=>edge.length)) {
+          indices.push(a,c,b,b,c,d);
+          continue;
+        }
+        const appendPoint=(p,template)=>{
+          const index=positions.length/3;
+          positions.push(p.x,p.y,p.z);
+          colors.push(...colors.slice(template*3,template*3+3));
+          mappedSurfaceTints.push(...mappedSurfaceTints.slice(template*3,template*3+3));
+          mappedSurfaceModes.push(mappedSurfaceModes[template]);
+          uvs.push((p.x-spec.outer.minX)/xRange,1-(p.z-spec.outer.minZ)/zRange);
+          return index;
+        };
+        // Shared grid corners match the detailed edge's piecewise-linear height.
+        edges.forEach((edge,i)=>{
+          if(!edge.length)return;
+          for(const [index,p] of [[corners[i],edge[0]],[corners[(i+1)%4],edge.at(-1)]]) {
+            positions[index*3+1]=p.y;surfaceWorldYs[index]=p.y;
+            point(index).y=p.y;
+            boundaryBindings.set(index,Math.abs(edge[0].x-edge.at(-1).x)<.001?'x':'z');
+          }
+        });
+        const perimeter=[];
+        corners.forEach((index,i)=>{
+          perimeter.push(index);
+          for(const p of edges[i].slice(1,-1)) {
+            const added=appendPoint(p,index);perimeter.push(added);
+            boundaryBindings.set(added,Math.abs(edges[i][0].x-edges[i].at(-1).x)<.001?'x':'z');
+          }
+        });
+        const center={x:(xValues[column]+xValues[column+1])/2,z:(zValues[row]+zValues[row+1])/2,y:corners.reduce((sum,index)=>sum+positions[index*3+1],0)/4};
+        const centerIndex=appendPoint(center,a),triangles=[];
+        perimeter.forEach((index,i)=>{
+          const next=perimeter[(i+1)%perimeter.length];
+          indices.push(centerIndex,index,next);triangles.push([center,point(index),point(next)]);
+        });
+        boundaryTriangles.set(row*width+column,triangles);
       }
     }
 
@@ -555,8 +614,23 @@ function createFarFieldGeometryPlanner(deps = {}) {
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
     geometry.computeBoundingSphere();
+    const worldYs=new Float32Array(surfaceWorldYs);
+    const refreshBoundaryHeights=meshes=>{
+      const lines=collectDetailBoundaryLines(meshes),attribute=geometry.attributes.position;
+      let changed=0;
+      for(const [index,axis] of boundaryBindings) {
+        const p=point(index),height=detailHeightAt(lines,axis,p.x,p.z);
+        if(!Number.isFinite(height) || Math.abs(height-p.y)<.00001)continue;
+        p.y=height;attribute.setY(index,height);
+        if(index<worldYs.length)worldYs[index]=height;
+        changed++;
+      }
+      if(changed){attribute.needsUpdate=true;geometry.computeVertexNormals();geometry.computeBoundingSphere();}
+      return changed;
+    };
     return {
       geometry,
+      refreshBoundaryHeights,
       columns: xValues.length,
       rows: zValues.length,
       minElevationMeters,
@@ -565,6 +639,8 @@ function createFarFieldGeometryPlanner(deps = {}) {
       mappedSurfaceTints: new Float32Array(mappedSurfaceTints),
       mappedSurfaceModes,
       coverage: {
+        boundaryTransitionCells:boundaryTriangles.size,
+        boundaryAdditionalVertices:positions.length/3-xValues.length*zValues.length,
         totalCells: (xValues.length - 1) * (zValues.length - 1),
         farOwnedCells,
         detailedOwnedCells,
@@ -574,7 +650,8 @@ function createFarFieldGeometryPlanner(deps = {}) {
       surfaceGrid: {
         xValues,
         zValues,
-        worldYs: new Float32Array(surfaceWorldYs),
+        worldYs,
+        boundaryTriangles,
         detailedCoverage: spec.detailedCoverage
       }
     };

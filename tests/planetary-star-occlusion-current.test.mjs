@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { setPlanetaryStarOcclusion } from '../app/js/planetary/star-occlusion.js';
+import { setPlanetaryStarOcclusion, updatePlanetaryStarHorizon } from '../app/js/planetary/star-occlusion.js';
 
 function skyObject({ nested = false } = {}) {
   const material = {
@@ -32,6 +32,7 @@ test('planetary star rendering is depth-tested after terrain, including nested c
   assert.equal(material.depthTest, true);
   assert.equal(material.depthWrite, false);
   assert.equal(material.transparent, true);
+  assert.equal(material.clippingPlanes.length, 1);
   assert.equal(points.renderOrder, 1000);
   assert.equal(root.userData.planetarySurfaceOcclusion, true);
 });
@@ -43,6 +44,7 @@ test('leaving a planet restores the exact Earth sky material and ordering state'
   assert.equal(material.depthTest, false);
   assert.equal(material.depthWrite, false);
   assert.equal(material.transparent, false);
+  assert.equal(material.clippingPlanes, undefined);
   assert.equal(points.renderOrder, -1000);
   assert.equal(root.userData.planetarySurfaceOcclusion, false);
   assert.equal(material.userData.planetarySurfaceSkyState, undefined);
@@ -56,4 +58,11 @@ test('repeated activation does not overwrite the original restoration state', ()
   assert.equal(material.depthTest, false);
   assert.equal(material.transparent, false);
   assert.equal(points.renderOrder, -1000);
+});
+
+test('planetary star horizon follows the camera and clips the lower celestial hemisphere', () => {
+  const { root, material } = skyObject();
+  setPlanetaryStarOcclusion(root, true);
+  assert.equal(updatePlanetaryStarHorizon(root, 24), true);
+  assert.ok(Math.abs(material.clippingPlanes[0].constant + 23.96) < 1e-9);
 });

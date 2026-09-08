@@ -42,7 +42,8 @@ renders the result.
 
 ## Stable property identity
 
-Every eligible building uses the identity already produced by the world:
+Every eligible building outside supported parcel coverage uses the identity
+already produced by the world:
 
 `locationId + sourceBuildingId`
 
@@ -52,6 +53,14 @@ guardrails, roofs, airport markings, and other infrastructure are not treated
 as buildings. Residential, retail, office, industrial, civic, agricultural,
 and mixed-use buildings are eligible, with category-specific names, values,
 storage, and future uses.
+
+In Maryland, a valid official parcel polygon with `POLYID` becomes the land
+identity: `parcel:md:{jurisdiction}:{hash(POLYID)}`. All loaded buildings whose
+centers fall inside that polygon associate with the same virtual property. This
+prevents one lot with several buildings from being sold as several pieces of
+land and allows mapped vacant land to participate. Unmatched buildings keep the
+building identity fallback, and existing building IDs remain legacy read aliases.
+No personal assessment owner or occupant data enters the property catalog.
 
 ## Property state
 
@@ -88,6 +97,12 @@ rentPrice, rentTermDays
 tenantUid, tenantName, leaseStartsAt, leaseEndsAt
 revision, createdAt, updatedAt
 ```
+
+Parcel-backed Maryland records additionally store the public source parcel
+reference, hashed parcel ID, jurisdiction, parcel authority, reported land area,
+land use, non-personal source dates, combined associated building IDs, and the
+public assessment input when available. Parcel geometry stays in the bounded
+browser query and is not accepted as client-authored Firestore authority.
 
 Names are public game display names. Email, provider keys,
 real-world owner names, and account details are never stored on a property.

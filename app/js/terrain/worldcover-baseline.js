@@ -1,5 +1,6 @@
 import { createProviderOutageCircuit } from '../earth-core/provider-outage-circuit.js?v=1';
 import { terrainSurfaceClassForWorldCover } from './surface-material-blend.js?v=2';
+import { fetchWorldCoverClasses, WORLD_COVER_CLASS_MIME } from './worldcover-categorical.js';
 
 const WORLDCOVER_WMS_ENDPOINT = 'https://titiler.terrascope.be/wms';
 const WORLDCOVER_LAYER = 'esa-worldcover-map-10m-2021-v2_map';
@@ -15,7 +16,7 @@ const CACHE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 const MAX_PARALLEL_REQUESTS = 6;
 const PROVIDER_OUTAGE_COOLDOWN_MS = 60 * 1000;
 const providerCircuit = createProviderOutageCircuit({
-  provider: 'esa-worldcover-titiler',
+  provider: 'worldcover-delivery',
   cooldownMs: PROVIDER_OUTAGE_COOLDOWN_MS
 });
 
@@ -84,6 +85,7 @@ function buildSmoothedSurfaceTints(classes, size) {
 
 let databasePromise = null;
 let activeRequests = 0;
+let consecutiveTransportFailures = 0;
 let drainScheduled = false;
 const requestQueue = [];
 const memoryBlobCache = new Map();
@@ -315,6 +317,16 @@ async function fetchWorldCoverBlob(
       controller.abort();
     }, timeoutMs);
     try {
+      let blob;
+      try {
+        const classes = await fetchWorldCoverClasses(normalizedBounds(bounds), size, controller.signal);
+        blob = new Blob([classes], {type: WORLD_COVER_CLASS_MIME});
+      } catch (numericError) {
+        if (controller.signal.aborted) throw numericError;
+        // Existing display-map input remains an explicitly lower-confidence
+        // fallback. It must never be reported as numeric source evidence.
+      }
+      if (!blob) {
       const response = await fetch(buildWorldCoverUrl(bounds, size), {
         mode: 'cors',
         credentials: 'omit',
@@ -326,10 +338,14 @@ async function fetchWorldCoverBlob(
         error.status = Number(response.status);
         throw error;
       }
-      const blob = await response.blob();
+      blob = await response.blob();
       if (!String(blob.type || '').startsWith('image/')) throw new Error('WorldCover WMS returned a non-image response');
-      rememberBlob(key, blob);
-      void writeCachedBlob(key, blob);
+      }
+      if (blob.type === WORLD_COVER_CLASS_MIME) {
+        rememberBlob(key, blob);
+        void writeCachedBlob(key, blob);
+      }
+      consecutiveTransportFailures = 0;
       return { blob, source: 'network' };
     } catch (error) {
       if (signal?.aborted) throw signal.reason || error;
@@ -342,7 +358,12 @@ async function fetchWorldCoverBlob(
           : status
             ? `HTTP ${status}`
             : String(error?.message || 'network request failed');
-        throw providerCircuit.trip(reason, controller);
+        // One slow tile is not evidence that every other tile/provider is down.
+        // Honor explicit rate limits immediately; trip other transport failures
+        // after three consecutive failures, while retaining the same queue cap.
+        consecutiveTransportFailures += 1;
+        if (status === 429 || consecutiveTransportFailures >= 3) throw providerCircuit.trip(reason, controller);
+        throw new Error(`WorldCover tile unavailable: ${reason}`);
       }
       throw error;
     } finally {
@@ -389,49 +410,40 @@ async function imageFromBlob(blob) {
 }
 
 async function createSemanticTexture(blob, size, bounds = null) {
+  const numeric = blob.type === WORLD_COVER_CLASS_MIME;
+  let classIds, imageData;
+  if (numeric) {
+    classIds = new Uint8Array(await blob.arrayBuffer());
+    if (classIds.length !== size * size) throw new Error('Invalid cached class raster');
+  } else {
   const sourceImage = await imageFromBlob(blob);
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
   const context = canvas.getContext('2d', { willReadFrequently: true });
   if (!context) throw new Error('WorldCover canvas context unavailable');
-  context.imageSmoothingEnabled = true;
-  context.imageSmoothingQuality = 'high';
+  context.imageSmoothingEnabled = false;
   context.drawImage(sourceImage, 0, 0, size, size);
   if (typeof sourceImage.close === 'function') sourceImage.close();
-  const imageData = context.getImageData(0, 0, size, size);
+  imageData = context.getImageData(0, 0, size, size);
+  }
   const counts = {};
   const classes = new Array(size * size);
   const surfaceMaterialClasses = new Uint8Array(size * size);
   let recognized = 0;
 
-  for (let i = 0; i < imageData.data.length; i += 4) {
-    const entry = nearestWorldCoverClass(imageData.data[i], imageData.data[i + 1], imageData.data[i + 2]);
-    classes[i / 4] = entry;
+  for (let i = 0; i < size * size; i++) {
+    const entry = numeric ? WORLD_COVER_CLASSES.find(entry => entry.id === classIds[i])
+      : nearestWorldCoverClass(imageData.data[i*4], imageData.data[i*4+1], imageData.data[i*4+2]);
+    classes[i] = entry;
     if (!entry) {
       continue;
     }
     counts[entry.name] = Number(counts[entry.name] || 0) + 1;
     recognized += 1;
   }
-  const builtClass = WORLD_COVER_CLASSES.find((entry) => entry.name === 'built');
   for (let pixel = 0; pixel < classes.length; pixel += 1) {
-    const x = pixel % size;
-    const y = Math.floor(pixel / size);
-    let entry = classes[pixel];
-    if (entry && entry.name !== 'built') {
-      let nearbyBuilt = 0;
-      for (let oy = -2; oy <= 2; oy += 1) {
-        for (let ox = -2; ox <= 2; ox += 1) {
-          const sx = x + ox;
-          const sy = y + oy;
-          if (sx < 0 || sy < 0 || sx >= size || sy >= size) continue;
-          if (classes[sy * size + sx]?.name === 'built') nearbyBuilt += 1;
-        }
-      }
-      if (nearbyBuilt >= 12) entry = builtClass;
-    }
-    classes[pixel] = entry;
+    const entry = classes[pixel];
     surfaceMaterialClasses[pixel] = terrainSurfaceClassForWorldCover(
       entry?.name || '',
       Number.isFinite(bounds?.latN) && Number.isFinite(bounds?.latS)
@@ -455,6 +467,9 @@ async function createSemanticTexture(blob, size, bounds = null) {
     }
   }
   return {
+    classIds: numeric ? classIds : null,
+    dataAuthority: numeric ? 'esa-worldcover-v200-categorical' : 'esa-worldcover-display-color-fallback',
+    deliveryProvider: numeric ? 'microsoft-planetary-computer' : 'esa-worldcover-wms',
     surfaceTints: buildSmoothedSurfaceTints(classes, size),
     surfaceTintSize: size,
     surfaceTintEncodingScale: SURFACE_TINT_ENCODING_SCALE,
@@ -471,7 +486,7 @@ async function createSemanticTexture(blob, size, bounds = null) {
 export async function loadWorldCoverBaseline(bounds, options = {}) {
   if (!worldCoverSupportsBounds(bounds) || typeof document === 'undefined') return null;
   const size = Math.max(32, Math.min(128, Math.round(Number(options.size) || DEFAULT_TEXTURE_SIZE)));
-  const key = String(options.key || worldCoverTileKey(bounds, size));
+  const key = `categorical-v200-v1:${size}:${String(options.key || worldCoverTileKey(bounds, size))}`;
   const loaded = await fetchWorldCoverBlob(
     bounds,
     size,

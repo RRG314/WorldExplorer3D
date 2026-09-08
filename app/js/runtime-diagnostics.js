@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { getModelAssetRuntimeMetrics } from './assets/model-asset-runtime.js?v=1';
+import { buildingExteriorMaterialPoolSnapshot } from './engine/building-facade-materials.js?v=16';
 
 const diagnosticsParams = new URLSearchParams(globalThis.location?.search || '');
 // Production-like local runs must behave exactly like the deployed build.
@@ -721,6 +721,27 @@ function transportStructureSnapshot() {
         z: numberOrNull(Number(point?.z)),
         terrainMode: String(road?.structureSemantics?.terrainMode || ''),
         verticalOrder: Number(road?.structureSemantics?.verticalOrder || 0),
+        assembly: {
+          width: numberOrNull(Number(road?.transportStructureAssembly?.width)),
+          total: numberOrNull(Number(road?.transportStructureAssembly?.total)),
+          baseThickness: numberOrNull(Number(road?.transportStructureAssembly?.baseThickness)),
+          surfaceSamples: Number(road?.transportStructureAssembly?.surfaceSamples?.length || 0),
+          supportStations: Number(road?.transportStructureAssembly?.supportStations?.length || 0),
+          terminalSupports: Number(road?.transportStructureAssembly?.terminalSupports?.length || 0),
+          abutments: Number(road?.transportStructureAssembly?.abutments?.length || 0),
+          endpointSamples: (road?.transportStructureAssembly?.surfaceSamples || [])
+            .filter((sample) => atStart
+              ? Number(sample?.distance) <= 18
+              : Number(road?.transportStructureAssembly?.total) - Number(sample?.distance) <= 18)
+            .map((sample) => ({
+              distance: numberOrNull(Number(sample?.distance)),
+              surfaceY: numberOrNull(Number(sample?.y)),
+              terrainY: numberOrNull(Number(sample?.terrainY)),
+              clearance: numberOrNull(Number(sample?.undersideClearance)),
+              thickness: numberOrNull(Number(sample?.thickness)),
+              onMappedWater: sample?.onMappedWater === true
+            }))
+        },
         abutmentPublished,
         terminalSupportPublished,
         supportWithinEndpointRun,
@@ -920,12 +941,39 @@ function transportStructureSnapshot() {
       allMappedRoadsSteepest: gradeProfiles.slice(0, 24)
     },
     roadSurfaceIntegrity: appCtx.transportSurfacePublication?.roadSurfaceIntegrity || null,
+    roadTerrainConformance: appCtx.transportSurfacePublication?.roadTerrainConformance || null,
     atGradeTerrainAuthority,
     visualMeshes: visuals.length,
     attachedVisualMeshes: visuals.filter((mesh) => !!mesh?.parent).length,
     visibleVisualMeshes: visuals.filter((mesh) =>
       mesh?.visible !== false && !!mesh?.parent).length,
     visualTypes
+  };
+}
+
+function environmentEvidenceSnapshot() {
+  const counts = {};
+  const failures = {};
+  for (const mesh of appCtx.terrainGroup?.children || []) {
+    const kind = mesh.userData?.worldCoverResult?.dataAuthority || mesh.userData?.worldCoverStatus || 'pending';
+    counts[kind] = (counts[kind] || 0) + 1;
+    const reason = mesh.userData?.worldCoverFailureReason;
+    if (kind === 'unavailable' && reason) failures[reason] = (failures[reason] || 0) + 1;
+  }
+  const trees = appCtx.vegetationFeatures || [];
+  const focus=appCtx.activeTransportActor?.()?.position || {x:0,z:0};
+  return {
+    biome: appCtx.worldSurfaceProfile?.biome || null,
+    biomeEvidence: appCtx.worldSurfaceProfile?.biomeEvidence || null,
+    owner: appCtx.worldCoverStats?.biomeOwner || null,
+    landCoverTiles: counts,
+    landCoverFailures: failures,
+    vegetationCount: trees.length,
+    vegetationNearPlayer: trees.filter(tree=>Math.hypot(tree.x-focus.x,tree.z-focus.z)<100).length,
+    vegetationBatches: appCtx.vegetationMeshes?.length || 0,
+    vegetationModels: appCtx.vegetationModelStatus || {},
+    rendererWork: appCtx.renderer?.info ? {calls:appCtx.renderer.info.render.calls,triangles:appCtx.renderer.info.render.triangles,geometries:appCtx.renderer.info.memory.geometries,textures:appCtx.renderer.info.memory.textures} : null,
+    nearestTreeToOrigin: trees.length ? trees.reduce((nearest, tree)=>Math.min(nearest, Math.hypot(tree.x,tree.z)), Infinity) : null
   };
 }
 
@@ -1076,16 +1124,6 @@ function getWorldExplorerRuntimeDiagnostics() {
     terrainSurfaceCompilation: appCtx.terrainSurfaceProfileStats || null,
     earthResumePending: !!appCtx.earthResumePending,
     worldDetail: appCtx.worldDetailState || null,
-    modelAssets: {
-      ...getModelAssetRuntimeMetrics(),
-      playerAssetId: appCtx.Walk?.state?.characterMesh?.userData?.characterAssetId || null,
-      playerAppearanceId: appCtx.Walk?.state?.characterMesh?.userData?.characterAppearanceId || null,
-      playerCharacterAuthority: appCtx.Walk?.state?.characterMesh?.userData?.performanceProfile?.authority || null,
-      playerCharacterProfile: appCtx.Walk?.state?.characterMesh?.userData?.performanceProfile || null
-    },
-    transportVisuals: {
-      activeAircraft: appCtx.planeMode?.mesh?.userData?.performanceProfile || null
-    },
     mappedTallBuildingVisuals: mappedTallBuildingVisualSnapshot(),
     modes: {
       boat: !!appCtx.boatMode?.active,
@@ -1164,6 +1202,8 @@ function getWorldExplorerRuntimeDiagnostics() {
       }
     },
     transportStructures: transportStructureSnapshot(),
+    buildingExteriors: appCtx.buildingExteriorDetailPublication || null,
+    buildingExteriorMaterials: buildingExteriorMaterialPoolSnapshot(),
     farTerrainClipmap: appCtx.farTerrainClipmapState || null,
     quality: appCtx.renderQualityLevel || null,
     earthOrigin: {
@@ -1171,6 +1211,7 @@ function getWorldExplorerRuntimeDiagnostics() {
       lon: numberOrNull(appCtx.LOC?.lon)
     },
     terrainCache: appCtx.terrainTileCacheSnapshot?.() || null,
+    environmentEvidence: environmentEvidenceSnapshot(),
     mapTileCache: appCtx.mapTileCacheSnapshot?.() || null,
     minimapView: appCtx.getMinimapViewSnapshot?.() || null,
     groundProviderCatalog:
@@ -1296,6 +1337,7 @@ globalThis.render_game_to_text = () => JSON.stringify({
     nearestBody: appCtx.spaceFlight?._nearestBody?.name || null
   },
   spaceFlight: spaceFlightSnapshot(),
+  pirateInterception: appCtx.getPirateInterceptionSnapshot?.() || { active: false, phase: 'INACTIVE' },
   surfacePodLaunch: appCtx.surfacePodLaunchSnapshot || null,
   stagedEarthPathfinder: appCtx.getStagedEarthPodSnapshot?.() || null,
   universeNavigation: appCtx.getUniverseCourseSnapshot?.() || (appCtx.universeRuntime ? {
@@ -1317,6 +1359,7 @@ globalThis.render_game_to_text = () => JSON.stringify({
     !document.getElementById("titleScreen").classList.contains("hidden"),
   surfaceChain: surfaceChainSnapshot(),
   terrainCache: appCtx.terrainTileCacheSnapshot?.() || null,
+  environmentEvidence: environmentEvidenceSnapshot(),
   mapTileCache: appCtx.mapTileCacheSnapshot?.() || null,
   minimapView: appCtx.getMinimapViewSnapshot?.() || null,
   liveGps: appCtx.getLiveGpsSnapshot?.() || { active: false },
@@ -1332,6 +1375,7 @@ globalThis.render_game_to_text = () => JSON.stringify({
     ...(appCtx.getBlockBuilderSnapshot?.() || { enabled: false, count: 0, shared: false }),
     persistence: appCtx.getBuildPersistenceStatus?.() || null
   },
+  marylandParcels: appCtx.marylandParcelRuntimeSnapshot?.() || { status: 'idle', parcelCount: 0 },
   interior: appCtx.activeInterior ? {
     active: true,
     key: String(appCtx.activeInterior.key || ''),
@@ -1345,6 +1389,8 @@ globalThis.render_game_to_text = () => JSON.stringify({
   worldDiscovery: appCtx.worldDiscoveryRuntimeSnapshot?.() || { active: false },
   editableWorld: appCtx.editableWorldRuntimeSnapshot?.() || { active: false },
   transportStructures: transportStructureSnapshot(),
+  buildingExteriors: appCtx.buildingExteriorDetailPublication || null,
+  buildingExteriorMaterials: buildingExteriorMaterialPoolSnapshot(),
   worldCounts: {
     buildings: appCtx.buildings?.length ?? null,
     roads: appCtx.roads?.length ?? null,

@@ -3,7 +3,7 @@ import {
   buildingSeedFromIdentity,
   inferFallbackBuildingHeightMeters,
   interpretBuildingSemantics
-} from '../building-semantics.js?v=4';
+} from '../building-semantics.js?v=5';
 
 function mappedBuildingTags(properties = {}) {
   const buildingType = String(

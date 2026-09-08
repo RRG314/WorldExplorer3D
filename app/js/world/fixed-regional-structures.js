@@ -117,6 +117,7 @@ function buildExactStructureSpatialIndex(exactWays, exactNodes, originLatitude) 
     if (!family) continue;
     for (const segment of projectedStructureSegments(way, exactNodes, originLatitude)) {
       segment.structureName = normalizedStructureName(way.tags);
+      segment.layer = Number(way.tags?.layer) || 0;
       const minCellX = Math.floor((Math.min(segment.a.x, segment.b.x) - padding) / STRUCTURE_DUPLICATE_GRID_METERS);
       const maxCellX = Math.floor((Math.max(segment.a.x, segment.b.x) + padding) / STRUCTURE_DUPLICATE_GRID_METERS);
       const minCellY = Math.floor((Math.min(segment.a.y, segment.b.y) - padding) / STRUCTURE_DUPLICATE_GRID_METERS);
@@ -271,8 +272,14 @@ export function buildFixedRegionalStructureQuery(bounds, timeoutSeconds = 20) {
 
 export function retainExactRegionalStructures(data) {
   const elements = Array.isArray(data?.elements) ? data.elements : [];
+  const publishedSurfaceControlsByFeatureId = new Map();
+  for (const control of data?._transportSurfaceControls || []) {
+    for (const sourceFeatureId of control?.match?.sourceFeatureIds || []) {
+      publishedSurfaceControlsByFeatureId.set(String(sourceFeatureId), String(control?.id || ''));
+    }
+  }
   const structureWays = elements
-    .filter(isDriveableStructureWay)
+    .filter(isDriveableStructureWay);
   const structuresByEndpoint = new Map();
   for (const way of structureWays) {
     for (const nodeId of [way.nodes[0], way.nodes.at(-1)]) {
@@ -315,7 +322,10 @@ export function retainExactRegionalStructures(data) {
     if (candidates[0]) connectorSet.add(candidates[0]);
   }
   const connectorWays = [...connectorSet];
-  const ways = [...structureWays, ...connectorWays].map((way) => ({
+  const ways = [...structureWays, ...connectorWays].map((way) => {
+    const sourceFeatureId = String(way.tags?._sourceFeatureId || `osm:way:${way.id}`);
+    const publishedSurfaceControlId = publishedSurfaceControlsByFeatureId.get(sourceFeatureId) || '';
+    return ({
       ...way,
       tags: {
         ...way.tags,
@@ -324,9 +334,13 @@ export function retainExactRegionalStructures(data) {
           ? { _fixedRegionalStructure: 'exact' }
           : { _fixedRegionalStructureConnector: 'exact' }),
         _regionalContext: 'fixed-location',
-        _sourceFeatureId: way.tags?._sourceFeatureId || `osm:way:${way.id}`
+        _sourceFeatureId: sourceFeatureId,
+        ...(publishedSurfaceControlId
+          ? { _publishedTransportSurfaceControlId: publishedSurfaceControlId }
+          : {})
       }
-    }));
+    });
+  });
   const nodeIds = new Set(ways.flatMap((way) => way.nodes));
   const nodes = elements.filter(
     (element) => element?.type === 'node' && nodeIds.has(element.id)
@@ -425,7 +439,7 @@ export function mergeExactRegionalStructures(worldData, structureData) {
   };
 }
 
-function removeLiveStructuresSupersededByReviewedPack(worldData, reviewedData) {
+export function removeLiveStructuresSupersededByReviewedPack(worldData, reviewedData) {
   const reviewed = retainExactRegionalStructures(reviewedData);
   const reviewedWays = reviewed.elements.filter((element) => element?.type === 'way');
   const reviewedIds = new Set(reviewedWays.map((way) => Number(way.id)));
@@ -435,6 +449,10 @@ function removeLiveStructuresSupersededByReviewedPack(worldData, reviewedData) {
       .map((way) => normalizedStructureName(way.tags))
       .filter(Boolean)
   );
+  const worldNodes = structureNodeMap(worldData?.elements || []);
+  const reviewedNodes = structureNodeMap(reviewed.elements);
+  const originLatitude = structureProjectionOriginLatitude(worldNodes, reviewedNodes);
+  const spatialIndex = buildExactStructureSpatialIndex(reviewedWays, reviewedNodes, originLatitude);
   let supersededLiveWays = 0;
   const elements = (worldData?.elements || []).filter((element) => {
     if (element?.type !== 'way' || !isDriveableStructureWay(element)) return true;
@@ -443,6 +461,26 @@ function removeLiveStructuresSupersededByReviewedPack(worldData, reviewedData) {
     if (reviewedIds.has(Number(element.id))) return true;
     const name = normalizedStructureName(element.tags);
     if (!name || !reviewedNames.has(name)) return true;
+    // Names identify routes, not extents. Retire an exact live way only when
+    // virtually its entire alignment is replaced on the same vertical layer.
+    // A parallel carriageway, ramp, or distant same-name span must survive.
+    const segments = projectedStructureSegments(element, worldNodes, originLatitude);
+    let total = 0;
+    let matched = 0;
+    for (const segment of segments) {
+      const count = Math.max(2, Math.ceil(segment.length / 8));
+      for (let i = 0; i <= count; i += 1) {
+        const x = segment.a.x + (segment.b.x - segment.a.x) * i / count;
+        const y = segment.a.y + (segment.b.y - segment.a.y) * i / count;
+        total += 1;
+        const candidates = spatialIndex.get(structureGridKey(structureFamily(element.tags), x, y)) || [];
+        if (candidates.some((candidate) => candidate.structureName === name &&
+          candidate.layer === (Number(element.tags?.layer) || 0) &&
+          Math.abs(segment.dx * candidate.dx + segment.dy * candidate.dy) > 0.98 &&
+          pointToStructureSegmentDistance(x, y, candidate) < 3)) matched += 1;
+      }
+    }
+    if (!total || matched / total < 0.98) return true;
     supersededLiveWays += 1;
     return false;
   });
@@ -595,7 +633,7 @@ export async function completeFixedRegionalStructureLoad(options = {}) {
     // Live OSM may split the same named deck into new overlapping way ids. If
     // those enter compilation first, geometric deduplication can discard the
     // reviewed carriageways and their published surface controls. Retire only
-    // same-named live engineered ways that are not part of the reviewed pack;
+    // spatially replaced live engineered ways that are not part of the reviewed pack;
     // unrelated live roads and the reviewed ids remain intact.
     merged = removeLiveStructuresSupersededByReviewedPack(merged, reviewedLandmarkData);
     merged = mergeExactRegionalStructures(merged, reviewedLandmarkData);

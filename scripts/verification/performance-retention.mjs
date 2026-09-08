@@ -174,6 +174,9 @@ async function measureMode(client, id, sampleMs = 5_000) {
           diagnostics: {
             renderer: diagnostics.renderer || {},
             worldCounts: diagnostics.worldCounts || null,
+            // Production artifacts bundle the module graph, so source-only module
+            // URLs are intentionally absent. Keep the release measurement on the
+            // public diagnostics contract instead of importing private source.
             drawCallBreakdown: diagnostics.performance?.drawCallBreakdown || []
           }
         });
@@ -249,7 +252,13 @@ async function runDesktop() {
     const baselineCounts = walk.worldCounts;
     const releases = [];
     const reloadCounts = [];
-    const environmentCycles = auditOnly ? 0 : budgets.retention.minimumEnvironmentCycles;
+    const requestedRetentionCycles = Number(process.env.WE3D_VERIFY_RETENTION_CYCLES);
+    const environmentCycles = auditOnly
+      ? 0
+      : Math.max(
+          budgets.retention.minimumEnvironmentCycles,
+          Number.isFinite(requestedRetentionCycles) ? Math.floor(requestedRetentionCycles) : 0
+        );
     for (let cycle = 0; cycle < environmentCycles; cycle += 1) {
       await client.page.locator('#mainMenuBtn').click();
       await client.page.waitForFunction(() => {

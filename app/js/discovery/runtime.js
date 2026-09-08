@@ -1,5 +1,5 @@
 import { BUILTIN_DISCOVERY_CATALOGS, COMPANION_CATALOG, TOOL_CATALOG, validateDiscoveryCatalogs } from './catalog.js?v=4';
-import { createCompanionRuntime } from './companion-runtime.js?v=7';
+import { createCompanionRuntime } from './companion-runtime.js?v=10';
 import { auditRegionalCreatureQuality } from './creature-quality.js?v=1';
 import { createDetectorSession } from './detector-session.js?v=3';
 import { createWalkingEncounterDirector } from './encounter-director.js?v=1';
@@ -8,7 +8,7 @@ import { compileEnvironmentContext } from './environment-context.js?v=2';
 import { createFieldRetentionSnapshot } from './field-retention.js?v=2';
 import { compileFieldActivityPlan, createFieldActivitySession } from './field-activities.js?v=4';
 import { createFieldExpedition } from './field-expedition.js?v=1';
-import { ACTIVITY_TOOL, createFieldEquipmentPresentation } from './field-equipment.js?v=1';
+import { ACTIVITY_TOOL, createFieldEquipmentPresentation } from './field-equipment.js?v=4';
 import { explorerProgressSnapshot } from './explorer-events.js?v=3';
 import {
   RELEASED_EXPLORER_TOOLS,
@@ -24,14 +24,14 @@ import {
   createDiscoveryPublicationStore,
   resolveContextActions
 } from './model.js?v=1';
-import { createIndexedDbDiscoveryProfileStore } from './profile-store.js?v=4';
+import { createIndexedDbDiscoveryProfileStore } from './profile-store.js?v=5';
 import { fieldProgress, slotAvailableAtProgress } from './pacing.js?v=2';
 import { emitDiscoveryTelemetry } from './telemetry.js?v=2';
 import { sampleDiscoverySurfaceY } from './surface.js?v=1';
 import { createExplorationEntitlementService } from './tools.js?v=1';
 import { tutorialForActivity } from './tutorials.js?v=1';
 import { visualForCatalogId } from './visual-content.js?v=1';
-import { compileAmbientWildlifePlan, createAmbientWildlifeRuntime } from './wildlife-runtime.js?v=4';
+import { compileAmbientWildlifePlan, createAmbientWildlifeRuntime } from './wildlife-runtime.js?v=6';
 import { createStableWorldIdentity } from '../living-world/model.js?v=1';
 import { evaluateArEligibility } from '../ar/eligibility.js?v=2';
 import { getScreenLayoutService } from '../ui/screen-layout.js?v=2';
@@ -466,7 +466,8 @@ function createDiscoveryUi(state) {
       const owned = ownedCompanions;
       const activeTravelLabel = ['aboard', 'vehicle-occupant'].includes(companionSnapshot.presentation?.travelState)
         ? 'Riding with you'
-        : companionSnapshot.presentation?.travelState === 'waiting' ? 'Waiting for you' : 'Following';
+        : companionSnapshot.presentation?.travelState === 'protected-quarters' ? 'Traveling safely with you'
+          : companionSnapshot.presentation?.travelState === 'safe-during-exposed-travel' ? 'Rejoining after this activity' : 'Following';
       const localSuggestions = COMPANION_CATALOG.filter((catalog) =>
         FIRST_RELEASE_COMPANION_IDS.has(catalog.id) &&
         !owned.some((companion) => companion.catalogId === catalog.id) &&
@@ -503,7 +504,13 @@ function createDiscoveryUi(state) {
           ? ` · Last: +${companion.progression.lastAward.points} ${companion.progression.lastAward.label}`
           : '';
         const specialty = companion.training?.specialization ? ` · Specialty: ${companion.training.specialization}` : '';
-        return `<article class="discoveryItem${visual ? ' discoveryItemVisual' : ''}">${visual ? `<img src="${escapeHtml(visual.image)}" alt="${escapeHtml(visual.alt)}" loading="lazy"><div>` : ''}<strong>${escapeHtml(companion.name)}${companion.active ? ' · Active' : ''}</strong><small>${escapeHtml(`Level ${level} · ${companion.progression?.trustState || 'Comfortable'} · ${nextLevel}${specialty}${lastAward}`)}</small><div class="discoveryCompanionActions"><button class="${companion.active ? 'active' : ''}" data-companion-action="activate" data-companion-id="${escapeHtml(companion.instanceId)}" type="button" ${companion.active ? 'disabled' : ''}>${companion.active ? activeTravelLabel : 'Set active'}</button><button data-companion-action="care" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Care</button>${level >= 2 ? `<button data-companion-action="recall-training" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Practice Recall</button>` : ''}<button class="discoveryArLaunch" data-companion-action="ar" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">View in AR</button></div>${visual ? '</div>' : ''}</article>`;
+        const residence = companion.active
+          ? activeTravelLabel
+          : companion.residence?.state === 'at-home' ? 'At home'
+            : companion.residence?.state === 'home-pending' ? 'Home not chosen yet' : 'Safe with the companion care network';
+        const starterLabel = companion.isStarterCompanion ? ' · First companion' : '';
+        const rename = `<div class="discoveryCompanionName"><label>${companion.nameStatus === 'default' ? 'Name your dog' : 'Companion name'}<input data-companion-name maxlength="24" autocomplete="off" value="${escapeHtml(companion.name)}"></label><button data-companion-action="rename" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">${companion.nameStatus === 'default' ? 'Choose Name' : 'Rename'}</button></div>`;
+        return `<article class="discoveryItem${visual ? ' discoveryItemVisual' : ''}">${visual ? `<img src="${escapeHtml(visual.image)}" alt="${escapeHtml(visual.alt)}" loading="lazy"><div>` : ''}<strong>${escapeHtml(companion.name)}${companion.active ? ' · Active' : ''}${starterLabel}</strong><small>${escapeHtml(`Level ${level} · ${companion.progression?.trustState || 'Comfortable'} · ${residence} · ${nextLevel}${specialty}${lastAward}`)}</small>${rename}<div class="discoveryCompanionActions"><button class="${companion.active ? 'active' : ''}" data-companion-action="activate" data-companion-id="${escapeHtml(companion.instanceId)}" type="button" ${companion.active ? 'disabled' : ''}>${companion.active ? activeTravelLabel : 'Travel together'}</button>${companion.active ? `<button data-companion-action="leave-home" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Leave at home</button>` : ''}<button data-companion-action="care" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Care</button>${level >= 2 ? `<button data-companion-action="recall-training" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">Practice Recall</button>` : ''}<button class="discoveryArLaunch" data-companion-action="ar" data-companion-id="${escapeHtml(companion.instanceId)}" type="button">View in AR</button></div>${visual ? '</div>' : ''}</article>`;
       }).join('') : '<div class="discoveryEmpty">Explore animal-friendly places to meet a potential companion.</div>';
     }
     if (elements.progress) {
@@ -787,7 +794,8 @@ function createDiscoveryUi(state) {
     }
     // A field lead is an invitation, not a permanent HUD layer. Keep the
     // underlying lead available in Explorer after this short notice expires.
-    const showEncounterLead = encounterPromptEligible && promptNow - encounterPromptShownAt < 7000;
+    const preferredNoticeMs = globalThis.getWorldExplorerAccessibilityNoticeMs?.(7000) ?? 7000;
+    const showEncounterLead = encounterPromptEligible && (!Number.isFinite(preferredNoticeMs) || promptNow - encounterPromptShownAt < preferredNoticeMs);
     elements.prompt?.classList.toggle('show', showEncounterLead);
     if (elements.prompt) {
       elements.prompt.dataset.tone = encounterLead?.tone || 'field';
@@ -964,7 +972,8 @@ async function syncTrustedReceipt(appCtx, profileStore, item) {
       catalogVersion: BUILTIN_DISCOVERY_CATALOGS.version
     });
     const updated = await profileStore.applyTrustedReceipt?.(item.instanceId, receipt);
-    appCtx.worldDiscoveryRuntime?.ui?.refreshData?.();
+    const discoveryUi = appCtx.worldDiscoveryRuntime?.ui;
+    if (discoveryUi?.open) void discoveryUi.refreshData?.();
     return updated;
   } catch (error) {
     console.warn('[world-discovery] Trusted receipt sync deferred:', error?.message || error);
@@ -1049,6 +1058,7 @@ function disposeWorldDiscoveryRuntime(appCtx, reason = 'world-reload') {
   appCtx.handleWorldDiscoveryToolUse = null;
   if (appCtx.recordFishingExplorerCatch === state.recordFishingExplorerCatch) appCtx.recordFishingExplorerCatch = null;
   if (appCtx.recordExplorerEvent === state.recordExplorerEvent) appCtx.recordExplorerEvent = null;
+  if (appCtx.assignCompanionPrimaryHome === state.assignCompanionPrimaryHome) appCtx.assignCompanionPrimaryHome = null;
   if (appCtx.resolveCharacterCapability === state.resolveCharacterCapability) appCtx.resolveCharacterCapability = null;
   return true;
 }
@@ -1251,7 +1261,10 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     });
     if (result?.recorded) {
       await state.refreshToolProgress?.();
-      await state.ui?.refreshData?.();
+      // The Explorer panel reloads current data whenever it opens. Rebuilding
+      // all hidden Journal, Guide, companion, and profile markup here made a
+      // background world-visit receipt compete with first-play rendering.
+      if (state.ui?.open) await state.ui.refreshData?.();
     }
     return result || { recorded: false, reason: 'event-store-unavailable' };
   };
@@ -1494,10 +1507,16 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       });
     }
   });
+  state.assignCompanionPrimaryHome = (homeId) => state.companionRuntime.assignPrimaryHome(homeId);
+  appCtx.assignCompanionPrimaryHome = state.assignCompanionPrimaryHome;
   if (appCtx.developerDiagnosticsEnabled) {
     state.companionSupportHook = Object.freeze({
       adopt: (catalogId, options = {}) => state.companionRuntime.adopt(catalogId, options),
       awardXp: (receiptId, reasonId) => state.companionRuntime.awardXp({ receiptId, reasonId }),
+      care: (instanceId, interaction = 'feed') => state.companionRuntime.care(instanceId, interaction),
+      assignPrimaryHome: (homeId) => state.companionRuntime.assignPrimaryHome(homeId),
+      leaveAtHome: (instanceId) => state.companionRuntime.leaveAtHome(instanceId),
+      rename: (instanceId, name) => state.companionRuntime.rename(instanceId, name),
       encounters: () => Object.freeze([...state.companionEncounters.values()].map((entry) => Object.freeze({ ...entry }))),
       encounterExercise: () => state.companionExercise ? Object.freeze({
         type: state.companionExercise.type,
@@ -1745,7 +1764,35 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       emitDiscoveryTelemetry('companion_adopted', { result: 'befriended', contextBands: telemetryContextBands() });
       appCtx.showToast?.(`${companion.name} joined you.`);
     }
-    else if (action === 'activate') await state.companionRuntime.setActive(instanceId);
+    else if (action === 'activate') {
+      await state.companionRuntime.setActive(instanceId);
+      const active = state.companionRuntime.snapshot().companions.find((entry) => entry.active);
+      if (active) appCtx.showToast?.(`${active.name} is traveling with you.`);
+    }
+    else if (action === 'leave-home') {
+      const companion = state.companionRuntime.snapshot().companions.find((entry) => entry.instanceId === String(instanceId));
+      if (!companion || !await state.companionRuntime.leaveAtHome(instanceId)) return false;
+      appCtx.showToast?.(companion.residence?.homeId ? `${companion.name} is safe at home.` : `${companion.name} is safe with the companion care network until you choose a home.`);
+    }
+    else if (action === 'rename') {
+      const result = await state.companionRuntime.rename(instanceId, requestedName);
+      if (!result?.renamed) {
+        appCtx.showToast?.(result?.reason === 'unchanged' ? 'That is already this companion’s name.' : 'Choose a name first.');
+        return false;
+      }
+      if (result.firstStarterNaming) {
+        await state.recordExplorerEvent({
+          eventId: 'event:achievement:starter-dog-named:v1',
+          eventType: 'achievement-earned', sourceSystem: 'companions',
+          sourceId: result.companion.instanceId, pathId: 'companion',
+          name: 'Best Friend',
+          detail: `Named the first dog ${result.companion.name}.`,
+          firstCompletion: true, points: 1, progressReason: 'first-dog-named',
+          metadata: { achievementId: 'best-friend', companionInstanceId: result.companion.instanceId }
+        });
+        appCtx.showToast?.(`Achievement unlocked · Best Friend · ${result.companion.name}`);
+      } else appCtx.showToast?.(`Companion renamed ${result.companion.name}.`);
+    }
     else if (action === 'care') {
       const companion = state.companionRuntime.snapshot().companions.find((entry) => entry.instanceId === String(instanceId));
       if (!companion) return false;
@@ -2054,13 +2101,6 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
         const resultRecord = item || outcome?.event || null;
         applyDiscoveryWorldEdit(appCtx, resultRecord, position);
         void syncTrustedReceipt(appCtx, profileStore, item);
-        if (recorded) emitDiscoveryTelemetry('discovery_recorded', {
-          activityId: state.activeActivityId,
-          catalogFamily: resultRecord?.family,
-          discipline: resultRecord?.specialtyId || resultRecord?.discipline,
-          contextBands: telemetryContextBands(),
-          result: outcome?.collected ? 'collected' : 'recorded'
-        });
         if (recorded) {
           await state.awardActiveCompanionForField?.(
             resultRecord?.eventId || resultRecord?.claimId || resultRecord?.instanceId || completedSlot?.claimId,
@@ -2068,6 +2108,17 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
           );
           discoveryHaptic([18, 36, 28]);
           state.ui.showResult(outcome);
+          // Publish onboarding/progression only after its visible result is in
+          // the DOM. Otherwise the tutorial can advance to “review” while the
+          // awaited companion reward is still resolving, leaving an empty
+          // completion card for the player.
+          emitDiscoveryTelemetry('discovery_recorded', {
+            activityId: state.activeActivityId,
+            catalogFamily: resultRecord?.family,
+            discipline: resultRecord?.specialtyId || resultRecord?.discipline,
+            contextBands: telemetryContextBands(),
+            result: outcome?.collected ? 'collected' : 'recorded'
+          });
         }
       }
       state.lastSnapshot = state.fieldSession.snapshot(position);
@@ -2099,17 +2150,17 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       const instanceId = state.session.snapshot(position).collectionResult?.instanceId;
       const item = (await profileStore.listItems(200)).find((entry) => entry.instanceId === instanceId);
       void syncTrustedReceipt(appCtx, profileStore, item);
-      if (recorded) emitDiscoveryTelemetry('discovery_recorded', {
-        activityId: 'metal-detect',
-        catalogFamily: item?.family,
-        discipline: item?.discipline,
-        contextBands: telemetryContextBands(),
-        result: 'collected'
-      });
       if (recorded) {
         await state.awardActiveCompanionForField?.(item?.eventId || item?.claimId || item?.instanceId, item?.firstIdentification === true);
         discoveryHaptic([20, 35, 40]);
         state.ui.showResult(state.session.snapshot(position).collectionResult);
+        emitDiscoveryTelemetry('discovery_recorded', {
+          activityId: 'metal-detect',
+          catalogFamily: item?.family,
+          discipline: item?.discipline,
+          contextBands: telemetryContextBands(),
+          result: 'collected'
+        });
       }
     }
     state.detectorSnapshot = state.session.snapshot(position);
@@ -2142,7 +2193,10 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
   appCtx.worldDiscoveryPublication = publication;
   appCtx.worldDiscoveryRuntime = state;
   appCtx.worldDiscoveryRuntimeSnapshot = () => worldDiscoveryRuntimeSnapshot(appCtx);
-  void hydrateSignedInReceipts(appCtx, profileStore, claimedIds).then(() => state.ui?.refreshData?.());
+  void hydrateSignedInReceipts(appCtx, profileStore, claimedIds).then(() => {
+    if (state.ui?.open) return state.ui.refreshData?.();
+    return null;
+  });
   appCtx.toggleWorldDiscoveryJournal = (force) => {
     const next = typeof force === 'boolean' ? force : !state.ui.open;
     state.ui.setOpen(next);

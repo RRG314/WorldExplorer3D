@@ -1,0 +1,55 @@
+{
+  "source": "https://quaternius.itch.io/stylized-nature-megakit",
+  "author": "Quaternius",
+  "license": "CC0-1.0",
+  "modifications": "Selected models converted to self-contained GLB; textures resized to512px; distant tree LODs simplified with bark-only spatial reduction.",
+  "assets": [
+    {
+      "id": "pine",
+      "sourceModel": "Pine_5",
+      "bytes": 915516,
+      "sha256": "e3d4c106db55dd799ff5f436150d3cd8854b90cd89fc97389a6370b0d598a942",
+      "triangles": 1646,
+      "lod": {
+        "file": "pine-lod.glb",
+        "bytes": 874608,
+        "sha256": "655cb27212e044dafdd001b799da522aa145b5d4bff7e434a5bc4f8e7e52a6f9",
+        "triangles": 997
+      }
+    },
+    {
+      "id": "broadleaf",
+      "sourceModel": "CommonTree_5",
+      "bytes": 1091328,
+      "sha256": "6d8530161fbe9b25414796a9e5ca7fab3f6e3c5e32e3506ee4808931d46ec401",
+      "triangles": 3182,
+      "lod": {
+        "file": "broadleaf-lod.glb",
+        "bytes": 985232,
+        "sha256": "90dcd4cd3f1e341e48ba5c61f603d39689d1c46f9e95bedcf90ce0864c3ba837",
+        "triangles": 1772
+      }
+    },
+    {
+      "id": "shrub",
+      "sourceModel": "Bush_Common",
+      "bytes": 138780,
+      "sha256": "df06919f95e25891b6ee2dacc61ac5ebccf591f25fa959d6e1f5c60cce884dbe",
+      "triangles": 900
+    },
+    {
+      "id": "fern",
+      "sourceModel": "Fern_1",
+      "bytes": 304116,
+      "sha256": "1cd4a83099375d4f14dcc76a31c194f3547d6171c242d0de5aa54927cd67859d",
+      "triangles": 288
+    },
+    {
+      "id": "grass",
+      "sourceModel": "Grass_Common_Tall",
+      "bytes": 42120,
+      "sha256": "d92d616a6c448dedcc3d31ea25664ddbec4f6dace1f1164f7d9b160135d58fbf",
+      "triangles": 326
+    }
+  ]
+}

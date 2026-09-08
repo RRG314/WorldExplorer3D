@@ -30,7 +30,7 @@ try {
   await page.getByRole('button', { name: 'Explore', exact: true }).click();
   await page.waitForFunction(() => {
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.();
-    return diagnostics?.gameStarted && !diagnostics.worldLoading && diagnostics.aviation?.fleetCount === 5;
+    return diagnostics?.gameStarted && !diagnostics.worldLoading && diagnostics.aviation?.fleetCount >= 5;
   }, null, { timeout: 360_000 });
 
   const initial = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.());
@@ -39,6 +39,7 @@ try {
   assert.equal(await page.evaluate((id) => globalThis.__WE3D_AVIATION_SUPPORT__?.moveNear(id), helicopter.id), true);
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().aviation?.interaction?.data?.aircraftId?.endsWith('utility-helicopter'));
   await page.keyboard.press('KeyE');
+  await page.locator('dialog.airport-hub[open] .airport-hub__primary').click();
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.identity?.catalogId === 'utility-helicopter');
   const start = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor);
 

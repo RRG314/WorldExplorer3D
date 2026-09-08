@@ -74,6 +74,7 @@ const openOceanSurfaceSuppression = createSurfaceLayerSuppression(() => [
   ...(appCtx.vegetationMeshes || []),
   ...(appCtx.streetFurnitureMeshes || []),
   ...(appCtx.structureVisualMeshes || []),
+  ...(appCtx.buildingExteriorDetailMeshes || []),
   ...(appCtx.poiMeshes || [])
 ]);
 

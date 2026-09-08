@@ -1,0 +1,30 @@
+{
+  "asset": "snow_02",
+  "author": "Rob Tuytel",
+  "license": "CC0",
+  "page": "https://polyhaven.com/a/snow_02",
+  "physicalWidthMeters": 2,
+  "files": [
+    {
+      "name": "snow_02_diffuse.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/snow_02/snow_02_diff_1k.jpg",
+      "sourceMd5": "fc54766c6b36ff298699115a619d440b",
+      "bytes": 38490,
+      "sha256": "390904af856af9f892148128adbc2bbb7ab0f484b78bd93759042df2e8b9c1cb"
+    },
+    {
+      "name": "snow_02_normal.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/snow_02/snow_02_nor_gl_1k.jpg",
+      "sourceMd5": "f16b5701f9ad521cdd6af10c1d6d2b48",
+      "bytes": 80368,
+      "sha256": "02ac1460873fcedcfe5ab41ef90f399a9c7b63c15261c7158cd35e893a9b1eab"
+    },
+    {
+      "name": "snow_02_roughness.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/snow_02/snow_02_rough_1k.jpg",
+      "sourceMd5": "1dbae0269e53dbf80d4fd1c4335f25a2",
+      "bytes": 18845,
+      "sha256": "7dae5c07723890e17afe477ad15ffe75982ef2fde5f04fee9845e68427928922"
+    }
+  ]
+}

@@ -21,6 +21,14 @@ page.on('response', (response) => {
 });
 
 const diagnostics = () => page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.() || {});
+async function waitForCameraRecenter(maximumHeadingDegrees, timeoutMs) {
+  await page.waitForFunction((maximumHeading) => {
+    const camera = globalThis.getWorldExplorerRuntimeDiagnostics?.().cameraFollow;
+    return Number(camera?.headingAlignmentDegrees) < maximumHeading &&
+      Number(camera?.trailingDistance) > 2;
+  }, maximumHeadingDegrees, { timeout: timeoutMs }).catch(() => {});
+  return diagnostics();
+}
 const distance = (a, b) => Math.hypot(Number(a?.x) - Number(b?.x), Number(a?.z) - Number(b?.z));
 // Walking is calibrated near a normal human pace. These journeys must prove
 // sustained directional movement without assuming vehicle-like displacement.
@@ -294,8 +302,7 @@ try {
   const planeControlled = await diagnostics();
   await touchDrag('#mobileLookPad', 42, 0, 900);
   const planeLooked = await diagnostics();
-  await page.waitForTimeout(3_000);
-  const planeRecentered = await diagnostics();
+  const planeRecentered = await waitForCameraRecenter(7, 6_000);
   await page.screenshot({ path: 'output/verification/mobile-controls/plane-standard-mobile.png', fullPage: true });
 
   await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });

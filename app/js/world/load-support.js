@@ -1,6 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { appendUpwardRibbonGeometry } from "../road-render.js?v=4";
-import { generateStreetFurniture } from "./furniture.js?v=18";
+import { generateStreetFurniture } from "./furniture.js?v=22";
 import { yieldToMainThread } from "./cooperative-scheduling.js?v=1";
 
 export function recordWorldLoadWarning(loadMetrics, label, err) {
@@ -167,6 +167,14 @@ export function createSyntheticFallbackWorld(options = {}) {
     arr.forEach((mesh) => {
       if (!mesh) return;
       mesh.parent?.remove?.(mesh);
+      if (mesh.userData?.vegetationAuthority === 'curated-model-cell-lod') {
+        mesh.traverse?.((object)=>{
+          object.geometry?.dispose?.();
+          const materials=Array.isArray(object.material) ? object.material : [object.material];
+          materials.forEach(material=>material?.dispose?.());
+        });
+        return;
+      }
       if (mesh.geometry && typeof mesh.geometry.dispose === 'function') mesh.geometry.dispose();
       if (mesh.material) {
         if (Array.isArray(mesh.material)) {
@@ -447,7 +455,7 @@ export function buildPoiGeometryPass(options = {}) {
       appCtx.pois.push({
         x: pos.x,
         z: pos.z,
-        sourceFeatureId: node.id ? String(node.id) : '',
+        sourceFeatureId: String(tags._sourceFeatureId || node.sourceFeatureId || (node.type && node.id ? `${node.type}:${node.id}` : node.id || '')),
         type: poiKey,
         name: tags.name || poiData.category,
         lodTier: poiTier,
@@ -459,6 +467,16 @@ export function buildPoiGeometryPass(options = {}) {
         retrievedAt: tags._we3dRetrievedAt || node.retrievedAt || '',
         regionalPackId: tags._we3dRegionalPackId || node.regionalPackId || '',
         regionalPackVersion: tags._we3dRegionalPackVersion || node.regionalPackVersion || '',
+        tags: {
+          amenity: tags.amenity || '',
+          shop: tags.shop || '',
+          healthcare: tags.healthcare || '',
+          leisure: tags.leisure || '',
+          tourism: tags.tourism || '',
+          emergency: tags.emergency || '',
+          opening_hours: tags.opening_hours || '',
+          name: tags.name || ''
+        },
         ...poiData
       });
 

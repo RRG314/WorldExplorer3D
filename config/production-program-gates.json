@@ -1,97 +1,99 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "programId": "world-explorer-5.2-release-2026-09-03",
   "targetVersion": "5.2.0",
   "productionBaseline": {
-    "version": "5.1.0",
-    "releaseCommit": "a4bc3247b3fccf209f558710f7f960a0d859c247"
+    "version": "5.2.0",
+    "releaseCommit": "a5f7d7372731d7b5697821437d2ebec307f8ecf8"
   },
   "roadmap": "ROADMAP.md",
   "acceptanceContract": "RELEASE_NOTES_5.2.0.md",
   "deploymentRequiresExplicitUserApproval": true,
-  "requiredCompleteStatus": "complete",
-  "statusDefinitions": ["complete", "in-progress", "partial", "not-implemented"],
+  "statusAuthority": "current-execution-evidence",
+  "requiredExecutionScopes": ["candidate", "backend"],
+  "executionGateRequirements": {
+    "CP0": ["source-graph", "artifact-world", "explorer-browser"],
+    "CP1": ["assembled-worlds", "assembled-fallback", "provider-release"],
+    "CP2": ["assembled-worlds", "actors-vehicles", "terrain-boundary"],
+    "CP3": ["interiors", "poi-lifecycle"],
+    "CP4": ["tutorial-controls", "mobile-controls", "commerce-coherence"],
+    "CP5": ["urban-sandbox", "urban-equipment", "actors-vehicles"],
+    "CP6": ["commerce-coherence", "world-economy", "maryland-parcels"],
+    "CP7": ["live-gps", "walking-field", "regional-world"],
+    "CP8": ["fishing", "fishing-recovery", "environments"],
+    "CP9": ["gameplay-menu", "hotbar-actions", "backend"],
+    "CP10": ["mobile-load", "performance", "space-release"],
+    "CP11": ["accessibility", "mobile-controls", "space-release", "artifact-integrity", "release-identity", "backend"]
+  },
   "checkpoints": {
     "CP0": {
       "name": "Current feature evidence",
-      "status": "complete",
       "minimumDecision": "Retain only public feature claims backed by current source evidence and fresh normal-input journeys on the immutable 5.2 candidate.",
       "requiredCommands": ["verify:source", "verify:world", "verify:artifact-runtime", "verify:release-claims", "verify:explorer-coherence-browser", "verify:regional-guide-new-york"],
       "openItems": []
     },
     "CP1": {
       "name": "Deterministic fixed world",
-      "status": "complete",
       "minimumDecision": "Retain the production fixed-location Earth authority with deterministic Shortbread transport, optional exact Overpass gap-fill, and explicit forced-outage evidence at the representative release locations.",
       "requiredCommands": ["verify:world", "verify:assembled-locations", "verify:assembled-locations-fallback", "verify:provider-release"],
       "openItems": []
     },
     "CP2": {
       "name": "Worldwide transport and vehicle contact",
-      "status": "complete",
       "minimumDecision": "Retain the compiled road/bridge/tunnel authority, reviewed bridge spans over mapped water, mapped share-link road identity, and measured four-wheel vehicle contact without claiming geometry beyond published provider data.",
       "requiredCommands": ["verify:assembled-locations", "verify:actors-vehicles", "verify:jfx-player-surface"],
       "openItems": []
     },
     "CP3": {
       "name": "Buildings, facades, entrances, and interiors",
-      "status": "complete",
       "minimumDecision": "Retain mapped indoor geometry on each available source level and generated fallback floors with working stairs, elevator, collision, keyboard/touch entry, exit recovery, and reload teardown. Explicit mapped connector semantics and moderated indoor overlay publication remain staged beyond 5.1 and are not public claims.",
       "requiredCommands": ["verify:world", "verify:assembled-locations", "verify:interiors"],
       "openItems": []
     },
     "CP4": {
       "name": "Player, Backpack, Journal, progression, and controls",
-      "status": "complete",
       "minimumDecision": "Ship one Explorer event and profile authority across the Backpack, Journal, Field Guide, fieldwork, games, making, travel, community, and companions; retain tested touch profiles with reset and reload recovery. Full cross-device Journal sync and per-action remapping remain staged and are not 5.2 claims.",
       "requiredCommands": ["verify:player-state", "verify:urban-equipment", "verify:mobile-controls", "verify:field-retention-ui", "verify:explorer-coherence", "verify:discovery-receipts", "verify:explorer-coherence-browser"],
       "openItems": []
     },
     "CP5": {
       "name": "Urban Sandbox",
-      "status": "complete",
       "minimumDecision": "Retain the equipment, vehicle, responder, custody, mapped-facility, and room-authority journeys proven by normal input. Universal full-body embodiment and broader sandbox simulation remain staged and are not 5.1 claims.",
       "requiredCommands": ["verify:urban-sandbox", "verify:urban-equipment", "verify:actors-vehicles", "verify:multiplayer"],
       "openItems": []
     },
     "CP6": {
       "name": "Missions, engagement, crafting, and economy",
-      "status": "complete",
       "minimumDecision": "Retain Field Today, daily and weekly Expeditions, seasonal surveys, progression, and existing games in the same Explorer Journal. Credits, mapped-business exchange, connected property transactions, and conserved Earth-to-ship materials must use the existing Backpack, cargo, property, and backend authorities.",
       "requiredCommands": ["verify:mission-lifecycle", "verify:retention-release", "verify:field-retention-ui", "verify:explorer-coherence", "verify:world-economy", "verify:connected-property-backend", "audit:release-claims"],
       "openItems": []
     },
     "CP7": {
       "name": "Live GPS Field Expeditions and regional ecology",
-      "status": "complete",
       "minimumDecision": "Retain the reviewed Baltimore 60-taxon slice and add ten source-bounded 12-entry regional slices so every built-in Earth destination has attainable field play. Expansion entries remain reference presentation unless media or models are separately reviewed; make no worldwide ecology, abundance, or live-animal-presence claim.",
       "requiredCommands": ["verify:live-gps-authority", "verify:live-gps", "verify:walking-encounters", "verify:regional-ecology", "verify:regional-world-richness", "verify:regional-guide-new-york", "verify:field-evidence", "verify:game-language", "verify:field-retention-ui", "verify:creature-quality"],
       "openItems": []
     },
     "CP8": {
       "name": "Water, Ocean, fishing, and environmental evidence",
-      "status": "complete",
       "minimumDecision": "Ship one honest shore/boat virtual fishing authority; connect underwater schools before describing water fish as unified.",
       "requiredCommands": ["verify:fish-population", "verify:shore-fishing", "verify:unified-fishing", "verify:fishing-loss-recovery", "verify:underwater-fish", "verify:environments"],
       "openItems": []
     },
     "CP9": {
       "name": "Multiplayer and Quick Build",
-      "status": "complete",
       "minimumDecision": "Retain authenticated rooms and one Quick Build path for persistent local and room Blocks. The removed game editor and unfinished overlay-authoring interface must not be loaded or presented as released features.",
       "requiredCommands": ["verify:multiplayer", "verify:block-local-store", "verify:block-shared-sync", "verify:gameplay-menu", "verify:hotbar-actions"],
       "openItems": []
     },
     "CP10": {
       "name": "Performance, memory, and data use",
-      "status": "complete",
       "minimumDecision": "Enforce numeric budgets on the physical Apple M1/8 GB desktop and a clearly labeled 390x844 Chrome touch-regression tier; do not claim physical-phone battery, thermal, or sustained FPS evidence until a phone is measured.",
       "requiredCommands": ["verify:performance-retention", "verify:space-memory-lifecycle", "verify:assembled-locations", "verify:environments"],
       "openItems": []
     },
     "CP11": {
       "name": "UI, accessibility, presentation, and release identity",
-      "status": "complete",
       "minimumDecision": "Require keyboard and 390x844 touch completion of every retained primary flow, honest public claims, inspected runtime captures, and one immutable 5.2 identity.",
       "requiredCommands": ["verify:accessibility-release", "verify:mobile-controls", "verify:player-reported-blockers", "verify:connected-explorer-journey", "verify:current-space-journey", "verify:landing-user-count", "verify:analytics-lifecycle", "verify:release-claims", "verify:source", "verify:hosting", "verify:release-identity", "release:verify"],
       "openItems": []

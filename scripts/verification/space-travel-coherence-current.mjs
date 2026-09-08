@@ -59,10 +59,10 @@ async function saveIncompleteExpedition(page) {
 
 async function verifyPathfinderAndInterior(page) {
   assert.equal(await saveIncompleteExpedition(page), 'insufficient');
-  await page.locator('#exploreBtn').click();
+  await page.locator('#travelBtn').click();
   await page.waitForTimeout(1_500);
-  assert.equal(await page.locator('#exploreMenu').evaluate((menu) => menu.classList.contains('open')), true, 'Exploration menu flickered closed without player input.');
-  const copy = await page.locator('#exploreMenu .floatItems').textContent();
+  assert.equal(await page.locator('#travelMenu').evaluate((menu) => menu.classList.contains('open')), true, 'Travel menu flickered closed without player input.');
+  const copy = await page.locator('#travelMenu .floatItems').textContent();
   assert.match(copy, /Deploy Pathfinder Pod/i);
   assert.match(copy, /Board Solis Reach/i);
   assert.match(copy, /Free Space Flight/i);
@@ -182,7 +182,7 @@ async function verifyPathfinderAndInterior(page) {
 }
 
 async function verifyFreeFlight(page) {
-  await page.locator('#exploreBtn').click();
+  await page.locator('#travelBtn').click();
   await page.locator('#fSpaceRocket').click();
   await page.waitForFunction(() => {
     const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');

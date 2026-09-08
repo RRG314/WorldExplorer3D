@@ -1,13 +1,17 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { ensurePlayerBackpackInventory } from '../urban-sandbox/equipment-model.js?v=9';
-import { createLocalCommerceModel } from '../urban-sandbox/commerce-model.js?v=3';
+import { ensurePlayerBackpackInventory } from '../urban-sandbox/equipment-model.js?v=10';
+import { createLocalCommerceModel } from '../urban-sandbox/commerce-model.js?v=5';
 import { createHousingModel, makeHomeCandidates } from '../real-estate/housing-model.js?v=2';
-import { createConnectedPropertyAuthority } from '../real-estate/connected-property-authority.js?v=2';
+import { createConnectedPropertyAuthority } from '../real-estate/connected-property-authority.js?v=3';
+import { createConnectedExplorerWallet } from '../economy/connected-wallet-authority.js?v=2';
 import { getCurrentUser } from '../../../js/auth-ui.js?v=55';
 import { getCurrentRoom } from '../multiplayer/rooms.js?v=67';
 import { postActivity } from '../multiplayer/loop.js?v=56';
 import { createNavigationRoute, describeDestinationEntrySupport, getNavigationTargetForDestination } from './navigation-ui.js?v=1';
 import { escapeHtml, sanitizeHttpUrl } from './ui-utils.js?v=1';
+import { isLikelyMarylandCoordinate } from '../gis/maryland-parcel-core.js?v=1';
+import { loadMarylandParcels, marylandParcelProviderSnapshot } from '../gis/maryland-parcel-provider.js?v=1';
+import { makeParcelPropertyCandidates, parcelBuildPermissionAt } from '../real-estate/parcel-property-model.js?v=1';
 
 let activeView = 'home';
 let housing = null;
@@ -19,6 +23,9 @@ let marketLoading = false;
 let propertyEventsBound = false;
 let nearbyVisibleLimit = 24;
 const PROPERTY_INTERACTION_RADIUS = 55;
+let parcelBoundaryGroup = null;
+let parcelRequestSequence = 0;
+let parcelRuntime = Object.freeze({ status: 'idle', sourceId: 'maryland-imap-parcels', parcelCount: 0 });
 
 function actorPosition() {
   if (appCtx.Walk?.state?.mode === 'walk' && appCtx.Walk?.state?.walker) return appCtx.Walk.state.walker;
@@ -61,6 +68,21 @@ function worldToGeo(x, z) {
   return { lat: baseLat - Number(z || 0) / scale, lon: baseLon + Number(x || 0) / (scale * cosLat) };
 }
 
+function geoToWorld(lat, lon) {
+  const baseLat = Number(appCtx.LOC?.lat || 0);
+  const baseLon = Number(appCtx.LOC?.lon || 0);
+  const scale = Number(appCtx.SCALE || 100000);
+  const cosLat = Math.cos(baseLat * Math.PI / 180) || 1;
+  return { x: (Number(lon) - baseLon) * scale * cosLat, z: (baseLat - Number(lat)) * scale };
+}
+
+function surfaceYAt(x, z) {
+  const queried = Number(appCtx.SurfaceQuery?.walkAt?.(x, z, { currentY: 0 })?.position?.y);
+  if (Number.isFinite(queried)) return queried;
+  const terrain = Number(appCtx.elevationWorldYAtWorldXZ?.(x, z));
+  return Number.isFinite(terrain) ? terrain : 0;
+}
+
 function ensureHousing() {
   const inventory = ensurePlayerBackpackInventory(appCtx);
   const economy = appCtx.worldEconomy || appCtx.localConvenienceStoreCommerce || createLocalCommerceModel({ inventory });
@@ -88,10 +110,19 @@ function ensureAuthority() {
   const key = `${user?.uid || 'guest'}:${room?.code || room?.id || 'world'}:${worldSeed}:${location.id}`;
   if (key !== connectedAuthorityKey) {
     connectedAuthority?.dispose?.();
+    if (appCtx.connectedExplorerWallet && appCtx.connectedExplorerWallet.uid !== user?.uid) {
+      appCtx.connectedExplorerWallet.dispose?.();
+      appCtx.connectedExplorerWallet = null;
+    }
+    const walletAuthority = appCtx.connectedExplorerWallet || createConnectedExplorerWallet({
+      onError: () => setStatus('Your Explorer Wallet could not refresh. Try again in a moment.', 'error')
+    });
+    if (walletAuthority) appCtx.connectedExplorerWallet = walletAuthority;
     connectedAuthority = createConnectedPropertyAuthority({
       room,
       locationId: location.id,
       worldSeed,
+      walletAuthority,
       getActorPosition: actorPosition,
       onChange: () => appCtx.PropertyUI.panel?.classList.contains('show') && updatePropertyPanel(),
       onError: () => setStatus('Property information could not refresh. Try again in a moment.', 'error')
@@ -114,13 +145,69 @@ function snapshot() {
   return Object.freeze({ ...view, authRequired: !getCurrentUser() });
 }
 
+// Interiors consume only this read-only ownership view. The furnishing layer
+// never grants, transfers, or mutates a property deed.
+appCtx.getExplorerPropertySnapshot = snapshot;
+appCtx.marylandParcelRuntimeSnapshot = () => Object.freeze({ ...parcelRuntime, provider: marylandParcelProviderSnapshot() });
+
+appCtx.canPlaceQuickBuildAt = ({ x, z } = {}) => {
+  const geo = worldToGeo(Number(x), Number(z));
+  const view = snapshot();
+  return parcelBuildPermissionAt({ candidates: appCtx.properties || [], homes: view.homes, lat: geo.lat, lon: geo.lon, status: parcelRuntime.status });
+};
+
 function credits(value) {
-  return `${Math.max(0, Math.round(Number(value) || 0)).toLocaleString()} credits`;
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+    .format(Math.max(0, Math.round(Number(value) || 0)));
 }
 
 function distance(value) {
   const meters = Math.max(0, Number(value) || 0);
   return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${Math.round(meters)} m`;
+}
+
+function parcelSize(property) {
+  if (!Number.isFinite(Number(property?.parcelAreaSqM)) || Number(property.parcelAreaSqM) <= 0) return '';
+  const acres = Number(property.reportedAcres) || Number(property.parcelAreaSqM) / 4046.8564224;
+  return `${acres < 10 ? acres.toFixed(2) : Math.round(acres).toLocaleString()} acres`;
+}
+
+function propertyAreaSummary(property) {
+  if (property?.parcelId) {
+    const parcel = parcelSize(property) || 'Area not reported';
+    return property.hasStructures
+      ? `${parcel} land · ${Math.round(property.footprintArea || property.area).toLocaleString()} m² primary footprint`
+      : `${parcel} mapped land · no associated loaded building`;
+  }
+  return `${Math.round(property.area).toLocaleString()} m² footprint · ${property.levels} level${property.levels === 1 ? '' : 's'}`;
+}
+
+function parcelBoundarySvg(property) {
+  const geometry = property?.parcelGeometry;
+  const ring = geometry?.type === 'Polygon'
+    ? geometry.coordinates?.[0]
+    : geometry?.type === 'MultiPolygon'
+      ? geometry.coordinates?.[0]?.[0]
+      : null;
+  if (!Array.isArray(ring) || ring.length < 4) return '';
+  const first = ring[0];
+  const last = ring[ring.length - 1];
+  const closed = Array.isArray(first) && Array.isArray(last) && first[0] === last[0] && first[1] === last[1];
+  const usable = closed ? ring.slice(0, -1) : ring;
+  const minLon = Math.min(...usable.map((point) => point[0]));
+  const maxLon = Math.max(...usable.map((point) => point[0]));
+  const minLat = Math.min(...usable.map((point) => point[1]));
+  const maxLat = Math.max(...usable.map((point) => point[1]));
+  const lonSpan = maxLon - minLon || 1;
+  const latSpan = maxLat - minLat || 1;
+  const step = Math.max(1, Math.ceil(usable.length / 320));
+  const sampled = usable.filter((_, index) => index % step === 0);
+  const points = sampled.map(([lon, lat]) => {
+    const x = 12 + (lon - minLon) / lonSpan * 216;
+    const y = 12 + (maxLat - lat) / latSpan * 96;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  return `<div class="propertyParcelShape"><svg viewBox="0 0 240 120" role="img" aria-label="Mapped parcel shape"><polygon points="${points}"/></svg><span>Mapped parcel shape · terrain outline available below</span></div>`;
 }
 
 function setStatus(message, tone = '') {
@@ -134,7 +221,7 @@ function updateHeader(view = snapshot()) {
   const balance = document.getElementById('propertyWalletBalance');
   if (balance) balance.textContent = view.authRequired
     ? '—'
-    : Math.max(0, Number(view.credits) || 0).toLocaleString();
+    : credits(view.credits);
   document.querySelectorAll('[data-property-view]').forEach((button) => {
     const buttonView = button.dataset.propertyView;
     const selected = button.closest('.propertyHubTabs')
@@ -159,7 +246,7 @@ function homeSummaryCard(home, view, options = {}) {
   return `<article class="propertyHomeCard${primary ? ' primary' : ''}">
     <div class="propertyHomeVisual" aria-hidden="true"><span>⌂</span><small>${escapeHtml(home.kind)}</small></div>
     <div class="propertyHomeInfo"><span class="propertyHomeKicker">${rental ? 'RENTED HOME' : primary ? 'PRIMARY HOME' : 'OWNED HOME'}</span><strong>${escapeHtml(home.label)}</strong>
-      <small>${escapeHtml(home.address?.formatted || home.locationLabel)} · ${Math.round(home.area).toLocaleString()} m² footprint · ${home.levels} level${home.levels === 1 ? '' : 's'}</small><small>${view.shared ? rental ? `Rented from ${escapeHtml(home.ownerName || 'another explorer')}` : `Owned by ${escapeHtml(home.ownerName || 'you')}` : `${used}/${home.storageCapacity} storage spaces used`}</small></div>
+      <small>${escapeHtml(home.address?.formatted || home.locationLabel)} · ${Math.round(home.area).toLocaleString()} m² footprint · ${home.levels} level${home.levels === 1 ? '' : 's'}</small><small>Move-in ready · furnished residential interior · companion home</small><small>${view.shared ? rental ? `Rented from ${escapeHtml(home.ownerName || 'another explorer')}` : `Owned by ${escapeHtml(home.ownerName || 'you')}` : `${used}/${home.storageCapacity} storage spaces used`}</small></div>
     <div class="propertyCardActions">${samePlace ? `<button type="button" data-property-action="navigate" data-property-id="${escapeHtml(home.id)}">Set Route</button>` : `<span class="propertyPlaceNote">Return to ${escapeHtml(home.locationLabel)} to set a route</span>`}
       ${primary || view.shared ? '' : `<button type="button" data-property-action="primary" data-property-id="${escapeHtml(home.id)}">Make Primary</button>`}
       ${options.allowSell && ownedByMe ? (view.shared ? connectedActions : `<button type="button" class="danger" data-property-action="sell" data-property-id="${escapeHtml(home.id)}">Sell · ${credits(Math.floor(Math.min(home.purchasePrice, home.currentValue) * .85))}</button>`) : ''}</div>
@@ -170,11 +257,11 @@ function renderHome(view) {
   if (!view.homes.length) {
     return `<section class="propertyEmptyState"><span class="propertyEmptyIcon">⌂</span><h3>Choose your first home</h3>
       <p>A home gives you a saved place and, as the feature expands, a place for finds from Earth, the ocean, and space.</p><button type="button" data-property-view="nearby">See Properties Nearby</button></section>
-      ${view.authRequired ? '<section class="propertyHowItWorks"><strong>Sign in when you are ready to choose</strong><p>You can explore and compare buildings as a guest. A free account keeps ownership, Credits, storage, and shared play connected wherever you return.</p><button type="button" data-property-action="sign-in">Sign In or Create an Account</button></section>' : ''}
-      <section class="propertyHowItWorks"><strong>One connected economy</strong><p>Explorer Credits earned from field finds, trade, travel, and missions can be used here. Items stay in the same Backpack until you move them into home storage.</p></section>`;
+      ${view.authRequired ? '<section class="propertyHowItWorks"><strong>Sign in when you are ready to choose</strong><p>You can explore and compare buildings as a guest. A free account keeps ownership, your Explorer wallet, storage, and shared play connected wherever you return.</p><button type="button" data-property-action="sign-in">Sign In or Create an Account</button></section>' : ''}
+      <section class="propertyHowItWorks"><strong>One Explorer Wallet</strong><p>Property and mapped-place purchases use the same account balance. Your first property deed is free; later purchases use market-scale values. Items stay in the same Backpack until you move them into home storage.</p></section>`;
   }
   const openOffers = (view.incomingTrades || []).filter((offer) => offer.status === 'pending' && offer.expiresAtMs > Date.now()).length;
-  return `<section class="propertySectionIntro"><span>${view.shared ? 'CONNECTED WORLD' : 'MY PLACES'}</span><strong>${view.homes.length} propert${view.homes.length === 1 ? 'y' : 'ies'} ${view.shared ? 'owned or rented' : 'owned'}</strong><p>${view.shared ? 'Your ownership, listings, rentals, and Credits follow your account across the world and every room.' : 'Your primary home is shown first for routes and storage.'}</p></section>
+  return `<section class="propertySectionIntro"><span>${view.shared ? 'CONNECTED WORLD' : 'MY PLACES'}</span><strong>${view.homes.length} propert${view.homes.length === 1 ? 'y' : 'ies'} ${view.shared ? 'owned or rented' : 'owned'}</strong><p>${view.shared ? 'Your ownership, listings, rentals, and Explorer wallet follow your account across the world and every room.' : 'Your primary home is shown first for routes and storage.'}</p></section>
     <div class="propertyHubShortcuts"><button type="button" data-property-view="storage">Home Storage</button><button type="button" data-property-view="offers">${openOffers ? `${openOffers} New ` : ''}Property Offers</button></div>
     ${view.homes.map((home) => homeSummaryCard(home, view, { allowSell: true })).join('')}<button class="propertyWideAction" type="button" data-property-view="nearby">Find another property</button>`;
 }
@@ -194,10 +281,10 @@ export function createPropertyCard(property, suppliedView = null) {
   else if (!occupied && !mineAsTenant && !owned && (!view.shared || property.sharedEligible)) transactionAction = `<button type="button" class="buy" data-property-action="buy" data-property-id="${escapeHtml(property.id)}">${view.shared && view.starterAvailable ? 'Claim as Free First Property' : 'Buy Property'}</button>`;
   else if (view.shared && !property.sharedEligible) transactionAction = '<span class="propertyPlaceNote">This building needs a stable map identity before it can be owned online.</span>';
   else if (view.shared && occupied && property.status === 'owned' && tradeableHomes.length) transactionAction = `<label class="propertyTradeChoice"><span>Offer one of your properties</span><select data-trade-offer-for="${escapeHtml(property.id)}">${tradeableHomes.map((home) => `<option value="${escapeHtml(home.id)}">${escapeHtml(home.label)}</option>`).join('')}</select></label><button type="button" data-property-action="propose-trade" data-property-id="${escapeHtml(property.id)}">Offer Trade</button>`;
-  return `<article class="propertyHomeCard candidate${owned ? ' owned' : ''}">
+  return `<article class="propertyHomeCard candidate${owned ? ' owned' : ''}" data-parcel-property="${property.parcelId ? 'true' : 'false'}">
     <div class="propertyHomeVisual" aria-hidden="true"><span>⌂</span><small>${escapeHtml(property.kind)}</small></div>
     <div class="propertyHomeInfo"><span class="propertyHomeKicker">${escapeHtml(statusLabel)}</span><strong>${escapeHtml(property.label)}</strong>
-      ${property.address?.formatted ? `<small>${escapeHtml(property.address.formatted)}</small>` : ''}<small>${Math.round(property.area).toLocaleString()} m² footprint · ${property.levels} level${property.levels === 1 ? '' : 's'}</small><small>${property.storageCapacity} storage spaces · ${escapeHtml(describeDestinationEntrySupport(property))}</small><b>${credits(property.price)}</b></div>
+      ${property.address?.formatted ? `<small>${escapeHtml(property.address.formatted)}</small>` : ''}<small>${escapeHtml(propertyAreaSummary(property))}</small>${property.parcelId ? `<small>${escapeHtml(property.landUseDescription || 'Land use not reported')} · ${escapeHtml(property.jurisdictionName)}</small>` : ''}<small>${property.hasStructures === false ? 'Land-only property · Quick Build permission after ownership' : `${property.mappedResidential ? 'Move-in ready furnished interior · ' : ''}${property.storageCapacity} storage spaces · ${escapeHtml(describeDestinationEntrySupport(property))}`}</small><small>Estimated game value${property.sourceAssessment ? ' · informed by public assessment data' : ''}</small><b>${credits(property.price)}</b></div>
     <div class="propertyCardActions"><button type="button" data-property-action="navigate" data-property-id="${escapeHtml(property.id)}">Set Route</button><button type="button" data-property-action="details" data-property-id="${escapeHtml(property.id)}">Details</button>
       ${transactionAction}</div>
   </article>`;
@@ -211,7 +298,13 @@ function renderNearby(view) {
     : view.shared && view.starterAvailable ? '<div class="propertyStarterNotice"><strong>Your first property is free</strong><span>You can choose any available mapped building in the world. The free deed can only be used once, so explore before you decide.</span></div>' : '';
   const visible = mappedCandidates.slice(0, nearbyVisibleLimit);
   const remaining = Math.max(0, mappedCandidates.length - visible.length);
-  return `${starter}<section class="propertySectionIntro"><span>PROPERTIES NEARBY</span><strong>${mappedCandidates.length} mapped propert${mappedCandidates.length === 1 ? 'y' : 'ies'} found</strong><p>Showing the closest ${visible.length}. Set a route to walk or drive to the actual building.</p></section>${visible.map((property) => createPropertyCard(property, view)).join('')}${remaining ? `<button class="propertyWideAction" type="button" data-property-action="show-more-nearby">Show ${Math.min(24, remaining)} More</button>` : ''}<div class="propertyHubSupportingLink"><button type="button" data-property-view="market">Connected Property Data</button><span>Optional reference records; game ownership and prices stay separate.</span></div>`;
+  const parcelNotice = parcelRuntime.status === 'loading'
+    ? '<div class="propertyParcelNotice loading"><strong>Checking Maryland land records…</strong><span>Buildings are available now; parcel boundaries will join when the state service responds.</span></div>'
+    : parcelRuntime.status === 'ready'
+      ? `<div class="propertyParcelNotice"><strong>Maryland parcel-aware</strong><span>${parcelRuntime.parcelPropertyCount} mapped land records · ${parcelRuntime.associatedBuildingCount} buildings associated · ${parcelRuntime.vacantParcelCount} land-only properties. Boundaries load only when requested.</span></div>`
+      : parcelRuntime.status === 'failed'
+        ? '<div class="propertyParcelNotice warning"><strong>Parcel service unavailable</strong><span>Existing mapped-building property remains available; no parcel facts were invented.</span></div>' : '';
+  return `${starter}${parcelNotice}<section class="propertySectionIntro"><span>PROPERTIES NEARBY</span><strong>${mappedCandidates.length} mapped propert${mappedCandidates.length === 1 ? 'y' : 'ies'} found</strong><p>Showing the closest ${visible.length}. Set a route to walk or drive to the actual place.</p></section>${visible.map((property) => createPropertyCard(property, view)).join('')}${remaining ? `<button class="propertyWideAction" type="button" data-property-action="show-more-nearby">Show ${Math.min(24, remaining)} More</button>` : ''}<div class="propertyHubSupportingLink"><button type="button" data-property-view="market">Connected Property Data</button><span>Optional reference records; game ownership and prices stay separate.</span></div>`;
 }
 
 function storageItem(item, homeId, carried = false) {
@@ -285,7 +378,7 @@ export function updatePropertyPanel() {
   else if (activeView === 'offers') appCtx.PropertyUI.list.innerHTML = renderOffers(view);
   else if (activeView === 'market') appCtx.PropertyUI.list.innerHTML = renderMarket();
   else appCtx.PropertyUI.list.innerHTML = renderHome(view);
-  appCtx.PropertyUI.panel?.classList.add('show');
+  appCtx.PropertyUI.panel?.classList.toggle('show', appCtx.realEstateMode === true);
 }
 
 function propertyById(id) {
@@ -299,15 +392,30 @@ export function openModalById(id) {
   const view = snapshot();
   const owned = view.homes.find((home) => home.id === property.id);
   appCtx.PropertyUI.modalTitle.textContent = property.label || 'Home';
-  appCtx.PropertyUI.modalBody.innerHTML = `<section class="propertyModalHome"><span class="propertyHomeKicker">${owned ? 'OWNED HOME' : 'AVAILABLE HOME'}</span><h3>${escapeHtml(property.kind || 'Home')}</h3>
-    <p>This home is attached to a building in the current world. Route guidance leads to that building${describeDestinationEntrySupport(property) === 'Exterior only' ? '; a furnished interior is not available here yet' : ' and its supported entrance'}.</p>
-    <dl><div><dt>Game price</dt><dd>${credits(property.price || property.purchasePrice)}</dd></div><div><dt>Footprint</dt><dd>${Math.round(property.area).toLocaleString()} m²</dd></div><div><dt>Levels</dt><dd>${property.levels}</dd></div><div><dt>Storage</dt><dd>${property.storageCapacity} spaces</dd></div></dl>
-    <div class="propertyCardActions"><button type="button" data-property-action="navigate" data-property-id="${escapeHtml(property.id)}">Set Route</button>${owned ? '' : view.authRequired ? '<button type="button" data-property-action="sign-in">Sign In to Choose This Property</button>' : `<button type="button" class="buy" data-property-action="buy" data-property-id="${escapeHtml(property.id)}">${view.shared && view.starterAvailable ? 'Claim as Free First Property' : 'Buy Property'}</button>`}</div></section>`;
+  const context = property.parcelId
+    ? `<p>This virtual property follows the mapped parcel boundary and contains ${property.buildingCount || 0} associated loaded building${property.buildingCount === 1 ? '' : 's'}. State parcel facts are reference context; game ownership and the game value remain World Explorer systems.</p>${parcelBoundarySvg(property)}
+      <dl><div><dt>Estimated game value</dt><dd>${credits(property.price || property.purchasePrice)}</dd></div><div><dt>Land</dt><dd>${escapeHtml(parcelSize(property) || 'Not reported')}</dd></div><div><dt>Land use</dt><dd>${escapeHtml(property.landUseDescription || 'Not reported')}</dd></div><div><dt>Jurisdiction</dt><dd>${escapeHtml(property.jurisdictionName)}</dd></div><div><dt>Mapped structures</dt><dd>${property.buildingCount || 0}</dd></div><div><dt>Source dates</dt><dd>${escapeHtml([property.geometryDate && `geometry ${property.geometryDate}`, property.assessmentDate && `assessment ${property.assessmentDate}`].filter(Boolean).join(' · ') || 'Not reported')}</dd></div></dl>
+      <p class="propertyTruthNote">Boundary display is an exploration aid from MD iMAP, MDP, and SDAT—not a legal survey. Owner names and owner addresses are never loaded.</p>`
+    : `<p>This home is attached to a building in the current world. Route guidance leads to that building${describeDestinationEntrySupport(property) === 'Exterior only' ? '; a furnished interior is not available here yet' : ' and its supported entrance'}.</p>
+      <dl><div><dt>Estimated game value</dt><dd>${credits(property.price || property.purchasePrice)}</dd></div><div><dt>Footprint</dt><dd>${Math.round(property.area).toLocaleString()} m²</dd></div><div><dt>Levels</dt><dd>${property.levels}</dd></div><div><dt>Storage</dt><dd>${property.storageCapacity} spaces</dd></div></dl>`;
+  appCtx.PropertyUI.modalBody.innerHTML = `<section class="propertyModalHome"><span class="propertyHomeKicker">${owned ? 'OWNED PROPERTY' : 'AVAILABLE PROPERTY'}</span><h3>${escapeHtml(property.kind || 'Property')}</h3>${context}
+    <div class="propertyCardActions"><button type="button" data-property-action="navigate" data-property-id="${escapeHtml(property.id)}">Set Route</button>${property.parcelId ? `<button type="button" data-property-action="boundary" data-property-id="${escapeHtml(property.id)}">Show Boundary</button>` : ''}${owned ? '' : view.authRequired ? '<button type="button" data-property-action="sign-in">Sign In to Choose This Property</button>' : `<button type="button" class="buy" data-property-action="buy" data-property-id="${escapeHtml(property.id)}">${view.shared && view.starterAvailable ? 'Claim as Free First Property' : 'Buy Property'}</button>`}</div></section>`;
   appCtx.PropertyUI.modal.classList.add('show');
 }
 
 export function closeModal() { appCtx.PropertyUI.modal?.classList.remove('show'); }
-export function closePropertyPanel() { appCtx.PropertyUI.panel?.classList.remove('show'); }
+export function closePropertyPanel() {
+  // Closing Real Estate is a mode transition, not just a visual hide. Pending
+  // parcel responses must not reopen the panel over an unrelated hotbar action.
+  parcelRequestSequence += 1;
+  appCtx.realEstateMode = false;
+  appCtx.PropertyUI.button?.classList.remove('active');
+  document.getElementById('fRealEstate')?.classList.remove('on');
+  appCtx.PropertyUI.panel?.classList.remove('show');
+  closeModal();
+  clearPropertyMarkers();
+  clearParcelBoundary();
+}
 export function togglePropertyFilters() { activeView = activeView === 'nearby' ? 'home' : 'nearby'; updatePropertyPanel(); }
 
 export function toggleRealEstate(force) {
@@ -315,16 +423,47 @@ export function toggleRealEstate(force) {
   appCtx.realEstateMode = shouldOpen;
   appCtx.PropertyUI.button?.classList.toggle('active', shouldOpen);
   if (shouldOpen) loadPropertiesAtCurrentLocation();
-  else { closePropertyPanel(); closeModal(); clearPropertyMarkers(); }
+  else closePropertyPanel();
 }
 
 export async function loadPropertiesAtCurrentLocation() {
   ensureHousing();
   nearbyVisibleLimit = 24;
-  appCtx.properties = [...currentCandidates()];
+  const baseCandidates = [...currentCandidates()];
+  appCtx.properties = baseCandidates;
+  const actor = actorPosition();
+  const geo = worldToGeo(actor.x, actor.z);
+  const requestId = ++parcelRequestSequence;
+  parcelRuntime = Object.freeze({ status: isLikelyMarylandCoordinate(geo.lat, geo.lon) ? 'loading' : 'outside-coverage', sourceId: 'maryland-imap-parcels', parcelCount: 0 });
   updatePropertyPanel();
   renderPropertyMarkers();
   bindPropertyEvents();
+  if (parcelRuntime.status !== 'loading') return appCtx.properties;
+  try {
+    const response = await loadMarylandParcels({ lat: geo.lat, lon: geo.lon, radiusM: 450 });
+    if (requestId !== parcelRequestSequence) return appCtx.properties;
+    if (response.status !== 'ready') {
+      parcelRuntime = Object.freeze({ status: response.status, sourceId: response.source.id, parcelCount: 0, warnings: response.warnings });
+      updatePropertyPanel();
+      return appCtx.properties;
+    }
+    const joined = makeParcelPropertyCandidates(response.parcels, baseCandidates, {
+      actor, locationId: runtimeLocation().id, locationLabel: runtimeLocation().label,
+      geoToWorld, heightAt: surfaceYAt, limit: 500
+    });
+    appCtx.properties = [...joined.candidates];
+    parcelRuntime = Object.freeze({
+      status: 'ready', sourceId: response.source.id, parcelCount: response.parcels.length,
+      fetchedAt: response.fetchedAt, fromCache: response.fromCache, warnings: response.warnings,
+      ...joined
+    });
+    renderPropertyMarkers();
+    updatePropertyPanel();
+  } catch (error) {
+    if (requestId !== parcelRequestSequence) return appCtx.properties;
+    parcelRuntime = Object.freeze({ status: 'failed', sourceId: 'maryland-imap-parcels', parcelCount: 0, error: String(error?.message || error) });
+    updatePropertyPanel();
+  }
   return appCtx.properties;
 }
 
@@ -381,6 +520,32 @@ export function clearPropertyMarkers() {
   appCtx.propMarkers = [];
 }
 
+function clearParcelBoundary() {
+  if (!parcelBoundaryGroup) return;
+  parcelBoundaryGroup.traverse?.((child) => { child.geometry?.dispose?.(); child.material?.dispose?.(); });
+  appCtx.scene?.remove?.(parcelBoundaryGroup);
+  parcelBoundaryGroup = null;
+}
+
+function showParcelBoundary(property) {
+  clearParcelBoundary();
+  if (!property?.parcelGeometry || !globalThis.THREE || !appCtx.scene) return false;
+  parcelBoundaryGroup = new THREE.Group();
+  parcelBoundaryGroup.name = `parcel-boundary:${property.parcelId}`;
+  const material = new THREE.LineBasicMaterial({ color: 0x58f1d2, transparent: true, opacity: .96, depthTest: true });
+  property.parcelGeometry.coordinates.forEach((polygon) => polygon.forEach((ring) => {
+    const points = ring.slice(0, -1).map(([lon, lat]) => {
+      const world = geoToWorld(lat, lon);
+      return new THREE.Vector3(world.x, surfaceYAt(world.x, world.z) + .28, world.z);
+    });
+    if (points.length >= 3) parcelBoundaryGroup.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(points), material));
+  }));
+  appCtx.scene.add(parcelBoundaryGroup);
+  appCtx.selectedProperty = property;
+  setStatus('Mapped parcel boundary shown. This is an exploration guide, not a legal survey.', 'ok');
+  return true;
+}
+
 export function navigateToProperty(propertyId) {
   const property = propertyById(propertyId);
   if (!property) return false;
@@ -398,22 +563,65 @@ export function navigateToProperty(propertyId) {
   return true;
 }
 
-async function recordPropertyProgress(result, action) {
-  if (!result?.home) return;
-  const home = result.home;
+async function recordPropertyProgress(result, action, candidate = null) {
+  const home = result?.home || (candidate ? {
+    ...candidate,
+    id: result?.property?.propertyId || candidate.id,
+    purchasedAt: Date.now()
+  } : null);
+  if (!home?.id) return { recorded: false, reason: 'home-unavailable' };
+  let storyResult = null;
   if (typeof appCtx.recordExplorerEvent === 'function') {
-    await appCtx.recordExplorerEvent({
-      eventId: `event:property:${action}:${home.id}:${action === 'bought' ? home.purchasedAt : Date.now()}`,
-      eventType: action === 'bought' ? 'home-purchased' : 'home-sold', sourceSystem: 'home-and-property', sourceId: home.id, pathId: 'creation',
-      name: action === 'bought' ? `Bought ${home.label}` : `Sold ${home.label}`,
-      detail: action === 'bought' ? 'Added a saved place with home storage.' : 'Completed a home sale.', projections: { journal: true, profile: true, place: true }
+    storyResult = await appCtx.recordExplorerEvent({
+      eventId: action === 'bought'
+        ? 'event:achievement:first-home:v1'
+        : `event:property:sold:${home.id}:${Date.now()}`,
+      eventType: action === 'bought' ? 'achievement-earned' : 'home-sold', sourceSystem: 'home-and-property', sourceId: home.id, pathId: 'creation',
+      name: action === 'bought' ? 'A Place of Our Own' : `Sold ${home.label}`,
+      detail: action === 'bought' ? `Chose ${home.label} as the first Explorer home.` : 'Completed a home sale.',
+      firstCompletion: action === 'bought', points: action === 'bought' ? 1 : 0,
+      progressReason: action === 'bought' ? 'first-home' : 'home-sold',
+      metadata: action === 'bought' ? { achievementId: 'a-place-of-our-own', propertyId: home.id, receiptId: result?.receiptId || '' } : {},
+      projections: { journal: true, profile: true, place: true }
     });
   }
+  if (action === 'bought' && storyResult?.recorded) {
+    await appCtx.assignCompanionPrimaryHome?.(home.id);
+    appCtx.showToast?.('Achievement unlocked · A Place of Our Own');
+  }
   void postActivity('home-base-updated', { city: runtimeLocation().label, text: action === 'bought' ? `Bought a home in ${runtimeLocation().label}` : `Sold a home in ${runtimeLocation().label}` }).catch(() => {});
+  return storyResult;
 }
 
 function reasonMessage(reason) {
-  return ({ starter_already_used: 'Your free first-property deed has already been used.', already_owned: 'Another explorer already owns this property.', not_owner: 'Only the owner can change this property.', own_listing: 'You cannot buy or rent your own listing.', not_for_sale: 'This property is no longer for sale.', not_for_rent: 'This property is no longer for rent.', not_listed: 'This property is not listed.', lease_active: 'This property has an active rental.', not_enough_credits: 'You need more Explorer Credits for this property.', storage_not_empty: 'Move everything out of this home before selling it.', storage_full: 'This home is out of storage space.', item_equipped: 'Equip something else before storing that item.', item_unavailable: 'That item is no longer available.', not_owned: 'This home is not in your portfolio.', home_too_far: 'Go to your home before moving items in or out of storage.', home_in_another_place: 'Return to that home’s location before using its storage.', save_failed: 'The change could not be saved on this device.', wallet_unavailable: 'Explorer Credits are unavailable right now.', offered_property_unavailable: 'The property you offered is no longer available to trade.', requested_property_unavailable: 'The requested property is no longer available to trade.', property_not_tradeable: 'One of these properties is currently listed, rented, or otherwise unavailable.', trade_offer_unavailable: 'This trade offer is no longer available.', trade_offer_closed: 'This trade offer has already been closed.', trade_offer_expired: 'This trade offer has expired.', trade_ownership_changed: 'Ownership changed before the trade could be completed.', offer_funds_unavailable: 'The offered Explorer Credits are no longer available.' })[reason] || 'That action could not be completed.';
+  return ({
+    starter_already_used: 'Your free first-property deed has already been used.',
+    already_owned: 'Another explorer already owns this property.',
+    not_owner: 'Only the owner can change this property.',
+    own_listing: 'You cannot buy or rent your own listing.',
+    not_for_sale: 'This property is no longer for sale.',
+    not_for_rent: 'This property is no longer for rent.',
+    not_listed: 'This property is not listed.',
+    lease_active: 'This property has an active rental.',
+    not_enough_credits: 'You need more money in your Explorer wallet for this property.',
+    storage_not_empty: 'Move everything out of this home before selling it.',
+    storage_full: 'This home is out of storage space.',
+    item_equipped: 'Equip something else before storing that item.',
+    item_unavailable: 'That item is no longer available.',
+    not_owned: 'This home is not in your portfolio.',
+    home_too_far: 'Go to your home before moving items in or out of storage.',
+    home_in_another_place: 'Return to that home’s location before using its storage.',
+    save_failed: 'The change could not be saved on this device.',
+    wallet_unavailable: 'Your Explorer wallet is unavailable right now.',
+    offered_property_unavailable: 'The property you offered is no longer available to trade.',
+    requested_property_unavailable: 'The property you requested is no longer available to trade.',
+    property_not_tradeable: 'One of these properties is currently listed, rented, or otherwise unavailable.',
+    trade_offer_unavailable: 'This trade offer is no longer available.',
+    trade_offer_closed: 'This trade offer has already been closed.',
+    trade_offer_expired: 'This trade offer has expired.',
+    trade_ownership_changed: 'Ownership changed before the trade could be completed.',
+    offer_funds_unavailable: 'The offered wallet funds are no longer available.'
+  })[reason] || 'That action could not be completed.';
 }
 
 async function loadConnectedMarket() {
@@ -435,6 +643,7 @@ async function handlePropertyAction(button) {
   const itemId = button.dataset.itemId || '';
   if (action === 'navigate') return navigateToProperty(propertyId);
   if (action === 'details') return openModalById(propertyId);
+  if (action === 'boundary') return showParcelBoundary(propertyById(propertyId));
   if (action === 'refresh') return loadPropertiesAtCurrentLocation();
   if (action === 'show-more-nearby') { nearbyVisibleLimit += 24; updatePropertyPanel(); return true; }
   if (action === 'load-market') return loadConnectedMarket();
@@ -445,7 +654,7 @@ async function handlePropertyAction(button) {
     return true;
   }
   if (!getCurrentUser() && ['buy', 'sell', 'sell-world', 'list-sale', 'list-rent', 'rent', 'cancel-listing', 'primary', 'store', 'withdraw', 'propose-trade', 'accept-trade', 'decline-trade', 'cancel-trade'].includes(action)) {
-    setStatus('Sign in to save property, Credits, storage, and shared play to your account.', 'error');
+    setStatus('Sign in to save property, your Explorer wallet, storage, and shared play to your account.', 'error');
     return false;
   }
   const model = ensureAuthority();
@@ -475,10 +684,16 @@ async function handlePropertyAction(button) {
   else if (action === 'withdraw') result = model.withdrawItem(propertyId, itemId, 1);
   if (!result) return false;
   if (!(shared ? result.accepted : result.ok)) { setStatus(reasonMessage(result.reason), 'error'); return false; }
-  if (!shared && (action === 'buy' || action === 'sell')) await recordPropertyProgress(result, action === 'buy' ? 'bought' : 'sold');
+  if (action === 'buy') await recordPropertyProgress(result, 'bought', selectedProperty);
+  else if (!shared && action === 'sell') await recordPropertyProgress(result, 'sold', selectedProperty);
+  if (action === 'primary') await appCtx.assignCompanionPrimaryHome?.(result.home?.id || propertyId);
+  if (['sell', 'sell-world'].includes(action)) {
+    const nextPrimaryHomeId = model.snapshot(appCtx.properties || []).primaryHomeId || '';
+    await appCtx.assignCompanionPrimaryHome?.(nextPrimaryHomeId);
+  }
   const label = propertyById(propertyId)?.label || 'Property';
   let success = 'Saved.';
-  if (action === 'buy') success = `${label} is now yours.`;
+  if (action === 'buy') success = `${label} is now yours. Your furnished home and companion home base are ready.`;
   else if (action === 'sell') success = `${result.home?.label || label} sold for ${credits(result.salePrice)}.`;
   else if (action === 'sell-world') success = `${label} was sold back to the world.`;
   else if (action === 'list-sale') success = `${label} is listed for sale.`;
@@ -492,7 +707,7 @@ async function handlePropertyAction(button) {
   else if (action === 'primary') success = `${result.home?.label || label} is now your primary home.`;
   else if (action === 'store') success = `${result.item?.label || 'Item'} moved into home storage.`;
   else if (action === 'withdraw') success = `${result.item?.label || 'Item'} moved back to your Backpack.`;
-  appCtx.properties = [...currentCandidates()]; renderPropertyMarkers(); updatePropertyPanel();
+  await loadPropertiesAtCurrentLocation();
   setStatus(success, 'ok');
   return true;
 }

@@ -238,4 +238,4 @@ export function tryEnablePostProcessing(ctx) {
   }
   return enabled;
 }
-import { applyDirectionalShadowPolicy } from './shadow-policy.js?v=1';
+import { applyDirectionalShadowPolicy } from './shadow-policy.js?v=2';

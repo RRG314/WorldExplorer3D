@@ -1,9 +1,10 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { featuredArrivalNear } from "./featured-arrivals.js?v=3";
 import { isRoadSurfaceReachable } from "../structure-semantics.js?v=63";
-import { createWorldSpawnSurfaceApi, roadHeadingAtSegment } from "./spawn-surface.js?v=13";
+import { createWorldSpawnSurfaceApi, roadHeadingAtSegment } from "./spawn-surface.js?v=14";
 import { findGradeSeparatedRoad } from "./spawn-structure-search.js?v=2";
 import { resolveCustomLocationArrival } from './spawn-location-arrival.js?v=6';
+import { resolveTunnelSpace } from './compiler/tunnel-space-query.js';
 
 let worldSpawnDeps = {
   buildingContainingPoint: () => null,
@@ -89,7 +90,7 @@ function evaluateWalkSpawnCandidate(x, z, options = {}) {
   if (walkBuildBlockCollision(x, z, terrainY)?.blocked) return { valid: false, reason: "build_block", terrainY };
 
   const slopeDeg = slopeDegreesAt(x, z);
-  if (slopeDeg > 40) return { valid: false, reason: "slope_too_steep", terrainY, slopeDeg };
+  if (!onRoadSurface && slopeDeg > 40) return { valid: false, reason: "slope_too_steep", terrainY, slopeDeg };
 
   return {
     valid: true,
@@ -185,7 +186,7 @@ function searchNearestSafeGroundSpawn(targetX, targetZ, options = {}) {
         angle: options.angle,
         source: "ground_search"
       });
-      if (!evaluated.valid) continue;
+      if (!evaluated.valid || isSubgradeArrival(evaluated)) continue;
       const score = radius + evaluated.slopeDeg * 0.6;
       if (!best || score < best.score) best = { ...evaluated, score };
     }
@@ -465,6 +466,13 @@ function fallbackResolvedSpawn(mode = "drive", options = {}) {
 }
 
 function isSubgradeArrival(spawn) { return spawn?.road?.structureSemantics?.terrainMode === "subgrade"; }
+function preservesOccupiedTunnel(spawn, options) {
+  if (options.preserveCurrentSupport !== true || !Number.isFinite(options.feetY)) return false;
+  const space = resolveTunnelSpace(spawn.road, spawn.x, spawn.z, options.feetY + 1.7);
+  // Mode changes may retain a verified occupied floor. New geographic arrivals
+  // still avoid underground roads, and collision checks above remain mandatory.
+  return space.inside && Math.abs(options.feetY - space.floorY) < 0.6;
+}
 function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
   const mode = options.mode === "walk" ? "walk" : "drive";
   const x = finiteNumberOr(targetX, 0);
@@ -481,7 +489,7 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
       allowBuildingRoof: options.allowBuildingRoof,
       source: options.source || "direct"
     });
-    if (direct.valid && !isSubgradeArrival(direct)) return direct;
+    if (direct.valid && (!isSubgradeArrival(direct) || preservesOccupiedTunnel(direct, options))) return direct;
 
     const surfaceFallback = searchNearestSafeRoadSpawn(x, z, {
       mode: "walk",
@@ -505,7 +513,7 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
     preferredRoad: options.preferredRoad || null,
     source: options.source || "direct"
   });
-  if (direct.valid && !isSubgradeArrival(direct) && (!preferRoad || direct.onRoad)) return direct;
+  if (direct.valid && (!isSubgradeArrival(direct) || preservesOccupiedTunnel(direct, options)) && (!preferRoad || direct.onRoad)) return direct;
 
   const projectedRoad = resolveProjectedRoadSpawn(x, z, {
     angle,

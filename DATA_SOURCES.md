@@ -1,10 +1,68 @@
 # Data Sources
 
-Last reviewed: 2026-09-03 for World Explorer 3D 5.2.0.
+Herbaceous wetland groundcover uses numeric ESA WorldCover class90, not inferred
+open water. The local CC0 Quaternius nature subset now also includes
+Grass_Common_Tall (grass.glb); its source, conversion hash and triangle count are
+recorded with the other nature assets. Models are generic vegetation, not surveyed
+species. The distant-context30s budget preserves partial mapped evidence and
+records deadline/skipped-request metrics rather than fabricating missing tiles.
+
+Last reviewed: 2026-09-08 for World Explorer 3D 5.2.0.
+
+## Local ground ecosystem update (not yet deployed)
+
+ESA WorldCover v200/2021 numeric classes are delivered as bounded nearest-sampled
+NPY windows from the [Microsoft Planetary Computer data API](https://planetarycomputer.microsoft.com/api/data/v1/openapi.json).
+The [dataset](https://planetarycomputer.microsoft.com/dataset/esa-worldcover)
+remains ESA remote-sensing classification, not live conditions or a species map.
+Only validated class bytes are persistently cached. Terrascope WMS remains an
+explicit display-color fallback; unavailable/nodata regions retain mapped/local
+fallbacks, not invented provider observations. Biome labels are gameplay
+inferences from local cover, latitude and existing elevation, not surveyed
+ecoregion boundaries. Roads, water and terrain elevation retain their owners.
+
+Curated vegetation comes from Quaternius' [Stylized Nature MegaKit](https://quaternius.itch.io/stylized-nature-megakit),
+CC0. Selected pine, broadleaf, shrub and fern models are packaged locally as GLB,
+with512px textures; woody trees have simplified distance models. The conversion
+script and asset manifest record source names and hashes. These are regional
+visual forms, not evidence of the exact species or individual tree at a location.
+
+## Functional POI research note (2026-09-05)
+
+The functional POI foundation currently consumes the mapped POI records already
+published by the Shortbread and exact OpenStreetMap/Overpass loaders. Shortbread
+is a deliberately lean vector-tile schema, so it is not assumed to cover every
+functional category or every OSM tag. Overture Places is being evaluated as a
+future normalized input for stable place identity, taxonomy, provenance,
+operating status, and confidence. No Overture Places runtime dependency has
+been added, and no generated gameplay inventory, service, interior, price, or
+opening state is described as provider data.
+
+See [FUNCTIONAL_POI_SYSTEM.md](FUNCTIONAL_POI_SYSTEM.md) for the provider
+reconciliation and truth-boundary rules.
 
 World Explorer keeps source identity and truth type with its data. Observations,
 forecasts and models, predictions, mapped features, and visual fallbacks are not
 interchangeable.
+
+## Community Reality Capture
+
+Reality Capture uses photos deliberately contributed by an authenticated user
+for a stable mapped building. The mapped provider remains the identity and
+geographic authority; the photographs are user-contributed observations, and
+the reconstructed GLB is a modeled presentation derivative. Neither establishes
+ownership, legal access, an official floor plan, a current business condition,
+or any other provider fact.
+
+Client normalization removes EXIF metadata, including embedded GPS, before the
+write-once private upload. The backend preserves contributor, target, pipeline,
+quality, review, and publication provenance. New interior contributions remain
+private and owner-only independently of any public exterior contribution.
+Unapproved photos and private processed assets are not public data sources and
+must only be delivered through the authorized short-lived asset broker.
+
+See [COMMUNITY_REALITY_CAPTURE_RND.md](COMMUNITY_REALITY_CAPTURE_RND.md) and
+[COMMUNITY_REALITY_CAPTURE_V1.md](COMMUNITY_REALITY_CAPTURE_V1.md).
 
 ## Earth Geometry And Surfaces
 
@@ -22,6 +80,24 @@ interchangeable.
 | GEBCO 2020 via OpenTopodata | Bundled Great Barrier Reef bathymetry seed | Bathymetric model | CC BY 4.0 |
 
 Required map attribution: `© OpenStreetMap contributors`.
+
+## Maryland Parcel Context
+
+| Source | Runtime use | Data class | License / terms |
+| --- | --- | --- | --- |
+| Maryland Parcel Boundaries, MD iMAP item `b33e5f03d50844b8819a4046ecfe0d97` | On-demand parcel geometry, stable public polygon reference, jurisdiction, site address, acreage, land use, zoning, public utility indicators, source dates, and a public assessment input for the existing virtual-property estimate | Authoritative statewide cadastral/reference layer assembled by Maryland Department of Planning with SDAT and local-source data | Public item states that the spatial data may be freely distributed if metadata is retained and derived data acknowledges the State of Maryland; data is provided as-is. Runtime attribution: `MD iMAP, MDP, SDAT`. |
+
+The parcel client never requests assessment account IDs, owner names, owner
+mailing addresses, deed parties, liber/folio details, or resident/unit data.
+Parcel facts remain visibly distinct from World Explorer ownership, prices,
+interiors, inventory, access, and Quick Build content. Requests occur only when
+Real Estate is opened in the Maryland service extent; they are spatially bounded,
+paginated to a fixed ceiling, simplified, timed out, cancelled on superseding
+work, and cached in memory for six hours. Outside Maryland or during provider
+failure, the existing mapped-building property system remains authoritative.
+
+See [MARYLAND_PARCEL_SOURCES.md](docs/MARYLAND_PARCEL_SOURCES.md) for the
+field allowlist, coverage evidence, dates, CRS, and provider limitations.
 
 ## Regional Ecology
 
@@ -87,6 +163,15 @@ Marine traffic is currently a labeled reference layer, not observed AIS. No synt
 
 When authoritative coverage is missing or a provider is unavailable, the app may use procedural materials, inferred building massing, generated interiors, vegetation placement, modeled routes, or cached data. These paths are bounded and labeled where surfaced to the user; they are not claims of observation or survey accuracy.
 
+## Curated Visual Assets
+
+Curated GLBs are presentation assets, not world-data or gameplay authorities. They are bundled locally, selected through `app/js/assets/model-asset-catalog.js`, and retain the existing collision and controller envelopes. The BMW E34 source is CC BY 4.0. The Field Explorer and City Explorer come from Quaternius' CC0 Ultimate Modular Men pack. File-level credits, hashes, processing notes, and source links are recorded in `app/assets/models/ATTRIBUTION.md`.
+
+The Pirate Interception's Insurgent raider, Solis Reach, and Pathfinder are all
+drawn from Quaternius' CC0 Ultimate Spaceships Pack. The raider is an optimized
+local presentation asset; Expedition encounter, damage, crew, resource, and
+persistence authorities remain separate from the model.
+
 ## Provider Boundaries
 
 - Browser clients do not receive private provider credentials.
@@ -95,3 +180,12 @@ When authoritative coverage is missing or a provider is unavailable, the app may
 - Production Firebase, payment, and administrative credentials are never included in this repository.
 
 See [ATTRIBUTION.md](ATTRIBUTION.md), [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md), and [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+# Natural snow surface — September 8, 2026
+
+The active snow material uses [Snow 02 by Rob Tuytel, Poly Haven](https://polyhaven.com/a/snow_02),
+CC0, nominal 2 m width. Diffuse, OpenGL normal and roughness maps are reduced
+to 512px JPEGs (137,703 bytes total). The existing Snow 01 footprint texture
+is no longer selected by the Earth material registry. Rebuild with
+`node scripts/build-snow-assets.mjs`; source checksums and resulting SHA-256
+hashes are recorded in `app/assets/textures/earth/snow_02.provenance.json`.
+This is representative surface detail, not measured Antarctic topography.

@@ -4,8 +4,8 @@ import {
   rebuildStructureVisualMeshes,
   rebuildStructureVisualMeshesCooperatively,
   updateStructureVisualVisibility
-} from "./terrain/structure-visuals.js?v=58";
-import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=14";
+} from "./terrain/structure-visuals.js?v=59";
+import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=15";
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=3";
 import { stitchTerrainGroupEdges } from "./terrain/seams.js?v=2";
 import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=22";
@@ -58,17 +58,18 @@ import {
   buildRoadSkirts,
   detectRoadIntersections,
   publishCompiledTransportMeshes
-} from "./terrain/rebuild.js?v=50";
+} from "./terrain/rebuild.js?v=54";
 import {
   disableRoadDebugMode as disableRoadDebugModeInternal,
   toggleRoadDebugMode as toggleRoadDebugModeInternal,
   validateRoadTerrainConformance as validateRoadTerrainConformanceInternal
-} from "./terrain/debug-tools.js?v=15";
+} from "./terrain/debug-tools.js?v=17";
 import { createLocationTerrainApi } from "./terrain/location-world.js?v=4";
 import { buildPolarCryosphereSurface } from "./terrain/polar-cryosphere-surface.js?v=1";
-import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=73";
+import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=74";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
-import { waterBedDepthAtShorelineDistance } from "./terrain/water-terrain-mask.js?v=1";
+import { waterTerrainBedY } from "./terrain/water-terrain-mask.js?v=1";
+import { sampleWaterwaySurfaceProfile } from "./water-dynamics.js?v=9";
 import {
   distanceToWaterBoundary,
   pointInWaterBody
@@ -239,14 +240,14 @@ function resolveWaterTerrainY(x, z, terrainY, candidates = null) {
       x < bounds.minX || x > bounds.maxX ||
       z < bounds.minZ || z > bounds.maxZ
     )) continue;
-    if (!Number.isFinite(Number(area?.surfaceY))) continue;
     if (!pointInWaterBody(area, x, z)) continue;
+    // Rivers have a varying profile and deliberately store surfaceY:null.
+    // Number(null) incorrectly excavated inland river beds down to sea level.
     // Meet the terrain close to the registered shoreline, then deepen the bed
     // smoothly. A fixed cut makes an opaque water polygon read as a floating
     // slab at quays and beaches.
     const shorelineDistance = distanceToWaterBoundary(area, x, z);
-    const bedDepth = waterBedDepthAtShorelineDistance(shorelineDistance);
-    resolvedY = Math.min(resolvedY, Number(area.surfaceY) - bedDepth);
+    resolvedY = Math.min(resolvedY,waterTerrainBedY(area,x,z,terrainY,shorelineDistance,sampleWaterwaySurfaceProfile));
   }
   return resolvedY;
 }
@@ -286,6 +287,7 @@ function applyWaterTerrainMask(options = {}) {
     maskedVertices += Number(mesh.userData?.waterMaskedVertices || 0);
   }
   const terrainSeams = stitchTerrainGroupEdges(appCtx);
+  refreshFarTerrainBoundaryHeights();
   clearTerrainHeightCache();
   const stats = {
     terrainMeshes: meshes.length,
@@ -312,6 +314,7 @@ function applyTransportTerrainCorridors(options = {}) {
     waterMaskedVertices += Number(mesh.userData?.waterMaskedVertices || 0);
   }
   const terrainSeams = stitchTerrainGroupEdges(appCtx);
+  refreshFarTerrainBoundaryHeights();
   clearTerrainHeightCache();
   const stats = Object.freeze({
     authority: 'compiled_transport_surface',
@@ -373,11 +376,12 @@ const transportPublicationDeps = {
   polylineCurvatureMetric,
   rebuildStructureVisualMeshes,
   rebuildStructureVisualMeshesCooperatively,
-  validateRoadTerrainConformance
+  worldToLatLon
 };
 
 const {
   refreshFarTerrainSurfaceColors,
+  refreshFarTerrainBoundaryHeights,
   resetFarTerrainClipmap,
   sampleFarTerrainWorldYAt,
   scheduleFarTerrainSurfaceRefresh,
@@ -388,6 +392,12 @@ const {
   clampElevationMeters,
   getOrLoadTerrainTile,
   latLonToTileXY,
+  sampleDetailedTerrainMetersAtLatLon: (lat, lon) => {
+    const sample = peekTerrainSourceSampleAtLatLon(lat, lon, terrainTileDeps);
+    return sample?.status === 'available' && Number.isFinite(Number(sample.elevationMeters))
+      ? Number(sample.elevationMeters)
+      : null;
+  },
   sampleAcceptedGroundAtLatLon,
   sampleTileElevationMeters,
   terrainTileDeps,
@@ -419,6 +429,15 @@ const {
 
 function resetEarthStreaming(reason = 'earth_streaming_reset') {
   earthStreamingReleaseGeneration += 1;
+  // Cut/fill profiles use location-relative coordinates. They must be released
+  // before any new tile samples terrain, including destinations with no roads
+  // (which legitimately skip transport compilation altogether).
+  appCtx.structureTerrainCuts = [];
+  appCtx.structureTerrainCutByFeature = null;
+  appCtx.structureTerrainCutIndex = null;
+  appCtx.transportTerrainCorridorPublication = null;
+  appCtx.transportTerrainCorridorStats = null;
+  clearTerrainHeightCache();
   const before = Object.freeze({
     terrainChildren: Number(appCtx.terrainGroup?.children?.length || 0),
     farFieldActive: !!appCtx.farTerrainClipmapState,

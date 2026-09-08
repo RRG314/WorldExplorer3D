@@ -23,7 +23,8 @@ function isAirportSelection(location = {}) {
   return details.isAirport === true || Boolean(
     String(details.airportClass || '').trim() ||
     String(details.iata || '').trim() ||
-    String(details.icao || '').trim()
+    String(details.icao || '').trim() ||
+    /\b(?:airport|aerodrome|airfield)\b/i.test(String(location.name || location.label || ''))
   );
 }
 
