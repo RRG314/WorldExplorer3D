@@ -678,7 +678,14 @@ that authority; it will not publish precise coordinates from an unrelated
 client or infer online players from local scene objects.
 
 Firebase Analytics is a presentation and reporting consumer, not a gameplay
-authority. Session and bounded product events exclude exact GPS coordinates,
+authority. `js/analytics-service.js` owns its singleton independently of game
+startup. `js/site-analytics.js` owns canonical page views and arrival-to-first-play
+events; `js/analytics.js` retains world sessions, auth association, and bounded
+gameplay events using the same instance through `firebase-init.js`. This local
+repair is not deployed yet. Initialization does not import the game or require
+sign-in, Firestore, Storage, or App Check. Manual page views replace the default
+automatic page view, preventing duplicate counts. Query strings and fragments
+are excluded; referrers retain only the origin. Session and bounded product events exclude exact GPS coordinates,
 room codes, names, messages, artifact text, and other free-form input. Standard
 first-party analytics storage is used when no preference has been recorded so
 visits and returning sessions can be counted reliably. An explicit limited
