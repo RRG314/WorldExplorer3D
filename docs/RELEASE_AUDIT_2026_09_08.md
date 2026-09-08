@@ -1,7 +1,8 @@
 # Production audit — September 8
 
-Status: incomplete, not release approval. Baseline 7061358a plus snow-surface
-polish under test. No production deployment or main/stable update performed.
+Status: incomplete, not release approval. Camera/snow candidate
+5.2.0+0761b370b3e7.abd395f67b79e0b9.production is served locally on port 4198.
+No production deployment or main/stable update performed.
 
 ## Confirmed source and deployment identity
 
@@ -22,8 +23,16 @@ visible, and temporarily uses a 4 cm near plane restored on leaving the cabin.
 The exterior atlas shell is outward-facing rather than double-sided so its
 opaque window backfaces do not block the separate modeled interior. Open-terrain
 C-key cycling and cabin screenshots were inspected; seven focused checks pass.
-East Pratt Street automation timed out before world readiness; city/tunnel
-camera acceptance remains open, not assumed from the open-terrain result.
+The first East Pratt run exceeded its 70 s startup limit; diagnostics showed
+geometry complete and gameplay startup in progress, with the optional exact
+Overpass provider unavailable. The corrected bounded 120 s readiness check
+passed on the immutable candidate at 39.2898,-76.6102. Actual C-key cycling
+produced chase -> cabin -> overhead -> chase, all with the BMW visible,
+near clip .5 -> .04 -> .5 -> .5, and restored rear distance 10 units.
+Screenshots in driving-camera-baltimore-candidate-bounded were visually inspected:
+whole-car rear view and a driver-seat dashboard/windshield view. No page errors.
+This verifies stationary city camera switching, not tunnel passage, sustained
+driving, or acceptable cold-start latency. Those remain open.
 
 Real staging upload -> validation -> preview save -> stale revision rejection ->
 reload -> manual submission passed on a disposable fixture, then removed along
@@ -43,12 +52,11 @@ representations rather than requiring the mutable capture to remain approved.
    the production provider and permitted domains, then test real authentication.
    Read-only Firebase App Check Enterprise config also returned no site key for
    the production web app; this is not only a missing local field.
-2. Staging records/media are not transferred by deployment. Read-only preflight
-   for capture_be8fe76770d9db092d58f314f236be0b rejected the current record because
-   it is not an approved manual exterior matching its admission requirements.
-   This does not prove the published representation is gone. Resolve the actual
-   approved immutable representation and ownership before migration; do not
-   force-copy this record or reapprove it blindly.
+2. Staging records/media are not transferred by deployment. The approved manual
+   revision and its 48 originals have now been resolved and verified above.
+   Copying verified generations/checksums and remapping the different production
+   owner UID remains outstanding; do not copy the old reconstruction record or
+   bypass review/private-media permissions.
 3. Exact bridge/tunnel visual acceptance, sustained travel and physical Android
    completion remain open. Earlier fixture successes are not new release evidence.
 4. Snow was visibly featureless after its classification fix. Natural snow

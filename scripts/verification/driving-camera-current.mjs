@@ -3,7 +3,9 @@ import {mkdir,writeFile} from 'node:fs/promises';
 const out=process.env.WE3D_VERIFY_OUTPUT||'output/verification/driving-camera-current';
 await mkdir(out,{recursive:true});
 const server=await chromium.launchServer({channel:'chrome',headless:true});
-const deadline=setTimeout(()=>server.process().kill('SIGTERM'),130000);
+// Cold dense-city provider + geometry loading exceeded 70 s in captured evidence.
+// Keep a hard overall deadline; do not turn a startup timeout into a camera pass.
+const deadline=setTimeout(()=>server.process().kill('SIGTERM'),180000);
 const report={errors:[],views:[]};
 let page;
 try {
@@ -13,7 +15,7 @@ try {
  await page.goto((process.env.WE3D_VERIFY_BASE_URL||'http://127.0.0.1:4195')+`/app/?loc=custom&lat=${process.env.WE3D_LAT||20.5043}&lon=${process.env.WE3D_LON||8.175}&mode=driving`);
  await page.waitForFunction(()=>window.__WE3D_RUNTIME_READY__,null,{timeout:45000});
  await page.locator('#globeSelectorStartBtn').click();
- await page.waitForFunction(()=>{const s=window.getWorldExplorerRuntimeDiagnostics?.();return s?.gameStarted&&!s.worldLoading&&!document.querySelector('#loading')?.classList.contains('show');},null,{timeout:70000});
+ await page.waitForFunction(()=>{const s=window.getWorldExplorerRuntimeDiagnostics?.();return s?.gameStarted&&!s.worldLoading&&!document.querySelector('#loading')?.classList.contains('show');},null,{timeout:120000});
  await page.evaluate(async()=>{window.cameraCtx=(await import('/app/js/shared-context.js?v=55')).ctx;if(cameraCtx.Walk.state.mode!=='drive')throw Error('Not driving: invalid test setup');await cameraCtx.ensureCuratedPlayerCar();cameraCtx.setTimeOfDay('day');cameraCtx.setCameraMode(0);});
  for(const name of ['chase','cabin','overhead','return-chase']) {
   await page.waitForTimeout(700);
