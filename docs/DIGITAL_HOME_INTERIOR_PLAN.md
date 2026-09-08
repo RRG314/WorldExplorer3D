@@ -6,6 +6,15 @@ installing independent room-sized photo boxes inside building-sized collision.
 
 ## Product decision
 
+The detailed interaction and implementation refinement is in
+[Floor-plan editing and playable digital homes](research/INTERIOR_FLOORPLAN_RESEARCH.md).
+It supersedes the earlier room-box-first entry flow: begin with optional floor,
+bedroom, bathroom, other-space and stair setup, then a gridded 2D layout. Closed
+room regions produce the actual blank 3D shell for inside-room photo placement.
+Counts create a suggested starting arrangement or unplaced room tray, never a
+claim to know the actual house. Irregular rooms have one photo surface per real
+wall segment, not a fixed six-surface model.
+
 Use **one home layout, progressively improved room by room**. Floor-plan editing
 owns room shape and connectivity; Reality Capture supplies photographs and
 representation revisions. A photo cannot establish unseen dimensions, doorway
@@ -48,7 +57,10 @@ these modules. Do not document the new graph as existing functionality.
    floor. Show the actual outline, not a generic rectangle. A private draft is
    allowed before publication; installing into a shared property requires the
    appropriate virtual entitlement.
-3. Select **Start with one room** or a suggested layout. Suggestions are explicitly
+3. Enter optional floor, bedroom, bathroom and other-space counts, plus whether
+   internal stairs connect the floors. Select **Arrange a starting plan** or
+   **Start with one room**. Use a gridded 2D plan with room pieces, shared walls,
+   door placement and corner edits for closets and irregular shapes. Suggestions are explicitly
    generated, not claimed to describe the real house. Unknown portions can remain
    unassigned; do not force a user to invent the entire house before saving.
 4. Drag room edges with large handles, enter a known measurement in feet/inches
@@ -56,7 +68,8 @@ these modules. Do not document the new graph as existing functionality.
    currently selected measurement, not a screen of compulsory fields.
 5. **Add a room beside this one** offers adjacent valid space. The shared wall is
    one wall, not two independently overlapping walls. Tap it to add a doorway.
-6. Tap a room surface, select a photo thumbnail, crop, then place on the whole
+6. Choose **Inside room** to enter the blank 3D space generated from the selected
+   closed 2D room. Tap a room surface, select a photo thumbnail, crop, then place on the whole
    surface or a grid region. Retain the existing exterior editor's familiar
    gestures, undo and explicit Save-to-account feedback. A simple diagram names
    the selected surface; it does not infer orientation from Photo 1/2/3.
