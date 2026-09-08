@@ -5,7 +5,9 @@ import {randomBytes} from 'node:crypto';
 import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {stagingCaptureAttestation} from './staging-capture-attestation.mjs';
-const origin='https://we3d-staging-20260712.web.app';
+const production=process.env.WE3D_VERIFY_PRODUCTION==='1';
+const origin=production?'https://worldexplorer3d.io':'https://we3d-staging-20260712.web.app';
+if(production&&process.env.WE3D_CAPTURE_AUTOMATION_ATTESTATION==='1')throw Error('Production must use real App Check, never a debug bypass');
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const page=await browser.newPage({viewport:{width:390,height:844}});page.setDefaultTimeout(20000);
 let account,config,captureId,deleted=false;
@@ -16,7 +18,7 @@ try{
     await page.addInitScript(token=>{self.FIREBASE_APPCHECK_DEBUG_TOKEN=token;},attestation.token);
   }
   await page.goto(origin+'/app/capture.html');await page.locator('#googleSignIn').waitFor({state:'visible'});
-  config=await page.evaluate(()=>globalThis.WORLD_EXPLORER_FIREBASE);assert.equal(config.projectId,'we3d-staging-20260712');
+  config=await page.evaluate(()=>globalThis.WORLD_EXPLORER_FIREBASE);assert.equal(config.projectId,production?'worldexplorer3d-d9b83':'we3d-staging-20260712');
   const email=`hybrid-smoke-${Date.now()}@example.test`,password=randomBytes(24).toString('base64url');
   const response=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${config.apiKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password,returnSecureToken:true})});account=await response.json();assert.ok(response.ok,account.error?.message);
   await page.locator('[name=email]').fill(email);await page.locator('[name=password]').fill(password);await page.locator('#emailSignIn button').click();await page.locator('#phoneCaptures').waitFor({state:'visible'});
@@ -54,7 +56,7 @@ try{
   },captureId);
   assert.deepEqual(manual,{uploadStatus:'uploaded',photoCount:1,revision:2,submissionStatus:'review_required',paidDenied:true,roomDenied:true});
   await page.evaluate(async id=>(await import('/js/community-reality-capture-api.js?v=4')).deleteRealityCapture(id),captureId);deleted=true;
-  await mkdir('output/verification/reality-capture-hybrid',{recursive:true});await writeFile('output/verification/reality-capture-hybrid/staging-report.json',JSON.stringify({passed:true,...result,afterReload,manual,fixtureDeleted:true,automationAttestation:!!attestation,limitations:'Synthetic photo with real staging upload/validation/CPU submission. No physical phone, public approval or world acceptance.'},null,2));console.log('Live staging manual photo upload, validation, save, CPU submission, cost gates and cleanup passed. No reconstruction launched.');
+  await mkdir('output/verification/reality-capture-hybrid',{recursive:true});await writeFile(`output/verification/reality-capture-hybrid/${production?'production':'staging'}-report.json`,JSON.stringify({passed:true,origin,...result,afterReload,manual,fixtureDeleted:true,automationAttestation:!!attestation,limitations:'Synthetic photo with real upload/validation/CPU submission. No physical phone, public approval or world acceptance.'},null,2));console.log('Live manual photo upload, validation, save, CPU submission, cost gates and cleanup passed. No reconstruction launched.');
 }finally{
   if(captureId&&!deleted)await page.evaluate(async id=>(await import('/js/community-reality-capture-api.js?v=4')).deleteRealityCapture(id),captureId).catch(()=>{});
   if(account?.idToken&&config)await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:delete?key=${config.apiKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idToken:account.idToken})});
