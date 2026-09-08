@@ -53,3 +53,7 @@ test('dividing a room joins adjacent wall vertices and preserves existing door r
   assert.equal(assertPlayableLayout(normalizeLayout(layout,envelope)),true);assert.equal(floor.rooms.length,4);assert.ok(oldDoors.every(id=>floor.doors.some(d=>d.id===id)));
   assert.throws(()=>splitRoom(floor,floor.rooms[0].id,'x',-1),/divide/);
 });
+test('starter follows a rotated mapped building instead of imposing a north-aligned rectangle',()=>{
+  const angle=.63,footprint=envelope.footprint.map(p=>({x:p.x*Math.cos(angle)-p.z*Math.sin(angle),z:p.x*Math.sin(angle)+p.z*Math.cos(angle)}));
+  const layout=makeStarterLayout({...envelope,footprint},{floorCount:2});assert.equal(assertPlayableLayout(layout),true);assert.equal(layout.floors.length,2);
+});

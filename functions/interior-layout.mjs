@@ -216,7 +216,8 @@ export function compileLayout(layout) {
 }
 
 export function makeStarterLayout(envelope,{bedrooms=1,bathrooms=1,floorCount=1,unitOutline,unitLabel}={}) {
-  const boundary=validateRing(unitOutline||envelope.footprint),minX=Math.min(...boundary.map(p=>p.x))+.2,maxX=Math.max(...boundary.map(p=>p.x))-.2,minZ=Math.min(...boundary.map(p=>p.z))+.2,maxZ=Math.max(...boundary.map(p=>p.z))-.2;
+  const mappedBoundary=validateRing(unitOutline||envelope.footprint),angle=Math.atan2(mappedBoundary[1].z-mappedBoundary[0].z,mappedBoundary[1].x-mappedBoundary[0].x),cos=Math.cos(angle),sin=Math.sin(angle);
+  const boundary=mappedBoundary.map(p=>({x:p.x*cos+p.z*sin,z:-p.x*sin+p.z*cos})),minX=Math.min(...boundary.map(p=>p.x))+.2,maxX=Math.max(...boundary.map(p=>p.x))-.2,minZ=Math.min(...boundary.map(p=>p.z))+.2,maxZ=Math.max(...boundary.map(p=>p.z))-.2;
   const labels=['Living / kitchen',...Array.from({length:Math.max(0,Math.min(8,bedrooms))},(_,i)=>`Bedroom ${i+1}`),...Array.from({length:Math.max(0,Math.min(4,bathrooms))},(_,i)=>`Bathroom ${i+1}`)];
   const count=Math.max(1,Math.min(4,floorCount)),height=Math.min(2.7,envelope.heightMeters/count-.15);
   const layout={schemaVersion:1,id:`home_${crypto.randomUUID().replaceAll('-','')}`,unitLabel:unitLabel||'My home',...(unitOutline?{unitOutline}:{}),floors:[],stairs:[]};
@@ -233,5 +234,8 @@ export function makeStarterLayout(envelope,{bedrooms=1,bathrooms=1,floorCount=1,
     layout.floors.push(floor);
     if(hall&&f>0)layout.stairs.push({id:`starter_stairs_${f}`,from:`floor_${f-1}`,to:floor.id,width:1,path:[{x:minX+.8,z:minZ+.7},{x:minX+.8,z:maxZ-.7}]});
   }
+  const toBuilding=p=>({x:p.x*cos-p.z*sin,z:p.x*sin+p.z*cos});
+  for(const floor of layout.floors)for(const [id,p] of Object.entries(floor.vertices))floor.vertices[id]=toBuilding(p);
+  for(const stair of layout.stairs)stair.path=stair.path.map(toBuilding);
   return normalizeLayout(layout,envelope);
 }
