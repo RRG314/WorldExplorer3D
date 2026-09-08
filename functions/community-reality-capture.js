@@ -331,6 +331,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       await db.runTransaction(async tx=>{
         const snap=await tx.get(ref), capture=snap.data();
         if(!snap.exists||capture.ownerUid!==auth.uid)throw Error('capture_not_found');
+        if(capture.status === 'deleting')throw Error('invalid_capture_state_transition');
         saved=normalizeHybridPreview({...capture,captureId},req.body?.preview);
         // Only private preview state changes. Existing processed assets, review,
         // public representations, collision and canonical building stay intact.
@@ -430,10 +431,20 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     const captureId = clean(req.body?.captureId, 180);
     try {
       const ref = db.collection(CAPTURES).doc(captureId);
-      const snap = await ref.get();
-      if (!snap.exists) throw new Error('capture_not_found');
-      const capture = snap.data() || {};
-      if (!isDeletableByOwner(capture, auth.uid)) throw new Error(capture.status === 'approved' ? 'approved_capture_admin_workflow_required' : 'capture_owner_required');
+      let capture;
+      // Claim deletion before touching Storage. Approval/submission transactions
+      // observe the tombstone and cannot publish files being removed. Published
+      // revisions remain protected even while a newer revision awaits review.
+      await db.runTransaction(async tx => {
+        const snap = await tx.get(ref);
+        if (!snap.exists) throw new Error('capture_not_found');
+        capture = snap.data() || {};
+        if (!isDeletableByOwner(capture, auth.uid)) throw new Error(capture.status === 'approved' ? 'approved_capture_admin_workflow_required' : 'capture_owner_required');
+        const published = await tx.get(db.collection(REPRESENTATIONS).where('captureId', '==', captureId).limit(1));
+        const space = capture.spaceId ? await tx.get(db.collection(SPACES).doc(capture.spaceId)) : null;
+        if (!published.empty || space?.data()?.captureId === captureId) throw Error('approved_capture_admin_workflow_required');
+        tx.update(ref, {status: 'deleting', updatedAt: FieldValue.serverTimestamp()});
+      });
       const [files] = await bucket.getFiles({ prefix: `reality-captures/${auth.uid}/${captureId}/` });
       await Promise.all(files.map((file) => file.delete({ ignoreNotFound: true })));
       let deletedRelatedDocuments = 0;
@@ -890,6 +901,10 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
         actorUid: moderator.auth.uid, actorName: moderator.displayName,
         actionType: `reality_capture.${decision}`, targetType: 'reality_capture', targetId: captureId,
         title: `Reality capture ${decision}`, summary: clean(capture.building?.label || captureId, 140)
+      }).catch(error => {
+        // Publication is already committed. Never report it as failed because
+        // the secondary activity feed is unavailable; review remains durable.
+        console.error('[realityCaptureActivityAfterCommit]', captureId, error?.code || 'activity_log_failed');
       });
       res.status(200).json({ captureId, status: decision, representationId });
     } catch (error) {

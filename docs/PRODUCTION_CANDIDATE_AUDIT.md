@@ -4,6 +4,22 @@ September 7, 2026. Audited source: `075ce038`. **Not ready for promotion.**
 This pass inspected changes and executed bounded tests; it did not deploy or
 claim a complete visual release acceptance. No cloud reconstruction was run.
 
+## Implementation follow-up
+
+The published-reference deletion blocker and post-commit activity-log error path
+below are now repaired locally. Deletion transactionally checks representation
+references and the installed private space, then claims `deleting` before Storage
+cleanup. Failed cleanup retains that retryable tombstone. Approval/submission
+cannot race it; private preview saves also reject it. Focused regressions cover
+published pending edits, approval winning the claim, cleanup failure/retry and
+secondary activity-log failure. This still needs actual staged Firestore/rules
+acceptance before promotion; test doubles are not the Firestore emulator.
+
+The exterior editor now uses the game's Poppins/Orbitron typography, dark native
+controls and contained scrolling. Desktop and touch-sized editor checks passed;
+screenshots of the editor and mapped-wall geometry were inspected. This is not
+a claim that all UI surfaces or remaining transport visuals are accepted.
+
 ## Release scope
 
 Finish and validate the existing manual exterior contribution path. Preserve

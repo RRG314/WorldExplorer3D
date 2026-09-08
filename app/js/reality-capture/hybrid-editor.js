@@ -15,9 +15,9 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
   const dialog=document.createElement('dialog'); dialog.className='captureHybridEditor';
   dialog.setAttribute('aria-label','Build a photo-supported building preview');
   dialog.innerHTML=`<style>
-    .captureHybridEditor{box-sizing:border-box;background:#09222d;color:#e3f5fa;border:1px solid #68c4d0;border-radius:12px;width:min(1000px,96vw);max-height:94dvh;padding:18px;overflow:auto;font:15px/1.5 system-ui}
+    .captureHybridEditor{box-sizing:border-box;color-scheme:dark;background:#09222d;color:#e3f5fa;border:1px solid #68c4d0;border-radius:12px;width:min(1000px,96vw);max-height:94dvh;padding:18px;overflow:auto;overscroll-behavior:contain;font:14px/1.5 'Poppins',sans-serif}
     .captureHybridEditor *{box-sizing:border-box}.captureHybridEditor::backdrop{background:#000b}
-    .captureHybridEditor h2{margin:0}.captureHybridEditor header{display:flex;justify-content:space-between;gap:12px;position:sticky;top:-18px;background:#09222d;z-index:5;padding:8px 0}
+    .captureHybridEditor h2{margin:0;font:700 18px/1.3 'Orbitron',sans-serif}.captureHybridEditor header{display:flex;justify-content:space-between;align-items:center;gap:12px;position:sticky;top:-18px;background:#09222d;z-index:5;padding:8px 0;border-bottom:1px solid #426573}
     .captureHybridEditor button,.captureHybridEditor select,.captureHybridEditor input{font:inherit;min-height:44px;background:#143844;color:#e3f5fa;border:1px solid #72b5c2;border-radius:6px;padding:8px;max-width:100%}
     .captureHybridEditor button{cursor:pointer}.captureHybridEditor button:disabled{opacity:.5;cursor:default}
     .captureHybridEditor :focus-visible{outline:3px solid #ffcc55;outline-offset:2px}

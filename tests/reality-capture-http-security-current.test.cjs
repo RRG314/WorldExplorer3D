@@ -36,9 +36,11 @@ function harness(t, capture = base, extras = {}) {
   function ref(path) {
     return { path, get: async () => snapshot(path),
       collection: (name) => collection(`${path}/${name}`),
-      set: async (patch) => { mutate(path, patch); writes.push(path); } };
+      set: async (patch) => { mutate(path, patch); writes.push(path); },
+      delete: async () => { mutate(path,null); writes.push(path); } };
   }
-  function collection(path) { return { doc: (name) => ref(`${path}/${name}`) }; }
+  function collection(path) { return { doc: (name) => ref(`${path}/${name}`),
+    where: (field, operator, value) => ({limit: count => ({query:{path,field,value,count}})}) }; }
   function mutate(path, patch) {
     function check(value, parentArray=false) {
       if(Array.isArray(value)) {
@@ -54,7 +56,10 @@ function harness(t, capture = base, extras = {}) {
   const db = { collection, runTransaction: async (callback) => {
     hooks.beforeTransaction?.();
     const staged = [];
-    await callback({ get: async (reference) => snapshot(reference.path),
+    await callback({ get: async (reference) => {
+      if(reference.query){const q=reference.query;const docs=[...records].filter(([p,v])=>p.startsWith(q.path+'/')&&v[q.field]===q.value).slice(0,q.count).map(([p])=>snapshot(p));return {empty:docs.length===0,docs};}
+      return snapshot(reference.path);
+    },
       update: (reference, patch) => staged.push([reference.path, patch]),
       set: (reference, patch) => staged.push([reference.path, patch]) });
     for (const [path, patch] of staged) { mutate(path, patch); writes.push(path); }
@@ -70,6 +75,7 @@ function harness(t, capture = base, extras = {}) {
   };
   const authClaims = {};
   const api = buildCommunityRealityCaptureExports({ db, bucket, setCors: () => false,
+    logAdminActivity: async () => { if(hooks.activityFailure)throw Error('activity_unavailable'); },
     requireModerator: async req => req.uid === 'moderator' ? { auth: { uid: req.uid }, displayName: 'Moderator' } : null,
     verifyAuth: async (req) => ({ uid: req.uid, ...authClaims }), verifyAppCheck: async () => true });
   async function call(name, uid, body = {}) {
@@ -81,6 +87,35 @@ function harness(t, capture = base, extras = {}) {
   }
   return { call, bucket, records, reads, fileRequests, writes, mutate, hooks, authClaims };
 }
+
+test('pending edits cannot delete an earlier published representation',async t=>{
+  const h=harness(t,{...base,status:'review_required'}, {'buildingRepresentations/published':{captureId:id,status:'approved'}});
+  let touched=false;h.bucket.getFiles=async()=>{touched=true;return [[]];};
+  assert.equal((await h.call('deleteRealityCapture','owner')).code,409);
+  assert.equal(touched,false);assert.equal(h.writes.length,0);
+});
+test('deletion claims a tombstone before storage and safely retries a cleanup failure',async t=>{
+  const h=harness(t,{...base,status:'uploaded'});
+  h.bucket.getFiles=async()=>{assert.equal(h.records.get(`realityCaptures/${id}`).status,'deleting');throw Error('temporary_storage_failure');};
+  assert.notEqual((await h.call('deleteRealityCapture','owner')).code,200);
+  assert.equal(h.records.get(`realityCaptures/${id}`).status,'deleting');
+  assert.equal((await h.call('moderateRealityCapture','moderator',{decision:'approved'})).code,409);
+  h.bucket.getFiles=async()=>[[]];
+  assert.equal((await h.call('deleteRealityCapture','owner')).code,200);
+  assert.equal(h.records.has(`realityCaptures/${id}`),false);
+});
+test('approval winning before the deletion claim leaves storage untouched',async t=>{
+  const h=harness(t,{...base,status:'review_required'});
+  h.hooks.beforeTransaction=()=>h.mutate(`realityCaptures/${id}`,{status:'approved'});
+  let touched=false;h.bucket.getFiles=async()=>{touched=true;return [[]];};
+  assert.equal((await h.call('deleteRealityCapture','owner')).code,409);
+  assert.equal(touched,false);
+});
+test('approval remains successful when secondary activity logging fails',async t=>{
+  const h=harness(t,{...base,status:'review_required'});h.hooks.activityFailure=true;
+  assert.equal((await h.call('moderateRealityCapture','moderator',{decision:'approved'})).code,200);
+  assert.equal(h.records.get(`realityCaptures/${id}`).status,'approved');
+});
 
 test('public interior preference cannot bypass approval, and owners can make it private again',async t=>{
   const h=harness(t,base,{'privateSpaces/room':{ownerUid:'owner',captureId:id,accessMode:'PRIVATE'}});
