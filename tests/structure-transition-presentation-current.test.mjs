@@ -3,11 +3,25 @@ import assert from 'node:assert/strict';
 import { compileTransportSurfaceModel } from '../app/js/world/compiler/transport-surface-model.js';
 import { compileTunnelSystemModels, compileTunnelSystemModel } from '../app/js/world/compiler/tunnel-system-model.js';
 import { tunnelWallIsOpen } from '../app/js/world/compiler/tunnel-junction-openings.js';
-import { shouldPublishTunnelShellSection, portalCopingHeight } from '../app/js/terrain/structure-visual-meshes.js';
+import { shouldPublishTunnelShellSection, portalCopingHeight, portalFaceUV } from '../app/js/terrain/structure-visual-meshes.js';
 import { compileStructureColliderDescriptors } from '../app/js/world/structure-colliders.js';
 import { sampleStructureAssemblyThicknessAt } from '../app/js/world/compiler/transport-structure-assembly.js';
 import { buildTransportJunctionProfileAnchors } from '../app/js/world/compiler/transport-junction-profile.js';
 import { sampleFeatureSurfaceY } from '../app/js/structure-semantics.js';
+
+test('portal face texture retains area across front, jamb and soffit at every heading',()=>{
+  const faces=[
+    [[0,0,0],[3,0,0],[0,3,0],[3,3,0]],
+    [[0,0,0],[0,3,0],[0,0,.36],[0,3,.36]],
+    [[0,3,0],[3,3,0],[0,3,.36],[3,3,.36]]
+  ];
+  for(const angle of [0,.2,Math.PI/4,Math.PI/2,2.8])for(const face of faces){
+    const rotated=face.map(([x,y,z])=>[x*Math.cos(angle)-z*Math.sin(angle),y,x*Math.sin(angle)+z*Math.cos(angle)]);
+    const [a,b,c]=portalFaceUV(rotated);
+    const area=Math.abs((b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]));
+    assert.ok(area>.08,`collapsed face at ${angle}`);
+  }
+});
 
 test('portal coping follows cross-slope locally without shrinking the clearance arch',()=>{
   assert.equal(portalCopingHeight(4.8,3),4.8);

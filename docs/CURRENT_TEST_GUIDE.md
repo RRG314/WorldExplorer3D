@@ -18,22 +18,26 @@ look at the already approved house.
 
 ## Exact availability
 
-Source checkpoint: `c801c19f`, branch `steven/building-exteriors-local`.
+Gameplay/capture checkpoint: `93470acb`, branch `steven/building-exteriors-local`.
 Recovery branch: `steven/manual-capture-working-checkpoint` at `ba14127f`.
 
 Deployed staging hosting build:
-`5.2.0+ba14127f756c.340d783fc235d491.staging`.
-This was built from an isolated deployment snapshot, not the current source tree.
-Its fingerprint matters: do not infer all current source code is deployed just
-because the version begins with 5.2.0.
+`5.2.0+93470acb1767.68ba49afe1848cc2.staging`.
+This is a clean build of the production-bound branch, not the earlier isolated
+snapshot. The production-configured artifact from the same source has matching
+runtime bundles; Firebase accounts, media and backend configuration are separate.
+The latest phone-font polish is local until the next candidate is built.
 
-The last staging update included facade trim orientation, wall-height alignment
-and the approved-exterior listing handler. Your saved four-wall contribution
-remains approved. New manual-first UI, placed-edit recovery, reconstruction
-request restrictions, public-interior approval guards and admin refresh feedback
-remain local. A coordinated hosting/backend update and focused acceptance are
-needed before those can be tested on your phone. Do not start a reconstruction
-job from the older staging UI just to test manual editing.
+The staged update includes facade alignment, manual-first UI, placed-edit
+recovery, protected publication/deletion, public-interior approval guards and
+admin refresh feedback. Your saved four-wall contribution remains approved.
+Public new-room capture and paid reconstruction admission are unavailable;
+existing private records remain accessible to their owners. No reconstruction
+job is needed to test editing.
+
+Use local candidates for gameplay/visual checks. Use staging for phone HTTPS,
+account continuation, protected media and approval tests that need its backend.
+Production remains unchanged at `22b2f4ef4b07`. Do not deploy before owner testing.
 
 Manual room editing, private in-world draft previews, capture-specific rewards,
 featured places and contribution-room sharing are not yet available. Room photo
@@ -61,13 +65,23 @@ This is a concise user replay route, not a claim that every row has just passed.
   mapped house displayed their photos in staging.
 - The latest local facade fixture verified six rotated sides, mapped wall height
   and partial regions. Its rendered screenshot was inspected.
-- Forty-three focused geometry, authority and HTTP-security checks passed in
-  the preceding implementation pass.
+- Published-revision deletion/race and post-commit approval-error regressions
+  passed. Actual Firestore/Storage emulator rules checks also passed.
 - Manual-editor browser checks covered desktop and touch-sized layouts,
   placement/cropping, save, reopen and device recovery using controlled services.
-- The staging neighborhood reloaded with the recorded build. The exact corrected
-  house top edge was not visually re-accepted in that pass.
+- A disposable staging account uploaded a synthetic photo, saved/reloaded manual
+  placements, submitted a CPU-built revision for review, and deleted the pending
+  test capture. Paid retry and new-room requests were rejected. This did not
+  approve a synthetic building into the public world.
+- The staged Mars landing, rover movement and return to the ship passed with no
+  page errors or failed local resources; rendered screenshots were inspected.
+- Monaco loaded actual OSM transport in the local built artifact with no detected
+  discontinuities, grade violations or runtime errors. Its street screenshot
+  does not by itself establish tunnel-entrance visual quality.
+- The exact corrected house top edge still needs owner visual acceptance.
 
-These checks do not prove the undeployed changes work against staging, do not
-replace private-room end-to-end tests, and are not a new whole-app release gate.
-No paid reconstruction is required for this replay.
+These checks are scoped evidence, not proof of every gameplay feature. Before
+promotion, production App Check must be configured and the selected approved
+house must be migrated with its production owner UID and protected media.
+Neither migration nor production deployment has happened. No paid reconstruction
+is required for this replay.

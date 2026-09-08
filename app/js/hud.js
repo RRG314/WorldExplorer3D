@@ -553,6 +553,18 @@ function updateCamera(dt = 1 / 60) {
       const safe = resolveTunnelCameraBoom(tunnelCameraState.road,
         { x: lookX, y: lookY, z: lookZ }, appCtx.camera.position, cameraRadius);
       appCtx.camera.position.set(safe.x, safe.y, safe.z);
+    } else {
+      // A safe target does not make the interpolated pose safe on a hillside.
+      // Match the tunnel branch: constrain the pose actually rendered after
+      // smoothing, using the existing terrain authority and camera clearance.
+      const safe = resolveChaseCameraTerrainCollision(
+        { x: lookX, y: lookY, z: lookZ }, appCtx.camera.position,
+        planetaryChase
+          ? (x, z) => planetarySurfaceYAtRenderXZ(appCtx, x, z)
+          : (x, z) => appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y,
+        { clearance: cameraRadius }
+      );
+      appCtx.camera.position.set(safe.x, safe.y, safe.z);
     }
 
     // Initialize lookAt target if needed

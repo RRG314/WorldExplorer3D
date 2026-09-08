@@ -2,6 +2,29 @@
 
 Reconciled September 7, 2026 against `c226b291`.
 
+## Current candidate update
+
+The earlier reconciliation below is historical evidence. Staging hosting now
+uses clean branch commit `93470acb1767`, build
+`5.2.0+93470acb1767.68ba49afe1848cc2.staging`. The old temporary snapshot is retired.
+The production-configured artifact from that same commit was built and verified,
+not deployed. Runtime bundles match; environment configuration and its fingerprint
+intentionally differ. Manifests are retained in
+`output/verification/candidate-parity/`.
+
+Capture handlers and Storage rules were updated for the manual exterior flow.
+The broader staging handler deployment was interrupted on request, but submitted
+cloud operations finished: a subsequent read-only inventory found all70 handlers
+ACTIVE. No further deployment is implied by that inventory. Reconstruction
+workers were not updated, production was not changed, and live Stripe credentials
+were not copied. Local gameplay verification is preferred; staging is reserved
+for tests that benefit from HTTPS, account, media and trusted backend behavior.
+
+The selected approved house has48 original photos and one approved manual
+representation. Preflight found the same account email in production with a
+different UID. Media/record migration remains a separate promotion action.
+Production App Check configuration is also a pending promotion prerequisite.
+
 ## Source of truth
 
 - Working branch: **`steven/building-exteriors-local`**.

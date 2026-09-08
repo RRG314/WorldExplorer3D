@@ -5,7 +5,8 @@ import { chromium } from 'playwright';
 const base = process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4195';
 const output = 'output/playwright/bridge-tunnel-current';
 await mkdir(output, { recursive: true });
-const browser = await chromium.launch({ channel: 'chrome', headless: false });
+const browserServer = await chromium.launchServer({ channel: 'chrome', headless: false });
+const browser = await chromium.connect(browserServer.wsEndpoint());
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 const report = { baseline: base, providerPath: 'explicit-worldwide-fallback', errors: [], frames: [], checks: {} };
 // This transport-only source fixture must not contact production capture
@@ -14,7 +15,23 @@ report.captureListing = 'isolated-empty-fixture-not-capture-acceptance';
 await page.route('**/listApprovedExteriorRepresentations', route => route.fulfill({
   status:200,contentType:'application/json',headers:{'Access-Control-Allow-Origin':'*'},body:JSON.stringify({representations:[]})
 }));
-const deadline = setTimeout(() => void browser.close(), 150_000);
+// A graceful Chrome close can hang after a WebGL run. Own only this test's
+// browser and keep a hard bound through cleanup, not merely through assertions.
+async function closeOwnedBrowser() {
+  let timer;
+  const closed=await Promise.race([
+    browser.close().then(()=>true,()=>false),
+    new Promise(resolve=>{timer=setTimeout(()=>resolve(false),8000);})
+  ]);
+  clearTimeout(timer);
+  if(!closed)await browserServer.kill();
+  return closed;
+}
+const deadline = setTimeout(() => {
+  report.failure='Transport verification exceeded its 150 second wall-clock limit.';
+  process.exitCode=1;
+  void browserServer.kill();
+}, 150_000);
 page.on('pageerror', error => report.errors.push(String(error)));
 page.on('console', message => { if (message.type() === 'error') report.errors.push({ message: message.text(), location: message.location() }); });
 report.failedRequests = [];
@@ -154,8 +171,9 @@ try {
   report.failure = String(error.stack || error);
   process.exitCode = 1;
 } finally {
+  await writeFile(`${output}/report.json`, JSON.stringify(report, null, 2));
+  report.gracefulBrowserClose = await closeOwnedBrowser();
   clearTimeout(deadline);
   await writeFile(`${output}/report.json`, JSON.stringify(report, null, 2));
-  await browser.close();
   console.log(JSON.stringify({ ok: report.ok || false, checks: report.checks, failure: report.failure }, null, 2));
 }

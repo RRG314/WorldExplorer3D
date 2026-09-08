@@ -6,6 +6,30 @@ claim a complete visual release acceptance. No cloud reconstruction was run.
 
 ## Implementation follow-up
 
+Current follow-up baseline: `93470acb`, with local phone typography polish.
+The original findings below remain as the audit trail, not the current status:
+
+- Clean-source staging hosting replaces the modified snapshot; production and
+  staging runtime bundle parity was checked from the same commit.
+- Capture publication/deletion protection and approval response fixes are
+  deployed to staging. The actual manual upload/save/submit/delete path passed;
+  emulator rules and focused HTTP regressions passed. The real user's approved
+  house was not used for destructive tests.
+- New public room creation and paid reconstruction requests are rejected in
+  staging; developer code and existing private records are preserved.
+- Mars landing, rover movement and return to ship passed against staging.
+- Monaco's locally served built artifact loaded exact OSM transport and passed
+  continuity/authority checks. Portal visual acceptance remains separate.
+- The48 old house originals had permanent SDK download tokens revoked with
+  unchanged media bytes; authorized short-lived delivery remains the path.
+- **Still required before production:** production App Check configuration,
+  selective approved-house migration with UID/generation remapping, remaining
+  transport visuals and owner acceptance of the frozen candidate. No production
+  deployment, GitHub push or paid reconstruction was performed.
+
+The following paragraphs describe the first implementation follow-up, before
+the subsequent staged checks above.
+
 The published-reference deletion blocker and post-commit activity-log error path
 below are now repaired locally. Deletion transactionally checks representation
 references and the installed private space, then claims `deleting` before Storage

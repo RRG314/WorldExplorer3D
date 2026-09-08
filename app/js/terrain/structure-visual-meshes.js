@@ -178,6 +178,16 @@ export function portalCopingHeight(archY, terrainY) {
   return Math.max(archY, Number.isFinite(terrainY) ? terrainY + 0.08 : archY);
 }
 
+// Project each frame face onto its own plane. Front-plane coordinates collapse
+// the depth of jamb/soffit faces to zero, stretching one texel into long stripes.
+export function portalFaceUV(vertices) {
+  const [a,b,c] = vertices;
+  const ab = b.map((n,i)=>n-a[i]), ac = c.map((n,i)=>n-a[i]);
+  const normal = [ab[1]*ac[2]-ab[2]*ac[1],ab[2]*ac[0]-ab[0]*ac[2],ab[0]*ac[1]-ab[1]*ac[0]].map(Math.abs);
+  const axes = normal[1]>=normal[0] && normal[1]>=normal[2] ? [0,2] : normal[0]>=normal[2] ? [2,1] : [0,1];
+  return vertices.map(v=>[v[axes[0]]/3,v[axes[1]]/3]);
+}
+
 function buildTunnelShellMeshForContext(appCtx, shellDescriptors = []) {
   if (!Array.isArray(shellDescriptors) || shellDescriptors.length === 0 || typeof THREE === "undefined") return null;
   const positions = [];
@@ -278,11 +288,13 @@ function buildTunnelShellMeshForContext(appCtx, shellDescriptors = []) {
       }
       const frameQuad = (a, b, c, d) => {
         const base = positions.length / 3;
-        for (const index of [a, b, c, d]) {
-          const vertex = frameVertices[index];
+        const face = [a,b,c,d].map(index=>frameVertices[index]);
+        const faceUV = portalFaceUV(face);
+        for (let index=0;index<face.length;index++) {
+          const vertex = face[index];
           positions.push(...vertex);
           colors.push(0.70, 0.69, 0.65);
-          uvs.push(((vertex[0] - ring.x) * nx + (vertex[2] - ring.z) * nz) / 3, vertex[1] / 3);
+          uvs.push(...faceUV[index]);
         }
         indices.push(base, base + 2, base + 1, base + 1, base + 2, base + 3);
       };
