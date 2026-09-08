@@ -1,14 +1,20 @@
-// Bounded live persistence/authorization check. No photo upload, GPU queue, owner
-// account alteration, or public representation. Disposable fixture is removed.
+// Bounded live persistence/authorization check. One synthetic photo and a CPU
+// derivative, never GPU work or public approval. Disposable fixture is removed.
 import assert from 'node:assert/strict';
 import {randomBytes} from 'node:crypto';
 import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
+import {stagingCaptureAttestation} from './staging-capture-attestation.mjs';
 const origin='https://we3d-staging-20260712.web.app';
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const page=await browser.newPage({viewport:{width:390,height:844}});page.setDefaultTimeout(20000);
 let account,config,captureId,deleted=false;
+let attestation;
 try{
+  if(process.env.WE3D_CAPTURE_AUTOMATION_ATTESTATION==='1'){
+    attestation=await stagingCaptureAttestation();
+    await page.addInitScript(token=>{self.FIREBASE_APPCHECK_DEBUG_TOKEN=token;},attestation.token);
+  }
   await page.goto(origin+'/app/capture.html');await page.locator('#googleSignIn').waitFor({state:'visible'});
   config=await page.evaluate(()=>globalThis.WORLD_EXPLORER_FIREBASE);assert.equal(config.projectId,'we3d-staging-20260712');
   const email=`hybrid-smoke-${Date.now()}@example.test`,password=randomBytes(24).toString('base64url');
@@ -29,10 +35,29 @@ try{
   assert.deepEqual(result,{revision:1,restoredRevision:1,private:'PRIVATE',conflict:true,status:'draft',photos:0});
   await page.reload();await page.locator('#phoneCaptures').waitFor({state:'visible'});
   const afterReload=await page.evaluate(async id=>(await(await import('/js/community-reality-capture-api.js?v=4')).getMyRealityCapture(id)).capture.hybridPreview.revision,captureId);assert.equal(afterReload,1);
+  const manual=await page.evaluate(async id=>{
+    const api=await import('/js/community-reality-capture-api.js?v=4');
+    const c=document.createElement('canvas');c.width=1280;c.height=720;
+    const ctx=c.getContext('2d');ctx.fillStyle='#9e7153';ctx.fillRect(0,0,c.width,c.height);
+    const photo=await api.normalizeCapturePhoto(await new Promise(resolve=>c.toBlob(resolve,'image/jpeg')));
+    const capture=(await api.getMyRealityCapture(id)).capture;
+    await api.uploadRealityCapturePhoto(capture,photo);
+    const finalized=await api.finalizeRealityCaptureUpload(id);
+    const uploaded=await api.getMyRealityCapture(id);
+    const preview={...uploaded.capture.hybridPreview,baseRevision:1,patches:[{id:'fixture-wall',wall:0,photoId:photo.id,region:[0,0,1,1],quad:[[0,0],[1,0],[1,1],[0,1]]}]};
+    const saved=await api.saveRealityCaptureHybridPreview(id,preview);
+    const submitted=await api.submitRealityCaptureHybrid(id,saved.preview.revision,true);
+    let paidDenied=false,roomDenied=false;
+    try{await api.retryRealityCapture(id);}catch(e){paidDenied=e.status===403;}
+    try{await api.createRealityCaptureDraft({captureKind:'interior_room'});}catch(e){roomDenied=e.status===403;}
+    return {uploadStatus:finalized.status,photoCount:uploaded.photos.length,revision:saved.preview.revision,submissionStatus:submitted.status,paidDenied,roomDenied};
+  },captureId);
+  assert.deepEqual(manual,{uploadStatus:'uploaded',photoCount:1,revision:2,submissionStatus:'review_required',paidDenied:true,roomDenied:true});
   await page.evaluate(async id=>(await import('/js/community-reality-capture-api.js?v=4')).deleteRealityCapture(id),captureId);deleted=true;
-  await mkdir('output/verification/reality-capture-hybrid',{recursive:true});await writeFile('output/verification/reality-capture-hybrid/staging-report.json',JSON.stringify({passed:true,...result,afterReload,fixtureDeleted:true,limitations:'Empty-shell live API test; actual owner-photo projection tested locally. No physical phone or public world acceptance.'},null,2));console.log('Live staging hybrid save, conflict, authenticated reload and cleanup passed. No reconstruction launched.');
+  await mkdir('output/verification/reality-capture-hybrid',{recursive:true});await writeFile('output/verification/reality-capture-hybrid/staging-report.json',JSON.stringify({passed:true,...result,afterReload,manual,fixtureDeleted:true,automationAttestation:!!attestation,limitations:'Synthetic photo with real staging upload/validation/CPU submission. No physical phone, public approval or world acceptance.'},null,2));console.log('Live staging manual photo upload, validation, save, CPU submission, cost gates and cleanup passed. No reconstruction launched.');
 }finally{
   if(captureId&&!deleted)await page.evaluate(async id=>(await import('/js/community-reality-capture-api.js?v=4')).deleteRealityCapture(id),captureId).catch(()=>{});
   if(account?.idToken&&config)await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:delete?key=${config.apiKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idToken:account.idToken})});
   await browser.close();
+  await attestation?.cleanup();
 }

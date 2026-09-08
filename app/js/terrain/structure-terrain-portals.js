@@ -1,5 +1,9 @@
 // Texture-backed descriptors avoid the former silent 32-opening truncation.
 const MAX_PORTAL_MASKS_PER_TERRAIN_MESH = Infinity;
+// The aperture must remove terrain at the pavement too. Leaving twelve
+// centimetres above it produces grass bands across shallow graded approaches.
+// Keep the same bounded volume for rendering, raycasts and support queries.
+const PORTAL_FLOOR_MARGIN = -0.02;
 
 export function portalFloorAt(mask, x, z) {
   const dx = x - mask.x;
@@ -12,7 +16,7 @@ export function portalFloorAt(mask, x, z) {
 
 export function terrainPointRemovedByPortal(mask, point) {
   const floor = portalFloorAt(mask, point.x, point.z);
-  return Number.isFinite(floor) && point.y > floor + 0.12 &&
+  return Number.isFinite(floor) && point.y > floor + PORTAL_FLOOR_MARGIN &&
     point.y < floor + (Number(mask.cutHeight) || 6);
 }
 
@@ -119,7 +123,7 @@ function installPortalMaskShader(material, masks) {
       '  float portalAlong = dot(portalDelta, portalA.zw);',
       '  float portalAcross = dot(portalDelta, vec2(-portalA.w, portalA.z));',
       '  float portalRoadY = portalB.x + portalAlong * portalB.y;',
-      '  if (abs(portalAcross) <= portalB.z && abs(portalAlong) <= portalB.w && vStructurePortalWorldPosition.y > portalRoadY + 0.12 && vStructurePortalWorldPosition.y < portalRoadY + cutHeight) discard;',
+      `  if (abs(portalAcross) <= portalB.z && abs(portalAlong) <= portalB.w && vStructurePortalWorldPosition.y > portalRoadY + ${PORTAL_FLOOR_MARGIN} && vStructurePortalWorldPosition.y < portalRoadY + cutHeight) discard;`,
       '}'
     ].join('\n');
     shader.fragmentShader = shader.fragmentShader
@@ -128,7 +132,7 @@ function installPortalMaskShader(material, masks) {
   };
   material.customProgramCacheKey = () => [
     previousProgramCacheKey?.() || '',
-    `structure-terrain-portals-v2:${masks.length}`
+    `structure-terrain-portals-v3:${masks.length}`
   ].join(':');
   material.needsUpdate = true;
   return true;

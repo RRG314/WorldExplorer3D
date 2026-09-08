@@ -8,6 +8,12 @@ await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ channel: 'chrome', headless: false });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 const report = { baseline: base, providerPath: 'explicit-worldwide-fallback', errors: [], frames: [], checks: {} };
+// This transport-only source fixture must not contact production capture
+// services. Capture publication is exercised separately on staged hosting.
+report.captureListing = 'isolated-empty-fixture-not-capture-acceptance';
+await page.route('**/listApprovedExteriorRepresentations', route => route.fulfill({
+  status:200,contentType:'application/json',headers:{'Access-Control-Allow-Origin':'*'},body:JSON.stringify({representations:[]})
+}));
 const deadline = setTimeout(() => void browser.close(), 150_000);
 page.on('pageerror', error => report.errors.push(String(error)));
 page.on('console', message => { if (message.type() === 'error') report.errors.push({ message: message.text(), location: message.location() }); });

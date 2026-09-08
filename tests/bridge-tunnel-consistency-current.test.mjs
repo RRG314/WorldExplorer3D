@@ -118,6 +118,8 @@ test('portal aperture agrees between CPU and ray hits, preserves overlying groun
   const mask = { x: 0, z: 0, tangentX: 0, tangentZ: 1, roadY: 2, grade: 0.1,
     halfWidth: 4, halfDepth: 5, cutHeight: 5 };
   assert.equal(terrainPointRemovedByPortal(mask, { x: 0, y: 4, z: 2 }), true);
+  assert.equal(terrainPointRemovedByPortal(mask, { x: 0, y: 2.21, z: 2 }), true, 'thin terrain above pavement must not leave a visible grass band');
+  assert.equal(terrainPointRemovedByPortal(mask, { x: 0, y: 2.1, z: 2 }), false, 'ground safely below the road is retained');
   assert.equal(terrainHeightWithPortalCuts([mask], 0, 2, 4), 2.2);
   assert.equal(terrainHeightWithPortalCuts([mask], 0, 2, 20), 20);
   assert.equal(terrainHeightWithPortalCuts([mask], 5, 2, 4), 4);
