@@ -17,6 +17,8 @@ Pushing stable also publishes GitHub Pages; it does not deploy Firebase.
    App Check with this key; capture endpoints require verified App Check.
    A hosting-only release cannot certify the photo workflow. Provision/check
    the production provider and permitted domains, then test real authentication.
+   Read-only Firebase App Check Enterprise config also returned no site key for
+   the production web app; this is not only a missing local field.
 2. Staging records/media are not transferred by deployment. Read-only preflight
    for capture_be8fe76770d9db092d58f314f236be0b rejected the current record because
    it is not an approved manual exterior matching its admission requirements.
@@ -39,6 +41,10 @@ Pushing stable also publishes GitHub Pages; it does not deploy Firebase.
   production or a physical Android camera. Phone screenshot inspected.
 - Seven biome/material tests passed after snow shader changes. These do not
   establish shader appearance or production cloud access.
+- Bounded bridge-tunnel-player-current run failed during its initial readiness
+  wait and exited with no executed checks. This explicit fallback fixture did
+  not establish either passage safety or exact-provider visual quality. No
+  automatic repeated runs were started.
 
 ## Remaining ordered release work
 
