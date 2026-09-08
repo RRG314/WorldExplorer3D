@@ -56,14 +56,14 @@ function footprintSizeFactor(footprintArea = 0, footprintWidth = 0, footprintDep
   return Math.max(areaFactor, spanFactor);
 }
 
-function buildingSeedFromIdentity(identity, worldSeed = 0) {
+function buildingSeedFromIdentity(identity) {
   const value = String(identity ?? '');
   let hash = 2166136261;
   for (let i = 0; i < value.length; i++) {
     hash ^= value.charCodeAt(i);
     hash = Math.imul(hash, 16777619);
   }
-  return (hash ^ (Number(worldSeed) >>> 0)) >>> 0;
+  return hash >>> 0;
 }
 
 function inferFallbackBuildingHeightMeters(buildingType, footprintArea, footprintWidth, footprintDepth, seedValue) {

@@ -3,6 +3,7 @@ import { worldModificationIdentityForLocation } from '../editable-world/model.js
 import { setBuildingPresentationSuppressed } from '../editable-world/runtime.js?v=4';
 import { runtimePublicationState } from './runtime-contract.js?v=2';
 import { applyCaptureAlignment, photoWallVerticalScale } from './alignment.js?v=1';
+import { createNearbyCaptureRefresh } from './nearby-refresh.js?v=1';
 
 const MAX_RUNTIME_VERTICES = 1_500_000;
 const instances = new Map();
@@ -143,18 +144,20 @@ export async function refreshCommunityRealityCapturePresentation(appCtx) {
   const sequence = Number(appCtx._worldLoadSequence || 0);
   const worldId = worldModificationIdentityForLocation(appCtx.LOC || {});
   if (!worldId || !appCtx.initialEarthWorldReady) return null;
-  clearCommunityRealityCapturePresentation(appCtx);
   const serial = ++refreshSerial;
   try {
-    const actor=appCtx.Walk?.state?.walker||appCtx.car||{x:0,z:0};
-    const nearby=(appCtx.buildings||[]).filter(b=>b.sourceBuildingId).map(b=>({id:String(b.sourceBuildingId),center:buildingCenter(b)})).sort((a,b)=>Math.hypot(a.center.x-actor.x,a.center.z-actor.z)-Math.hypot(b.center.x-actor.x,b.center.z-actor.z)).slice(0,60).map(b=>b.id);
+    const actor=appCtx.activeTransportActor?.()?.position||appCtx.Walk?.state?.walker||appCtx.car||{x:0,z:0};
+    const nearby=[...new Set((appCtx.buildings||[]).filter(b=>b.sourceBuildingId).map(b=>({id:String(b.sourceBuildingId),center:buildingCenter(b)})).sort((a,b)=>Math.hypot(a.center.x-actor.x,a.center.z-actor.z)-Math.hypot(b.center.x-actor.x,b.center.z-actor.z)).map(b=>b.id))].slice(0,60);
     const response = await listApprovedExteriorRepresentations(worldId,nearby);
+    if(serial!==refreshSerial)return null;
     const rows = Array.isArray(response?.representations) ? response.representations : [];
+    const retained=new Set(rows.map(row=>row.representationId));
+    for(const id of instances.keys())if(!retained.has(id))removeInstance(appCtx,id);
     let loaded = 0;
     let failed = 0;
     for (const representation of rows) {
       try {
-        if (await attachRepresentation(appCtx, representation, worldId, sequence, serial)) loaded += 1;
+        if (instances.has(representation.representationId)||await attachRepresentation(appCtx, representation, worldId, sequence, serial)) loaded += 1;
       } catch (error) {
         failed += 1;
         console.warn('[RealityCapture] Approved exterior kept its procedural fallback:', error);
@@ -176,5 +179,19 @@ export function installCommunityRealityCaptureRuntime(appCtx) {
   Object.assign(appCtx, {
     clearCommunityRealityCapturePresentation: () => clearCommunityRealityCapturePresentation(appCtx),
     refreshCommunityRealityCapturePresentation: () => refreshCommunityRealityCapturePresentation(appCtx)
+  });
+  if(appCtx._captureNearbyRefreshInstalled)return;
+  appCtx._captureNearbyRefreshInstalled=true;
+  const update=createNearbyCaptureRefresh(()=>refreshCommunityRealityCapturePresentation(appCtx));
+  appCtx.refreshNearbyCapturePresentation=()=>update(
+    appCtx.activeTransportActor?.()?.position,performance.now(),appCtx._worldLoadSequence
+  );
+  appCtx.registerRuntimeSystem?.({
+    id:'reality-capture.nearby',owner:'reality-capture',phase:'world',critical:false,
+    enabled:()=>appCtx.gameStarted===true&&!appCtx.worldLoading&&appCtx.initialEarthWorldReady===true&&appCtx.getEnv?.()==='EARTH',
+    update(frame){
+      const position=appCtx.activeTransportActor?.()?.position;
+      if(position)void update(position,frame.timestamp,appCtx._worldLoadSequence);
+    }
   });
 }

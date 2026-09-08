@@ -96,7 +96,7 @@ function resolveChaseCameraStructureCollision(lookX, lookY, lookZ, targetX, targ
     );
     const roadBlocked = appCtx.cameraRoadSurfaceCollision?.(
       lookX + deltaX * ratio, y, lookZ + deltaZ * ratio,
-      vehicleCameraProbeRadius(appCtx.camera)
+      vehicleCameraProbeRadius(appCtx.camera) * ratio
     ) === true;
     if (collision?.collision === true || roadBlocked) {
       blockedRatio = Math.max(0.12, ratio - 1.2 / probeCount);

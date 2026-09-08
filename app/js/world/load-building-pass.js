@@ -268,7 +268,9 @@ export async function buildBuildingGeometryPass(options = {}) {
       continue;
     }
 
-    const bSeed = buildingSeedFromIdentity(way.tags?._sourceFeatureId || way.id, appCtx.rdtSeed);
+    // A mapped building is shared Earth content, not a session-seeded prop.
+    // Starting nearby or joining another mode must not change its massing.
+    const bSeed = buildingSeedFromIdentity(way.tags?._sourceFeatureId || way.id);
     const br1 = appCtx.rand01FromInt(bSeed);
     const br2 = appCtx.rand01FromInt(bSeed ^ 0x9e3779b9);
     const bt = way.tags.building || way.tags['building:part'] || 'yes';

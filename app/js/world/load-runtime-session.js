@@ -604,7 +604,7 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
   appCtx.worldLoading = false;
   appCtx.enforceEnvironmentSceneOwnership?.();
   appCtx.hideLoad?.();
-  void appCtx.refreshCommunityRealityCapturePresentation?.();
+  void appCtx.refreshNearbyCapturePresentation?.();
   scheduleAfterFirstPlay(`earth-ambient-state-${publication.sequence}`, () => {
     appCtx.refreshAstronomicalSky?.(true);
     return appCtx.refreshLiveWeather?.(true);

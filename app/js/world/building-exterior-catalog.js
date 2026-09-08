@@ -227,7 +227,12 @@ function selectBuildingExteriorProfile(options = {}) {
   const context = normalizedContext(options);
   const stableIdentity = String(options.buildingIdentity || options.sourceBuildingId || `${context.buildingType}:${options.buildingSeed || 0}`);
   const buildingSeed = (Number(options.buildingSeed) || stableStringHash(stableIdentity)) >>> 0;
-  const districtKey = `${String(options.location?.countryCode || '')}:${Math.floor(Number(options.centerX || 0) / 120)}:${Math.floor(Number(options.centerZ || 0) / 120)}`;
+  // Local X/Z move when the world origin changes. District variation must be
+  // anchored to geography; callers without it fall back to stable identity.
+  const geo = options.geographicCenter;
+  const districtKey = Number.isFinite(geo?.lat) && Number.isFinite(geo?.lon)
+    ? `${Math.floor(geo.lat * 1000)}:${Math.floor(geo.lon * 1000)}`
+    : stableIdentity;
   const districtSeed = stableStringHash(districtKey);
   const familyId = inferFamilyId(context, buildingSeed ^ districtSeed);
   const definition = BUILDING_EXTERIOR_FAMILIES[familyId] || BUILDING_EXTERIOR_FAMILIES.generic_unknown;

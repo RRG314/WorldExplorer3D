@@ -19,8 +19,15 @@ source=source.replace('console.warn("Failed to click selector", args.clickSelect
 // Capture the composited page instead, including the real player-facing HUD.
 source=source.replace('await captureScreenshot(page, canvas, shotPath);', 'await page.screenshot({path:shotPath, type:"png"});\nfs.writeFileSync(path.join(args.screenshotDir,"runtime.json"),JSON.stringify(await page.evaluate(()=>window.getWorldExplorerRuntimeDiagnostics?.()),null,2));');
 if(process.env.WE3D_TEST_DAY==='1') source=source.replace('await doChoreography(page, canvas, steps);', `await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setTimeOfDay?.('day');});\nawait doChoreography(page, canvas, steps);`);
-if(process.env.WE3D_TEST_MOBILE==='1') source=source.replace('const page = await browser.newPage();','const page = await browser.newPage({viewport:{width:412,height:915},isMobile:true,hasTouch:true,deviceScaleFactor:1});');
+if(process.env.WE3D_TEST_MOBILE==='1') source=source.replace('const page = await browser.newPage();','const page = await browser.newPage({viewport:{width:412,height:915},isMobile:true,hasTouch:true,deviceScaleFactor:1,userAgent:"Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36"});');
 if(process.env.WE3D_REAL_GPU==='1') source=source.replace('args: ["--use-gl=angle", "--use-angle=swiftshader"],','channel:"chrome",');
+if(process.env.WE3D_BUILDING_PARITY==='1') source=source.replace('await page.screenshot({path:shotPath, type:"png"});', `await page.screenshot({path:shotPath, type:"png"});
+fs.writeFileSync(path.join(args.screenshotDir,'buildings.json'),JSON.stringify(await page.evaluate(async()=>{
+ const {ctx}=await import('/app/js/shared-context.js?v=55');
+ return {location:ctx.LOC,device:ctx.isLikelyMobileDevice?.(),detail:ctx.worldDetailState?.buildings,
+  buildings:(ctx.buildings||[]).filter(b=>Math.hypot(b.centerX,b.centerZ)<250).map(b=>({id:b.sourceBuildingId,x:b.centerX,z:b.centerZ,pts:b.pts,height:b.bodyHeightMeters,baseY:b.baseY,levels:b.levels})),
+  provenance:ctx.buildingProvenanceRecords?.filter(r=>r.identity?.featureId==='overture:ba77061a-6e09-416a-aaf8-3057532ee880')};
+}),null,2));`);
 if(process.env.WE3D_TERRAIN_SAMPLES==='1') source=source.replace('await page.screenshot({path:shotPath, type:"png"});', `await page.screenshot({path:shotPath, type:"png"});
 fs.writeFileSync(path.join(args.screenshotDir,'terrain-samples.json'),JSON.stringify(await page.evaluate(async()=>{
  const {ctx}=await import('/app/js/shared-context.js?v=55');

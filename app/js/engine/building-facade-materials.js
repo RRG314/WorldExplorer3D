@@ -519,6 +519,7 @@ export function resolveBuildingExteriorPresentation(engineContext, buildingType,
     buildingType,
     buildingSeed,
     buildingIdentity: options.buildingIdentity,
+    geographicCenter: options.geographicCenter || appCtx?.worldToLatLon?.(options.centerX, options.centerZ),
     location: options.location || appCtx?.LOC || {},
     qualityTier: options.qualityTier || appCtx?.getDynamicBudgetState?.().tier || 'balanced'
   });
