@@ -27,7 +27,7 @@ try {
   const camera=ctx.camera.clone();
   camera.position.set(0,200,400);camera.lookAt(0,60,-400);camera.updateMatrixWorld(true);
   ctx.renderer.render(ctx.scene,camera);
-  return {image:ctx.renderer.domElement.toDataURL('image/png'),records:ctx.buildingProvenanceRecords.map(p=>({identity:p.identity,foundation:p.foundation,fields:{heightMeters:p.fields.heightMeters,minHeightMeters:p.fields.minHeightMeters}})),errors:globalThis.getWorldExplorerRuntimeDiagnostics?.().errors};
+  return {image:ctx.renderer.domElement.toDataURL('image/png'),buildingDetail:ctx.worldDetailState?.buildings,biome:ctx.worldSurfaceProfile?.biome,biomeEvidence:ctx.worldSurfaceProfile?.biomeEvidence,records:ctx.buildingProvenanceRecords.map(p=>({identity:p.identity,foundation:p.foundation,fields:{heightMeters:p.fields.heightMeters,minHeightMeters:p.fields.minHeightMeters}})),errors:globalThis.getWorldExplorerRuntimeDiagnostics?.().errors};
  });
  await writeFile(`${out}/skyline.png`,Buffer.from(result.image.split(',')[1],'base64'));
  delete result.image;
