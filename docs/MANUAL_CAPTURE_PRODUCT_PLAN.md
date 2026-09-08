@@ -2,6 +2,15 @@
 
 September 7, 2026 · staging development · not a production readiness claim
 
+## Release scope clarification — September 7
+
+The owner has paused feature expansion. Manual exterior reliability is the
+release priority. Manual rooms, 3D regeneration, shared preview worlds and
+capture rewards below remain roadmap work, not this release's completion gate.
+Use [PRODUCTION_CANDIDATE_AUDIT.md](PRODUCTION_CANDIDATE_AUDIT.md) for current
+production/staging identities, confirmed blockers and the ordered acceptance
+plan. The historical snapshot recorded below is not the latest staged build.
+
 ## Working baseline
 
 The owner confirmed the four saved photo walls appear on their actual mapped house in staging. Local checkpoint `ba14127f`, also named `steven/manual-capture-working-checkpoint`, preserves that work plus explicitly unfinished hardening. The deployed hosting artifact is `5.2.0+010649748fcf.cc61169899fcd325.staging`; its isolated source snapshot remains `/tmp/we3d-capture-phone-fix.DE4zLe`. These are different baselines: the checkpoint includes undeployed worker changes. Do not deploy it wholesale.
