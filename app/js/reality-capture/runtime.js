@@ -67,11 +67,11 @@ function loadGlb(url) {
   });
 }
 
-function removeInstance(appCtx, sourceBuildingId) {
-  const instance = instances.get(sourceBuildingId);
+function removeInstance(appCtx, representationId) {
+  const instance = instances.get(representationId);
   if (!instance) return;
-  instances.delete(sourceBuildingId);
-  setBuildingPresentationSuppressed(appCtx, sourceBuildingId, false, 'community-reality-capture');
+  instances.delete(representationId);
+  if(!instance.partial)setBuildingPresentationSuppressed(appCtx, instance.sourceBuildingId, false, 'community-reality-capture');
   disposeObject(instance.root);
 }
 
@@ -84,9 +84,15 @@ export function clearCommunityRealityCapturePresentation(appCtx) {
 async function attachRepresentation(appCtx, representation, worldId, sequence, serial) {
   const sourceBuildingId = String(representation?.sourceBuildingId || '');
   const modelUrl = String(representation?.model?.url || '');
-  if (!sourceBuildingId || !modelUrl || instances.has(sourceBuildingId)) return false;
+  const partial=representation.representationKind==='facade-patches';
+  if (!sourceBuildingId || !modelUrl || instances.has(representation.representationId)) return false;
   const building = (appCtx.buildings || []).find((candidate) => String(candidate?.sourceBuildingId || '') === sourceBuildingId);
   if (!building) return false;
+  if(partial){
+    const center=buildingCenter(building),current=(building.pts||[]).map(p=>({x:p.x-center.x,z:p.z-center.z}));
+    const saved=representation.footprint;
+    if(!Array.isArray(saved)||current.length!==saved.length||saved.some(p=>!current.some(q=>Math.hypot(p.x-q.x,p.z-q.z)<.15)))throw Error('Approved photo patches do not match the current mapped footprint.');
+  }
   const root = await loadGlb(modelUrl);
   try {
     validateRuntimeModel(root);
@@ -109,10 +115,11 @@ async function attachRepresentation(appCtx, representation, worldId, sequence, s
       object.castShadow = true;
       object.receiveShadow = true;
       object.frustumCulled = true;
+      if(partial){object.castShadow=false;const materials=Array.isArray(object.material)?object.material:[object.material];materials.forEach(m=>{m.polygonOffset=true;m.polygonOffsetFactor=-2;m.polygonOffsetUnits=-2;});}
     });
     appCtx.scene.add(root);
-    setBuildingPresentationSuppressed(appCtx, sourceBuildingId, true, 'community-reality-capture');
-    instances.set(sourceBuildingId, { root, representationId: representation.representationId });
+    if(!partial)setBuildingPresentationSuppressed(appCtx, sourceBuildingId, true, 'community-reality-capture');
+    instances.set(representation.representationId, { root, sourceBuildingId, partial, representationId: representation.representationId });
     return true;
   } catch (error) {
     disposeObject(root);
@@ -135,7 +142,9 @@ export async function refreshCommunityRealityCapturePresentation(appCtx) {
   clearCommunityRealityCapturePresentation(appCtx);
   const serial = ++refreshSerial;
   try {
-    const response = await listApprovedExteriorRepresentations(worldId);
+    const actor=appCtx.Walk?.state?.walker||appCtx.car||{x:0,z:0};
+    const nearby=(appCtx.buildings||[]).filter(b=>b.sourceBuildingId).map(b=>({id:String(b.sourceBuildingId),center:buildingCenter(b)})).sort((a,b)=>Math.hypot(a.center.x-actor.x,a.center.z-actor.z)-Math.hypot(b.center.x-actor.x,b.center.z-actor.z)).slice(0,60).map(b=>b.id);
+    const response = await listApprovedExteriorRepresentations(worldId,nearby);
     const rows = Array.isArray(response?.representations) ? response.representations : [];
     let loaded = 0;
     let failed = 0;

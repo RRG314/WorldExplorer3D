@@ -1,6 +1,17 @@
 'use strict';
 const {createHash}=require('node:crypto');
 
+// Firestore cannot store arrays of arrays. Keep the editor's coordinate pairs
+// at the API boundary, but persist each corner as a named point.
+function encodeHybridPreview(preview) {
+  if(!preview)return null;
+  return {...preview,patches:(preview.patches||[]).map(p=>({...p,quad:p.quad.map(q=>Array.isArray(q)?{x:q[0],y:q[1]}:q)}))};
+}
+function decodeHybridPreview(preview) {
+  if(!preview)return null;
+  return {...preview,patches:(preview.patches||[]).map(p=>({...p,quad:p.quad.map(q=>Array.isArray(q)?q:[q.x,q.y])}))};
+}
+
 function footprintSignature(building) {
   return createHash('sha256').update(JSON.stringify({authority:building?.sourceAuthority,id:building?.sourceBuildingId,footprint:building?.spatialContext?.footprint})).digest('hex');
 }
@@ -31,4 +42,4 @@ function normalizeHybridPreview(capture, input) {
   });
   return {schemaVersion:1,revision:input.baseRevision+1,footprintSignature:input.footprintSignature,heightMeters:input.heightMeters,heightEvidence:'user-preview-unverified',roofShape,roofRiseMeters,patches,visibility:'PRIVATE',coverageVerified:false};
 }
-module.exports={footprintSignature,normalizeHybridPreview};
+module.exports={footprintSignature,normalizeHybridPreview,encodeHybridPreview,decodeHybridPreview};

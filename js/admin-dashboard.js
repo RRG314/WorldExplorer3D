@@ -899,6 +899,13 @@ function renderRealityDetail() {
       <label>Scale<input id="captureAlignScale" type="number" min="0.05" max="20" step="0.01" value="${escapeHtml(String(alignment.scale || 1))}"></label>
     </div></section>
     <section class="detail-section"><div class="detail-section-title">Moderation decision</div><textarea id="captureDecisionNote" maxlength="400" placeholder="Record visible privacy, quality, cleanup, or alignment issues.">${escapeHtml(capture.review?.note || '')}</textarea><div class="action-row"><a class="secondary-btn" target="_blank" rel="noreferrer" href="${escapeHtml(buildWorldUrl(capture.building?.lat, capture.building?.lon, capture.building?.label || 'Capture review'))}">Open mapped building</a><button id="captureApproveBtn" type="button" class="primary-btn" ${canModerate ? '' : 'disabled'}>Approve visual</button><button id="captureRejectBtn" type="button" class="danger-btn" ${capture.status === 'review_required' ? '' : 'disabled'}>Reject</button></div></section>`;
+  if(capture.hybridSubmission){
+    const revision=capture.hybridSubmission.revision;
+    refs.moderationDetail.querySelectorAll('.capture-alignment-grid input').forEach(input=>{input.disabled=true;});
+    const label=document.createElement('p');
+    label.className='detail-note';label.textContent=`Saved photo walls · revision ${revision} · ${capture.hybridSubmission.patches?.length||0} patches. Placement is fixed to the submitted mapped walls; uncovered geometry remains unchanged.`;
+    refs.moderationDetail.prepend(label);
+  }
   if (detail.model?.url) void mountRealityModelPreview(detail.model.url, capture);
 }
 
@@ -1692,7 +1699,8 @@ async function handleRealityDecision(decision) {
       item.captureId,
       decision,
       sanitizeLongText(document.getElementById('captureDecisionNote')?.value || '', 400),
-      alignment
+      alignment,
+      (state.realityDetails.get(item.captureId)?.capture || item).hybridSubmission?.revision
     );
     state.realityDetails.delete(item.captureId);
     await Promise.all([loadRealityQueue(), loadActivity()]);

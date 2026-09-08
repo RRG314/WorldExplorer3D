@@ -129,8 +129,8 @@ export function getMyRealityCapture(captureId) {
   return endpoint('/getMyRealityCapture', { captureId });
 }
 
-export function finalizeRealityCaptureUpload(captureId) {
-  return endpoint('/finalizeRealityCaptureUpload', { captureId });
+export function finalizeRealityCaptureUpload(captureId, mode = 'reconstruction') {
+  return endpoint('/finalizeRealityCaptureUpload', { captureId, mode });
 }
 
 export function retryRealityCapture(captureId) {
@@ -153,8 +153,8 @@ export function resolveBuildingExteriorRepresentation(sourceBuildingId, worldId)
   return postAppCheckedFunction('/resolveBuildingExteriorRepresentation', { sourceBuildingId, worldId }, { label: 'Reality Capture' });
 }
 
-export function listApprovedExteriorRepresentations(worldId) {
-  return postAppCheckedFunction('/listApprovedExteriorRepresentations', { worldId }, { label: 'Reality Capture' });
+export function listApprovedExteriorRepresentations(worldId, sourceBuildingIds) {
+  return postAppCheckedFunction('/listApprovedExteriorRepresentations', { worldId, ...(sourceBuildingIds?{sourceBuildingIds}:{}) }, { label: 'Reality Capture' });
 }
 
 export function requestPrivateSpaceAccess(spaceId, roomId = '', message = '') {
@@ -172,6 +172,9 @@ export function getRealityCaptureAssetAccess(captureId, assetKind = 'processed',
 export function saveRealityCaptureHybridPreview(captureId, preview) {
   return endpoint('/saveRealityCaptureHybridPreview', {captureId, preview});
 }
+export function submitRealityCaptureHybrid(captureId, revision, consent) {
+  return endpoint('/submitRealityCaptureHybrid', {captureId,revision,consent});
+}
 
 export function listRealityCaptureModeration(status = 'review_required') {
   return endpoint('/listRealityCaptureModeration', { status });
@@ -181,8 +184,8 @@ export function getRealityCaptureModerationDetail(captureId) {
   return endpoint('/getRealityCaptureModerationDetail', { captureId });
 }
 
-export function moderateRealityCapture(captureId, decision, note = '', alignment = {}) {
-  return endpoint('/moderateRealityCapture', { captureId, decision, note, alignment });
+export function moderateRealityCapture(captureId, decision, note = '', alignment = {}, revision) {
+  return endpoint('/moderateRealityCapture', { captureId, decision, note, alignment, ...(revision!==undefined?{revision}:{}) });
 }
 
 export async function uploadRealityCapturePhoto(capture, photo, onProgress = null, signal = null) {

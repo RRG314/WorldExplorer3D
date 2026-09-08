@@ -4,6 +4,7 @@ import {
   getMyRealityCapture,
   getRealityCaptureAssetAccess,
   saveRealityCaptureHybridPreview,
+  submitRealityCaptureHybrid,
   retryRealityCapture,
   deleteRealityCapture,
   finalizeRealityCaptureUpload,
@@ -672,6 +673,10 @@ async function previewHybrid() {
         const access=await getRealityCaptureAssetAccess(session.serverCapture.captureId,'original',path);assertCurrent(session);
         const response=await fetch(access.url,{cache:'no-store',signal});if(!response.ok)throw Error('Unable to open this saved photo.');
         const blob=await response.blob();assertCurrent(session);return blob;
+      },submit:async revision=>{
+        assertCurrent(session);
+        const result=await submitRealityCaptureHybrid(session.serverCapture.captureId,revision,true);
+        assertCurrent(session);return result;
       },save:async preview=>{
         assertCurrent(session);const result=await saveRealityCaptureHybridPreview(session.serverCapture.captureId,preview);assertCurrent(session);
         session.serverCapture.hybridPreview=result.preview;await persist(session);return result;

@@ -23,6 +23,7 @@ function harness(t, capture = base, extras = {}) {
   const versions = new Map();
   const writes = [];
   const reads = [];
+  const fileRequests = [];
   const hooks = {};
   let generation = 1;
   function version(path) { return versions.get(path) || 0; }
@@ -39,6 +40,13 @@ function harness(t, capture = base, extras = {}) {
   }
   function collection(path) { return { doc: (name) => ref(`${path}/${name}`) }; }
   function mutate(path, patch) {
+    function check(value, parentArray=false) {
+      if(Array.isArray(value)) {
+        if(parentArray)throw Error('Nested arrays are not allowed');
+        value.forEach(v=>check(v,true));
+      } else if(value && typeof value==='object')Object.values(value).forEach(v=>check(v,false));
+    }
+    check(patch);
     if (patch === null) records.delete(path);
     else records.set(path, { ...records.get(path), ...patch });
     versions.set(path, generation++);
@@ -53,9 +61,11 @@ function harness(t, capture = base, extras = {}) {
   } };
   const bucket = {
     getFiles: async () => [[]],
-    file: (path) => { reads.push(path); return {
+    file: (path,options) => { reads.push(path);fileRequests.push({path,options}); return {
       exists: async () => [true], getSignedUrl: async () => ['https://example.invalid/private-test-url'],
-      download: async () => [realJpeg]
+      download: async () => [realJpeg],
+      save: async (bytes,options) => { assert.equal(options.preconditionOpts.ifGenerationMatch,0); assert.equal(bytes.readUInt32LE(0),0x46546c67); },
+      getMetadata: async () => [{generation:'123'}]
     }; }
   };
   const api = buildCommunityRealityCaptureExports({ db, bucket, setCors: () => false,
@@ -68,8 +78,15 @@ function harness(t, capture = base, extras = {}) {
     await api[name]({ method: 'POST', uid, body: { captureId: id, ...body } }, res);
     return res;
   }
-  return { call, bucket, records, reads, writes, mutate, hooks };
+  return { call, bucket, records, reads, fileRequests, writes, mutate, hooks };
 }
+
+test('processed asset delivery pins the inspected generation, not the latest path',async t=>{
+  const h=harness(t,{...base,processed:{...base.processed,modelGeneration:'12345',sha256:'a'.repeat(64)}});
+  const result=await h.call('getRealityCaptureAssetAccess','owner');
+  assert.equal(result.code,200);
+  assert.deepEqual(h.fileRequests.at(-1),{path:modelPath,options:{generation:'12345'}});
+});
 
 test('hybrid preview HTTP save is owner-only, revision-checked and cannot publish or change geometry',async t=>{
   const {footprintSignature}=require('../functions/reality-capture-hybrid');
@@ -93,6 +110,25 @@ test('only the owner can retry a failed, validated capture without another uploa
   const empty = harness(t, { ...base, status: 'processing_failed' });
   assert.equal((await empty.call('retryRealityCapture', 'owner')).code, 422);
   assert.equal(empty.writes.length, 0);
+});
+
+test('saved cropped walls submit immutable derivatives and require the reviewed revision for approval',async t=>{
+  const {footprintSignature}=require('../functions/reality-capture-hybrid');
+  const building={sourceAuthority:'osm',sourceBuildingId:'osm:way:1',worldId:'earth:test',spatialContext:{footprint:[{x:0,z:0},{x:10,z:0},{x:10,z:8},{x:0,z:8}]}};
+  const h=harness(t,{...base,captureId:id,status:'review_required',captureSchemaVersion:1,processingPipelineVersion:'test',building,inputManifest:[{name:photoPath,generation:'1',size:realJpeg.length,sha256:require('node:crypto').createHash('sha256').update(realJpeg).digest('hex')}]});
+  const preview={baseRevision:0,footprintSignature:footprintSignature(building),heightMeters:6,patches:[{id:'one',photoId:'a'.repeat(32),wall:0,region:[0,0,1,1],quad:[[0,0],[1,0],[1,1],[0,1]]}]};
+  assert.equal((await h.call('saveRealityCaptureHybridPreview','owner',{preview})).code,200);
+  assert.equal((await h.call('submitRealityCaptureHybrid','visitor',{revision:1,consent:true})).code,404);
+  assert.equal((await h.call('submitRealityCaptureHybrid','owner',{revision:1,consent:false})).code,403);
+  assert.equal((await h.call('submitRealityCaptureHybrid','owner',{revision:2,consent:true})).code,409);
+  const submitted=await h.call('submitRealityCaptureHybrid','owner',{revision:1,consent:true});assert.equal(submitted.code,200,JSON.stringify(submitted.body));
+  assert.equal(h.records.get(`realityCaptures/${id}`).hybridSubmission.status,'review_required');
+  assert.equal((await h.call('submitRealityCaptureHybrid','owner',{revision:1,consent:true})).body.existing,true);
+  assert.equal((await h.call('moderateRealityCapture','moderator',{decision:'approved',revision:2})).code,409);
+  const approved=await h.call('moderateRealityCapture','moderator',{decision:'approved',revision:1});assert.equal(approved.code,200,JSON.stringify(approved.body));
+  assert.equal(h.records.get(`realityCaptures/${id}`).hybridSubmission.status,'approved');
+  const representation=[...h.records].find(([key])=>key.startsWith('buildingRepresentations/'))?.[1];
+  assert.equal(representation.representationKind,'facade-patches');assert.equal(representation.modelGeneration,'123');assert.equal(representation.canonicalBuilding.sourceBuildingId,building.sourceBuildingId);
 });
 
 test('moderation commits approval and representation together, never revives deleted captures', async t => {

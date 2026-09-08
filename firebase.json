@@ -211,6 +211,10 @@
         "function": "saveRealityCaptureHybridPreview"
       },
       {
+        "source": "/submitRealityCaptureHybrid",
+        "function": "submitRealityCaptureHybrid"
+      },
+      {
         "source": "/reserveRealityCapturePhoto",
         "function": "reserveRealityCapturePhoto"
       },

@@ -5,7 +5,7 @@ import {wallFootprint,validateQuad,rectifyPhoto,buildHybridShell,buildWallPatch}
 
 // The host supplies the existing authenticated asset/save APIs. No public URLs,
 // alternate uploader, reconstruction queue, or world-geometry authority here.
-export async function openHybridEditor({capture,photos,loadPhoto,save,signal}) {
+export async function openHybridEditor({capture,photos,loadPhoto,save,submit,signal}) {
   const pts=wallFootprint(capture.building);
   if(!photos.length)throw Error('No saved photographs are available for this capture.');
   if(!globalThis.THREE)await loadClassicScript(vendorScriptsCritical[0]);
@@ -65,12 +65,17 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,signal}) {
     </details>
     <p>This places the visible photo on a flat wall; it does not recover hidden detail or remove objects in the photo. Rotate the building to check your work.</p>
   </section></div><button data-save>Save private preview to account</button>
-    <p data-saved></p>
+    <p data-saved role="status"></p>
+    <section data-publication hidden><h3>Send these walls for approval</h3>
+    <p>Only the cropped wall images are submitted. Your original photos stay private. Approval adds these patches to this mapped building; uncovered areas remain unchanged.</p>
+    <button data-submit>Submit saved walls for approval</button><p data-submission role="status"></p></section>
   `;
   const $=s=>dialog.querySelector(s), cache=new Map(), snapshots=[], thumbs=new Map(),patchThumbs=new Map();
   let preview=structuredClone(capture.hybridPreview||{revision:0,footprintSignature:capture.footprintSignature,heightMeters:capture.buildingDetails?.heightMeters||capture.building?.spatialContext?.height?.meters||6,roofShape:['flat','gabled','hipped'].includes(capture.buildingDetails?.roofShape)?capture.buildingDetails.roofShape:'unknown',roofRiseMeters:2,patches:[]});
   let quad=[],selected=0,bitmap=null,viewer=null,busy=false,closed=false,editId=null,drag=false,dirty=false,highlight=null,photoPage=0,thumbnailBusy=false;
   const status=t=>{$('[data-status]').textContent=t;};
+  $('[data-publication]').hidden=typeof submit!=='function';
+  if(preview.revision)$('[data-saved]').textContent=`Saved to account · revision ${preview.revision} · ${preview.patches.length} photo patches.`;
   const active=()=>{abort.signal.throwIfAborted();signal.throwIfAborted();};
   function setBusy(value){busy=value;dialog.querySelectorAll('button:not([data-close]),input,select').forEach(e=>e.disabled=value);pageButtons();}
   function pageButtons(){$('[data-prev-photos]').disabled=busy||thumbnailBusy||photoPage===0;$('[data-next-photos]').disabled=busy||thumbnailBusy||(photoPage+1)*6>=photos.length;}
@@ -210,7 +215,18 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,signal}) {
   });
   $('[data-rebuild]').onclick=()=>run(async()=>{const height=Number($('[data-height]').value),rise=Number($('[data-rise]').value);if(!Number.isFinite(height)||height<1||height>1200||!Number.isFinite(rise)||rise<.3||rise>20)throw Error('Enter valid wall and roof dimensions.');remember();preview.heightMeters=height;preview.roofShape=$('[data-roof]').value;preview.roofRiseMeters=rise;await rebuild();status('Preview dimensions updated; mapped geometry is unchanged.');});
   $('[data-undo]').onclick=()=>run(async()=>{if(!snapshots.length)return;const revision=preview.revision;preview=snapshots.pop();preview.revision=revision;dirty=true;$('[data-height]').value=preview.heightMeters;editId=null;await rebuild();status('Last preview edit undone. Save to keep this version.');});
-  $('[data-save]').onclick=()=>run(async()=>{const result=await save({...preview,baseRevision:preview.revision});active();preview=structuredClone(result.preview);dirty=false;$('[data-saved]').textContent=`Private preview saved · revision ${preview.revision}. Available through this account; the original reconstruction is unchanged.`;status('Saved. Nothing was published to the world.');});
+  $('[data-save]').onclick=()=>run(async()=>{
+    $('[data-saved]').textContent='Saving your photo placements…';
+    try {const result=await save({...preview,baseRevision:preview.revision});active();preview=structuredClone(result.preview);dirty=false;$('[data-saved]').textContent=`Saved to account · revision ${preview.revision} · ${preview.patches.length} photo patches.`;status('Saved. Submit these walls when you are ready for approval.');}
+    catch(error){$('[data-saved]').textContent=`Not saved: ${error.message}. Keep this editor open and retry.`;throw error;}
+  });
+  $('[data-submit]').onclick=()=>run(async()=>{
+    if(dirty||!preview.revision)throw Error('Save your latest photo placements before submitting.');
+    if(!preview.patches.length)throw Error('Place at least one photo on a wall first.');
+    $('[data-submission]').textContent='Preparing your cropped wall images for review…';
+    try {const result=await submit(preview.revision);active();$('[data-submission]').textContent=`Revision ${result.revision} · ${result.status==='approved'?'Approved':'Submitted for approval'}. Your saved edits remain available.`;status('Submission recorded. The building changes after approval, not merely after saving.');}
+    catch(error){$('[data-submission]').textContent=`Not submitted: ${error.message}. Your saved edits are safe.`;throw error;}
+  });
   $('[data-rotate]').onclick=()=>viewer?.rotate();$('[data-reset]').onclick=()=>viewer?.reset();
   $('[data-closer]').onclick=()=>viewer?.zoom(.8);$('[data-farther]').onclick=()=>viewer?.zoom(1.25);
   document.body.append(dialog);dialog.showModal();

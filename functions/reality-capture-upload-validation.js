@@ -3,10 +3,11 @@
 const sharp = require('sharp');
 const { createHash } = require('node:crypto');
 const { CAPTURE_LIMITS, validateUploadedPhotoSet } = require('./reality-capture-authority');
+const { sealCapturePhoto } = require('./reality-capture-storage-privacy');
 
 // Storage metadata is supplied by the client. Decode the actual pinned object,
 // not the claimed dimensions, before admitting expensive reconstruction work.
-async function validateCaptureObjects(bucket, capture, files) {
+async function validateCaptureObjects(bucket, capture, files, options = {}) {
   const limits = CAPTURE_LIMITS[capture.captureKind];
   if (!limits || files.length > limits.maxPhotos) throw Error('too_many_photos');
   const prefix = `reality-captures/${capture.ownerUid}/${capture.captureId}/originals/`;
@@ -15,6 +16,7 @@ async function validateCaptureObjects(bucket, capture, files) {
   for (const file of files) {
     if (!file.name.startsWith(prefix) || !/^[a-f0-9]{32}\.(jpg|webp)$/.test(file.name.slice(prefix.length))) throw Error('invalid_photo_name');
     const [metadata] = await file.getMetadata();
+    await sealCapturePhoto(file, metadata);
     const size = Number(metadata.size);
     total += size;
     if (!Number.isSafeInteger(size) || size < 1 || size > CAPTURE_LIMITS.maxFileBytes || total > limits.maxTotalBytes) throw Error('photo_size_out_of_range');
@@ -33,7 +35,7 @@ async function validateCaptureObjects(bucket, capture, files) {
       width: image.width, height: image.height, sha256: createHash('sha256').update(bytes).digest('hex'),
       sector: Number.isInteger(sector) && sector >= 0 && sector < 8 ? sector : -1 });
   }
-  return { manifest, summary: validateUploadedPhotoSet(capture, manifest) };
+  return { manifest, summary: validateUploadedPhotoSet(capture, manifest, options) };
 }
 
 module.exports = { validateCaptureObjects };

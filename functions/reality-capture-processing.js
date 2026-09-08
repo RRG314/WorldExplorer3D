@@ -2,7 +2,7 @@
 
 const functions = require('firebase-functions/v1');
 const { GoogleAuth, OAuth2Client } = require('google-auth-library');
-const { randomUUID } = require('node:crypto');
+const { randomUUID, createHash } = require('node:crypto');
 const { FieldValue } = require('firebase-admin/firestore');
 const { validateRegistrationReport } = require('./reality-capture-diagnostics');
 
@@ -97,8 +97,9 @@ function buildCaptureProcessingExports({ db, bucket }) {
           const [url] = await bucket.file(photo.name, { generation: photo.generation }).getSignedUrl({ version: 'v4', action: 'read', expires });
           return { ...photo, name: photo.name.split('/').pop(), url };
         }));
-        const [uploadUrl] = await bucket.file(destination).getSignedUrl({ version: 'v4', action: 'write', expires, contentType: 'model/gltf-binary' });
-        return res.json({ captureKind: capture.captureKind, photos, uploadUrl,
+        const uploadHeaders={'x-goog-if-generation-match':'0'};
+        const [uploadUrl] = await bucket.file(destination).getSignedUrl({ version: 'v4', action: 'write', expires, contentType: 'model/gltf-binary',extensionHeaders:uploadHeaders });
+        return res.json({ captureKind: capture.captureKind, photos, uploadUrl, uploadHeaders,
           worldContext: { building: capture.building, room: capture.room || null,
             trust: 'capture-context-requires-registration-review' } });
       }
@@ -109,19 +110,24 @@ function buildCaptureProcessingExports({ db, bucket }) {
       if (action !== 'complete') return res.status(400).end();
       const file = bucket.file(destination);
       const [metadata] = await file.getMetadata();
+      if(!/^\d+$/.test(String(metadata.generation)))throw Error('model_generation_required');
       if (Number(metadata.size) > 20 * 1024 * 1024 || Number(metadata.size) < 20) throw Error('model_budget');
-      const [bytes] = await file.download();
+      const pinned=bucket.file(destination,{generation:metadata.generation});
+      const [bytes] = await pinned.download();
+      if(bytes.length!==Number(metadata.size))throw Error('model_size_changed');
       const { inspectGlb } = require('./reality-capture-glb');
       const modelInspection = inspectGlb(bytes);
       const registration = validateRegistrationReport(req.body.registration, capture.inputManifest.map(photo => photo.name));
       if (modelInspection.triangles < 1 || modelInspection.triangles > 500000) throw Error('model_triangles');
-      await file.setMetadata({ cacheControl: 'private, no-store, max-age=0', contentType: 'model/gltf-binary' });
+      await pinned.setMetadata({ cacheControl: 'private, no-store, max-age=0', contentType: 'model/gltf-binary' });
       const saved = await finish(captureId, attemptId, { status: 'review_required', processingCompletedAt: FieldValue.serverTimestamp(),
-        processed: { optimizedModelPath: destination, inputSummary: capture.uploadSummary, modelInspection, registration,
+        processed: { optimizedModelPath: destination, modelGeneration:String(metadata.generation),sha256:createHash('sha256').update(bytes).digest('hex'),inputSummary: capture.uploadSummary, modelInspection, registration,
           provenance: { provider: 'meshroom', pipelineVersion: PIPELINE, evidenceClass: 'observation-derived', usesFullPhotoSet: true,
             realReconstructionAcceptance: false, runtimeRevision: String(req.body.revision || '').slice(0, 100) },
           rawCollisionAllowed: false, rawNavigationAllowed: false } });
-      if (!saved) await file.delete({ ignoreNotFound: true });
+      // A concurrent duplicate may lose this transaction after another request
+      // already accepted the same output. Never delete that output here; orphan
+      // cleanup must check all revision/publication references separately.
       return res.json({ saved });
     } catch (error) {
       console.error('Capture worker request rejected', error.code || error.name);

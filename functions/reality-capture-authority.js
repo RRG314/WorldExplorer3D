@@ -222,11 +222,12 @@ function assertCaptureTransition(from, to) {
   return to;
 }
 
-function validateUploadedPhotoSet(capture = {}, files = []) {
+function validateUploadedPhotoSet(capture = {}, files = [], options = {}) {
   const kind = normalizeCaptureKind(capture.captureKind);
   const limits = CAPTURE_LIMITS[kind];
   const rows = Array.isArray(files) ? files : [];
-  if (rows.length < limits.minPhotos) throw new Error('too_few_photos');
+  const minimum = options.manual === true && kind === 'exterior' ? 1 : limits.minPhotos;
+  if (rows.length < minimum) throw new Error('too_few_photos');
   if (rows.length > limits.maxPhotos) throw new Error('too_many_photos');
   let totalBytes = 0;
   const seenNames = new Set();

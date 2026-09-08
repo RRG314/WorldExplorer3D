@@ -34,6 +34,7 @@ const GAME_RUNTIME_ENTRYPOINTS = Object.freeze({
   'app-entry': 'app/js/app-entry.js',
   'account-social': 'app/js/multiplayer/social.js',
   'capture-phone': 'app/js/reality-capture/phone-entry.js',
+  'capture-review': 'app/js/reality-capture/result-viewer.js',
   'multiplayer-rooms': 'app/js/multiplayer/rooms.js',
   'multiplayer-artifacts': 'app/js/multiplayer/artifacts.js',
   'tunnel-solid-worker': 'app/js/world/compiler/tunnel-solid-worker.js'
@@ -354,6 +355,9 @@ async function buildArtifact(environment) {
   const captureHtmlPath = path.join(OUTPUT_DIR, 'app', 'capture.html');
   const captureHtml = await fs.readFile(captureHtmlPath, 'utf8');
   await fs.writeFile(captureHtmlPath, captureHtml.replace('js/reality-capture/phone-entry.js?v=1', runtimePackaging.entries['capture-phone']));
+  const adminModulePath = path.join(OUTPUT_DIR, 'js', 'admin-dashboard.js');
+  const adminModule = await fs.readFile(adminModulePath, 'utf8');
+  await fs.writeFile(adminModulePath, adminModule.replace('../app/js/reality-capture/result-viewer.js?v=1', `../app/${runtimePackaging.entries['capture-review']}`));
   await writeGeneratedFirebaseFiles(environment, config);
 
   const files = await hashOutputFiles();
@@ -435,7 +439,10 @@ async function verifyArtifact() {
       ? `location-data/ground/${sourceReleases.sha256.slice(0, 16)}/${relative.slice('app/assets/ground/'.length)}`
       : relative;
     const outputHash = expectedFiles[outputRelative];
-    if (!outputHash || outputHash !== await hashFile(source)) {
+    const sourceHash = relative === 'js/admin-dashboard.js'
+      ? sha256((await fs.readFile(source, 'utf8')).replace('../app/js/reality-capture/result-viewer.js?v=1', `../app/${buildManifest.runtimePackaging?.entries?.['capture-review']}`))
+      : await hashFile(source);
+    if (!outputHash || outputHash !== sourceHash) {
       throw new Error(`Hosting artifact differs from canonical source: ${relative} -> ${outputRelative}`);
     }
   }
@@ -471,9 +478,11 @@ async function verifyArtifact() {
   const gameHtml = await fs.readFile(path.join(OUTPUT_DIR, 'app', 'index.html'), 'utf8');
   const accountHtml = await fs.readFile(path.join(OUTPUT_DIR, 'account', 'index.html'), 'utf8');
   const captureHtml = await fs.readFile(path.join(OUTPUT_DIR, 'app', 'capture.html'), 'utf8');
+  const adminModule = await fs.readFile(path.join(OUTPUT_DIR, 'js', 'admin-dashboard.js'), 'utf8');
   for (const [name, entry] of Object.entries(runtimePackaging.entries || {})) {
     const referenced = name === 'account-social' ? accountHtml.includes(`../app/${entry}`)
-      : name === 'capture-phone' ? captureHtml.includes(entry) : gameHtml.includes(entry);
+      : name === 'capture-phone' ? captureHtml.includes(entry)
+      : name === 'capture-review' ? adminModule.includes(`../app/${entry}`) : gameHtml.includes(entry);
     if (!referenced && !INDIRECT_RUNTIME_ENTRYPOINTS.has(name)) {
       throw new Error(`Game HTML does not reference bundled entry: ${entry}`);
     }
