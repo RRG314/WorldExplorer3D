@@ -167,6 +167,14 @@ export function createSyntheticFallbackWorld(options = {}) {
     arr.forEach((mesh) => {
       if (!mesh) return;
       mesh.parent?.remove?.(mesh);
+      if (mesh.userData?.vegetationAuthority === 'curated-model-cell-lod') {
+        mesh.traverse?.((object)=>{
+          object.geometry?.dispose?.();
+          const materials=Array.isArray(object.material) ? object.material : [object.material];
+          materials.forEach(material=>material?.dispose?.());
+        });
+        return;
+      }
       if (mesh.geometry && typeof mesh.geometry.dispose === 'function') mesh.geometry.dispose();
       if (mesh.material) {
         if (Array.isArray(mesh.material)) {

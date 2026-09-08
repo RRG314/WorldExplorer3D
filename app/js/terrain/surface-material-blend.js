@@ -5,7 +5,8 @@ export const TERRAIN_SURFACE_CLASS = Object.freeze({
   forest: 3,
   soil: 4,
   rock: 5,
-  snow: 6
+  snow: 6,
+  moss: 7
 });
 
 const MATERIAL_ATTRIBUTE_A = 'terrainSurfaceMixA';
@@ -44,7 +45,7 @@ function terrainAttributeComponent(attribute, index, component) {
 export function terrainSurfaceClassForWorldCover(name = '', latitude = 0) {
   const normalized = String(name || '').toLowerCase();
   if (normalized === 'built') return TERRAIN_SURFACE_CLASS.urban;
-  if (normalized === 'tree' || normalized === 'mangrove' || normalized === 'wetland') {
+  if (normalized === 'tree' || normalized === 'mangrove') {
     return TERRAIN_SURFACE_CLASS.forest;
   }
   if (normalized === 'crop') return TERRAIN_SURFACE_CLASS.soil;
@@ -55,6 +56,7 @@ export function terrainSurfaceClassForWorldCover(name = '', latitude = 0) {
       : TERRAIN_SURFACE_CLASS.rock;
   }
   if (normalized === 'snow') return TERRAIN_SURFACE_CLASS.snow;
+  if (normalized === 'moss') return TERRAIN_SURFACE_CLASS.moss;
   return TERRAIN_SURFACE_CLASS.grass;
 }
 export function terrainSurfaceClassForMappedMode(mode = '') {
@@ -77,6 +79,7 @@ export function terrainSurfaceMixForClass(surfaceClass = TERRAIN_SURFACE_CLASS.g
   else if (surfaceClass === TERRAIN_SURFACE_CLASS.soil) mixA[3] = 1;
   else if (surfaceClass === TERRAIN_SURFACE_CLASS.rock) mixB[0] = 1;
   else if (surfaceClass === TERRAIN_SURFACE_CLASS.snow) mixB[1] = 1;
+  else if (surfaceClass === TERRAIN_SURFACE_CLASS.moss) { mixA[3] = 0.45; mixB[0] = 0.55; }
   return { mixA, mixB };
 }
 
@@ -243,6 +246,7 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
         terrainSoilMap: { value: null },
         terrainRockMap: { value: null },
         terrainSnowMap: { value: null },
+        terrainColdGround: { value: 0 },
         terrainAridWarmth: { value: 0 }
       }
     };
@@ -251,6 +255,7 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
       previousOnBeforeCompile?.(shader, renderer);
       Object.assign(shader.uniforms, state.uniforms);
       shader.fragmentShader = '#ifdef WE3D_TERRAIN_SNOW_MAP\nuniform sampler2D terrainSnowMap;\n#endif\n' + shader.fragmentShader;
+      shader.fragmentShader = 'uniform float terrainColdGround;\n' + shader.fragmentShader;
       // Rock on steep faces needs vertical projection, not stretched ground UVs.
       // Reuse the same rock sampler; this does not alter surface geometry.
       shader.vertexShader = 'varying vec3 vTerrainDetailPosition;\nvarying vec3 vTerrainDetailNormal;\n' + shader.vertexShader;
@@ -298,6 +303,7 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
             '  #endif',
             '#endif',
             'terrainGrassColor.rgb = mix(terrainGrassColor.rgb, vec3(0.42, 0.36, 0.22), terrainAridWarmth * 0.72);',
+            'terrainGrassColor.rgb = mix(terrainGrassColor.rgb, vec3(0.30, 0.32, 0.23), terrainColdGround * 0.58);',
             'terrainRockColor.rgb = mix(terrainRockColor.rgb, vec3(0.58, 0.31, 0.15), terrainAridWarmth);',
             'float terrainRockBand = 0.5 + 0.5 * sin(vTerrainWorldHeight * 0.045 + sin(vTerrainWorldHorizontal * 0.013) * 0.8);',
             'terrainRockColor.rgb *= mix(0.94, 1.06, smoothstep(0.12, 0.88, terrainRockBand));',
@@ -314,13 +320,17 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
           ].join('\n')
         )
         .replace(
+          '#include <normal_fragment_maps>',
+          'vec3 terrainGeometricNormal = normal;\n#include <normal_fragment_maps>\nnormal = normalize(mix(normal, terrainGeometricNormal, clamp(dot(vTerrainSurfaceMixA, vec4(1.0)) + dot(vTerrainSurfaceMixB, vec2(1.0)), 0.0, 1.0)));'
+        )
+        .replace(
           '#include <roughnessmap_fragment>',
           '#include <roughnessmap_fragment>\nfloat groundClassTotal = clamp(dot(vTerrainSurfaceMixA, vec4(1.0)) + dot(vTerrainSurfaceMixB, vec2(1.0)), 0.0, 1.0);\nroughnessFactor = roughnessFactor * (1.0 - groundClassTotal) + dot(vTerrainSurfaceMixA, vec4(0.84, 0.96, 0.97, 0.94)) + dot(vTerrainSurfaceMixB, vec2(0.90, 0.82));\nroughnessFactor = clamp(roughnessFactor, 0.04, 1.0);'
         );
     };
     material.customProgramCacheKey = () => [
       previousProgramCacheKey?.() || '',
-      'terrain-semantic-pbr-material-mix-v6'
+      'terrain-semantic-pbr-material-mix-v7'
     ].join(':');
   }
   state.uniforms.terrainUrbanMap.value = textureSets.urban?.map || material.map;
@@ -329,6 +339,7 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
   state.uniforms.terrainSoilMap.value = textureSets.soil?.map || material.map;
   state.uniforms.terrainRockMap.value = textureSets.rock?.map || material.map;
   state.uniforms.terrainSnowMap.value = textureSets.snow?.map || material.map;
+  state.uniforms.terrainColdGround.value = textureSets.biomeId === 'tundra' ? 1 : 0;
   material.defines = {...material.defines};
   if (textureSets.snowTextureSupported && textureSets.snow?.map) material.defines.WE3D_TERRAIN_SNOW_MAP = 1;
   else delete material.defines.WE3D_TERRAIN_SNOW_MAP;
@@ -336,7 +347,7 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
   material.needsUpdate = true;
   mesh.userData.terrainSurfaceMaterialBlend = {
     authority: 'single-terrain-semantic-pbr-material',
-    classes: ['grass', 'urban', 'sand', 'forest', 'soil', 'rock', 'snow']
+    classes: ['grass', 'urban', 'sand', 'forest', 'soil', 'rock', 'snow', 'moss-rock-mix']
   };
   return true;
 }

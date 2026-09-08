@@ -42,8 +42,9 @@ export function refreshWorldBiomeFromWorldCoverStats(appCtx, stats, tile = null)
   if (!(total > 0) || !appCtx.worldSurfaceProfile) return null;
   stats.biomeOwner = {distance, key:String(key)};
   const ratio = (name) => Math.max(0, Number(counts[name] || 0)) / total;
+  const landFraction = Math.max(0.01, 1 - ratio('water'));
   const signals = {
-    woody: ratio('tree') + ratio('mangrove'),
+    woody: Math.min(1, (ratio('tree') + ratio('mangrove')) / landFraction),
     vegetated: ratio('tree') + ratio('mangrove') + ratio('wetland') +
       ratio('shrub') + ratio('grass') + ratio('crop') + ratio('moss'),
     water: ratio('water'),

@@ -10,12 +10,12 @@ export function terrainForestAttributeWeight(attribute,index) {
   return attribute.normalized ? value/255 : value;
 }
 
-export function* nearbyVegetationCells(bounds, spacing, limit) {
+export function* nearbyVegetationCells(bounds, spacing, limit, focus = {x:0,z:0}) {
   if (!(spacing>0) || !Number.isFinite(spacing) || !(limit>0)) return;
   const minX=Math.floor(bounds.minX/spacing), maxX=Math.floor(bounds.maxX/spacing);
   const minZ=Math.floor(bounds.minZ/spacing), maxZ=Math.floor(bounds.maxZ/spacing);
   if (![minX,maxX,minZ,maxZ].every(Number.isFinite)) return;
-  const originX=Math.max(minX,Math.min(maxX,0)), originZ=Math.max(minZ,Math.min(maxZ,0));
+  const originX=Math.max(minX,Math.min(maxX,Math.floor((Number(focus.x)||0)/spacing))), originZ=Math.max(minZ,Math.min(maxZ,Math.floor((Number(focus.z)||0)/spacing)));
   const maxRing=Math.max(originX-minX,maxX-originX,originZ-minZ,maxZ-originZ);
   let count=0;
   for(let ring=0;ring<=maxRing && count<limit;ring++) {

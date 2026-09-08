@@ -17,7 +17,24 @@ for(const [before,after] of patches){
 source=source.replace('console.warn("Failed to click selector", args.clickSelector, err);','throw err;');
 // WebGL's default non-preserved drawing buffer may be cleared before toDataURL.
 // Capture the composited page instead, including the real player-facing HUD.
-source=source.replace('await captureScreenshot(page, canvas, shotPath);', 'await page.screenshot({path:shotPath, type:"png"});');
+source=source.replace('await captureScreenshot(page, canvas, shotPath);', 'await page.screenshot({path:shotPath, type:"png"});\nfs.writeFileSync(path.join(args.screenshotDir,"runtime.json"),JSON.stringify(await page.evaluate(()=>window.getWorldExplorerRuntimeDiagnostics?.()),null,2));');
+if(process.env.WE3D_TEST_DAY==='1') source=source.replace('await doChoreography(page, canvas, steps);', `await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setTimeOfDay?.('day');});\nawait doChoreography(page, canvas, steps);`);
+if(process.env.WE3D_TEST_MOBILE==='1') source=source.replace('const page = await browser.newPage();','const page = await browser.newPage({viewport:{width:412,height:915},isMobile:true,hasTouch:true,deviceScaleFactor:1});');
+if(process.env.WE3D_REAL_GPU==='1') source=source.replace('args: ["--use-gl=angle", "--use-angle=swiftshader"],','channel:"chrome",');
+if(process.env.WE3D_TREE_CLOSEUP==='1') source=source.replace('await page.screenshot({path:shotPath, type:"png"});', `await page.screenshot({path:shotPath, type:"png"});
+const treeImage=await page.evaluate(async()=>{
+ const {ctx}=await import('/app/js/shared-context.js?v=55');
+ const tree=[...(ctx.vegetationFeatures||[])].filter(p=>p.trunkRadius>0).sort((a,b)=>Math.hypot(a.x,a.z)-Math.hypot(b.x,b.z))[0];
+ if(!tree)return null;
+ const camera=ctx.camera.clone();camera.position.set(tree.x+10,tree.baseY+5,tree.z+12);camera.lookAt(tree.x,tree.baseY+4,tree.z);camera.updateMatrixWorld(true);
+ ctx.renderer.render(ctx.scene,camera);const image=ctx.renderer.domElement.toDataURL('image/png');ctx.renderer.render(ctx.scene,ctx.camera);return image;
+});
+if(treeImage)fs.writeFileSync(path.join(args.screenshotDir,'tree-closeup.png'),Buffer.from(treeImage.split(',')[1],'base64'));
+`);
+source=source.replace('null, {timeout:90000});', `null, {timeout:90000}).catch(async error=>{
+ fs.writeFileSync(path.join(args.screenshotDir,'failed-start.json'),JSON.stringify(await page.evaluate(()=>({state:window.getWorldExplorerRuntimeDiagnostics?.(),loading:document.getElementById('loading')?.innerText})),null,2));
+ await page.screenshot({path:path.join(args.screenshotDir,'failed-start.png')});throw error;
+});`);
 const child=spawn(process.execPath,['--input-type=module','-',...process.argv.slice(2)],{stdio:['pipe','inherit','inherit']});
 const deadline=setTimeout(()=>child.kill('SIGTERM'),150000);
 child.stdin.end(source);

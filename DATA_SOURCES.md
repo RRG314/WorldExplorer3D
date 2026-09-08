@@ -1,6 +1,24 @@
 # Data Sources
 
-Last reviewed: 2026-09-06 for World Explorer 3D 5.2.0.
+Last reviewed: 2026-09-08 for World Explorer 3D 5.2.0.
+
+## Local ground ecosystem update (not yet deployed)
+
+ESA WorldCover v200/2021 numeric classes are delivered as bounded nearest-sampled
+NPY windows from the [Microsoft Planetary Computer data API](https://planetarycomputer.microsoft.com/api/data/v1/openapi.json).
+The [dataset](https://planetarycomputer.microsoft.com/dataset/esa-worldcover)
+remains ESA remote-sensing classification, not live conditions or a species map.
+Only validated class bytes are persistently cached. Terrascope WMS remains an
+explicit display-color fallback; unavailable/nodata regions retain mapped/local
+fallbacks, not invented provider observations. Biome labels are gameplay
+inferences from local cover, latitude and existing elevation, not surveyed
+ecoregion boundaries. Roads, water and terrain elevation retain their owners.
+
+Curated vegetation comes from Quaternius' [Stylized Nature MegaKit](https://quaternius.itch.io/stylized-nature-megakit),
+CC0. Selected pine, broadleaf, shrub and fern models are packaged locally as GLB,
+with512px textures; woody trees have simplified distance models. The conversion
+script and asset manifest record source names and hashes. These are regional
+visual forms, not evidence of the exact species or individual tree at a location.
 
 ## Functional POI research note (2026-09-05)
 

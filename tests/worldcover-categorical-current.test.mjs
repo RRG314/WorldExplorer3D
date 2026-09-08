@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {worldCoverSourceTile,readWorldCoverClasses} from '../scripts/lib/worldcover-categorical.mjs';
-import {decodeWorldCoverNpy,fetchWorldCoverClasses} from '../app/js/terrain/worldcover-categorical.js';
+import {decodeWorldCoverNpy,fetchWorldCoverClasses,worldCoverWindows} from '../app/js/terrain/worldcover-categorical.js';
 
 function raster(width,height,value) {
  const header=new TextEncoder().encode(`{'descr': '|u1', 'fortran_order': False, 'shape': (1, ${height}, ${width}), }\n`);
@@ -27,6 +27,21 @@ test('categorical tile names use southwest source origin across hemispheres',()=
  assert.equal(worldCoverSourceTile(39.29,-76.61).id,'N39W078');
  assert.equal(worldCoverSourceTile(-2.1,-59.9).id,'S03W060');
  assert.equal(worldCoverSourceTile(0,-.01).id,'N00W003');
+});
+test('edge-of-world tiles remain bounded and nodata is not invented vegetation',()=>{
+ for(const [lonW,lonE,expected] of [[179.9,180,'E177'],[-180,-179.9,'W180']]) {
+  const windows=worldCoverWindows({latS:0,latN:.1,lonW,lonE},4);
+  assert.equal(windows.length,1);assert.ok(windows[0].tile.id.endsWith(expected));
+ }
+ assert.deepEqual([...decodeWorldCoverNpy(raster(2,2,0).buffer,2,2)],[0,0,0,0]);
+ assert.throws(()=>worldCoverWindows({latS:0,latN:1,lonW:179,lonE:-179},4));
+});
+test('oversized responses and aborted requests cannot become cached class tiles',async()=>{
+ const bounds={latS:1,latN:2,lonW:1,lonE:2};
+ await assert.rejects(fetchWorldCoverClasses(bounds,4,null,async()=>new Response(new Uint8Array(32769))),/bounded payload/);
+ const controller=new AbortController();controller.abort();let calls=0;
+ await assert.rejects(fetchWorldCoverClasses(bounds,4,controller.signal,async()=>{calls++;return new Response(raster(4,4,10));}),{name:'AbortError'});
+ assert.equal(calls,0);
 });
 test('cross-border windows preserve class bytes and placement without RGB interpolation',async()=>{
  const calls=[];

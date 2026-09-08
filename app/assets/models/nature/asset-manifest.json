@@ -1,0 +1,48 @@
+{
+  "source": "https://quaternius.itch.io/stylized-nature-megakit",
+  "author": "Quaternius",
+  "license": "CC0-1.0",
+  "modifications": "Selected models converted to self-contained GLB; textures resized to512px.",
+  "assets": [
+    {
+      "id": "pine",
+      "sourceModel": "Pine_5",
+      "bytes": 915516,
+      "sha256": "e3d4c106db55dd799ff5f436150d3cd8854b90cd89fc97389a6370b0d598a942",
+      "triangles": 1646,
+      "lod": {
+        "file": "pine-lod.glb",
+        "bytes": 893960,
+        "sha256": "9c387caa696ffd529314dc3440475454b05b23e16218ec4b3d4e1121b81bffa3",
+        "triangles": 1229
+      }
+    },
+    {
+      "id": "broadleaf",
+      "sourceModel": "CommonTree_5",
+      "bytes": 1091328,
+      "sha256": "6d8530161fbe9b25414796a9e5ca7fab3f6e3c5e32e3506ee4808931d46ec401",
+      "triangles": 3182,
+      "lod": {
+        "file": "broadleaf-lod.glb",
+        "bytes": 1078020,
+        "sha256": "9b167fb3465141245862b894e40dc4b67d6b6dae8530fb4b8051440445582de6",
+        "triangles": 2924
+      }
+    },
+    {
+      "id": "shrub",
+      "sourceModel": "Bush_Common",
+      "bytes": 138780,
+      "sha256": "df06919f95e25891b6ee2dacc61ac5ebccf591f25fa959d6e1f5c60cce884dbe",
+      "triangles": 900
+    },
+    {
+      "id": "fern",
+      "sourceModel": "Fern_1",
+      "bytes": 304116,
+      "sha256": "1cd4a83099375d4f14dcc76a31c194f3547d6171c242d0de5aa54927cd67859d",
+      "triangles": 288
+    }
+  ]
+}

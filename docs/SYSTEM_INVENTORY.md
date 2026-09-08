@@ -1,5 +1,14 @@
 # World Explorer 3D System Inventory
 
+Local update,2026-09-08 (not deployed): numeric ESA2021 land-cover delivery,
+nearest-tile biome evidence, slope-projected rock/class roughness/snow texture,
+bounded forest placement and curated tree/shrub/fern cell rendering now replace
+the old generated tree batches. Woody trees have actual reduced-geometry LODs;
+nearby trunks enter the existing collision authority while soft plants do not.
+Original building part groups are selected atomically within publication limits.
+This is an implementation inventory, not completion of global visual acceptance.
+See [ground execution plan](research/ground-ecosystems/EXECUTION_PLAN.md).
+
 Last updated: 2026-09-07 for World Explorer 3D 5.2; source baseline `c801c19f`.
 
 This is a source inventory, not a declaration that every feature has passed

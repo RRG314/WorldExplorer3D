@@ -14,6 +14,13 @@ test('mountain snow does not turn a temperate location into the polar region',()
  assert.equal(classifyBiomeProfile({latitude:37,elevationMeters:3400,signals:{cryo:.1}}).id,'alpine');
  assert.equal(classifyBiomeProfile({latitude:75,signals:{cryo:.8}}).id,'polar-cryosphere');
 });
+test('river pixels do not erase the wooded character of adjacent land',()=>{
+ const ctx={LOC:{lat:-3,lon:-60},worldSurfaceProfile:{}};
+ const stats=worldCoverStatsForLocation(ctx);
+ refreshWorldBiomeFromWorldCoverStats(ctx,stats,{key:'river',bounds:{latS:-3.1,latN:-2.9,lonW:-60.1,lonE:-59.9},counts:{water:75,tree:20,grass:5},elevationMeters:20});
+ assert.equal(ctx.worldSurfaceProfile.biomeEvidence.signals.woody,.8);
+ assert.equal(ctx.worldSurfaceProfile.biome.id,'tropical-rainforest');
+});
 test('same accepted tiles give same local biome in either completion order',()=>{
  const near={key:'near',bounds:{latS:38,latN:40,lonW:-77,lonE:-75},counts:{crop:80,water:20},elevationMeters:100};
  const far={key:'far',bounds:{latS:45,latN:46,lonW:-77,lonE:-75},counts:{tree:90,water:10},elevationMeters:100};

@@ -1,5 +1,15 @@
 # World Explorer 3D Architecture
 
+Local ground update,2026-09-08: `worldcover-categorical.js` validates bounded
+numeric rasters; existing `worldcover-baseline.js` owns queue/cache/fallback;
+`worldcover-biome-state.js` selects nearest local evidence. Surface material
+blending changes presentation only. `vegetation.js` owns placement;
+`vegetation-models.js` consumes the existing model catalog/runtime and publishes
+cell LOD batches into the existing vegetation collection. The existing obstacle
+solver consumes a nearby trunk index; no parallel physics or world authority.
+Old generated sphere-canopy rendering/allocation has been removed. Global
+appearance, terrain seams and physical-device acceptance remain open.
+
 Updated 2026-09-07 against source `c801c19f`. This map identifies ownership and
 integration, not universal release acceptance. [Current test guide](CURRENT_TEST_GUIDE.md)
 records the deployed boundary; [project description](PROJECT_DESCRIPTION.md)

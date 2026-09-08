@@ -961,6 +961,7 @@ function environmentEvidenceSnapshot() {
     if (kind === 'unavailable' && reason) failures[reason] = (failures[reason] || 0) + 1;
   }
   const trees = appCtx.vegetationFeatures || [];
+  const focus=appCtx.activeTransportActor?.()?.position || {x:0,z:0};
   return {
     biome: appCtx.worldSurfaceProfile?.biome || null,
     biomeEvidence: appCtx.worldSurfaceProfile?.biomeEvidence || null,
@@ -968,7 +969,10 @@ function environmentEvidenceSnapshot() {
     landCoverTiles: counts,
     landCoverFailures: failures,
     vegetationCount: trees.length,
+    vegetationNearPlayer: trees.filter(tree=>Math.hypot(tree.x-focus.x,tree.z-focus.z)<100).length,
     vegetationBatches: appCtx.vegetationMeshes?.length || 0,
+    vegetationModels: appCtx.vegetationModelStatus || {},
+    rendererWork: appCtx.renderer?.info ? {calls:appCtx.renderer.info.render.calls,triangles:appCtx.renderer.info.render.triangles,geometries:appCtx.renderer.info.memory.geometries,textures:appCtx.renderer.info.memory.textures} : null,
     nearestTreeToOrigin: trees.length ? trees.reduce((nearest, tree)=>Math.min(nearest, Math.hypot(tree.x,tree.z)), Infinity) : null
   };
 }

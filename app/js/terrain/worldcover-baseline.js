@@ -16,7 +16,7 @@ const CACHE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 const MAX_PARALLEL_REQUESTS = 6;
 const PROVIDER_OUTAGE_COOLDOWN_MS = 60 * 1000;
 const providerCircuit = createProviderOutageCircuit({
-  provider: 'esa-worldcover-titiler',
+  provider: 'worldcover-delivery',
   cooldownMs: PROVIDER_OUTAGE_COOLDOWN_MS
 });
 
@@ -85,6 +85,7 @@ function buildSmoothedSurfaceTints(classes, size) {
 
 let databasePromise = null;
 let activeRequests = 0;
+let consecutiveTransportFailures = 0;
 let drainScheduled = false;
 const requestQueue = [];
 const memoryBlobCache = new Map();
@@ -344,6 +345,7 @@ async function fetchWorldCoverBlob(
         rememberBlob(key, blob);
         void writeCachedBlob(key, blob);
       }
+      consecutiveTransportFailures = 0;
       return { blob, source: 'network' };
     } catch (error) {
       if (signal?.aborted) throw signal.reason || error;
@@ -356,7 +358,12 @@ async function fetchWorldCoverBlob(
           : status
             ? `HTTP ${status}`
             : String(error?.message || 'network request failed');
-        throw providerCircuit.trip(reason, controller);
+        // One slow tile is not evidence that every other tile/provider is down.
+        // Honor explicit rate limits immediately; trip other transport failures
+        // after three consecutive failures, while retaining the same queue cap.
+        consecutiveTransportFailures += 1;
+        if (status === 429 || consecutiveTransportFailures >= 3) throw providerCircuit.trip(reason, controller);
+        throw new Error(`WorldCover tile unavailable: ${reason}`);
       }
       throw error;
     } finally {

@@ -1,6 +1,28 @@
 # Ecosystem implementation status — September 8, 2026
 
-The research plan is not fully implemented.
+The research plan is not fully implemented. This is local work, not a production
+acceptance statement. No hosting deployment was performed.
+
+## Curated vegetation checkpoint
+
+The old procedural trunk/canopy builder and its furniture allocations have been
+removed. CC0 Quaternius trees, shrubs and ferns now use the existing model asset
+loader, spatial cell instancing, tree LODs and shared collision authority. Source
+and conversion records are in app/assets/models/nature/asset-manifest.json and
+scripts/build-nature-assets.mjs. No paid assets or reconstruction jobs were used.
+
+Actual Amazon gameplay at -2.9,-60.2 contains 4,180 plants, 121 within 100m,
+in 46 spatial batches. The composited screenshot was inspected: forest occupies
+the nearby ground rather than spending the budget on distant tiles. Yosemite
+tree close-ups, mobile-sized Sahara gameplay and Arctic gameplay were inspected.
+These are not physical-phone frame-rate measurements. The later muted tundra
+palette and 450m follow-player refresh still require visual acceptance.
+
+Remaining blockers: mountain seams are visible; an Alpine start exceeded the
+90-second test limit, including 35s regional-ground and 20s transport-ground
+waits. Their common far-field dependency needs profiling, not larger test
+timeouts. The exact historical floating-skyline screenshot remains unresolved.
+Provider recovery and the remaining regional matrix are not fully accepted.
 
 Implemented locally: existing tree placements publish their rendered base
 height; a bounded spatial trunk index supplies nearby candidates to the existing
@@ -33,8 +55,9 @@ recovery exists, but provider failure/performance acceptance remains open.
 Vegetation now reads normalized byte attributes correctly on Three r128,
 rechecks forest support after jitter, uses source-based seeds and prioritizes
 nearby cells inside large mapped forests. Yosemite's nearest tree moved from
-489m to48m. These are still the old procedural tree models; asset replacement
-and species/LOD work are NOT complete.
+489m to48m. This earlier measurement predates the curated models described above.
+Regional model forms are implemented; authoritative species distributions are
+not implemented and must not be inferred from the asset selection.
 
 Rock uses three-axis projection to avoid cliff UV stretching; material classes
 have differentiated roughness and snow can use the existing snow texture on

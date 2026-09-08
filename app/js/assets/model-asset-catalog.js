@@ -1,6 +1,20 @@
 const MODEL_ASSET_SCHEMA_VERSION = 1;
 
 const MODEL_ASSET_CATALOG = Object.freeze([
+  ...['pine', 'broadleaf', 'shrub', 'fern'].flatMap((kind) => (['pine','broadleaf'].includes(kind) ? ['', '-lod'] : ['']).map((suffix) => Object.freeze({
+    schemaVersion: MODEL_ASSET_SCHEMA_VERSION,
+    id: `nature-${kind}${suffix}`,
+    label: `Quaternius ${kind}${suffix ? ' distant model' : ''}`,
+    url: `/app/assets/models/nature/${kind}${suffix}.glb`,
+    roles: Object.freeze(['world-vegetation']),
+    license: 'CC0-1.0',
+    sourceUrl: 'https://quaternius.itch.io/stylized-nature-megakit',
+    attribution: 'Stylized Nature MegaKit by Quaternius',
+    sourceUpAxis: 'y',
+    collisionPolicy: 'existing-world-obstacle-trunk-index',
+    instancePolicy: Object.freeze({geometry: 'clone', materials: 'clone'}),
+    budgets: Object.freeze({bytes: 1200000, triangles: 3200, textureEdgePixels: 512})
+  }))),
   Object.freeze({
     schemaVersion: MODEL_ASSET_SCHEMA_VERSION,
     id: 'vehicle-bmw-525i-e34',
