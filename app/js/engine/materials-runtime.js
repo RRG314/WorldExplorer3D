@@ -27,7 +27,7 @@ export const LOCAL_PBR_ASSET_IDS = Object.freeze({
   sand: 'sand_01',
   soil: 'dirt',
   rock: 'rock_ground',
-  snow: 'snow_01'
+  snow: 'snow_02'
 });
 
 function localPbrUrls(assetId) {

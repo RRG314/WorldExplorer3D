@@ -318,6 +318,8 @@ function ensureTerrainSemanticTextureSets(mesh, repeats) {
     rock: terrainTextureSource('rock'),
     snow: terrainTextureSource('snow'),
     snowTextureSupported: Number(appCtx.renderer?.capabilities?.maxTextures || 0) >= 16,
+    snowUvScale: 1 / (2 * (Number(appCtx.WORLD_UNITS_PER_METER) || 1)),
+    baseSnowNormal: mesh.userData?.terrainVisualProfile?.mode === 'snow' && !mesh.userData?.worldCoverResult && !mesh.userData?.isFixedLocationTerrainLod,
     biomeId: String(appCtx.worldSurfaceProfile?.biome?.id || '')
   };
 }
@@ -739,19 +741,19 @@ export function applyTerrainVisualProfile(mesh, profile, repeats = null, options
   mesh.userData.terrainTextureRepeats = textureRepeats;
 
   if (nextMode === "snow" || nextMode === "snowRock") {
-    const textures = ensureTerrainTextureSet(mesh, textureRepeats, nextMode);
-    // Snow uses clean material response instead of the registered repeating
-    // ground scan. On large alpine slopes that directional scan produced
-    // visible diagonal bands and moire that read as terrain geometry.
-    mat.map = nextMode === "snow" ? null : textures?.map || null;
-    mat.normalMap = nextMode === "snow" ? null : textures?.normalMap || null;
-    mat.roughnessMap = nextMode === "snow" ? null : textures?.roughnessMap || null;
+    mesh.geometry.computeBoundingBox();
+    const span = mesh.geometry.boundingBox.max.x - mesh.geometry.boundingBox.min.x;
+    const snowRepeats = span / (2 * (Number(appCtx.WORLD_UNITS_PER_METER) || 1));
+    const textures = ensureTerrainTextureSet(mesh, nextMode === 'snow' ? snowRepeats : textureRepeats, nextMode);
+    mat.map = textures?.map || null;
+    mat.normalMap = textures?.normalMap || null;
+    mat.roughnessMap = textures?.roughnessMap || null;
     mat.color.setHex(nextMode === "snow" ? SNOW_COLOR_HEX : ALPINE_SNOW_COLOR_HEX);
     if (mat.emissive) mat.emissive.setHex(0x000000);
     mat.emissiveIntensity = 0;
     mat.roughness = nextMode === "snow" ? 0.94 : 0.86;
     mat.metalness = 0.01;
-    mat.normalScale = nextMode === "snow" ? new THREE.Vector2(0, 0) : new THREE.Vector2(0.2, 0.2);
+    mat.normalScale = nextMode === "snow" ? new THREE.Vector2(0.16, 0.16) : new THREE.Vector2(0.2, 0.2);
   } else if (nextMode === "sand") {
     const textures = ensureTerrainTextureSet(mesh, textureRepeats * 1.3, "sand");
     mat.map = textures?.map || null;

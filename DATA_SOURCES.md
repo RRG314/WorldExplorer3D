@@ -180,3 +180,12 @@ persistence authorities remain separate from the model.
 - Production Firebase, payment, and administrative credentials are never included in this repository.
 
 See [ATTRIBUTION.md](ATTRIBUTION.md), [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md), and [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+# Natural snow surface — September 8, 2026
+
+The active snow material uses [Snow 02 by Rob Tuytel, Poly Haven](https://polyhaven.com/a/snow_02),
+CC0, nominal 2 m width. Diffuse, OpenGL normal and roughness maps are reduced
+to 512px JPEGs (137,703 bytes total). The existing Snow 01 footprint texture
+is no longer selected by the Earth material registry. Rebuild with
+`node scripts/build-snow-assets.mjs`; source checksums and resulting SHA-256
+hashes are recorded in `app/assets/textures/earth/snow_02.provenance.json`.
+This is representative surface detail, not measured Antarctic topography.
