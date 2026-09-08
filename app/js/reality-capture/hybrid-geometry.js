@@ -1,5 +1,5 @@
 import {resolveMappedRoof,createMappedRoofMesh} from '../world/mapped-roof-geometry.js?v=6';
-import {manualRoomFootprint,manualRoomSurfacePoint} from '../../../functions/capture-room-geometry.mjs';
+import {manualRoomFootprint,manualRoomSurfacePoint,manualRoomPatchGeometry} from '../../../functions/capture-room-geometry.mjs';
 // Photo-supported planar patches, never an inferred reconstruction of hidden surfaces.
 export function wallFootprint(building) {
   if(building?.manualRoom)return manualRoomFootprint(building.manualRoom);
@@ -44,9 +44,10 @@ export function rectifyPhoto(bitmap, quad, aspect=1, maxSize=1024) {
 export function buildHybridShell(T, building, height, roof={}) {
   if(building.manualRoom){
     const group=new T.Group();group.userData.evidence='user-dimensioned-room';
-    for(let wall=0;wall<6;wall++){
+    const count=manualRoomFootprint(building.manualRoom).length;
+    for(let wall=0;wall<count+2;wall++){
       const mesh=buildWallPatch(T,building,height,{wall,region:[0,0,1,1]},null);
-      mesh.material.color.setHex(wall===4?0x776a59:0xc7c0b4);
+      mesh.material.color.setHex(wall===count?0x776a59:0xc7c0b4);
       mesh.material.polygonOffset=false;mesh.userData.roomShell=true;
       group.add(mesh);
     }
@@ -77,8 +78,9 @@ export function buildWallPatch(T, building, height, patch, texture) {
   const [left,bottom,right,top]=patch.region;
   if(![left,bottom,right,top].every(Number.isFinite)||left<0||right>1||bottom<0||top>1||right-left<.01||top-bottom<.01) throw Error('Choose a non-empty region within this wall.');
   const point=(u,v)=>building.manualRoom?manualRoomSurfacePoint(building.manualRoom,patch.wall,u,v):[a.x+(b.x-a.x)*u,height*v,a.z+(b.z-a.z)*u];
-  const geo=new T.BufferGeometry(); geo.setAttribute('position',new T.Float32BufferAttribute([...point(left,bottom),...point(right,bottom),...point(right,top),...point(left,top)],3));
-  geo.setAttribute('uv',new T.Float32BufferAttribute([0,0,1,0,1,1,0,1],2));geo.setIndex([0,1,2,0,2,3]);geo.computeVertexNormals();
+  const data=building.manualRoom?manualRoomPatchGeometry(building.manualRoom,patch.wall,patch.region):{positions:[...point(left,bottom),...point(right,bottom),...point(right,top),...point(left,top)],uv:[0,0,1,0,1,1,0,1],indices:[0,1,2,0,2,3]};
+  const geo=new T.BufferGeometry(); geo.setAttribute('position',new T.Float32BufferAttribute(data.positions,3));
+  geo.setAttribute('uv',new T.Float32BufferAttribute(data.uv,2));geo.setIndex(data.indices);geo.computeVertexNormals();
   const mesh=new T.Mesh(geo,new T.MeshBasicMaterial({map:texture,side:building.manualRoom?T.FrontSide:T.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));
   mesh.userData={evidence:'photo-projected-user-alignment',photoId:patch.photoId,wall:patch.wall};return mesh;
 }

@@ -88,10 +88,19 @@ function harness(t, capture = base, extras = {}) {
   return { call, bucket, records, reads, fileRequests, writes, mutate, hooks, authClaims };
 }
 
-test('public users cannot start roadmap-only room captures',async t=>{
-  const h=harness(t);
-  assert.equal((await h.call('createRealityCaptureDraft','owner',{captureKind:'interior_room'})).code,403);
-  assert.equal(h.writes.length,0);
+test('manual home layout save requires owner and permission, not paid reconstruction claims',async t=>{
+  const {makeStarterLayout}=await import('../functions/interior-layout.mjs');
+  const {footprintSignature}=require('../functions/reality-capture-hybrid');
+  const envelope={footprint:[{x:0,z:0},{x:10,z:0},{x:10,z:12},{x:0,z:12}],heightMeters:6};
+  const capture={...base,captureKind:'interior_room',room:{widthMeters:4,lengthMeters:6,heightMeters:2.7},building:{sourceAuthority:'osm',sourceBuildingId:'test',spatialContext:{footprint:envelope.footprint,height:{meters:6}}},consent:{propertyPermissionConfirmed:true}};
+  const preview={baseRevision:0,footprintSignature:footprintSignature(capture.building,capture.room),layout:makeStarterLayout(envelope)};
+  const h=harness(t,capture);
+  assert.equal((await h.call('saveRealityCaptureHybridPreview','visitor',{preview})).code,404);
+  const saved=await h.call('saveRealityCaptureHybridPreview','owner',{preview});assert.equal(saved.code,200,JSON.stringify(saved.body));assert.equal(saved.body.preview.visibility,'PRIVATE');
+  assert.deepEqual(h.records.get(`realityCaptures/${id}`).building,capture.building);
+  assert.equal((await h.call('saveRealityCaptureHybridPreview','owner',{preview})).code,409);
+  h.mutate(`realityCaptures/${id}`,{consent:{propertyPermissionConfirmed:false}});
+  assert.equal((await h.call('saveRealityCaptureHybridPreview','owner',{preview:{...preview,baseRevision:1}})).code,403);
 });
 test('pending edits cannot delete an earlier published representation',async t=>{
   const h=harness(t,{...base,status:'review_required'}, {'buildingRepresentations/published':{captureId:id,status:'approved'}});

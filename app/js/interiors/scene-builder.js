@@ -1,4 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
+import {buildAuthoredInterior} from './authored-geometry.js';
+import {normalizeLayout,assertPlayableLayout,roomRing,pointInRoom} from '../../../functions/interior-layout.mjs';
+import {captureBuildingContext} from '../reality-capture/alignment.js?v=1';
 import { buildingFootprintPoints } from "../building-entry.js?v=9";
 import {
   INTERIOR_FLOOR_OFFSET,
@@ -715,6 +718,7 @@ function floorDefinition(definition, level) {
 }
 
 export function buildInteriorScene(definition, options = {}) {
+  if(definition.communityRealityCapture?.layout)return buildAuthoredHomeScene(definition,options);
   const building = definition.support?.building || definition.building;
   const footprint = buildingFootprintPoints(building);
   const bounds = footprintBounds(footprint);
@@ -802,4 +806,23 @@ export function buildInteriorScene(definition, options = {}) {
     lobbyEntryPoint,
     entryPoint: activeLevel === 0 ? lobbyEntryPoint : activeState.entryPoint
   };
+}
+
+function buildAuthoredHomeScene(definition,options){
+  const building=definition.support?.building||definition.building,context=captureBuildingContext(building),footprint=buildingFootprintPoints(building);
+  if(!context)throw Error('This building has no supported interior envelope.');
+  const layout=normalizeLayout(definition.communityRealityCapture.layout,{footprint:context.footprint,holes:context.holes||[],heightMeters:context.wallHeightMeters||context.height?.meters||3,revision:'runtime-building'});
+  assertPlayableLayout(layout);
+  const center={x:finiteNumber(building.centerX,footprint.reduce((n,p)=>n+p.x,0)/footprint.length),z:finiteNumber(building.centerZ,footprint.reduce((n,p)=>n+p.z,0)/footprint.length)};
+  const base=estimateInteriorFloorBaseY(building,footprint,center,[],null)+INTERIOR_FLOOR_OFFSET;
+  const authored=buildAuthoredInterior(THREE,layout),root=authored.group;root.position.set(center.x,base,center.z);root.add(new THREE.HemisphereLight(0xffffff,0x52606a,.8));
+  const world=p=>({x:p.x+center.x,z:p.z+center.z}),dynamicColliders=authored.compiled.solids.map(s=>createWallCollider(world(s.a),world(s.b),base+s.bottom,s.top-s.bottom,s.thickness,.000001)).filter(Boolean);
+  const walkSurfaces=authored.compiled.floors.flatMap(f=>f.polygons.map(p=>({kind:'polygon',pts:p[0].map(([x,z])=>world({x,z})),holes:p.slice(1).map(r=>r.map(([x,z])=>world({x,z}))),y:base+f.y,floorLevel:layout.floors.findIndex(v=>v.id===f.floorId)})));
+  const stairs=authored.compiled.ramps.map(r=>({kind:'ramp',start:world(r.a),end:world(r.b),halfWidth:r.width/2,yStart:base+r.y0,yEnd:base+r.y1}));walkSurfaces.unshift(...stairs);
+  const first=layout.floors[0],firstRoom=first.rooms[0],ring=roomRing(first,firstRoom);let spawn=null;
+  for(let z=Math.min(...ring.map(p=>p.z))+.5;z<Math.max(...ring.map(p=>p.z))&&!spawn;z+=.35)for(let x=Math.min(...ring.map(p=>p.x))+.5;x<Math.max(...ring.map(p=>p.x));x+=.35){const p=world({x,z});if(pointInRoom({x,z},ring)&&interiorSpawnIsClear(p,footprint,dynamicColliders)){spawn=p;break;}}
+  if(!spawn){authored.dispose();throw Error('No clear entrance position fits in this home.');}
+  const eyeHeight=appCtx.Walk?.CFG?.eyeHeight||1.7,entryPoint={...spawn,y:base+first.elevation+eyeHeight+.03};
+  const floorPlan={authored:true,floorCount:layout.floors.length,storyHeight:first.height+first.slab,floors:layout.floors.map((f,i)=>({id:f.id,label:f.label,level:i,elevation:f.elevation,height:f.height})),connectorEligible:stairs.length>0};
+  return {group:root,mode:'authored',layoutKind:'authored-home',dynamicColliders,walkSurfaces,placementTargets:[],floorPlan,floorId:first.id,floorLabel:first.label,activeLevel:0,loadedLevels:layout.floors.map((_,i)=>i),connector:null,stairs,center,floorBaseY:base,floorY:base,wallHeight:first.height,entryPoint,lobbyEntryPoint:entryPoint,exteriorFootprint:footprint,usableFootprint:footprint,exteriorArea:ringAreaAbs(footprint),usableArea:layout.floors[0].rooms.reduce((n,r)=>n+ringAreaAbs(roomRing(first,r)),0),shellClearanceMin:.05,requiredShellClearance:.05,partitionCount:dynamicColliders.length,interactions:[{kind:'exit',level:0,x:spawn.x,z:spawn.z,radius:2.25,label:'Exit home'}],authoredCeilings:authored.compiled.surfaces.filter(s=>s.kind==='ceiling').map(s=>({y:base+s.y,polygons:s.polygons.map(p=>p.map(r=>r.map(([x,z])=>world({x,z}))))}))};
 }

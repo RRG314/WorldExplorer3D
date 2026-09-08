@@ -111,20 +111,24 @@ export async function attachCommunityInteriorRepresentation(appCtx, active) {
       return false;
     }
     const alignment = representation.alignment || {};
-    applyCaptureAlignment(root, alignment, { x: finite(active.center?.x), y: finite(active.floorBaseY), z: finite(active.center?.z) });
+    if(representation.representationKind==='home-layout')applyCaptureAlignment(root,{},{});
+    else applyCaptureAlignment(root, alignment, { x: finite(active.center?.x), y: finite(active.floorBaseY), z: finite(active.center?.z) });
     root.userData.communityRealityCapture = Object.freeze({
       captureId: String(representation.captureId || ''),
       spaceId: String(representation.spaceId || ''),
       presentationOnly: true,
-      collisionAuthority: 'generated-interior-proxy'
+      collisionAuthority: representation.representationKind==='home-layout'?'authored-layout':'generated-interior-proxy'
     });
     root.traverse((object) => {
       if (!object?.isMesh) return;
       object.castShadow = true;
       object.receiveShadow = true;
       object.frustumCulled = true;
+      if(representation.representationKind==='home-layout'){
+        for(const material of Array.isArray(object.material)?object.material:[object.material]){material.polygonOffset=true;material.polygonOffsetFactor=-2;material.polygonOffsetUnits=-2;}
+      }
     });
-    active.group.traverse((object) => {
+    if(representation.representationKind!=='home-layout')active.group.traverse((object) => {
       if (object?.isMesh && !isInteractionVisual(object)) object.visible = false;
     });
     active.group.add(root);

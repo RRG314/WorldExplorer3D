@@ -150,7 +150,7 @@ function ensurePanel() {
       <button type="button" data-capture-hybrid hidden>Match photos to building sides</button>
       <div class="realityCaptureKinds" role="tablist" aria-label="Capture type">
         <button type="button" data-capture-kind="exterior" role="tab">Exterior</button>
-        <button type="button" data-capture-kind="interior_room" role="tab" hidden>One room</button>
+        <button type="button" data-capture-kind="interior_room" role="tab">Home interior</button>
       </div>
       <label class="realityCaptureConsent" data-facade-choice hidden><input data-exterior-facade type="checkbox" checked> <span>Photograph only the sides you can safely access.</span></label>
       <details data-building-details class="captureVisualGuide"><summary>Advanced · building details and measurements (optional)</summary>
@@ -209,7 +209,7 @@ function ensurePanel() {
   panel.addEventListener('cancel', event => { event.preventDefault(); closeRealityCapture(); });
   panel.querySelector('[data-capture-close]').addEventListener('click', closeRealityCapture);
   panel.querySelector('[data-capture-cancel]').addEventListener('click', clearDraft);
-  panel.querySelector('[data-capture-upload]').addEventListener('click', () => uploadDraft(current?.kind !== 'interior_room'));
+  panel.querySelector('[data-capture-upload]').addEventListener('click', () => uploadDraft(true));
   panel.querySelector('[data-capture-save]').addEventListener('click', () => uploadDraft(false));
   panel.querySelector('[data-capture-input]').addEventListener('change', addPhotos);
   panel.querySelector('[data-capture-video]').addEventListener('change', importVideo);
@@ -462,7 +462,8 @@ function render() {
   panel.querySelector('[data-photo-prev]').disabled=current.busy||current.photoPage===0;
   panel.querySelector('[data-photo-next]').disabled=current.busy||(current.photoPage+1)*6>=galleryPhotos.length;
   panel.querySelector('[data-photo-page]').textContent=galleryPhotos.length?` ${current.photoPage*6+1}–${Math.min((current.photoPage+1)*6,galleryPhotos.length)} of ${galleryPhotos.length} `:'No photos in this set.';
-  panel.querySelector('[data-capture-hybrid]').hidden = current.kind !== 'exterior' || !current.remotePhotos.length || !current.serverCapture?.building?.spatialContext?.footprint?.length;
+  panel.querySelector('[data-capture-hybrid]').hidden = current.kind === 'exterior' && (!current.remotePhotos.length || !current.serverCapture?.building?.spatialContext?.footprint?.length);
+  panel.querySelector('[data-capture-hybrid]').textContent = current.kind === 'interior_room' ? 'Design my interior floor plan' : 'Match photos to building sides';
   panel.querySelector('[data-capture-result]').hidden = !current.serverCapture?.processed?.optimizedModelPath;
   const registration = current.serverCapture?.processed?.registration;
   panel.querySelector('[data-capture-registration]').textContent = registration?.status === 'available'
@@ -516,9 +517,7 @@ async function persist(session = current) {
 }
 
 async function switchKind(kind) {
-  // Existing private room records remain reopenable, but new room editing is
-  // not part of the public manual-exterior release.
-  if (kind !== 'exterior') return;
+  if (!['exterior','interior_room'].includes(kind)) return;
   const session = current;
   if (!session || session.busy || session.resumed || kind === session.kind) return;
   setBusy(session, true);
@@ -668,21 +667,23 @@ function scheduleProgress(session) {
 }
 
 async function previewHybrid() {
-  const session=current;if(!session||session.busy||!session.serverCapture)return;
+  const session=current;if(!session||session.busy)return;
   setBusy(session,true);
   try {
-    const {openHybridEditor}=await import('./hybrid-editor.js?v=1');assertCurrent(session);
+    await ensureServerCapture(session);assertCurrent(session);
+    const {openHybridEditor}=await import('./hybrid-editor.js?v=1');
+    const {openHomeLayoutEditor}=session.kind==='interior_room'?await import('./home-layout-editor.js'):{};assertCurrent(session);
     session.hybridEditor?.close();
-    session.hybridEditor=await openHybridEditor({capture:session.serverCapture,photos:session.remotePhotos,signal:session.abort.signal,
+    session.hybridEditor=await (openHomeLayoutEditor||openHybridEditor)({capture:session.serverCapture,photos:session.remotePhotos,signal:session.abort.signal,
       loadPhoto:async(id,signal)=>{
         assertCurrent(session);const item=session.remotePhotos.find(p=>p.id===id);if(!item)throw Error('Unknown capture photo.');
         const path=item.path||`reality-captures/${session.uid}/${session.serverCapture.captureId}/originals/${id}.jpg`;
         const access=await getRealityCaptureAssetAccess(session.serverCapture.captureId,'original',path);assertCurrent(session);
         const response=await fetch(access.url,{cache:'no-store',signal});if(!response.ok)throw Error('Unable to open this saved photo.');
         const blob=await response.blob();assertCurrent(session);return blob;
-      },submit:async revision=>{
+      },submit:async (revision,publicSharing=false)=>{
         assertCurrent(session);
-        const result=await submitRealityCaptureHybrid(session.serverCapture.captureId,revision,true);
+        const result=await submitRealityCaptureHybrid(session.serverCapture.captureId,revision,session.kind==='interior_room'?publicSharing===true:true);
         assertCurrent(session);return result;
       },save:async preview=>{
         assertCurrent(session);const result=await saveRealityCaptureHybridPreview(session.serverCapture.captureId,preview);assertCurrent(session);
@@ -814,7 +815,7 @@ async function uploadDraft(submit = true) {
   } finally {
     setBusy(session, false);
   }
-  if (submit && isCurrent(session) && session.serverCapture?.status === 'uploaded' && session.kind === 'exterior') await previewHybrid();
+  if (submit && isCurrent(session) && session.serverCapture?.status === 'uploaded') await previewHybrid();
 }
 
 async function clearDraft() {

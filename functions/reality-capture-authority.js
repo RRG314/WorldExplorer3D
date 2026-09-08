@@ -275,7 +275,10 @@ function resolveSpaceAccess(input = {}) {
   if (mode === 'PUBLIC') {
     // Sharing preference is not publication authority. A reviewed interior
     // must be the exact capture currently installed in this private space.
-    const reviewed = !!space.captureId && space.publicApproval?.captureId === space.captureId;
+    const installed=space.installedRepresentation,approval=space.publicApproval;
+    const reviewed = !!space.captureId && approval?.captureId === space.captureId && (!installed || (
+      installed.modelPath===approval.modelPath && installed.modelGeneration===approval.modelGeneration && installed.revision===approval.revision
+    ));
     return Object.freeze(reviewed
       ? { allowed: true, reason: 'public', scope: 'public' }
       : { allowed: false, reason: 'public_review_required', requestable: false });

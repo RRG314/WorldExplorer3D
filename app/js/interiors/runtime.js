@@ -81,6 +81,7 @@ export function sampleInteriorWalkSurface(x, z, currentY, deps) {
     if (surface.kind === "polygon") {
       if (!Array.isArray(surface.pts) || surface.pts.length < 3) continue;
       if (!deps.pointInPolygonSafe(x, z, surface.pts)) continue;
+      if(surface.holes?.some(r=>deps.pointInPolygonSafe(x,z,r)))continue;
       consider({
         y: surface.y,
         source: "interior",
@@ -129,6 +130,7 @@ function applyInteriorSceneState(active, sceneState) {
   active.partitionCount = sceneState.partitionCount;
   active.layoutKind = sceneState.layoutKind;
   active.floorPlan = sceneState.floorPlan;
+  active.authoredCeilings = sceneState.authoredCeilings;
   active.floorId = sceneState.floorId;
   active.floorLabel = sceneState.floorLabel;
   active.floorBaseY = sceneState.floorBaseY;
@@ -253,6 +255,11 @@ function openElevatorFloorPicker(active, deps) {
 function refreshActiveFloorFromHeight(active, walker, deps) {
   if (!active?.floorPlan || active.floorPlan.floorCount <= 1 || active.floorTransitionPending) return;
   const feetY = walker.y - (appCtx.Walk?.CFG?.eyeHeight || 1.7);
+  if(active.floorPlan.authored){
+    const nearest=active.floorPlan.floors.reduce((best,f,i)=>Math.abs(active.floorBaseY+f.elevation-feetY)<Math.abs(active.floorBaseY+active.floorPlan.floors[best].elevation-feetY)?i:best,0);
+    if(Math.abs(active.floorBaseY+active.floorPlan.floors[nearest].elevation-feetY)<.45){active.activeLevel=nearest;active.floorId=active.floorPlan.floors[nearest].id;active.floorLabel=active.floorPlan.floors[nearest].label;}
+    return;
+  }
   const relative = (feetY - active.floorBaseY) / active.floorPlan.storyHeight;
   const nearestLevel = Math.max(0, Math.min(active.floorPlan.floorCount - 1, Math.round(relative)));
   const targetFloorY = active.floorBaseY + nearestLevel * active.floorPlan.storyHeight;
@@ -378,7 +385,9 @@ export async function enterInteriorForSupport(support, deps) {
   }
 
   const ownedHome = deps.findOwnedHomeForInteriorSupport?.(support) || null;
-  const sceneState = deps.buildInteriorScene(definition, { curatedHome: !!ownedHome });
+  let sceneState;
+  try{sceneState=deps.buildInteriorScene(definition,{curatedHome:!!ownedHome});}
+  catch(error){setTransientHint(`Interior not ready: ${error.message}`,deps.INTERIOR_NOTICE_MS,deps);return false;}
   appCtx.scene.add(sceneState.group);
   appCtx.replaceWorldCollection('dynamicBuildingColliders', sceneState.dynamicColliders.slice());
 

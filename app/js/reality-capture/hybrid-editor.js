@@ -7,7 +7,7 @@ import {normalizeManualRoom,manualRoomFootprint,manualRoomSurfaceSize,ROOM_SURFA
 
 // The host supplies the existing authenticated asset/save APIs. No public URLs,
 // alternate uploader, reconstruction queue, or world-geometry authority here.
-export async function openHybridEditor({capture,photos,loadPhoto,save,submit,signal}) {
+export async function openHybridEditor({capture,photos,loadPhoto,save,submit,signal,onClose}) {
   const isRoom=capture.captureKind==='interior_room';
   let pts=isRoom?manualRoomFootprint(capture.hybridPreview?.room||capture.room):wallFootprint(capture.building);
   if(!photos.length)throw Error('No saved photographs are available for this capture.');
@@ -92,9 +92,11 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
     $('[data-publication] h3').textContent='Review this room';
     $('[data-publication] p').textContent='Cropped images remain protected. Submitting for review does not make your room public.';
     $('[data-submit]').textContent='Submit private room for review';
+    dialog.querySelector('.hybridBuilding h3').textContent='1. Choose a room surface';
+    if(capture.authoredLayout){$('[data-rebuild]').hidden=true;dimensions.hidden=true;$('[data-height]').closest('label').hidden=true;$('[data-height-evidence]').hidden=true;}
   }
   let quad=[],selected=0,bitmap=null,viewer=null,busy=false,closed=false,editId=null,drag=false,dirty=false,highlight=null,photoPage=0,thumbnailBusy=false;
-  const localKey=JSON.stringify(['capture-wall-edit-v1',capture.ownerUid,capture.captureId]);
+  const localKey=JSON.stringify(['capture-wall-edit-v1',capture.ownerUid,capture.captureId,...(capture.authoredRoomId?[capture.authoredRoomId]:[])]);
   let recovery=null;
   try { recovery=(await loadLocalCaptureDraft(localKey)).draft; } catch { /* Account Save still works when device storage is unavailable. */ }
   const status=t=>{$('[data-status]').textContent=t;};
@@ -110,7 +112,7 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
     }
     if(!closed)setBusy(false);
   }}
-  function close(){if(closed)return;closed=true;abort.abort();viewer?.dispose();for(const b of cache.values())b.close?.();cache.clear();thumbs.clear();signal.removeEventListener('abort',close);dialog.close();dialog.remove();}
+  function close(){if(closed)return;closed=true;abort.abort();viewer?.dispose();for(const b of cache.values())b.close?.();cache.clear();thumbs.clear();signal.removeEventListener('abort',close);dialog.close();dialog.remove();onClose?.();}
   signal.addEventListener('abort',close,{once:true});
   if(recovery?.preview){
     $('[data-recovery]').hidden=false;
@@ -123,7 +125,7 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
   $('[data-close]').onclick=close;dialog.addEventListener('cancel',e=>{e.preventDefault();close();});
   const photoSelect=$('[data-photo-choice]');
   photos.forEach((p,i)=>photoSelect.add(new Option(`Photo ${i+1}`,p.id)));
-  const surfaceNames=isRoom?ROOM_SURFACE_NAMES:pts.map((p,i)=>`Wall ${i+1} · ${Math.hypot(p.x-pts[(i+1)%pts.length].x,p.z-pts[(i+1)%pts.length].z).toFixed(1)} m`);
+  const surfaceNames=isRoom?[...pts.map((_,i)=>`Wall ${i+1}`),'Floor','Ceiling']:pts.map((p,i)=>`Wall ${i+1} · ${Math.hypot(p.x-pts[(i+1)%pts.length].x,p.z-pts[(i+1)%pts.length].z).toFixed(1)} m`);
   surfaceNames.forEach((label,i)=>$('[data-wall]').add(new Option(label,String(i))));
   surfaceNames.forEach((label,i)=>{const b=document.createElement('button');b.textContent=isRoom?label:`Side ${i+1}`;b.dataset.side=i;b.onclick=()=>selectWall(i);$('[data-wall-buttons]').append(b);});
   $('[data-height]').value=preview.heightMeters;
@@ -156,13 +158,13 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
     if((busy&&!internal)||closed)return;
     $('[data-wall]').value=wall;editId=null;drawPlan();drawPlacement();
     dialog.querySelectorAll('[data-side]').forEach(b=>b.setAttribute('aria-pressed',String(Number(b.dataset.side)===wall)));
-    $('[data-side-label]').textContent=`Selected: ${$('[data-wall]').selectedOptions[0].textContent}. Yellow shows the selected wall.`;
+    $('[data-side-label]').textContent=`Selected: ${$('[data-wall]').selectedOptions[0].textContent}. Yellow shows the selected surface.`;
     if(highlight){const mesh=buildWallPatch(T,presentationBuilding(),preview.heightMeters,{wall,region:[0,0,1,1]},null);highlight.geometry.dispose();highlight.geometry=mesh.geometry;mesh.material.dispose();viewer?.redraw();}
   }
   function pickWall({point}){
     if(busy||point.y<0||point.y>preview.heightMeters+.02)return;
     if(isRoom&&(point.y<.02||Math.abs(point.y-preview.heightMeters)<.02)){
-      selectWall(point.y<.02?4:5);return;
+      selectWall(point.y<.02?pts.length:pts.length+1);return;
     }
     let best=-1,distance=Infinity;
     pts.forEach((a,i)=>{const b=pts[(i+1)%pts.length],dx=b.x-a.x,dz=b.z-a.z,u=Math.max(0,Math.min(1,((point.x-a.x)*dx+(point.z-a.z)*dz)/(dx*dx+dz*dz))),d=Math.hypot(point.x-a.x-u*dx,point.z-a.z-u*dz);if(d<distance){distance=d;best=i;}});

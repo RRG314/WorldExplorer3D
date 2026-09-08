@@ -9,6 +9,7 @@ export async function createCaptureViewer(host, bytes, signal, options = {}) {
   if (signal.aborted) return null;
   const T = globalThis.THREE;
   const model = options.model || (await new Promise((resolve, reject) => new T.GLTFLoader().parse(bytes, '', resolve, reject))).scene;
+  if(model.name==='authored-home')options={...options,interiorLighting:true};
   const disposeModel = () => model.traverse(object => {
     object.geometry?.dispose();
     for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
@@ -28,8 +29,8 @@ export async function createCaptureViewer(host, bytes, signal, options = {}) {
   if (!Number.isFinite(radius) || radius <= 0) { disposeModel(); throw Error('Invalid reconstruction bounds.'); }
   const placementReview = options.alignment !== undefined;
   if (placementReview) applyCaptureAlignment(model, options.alignment);
-  else model.position.sub(center);
-  scene.add(model, new T.HemisphereLight(0xffffff, 0x4b6970, 1.4));
+  else if(!options.preserveCoordinates) model.position.sub(center);
+  scene.add(model, new T.HemisphereLight(0xffffff, 0x4b6970, options.interiorLighting ? .55 : 1.4));
   const reference = new T.Group();
   const footprint = options.spatialContext?.footprint || [];
   if (placementReview && footprint.length >= 3) {
@@ -45,12 +46,13 @@ export async function createCaptureViewer(host, bytes, signal, options = {}) {
     ]), new T.LineBasicMaterial({ color: 0xffcc55, depthTest: false })));
     scene.add(reference);
   }
-  const light = new T.DirectionalLight(0xffffff, 0.8);
+  const light = new T.DirectionalLight(0xffffff, options.interiorLighting ? .45 : .8);
   light.position.set(1, 2, 3); scene.add(light);
   const camera = new T.PerspectiveCamera(50, 1, radius / 1000, radius * 100);
   const renderer = new T.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
   renderer.outputEncoding = T.sRGBEncoding;
+  if(options.interiorLighting){renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=.8;}
   const canvas = renderer.domElement;
   canvas.tabIndex = 0;
   canvas.setAttribute('aria-label', options.label || 'Your reconstructed model. Drag to rotate, pinch or scroll to zoom. Use the buttons below for keyboard control.');
@@ -109,6 +111,14 @@ export async function createCaptureViewer(host, bytes, signal, options = {}) {
   };
   signal.addEventListener('abort', dispose, { once: true });
   return { dispose, reset,
+    setInside: position => {
+      if(disposed)return;
+      camera.position.set(position.x,position.y,position.z);
+      camera.near=.03;camera.updateProjectionMatrix();
+      controls.target.set(position.x,position.y,position.z-.01);
+      controls.minDistance=.01;controls.maxDistance=.01;controls.enableZoom=false;controls.enablePan=false;
+      controls.update();draw();
+    },
     redraw: draw,
     getView: () => ({position:camera.position.toArray(),target:controls.target.toArray()}),
     updateAlignment: alignment => { if (!placementReview || disposed) return; applyCaptureAlignment(model, alignment); draw(); },

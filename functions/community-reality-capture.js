@@ -181,9 +181,6 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
   const createRealityCaptureDraft = functions.region('us-central1').https.onRequest(async (req, res) => {
     const auth = await guard(req, res);
     if (!auth) return;
-    if (req.body?.captureKind === 'interior_room' && auth.realityCaptureReconstruction !== true) {
-      return res.status(403).json({error: 'Room capture is not available in this release. Existing private photos are preserved.'});
-    }
     try {
       const authUser = await admin.auth().getUser(auth.uid);
       if (auth.firebase?.sign_in_provider === 'anonymous') throw Error('authentication_required');
@@ -416,14 +413,16 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       if(capture.hybridSubmission?.revision===req.body.revision)return res.status(200).json({status:capture.hybridSubmission.status,revision:req.body.revision,existing:true});
       const preview=normalizeHybridPreview(capture,{...decodeHybridPreview(capture.hybridPreview),baseRevision:capture.hybridPreview.revision});
       preview.revision=capture.hybridPreview.revision;
-      if(!preview.patches.length)throw Error('photo_patch_required');
+      if(preview.kind==='home-layout')require('./interior-layout.mjs').assertPlayableLayout(preview.layout);
+      if(!preview.patches.length&&!preview.roomPhotos?.some(r=>r.patches.length))throw Error('photo_patch_required');
       const bytes=await createPatchGlb(capture,preview,async p=>(await bucket.file(p.name,{generation:p.generation}).download())[0]);
       const digest=require('node:crypto').createHash('sha256').update(bytes).digest('hex');
       const modelPath=`reality-captures/${auth.uid}/${captureId}/processed/manual-v1/r${preview.revision}-${digest.slice(0,16)}/capture.glb`;
       const file=bucket.file(modelPath);try{await file.save(bytes,{resumable:false,preconditionOpts:{ifGenerationMatch:0},metadata:{contentType:'model/gltf-binary',cacheControl:'private,no-store'}});}catch(e){if(Number(e.code)!==412)throw e;}
       const [metadata]=await file.getMetadata();
       const isRoom=capture.captureKind==='interior_room';
-      const submission={revision:preview.revision,status:'review_required',kind:isRoom?'room-patches':'facade-patches',...(isRoom?{room:preview.room}:{}),modelPath,modelGeneration:String(metadata.generation),sha256:digest,footprintSignature:preview.footprintSignature,footprint:isRoom?require('./capture-room-geometry.mjs').manualRoomFootprint(preview.room):capture.building.spatialContext.footprint,heightMeters:preview.heightMeters,patches:preview.patches,submittedAtMs:Date.now()};
+      const isHome=preview.kind==='home-layout';
+      const submission={revision:preview.revision,status:'review_required',kind:isHome?'home-layout':isRoom?'room-patches':'facade-patches',...(isHome?{layout:preview.layout,roomPhotos:preview.roomPhotos}:isRoom?{room:preview.room}:{}),modelPath,modelGeneration:String(metadata.generation),sha256:digest,footprintSignature:preview.footprintSignature,footprint:isRoom&&!isHome?require('./capture-room-geometry.mjs').manualRoomFootprint(preview.room):capture.building.spatialContext.footprint,heightMeters:isHome?Math.max(...preview.layout.floors.map(f=>f.elevation+f.height+f.slab)):preview.heightMeters,patches:preview.patches,submittedAtMs:Date.now()};
       await db.runTransaction(async tx=>{const now=await tx.get(ref);if(!now.exists||!snap.updateTime.isEqual(now.updateTime))throw Error('hybrid_state_transition_conflict');tx.update(ref,{hybridSubmission:encodeHybridPreview(submission),status:'review_required',publicContributionRequested:isRoom?req.body?.publicSharing===true:true,updatedAt:FieldValue.serverTimestamp()});});
       res.status(200).json({status:'review_required',revision:preview.revision});
     }catch(e){sendKnownError(res,e);}
@@ -548,12 +547,16 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
         const captureSnap = await db.collection(CAPTURES).doc(selectedCaptureId).get();
         if (!captureSnap.exists) continue;
         const capture = captureSnap.data() || {};
-        const manual=capture.hybridSubmission?.kind==='room-patches'&&
+        const manual=['room-patches','home-layout'].includes(capture.hybridSubmission?.kind)&&
           (capture.ownerUid===auth.uid||capture.hybridSubmission.status==='approved')?capture.hybridSubmission:null;
         if (capture.ownerUid!==auth.uid&&capture.status!=='approved') continue;
         const modelPath=manual?.modelPath||capture.processed?.optimizedModelPath;
         const modelGeneration=manual?.modelGeneration||capture.processed?.modelGeneration;
-        if(!modelPath)continue;
+        if(!modelPath){
+          const draft=capture.ownerUid===auth.uid&&capture.hybridPreview?.kind==='home-layout'?capture.hybridPreview:null;
+          if(draft){res.set('Cache-Control','private, no-store');return res.status(200).json({available:true,authorized:true,spaceId:row.id,captureId:captureSnap.id,representationKind:'home-layout',layout:draft.layout,revision:draft.revision,model:null,access});}
+          continue;
+        }
         const file = bucket.file(modelPath,modelGeneration?{generation:modelGeneration}:undefined);
         const [exists] = await file.exists();
         if (!exists) continue;
@@ -567,7 +570,8 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
           spaceId: row.id,
           captureId: captureSnap.id,
           room: manual?.room || capture.room || null,
-          representationKind: manual?'room-patches':'reconstruction',
+          representationKind: manual?.kind||'reconstruction',
+          ...(manual?.layout?{layout:manual.layout,revision:manual.revision}:{}),
           alignment: capture.review?.alignment || null,
           model: { url, expiresAtMs, cache: 'private-no-store' },
           access
@@ -702,7 +706,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
           const current = await tx.get(spaceRef);
           if (!current.exists || current.data()?.ownerUid !== auth.uid) throw Error('space_owner_required');
           const value = current.data();
-          if (accessMode === 'PUBLIC' && (!value.captureId || value.publicApproval?.captureId !== value.captureId)) throw Error('interior_public_review_required');
+          if (accessMode === 'PUBLIC' && !resolveSpaceAccess({space:{...value,accessMode:'PUBLIC'}}).allowed) throw Error('interior_public_review_required');
           tx.update(spaceRef, { accessMode, updatedAt: FieldValue.serverTimestamp() });
         });
         res.status(200).json({ spaceId, accessMode });
@@ -878,8 +882,10 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       if (decision === 'approved' && capture.captureKind === 'interior_room' && capture.spaceId) {
         writes.push([db.collection(SPACES).doc(capture.spaceId), {
           captureId,
+          installedRepresentation:{modelPath:hybrid?.modelPath||capture.processed?.optimizedModelPath||'',modelGeneration:hybrid?.modelGeneration||capture.processed?.modelGeneration||'',revision:hybrid?.revision||0},
           publicApproval: capture.publicContributionRequested === true ? {
             captureId,
+            revision:hybrid?.revision||0,
             modelPath: hybrid?.modelPath || capture.processed?.optimizedModelPath,
             modelGeneration: hybrid?.modelGeneration || capture.processed?.modelGeneration || '',
             moderatorUid: moderator.auth.uid
