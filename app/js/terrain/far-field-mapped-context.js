@@ -5,6 +5,7 @@ import {
 import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js?v=1';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
 import { regionalBuildingTileOwnsUrbanSurface } from '../surface-rules-local.js?v=4';
+import { mappedGroundProfile } from './mapped-ground-evidence.js';
 
 const FAR_CONTEXT_ZOOM = 14;
 const FAR_WATER_CONTEXT_ZOOM = 11;
@@ -24,31 +25,11 @@ const FAR_CONTEXT_BUILDING_MAX_TILES = 512;
 const FAR_CONTEXT_TILE_CONCURRENCY = 8;
 const FAR_WATER_MIN_SPAN_METERS = 200;
 const FAR_LAND_SURFACE_PROFILES = Object.freeze({
-  forest: Object.freeze({ mode: 'forest', tint: [0.64, 0.82, 0.60], priority: 3 }),
-  grass: Object.freeze({ mode: 'grass', tint: [0.82, 0.96, 0.74], priority: 3 }),
-  agriculture: Object.freeze({ mode: 'soil', tint: [0.92, 0.90, 0.68], priority: 2 }),
-  sand: Object.freeze({ mode: 'sand', tint: [1.08, 0.98, 0.76], priority: 3 }),
-  bare: Object.freeze({ mode: 'rock', tint: [0.94, 0.88, 0.76], priority: 3 }),
   urban: Object.freeze({ mode: 'urban', tint: [0.76, 0.78, 0.80], priority: 1 })
 });
 
-function mappedLandSurfaceProfile(kind = '') {
-  const normalized = String(kind || '').toLowerCase();
-  if (['forest', 'wood', 'scrub', 'heath', 'mangrove'].includes(normalized)) {
-    return FAR_LAND_SURFACE_PROFILES.forest;
-  }
-  if (['grass', 'grassland', 'meadow', 'park', 'garden', 'recreation_ground', 'village_green', 'cemetery'].includes(normalized)) {
-    return FAR_LAND_SURFACE_PROFILES.grass;
-  }
-  if (['farmland', 'farmyard', 'orchard', 'vineyard', 'allotments', 'plant_nursery'].includes(normalized)) {
-    return FAR_LAND_SURFACE_PROFILES.agriculture;
-  }
-  if (['sand', 'beach', 'dune'].includes(normalized)) return FAR_LAND_SURFACE_PROFILES.sand;
-  if (['bare_rock', 'scree', 'shingle', 'quarry'].includes(normalized)) return FAR_LAND_SURFACE_PROFILES.bare;
-  if (['residential', 'industrial', 'commercial', 'retail', 'garages', 'railway', 'construction', 'brownfield', 'landfill', 'education', 'medical'].includes(normalized)) {
-    return FAR_LAND_SURFACE_PROFILES.urban;
-  }
-  return null;
+function mappedLandSurfaceProfile(kind = '', tags = {}) {
+  return mappedGroundProfile(kind, tags);
 }
 
 function polygonRings(geometry) {
@@ -459,7 +440,7 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
       for (let index = 0; index < layer.length; index += 1) {
         const feature = layer.feature(index);
         const geojson = feature?.toGeoJSON?.(tileRecord.x, tileRecord.y, tileRecord.z);
-        const profile = mappedLandSurfaceProfile(geojson?.properties?.kind);
+        const profile = mappedLandSurfaceProfile(geojson?.properties?.kind, geojson?.properties);
         if (!profile) continue;
         for (const rings of polygonAreas(geojson?.geometry)) {
           const outer = retainFarWaterRing(rings?.[0]);
@@ -471,13 +452,18 @@ async function loadFarMappedContext(bounds, excludedBounds = null, waterBounds =
             tint: profile.tint,
             mode: profile.mode,
             priority: profile.priority,
+            evidence: profile.evidence,
+            sourceFeatureId: `shortbread:${layerName}:${tileRecord.z}:${tileRecord.x}:${tileRecord.y}:${feature.id ?? index}`,
             kind: String(geojson?.properties?.kind || '')
           });
         }
       }
     }
     if (landBucket.length > 0) {
-      landBucket.sort((left, right) => Number(right.priority || 0) - Number(left.priority || 0));
+      const area = (entry) => (entry.bounds.maxLon - entry.bounds.minLon) *
+        (entry.bounds.maxLat - entry.bounds.minLat);
+      landBucket.sort((left, right) => Number(right.priority || 0) - Number(left.priority || 0) ||
+        area(left) - area(right) || left.sourceFeatureId.localeCompare(right.sourceFeatureId));
       const tileKey = `${tileRecord.z}/${tileRecord.x}/${tileRecord.y}`;
       landAreasByTile.set(tileKey, landBucket);
       landAreaSpatialByTile.set(tileKey, createLandAreaSpatialBucket(landBucket));

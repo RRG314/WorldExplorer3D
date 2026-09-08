@@ -1,5 +1,14 @@
 # World Explorer 3D Architecture
 
+Local mapped-ground path: the existing nearby Shortbread request supplies POIs
+plus land/sites/street polygons. Numeric polygon node IDs are remapped by the
+existing merge utility before joining the source graph; string POI identities
+remain unchanged. `load-landuse-pass` retains source tags and holes in `landuses`.
+`terrain/mapped-ground-evidence.js` interprets physical cover and builds a bounded
+spatial index used by `surface-profiles`; the regional context uses the same
+interpretation. This changes surface materials, not terrain elevation or road
+ownership. No additional frame loop, provider or storage service is introduced.
+
 September 8 camera ownership: `hud.js` keeps mode selection, collision-aware chase
 and overhead routing. `hud/driving-cabin-camera.js` owns the BMW local driver-eye
 transform and temporary near-plane adjustment; it does not add a second camera

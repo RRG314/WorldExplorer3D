@@ -389,12 +389,12 @@ function geometryParts(geometry) {
     return geometry.coordinates.map((coords) => ({ coords, polygon: false }));
   }
   if (geometry.type === 'Polygon') {
-    return geometry.coordinates.length > 0 ? [{ coords: geometry.coordinates[0], polygon: true }] : [];
+    return geometry.coordinates.length > 0 ? [{ coords: geometry.coordinates[0], holes: geometry.coordinates.slice(1), polygon: true }] : [];
   }
   if (geometry.type === 'MultiPolygon') {
     return geometry.coordinates
       .filter((polygon) => polygon.length > 0)
-      .map((polygon) => ({ coords: polygon[0], polygon: true }));
+      .map((polygon) => ({ coords: polygon[0], holes: polygon.slice(1), polygon: true }));
   }
   return [];
 }
@@ -509,6 +509,9 @@ async function convertTilesToElements(tiles, layerNames, bounds = null) {
             if (!partIntersectsBounds(part, bounds)) continue;
           const resolvedTags = {
             ...tags,
+            ...(['land', 'sites', 'street_polygons'].includes(layerName) &&
+                typeof geojson.properties?.surface === 'string'
+              ? { surface: geojson.properties.surface } : {}),
             ...(layerName === 'buildings' ? { _geometrySource: 'shortbread-vector' } : {})
           };
           if (layerName === 'streets' && resolveRoadName) {
@@ -533,6 +536,8 @@ async function convertTilesToElements(tiles, layerNames, bounds = null) {
             type: 'way',
             id: nextWayId--,
             nodes: nodeIds,
+            ...(['land', 'sites', 'street_polygons'].includes(layerName)
+              ? { surfaceHoles: part.holes || [] } : {}),
             tags: { ...resolvedTags, _sourceFeatureId: sourceFeatureId }
           });
         }

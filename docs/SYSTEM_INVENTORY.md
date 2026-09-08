@@ -1,5 +1,12 @@
 # World Explorer 3D System Inventory
 
+Local mapped-ground work (not a release assertion): nearby Shortbread land/site
+polygons now join the existing land-use collection through collision-safe node
+remapping. Terrain consumes a spatial index of physical-cover evidence; regional
+terrain shares the same classifier. Explicit parking surface tags select existing
+material families. Source polygon holes are retained. See
+`research/ground-ecosystems/MAPPED_GROUND_PLAN.md` for acceptance still in progress.
+
 September 8 release follow-up: driving uses the existing camera-mode controller
 with a model-visible E34 driver seat and restored rear-target recovery. Cabin
 near clipping is scoped and restored on exit. Seven focused tests and inspected

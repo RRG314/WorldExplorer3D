@@ -48,14 +48,20 @@ export function sampleWaterPolygonInteriorHeights(appCtx, ring, holes, bounds) {
   return samples;
 }
 
-function hardscapeMaterialOptions(appCtx, landuseType, composition) {
-  const textures = appCtx.surfaceTextureSets?.pavement?.map
+export function hardscapeMaterialOptions(appCtx, landuseType, composition, tags = {}) {
+  const surface = String(tags.surface || '').toLowerCase();
+  const materialFamily = ['gravel', 'fine_gravel', 'pebblestone'].includes(surface) ? 'rock' :
+    ['dirt', 'earth', 'compacted', 'unpaved'].includes(surface) ? 'soil' :
+    surface === 'grass' ? 'grass' : surface === 'sand' ? 'sand' : 'pavement';
+  const textures = appCtx.surfaceTextureSets?.[materialFamily]?.map
+    ? appCtx.surfaceTextureSets[materialFamily]
+    : appCtx.surfaceTextureSets?.pavement?.map
     ? appCtx.surfaceTextureSets.pavement
     : appCtx.pavementDiffuse
       ? { map: appCtx.pavementDiffuse, normalMap: appCtx.pavementNormal, roughnessMap: appCtx.pavementRoughness }
       : null;
   const material = {
-      color: textures?.map ? 0xffffff : (appCtx.LANDUSE_STYLES?.[landuseType]?.color ?? 0xb8b8b8),
+      color: textures?.map ? (surface === 'asphalt' ? 0x777b80 : 0xffffff) : (appCtx.LANDUSE_STYLES?.[landuseType]?.color ?? 0xb8b8b8),
       map: textures?.map || null,
       normalMap: textures?.normalMap || null,
       roughnessMap: textures?.roughnessMap || null,
@@ -153,6 +159,9 @@ export function createWorldLandusePass(options = {}) {
         bounds: { minX, maxX, minZ, maxZ },
         semanticOnly: true,
         presentationOwner: 'terrain_worldcover',
+        tags: featureMeta.tags || {},
+        holeRings,
+        geometrySource: featureMeta.geometrySource || null,
         sourceFeatureId: featureMeta.sourceFeatureId || null
       });
       return true;
@@ -271,7 +280,7 @@ export function createWorldLandusePass(options = {}) {
       );
     }
 
-    const mappedSurface = isWater ? null : hardscapeMaterialOptions(appCtx, landuseType, composition);
+    const mappedSurface = isWater ? null : hardscapeMaterialOptions(appCtx, landuseType, composition, featureMeta.tags);
     if (!isWater) applyWorldSpaceSurfaceUvs(geometry, mappedSurface.metersPerTile);
     const material = new THREE.MeshStandardMaterial(isWater ? {
       color: waterVisualProfile?.color || appCtx.LANDUSE_STYLES.water.color,
@@ -630,7 +639,10 @@ export function createWorldLandusePass(options = {}) {
         .map((node) => appCtx.geoToWorld(node.lat, node.lon));
       const guard = landuseType === 'water' ? runtime.waterGeometryGuards : runtime.landuseGeometryGuards;
       cacheSurfaceFeatureHint(pts, landuseType, guard);
-      addLandusePolygon(runtime, pts, landuseType, [], guard, landuseType === 'water' ? {
+      const holes = (way.surfaceHoles || []).map((ring) => ring
+        .filter((coordinate) => Number.isFinite(coordinate?.[0]) && Number.isFinite(coordinate?.[1]))
+        .map(([lon, lat]) => appCtx.geoToWorld(lat, lon))).filter((ring) => ring.length >= 3);
+      addLandusePolygon(runtime, pts, landuseType, holes, guard, landuseType === 'water' ? {
         kindHint: way.tags?.natural || way.tags?.water || way.tags?.landuse,
         surfaceType: way.tags?.water || way.tags?.natural || way.tags?.landuse,
         access: way.tags?.access,
@@ -638,7 +650,12 @@ export function createWorldLandusePass(options = {}) {
         sourceFeatureId: way.id ? `osm:${way.id}` : null,
         geometrySource: 'osm-overpass',
         layer: 'landuse'
-      } : {});
+      } : {
+        tags: way.tags || {},
+        sourceFeatureId: way.tags?._sourceFeatureId || (way.id ? `osm:${way.id}` : null),
+        geometrySource: way.tags?._geometrySource ||
+          (String(way.tags?._sourceFeatureId || '').startsWith('shortbread:') ? 'shortbread-vector' : 'osm-overpass')
+      });
     });
 
     if (Array.isArray(runtime.waterwayWays) && runtime.waterwayWays.length > 0) {

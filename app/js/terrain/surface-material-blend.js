@@ -69,6 +69,8 @@ export function terrainSurfaceClassForMappedMode(mode = '') {
   if (normalized === 'soil' || normalized === 'agriculture') return TERRAIN_SURFACE_CLASS.soil;
   if (normalized === 'rock' || normalized === 'bare') return TERRAIN_SURFACE_CLASS.rock;
   if (normalized === 'snow') return TERRAIN_SURFACE_CLASS.snow;
+  if (normalized === 'wetland') return TERRAIN_SURFACE_CLASS.wetland;
+  if (normalized === 'moss') return TERRAIN_SURFACE_CLASS.moss;
   return TERRAIN_SURFACE_CLASS.grass;
 }
 
@@ -302,10 +304,15 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
             'vec4 terrainSnowColor = vec4(0.94, 0.96, 1.0, 1.0);',
             '#ifdef USE_MAP',
             '  terrainGrassColor = mapTexelToLinear(texture2D(map, vUv));',
-            '  terrainUrbanColor = mapTexelToLinear(texture2D(terrainUrbanMap, vUv));',
-            '  terrainSandColor = mapTexelToLinear(texture2D(terrainSandMap, vUv));',
-            '  terrainForestColor = mapTexelToLinear(texture2D(terrainForestMap, vUv));',
-            '  terrainSoilColor = mapTexelToLinear(texture2D(terrainSoilMap, vUv));',
+            '  vec2 groundPoint = vTerrainDetailPosition.xz;',
+            '  float grassMacro = dot(mapTexelToLinear(texture2D(map, groundPoint * 0.007)).rgb, vec3(0.333333));',
+            '  terrainGrassColor.rgb *= mix(0.92, 1.08, smoothstep(0.1, 0.7, grassMacro));',
+            '  terrainUrbanColor = mapTexelToLinear(texture2D(terrainUrbanMap, groundPoint / 5.0));',
+            '  terrainSandColor = mapTexelToLinear(texture2D(terrainSandMap, groundPoint / 6.0));',
+            '  vec3 sandRotated = mapTexelToLinear(texture2D(terrainSandMap, mat2(0.8, -0.6, 0.6, 0.8) * groundPoint / 8.226 + vec2(0.37, 0.19))).rgb;',
+            '  terrainSandColor.rgb = mix(terrainSandColor.rgb, sandRotated, 0.5);',
+            '  terrainForestColor = mapTexelToLinear(texture2D(terrainForestMap, groundPoint / 4.0));',
+            '  terrainSoilColor = mapTexelToLinear(texture2D(terrainSoilMap, groundPoint / 5.0));',
             '  vec3 rockAxes = pow(abs(normalize(vTerrainDetailNormal)), vec3(4.0));',
             '  rockAxes /= max(dot(rockAxes, vec3(1.0)), 0.0001);',
             '  vec3 rockPoint = vTerrainDetailPosition * 0.125;',
@@ -350,7 +357,7 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
     };
     material.customProgramCacheKey = () => [
       previousProgramCacheKey?.() || '',
-      'terrain-semantic-pbr-material-mix-v8'
+      'terrain-semantic-pbr-material-mix-v9'
     ].join(':');
   }
   state.uniforms.terrainUrbanMap.value = textureSets.urban?.map || material.map;

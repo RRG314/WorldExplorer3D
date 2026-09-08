@@ -1,5 +1,13 @@
 # Data Sources
 
+Local September 8 mapped-ground revision: existing Shortbread z14 coverage is
+also decoded for nearby land, sites and street polygons. These are generalized
+OSM-derived polygons, not parcel surveys. Source identity, available surface tags
+and interior rings are retained. Explicit physical cover outranks broad property
+purpose; unknown purpose-only areas retain existing cover fallback. Texture
+detail is representative CC0 material, not a photograph of that exact ground.
+No new provider requests or paid datasets were introduced by this revision.
+
 Herbaceous wetland groundcover uses numeric ESA WorldCover class90, not inferred
 open water. The local CC0 Quaternius nature subset now also includes
 Grass_Common_Tall (grass.glb); its source, conversion hash and triangle count are

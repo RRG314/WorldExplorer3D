@@ -7,7 +7,11 @@ let source=await readFile(client,'utf8');
 const patches=[
  ['await page.waitForTimeout(500);', `await page.waitForFunction(() => window.__WE3D_RUNTIME_READY__, null, {timeout:45000});`],
  ['await page.click(args.clickSelector, { timeout: 5000 });', 'await page.click(args.clickSelector, { timeout: 15000 });'],
- ['await page.waitForTimeout(250);', `await page.waitForFunction(() => { const s=window.getWorldExplorerRuntimeDiagnostics?.(); return s?.gameStarted && !s.worldLoading && !document.getElementById('loading')?.classList.contains('show'); }, null, {timeout:90000});`]
+ ['await page.waitForTimeout(250);', `try { await page.waitForFunction(() => { const s=window.getWorldExplorerRuntimeDiagnostics?.(); return s?.gameStarted && !s.worldLoading && !document.getElementById('loading')?.classList.contains('show'); }, null, {timeout:90000}); }
+ catch(error) { fs.mkdirSync(args.screenshotDir,{recursive:true});
+ await page.screenshot({path:path.join(args.screenshotDir,'load-failure.png')});
+ fs.writeFileSync(path.join(args.screenshotDir,'load-failure.json'),JSON.stringify(await page.evaluate(()=>({diagnostics:window.getWorldExplorerRuntimeDiagnostics?.(),loading:document.getElementById('loading')?.textContent})),null,2));
+ throw error; }`]
 ];
 for(const [before,after] of patches){
  if(!source.includes(before)) throw new Error('Prescribed client changed; review readiness adapter before running.');
@@ -21,6 +25,16 @@ source=source.replace('await captureScreenshot(page, canvas, shotPath);', 'await
 if(process.env.WE3D_TEST_DAY==='1') source=source.replace('await doChoreography(page, canvas, steps);', `await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setTimeOfDay?.('day');});\nawait doChoreography(page, canvas, steps);`);
 if(process.env.WE3D_TEST_MOBILE==='1') source=source.replace('const page = await browser.newPage();','const page = await browser.newPage({viewport:{width:412,height:915},isMobile:true,hasTouch:true,deviceScaleFactor:1,userAgent:"Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36"});');
 if(process.env.WE3D_REAL_GPU==='1') source=source.replace('args: ["--use-gl=angle", "--use-angle=swiftshader"],','channel:"chrome",');
+if(process.env.WE3D_GROUND_EVIDENCE==='1') source=source.replace('await page.screenshot({path:shotPath, type:"png"});', `await page.screenshot({path:shotPath, type:"png"});
+fs.writeFileSync(path.join(args.screenshotDir,'ground.json'),JSON.stringify(await page.evaluate(async()=>{
+ const {ctx}=await import('/app/js/shared-context.js?v=55');
+ const counts={}; for(const f of ctx.landuses||[])counts[f.type]=(counts[f.type]||0)+1;
+ return {location:ctx.LOC,counts,localSamples:(ctx.landuses||[]).slice(0,8).map(f=>({type:f.type,tags:f.tags,source:f.geometrySource})),
+ meshes:(ctx.terrainGroup?.children||[]).filter(m=>m.userData?.isTerrainMesh).slice(0,8).map(m=>({
+  profile:m.userData.terrainVisualProfile,tinted:m.userData.mappedSemanticTintVertices,
+  repeats:m.userData.terrainTextureRepeats,color:m.material?.color?.getHexString(),
+  map:m.material?.map?.image?.src,worldCover:m.userData.worldCoverResult?.stats}))};
+}),null,2));`);
 if(process.env.WE3D_BUILDING_PARITY==='1') source=source.replace('await page.screenshot({path:shotPath, type:"png"});', `await page.screenshot({path:shotPath, type:"png"});
 fs.writeFileSync(path.join(args.screenshotDir,'buildings.json'),JSON.stringify(await page.evaluate(async()=>{
  const {ctx}=await import('/app/js/shared-context.js?v=55');

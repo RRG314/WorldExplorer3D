@@ -25,6 +25,7 @@ import {
   beginFixedRegionalTransportLoad,
   completeFixedRegionalTransportLoad,
   fixedRegionalRoadGeometryGuards,
+  mergeFixedRegionalTransport,
   sampleFixedRegionalGround,
   waitForFixedRegionalGround
 } from "./fixed-regional-context.js?v=9";
@@ -452,7 +453,7 @@ export function createWorldRoadLoader(deps = {}) {
             radius: Math.min(0.02, Math.max(0.006, featureRadius)),
             zoom: 14,
             includeBuildings: false,
-            layerNames: ['pois'],
+            layerNames: ['pois', 'land', 'sites', 'street_polygons'],
             signal
           })
         ).then((poiData) => ({ poiData, error: null }))
@@ -621,11 +622,23 @@ export function createWorldRoadLoader(deps = {}) {
         const mappedPoiResult = await mappedPoiRequest;
         if (mappedPoiResult.poiData?.elements?.length) {
           const merged = new Map((data?.elements || []).map((element) => [`${element.type}:${element.id}`, element]));
-          mappedPoiResult.poiData.elements.forEach((element) => merged.set(`${element.type}:${element.id}`, element));
+          // POIs have globally namespaced string identities; polygon nodes use
+          // converter-local numeric IDs and must never overwrite road nodes.
+          const surfaceElements = mappedPoiResult.poiData.elements.filter((element) => Number.isFinite(element.id));
+          mappedPoiResult.poiData.elements.filter((element) => !Number.isFinite(element.id))
+            .forEach((element) => merged.set(`${element.type}:${element.id}`, element));
           data = { ...data, elements: [...merged.values()] };
+          const surfaceMerge = mergeFixedRegionalTransport(data, { elements: surfaceElements });
+          data = { ...data, elements: surfaceMerge.elements };
+          loadMetrics.mappedGround = {
+            provider: 'openstreetmap-shortbread',
+            polygons: surfaceElements.filter((element) => element.type === 'way').length,
+            status: surfaceElements.length ? 'loaded' : 'authoritative-empty',
+            zoom: 14
+          };
           loadMetrics.mappedPois = {
             provider: 'openstreetmap-shortbread',
-            mapped: mappedPoiResult.poiData.elements.length,
+            mapped: mappedPoiResult.poiData.elements.filter((element) => !Number.isFinite(element.id)).length,
             status: 'loaded',
             zoom: 14
           };

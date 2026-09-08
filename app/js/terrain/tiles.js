@@ -479,7 +479,9 @@ export function buildTerrainTileMesh(z, tx, ty, deps = {}) {
   const geo = new THREE.PlaneGeometry(width, depth, appCtx.TERRAIN_SEGMENTS, appCtx.TERRAIN_SEGMENTS);
   geo.rotateX(-Math.PI / 2);
 
-  const repeats = Math.max(10, Math.round(width / 25));
+  // Keep blades/soil detail at pedestrian scale, not a 25-unit carpet.
+  // The same UV transform feeds diffuse, normal and roughness maps.
+  const repeats = Math.max(1, width / 6);
   const mat = new THREE.MeshStandardMaterial({
     color: typeof appCtx.grassDiffuse !== "undefined" && appCtx.grassDiffuse ? 0xffffff : TERRAIN_GRASS_COLOR_HEX,
     roughness: 0.95,

@@ -248,10 +248,9 @@ function createFarFieldTerrainApi(deps = {}) {
       Number(spec?.outer?.maxX || 0) - Number(spec?.outer?.minX || 0),
       Number(spec?.outer?.maxZ || 0) - Number(spec?.outer?.minZ || 0)
     ) / unitsPerMeter;
-    // Detailed z15 tiles use roughly one repeat per 80 m. The location LOD
-    // keeps that physical scale instead of stretching one texture across the
-    // entire 44 km background square.
-    const repeats = Math.max(12, spanMeters / 80);
+    // Match the detailed terrain's six-world-unit grass scale. Mip filtering
+    // handles the aerial LOD; changing texel scale at the seam does not.
+    const repeats = Math.max(1, spanMeters * unitsPerMeter / 6);
     const detailTextures = ensureTerrainTextureSet(mesh, repeats, 'grass');
     material.map = detailTextures?.map || null;
     material.normalMap = detailTextures?.normalMap || null;
@@ -836,6 +835,7 @@ function createFarFieldTerrainApi(deps = {}) {
       contextZoom: mappedContext.contextZoom,
       landAreas: Number(mappedContext.landAreas || 0),
       landAreasByTile: mappedContext.landAreasByTile,
+      landAreaSpatialByTile: mappedContext.landAreaSpatialByTile,
       surfaceFallbackByTile: mappedContext.surfaceFallbackByTile
     });
   }
