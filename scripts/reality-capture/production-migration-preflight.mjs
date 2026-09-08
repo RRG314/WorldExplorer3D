@@ -17,7 +17,7 @@ function value(v){if('stringValue'in v)return v.stringValue;if('integerValue'in 
 function fields(f){return Object.fromEntries(Object.entries(f).map(([k,v])=>[k,value(v)]));}
 const root=project=>`/v1/projects/${project}/databases/(default)/documents`;
 const capture=fields((await db.get(`${root(source)}/realityCaptures/${captureId}`)).body.fields);
-if(capture.status!=='approved'||capture.captureKind!=='exterior'||capture.hybridSubmission?.status!=='approved')throw Error('Only an approved manual exterior can be planned');
+if(capture.captureKind!=='exterior')throw Error('Only an exterior capture can be planned');
 const user=(await identity.post(`/v1/projects/${source}/accounts:lookup`,{localId:[capture.ownerUid]})).body.users?.[0];
 if(!user?.email)throw Error('A verified owner mapping is required');
 const targetUsers=(await identity.post(`/v1/projects/${destination}/accounts:lookup`,{email:[user.email]})).body.users||[];
@@ -27,10 +27,12 @@ const prefix=`reality-captures/${capture.ownerUid}/${captureId}/`;
 let objects=[],pageToken;
 do{const result=(await storage.get(`/storage/v1/b/${source}.firebasestorage.app/o`,{queryParams:{prefix,...(pageToken?{pageToken}:{})}})).body;objects.push(...(result.items||[]));pageToken=result.nextPageToken;}while(pageToken);
 const original=objects.filter(o=>o.name.startsWith(prefix+'originals/'));
-const matched=representations.filter(r=>r.status==='approved'&&r.modelPath===capture.hybridSubmission.modelPath&&String(r.modelGeneration)===String(capture.hybridSubmission.modelGeneration));
-const hasDerivative=objects.some(o=>o.name===capture.hybridSubmission.modelPath&&String(o.generation)===String(capture.hybridSubmission.modelGeneration));
+// A pending edit must not hide an older approved immutable publication.
+const matched=representations.filter(r=>r.status==='approved'&&r.visibility==='public'&&r.captureKind==='exterior'&&r.representationKind==='facade-patches');
+if(!matched.length)throw Error('No approved manual exterior representation found; no migration planned');
+const hasDerivative=matched.every(r=>objects.some(o=>o.name===r.modelPath&&String(o.generation)===String(r.modelGeneration)));
 const productionConfig=JSON.parse(await fs.readFile(new URL('../../config/firebase.production.json',import.meta.url),'utf8'));
-const report={readOnly:true,source,destination,captureId,canonicalBuilding:capture.building.sourceBuildingId,revision:capture.hybridSubmission.revision,
+const report={readOnly:true,source,destination,captureId,canonicalBuilding:capture.building.sourceBuildingId,captureStatus:capture.status,approvedRevisions:matched.map(r=>({revision:r.revision,worldId:r.canonicalBuilding?.worldId,sourceBuildingId:r.canonicalBuilding?.sourceBuildingId})),
   originalPhotos:original.length,totalMediaBytes:objects.reduce((sum,o)=>sum+Number(o.size||0),0),approvedRepresentations:matched.length,approvedDerivativePresent:hasDerivative,
   ownerMapping:targetUsers.length===1?'matching-production-account':'requires-resolution',sameUid:targetUsers.length===1&&targetUsers[0].localId===capture.ownerUid,
   rawPhotosWithPermanentDownloadToken:original.filter(o=>o.metadata?.firebaseStorageDownloadTokens).length,

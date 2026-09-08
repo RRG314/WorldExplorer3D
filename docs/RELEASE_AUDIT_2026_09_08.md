@@ -13,6 +13,30 @@ Pushing stable also publishes GitHub Pages; it does not deploy Firebase.
 
 ## Blocking findings
 
+### Camera/capture follow-up
+
+Driving view cycling reproduced a collapsed roof pose on return to chase.
+The collision controller now prefers its safe rear destination over the roof
+fallback. First person uses the normalized E34 driver seat, keeps the model
+visible, and temporarily uses a 4 cm near plane restored on leaving the cabin.
+The exterior atlas shell is outward-facing rather than double-sided so its
+opaque window backfaces do not block the separate modeled interior. Open-terrain
+C-key cycling and cabin screenshots were inspected; seven focused checks pass.
+East Pratt Street automation timed out before world readiness; city/tunnel
+camera acceptance remains open, not assumed from the open-terrain result.
+
+Real staging upload -> validation -> preview save -> stale revision rejection ->
+reload -> manual submission passed on a disposable fixture, then removed along
+with its temporary account/attestation. No reconstruction ran or public fixture
+was approved. The actual approved house is capture_d7a83f7f2adf291ac8d76e04a7cb3636,
+not the old reconstruction ID below. Its 48 originals and approved derivative
+are present, with no permanent download tokens on originals. Approved revision1
+is returned by the public App-Checked canonical-building lookup before and after
+reload. This is retrieval evidence, not a new in-world screenshot or moderation
+write. Production owner account exists with a different UID; migration and
+App Check still need completion. Preflight now uses immutable approved
+representations rather than requiring the mutable capture to remain approved.
+
 1. Production config lacks appCheckSiteKey. firebase-init only initializes
    App Check with this key; capture endpoints require verified App Check.
    A hosting-only release cannot certify the photo workflow. Provision/check

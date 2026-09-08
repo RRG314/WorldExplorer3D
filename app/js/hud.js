@@ -11,6 +11,7 @@ import { resolveChaseCameraTerrainCollision } from "./hud/chase-camera-terrain.j
 import { resolveTunnelCameraState } from "./hud/tunnel-camera-controller.js?v=6";
 import { resolveTunnelCameraBoom } from './hud/tunnel-camera-boom.js';
 import { createVehicleCameraBody, selectBodySafeCamera, vehicleCameraProbeRadius } from './hud/vehicle-camera-body.js';
+import { applyDrivingCabinCamera, setCabinNearClip } from './hud/driving-cabin-camera.js';
 import { cameraSmoothingBlend } from "./controls/traversal-control-policy.js?v=8";
 import { planetarySurfaceYAtRenderXZ } from './planetary/runtime/surface-query.js?v=3';
 // hud.js - HUD updates, camera system, sky positioning
@@ -26,9 +27,6 @@ const CHASE_CAMERA_HEIGHT = 5;
 // 60 Hz. Keep the time-based response close to that feel without bringing
 // back refresh-rate-dependent camera motion.
 const CHASE_CAMERA_SMOOTH_RATE = 60;
-const HOOD_FORWARD_OFFSET = 1.2;
-const HOOD_LOOK_DISTANCE = 10;
-const HOOD_CAMERA_HEIGHT = 1.8;
 const OVERHEAD_CAMERA_HEIGHT = 50;
 const OVERHEAD_CAMERA_Z_OFFSET = 15;
 const WALK_ROAD_EDGE_MIN = 6;
@@ -386,6 +384,7 @@ function updateSkyPositions() {
 }
 
 function updateCamera(dt = 1 / 60) {
+  if (appCtx.planeMode?.active || appCtx.boatMode?.active || appCtx.droneMode || appCtx.Walk?.state?.mode === 'walk') setCabinNearClip(appCtx.camera, false);
   if (appCtx.planeMode?.active && appCtx.applyPlaneCamera?.(dt)) {
     updateBillboardMarkers();
     updateCameraLinkedEffects();
@@ -604,33 +603,17 @@ function updateCamera(dt = 1 / 60) {
         { actorBaseY: point.y - cameraRadius, actorHeight: cameraRadius * 2 })?.collision !== true;
     };
     const roof = body?.contains(appCtx.camera.position) ? body.roofPoint() : null;
-    const choice = selectBodySafeCamera(appCtx.camera.position, roof ? [roof] : [], body, isClear);
+    const choice = selectBodySafeCamera(appCtx.camera.position, [{x:targetX,y:targetY,z:targetZ}, ...(roof ? [roof] : [])], body, isClear);
     appCtx.camera.userData.vehicleClearanceMode = choice.mode;
     if (choice.mode === 'clearance-chase') {
       appCtx.camera.position.copy(choice.point);
-      appCtx.camera.lookAt(lookX + Math.sin(viewAngle) * 4, lookY, lookZ + Math.cos(viewAngle) * 4);
+      appCtx.camera.lookAt(lookX, lookY, lookZ);
     } else if (choice.mode === 'clearance-first-person') {
-      const eye = { x: carX, y: carGroundY + HOOD_CAMERA_HEIGHT, z: carZ };
-      const safe = insideTunnel ? resolveTunnelCameraBoom(tunnelCameraState.road, anchor, eye, cameraRadius, sampleOutsideTunnelTerrain) : eye;
-      appCtx.camera.position.set(safe.x, safe.y, safe.z);
-      appCtx.camera.lookAt(carX + Math.sin(viewAngle) * HOOD_LOOK_DISTANCE,
-        safe.y + Math.sin(carLook.pitch) * HOOD_LOOK_DISTANCE, carZ + Math.cos(viewAngle) * HOOD_LOOK_DISTANCE);
-      appCtx.carMesh.visible = false;
+      applyDrivingCabinCamera(THREE, appCtx.camera, appCtx.carMesh, {yaw:carLook.yaw + (lb ? Math.PI : 0),pitch:carLook.pitch});
     }
   } else if (appCtx.camMode === 1) {
     appCtx.camera.userData.vehicleClearanceMode = 'selected-first-person';
-    // Hood camera - positioned at front of car looking forward over the hood
-    // Move camera forward to the hood area (1.2 units ahead of car center)
-    const fwdX = Math.sin(carAngle) * HOOD_FORWARD_OFFSET;
-    const fwdZ = Math.cos(carAngle) * HOOD_FORWARD_OFFSET;
-    appCtx.camera.position.set(carX + fwdX, carGroundY + HOOD_CAMERA_HEIGHT, carZ + fwdZ);
-    appCtx.camera.lookAt(
-      carX + Math.sin(viewAngle) * HOOD_LOOK_DISTANCE,
-      carGroundY + 1.6 + Math.sin(carLook.pitch) * HOOD_LOOK_DISTANCE,
-      carZ + Math.cos(viewAngle) * HOOD_LOOK_DISTANCE
-    );
-    // Hide car mesh in first-person so you don't see tires/body
-    if (appCtx.carMesh) appCtx.carMesh.visible = false;
+    applyDrivingCabinCamera(THREE, appCtx.camera, appCtx.carMesh, {yaw:carLook.yaw + (lb ? Math.PI : 0),pitch:carLook.pitch});
   } else {
     appCtx.camera.userData.vehicleClearanceMode = 'overhead';
     // Overhead camera - high above car
@@ -638,6 +621,7 @@ function updateCamera(dt = 1 / 60) {
     appCtx.camera.lookAt(carX, carGroundY, carZ);
   }
 
+  if (appCtx.camMode !== 1 && appCtx.camera.userData.vehicleClearanceMode !== 'clearance-first-person') setCabinNearClip(appCtx.camera, false);
   updateBillboardMarkers();
   updateCameraLinkedEffects();
 }
