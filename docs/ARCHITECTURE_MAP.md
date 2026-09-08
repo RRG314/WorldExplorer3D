@@ -1,5 +1,16 @@
 # World Explorer 3D Architecture
 
+Authored-home path (staging test implementation): canonical captured building
+snapshot → one versioned layout (`functions/interior-layout.mjs`) →
+`home-layout-editor` and `interiors/authored-geometry` → existing interior runtime
+entry/exit, wall collision and walk surfaces. `roomPhotos` refer to stable room
+and wall-side IDs. Shared `capture-room-geometry` clips photo triangles around
+doorways and stair voids in both browser and backend derivatives. Metadata stays
+in existing capture/private-space records; media stays in protected Storage.
+No reconstruction worker or second movement authority is introduced. Installed
+home revisions and public approval bind model path, generation and revision.
+See the interior implementation verification note for remaining acceptance gates.
+
 Local mapped-ground path: the existing nearby Shortbread request supplies POIs
 plus land/sites/street polygons. Numeric polygon node IDs are remapped by the
 existing merge utility before joining the source graph; string POI identities

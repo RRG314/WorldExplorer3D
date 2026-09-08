@@ -1,5 +1,14 @@
 # World Explorer 3D System Inventory
 
+September 8 authored-interior test implementation: the shared
+`functions/interior-layout.mjs` document/compiler now supplies the home grid
+editor, blank 3D shell, doorway/stair geometry and existing game collision/walking
+integration. Home photo placements reuse capture originals, private delivery,
+account revisions and manual CPU derivative submission. New interiors default
+private; public requests remain explicit and reviewed. This is a staging test
+implementation, not production acceptance. See
+`verification/interior-layout-implementation-20260908.md` for limitations.
+
 Local mapped-ground work (not a release assertion): nearby Shortbread land/site
 polygons now join the existing land-use collection through collision-safe node
 remapping. Terrain consumes a spatial index of physical-cover evidence; regional

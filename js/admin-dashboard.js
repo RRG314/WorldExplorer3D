@@ -828,6 +828,7 @@ async function mountRealityModelPreview(url, capture) {
     const response = await fetch(url, { signal: controller.signal, cache: 'no-store', credentials: 'omit' });
     if (!response.ok) throw Error('protected_model_unavailable');
     viewer = await createCaptureViewer(host, await response.arrayBuffer(), controller.signal, {
+      homeLayout:capture.hybridSubmission?.kind==='home-layout'?capture.hybridSubmission.layout:null,
       alignment: capture.review?.alignment || {},
       spatialContext: capture.captureKind === 'exterior' ? capture.building?.spatialContext : null
     });

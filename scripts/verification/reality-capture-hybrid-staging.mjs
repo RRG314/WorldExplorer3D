@@ -5,7 +5,11 @@ import {randomBytes} from 'node:crypto';
 import {chromium} from 'playwright';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {stagingCaptureAttestation} from './staging-capture-attestation.mjs';
+import {makeStarterLayout,layoutRoomDescriptor} from '../../functions/interior-layout.mjs';
 const production=process.env.WE3D_VERIFY_PRODUCTION==='1';
+const home=process.env.WE3D_VERIFY_HOME_LAYOUT==='1';
+if(home&&production)throw Error('Home layout acceptance is staging-only.');
+const homeLayout=home?makeStarterLayout({footprint:[{x:-10,z:-5},{x:10,z:-5},{x:10,z:5},{x:-10,z:5}],heightMeters:6},{floorCount:2}):null;
 const origin=production?'https://worldexplorer3d.io':'https://we3d-staging-20260712.web.app';
 if(production&&process.env.WE3D_CAPTURE_AUTOMATION_ATTESTATION==='1')throw Error('Production must use real App Check, never a debug bypass');
 const browser=await chromium.launch({channel:'chrome',headless:true});
@@ -22,41 +26,44 @@ try{
   const email=`hybrid-smoke-${Date.now()}@example.test`,password=randomBytes(24).toString('base64url');
   const response=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${config.apiKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password,returnSecureToken:true})});account=await response.json();assert.ok(response.ok,account.error?.message);
   await page.locator('[name=email]').fill(email);await page.locator('[name=password]').fill(password);await page.locator('#emailSignIn button').click();await page.locator('#phoneCaptures').waitFor({state:'visible'});
-  const admitted=await page.evaluate(async()=>{
+  const admitted=await page.evaluate(async home=>{
     const api=await import('/js/community-reality-capture-api.js?v=4');
-    return api.createRealityCaptureDraft({captureKind:'exterior',publicContributionRequested:false,building:{sourceBuildingId:'osm:way:hybrid-fixture',worldId:'capture-benchmark-only',sourceAuthority:'osm',label:'Private hybrid API fixture — not a mapped house',lat:0,lon:0,spatialContext:{schemaVersion:1,frame:'building-local-x-east-y-up-z-south',footprint:[{x:-10,z:-5},{x:10,z:-5},{x:10,z:5},{x:-10,z:5}]}}});
-  });captureId=admitted.capture.captureId;
-  const result=await page.evaluate(async id=>{
+    return api.createRealityCaptureDraft({captureKind:home?'interior_room':'exterior',permissionConfirmed:home,room:home?{label:'Home test',widthMeters:20,lengthMeters:10,heightMeters:2.7}:undefined,publicContributionRequested:false,building:{sourceBuildingId:'osm:way:hybrid-fixture',worldId:'capture-benchmark-only',sourceAuthority:'osm',label:'Private hybrid API fixture — not a mapped house',lat:0,lon:0,spatialContext:{schemaVersion:1,frame:'building-local-x-east-y-up-z-south',height:{meters:6,evidence:'user-test'},wallHeightMeters:6,footprint:[{x:-10,z:-5},{x:10,z:-5},{x:10,z:5},{x:-10,z:5}]}}});
+  },home);captureId=admitted.capture.captureId;
+  const result=await page.evaluate(async ({id,homeLayout})=>{
     const api=await import('/js/community-reality-capture-api.js?v=4'),original=await api.getMyRealityCapture(id);
-    const preview={baseRevision:0,footprintSignature:original.capture.footprintSignature,heightMeters:6,roofShape:'gabled',roofRiseMeters:2,patches:[]};
+    const preview={baseRevision:0,footprintSignature:original.capture.footprintSignature,...(homeLayout?{layout:homeLayout,roomPhotos:[]}:{heightMeters:6,roofShape:'gabled',roofRiseMeters:2,patches:[]})};
     const saved=await api.saveRealityCaptureHybridPreview(id,preview);
     let conflict=false;try{await api.saveRealityCaptureHybridPreview(id,preview);}catch{conflict=true;}
     const restored=await api.getMyRealityCapture(id);
     return {revision:saved.preview.revision,restoredRevision:restored.capture.hybridPreview.revision,private:restored.capture.hybridPreview.visibility,conflict,status:restored.capture.status,photos:restored.photos.length};
-  },captureId);
+  },{id:captureId,homeLayout});
   assert.deepEqual(result,{revision:1,restoredRevision:1,private:'PRIVATE',conflict:true,status:'draft',photos:0});
   await page.reload();await page.locator('#phoneCaptures').waitFor({state:'visible'});
   const afterReload=await page.evaluate(async id=>(await(await import('/js/community-reality-capture-api.js?v=4')).getMyRealityCapture(id)).capture.hybridPreview.revision,captureId);assert.equal(afterReload,1);
-  const manual=await page.evaluate(async id=>{
+  const surface=home?layoutRoomDescriptor(homeLayout,homeLayout.floors[0].rooms[0].id).surfaceIds[0]:null;
+  const manual=await page.evaluate(async ({id,home,surface})=>{
     const api=await import('/js/community-reality-capture-api.js?v=4');
     const c=document.createElement('canvas');c.width=1280;c.height=720;
     const ctx=c.getContext('2d');ctx.fillStyle='#9e7153';ctx.fillRect(0,0,c.width,c.height);
     const photo=await api.normalizeCapturePhoto(await new Promise(resolve=>c.toBlob(resolve,'image/jpeg')));
     const capture=(await api.getMyRealityCapture(id)).capture;
     await api.uploadRealityCapturePhoto(capture,photo);
-    const finalized=await api.finalizeRealityCaptureUpload(id);
+    const finalized=await api.finalizeRealityCaptureUpload(id,'manual');
     const uploaded=await api.getMyRealityCapture(id);
-    const preview={...uploaded.capture.hybridPreview,baseRevision:1,patches:[{id:'fixture-wall',wall:0,photoId:photo.id,region:[0,0,1,1],quad:[[0,0],[1,0],[1,1],[0,1]]}]};
+    const patch={id:'fixture-wall',wall:0,photoId:photo.id,region:[0,0,1,1],quad:[[0,0],[1,0],[1,1],[0,1]]};
+    const preview={...uploaded.capture.hybridPreview,baseRevision:1,...(home?{roomPhotos:[{roomId:uploaded.capture.hybridPreview.layout.floors[0].rooms[0].id,patches:[{...patch,surfaceId:surface}]}]}:{patches:[patch]})};
     const saved=await api.saveRealityCaptureHybridPreview(id,preview);
-    const submitted=await api.submitRealityCaptureHybrid(id,saved.preview.revision,true);
+    const submitted=await api.submitRealityCaptureHybrid(id,saved.preview.revision,!home);
     let paidDenied=false,roomDenied=false;
     try{await api.retryRealityCapture(id);}catch(e){paidDenied=e.status===403;}
-    try{await api.createRealityCaptureDraft({captureKind:'interior_room'});}catch(e){roomDenied=e.status===403;}
+    try{await api.createRealityCaptureDraft({captureKind:'interior_room',building:capture.building});}catch(e){roomDenied=e.status===403;}
     return {uploadStatus:finalized.status,photoCount:uploaded.photos.length,revision:saved.preview.revision,submissionStatus:submitted.status,paidDenied,roomDenied};
-  },captureId);
+  },{id:captureId,home,surface});
   assert.deepEqual(manual,{uploadStatus:'uploaded',photoCount:1,revision:2,submissionStatus:'review_required',paidDenied:true,roomDenied:true});
+  if(home){const resolved=await page.evaluate(async id=>{const api=await import('/js/community-reality-capture-api.js?v=4'),capture=(await api.getMyRealityCapture(id)).capture;const value=await api.resolveBuildingInteriorRepresentation(capture.building.sourceBuildingId,capture.building.worldId,'');return {authorized:value.authorized,available:value.available,kind:value.representationKind,floors:value.layout?.floors?.length,publicRequested:capture.publicContributionRequested,model:!!value.model?.url};},captureId);assert.equal(resolved.authorized,true);assert.equal(resolved.kind,'home-layout');assert.equal(resolved.floors,2);assert.equal(resolved.publicRequested,false);assert.equal(resolved.model,true);}
   await page.evaluate(async id=>(await import('/js/community-reality-capture-api.js?v=4')).deleteRealityCapture(id),captureId);deleted=true;
-  await mkdir('output/verification/reality-capture-hybrid',{recursive:true});await writeFile(`output/verification/reality-capture-hybrid/${production?'production':'staging'}-report.json`,JSON.stringify({passed:true,origin,...result,afterReload,manual,fixtureDeleted:true,automationAttestation:!!attestation,limitations:'Synthetic photo with real upload/validation/CPU submission. No physical phone, public approval or world acceptance.'},null,2));console.log('Live manual photo upload, validation, save, CPU submission, cost gates and cleanup passed. No reconstruction launched.');
+  await mkdir('output/verification/reality-capture-hybrid',{recursive:true});await writeFile(`output/verification/reality-capture-hybrid/${home?'home-staging':production?'production':'staging'}-report.json`,JSON.stringify({passed:true,origin,home,...result,afterReload,manual,fixtureDeleted:true,automationAttestation:!!attestation,limitations:'Synthetic photo with real upload/validation/CPU submission. No physical phone, public approval or world acceptance.'},null,2));console.log('Live manual photo upload, validation, save, CPU submission, cost gates and cleanup passed. No reconstruction launched.');
 }finally{
   if(captureId&&!deleted)await page.evaluate(async id=>(await import('/js/community-reality-capture-api.js?v=4')).deleteRealityCapture(id),captureId).catch(()=>{});
   if(account?.idToken&&config)await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:delete?key=${config.apiKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idToken:account.idToken})});

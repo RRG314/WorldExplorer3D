@@ -404,6 +404,7 @@ export async function enterInteriorForSupport(support, deps) {
 
   const walker = appCtx.Walk.state.walker;
   const outsideState = {
+    ...(sceneState.mode==='authored'?{cameraNear:appCtx.camera?.near}:{}),
     x: deps.finiteNumber(walker.x, 0),
     z: deps.finiteNumber(walker.z, 0),
     y: deps.finiteNumber(walker.y, 0),
@@ -435,6 +436,7 @@ export async function enterInteriorForSupport(support, deps) {
   }
 
   const entryHeight = sceneState.entryPoint.y;
+  if(sceneState.mode==='authored'&&appCtx.camera){appCtx.camera.near=.04;appCtx.camera.updateProjectionMatrix();}
   appCtx.activeInterior = {
     key,
     label: definition.label,
@@ -484,6 +486,7 @@ export async function enterInteriorForSupport(support, deps) {
 
 export function clearActiveInterior(options = {}, deps) {
   const active = appCtx.activeInterior;
+  if(Number.isFinite(active?.outsideState?.cameraNear)&&appCtx.camera){appCtx.camera.near=active.outsideState.cameraNear;appCtx.camera.updateProjectionMatrix();}
   if (active?.environmentKind === 'expedition-ship' && options.shipInternal !== true) {
     return appCtx.exitExpeditionShipInterior?.() === true;
   }

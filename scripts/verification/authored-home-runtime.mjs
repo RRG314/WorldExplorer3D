@@ -22,7 +22,7 @@ try{
     const entered=await runtime.enterInteriorForSupport(support,deps);
     return {entered,hint:ctx.interiorHint,mode:ctx.activeInterior?.mode,floors:ctx.activeInterior?.floorPlan?.floorCount};
   });
-  assert.equal(entry.entered,true,JSON.stringify(entry));assert.equal(entry.mode,'authored');assert.equal(entry.floors,2);
+  assert.equal(entry.entered,true,JSON.stringify(entry));assert.equal(entry.mode,'authored');assert.equal(entry.floors,2);assert.equal(await page.evaluate(()=>window.authoredTest.ctx.camera.near),.04);
   await page.waitForTimeout(250);await page.screenshot({path:`${out}/entry.png`});
   const before=await page.evaluate(()=>({...window.authoredTest.ctx.Walk.state.walker}));
   await page.keyboard.down('w');await page.waitForTimeout(700);await page.keyboard.up('w');
@@ -34,10 +34,12 @@ try{
   let reached=null;await page.keyboard.down('w');
   for(let i=0;i<32;i++){await page.waitForTimeout(250);reached=await page.evaluate(()=>{const {ctx}=window.authoredTest,w=ctx.Walk.state.walker;return {x:w.x,z:w.z,y:w.y,level:ctx.activeInterior.activeLevel};});if(reached.z>=target.z-.1)break;}
   await page.keyboard.up('w');await page.screenshot({path:`${out}/stairs.png`});
+  const visual=await page.evaluate(()=>{const {ctx}=window.authoredTest,b=new THREE.Box3().setFromObject(ctx.activeInterior.group);return {camera:ctx.camera.position.toArray(),near:ctx.camera.near,groupVisible:ctx.activeInterior.group.visible,bounds:{min:b.min.toArray(),max:b.max.toArray()},walker:{x:ctx.Walk.state.walker.x,y:ctx.Walk.state.walker.y,z:ctx.Walk.state.walker.z}};});console.log(JSON.stringify(visual));
   assert.ok(reached.z>=target.z-.1,'could not walk to upper landing');assert.ok(Math.abs(reached.y-target.y)<.35,JSON.stringify({target,reached}));assert.equal(reached.level,1);
   await page.screenshot({path:`${out}/walk.png`});
   await page.evaluate(()=>{const {runtime,deps}=window.authoredTest;runtime.clearActiveInterior({restorePlayer:true},deps);});
   assert.equal(await page.evaluate(()=>!!window.authoredTest.ctx.activeInterior),false);
-  assert.deepEqual(errors,[]);await writeFile(`${out}/report.json`,JSON.stringify({entry,before:{x:before.x,z:before.z},after,stairs,target,reached,errors,scope:'Actual game entry, W movement, stair ascent, surface sampling and exit; synthetic local layout, no account/cloud verification.'},null,2));
+  assert.equal(await page.evaluate(()=>window.authoredTest.ctx.camera.near),.5);
+  assert.deepEqual(errors,[]);await writeFile(`${out}/report.json`,JSON.stringify({entry,before:{x:before.x,z:before.z},after,stairs,target,reached,visual,errors,scope:'Actual game entry, W movement, stair ascent, surface sampling and exit; synthetic local layout, no account/cloud verification.'},null,2));
   console.log('Actual game: authored entry, W movement, stair surface continuity and exit passed. Cloud/account not tested.');
 }finally{await browser.close();}

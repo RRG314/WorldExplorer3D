@@ -464,7 +464,7 @@ function render() {
   panel.querySelector('[data-photo-page]').textContent=galleryPhotos.length?` ${current.photoPage*6+1}–${Math.min((current.photoPage+1)*6,galleryPhotos.length)} of ${galleryPhotos.length} `:'No photos in this set.';
   panel.querySelector('[data-capture-hybrid]').hidden = current.kind === 'exterior' && (!current.remotePhotos.length || !current.serverCapture?.building?.spatialContext?.footprint?.length);
   panel.querySelector('[data-capture-hybrid]').textContent = current.kind === 'interior_room' ? 'Design my interior floor plan' : 'Match photos to building sides';
-  panel.querySelector('[data-capture-result]').hidden = !current.serverCapture?.processed?.optimizedModelPath;
+  panel.querySelector('[data-capture-result]').hidden = !(current.serverCapture?.hybridSubmission?.modelPath||current.serverCapture?.processed?.optimizedModelPath);
   const registration = current.serverCapture?.processed?.registration;
   panel.querySelector('[data-capture-registration]').textContent = registration?.status === 'available'
     ? `${registration.registeredCount} of ${registration.submittedCount} photos positioned in 3D. ${registration.registeredCount < registration.submittedCount
@@ -695,7 +695,7 @@ async function previewHybrid() {
 
 async function previewResult() {
   const session = current;
-  if (!session || session.busy || !session.serverCapture?.processed?.optimizedModelPath) return;
+  if (!session || session.busy || !(session.serverCapture?.hybridSubmission?.modelPath||session.serverCapture?.processed?.optimizedModelPath)) return;
   setBusy(session, true);
   const panel = ensurePanel();
   panel.querySelector('[data-capture-status]').textContent = 'Opening your private reconstruction…';
@@ -710,7 +710,7 @@ async function previewResult() {
     const { createCaptureViewer } = await import('./result-viewer.js?v=1');
     assertCurrent(session);
     session.viewer?.dispose();
-    session.viewer = await createCaptureViewer(panel.querySelector('[data-capture-viewer]'), bytes, session.abort.signal);
+    session.viewer = await createCaptureViewer(panel.querySelector('[data-capture-viewer]'), bytes, session.abort.signal,{homeLayout:session.serverCapture.hybridSubmission?.kind==='home-layout'?session.serverCapture.hybridSubmission.layout:null});
     assertCurrent(session);
     panel.querySelector('[data-capture-viewer-controls]').hidden = false;
     panel.querySelector('[data-capture-status]').textContent = 'Drag to rotate. Pinch or scroll to zoom. This preview does not change the public world.';
