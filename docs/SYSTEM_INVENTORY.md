@@ -1,5 +1,10 @@
 # World Explorer 3D System Inventory
 
+Herbaceous wetlands retain numeric class90 as a separate low-vegetation profile,
+with a soil/grass material mix and up to600 nearby nonblocking grass clumps from
+the same curated nature pack. Distant mapped context has a bounded30s request
+budget and partial-result metrics; primary road/building requests are unchanged.
+
 Local terrain continuity: far-field boundary cells now retain detailed edge
 vertices, including intermediate cliff heights; shared height queries and later
 water/transport rebuilds consume the same transition geometry. Yosemite's sampled

@@ -6,6 +6,8 @@ const CELL_METERS = 192;
 
 export function vegetationModelKind(placement, biome = '', latitude = 45) {
   if (placement.landuseType === 'forest_groundcover') return 'fern';
+  if (placement.landuseType === 'wetland_groundcover') return 'grass';
+  if (placement.landuseType === 'wetland') return 'shrub';
   if (biome==='tundra' && placement.source!=='node') return 'shrub';
   if (placement.landuseType === 'scrub' || Number(placement.scale) < 0.6) return 'shrub';
   if (placement.leafType === 'needleleaved' || /boreal|alpine/.test(biome)) return 'pine';
@@ -33,7 +35,7 @@ function requestModel(ctx, kind) {
         instance.root.updateMatrixWorld(true);
         const bounds = new THREE.Box3().setFromObject(instance.root);
         const height = bounds.max.y-bounds.min.y;
-        const normalizedScale = (kind === 'fern' ? 0.7 : kind === 'shrub' ? 1.8 : 9) / Math.max(height,0.1);
+        const normalizedScale = (kind === 'grass' ? 1.2 : kind === 'fern' ? 0.7 : kind === 'shrub' ? 1.8 : 9) / Math.max(height,0.1);
         const parts=[];
         instance.root.traverse(mesh=>{
           if(!mesh.isMesh) return;
@@ -74,8 +76,8 @@ export function renderVegetationModels(ctx, placements) {
     if(!groups.has(key)) groups.set(key,{cx,cz,kind,model,placements:[]});
     placement.baseY=baseY;
     placement.modelKind=kind;
-    placement.trunkRadius=kind==='shrub' || kind==='fern' ? 0 : model.trunkRadius*Math.max(.65,Number(placement.scale)||1);
-    placement.trunkHeight=kind==='shrub' || kind==='fern' ? 0 : 3.5*Math.max(.65,Number(placement.scale)||1);
+    placement.trunkRadius=['shrub','fern','grass'].includes(kind) ? 0 : model.trunkRadius*Math.max(.65,Number(placement.scale)||1);
+    placement.trunkHeight=['shrub','fern','grass'].includes(kind) ? 0 : 3.5*Math.max(.65,Number(placement.scale)||1);
     groups.get(key).placements.push(placement);accepted.push(placement);
   }
   for(const group of groups.values()) {
@@ -105,7 +107,7 @@ export function renderVegetationModels(ctx, placements) {
       }
       lod.addLevel(root,level===0 ? 0 : 300);
     }
-    lod.addLevel(new THREE.Group(),group.kind==='fern' ? 240 : 1600);
+    lod.addLevel(new THREE.Group(),['fern','grass'].includes(group.kind) ? 240 : 1600);
     lod.userData.isVegetationBatch=true;
     lod.userData.vegetationAuthority='curated-model-cell-lod';
     ctx.addEarthWorldObject(lod);ctx.vegetationMeshes.push(lod);

@@ -48,6 +48,7 @@ export function refreshWorldBiomeFromWorldCoverStats(appCtx, stats, tile = null)
     vegetated: ratio('tree') + ratio('mangrove') + ratio('wetland') +
       ratio('shrub') + ratio('grass') + ratio('crop') + ratio('moss'),
     water: ratio('water'),
+    wetland:ratio('wetland'),
     arid: ratio('bare'),
     cryo: ratio('snow'),
     scrub: ratio('shrub')

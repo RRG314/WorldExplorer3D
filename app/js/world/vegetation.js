@@ -486,7 +486,28 @@ export function collectWorldVegetationPlacements() {
     const supported=mapped ? ['forest','wood'].includes(mapped.type) : (appCtx.terrainGroup?.children||[]).some(mesh=>semanticForestWeightAt(mesh,x,z)>.7);
     if (supported) groundcover.push({x,z,scale:0.7+(seed%40)/100,rotation:seed%628/100,landuseType:'forest_groundcover',source:'supported-forest-understory'});
   }
-  return placements.concat(groundcover);
+  // Herbaceous wetland cover is not a forest. Close clumps use the same
+  // accepted numeric raster, exclusion checks and existing instance publisher.
+  const marsh=[];
+  for(const mesh of appCtx.terrainGroup?.children||[]) {
+    if(marsh.length>=600)break;
+    const result=mesh.userData?.worldCoverResult,bounds=mesh.userData?.terrainTile?.bounds;
+    const classes=result?.classIds,n=Math.sqrt(classes?.length||0);
+    if(!bounds || !Number.isInteger(n) || n<2)continue;
+    const nw=appCtx.geoToWorld(bounds.latN,bounds.lonW),se=appCtx.geoToWorld(bounds.latS,bounds.lonE);
+    const area={minX:Math.max(nw.x,focus.x-90),maxX:Math.min(se.x,focus.x+90),minZ:Math.max(nw.z,focus.z-90),maxZ:Math.min(se.z,focus.z+90)};
+    if(area.maxX<=area.minX || area.maxZ<=area.minZ)continue;
+    for(const cell of nearbyVegetationCells(area,4,1000,focus)) {
+      if(marsh.length>=600)break;
+      const seed=vegetationIdentitySeed(`wetland:${cell.cx}:${cell.cz}`);
+      const x=(cell.cx+.15+(seed%700)/1000)*4,z=(cell.cz+.15+((seed>>>12)%700)/1000)*4;
+      if(x<area.minX || x>area.maxX || z<area.minZ || z>area.maxZ)continue;
+      const u=Math.min(n-1,Math.floor((x-nw.x)/(se.x-nw.x)*n)),v=Math.min(n-1,Math.floor((z-nw.z)/(se.z-nw.z)*n));
+      if(classes[v*n+u]!==90 || isVegetationPlacementBlocked(x,z,{roadPadding:1.8,buildingPadding:1}))continue;
+      marsh.push({x,z,scale:.65+(seed%65)/100,rotation:seed%628/100,landuseType:'wetland_groundcover',source:'numeric-herbaceous-wetland'});
+    }
+  }
+  return placements.concat(groundcover,marsh);
 }
 
 export function buildWorldVegetationInstancing(placements) {

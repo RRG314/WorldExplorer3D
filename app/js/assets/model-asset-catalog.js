@@ -1,7 +1,7 @@
 const MODEL_ASSET_SCHEMA_VERSION = 1;
 
 const MODEL_ASSET_CATALOG = Object.freeze([
-  ...['pine', 'broadleaf', 'shrub', 'fern'].flatMap((kind) => (['pine','broadleaf'].includes(kind) ? ['', '-lod'] : ['']).map((suffix) => Object.freeze({
+  ...['pine', 'broadleaf', 'shrub', 'fern', 'grass'].flatMap((kind) => (['pine','broadleaf'].includes(kind) ? ['', '-lod'] : ['']).map((suffix) => Object.freeze({
     schemaVersion: MODEL_ASSET_SCHEMA_VERSION,
     id: `nature-${kind}${suffix}`,
     label: `Quaternius ${kind}${suffix ? ' distant model' : ''}`,

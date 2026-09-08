@@ -11,7 +11,8 @@ test('mapped foliage and cold forests choose matching forms, wetlands are not fo
  assert.equal(vegetationModelKind({},'boreal-forest'),'pine');
  assert.equal(vegetationModelKind({source:'worldcover'},'tundra'),'shrub');
  assert.equal(vegetationModelKind({landuseType:'scrub'}),'shrub');
- assert.equal(terrainSurfaceClassForWorldCover('wetland'),TERRAIN_SURFACE_CLASS.grass);
+ assert.equal(terrainSurfaceClassForWorldCover('wetland'),TERRAIN_SURFACE_CLASS.wetland);
+ assert.equal(vegetationModelKind({landuseType:'wetland',scale:.77}),'shrub');
  assert.equal(terrainSurfaceClassForWorldCover('mangrove'),TERRAIN_SURFACE_CLASS.forest);
  const moss=terrainSurfaceMixForClass(terrainSurfaceClassForWorldCover('moss'));
  assert.equal(moss.mixA[2],0);assert.equal(moss.mixA[3]+moss.mixB[0],1);

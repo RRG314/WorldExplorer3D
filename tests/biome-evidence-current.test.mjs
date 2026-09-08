@@ -3,6 +3,12 @@ import assert from 'node:assert/strict';
 import {classifyBiomeProfile} from '../app/js/earth-core/biome-profile.js';
 import {worldCoverStatsForLocation,refreshWorldBiomeFromWorldCoverStats} from '../app/js/terrain/worldcover-biome-state.js';
 
+test('mapped herbaceous wetlands remain distinct from open water and woodland',()=>{
+ const biome=classifyBiomeProfile({latitude:25.45,elevationMeters:1,signals:{woody:0,vegetated:1,wetland:.9,water:0}});
+ assert.equal(biome.id,'wetland');assert.equal(biome.vegetationModel,'low-vegetation');
+ assert.equal(biome.hydrologyPolicy,'mapped-water-only');
+});
+
 test('known non-tree vegetation cannot become a closed forest',()=>{
  for(const latitude of [5,39]) {
   const biome=classifyBiomeProfile({latitude,signals:{woody:0,vegetated:.8,water:.1}});

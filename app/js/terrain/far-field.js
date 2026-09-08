@@ -753,6 +753,8 @@ function createFarFieldTerrainApi(deps = {}) {
     setState({
       status: 'ready',
       dependencyDurationsMs,
+      contextBatchMetrics:mappedContext.contextBatchMetrics,
+      waterBatchMetrics:mappedContext.waterBatchMetrics,
       sourceZoom: spec.sourceZoom,
       preferredSourceZoom: spec.preferredSourceZoom,
       sourceTiles: sourceTiles.length,

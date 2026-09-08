@@ -14,7 +14,7 @@ const archive=process.argv[2];
 if(!archive) throw new Error('Pass the downloaded Standard nature ZIP');
 const target=resolve('app/assets/models/nature');
 const temporary=await mkdtemp(join(tmpdir(),'we3d-nature-convert-'));
-const entries={pine:'Pine_5',broadleaf:'CommonTree_5',shrub:'Bush_Common',fern:'Fern_1'};
+const entries={pine:'Pine_5',broadleaf:'CommonTree_5',shrub:'Bush_Common',fern:'Fern_1',grass:'Grass_Common_Tall'};
 const report=[];
 await mkdir(target,{recursive:true});
 try {

@@ -5,6 +5,21 @@ acceptance statement. No hosting deployment was performed.
 
 ## Curated vegetation checkpoint
 
+Wetland follow-up: numeric class90 now remains a distinct low-vegetation biome
+and soil/grass material mix. Bounded nearby tall-grass clumps use the same CC0
+Quaternius pack, existing instance publisher and placement exclusions; soft
+groundcover has no trunk collider. The actual Everglades mobile-sized run
+published600 nearby clumps with one additional draw call (87 total in that view),
+49 numeric tiles and no runtime exceptions. This is generic stylized wetland
+vegetation, not a surveyed species map. Physical-phone performance is unverified.
+
+Secondary distant mapped-context batches have a30s cooperative deadline using
+the existing batch authority. Completed records survive; outstanding requests
+are cancelled and missing context is reported in metrics. Primary road/building
+loaders are unchanged. The original Everglades90s startup failure is recorded;
+the later actual run completed, but did not exercise the deadline. Forced
+deadline/cancellation/normal-completion execution tests separately passed.
+
 The old procedural trunk/canopy builder and its furniture allocations have been
 removed. CC0 Quaternius trees, shrubs and ferns now use the existing model asset
 loader, spatial cell instancing, tree LODs and shared collision authority. Source
@@ -62,6 +77,13 @@ and walking contact passed with inspected screenshots. Physical-phone acceptance
 remains pending.
 
 ## Numeric land-cover experiment
+
+Browser persistence check passed for a real128px Yosemite tile:16,384 class
+bytes survived a page reload unchanged with both land-cover providers blocked;
+the result came from IndexedDB and attempted zero network requests. An earlier
+arbitrary32px bbox request timed out at6.5s and is not a provider-reliability pass.
+Evidence: worldcover-browser-cache-current/report.json. The test now uses the
+same tile dimensions/bounds as normal game loading.
 
 scripts/lib/worldcover-categorical.mjs reads range-limited, nearest-resampled
 ESA WorldCover v200/2021 COG windows using the installed geotiff dependency.

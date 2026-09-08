@@ -43,6 +43,13 @@
       "bytes": 304116,
       "sha256": "1cd4a83099375d4f14dcc76a31c194f3547d6171c242d0de5aa54927cd67859d",
       "triangles": 288
+    },
+    {
+      "id": "grass",
+      "sourceModel": "Grass_Common_Tall",
+      "bytes": 42120,
+      "sha256": "d92d616a6c448dedcc3d31ea25664ddbec4f6dace1f1164f7d9b160135d58fbf",
+      "triangles": 326
     }
   ]
 }

@@ -6,7 +6,8 @@ export const TERRAIN_SURFACE_CLASS = Object.freeze({
   soil: 4,
   rock: 5,
   snow: 6,
-  moss: 7
+  moss: 7,
+  wetland:8
 });
 
 const MATERIAL_ATTRIBUTE_A = 'terrainSurfaceMixA';
@@ -57,6 +58,7 @@ export function terrainSurfaceClassForWorldCover(name = '', latitude = 0) {
   }
   if (normalized === 'snow') return TERRAIN_SURFACE_CLASS.snow;
   if (normalized === 'moss') return TERRAIN_SURFACE_CLASS.moss;
+  if (normalized === 'wetland') return TERRAIN_SURFACE_CLASS.wetland;
   return TERRAIN_SURFACE_CLASS.grass;
 }
 export function terrainSurfaceClassForMappedMode(mode = '') {
@@ -80,6 +82,7 @@ export function terrainSurfaceMixForClass(surfaceClass = TERRAIN_SURFACE_CLASS.g
   else if (surfaceClass === TERRAIN_SURFACE_CLASS.rock) mixB[0] = 1;
   else if (surfaceClass === TERRAIN_SURFACE_CLASS.snow) mixB[1] = 1;
   else if (surfaceClass === TERRAIN_SURFACE_CLASS.moss) { mixA[3] = 0.45; mixB[0] = 0.55; }
+  else if (surfaceClass === TERRAIN_SURFACE_CLASS.wetland) mixA[3]=0.55;
   return { mixA, mixB };
 }
 

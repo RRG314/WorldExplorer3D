@@ -1,5 +1,12 @@
 # Data Sources
 
+Herbaceous wetland groundcover uses numeric ESA WorldCover class90, not inferred
+open water. The local CC0 Quaternius nature subset now also includes
+Grass_Common_Tall (grass.glb); its source, conversion hash and triangle count are
+recorded with the other nature assets. Models are generic vegetation, not surveyed
+species. The distant-context30s budget preserves partial mapped evidence and
+records deadline/skipped-request metrics rather than fabricating missing tiles.
+
 Last reviewed: 2026-09-08 for World Explorer 3D 5.2.0.
 
 ## Local ground ecosystem update (not yet deployed)

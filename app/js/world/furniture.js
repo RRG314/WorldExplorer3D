@@ -646,7 +646,8 @@ export function updateVegetationFocus() {
   if(appCtx.worldLoading || !appCtx.gameStarted || (appCtx.isEnv && appCtx.ENV && !appCtx.isEnv(appCtx.ENV.EARTH))) return;
   const point=appCtx.activeTransportActor?.()?.position;
   if(!point || !Number.isFinite(point.x) || !Number.isFinite(point.z)) return;
-  if(vegetationFocus && Math.hypot(point.x-vegetationFocus.x,point.z-vegetationFocus.z)<450) return;
+  const refreshDistance=appCtx.worldSurfaceProfile?.biome?.id==='wetland'?60:450;
+  if(vegetationFocus && Math.hypot(point.x-vegetationFocus.x,point.z-vegetationFocus.z)<refreshDistance) return;
   vegetationFocus={x:point.x,z:point.z};
   scheduleWorldCoverVegetationRefresh();
 }
