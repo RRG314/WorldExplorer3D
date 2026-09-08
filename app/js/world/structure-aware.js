@@ -686,10 +686,17 @@ export function refreshStructureAwareFeatureProfiles() {
 }
 
 export async function refreshStructureAwareFeatureProfilesCooperatively() {
+  const sequence = appCtx._worldLoadSequence;
+  const roads = appCtx.roads;
+  const groundRelease = appCtx.lastEarthStreamingRelease;
   const steps = compileStructureAwareFeatureProfileSteps();
   let result = steps.next();
   while (!result.done) {
     await yieldToMainThread();
+    if (appCtx._worldLoadSequence !== sequence || appCtx.roads !== roads || appCtx.lastEarthStreamingRelease !== groundRelease) {
+      steps.return();
+      throw new DOMException('Transport compilation belongs to a previous world', 'AbortError');
+    }
     result = steps.next();
   }
   return result.value;

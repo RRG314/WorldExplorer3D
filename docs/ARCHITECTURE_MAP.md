@@ -1,5 +1,11 @@
 # World Explorer 3D Architecture
 
+Earth reset also owns location-relative road grading state: corridor references,
+spatial index, publication metadata and height caches are released before the
+next terrain is sampled. This includes roadless destinations that skip transport
+compilation. Cooperative structure work cannot publish after its world sequence,
+road collection or ground release has been replaced.
+
 Terrain boundary update: `detail-boundary.js` reads published detailed mesh edges;
 the existing far-field geometry builder refines only adjoining cells and records
 their triangles in its existing surface grid. Rendering and height queries share

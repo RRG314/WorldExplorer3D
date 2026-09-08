@@ -429,6 +429,15 @@ const {
 
 function resetEarthStreaming(reason = 'earth_streaming_reset') {
   earthStreamingReleaseGeneration += 1;
+  // Cut/fill profiles use location-relative coordinates. They must be released
+  // before any new tile samples terrain, including destinations with no roads
+  // (which legitimately skip transport compilation altogether).
+  appCtx.structureTerrainCuts = [];
+  appCtx.structureTerrainCutByFeature = null;
+  appCtx.structureTerrainCutIndex = null;
+  appCtx.transportTerrainCorridorPublication = null;
+  appCtx.transportTerrainCorridorStats = null;
+  clearTerrainHeightCache();
   const before = Object.freeze({
     terrainChildren: Number(appCtx.terrainGroup?.children?.length || 0),
     farFieldActive: !!appCtx.farTerrainClipmapState,

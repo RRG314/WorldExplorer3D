@@ -21,6 +21,15 @@ source=source.replace('await captureScreenshot(page, canvas, shotPath);', 'await
 if(process.env.WE3D_TEST_DAY==='1') source=source.replace('await doChoreography(page, canvas, steps);', `await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setTimeOfDay?.('day');});\nawait doChoreography(page, canvas, steps);`);
 if(process.env.WE3D_TEST_MOBILE==='1') source=source.replace('const page = await browser.newPage();','const page = await browser.newPage({viewport:{width:412,height:915},isMobile:true,hasTouch:true,deviceScaleFactor:1});');
 if(process.env.WE3D_REAL_GPU==='1') source=source.replace('args: ["--use-gl=angle", "--use-angle=swiftshader"],','channel:"chrome",');
+if(process.env.WE3D_TERRAIN_SAMPLES==='1') source=source.replace('await page.screenshot({path:shotPath, type:"png"});', `await page.screenshot({path:shotPath, type:"png"});
+fs.writeFileSync(path.join(args.screenshotDir,'terrain-samples.json'),JSON.stringify(await page.evaluate(async()=>{
+ const {ctx}=await import('/app/js/shared-context.js?v=55');
+ const actor=ctx.activeTransportActor().position;
+ const meshes=ctx.terrainGroup.children.filter(m=>m.userData?.isTerrainMesh&&!m.userData?.isFarTerrainClipmap).sort((a,b)=>Math.hypot(a.position.x-actor.x,a.position.z-actor.z)-Math.hypot(b.position.x-actor.x,b.position.z-actor.z)).slice(0,4);
+ const lines=[];
+ for(let x=-250;x<=250;x+=2)lines.push({x:actor.x+x,z:actor.z,source:ctx.elevationWorldYAtWorldXZ(actor.x+x,actor.z),rendered:ctx.terrainMeshHeightAt(actor.x+x,actor.z),accepted:ctx.sampleAcceptedGroundAtWorldXZ?.(actor.x+x,actor.z)});
+ return {actor,location:ctx.LOC,ground:ctx.worldLoadRuntimeState,lines,meshes:meshes.map(m=>({position:m.position,tile:m.userData.terrainTile,provenance:m.userData.renderProvenance,vertices:Array.from(m.geometry.attributes.position.array),base:Array.from(m.userData.baseTerrainWorldY||[])}))};
+}),null,2));`);
 if(process.env.WE3D_TERRAIN_SEAMS==='1') source=source.replace('await page.screenshot({path:shotPath, type:"png"});', `await page.screenshot({path:shotPath, type:"png"});
 fs.writeFileSync(path.join(args.screenshotDir,'seams.json'),JSON.stringify(await page.evaluate(async()=>{
  const {ctx}=await import('/app/js/shared-context.js?v=55');const samples=[];

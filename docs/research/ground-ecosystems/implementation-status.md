@@ -3,6 +3,41 @@
 The research plan is not fully implemented. This is local work, not a production
 acceptance statement. No hosting deployment was performed.
 
+## Cross-location terrain corruption
+
+Reproduced the user's Niger terraces through the actual Main Menu transition
+from Monaco to20.5043,8.1750. The destination had zero roads but retained11,211
+location-relative road grading records from the previous city. Those old cut/fill
+profiles carved the new DEM: worst rendered-minus-source difference was572.55
+world units across1,681 probes. A fresh load at the same coordinates was smooth;
+PNG decoding agreed in Chrome, WebKit and the in-app browser. This was a world
+lifecycle defect, not a reason to smooth or replace the source elevation data.
+
+`resetEarthStreaming` now releases the corridor records, spatial index, publication
+and cached height results before new terrain loads. Cooperative structure
+compilation also rejects a replaced world/ground generation. The same real menu
+transition after the reset fix retained zero stale cuts and the worst difference
+fell to0.229 world units. Before/after screenshots were inspected. Existing road
+surface rules and DEM values are unchanged. The omission is present in the
+August22 release commit af540b39; an earlier exact introduction is not established.
+
+Evidence: `scripts/verification/terrain-location-transition-current.mjs`;
+`output/verification/terrain-transition-before-fix-ui` and
+`output/verification/terrain-transition-after-fix-ui`. An earlier probe that opened
+only the selector rather than returning to Main Menu did not change worlds; it
+failed and is excluded from acceptance. The maintained script uses the real menu
+button and requires a new world sequence before examining the destination.
+
+A second transition from Monaco to the Namib destination(-24.8,15.3) retained
+zero old grading corridors;1,681 origin-neighborhood samples stayed within0.667
+world units of the DEM and the gameplay image was inspected. Cancelling actual
+cooperative compilation with an Earth reset produced AbortError and no corridor
+republication. The first report's overall flag was false because its test wrongly
+required zero road records (Namib has four mapped ways but zero grading corridors).
+The saved measurements passed the relevant checks when reassessed; the maintained
+test now checks absence of grading corridors and the actual destination instead.
+No gameplay rule was changed to satisfy that incorrect road-count assumption.
+
 ## Curated vegetation checkpoint
 
 Distant tree follow-up: the first broadleaf LOD retained2,924 of3,182 triangles,

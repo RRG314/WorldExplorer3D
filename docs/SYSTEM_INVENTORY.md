@@ -1,5 +1,10 @@
 # World Explorer 3D System Inventory
 
+World-transition terrain correction: old city road-grading profiles no longer
+carve a subsequently loaded desert/roadless region. Cleanup is part of the
+existing Earth ground reset, not a second terrain authority. Monaco→Niger
+before/after gameplay and sampled heights verify the reproduced defect and fix.
+
 Herbaceous wetlands retain numeric class90 as a separate low-vegetation profile,
 with a soil/grass material mix and up to600 nearby nonblocking grass clumps from
 the same curated nature pack. Distant mapped context has a bounded30s request
