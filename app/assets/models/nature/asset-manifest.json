@@ -2,7 +2,7 @@
   "source": "https://quaternius.itch.io/stylized-nature-megakit",
   "author": "Quaternius",
   "license": "CC0-1.0",
-  "modifications": "Selected models converted to self-contained GLB; textures resized to512px.",
+  "modifications": "Selected models converted to self-contained GLB; textures resized to512px; distant tree LODs simplified with bark-only spatial reduction.",
   "assets": [
     {
       "id": "pine",
@@ -12,9 +12,9 @@
       "triangles": 1646,
       "lod": {
         "file": "pine-lod.glb",
-        "bytes": 893960,
-        "sha256": "9c387caa696ffd529314dc3440475454b05b23e16218ec4b3d4e1121b81bffa3",
-        "triangles": 1229
+        "bytes": 874608,
+        "sha256": "655cb27212e044dafdd001b799da522aa145b5d4bff7e434a5bc4f8e7e52a6f9",
+        "triangles": 997
       }
     },
     {
@@ -25,9 +25,9 @@
       "triangles": 3182,
       "lod": {
         "file": "broadleaf-lod.glb",
-        "bytes": 1078020,
-        "sha256": "9b167fb3465141245862b894e40dc4b67d6b6dae8530fb4b8051440445582de6",
-        "triangles": 2924
+        "bytes": 985232,
+        "sha256": "90dcd4cd3f1e341e48ba5c61f603d39689d1c46f9e95bedcf90ce0864c3ba837",
+        "triangles": 1772
       }
     },
     {

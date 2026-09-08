@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
 import {NodeIO} from '@gltf-transform/core';
 import {vegetationModelKind} from '../app/js/world/vegetation-models.js';
 import {nearbyVegetationObstacles} from '../app/js/world/vegetation-obstacle-index.js';
@@ -30,10 +31,16 @@ test('local GLBs are self-contained, bounded, and distant geometry actually has 
   for(const suffix of (['pine','broadleaf'].includes(asset.id) ? ['', '-lod'] : [''])) {
    const bytes=await readFile(new URL(`../app/assets/models/nature/${asset.id}${suffix}.glb`,import.meta.url));
    assert.ok(bytes.length<1200000);
+   assert.equal(createHash('sha256').update(bytes).digest('hex'),suffix ? asset.lod.sha256 : asset.sha256);
    const doc=await io.readBinary(bytes);
+   for(const mesh of doc.getRoot().listMeshes()) for(const primitive of mesh.listPrimitives()) {
+    const positions=primitive.getAttribute('POSITION');
+    assert.ok(positions.getArray().every(Number.isFinite));
+    assert.ok(primitive.getIndices().getArray().every(index=>index<positions.getCount()));
+   }
    counts.push(doc.getRoot().listMeshes().reduce((n,m)=>n+m.listPrimitives().reduce((s,p)=>s+p.getIndices().getCount()/3,0),0));
    assert.ok(doc.getRoot().listTextures().every(t=>t.getImage()?.length>0));
   }
-  if(counts.length===2) assert.ok(counts[1]<counts[0],`${asset.id} requires actual lower detail`);
+  if(counts.length===2) assert.ok(counts[1]<=counts[0]*.7,`${asset.id} distant mesh must save at least30% of triangles`);
  }
 });

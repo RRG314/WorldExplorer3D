@@ -5,6 +5,17 @@ acceptance statement. No hosting deployment was performed.
 
 ## Curated vegetation checkpoint
 
+Distant tree follow-up: the first broadleaf LOD retained2,924 of3,182 triangles,
+so the LOD label overstated its benefit. Offline bark-only spatial reduction now
+produces1,772-triangle broadleaf and997-triangle pine distant meshes. Near assets
+and leaf-card coverage are unchanged. The actual Amazon comparison retained
+4,180 plants/43 batches/666 draw calls and reduced total rendered triangles from
+9,745,927 to7,738,823 (about20.6%). Both gameplay images were inspected. This is
+geometry reduction, not an FPS or physical-mobile acceptance claim; the total
+render workload remains substantial. Tests now require at least30% tree LOD
+reduction, valid finite positions/indices and manifest-matching asset hashes.
+Method reference: [meshoptimizer simplifier](https://github.com/zeux/meshoptimizer/blob/master/js/README.md#simplifier).
+
 Player-relative refresh: both terrain candidate lists now prioritize the current
 player, not the original world origin. A real browser relocation check at 500m,
 1,000m and back retained 327, 330 and 235 plants within 100m respectively;
