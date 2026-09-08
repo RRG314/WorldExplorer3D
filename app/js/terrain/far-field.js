@@ -455,13 +455,19 @@ function createFarFieldTerrainApi(deps = {}) {
   }
 
   async function buildAndPublish(spec, requestGeneration, signal) {
+    const dependencyStartedAt=performance.now();
+    const dependencyDurationsMs={};
+    const measureDependency=(name,promise)=>Promise.resolve(promise).finally(()=>{
+      dependencyDurationsMs[name]=Math.round(performance.now()-dependencyStartedAt);
+      if(requestGeneration===generation) setState({...appCtx.farTerrainClipmapState,dependencyDurationsMs:{...dependencyDurationsMs}});
+    });
     const acceptedRegionalGround = acceptedGroundCoversBounds(spec.geographic);
     const sourceTiles = acceptedRegionalGround
       ? []
       : sourceTileRange(spec.geographic, spec.sourceZoom);
     setState({ status: 'loading-elevation-and-context', sourceZoom: spec.sourceZoom, sourceTiles: sourceTiles.length });
     const [elevation, mappedContext, worldCoverContext] = await Promise.all([
-      acceptedRegionalGround
+      measureDependency('elevation', acceptedRegionalGround
         ? Promise.resolve({
             ready: true,
             missingSourceTiles: [],
@@ -476,8 +482,8 @@ function createFarFieldTerrainApi(deps = {}) {
             loadTile: (tile) => waitForTerrainTileReadyAtZoom(
               tile.z, tile.tx, tile.ty, 10000, deps, { signal }
             )
-          }),
-      loadFarMappedContext(
+          })),
+      measureDependency('mappedContext', loadFarMappedContext(
         spec.contextGeographic,
         spec.detailExclusionGeographic,
         spec.geographic,
@@ -489,13 +495,13 @@ function createFarFieldTerrainApi(deps = {}) {
           // not resolvable on a phone screen.
           contextZoom: appCtx.isLikelyMobileDevice?.() ? 13 : undefined
         }
-      ),
-      loadWorldCoverBaseline(spec.geographic, {
+      )),
+      measureDependency('worldCover', loadWorldCoverBaseline(spec.geographic, {
         size: FAR_FIELD_WORLDCOVER_SIZE,
         key: `far-field:${activeKey}`,
         signal,
         priority: -10
-      }).catch(() => null)
+      }).catch(() => null))
     ]);
     if (requestGeneration !== generation) return;
     appCtx.fixedLocationMappedSurfaceContext = mappedContext;
@@ -745,6 +751,7 @@ function createFarFieldTerrainApi(deps = {}) {
     }
     setState({
       status: 'ready',
+      dependencyDurationsMs,
       sourceZoom: spec.sourceZoom,
       preferredSourceZoom: spec.preferredSourceZoom,
       sourceTiles: sourceTiles.length,

@@ -21,6 +21,26 @@ source=source.replace('await captureScreenshot(page, canvas, shotPath);', 'await
 if(process.env.WE3D_TEST_DAY==='1') source=source.replace('await doChoreography(page, canvas, steps);', `await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setTimeOfDay?.('day');});\nawait doChoreography(page, canvas, steps);`);
 if(process.env.WE3D_TEST_MOBILE==='1') source=source.replace('const page = await browser.newPage();','const page = await browser.newPage({viewport:{width:412,height:915},isMobile:true,hasTouch:true,deviceScaleFactor:1});');
 if(process.env.WE3D_REAL_GPU==='1') source=source.replace('args: ["--use-gl=angle", "--use-angle=swiftshader"],','channel:"chrome",');
+if(process.env.WE3D_TERRAIN_SEAMS==='1') source=source.replace('await page.screenshot({path:shotPath, type:"png"});', `await page.screenshot({path:shotPath, type:"png"});
+fs.writeFileSync(path.join(args.screenshotDir,'seams.json'),JSON.stringify(await page.evaluate(async()=>{
+ const {ctx}=await import('/app/js/shared-context.js?v=55');const samples=[];
+ for(const mesh of ctx.terrainGroup.children) {
+  if(mesh.userData?.isTerrainMesh!==true || mesh.userData?.isFarTerrainClipmap || !mesh.userData?.terrainTile || mesh.userData?.pendingTerrainTile)continue;
+  const p=mesh.geometry?.attributes?.position,n=Math.round(Math.sqrt(p?.count||0));
+  if(!p || n*n!==p.count)continue;
+  for(let i=0;i<n;i++)for(const [index,dx,dz] of [[i,-0,-.02],[(n-1)*n+i,0,.02],[i*n,-.02,0],[i*n+n-1,.02,0]]) {
+   const x=p.getX(index)+mesh.position.x,z=p.getZ(index)+mesh.position.z,y=p.getY(index)+mesh.position.y;
+   const far=ctx.sampleFarTerrainWorldYAt(x+dx,z+dz,{ignorePortalCuts:true});
+   if(Number.isFinite(far))samples.push({x,z,y,far,delta:far-y,tile:mesh.userData.terrainTile});
+  }
+ }
+ samples.sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta));
+ const {pointInWaterBody}=await import('/app/js/world/water-surface-registry.js?v=3');
+ return {count:samples.length,worst:samples.slice(0,12).map(sample=>({...sample,
+  sourceHeight:ctx.elevationWorldYAtWorldXZ(sample.x,sample.z),
+  water:(ctx.waterAreas||[]).filter(area=>pointInWaterBody(area,sample.x,sample.z)).map(area=>({surfaceY:area.surfaceY,kind:area.kind,provenance:area.provenance}))
+ }))};
+}),null,2));`);
 if(process.env.WE3D_TREE_CLOSEUP==='1') source=source.replace('await page.screenshot({path:shotPath, type:"png"});', `await page.screenshot({path:shotPath, type:"png"});
 const treeImage=await page.evaluate(async()=>{
  const {ctx}=await import('/app/js/shared-context.js?v=55');

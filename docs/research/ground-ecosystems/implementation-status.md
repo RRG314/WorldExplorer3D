@@ -24,11 +24,32 @@ waits. Their common far-field dependency needs profiling, not larger test
 timeouts. The exact historical floating-skyline screenshot remains unresolved.
 Provider recovery and the remaining regional matrix are not fully accepted.
 
+## Terrain boundary investigation
+
+Actual boundary sampling found a separate inland-water defect: missing DEM
+samples were coerced to zero in sampleWaterPolygonInteriorHeights (introduced
+in f7d040231 on August 6). A Chamonix mapped water polygon was consequently
+published at0.08m against964m ground. Excluding missing samples removed the
+roughly965m discontinuity; the next worst measured difference was25m beneath
+water, where near/far bed policies differ. Evidence: alpine-water-authority-current
+and alpine-inland-water-current under output/verification. This is not a claim
+that all seams are fixed. Yosemite has a separate dry boundary gap up to95m.
+
+Terrain bed handling now also uses the existing water-body/profile resolver,
+so an explicitly absent flat datum cannot silently become sea level. Three
+execution tests cover missing inland samples, varying river profiles, and
+known lake/ocean datums. No road geometry was changed.
+
+Successful Alpine dependency profile: numeric cover238ms, elevation2122ms,
+mapped context3733ms, both downstream ground waits0ms. The earlier slow run
+remains a provider-dependent startup limitation, not a permanent loading failure.
+
 Implemented locally: existing tree placements publish their rendered base
 height; a bounded spatial trunk index supplies nearby candidates to the existing
 collision solver. No separate collision response system was added. Polygon
-placement now honors its desired accepted count. Driving and phone acceptance
-remain pending.
+placement now honors its desired accepted count. Actual BMW contact, reversing
+and walking contact passed with inspected screenshots. Physical-phone acceptance
+remains pending.
 
 ## Numeric land-cover experiment
 

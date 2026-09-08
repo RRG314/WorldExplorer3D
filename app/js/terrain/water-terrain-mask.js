@@ -1,3 +1,5 @@
+import { resolveWaterBodySurfaceY } from '../world/water-body-contract.js?v=4';
+
 function clamp01(value) {
   return Math.max(0, Math.min(1, Number(value) || 0));
 }
@@ -10,4 +12,13 @@ function waterBedDepthAtShorelineDistance(distance, options = {}) {
   return maximumDepth * smoothBlend;
 }
 
-export { waterBedDepthAtShorelineDistance };
+function waterTerrainBedY(area,x,z,terrainY,shorelineDistance,sampleWaterwayProfile) {
+  const surfaceY=resolveWaterBodySurfaceY(area,x,z,{
+    sampleWaterwayProfile,terrainHeightAt:()=>terrainY
+  });
+  return Number.isFinite(surfaceY)
+    ? Math.min(terrainY,surfaceY-waterBedDepthAtShorelineDistance(shorelineDistance))
+    : terrainY;
+}
+
+export { waterBedDepthAtShorelineDistance, waterTerrainBedY };

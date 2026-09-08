@@ -68,7 +68,8 @@ import { createLocationTerrainApi } from "./terrain/location-world.js?v=4";
 import { buildPolarCryosphereSurface } from "./terrain/polar-cryosphere-surface.js?v=1";
 import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=74";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
-import { waterBedDepthAtShorelineDistance } from "./terrain/water-terrain-mask.js?v=1";
+import { waterTerrainBedY } from "./terrain/water-terrain-mask.js?v=1";
+import { sampleWaterwaySurfaceProfile } from "./water-dynamics.js?v=9";
 import {
   distanceToWaterBoundary,
   pointInWaterBody
@@ -239,14 +240,14 @@ function resolveWaterTerrainY(x, z, terrainY, candidates = null) {
       x < bounds.minX || x > bounds.maxX ||
       z < bounds.minZ || z > bounds.maxZ
     )) continue;
-    if (!Number.isFinite(Number(area?.surfaceY))) continue;
     if (!pointInWaterBody(area, x, z)) continue;
+    // Rivers have a varying profile and deliberately store surfaceY:null.
+    // Number(null) incorrectly excavated inland river beds down to sea level.
     // Meet the terrain close to the registered shoreline, then deepen the bed
     // smoothly. A fixed cut makes an opaque water polygon read as a floating
     // slab at quays and beaches.
     const shorelineDistance = distanceToWaterBoundary(area, x, z);
-    const bedDepth = waterBedDepthAtShorelineDistance(shorelineDistance);
-    resolvedY = Math.min(resolvedY, Number(area.surfaceY) - bedDepth);
+    resolvedY = Math.min(resolvedY,waterTerrainBedY(area,x,z,terrainY,shorelineDistance,sampleWaterwaySurfaceProfile));
   }
   return resolvedY;
 }
