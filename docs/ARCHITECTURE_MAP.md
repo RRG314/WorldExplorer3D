@@ -1,20 +1,53 @@
 # World Explorer 3D Architecture
 
+Updated 2026-09-07 against source `c801c19f`. This map identifies ownership and
+integration, not universal release acceptance. [Current test guide](CURRENT_TEST_GUIDE.md)
+records the deployed boundary; [project description](PROJECT_DESCRIPTION.md)
+explains the app as a whole.
+
 > POI work in progress (2026-09-05):
 > [FUNCTIONAL_POI_SYSTEM.md](../FUNCTIONAL_POI_SYSTEM.md) defines the new
 > normalization and capability boundary. Semantic publication, safe building
 > association, and the shared wallet boundary are now live; interior and full
 > family acceptance gates remain in progress.
 
-> Community Reality Capture local V1 (2026-09-06): capture, processing,
-> moderation, presentation replacement, and generic private-space access now
-> have explicit owners. It is intentionally not deployed or described as
-> production-ready; provisioning and controlled reconstruction proofs remain.
+> Community Reality Capture (2026-09-07): staging is provisioned and the
+> phone → manual facade → approval → mapped-house loop has worked. Latest
+> manual-first and privacy hardening is source-only; playable manual rooms,
+> contributor-world previews and community rewards are not complete.
 
 World Explorer 3D is a browser game organized around explicit ownership of the
 active environment, assembled world, player state, and shared services.
 
 ## Application overview
+
+### Product entry points and shared services
+
+| Entry / subsystem | Ownership and connection |
+| --- | --- |
+| Public site / About | Static product pages lead into the app and existing account/support routes; they do not own gameplay state |
+| Account | `account/account-center.js` connects Firebase identity, profile/creator settings, friends, security and receipts; phone and desktop use the same UID |
+| Capture page | Lightweight authenticated client of the existing capture backend, not another world instance or building database |
+| Admin | Role-authorized actions call backend moderation; successful publication is distinct from refreshing dashboard widgets |
+| Live Earth | `app/js/live-earth/registry.js` and provider-specific modules own data layers and health; they do not become the road-traffic simulation or terrain authority |
+| AR | `app/js/ar/session-service.js` owns AR lifecycle; capability detection chooses spatial AR, camera or 3D fallback. It does not own uploaded capture reconstruction or persistent anchors |
+| Activities / rankings | Existing activity authorities and leaderboard catalog own results; capture awards and featured contribution rooms are not implemented by merely adding a new label |
+| Support | Stripe payment/receipt flow remains separate from the single gameplay economy |
+
+### Persistence boundaries
+
+Firebase Auth identifies a user; it is not itself an authorization decision.
+Backend authorities validate purchases, property, player state and capture
+actions. Firestore stores their structured records; Storage holds media.
+Browser settings and recovery drafts are convenience state, not trusted shared
+ownership. Multiplayer rooms have their own membership/session lifecycle and
+must not implicitly publish a private capture. Approved exterior presentation
+is global by building identity; private interior delivery checks space access.
+
+See the capture schema table below for actual collection names. Proposed names
+such as `captureSessions`, `representationRevisions` and `reviews` must not be
+documented as deployed collections when the current implementation stores those
+states on existing records.
 
 ### Local bridge/tunnel transition work (2026-09-07; not release-approved)
 
@@ -133,7 +166,11 @@ attributes so distant buildings do not allocate unique materials.
 
 ### Community Reality Capture flow
 
-Phone/desktop continuation (local, 2026-09-07): `app/capture.html` → existing Firebase Auth → owner-only `getMyRealityCapture` → existing capture UI/uploader and capture document. Account links to this lightweight page. Desktop QR contains a capture ID, never credentials; phone resolves identity from the backend, not a new world renderer. Local drafts are UID-scoped; uploaded IDs support retry/deduplication across devices. `capture-phone` is a normal bundled hosting entry. Real test infrastructure and GPU reconstruction remain unprovisioned; see `REALITY_CAPTURE_AR_INTEGRATION_PLAN.md`.
+`app/capture.html` → existing Firebase Auth → owner-authorized capture API →
+the same capture record and upload gallery. Account links and desktop QR open
+this lightweight page without booting a second world. QR carries a capture ID,
+not credentials. Local drafts are UID-scoped; server uploads survive device
+changes. Staging Storage, Functions and worker infrastructure are provisioned.
 
 ```mermaid
 flowchart LR
@@ -141,20 +178,60 @@ flowchart LR
     Draft --> Normalize[Client normalization and EXIF removal]
     Normalize --> Quarantine[Write-once private quarantine]
     Quarantine --> Validate[Server signature, count, size, and state validation]
-    Validate --> Worker[Isolated reconstruction and GLB optimization]
-    Worker --> Review[Administrator photo, model, footprint, and alignment review]
+    Validate --> Manual[Select mapped wall, crop and place photos]
+    Manual --> Save[Owner revisioned save]
+    Save --> Submit[Immutable cropped-photo GLB submission]
+    Submit --> Review[Administrator photo, model, footprint, and alignment review]
+    Validate -. restricted development path .-> Worker[Reconstruction and GLB optimization]
+    Worker --> Review
     Review -->|approved exterior| Exterior[Presentation overlay]
     Review -->|approved interior| Interior[Authorized private-space resolver]
     Exterior --> Canonical[Existing mapped identity, terrain, collision, POI, and property]
-    Interior --> Proxy[Existing interior proxy collision, navigation, and interactions]
+    Interior --> Proxy[Existing interior proxy; layout alignment still requires acceptance]
     Review -->|rejected or failed| Fallback[Existing procedural presentation]
 ```
 
-The capture system never creates a second building authority. Exterior models
-are presentation-only and suppress procedural massing only after the approved
-GLB loads successfully. Interior models replace visible room dressing while the
-existing proxy shell remains authoritative for collision, navigation, doors,
-and gameplay interactions.
+The capture system never creates a second building authority. Manual wall
+patches cover selected regions of the actual mapped footprint; uncovered surfaces
+remain procedural. They do not suppress the building or alter its collision.
+Whole-model reconstruction is a separate representation kind that can suppress
+generated visuals after load. Do not apply that whole-model behavior to patches.
+
+`alignment.js` snapshots mapped geometry and wall height; `hybrid-editor.js`
+owns crop/placement editing; server save checks owner and revision. Submission
+builds an immutable cropped-image GLB. Approval publishes the exact submitted
+revision with its region manifest. `runtime.js` resolves approved exterior
+representations by canonical building ID, with bounded activation and procedural
+fallback. The latest facade fix uses body height rather than roof-inclusive
+height and fixes the local-X orientation of generated trim.
+
+Interior model presentation currently retains an existing proxy shell for
+collision and interactions. An arbitrary reconstructed layout is **not** thereby
+a correctly playable interior. The manual room editor, dimensions, doors,
+collision agreement and owner-world preview are remaining implementation work.
+
+### Capture records, media and authority
+
+| Record or media | Current owner and purpose |
+| --- | --- |
+| Existing canonical building identity | World/provider identity remains the target; geometry snapshots document alignment rather than becoming another building registry |
+| `realityCaptures/{captureId}` | Owner UID, target, uploads/manifest, processing status/attempt identity, hybrid preview/submission and review; these are currently fields on the capture, not invented separate `captureSessions` or `reviews` collections |
+| `buildingRepresentations` | Approved exterior publication records, immutable model reference and region/height metadata |
+| `buildingPatchManifests` | Building-specific published patch regions and overlap conflict checks |
+| `privateSpaces` | Interior owner, installed/pending capture, access mode, members and temporary grants |
+| `privateSpaceAccessRequests` | Visitor requests, separate from a grant or public publication |
+| `captureAdmission` | Admission/quota bookkeeping; processing also uses a lease and attempt ID, not client-controlled worker state |
+| Storage `reality-captures/{uid}/{captureId}/originals/…` | Private original media; Firestore contains metadata, not photo blobs |
+| Storage `…/processed/manual-v1/r{revision}-{hash}/capture.glb` | Immutable manual derivative; only the chosen cropped photos are embedded |
+| Storage processing-attempt paths | Reconstruction outputs tied to the attempt, separate from manual derivatives |
+| UID/capture-scoped local draft store | Recoverable editing convenience, never publication or permission authority |
+
+The new source public-access guard requires a matching reviewed capture before
+`PUBLIC` grants interior access. Owner/admin access and explicit private grants
+are distinct. A public exterior cannot change an interior policy. This guard is
+not yet part of the deployed facade-only update. Changing an already-private
+approved capture into a public contribution still needs a complete reviewed UI
+flow; policy enum values alone are not proof of that feature.
 
 Raw uploads, processed private interiors, capture records, review decisions,
 grants, and access requests are server-owned. Browser code can request an action

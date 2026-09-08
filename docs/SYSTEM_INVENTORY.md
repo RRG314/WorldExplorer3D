@@ -1,6 +1,11 @@
 # World Explorer 3D System Inventory
 
-Last updated: 2026-09-06 for World Explorer 3D 5.2.
+Last updated: 2026-09-07 for World Explorer 3D 5.2; source baseline `c801c19f`.
+
+This is a source inventory, not a declaration that every feature has passed
+production acceptance. See [PROJECT_DESCRIPTION.md](PROJECT_DESCRIPTION.md) for
+the full product description and [CURRENT_TEST_GUIDE.md](CURRENT_TEST_GUIDE.md)
+for the exact staging build, links, available updates, and remaining work.
 
 Local transport follow-up (2026-09-07, not deployed): shared tunnel floor,
 ceiling, portal, and wall-collision ownership has been extended with compiled
@@ -34,19 +39,24 @@ compiled roads, and terrain remain. A replacement must solve coherent block
 edges and junction joins before release. See
 [STREETSCAPE_SYSTEM.md](../STREETSCAPE_SYSTEM.md).
 
-Community Reality Capture note (2026-09-06): a local, not-yet-provisioned V1
-adds guided photo contribution for stable mapped-building exteriors and one
-permitted interior room. It preserves mapped identity and gameplay collision,
-requires processing and moderator approval before presentation, and keeps every
-new interior private until its owner separately changes a reusable private-space
-policy. See [COMMUNITY_REALITY_CAPTURE_V1.md](../COMMUNITY_REALITY_CAPTURE_V1.md).
+Community Reality Capture (2026-09-07): staging Auth, Storage, Functions,
+moderation, manual photo-wall publication and reconstruction infrastructure exist.
+The owner has uploaded from a phone, saved four facade placements, and confirmed
+the approved result on the actual mapped house in staging. Manual contributions
+use cropped photo derivatives, not paid reconstruction. Real reconstruction has
+also run, but its incomplete building coverage is not accepted as a complete
+building solution. Interior capture is private by default. A stretchable,
+photo-textured playable room, owner-only in-world draft previews and community
+contribution rewards remain unfinished. See [MANUAL_CAPTURE_PRODUCT_PLAN.md](MANUAL_CAPTURE_PRODUCT_PLAN.md).
 
 Phone handoff follow-up (2026-09-07, local): Account now links to a lightweight
 capture page. Desktop QR → same Firebase account → same owner-authorized capture,
 with partial upload, retry and explicit cross-device progress refresh. Local
 drafts are UID-scoped and session cancellation prevents account-switch leakage.
-Staging billing, Storage and Functions are not provisioned; real reconstruction
-and physical-phone acceptance remain open. See `REALITY_CAPTURE_AR_INTEGRATION_PLAN.md`.
+The phone upload and approved exterior loop has been exercised on the user's
+phone; broader physical-device coverage remains open. New manual-first UI,
+device edit recovery, and reviewed-public-interior guards are in source, not
+in the currently deployed facade-only staging update.
 
 Building exterior note (2026-09-06): the mapped building renderer now has one
 deterministic semantic exterior catalog, shared CC0 wall surfaces, procedural
@@ -78,7 +88,7 @@ with explicit entry and exit lifecycles.
 | Other environments | Underwater, Moon, Mars, solid and atmospheric planets, featured moons and small bodies, solar-system flight, deep space, three distinct three-step planetary field instrument procedures, and the three-deck Solis Reach Expedition Alpha with live local-space views, objective routing, crew guidance, planet pod journeys, a manual Earth–Solis Reach Pathfinder shuttle, and one persistent mid-voyage pirate boarding interception | Distances use explicit game scales; planetary life, NPC, pod, rover, mission, and ship visual detail remains an active quality program rather than worldwide or final asset completeness. Boarding consequences use ship, crew, resource, and failure authority rather than an unsupported interior FPS layer. |
 | Mobile play | Analog movement/look controls, mode actions, handedness, sensitivity, camera follow, map, Backpack, and recovery | Physical-device battery and thermal performance still require device testing |
 | Browser support | Standards-based WebGL browser runtime verified through current Chromium and Firefox desktop gameplay, with responsive keyboard and touch layouts | Physical-device and assistive-technology coverage remains a release acceptance responsibility; provider features still depend on browser permissions and capabilities |
-| Character and equipment | One persistent character profile, attributes, skills, explorer health, six assignable quick slots, ammunition, field tools, and consumable food, water, first aid, and medicine | Complete cross-device character sync is not yet available |
+| Character and equipment | Character profile, attributes, skills, explorer health, six assignable quick slots, ammunition, field tools, and consumable food, water, first aid, and medicine; signed-in health and owned-vehicle upgrades use player-state authority | Persistence is domain-specific; do not assume every local setting, draft, or activity is synchronized across devices |
 | Vehicles and collisions | Distinct road-vehicle families plus boats, aircraft, rovers, and spacecraft; enter/exit, condition, collision, damage presentation, recovery, ramp/support-loss airborne motion, Earth gravity, and landing impact. The permanent BMW and personal plane remain full-condition, always-drivable exploration options. Fixed-wing classes have distinct acceleration, rotation, lift, stall, drag, bank, and turn response; vessels use length- and displacement-aware throttle, drag, rudder, braking, and wave response | Collisions and handling are readable game physics, not an engineering or accident simulator |
 | Urban play | Pedestrian behavior, predictive bounded defensive combat, civic response, recoverable world loot, typed mapped-business trade, compensated service settlement, sequential mechanic upgrades with observable handling effects, responder vehicles, and lifecycle cleanup for temporary entities | Stock, price, and services are game rules rather than claims about a mapped business; shared-room combat, trade, loot, and retirement remain restricted where server authority is unavailable |
 | Companions | Individual domestic animals, birds, livestock, trust, care, level progression, travel state, and vehicle boarding | Availability follows the game catalog and regional rules, not live occurrence reports |
@@ -87,12 +97,42 @@ with explicit entry and exit lifecycles.
 | Fishing | Shared shore, boat, and underwater records with catch, loss, retry, and recovery | Fish availability depends on the current water and regional data boundary |
 | Live GPS | Optional foreground location following, privacy/consent controls, three-stop Expeditions, and shared field activities | No continuous world streaming; background tracking is not part of the product |
 | Multiplayer | Bounded public/private rooms, presence, chat, shared Blocks, activities, and persistent room vehicles | Large-room capacity and moderation continue to evolve |
-| Product analytics | Firebase Analytics session and bounded gameplay events; cookieless basic measurement when analytics storage is unset or denied; optional stored analytics and signed-in session identity | Exact GPS, room codes, names, messages, artifact text, and other free-form text are excluded; advertising storage and personalization remain denied |
+| Product analytics | Firebase Analytics session and bounded gameplay events. Current code permits analytics storage when preference is unset; explicit denial disables storage and clears analytics cookies | This records actual behavior, not an opt-in claim. Exact GPS and free-form text are excluded; advertising storage and personalization remain denied |
 | Quick Build | One in-world panel for persistent local and room Blocks | It does not edit OpenStreetMap or other provider data |
 | Real Estate and Maryland parcels | Existing building-backed ownership worldwide; official parcel-backed land/building grouping in all 23 Maryland counties and Baltimore City; vacant mapped land, public parcel context, and on-demand boundary display | Parcel data loads only from the official statewide service when Real Estate is opened in Maryland. World Explorer ownership/value is virtual, owner data is not loaded, and boundaries are not legal surveys. |
 | Accessibility | Keyboard navigation, visible focus, browser zoom, text through 200%, notice duration, reticle size, increased contrast, reduced motion/flashes, persistent action detail, polite live status, and coarse-pointer targets | Cross-device assistive-technology review remains ongoing |
 
 ## World systems
+
+### Supporting product surfaces
+
+| System | Source owner | Capability and current boundary |
+| --- | --- | --- |
+| Website and support | `index.html`, `about/`, `account/`, `legal/`, `js/` | Public app introduction, account entry, support/receipts and policy pages; Stripe support is separate from the in-game Explorer Wallet |
+| Account and identity | `account/account-center.js`, `functions/creator-profile.js`, `functions/player-state-authority.js` | Profile/character selection, creator profile, friends/invites, support history, security/privacy and capture continuation; Firebase identity is shared across desktop and phone |
+| Administration | `account/admin.html`, `js/admin-dashboard.js`, `functions/admin-dashboard.js`, `functions/community-reality-capture.js` | Role-protected moderation and operational views; newest post-approval refresh feedback remains local. Email and push delivery are not accepted as working |
+| Live Earth | `app/js/live-earth/`, `app/js/places/`, `app/js/deflock/` | Globe/data views for satellites, earthquakes, imagery, weather, ocean conditions, vessels, aircraft and mapped cameras; availability depends on each provider, not guaranteed live feeds or traffic simulation |
+| AR | `app/js/ar/` | Capability-detected spatial AR, camera-overlay or interactive-3D fallback; secure-context/camera permissions apply. Persistent anchors are not supported; AR viewing is not building reconstruction |
+| Creator and editable world | `app/js/creator/`, `app/js/editable-world/`, `app/js/block-builder/` | Existing authored-world/Blocks storage and sessions; no new parallel editor authority is needed for capture |
+| Leaderboards | `app/js/leaderboards/catalog.js`, existing backend activity authorities | Flower Sprint, Paint Town, Fishing, Community, Property and DeFlock Hunt catalogs; capture-specific achievements/featured places are still planned |
+| Gameplay extension registry | `app/js/gameplay/plugin-registry.js` | Internal gameplay registration boundary, not an arbitrary public plugin marketplace |
+
+### Current capture availability
+
+| Capability | Evidence / availability |
+| --- | --- |
+| Phone sign-in, uploads, manual facade save and moderated house publication | Exercised in staging; user confirmed the photo-covered house appeared |
+| Trim direction and photo wall-height correction | Deployed to staging; local rendered geometry inspected, exact updated house edge still needs in-world confirmation |
+| Manual-first finalize with no GPU job by default | Implemented and focused HTTP-tested locally; not in current staging UI/handler deployment |
+| Recover unsaved placed-photo edits | Local browser checks on desktop and touch-sized viewports; not yet staged |
+| Public interior requires matching reviewed capture | Local authority/HTTP checks; not yet staged |
+| Paid 3D generation | Real worker runs occurred; retained for development, incomplete reconstruction quality. New source gates requests to a trusted claim; staging rollout remains pending |
+| Stretchable manual room and private contributor-world preview | Planned, not implemented |
+| Capture achievements, featured contributions, contribution-room sharing, tutorial addition | Planned, not implemented |
+| Push/email approval notifications | Not verified/configured end-to-end; no delivery promise |
+
+The detailed tables below describe source ownership. An existing module is not
+itself proof of a passing end-to-end user journey.
 
 | System | Primary source area | Responsibility |
 | --- | --- | --- |
@@ -100,7 +140,7 @@ with explicit entry and exit lifecycles.
 | Earth compilation | `app/js/world/`, `app/js/earth-core/`, `app/js/terrain/` | Selects providers and publishes one assembled world |
 | Terrain and ground | `app/js/terrain.js`, `app/js/terrain/`, `data/ground-attestations/` | Ground height, land cover, seams, collision, and regional fallbacks |
 | Roads and structures | `app/js/world/compiler/`, `app/js/world/transport-structures/` | Roads, bridges, ramps, elevated ways, underpasses, and tunnels |
-| Buildings and interiors | `app/js/buildings/`, `app/js/world/building-exterior-*`, `app/js/engine/building-facade-materials.js`, `app/js/interiors/`, `app/js/reality-capture/` | Authoritative mapped form and collision; deterministic generated exterior families, shared wall/window/door/storefront presentation, bounded near-detail batches, functional entrances, generated floors, mapped indoor detail, and approved community overlays that retain canonical collision/navigation and fail back to the procedural world |
+| Buildings and interiors | `app/js/world/`, `app/js/world/building-exterior-*`, `app/js/engine/building-facade-materials.js`, `app/js/interiors/`, `app/js/reality-capture/` | Authoritative mapped form and collision; deterministic generated exterior families, shared wall/window/door/storefront presentation, bounded near-detail batches, functional entrances, generated floors, mapped indoor detail, and approved community overlays that retain canonical collision/navigation and fail back to the procedural world |
 | Water | `app/js/world/water-*`, `app/js/boat-mode/`, `app/js/ocean/`, `app/js/transport/maritime-*` | Surface water, near-shore rendering, channel camera framing, playable vessel fleets, mapped ship identity, underwater play, and fish life |
 | Aviation | `app/js/plane-mode.js`, `app/js/plane/`, `app/js/transport/airport-*`, `app/js/transport/aviation-*` | One flight controller and airport layout authority; map-informed major, regional, and local layouts; scale-appropriate playable fleets; class-specific flight response; parked, taxi, and bounded circuit activity; aircraft collision; pilot/passenger travel; airport arrivals; skydiving handoff; presentation; and recovery |
 | Maritime transport | `app/js/boat-mode/`, `app/js/transport/maritime-*` | One vessel controller, displacement-aware handling, generated playable port fleets, bounded harbor traffic, mapped vessel identity, presentation, and recovery |
@@ -113,7 +153,7 @@ with explicit entry and exit lifecycles.
 | Quick Build and Blocks | `app/js/block-builder/`, `app/js/blocks.js`, `app/js/runtime/on-demand-block-builder.js` | In-world placement, removal, persistence, undo, room sharing, collision, and recovery |
 | Real Estate and parcel context | `app/js/real-estate/`, `app/js/game/property-ui.js`, `app/js/gis/maryland-parcel-*`, `js/property-api.js`, `functions/property-authority.js` | One property identity/transaction authority; Maryland parcel normalization, building association, vacant land, game valuation, boundary inspection, privacy filtering, and parcel-aware build permission |
 | Multiplayer | `app/js/multiplayer/`, `firestore.rules`, `functions/` | Room state, authorization, presence, chat, shared content, and activities |
-| Community Reality Capture | `app/js/reality-capture/`, `js/community-reality-capture-api.js`, `functions/community-reality-capture.js`, `functions/reality-capture-authority.js`, `scripts/reality-capture/` | Existing photo/room capture, private access, review and presentation; Meshroom/TRELLIS.2 adapters share one worker and optimizer. No staging-only presentation unlock. Backend photo/model access and stale finalization repaired. Remote GPU inference, physical phones and full private-room playability remain unverified; see `REALITY_CAPTURE_AR_INTEGRATION_PLAN.md`. |
+| Community Reality Capture | `app/js/reality-capture/`, `js/community-reality-capture-api.js`, `functions/community-reality-capture.js`, `functions/reality-capture-authority.js`, `scripts/reality-capture/` | Canonical-building photo uploads, manual facade editing, revisioned save/submit, moderation, approved wall overlays and private-space access. Meshroom/TRELLIS adapters remain a development path. Staging phone/manual publication has worked; full manual-room playability and the latest hardening rollout remain open. |
 | Planetary and space | `app/js/planetary/`, `app/js/space/`, `app/js/universe/`, `app/js/expedition/` | Body catalog, physical environments, accepted surfaces, spacecraft state, journeys, Solis Reach rooms and docking, Pathfinder shuttle state, collision, landing, Earth handoff, return, and the one-time Expedition hostile-interception authority with manual defense, boarding pressure, damage, persistence, and course recovery |
 
 ## Data and truth boundaries
@@ -189,10 +229,11 @@ committed.
 - Broader physical-phone battery, thermal, accessibility, and gameplay coverage
   remains continuing release work.
 - Backend-dependent features require the matching authorized environment.
-- Community Reality Capture is not production-ready until Storage and App Check
-  are provisioned, rules pass in the Firebase emulator, the reconstruction tools
-  run in an isolated worker, and one controlled exterior plus one permitted
-  private interior pass the documented end-to-end acceptance gate.
+- Community Reality Capture staging infrastructure is provisioned. Production
+  readiness still requires exact-deployment access/rules verification, manual
+  contribution acceptance, privacy/revocation checks and device coverage. The
+  planned manual-room editor is not implemented; worker existence is not proof
+  of complete or accurate reconstruction.
 - Release readiness is not stored as a hand-edited checkpoint status. Candidate
   and backend matrices must both pass against the exact current commit and
   working-tree fingerprint; any source change makes that evidence stale.
