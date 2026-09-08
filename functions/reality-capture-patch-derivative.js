@@ -1,6 +1,7 @@
 'use strict';
 const sharp=require('sharp');
 const {createHash}=require('node:crypto');
+const {manualRoomFootprint,manualRoomSurfacePoint,manualRoomSurfaceSize}=require('./capture-room-geometry.mjs');
 
 async function rectify(bytes,quad,aspect){
   const {photoHomography,projectPhoto}=await import('./capture-projectivity.mjs');
@@ -17,7 +18,8 @@ async function rectify(bytes,quad,aspect){
 }
 
 async function createPatchGlb(capture,preview,loadPhoto){
-  const pts=capture.building.spatialContext.footprint;
+  const isRoom=capture.captureKind==='interior_room';
+  const pts=isRoom?manualRoomFootprint(preview.room):capture.building.spatialContext.footprint;
   const json={asset:{version:'2.0',generator:'World Explorer reviewed planar patches'},scene:0,scenes:[{nodes:[]}],nodes:[],meshes:[],materials:[],textures:[],images:[],samplers:[{magFilter:9729,minFilter:9729,wrapS:33071,wrapT:33071}],buffers:[{byteLength:0}],bufferViews:[],accessors:[],extensionsUsed:['KHR_materials_unlit']};
   const buffers=[];let offset=0;
   function view(bytes,target){const padding=(4-offset%4)%4;if(padding){buffers.push(Buffer.alloc(padding));offset+=padding;}const index=json.bufferViews.length;json.bufferViews.push({buffer:0,byteOffset:offset,byteLength:bytes.byteLength,...(target?{target}:{})});buffers.push(bytes);offset+=bytes.byteLength;return index;}
@@ -26,9 +28,10 @@ async function createPatchGlb(capture,preview,loadPhoto){
     if(!source||String(source.generation)!==patch.photoGeneration)throw Error('validated_patch_source_required');
     const bytes=await loadPhoto(source);if(bytes.length!==source.size||createHash('sha256').update(bytes).digest('hex')!==source.sha256)throw Error('patch_source_integrity_failed');
     const a=pts[patch.wall],b=pts[(patch.wall+1)%pts.length],[l,bot,r,top]=patch.region;
-    const image=await rectify(bytes,patch.quad,Math.hypot(b.x-a.x,b.z-a.z)*(r-l)/(preview.heightMeters*(top-bot)));
+    const size=isRoom?manualRoomSurfaceSize(preview.room,patch.wall):[Math.hypot(b.x-a.x,b.z-a.z),preview.heightMeters];
+    const image=await rectify(bytes,patch.quad,size[0]*(r-l)/(size[1]*(top-bot)));
     if(image.length>2*1024*1024)throw Error('patch_texture_budget_exceeded');
-    const point=(u,v)=>[a.x+(b.x-a.x)*u,preview.heightMeters*v,a.z+(b.z-a.z)*u];
+    const point=(u,v)=>isRoom?manualRoomSurfacePoint(preview.room,patch.wall,u,v):[a.x+(b.x-a.x)*u,preview.heightMeters*v,a.z+(b.z-a.z)*u];
     const positions=new Float32Array([...point(l,bot),...point(r,bot),...point(r,top),...point(l,top)]),uv=new Float32Array([0,1,1,1,1,0,0,0]),indices=new Uint16Array([0,1,2,0,2,3]);
     const index=json.meshes.length,access=json.accessors.length;
     json.accessors.push({bufferView:view(Buffer.from(positions.buffer),34962),componentType:5126,count:4,type:'VEC3',min:[0,1,2].map(c=>Math.min(...[0,1,2,3].map(i=>positions[i*3+c]))),max:[0,1,2].map(c=>Math.max(...[0,1,2,3].map(i=>positions[i*3+c])))},{bufferView:view(Buffer.from(uv.buffer),34962),componentType:5126,count:4,type:'VEC2'},{bufferView:view(Buffer.from(indices.buffer),34963),componentType:5123,count:6,type:'SCALAR'});

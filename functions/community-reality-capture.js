@@ -70,7 +70,7 @@ function serializeCapture(snapshot) {
     buildingDetails: data.buildingDetails || null,
     hybridPreview: decodeHybridPreview(data.hybridPreview),
     hybridSubmission: decodeHybridPreview(data.hybridSubmission),
-    footprintSignature: footprintSignature(data.building),
+    footprintSignature: footprintSignature(data.building,data.captureKind==='interior_room'?data.room:null),
     room: data.room || null,
     spaceId: clean(data.spaceId, 180),
     uploadSummary: data.uploadSummary || null,
@@ -367,7 +367,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       const prefix = `reality-captures/${auth.uid}/${captureId}/originals/`;
       const [files] = await bucket.getFiles({ prefix, maxResults: 49, autoPaginate: false });
       const manual = mode === 'manual';
-      if(manual && capture.captureKind !== 'exterior')throw Error('manual_exterior_required');
+      if(manual && !['exterior','interior_room'].includes(capture.captureKind))throw Error('invalid_capture_kind');
       const { manifest: inputManifest, summary: uploadSummary } = await validateCaptureObjects(bucket, { ...capture, captureId }, files, {manual});
       assertCaptureTransition('uploading', 'uploaded');
       assertCaptureTransition('uploaded', 'queued');
@@ -422,8 +422,9 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       const modelPath=`reality-captures/${auth.uid}/${captureId}/processed/manual-v1/r${preview.revision}-${digest.slice(0,16)}/capture.glb`;
       const file=bucket.file(modelPath);try{await file.save(bytes,{resumable:false,preconditionOpts:{ifGenerationMatch:0},metadata:{contentType:'model/gltf-binary',cacheControl:'private,no-store'}});}catch(e){if(Number(e.code)!==412)throw e;}
       const [metadata]=await file.getMetadata();
-      const submission={revision:preview.revision,status:'review_required',kind:'facade-patches',modelPath,modelGeneration:String(metadata.generation),sha256:digest,footprintSignature:preview.footprintSignature,footprint:capture.building.spatialContext.footprint,heightMeters:preview.heightMeters,patches:preview.patches,submittedAtMs:Date.now()};
-      await db.runTransaction(async tx=>{const now=await tx.get(ref);if(!now.exists||!snap.updateTime.isEqual(now.updateTime))throw Error('hybrid_state_transition_conflict');tx.update(ref,{hybridSubmission:encodeHybridPreview(submission),status:'review_required',publicContributionRequested:true,updatedAt:FieldValue.serverTimestamp()});});
+      const isRoom=capture.captureKind==='interior_room';
+      const submission={revision:preview.revision,status:'review_required',kind:isRoom?'room-patches':'facade-patches',...(isRoom?{room:preview.room}:{}),modelPath,modelGeneration:String(metadata.generation),sha256:digest,footprintSignature:preview.footprintSignature,footprint:isRoom?require('./capture-room-geometry.mjs').manualRoomFootprint(preview.room):capture.building.spatialContext.footprint,heightMeters:preview.heightMeters,patches:preview.patches,submittedAtMs:Date.now()};
+      await db.runTransaction(async tx=>{const now=await tx.get(ref);if(!now.exists||!snap.updateTime.isEqual(now.updateTime))throw Error('hybrid_state_transition_conflict');tx.update(ref,{hybridSubmission:encodeHybridPreview(submission),status:'review_required',publicContributionRequested:isRoom?req.body?.publicSharing===true:true,updatedAt:FieldValue.serverTimestamp()});});
       res.status(200).json({status:'review_required',revision:preview.revision});
     }catch(e){sendKnownError(res,e);}
   });
@@ -542,11 +543,18 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
           deniedAccess ||= { ...access, spaceId: row.id };
           continue;
         }
-        const captureSnap = await db.collection(CAPTURES).doc(space.captureId).get();
+        const selectedCaptureId=auth.uid===space.ownerUid?(space.pendingCaptureId||space.captureId):space.captureId;
+        if(!selectedCaptureId)continue;
+        const captureSnap = await db.collection(CAPTURES).doc(selectedCaptureId).get();
         if (!captureSnap.exists) continue;
         const capture = captureSnap.data() || {};
-        if (capture.status !== 'approved' || !capture.processed?.optimizedModelPath) continue;
-        const file = bucket.file(capture.processed.optimizedModelPath,capture.processed.modelGeneration?{generation:capture.processed.modelGeneration}:undefined);
+        const manual=capture.hybridSubmission?.kind==='room-patches'&&
+          (capture.ownerUid===auth.uid||capture.hybridSubmission.status==='approved')?capture.hybridSubmission:null;
+        if (capture.ownerUid!==auth.uid&&capture.status!=='approved') continue;
+        const modelPath=manual?.modelPath||capture.processed?.optimizedModelPath;
+        const modelGeneration=manual?.modelGeneration||capture.processed?.modelGeneration;
+        if(!modelPath)continue;
+        const file = bucket.file(modelPath,modelGeneration?{generation:modelGeneration}:undefined);
         const [exists] = await file.exists();
         if (!exists) continue;
         const expiresAtMs = Date.now() + SIGNED_URL_TTL_MS;
@@ -558,7 +566,8 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
           authorized: true,
           spaceId: row.id,
           captureId: captureSnap.id,
-          room: capture.room || null,
+          room: manual?.room || capture.room || null,
+          representationKind: manual?'room-patches':'reconstruction',
           alignment: capture.review?.alignment || null,
           model: { url, expiresAtMs, cache: 'private-no-store' },
           access
@@ -871,8 +880,8 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
           captureId,
           publicApproval: capture.publicContributionRequested === true ? {
             captureId,
-            modelPath: capture.processed.optimizedModelPath,
-            modelGeneration: capture.processed.modelGeneration || '',
+            modelPath: hybrid?.modelPath || capture.processed?.optimizedModelPath,
+            modelGeneration: hybrid?.modelGeneration || capture.processed?.modelGeneration || '',
             moderatorUid: moderator.auth.uid
           } : null,
           pendingCaptureId: FieldValue.delete(),
@@ -883,7 +892,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
         const current = await tx.get(ref);
         if (!current.exists || !snap.updateTime.isEqual(current.updateTime)) throw Error('invalid_capture_state_transition');
         assertCaptureTransition(current.data().status, decision);
-        if(hybrid && decision==='approved'){
+        if(hybrid && decision==='approved' && capture.captureKind==='exterior'){
           const manifestRef=db.collection('buildingPatchManifests').doc(stableId('building-patches',capture.building.sourceBuildingId));
           const manifest=await tx.get(manifestRef),previous=manifest.exists?manifest.data().regions||[]:[];
           const regions=hybrid.patches.map(p=>{const a=hybrid.footprint[p.wall],b=hybrid.footprint[(p.wall+1)%hybrid.footprint.length];const one=[a.x,a.z].map(n=>n.toFixed(2)).join(','),two=[b.x,b.z].map(n=>n.toFixed(2)).join(',');return {captureId,edge:[one,two].sort().join('|'),left:one<two?p.region[0]:1-p.region[2],right:one<two?p.region[2]:1-p.region[0],bottom:p.region[1]*hybrid.heightMeters,top:p.region[3]*hybrid.heightMeters};});
@@ -1000,7 +1009,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
         throw new Error('asset_access_denied');
       }
       // Approving wall patches does not approve the separate reconstruction.
-      const approvedHybrid = capture.ownerUid !== auth.uid && capture.hybridSubmission?.status === 'approved'
+      const approvedHybrid = (capture.ownerUid === auth.uid || capture.hybridSubmission?.status === 'approved')
         ? capture.hybridSubmission : null;
       const path = assetKind === 'original'
         ? clean(req.body?.path, 500)

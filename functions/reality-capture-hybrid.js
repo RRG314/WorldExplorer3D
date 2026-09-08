@@ -1,5 +1,6 @@
 'use strict';
 const {createHash}=require('node:crypto');
+const {normalizeManualRoom,manualRoomFootprint}=require('./capture-room-geometry.mjs');
 
 // Firestore cannot store arrays of arrays. Keep the editor's coordinate pairs
 // at the API boundary, but persist each corner as a named point.
@@ -12,15 +13,18 @@ function decodeHybridPreview(preview) {
   return {...preview,patches:(preview.patches||[]).map(p=>({...p,quad:p.quad.map(q=>Array.isArray(q)?q:[q.x,q.y])}))};
 }
 
-function footprintSignature(building) {
-  return createHash('sha256').update(JSON.stringify({authority:building?.sourceAuthority,id:building?.sourceBuildingId,footprint:building?.spatialContext?.footprint})).digest('hex');
+function footprintSignature(building, room = null) {
+  return createHash('sha256').update(JSON.stringify({authority:building?.sourceAuthority,id:building?.sourceBuildingId,footprint:building?.spatialContext?.footprint,...(room?{manualRoom:normalizeManualRoom(room)}:{})})).digest('hex');
 }
 
 function normalizeHybridPreview(capture, input) {
-  if(capture.captureKind!=='exterior') throw Error('hybrid_exterior_required');
-  const footprint=capture.building?.spatialContext?.footprint;
+  const isRoom=capture.captureKind==='interior_room';
+  if(capture.captureKind!=='exterior'&&!isRoom) throw Error('hybrid_exterior_required');
+  if(isRoom&&capture.consent?.propertyPermissionConfirmed!==true)throw Error('interior_permission_confirmation_required');
+  const room=isRoom?normalizeManualRoom(input.room||capture.room):null;
+  const footprint=isRoom?manualRoomFootprint(room):capture.building?.spatialContext?.footprint;
   if(!Array.isArray(footprint)||footprint.length<3) throw Error('mapped_footprint_required');
-  if(input?.footprintSignature!==footprintSignature(capture.building)) throw Error('hybrid_footprint_changed');
+  if(input?.footprintSignature!==footprintSignature(capture.building,isRoom?capture.room:null)) throw Error('hybrid_footprint_changed');
   if(!Number.isInteger(input.baseRevision)||input.baseRevision!==(capture.hybridPreview?.revision||0)) throw Error('hybrid_state_transition_conflict');
   if(typeof input.heightMeters!=='number'||!Number.isFinite(input.heightMeters)||input.heightMeters<1||input.heightMeters>1200) throw Error('invalid_hybrid_height');
   const roofShape=input.roofShape||'unknown',roofRiseMeters=input.roofRiseMeters??2;
@@ -29,7 +33,7 @@ function normalizeHybridPreview(capture, input) {
   const prefix=`reality-captures/${capture.ownerUid}/${capture.captureId}/originals/`;
   const photos=new Map((capture.inputManifest||[]).filter(p=>p.name?.startsWith(prefix)).map(p=>[p.name.slice(prefix.length).split('.')[0],p]));
   const closed=footprint[0].x===footprint.at(-1).x&&footprint[0].z===footprint.at(-1).z;
-  const wallCount=footprint.length-(closed?1:0), ids=new Set();
+  const wallCount=isRoom?6:footprint.length-(closed?1:0), ids=new Set();
   const patches=input.patches.map(p=>{
     if(!/^[a-zA-Z0-9_-]{1,64}$/.test(p.id)||ids.has(p.id)) throw Error('invalid_hybrid_patch_id'); ids.add(p.id);
     const photo=photos.get(p.photoId);
@@ -40,6 +44,6 @@ function normalizeHybridPreview(capture, input) {
     for(let i=0;i<4;i++){const a=p.quad[i],b=p.quad[(i+1)%4],c=p.quad[(i+2)%4];if((b[0]-a[0])*(c[1]-b[1])-(b[1]-a[1])*(c[0]-b[0])<.0001)throw Error('invalid_hybrid_quad');}
     return {id:p.id,photoId:p.photoId,photoGeneration:String(photo.generation),wall:p.wall,region:p.region.map(Number),quad:p.quad.map(q=>q.map(Number)),evidence:'photo-projected-user-alignment'};
   });
-  return {schemaVersion:1,revision:input.baseRevision+1,footprintSignature:input.footprintSignature,heightMeters:input.heightMeters,heightEvidence:'user-preview-unverified',roofShape,roofRiseMeters,patches,visibility:'PRIVATE',coverageVerified:false};
+  return {schemaVersion:1,...(isRoom?{kind:'room-patches',room}:{}),revision:input.baseRevision+1,footprintSignature:input.footprintSignature,heightMeters:room?.heightMeters||input.heightMeters,heightEvidence:'user-preview-unverified',roofShape:isRoom?'flat':roofShape,roofRiseMeters,patches,visibility:'PRIVATE',coverageVerified:false};
 }
 module.exports={footprintSignature,normalizeHybridPreview,encodeHybridPreview,decodeHybridPreview};

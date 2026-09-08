@@ -4,10 +4,12 @@ import {createRequire} from 'node:module';
 import {chromium} from 'playwright';
 import {startStaticServer} from './static-server.mjs';
 const require=createRequire(import.meta.url),{footprintSignature,normalizeHybridPreview}=require('../../functions/reality-capture-hybrid');
-const out='output/verification/reality-capture-hybrid';await mkdir(out,{recursive:true});
+const roomTest=process.env.WE3D_ROOM_EDITOR_TEST==='1';
+const out=roomTest?'output/verification/reality-capture-room-editor':'output/verification/reality-capture-hybrid';await mkdir(out,{recursive:true});
 const privateDir=process.env.WE3D_PRIVATE_CAPTURE_REPLAY;
 const building=privateDir?JSON.parse(await readFile(`${privateDir}/hybrid-building.json`,'utf8')):{sourceAuthority:'osm',sourceBuildingId:'osm:way:fixture',spatialContext:{footprint:[{x:-15,z:-6},{x:15,z:-6},{x:15,z:6},{x:-15,z:6}],height:{meters:6,evidence:'inferred'}}};
 const capture={captureId:'private-local-replay',ownerUid:'local-verifier',captureKind:'exterior',building,footprintSignature:footprintSignature(building)};
+if(roomTest){capture.captureKind='interior_room';capture.room={widthMeters:4,lengthMeters:6,heightMeters:2.7};capture.consent={propertyPermissionConfirmed:true};capture.footprintSignature=footprintSignature(building,capture.room);}
 const ids=['a','b','c','d','e','f','0'].map(c=>c.repeat(32));capture.inputManifest=ids.map(id=>({name:`reality-captures/local-verifier/private-local-replay/originals/${id}.jpg`,generation:'local-replay-only'}));
 const source=privateDir?await readFile(`${privateDir}/photos/06.jpg`):await require('../../functions/node_modules/sharp')({create:{width:1600,height:2000,channels:3,background:'#cb9876'}}).jpeg().toBuffer();
 const sources=privateDir?await Promise.all(['06','08','01','02','03','04','05'].map(n=>readFile(`${privateDir}/photos/${n}.jpg`))):ids.map(()=>source);
@@ -28,6 +30,27 @@ try{
     },capture);
     assert.equal(await page.locator('[data-advanced]').getAttribute('open'),null);
     await page.waitForFunction(()=>document.querySelectorAll('[data-thumbnails] img').length===6);
+    if(roomTest){
+      assert.equal(await page.locator('[data-side]').count(),6);
+      await page.locator('[data-side="4"]').click();
+      await page.locator('[data-add]').click();await page.waitForFunction(()=>editor.getState().patches===1);
+      await page.locator('[data-advanced] summary').click();
+      await page.locator('[data-room-edit-width]').fill('5');
+      await page.locator('[data-rebuild]').click();
+      await page.locator('[data-save]').click();await page.waitForFunction(()=>editor.getState().revision===1);
+      assert.equal(saved.hybridPreview.room.widthMeters,5);assert.equal(saved.hybridPreview.visibility,'PRIVATE');
+      assert.equal(saved.hybridPreview.patches[0].wall,4);assert.deepEqual(saved.building,building);
+      await page.locator('[data-advanced] summary').click();
+      await page.locator('[data-viewer]').scrollIntoViewIfNeeded();await page.screenshot({path:`${out}/${width}-room.png`});
+      await page.locator('[data-close]').click();await page.evaluate(()=>openReplay());
+      assert.equal(await page.evaluate(()=>editor.getState().patches),1);
+      await page.locator('[data-side="5"]').click();
+      await page.locator('[data-add]').click();await page.waitForFunction(()=>editor.getState().patches===2);
+      await page.locator('[data-save]').click();await page.waitForFunction(()=>editor.getState().revision===2);
+      assert.equal(saved.hybridPreview.patches[1].wall,5);
+      const sizes=await page.evaluate(()=>{const d=document.querySelector('.captureHybridEditor');return [d.scrollWidth,d.clientWidth];});assert.ok(sizes[0]<=sizes[1]+2);
+      await page.evaluate(()=>replayAbort.abort());await context.close();continue;
+    }
     if(privateDir)assert.notEqual(await page.locator('[data-thumbnails] img').nth(0).getAttribute('src'),await page.locator('[data-thumbnails] img').nth(1).getAttribute('src'),'Different saved photos have distinct thumbnails');
     await page.locator('[data-next-photos]').click();await page.waitForFunction(()=>document.querySelectorAll('[data-thumbnails] img').length===1);assert.equal(await page.locator('[data-next-photos]').isDisabled(),true);
     await page.locator('[data-prev-photos]').click();await page.waitForFunction(()=>document.querySelectorAll('[data-thumbnails] img').length===6);
@@ -94,5 +117,5 @@ try{
     await page.evaluate(()=>replayAbort.abort());assert.equal(await page.locator('.captureHybridEditor').count(),0);
     await context.close();
   }
-  assert.deepEqual(errors,[]);await writeFile(`${out}/report.json`,JSON.stringify({passed:true,actualOwnerPhoto:!!privateDir,checks:['real photo thumbnails, paging, decode and four-point rectification','3D raycast wall tapping; orbit does not select','procedural mapped-footprint shell and shared gabled roof generator','grid move, keyboard move, native touch resize','two same-wall patches and overlap rejection','private revision save via actual validator with transport double','remove/undo/reopen','1100px, Android-emulated 412px, 390px fit','abort disposal'],limitations:['Manual example alignment is not an automatically registered reconstruction.','No cloud write, physical phone, or world publication tested here.'],errors},null,2));console.log('Hybrid UI passed on desktop and mobile width; no cloud reconstruction.');
+  assert.deepEqual(errors,[]);await writeFile(`${out}/report.json`,JSON.stringify({passed:true,roomTest,actualOwnerPhoto:!!privateDir,checks:roomTest?['six room surfaces','floor and ceiling placements','dimension edit and unchanged canonical building','private account revision via actual normalizer and HTTP double','close/reopen and second saved revision','desktop and Android-width layout']:['real photo thumbnails, paging, decode and four-point rectification','3D raycast wall tapping; orbit does not select','procedural mapped-footprint shell and shared gabled roof generator','grid move, keyboard move, native touch resize','two same-wall patches and overlap rejection','private revision save via actual validator with transport double','remove/undo/reopen','1100px, Android-emulated 412px, 390px fit','abort disposal'],limitations:['Manual example alignment is not an automatically registered reconstruction.','No cloud write, physical phone, or world publication tested here.'],errors},null,2));console.log('Hybrid UI passed on desktop and mobile width; no cloud reconstruction.');
 }finally{await browser.close();await server.close();}

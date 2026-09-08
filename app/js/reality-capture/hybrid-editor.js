@@ -3,11 +3,13 @@ import {vendorScriptsCritical} from '../modules/manifest.js?v=597';
 import {createCaptureViewer} from './result-viewer.js?v=1';
 import {wallFootprint,validateQuad,rectifyPhoto,buildHybridShell,buildWallPatch} from './hybrid-geometry.js?v=1';
 import {loadLocalCaptureDraft,saveLocalCaptureDraft,deleteLocalCaptureDraft} from './local-draft-store.js?v=1';
+import {normalizeManualRoom,manualRoomFootprint,manualRoomSurfaceSize,ROOM_SURFACE_NAMES} from '../../../functions/capture-room-geometry.mjs';
 
 // The host supplies the existing authenticated asset/save APIs. No public URLs,
 // alternate uploader, reconstruction queue, or world-geometry authority here.
 export async function openHybridEditor({capture,photos,loadPhoto,save,submit,signal}) {
-  const pts=wallFootprint(capture.building);
+  const isRoom=capture.captureKind==='interior_room';
+  let pts=isRoom?manualRoomFootprint(capture.hybridPreview?.room||capture.room):wallFootprint(capture.building);
   if(!photos.length)throw Error('No saved photographs are available for this capture.');
   if(!globalThis.THREE)await loadClassicScript(vendorScriptsCritical[0]);
   signal.throwIfAborted();
@@ -74,6 +76,23 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
   `;
   const $=s=>dialog.querySelector(s), cache=new Map(), snapshots=[], thumbs=new Map(),patchThumbs=new Map();
   let preview=structuredClone(capture.hybridPreview||{revision:0,footprintSignature:capture.footprintSignature,heightMeters:capture.building?.spatialContext?.wallHeightMeters||capture.buildingDetails?.heightMeters||capture.building?.spatialContext?.height?.meters||6,roofShape:['flat','gabled','hipped'].includes(capture.buildingDetails?.roofShape)?capture.buildingDetails.roofShape:'unknown',roofRiseMeters:2,patches:[]});
+  if(isRoom){preview.room=normalizeManualRoom(preview.room||capture.room);preview.heightMeters=preview.room.heightMeters;preview.roofShape='flat';}
+  const presentationBuilding=()=>isRoom?{...capture.building,manualRoom:preview.room}:capture.building;
+  if(isRoom){
+    dialog.setAttribute('aria-label','Edit private room photos');
+    dialog.querySelector('h2').textContent='Your private room';
+    dialog.querySelector('header + p').textContent='Choose a wall, floor or ceiling, then place a cropped photo. This room stays private; public sharing requires your choice and approval.';
+    $('[data-advanced] summary').textContent='Advanced · room dimensions and exact placement';
+    $('[data-height]').min='1.8';$('[data-height]').max='12';
+    $('[data-roof]').closest('.hybridFields').hidden=true;
+    const dimensions=document.createElement('div');dimensions.className='hybridFields';
+    dimensions.innerHTML='<label>Room width (m)<input data-room-edit-width type="number" min="1.5" max="80" step="0.1"></label><label>Room length (m)<input data-room-edit-length type="number" min="1.5" max="80" step="0.1"></label>';
+    $('[data-rebuild]').before(dimensions);
+    $('[data-room-edit-width]').value=preview.room.widthMeters;$('[data-room-edit-length]').value=preview.room.lengthMeters;
+    $('[data-publication] h3').textContent='Review this room';
+    $('[data-publication] p').textContent='Cropped images remain protected. Submitting for review does not make your room public.';
+    $('[data-submit]').textContent='Submit private room for review';
+  }
   let quad=[],selected=0,bitmap=null,viewer=null,busy=false,closed=false,editId=null,drag=false,dirty=false,highlight=null,photoPage=0,thumbnailBusy=false;
   const localKey=JSON.stringify(['capture-wall-edit-v1',capture.ownerUid,capture.captureId]);
   let recovery=null;
@@ -104,8 +123,9 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
   $('[data-close]').onclick=close;dialog.addEventListener('cancel',e=>{e.preventDefault();close();});
   const photoSelect=$('[data-photo-choice]');
   photos.forEach((p,i)=>photoSelect.add(new Option(`Photo ${i+1}`,p.id)));
-  pts.forEach((p,i)=>$('[data-wall]').add(new Option(`Wall ${i+1} · ${Math.hypot(p.x-pts[(i+1)%pts.length].x,p.z-pts[(i+1)%pts.length].z).toFixed(1)} m`,String(i))));
-  pts.forEach((p,i)=>{const b=document.createElement('button');b.textContent=`Side ${i+1}`;b.dataset.side=i;b.onclick=()=>selectWall(i);$('[data-wall-buttons]').append(b);});
+  const surfaceNames=isRoom?ROOM_SURFACE_NAMES:pts.map((p,i)=>`Wall ${i+1} · ${Math.hypot(p.x-pts[(i+1)%pts.length].x,p.z-pts[(i+1)%pts.length].z).toFixed(1)} m`);
+  surfaceNames.forEach((label,i)=>$('[data-wall]').add(new Option(label,String(i))));
+  surfaceNames.forEach((label,i)=>{const b=document.createElement('button');b.textContent=isRoom?label:`Side ${i+1}`;b.dataset.side=i;b.onclick=()=>selectWall(i);$('[data-wall-buttons]').append(b);});
   $('[data-height]').value=preview.heightMeters;
   $('[data-roof]').value=preview.roofShape||'unknown';$('[data-rise]').value=preview.roofRiseMeters||2;
   $('[data-height-evidence]').textContent=capture.buildingDetails?.heightMeters?'Starting height: your unverified measurement.':capture.building?.spatialContext?.height?.meters?`Starting height: ${capture.building.spatialContext.height.evidence} map snapshot. Check this against the actual eaves; it may include the roof or be inaccurate.`:'No mapped height; 6 m is only a provisional preview value.';
@@ -137,10 +157,13 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
     $('[data-wall]').value=wall;editId=null;drawPlan();drawPlacement();
     dialog.querySelectorAll('[data-side]').forEach(b=>b.setAttribute('aria-pressed',String(Number(b.dataset.side)===wall)));
     $('[data-side-label]').textContent=`Selected: ${$('[data-wall]').selectedOptions[0].textContent}. Yellow shows the selected wall.`;
-    if(highlight){const mesh=buildWallPatch(T,capture.building,preview.heightMeters,{wall,region:[0,0,1,1]},null);highlight.geometry.dispose();highlight.geometry=mesh.geometry;mesh.material.dispose();viewer?.redraw();}
+    if(highlight){const mesh=buildWallPatch(T,presentationBuilding(),preview.heightMeters,{wall,region:[0,0,1,1]},null);highlight.geometry.dispose();highlight.geometry=mesh.geometry;mesh.material.dispose();viewer?.redraw();}
   }
   function pickWall({point}){
     if(busy||point.y<0||point.y>preview.heightMeters+.02)return;
+    if(isRoom&&(point.y<.02||Math.abs(point.y-preview.heightMeters)<.02)){
+      selectWall(point.y<.02?4:5);return;
+    }
     let best=-1,distance=Infinity;
     pts.forEach((a,i)=>{const b=pts[(i+1)%pts.length],dx=b.x-a.x,dz=b.z-a.z,u=Math.max(0,Math.min(1,((point.x-a.x)*dx+(point.z-a.z)*dz)/(dx*dx+dz*dz))),d=Math.hypot(point.x-a.x-u*dx,point.z-a.z-u*dz);if(d<distance){distance=d;best=i;}});
     if(best>=0&&distance<.1){selectWall(best);status(`Side ${best+1} selected. Choose a photo, crop it, then place it on this wall.`);}
@@ -184,11 +207,11 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
     });
   }
   async function rebuild(){
-    active();patchThumbs.clear();const group=buildHybridShell(T,capture.building,preview.heightMeters,preview);
+    active();patchThumbs.clear();if(isRoom)pts=manualRoomFootprint(preview.room);const group=buildHybridShell(T,presentationBuilding(),preview.heightMeters,preview);
     try{
-      highlight=buildWallPatch(T,capture.building,preview.heightMeters,{wall:Number($('[data-wall]').value),region:[0,0,1,1]},null);
+      highlight=buildWallPatch(T,presentationBuilding(),preview.heightMeters,{wall:Number($('[data-wall]').value),region:[0,0,1,1]},null);
       highlight.material.color.set('#ffcc55');highlight.material.transparent=true;highlight.material.opacity=.22;highlight.material.depthWrite=false;highlight.material.polygonOffsetFactor=-1;highlight.material.polygonOffsetUnits=-1;group.add(highlight);
-      for(const p of preview.patches){const b=await photo(p.photoId);active();const a=pts[p.wall],end=pts[(p.wall+1)%pts.length];const aspect=Math.hypot(end.x-a.x,end.z-a.z)*(p.region[2]-p.region[0])/(preview.heightMeters*(p.region[3]-p.region[1]));const canvas=rectifyPhoto(b,p.quad,aspect),texture=new T.CanvasTexture(canvas);texture.encoding=T.sRGBEncoding;group.add(buildWallPatch(T,capture.building,preview.heightMeters,p,texture));const thumb=document.createElement('canvas');thumb.width=192;thumb.height=192;thumb.getContext('2d').drawImage(canvas,0,0,192,192);patchThumbs.set(p.id,thumb.toDataURL('image/jpeg',.75));thumb.width=thumb.height=0;}
+      for(const p of preview.patches){const b=await photo(p.photoId);active();const a=pts[p.wall],end=pts[(p.wall+1)%pts.length];const size=isRoom?manualRoomSurfaceSize(preview.room,p.wall):[Math.hypot(end.x-a.x,end.z-a.z),preview.heightMeters];const aspect=size[0]*(p.region[2]-p.region[0])/(size[1]*(p.region[3]-p.region[1]));const canvas=rectifyPhoto(b,p.quad,aspect),texture=new T.CanvasTexture(canvas);texture.encoding=T.sRGBEncoding;group.add(buildWallPatch(T,presentationBuilding(),preview.heightMeters,p,texture));const thumb=document.createElement('canvas');thumb.width=192;thumb.height=192;thumb.getContext('2d').drawImage(canvas,0,0,192,192);patchThumbs.set(p.id,thumb.toDataURL('image/jpeg',.75));thumb.width=thumb.height=0;}
       active();const view=viewer?.getView();viewer?.dispose();viewer=await createCaptureViewer($('[data-viewer]'),null,abort.signal,{model:group,alignment:{},fitScale:.65,view,onPick:pickWall,label:'Tap a wall to select it. Drag to rotate; pinch or scroll to zoom. Side buttons also select walls.'});
       active();bitmap=await photo(photoSelect.value);drawPhoto();cropPreview();patchList();drawPlacement();
     }catch(e){group.traverse(o=>{o.geometry?.dispose();o.material?.map?.dispose();o.material?.dispose();});throw e;}
@@ -227,12 +250,12 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
   $('[data-add]').onclick=()=>run(async()=>{
     validateQuad(quad);const region=[...dialog.querySelectorAll('[data-region]')].map(e=>Number(e.value)/100),wall=Number($('[data-wall]').value);
     const patch={id:editId||crypto.randomUUID(),photoId:photoSelect.value,quad:structuredClone(quad),wall,region};
-    const check=buildWallPatch(T,capture.building,preview.heightMeters,patch,null);check.geometry.dispose();check.material.dispose();
+    const check=buildWallPatch(T,presentationBuilding(),preview.heightMeters,patch,null);check.geometry.dispose();check.material.dispose();
     if(preview.patches.some(p=>p.id!==editId&&p.wall===wall&&Math.min(p.region[2],region[2])-Math.max(p.region[0],region[0])>.001&&Math.min(p.region[3],region[3])-Math.max(p.region[1],region[1])>.001))throw Error('This overlaps an existing patch. Adjust that patch or choose a separate wall region.');
     if(!editId&&preview.patches.length>=16)throw Error('This preview supports 16 patches. Adjust an existing patch to improve it.');
     remember();preview.patches=preview.patches.filter(p=>p.id!==editId);preview.patches.push(patch);editId=patch.id;await rebuild();status('Photo patch applied. Rotate the building and check alignment before saving.');
   });
-  $('[data-rebuild]').onclick=()=>run(async()=>{const height=Number($('[data-height]').value),rise=Number($('[data-rise]').value);if(!Number.isFinite(height)||height<1||height>1200||!Number.isFinite(rise)||rise<.3||rise>20)throw Error('Enter valid wall and roof dimensions.');remember();preview.heightMeters=height;preview.roofShape=$('[data-roof]').value;preview.roofRiseMeters=rise;await rebuild();status('Preview dimensions updated; mapped geometry is unchanged.');});
+  $('[data-rebuild]').onclick=()=>run(async()=>{const height=Number($('[data-height]').value),rise=Number($('[data-rise]').value);if(!Number.isFinite(height)||height<1||height>1200||!Number.isFinite(rise)||rise<.3||rise>20)throw Error('Enter valid wall and roof dimensions.');const room=isRoom?normalizeManualRoom({widthMeters:Number($('[data-room-edit-width]').value),lengthMeters:Number($('[data-room-edit-length]').value),heightMeters:height}):null;remember();if(room)preview.room=room;preview.heightMeters=height;preview.roofShape=$('[data-roof]').value;preview.roofRiseMeters=rise;await rebuild();status('Preview dimensions updated; mapped geometry is unchanged.');});
   $('[data-undo]').onclick=()=>run(async()=>{if(!snapshots.length)return;const revision=preview.revision;preview=snapshots.pop();preview.revision=revision;dirty=true;$('[data-height]').value=preview.heightMeters;editId=null;await rebuild();status('Last preview edit undone. Save to keep this version.');});
   $('[data-save]').onclick=()=>run(async()=>{
     $('[data-saved]').textContent='Saving your photo placements…';

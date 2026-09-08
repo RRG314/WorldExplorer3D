@@ -1,6 +1,8 @@
 import {resolveMappedRoof,createMappedRoofMesh} from '../world/mapped-roof-geometry.js?v=6';
+import {manualRoomFootprint,manualRoomSurfacePoint} from '../../../functions/capture-room-geometry.mjs';
 // Photo-supported planar patches, never an inferred reconstruction of hidden surfaces.
 export function wallFootprint(building) {
+  if(building?.manualRoom)return manualRoomFootprint(building.manualRoom);
   const input = building?.spatialContext?.footprint;
   if (!Array.isArray(input) || input.length < 3 || input.length > 256) throw Error('This capture needs its mapped footprint before a hybrid preview can be made.');
   const pts = input.map(p => ({x:p.x,z:p.z}));
@@ -40,6 +42,16 @@ export function rectifyPhoto(bitmap, quad, aspect=1, maxSize=1024) {
 }
 
 export function buildHybridShell(T, building, height, roof={}) {
+  if(building.manualRoom){
+    const group=new T.Group();group.userData.evidence='user-dimensioned-room';
+    for(let wall=0;wall<6;wall++){
+      const mesh=buildWallPatch(T,building,height,{wall,region:[0,0,1,1]},null);
+      mesh.material.color.setHex(wall===4?0x776a59:0xc7c0b4);
+      mesh.material.polygonOffset=false;mesh.userData.roomShell=true;
+      group.add(mesh);
+    }
+    return group;
+  }
   const pts=wallFootprint(building);
   if(!Number.isFinite(height)||height<1||height>1200) throw Error('Enter a preview wall height between 1 and 1,200 metres.');
   const group=new T.Group(); group.userData.evidence='procedural-unobserved-shell';
@@ -61,12 +73,12 @@ export function buildHybridShell(T, building, height, roof={}) {
 
 export function buildWallPatch(T, building, height, patch, texture) {
   const pts=wallFootprint(building), a=pts[patch.wall], b=pts[(patch.wall+1)%pts.length];
-  if(!a||!b) throw Error('Select a mapped wall.');
+  if(!building.manualRoom&&(!a||!b)) throw Error('Select a mapped wall.');
   const [left,bottom,right,top]=patch.region;
   if(![left,bottom,right,top].every(Number.isFinite)||left<0||right>1||bottom<0||top>1||right-left<.01||top-bottom<.01) throw Error('Choose a non-empty region within this wall.');
-  const point=(u,v)=>[a.x+(b.x-a.x)*u,height*v,a.z+(b.z-a.z)*u];
+  const point=(u,v)=>building.manualRoom?manualRoomSurfacePoint(building.manualRoom,patch.wall,u,v):[a.x+(b.x-a.x)*u,height*v,a.z+(b.z-a.z)*u];
   const geo=new T.BufferGeometry(); geo.setAttribute('position',new T.Float32BufferAttribute([...point(left,bottom),...point(right,bottom),...point(right,top),...point(left,top)],3));
   geo.setAttribute('uv',new T.Float32BufferAttribute([0,0,1,0,1,1,0,1],2));geo.setIndex([0,1,2,0,2,3]);geo.computeVertexNormals();
-  const mesh=new T.Mesh(geo,new T.MeshBasicMaterial({map:texture,side:T.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));
+  const mesh=new T.Mesh(geo,new T.MeshBasicMaterial({map:texture,side:building.manualRoom?T.FrontSide:T.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));
   mesh.userData={evidence:'photo-projected-user-alignment',photoId:patch.photoId,wall:patch.wall};return mesh;
 }
