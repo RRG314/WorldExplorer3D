@@ -195,12 +195,14 @@ export function installCommunityRealityCaptureRuntime(appCtx) {
   appCtx._captureNearbyRefreshInstalled=true;
   const isLocal=['localhost','127.0.0.1','[::1]'].includes(location.hostname);
   // A saved survey URL must not unexpectedly replace the world with an editor.
-  if(isLocal){
+  {
     const menu=document.getElementById('fCommunityBoard')?.parentElement;
     if(menu&&!document.getElementById('fPhotoSurvey')){
       const button=document.createElement('button');button.id='fPhotoSurvey';button.className='floatItem';button.type='button';button.textContent='Reality Capture · My contributions';
       button.onclick=async()=>{if(appCtx.getEnv?.()!=='EARTH'||!appCtx.initialEarthWorldReady)return;appCtx.closeAllFloatMenus?.();const {openRealityCaptureLibrary}=await import('./ui.js?v=2');await openRealityCaptureLibrary(appCtx);};menu.append(button);
     }
+  }
+  if(isLocal){
     window.addEventListener('we3d-local-survey-changed',()=>{void refreshCommunityRealityCapturePresentation(appCtx);});
     void import('../../../js/auth-ui.js?v=55').then(({observeAuth})=>observeAuth(()=>{
       for(const id of instances.keys())if(id.startsWith('local-survey:'))removeInstance(appCtx,id);
