@@ -142,7 +142,7 @@ const ACTIVITY_CATALOG = Object.freeze([
   },
   {
     id: 'geology-inspect', label: 'Inspect Geology', discipline: 'earth-science', toolCapability: 'inspect-rock',
-    contexts: ['outcrop', 'mountain', 'desert', 'riverbank', 'beach'], exclusions: ['deep-water'],
+    contexts: ['any'], exclusions: ['deep-water', 'open-ocean'],
     sourceRefs: [sourceRef('we3d-original', 'activity:geology-inspect')]
   },
   {
@@ -298,6 +298,7 @@ const FIND_CATALOG = Object.freeze([
 ].map(Object.freeze));
 
 const FIELD_DISCOVERY_CATALOG = Object.freeze([
+  { id: 'mapped-geology-study', names: { common: 'Mapped Geology Study' }, family: 'geology-record', activityIds: ['geology-inspect'], contexts: ['any'], rarityBand: 'common', qualityBand: 'reference', tradePolicy: 'not-tradeable', description: 'A location-specific study of published geological units. A mapped unit does not establish exposed rock or permission to collect.', sourceRefs: [sourceRef('we3d-original', 'field:mapped-geology-study')] },
   { id: 'area-survey-note', names: { common: 'Area Survey Note' }, family: 'exploration-record', activityIds: ['inspect', 'survey'], contexts: ['any'], rarityBand: 'common', qualityBand: 'observed', tradePolicy: 'not-tradeable', description: 'A virtual note describing the current compiled environment context.', sourceRefs: [sourceRef('we3d-original', 'field:area-survey')] },
   { id: 'granite-field-sample', names: { common: 'Granite Field Sample', scientific: 'Coarse-grained intrusive igneous rock' }, visualId: 'granite', family: 'rock', activityIds: ['geology-inspect'], contexts: ['mountain', 'outcrop'], rarityBand: 'common', qualityBand: 'field', tradePolicy: 'specimen', description: 'A virtual specimen representing coarse-grained igneous rock. The photograph is an identification reference, not a location claim.', sourceRefs: [sourceRef('we3d-original', 'field:granite')] },
   { id: 'quartz-vein-sample', names: { common: 'Quartz Vein Sample', scientific: 'SiO₂' }, visualId: 'quartz', family: 'mineral', activityIds: ['geology-inspect', 'pan-sediment'], contexts: ['outcrop', 'mountain', 'riverbank'], rarityBand: 'uncommon', qualityBand: 'field', tradePolicy: 'specimen', description: 'A virtual quartz-bearing sample for Earth-science play. The photograph is an identification reference.', sourceRefs: [sourceRef('we3d-original', 'field:quartz')] },

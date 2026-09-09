@@ -1,5 +1,23 @@
 # Data Sources
 
+## Local geology data integration — September 9
+
+- USGS Cooperative National Geologic Map surface-unit service:
+  `https://energy.usgs.gov/arcgis/rest/services/Hosted/mapunitpolys_esurf_labels/FeatureServer/0`.
+  Exact point queries return names, geomaterials, ages, confidence and original map
+  citations. Preserve source scale and age uncertainty. This integration identifies
+  the deployed service, not a guessed version from the viewer announcement.
+- Macrostrat point API: `https://macrostrat.org/api/v2/geologic_units/map`.
+  Missing USGS coverage falls back to regional geology with source references and
+  CC-BY-4.0 attribution. Multiple returned units remain explicit alternatives.
+- On-demand lookup only; bounded cache, ten-second timeout, no map embedding or
+  paid reconstruction. Records retain provider, query point, fetched time and
+  evidence snapshot. Data is a regional map reference, not proof of an exposed
+  sample, a mineral occurrence, or collecting access. No user images are sent.
+- Live spot queries verified Manchester (Wissahickon schist/gneiss) and Hawaii
+  (mafic lava flows). See `docs/GEOLOGY_DATA_IMPLEMENTATION.md` for later regional
+  packages, USMIN, exposure logic and validation boundaries.
+
 Local September 8 mapped-ground revision: existing Shortbread z14 coverage is
 also decoded for nearby land, sites and street polygons. These are generalized
 OSM-derived polygons, not parcel surveys. Source identity, available surface tags

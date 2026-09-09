@@ -1,5 +1,14 @@
 # World Explorer 3D System Inventory
 
+September 9 local geology integration: `app/js/geospatial/geology.js` supplies
+on-demand USGS surface-unit queries with Macrostrat fallback through the existing
+provider registry. Inspect Geology now records mapped unit evidence in the existing
+Journal/Field Guide transaction, not a guessed granite/quartz specimen. Sources,
+age, materials and uncertainty are visible in expandable record details. Geology
+studies retain the existing Pathfinder/tool unlock. No startup network dependency,
+new viewer, terrain/road changes, mineral-deposit ingestion or rock visual upgrade.
+See `GEOLOGY_DATA_IMPLEMENTATION.md` for the staged plan and current boundaries.
+
 September 8 authored-interior test implementation: the shared
 `functions/interior-layout.mjs` document/compiler now supplies the home grid
 editor, blank 3D shell, doorway/stair geometry and existing game collision/walking

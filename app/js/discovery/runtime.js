@@ -236,7 +236,7 @@ function guideCategoryFor(record = {}) {
   if (/wildlife|animal|bird|fish|marine/.test(family)) return family.includes('marine') || family === 'fish' ? 'ocean' : 'wildlife';
   if (/botany|plant|fung/.test(family)) return 'plants';
   if (/fossil/.test(family)) return 'fossils';
-  if (/rock|mineral|sediment|gem|ore|metal/.test(family)) return 'geology';
+  if (/geology|rock|mineral|sediment|gem|ore|metal/.test(family)) return 'geology';
   if (/water-survey|ocean/.test(family)) return 'ocean';
   return 'places';
 }
@@ -309,7 +309,7 @@ function createDiscoveryUi(state) {
       : worldCatalog;
     const companionCatalogIds = new Set(COMPANION_CATALOG.map((entry) => entry.id));
     const scopedGuide = requestedScope === 'current' && regionalPack
-      ? guideRecords.filter((entry) => (currentRegionIds.has(entry.catalogId) || companionCatalogIds.has(entry.catalogId)) && entry.regions?.includes(state.worldIdentityId))
+      ? guideRecords.filter((entry) => (currentRegionIds.has(entry.catalogId) || companionCatalogIds.has(entry.catalogId) || entry.catalogId === 'mapped-geology-study') && entry.regions?.includes(state.worldIdentityId))
       : guideRecords;
     const knownIds = new Set(scopedGuide.map((entry) => entry.catalogId));
     const known = scopedGuide.filter((entry) => {
@@ -363,6 +363,11 @@ function createDiscoveryUi(state) {
     }
   }
 
+  function geologyDetails(evidence) {
+    if(!evidence?.units?.length)return '';
+    return '<details class="discoveryGeologyEvidence"><summary>Mapped geology and sources</summary>'+evidence.units.map(unit=>'<p><strong>'+escapeHtml(unit.name)+'</strong><br>'+escapeHtml(unit.material)+'<br>Age: '+escapeHtml(unit.age||'Unspecified')+'<br>'+escapeHtml(unit.citation)+'<br>'+escapeHtml(unit.provider+' · '+unit.license)+'</p>').join('')+'<small>Regional mapped evidence; exposure and collecting permission are not established. '+escapeHtml((evidence.warnings||[]).join(' '))+'</small></details>';
+  }
+
   function renderJournal() {
     if (!elements.journal) return;
     const path = String(elements.journalCategory?.value || 'all');
@@ -382,7 +387,7 @@ function createDiscoveryUi(state) {
       const returnButton = canReturn ? `<button class="discoveryJournalReturn" data-journal-return="${escapeHtml(event.eventId)}" type="button">Return to location</button>` : '';
       const activity = displayDiscoveryLabel(event.activityId || event.eventType || event.pathId, 'Explorer memory');
       const eventPath = event.pathId || 'field';
-      return `<article class="discoveryItem discoveryJournalEvent"><span class="discoveryJournalTime">${escapeHtml(when)}</span><span class="discoveryJournalPath">${escapeHtml(pathLabels[eventPath] || 'Explorer')}</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><small>${escapeHtml(`${event.regionLabel || 'Current region'} · ${activity}${connections ? ` · ${connections}` : ''}`)}</small>${event.detail ? `<small>${escapeHtml(event.detail)}</small>` : ''}<span class="discoveryJournalProgress">${event.progress?.points > 0 ? `+${event.progress.points} Explorer points` : 'Saved to your Journal'}</span>${returnButton}</article>`;
+      return `<article class="discoveryItem discoveryJournalEvent"><span class="discoveryJournalTime">${escapeHtml(when)}</span><span class="discoveryJournalPath">${escapeHtml(pathLabels[eventPath] || 'Explorer')}</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><small>${escapeHtml(`${event.regionLabel || 'Current region'} · ${activity}${connections ? ` · ${connections}` : ''}`)}</small>${event.detail ? `<small>${escapeHtml(event.detail)}</small>` : ''}<span class="discoveryJournalProgress">${event.progress?.points > 0 ? `+${event.progress.points} Explorer points` : 'Saved to your Journal'}</span>${geologyDetails(event.evidencePayload?.geologyEvidence)}${returnButton}</article>`;
     }).join('') : '<div class="discoveryEmpty">No Journal records match these filters.</div>';
   }
 
@@ -566,6 +571,7 @@ function createDiscoveryUi(state) {
     const visual = visualForCatalogId(record.catalogId);
     const name = record.name || catalog?.names?.common || record.catalogId;
     const details = meta || `${displayDiscoveryLabel(record.family || catalog?.family)} · ${displayDiscoveryLabel(record.evidenceClass, 'Field reference')}`;
+    if(record.geologyEvidence)return `<article class="discoveryItem"><strong>${escapeHtml(name)}</strong><small>${escapeHtml(details)}</small>${geologyDetails(record.geologyEvidence)}</article>`;
     if (!visual) return `<article class="discoveryItem"><strong>${escapeHtml(name)}</strong><small>${escapeHtml(details)}</small></article>`;
     return `<article class="discoveryItem discoveryItemVisual"><img src="${escapeHtml(visual.image)}" alt="${escapeHtml(visual.alt)}" loading="lazy"><div><strong>${escapeHtml(name)}</strong><div class="discoveryScientific">${escapeHtml(catalog?.names?.scientific || visual.scientificName)}</div><small>${escapeHtml(details)}</small><span class="discoveryEvidence">Reference image</span><a class="discoveryCredit" href="${escapeHtml(visual.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(`${visual.author} · ${visual.license}`)}</a><div class="discoveryCompanionActions"><button class="discoveryArLaunch" data-ar-record="${escapeHtml(record.instanceId || record.catalogId)}" data-ar-source="${escapeHtml(source)}" type="button">Place in AR</button></div></div></article>`;
   }
@@ -813,6 +819,9 @@ function createDiscoveryUi(state) {
       elements.actions.innerHTML = actions.slice(0, 3).map((action, index) =>
         `<button class="discoveryActionChip${action.id === activityId ? ' active' : ''}" data-discovery-action="${escapeHtml(action.id)}" type="button"><span>${escapeHtml(action.label)}</span><small>${action.id === 'fish' ? 'Full game' : index === 0 ? 'Recommended nearby lead' : 'Alternative lead'}</small></button>`
       ).join('');
+    }
+    if(elements.actions && actions.length>3 && !elements.actions.querySelector('.discoveryMoreActivities')) {
+      elements.actions.insertAdjacentHTML('beforeend', `<details class="discoveryMoreActivities"><summary>More field activities</summary>${actions.slice(3).map(action=>`<button class="discoveryActionChip" data-discovery-action="${escapeHtml(action.id)}" type="button"><span>${escapeHtml(action.label)}</span></button>`).join('')}</details>`);
     }
     const activeAction = actions.find((action) => action.id === activityId);
     const arEligibility = state.getArChallengeEligibility?.();
@@ -2084,6 +2093,12 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       } else if (fieldPhase === 'revealed') {
         const completedSlot = fieldActivities.slots.find((entry) => entry.id === state.fieldSession.snapshot(position).targetId);
         const recorded = await state.fieldSession.record(profileStore, {
+          isCurrent: () => appCtx.worldDiscoveryRuntime === state,
+          resolveGeology: async (point) => {
+            const location = appCtx.worldToLatLon(point.x, point.z);
+            const {lookupGeology,geologyRecord} = await import('../geospatial/geology.js');
+            return geologyRecord(await lookupGeology(location));
+          },
           toolId: ACTIVITY_TOOL[state.activeActivityId] || '',
           regionLabel,
           locationKey: state.locationKey,
@@ -2292,8 +2307,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
             .filter((action) => {
               const toolId = ACTIVITY_TOOL[action.id];
               return !toolId || state.entitlements.canUseTool(toolId).allowed;
-            })
-            .slice(0, 3);
+            });
         }
         state.currentCellId = state.actions[0]?.cellId || null;
       }

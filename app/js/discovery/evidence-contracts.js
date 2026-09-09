@@ -35,7 +35,7 @@ const FIELD_EVIDENCE_CONTRACTS = deepFreeze({
   geology: {
     id: 'geology', recordKind: 'geology-context-record', holdSeconds: 3.4,
     activityIds: ['geology-inspect'], requiredFields: ['substrateContext', 'samplePolicy', 'locationClaim'],
-    actionPhrase: 'inspect a virtual geology context'
+    actionPhrase: 'inspect this location before consulting its mapped geology'
   },
   community: {
     id: 'community', recordKind: 'local-game-checklist', holdSeconds: 4,

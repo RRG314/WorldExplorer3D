@@ -1,4 +1,8 @@
 @layer interface {
+.discoveryGeologyEvidence,.discoveryMoreActivities{grid-column:1/-1;min-width:0;margin-top:8px;padding:8px;border:1px solid var(--wx-line-soft);overflow-wrap:anywhere}
+.discoveryGeologyEvidence summary,.discoveryMoreActivities summary{min-height:44px;display:flex;align-items:center;cursor:pointer;color:var(--wx-text)}
+.discoveryGeologyEvidence p{margin:8px 0;font:500 12px/1.5 Inter,sans-serif}
+.discoveryMoreActivities .discoveryActionChip{width:100%;min-height:44px;margin-top:6px}
 #discoveryQuickToolBtn{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);display:none;align-items:center;gap:9px;z-index:148;height:38px;border:1px solid rgba(45,125,255,.54);border-radius:2px;padding:0 13px;background:rgba(6,13,19,.94);color:var(--wx-muted);font:600 10px/1 Inter,sans-serif;box-shadow:0 12px 32px rgba(0,0,0,.42);cursor:pointer;backdrop-filter:blur(10px)}
 #discoveryQuickToolBtn.show{display:flex}#discoveryQuickToolBtn>span:first-child{color:var(--wx-blue);font-size:17px}#discoveryQuickToolBtn strong{color:var(--wx-text);font:700 10px Orbitron,sans-serif;letter-spacing:.05em;text-transform:uppercase}#discoveryQuickSignal{color:var(--wx-green);border-left:1px solid var(--wx-line-soft);padding-left:9px}
 #discoveryContextPrompt{position:fixed;left:50%;bottom:72px;transform:translateX(-50%);display:none;align-items:center;gap:12px;max-width:min(600px,calc(100vw - 28px));z-index:147;border:1px solid var(--wx-line-soft);border-left:2px solid var(--wx-blue);border-radius:2px;padding:8px 8px 8px 12px;background:var(--wx-panel);color:var(--wx-text);font:500 11px/1.35 Inter,sans-serif;box-shadow:0 12px 30px rgba(0,0,0,.34);backdrop-filter:blur(10px)}

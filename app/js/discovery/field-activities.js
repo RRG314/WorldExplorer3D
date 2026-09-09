@@ -53,6 +53,7 @@ function compileFieldActivityPlan(environment, eligibility, options = {}) {
       }).map((entry) => entry.id));
       const candidates = FIELD_DISCOVERY_CATALOG.filter((entry) =>
         entry.activityIds.includes(activity.id) &&
+        (activity.id !== 'geology-inspect' || entry.id === 'mapped-geology-study') &&
         (!entry.regionalPackId || (entry.regionalPackId === regionalPack?.id && eligibleRegionalIds.has(entry.id))) &&
         (entry.contexts.includes('any') || entry.contexts.some((context) => contextSet.has(context)))
       );
@@ -83,7 +84,7 @@ function compileFieldActivityPlan(environment, eligibility, options = {}) {
         const evidenceContract = resolveFieldEvidenceContract(activity.id);
         slots.push({
           id: slotId,
-          claimId: `claim:${environment.worldIdentity.id}:${eligibility.catalogBundleVersion}:field:${activity.id}:${cellId}:${slotIndex}`,
+          claimId: `claim:${environment.worldIdentity.id}:${eligibility.catalogBundleVersion}:field:${activity.id}${activity.id==='geology-inspect'?':mapped-v1':''}:${cellId}:${slotIndex}`,
           activityId: activity.id,
           activityLabel: activity.label,
           discipline: activity.discipline,
@@ -139,6 +140,7 @@ function createFieldActivitySession(options = {}) {
   const claimedIds = options.claimedIds instanceof Set ? options.claimedIds : new Set(options.claimedIds || []);
   const observedCatalogIds = options.observedCatalogIds instanceof Set ? options.observedCatalogIds : new Set(options.observedCatalogIds || []);
   let progress = options.progress || fieldProgress({ collectionCount: options.collectionCount || 0 });
+  let recording = false;
   let state = { phase: 'idle', activityId: null, slot: null, elapsed: 0, message: 'Choose an available field activity.', error: '', result: null, authority: null, characterTuning: null };
 
   const distanceToSlot = (position, slot) => slot ? Math.hypot(Number(position?.x || 0) - slot.position.x, Number(position?.z || 0) - slot.position.z) : null;
@@ -223,7 +225,10 @@ function createFieldActivitySession(options = {}) {
   }
 
   async function record(profileStore, context = {}) {
-    if (state.phase !== 'revealed' || !state.slot) return false;
+    if (state.phase !== 'revealed' || !state.slot || recording) return false;
+    const recordingState = state;
+    recording = true;
+    try {
     const authority = authorityFor(state.slot, context);
     if (authority && !authority.eligible) {
       state.authority = authority;
@@ -231,6 +236,15 @@ function createFieldActivitySession(options = {}) {
       return false;
     }
     state.error = '';
+    let mappedGeology = null;
+    if(state.slot.catalogId === 'mapped-geology-study') {
+      state.message = 'Reading published geology for this survey point…';
+      if(typeof context.resolveGeology !== 'function')throw new Error('Geology data is unavailable in this session. Nothing was saved.');
+      mappedGeology = await context.resolveGeology(state.slot.position);
+      if(state !== recordingState || context.isCurrent?.() === false)return false;
+      const latestAuthority = authorityFor(state.slot, context);
+      if(latestAuthority && !latestAuthority.eligible)throw new Error('Return to the survey point before saving its geology study.');
+    }
     const discovery = FIELD_DISCOVERY_CATALOG.find((entry) => entry.id === state.slot.catalogId);
     const distance = state.authority?.distanceMeters ?? distanceToSlot(context.localPosition || {}, state.slot);
     const evidencePayload = buildFieldEvidencePayload(state.slot.evidenceContract, {
@@ -244,8 +258,8 @@ function createFieldActivitySession(options = {}) {
       instanceId: `item:${state.slot.id}`,
       claimId: state.slot.claimId,
       catalogId: state.slot.catalogId,
-      name: discovery?.names?.common || state.slot.catalogId,
-      description: discovery?.description || '',
+      name: mappedGeology?.name || discovery?.names?.common || state.slot.catalogId,
+      description: mappedGeology?.description || discovery?.description || '',
       family: discovery?.family || 'field-record',
       regionalPackId: state.slot.regionalPackId || null,
       regionalPackVersion: state.slot.regionalPackVersion || null,
@@ -265,9 +279,9 @@ function createFieldActivitySession(options = {}) {
       localPosition: context.localPosition || state.slot.position,
       evidenceClass: state.slot.evidenceClass,
       evidenceContractId: state.slot.evidenceContract?.id || null,
-      evidencePayload,
+      evidencePayload: mappedGeology ? {...evidencePayload, geologyEvidence:mappedGeology.geologyEvidence, locationClaim:'published-map-unit-not-field-confirmed'} : evidencePayload,
       supportingEvidence: state.slot.supportingEvidence,
-      sourceRefs: state.slot.sourceRefs,
+      sourceRefs: mappedGeology?.sourceRefs || state.slot.sourceRefs,
       collectedAt: Date.now()
     };
     const collection = ['specimen', 'collectible'].includes(String(discovery?.tradePolicy || ''));
@@ -286,6 +300,10 @@ function createFieldActivitySession(options = {}) {
     const destination = result.collected ? 'Journal, Field Guide, and Backpack' : 'Journal and Field Guide';
     state.message = `${result.event?.name || result.item?.name || record.name} saved to your ${destination}.`;
     return true;
+    } catch(error) {
+      if(state === recordingState)state.error=error.message || 'The field record could not be saved.';
+      return false;
+    } finally { recording=false; }
   }
 
   function leave() {

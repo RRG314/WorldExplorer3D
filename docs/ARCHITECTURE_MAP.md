@@ -1,5 +1,14 @@
 # World Explorer 3D Architecture
 
+Local geology data path (September 9): existing Inspect Geology slot → exact
+world-to-geographic position → `geospatial/geology.js` → bounded provider registry
+query → USGS surface unit or attributed Macrostrat alternatives → existing
+field-record transaction → Journal and Field Guide. Saved evidence is a snapshot;
+it is not a specimen/exposure/access assertion. Pending results cannot save after
+the activity or world session changes. Geology does not own terrain elevation,
+road geometry, inventory, world loading or account storage. Regional packages,
+USMIN and exposure-driven visuals remain subsequent stages.
+
 Authored-home path (staging test implementation): canonical captured building
 snapshot → one versioned layout (`functions/interior-layout.mjs`) →
 `home-layout-editor` and `interiors/authored-geometry` → existing interior runtime

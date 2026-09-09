@@ -88,7 +88,7 @@ test('recording a field mechanic persists its typed evidence payload', async () 
     assert.equal(session.beginSlot(slot.id, slot.position), true);
     const revealed = session.update(slot.evidenceContract.holdSeconds + 0.1, slot.position);
     assert.equal(revealed.phase, 'revealed');
-    assert.equal(await session.record(profileStore, { localPosition: slot.position }), true);
+    assert.equal(await session.record(profileStore, { localPosition: slot.position, resolveGeology:async()=>({name:'Fixture mapped geology',description:'Unit-test provider response',sourceRefs:[],geologyEvidence:{units:[]}}) }), true);
     const record = recorded.at(-1);
     assert.equal(record.evidenceContractId, slot.evidenceContract.id);
     assert.equal(record.evidencePayload.recordKind, slot.evidenceContract.recordKind);
