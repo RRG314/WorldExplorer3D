@@ -1,4 +1,5 @@
 import {resolveMappedRoof,createMappedRoofMesh} from '../world/mapped-roof-geometry.js?v=6';
+import {exteriorPhotoGeometry} from '../../../functions/exterior-photo-geometry.mjs';
 import {manualRoomFootprint,manualRoomSurfacePoint,manualRoomPatchGeometry} from '../../../functions/capture-room-geometry.mjs';
 // Photo-supported planar patches, never an inferred reconstruction of hidden surfaces.
 export function wallFootprint(building) {
@@ -78,7 +79,7 @@ export function buildWallPatch(T, building, height, patch, texture) {
   const [left,bottom,right,top]=patch.region;
   if(![left,bottom,right,top].every(Number.isFinite)||left<0||right>1||bottom<0||top>1||right-left<.01||top-bottom<.01) throw Error('Choose a non-empty region within this wall.');
   const point=(u,v)=>building.manualRoom?manualRoomSurfacePoint(building.manualRoom,patch.wall,u,v):[a.x+(b.x-a.x)*u,height*v,a.z+(b.z-a.z)*u];
-  const data=building.manualRoom?manualRoomPatchGeometry(building.manualRoom,patch.wall,patch.region):{positions:[...point(left,bottom),...point(right,bottom),...point(right,top),...point(left,top)],uv:[0,0,1,0,1,1,0,1],indices:[0,1,2,0,2,3]};
+  const data=building.manualRoom?manualRoomPatchGeometry(building.manualRoom,patch.wall,patch.region):exteriorPhotoGeometry(pts,height,patch);
   const geo=new T.BufferGeometry(); geo.setAttribute('position',new T.Float32BufferAttribute(data.positions,3));
   geo.setAttribute('uv',new T.Float32BufferAttribute(data.uv,2));geo.setIndex(data.indices);geo.computeVertexNormals();
   const mesh=new T.Mesh(geo,new T.MeshBasicMaterial({map:texture,side:building.manualRoom?T.FrontSide:T.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));

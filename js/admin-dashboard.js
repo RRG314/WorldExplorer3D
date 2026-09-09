@@ -830,6 +830,9 @@ async function mountRealityModelPreview(url, capture) {
     if (!response.ok) throw Error('protected_model_unavailable');
     viewer = await createCaptureViewer(host, await response.arrayBuffer(), controller.signal, {
       homeLayout:capture.hybridSubmission?.kind==='home-layout'?capture.hybridSubmission.layout:null,
+      exteriorBuilding:capture.hybridSubmission?.kind==='facade-patches'?capture.building:null,
+      patchHeightMeters:capture.hybridSubmission?.heightMeters,
+      streetFacingWall:capture.hybridSubmission?.streetFacingWall,
       alignment: capture.review?.alignment || {},
       spatialContext: capture.captureKind === 'exterior' ? capture.building?.spatialContext : null
     });
@@ -881,10 +884,12 @@ function renderRealityDetail() {
   const alignment = capture.review?.alignment || { positionOffset: { x: 0, y: 0, z: 0 }, rotationYDegrees: 0, scale: 1 };
   const canModerate = capture.status === 'review_required' && !!detail.model?.url;
   const emailStatus = ({accepted:'Accepted by email provider (delivery not confirmed)',not_configured:'Email sender is not configured',failed:'Email failed; retry pending',needs_attention:'Email needs attention; automatic retries stopped'})[capture.reviewEmail?.status] || 'No email send recorded';
+  const front=capture.hybridSubmission?.streetFacingWall;
   refs.moderationDetail.innerHTML = `
     <div class="detail-header"><div><h3>${escapeHtml(capture.building?.label || 'Reality capture')}</h3><p>${escapeHtml(capture.captureKind === 'interior_room' ? capture.room?.label || 'Interior room' : 'Building exterior')} • ${escapeHtml(capture.building?.sourceBuildingId || '')}</p></div><span class="status-pill" data-status="${escapeHtml(capture.status)}">${escapeHtml(capture.status)}</span></div>
     <div class="detail-grid">
       <article class="detail-card"><span class="detail-label">Approval notice</span><strong>${escapeHtml(emailStatus)}</strong><p>This submission is available here regardless of email delivery.</p></article>
+      <article class="detail-card"><span class="detail-label">Submitted street-facing reference</span><strong>${Number.isInteger(front)?`Wall ${front+1}`:'Not identified'}</strong><p>Contributor-declared reference from this submitted revision, not verified road data.</p></article>
       <article class="detail-card"><span class="detail-label">Contributor</span><strong>${escapeHtml(capture.ownerDisplayName || 'Explorer')}</strong><p>Originals remain private</p></article>
       <article class="detail-card"><span class="detail-label">Photos</span><strong>${escapeHtml(String(capture.uploadSummary?.photoCount || detail.thumbnails?.length || 0))}</strong><p>${escapeHtml(String(capture.uploadSummary?.totalBytes || 0))} bytes</p></article>
       <article class="detail-card"><span class="detail-label">Pipeline</span><strong>${escapeHtml(capture.processingPipelineVersion || 'Pending')}</strong><p>Schema ${escapeHtml(String(capture.captureSchemaVersion || 1))}</p></article>

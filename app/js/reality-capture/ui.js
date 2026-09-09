@@ -717,7 +717,13 @@ async function previewResult() {
     const { createCaptureViewer } = await import('./result-viewer.js?v=1');
     assertCurrent(session);
     session.viewer?.dispose();
-    session.viewer = await createCaptureViewer(panel.querySelector('[data-capture-viewer]'), bytes, session.abort.signal,{homeLayout:session.serverCapture.hybridSubmission?.kind==='home-layout'?session.serverCapture.hybridSubmission.layout:null});
+    const submitted=session.serverCapture.hybridSubmission;
+    session.viewer = await createCaptureViewer(panel.querySelector('[data-capture-viewer]'), bytes, session.abort.signal,{
+      homeLayout:submitted?.kind==='home-layout'?submitted.layout:null,
+      exteriorBuilding:submitted?.kind==='facade-patches'?session.serverCapture.building:null,
+      patchHeightMeters:submitted?.heightMeters,
+      ...(submitted?.kind==='facade-patches'?{alignment:{},spatialContext:session.serverCapture.building?.spatialContext,streetFacingWall:submitted.streetFacingWall}:{})
+    });
     assertCurrent(session);
     panel.querySelector('[data-capture-viewer-controls]').hidden = false;
     panel.querySelector('[data-capture-status]').textContent = 'Drag to rotate. Pinch or scroll to zoom. This preview does not change the public world.';

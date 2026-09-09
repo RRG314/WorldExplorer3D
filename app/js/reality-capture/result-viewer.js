@@ -9,6 +9,7 @@ export async function createCaptureViewer(host, bytes, signal, options = {}) {
   if (signal.aborted) return null;
   const T = globalThis.THREE;
   let model = options.model || (await new Promise((resolve, reject) => new T.GLTFLoader().parse(bytes, '', resolve, reject))).scene;
+  if(options.exteriorBuilding){const {buildHybridShell}=await import('./hybrid-geometry.js');const shell=buildHybridShell(T,options.exteriorBuilding,options.patchHeightMeters,{});shell.add(model);model=shell;}
   if(options.homeLayout){const {buildAuthoredInterior}=await import('../interiors/authored-geometry.js');const home=buildAuthoredInterior(T,options.homeLayout);home.group.add(model);home.group.traverse(o=>{if(o.userData.kind==='ceiling')o.visible=false;});model=home.group;}
   if(model.name==='authored-home')options={...options,interiorLighting:true};
   const disposeModel = () => model.traverse(object => {
@@ -46,6 +47,11 @@ export async function createCaptureViewer(host, bytes, signal, options = {}) {
       new T.Vector3(entrance.x, 0, entrance.z), new T.Vector3(entrance.x, 2, entrance.z)
     ]), new T.LineBasicMaterial({ color: 0xffcc55, depthTest: false })));
     scene.add(reference);
+    const front=options.streetFacingWall;
+    if(Number.isInteger(front)&&footprint[front]){
+      const a=footprint[front],b=footprint[(front+1)%footprint.length];
+      reference.add(new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(a.x,.1,a.z),new T.Vector3(b.x,.1,b.z)]),new T.LineBasicMaterial({color:0xffcc55,depthTest:false})));
+    }
   }
   const light = new T.DirectionalLight(0xffffff, options.interiorLighting ? .45 : .8);
   light.position.set(1, 2, 3); scene.add(light);

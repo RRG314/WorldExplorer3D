@@ -3,6 +3,7 @@ const sharp=require('sharp');
 const {createHash}=require('node:crypto');
 const {manualRoomFootprint,manualRoomSurfacePoint,manualRoomSurfaceSize,manualRoomPatchGeometry}=require('./capture-room-geometry.mjs');
 const {layoutRoomDescriptor}=require('./interior-layout.mjs');
+const {exteriorPhotoGeometry}=require('./exterior-photo-geometry.mjs');
 
 async function rectify(bytes,quad,aspect,maxSize=1024){
   const {photoHomography,projectPhoto}=await import('./capture-projectivity.mjs');
@@ -39,7 +40,7 @@ async function createPatchGlb(capture,preview,loadPhoto){
     const image=await rectify(bytes,patch.quad,size[0]*(r-l)/(size[1]*(top-bot)),maxTextureSize);
     if(image.length>2*1024*1024)throw Error('patch_texture_budget_exceeded');
     const point=(u,v)=>[a.x+(b.x-a.x)*u,preview.heightMeters*v,a.z+(b.z-a.z)*u];
-    const data=isRoom?manualRoomPatchGeometry(room,patch.wall,patch.region):{positions:[...point(l,bot),...point(r,bot),...point(r,top),...point(l,top)],uv:[0,0,1,0,1,1,0,1],indices:[0,1,2,0,2,3]};
+    const data=isRoom?manualRoomPatchGeometry(room,patch.wall,patch.region):exteriorPhotoGeometry(pts,preview.heightMeters,patch);
     if(!data.indices.length)throw Error('photo_patch_has_no_visible_surface');
     if(isHome)for(let i=1;i<data.positions.length;i+=3)data.positions[i]+=room.elevation;
     const positions=new Float32Array(data.positions),uv=new Float32Array(data.uv.map((v,i)=>i%2?1-v:v)),indices=new Uint16Array(data.indices);

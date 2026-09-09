@@ -424,6 +424,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       const isRoom=capture.captureKind==='interior_room';
       const isHome=preview.kind==='home-layout';
       const submission={revision:preview.revision,status:'review_required',kind:isHome?'home-layout':isRoom?'room-patches':'facade-patches',...(isHome?{layout:preview.layout,roomPhotos:preview.roomPhotos}:isRoom?{room:preview.room}:{}),modelPath,modelGeneration:String(metadata.generation),sha256:digest,footprintSignature:preview.footprintSignature,footprint:isRoom&&!isHome?require('./capture-room-geometry.mjs').manualRoomFootprint(preview.room):capture.building.spatialContext.footprint,heightMeters:isHome?Math.max(...preview.layout.floors.map(f=>f.elevation+f.height+f.slab)):preview.heightMeters,patches:preview.patches,submittedAtMs:Date.now()};
+      if(!isRoom&&Number.isInteger(preview.streetFacingWall))submission.streetFacingWall=preview.streetFacingWall;
       await db.runTransaction(async tx=>{const now=await tx.get(ref);if(!now.exists||!snap.updateTime.isEqual(now.updateTime))throw Error('hybrid_state_transition_conflict');tx.update(ref,{hybridSubmission:encodeHybridPreview(submission),status:'review_required',publicContributionRequested:isRoom?req.body?.publicSharing===true:true,updatedAt:FieldValue.serverTimestamp()});});
       res.status(200).json({status:'review_required',revision:preview.revision});
     }catch(e){sendKnownError(res,e);}
@@ -654,7 +655,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       const representations = [];
       for (const row of snapshot.docs) {
         const data = row.data() || {};
-        if (data.captureKind !== 'exterior' || !data.modelPath) continue;
+        if (data.captureKind !== 'exterior' || !data.modelPath || clean(data.canonicalBuilding?.worldId,220)!==worldId) continue;
         let patchHeightMeters = data.patchHeightMeters;
         // Legacy approved wall revisions predate an explicit height field.
         // Read their exact matching submission; never guess from a partial mesh.

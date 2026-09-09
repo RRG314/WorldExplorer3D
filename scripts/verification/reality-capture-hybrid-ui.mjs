@@ -7,7 +7,7 @@ const require=createRequire(import.meta.url),{footprintSignature,normalizeHybrid
 const roomTest=process.env.WE3D_ROOM_EDITOR_TEST==='1';
 const out=roomTest?'output/verification/reality-capture-room-editor':'output/verification/reality-capture-hybrid';await mkdir(out,{recursive:true});
 const privateDir=process.env.WE3D_PRIVATE_CAPTURE_REPLAY;
-const building=privateDir?JSON.parse(await readFile(`${privateDir}/hybrid-building.json`,'utf8')):{sourceAuthority:'osm',sourceBuildingId:'osm:way:fixture',spatialContext:{footprint:[{x:-15,z:-6},{x:15,z:-6},{x:15,z:6},{x:-15,z:6}],height:{meters:6,evidence:'inferred'}}};
+const building=privateDir?JSON.parse(await readFile(`${privateDir}/hybrid-building.json`,'utf8')):{sourceAuthority:'osm',sourceBuildingId:'osm:way:fixture',lat:39.6572,lon:-76.88618,spatialContext:{footprint:[{x:-15,z:-6},{x:15,z:-6},{x:15,z:6},{x:-15,z:6}],height:{meters:6,evidence:'inferred'}}};
 const capture={captureId:'private-local-replay',ownerUid:'local-verifier',captureKind:'exterior',building,footprintSignature:footprintSignature(building)};
 if(roomTest){capture.captureKind='interior_room';capture.room={widthMeters:4,lengthMeters:6,heightMeters:2.7};capture.consent={propertyPermissionConfirmed:true};capture.footprintSignature=footprintSignature(building,capture.room);}
 const ids=['a','b','c','d','e','f','0'].map(c=>c.repeat(32));capture.inputManifest=ids.map(id=>({name:`reality-captures/local-verifier/private-local-replay/originals/${id}.jpg`,generation:'local-replay-only'}));
@@ -57,6 +57,12 @@ try{
     await page.locator('[data-face-wall]').click();
     await page.locator('[data-mark-front]').click();
     assert.match(await page.locator('[data-front-reference]').innerText(),/wall 1/);
+    await page.locator('[data-map-panel] summary').click();
+    await page.locator('[data-map-preview] [aria-label="Select wall 2"]').click();
+    assert.equal(await page.evaluate(()=>editor.getState().selectedWall),1);
+    await page.locator('[data-map-preview]').scrollIntoViewIfNeeded();
+    await page.screenshot({path:`${out}/${width}-map-context.png`});
+    await page.locator('[data-map-panel] summary').click();
     await page.locator('[data-viewer]').scrollIntoViewIfNeeded();
     await page.screenshot({path:`${out}/${width}-orientation.png`});
     await page.locator('[data-next-photos]').click();await page.waitForFunction(()=>document.querySelectorAll('[data-thumbnails] img').length===1);assert.equal(await page.locator('[data-next-photos]').isDisabled(),true);

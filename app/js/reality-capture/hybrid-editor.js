@@ -1,5 +1,6 @@
 import './capture-theme.js';
 import {wallDirections} from './orientation.js';
+import {mountCaptureMap} from './map-context.js';
 import {loadClassicScript} from '../modules/script-loader.js?v=56';
 import {vendorScriptsCritical} from '../modules/manifest.js?v=597';
 import {createCaptureViewer} from './result-viewer.js?v=1';
@@ -52,6 +53,7 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
     <a data-map-context target="_blank" rel="noopener noreferrer">Check this building on the map</a>
     <button data-face-wall>Look straight at selected wall</button>
     <button data-mark-front>Mark selected wall as street-facing</button><p data-front-reference></p>
+    <details data-map-panel><summary>See surrounding streets and match a wall</summary><div data-map-preview></div></details>
     </section><section class="hybridPlacement" aria-label="Wall placement"><h3>3. Place the photo on this side</h3><p>Start with the whole wall, or choose a grid section. Drag the yellow box to move it; drag its lower-right handle to resize.</p>
     <div class="hybridActions"><button data-whole>Whole wall</button><button data-tile>Grid section</button><label>Grid<select data-grid><option value="2">2 × 2</option><option value="4" selected>4 × 4</option><option value="8">8 × 8</option></select></label></div>
     <div class="hybridWall" data-wall-board aria-label="Wall placement. Drag the selected region or use arrow keys; Shift plus arrows resizes."><div data-existing></div><div data-placement tabindex="0" role="group" aria-label="Selected photo region"><img data-placement-image alt="Cropped photo preview" hidden><span data-resize aria-hidden="true">↘</span></div></div>
@@ -132,6 +134,9 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
   const photoSelect=$('[data-photo-choice]');
   photos.forEach((p,i)=>photoSelect.add(new Option(`Photo ${i+1}`,p.id)));
   const directions=wallDirections(pts);
+  let mapContext=null;
+  $('[data-map-panel]').hidden=isRoom;
+  $('[data-map-panel]').addEventListener('toggle',()=>{if($('[data-map-panel]').open&&!mapContext){mapContext=mountCaptureMap($('[data-map-preview]'),capture.building,pts,selectWall,abort.signal);mapContext.select(Number($('[data-wall]').value));}});
   const surfaceNames=isRoom?[...pts.map((_,i)=>`Wall ${i+1}`),'Floor','Ceiling']:directions.map(d=>`Wall ${d.wall+1} · faces ${d.compass} · ${d.length.toFixed(1)} m`);
   const geo=capture.building;
   $('[data-map-context]').hidden=isRoom||!Number.isFinite(geo?.lat)||!Number.isFinite(geo?.lon);
@@ -168,6 +173,7 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
   function selectWall(wall,internal=false){
     if((busy&&!internal)||closed)return;
     $('[data-wall]').value=wall;editId=null;drawPlan();drawPlacement();
+    mapContext?.select(wall);
     dialog.querySelectorAll('[data-side]').forEach(b=>b.setAttribute('aria-pressed',String(Number(b.dataset.side)===wall)));
     $('[data-side-label]').textContent=`Selected: ${$('[data-wall]').selectedOptions[0].textContent}. Yellow shows the selected surface.`;
     if(highlight){const mesh=buildWallPatch(T,presentationBuilding(),preview.heightMeters,{wall,region:[0,0,1,1]},null);highlight.geometry.dispose();highlight.geometry=mesh.geometry;mesh.material.dispose();viewer?.redraw();}
@@ -273,7 +279,7 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
   $('[data-new]').onclick=()=>run(async()=>{await selectPhoto();setRegion([0,0,1,1]);status('Choose a photo and wall. For a smaller patch, choose Grid section or tap the wall grid.');});
   $('[data-add]').onclick=()=>run(async()=>{
     validateQuad(quad);const region=[...dialog.querySelectorAll('[data-region]')].map(e=>Number(e.value)/100),wall=Number($('[data-wall]').value);
-    const patch={id:editId||crypto.randomUUID(),photoId:photoSelect.value,quad:structuredClone(quad),wall,region};
+    const patch={id:editId||crypto.randomUUID(),photoId:photoSelect.value,quad:structuredClone(quad),wall,region,...(!isRoom?{orientationVersion:2}:{})};
     const check=buildWallPatch(T,presentationBuilding(),preview.heightMeters,patch,null);check.geometry.dispose();check.material.dispose();
     if(preview.patches.some(p=>p.id!==editId&&p.wall===wall&&Math.min(p.region[2],region[2])-Math.max(p.region[0],region[0])>.001&&Math.min(p.region[3],region[3])-Math.max(p.region[1],region[1])>.001))throw Error('This overlaps an existing patch. Adjust that patch or choose a separate wall region.');
     if(!editId&&preview.patches.length>=16)throw Error('This preview supports 16 patches. Adjust an existing patch to improve it.');

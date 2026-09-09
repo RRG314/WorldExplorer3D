@@ -64,9 +64,14 @@ function normalizeHybridPreview(capture, input) {
     if(!Array.isArray(p.region)||p.region.length!==4||p.region.some(n=>typeof n!=='number'||!Number.isFinite(n)||n<0||n>1)||p.region[2]-p.region[0]<.01||p.region[3]-p.region[1]<.01) throw Error('invalid_hybrid_region');
     if(!Array.isArray(p.quad)||p.quad.length!==4||p.quad.some(q=>!Array.isArray(q)||q.length!==2||q.some(n=>typeof n!=='number'||!Number.isFinite(n)||n<0||n>1))) throw Error('invalid_hybrid_quad');
     for(let i=0;i<4;i++){const a=p.quad[i],b=p.quad[(i+1)%4],c=p.quad[(i+2)%4];if((b[0]-a[0])*(c[1]-b[1])-(b[1]-a[1])*(c[0]-b[0])<.0001)throw Error('invalid_hybrid_quad');}
-    return {id:p.id,photoId:p.photoId,photoGeneration:String(photo.generation),wall:p.wall,region:p.region.map(Number),quad:p.quad.map(q=>q.map(Number)),evidence:'photo-projected-user-alignment'};
+    if(p.orientationVersion!==undefined&&![1,2].includes(p.orientationVersion))throw Error('invalid_photo_orientation_version');
+    return {id:p.id,photoId:p.photoId,photoGeneration:String(photo.generation),wall:p.wall,...(!isRoom?{orientationVersion:p.orientationVersion||1}:{}),region:p.region.map(Number),quad:p.quad.map(q=>q.map(Number)),evidence:'photo-projected-user-alignment'};
   });
   if(!isRoom&&input.streetFacingWall!==undefined&&(!Number.isInteger(input.streetFacingWall)||input.streetFacingWall<0||input.streetFacingWall>=wallCount))throw Error('invalid_street_facing_wall');
+  for(let i=0;i<patches.length;i++)for(let j=i+1;j<patches.length;j++){
+    const a=patches[i],b=patches[j];
+    if(a.wall===b.wall&&Math.min(a.region[2],b.region[2])-Math.max(a.region[0],b.region[0])>.001&&Math.min(a.region[3],b.region[3])-Math.max(a.region[1],b.region[1])>.001)throw Error('photo_patches_overlap');
+  }
   return {schemaVersion:1,...(isRoom?{kind:'room-patches',room}:{}),...(!isRoom&&input.streetFacingWall!==undefined?{streetFacingWall:input.streetFacingWall}:{}),revision:input.baseRevision+1,footprintSignature:input.footprintSignature,heightMeters:room?.heightMeters||input.heightMeters,heightEvidence:'user-preview-unverified',roofShape:isRoom?'flat':roofShape,roofRiseMeters,patches,visibility:'PRIVATE',coverageVerified:false};
 }
 module.exports={footprintSignature,normalizeHybridPreview,encodeHybridPreview,decodeHybridPreview,captureInteriorEnvelope};

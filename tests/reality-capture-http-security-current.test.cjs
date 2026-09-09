@@ -195,19 +195,29 @@ test('saved cropped walls submit immutable derivatives and require the reviewed 
   const {footprintSignature}=require('../functions/reality-capture-hybrid');
   const building={sourceAuthority:'osm',sourceBuildingId:'osm:way:1',worldId:'earth:test',spatialContext:{footprint:[{x:0,z:0},{x:10,z:0},{x:10,z:8},{x:0,z:8}]}};
   const h=harness(t,{...base,captureId:id,status:'review_required',captureSchemaVersion:1,processingPipelineVersion:'test',building,inputManifest:[{name:photoPath,generation:'1',size:realJpeg.length,sha256:require('node:crypto').createHash('sha256').update(realJpeg).digest('hex')}]});
-  const preview={baseRevision:0,footprintSignature:footprintSignature(building),heightMeters:6,patches:[{id:'one',photoId:'a'.repeat(32),wall:0,region:[0,0,1,1],quad:[[0,0],[1,0],[1,1],[0,1]]}]};
+  const preview={baseRevision:0,footprintSignature:footprintSignature(building),heightMeters:6,streetFacingWall:2,patches:[{id:'one',photoId:'a'.repeat(32),wall:0,orientationVersion:2,region:[0,0,1,1],quad:[[0,0],[1,0],[1,1],[0,1]]}]};
   assert.equal((await h.call('saveRealityCaptureHybridPreview','owner',{preview})).code,200);
   assert.equal((await h.call('submitRealityCaptureHybrid','visitor',{revision:1,consent:true})).code,404);
   assert.equal((await h.call('submitRealityCaptureHybrid','owner',{revision:1,consent:false})).code,403);
   assert.equal((await h.call('submitRealityCaptureHybrid','owner',{revision:2,consent:true})).code,409);
   const submitted=await h.call('submitRealityCaptureHybrid','owner',{revision:1,consent:true});assert.equal(submitted.code,200,JSON.stringify(submitted.body));
   assert.equal(h.records.get(`realityCaptures/${id}`).hybridSubmission.status,'review_required');
+  assert.equal(h.records.get(`realityCaptures/${id}`).hybridSubmission.streetFacingWall,2);
   assert.equal((await h.call('submitRealityCaptureHybrid','owner',{revision:1,consent:true})).body.existing,true);
   assert.equal((await h.call('moderateRealityCapture','moderator',{decision:'approved',revision:2})).code,409);
   const approved=await h.call('moderateRealityCapture','moderator',{decision:'approved',revision:1});assert.equal(approved.code,200,JSON.stringify(approved.body));
   assert.equal(h.records.get(`realityCaptures/${id}`).hybridSubmission.status,'approved');
   const representation=[...h.records].find(([key])=>key.startsWith('buildingRepresentations/'))?.[1];
   assert.equal(representation.representationKind,'facade-patches');assert.equal(representation.modelGeneration,'123');assert.equal(representation.canonicalBuilding.sourceBuildingId,building.sourceBuildingId);
+  const installed=structuredClone(representation);
+  const revised={...preview,baseRevision:1,streetFacingWall:0};
+  assert.equal((await h.call('saveRealityCaptureHybridPreview','owner',{preview:revised})).code,200);
+  assert.equal(h.records.get(`realityCaptures/${id}`).hybridSubmission.streetFacingWall,2,'draft must not rewrite reviewed orientation');
+  assert.equal((await h.call('submitRealityCaptureHybrid','owner',{revision:2,consent:true})).code,200);
+  assert.deepEqual(structuredClone([...h.records].find(([key])=>key.startsWith('buildingRepresentations/'))[1]),installed,'pending revision preserves installed model');
+  assert.equal((await h.call('moderateRealityCapture','moderator',{decision:'approved',revision:1})).code,409);
+  assert.equal((await h.call('moderateRealityCapture','moderator',{decision:'approved',revision:2})).code,200);
+  assert.equal([...h.records].find(([key])=>key.startsWith('buildingRepresentations/'))[1].revision,2);
 });
 
 test('moderation commits approval and representation together, never revives deleted captures', async t => {
