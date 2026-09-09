@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Photo Survey · World Explorer</title>
+<style>body{margin:0;background:#071018;color:#f4f7f9;font:16px/1.6 system-ui,sans-serif}main{max-width:700px;margin:8vh auto;padding:24px}a{color:#9ae0ee}button{min-height:44px;background:#2d7dff;color:white;border:1px solid #53606a;border-radius:4px;padding:12px 20px;font:inherit}</style></head>
+<body><main><a href="../account/">World Explorer account</a><h1>Improve the places you know</h1><p>Bring a batch of photos into Photo Survey. Match them to buildings in the world, crop the walls, and walk around your local preview.</p><p>This test saves on this device. It does not upload photos, request reconstruction, or publish changes.</p><button id="openSurvey">Open Photo Survey</button><p id="surveyStatus" role="status"></p><a href="./?survey=1&mode=walking">Open the world and choose buildings</a></main>
+<script type="module">
+import {openPhotoSurvey} from './js/reality-capture/survey-ui.js';
+import {observeAuth} from '../js/auth-ui.js?v=55';
+const status=document.getElementById('surveyStatus');
+observeAuth(user=>{status.textContent=user&&!user.isAnonymous?'Using your signed-in account’s local survey.':'Using a private device draft. Sign in through Account before importing if you want this draft associated with your account.';});
+document.getElementById('openSurvey').onclick=()=>openPhotoSurvey().catch(e=>status.textContent=e.message);
+</script></body></html>

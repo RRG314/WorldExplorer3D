@@ -43,6 +43,20 @@ export async function saveLocalCaptureDraft(draft) {
   }));
 }
 
+export async function loadLocalCaptureRecord(storeName, id) {
+  if(![DRAFTS,PHOTOS].includes(storeName))throw Error('Invalid local capture record');
+  const db=await openDatabase();
+  return new Promise((resolve,reject)=>{const transaction=db.transaction([storeName],'readonly'),request=transaction.objectStore(storeName).get(id);transaction.oncomplete=()=>{db.close();resolve(request.result||null);};transaction.onerror=()=>{db.close();reject(transaction.error);};});
+}
+
+export async function saveLocalCaptureDraftIfVersion(draft, expectedVersion=0) {
+  const db=await openDatabase();
+  return new Promise((resolve,reject)=>{const tx=db.transaction([DRAFTS],'readwrite'),store=tx.objectStore(DRAFTS),get=store.get(draft.id);let conflict=false;
+    get.onsuccess=()=>{if((get.result?.draftVersion||0)!==expectedVersion){conflict=true;tx.abort();return;}store.put({...draft,draftVersion:expectedVersion+1,updatedAtMs:Date.now()});};
+    tx.oncomplete=()=>{db.close();resolve(expectedVersion+1);};tx.onabort=tx.onerror=()=>{db.close();reject(new Error(conflict?'This survey changed in another tab. Close and reopen it before editing.':'Local save failed. Your existing survey has been retained.'));};
+  });
+}
+
 export async function saveLocalCapturePhoto(draftId, photo, sector) {
   await transact([PHOTOS], 'readwrite', (transaction) => transaction.objectStore(PHOTOS).put({
     id: photo.id,

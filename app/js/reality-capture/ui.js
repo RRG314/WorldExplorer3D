@@ -211,6 +211,11 @@ function ensurePanel() {
       <p class="realityCaptureStatus" data-capture-status role="status" aria-live="polite"></p>
     </div>`;
   document.body.appendChild(panel);
+  if(['localhost','127.0.0.1','[::1]'].includes(location.hostname)){
+    const survey=document.createElement('button');survey.type='button';survey.textContent='Photo Survey · use photos from my batch';survey.dataset.captureSurvey='';
+    panel.querySelector('.realityCaptureScroll').prepend(survey);
+    survey.onclick=async()=>{const session=current;if(!session||session.busy)return;const {openPhotoSurvey}=await import('./survey-ui.js');await openPhotoSurvey({appCtx:session.appCtx,building:session.target});};
+  }
   panel.addEventListener('cancel', event => { event.preventDefault(); closeRealityCapture(); });
   panel.querySelector('[data-capture-close]').addEventListener('click', closeRealityCapture);
   panel.querySelector('[data-capture-cancel]').addEventListener('click', clearDraft);
@@ -322,7 +327,7 @@ function ensurePanel() {
   return panel;
 }
 
-function buildTarget(appCtx, target) {
+export function buildTarget(appCtx, target) {
   const position = target.position || target.object?.position || { x: 0, z: 0 };
   const geo = appCtx.worldToLatLon?.(finite(position.x), finite(position.z)) || appCtx.worldToGeo?.(finite(position.x), finite(position.z)) || appCtx.LOC || {};
   const building = resolveCanonicalMappedBuilding(appCtx, target);
@@ -465,6 +470,7 @@ function render() {
     element.disabled = current.busy || (locked && !element.matches('[data-capture-refresh], [data-capture-copy], [data-capture-phone], [data-capture-preview], [data-capture-hybrid], [data-viewer-action], [data-capture-cancel], [data-capture-retry], [data-capture-source], [data-capture-new-set], [data-photo-prev], [data-photo-next]'));
   });
   panel.querySelector('[data-photo-prev]').disabled=current.busy||current.photoPage===0;
+  const survey=panel.querySelector('[data-capture-survey]');if(survey)survey.disabled=current.busy;
   panel.querySelector('[data-photo-next]').disabled=current.busy||(current.photoPage+1)*6>=galleryPhotos.length;
   panel.querySelector('[data-photo-page]').textContent=galleryPhotos.length?` ${current.photoPage*6+1}–${Math.min((current.photoPage+1)*6,galleryPhotos.length)} of ${galleryPhotos.length} `:'No photos in this set.';
   panel.querySelector('[data-capture-hybrid]').hidden = current.kind === 'exterior' && (!current.remotePhotos.length || !current.serverCapture?.building?.spatialContext?.footprint?.length);
@@ -533,7 +539,10 @@ async function switchKind(kind) {
     await persist(session); assertCurrent(session);
     const result = await listMyRealityCaptures({worldId:session.target.worldId,sourceBuildingId:session.target.sourceBuildingId});
     assertCurrent(session);
-    if(result.buildingScoped!==true)throw Error('The capture service needs the matching update before linked interiors can open. Your saved work has not been changed.');
+    // Older services return the complete owner list when fewer than their
+    // documented 60-record cap exists. Filter it below; never infer completeness
+    // from a full capped page or silently start a duplicate from that page.
+    if(result.buildingScoped!==true&&(!Array.isArray(result.captures)||result.captures.length>=60))throw Error('This account needs the updated capture lookup to safely find this building’s saved work. Your captures are unchanged.');
     if(result.truncated) throw Error('This building has many saved contributions. Open the specific interior from My captures to avoid starting a duplicate.');
     const matches=(result.captures||[]).filter(c=>c.captureKind===kind&&c.building?.worldId===session.target.worldId&&c.building?.sourceBuildingId===session.target.sourceBuildingId);
     if(matches.length>1) {

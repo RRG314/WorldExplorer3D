@@ -84,7 +84,8 @@ older unscoped service cannot silently cause duplicate drafts. Deploy the lookup
 function and its Firestore index together with the UI when this is accepted.
 Room/floor selection and photo editing remain accessible from the inside view.
 
-Photo Survey is NOT implemented or exposed as a finished feature. The supplied
+At the initial audit Photo Survey was not implemented. The local implementation
+described below supersedes that checkpoint. The supplied
 34 original JPEGs were inspected read-only using pinned exifr 7.1.3, including
 raw GPS fields. Total input: 190,488,256 bytes; exact duplicates: zero; all images
 report 4096 × 3072 encoded dimensions. Usable coordinates: **0/34**; camera
@@ -95,7 +96,7 @@ and repeatable read-only audit cover these cases; exifr is a development-only
 dependency, not another game startup dependency. Originals have not been copied
 into the repository, uploaded, assigned, or published.
 
-Adapted implementation sequence (planned, not delivered):
+Original implementation sequence (status is updated by the local delivery below):
 
 1. Account-launched private batch review; bounded, sequential decode, exact and
    conservative near-duplicate flags, thumbnails, durable per-owner device drafts.
@@ -127,6 +128,65 @@ uploads. Cloud survey cost, top-1/top-3 correctness, wall accuracy, correction r
 and second-user acceptance are **not measured**, not zero. Current scripts use
 transport doubles for UI; no physical Android or production acceptance is claimed.
 Reference: https://exiftool.org/TagNames/GPS.html (camera GPS and direction fields).
+
+### Local Photo Survey delivery — 2026-09-09
+
+Test entry: `http://127.0.0.1:4195/app/survey.html`, also linked from the local
+Account page. The game exposes Photo Survey from Improve this place. Opening the
+world with `survey=1` opens the survey after world startup. No production deploy,
+cloud upload, moderation bypass, new Firestore collection, or paid job is involved.
+
+Implemented local acquisition/review:
+
+- Multi-file import, pinned/lazy exifr reader, useful normalized metadata before
+  the existing JPEG normalization removes raw EXIF. 120 photos / 500 MB source
+  budget; 32 MB individual limit; sequential normalization and bounded thumbnails.
+- Existing IndexedDB capture database stores the survey draft and normalized
+  photos. Owner-scoped survey key; anonymous local testing uses `local-device`.
+  This is local persistence, NOT cross-device account backup or encrypted storage.
+  Account changes close the UI and remove local scene previews. Atomic draft
+  versions reject concurrent stale saves instead of overwriting another tab.
+- Exact SHA-256 duplicates are skipped. Perceptual difference hashes flag similar
+  photos for review without deleting them. Existing exposure/focus checks retained.
+- Up to 200 nearby **runtime-loaded** canonical mapped buildings, zoomable numbered
+  outline map, optional existing street-map component, compass wall labels, and
+  explicit confirmation. There is no separate building database/provider fallback.
+- Camera position plus optional true heading rank up to three nearby candidates;
+  wall outward normals suggest visible sides. Confidence is LOW/MEDIUM, not a
+  probability or automatic assignment. Missing/malformed GPS stays unassigned.
+- Mixed-location photos can open their recorded area; no-GPS photos use the world
+  Travel/map choice or a contributor-entered coordinate. Building groups, ignored
+  photos, unassignment, confirmed-side counts and saved-place links are retained.
+- Confirmed photos open the **existing** hybrid facade editor, including crop,
+  wall selection, placement/adjustment, and revision save. Its device-save mode is
+  explicit; account save/submission behavior for normal captures is unchanged.
+- Saved patches are supplied to the **existing runtime representation attachment**
+  and the shared facade geometry builder. They match the saved world/building and
+  footprint, preserve mapped collision, and replace only the local appearance.
+  They load after refresh, can be removed without deleting originals, and are
+  bounded to eight nearby buildings / 32 total patches / 512px textures.
+
+Local verification:
+
+- `photo-survey-local.mjs`: all 34 supplied JPEGs on desktop; two supplied JPEGs
+  at 412px touch width; exact duplicate retry; two independently confirmed test
+  building targets; actual crop/editor/store/renderer path; reload; no photo HTTP
+  writes and no page errors. Test fixtures do not establish real subject accuracy.
+- `photo-survey-world.mjs`: fresh actual Earth scene at Manchester, one supplied
+  photo explicitly assigned to a loaded Overture target for workflow testing;
+  shared renderer attached at exactly its building origin, screenshot inspected,
+  hard refresh retained the preview, no page errors. This does NOT assert that
+  this photo depicts that test building. The test uses an isolated browser profile.
+- Metadata, candidate-ranking, owner/building lookup and capture-session unit tests
+  pass. Interior navigation and existing crop paths retain their focused checks.
+
+Still outside this local acceptance: calibrated geotagged multi-building accuracy,
+automatic fetching of multiple remote neighborhoods without opening them, account
+cloud synchronization of surveys, batch submission/moderation, five-building
+physical ground truth, another physical device/user, and survey video/live guidance.
+Existing per-building account upload/moderation is not replaced. The local test UI
+does not pretend that saving here has submitted anything to it. Later cloud handoff
+must reserve/upload through that authority, not copy arbitrary Storage records.
 
 Orientation unit tests cover normal/reversed winding and rotated geometry.
 Existing exterior UI harness passed 1100/412/390px with real canvas wall selection,

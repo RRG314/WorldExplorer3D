@@ -86,7 +86,7 @@ async function attachRepresentation(appCtx, representation, worldId, sequence, s
   const sourceBuildingId = String(representation?.sourceBuildingId || '');
   const modelUrl = String(representation?.model?.url || '');
   const partial=representation.representationKind==='facade-patches';
-  if (!sourceBuildingId || !modelUrl || instances.has(representation.representationId)) return false;
+  if (!sourceBuildingId || (!modelUrl&&!representation.localRoot) || instances.has(representation.representationId)) return false;
   const building = (appCtx.buildings || []).find((candidate) => String(candidate?.sourceBuildingId || '') === sourceBuildingId);
   if (!building) return false;
   if(partial){
@@ -94,7 +94,7 @@ async function attachRepresentation(appCtx, representation, worldId, sequence, s
     const saved=representation.footprint;
     if(!Array.isArray(saved)||current.length!==saved.length||saved.some(p=>!current.some(q=>Math.hypot(p.x-q.x,p.z-q.z)<.15)))throw Error('Approved photo patches do not match the current mapped footprint.');
   }
-  const root = await loadGlb(modelUrl);
+  const root = representation.localRoot || await loadGlb(modelUrl);
   try {
     validateRuntimeModel(root);
     if (serial !== refreshSerial || sequence !== Number(appCtx._worldLoadSequence || 0) || worldId !== worldModificationIdentityForLocation(appCtx.LOC || {})) {
@@ -146,12 +146,23 @@ export async function refreshCommunityRealityCapturePresentation(appCtx) {
   if (!worldId || !appCtx.initialEarthWorldReady) return null;
   const serial = ++refreshSerial;
   try {
+    let local=[];
+    if(['localhost','127.0.0.1','[::1]'].includes(location.hostname)&&localStorage.getItem('we3d-local-survey-present')){
+      const {localSurveyRepresentations}=await import('./survey-presentation.js');
+      local=await localSurveyRepresentations(appCtx,instances);
+      const localIds=new Set(local.map(r=>r.representationId));
+      for(const id of instances.keys())if(id.startsWith('local-survey:')&&!localIds.has(id))removeInstance(appCtx,id);
+      const replaced=new Set(local.map(r=>r.sourceBuildingId));
+      for(const [id,instance]of instances)if(!id.startsWith('local-survey:')&&replaced.has(instance.sourceBuildingId))removeInstance(appCtx,id);
+      for(const r of local)if(!instances.has(r.representationId))await attachRepresentation(appCtx,r,worldId,sequence,serial);
+    }
     const actor=appCtx.activeTransportActor?.()?.position||appCtx.Walk?.state?.walker||appCtx.car||{x:0,z:0};
     const nearby=[...new Set((appCtx.buildings||[]).filter(b=>b.sourceBuildingId).map(b=>({id:String(b.sourceBuildingId),center:buildingCenter(b)})).sort((a,b)=>Math.hypot(a.center.x-actor.x,a.center.z-actor.z)-Math.hypot(b.center.x-actor.x,b.center.z-actor.z)).map(b=>b.id))].slice(0,60);
     const response = await listApprovedExteriorRepresentations(worldId,nearby);
     if(serial!==refreshSerial)return null;
-    const rows = Array.isArray(response?.representations) ? response.representations : [];
-    const retained=new Set(rows.map(row=>row.representationId));
+    const localBuildings=new Set(local.map(r=>r.sourceBuildingId));
+    const rows = Array.isArray(response?.representations) ? response.representations.filter(r=>!localBuildings.has(r.sourceBuildingId)) : [];
+    const retained=new Set([...rows,...local].map(row=>row.representationId));
     for(const id of instances.keys())if(!retained.has(id))removeInstance(appCtx,id);
     let loaded = 0;
     let failed = 0;
@@ -182,6 +193,15 @@ export function installCommunityRealityCaptureRuntime(appCtx) {
   });
   if(appCtx._captureNearbyRefreshInstalled)return;
   appCtx._captureNearbyRefreshInstalled=true;
+  const isLocal=['localhost','127.0.0.1','[::1]'].includes(location.hostname);
+  const autoOpenSurvey=isLocal&&new URLSearchParams(location.search).has('survey');
+  if(isLocal){
+    window.addEventListener('we3d-local-survey-changed',()=>{void refreshCommunityRealityCapturePresentation(appCtx);});
+    void import('../../../js/auth-ui.js?v=55').then(({observeAuth})=>observeAuth(()=>{
+      for(const id of instances.keys())if(id.startsWith('local-survey:'))removeInstance(appCtx,id);
+      if(appCtx.initialEarthWorldReady)void refreshCommunityRealityCapturePresentation(appCtx);
+    }));
+  }
   const update=createNearbyCaptureRefresh(()=>refreshCommunityRealityCapturePresentation(appCtx));
   appCtx.refreshNearbyCapturePresentation=()=>update(
     appCtx.activeTransportActor?.()?.position,performance.now(),appCtx._worldLoadSequence
@@ -190,6 +210,7 @@ export function installCommunityRealityCaptureRuntime(appCtx) {
     id:'reality-capture.nearby',owner:'reality-capture',phase:'world',critical:false,
     enabled:()=>appCtx.gameStarted===true&&!appCtx.worldLoading&&appCtx.initialEarthWorldReady===true&&appCtx.getEnv?.()==='EARTH',
     update(frame){
+      if(autoOpenSurvey&&!appCtx._photoSurveyOpened){appCtx._photoSurveyOpened=true;void import('./survey-ui.js').then(({openPhotoSurvey})=>openPhotoSurvey({appCtx})).catch(e=>console.warn('[PhotoSurvey]',e));}
       const position=appCtx.activeTransportActor?.()?.position;
       if(position)void update(position,frame.timestamp,appCtx._worldLoadSequence);
     }
