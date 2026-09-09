@@ -3,6 +3,30 @@
 This is an implementation checkpoint, **not a production or end-to-end phone
 acceptance claim**. Production has not been changed.
 
+## Latest staging result
+
+The deployed browser/account workflow passed on September 8 against staging build
+`5.2.0+5acdce68640a.cdc7fb8f4fbfe7d7.staging`: private layout creation, stale-save
+rejection, refresh persistence, real Storage photo upload/validation, CPU manual
+GLB generation, private submission, authorized owner representation resolution,
+phone-page editor opening, room rename/save and refresh recovery. The test uses a
+390 px Chrome viewport and disposable synthetic account/photo, not a physical
+Android handset. No public approval or paid reconstruction was performed.
+Capture and account cleanup completed and the disposable App Check test token was
+revoked. See `output/verification/reality-capture-hybrid/home-staging-report.json`
+and `home-staging-phone.png` for local evidence.
+
+64 targeted layout, photo geometry, legacy room geometry and HTTP/access-authority
+tests pass. The actual game browser checks also exercised straight-stair ascent,
+W movement, entry/exit and near-plane restoration. The full complex-house plan is
+not complete; remaining gates below are intentionally still open.
+
+The live check caught three integration failures missed by the earlier local
+fixture: the stale exterior-only finalizer, the reconstruction photo minimum, and
+the API confusing review consent with public sharing. Each was corrected before
+the successful deployed run. Manual private review now sends consent separately
+from the explicit public-sharing preference.
+
 ## Implemented locally
 
 - One versioned metric layout feeds the 2D editor, 3D shell, backend validation,
