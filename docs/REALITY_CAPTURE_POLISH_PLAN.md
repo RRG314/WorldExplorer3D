@@ -2,7 +2,33 @@
 
 Production is unchanged by this work. The approved exterior remains installed.
 
-## In-game Photo Survey workspace — 2026-09-09
+## Account workflow correction — 2026-09-09 (current)
+
+The device-only Photo Survey must not replace Reality Capture. Community now
+opens the authenticated My contributions library inside the game. Improve this
+place checks saved owner/world/building records before starting a local draft;
+one exterior resumes directly, multiple records require explicit selection.
+Exterior/interior switching retains the existing backend and private defaults.
+Lookup errors and incomplete results do not silently start duplicate captures.
+Submitted captures still allow library navigation. Account pages identify the
+configured environment: source localhost currently uses production Firebase;
+the staging capture links use a separate staging project. No data was migrated.
+
+Legacy `survey=1` no longer automatically opens an editor. Existing device batches
+are preserved under Advanced in the library; they remain local previews, not
+uploaded account contributions. Batch-to-account upload consolidation remains
+unfinished and is not described as end-to-end cloud submission.
+
+Verification: existing desktop/390px real UI suite plus fresh-device saved
+exterior resume, account library, existing Kitchen navigation and private consent
+checks pass with auth/storage transport doubles. Screenshot inspected. Real
+signed-in browser inspection was unavailable (browser connector timed out), so
+the user's exact server records and approval-to-world reload remain unverified
+this pass. No deployment or cloud record mutation.
+The retained local-world preview repeat did not complete: the browser closed
+during organizer startup. This is a failed/incomplete check, not a passing gate.
+
+## Earlier in-game Photo Survey workspace — superseded entry points
 
 Local Photo Survey now opens within the running Earth game from Community or
 Improve this place. Account and legacy survey links enter that same game flow.

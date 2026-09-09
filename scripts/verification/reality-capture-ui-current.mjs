@@ -271,6 +271,24 @@ try {
   await phone.waitForFunction(()=>location.hash==='#capture=capture-2');
   assert.equal(await phone.locator('[data-room-label]').inputValue(),'Kitchen');
   assert.equal(captures.size,2);
+  // A fresh device has no IndexedDB draft, but clicking the same mapped building
+  // must resume uploaded work through the account authority rather than start blank.
+  const fresh=await makePage({width:1280,height:800});
+  await fresh.goto(`${origin}/app/capture.html`);await fresh.click('#googleSignIn');
+  await fresh.evaluate(async()=>{
+    const ui=await import('/app/js/reality-capture/ui.js?v=2');
+    await ui.openRealityCaptureForBuilding({LOC:{lat:39.29,lon:-76.61},buildings:[{sourceBuildingId:'osm:way:424242',geometrySource:'osm',minX:0,maxX:10,minZ:0,maxZ:10}],worldToLatLon:()=>({lat:39.29,lon:-76.61})},{id:'osm:way:424242',label:'Selected test house',position:{x:5,z:5}});
+  });
+  await fresh.waitForFunction(()=>location.hash==='#capture=capture-1');
+  assert.match(await fresh.locator('[data-capture-server-status]').innerText(),/20 photos uploaded/);
+  await fresh.getByRole('button',{name:'My contributions',exact:true}).click();
+  await fresh.locator('#realityCaptureLibrary [data-list] button').nth(1).waitFor();
+  assert.equal(await fresh.locator('#realityCaptureLibrary [data-list] button').count(),2);
+  await fresh.screenshot({path:`${out}/unified-account-library.png`});
+  await fresh.locator('#realityCaptureLibrary [data-list] button').filter({hasText:'Kitchen'}).click();
+  await fresh.waitForFunction(()=>document.querySelector('[data-room-label]')?.value==='Kitchen');
+  assert.equal(await fresh.locator('[data-public-contribution]').isChecked(),false);
+  await fresh.context().close();
   assert.equal(await phone.locator('[data-capture-sectors] button').count(), 6);
   await desktop.keyboard.press('Escape');
   assert.equal(await desktop.locator('#realityCapturePanel.show').count(), 0);

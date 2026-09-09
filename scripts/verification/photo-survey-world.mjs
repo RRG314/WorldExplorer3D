@@ -11,7 +11,12 @@ try{
   await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:120000});
   if(await page.locator('#analyticsConsentDenyBtn').isVisible())await page.locator('#analyticsConsentDenyBtn').click();
   if(await page.locator('#globeSelectorStartBtn').isVisible())await page.locator('#globeSelectorStartBtn').click();
-  await page.locator('.photoSurvey').waitFor({timeout:120000});
+  await page.evaluate(async()=>{window.surveyTestCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});
+  await page.waitForFunction(()=>window.surveyTestCtx.initialEarthWorldReady===true,null,{timeout:120000});
+  assert.equal(await page.locator('.photoSurvey').count(),0,'Legacy survey URL must not auto-open device-only editor');
+  // Explicit component invocation: this test covers retained device drafts, not account publication.
+  const openOrganizer=()=>page.evaluate(async()=>{await(await import('/app/js/reality-capture/survey-ui.js')).openPhotoSurvey({appCtx:window.surveyTestCtx});});
+  await openOrganizer();
   const readWorld=()=>page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return {position:ctx.activeTransportActor().position,camera:ctx.camera.position.toArray(),rotation:ctx.camera.quaternion.toArray()};});
   const before=await readWorld();
   const panel=await page.locator('.photoSurvey').boundingBox();assert.ok(width<700?panel.width<=width:panel.x>width*.3);
@@ -22,8 +27,9 @@ try{
   await page.click('[data-survey-edit]');await page.locator('.captureHybridEditor [data-save]:enabled').waitFor();await page.click('.captureHybridEditor [data-add]');await page.click('.captureHybridEditor [data-save]');await page.locator('.captureHybridEditor [data-saved]').filter({hasText:'Saved on this device'}).waitFor();await page.screenshot({path:`${out}/editor.png`});
   await page.click('.captureHybridEditor [data-close]');await page.click('[data-survey-close]');
   const after=await readWorld();assert.ok(Math.hypot(...before.camera.map((v,i)=>v-after.camera[i]))<.1,'Editor must not relocate the game camera');assert.deepEqual(after.position,before.position);
-  await page.click('#communityBtn');await page.click('#fPhotoSurvey');await page.locator('.photoSurvey').waitFor();await page.click('[data-survey-close]');
-  await page.waitForFunction(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return ctx.scene.children.some(o=>o.userData.communityRealityCapture?.representationId.startsWith('local-survey:'));},null,{timeout:20000});
+  assert.match(await page.locator('#fPhotoSurvey').innerText(),/Reality Capture/);
+  await openOrganizer();await page.click('[data-survey-close]');
+  await page.waitForFunction(()=>window.surveyTestCtx.scene.children.some(o=>o.userData.communityRealityCapture?.representationId.startsWith('local-survey:')),null,{timeout:20000});
   const state=await page.evaluate(async()=>{
     const {ctx}=await import('/app/js/shared-context.js?v=55'),{wallDirections}=await import('/app/js/reality-capture/orientation.js');
     const root=ctx.scene.children.find(o=>o.userData.communityRealityCapture?.representationId.startsWith('local-survey:')),id=root.userData.communityRealityCapture.sourceBuildingId,b=ctx.buildings.find(b=>b.sourceBuildingId===id);
@@ -33,6 +39,6 @@ try{
     return {frame:ctx.renderer.domElement.toDataURL('image/png'),id,patches:root.children.length,position:root.position.toArray(),expected:[b.centerX,b.baseY,b.centerZ],collisionAuthority:root.userData.communityRealityCapture.collisionAuthority};
   });
   await writeFile(`${out}/mapped-building-local-preview.png`,Buffer.from(state.frame.split(',')[1],'base64'));delete state.frame;assert.equal(state.id,building);assert.equal(state.patches,1);assert.equal(state.collisionAuthority,'canonical-mapped-building');console.log('Mapped building preview attached:',JSON.stringify(state));
-  await page.reload();await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:60000});if(await page.locator('#globeSelectorStartBtn').isVisible())await page.locator('#globeSelectorStartBtn').click();await page.locator('.photoSurvey').waitFor({timeout:60000});await page.click('[data-survey-close]');await page.waitForFunction(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return ctx.scene.children.some(o=>o.userData.communityRealityCapture?.representationId.startsWith('local-survey:'));},null,{timeout:30000});
+  await page.reload();await page.waitForFunction(()=>globalThis.__WE3D_RUNTIME_READY__,null,{timeout:60000});if(await page.locator('#globeSelectorStartBtn').isVisible())await page.locator('#globeSelectorStartBtn').click();await page.evaluate(async()=>{window.surveyTestCtx=(await import('/app/js/shared-context.js?v=55')).ctx;});await page.waitForFunction(()=>window.surveyTestCtx.scene.children.some(o=>o.userData.communityRealityCapture?.representationId.startsWith('local-survey:')),null,{timeout:60000});assert.equal(await page.locator('.photoSurvey').count(),0);
   assert.deepEqual(errors,[]);console.log(JSON.stringify({...state,width,reloaded:true,errors}));
 }finally{await browser.close();}

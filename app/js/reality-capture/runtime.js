@@ -194,12 +194,12 @@ export function installCommunityRealityCaptureRuntime(appCtx) {
   if(appCtx._captureNearbyRefreshInstalled)return;
   appCtx._captureNearbyRefreshInstalled=true;
   const isLocal=['localhost','127.0.0.1','[::1]'].includes(location.hostname);
-  const autoOpenSurvey=isLocal&&new URLSearchParams(location.search).has('survey');
+  // A saved survey URL must not unexpectedly replace the world with an editor.
   if(isLocal){
     const menu=document.getElementById('fCommunityBoard')?.parentElement;
     if(menu&&!document.getElementById('fPhotoSurvey')){
-      const button=document.createElement('button');button.id='fPhotoSurvey';button.className='floatItem';button.type='button';button.textContent='Photo Survey · improve buildings';
-      button.onclick=async()=>{if(appCtx.getEnv?.()!=='EARTH'||!appCtx.initialEarthWorldReady)return;const {openPhotoSurvey}=await import('./survey-ui.js');await openPhotoSurvey({appCtx});};menu.append(button);
+      const button=document.createElement('button');button.id='fPhotoSurvey';button.className='floatItem';button.type='button';button.textContent='Reality Capture · My contributions';
+      button.onclick=async()=>{if(appCtx.getEnv?.()!=='EARTH'||!appCtx.initialEarthWorldReady)return;appCtx.closeAllFloatMenus?.();const {openRealityCaptureLibrary}=await import('./ui.js?v=2');await openRealityCaptureLibrary(appCtx);};menu.append(button);
     }
     window.addEventListener('we3d-local-survey-changed',()=>{void refreshCommunityRealityCapturePresentation(appCtx);});
     void import('../../../js/auth-ui.js?v=55').then(({observeAuth})=>observeAuth(()=>{
@@ -215,7 +215,6 @@ export function installCommunityRealityCaptureRuntime(appCtx) {
     id:'reality-capture.nearby',owner:'reality-capture',phase:'world',critical:false,
     enabled:()=>appCtx.gameStarted===true&&!appCtx.worldLoading&&appCtx.initialEarthWorldReady===true&&appCtx.getEnv?.()==='EARTH',
     update(frame){
-      if(autoOpenSurvey&&!appCtx._photoSurveyOpened){appCtx._photoSurveyOpened=true;void import('./survey-ui.js').then(({openPhotoSurvey})=>openPhotoSurvey({appCtx})).catch(e=>console.warn('[PhotoSurvey]',e));}
       const position=appCtx.activeTransportActor?.()?.position;
       if(position)void update(position,frame.timestamp,appCtx._worldLoadSequence);
     }

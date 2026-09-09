@@ -66,7 +66,7 @@ observeAuth(async (user) => {
   const signedIn = user && !user.isAnonymous;
   document.getElementById('phoneSignIn').hidden = !!signedIn;
   document.getElementById('phoneCaptures').hidden = !signedIn;
-  document.getElementById('phoneAccount').textContent = signedIn ? `Signed in as ${user.email || user.displayName || 'Explorer'}` : '';
+  document.getElementById('phoneAccount').textContent = signedIn ? `Signed in as ${user.email || user.displayName || 'Explorer'} · ${globalThis.WORLD_EXPLORER_FIREBASE_ENV || 'configured'} environment` : '';
   status.textContent = signedIn ? 'Choose a capture below.' : 'Your capture link will remain here while you sign in.';
   if (!signedIn) return;
   await refreshList();

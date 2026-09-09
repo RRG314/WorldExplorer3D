@@ -6,11 +6,11 @@ import {buildAuthoredInterior} from '../interiors/authored-geometry.js';
 import {createCaptureViewer} from './result-viewer.js?v=1';
 import {loadLocalCaptureDraft,saveLocalCaptureDraft,deleteLocalCaptureDraft} from './local-draft-store.js?v=1';
 
-export async function openHomeLayoutEditor({capture,save,signal,photos=[],loadPhoto,submit}) {
+export async function openHomeLayoutEditor({capture,save,signal,photos=[],loadPhoto,submit,inWorld=false}) {
   signal.throwIfAborted();
   if(!globalThis.THREE)await loadClassicScript(vendorScriptsCritical[0]);
   const envelope={footprint:capture.building?.spatialContext?.footprint,holes:capture.building?.spatialContext?.holes||[],heightMeters:capture.building?.spatialContext?.wallHeightMeters||capture.building?.spatialContext?.height?.meters||3,revision:capture.footprintSignature};
-  const dialog=document.createElement('dialog');dialog.className='homeLayoutEditor';
+  const dialog=document.createElement('dialog');dialog.className=`homeLayoutEditor${inWorld?' captureInWorld':''}`;
   dialog.innerHTML=`<style>
   .homeLayoutEditor{width:min(1100px,96vw);max-height:94dvh;background:#09222d;color:#e3f5fa;border:1px solid #72b5c2;padding:16px;font:14px/1.5 Poppins,sans-serif;overflow:auto}.homeLayoutEditor::backdrop{background:#000b}.homeLayoutEditor *{box-sizing:border-box}.homeLayoutEditor h2{font-size:19px;margin:0}.homeLayoutEditor header,.homeLayoutEditor nav,.homeLayoutEditor .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.homeLayoutEditor header{justify-content:space-between}.homeLayoutEditor button,.homeLayoutEditor input,.homeLayoutEditor select{font:inherit;min-height:44px;background:#143844;color:inherit;border:1px solid #72b5c2;padding:8px;max-width:100%}.homeLayoutEditor button{cursor:pointer}.homeLayoutEditor button:disabled{opacity:.5}.homeLayoutEditor label{display:flex;flex-direction:column;gap:4px}.homeLayoutEditor .fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}.homeLayoutEditor [data-status]{min-height:44px;padding:8px;background:#153b47;border-left:3px solid #ffc966}.homeLayoutEditor svg{width:100%;height:400px;background:#102f3a;touch-action:none}.homeLayoutEditor [data-grid-panel]{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:14px}.homeLayoutEditor [hidden]{display:none!important}.homeLayoutEditor :focus-visible{outline:3px solid #ffcc55}.homeLayoutEditor .room-shape{cursor:pointer}.homeLayoutEditor [data-floor]{margin:12px 0}.homeLayoutEditor details{padding:8px;border:1px solid #426573;margin:12px 0}@media(max-width:700px){.homeLayoutEditor [data-grid-panel]{display:block}.homeLayoutEditor .fields{grid-template-columns:repeat(2,minmax(0,1fr))}.homeLayoutEditor svg{height:340px}.homeLayoutEditor{padding:12px}}
   </style><header><h2>Design your home</h2><button data-close>Close</button></header>
@@ -115,7 +115,7 @@ export async function openHomeLayoutEditor({capture,save,signal,photos=[],loadPh
     const {openHybridEditor}=await import('./hybrid-editor.js?v=1'),selectedRoom=room().id,descriptor=layoutRoomDescriptor(layout,selectedRoom);
     const saved=roomPhotos.find(p=>p.roomId===selectedRoom);
     const pseudo={...capture,authoredLayout:true,authoredRoomId:selectedRoom,room:descriptor,hybridPreview:{revision,room:descriptor,footprintSignature:capture.footprintSignature,heightMeters:descriptor.heightMeters,roofShape:'flat',roofRiseMeters:2,patches:(saved?.patches||[]).map(p=>({...p,wall:descriptor.surfaceIds.indexOf(p.surfaceId)}))}};
-    photoEditor=await openHybridEditor({capture:pseudo,photos,loadPhoto,signal:events.signal,save:async preview=>{
+    photoEditor=await openHybridEditor({capture:pseudo,photos,loadPhoto,inWorld,signal:events.signal,save:async preview=>{
       const next={roomId:selectedRoom,patches:preview.patches.map(p=>({...p,surfaceId:descriptor.surfaceIds[p.wall]}))};
       const entries=[...roomPhotos.filter(p=>p.roomId!==selectedRoom),next];
       const result=await save({baseRevision:revision,footprintSignature:capture.footprintSignature,layout:clone(),roomPhotos:entries});

@@ -211,11 +211,9 @@ function ensurePanel() {
       <p class="realityCaptureStatus" data-capture-status role="status" aria-live="polite"></p>
     </div>`;
   document.body.appendChild(panel);
-  if(['localhost','127.0.0.1','[::1]'].includes(location.hostname)){
-    const survey=document.createElement('button');survey.type='button';survey.textContent='Photo Survey · use photos from my batch';survey.dataset.captureSurvey='';
-    panel.querySelector('.realityCaptureScroll').prepend(survey);
-    survey.onclick=async()=>{const session=current;if(!session||session.busy)return;const {openPhotoSurvey}=await import('./survey-ui.js');if(!session.appCtx){location.href='./?survey=1&mode=walking';return;}await persist(session);closeRealityCapture();await openPhotoSurvey({appCtx:session.appCtx,building:session.target});};
-  }
+  const library=document.createElement('button');library.type='button';library.textContent='My contributions';library.dataset.captureLibrary='';
+  panel.querySelector('.realityCaptureScroll').prepend(library);
+  library.onclick=()=>{if(current&&!current.busy)void openRealityCaptureLibrary(current.appCtx);};
   panel.addEventListener('cancel', event => { event.preventDefault(); closeRealityCapture(); });
   panel.querySelector('[data-capture-close]').addEventListener('click', closeRealityCapture);
   panel.querySelector('[data-capture-cancel]').addEventListener('click', clearDraft);
@@ -470,7 +468,7 @@ function render() {
     element.disabled = current.busy || (locked && !element.matches('[data-capture-refresh], [data-capture-copy], [data-capture-phone], [data-capture-preview], [data-capture-hybrid], [data-viewer-action], [data-capture-cancel], [data-capture-retry], [data-capture-source], [data-capture-new-set], [data-photo-prev], [data-photo-next]'));
   });
   panel.querySelector('[data-photo-prev]').disabled=current.busy||current.photoPage===0;
-  const survey=panel.querySelector('[data-capture-survey]');if(survey)survey.disabled=current.busy;
+  panel.querySelector('[data-capture-library]').disabled=current.busy;
   panel.querySelector('[data-photo-next]').disabled=current.busy||(current.photoPage+1)*6>=galleryPhotos.length;
   panel.querySelector('[data-photo-page]').textContent=galleryPhotos.length?` ${current.photoPage*6+1}–${Math.min((current.photoPage+1)*6,galleryPhotos.length)} of ${galleryPhotos.length} `:'No photos in this set.';
   panel.querySelector('[data-capture-hybrid]').hidden = current.kind === 'exterior' && (!current.remotePhotos.length || !current.serverCapture?.building?.spatialContext?.footprint?.length);
@@ -714,7 +712,7 @@ async function previewHybrid() {
     const {openHybridEditor}=await import('./hybrid-editor.js?v=1');
     const {openHomeLayoutEditor}=session.kind==='interior_room'?await import('./home-layout-editor.js'):{};assertCurrent(session);
     session.hybridEditor?.close();
-    session.hybridEditor=await (openHomeLayoutEditor||openHybridEditor)({capture:session.serverCapture,photos:session.remotePhotos,signal:session.abort.signal,
+    session.hybridEditor=await (openHomeLayoutEditor||openHybridEditor)({capture:session.serverCapture,photos:session.remotePhotos,signal:session.abort.signal,inWorld:!!session.appCtx,
       loadPhoto:async(id,signal)=>{
         assertCurrent(session);const item=session.remotePhotos.find(p=>p.id===id);if(!item)throw Error('Unknown capture photo.');
         const path=item.path||`reality-captures/${session.uid}/${session.serverCapture.captureId}/originals/${id}.jpg`;
@@ -892,6 +890,7 @@ function startSession(appCtx, target) {
   const session = { appCtx, uid: user.uid, target, kind: 'exterior', draftId: '', activeSector: 0,
     photos: [], remotePhotos: [], serverCapture: null, uploadedPhotoIds: new Set(), abort: new AbortController(), busy: false };
   current = session;
+  ensurePanel().classList.toggle('captureInWorld',!!appCtx);
   session.unsubscribe = observeAuth((next) => {
     if (current === session && next?.uid !== session.uid) closeRealityCapture();
   });
@@ -907,10 +906,19 @@ export async function openRealityCaptureForBuilding(appCtx, buildingTarget) {
   }
   let session;
   try {
+    const user=getCurrentUser();
+    if(!user||user.isAnonymous)throw Error('Sign in to your World Explorer account before capturing.');
+    const result=await listMyRealityCaptures({worldId:target.worldId,sourceBuildingId:target.sourceBuildingId});
+    if(getCurrentUser()?.uid!==user.uid)throw Error('Account changed. Please open this building again.');
+    if(result.truncated||(result.buildingScoped!==true&&(!Array.isArray(result.captures)||result.captures.length>=60)))throw Error('Saved work could not be fully checked. Open My contributions before starting another capture.');
+    const saved=(result.captures||[]).filter(c=>c.building?.worldId===target.worldId&&c.building?.sourceBuildingId===target.sourceBuildingId);
+    const exteriors=saved.filter(c=>c.captureKind==='exterior');
+    if(exteriors.length===1)return openRealityCaptureSession(exteriors[0].captureId,appCtx);
+    if(saved.length)return openRealityCaptureLibrary(appCtx,target);
     session = startSession(appCtx, target);
     await restore('exterior', session);
   } catch (error) {
-    appCtx.showWorldSelectionNotice?.('Sign in to capture', error.message);
+    appCtx.showWorldSelectionNotice?.('Could not open contribution', error.message);
     return false;
   }
   panel.classList.add('show');
@@ -927,6 +935,38 @@ export async function openRealityCaptureForBuilding(appCtx, buildingTarget) {
     if (isCurrent(session)) panel.querySelector('[data-capture-status]').textContent = 'Your saved capture is open. Use Check progress when the connection returns.';
   });
   return true;
+}
+
+// One account library, used in the world without replacing it with device-only drafts.
+export async function openRealityCaptureLibrary(appCtx=null,target=null) {
+  const user=getCurrentUser();
+  if(!user||user.isAnonymous){appCtx?.showWorldSelectionNotice?.('Sign in to contribute','Use your World Explorer account to see your saved exterior and interior work.');return false;}
+  if(current){await persist(current);closeRealityCapture();}
+  document.getElementById('realityCaptureLibrary')?.close();
+  const dialog=document.createElement('dialog');dialog.id='realityCaptureLibrary';dialog.className=`realityCaptureDialog${appCtx?' captureInWorld':''}`;
+  dialog.innerHTML='<header><h2>Reality Capture · My contributions</h2><button type="button" data-close>Back to world</button></header><p>Exterior contributions are reviewed before appearing publicly. Interiors stay private unless you explicitly choose sharing and they are approved.</p><p data-state role="status">Loading your saved contributions…</p><div data-list></div><button type="button" data-refresh>Refresh saved work</button>';
+  document.body.append(dialog);dialog.showModal();
+  const environment=document.createElement('p');environment.textContent=`Account: ${user.email||user.displayName||'Explorer'} · ${globalThis.WORLD_EXPLORER_FIREBASE_ENV||'configured'} environment. Saved uploads are shared across devices in this environment.`;dialog.querySelector('[data-state]').before(environment);
+  appCtx?.setPauseReason?.('reality_capture_library',true);appCtx?.clearControlInputState?.('capture-library-open');document.exitPointerLock?.();
+  let disposed=false,request=0;
+  const unsubscribe=observeAuth(next=>{if(next?.uid!==user.uid)dialog.close();});
+  dialog.addEventListener('close',()=>{disposed=true;request++;unsubscribe();dialog.remove();appCtx?.setPauseReason?.('reality_capture_library',false);appCtx?.clearControlInputState?.('capture-library-close');},{once:true});
+  dialog.querySelector('[data-close]').onclick=()=>dialog.close();
+  async function refresh(){
+    const token=++request,list=dialog.querySelector('[data-list]'),status=dialog.querySelector('[data-state]');status.textContent='Checking your account…';list.replaceChildren();
+    try{
+      const result=await listMyRealityCaptures(target?{worldId:target.worldId,sourceBuildingId:target.sourceBuildingId}:undefined);
+      if(disposed||token!==request||getCurrentUser()?.uid!==user.uid)return;
+      const records=(result.captures||[]).filter(c=>!target||(c.building?.worldId===target.worldId&&c.building?.sourceBuildingId===target.sourceBuildingId));
+      status.textContent=records.length?`${records.length} saved contributions${result.truncated?' · more records exist; this list is incomplete':''}`:'No saved contributions found for this account'+(target?' at this building.':'. Device-only photo batches are separate from uploaded contributions.');
+      for(const capture of records){const button=document.createElement('button');button.type='button';button.style.cssText='display:block;width:100%;min-height:48px;margin:8px 0;text-align:left';button.textContent=`${capture.building?.label||'Mapped building'} · ${capture.captureKind==='interior_room'?(capture.room?.label||'Home interior'):'Exterior'} · ${(capture.status||'draft').replaceAll('_',' ')}`;button.onclick=async()=>{button.disabled=true;try{await openRealityCaptureSession(capture.captureId,appCtx);dialog.close();}catch(error){status.textContent=error.message;button.disabled=false;}};list.append(button);}
+    }catch(error){if(!disposed&&token===request)status.textContent=`Could not load saved contributions: ${error.message}. Your uploads have not been removed.`;}
+  }
+  dialog.querySelector('[data-refresh]').onclick=refresh;
+  if(['localhost','127.0.0.1','[::1]'].includes(location.hostname)&&appCtx){
+    const advanced=document.createElement('details');advanced.innerHTML='<summary>Advanced · device photo batches</summary><p>Recover or organize a local photo batch. These previews have not been uploaded or submitted for approval.</p><button type="button">Open device photo organizer</button>';advanced.querySelector('button').onclick=async()=>{dialog.close();const {openPhotoSurvey}=await import('./survey-ui.js');await openPhotoSurvey({appCtx,building:target});};dialog.append(advanced);
+  }
+  await refresh();return true;
 }
 
 // Server-resolved identity is used on the phone; do not instantiate the Earth renderer.
