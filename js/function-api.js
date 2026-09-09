@@ -1,5 +1,6 @@
 import { getCurrentUserToken } from './auth-ui.js?v=55';
 import { getFirebaseAppCheckToken, readFirebaseConfig } from './firebase-init.js?v=57';
+import { assertFunctionsOrigin } from './firebase-environment-policy.js';
 
 const DEFAULT_FUNCTIONS_REGION = 'us-central1';
 const RETRYABLE_STATUS_CODES = new Set([404, 405, 406, 501, 502, 503, 504]);
@@ -27,9 +28,8 @@ export function getReturnUrlBase() {
 
 function getDirectFunctionsOrigin() {
   const override = String(globalThis.WORLD_EXPLORER_FUNCTIONS_ORIGIN || '').trim();
-  if (override) return override.replace(/\/$/, '');
-
   const cfg = readFirebaseConfig();
+  if (override) return assertFunctionsOrigin(override, cfg, globalThis.location, globalThis.WORLD_EXPLORER_FIREBASE_EMULATORS);
   const projectId = cfg && cfg.projectId ? String(cfg.projectId).trim() : '';
   if (!projectId) return '';
 

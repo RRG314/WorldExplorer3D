@@ -8,6 +8,7 @@ import {
   initializeAppCheck
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app-check.js';
 import { getAnalyticsTools } from './analytics-service.js?v=1';
+import { assertFirebaseEnvironment } from './firebase-environment-policy.js';
 
 const FIREBASE_CONFIG_STORAGE_KEY = 'worldExplorer3D.firebaseConfig';
 
@@ -58,7 +59,7 @@ function readStoredConfig() {
 }
 
 export function readFirebaseConfig() {
-  return readWindowConfig() || readStoredConfig();
+  return assertFirebaseEnvironment(readWindowConfig() || readStoredConfig());
 }
 
 export function hasFirebaseConfig() {
@@ -71,6 +72,8 @@ export function initFirebase() {
   if (!config) return null;
 
   const app = getApps().length > 0 ? getApp() : initializeApp(config);
+  assertFirebaseEnvironment(app.options);
+  if (app.options.projectId !== config.projectId) throw new Error('Firebase environment changed. Reload before continuing.');
   const auth = getAuth(app);
   const db = getFirestore(app);
   const storage = getStorage(app);
@@ -113,6 +116,7 @@ export function setFirebaseConfig(config) {
     throw new Error('Invalid Firebase config. Expected apiKey, projectId, and appId.');
   }
 
+  assertFirebaseEnvironment(normalized);
   localStorage.setItem(FIREBASE_CONFIG_STORAGE_KEY, JSON.stringify(normalized));
   cachedServices = null;
   return normalized;
