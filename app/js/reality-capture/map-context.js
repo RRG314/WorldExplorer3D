@@ -20,7 +20,10 @@ export function mountCaptureMap(host,building,points,onWall,signal){
   const lines=[];
   points.forEach((p,i)=>{const q=points[(i+1)%points.length],line=document.createElementNS(ns,'line');
     for(const [k,v]of Object.entries({x1:256+p.x*meter,y1:256+p.z*meter,x2:256+q.x*meter,y2:256+q.z*meter,stroke:'#1675db','stroke-width':8,tabindex:0,role:'button','aria-label':`Select wall ${i+1}`}))line.setAttribute(k,v);
-    line.style.cursor='pointer';line.addEventListener('click',()=>onWall(i),{signal});line.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();onWall(i);}},{signal});svg.append(line);lines.push(line);
+    line.removeAttribute('role');line.removeAttribute('tabindex');line.removeAttribute('aria-label');svg.append(line);lines.push(line);
+    const hit=document.createElementNS(ns,'rect');
+    for(const[k,v]of Object.entries({x:256+(p.x+q.x)*meter/2-24,y:256+(p.z+q.z)*meter/2-24,width:48,height:48,fill:'transparent',tabindex:0,role:'button','aria-label':`Select wall ${i+1}`}))hit.setAttribute(k,v);
+    hit.style.cursor='pointer';hit.addEventListener('click',()=>onWall(i),{signal});hit.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();onWall(i);}},{signal});svg.append(hit);
     const label=document.createElementNS(ns,'text');label.setAttribute('x',256+(p.x+q.x)*meter/2);label.setAttribute('y',250+(p.z+q.z)*meter/2);label.setAttribute('fill','#000');label.setAttribute('stroke','#fff');label.setAttribute('stroke-width','3');label.setAttribute('paint-order','stroke');label.style.cssText='font:bold 20px system-ui;pointer-events:none';label.textContent=String(i+1);svg.append(label);
   });
   const attribution=document.createElement('a');attribution.href='https://www.openstreetmap.org/copyright';attribution.target='_blank';attribution.rel='noopener noreferrer';attribution.textContent='© OpenStreetMap contributors';
