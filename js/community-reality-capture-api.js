@@ -172,8 +172,8 @@ export function getRealityCaptureAssetAccess(captureId, assetKind = 'processed',
 export function saveRealityCaptureHybridPreview(captureId, preview) {
   return endpoint('/saveRealityCaptureHybridPreview', {captureId, preview});
 }
-export function submitRealityCaptureHybrid(captureId, revision, consent) {
-  return endpoint('/submitRealityCaptureHybrid', {captureId,revision,consent});
+export function submitRealityCaptureHybrid(captureId, revision, consent, publicSharing = false) {
+  return endpoint('/submitRealityCaptureHybrid', {captureId,revision,consent,publicSharing:publicSharing===true});
 }
 
 export function listRealityCaptureModeration(status = 'review_required') {

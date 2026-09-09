@@ -686,7 +686,7 @@ async function previewHybrid() {
         const blob=await response.blob();assertCurrent(session);return blob;
       },submit:async (revision,publicSharing=false)=>{
         assertCurrent(session);
-        const result=await submitRealityCaptureHybrid(session.serverCapture.captureId,revision,session.kind==='interior_room'?publicSharing===true:true);
+        const result=await submitRealityCaptureHybrid(session.serverCapture.captureId,revision,true,session.kind==='interior_room'?publicSharing===true:true);
         assertCurrent(session);await fetchProgress(session);return result;
       },save:async preview=>{
         assertCurrent(session);const result=await saveRealityCaptureHybridPreview(session.serverCapture.captureId,preview);assertCurrent(session);
