@@ -187,6 +187,9 @@ export function getRealityCaptureModerationDetail(captureId) {
 export function moderateRealityCapture(captureId, decision, note = '', alignment = {}, revision) {
   return endpoint('/moderateRealityCapture', { captureId, decision, note, alignment, ...(revision!==undefined?{revision}:{}) });
 }
+export function retryRealityCaptureReviewEmail(captureId) {
+  return endpoint('/retryRealityCaptureReviewEmail', {captureId});
+}
 
 export async function uploadRealityCapturePhoto(capture, photo, onProgress = null, signal = null) {
   const services = initFirebase();

@@ -60,6 +60,7 @@ try{
     await page.locator('[data-map-panel] summary').click();
     await page.locator('[data-map-preview] [aria-label="Select wall 2"]').click();
     assert.equal(await page.evaluate(()=>editor.getState().selectedWall),1);
+    await page.waitForFunction(()=>!document.querySelector('[data-map-preview] p')?.textContent.includes('Loading'),null,{timeout:20000});
     await page.locator('[data-map-preview]').scrollIntoViewIfNeeded();
     await page.screenshot({path:`${out}/${width}-map-context.png`});
     await page.locator('[data-map-panel] summary').click();

@@ -37,6 +37,7 @@ function harness(t, capture = base, extras = {}) {
     return { path, get: async () => snapshot(path),
       collection: (name) => collection(`${path}/${name}`),
       set: async (patch) => { mutate(path, patch); writes.push(path); },
+      update: async (patch) => { if(!records.has(path))throw Error('missing');mutate(path,patch);writes.push(path); },
       delete: async () => { mutate(path,null); writes.push(path); } };
   }
   function collection(path) { return { doc: (name) => ref(`${path}/${name}`),
@@ -88,6 +89,13 @@ function harness(t, capture = base, extras = {}) {
   return { call, bucket, records, reads, fileRequests, writes, mutate, hooks, authClaims };
 }
 
+test('email retry requires moderator and pending review; missing sender is visible',async t=>{
+ const h=harness(t,{...base,status:'review_required'});
+ await h.call('retryRealityCaptureReviewEmail','owner');assert.equal(h.writes.length,0);
+ const result=await h.call('retryRealityCaptureReviewEmail','moderator');assert.equal(result.code,200);assert.equal(result.body.status,'not_configured');
+ h.mutate(`realityCaptures/${id}`,{status:'approved'});
+ assert.equal((await h.call('retryRealityCaptureReviewEmail','moderator')).code,409);
+});
 test('manual home layout save requires owner and permission, not paid reconstruction claims',async t=>{
   const {makeStarterLayout}=await import('../functions/interior-layout.mjs');
   const {footprintSignature}=require('../functions/reality-capture-hybrid');

@@ -21,6 +21,7 @@ import {
   getRealityCaptureModerationDetail,
   listRealityCaptureModeration,
   moderateRealityCapture
+  ,retryRealityCaptureReviewEmail
 } from './community-reality-capture-api.js?v=4';
 import {
   LANDING_PAGE_ENTRY_ID,
@@ -888,7 +889,7 @@ function renderRealityDetail() {
   refs.moderationDetail.innerHTML = `
     <div class="detail-header"><div><h3>${escapeHtml(capture.building?.label || 'Reality capture')}</h3><p>${escapeHtml(capture.captureKind === 'interior_room' ? capture.room?.label || 'Interior room' : 'Building exterior')} • ${escapeHtml(capture.building?.sourceBuildingId || '')}</p></div><span class="status-pill" data-status="${escapeHtml(capture.status)}">${escapeHtml(capture.status)}</span></div>
     <div class="detail-grid">
-      <article class="detail-card"><span class="detail-label">Approval notice</span><strong>${escapeHtml(emailStatus)}</strong><p>This submission is available here regardless of email delivery.</p></article>
+      <article class="detail-card"><span class="detail-label">Approval notice</span><strong>${escapeHtml(emailStatus)}</strong><p>This submission is available here regardless of email delivery.</p>${capture.status==='review_required'?'<button id="captureRetryEmail" type="button">Retry approval email</button>':''}</article>
       <article class="detail-card"><span class="detail-label">Submitted street-facing reference</span><strong>${Number.isInteger(front)?`Wall ${front+1}`:'Not identified'}</strong><p>Contributor-declared reference from this submitted revision, not verified road data.</p></article>
       <article class="detail-card"><span class="detail-label">Contributor</span><strong>${escapeHtml(capture.ownerDisplayName || 'Explorer')}</strong><p>Originals remain private</p></article>
       <article class="detail-card"><span class="detail-label">Photos</span><strong>${escapeHtml(String(capture.uploadSummary?.photoCount || detail.thumbnails?.length || 0))}</strong><p>${escapeHtml(String(capture.uploadSummary?.totalBytes || 0))} bytes</p></article>
@@ -1868,6 +1869,13 @@ refs.signOutBtn.addEventListener('click', async () => {
 document.addEventListener('click', async (event) => {
   const target = event.target instanceof HTMLElement ? event.target : null;
   if (!target) return;
+
+  if(target.id==='captureRetryEmail'){
+    const item=selectedRealityItem();if(!item)return;
+    setBusy(true);
+    try{const result=await retryRealityCaptureReviewEmail(item.captureId);state.realityDetails.delete(item.captureId);await ensureRealityDetail(item.captureId);renderRealityDetail();setStatus(result.status==='accepted'?'Email accepted by the sending provider.':`Email not sent: ${result.status}. Your contribution remains in this queue.`,result.status==='accepted'?'ok':'warn');}
+    catch(error){setStatus(error.message||'Email retry failed.','warn');}finally{setBusy(false);}return;
+  }
 
   const goTo = target.closest('[data-goto-view]');
   if (goTo) {

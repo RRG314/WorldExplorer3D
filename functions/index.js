@@ -2757,6 +2757,7 @@ Object.assign(exports, buildDiscoveryExports({
 
 Object.assign(exports, buildCommunityRealityCaptureExports({
   db,
+  contributionNotificationConfig,
   setCors,
   verifyAuth,
   verifyAppCheck,

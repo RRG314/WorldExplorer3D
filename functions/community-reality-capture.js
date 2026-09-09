@@ -1044,7 +1044,22 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     }
   });
 
+  const retryRealityCaptureReviewEmail=functions.region('us-central1').https.onRequest(async(req,res)=>{
+    if(setCors(req,res))return;
+    if(req.method!=='POST')return res.status(405).json({error:'Method not allowed.'});
+    if(verifyAppCheck&&!(await verifyAppCheck(req,res,{required:true})))return;
+    if(!(await requireModerator(req,res)))return;
+    try{
+      const captureId=clean(req.body?.captureId,180),ref=db.collection(CAPTURES).doc(captureId),snap=await ref.get();
+      if(!snap.exists)throw Error('capture_not_found');
+      const capture=snap.data();if(capture.status!=='review_required')throw Error('invalid_capture_state_transition');
+      const {reviewNotice,deliverReviewNotice}=require('./capture-review-notice');
+      await deliverReviewNotice({ref,notice:reviewNotice(null,capture,captureId),config:helpers.contributionNotificationConfig?.()||{}});
+      res.status(200).json({status:(await ref.get()).data()?.reviewEmail?.status||'not_configured'});
+    }catch(error){sendKnownError(res,error);}
+  });
   return {
+    retryRealityCaptureReviewEmail,
     createRealityCaptureDraft,
     reserveRealityCapturePhoto,
     retryRealityCapture,
