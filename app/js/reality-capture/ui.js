@@ -214,7 +214,7 @@ function ensurePanel() {
   if(['localhost','127.0.0.1','[::1]'].includes(location.hostname)){
     const survey=document.createElement('button');survey.type='button';survey.textContent='Photo Survey · use photos from my batch';survey.dataset.captureSurvey='';
     panel.querySelector('.realityCaptureScroll').prepend(survey);
-    survey.onclick=async()=>{const session=current;if(!session||session.busy)return;const {openPhotoSurvey}=await import('./survey-ui.js');await openPhotoSurvey({appCtx:session.appCtx,building:session.target});};
+    survey.onclick=async()=>{const session=current;if(!session||session.busy)return;const {openPhotoSurvey}=await import('./survey-ui.js');if(!session.appCtx){location.href='./?survey=1&mode=walking';return;}await persist(session);closeRealityCapture();await openPhotoSurvey({appCtx:session.appCtx,building:session.target});};
   }
   panel.addEventListener('cancel', event => { event.preventDefault(); closeRealityCapture(); });
   panel.querySelector('[data-capture-close]').addEventListener('click', closeRealityCapture);

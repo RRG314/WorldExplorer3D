@@ -13,9 +13,11 @@ let active=null;
 export async function openPhotoSurvey({appCtx=null,building=null}={}){
   if(!localSurveyEnabled())throw Error('Open Photo Survey in the local test app.');
   if(active){active.focus();return;}
+  appCtx?.closeAllFloatMenus?.();
   const owner=surveyOwner(),loaded=await loadSurvey(owner),survey=loaded.survey;
   const photos=new Map(loaded.photos.map(p=>[p.id,p])),urls=new Map(),selected=new Set(),abort=new AbortController();
   const dialog=document.createElement('dialog');dialog.className='realityCaptureDialog photoSurvey';active=dialog;
+  if(appCtx)dialog.classList.add('captureInWorld');
   dialog.setAttribute('aria-label','Photo Survey');
   dialog.innerHTML=`<style>
     .photoSurvey{width:min(1150px,96vw);max-height:94dvh}.photoSurvey header,.photoSurvey nav{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.photoSurvey header h2{flex:1}.photoSurvey button{width:auto;display:inline-block;margin:4px 0}.photoSurvey input,.photoSurvey select{max-width:100%;min-height:44px;background:#101921;color:#f4f7f9;border:1px solid #53606a;padding:6px;font:inherit}.photoSurvey [hidden]{display:none!important}.photoSurvey .surveyColumns{display:grid;grid-template-columns:1fr 1fr;gap:18px}.photoSurvey [data-survey-gallery]{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.photoSurvey article{border:1px solid #53606a;padding:8px;overflow-wrap:anywhere}.photoSurvey article img{width:100%;height:110px;object-fit:contain;background:#18232b}.photoSurvey article label{display:block}.photoSurvey article p{font-size:12px}.photoSurvey [data-survey-map]{background:#17272e;width:100%;height:270px}.photoSurvey [data-survey-status]{border-left:3px solid #2d7dff;padding:10px;min-height:44px}.photoSurvey a{color:#9ae0ee}.photoSurvey .surveyInfo{color:#bbcad3}.photoSurvey input[type=checkbox]{width:24px;min-height:24px;vertical-align:middle}.photoSurvey footer{margin-top:16px}@media(max-width:700px){.photoSurvey .surveyColumns{display:block}.photoSurvey [data-survey-gallery]{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -110,15 +112,16 @@ export async function openPhotoSurvey({appCtx=null,building=null}={}){
   $('[data-survey-edit]').onclick=()=>run(async()=>{if(!chosen)throw Error('Choose a mapped building first.');const key=surveyBuildingKey(chosen),entries=survey.entries.filter(e=>e.assignment?.key===key&&!e.ignored);if(!entries.length)throw Error('Confirm at least one photo for this building first.');
     const prior=survey.previews[key],ids=new Set([...entries.map(e=>e.id),...(prior?.preview?.patches||[]).map(p=>p.photoId)]),images=[...ids].map(id=>photos.get(id)).filter(Boolean);
     const {openHybridEditor}=await import('./hybrid-editor.js?v=1');
-    await openHybridEditor({capture:{captureId:`survey:${key}`,ownerUid:owner,captureKind:'exterior',building:chosen,hybridPreview:prior?.preview},photos:images,signal:abort.signal,initialWall:entries[0].assignment.wall??0,saveScope:'device',loadPhoto:async id=>{assertOwner();const photo=photos.get(id);if(!photo)throw Error('Photo missing from this device');return photo.blob;},save:async input=>{assertOwner();const current=survey.previews[key]?.preview;if((current?.revision||0)!==input.baseRevision)throw Error('Preview changed. Reopen this building.');const preview={...input,revision:(current?.revision||0)+1};survey.previews[key]={building:chosen,preview};await saveSurvey(survey,{previewChanged:true});renderBuilding();return {preview};},onClose:()=>status('Saved local patches appear on this building in the local world. Close Photo Survey to look around.')});
+    dialog.style.visibility='hidden';
+    try{await openHybridEditor({inWorld:!!appCtx,capture:{captureId:`survey:${key}`,ownerUid:owner,captureKind:'exterior',building:chosen,hybridPreview:prior?.preview},photos:images,signal:abort.signal,initialWall:entries[0].assignment.wall??0,saveScope:'device',loadPhoto:async id=>{assertOwner();const photo=photos.get(id);if(!photo)throw Error('Photo missing from this device');return photo.blob;},save:async input=>{assertOwner();const current=survey.previews[key]?.preview;if((current?.revision||0)!==input.baseRevision)throw Error('Preview changed. Reopen this building.');const preview={...input,revision:(current?.revision||0)+1};survey.previews[key]={building:chosen,preview};await saveSurvey(survey,{previewChanged:true});renderBuilding();return {preview};},onClose:()=>{dialog.style.visibility='';dialog.focus();status('Saved local patches appear on this building in the local world. Close Photo Survey to look around.');}});}catch(error){dialog.style.visibility='';throw error;}
   });
   $('[data-survey-filter]').onchange=()=>{page=0;render();};$('[data-survey-prev]').onclick=()=>{page=Math.max(0,page-1);render();};$('[data-survey-next]').onclick=()=>{page++;render();};
   $('[data-survey-go]').onclick=()=>{const lat=$('[data-survey-lat]').value,lon=$('[data-survey-lon]').value;if(lat===''||lon===''||Math.abs(Number(lat))>90||Math.abs(Number(lon))>180){status('Enter a valid latitude and longitude.');return;}location.href=linkFor({location:{latitude:Number(lat),longitude:Number(lon)}});};
   let unsubscribe=()=>{};
-  function close(){abort.abort();unsubscribe();streetMapAbort?.abort();for(const url of urls.values())URL.revokeObjectURL(url);dialog.close();dialog.remove();active=null;appCtx?.setPauseReason?.('photo-survey',false);}
+  function close(){abort.abort();unsubscribe();streetMapAbort?.abort();for(const url of urls.values())URL.revokeObjectURL(url);dialog.close();dialog.remove();active=null;appCtx?.clearControlInputState?.('photo-survey-close');appCtx?.screenLayout?.setPanelLayer('photo-survey',false);appCtx?.setPauseReason?.('photo-survey',false);}
   unsubscribe=observeAuth(()=>{if(owner!==surveyOwner())close();});
   $('[data-survey-close]').onclick=close;dialog.addEventListener('cancel',e=>{e.preventDefault();if(!busy)close();});
-  appCtx?.setPauseReason?.('photo-survey',true);document.exitPointerLock?.();
+  appCtx?.clearControlInputState?.('photo-survey-open');appCtx?.setPauseReason?.('photo-survey',true);appCtx?.screenLayout?.setPanelLayer('photo-survey',true);document.exitPointerLock?.();
   render();renderBuilding();status(`${survey.entries.length} photos saved on this device. Choose a building to continue.`);
   return {close};
 }

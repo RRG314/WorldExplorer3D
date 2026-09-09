@@ -196,6 +196,11 @@ export function installCommunityRealityCaptureRuntime(appCtx) {
   const isLocal=['localhost','127.0.0.1','[::1]'].includes(location.hostname);
   const autoOpenSurvey=isLocal&&new URLSearchParams(location.search).has('survey');
   if(isLocal){
+    const menu=document.getElementById('fCommunityBoard')?.parentElement;
+    if(menu&&!document.getElementById('fPhotoSurvey')){
+      const button=document.createElement('button');button.id='fPhotoSurvey';button.className='floatItem';button.type='button';button.textContent='Photo Survey · improve buildings';
+      button.onclick=async()=>{if(appCtx.getEnv?.()!=='EARTH'||!appCtx.initialEarthWorldReady)return;const {openPhotoSurvey}=await import('./survey-ui.js');await openPhotoSurvey({appCtx});};menu.append(button);
+    }
     window.addEventListener('we3d-local-survey-changed',()=>{void refreshCommunityRealityCapturePresentation(appCtx);});
     void import('../../../js/auth-ui.js?v=55').then(({observeAuth})=>observeAuth(()=>{
       for(const id of instances.keys())if(id.startsWith('local-survey:'))removeInstance(appCtx,id);

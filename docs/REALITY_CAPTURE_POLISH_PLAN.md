@@ -2,6 +2,23 @@
 
 Production is unchanged by this work. The approved exterior remains installed.
 
+## In-game Photo Survey workspace — 2026-09-09
+
+Local Photo Survey now opens within the running Earth game from Community or
+Improve this place. Account and legacy survey links enter that same game flow.
+The desktop workspace docks beside the visible world; phone layouts fill the
+screen without leaving the game session. The crop editor replaces the visible
+survey pane, then returns to photos. Closing returns to gameplay without moving
+the actor or camera. Upload, save, privacy and moderation authorities are unchanged;
+this local batch workflow still saves device previews, not cloud submissions.
+
+Actual Earth checks passed at 1280px and 412px: import, confirm, crop, save, return,
+Community reopen, and reload of the mapped facade. Actor/camera positions remained
+unchanged; no page errors. Desktop/mobile screenshots were inspected. Component
+checks passed with 34 supplied photos on desktop and two on mobile, including two
+independent building previews and stale-draft rejection. These are browser checks,
+not a physical Android or production signoff. No deployment was performed.
+
 ## Authority contract
 
 The existing canonical building owns footprint, origin and world placement.

@@ -7,13 +7,15 @@ const files=[];for(const dir of folders)for(const name of(await readdir(dir)).so
 const out='output/verification/photo-survey-local';await mkdir(out,{recursive:true});
 const server=await startStaticServer({rootDir:process.cwd(),ports:[4496,4497]});
 const origin=`http://127.0.0.1:${server.port}`,browser=await chromium.launch({channel:'chrome',headless:true});
-try{for(const width of [1100,412]){
+try{for(const width of process.env.SURVEY_WIDTH?[Number(process.env.SURVEY_WIDTH)]:[1100,412]){
   const context=await browser.newContext({viewport:{width,height:900},isMobile:width<700,hasTouch:width<700}),page=await context.newPage(),errors=[],uploads=[];
   page.on('pageerror',e=>errors.push(e.message));
   await page.route('**/auth-ui.js*',r=>r.fulfill({contentType:'text/javascript',body:'export const getCurrentUser=()=>null;export const observeAuth=cb=>{cb(null);return()=>{}};'}));
   await page.route('**/function-api.js*',r=>r.fulfill({contentType:'text/javascript',body:'export const postProtectedFunction=async()=>({representations:[]});export const postAppCheckedFunction=postProtectedFunction;'}));
   page.on('request',r=>{if(r.method()!=='GET')uploads.push(r.url());});
-  await page.goto(`${origin}/app/survey.html`);await page.click('#openSurvey');
+  // Isolated component harness; the public survey URL now enters the actual game.
+  await page.route('**/survey-component-fixture.html',r=>r.fulfill({contentType:'text/html',body:'<meta name="viewport" content="width=device-width,initial-scale=1"><button id="openSurvey">Open</button><script type="module">import {openPhotoSurvey} from "/app/js/reality-capture/survey-ui.js";document.querySelector("button").onclick=()=>openPhotoSurvey();</script>'}));
+  await page.goto(`${origin}/survey-component-fixture.html`);await page.click('#openSurvey');
   const subset=width===1100?files:files.slice(0,2);
   await page.locator('[data-survey-import]').setInputFiles(subset);
   await page.locator('[data-survey-status]').filter({hasText:new RegExp(`${subset.length} photos added`)}).waitFor({timeout:120000});

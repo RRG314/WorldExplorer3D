@@ -138,6 +138,7 @@ function setupUI() {
     perfSettingsStatus,
     gameShareFloatBtn,
     closeGameShareMenu: () => shareUi?.closeGameShareMenu?.(),
+    closeAllFloatMenus,
     applySharedRuntimeState: () => shareUi?.applySharedRuntimeState?.(),
     updateControlsModeUI,
     isTouchPreferredClient

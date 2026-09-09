@@ -10,7 +10,7 @@ import {normalizeManualRoom,manualRoomFootprint,manualRoomSurfaceSize,ROOM_SURFA
 
 // The host supplies the existing authenticated asset/save APIs. No public URLs,
 // alternate uploader, reconstruction queue, or world-geometry authority here.
-export async function openHybridEditor({capture,photos,loadPhoto,save,submit,signal,onClose,initialWall=0,saveScope='account'}) {
+export async function openHybridEditor({capture,photos,loadPhoto,save,submit,signal,onClose,initialWall=0,saveScope='account',inWorld=false}) {
   const isRoom=capture.captureKind==='interior_room';
   let pts=isRoom?manualRoomFootprint(capture.hybridPreview?.room||capture.room):wallFootprint(capture.building);
   if(!photos.length)throw Error('No saved photographs are available for this capture.');
@@ -18,6 +18,7 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
   signal.throwIfAborted();
   const T=globalThis.THREE, abort=new AbortController();
   const dialog=document.createElement('dialog'); dialog.className='captureHybridEditor';
+  if(inWorld)dialog.classList.add('captureInWorld');
   dialog.setAttribute('aria-label','Build a photo-supported building preview');
   dialog.innerHTML=`<style>
     .captureHybridEditor{box-sizing:border-box;color-scheme:dark;background:#09222d;color:#e3f5fa;border:1px solid #68c4d0;border-radius:12px;width:min(1000px,96vw);max-height:94dvh;padding:18px;overflow:auto;overscroll-behavior:contain;font:14px/1.5 'Poppins',sans-serif}
@@ -83,6 +84,7 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
     <button data-submit>Submit saved walls for approval</button><p data-submission role="status"></p></section>
   `;
   const $=s=>dialog.querySelector(s), cache=new Map(), snapshots=[], thumbs=new Map(),patchThumbs=new Map();
+  if(inWorld){$('[data-close]').textContent='Back to photos';$('[data-close]').setAttribute('aria-label','Back to Photo Survey');}
   const deviceOnly=saveScope==='device',savedWhere=deviceOnly?'on this device':'to account';
   if(deviceOnly)$('[data-save]').textContent='Save preview in my local world';
   let preview=structuredClone(capture.hybridPreview||{revision:0,footprintSignature:capture.footprintSignature,heightMeters:capture.building?.spatialContext?.wallHeightMeters||capture.buildingDetails?.heightMeters||capture.building?.spatialContext?.height?.meters||6,roofShape:['flat','gabled','hipped'].includes(capture.buildingDetails?.roofShape)?capture.buildingDetails.roofShape:'unknown',roofRiseMeters:2,patches:[]});
