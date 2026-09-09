@@ -1,3 +1,4 @@
+import './capture-theme.js';
 import {loadClassicScript} from '../modules/script-loader.js?v=56';
 import {vendorScriptsCritical} from '../modules/manifest.js?v=597';
 import {createCaptureViewer} from './result-viewer.js?v=1';

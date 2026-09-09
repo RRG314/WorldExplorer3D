@@ -448,6 +448,11 @@ async function computeRoomOccupancy(roomId, maxPlayers = 10) {
 
 function buildAlerts(summary = {}) {
   const alerts = [];
+  if (Number(summary.pendingReality) > 0) alerts.push({
+    severity: 'warning',
+    title: `${summary.pendingReality} building improvement${summary.pendingReality === 1 ? '' : 's'} awaiting approval`,
+    detail: 'Open Moderation → Reality Captures to inspect and approve exterior and private interior submissions.'
+  });
   const pendingTotal = Number(summary.pendingOverlay || 0) + Number(summary.pendingLegacy || 0);
   if (pendingTotal > 0) {
     alerts.push({
@@ -557,7 +562,9 @@ function buildAdminDashboardExports(helpers = {}) {
         }
 
         const publishedAtMs = publishedLandingSnap.exists ? timestampToMillis(publishedLandingSnap.data()?.publishedAt) : 0;
+        const pendingReality = await safeCount(db.collection('realityCaptures').where('status', '==', 'review_required'));
         const summary = {
+          pendingReality,
           pendingOverlay,
           needsChangesOverlay,
           publishedOverlay,

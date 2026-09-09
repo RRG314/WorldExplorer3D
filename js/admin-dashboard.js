@@ -34,8 +34,8 @@ const VIEW_META = {
     subtitle: 'Platform health, pending review workload, active rooms, and recent admin actions in one place.'
   },
   moderation: {
-    title: 'Editor Moderation',
-    subtitle: 'Review overlay submissions and legacy contributions without mixing them into the rest of the admin system.'
+    title: 'Contribution approvals',
+    subtitle: 'Inspect building exteriors and interiors, then approve or return them with a decision. Interior access stays private unless explicitly shared.'
   },
   users: {
     title: 'User Management',
@@ -97,7 +97,7 @@ const state = {
   dashboardOverview: null,
   operations: null,
   currentView: 'overview',
-  currentModerationMode: 'overlay',
+  currentModerationMode: ['overlay', 'legacy', 'reality'].includes(new URL(location.href).searchParams.get('queue')) ? new URL(location.href).searchParams.get('queue') : 'reality',
   busy: false,
   overlayFilters: {
     reviewState: 'submitted',
@@ -126,7 +126,7 @@ const state = {
   legacySelectedId: '',
   realityFilters: { status: 'review_required' },
   realityItems: [],
-  realitySelectedId: '',
+  realitySelectedId: new URL(location.href).searchParams.get('capture') || '',
   realityDetails: new Map(),
   userFilters: {
     search: '',
@@ -391,6 +391,7 @@ function renderOverview() {
   const activity = Array.isArray(state.dashboardOverview?.recentActivity) ? state.dashboardOverview.recentActivity : [];
   const rooms = Array.isArray(state.dashboardOverview?.recentRooms) ? state.dashboardOverview.recentRooms : [];
   const statCards = [
+    { label: 'Building Improvements Awaiting Review', value: summary.pendingReality ?? 'Unavailable', tone: 'warning' },
     { label: 'Pending Overlay', value: summary.pendingOverlay || 0, tone: 'warning' },
     { label: 'Pending Legacy', value: summary.pendingLegacy || 0, tone: 'warning' },
     { label: 'Published Overlays', value: summary.publishedOverlay || 0, tone: 'ok' },
@@ -879,9 +880,11 @@ function renderRealityDetail() {
   const capture = detail.capture || item;
   const alignment = capture.review?.alignment || { positionOffset: { x: 0, y: 0, z: 0 }, rotationYDegrees: 0, scale: 1 };
   const canModerate = capture.status === 'review_required' && !!detail.model?.url;
+  const emailStatus = ({accepted:'Accepted by email provider (delivery not confirmed)',not_configured:'Email sender is not configured',failed:'Email failed; retry pending',needs_attention:'Email needs attention; automatic retries stopped'})[capture.reviewEmail?.status] || 'No email send recorded';
   refs.moderationDetail.innerHTML = `
     <div class="detail-header"><div><h3>${escapeHtml(capture.building?.label || 'Reality capture')}</h3><p>${escapeHtml(capture.captureKind === 'interior_room' ? capture.room?.label || 'Interior room' : 'Building exterior')} • ${escapeHtml(capture.building?.sourceBuildingId || '')}</p></div><span class="status-pill" data-status="${escapeHtml(capture.status)}">${escapeHtml(capture.status)}</span></div>
     <div class="detail-grid">
+      <article class="detail-card"><span class="detail-label">Approval notice</span><strong>${escapeHtml(emailStatus)}</strong><p>This submission is available here regardless of email delivery.</p></article>
       <article class="detail-card"><span class="detail-label">Contributor</span><strong>${escapeHtml(capture.ownerDisplayName || 'Explorer')}</strong><p>Originals remain private</p></article>
       <article class="detail-card"><span class="detail-label">Photos</span><strong>${escapeHtml(String(capture.uploadSummary?.photoCount || detail.thumbnails?.length || 0))}</strong><p>${escapeHtml(String(capture.uploadSummary?.totalBytes || 0))} bytes</p></article>
       <article class="detail-card"><span class="detail-label">Pipeline</span><strong>${escapeHtml(capture.processingPipelineVersion || 'Pending')}</strong><p>Schema ${escapeHtml(String(capture.captureSchemaVersion || 1))}</p></article>

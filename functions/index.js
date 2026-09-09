@@ -2767,3 +2767,14 @@ Object.assign(exports, buildCommunityRealityCaptureExports({
 Object.assign(exports, require('./reality-capture-processing').buildCaptureProcessingExports({
   db, bucket: admin.storage().bucket()
 }));
+
+// Submission survives browser closure; retry delivery without resubmitting photos.
+exports.notifyCaptureReview = functions.region('us-central1').runWith({ failurePolicy: true })
+  .firestore.document('realityCaptures/{captureId}').onWrite(async (change, context) => {
+    const { reviewNotice, deliverReviewNotice } = require('./capture-review-notice');
+    const notice = reviewNotice(change.before.exists ? change.before.data() : null,
+      change.after.exists ? change.after.data() : null, context.params.captureId);
+    if (!notice) return;
+    notice.eventTimeMs = Date.parse(context.timestamp);
+    await deliverReviewNotice({ ref: change.after.ref, notice, config: contributionNotificationConfig() });
+  });

@@ -63,6 +63,7 @@ function serializeCapture(snapshot) {
     exteriorScope: data.exteriorScope === 'facade' ? 'facade' : 'building',
     permissionConfirmed: data.consent?.propertyPermissionConfirmed === true,
     status: clean(data.status, 40),
+    reviewEmail: data.reviewEmail ? { status: clean(data.reviewEmail.status, 40), checkedAtMs: Number(data.reviewEmail.checkedAtMs) || 0 } : null,
     capturePrivacy: clean(data.capturePrivacy || 'PRIVATE', 40),
     accessMode: clean(data.accessMode || 'PRIVATE', 40),
     publicContributionRequested: data.publicContributionRequested === true,

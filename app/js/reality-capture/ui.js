@@ -1,3 +1,4 @@
+import './capture-theme.js';
 import { worldModificationIdentityForLocation } from '../editable-world/model.js?v=1';
 import {
   createRealityCaptureDraft,
@@ -119,9 +120,12 @@ function ensurePanel() {
       <section class="realityCaptureTarget"><span>SELECTED MAPPED BUILDING</span><strong data-capture-label></strong><small data-capture-id></small></section>
       <section class="realityCaptureHandoff">
         <strong data-capture-account></strong>
-        <p>Use this same account on your phone. Your building, room and uploaded photos stay together.</p>
-        <button type="button" data-capture-phone>Continue on phone</button>
+        <p>Take or choose photos, place them, then submit your saved improvement for review—all on this device. Saving alone does not submit it.</p>
+        <details><summary>Use another device (optional)</summary>
+        <p>Your saved photos stay with this account. You do not need a computer.</p>
+        <button type="button" data-capture-phone>Create a phone link</button>
         <div data-capture-link-box hidden><canvas data-capture-qr aria-label="Scan to continue this capture on your phone"></canvas><a data-capture-link></a><button type="button" data-capture-copy>Copy phone link</button></div>
+        </details>
         <button type="button" data-capture-refresh hidden>Check uploaded photos and progress</button>
         <section data-capture-processing-status class="realityCaptureProcessingStatus" role="status" aria-live="polite" aria-atomic="true" hidden>
           <strong data-capture-progress-title></strong>

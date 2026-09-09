@@ -1,3 +1,4 @@
+import './capture-theme.js';
 import {makeStarterLayout,normalizeLayout,assertPlayableLayout,floorWalls,roomRing,wallKey,layoutRoomDescriptor,roomInteriorPoint,splitRoom} from '../../../functions/interior-layout.mjs';
 import {loadClassicScript} from '../modules/script-loader.js?v=56';
 import {vendorScriptsCritical} from '../modules/manifest.js?v=597';
