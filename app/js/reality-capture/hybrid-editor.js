@@ -1,4 +1,5 @@
 import './capture-theme.js';
+import {wallDirections} from './orientation.js';
 import {loadClassicScript} from '../modules/script-loader.js?v=56';
 import {vendorScriptsCritical} from '../modules/manifest.js?v=597';
 import {createCaptureViewer} from './result-viewer.js?v=1';
@@ -46,6 +47,11 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
   <div class="hybridColumns"><section class="hybridBuilding" aria-label="Building side"><h3>1. Choose a building side</h3>
     <div data-viewer></div><div class="hybridActions"><button data-rotate>Rotate view</button><button data-closer>Zoom in</button><button data-farther>Zoom out</button><button data-reset>Reset view</button></div>
     <div data-wall-buttons aria-label="Choose a building side"></div><p data-side-label></p>
+    <canvas data-plan aria-label="Building footprint, north up; highlighted wall matches the 3D selection" style="width:100%;height:auto"></canvas>
+    <p data-orientation-help>North is up on this plan. Directions describe where each outside wall faces, not the camera direction. Match this outline to the map before placing photos.</p>
+    <a data-map-context target="_blank" rel="noopener noreferrer">Check this building on the map</a>
+    <button data-face-wall>Look straight at selected wall</button>
+    <button data-mark-front>Mark selected wall as street-facing</button><p data-front-reference></p>
     </section><section class="hybridPlacement" aria-label="Wall placement"><h3>3. Place the photo on this side</h3><p>Start with the whole wall, or choose a grid section. Drag the yellow box to move it; drag its lower-right handle to resize.</p>
     <div class="hybridActions"><button data-whole>Whole wall</button><button data-tile>Grid section</button><label>Grid<select data-grid><option value="2">2 × 2</option><option value="4" selected>4 × 4</option><option value="8">8 × 8</option></select></label></div>
     <div class="hybridWall" data-wall-board aria-label="Wall placement. Drag the selected region or use arrow keys; Shift plus arrows resizes."><div data-existing></div><div data-placement tabindex="0" role="group" aria-label="Selected photo region"><img data-placement-image alt="Cropped photo preview" hidden><span data-resize aria-hidden="true">↘</span></div></div>
@@ -60,7 +66,6 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
     <label>Saved photo<select data-photo-choice></select></label>
     <div class="hybridFields"><label>Selected corner<select data-corner><option value="0">1 · Top-left</option><option value="1">2 · Top-right</option><option value="2">3 · Bottom-right</option><option value="3">4 · Bottom-left</option></select></label>
     <label>Photo X (%)<input data-x type="number" min="0" max="100" step="0.1"></label><label>Photo Y (%)<input data-y type="number" min="0" max="100" step="0.1"></label></div>
-    <canvas data-plan aria-label="Mapped footprint, north up; wall numbers match the selector"></canvas>
     <label>Mapped wall<select data-wall></select></label><p>Wall percentages run from its numbered start corner to the next corner; height runs from ground to eaves. A close-up must cover only its actual portion, not the whole wall.</p>
     <div class="hybridFields"><label>Left (%)<input data-region="0" type="number" min="0" max="100" value="0"></label><label>Bottom (%)<input data-region="1" type="number" min="0" max="100" value="0"></label><label>Right (%)<input data-region="2" type="number" min="0" max="100" value="100"></label><label>Top (%)<input data-region="3" type="number" min="0" max="100" value="100"></label></div>
     <label>Preview wall / eaves height (metres)<input data-height type="number" min="1" max="1200" step="0.1"></label><p data-height-evidence></p>
@@ -126,9 +131,14 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
   $('[data-close]').onclick=close;dialog.addEventListener('cancel',e=>{e.preventDefault();close();});
   const photoSelect=$('[data-photo-choice]');
   photos.forEach((p,i)=>photoSelect.add(new Option(`Photo ${i+1}`,p.id)));
-  const surfaceNames=isRoom?[...pts.map((_,i)=>`Wall ${i+1}`),'Floor','Ceiling']:pts.map((p,i)=>`Wall ${i+1} · ${Math.hypot(p.x-pts[(i+1)%pts.length].x,p.z-pts[(i+1)%pts.length].z).toFixed(1)} m`);
+  const directions=wallDirections(pts);
+  const surfaceNames=isRoom?[...pts.map((_,i)=>`Wall ${i+1}`),'Floor','Ceiling']:directions.map(d=>`Wall ${d.wall+1} · faces ${d.compass} · ${d.length.toFixed(1)} m`);
+  const geo=capture.building;
+  $('[data-map-context]').hidden=isRoom||!Number.isFinite(geo?.lat)||!Number.isFinite(geo?.lon);
+  if(!$('[data-map-context]').hidden)$('[data-map-context]').href=`https://www.openstreetmap.org/?mlat=${geo.lat}&mlon=${geo.lon}#map=19/${geo.lat}/${geo.lon}`;
+  if(isRoom){$('[data-orientation-help]').textContent='Room plan: wall numbers match this room’s saved layout. This local room view does not imply a street-facing side.';$('[data-face-wall]').hidden=true;$('[data-mark-front]').hidden=true;}
   surfaceNames.forEach((label,i)=>$('[data-wall]').add(new Option(label,String(i))));
-  surfaceNames.forEach((label,i)=>{const b=document.createElement('button');b.textContent=isRoom?label:`Side ${i+1}`;b.dataset.side=i;b.onclick=()=>selectWall(i);$('[data-wall-buttons]').append(b);});
+  surfaceNames.forEach((label,i)=>{const b=document.createElement('button');b.textContent=isRoom?label:`${i+1} · ${directions[i].compass}`;b.dataset.side=i;b.onclick=()=>selectWall(i);$('[data-wall-buttons]').append(b);});
   $('[data-height]').value=preview.heightMeters;
   $('[data-roof]').value=preview.roofShape||'unknown';$('[data-rise]').value=preview.roofRiseMeters||2;
   $('[data-height-evidence]').textContent=capture.buildingDetails?.heightMeters?'Starting height: your unverified measurement.':capture.building?.spatialContext?.height?.meters?`Starting height: ${capture.building.spatialContext.height.evidence} map snapshot. Check this against the actual eaves; it may include the roof or be inaccurate.`:'No mapped height; 6 m is only a provisional preview value.';
@@ -196,15 +206,24 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
   }
   async function selectPhoto(){bitmap=await photo(photoSelect.value);active();quad=[[.08,.08],[.92,.08],[.92,.92],[.08,.92]];selected=0;editId=null;drawPhoto();cropPreview();drawPlacement();dialog.querySelectorAll('[data-photo-id]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.photoId===photoSelect.value)));}
   function drawPlan(){
+    $('[data-front-reference]').textContent=Number.isInteger(preview.streetFacingWall)?`Your street-facing reference: wall ${preview.streetFacingWall+1}. User supplied—not verified map data.`:isRoom?'':'Street-facing side not identified. Check the map, then mark the correct wall.';
     const c=$('[data-plan]');c.width=640;c.height=320;const ctx=c.getContext('2d');ctx.clearRect(0,0,640,320);
     const xs=pts.map(p=>p.x),zs=pts.map(p=>p.z),minx=Math.min(...xs),minz=Math.min(...zs),dx=Math.max(...xs)-minx,dz=Math.max(...zs)-minz,scale=Math.min(500/dx,220/dz);
     const xy=p=>[70+(p.x-minx)*scale,50+(p.z-minz)*scale];ctx.fillStyle='#cdebf1';ctx.font='20px system-ui';ctx.fillText('N ↑',560,32);
     pts.forEach((p,i)=>{const a=xy(p),b=xy(pts[(i+1)%pts.length]);ctx.strokeStyle=i===Number($('[data-wall]').value)?'#ffcb55':'#7fb1bc';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke();ctx.fillStyle='#fff';ctx.fillText(String(i+1),(a[0]+b[0])/2,(a[1]+b[1])/2-8);ctx.fillStyle='#ffcb55';ctx.fillRect(a[0]-3,a[1]-3,6,6);});
+    const entrance=!isRoom&&capture.building?.spatialContext?.entrance;
+    if(entrance){const [x,y]=xy(entrance);ctx.fillStyle='#4edb97';ctx.beginPath();ctx.arc(x,y,7,0,Math.PI*2);ctx.fill();ctx.fillText('Entrance reference',20,310);}
+    if(isRoom){ctx.clearRect(550,0,90,40);ctx.fillStyle='#cdebf1';ctx.fillText('Room',550,32);}
   }
   function remember(){snapshots.push(structuredClone(preview));if(snapshots.length>10)snapshots.shift();dirty=true;$('[data-saved]').textContent='Unsaved preview changes.';}
   function patchList(){
     const ul=$('[data-patches]');ul.replaceChildren();
     preview.patches.forEach(p=>{const li=document.createElement('li');li.append(`Wall ${p.wall+1} · Photo ${photos.findIndex(x=>x.id===p.photoId)+1} `);
+      const destination=document.createElement('select');destination.setAttribute('aria-label',`Move photo patch ${p.id} to surface`);
+      surfaceNames.forEach((name,i)=>destination.add(new Option(name,String(i))));destination.value=String(p.wall);
+      const relocate=document.createElement('button');relocate.textContent='Move to this surface';
+      relocate.onclick=()=>run(async()=>{const wall=Number(destination.value);if(wall===p.wall)return;remember();p.wall=wall;selectWall(wall,true);await rebuild();status('Photo moved in this draft. Check crop and proportions on the new surface, then save and submit for review. The live building is unchanged.');});
+      li.append(destination,relocate);
       const edit=document.createElement('button');edit.textContent='Adjust';edit.onclick=()=>run(async()=>{photoSelect.value=p.photoId;bitmap=await photo(p.photoId);quad=structuredClone(p.quad);selected=0;selectWall(p.wall,true);editId=p.id;setRegion(p.region);drawPhoto();cropPreview();status('Adjust this patch, then choose Place photo on wall to update it.');});
       const remove=document.createElement('button');remove.textContent='Remove';remove.onclick=()=>run(async()=>{remember();preview.patches=preview.patches.filter(x=>x.id!==p.id);await rebuild();});li.append(edit,remove);ul.append(li);
     });
@@ -220,6 +239,8 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
     }catch(e){group.traverse(o=>{o.geometry?.dispose();o.material?.map?.dispose();o.material?.dispose();});throw e;}
   }
   photoSelect.onchange=()=>run(selectPhoto);$('[data-wall]').onchange=()=>selectWall(Number($('[data-wall]').value));
+  $('[data-face-wall]').onclick=()=>{const d=directions[Number($('[data-wall]').value)];if(!d||!viewer)return;viewer.faceDirection(d.normal);};
+  $('[data-mark-front]').onclick=()=>{if(busy)return;remember();preview.streetFacingWall=Number($('[data-wall]').value);drawPlan();status('Street-facing reference marked. Save to account to keep it; existing photos have not been moved.');};
   const loadThumbnails=()=>thumbnailPage().catch(e=>{if(!closed)status(e.message);});
   $('[data-prev-photos]').onclick=()=>{photoPage=Math.max(0,photoPage-1);void loadThumbnails();};
   $('[data-next-photos]').onclick=()=>{photoPage=Math.min(Math.ceil(photos.length/6)-1,photoPage+1);void loadThumbnails();};

@@ -112,6 +112,13 @@ export async function createCaptureViewer(host, bytes, signal, options = {}) {
   };
   signal.addEventListener('abort', dispose, { once: true });
   return { dispose, reset,
+    faceDirection: normal => {
+      if(disposed)return;
+      const box=new T.Box3().setFromObject(model),target=box.getCenter(new T.Vector3());
+      const distance=Math.max(...box.getSize(new T.Vector3()).toArray(),1)*1.6;
+      controls.target.copy(target);camera.position.copy(target).add(new T.Vector3(normal.x,0,normal.z).multiplyScalar(distance));
+      controls.update();draw();
+    },
     setInside: position => {
       if(disposed)return;
       camera.position.set(position.x,position.y,position.z);

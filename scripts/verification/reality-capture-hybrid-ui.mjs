@@ -52,6 +52,13 @@ try{
       await page.evaluate(()=>replayAbort.abort());await context.close();continue;
     }
     if(privateDir)assert.notEqual(await page.locator('[data-thumbnails] img').nth(0).getAttribute('src'),await page.locator('[data-thumbnails] img').nth(1).getAttribute('src'),'Different saved photos have distinct thumbnails');
+    assert.equal(await page.locator('[data-plan]').isVisible(),true,'Orientation is not hidden in Advanced');
+    await page.locator('[data-side="0"]').click();
+    await page.locator('[data-face-wall]').click();
+    await page.locator('[data-mark-front]').click();
+    assert.match(await page.locator('[data-front-reference]').innerText(),/wall 1/);
+    await page.locator('[data-viewer]').scrollIntoViewIfNeeded();
+    await page.screenshot({path:`${out}/${width}-orientation.png`});
     await page.locator('[data-next-photos]').click();await page.waitForFunction(()=>document.querySelectorAll('[data-thumbnails] img').length===1);assert.equal(await page.locator('[data-next-photos]').isDisabled(),true);
     await page.locator('[data-prev-photos]').click();await page.waitForFunction(()=>document.querySelectorAll('[data-thumbnails] img').length===6);
     await page.locator('[data-side="2"]').click();assert.equal(await page.evaluate(()=>editor.getState().selectedWall),2);
@@ -90,7 +97,7 @@ try{
     }
     for(const [i,n] of [.4,.15,.6,1].entries())await page.locator(`[data-region="${i}"]`).fill(String(n*100));
     await page.locator('[data-add]').click();await page.waitForFunction(()=>window.editor?.getState().patches===1);await page.locator('[data-save]').click();await page.waitForFunction(()=>window.editor?.getState().revision===1);
-    assert.equal(saved.hybridPreview.patches.length,1);assert.equal(saved.hybridPreview.visibility,'PRIVATE');assert.equal(saved.hybridPreview.roofShape,'gabled');
+    assert.equal(saved.hybridPreview.patches.length,1);assert.equal(saved.hybridPreview.visibility,'PRIVATE');assert.equal(saved.hybridPreview.roofShape,'gabled');assert.equal(saved.hybridPreview.streetFacingWall,0);
     saved.hybridPreview.patches[0].quad.forEach((p,i)=>p.forEach((n,j)=>assert.ok(Math.abs(n-quad[i][j])<.001,`Corner ${i}/${j}: ${n}, expected ${quad[i][j]}`)));
     await page.locator('[data-advanced] summary').click();
     await page.locator('[data-viewer]').scrollIntoViewIfNeeded();await page.screenshot({path:`${out}/${width}-preview.png`});

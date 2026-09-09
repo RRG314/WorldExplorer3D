@@ -66,6 +66,7 @@ function normalizeHybridPreview(capture, input) {
     for(let i=0;i<4;i++){const a=p.quad[i],b=p.quad[(i+1)%4],c=p.quad[(i+2)%4];if((b[0]-a[0])*(c[1]-b[1])-(b[1]-a[1])*(c[0]-b[0])<.0001)throw Error('invalid_hybrid_quad');}
     return {id:p.id,photoId:p.photoId,photoGeneration:String(photo.generation),wall:p.wall,region:p.region.map(Number),quad:p.quad.map(q=>q.map(Number)),evidence:'photo-projected-user-alignment'};
   });
-  return {schemaVersion:1,...(isRoom?{kind:'room-patches',room}:{}),revision:input.baseRevision+1,footprintSignature:input.footprintSignature,heightMeters:room?.heightMeters||input.heightMeters,heightEvidence:'user-preview-unverified',roofShape:isRoom?'flat':roofShape,roofRiseMeters,patches,visibility:'PRIVATE',coverageVerified:false};
+  if(!isRoom&&input.streetFacingWall!==undefined&&(!Number.isInteger(input.streetFacingWall)||input.streetFacingWall<0||input.streetFacingWall>=wallCount))throw Error('invalid_street_facing_wall');
+  return {schemaVersion:1,...(isRoom?{kind:'room-patches',room}:{}),...(!isRoom&&input.streetFacingWall!==undefined?{streetFacingWall:input.streetFacingWall}:{}),revision:input.baseRevision+1,footprintSignature:input.footprintSignature,heightMeters:room?.heightMeters||input.heightMeters,heightEvidence:'user-preview-unverified',roofShape:isRoom?'flat':roofShape,roofRiseMeters,patches,visibility:'PRIVATE',coverageVerified:false};
 }
 module.exports={footprintSignature,normalizeHybridPreview,encodeHybridPreview,decodeHybridPreview,captureInteriorEnvelope};
