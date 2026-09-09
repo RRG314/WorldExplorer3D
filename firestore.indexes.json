@@ -1,6 +1,15 @@
 {
   "indexes": [
     {
+      "collectionGroup": "realityCaptures",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath":"ownerUid","order":"ASCENDING"},
+        {"fieldPath":"building.worldId","order":"ASCENDING"},
+        {"fieldPath":"building.sourceBuildingId","order":"ASCENDING"}
+      ]
+    },
+    {
       "collectionGroup": "rooms",
       "queryScope": "COLLECTION",
       "fields": [

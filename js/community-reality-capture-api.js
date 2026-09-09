@@ -121,8 +121,8 @@ export function createRealityCaptureDraft(input) {
   return endpoint('/createRealityCaptureDraft', input);
 }
 
-export function listMyRealityCaptures() {
-  return endpoint('/listMyRealityCaptures');
+export function listMyRealityCaptures(building) {
+  return endpoint('/listMyRealityCaptures', building ? {building} : undefined);
 }
 
 export function getMyRealityCapture(captureId) {

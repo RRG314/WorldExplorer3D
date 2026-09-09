@@ -276,9 +276,16 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     const auth = await guard(req, res);
     if (!auth) return;
     try {
-      const snap = await db.collection(CAPTURES).where('ownerUid', '==', auth.uid).limit(60).get();
+      let query = db.collection(CAPTURES).where('ownerUid', '==', auth.uid);
+      const target = req.body?.building;
+      if (target) {
+        const worldId = clean(target.worldId, 220), sourceBuildingId = clean(target.sourceBuildingId, 220);
+        if (!worldId || !sourceBuildingId) return res.status(400).json({error:'canonical_building_required'});
+        query = query.where('building.worldId', '==', worldId).where('building.sourceBuildingId', '==', sourceBuildingId);
+      }
+      const snap = await query.limit(61).get();
       const captures = snap.docs.map(serializeCapture).sort((a, b) => b.updatedAtMs - a.updatedAtMs);
-      res.status(200).json({ captures });
+      res.status(200).json({ captures: captures.slice(0,60), truncated: captures.length > 60, buildingScoped: !!target });
     } catch (error) {
       console.error('[listMyRealityCaptures]', error);
       res.status(500).json({ error: 'Unable to list captures.' });

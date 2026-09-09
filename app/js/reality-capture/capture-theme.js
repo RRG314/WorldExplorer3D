@@ -4,6 +4,9 @@ if (!document.getElementById('captureInterfaceTheme')) {
   const style = document.createElement('style');
   style.id = 'captureInterfaceTheme';
   style.textContent = `
+  .realityCaptureDialog{width:min(520px,94vw);max-height:85dvh;overflow:auto;padding:20px;background:var(--wx-panel-solid,#071018);color:var(--wx-text,#f4f7f9);border:1px solid var(--wx-line,#53606a);font:14px/1.5 Inter,system-ui,sans-serif;color-scheme:dark}
+  .realityCaptureDialog button{display:block;width:100%;min-height:44px;margin-top:10px;padding:8px;background:var(--wx-panel-soft,#101921);color:inherit;border:1px solid var(--wx-line,#53606a);font:inherit}
+  .realityCaptureDialog::backdrop{background:#000b}.realityCaptureDialog :focus-visible{outline:2px solid var(--wx-blue,#2d7dff);outline-offset:3px}
   :is(#realityCapturePanel,.homeLayoutEditor,.captureHybridEditor,.captureLiveCamera){
     background:var(--wx-panel-solid,#071018);color:var(--wx-text,#f4f7f9);
     border-color:var(--wx-line,#53606a);font:14px/1.5 Inter,system-ui,sans-serif;color-scheme:dark;

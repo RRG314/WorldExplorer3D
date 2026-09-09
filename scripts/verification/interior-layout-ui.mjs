@@ -34,6 +34,13 @@ try{
     await page.screenshot({path:`${output}/${width}-plan.png`,fullPage:true});
     await page.locator('[data-3d-mode]').click();try{await page.locator('[data-viewer] canvas').waitFor({timeout:15000});}catch(e){console.log(await page.locator('[data-status]').innerText(),errors);throw e;}await page.screenshot({path:`${output}/${width}-shell.png`,fullPage:true});
     await page.locator('[data-inside]').click();await page.locator('[data-viewer] canvas').waitFor();await page.screenshot({path:`${output}/${width}-inside.png`,fullPage:true});
+    assert.equal(await page.locator('[data-room]').isVisible(),true);
+    assert.equal(await page.locator('[data-photos]').isVisible(),true);
+    await page.locator('[data-room]').selectOption('1');
+    await page.locator('[data-viewer] canvas').waitFor();
+    assert.equal(await page.locator('[data-room]').inputValue(),'1');
+    await page.locator('[data-plan-mode]').click();
+    assert.equal(await page.locator('[data-grid-panel]').isVisible(),true);
     await page.locator('[data-close]').click();await page.evaluate(()=>window.openEditor());assert.equal(await page.locator('[data-name]').inputValue(),'Living room');
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
     assert.deepEqual(errors,[]);await context.close();console.log(`${width}: plan, crop/place/save, protected GLB generation, private submission, reopen and 3D passed (mock HTTP, actual normalizer and derivative builder).`);

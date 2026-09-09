@@ -46,7 +46,7 @@ async function makePage(viewport, mobile = false) {
         const capture = { ...input, captureId: `capture-${++serial}`, ownerUid: input.uid, status: 'draft' };
         captures.set(capture.captureId, capture); return json({ capture });
       }
-      if (action === 'listMyRealityCaptures') return json({ captures: [...captures.values()].filter(c => c.ownerUid === input.uid) });
+      if (action === 'listMyRealityCaptures') return json({buildingScoped:!!input.building,truncated:false,captures: [...captures.values()].filter(c => c.ownerUid === input.uid&&(!input.building||(c.building.worldId===input.building.worldId&&c.building.sourceBuildingId===input.building.sourceBuildingId))) });
       const capture = captures.get(input.captureId);
       if (!capture || capture.ownerUid !== input.uid) return json({ error: 'Capture not found' }, 404);
       if (action === 'getMyRealityCapture') {
@@ -90,6 +90,7 @@ try {
   await desktop.fill('[data-building-referenceLabel]','Door frame, brick to brick');
   await desktop.fill('[data-building-referenceWidthMeters]','1.016');
   await desktop.fill('[data-building-referenceHeightMeters]','2.0828');
+  await desktop.locator('details:has([data-capture-phone]) > summary').click();
   await desktop.click('[data-capture-phone]');
   await desktop.locator('[data-capture-link-box]').waitFor({ state: 'visible' });
   const link = await desktop.locator('[data-capture-link]').getAttribute('href');
@@ -116,6 +117,16 @@ try {
   await phone.locator('[data-building-details] summary').click();
   await phone.locator('#realityCapturePanel.show').waitFor();
   assert.equal(await phone.locator('[data-capture-label]').innerText(), 'Selected test house');
+  // A resumed exterior is not a dead end: start its private interior without
+  // altering the exterior, then resume the exact existing exterior record.
+  await phone.click('[data-capture-kind="interior_room"]');
+  await phone.locator('.realityCaptureRoom').waitFor({state:'visible'});
+  assert.equal(await phone.locator('[data-room-permission]').isChecked(),false);
+  assert.equal(captures.size,1);
+  await phone.click('[data-capture-kind="exterior"]');
+  await phone.locator('[data-building-details]').waitFor({state:'visible'});
+  assert.equal(captures.size,1);
+  assert.equal(await phone.locator('[data-building-referenceWidthMeters]').inputValue(),'1.016');
   await phone.click('[data-capture-live-camera]');
   await phone.locator('[data-camera-shutter]:enabled').waitFor();
   await phone.click('[data-camera-shutter]');
@@ -239,8 +250,8 @@ try {
   await returning.context().close();
   captures.get('capture-1').status = 'queued';
   delete captures.get('capture-1').processed;
-  // New room editing is roadmap-only. Existing private records still reopen.
-  assert.equal(await desktop.locator('[data-capture-kind="interior_room"]').isVisible(),false);
+  // Interior navigation is available locally; existing private records still reopen.
+  assert.equal(await desktop.locator('[data-capture-kind="interior_room"]').isVisible(),true);
   captures.set('capture-2',{...captures.get('capture-1'),captureId:'capture-2',captureKind:'interior_room',status:'draft',permissionConfirmed:true,publicContributionRequested:false,room:{label:'Kitchen',widthMeters:5.5,lengthMeters:6,heightMeters:2.7}});
   serial=2;
   await phone.goto(`${origin}/app/capture.html#capture=capture-2`, { waitUntil: 'networkidle' });
@@ -254,6 +265,12 @@ try {
   assert.equal(await phone.locator('[data-room-width]').inputValue(), '5.5');
   assert.equal(await phone.locator('[data-room-permission]').isChecked(), true);
   assert.equal(await phone.locator('[data-public-contribution]').isChecked(), false);
+  await phone.click('[data-capture-kind="exterior"]');
+  await phone.waitForFunction(()=>location.hash==='#capture=capture-1');
+  await phone.click('[data-capture-kind="interior_room"]');
+  await phone.waitForFunction(()=>location.hash==='#capture=capture-2');
+  assert.equal(await phone.locator('[data-room-label]').inputValue(),'Kitchen');
+  assert.equal(captures.size,2);
   assert.equal(await phone.locator('[data-capture-sectors] button').count(), 6);
   await desktop.keyboard.press('Escape');
   assert.equal(await desktop.locator('#realityCapturePanel.show').count(), 0);
