@@ -70,6 +70,8 @@ resolution succeeded, and saved editing, phone-photo refresh, QR handoff and
 hard-reload reopening worked. Temporary accounts/captures and attestation
 registrations were removed. Production remained
 `5.2.0+db62593ba377.6342cddaba06fc68.production`.
+The corresponding exterior staging upload/append/save/private-preview/review
+regression check also passed; it did not approve or publish the fixture.
 
 Staging acceptance is separately recorded by
 `scripts/verification/reality-capture-hybrid-staging.mjs`. It uses disposable
