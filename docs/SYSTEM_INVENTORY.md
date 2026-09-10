@@ -1,5 +1,14 @@
 # World Explorer 3D System Inventory
 
+September 10 continuity follow-up: existing capture records now support private,
+retry-safe continuations carrying uploaded originals and photo placements into
+editable versions; prior submissions stay intact. Libraries are paginated and
+share lifecycle labels. Legacy-room preservation, stale device inspection,
+undo/redo, shared-wall movement, plan navigation, photo labels/rotation and
+submission confirmation are implemented. Account contribution updates reuse the
+owner-only notification collection. This is staging work, not a production
+rollout. See [verification and limitations](verification/capture-continuity-20260910.md).
+
 September 10 interior workflow: `reality-capture/layout-drawing.js` provides
 pointer rectangle/divider/door tools over the existing shared layout authority.
 Home editor opens directly on the grid, exposes phone handoff/photo imports and

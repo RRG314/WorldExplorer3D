@@ -40,8 +40,30 @@ shared-wall movement, undo/redo, zoom/reset, rotation, labels, photo save,
 private CPU submission, inside picking, and reopen. Component transport doubles
 are not proof of a deployed Firebase workflow.
 
-Staging acceptance results will be recorded after deployment of this candidate.
+Staging acceptance passed on hosting
+`5.2.0+859335051ed3.06c5683046ebc2be.staging`. The real interior flow uploaded
+three photos, retained a two-floor layout, submitted a private CPU derivative,
+received an account notice, reopened after reload, displayed its phone QR, and
+created an idempotent continuation retaining all three photos and the placement.
+The real exterior flow likewise retained both photos and its placement in the
+continued version. Both building-scoped libraries returned the source and new
+version. The owner-only interior resolver and denial of paid reconstruction were
+checked. Disposable captures/accounts and temporary attestation were cleaned up.
+
+The focused suite passed 64 checks. The desktop/phone component runs also passed
+stale-device inspection followed by Undo without writing over the account, shared
+wall dragging, saved photo labels, rotation, redo and navigation controls. The
+broader capture UI run passed upload failure/retry, photo/video handling, account
+switching and continuation using transport doubles. Staged screenshots were
+inspected; this does not claim real-house photographic quality from synthetic
+test photos.
+
+Production was read-only checked and remains
+`5.2.0+db62593ba377.6342cddaba06fc68.production`.
+
 Physical Android camera behavior and email arrival in a real inbox cannot be
 inferred from browser emulation or an email-provider acceptance response.
 These account updates are not background Web Push notifications. No new push
 provider, public reconstruction option or parallel building database is added.
+Staging has a moderation recipient but no configured sending address or Resend
+key. Email delivery is therefore a configuration blocker, not a passed feature.

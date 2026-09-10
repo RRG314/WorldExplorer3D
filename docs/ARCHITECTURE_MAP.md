@@ -233,6 +233,22 @@ attributes so distant buildings do not allocate unique materials.
 
 ### Community Reality Capture flow
 
+Continuations use `createRealityCaptureDraft(sourceCaptureId)` rather than a new
+upload authority. The owner-authorized endpoint creates a deterministic private
+draft, copies generation-pinned originals into its existing Storage namespace,
+normalizes inherited placements, and unlocks editing only after completion.
+`sourceCaptureId`/`sourceRevision` preserve lineage; canonical building and private
+space identity remain unchanged. Pagination covers the complete owned library.
+Presentation helpers do not grant access or alter server lifecycle states.
+
+`notifyCaptureReview` also derives owner notices from authoritative review events
+and transactionally checks the capture still has that state. It writes
+`users/{uid}/notifications/{deterministic-event-id}`, already owner-read-only.
+`js/capture-activity.js` displays these in Account and the contribution libraries.
+Capture deletion removes its notices; late events cannot recreate them after the
+deletion tombstone. This is in-site activity, not background Web Push. Moderator
+email remains the existing retryable provider integration.
+
 `app/capture.html` → existing Firebase Auth → owner-authorized capture API →
 the same capture record and upload gallery. Account links and desktop QR open
 this lightweight page without booting a second world. QR carries a capture ID,
