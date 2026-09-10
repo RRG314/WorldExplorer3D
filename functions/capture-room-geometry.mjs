@@ -3,6 +3,7 @@
 import {validateRing,polygons} from './interior-layout.mjs';
 import * as bundledEarcut from './vendor/earcut/index.js';
 const earcut=bundledEarcut.default||globalThis.earcut;
+export const ROOM_PHOTO_SURFACE_INSET = .006;
 export const ROOM_SURFACE_NAMES = Object.freeze(['Wall 1 · entrance side', 'Wall 2', 'Wall 3', 'Wall 4', 'Floor', 'Ceiling']);
 export function normalizeManualRoom(input = {}) {
   const result = {};
@@ -36,8 +37,8 @@ export function manualRoomSurfacePoint(input,surface,u,v) {
   const r=normalizeManualRoom(input);manualRoomSurfaceSize(r,surface);
   if (![u,v].every(n=>Number.isFinite(n)&&n>=0&&n<=1))throw Error('invalid_manual_room_coordinate');
   const pts=manualRoomFootprint(r),count=pts.length,minX=Math.min(...pts.map(p=>p.x)),minZ=Math.min(...pts.map(p=>p.z));
-  if(surface===count)return [minX+u*r.widthMeters,0,minZ+(1-v)*r.lengthMeters];
-  if(surface===count+1)return [minX+u*r.widthMeters,r.heightMeters,minZ+v*r.lengthMeters];
+  if(surface===count)return [minX+u*r.widthMeters,ROOM_PHOTO_SURFACE_INSET,minZ+(1-v)*r.lengthMeters];
+  if(surface===count+1)return [minX+u*r.widthMeters,r.heightMeters-ROOM_PHOTO_SURFACE_INSET,minZ+v*r.lengthMeters];
   const a=pts[surface],b=pts[(surface+1)%count];
   const signed=pts.reduce((sum,p,i)=>{const q=pts[(i+1)%count];return sum+p.x*q.z-q.x*p.z;},0),length=Math.hypot(b.x-a.x,b.z-a.z),inset=(r.wallInset||0)*(signed>=0?1:-1);
   return [a.x+(b.x-a.x)*u-(b.z-a.z)/length*inset,r.heightMeters*v,a.z+(b.z-a.z)*u+(b.x-a.x)/length*inset];

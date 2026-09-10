@@ -40,7 +40,12 @@ try{
  await assert.rejects(()=>call(visitor.page,'/getRealityCaptureAssetAccess',{captureId,asset:'original',path:objects.body.items[0].name}));
  const lookup={worldId:'earth:v1:396570000:-768870000',sourceBuildingIds:[sourceId]};
  assert.equal((await call(visitor.page,'/listApprovedExteriorRepresentations',lookup)).representations.length,0);
- await call(page,'/moderateRealityCapture',{captureId,decision:'approved',revision:saved.revision});
+ await page.goto(`${origin}/account/?section=review&capture=${captureId}`);
+ await page.getByRole('heading',{name:'Review improvements',exact:true}).waitFor();
+ await page.waitForFunction(()=>[...document.querySelectorAll('button')].some(b=>b.textContent==='Approve improvement'&&!b.disabled));
+ await page.getByRole('button',{name:'Approve improvement',exact:true}).click();await page.locator('[data-review-state]').filter({hasText:'Approved. Open'}).waitFor();
+ await page.locator('.account-nav [data-account-target="contributions"]').click();await page.getByRole('button',{name:'Open contribution',exact:true}).waitFor();await page.goBack();await page.locator('.reviewVersionStatus').filter({hasText:'Published exterior'}).waitFor();
+ await mkdir('output/verification/capture-public-lifecycle',{recursive:true});await page.screenshot({path:'output/verification/capture-public-lifecycle/account-review.png',fullPage:true});
  const published=await call(visitor.page,'/listApprovedExteriorRepresentations',lookup);assert.equal(published.representations.length,1);
  // Actual runtime loader reads the deployed endpoint and protected generation URL.
  const rendered=await visitor.page.evaluate(async({sourceId})=>{for(const url of ['https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js','https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js'])await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=url;s.onload=resolve;s.onerror=reject;document.head.append(s);});const THREE=globalThis.THREE;if(!THREE.GLTFLoader)throw Error('GLTFLoader not ready');

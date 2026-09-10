@@ -1,3 +1,5 @@
+// Building review lives in the account workspace; preserve old review links.
+if(new URL(location.href).searchParams.get('view')==='moderation'&&(!new URL(location.href).searchParams.get('queue')||new URL(location.href).searchParams.get('queue')==='reality')){const target=new URL('./',location.href);target.searchParams.set('section','review');const capture=new URL(location.href).searchParams.get('capture');if(capture)target.searchParams.set('capture',capture);location.replace(target.href);}
 import { hasFirebaseConfig } from './firebase-init.js?v=57';
 import { ensureSignedIn, observeAuth, signOutUser } from './auth-ui.js?v=55';
 import { enableAdminTester, getAccountOverview } from './billing.js?v=58';
@@ -1887,6 +1889,7 @@ document.addEventListener('click', async (event) => {
   const modeBtn = target.closest('[data-moderation-mode]');
   if (modeBtn) {
     state.currentModerationMode = modeBtn.getAttribute('data-moderation-mode') || 'overlay';
+    if(state.currentModerationMode==='reality'){location.assign('./?section=review');return;}
     renderModeration();
     try {
       setBusy(true);

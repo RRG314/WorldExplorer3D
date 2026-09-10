@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {normalizeManualRoom,manualRoomFootprint,manualRoomSurfacePoint,manualRoomSurfaceSize} from '../functions/capture-room-geometry.mjs';
+import {normalizeManualRoom,manualRoomFootprint,manualRoomSurfacePoint,manualRoomSurfaceSize,ROOM_PHOTO_SURFACE_INSET} from '../functions/capture-room-geometry.mjs';
 const room={widthMeters:4,lengthMeters:6,heightMeters:2.7};
 test('room dimensions remain local and cover six surfaces',()=>{
   const before=structuredClone(room);
@@ -8,8 +8,8 @@ test('room dimensions remain local and cover six surfaces',()=>{
   assert.deepEqual(manualRoomSurfaceSize(room,0),[4,2.7]);
   assert.deepEqual(manualRoomSurfaceSize(room,1),[6,2.7]);
   assert.deepEqual(manualRoomSurfaceSize(room,4),[4,6]);
-  assert.deepEqual(manualRoomSurfacePoint(room,4,.5,.5),[0,0,0]);
-  assert.deepEqual(manualRoomSurfacePoint(room,5,.5,.5),[0,2.7,0]);
+  assert.deepEqual(manualRoomSurfacePoint(room,4,.5,.5),[0,ROOM_PHOTO_SURFACE_INSET,0]);
+  assert.deepEqual(manualRoomSurfacePoint(room,5,.5,.5),[0,2.7-ROOM_PHOTO_SURFACE_INSET,0]);
   assert.deepEqual(room,before);
 });
 test('invalid dimensions and surface coordinates are rejected',()=>{

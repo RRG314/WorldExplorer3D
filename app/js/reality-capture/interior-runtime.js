@@ -1,3 +1,4 @@
+import {prepareHomePhotoSurfaces} from './home-photo-surfaces.js';
 import './capture-theme.js';
 import {
   requestPrivateSpaceAccess,
@@ -129,6 +130,7 @@ export async function attachCommunityInteriorRepresentation(appCtx, active) {
       presentationOnly: true,
       collisionAuthority: representation.representationKind==='home-layout'?'authored-layout':'generated-interior-proxy'
     });
+    if(representation.representationKind==='home-layout')prepareHomePhotoSurfaces(root,representation.layout);
     root.traverse((object) => {
       if (!object?.isMesh) return;
       object.castShadow = true;

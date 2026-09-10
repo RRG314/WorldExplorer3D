@@ -66,7 +66,7 @@ try{
   }
   await page.locator('[data-capture-close]').click();
   const afterReload=await page.evaluate(async id=>(await(await import('/js/community-reality-capture-api.js?v=4')).getMyRealityCapture(id)).capture.hybridPreview.revision,captureId);assert.equal(afterReload,1);
-  const surface=home?layoutRoomDescriptor(homeLayout,homeLayout.floors[0].rooms[0].id).surfaceIds[0]:null;
+  const surface=home?layoutRoomDescriptor(homeLayout,homeLayout.floors[0].rooms[0].id).surfaceIds:null;
   const manual=await page.evaluate(async ({id,home,surface})=>{
     const api=await import('/js/community-reality-capture-api.js?v=4');
     const c=document.createElement('canvas');c.width=1280;c.height=720;
@@ -83,7 +83,7 @@ try{
     await api.finalizeRealityCaptureUpload(id,'manual');
     const uploaded=await api.getMyRealityCapture(id);
     const patch={id:'fixture-wall',wall:0,photoId:photo.id,region:[0,0,1,1],quad:[[0,0],[1,0],[1,1],[0,1]]};
-    const preview={...uploaded.capture.hybridPreview,baseRevision:1,...(home?{roomPhotos:[{roomId:uploaded.capture.hybridPreview.layout.floors[0].rooms[0].id,patches:[{...patch,surfaceId:surface}]}]}:{patches:[patch]})};
+    const preview={...uploaded.capture.hybridPreview,baseRevision:1,...(home?{roomPhotos:[{roomId:uploaded.capture.hybridPreview.layout.floors[0].rooms[0].id,patches:[0,surface.length-2,surface.length-1].map(w=>({...patch,id:`fixture-${w}`,surfaceId:surface[w]}))}]}:{patches:[patch]})};
     const saved=await api.saveRealityCaptureHybridPreview(id,preview);
     const submitted=await api.submitRealityCaptureHybrid(id,saved.preview.revision,true,!home);
     let paidDenied=false,roomDenied=false;

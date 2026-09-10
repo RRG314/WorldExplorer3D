@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {makeStarterLayout,normalizeLayout,compileLayout,containsRegion,validateRing,floorWalls,assertPlayableLayout,splitRoom} from '../functions/interior-layout.mjs';
+import {makeStarterLayout,normalizeLayout,compileLayout,containsRegion,validateRing,floorWalls,assertPlayableLayout,splitRoom,layoutEntrance,pointInRoom,roomRing} from '../functions/interior-layout.mjs';
 const envelope={revision:'mapped-v1',footprint:[{x:0,z:0},{x:10,z:0},{x:10,z:12},{x:0,z:12}],heightMeters:6};
 test('starter produces connected rooms and shared walls, not duplicate boxes',()=>{
   const layout=makeStarterLayout(envelope),floor=layout.floors[0],compiled=compileLayout(layout);
@@ -56,4 +56,16 @@ test('dividing a room joins adjacent wall vertices and preserves existing door r
 test('starter follows a rotated mapped building instead of imposing a north-aligned rectangle',()=>{
   const angle=.63,footprint=envelope.footprint.map(p=>({x:p.x*Math.cos(angle)-p.z*Math.sin(angle),z:p.x*Math.sin(angle)+p.z*Math.cos(angle)}));
   const layout=makeStarterLayout({...envelope,footprint},{floorCount:2});assert.equal(assertPlayableLayout(layout),true);assert.equal(layout.floors.length,2);
+});
+
+test('entrance resolves the marked wall and faces inward regardless of room order or winding',()=>{
+  for(const reverse of [false,true]){
+    const layout=makeStarterLayout(envelope),floor=layout.floors[0],room=floor.rooms[1];
+    floor.doors.forEach(d=>d.entry=false);
+    const wall=floorWalls(floor).find(w=>w.rooms.length===1&&w.rooms.includes(room.id));
+    floor.doors.push({id:'chosen_entry',wall:wall.id,offset:Math.hypot(wall.b.x-wall.a.x,wall.b.z-wall.a.z)/2,width:.9,height:2.05,entry:true});
+    if(reverse)room.vertices.reverse();
+    const e=layoutEntrance(layout);assert.equal(e.room.id,room.id);assert.equal(e.door.id,'chosen_entry');
+    assert.ok(pointInRoom({x:e.point.x+e.inward.x*.65,z:e.point.z+e.inward.z*.65},roomRing(floor,room)));
+  }
 });

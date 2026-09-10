@@ -417,7 +417,7 @@ export async function enterInteriorForSupport(support, deps) {
   walker.x = sceneState.entryPoint.x;
   walker.z = sceneState.entryPoint.z;
   walker.y = sceneState.entryPoint.y;
-  const entryYaw = Math.atan2(sceneState.center.x - walker.x, sceneState.center.z - walker.z);
+  const entryYaw = Number.isFinite(sceneState.entryYaw) ? sceneState.entryYaw : Math.atan2(sceneState.center.x - walker.x, sceneState.center.z - walker.z);
   walker.angle = entryYaw;
   walker.yaw = entryYaw;
   walker.pitch = 0;

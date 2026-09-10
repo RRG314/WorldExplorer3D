@@ -32,3 +32,11 @@ test('photos preserve stair openings, solid top ceilings and interior wall offse
   assert.equal(manualRoomPatchGeometry(upper,5,[0,0,1,1]).indices.length,6);
   const wall=manualRoomPatchGeometry(lower,0,[0,0,1,1]);assert.ok(wall.positions[2]>lower.outline[0].z+.05);
 });
+
+test('floor and ceiling photos sit physically inside the shell',()=>{
+  const descriptor=layoutRoomDescriptor(makeStarterLayout(envelope),'room_0_0');
+  for(const [surface,y] of [[4,.006],[5,descriptor.heightMeters-.006]]){
+    const g=manualRoomPatchGeometry(descriptor,surface,[0,0,1,1]);
+    for(let i=1;i<g.positions.length;i+=3)assert.ok(Math.abs(g.positions[i]-y)<1e-5);
+  }
+});

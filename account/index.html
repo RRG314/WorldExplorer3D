@@ -721,7 +721,6 @@
   </style>
 </head>
 <body>
-  <a href="../app/capture.html" style="display:block;padding:12px 4%;color:#82eef1">My building and room captures · continue on phone or desktop</a>
   <div class="account-shell">
     <aside class="account-rail" aria-label="Account Center navigation">
       <div class="account-brand">
@@ -731,11 +730,12 @@
       </div>
       <nav class="account-nav">
         <button type="button" data-account-target="overview"><strong>Overview</strong><span>Status and shortcuts</span></button>
+        <button type="button" data-account-target="contributions"><strong>My contributions</strong><span>Saved buildings and status</span></button>
         <button type="button" data-account-target="profile"><strong>Profile</strong><span>Identity and creator card</span></button>
         <button type="button" data-account-target="social"><strong>Friends & Rooms</strong><span>Friends and invitations</span></button>
         <button type="button" data-account-target="support"><strong>Support & Receipts</strong><span>Donations and billing history</span></button>
         <button type="button" data-account-target="security"><strong>Security & Privacy</strong><span>Sign-in details and account controls</span></button>
-        <a id="moderationPanelLink" class="account-nav-admin" href="./admin.html?view=moderation&queue=reality" hidden><strong>Review building improvements</strong><span>Admin · exterior and interior approvals</span></a>
+        <button id="moderationPanelLink" class="account-nav-admin" data-account-target="review" hidden><strong>Review improvements</strong><span>Approve or request changes</span></button>
       </nav>
       <a class="account-back" href="../app/">Return to World Explorer</a>
     </aside>
@@ -793,13 +793,15 @@
 
       <div class="actions">
         <button id="enableAdminBtn" class="btn-ghost" type="button">Enable Admin Test Access</button>
-        <button class="btn-primary" type="button" data-account-target="profile">Edit Profile</button>
+        <button class="btn-primary" type="button" data-account-target="contributions">My contributions</button><button class="btn-ghost" type="button" data-account-target="profile">Edit Profile</button>
         <button class="btn-ghost" type="button" data-account-target="social">View Friends & Rooms</button>
       </div>
 
       <p id="statusLine"></p>
       </section>
 
+      <section class="account-view" data-account-view="contributions" hidden><div data-contribution-workspace></div></section>
+      <section class="account-view" data-account-view="review" hidden><div data-contribution-workspace></div><details><summary>System administration</summary><p>Advanced tools for users, multiplayer, site content and service health.</p><a href="./admin.html?view=system">Open system administration</a></details></section>
       <section class="account-view" data-account-view="profile" hidden>
       <h2 class="section-title">Identity</h2>
       <div class="identity-grid">
@@ -995,7 +997,7 @@
     </main>
   </div>
 
-  <script src="./account-center.js" defer></script>
+  <script src="./account-center.js" defer></script><script type="module" src="./contribution-workspace.js"></script>
 
   <script type="module">
     import { hasFirebaseConfig } from '../js/firebase-init.js?v=56';
@@ -2080,7 +2082,7 @@
   </script>
   <script type="module">
     import {mountCaptureActivity} from '../js/capture-activity.js';
-    mountCaptureActivity(document.getElementById('accountPanel'));
+    mountCaptureActivity(document.querySelector('[data-account-view=overview]'));
   </script>
 </body>
 </html>

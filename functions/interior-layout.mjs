@@ -248,3 +248,16 @@ export function makeEmptyLayout(envelope) {
     unitLabel:'My home',floors:[{id:'floor_0',label:'Floor 1',elevation:0,
       height:Math.min(2.7,envelope.heightMeters-.15),slab:.15,vertices:{},rooms:[],doors:[]}],stairs:[]},envelope);
 }
+
+// The authored entrance, rather than the first room or a bounding-box scan,
+// determines where the walker arrives and faces after entering the home.
+export function layoutEntrance(layout) {
+  const floor=layout.floors.find(f=>f.elevation===0&&f.doors.some(d=>d.entry));
+  if(!floor)fail('Mark a ground-floor doorway as the home entrance.');
+  const door=floor.doors.find(d=>d.entry),wall=floorWalls(floor).find(w=>w.id===door.wall);
+  const room=floor.rooms.find(r=>r.id===wall?.rooms[0]);if(!room)fail('The entrance needs a room.');
+  const length=Math.hypot(wall.b.x-wall.a.x,wall.b.z-wall.a.z),t=door.offset/length,point={x:wall.a.x+(wall.b.x-wall.a.x)*t,z:wall.a.z+(wall.b.z-wall.a.z)*t};
+  let inward={x:-(wall.b.z-wall.a.z)/length,z:(wall.b.x-wall.a.x)/length};
+  if(!pointInRoom({x:point.x+inward.x*.1,z:point.z+inward.z*.1},roomRing(floor,room)))inward={x:-inward.x,z:-inward.z};
+  return {floor,room,door,point,inward};
+}

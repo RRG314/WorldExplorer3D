@@ -1035,6 +1035,10 @@ export async function openRealityCaptureLibrary(appCtx=null,target=null) {
   if(['localhost','127.0.0.1','[::1]'].includes(location.hostname)&&appCtx){
     const advanced=document.createElement('details');advanced.innerHTML='<summary>Advanced · device photo batches</summary><p>Recover or organize a local photo batch. These previews have not been uploaded or submitted for approval.</p><button type="button">Open device photo organizer</button>';advanced.querySelector('button').onclick=async()=>{dialog.close();const {openPhotoSurvey}=await import('./survey-ui.js');await openPhotoSurvey({appCtx,building:target});};dialog.append(advanced);
   }
+  void import('../../../js/billing.js?v=58').then(m=>m.getAccountOverview()).then(overview=>{
+    if(disposed||getCurrentUser()?.uid!==user.uid||!(overview.isAdmin||overview.adminTesterEligible))return;
+    const review=document.createElement('button');review.textContent='Review improvements';review.onclick=async()=>{const {openCaptureReview}=await import('./review-dialog.js');await openCaptureReview({appCtx});};dialog.querySelector('header').after(review);
+  }).catch(()=>{});
   await refresh();return true;
 }
 

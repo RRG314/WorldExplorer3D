@@ -1,3 +1,4 @@
+import {prepareHomePhotoSurfaces} from './home-photo-surfaces.js';
 import { loadClassicScript } from '../modules/script-loader.js?v=56';
 import { vendorScriptsCritical } from '../modules/manifest.js?v=597';
 import { applyCaptureAlignment } from './alignment.js?v=1';
@@ -10,7 +11,7 @@ export async function createCaptureViewer(host, bytes, signal, options = {}) {
   const T = globalThis.THREE;
   let model = options.model || (await new Promise((resolve, reject) => new T.GLTFLoader().parse(bytes, '', resolve, reject))).scene;
   if(options.exteriorBuilding){const {buildHybridShell}=await import('./hybrid-geometry.js?v=1');const shell=buildHybridShell(T,options.exteriorBuilding,options.patchHeightMeters,{});shell.add(model);model=shell;}
-  if(options.homeLayout){const {buildAuthoredInterior}=await import('../interiors/authored-geometry.js');const home=buildAuthoredInterior(T,options.homeLayout);home.group.add(model);home.group.traverse(o=>{if(o.userData.kind==='ceiling')o.visible=false;});model=home.group;}
+  if(options.homeLayout){prepareHomePhotoSurfaces(model,options.homeLayout);const {buildAuthoredInterior}=await import('../interiors/authored-geometry.js');const home=buildAuthoredInterior(T,options.homeLayout);home.group.add(model);home.group.traverse(o=>{if(o.userData.kind==='ceiling')o.visible=false;});model=home.group;}
   if(model.name==='authored-home')options={...options,interiorLighting:true};
   const disposeModel = () => model.traverse(object => {
     object.geometry?.dispose();
@@ -94,6 +95,8 @@ export async function createCaptureViewer(host, bytes, signal, options = {}) {
   canvas.addEventListener('pointercancel', e=>{pointers.delete(e.pointerId);press=null;}, {signal:events.signal});
   const draw = () => { if (!disposed && !document.hidden) renderer.render(scene, camera); };
   const reset = () => {
+    controls.enableZoom=true;controls.enablePan=true;
+    if(options.homeLayout)model.traverse(o=>{if(o.userData.kind==='ceiling')o.visible=false;});
     const box = new T.Box3().setFromObject(model);
     if (reference.children.length) box.union(new T.Box3().setFromObject(reference));
     const target = box.getCenter(new T.Vector3());
@@ -127,6 +130,7 @@ export async function createCaptureViewer(host, bytes, signal, options = {}) {
     },
     setInside: position => {
       if(disposed)return;
+      if(options.homeLayout)model.traverse(o=>{if(o.userData.kind==='ceiling')o.visible=true;});
       camera.position.set(position.x,position.y,position.z);
       camera.near=.03;camera.updateProjectionMatrix();
       controls.target.set(position.x,position.y,position.z-.01);
