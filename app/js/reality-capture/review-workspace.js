@@ -36,7 +36,7 @@ export function mountReviewWorkspace(host,{captureId='',onOpenWorld,onEdit,api={
       const created=await createCaptureViewer(preview,bytes,controller.signal,{homeLayout:submitted?.kind==='home-layout'?submitted.layout:null,exteriorBuilding:submitted?.kind==='facade-patches'?c.building:null,patchHeightMeters:submitted?.heightMeters,spatialContext:home?null:c.building?.spatialContext,alignment:c.review?.alignment||{}});
       if(disposed||token!==request){created?.dispose();return;}viewer=created;
       const views=document.createElement('nav');views.setAttribute('aria-label','Preview views');views.append(button('Overview',()=>viewer?.reset()),button('Rotate view',()=>viewer?.rotate()));
-      if(submitted?.kind==='home-layout'){const entrance=layoutEntrance(submitted.layout);views.append(button('Inside · walls and ceiling',()=>viewer?.setInside({x:entrance.point.x+entrance.inward.x,y:entrance.floor.elevation+1.6,z:entrance.point.z+entrance.inward.z})));}
+      if(submitted?.kind==='home-layout'){const entrance=layoutEntrance(submitted.layout),position={x:entrance.point.x+entrance.inward.x,y:entrance.floor.elevation+1.6,z:entrance.point.z+entrance.inward.z};views.append(button('Inside · walls and ceiling',()=>viewer?.setInside(position,entrance.inward)),button('Look at floor',()=>viewer?.setInside(position,{y:-1,z:.001})),button('Look at ceiling',()=>viewer?.setInside(position,{y:1,z:.001})));}
       preview.after(views);approve.disabled=c.status!=='review_required'||!viewer;
       async function decide(decision){
         if(busy||disposed||current!==c)return;const message=note.value.trim();if(decision==='rejected'&&!message){status('Explain what needs changing before returning this improvement.');note.focus();return;}

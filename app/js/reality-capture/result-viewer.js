@@ -128,12 +128,12 @@ export async function createCaptureViewer(host, bytes, signal, options = {}) {
       controls.target.copy(target);camera.position.copy(target).add(new T.Vector3(normal.x,0,normal.z).multiplyScalar(distance));
       controls.update();draw();
     },
-    setInside: position => {
+    setInside: (position,direction={x:0,y:0,z:-1}) => {
       if(disposed)return;
       if(options.homeLayout)model.traverse(o=>{if(o.userData.kind==='ceiling')o.visible=true;});
       camera.position.set(position.x,position.y,position.z);
       camera.near=.03;camera.updateProjectionMatrix();
-      controls.target.set(position.x,position.y,position.z-.01);
+      controls.target.copy(camera.position).add(new T.Vector3(direction.x||0,direction.y||0,direction.z||0).normalize().multiplyScalar(.01));
       controls.minDistance=.01;controls.maxDistance=.01;controls.enableZoom=false;controls.enablePan=false;
       controls.update();draw();
     },

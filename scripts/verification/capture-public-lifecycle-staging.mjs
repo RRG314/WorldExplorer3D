@@ -62,7 +62,7 @@ try{
  await visitor.page.evaluate(async()=>{await(await import('/__capture_runtime_fixture.js')).refreshCommunityRealityCapturePresentation(window.captureTestApp);if(window.captureTestApp.scene.children.some(c=>c.userData?.communityRealityCapture))throw Error('Deleted publication still installed');});
  await deleteTestAccount(visitor);
  await writeFile('output/verification/capture-public-lifecycle/result.json',JSON.stringify({passed:true,project,checks:['owner-only originals','token-free idempotent upload','independent viewer cannot see pending','approval-to-runtime GLB','Earth origin compatibility','approved continuation replacement','account deletion removes originals and publications','runtime withdrawal'],limits:'Synthetic isolated building and photo; real deployed APIs and actual renderer. Temporary staging attestation and disposable moderator claim. No physical Android or production.'},null,2));console.log('Staging public lifecycle, independent viewer runtime, private originals, replacement and account cleanup passed.');
-}finally{
+}catch(error){if(page){console.error('Acceptance page:',page.url());console.error((await page.locator('body').innerText()).slice(-4500));await page.screenshot({path:'output/verification/capture-public-lifecycle/failure.png',fullPage:true}).catch(()=>{});}throw error;}finally{
  for(const account of accounts)if(!account.deleted)try{await deleteTestAccount(account);}catch(e){console.error('Disposable fixture cleanup needs retry:',account.localId,e.message);}
  await browser.close();await attestation.cleanup();
 }

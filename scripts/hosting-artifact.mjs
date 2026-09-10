@@ -33,6 +33,7 @@ const GAME_RUNTIME_ENTRYPOINTS = Object.freeze({
   bootstrap: 'app/js/bootstrap.js',
   'app-entry': 'app/js/app-entry.js',
   'account-social': 'app/js/multiplayer/social.js',
+  'account-contributions': 'account/contribution-workspace.js',
   'capture-phone': 'app/js/reality-capture/phone-entry.js',
   'capture-review': 'app/js/reality-capture/result-viewer.js',
   'multiplayer-rooms': 'app/js/multiplayer/rooms.js',
@@ -255,6 +256,8 @@ async function rewriteAccountHtml(runtime) {
     throw new Error('Account HTML no longer contains the expected social source import.');
   }
   html = html.replace(sourceImport, bundledImport);
+  if(!html.includes('./contribution-workspace.js'))throw new Error('Account contributions entry is missing.');
+  html = html.replace('./contribution-workspace.js',`../app/${runtime.entries['account-contributions']}`);
   await fs.writeFile(htmlPath, html, 'utf8');
 }
 
@@ -480,7 +483,7 @@ async function verifyArtifact() {
   const captureHtml = await fs.readFile(path.join(OUTPUT_DIR, 'app', 'capture.html'), 'utf8');
   const adminModule = await fs.readFile(path.join(OUTPUT_DIR, 'js', 'admin-dashboard.js'), 'utf8');
   for (const [name, entry] of Object.entries(runtimePackaging.entries || {})) {
-    const referenced = name === 'account-social' ? accountHtml.includes(`../app/${entry}`)
+    const referenced = (name === 'account-social'||name === 'account-contributions') ? accountHtml.includes(`../app/${entry}`)
       : name === 'capture-phone' ? captureHtml.includes(entry)
       : name === 'capture-review' ? adminModule.includes(`../app/${entry}`) : gameHtml.includes(entry);
     if (!referenced && !INDIRECT_RUNTIME_ENTRYPOINTS.has(name)) {
