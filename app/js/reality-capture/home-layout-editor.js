@@ -43,7 +43,7 @@ export async function openHomeLayoutEditor({capture,save,signal,photos=[],loadPh
   <section data-recovery hidden><p>This device has an unsaved layout.</p><button data-restore>Restore device layout</button></section>`;
   document.body.append(dialog);dialog.showModal();
   const actions=document.createElement('nav');actions.innerHTML='<button data-link-phone>Continue on phone</button><label>Add photos<input data-import-room type="file" accept="image/*" multiple></label><button data-refresh-photos>Check phone uploads</button><span data-photo-total></span>';
-  dialog.querySelector('header').after(actions);
+  dialog.querySelector('[data-viewer]').after(actions);
   const handoff=document.createElement('section');handoff.hidden=true;handoff.dataset.homeHandoff='';handoff.innerHTML='<p>Scan this with your phone camera and sign in with the same World Explorer account. Your saved layout and uploads stay with this building. This link does not grant anyone access.</p><canvas data-home-qr></canvas><a data-home-link></a>';
   actions.after(handoff);
   const tools=document.createElement('nav');tools.dataset.drawingTools='';tools.innerHTML='<button data-tool="enter">Enter room</button><button data-tool="select">Select / move corners</button><button data-tool="rectangle">Draw room</button><button data-tool="divide">Draw dividing wall</button><button data-tool="door">Place door</button><label>Room label<select data-room-label-preset><option value="">Choose a label…</option><option>Living room</option><option>Kitchen</option><option>Bedroom</option><option>Bathroom</option><option>Hall</option><option>Closet</option><option>Office</option><option>Other</option></select></label>';
@@ -73,7 +73,12 @@ export async function openHomeLayoutEditor({capture,save,signal,photos=[],loadPh
   const clone=()=>structuredClone(layout);
   let planZoom=1,panX=0,panZ=0;
   const planNav=document.createElement('nav');planNav.setAttribute('aria-label','Floor plan view');planNav.innerHTML='<button data-plan-zoom="1.4" aria-label="Zoom in on plan">+</button><button data-plan-zoom="0.7142857" aria-label="Zoom out of plan">−</button><button data-plan-fit>Fit plan</button><button data-pan-x="-1" aria-label="Pan left">←</button><button data-pan-x="1" aria-label="Pan right">→</button><button data-pan-z="-1" aria-label="Pan up">↑</button><button data-pan-z="1" aria-label="Pan down">↓</button><label>Room measurements<select data-measure-units><option value="m">Metres</option><option value="ft">Feet</option></select></label><span data-room-measures></span>';
-  $('[data-grid-panel]').prepend(planNav);planNav.style.gridColumn='1 / -1';
+  // Keep the plan itself first, especially on phones. Editing and photo tools
+  // stay in the same workspace without pushing the canvas below the fold.
+  const planWorkspace=document.createElement('div');
+  $('[data-plan]').before(planWorkspace);
+  planWorkspace.append($('[data-plan]'),tools,planNav);
+  actions.before($('[data-navigation-help]'),$('[data-photos]'));
   planNav.querySelectorAll('[data-plan-zoom]').forEach(b=>b.onclick=()=>{planZoom=Math.min(8,Math.max(1,planZoom*Number(b.dataset.planZoom)));drawPlan();});
   $('[data-plan-fit]').onclick=()=>{planZoom=1;panX=panZ=0;drawPlan();};
   planNav.querySelectorAll('[data-pan-x],[data-pan-z]').forEach(b=>b.onclick=()=>{panX+=Number(b.dataset.panX||0)*2/planZoom;panZ+=Number(b.dataset.panZ||0)*2/planZoom;drawPlan();});

@@ -24,6 +24,8 @@ try{
     await page.goto(`http://127.0.0.1:${server.port}/layout-fixture`);
     await page.evaluate(async ({capture,photoId})=>{const {openHomeLayoutEditor}=await import('/app/js/reality-capture/home-layout-editor.js');window.abortEditor=new AbortController();window.openEditor=()=>openHomeLayoutEditor({capture,signal:window.abortEditor.signal,photos:[{id:photoId}],loadPhoto:async()=>await (await fetch('/layout-photo.jpg')).blob(),submit:async(revision,publicSharing)=>await(await fetch('/layout-submit',{method:'POST',body:JSON.stringify({revision,publicSharing})})).json(),save:async input=>{const r=await fetch('/layout-save',{method:'POST',body:JSON.stringify(input)}),value=await r.json();if(!r.ok)throw Error(value.error);capture.hybridPreview=value.preview;return value;}});await window.openEditor();},{capture,photoId});
     assert.equal(await page.locator('[data-plan]').isVisible(),true,'A new home opens on the grid, without completing a form');
+    await page.screenshot({path:`${output}/${width}-initial-entry.png`});
+    assert.equal(await page.locator('[data-plan]').evaluate(e=>e.getBoundingClientRect().top<innerHeight-100),true,'The opened editor must show the grid in the initial viewport');
     assert.equal(await page.locator('[data-room] option').count(),1);
     await page.locator('[data-tool="rectangle"]').click();
     await page.locator('[data-plan]').scrollIntoViewIfNeeded();
