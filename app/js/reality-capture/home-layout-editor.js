@@ -110,6 +110,7 @@ export async function openHomeLayoutEditor({capture,save,signal,photos=[],loadPh
   },{capture:true,signal:events.signal});
   let viewMode='plan';
   async function show3D(inside=false){try{
+    tools.hidden=true;
     for(const element of dialog.querySelectorAll('[data-floor],[data-room],[data-plan-mode],[data-3d-mode],[data-inside]'))element.disabled=true;
     viewMode=inside?'inside':'overview';
     $('[data-navigation-help]').textContent=inside?'Drag to look around. Choose another room above, tap a wall to place photos, or return to 2D plan.':'Drag to orbit your home. Choose Inside selected room to enter, or 2D plan to change its layout.';
@@ -156,7 +157,7 @@ export async function openHomeLayoutEditor({capture,save,signal,photos=[],loadPh
   $('[data-stair]').onclick=()=>edit(()=>{const x=Number($('[data-stair-x]').value),z=Number($('[data-stair-z]').value),run=Number($('[data-stair-run]').value),shape=$('[data-stair-shape]').value;const path=shape==='straight'?[{x,z},{x,z:z+run}]:shape==='L'?[{x,z},{x,z:z+run/2},{x:x+run/2,z:z+run/2}]:[{x,z},{x,z:z+run/2},{x:x+1.2,z:z+run/2},{x:x+1.2,z}];layout.stairs.push({id:`stair_${crypto.randomUUID().replaceAll('-','')}`,from:floor().id,to:layout.floors[floorIndex+1].id,width:1,path});});
   $('[data-remove-stair]').onclick=()=>edit(()=>layout.stairs=layout.stairs.filter(s=>s.from!==floor().id));
   $('[data-undo]').onclick=()=>{if(busy||!history.length)return;try{validatePhotoSurfaces(history.at(-1));layout=history.pop();floorIndex=Math.min(floorIndex,layout.floors.length-1);roomIndex=cornerIndex=0;render();persist();}catch(e){status(e.message);}};
-  $('[data-3d-mode]').onclick=()=>show3D();$('[data-inside]').onclick=()=>show3D(true);$('[data-plan-mode]').onclick=()=>{viewMode='plan';viewer?.dispose();viewer=null;scene?.dispose();scene=null;$('[data-grid-panel]').hidden=false;$('[data-viewer]').hidden=true;$('[data-navigation-help]').textContent='Select a room on the plan or use the room list. Step inside to look around and place photos.';render();};
+  $('[data-3d-mode]').onclick=()=>show3D();$('[data-inside]').onclick=()=>show3D(true);$('[data-plan-mode]').onclick=()=>{viewMode='plan';tools.hidden=false;viewer?.dispose();viewer=null;scene?.dispose();scene=null;$('[data-grid-panel]').hidden=false;$('[data-viewer]').hidden=true;$('[data-navigation-help]').textContent='Select a room on the plan or use the room list. Step inside to look around and place photos.';render();};
   $('[data-photos]').onclick=async()=>{try{
     const {openHybridEditor}=await import('./hybrid-editor.js?v=1'),selectedRoom=room().id,descriptor=layoutRoomDescriptor(layout,selectedRoom);
     const saved=roomPhotos.find(p=>p.roomId===selectedRoom);
