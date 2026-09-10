@@ -47,6 +47,7 @@ async function makePage(viewport, mobile = false) {
       if (!input.uid) return json({ error: 'Sign in first.' }, 401);
       if (action === 'createRealityCaptureDraft') {
         const capture = { ...input, captureId: `capture-${++serial}`, ownerUid: input.uid, status: 'draft' };
+        if(input.sourceCaptureId){const source=captures.get(input.sourceCaptureId);if(!source||source.ownerUid!==input.uid)return json({error:'Capture not found'},404);capture.status='uploaded';capture.hybridPreview=structuredClone(source.hybridPreview||null);capture.continuationReady=true;uploaded.set(capture.captureId,structuredClone(uploaded.get(input.sourceCaptureId)||[]));}
         captures.set(capture.captureId, capture); return json({ capture });
       }
       if (action === 'listMyRealityCaptures') return json({buildingScoped:!!input.building,truncated:false,captures: [...captures.values()].filter(c => c.ownerUid === input.uid&&(!input.building||(c.building.worldId===input.building.worldId&&c.building.sourceBuildingId===input.building.sourceBuildingId))) });
@@ -382,7 +383,8 @@ try {
   await continuation.goto(`${origin}/app/capture.html#capture=capture-1`);await continuation.click('#googleSignIn');
   await continuation.locator('#realityCapturePanel.show').waitFor();
   await continuation.click('[data-capture-new-set]');
-  await statusContains(continuation,'New photo set ready');
+  await statusContains(continuation,'Your editable version is ready');
+  assert.equal(uploaded.get(`capture-${serial}`).length,20,'Continuation retains the existing photos');
   assert.equal(captures.get('capture-1').status,'review_required');
   assert.equal(uploaded.get('capture-1').length,20);
   assert.equal(await continuation.locator('[data-capture-video]').isEnabled(),true);

@@ -502,6 +502,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       const [files] = await bucket.getFiles({ prefix: `reality-captures/${auth.uid}/${captureId}/` });
       await Promise.all(files.map((file) => file.delete({ ignoreNotFound: true })));
       let deletedRelatedDocuments = 0;
+      deletedRelatedDocuments += await deleteQueryDocuments(db, db.collection('users').doc(auth.uid).collection('notifications').where('captureId','==',captureId));
       if (capture.spaceId) {
         const spaceRef = db.collection(SPACES).doc(capture.spaceId);
         const spaceSnap = await spaceRef.get();
