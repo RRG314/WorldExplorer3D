@@ -1,5 +1,12 @@
 # World Explorer 3D System Inventory
 
+September 10 interior workflow: `reality-capture/layout-drawing.js` provides
+pointer rectangle/divider/door tools over the existing shared layout authority.
+Home editor opens directly on the grid, exposes phone handoff/photo imports and
+refresh, and preserves clicked wall/floor identity in the existing crop editor.
+Manual validated photo sets can append originals before review; reviewed or
+reconstruction sets remain frozen. See [workflow audit](research/INTERIOR_WORKFLOW_AUDIT_20260910.md).
+
 September 9 local geology integration: `app/js/geospatial/geology.js` supplies
 on-demand USGS surface-unit queries with Macrostrat fallback through the existing
 provider registry. Inspect Geology now records mapped unit evidence in the existing

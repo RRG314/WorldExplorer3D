@@ -239,12 +239,16 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       await db.runTransaction(async (tx) => {
         const snap = await tx.get(ref);
         if (!snap.exists || snap.data().ownerUid !== auth.uid) throw Error('capture_not_found');
-        if (!['draft', 'uploading'].includes(snap.data().status)) throw Error('invalid_capture_state_transition');
-        const slots = snap.data().uploadSlots || {};
+        const capture=snap.data();
+        // Manual validation is not review submission. New immutable objects may
+        // be added until a reconstruction/review has frozen this photo set.
+        const appendable=capture.status==='uploaded'&&!capture.hybridSubmission&&!capture.processed&&!capture.queuedAt;
+        if (!['draft', 'uploading'].includes(capture.status)&&!appendable) throw Error('invalid_capture_state_transition');
+        const slots = capture.uploadSlots || {};
         if (slots[`${photoId}.jpg`] === true) return;
         if (Object.keys(slots).length >= 48) throw Error('too_many_photos');
         slots[`${photoId}.jpg`] = true;
-        tx.update(ref, { uploadSlots: slots });
+        tx.update(ref, { uploadSlots: slots,...(appendable?{status:'uploading'}:{}),updatedAt:FieldValue.serverTimestamp() });
       });
       res.json({ reserved: true });
     } catch (error) { sendKnownError(res, error); }

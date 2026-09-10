@@ -307,7 +307,7 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
   $('[data-rotate]').onclick=()=>viewer?.rotate();$('[data-reset]').onclick=()=>viewer?.reset();
   $('[data-closer]').onclick=()=>viewer?.zoom(.8);$('[data-farther]').onclick=()=>viewer?.zoom(1.25);
   document.body.append(dialog);dialog.showModal();
-  await run(async()=>{await selectPhoto();selectWall(Number.isInteger(initialWall)&&initialWall>=0&&initialWall<pts.length?initialWall:0,true);await rebuild();});
+  await run(async()=>{await selectPhoto();selectWall(Number.isInteger(initialWall)&&initialWall>=0&&initialWall<$('[data-wall]').options.length?initialWall:0,true);await rebuild();});
   void loadThumbnails();
   return {close,getState:()=>({revision:preview.revision,patches:preview.patches.length,dirty,closed,selectedWall:Number($('[data-wall]').value),selectedPhoto:photoSelect.value,region:getRegion(),quad,buildingId:capture.building.sourceBuildingId})};
 }

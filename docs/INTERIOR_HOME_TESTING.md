@@ -7,11 +7,12 @@ Sign in with the same account on your phone and computer.
    **Home interior** capture rather than changing an existing exterior capture.
 2. Confirm you have permission to photograph the interior. Upload one or more
    room photos. Manual placement does not require 18 photos or paid processing.
-3. Choose **Design my interior floor plan**. Start with one floor and one open
-   room for a small first test: zero bedrooms and zero bathrooms leaves the
-   living/kitchen space. Counts create suggestions, not measured rooms.
-4. Rename the room, drag corners on the plan, or expand the exact-dimension
-   controls. A room can be divided into two connected rooms with a doorway.
+3. Choose **Design my interior floor plan**. A new plan opens directly on one
+   open space. Optional **Set up your home** supplies room-count suggestions.
+4. Choose **Draw room** and drag a rectangle inside the selected space, or
+   **Draw dividing wall**. Use **Select / move corners** for irregular outlines.
+   Choose a room label. **Place door** places a real opening on the clicked wall.
+   Exact coordinates and stair configuration remain in expandable controls.
    Finish structural divisions before placing photos.
 5. Choose **Inside selected room**, or **Add photos to this room**. Choose a
    surface, crop the photo, place it, and save it. Each side of a shared wall has

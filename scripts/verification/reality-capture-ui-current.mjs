@@ -293,10 +293,10 @@ try {
   await desktop.keyboard.press('Escape');
   assert.equal(await desktop.locator('#realityCapturePanel.show').count(), 0);
   assert.deepEqual(await desktop.evaluate(() => capturePauseEvents.at(-1)), ['reality_capture', false]);
-  assert.match(await phone.locator('[data-capture-photo-guide]').innerText(), /one room at a time/);
-  if (!await phone.locator('.captureVisualGuide:has([data-capture-photo-guide])').getAttribute('open').then(value => value !== null)) await phone.locator('.captureVisualGuide:has([data-capture-photo-guide]) summary').click();
-  assert.equal(await phone.locator('[data-capture-photo-guide] svg').isVisible(), true);
-  await phone.locator('.captureVisualGuide:has([data-capture-photo-guide])').scrollIntoViewIfNeeded();
+  assert.equal(await phone.locator('[data-capture-sectors]').isVisible(),false,'Legacy Door coverage labels are not surface assignments');
+  assert.match(await phone.locator('[data-capture-instruction]').innerText(), /click the wall or floor/);
+  assert.equal(await phone.locator('.realityCaptureRoom details').getAttribute('open'),null,'Exact measurements are optional advanced fields');
+  await phone.locator('[data-capture-instruction]').scrollIntoViewIfNeeded();
   await phone.screenshot({ path: `${out}/mobile-room-guide.png` });
   await phone.screenshot({ path: `${out}/mobile-private-room.png` });
   // Actual encoded MP4 → browser decode → normalization → existing local store.

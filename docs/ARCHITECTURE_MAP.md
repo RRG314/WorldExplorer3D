@@ -1,5 +1,13 @@
 # World Explorer 3D Architecture
 
+Interior interaction path (September 10): home grid pointer tools → existing
+`interior-layout.mjs` normalization → same saved capture layout → authored 3D
+surfaces/collision. 3D picking → canonical room/surface ID → shared hybrid photo
+editor → revision-checked private capture preview. QR carries only capture ID;
+same-account authorization resolves that capture on the phone. No duplicate
+building or photo store is introduced. Exact world/building identity groups the
+account library; production and staging records are intentionally not merged.
+
 Local geology data path (September 9): existing Inspect Geology slot → exact
 world-to-geographic position → `geospatial/geology.js` → bounded provider registry
 query → USGS surface unit or attributed Macrostrat alternatives → existing

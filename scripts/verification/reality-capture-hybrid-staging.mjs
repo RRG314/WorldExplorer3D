@@ -57,6 +57,12 @@ try{
     const capture=(await api.getMyRealityCapture(id)).capture;
     await api.uploadRealityCapturePhoto(capture,photo);
     const finalized=await api.finalizeRealityCaptureUpload(id,'manual');
+    // Add a second photo after manual validation, preserving the same capture
+    // and saved layout. This used to force users into disconnected new records.
+    ctx.fillStyle='#335577';ctx.fillRect(0,0,c.width,c.height);
+    const second=await api.normalizeCapturePhoto(await new Promise(resolve=>c.toBlob(resolve,'image/jpeg')));
+    await api.uploadRealityCapturePhoto((await api.getMyRealityCapture(id)).capture,second);
+    await api.finalizeRealityCaptureUpload(id,'manual');
     const uploaded=await api.getMyRealityCapture(id);
     const patch={id:'fixture-wall',wall:0,photoId:photo.id,region:[0,0,1,1],quad:[[0,0],[1,0],[1,1],[0,1]]};
     const preview={...uploaded.capture.hybridPreview,baseRevision:1,...(home?{roomPhotos:[{roomId:uploaded.capture.hybridPreview.layout.floors[0].rooms[0].id,patches:[{...patch,surfaceId:surface}]}]}:{patches:[patch]})};
@@ -67,7 +73,7 @@ try{
     try{await api.createRealityCaptureDraft({captureKind:'interior_room',building:capture.building});}catch(e){roomDenied=e.status===403;}
     return {uploadStatus:finalized.status,photoCount:uploaded.photos.length,revision:saved.preview.revision,submissionStatus:submitted.status,paidDenied,roomDenied};
   },{id:captureId,home,surface});
-  assert.deepEqual(manual,{uploadStatus:'uploaded',photoCount:1,revision:2,submissionStatus:'review_required',paidDenied:true,roomDenied:true});
+  assert.deepEqual(manual,{uploadStatus:'uploaded',photoCount:2,revision:2,submissionStatus:'review_required',paidDenied:true,roomDenied:true});
   if(home){const resolved=await page.evaluate(async id=>{const api=await import('/js/community-reality-capture-api.js?v=4'),capture=(await api.getMyRealityCapture(id)).capture;const value=await api.resolveBuildingInteriorRepresentation(capture.building.sourceBuildingId,capture.building.worldId,'');return {authorized:value.authorized,available:value.available,kind:value.representationKind,floors:value.layout?.floors?.length,publicRequested:capture.publicContributionRequested,model:!!value.model?.url};},captureId);assert.equal(resolved.authorized,true);assert.equal(resolved.kind,'home-layout');assert.equal(resolved.floors,2);assert.equal(resolved.publicRequested,false);assert.equal(resolved.model,true);}
   if(home){
     // Reopen through the visible account action: assigning the same hash after
@@ -77,6 +83,10 @@ try{
     const editor=page.locator('.homeLayoutEditor');await editor.waitFor();
     await editor.locator('[data-name]').fill('My saved test room');await editor.locator('[data-name]').dispatchEvent('change');
     await editor.locator('[data-save]').click();await editor.locator('[data-status]').filter({hasText:'Saved to account · revision 3'}).waitFor();
+    await editor.locator('[data-refresh-photos]').click();await editor.locator('[data-status]').filter({hasText:'2 photos available'}).waitFor();
+    await editor.locator('[data-link-phone]').click();await editor.locator('[data-home-handoff]').waitFor();
+    assert.equal(await editor.locator('[data-home-link]').getAttribute('href'),`${origin}/app/capture.html#capture=${captureId}`);
+    assert.equal(await editor.locator('[data-home-qr]').evaluate(canvas=>canvas.width>0&&canvas.height>0),true);
     await editor.locator('[data-inside]').click();await editor.locator('[data-viewer] canvas').waitFor();
     await mkdir('output/verification/reality-capture-hybrid',{recursive:true});await page.screenshot({path:'output/verification/reality-capture-hybrid/home-staging-phone.png',fullPage:true});
     await page.reload();await page.locator('[data-capture-hybrid]').click();await page.locator('.homeLayoutEditor').waitFor();

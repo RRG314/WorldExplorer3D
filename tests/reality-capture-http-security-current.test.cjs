@@ -80,7 +80,7 @@ function harness(t, capture = base, extras = {}) {
     requireModerator: async req => req.uid === 'moderator' ? { auth: { uid: req.uid }, displayName: 'Moderator' } : null,
     verifyAuth: async (req) => ({ uid: req.uid, ...authClaims }), verifyAppCheck: async () => true });
   async function call(name, uid, body = {}) {
-    const res = { headers: {}, status(code) { this.code = code; return this; },
+    const res = { code:200, headers: {}, status(code) { this.code = code; return this; },
       set(key, value) { this.headers[key] = value; return this; },
       json(value) { this.body = value; return this; } };
     await api[name]({ method: 'POST', uid, body: { captureId: id, ...body } }, res);
@@ -109,6 +109,16 @@ test('manual home layout save requires owner and permission, not paid reconstruc
   assert.equal((await h.call('saveRealityCaptureHybridPreview','owner',{preview})).code,409);
   h.mutate(`realityCaptures/${id}`,{consent:{propertyPermissionConfirmed:false}});
   assert.equal((await h.call('saveRealityCaptureHybridPreview','owner',{preview:{...preview,baseRevision:1}})).code,403);
+});
+test('only unsubmitted manual photo sets reopen for append; existing inputs are retained',async t=>{
+  const capture={ownerUid:'owner',captureKind:'interior_room',status:'uploaded',inputManifest:[{name:photoPath,generation:'1'}],hybridPreview:{revision:2}};
+  const h=harness(t,capture),photoId='b'.repeat(32);
+  assert.equal((await h.call('reserveRealityCapturePhoto','visitor',{photoId})).code,404);
+  assert.equal((await h.call('reserveRealityCapturePhoto','owner',{photoId})).code,200);
+  const saved=h.records.get(`realityCaptures/${id}`);assert.equal(saved.status,'uploading');assert.deepEqual(saved.inputManifest,capture.inputManifest);assert.equal(saved.hybridPreview.revision,2);
+  for(const extra of [{status:'review_required'},{status:'uploaded',hybridSubmission:{revision:1}},{status:'uploaded',processed:{}},{status:'uploaded',queuedAt:1}]){
+    const frozen=harness(t,{...capture,...extra});assert.notEqual((await frozen.call('reserveRealityCapturePhoto','owner',{photoId})).code,200);assert.equal(frozen.writes.length,0);
+  }
 });
 test('pending edits cannot delete an earlier published representation',async t=>{
   const h=harness(t,{...base,status:'review_required'}, {'buildingRepresentations/published':{captureId:id,status:'approved'}});
