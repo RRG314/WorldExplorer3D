@@ -609,9 +609,8 @@ function pickNearbyBuildingCandidate(force = false, deps) {
   const candidate = pickNearbyEnterableBuildingSupport(walker.x, walker.z, {
     radius: deps.INTERIOR_ENTRY_RADIUS,
     allowSynthetic: true,
-    // World entry is a door interaction, not a building-footprint proximity
-    // test. Buildings without a published exterior entrance remain available
-    // through property/place planning, but do not shout an ambient E prompt.
+    // Generated buildings use their visible door. Loaded reviewed facades also
+    // allow a nearby-building action because photos can hide that generated door.
     requireExteriorEntrance: true,
     actorBaseY: Number.isFinite(walker.y) ?
       walker.y - (appCtx.Walk?.CFG?.eyeHeight || 1.7) :
@@ -630,8 +629,7 @@ function pickNearbyBuildingCandidate(force = false, deps) {
 async function enterNearbyBuilding(deps, resolvedCandidate = null) {
   const candidate = resolvedCandidate || pickNearbyBuildingCandidate(true, deps);
   if (!candidate?.support?.enterable) return false;
-  await enterInteriorForSupport(candidate.support, deps);
-  return true;
+  return await enterInteriorForSupport(candidate.support, deps);
 }
 
 function ensureExteriorContextInteraction(deps) {

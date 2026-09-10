@@ -126,3 +126,11 @@ Validation:
 - `scripts/verification/interior-layout-ui.mjs`: 1100px and 412px; browser Back, rectangle draw/undo, shared-wall resizing, actual photo crop/save, GLB derivative, private submission, reopen, 3D surface picking and recovery. Mock HTTP with real normalizer and builder.
 - Source graph checks and skill browser smoke passed. Screenshots inspected at `output/verification/interior-reshape/`.
 - No backend schema or rule changes in this correction. Existing contributions were inspected without saving edits to them. Staging hosting is the delivery target.
+
+## Missing E prompt at photographed door
+
+The ordinary staging browser showed the user standing at the photographed door with no entry prompt. A fresh world probe at the same location found the canonical building and a generated entrance on another facade. The runtime previously gated interaction entirely on that generated entrance, even when a captured exterior covered it.
+
+Loaded reviewed exterior instances now register their canonical building for an explicit nearby entry action (3.25m from the footprint). Generated-only buildings retain their existing door-only interaction. Registration is removed with the visual and rebuilt across replacement; access still resolves through the existing protected interior endpoint. The entry action now returns actual entry success instead of reporting success after a denial/failure.
+
+Evidence: targeted proximity/height/withdrawal tests; `captured-home-entry-ui.mjs` reproduced the missing prompt and exercised real E key handling, authored scene/colliders, first-person entry, exit to previous position, and private denial. It passed with a read-only copy of the user's approved revision-2 layout as well as a synthetic layout (resolver response mocked, no private photo model loaded). The deployed staging public lifecycle test passed with actual endpoint/GLB loading, including registration of the published exterior. Source verification passed. No user submissions, sharing modes, or approvals were changed.

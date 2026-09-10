@@ -69,10 +69,19 @@ function loadGlb(url) {
   });
 }
 
+function publishCaptureEntryBuildings(appCtx) {
+  // A photographed facade can cover a generated door elsewhere on the house.
+  // Register a nearby-building interaction only while its reviewed visual exists.
+  appCtx.communityRealityCaptureEntryBuildings = new Set([...instances.values()]
+    .filter(instance => !instance.representationId.startsWith('local-survey:'))
+    .map(instance => instance.sourceBuildingId));
+}
+
 function removeInstance(appCtx, representationId) {
   const instance = instances.get(representationId);
   if (!instance) return;
   instances.delete(representationId);
+  publishCaptureEntryBuildings(appCtx);
   if(!instance.partial)setBuildingPresentationSuppressed(appCtx, instance.sourceBuildingId, false, 'community-reality-capture');
   disposeObject(instance.root);
 }
@@ -80,6 +89,7 @@ function removeInstance(appCtx, representationId) {
 export function clearCommunityRealityCapturePresentation(appCtx) {
   refreshSerial += 1;
   [...instances.keys()].forEach((sourceBuildingId) => removeInstance(appCtx, sourceBuildingId));
+  publishCaptureEntryBuildings(appCtx);
   appCtx.communityRealityCapturePresentation = Object.freeze({ worldId: '', approved: 0, loaded: 0, failed: 0 });
 }
 
@@ -126,6 +136,7 @@ async function attachRepresentation(appCtx, representation, worldId, sequence, s
     appCtx.scene.add(root);
     if(!partial)setBuildingPresentationSuppressed(appCtx, sourceBuildingId, true, 'community-reality-capture');
     instances.set(representation.representationId, { root, sourceBuildingId, partial, revision:representation.revision||0, representationId: representation.representationId });
+    publishCaptureEntryBuildings(appCtx);
     return true;
   } catch (error) {
     disposeObject(root);
