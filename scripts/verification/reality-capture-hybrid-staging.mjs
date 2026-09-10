@@ -126,7 +126,7 @@ try{
 }finally{
   if(continuedId)await page.evaluate(async id=>(await import('/js/community-reality-capture-api.js?v=4')).deleteRealityCapture(id),continuedId).catch(()=>{});
   if(captureId&&!deleted)await page.evaluate(async id=>(await import('/js/community-reality-capture-api.js?v=4')).deleteRealityCapture(id),captureId).catch(()=>{});
-  if(account?.idToken&&config)await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:delete?key=${config.apiKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idToken:account.idToken})});
+  if(account?.idToken&&config)await page.evaluate(async()=>(await import('/js/function-api.js?v=1')).postProtectedFunction('/deleteAccount',{confirmation:'DELETE'})).catch(error=>{console.error('Disposable account cleanup needs retry:',account.localId,error.message);throw error;});
   try { await browser.close(); }
   finally { await attestation?.cleanup(); }
 }

@@ -1,9 +1,6 @@
 import { postAppCheckedFunction, postProtectedFunction } from './function-api.js?v=3';
 import { initFirebase } from './firebase-init.js?v=57';
-import {
-  ref as storageRef,
-  uploadBytesResumable
-} from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-storage.js';
+
 
 const CLIENT_LIMITS = Object.freeze({
   maxInputBytes: 32 * 1024 * 1024,
@@ -153,8 +150,8 @@ export function resolvePrivateSpaceEntry(spaceId, roomId = '') {
   return endpoint('/resolvePrivateSpaceEntry', { spaceId, roomId });
 }
 
-export function resolveBuildingInteriorRepresentation(sourceBuildingId, worldId, roomId = '') {
-  return endpoint('/resolveBuildingInteriorRepresentation', { sourceBuildingId, worldId, roomId });
+export function resolveBuildingInteriorRepresentation(sourceBuildingId, worldId, roomId = '',spaceId='') {
+  return endpoint('/resolveBuildingInteriorRepresentation', { sourceBuildingId, worldId, roomId,spaceId });
 }
 
 export function resolveBuildingExteriorRepresentation(sourceBuildingId, worldId) {
@@ -210,30 +207,20 @@ export async function uploadRealityCapturePhoto(capture, photo, onProgress = nul
   await endpoint('/reserveRealityCapturePhoto', { captureId, photoId: photo.id });
   signal?.throwIfAborted();
   if (services.auth?.currentUser?.uid !== ownerUid) throw new Error('The signed-in account changed.');
-  const path = `reality-captures/${ownerUid}/${captureId}/originals/${photo.id}.jpg`;
-  const task = uploadBytesResumable(storageRef(services.storage, path), photo.blob, {
-    contentType: 'image/jpeg',
-    cacheControl: 'private, no-store, max-age=0',
-    customMetadata: {
-      ownerUid,
-      captureId,
-      sector: String(photo.sector ?? -1),
-      captureSchemaVersion: '1',
-      width: String(photo.width),
-      height: String(photo.height),
-      clientFocus: String(photo.quality?.focus || 'unknown'),
-      clientExposure: String(photo.quality?.exposure || 'unknown')
-    }
-  });
-  return new Promise((resolve, reject) => {
-    const cancel = () => task.cancel();
-    const cleanup = () => signal?.removeEventListener('abort', cancel);
-    signal?.addEventListener('abort', cancel, { once: true });
-    task.on('state_changed',
-      (snapshot) => onProgress?.(snapshot.totalBytes ? snapshot.bytesTransferred / snapshot.totalBytes : 0),
-      (error) => { cleanup(); reject(error); },
-      () => { cleanup(); resolve({ path, bytes: task.snapshot.totalBytes }); });
-    if (signal?.aborted) cancel();
+  const sha256=[...new Uint8Array(await crypto.subtle.digest('SHA-256',await photo.blob.arrayBuffer()))].map(n=>n.toString(16).padStart(2,'0')).join('');
+  const ticket=await endpoint('/createRealityCaptureUploadUrl',{captureId,photoId:photo.id,size:photo.blob.size,sector:photo.sector??-1,sha256});
+  signal?.throwIfAborted();if(services.auth?.currentUser?.uid!==ownerUid)throw Error('The signed-in account changed.');
+  if(ticket.existing){onProgress?.(1);return {path:ticket.path,bytes:photo.blob.size};}
+  return await new Promise((resolve,reject)=>{
+    const request=new XMLHttpRequest();request.open('PUT',ticket.url);
+    for(const [key,value]of Object.entries(ticket.headers))request.setRequestHeader(key,value);
+    const cancel=()=>request.abort(),cleanup=()=>signal?.removeEventListener('abort',cancel);
+    signal?.addEventListener('abort',cancel,{once:true});
+    request.upload.onprogress=e=>{if(e.lengthComputable)onProgress?.(e.loaded/e.total);};
+    request.onerror=()=>{cleanup();reject(Error('Upload interrupted. Your photo stays on this device; retry to continue.'));};
+    request.onabort=()=>{cleanup();reject(new DOMException('Upload cancelled','AbortError'));};
+    request.onload=()=>{cleanup();if(request.status>=200&&request.status<300){onProgress?.(1);resolve({path:ticket.path,bytes:photo.blob.size});}else reject(Error('Upload did not finish. Retry this photo; existing originals cannot be overwritten.'));};
+    request.send(photo.blob);if(signal?.aborted)cancel();
   });
 }
 

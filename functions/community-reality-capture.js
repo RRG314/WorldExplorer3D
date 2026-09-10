@@ -20,6 +20,7 @@ const CAPTURES = 'realityCaptures';
 const SPACES = 'privateSpaces';
 const ACCESS_REQUESTS = 'privateSpaceAccessRequests';
 const REPRESENTATIONS = 'buildingRepresentations';
+const targetPolicy=import('./capture-target.mjs');
 const SIGNED_URL_TTL_MS = 60 * 1000;
 
 function clean(value, max = 180) {
@@ -59,6 +60,7 @@ function serializeCapture(snapshot) {
     captureId: clean(data.captureId || snapshot.id, 180),
     sourceCaptureId: clean(data.sourceCaptureId, 180),
     sourceRevision: Number(data.sourceRevision) || 0,
+    supersededBy: clean(data.supersededBy,180),
     continuationReady: data.continuationReady !== false,
     captureSchemaVersion: Number(data.captureSchemaVersion) || 1,
     processingPipelineVersion: clean(data.processingPipelineVersion, 100),
@@ -103,6 +105,14 @@ async function deleteQueryDocuments(db, query, batchSize = 200) {
   }
 }
 
+async function readAllCaptureRows(query) {
+  const docs=[];let cursor=null;
+  do {let page=query.orderBy(FieldPath.documentId()).limit(200);if(cursor)page=page.startAfter(cursor);
+    const snapshot=await page.get();docs.push(...snapshot.docs);cursor=snapshot.docs.length===200?snapshot.docs.at(-1).id:null;
+  } while(cursor);
+  return {docs,empty:!docs.length,size:docs.length};
+}
+
 async function readAccessContext(spaceRef, uid, roomId = '') {
   const memberPromise = spaceRef.collection('members').doc(uid).get();
   const sessionPromise = roomId
@@ -140,7 +150,7 @@ async function sharedRoomOwnerIsOnline(db, roomId, requesterUid, ownerUid, expec
     roomRef.collection('players').doc(ownerUid).get()
   ]);
   if (!roomSnap.exists || !requesterSnap.exists || !ownerSnap.exists) return false;
-  if (expectedWorldId && roomWorldId(roomSnap.data() || {}) !== expectedWorldId) return false;
+  if (expectedWorldId && !(await targetPolicy).sameCaptureWorld(roomWorldId(roomSnap.data() || {}),expectedWorldId)) return false;
   const nowMs = Date.now();
   const isFresh = (snapshot) => {
     const presence = snapshot.data() || {};
@@ -179,6 +189,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     if (verifyAppCheck && !(await verifyAppCheck(req, res, { required: options.appCheck !== false }))) return null;
     const auth = await verifyAuth(req, res);
     if (!auth) return null;
+    if(helpers.captureAccountIsDeleting&&await helpers.captureAccountIsDeleting(auth.uid)){res.status(409).json({error:'Account deletion is in progress. Capture changes are disabled.'});return null;}
     return auth;
   }
 
@@ -199,12 +210,15 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
         if(source.captureKind==='interior_room'&&source.consent?.propertyPermissionConfirmed!==true)throw Error('interior_permission_confirmation_required');
         draft.captureId=`capture_${require('node:crypto').createHash('sha256').update(`${auth.uid}/${id}/${source.hybridPreview?.revision||0}/${source.hybridSubmission?.revision||0}`).digest('hex').slice(0,32)}`;
         Object.assign(draft,{building:source.building,captureKind:source.captureKind,room:source.room||null,spaceId:source.spaceId||null,footprintSignature:footprintSignature(source.building,source.captureKind==='interior_room'?source.room:null),consent:source.consent||draft.consent,sourceCaptureId:id,sourceRevision:source.hybridPreview?.revision||0,continuationReady:false,publicContributionRequested:false});
+        draft.replacementCaptureId=source.status==='approved'?id:(source.replacementCaptureId||'');
+        draft.replacementRevision=source.status==='approved'?(source.hybridSubmission?.revision||0):(source.replacementRevision||0);
         draft.buildingDetails=source.buildingDetails||draft.buildingDetails;
         draft.exteriorScope=source.exteriorScope==='facade'?'facade':'building';
         draft.consent={...draft.consent,publicContributionExplicit:false};
       }
       const ref = db.collection(CAPTURES).doc(draft.captureId);
       await db.runTransaction(async (transaction) => {
+        if((await transaction.get(db.collection('captureAccountDeletions').doc(auth.uid))).exists)throw Error('account_deleting');
         if(source){const existingDraft=await transaction.get(ref);if(existingDraft.exists){if(existingDraft.data().ownerUid!==auth.uid||existingDraft.data().sourceCaptureId!==source.captureId)throw Error('capture_owner_required');return;}}
         const spaceRef = draft.spaceId ? db.collection(SPACES).doc(draft.spaceId) : null;
         const existing = spaceRef ? await transaction.get(spaceRef) : null;
@@ -293,6 +307,25 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     } catch (error) { sendKnownError(res, error); }
   });
 
+  const createRealityCaptureUploadUrl=functions.region('us-central1').https.onRequest(async(req,res)=>{
+    const auth=await guard(req,res);if(!auth)return;
+    try{
+      const captureId=clean(req.body?.captureId,180),photoId=clean(req.body?.photoId,32),size=req.body?.size,sha256=req.body?.sha256;
+      if(!/^[\w-]{1,180}$/.test(captureId)||!/^[a-f0-9]{32}$/.test(photoId))throw Error('invalid_photo_identity');
+      if(!Number.isSafeInteger(size)||size<1||size>12*1024*1024||!/^[a-f0-9]{64}$/.test(sha256||''))throw Error('invalid_photo_size_or_hash');
+      const snap=await db.collection(CAPTURES).doc(captureId).get(),capture=snap.data();
+      if(!snap.exists||capture.ownerUid!==auth.uid)throw Error('capture_not_found');
+      if(!['draft','uploading'].includes(capture.status)||capture.uploadSlots?.[photoId+'.jpg']!==true)throw Error('invalid_capture_state_transition');
+      const path=`reality-captures/${auth.uid}/${captureId}/originals/${photoId}.jpg`,file=bucket.file(path);
+      if((await file.exists())[0]){const [bytes]=await file.download();if(require('node:crypto').createHash('sha256').update(bytes).digest('hex')!==sha256)throw Error('photo_identity_conflict');return res.json({existing:true,path});}
+      const headers={'Content-Type':'image/jpeg','Cache-Control':'private, no-store, max-age=0','x-goog-if-generation-match':'0','x-goog-content-length-range':`${size},${size}`,
+        'x-goog-meta-owneruid':auth.uid,'x-goog-meta-captureid':captureId,'x-goog-meta-sector':String(Number.isInteger(req.body.sector)?req.body.sector:-1),'x-goog-meta-sha256':sha256};
+      const expiresAtMs=Date.now()+60000;
+      const [url]=await file.getSignedUrl({version:'v4',action:'write',expires:expiresAtMs,contentType:'image/jpeg',extensionHeaders:headers});
+      res.set('Cache-Control','private, no-store');res.json({url,headers,path,expiresAtMs});
+    }catch(e){sendKnownError(res,e);}
+  });
+
   const retryRealityCapture = functions.region('us-central1').https.onRequest(async (req, res) => {
     const auth = await guard(req, res);
     if (!auth) return;
@@ -319,18 +352,19 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     const auth = await guard(req, res);
     if (!auth) return;
     try {
+      const {sameCaptureWorld}=await targetPolicy;
       let query = db.collection(CAPTURES).where('ownerUid', '==', auth.uid);
       const target = req.body?.building;
       if (target) {
         const worldId = clean(target.worldId, 220), sourceBuildingId = clean(target.sourceBuildingId, 220);
         if (!worldId || !sourceBuildingId) return res.status(400).json({error:'canonical_building_required'});
-        query = query.where('building.worldId', '==', worldId).where('building.sourceBuildingId', '==', sourceBuildingId);
+        query = query.where('building.sourceBuildingId', '==', sourceBuildingId);
       }
       query=query.orderBy(FieldPath.documentId());
       const cursor=req.body?.cursor;
       if(cursor){if(typeof cursor!=='string'||!/^[-\w]{1,180}$/.test(cursor))return res.status(400).json({error:'invalid_capture_cursor'});query=query.startAfter(cursor);}
       const snap = await query.limit(61).get(),page=snap.docs.slice(0,60);
-      const captures = page.map(serializeCapture).sort((a, b) => b.updatedAtMs - a.updatedAtMs);
+      const captures = (await Promise.all(page.map(async row=>{const value=serializeCapture(row);if(value.spaceId){const space=await db.collection(SPACES).doc(value.spaceId).get();if(space.exists&&space.data().ownerUid===auth.uid)value.accessMode=space.data().accessMode||'PRIVATE';}return value;}))).filter(c=>!target||sameCaptureWorld(c.building.worldId,target.worldId)).sort((a, b) => b.updatedAtMs - a.updatedAtMs);
       res.status(200).json({ captures, truncated: snap.docs.length > 60,nextCursor:snap.docs.length>60?page.at(-1).id:null, buildingScoped: !!target });
     } catch (error) {
       console.error('[listMyRealityCaptures]', error);
@@ -370,7 +404,8 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       }));
       }
       res.set('Cache-Control', 'private, no-store');
-      res.status(200).json({ capture: { ...serializeCapture(snap), captureId, ownerUid: auth.uid }, photos });
+      const serialized=serializeCapture(snap);if(serialized.spaceId){const space=await db.collection(SPACES).doc(serialized.spaceId).get();if(space.exists&&space.data().ownerUid===auth.uid)serialized.accessMode=space.data().accessMode||'PRIVATE';}
+      res.status(200).json({ capture: { ...serialized, captureId, ownerUid: auth.uid }, photos });
     } catch (error) {
       sendKnownError(res, error);
     }
@@ -568,41 +603,32 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     const auth = await guard(req, res);
     if (!auth) return;
     try {
+      const {sameCaptureWorld}=await targetPolicy;
       const sourceBuildingId = clean(req.body?.sourceBuildingId, 220);
       const worldId = clean(req.body?.worldId, 220);
       const roomId = clean(req.body?.roomId, 180);
       if (!sourceBuildingId || !worldId) throw new Error('canonical_building_required');
-      const spacesSnap = await db.collection(SPACES)
-        .where('canonicalBuilding.sourceBuildingId', '==', sourceBuildingId)
-        .limit(12)
-        .get();
-      const matching = spacesSnap.docs.filter((row) => clean(row.data()?.canonicalBuilding?.worldId, 220) === worldId);
+      const spacesSnap = await readAllCaptureRows(db.collection(SPACES).where('canonicalBuilding.sourceBuildingId','==',sourceBuildingId));
+      const matching = spacesSnap.docs.filter((row) => sameCaptureWorld(row.data()?.canonicalBuilding?.worldId,worldId));
       if (!matching.length) return res.status(200).json({ available: false, reason: 'no_captured_interior' });
-      let deniedAccess = null;
-      const ownerPresence = new Map();
-      for (const row of matching) {
-        const space = row.data() || {};
-        const context = await readAccessContext(row.ref, auth.uid, roomId);
-        const ownerUid = clean(space.ownerUid, 180);
-        if (!ownerPresence.has(ownerUid)) {
-          ownerPresence.set(ownerUid, await sharedRoomOwnerIsOnline(db, roomId, auth.uid, ownerUid, worldId));
-        }
-        const access = resolveSpaceAccess({
-          space,
-          requesterUid: auth.uid,
-          ...context,
-          roomId,
-          ownerOnline: ownerPresence.get(ownerUid) === true
-        });
-        if (!access.allowed) {
-          deniedAccess ||= { ...access, spaceId: row.id };
-          continue;
-        }
-        const selectedCaptureId=auth.uid===space.ownerUid?(space.pendingCaptureId||space.captureId):space.captureId;
-        if(!selectedCaptureId)continue;
-        const captureSnap = await db.collection(CAPTURES).doc(selectedCaptureId).get();
-        if (!captureSnap.exists) continue;
-        const capture = captureSnap.data() || {};
+      let deniedAccess=null;
+      const eligible=[];
+      for(const row of matching){
+        const space=row.data()||{},context=await readAccessContext(row.ref,auth.uid,roomId);
+        const ownerOnline=await sharedRoomOwnerIsOnline(db,roomId,auth.uid,clean(space.ownerUid,180),worldId);
+        const access=resolveSpaceAccess({space,requesterUid:auth.uid,...context,roomId,ownerOnline});
+        if(!access.allowed){deniedAccess||={...access,spaceId:row.id};continue;}
+        const captureId=auth.uid===space.ownerUid?(space.pendingCaptureId||space.captureId):space.captureId;if(!captureId)continue;
+        const captureSnap=await db.collection(CAPTURES).doc(captureId).get();if(!captureSnap.exists)continue;const capture=captureSnap.data();
+        if(capture.ownerUid!==auth.uid&&capture.status!=='approved')continue;
+        const hasPreview=capture.ownerUid===auth.uid&&capture.hybridPreview?.kind==='home-layout'&&capture.hybridPreview.layout?.floors?.some(f=>f.rooms?.length);
+        if(!capture.hybridSubmission?.modelPath&&!capture.processed?.optimizedModelPath&&!hasPreview)continue;
+        eligible.push({row,space,context,access,captureSnap,capture,label:clean(capture.hybridPreview?.layout?.unitLabel||space.label||space.unitLabel||capture.room?.label||'Private interior',100)});
+      }
+      const selectedSpaceId=clean(req.body?.spaceId,180);
+      if(!selectedSpaceId&&eligible.length>1)return res.status(200).json({available:true,authorized:true,selectionRequired:true,spaces:eligible.map(({row,label})=>({spaceId:row.id,label}))});
+      const candidates=selectedSpaceId?eligible.filter(v=>v.row.id===selectedSpaceId):eligible;
+      for(const {row,space,context,access,captureSnap,capture} of candidates){
         const manual=['room-patches','home-layout'].includes(capture.hybridSubmission?.kind)&&
           (capture.ownerUid===auth.uid||capture.hybridSubmission.status==='approved')?capture.hybridSubmission:null;
         if (capture.ownerUid!==auth.uid&&capture.status!=='approved') continue;
@@ -633,6 +659,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
           access
         });
       }
+      if(!deniedAccess&&!selectedSpaceId)return res.status(200).json({available:false,reason:'no_saved_interior'});
       return res.status(403).json({
         available: true,
         authorized: false,
@@ -652,17 +679,15 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
     if (verifyAppCheck && !(await verifyAppCheck(req, res, { required: true }))) return;
     try {
+      const {sameCaptureWorld}=await targetPolicy;
       const sourceBuildingId = clean(req.body?.sourceBuildingId, 220);
       const worldId = clean(req.body?.worldId, 220);
       if (!sourceBuildingId || !worldId) throw new Error('canonical_building_required');
-      const snap = await db.collection(REPRESENTATIONS)
-        .where('canonicalBuilding.sourceBuildingId', '==', sourceBuildingId)
-        .limit(8)
-        .get();
+      const snap = await readAllCaptureRows(db.collection(REPRESENTATIONS).where('canonicalBuilding.sourceBuildingId','==',sourceBuildingId));
       const match = snap.docs.find((row) => {
         const data = row.data() || {};
         return data.status === 'approved' && data.visibility === 'public' && data.captureKind === 'exterior' &&
-          clean(data.canonicalBuilding?.worldId, 220) === worldId;
+          sameCaptureWorld(data.canonicalBuilding?.worldId,worldId);
       });
       if (!match) return res.status(200).json({ available: false });
       const representation = match.data() || {};
@@ -691,6 +716,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
     if (verifyAppCheck && !(await verifyAppCheck(req, res, { required: true }))) return;
     try {
+      const {sameCaptureWorld}=await targetPolicy;
       const worldId = clean(req.body?.worldId, 220);
       if (!worldId) throw new Error('canonical_building_required');
       const sourceIds=req.body?.sourceBuildingIds;
@@ -698,18 +724,16 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       let snapshot;
       if(sourceIds?.length){
         const ids=[...new Set(sourceIds)],pages=[];
-        for(let i=0;i<ids.length;i+=30)pages.push(await db.collection(REPRESENTATIONS).where('canonicalBuilding.sourceBuildingId','in',ids.slice(i,i+30)).limit(120).get());
+        for(let i=0;i<ids.length;i+=30)pages.push(await readAllCaptureRows(db.collection(REPRESENTATIONS).where('canonicalBuilding.sourceBuildingId','in',ids.slice(i,i+30))));
         snapshot={docs:pages.flatMap(page=>page.docs).filter(row=>row.data().status==='approved'&&row.data().visibility==='public')};
-      }else snapshot = await db.collection(REPRESENTATIONS)
+      }else snapshot = await readAllCaptureRows(db.collection(REPRESENTATIONS)
         .where('canonicalBuilding.worldId', '==', worldId)
         .where('status', '==', 'approved')
-        .where('visibility', '==', 'public')
-        .limit(60)
-        .get();
+        .where('visibility', '==', 'public'));
       const representations = [];
       for (const row of snapshot.docs) {
         const data = row.data() || {};
-        if (data.captureKind !== 'exterior' || !data.modelPath || clean(data.canonicalBuilding?.worldId,220)!==worldId) continue;
+        if (data.captureKind !== 'exterior' || !data.modelPath || !sameCaptureWorld(data.canonicalBuilding?.worldId,worldId)) continue;
         let patchHeightMeters = data.patchHeightMeters;
         // Legacy approved wall revisions predate an explicit height field.
         // Read their exact matching submission; never guess from a partial mesh.
@@ -958,7 +982,17 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
           const manifestRef=db.collection('buildingPatchManifests').doc(stableId('building-patches',capture.building.sourceBuildingId));
           const manifest=await tx.get(manifestRef),previous=manifest.exists?manifest.data().regions||[]:[];
           const regions=hybrid.patches.map(p=>{const a=hybrid.footprint[p.wall],b=hybrid.footprint[(p.wall+1)%hybrid.footprint.length];const one=[a.x,a.z].map(n=>n.toFixed(2)).join(','),two=[b.x,b.z].map(n=>n.toFixed(2)).join(',');return {captureId,edge:[one,two].sort().join('|'),left:one<two?p.region[0]:1-p.region[2],right:one<two?p.region[2]:1-p.region[0],bottom:p.region[1]*hybrid.heightMeters,top:p.region[3]*hybrid.heightMeters};});
-          const retained=previous.filter(p=>p.captureId!==captureId);
+          let replacing='';
+          if(capture.replacementCaptureId){
+            const priorRef=db.collection(CAPTURES).doc(capture.replacementCaptureId),prior=await tx.get(priorRef);
+            const installed=await tx.get(db.collection(REPRESENTATIONS).where('captureId','==',capture.replacementCaptureId));
+            const {sameCaptureBuilding}=await targetPolicy;
+            if(!prior.exists||prior.data().ownerUid!==capture.ownerUid||!sameCaptureBuilding(prior.data().building,capture.building)||(prior.data().hybridSubmission?.revision||0)!==capture.replacementRevision||!installed.docs.some(r=>r.data().status==='approved'))throw Error('replacement_revision_changed');
+            replacing=capture.replacementCaptureId;
+            for(const row of installed.docs)if(row.data().status==='approved')writes.push([db.collection(REPRESENTATIONS).doc(row.id),{status:'superseded',supersededBy:captureId}]);
+            writes.push([priorRef,{supersededBy:captureId,updatedAt:FieldValue.serverTimestamp()}]);
+          }
+          const retained=previous.filter(p=>p.captureId!==captureId&&p.captureId!==replacing);
           if(retained.some(a=>regions.some(b=>a.edge===b.edge && Math.min(a.right,b.right)-Math.max(a.left,b.left)>.001 && Math.min(a.top,b.top)-Math.max(a.bottom,b.bottom)>.01)))throw Error('approved_patch_overlap_requires_resolution');
           if(retained.length+regions.length>128)throw Error('building_patch_budget_exceeded');
           writes.push([manifestRef,{sourceBuildingId:capture.building.sourceBuildingId,regions:[...retained,...regions],updatedAt:FieldValue.serverTimestamp()}]);
@@ -1115,6 +1149,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
   return {
     retryRealityCaptureReviewEmail,
     createRealityCaptureDraft,
+    createRealityCaptureUploadUrl,
     reserveRealityCapturePhoto,
     retryRealityCapture,
     getMyRealityCapture,

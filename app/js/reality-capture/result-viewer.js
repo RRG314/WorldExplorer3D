@@ -9,7 +9,7 @@ export async function createCaptureViewer(host, bytes, signal, options = {}) {
   if (signal.aborted) return null;
   const T = globalThis.THREE;
   let model = options.model || (await new Promise((resolve, reject) => new T.GLTFLoader().parse(bytes, '', resolve, reject))).scene;
-  if(options.exteriorBuilding){const {buildHybridShell}=await import('./hybrid-geometry.js');const shell=buildHybridShell(T,options.exteriorBuilding,options.patchHeightMeters,{});shell.add(model);model=shell;}
+  if(options.exteriorBuilding){const {buildHybridShell}=await import('./hybrid-geometry.js?v=1');const shell=buildHybridShell(T,options.exteriorBuilding,options.patchHeightMeters,{});shell.add(model);model=shell;}
   if(options.homeLayout){const {buildAuthoredInterior}=await import('../interiors/authored-geometry.js');const home=buildAuthoredInterior(T,options.homeLayout);home.group.add(model);home.group.traverse(o=>{if(o.userData.kind==='ceiling')o.visible=false;});model=home.group;}
   if(model.name==='authored-home')options={...options,interiorLighting:true};
   const disposeModel = () => model.traverse(object => {

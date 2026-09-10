@@ -32,16 +32,14 @@ async function makePage(viewport, mobile = false) {
     // delivery is exercised by the staging acceptance, not this transport double.
     if(url.pathname.endsWith('firebase-firestore.js'))return module(`export const collection=(...args)=>args;export const query=(...args)=>args;export const orderBy=(...args)=>args;export const limit=n=>n;export const onSnapshot=(_,next)=>{queueMicrotask(()=>next({docs:[]}));return()=>{}};`);
     if (url.pathname.endsWith('/function-api.js')) return module(`import {getCurrentUser} from '/js/auth-ui.js?v=55';export async function postProtectedFunction(name,body={}){const r=await fetch('/__test'+name,{method:'POST',body:JSON.stringify({uid:getCurrentUser()?.uid,...body})});const data=await r.json();if(!r.ok){const e=new Error(data.error);e.status=r.status;throw e;}return data;}export const postAppCheckedFunction=postProtectedFunction;`);
-    if (url.pathname.endsWith('firebase-storage.js')) return module(`export const ref=(_,path)=>path;
-      export function uploadBytesResumable(path,blob,metadata){let cancelled=false;return {snapshot:{totalBytes:blob.size},cancel(){cancelled=true},on(_,progress,error,done){fetch('/__test/upload',{method:'POST',body:JSON.stringify({path,metadata})}).then(async r=>{if(cancelled||!r.ok)throw Error('Upload interrupted. Retry to continue.');progress({bytesTransferred:blob.size,totalBytes:blob.size});done()}).catch(error);}}}`);
     if (url.pathname.startsWith('/__test/')) {
-      const input = route.request().postDataJSON(), action = url.pathname.slice(8);
+      const action = url.pathname.slice(8), input=action==='upload'?{path:url.searchParams.get('path'),sector:url.searchParams.get('sector')}:route.request().postDataJSON();
       const json = (body, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
       if (action === 'upload') {
         if (failNextUpload) { failNextUpload = false; return json({ error: 'interrupted' }, 503); }
         const captureId = input.path.split('/')[2], photos = uploaded.get(captureId) || [];
         const id = input.path.split('/').at(-1).split('.')[0];
-        if (!photos.some(p => p.id === id)) photos.push({ id, sector: Number(input.metadata.customMetadata.sector) });
+        if (!photos.some(p => p.id === id)) photos.push({ id, sector: Number(input.sector) });
         uploaded.set(captureId, photos); return json({ ok: true });
       }
       if (!input.uid) return json({ error: 'Sign in first.' }, 401);
@@ -60,6 +58,7 @@ async function makePage(viewport, mobile = false) {
       }
       if (action === 'retryRealityCapture') return json({error:'Reconstruction is development-only.'},403);
       if (action === 'getRealityCaptureAssetAccess') return json({url:savedPhotoDataUrl});
+      if(action==='createRealityCaptureUploadUrl'){const path=`reality-captures/${input.uid}/${input.captureId}/originals/${input.photoId}.jpg`;return json({path,url:`${origin}/__test/upload?path=${encodeURIComponent(path)}&sector=${input.sector||0}`,headers:{'Content-Type':'image/jpeg'}});}
       if (action === 'reserveRealityCapturePhoto') return json({ reserved: true });
       if (action === 'finalizeRealityCaptureUpload') { assert.equal(input.mode,'manual'); capture.status = 'uploaded'; return json({ status: 'uploaded' }); }
       if (action === 'deleteRealityCapture') { captures.delete(input.captureId); return json({ deleted: true }); }
@@ -114,6 +113,7 @@ try {
   assert.equal(await phone.locator('#realityCapturePanel.show').count(), 0);
   await phone.click('#switchAccount'); await phone.click('#googleSignIn');
   await phone.locator('#realityCapturePanel.show').waitFor();
+  assert.ok(await phone.evaluate(()=>history.state?.captureStep),'Phone handoff URL must retain the active workspace history entry');
   await phone.locator('[data-building-details] summary').click();
   assert.equal(await phone.locator('[data-building-referenceWidthMeters]').inputValue(),'1.016');
   assert.equal(await phone.locator('[data-building-referenceWidthMeters]').isDisabled(),true);
@@ -144,12 +144,10 @@ try {
   await phone.waitForFunction(() => document.querySelector('[data-camera-status]').textContent.includes('Last local photo removed'));
   await phone.click('[data-camera-done]');
   assert.match(await phone.locator('[data-capture-count]').textContent(), /^0 /);
-  assert.match(await phone.locator('[data-capture-photo-guide]').innerText(), /70%/);
-  await phone.click('[data-sector-index="2"]');
-  assert.match(await phone.locator('[data-capture-photo-guide] svg').getAttribute('aria-label'), /Position 3 selected/);
+  assert.match(await phone.locator('[data-capture-photo-guide]').innerText(), /One photo is enough/);
+  assert.equal(await phone.locator('[data-capture-sectors]').isVisible(),false);
   await phone.locator('.captureVisualGuide:has([data-capture-photo-guide])').scrollIntoViewIfNeeded();
   await phone.screenshot({ path: `${out}/mobile-exterior-guide.png` });
-  await phone.click('[data-sector-index="0"]');
   await phone.locator('.captureVisualGuide:has([data-capture-photo-guide]) summary').click();
   const photo = await phone.evaluate(() => {
     const c=document.createElement('canvas');c.width=1600;c.height=1200;const x=c.getContext('2d');
@@ -161,19 +159,18 @@ try {
   savedPhotoDataUrl='data:image/png;base64,'+photo;
   await phone.locator('[data-capture-input]').setInputFiles([file, file, file]);
   await statusContains(phone, '3 photos are saved');
-  assert.match(await phone.locator('[data-capture-sectors] button.active').innerText(), /Front/);
-  assert.equal(await phone.locator('[data-capture-sectors] button.covered').count(), 1);
+  assert.equal(await phone.locator('[data-capture-sectors]').isVisible(),false);
   await phone.getByText('View saved and new photos', { exact: true }).click();
   assert.equal(await phone.locator('[data-capture-photo-grid] img').count(), 3);
   await phone.waitForFunction(() => [...document.querySelectorAll('[data-capture-photo-grid] img')].every(image => image.naturalWidth > 0));
   await phone.locator('[data-capture-photo-grid]').scrollIntoViewIfNeeded();
   await phone.screenshot({ path: `${out}/mobile-photo-review.png` });
   await phone.locator('[data-remove-photo]').first().click();
-  await phone.waitForFunction(() => document.querySelector('[data-capture-count]').textContent.startsWith('2 /'));
+  await phone.waitForFunction(() => document.querySelector('[data-capture-count]').textContent.startsWith('2 photos'));
   await phone.locator('[data-capture-input]').setInputFiles(file);
-  await phone.waitForFunction(() => document.querySelector('[data-capture-count]').textContent.startsWith('3 /'));
+  await phone.waitForFunction(() => document.querySelector('[data-capture-count]').textContent.startsWith('3 photos'));
   await phone.getByText('View saved and new photos', { exact: true }).click();
-  failNextUpload = true; await phone.click('[data-capture-save]'); await statusContains(phone, 'interrupted');
+  failNextUpload = true; await phone.click('[data-capture-save]'); await statusContains(phone, 'did not finish');
   await phone.click('[data-capture-save]'); await statusContains(phone, 'Photos saved privately to your account');
   assert.equal(uploaded.get('capture-1').length, 3);
   await desktop.click('[data-capture-refresh]');
@@ -274,6 +271,14 @@ try {
   assert.equal(await phone.locator('[data-room-width]').inputValue(), '5.5');
   assert.equal(await phone.locator('[data-room-permission]').isChecked(), true);
   assert.equal(await phone.locator('[data-public-contribution]').isChecked(), false);
+  await phone.click('[data-capture-reuse]');
+  await phone.locator('.realityCaptureDialog [data-photos] input').first().waitFor();
+  await phone.locator('.realityCaptureDialog [data-photos] input').first().check();
+  await phone.locator('.realityCaptureDialog [data-import]').click();
+  await statusContains(phone,'1 photos are saved');
+  assert.equal(await phone.locator('#realityCapturePanel').isVisible(),true,'Photo reuse returns to the same building');
+  assert.equal(uploaded.get('capture-2')?.length||0,0,'Reusing photos does not silently upload them');
+
   await phone.click('[data-capture-kind="exterior"]');
   await phone.waitForFunction(()=>location.hash==='#capture=capture-1');
   await phone.click('[data-capture-kind="interior_room"]');
@@ -327,7 +332,7 @@ try {
   });
   await statusContains(phone,'video frames saved locally');
   const videoCount=await phone.locator('[data-capture-count]').textContent();
-  assert.match(videoCount,/^[12] \/ 1 minimum/);
+  assert.match(videoCount,/^[23] photos/); // One reused photo plus one or two decoded frames.
   const videoChecks=await phone.evaluate(async()=>{
     const {extractVideoFrames}=await import('/app/js/reality-capture/video-frames.js?v=1');
     const aborted=new AbortController();aborted.abort();let stopped=false;

@@ -1,3 +1,4 @@
+import './capture-theme.js';
 import {
   requestPrivateSpaceAccess,
   resolveBuildingInteriorRepresentation
@@ -25,7 +26,16 @@ export async function resolveCommunityInteriorDefinition(appCtx, support, resolv
   if (!sourceBuildingId || !worldId) return resolveFallback(support);
   try {
     const roomId = canonicalRoomId(appCtx);
-    const response = await resolveBuildingInteriorRepresentation(sourceBuildingId, worldId, roomId);
+    let response = await resolveBuildingInteriorRepresentation(sourceBuildingId, worldId, roomId);
+    if(response?.selectionRequired){
+      const dialog=document.createElement('dialog');dialog.className='realityCaptureDialog';dialog.setAttribute('aria-label','Choose an interior');
+      const title=document.createElement('h2');title.textContent='Choose an interior';dialog.append(title);
+      for(const [index,space] of response.spaces.entries()){const b=document.createElement('button');b.textContent=`${space.label} · ${index+1}`;b.onclick=()=>dialog.close(space.spaceId);dialog.append(b);}
+      const cancel=document.createElement('button');cancel.textContent='Back outside';cancel.onclick=()=>dialog.close();dialog.append(cancel);document.body.append(dialog);dialog.showModal();
+      const id=await new Promise(resolve=>dialog.addEventListener('close',()=>resolve(dialog.returnValue),{once:true}));dialog.remove();
+      if(!id)return {accessDenied:true,label:'Interior selection cancelled',reason:'cancelled',requestable:false};
+      response=await resolveBuildingInteriorRepresentation(sourceBuildingId,worldId,roomId,id);
+    }
     if (!response?.available) return resolveFallback(support);
     if (!response.authorized) {
       return {

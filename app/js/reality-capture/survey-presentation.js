@@ -1,6 +1,6 @@
 import {surveyOwner,surveyKey,localSurveyEnabled} from './survey-store.js';
-import {loadLocalCaptureRecord} from './local-draft-store.js';
-import {buildWallPatch,rectifyPhoto,wallFootprint} from './hybrid-geometry.js';
+import {loadLocalCaptureRecord} from './local-draft-store.js?v=1';
+import {buildWallPatch,rectifyPhoto,wallFootprint} from './hybrid-geometry.js?v=1';
 import {worldModificationIdentityForLocation} from '../editable-world/model.js?v=1';
 
 // Produces the same facade-patch representation consumed by the existing runtime.

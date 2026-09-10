@@ -5,7 +5,7 @@ import {groupCaptureBuildings,captureLabel} from './workflow-presentation.js';
 import {mountCaptureActivity} from '../../../js/capture-activity.js';
 
 const status = document.getElementById('phoneStatus');
-mountCaptureActivity(document.getElementById('phoneCaptures'),{open:id=>{history.replaceState(null,'',`#capture=${encodeURIComponent(id)}`);void openCapture(id);}});
+mountCaptureActivity(document.getElementById('phoneCaptures'),{open:id=>{history.replaceState(history.state,'',`#capture=${encodeURIComponent(id)}`);void openCapture(id);}});
 let generation = 0;
 const selectedCapture = () => new URLSearchParams(location.hash.slice(1)).get('capture') || '';
 
@@ -37,7 +37,7 @@ async function refreshList() {
       button.type = 'button';
       button.textContent = captureLabel(capture);
       button.addEventListener('click', () => {
-        history.replaceState(null, '', `#capture=${encodeURIComponent(capture.captureId)}`);
+        history.replaceState(history.state, '', `#capture=${encodeURIComponent(capture.captureId)}`);
         void openCapture(capture.captureId);
       });
       section.appendChild(button);

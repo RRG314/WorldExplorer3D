@@ -1,3 +1,4 @@
+import {mountCaptureStep} from './workspace-navigation.js';
 import './capture-theme.js';
 import {wallDirections} from './orientation.js';
 import {mountCaptureMap} from './map-context.js';
@@ -84,7 +85,7 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
     <button data-submit>Submit saved walls for approval</button><p data-submission role="status"></p></section>
   `;
   const $=s=>dialog.querySelector(s), cache=new Map(), snapshots=[], thumbs=new Map(),patchThumbs=new Map();
-  if(inWorld){$('[data-close]').textContent='Back to photos';$('[data-close]').setAttribute('aria-label','Back to Photo Survey');}
+  if(inWorld){$('[data-close]').textContent='Back to photos';$('[data-close]').setAttribute('aria-label',capture.authoredLayout?'Back to interior':'Back to photos');}
   const deviceOnly=saveScope==='device',savedWhere=deviceOnly?'on this device':'to account';
   if(deviceOnly)$('[data-save]').textContent='Save preview in my local world';
   if(capture.authoredLayout)$('[data-save]').textContent='Save room photos and home layout';
@@ -128,7 +129,7 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
     }
     if(!closed)setBusy(false);
   }}
-  function close(){if(closed)return;closed=true;abort.abort();viewer?.dispose();for(const b of cache.values())b.close?.();cache.clear();thumbs.clear();signal.removeEventListener('abort',close);dialog.close();dialog.remove();onClose?.();}
+  function close(){if(closed)return;closed=true;abort.abort();viewer?.dispose();for(const b of cache.values())b.close?.();cache.clear();thumbs.clear();signal.removeEventListener('abort',close);dialog.captureStepDispose?.();dialog.close();dialog.remove();onClose?.();}
   signal.addEventListener('abort',close,{once:true});
   if(recovery?.preview){
     $('[data-recovery]').hidden=false;
@@ -139,6 +140,7 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
   $('[data-recover]').onclick=()=>run(async()=>{if(recovery.preview.footprintSignature!==preview.footprintSignature)throw Error('The mapped outline changed. Keep this device draft; its photos must be aligned with the updated building before saving.');const currentRevision=preview.revision;remember();preview={...structuredClone(recovery.preview),revision:currentRevision};dirty=true;$('[data-height]').value=preview.heightMeters;$('[data-roof]').value=preview.roofShape;$('[data-rise]').value=preview.roofRiseMeters;$('[data-recovery]').hidden=true;await rebuild();status('Inspecting device placements. Save explicitly to replace the account placements with this draft, or Undo to return to the account version.');});
   $('[data-discard-recovery]').onclick=()=>run(async()=>{await deleteLocalCaptureDraft(localKey);recovery=null;$('[data-recovery]').hidden=true;});
   const requestClose=()=>{if(busy){status('Wait for the current operation to finish before closing.');return;}if(dirty&&!confirm('These edits have not been saved to your account. Close the editor and keep only the device recovery draft?'))return;close();};
+  mountCaptureStep(dialog,{building:capture.building,section:capture.authoredLayout?'Interior · room photos':'Exterior · photo placement',requestClose,parentLabel:capture.authoredLayout?'Back to floor plan':'Back to building'});
   $('[data-close]').onclick=requestClose;dialog.addEventListener('cancel',e=>{e.preventDefault();requestClose();});
   const photoSelect=$('[data-photo-choice]');
   const photoName=document.createElement('label');photoName.textContent='Photo label (optional)';const nameInput=document.createElement('input');nameInput.maxLength=60;nameInput.dataset.photoName='';photoName.append(nameInput);$('[data-photo]').before(photoName);

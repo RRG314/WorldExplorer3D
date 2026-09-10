@@ -39,6 +39,7 @@ export function roomInteriorPoint(ring){
   return clearance>=.34?best:null;
 }
 export function assertPlayableLayout(layout){
+  if(!layout.floors.some(f=>f.rooms.length))fail('Draw a room and place its entrance before walking through.');
   const links=new Map(layout.floors.flatMap(f=>f.rooms.map(r=>[r.id,new Set()]))),entries=[];
   for(const floor of layout.floors)for(const door of floor.doors){const wall=floorWalls(floor).find(w=>w.id===door.wall);if(door.entry)entries.push(wall.rooms[0]);if(wall.rooms.length===2){links.get(wall.rooms[0]).add(wall.rooms[1]);links.get(wall.rooms[1]).add(wall.rooms[0]);}}
   for(const stair of layout.stairs){const from=layout.floors.find(f=>f.id===stair.from),to=layout.floors.find(f=>f.id===stair.to),a=from.rooms.find(r=>pointInRoom(stair.path[0],roomRing(from,r))),b=to.rooms.find(r=>pointInRoom(stair.path.at(-1),roomRing(to,r)));if(!a||!b)fail('Stairs need a reachable landing in each room.');links.get(a.id).add(b.id);links.get(b.id).add(a.id);}
@@ -115,7 +116,7 @@ export function normalizeLayout(input,envelope) {
   if(input?.schemaVersion!==LAYOUT_VERSION)fail('Unsupported home layout version.');
   const mappedBoundary=validateRing(envelope.footprint),holes=(envelope.holes||[]).map(validateRing);
   const boundary=input.unitOutline?validateRing(input.unitOutline):mappedBoundary;
-  if(!containsRegion(mappedBoundary,boundary,holes))fail('Your home boundary must stay inside the mapped building.');
+  if(input.unitOutline&&!containsRegion(mappedBoundary,boundary,holes))fail('Your home boundary must stay inside the mapped building.');
   const maxHeight=finite(envelope.heightMeters,.5,1200,'building height');
   if(!Array.isArray(input.floors)||input.floors.length<1||input.floors.length>8)fail('Choose between one and eight floors.');
   const ids=new Set(), unique=id=>{identifier(id);if(ids.has(id))fail('Duplicate layout identity.');ids.add(id);return id;};
@@ -125,7 +126,7 @@ export function normalizeLayout(input,envelope) {
     if(floor.elevation+floor.height+floor.slab>maxHeight+EPS)fail(`${floor.label} extends above the supported building height.`);
     if(!source.vertices||Object.keys(source.vertices).length>256)fail('Too many corners on this floor.');
     for(const [id,p] of Object.entries(source.vertices)){identifier(id);floor.vertices[id]={x:finite(p.x,-10000,10000,'corner X'),z:finite(p.z,-10000,10000,'corner Z')};}
-    if(!Array.isArray(source.rooms)||source.rooms.length<1||source.rooms.length>32)fail('Each floor needs 1–32 rooms.');
+    if(!Array.isArray(source.rooms)||source.rooms.length>32)fail('Each floor supports up to 32 rooms.');
     for(const r of source.rooms){
       if(!Array.isArray(r.vertices))fail('Room corners are missing.');
       const room={id:unique(r.id),label:String(r.label||'Room').slice(0,60),type:String(r.type||'room').slice(0,30),vertices:r.vertices.map(identifier)};
@@ -238,4 +239,12 @@ export function makeStarterLayout(envelope,{bedrooms=1,bathrooms=1,floorCount=1,
   for(const floor of layout.floors)for(const [id,p] of Object.entries(floor.vertices))floor.vertices[id]=toBuilding(p);
   for(const stair of layout.stairs)stair.path=stair.path.map(toBuilding);
   return normalizeLayout(layout,envelope);
+}
+
+// An incomplete private draft is useful even when no rectangular starter fits.
+// Unknown space has no fabricated walls, doors, photos, or walkable surfaces.
+export function makeEmptyLayout(envelope) {
+  return normalizeLayout({schemaVersion:1,id:`home_${crypto.randomUUID().replaceAll('-','')}`,
+    unitLabel:'My home',floors:[{id:'floor_0',label:'Floor 1',elevation:0,
+      height:Math.min(2.7,envelope.heightMeters-.15),slab:.15,vertices:{},rooms:[],doors:[]}],stairs:[]},envelope);
 }

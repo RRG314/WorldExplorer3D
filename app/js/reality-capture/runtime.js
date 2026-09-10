@@ -1,3 +1,4 @@
+import {readCaptureIntent,clearCaptureIntent} from './capture-intent.js';
 import { listApprovedExteriorRepresentations } from '../../../js/community-reality-capture-api.js?v=4';
 import { worldModificationIdentityForLocation } from '../editable-world/model.js?v=1';
 import { setBuildingPresentationSuppressed } from '../editable-world/runtime.js?v=4';
@@ -32,7 +33,7 @@ function buildingCenter(building) {
 }
 
 function disposeObject(root) {
-  root?.removeFromParent?.();
+  root?.parent?.remove(root);
   root?.traverse?.((object) => {
     if (!object?.isMesh) return;
     object.geometry?.dispose?.();
@@ -124,7 +125,7 @@ async function attachRepresentation(appCtx, representation, worldId, sequence, s
     });
     appCtx.scene.add(root);
     if(!partial)setBuildingPresentationSuppressed(appCtx, sourceBuildingId, true, 'community-reality-capture');
-    instances.set(representation.representationId, { root, sourceBuildingId, partial, representationId: representation.representationId });
+    instances.set(representation.representationId, { root, sourceBuildingId, partial, revision:representation.revision||0, representationId: representation.representationId });
     return true;
   } catch (error) {
     disposeObject(root);
@@ -144,6 +145,9 @@ export async function refreshCommunityRealityCapturePresentation(appCtx) {
   const sequence = Number(appCtx._worldLoadSequence || 0);
   const worldId = worldModificationIdentityForLocation(appCtx.LOC || {});
   if (!worldId || !appCtx.initialEarthWorldReady) return null;
+  const intent=readCaptureIntent();
+  if(intent&&!appCtx._captureSignInResume){appCtx._captureSignInResume=true;void import('../../../js/auth-ui.js?v=55').then(async({getCurrentUser})=>{const user=getCurrentUser();if(!user||user.isAnonymous)return;const ui=await import('./ui.js?v=2');clearCaptureIntent();const target=intent.target,building=target&&(appCtx.buildings||[]).find(b=>b.sourceBuildingId===target.sourceBuildingId);if(building)await ui.openRealityCaptureForBuilding(appCtx,{id:building.sourceBuildingId,label:target.label,position:{x:buildingCenter(building).x,z:buildingCenter(building).z}});else await ui.openRealityCaptureLibrary(appCtx,target);}).catch(()=>{}).finally(()=>appCtx._captureSignInResume=false);}
+
   const serial = ++refreshSerial;
   try {
     let local=[];
@@ -168,6 +172,8 @@ export async function refreshCommunityRealityCapturePresentation(appCtx) {
     let failed = 0;
     for (const representation of rows) {
       try {
+        const previous=instances.get(representation.representationId);
+        if(previous&&(previous.revision||0)!==(representation.revision||0))removeInstance(appCtx,representation.representationId);
         if (instances.has(representation.representationId)||await attachRepresentation(appCtx, representation, worldId, sequence, serial)) loaded += 1;
       } catch (error) {
         failed += 1;
@@ -199,7 +205,7 @@ export function installCommunityRealityCaptureRuntime(appCtx) {
     const menu=document.getElementById('fCommunityBoard')?.parentElement;
     if(menu&&!document.getElementById('fPhotoSurvey')){
       const button=document.createElement('button');button.id='fPhotoSurvey';button.className='floatItem';button.type='button';button.textContent='Reality Capture · My contributions';
-      button.onclick=async()=>{if(appCtx.getEnv?.()!=='EARTH'||!appCtx.initialEarthWorldReady)return;appCtx.closeAllFloatMenus?.();const {openRealityCaptureLibrary}=await import('./ui.js?v=2');await openRealityCaptureLibrary(appCtx);};menu.append(button);
+      button.onclick=async()=>{if(appCtx.getEnv?.()!=='EARTH')return;appCtx.closeAllFloatMenus?.();const {openRealityCaptureLibrary}=await import('./ui.js?v=2');await openRealityCaptureLibrary(appCtx);};menu.append(button);
     }
   }
   if(isLocal){

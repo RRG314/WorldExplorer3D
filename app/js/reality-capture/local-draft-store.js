@@ -3,13 +3,13 @@ const DB_VERSION = 1;
 const DRAFTS = 'drafts';
 const PHOTOS = 'photos';
 
-function openDatabase() {
+function openDatabase(legacy=false) {
   return new Promise((resolve, reject) => {
     if (!globalThis.indexedDB) {
       reject(new Error('Local draft storage is unavailable in this browser.'));
       return;
     }
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    const request = indexedDB.open(legacy?DB_NAME:`${DB_NAME}:${globalThis.WORLD_EXPLORER_FIREBASE?.projectId||'device-only'}`, DB_VERSION);
     request.onerror = () => reject(request.error || new Error('Could not open local draft storage.'));
     request.onupgradeneeded = () => {
       const db = request.result;
@@ -84,8 +84,8 @@ export async function deleteLocalCapturePhoto(draftId, photoId) {
   });
 }
 
-export async function loadLocalCaptureDraft(draftId) {
-  const db = await openDatabase();
+export async function loadLocalCaptureDraft(draftId, {legacy=false}={}) {
+  const db = await openDatabase(legacy);
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([DRAFTS, PHOTOS], 'readonly');
     const draftRequest = transaction.objectStore(DRAFTS).get(draftId);
@@ -117,4 +117,11 @@ export async function deleteLocalCaptureDraft(draftId) {
       resolve(true);
     };
   });
+}
+
+// Legacy recovery is explicit: callers display the source and ask which photos
+// to copy. No old capture id or account save is silently restored across projects.
+export async function listLocalCaptureDrafts({legacy=false}={}) {
+ const db=await openDatabase(legacy);
+ return new Promise((resolve,reject)=>{const tx=db.transaction([DRAFTS],'readonly'),request=tx.objectStore(DRAFTS).getAll();tx.oncomplete=()=>{db.close();resolve(request.result||[]);};tx.onerror=()=>{db.close();reject(tx.error);};});
 }

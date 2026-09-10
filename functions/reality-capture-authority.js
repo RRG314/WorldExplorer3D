@@ -166,7 +166,9 @@ function createCaptureDraft(input = {}, actor = {}, nowMs = Date.now()) {
     throw new Error('interior_permission_confirmation_required');
   }
   const captureId = stableId('capture', ownerUid, building.worldId, building.sourceBuildingId, captureKind, nowMs, crypto.randomBytes(8).toString('hex'));
-  const spaceId = spaceIdForCapture(ownerUid, building, captureKind, room?.label || '');
+  // A new unit has an opaque identity. Renaming rooms cannot create a different
+  // home; continuations explicitly retain their source spaceId.
+  const spaceId = captureKind==='interior_room'?stableId('space',ownerUid,captureId):'';
   return Object.freeze({
     captureId,
     captureSchemaVersion: CAPTURE_SCHEMA_VERSION,

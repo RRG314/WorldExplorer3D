@@ -30,7 +30,7 @@ function harness(t, capture = base, extras = {}) {
   function snapshot(path) {
     const data = records.get(path);
     const value = version(path);
-    return { id:path.split('/').at(-1), exists: data !== undefined, data: () => data && structuredClone(data),
+    return { ref:ref(path), id:path.split('/').at(-1), exists: data !== undefined, data: () => data && structuredClone(data),
       updateTime: { value, isEqual: (other) => value === other?.value } };
   }
   function ref(path) {
@@ -72,7 +72,7 @@ function harness(t, capture = base, extras = {}) {
   const bucket = {
     getFiles: async () => [[]],
     file: (path,options) => { reads.push(path);fileRequests.push({path,options}); return {
-      exists: async () => [true], getSignedUrl: async () => ['https://example.invalid/private-test-url'],
+      exists: async () => [hooks.objectExists!==false], getSignedUrl: async options => {hooks.signedOptions=options;return ['https://example.invalid/private-test-url'];},
       download: async () => [realJpeg],
       save: async (bytes,options) => { assert.equal(options.preconditionOpts.ifGenerationMatch,0); if(options.metadata?.contentType==='image/jpeg')assert.deepEqual(bytes,realJpeg);else assert.equal(bytes.readUInt32LE(0),0x46546c67); },
       getMetadata: async () => [{generation:'123'}]
@@ -273,6 +273,25 @@ test('saved cropped walls submit immutable derivatives and require the reviewed 
   assert.equal([...h.records].find(([key])=>key.startsWith('buildingRepresentations/'))[1].revision,2);
 });
 
+test('continuing an approved exterior replaces only its own installed patches after fresh approval',async t=>{
+ const {footprintSignature}=require('../functions/reality-capture-hybrid');
+ const building={sourceAuthority:'osm',sourceBuildingId:'osm:way:1',worldId:'earth:v1:1:2',lat:39,lon:-76,spatialContext:{footprint:[{x:0,z:0},{x:10,z:0},{x:10,z:8},{x:0,z:8}],height:{meters:6}}};
+ const h=harness(t,{...base,captureId:id,status:'uploaded',building,inputManifest:[{name:photoPath,generation:'1',size:realJpeg.length,sha256:require('node:crypto').createHash('sha256').update(realJpeg).digest('hex')}]});
+ const preview={baseRevision:0,footprintSignature:footprintSignature(building),heightMeters:6,patches:[{id:'one',photoId:'a'.repeat(32),wall:0,orientationVersion:2,region:[0,0,1,1],quad:[[0,0],[1,0],[1,1],[0,1]]}]};
+ assert.equal((await h.call('saveRealityCaptureHybridPreview','owner',{preview})).code,200);
+ assert.equal((await h.call('submitRealityCaptureHybrid','owner',{revision:1,consent:true})).code,200);
+ assert.equal((await h.call('moderateRealityCapture','moderator',{decision:'approved',revision:1})).code,200);
+ const manifestKey=[...h.records.keys()].find(k=>k.startsWith('buildingPatchManifests/'));
+ const other={captureId:'other-owner',edge:'other-edge',left:0,right:1,bottom:0,top:6};h.mutate(manifestKey,{regions:[...h.records.get(manifestKey).regions,other]});
+ const copied=await h.call('createRealityCaptureDraft','owner',{sourceCaptureId:id,captureKind:'exterior',building});assert.equal(copied.code,200,JSON.stringify(copied.body));const next=copied.body.capture.captureId;
+ assert.equal((await h.call('submitRealityCaptureHybrid','owner',{captureId:next,revision:1,consent:true})).code,200);
+ assert.ok(h.records.get(manifestKey).regions.some(r=>r.captureId===id));
+ const approved=await h.call('moderateRealityCapture','moderator',{captureId:next,decision:'approved',revision:1});assert.equal(approved.code,200,JSON.stringify(approved.body));
+ assert.deepEqual(h.records.get(manifestKey).regions.map(r=>r.captureId).sort(),['other-owner',next].sort());
+ assert.equal(h.records.get(`realityCaptures/${id}`).supersededBy,next);
+ assert.equal([...h.records.values()].filter(r=>r.captureId===id&&r.status==='superseded').length,1);
+});
+
 test('moderation commits approval and representation together, never revives deleted captures', async t => {
   const capture = { ...base, status: 'review_required', building: { sourceBuildingId: 'osm:42', worldId: 'earth' } };
   const ok = harness(t, capture);
@@ -457,4 +476,41 @@ test('processed manifest cannot point to raw photos even for owner', async (t) =
   const h = harness(t, { ...base, processed: { optimizedModelPath: photoPath } });
   assert.equal((await h.call('getRealityCaptureAssetAccess', 'owner')).code, 403);
   assert.deepEqual(h.reads, []);
+});
+
+
+test('upload tickets are owner-only, bounded, immutable and idempotent without download tokens',async t=>{
+ const crypto=require('node:crypto'),photoId='a'.repeat(32);
+ const h=harness(t,{ownerUid:'owner',status:'draft',uploadSlots:{[photoId+'.jpg']:true}});
+ const body={photoId,size:realJpeg.length,sha256:crypto.createHash('sha256').update(realJpeg).digest('hex')};
+ assert.equal((await h.call('createRealityCaptureUploadUrl','visitor',body)).code,404);
+ assert.notEqual((await h.call('createRealityCaptureUploadUrl','owner',{...body,size:13*1024*1024})).code,200);
+ h.hooks.objectExists=false;
+ const ticket=await h.call('createRealityCaptureUploadUrl','owner',body);assert.equal(ticket.code,200,JSON.stringify(ticket.body));
+ assert.equal(ticket.body.headers['x-goog-if-generation-match'],'0');
+ assert.equal(ticket.body.headers['x-goog-content-length-range'],`${body.size},${body.size}`);
+ assert.equal(h.hooks.signedOptions.action,'write');assert.ok(ticket.body.expiresAtMs-Date.now()<=60000);
+ assert.equal(JSON.stringify(ticket.body).includes('firebaseStorageDownloadTokens'),false);
+ h.hooks.objectExists=true;assert.equal((await h.call('createRealityCaptureUploadUrl','owner',body)).body.existing,true);
+ assert.notEqual((await h.call('createRealityCaptureUploadUrl','owner',{...body,sha256:'0'.repeat(64)})).code,200);
+ h.mutate(`realityCaptures/${id}`,{status:'deleting'});assert.notEqual((await h.call('createRealityCaptureUploadUrl','owner',body)).code,200);
+});
+
+test('Earth account lookup spans old entry origins without mixing private worlds',async t=>{
+ const building={sourceBuildingId:'osm:way:99',worldId:'earth:v1:100:200'};
+ const h=harness(t,{...base,building},{'realityCaptures/second':{...base,building:{...building,worldId:'earth:v1:101:201'}},'realityCaptures/private':{...base,building:{...building,worldId:'private-session'}}});
+ const response=await h.call('listMyRealityCaptures','owner',{building:{sourceBuildingId:building.sourceBuildingId,worldId:'earth:physical:v1'}});
+ assert.equal(response.code,200,JSON.stringify(response.body));assert.deepEqual(response.body.captures.map(c=>c.captureId).sort(),[id,'second'].sort());
+});
+
+test('interior retrieval searches beyond twelve spaces and offers only authorized unit choices',async t=>{
+ const building={sourceBuildingId:'osm:way:99',worldId:'earth:v1:100:200'};
+ const extras=Object.fromEntries(Array.from({length:15},(_,i)=>[`privateSpaces/a${String(i).padStart(2,'0')}`,{canonicalBuilding:building,ownerUid:'someone-else',accessMode:'PRIVATE',captureId:id}]));
+ extras['privateSpaces/zhome']={canonicalBuilding:building,ownerUid:'owner',accessMode:'PRIVATE',captureId:id,label:'Home'};
+ const h=harness(t,{...base,captureKind:'interior_room'},extras),body={sourceBuildingId:building.sourceBuildingId,worldId:'earth:physical:v1'};
+ const single=await h.call('resolveBuildingInteriorRepresentation','owner',body);assert.equal(single.code,200,JSON.stringify(single.body));assert.equal(single.body.spaceId,'zhome');
+ h.mutate('privateSpaces/zunit',{...extras['privateSpaces/zhome'],label:'Second unit'});
+ const choices=await h.call('resolveBuildingInteriorRepresentation','owner',body);assert.equal(choices.body.selectionRequired,true);assert.deepEqual(choices.body.spaces.map(s=>s.spaceId),['zhome','zunit']);assert.equal(choices.body.model,undefined);
+ const selected=await h.call('resolveBuildingInteriorRepresentation','owner',{...body,spaceId:'zunit'});assert.equal(selected.body.spaceId,'zunit');
+ const denied=await h.call('resolveBuildingInteriorRepresentation','owner',{...body,spaceId:'a00'});assert.notEqual(denied.body.authorized,true);
 });

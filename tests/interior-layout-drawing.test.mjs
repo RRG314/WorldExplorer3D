@@ -1,24 +1,40 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {makeStarterLayout,normalizeLayout,roomRing,floorWalls,assertPlayableLayout} from '../functions/interior-layout.mjs';
+import {makeStarterLayout,makeEmptyLayout,normalizeLayout,roomRing,floorWalls,assertPlayableLayout} from '../functions/interior-layout.mjs';
 import {drawRectangleRoom,nearestPlanWall,snapPlanPoint} from '../app/js/reality-capture/layout-drawing.js';
 const envelope={footprint:[{x:0,z:0},{x:10,z:0},{x:10,z:12},{x:0,z:12}],heightMeters:6};
-test('rectangle drawing partitions existing space with shared walls and reachable doorways',()=>{
-  let layout=makeStarterLayout(envelope,{bedrooms:0,bathrooms:0});
-  const id=drawRectangleRoom(layout.floors[0],layout.floors[0].rooms[0].id,{x:2,z:2},{x:6,z:7});
-  layout=normalizeLayout(layout,envelope);assertPlayableLayout(layout);
-  assert.equal(layout.floors[0].rooms.length,5);
-  const ring=roomRing(layout.floors[0],layout.floors[0].rooms.find(r=>r.id===id));
-  assert.equal(Math.min(...ring.map(p=>p.x)),2);assert.equal(Math.max(...ring.map(p=>p.z)),7);
+test('drawing one known room leaves unknown space empty and never invents doors',()=>{
+  let layout=makeEmptyLayout(envelope);const floor=layout.floors[0];
+  const id=drawRectangleRoom(floor,null,{x:2,z:2},{x:6,z:7});
+  layout=normalizeLayout(layout,envelope);
+  assert.equal(layout.floors[0].rooms.length,1);assert.equal(layout.floors[0].doors.length,0);
+  assert.throws(()=>assertPlayableLayout(layout),/entrance/);
+  assert.equal(roomRing(layout.floors[0],layout.floors[0].rooms[0])[0].x,2);
+  assert.equal(layout.floors[0].rooms[0].id,id);
 });
-test('drawing outside existing space is rejected before modifying it',()=>{
-  const layout=makeStarterLayout(envelope,{bedrooms:0,bathrooms:0}),before=JSON.stringify(layout);
-  assert.throws(()=>drawRectangleRoom(layout.floors[0],layout.floors[0].rooms[0].id,{x:-2,z:2},{x:6,z:7}),/within one/);
-  assert.equal(JSON.stringify(layout),before);
+test('irregular and courtyard envelopes open empty drafts without fabricating a starter',()=>{
+  for(const target of [{...envelope,footprint:[{x:0,z:0},{x:10,z:0},{x:10,z:4},{x:4,z:4},{x:4,z:12},{x:0,z:12}]},{...envelope,holes:[[{x:4,z:4},{x:6,z:4},{x:6,z:8},{x:4,z:8}]]}]){
+    const layout=makeEmptyLayout(target);assert.equal(layout.floors[0].rooms.length,0);
+    drawRectangleRoom(layout.floors[0],null,{x:1,z:1},{x:3,z:3});assert.doesNotThrow(()=>normalizeLayout(layout,target));
+    drawRectangleRoom(layout.floors[0],null,{x:2,z:2},{x:8,z:10});assert.throws(()=>normalizeLayout(layout,target));
+  }
+});
+test('adding a neighboring room keeps existing room identity and creates a shared wall',()=>{
+  const layout=makeEmptyLayout(envelope),f=layout.floors[0];
+  const a=drawRectangleRoom(f,null,{x:1,z:1},{x:4,z:5});
+  drawRectangleRoom(f,null,{x:4,z:1},{x:8,z:5});
+  normalizeLayout(layout,envelope);assert.equal(f.rooms[0].id,a);assert.equal(f.rooms.length,2);
+  assert.equal(floorWalls(f).filter(w=>w.rooms.length===2).length,1);assert.equal(f.doors.length,0);
 });
 test('pointer snapping and nearest-wall placement use metres in the canonical plan',()=>{
   assert.deepEqual(snapPlanPoint({x:2.13,z:3.08}),{x:2.1,z:3.1});
   const layout=makeStarterLayout(envelope,{bedrooms:0,bathrooms:0});
   const hit=nearestPlanWall(floorWalls(layout.floors[0]),{x:2,z:.25});
   assert.ok(hit.distance<.1);assert.ok(hit.offset>1);
+});
+
+test('adding an adjacent room preserves an existing doorway across split wall segments',()=>{
+ const envelope={footprint:[{x:0,z:0},{x:12,z:0},{x:12,z:12},{x:0,z:12}],heightMeters:6};const layout=makeEmptyLayout(envelope),f=layout.floors[0];
+ drawRectangleRoom(f,null,{x:1,z:1},{x:6,z:10});const wall=floorWalls(f).find(w=>w.a.x===6&&w.b.x===6);f.doors.push({id:'entry',wall:wall.id,offset:2,width:.9,height:2,entry:true});
+ drawRectangleRoom(f,null,{x:6,z:6},{x:10,z:10});const valid=normalizeLayout(layout,envelope);assert.equal(valid.floors[0].doors.length,1);assert.equal(valid.floors[0].doors[0].id,'entry');assert.equal(valid.floors[0].doors[0].entry,true);
 });

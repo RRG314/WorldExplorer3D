@@ -1,12 +1,12 @@
 import './capture-theme.js';
 import {observeAuth} from '../../../js/auth-ui.js?v=55';
 import {normalizeCapturePhoto} from '../../../js/community-reality-capture-api.js?v=4';
-import {saveLocalCapturePhoto} from './local-draft-store.js';
+import {saveLocalCapturePhoto} from './local-draft-store.js?v=1';
 import {loadSurvey,saveSurvey,surveyOwner,surveyBuildingKey,localSurveyEnabled} from './survey-store.js';
 import {normalizeSurveyMetadata} from './survey-metadata.js';
 import {rankSurveyBuildings} from './survey-association.js';
 import {wallDirections} from './orientation.js';
-import {hasStableMappedBuildingIdentity} from './runtime-contract.js';
+import {hasStableMappedBuildingIdentity} from './runtime-contract.js?v=2';
 
 const MAX_PHOTOS=120,MAX_BYTES=500*1024*1024;
 let active=null;

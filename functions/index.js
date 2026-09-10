@@ -952,6 +952,7 @@ async function deleteDiscoveryTradesForUser(uid) {
 
 async function deleteUserData(uid) {
   if (!uid) return;
+  await require('./capture-account-cleanup').cleanupCaptureAccount({db,bucket:admin.storage().bucket(),uid,FieldValue});
 
   const userRef = db.collection('users').doc(uid);
   const creatorProfileRef = db.collection(CREATOR_PROFILES_COLLECTION).doc(uid);
@@ -1683,7 +1684,7 @@ exports.updateAccountProfile = functions.region('us-central1').https.onRequest(a
   }
 });
 
-exports.deleteAccount = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.deleteAccount = functions.runWith({timeoutSeconds:540,memory:'512MB',invoker:'public'}).region('us-central1').https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
@@ -2757,6 +2758,7 @@ Object.assign(exports, buildDiscoveryExports({
 
 Object.assign(exports, buildCommunityRealityCaptureExports({
   db,
+  captureAccountIsDeleting:async uid=>(await db.collection('captureAccountDeletions').doc(uid).get()).exists,
   contributionNotificationConfig,
   setCors,
   verifyAuth,
@@ -2781,3 +2783,14 @@ exports.notifyCaptureReview = functions.region('us-central1').runWith({ failureP
     notice.eventTimeMs = Date.parse(context.timestamp);
     await deliverReviewNotice({ ref: change.after.ref, notice, config: contributionNotificationConfig() });
   });
+
+// Reconcile uploads that finish after capture/account deletion. This trigger
+// never publishes media and also seals legacy SDK-uploaded originals.
+exports.sealRealityCaptureOriginal=functions.storage.object().onFinalize(async object=>{
+  const match=/^reality-captures\/([^/]+)\/([^/]+)\/originals\/([a-f0-9]{32})\.jpg$/.exec(object.name||'');
+  if(!match)return;
+  const [,uid,captureId]=match,file=admin.storage().bucket(object.bucket).file(object.name,{generation:object.generation});
+  const [capture,tombstone]=await Promise.all([db.collection('realityCaptures').doc(captureId).get(),db.collection('captureAccountDeletions').doc(uid).get()]);
+  if(tombstone.exists||!capture.exists||capture.data().ownerUid!==uid||capture.data().status==='deleting'){await file.delete({ignoreNotFound:true});return;}
+  const [metadata]=await file.getMetadata();await require('./reality-capture-storage-privacy').sealCapturePhoto(file,metadata);
+});
