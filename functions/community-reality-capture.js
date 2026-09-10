@@ -194,10 +194,14 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
         const id=clean(req.body.sourceCaptureId,180);if(!/^[\w-]+$/.test(id))throw Error('invalid_capture_id');
         const snap=await db.collection(CAPTURES).doc(id).get();source=snap.exists?{...snap.data(),captureId:id}:null;
         if(!source||source.ownerUid!==auth.uid||source.status==='deleting')throw Error('capture_not_found');
+        if(source.captureKind!==draft.captureKind)throw Error('invalid_capture_kind');
         if(!source.inputManifest?.length)throw Error('validated_photos_required');
         if(source.captureKind==='interior_room'&&source.consent?.propertyPermissionConfirmed!==true)throw Error('interior_permission_confirmation_required');
         draft.captureId=`capture_${require('node:crypto').createHash('sha256').update(`${auth.uid}/${id}/${source.hybridPreview?.revision||0}/${source.hybridSubmission?.revision||0}`).digest('hex').slice(0,32)}`;
         Object.assign(draft,{building:source.building,captureKind:source.captureKind,room:source.room||null,spaceId:source.spaceId||null,footprintSignature:footprintSignature(source.building,source.captureKind==='interior_room'?source.room:null),consent:source.consent||draft.consent,sourceCaptureId:id,sourceRevision:source.hybridPreview?.revision||0,continuationReady:false,publicContributionRequested:false});
+        draft.buildingDetails=source.buildingDetails||draft.buildingDetails;
+        draft.exteriorScope=source.exteriorScope==='facade'?'facade':'building';
+        draft.consent={...draft.consent,publicContributionExplicit:false};
       }
       const ref = db.collection(CAPTURES).doc(draft.captureId);
       await db.runTransaction(async (transaction) => {

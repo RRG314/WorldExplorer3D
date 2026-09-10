@@ -65,6 +65,9 @@ try{
     await page.locator('[data-plan-mode]').click();
     assert.equal(await page.locator('[data-grid-panel]').isVisible(),true);
     await page.locator('[data-close]').click();await page.evaluate(()=>window.openEditor());assert.equal(await page.locator('[data-name]').inputValue(),'Living room');
+    await page.locator('[data-close]').click();
+    await page.evaluate(async preview=>{const {saveLocalCaptureDraft}=await import('/app/js/reality-capture/local-draft-store.js?v=1');const layout=structuredClone(preview.layout);layout.floors[0].rooms[0].label='Older device edits';await saveLocalCaptureDraft({id:JSON.stringify(['home-layout','local-verifier','layout-test']),baseRevision:preview.revision-1,layout,roomPhotos:preview.roomPhotos});await window.openEditor();},capture.hybridPreview);
+    assert.equal(await page.locator('[data-restore]').isVisible(),true,'Stale device work must not disappear');await page.locator('[data-restore]').click();assert.equal(await page.locator('[data-name]').inputValue(),'Older device edits');assert.equal(capture.hybridPreview.layout.floors[0].rooms[0].label,'Living room','Inspecting recovery does not save over the account');await page.locator('[data-undo]').click();assert.equal(await page.locator('[data-name]').inputValue(),'Living room');
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
     assert.deepEqual(errors,[]);await context.close();console.log(`${width}: plan, crop/place/save, protected GLB generation, private submission, reopen and 3D passed (mock HTTP, actual normalizer and derivative builder).`);
   }

@@ -267,7 +267,7 @@ function ensurePanel() {
     const session=current;if(!session||session.busy)return;
     setBusy(session,true);
     try {
-      const response=await createRealityCaptureDraft({...draftInput(session),sourceCaptureId:session.serverCapture.captureId,publicContributionRequested:false});
+      const response=await createRealityCaptureDraft({...draftInput(session),sourceCaptureId:session.serverCapture.continuationReady===false?session.serverCapture.sourceCaptureId:session.serverCapture.captureId,publicContributionRequested:false});
       assertCurrent(session);
       await openRealityCaptureSession(response.capture.captureId);
       if(location.pathname.endsWith('/capture.html'))history.replaceState(null,'',`#capture=${encodeURIComponent(response.capture.captureId)}`);
@@ -731,7 +731,7 @@ async function previewHybrid() {
       },
       importPhotos:async files=>{
         assertCurrent(session);
-        if(!captureIsEditable(session.serverCapture))throw Error('This submitted photo set is preserved. Existing photos can still be placed here. To add new uploads, close this editor and choose Take more photos for this building.');
+        if(!captureIsEditable(session.serverCapture))throw Error('This submitted photo set is preserved. Existing photos can still be placed here. To add new uploads, close this editor and choose Continue improving this building.');
         const accepted=await addPhotos({target:{files,value:''}});assertCurrent(session);
         if(!accepted)throw Error(ensurePanel().querySelector('[data-capture-status]').textContent||'No photos were accepted.');
         await uploadDraft(false);assertCurrent(session);
