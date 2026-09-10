@@ -46,6 +46,13 @@ try{
   await page.locator('#realityCapturePanel.show').waitFor();
   await mkdir('output/verification/reality-capture-hybrid',{recursive:true});
   await page.screenshot({path:`output/verification/reality-capture-hybrid/${home?'home':'exterior'}-staging-open.png`,fullPage:true});
+  if(home){
+    await page.locator('[data-capture-hybrid]').click();await page.locator('.homeLayoutEditor').waitFor();
+    const data=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=1280;c.height=720;const ctx=c.getContext('2d');ctx.fillStyle='#558877';ctx.fillRect(0,0,c.width,c.height);return c.toDataURL('image/jpeg').split(',')[1];});
+    await page.locator('.homeLayoutEditor [data-import-room]').setInputFiles({name:'room-upload-test.jpg',mimeType:'image/jpeg',buffer:Buffer.from(data,'base64')});
+    await page.locator('.homeLayoutEditor [data-status]').filter({hasText:'1 photos available'}).waitFor({timeout:45000});
+    await page.locator('.homeLayoutEditor [data-close]').click();
+  }
   await page.locator('[data-capture-close]').click();
   const afterReload=await page.evaluate(async id=>(await(await import('/js/community-reality-capture-api.js?v=4')).getMyRealityCapture(id)).capture.hybridPreview.revision,captureId);assert.equal(afterReload,1);
   const surface=home?layoutRoomDescriptor(homeLayout,homeLayout.floors[0].rooms[0].id).surfaceIds[0]:null;
@@ -73,7 +80,7 @@ try{
     try{await api.createRealityCaptureDraft({captureKind:'interior_room',building:capture.building});}catch(e){roomDenied=e.status===403;}
     return {uploadStatus:finalized.status,photoCount:uploaded.photos.length,revision:saved.preview.revision,submissionStatus:submitted.status,paidDenied,roomDenied};
   },{id:captureId,home,surface});
-  assert.deepEqual(manual,{uploadStatus:'uploaded',photoCount:2,revision:2,submissionStatus:'review_required',paidDenied:true,roomDenied:true});
+  assert.deepEqual(manual,{uploadStatus:'uploaded',photoCount:home?3:2,revision:2,submissionStatus:'review_required',paidDenied:true,roomDenied:true});
   if(home){const resolved=await page.evaluate(async id=>{const api=await import('/js/community-reality-capture-api.js?v=4'),capture=(await api.getMyRealityCapture(id)).capture;const value=await api.resolveBuildingInteriorRepresentation(capture.building.sourceBuildingId,capture.building.worldId,'');return {authorized:value.authorized,available:value.available,kind:value.representationKind,floors:value.layout?.floors?.length,publicRequested:capture.publicContributionRequested,model:!!value.model?.url};},captureId);assert.equal(resolved.authorized,true);assert.equal(resolved.kind,'home-layout');assert.equal(resolved.floors,2);assert.equal(resolved.publicRequested,false);assert.equal(resolved.model,true);}
   if(home){
     // Reopen through the visible account action: assigning the same hash after
@@ -83,7 +90,7 @@ try{
     const editor=page.locator('.homeLayoutEditor');await editor.waitFor();
     await editor.locator('[data-name]').fill('My saved test room');await editor.locator('[data-name]').dispatchEvent('change');
     await editor.locator('[data-save]').click();await editor.locator('[data-status]').filter({hasText:'Saved to account · revision 3'}).waitFor();
-    await editor.locator('[data-refresh-photos]').click();await editor.locator('[data-status]').filter({hasText:'2 photos available'}).waitFor();
+    await editor.locator('[data-refresh-photos]').click();await editor.locator('[data-status]').filter({hasText:'3 photos available'}).waitFor();
     await editor.locator('[data-link-phone]').click();await editor.locator('[data-home-handoff]').waitFor();
     assert.equal(await editor.locator('[data-home-link]').getAttribute('href'),`${origin}/app/capture.html#capture=${captureId}`);
     assert.equal(await editor.locator('[data-home-qr]').evaluate(canvas=>canvas.width>0&&canvas.height>0),true);

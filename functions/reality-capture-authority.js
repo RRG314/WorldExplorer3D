@@ -22,7 +22,9 @@ const CAPTURE_STATES = Object.freeze([
 const STATE_TRANSITIONS = Object.freeze({
   draft: Object.freeze(['uploading']),
   uploading: Object.freeze(['draft', 'uploaded', 'processing_failed']),
-  uploaded: Object.freeze(['queued']),
+  // Reopening is additionally restricted by the reservation endpoint to manual
+  // sets without a review submission, processed result or queued attempt.
+  uploaded: Object.freeze(['queued', 'uploading']),
   queued: Object.freeze(['processing', 'processing_failed']),
   processing: Object.freeze(['review_required', 'processing_failed']),
   processing_failed: Object.freeze(['queued', 'rejected']),

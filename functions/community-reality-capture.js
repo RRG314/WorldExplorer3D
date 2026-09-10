@@ -244,6 +244,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
         // be added until a reconstruction/review has frozen this photo set.
         const appendable=capture.status==='uploaded'&&!capture.hybridSubmission&&!capture.processed&&!capture.queuedAt;
         if (!['draft', 'uploading'].includes(capture.status)&&!appendable) throw Error('invalid_capture_state_transition');
+        if(appendable)assertCaptureTransition(capture.status,'uploading');
         const slots = capture.uploadSlots || {};
         if (slots[`${photoId}.jpg`] === true) return;
         if (Object.keys(slots).length >= 48) throw Error('too_many_photos');

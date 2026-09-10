@@ -62,7 +62,16 @@ normalization, IndexedDB, QR and account-scoped reopening with transport doubles
 The HTTP-handler tests execute actual handlers with isolated storage/database
 doubles, including append denial after review and preservation of prior inputs.
 
-Real staging acceptance is separately recorded by
+Real staging acceptance passed on hosting build
+`5.2.0+c5565f32f48f.dadabf3f68090fc9.staging`: the actual home file input uploaded
+and validated a photo, two additional photos were added to the same capture,
+the saved layout was retained, private review submission and owner-only interior
+resolution succeeded, and saved editing, phone-photo refresh, QR handoff and
+hard-reload reopening worked. Temporary accounts/captures and attestation
+registrations were removed. Production remained
+`5.2.0+db62593ba377.6342cddaba06fc68.production`.
+
+Staging acceptance is separately recorded by
 `scripts/verification/reality-capture-hybrid-staging.mjs`. It uses disposable
 accounts, synthetic photos and a temporary staging App Check debug identity;
 it never approves public contributions or launches paid reconstruction. Physical

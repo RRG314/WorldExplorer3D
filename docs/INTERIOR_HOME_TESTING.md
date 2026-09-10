@@ -3,6 +3,17 @@
 Use the [staging world](https://we3d-staging-20260712.web.app/app/), not production.
 Sign in with the same account on your phone and computer.
 
+**Continue on phone** is now in the home editor itself. It saves the current
+layout and shows a QR/link to that exact capture. After uploading on your phone,
+use **Check phone uploads** in the desktop editor. **Add photos** also works
+without leaving the home editor. Uploaded photos are unassigned until you select
+their room and wall/floor. You can add more originals to a manually validated set
+until it has been submitted for review or reconstruction.
+
+Staging and production use separate account data. Production contributions will
+not appear in a staging library unless an explicit, controlled migration is done;
+this test update does not copy private production images.
+
 1. Select the mapped building and choose **Improve this place**. Start a new
    **Home interior** capture rather than changing an existing exterior capture.
 2. Confirm you have permission to photograph the interior. Upload one or more
