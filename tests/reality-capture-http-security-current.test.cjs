@@ -30,7 +30,7 @@ function harness(t, capture = base, extras = {}) {
   function snapshot(path) {
     const data = records.get(path);
     const value = version(path);
-    return { exists: data !== undefined, data: () => data && structuredClone(data),
+    return { id:path.split('/').at(-1), exists: data !== undefined, data: () => data && structuredClone(data),
       updateTime: { value, isEqual: (other) => value === other?.value } };
   }
   function ref(path) {
@@ -40,8 +40,11 @@ function harness(t, capture = base, extras = {}) {
       update: async (patch) => { if(!records.has(path))throw Error('missing');mutate(path,patch);writes.push(path); },
       delete: async () => { mutate(path,null); writes.push(path); } };
   }
-  function collection(path) { return { doc: (name) => ref(`${path}/${name}`),
-    where: (field, operator, value) => ({limit: count => ({query:{path,field,value,count}})}) }; }
+  function query(path,filters=[],count=Infinity,cursor=''){
+    const q={query:{path,filters,count,cursor},where:(field,op,value)=>query(path,[...filters,{field,value}],count,cursor),orderBy:()=>q,startAfter:value=>query(path,filters,count,value),limit:value=>query(path,filters,value,cursor),get:async()=>querySnapshot(q.query)};return q;
+  }
+  function querySnapshot(q){const docs=[...records].filter(([p,v])=>p.startsWith(q.path+'/')&&p.split('/').length===q.path.split('/').length+1&&p.split('/').at(-1)>q.cursor&&q.filters.every(({field,value})=>field.split('.').reduce((v,k)=>v?.[k],v)===value)).sort(([a],[b])=>a.localeCompare(b)).slice(0,q.count).map(([p])=>snapshot(p));return {empty:!docs.length,docs,size:docs.length};}
+  function collection(path) { return {...query(path),doc: (name) => ref(`${path}/${name}`)}; }
   function mutate(path, patch) {
     function check(value, parentArray=false) {
       if(Array.isArray(value)) {
@@ -58,10 +61,11 @@ function harness(t, capture = base, extras = {}) {
     hooks.beforeTransaction?.();
     const staged = [];
     await callback({ get: async (reference) => {
-      if(reference.query){const q=reference.query;const docs=[...records].filter(([p,v])=>p.startsWith(q.path+'/')&&v[q.field]===q.value).slice(0,q.count).map(([p])=>snapshot(p));return {empty:docs.length===0,docs};}
+      if(reference.query)return querySnapshot(reference.query);
       return snapshot(reference.path);
     },
       update: (reference, patch) => staged.push([reference.path, patch]),
+      create: (reference, patch) => {assert.equal(records.has(reference.path),false);staged.push([reference.path,patch]);},
       set: (reference, patch) => staged.push([reference.path, patch]) });
     for (const [path, patch] of staged) { mutate(path, patch); writes.push(path); }
   } };
@@ -70,12 +74,13 @@ function harness(t, capture = base, extras = {}) {
     file: (path,options) => { reads.push(path);fileRequests.push({path,options}); return {
       exists: async () => [true], getSignedUrl: async () => ['https://example.invalid/private-test-url'],
       download: async () => [realJpeg],
-      save: async (bytes,options) => { assert.equal(options.preconditionOpts.ifGenerationMatch,0); assert.equal(bytes.readUInt32LE(0),0x46546c67); },
+      save: async (bytes,options) => { assert.equal(options.preconditionOpts.ifGenerationMatch,0); if(options.metadata?.contentType==='image/jpeg')assert.deepEqual(bytes,realJpeg);else assert.equal(bytes.readUInt32LE(0),0x46546c67); },
       getMetadata: async () => [{generation:'123'}]
     }; }
   };
   const authClaims = {};
   const api = buildCommunityRealityCaptureExports({ db, bucket, setCors: () => false,
+    getAuthUser: async uid=>({uid,displayName:'Test owner'}),
     logAdminActivity: async () => { if(hooks.activityFailure)throw Error('activity_unavailable'); },
     requireModerator: async req => req.uid === 'moderator' ? { auth: { uid: req.uid }, displayName: 'Moderator' } : null,
     verifyAuth: async (req) => ({ uid: req.uid, ...authClaims }), verifyAppCheck: async () => true });
@@ -89,6 +94,36 @@ function harness(t, capture = base, extras = {}) {
   return { call, bucket, records, reads, fileRequests, writes, mutate, hooks, authClaims };
 }
 
+test('continuing a contribution copies owned immutable photos and placements without changing the submitted version',async t=>{
+  const {footprintSignature}=require('../functions/reality-capture-hybrid');
+  const building={sourceAuthority:'osm',sourceBuildingId:'osm:way:424242',worldId:'earth',lat:39.29,lon:-76.61,label:'Home',spatialContext:{footprint:[{x:0,z:0},{x:10,z:0},{x:10,z:10},{x:0,z:10}],height:{meters:6}}};
+  const source={...base,building,inputManifest:[{name:photoPath,generation:'1'}]};
+  const h=harness(t,source);
+  const saved=await h.call('saveRealityCaptureHybridPreview','owner',{preview:{baseRevision:0,footprintSignature:footprintSignature(building),heightMeters:6,roofShape:'flat',roofRiseMeters:2,patches:[{id:'patch1',photoId:'a'.repeat(32),wall:0,region:[0,0,1,1],quad:[[0,0],[1,0],[1,1],[0,1]],orientationVersion:2}]}});
+  assert.equal(saved.code,200,JSON.stringify(saved.body));
+  const before=structuredClone(h.records.get(`realityCaptures/${id}`));
+  const body={sourceCaptureId:id,captureKind:'exterior',building};
+  assert.equal((await h.call('createRealityCaptureDraft','visitor',body)).code,404);
+  const copied=await h.call('createRealityCaptureDraft','owner',body);
+  assert.equal(copied.code,200,JSON.stringify(copied.body));
+  const target=copied.body.capture;
+  assert.equal(target.sourceCaptureId,id);assert.equal(target.continuationReady,true);assert.equal(target.hybridPreview.patches.length,1);
+  assert.equal(target.hybridSubmission,null);assert.equal(target.publicContributionRequested,false);
+  const record=h.records.get(`realityCaptures/${target.captureId}`);
+  assert.equal(record.inputManifest[0].name,`reality-captures/owner/${target.captureId}/originals/${'a'.repeat(32)}.jpg`);
+  assert.deepEqual(structuredClone(h.records.get(`realityCaptures/${id}`)),before);
+  const retry=await h.call('createRealityCaptureDraft','owner',body);assert.equal(retry.body.capture.captureId,target.captureId);
+  assert.equal(h.records.get('captureAdmission/owner').count,1);
+});
+test('capture library pagination returns every owned record, never another account',async t=>{
+  const extras=Object.fromEntries(Array.from({length:65},(_,i)=>[`realityCaptures/page${String(i).padStart(3,'0')}`,{...base,updatedAtMs:i}]));
+  extras['realityCaptures/other']={...base,ownerUid:'someone-else'};
+  const h=harness(t,null,extras),first=await h.call('listMyRealityCaptures','owner');
+  assert.equal(first.code,200,JSON.stringify(first.body));assert.equal(first.body.captures.length,60);assert.ok(first.body.nextCursor);
+  const second=await h.call('listMyRealityCaptures','owner',{cursor:first.body.nextCursor});
+  assert.equal(second.body.captures.length,5);assert.equal(second.body.nextCursor,null);
+  assert.equal(new Set([...first.body.captures,...second.body.captures].map(c=>c.captureId)).size,65);
+});
 test('email retry requires moderator and pending review; missing sender is visible',async t=>{
  const h=harness(t,{...base,status:'review_required'});
  await h.call('retryRealityCaptureReviewEmail','owner');assert.equal(h.writes.length,0);

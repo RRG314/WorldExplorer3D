@@ -47,4 +47,11 @@ async function deliverReviewNotice({ ref, notice, config, fetchImpl = fetch }) {
   await ref.update({ reviewEmail: { ...record, status: 'accepted', providerId: String(result.id || '') } });
 }
 
-module.exports = { reviewNotice, deliverReviewNotice };
+function contributorNotice(before,after,captureId){
+  if(!after?.ownerUid||!['review_required','approved','rejected'].includes(after.status))return null;
+  const revision=String(after.hybridSubmission?.revision||after.processingAttemptId||'initial');
+  if(before?.status===after.status&&String(before?.hybridSubmission?.revision||before?.processingAttemptId||'initial')===revision)return null;
+  return {type:'reality_capture',captureId,revision,status:after.status,ownerUid:after.ownerUid,
+    title:after.status==='approved'?'Your building improvement was approved':after.status==='rejected'?'Your improvement needs changes':'Your improvement is awaiting review'};
+}
+module.exports = { reviewNotice, deliverReviewNotice, contributorNotice };

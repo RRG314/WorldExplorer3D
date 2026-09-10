@@ -38,8 +38,8 @@ function normalizeHybridPreview(capture, input) {
       if(roomIds.has(entry.roomId))throw Error('duplicate_room_photos');roomIds.add(entry.roomId);
       const room=layoutRoomDescriptor(layout,entry.roomId),pseudo={...capture,room,hybridPreview:null};
       const patches=(entry.patches||[]).map(p=>{const wall=room.surfaceIds.indexOf(p.surfaceId);if(wall<0)throw Error('A photographed wall changed. Remove its placement before changing that wall; original photos remain saved.');return {...p,wall};});
-      const normalized=normalizeHybridPreview(pseudo,{room,baseRevision:0,footprintSignature:footprintSignature(capture.building,room),heightMeters:room.heightMeters,roofShape:'flat',roofRiseMeters:2,patches});
-      return {roomId:entry.roomId,patches:normalized.patches.map(p=>({...p,surfaceId:room.surfaceIds[p.wall]}))};
+      const normalized=normalizeHybridPreview(pseudo,{room,baseRevision:0,footprintSignature:footprintSignature(capture.building,room),heightMeters:room.heightMeters,roofShape:'flat',roofRiseMeters:2,patches,photoLabels:entry.photoLabels});
+      return {roomId:entry.roomId,photoLabels:normalized.photoLabels,patches:normalized.patches.map(p=>({...p,surfaceId:room.surfaceIds[p.wall]}))};
     });
     return {schemaVersion:1,kind:'home-layout',revision:input.baseRevision+1,footprintSignature:input.footprintSignature,layout,patches:[],roomPhotos,visibility:'PRIVATE',coverageVerified:false,envelopeEvidence:'capture-snapshot-unverified'};
   }
@@ -54,6 +54,9 @@ function normalizeHybridPreview(capture, input) {
   if(!Array.isArray(input.patches)||input.patches.length>16) throw Error('invalid_hybrid_patches');
   const prefix=`reality-captures/${capture.ownerUid}/${capture.captureId}/originals/`;
   const photos=new Map((capture.inputManifest||[]).filter(p=>p.name?.startsWith(prefix)).map(p=>[p.name.slice(prefix.length).split('.')[0],p]));
+  const labels=input.photoLabels??{},photoLabels={};
+  if(!labels||typeof labels!=='object'||Array.isArray(labels)||Object.keys(labels).length>48)throw Error('invalid_photo_labels');
+  for(const [id,label] of Object.entries(labels)){if(!photos.has(id)||typeof label!=='string'||label.length>60)throw Error('invalid_photo_labels');photoLabels[id]=label.trim();}
   const closed=footprint[0].x===footprint.at(-1).x&&footprint[0].z===footprint.at(-1).z;
   const wallCount=isRoom?footprint.length+2:footprint.length-(closed?1:0), ids=new Set();
   const patches=input.patches.map(p=>{
@@ -72,6 +75,6 @@ function normalizeHybridPreview(capture, input) {
     const a=patches[i],b=patches[j];
     if(a.wall===b.wall&&Math.min(a.region[2],b.region[2])-Math.max(a.region[0],b.region[0])>.001&&Math.min(a.region[3],b.region[3])-Math.max(a.region[1],b.region[1])>.001)throw Error('photo_patches_overlap');
   }
-  return {schemaVersion:1,...(isRoom?{kind:'room-patches',room}:{}),...(!isRoom&&input.streetFacingWall!==undefined?{streetFacingWall:input.streetFacingWall}:{}),revision:input.baseRevision+1,footprintSignature:input.footprintSignature,heightMeters:room?.heightMeters||input.heightMeters,heightEvidence:'user-preview-unverified',roofShape:isRoom?'flat':roofShape,roofRiseMeters,patches,visibility:'PRIVATE',coverageVerified:false};
+  return {schemaVersion:1,...(isRoom?{kind:'room-patches',room}:{}),...(!isRoom&&input.streetFacingWall!==undefined?{streetFacingWall:input.streetFacingWall}:{}),revision:input.baseRevision+1,footprintSignature:input.footprintSignature,heightMeters:room?.heightMeters||input.heightMeters,heightEvidence:'user-preview-unverified',roofShape:isRoom?'flat':roofShape,roofRiseMeters,patches,photoLabels,visibility:'PRIVATE',coverageVerified:false};
 }
 module.exports={footprintSignature,normalizeHybridPreview,encodeHybridPreview,decodeHybridPreview,captureInteriorEnvelope};

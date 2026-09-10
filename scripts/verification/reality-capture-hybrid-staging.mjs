@@ -15,7 +15,8 @@ const origin=production?'https://worldexplorer3d.io':'https://we3d-staging-20260
 if(production&&process.env.WE3D_CAPTURE_AUTOMATION_ATTESTATION==='1')throw Error('Production must use real App Check, never a debug bypass');
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const page=await browser.newPage({viewport:{width:390,height:844}});page.setDefaultTimeout(20000);
-let account,config,captureId,deleted=false;
+page.on('dialog',dialog=>dialog.accept());
+let account,config,captureId,continuedId,deleted=false;
 let attestation;
 try{
   {
@@ -81,6 +82,7 @@ try{
     return {uploadStatus:finalized.status,photoCount:uploaded.photos.length,revision:saved.preview.revision,submissionStatus:submitted.status,paidDenied,roomDenied};
   },{id:captureId,home,surface});
   assert.deepEqual(manual,{uploadStatus:'uploaded',photoCount:home?3:2,revision:2,submissionStatus:'review_required',paidDenied:true,roomDenied:true});
+  await page.locator('.captureActivity').getByText('Your improvement is awaiting review',{exact:true}).waitFor({timeout:60000});
   if(home){const resolved=await page.evaluate(async id=>{const api=await import('/js/community-reality-capture-api.js?v=4'),capture=(await api.getMyRealityCapture(id)).capture;const value=await api.resolveBuildingInteriorRepresentation(capture.building.sourceBuildingId,capture.building.worldId,'');return {authorized:value.authorized,available:value.available,kind:value.representationKind,floors:value.layout?.floors?.length,publicRequested:capture.publicContributionRequested,model:!!value.model?.url};},captureId);assert.equal(resolved.authorized,true);assert.equal(resolved.kind,'home-layout');assert.equal(resolved.floors,2);assert.equal(resolved.publicRequested,false);assert.equal(resolved.model,true);}
   if(home){
     // Reopen through the visible account action: assigning the same hash after
@@ -100,9 +102,19 @@ try{
     assert.equal(await page.locator('.homeLayoutEditor [data-name]').inputValue(),'My saved test room');
     await page.locator('.homeLayoutEditor [data-close]').click();await page.locator('[data-capture-close]').click();
   }
+  const continued=await page.evaluate(async id=>{
+    const api=await import('/js/community-reality-capture-api.js?v=4'),source=await api.getMyRealityCapture(id);
+    const c=source.capture,result=await api.createRealityCaptureDraft({sourceCaptureId:id,captureKind:c.captureKind,building:c.building,room:c.room,permissionConfirmed:c.permissionConfirmed});
+    const next=await api.getMyRealityCapture(result.capture.captureId),again=await api.createRealityCaptureDraft({sourceCaptureId:id,captureKind:c.captureKind,building:c.building,room:c.room,permissionConfirmed:c.permissionConfirmed});
+    const library=await api.listMyRealityCaptures({worldId:c.building.worldId,sourceBuildingId:c.building.sourceBuildingId});
+    return {id:next.capture.captureId,ready:next.capture.continuationReady,photoCount:next.photos.length,hasLayout:!!next.capture.hybridPreview?.layout,placements:next.capture.hybridPreview?.layout?next.capture.hybridPreview.roomPhotos.reduce((n,r)=>n+r.patches.length,0):next.capture.hybridPreview.patches.length,sameRetry:again.capture.captureId===next.capture.captureId,libraryCount:library.captures.length,submission:next.capture.hybridSubmission};
+  },captureId);continuedId=continued.id;
+  assert.equal(continued.ready,true);assert.equal(continued.photoCount,home?3:2);assert.equal(continued.placements,1);assert.equal(continued.hasLayout,home);assert.equal(continued.sameRetry,true);assert.equal(continued.libraryCount,2);assert.equal(continued.submission,null);
+  await page.evaluate(async id=>(await import('/js/community-reality-capture-api.js?v=4')).deleteRealityCapture(id),continuedId);continuedId=null;
   await page.evaluate(async id=>(await import('/js/community-reality-capture-api.js?v=4')).deleteRealityCapture(id),captureId);deleted=true;
   await mkdir('output/verification/reality-capture-hybrid',{recursive:true});await writeFile(`output/verification/reality-capture-hybrid/${home?'home-staging':production?'production':'staging'}-report.json`,JSON.stringify({passed:true,origin,home,...result,afterReload,manual,fixtureDeleted:true,automationAttestation:!!attestation,limitations:'Synthetic photo with real upload/validation/CPU submission. No physical phone, public approval or world acceptance.'},null,2));console.log('Live manual photo upload, validation, save, CPU submission, cost gates and cleanup passed. No reconstruction launched.');
 }finally{
+  if(continuedId)await page.evaluate(async id=>(await import('/js/community-reality-capture-api.js?v=4')).deleteRealityCapture(id),continuedId).catch(()=>{});
   if(captureId&&!deleted)await page.evaluate(async id=>(await import('/js/community-reality-capture-api.js?v=4')).deleteRealityCapture(id),captureId).catch(()=>{});
   if(account?.idToken&&config)await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:delete?key=${config.apiKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idToken:account.idToken})});
   try { await browser.close(); }

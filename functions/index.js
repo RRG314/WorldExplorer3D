@@ -2772,9 +2772,11 @@ Object.assign(exports, require('./reality-capture-processing').buildCaptureProce
 // Submission survives browser closure; retry delivery without resubmitting photos.
 exports.notifyCaptureReview = functions.region('us-central1').runWith({ failurePolicy: true })
   .firestore.document('realityCaptures/{captureId}').onWrite(async (change, context) => {
-    const { reviewNotice, deliverReviewNotice } = require('./capture-review-notice');
-    const notice = reviewNotice(change.before.exists ? change.before.data() : null,
-      change.after.exists ? change.after.data() : null, context.params.captureId);
+    const { reviewNotice, deliverReviewNotice, contributorNotice } = require('./capture-review-notice');
+    const before=change.before.exists?change.before.data():null,after=change.after.exists?change.after.data():null;
+    const activity=contributorNotice(before,after,context.params.captureId);
+    if(activity){const id=crypto.createHash('sha256').update(`${activity.captureId}/${activity.revision}/${activity.status}`).digest('hex');await db.collection('users').doc(activity.ownerUid).collection('notifications').doc(id).set({...activity,createdAtMs:Date.parse(context.timestamp)});}
+    const notice = reviewNotice(before,after,context.params.captureId);
     if (!notice) return;
     notice.eventTimeMs = Date.parse(context.timestamp);
     await deliverReviewNotice({ ref: change.after.ref, notice, config: contributionNotificationConfig() });

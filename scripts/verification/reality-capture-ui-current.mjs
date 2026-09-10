@@ -27,7 +27,10 @@ async function makePage(viewport, mobile = false) {
     const url = new URL(route.request().url());
     const module = body => route.fulfill({ contentType: 'text/javascript', body });
     if (url.pathname.endsWith('/auth-ui.js')) return module(authModule);
-    if (url.pathname.endsWith('/firebase-init.js')) return module(`import {getCurrentUser} from '/js/auth-ui.js?v=55';export const initFirebase=()=>({storage:{},auth:{get currentUser(){return getCurrentUser()}}});`);
+    if (url.pathname.endsWith('/firebase-init.js')) return module(`import {getCurrentUser} from '/js/auth-ui.js?v=55';export const initFirebase=()=>({db:{},storage:{},auth:{get currentUser(){return getCurrentUser()}}});`);
+    // This component fixture has no notification events. Real Firestore receipt
+    // delivery is exercised by the staging acceptance, not this transport double.
+    if(url.pathname.endsWith('firebase-firestore.js'))return module(`export const collection=(...args)=>args;export const query=(...args)=>args;export const orderBy=(...args)=>args;export const limit=n=>n;export const onSnapshot=(_,next)=>{queueMicrotask(()=>next({docs:[]}));return()=>{}};`);
     if (url.pathname.endsWith('/function-api.js')) return module(`import {getCurrentUser} from '/js/auth-ui.js?v=55';export async function postProtectedFunction(name,body={}){const r=await fetch('/__test'+name,{method:'POST',body:JSON.stringify({uid:getCurrentUser()?.uid,...body})});const data=await r.json();if(!r.ok){const e=new Error(data.error);e.status=r.status;throw e;}return data;}export const postAppCheckedFunction=postProtectedFunction;`);
     if (url.pathname.endsWith('firebase-storage.js')) return module(`export const ref=(_,path)=>path;
       export function uploadBytesResumable(path,blob,metadata){let cancelled=false;return {snapshot:{totalBytes:blob.size},cancel(){cancelled=true},on(_,progress,error,done){fetch('/__test/upload',{method:'POST',body:JSON.stringify({path,metadata})}).then(async r=>{if(cancelled||!r.ok)throw Error('Upload interrupted. Retry to continue.');progress({bytesTransferred:blob.size,totalBytes:blob.size});done()}).catch(error);}}}`);

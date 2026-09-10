@@ -10,7 +10,7 @@ import {normalizeManualRoom,manualRoomFootprint,manualRoomSurfaceSize,ROOM_SURFA
 
 // The host supplies the existing authenticated asset/save APIs. No public URLs,
 // alternate uploader, reconstruction queue, or world-geometry authority here.
-export async function openHybridEditor({capture,photos,loadPhoto,save,submit,signal,onClose,initialWall=0,saveScope='account',inWorld=false}) {
+export async function openHybridEditor({capture,photos,loadPhoto,save,submit,signal,onClose,initialWall=0,saveScope='account',inWorld=false,notice=''}) {
   const isRoom=capture.captureKind==='interior_room';
   let pts=isRoom?manualRoomFootprint(capture.hybridPreview?.room||capture.room):wallFootprint(capture.building);
   if(!photos.length)throw Error('No saved photographs are available for this capture.');
@@ -87,6 +87,7 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
   if(inWorld){$('[data-close]').textContent='Back to photos';$('[data-close]').setAttribute('aria-label','Back to Photo Survey');}
   const deviceOnly=saveScope==='device',savedWhere=deviceOnly?'on this device':'to account';
   if(deviceOnly)$('[data-save]').textContent='Save preview in my local world';
+  if(capture.authoredLayout)$('[data-save]').textContent='Save room photos and home layout';
   let preview=structuredClone(capture.hybridPreview||{revision:0,footprintSignature:capture.footprintSignature,heightMeters:capture.building?.spatialContext?.wallHeightMeters||capture.buildingDetails?.heightMeters||capture.building?.spatialContext?.height?.meters||6,roofShape:['flat','gabled','hipped'].includes(capture.buildingDetails?.roofShape)?capture.buildingDetails.roofShape:'unknown',roofRiseMeters:2,patches:[]});
   if(isRoom){preview.room=normalizeManualRoom(preview.room||capture.room);preview.heightMeters=preview.room.heightMeters;preview.roofShape='flat';}
   const presentationBuilding=()=>isRoom?{...capture.building,manualRoom:preview.room}:capture.building;
@@ -108,6 +109,9 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
     if(capture.authoredLayout){$('[data-rebuild]').hidden=true;dimensions.hidden=true;$('[data-height]').closest('label').hidden=true;$('[data-height-evidence]').hidden=true;}
   }
   let quad=[],selected=0,bitmap=null,viewer=null,busy=false,closed=false,editId=null,drag=false,dirty=false,highlight=null,photoPage=0,thumbnailBusy=false;
+  let showPhotos=true,photoMeshes=[];
+  const compare=document.createElement('button');compare.textContent='Show without photos';compare.setAttribute('aria-pressed','false');$('[data-reset]').after(compare);
+  compare.onclick=()=>{showPhotos=!showPhotos;for(const mesh of photoMeshes)mesh.visible=showPhotos;compare.textContent=showPhotos?'Show without photos':'Show photo placements';compare.setAttribute('aria-pressed',String(!showPhotos));};
   const localKey=JSON.stringify(['capture-wall-edit-v1',capture.ownerUid,capture.captureId,...(capture.authoredRoomId?[capture.authoredRoomId]:[])]);
   let recovery=null;
   try { recovery=(await loadLocalCaptureDraft(localKey)).draft; } catch { /* Account Save still works when device storage is unavailable. */ }
@@ -129,14 +133,20 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
   if(recovery?.preview){
     $('[data-recovery]').hidden=false;
     const same=recovery.baseRevision===preview.revision&&recovery.preview.footprintSignature===preview.footprintSignature;
-    $('[data-recover]').hidden=!same;
-    $('[data-recovery-copy]').textContent=same?'This device has unsaved photo placements from your last visit. Restore them or keep the account version.':'A newer account revision exists. The older device draft will not overwrite it.';
+    $('[data-recover]').hidden=false;
+    $('[data-recovery-copy]').textContent=same?'This device has unsaved photo placements from your last visit. Inspect them or keep the account version.':`Device edits were based on version ${recovery.baseRevision}; your account is version ${preview.revision}. Inspect them before explicitly saving. Nothing is overwritten automatically.`;
   }
-  $('[data-recover]').onclick=()=>run(async()=>{if(recovery?.baseRevision!==preview.revision||recovery.preview.footprintSignature!==preview.footprintSignature)throw Error('The account version changed. Reopen this editor.');preview=structuredClone(recovery.preview);dirty=true;$('[data-height]').value=preview.heightMeters;$('[data-roof]').value=preview.roofShape;$('[data-rise]').value=preview.roofRiseMeters;$('[data-recovery]').hidden=true;await rebuild();status('Recovered placements. Save to account when ready.');});
+  $('[data-recover]').onclick=()=>run(async()=>{if(recovery.preview.footprintSignature!==preview.footprintSignature)throw Error('The mapped outline changed. Keep this device draft; its photos must be aligned with the updated building before saving.');const currentRevision=preview.revision;remember();preview={...structuredClone(recovery.preview),revision:currentRevision};dirty=true;$('[data-height]').value=preview.heightMeters;$('[data-roof]').value=preview.roofShape;$('[data-rise]').value=preview.roofRiseMeters;$('[data-recovery]').hidden=true;await rebuild();status('Inspecting device placements. Save explicitly to replace the account placements with this draft, or Undo to return to the account version.');});
   $('[data-discard-recovery]').onclick=()=>run(async()=>{await deleteLocalCaptureDraft(localKey);recovery=null;$('[data-recovery]').hidden=true;});
-  $('[data-close]').onclick=close;dialog.addEventListener('cancel',e=>{e.preventDefault();close();});
+  const requestClose=()=>{if(busy){status('Wait for the current operation to finish before closing.');return;}if(dirty&&!confirm('These edits have not been saved to your account. Close the editor and keep only the device recovery draft?'))return;close();};
+  $('[data-close]').onclick=requestClose;dialog.addEventListener('cancel',e=>{e.preventDefault();requestClose();});
   const photoSelect=$('[data-photo-choice]');
-  photos.forEach((p,i)=>photoSelect.add(new Option(`Photo ${i+1}`,p.id)));
+  const photoName=document.createElement('label');photoName.textContent='Photo label (optional)';const nameInput=document.createElement('input');nameInput.maxLength=60;nameInput.dataset.photoName='';photoName.append(nameInput);$('[data-photo]').before(photoName);
+  const photoTitle=(id,index)=>preview.photoLabels?.[id]||`Photo ${index+1}`;
+  nameInput.onchange=()=>run(async()=>{remember();preview.photoLabels={...preview.photoLabels,[photoSelect.value]:nameInput.value.trim()};for(const [i,p] of photos.entries())photoSelect.options[i].textContent=photoTitle(p.id,i);await loadThumbnails();status('Photo label updated in this draft. Save to keep it across devices.');});
+  const rotateCrop=document.createElement('button');rotateCrop.textContent='Rotate photo 90°';rotateCrop.dataset.rotatePhoto='';$('[data-clear]').after(rotateCrop);
+  rotateCrop.onclick=()=>{if(busy||quad.length!==4)return;quad=[quad[3],quad[0],quad[1],quad[2]];drawPhoto();cropPreview();status('Photo orientation adjusted. Choose Place photo to apply this crop.');};
+  photos.forEach((p,i)=>photoSelect.add(new Option(photoTitle(p.id,i),p.id)));
   const directions=wallDirections(pts);
   let mapContext=null;
   $('[data-map-panel]').hidden=isRoom;
@@ -202,7 +212,7 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
       b.onclick=()=>run(async()=>{photoSelect.value=p.id;await selectPhoto();status('Photo selected. Adjust the yellow crop corners, then choose Place photo on wall.');});
       try{
         if(!thumbs.has(p.id)){const blob=await loadPhoto(p.id,abort.signal);active();if(!(blob instanceof Blob)||blob.size>32*1024*1024)throw Error('Photo exceeds preview limit');const image=await createImageBitmap(blob,{imageOrientation:'from-image',resizeWidth:160});try{active();const c=document.createElement('canvas');c.width=160;c.height=Math.max(1,Math.round(image.height/image.width*160));c.getContext('2d').drawImage(image,0,0,c.width,c.height);thumbs.set(p.id,c.toDataURL('image/jpeg',.75));c.width=c.height=0;}finally{image.close();}}
-        const img=document.createElement('img');img.src=thumbs.get(p.id);img.alt=`Saved photo ${start+offset+1}`;b.replaceChildren(img,document.createTextNode(`Photo ${start+offset+1}`));
+        const img=document.createElement('img');img.src=thumbs.get(p.id);img.alt=`Saved photo ${start+offset+1}`;const uses=[...new Set(preview.patches.filter(patch=>patch.photoId===p.id).map(patch=>surfaceNames[patch.wall]))];b.replaceChildren(img,document.createTextNode(`${photoTitle(p.id,start+offset)} · ${uses.length?uses.join(', '):'Not placed'}`));
       }catch(e){active();b.textContent=`Photo ${start+offset+1} · tap to retry`;}
     }
     }finally{thumbnailBusy=false;if(!closed)pageButtons();}
@@ -214,7 +224,7 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
     ctx.strokeStyle='#ffcb55';ctx.lineWidth=c.width/220;ctx.beginPath();quad.forEach((p,i)=>i?ctx.lineTo(p[0]*c.width,p[1]*c.height):ctx.moveTo(p[0]*c.width,p[1]*c.height));if(quad.length===4)ctx.closePath();ctx.stroke();
     quad.forEach((p,i)=>{ctx.fillStyle=i===selected?'#fff':'#ffcb55';ctx.beginPath();ctx.arc(p[0]*c.width,p[1]*c.height,c.width/65,0,Math.PI*2);ctx.fill();ctx.fillStyle='#05202b';ctx.font=`bold ${c.width/48}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(String(i+1),p[0]*c.width,p[1]*c.height);});if(updateFields)coordinates();
   }
-  async function selectPhoto(){bitmap=await photo(photoSelect.value);active();quad=[[.08,.08],[.92,.08],[.92,.92],[.08,.92]];selected=0;editId=null;drawPhoto();cropPreview();drawPlacement();dialog.querySelectorAll('[data-photo-id]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.photoId===photoSelect.value)));}
+  async function selectPhoto(){nameInput.value=preview.photoLabels?.[photoSelect.value]||'';bitmap=await photo(photoSelect.value);active();quad=[[.08,.08],[.92,.08],[.92,.92],[.08,.92]];selected=0;editId=null;drawPhoto();cropPreview();drawPlacement();dialog.querySelectorAll('[data-photo-id]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.photoId===photoSelect.value)));}
   function drawPlan(){
     $('[data-front-reference]').textContent=Number.isInteger(preview.streetFacingWall)?`Your street-facing reference: wall ${preview.streetFacingWall+1}. User supplied—not verified map data.`:isRoom?'':'Street-facing side not identified. Check the map, then mark the correct wall.';
     const c=$('[data-plan]');c.width=640;c.height=320;const ctx=c.getContext('2d');ctx.clearRect(0,0,640,320);
@@ -228,7 +238,8 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
   function remember(){snapshots.push(structuredClone(preview));if(snapshots.length>10)snapshots.shift();dirty=true;$('[data-saved]').textContent='Unsaved preview changes.';}
   function patchList(){
     const ul=$('[data-patches]');ul.replaceChildren();
-    preview.patches.forEach(p=>{const li=document.createElement('li');li.append(`Wall ${p.wall+1} · Photo ${photos.findIndex(x=>x.id===p.photoId)+1} `);
+    preview.patches.forEach(p=>{const li=document.createElement('li');li.append(`${surfaceNames[p.wall]} · ${photoTitle(p.photoId,photos.findIndex(x=>x.id===p.photoId))} `);
+      const replace=document.createElement('button');replace.textContent='Replace with selected photo';replace.onclick=()=>run(async()=>{validateQuad(quad);remember();p.photoId=photoSelect.value;p.quad=structuredClone(quad);await rebuild();status('The selected photo and crop replaced this placement. Its surface and region are unchanged. Save to keep it.');});li.append(replace);
       const destination=document.createElement('select');destination.setAttribute('aria-label',`Move photo patch ${p.id} to surface`);
       surfaceNames.forEach((name,i)=>destination.add(new Option(name,String(i))));destination.value=String(p.wall);
       const relocate=document.createElement('button');relocate.textContent='Move to this surface';
@@ -240,13 +251,14 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
     });
   }
   async function rebuild(){
+    photoMeshes=[];
     active();patchThumbs.clear();if(isRoom)pts=manualRoomFootprint(preview.room);const group=buildHybridShell(T,presentationBuilding(),preview.heightMeters,preview);
     try{
       highlight=buildWallPatch(T,presentationBuilding(),preview.heightMeters,{wall:Number($('[data-wall]').value),region:[0,0,1,1]},null);
       highlight.material.color.set('#ffcc55');highlight.material.transparent=true;highlight.material.opacity=.22;highlight.material.depthWrite=false;highlight.material.polygonOffsetFactor=-1;highlight.material.polygonOffsetUnits=-1;group.add(highlight);
-      for(const p of preview.patches){const b=await photo(p.photoId);active();const a=pts[p.wall],end=pts[(p.wall+1)%pts.length];const size=isRoom?manualRoomSurfaceSize(preview.room,p.wall):[Math.hypot(end.x-a.x,end.z-a.z),preview.heightMeters];const aspect=size[0]*(p.region[2]-p.region[0])/(size[1]*(p.region[3]-p.region[1]));const canvas=rectifyPhoto(b,p.quad,aspect),texture=new T.CanvasTexture(canvas);texture.encoding=T.sRGBEncoding;group.add(buildWallPatch(T,presentationBuilding(),preview.heightMeters,p,texture));const thumb=document.createElement('canvas');thumb.width=192;thumb.height=192;thumb.getContext('2d').drawImage(canvas,0,0,192,192);patchThumbs.set(p.id,thumb.toDataURL('image/jpeg',.75));thumb.width=thumb.height=0;}
+      for(const p of preview.patches){const b=await photo(p.photoId);active();const a=pts[p.wall],end=pts[(p.wall+1)%pts.length];const size=isRoom?manualRoomSurfaceSize(preview.room,p.wall):[Math.hypot(end.x-a.x,end.z-a.z),preview.heightMeters];const aspect=size[0]*(p.region[2]-p.region[0])/(size[1]*(p.region[3]-p.region[1]));const canvas=rectifyPhoto(b,p.quad,aspect),texture=new T.CanvasTexture(canvas);texture.encoding=T.sRGBEncoding;const mesh=buildWallPatch(T,presentationBuilding(),preview.heightMeters,p,texture);mesh.visible=showPhotos;photoMeshes.push(mesh);group.add(mesh);const thumb=document.createElement('canvas');thumb.width=192;thumb.height=192;thumb.getContext('2d').drawImage(canvas,0,0,192,192);patchThumbs.set(p.id,thumb.toDataURL('image/jpeg',.75));thumb.width=thumb.height=0;}
       active();const view=viewer?.getView();viewer?.dispose();viewer=await createCaptureViewer($('[data-viewer]'),null,abort.signal,{model:group,alignment:{},fitScale:.65,view,onPick:pickWall,label:'Tap a wall to select it. Drag to rotate; pinch or scroll to zoom. Side buttons also select walls.'});
-      active();bitmap=await photo(photoSelect.value);drawPhoto();cropPreview();patchList();drawPlacement();
+      active();bitmap=await photo(photoSelect.value);drawPhoto();cropPreview();patchList();drawPlacement();await thumbnailPage();
     }catch(e){group.traverse(o=>{o.geometry?.dispose();o.material?.map?.dispose();o.material?.dispose();});throw e;}
   }
   photoSelect.onchange=()=>run(selectPhoto);$('[data-wall]').onchange=()=>selectWall(Number($('[data-wall]').value));
@@ -300,6 +312,7 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
   $('[data-submit]').onclick=()=>run(async()=>{
     if(dirty||!preview.revision)throw Error('Save your latest photo placements before submitting.');
     if(!preview.patches.length)throw Error('Place at least one photo on a wall first.');
+    if(!confirm(`Submit revision ${preview.revision} with ${preview.patches.length} photo placements on ${new Set(preview.patches.map(p=>p.wall)).size} surfaces? Original photos stay private. ${isRoom?'Interior access stays private unless separately requested and approved.':'The exterior changes for everyone only after approval.'}`))return;
     $('[data-submission]').textContent='Preparing your cropped wall images for review…';
     try {const result=await submit(preview.revision);active();$('[data-submission]').textContent=`Revision ${result.revision} · ${result.status==='approved'?'Approved':'Submitted for approval'}. Your saved edits remain available.`;status('Submission recorded. The building changes after approval, not merely after saving.');}
     catch(error){$('[data-submission]').textContent=`Not submitted: ${error.message}. Your saved edits are safe.`;throw error;}
@@ -309,5 +322,6 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
   document.body.append(dialog);dialog.showModal();
   await run(async()=>{await selectPhoto();selectWall(Number.isInteger(initialWall)&&initialWall>=0&&initialWall<$('[data-wall]').options.length?initialWall:0,true);await rebuild();});
   void loadThumbnails();
+  if(notice)status(notice);
   return {close,getState:()=>({revision:preview.revision,patches:preview.patches.length,dirty,closed,selectedWall:Number($('[data-wall]').value),selectedPhoto:photoSelect.value,region:getRegion(),quad,buildingId:capture.building.sourceBuildingId})};
 }

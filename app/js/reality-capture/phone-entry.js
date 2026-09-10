@@ -1,8 +1,11 @@
 import { observeAuth, getCurrentUser, signInWithGoogle, signInWithEmailPassword, signOutUser, resolveRedirectSignIn } from '../../../js/auth-ui.js?v=55';
 import { listMyRealityCaptures } from '../../../js/community-reality-capture-api.js?v=4';
 import { openRealityCaptureSession, closeRealityCapture } from './ui.js?v=2';
+import {groupCaptureBuildings,captureLabel} from './workflow-presentation.js';
+import {mountCaptureActivity} from '../../../js/capture-activity.js';
 
 const status = document.getElementById('phoneStatus');
+mountCaptureActivity(document.getElementById('phoneCaptures'),{open:id=>{history.replaceState(null,'',`#capture=${encodeURIComponent(id)}`);void openCapture(id);}});
 let generation = 0;
 const selectedCapture = () => new URLSearchParams(location.hash.slice(1)).get('capture') || '';
 
@@ -27,15 +30,18 @@ async function refreshList() {
     if (token !== generation || getCurrentUser()?.uid !== uid) return;
     const list = document.getElementById('captureList');
     list.replaceChildren();
-    for (const capture of result.captures || []) {
+    for (const group of groupCaptureBuildings(result.captures||[])) {
+      const section=document.createElement('section'),heading=document.createElement('h3');heading.textContent=group.building.label||'Mapped building';section.append(heading);list.append(section);
+      for (const capture of group.captures) {
       const button = document.createElement('button');
       button.type = 'button';
-      button.textContent = `${capture.building?.label || 'Mapped building'} · ${capture.room?.label || 'Exterior'} · ${capture.status.replaceAll('_', ' ')}`;
+      button.textContent = captureLabel(capture);
       button.addEventListener('click', () => {
         history.replaceState(null, '', `#capture=${encodeURIComponent(capture.captureId)}`);
         void openCapture(capture.captureId);
       });
-      list.appendChild(button);
+      section.appendChild(button);
+      }
     }
     if (!list.children.length) list.textContent = 'No captures yet. Select a mapped building in the world and choose Improve this place.';
   } catch (error) { if (token === generation) status.textContent = error.message; }

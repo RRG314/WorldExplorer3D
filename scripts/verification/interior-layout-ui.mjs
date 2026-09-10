@@ -13,7 +13,7 @@ const browser=await chromium.launch({channel:'chrome',headless:true});
 try{
   for(const width of [1100,412]){
     const context=await browser.newContext({viewport:{width,height:900},hasTouch:width<700,isMobile:width<700});
-    const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+    const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',dialog=>dialog.accept());
     const capture={captureId:'layout-test',ownerUid:'local-verifier',captureKind:'interior_room',room:{widthMeters:4,lengthMeters:6,heightMeters:2.7},consent:{propertyPermissionConfirmed:true},building:{sourceAuthority:'osm',sourceBuildingId:'test-building',spatialContext:{footprint:[{x:0,z:0},{x:10,z:0},{x:10,z:12},{x:0,z:12}],height:{meters:6}}}};
     capture.footprintSignature=footprintSignature(capture.building,capture.room);
     capture.inputManifest=[{name:`reality-captures/${capture.ownerUid}/${capture.captureId}/originals/${photoId}.jpg`,generation:'1',size:photoBytes.length,sha256:createHash('sha256').update(photoBytes).digest('hex')}];
@@ -31,15 +31,21 @@ try{
     await page.mouse.move(points[0].x,points[0].y);await page.mouse.down();await page.mouse.move(points[1].x,points[1].y,{steps:8});await page.mouse.up();
     assert.equal(await page.locator('[data-room] option').count(),5,'Pointer drawing must create rooms, not just a visual rectangle');
     await page.locator('[data-undo]').click();assert.equal(await page.locator('[data-room] option').count(),1);
+    await page.locator('[data-redo]').click();assert.equal(await page.locator('[data-room] option').count(),5);
+    await page.locator('[data-undo]').click();assert.equal(await page.locator('[data-room] option').count(),1);
+    const fitted=await page.locator('[data-plan]').getAttribute('viewBox');await page.locator('[data-plan-zoom="1.4"]').click();assert.notEqual(await page.locator('[data-plan]').getAttribute('viewBox'),fitted);await page.locator('[data-plan-fit]').click();assert.equal(await page.locator('[data-plan]').getAttribute('viewBox'),fitted);
+    await page.locator('[data-measure-units]').selectOption('ft');assert.match(await page.locator('[data-room-measures]').textContent(),/ft/);
     await page.locator('[data-link-phone]').click();await page.locator('[data-status]').filter({hasText:/reachable HTTPS/}).waitFor();
     await page.locator('[data-setup] > summary').click();
     await page.locator('[data-start]').click();assert.equal(await page.locator('[data-room] option').count(),3);
+    await page.locator('[data-tool="select"]').click();const shared=page.locator('[data-shared-wall]').first();await shared.scrollIntoViewIfNeeded();const beforeWall=await shared.getAttribute('cy'),wallBox=await shared.boundingBox();await page.mouse.move(wallBox.x+wallBox.width/2,wallBox.y+wallBox.height/2);await page.mouse.down();await page.mouse.move(wallBox.x+wallBox.width/2,wallBox.y+wallBox.height/2+12);await page.mouse.up();assert.notEqual(await page.locator('[data-shared-wall]').first().getAttribute('cy'),beforeWall,'Dragging the shared wall changes both connected rooms');
     await page.locator('[data-name]').fill('Living room');await page.locator('[data-name]').dispatchEvent('change');
     await page.locator('[data-save]').click();await page.getByText('Saved to account · revision 1. Your home remains private.',{exact:true}).waitFor();
     await page.locator('[data-photos]').click();const crop=page.locator('.captureHybridEditor');
-    await crop.locator('[data-photo]').waitFor();await crop.locator('[data-add]').click();await crop.locator('[data-save]').click();
+    await crop.locator('[data-photo]').waitFor();await crop.locator('[data-photo-name]').fill('Living room wall');await crop.locator('[data-photo-name]').dispatchEvent('change');await crop.locator('[data-rotate-photo]').click();await crop.locator('[data-add]').click();await crop.locator('[data-save]').click();
     await crop.locator('[data-saved]').filter({hasText:/Saved/}).waitFor();await crop.locator('[data-close]').click();
     assert.equal(capture.hybridPreview.roomPhotos[0].patches.length,1);
+    assert.equal(capture.hybridPreview.roomPhotos[0].photoLabels[photoId],'Living room wall');
     await page.locator('.homeLayoutEditor [data-submit]').click();await page.locator('.homeLayoutEditor [data-status]').filter({hasText:/submitted for review/}).waitFor();
     await page.screenshot({path:`${output}/${width}-plan.png`,fullPage:true});
     await page.locator('[data-3d-mode]').click();try{await page.locator('[data-viewer] canvas').waitFor({timeout:15000});}catch(e){console.log(await page.locator('[data-status]').innerText(),errors);throw e;}await page.screenshot({path:`${output}/${width}-shell.png`,fullPage:true});

@@ -2,7 +2,7 @@
 
 const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
-const { FieldValue } = require('firebase-admin/firestore');
+const { FieldValue, FieldPath } = require('firebase-admin/firestore');
 const { validateCaptureObjects } = require('./reality-capture-upload-validation');
 const { footprintSignature, normalizeHybridPreview, encodeHybridPreview, decodeHybridPreview } = require('./reality-capture-hybrid');
 const { createPatchGlb } = require('./reality-capture-patch-derivative');
@@ -57,6 +57,9 @@ function serializeCapture(snapshot) {
   return {
     id: snapshot.id,
     captureId: clean(data.captureId || snapshot.id, 180),
+    sourceCaptureId: clean(data.sourceCaptureId, 180),
+    sourceRevision: Number(data.sourceRevision) || 0,
+    continuationReady: data.continuationReady !== false,
     captureSchemaVersion: Number(data.captureSchemaVersion) || 1,
     processingPipelineVersion: clean(data.processingPipelineVersion, 100),
     captureKind: clean(data.captureKind, 40),
@@ -179,15 +182,26 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     return auth;
   }
 
-  const createRealityCaptureDraft = functions.region('us-central1').https.onRequest(async (req, res) => {
+  const createRealityCaptureDraft = functions.runWith({ timeoutSeconds: 120, memory: '512MB', maxInstances: 2 }).region('us-central1').https.onRequest(async (req, res) => {
     const auth = await guard(req, res);
     if (!auth) return;
     try {
-      const authUser = await admin.auth().getUser(auth.uid);
+      const authUser = await (helpers.getAuthUser || (uid=>admin.auth().getUser(uid)))(auth.uid);
       if (auth.firebase?.sign_in_provider === 'anonymous') throw Error('authentication_required');
-      const draft = createCaptureDraft(req.body || {}, actorFromAuth(auth, authUser));
+      const draft = {...createCaptureDraft(req.body || {}, actorFromAuth(auth, authUser))};
+      let source=null;
+      if(req.body?.sourceCaptureId){
+        const id=clean(req.body.sourceCaptureId,180);if(!/^[\w-]+$/.test(id))throw Error('invalid_capture_id');
+        const snap=await db.collection(CAPTURES).doc(id).get();source=snap.exists?{...snap.data(),captureId:id}:null;
+        if(!source||source.ownerUid!==auth.uid||source.status==='deleting')throw Error('capture_not_found');
+        if(!source.inputManifest?.length)throw Error('validated_photos_required');
+        if(source.captureKind==='interior_room'&&source.consent?.propertyPermissionConfirmed!==true)throw Error('interior_permission_confirmation_required');
+        draft.captureId=`capture_${require('node:crypto').createHash('sha256').update(`${auth.uid}/${id}/${source.hybridPreview?.revision||0}/${source.hybridSubmission?.revision||0}`).digest('hex').slice(0,32)}`;
+        Object.assign(draft,{building:source.building,captureKind:source.captureKind,room:source.room||null,spaceId:source.spaceId||null,footprintSignature:footprintSignature(source.building,source.captureKind==='interior_room'?source.room:null),consent:source.consent||draft.consent,sourceCaptureId:id,sourceRevision:source.hybridPreview?.revision||0,continuationReady:false,publicContributionRequested:false});
+      }
       const ref = db.collection(CAPTURES).doc(draft.captureId);
       await db.runTransaction(async (transaction) => {
+        if(source){const existingDraft=await transaction.get(ref);if(existingDraft.exists){if(existingDraft.data().ownerUid!==auth.uid||existingDraft.data().sourceCaptureId!==source.captureId)throw Error('capture_owner_required');return;}}
         const spaceRef = draft.spaceId ? db.collection(SPACES).doc(draft.spaceId) : null;
         const existing = spaceRef ? await transaction.get(spaceRef) : null;
         const quotaRef = db.collection('captureAdmission').doc(auth.uid);
@@ -221,6 +235,25 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
           updatedAt: FieldValue.serverTimestamp()
         }, { merge: true });
       });
+      if(source){
+        const existing=(await ref.get()).data();
+        if(!existing.continuationReady){
+          const manifest=[],slots={};
+          for(const photo of source.inputManifest){
+            const prefix=`reality-captures/${auth.uid}/${source.captureId}/originals/`,name=photo.name?.slice(prefix.length);
+            if(!photo.name?.startsWith(prefix)||!/^([a-f0-9]{32})\.jpg$/.test(name)||!photo.generation)throw Error('invalid_photo_identity');
+            const path=`reality-captures/${auth.uid}/${draft.captureId}/originals/${name}`,file=bucket.file(path);
+            const [bytes]=await bucket.file(photo.name,{generation:photo.generation}).download();
+            const digest=require('node:crypto').createHash('sha256').update(bytes).digest('hex');
+            if(photo.sha256&&photo.sha256!==digest)throw Error('capture_source_changed');
+            try{await file.save(bytes,{resumable:false,preconditionOpts:{ifGenerationMatch:0},metadata:{contentType:'image/jpeg',cacheControl:'private,no-store',metadata:{ownerUid:auth.uid,captureId:draft.captureId,sector:String(photo.sector??-1)}}});}catch(e){if(Number(e.code)!==412)throw e;}
+            const [meta]=await file.getMetadata();manifest.push({...photo,name:path,generation:String(meta.generation),sha256:digest});slots[name]=true;
+          }
+          const preview=source.hybridPreview?normalizeHybridPreview({...draft,inputManifest:manifest,hybridPreview:null},{...decodeHybridPreview(source.hybridPreview),baseRevision:0}):null;
+          await db.runTransaction(async tx=>{const current=await tx.get(ref);if(current.data()?.continuationReady)return;if(current.data()?.status!=='draft')throw Error('invalid_capture_state_transition');tx.update(ref,{inputManifest:manifest,uploadSlots:slots,status:'uploaded',...(preview?{hybridPreview:encodeHybridPreview(preview)}:{}),continuationReady:true,updatedAt:FieldValue.serverTimestamp()});});
+        }
+        return res.status(200).json({capture:serializeCapture(await ref.get())});
+      }
       res.status(200).json({ capture: { ...draft, uploadPrefix: `reality-captures/${auth.uid}/${draft.captureId}/originals/` } });
     } catch (error) {
       console.error('[createRealityCaptureDraft]', error);
@@ -240,6 +273,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
         const snap = await tx.get(ref);
         if (!snap.exists || snap.data().ownerUid !== auth.uid) throw Error('capture_not_found');
         const capture=snap.data();
+        if(capture.continuationReady===false)throw Error('invalid_capture_state_transition');
         // Manual validation is not review submission. New immutable objects may
         // be added until a reconstruction/review has frozen this photo set.
         const appendable=capture.status==='uploaded'&&!capture.hybridSubmission&&!capture.processed&&!capture.queuedAt;
@@ -288,9 +322,12 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
         if (!worldId || !sourceBuildingId) return res.status(400).json({error:'canonical_building_required'});
         query = query.where('building.worldId', '==', worldId).where('building.sourceBuildingId', '==', sourceBuildingId);
       }
-      const snap = await query.limit(61).get();
-      const captures = snap.docs.map(serializeCapture).sort((a, b) => b.updatedAtMs - a.updatedAtMs);
-      res.status(200).json({ captures: captures.slice(0,60), truncated: captures.length > 60, buildingScoped: !!target });
+      query=query.orderBy(FieldPath.documentId());
+      const cursor=req.body?.cursor;
+      if(cursor){if(typeof cursor!=='string'||!/^[-\w]{1,180}$/.test(cursor))return res.status(400).json({error:'invalid_capture_cursor'});query=query.startAfter(cursor);}
+      const snap = await query.limit(61).get(),page=snap.docs.slice(0,60);
+      const captures = page.map(serializeCapture).sort((a, b) => b.updatedAtMs - a.updatedAtMs);
+      res.status(200).json({ captures, truncated: snap.docs.length > 60,nextCursor:snap.docs.length>60?page.at(-1).id:null, buildingScoped: !!target });
     } catch (error) {
       console.error('[listMyRealityCaptures]', error);
       res.status(500).json({ error: 'Unable to list captures.' });
@@ -344,7 +381,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
       await db.runTransaction(async tx=>{
         const snap=await tx.get(ref), capture=snap.data();
         if(!snap.exists||capture.ownerUid!==auth.uid)throw Error('capture_not_found');
-        if(capture.status === 'deleting')throw Error('invalid_capture_state_transition');
+        if(capture.status === 'deleting'||capture.continuationReady===false)throw Error('invalid_capture_state_transition');
         saved=normalizeHybridPreview({...capture,captureId},req.body?.preview);
         // Only private preview state changes. Existing processed assets, review,
         // public representations, collision and canonical building stay intact.

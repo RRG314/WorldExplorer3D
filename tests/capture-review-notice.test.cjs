@@ -1,6 +1,13 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { reviewNotice, deliverReviewNotice } = require('../functions/capture-review-notice');
+const { reviewNotice, deliverReviewNotice, contributorNotice } = require('../functions/capture-review-notice');
+test('account notices follow authoritative review versions and contain no private media',()=>{
+  const capture={ownerUid:'owner',status:'review_required',hybridSubmission:{revision:2},building:{label:'Private home'},inputManifest:[{name:'secret'}]};
+  const notice=contributorNotice(null,capture,'capture1');assert.equal(notice.status,'review_required');assert.equal(notice.ownerUid,'owner');assert.equal(notice.building,undefined);assert.equal(notice.inputManifest,undefined);
+  assert.equal(contributorNotice(capture,{...capture,hybridPreview:{revision:3}},'capture1'),null);
+  assert.equal(contributorNotice(capture,{...capture,status:'rejected'},'capture1').status,'rejected');
+  assert.equal(contributorNotice(capture,{...capture,status:'uploaded'},'capture1'),null);
+});
 test('only a submitted revision creates a review event', () => {
   assert.equal(reviewNotice(null, {status:'uploaded'}, 'a'), null);
   const capture = {status:'review_required',hybridSubmission:{revision:2}};

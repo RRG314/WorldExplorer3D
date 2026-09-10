@@ -121,8 +121,16 @@ export function createRealityCaptureDraft(input) {
   return endpoint('/createRealityCaptureDraft', input);
 }
 
-export function listMyRealityCaptures(building) {
-  return endpoint('/listMyRealityCaptures', building ? {building} : undefined);
+export async function listMyRealityCaptures(building) {
+  const captures=new Map(),seen=new Set();let cursor=null,result;
+  do{
+    result=await endpoint('/listMyRealityCaptures',{...(building?{building}:{}),...(cursor?{cursor}:{})});
+    for(const capture of result.captures||[])captures.set(capture.captureId,capture);
+    cursor=result.nextCursor||null;
+    if(cursor&&seen.has(cursor))throw Error('The contribution list could not finish loading. Refresh to retry; your saved work is unchanged.');
+    if(cursor)seen.add(cursor);
+  }while(cursor);
+  return {...result,captures:[...captures.values()].sort((a,b)=>(b.updatedAtMs||0)-(a.updatedAtMs||0))};
 }
 
 export function getMyRealityCapture(captureId) {

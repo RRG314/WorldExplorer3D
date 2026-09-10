@@ -913,7 +913,8 @@ function renderRealityDetail() {
     const revision=capture.hybridSubmission.revision;
     refs.moderationDetail.querySelectorAll('.capture-alignment-grid input').forEach(input=>{input.disabled=true;});
     const label=document.createElement('p');
-    label.className='detail-note';label.textContent=`Saved photo walls · revision ${revision} · ${capture.hybridSubmission.patches?.length||0} patches. Placement is fixed to the submitted mapped walls; uncovered geometry remains unchanged.`;
+    const submission=capture.hybridSubmission,isHome=submission.kind==='home-layout',count=isHome?(submission.roomPhotos||[]).reduce((sum,room)=>sum+(room.patches?.length||0),0):(submission.patches?.length||0);
+    label.className='detail-note';label.textContent=`${isHome?'Photo-supported interior':'Saved exterior photos'} · revision ${revision} · ${count} placed photos. ${isHome?'Check room boundaries, doorways and private access.':'Check the selected building and each photographed side.'} Uncovered surfaces remain procedural.`;
     refs.moderationDetail.prepend(label);
   }
   if (detail.model?.url) void mountRealityModelPreview(detail.model.url, capture);

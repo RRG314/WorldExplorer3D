@@ -7,11 +7,14 @@ import {createCaptureViewer} from './result-viewer.js?v=1';
 import {loadLocalCaptureDraft,saveLocalCaptureDraft,deleteLocalCaptureDraft} from './local-draft-store.js?v=1';
 import {capturePhoneUrl} from './capture-session.js?v=1';
 import {drawRectangleRoom,nearestPlanWall,snapPlanPoint} from './layout-drawing.js';
+import {migrateLegacyRoom} from './legacy-room.js';
 
 export async function openHomeLayoutEditor({capture,save,signal,photos=[],loadPhoto,submit,inWorld=false,importPhotos,refreshPhotos}) {
   signal.throwIfAborted();
   if(!globalThis.THREE)await loadClassicScript(vendorScriptsCritical[0]);
   const envelope={footprint:capture.building?.spatialContext?.footprint,holes:capture.building?.spatialContext?.holes||[],heightMeters:capture.building?.spatialContext?.wallHeightMeters||capture.building?.spatialContext?.height?.meters||3,revision:capture.footprintSignature};
+  let legacy=null;
+  try{legacy=migrateLegacyRoom(capture,envelope);}catch(error){const {openHybridEditor}=await import('./hybrid-editor.js?v=1');const editor=await openHybridEditor({capture,save,signal,photos,loadPhoto,submit,inWorld,notice:'Your saved room is preserved in its original editor because it cannot safely fit the mapped home layout. No photos were moved or removed.'});return editor;}
   const dialog=document.createElement('dialog');dialog.className=`homeLayoutEditor${inWorld?' captureInWorld':''}`;
   dialog.innerHTML=`<style>
   .homeLayoutEditor{width:min(1100px,96vw);max-height:94dvh;background:#09222d;color:#e3f5fa;border:1px solid #72b5c2;padding:16px;font:14px/1.5 Poppins,sans-serif;overflow:auto}.homeLayoutEditor::backdrop{background:#000b}.homeLayoutEditor *{box-sizing:border-box}.homeLayoutEditor h2{font-size:19px;margin:0}.homeLayoutEditor header,.homeLayoutEditor nav,.homeLayoutEditor .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.homeLayoutEditor header{justify-content:space-between}.homeLayoutEditor button,.homeLayoutEditor input,.homeLayoutEditor select{font:inherit;min-height:44px;background:#143844;color:inherit;border:1px solid #72b5c2;padding:8px;max-width:100%}.homeLayoutEditor button{cursor:pointer}.homeLayoutEditor button:disabled{opacity:.5}.homeLayoutEditor label{display:flex;flex-direction:column;gap:4px}.homeLayoutEditor .fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}.homeLayoutEditor [data-status]{min-height:44px;padding:8px;background:#153b47;border-left:3px solid #ffc966}.homeLayoutEditor svg{width:100%;height:400px;background:#102f3a;touch-action:none}.homeLayoutEditor [data-grid-panel]{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:14px}.homeLayoutEditor [hidden]{display:none!important}.homeLayoutEditor :focus-visible{outline:3px solid #ffcc55}.homeLayoutEditor .room-shape{cursor:pointer}.homeLayoutEditor [data-floor]{margin:12px 0}.homeLayoutEditor details{padding:8px;border:1px solid #426573;margin:12px 0}@media(max-width:700px){.homeLayoutEditor [data-grid-panel]{display:block}.homeLayoutEditor .fields{grid-template-columns:repeat(2,minmax(0,1fr))}.homeLayoutEditor svg{height:340px}.homeLayoutEditor{padding:12px}}
@@ -48,12 +51,14 @@ export async function openHomeLayoutEditor({capture,save,signal,photos=[],loadPh
   const details=document.createElement('details');details.innerHTML='<summary>Advanced · exact door placement</summary>';const aside=dialog.querySelector('aside');
   for(const node of [aside.querySelector('[data-wall]').parentElement,aside.querySelector('[data-door-width]').closest('.fields'),aside.querySelector('[data-door]').closest('.actions')])details.append(node);
   aside.append(details);
-  const $=s=>dialog.querySelector(s),events=new AbortController(),history=[],key=JSON.stringify(['home-layout',capture.ownerUid,capture.captureId]);
-  let layout=capture.hybridPreview?.layout||null,revision=capture.hybridPreview?.revision||0,roomPhotos=structuredClone(capture.hybridPreview?.roomPhotos||[]),floorIndex=0,roomIndex=0,cornerIndex=0,viewer=null,scene=null,closed=false,busy=false,photoEditor=null;
+  const $=s=>dialog.querySelector(s),events=new AbortController(),history=[],future=[],key=JSON.stringify(['home-layout',capture.ownerUid,capture.captureId]);
+  let layout=capture.hybridPreview?.layout||legacy?.layout||null,revision=capture.hybridPreview?.revision||0,roomPhotos=structuredClone(capture.hybridPreview?.roomPhotos||legacy?.roomPhotos||[]),floorIndex=0,roomIndex=0,cornerIndex=0,viewer=null,scene=null,closed=false,busy=false,photoEditor=null;
+  let savedState=JSON.stringify({layout,roomPhotos});
+  function markSaved(){savedState=JSON.stringify({layout,roomPhotos});}
   const status=message=>$('[data-status]').textContent=message;
   let tool='enter',selectedSurface=0;
   const photoCount=()=>{$('[data-photo-total]').textContent=`${photos.length} saved photos · choose their room and surface yourself`;$('[data-import-room]').disabled=!importPhotos;$('[data-refresh-photos]').disabled=!refreshPhotos;};photoCount();
-  const saveLayout=async()=>{const result=await save({baseRevision:revision,layout:normalizeLayout(layout,envelope),roomPhotos,footprintSignature:capture.footprintSignature});revision=result.preview.revision;roomPhotos=result.preview.roomPhotos;await deleteLocalCaptureDraft(key);return result;};
+  const saveLayout=async()=>{const result=await save({baseRevision:revision,layout:normalizeLayout(layout,envelope),roomPhotos,footprintSignature:capture.footprintSignature});revision=result.preview.revision;roomPhotos=result.preview.roomPhotos;markSaved();await deleteLocalCaptureDraft(key);return result;};
   $('[data-link-phone]').onclick=async()=>{if(busy)return;busy=true;try{const url=capturePhoneUrl(capture.captureId,location.href);await saveLayout();const {default:qr}=await import('../../vendor/qrcode/qrcode.js');await qr.toCanvas($('[data-home-qr]'),url,{width:208,margin:4});$('[data-home-link]').href=url;$('[data-home-link]').textContent='Open this same interior on another device';handoff.hidden=false;status('Layout saved. Scan the phone link above, then use Check phone uploads here.');}catch(e){status(e.message);}finally{busy=false;}};
   async function getPhotos(files){if(busy)return;busy=true;try{status(files?'Uploading photos to this private interior…':'Checking this interior’s saved photos…');const result=await(files?importPhotos(files):refreshPhotos());photos=result.photos;photoCount();fillControls();status(`${photos.length} photos available. Choose a room, then a wall or floor. Existing uploads are not assigned to a door.`);}catch(e){status(e.message);}finally{busy=false;}}
   $('[data-import-room]').onchange=e=>{const files=[...e.target.files];e.target.value='';if(files.length)void getPhotos(files);};$('[data-refresh-photos]').onclick=()=>getPhotos();
@@ -66,9 +71,21 @@ export async function openHomeLayoutEditor({capture,save,signal,photos=[],loadPh
   const floor=()=>layout.floors[floorIndex],room=()=>floor().rooms[roomIndex];
   const option=(text,value)=>new Option(text,value);
   const clone=()=>structuredClone(layout);
-  const persist=async()=>{try{await saveLocalCaptureDraft({id:key,baseRevision:revision,layout:clone()});status('Saved on this device. Save to account to continue on another device.');}catch{status('Device recovery unavailable. Save to account before closing.');}};
+  let planZoom=1,panX=0,panZ=0;
+  const planNav=document.createElement('nav');planNav.setAttribute('aria-label','Floor plan view');planNav.innerHTML='<button data-plan-zoom="1.4" aria-label="Zoom in on plan">+</button><button data-plan-zoom="0.7142857" aria-label="Zoom out of plan">−</button><button data-plan-fit>Fit plan</button><button data-pan-x="-1" aria-label="Pan left">←</button><button data-pan-x="1" aria-label="Pan right">→</button><button data-pan-z="-1" aria-label="Pan up">↑</button><button data-pan-z="1" aria-label="Pan down">↓</button><label>Room measurements<select data-measure-units><option value="m">Metres</option><option value="ft">Feet</option></select></label><span data-room-measures></span>';
+  $('[data-grid-panel]').prepend(planNav);planNav.style.gridColumn='1 / -1';
+  planNav.querySelectorAll('[data-plan-zoom]').forEach(b=>b.onclick=()=>{planZoom=Math.min(8,Math.max(1,planZoom*Number(b.dataset.planZoom)));drawPlan();});
+  $('[data-plan-fit]').onclick=()=>{planZoom=1;panX=panZ=0;drawPlan();};
+  planNav.querySelectorAll('[data-pan-x],[data-pan-z]').forEach(b=>b.onclick=()=>{panX+=Number(b.dataset.panX||0)*2/planZoom;panZ+=Number(b.dataset.panZ||0)*2/planZoom;drawPlan();});
+  $('[data-measure-units]').onchange=()=>fillControls();
+  const snapshot=()=>({layout:clone(),roomPhotos:structuredClone(roomPhotos)});
+  const remember=previous=>{history.push(previous);if(history.length>30)history.shift();future.length=0;};
+  const redo=document.createElement('button');redo.textContent='Redo';redo.dataset.redo='';$('[data-undo]').after(redo);
+  function restoreEdit(from,to){if(busy||!from.length)return;const next=from.pop();to.push(snapshot());layout=next.layout;roomPhotos=next.roomPhotos;floorIndex=Math.min(floorIndex,layout.floors.length-1);roomIndex=cornerIndex=0;render();void persist();}
+  redo.onclick=()=>restoreEdit(future,history);
+  const persist=async()=>{try{await saveLocalCaptureDraft({id:key,baseRevision:revision,layout:clone(),roomPhotos:structuredClone(roomPhotos)});status('Saved on this device. Save to account to continue on another device.');}catch{status('Device recovery unavailable. Save to account before closing.');}};
   function validatePhotoSurfaces(candidate){for(const entry of roomPhotos){const surfaces=layoutRoomDescriptor(candidate,entry.roomId).surfaceIds;if(entry.patches.some(p=>!surfaces.includes(p.surfaceId)))throw Error('This edit would remove a photographed surface. Remove that placement first; the uploaded original is kept.');}}
-  async function edit(fn){if(busy)return;const previous=clone(),selection=[floorIndex,roomIndex];try{fn();layout=normalizeLayout(layout,envelope);validatePhotoSurfaces(layout);history.push(previous);render();await persist();}catch(e){layout=previous;[floorIndex,roomIndex]=selection;render();status(e.message);}}
+  async function edit(fn){if(busy)return;const previous=snapshot(),selection=[floorIndex,roomIndex];try{fn();layout=normalizeLayout(layout,envelope);validatePhotoSurfaces(layout);remember(previous);render();await persist();}catch(e){layout=previous.layout;roomPhotos=previous.roomPhotos;[floorIndex,roomIndex]=selection;render();status(e.message);}}
   let lastValid=layout?structuredClone(layout):null;
   function fillControls(){
     $('[data-floor]').replaceChildren(...layout.floors.map((f,i)=>option(f.label,i)));$('[data-floor]').value=floorIndex;
@@ -76,12 +93,14 @@ export async function openHomeLayoutEditor({capture,save,signal,photos=[],loadPh
     $('[data-corner]').replaceChildren(...room().vertices.map((id,i)=>option(`Corner ${i+1}`,i)));cornerIndex=Math.min(cornerIndex,room().vertices.length-1);$('[data-corner]').value=cornerIndex;
     const point=floor().vertices[room().vertices[cornerIndex]];$('[data-x]').value=point.x;$('[data-z]').value=point.z;
     const axis=$('[data-split-axis]').value,ring=roomRing(floor(),room());$('[data-split-at]').value=(Math.min(...ring.map(p=>p[axis]))+Math.max(...ring.map(p=>p[axis])))/2;
+    const unit=$('[data-measure-units]').value,scale=unit==='ft'?3.280839895:1;
+    $('[data-room-measures]').textContent=`Room bounds: ${((Math.max(...ring.map(p=>p.x))-Math.min(...ring.map(p=>p.x)))*scale).toFixed(1)} × ${((Math.max(...ring.map(p=>p.z))-Math.min(...ring.map(p=>p.z)))*scale).toFixed(1)} ${unit}. Advanced coordinates remain metres.`;
     const walls=floorWalls(floor()).filter(w=>w.rooms.includes(room().id));$('[data-wall]').replaceChildren(...walls.map((w,i)=>option(`Wall ${i+1} · ${Math.hypot(w.b.x-w.a.x,w.b.z-w.a.z).toFixed(2)} m`,w.id)));
     $('[data-photos]').disabled=!photos.length||!loadPhoto;$('[data-stair]').disabled=floorIndex>=layout.floors.length-1;
   }
   function drawPlan(){
     const svg=$('[data-plan]'),points=envelope.footprint,minX=Math.min(...points.map(p=>p.x))-.5,minZ=Math.min(...points.map(p=>p.z))-.5,w=Math.max(...points.map(p=>p.x))-minX+.5,h=Math.max(...points.map(p=>p.z))-minZ+.5;
-    svg.setAttribute('viewBox',`${minX} ${minZ} ${w} ${h}`);svg.replaceChildren();
+    svg.setAttribute('viewBox',`${minX+w/2-w/planZoom/2+panX} ${minZ+h/2-h/planZoom/2+panZ} ${w/planZoom} ${h/planZoom}`);svg.replaceChildren();
     const add=(tag,attrs)=>{const n=document.createElementNS('http://www.w3.org/2000/svg',tag);Object.entries(attrs).forEach(([k,v])=>n.setAttribute(k,v));svg.append(n);return n;};
     for(let x=Math.ceil(minX);x<minX+w;x++)add('path',{d:`M${x},${minZ}v${h}`,stroke:'#315260','stroke-width':.015});
     for(let z=Math.ceil(minZ);z<minZ+h;z++)add('path',{d:`M${minX},${z}h${w}`,stroke:'#315260','stroke-width':.015});
@@ -93,7 +112,25 @@ export async function openHomeLayoutEditor({capture,save,signal,photos=[],loadPh
     for(const s of layout.stairs.filter(s=>s.from===floor().id||s.to===floor().id))add('polyline',{points:s.path.map(p=>`${p.x},${p.z}`).join(' '),fill:'none',stroke:'#d0aa65','stroke-width':s.width});
     room().vertices.forEach((id,i)=>{const p=floor().vertices[id],c=add('circle',{cx:p.x,cy:p.z,r:Math.max(w,h)/60,fill:i===cornerIndex?'#ffcf55':'#c9e9ed',stroke:'#09222d','stroke-width':.02});c.style.cursor='grab';c.onpointerdown=e=>{e.preventDefault();cornerIndex=i;svg.setPointerCapture(e.pointerId);const move=event=>{const point=new DOMPoint(event.clientX,event.clientY).matrixTransform(svg.getScreenCTM().inverse());c.setAttribute('cx',Math.round(point.x*10)/10);c.setAttribute('cy',Math.round(point.y*10)/10);};const end=event=>{svg.removeEventListener('pointermove',move);svg.removeEventListener('pointerup',end);svg.removeEventListener('pointercancel',cancel);if(svg.hasPointerCapture(event.pointerId))svg.releasePointerCapture(event.pointerId);edit(()=>floor().vertices[id]={x:Number(c.getAttribute('cx')),z:Number(c.getAttribute('cy'))});};const cancel=()=>{svg.removeEventListener('pointermove',move);svg.removeEventListener('pointerup',end);svg.removeEventListener('pointercancel',cancel);render();};svg.addEventListener('pointermove',move);svg.addEventListener('pointerup',end);svg.addEventListener('pointercancel',cancel);};});
   }
-  function render(){if(!layout)return;lastValid=clone();$('[data-editor]').hidden=false;$('[data-setup]').open=false;fillControls();drawPlan();}
+  function drawSharedHandles(){
+    if(tool!=='select')return;
+    const svg=$('[data-plan]');
+    for(const wall of floorWalls(floor()).filter(w=>w.rooms.length===2&&w.rooms.includes(room().id))){
+      const handle=document.createElementNS('http://www.w3.org/2000/svg','circle'),center={x:(wall.a.x+wall.b.x)/2,z:(wall.a.z+wall.b.z)/2};
+      handle.dataset.sharedWall=wall.id;
+      for(const [k,v] of Object.entries({cx:center.x,cy:center.z,r:.18,fill:'#65dfce',stroke:'#09222d','stroke-width':.03}))handle.setAttribute(k,v);
+      const title=document.createElementNS('http://www.w3.org/2000/svg','title');title.textContent='Drag shared wall; both rooms stay connected';handle.append(title);svg.append(handle);
+      handle.onpointerdown=e=>{e.preventDefault();e.stopPropagation();svg.setPointerCapture(e.pointerId);
+        const start=new DOMPoint(e.clientX,e.clientY).matrixTransform(svg.getScreenCTM().inverse());let dx=0,dz=0;
+        const move=e=>{const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(svg.getScreenCTM().inverse());dx=Math.round((p.x-start.x)*10)/10;dz=Math.round((p.y-start.y)*10)/10;handle.setAttribute('cx',center.x+dx);handle.setAttribute('cy',center.z+dz);};
+        const clear=()=>{svg.removeEventListener('pointermove',move);svg.removeEventListener('pointerup',end);svg.removeEventListener('pointercancel',cancel);};
+        const cancel=()=>{clear();render();};
+        const end=()=>{clear();void edit(()=>{const points=Object.values(floor().vertices).filter(point=>(point.x===wall.a.x&&point.z===wall.a.z)||(point.x===wall.b.x&&point.z===wall.b.z));for(const point of points){point.x+=dx;point.z+=dz;}});};
+        svg.addEventListener('pointermove',move);svg.addEventListener('pointerup',end);svg.addEventListener('pointercancel',cancel);
+      };
+    }
+  }
+  function render(){if(!layout)return;lastValid=clone();$('[data-editor]').hidden=false;$('[data-setup]').open=false;fillControls();drawPlan();drawSharedHandles();}
   const plan=$('[data-plan]');
   const planPoint=e=>{const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(plan.getScreenCTM().inverse());return snapPlanPoint({x:p.x,z:p.y});};
   plan.addEventListener('pointerdown',e=>{
@@ -143,7 +180,7 @@ export async function openHomeLayoutEditor({capture,save,signal,photos=[],loadPh
     }});
     if(inside){const center=roomInteriorPoint(roomRing(floor(),room()));if(!center)throw Error('This room needs more clear floor space for an inside view.');viewer.setInside?.({x:center.x,y:floor().elevation+1.6,z:center.z});}
   }catch(e){status(e.message);}finally{for(const element of dialog.querySelectorAll('[data-floor],[data-room],[data-plan-mode],[data-3d-mode],[data-inside]'))element.disabled=false;}}
-  $('[data-start]').onclick=()=>{try{const values=Object.fromEntries([...dialog.querySelectorAll('[data-count]')].map(e=>[e.dataset.count,Number(e.value)]));if(roomPhotos.some(e=>e.patches.length))throw Error('This home already has placed photos. Edit its existing corners instead of replacing the whole plan');if($('[data-use-unit]').checked){const x=Number($('[data-unit-x]').value),z=Number($('[data-unit-z]').value),w=Number($('[data-unit-width]').value),d=Number($('[data-unit-depth]').value);if(w<2||d<2)throw Error('The unit needs at least two metres in each direction');values.unitOutline=[{x,z},{x:x+w,z},{x:x+w,z:z+d},{x,z:z+d}];}values.unitLabel=$('[data-unit-label]').value;const next=makeStarterLayout(envelope,values);if(layout){history.push(clone());next.id=layout.id;}layout=next;floorIndex=roomIndex=cornerIndex=0;render();persist();}catch(e){status(`${e.message} Adjust the room count or dimensions; the building has not been changed.`);}};
+  $('[data-start]').onclick=()=>{try{const values=Object.fromEntries([...dialog.querySelectorAll('[data-count]')].map(e=>[e.dataset.count,Number(e.value)]));if(roomPhotos.some(e=>e.patches.length))throw Error('This home already has placed photos. Edit its existing corners instead of replacing the whole plan');if($('[data-use-unit]').checked){const x=Number($('[data-unit-x]').value),z=Number($('[data-unit-z]').value),w=Number($('[data-unit-width]').value),d=Number($('[data-unit-depth]').value);if(w<2||d<2)throw Error('The unit needs at least two metres in each direction');values.unitOutline=[{x,z},{x:x+w,z},{x:x+w,z:z+d},{x,z:z+d}];}values.unitLabel=$('[data-unit-label]').value;const next=makeStarterLayout(envelope,values);if(layout){remember(snapshot());next.id=layout.id;}layout=next;floorIndex=roomIndex=cornerIndex=0;render();persist();}catch(e){status(`${e.message} Adjust the room count or dimensions; the building has not been changed.`);}};
   const refreshSelectedView=()=>{render();if(viewMode!=='plan')void show3D(viewMode==='inside');};
   $('[data-floor]').onchange=()=>{floorIndex=Number($('[data-floor]').value);roomIndex=cornerIndex=0;refreshSelectedView();};$('[data-room]').onchange=()=>{roomIndex=Number($('[data-room]').value);cornerIndex=0;refreshSelectedView();};$('[data-corner]').onchange=()=>{cornerIndex=Number($('[data-corner]').value);render();};
   $('[data-name]').onchange=()=>edit(()=>room().label=$('[data-name]').value);
@@ -156,26 +193,33 @@ export async function openHomeLayoutEditor({capture,save,signal,photos=[],loadPh
   $('[data-remove-door]').onclick=()=>edit(()=>floor().doors=floor().doors.filter(d=>d.wall!==$('[data-wall]').value));
   $('[data-stair]').onclick=()=>edit(()=>{const x=Number($('[data-stair-x]').value),z=Number($('[data-stair-z]').value),run=Number($('[data-stair-run]').value),shape=$('[data-stair-shape]').value;const path=shape==='straight'?[{x,z},{x,z:z+run}]:shape==='L'?[{x,z},{x,z:z+run/2},{x:x+run/2,z:z+run/2}]:[{x,z},{x,z:z+run/2},{x:x+1.2,z:z+run/2},{x:x+1.2,z}];layout.stairs.push({id:`stair_${crypto.randomUUID().replaceAll('-','')}`,from:floor().id,to:layout.floors[floorIndex+1].id,width:1,path});});
   $('[data-remove-stair]').onclick=()=>edit(()=>layout.stairs=layout.stairs.filter(s=>s.from!==floor().id));
-  $('[data-undo]').onclick=()=>{if(busy||!history.length)return;try{validatePhotoSurfaces(history.at(-1));layout=history.pop();floorIndex=Math.min(floorIndex,layout.floors.length-1);roomIndex=cornerIndex=0;render();persist();}catch(e){status(e.message);}};
+  $('[data-undo]').onclick=()=>restoreEdit(history,future);
   $('[data-3d-mode]').onclick=()=>show3D();$('[data-inside]').onclick=()=>show3D(true);$('[data-plan-mode]').onclick=()=>{viewMode='plan';tools.hidden=false;viewer?.dispose();viewer=null;scene?.dispose();scene=null;$('[data-grid-panel]').hidden=false;$('[data-viewer]').hidden=true;$('[data-navigation-help]').textContent='Select a room on the plan or use the room list. Step inside to look around and place photos.';render();};
   $('[data-photos]').onclick=async()=>{try{
     const {openHybridEditor}=await import('./hybrid-editor.js?v=1'),selectedRoom=room().id,descriptor=layoutRoomDescriptor(layout,selectedRoom);
     const saved=roomPhotos.find(p=>p.roomId===selectedRoom);
-    const pseudo={...capture,authoredLayout:true,authoredRoomId:selectedRoom,room:descriptor,hybridPreview:{revision,room:descriptor,footprintSignature:capture.footprintSignature,heightMeters:descriptor.heightMeters,roofShape:'flat',roofRiseMeters:2,patches:(saved?.patches||[]).map(p=>({...p,wall:descriptor.surfaceIds.indexOf(p.surfaceId)}))}};
+    const pseudo={...capture,authoredLayout:true,authoredRoomId:selectedRoom,room:descriptor,hybridPreview:{revision,photoLabels:saved?.photoLabels||{},room:descriptor,footprintSignature:capture.footprintSignature,heightMeters:descriptor.heightMeters,roofShape:'flat',roofRiseMeters:2,patches:(saved?.patches||[]).map(p=>({...p,wall:descriptor.surfaceIds.indexOf(p.surfaceId)}))}};
     photoEditor=await openHybridEditor({capture:pseudo,photos,loadPhoto,inWorld,initialWall:selectedSurface,signal:events.signal,save:async preview=>{
-      const next={roomId:selectedRoom,patches:preview.patches.map(p=>({...p,surfaceId:descriptor.surfaceIds[p.wall]}))};
+      const next={roomId:selectedRoom,photoLabels:preview.photoLabels||{},patches:preview.patches.map(p=>({...p,surfaceId:descriptor.surfaceIds[p.wall]}))};
       const entries=[...roomPhotos.filter(p=>p.roomId!==selectedRoom),next];
       const result=await save({baseRevision:revision,footprintSignature:capture.footprintSignature,layout:clone(),roomPhotos:entries});
-      revision=result.preview.revision;roomPhotos=result.preview.roomPhotos;return {preview:{...preview,revision}};
+      revision=result.preview.revision;roomPhotos=result.preview.roomPhotos;markSaved();return {preview:{...preview,revision}};
     },onClose:()=>{status('Room editor closed. Only photos confirmed as saved are stored in your account.');if(viewMode!=='plan')void show3D(viewMode==='inside');}});
   }catch(e){status(e.message);}};
-  $('[data-save]').onclick=async()=>{if(busy)return;busy=true;$('[data-save]').disabled=true;status('Saving your private layout…');try{const result=await save({baseRevision:revision,layout:normalizeLayout(layout,envelope),roomPhotos,footprintSignature:capture.footprintSignature});signal.throwIfAborted();revision=result.preview.revision;roomPhotos=result.preview.roomPhotos;await deleteLocalCaptureDraft(key);status(`Saved to account · revision ${revision}. Your home remains private.`);}catch(e){status(`Not saved to account: ${e.message}. Your device draft is retained.`);}finally{busy=false;$('[data-save]').disabled=false;}};
+  $('[data-save]').onclick=async()=>{if(busy)return;busy=true;$('[data-save]').disabled=true;status('Saving your private layout…');try{const result=await save({baseRevision:revision,layout:normalizeLayout(layout,envelope),roomPhotos,footprintSignature:capture.footprintSignature});signal.throwIfAborted();revision=result.preview.revision;roomPhotos=result.preview.roomPhotos;markSaved();await deleteLocalCaptureDraft(key);status(`Saved to account · revision ${revision}. Your home remains private.`);}catch(e){status(`Not saved to account: ${e.message}. Your device draft is retained.`);}finally{busy=false;$('[data-save]').disabled=false;}};
   $('[data-submit]').disabled=!submit;
-  $('[data-submit]').onclick=async()=>{if(busy||!submit)return;busy=true;$('[data-submit]').disabled=true;try{assertPlayableLayout(normalizeLayout(layout,envelope));if(!roomPhotos.some(e=>e.patches.length))throw Error('Add and save room photos before building the photo-supported home.');status('Saving the layout and building your protected home preview…');const saved=await save({baseRevision:revision,layout:clone(),roomPhotos,footprintSignature:capture.footprintSignature});revision=saved.preview.revision;roomPhotos=saved.preview.roomPhotos;const result=await submit(revision,$('[data-public]').checked);status(`Home revision ${result.revision} submitted for review. ${$('[data-public]').checked?'Public access was requested; approval is still required.':'Your home remains private.'}`);}catch(e){status(`Not submitted: ${e.message}`);}finally{busy=false;$('[data-submit]').disabled=false;}};
+  $('[data-submit]').onclick=async()=>{if(busy||!submit)return;if(!confirm('Submit this home layout and saved photos for review? Original photos stay private. Public entry is only requested if you selected it below.'))return;busy=true;$('[data-submit]').disabled=true;try{assertPlayableLayout(normalizeLayout(layout,envelope));if(!roomPhotos.some(e=>e.patches.length))throw Error('Add and save room photos before building the photo-supported home.');status('Saving the layout and building your protected home preview…');const saved=await save({baseRevision:revision,layout:clone(),roomPhotos,footprintSignature:capture.footprintSignature});revision=saved.preview.revision;roomPhotos=saved.preview.roomPhotos;markSaved();const result=await submit(revision,$('[data-public]').checked);status(`Home revision ${result.revision} submitted for review. ${$('[data-public]').checked?'Public access was requested; approval is still required.':'Your home remains private.'}`);}catch(e){status(`Not submitted: ${e.message}`);}finally{busy=false;$('[data-submit]').disabled=false;}};
   function close(){if(closed)return;closed=true;events.abort();viewer?.dispose();scene?.dispose();signal.removeEventListener('abort',close);dialog.close();dialog.remove();}
-  $('[data-close]').onclick=close;dialog.addEventListener('cancel',e=>{e.preventDefault();close();});signal.addEventListener('abort',close,{once:true});
-  try{const recovery=(await loadLocalCaptureDraft(key)).draft;if(recovery?.layout&&recovery.baseRevision===revision){$('[data-recovery]').hidden=false;$('[data-restore]').onclick=()=>{try{layout=normalizeLayout(recovery.layout,envelope);render();$('[data-recovery]').hidden=true;status('Recovered device layout. Save to account when ready.');}catch(e){status(e.message);}};}}catch{}
+  const requestClose=()=>{if(busy){status('Wait for the current save or upload to finish before closing.');return;}if(savedState!==JSON.stringify({layout,roomPhotos})&&!confirm('This layout has changes that are not saved to your account. Close and keep the device recovery draft?'))return;close();};
+  $('[data-close]').onclick=requestClose;dialog.addEventListener('cancel',e=>{e.preventDefault();requestClose();});signal.addEventListener('abort',close,{once:true});
+  try{const recovery=(await loadLocalCaptureDraft(key)).draft;if(recovery?.layout){
+    $('[data-recovery]').hidden=false;const stale=recovery.baseRevision!==revision;
+    $('[data-recovery] p').textContent=stale?`This device has edits based on version ${recovery.baseRevision}; your account is version ${revision}. Inspect the device layout before choosing whether to save it over the account layout. Nothing changes in your account until Save.`:'This device has an unsaved layout.';
+    $('[data-restore]').textContent='Inspect device layout';
+    $('[data-restore]').onclick=()=>{try{const next=normalizeLayout(recovery.layout,envelope);remember(snapshot());layout=next;roomPhotos=structuredClone(recovery.roomPhotos||roomPhotos);floorIndex=roomIndex=0;render();$('[data-recovery]').hidden=true;status('Inspecting device edits. Save explicitly to use these instead of the account layout; close without saving to keep the account version.');}catch(e){status(e.message);}};
+  }}catch{}
   if(!layout){try{layout=makeStarterLayout(envelope,{bedrooms:0,bathrooms:0});layout.floors[0].rooms[0].label='My space';status('Draw rooms inside the mapped outline. Click a room to enter it. Heights fit inside this building.');}catch(e){status(`The mapped outline needs a unit boundary before a safe plan can be made: ${e.message}`);}}
   if(layout)render();
+  if(legacy)status('Your existing room photos are preserved. The room is centered inside the mapped outline as a starting placement; check its position and doorway before saving.');
   return {close};
 }
