@@ -224,7 +224,7 @@ export async function openHomeLayoutEditor({capture,save,signal,photos=[],loadPh
     $('[data-restore]').onclick=()=>{try{const next=normalizeLayout(recovery.layout,envelope);remember(snapshot());layout=next;roomPhotos=structuredClone(recovery.roomPhotos||roomPhotos);floorIndex=roomIndex=0;render();$('[data-recovery]').hidden=true;status('Inspecting device edits. Save explicitly to use these instead of the account layout; close without saving to keep the account version.');}catch(e){status(e.message);}};
   }}catch{}
   if(!layout){try{layout=makeStarterLayout(envelope,{bedrooms:0,bathrooms:0});layout.floors[0].rooms[0].label='My space';status('Draw rooms inside the mapped outline. Click a room to enter it. Heights fit inside this building.');}catch(e){status(`The mapped outline needs a unit boundary before a safe plan can be made: ${e.message}`);}}
-  if(layout)render();
+  if(layout){render();status('Click a room on the grid to go inside and place photos. Use the tools below the grid to draw rooms and doors.');}
   if(legacy)status('Your existing room photos are preserved. The room is centered inside the mapped outline as a starting placement; check its position and doorway before saving.');
   return {close};
 }
