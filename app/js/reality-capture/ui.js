@@ -217,6 +217,14 @@ function ensurePanel() {
       <p class="realityCaptureStatus" data-capture-status role="status" aria-live="polite"></p>
     </div>`;
   document.body.appendChild(panel);
+  // Keep the mode, its primary action and any permission/error together.
+  // Reuse the existing controls and authority; do not create a second launcher.
+  const workspace=document.createElement('section');workspace.dataset.captureWorkspace='';workspace.className='realityCaptureHandoff';
+  const help=document.createElement('p');help.dataset.captureWorkspaceHelp='';
+  const permission=panel.querySelector('[data-room-permission]').closest('label');permission.dataset.captureWorkspacePermission='';
+  const launch=panel.querySelector('[data-capture-hybrid]');launch.classList.add('captureGuidedCameraButton');launch.style.width='100%';launch.style.minHeight='48px';
+  workspace.append(panel.querySelector('.realityCaptureKinds'),help,permission,launch,panel.querySelector('[data-capture-status]'));
+  panel.querySelector('.realityCaptureTarget').after(workspace);
   const library=document.createElement('button');library.type='button';library.textContent='My contributions';library.dataset.captureLibrary='';
   panel.querySelector('.realityCaptureScroll').prepend(library);
   library.onclick=()=>{if(current&&!current.busy)void openRealityCaptureLibrary(current.appCtx);};
@@ -478,7 +486,9 @@ function render() {
   panel.querySelector('[data-photo-next]').disabled=current.busy||(current.photoPage+1)*6>=galleryPhotos.length;
   panel.querySelector('[data-photo-page]').textContent=galleryPhotos.length?` ${current.photoPage*6+1}–${Math.min((current.photoPage+1)*6,galleryPhotos.length)} of ${galleryPhotos.length} `:'No photos in this set.';
   panel.querySelector('[data-capture-hybrid]').hidden = current.kind === 'exterior' && (!current.remotePhotos.length || !current.serverCapture?.building?.spatialContext?.footprint?.length);
-  panel.querySelector('[data-capture-hybrid]').textContent = current.kind === 'interior_room' ? 'Design my interior floor plan' : 'Match photos to building sides';
+  panel.querySelector('[data-capture-hybrid]').textContent = current.kind === 'interior_room' ? 'Open floor-plan grid' : 'Match photos to building sides';
+  panel.querySelector('[data-capture-workspace-help]').textContent=current.kind==='interior_room'?'Start here: draw rooms on the grid, then click a room to go inside and add wall or floor photos. No photos or measurements are required to open the grid. Your interior stays private.':'Choose Home interior to draw your floor plan. For the outside, add photos below, then match them to building sides.';
+  panel.querySelector('[data-capture-workspace-permission]').hidden=current.kind!=='interior_room';
   panel.querySelector('[data-capture-result]').hidden = !(current.serverCapture?.hybridSubmission?.modelPath||current.serverCapture?.processed?.optimizedModelPath);
   const manualHome=current.serverCapture?.hybridSubmission?.kind==='home-layout';
   panel.querySelector('[data-capture-result] h2').textContent=manualHome?'Your photo-supported home':'Reconstruction preview';
@@ -570,7 +580,7 @@ async function switchKind(kind) {
     }
   }
   catch (error) { if (isCurrent(session)) ensurePanel().querySelector('[data-capture-status]').textContent = error.message; }
-  finally { setBusy(session, false); }
+  finally { setBusy(session, false); if(current?.kind===kind){const panel=ensurePanel();panel.querySelector('.realityCaptureScroll').scrollTop=0;panel.querySelector('[data-capture-hybrid]').focus({preventScroll:true});} }
 }
 
 async function addPhotos(event) {

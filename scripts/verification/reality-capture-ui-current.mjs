@@ -126,6 +126,11 @@ try {
   await phone.click('[data-capture-kind="interior_room"]');
   await phone.locator('.realityCaptureRoom').waitFor({state:'visible'});
   assert.equal(await phone.locator('[data-room-permission]').isChecked(),false);
+  assert.equal(await phone.locator('[data-capture-hybrid]').textContent(),'Open floor-plan grid');
+  assert.equal(await phone.locator('[data-capture-hybrid]').evaluate(e=>{const r=e.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;}),true,'The interior entry must be on screen without hunting or scrolling');
+  await phone.click('[data-capture-hybrid]');await statusContains(phone,'Confirm permission');
+  assert.equal(await phone.locator('p[data-capture-status]').evaluate(e=>e.getBoundingClientRect().bottom<=innerHeight),true,'Permission feedback is beside the entry action');
+  await phone.screenshot({path:`${out}/mobile-interior-entry.png`});
   assert.equal(captures.size,1);
   await phone.click('[data-capture-kind="exterior"]');
   await phone.locator('[data-building-details]').waitFor({state:'visible'});

@@ -48,7 +48,17 @@ try{
   await mkdir('output/verification/reality-capture-hybrid',{recursive:true});
   await page.screenshot({path:`output/verification/reality-capture-hybrid/${home?'home':'exterior'}-staging-open.png`,fullPage:true});
   if(home){
+    await page.setViewportSize({width:1100,height:900});
+    assert.equal(await page.locator('[data-capture-hybrid]').evaluate(e=>{const r=e.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;}),true,'Desktop entry is visible without scrolling');
+    await page.screenshot({path:'output/verification/reality-capture-hybrid/desktop-interior-entry.png'});
+    await page.locator('[data-capture-hybrid]').click();await page.locator('.homeLayoutEditor [data-plan]').waitFor({state:'visible'});
+    await page.screenshot({path:'output/verification/reality-capture-hybrid/desktop-interior-grid-entry.png'});
+    await page.locator('.homeLayoutEditor [data-close]').click();await page.setViewportSize({width:390,height:844});
+    assert.equal(await page.locator('[data-capture-hybrid]').textContent(),'Open floor-plan grid');
+    assert.equal(await page.locator('[data-capture-hybrid]').evaluate(e=>{const r=e.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;}),true,'Interior grid entry is immediately visible');
     await page.locator('[data-capture-hybrid]').click();await page.locator('.homeLayoutEditor').waitFor();
+    assert.equal(await page.locator('.homeLayoutEditor [data-plan]').isVisible(),true,'The entry opens the actual floor grid without photos');
+    await page.screenshot({path:'output/verification/reality-capture-hybrid/mobile-interior-grid-entry.png'});
     const data=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=1280;c.height=720;const ctx=c.getContext('2d');ctx.fillStyle='#558877';ctx.fillRect(0,0,c.width,c.height);return c.toDataURL('image/jpeg').split(',')[1];});
     await page.locator('.homeLayoutEditor [data-import-room]').setInputFiles({name:'room-upload-test.jpg',mimeType:'image/jpeg',buffer:Buffer.from(data,'base64')});
     await page.locator('.homeLayoutEditor [data-status]').filter({hasText:'1 photos available'}).waitFor({timeout:45000});
