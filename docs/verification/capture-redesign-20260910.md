@@ -113,3 +113,16 @@ Old pre-change orphaned media are not swept indiscriminately. New upload/token
 and deletion safeguards are active; a historical retention sweep would require
 an inventory and narrowly scoped migration. Provider-ID replacement/aliases are
 not guessed automatically. Reconstruction and procedural systems are retained.
+
+## Interior reshaping correction after user acceptance feedback
+
+The previous acceptance script covered axis-aligned rectangle drawing and a shared-wall drag. It did not demonstrate a usable editing workflow on the user's diagonal building. The user correctly rejected that experience.
+
+Implemented a building-aligned view frame (inverse transforms retain canonical geometry/photo coordinates), one-click Add room with rectangle/L-shaped choices, immediate highlighted reshape selection, live polygon feedback while dragging corners/walls, whole-room movement, add/remove corner, deletion, room zoom and visible undo/redo. Secondary drawing/door tools remain available. Drawing now returns to selection instead of intercepting subsequent corner drags. Shared corners are joined on edit; existing door locations are remapped. Invalid containment/overlap edits roll back. Shared rooms resize together; moving an entire attached room explains that shared-wall handles must be used. Topology changes retain the existing photo reassignment confirmation and undo recovery.
+
+Validation:
+- 23 geometry/photo/drawing/frame tests passed, including the outline read from the user's open staging editor, rotated concavity, courtyard exclusion, and joining moved rooms.
+- `scripts/verification/interior-reshape-ui.mjs`: 1100px and 412px; real mouse gestures and CDP touch corner drag, one-click room, wall drag, custom polygon, invalid-drag rollback, room movement, fit room, save/reopen, L room, delete/undo. Actual layout authority; synthetic account-save callback.
+- `scripts/verification/interior-layout-ui.mjs`: 1100px and 412px; browser Back, rectangle draw/undo, shared-wall resizing, actual photo crop/save, GLB derivative, private submission, reopen, 3D surface picking and recovery. Mock HTTP with real normalizer and builder.
+- Source graph checks and skill browser smoke passed. Screenshots inspected at `output/verification/interior-reshape/`.
+- No backend schema or rule changes in this correction. Existing contributions were inspected without saving edits to them. Staging hosting is the delivery target.

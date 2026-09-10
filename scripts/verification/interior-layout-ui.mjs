@@ -29,7 +29,7 @@ try{
     await page.screenshot({path:`${output}/${width}-initial-entry.png`});
     assert.equal(await page.locator('[data-plan]').evaluate(e=>e.getBoundingClientRect().top<innerHeight-100),true,'The opened editor must show the grid in the initial viewport');
     assert.equal(await page.locator('[data-room]').inputValue(),'');
-    await page.locator('[data-tool="rectangle"]').click();
+    await page.locator('[data-more-tools] > summary').click();await page.locator('[data-tool="rectangle"]').click();
     await page.locator('[data-plan]').scrollIntoViewIfNeeded();
     const points=await page.locator('[data-plan]').evaluate(svg=>[{x:2,z:2},{x:6,z:7}].map(p=>{const v=new DOMPoint(p.x,p.z).matrixTransform(svg.getScreenCTM());return{x:v.x,y:v.y};}));
     await page.mouse.move(points[0].x,points[0].y);await page.mouse.down();await page.mouse.move(points[1].x,points[1].y,{steps:8});await page.mouse.up();
