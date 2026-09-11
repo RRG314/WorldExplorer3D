@@ -5,6 +5,18 @@ import process from 'node:process';
 // tests. Every file corresponds to a retained System Inventory capability or
 // an Architecture Map ownership boundary.
 const tests = [
+  'tests/contribution-idempotency.test.cjs',
+  'tests/account-cleanup-failure.test.mjs',
+  'tests/request-reliability.test.mjs',
+  'tests/script-loader-recovery.test.mjs',
+  'tests/interior-layout-current.test.mjs',
+  'tests/interior-layout-photos-current.test.mjs',
+  'tests/interior-layout-drawing.test.mjs',
+  'tests/captured-building-entry.test.mjs',
+  'tests/capture-workflow-continuity-current.test.mjs',
+  'tests/capture-account-cleanup.test.cjs',
+  'tests/reality-capture-http-security-current.test.cjs',
+  'tests/reality-capture-storage-privacy-current.test.cjs',
   'tests/astronomy-body-catalog-current.test.mjs',
   'tests/astronomy-frames-world-address-current.test.mjs',
   'tests/baltimore-regional-ecology.test.mjs',
@@ -45,11 +57,11 @@ const tests = [
   'tests/weapon-reticle-current.test.mjs'
 ];
 
-const result = spawnSync(process.execPath, ['--test', ...tests], {
+const result = spawnSync(process.execPath, ['--test', '--test-concurrency=1', ...tests], {
   cwd: process.cwd(),
   env: process.env,
   stdio: 'inherit'
 });
 
 if (result.error) throw result.error;
-process.exitCode = Number(result.status || 0);
+process.exitCode = result.signal ? 1 : Number(result.status ?? 1);

@@ -3,13 +3,14 @@ import path from 'node:path';
 import process from 'node:process';
 import { runLoggedStep } from './run-logged-step.mjs';
 
-for (const variable of ['FIREBASE_AUTH_EMULATOR_HOST', 'FIRESTORE_EMULATOR_HOST']) {
+for (const variable of ['FIREBASE_AUTH_EMULATOR_HOST', 'FIRESTORE_EMULATOR_HOST', 'FIREBASE_STORAGE_EMULATOR_HOST']) {
   if (!String(process.env[variable] || '').trim()) {
     throw new Error(`backend-release must run inside Firebase emulators: missing ${variable}`);
   }
 }
 
 const steps = [
+  { id: 'storage-rules', command: [process.execPath, '--test', '--test-concurrency=1', 'tests/storage.rules.reality-capture.test.mjs'] },
   { id: 'firestore-rules', command: [process.execPath, '--test', 'tests/firestore.rules.security.test.mjs'] },
   { id: 'discovery-receipts', command: [process.execPath, '--test', 'tests/discovery-receipt-endpoint-current.test.mjs'] },
   { id: 'public-user-count', command: [process.execPath, 'scripts/verification/public-user-count-backend-current.mjs'] },

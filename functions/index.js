@@ -807,12 +807,6 @@ function parsePositiveInt(value, fallback = 20, min = 1, max = 50) {
   return Math.max(min, Math.min(max, Math.floor(n)));
 }
 
-function isFailedPreconditionError(err) {
-  const code = err && err.code;
-  if (Number(code) === 9) return true;
-  return String(code || '').toLowerCase() === 'failed-precondition';
-}
-
 async function deleteDocsByQuery(query, batchSize = 200, label = '') {
   const limit = Math.max(10, Math.min(500, Number(batchSize) || 200));
   for (;;) {
@@ -820,11 +814,9 @@ async function deleteDocsByQuery(query, batchSize = 200, label = '') {
     try {
       snap = await query.limit(limit).get();
     } catch (err) {
-      if (isFailedPreconditionError(err)) {
-        const tag = label ? ` (${label})` : '';
-        console.warn(`[deleteAccount] Skipping query cleanup${tag}: Firestore failed precondition.`, err && err.message ? err.message : err);
-        return;
-      }
+      // A missing index or failed query is unfinished cleanup, never success.
+      // Preserve the login so the owner can retry after the cause is repaired.
+      console.error('[deleteAccount] Unfinished cleanup:', label, err.code || 'unknown');
       throw err;
     }
     if (snap.empty) return;
@@ -842,11 +834,9 @@ async function updateDocsByQuery(query, updateForDoc, batchSize = 200, label = '
     try {
       snap = await query.limit(limit).get();
     } catch (err) {
-      if (isFailedPreconditionError(err)) {
-        const tag = label ? ` (${label})` : '';
-        console.warn(`[deleteAccount] Skipping query update${tag}: Firestore failed precondition.`, err && err.message ? err.message : err);
-        return;
-      }
+      // A missing index or failed query is unfinished cleanup, never success.
+      // Preserve the login so the owner can retry after the cause is repaired.
+      console.error('[deleteAccount] Unfinished cleanup:', label, err.code || 'unknown');
       throw err;
     }
     if (snap.empty) return;
@@ -978,9 +968,9 @@ async function deleteUserData(uid) {
   await deleteDocsByQuery(db.collection('fishingLeaderboard').where('uid', '==', uid), 200, 'fishingLeaderboard(uid)');
   await deleteDocsByQuery(db.collection('deflockLeaderboard').where('uid', '==', uid), 200, 'deflockLeaderboard(uid)');
   await deleteDocsByQuery(db.collection('activityFeed').where('uid', '==', uid), 200, 'activityFeed(uid)');
-  await db.collection('explorerLeaderboard').doc(uid).delete().catch(() => {});
+  await db.collection('explorerLeaderboard').doc(uid).delete();
   await releaseWorldPropertiesForUser(uid);
-  await db.collection('propertyLeaderboard').doc(uid).delete().catch(() => {});
+  await db.collection('propertyLeaderboard').doc(uid).delete();
   await deleteDiscoveryTradesForUser(uid);
 
   if (db && typeof db.recursiveDelete === 'function') {
@@ -996,15 +986,15 @@ async function deleteUserData(uid) {
     await deleteDocsByQuery(userRef.collection('commerceStock'), 200, 'users/{uid}/commerceStock');
     await deleteDocsByQuery(userRef.collection('gameplay'), 200, 'users/{uid}/gameplay');
     await deleteDocsByQuery(userRef.collection('propertyEntitlements'), 200, 'users/{uid}/propertyEntitlements');
-    await userRef.delete().catch(() => {});
+    await userRef.delete();
   }
-  await creatorProfileRef.delete().catch(() => {});
+  await creatorProfileRef.delete();
   if (db && typeof db.recursiveDelete === 'function') {
-    await db.recursiveDelete(explorerProfileRef).catch(() => {});
+    await db.recursiveDelete(explorerProfileRef);
   } else {
     await deleteDocsByQuery(explorerProfileRef.collection('items'), 200, 'explorerProfiles/{uid}/items');
     await deleteDocsByQuery(explorerProfileRef.collection('claims'), 200, 'explorerProfiles/{uid}/claims');
-    await explorerProfileRef.delete().catch(() => {});
+    await explorerProfileRef.delete();
   }
 }
 
@@ -2416,20 +2406,15 @@ exports.submitContribution = functions.region('us-central1').https.onRequest(asy
       return;
     }
 
-    const createdAt = FieldValue.serverTimestamp();
-    const ref = await db.collection('editorSubmissions').add({
-      editType,
-      status: 'pending',
-      worldKind,
-      areaKey,
-      target,
-      payload,
-      userId: auth.uid,
-      userDisplayName,
-      source,
-      createdAt,
-      updatedAt: createdAt
+    const { ref, replayed, status } = await require('./contribution-idempotency').saveContributionOnce({
+      db, uid: auth.uid, requestId: req.body?.requestId,
+      record: { editType, worldKind, areaKey, target, payload, userId: auth.uid, userDisplayName, source },
+      timestamp: FieldValue.serverTimestamp()
     });
+    if (replayed) {
+      res.status(200).json({ id: ref.id, status, replayed: true, notification: { sent: false, reason: 'already-submitted' } });
+      return;
+    }
 
     const savedSnap = await ref.get();
     const saved = serializeContributionDoc(savedSnap, { reviewerOnly: true });
@@ -2448,7 +2433,8 @@ exports.submitContribution = functions.region('us-central1').https.onRequest(asy
     });
   } catch (err) {
     console.error('[submitContribution] failed:', err);
-    res.status(500).json({ error: 'Could not save this contribution right now.' });
+    const publicError = err.status === 400 || err.status === 409;
+    res.status(publicError ? err.status : 500).json({ error: publicError ? err.message : 'Could not save this contribution right now.' });
   }
 });
 

@@ -47,6 +47,10 @@
     "maryland-parcels": { "scope": "candidate", "command": ["npm", "run", "verify:maryland-parcels"], "artifactRequired": true },
     "artifact-integrity": { "scope": "candidate", "command": ["npm", "run", "verify:hosting"], "artifactRequired": true },
     "release-identity": { "scope": "candidate", "command": ["npm", "run", "verify:release-identity"], "artifactRequired": true },
+    "capture-local": {"scope": "candidate", "command": ["npm", "run", "verify:reality-capture:local"], "artifactRequired": false},
+    "capture-editor-fixture": {"scope": "candidate", "command": ["node", "scripts/verification/interior-reshape-ui.mjs"], "artifactRequired": false},
+    "capture-review-fixture": {"scope": "candidate", "command": ["node", "scripts/verification/capture-review-workspace-ui.mjs"], "artifactRequired": false},
+    "capture-entry-fixture": {"scope": "candidate", "command": ["node", "scripts/verification/captured-home-entry-ui.mjs"], "artifactRequired": false},
     "backend": { "scope": "backend", "command": ["npm", "run", "verify:backend-release"], "artifactRequired": true }
   },
   "systems": [
@@ -64,6 +68,7 @@
     { "id": "multiplayer-and-backend", "documents": ["Multiplayer", "Persistence and backend", "Multiplayer and backend"], "assertions": ["authenticated room clients converge", "rules enforce membership ownership and moderation", "server-authorized receipts accept the current client contract", "analytics initializes once per environment without collecting precise location or free-form player data"], "gates": ["analytics-lifecycle", "backend"] },
     { "id": "persistence-and-migration", "documents": ["Persistence and backend", "Field exploration and progression"], "assertions": ["schema-one player data migrates to schema two with backup", "quick slots companion progress Journal and Blocks retain stable identity"], "gates": ["current-contracts", "backend"] },
     { "id": "accessibility-and-presentation", "documents": ["Accessibility", "Current limits", "Release shape"], "assertions": ["keyboard focus zoom contrast text motion status and touch targets pass current journeys", "loading cover prevents partial-world exposure", "public copy matches verified boundaries"], "gates": ["accessibility", "player-blockers", "public-claims"] },
-    { "id": "performance-and-resilience", "documents": ["Mobile play", "Earth world flow", "Current limits"], "assertions": ["mobile normal and Live GPS cold starts stay within enforced budgets", "performance retention survives repeated transitions", "auxiliary renderers release their drawing buffers between environments", "provider fallbacks are bounded"], "gates": ["mobile-load", "performance", "space-release", "assembled-fallback"] }
+    { "id": "performance-and-resilience", "documents": ["Mobile play", "Earth world flow", "Current limits"], "assertions": ["mobile normal and Live GPS cold starts stay within enforced budgets", "performance retention survives repeated transitions", "auxiliary renderers release their drawing buffers between environments", "provider fallbacks are bounded"], "gates": ["mobile-load", "performance", "space-release", "assembled-fallback"] },
+    {"id": "capture-edit-review-entry", "documents": ["World systems", "Persistence and backend"], "assertions": ["capture owner and media contracts pass", "editor reshape review and entry fixtures pass independently; fixtures do not certify a live published journey", "Storage rules deny unauthorized media access"], "gates": ["current-contracts", "capture-local", "capture-editor-fixture", "capture-review-fixture", "capture-entry-fixture", "backend"]}
   ]
 }

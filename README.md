@@ -1,6 +1,6 @@
 # World Explorer 3D
 
-[Full project description](docs/PROJECT_DESCRIPTION.md) · [System inventory](docs/SYSTEM_INVENTORY.md) · [Architecture map](docs/ARCHITECTURE_MAP.md)
+[Full project description](docs/PROJECT_DESCRIPTION.md) · [System inventory](docs/SYSTEM_INVENTORY.md) · [Architecture map](docs/ARCHITECTURE_MAP.md) · [Source reference](docs/SYSTEM_INVENTORY_REFERENCE.md)
 
 [![Runtime Verify](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml/badge.svg?branch=stable)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml)
 [![Secret Scan](https://github.com/RRG314/WorldExplorer3D/actions/workflows/secret-scan.yml/badge.svg?branch=stable)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/secret-scan.yml)
@@ -9,8 +9,14 @@
 [![License: Source Available](https://img.shields.io/badge/license-source--available-lightgrey)](LICENSE)
 
 World Explorer 3D is a browser-based world sandbox built around real places.
-Choose a location, step into the world, and explore by land, water, air, or
-space.
+Choose a location, step into a bounded playable world, and explore by land,
+water, air, or space. Discovery, vehicles, virtual property, persistent building,
+photo-based home improvements and shared rooms connect the experience.
+
+The [September 10 system report](docs/SYSTEM_INVENTORY.md) distinguishes implemented
+features from tested and deployed behavior. The [project description](docs/PROJECT_DESCRIPTION.md)
+now includes room editing, floor/ceiling photos and contribution review; broader
+acceptance and reliability work are tracked in the [audit](docs/audits/2026-09-10/README.md).
 
 <p align="center">
   <a href="https://worldexplorer3d.io/app/"><strong>Play World Explorer 3D</strong></a>
@@ -161,6 +167,8 @@ multiplayer, moderation, and other online features require an authorized
 environment. Secrets are not included in the repository.
 
 ## Project guide
+
+- [Active release repair program](docs/RELEASE_REPAIR_PROGRAM.md)
 
 - [Release notes](RELEASE_NOTES_5.2.0.md)
 - [Changelog](CHANGELOG.md)

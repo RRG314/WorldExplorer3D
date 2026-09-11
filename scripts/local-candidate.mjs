@@ -45,8 +45,33 @@ async function readManifest(directory, { requireCurrentCommit = false } = {}) {
   return manifest;
 }
 
+async function assertLocalCandidateCapacity() {
+  // Saved candidates are disposable build copies, but never delete them implicitly.
+  // Bound growth before starting a compiler or copying another whole artifact.
+  const directories = await fs.readdir(candidateRoot, { withFileTypes: true }).catch(error => {
+    if (error.code === 'ENOENT') return [];
+    throw error;
+  });
+  let savedBuilds = 0;
+  for (const directory of directories) {
+    if (!directory.isDirectory() || directory.isSymbolicLink()) continue;
+    try {
+      await readManifest(path.join(candidateRoot, directory.name));
+      savedBuilds += 1;
+    } catch { /* Source snapshots and unrecognized folders are preserved. */ }
+  }
+  if (savedBuilds >= 4) {
+    throw new Error('Local candidate cache already contains four saved builds. Reuse one or explicitly clean up older generated builds before creating another. Source folders must be preserved.');
+  }
+  const disk = await fs.statfs(rootDir);
+  if (disk.bavail * disk.bsize < 10 * 1024 ** 3) {
+    throw new Error('Less than 10 GiB of disk space is available. Free generated build space before creating another candidate.');
+  }
+}
+
 async function createCandidate(firebaseEnvironment = 'staging') {
   requireCleanSource();
+  await assertLocalCandidateCapacity();
   execFileSync(process.execPath, [
     'scripts/verification/provider-release.mjs'
   ], { cwd: rootDir, stdio: 'inherit' });

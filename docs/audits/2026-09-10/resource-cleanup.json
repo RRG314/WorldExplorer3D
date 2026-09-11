@@ -1,0 +1,576 @@
+{
+  "createdAt": "2026-09-10T23:34:17.188431+00:00",
+  "removedBuildCount": 111,
+  "keptBuilds": [
+    "5.2.0+0761b370b3e7.abd395f67b79e0b9.production",
+    "5.2.0+10731504f9eb.3c7cb15e993d8353.staging",
+    "5.2.0+ace2ba796975.ae2f513a22aaec8f.staging",
+    "5.2.0+db62593ba377.6342cddaba06fc68.production"
+  ],
+  "preservedUnverifiedDirectories": [
+    "source-dcf94d2",
+    "source-48db602",
+    "source-0d4e6c3",
+    "source-63b4574",
+    "source-6850f37",
+    "source-764faae"
+  ],
+  "removedBuilds": [
+    {
+      "buildId": "5.1.0+991b257d2d7d.842d7be328bbcb77.staging",
+      "commit": "991b257d2d7d67a23311c3a1e122823e1b3579ed",
+      "environment": "staging"
+    },
+    {
+      "buildId": "4.3.0+cc3cd0e275b4.a5745ef727c68879.staging",
+      "commit": "cc3cd0e275b4b0ab506fb4683273a90c9607d534",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.2.0+4cf180524e6f.adff0b7838eda179.production",
+      "commit": "4cf180524e6f303145071d2e14ced8470139a2f6",
+      "environment": "production"
+    },
+    {
+      "buildId": "5.2.0+1319fc5a9662.eebfac63a24e3cf8.production",
+      "commit": "1319fc5a9662b3f5119d4442f3900040eb911755",
+      "environment": "production"
+    },
+    {
+      "buildId": "5.1.0+1aeb3ab508ff.1532db7b2ffb33bb.staging",
+      "commit": "1aeb3ab508ff3e62cd9941372a5e25603522f46b",
+      "environment": "staging"
+    },
+    {
+      "buildId": "4.3.0+d43265be7756.faeab94720d1b957.production",
+      "commit": "d43265be77561f681187ee7c239aa11d17cc7394",
+      "environment": "production"
+    },
+    {
+      "buildId": "5.1.0+772c70fa688c.1ebf1a0a8e2b29b7.staging",
+      "commit": "772c70fa688c08c5bc8968c1bb93fd2ca2d54321",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.1.0+d27d3ae52107.bcb9532fff45895c.staging",
+      "commit": "d27d3ae52107f50e2206d4cf44be46c9ac8c4d04",
+      "environment": "staging"
+    },
+    {
+      "buildId": "4.3.0+9c71e5bc7613.0c5453a5b4e09497.staging",
+      "commit": "9c71e5bc7613b7a0011a7063428f5ade74d3c9e8",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.1.0+a5ea3d063fc0.82f4fa0f9fb5497f.staging",
+      "commit": "a5ea3d063fc0e70d8d24abf0e2d9ac3e71bad539",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.1.0+d18514f2c48a.79b9c4317f5319dc.staging",
+      "commit": "d18514f2c48af67dac5898888a5507b9de6b8cd4",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.2.0+3707ae58fe6a.9a7f4688febb6dde.production",
+      "commit": "3707ae58fe6a85dab229521ebb0b7acb5d0e677c",
+      "environment": "production"
+    },
+    {
+      "buildId": "4.3.1+5fcc830c0a34.e86b227efc17dbb7.production",
+      "commit": "5fcc830c0a34a14ac7755f0da90c40280c17e959",
+      "environment": "production"
+    },
+    {
+      "buildId": "5.1.0+4d6d745b467c.82f4fa0f9fb5497f.staging",
+      "commit": "4d6d745b467cc2a9ab09e45db2992ff79b2abbcf",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.2.0+fe5a69b738c6.f00bdaa72969cce2.production",
+      "commit": "fe5a69b738c6614fb48ba7811775a23eb1905314",
+      "environment": "production"
+    },
+    {
+      "buildId": "4.3.0+88c3ff8b88a7.60a184335587db86.staging",
+      "commit": "88c3ff8b88a7a3b2ff29d3f039794c98c4a8f2f8",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.2.0+03370722bf4a.6f0169bcfdc0043d.staging",
+      "commit": "03370722bf4afaa405d3a2356bb1f70924e5ef84",
+      "environment": "staging"
+    },
+    {
+      "buildId": "4.3.0+f5876b5bf6c3.c32a3085b4b5a2e8.staging",
+      "commit": "f5876b5bf6c324f3a418893b0d76572172401444",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.1.0+a54c607c2de9.9315ac417ba7877d.staging",
+      "commit": "a54c607c2de9a9f096d27f05212d7ca67a0bae39",
+      "environment": "staging"
+    },
+    {
+      "buildId": "4.3.0+5bb04e4b1d91.0d680f12c93316d1.staging",
+      "commit": "5bb04e4b1d91b2753c5e70472c3e5a9e68310bc3",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.1.0+7166a1607325.5de2b234fcd0f899.staging",
+      "commit": "7166a160732538b8d8fd76164d49924e90616af2",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.1.0+a4794cc5795e.835dec4a0bbab7ad.staging",
+      "commit": "a4794cc5795e9b026924e1c4e7071b6dfc68d7a8",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.2.0+a124b08c061f.6ae20fd47e751208.production",
+      "commit": "a124b08c061f68eb0a49d6a725ed89bdd0157d89",
+      "environment": "production"
+    },
+    {
+      "buildId": "4.3.0+b88360cfca29.6e5874e70b2da670.staging",
+      "commit": "b88360cfca296e9e9a42ad7173dc5ba82674610f",
+      "environment": "staging"
+    },
+    {
+      "buildId": "4.3.0+61ec99b3a86a.13bc7366b6cec7a7.staging",
+      "commit": "61ec99b3a86af5d81447f202ee7b97687f514066",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.1.0+1f320f121a41.ac9e782f9f01c753.staging",
+      "commit": "1f320f121a416420485e2edc2919506802c57dd5",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.1.0+53247387e568.54c6176dd86284fb.staging",
+      "commit": "53247387e568924ac5583f43b28be2eb375ec5e0",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.2.0+87f5e153395c.5fd8dbc70fd6855c.production",
+      "commit": "87f5e153395c558f9aa8f2d4c67ff189ff23df94",
+      "environment": "production"
+    },
+    {
+      "buildId": "5.2.0+5d78e2d13b31.2118a00778c2a942.production",
+      "commit": "5d78e2d13b31944fc6068c800ace67dd02067e29",
+      "environment": "production"
+    },
+    {
+      "buildId": "4.3.0+9c2ce62716e2.deedd22c56363546.staging",
+      "commit": "9c2ce62716e25d3de925f0f78f981f4f10782cbb",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.1.0+19e081c3b826.8326ffe7aee976f7.staging",
+      "commit": "19e081c3b826ecb4c7f418d5d527a8d7b35de160",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.2.0+6926a2691654.0edd681c6bada082.production",
+      "commit": "6926a26916544ba2b1759e25e8cfdd04bd56a5d8",
+      "environment": "production"
+    },
+    {
+      "buildId": "5.2.0+0d5cea91042d.75781b5f4b0c666c.production",
+      "commit": "0d5cea91042d24d65377f2ad9fa08b65023b3f51",
+      "environment": "production"
+    },
+    {
+      "buildId": "5.1.0+bcdaa0f4152d.1144f7bd166615f4.staging",
+      "commit": "bcdaa0f4152d0ba283d1f751419eb15a0d77afb9",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.1.0+e5d62ff56f26.0fc385cd60384522.staging",
+      "commit": "e5d62ff56f26e8846884cc6c00dcd02d724d0eca",
+      "environment": "staging"
+    },
+    {
+      "buildId": "4.3.0+377d10f70693.618c047d7d80a818.staging",
+      "commit": "377d10f706937aed33dd44ee2a4ec65cfbb203d7",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.2.0+52f4775addf4.a7775489005697fe.production",
+      "commit": "52f4775addf496854bbb74730138dcfe89d60dbc",
+      "environment": "production"
+    },
+    {
+      "buildId": "5.2.0+0af2eece3fe4.689dc84ae81da67a.production",
+      "commit": "0af2eece3fe42233c3fb99e7a04cdb3735424e75",
+      "environment": "production"
+    },
+    {
+      "buildId": "5.2.0+bd52fa4a43eb.b5741da5af0726e9.production",
+      "commit": "bd52fa4a43ebe62ba5059e2a9fb80cda60150bae",
+      "environment": "production"
+    },
+    {
+      "buildId": "5.1.0+356317a4e7b1.64190a40035bc925.staging",
+      "commit": "356317a4e7b1d595eab81530ee920c83183cb596",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.1.0+533f3befd4bd.14a576a659dd2cde.staging",
+      "commit": "533f3befd4bd09d30e0e052ab1db987923fb8727",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.1.0+ec339bcb92e7.6b6518d17ff24958.staging",
+      "commit": "ec339bcb92e7ed4760e7d4fc77641417741fee85",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.2.0+52948bf84fe9.643f2d3d470b83d0.staging",
+      "commit": "52948bf84fe93eff5af2fa8501c2ab1a1c6fd266",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.2.0+35182a42abe3.3e4aad484cb12bd4.production",
+      "commit": "35182a42abe3542ec60b083a17a76dac9b3e28b9",
+      "environment": "production"
+    },
+    {
+      "buildId": "5.1.0+606bfc6fa8ba.9122a23aafaf9ff7.staging",
+      "commit": "606bfc6fa8bacbd8cc0ccb310eaf5bd5a55f18aa",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.2.0+5b8a7e6386dc.8824d37ed4d3a39f.production",
+      "commit": "5b8a7e6386dc7d6e3e1473e2e6e767823bcdc182",
+      "environment": "production"
+    },
+    {
+      "buildId": "5.2.0+7061358a41ee.4abfd3733d5208a7.production",
+      "commit": "7061358a41eea7b4de33f40db1fa090b6d65dc39",
+      "environment": "production"
+    },
+    {
+      "buildId": "4.3.0+0e5ab9b13333.9e264ee18dc17c2f.staging",
+      "commit": "0e5ab9b133337ecd8a9e26571c49156c4889b657",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.2.0+8d9697839f50.0edd681c6bada082.production",
+      "commit": "8d9697839f50c7792ddae59da4413eb9f63fb879",
+      "environment": "production"
+    },
+    {
+      "buildId": "5.1.0+769d36e10abe.256fce3608fc5d55.staging",
+      "commit": "769d36e10abe4e8503ede239bf07682b0d834530",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.2.0+52948bf84fe9.e98166cbeaede193.production",
+      "commit": "52948bf84fe93eff5af2fa8501c2ab1a1c6fd266",
+      "environment": "production"
+    },
+    {
+      "buildId": "4.3.0+aabf394bbc8e.6e5874e70b2da670.staging",
+      "commit": "aabf394bbc8e681010d3b4b1bfb194de8e09ffca",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.2.0+159c4e07715b.196bf17026a8dd78.production",
+      "commit": "159c4e07715b43ab3842a2196f39aee307635639",
+      "environment": "production"
+    },
+    {
+      "buildId": "5.2.0+5280755308cc.01660eb423ad106a.production",
+      "commit": "5280755308cc6407b71d47f0927a12e31e560ac7",
+      "environment": "production"
+    },
+    {
+      "buildId": "5.1.0+c221f649e159.58a8e127a36713c5.staging",
+      "commit": "c221f649e15981cb38ef659ed9e445f95cde03e6",
+      "environment": "staging"
+    },
+    {
+      "buildId": "4.3.0+843edb35a609.746b30bca9dfcf09.staging",
+      "commit": "843edb35a6092608369a78cf0696311007837506",
+      "environment": "staging"
+    },
+    {
+      "buildId": "4.3.0+c633918d4d00.41d12289c45bf0ec.staging",
+      "commit": "c633918d4d00eb0dbcd116e214f1e44219b4da78",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.1.0+250b66716992.ad19fd1b5bf0e2a6.staging",
+      "commit": "250b66716992f17c08757e1ed68dcd9321329fb1",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.1.0+404fb117fa72.2be078571f029d49.staging",
+      "commit": "404fb117fa729176d2160d33a0ef12e5c5628dac",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.1.0+772c70fa688c.e88b82eda8c6179b.production",
+      "commit": "772c70fa688c08c5bc8968c1bb93fd2ca2d54321",
+      "environment": "production"
+    },
+    {
+      "buildId": "5.1.0+0bf0cd8aae81.9c8793e2f0a929c1.staging",
+      "commit": "0bf0cd8aae8114e8c5e01113fcae7d4e08b3a647",
+      "environment": "staging"
+    },
+    {
+      "buildId": "4.3.1+89e7387d4cf8.e86b227efc17dbb7.production",
+      "commit": "89e7387d4cf80b9966de7ba25ff74df76d1bc92b",
+      "environment": "production"
+    },
+    {
+      "buildId": "4.3.0+2cde262e5a6d.47fb0f1564e2e5b3.staging",
+      "commit": "2cde262e5a6d3c3409dbd4959d7165be7dcca072",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.2.0+5fbd005fa916.fe8f2cfbf698967a.production",
+      "commit": "5fbd005fa916d2bee582dc23ddd4d822c837be18",
+      "environment": "production"
+    },
+    {
+      "buildId": "4.3.0+c7871f880d63.63f0cd036083cd92.production",
+      "commit": "c7871f880d63f890a5750437888f38ee1088aef4",
+      "environment": "production"
+    },
+    {
+      "buildId": "5.1.0+9cd8e3cd2161.82f4fa0f9fb5497f.staging",
+      "commit": "9cd8e3cd21613aa4acc249b766582cb12b905953",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.1.0+916ad97f5c41.017628db5fd33392.staging",
+      "commit": "916ad97f5c417582821f01a97ab6ec6ef11dd2e7",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.2.0+bb95cc5e704a.c59b86e2ff548a72.production",
+      "commit": "bb95cc5e704a84ba30f3c3571ee72f01a37796c6",
+      "environment": "production"
+    },
+    {
+      "buildId": "5.1.0+93066bca0d76.1f19dd370a6c29b4.staging",
+      "commit": "93066bca0d761a5222c8d61d812742bf914f6c5c",
+      "environment": "staging"
+    },
+    {
+      "buildId": "4.3.0+689c13668eba.47fb0f1564e2e5b3.staging",
+      "commit": "689c13668ebaa059619cbcb9808f93ca08458a42",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.1.0+c67cf730d7f3.b70ead55aaeee6e6.staging",
+      "commit": "c67cf730d7f30090fe02d762447b46e67aa42033",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.2.0+0e7d4e6632be.bb41ce383dde0218.staging",
+      "commit": "0e7d4e6632be51563e6b3087ce8f6a30962b475f",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.0.0+8546ad5c125e.f28941600b20d813.staging",
+      "commit": "8546ad5c125e42eb2ca5c634933ba961e8e0c625",
+      "environment": "staging"
+    },
+    {
+      "buildId": "4.3.0+59332cb3d0d2.faeab94720d1b957.production",
+      "commit": "59332cb3d0d2356aea1ee09c64c69e814694bc49",
+      "environment": "production"
+    },
+    {
+      "buildId": "5.1.0+0f75543944b5.1134c373fc5f3715.staging",
+      "commit": "0f75543944b58bf005aa3123269d98964e59f9a7",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.1.0+f509f7b96bd8.58a8e127a36713c5.staging",
+      "commit": "f509f7b96bd8cad77ac70f8aa5776303c98e9b0b",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.2.0+24a0cf0c61ec.3e4aad484cb12bd4.production",
+      "commit": "24a0cf0c61ec71b37c31728ff8eb7df3bb1cbeea",
+      "environment": "production"
+    },
+    {
+      "buildId": "5.2.0+69a996b698f9.eb09eb6bd6915a34.production",
+      "commit": "69a996b698f9ecb66dbd8f471244bee202c3de7f",
+      "environment": "production"
+    },
+    {
+      "buildId": "5.1.0+75b528188a5c.eb1a5dba1792f178.staging",
+      "commit": "75b528188a5c42af3adc7df14fdde14ddbbd5a69",
+      "environment": "staging"
+    },
+    {
+      "buildId": "4.2.0+993ab660255b.80fb35ac0b82b6b0.production",
+      "commit": "993ab660255bff3abf5bc4f9b544972402adeec4",
+      "environment": "production"
+    },
+    {
+      "buildId": "5.2.0+13faf8a35060.eebfac63a24e3cf8.production",
+      "commit": "13faf8a35060d102351ed4c1969b59dec8e9676c",
+      "environment": "production"
+    },
+    {
+      "buildId": "4.3.0+917d33cc384a.63f0cd036083cd92.production",
+      "commit": "917d33cc384aad27126c82c9edcbb9975567214f",
+      "environment": "production"
+    },
+    {
+      "buildId": "5.2.0+eb202ad0b91a.7c3678e07aaee4b9.production",
+      "commit": "eb202ad0b91a3ed7f5ce8da30a6ba6cd94887d27",
+      "environment": "production"
+    },
+    {
+      "buildId": "5.1.0+f15a1d342828.9ba41dd81b106b5e.staging",
+      "commit": "f15a1d342828277d6c640251b99cc0de9f7146c0",
+      "environment": "staging"
+    },
+    {
+      "buildId": "4.3.1+7f23e8b3fdb6.f9534e34bdd6614a.staging",
+      "commit": "7f23e8b3fdb6f021931840945394d92e0be40bce",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.1.0+eb92d484e971.4600153ef86ec1f8.staging",
+      "commit": "eb92d484e97138462fc53d061fcd4648cf658ec0",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.1.0+7416e26bce08.75924dda56cabbc2.staging",
+      "commit": "7416e26bce08f6eebcfab987f56205152b05f3c3",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.1.0+e6be528214ae.38cba47d3463ff8a.staging",
+      "commit": "e6be528214aee16a4cbc82fdb1c767969fb06660",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.1.0+e784091bcb7b.a8057d39811cd8cd.staging",
+      "commit": "e784091bcb7bd504717105d00288c1f05eee0eb9",
+      "environment": "staging"
+    },
+    {
+      "buildId": "4.3.0+07bebc199236.329679fd253149b0.staging",
+      "commit": "07bebc199236377fc464ad6a5316f36ae4759af6",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.1.0+3956d28df02e.243b173e86f0ae92.staging",
+      "commit": "3956d28df02e94712d98e147f162595cbd972945",
+      "environment": "staging"
+    },
+    {
+      "buildId": "4.3.0+218057efffec.9e264ee18dc17c2f.staging",
+      "commit": "218057efffec1288e7916aa567d4619f20f90d7f",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.2.0+e0f860e48d49.eebfac63a24e3cf8.production",
+      "commit": "e0f860e48d49791c09d3965b222f7135493b3eb0",
+      "environment": "production"
+    },
+    {
+      "buildId": "4.3.0+2bca4bea5a26.f19a671904fb07e5.staging",
+      "commit": "2bca4bea5a26032278167ac4c21c681319ea6ed8",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.1.0+75183a6faad2.ab1512320389bf93.staging",
+      "commit": "75183a6faad2c5deda5b5cb44cd74d2809b197be",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.1.0+fb196671d6bd.f0d2f51c80fa1047.staging",
+      "commit": "fb196671d6bd1b54d2d33226f8e529df04b037a3",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.2.0+c10546c501d3.d37bdb3ddea7d8bd.production",
+      "commit": "c10546c501d3ba6c486efc93a341b7202cc8f6fc",
+      "environment": "production"
+    },
+    {
+      "buildId": "5.2.0+7d45019ec2e3.d98cfc0e04710a52.production",
+      "commit": "7d45019ec2e3fd7ba4889bdf8c3353a26177d9c9",
+      "environment": "production"
+    },
+    {
+      "buildId": "5.1.0+313267ccc450.3208440c592a878e.production",
+      "commit": "313267ccc450b5d0bd3ce827d50038d678ff4be6",
+      "environment": "production"
+    },
+    {
+      "buildId": "4.3.0+6d5c6b1f22cb.7685ce8951248fb0.staging",
+      "commit": "6d5c6b1f22cb11047c93b1656c36f7cf6d2e0edc",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.2.0+59460eb83401.d6bc02c5fe6d463a.production",
+      "commit": "59460eb8340193db980a3f37b54b180584828fec",
+      "environment": "production"
+    },
+    {
+      "buildId": "5.1.0+744b02eb83cc.bcb9532fff45895c.staging",
+      "commit": "744b02eb83cc4840d98841497a4632ce9c5d6425",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.1.0+cf44154d03de.512410563e69f634.staging",
+      "commit": "cf44154d03de277376efdd62aa00f8a886f22a7f",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.2.0+5fc98d26c117.b5741da5af0726e9.production",
+      "commit": "5fc98d26c1174a1413a5d810e19ddeccac940f1c",
+      "environment": "production"
+    },
+    {
+      "buildId": "5.2.0+756ad1a5b117.d174ee15b8d64850.production",
+      "commit": "756ad1a5b11716c2deb345e7ab02af82ce46b448",
+      "environment": "production"
+    },
+    {
+      "buildId": "5.2.0+beb822263743.ef2336af6e3413e3.production",
+      "commit": "beb8222637439eaa7c1dec887ba52b736da157a3",
+      "environment": "production"
+    },
+    {
+      "buildId": "4.3.0+527ed05e3ea2.5266c2d92f2fed46.staging",
+      "commit": "527ed05e3ea2601271bbb3f3052c8b9d1babbf7a",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.1.0+d0d83c8d6117.1532db7b2ffb33bb.staging",
+      "commit": "d0d83c8d61175fd12b001857eb02702c887ed1d5",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.1.0+350d1d86dab7.1f305df331477260.staging",
+      "commit": "350d1d86dab7159e84120122f74a52b9479be8eb",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.1.0+1b23036f9dc9.99e29f855b197131.staging",
+      "commit": "1b23036f9dc99eebc26aea631a9ac2bdec55d5d6",
+      "environment": "staging"
+    },
+    {
+      "buildId": "5.2.0+5c0c3ea4d3dc.7384d7480de12501.production",
+      "commit": "5c0c3ea4d3dc16a3bd0bf79657e013e31b40c2ef",
+      "environment": "production"
+    }
+  ],
+  "preserved": "source, Git history, dist, dependencies, saved user records"
+}

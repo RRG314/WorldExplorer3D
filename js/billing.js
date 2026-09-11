@@ -72,6 +72,6 @@ export async function enableAdminTester() {
 }
 
 export async function deleteAccount() {
-  const payload = await postProtectedFunction('/deleteAccount', { confirmation: 'DELETE' }, { label: 'Account API' });
+  const payload = await postProtectedFunction('/deleteAccount', { confirmation: 'DELETE' }, { label: 'Account API', timeoutMs: 570000 });
   return payload || {};
 }

@@ -23,13 +23,19 @@ function normalizeSubmissionFilters(options = {}) {
   };
 }
 
-export async function submitContribution(input = {}) {
-  const payload = await postProtectedFunction(
-    '/submitContribution',
-    input,
-    { label: 'Contribution API' }
-  );
-  return payload || {};
+export async function submitContribution(input = {}, options = {}) {
+  // A caller retrying an uncertain result must reuse error.requestId.
+  const requestId = options.requestId || input.requestId || globalThis.crypto.randomUUID();
+  try {
+    const payload = await postProtectedFunction(
+      '/submitContribution', { ...input, requestId },
+      { ...options, label: 'Contribution API' }
+    );
+    return payload || {};
+  } catch (error) {
+    error.requestId = requestId;
+    throw error;
+  }
 }
 
 export async function listContributionSubmissions(options = {}) {

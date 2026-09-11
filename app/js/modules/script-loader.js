@@ -18,36 +18,35 @@ export function loadClassicScript(src, options = {}) {
       return;
     }
 
-    if (existing && existing.dataset?.loaded !== 'true') {
-      existing.addEventListener('load', () => resolve(), { once: true });
-      existing.addEventListener(
-        'error',
-        () => reject(new Error(`Failed to load script: ${src}`)),
-        { once: true }
-      );
-      return;
+    const script = existing || document.createElement('script');
+    let settled = false;
+    let timeoutId;
+    const finish = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      script.removeEventListener('load', onLoad);
+      script.removeEventListener('error', onError);
+      if (error) {
+        script.remove();
+        reject(error);
+      } else {
+        script.dataset.loaded = 'true';
+        resolve();
+      }
+    };
+    const onLoad = () => finish();
+    const onError = () => finish(new Error(`Failed to load script: ${src}`));
+    script.addEventListener('load', onLoad);
+    script.addEventListener('error', onError);
+    timeoutId = setTimeout(() => finish(new Error(`Script load timeout (${timeoutMs}ms): ${src}`)), timeoutMs);
+    if (!existing) {
+      script.src = src;
+      script.async = false;
+      script.dataset.loaded = 'false';
+      try { document.head.appendChild(script); } catch (error) { finish(error); }
     }
 
-    let timeoutId = null;
-    const script = document.createElement('script');
-    script.src = src;
-    script.async = false;
-    script.dataset.loaded = 'false';
-    script.onload = () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      script.dataset.loaded = 'true';
-      resolve();
-    };
-    script.onerror = () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      reject(new Error(`Failed to load script: ${src}`));
-    };
-
-    timeoutId = setTimeout(() => {
-      reject(new Error(`Script load timeout (${timeoutMs}ms): ${src}`));
-    }, timeoutMs);
-
-    document.head.appendChild(script);
   });
 
   const trackedPromise = loadPromise.finally(() => {

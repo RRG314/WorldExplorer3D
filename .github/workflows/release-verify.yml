@@ -6,8 +6,13 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
+    timeout-minutes: 120
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -33,6 +38,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install backend dependencies
+        run: npm ci --prefix functions
+
       - name: Install Firebase release tooling
         run: npm install --global firebase-tools@15.22.0
 
@@ -40,7 +48,19 @@ jobs:
         run: python -m pip install -r scripts/ground-datum-requirements.txt
 
       - name: Install Playwright
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium chrome
 
       - name: Full release verification
         run: npm run release:verify
+
+      - name: Preserve verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-evidence-${{ github.sha }}
+          path: |
+            output/release-evidence/
+            output/verification/
+            /tmp/worldexplorer3d-verification/
+          if-no-files-found: warn
+          retention-days: 14
