@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-09-11",
+  "testedPublicSourceCommit": "db6c529e60a4e6371934a767696635b90f05e5ae",
+  "scope": "privacy-sanitized source snapshot; local verification",
+  "nodeResearchTests": {
+    "passed": 59,
+    "failed": 0,
+    "skipped": 0
+  },
+  "recordkeepingTests": {
+    "passed": 7,
+    "failed": 0
+  },
+  "inventoryValidation": "passed: five retained runs and deterministic summary",
+  "researchMarkdownLinks": "all local targets present",
+  "personalPathAndEmailScan": "no matches in inspected text blobs up to 2 MiB",
+  "gitleaks": {
+    "version": "8.30.0",
+    "scope": "complete root commit",
+    "exitCode": 0,
+    "findings": 0
+  },
+  "binaryReview": "Changed binary paths are vegetation models, attributed textures, vendor WASM and existing public showcase images; no raw capture uploads added.",
+  "liveModelRunPerformedForPackaging": false,
+  "deploymentPerformed": false,
+  "remoteCI": "not yet run at attestation creation",
+  "limitations": [
+    "Automated pattern scans do not guarantee absence of every kind of sensitive information.",
+    "Local tests use component fixtures and transport doubles; they are not another live survival run.",
+    "This attestation is added after the tested source commit and changes documentation only."
+  ]
+}
