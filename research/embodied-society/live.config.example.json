@@ -1,0 +1,10 @@
+{
+  "runId": "choose-a-new-run-id",
+  "provider": "openai",
+  "model": "",
+  "budgetUsd": 0,
+  "maxCalls": 20,
+  "maxOutputTokens": 512,
+  "inputUsdPerMillion": 0,
+  "outputUsdPerMillion": 0
+}

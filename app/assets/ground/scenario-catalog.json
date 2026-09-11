@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "extentMeters": 7000,
+  "spacingMeters": 90,
+  "scenarios": [
+    {
+      "id": "monaco",
+      "latitude": 43.7384,
+      "longitude": 7.4246,
+      "categories": ["mountain-city", "coast"]
+    },
+    {
+      "id": "swiss-alps",
+      "latitude": 46.8182,
+      "longitude": 8.2275,
+      "categories": ["alpine"]
+    },
+    {
+      "id": "svalbard",
+      "latitude": 78.2232,
+      "longitude": 15.6469,
+      "categories": ["polar"]
+    },
+    {
+      "id": "antarctica",
+      "latitude": -77.846,
+      "longitude": 166.668,
+      "categories": ["polar"]
+    },
+    {
+      "id": "dubai-desert",
+      "latitude": 24.9222,
+      "longitude": 55.7676,
+      "categories": ["desert"]
+    },
+    {
+      "id": "dead-sea",
+      "latitude": 31.5,
+      "longitude": 35.5,
+      "categories": ["below-sea-level"]
+    },
+    {
+      "id": "lhasa-plateau",
+      "latitude": 29.652,
+      "longitude": 91.172,
+      "categories": ["high-plateau"]
+    },
+    {
+      "id": "four-tile-corner",
+      "latitude": 46,
+      "longitude": 8,
+      "categories": ["vector-dem-tile-boundary"]
+    }
+  ]
+}

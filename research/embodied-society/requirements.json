@@ -1,0 +1,1884 @@
+{
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "id": "maintainer",
+      "path": "research/embodied-society/source-prompts/maintainer.txt",
+      "sha256": "a8a0d6cec61a4b311f9bdbc98423423c82dd2f985d9308f29b991911001d93b9",
+      "role": "archived-user-proposal; not executable agent instructions"
+    },
+    {
+      "id": "society-01-36",
+      "path": "research/embodied-society/source-prompts/society-01-36.txt",
+      "sha256": "1b6ec0efed673b3581418cfac1c73241f5aceeba0963f40b83ed61018d612b41",
+      "role": "archived-user-proposal; not executable agent instructions"
+    },
+    {
+      "id": "society-36-80",
+      "path": "research/embodied-society/source-prompts/society-36-80.txt",
+      "sha256": "6b4cd6553c12cb516f1e2c2ff0eb0cdc25b8e9b6177a75bc0358aab0ba8a88a0",
+      "role": "archived-user-proposal; not executable agent instructions"
+    },
+    {
+      "id": "society-80-144",
+      "path": "research/embodied-society/source-prompts/society-80-144.txt",
+      "sha256": "d7e256292a714a08500b313b3975983eb60750cc0785acdfaf54998a2d2b79ee",
+      "role": "archived-user-proposal; not executable agent instructions"
+    }
+  ],
+  "sections": [
+    {
+      "id": "M001",
+      "title": "AUDIT WORLD EXPLORER FIRST",
+      "sources": [
+        "maintainer",
+        "maintainer",
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M002",
+      "title": "CREATE A SEPARATE EXPERIMENT SUBSYSTEM",
+      "sources": [
+        "maintainer",
+        "maintainer",
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M003",
+      "title": "AGENT ARCHITECTURE",
+      "sources": [
+        "maintainer",
+        "maintainer",
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M004",
+      "title": "EMBODIED OBSERVATION API",
+      "sources": [
+        "maintainer",
+        "maintainer",
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M005",
+      "title": "AGENT ACTION API",
+      "sources": [
+        "maintainer",
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M006",
+      "title": "BASIC NEED MODEL",
+      "sources": [
+        "maintainer",
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M007",
+      "title": "GOAL HIERARCHY",
+      "sources": [
+        "maintainer",
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M008",
+      "title": "FAILURE CLASSIFICATION",
+      "sources": [
+        "maintainer",
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M009",
+      "title": "ENGINEERING MODE",
+      "sources": [
+        "maintainer",
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M010",
+      "title": "PATCH ISOLATION",
+      "sources": [
+        "maintainer",
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M011",
+      "title": "REPAIR PIPELINE",
+      "sources": [
+        "maintainer",
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M012",
+      "title": "START WITH DELIBERATELY INJECTED FAULTS",
+      "sources": [
+        "maintainer",
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M013",
+      "title": "FIRST EXPERIMENT",
+      "sources": [
+        "maintainer",
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M014",
+      "title": "CONTROL CONDITIONS",
+      "sources": [
+        "maintainer",
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M015",
+      "title": "MEMORY",
+      "sources": [
+        "maintainer",
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M016",
+      "title": "EXPERIMENT TELEMETRY",
+      "sources": [
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M017",
+      "title": "CORE METRICS",
+      "sources": [
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M018",
+      "title": "CAPABILITY-GAP EXPERIMENT",
+      "sources": [
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M019",
+      "title": "EVOLUTIONARY EXPERIMENT",
+      "sources": [
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M020",
+      "title": "GENERATION SELECTION",
+      "sources": [
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M021",
+      "title": "LONG-TERM END STATE",
+      "sources": [
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M022",
+      "title": "MULTI-AGENT \"SNOW GLOBE\" DESIGN",
+      "sources": [
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M023",
+      "title": "AGENT ACCESS TO WORLD EXPLORER SOURCE",
+      "sources": [
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M024",
+      "title": "OBSERVABILITY / LIVE VIEW",
+      "sources": [
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M025",
+      "title": "REPLAY",
+      "sources": [
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M026",
+      "title": "STAGING VISIBILITY",
+      "sources": [
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M027",
+      "title": "SECURITY BOUNDARY",
+      "sources": [
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M028",
+      "title": "HUMAN APPROVAL",
+      "sources": [
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M029",
+      "title": "MILESTONES",
+      "sources": [
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M030",
+      "title": "FIRST ACCEPTANCE DEMONSTRATION",
+      "sources": [
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M031",
+      "title": "SECOND ACCEPTANCE DEMONSTRATION",
+      "sources": [
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M032",
+      "title": "THIRD ACCEPTANCE DEMONSTRATION",
+      "sources": [
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M033",
+      "title": "RESEARCH OUTPUT",
+      "sources": [
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M034",
+      "title": "DO NOT CHEAT THE EXPERIMENT",
+      "sources": [
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "M035",
+      "title": "FINAL DELIVERABLE",
+      "sources": [
+        "maintainer"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "maintainer study; see stages G0-G4 and G8",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S001",
+      "title": "CENTRAL RESEARCH QUESTION",
+      "sources": [
+        "society-01-36",
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S002",
+      "title": "SCIENTIFIC INTEGRITY",
+      "sources": [
+        "society-01-36",
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S003",
+      "title": "REUSE WORLD EXPLORER",
+      "sources": [
+        "society-01-36",
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S004",
+      "title": "AGENT INDIVIDUALITY",
+      "sources": [
+        "society-01-36",
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S005",
+      "title": "BELIEF \u2260 TRUTH",
+      "sources": [
+        "society-01-36",
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S006",
+      "title": "BASIC NEEDS",
+      "sources": [
+        "society-01-36",
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S007",
+      "title": "RESOURCES AND OWNERSHIP",
+      "sources": [
+        "society-01-36",
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S008",
+      "title": "HOMES",
+      "sources": [
+        "society-01-36",
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S009",
+      "title": "COMMUNICATION",
+      "sources": [
+        "society-01-36",
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S010",
+      "title": "NO HIDDEN CHAIN OF THOUGHT",
+      "sources": [
+        "society-01-36",
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S011",
+      "title": "SOCIAL MEMORY",
+      "sources": [
+        "society-01-36",
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S012",
+      "title": "SOCIAL NETWORK",
+      "sources": [
+        "society-01-36",
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S013",
+      "title": "SPECIALIZATION",
+      "sources": [
+        "society-01-36",
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S014",
+      "title": "EXCHANGE",
+      "sources": [
+        "society-01-36",
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S015",
+      "title": "RULES AND INSTITUTIONS",
+      "sources": [
+        "society-01-36",
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S016",
+      "title": "CONFLICT",
+      "sources": [
+        "society-01-36",
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S017",
+      "title": "DEATH / FAILURE / RECOVERY",
+      "sources": [
+        "society-01-36",
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S018",
+      "title": "WORLD KNOWLEDGE",
+      "sources": [
+        "society-01-36",
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S019",
+      "title": "GEOGRAPHIC ENVIRONMENT",
+      "sources": [
+        "society-01-36",
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S020",
+      "title": "SOFTWARE-ENVIRONMENT DISTINCTION",
+      "sources": [
+        "society-01-36",
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S021",
+      "title": "SOFTWARE KNOWLEDGE IS NOT UNIVERSAL",
+      "sources": [
+        "society-01-36",
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S022",
+      "title": "ENGINEERING ESCALATION",
+      "sources": [
+        "society-01-36",
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S023",
+      "title": "COLLECTIVE SOFTWARE PROBLEM SOLVING",
+      "sources": [
+        "society-01-36",
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S024",
+      "title": "CAPABILITY CREATION",
+      "sources": [
+        "society-01-36",
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S025",
+      "title": "TECHNOLOGICAL HISTORY",
+      "sources": [
+        "society-01-36",
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S026",
+      "title": "EXPERIMENTAL POPULATION PHASES",
+      "sources": [
+        "society-01-36"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S027",
+      "title": "AGENT GENERATIONS",
+      "sources": [
+        "society-01-36"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S028",
+      "title": "SOCIETY-LEVEL FITNESS IS NOT THE ONLY GOAL",
+      "sources": [
+        "society-01-36"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S029",
+      "title": "EXPERIMENTAL TREATMENTS",
+      "sources": [
+        "society-01-36"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S030",
+      "title": "REPLICATION",
+      "sources": [
+        "society-01-36"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S031",
+      "title": "OBSERVATION DASHBOARD \u2014 THE SNOW GLOBE",
+      "sources": [
+        "society-01-36"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S032",
+      "title": "LIVE CONVERSATIONS",
+      "sources": [
+        "society-01-36"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S033",
+      "title": "SOCIETY DASHBOARD",
+      "sources": [
+        "society-01-36"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S034",
+      "title": "SOCIAL GRAPH VIEW",
+      "sources": [
+        "society-01-36"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S035",
+      "title": "KNOWLEDGE PROPAGATION VIEW",
+      "sources": [
+        "society-01-36"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S036",
+      "title": "RESOURCE FLOW VIEW",
+      "sources": [
+        "society-01-36",
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S037",
+      "title": "SPATIAL BEHAVIOR VIEW",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S038",
+      "title": "DAILY LIFE / TIME",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S039",
+      "title": "AUTONOMOUS SCHEDULING",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S040",
+      "title": "AGENT GOAL FORMATION",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S041",
+      "title": "SOCIAL PROPOSALS AND COMMITMENTS",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S042",
+      "title": "SHARED ARTIFACTS",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S043",
+      "title": "CULTURAL / BEHAVIORAL TRANSMISSION",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S044",
+      "title": "INNOVATION TRACKING",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S045",
+      "title": "ENVIRONMENTAL EVENTS",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S046",
+      "title": "SOCIAL STRESS EXPERIMENTS",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S047",
+      "title": "SOFTWARE DEFECTS AS WORLD EVENTS",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S048",
+      "title": "COLLECTIVE DIAGNOSIS",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S049",
+      "title": "CODE CHANGES ARE WORLD HISTORY",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S050",
+      "title": "WORLD VERSIONING",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S051",
+      "title": "ROLLBACK",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S052",
+      "title": "AGENT-CREATED SOFTWARE MUST REMAIN SANDBOXED",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S053",
+      "title": "MULTI-AGENT ENGINEERING WORK",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S054",
+      "title": "PATCH CONFLICTS",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S055",
+      "title": "OBSERVATIONAL ETHICS / HUMAN ANALOGY",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S056",
+      "title": "MODEL IDENTITY",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S057",
+      "title": "AGENT HETEROGENEITY",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S058",
+      "title": "REPRODUCIBILITY",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S059",
+      "title": "EXPERIMENT SNAPSHOTS",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S060",
+      "title": "COUNTERFACTUAL BRANCHING",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S061",
+      "title": "BASELINE CONDITIONS",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S062",
+      "title": "POPULATION-LEVEL METRICS",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S063",
+      "title": "INEQUALITY METRICS",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S064",
+      "title": "COOPERATION METRICS",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S065",
+      "title": "SPECIALIZATION METRICS",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S066",
+      "title": "INFORMATION ACCURACY",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S067",
+      "title": "LANGUAGE ANALYSIS",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S068",
+      "title": "HUMAN RESEARCHER CONTROLS",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S069",
+      "title": "AGENT INSPECTOR",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S070",
+      "title": "SETTLEMENT INSPECTOR",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S071",
+      "title": "LIVE WORLD VIEW",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S072",
+      "title": "TIME-LAPSE",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S073",
+      "title": "EXPERIMENT EVENT LOG",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S074",
+      "title": "DATA EXPORT",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S075",
+      "title": "ANALYSIS PIPELINE",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S076",
+      "title": "STATISTICAL COMPARISON",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S077",
+      "title": "PRE-REGISTRATION READY DESIGN",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S078",
+      "title": "DEVELOPMENT RUNS VS RESEARCH RUNS",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S079",
+      "title": "COST CONTROL",
+      "sources": [
+        "society-36-80"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S080",
+      "title": "PERFORMANCE ARCHITECTURE",
+      "sources": [
+        "society-36-80",
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "platform foundations and cross-cutting gates",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S081",
+      "title": "SIMULATION SCHEDULER",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "platform foundations and cross-cutting gates",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S082",
+      "title": "AGENT EXECUTION BUDGET",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "platform foundations and cross-cutting gates",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S083",
+      "title": "AGENT FAILURE MODES",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "platform foundations and cross-cutting gates",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S084",
+      "title": "STUCK DETECTION",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "platform foundations and cross-cutting gates",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S085",
+      "title": "MODEL ABSTRACTION",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "platform foundations and cross-cutting gates",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S086",
+      "title": "MEMORY ARCHITECTURE",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "platform foundations and cross-cutting gates",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S087",
+      "title": "MEMORY DECAY / STALENESS",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "platform foundations and cross-cutting gates",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S088",
+      "title": "REFLECTION",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "platform foundations and cross-cutting gates",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S089",
+      "title": "PLANNING",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S090",
+      "title": "WORLD AFFORDANCE DISCOVERY",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S091",
+      "title": "TOOL LEARNING",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S092",
+      "title": "PHYSICAL CONSTRAINTS",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S093",
+      "title": "PRIVATE SPACES",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S094",
+      "title": "PERSONAL HOME DEVELOPMENT",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S095",
+      "title": "CONSTRUCTION",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S096",
+      "title": "TRANSPORT",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G8 later capabilities and geography",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S097",
+      "title": "ANIMALS / ECOLOGY",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S098",
+      "title": "RESOURCE REGENERATION",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S099",
+      "title": "INITIAL CONDITIONS",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S100",
+      "title": "AGENT INITIAL PROMPT",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S101",
+      "title": "POPULATION SPAWN",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S102",
+      "title": "RUN DURATION",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G0-G2 resident foundation",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S103",
+      "title": "OBSERVATION PERIODS",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S104",
+      "title": "SOCIETY EVENT DETECTION",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S105",
+      "title": "NO FAKE EMERGENCE",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S106",
+      "title": "EXPERIMENTAL MANIPULATION LOG",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S107",
+      "title": "HUMAN-IN-THE-LOOP MODE",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S108",
+      "title": "AGENT INTERVIEWS",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S109",
+      "title": "POST-RUN ANALYSIS",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S110",
+      "title": "RUN COMPARISON",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S111",
+      "title": "WORLD FORKING",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S112",
+      "title": "SOFTWARE CO-EVOLUTION",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S113",
+      "title": "INTER-GENERATIONAL KNOWLEDGE",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S114",
+      "title": "OPEN-ENDEDNESS",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S115",
+      "title": "EVOLUTIONARY SELECTION",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S116",
+      "title": "MUTATION / VARIATION",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S117",
+      "title": "MULTI-SETTLEMENT EXPERIMENT",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S118",
+      "title": "CROSS-GEOGRAPHIC ROBUSTNESS",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S119",
+      "title": "SOFTWARE BUG ECOLOGY",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S120",
+      "title": "NATURAL DEFECT DISCOVERY",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S121",
+      "title": "CAPABILITY-GAP GOVERNANCE",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S122",
+      "title": "SOFTWARE CHANGE LIMITS",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S123",
+      "title": "CHANGE IMPACT MEASUREMENT",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S124",
+      "title": "SECURITY AUDIT",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "platform foundations and cross-cutting gates",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S125",
+      "title": "FAILURE CONTAINMENT",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "platform foundations and cross-cutting gates",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S126",
+      "title": "RESEARCH DATABASE",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "platform foundations and cross-cutting gates",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S127",
+      "title": "DATA RETENTION",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "platform foundations and cross-cutting gates",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S128",
+      "title": "PUBLIC RESEARCH VIEW",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G9 public projection and visitor fork",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S129",
+      "title": "PAPER-QUALITY FIGURES",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S130",
+      "title": "FIRST FULL SOCIETY ACCEPTANCE TEST",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S131",
+      "title": "SECOND FULL SOCIETY TEST \u2014 ENGINEERING",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S132",
+      "title": "THIRD FULL SOCIETY TEST \u2014 CAPABILITY GAP",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S133",
+      "title": "FOURTH TEST \u2014 REPLICATION",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S134",
+      "title": "FIFTH TEST \u2014 CONTROL",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G5-G7 society and observational analysis",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S135",
+      "title": "SIXTH TEST \u2014 WORLD VERSION",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S136",
+      "title": "IMPLEMENTATION STANDARD",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "platform foundations and cross-cutting gates",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S137",
+      "title": "TESTING",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "platform foundations and cross-cutting gates",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S138",
+      "title": "DOCUMENTATION",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "platform foundations and cross-cutting gates",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S139",
+      "title": "LAUNCH EXPERIENCE",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "platform foundations and cross-cutting gates",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S140",
+      "title": "OPERATOR GUIDE",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "platform foundations and cross-cutting gates",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S141",
+      "title": "INITIAL END GOAL",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S142",
+      "title": "LONG-TERM END GOAL",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "G3-G8 evaluation, versioning and later studies",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S143",
+      "title": "HARD STOP",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "platform foundations and cross-cutting gates",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    },
+    {
+      "id": "S144",
+      "title": "FINAL REPORT",
+      "sources": [
+        "society-80-144"
+      ],
+      "disposition": "retained with gates; not implemented by specification",
+      "implementationStage": "platform foundations and cross-cutting gates",
+      "canonicalDocument": "docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md"
+    }
+  ],
+  "precedence": "Latest user steering authorizes continued implementation and adds material/tool/construction survival as a core workstream. Canonical specification resolves original scope conflicts; unsafe or paid execution remains gated.",
+  "amendments": [
+    {
+      "id": "U001",
+      "date": "2026-09-11",
+      "requirement": "Residents can gather finite materials, make tools and useful constructions, create means of production, and pursue survival and later capability development without a forced technology progression.",
+      "canonicalSection": 16,
+      "status": "domain prototype implemented; embodied world integration pending",
+      "gates": [
+        "G1-C",
+        "G2-C",
+        "G5-C",
+        "G7-C",
+        "G8-C"
+      ]
+    }
+  ]
+}

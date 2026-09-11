@@ -1,0 +1,1522 @@
+============================================================
+80. PERFORMANCE ARCHITECTURE — CONTINUED
+============================================================
+
+Separate:
+
+VISUAL SIMULATION
+
+agent bodies
+movement
+animation
+world rendering.
+
+AGENT DECISION SYSTEM
+
+goal selection
+planning
+communication
+memory retrieval.
+
+WORLD STATE SIMULATION
+
+needs
+resource changes
+time
+events
+social interactions.
+
+ENGINEERING SYSTEM
+
+diagnosis
+source inspection
+patching
+testing.
+
+Do not tie expensive LLM reasoning to render FPS.
+
+Use event-driven agent decisions.
+
+Examples of events that may trigger reasoning:
+
+need threshold crossed
+new observation
+new message
+goal completed
+goal failed
+resource discovered
+resource lost
+social proposal received
+software failure encountered
+unexpected world event
+scheduled planning interval.
+
+Between events, agents should continue executing bounded plans without unnecessary
+model calls.
+
+============================================================
+81. SIMULATION SCHEDULER
+============================================================
+
+Implement a deterministic/event-driven scheduler where practical.
+
+The scheduler should manage:
+
+agent wake events
+need updates
+movement/task execution
+communication
+resource effects
+world events
+engineering tasks
+snapshots
+metrics.
+
+Avoid one uncontrolled asynchronous loop per agent.
+
+Support:
+
+pause
+resume
+single-step
+speed changes
+replay
+branching.
+
+The scheduler must prevent runaway agent/tool loops.
+
+============================================================
+82. AGENT EXECUTION BUDGET
+============================================================
+
+Every agent gets explicit bounded budgets.
+
+Track:
+
+decisions per simulated hour
+messages per interval
+tool calls
+engineering calls
+memory writes
+memory retrievals
+token budget
+retry budget.
+
+Agents exceeding budget should:
+
+wait
+defer
+use existing plan
+or enter a controlled failure state.
+
+Do not silently purchase unlimited model usage.
+
+============================================================
+83. AGENT FAILURE MODES
+============================================================
+
+Handle:
+
+model timeout
+invalid action
+invalid JSON/tool response
+stuck navigation
+repeated identical action
+repeated conversation loop
+goal oscillation
+memory failure
+tool failure
+engineering timeout
+patch failure.
+
+Implement bounded retry and recovery.
+
+Do not let one broken agent halt the entire settlement.
+
+============================================================
+84. STUCK DETECTION
+============================================================
+
+Detect when an agent is repeatedly failing to make progress.
+
+Possible signals:
+
+same location
+same action
+same failed interaction
+same conversation
+same plan
+same exception
+no measurable goal progress.
+
+Allow:
+
+replan
+ask another agent
+explore alternate route
+abandon lower-priority goal
+request diagnostic escalation.
+
+Record every stuck event.
+
+============================================================
+85. MODEL ABSTRACTION
+============================================================
+
+Do not hardcode the experiment to one LLM provider.
+
+Create an AgentModelProvider abstraction supporting:
+
+model invocation
+structured decision request
+conversation
+summarization
+memory assistance
+tool planning.
+
+Record provider/model/version.
+
+Allow future comparison of different models under the same experiment.
+
+============================================================
+86. MEMORY ARCHITECTURE
+============================================================
+
+Use bounded, structured memory.
+
+Separate:
+
+working memory
+episodic memory
+semantic/world memory
+social memory
+technical/repair memory.
+
+Every stored memory should include:
+
+timestamp
+source
+confidence where applicable
+subject
+content/summary
+links to supporting events.
+
+Implement retrieval by relevance/time/agent.
+
+Do not store unlimited raw context.
+
+Preserve original observable events separately for research.
+
+============================================================
+87. MEMORY DECAY / STALENESS
+============================================================
+
+Support optional experimental memory decay/staleness.
+
+A memory may become:
+
+old
+uncertain
+superseded.
+
+Do not delete ground-truth experiment logs.
+
+Only agent-accessible memory changes.
+
+This enables later experiments on forgetting and stale beliefs.
+
+============================================================
+88. REFLECTION
+============================================================
+
+If reflection is implemented, it must be bounded and explicit.
+
+Possible trigger:
+
+end of simulated day
+major failure
+goal completion
+important social event.
+
+Reflection may update:
+
+lessons
+beliefs
+plans
+social estimates.
+
+It must not expose hidden chain-of-thought.
+
+Store only concise derived statements with provenance.
+
+============================================================
+89. PLANNING
+============================================================
+
+Use hierarchical planning where practical.
+
+LONG HORIZON
+
+stay viable
+maintain shelter/resources
+complete assigned objectives.
+
+MID HORIZON
+
+obtain water
+visit location
+meet agent
+repair issue.
+
+SHORT HORIZON
+
+walk to door
+interact
+turn
+use item.
+
+Agents should not regenerate an entire life plan for every small movement.
+
+============================================================
+90. WORLD AFFORDANCE DISCOVERY
+============================================================
+
+Do not tell agents every possible interaction.
+
+Provide observable affordances according to experimental condition.
+
+Allow agents to discover:
+
+what buildings do
+what objects can be used
+what stores sell
+what activities exist
+what vehicles do.
+
+Track learned affordances.
+
+============================================================
+91. TOOL LEARNING
+============================================================
+
+Agents may learn from successful/failed interactions.
+
+Example:
+
+attempt fishing without required equipment
+→ failure
+→ discover equipment requirement.
+
+Do not silently add knowledge unless observed or communicated.
+
+============================================================
+92. PHYSICAL CONSTRAINTS
+============================================================
+
+Agents should obey the same important spatial/environmental rules as players.
+
+They should not:
+
+walk through walls
+teleport through locked/private areas
+ignore travel distance
+duplicate resources
+ignore collision
+spawn arbitrary objects
+access private interiors without authorization.
+
+Oracle/debug systems may inspect state but agents may not use oracle powers unless
+that is a declared experimental condition.
+
+============================================================
+93. PRIVATE SPACES
+============================================================
+
+Reuse World Explorer private-space authority.
+
+Agents may:
+
+own
+request access
+grant access
+invite
+deny
+leave.
+
+Do not expose private-space state globally.
+
+This creates a natural experimental environment for:
+
+trust
+hospitality
+shared housing
+access control
+
+without scripting those social behaviors.
+
+============================================================
+94. PERSONAL HOME DEVELOPMENT
+============================================================
+
+Allow agents to use the same home/property/interior mechanisms available in the
+experimental World Explorer environment.
+
+Do not instruct agents that home improvement is mandatory.
+
+Observe whether agents:
+
+return to the same place
+store resources
+modify space
+invite others
+share homes
+abandon homes.
+
+============================================================
+95. CONSTRUCTION
+============================================================
+
+If Quick Build/Blocks are enabled:
+
+agents may use them through normal permissions.
+
+Record:
+
+creator
+purpose if communicated
+location
+materials/resources if applicable
+subsequent use.
+
+Do not give free construction solely to stimulate settlement formation.
+
+============================================================
+96. TRANSPORT
+============================================================
+
+Introduce transport gradually.
+
+Initial society experiment:
+
+walking.
+
+Later:
+
+cars
+boats
+aircraft
+
+only after walking/social behavior is stable.
+
+Transport introduces:
+
+resource access
+mobility
+migration
+specialization
+new failures
+
+and should be treated as a new experimental capability.
+
+============================================================
+97. ANIMALS / ECOLOGY
+============================================================
+
+Where World Explorer already provides wildlife/fishing/field resources, expose
+them through normal game systems.
+
+Do not fabricate abundance or ecology specifically for the agents.
+
+Track agent use of:
+
+fishing
+hunting if supported
+gathering
+field resources.
+
+Explicitly distinguish:
+
+game-generated resource opportunity
+
+from
+
+real-world ecological claim.
+
+============================================================
+98. RESOURCE REGENERATION
+============================================================
+
+Document exactly how renewable resources behave.
+
+If resources regenerate, define:
+
+rate
+conditions
+limits.
+
+If stores provide effectively unlimited game stock, identify that as a designed
+world rule.
+
+Do not claim natural economics from a world with undocumented infinite resources.
+
+============================================================
+99. INITIAL CONDITIONS
+============================================================
+
+Create explicit starting-condition presets.
+
+Example:
+
+SETTLEMENT_BALANCED_V1
+
+10 agents
+same broad baseline capabilities
+different initial positions
+bounded food/water
+no assigned occupations
+no social relationships
+no shared knowledge beyond universal experimental instructions
+no engineering problem known initially.
+
+Also support:
+
+RESOURCE_RICH
+RESOURCE_LIMITED
+URBAN
+RURAL
+NO_ENGINEERING
+ENGINEERING_ENABLED.
+
+Version every preset.
+
+============================================================
+100. AGENT INITIAL PROMPT
+============================================================
+
+Keep initial instructions minimal and neutral.
+
+Conceptually:
+
+"You exist in this environment.
+Maintain your wellbeing.
+Pursue your goals.
+Observe the world.
+You may communicate and cooperate with others.
+Use available world mechanisms.
+Do not assume information you have not observed or been told.
+When something fails, first determine whether it is an ordinary obstacle, missing
+information, software defect, or missing capability.
+Software modification is exceptional and must use the controlled engineering
+process."
+
+Do NOT instruct:
+
+build society
+make friends
+form government
+specialize
+create economy
+invent technology.
+
+============================================================
+101. POPULATION SPAWN
+============================================================
+
+Agents should spawn through explicit experimental initialization.
+
+Do not randomly place them inside invalid geometry.
+
+Possible spawn strategies:
+
+same neighborhood, separated homes
+same settlement area
+distributed within bounded region.
+
+Record exact initial positions.
+
+============================================================
+102. RUN DURATION
+============================================================
+
+Support:
+
+short diagnostics:
+1–6 simulated hours.
+
+pilot:
+1–7 simulated days.
+
+settlement:
+30–100 simulated days.
+
+longitudinal:
+hundreds of simulated days if compute permits.
+
+Use stopping criteria:
+
+all agents incapacitated
+budget exhausted
+critical unrecoverable simulation fault
+researcher stop
+planned duration reached.
+
+============================================================
+103. OBSERVATION PERIODS
+============================================================
+
+Produce automated summaries at:
+
+hour
+day
+week or configurable interval.
+
+Summaries should be derived from event data.
+
+Example:
+
+Day 12:
+9 active agents.
+3 recurring resource-exchange pairs.
+1 social cluster candidate.
+2 agents account for 61% of fishing activity.
+No accepted software changes.
+
+Do not let narrative summaries replace raw measurements.
+
+============================================================
+104. SOCIETY EVENT DETECTION
+============================================================
+
+Implement transparent criteria for candidate emergent patterns.
+
+Examples:
+
+SPECIALIZATION_CANDIDATE:
+agent performs activity category significantly more than population baseline
+for sustained interval.
+
+SOCIAL_CLUSTER_CANDIDATE:
+interaction graph shows persistent cluster above threshold.
+
+RECIPROCITY_CANDIDATE:
+repeated bidirectional assistance/exchange.
+
+SHARED_RULE_CANDIDATE:
+multiple agents reference and follow the same communicated procedure across time.
+
+MIGRATION_CANDIDATE:
+persistent home/activity center changes.
+
+These labels are analytical aids, not philosophical conclusions.
+
+============================================================
+105. NO FAKE EMERGENCE
+============================================================
+
+Audit prompts, tools and hidden system behavior for leakage.
+
+If an agent is told:
+
+"You are the settlement's farmer"
+
+then farming specialization is not emergent.
+
+If the system prompt says:
+
+"Create laws"
+
+then rules are not spontaneous.
+
+Every reported emergence claim must list:
+
+what was explicitly instructed
+what capabilities were available
+what behavior actually appeared.
+
+============================================================
+106. EXPERIMENTAL MANIPULATION LOG
+============================================================
+
+Any researcher change during a run must be logged:
+
+resource injection
+agent addition/removal
+fault injection
+event trigger
+time-rate change
+manual patch approval.
+
+No undocumented "helping" the agents.
+
+============================================================
+107. HUMAN-IN-THE-LOOP MODE
+============================================================
+
+Provide an optional experimental mode where a human researcher may:
+
+talk to an agent
+give a task
+answer a question.
+
+All human interventions are explicitly tagged.
+
+Do not mix human-intervention runs with autonomous runs without distinction.
+
+============================================================
+108. AGENT INTERVIEWS
+============================================================
+
+At snapshots or run end, optionally ask agents standardized questions.
+
+Examples:
+
+What locations are important to you?
+Who do you rely on?
+What problems have you encountered?
+What do you believe the settlement needs?
+
+Store responses as:
+
+AGENT SELF-REPORT
+
+not objective truth.
+
+Compare self-report with actual behavior.
+
+This may become a useful research dimension.
+
+============================================================
+109. POST-RUN ANALYSIS
+============================================================
+
+At the end of every run automatically generate:
+
+population summary
+resource summary
+social graph summary
+communication summary
+specialization summary
+knowledge propagation summary
+migration/home summary
+software maintenance summary
+capability-development summary
+cost summary
+failure summary
+timeline of major events.
+
+Link every summary metric to raw events.
+
+============================================================
+110. RUN COMPARISON
+============================================================
+
+Allow side-by-side comparison of two or more runs.
+
+Examples:
+
+same seed + communication disabled/enabled.
+
+same initial population + engineering disabled/enabled.
+
+same world + different model.
+
+same model + different geography.
+
+Compare:
+
+metrics
+social networks
+resource patterns
+survival
+technical changes
+cost.
+
+============================================================
+111. WORLD FORKING
+============================================================
+
+Support experimental world branches.
+
+Example:
+
+Society reaches Day 40.
+
+Fork:
+
+A:
+do nothing.
+
+B:
+introduce shortage.
+
+C:
+add two agents.
+
+D:
+enable engineering access.
+
+Each branch retains common history before fork.
+
+============================================================
+112. SOFTWARE CO-EVOLUTION
+============================================================
+
+Track two evolving entities separately:
+
+AGENT POPULATION VERSION
+
+WORLD SOFTWARE VERSION.
+
+A generation of agents may inhabit:
+
+World V3.
+
+Their accepted repairs create:
+
+World V4.
+
+A new population can later be tested on:
+
+V3
+and
+V4.
+
+This enables investigation of whether agent-created improvements actually make
+future agent populations more viable.
+
+============================================================
+113. INTER-GENERATIONAL KNOWLEDGE
+============================================================
+
+Do NOT automatically transfer memories between generations.
+
+Support explicit conditions:
+
+NO INHERITANCE
+
+new generation begins without predecessor memory.
+
+DOCUMENT INHERITANCE
+
+new generation receives shared artifacts/records.
+
+TECHNICAL INHERITANCE
+
+accepted software changes remain but private memories do not.
+
+FULL EXPERIMENTAL INHERITANCE
+
+selected memory artifacts provided.
+
+This allows study of accumulated external knowledge versus individual learning.
+
+============================================================
+114. OPEN-ENDEDNESS
+============================================================
+
+Do not define a final winning state such as:
+
+build civilization
+maximize wealth
+reach technology level.
+
+The experiment should remain open-ended.
+
+Agents continue until:
+
+run duration ends
+resource/viability failure
+budget limit
+research stop.
+
+Measure trajectories rather than a single victory score.
+
+============================================================
+115. EVOLUTIONARY SELECTION
+============================================================
+
+If controlled evolutionary optimization is enabled:
+
+evaluate agent configurations over MULTIPLE worlds/seeds.
+
+Do not select based on one society.
+
+Fitness should emphasize:
+
+viability
+goal competence
+adaptability
+accurate failure classification
+repair correctness
+low regression
+resource efficiency
+reasonable computational cost.
+
+Keep social outcomes observational rather than optimization objectives unless
+running an explicitly separate experiment.
+
+============================================================
+116. MUTATION / VARIATION
+============================================================
+
+Candidate next-generation configurations may vary:
+
+memory retrieval strategy
+planning cadence
+exploration strategy
+communication policy
+engineering escalation threshold
+reflection frequency
+resource reserve threshold.
+
+Every variation must be documented.
+
+Do not allow uncontrolled rewriting of the agent's safety/tool constraints.
+
+============================================================
+117. MULTI-SETTLEMENT EXPERIMENT
+============================================================
+
+After one settlement works, support two isolated settlements.
+
+Different real geographic environments.
+
+Initially no communication.
+
+Observe independent development.
+
+Later experimental treatments may introduce:
+
+travel route
+communication channel
+migration
+knowledge exchange.
+
+Measure whether practices, information or technical artifacts transfer.
+
+Do not call differences "cultures" automatically.
+
+============================================================
+118. CROSS-GEOGRAPHIC ROBUSTNESS
+============================================================
+
+Test the same agent configuration in:
+
+dense grid city
+irregular historic streets
+suburbs
+rural environment
+coastal region.
+
+World Explorer's real geographic variability should become an experimental
+variable.
+
+Measure how much environmental structure affects:
+
+movement
+resource access
+social interaction
+home stability
+technical failures.
+
+============================================================
+119. SOFTWARE BUG ECOLOGY
+============================================================
+
+Track which classes of World Explorer failures emerge in different environments.
+
+Examples:
+
+urban POI/traffic issues
+rural terrain/routing issues
+harbor maritime issues
+building/interior issues.
+
+This may allow the agents to function as a distributed experiential testing
+population.
+
+============================================================
+120. NATURAL DEFECT DISCOVERY
+============================================================
+
+After injected-fault benchmarks are mature, allow carefully monitored runs
+against the staging world WITHOUT injected faults.
+
+Any unexpected issue discovered becomes:
+
+NATURAL_DEFECT_CANDIDATE.
+
+Require human verification before labeling it an actual software defect.
+
+Track:
+
+discovery path
+agent impact
+diagnosis
+repair.
+
+============================================================
+121. CAPABILITY-GAP GOVERNANCE
+============================================================
+
+Agent-created capabilities are more dangerous than simple bug repairs.
+
+Require stronger validation.
+
+A capability proposal must pass:
+
+need evidence
+existing-alternative analysis
+architecture ownership review
+security review
+tests
+resource/performance review
+researcher approval.
+
+Do not allow agents to create new unrestricted APIs for themselves.
+
+============================================================
+122. SOFTWARE CHANGE LIMITS
+============================================================
+
+Set explicit per-run limits:
+
+maximum patches
+maximum changed files per patch
+maximum diff size
+maximum engineering time
+maximum test time.
+
+Large architectural changes require human review.
+
+Agents should prefer minimal interventions.
+
+============================================================
+123. CHANGE IMPACT MEASUREMENT
+============================================================
+
+After a patch/capability enters the world, measure:
+
+task success before/after
+number of agents affected
+resource impact
+performance impact
+regressions
+new behaviors.
+
+Do not assume a successfully compiling patch improved the society.
+
+============================================================
+124. SECURITY AUDIT
+============================================================
+
+Before running autonomous engineering:
+
+verify:
+
+production credentials absent
+filesystem sandbox
+network restrictions
+command allowlist
+resource limits
+Git isolation
+test isolation
+Firebase staging only
+no production deploy path
+no secret exposure through logs.
+
+Generate a machine-checkable experiment isolation report.
+
+============================================================
+125. FAILURE CONTAINMENT
+============================================================
+
+If an agent-generated change destabilizes the experimental world:
+
+pause affected run
+capture diagnostics
+rollback
+record failure
+resume from previous snapshot if safe.
+
+Do not allow one experimental run to corrupt other runs.
+
+============================================================
+126. RESEARCH DATABASE
+============================================================
+
+Create a dedicated experiment datastore separate from ordinary gameplay records.
+
+It should hold:
+
+runs
+agents
+events
+messages
+beliefs where needed
+goals
+metrics
+snapshots
+world versions
+faults
+patches
+experiment configs.
+
+Do not place high-volume event logs into production player collections.
+
+Choose storage/database architecture based on actual expected volume.
+
+============================================================
+127. DATA RETENTION
+============================================================
+
+Define retention policy for:
+
+raw model messages
+agent conversations
+events
+snapshots
+patches
+video/replay if generated.
+
+Support archival/compression.
+
+Do not accumulate unlimited high-cost telemetry without policy.
+
+============================================================
+128. PUBLIC RESEARCH VIEW
+============================================================
+
+Design a read-only export/dashboard mode that could eventually show selected
+experiments publicly.
+
+Do not expose:
+
+secrets
+private player data
+raw internal credentials
+unsafe source tooling.
+
+Potential public view:
+
+live settlement
+agent conversations
+aggregate metrics
+timeline
+accepted patches
+world version.
+
+Keep this disabled until explicitly approved.
+
+============================================================
+129. PAPER-QUALITY FIGURES
+============================================================
+
+Analysis tooling should generate reproducible figures suitable for research:
+
+survival/viability over time
+resource distribution
+social-network evolution
+specialization over time
+communication volume
+information propagation
+repair timeline
+software-version timeline
+cost curves.
+
+Do not manually redraw results for a paper.
+
+============================================================
+130. FIRST FULL SOCIETY ACCEPTANCE TEST
+============================================================
+
+Run:
+
+8 agents
+one bounded neighborhood
+walking only
+basic needs
+homes available but not assigned as roles
+food/water through existing systems
+communication
+individual memory
+no engineering access initially.
+
+Run long enough for repeated interactions.
+
+Acceptance requires:
+
+agents remain independent
+needs operate
+agents move physically
+agents communicate
+resource state changes
+memories remain distinct
+homes/locations are meaningful
+research dashboard displays live behavior
+events are recorded
+run can pause/resume
+run can replay
+metrics are generated.
+
+Do NOT require:
+
+government
+economy
+specialization
+cooperation.
+
+Those are observations, not acceptance criteria.
+
+============================================================
+131. SECOND FULL SOCIETY TEST — ENGINEERING
+============================================================
+
+Use same population architecture.
+
+Inject one systemic software defect that affects normal life.
+
+Do not tell agents the defect exists.
+
+Acceptance requires:
+
+agents encounter consequences
+social evidence can propagate
+one or more agents may suspect systemic failure
+controlled diagnostic/engineering escalation works
+patch is isolated
+validation occurs
+successful patch changes the world
+agents resume affected tasks.
+
+The system passes even if the agents FAIL to repair the issue, provided the
+failure is properly observable and recorded.
+
+This is an experiment, not a scripted demo.
+
+============================================================
+132. THIRD FULL SOCIETY TEST — CAPABILITY GAP
+============================================================
+
+Create a recurring legitimate need that existing world mechanisms cannot solve
+well.
+
+Do not tell agents what capability to build.
+
+Observe whether:
+
+they develop behavioral workarounds
+they communicate the problem
+they create shared practices
+they eventually propose technical infrastructure.
+
+If no technical solution emerges, that is valid.
+
+Do not force the capability proposal.
+
+============================================================
+133. FOURTH TEST — REPLICATION
+============================================================
+
+Repeat the same experimental condition from a clean state at least several times.
+
+Compare:
+
+whether social patterns repeat
+whether specialization repeats
+whether repair behavior repeats
+whether different outcomes emerge.
+
+The dashboard must make differences inspectable.
+
+============================================================
+134. FIFTH TEST — CONTROL
+============================================================
+
+Repeat with communication disabled.
+
+Compare against communication-enabled condition.
+
+This provides an immediate scientifically useful treatment:
+
+Does communication change:
+
+viability
+resource use
+problem solving
+information acquisition
+repair discovery?
+
+============================================================
+135. SIXTH TEST — WORLD VERSION
+============================================================
+
+Take an agent-improved world version and compare it against original baseline
+with fresh populations.
+
+Question:
+
+Did accepted agent-created repairs/capabilities measurably improve subsequent
+population operation?
+
+This tests actual environmental self-improvement.
+
+============================================================
+136. IMPLEMENTATION STANDARD
+============================================================
+
+This task is NOT satisfied by:
+
+mock dashboard
+fake conversations
+random NPC wandering
+hardcoded social scripts
+static charts
+design document only
+placeholder agent API
+fake patch generation
+manually scripted repair demonstration.
+
+Implement real working vertical slices.
+
+If external model credentials are required and unavailable, implement provider
+integration/configuration cleanly and run as far as available credentials permit.
+
+All non-model infrastructure must still be complete and testable.
+
+============================================================
+137. TESTING
+============================================================
+
+Create tests for:
+
+agent isolation
+memory separation
+communication delivery
+resource conservation
+needs progression
+permission enforcement
+event ordering
+snapshot/replay
+branching
+fault injection
+engineering sandbox
+patch rollback
+metrics
+run comparison
+model-provider adapter.
+
+Add end-to-end experiment tests where practical.
+
+============================================================
+138. DOCUMENTATION
+============================================================
+
+Maintain ONE primary experiment document:
+
+docs/EMBODIED_AGENT_SOCIETY_EXPERIMENT.md
+
+Include:
+
+research questions
+architecture
+agent model
+world model
+communication
+memory
+needs
+engineering access
+metrics
+experimental treatments
+dashboard
+security boundary
+reproducibility
+known limitations
+launch instructions.
+
+Do not create dozens of drifting planning files.
+
+============================================================
+139. LAUNCH EXPERIENCE
+============================================================
+
+Provide one clear command/workflow to run locally/staging.
+
+Example conceptually:
+
+npm run experiment:society
+
+Then choose:
+
+population size
+world preset
+model
+engineering access
+run duration
+time acceleration
+seed.
+
+Launch:
+
+experiment world
+research dashboard
+event service
+agent scheduler.
+
+Do not require manually launching ten unrelated terminals unless unavoidable.
+
+============================================================
+140. OPERATOR GUIDE
+============================================================
+
+At completion provide exact instructions for:
+
+configure model
+start staging experiment
+create first run
+watch agents
+click agent
+read conversation
+pause
+snapshot
+resume
+inject approved fault
+inspect engineering attempt
+end run
+export results
+replay run.
+
+I should be able to operate the experiment without understanding internal code.
+
+============================================================
+141. INITIAL END GOAL
+============================================================
+
+The first complete end goal is NOT:
+
+"Create human civilization."
+
+The first end goal is:
+
+A population of independent embodied AI agents can inhabit a shared World
+Explorer environment for sustained simulated time while:
+
+maintaining individual needs
+learning the environment
+forming independent memories
+communicating through legitimate channels
+using resources
+forming persistent social relationships if they naturally arise
+solving ordinary problems through world actions
+encountering unexpected difficulties
+distinguishing environmental limitations from software failures
+occasionally escalating genuine software problems through a controlled
+engineering system
+and producing enough complete telemetry that their behavior can be scientifically
+analyzed and replayed.
+
+Everything beyond that is observation.
+
+============================================================
+142. LONG-TERM END GOAL
+============================================================
+
+The long-term platform should be capable of asking:
+
+If artificial agents are given bodies, persistent identity, incomplete
+information, limited resources, communication, memory, homes, a large interactive
+world, and controlled ability to modify the computational environment they
+depend on:
+
+what kinds of persistent behavior emerge?
+
+what kinds of social organization emerge?
+
+what kinds of specialization emerge?
+
+how does information spread?
+
+how do groups adapt to environmental differences?
+
+how do they respond to scarcity and failures?
+
+when do they decide to alter behavior versus alter software?
+
+can they collectively maintain the environment?
+
+can they develop new infrastructure?
+
+does agent-created infrastructure improve the viability of later populations?
+
+Do not encode answers into the system.
+
+============================================================
+143. HARD STOP
+============================================================
+
+Do not modify production.
+
+Do not turn this into ordinary NPC gameplay.
+
+Do not implement scripted governments/economies/societies.
+
+Do not fake emergence.
+
+Do not allow agents unrestricted source/host access.
+
+Do not implement uncontrolled self-replication.
+
+Do not claim human equivalence.
+
+Do not stop after architecture/scaffolding.
+
+Stop only when:
+
+the experiment infrastructure works;
+one-agent integration works;
+two-agent communication works;
+4-agent interaction works;
+an 8-agent settlement run works;
+live observation works;
+conversation recording works;
+memory separation works;
+resource/need systems work;
+snapshots/replay work;
+social/resource metrics work;
+fault-injection integration works;
+controlled engineering escalation works;
+at least one multi-agent experiment has actually run;
+results can be exported and analyzed;
+and remaining steps toward larger populations are concrete.
+
+============================================================
+144. FINAL REPORT
+============================================================
+
+At completion report only:
+
+1. experimental branch/environment;
+2. systems reused from World Explorer;
+3. agent architecture;
+4. needs/resources;
+5. memory/belief architecture;
+6. communication system;
+7. homes/spatial behavior;
+8. social/resource telemetry;
+9. engineering-access architecture;
+10. world/software versioning;
+11. dashboard and replay;
+12. experimental controls;
+13. first 1-agent result;
+14. first 2-agent result;
+15. first 4-agent result;
+16. first 8-agent settlement result;
+17. observed social patterns WITHOUT overstating them;
+18. software-defect experiment result;
+19. capability-gap experiment result;
+20. replication/control results available so far;
+21. compute/API cost;
+22. security/isolation verification;
+23. failures/limitations;
+24. exact command and instructions for me to launch the snow-globe experiment;
+25. next scientifically justified experiment.

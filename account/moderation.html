@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>World Explorer Moderation Redirect</title>
+  <meta http-equiv="refresh" content="0; url=./admin.html?view=moderation">
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(180deg, #11233a, #05101d);
+      color: #edf6ff;
+      font-family: system-ui, sans-serif;
+    }
+
+    .card {
+      width: min(560px, 92vw);
+      padding: 24px;
+      border-radius: 20px;
+      border: 1px solid rgba(163, 197, 224, 0.2);
+      background: rgba(8, 22, 40, 0.9);
+      text-align: center;
+    }
+
+    a { color: #5ad0ff; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Moderation moved</h1>
+    <p>Moderation now lives inside the dedicated admin dashboard.</p>
+    <p><a href="./admin.html?view=moderation">Open the admin moderation workspace</a></p>
+  </div>
+  <script>
+    window.location.replace('./admin.html?view=moderation');
+  </script>
+</body>
+</html>

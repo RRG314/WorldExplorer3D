@@ -1,0 +1,455 @@
+@layer legacy {
+.universe-navigator {
+  position: fixed;
+  top: 92px;
+  right: 20px;
+  z-index: 10003;
+  width: min(360px, calc(100vw - 40px));
+  padding: 16px;
+  color: #eef6ff;
+  background: rgba(7, 12, 25, 0.96);
+  border: 1px solid rgba(122, 162, 218, 0.7);
+  border-radius: 8px;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.38);
+  font-family: Inter, sans-serif;
+}
+
+.universe-navigator[hidden] {
+  display: none;
+}
+
+.universe-heading {
+  position: sticky;
+  top: -16px;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -16px -16px 0;
+  padding: 16px 16px 10px;
+  background: rgba(7, 12, 25, 0.98);
+}
+
+.universe-kicker,
+.universe-field span {
+  color: #9cb4d5;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.universe-frame-name {
+  margin-top: 3px;
+  font-family: Orbitron, sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.universe-icon-button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  color: #dce9fb;
+  background: transparent;
+  border: 1px solid rgba(156, 180, 213, 0.45);
+  border-radius: 4px;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.universe-address {
+  margin: 10px 0 14px;
+  overflow-wrap: anywhere;
+  color: #83a7d6;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+}
+
+.universe-field {
+  display: grid;
+  gap: 6px;
+}
+
+.universe-field select {
+  width: 100%;
+  min-height: 38px;
+  padding: 7px 10px;
+  color: #eef6ff;
+  background: #111c31;
+  border: 1px solid #435d82;
+  border-radius: 5px;
+  font: 600 13px Inter, sans-serif;
+}
+
+.universe-destination-meta {
+  min-height: 18px;
+  margin: 8px 0 12px;
+  color: #b8c9e1;
+  font-size: 11px;
+}
+
+.universe-course-readout {
+  display: grid;
+  gap: 3px;
+  margin: 0 0 12px;
+  padding: 10px 11px;
+  background: rgba(19, 31, 52, 0.8);
+  border: 1px solid rgba(91, 123, 166, 0.58);
+  border-left: 3px solid #5b7ba6;
+  border-radius: 5px;
+}
+
+.universe-course-readout.has-course {
+  background: rgba(15, 58, 73, 0.82);
+  border-color: rgba(93, 225, 240, 0.7);
+  border-left-color: #6fe8ff;
+  box-shadow: inset 0 0 20px rgba(48, 188, 219, 0.08);
+}
+
+.universe-course-status {
+  color: #8ba5c8;
+  font: 700 9px Orbitron, sans-serif;
+  letter-spacing: 0.12em;
+}
+
+.universe-course-readout.has-course .universe-course-status {
+  color: #75ecff;
+}
+
+.universe-course-readout strong {
+  color: #f4f8ff;
+  font: 700 14px Inter, sans-serif;
+}
+
+.universe-course-readout small {
+  color: #aebfd5;
+  font: 500 10px/1.4 Inter, sans-serif;
+}
+
+.universe-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+
+.universe-return-actions {
+  grid-template-columns: 1fr 1fr;
+  margin-top: 7px;
+}
+
+.universe-action {
+  min-height: 36px;
+  padding: 8px 10px;
+  color: #eaf3ff;
+  background: #192640;
+  border: 1px solid #4e6c98;
+  border-radius: 5px;
+  font: 700 11px Inter, sans-serif;
+  cursor: pointer;
+}
+
+.universe-action.primary {
+  background: #315d9d;
+  border-color: #6696d8;
+}
+
+.universe-action.earth {
+  background: #185e53;
+  border-color: #43a995;
+}
+
+.universe-action:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
+.universe-action[hidden] {
+  display: none;
+}
+
+.universe-source {
+  display: inline-block;
+  margin-top: 12px;
+  color: #9ec5ff;
+  font-size: 11px;
+}
+
+.destination-mission-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 10020;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(1, 5, 14, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.destination-mission-panel[hidden] {
+  display: none;
+}
+
+.destination-mission-card {
+  width: min(680px, calc(100vw - 32px));
+  max-height: min(760px, calc(100vh - 32px));
+  overflow: auto;
+  padding: 22px;
+  color: #eef7ff;
+  background: linear-gradient(145deg, rgba(7, 20, 37, 0.98), rgba(10, 35, 48, 0.98));
+  border: 1px solid rgba(111, 232, 255, 0.72);
+  border-radius: 10px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.58), inset 0 0 38px rgba(57, 190, 214, 0.05);
+  font-family: Inter, sans-serif;
+}
+
+.destination-mission-card header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.destination-mission-card header span,
+.destination-mission-current span,
+.destination-mission-evidence span {
+  color: #73e7f6;
+  font: 700 9px Orbitron, sans-serif;
+  letter-spacing: 0.12em;
+}
+
+.destination-mission-card h2 {
+  margin: 5px 0 0;
+  font: 700 24px Orbitron, sans-serif;
+}
+
+.destination-mission-card > p {
+  margin: 16px 0;
+  color: #c9d8e7;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.destination-mission-evidence,
+.destination-mission-current {
+  display: grid;
+  gap: 5px;
+  margin: 12px 0;
+  padding: 12px 14px;
+  background: rgba(12, 50, 66, 0.62);
+  border: 1px solid rgba(99, 201, 222, 0.35);
+  border-radius: 7px;
+}
+
+.destination-mission-evidence strong,
+.destination-mission-current strong {
+  font-size: 13px;
+}
+
+.destination-mission-evidence small {
+  color: #aebfd0;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.destination-mission-card ol {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.destination-mission-card li {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 8px 10px;
+  color: #8193a8;
+  border: 1px solid rgba(121, 148, 179, 0.22);
+  border-radius: 6px;
+}
+
+.destination-mission-card li i {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.destination-mission-card li.current {
+  color: #eefcff;
+  background: rgba(29, 108, 129, 0.36);
+  border-color: rgba(111, 232, 255, 0.65);
+}
+
+.destination-mission-card li.complete {
+  color: #83e6a6;
+  border-color: rgba(87, 194, 126, 0.32);
+}
+
+.destination-mission-actions {
+  display: grid;
+}
+
+.universe-navigator.is-busy .universe-frame-name::after {
+  content: ' · TRANSIT';
+  color: #78c9ff;
+  font-size: 10px;
+}
+
+#universeToggle {
+  background: rgba(10, 18, 36, 0.92) !important;
+  border: 2px solid #7d9bd0 !important;
+  color: #fff;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font: 600 11px Orbitron, sans-serif;
+  cursor: pointer;
+}
+
+#universeToggle.has-course {
+  max-width: min(280px, 56vw);
+  overflow: hidden;
+  color: #8df2ff;
+  border-color: #6fe8ff !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.universe-course-cue {
+  position: fixed;
+  z-index: 10002;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(230px, calc(100vw - 36px));
+  padding: 7px 10px;
+  transform: translate(-50%, -50%);
+  color: #eafcff;
+  background: rgba(4, 16, 30, 0.88);
+  border: 1px solid rgba(111, 232, 255, 0.78);
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.34), 0 0 18px rgba(73, 213, 240, 0.12);
+  font-family: Inter, sans-serif;
+  pointer-events: none;
+  backdrop-filter: blur(7px);
+}
+
+.universe-course-cue[hidden] {
+  display: none;
+}
+
+.universe-course-cue-arrow {
+  color: #6fe8ff;
+  font-size: 16px;
+  line-height: 1;
+  transform: rotate(var(--course-cue-angle, 0deg));
+}
+
+.universe-course-cue-copy {
+  display: grid;
+  min-width: 0;
+}
+
+.universe-course-cue-copy strong {
+  color: #76efff;
+  font: 700 8px Orbitron, sans-serif;
+  letter-spacing: 0.12em;
+}
+
+.universe-course-cue-copy small {
+  overflow: hidden;
+  color: #fff;
+  font: 700 11px Inter, sans-serif;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.universe-course-cue.is-assisted {
+  border-color: rgba(104, 216, 192, 0.88);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.34), 0 0 20px rgba(104, 216, 192, 0.18);
+}
+
+.universe-course-cue.is-assisted .universe-course-cue-arrow,
+.universe-course-cue.is-assisted .universe-course-cue-copy strong {
+  color: #7af0c9;
+}
+
+.universe-course-cue.is-onscreen .universe-course-cue-arrow {
+  opacity: 0.55;
+  transform: none;
+}
+
+.solar-system-scale {
+  display: none;
+  position: fixed;
+  right: 20px;
+  bottom: 16px;
+  z-index: 10000;
+  width: 220px;
+  height: 130px;
+  overflow: hidden;
+  border: 1px solid rgba(122, 162, 218, 0.58);
+  border-radius: 5px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+}
+
+.solar-system-scale canvas {
+  display: block;
+  width: 220px;
+  height: 130px;
+}
+
+@media (max-width: 720px) {
+  .solar-system-scale {
+    display: none !important;
+  }
+
+  .universe-navigator {
+    top: auto;
+    bottom: 10px;
+    left: 12px;
+    right: auto;
+    width: calc(100vw - 24px);
+    max-height: min(72vh, 560px);
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+
+  .universe-return-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .universe-course-cue {
+    max-width: min(180px, calc(100vw - 28px));
+    padding: 6px 8px;
+  }
+
+  .destination-mission-panel {
+    align-items: end;
+    padding: 0;
+  }
+
+  .destination-mission-card {
+    width: 100vw;
+    max-height: 82vh;
+    padding: 18px;
+    border-radius: 10px 10px 0 0;
+  }
+
+  .destination-mission-card h2 {
+    font-size: 20px;
+  }
+}
+}

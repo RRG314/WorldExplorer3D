@@ -1,0 +1,1598 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1a1a2e">
+<title>World Explorer 3D</title>
+<script>
+if (location.protocol === 'file:') document.documentElement.classList.add('unsupported-file-launch');
+</script>
+<style>
+.unsupported-file-launch body>*:not(#fileLaunchError){display:none!important}
+#fileLaunchError{display:none;min-height:100vh;box-sizing:border-box;padding:48px 24px;background:#071821;color:#eef7f8;font:16px/1.55 Inter,system-ui,sans-serif}
+.unsupported-file-launch #fileLaunchError{display:grid!important;place-content:center;text-align:center}
+#fileLaunchError strong{font:700 24px/1.2 Poppins,system-ui,sans-serif}
+#fileLaunchError code{display:block;margin-top:14px;color:#7dd3fc}
+</style>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Orbitron:wght@500;700;900&family=Righteous&display=swap" rel="stylesheet">
+<script src="../js/firebase-project-config.js"></script>
+<script type="module" src="../js/site-analytics.js?v=1"></script>
+<style>@layer legacy, interface;</style>
+<link rel="stylesheet" href="styles/title-shell.css?v=95">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=124">
+<link rel="stylesheet" href="styles/block-builder.css?v=8">
+<link rel="stylesheet" href="styles/universe.css?v=9">
+<link rel="stylesheet" href="styles/fishing-game.css?v=6">
+<link rel="stylesheet" href="styles/interface-v4.css?v=30">
+<link rel="stylesheet" href="styles/start-hub.css?v=18">
+<link rel="stylesheet" href="styles/discovery.css?v=17">
+<link rel="stylesheet" href="styles/tutorial.css?v=15">
+<link rel="stylesheet" href="styles/ar.css?v=1">
+<link rel="stylesheet" href="styles/mobile-controls.css?v=2">
+<link rel="stylesheet" href="styles/map-explorer.css?v=4">
+<link rel="stylesheet" href="styles/accessibility.css?v=3">
+<link rel="stylesheet" href="styles/reality-capture.css?v=2">
+</head>
+<body>
+<a class="we3d-skip-link" href="#globeSelectorStartBtn">Skip to world controls</a>
+<div id="accessibilityAnnouncements" class="we3d-visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
+<div id="fileLaunchError" role="alert"><div><strong>World Explorer needs a local web server.</strong><code>npm run dev</code></div></div>
+<button id="appSignInBtn" class="auth-float-toggle" type="button" aria-expanded="false" aria-controls="authFloatPanel">Sign In / Sign Up</button>
+<aside id="authFloatPanel" class="auth-float-panel" hidden>
+  <div id="authFormBlock" class="auth-form-block">
+    <div class="auth-tabs">
+      <button id="authModeSignInBtn" class="auth-tab-btn active" type="button">Sign In</button>
+      <button id="authModeSignUpBtn" class="auth-tab-btn" type="button">Sign Up</button>
+    </div>
+    <div id="authDisplayNameRow" class="auth-row" hidden>
+      <label for="authDisplayNameInput">Display Name</label>
+      <input id="authDisplayNameInput" type="text" autocomplete="nickname" maxlength="60" placeholder="Explorer Name">
+    </div>
+    <div class="auth-row">
+      <label for="authEmailInput">Email</label>
+      <input id="authEmailInput" type="email" autocomplete="email" placeholder="you@example.com">
+    </div>
+    <div class="auth-row">
+      <label for="authPasswordInput">Password</label>
+      <input id="authPasswordInput" type="password" autocomplete="current-password" placeholder="At least 6 characters">
+    </div>
+    <div id="authConfirmRow" class="auth-row" hidden>
+      <label for="authConfirmPasswordInput">Confirm Password</label>
+      <input id="authConfirmPasswordInput" type="password" autocomplete="new-password" placeholder="Repeat password">
+    </div>
+    <div class="auth-actions">
+      <button id="authEmailSubmitBtn" class="auth-main-btn" type="button">Sign In With Email</button>
+      <button id="authGoogleBtn" class="auth-main-btn" type="button">Continue With Google</button>
+    </div>
+    <button id="authForgotBtn" class="auth-link-btn" type="button">Forgot password?</button>
+  </div>
+  <div id="authSignedInBlock" class="auth-signedin-block" hidden>
+    <div id="authUserSummary" class="auth-user-summary"></div>
+    <div class="auth-actions">
+      <button id="authAccountBtn" class="auth-main-btn" type="button">Open Account</button>
+      <button id="authSignOutBtn" class="auth-main-btn" type="button">Sign Out</button>
+    </div>
+  </div>
+  <div id="authPanelStatus"></div>
+  <p class="auth-hint">If login is disabled, enable Google and/or Email/Password in Firebase Console -> Authentication -> Sign-in method.</p>
+</aside>
+<aside id="proAccessPanel" class="pro-access-panel" hidden>
+  <div class="pro-access-head">
+    <div class="pro-access-title">OPTIONAL DONATIONS</div>
+    <div id="proAccessState" class="pro-access-state">Open Access</div>
+  </div>
+  <div class="pro-access-note">Core play, map access, and signed-in multiplayer stay free. Donations only support development and account recognition.</div>
+  <button id="upgradeFromAppBtn" class="pro-access-btn" type="button">Account & Donations</button>
+  <div id="proAccessStatus"></div>
+</aside>
+<div id="titleScreen">
+<div class="logo">WORLD EXPLORER</div>
+<div class="sub">Explore Any Place on Earth and Beyond</div>
+<button id="flowerChallengeToggleBtn" class="flowerChallengeToggleBtn" type="button" aria-label="Open Community Board" aria-controls="flowerChallengePanel" aria-expanded="false">◉ Community Board</button>
+<div class="title-main-row">
+<div class="menu-container">
+<div class="tab-nav">
+<button class="tab-btn active" data-tab="location">Location</button>
+<button class="tab-btn" data-tab="games">Games</button>
+<button class="tab-btn" data-tab="multiplayer">Multiplayer</button>
+<button class="tab-btn" data-tab="settings">Settings</button>
+<button class="tab-btn" data-tab="controls">Controls</button>
+</div>
+<div class="tab-content active" id="tab-location">
+<div class="launch-switch-row">
+<button class="launch-switch-btn active" id="earthLaunchToggle" data-launch="earth" type="button" disabled>🌍 Earth</button>
+<button class="launch-switch-btn" id="moonLaunchToggle" data-launch="moon" type="button" disabled>🌙 Moon</button>
+<button class="launch-switch-btn" id="marsLaunchToggle" data-launch="mars" type="button" disabled>🔴 Mars</button>
+<button class="launch-switch-btn" id="spaceLaunchToggle" data-launch="space" type="button" disabled>🚀 Space</button>
+<button class="launch-switch-btn" id="oceanLaunchToggle" data-launch="ocean" type="button" disabled>🌊 Ocean</button>
+</div>
+<div class="loc-grid custom-centered">
+<div class="loc custom" data-loc="custom"><div class="loc-name">🌍 Custom</div><div class="loc-region">Any Location</div></div>
+</div>
+<div class="title-location-actions">
+<div class="location-entry-pair" aria-label="Choose how to use your location">
+<button id="titleUseMyLocationBtn" class="title-use-location-btn location-entry-card" type="button">
+  <span class="location-entry-icon" aria-hidden="true">◎</span>
+  <span class="location-entry-copy"><strong data-location-entry-label>Current Location</strong><small>Explore here once</small></span>
+</button>
+<button id="titleLiveGpsBtn" class="title-live-gps-btn location-entry-card" type="button">
+  <span class="location-entry-icon" aria-hidden="true">⌖</span>
+  <span class="location-entry-copy"><strong data-location-entry-label>Live GPS</strong><small>Follow as I move</small></span>
+</button>
+</div>
+<div id="titleUseMyLocationStatus" class="title-location-status" aria-live="polite"></div>
+</div>
+<div id="customPanel">
+<div class="custom-title">🌍 Enter Any Location Worldwide</div>
+
+<div class="custom-row">
+<label>🔍 Search by Location Name</label>
+<div class="search-row">
+<input type="text" id="locationSearch" placeholder="Try: Seattle, Tokyo, Paris France">
+<button class="search-btn" id="locationSearchBtn">🔍</button>
+</div>
+<div id="locationSearchStatus" style="font-size:11px;margin-top:6px;min-height:16px;color:#6b7280">
+Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, TX"
+</div>
+</div>
+
+<div class="divider"><span>OR</span></div>
+
+<div class="custom-row">
+<label>📍 Enter Exact Coordinates</label>
+<div class="coords-row">
+<input type="number" id="customLat" placeholder="Latitude (e.g. 39.2904)" step="0.0001">
+<input type="number" id="customLon" placeholder="Longitude (e.g. -76.6122)" step="0.0001">
+</div>
+<div style="font-size:11px;margin-top:6px;color:#6b7280">Right-click on Google Maps and copy coordinates</div>
+</div>
+</div>
+<div class="loc-grid">
+<div class="loc sel" data-loc="baltimore"><div class="loc-name">Baltimore</div><div class="loc-region">Maryland, USA</div></div>
+<div class="loc" data-loc="hollywood"><div class="loc-name">Hollywood</div><div class="loc-region">California, USA</div></div>
+<div class="loc" data-loc="newyork"><div class="loc-name">New York</div><div class="loc-region">New York, USA</div></div>
+<div class="loc" data-loc="miami"><div class="loc-name">Miami</div><div class="loc-region">Florida, USA</div></div>
+<div class="loc" data-loc="tokyo"><div class="loc-name">Tokyo</div><div class="loc-region">Japan</div></div>
+<div class="loc" data-loc="monaco"><div class="loc-name">Monaco</div><div class="loc-region">Monte Carlo</div></div>
+<div class="loc" data-loc="nurburgring"><div class="loc-name">Nürburgring</div><div class="loc-region">Germany</div></div>
+<div class="loc" data-loc="lasvegas"><div class="loc-name">Las Vegas</div><div class="loc-region">Nevada, USA</div></div>
+<div class="loc" data-loc="london"><div class="loc-name">London</div><div class="loc-region">United Kingdom</div></div>
+<div class="loc" data-loc="paris"><div class="loc-name">Paris</div><div class="loc-region">France</div></div>
+<div class="loc" data-loc="dubai"><div class="loc-name">Dubai</div><div class="loc-region">UAE</div></div>
+<div class="loc" data-loc="sanfrancisco"><div class="loc-name">San Francisco</div><div class="loc-region">California, USA</div></div>
+<div class="loc" data-loc="losangeles"><div class="loc-name">Los Angeles</div><div class="loc-region">California, USA</div></div>
+<div class="loc" data-loc="chicago"><div class="loc-name">Chicago</div><div class="loc-region">Illinois, USA</div></div>
+<div class="loc" data-loc="seattle"><div class="loc-name">Seattle</div><div class="loc-region">Washington, USA</div></div>
+</div>
+</div>
+<div class="tab-content" id="tab-games">
+<div style="padding:8px 0">
+<div style="margin-bottom:24px">
+<div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin-bottom:12px;display:flex;align-items:center;gap:8px">
+🎮 Game Mode
+</div>
+<div class="mode-grid">
+<div class="mode" data-mode="deflock"><div class="mode-icon">📷</div><div><div class="mode-name">DeFlock Hunt</div><div class="mode-desc">Find publicly mapped virtual cameras and disable them inside the game. Physical infrastructure is never affected.</div></div><div class="mode-check">✓</div></div>
+<div class="mode" data-mode="livegps"><div class="mode-icon">📍</div><div><div class="mode-name">Live GPS Explore</div><div class="mode-desc">Walk through one loaded Earth location as you move in real life. Foreground use only; never use while driving.</div></div><div class="mode-check">✓</div></div>
+<div class="mode sel" data-mode="free"><div class="mode-icon">🚗</div><div><div class="mode-name">Free Roam</div><div class="mode-desc">Explore the city at your own pace</div></div><div class="mode-check">✓</div></div>
+<div class="mode" data-mode="trial"><div class="mode-icon">⏱️</div><div><div class="mode-name">Time Trial</div><div class="mode-desc">Race to the destination as fast as you can</div></div><div class="mode-check">✓</div></div>
+<div class="mode" data-mode="checkpoint"><div class="mode-icon">🏁</div><div><div class="mode-name">Checkpoints</div><div class="mode-desc">Collect all markers scattered across the map</div></div><div class="mode-check">✓</div></div>
+<div class="mode" data-mode="painttown"><div class="mode-icon">🟥</div><div><div class="mode-name">Paint the Town Red</div><div class="mode-desc">Use touch paint or paintball gun to claim buildings. Room rules can enforce roof-only or gun-only rounds.</div></div><div class="mode-check">✓</div></div>
+<div class="mode" data-mode="flower"><div class="mode-icon">🌹</div><div><div class="mode-name">Find the Flower</div><div class="mode-desc">Instantly start the red flower hunt and race for the fastest time.</div></div><div class="mode-check">✓</div></div>
+<div style="grid-column:1/-1;padding:12px 0;text-align:center;font-size:11px;color:#64748b;border-top:2px solid #e8eef5;margin-top:8px;">💡 Cycle through walking, the BMW, the plane, and the drone with <b>F</b>, or choose a mode directly from Travel</div>
+</div>
+</div>
+</div>
+</div>
+<div class="tab-content" id="tab-multiplayer">
+<div class="mp-card">
+<div class="mp-title">🌐 Explore Together</div>
+<div id="mpPlanState" class="mp-plan-state">Sign in to access multiplayer rooms.</div>
+<div class="mp-subtitle">Join With A Room Code</div>
+<div class="mp-row">
+<input id="mpTitleCodeInput" class="mp-input" type="text" maxlength="8" placeholder="Room code (AB12CD)">
+<button id="mpTitleJoinBtn" class="mp-btn primary" type="button">Join Room</button>
+</div>
+<div class="mp-status">Private rooms use an invite code. Public rooms can also be found by city below.</div>
+
+<div class="mp-subtitle">Create A Room At Your Selected Location</div>
+<div class="mp-row">
+<select id="mpTitleVisibilitySelect" class="mp-select" aria-label="Room visibility">
+<option value="private" selected>Private Room</option>
+<option value="public">Public Room</option>
+</select>
+<input id="mpTitleRoomNameInput" class="mp-input" type="text" maxlength="80" placeholder="Room name (optional)">
+<input id="mpTitleLocationTagInput" class="mp-input" type="text" maxlength="80" placeholder="City label for public discovery (optional for private rooms)">
+</div>
+<div class="mp-row">
+<button id="mpTitleCreateBtn" class="mp-btn primary" type="button">Create Room Here</button>
+<button id="mpTitlePanelBtn" class="mp-btn secondary" type="button">Open Active Room</button>
+<button id="mpTitleInviteBtn" class="mp-btn secondary" type="button">Copy Invite</button>
+<button id="mpTitleLeaveBtn" class="mp-btn secondary" type="button">Leave Room</button>
+</div>
+<div class="mp-row">
+<button id="mpTitleTrialBtn" class="mp-btn warn" type="button">Account / Sign In</button>
+</div>
+<div id="mpTitleStatus" class="mp-status"></div>
+
+<div class="mp-subtitle">My Rooms</div>
+<div id="mpOwnedRoomsStatus" class="mp-status">Rooms you create or join appear here so you can return any time. You can delete rooms you own.</div>
+<ul id="mpOwnedRoomsList" class="mp-room-list">
+<li class="mpRoomEmpty">Sign in to load your rooms.</li>
+</ul>
+
+<div class="mp-subtitle">Public Rooms Near A City</div>
+<div class="mp-row">
+<input id="mpBrowseCityInput" class="mp-input" type="text" maxlength="48" placeholder="City (e.g. Tokyo)">
+<button id="mpBrowseBtn" class="mp-btn secondary" type="button">Find Rooms</button>
+</div>
+<div id="mpBrowseStatus" class="mp-status">Browse room metadata only (no live presence stream).</div>
+<ul id="mpBrowseList" class="mp-room-list">
+<li class="mpRoomEmpty">Search a city to find public rooms.</li>
+</ul>
+
+<div class="mp-subtitle">Featured City</div>
+<div class="mp-row">
+<button id="mpFeaturedWeeklyBtn" class="mp-btn primary mpSmallBtn" type="button">Join Weekly City</button>
+<button id="mpFeaturedRefreshBtn" class="mp-btn secondary mpSmallBtn" type="button">Refresh Curated Rooms</button>
+</div>
+<div id="mpFeaturedWeeklyMeta" class="mp-status">Weekly city room rotates each week.</div>
+<ul id="mpFeaturedList" class="mp-room-list">
+<li class="mpRoomEmpty">Admin-curated public rooms will appear here.</li>
+</ul>
+
+<details class="mp-secondary-tools">
+<summary>Friends, invites, recent players, and leaderboard</summary>
+<div class="mp-subtitle">Friends</div>
+<div id="mpFriendsStatus" class="mp-status">Add friends by UID or from Recent Players to invite them fast.</div>
+<div class="mp-row">
+<input id="mpFriendUidInput" class="mp-input" type="text" maxlength="128" placeholder="Friend UID">
+<input id="mpFriendNameInput" class="mp-input" type="text" maxlength="48" placeholder="Display name (optional)">
+<button id="mpAddFriendBtn" class="mp-btn secondary" type="button">Add Friend</button>
+</div>
+<ul id="mpFriendsList" class="mp-room-list">
+<li class="mpRoomEmpty">No friends yet.</li>
+</ul>
+
+<div class="mp-subtitle">Recent Players</div>
+<ul id="mpRecentPlayersList" class="mp-room-list">
+<li class="mpRoomEmpty">Play with others to populate your recent list.</li>
+</ul>
+
+<div class="mp-subtitle">Incoming Invites</div>
+<ul id="mpInvitesList" class="mp-room-list">
+<li class="mpRoomEmpty">No incoming invites.</li>
+</ul>
+
+<div class="mp-subtitle">Community League · Global · All time</div>
+<ul id="mpLeaderboardList" class="mpFeedList">
+<li class="mpRoomEmpty">Loading public Community League results…</li>
+</ul>
+</details>
+</div>
+</div>
+<div class="tab-content" id="tab-settings">
+<div style="padding:8px 0">
+<div style="margin-bottom:24px">
+<div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin-bottom:12px;display:flex;align-items:center;gap:8px">
+Graphics
+</div>
+<div style="background:#f8fafc;border:2px solid #e2e8f0;border-radius:8px;padding:14px">
+<label style="display:block;font-size:12px;font-weight:600;color:#1e293b;margin-bottom:6px">Render Quality</label>
+<select id="renderQualitySelect" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;color:#1e293b;margin-bottom:10px">
+<option value="low">Low (mobile/performance)</option>
+<option value="med">Medium (balanced)</option>
+<option value="high">High (best visuals)</option>
+</select>
+<label style="display:flex;align-items:center;gap:10px;font-size:12px;color:#334155;margin-bottom:12px;cursor:pointer">
+<input type="checkbox" id="highQualityToggle" style="width:16px;height:16px;cursor:pointer">
+High Quality Boost (stronger shadows + car paint)
+</label>
+<label style="display:flex;align-items:center;gap:10px;font-size:12px;color:#334155;margin-bottom:12px;cursor:pointer">
+<input type="checkbox" id="ssaoToggle" style="width:16px;height:16px;cursor:pointer">
+High-only SSAO contact shadows
+</label>
+<div id="perfSettingsStatus" style="font-size:11px;color:#64748b;min-height:16px">
+Graphics changes apply to the current session.
+</div>
+</div>
+</div>
+<div style="margin-bottom:24px">
+<div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin-bottom:12px;display:flex;align-items:center;gap:8px">
+Optional Property Data
+</div>
+<div style="background:#f8fafc;border:2px solid #e2e8f0;border-radius:12px;padding:16px">
+<div hidden><input type="password" id="estatedKeyInput" autocomplete="off"></div>
+<div style="margin-bottom:16px">
+<label style="display:block;font-size:12px;font-weight:600;color:#1e293b;margin-bottom:6px">ATTOM API Key</label>
+<input type="password" id="attomKeyInput" autocomplete="off" placeholder="Enter your ATTOM API key" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;font-family:'Inter',sans-serif;color:#1e293b;margin-bottom:4px">
+<div style="font-size:10px;color:#64748b;margin-bottom:8px">
+Property records from your ATTOM account. <a href="https://api.developer.attomdata.com/docs" target="_blank" rel="noopener noreferrer" style="color:#667eea">ATTOM documentation</a>
+</div>
+</div>
+<div style="margin-bottom:12px">
+<label style="display:block;font-size:12px;font-weight:600;color:#1e293b;margin-bottom:6px">RentCast API Key</label>
+<input type="password" id="rentcastKeyInput" autocomplete="off" placeholder="Enter your RentCast API key" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;font-family:'Inter',sans-serif;color:#1e293b;margin-bottom:4px">
+<div style="font-size:10px;color:#64748b;margin-bottom:8px">
+Sale and rental listings from your RentCast account. <a href="https://developers.rentcast.io/reference/search-queries" target="_blank" rel="noopener noreferrer" style="color:#667eea">RentCast documentation</a>
+</div>
+</div>
+<button id="saveApiKey" style="background:#667eea;border:none;border-radius:8px;padding:10px 20px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;font-size:13px;transition:all 0.2s;width:100%">
+💾 Save All API Keys
+</button>
+</div>
+</div>
+<div>
+<div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin-bottom:12px;display:flex;align-items:center;gap:8px">
+How Connected Data Is Used
+</div>
+<div style="background:#f0f4ff;border:2px solid #c7d2fe;border-radius:12px;padding:16px;font-size:12px;color:#475569;line-height:1.6">
+<p style="margin:0 0 8px 0">Connected records appear under <strong>Home &amp; Property → Property Data</strong> as optional reference information.</p>
+<p style="margin:0 0 8px 0">Provider terms, coverage, and request limits depend on your own account. Keys are stored only in this browser.</p>
+<p style="margin:0">Outside data never creates game buildings, changes in-game home prices, or grants ownership.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="tab-content" id="tab-controls">
+<div class="ctrl-grid">
+<div class="ctrl-section">Driving</div>
+<div class="ctrl-row"><span class="ctrl-key">W / S</span><span class="ctrl-action">Accelerate / Brake &amp; Reverse</span></div>
+<div class="ctrl-row"><span class="ctrl-key">A / D</span><span class="ctrl-action">Steer</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Alternate drive controls</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Right Drag</span><span class="ctrl-action">Look Around</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Handbrake</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Ctrl</span><span class="ctrl-action">Boost</span></div>
+<div class="ctrl-section">Walking Mode</div>
+<div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Move / Strafe</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Alternate move / turn</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Jump</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Space at Wall</span><span class="ctrl-action">Climb / Wall Jump</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Shift</span><span class="ctrl-action">Run (2x speed)</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Drag World</span><span class="ctrl-action">Look Around (left or right mouse)</span></div>
+<div class="ctrl-section">World Interaction</div>
+<div class="ctrl-row"><span class="ctrl-key">E / Action</span><span class="ctrl-action">Use the visible nearby door, vehicle, person, or object</span></div>
+<div class="ctrl-row"><span class="ctrl-key">I</span><span class="ctrl-action">Open / close carried equipment</span></div>
+<div class="ctrl-row"><span class="ctrl-key">1–6</span><span class="ctrl-action">Quick-equip a carried item</span></div>
+<div class="ctrl-row"><span class="ctrl-key">V</span><span class="ctrl-action">Use equipped item</span></div>
+<div class="ctrl-row"><span class="ctrl-key">T</span><span class="ctrl-action">Take an available nearby item</span></div>
+<div class="ctrl-section">Drone Controls</div>
+<div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Fly Forward / Back / Turn</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Alternate flight controls</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Move Up</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Shift/Ctrl</span><span class="ctrl-action">Move Down</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Mouse</span><span class="ctrl-action">Look Around</span></div>
+<div class="ctrl-section">Personal Plane</div>
+<div class="ctrl-row"><span class="ctrl-key">W / S</span><span class="ctrl-action">Nose Down / Pull Up (Inverted)</span></div>
+<div class="ctrl-row"><span class="ctrl-key">A / D</span><span class="ctrl-action">Bank / Ground Steer</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Alternate flight controls</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Double-tap ← / →</span><span class="ctrl-action">Barrel Roll while airborne</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Space / Shift</span><span class="ctrl-action">Increase / Reduce Throttle</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Full Throttle</span><span class="ctrl-action">About 150 MPH; boarded aircraft differ</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Right Drag</span><span class="ctrl-action">Look Around</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Ctrl</span><span class="ctrl-action">Wheel Brake (Ground)</span></div>
+<div class="ctrl-row"><span class="ctrl-key">C</span><span class="ctrl-action">Chase / Cockpit / Overhead</span></div>
+<div class="ctrl-row"><span class="ctrl-key">P</span><span class="ctrl-action">Enter / Exit Personal Plane</span></div>
+<div class="ctrl-section">Camera & View</div>
+<div class="ctrl-row"><span class="ctrl-key">C</span><span class="ctrl-action">Cycle Camera (3rd/1st/Overhead)</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Q</span><span class="ctrl-action">Look Back while driving</span></div>
+<div class="ctrl-section">Mode Switching</div>
+<div class="ctrl-row"><span class="ctrl-key">F</span><span class="ctrl-action">Cycle Character → BMW → Plane → Drone</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Travel Menu</span><span class="ctrl-action">Choose Character / Car / Plane / Drone</span></div>
+<div class="ctrl-row"><span class="ctrl-key">P / G</span><span class="ctrl-action">Personal plane / boat shortcuts</span></div>
+<div class="ctrl-row"><span class="ctrl-key">B</span><span class="ctrl-action">Open / Close Build with Blocks</span></div>
+<div class="ctrl-section">Navigation & Map</div>
+<div class="ctrl-row"><span class="ctrl-key">M</span><span class="ctrl-action">Toggle Map</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Right Click on Map</span><span class="ctrl-action">Teleport to Location</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Left Click on Map</span><span class="ctrl-action">View Property/POI Info</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Shift + N</span><span class="ctrl-action">Next City (Teleport)</span></div>
+<div class="ctrl-section">Space Exploration</div>
+<div class="ctrl-row"><span class="ctrl-key">Click on Moon</span><span class="ctrl-action">Travel to Moon</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Click on Stars</span><span class="ctrl-action">View Constellation Info</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Click Apollo 11 Flag</span><span class="ctrl-action">View Mission Info (on Moon)</span></div>
+<div class="ctrl-section">Space Flight Controls</div>
+<div class="ctrl-row"><span class="ctrl-key">A/D or ←/→</span><span class="ctrl-action">Yaw Left/Right</span></div>
+<div class="ctrl-row"><span class="ctrl-key">W/S or ↑/↓</span><span class="ctrl-action">Pitch Up/Down</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Primary / Space</span><span class="ctrl-action">Thrust / Boost</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Modifier / Shift</span><span class="ctrl-action">Brake / Decelerate</span></div>
+<div class="ctrl-row"><span class="ctrl-key">LAND ON ... Button</span><span class="ctrl-action">Land when in range</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Click Planets/Asteroids/Galaxies</span><span class="ctrl-action">Inspect deep-space object info</span></div>
+<div class="ctrl-section">Gamepad</div>
+<div class="ctrl-row"><span class="ctrl-key">Left Stick</span><span class="ctrl-action">Move / steer / flight control</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Right Stick</span><span class="ctrl-action">Look around</span></div>
+<div class="ctrl-row"><span class="ctrl-key">A / X</span><span class="ctrl-action">Primary movement action / context action</span></div>
+<div class="ctrl-row"><span class="ctrl-key">D-pad Up / LB</span><span class="ctrl-action">Backpack / change camera</span></div>
+<div class="ctrl-row"><span class="ctrl-key">View / Menu</span><span class="ctrl-action">Map / pause</span></div>
+<div class="ctrl-section">Phone &amp; Tablet</div>
+<div class="ctrl-row"><span class="ctrl-key">Left Pad</span><span class="ctrl-action">Move; can swap sides in Mobile Controls</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Right Pad</span><span class="ctrl-action">Analog camera; sensitivity and recenter are adjustable</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Action Buttons</span><span class="ctrl-action">Change for walking, driving, flight, water, and Space</span></div>
+<div class="ctrl-section">Other</div>
+<div class="ctrl-row"><span class="ctrl-key">Connect Menu</span><span class="ctrl-action">Rooms, share tools, and memory markers</span></div>
+<div class="ctrl-row"><span class="ctrl-key">R</span><span class="ctrl-action">Record/Stop Track</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Esc</span><span class="ctrl-action">Pause</span></div>
+</div>
+</div>
+<div class="start-section"><button class="startBtn" id="startBtn" type="button" disabled aria-busy="true">EXPLORE</button></div>
+</div>
+<aside id="flowerChallengePanel" class="flowerChallengePanel">
+<div class="flowerChallengeHeader">
+<div class="flowerChallengeTitle">Community Board</div>
+<div id="gameLeaderboardBadge" class="flowerChallengeBadge">Flower Sprint</div>
+</div>
+<div class="flowerChallengeBody">
+<div id="gameLeaderboardHint" class="flowerChallengeHint">Fastest red-flower runs. Signed-in scores publish to the shared board.</div>
+<div id="gameLeaderboardScope" class="flowerLeaderboardScope">Global • All time</div>
+<div class="flowerChallengeLocation">Location: <b id="flowerChallengeLocation">Baltimore</b></div>
+<div class="flowerLeaderboardTabs">
+<button id="leaderboardTabFlower" class="flowerLeaderboardTab active" type="button">🌹 Flower</button>
+<button id="leaderboardTabPaintTown" class="flowerLeaderboardTab" type="button">🟥 Paint Town</button>
+<button id="leaderboardTabFishing" class="flowerLeaderboardTab" type="button">🎣 Fishing</button>
+<button id="leaderboardTabExplorer" class="flowerLeaderboardTab" type="button">◎ Community</button>
+<button id="leaderboardTabProperty" class="flowerLeaderboardTab" type="button">⌂ Property</button>
+<button id="leaderboardTabDeFlock" class="flowerLeaderboardTab" type="button">📷 DeFlock</button>
+</div>
+<div class="flowerChallengeRow">
+<input id="flowerPlayerName" class="flowerChallengeName" type="text" maxlength="24" placeholder="Player Name" value="Explorer">
+<button id="titleFindFlowerBtn" class="flowerChallengeBtn" type="button">Find Flower</button>
+<button id="titleFlowerRefreshBtn" class="flowerChallengeBtn refresh" type="button">Refresh</button>
+</div>
+<div id="flowerChallengeStatus" class="flowerChallengeStatus" role="status" aria-live="polite"></div>
+<ol id="flowerLeaderboardList" class="flowerLeaderboard">
+<li class="flowerLeaderboardEmpty">Loading leaderboard...</li>
+</ol>
+</div>
+</aside>
+</div>
+<div class="title-footer">
+<div class="title-share-row" aria-label="Share links">
+<button id="shareExperienceBtn" class="title-share-btn copy" type="button" aria-label="Copy Link" title="Copy Link">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 15l6-6"></path><path d="M7.5 18a3 3 0 0 1 0-4.2l2.1-2.1"></path><path d="M16.5 6a3 3 0 0 1 0 4.2l-2.1 2.1"></path></svg>
+</button>
+<button id="titleShareNative" class="title-share-btn native" type="button" aria-label="Share" title="Share">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11"></path><path d="M7.5 7.5L12 3l4.5 4.5"></path><path d="M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"></path></svg>
+</button>
+<button id="titleShareFacebook" class="title-share-btn facebook" type="button" aria-label="Share to Facebook" title="Facebook">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 21v-7h2.2l.3-2.7h-2.5v-1.7c0-.8.2-1.4 1.4-1.4H16V5.8c-.4-.1-1.2-.2-2.2-.2-2.2 0-3.7 1.3-3.7 3.8v2h-2.1V14h2.1v7h3.4z"></path></svg>
+</button>
+<button id="titleShareTwitter" class="title-share-btn twitter" type="button" aria-label="Share to X" title="X">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h3.9l3.4 4.9L15.7 4H20l-6.5 7.4L20.4 20h-3.9l-3.9-5.5L7.6 20H3.3l6.8-7.8z"></path></svg>
+</button>
+<button id="titleShareInstagram" class="title-share-btn instagram" type="button" aria-label="Instagram" title="Instagram">
+<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"></rect><circle cx="12" cy="12" r="3.5"></circle><circle cx="17.2" cy="6.8" r="1"></circle></svg>
+</button>
+<button id="titleShareText" class="title-share-btn text" type="button" aria-label="Text Message" title="Text">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H10l-4.5 3V17H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"></path></svg>
+</button>
+</div>
+<div id="shareExperienceStatus"></div>
+<div class="title-license">
+<a class="title-map-credit" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap contributors • ODbL</a>
+<span aria-hidden="true">•</span>
+<button id="dataLicensesBtn" class="title-legal-link" type="button" data-open-data-licenses>Data &amp; Licenses</button>
+<span aria-hidden="true">•</span>
+<a href="../about/" target="_blank" rel="noopener">About</a>
+<a href="../legal/terms" target="_blank" rel="noopener">Terms</a>
+<a href="../legal/privacy" target="_blank" rel="noopener">Privacy</a>
+<span>© 2026 Steven Reid</span>
+</div>
+</div>
+</div>
+<dialog id="dataLicensesDialog" class="data-licenses-dialog" aria-labelledby="dataLicensesTitle">
+  <div class="data-licenses-head">
+    <div>
+      <span class="data-licenses-kicker">World Explorer 3D</span>
+      <h2 id="dataLicensesTitle">Data, licenses &amp; credits</h2>
+    </div>
+    <button id="dataLicensesCloseBtn" type="button" aria-label="Close data and licenses">Close</button>
+  </div>
+  <p class="data-licenses-intro">World Explorer combines first-party game systems with attributed open data, public scientific sources, licensed software, and optional provider services. Provider coverage and availability vary.</p>
+  <div class="data-licenses-grid">
+    <section>
+      <h3>Maps &amp; Earth</h3>
+      <p><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap contributors</a> — ODbL 1.0. Includes mapped roads, buildings, water, places, and surveillance nodes.</p>
+      <p><a href="https://www.esri.com/en-us/legal/terms/full-master-agreement" target="_blank" rel="noopener noreferrer">Esri World Imagery</a> — interactive satellite basemap imagery with provider attribution shown in the globe selector.</p>
+      <p>ESA WorldCover 2021 / modified Copernicus Sentinel data — CC BY 4.0. GEBCO bathymetry — CC BY 4.0. Copernicus and USGS terrain artifacts retain source-specific notices.</p>
+    </section>
+    <section>
+      <h3>Live &amp; community feeds</h3>
+      <p>OpenSky Network and ADSB.lol aircraft observations; USGS earthquakes; CelesTrak orbital elements; Open-Meteo weather and marine models; NOAA CO-OPS observations and tide predictions.</p>
+      <p>Panoramax and KartaView street imagery is provided by their contributors under CC BY-SA 4.0.</p>
+    </section>
+    <section>
+      <h3>Software, fonts &amp; assets</h3>
+      <p>Three.js r128 — MIT License. Inter, Poppins, Orbitron, Righteous, Barlow, and Chakra Petch fonts — SIL Open Font License.</p>
+      <p>NASA, ESA, JPL-Caltech, USGS Astrogeology, LROC, Wikimedia contributors, ambientCG, and Poly Haven assets retain the credits and terms documented in the attribution index.</p>
+    </section>
+    <section>
+      <h3>Project terms</h3>
+      <p>World Explorer 3D is publicly viewable under its proprietary source-available license. Attribution alone does not grant permission to copy, publish, host, or redistribute the game. Third-party components and data remain under their original terms.</p>
+      <nav class="data-licenses-links" aria-label="Detailed legal and attribution documents">
+        <a href="https://github.com/RRG314/WorldExplorer3D/blob/main/ATTRIBUTION.md" target="_blank" rel="noopener noreferrer">Attribution index</a>
+        <a href="https://github.com/RRG314/WorldExplorer3D/blob/main/DATA_SOURCES.md" target="_blank" rel="noopener noreferrer">Data sources</a>
+        <a href="https://github.com/RRG314/WorldExplorer3D/blob/main/ACKNOWLEDGEMENTS.md" target="_blank" rel="noopener noreferrer">Acknowledgements</a>
+        <a href="https://github.com/RRG314/WorldExplorer3D/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">Project license</a>
+      </nav>
+      <button id="analyticsConsentManageBtn" class="analytics-consent-manage" type="button">Analytics preference</button>
+    </section>
+  </div>
+  <p class="data-licenses-note">Detailed asset-level credits are retained with the bundled model and texture records. This summary is informational and is not legal advice.</p>
+</dialog>
+<aside id="analyticsConsentBanner" class="analytics-consent-banner" hidden aria-hidden="true" aria-labelledby="analyticsConsentTitle">
+  <div>
+    <strong id="analyticsConsentTitle">Help improve World Explorer</strong>
+    <p>World Explorer uses standard Firebase Analytics to count visits and understand which parts of the game are used. You can switch to limited cookieless analytics at any time. If you are signed in, choosing standard analytics also helps count repeat play across devices. Advertising remains off, and exact GPS coordinates, room codes, messages, and other free-form text are never included.</p>
+    <a href="../legal/privacy" target="_blank" rel="noopener">Privacy details</a>
+  </div>
+  <div class="analytics-consent-actions">
+    <button id="analyticsConsentDenyBtn" class="secondary" type="button">Use limited analytics</button>
+    <button id="analyticsConsentAllowBtn" type="button">Keep standard analytics</button>
+  </div>
+</aside>
+<div id="globeSelectorScreen" aria-hidden="true">
+<div class="globe-selector-shell">
+<div class="globe-selector-brand" aria-label="World Explorer 3D"><span class="globe-brand-mark" aria-hidden="true">◎</span>WORLD EXPLORER <strong>3D</strong></div>
+<nav class="globe-app-rail" aria-label="Main sections">
+  <button class="active" type="button" data-globe-destination="location"><span>◎</span>Explore</button>
+  <button type="button" data-globe-destination="games"><span>⌖</span>Activities</button>
+  <button type="button" data-globe-destination="multiplayer"><span>♙</span>Multiplayer</button>
+  <button type="button" data-globe-destination="live-earth"><span>⌁</span>Live Data</button>
+  <button type="button" data-globe-destination="library"><span>▥</span>My Places</button>
+  <button type="button" data-globe-destination="controls"><span>⌨</span>Quick Start</button>
+</nav>
+<div class="globe-selector-top">
+<div class="globe-hub-search">
+<span aria-hidden="true">⌕</span>
+<input id="globeLocationSearch" type="text" placeholder="Search location or enter coordinates" aria-label="Search location or enter coordinates">
+<button id="globeLocationSearchBtn" type="button">Search</button>
+</div>
+<div class="globe-hub-tools" aria-label="Account and application tools">
+<button id="globeHubShareBtn" type="button" title="Share World Explorer" aria-label="Share World Explorer">↗</button>
+<button id="globeHubThemeBtn" type="button" title="Switch to light appearance" aria-label="Switch to light appearance" aria-pressed="false">☼</button>
+<button type="button" data-globe-destination="settings" title="Settings" aria-label="Open settings">⚙</button>
+<button type="button" data-globe-destination="controls" title="Controls" aria-label="Open controls">?</button>
+<button id="globeHubFullscreenBtn" type="button" title="Fullscreen" aria-label="Toggle fullscreen">⛶</button>
+</div>
+</div>
+<div class="globe-selector-side">
+<div class="globe-location-entry-pair" aria-label="Choose how to use your location">
+  <button id="globeSelectorLocateBtn" class="globe-location-entry-card globe-location-current" type="button">
+    <span class="location-entry-icon" aria-hidden="true">◎</span>
+    <span class="location-entry-copy"><strong data-location-entry-label>Current Location</strong><small>Explore here once</small></span>
+  </button>
+  <button id="globeSelectorLiveGpsBtn" class="globe-location-entry-card globe-selector-live-gps-btn" type="button">
+    <span class="location-entry-icon" aria-hidden="true">⌖</span>
+    <span class="location-entry-copy"><strong data-location-entry-label>Live GPS</strong><small>Follow as I move</small></span>
+  </button>
+</div>
+<div class="globe-mobile-search">
+  <input id="globeMobileLocationSearch" type="text" placeholder="Search city or place" aria-label="Search city or place">
+  <button id="globeMobileLocationSearchBtn" type="button">Search</button>
+</div>
+<div class="globe-selector-stat">
+<div class="globe-selector-stat-label">Selected Coordinates</div>
+<div id="globeSelectorLatLon" class="globe-selector-stat-value">No point selected</div>
+<div id="globeSelectorPlace" class="globe-selector-stat-label" style="margin-top:4px">Click the globe to choose a location.</div>
+<button id="globeSaveFavoriteBtn" class="globe-save-favorite" type="button" title="Add selected place to My Places" aria-label="Add selected place to My Places" disabled>☆</button>
+</div>
+<div class="globe-selector-actions">
+<button id="globeSelectorBackBtn" class="globe-selector-action-btn" type="button">Close</button>
+<button id="globeSelectorStartBtn" class="globe-selector-action-btn" type="button">Explore</button>
+</div>
+<div class="globe-selector-mode-tabs" role="tablist" aria-label="Globe selector mode">
+<button id="globeSelectorExploreModeBtn" class="globe-selector-mode-tab active" type="button">Choose Location</button>
+<button id="globeSelectorLiveEarthModeBtn" class="globe-selector-mode-tab" type="button">Live Earth</button>
+</div>
+<div id="globeSelectorExplorePanel" class="globe-selector-mode-panel active">
+<div id="globeLocationSearchStatus" style="font-size:11px;min-height:14px;color:#64748b">Search for a place or choose one from the globe.</div>
+<div id="globeLocationSearchResults" class="globe-location-search-results" role="listbox" aria-label="Place search results" hidden></div>
+<div class="globe-selector-field-label">Manual Coordinates</div>
+<div class="globe-selector-row globe-selector-coordinate-row">
+<input id="globeCustomLat" type="number" step="0.0001" placeholder="Latitude">
+<input id="globeCustomLon" type="number" step="0.0001" placeholder="Longitude">
+</div>
+<div class="globe-selector-city-tabs" role="tablist" aria-label="City lists">
+<button id="globeNearbyTabBtn" class="globe-selector-city-tab active" type="button" data-city-tab="nearby">Nearby</button>
+<button id="globeFavoritesTabBtn" class="globe-selector-city-tab" type="button" data-city-tab="favorites">Featured Cities</button>
+</div>
+<div id="globeCityListHint" class="globe-selector-stat-label">Pick a point to see nearby cities.</div>
+<ul id="globeCityList" class="globe-selector-city-list">
+  <li class="globe-selector-city-empty">Pick a point on the globe to see nearby cities.</li>
+</ul>
+</div>
+<div id="globeSelectorLiveEarthPanel" class="globe-selector-mode-panel" hidden>
+<div class="globe-selector-live-header">
+<div class="globe-selector-live-title">Live Earth</div>
+<button id="globeLiveEarthRefreshBtn" class="globe-selector-live-refresh" type="button">Refresh</button>
+</div>
+<div id="globeLiveEarthStatus" class="globe-selector-live-status">Live feeds are cached and refreshed only when needed.</div>
+<div id="globeLiveEarthCategoryChips" class="globe-selector-live-chips"></div>
+<div id="globeLiveEarthLayerList" class="globe-selector-live-layer-list"></div>
+<div id="globeLiveEarthDetails" class="globe-selector-live-details" aria-live="polite">
+  <div class="globe-selector-live-loading">Loading working Live Earth layers...</div>
+</div>
+</div>
+<nav class="globe-legal-strip" aria-label="Data and legal information">
+  <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap contributors · ODbL</a>
+  <button type="button" data-open-data-licenses>Data &amp; Licenses</button>
+  <a href="../legal/privacy" target="_blank" rel="noopener">Privacy</a>
+  <a href="../legal/terms" target="_blank" rel="noopener">Terms</a>
+</nav>
+</div>
+<div class="globe-selector-stage">
+<canvas id="globeSelectorCanvas"></canvas>
+<div class="globe-selector-basemap-controls" role="group" aria-label="Globe map style">
+  <button id="globeSelectorMapBasemapBtn" type="button" aria-pressed="false">Map</button>
+  <button id="globeSelectorSatelliteBasemapBtn" class="active" type="button" aria-pressed="true">Satellite</button>
+</div>
+<div class="globe-selector-zoom-controls" role="group" aria-label="Globe zoom controls">
+  <button id="globeSelectorZoomInBtn" type="button" aria-label="Zoom in">+</button>
+  <button id="globeSelectorZoomOutBtn" type="button" aria-label="Zoom out">−</button>
+  <output id="globeSelectorScaleReadout" aria-live="polite">Global view</output>
+</div>
+<a id="globeSelectorBasemapAttribution" class="globe-selector-basemap-attribution" href="https://www.esri.com/en-us/legal/terms/full-master-agreement" target="_blank" rel="noopener noreferrer">Imagery © Esri and contributors</a>
+<div class="globe-selector-hint">Drag to rotate · Scroll to zoom · Tap/Click to pick</div>
+</div>
+<div class="globe-destination-bar" aria-label="World destinations">
+  <button id="globeSelectorEarthBtn" class="active" type="button" title="Explore Earth" aria-label="Explore Earth"><span class="destination-thumb earth" aria-hidden="true"></span></button>
+  <button id="globeSelectorMoonBtn" class="globe-selector-shortcut" type="button" title="Explore the Moon" aria-label="Explore the Moon"><span class="destination-thumb moon" aria-hidden="true"></span></button>
+  <button id="globeSelectorMarsBtn" type="button" title="Explore Mars" aria-label="Explore Mars"><span class="destination-thumb mars" aria-hidden="true"></span></button>
+  <button id="globeSelectorSpaceBtn" class="globe-selector-shortcut" type="button" title="Explore space" aria-label="Explore space"><span class="destination-thumb space" aria-hidden="true"></span></button>
+  <button id="globeSelectorOceanBtn" type="button" title="Explore underwater at the selected coordinates" aria-label="Explore underwater at the selected coordinates"><span class="destination-thumb ocean" aria-hidden="true"></span></button>
+</div>
+<section id="globeHubOverlay" class="globe-hub-overlay" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="globeHubOverlayTitle" tabindex="-1">
+  <header class="globe-hub-overlay-header">
+    <div>
+      <span>World Explorer 3D</span>
+      <h2 id="globeHubOverlayTitle">My Places</h2>
+    </div>
+    <button id="globeHubOverlayCloseBtn" type="button" aria-label="Return to globe">×</button>
+  </header>
+  <div id="globeHubPanelHost" class="globe-hub-panel-host"></div>
+  <div id="globeHubFooterHost" class="globe-hub-footer-host"></div>
+</section>
+</div>
+</div>
+<div id="liveEarthLocalPanel" aria-live="polite">
+<div id="liveEarthLocalTitle" class="live-earth-local-title"></div>
+<div id="liveEarthLocalMeta" class="live-earth-local-meta"></div>
+<div class="live-earth-local-actions">
+<button id="liveEarthDismissBtn" class="live-earth-local-btn secondary" type="button">Dismiss</button>
+<button id="liveEarthReplayBtn" class="live-earth-local-btn primary" type="button">Replay Shake</button>
+</div>
+</div>
+<div id="hud"><div class="hud-box" id="hudBox">
+<button id="hudToggleBtn" type="button" aria-label="Collapse HUD" aria-expanded="true">-</button>
+<div id="hudHeader">
+<div id="hudSpeedBlock">
+<div id="speed">0</div>
+<div class="hud-label"><span id="speedUnitLabel">MPH</span> <span style="margin-left:6px"><span id="limitLabel">LIMIT</span> <span id="limit">--</span></span></div>
+</div>
+<div id="weatherPanel">
+<div id="weatherLine"></div>
+<div id="weatherTimeLine"></div>
+<div id="weatherMetaLine"></div>
+</div>
+</div>
+<div id="hudClockDisplay"></div>
+<div id="hudDetails">
+<div id="conditionBar" role="progressbar" aria-label="Explorer health" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" title="Explorer health · 100%"><div id="conditionFill" data-state="healthy"></div></div>
+<div id="street">Loading...</div>
+<div id="locationLine"></div>
+<div class="indicators"><span class="ind" id="indBrake">BRK</span><span class="ind" id="indBoost">BOOST</span><span class="ind" id="indDrift">DRIFT</span></div>
+</div>
+</div></div>
+<div id="coords"><span id="coordsText">--</span><a id="coordsOsmLink" data-osm-location-link href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" title="Edit this location in OpenStreetMap">OSM</a></div>
+<div id="interiorPrompt" aria-live="polite"></div>
+<div id="boatPrompt" aria-live="polite"></div>
+<div id="discoveryContextPrompt" aria-live="polite"><span id="discoveryContextText">Explore what is possible here.</span><button id="discoveryContextOpenBtn" type="button">Explore</button></div>
+<button id="discoveryQuickToolBtn" type="button" aria-controls="discoveryPanel" aria-expanded="false"><span>⌁</span><strong>Resume Field Activity</strong><span id="discoveryQuickSignal">Ready</span></button>
+<aside id="currentJourneyCard" role="status" aria-label="Current journey" aria-live="polite" aria-atomic="true" hidden>
+  <span class="currentJourneyMark" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="m15.8 8.2-2.1 5.5-5.5 2.1 2.1-5.5 5.5-2.1Z"></path></svg></span>
+  <div class="currentJourneyCopy"><span id="currentJourneyEyebrow">CURRENT JOURNEY</span><strong id="currentJourneyTitle">Explore this place</strong><small id="currentJourneyDetail">Choose something nearby and begin when you are ready.</small></div>
+  <button id="currentJourneyAction" type="button">Open</button>
+  <button id="currentJourneyDismiss" type="button" aria-label="Dismiss this notice" title="Dismiss">×</button>
+</aside>
+<aside id="discoveryPanel" aria-label="Explorer fieldwork" aria-hidden="true">
+  <header class="discoveryHead">
+    <div class="discoveryIdentity"><span class="discoveryMark" aria-hidden="true">⌖</span><div><span class="discoveryEyebrow">Explorer Fieldwork</span><strong id="discoveryPanelTitle">Today</strong></div></div>
+    <div class="discoveryHeadActions"><button id="discoveryProfileBtn" class="discoveryProfileBtn" type="button" aria-label="Open Explorer Profile" aria-pressed="false"><span id="discoveryProfileRank">Trailhead</span><b id="discoveryProfilePoints">0</b></button><button id="discoveryHelpBtn" type="button" aria-label="Show help for this section">?</button><button id="discoveryCloseBtn" type="button" aria-label="Minimize fieldwork" title="Minimize during play">—</button></div>
+  </header>
+  <div class="discoveryWorkspace">
+    <nav class="discoveryTabs" aria-label="Explorer fieldwork sections">
+      <button class="discoveryTab active" data-discovery-tab="today" type="button"><span>⌖</span>Today</button>
+      <button class="discoveryTab" data-discovery-tab="journal" type="button"><span>≡</span>Journal</button>
+      <button class="discoveryTab" data-discovery-tab="guide" type="button"><span>▤</span>Guide</button>
+      <button class="discoveryTab discoveryPackDestination" data-discovery-destination="pack" type="button"><span>▣</span>Backpack</button>
+    </nav>
+    <div class="discoveryContent">
+      <div id="discoverySectionTutorial" class="discoverySectionTutorial" hidden role="dialog" aria-modal="false" aria-labelledby="discoverySectionTutorialTitle"><strong id="discoverySectionTutorialTitle">Explorer guide</strong><ol id="discoverySectionTutorialSteps"></ol><button id="discoverySectionTutorialDoneBtn" type="button">Understood</button></div>
+      <section class="discoveryPane active" data-discovery-pane="today">
+        <div class="discoveryModeNote"><b>YOUR NEXT STEP</b><span>Choose one activity, then return to the world. The active tool and nearby cues will guide you.</span></div>
+        <button id="discoveryOpenBackpackTodayBtn" class="discoveryBackpackEntry" type="button"><span>▣</span><strong>Open Backpack</strong><small>Tools · quick slots · finds</small></button>
+        <div id="discoveryFieldSession" class="discoveryFieldSession" hidden aria-live="polite"></div>
+        <div id="discoveryResultCard" class="discoveryResultCard" hidden aria-live="polite"></div>
+        <div class="discoverySectionHead"><span>CHOOSE AN ACTIVITY</span><small>BEST LOCAL FIT FIRST</small></div>
+        <div id="discoveryActionList" class="discoveryActionList" aria-label="Available activities"></div>
+        <div id="discoveryTutorial" class="discoveryTutorial" hidden><strong id="discoveryTutorialTitle">Tool guide</strong><ol id="discoveryTutorialSteps"></ol><button id="discoveryTutorialDoneBtn" type="button">Understood</button></div>
+        <div id="discoveryInspection" class="discoveryInspection" hidden></div>
+        <div class="discoveryOperation">
+          <div class="discoveryOperationHead"><span id="discoveryPhase">Ready</span><span id="discoveryBearing">No signal</span></div>
+          <div class="discoveryMeter"><i id="discoverySignalFill"></i></div>
+          <div class="discoveryReadout"><span>DISTANCE<strong id="discoveryDistance">—</strong></span><span>CLASSIFICATION<strong id="discoveryClassification">Unknown</strong></span></div>
+          <div id="discoveryMessage" class="discoveryMessage">Sweep a suitable area to begin.</div>
+          <div id="discoveryCharacterAssist" class="discoveryCharacterAssist" hidden></div>
+        </div>
+        <div class="discoverySafety"><b>EXPLORE RESPONSIBLY</b><span>Activities are virtual and do not grant access, collecting, or excavation permission in the real world.</span></div>
+        <button id="discoveryArChallengeBtn" class="discoveryArContextAction" type="button" hidden><span>AR FIELD CHALLENGE</span><strong>Photograph virtual waterfowl</strong></button>
+        <div class="discoveryActions"><button id="discoverySecondaryBtn" type="button">Close</button><button id="discoveryPrimaryBtn" class="primary" type="button">Start Sweep</button></div>
+        <details class="discoveryTodayRoute"><summary><span>Today's route</span><small id="discoveryExpeditionMode">Three nearby field stops</small></summary><div id="discoveryExpeditionList" class="discoveryExpeditionList"></div></details>
+        <details class="discoveryTodayDetails"><summary>Goals and Expeditions</summary><div id="discoveryRankSummary" class="discoveryRankSummary"><span>EXPLORER RANK</span><strong>Trailhead</strong><small>Build records to reveal follow-up opportunities.</small></div><div id="discoveryGoal" class="discoveryGoal" aria-live="polite"></div><div class="discoverySubsection discoveryRetentionSection"><h3>Field Rhythm</h3><p>Daily, weekly, and seasonal goals build on your permanent Journal. Missed days never remove progress.</p><div id="discoveryRetentionDashboard" class="discoveryRetentionDashboard"></div></div></details>
+      </section>
+      <section class="discoveryPane" data-discovery-pane="journal">
+        <div class="discoverySectionHead"><span>JOURNAL</span><small>YOUR STORY</small></div>
+        <div class="discoveryModeNote"><b>MEMORIES</b><span>Fieldwork, games, making, travel, rooms, and companions appear here in time order.</span></div>
+        <div class="discoveryJournalFilters"><select id="discoveryJournalCategory" aria-label="Filter Journal by Explorer path"><option value="all">All paths</option><option value="field">Fieldwork</option><option value="activity">Games</option><option value="creation">Making</option><option value="travel">Travel</option><option value="community">Community</option><option value="companion">Companions</option></select><select id="discoveryJournalRegion" aria-label="Filter Journal by region"><option value="all">All regions</option></select></div><div id="discoveryJournalList" class="discoveryList"></div>
+        <details class="discoveryJournalPlaces"><summary>Visited places</summary><p>Places are part of your story, not a separate collection.</p><div id="discoveryCollectionList" class="discoveryList"></div></details>
+      </section>
+      <section class="discoveryPane" data-discovery-pane="guide">
+        <div class="discoverySectionHead"><span>FIELD GUIDE</span><small>WHAT YOU HAVE LEARNED</small></div>
+        <div class="discoveryGuideControls"><input id="discoveryGuideSearch" type="search" placeholder="Search your Field Guide" aria-label="Search your Field Guide"><select id="discoveryGuideScope" aria-label="Choose Field Guide scope"><option value="current">Current region</option><option value="world">World Guide</option></select><select id="discoveryGuideCategory" aria-label="Filter Field Guide category"><option value="all">All categories</option><option value="wildlife">Wildlife</option><option value="plants">Plants &amp; Fungi</option><option value="geology">Geology</option><option value="fossils">Fossils</option><option value="places">Places &amp; History</option><option value="ocean">Ocean</option></select><button id="discoveryGuideHelpBtn" type="button">How This Works</button></div>
+        <div id="discoveryGuideHelp" class="discoveryGuideHelp" hidden><h3>How the Field Guide works</h3><p>The Guide is an identification index, not an inventory. A documented entry shows what you identified, how many times you observed it, and the regions where you recorded evidence.</p><dl><div><dt>Reference image</dt><dd>A real identification photograph where licensed imagery is available; it is not proof that the subject exists at the exact selected point.</dd></div><div><dt>Field lead</dt><dd>A field lead uses broad habitat and season information. It does not report a nearby animal.</dd></div><div><dt>Backpack</dt><dd>A virtual specimen, find, catch trophy, or created item enters your Backpack only when you acquire it.</dd></div><div><dt>Rarity</dt><dd>How often an opportunity appears in the game, not real-world conservation status.</dd></div><div><dt>Region progress</dt><dd>Credit for new identifications and new-region evidence. Repeating the same entry in the same region may add an observation without rank credit.</dd></div><div><dt>Companions</dt><dd>Owned virtual companions are separate from real wildlife observations.</dd></div></dl></div>
+        <div id="discoveryGuideOverview" class="discoveryGuideOverview"></div>
+        <details class="discoveryGuideLifeDetails"><summary>Regional life list</summary><div id="discoveryLifeList" class="discoveryLifeList"></div></details>
+        <div class="discoverySectionHead discoveryGuideLeadsHead"><span>IDENTIFICATION LEADS</span><small>METHODS TO TRY</small></div>
+        <div id="discoveryFieldGuideList" class="discoveryList"></div>
+      </section>
+      <section class="discoveryPane discoveryProfilePane" data-discovery-pane="profile">
+        <div class="discoverySectionHead"><span>EXPLORER PROFILE</span><small>IDENTITY / SKILLS / COMPANIONS</small></div>
+        <div id="discoveryProfileHero" class="discoveryProfileHero"></div>
+        <section id="discoveryJourneyOverview" class="discoveryJourneyOverview" aria-label="Ways to explore"></section>
+        <div id="discoveryProgress" class="discoveryProgressGrid"></div>
+        <section class="discoveryCompanionSection"><div class="discoverySectionHead"><span>COMPANIONS</span><small>ANIMALS YOU KNOW</small></div><p>Wild species belong in the Guide. Individual animals you befriend and care for live here.</p><div id="discoveryCompanionList" class="discoveryList"></div></section>
+        <details class="discoveryOnlineService"><summary>Data and backup</summary><p>Your Journal, Guide, companions, and local Backpack history are stored in this browser. Signed-in receipts cover eligible collected items; the full Journal does not yet follow you between devices.</p><div class="discoveryResultActions"><button id="discoveryExportBtn" type="button">Download backup</button><button id="discoveryImportBtn" type="button">Restore backup</button><input id="discoveryImportFile" type="file" accept="application/json,.json" hidden></div><p id="discoveryBackupStatus" role="status" aria-live="polite"></p></details>
+        <div class="discoveryLegacyEquipmentData" hidden><div id="discoveryEquippedSummary"></div><button id="discoveryOpenBackpackBtn" type="button">Open Backpack</button><div id="discoveryToolList"></div></div>
+      </section>
+    </div>
+  </div>
+</aside>
+<section id="arExperience" aria-label="World Explorer augmented reality" aria-hidden="true">
+  <video id="arCameraFeed" playsinline muted aria-hidden="true"></video>
+  <div class="arViewerBackdrop" aria-hidden="true"></div>
+  <canvas id="arCanvas" aria-label="Interactive augmented reality view"></canvas>
+  <header class="arTopBar">
+    <div class="arIdentity"><span class="arMark" aria-hidden="true">◎</span><div><small>WORLD EXPLORER / AR</small><strong id="arTitle">AR Experience</strong></div></div>
+    <div class="arTopMeta"><span id="arPrivacyBadge">No camera recording</span><span id="arModeBadge">Checking device</span><button id="arCloseBtn" type="button" aria-label="Close AR">×</button></div>
+  </header>
+  <div id="arStatus" class="arStatus" role="status" aria-live="polite"></div>
+  <section id="arIntro" class="arIntroCard" role="dialog" aria-modal="true" aria-labelledby="arIntroTitle">
+    <span class="arIntroEyebrow">CONTEXTUAL WORLD VIEW</span>
+    <h2 id="arIntroTitle">Open AR?</h2>
+    <p id="arIntroCopy">Checking this device…</p>
+    <div class="arSafety"><b>LOOK UP OFTEN</b><span>Use a clear, stationary area. Do not use AR while driving, cycling, or crossing traffic.</span></div>
+    <div class="arPrivacyCopy">Camera frames stay in the local browser session. World Explorer does not record, upload, or analyze them.</div>
+    <div class="arIntroActions"><button id="arCancelBtn" type="button">Cancel</button><button id="arContinueBtn" class="primary" type="button">Continue</button></div>
+  </section>
+  <footer id="arControls" class="arControls" hidden>
+    <div><strong id="arInstruction">Drag to rotate.</strong><span id="arMetric">Local presentation</span></div>
+    <div class="arControlActions"><button id="arSmallerBtn" type="button" aria-label="Make object smaller">−</button><button id="arLargerBtn" type="button" aria-label="Make object larger">+</button><button id="arPlaceBtn" class="primary" type="button">Place</button></div>
+  </footer>
+</section>
+<div id="boatWaveDock" aria-hidden="true">
+  <div class="boatWaveMeta">
+    <span id="boatWaveLabel">Moderate Water</span>
+    <span id="boatWaveHint">Wave intensity</span>
+  </div>
+  <input id="boatWaveSlider" type="range" min="0" max="100" step="1" value="46" aria-label="Wave intensity">
+  <span id="boatWaveValue">46%</span>
+  <button id="fishingDockBtn" type="button">Fishing</button>
+</div>
+<aside id="fishingGamePanel" aria-label="Fishing game" aria-hidden="true">
+  <header class="fishingHeader">
+    <div class="fishingIdentity"><span class="fishingMark" aria-hidden="true">◒</span><div><span class="fishingEyebrow">ANGLING</span><strong>Boat Fishing</strong></div></div>
+    <div class="fishingHeaderActions">
+      <span id="fishingStage">Idle</span>
+      <button id="fishingCloseBtn" type="button" aria-label="Close fishing" title="Close fishing">×</button>
+    </div>
+  </header>
+  <div class="fishingContext">
+    <span id="fishingWater">Water</span>
+    <span id="fishingSpeed">0.0 m/s</span>
+  </div>
+  <div class="fishingScene">
+    <canvas id="fishingCanvas" width="1280" height="720" aria-label="Fishing view. Tap to cast or hook. Drag while fighting to move the rod and reel."></canvas>
+    <div class="fishingGesture" aria-hidden="true"><span class="fishingGesturePointer"></span><b id="fishingGestureLabel">TAP WATER TO CAST</b></div>
+    <div class="fishingFishReadout">
+      <strong id="fishingFishName">Unknown fish</strong>
+      <span id="fishingFishMeta"></span>
+    </div>
+  </div>
+  <div id="fishingMessage" class="fishingMessage" role="status" aria-live="polite">READY</div>
+  <button id="fishingActionBtn" class="fishingPrimary" type="button" aria-label="Cast line"><span class="fishingActionIcon" aria-hidden="true">↗</span><span id="fishingActionLabel">CAST</span></button>
+  <div class="fishingMeters" aria-label="Fishing status">
+    <div class="fishingMeterRow tension" title="Line tension"><span aria-hidden="true">⌁</span><div class="fishingMeter"><i id="fishingTensionFill"></i><b class="safeBand"></b></div><em id="fishingTensionValue">0%</em></div>
+    <div class="fishingMeterRow stamina" title="Fish fatigue"><span aria-hidden="true">◒</span><div class="fishingMeter"><i id="fishingStaminaFill"></i></div><em id="fishingStaminaValue">0%</em></div>
+    <div class="fishingMeterRow integrity" title="Line integrity"><span aria-hidden="true">╱</span><div class="fishingMeter"><i id="fishingIntegrityFill"></i></div><em id="fishingIntegrityValue">100%</em></div>
+    <div class="fishingMeterRow progress" title="Distance reeled"><span aria-hidden="true">◎</span><div class="fishingMeter"><i id="fishingProgressFill"></i></div><em id="fishingProgressValue">0%</em></div>
+  </div>
+  <label class="fishingDragRow" for="fishingDrag">
+    <span title="Reel drag" aria-label="Reel drag">◉</span>
+    <input id="fishingDrag" type="range" min="15" max="90" step="1" value="48">
+    <em id="fishingDragValue">48%</em>
+  </label>
+  <div class="fishingFightControls">
+    <button id="fishingGiveBtn" type="button" aria-label="Hold to give line"><span aria-hidden="true">↘</span><small>Q</small></button>
+    <button id="fishingReelBtn" class="reel" type="button" aria-label="Hold to reel"><span aria-hidden="true">⟳</span><small>SPACE</small></button>
+  </div>
+  <div class="fishingRodControls" role="group" aria-label="Rod direction">
+    <button id="fishingRodLeft" type="button" aria-label="Rod left"><span aria-hidden="true">↖</span><small>J</small></button>
+    <button id="fishingRodCenter" class="active" type="button" aria-label="Rod center"><span aria-hidden="true">↑</span><small>K</small></button>
+    <button id="fishingRodRight" type="button" aria-label="Rod right"><span aria-hidden="true">↗</span><small>L</small></button>
+  </div>
+  <details class="fishingCatchBook"><summary><strong id="fishingSummary">0 catches</strong><span id="fishingRecord"></span></summary><ol id="fishingCatchList" class="fishingCatchList"><li>No catches yet.</li></ol></details>
+</aside>
+<div id="flowerChallengeHud">
+<span id="flowerChallengeHudStatus"></span>
+<span id="flowerChallengeHudTimer"></span>
+</div>
+<aside id="deFlockHud" aria-live="polite">
+  <div class="deFlockHudHead"><strong>📷 DEFLOCK HUNT</strong><button id="deFlockHelpOpen" type="button" aria-label="DeFlock information">i</button></div>
+  <div id="deFlockCounts">Loading mapped cameras…</div>
+  <div class="deFlockHudMeta"><span id="deFlockStatus">Preparing virtual game objects…</span><time id="deFlockTimer">00:00</time></div>
+</aside>
+<div id="deFlockPrompt" role="status"></div>
+<div id="urbanVehiclePrompt" role="status" aria-live="polite" aria-hidden="true">
+  <div class="urbanVehiclePromptCopy">
+    <div id="urbanVehiclePromptTitle">Enter vehicle</div>
+    <div id="urbanVehiclePromptMeta"></div>
+  </div>
+  <kbd id="urbanVehiclePromptKey">E</kbd>
+  <button id="urbanVehiclePromptButton" type="button">Enter</button>
+  <kbd id="urbanVehiclePromptSecondaryKey" hidden>V</kbd>
+  <button id="urbanVehiclePromptSecondaryButton" type="button" hidden>Use</button>
+  <kbd id="urbanVehiclePromptTakeKey" hidden>T</kbd>
+  <button id="urbanVehiclePromptTakeButton" type="button" hidden>Take</button>
+</div>
+<aside id="urbanEquipment" aria-hidden="true" aria-label="Character Backpack">
+  <div class="urbanEquipmentHead"><span>Backpack</span><div><small>I to close · 1–6 quick equip</small><button id="urbanEquipmentCloseBtn" type="button" aria-label="Close Backpack">×</button></div></div>
+  <section class="urbanBackpackWallet" aria-label="Explorer wallet"><span>Explorer wallet</span><strong id="urbanBackpackWallet">$0</strong></section>
+  <div class="urbanBackpackLabel">Quick access</div>
+  <div id="urbanEquipmentSlots" class="urbanEquipmentSlots"></div>
+  <div class="urbanBackpackLabel">Pack contents</div>
+  <nav id="urbanBackpackFilters" class="urbanBackpackFilters" aria-label="Backpack categories"><button class="active" data-backpack-filter="all" type="button">All</button><button data-backpack-filter="field-tool" type="button">Tools</button><button data-backpack-filter="specimen" type="button">Finds</button><button data-backpack-filter="gear" type="button">Gear</button></nav>
+  <div id="urbanBackpackContents" class="urbanBackpackContents"></div>
+  <div id="urbanBackpackDetail" class="urbanBackpackDetail" aria-live="polite"><span>Select an item to see its story and available actions.</span></div>
+  <div id="urbanEquipmentStatus" class="urbanEquipmentStatus"></div>
+  <details class="urbanConditionDetails"><summary>Character condition <span id="urbanPlayerConditionText">100%</span></summary><div id="urbanPlayerCondition" class="urbanPlayerCondition" role="status" aria-label="Character health"><i aria-hidden="true"><b id="urbanPlayerConditionFill"></b></i></div></details>
+</aside>
+<aside id="urbanStore" role="dialog" aria-modal="true" aria-labelledby="urbanStoreName" aria-hidden="true">
+  <div class="urbanStoreHead"><div><small>MAPPED LOCAL PLACE</small><strong id="urbanStoreName">Convenience store</strong></div><button id="urbanStoreCloseBtn" type="button" aria-label="Close place">×</button></div>
+  <div class="urbanStoreMeta"><span id="urbanStoreSource">OpenStreetMap place</span><strong id="urbanStoreCredits">$0</strong></div>
+  <p class="urbanStoreAuthority">The mapped place determines where this opportunity exists. Stock, services, and prices are World Explorer gameplay.</p>
+  <section id="urbanStoreServicesSection"><h3>Available services</h3><div id="urbanStoreServices" class="urbanStoreGrid"></div></section>
+  <section><h3>Today’s stock</h3><div id="urbanStoreStock" class="urbanStoreGrid"></div></section>
+  <section><h3>Sell from Backpack</h3><div id="urbanStoreSell" class="urbanStoreGrid"></div></section>
+  <section><h3>Rare counter find</h3><div id="urbanStoreRare"></div></section>
+  <div id="urbanStoreStatus" role="status" aria-live="polite"></div>
+</aside>
+<button id="urbanEquipmentToggle" type="button" aria-label="Open character Backpack" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7V5.8C8 3.7 9.7 2 11.8 2h.4C14.3 2 16 3.7 16 5.8V7M6.5 8h11A2.5 2.5 0 0 1 20 10.5v8A2.5 2.5 0 0 1 17.5 21h-11A2.5 2.5 0 0 1 4 18.5v-8A2.5 2.5 0 0 1 6.5 8ZM4 13h16M8 16h8"/></svg><span>PACK</span></button>
+<div id="urbanWeaponReticle" aria-hidden="true"><i></i><b></b><span></span><em></em></div>
+<div id="urbanCrashFeedback" aria-hidden="true"></div>
+<aside id="urbanCivicStatus" role="status" aria-live="polite" aria-hidden="true">
+  <div id="urbanCivicStatusMeter" aria-label="Civic attention level">○○○</div>
+  <div class="urbanCivicStatusCopy">
+    <div id="urbanCivicStatusTitle">Incident witnessed</div>
+    <div id="urbanCivicStatusDetail">Local civic response</div>
+  </div>
+</aside>
+<aside id="deFlockHelp" role="dialog" aria-modal="false" aria-labelledby="deFlockHelpTitle">
+  <div class="deFlockHelpHead"><strong id="deFlockHelpTitle">About DeFlock Hunt</strong><button id="deFlockHelpClose" type="button" aria-label="Close DeFlock information">×</button></div>
+  <p>Camera locations are publicly mapped community data from OpenStreetMap. Coverage can be incomplete or outdated.</p>
+  <p>All actions are fictional and happen only inside World Explorer. “Virtual Camera Disabled” never changes physical equipment.</p>
+  <p>Direction cones and detection range are gameplay approximations, not claims about real camera capabilities. No plates, vehicle photos, live results, or driver data are collected.</p>
+  <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors • ODbL</a>
+</aside>
+<div id="liveGpsPermissionPanel" role="dialog" aria-modal="true" aria-labelledby="liveGpsPermissionTitle" tabindex="-1">
+  <div class="liveGpsPermissionCard">
+    <div class="liveGpsPermissionIcon">📍</div>
+    <h2 id="liveGpsPermissionTitle">Start Live GPS Explore?</h2>
+    <p>Your location moves the in-world walker while World Explorer remains open and visible. Locking the screen or switching apps may pause movement.</p>
+    <p class="liveGpsSafety"><strong>Stay aware of traffic, terrain, private property, and local rules. Do not use the game while driving.</strong></p>
+    <p>Only bounded current-processing fixes and aggregate distance/quality counters stay in session memory. World Explorer does not retain a raw fix history or save a raw route.</p>
+    <p>Field stops create personal virtual records only. They do not prove physical access, a real animal nearby, or eligibility for a competitive location reward.</p>
+    <div id="liveGpsPermissionStatus" aria-live="polite"></div>
+    <div class="liveGpsPermissionActions">
+      <button id="liveGpsPermissionCancel" type="button">Cancel</button>
+      <button id="liveGpsPermissionContinue" type="button">Continue &amp; Allow Location</button>
+    </div>
+  </div>
+</div>
+<section id="liveGpsHud" aria-label="Live GPS status">
+  <div class="liveGpsHudTop"><strong>📍 LIVE GPS</strong><span id="liveGpsMotion">stationary · 0.0 m/s</span></div>
+  <div id="liveGpsStatus" aria-live="polite">Waiting for GPS…</div>
+  <div class="liveGpsMetrics"><span id="liveGpsAccuracy">Accuracy —</span><span id="liveGpsDistance">From center 0.00 km</span><span id="liveGpsFieldDistance">Walk 0 m</span></div>
+  <div class="liveGpsActions">
+    <button id="liveGpsFieldBtn" type="button">Field Today</button>
+    <button id="liveGpsPauseBtn" type="button">Pause GPS</button>
+    <button id="liveGpsRecenterBtn" type="button" hidden>Recenter</button>
+    <button id="liveGpsLowPowerBtn" type="button">Low Power</button>
+    <button id="liveGpsStopBtn" type="button">Stop</button>
+  </div>
+</section>
+<canvas id="minimap" width="150" height="150"></canvas>
+<div id="minimapZoomControls" aria-label="Minimap zoom controls">
+  <button id="minimapZoomIn" class="minimapZoomBtn" type="button" aria-label="Zoom in on minimap">+</button>
+  <div id="minimapZoomLevel" aria-live="polite">Z 15</div>
+  <button id="minimapZoomOut" class="minimapZoomBtn" type="button" aria-label="Zoom out on minimap">−</button>
+</div>
+<div id="largeMap">
+<header id="mapExplorerHeader">
+  <div><span>WORLD MAP</span><strong id="mapExplorerStatus">Following your position</strong></div>
+  <form id="mapSearchForm" class="mapSearchForm" role="search">
+    <label class="sr-only" for="mapSearchInput">Search for a city, place, airport, or coordinates</label>
+    <input id="mapSearchInput" type="search" autocomplete="off" placeholder="City, place, airport, or coordinates">
+    <button id="mapSearchBtn" type="submit">Search</button>
+    <span id="mapSearchStatus" role="status" aria-live="polite"></span>
+  </form>
+  <button id="mapRecenter" type="button">◎ My position</button>
+</header>
+<canvas id="largeMapCanvas" width="800" height="800"></canvas>
+<div id="mapExplorerHint">Drag to explore · use +/− to zoom · tap a marker for details</div>
+<button id="mapClose" type="button" aria-label="Close world map">Close</button>
+<button id="mapLegend" style="position:absolute;bottom:20px;left:20px;background:rgba(0,0,0,0.8);border:2px solid #0fc;color:#0fc;font-family:Orbitron;font-size:12px;padding:10px 20px;cursor:pointer;border-radius:6px">Map layers</button>
+<div id="legendPanel" style="position:absolute;top:20px;left:20px;background:rgba(0,0,0,0.95);border:2px solid #0fc;color:#0fc;font-family:Orbitron;border-radius:12px;padding:16px;max-width:340px;display:none;max-height:calc(100% - 40px);overflow-y:auto;z-index:200">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid #0fc;padding-bottom:8px">
+    <div style="font-size:14px;font-weight:bold">MAP LAYERS</div>
+    <button id="legendCloseBtn" style="background:transparent;border:none;color:#0fc;font-size:18px;cursor:pointer;padding:0;width:24px;height:24px">×</button>
+  </div>
+
+  <div style="margin-bottom:12px;padding:8px;background:rgba(0,255,200,0.1);border-radius:6px">
+    <div style="font-size:10px;margin-bottom:6px;opacity:0.8">Choose what appears on the map.</div>
+    <button id="legendShowAllBtn" style="background:#0fc;color:#000;border:none;padding:4px 8px;border-radius:4px;font-size:9px;cursor:pointer;margin-right:6px;font-family:Orbitron;font-weight:bold">Show All</button>
+    <button id="legendHideAllBtn" style="background:#f36;color:#fff;border:none;padding:4px 8px;border-radius:4px;font-size:9px;cursor:pointer;font-family:Orbitron;font-weight:bold">Hide All</button>
+  </div>
+
+  <details class="mapLegendGroup">
+    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;color:#0ff;display:flex;align-items:center;gap:6px">
+      <input type="checkbox" id="filterProperties" checked style="cursor:pointer">
+      <label for="filterProperties" style="cursor:pointer">Properties</label>
+    </summary>
+    <div style="font-size:10px;line-height:1.6;padding-left:24px;opacity:0.9">
+      <div style="margin-bottom:3px"><span style="color:#10b981">● Green</span> - For Sale</div>
+      <div style="margin-bottom:3px"><span style="color:#3b82f6">● Blue</span> - For Rent</div>
+      <div style="margin-bottom:3px">Click marker for details & navigation</div>
+    </div>
+  </details>
+
+  <details class="mapLegendGroup">
+    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;color:#0ff;display:flex;align-items:center;gap:6px">
+      <input type="checkbox" id="filterNavigation" checked style="cursor:pointer">
+      <label for="filterNavigation" style="cursor:pointer">Active route</label>
+    </summary>
+    <div style="font-size:10px;line-height:1.6;padding-left:24px;opacity:0.9">
+      <div style="margin-bottom:3px"><span style="color:#00ff88">⋯⋯⋯</span> Active Route Line</div>
+      <div style="margin-bottom:3px"><span style="color:#00ff88">◉</span> Destination Marker</div>
+    </div>
+  </details>
+
+  <details class="mapLegendGroup">
+    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;color:#0ff;display:flex;align-items:center;gap:6px">
+      <input type="checkbox" id="filterInteriors" checked style="cursor:pointer">
+      <label for="filterInteriors" style="cursor:pointer">Enterable buildings</label>
+    </summary>
+    <div style="font-size:10px;line-height:1.5;padding-left:24px;opacity:0.9">
+      <div id="enterableBuildingsStatus" style="margin-bottom:6px">Open the legend to scan nearby enterable buildings.</div>
+      <div style="margin-bottom:6px;color:#8ef9ff">Press <strong>E</strong> near a listed building to enter or exit.</div>
+      <div id="enterableBuildingsList" style="display:grid;gap:4px"></div>
+    </div>
+  </details>
+
+  <details class="mapLegendGroup">
+    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;color:#0ff;display:flex;align-items:center;gap:6px">
+      <input type="checkbox" id="filterActivities" checked style="cursor:pointer">
+      <label for="filterActivities" style="cursor:pointer">Activities</label>
+    </summary>
+    <div style="font-size:10px;line-height:1.5;padding-left:24px;opacity:0.9">
+      <div style="margin-bottom:3px"><span style="color:#f59e0b">▲</span> Nearby and featured activities</div>
+      <div style="margin-bottom:3px"><span style="color:#8b5cf6">◆</span> Room sessions and creator routes</div>
+      <div style="margin-bottom:3px">Click markers to inspect and join them.</div>
+    </div>
+  </details>
+
+  <details class="mapLegendGroup">
+    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;margin-bottom:8px;color:#0ff;display:flex;align-items:center;gap:6px">
+      <input type="checkbox" id="filterPOIsAll" checked style="cursor:pointer">
+      <label for="filterPOIsAll" style="cursor:pointer">Places</label><small>14 types</small>
+    </summary>
+    <div style="font-size:10px;line-height:1.4;padding-left:24px;opacity:0.9">
+      <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="filterSchools" checked style="cursor:pointer">
+        <label for="filterSchools" style="cursor:pointer">🏫 Schools & Universities</label>
+      </div>
+      <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="filterHealthcare" checked style="cursor:pointer">
+        <label for="filterHealthcare" style="cursor:pointer">🏥 Healthcare</label>
+      </div>
+      <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="filterEmergency" checked style="cursor:pointer">
+        <label for="filterEmergency" style="cursor:pointer">👮 Police & 🚒 Fire</label>
+      </div>
+      <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="filterFood" checked style="cursor:pointer">
+        <label for="filterFood" style="cursor:pointer">🍽️ Restaurants & Cafes</label>
+      </div>
+      <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="filterShopping" checked style="cursor:pointer">
+        <label for="filterShopping" style="cursor:pointer">🏪 Shopping & Malls</label>
+      </div>
+      <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="filterCulture" checked style="cursor:pointer">
+        <label for="filterCulture" style="cursor:pointer">🏛️ Museums & Attractions</label>
+      </div>
+      <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="filterHistoric" checked style="cursor:pointer">
+        <label for="filterHistoric" style="cursor:pointer">🗿 Historic Sites</label>
+      </div>
+      <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="filterParks" checked style="cursor:pointer">
+        <label for="filterParks" style="cursor:pointer">🌳 Parks & Recreation</label>
+      </div>
+      <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="filterParking" checked style="cursor:pointer">
+        <label for="filterParking" style="cursor:pointer">🅿️ Parking</label>
+      </div>
+      <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="filterFuel" checked style="cursor:pointer">
+        <label for="filterFuel" style="cursor:pointer">⛽ Gas Stations</label>
+      </div>
+      <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="filterBanks" checked style="cursor:pointer">
+        <label for="filterBanks" style="cursor:pointer">🏦 Banks</label>
+      </div>
+      <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="filterPostal" checked style="cursor:pointer">
+        <label for="filterPostal" style="cursor:pointer">📮 Post Offices</label>
+      </div>
+      <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="filterHotels" checked style="cursor:pointer">
+        <label for="filterHotels" style="cursor:pointer">🏨 Hotels</label>
+      </div>
+      <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="filterTourism" checked style="cursor:pointer">
+        <label for="filterTourism" style="cursor:pointer">⭐ Tourism & Viewpoints</label>
+      </div>
+    </div>
+  </details>
+
+  <details class="mapLegendGroup">
+    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;margin-bottom:8px;color:#0ff">Memories</summary>
+    <div style="font-size:11px;line-height:1.5;padding-left:24px;opacity:0.95">
+      <div style="margin-bottom:4px;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="filterMemoryPins" checked style="cursor:pointer">
+        <label for="filterMemoryPins" style="cursor:pointer;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px">
+          <span style="color:#ef4444;font-size:16px;line-height:1">📍</span>
+          Pin memories
+        </label>
+      </div>
+      <div style="margin-bottom:4px;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="filterMemoryFlowers" checked style="cursor:pointer">
+        <label for="filterMemoryFlowers" style="cursor:pointer;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px">
+          <span style="color:#ec4899;font-size:16px;line-height:1">🌸</span>
+          Flower memories
+        </label>
+      </div>
+      <div style="margin-bottom:3px;font-size:10px;opacity:0.85">Shown on minimap and large map</div>
+    </div>
+  </details>
+
+  <details class="mapLegendGroup">
+    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;margin-bottom:8px;color:#0ff;display:flex;align-items:center;gap:6px">
+      <input type="checkbox" id="filterGameElementsAll" checked style="cursor:pointer">
+      <label for="filterGameElementsAll" style="cursor:pointer">Games and routes</label>
+    </summary>
+    <div style="font-size:10px;line-height:1.4;padding-left:24px;opacity:0.9">
+      <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="filterCheckpoints" checked style="cursor:pointer">
+        <label for="filterCheckpoints" style="cursor:pointer"><span style="color:#f36">●</span> Checkpoints (game mode)</label>
+      </div>
+      <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="filterDestination" checked style="cursor:pointer">
+        <label for="filterDestination" style="cursor:pointer"><span style="color:#fc0">●</span> Trial Destination</label>
+      </div>
+      <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="filterCustomTrack" checked style="cursor:pointer">
+        <label for="filterCustomTrack" style="cursor:pointer"><span style="color:#fa0">━━</span> Custom Track</label>
+      </div>
+    </div>
+  </details>
+
+  <details class="mapLegendGroup">
+    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;color:#0ff;display:flex;align-items:center;gap:6px">
+      <input type="checkbox" id="filterPolice" checked style="cursor:pointer">
+      <label for="filterPolice" style="cursor:pointer">Police vehicles</label>
+    </summary>
+    <div style="font-size:10px;line-height:1.6;padding-left:24px;opacity:0.9">
+      <div style="margin-bottom:3px">🚓 Police Vehicles</div>
+      <div style="margin-bottom:3px"><span style="color:#f00">Red/Blue</span> when chasing</div>
+    </div>
+  </details>
+
+  <details class="mapLegendGroup">
+    <summary class="mapLegendSummary" style="font-size:11px;font-weight:bold;color:#0ff;display:flex;align-items:center;gap:6px">
+      <input type="checkbox" id="filterRoads" checked style="cursor:pointer">
+      <label for="filterRoads" style="cursor:pointer">Roads</label>
+    </summary>
+    <div style="font-size:10px;line-height:1.6;padding-left:24px;opacity:0.9">
+      <div style="margin-bottom:3px">🛣️ Street Network</div>
+      <div style="margin-bottom:3px">Shows the driveable street network</div>
+    </div>
+  </details>
+
+  <div style="margin-bottom:12px" hidden>
+    <div style="font-size:11px;font-weight:bold;margin-bottom:6px;color:#0ff;display:flex;align-items:center;gap:6px">
+      <input type="checkbox" id="filterPaths" style="cursor:pointer">
+      <label for="filterPaths" style="cursor:pointer">PATH OVERLAY</label>
+    </div>
+    <div style="font-size:10px;line-height:1.6;padding-left:24px;opacity:0.9">
+      <div style="margin-bottom:3px">🚶 Footways and cycleways</div>
+      <div style="margin-bottom:3px">🚆 Rail corridors</div>
+      <div style="margin-bottom:3px">Traversal stays active even when this overlay is hidden</div>
+    </div>
+  </div>
+
+  <div style="font-size:9px;opacity:0.6;margin-top:12px;padding-top:8px;border-top:1px solid #0fc">
+    Data: OpenStreetMap contributors<br>
+    Click any map element for details & directions<br>
+    <span style="color:#0f8;font-weight:bold">Right-click map to teleport to location</span>
+  </div>
+</div>
+
+<!-- Map Click Info Panel -->
+<div id="mapInfoPanel" style="position:absolute;top:20px;right:20px;background:rgba(0,0,0,0.95);border:2px solid #0fc;color:#0fc;font-family:Orbitron;border-radius:12px;padding:16px;width:280px;display:none;max-height:calc(100% - 40px);overflow-y:auto">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid #0fc;padding-bottom:8px">
+    <div style="font-size:14px;font-weight:bold" id="mapInfoTitle">Location Info</div>
+    <button id="mapInfoCloseBtn" style="background:transparent;border:none;color:#0fc;font-size:18px;cursor:pointer;padding:0;width:24px;height:24px">×</button>
+  </div>
+  <div id="mapInfoContent" style="font-size:11px;line-height:1.6"></div>
+</div>
+
+<div id="mapControlDock">
+<button id="mapSatelliteToggle" type="button" aria-label="Toggle satellite map" title="Satellite">🛰️</button>
+<button id="mapRoadsToggle" class="active" type="button" aria-label="Toggle road overlay" title="Roads">🛣️</button>
+<button id="mapPathsToggle" hidden style="background:rgba(0,0,0,0.8);border:2px solid #0fc;color:#0fc;font-family:Orbitron;font-size:11px;padding:8px 12px;cursor:pointer;border-radius:6px;width:50px;font-weight:bold">🚶</button>
+<span aria-hidden="true"></span>
+<button id="mapZoomIn" type="button" aria-label="Zoom map in">+</button>
+<button id="mapZoomOut" type="button" aria-label="Zoom map out">−</button>
+<div id="zoomLevel" aria-live="polite">Z 14</div>
+</div>
+</div>
+<div id="explorationModeMsg" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.85);border:3px solid #667eea;border-radius:16px;padding:24px 48px;color:#ffffff;font-family:'Orbitron',sans-serif;font-size:28px;font-weight:700;z-index:1000;display:none;box-shadow:0 8px 32px rgba(0,0,0,0.5);text-align:center;letter-spacing:1px;cursor:pointer;pointer-events:auto">
+Explore the area
+</div>
+<div id="navigationHud" style="position:fixed;top:100px;left:20px;background:rgba(0,255,136,0.9);border:2px solid #00ff88;border-radius:12px;padding:16px;color:#000;font-family:'Poppins',sans-serif;z-index:100;display:none;min-width:180px;box-shadow:0 4px 20px rgba(0,255,136,0.4)">
+<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;opacity:0.8">🧭 Navigation</div>
+<div id="navDestination" style="font-size:14px;font-weight:700;margin-bottom:8px">Destination</div>
+<div id="navDistance" style="font-size:24px;font-weight:700;margin-bottom:4px">--m</div>
+<div id="navDirection" style="font-size:32px;text-align:center;margin-top:8px">↑</div>
+</div>
+<div id="police">💔 0/3</div>
+<div id="poiInfo" style="position:fixed;top:20px;right:20px;background:rgba(0,0,0,0.85);border:2px solid #0fc;border-radius:12px;padding:16px;color:#0fc;font-family:Orbitron;z-index:100;display:none;min-width:200px;box-shadow:0 4px 20px rgba(0,255,200,0.3)">
+<div id="poiIcon" style="font-size:32px;text-align:center;margin-bottom:8px">🏫</div>
+<div id="poiName" style="font-size:14px;font-weight:bold;text-align:center;margin-bottom:4px">School</div>
+<div id="poiCategory" style="font-size:11px;text-align:center;opacity:0.8;margin-bottom:8px">Education</div>
+<div id="poiDistance" style="font-size:12px;text-align:center;padding-top:8px;border-top:1px solid rgba(0,255,200,0.3)">50m ahead</div>
+</div>
+<div class="floatMenuContainer" id="floatMenuContainer">
+<!-- Stable player goals. Detailed controls stay inside their owning panels. -->
+<div class="floatMenu" id="exploreMenu">
+<button class="floatBtn explore" id="exploreBtn" type="button" aria-label="Open Explore" aria-expanded="false" data-mobile-label="Explore"><span class="btnIcon">⌖</span><span class="btnText">Explore</span></button>
+<div class="floatItems" data-menu-title="EXPLORE">
+<div class="floatItemSection" role="separator">FIELDWORK</div>
+<div class="floatItem" id="fWorldDiscovery">⌖ Today &amp; Nearby</div>
+<div class="floatItem" id="fLiveGps">📍 Explore with Live GPS</div>
+<div class="floatItemSection" role="separator">ACTIVITIES</div>
+<div class="floatItem" id="fDeFlock">📷 DeFlock Hunt</div>
+<div class="floatItem" id="fFlowerChallenge">🔴 Find Red Flower</div>
+<div class="floatItem" id="fFishing" style="display:none">🎣 Fishing</div>
+<div class="floatItemSection" role="separator">PLACES</div>
+<div class="floatItem" id="fHistoric">⛩️ Historic Places</div>
+<div class="floatItem" id="fPOI">📍 Nearby Places</div>
+</div>
+</div>
+
+<div class="floatMenu" id="travelMenu">
+<button class="floatBtn travel" id="travelBtn" type="button" aria-label="Open Travel" aria-expanded="false" data-mobile-label="Travel"><span class="btnIcon">◈</span><span class="btnText">Travel</span></button>
+<div class="floatItems" data-menu-title="TRAVEL">
+<div class="floatItemSection" role="separator">MAP</div>
+<div class="floatItem" id="fWorldMap">🗺️ World Map &amp; Search</div>
+<div class="floatItemSection" role="separator">MOVE</div>
+<div class="floatItem" id="fWalk">🚶 Walk</div>
+<div class="floatItem" id="fDriving">🚗 Drive</div>
+<div class="floatItem" id="fDrone">🚁 Fly Drone</div>
+<div class="floatItem" id="fPlane">✈️ Fly Plane</div>
+<div class="floatItem" id="fBoat" style="display:none">🚤 Pilot Boat</div>
+<div class="floatItemSection" role="separator">WORLDS</div>
+<div class="floatItem" id="fEarthMode">🌍 Explore Earth</div>
+<div class="floatItem" id="fOceanMode">🌊 Explore the Ocean</div>
+<div class="floatItemSection" role="separator">SPACE</div>
+<div class="floatItem" id="fDeployPathfinder">🛸 Launch Pathfinder</div>
+<div class="floatItem" id="fBoardSolisReach">🛰️ Board Solis Reach</div>
+<div class="floatItem" id="fSpaceRocket">✦ Free Space Flight</div>
+<div class="floatItem" id="fSpaceDirect">🌙 Direct to Moon</div>
+<div class="floatItemSection" role="separator">RECOVERY</div>
+<div class="floatItem" id="fRespawn">🎯 Return to Safe Ground</div>
+</div>
+</div>
+
+<div class="floatMenu" id="backpackMenu">
+<button class="floatBtn backpack" id="backpackBtn" type="button" aria-label="Open Backpack" aria-expanded="false" data-mobile-label="Backpack"><span class="btnIcon">▣</span><span class="btnText">Backpack</span></button>
+<div class="floatItems" data-menu-title="BACKPACK">
+<div class="floatItem" id="fBackpack">🎒 Items &amp; Quick Slots</div>
+<div class="floatItem" id="fExplorerJournal">≡ Journal</div>
+<div class="floatItem" id="fExplorerGuide">▤ Field Guide</div>
+<div class="floatItem" id="fExplorerProfile">◎ Profile, Skills &amp; Companions</div>
+</div>
+</div>
+
+<div class="floatMenu" id="communityMenu">
+<button class="floatBtn community" id="communityBtn" type="button" aria-label="Open Community" aria-expanded="false" data-mobile-label="Community"><span class="btnIcon">◎</span><span class="btnText">Community</span></button>
+<div class="floatItems" data-menu-title="COMMUNITY">
+<div class="floatItem" id="fMultiplayer">👥 Multiplayer</div>
+<div class="floatItem" id="fCommunityBoard">◎ Community Board</div>
+<div class="floatItem" id="fMemoryFlower">🌸 Leave a Memory Marker</div>
+<div class="floatItem" id="fSharePlace">↗ Share This Place</div>
+<!-- Preserved for future product work, intentionally absent from production UI. -->
+<div class="floatItem" id="fRoomGames" hidden>👥 Room Games</div>
+<div class="floatItem" id="fTrack" hidden>🏁 Record Track</div>
+<div class="floatItem" id="fEraseTrack" hidden>🗑️ Erase Track</div>
+<div class="floatItem" id="fRespawnRand" hidden>🎲 Random Respawn</div>
+<div class="floatItem" id="fMpCreate" hidden>🆕 Create Room</div>
+<div class="floatItem" id="fMpJoin" hidden>🔑 Join Room</div>
+<div class="floatItem" id="fMpInvite" hidden>🔗 Invite Link</div>
+<div class="floatItem" id="fMpLeave" hidden>🚪 Leave Room</div>
+<div class="floatItem on" id="fMpGhosts" hidden>👻 Toggle Ghosts</div>
+<div class="floatItem" id="fMpChat" hidden>💬 Toggle Chat</div>
+</div>
+</div>
+
+<div class="floatMenu" id="realEstateMenu">
+<button class="floatBtn realEstate" id="realEstateFloatBtn" type="button" aria-label="Open Real Estate" aria-expanded="false" data-mobile-label="Real Estate"><span class="btnIcon">⌂</span><span class="btnText">Real Estate</span></button>
+<div class="floatItems" data-menu-title="REAL ESTATE">
+<div class="floatItem" id="fRealEstate">⌂ Property Hub</div>
+<div class="floatItem" id="fQuickBuild">🧱 Quick Build</div>
+</div>
+</div>
+
+<div class="floatMenu contextualMenuControl" id="controlsMenu">
+<button class="floatBtn controls" id="controlsBarBtn" type="button" aria-label="Open current controls" aria-expanded="false" title="Current controls"><span class="btnIcon">⚙️</span><span class="btnText">Controls</span></button>
+</div>
+<div class="floatItem" id="fHome" style="display:none">🏠 Menu</div>
+
+<!-- Map display settings live with the map; weather and time live in the top quick controls. -->
+<div hidden aria-hidden="true">
+<div class="floatItem" id="fSatellite">🛰️ Satellite</div>
+<div class="floatItem" id="fRoads">🛣️ Show Roads</div>
+<div class="floatItem" id="fPaths">🚶 Path Overlay</div>
+<div class="floatItem" id="fLandUse">🗺️ Land Use</div>
+<div class="floatItem" id="fLandUseRE">🗺️ Land Use</div>
+<div class="floatItem" id="fTimeOfDay">☀️ Live Sky</div>
+<div class="floatItem" id="fWeatherMode">🌦️ Weather Live</div>
+<div class="floatItem" id="fSeaState">🌊 Sea State: Moderate</div>
+<div class="floatItem" id="fClouds">☁️ Clouds</div>
+<div class="floatItem" id="fConstellations">✨ Constellations</div>
+</div>
+</div>
+
+<div id="memoryComposer">
+<div class="memoryComposerTitle">Memory Marker</div>
+<div id="memoryPersistenceHint" class="memoryComposerSub">Place a pin or flower with a short note (200 chars max).</div>
+<div class="memoryTypeRow">
+<button id="memoryTypePin" class="memoryTypeBtn active" type="button">📍 Pin</button>
+<button id="memoryTypeFlower" class="memoryTypeBtn" type="button">🌸 Flower</button>
+</div>
+<textarea id="memoryMessageInput" maxlength="200" placeholder="Leave a short memory note..."></textarea>
+<div class="memoryComposerMeta">
+<div id="memoryComposerStatus"></div>
+<div id="memoryCharCount">0/200</div>
+</div>
+<div class="memoryActionRow">
+<button id="memoryCancelBtn" class="memoryActionBtn" type="button">Cancel</button>
+<button id="memoryPlaceBtn" class="memoryActionBtn" type="button">Place Marker</button>
+<button id="memoryDeleteAllBtn" class="memoryActionBtn" type="button">Delete All</button>
+</div>
+</div>
+
+<div id="memoryInfoPanel">
+<div id="memoryInfoTitle">Memory Marker</div>
+<div id="memoryInfoText"></div>
+<div id="memoryInfoMeta"></div>
+<div class="memoryInfoActions">
+<button id="memoryInfoCloseBtn" class="memoryInfoBtn" type="button">Close</button>
+<button id="memoryDeleteBtn" class="memoryInfoBtn" type="button">Remove Marker</button>
+</div>
+</div>
+
+<section id="activityDiscoveryPanel" aria-label="Activity browser panel">
+  <div class="activityDiscoveryTopBar">
+    <div class="activityDiscoveryTitleWrap">
+      <div id="activityDiscoveryTitle">Games &amp; Activities</div>
+      <div id="activityDiscoverySubline">Choose a ready-to-play activity tied to the current real-world location.</div>
+    </div>
+    <div class="activityDiscoveryHeaderActions">
+      <button id="activityDiscoveryCloseBtn" type="button">Close</button>
+    </div>
+  </div>
+  <div id="activityDiscoveryStatus">Loading activities...</div>
+  <aside class="activityDiscoveryPanelCol activityDiscoveryBrowseCol">
+    <div class="activityDiscoverySectionTitle">Browse</div>
+    <div class="activityDiscoverySearchRow">
+      <input id="activityDiscoverySearchInput" type="text" maxlength="120" placeholder="Search games and locations">
+      <select id="activityDiscoverySortSelect">
+        <option value="recommended">Recommended</option>
+        <option value="title">Title</option>
+        <option value="duration">Duration</option>
+      </select>
+    </div>
+    <div id="activityDiscoveryScopeChips" class="activityDiscoveryChipRow"></div>
+    <div id="activityDiscoveryCategoryChips" class="activityDiscoveryChipRow"></div>
+    <div class="activityDiscoverySectionTitle">Featured</div>
+    <div id="activityDiscoveryFeatured" class="activityDiscoveryFeaturedStrip"></div>
+    <div class="activityDiscoverySectionTitle">Available Here</div>
+    <div id="activityDiscoveryList" class="activityDiscoveryCardList"></div>
+  </aside>
+  <aside class="activityDiscoveryPanelCol activityDiscoveryDetailCol">
+    <div class="activityDiscoverySectionTitle">Details</div>
+    <div id="activityDiscoveryDetail"></div>
+  </aside>
+</section>
+
+<section id="creatorProfilePanel" class="creatorProfilePanel" aria-label="Creator profile panel">
+  <div class="creatorProfileShell">
+    <div class="creatorProfileTopBar">
+      <div class="creatorProfileTitleWrap">
+        <div id="creatorProfileTitle">Creator Profile</div>
+        <div id="creatorProfileSubline">Room activities and approved community contributions.</div>
+      </div>
+      <button id="creatorProfileCloseBtn" type="button">Close</button>
+    </div>
+    <div id="creatorProfileStatus"></div>
+    <div id="creatorProfileBody"></div>
+  </div>
+</section>
+
+<div id="activityDiscoveryPrompt" class="activityDiscoveryPrompt" aria-live="polite">
+  <div class="activityDiscoveryPromptCopy">
+    <div id="activityDiscoveryPromptTitle" class="activityDiscoveryPromptTitle">Nearby Activity</div>
+    <div id="activityDiscoveryPromptMeta" class="activityDiscoveryPromptMeta">Inspect what you can do here.</div>
+  </div>
+  <div class="activityDiscoveryPromptActions">
+    <button id="activityDiscoveryPromptInspectBtn" type="button">Inspect</button>
+    <button id="activityDiscoveryPromptJoinBtn" class="primary" type="button">Start</button>
+  </div>
+</div>
+
+<div id="activityRunHud" class="activityRunHud" aria-live="polite">
+  <div class="activityRunHudCopy">
+    <div id="activityRunTitle">Activity Running</div>
+    <div id="activityRunStatus">Move to the next target.</div>
+    <div id="activityRunProgress">0 cleared</div>
+  </div>
+  <button id="activityRunReplayBtn" class="primary" type="button">Replay</button>
+  <button id="activityRunStopBtn" type="button">Stop</button>
+</div>
+
+<button class="mainMenuBtn" id="mainMenuBtn">🏠 Main Menu</button>
+<div id="worldQuickControls" aria-label="Quick world controls">
+<button id="quickTimeOfDay" class="worldQuickControl" type="button" aria-label="Change time of day" title="Change time of day">
+<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"></circle><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"></path></svg>
+<span id="quickTimeOfDayState">Live</span>
+</button>
+<button id="quickWeatherMode" class="worldQuickControl" type="button" aria-label="Change weather" title="Change weather">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.2 18.2h10.3a3.6 3.6 0 0 0 .4-7.2 5.8 5.8 0 0 0-11-1.1 4.2 4.2 0 0 0 .3 8.3Z"></path></svg>
+<span id="quickWeatherModeState">Live</span>
+</button>
+</div>
+<button id="memoryFlowerFloatBtn" title="Place Flower Memory">🌸</button>
+<div id="flowerActionMenu" aria-label="Flower Actions">
+<button id="flowerActionMemoryBtn" class="flowerActionOption" type="button">🌸 Place Memory Flower</button>
+<button id="flowerActionChallengeBtn" class="flowerActionOption danger" type="button">🔴 Find Red Flower</button>
+<button id="flowerActionCloseBtn" class="flowerActionOption" type="button">Close</button>
+</div>
+<button id="gameShareFloatBtn" title="Share This Experience" aria-label="Share This Experience">
+<svg class="shareIcon" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M12 16V4"></path>
+<path d="M8 8l4-4 4 4"></path>
+<path d="M4 13v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"></path>
+</svg>
+</button>
+<div id="gameShareMenu" aria-label="Share Experience Menu">
+<button id="gameShareCopy" class="gameShareOption" type="button">🔗 Copy Link</button>
+<button id="gameShareNative" class="gameShareOption" type="button">📤 Share...</button>
+<button id="gameShareFacebook" class="gameShareOption" type="button">📘 Facebook</button>
+<button id="gameShareTwitter" class="gameShareOption" type="button">𝕏 Twitter</button>
+<button id="gameShareInstagram" class="gameShareOption" type="button">📷 Instagram</button>
+<button id="gameShareText" class="gameShareOption" type="button">💬 Text</button>
+<div id="gameShareStatus"></div>
+</div>
+<aside id="blockBuilderPanel" aria-label="Build with Blocks" aria-hidden="true">
+  <header class="blockBuilderHeader">
+    <strong>Quick Build</strong>
+    <div class="blockBuilderHeaderActions">
+      <button id="blockBuilderClose" type="button" aria-label="Close Quick Build" title="Close Quick Build">×</button>
+    </div>
+  </header>
+  <p class="blockBuilderTruthNote">Blocks persist in this virtual location on this device or in the current shared room. They never change OpenStreetMap, Overture, or real-world data.</p>
+  <section class="editableWorldBuildingTools" aria-label="Mapped building tools">
+    <strong>Mapped building</strong>
+    <div class="blockBuilderActions">
+      <button id="editableWorldSelectBuilding" type="button">Select Nearby</button>
+      <button id="editableWorldSuppressBuilding" type="button">Remove Virtually</button>
+      <button id="editableWorldRestoreBuilding" type="button">Restore</button>
+    </div>
+    <div id="editableWorldSelection" aria-live="polite">No mapped building selected.</div>
+  </section>
+  <div class="blockBuilderTools" role="group" aria-label="Build tool">
+    <button type="button" data-block-tool="place">Place</button>
+    <button type="button" data-block-tool="remove">Remove</button>
+  </div>
+  <div id="blockBuilderShapes" class="blockBuilderShapes" role="group" aria-label="Block shape"></div>
+  <div class="blockBuilderColorRow">
+    <div id="blockBuilderSwatches" class="blockBuilderSwatches" role="group" aria-label="Block color"></div>
+    <button id="blockBuilderRotate" class="blockBuilderIconButton" type="button" aria-label="Rotate shape" title="Rotate shape">↻</button>
+  </div>
+  <div class="blockBuilderActions">
+    <button id="blockBuilderUndo" type="button">Undo</button>
+    <button id="blockBuilderClear" type="button">Clear</button>
+    <button id="editableWorldReset" type="button">Restore Base World</button>
+  </div>
+  <div class="blockBuilderMapActions">
+    <a id="blockBuilderOsmLink" data-osm-location-link href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer">Improve map in OSM</a>
+    <button id="blockBuilderRefresh" type="button">Refresh map data</button>
+  </div>
+  <div id="blockBuilderCount"></div>
+  <div id="blockBuilderStatus" role="status" aria-live="polite"></div>
+</aside>
+<div id="controlsTab" aria-hidden="true"><div id="ctrlHeader" aria-expanded="false" aria-controls="ctrlContent">⚙️ Driving Mode ▼</div><div id="ctrlContent" class="hidden" aria-hidden="true">
+<section id="mobileControlSettings" aria-label="Mobile control settings">
+<div class="mobileControlSettingsHead"><strong>Mobile Controls</strong><button id="mobileControlsReset" type="button">Reset</button></div>
+<label><span>Layout</span><select id="mobileControlsHandedness"><option value="standard">Standard · move left</option><option value="southpaw">Southpaw · move right</option></select></label>
+<label><span>Move sensitivity</span><input id="mobileMoveSensitivity" type="range" min="45" max="150" step="5" value="100"><output id="mobileMoveSensitivityValue">100%</output></label>
+<label><span>Camera sensitivity</span><input id="mobileLookSensitivity" type="range" min="35" max="150" step="5" value="80"><output id="mobileLookSensitivityValue">80%</output></label>
+<label class="mobileControlToggle"><input id="mobileCameraRecenter" type="checkbox" checked><span>Return camera behind player</span></label>
+<p id="mobileControlSettingsStatus">Left thumb moves. Right thumb looks and uses actions.</p>
+<div id="mobileControlModeSummary" aria-live="polite">
+<strong id="mobileControlModeName">Walking</strong>
+<div><span><b>LEFT</b><i id="mobileControlLeftSummary">Move</i></span><span><b>RIGHT</b><i id="mobileControlRightSummary">Look</i></span><span><b>ACTIONS</b><i id="mobileControlActionSummary">Jump · Run</i></span></div>
+</div>
+</section>
+<section id="accessibilitySettings" aria-label="Accessibility settings">
+<div class="accessibilitySettingsHead"><strong>Accessibility</strong><button id="accessibilityReset" type="button">Reset</button></div>
+<p class="accessibilitySettingsIntro">Readable controls, calmer effects, and guidance that stays long enough for you.</p>
+<label><span>Text size</span><select id="accessibilityTextScale"><option value="100">Standard · 100%</option><option value="115">Large · 115%</option><option value="130">Extra large · 130%</option><option value="160">Very large · 160%</option><option value="200">Maximum · 200%</option></select></label>
+<label><span>Nearby notice time</span><select id="accessibilityNoticeDuration"><option value="standard">Standard · 7 seconds</option><option value="long">Longer · 15 seconds</option><option value="persistent">Until dismissed</option></select></label>
+<label><span>Aim reticle</span><select id="accessibilityReticleSize"><option value="standard">Standard</option><option value="large">Large</option></select></label>
+<label><input id="accessibilityReducedMotion" type="checkbox"><span>Reduce interface motion</span></label>
+<label><input id="accessibilityReducedEffects" type="checkbox"><span>Reduce flashes and screen pulses</span></label>
+<label><input id="accessibilityHighContrast" type="checkbox"><span>Increase interface contrast</span></label>
+<label><input id="accessibilityActionDetails" type="checkbox"><span>Keep full nearby-action descriptions</span></label>
+<p id="accessibilitySettingsStatus" role="status" aria-live="polite">100% text · system motion · standard contrast</p>
+</section>
+<div id="drivingControls">
+<b>🚗 Driving Mode · default layout:</b><br>
+• W/S - Accelerate / brake and reverse<br>
+• A/D - Steer left / right; arrow keys are an alternate<br>
+• Right-click + drag - Look around; chase view recenters automatically<br>
+• Space - Handbrake<br>
+• Ctrl - Boost<br>
+• E - Context action: enter / exit a nearby vehicle or use an object<br>
+• C - Camera view<br>
+• Q - Look behind while held<br>
+• F - Cycle character / BMW / plane / drone<br>
+• H - Open a mapped mechanic only when you are close enough<br>
+• Travel menu - Choose a travel mode directly<br>
+• M - Toggle map<br>
+• Shift+N - Next city<br>
+• B - Open / close Build with Blocks<br>
+</div>
+<div id="boatControls" style="display:none">
+<b>🚤 Boat Mode · default layout:</b><br>
+• W/S - Throttle / Reverse; A/D - Steer<br>
+• Arrow keys - Alternate boat controls<br>
+• Right-click + drag - Look around<br>
+• Space - Brake / Hold position<br>
+• G - Enter / exit boat travel<br>
+• C - Camera view<br>
+• Fishing button - Open fishing while the boat is stopped<br>
+• E - Cast / set hook; hold Space to reel; hold Q to give line<br>
+• J/K/L - Rod left / center / right during a fight<br>
+• Use the bottom Wave Intensity slider for calm, moderate, or rough water
+</div>
+<div id="walkingControls" style="display:none">
+<b>🚶 Walking Mode · default layout:</b><br>
+• WASD - Move forward / back and strafe<br>
+• Arrow Up/Down - Alternate forward / back; Arrow Left/Right - turn<br>
+• E - Context action at a visible door, vehicle, person, or object<br>
+• I - Open / close carried equipment; 1–6 quick-equip<br>
+• V - Use equipped item; T - take an available nearby item<br>
+• Space - Jump<br>
+• Space at a wall - Climb / wall jump<br>
+• Shift - Run (2x speed)<br>
+• Drag on the world with either mouse button - Look around<br>
+• C - Camera view<br>
+• F - Cycle character / BMW / plane / drone<br>
+• H - Open a mapped mechanic only when you are close enough<br>
+• Travel menu - Choose a travel mode directly<br>
+• B - Open / close Build with Blocks<br>
+</div>
+<div id="droneControls" style="display:none">
+<b>🚁 Drone Mode · default layout:</b><br>
+• W/S - Fly forward / back; A/D - turn<br>
+• Arrow keys - Alternate flight controls<br>
+• Right-click + drag - Look around independently<br>
+• Space - Fly up<br>
+• Shift/Ctrl - Fly down<br>
+• Travel menu - Choose another travel mode<br>
+• B - Open / close Build with Blocks<br>
+</div>
+<div id="planeControls" style="display:none">
+<b>✈️ Personal Plane · default layout:</b><br>
+• W/S - Nose down / pull up (inverted)<br>
+• A/D - Bank or ground steer; arrow keys are an alternate<br>
+• Double-tap Arrow Left/Right - Deliberate barrel roll while airborne<br>
+• Space/Shift - Increase / reduce throttle<br>
+• Full throttle - About 150 MPH; boarded aircraft differ<br>
+• Hold pitch for loops; ordinary left/right banks into a coordinated turn<br>
+• Ctrl - Wheel brake on the ground<br>
+• Right-click + drag - Look around<br>
+• C - Chase / cockpit / overhead camera<br>
+• P - Enter / exit your personal plane<br>
+</div>
+<div id="rocketControls" style="display:none">
+<b>🚀 Rocket Mode · default layout:</b><br>
+• WASD or Arrow Keys - Steer rocket (yaw/pitch)<br>
+• Space - Thrust / Boost<br>
+• Shift - Brake / Decelerate<br>
+• Configured Use Item key (default V) or left-click - Fire Pathfinder cannons during an interception<br>
+• Gamepad X or the mobile FIRE action - Fire Pathfinder cannons<br>
+• LAND ON ... Button - Land when in range
+</div>
+<div id="oceanControls" style="display:none">
+<b>🌊 Submarine Mode · default layout:</b><br>
+• W/S - Forward / Reverse thrust<br>
+• A/D - Turn left / right; arrow keys are an alternate<br>
+• Space - Ascend<br>
+• Shift/Ctrl - Descend<br>
+• Explore the reef shelf and open deep ocean
+</div>
+</div></div>
+<div id="mobileTouchControls" aria-label="Mobile navigation controls">
+<div id="mobileMovePad" class="mobilePad" aria-label="Movement pad">
+<button id="mobileMoveUp" class="mobileNavBtn up" type="button" aria-label="Move up">▲</button>
+<button id="mobileMoveLeft" class="mobileNavBtn left" type="button" aria-label="Move left">◀</button>
+<button id="mobileMoveRight" class="mobileNavBtn right" type="button" aria-label="Move right">▶</button>
+<button id="mobileMoveDown" class="mobileNavBtn down" type="button" aria-label="Move down">▼</button>
+<div id="mobileMoveLabel" class="mobilePadLabel">Move</div>
+</div>
+<div id="mobileActionStack" aria-label="Mode actions">
+<button id="mobileActionPrimary" class="mobileActionBtn" type="button">Action 1</button>
+<button id="mobileActionSecondary" class="mobileActionBtn" type="button">Action 2</button>
+<button id="mobileEquipmentUse" class="mobileActionBtn hidden" type="button" aria-label="Use equipped item">Use</button>
+</div>
+<div id="mobileLookPad" class="mobilePad" aria-label="Look pad">
+<button id="mobileLookUp" class="mobileNavBtn up" type="button" aria-label="Look up">▲</button>
+<button id="mobileLookLeft" class="mobileNavBtn left" type="button" aria-label="Look left">◀</button>
+<button id="mobileLookRight" class="mobileNavBtn right" type="button" aria-label="Look right">▶</button>
+<button id="mobileLookDown" class="mobileNavBtn down" type="button" aria-label="Look down">▼</button>
+<div id="mobileLookLabel" class="mobilePadLabel">Look</div>
+</div>
+</div>
+
+<!-- Real Estate System -->
+<script type="module" src="js/app-shell-fragments.js?v=86"></script>
+<script type="module" src="js/app-auth-shell.js?v=87"></script>
+<script type="module" src="js/bootstrap.js?v=601"></script>
+</body></html>

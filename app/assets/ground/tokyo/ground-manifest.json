@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "tokyo-ground",
+  "providerId": "copernicus-dem-classified-ground-v1",
+  "sourceRelease": "COP-DEM-2021:GLO-30",
+  "contentSha256": "d3802b73f17c6ebc7cc12063a36502bfb8cf660b78e04353d6a8bbc219b414e8",
+  "spacingMeters": 90,
+  "coverage": {
+    "south": 35.64950238673167,
+    "north": 35.702699381699134,
+    "west": 139.61786825689592,
+    "east": 139.68335544110823
+  },
+  "verticalDatum": "EGM2008",
+  "complete": true,
+  "missingSampleCount": 0,
+  "licenseAttested": true,
+  "correctionAttested": true,
+  "sourceEvidence": {
+    "sourceClassification": "digital-surface-model",
+    "correctionMethod": "worldexplorer-pmf-grid-v1",
+    "sourceTiles": [
+      {
+        "tileId": "Copernicus_DSM_COG_10_N35_00_E139_00_DEM",
+        "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N35_00_E139_00_DEM/Copernicus_DSM_COG_10_N35_00_E139_00_DEM.tif",
+        "resolutionMeters": 30,
+        "contentLength": 36863907,
+        "contentSha256": "a4a8dd95b4d3a9f06d7bd09d5125e3196efd7e142fc5b4c6a85431a46f1905fc",
+        "etag": "1e0020384f857e90e0ecf3ecc806f28c",
+        "lastModified": "Mon, 09 May 2022 14:18:06 GMT"
+      }
+    ]
+  },
+  "attribution": {
+    "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+    "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+    "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+    "modified": true
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "dubai-desert-ground",
+  "providerId": "copernicus-dem-classified-ground-v1",
+  "sourceRelease": "COP-DEM-2021:GLO-30",
+  "contentSha256": "a0e1c63f3e8234c9784dcfca4da09cc1792c1a33326b4764a1d50aa1cd13ba35",
+  "spacingMeters": 90,
+  "coverage": {
+    "south": 24.893180924530462,
+    "north": 24.951103621995596,
+    "west": 55.73606163472414,
+    "east": 55.79912336766938
+  },
+  "verticalDatum": "EGM2008",
+  "complete": true,
+  "missingSampleCount": 0,
+  "licenseAttested": true,
+  "correctionAttested": true,
+  "sourceEvidence": {
+    "sourceClassification": "digital-surface-model",
+    "correctionMethod": "worldexplorer-pmf-grid-v1",
+    "sourceTiles": [
+      {
+        "tileId": "Copernicus_DSM_COG_10_N24_00_E055_00_DEM",
+        "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N24_00_E055_00_DEM/Copernicus_DSM_COG_10_N24_00_E055_00_DEM.tif",
+        "resolutionMeters": 30,
+        "contentLength": 43713741,
+        "contentSha256": "bb98178567b880aa6b66fcf48ec11bade94c13236ae63ec8e8c0e894b54225b3",
+        "etag": "559b39e9c0b0e096f7dd29c36ead3804",
+        "lastModified": "Mon, 09 May 2022 14:10:24 GMT"
+      }
+    ]
+  },
+  "attribution": {
+    "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+    "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+    "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+    "modified": true
+  }
+}

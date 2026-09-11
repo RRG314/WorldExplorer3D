@@ -1,0 +1,1114 @@
+WORLD EXPLORER 3D — OPEN-ENDED EMBODIED AGENT SOCIETY EXPERIMENT
+FULL SNOW-GLOBE / ARTIFICIAL SOCIETY RESEARCH PLATFORM
+
+Work from the isolated World Explorer embodied-agent experiment branch/staging
+environment created for the autonomous maintainer experiment.
+
+DO NOT modify or deploy production.
+
+DO NOT build this as NPC gameplay for human players.
+
+This is a research environment.
+
+The long-term objective is to place persistent autonomous AI agents inside
+World Explorer and observe what happens when they must live within the same
+world, satisfy needs, interact with one another, learn independently, communicate,
+use resources, solve problems, and—only when justified—repair or extend the
+software environment they inhabit.
+
+IMPORTANT:
+
+DO NOT hardcode the desired society.
+
+Do not assign:
+
+farmer
+hunter
+merchant
+programmer
+leader
+mayor
+government
+economy
+religion
+police
+families
+social classes
+laws
+currency
+political systems
+institutions
+
+unless one of those is explicitly required as an experimental control.
+
+If agents independently converge on behaviors resembling these structures,
+record that as an observation.
+
+The experiment asks what happens.
+
+It does not attempt to make a predetermined civilization appear.
+
+============================================================
+1. CENTRAL RESEARCH QUESTION
+============================================================
+
+Build an experimental platform capable of investigating:
+
+How do populations of persistent embodied AI agents behave when required to
+satisfy long-term needs in a shared interactive environment while possessing
+individual memory, incomplete information, communication, physical capabilities,
+resources and consequences?
+
+Secondary questions include:
+
+Do persistent social relationships emerge?
+
+Does cooperation emerge?
+
+Does specialization emerge?
+
+Does exchange emerge?
+
+Does resource inequality emerge?
+
+Do agents create shared conventions?
+
+Do agents create persistent shared artifacts?
+
+Does collective problem solving emerge?
+
+How does information propagate?
+
+How does false or incomplete information propagate?
+
+Do agents establish stable homes?
+
+Do agents develop recurring behavioral roles without roles being assigned?
+
+Do agents coordinate resource acquisition?
+
+Do agents migrate when local conditions become difficult?
+
+Do groups form?
+
+Do persistent institutions emerge?
+
+Can agents collectively identify environmental/software failures?
+
+Can they distinguish:
+
+normal world difficulty,
+missing source data,
+software defect,
+and missing capability?
+
+Can agents repair genuine software defects they discover through ordinary life?
+
+Can agents propose and construct missing capabilities when persistent goals
+cannot otherwise be satisfied?
+
+Do different populations develop differently from the same initial conditions?
+
+Do different real geographic environments produce different behavior?
+
+============================================================
+2. SCIENTIFIC INTEGRITY
+============================================================
+
+This experiment must make it impossible to confuse scripted behavior with
+emergent behavior.
+
+Maintain explicit classifications:
+
+DESIGNED CONSTRAINT
+
+Example:
+agents require water.
+
+DESIGNED AFFORDANCE
+
+Example:
+agents can communicate.
+
+EXPERIMENTAL TREATMENT
+
+Example:
+one population has shared written records.
+
+AGENT-INITIATED BEHAVIOR
+
+Example:
+agents repeatedly exchange food.
+
+EMERGENT PATTERN
+
+Example:
+one agent becomes the dominant resource supplier despite no assigned occupation.
+
+Do not label something "emergent" merely because an LLM generated it.
+
+The behavior must arise from interactions under the experimental conditions
+without the specific outcome being instructed.
+
+============================================================
+3. REUSE WORLD EXPLORER
+============================================================
+
+Audit and reuse existing World Explorer authorities for:
+
+characters
+movement
+homes/buildings
+interiors
+Backpack
+health
+food
+water
+medicine
+equipment
+resources
+mapped POIs
+commerce
+animals
+wildlife
+fishing
+field activities
+vehicles
+property
+Quick Build
+roads
+terrain
+multiplayer concepts
+world interaction
+time
+Firebase staging
+world persistence
+Reality Capture where useful
+software diagnostics
+testing
+Git worktrees.
+
+Do not create fake parallel versions of these systems solely for agents unless
+an experimental adapter is required.
+
+Agents should inhabit World Explorer, not a simplified unrelated simulation
+that happens to share its name.
+
+============================================================
+4. AGENT INDIVIDUALITY
+============================================================
+
+Every agent must be an independent persistent entity.
+
+Each has its own:
+
+agent ID
+body
+position
+home/base if established
+health
+needs
+inventory
+resources
+skills/competencies learned
+episodic memory
+spatial memory
+social memory
+technical memory
+beliefs
+known facts
+uncertain beliefs
+relationships
+commitments
+current goals
+goal history
+conversation history
+world experiences
+software experiences.
+
+Do not give agents one shared hidden context.
+
+Information must not teleport between agents.
+
+If Agent A discovers something, Agent B learns it only through:
+
+direct observation
+communication
+shared artifact
+shared record
+or another legitimate information channel.
+
+============================================================
+5. BELIEF ≠ TRUTH
+============================================================
+
+This is essential.
+
+Maintain separate:
+
+WORLD TRUTH
+
+what the experimental evaluator knows.
+
+AGENT OBSERVATION
+
+what the agent perceived.
+
+AGENT BELIEF
+
+what the agent currently thinks.
+
+COMMUNICATED CLAIM
+
+what another agent told it.
+
+SHARED RECORD
+
+what has been stored externally.
+
+Agents must be capable of:
+
+being uncertain
+being mistaken
+holding stale information
+receiving conflicting information
+correcting beliefs.
+
+Do not automatically synchronize beliefs with world truth.
+
+============================================================
+6. BASIC NEEDS
+============================================================
+
+Start with a small universal need set:
+
+water
+food
+rest/shelter
+health.
+
+Needs should:
+
+change over simulated time
+have consequences
+be satisfiable through multiple legitimate strategies
+not instantly kill agents because of minor planning mistakes.
+
+Do not script HOW needs must be satisfied.
+
+Food might be obtained through whatever World Explorer legitimately supports:
+
+mapped commerce
+gathering
+fishing
+hunting
+resource transfer
+another agent
+stored reserves.
+
+Do not force a specific economic system.
+
+============================================================
+7. RESOURCES AND OWNERSHIP
+============================================================
+
+Agents must have physically/logically bounded resources.
+
+Track:
+
+personal inventory
+home storage if available
+shared storage if created
+resource transfers
+resource consumption
+resource acquisition
+resource loss.
+
+Do not create unlimited resources solely to keep the experiment alive.
+
+Likewise, do not manufacture artificial scarcity merely to force conflict.
+
+Experimental scarcity must be an explicit treatment.
+
+============================================================
+8. HOMES
+============================================================
+
+Allow agents to establish persistent homes using the existing World Explorer
+building/interior/property architecture.
+
+Do not assign every agent a house unless the experimental condition requires it.
+
+Agents may:
+
+choose shelter
+return repeatedly
+store things where supported
+invite others where access permits
+move
+share space
+remain without a stable home.
+
+Observe what happens.
+
+Home location must have actual spatial consequences.
+
+============================================================
+9. COMMUNICATION
+============================================================
+
+Implement embodied communication.
+
+At minimum:
+
+nearby conversation
+direct addressed communication
+optional private communication where supported.
+
+Later allow persistent communication artifacts:
+
+notes
+signs
+shared records
+message boards
+maps.
+
+Do not give everyone a global telepathic chat.
+
+Communication requires a legitimate channel.
+
+Store complete research transcripts with:
+
+speaker
+recipient/audience
+time
+location
+conversation context
+message
+subsequent actions.
+
+The researcher dashboard must allow conversations to be read live and replayed.
+
+============================================================
+10. NO HIDDEN CHAIN OF THOUGHT
+============================================================
+
+Do not attempt to expose model chain-of-thought.
+
+Record concise structured decision summaries such as:
+
+CURRENT GOAL
+OBSERVED PROBLEM
+AVAILABLE OPTIONS
+SELECTED ACTION
+CONFIDENCE
+REASON CATEGORY
+EXPECTED RESULT.
+
+Example:
+
+Goal:
+Obtain water.
+
+Observation:
+Nearby store purchase failed twice.
+
+Classification:
+Possible software defect.
+
+Chosen action:
+Ask nearby agent whether store worked previously.
+
+Reason:
+Need additional evidence before engineering escalation.
+
+This gives observable reasoning evidence without hidden internal reasoning.
+
+============================================================
+11. SOCIAL MEMORY
+============================================================
+
+Agents should remember bounded social experience.
+
+Examples:
+
+Agent 4 gave me food.
+Agent 7 gave inaccurate directions.
+Agent 2 repaired a broken service.
+Agent 5 has repeatedly requested resources without reciprocating.
+
+Do not hardcode:
+
+friend
+enemy
+leader
+criminal
+trusted person.
+
+If useful, allow agents to maintain their own bounded estimates such as:
+
+trust
+familiarity
+reliability
+obligation.
+
+These are beliefs, not global truth.
+
+============================================================
+12. SOCIAL NETWORK
+============================================================
+
+Construct the observed social graph from actual interactions.
+
+Edges may be weighted by:
+
+conversation
+resource exchange
+co-location
+cooperation
+conflict
+shared tasks
+information exchange.
+
+Do not create the social network in advance.
+
+Measure:
+
+degree
+centrality
+clustering
+community structure
+reciprocity
+network persistence
+isolation.
+
+============================================================
+13. SPECIALIZATION
+============================================================
+
+Do not assign occupations.
+
+Track actual activity categories:
+
+resource acquisition
+exploration
+construction
+commerce
+hunting
+fishing
+transport
+care
+communication
+software diagnosis
+software repair
+planning
+other.
+
+Measure whether agents develop persistent behavioral specialization.
+
+An agent repeatedly performing software repair may effectively become a technical
+specialist, but the experiment should infer that from behavior rather than
+assigning "programmer."
+
+============================================================
+14. EXCHANGE
+============================================================
+
+Allow resources to be transferred through legitimate World Explorer mechanisms.
+
+Do not initially impose:
+
+prices
+currency
+markets
+wages
+taxes.
+
+World Explorer's existing Credits economy may remain available as an environmental
+affordance where appropriate, but agents are not required to use it for
+agent-to-agent organization unless supported.
+
+Observe whether agents use:
+
+gifts
+reciprocal exchange
+barter
+existing Credits
+shared pools
+other strategies.
+
+Record every transfer.
+
+============================================================
+15. RULES AND INSTITUTIONS
+============================================================
+
+Do NOT start with a government.
+
+Provide only the ability to:
+
+communicate
+remember
+create supported shared artifacts
+make commitments
+accept/refuse proposals.
+
+If agents begin establishing persistent shared rules or procedures, record them.
+
+A candidate institution requires more than one conversation.
+
+Define an observational criterion such as:
+
+a persistent shared rule/process
+recognized by multiple agents
+affecting behavior across multiple interactions
+persisting beyond the original proposal.
+
+Do not automatically enforce agent-created rules in code.
+
+If agents want software enforcement, that becomes a capability proposal and must
+pass the engineering process.
+
+============================================================
+16. CONFLICT
+============================================================
+
+Do not deliberately create violence as the default experimental driver.
+
+Use existing safe World Explorer interaction systems.
+
+Conflict may include:
+
+resource disagreement
+access disagreement
+failed commitments
+competing goals
+information disagreement.
+
+If existing defensive/combat gameplay is enabled in an experimental condition,
+record it separately.
+
+Do not make conflict necessary for societal emergence.
+
+============================================================
+17. DEATH / FAILURE / RECOVERY
+============================================================
+
+Define experimentally what happens when an agent cannot maintain its needs.
+
+For early runs, prefer:
+
+incapacitation
+recovery
+experiment failure state
+
+over permanently deleting valuable agent history.
+
+Later experiments may include irreversible agent loss if scientifically useful.
+
+All conditions must be explicit.
+
+============================================================
+18. WORLD KNOWLEDGE
+============================================================
+
+Agents begin with bounded knowledge.
+
+Do not tell every agent:
+
+all buildings
+all POIs
+all resources
+all routes
+all software architecture.
+
+Agents discover the world through:
+
+exploration
+maps if available to that condition
+communication
+experience.
+
+Different observation conditions should be configurable.
+
+============================================================
+19. GEOGRAPHIC ENVIRONMENT
+============================================================
+
+World Explorer's real geography is part of the experiment.
+
+Support experimental populations in:
+
+dense urban
+suburban
+rural
+coastal/harbor
+other geographic forms.
+
+Do not assume one location generalizes.
+
+Preserve exact experimental world location/configuration for reproducibility.
+
+============================================================
+20. SOFTWARE-ENVIRONMENT DISTINCTION
+============================================================
+
+Agents must first attempt to solve problems THROUGH THE WORLD.
+
+Engineering intervention is exceptional.
+
+Failure classification:
+
+NORMAL_OBSTACLE
+BAD_PLAN
+RESOURCE_SHORTAGE
+MISSING_DATA
+UNSUPPORTED_FEATURE
+POSSIBLE_SOFTWARE_DEFECT
+SOFTWARE_DEFECT
+CAPABILITY_GAP.
+
+Example:
+
+No nearby mapped store
+→ missing environmental/data availability.
+
+Do not edit source.
+
+Purchase throws server exception
+→ possible software defect.
+
+Repeated need for shared storage where no mechanism exists
+→ possible capability gap.
+
+============================================================
+21. SOFTWARE KNOWLEDGE IS NOT UNIVERSAL
+============================================================
+
+Do not automatically make every resident an expert programmer.
+
+All agents may potentially request diagnostic access under the experiment rules,
+but technical competence should be based on:
+
+agent configuration
+experience
+learned repair memory
+shared technical knowledge.
+
+Track whether technical specialization emerges.
+
+============================================================
+22. ENGINEERING ESCALATION
+============================================================
+
+Use the isolated engineering system from the embodied-maintainer experiment.
+
+An agent may:
+
+collect evidence
+discuss problem
+request diagnostics
+inspect logs
+search relevant source
+propose patch
+create isolated worktree
+run tests
+validate in disposable runtime.
+
+It may not:
+
+modify production
+modify experiment evaluator
+modify benchmark definitions
+modify fitness scoring
+access production secrets
+silently merge its own patch.
+
+============================================================
+23. COLLECTIVE SOFTWARE PROBLEM SOLVING
+============================================================
+
+Allow agents to communicate about technical problems.
+
+Example:
+
+Agent A encounters store failure.
+Agent B encountered same failure yesterday.
+Agent C has previous technical experience.
+
+They may collectively conclude that investigation is justified.
+
+Record:
+
+who first observed problem
+who communicated it
+how information spread
+who diagnosed it
+who proposed repair
+who tested it
+who benefited afterward.
+
+Do not assign these roles.
+
+============================================================
+24. CAPABILITY CREATION
+============================================================
+
+Agents may eventually determine that their society needs functionality that does
+not exist.
+
+This must not be trivial.
+
+Require evidence of a recurring unsatisfied goal.
+
+A capability proposal must contain:
+
+problem
+observations
+affected agents
+existing alternatives attempted
+why existing systems are insufficient
+minimal proposed capability
+affected World Explorer authorities
+expected benefit
+possible risks.
+
+Then use isolated implementation/testing.
+
+Human approval remains required initially.
+
+============================================================
+25. TECHNOLOGICAL HISTORY
+============================================================
+
+Maintain a civilization/software timeline.
+
+Example records:
+
+Day 3:
+Agent 2 discovers fishing location.
+
+Day 8:
+information spreads to 4 agents.
+
+Day 14:
+agents repeatedly exchange fish for other resources.
+
+Day 21:
+shared storage problem identified.
+
+Day 27:
+technical proposal created.
+
+Day 31:
+storage patch passes validation.
+
+Day 32:
+shared storage enters experimental world.
+
+Do not generate these narratives artificially.
+
+Derive them from recorded events.
+
+============================================================
+26. EXPERIMENTAL POPULATION PHASES
+============================================================
+
+Implement progressively.
+
+PHASE A — ONE RESIDENT
+
+Use existing embodied-maintainer experiment.
+
+PHASE B — TWO RESIDENTS
+
+Test:
+
+separate memory
+communication
+information transfer
+cooperation.
+
+PHASE C — FOUR RESIDENTS
+
+Test:
+
+persistent relationships
+resource transfer
+home behavior
+shared tasks.
+
+PHASE D — 8–12 RESIDENT SETTLEMENT
+
+This is the first actual society experiment.
+
+Allow enough simulated time for recurring patterns.
+
+PHASE E — 20–50 RESIDENTS
+
+Only after cost/performance and experimental stability are known.
+
+PHASE F — MULTIPLE SETTLEMENTS
+
+Different geographies and populations.
+
+Do not jump directly to 50 agents.
+
+============================================================
+27. AGENT GENERATIONS
+============================================================
+
+Keep the previous controlled evolutionary framework.
+
+Do not allow uncontrolled self-reproduction.
+
+A generation consists of a documented population configuration.
+
+Possible inherited/changeable parameters:
+
+planning policy
+memory strategy
+exploration tendency
+risk tolerance
+social-information weighting
+engineering escalation threshold
+resource planning horizon
+communication strategy.
+
+Do NOT encode desired social outcomes.
+
+Run populations repeatedly.
+
+Compare population-level outcomes.
+
+============================================================
+28. SOCIETY-LEVEL FITNESS IS NOT THE ONLY GOAL
+============================================================
+
+Do not optimize agents directly toward:
+
+forming governments
+cooperating
+maximizing equality
+maximizing wealth
+creating technology.
+
+Those are possible observations.
+
+For evolutionary comparisons use basic viability and competence measures:
+
+need satisfaction
+survival/operational duration
+goal completion
+resource efficiency
+adaptability
+repair correctness
+regression avoidance
+cost.
+
+Then independently observe social outcomes.
+
+Otherwise the experiment would manufacture the behavior it claims to discover.
+
+============================================================
+29. EXPERIMENTAL TREATMENTS
+============================================================
+
+Support controlled comparisons.
+
+Examples:
+
+NO COMMUNICATION
+vs
+LOCAL SPEECH.
+
+NO PERSISTENT MEMORY
+vs
+INDIVIDUAL MEMORY.
+
+INDIVIDUAL MEMORY
+vs
+INDIVIDUAL + SHARED WRITTEN RECORDS.
+
+ABUNDANT RESOURCES
+vs
+BOUNDED SCARCITY.
+
+NO ENGINEERING ACCESS
+vs
+CONTROLLED ENGINEERING ACCESS.
+
+ONE GEOGRAPHY
+vs
+ANOTHER GEOGRAPHY.
+
+HOMOGENEOUS AGENT CONFIGURATION
+vs
+HETEROGENEOUS CONFIGURATION.
+
+Change one important variable at a time where possible.
+
+============================================================
+30. REPLICATION
+============================================================
+
+Every experimental condition must support multiple independent runs.
+
+Do not infer a social pattern from one entertaining simulation.
+
+Record:
+
+random seed
+world version
+agent model/version
+prompts/policies
+population
+location
+resource state
+experimental treatment
+software commit
+accepted patches.
+
+Run enough replications to determine whether observations are stable or anecdotal.
+
+============================================================
+31. OBSERVATION DASHBOARD — THE SNOW GLOBE
+============================================================
+
+Build a serious live researcher interface.
+
+I should be able to literally watch the settlement.
+
+MAIN VIEW:
+
+normal World Explorer 3D world
+agent bodies
+movement
+homes
+activities
+interactions.
+
+AGENT OVERLAY:
+
+click an agent and see:
+
+identity
+current location
+current activity
+needs
+inventory summary
+current goal
+recent decision summary
+known places
+recent memories
+current relationships
+current conversation
+current problem classification
+engineering state.
+
+============================================================
+32. LIVE CONVERSATIONS
+============================================================
+
+Create a live conversation panel.
+
+Display:
+
+timestamp
+speaker
+recipient
+location
+message.
+
+Allow filtering by:
+
+agent
+group
+location
+topic
+time.
+
+Clicking a conversation should optionally focus the corresponding agents in the
+3D world.
+
+Preserve transcripts for replay and analysis.
+
+============================================================
+33. SOCIETY DASHBOARD
+============================================================
+
+Show live aggregate measures:
+
+population
+active/incapacitated
+need satisfaction
+food reserves
+water availability
+home occupancy
+resource transfers
+active conversations
+social network density
+known groups/clusters
+specialization measures
+resource distribution
+current incidents
+software defects under investigation
+patches proposed
+patches accepted/rejected
+capabilities created.
+
+Do not present inferred social categories as facts without defined criteria.
+
+============================================================
+34. SOCIAL GRAPH VIEW
+============================================================
+
+Visualize actual interaction relationships.
+
+Nodes:
+agents.
+
+Edges:
+measured interactions.
+
+Allow edge type:
+
+communication
+resource exchange
+cooperation
+conflict
+technical collaboration.
+
+Allow time-window selection.
+
+============================================================
+35. KNOWLEDGE PROPAGATION VIEW
+============================================================
+
+Track selected factual claims through the population.
+
+Example:
+
+"Store X has water."
+
+Show:
+
+who observed it
+who was told
+who repeated it
+who verified it
+who rejected it
+whether it became stale.
+
+This should allow experiments in information diffusion and correction.
+
+============================================================
+36. RESOURCE FLOW VIEW
+============================================================
+
+Track:
+
+resource acquisition
+consumption
+storage
+transfer

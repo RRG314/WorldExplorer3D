@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "shenandoah_custom-ground",
+  "providerId": "copernicus-dem-classified-ground-v1",
+  "sourceRelease": "COP-DEM-2021:GLO-30",
+  "contentSha256": "fede7ea1530a70c603eaf267fab91cc557e65bf77606582ca67af63d9a49e221",
+  "spacingMeters": 90,
+  "coverage": {
+    "south": 50.30600418103723,
+    "north": 50.34781161577599,
+    "west": 6.906876725009738,
+    "east": 6.972363909222054
+  },
+  "verticalDatum": "EGM2008",
+  "complete": true,
+  "missingSampleCount": 0,
+  "licenseAttested": true,
+  "correctionAttested": true,
+  "sourceEvidence": {
+    "sourceClassification": "digital-surface-model",
+    "correctionMethod": "worldexplorer-pmf-grid-v1",
+    "sourceTiles": [
+      {
+        "tileId": "Copernicus_DSM_COG_10_N50_00_E006_00_DEM",
+        "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N50_00_E006_00_DEM/Copernicus_DSM_COG_10_N50_00_E006_00_DEM.tif",
+        "resolutionMeters": 30,
+        "contentLength": 30359565,
+        "contentSha256": "41f820867a2823b124dd2cc097101fa83f166652b9b95154ce9f557281ddb9d4",
+        "etag": "9d5bfd04e92be7c5731f2424863661fe",
+        "lastModified": "Mon, 09 May 2022 14:29:05 GMT"
+      }
+    ]
+  },
+  "attribution": {
+    "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+    "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+    "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+    "modified": true
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "antarctica-ground",
+  "providerId": "copernicus-dem-classified-ground-v1",
+  "sourceRelease": "COP-DEM-2021:GLO-30",
+  "contentSha256": "0bef6158ec20c567f79d0956f204d81a5128d84d5fe75c398db226a7af1e0e20",
+  "spacingMeters": 90,
+  "coverage": {
+    "south": -77.85269927558262,
+    "north": -77.83925201442595,
+    "west": 166.63577840513142,
+    "east": 166.69964862183224
+  },
+  "verticalDatum": "EGM2008",
+  "complete": true,
+  "missingSampleCount": 0,
+  "licenseAttested": true,
+  "correctionAttested": true,
+  "sourceEvidence": {
+    "sourceClassification": "digital-surface-model",
+    "correctionMethod": "worldexplorer-pmf-grid-v1",
+    "sourceTiles": [
+      {
+        "tileId": "Copernicus_DSM_COG_10_S78_00_E166_00_DEM",
+        "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_S78_00_E166_00_DEM/Copernicus_DSM_COG_10_S78_00_E166_00_DEM.tif",
+        "resolutionMeters": 30,
+        "contentLength": 6744167,
+        "contentSha256": "9328bf6be57a39adeedc709e909c4c10a8c65d1d9b8f03204e8eea46e4399aa9",
+        "etag": "567f4df64591ab6e4e46d4db45714c7d",
+        "lastModified": "Mon, 09 May 2022 15:13:27 GMT"
+      }
+    ]
+  },
+  "attribution": {
+    "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+    "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+    "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+    "modified": true
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "release": "5.0.0",
+  "generatedAt": "2026-08-26T23:34:23.477Z",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "captureCommand": "npm run capture:5.0-gallery",
+  "writesProduction": false,
+  "captures": [
+    {
+      "file": "assets/landing/current/world-entry-5.0.png",
+      "label": "World entry",
+      "journey": "Baltimore selected in the normal world selector",
+      "width": 1440,
+      "height": 900,
+      "sha256": "d12b32b894ce1f76d82b4392e5359cb43d04bd1f00e0d4657fbf541f166cce25",
+      "provenance": "normal-input browser runtime capture; no synthetic camera or test-only scene"
+    },
+    {
+      "file": "assets/landing/current/street-walk-5.0.png",
+      "label": "Street exploration",
+      "journey": "Normal keyboard walking in the assembled Baltimore world",
+      "width": 1440,
+      "height": 900,
+      "sha256": "2556642e5f7a8626f3f7c63ee6ca5eae65aa73094c4a9ea5f41117bc07aa3c0a",
+      "provenance": "normal-input browser runtime capture; no synthetic camera or test-only scene"
+    },
+    {
+      "file": "assets/landing/current/driving-5.0.png",
+      "label": "Driving",
+      "journey": "Normal keyboard driving in the assembled Baltimore world",
+      "width": 1440,
+      "height": 900,
+      "sha256": "e523d884d24d1f4876c5282b4c4046da1633a35beb5c693fa64961a148208c55",
+      "provenance": "normal-input browser runtime capture; no synthetic camera or test-only scene"
+    },
+    {
+      "file": "assets/landing/current/drone-5.0.png",
+      "label": "Drone flight",
+      "journey": "Normal keyboard drone controls in the assembled Baltimore world",
+      "width": 1440,
+      "height": 900,
+      "sha256": "de46a8be1fad0d8babcd520fa369c5b48fe07071a0515efb9012ccd97face65b",
+      "provenance": "normal-input browser runtime capture; no synthetic camera or test-only scene"
+    },
+    {
+      "file": "assets/landing/current/plane-5.0.png",
+      "label": "Plane flight",
+      "journey": "Normal keyboard plane controls in the assembled Baltimore world",
+      "width": 1440,
+      "height": 900,
+      "sha256": "9d739154d8f241c871f8fb42c9f4bad3cecc3ce55bf61340afb8fcaa126937b2",
+      "provenance": "normal-input browser runtime capture; no synthetic camera or test-only scene"
+    },
+    {
+      "file": "assets/landing/current/ocean-5.0.png",
+      "label": "Ocean exploration",
+      "journey": "Normal title-screen Ocean launch at the selected coordinates",
+      "width": 1440,
+      "height": 900,
+      "sha256": "dbd4bde5dd6f865ed3dcfa1812104029d92837cc281373761a10763762c17f17",
+      "provenance": "normal-input browser runtime capture; no synthetic camera or test-only scene"
+    }
+  ]
+}

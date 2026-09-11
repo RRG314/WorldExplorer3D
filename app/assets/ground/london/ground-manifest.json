@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "london-ground",
+  "providerId": "copernicus-dem-classified-ground-v1",
+  "sourceRelease": "COP-DEM-2021:GLO-30",
+  "contentSha256": "a8b00430c605ba3f098779afd280badee098124308dddfd299f867e6511a7da0",
+  "spacingMeters": 90,
+  "coverage": {
+    "south": 51.486917632326914,
+    "north": 51.52767783131608,
+    "west": -0.1608882673858716,
+    "east": -0.09540108317355589
+  },
+  "verticalDatum": "EGM2008",
+  "complete": true,
+  "missingSampleCount": 0,
+  "licenseAttested": true,
+  "correctionAttested": true,
+  "sourceEvidence": {
+    "sourceClassification": "digital-surface-model",
+    "correctionMethod": "worldexplorer-pmf-grid-v1",
+    "sourceTiles": [
+      {
+        "tileId": "Copernicus_DSM_COG_10_N51_00_W001_00_DEM",
+        "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N51_00_W001_00_DEM/Copernicus_DSM_COG_10_N51_00_W001_00_DEM.tif",
+        "resolutionMeters": 30,
+        "contentLength": 32682214,
+        "contentSha256": "bdd0e7522e84cb434450d6f6f5b7c1889eefb0f8c28abaeddbaad77048c3961e",
+        "etag": "6a9f702479b4d415478d0c63fc78d605",
+        "lastModified": "Mon, 09 May 2022 14:30:24 GMT"
+      }
+    ]
+  },
+  "attribution": {
+    "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+    "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+    "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+    "modified": true
+  }
+}

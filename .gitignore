@@ -1,0 +1,45 @@
+.DS_Store
+.firebase/
+.playwright-cli/
+node_modules/
+functions/node_modules/
+.datum-venv/
+.datum-grids/
+.ground-datum-grids/
+__pycache__/
+*.pyc
+output/
+test-results/
+coverage/
+dist/
+.local-candidates/
+public/
+*.log
+progress.md
+
+# Internal development records are kept outside public release branches.
+docs/*AUDIT*.md
+docs/*HANDOFF*.md
+docs/*RND*.md
+docs/*PLAN*.md
+docs/*IMPLEMENTATION_REPORT*.md
+docs/DATA_AND_PROVENANCE.md
+docs/PERSISTENCE_AND_TRUST.md
+docs/PRODUCT_CAPABILITIES.md
+docs/REGRESSION_LEDGER.md
+docs/TEST_AND_RELEASE_MAP.md
+docs/VERIFICATION_STRATEGY*.md
+
+# Local env/param files
+.env
+.env.*
+!.env.example
+functions/.env
+functions/.env.*
+!functions/.env.example
+
+# Local backup/reference snapshots not part of production repo
+WorldExplorer3D-rdt-engine/
+_style_reference_worldexplorer3d/
+world-explorer-esm/
+three.js

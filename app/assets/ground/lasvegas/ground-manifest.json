@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "lasvegas-ground",
+  "providerId": "copernicus-dem-classified-ground-v1",
+  "sourceRelease": "COP-DEM-2021:GLO-30",
+  "contentSha256": "5f2c4ad858b2363ea4733e65b1c681fd5f77b1f884957f1dc28a83101dae58d3",
+  "spacingMeters": 90,
+  "coverage": {
+    "south": 36.14332039698904,
+    "north": 36.1961863621207,
+    "west": -115.17255341932179,
+    "east": -115.10706623510947
+  },
+  "verticalDatum": "EGM2008",
+  "complete": true,
+  "missingSampleCount": 0,
+  "licenseAttested": true,
+  "correctionAttested": true,
+  "sourceEvidence": {
+    "sourceClassification": "digital-surface-model",
+    "correctionMethod": "worldexplorer-pmf-grid-v1",
+    "sourceTiles": [
+      {
+        "tileId": "Copernicus_DSM_COG_10_N36_00_W116_00_DEM",
+        "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N36_00_W116_00_DEM/Copernicus_DSM_COG_10_N36_00_W116_00_DEM.tif",
+        "resolutionMeters": 30,
+        "contentLength": 39921927,
+        "contentSha256": "4bf2408ee5018b86b7bbec30c95764d5af628c78ee4879be63f82d9749c4f1b5",
+        "etag": "15412bffa5503a2d14e80128a98db48c",
+        "lastModified": "Mon, 09 May 2022 14:19:02 GMT"
+      }
+    ]
+  },
+  "attribution": {
+    "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+    "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+    "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+    "modified": true
+  }
+}

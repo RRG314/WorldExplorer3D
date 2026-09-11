@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "lhasa-plateau-ground",
+  "providerId": "copernicus-dem-classified-ground-v1",
+  "sourceRelease": "COP-DEM-2021:GLO-30",
+  "contentSha256": "138f688ef2f4266d863372b7c4207e96fb5abaa62fb248c186002a1c4d94aa81",
+  "spacingMeters": 90,
+  "coverage": {
+    "south": 29.624472183407057,
+    "north": 29.67997823011354,
+    "west": 91.14037378091427,
+    "east": 91.20424399761521
+  },
+  "verticalDatum": "EGM2008",
+  "complete": true,
+  "missingSampleCount": 0,
+  "licenseAttested": true,
+  "correctionAttested": true,
+  "sourceEvidence": {
+    "sourceClassification": "digital-surface-model",
+    "correctionMethod": "worldexplorer-pmf-grid-v1",
+    "sourceTiles": [
+      {
+        "tileId": "Copernicus_DSM_COG_10_N29_00_E091_00_DEM",
+        "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N29_00_E091_00_DEM/Copernicus_DSM_COG_10_N29_00_E091_00_DEM.tif",
+        "resolutionMeters": 30,
+        "contentLength": 38500243,
+        "contentSha256": "16a6e20e81594429ee66def68c321d66ee71b81a59f5db71abf284a0cc5f8f9e",
+        "etag": "14562d345e9a55dc14e40344e86e524f",
+        "lastModified": "Mon, 09 May 2022 14:13:56 GMT"
+      }
+    ]
+  },
+  "attribution": {
+    "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+    "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+    "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+    "modified": true
+  }
+}

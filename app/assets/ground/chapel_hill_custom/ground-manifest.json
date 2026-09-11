@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "chapel_hill_custom-ground",
+  "providerId": "copernicus-dem-classified-ground-v1",
+  "sourceRelease": "COP-DEM-2021:GLO-30",
+  "contentSha256": "c8c9a0696be9479583bfe7cea334be3790241be706d7a6633c715a23f0c73c13",
+  "spacingMeters": 90,
+  "coverage": {
+    "south": 39.37596978288268,
+    "north": 39.426573002515745,
+    "west": -76.63294126849769,
+    "east": -76.56745408428537
+  },
+  "verticalDatum": "EGM2008",
+  "complete": true,
+  "missingSampleCount": 0,
+  "licenseAttested": true,
+  "correctionAttested": true,
+  "sourceEvidence": {
+    "sourceClassification": "digital-surface-model",
+    "correctionMethod": "worldexplorer-pmf-grid-v1",
+    "sourceTiles": [
+      {
+        "tileId": "Copernicus_DSM_COG_10_N39_00_W077_00_DEM",
+        "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N39_00_W077_00_DEM/Copernicus_DSM_COG_10_N39_00_W077_00_DEM.tif",
+        "resolutionMeters": 30,
+        "contentLength": 43599143,
+        "contentSha256": "57620f4279d45e91895daf961107678fd141f2da615b12eb363f20cc497f6f8d",
+        "etag": "8c0e719bd64d075deba09fdb11a60a48",
+        "lastModified": "Mon, 09 May 2022 14:20:57 GMT"
+      }
+    ]
+  },
+  "attribution": {
+    "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+    "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+    "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+    "modified": true
+  }
+}

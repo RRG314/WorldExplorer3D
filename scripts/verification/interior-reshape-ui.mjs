@@ -1,0 +1,48 @@
+import assert from 'node:assert/strict';
+import {mkdir} from 'node:fs/promises';
+import {chromium} from 'playwright';
+import {startStaticServer} from './static-server.mjs';
+const output='output/verification/interior-reshape';await mkdir(output,{recursive:true});
+const server=await startStaticServer({rootDir:process.cwd(),ports:[4496,4497]});
+const browser=await chromium.launch({channel:'chrome',headless:true});
+try{for(const width of [1100,412]){
+ const context=await browser.newContext({viewport:{width,height:900},hasTouch:width<700,isMobile:width<700}),page=await context.newPage(),errors=[];
+ page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
+ await page.goto(`http://127.0.0.1:${server.port}/app/capture.html`);
+ await page.evaluate(async()=>{
+  document.body.replaceChildren();const angle=.61,c=Math.cos(angle),s=Math.sin(angle);
+  const outline=[[0,0],[12,0],[12,8],[9,8],[9,12],[0,12]].map(([x,z])=>({x:c*x-s*z,z:s*x+c*z}));
+  window.fixtureCapture={captureId:'reshape-verification',ownerUid:'synthetic',building:{spatialContext:{footprint:outline,height:{meters:3}}}};
+  const {openHomeLayoutEditor}=await import('/app/js/reality-capture/home-layout-editor.js');
+  const {normalizeLayout}=await import('/functions/interior-layout.mjs');
+  window.openFixture=()=>openHomeLayoutEditor({capture:fixtureCapture,signal:new AbortController().signal,save:async input=>{const layout=normalizeLayout(input.layout,{footprint:outline,heightMeters:3});fixtureCapture.hybridPreview={layout,roomPhotos:input.roomPhotos,revision:(fixtureCapture.hybridPreview?.revision||0)+1};return{preview:fixtureCapture.hybridPreview};}});
+  await openFixture();
+ });
+ const polygons=()=>page.locator('[data-room-id]');
+ await page.locator('[data-add-room]').click();assert.equal(await polygons().count(),1);
+ assert.equal(await page.locator('[data-tool="select"]').getAttribute('aria-pressed'),'true');
+ const fitted=await page.locator('[data-plan]').getAttribute('viewBox');await page.locator('[data-plan-room]').click();assert.notEqual(await page.locator('[data-plan]').getAttribute('viewBox'),fitted);await page.locator('[data-plan-fit]').click();
+ const initial=await polygons().first().getAttribute('points');
+ const ring=initial.split(' ').map(p=>p.split(',').map(Number));assert.ok(Math.abs(ring[0][1]-ring[1][1])<1e-8,'Room is horizontal in building-aligned grid');
+ async function drag(locator,dx,dy,touch=false){await locator.scrollIntoViewIfNeeded();const b=await locator.boundingBox(),x=b.x+b.width/2,y=b.y+b.height/2;if(touch){const cdp=await context.newCDPSession(page);await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x+dx,y:y+dy}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await cdp.detach();}else{await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+dx,y+dy,{steps:8});await page.mouse.up();}}
+ await drag(page.locator('[data-corner-handle="0"]'),-15,-15,width<700);
+ assert.notEqual(await polygons().first().getAttribute('points'),initial,'Corner drag changes highlighted room with mouse/touch');
+ await page.locator('[data-undo]').click();assert.equal(await polygons().first().getAttribute('points'),initial);
+ await drag(page.locator('[data-wall-handle="1"]'),20,0);
+ const resized=await polygons().first().getAttribute('points');assert.notEqual(resized,initial,'Wall handle resizes the actual polygon');
+ await page.locator('[data-tool="corner"]').click();
+ const mid=await polygons().first().evaluate(el=>{const p=el.points,a=p[0],b=p[1],q=new DOMPoint((a.x+b.x)/2,(a.y+b.y)/2).matrixTransform(el.getScreenCTM());return{x:q.x,y:q.y};});await page.mouse.click(mid.x,mid.y);
+ assert.equal(await page.locator('[data-corner-handle]').count(),5,'Adding a corner enables a custom polygon');
+ await drag(page.locator('[data-corner-handle="1"]'),0,18);
+ const custom=await polygons().first().getAttribute('points');assert.notEqual(custom,resized);
+ await drag(page.locator('[data-corner-handle="0"]'),-350,-200);assert.equal(await polygons().first().getAttribute('points'),custom,'Out-of-building edit rolls back without changing shape');
+ await page.locator('[data-tool="move-room"]').click();await drag(polygons().first(),8,0);
+ const moved=await polygons().first().getAttribute('points');assert.notEqual(moved,custom,'Whole room moves');
+ await page.locator('[data-save]').click();await page.locator('[data-status]').filter({hasText:/Saved to account/}).waitFor();
+ await page.locator('[data-close]').click();await page.evaluate(()=>openFixture());assert.equal(await polygons().first().getAttribute('points'),moved,'Save and reopen preserve authored shape and placement');
+ await page.locator('[data-room-shape]').selectOption('L');await page.locator('[data-add-room]').click();assert.equal(await polygons().count(),2);assert.equal(await page.locator('[data-corner-handle]').count(),6);
+ await page.locator('[data-more-tools] > summary').click();await page.locator('[data-delete-room]').click();assert.equal(await polygons().count(),1);await page.locator('[data-undo]').click();assert.equal(await polygons().count(),2);
+ await page.locator('[data-plan]').scrollIntoViewIfNeeded();await page.screenshot({path:`${output}/${width}-custom-plan.png`});
+ assert.deepEqual(errors,[]);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+ await context.close();console.log(`${width}: rotated concave outline, add, mouse/touch corner, wall, custom polygon, move, save/reopen, L room, delete/undo passed.`);
+}}finally{await browser.close();await server.close();}

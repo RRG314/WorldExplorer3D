@@ -1,0 +1,40 @@
+{
+  "date": "2026-09-11",
+  "runId": "free-1789158460096-09fbef",
+  "provider": "gemini",
+  "model": "gemini-3.1-flash-lite",
+  "environment": "actual mapped Baltimore world",
+  "evidenceType": "live API plus real browser and persisted workshop",
+  "providerResponses": 3,
+  "connectionChecks": 1,
+  "residentDecisions": 2,
+  "actions": [
+    {
+      "kind": "gather",
+      "materialId": "trail-water",
+      "quantity": 1,
+      "tick": 0
+    },
+    {
+      "kind": "gather",
+      "materialId": "route-snack",
+      "quantity": 1,
+      "tick": 36
+    }
+  ],
+  "pausedAtSimulatedSeconds": 23,
+  "pauseFrozenObserved": true,
+  "resumed": true,
+  "finalFrames": 3892,
+  "finalStatus": "ended",
+  "finalError": null,
+  "humanRestoredVisually": true,
+  "browserAndServerClosed": true,
+  "freeTierObserved": true,
+  "billingChanged": false,
+  "limitations": [
+    "No autonomous movement, consumption, crafting or building tested in this run.",
+    "Finite operator-placed supplies are declared starting conditions.",
+    "This does not establish sustained autonomous survival."
+  ]
+}

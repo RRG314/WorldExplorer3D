@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "panama_canal_custom-ground",
+  "providerId": "copernicus-dem-classified-ground-v1",
+  "sourceRelease": "COP-DEM-2021:GLO-30",
+  "contentSha256": "dc55f7744c1eec456e3128620a211494ab6bbe313a9568f5afac7135a59ad6d5",
+  "spacingMeters": 90,
+  "coverage": {
+    "south": 9.133320383701356,
+    "north": 9.197971420736513,
+    "west": -79.97602159834844,
+    "east": -79.91053441413612
+  },
+  "verticalDatum": "EGM2008",
+  "complete": true,
+  "missingSampleCount": 0,
+  "licenseAttested": true,
+  "correctionAttested": true,
+  "sourceEvidence": {
+    "sourceClassification": "digital-surface-model",
+    "correctionMethod": "worldexplorer-pmf-grid-v1",
+    "sourceTiles": [
+      {
+        "tileId": "Copernicus_DSM_COG_10_N09_00_W080_00_DEM",
+        "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N09_00_W080_00_DEM/Copernicus_DSM_COG_10_N09_00_W080_00_DEM.tif",
+        "resolutionMeters": 30,
+        "contentLength": 25029275,
+        "contentSha256": "3f680f7b6fdf15f10182c5d869024e74a2eeb3bb4981f50a792f59f884283215",
+        "etag": "84b7beb83710a0b869d14c985cfe31c3",
+        "lastModified": "Mon, 09 May 2022 14:03:21 GMT"
+      }
+    ]
+  },
+  "attribution": {
+    "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+    "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+    "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+    "modified": true
+  }
+}

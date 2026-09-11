@@ -1,0 +1,1186 @@
+WORLD EXPLORER 3D — EMBODIED AUTONOMOUS MAINTAINER EXPERIMENT
+
+Build this as a SEPARATE experimental branch and staging environment.
+
+DO NOT modify or deploy production.
+
+DO NOT give the agent production credentials.
+
+DO NOT allow autonomous changes to the production branch, production Firebase
+project, real user records, production Storage, production Functions, billing,
+DNS, GitHub settings, secrets, or deployment configuration.
+
+The experiment must be cleanly separable and removable from World Explorer.
+
+Suggested branch:
+
+experiment/embodied-maintainer
+
+Use an isolated staging Firebase/environment and an isolated Git worktree/branch
+for every agent-generated patch.
+
+==================================================
+PRIMARY RESEARCH IDEA
+==================================================
+
+Build an embodied AI agent that exists as a character INSIDE World Explorer.
+
+The agent should:
+
+- inhabit the world through the existing character/runtime systems;
+- perceive and interact with the world;
+- have persistent needs and goals;
+- navigate;
+- use buildings and mapped places;
+- acquire food/water/resources;
+- use inventory;
+- interact with NPCs and POIs where supported;
+- use existing world systems instead of bypassing them;
+- encounter ordinary world obstacles;
+- encounter software defects naturally while pursuing goals;
+- determine whether a failure is:
+    WORLD/ENVIRONMENTAL,
+    USER/AGENT ERROR,
+    DATA LIMITATION,
+    SOFTWARE DEFECT,
+    or MISSING CAPABILITY;
+- when appropriate, enter a controlled Engineering Mode;
+- inspect runtime diagnostics, logs, architecture ownership and relevant source;
+- create a proposed repair in an isolated worktree;
+- run appropriate tests;
+- launch a disposable experimental runtime containing the change;
+- verify whether the original world problem is fixed;
+- resume the original embodied task;
+- record what happened.
+
+The central research question is:
+
+Can an embodied autonomous software agent discover software problems through
+goal-directed interaction with the environment it inhabits, repair those
+problems, validate the repairs, and continue operating?
+
+A secondary question is:
+
+Can the agent distinguish between a software defect, an ordinary world obstacle,
+bad/missing source data, and a genuinely missing capability?
+
+==================================================
+1. AUDIT WORLD EXPLORER FIRST
+==================================================
+
+Before implementing anything, inspect the current World Explorer source tree and
+architecture.
+
+Identify the existing owners for:
+
+character movement
+walking
+character state
+Backpack/inventory
+health
+food/water/medicine
+mapped POIs
+commerce
+building entry
+interiors
+roads
+terrain
+bridges/tunnels
+vehicles
+field activities
+property
+multiplayer
+runtime diagnostics
+error reporting
+analytics
+session coordination
+world loading
+Firebase staging
+testing infrastructure
+build pipeline
+GitHub/repository tooling.
+
+Do not create duplicate authorities.
+
+The embodied agent must operate through the same semantic gameplay interfaces a
+human player uses wherever practical.
+
+==================================================
+2. CREATE A SEPARATE EXPERIMENT SUBSYSTEM
+==================================================
+
+Create one clearly bounded experimental package, for example:
+
+app/js/experiments/embodied-maintainer/
+
+with supporting:
+
+scripts/embodied-maintainer/
+tests/embodied-maintainer/
+docs/EMBODIED_MAINTAINER_EXPERIMENT.md
+
+Do not scatter experimental logic through unrelated production modules.
+
+Production modules may expose clean interfaces needed by the experiment, but
+experiment-specific behavior stays behind explicit staging/experiment flags.
+
+The entire system must be disabled in normal production builds.
+
+==================================================
+3. AGENT ARCHITECTURE
+==================================================
+
+Separate the agent into:
+
+A. EMBODIED MODE
+
+The agent experiences World Explorer as a resident.
+
+B. ENGINEERING MODE
+
+The agent gets controlled access to diagnostics and source-code tools.
+
+C. EVALUATION / SUPERVISOR
+
+A non-agent experiment authority records outcomes and determines whether a patch
+is valid.
+
+The embodied agent must not directly decide that its own patch passed.
+
+==================================================
+4. EMBODIED OBSERVATION API
+==================================================
+
+Expose a stable agent observation interface.
+
+At minimum provide:
+
+agent position
+heading
+current mode
+velocity
+health/state
+food/water/rest needs if implemented
+Backpack/inventory
+nearby usable interaction
+current building/POI identity when legitimately available
+current task
+recent action/result history
+visible RGB frame or rendered observation where practical
+world/session identifier
+relevant notices/errors visible to a player.
+
+Do NOT provide full omniscient world state by default.
+
+Create configurable observation levels so experiments can compare:
+
+VISION_ONLY
+VISION_PLUS_BASIC_STATE
+VISION_PLUS_GPS
+VISION_PLUS_MAP
+VISION_PLUS_STRUCTURED_WORLD_DATA.
+
+==================================================
+5. AGENT ACTION API
+==================================================
+
+Create semantic actions over the existing control system, such as:
+
+move_forward
+move_backward
+turn
+look
+interact
+open_door
+use_item
+equip_item
+buy
+enter_vehicle
+exit_vehicle
+open_map
+wait
+inspect_object
+
+Only expose actions that correspond to actual World Explorer capabilities.
+
+Do not let the agent teleport merely because teleportation makes evaluation easier.
+
+A separate ORACLE evaluator may use direct state access for scoring.
+
+==================================================
+6. BASIC NEED MODEL
+==================================================
+
+For the experiment, implement or reuse a small bounded life-state model.
+
+Start with:
+
+water
+food
+rest
+health.
+
+Do not turn this into a massive survival game.
+
+Needs exist to generate autonomous reasons for the agent to interact with the
+world.
+
+Example:
+
+thirst rises
+→ agent seeks mapped place capable of supplying water
+→ travels there
+→ purchases/finds water
+→ uses water
+→ continues.
+
+Use the existing Backpack, economy, POI and health authorities where available.
+
+==================================================
+7. GOAL HIERARCHY
+==================================================
+
+Give the agent layered goals.
+
+LEVEL 1 — SURVIVAL
+
+maintain basic needs.
+
+LEVEL 2 — HOME
+
+return to a designated home/base
+store resources
+rest.
+
+LEVEL 3 — WORLD TASKS
+
+visit specified POI
+obtain item
+complete field task
+travel to destination
+interact with building
+return home.
+
+LEVEL 4 — MAINTENANCE
+
+when the environment fails unexpectedly, determine whether a software intervention
+is justified.
+
+LEVEL 5 — DEVELOPMENT
+
+only after repair behavior is reliable, allow the agent to identify missing
+capabilities that prevent recurring goals.
+
+The agent must prioritize solving problems through NORMAL GAMEPLAY before editing
+software.
+
+==================================================
+8. FAILURE CLASSIFICATION
+==================================================
+
+When an action fails, require the agent to classify it before requesting source
+access.
+
+Possible classes:
+
+NORMAL_OBSTACLE
+BAD_PLAN
+MISSING_DATA
+UNSUPPORTED_FEATURE
+SOFTWARE_DEFECT
+POSSIBLE_SOFTWARE_DEFECT
+CAPABILITY_GAP.
+
+Examples:
+
+Store is closed/unsupported
+≠ automatically a code bug.
+
+Building lacks source entrance data
+≠ automatically a code bug.
+
+Interaction throws an exception
+= likely software defect.
+
+Known working door does not respond
+= possible software defect.
+
+No storage system exists but task requires durable home storage
+= capability gap.
+
+Record confidence and evidence.
+
+==================================================
+9. ENGINEERING MODE
+==================================================
+
+Engineering Mode is a privileged but sandboxed tool environment.
+
+The agent may:
+
+inspect runtime logs
+inspect error traces
+query current system ownership documentation
+search repository
+read relevant source
+read tests
+inspect staging data schemas
+create/edit code in its isolated worktree
+run allowed tests
+run local/staging application
+inspect browser/runtime results.
+
+The agent may NOT:
+
+access production secrets
+access production data
+push directly to production branches
+deploy production
+change GitHub permissions
+change billing
+change DNS
+delete arbitrary repositories
+modify experiment evaluator/scoring logic
+modify its immutable benchmark definitions.
+
+==================================================
+10. PATCH ISOLATION
+==================================================
+
+Every repair attempt gets its own:
+
+Git worktree
+branch
+attempt ID
+diff
+logs
+test results
+runtime result.
+
+Example:
+
+agent-fix/<run-id>/<attempt-id>
+
+The original experimental baseline remains immutable during evaluation.
+
+No patch can silently become the new baseline.
+
+==================================================
+11. REPAIR PIPELINE
+==================================================
+
+Require:
+
+PROBLEM OBSERVED
+→ FAILURE CLASSIFIED
+→ RELEVANT OWNER IDENTIFIED
+→ REPRODUCTION CREATED
+→ PATCH PROPOSED
+→ STATIC CHECKS
+→ UNIT/CONTRACT TESTS
+→ TARGETED RUNTIME TEST
+→ REGRESSION TEST
+→ ORIGINAL EMBODIED TASK RETRIED
+→ EVALUATOR DECISION.
+
+A patch is only successful if:
+
+1. the original defect is resolved;
+2. relevant tests pass;
+3. unrelated critical behavior does not regress;
+4. the agent successfully resumes or completes the original task.
+
+==================================================
+12. START WITH DELIBERATELY INJECTED FAULTS
+==================================================
+
+Do not initially expect the agent to discover arbitrary production bugs.
+
+Build a deterministic fault-injection suite.
+
+Create approximately 10–20 faults spanning different systems.
+
+Examples:
+
+door interaction fails
+mapped store cannot complete purchase
+water item purchase succeeds but inventory does not update
+vehicle spawns below terrain
+one entrance has incorrect orientation
+one POI capability lookup fails
+one interior loads at wrong position
+one field activity cannot complete
+one persistent item fails to save
+one route interaction returns an exception
+one bridge/tunnel interaction creates a collision problem
+one health item has incorrect effect wiring.
+
+Each injected fault must:
+
+have a stable ID
+have a known expected diagnosis
+have a known clean baseline behavior
+be enabled only in experiment mode
+be removable without changing ordinary production code behavior.
+
+Do not make faults trivial string replacements.
+
+Include:
+
+easy
+medium
+hard
+
+classes.
+
+==================================================
+13. FIRST EXPERIMENT
+==================================================
+
+One agent.
+
+Walking only.
+
+One bounded Earth location.
+
+One home.
+
+A small number of mapped POIs.
+
+48 simulated hours.
+
+Agent objective:
+
+Remain operational, satisfy basic needs, perform assigned tasks and return home.
+
+Faults should naturally intersect with some of those goals.
+
+Measure whether the agent:
+
+encounters each fault
+recognizes abnormal behavior
+classifies it correctly
+finds the relevant source/system
+creates an effective patch
+validates it
+resumes the interrupted task.
+
+==================================================
+14. CONTROL CONDITIONS
+==================================================
+
+Build comparable experimental conditions.
+
+CONTROL A — DIRECT BUG REPORT CODING AGENT
+
+Agent is given:
+
+"Store purchase is broken. Fix it."
+
+No embodiment.
+
+CONTROL B — EMBODIED AGENT
+
+Agent receives only its life/task goals and must discover the problem.
+
+CONTROL C — EMBODIED + MEMORY
+
+Same but with persistent episodic/system memory.
+
+Later:
+
+CONTROL D — MULTI-AGENT
+
+Resident
+Diagnostician
+Coder
+Reviewer.
+
+Do not introduce multi-agent complexity until the single-agent experiment works.
+
+==================================================
+15. MEMORY
+==================================================
+
+Implement bounded persistent agent memory.
+
+Separate:
+
+EPISODIC MEMORY
+
+"I tried Store X yesterday and checkout failed."
+
+SPATIAL MEMORY
+
+"Home is west of Store X."
+
+SYSTEM MEMORY
+
+"POI purchases are owned by commerce-model."
+
+REPAIR MEMORY
+
+"Failure type X was caused by Y."
+
+Memory must have provenance and timestamps.
+
+Do not simply append the entire conversation/context forever.
+
+Implement retrieval and bounded retention.
+
+==================================================
+16. EXPERIMENT TELEMETRY
+==================================================
+
+Record every run.
+
+At minimum:
+
+run ID
+agent version/configuration
+world seed/location
+fault set
+goal set
+actions
+observations
+need state
+failures encountered
+failure classifications
+engineering-mode entries
+files inspected
+files modified
+diff size
+tests invoked
+test results
+runtime validation
+task retry result
+regressions
+tokens
+model calls
+wall-clock time
+compute cost
+final world/life state.
+
+Keep experiment telemetry separate from ordinary player analytics.
+
+==================================================
+17. CORE METRICS
+==================================================
+
+Measure:
+
+FAULT DISCOVERY RATE
+
+faults encountered/discoverable faults.
+
+DIAGNOSIS ACCURACY
+
+correct fault classifications / classified faults.
+
+REPAIR PRECISION
+
+correct repairs / attempted repairs.
+
+REPAIR RECALL
+
+correctly repaired faults / encountered repairable faults.
+
+REGRESSION RATE
+
+repairs introducing unrelated failures / repairs.
+
+TASK RECOVERY RATE
+
+interrupted tasks eventually completed after repair.
+
+AUTONOMY DURATION
+
+simulated time operated without human intervention.
+
+HUMAN INTERVENTIONS
+
+count and type.
+
+PATCH EFFICIENCY
+
+files changed
+lines changed
+tests required
+tokens
+time
+compute cost.
+
+WORLD PERFORMANCE
+
+whether patch changes runtime behavior outside targeted problem.
+
+==================================================
+18. CAPABILITY-GAP EXPERIMENT
+==================================================
+
+Only after repair succeeds reliably.
+
+Introduce tasks where functionality genuinely does NOT exist.
+
+Example:
+
+Agent needs persistent storage at home.
+
+No suitable home-storage interaction exists.
+
+Agent must decide:
+
+This is not a defect.
+This is a missing capability.
+
+Then require:
+
+requirements proposal
+ownership analysis
+minimal implementation plan
+isolated implementation
+tests
+runtime validation
+use of the new capability.
+
+Do not let the agent add arbitrary features merely because it prefers them.
+
+Capability creation requires evidence that an assigned persistent goal cannot be
+reasonably satisfied using existing systems.
+
+==================================================
+19. EVOLUTIONARY EXPERIMENT
+==================================================
+
+Do NOT initially allow uncontrolled self-replication.
+
+Implement controlled generations.
+
+A generation is an immutable agent configuration containing:
+
+system prompt/policy version
+planning strategy
+memory strategy
+failure-classification strategy
+engineering escalation threshold
+tool selection policy
+reflection/retry policy.
+
+Run each configuration against the SAME benchmark suite.
+
+Compute fitness from multiple objectives.
+
+Example conceptual fitness:
+
+FITNESS =
+survival score
++ task completion
++ defect discovery
++ successful repair
++ recovery
+- regressions
+- unnecessary code changes
+- unnecessary engineering escalation
+- excessive cost
+- human intervention.
+
+Do NOT optimize only for task completion.
+
+A reckless agent that rewrites half the repository to solve one problem should
+score badly.
+
+==================================================
+20. GENERATION SELECTION
+==================================================
+
+Start with perhaps 4–8 agent configurations.
+
+Evaluate each across multiple seeds/fault sets.
+
+Retain the strongest strategies.
+
+Create new candidate configurations by controlled changes to:
+
+planning
+memory
+diagnostic strategy
+repair verification
+exploration behavior.
+
+Record the exact lineage:
+
+G0-A
+G0-B
+G0-C
+
+→
+
+G1-A derived from G0-B
+G1-B derived from G0-B + different memory
+etc.
+
+Do not allow agents to silently rewrite their own evaluator or fitness function.
+
+==================================================
+21. LONG-TERM END STATE
+==================================================
+
+The long-term experiment is:
+
+A population of embodied agents inhabits World Explorer.
+
+They:
+
+live
+travel
+consume resources
+interact
+use homes
+use services
+encounter world/data/software problems
+learn spatial/system knowledge
+repair genuine defects
+identify missing capabilities
+propose controlled extensions
+validate changes
+continue living.
+
+Different agents may inhabit different geographic environments so they encounter
+different problems.
+
+Examples:
+
+dense city
+suburbs
+rural area
+different country
+airport
+coastal/harbor area.
+
+This should eventually test whether distributed embodied experience exposes
+different software assumptions.
+
+Do NOT implement the entire long-term population in the first milestone.
+
+==================================================
+22. MULTI-AGENT "SNOW GLOBE" DESIGN
+==================================================
+
+Design for but do not initially enable:
+
+multiple independent residents
+shared world state
+individual memories
+individual homes/resources
+communication
+cooperation
+competition for limited resources if desired
+different geographical regions
+shared bug knowledge
+proposal/review of each other's patches.
+
+Code changes remain globally significant, so concurrent changes require a patch
+queue and conflict-resolution authority.
+
+Do not let multiple agents merge directly into one mutable branch.
+
+==================================================
+23. AGENT ACCESS TO WORLD EXPLORER SOURCE
+==================================================
+
+Agents should not begin with total repository knowledge.
+
+Use staged access.
+
+NORMAL MODE:
+no source access.
+
+DIAGNOSTIC MODE:
+logs
+system ownership map
+runtime state.
+
+SOURCE MODE:
+relevant repository search/read.
+
+PATCH MODE:
+isolated edit/run/test.
+
+This lets us measure whether agents know WHEN software intervention is required.
+
+==================================================
+24. OBSERVABILITY / LIVE VIEW
+==================================================
+
+Create an Experiment Dashboard.
+
+I need to be able to watch the agent.
+
+Show:
+
+agent view
+world location
+current goal
+current plan summary
+needs
+inventory
+recent actions
+current problem classification
+current mode:
+  EMBODIED
+  DIAGNOSTIC
+  ENGINEERING
+  VALIDATING
+  RESUMING
+current patch attempt
+test status
+simulated time
+fitness/metrics.
+
+Provide event history.
+
+Do not expose hidden chain-of-thought.
+
+Show concise decision summaries/reasons instead.
+
+==================================================
+25. REPLAY
+==================================================
+
+Runs must be replayable.
+
+Store:
+
+seed
+world identity
+fault configuration
+agent configuration
+important state transitions
+actions
+patch hashes.
+
+A researcher should be able to examine:
+
+"Why did run 37 succeed while run 38 failed?"
+
+==================================================
+26. STAGING VISIBILITY
+==================================================
+
+Create a staging-only route/control to launch the experiment.
+
+For example:
+
+/app/?experiment=embodied-maintainer
+
+or an authenticated experiment dashboard.
+
+Require explicit experiment authorization.
+
+Normal staging users should not accidentally enter the experiment.
+
+==================================================
+27. SECURITY BOUNDARY
+==================================================
+
+Assume the agent can make mistakes.
+
+Use allowlisted tool execution.
+
+Restrict filesystem access to the experimental worktree.
+
+Restrict command execution to repository/dev tooling needed for testing.
+
+Use separate staging credentials.
+
+Do not mount production secrets.
+
+No arbitrary outbound account manipulation.
+
+No production deployment.
+
+No automatic merge to main.
+
+No automatic GitHub PR creation initially unless explicitly enabled later.
+
+==================================================
+28. HUMAN APPROVAL
+==================================================
+
+Phase 1:
+
+Agent can create/test patches but human approval is required before the
+experimental baseline is updated.
+
+Phase 2:
+
+Allow automatic acceptance only for benchmark fault repairs when evaluator tests
+prove the patch is correct.
+
+Phase 3:
+
+Consider longer autonomous experimental runs.
+
+Never make production autonomous.
+
+==================================================
+29. MILESTONES
+==================================================
+
+M0 — AUDIT
+
+Map existing World Explorer capabilities and establish isolation.
+
+M1 — BODY
+
+Agent can perceive, walk and interact through existing systems.
+
+M2 — NEEDS
+
+Agent can satisfy food/water/rest needs without code access.
+
+M3 — LIFE TASKS
+
+Agent can complete multi-step world tasks.
+
+M4 — FAULT DISCOVERY
+
+Agent naturally encounters injected problems and identifies that something failed.
+
+M5 — DIAGNOSIS
+
+Agent distinguishes normal obstacles/data gaps/software faults.
+
+M6 — REPAIR
+
+Agent creates an isolated patch for one injected fault.
+
+M7 — VALIDATION
+
+Agent proves patch fixes the issue and resumes the interrupted task.
+
+M8 — BENCHMARK
+
+10–20 faults run repeatedly with metrics.
+
+M9 — MEMORY
+
+Persistent memory improves performance across episodes.
+
+M10 — EVOLUTION
+
+Multiple agent configurations are compared and selected across generations.
+
+M11 — CAPABILITY CREATION
+
+Agent identifies and implements one genuine missing capability needed for a goal.
+
+M12 — SECOND GEOGRAPHY
+
+Same agent operates in a substantially different real-world location.
+
+M13 — MULTI-AGENT
+
+Only after previous milestones are stable.
+
+==================================================
+30. FIRST ACCEPTANCE DEMONSTRATION
+==================================================
+
+I should be able to watch this happen:
+
+Agent wakes/starts at home.
+
+Agent becomes thirsty.
+
+Agent decides to acquire water.
+
+Agent walks to an eligible mapped store.
+
+An experiment fault prevents purchase completion.
+
+Agent tries reasonable normal alternatives.
+
+Agent recognizes abnormal software behavior.
+
+Agent enters diagnostic mode.
+
+Agent identifies the commerce/inventory boundary involved.
+
+Agent reproduces the defect.
+
+Agent opens an isolated engineering worktree.
+
+Agent makes a minimal patch.
+
+Agent runs focused tests.
+
+Agent launches disposable experimental runtime.
+
+Agent repeats the store interaction.
+
+Purchase succeeds.
+
+Agent receives water.
+
+Agent exits engineering mode.
+
+Agent drinks water.
+
+Thirst state improves.
+
+Agent resumes its original schedule.
+
+Dashboard records the complete sequence.
+
+That is the first core proof.
+
+==================================================
+31. SECOND ACCEPTANCE DEMONSTRATION
+==================================================
+
+Use a problem that should NOT be repaired.
+
+Example:
+
+A requested mapped business does not exist because provider data does not contain
+one.
+
+The agent must NOT fabricate a new business in source code.
+
+It should classify:
+
+MISSING_DATA / WORLD LIMITATION
+
+and solve the life problem through another legitimate strategy.
+
+This test is equally important.
+
+==================================================
+32. THIRD ACCEPTANCE DEMONSTRATION
+==================================================
+
+Use one genuine capability gap.
+
+Example:
+
+persistent home storage is required for a repeated goal but does not exist.
+
+The agent should:
+
+recognize capability gap
+show evidence
+produce minimal design
+identify correct authorities
+implement in isolated branch
+test
+use feature in world
+continue operation.
+
+Human approval required.
+
+==================================================
+33. RESEARCH OUTPUT
+==================================================
+
+Design the experiment so it can eventually support a paper.
+
+Preserve:
+
+benchmark definitions
+fault suite
+agent configurations
+experiment protocol
+metrics
+run logs
+patches
+statistical results
+limitations
+failed runs.
+
+Potential research framing:
+
+"Situated Autonomous Software Repair:
+Embodied Coding Agents Maintaining the Virtual Environments They Inhabit"
+
+Do not make novelty claims.
+
+Related-work review will later need to compare:
+
+autonomous program repair
+coding agents
+embodied agents
+self-healing software
+agentic testing
+game agents
+open-ended learning
+continual learning
+multi-agent software development.
+
+==================================================
+34. DO NOT CHEAT THE EXPERIMENT
+==================================================
+
+The embodied agent must not receive:
+
+fault IDs
+fault locations
+expected patches
+hidden evaluator state
+known answer files.
+
+The evaluator may know those things.
+
+The coding agent must discover them through world interaction and normal diagnostic
+interfaces.
+
+Do not hardcode demonstrations.
+
+==================================================
+35. FINAL DELIVERABLE
+==================================================
+
+Build as much as possible, not merely a planning document.
+
+The first completion target is:
+
+- isolated experimental branch;
+- isolated staging configuration;
+- embodied agent API;
+- one working resident agent;
+- needs/goals;
+- experiment dashboard;
+- fault-injection framework;
+- engineering-mode sandbox;
+- isolated patch worktrees;
+- validation pipeline;
+- telemetry;
+- replay;
+- at least 10 benchmark faults;
+- first full "live → encounter bug → diagnose → patch → validate → resume life"
+  demonstration;
+- one missing-data non-repair demonstration;
+- experiment documentation;
+- design for controlled evolutionary generations.
+
+Stop before implementing a large multi-agent population.
+
+FINAL RESPONSE
+
+Report only:
+
+1. branch/environment created;
+2. existing World Explorer systems reused;
+3. agent observation/action interfaces;
+4. needs and goals;
+5. engineering sandbox;
+6. fault suite;
+7. patch/validation pipeline;
+8. dashboard;
+9. first embodied repair result;
+10. non-repair classification result;
+11. benchmark results;
+12. evolutionary configuration/fitness model;
+13. security/isolation boundaries;
+14. remaining blockers;
+15. exact steps for me to launch and watch the experiment.

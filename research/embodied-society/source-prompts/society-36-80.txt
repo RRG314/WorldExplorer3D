@@ -1,0 +1,1164 @@
+============================================================
+36. RESOURCE FLOW VIEW — CONTINUED
+============================================================
+
+Track:
+
+resource acquisition
+production where supported
+consumption
+storage
+transfer
+loss
+waste
+location
+ownership/custody changes.
+
+Allow inspection by:
+
+agent
+resource type
+household/group if one actually emerges
+location
+time interval.
+
+Visualize resource movement through the settlement.
+
+Do not infer an economy merely because resources move between agents.
+
+Distinguish:
+
+GIFT
+RECIPROCAL_TRANSFER
+BARTER
+PURCHASE
+SHARED_RESOURCE
+THEFT/UNAUTHORIZED_TRANSFER if the world actually supports and observes it
+UNKNOWN.
+
+Classification must be based on observable events and agent statements, not
+researcher assumptions.
+
+============================================================
+37. SPATIAL BEHAVIOR VIEW
+============================================================
+
+Record where agents actually spend time.
+
+Support:
+
+movement trails
+frequently visited locations
+home ranges
+resource locations
+meeting locations
+travel corridors
+territorial concentration
+migration
+abandoned locations
+new settlement formation.
+
+World Explorer geography must remain meaningful.
+
+Do not replace real navigation with abstract node movement just to simplify the
+experiment.
+
+The researcher should be able to watch an agent physically:
+
+leave home
+walk down a road
+enter a place
+obtain something
+meet another agent
+travel elsewhere
+return home.
+
+============================================================
+38. DAILY LIFE / TIME
+============================================================
+
+Implement a controlled simulation clock.
+
+Agents should experience:
+
+time of day
+need progression
+activity duration
+rest
+travel time
+resource consumption.
+
+Use an acceleration factor so long experiments are practical.
+
+The acceleration factor must be recorded for every run.
+
+Do not allow accelerated simulation to invalidate physics or interaction systems.
+
+If some World Explorer systems cannot safely run at accelerated time, separate:
+
+STRATEGIC TIME
+
+from:
+
+INTERACTIVE RUNTIME TIME.
+
+Document the conversion explicitly.
+
+============================================================
+39. AUTONOMOUS SCHEDULING
+============================================================
+
+Do not give agents scripted daily schedules.
+
+Agents may plan:
+
+immediate actions
+short-term goals
+longer-term intentions.
+
+Allow plans to be interrupted by:
+
+needs
+new information
+social interaction
+environmental events
+software failures
+resource changes.
+
+Record:
+
+planned action
+actual action
+reason for deviation.
+
+This provides a measurable distinction between planning and behavior.
+
+============================================================
+40. AGENT GOAL FORMATION
+============================================================
+
+Separate:
+
+SYSTEM-IMPOSED NEEDS
+
+food/water/rest/health.
+
+EXPERIMENTAL TASKS
+
+specific researcher-defined tasks used for controlled evaluation.
+
+SELF-GENERATED GOALS
+
+goals the agent forms from experience.
+
+Store goal provenance.
+
+An agent deciding:
+
+"I should keep extra water at home"
+
+is different from the experiment instructing:
+
+"Store water at home."
+
+Do not mix these categories.
+
+============================================================
+41. SOCIAL PROPOSALS AND COMMITMENTS
+============================================================
+
+Allow agents to make explicit proposals to one another.
+
+Examples might naturally include:
+
+meet somewhere
+exchange something
+share information
+perform a task together
+use a resource jointly
+help investigate a problem.
+
+Do not predefine the social meaning of these proposals.
+
+Track:
+
+proposal
+participants
+accept/reject
+commitment
+completion
+failure
+explanation if communicated.
+
+This enables measurement of cooperation and reliability.
+
+============================================================
+42. SHARED ARTIFACTS
+============================================================
+
+Allow agents to use existing World Explorer systems to create persistent artifacts
+where legitimate.
+
+Potential examples:
+
+Blocks
+signs
+notes
+stored resources
+mapped routes
+shared records
+constructed objects
+technical documentation.
+
+Do not provide artifacts solely because a desired social phenomenon requires them.
+
+Each artifact records:
+
+creator
+time
+location
+revision
+access
+subsequent users.
+
+This lets the experiment test whether knowledge or organization can persist
+outside individual memory.
+
+============================================================
+43. CULTURAL / BEHAVIORAL TRANSMISSION
+============================================================
+
+Do not implement "culture" as a predefined variable.
+
+Instead record whether behavioral practices propagate.
+
+Example:
+
+Agent A discovers a particular efficient fishing method.
+
+Agent A communicates it.
+
+Agent B adopts it.
+
+Agent B teaches Agent C.
+
+Track the lineage of the behavior/information.
+
+A candidate transmitted practice requires:
+
+origin
+communication/observation pathway
+subsequent adoption
+persistence across time.
+
+Do not call it culture automatically.
+
+Expose the raw evidence so researchers can decide how to characterize it.
+
+============================================================
+44. INNOVATION TRACKING
+============================================================
+
+Record agent-originated solutions that were not explicitly specified.
+
+Examples could include:
+
+new resource strategy
+new route
+new cooperation pattern
+new use of an existing object
+new shared procedure
+new software capability proposal.
+
+For every candidate innovation store:
+
+problem context
+originating agent(s)
+prior available alternatives
+proposed solution
+adoption
+spread
+persistence
+measured effect.
+
+Do not count random LLM suggestions as innovation unless the behavior is actually
+implemented/used in the world.
+
+============================================================
+45. ENVIRONMENTAL EVENTS
+============================================================
+
+Create a controlled event framework.
+
+Events may affect:
+
+resource availability
+accessibility
+weather where appropriate
+transport
+services
+building access
+software functionality.
+
+Every event must have:
+
+event ID
+type
+start
+duration
+scope
+whether agents know about it
+whether it is environmental or software-induced.
+
+Do not secretly change the world without recording the experimental treatment.
+
+============================================================
+46. SOCIAL STRESS EXPERIMENTS
+============================================================
+
+Only after baseline society runs are stable.
+
+Support controlled conditions such as:
+
+temporary resource shortage
+transport disruption
+loss of a service
+new resource discovery
+arrival of new agents
+migration opportunity
+information conflict
+software outage.
+
+Do not hardcode the expected response.
+
+Measure:
+
+adaptation
+cooperation
+resource redistribution
+migration
+communication
+conflict
+technical intervention
+recovery time.
+
+============================================================
+47. SOFTWARE DEFECTS AS WORLD EVENTS
+============================================================
+
+Integrate the existing fault-injection framework into society experiments.
+
+Some faults should affect:
+
+one agent
+one building
+one service
+one geographic area
+the whole settlement.
+
+Agents must discover them through normal life.
+
+Example:
+
+A commerce defect affects everyone using one service.
+
+The evaluator knows:
+
+FAULT-017 is active.
+
+Agents do not.
+
+Track:
+
+first encounter
+first communication
+number of affected agents
+time until recognized as systemic
+time until engineering investigation
+repair attempts
+successful repair
+post-repair recovery.
+
+============================================================
+48. COLLECTIVE DIAGNOSIS
+============================================================
+
+Allow agents to pool evidence through ordinary communication.
+
+Example:
+
+Agent A:
+"I couldn't buy water."
+
+Agent B:
+"Neither could I."
+
+Agent C:
+"The same store worked yesterday."
+
+This may increase confidence that the problem is software-related.
+
+Do not provide an automatic global bug aggregation service unless that is an
+experimental treatment.
+
+Measure whether social evidence improves diagnosis.
+
+============================================================
+49. CODE CHANGES ARE WORLD HISTORY
+============================================================
+
+Every accepted experimental software change becomes part of the recorded world
+history.
+
+Store:
+
+patch ID
+originating problem
+proposing agent(s)
+reviewing/assisting agents
+files changed
+tests
+validation
+approval
+world version before
+world version after
+affected behaviors
+later regressions.
+
+Agents should be able to encounter consequences of previous accepted changes.
+
+============================================================
+50. WORLD VERSIONING
+============================================================
+
+Every experiment run must know exactly which World Explorer version it inhabits.
+
+Use immutable identifiers:
+
+source commit
+experiment configuration hash
+accepted experimental patch sequence
+data/config version.
+
+A society that modifies its experimental environment should create:
+
+World V0
+→ Patch A
+→ World V1
+→ Patch B
+→ World V2.
+
+Never overwrite historical world state.
+
+Researchers must be able to replay a society against an earlier world version.
+
+============================================================
+51. ROLLBACK
+============================================================
+
+If an accepted experimental patch causes a regression:
+
+detect it
+record it
+rollback to previous accepted world version
+record the rollback
+allow agents to experience the consequences if appropriate.
+
+The experiment supervisor, not the agent that authored the patch, owns final
+rollback authority.
+
+============================================================
+52. AGENT-CREATED SOFTWARE MUST REMAIN SANDBOXED
+============================================================
+
+Even if society becomes sophisticated, agents NEVER receive unrestricted host or
+production access.
+
+All code modifications remain:
+
+experimental
+branch-isolated
+worktree-isolated
+staging-only
+test-gated
+versioned
+reversible.
+
+No agent can:
+
+modify production
+access production secrets
+change billing
+change external account permissions
+modify evaluator scoring
+delete experiment history
+disable security boundaries
+grant itself additional tool permissions.
+
+============================================================
+53. MULTI-AGENT ENGINEERING WORK
+============================================================
+
+Support collaborative software work without scripting roles.
+
+Agents may naturally:
+
+report problem
+collect evidence
+inspect logs
+inspect source
+suggest cause
+write patch
+review patch
+test patch.
+
+Record who actually did each operation.
+
+Do not designate:
+
+developer
+tester
+manager
+
+unless used in a controlled comparison.
+
+If specialization emerges, infer it afterward from activity.
+
+============================================================
+54. PATCH CONFLICTS
+============================================================
+
+Multiple agents may eventually propose incompatible changes.
+
+Implement a patch queue.
+
+Each proposal receives:
+
+base world version
+affected ownership areas
+changed files
+tests
+claimed problem
+expected effect.
+
+Detect:
+
+overlapping edits
+stale base versions
+behavioral conflicts.
+
+Do not automatically merge conflicting agent patches.
+
+Require rebase/re-evaluation or experiment-supervisor resolution.
+
+============================================================
+55. OBSERVATIONAL ETHICS / HUMAN ANALOGY
+============================================================
+
+Do not claim that agent behavior directly demonstrates human psychology,
+sociology, morality, economics or consciousness.
+
+The system studies artificial agents.
+
+Human-like behavior may be compared descriptively where appropriate, but the
+research output must distinguish:
+
+AI-agent behavior
+
+from
+
+human behavior.
+
+Do not anthropomorphize metrics.
+
+============================================================
+56. MODEL IDENTITY
+============================================================
+
+Record the exact model/provider/configuration used by every agent.
+
+Different model families may behave very differently.
+
+Store:
+
+model
+version
+temperature/sampling configuration where applicable
+system policy hash
+agent policy version
+memory implementation
+tool permissions.
+
+Do not treat "AI agents" as one homogeneous population.
+
+============================================================
+57. AGENT HETEROGENEITY
+============================================================
+
+Support both:
+
+HOMOGENEOUS POPULATION
+
+same base agent configuration.
+
+and
+
+HETEROGENEOUS POPULATION
+
+controlled differences.
+
+Possible differences:
+
+planning horizon
+memory capacity
+exploration tendency
+communication frequency
+risk tolerance parameter
+resource reserve preference
+engineering escalation threshold.
+
+Do not encode demographic stereotypes or human protected characteristics.
+
+The goal is behavioral-system experimentation, not simulation of real demographic
+groups.
+
+============================================================
+58. REPRODUCIBILITY
+============================================================
+
+Every run must be reproducible as far as nondeterministic model behavior permits.
+
+Record:
+
+run ID
+source commit
+world location
+world seed
+world data snapshot where legally possible
+agent models
+agent configurations
+population
+initial positions
+initial inventories
+initial needs
+resource configuration
+fault configuration
+event schedule
+time acceleration
+tool permissions
+accepted patches
+random seeds
+API/model settings.
+
+Preserve model outputs necessary for analysis subject to provider/privacy rules.
+
+============================================================
+59. EXPERIMENT SNAPSHOTS
+============================================================
+
+Create periodic state snapshots.
+
+Include:
+
+simulated time
+agent positions
+agent needs
+inventory
+homes
+relationships/beliefs where represented
+shared artifacts
+resource state
+world version
+active events
+accepted patches.
+
+Snapshots allow:
+
+pause
+resume
+replay
+branching experiments.
+
+A researcher should be able to branch:
+
+Day 30 state
+
+into:
+
+Condition A
+Condition B
+
+and compare subsequent development.
+
+============================================================
+60. COUNTERFACTUAL BRANCHING
+============================================================
+
+Once snapshots work, support controlled counterfactual experiments.
+
+Example:
+
+Take the exact same Day 20 society.
+
+Branch A:
+commerce bug remains.
+
+Branch B:
+bug is externally fixed.
+
+Branch C:
+agents receive engineering access.
+
+Then compare outcomes.
+
+This is more useful scientifically than merely watching one timeline.
+
+============================================================
+61. BASELINE CONDITIONS
+============================================================
+
+Implement baselines.
+
+At minimum:
+
+RANDOM/VERY SIMPLE POLICY where technically meaningful
+
+SCRIPTED SURVIVAL POLICY
+
+LLM EMBODIED AGENTS WITHOUT SOCIAL COMMUNICATION
+
+LLM EMBODIED AGENTS WITH COMMUNICATION
+
+LLM EMBODIED AGENTS WITH COMMUNICATION + MEMORY
+
+FULL EXPERIMENTAL AGENTS WITH CONTROLLED ENGINEERING ACCESS.
+
+Not every baseline needs every World Explorer capability.
+
+The purpose is to determine what each added capability changes.
+
+============================================================
+62. POPULATION-LEVEL METRICS
+============================================================
+
+Track at minimum:
+
+operational/survival duration
+need satisfaction
+resource availability
+resource distribution
+resource waste
+goal completion
+travel distance
+home stability
+communication volume
+social graph properties
+resource-transfer graph
+cooperation events
+failed commitments
+information propagation
+information correction
+specialization
+shared artifact creation/use
+migration
+software faults discovered
+software faults correctly classified
+repair attempts
+successful repairs
+regressions
+capabilities proposed
+capabilities accepted
+human interventions
+compute/token cost.
+
+============================================================
+63. INEQUALITY METRICS
+============================================================
+
+If resources become unevenly distributed, measure it rather than labeling it.
+
+Support:
+
+resource quantiles
+Gini coefficient where mathematically appropriate
+resource concentration
+housing/access differences
+service access differences.
+
+Do not assume inequality is good, bad, intended or analogous to human society.
+
+Report it as an observed distribution.
+
+============================================================
+64. COOPERATION METRICS
+============================================================
+
+Define cooperation behaviorally.
+
+Examples:
+
+agent incurs measurable cost/time
+another agent or shared goal receives measurable benefit.
+
+Track:
+
+resource assistance
+joint task completion
+information assistance
+technical assistance.
+
+Do not infer cooperation solely from friendly language.
+
+============================================================
+65. SPECIALIZATION METRICS
+============================================================
+
+For each agent calculate distribution over activity classes.
+
+Track persistence across simulated time.
+
+Compare against shuffled/random expectation where appropriate.
+
+This should answer whether persistent functional differentiation emerges rather
+than whether an LLM occasionally calls itself a profession.
+
+============================================================
+66. INFORMATION ACCURACY
+============================================================
+
+For selected world facts, compare:
+
+agent belief
+communicated claims
+world/evaluator truth.
+
+Measure:
+
+accuracy
+uncertainty
+propagation
+correction
+staleness.
+
+This can support controlled misinformation experiments later, but do not add
+deceptive agents merely to create drama in the initial system.
+
+============================================================
+67. LANGUAGE ANALYSIS
+============================================================
+
+Store conversations in structured research format.
+
+Allow later analysis of:
+
+topic
+coordination
+requests
+offers
+warnings
+technical discussion
+resource discussion.
+
+Do not use model-generated hidden interpretations as ground truth.
+
+Keep original observable messages.
+
+============================================================
+68. HUMAN RESEARCHER CONTROLS
+============================================================
+
+Researcher dashboard must provide:
+
+START
+PAUSE
+RESUME
+STEP
+SNAPSHOT
+BRANCH
+END RUN
+INJECT DOCUMENTED EVENT
+ENABLE/DISABLE DOCUMENTED FAULT
+CHANGE TIME RATE within safe bounds.
+
+Researcher actions are logged.
+
+No invisible intervention.
+
+============================================================
+69. AGENT INSPECTOR
+============================================================
+
+Click any agent and inspect:
+
+current goal
+goal provenance
+current activity
+needs
+inventory
+home
+known locations
+recent observations
+beliefs with confidence/source
+recent communications
+relationships
+commitments
+recent decision summaries
+technical experience
+engineering access state
+current software investigation.
+
+Provide historical timeline.
+
+============================================================
+70. SETTLEMENT INSPECTOR
+============================================================
+
+Provide a settlement-level timeline.
+
+Examples of automatically derived event candidates:
+
+first home established
+first resource transfer
+first recurring cooperation
+first persistent specialization candidate
+first shared artifact
+first migration
+first systemic software defect recognized
+first successful autonomous repair
+first capability proposal
+first accepted capability
+first rollback.
+
+These are event candidates derived from measurable criteria.
+
+Do not generate celebratory narrative as evidence.
+
+============================================================
+71. LIVE WORLD VIEW
+============================================================
+
+The experiment must remain visually observable in World Explorer itself.
+
+I should be able to:
+
+move the camera
+follow an agent
+switch agents
+watch conversations
+watch travel
+watch resource acquisition
+watch agents enter/leave buildings
+watch group activity
+watch engineering-related world consequences.
+
+Do not reduce the experiment to charts and logs.
+
+The "ant farm / snow globe" view is a primary requirement.
+
+============================================================
+72. TIME-LAPSE
+============================================================
+
+Create a time-lapse/replay mode.
+
+Allow playback at:
+
+1x
+5x
+10x
+higher event-driven speeds where safe.
+
+Show:
+
+agent movement
+settlement changes
+homes
+shared artifacts
+major events
+software-version transitions.
+
+Allow jumping to significant events.
+
+============================================================
+73. EXPERIMENT EVENT LOG
+============================================================
+
+Create one canonical event schema.
+
+Possible event families:
+
+AGENT_ACTION
+NEED_CHANGE
+RESOURCE_ACQUIRE
+RESOURCE_CONSUME
+RESOURCE_TRANSFER
+COMMUNICATION
+BELIEF_UPDATE
+GOAL_CREATE
+GOAL_COMPLETE
+COMMITMENT
+HOME_CHANGE
+ARTIFACT_CREATE
+SOCIAL_INTERACTION
+FAULT_ENCOUNTER
+FAULT_CLASSIFICATION
+ENGINEERING_ESCALATION
+PATCH_PROPOSE
+PATCH_VALIDATE
+PATCH_ACCEPT
+PATCH_REJECT
+PATCH_ROLLBACK
+CAPABILITY_PROPOSE
+CAPABILITY_ACCEPT
+WORLD_EVENT
+AGENT_INCAPACITATION
+MIGRATION.
+
+Every event has:
+
+run ID
+event ID
+simulated timestamp
+real timestamp
+actors
+location where relevant
+world version
+event payload
+provenance.
+
+============================================================
+74. DATA EXPORT
+============================================================
+
+Support research export in machine-readable formats.
+
+At minimum:
+
+JSONL event stream
+CSV summary tables.
+
+Where useful:
+
+GraphML or equivalent social-network export.
+
+Export must exclude secrets and production/private user information.
+
+This experiment should use synthetic agent identities, not real player personal
+data.
+
+============================================================
+75. ANALYSIS PIPELINE
+============================================================
+
+Create reproducible analysis scripts.
+
+They should generate:
+
+run summary
+population survival/viability curves
+need satisfaction
+resource distributions
+social graph statistics
+communication statistics
+specialization metrics
+information diffusion metrics
+fault/repair metrics
+capability-development timeline
+human-intervention count
+compute/token cost.
+
+Do not manually calculate paper results from dashboard screenshots.
+
+============================================================
+76. STATISTICAL COMPARISON
+============================================================
+
+Design experiments for repeated runs.
+
+Report:
+
+sample size
+mean/median where appropriate
+variance/IQR
+confidence intervals
+effect sizes
+statistical tests only where assumptions are justified.
+
+Do not p-hack or repeatedly alter the experiment after observing results without
+recording the change.
+
+Separate:
+
+EXPLORATORY experiments
+
+from
+
+CONFIRMATORY experiments.
+
+============================================================
+77. PRE-REGISTRATION READY DESIGN
+============================================================
+
+Structure experiment definitions so a later formal study can be preregistered.
+
+An experiment config should specify before execution:
+
+hypothesis
+independent variable
+dependent variables
+population
+world
+duration
+stopping conditions
+exclusions
+analysis plan.
+
+Do not require preregistration for development/debug runs.
+
+============================================================
+78. DEVELOPMENT RUNS VS RESEARCH RUNS
+============================================================
+
+Mark every run:
+
+DEV
+PILOT
+EXPLORATORY
+CONFIRMATORY.
+
+DEV/PILOT runs may be used to debug.
+
+Do not silently include them in final confirmatory statistics.
+
+============================================================
+79. COST CONTROL
+============================================================
+
+A multi-agent LLM society can become extremely expensive.
+
+Implement budgets:
+
+model calls per agent per simulated hour
+tokens
+memory retrieval
+conversation frequency
+engineering-tool calls
+concurrent agents
+simulation duration.
+
+Use event-driven reasoning where possible.
+
+Agents should not call an LLM every rendered frame.
+
+Idle agents should use lower-cost state progression until a meaningful decision
+is required.
+
+Record all costs.
+
+============================================================
+80. PERFORMANCE ARCHITECTURE
+============================================================
+
+Separate:
+
+VISUAL

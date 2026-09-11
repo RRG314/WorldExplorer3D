@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "hollywood-ground",
+  "providerId": "copernicus-dem-classified-ground-v1",
+  "sourceRelease": "COP-DEM-2021:GLO-30",
+  "contentSha256": "30432113917bf238fc7873a044ce9ab0e201430096521284ef54c91aa93cbfc7",
+  "spacingMeters": 90,
+  "coverage": {
+    "south": 34.0653476669721,
+    "north": 34.119579831464016,
+    "west": -118.36121335183242,
+    "east": -118.29572616762016
+  },
+  "verticalDatum": "EGM2008",
+  "complete": true,
+  "missingSampleCount": 0,
+  "licenseAttested": true,
+  "correctionAttested": true,
+  "sourceEvidence": {
+    "sourceClassification": "digital-surface-model",
+    "correctionMethod": "worldexplorer-pmf-grid-v1",
+    "sourceTiles": [
+      {
+        "tileId": "Copernicus_DSM_COG_10_N34_00_W119_00_DEM",
+        "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N34_00_W119_00_DEM/Copernicus_DSM_COG_10_N34_00_W119_00_DEM.tif",
+        "resolutionMeters": 30,
+        "contentLength": 42718799,
+        "contentSha256": "eb5f76ce3183a33c76e24d00fd854598b490523f6cb325e3f234203a3bc011a8",
+        "etag": "7159b3ec2537eebe6eb1c8430bb07403",
+        "lastModified": "Mon, 09 May 2022 14:17:35 GMT"
+      }
+    ]
+  },
+  "attribution": {
+    "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+    "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+    "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+    "modified": true
+  }
+}

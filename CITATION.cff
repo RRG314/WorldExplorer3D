@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "Please cite this research software and technical report with the exact public Git commit. Not peer reviewed."
+title: "World Explorer embodied-agent research: bounded mapped-world pilot"
+authors:
+  - family-names: "Reid"
+    given-names: "Steven"
+version: "0.1.0"
+date-released: "2026-09-11"
+repository-code: "https://github.com/RRG314/WorldExplorer3D/tree/steven/research-embodied-society"
+url: "https://github.com/RRG314/WorldExplorer3D/tree/steven/research-embodied-society/research/embodied-society"
+license: "LicenseRef-World-Explorer-3D-Source-Available-1.0"
+abstract: "Research integration and developmental evidence for one model-controlled resident in a mapped 3D world; no sustained-survival or society claim."

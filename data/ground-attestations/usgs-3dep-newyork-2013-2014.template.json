@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "type": "GroundSourceAttestationTemplate",
+  "rasters": [
+    {
+      "rasterId": "20895",
+      "sourceRelease": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/NJ_SdL5_2014/TIFF/USGS_one_meter_x58y451_NJ_SdL5_2014.tif",
+      "sourceTitle": "USGS one meter x58y451 NJ SdL5 2014",
+      "sourceResolutionMeters": 1,
+      "acquisitionStartDate": "20130806",
+      "acquisitionEndDate": "20140421",
+      "sourceHorizontalFrame": "NAD83",
+      "sourceVerticalDatum": "NAVD88",
+      "sourceGeoidModel": "unspecified",
+      "verticalAccuracyRmseMeters": 0.2,
+      "samplingUncertaintyMeters": 0.5,
+      "referenceFrameUncertaintyMeters": 0.25,
+      "metadataUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/NJ_SdL5_2014/metadata/USGS_one_meter_x58y451_NJ_SdL5_2014_meta.xml",
+      "metadataSha256": "25d798e7a40fd9a69e9c3002e55bf3d5c455769d8e32d04245337eab06b7a663"
+    },
+    {
+      "rasterId": "30649",
+      "sourceRelease": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/NY_CMPG_2013/TIFF/USGS_one_meter_x58y451_NY_CMPG_2013.tif",
+      "sourceTitle": "USGS one meter x58y451 NY CMPG 2013",
+      "sourceResolutionMeters": 1,
+      "acquisitionStartDate": "20130806",
+      "acquisitionEndDate": "20140421",
+      "sourceHorizontalFrame": "NAD83",
+      "sourceVerticalDatum": "NAVD88",
+      "sourceGeoidModel": "unspecified",
+      "verticalAccuracyRmseMeters": 0.2,
+      "samplingUncertaintyMeters": 0.5,
+      "referenceFrameUncertaintyMeters": 0.25,
+      "metadataUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/NY_CMPG_2013/metadata/USGS_one_meter_x58y451_NY_CMPG_2013_meta.xml",
+      "metadataSha256": "714de20056bda21597347846a2f22512bbc9f4efb5cc94aff146f27815f704bc"
+    },
+    {
+      "rasterId": "87399",
+      "sourceRelease": "20200330",
+      "sourceTitle": "USGS one meter x58y452 NY CMPG 2013",
+      "sourceResolutionMeters": 1,
+      "acquisitionStartDate": "20130806",
+      "acquisitionEndDate": "20140421",
+      "sourceHorizontalFrame": "NAD83",
+      "sourceVerticalDatum": "NAVD88",
+      "sourceGeoidModel": "unspecified",
+      "verticalAccuracyRmseMeters": 0.2,
+      "samplingUncertaintyMeters": 0.5,
+      "referenceFrameUncertaintyMeters": 0.25,
+      "metadataUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/NY_CMPG_2013/metadata/USGS_one_meter_x58y452_NY_CMPG_2013_meta.xml",
+      "metadataSha256": "8903ba62c13a89e88d43b191a03c4a1c108a14e1ed2df2f0c733566ca3d12e3f"
+    },
+    {
+      "rasterId": "21709",
+      "sourceRelease": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/NJ_SdL5_2014/TIFF/USGS_one_meter_x58y452_NJ_SdL5_2014.tif",
+      "sourceTitle": "USGS one meter x58y452 NJ SdL5 2014",
+      "sourceResolutionMeters": 1,
+      "acquisitionStartDate": "20130806",
+      "acquisitionEndDate": "20140421",
+      "sourceHorizontalFrame": "NAD83",
+      "sourceVerticalDatum": "NAVD88",
+      "sourceGeoidModel": "unspecified",
+      "verticalAccuracyRmseMeters": 0.2,
+      "samplingUncertaintyMeters": 0.5,
+      "referenceFrameUncertaintyMeters": 0.25,
+      "metadataUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/NJ_SdL5_2014/metadata/USGS_one_meter_x58y452_NJ_SdL5_2014_meta.xml",
+      "metadataSha256": "774a397bf84331162e268d90bc4ea0a4ed8c2663e43c58756d319d426398f762"
+    }
+  ]
+}

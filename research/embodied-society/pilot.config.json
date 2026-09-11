@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "experimentId": "embodied-society",
+  "runClass": "DEV",
+  "stage": "G0_SPECIFICATION",
+  "enabled": false,
+  "baselineCommit": "f88af9db",
+  "environment": {
+    "kind": "unprovisioned-research",
+    "firebaseProjectId": null,
+    "productionAccess": false,
+    "playerDataAccess": false,
+    "networkAccess": false
+  },
+  "population": {
+    "initial": 1,
+    "localMaximum": 1,
+    "assignedOccupations": [],
+    "sharedHiddenContext": false
+  },
+  "world": {
+    "mode": "walking",
+    "location": null,
+    "snapshotId": null,
+    "providerPolicy": "record-and-pin-before-pilot",
+    "physicsRate": 1,
+    "strategicRate": 1
+  },
+  "model": {
+    "provider": null,
+    "modelId": null,
+    "credentialConfigured": false,
+    "maxConcurrentCalls": 1
+  },
+  "budget": {
+    "modelSpendUsd": 0,
+    "modelCalls": 0,
+    "wallMinutes": 15,
+    "maxRenderers": 1,
+    "maxEngineeringWorkers": 0,
+    "maxPatchWorktrees": 0,
+    "newArtifactMiB": 256,
+    "minimumFreeDiskGiB": 10
+  },
+  "engineering": {
+    "enabled": false,
+    "baselineAutoAccept": false,
+    "productionDeploy": false,
+    "editEvaluator": false,
+    "sandboxAttestation": null
+  },
+  "observer": {
+    "publicEnabled": false,
+    "researcherCanInspectPrivateState": true,
+    "visitorMode": "disabled",
+    "browserReceivesCredentials": false
+  },
+  "acceptance": {
+    "bodyAdapterVerified": false,
+    "actorIsolationVerified": false,
+    "baselineJourneyVerified": false,
+    "worldDataPinned": false,
+    "sandboxVerified": false,
+    "canLaunch": false
+  }
+}

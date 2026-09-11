@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "branch": "steven/research-embodied-society",
+  "parentCheckpoint": "f88af9db",
+  "date": "2026-09-11",
+  "stage": "SINGLE_RESIDENT_LIVE_GATHERING_VERIFIED_SURVIVAL_PENDING",
+  "launchable": true,
+  "productionChanged": false,
+  "experimentModelCalls": null,
+  "experimentApiSpendUsd": null,
+  "components": {
+    "materialProcesses": "component-tested",
+    "inventoryStorage": "component-tested",
+    "needsAndIdleClock": "component-tested",
+    "residentWalking": "component-and-browser-fixture-tested",
+    "worldAuthority": "controlled-world-query-tests",
+    "constructionProjection": "component-and-browser-fixture-tested",
+    "runController": "bounded live decisions and observed Pause/Resume/End",
+    "controlRehearsal": "removed from launch path per owner correction",
+    "mappedWorldHost": "actual mapped-world load and two live gathering actions verified; movement/shelter acceptance pending",
+    "modelProvider": "real Gemini responses verified; other adapters transport-double tested",
+    "liveServer": "implemented; actual app HTML injection and account disabling HTTP-tested"
+  },
+  "evidence": {
+    "researchTests": {
+      "passed": 59,
+      "failed": 0,
+      "command": "npm run experiment:society:test"
+    },
+    "existingContracts": {
+      "passed": 333,
+      "failed": 0,
+      "command": "npm run verify:pr"
+    },
+    "browser": {
+      "type": "synthetic component fixture, explicit one-kit starter reserve",
+      "actualModules": [
+        "FieldNavigator mesh",
+        "walking physics",
+        "Backpack",
+        "Block geometry",
+        "Block collision"
+      ],
+      "wallConstructed": 1,
+      "wallKitRemaining": 0,
+      "residentAStoppedAtZ": 1.5866666666666658,
+      "residentBStayedAtZ": 0,
+      "consoleOrPageErrors": 0,
+      "serverAndBrowserClosed": true
+    },
+    "specification": {
+      "sourceSections": 179,
+      "sourceArchives": 4,
+      "valid": true,
+      "preflightExitCode": 1,
+      "preflightMeaning": "Expected refusal: not launchable"
+    }
+  },
+  "remaining": [
+    "Extend verified live Gemini gathering to movement, consumption, crafting and construction",
+    "Interior/shelter validation, complete world input pinning and longer-term memory",
+    "Memory, communication and later population gates",
+    "OS-enforced engineering isolation and independent evaluator",
+    "Public observation export and visitor forks"
+  ],
+  "verification": {
+    "mappedWorldFollowup": {
+      "date": "2026-09-11",
+      "result": "incomplete-world-loading-timeout",
+      "browserTotalMs": 76377,
+      "modelCalls": 0,
+      "runtimeErrorsObserved": 0,
+      "finding": "Research controls intercepted Explore; panel now hidden during world selection/loading. Retest reached loading screen but accepted terrain did not become ready within the bound.",
+      "sourceFixes": [
+        "Hide controls during world selection/loading",
+        "Restore original human camera, pause and character visibility on end and failed start; dispose resident resources"
+      ],
+      "researchTestsPassed": 49,
+      "browserAndServerClosed": true,
+      "evidence": "output/verification/embodied-mapped-world/report.json",
+      "limitation": "No positive mapped resident or real provider acceptance; cleanup changes source/syntax checked only."
+    },
+    "mappedWorldLongCheck": {
+      "date": "2026-09-11",
+      "result": "actual-world-loaded",
+      "readyObservedAtMs": 83030,
+      "closedAtMs": 84619,
+      "modelCalls": 0,
+      "runtimeErrors": 0,
+      "evidence": "output/verification/embodied-mapped-world/long-report.json",
+      "screenshot": "output/verification/embodied-mapped-world/long-final.png",
+      "limitation": "World load acceptance only; resident placement and real model-driven survival still unverified."
+    },
+    "freeProvider": {
+      "provider": "groq",
+      "model": "openai/gpt-oss-20b",
+      "researchTestsPassed": 52,
+      "evidenceType": "provider transport double, not live API",
+      "requires": "Owner Free-plan account and API key",
+      "defaultCallCap": 20,
+      "minimumCallIntervalMs": 60000
+    },
+    "geminiLiveAttempt": {
+      "date": "2026-09-11",
+      "provider": "gemini",
+      "model": "gemini-3.8-flash",
+      "runId": "free-1789156903764-2a7df2",
+      "result": "mapped-resident-created-provider-503",
+      "actualRequestsReserved": 1,
+      "modelActionsApplied": 0,
+      "accountTierObserved": "Free tier in Google AI Studio",
+      "endedAndHumanRestored": true,
+      "browserAndServerClosed": true,
+      "credentialsPersisted": false,
+      "automatedResearchTests": 55,
+      "evidence": "output/embodied-society-live/free-1789156903764-2a7df2",
+      "limitation": "Provider returned 503; real AI survival behavior is unverified."
+    },
+    "geminiLiveSuccess": {
+      "date": "2026-09-11",
+      "runId": "free-1789158460096-09fbef",
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "environment": "actual mapped Baltimore world",
+      "evidenceType": "live API plus real browser and persisted workshop",
+      "providerResponses": 3,
+      "connectionChecks": 1,
+      "residentDecisions": 2,
+      "actions": [
+        {
+          "kind": "gather",
+          "materialId": "trail-water",
+          "quantity": 1,
+          "tick": 0
+        },
+        {
+          "kind": "gather",
+          "materialId": "route-snack",
+          "quantity": 1,
+          "tick": 36
+        }
+      ],
+      "pausedAtSimulatedSeconds": 23,
+      "pauseFrozenObserved": true,
+      "resumed": true,
+      "finalFrames": 3892,
+      "finalStatus": "ended",
+      "finalError": null,
+      "humanRestoredVisually": true,
+      "browserAndServerClosed": true,
+      "freeTierObserved": true,
+      "billingChanged": false,
+      "limitations": [
+        "No autonomous movement, consumption, crafting or building tested in this run.",
+        "Finite operator-placed supplies are declared starting conditions.",
+        "This does not establish sustained autonomous survival."
+      ],
+      "automatedResearchTests": 59
+    }
+  },
+  "launchScope": "Operator-configured, bounded local pilot only; full experiment not ready",
+  "aggregateMeaning": "Historical lifetime calls/spend not fully audited; see scoped development inventory and dated verification."
+}

@@ -1,0 +1,36 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Resident body component verification</title>
+<style>body{margin:0;background:#e9eef2;color:#172b35;font:16px system-ui}header{padding:12px 20px}canvas{display:block}button{margin-left:16px}</style>
+<header>Resident body verification — synthetic test scene, no AI or society run <button id="ready" disabled>Loading</button></header>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script type="module">
+import {createResidentBody} from '/app/js/experiments/embodied-society/resident-body.mjs';
+import {createConstructionProjection} from '/app/js/experiments/embodied-society/construction-projection.mjs';
+import {createWorkshopState,createWorkshopService} from '/app/js/experiments/embodied-society/workshop.mjs';
+import {createWorldAuthority} from '/app/js/experiments/embodied-society/world-authority.mjs';
+const renderer=new THREE.WebGLRenderer({antialias:false,preserveDrawingBuffer:true});renderer.setSize(900,540);renderer.setPixelRatio(1);document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0xd9e6ed);scene.add(new THREE.HemisphereLight(0xffffff,0x647f68,1.5));
+const light=new THREE.DirectionalLight(0xffffff,1);light.position.set(4,8,3);scene.add(light);
+const camera=new THREE.PerspectiveCamera(50,900/540,.1,100);camera.position.set(7,6,9);camera.lookAt(0,1,0);
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(15,15),new THREE.MeshStandardMaterial({color:0x9fb391}));floor.rotation.x=-Math.PI/2;scene.add(floor);
+scene.add(new THREE.GridHelper(14,14,0x667c70,0x8b9e8a));
+const projection=createConstructionProjection({THREE,scene,runId:'visual-component'});
+const world={walkSurfaceAt:()=>({position:{y:0}}),checkBuildingCollision:()=>({collision:false}),
+ getBuildCollisionAtWorldXZ:projection.getBuildCollisionAtWorldXZ,getBuildTopSurfaceAtWorldXZ:projection.getBuildTopSurfaceAtWorldXZ};
+const a=createResidentBody({THREE,scene,world,actorId:'a',spawn:{x:-1,y:1.7,z:0,yaw:0}});
+const b=createResidentBody({THREE,scene,world,actorId:'b',spawn:{x:2,y:1.7,z:0,yaw:0}});
+// Explicit test reserve: one pre-made wall kit. This verifies publication and
+// physical collision, not autonomous discovery or the separately tested recipe chain.
+let saved,workshop;
+const authority=createWorldAuthority({runId:'visual-component',bodies:new Map([['a',a],['b',b]]),snapshot:()=>workshop.snapshot(),world:{
+ permits:()=>true,lineOfSight:()=>true,placementAllowed:()=>true,shelterAt:()=>null,transferConsented:()=>false}});
+workshop=createWorkshopService({initialState:createWorkshopState({runId:'visual-component',actorIds:['a','b'],nodes:[{id:'test-reserve',materialId:'research:wall-kit',remaining:1,position:{x:-1,y:0,z:0}}]}),authorize:authority.authorize,persist:async snapshot=>{saved=snapshot;}});
+await workshop.execute('a',{kind:'gather',targetId:'test-reserve',quantity:1,operationId:'reserve',expectedRevision:0},0);
+await workshop.execute('a',{kind:'build',materialId:'research:wall-kit',placement:{gx:-1,gy:.5,gz:2},operationId:'wall',expectedRevision:1},0);
+projection.reconcile(saved);
+const held=new Set();window.addEventListener('keydown',e=>held.add(e.code));window.addEventListener('keyup',e=>held.delete(e.code));
+const render=()=>renderer.render(scene,camera);
+window.advanceTime=async ms=>{for(let i=0;i<Math.max(1,Math.round(ms/(1000/60)));i++){a.command({frames:1,move:held.has('ArrowUp')?1:0});a.step();b.step();}render();};
+window.render_game_to_text=()=>JSON.stringify({kind:'component-fixture-not-autonomous-run',coordinates:'metres; +z forward, +y up',a:a.observation(),b:b.observation(),wall:{z:2},savedConstructionCount:Object.keys(saved.structures).length,remainingKitCount:workshop.inspectInventory('a').items.length,projectionCollision:projection.getBuildCollisionAtWorldXZ(-1,2,0,.65,1.7)});
+window.addEventListener('pagehide',()=>{a.dispose();b.dispose();projection.dispose();renderer.dispose();});
+render();document.getElementById('ready').disabled=false;document.getElementById('ready').textContent='Ready';
+</script></html>

@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "seattle-ground",
+  "providerId": "copernicus-dem-classified-ground-v1",
+  "sourceRelease": "COP-DEM-2021:GLO-30",
+  "contentSha256": "b0a902c2f7b0537c35acbdc9a62eb69b9ee9202914087f444e7e7bb6b446b662",
+  "spacingMeters": 90,
+  "coverage": {
+    "south": 47.58397456077559,
+    "north": 47.62812761418583,
+    "west": -122.36482491009633,
+    "east": -122.29933772588402
+  },
+  "verticalDatum": "EGM2008",
+  "complete": true,
+  "missingSampleCount": 0,
+  "licenseAttested": true,
+  "correctionAttested": true,
+  "sourceEvidence": {
+    "sourceClassification": "digital-surface-model",
+    "correctionMethod": "worldexplorer-pmf-grid-v1",
+    "sourceTiles": [
+      {
+        "tileId": "Copernicus_DSM_COG_10_N47_00_W123_00_DEM",
+        "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N47_00_W123_00_DEM/Copernicus_DSM_COG_10_N47_00_W123_00_DEM.tif",
+        "resolutionMeters": 30,
+        "contentLength": 39786033,
+        "contentSha256": "51b92a67a23666a7b688b1c844406ea4416d736b3b4769a71fb9f69aaccec666",
+        "etag": "1fc6b8ff9866072475dc8703a201d1fd",
+        "lastModified": "Mon, 09 May 2022 14:27:25 GMT"
+      }
+    ]
+  },
+  "attribution": {
+    "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+    "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+    "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+    "modified": true
+  }
+}

@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>World Explorer 3D | Your Next Expedition Starts Anywhere</title>
+  <meta name="description" content="Enter real locations as your explorer. Travel, investigate wildlife and geology, record discoveries, build, and explore a connected world from the ground to orbit.">
+  <meta name="theme-color" content="#070b0e">
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles/landing.css?v=4">
+  <script src="./js/firebase-project-config.js"></script>
+  <script type="module" src="./js/site-analytics.js?v=1"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="landing-masthead" aria-label="Main navigation">
+    <a class="landing-brand" href="./" aria-label="World Explorer 3D home">
+      <span class="brand-mark" aria-hidden="true"><span>W</span></span>
+      <span>World Explorer 3D</span>
+    </a>
+    <nav class="landing-nav" aria-label="Landing page sections">
+      <a href="#expedition">The experience</a>
+      <a href="#gameplay">Current gameplay</a>
+      <a href="#world">The world</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <div class="masthead-actions">
+      <a class="account-link" id="landingTertiaryCta" href="./account/">Account</a>
+      <a class="nav-launch" href="./app/">Enter world</a>
+    </div>
+  </header>
+
+  <main id="main">
+    <aside class="announcement" id="landingAnnouncement" hidden>
+      <div class="announcement-eyebrow" id="landingAnnouncementEyebrow">World update</div>
+      <h2 id="landingAnnouncementTitle">A new expedition is ready.</h2>
+      <p id="landingAnnouncementBody"></p>
+      <a id="landingAnnouncementLink" href="./app/" hidden>See what changed</a>
+    </aside>
+
+    <section class="hero" aria-labelledby="landingHeroHeadline">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <span class="hero-brand" id="landingHeroBrand">A playable world built from real places</span>
+          <h1 id="landingHeroHeadline"><span class="hero-headline">Your next expedition starts anywhere on Earth.</span></h1>
+          <p class="lead" id="landingHeroLead">Choose a real location. Enter it as your explorer. Walk, drive, fly, investigate wildlife and geology, record what you find, build, or meet friends—then keep going from Earth to orbit.</p>
+          <div class="cta-row">
+            <a class="btn btn-primary" id="landingPrimaryCta" href="./app/">Start exploring — free</a>
+            <button class="btn btn-secondary" id="landingSecondaryCta" type="button">Explore with friends</button>
+          </div>
+          <ul class="hero-notes" aria-label="Access details">
+            <li>Runs in your browser</li>
+            <li>No download required</li>
+            <li>Optional sign-in</li>
+          </ul>
+          <div class="community-count" id="landingExplorerCount" aria-live="polite" hidden>
+            <strong id="landingExplorerCountValue">0</strong>
+            <span class="community-count-label">explorers have joined</span>
+          </div>
+          <p class="perf-note" id="landingPerformanceNote">Desktop is recommended for the highest world detail. Mobile field controls are included.</p>
+          <p class="status" id="multiplayerStatus" aria-live="polite"></p>
+        </div>
+
+        <div class="hero-media">
+          <div class="hero-coordinate">Baltimore Inner Harbor · in-game view</div>
+          <figure class="hero-frame">
+            <img src="./assets/landing/current/baltimore-harbor-hero.webp" width="1280" height="720" alt="Baltimore skyline and tall downtown buildings viewed across the rendered Inner Harbor water" fetchpriority="high">
+            <figcaption class="hero-caption">
+              <strong>Real mapped city, water, terrain, and skyline in one world.</strong>
+              <span>Inner Harbor · Baltimore</span>
+            </figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <div class="promise-bar" aria-label="World Explorer promises">
+      <div class="promise"><strong>Real places</strong><span>Start from mapped cities, coastlines, terrain, weather, and live world data.</span></div>
+      <div class="promise"><strong>Your explorer</strong><span>The character on screen is you—not a disposable hero from somebody else's story.</span></div>
+      <div class="promise"><strong>A world that remembers</strong><span>Keep discoveries, companions, builds, contributions, and places worth returning to.</span></div>
+      <div class="promise"><strong>Free core world</strong><span>The map, core exploration, and traversal modes are free.</span></div>
+    </div>
+
+    <section class="section" id="expedition">
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">Your expedition</span>
+          <h2>Pick a place. Find your own reason to stay.</h2>
+        </div>
+        <p>World Explorer is not a tour you watch from above. It is a place you enter: choose where to begin, move through it as your own character, notice what is there, and decide what matters to you.</p>
+      </div>
+      <div class="journey-grid">
+        <article class="journey-card">
+          <span class="journey-number">01 / ARRIVE</span>
+          <h3>Choose anywhere</h3>
+          <p>Search for a real destination or begin where you are curious—from a nearby street to another continent.</p>
+        </article>
+        <article class="journey-card">
+          <span class="journey-number">02 / MOVE</span>
+          <h3>Explore your way</h3>
+          <p>Walk at street level, drive farther, launch a boat, take to the air, or pull back to the living globe.</p>
+        </article>
+        <article class="journey-card">
+          <span class="journey-number">03 / DISCOVER</span>
+          <h3>Pay attention</h3>
+          <p>Look for wildlife, plants, geology, metal finds, landmarks, changing weather, and other field opportunities.</p>
+        </article>
+        <article class="journey-card">
+          <span class="journey-number">04 / CONTINUE</span>
+          <h3>Make it yours</h3>
+          <p>Build a field journal, earn trust with companions, save places, create rooms, contribute edits, and return.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="gameplay">
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">Current gameplay</span>
+          <h2>One world, seen from where you stand.</h2>
+        </div>
+        <p>Begin at the globe, arrive at street level, and change how you travel without leaving your expedition.</p>
+      </div>
+
+      <div class="story-stack">
+        <article class="story">
+          <figure class="story-media">
+            <span class="media-label">Choose your destination</span>
+            <img src="./assets/landing/current/world-entry-5.0.png" width="1440" height="900" loading="lazy" alt="World Explorer location selector with Baltimore selected on the interactive globe">
+          </figure>
+          <div class="feature-copy">
+            <span class="eyebrow">Start anywhere</span>
+            <h2>Choose a real location, then arrive in the rendered world.</h2>
+            <p>Search for a place, enter coordinates, or pick a featured destination. World Explorer brings you into the same connected experience for walking, driving, field work, building, and flight.</p>
+            <ul class="feature-list">
+              <li>Move between ground, water, air, and planetary exploration.</li>
+              <li>Record discoveries and continue building your Explorer story.</li>
+              <li>Return to saved places, persistent builds, and shared rooms.</li>
+            </ul>
+          </div>
+        </article>
+      </div>
+
+      <div class="gallery" aria-label="Current World Explorer gameplay">
+        <figure>
+          <img src="./assets/landing/current/street-walk-5.0.png" width="1440" height="900" loading="lazy" alt="World Explorer walking character on an assembled Baltimore street">
+          <figcaption><strong>Walk the street</strong><span>Explore Baltimore on foot</span></figcaption>
+        </figure>
+        <figure>
+          <img src="./assets/landing/current/driving-5.0.png" width="1440" height="900" loading="lazy" alt="World Explorer vehicle driving on an assembled Baltimore road">
+          <figcaption><strong>Drive the city</strong><span>Follow mapped streets and find a new route</span></figcaption>
+        </figure>
+        <figure>
+          <img src="./assets/landing/current/drone-5.0.png" width="1440" height="900" loading="lazy" alt="World Explorer drone view above assembled Baltimore buildings">
+          <figcaption><strong>Survey by drone</strong><span>See the city from above</span></figcaption>
+        </figure>
+        <figure>
+          <img src="./assets/landing/current/plane-5.0.png" width="1440" height="900" loading="lazy" alt="World Explorer plane flying between assembled Baltimore buildings">
+          <figcaption><strong>Take flight</strong><span>Launch from the city and travel farther</span></figcaption>
+        </figure>
+        <figure>
+          <img src="./assets/landing/current/ocean-5.0.png" width="1440" height="900" loading="lazy" alt="World Explorer submarine traveling across a rendered ocean floor">
+          <figcaption><strong>Explore the Ocean</strong><span>Descend beneath the surface by submarine</span></figcaption>
+        </figure>
+        <figure>
+          <img src="./assets/landing/current/world-entry-5.0.png" width="1440" height="900" loading="lazy" alt="World Explorer globe selector with Baltimore coordinates and Explore action visible">
+          <figcaption><strong>Choose the destination</strong><span>Search Earth or begin with a featured city</span></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="section" id="world">
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">One connected world</span>
+          <h2>More depth, without becoming ten separate apps.</h2>
+        </div>
+        <p>The systems are organized around what you are trying to do. Travel changes your point of view. Field work deepens a place. Creation and multiplayer let your time there leave a trace.</p>
+      </div>
+      <div class="features" id="landingHighlights">
+        <article class="feature">
+          <h3>Explore and move</h3>
+          <p>Search the globe, enter a location, then walk, drive, boat, fly, orbit, or visit the Moon without leaving the connected world.</p>
+        </article>
+        <article class="feature">
+          <h3>Investigate and collect</h3>
+          <p>Use a field journal and activity-specific tools to study wildlife, plants, rocks, landmarks, and finds tied to place.</p>
+        </article>
+        <article class="feature">
+          <h3>Create and share</h3>
+          <p>Build rooms and objects, contribute reviewed world edits, preserve memories, and explore together through multiplayer.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="access">
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">Open access</span>
+          <h2>Explore first. Decide what matters later.</h2>
+        </div>
+        <p>The world is available without a payment decision at the door. An account keeps multiplayer and persistent progress together. Donations are optional and support hosting and continued development.</p>
+      </div>
+      <div class="support-grid">
+        <article class="support-card">
+          <h3>Free exploration</h3>
+          <p>Start in the browser, learn the controls in context, and use the core world before creating an account.</p>
+          <ul class="free-list">
+            <li>Map and location search</li>
+            <li>Core traversal modes</li>
+            <li>Field discovery activities</li>
+            <li>Live Earth and world systems</li>
+          </ul>
+        </article>
+        <article class="support-card">
+          <h3>Support the world</h3>
+          <p>If World Explorer becomes a place you value, you can help keep it online. Support never gates the core experience.</p>
+          <div class="support-options">
+            <button class="btn btn-secondary donate-btn" id="donateSupporterBtn" type="button">Donate $1 monthly</button>
+            <button class="btn btn-secondary donate-btn" id="donateProBtn" type="button">Donate $5 monthly</button>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="faq">
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">Before you enter</span>
+          <h2>Useful answers, plainly stated.</h2>
+        </div>
+      </div>
+      <div class="faq">
+        <article class="qa"><h3>Is this a game?</h3><p>It is an open exploration experience with game systems, but no single required storyline. Your goals can be travel, discovery, collection, creation, learning, or spending time with other explorers.</p></article>
+        <article class="qa"><h3>Does it use real locations?</h3><p>Yes. World Explorer builds its world from geographic data and open real-world feeds, then fills in the playable scenery and activities needed for exploration.</p></article>
+        <article class="qa"><h3>Does it run on mobile?</h3><p>Yes. Mobile includes touch controls and field activities. A desktop browser is currently recommended for the highest rendering quality and the largest city scenes.</p></article>
+        <article class="qa"><h3>Do I need an account?</h3><p>No account is required for core exploration. Sign in when you want multiplayer and persistent account-linked progress.</p></article>
+        <article class="qa"><h3>Can I build in the world?</h3><p>Yes. Quick Build places Blocks in the current location. Local builds stay on this device, while room builds can be shared with other signed-in explorers.</p></article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="final-cta">
+        <div>
+          <span class="section-kicker">Choose a starting point</span>
+          <h2>See what is waiting there.</h2>
+          <p>Enter the world now, or begin with a familiar place and discover what changes when it becomes somewhere you can inhabit.</p>
+        </div>
+        <a class="btn btn-primary" href="./app/">Start exploring — free</a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span>World Explorer 3D</span>
+    <span id="landingBuildIdentity">Version 5.2.0</span>
+    <a href="./about/">About</a>
+    <a href="./legal/privacy">Privacy</a>
+    <a href="./legal/terms">Terms</a>
+    <a href="mailto:mail@worldexplorer3d.io">Contact</a>
+    <a href="https://github.com/RRG314/WorldExplorer" target="_blank" rel="noreferrer">GitHub</a>
+    <span>OpenStreetMap data © OpenStreetMap contributors (ODbL)</span>
+  </footer>
+
+  <script type="module">
+    import { hasFirebaseConfig } from './js/firebase-init.js?v=57';
+    import { ensureSignedIn } from './js/auth-ui.js?v=55';
+    import { redirectToCheckout } from './js/billing.js?v=58';
+    import { hydratePublicExplorerCount } from './js/public-site-stats.js?v=1';
+    import { hydrateLandingPageFromPublishedContent } from './js/site-content.js?v=1';
+
+    fetch('./build-manifest.json', { cache: 'no-store' }).then(async (response) => {
+      if (!response.ok) return;
+      const manifest = await response.json();
+      if (!manifest?.buildId || manifest.buildId !== manifest.candidateId) return;
+      const identity = document.getElementById('landingBuildIdentity');
+      if (!identity) return;
+      identity.textContent = `Version ${manifest.version} · ${String(manifest.commit || '').slice(0, 7)}`;
+      identity.title = manifest.buildId;
+      identity.dataset.buildId = manifest.buildId;
+    }).catch(() => {});
+
+    const openMultiplayerBtn = document.getElementById('landingSecondaryCta');
+    const donateSupporterBtn = document.getElementById('donateSupporterBtn');
+    const donateProBtn = document.getElementById('donateProBtn');
+    const statusEl = document.getElementById('multiplayerStatus');
+
+    function setStatus(message, isError = false) {
+      statusEl.textContent = message || '';
+      statusEl.style.color = isError ? 'var(--danger)' : 'var(--muted)';
+    }
+
+    openMultiplayerBtn?.addEventListener('click', async () => {
+      openMultiplayerBtn.disabled = true;
+      setStatus('Checking your account…');
+
+      try {
+        if (!hasFirebaseConfig()) {
+          setStatus('Opening the world in free mode. Multiplayer will be available after Firebase is configured.', true);
+          window.location.assign('./app/?tab=multiplayer');
+          return;
+        }
+
+        const user = await ensureSignedIn();
+        if (!user) {
+          setStatus('Finish signing in to enter multiplayer.');
+          return;
+        }
+
+        setStatus('Opening multiplayer…');
+        window.location.assign('./app/?tab=multiplayer');
+      } catch (err) {
+        console.error('[landing] Multiplayer sign-in failed:', err);
+        setStatus(err?.message || 'Multiplayer could not open right now.', true);
+      } finally {
+        openMultiplayerBtn.disabled = false;
+      }
+    });
+
+    async function startDonationCheckout(plan, button, planLabel) {
+      if (!button) return;
+      button.disabled = true;
+      setStatus(`Preparing the ${planLabel} donation checkout…`);
+
+      try {
+        if (!hasFirebaseConfig()) {
+          setStatus('Open Account to complete a donation after Firebase is configured.', true);
+          window.location.assign('./account/');
+          return;
+        }
+
+        const user = await ensureSignedIn();
+        if (!user) {
+          setStatus('Finish signing in to continue the donation checkout.');
+          return;
+        }
+
+        await redirectToCheckout(plan);
+      } catch (err) {
+        console.error('[landing] Donation checkout failed:', err);
+        setStatus(err?.message || 'Donation checkout could not start right now.', true);
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    donateSupporterBtn?.addEventListener('click', () => startDonationCheckout('supporter', donateSupporterBtn, 'Supporter'));
+    donateProBtn?.addEventListener('click', () => startDonationCheckout('pro', donateProBtn, 'Pro'));
+
+    hydrateLandingPageFromPublishedContent(document).catch((error) => {
+      console.warn('[landing] Published site content unavailable:', error);
+    });
+    hydratePublicExplorerCount(document).catch(() => {});
+  </script>
+</body>
+</html>

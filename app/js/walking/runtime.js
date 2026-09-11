@@ -1,0 +1,274 @@
+import { ctx as appCtx } from "../shared-context.js?v=55";
+import { resolveTunnelCameraEnvelope } from '../hud/tunnel-camera-envelope.js?v=6';
+import { resolveTunnelCameraBoom } from '../hud/tunnel-camera-boom.js';
+import { resolveChaseCameraTerrainCollision } from '../hud/chase-camera-terrain.js?v=1';
+
+function createWalkingRuntimeHelpers({
+  CFG,
+  camera,
+  car,
+  carMesh,
+  clampPointInsideFootprint,
+  createCharacterMesh,
+  finiteOr,
+  getSafeDriveY,
+  getWalkGroundY,
+  pointInPolygonSafe,
+  resolveWalkGroundState,
+  scene,
+  state,
+  syncCarFromWalker,
+  syncWalkerFromCar
+}) {
+  function setModeWalk(options = {}) {
+    if (appCtx.boatMode?.active && !appCtx.boatMode?.manualExitPending) {
+      if (typeof appCtx.setTravelMode === "function") {
+        appCtx.setTravelMode("walk", { source: "walk_mode_direct" });
+      }
+      return;
+    }
+
+    state.mode = "walk";
+    state.walker._resolvedGroundState = null;
+    state.walker.lookYawOffset = 0;
+    state.walker.mobileMoveBasisYaw = null;
+    state.walker.mobileMoveWasActive = false;
+    let appliedSafeWalkSpawn = options.preserveResolvedSpawn === true;
+    if (!appliedSafeWalkSpawn && typeof appCtx.resolveSafeWorldSpawn === "function" && typeof appCtx.applyResolvedWorldSpawn === "function") {
+      const safeWalkSpawn = appCtx.resolveSafeWorldSpawn(
+        finiteOr(car.x, state.walker.x),
+        finiteOr(car.z, state.walker.z),
+        {
+          mode: "walk",
+          angle: finiteOr(car.angle, state.walker.angle),
+          feetY: finiteOr(car.y, 1.2) - 1.2,
+          preserveCurrentSupport: true,
+          preferredRoad: car.road || null,
+          source: "walk_mode_switch"
+        }
+      );
+      appCtx.applyResolvedWorldSpawn(safeWalkSpawn, {
+        mode: "walk",
+        syncCar: true,
+        syncWalker: true
+      });
+      appliedSafeWalkSpawn = true;
+    }
+    if (!appliedSafeWalkSpawn) syncWalkerFromCar();
+    if (carMesh) {
+      carMesh.visible = false;
+    }
+    if (!state.characterMesh) {
+      state.characterMesh = createCharacterMesh();
+    }
+
+    if (state.characterMesh) {
+      const terrainY = options.preserveResolvedSurface === true ?
+        state.walker.y - CFG.eyeHeight :
+        getWalkGroundY(state.walker.x, state.walker.z, car.y - 1.7);
+      state.walker.y = terrainY + 1.7;
+      state.walker.vy = 0;
+      state.characterMesh.visible = state.view !== "first";
+      state.characterMesh.position.set(state.walker.x, terrainY, state.walker.z);
+      state.characterMesh.rotation.y = state.walker.angle;
+    } else {
+      console.error("ERROR: Character mesh is still null after creation!");
+    }
+  }
+
+  function setModeDrive(options = {}) {
+    if (appCtx.boatMode?.active && !appCtx.boatMode?.manualExitPending) {
+      if (typeof appCtx.setTravelMode === "function") {
+        appCtx.setTravelMode("drive", { source: "drive_mode_direct" });
+      }
+      return;
+    }
+
+    const wasWalk = state.mode === "walk";
+    state.mode = "drive";
+    state.walker._resolvedGroundState = null;
+    let resolvedDriveSpawn = null;
+    if (options.preserveResolvedSpawn !== true && typeof appCtx.resolveSafeWorldSpawn === "function" && typeof appCtx.applyResolvedWorldSpawn === "function") {
+      const targetX = wasWalk ? finiteOr(state.walker.x, car.x) : finiteOr(car.x, state.walker.x);
+      const targetZ = wasWalk ? finiteOr(state.walker.z, car.z) : finiteOr(car.z, state.walker.z);
+      const targetAngle = wasWalk ? finiteOr(state.walker.angle, car.angle) : finiteOr(car.angle, state.walker.angle);
+      const walkerFeetY = finiteOr(state.walker.y, 0) - CFG.eyeHeight;
+      resolvedDriveSpawn = appCtx.resolveSafeWorldSpawn(targetX, targetZ, {
+        mode: "drive",
+        angle: targetAngle,
+        feetY: wasWalk ? walkerFeetY : finiteOr(car.y, 1.2) - 1.2,
+        preserveCurrentSupport: true,
+        preferredRoad: car.road || null,
+        source: "drive_mode_switch"
+      });
+      appCtx.applyResolvedWorldSpawn(resolvedDriveSpawn, {
+        mode: "drive",
+        syncCar: true,
+        syncWalker: true
+      });
+    } else if (wasWalk) {
+      syncCarFromWalker();
+    } else {
+      syncWalkerFromCar();
+    }
+
+    car.x = finiteOr(car.x, finiteOr(state.walker.x, 0));
+    car.z = finiteOr(car.z, finiteOr(state.walker.z, 0));
+    car.angle = finiteOr(car.angle, finiteOr(state.walker.angle, 0));
+    const fallbackY = finiteOr(car.y, 1.2);
+    car.y = resolvedDriveSpawn && Number.isFinite(resolvedDriveSpawn.carY)
+      ? resolvedDriveSpawn.carY
+      : getSafeDriveY(car.x, car.z, fallbackY);
+    if (carMesh) {
+      carMesh.visible = true;
+      if (scene && carMesh.parent !== scene) scene.add(carMesh);
+      carMesh.position.set(car.x, car.y, car.z);
+      carMesh.rotation.y = car.angle;
+      carMesh.updateMatrixWorld(true);
+    }
+    appCtx.setCameraMode(0);
+    if (state.characterMesh) state.characterMesh.visible = false;
+    window.walkMouseLookActive = false;
+  }
+
+  function toggleWalk() {
+    if (!state.enabled) return;
+    if (state.mode === "walk") setModeDrive();
+    else setModeWalk();
+  }
+
+  function toggleView() {
+    if (state.view === "third") {
+      state.view = "first";
+    } else if (state.view === "first") {
+      state.view = "overhead";
+    } else {
+      state.view = "third";
+    }
+
+    if (state.characterMesh) {
+      state.characterMesh.visible = state.view !== "first";
+    }
+  }
+
+  function updateWalkCamera() {
+    if (state.mode !== "walk") {
+      return false;
+    }
+
+    const walker = appCtx.presentationPose?.mode === 'walk'
+      ? appCtx.presentationPose.walk
+      : state.walker;
+    const cameraYaw = walker.yaw + (Number(walker.lookYawOffset) || 0);
+    const groundSample = !appCtx.activeInterior && !appCtx.activePlanetaryBodyId &&
+      appCtx.SurfaceQuery?.walkAt?.(walker.x, walker.z, { currentY: walker.y - CFG.eyeHeight });
+    const tunnelRoad = groundSample?.feature || null;
+    const tunnelEnvelope = resolveTunnelCameraEnvelope(tunnelRoad, walker.x, walker.z, walker.y);
+
+    if (state.view === "first") {
+      const y = walker.y;
+      camera.position.set(walker.x, y, walker.z);
+
+      const lookDistance = 10;
+      const lookX = walker.x + Math.sin(cameraYaw) * Math.cos(walker.pitch) * lookDistance;
+      const lookY = y + Math.sin(walker.pitch) * lookDistance;
+      const lookZ = walker.z + Math.cos(cameraYaw) * Math.cos(walker.pitch) * lookDistance;
+
+      camera.lookAt(lookX, lookY, lookZ);
+      return true;
+    }
+
+    if (state.view === "overhead" && !tunnelEnvelope.inside) {
+      const terrainY = getWalkGroundY(walker.x, walker.z, 0);
+      const height = 45;
+      const offsetBack = 8;
+
+      camera.position.set(
+        walker.x - Math.sin(cameraYaw) * offsetBack,
+        terrainY + height,
+        walker.z - Math.cos(cameraYaw) * offsetBack
+      );
+
+      const lookAhead = 15;
+      camera.lookAt(
+        walker.x + Math.sin(cameraYaw) * lookAhead,
+        terrainY,
+        walker.z + Math.cos(cameraYaw) * lookAhead
+      );
+      return true;
+    }
+
+    const activeInterior = appCtx.activeInterior || null;
+    const interiorFootprint = Array.isArray(activeInterior?.usableFootprint) ? activeInterior.usableFootprint : null;
+    const interiorCamera = !!(activeInterior && interiorFootprint && interiorFootprint.length >= 3);
+    const baseY = walker.y;
+    const back = interiorCamera ? Math.min(2.6, Math.max(1.8, CFG.thirdPersonDist * 0.55)) : CFG.thirdPersonDist;
+    const up = interiorCamera ? Math.min(1.45, Math.max(1.05, CFG.thirdPersonHeight * 0.52)) : CFG.thirdPersonHeight;
+    const pitchBackScale = Math.max(0.46, Math.cos(walker.pitch));
+    const camX = walker.x - Math.sin(cameraYaw) * pitchBackScale * back;
+    const camZ = walker.z - Math.cos(cameraYaw) * pitchBackScale * back;
+    const camY = baseY + up - Math.sin(walker.pitch) * back * 0.42;
+
+    let resolvedCamX = camX;
+    let resolvedCamZ = camZ;
+    if (interiorCamera && !pointInPolygonSafe(camX, camZ, interiorFootprint)) {
+      const clamped = clampPointInsideFootprint(camX, camZ, interiorFootprint, 0.42);
+      resolvedCamX = clamped.x;
+      resolvedCamZ = clamped.z;
+    }
+
+    const cameraAnchor = { x: walker.x, y: tunnelEnvelope.inside ? baseY : baseY + 1.35, z: walker.z };
+    let collisionSafeCamera = resolveThirdPersonCameraCollision({
+      anchor: cameraAnchor,
+      target: { x: resolvedCamX, y: camY, z: resolvedCamZ },
+      checkBuildingCollision: appCtx.checkBuildingCollision,
+      probeSpacing: interiorCamera ? 0.24 : 0.45,
+      clearance: interiorCamera ? 0.22 : 0.32
+    });
+    if (tunnelEnvelope.inside) {
+      collisionSafeCamera = { ...collisionSafeCamera,
+        ...resolveTunnelCameraBoom(tunnelRoad, cameraAnchor, collisionSafeCamera) };
+    } else if (!activeInterior && !appCtx.activePlanetaryBodyId && !appCtx.onMoon && !appCtx.onMars) {
+      collisionSafeCamera = { ...collisionSafeCamera,
+        ...resolveChaseCameraTerrainCollision(cameraAnchor, collisionSafeCamera,
+          (x, z) => appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y) };
+    }
+    resolvedCamX = collisionSafeCamera.x;
+    resolvedCamZ = collisionSafeCamera.z;
+    camera.position.set(resolvedCamX, collisionSafeCamera.y, resolvedCamZ);
+
+    if (state.characterMesh && state.view === "third") {
+      // When a tight corridor forces the camera almost onto the avatar, hide
+      // the avatar instead of letting either model or camera clip through a
+      // pressure wall.
+      state.characterMesh.visible = walker.pitch < 0.98 && (!interiorCamera || collisionSafeCamera.ratio > 0.22);
+    }
+
+    const lookAhead = interiorCamera ? Math.min(1.45, CFG.thirdPersonLookAhead * 0.24) : CFG.thirdPersonLookAhead;
+    const lookX = walker.x + Math.sin(cameraYaw) * Math.cos(walker.pitch) * lookAhead;
+    const lookY = baseY - CFG.eyeHeight + 1.2 + Math.sin(walker.pitch) * lookAhead * 0.5;
+    const lookZ = walker.z + Math.cos(cameraYaw) * Math.cos(walker.pitch) * lookAhead;
+
+    camera.lookAt(lookX, lookY, lookZ);
+    return true;
+  }
+
+  function getMapRefPosition(droneMode, drone) {
+    if (appCtx.planeMode?.active) return { x: appCtx.planeMode.x, z: appCtx.planeMode.z };
+    if (droneMode) return { x: drone.x, z: drone.z };
+    if (state.mode === "walk") return { x: state.walker.x, z: state.walker.z };
+    return { x: car.x, z: car.z };
+  }
+
+  return {
+    getMapRefPosition,
+    setModeDrive,
+    setModeWalk,
+    toggleView,
+    toggleWalk,
+    updateWalkCamera
+  };
+}
+
+export { createWalkingRuntimeHelpers };
+import { resolveThirdPersonCameraCollision } from './camera-collision.js?v=1';

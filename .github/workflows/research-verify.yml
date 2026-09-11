@@ -1,0 +1,26 @@
+name: Research records and contracts
+on:
+  push:
+    branches: [steven/research-embodied-society]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: research-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  research:
+    if: github.ref == 'refs/heads/steven/research-embodied-society'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: npm run experiment:society:test
+      - run: python3 scripts/embodied-society/research-records.py check
+      - run: python3 -m unittest discover -s tests/embodied-society -p 'test_research_records.py'

@@ -1,0 +1,163 @@
+{
+  "recordClass": "retrospective-development-inventory",
+  "runs": [
+    {
+      "checkpoint": {
+        "controllerCalls": 1,
+        "frames": 0,
+        "status": "ended"
+      },
+      "providerCalls": 1,
+      "providerEvents": [
+        {
+          "call": 1,
+          "commandKind": null,
+          "status": "reserved",
+          "usage": {
+            "inputTokens": null,
+            "outputTokens": null
+          }
+        }
+      ],
+      "runId": "free-1789156903764-2a7df2",
+      "sources": {
+        "checkpointSha256": "4eb4ba262c5697e4ab8205a17e862d646551a5faf4bd28cadf79f7e0b859859f",
+        "modelSha256": "8a57834ccf055982a2efa822cec66b07c22c432407a9b802c7d8517fc30a6c10"
+      }
+    },
+    {
+      "checkpoint": {
+        "controllerCalls": 1,
+        "frames": 0,
+        "status": "ended"
+      },
+      "providerCalls": 2,
+      "providerEvents": [
+        {
+          "call": 1,
+          "commandKind": null,
+          "status": "completed",
+          "usage": {
+            "inputTokens": 222,
+            "outputTokens": 412
+          }
+        },
+        {
+          "call": 2,
+          "commandKind": null,
+          "status": "failed",
+          "usage": {
+            "inputTokens": null,
+            "outputTokens": null
+          }
+        }
+      ],
+      "runId": "free-1789157745829-1887f0",
+      "sources": {
+        "checkpointSha256": "2881ab4f985676e0763a42e212841ad3b3bc73d2dc4d287278e6caa401784110",
+        "modelSha256": "cf88e57f228eff569c6da2a33f38ea278843c881a92548851742ca04f61bb034"
+      }
+    },
+    {
+      "checkpoint": {
+        "controllerCalls": 1,
+        "frames": 0,
+        "status": "ended"
+      },
+      "providerCalls": 2,
+      "providerEvents": [
+        {
+          "call": 1,
+          "commandKind": null,
+          "status": "completed",
+          "usage": {
+            "inputTokens": 222,
+            "outputTokens": 102
+          }
+        },
+        {
+          "call": 2,
+          "commandKind": null,
+          "status": "completed",
+          "usage": {
+            "inputTokens": 1342,
+            "outputTokens": 93
+          }
+        }
+      ],
+      "runId": "free-1789157970038-f53e68",
+      "sources": {
+        "checkpointSha256": "b086ab4952492aa4f4d80c70152555ed2f7beac10d35e4209f576aca452c5a53",
+        "modelSha256": "840d417a7dfc4f58505e1fb8b7eedd7b35a58580d8678e9c2522ed1f2a7fedaf"
+      }
+    },
+    {
+      "checkpoint": {
+        "controllerCalls": 1,
+        "frames": 0,
+        "status": "ended"
+      },
+      "providerCalls": 1,
+      "providerEvents": [
+        {
+          "call": 1,
+          "commandKind": null,
+          "status": "reserved",
+          "usage": {
+            "inputTokens": null,
+            "outputTokens": null
+          }
+        }
+      ],
+      "runId": "free-1789158233581-43a171",
+      "sources": {
+        "checkpointSha256": "caf60aad1dbb1a880686839eebd1c40d50b3ac5bb9f2d3b0400112b093fdda9f",
+        "modelSha256": "d1cc7600f19f77ac5bee1b20cd6aea717ab46d13c80ca19c38d976e596f6106b"
+      }
+    },
+    {
+      "checkpoint": {
+        "controllerCalls": 2,
+        "frames": 3892,
+        "status": "ended"
+      },
+      "providerCalls": 3,
+      "providerEvents": [
+        {
+          "call": 1,
+          "commandKind": "wait",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 244,
+            "outputTokens": 7
+          }
+        },
+        {
+          "call": 2,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 1364,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 3,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 1677,
+            "outputTokens": 18
+          }
+        }
+      ],
+      "runId": "free-1789158460096-09fbef",
+      "sources": {
+        "checkpointSha256": "530e35718098a72ef08efc7e7b13880d3438f9175c480de123564f8a89ed9cef",
+        "modelSha256": "9d78f4766afad5270e1dbb05fd2ef0901482412356730d9363a03c01f487078f"
+      }
+    }
+  ],
+  "schemaVersion": 1,
+  "scope": "retained-local-free-runs"
+}

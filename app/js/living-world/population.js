@@ -1,0 +1,928 @@
+import { selectVehicleVariant, VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=6';
+import { resolveVehicleRoadContactPose } from '../engine/vehicle-road-attitude.js?v=2';
+import {
+  attachCuratedTrafficVehicle,
+  disposeCuratedTrafficVehicle
+} from '../urban-sandbox/curated-traffic-vehicle.js?v=4';
+import {
+  attachCuratedExplorerCharacter,
+  disposeCuratedCharacter,
+  NEARBY_NPC_ASSET_IDS,
+  updateCuratedCharacterAnimation
+} from '../walking/curated-explorer-character.js?v=8';
+import {
+  activityLabelForEdge,
+  LIVING_WORLD_DEMAND_BY_TIER,
+  populationEdgeWeight,
+  resolveLivingWorldDemand
+} from './demand-model.js?v=2';
+import { compileTrafficControlSystem } from './traffic-control-system.js?v=2';
+
+const POPULATION_STEP_SECONDS = 1 / 30;
+
+const POPULATION_BUDGET_BY_TIER = LIVING_WORLD_DEMAND_BY_TIER;
+
+const POPULATION_VISIBILITY_POLICY = Object.freeze({
+  // Traffic stays resident well beyond the immediate interaction bubble so
+  // recognizable vehicles continue along the road instead of popping out as
+  // the player approaches or looks back down a long street.
+  enterDistance: 900,
+  exitDistance: 1180,
+  fadeInPerSecond: 1.7,
+  fadeOutPerSecond: 1.05,
+  relocationHideSeconds: 1.25
+});
+
+const LIVING_PEDESTRIAN_CAPABILITIES = Object.freeze({
+  selectable: true,
+  conversational: true,
+  collisionTarget: true,
+  projectileTarget: true,
+  vehicleImpactTarget: true,
+  damageable: true
+});
+
+const PEDESTRIAN_ARCHETYPES = Object.freeze([
+  Object.freeze({ id: 'city-casual', label: 'City casual', torso: 1, leg: 1, pack: 0 }),
+  Object.freeze({ id: 'field-walker', label: 'Field walker', torso: 1.05, leg: 1.04, pack: 1 }),
+  Object.freeze({ id: 'commuter', label: 'Commuter', torso: .96, leg: 1.02, pack: .7 }),
+  Object.freeze({ id: 'weekend-explorer', label: 'Weekend explorer', torso: 1.08, leg: .96, pack: 1.15 }),
+  Object.freeze({ id: 'local-runner', label: 'Local runner', torso: .9, leg: 1.08, pack: 0 }),
+  Object.freeze({ id: 'service-worker', label: 'Service worker', torso: 1.04, leg: .98, pack: .3 }),
+  Object.freeze({ id: 'office-worker', label: 'Office worker', torso: .97, leg: 1.01, pack: .65 }),
+  Object.freeze({ id: 'student', label: 'Student', torso: .94, leg: 1.04, pack: .95 }),
+  Object.freeze({ id: 'traveler', label: 'Traveler', torso: 1.02, leg: .97, pack: 1.05 }),
+  Object.freeze({ id: 'neighborhood-local', label: 'Neighborhood local', torso: 1.06, leg: .94, pack: 0 })
+]);
+
+const OUTFIT_PALETTE = Object.freeze([0x3f5961, 0x8d6048, 0x3f6577, 0x6b7550, 0x73566f, 0x8a783f, 0x48536a]);
+const PANTS_PALETTE = Object.freeze([0x202832, 0x34393d, 0x3e4854, 0x443b36, 0x273746]);
+const HAIR_PALETTE = Object.freeze([0x171513, 0x38271d, 0x6b4a2f, 0x8b735b, 0x2d2422]);
+const VEHICLE_PALETTE = Object.freeze([0x4f7588, 0x718269, 0xa64b41, 0xbdb59d, 0x536270, 0x886d50, 0x705d85, 0xc5b94d]);
+
+function edgeLookup(graph, options = {}) {
+  const outgoing = new Map();
+  if (!Array.isArray(graph?.edges)) return outgoing;
+  for (let index = 0; index < graph.edges.length; index += 1) {
+    const edge = graph.edges[index];
+    const list = outgoing.get(edge.from) || [];
+    list.push(index);
+    outgoing.set(edge.from, list);
+  }
+  if (options.connectNearby !== true) return outgoing;
+  for (let index = 0; index < graph.edges.length; index += 1) {
+    const edge = graph.edges[index];
+    if ((outgoing.get(edge.to) || []).length) continue;
+    const heading = Math.atan2(edge.p2.x - edge.p1.x, edge.p2.z - edge.p1.z);
+    const candidates = graph.edges.map((candidate, candidateIndex) => {
+      if (candidateIndex === index) return null;
+      const distance = Math.hypot(candidate.p1.x - edge.p2.x, candidate.p1.z - edge.p2.z);
+      if (distance > 18) return null;
+      const candidateHeading = Math.atan2(candidate.p2.x - candidate.p1.x, candidate.p2.z - candidate.p1.z);
+      const headingDelta = Math.abs(Math.atan2(Math.sin(candidateHeading - heading), Math.cos(candidateHeading - heading)));
+      return { candidateIndex, score: distance + headingDelta * 3.5 };
+    }).filter(Boolean).sort((left, right) => left.score - right.score);
+    if (candidates.length) outgoing.set(edge.to, candidates.slice(0, 3).map((candidate) => candidate.candidateIndex));
+  }
+  return outgoing;
+}
+
+function edgeSpawnWeight(edge, kind) {
+  return populationEdgeWeight(edge, kind);
+}
+
+function selectSpawnEdgeIndex(graph, random, kind, reference = null) {
+  const allIndexes = graph.edges.map((_, index) => index);
+  const localIndexes = reference ? allIndexes.filter((index) => {
+    const edge = graph.edges[index];
+    const x = (Number(edge?.p1?.x || 0) + Number(edge?.p2?.x || 0)) * .5;
+    const z = (Number(edge?.p1?.z || 0) + Number(edge?.p2?.z || 0)) * .5;
+    return Math.hypot(x - Number(reference.x || 0), z - Number(reference.z || 0)) <= 520;
+  }) : [];
+  const indexes = localIndexes.length ? localIndexes : allIndexes;
+  const weights = indexes.map((index) => edgeSpawnWeight(graph.edges[index], kind));
+  let target = random() * weights.reduce((sum, weight) => sum + weight, 0);
+  for (let index = 0; index < weights.length; index += 1) {
+    target -= weights[index];
+    if (target <= 0) return indexes[index];
+  }
+  return indexes[0] || 0;
+}
+
+function edgePoint(edge, progress, pathOffset = 0) {
+  const t = Math.max(0, Math.min(1, Number(progress || 0) / Math.max(.01, Number(edge?.length || 0))));
+  const dx = Number(edge?.p2?.x || 0) - Number(edge?.p1?.x || 0);
+  const dz = Number(edge?.p2?.z || 0) - Number(edge?.p1?.z || 0);
+  const length = Math.max(.01, Math.hypot(dx, dz));
+  return {
+    x: Number(edge?.p1?.x || 0) + dx * t - dz / length * pathOffset,
+    z: Number(edge?.p1?.z || 0) + dz * t + dx / length * pathOffset
+  };
+}
+
+function physicalEdgeKey(edge) {
+  const keyFor = (point) => `${Math.round(Number(point?.x || 0) * 2)}:${Math.round(Number(point?.z || 0) * 2)}`;
+  const first = keyFor(edge?.p1);
+  const second = keyFor(edge?.p2);
+  return first < second ? `${first}|${second}` : `${second}|${first}`;
+}
+
+function pedestrianPathOffset(edge, random) {
+  const spread = edge?.role === 'entrance' ? .22 : edge?.role === 'crossing' ? .3 : .62;
+  const raw = (random() * 2 - 1) * spread;
+  return Math.abs(raw) < .12 ? (raw < 0 ? -.12 : .12) : raw;
+}
+
+function spawnCandidate(graph, random, kind, reference) {
+  const edgeIndex = selectSpawnEdgeIndex(graph, random, kind, reference);
+  const edge = graph.edges[edgeIndex];
+  const progress = (.06 + random() * .88) * edge.length;
+  const pathOffset = kind === 'pedestrian' ? pedestrianPathOffset(edge, random) : 0;
+  const point = edgePoint(edge, progress, pathOffset);
+  return { edgeIndex, progress, pathOffset, x: point.x, z: point.z, corridorKey: physicalEdgeKey(edge) };
+}
+
+function spawnCandidateScore(candidate, placements, graph, kind) {
+  if (kind !== 'pedestrian') return 0;
+  const sameCorridor = placements.filter((entry) => entry.corridorKey === candidate.corridorKey).length;
+  const nearest = placements.reduce((distance, entry) => (
+    Math.min(distance, Math.hypot(candidate.x - entry.x, candidate.z - entry.z))
+  ), Infinity);
+  const edge = graph.edges[candidate.edgeIndex];
+  const personalSpacePenalty = Number.isFinite(nearest) && nearest < 7.5
+    ? Math.pow(7.5 - nearest, 2) * 12
+    : 0;
+  const corridorPenalty = sameCorridor * sameCorridor * 38;
+  const entrancePenalty = edge?.role === 'entrance' ? sameCorridor * 95 : 0;
+  return corridorPenalty + entrancePenalty + personalSpacePenalty;
+}
+
+function planAgentSpawns(count, graph, random, kind, reference = null) {
+  if (!graph?.edges?.length) return [];
+  const placements = [];
+  const attempts = kind === 'pedestrian' ? Math.min(28, Math.max(12, graph.edges.length * 2)) : 1;
+  for (let index = 0; index < count; index += 1) {
+    let best = null;
+    let bestScore = Infinity;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      const candidate = spawnCandidate(graph, random, kind, reference);
+      const score = spawnCandidateScore(candidate, placements, graph, kind) + random() * .01;
+      if (score < bestScore) {
+        best = candidate;
+        bestScore = score;
+      }
+      if (kind === 'pedestrian' && score < .01) break;
+    }
+    placements.push(best);
+  }
+  return placements;
+}
+
+function paletteColor(palette, random) {
+  return new THREE.Color(palette[Math.floor(random() * palette.length) % palette.length]);
+}
+
+function vehicleColor(variant, random) {
+  const serviceColors = { taxi: 0xd4b82d, delivery_van: 0xc8c7bd, box_truck: 0xaeb9bd, city_bus: 0x3f6685 };
+  return new THREE.Color(serviceColors[variant?.id] || VEHICLE_PALETTE[Math.floor(random() * VEHICLE_PALETTE.length) % VEHICLE_PALETTE.length]);
+}
+
+function createAgents(count, graph, random, kind, reference = null) {
+  if (!graph?.edges?.length) return [];
+  const spawnPlan = planAgentSpawns(count, graph, random, kind, reference);
+  const agents = [];
+  for (let index = 0; index < count; index += 1) {
+    const spawn = spawnPlan[index];
+    const edgeIndex = spawn.edgeIndex;
+    const edge = graph.edges[edgeIndex];
+    const variant = kind === 'vehicle'
+      ? selectVehicleVariant(random, { majorRoad: /motorway|trunk|primary|secondary/i.test(edge.roadClass || '') })
+      : null;
+    const archetype = kind === 'pedestrian' ? PEDESTRIAN_ARCHETYPES[Math.floor(random() * PEDESTRIAN_ARCHETYPES.length)] : null;
+    const heightScale = kind === 'pedestrian' ? .86 + random() * .28 : 1;
+    agents.push({
+      id: `${kind}:${index}`,
+      edgeIndex,
+      progress: spawn.progress,
+      pathOffset: spawn.pathOffset,
+      speed: kind === 'vehicle'
+        ? Math.min(edge.speedLimit || 12, (6.5 + random() * 5.5) * variant.speedFactor)
+        : .8 + random() * .65,
+      variant,
+      archetype,
+      heightScale,
+      color: kind === 'vehicle' ? vehicleColor(variant, random) : paletteColor(OUTFIT_PALETTE, random),
+      secondaryColor: paletteColor(PANTS_PALETTE, random),
+      hairColor: paletteColor(HAIR_PALETTE, random),
+      skinColor: kind === 'pedestrian' ? new THREE.Color().setHSL(.045 + random() * .045, .28 + random() * .26, .34 + random() * .42) : null,
+      activityAffinity: random(),
+      visibility: 0,
+      visibleTarget: false,
+      relocationCooldown: 0,
+      motionTime: random() * Math.PI * 2,
+      waiting: false,
+      promoted: false,
+      detailPromoted: false,
+      currentSpeed: null,
+      bridge: null,
+      reaction: '',
+      reactionRemaining: 0,
+      reactionTarget: null,
+      signalAspect: 'none',
+      waitReason: '',
+      routeEndHold: 0,
+      stopWaitSeconds: 0,
+      clearedControlId: ''
+    });
+  }
+  return agents;
+}
+
+function agentPose(agent, graph, sampleVehicleSurface = null) {
+  const edge = agent.bridge || graph.edges[agent.edgeIndex];
+  if (!edge) return null;
+  const progress = agent.bridge ? agent.bridge.progress : agent.progress;
+  const t = Math.max(0, Math.min(1, progress / Math.max(.01, edge.length)));
+  const dx = edge.p2.x - edge.p1.x;
+  const dz = edge.p2.z - edge.p1.z;
+  const edgeLength = Math.max(.01, Math.hypot(dx, dz));
+  const pathOffset = agent.variant ? 0 : Number(agent.pathOffset || 0);
+  const x = edge.p1.x + dx * t - dz / edgeLength * pathOffset;
+  const y = edge.p1.y + (edge.p2.y - edge.p1.y) * t;
+  const z = edge.p1.z + dz * t + dx / edgeLength * pathOffset;
+  let yaw = Math.atan2(edge.p2.x - edge.p1.x, edge.p2.z - edge.p1.z);
+  if (agent.reactionRemaining > 0 && agent.reactionTarget) {
+    yaw = Math.atan2(agent.reactionTarget.x - x, agent.reactionTarget.z - z);
+  }
+  const edgePose = {
+    x,
+    y,
+    z,
+    yaw,
+    pitch: Number.isFinite(Number(edge.surfacePitch)) ? Number(edge.surfacePitch) : 0,
+    roll: 0
+  };
+  if (!agent.variant || typeof sampleVehicleSurface !== 'function') return edgePose;
+  return resolveVehicleRoadContactPose({
+    ...edgePose,
+    variant: agent.variant,
+    sampleSurface: (sampleX, sampleZ) => sampleVehicleSurface(edge, sampleX, sampleZ)
+  });
+}
+
+function selectSafeRelocationEdge(graph, random, kind, reference) {
+  const minimumDistance = kind === 'vehicle' ? 170 : 85;
+  const maximumDistance = kind === 'vehicle' ? 720 : 460;
+  const local = reference ? graph.edges.map((edge, index) => ({ edge, index })).filter(({ edge }) => {
+    const x = (edge.p1.x + edge.p2.x) * .5;
+    const z = (edge.p1.z + edge.p2.z) * .5;
+    const distance = Math.hypot(x - reference.x, z - reference.z);
+    return distance >= minimumDistance && distance <= maximumDistance;
+  }) : [];
+  if (local.length) {
+    const total = local.reduce((sum, entry) => sum + edgeSpawnWeight(entry.edge, kind), 0);
+    let target = random() * total;
+    for (const entry of local) {
+      target -= edgeSpawnWeight(entry.edge, kind);
+      if (target <= 0) return entry.index;
+    }
+    return local[0].index;
+  }
+  return selectSpawnEdgeIndex(graph, random, kind);
+}
+
+function relocateAgent(agent, graph, random, kind, reference) {
+  agent.edgeIndex = selectSafeRelocationEdge(graph, random, kind, reference);
+  agent.progress = Math.max(.05, random() * .3) * (graph.edges[agent.edgeIndex]?.length || 1);
+  if (kind === 'pedestrian') agent.pathOffset = pedestrianPathOffset(graph.edges[agent.edgeIndex], random);
+  agent.visibleTarget = false;
+  agent.relocationCooldown = POPULATION_VISIBILITY_POLICY.relocationHideSeconds;
+}
+
+function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {}) {
+  const occupancy = new Map();
+  if (kind === 'vehicle') {
+    agents.forEach((agent) => {
+      const list = occupancy.get(agent.edgeIndex) || [];
+      list.push(agent);
+      occupancy.set(agent.edgeIndex, list);
+    });
+    occupancy.forEach((list) => list.sort((a, b) => b.progress - a.progress));
+  }
+  for (const agent of agents) {
+    if (agent.promoted && !agent.detailPromoted) {
+      agent.currentSpeed = 0;
+      continue;
+    }
+    agent.relocationCooldown = Math.max(0, agent.relocationCooldown - dt);
+    if (kind === 'vehicle' && agent.routeEndHold > 0) {
+      const heldPose = agentPose(agent, graph, behavior.sampleVehicleSurface);
+      const heldDistance = heldPose && behavior.reference
+        ? Math.hypot(heldPose.x - behavior.reference.x, heldPose.z - behavior.reference.z)
+        : 0;
+      agent.routeEndHold = Math.max(0, agent.routeEndHold - dt);
+      agent.currentSpeed = 0;
+      agent.waiting = true;
+      agent.waitReason = 'route_end';
+      if (heldDistance > POPULATION_VISIBILITY_POLICY.exitDistance) {
+        relocateAgent(agent, graph, random, kind, behavior.reference);
+        agent.routeEndHold = 0;
+      }
+      continue;
+    }
+    if (agent.bridge) {
+      const bridgeSpeed = agent.speed * .72;
+      agent.currentSpeed = bridgeSpeed;
+      agent.motionTime += bridgeSpeed * dt * (kind === 'vehicle' ? .42 : 3.1);
+      agent.bridge.progress += bridgeSpeed * dt;
+      if (agent.bridge.progress >= agent.bridge.length) {
+        const overflow = agent.bridge.progress - agent.bridge.length;
+        agent.edgeIndex = agent.bridge.nextEdgeIndex;
+        agent.progress = overflow;
+        agent.bridge = null;
+      }
+      continue;
+    }
+    const edge = graph.edges[agent.edgeIndex];
+    if (!edge) continue;
+    const pose = agentPose(agent, graph, kind === 'vehicle' ? behavior.sampleVehicleSurface : null);
+    const reference = behavior.reference;
+    const distance = pose && reference ? Math.hypot(pose.x - reference.x, pose.z - reference.z) : 0;
+    const stride = kind === 'vehicle' ? 1 : distance > 900 ? 8 : distance > 480 ? 4 : distance > 220 ? 2 : 1;
+    if (behavior.tick % stride !== 0) continue;
+    let speed = agent.speed;
+    if (kind === 'vehicle') {
+      const sameEdge = occupancy.get(agent.edgeIndex) || [];
+      const rank = sameEdge.indexOf(agent);
+      const leader = rank > 0 ? sameEdge[rank - 1] : null;
+      const followingGap = 3.2 + Math.max(0, Number(agent.currentSpeed ?? speed)) * .82;
+      if (leader && leader.progress - agent.progress < followingGap) {
+        const availableGap = Math.max(0, leader.progress - agent.progress - 2.8);
+        speed *= Math.max(0, Math.min(1, availableGap / Math.max(1, followingGap - 2.8)));
+        agent.waitReason = 'traffic_queue';
+      } else {
+        agent.waitReason = '';
+      }
+      if (edge.structure?.terrainMode === 'subgrade') speed *= .82;
+      if (agent.progress > edge.length * .78 && (outgoing.get(edge.to)?.length || 0) > 1) speed *= .55;
+      if (reference && pose && Math.hypot(pose.x - reference.x, pose.z - reference.z) < 7) speed *= .12;
+      const signal = behavior.signalDirective?.(agent.edgeIndex, agent.progress, speed) || null;
+      agent.signalAspect = signal?.aspect || 'none';
+      if (signal?.controlled !== true) {
+        agent.clearedControlId = '';
+        agent.stopWaitSeconds = 0;
+      } else if (signal.kind === 'stop_sign') {
+        const alreadyCleared = agent.clearedControlId === signal.controllerId;
+        if (!alreadyCleared && signal.remaining <= 3.45 && Number(agent.currentSpeed ?? speed) <= .4) {
+          agent.stopWaitSeconds += dt * stride;
+        }
+        if (!alreadyCleared && agent.stopWaitSeconds >= .8) {
+          agent.clearedControlId = signal.controllerId;
+          agent.stopWaitSeconds = 0;
+          speed = Math.max(speed, agent.speed * .28);
+          agent.waitReason = '';
+        } else if (!alreadyCleared && signal.speedScale < 1) {
+          speed *= signal.speedScale;
+          agent.waitReason = 'stop_sign';
+        }
+      } else if (signal?.mustStop && signal.speedScale < 1) {
+        agent.stopWaitSeconds = 0;
+        speed *= signal.speedScale;
+        agent.waitReason = `signal_${signal.aspect}`;
+      }
+      speed *= Math.max(.12, Number(behavior.speedScale) || 1);
+    } else {
+      if (agent.reactionRemaining > 0) {
+        agent.reactionRemaining = Math.max(0, agent.reactionRemaining - dt * stride);
+        if (agent.reaction === 'reporting' || agent.reaction === 'watching') speed = 0;
+        else if (agent.reaction === 'startled') speed *= 1.65;
+        if (agent.reactionRemaining <= 0) {
+          agent.reaction = '';
+          agent.reactionTarget = null;
+        }
+      }
+      if (edge.role === 'crossing') speed *= behavior.crossingBlocked?.(edge) ? 0 : .86;
+    }
+    agent.waiting = speed < agent.speed * .5;
+    agent.currentSpeed = speed;
+    agent.motionTime += speed * dt * stride * (kind === 'vehicle' ? .42 : 3.1);
+    agent.progress += speed * dt * stride;
+    let transitionEdge = edge;
+    while (transitionEdge && agent.progress >= transitionEdge.length) {
+      agent.progress -= transitionEdge.length;
+      const next = outgoing.get(transitionEdge.to) || [];
+      if (kind === 'pedestrian' && transitionEdge.role === 'entrance' && graph.nodes?.[transitionEdge.to]?.role === 'entrance') {
+        relocateAgent(agent, graph, random, kind, reference);
+        agent.virtualizedEntries = Number(agent.virtualizedEntries || 0) + 1;
+        break;
+      }
+      if (next.length === 0) {
+        if (kind === 'vehicle') {
+          agent.progress = Math.max(0, edge.length - .05);
+          agent.routeEndHold = 18;
+          agent.currentSpeed = 0;
+          agent.waiting = true;
+          agent.waitReason = 'route_end';
+          break;
+        }
+        relocateAgent(agent, graph, random, kind, reference);
+        break;
+      }
+      const nextEdgeIndex = next[Math.floor(random() * next.length) % next.length];
+      const nextEdge = graph.edges[nextEdgeIndex];
+      const gap = nextEdge ? Math.hypot(
+        nextEdge.p1.x - transitionEdge.p2.x,
+        nextEdge.p1.z - transitionEdge.p2.z
+      ) : 0;
+      if (nextEdge && gap > .08) {
+        agent.bridge = {
+          p1: { x: transitionEdge.p2.x, y: transitionEdge.p2.y, z: transitionEdge.p2.z },
+          p2: { x: nextEdge.p1.x, y: nextEdge.p1.y, z: nextEdge.p1.z },
+          length: gap,
+          progress: Math.min(gap, agent.progress),
+          nextEdgeIndex
+        };
+        agent.progress = 0;
+        break;
+      }
+      agent.edgeIndex = nextEdgeIndex;
+      transitionEdge = nextEdge;
+      if (!nextEdge || agent.progress < nextEdge.length) break;
+    }
+  }
+}
+
+function updateAgentVisibility(agent, distance, activeRatio, dt, policy = POPULATION_VISIBILITY_POLICY) {
+  const withinDistance = agent.visibleTarget
+    ? distance <= policy.exitDistance
+    : distance <= policy.enterDistance;
+  agent.visibleTarget = agent.relocationCooldown <= 0 && withinDistance && agent.activityAffinity <= activeRatio;
+  const rate = agent.visibleTarget ? POPULATION_VISIBILITY_POLICY.fadeInPerSecond : POPULATION_VISIBILITY_POLICY.fadeOutPerSecond;
+  const target = agent.visibleTarget ? 1 : 0;
+  if (agent.visibility < target) agent.visibility = Math.min(target, agent.visibility + rate * dt);
+  else if (agent.visibility > target) agent.visibility = Math.max(target, agent.visibility - rate * dt);
+}
+
+export function createLivingWorldPopulation(options = {}) {
+  const tier = String(options.tier || 'balanced').toLowerCase();
+  const initialDemand = resolveLivingWorldDemand({ tier, timePhase: options.getTimePhase?.(), liveFlow: options.getTrafficFlow?.() });
+  const budget = initialDemand;
+  const pedestrianGraph = options.pedestrianGraph;
+  const trafficGraph = options.trafficGraph;
+  const random = typeof options.random === 'function' ? options.random : Math.random;
+  const sampleVehicleSurface = typeof options.sampleVehicleSurface === 'function' ? options.sampleVehicleSurface : null;
+  const initialReference = options.getReferencePosition?.() || null;
+  const pedestrians = createAgents(budget.pedestrians, pedestrianGraph, random, 'pedestrian', initialReference);
+  const vehicles = createAgents(budget.vehicles, trafficGraph, random, 'vehicle', initialReference);
+  const group = new THREE.Group();
+  group.name = 'Living World Population';
+  let disposed = false;
+  const pedestrianHosts = pedestrians.map((agent, index) => {
+    const host = new THREE.Group();
+    const assetId = NEARBY_NPC_ASSET_IDS[index % NEARBY_NPC_ASSET_IDS.length];
+    host.name = `${agent.archetype.label} curated pedestrian host`;
+    host.userData.characterStyle = 'curated-only-local-model';
+    host.userData.proceduralCharacterMeshCount = 0;
+    host.userData.disposeCuratedCharacter = () => disposeCuratedCharacter(host);
+    host.userData.updateCuratedCharacterAnimation = (moving, deltaTime, running) =>
+      updateCuratedCharacterAnimation(host, moving, deltaTime, running);
+    host.userData.worldClickTarget = () => ({
+      kind: 'living-pedestrian',
+      id: agent.id,
+      label: agent.archetype?.label || 'Local person',
+      capabilities: LIVING_PEDESTRIAN_CAPABILITIES
+    });
+    host.userData.interactionCapabilities = LIVING_PEDESTRIAN_CAPABILITIES;
+    agent.visualHost = host;
+    agent.curatedAssetId = assetId;
+    group.add(host);
+    void attachCuratedExplorerCharacter(THREE, host, {
+      assetId,
+      role: 'nearby-npc-character',
+      variation: 'ambient-pedestrian',
+      failClosed: true,
+      palette: {
+        uniform: agent.color?.getHex?.(),
+        secondary: agent.secondaryColor?.getHex?.()
+      },
+      isCurrent: () => !disposed && agent.visualHost === host
+    });
+    return host;
+  });
+  const vehicleHosts = vehicles.map((agent) => {
+    const host = new THREE.Group();
+    host.name = `${agent.variant.label || agent.variant.id} curated traffic host`;
+    host.userData.vehiclePresentation = 'curated-only-local-model';
+    host.userData.proceduralVehicleMeshCount = 0;
+    host.userData.disposeCuratedTrafficVehicle = () => disposeCuratedTrafficVehicle(host);
+    host.userData.worldClickTarget = () => ({
+      kind: 'living-vehicle',
+      id: agent.id,
+      label: agent.variant?.label || 'Road vehicle'
+    });
+    agent.visualHost = host;
+    group.add(host);
+    void attachCuratedTrafficVehicle(THREE, host, {
+      variantId: agent.variant.id,
+      color: agent.color?.getHex?.() ?? 0x566675,
+      dimensionsMeters: agent.variant,
+      isCurrent: () => !disposed && agent.visualHost === host
+    });
+    return host;
+  });
+  const pedestrianOutgoing = edgeLookup(pedestrianGraph);
+  const trafficOutgoing = edgeLookup(trafficGraph, { connectNearby: true });
+  const trafficControls = compileTrafficControlSystem({ graph: trafficGraph, controls: options.trafficControls });
+  let accumulator = 0;
+  let tick = 0;
+  let elapsedSeconds = 0;
+  const referencePosition = () => options.getReferencePosition?.() || null;
+  const currentDemand = () => resolveLivingWorldDemand({
+    tier,
+    timePhase: options.getTimePhase?.(),
+    liveFlow: options.getTrafficFlow?.()
+  });
+
+  const vehicleSnapshot = (agent) => {
+    const pose = agentPose(agent, trafficGraph, sampleVehicleSurface);
+    if (!pose) return null;
+    return Object.freeze({
+      id: agent.id,
+      x: pose.x,
+      y: pose.y,
+      z: pose.z,
+      yaw: pose.yaw,
+      pitch: pose.pitch,
+      roll: pose.roll,
+      renderedPitch: Number(agent.renderedPitch || 0),
+      renderedRoll: Number(agent.renderedRoll || 0),
+      renderedGroundY: Number(agent.renderedGroundY || 0),
+      wheelContact: agent.wheelContact || null,
+      speed: Number(Number.isFinite(agent.currentSpeed) ? agent.currentSpeed : agent.speed || 0),
+      visible: agent.detailPromoted === true || agent.visibility > 0.08,
+      promoted: agent.promoted === true,
+      detailPromoted: agent.detailPromoted === true,
+      variant: agent.variant,
+      color: agent.color?.getHex?.() ?? 0x566675,
+      activity: activityLabelForEdge(trafficGraph.edges[agent.edgeIndex], 'vehicle'),
+      waiting: agent.waiting === true,
+      waitReason: agent.waitReason || '',
+      signalAspect: agent.signalAspect || 'none'
+    });
+  };
+
+  const pedestrianSnapshot = (agent) => {
+    const pose = agentPose(agent, pedestrianGraph);
+    if (!pose) return null;
+    return Object.freeze({
+      id: agent.id,
+      x: pose.x,
+      y: pose.y,
+      z: pose.z,
+      yaw: pose.yaw,
+      visible: agent.visibility > 0.08,
+      promoted: agent.promoted === true,
+      archetype: agent.archetype?.id || 'pedestrian',
+      outfitColor: agent.color?.getHex?.() ?? 0x496673,
+      pantsColor: agent.secondaryColor?.getHex?.() ?? 0x29333d,
+      hairColor: agent.hairColor?.getHex?.() ?? 0x241d18,
+      skinColor: agent.skinColor?.getHex?.() ?? 0x9a6d52,
+      heightScale: Number(agent.heightScale || 1),
+      reaction: agent.reaction || '',
+      reactionRemaining: Number(Math.max(0, agent.reactionRemaining || 0).toFixed(2)),
+      activity: activityLabelForEdge(pedestrianGraph.edges[agent.edgeIndex], 'pedestrian'),
+      waiting: agent.waiting === true,
+      capabilities: LIVING_PEDESTRIAN_CAPABILITIES
+    });
+  };
+
+  const updateCuratedPedestrianHosts = (dt = POPULATION_STEP_SECONDS) => {
+    const reference = referencePosition();
+    const demand = currentDemand();
+    const ratio = demand.pedestrianActiveRatio;
+    const visibilityPolicy = { enterDistance: demand.pedestrianRadius, exitDistance: demand.pedestrianExitRadius };
+    pedestrians.forEach((agent) => {
+      const pose = agentPose(agent, pedestrianGraph);
+      const host = agent.visualHost;
+      if (!pose || !host) return;
+      const distance = reference ? Math.hypot(pose.x - reference.x, pose.z - reference.z) : 0;
+      if (agent.promoted) {
+        agent.visibleTarget = false;
+        agent.visibility = 0;
+      } else {
+        updateAgentVisibility(agent, distance, ratio, dt, visibilityPolicy);
+      }
+      host.position.set(pose.x, pose.y, pose.z);
+      host.rotation.set(0, pose.yaw, 0);
+      host.scale.setScalar(Math.max(.001, Number(agent.heightScale || 1) * agent.visibility));
+      host.visible = agent.visibility > .01 && agent.promoted !== true;
+      host.userData.reaction = String(agent.reaction || '');
+      if (host.visible) {
+        updateCuratedCharacterAnimation(
+          host,
+          Number(agent.currentSpeed || 0) > .05,
+          dt,
+          Number(agent.currentSpeed || 0) > 1.45
+        );
+      }
+    });
+  };
+
+  const updateCuratedVehicleHosts = (dt = POPULATION_STEP_SECONDS) => {
+    const reference = referencePosition();
+    const demand = currentDemand();
+    const ratio = demand.vehicleActiveRatio;
+    const visibilityPolicy = { enterDistance: demand.vehicleRadius, exitDistance: demand.vehicleExitRadius };
+    vehicles.forEach((agent) => {
+      const pose = agentPose(agent, trafficGraph, sampleVehicleSurface);
+      const host = agent.visualHost;
+      if (!pose || !host) return;
+      const distance = reference ? Math.hypot(pose.x - reference.x, pose.z - reference.z) : 0;
+      if (agent.promoted) {
+        agent.visibleTarget = false;
+        agent.visibility = 0;
+      } else {
+        updateAgentVisibility(agent, distance, ratio, dt, visibilityPolicy);
+      }
+      agent.renderedPitch = Number(pose.pitch || 0);
+      agent.renderedRoll = Number(pose.roll || 0);
+      agent.renderedGroundY = Number(pose.y || 0);
+      agent.wheelContact = Object.freeze({
+        authority: String(pose.authority || 'edge-plane-fallback'),
+        sampledWheelContacts: Number(pose.sampledWheelContacts || 0),
+        maximumWheelPenetration: Number(pose.maximumWheelPenetration || 0),
+        maximumWheelGap: Number(pose.maximumWheelGap || 0),
+        previousMaximumWheelPenetration: Number(pose.previousMaximumWheelPenetration || 0)
+      });
+      host.position.set(pose.x, pose.y + VEHICLE_ROOT_TO_GROUND_METERS, pose.z);
+      host.rotation.order = 'YXZ';
+      host.rotation.set(Number(pose.pitch || 0), pose.yaw, Number(pose.roll || 0));
+      host.visible = agent.visibility > .01 && agent.promoted !== true;
+      host.scale.setScalar(Math.max(.001, agent.visibility));
+    });
+  };
+
+  const refreshVehiclePresentation = () => updateCuratedVehicleHosts(POPULATION_STEP_SECONDS);
+  updateCuratedPedestrianHosts(.1);
+  refreshVehiclePresentation();
+
+  return Object.freeze({
+    group,
+    diagnostics: Object.freeze({
+      tier,
+      pedestrians: pedestrians.length,
+      vehicles: vehicles.length,
+      drawCalls: pedestrianHosts.length + vehicles.length,
+      pedestrianRenderedParts: 0,
+      pedestrianRepresentation: 'curated-only-local-models',
+      pedestrianLegacyBlockFallback: false,
+      proceduralPedestrianMeshes: 0,
+      curatedPedestrianHosts: pedestrianHosts.length,
+      pedestrianPartRoles: Object.freeze([]),
+      vehicleRenderedParts: 0,
+      vehiclePresentation: 'curated-only-local-models',
+      proceduralVehicleMeshes: 0,
+      curatedVehicleHosts: vehicleHosts.length,
+      simulationHz: 30,
+      vehicleAttitudeAuthority: 'published-road-four-wheel-contact',
+      demandAuthority: 'mapped-activity-time-and-optional-aggregate-flow',
+      controlledJunctions: trafficControls.controllers.length,
+      controlledApproaches: trafficControls.controlledApproaches,
+      visibilityPolicy: POPULATION_VISIBILITY_POLICY,
+      characterArchetypes: Object.freeze([...new Set(pedestrians.map((agent) => agent.archetype.id))].sort()),
+      vehicleCategories: Object.freeze([...new Set(vehicles.map((agent) => agent.variant.id))].sort()),
+      vehicleDimensions: Object.freeze([...new Map(vehicles.map((agent) => [agent.variant.id, Object.freeze({
+        id: agent.variant.id,
+        width: Number(agent.variant.width),
+        height: Number(agent.variant.height),
+        length: Number(agent.variant.length)
+      })])).values()])
+    }),
+    nearbyVehicles(reference, radius = 8) {
+      const origin = reference || referencePosition();
+      if (!origin) return Object.freeze([]);
+      const safeRadius = Math.max(1, Math.min(220, Number(radius) || 8));
+      return Object.freeze(vehicles.map(vehicleSnapshot).filter((vehicle) => (
+        vehicle && !vehicle.promoted && vehicle.visible &&
+        Math.hypot(vehicle.x - origin.x, vehicle.z - origin.z) <= safeRadius
+      )).sort((a, b) => (
+        Math.hypot(a.x - origin.x, a.z - origin.z) - Math.hypot(b.x - origin.x, b.z - origin.z)
+      )));
+    },
+    nearbyPedestrians(reference, radius = 8) {
+      const origin = reference || referencePosition();
+      if (!origin) return Object.freeze([]);
+      const safeRadius = Math.max(1, Math.min(180, Number(radius) || 8));
+      return Object.freeze(pedestrians.map(pedestrianSnapshot).filter((pedestrian) => (
+        pedestrian && pedestrian.visible && !pedestrian.promoted &&
+        Math.hypot(pedestrian.x - origin.x, pedestrian.z - origin.z) <= safeRadius
+      )).sort((a, b) => (
+        Math.hypot(a.x - origin.x, a.z - origin.z) - Math.hypot(b.x - origin.x, b.z - origin.z)
+      )));
+    },
+    vehicleSnapshots() {
+      return Object.freeze(vehicles.map(vehicleSnapshot).filter(Boolean));
+    },
+    pedestrianSnapshots() {
+      return Object.freeze(pedestrians.map(pedestrianSnapshot).filter(Boolean));
+    },
+    pickableRoots() {
+      return Object.freeze([...pedestrianHosts, ...vehicleHosts].filter((host) => host?.visible));
+    },
+    promotePedestrian(agentId) {
+      const agent = pedestrians.find((entry) => entry.id === String(agentId || ''));
+      if (!agent || agent.promoted) return null;
+      const promoted = pedestrianSnapshot(agent);
+      agent.promoted = true;
+      agent.visibility = 0;
+      agent.visibleTarget = false;
+      updateCuratedPedestrianHosts(.1);
+      return promoted ? Object.freeze({ ...promoted, promoted: true }) : null;
+    },
+    releasePedestrian(agentId) {
+      const agent = pedestrians.find((entry) => entry.id === String(agentId || ''));
+      if (!agent || !agent.promoted) return false;
+      agent.promoted = false;
+      agent.reaction = '';
+      agent.reactionRemaining = 0;
+      agent.reactionTarget = null;
+      // Restore the same curated actor immediately after close-detail release.
+      agent.relocationCooldown = 0;
+      agent.visibility = 1;
+      agent.visibleTarget = true;
+      updateCuratedPedestrianHosts(.1);
+      return true;
+    },
+    retirePedestrian(agentId) {
+      const agent = pedestrians.find((entry) => entry.id === String(agentId || ''));
+      if (!agent || !agent.promoted) return false;
+      agent.promoted = false;
+      agent.reaction = '';
+      agent.reactionRemaining = 0;
+      agent.reactionTarget = null;
+      relocateAgent(agent, pedestrianGraph, random, 'pedestrian', referencePosition());
+      agent.visibility = 0;
+      updateCuratedPedestrianHosts(.1);
+      return true;
+    },
+    witnessEvent(event = {}) {
+      const position = event.position;
+      if (!position || !Number.isFinite(position.x) || !Number.isFinite(position.z)) return Object.freeze([]);
+      const radius = Math.max(4, Math.min(60, Number(event.radius) || 30));
+      const audibleRadius = Math.max(0, Math.min(radius, Number(event.audibleRadius) || 8));
+      const maximum = Math.max(1, Math.min(4, Number(event.maximumWitnesses) || 3));
+      const candidates = pedestrians.map((agent) => {
+        const pose = agentPose(agent, pedestrianGraph);
+        if (!pose || agent.visibility <= .2) return null;
+        const dx = position.x - pose.x;
+        const dz = position.z - pose.z;
+        const distance = Math.hypot(dx, dz);
+        if (distance > radius) return null;
+        const facing = distance <= audibleRadius || distance <= .01 ||
+          (Math.sin(pose.yaw) * dx + Math.cos(pose.yaw) * dz) / distance >= -0.08;
+        if (!facing || options.hasPedestrianLineOfSight?.(pose, position) === false) return null;
+        return { agent, pose, distance };
+      }).filter(Boolean).sort((a, b) => a.distance - b.distance).slice(0, maximum);
+      candidates.forEach(({ agent }, index) => {
+        agent.reaction = index === 0 ? 'reporting' : event.kind === 'reckless_driving' ? 'startled' : 'watching';
+        agent.reactionRemaining = index === 0 ? 5.5 : 3.8;
+        agent.reactionTarget = { x: position.x, z: position.z };
+        agent.waiting = agent.reaction !== 'startled';
+      });
+      if (candidates.length) {
+        updateCuratedPedestrianHosts(.1);
+      }
+      return Object.freeze(candidates.map(({ agent, distance }) => Object.freeze({
+        ...pedestrianSnapshot(agent),
+        distance: Number(distance.toFixed(2))
+      })));
+    },
+    promoteVehicle(agentId) {
+      const agent = vehicles.find((entry) => entry.id === String(agentId || ''));
+      if (!agent || agent.promoted && !agent.detailPromoted) return null;
+      const promoted = vehicleSnapshot(agent);
+      agent.promoted = true;
+      agent.detailPromoted = false;
+      agent.currentSpeed = 0;
+      agent.visibility = 0;
+      agent.visibleTarget = false;
+      refreshVehiclePresentation();
+      return promoted ? Object.freeze({ ...promoted, promoted: true, speed: 0 }) : null;
+    },
+    promoteVehicleDetail(agentId) {
+      const agent = vehicles.find((entry) => entry.id === String(agentId || ''));
+      if (!agent || agent.promoted) return null;
+      const promoted = vehicleSnapshot(agent);
+      agent.promoted = true;
+      agent.detailPromoted = true;
+      agent.visibility = 0;
+      agent.visibleTarget = false;
+      refreshVehiclePresentation();
+      return promoted ? Object.freeze({ ...promoted, promoted: true, detailPromoted: true }) : null;
+    },
+    releaseVehicleDetail(agentId) {
+      const agent = vehicles.find((entry) => entry.id === String(agentId || ''));
+      if (!agent || !agent.detailPromoted) return false;
+      agent.promoted = false;
+      agent.detailPromoted = false;
+      // The detailed and instanced visuals are two LODs of this same agent.
+      // Hand the pose back in the same frame instead of fading from zero.
+      agent.relocationCooldown = 0;
+      agent.visibility = 1;
+      agent.visibleTarget = true;
+      refreshVehiclePresentation();
+      return true;
+    },
+    retireVehicleDetail(agentId) {
+      const agent = vehicles.find((entry) => entry.id === String(agentId || ''));
+      if (!agent || !agent.detailPromoted) return false;
+      agent.promoted = false;
+      agent.detailPromoted = false;
+      relocateAgent(agent, trafficGraph, random, 'vehicle', referencePosition());
+      agent.visibility = 0;
+      refreshVehiclePresentation();
+      return true;
+    },
+    fixedUpdate(dt) {
+      accumulator += dt;
+      if (accumulator < POPULATION_STEP_SECONDS) return;
+      const stepCount = Math.min(4, Math.floor(accumulator / POPULATION_STEP_SECONDS));
+      accumulator -= stepCount * POPULATION_STEP_SECONDS;
+      for (let stepIndex = 0; stepIndex < stepCount; stepIndex += 1) {
+        tick += 1;
+        elapsedSeconds += POPULATION_STEP_SECONDS;
+        const reference = referencePosition();
+        const demand = currentDemand();
+        advanceAgents(vehicles, trafficGraph, trafficOutgoing, random, POPULATION_STEP_SECONDS, 'vehicle', {
+          reference,
+          tick,
+          sampleVehicleSurface,
+          speedScale: demand.vehicleSpeedScale,
+          signalDirective: (edgeIndex, progress, speed) => trafficControls.directive(edgeIndex, progress, speed, elapsedSeconds)
+        });
+        const vehiclePoses = vehicles.map((agent) => agentPose(agent, trafficGraph, sampleVehicleSurface)).filter(Boolean);
+        advanceAgents(pedestrians, pedestrianGraph, pedestrianOutgoing, random, POPULATION_STEP_SECONDS, 'pedestrian', {
+          reference,
+          tick,
+          crossingBlocked: (edge) => {
+            const x = (edge.p1.x + edge.p2.x) * .5;
+            const z = (edge.p1.z + edge.p2.z) * .5;
+            return vehiclePoses.some((pose) => Math.hypot(pose.x - x, pose.z - z) < 9);
+          }
+        });
+      }
+      options.updateTrafficSignalVisuals?.(trafficControls.states(elapsedSeconds));
+      updateCuratedPedestrianHosts(stepCount * POPULATION_STEP_SECONDS);
+      updateCuratedVehicleHosts(stepCount * POPULATION_STEP_SECONDS);
+    },
+    activeCounts() {
+      const vehicleAttitudeMismatches = vehicles.filter((agent) => {
+        const pose = agentPose(agent, trafficGraph, sampleVehicleSurface);
+        return pose && (
+          Math.abs(Number(agent.renderedPitch || 0) - Number(pose.pitch || 0)) > 0.001 ||
+          Math.abs(Number(agent.renderedRoll || 0) - Number(pose.roll || 0)) > 0.001 ||
+          Math.abs(Number(agent.renderedGroundY || 0) - Number(pose.y || 0)) > 0.001
+        );
+      }).length;
+      const contactSamples = vehicles.map((agent) => agent.wheelContact).filter((contact) => contact?.sampledWheelContacts === 4);
+      return Object.freeze({
+        pedestrians: pedestrians.filter((agent) => !agent.promoted && agent.visibility > .08).length,
+        vehicles: vehicles.filter((agent) => !agent.promoted && agent.visibility > .08).length,
+        promotedPedestrians: pedestrians.filter((agent) => agent.promoted).length,
+        promotedVehicles: vehicles.filter((agent) => agent.promoted).length,
+        detailedMovingVehicles: vehicles.filter((agent) => agent.detailPromoted).length,
+        slopedVehicles: vehicles.filter((agent) => {
+          const pose = agentPose(agent, trafficGraph, sampleVehicleSurface);
+          return pose && (Math.abs(Number(pose.pitch || 0)) > 0.01 || Math.abs(Number(pose.roll || 0)) > 0.01);
+        }).length,
+        vehicleAttitudeMismatches,
+        fourWheelContactVehicles: contactSamples.length,
+        maximumWheelPenetration: Math.max(0, ...contactSamples.map((contact) => Number(contact.maximumWheelPenetration || 0))),
+        maximumWheelGap: Math.max(0, ...contactSamples.map((contact) => Number(contact.maximumWheelGap || 0))),
+        previousMaximumWheelPenetration: Math.max(0, ...contactSamples.map((contact) => Number(contact.previousMaximumWheelPenetration || 0))),
+        entranceVirtualizations: pedestrians.reduce((sum, agent) => sum + Number(agent.virtualizedEntries || 0), 0)
+      });
+    },
+    dispose() {
+      disposed = true;
+      group.removeFromParent?.();
+      vehicles.forEach((agent) => {
+        disposeCuratedTrafficVehicle(agent.visualHost);
+        agent.visualHost = null;
+      });
+      pedestrians.forEach((agent) => {
+        disposeCuratedCharacter(agent.visualHost);
+        agent.visualHost = null;
+      });
+    }
+  });
+}
+
+export {
+  LIVING_PEDESTRIAN_CAPABILITIES,
+  PEDESTRIAN_ARCHETYPES,
+  POPULATION_BUDGET_BY_TIER,
+  POPULATION_VISIBILITY_POLICY,
+  physicalEdgeKey,
+  planAgentSpawns
+};

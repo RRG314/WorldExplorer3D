@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "lake_tahoe_custom-ground",
+  "providerId": "copernicus-dem-classified-ground-v1",
+  "sourceRelease": "COP-DEM-2021:GLO-30",
+  "contentSha256": "2d63447ebf4ae19dddc2060559c7bcff35156cfab0ac8fca8ef79fc4ab845d89",
+  "spacingMeters": 90,
+  "coverage": {
+    "south": 39.07158009763476,
+    "north": 39.12240335620342,
+    "west": -120.06549710886401,
+    "east": -120.00000992465169
+  },
+  "verticalDatum": "EGM2008",
+  "complete": true,
+  "missingSampleCount": 0,
+  "licenseAttested": true,
+  "correctionAttested": true,
+  "sourceEvidence": {
+    "sourceClassification": "digital-surface-model",
+    "correctionMethod": "worldexplorer-pmf-grid-v1",
+    "sourceTiles": [
+      {
+        "tileId": "Copernicus_DSM_COG_10_N39_00_W121_00_DEM",
+        "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N39_00_W121_00_DEM/Copernicus_DSM_COG_10_N39_00_W121_00_DEM.tif",
+        "resolutionMeters": 30,
+        "contentLength": 39783792,
+        "contentSha256": "5140a11966cdefd4b5a46c45baa9f4c0b8e6bab0f1bca9f39ceb84adacddf097",
+        "etag": "ae1ccc52d64cda619fa2165a96bb451b",
+        "lastModified": "Mon, 09 May 2022 14:21:06 GMT"
+      },
+      {
+        "tileId": "Copernicus_DSM_COG_10_N39_00_W120_00_DEM",
+        "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N39_00_W120_00_DEM/Copernicus_DSM_COG_10_N39_00_W120_00_DEM.tif",
+        "resolutionMeters": 30,
+        "contentLength": 38347132,
+        "contentSha256": "b565a326f452f54938c3300c0d81399dab4e226aba207fd467d51978cfa6807e",
+        "etag": "202fb8067384f57fb2cffefd7239fb1f",
+        "lastModified": "Mon, 09 May 2022 14:21:06 GMT"
+      }
+    ]
+  },
+  "attribution": {
+    "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+    "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+    "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+    "modified": true
+  }
+}

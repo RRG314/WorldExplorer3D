@@ -1,0 +1,2782 @@
+const functions = require('firebase-functions/v1');
+const admin = require('firebase-admin');
+const crypto = require('node:crypto');
+const { FieldValue, Timestamp: AdminTimestamp } = require('firebase-admin/firestore');
+const { defineString } = require('firebase-functions/params');
+const Stripe = require('stripe');
+const { ADMIN_ACTIVITY_COLLECTION, buildAdminDashboardExports } = require('./admin-dashboard');
+const {
+  CREATOR_PROFILES_COLLECTION,
+  ensureCreatorProfileDoc,
+  mergeCreatorProfile,
+  sanitizeAvatar,
+  sanitizeMultilineText: sanitizeCreatorProfileMultilineText,
+  sanitizeUsername
+} = require('./creator-profile');
+const { buildOverlayExports } = require('./overlay');
+const { buildGeospatialExports } = require('./geospatial');
+const { buildDiscoveryExports } = require('./discovery');
+const { buildCommunityRealityCaptureExports } = require('./community-reality-capture');
+const {
+  claimImmutableDeFlockState,
+  isMappedCameraTags,
+  normalizeDeFlockSourceId
+} = require('./deflock');
+const {
+  claimUrbanVehicleLease,
+  commitUrbanCivicEvent,
+  commitUrbanImpacts,
+  normalizePose: normalizeUrbanPose,
+  normalizeUrbanEntityId,
+  poseDistance: urbanPoseDistance,
+  resolveUrbanCivicOutcome,
+  updateUrbanVehicleLease,
+  urbanEntityDocumentId
+} = require('./urban-sandbox');
+const {
+  commitSharedExpedition,
+  createSharedExpedition,
+  joinSharedExpedition,
+  rescueIntoSharedExpedition,
+  setParticipantConnection,
+  setParticipantReady
+} = require('./expedition-authority');
+const {
+  PROPERTY_INTERACTION_RADIUS,
+  propertyDocumentId,
+  settlePropertyAction,
+  settlePropertyTrade,
+  validatePropertyProximity
+} = require('./property-authority');
+const { settleCommerceOutcome, settleCommerceTransaction } = require('./economy-authority');
+const { normalizePlayerConditionInput } = require('./player-state-authority');
+
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
+const db = admin.firestore();
+
+const ACTIVE_SUB_STATUSES = new Set(['active', 'trialing', 'past_due']);
+const ALLOWED_PLANS = new Set(['support', 'supporter', 'pro']);
+const TRIAL_DURATION_MS = 48 * 60 * 60 * 1000;
+const DELETE_ACCOUNT_MAX_AUTH_AGE_SECONDS = 10 * 60;
+const ADMIN_TEST_ROOM_CREATE_LIMIT = 10000;
+const PUBLIC_SITE_STATS_CACHE_MS = 5 * 60 * 1000;
+const DEFAULT_ALLOWED_ORIGINS = Object.freeze([
+  'https://rrg314.github.io',
+  'https://worldexplorer.io',
+  'https://www.worldexplorer.io',
+  'https://worldexplorer3d.io',
+  'https://www.worldexplorer3d.io'
+]);
+const ROOM_CREATE_LIMITS = Object.freeze({
+  free: 3,
+  trial: 3,
+  supporter: 3,
+  pro: 10
+});
+const PARAM_STRIPE_SECRET = defineString('WE3D_STRIPE_SECRET', { default: '' });
+const PARAM_STRIPE_WEBHOOK = defineString('WE3D_STRIPE_WEBHOOK_SECRET', { default: '' });
+const PARAM_STRIPE_PRICE_SUPPORTER = defineString('WE3D_STRIPE_PRICE_SUPPORTER', { default: '' });
+const PARAM_STRIPE_PRICE_PRO = defineString('WE3D_STRIPE_PRICE_PRO', { default: '' });
+const PARAM_ADMIN_ALLOWED_EMAILS = defineString('WE3D_ADMIN_ALLOWED_EMAILS', { default: '' });
+const PARAM_ADMIN_ALLOWED_UIDS = defineString('WE3D_ADMIN_ALLOWED_UIDS', { default: '' });
+const PARAM_ALLOWED_ORIGINS = defineString('WE3D_ALLOWED_ORIGINS', { default: '' });
+const PARAM_RESEND_API_KEY = defineString('WE3D_RESEND_API_KEY', { default: '' });
+const PARAM_EMAIL_FROM = defineString('WE3D_EMAIL_FROM', { default: '' });
+const PARAM_ADMIN_NOTIFICATION_EMAIL = defineString('WE3D_ADMIN_NOTIFICATION_EMAIL', { default: '' });
+const PARAM_MODERATION_PANEL_URL = defineString('WE3D_MODERATION_PANEL_URL', { default: 'https://worldexplorer3d.io/account/admin.html?view=moderation' });
+let publicSiteStatsCache = null;
+
+const CONTRIBUTION_EDIT_TYPE_CONFIG = Object.freeze({
+  place_info: Object.freeze({
+    id: 'place_info',
+    label: 'Place Info',
+    icon: '📍',
+    markerStyle: 'info-pin',
+    defaultCategory: 'place',
+    targetKinds: ['world', 'building', 'destination', 'interior'],
+    requiresScopedTarget: false
+  }),
+  artifact_marker: Object.freeze({
+    id: 'artifact_marker',
+    label: 'Artifact Marker',
+    icon: '🧿',
+    markerStyle: 'artifact-beacon',
+    defaultCategory: 'artifact',
+    targetKinds: ['world', 'building', 'destination', 'interior'],
+    requiresScopedTarget: false
+  }),
+  building_note: Object.freeze({
+    id: 'building_note',
+    label: 'Building Note',
+    icon: '🏢',
+    markerStyle: 'building-outline',
+    defaultCategory: 'building',
+    targetKinds: ['building', 'destination', 'interior'],
+    requiresScopedTarget: true
+  }),
+  interior_seed: Object.freeze({
+    id: 'interior_seed',
+    label: 'Interior Seed',
+    icon: '🚪',
+    markerStyle: 'interior-node',
+    defaultCategory: 'interior',
+    targetKinds: ['building', 'interior', 'destination'],
+    requiresScopedTarget: true
+  }),
+  photo_point: Object.freeze({
+    id: 'photo_point',
+    label: 'Photo Contribution',
+    icon: '📷',
+    markerStyle: 'photo-frame',
+    defaultCategory: 'photo',
+    targetKinds: ['world', 'building', 'destination', 'interior'],
+    requiresScopedTarget: false
+  })
+});
+const CONTRIBUTION_EDIT_TYPES = new Set(Object.keys(CONTRIBUTION_EDIT_TYPE_CONFIG));
+const CONTRIBUTION_STATUS_VALUES = new Set(['pending', 'approved', 'rejected']);
+const CONTRIBUTION_WORLD_KINDS = new Set(['earth', 'moon', 'space']);
+const CONTRIBUTION_MAX_RESULTS = 120;
+const CONTRIBUTION_AREA_CELL_DEGREES = 0.06;
+
+function readParamString(paramRef, envFallback = '') {
+  try {
+    const value = typeof paramRef?.value === 'function' ? paramRef.value() : '';
+    const text = String(value || '').trim();
+    if (text) return text;
+  } catch (_) {
+    // Param resolution can be unavailable in some local tooling; env fallback still works.
+  }
+  return String(envFallback || '').trim();
+}
+
+function stripeConfig() {
+  return {
+    secret: readParamString(PARAM_STRIPE_SECRET, process.env.WE3D_STRIPE_SECRET || process.env.STRIPE_SECRET || ''),
+    webhook: readParamString(PARAM_STRIPE_WEBHOOK, process.env.WE3D_STRIPE_WEBHOOK_SECRET || process.env.STRIPE_WEBHOOK || ''),
+    price_supporter: readParamString(PARAM_STRIPE_PRICE_SUPPORTER, process.env.WE3D_STRIPE_PRICE_SUPPORTER || process.env.STRIPE_PRICE_SUPPORTER || ''),
+    price_pro: readParamString(PARAM_STRIPE_PRICE_PRO, process.env.WE3D_STRIPE_PRICE_PRO || process.env.STRIPE_PRICE_PRO || '')
+  };
+}
+
+function adminConfig() {
+  return {
+    allowedEmails: readParamString(PARAM_ADMIN_ALLOWED_EMAILS, process.env.WE3D_ADMIN_EMAILS || ''),
+    allowedUids: readParamString(PARAM_ADMIN_ALLOWED_UIDS, process.env.WE3D_ADMIN_UIDS || '')
+  };
+}
+
+function contributionNotificationConfig() {
+  return {
+    resendApiKey: readParamString(PARAM_RESEND_API_KEY, process.env.WE3D_RESEND_API_KEY || ''),
+    emailFrom: readParamString(PARAM_EMAIL_FROM, process.env.WE3D_EMAIL_FROM || ''),
+    adminNotificationEmail: readParamString(PARAM_ADMIN_NOTIFICATION_EMAIL, process.env.WE3D_ADMIN_NOTIFICATION_EMAIL || ''),
+    moderationPanelUrl: readParamString(
+      PARAM_MODERATION_PANEL_URL,
+      process.env.WE3D_MODERATION_PANEL_URL || 'https://worldexplorer3d.io/account/admin.html?view=moderation'
+    )
+  };
+}
+
+function parseCsvSet(value, normalize = (item) => item) {
+  return new Set(
+    String(value || '')
+      .split(',')
+      .map((part) => normalize(String(part || '').trim()))
+      .filter(Boolean)
+  );
+}
+
+function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function sanitizeText(value, max = 120) {
+  return String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
+}
+
+async function fetchVerifiedOsmCamera(nodeId) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(`https://api.openstreetmap.org/api/0.6/node/${encodeURIComponent(nodeId)}.json`, {
+      headers: { 'User-Agent': 'WorldExplorer3D-DeFlock/1.0 (public OSM verification)' },
+      signal: controller.signal
+    });
+    if (!response.ok) return null;
+    const payload = await response.json();
+    const node = Array.isArray(payload?.elements) ? payload.elements[0] : null;
+    if (!node || node.type !== 'node' || String(node.id) !== String(nodeId) || !isMappedCameraTags(node.tags || {})) return null;
+    const lat = Number(node.lat);
+    const lon = Number(node.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    return { lat, lon, timestamp: sanitizeText(node.timestamp || '', 40) };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function sanitizeMultilineText(value, max = 320) {
+  return String(value || '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[^\S\n]+/g, ' ')
+    .trim()
+    .slice(0, max);
+}
+
+function sanitizeHttpUrl(value, max = 320) {
+  const raw = String(value || '').trim().slice(0, max);
+  if (!raw) return '';
+  try {
+    const parsed = new URL(raw);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.href.slice(0, max) : '';
+  } catch (_) {
+    return '';
+  }
+}
+
+function finiteNumber(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function clampLat(lat) {
+  return Math.max(-90, Math.min(90, finiteNumber(lat, 0)));
+}
+
+function wrapLon(lon) {
+  let next = finiteNumber(lon, 0);
+  while (next < -180) next += 360;
+  while (next > 180) next -= 360;
+  return next;
+}
+
+function sanitizeContributionEditType(value) {
+  const next = String(value || '').trim().toLowerCase();
+  return CONTRIBUTION_EDIT_TYPES.has(next) ? next : 'place_info';
+}
+
+function getContributionEditTypeConfig(editType) {
+  return CONTRIBUTION_EDIT_TYPE_CONFIG[sanitizeContributionEditType(editType)] || CONTRIBUTION_EDIT_TYPE_CONFIG.place_info;
+}
+
+function sanitizeContributionStatus(value) {
+  const next = String(value || '').trim().toLowerCase();
+  return CONTRIBUTION_STATUS_VALUES.has(next) ? next : 'pending';
+}
+
+function sanitizeWorldKind(value) {
+  const next = String(value || '').trim().toLowerCase();
+  return CONTRIBUTION_WORLD_KINDS.has(next) ? next : 'earth';
+}
+
+function computeContributionAreaKey(lat, lon, worldKind = 'earth') {
+  const safeWorldKind = sanitizeWorldKind(worldKind);
+  const safeLat = clampLat(lat);
+  const safeLon = wrapLon(lon);
+  const latBucket = Math.floor((safeLat + 90) / CONTRIBUTION_AREA_CELL_DEGREES);
+  const lonBucket = Math.floor((safeLon + 180) / CONTRIBUTION_AREA_CELL_DEGREES);
+  return `${safeWorldKind}:${latBucket}:${lonBucket}`;
+}
+
+function normalizeContributionTarget(raw = {}) {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const anchorKind = String(source.anchorKind || 'world').toLowerCase();
+  return {
+    anchorKind: anchorKind === 'building' || anchorKind === 'interior' || anchorKind === 'destination' ? anchorKind : 'world',
+    lat: clampLat(source.lat),
+    lon: wrapLon(source.lon),
+    x: finiteNumber(source.x, 0),
+    y: finiteNumber(source.y, 0),
+    z: finiteNumber(source.z, 0),
+    locationLabel: sanitizeText(source.locationLabel || 'Current Location', 120),
+    buildingKey: sanitizeText(source.buildingKey || '', 180),
+    buildingLabel: sanitizeText(source.buildingLabel || '', 120),
+    interiorKey: sanitizeText(source.interiorKey || '', 180),
+    destinationKey: sanitizeText(source.destinationKey || '', 180),
+    destinationLabel: sanitizeText(source.destinationLabel || '', 120)
+  };
+}
+
+function normalizeContributionPayload(raw = {}, editType = 'place_info') {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const cfg = getContributionEditTypeConfig(editType);
+  return {
+    title: sanitizeText(source.title || '', 80),
+    subtitle: sanitizeText(source.subtitle || '', 120),
+    note: sanitizeMultilineText(source.note || '', 320),
+    category: sanitizeText(source.category || cfg.defaultCategory, 40).toLowerCase(),
+    icon: sanitizeText(source.icon || cfg.icon, 8),
+    markerStyle: sanitizeText(source.markerStyle || cfg.markerStyle, 32).toLowerCase(),
+    tagsText: sanitizeText(source.tagsText || '', 160),
+    placeKind: sanitizeText(source.placeKind || '', 48).toLowerCase(),
+    website: sanitizeHttpUrl(source.website || '', 240),
+    phone: sanitizeText(source.phone || '', 40),
+    hours: sanitizeText(source.hours || '', 120),
+    accessNotes: sanitizeMultilineText(source.accessNotes || '', 180),
+    buildingUse: sanitizeText(source.buildingUse || '', 60),
+    entranceLabel: sanitizeText(source.entranceLabel || '', 60),
+    floorLabel: sanitizeText(source.floorLabel || '', 40),
+    roomLabel: sanitizeText(source.roomLabel || '', 80),
+    photoUrl: sanitizeHttpUrl(source.photoUrl || '', 320),
+    photoCaption: sanitizeText(source.photoCaption || '', 160),
+    photoAttribution: sanitizeText(source.photoAttribution || '', 120)
+  };
+}
+
+function contributionTargetValidForType(editType, target) {
+  const cfg = getContributionEditTypeConfig(editType);
+  const anchorKind = String(target?.anchorKind || 'world').toLowerCase();
+  return cfg.targetKinds.includes(anchorKind);
+}
+
+function previewLocationLabel(target = {}) {
+  return sanitizeText(
+    target.buildingLabel ||
+    target.destinationLabel ||
+    target.locationLabel ||
+    'Current Location',
+    120
+  );
+}
+
+function previewSummaryLine(payload = {}, target = {}) {
+  const parts = [
+    sanitizeText(payload?.title || '', 80),
+    sanitizeText(target?.buildingLabel || target?.destinationLabel || target?.locationLabel || '', 120),
+    `${clampLat(target?.lat).toFixed(5)}, ${wrapLon(target?.lon).toFixed(5)}`
+  ].filter(Boolean);
+  return parts.join(' • ');
+}
+
+function serializeContributionDoc(docLike = {}, options = {}) {
+  const data = typeof docLike.data === 'function' ? docLike.data() || {} : docLike || {};
+  const editType = sanitizeContributionEditType(data.editType);
+  const target = normalizeContributionTarget(data.target || {});
+  const payload = normalizeContributionPayload(data.payload || {}, editType);
+  const status = sanitizeContributionStatus(data.status);
+  const moderation = data.moderation && typeof data.moderation === 'object'
+    ? {
+        moderatedBy: sanitizeText(data.moderation.moderatedBy || '', 120),
+        moderatedByName: sanitizeText(data.moderation.moderatedByName || '', 60),
+        moderatedAtMs: timestampToMillis(data.moderation.moderatedAt),
+        decisionNote: sanitizeMultilineText(data.moderation.decisionNote || '', 200)
+      }
+    : null;
+
+  return {
+    id: sanitizeText(docLike.id || data.id || '', 180),
+    editType,
+    editTypeLabel: getContributionEditTypeConfig(editType).label,
+    status,
+    worldKind: sanitizeWorldKind(data.worldKind || 'earth'),
+    areaKey: sanitizeText(data.areaKey || computeContributionAreaKey(target.lat, target.lon, data.worldKind), 64),
+    source: sanitizeText(data.source || 'editor-v1', 48),
+    userId: sanitizeText(data.userId || '', 160),
+    userDisplayName: sanitizeText(data.userDisplayName || 'Explorer', 60),
+    target,
+    payload,
+    moderation,
+    createdAtMs: timestampToMillis(data.createdAt),
+    updatedAtMs: timestampToMillis(data.updatedAt),
+    preview: {
+      title: sanitizeText(payload.title || 'Untitled contribution', 80),
+      summary: previewSummaryLine(payload, target),
+      locationLabel: previewLocationLabel(target),
+      hasPhoto: !!payload.photoUrl,
+      buildingLabel: sanitizeText(target.buildingLabel || '', 120),
+      destinationLabel: sanitizeText(target.destinationLabel || '', 120)
+    },
+    reviewerOnly: options.reviewerOnly === true ? {
+      openStreetMapUrl: `https://www.openstreetmap.org/?mlat=${clampLat(target.lat).toFixed(6)}&mlon=${wrapLon(target.lon).toFixed(6)}#map=19/${clampLat(target.lat).toFixed(6)}/${wrapLon(target.lon).toFixed(6)}`
+    } : undefined
+  };
+}
+
+async function requireModerator(req, res) {
+  const auth = await verifyAuth(req, res);
+  if (!auth) return null;
+
+  try {
+    const authUser = await admin.auth().getUser(auth.uid);
+    const userSnap = await db.collection('users').doc(auth.uid).get();
+    const userData = userSnap.exists ? userSnap.data() || {} : {};
+    const claimAdmin = auth.admin === true || String(auth.role || '').toLowerCase() === 'admin';
+    const storedAdmin = String(userData.subscriptionStatus || '').toLowerCase() === 'admin';
+    const allowlisted = isAllowlistedAdminCandidate(authUser, auth.uid);
+    if (!claimAdmin && !storedAdmin && !allowlisted.allowed) {
+      res.status(403).json({ error: 'Admin access is required for moderation.' });
+      return null;
+    }
+    return {
+      auth,
+      authUser,
+      userData,
+      displayName: sanitizeText(authUser.displayName || authUser.email || userData.displayName || 'Admin', 60)
+    };
+  } catch (err) {
+    console.error('[moderation] moderator verification failed:', err);
+    res.status(500).json({ error: 'Unable to verify moderator access right now.' });
+    return null;
+  }
+}
+
+function contributionNotificationEnabled(cfg = contributionNotificationConfig()) {
+  return !!(cfg.resendApiKey && cfg.emailFrom && cfg.adminNotificationEmail);
+}
+
+async function logAdminActivity(entry = {}) {
+  const actorUid = sanitizeText(entry.actorUid || '', 160);
+  const actorName = sanitizeText(entry.actorName || '', 80);
+  const actionType = sanitizeText(entry.actionType || '', 80);
+  const targetType = sanitizeText(entry.targetType || '', 80);
+  const targetId = sanitizeText(entry.targetId || '', 180);
+  if (!actorUid || !actionType || !targetType || !targetId) return;
+
+  await db.collection(ADMIN_ACTIVITY_COLLECTION).add({
+    actorUid,
+    actorName,
+    actionType,
+    targetType,
+    targetId,
+    title: sanitizeText(entry.title || '', 140),
+    summary: sanitizeMultilineText(entry.summary || '', 320),
+    createdAt: FieldValue.serverTimestamp(),
+    createdAtMs: Date.now()
+  });
+}
+
+async function sendContributionNotificationEmail(submission) {
+  const cfg = contributionNotificationConfig();
+  if (!contributionNotificationEnabled(cfg)) {
+    return { sent: false, reason: 'not-configured' };
+  }
+
+  const title = sanitizeText(submission?.payload?.title || 'Untitled contribution', 80);
+  const typeLabel = sanitizeText(submission?.editTypeLabel || 'Contribution', 60);
+  const locationLabel = previewLocationLabel(submission?.target || {});
+  const coords = `${clampLat(submission?.target?.lat).toFixed(5)}, ${wrapLon(submission?.target?.lon).toFixed(5)}`;
+  const reviewUrl = String(cfg.moderationPanelUrl || 'https://worldexplorer3d.io/account/admin.html?view=moderation').trim();
+  const subject = `World Explorer pending contribution: ${typeLabel} — ${title}`;
+  const text = [
+    'A new World Explorer contribution is waiting for review.',
+    '',
+    `Type: ${typeLabel}`,
+    `Title: ${title}`,
+    `Submitted by: ${sanitizeText(submission?.userDisplayName || 'Explorer', 60)} (${sanitizeText(submission?.userId || '', 160)})`,
+    `Location: ${locationLabel}`,
+    `Coordinates: ${coords}`,
+    `Review: ${reviewUrl}`,
+    '',
+    'This submission is pending and is not live yet.'
+  ].join('\n');
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${cfg.resendApiKey}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      'User-Agent': 'WorldExplorer3D-Functions/1.0'
+    },
+    body: JSON.stringify({
+      from: cfg.emailFrom,
+      to: [cfg.adminNotificationEmail],
+      subject,
+      text,
+      html: `
+        <div style="font-family:Arial,sans-serif;line-height:1.5;color:#102033">
+          <h2>New World Explorer contribution</h2>
+          <p>A new contribution is waiting for review.</p>
+          <ul>
+            <li><strong>Type:</strong> ${typeLabel}</li>
+            <li><strong>Title:</strong> ${title}</li>
+            <li><strong>Submitted by:</strong> ${sanitizeText(submission?.userDisplayName || 'Explorer', 60)}</li>
+            <li><strong>Location:</strong> ${locationLabel}</li>
+            <li><strong>Coordinates:</strong> ${coords}</li>
+          </ul>
+          <p><a href="${reviewUrl}">Open the moderation panel</a></p>
+          <p>This submission is pending and is not visible in the live world yet.</p>
+        </div>
+      `
+    })
+  });
+
+  if (!response.ok) {
+    const raw = await response.text();
+    throw new Error(`Email notification failed (${response.status}): ${raw.slice(0, 200)}`);
+  }
+
+  return { sent: true };
+}
+
+async function listContributionCounts() {
+  try {
+    const statuses = ['pending', 'approved', 'rejected'];
+    const entries = await Promise.all(statuses.map(async (status) => {
+      const snap = await db.collection('editorSubmissions').where('status', '==', status).count().get();
+      return [status, Number(snap.data()?.count || 0)];
+    }));
+    return Object.fromEntries(entries);
+  } catch (err) {
+    console.warn('[moderation] count query failed:', err?.message || err);
+    return {};
+  }
+}
+
+function isAllowlistedAdminCandidate(authUser, uid) {
+  const cfg = adminConfig();
+  const allowedUidSet = parseCsvSet(cfg.allowedUids);
+  if (allowedUidSet.has(String(uid || '').trim())) {
+    return { allowed: true, source: 'uid' };
+  }
+
+  const allowedEmailSet = parseCsvSet(cfg.allowedEmails, normalizeEmail);
+  const email = normalizeEmail(authUser && authUser.email ? authUser.email : '');
+  if (email && allowedEmailSet.has(email)) {
+    if (authUser && authUser.emailVerified === true) {
+      return { allowed: true, source: 'email' };
+    }
+    return { allowed: false, reason: 'Email is allowlisted but not verified yet.' };
+  }
+
+  return { allowed: false, reason: 'Your account is not on the admin allowlist.' };
+}
+
+function getStripeClient() {
+  const cfg = stripeConfig();
+  if (!cfg.secret) {
+    throw new Error('Stripe secret is missing. Set WE3D_STRIPE_SECRET (Firebase param or env).');
+  }
+  return new Stripe(cfg.secret, { apiVersion: '2024-06-20' });
+}
+
+function planEntitlements(plan) {
+  const normalized = normalizePlan(plan);
+
+  if (normalized === 'pro') {
+    return {
+      fullAccess: true,
+      cloudSync: true,
+      proEarlyAccess: true,
+      prioritySupport: true,
+      featureConsideration: true,
+      directContact: true
+    };
+  }
+
+  if (normalized === 'supporter' || normalized === 'trial') {
+    return {
+      fullAccess: true,
+      cloudSync: true,
+      proEarlyAccess: false,
+      prioritySupport: false,
+      featureConsideration: false,
+      directContact: false
+    };
+  }
+
+  return {
+    fullAccess: true,
+    cloudSync: true,
+    proEarlyAccess: false,
+    prioritySupport: false,
+    featureConsideration: false,
+    directContact: false
+  };
+}
+
+function normalizePlan(plan) {
+  const lowered = String(plan || '').toLowerCase();
+  if (lowered === 'support') return 'supporter';
+  if (lowered === 'pro' || lowered === 'supporter' || lowered === 'trial') return lowered;
+  return 'free';
+}
+
+function roomCreateLimitForPlan(plan) {
+  const normalized = normalizePlan(plan);
+  return ROOM_CREATE_LIMITS[normalized] || ROOM_CREATE_LIMITS.free;
+}
+
+function normalizeRoomCreateCount(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(10000, Math.floor(n)));
+}
+
+function normalizeRoomCreateLimit(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(10000, Math.floor(n)));
+}
+
+function hasActiveSubscription(status) {
+  return ACTIVE_SUB_STATUSES.has(String(status || '').toLowerCase());
+}
+
+function normalizeOrigin(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const parsed = new URL(raw);
+    return `${parsed.protocol}//${parsed.host}`.toLowerCase();
+  } catch (_) {
+    return '';
+  }
+}
+
+function allowedOrigins() {
+  const configured = parseCsvSet(
+    readParamString(PARAM_ALLOWED_ORIGINS, process.env.WE3D_ALLOWED_ORIGINS || ''),
+    normalizeOrigin
+  );
+  const projectId = String(process.env.GCLOUD_PROJECT || '').trim();
+  const defaults = new Set(DEFAULT_ALLOWED_ORIGINS);
+
+  if (projectId) {
+    defaults.add(`https://${projectId}.web.app`);
+    defaults.add(`https://${projectId}.firebaseapp.com`);
+  }
+
+  configured.forEach((origin) => defaults.add(origin));
+  return defaults;
+}
+
+function originIsAllowed(origin, allowlist) {
+  const normalized = normalizeOrigin(origin);
+  if (!normalized) return false;
+  if (normalized.startsWith('http://localhost:')) return true;
+  if (normalized.startsWith('http://127.0.0.1:')) return true;
+  return allowlist.has(normalized);
+}
+
+function setCors(req, res) {
+  const requestOrigin = req.get('origin') || '';
+  const allowlist = allowedOrigins();
+
+  if (requestOrigin && !originIsAllowed(requestOrigin, allowlist)) {
+    res.status(403).json({ error: 'Origin not allowed.' });
+    return true;
+  }
+
+  const allowOrigin = requestOrigin || '*';
+  res.set('Access-Control-Allow-Origin', allowOrigin);
+  res.set('Vary', 'Origin');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Firebase-AppCheck');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return true;
+  }
+
+  return false;
+}
+
+function isRegisteredAuthUser(user) {
+  return Boolean(
+    user && (
+      String(user.email || '').trim() ||
+      String(user.phoneNumber || '').trim() ||
+      (Array.isArray(user.providerData) && user.providerData.length > 0)
+    )
+  );
+}
+
+async function countRegisteredAuthUsers() {
+  let totalUsers = 0;
+  let pageToken;
+  do {
+    const page = await admin.auth().listUsers(1000, pageToken);
+    totalUsers += (Array.isArray(page.users) ? page.users : []).filter(isRegisteredAuthUser).length;
+    pageToken = page.pageToken;
+  } while (pageToken);
+  return totalUsers;
+}
+
+async function getPublicSiteStatsSnapshot(nowMs = Date.now()) {
+  if (publicSiteStatsCache && publicSiteStatsCache.expiresAtMs > nowMs) {
+    return publicSiteStatsCache.payload;
+  }
+  const payload = Object.freeze({
+    totalUsers: await countRegisteredAuthUsers()
+  });
+  publicSiteStatsCache = Object.freeze({
+    payload,
+    expiresAtMs: nowMs + PUBLIC_SITE_STATS_CACHE_MS
+  });
+  return payload;
+}
+
+async function verifyAuth(req, res) {
+  const header = req.get('authorization') || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+  if (!token) {
+    res.status(401).json({ error: 'Missing bearer token.' });
+    return null;
+  }
+
+  try {
+    // Authentication-sensitive HTTP endpoints must reject sessions that an
+    // account owner or administrator has explicitly revoked. Signature and
+    // expiry checks alone do not consult Firebase's revocation state.
+    return await admin.auth().verifyIdToken(token, true);
+  } catch (err) {
+    console.error('[auth] verifyIdToken failed:', err);
+    res.status(401).json({ error: 'Invalid auth token.' });
+    return null;
+  }
+}
+
+async function verifyAppCheck(req, res, options = {}) {
+  const required = options.required !== false;
+  const emulator = process.env.FUNCTIONS_EMULATOR === 'true';
+  const explicitlyDisabled = process.env.WE3D_CAPTURE_APP_CHECK_DISABLED === 'true';
+  if (!required || emulator || explicitlyDisabled) return { emulator: emulator || explicitlyDisabled };
+  const token = String(req.get('X-Firebase-AppCheck') || '').trim();
+  if (!token) {
+    res.status(401).json({ error: 'Missing App Check token.' });
+    return null;
+  }
+  try {
+    return await admin.appCheck().verifyToken(token);
+  } catch (error) {
+    console.error('[app-check] verification failed:', error);
+    res.status(401).json({ error: 'Invalid App Check token.' });
+    return null;
+  }
+}
+
+function currentBaseUrl(req) {
+  const explicitOrigin = req.get('origin');
+  if (explicitOrigin) return explicitOrigin.replace(/\/$/, '');
+
+  const host = req.get('host');
+  if (host) {
+    const isLocal = host.includes('localhost') || host.startsWith('127.0.0.1');
+    return `${isLocal ? 'http' : 'https'}://${host}`;
+  }
+
+  return `https://${process.env.GCLOUD_PROJECT}.web.app`;
+}
+
+function sanitizeReturnBaseUrl(raw) {
+  const value = String(raw || '').trim();
+  if (!value) return '';
+
+  try {
+    const parsed = new URL(value);
+    const isLocal = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+    if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && isLocal)) {
+      return '';
+    }
+
+    parsed.hash = '';
+    parsed.search = '';
+    return parsed.toString().replace(/\/$/, '');
+  } catch (_) {
+    return '';
+  }
+}
+
+function resolveReturnBaseUrl(req) {
+  const candidate = req && req.body && typeof req.body.returnUrlBase === 'string' ? req.body.returnUrlBase : '';
+  const sanitized = sanitizeReturnBaseUrl(candidate);
+  return sanitized || currentBaseUrl(req);
+}
+
+function planFromPriceId(priceId, cfg) {
+  if (!priceId) return 'free';
+  if (priceId === cfg.price_pro) return 'pro';
+  if (priceId === cfg.price_supporter) return 'supporter';
+  return 'free';
+}
+
+function priceIdForPlan(plan, cfg) {
+  const normalized = normalizePlan(plan);
+  if (normalized === 'pro') return cfg.price_pro;
+  if (normalized === 'supporter') return cfg.price_supporter;
+  return '';
+}
+
+function parsePositiveInt(value, fallback = 20, min = 1, max = 50) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, Math.floor(n)));
+}
+
+async function deleteDocsByQuery(query, batchSize = 200, label = '') {
+  const limit = Math.max(10, Math.min(500, Number(batchSize) || 200));
+  for (;;) {
+    let snap;
+    try {
+      snap = await query.limit(limit).get();
+    } catch (err) {
+      // A missing index or failed query is unfinished cleanup, never success.
+      // Preserve the login so the owner can retry after the cause is repaired.
+      console.error('[deleteAccount] Unfinished cleanup:', label, err.code || 'unknown');
+      throw err;
+    }
+    if (snap.empty) return;
+    const batch = db.batch();
+    snap.docs.forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+    if (snap.size < limit) return;
+  }
+}
+
+async function updateDocsByQuery(query, updateForDoc, batchSize = 200, label = '') {
+  const limit = Math.max(10, Math.min(500, Number(batchSize) || 200));
+  for (;;) {
+    let snap;
+    try {
+      snap = await query.limit(limit).get();
+    } catch (err) {
+      // A missing index or failed query is unfinished cleanup, never success.
+      // Preserve the login so the owner can retry after the cause is repaired.
+      console.error('[deleteAccount] Unfinished cleanup:', label, err.code || 'unknown');
+      throw err;
+    }
+    if (snap.empty) return;
+    const batch = db.batch();
+    snap.docs.forEach((doc) => batch.update(doc.ref, updateForDoc(doc)));
+    await batch.commit();
+    if (snap.size < limit) return;
+  }
+}
+
+async function releaseWorldPropertiesForUser(uid) {
+  await updateDocsByQuery(
+    db.collection('worldProperties').where('ownerUid', '==', uid),
+    () => ({
+      ownerUid: '', ownerName: '', tenantUid: '', tenantName: '',
+      status: 'available', purchasePrice: 0, acquiredAt: null,
+      salePrice: 0, rentPrice: 0, rentTermDays: 0,
+      leaseStartsAt: null, leaseEndsAt: null,
+      revision: FieldValue.increment(1), updatedAt: FieldValue.serverTimestamp()
+    }),
+    200,
+    'worldProperties(ownerUid)'
+  );
+  await updateDocsByQuery(
+    db.collection('worldProperties').where('tenantUid', '==', uid),
+    () => ({
+      tenantUid: '', tenantName: '', status: 'owned',
+      rentPrice: 0, rentTermDays: 0, leaseStartsAt: null, leaseEndsAt: null,
+      revision: FieldValue.increment(1), updatedAt: FieldValue.serverTimestamp()
+    }),
+    200,
+    'worldProperties(tenantUid)'
+  );
+  await deleteDocsByQuery(db.collection('propertyTradeOffers').where('proposerUid', '==', uid), 200, 'propertyTradeOffers(proposerUid)');
+  await deleteDocsByQuery(db.collection('propertyTradeOffers').where('recipientUid', '==', uid), 200, 'propertyTradeOffers(recipientUid)');
+}
+
+async function deleteRoomTree(roomRef) {
+  if (db && typeof db.recursiveDelete === 'function') {
+    await db.recursiveDelete(roomRef);
+    return;
+  }
+
+  // Keep the fallback exhaustive with the room collections authorized by
+  // firestore.rules. Production Admin SDKs expose recursiveDelete, but the
+  // explicit path is still used by emulators and older runtimes.
+  const subcollections = [
+    'players',
+    'chat',
+    'chatState',
+    'artifacts',
+    'activities',
+    'activityState',
+    'expeditions',
+    'blocks',
+    'worldModifications',
+    'paintClaims',
+    'deflockStates',
+    'state',
+    'urbanEntities',
+    'urbanActors',
+    'urbanCivic'
+  ];
+  for (const name of subcollections) {
+    await deleteDocsByQuery(roomRef.collection(name));
+  }
+  await roomRef.delete();
+}
+
+async function deleteDiscoveryTradesForUser(uid) {
+  const tradeRefs = new Map();
+  for (const field of ['ownerUid', 'recipientUid']) {
+    const snapshot = await db.collection('discoveryTrades').where(field, '==', uid).get();
+    snapshot.docs.forEach((tradeDoc) => tradeRefs.set(tradeDoc.ref.path, tradeDoc.ref));
+  }
+
+  for (const tradeRef of tradeRefs.values()) {
+    await db.runTransaction(async (transaction) => {
+      const tradeSnap = await transaction.get(tradeRef);
+      if (!tradeSnap.exists) return;
+      const trade = tradeSnap.data() || {};
+      if (trade.status === 'pending' && trade.ownerUid) {
+        const offeredRefs = (Array.isArray(trade.offeredItemIds) ? trade.offeredItemIds : [])
+          .slice(0, 20)
+          .map((itemId) => db.collection('explorerProfiles')
+            .doc(String(trade.ownerUid))
+            .collection('items')
+            .doc(String(itemId)));
+        const offered = await Promise.all(offeredRefs.map((itemRef) => transaction.get(itemRef)));
+        offered.forEach((itemSnap) => {
+          if (itemSnap.exists && itemSnap.data()?.lockedByTradeId === tradeSnap.id) {
+            transaction.update(itemSnap.ref, {
+              lockedByTradeId: null,
+              updatedAt: FieldValue.serverTimestamp()
+            });
+          }
+        });
+      }
+      transaction.delete(tradeRef);
+    });
+  }
+}
+
+async function deleteUserData(uid) {
+  if (!uid) return;
+  await require('./capture-account-cleanup').cleanupCaptureAccount({db,bucket:admin.storage().bucket(),uid,FieldValue});
+
+  const userRef = db.collection('users').doc(uid);
+  const creatorProfileRef = db.collection(CREATOR_PROFILES_COLLECTION).doc(uid);
+  const explorerProfileRef = db.collection('explorerProfiles').doc(uid);
+
+  const ownedRoomsSnap = await db.collection('rooms').where('ownerUid', '==', uid).get();
+  for (const roomDoc of ownedRoomsSnap.docs) {
+    await deleteRoomTree(roomDoc.ref);
+  }
+
+  await deleteDocsByQuery(db.collectionGroup('players').where('uid', '==', uid), 200, 'players(uid)');
+  await deleteDocsByQuery(db.collectionGroup('chatState').where('uid', '==', uid), 200, 'chatState(uid)');
+  await deleteDocsByQuery(db.collectionGroup('friends').where('uid', '==', uid), 200, 'friends(uid)');
+  await deleteDocsByQuery(db.collectionGroup('recentPlayers').where('uid', '==', uid), 200, 'recentPlayers(uid)');
+  await deleteDocsByQuery(db.collectionGroup('incomingInvites').where('fromUid', '==', uid), 200, 'incomingInvites(fromUid)');
+  await deleteDocsByQuery(db.collectionGroup('artifacts').where('ownerUid', '==', uid), 200, 'artifacts(ownerUid)');
+  await deleteDocsByQuery(db.collectionGroup('blocks').where('createdBy', '==', uid), 200, 'blocks(createdBy)');
+  await deleteDocsByQuery(db.collectionGroup('paintClaims').where('uid', '==', uid), 200, 'paintClaims(uid)');
+  await deleteDocsByQuery(db.collectionGroup('worldModifications').where('createdBy', '==', uid), 200, 'worldModifications(createdBy)');
+
+  await deleteDocsByQuery(db.collection('flowerLeaderboard').where('uid', '==', uid), 200, 'flowerLeaderboard(uid)');
+  await deleteDocsByQuery(db.collection('paintTownLeaderboard').where('uid', '==', uid), 200, 'paintTownLeaderboard(uid)');
+  await deleteDocsByQuery(db.collection('fishingLeaderboard').where('uid', '==', uid), 200, 'fishingLeaderboard(uid)');
+  await deleteDocsByQuery(db.collection('deflockLeaderboard').where('uid', '==', uid), 200, 'deflockLeaderboard(uid)');
+  await deleteDocsByQuery(db.collection('activityFeed').where('uid', '==', uid), 200, 'activityFeed(uid)');
+  await db.collection('explorerLeaderboard').doc(uid).delete();
+  await releaseWorldPropertiesForUser(uid);
+  await db.collection('propertyLeaderboard').doc(uid).delete();
+  await deleteDiscoveryTradesForUser(uid);
+
+  if (db && typeof db.recursiveDelete === 'function') {
+    await db.recursiveDelete(userRef);
+  } else {
+    await deleteDocsByQuery(userRef.collection('friends'), 200, 'users/{uid}/friends');
+    await deleteDocsByQuery(userRef.collection('recentPlayers'), 200, 'users/{uid}/recentPlayers');
+    await deleteDocsByQuery(userRef.collection('incomingInvites'), 200, 'users/{uid}/incomingInvites');
+    await deleteDocsByQuery(userRef.collection('myRooms'), 200, 'users/{uid}/myRooms');
+    await deleteDocsByQuery(userRef.collection('economy'), 200, 'users/{uid}/economy');
+    await deleteDocsByQuery(userRef.collection('commerceReceipts'), 200, 'users/{uid}/commerceReceipts');
+    await deleteDocsByQuery(userRef.collection('commerceItems'), 200, 'users/{uid}/commerceItems');
+    await deleteDocsByQuery(userRef.collection('commerceStock'), 200, 'users/{uid}/commerceStock');
+    await deleteDocsByQuery(userRef.collection('gameplay'), 200, 'users/{uid}/gameplay');
+    await deleteDocsByQuery(userRef.collection('propertyEntitlements'), 200, 'users/{uid}/propertyEntitlements');
+    await userRef.delete();
+  }
+  await creatorProfileRef.delete();
+  if (db && typeof db.recursiveDelete === 'function') {
+    await db.recursiveDelete(explorerProfileRef);
+  } else {
+    await deleteDocsByQuery(explorerProfileRef.collection('items'), 200, 'explorerProfiles/{uid}/items');
+    await deleteDocsByQuery(explorerProfileRef.collection('claims'), 200, 'explorerProfiles/{uid}/claims');
+    await explorerProfileRef.delete();
+  }
+}
+
+function timestampToMillis(value) {
+  if (!value) return null;
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  if (typeof value.seconds === 'number') return value.seconds * 1000;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const parsed = Date.parse(String(value));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeDisplayName(value) {
+  const cleaned = String(value || '').trim().replace(/\s+/g, ' ');
+  return cleaned.slice(0, 60);
+}
+
+async function assertStripeCustomerOwnership(stripe, customerId, uid, expectedEmail = '') {
+  if (!stripe || !customerId || !uid) return false;
+  const customer = await stripe.customers.retrieve(customerId);
+  if (!customer || customer.deleted) return false;
+
+  const metadataUid = customer.metadata && customer.metadata.uid ? String(customer.metadata.uid) : '';
+  if (metadataUid && metadataUid === uid) return true;
+
+  const normalizedExpectedEmail = String(expectedEmail || '').trim().toLowerCase();
+  const normalizedCustomerEmail = String(customer.email || '').trim().toLowerCase();
+  if (!normalizedExpectedEmail || normalizedExpectedEmail !== normalizedCustomerEmail) {
+    return false;
+  }
+
+  const nextMetadata = {
+    ...(customer.metadata || {}),
+    uid
+  };
+  await stripe.customers.update(customerId, { metadata: nextMetadata });
+  return true;
+}
+
+async function ensureUserDoc(uid, email, displayName) {
+  const ref = db.collection('users').doc(uid);
+  const snap = await ref.get();
+  const normalizedDisplayName = normalizeDisplayName(displayName);
+
+  if (snap.exists) {
+    const existing = snap.data() || {};
+    const plan = normalizePlan(existing.plan);
+    const roomCreateCount = normalizeRoomCreateCount(existing.roomCreateCount);
+    const existingLimit = Number.isFinite(Number(existing.roomCreateLimit))
+      ? Math.max(0, Math.min(10000, Math.floor(Number(existing.roomCreateLimit))))
+      : null;
+    const isAdminOverride = String(existing.subscriptionStatus || '').toLowerCase() === 'admin';
+    const roomCreateLimit = isAdminOverride
+      ? Math.max(existingLimit || 0, ADMIN_TEST_ROOM_CREATE_LIMIT)
+      : roomCreateLimitForPlan(plan);
+    await ref.set(
+      {
+        email: email || existing.email || '',
+        displayName: normalizedDisplayName || existing.displayName || 'Explorer',
+        roomCreateCount,
+        roomCreateLimit,
+        updatedAt: FieldValue.serverTimestamp()
+      },
+      { merge: true }
+    );
+    await ensureCreatorProfileDoc(db, uid, {
+      username: normalizedDisplayName || existing.displayName || 'Explorer'
+    });
+    return {
+      ...existing,
+      roomCreateCount,
+      roomCreateLimit
+    };
+  }
+
+  const plan = 'free';
+  const created = {
+    uid,
+    email: email || '',
+    displayName: normalizedDisplayName || 'Explorer',
+    plan,
+    trialEndsAt: null,
+    subscriptionStatus: 'none',
+    entitlements: planEntitlements(plan),
+    roomCreateCount: 0,
+    roomCreateLimit: roomCreateLimitForPlan(plan),
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp()
+  };
+
+  await ref.set(created, { merge: true });
+  await ensureCreatorProfileDoc(db, uid, {
+    username: normalizedDisplayName || 'Explorer'
+  });
+  return created;
+}
+
+async function resolveUidFromCustomer(customerId) {
+  if (!customerId) return null;
+  const snap = await db.collection('users').where('stripeCustomerId', '==', customerId).limit(1).get();
+  if (snap.empty) return null;
+  return snap.docs[0].id;
+}
+
+async function resolveFallbackPlan(uid) {
+  const snap = await db.collection('users').doc(uid).get();
+  const data = snap.exists ? snap.data() || {} : {};
+  const trialEndsAt = data.trialEndsAt && typeof data.trialEndsAt.toMillis === 'function' ? data.trialEndsAt.toMillis() : null;
+
+  if (trialEndsAt && trialEndsAt > Date.now()) {
+    return 'trial';
+  }
+
+  return 'free';
+}
+
+async function upsertPlanFromSubscription({ uid, customerId, subscriptionId, status, priceId }) {
+  if (!uid) return;
+
+  const cfg = stripeConfig();
+  const paidPlan = planFromPriceId(priceId, cfg);
+  const active = hasActiveSubscription(status);
+  const fallbackPlan = active ? 'free' : await resolveFallbackPlan(uid);
+  const plan = active ? normalizePlan(paidPlan) : fallbackPlan;
+  const userRef = db.collection('users').doc(uid);
+  const userSnap = await userRef.get();
+  const userData = userSnap.exists ? userSnap.data() || {} : {};
+  const roomCreateCount = normalizeRoomCreateCount(userData.roomCreateCount);
+  const isAdminOverride = String(userData.subscriptionStatus || '').toLowerCase() === 'admin';
+  const existingLimit = Number.isFinite(Number(userData.roomCreateLimit))
+    ? Math.max(0, Math.min(10000, Math.floor(Number(userData.roomCreateLimit))))
+    : 0;
+  const roomCreateLimit = isAdminOverride
+    ? Math.max(existingLimit, ADMIN_TEST_ROOM_CREATE_LIMIT)
+    : roomCreateLimitForPlan(plan);
+
+  await userRef.set(
+    {
+      stripeCustomerId: customerId || null,
+      stripeSubscriptionId: subscriptionId || null,
+      subscriptionStatus: status || 'none',
+      plan,
+      entitlements: planEntitlements(plan),
+      roomCreateCount,
+      roomCreateLimit,
+      updatedAt: FieldValue.serverTimestamp()
+    },
+    { merge: true }
+  );
+}
+
+exports.getPublicSiteStats = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed.' });
+  try {
+    const payload = await getPublicSiteStatsSnapshot();
+    res.set('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=3600');
+    return res.status(200).json(payload);
+  } catch (error) {
+    console.error('[getPublicSiteStats] failed:', error);
+    return res.status(503).json({ error: 'Explorer count is temporarily unavailable.' });
+  }
+});
+
+exports.createCheckoutSession = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed.' });
+    return;
+  }
+
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+
+  try {
+    const requestedPlan = normalizePlan(req.body && req.body.plan);
+    if (!ALLOWED_PLANS.has(requestedPlan)) {
+      res.status(400).json({ error: 'Invalid plan. Use support/supporter or pro.' });
+      return;
+    }
+
+    const cfg = stripeConfig();
+    const priceId = priceIdForPlan(requestedPlan, cfg);
+    if (!priceId) {
+      res.status(500).json({ error: `Missing Stripe price ID for ${requestedPlan}.` });
+      return;
+    }
+
+    const userRecord = await admin.auth().getUser(auth.uid);
+    const userDoc = await ensureUserDoc(auth.uid, userRecord.email || '', userRecord.displayName || '');
+
+    const stripe = getStripeClient();
+    let customerId = userDoc.stripeCustomerId || null;
+
+    if (customerId) {
+      const ownedByUser = await assertStripeCustomerOwnership(
+        stripe,
+        customerId,
+        auth.uid,
+        userRecord.email || userDoc.email || ''
+      );
+      if (!ownedByUser) {
+        customerId = null;
+      }
+    }
+
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: userRecord.email || undefined,
+        name: userRecord.displayName || undefined,
+        metadata: { uid: auth.uid }
+      });
+      customerId = customer.id;
+      await db.collection('users').doc(auth.uid).set(
+        {
+          stripeCustomerId: customerId,
+          updatedAt: FieldValue.serverTimestamp()
+        },
+        { merge: true }
+      );
+    }
+
+    const baseUrl = resolveReturnBaseUrl(req);
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      customer: customerId,
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${baseUrl}/account/?checkout=success`,
+      cancel_url: `${baseUrl}/account/?checkout=cancel`,
+      client_reference_id: auth.uid,
+      metadata: {
+        uid: auth.uid,
+        plan: requestedPlan
+      },
+      subscription_data: {
+        metadata: {
+          uid: auth.uid,
+          plan: requestedPlan
+        }
+      }
+    });
+
+    res.status(200).json({ url: session.url });
+  } catch (err) {
+    console.error('[createCheckoutSession] failed:', err);
+    res.status(500).json({ error: 'Unable to create checkout session.' });
+  }
+});
+
+exports.createPortalSession = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed.' });
+    return;
+  }
+
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+
+  try {
+    const stripe = getStripeClient();
+    const userRef = db.collection('users').doc(auth.uid);
+    const authUser = await admin.auth().getUser(auth.uid);
+    const userSnap = await userRef.get();
+    const userData = userSnap.exists ? userSnap.data() || {} : {};
+
+    let customerId = userData.stripeCustomerId || null;
+    if (!customerId) {
+      res.status(400).json({ error: 'No Stripe customer found for this account.' });
+      return;
+    }
+
+    const ownedByUser = await assertStripeCustomerOwnership(
+      stripe,
+      customerId,
+      auth.uid,
+      authUser.email || userData.email || ''
+    );
+    if (!ownedByUser) {
+      res.status(403).json({ error: 'Stripe customer ownership could not be verified.' });
+      return;
+    }
+
+    const baseUrl = resolveReturnBaseUrl(req);
+    const session = await stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: `${baseUrl}/account/`
+    });
+
+    res.status(200).json({ url: session.url });
+  } catch (err) {
+    console.error('[createPortalSession] failed:', err);
+    res.status(500).json({ error: 'Unable to create billing portal session.' });
+  }
+});
+
+exports.startTrial = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed.' });
+    return;
+  }
+
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+
+  try {
+    const authUser = await admin.auth().getUser(auth.uid);
+    const existing = await ensureUserDoc(auth.uid, authUser.email || '', authUser.displayName || '');
+    const nowMs = Date.now();
+
+    const existingPlan = normalizePlan(existing.plan);
+    const subscriptionStatus = String(existing.subscriptionStatus || 'none');
+    const trialEndsAtMs = timestampToMillis(existing.trialEndsAt) || timestampToMillis(existing.trialEndsAtMs);
+    const trialConsumedAtMs = timestampToMillis(existing.trialConsumedAt) || timestampToMillis(existing.trialConsumedAtMs);
+
+    if (existingPlan === 'supporter' || existingPlan === 'pro' || hasActiveSubscription(subscriptionStatus)) {
+      res.status(200).json({
+        status: 'already-paid',
+        plan: existingPlan,
+        trialEndsAtMs: trialEndsAtMs || null
+      });
+      return;
+    }
+
+    if (existingPlan === 'trial' && trialEndsAtMs && trialEndsAtMs > nowMs) {
+      const trialEndsAtIsTimestamp = existing.trialEndsAt && typeof existing.trialEndsAt.toMillis === 'function';
+      const trialStartsAtIsTimestamp = existing.trialStartsAt && typeof existing.trialStartsAt.toMillis === 'function';
+      const trialConsumedAtIsTimestamp = existing.trialConsumedAt && typeof existing.trialConsumedAt.toMillis === 'function';
+
+      if (!trialEndsAtIsTimestamp || !trialStartsAtIsTimestamp || !trialConsumedAtIsTimestamp) {
+        const normalizedTrialEndsAt = AdminTimestamp.fromMillis(trialEndsAtMs);
+        const normalizedTrialStartMs = trialStartsAtIsTimestamp
+          ? existing.trialStartsAt.toMillis()
+          : Math.max(nowMs - TRIAL_DURATION_MS, trialEndsAtMs - TRIAL_DURATION_MS);
+        const normalizedTrialStartsAt = AdminTimestamp.fromMillis(normalizedTrialStartMs);
+        const normalizedTrialConsumedAt = trialConsumedAtIsTimestamp
+          ? existing.trialConsumedAt
+          : normalizedTrialStartsAt;
+        const roomCreateCount = normalizeRoomCreateCount(existing.roomCreateCount);
+        const roomCreateLimit = Math.max(
+          roomCreateLimitForPlan('trial'),
+          normalizeRoomCreateLimit(existing.roomCreateLimit)
+        );
+
+        await db.collection('users').doc(auth.uid).set(
+          {
+            plan: 'trial',
+            trialStartsAt: normalizedTrialStartsAt,
+            trialEndsAt: normalizedTrialEndsAt,
+            trialConsumedAt: normalizedTrialConsumedAt,
+            entitlements: planEntitlements('trial'),
+            roomCreateCount,
+            roomCreateLimit,
+            updatedAt: FieldValue.serverTimestamp()
+          },
+          { merge: true }
+        );
+      }
+
+      res.status(200).json({
+        status: 'already-active',
+        plan: 'trial',
+        trialEndsAtMs
+      });
+      return;
+    }
+
+    if (trialConsumedAtMs || (trialEndsAtMs && trialEndsAtMs <= nowMs)) {
+      res.status(403).json({
+        error: 'Trial already used. Upgrade to Supporter or Pro for multiplayer access.'
+      });
+      return;
+    }
+
+    const trialStartsAt = AdminTimestamp.fromMillis(nowMs);
+    const trialEndsAt = AdminTimestamp.fromMillis(nowMs + TRIAL_DURATION_MS);
+    const roomCreateCount = normalizeRoomCreateCount(existing.roomCreateCount);
+    const roomCreateLimit = roomCreateLimitForPlan('trial');
+    await db.collection('users').doc(auth.uid).set(
+      {
+        uid: auth.uid,
+        email: authUser.email || existing.email || '',
+        displayName: authUser.displayName || existing.displayName || '',
+        plan: 'trial',
+        subscriptionStatus,
+        trialStartsAt,
+        trialEndsAt,
+        trialConsumedAt: trialStartsAt,
+        entitlements: planEntitlements('trial'),
+        roomCreateCount,
+        roomCreateLimit,
+        updatedAt: FieldValue.serverTimestamp()
+      },
+      { merge: true }
+    );
+
+    res.status(200).json({
+      status: 'activated',
+      plan: 'trial',
+      trialEndsAtMs: nowMs + TRIAL_DURATION_MS
+    });
+  } catch (err) {
+    console.error('[startTrial] failed:', err);
+    res.status(500).json({ error: 'Unable to start trial right now.' });
+  }
+});
+
+exports.enableAdminTester = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed.' });
+    return;
+  }
+
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+
+  try {
+    const authUser = await admin.auth().getUser(auth.uid);
+    const allowlistResult = isAllowlistedAdminCandidate(authUser, auth.uid);
+    if (!allowlistResult.allowed) {
+      res.status(403).json({
+        error: allowlistResult.reason || 'Account is not allowlisted for admin access.'
+      });
+      return;
+    }
+
+    const existingClaims = authUser.customClaims || {};
+    const nextClaims = {
+      ...existingClaims,
+      admin: true,
+      role: 'admin'
+    };
+    const claimsChanged = existingClaims.admin !== true || existingClaims.role !== 'admin';
+    if (claimsChanged) {
+      await admin.auth().setCustomUserClaims(auth.uid, nextClaims);
+    }
+
+    const existingDoc = await ensureUserDoc(
+      auth.uid,
+      authUser.email || '',
+      authUser.displayName || ''
+    );
+    const roomCreateCount = normalizeRoomCreateCount(existingDoc.roomCreateCount);
+    const roomCreateLimit = ADMIN_TEST_ROOM_CREATE_LIMIT;
+
+    await db.collection('users').doc(auth.uid).set(
+      {
+        uid: auth.uid,
+        email: authUser.email || existingDoc.email || '',
+        displayName: authUser.displayName || existingDoc.displayName || '',
+        plan: 'pro',
+        subscriptionStatus: 'admin',
+        entitlements: planEntitlements('pro'),
+        roomCreateCount,
+        roomCreateLimit,
+        updatedAt: FieldValue.serverTimestamp()
+      },
+      { merge: true }
+    );
+
+    res.status(200).json({
+      enabled: true,
+      plan: 'pro',
+      subscriptionStatus: 'admin',
+      roomCreateLimit,
+      claimsChanged,
+      allowlistSource: allowlistResult.source
+    });
+  } catch (err) {
+    console.error('[enableAdminTester] failed:', err);
+    res.status(500).json({ error: 'Unable to enable admin test access right now.' });
+  }
+});
+
+exports.getAccountOverview = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed.' });
+    return;
+  }
+
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+
+  try {
+    const userRef = db.collection('users').doc(auth.uid);
+    const authUser = await admin.auth().getUser(auth.uid);
+    const customClaims = authUser.customClaims || {};
+    const userSnap = await userRef.get();
+    const userData = userSnap.exists ? userSnap.data() || {} : {};
+
+    const plan = normalizePlan(userData.plan);
+    const trialStartsAtMs = timestampToMillis(userData.trialStartsAt);
+    const trialEndsAtMs = timestampToMillis(userData.trialEndsAt);
+    const trialConsumedAtMs = timestampToMillis(userData.trialConsumedAt);
+    const stripeCustomerId = userData.stripeCustomerId || null;
+    const stripeSubscriptionId = userData.stripeSubscriptionId || null;
+    const roomCreateCount = normalizeRoomCreateCount(userData.roomCreateCount);
+    const rawRoomCreateLimit = Number.isFinite(Number(userData.roomCreateLimit))
+      ? Math.max(0, Math.min(10000, Math.floor(Number(userData.roomCreateLimit))))
+      : roomCreateLimitForPlan(plan);
+    const planRoomCreateLimit = roomCreateLimitForPlan(plan);
+    const isAdmin = customClaims.admin === true ||
+      String(customClaims.role || '').toLowerCase() === 'admin' ||
+      String(userData.subscriptionStatus || '').toLowerCase() === 'admin';
+    const allowlistResult = isAllowlistedAdminCandidate(authUser, auth.uid);
+    const roomCreateLimit = isAdmin
+      ? Math.max(rawRoomCreateLimit, ADMIN_TEST_ROOM_CREATE_LIMIT)
+      : planRoomCreateLimit;
+
+    const overview = {
+      uid: auth.uid,
+      email: authUser.email || userData.email || '',
+      emailVerified: !!authUser.emailVerified,
+      displayName: authUser.displayName || userData.displayName || '',
+      isAdmin,
+      adminTesterEligible: !!allowlistResult.allowed,
+      role: isAdmin ? 'admin' : 'member',
+      providers: Array.isArray(authUser.providerData) ? authUser.providerData.map((p) => p.providerId).filter(Boolean) : [],
+      authCreatedAt: authUser.metadata && authUser.metadata.creationTime ? authUser.metadata.creationTime : null,
+      authLastSignInAt: authUser.metadata && authUser.metadata.lastSignInTime ? authUser.metadata.lastSignInTime : null,
+      plan,
+      subscriptionStatus: String(userData.subscriptionStatus || 'none'),
+      trialStartsAtMs,
+      trialEndsAtMs,
+      trialConsumedAtMs,
+      stripeCustomerId,
+      stripeSubscriptionId,
+      roomCreateCount,
+      roomCreateLimit,
+      nextBillingAtMs: null,
+      cancelAtPeriodEnd: null
+    };
+
+    if (stripeCustomerId && stripeSubscriptionId) {
+      try {
+        const stripe = getStripeClient();
+        const ownedByUser = await assertStripeCustomerOwnership(
+          stripe,
+          stripeCustomerId,
+          auth.uid,
+          overview.email || userData.email || ''
+        );
+        if (!ownedByUser) {
+          throw new Error('Stripe customer ownership mismatch.');
+        }
+        const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+        if (String(subscription.customer || '') !== String(stripeCustomerId)) {
+          throw new Error('Stripe subscription/customer mismatch.');
+        }
+        overview.subscriptionStatus = String(subscription.status || overview.subscriptionStatus || 'none');
+        overview.nextBillingAtMs = subscription.current_period_end ? Number(subscription.current_period_end) * 1000 : null;
+        overview.cancelAtPeriodEnd = !!subscription.cancel_at_period_end;
+      } catch (err) {
+        console.warn('[getAccountOverview] Unable to load subscription details:', err.message || err);
+      }
+    }
+
+    res.status(200).json({ overview });
+  } catch (err) {
+    console.error('[getAccountOverview] failed:', err);
+    res.status(500).json({ error: 'Unable to load account overview.' });
+  }
+});
+
+exports.listBillingReceipts = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed.' });
+    return;
+  }
+
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+
+  try {
+    const userRef = db.collection('users').doc(auth.uid);
+    const authUser = await admin.auth().getUser(auth.uid);
+    const userSnap = await userRef.get();
+    const userData = userSnap.exists ? userSnap.data() || {} : {};
+    const stripeCustomerId = userData.stripeCustomerId || null;
+
+    if (!stripeCustomerId) {
+      res.status(200).json({ receipts: [] });
+      return;
+    }
+
+    const stripe = getStripeClient();
+    const ownedByUser = await assertStripeCustomerOwnership(
+      stripe,
+      stripeCustomerId,
+      auth.uid,
+      authUser.email || userData.email || ''
+    );
+    if (!ownedByUser) {
+      res.status(403).json({ error: 'Stripe customer ownership could not be verified.' });
+      return;
+    }
+
+    const listLimit = parsePositiveInt(req.body && req.body.limit, 20, 1, 40);
+    const startingAfter = req.body && typeof req.body.startingAfter === 'string' ? req.body.startingAfter.trim() : '';
+
+    const params = {
+      customer: stripeCustomerId,
+      limit: listLimit
+    };
+    if (startingAfter) params.starting_after = startingAfter;
+
+    const invoiceList = await stripe.invoices.list(params);
+    const receipts = Array.isArray(invoiceList.data) ? invoiceList.data.map((invoice) => ({
+      id: invoice.id,
+      number: invoice.number || invoice.id,
+      status: invoice.status || 'unknown',
+      currency: String(invoice.currency || 'usd').toUpperCase(),
+      total: Number.isFinite(invoice.total) ? invoice.total : 0,
+      amountPaid: Number.isFinite(invoice.amount_paid) ? invoice.amount_paid : 0,
+      amountDue: Number.isFinite(invoice.amount_due) ? invoice.amount_due : 0,
+      createdAtMs: invoice.created ? Number(invoice.created) * 1000 : null,
+      paidAtMs: invoice.status_transitions && invoice.status_transitions.paid_at
+        ? Number(invoice.status_transitions.paid_at) * 1000
+        : null,
+      periodStartMs: invoice.period_start ? Number(invoice.period_start) * 1000 : null,
+      periodEndMs: invoice.period_end ? Number(invoice.period_end) * 1000 : null,
+      hostedInvoiceUrl: invoice.hosted_invoice_url || null,
+      invoicePdfUrl: invoice.invoice_pdf || null
+    })) : [];
+
+    res.status(200).json({
+      receipts,
+      hasMore: !!invoiceList.has_more
+    });
+  } catch (err) {
+    console.error('[listBillingReceipts] failed:', err);
+    res.status(500).json({ error: 'Unable to load billing receipts.' });
+  }
+});
+
+exports.updateAccountProfile = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed.' });
+    return;
+  }
+
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+
+  try {
+    const displayName = normalizeDisplayName(req.body && req.body.displayName);
+    const bio = sanitizeCreatorProfileMultilineText(req.body && req.body.bio, 320);
+    const avatar = sanitizeAvatar(req.body && req.body.avatar);
+    if (!displayName) {
+      res.status(400).json({ error: 'Display name is required.' });
+      return;
+    }
+
+    await admin.auth().updateUser(auth.uid, { displayName });
+    await db.collection('users').doc(auth.uid).set({
+      displayName,
+      updatedAt: FieldValue.serverTimestamp()
+    }, { merge: true });
+    const creatorProfile = await mergeCreatorProfile(db, auth.uid, {
+      username: sanitizeUsername(displayName, 'Explorer'),
+      bio,
+      avatar
+    });
+
+    res.status(200).json({
+      displayName,
+      creatorProfile
+    });
+  } catch (err) {
+    console.error('[updateAccountProfile] failed:', err);
+    res.status(500).json({ error: 'Unable to update account profile.' });
+  }
+});
+
+exports.deleteAccount = functions.runWith({timeoutSeconds:540,memory:'512MB',invoker:'public'}).region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed.' });
+    return;
+  }
+
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+
+  const confirmation = String(req.body && req.body.confirmation ? req.body.confirmation : '').trim();
+  if (confirmation !== 'DELETE') {
+    res.status(400).json({ error: 'Confirmation token is missing. Send confirmation: DELETE.' });
+    return;
+  }
+
+  const authTimeSec = Number(auth.auth_time || 0);
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (!Number.isFinite(authTimeSec) || authTimeSec <= 0 || nowSec - authTimeSec > DELETE_ACCOUNT_MAX_AUTH_AGE_SECONDS) {
+    res.status(401).json({ error: 'Recent sign-in required. Sign out and sign in again, then retry account deletion.' });
+    return;
+  }
+
+  try {
+    const uid = auth.uid;
+    const userRef = db.collection('users').doc(uid);
+    const authUser = await admin.auth().getUser(uid);
+    const userSnap = await userRef.get();
+    const userData = userSnap.exists ? userSnap.data() || {} : {};
+
+    const stripeCustomerId = String(userData.stripeCustomerId || '').trim();
+    const stripeSubscriptionId = String(userData.stripeSubscriptionId || '').trim();
+    if (stripeSubscriptionId) {
+      const stripe = getStripeClient();
+      if (stripeCustomerId) {
+        const ownedByUser = await assertStripeCustomerOwnership(
+          stripe,
+          stripeCustomerId,
+          uid,
+          authUser.email || userData.email || ''
+        );
+        if (!ownedByUser) {
+          res.status(403).json({ error: 'Unable to verify billing ownership for account deletion.' });
+          return;
+        }
+      }
+
+      try {
+        const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+        const normalizedStatus = String(subscription && subscription.status ? subscription.status : '').toLowerCase();
+        if (normalizedStatus && normalizedStatus !== 'canceled' && normalizedStatus !== 'incomplete_expired') {
+          await stripe.subscriptions.cancel(stripeSubscriptionId);
+        }
+      } catch (err) {
+        console.error('[deleteAccount] subscription cancel failed:', err);
+        res.status(500).json({ error: 'Could not cancel active subscription. Try again or contact support.' });
+        return;
+      }
+    }
+
+    await deleteUserData(uid);
+    await admin.auth().deleteUser(uid);
+
+    res.status(200).json({ deleted: true });
+  } catch (err) {
+    console.error('[deleteAccount] failed:', err);
+    res.status(500).json({ error: 'Unable to delete account right now.' });
+  }
+});
+
+exports.claimDeFlockVirtualDisable = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed.' });
+    return;
+  }
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+
+  const roomCode = sanitizeText(req.body && req.body.roomCode, 12).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const source = normalizeDeFlockSourceId(req.body && req.body.sourceId);
+  if (!roomCode || !source) {
+    res.status(400).json({ error: 'A valid room and OpenStreetMap camera ID are required.' });
+    return;
+  }
+
+  try {
+    const roomRef = db.collection('rooms').doc(roomCode);
+    const roomSnap = await roomRef.get();
+    if (!roomSnap.exists) {
+      res.status(404).json({ error: 'Room not found.' });
+      return;
+    }
+    const room = roomSnap.data() || {};
+    const memberSnap = await roomRef.collection('players').doc(auth.uid).get();
+    if (room.ownerUid !== auth.uid && !memberSnap.exists) {
+      res.status(403).json({ error: 'Join this room before changing shared DeFlock progress.' });
+      return;
+    }
+    if (String(room.world?.kind || 'earth').toLowerCase() !== 'earth') {
+      res.status(409).json({ error: 'DeFlock shared progress is only available in Earth rooms.' });
+      return;
+    }
+
+    const camera = await fetchVerifiedOsmCamera(source.nodeId);
+    if (!camera) {
+      res.status(422).json({ error: 'The requested source is not a currently mapped OSM surveillance camera.' });
+      return;
+    }
+    const roomLat = Number(room.world?.lat);
+    const roomLon = Number(room.world?.lon);
+    const lonScale = Math.max(0.1, Math.cos(roomLat * Math.PI / 180));
+    const distanceDegrees = Math.hypot((camera.lat - roomLat), (camera.lon - roomLon) * lonScale);
+    if (!Number.isFinite(roomLat) || !Number.isFinite(roomLon) || distanceDegrees > 0.0245) {
+      res.status(422).json({ error: 'That mapped camera is outside this room location.' });
+      return;
+    }
+
+    const authUser = await admin.auth().getUser(auth.uid);
+    const cameraRef = roomRef.collection('deflockStates').doc(`osm-node-${source.nodeId}`);
+    const state = {
+      sourceId: source.sourceId,
+      sourceDataset: 'OpenStreetMap',
+      sourceTimestamp: camera.timestamp || '',
+      action: 'virtually_disabled',
+      uid: auth.uid,
+      displayName: sanitizeText(authUser.displayName || authUser.email || 'Explorer', 48) || 'Explorer',
+      createdAt: FieldValue.serverTimestamp()
+    };
+    const result = await claimImmutableDeFlockState({
+      cameraRef,
+      state,
+      runTransaction: (callback) => db.runTransaction(callback)
+    });
+    res.status(200).json({
+      awarded: result.awarded === true,
+      sourceId: source.sourceId,
+      action: 'virtually_disabled'
+    });
+  } catch (error) {
+    console.error('[claimDeFlockVirtualDisable] failed:', error);
+    res.status(500).json({ error: 'Could not update shared DeFlock progress right now.' });
+  }
+});
+
+async function requireUrbanRoomContext(req, res, auth) {
+  const roomCode = sanitizeText(req.body && req.body.roomCode, 12).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const worldSeed = sanitizeText(req.body && req.body.worldSeed, 180);
+  if (!roomCode || !worldSeed) {
+    res.status(400).json({ error: 'A valid room and world identity are required.' });
+    return null;
+  }
+  const roomRef = db.collection('rooms').doc(roomCode);
+  const [roomSnap, memberSnap] = await Promise.all([
+    roomRef.get(),
+    roomRef.collection('players').doc(auth.uid).get()
+  ]);
+  if (!roomSnap.exists) {
+    res.status(404).json({ error: 'Room not found.' });
+    return null;
+  }
+  const room = roomSnap.data() || {};
+  if (room.ownerUid !== auth.uid && !memberSnap.exists) {
+    res.status(403).json({ error: 'Join this room before using shared urban interactions.' });
+    return null;
+  }
+  if (String(room.world?.kind || 'earth').toLowerCase() !== 'earth') {
+    res.status(409).json({ error: 'Urban room interactions are only available in Earth rooms.' });
+    return null;
+  }
+  if (String(room.world?.seed || '') !== worldSeed) {
+    res.status(409).json({ error: 'The active room world does not match this interaction.' });
+    return null;
+  }
+  const playerSnap = memberSnap.exists
+    ? memberSnap
+    : await roomRef.collection('players').doc(auth.uid).get();
+  if (!playerSnap.exists) {
+    res.status(409).json({ error: 'Active room presence is required.' });
+    return null;
+  }
+  const player = playerSnap.data() || {};
+  const lastSeenMs = timestampToMillis(player.lastSeenAt);
+  const expiresAtMs = timestampToMillis(player.expiresAt);
+  const nowMs = Date.now();
+  if (!Number.isFinite(lastSeenMs) || nowMs - lastSeenMs > 120_000 || (Number.isFinite(expiresAtMs) && expiresAtMs < nowMs - 2_000)) {
+    res.status(409).json({ error: 'Room presence is stale. Rejoin the room and try again.' });
+    return null;
+  }
+  return { roomCode, worldSeed, roomRef, room, player, nowMs };
+}
+
+function urbanTimestampFromMs(value) {
+  return AdminTimestamp.fromMillis(Math.floor(Number(value) || Date.now()));
+}
+
+function urbanCivicAgencyForRoom(room = {}) {
+  const label = sanitizeText(room.world?.name || room.world?.label || room.name || '', 72);
+  const normalized = label.toLowerCase();
+  if (/national park|state park|forest|preserve|wilderness/.test(normalized)) return 'Ranger service';
+  if (/campus|university|college/.test(normalized)) return 'Campus safety';
+  if (label) return `${label.replace(/,.*$/, '')} civic response`.slice(0, 80);
+  return 'Local civic response';
+}
+
+exports.claimUrbanVehicle = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+  try {
+    const context = await requireUrbanRoomContext(req, res, auth);
+    if (!context) return;
+    const entityId = normalizeUrbanEntityId(req.body && req.body.entityId);
+    const documentId = urbanEntityDocumentId(entityId);
+    if (!entityId || !documentId) return res.status(400).json({ error: 'A valid vehicle identity is required.' });
+    const pose = normalizeUrbanPose(req.body && req.body.pose);
+    if (urbanPoseDistance(context.player.pose, pose) > 30) {
+      return res.status(422).json({ error: 'Move closer to that vehicle before entering it.' });
+    }
+    const result = await claimUrbanVehicleLease({
+      runTransaction: (callback) => db.runTransaction(callback),
+      entityRef: context.roomRef.collection('urbanEntities').doc(documentId),
+      uid: auth.uid,
+      nowMs: context.nowMs,
+      timestampFromMs: urbanTimestampFromMs,
+      input: {
+        entityId,
+        worldSeed: context.worldSeed,
+        pose,
+        label: sanitizeText(req.body && req.body.label, 80),
+        style: sanitizeText(req.body && req.body.style, 40),
+        color: req.body && req.body.color
+      }
+    });
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('[claimUrbanVehicle] failed:', error);
+    res.status(500).json({ error: 'Could not claim this room vehicle right now.' });
+  }
+});
+
+async function handleUrbanVehicleLeaseUpdate(req, res, release = false) {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+  try {
+    const context = await requireUrbanRoomContext(req, res, auth);
+    if (!context) return;
+    const entityId = normalizeUrbanEntityId(req.body && req.body.entityId);
+    const documentId = urbanEntityDocumentId(entityId);
+    if (!entityId || !documentId) return res.status(400).json({ error: 'A valid vehicle identity is required.' });
+    const result = await updateUrbanVehicleLease({
+      runTransaction: (callback) => db.runTransaction(callback),
+      entityRef: context.roomRef.collection('urbanEntities').doc(documentId),
+      uid: auth.uid,
+      nowMs: context.nowMs,
+      timestampFromMs: urbanTimestampFromMs,
+      release,
+      input: { pose: normalizeUrbanPose(req.body && req.body.pose) }
+    });
+    res.status(200).json(result);
+  } catch (error) {
+    console.error(`[${release ? 'release' : 'update'}UrbanVehicle] failed:`, error);
+    res.status(500).json({ error: `Could not ${release ? 'release' : 'update'} this room vehicle right now.` });
+  }
+}
+
+exports.updateUrbanVehicle = functions.region('us-central1').https.onRequest((req, res) => handleUrbanVehicleLeaseUpdate(req, res, false));
+exports.releaseUrbanVehicle = functions.region('us-central1').https.onRequest((req, res) => handleUrbanVehicleLeaseUpdate(req, res, true));
+
+exports.commitWorldPropertyAction = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+  try {
+    const input = req.body || {};
+    let context = null;
+    if (sanitizeText(input.roomCode, 12)) {
+      context = await requireUrbanRoomContext(req, res, auth);
+      if (!context) return;
+    } else {
+      const worldSeed = sanitizeText(input.worldSeed, 180);
+      if (!worldSeed) return res.status(400).json({ error: 'A loaded world is required.' });
+      const profile = (await db.collection('users').doc(auth.uid).get()).data() || {};
+      context = {
+        roomCode: 'WORLD',
+        worldSeed,
+        player: { displayName: profile.displayName || auth.name || 'Explorer' },
+        nowMs: Date.now()
+      };
+    }
+    const action = sanitizeText(input.action, 32).toLowerCase();
+    const requestId = sanitizeText(input.requestId, 120).replace(/[^A-Za-z0-9:._-]/g, '');
+    if (action.startsWith('trade_')) {
+      const offerId = sanitizeText(action === 'trade_offer' ? requestId : input.offerId, 120).replace(/[^A-Za-z0-9:._-]/g, '');
+      if (!offerId || !requestId) return res.status(400).json({ error: 'A valid trade offer is required.' });
+      const offerRef = db.collection('propertyTradeOffers').doc(offerId);
+      const existingOffer = action === 'trade_offer' ? null : (await offerRef.get()).data();
+      if (action !== 'trade_offer' && !existingOffer) return res.status(404).json({ error: 'This trade offer is no longer available.' });
+      const offeredPropertyId = action === 'trade_offer' ? input.offeredProperty?.propertyId : existingOffer.offeredPropertyId;
+      const requestedPropertyId = action === 'trade_offer' ? input.requestedProperty?.propertyId : existingOffer.requestedPropertyId;
+      const offeredDocumentId = propertyDocumentId(offeredPropertyId);
+      const requestedDocumentId = propertyDocumentId(requestedPropertyId);
+      if (!offeredDocumentId || !requestedDocumentId) return res.status(400).json({ error: 'Both properties are required for a trade.' });
+      const actorWalletRef = db.collection('users').doc(auth.uid).collection('economy').doc('wallet');
+      const proposerUid = existingOffer?.proposerUid || auth.uid;
+      const recipientUid = existingOffer?.recipientUid || '';
+      const result = await settlePropertyTrade({
+        runTransaction: (callback) => db.runTransaction(callback),
+        offerRef,
+        offeredPropertyRef: db.collection('worldProperties').doc(offeredDocumentId),
+        requestedPropertyRef: db.collection('worldProperties').doc(requestedDocumentId),
+        actorWalletRef,
+        proposerWalletRef: db.collection('users').doc(proposerUid).collection('economy').doc('wallet'),
+        recipientWalletRef: recipientUid ? db.collection('users').doc(recipientUid).collection('economy').doc('wallet') : null,
+        receiptRef: db.collection('users').doc(auth.uid).collection('propertyReceipts').doc(requestId),
+        actorBoardRef: db.collection('propertyLeaderboard').doc(auth.uid),
+        proposerBoardRef: db.collection('propertyLeaderboard').doc(proposerUid),
+        recipientBoardRef: recipientUid ? db.collection('propertyLeaderboard').doc(recipientUid) : null,
+        notificationRefForUid: (uid, id) => db.collection('users').doc(uid).collection('notifications').doc(id),
+        activityRef: db.collection('activityFeed').doc(`property-${requestId}`.slice(0, 160)),
+        uid: auth.uid,
+        displayName: sanitizeText(context.player.displayName || context.player.name || auth.name || 'Explorer', 80),
+        roomCode: context.roomCode,
+        input: { ...input, action, offerId, requestId },
+        nowMs: context.nowMs,
+        timestampFromMs: urbanTimestampFromMs
+      });
+      return res.status(200).json(result);
+    }
+    const property = input.property || {};
+    const documentId = propertyDocumentId(property.propertyId);
+    if (!documentId || !requestId) return res.status(400).json({ error: 'A valid property and request are required.' });
+    const visitRequired = new Set([
+      'starter_claim', 'buy', 'buy_listing', 'sell_world',
+      'list_sale', 'list_rent', 'rent', 'cancel_listing'
+    ]).has(action);
+    if (visitRequired) {
+      const actorPose = context.roomCode === 'WORLD' ? input.actorPose : context.player.pose;
+      const proximity = validatePropertyProximity(property, actorPose, PROPERTY_INTERACTION_RADIUS);
+      if (!proximity.valid) {
+        const message = proximity.reason === 'property_proximity_required'
+          ? 'Move near this building before using its property options.'
+          : 'This building is too far away. Travel to it before using its property options.';
+        return res.status(422).json({ error: message, reason: proximity.reason });
+      }
+    }
+    const userRef = db.collection('users').doc(auth.uid);
+    const result = await settlePropertyAction({
+      runTransaction: (callback) => db.runTransaction(callback),
+      propertyRef: db.collection('worldProperties').doc(documentId),
+      catalogRef: db.collection('worldPropertyCatalog').doc(documentId),
+      actorWalletRef: userRef.collection('economy').doc('wallet'),
+      receiptRef: userRef.collection('propertyReceipts').doc(requestId),
+      starterEntitlementRef: userRef.collection('propertyEntitlements').doc('starter'),
+      sellerWalletRefForUid: (uid) => db.collection('users').doc(uid).collection('economy').doc('wallet'),
+      notificationRefForUid: (uid, id) => db.collection('users').doc(uid).collection('notifications').doc(id),
+      actorBoardRef: db.collection('propertyLeaderboard').doc(auth.uid),
+      sellerBoardRefForUid: (uid) => db.collection('propertyLeaderboard').doc(uid),
+      activityRef: db.collection('activityFeed').doc(`property-${requestId}`.slice(0, 160)),
+      uid: auth.uid,
+      displayName: sanitizeText(context.player.displayName || context.player.name || auth.name || 'Explorer', 80),
+      roomCode: context.roomCode,
+      input: { ...input, requestId },
+      nowMs: context.nowMs,
+      timestampFromMs: urbanTimestampFromMs
+    });
+    res.status(200).json(result);
+  } catch (error) {
+    const code = String(error?.message || '');
+    if (['invalid_action', 'invalid_property', 'property_catalog_mismatch', 'property_identity_conflict', 'trade_offer_exists', 'trade_property_conflict'].includes(code)) {
+      return res.status(400).json({ error: 'This property action is not valid.' });
+    }
+    console.error('[commitWorldPropertyAction] failed:', error);
+    res.status(500).json({ error: 'Could not complete this property action right now.' });
+  }
+});
+
+exports.commitExplorerCommerceAction = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+  try {
+    const input = req.body || {};
+    const requestId = sanitizeText(input.requestId, 120).replace(/[^A-Za-z0-9:._-]/g, '');
+    const storeId = sanitizeText(input.storeId, 420);
+    const catalogId = sanitizeText(input.catalogId, 100).toLowerCase();
+    const targetId = sanitizeText(input.targetId, 180);
+    const dayKey = sanitizeText(input.dayKey, 10);
+    if (!requestId || !storeId || !catalogId || !/^\d{4}-\d{2}-\d{2}$/.test(dayKey)) return res.status(400).json({ error: 'A valid store transaction is required.' });
+    const digest = (value) => crypto.createHash('sha256').update(value).digest('hex').slice(0, 40);
+    const userRef = db.collection('users').doc(auth.uid);
+    const result = await settleCommerceTransaction({
+      runTransaction: (callback) => db.runTransaction(callback),
+      walletRef: userRef.collection('economy').doc('wallet'),
+      receiptRef: userRef.collection('commerceReceipts').doc(digest(requestId)),
+      itemRef: userRef.collection('commerceItems').doc(digest(catalogId)),
+      stockRef: userRef.collection('commerceStock').doc(digest(`${dayKey}:${storeId}:${catalogId}`)),
+      uid: auth.uid,
+      input: { ...input, requestId, storeId, catalogId, targetId, dayKey },
+      nowMs: Date.now(),
+      timestampFromMs: urbanTimestampFromMs
+    });
+    res.status(200).json(result);
+  } catch (error) {
+    if (String(error?.message || '') === 'invalid_commerce_transaction') {
+      return res.status(400).json({ error: 'This store transaction is not valid.' });
+    }
+    console.error('[commitExplorerCommerceAction] failed:', error);
+    res.status(500).json({ error: 'The Explorer Wallet could not complete this transaction.' });
+  }
+});
+
+exports.settleExplorerCommerceOutcome = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+  try {
+    const requestId = sanitizeText(req.body?.requestId, 120).replace(/[^A-Za-z0-9:._-]/g, '');
+    const outcome = sanitizeText(req.body?.outcome, 24).toLowerCase();
+    const reason = sanitizeText(req.body?.reason, 120);
+    if (!requestId || !['applied', 'failed'].includes(outcome)) return res.status(400).json({ error: 'A valid service outcome is required.' });
+    const digest = (value) => crypto.createHash('sha256').update(value).digest('hex').slice(0, 40);
+    const userRef = db.collection('users').doc(auth.uid);
+    const result = await settleCommerceOutcome({
+      runTransaction: (callback) => db.runTransaction(callback),
+      walletRef: userRef.collection('economy').doc('wallet'),
+      receiptRef: userRef.collection('commerceReceipts').doc(digest(requestId)),
+      playerProgressRef: userRef.collection('gameplay').doc('vehicleUpgrades'),
+      input: { requestId, outcome, reason },
+      nowMs: Date.now(),
+      timestampFromMs: urbanTimestampFromMs
+    });
+    res.status(200).json(result);
+  } catch (error) {
+    if (['invalid_commerce_outcome', 'commerce_receipt_not_found'].includes(String(error?.message || ''))) {
+      return res.status(400).json({ error: 'This service settlement is not valid.' });
+    }
+    console.error('[settleExplorerCommerceOutcome] failed:', error);
+    res.status(500).json({ error: 'The Explorer Wallet could not settle this service.' });
+  }
+});
+
+exports.saveExplorerPlayerCondition = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+  try {
+    const state = normalizePlayerConditionInput(req.body || {});
+    await db.collection('users').doc(auth.uid).collection('gameplay').doc('condition').set({
+      ...state,
+      updatedAt: AdminTimestamp.now()
+    }, { merge: false });
+    res.status(200).json(state);
+  } catch (error) {
+    if (String(error?.message || '') === 'invalid_player_condition') {
+      return res.status(400).json({ error: 'Player condition must be between 0 and 1.' });
+    }
+    console.error('[saveExplorerPlayerCondition] failed:', error);
+    res.status(500).json({ error: 'Explorer health could not be saved.' });
+  }
+});
+
+exports.commitUrbanImpacts = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+  try {
+    const context = await requireUrbanRoomContext(req, res, auth);
+    if (!context) return;
+    const rawTargets = Array.isArray(req.body && req.body.targets) ? req.body.targets.slice(0, 10) : [];
+    const targets = rawTargets.map((target) => ({
+      entityId: normalizeUrbanEntityId(target && target.entityId),
+      kind: sanitizeText(target && target.kind, 20).toLowerCase(),
+      pose: normalizeUrbanPose(target && target.pose),
+      label: sanitizeText(target && target.label, 80),
+      style: sanitizeText(target && target.style, 40),
+      color: target && target.color
+    }));
+    if (!targets.length || targets.some((target) => !target.entityId)) {
+      return res.status(400).json({ error: 'At least one valid impact target is required.' });
+    }
+    const entityRefs = new Map(targets.map((target) => [
+      target.entityId,
+      context.roomRef.collection('urbanEntities').doc(urbanEntityDocumentId(target.entityId))
+    ]));
+    const result = await commitUrbanImpacts({
+      runTransaction: (callback) => db.runTransaction(callback),
+      actorRef: context.roomRef.collection('urbanActors').doc(auth.uid),
+      entityRefs,
+      uid: auth.uid,
+      actorPose: normalizeUrbanPose(context.player.pose),
+      nowMs: context.nowMs,
+      timestampFromMs: urbanTimestampFromMs,
+      input: {
+        equipmentId: sanitizeText(req.body && req.body.equipmentId, 40),
+        worldSeed: context.worldSeed,
+        impactPosition: normalizeUrbanPose(req.body && req.body.impactPosition),
+        targets
+      }
+    });
+    res.status(200).json(result);
+  } catch (error) {
+    const message = String(error && error.message || '');
+    if (message === 'impact_out_of_range' || message.startsWith('invalid_')) {
+      return res.status(422).json({ error: 'The requested impact is not valid from the current room position.' });
+    }
+    console.error('[commitUrbanImpacts] failed:', error);
+    res.status(500).json({ error: 'Could not commit this room interaction right now.' });
+  }
+});
+
+exports.commitUrbanCivicEvent = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+  try {
+    const context = await requireUrbanRoomContext(req, res, auth);
+    if (!context) return;
+    const result = await commitUrbanCivicEvent({
+      runTransaction: (callback) => db.runTransaction(callback),
+      civicRef: context.roomRef.collection('urbanCivic').doc('current'),
+      actorRef: context.roomRef.collection('urbanActors').doc(auth.uid),
+      uid: auth.uid,
+      actorPose: normalizeUrbanPose(context.player.pose),
+      nowMs: context.nowMs,
+      timestampFromMs: urbanTimestampFromMs,
+      input: {
+        worldSeed: context.worldSeed,
+        kind: sanitizeText(req.body && req.body.kind, 40).toLowerCase(),
+        severity: req.body && req.body.severity,
+        witnessCount: req.body && req.body.witnessCount,
+        vehicleId: normalizeUrbanEntityId(req.body && req.body.vehicleId),
+        position: normalizeUrbanPose(req.body && req.body.position),
+        agency: urbanCivicAgencyForRoom(context.room)
+      }
+    });
+    res.status(200).json(result);
+  } catch (error) {
+    const message = String(error && error.message || '');
+    if (message.startsWith('invalid_') || message === 'civic_event_out_of_range') {
+      return res.status(422).json({ error: 'The witnessed event is not valid from the current room position.' });
+    }
+    console.error('[commitUrbanCivicEvent] failed:', error);
+    res.status(500).json({ error: 'Could not share this civic event right now.' });
+  }
+});
+
+exports.resolveUrbanCivicOutcome = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+  try {
+    const context = await requireUrbanRoomContext(req, res, auth);
+    if (!context) return;
+    const result = await resolveUrbanCivicOutcome({
+      runTransaction: (callback) => db.runTransaction(callback),
+      civicRef: context.roomRef.collection('urbanCivic').doc('current'),
+      uid: auth.uid,
+      actorPose: normalizeUrbanPose(context.player.pose),
+      actorVelocity: context.player.pose || {},
+      nowMs: context.nowMs,
+      timestampFromMs: urbanTimestampFromMs
+    });
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('[resolveUrbanCivicOutcome] failed:', error);
+    res.status(500).json({ error: 'Could not resolve this shared civic outcome right now.' });
+  }
+});
+
+async function requireExpeditionRoomContext(req, res, auth) {
+  const roomCode = sanitizeText(req.body && req.body.roomCode, 12).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!roomCode) {
+    res.status(400).json({ error: 'A valid multiplayer room is required.' });
+    return null;
+  }
+  const roomRef = db.collection('rooms').doc(roomCode);
+  const [roomSnap, memberSnap] = await Promise.all([
+    roomRef.get(),
+    roomRef.collection('players').doc(auth.uid).get()
+  ]);
+  if (!roomSnap.exists) {
+    res.status(404).json({ error: 'Room not found.' });
+    return null;
+  }
+  const room = roomSnap.data() || {};
+  if (room.ownerUid !== auth.uid && !memberSnap.exists) {
+    res.status(403).json({ error: 'Join this room before using its Expedition.' });
+    return null;
+  }
+  const playerSnap = memberSnap.exists ? memberSnap : await roomRef.collection('players').doc(auth.uid).get();
+  if (!playerSnap.exists) {
+    res.status(409).json({ error: 'Active room presence is required.' });
+    return null;
+  }
+  const player = playerSnap.data() || {};
+  const lastSeenMs = timestampToMillis(player.lastSeenAt);
+  if (!Number.isFinite(lastSeenMs) || Date.now() - lastSeenMs > 120_000) {
+    res.status(409).json({ error: 'Room presence is stale. Rejoin the room and try again.' });
+    return null;
+  }
+  return { roomCode, roomRef, room, player };
+}
+
+exports.mutateSharedExpedition = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+  try {
+    const context = await requireExpeditionRoomContext(req, res, auth);
+    if (!context) return;
+    const action = sanitizeText(req.body && req.body.action, 32).toLowerCase();
+    const nowMs = Date.now();
+    const authUser = await admin.auth().getUser(auth.uid);
+    const actor = {
+      uid: auth.uid,
+      displayName: sanitizeText(authUser.displayName || authUser.email || context.player.displayName || 'Explorer', 60),
+      role: sanitizeText(req.body && req.body.role, 32)
+    };
+    const expeditionRef = context.roomRef.collection('expeditions').doc('active');
+    const playersSnap = await context.roomRef.collection('players').get();
+    const activeUids = playersSnap.docs.filter((entry) => {
+      const data = entry.data() || {};
+      const lastSeen = timestampToMillis(data.lastSeenAt);
+      const expiresAt = timestampToMillis(data.expiresAt);
+      return Number.isFinite(lastSeen) && nowMs - lastSeen <= 120_000 &&
+        (!Number.isFinite(expiresAt) || expiresAt >= nowMs - 2_000);
+    }).map((entry) => entry.id);
+
+    const state = await db.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(expeditionRef);
+      const current = snapshot.exists ? snapshot.data() || null : null;
+      let next;
+      if (action === 'create') {
+        if (current && current.expedition?.state !== 'failed' && current.expedition?.state !== 'arrived') {
+          throw new Error('shared_expedition_already_active');
+        }
+        next = createSharedExpedition({ roomCode: context.roomCode, actor, configuration: req.body?.configuration, nowMs });
+      } else {
+        if (!current || current.type !== 'SharedInterstellarExpedition') throw new Error('shared_expedition_not_found');
+        if (action === 'join') next = joinSharedExpedition(current, { actor, requestedRole: req.body?.role, nowMs });
+        else if (action === 'ready') next = setParticipantReady(current, { uid: auth.uid, ready: req.body?.ready !== false, nowMs });
+        else if (action === 'connection') next = setParticipantConnection(current, { uid: auth.uid, connected: req.body?.connected !== false, nowMs });
+        else if (action === 'commit') next = commitSharedExpedition(current, {
+          uid: auth.uid,
+          expectedRevision: req.body?.expectedRevision,
+          command: req.body?.command,
+          activeUids,
+          nowMs
+        });
+        else if (action === 'rescue') next = rescueIntoSharedExpedition(current, {
+          uid: auth.uid,
+          manifestId: req.body?.manifestId,
+          nowMs
+        });
+        else throw new Error('invalid_shared_expedition_action');
+      }
+      transaction.set(expeditionRef, { ...next, updatedAt: FieldValue.serverTimestamp() });
+      return next;
+    });
+    res.status(200).json({ accepted: true, state });
+  } catch (error) {
+    const code = String(error && error.message || '');
+    const conflicts = new Set([
+      'shared_expedition_already_active', 'shared_expedition_not_found',
+      'stale_expedition_revision', 'two_connected_crew_required', 'connected_crew_not_ready',
+      'rescue_already_completed', 'expedition_command_not_available'
+    ]);
+    const invalid = code.startsWith('invalid_') || code.startsWith('advance_') ||
+      code === 'expedition_identity_is_immutable' || code === 'only_advance_changes_time' ||
+      code === 'progress_cannot_reverse' || code === 'expedition_record_too_large';
+    if (conflicts.has(code)) return res.status(409).json({ error: code.replaceAll('_', ' ') });
+    if (invalid) return res.status(422).json({ error: code.replaceAll('_', ' ') });
+    console.error('[mutateSharedExpedition] failed:', error);
+    return res.status(500).json({ error: 'Could not update the shared Expedition right now.' });
+  }
+});
+
+exports.submitContribution = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed.' });
+    return;
+  }
+
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+
+  try {
+    const authUser = await admin.auth().getUser(auth.uid);
+    await ensureUserDoc(auth.uid, authUser.email || '', authUser.displayName || '');
+
+    const editType = sanitizeContributionEditType(req.body && req.body.editType);
+    const worldKind = sanitizeWorldKind(req.body && req.body.worldKind);
+    const source = sanitizeText(req.body && req.body.source ? req.body.source : 'editor-v2', 48) || 'editor-v2';
+    const target = normalizeContributionTarget(req.body && req.body.target ? req.body.target : {});
+    const payload = normalizeContributionPayload(req.body && req.body.payload ? req.body.payload : {}, editType);
+    const areaKey = computeContributionAreaKey(target.lat, target.lon, worldKind);
+    const userDisplayName = sanitizeText(
+      req.body && req.body.userDisplayName ? req.body.userDisplayName : (authUser.displayName || authUser.email || 'Explorer'),
+      60
+    ) || 'Explorer';
+    const typeConfig = getContributionEditTypeConfig(editType);
+
+    if (!payload.title) {
+      res.status(400).json({ error: 'Add a short title before submitting.' });
+      return;
+    }
+    if (editType === 'photo_point' && !payload.photoUrl) {
+      res.status(400).json({ error: 'Add a photo URL before submitting a photo contribution.' });
+      return;
+    }
+    if (!contributionTargetValidForType(editType, target)) {
+      res.status(400).json({ error: 'This contribution type needs a valid world, building, destination, or interior target.' });
+      return;
+    }
+    if (typeConfig.requiresScopedTarget === true && target.anchorKind === 'world') {
+      res.status(400).json({ error: 'Capture a building, destination, or interior target before submitting this contribution type.' });
+      return;
+    }
+
+    const { ref, replayed, status } = await require('./contribution-idempotency').saveContributionOnce({
+      db, uid: auth.uid, requestId: req.body?.requestId,
+      record: { editType, worldKind, areaKey, target, payload, userId: auth.uid, userDisplayName, source },
+      timestamp: FieldValue.serverTimestamp()
+    });
+    if (replayed) {
+      res.status(200).json({ id: ref.id, status, replayed: true, notification: { sent: false, reason: 'already-submitted' } });
+      return;
+    }
+
+    const savedSnap = await ref.get();
+    const saved = serializeContributionDoc(savedSnap, { reviewerOnly: true });
+    let notification = { sent: false, reason: 'not-configured' };
+    try {
+      notification = await sendContributionNotificationEmail(saved);
+    } catch (err) {
+      notification = { sent: false, reason: 'send-failed' };
+      console.error('[submitContribution] notification failed:', err);
+    }
+
+    res.status(200).json({
+      id: ref.id,
+      status: 'pending',
+      notification
+    });
+  } catch (err) {
+    console.error('[submitContribution] failed:', err);
+    const publicError = err.status === 400 || err.status === 409;
+    res.status(publicError ? err.status : 500).json({ error: publicError ? err.message : 'Could not save this contribution right now.' });
+  }
+});
+
+exports.getContributionModerationOverview = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed.' });
+    return;
+  }
+
+  const moderator = await requireModerator(req, res);
+  if (!moderator) return;
+
+  try {
+    const counts = await listContributionCounts();
+    const notificationCfg = contributionNotificationConfig();
+    res.status(200).json({
+      reviewer: {
+        uid: moderator.auth.uid,
+        displayName: moderator.displayName,
+        email: sanitizeText(moderator.authUser.email || '', 120)
+      },
+      summary: counts,
+      notifications: {
+        configured: contributionNotificationEnabled(notificationCfg),
+        adminEmail: sanitizeText(notificationCfg.adminNotificationEmail || '', 160),
+        moderationPanelUrl: sanitizeText(notificationCfg.moderationPanelUrl || '', 320)
+      }
+    });
+  } catch (err) {
+    console.error('[getContributionModerationOverview] failed:', err);
+    res.status(500).json({ error: 'Unable to load moderation overview.' });
+  }
+});
+
+exports.listContributionSubmissions = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed.' });
+    return;
+  }
+
+  const moderator = await requireModerator(req, res);
+  if (!moderator) return;
+
+  try {
+    const rawStatus = sanitizeText(req.body && req.body.status ? req.body.status : 'pending', 20).toLowerCase();
+    const status = rawStatus === 'all' ? 'all' : sanitizeContributionStatus(rawStatus);
+    const editTypeFilter = sanitizeText(req.body && req.body.editType ? req.body.editType : 'all', 40).toLowerCase() || 'all';
+    const search = sanitizeText(req.body && req.body.search ? req.body.search : '', 80).toLowerCase();
+    const limitValue = parsePositiveInt(req.body && req.body.limit, 60, 1, CONTRIBUTION_MAX_RESULTS);
+
+    const baseRef = db.collection('editorSubmissions');
+    const queryRef = status !== 'all'
+      ? baseRef.where('status', '==', status).orderBy('createdAt', 'desc').limit(limitValue)
+      : baseRef.orderBy('createdAt', 'desc').limit(limitValue);
+
+    const snap = await queryRef.get();
+    let items = snap.docs.map((row) => serializeContributionDoc(row, { reviewerOnly: true }));
+
+    if (editTypeFilter !== 'all' && CONTRIBUTION_EDIT_TYPES.has(editTypeFilter)) {
+      items = items.filter((item) => item.editType === editTypeFilter);
+    }
+    if (search) {
+      items = items.filter((item) => {
+        const haystack = [
+          item.payload?.title,
+          item.payload?.subtitle,
+          item.payload?.note,
+          item.userDisplayName,
+          item.target?.locationLabel,
+          item.target?.buildingLabel,
+          item.target?.destinationLabel,
+          item.payload?.photoCaption,
+          item.payload?.buildingUse,
+          item.payload?.roomLabel
+        ].join(' ').toLowerCase();
+        return haystack.includes(search);
+      });
+    }
+
+    const counts = await listContributionCounts();
+    const notificationCfg = contributionNotificationConfig();
+    res.status(200).json({
+      items,
+      summary: counts,
+      reviewer: {
+        uid: moderator.auth.uid,
+        displayName: moderator.displayName,
+        email: sanitizeText(moderator.authUser.email || '', 120)
+      },
+      notifications: {
+        configured: contributionNotificationEnabled(notificationCfg),
+        adminEmail: sanitizeText(notificationCfg.adminNotificationEmail || '', 160),
+        moderationPanelUrl: sanitizeText(notificationCfg.moderationPanelUrl || '', 320)
+      }
+    });
+  } catch (err) {
+    console.error('[listContributionSubmissions] failed:', err);
+    res.status(500).json({ error: 'Unable to load contribution submissions.' });
+  }
+});
+
+exports.moderateContributionSubmission = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed.' });
+    return;
+  }
+
+  const moderator = await requireModerator(req, res);
+  if (!moderator) return;
+
+  try {
+    const submissionId = sanitizeText(req.body && req.body.submissionId ? req.body.submissionId : '', 180);
+    const status = sanitizeContributionStatus(req.body && req.body.status ? req.body.status : 'pending');
+    const decisionNote = sanitizeMultilineText(req.body && req.body.decisionNote ? req.body.decisionNote : '', 200);
+    if (!submissionId) {
+      res.status(400).json({ error: 'Missing submission id.' });
+      return;
+    }
+    if (status !== 'approved' && status !== 'rejected') {
+      res.status(400).json({ error: 'Moderation status must be approved or rejected.' });
+      return;
+    }
+
+    const ref = db.collection('editorSubmissions').doc(submissionId);
+    const snap = await ref.get();
+    if (!snap.exists) {
+      res.status(404).json({ error: 'Contribution submission not found.' });
+      return;
+    }
+
+    const existing = snap.data() || {};
+    if (sanitizeContributionStatus(existing.status) !== 'pending') {
+      res.status(409).json({ error: 'This submission has already been reviewed.' });
+      return;
+    }
+
+    await ref.set({
+      status,
+      updatedAt: FieldValue.serverTimestamp(),
+      moderation: {
+        moderatedBy: moderator.auth.uid,
+        moderatedByName: moderator.displayName,
+        moderatedAt: FieldValue.serverTimestamp(),
+        decisionNote
+      }
+    }, { merge: true });
+
+    const updatedSnap = await ref.get();
+    await logAdminActivity({
+      actorUid: moderator.auth.uid,
+      actorName: moderator.displayName,
+      actionType: status === 'approved' ? 'legacy_submission.approve' : 'legacy_submission.reject',
+      targetType: 'legacy_submission',
+      targetId: submissionId,
+      title: status === 'approved' ? 'Legacy contribution approved' : 'Legacy contribution rejected',
+      summary: `${sanitizeText(existing.payload?.title || existing.editType || submissionId, 120)} is now ${status}.`
+    });
+    res.status(200).json({
+      item: serializeContributionDoc(updatedSnap, { reviewerOnly: true })
+    });
+  } catch (err) {
+    console.error('[moderateContributionSubmission] failed:', err);
+    res.status(500).json({ error: 'Could not update moderation status right now.' });
+  }
+});
+
+exports.stripeWebhook = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (req.method !== 'POST') {
+    res.status(405).send('Method not allowed');
+    return;
+  }
+
+  const cfg = stripeConfig();
+  if (!cfg.webhook) {
+    res.status(500).send('Missing Stripe webhook secret.');
+    return;
+  }
+
+  let event;
+  try {
+    const stripe = getStripeClient();
+    const signature = req.get('stripe-signature');
+    event = stripe.webhooks.constructEvent(req.rawBody, signature, cfg.webhook);
+  } catch (err) {
+    console.error('[stripeWebhook] signature verification failed:', err);
+    res.status(400).send('Webhook signature verification failed.');
+    return;
+  }
+
+  try {
+    switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object;
+        const customerId = session.customer || null;
+        const subscriptionId = session.subscription || null;
+        let uid = (session.metadata && session.metadata.uid) || session.client_reference_id || null;
+
+        if (!uid) {
+          uid = await resolveUidFromCustomer(customerId);
+        }
+
+        if (uid) {
+          const stripe = getStripeClient();
+          let status = 'active';
+          let priceId = null;
+
+          if (subscriptionId) {
+            const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+            status = subscription.status || status;
+            priceId =
+              subscription.items &&
+              subscription.items.data &&
+              subscription.items.data[0] &&
+              subscription.items.data[0].price
+                ? subscription.items.data[0].price.id
+                : null;
+          }
+
+          await upsertPlanFromSubscription({
+            uid,
+            customerId,
+            subscriptionId,
+            status,
+            priceId
+          });
+        }
+
+        break;
+      }
+
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated':
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object;
+        const customerId = subscription.customer || null;
+        const subscriptionId = subscription.id || null;
+        const status = subscription.status || 'none';
+        const priceId =
+          subscription.items &&
+          subscription.items.data &&
+          subscription.items.data[0] &&
+          subscription.items.data[0].price
+            ? subscription.items.data[0].price.id
+            : null;
+
+        let uid = (subscription.metadata && subscription.metadata.uid) || null;
+        if (!uid) {
+          uid = await resolveUidFromCustomer(customerId);
+        }
+
+        if (uid) {
+          await upsertPlanFromSubscription({
+            uid,
+            customerId,
+            subscriptionId,
+            status,
+            priceId
+          });
+        }
+
+        break;
+      }
+
+      default:
+        break;
+    }
+
+    res.status(200).json({ received: true });
+  } catch (err) {
+    console.error('[stripeWebhook] processing failed:', err);
+    res.status(500).send('Webhook processing failed.');
+  }
+});
+
+Object.assign(exports, buildOverlayExports({
+  setCors,
+  verifyAuth,
+  requireModerator,
+  logAdminActivity,
+  mergeCreatorProfile
+}));
+
+Object.assign(exports, buildAdminDashboardExports({
+  setCors,
+  requireModerator,
+  adminConfig,
+  contributionNotificationConfig,
+  contributionNotificationEnabled,
+  logAdminActivity
+}));
+
+Object.assign(exports, buildGeospatialExports({
+  functions,
+  setCors
+}));
+
+Object.assign(exports, buildDiscoveryExports({
+  functions,
+  setCors,
+  verifyAuth,
+  db,
+  admin
+}));
+
+Object.assign(exports, buildCommunityRealityCaptureExports({
+  db,
+  captureAccountIsDeleting:async uid=>(await db.collection('captureAccountDeletions').doc(uid).get()).exists,
+  contributionNotificationConfig,
+  setCors,
+  verifyAuth,
+  verifyAppCheck,
+  requireModerator,
+  logAdminActivity
+}));
+
+Object.assign(exports, require('./reality-capture-processing').buildCaptureProcessingExports({
+  db, bucket: admin.storage().bucket()
+}));
+
+// Submission survives browser closure; retry delivery without resubmitting photos.
+exports.notifyCaptureReview = functions.region('us-central1').runWith({ failurePolicy: true })
+  .firestore.document('realityCaptures/{captureId}').onWrite(async (change, context) => {
+    const { reviewNotice, deliverReviewNotice, contributorNotice } = require('./capture-review-notice');
+    const before=change.before.exists?change.before.data():null,after=change.after.exists?change.after.data():null;
+    const activity=contributorNotice(before,after,context.params.captureId);
+    if(activity){const id=crypto.createHash('sha256').update(`${activity.captureId}/${activity.revision}/${activity.status}`).digest('hex');await db.runTransaction(async tx=>{const live=await tx.get(change.after.ref),current=live.data();if(!live.exists||current.ownerUid!==activity.ownerUid||current.status!==activity.status||String(current.hybridSubmission?.revision||current.processingAttemptId||'initial')!==activity.revision)return;tx.set(db.collection('users').doc(activity.ownerUid).collection('notifications').doc(id),{...activity,createdAtMs:Date.parse(context.timestamp)});});}
+    const notice = reviewNotice(before,after,context.params.captureId);
+    if (!notice) return;
+    notice.eventTimeMs = Date.parse(context.timestamp);
+    await deliverReviewNotice({ ref: change.after.ref, notice, config: contributionNotificationConfig() });
+  });
+
+// Reconcile uploads that finish after capture/account deletion. This trigger
+// never publishes media and also seals legacy SDK-uploaded originals.
+exports.sealRealityCaptureOriginal=functions.storage.object().onFinalize(async object=>{
+  const match=/^reality-captures\/([^/]+)\/([^/]+)\/originals\/([a-f0-9]{32})\.jpg$/.exec(object.name||'');
+  if(!match)return;
+  const [,uid,captureId]=match,file=admin.storage().bucket(object.bucket).file(object.name,{generation:object.generation});
+  const [capture,tombstone]=await Promise.all([db.collection('realityCaptures').doc(captureId).get(),db.collection('captureAccountDeletions').doc(uid).get()]);
+  if(tombstone.exists||!capture.exists||capture.data().ownerUid!==uid||capture.data().status==='deleting'){await file.delete({ignoreNotFound:true});return;}
+  const [metadata]=await file.getMetadata();await require('./reality-capture-storage-privacy').sealCapturePhoto(file,metadata);
+});

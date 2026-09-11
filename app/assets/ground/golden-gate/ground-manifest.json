@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "golden-gate-ground",
+  "providerId": "copernicus-dem-classified-ground-v1",
+  "sourceRelease": "COP-DEM-2021:GLO-30",
+  "contentSha256": "da406a877fca8414b13c32dc1f5360a17e32ccfb8d28efef7613070a69731651",
+  "spacingMeters": 90,
+  "coverage": {
+    "south": 37.79488267476738,
+    "north": 37.84533630041809,
+    "west": -122.51035198612368,
+    "east": -122.4464817694228
+  },
+  "verticalDatum": "EGM2008",
+  "complete": true,
+  "missingSampleCount": 0,
+  "licenseAttested": true,
+  "correctionAttested": true,
+  "sourceEvidence": {
+    "sourceClassification": "digital-surface-model",
+    "correctionMethod": "worldexplorer-pmf-grid-v1",
+    "sourceTiles": [
+      {
+        "tileId": "Copernicus_DSM_COG_10_N37_00_W123_00_DEM",
+        "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N37_00_W123_00_DEM/Copernicus_DSM_COG_10_N37_00_W123_00_DEM.tif",
+        "resolutionMeters": 30,
+        "contentLength": 20060161,
+        "contentSha256": "82343318fbf7265c32342d9cace0fda4eb48d4b567a1a3335cc37488d4a9a7d5",
+        "etag": "6283cf0e490d2ac5d9f849eb3b9cffa9",
+        "lastModified": "Mon, 09 May 2022 14:19:44 GMT"
+      }
+    ]
+  },
+  "attribution": {
+    "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+    "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+    "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+    "modified": true
+  }
+}
