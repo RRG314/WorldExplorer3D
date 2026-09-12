@@ -1,6 +1,6 @@
 # Developmental results
 
-As of September 12, 2026, the strongest observed behavior is movement followed by acquisition and consumption of a finite food item. Useful manufacturing has not been demonstrated. The retained inventory contains **13 developmental runs and 105 provider ledger events**: 102 completed, one failed and two left reserved. Provider completion does not imply an action succeeded in the world.
+As of September 12, 2026, the strongest observed behavior is movement followed by acquisition and consumption of a finite food item. Useful manufacturing has not been demonstrated. The retained inventory contains **14 developmental runs and 190 provider ledger events**: 187 completed, one failed and two left reserved. Provider completion does not imply an action succeeded in the world.
 
 These attempts used different model or interface revisions. No success rate, model ranking or population inference is calculated from them. Each evidence file records the applicable source and conditions.
 
@@ -40,4 +40,10 @@ The next behavioral requirement remains: manufacture a tool from gathered materi
 
 ## Accelerated needs study launch
 
-The owner selected a shorter accelerated observation before later real-time studies. The six-hour accelerated window is implemented and component tested. Its first mapped-world launch was interrupted during loading before resident startup: zero model calls and no checkpoint. The cause is unresolved and no automatic heavy retry was performed. This is separate from the thirteen model-run inventory, not a fourteenth behavioral trial. See the [launch report](reports/accelerated-needs-1.md) and [prospective protocol](ACCELERATED-NEEDS-STUDY.md). No longer-duration live behavior is established.
+The owner selected a shorter accelerated observation before later real-time studies. The six-hour accelerated window is implemented and component tested. Its first mapped-world launch was interrupted during loading before resident startup: zero model calls and no checkpoint. The cause is unresolved and no automatic heavy retry was performed. This pre-dispatch interruption is recorded separately from model-run counts. See the [launch report](reports/accelerated-needs-1.md) and [prospective protocol](ACCELERATED-NEEDS-STUDY.md). A later owner-authorized attempt did obtain a longer live trajectory, described below.
+
+## Accelerated needs observation
+
+Run `free-1789236888624-bcf86d` completed 85 Gemini responses over 5,040 simulated seconds (84 minutes), approximately thirteen wall minutes. It completed 68 movements (524.985 cumulative metres) and 16 balanced stone gathers. Water fell from 45% to 10%, food from 55% to 37.5%, and rest from 90% to 72.5%, with no replenishment, crafting or tool use. The final fiber gather requested two units; the workshop correctly refused it, but the controller incorrectly ended the trial.
+
+The Gemini gather schema and nonfatal rejection handling were repaired afterward and pass regression tests. The repaired behavior has not been live retested. The six-hour target and sustained self-maintenance remain unmet. See the [study report](reports/accelerated-needs-2.md), [all 85 decision summaries and effects](reports/accelerated-needs-2-decisions.md), and [machine-readable evidence](evidence/accelerated-needs-attempt-2.json).

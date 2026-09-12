@@ -37,3 +37,7 @@ The previous two-arm memory comparison is deferred, not silently extended. Its o
 For a real-time needs observation, the implemented `needs-8h` window provides sufficient elapsed time for all initial reserves to become low. Before dispatch, freeze the source, initial needs, finite supplies, memory condition, general-exploration contract, clock/checkpoint interval and call/wall allowances. Record every consumption, rejected action, interruption and available reserve sample. Report reserve minima, restoration events, intervals of deprivation where supported by records, and ending reason. Do not use “still alive at the end” as the sole success criterion.
 
 The long mode is implemented and component tested. No eight-hour live AI run or benefit from memory feedback has been established. The owner's concerns about other aspects of the approach should inform the next prospective protocol before that study is launched.
+
+## First longer trajectory
+
+The [84-minute accelerated trial](reports/accelerated-needs-2.md) reached materially lower water reserves but produced no replenishment or crafting. It exposed an ordinary invalid gather treated as terminal, now repaired and regression tested. Navigation also needs a calibrated interface review: accumulated yaw and unspecified turning rate made the control contract unnecessarily difficult to interpret. This is a design concern supported by source inspection, not proof of why the model wandered. Preserve the original failed trajectory and declare interface changes before another trial.

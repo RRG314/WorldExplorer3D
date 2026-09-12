@@ -1140,6 +1140,786 @@
         "checkpointSha256": "6d1a9451d44541278fdc7d6807253874414cd7a80954312ba5a9dc4a704f797d",
         "modelSha256": "83383d94f2f4e00a3a80ab6ec10b1e96d544e78960009e0b43669953bf6ba150"
       }
+    },
+    {
+      "checkpoint": {
+        "controllerCalls": 85,
+        "frames": 302400,
+        "status": "failed"
+      },
+      "providerCalls": 85,
+      "providerEvents": [
+        {
+          "call": 1,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 1991,
+            "outputTokens": 98
+          }
+        },
+        {
+          "call": 2,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2159,
+            "outputTokens": 97
+          }
+        },
+        {
+          "call": 3,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2316,
+            "outputTokens": 102
+          }
+        },
+        {
+          "call": 4,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2516,
+            "outputTokens": 62
+          }
+        },
+        {
+          "call": 5,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2690,
+            "outputTokens": 65
+          }
+        },
+        {
+          "call": 6,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2783,
+            "outputTokens": 44
+          }
+        },
+        {
+          "call": 7,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2876,
+            "outputTokens": 61
+          }
+        },
+        {
+          "call": 8,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2968,
+            "outputTokens": 60
+          }
+        },
+        {
+          "call": 9,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3062,
+            "outputTokens": 72
+          }
+        },
+        {
+          "call": 10,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3157,
+            "outputTokens": 59
+          }
+        },
+        {
+          "call": 11,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3248,
+            "outputTokens": 67
+          }
+        },
+        {
+          "call": 12,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3342,
+            "outputTokens": 65
+          }
+        },
+        {
+          "call": 13,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3433,
+            "outputTokens": 60
+          }
+        },
+        {
+          "call": 14,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3530,
+            "outputTokens": 60
+          }
+        },
+        {
+          "call": 15,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3621,
+            "outputTokens": 61
+          }
+        },
+        {
+          "call": 16,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3714,
+            "outputTokens": 58
+          }
+        },
+        {
+          "call": 17,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3806,
+            "outputTokens": 40
+          }
+        },
+        {
+          "call": 18,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3904,
+            "outputTokens": 61
+          }
+        },
+        {
+          "call": 19,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3998,
+            "outputTokens": 67
+          }
+        },
+        {
+          "call": 20,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4092,
+            "outputTokens": 117
+          }
+        },
+        {
+          "call": 21,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4206,
+            "outputTokens": 108
+          }
+        },
+        {
+          "call": 22,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4214,
+            "outputTokens": 78
+          }
+        },
+        {
+          "call": 23,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4226,
+            "outputTokens": 97
+          }
+        },
+        {
+          "call": 24,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4187,
+            "outputTokens": 61
+          }
+        },
+        {
+          "call": 25,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4202,
+            "outputTokens": 58
+          }
+        },
+        {
+          "call": 26,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4220,
+            "outputTokens": 97
+          }
+        },
+        {
+          "call": 27,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4234,
+            "outputTokens": 102
+          }
+        },
+        {
+          "call": 28,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4288,
+            "outputTokens": 67
+          }
+        },
+        {
+          "call": 29,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4301,
+            "outputTokens": 112
+          }
+        },
+        {
+          "call": 30,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4350,
+            "outputTokens": 109
+          }
+        },
+        {
+          "call": 31,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4354,
+            "outputTokens": 100
+          }
+        },
+        {
+          "call": 32,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4377,
+            "outputTokens": 97
+          }
+        },
+        {
+          "call": 33,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4406,
+            "outputTokens": 114
+          }
+        },
+        {
+          "call": 34,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4316,
+            "outputTokens": 109
+          }
+        },
+        {
+          "call": 35,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4439,
+            "outputTokens": 108
+          }
+        },
+        {
+          "call": 36,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4461,
+            "outputTokens": 74
+          }
+        },
+        {
+          "call": 37,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4483,
+            "outputTokens": 102
+          }
+        },
+        {
+          "call": 38,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4423,
+            "outputTokens": 102
+          }
+        },
+        {
+          "call": 39,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4450,
+            "outputTokens": 104
+          }
+        },
+        {
+          "call": 40,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4379,
+            "outputTokens": 58
+          }
+        },
+        {
+          "call": 41,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4274,
+            "outputTokens": 112
+          }
+        },
+        {
+          "call": 42,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4264,
+            "outputTokens": 99
+          }
+        },
+        {
+          "call": 43,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4258,
+            "outputTokens": 97
+          }
+        },
+        {
+          "call": 44,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4449,
+            "outputTokens": 95
+          }
+        },
+        {
+          "call": 45,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4550,
+            "outputTokens": 108
+          }
+        },
+        {
+          "call": 46,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4461,
+            "outputTokens": 64
+          }
+        },
+        {
+          "call": 47,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4258,
+            "outputTokens": 112
+          }
+        },
+        {
+          "call": 48,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4449,
+            "outputTokens": 109
+          }
+        },
+        {
+          "call": 49,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4525,
+            "outputTokens": 79
+          }
+        },
+        {
+          "call": 50,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4444,
+            "outputTokens": 93
+          }
+        },
+        {
+          "call": 51,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4436,
+            "outputTokens": 91
+          }
+        },
+        {
+          "call": 52,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4510,
+            "outputTokens": 107
+          }
+        },
+        {
+          "call": 53,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4429,
+            "outputTokens": 100
+          }
+        },
+        {
+          "call": 54,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4336,
+            "outputTokens": 107
+          }
+        },
+        {
+          "call": 55,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4233,
+            "outputTokens": 95
+          }
+        },
+        {
+          "call": 56,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4333,
+            "outputTokens": 100
+          }
+        },
+        {
+          "call": 57,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4323,
+            "outputTokens": 100
+          }
+        },
+        {
+          "call": 58,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4524,
+            "outputTokens": 98
+          }
+        },
+        {
+          "call": 59,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4511,
+            "outputTokens": 100
+          }
+        },
+        {
+          "call": 60,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4512,
+            "outputTokens": 98
+          }
+        },
+        {
+          "call": 61,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4418,
+            "outputTokens": 102
+          }
+        },
+        {
+          "call": 62,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4435,
+            "outputTokens": 102
+          }
+        },
+        {
+          "call": 63,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4245,
+            "outputTokens": 107
+          }
+        },
+        {
+          "call": 64,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4529,
+            "outputTokens": 108
+          }
+        },
+        {
+          "call": 65,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4549,
+            "outputTokens": 102
+          }
+        },
+        {
+          "call": 66,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4546,
+            "outputTokens": 102
+          }
+        },
+        {
+          "call": 67,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4567,
+            "outputTokens": 114
+          }
+        },
+        {
+          "call": 68,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4540,
+            "outputTokens": 109
+          }
+        },
+        {
+          "call": 69,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4536,
+            "outputTokens": 93
+          }
+        },
+        {
+          "call": 70,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4164,
+            "outputTokens": 93
+          }
+        },
+        {
+          "call": 71,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4056,
+            "outputTokens": 104
+          }
+        },
+        {
+          "call": 72,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4067,
+            "outputTokens": 102
+          }
+        },
+        {
+          "call": 73,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4064,
+            "outputTokens": 102
+          }
+        },
+        {
+          "call": 74,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4055,
+            "outputTokens": 112
+          }
+        },
+        {
+          "call": 75,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4528,
+            "outputTokens": 102
+          }
+        },
+        {
+          "call": 76,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4518,
+            "outputTokens": 127
+          }
+        },
+        {
+          "call": 77,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4435,
+            "outputTokens": 62
+          }
+        },
+        {
+          "call": 78,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4423,
+            "outputTokens": 102
+          }
+        },
+        {
+          "call": 79,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4494,
+            "outputTokens": 54
+          }
+        },
+        {
+          "call": 80,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4490,
+            "outputTokens": 97
+          }
+        },
+        {
+          "call": 81,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4496,
+            "outputTokens": 114
+          }
+        },
+        {
+          "call": 82,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4508,
+            "outputTokens": 97
+          }
+        },
+        {
+          "call": 83,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4489,
+            "outputTokens": 106
+          }
+        },
+        {
+          "call": 84,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4496,
+            "outputTokens": 102
+          }
+        },
+        {
+          "call": 85,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4513,
+            "outputTokens": 74
+          }
+        }
+      ],
+      "runId": "free-1789236888624-bcf86d",
+      "sources": {
+        "checkpointSha256": "3d278117bf14216c56df0e8381d43c94d05b2811bf239bba6e41f12b0389ddda",
+        "modelSha256": "185d560b9df5f5d4204221cb9751a61eb046fd45ac35c939cdfdcb95ad392dfc"
+      }
     }
   ],
   "schemaVersion": 1,

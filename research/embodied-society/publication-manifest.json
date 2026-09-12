@@ -5,10 +5,10 @@
   "historyPolicy": "root snapshot; no private ancestors",
   "latestUpdate": {
     "date": "2026-09-12",
-    "parentPublicCommit": "f45ac70ad6a58bda03d43eba7341cf472503171e",
+    "parentPublicCommit": "fa5b86c1a7dd8f390bd75020028cc47e8d7083cf",
     "productionChanged": false,
-    "scope": "Accelerated needs window, fixed-step and quota checks, prospective protocol and pre-dispatch interruption report",
-    "sourceCheckpoint": "6e11d91086777d5fe15caa8293ff5377ce9871ac"
+    "scope": "84-minute accelerated study, complete decision report and oversized-gather recovery",
+    "sourceCheckpoint": "91c08ad4172b0807ffe7c48256fcd1bae158da6b"
   },
   "omittedFiles": [
     ".firebaserc",

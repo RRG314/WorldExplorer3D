@@ -4,7 +4,7 @@
 
 Can a language-model agent maintain itself and make useful things while acting through a body in an existing mapped 3D world? This branch investigates that question using World Explorer 3D as the environment. The present system supports one resident, finite resources, needs, designed recipes and bounded model calls. It is an experiment platform, not a demonstration of artificial human life.
 
-Live Gemini runs have produced movement, balanced resource gathering and one observed eating event with a measured increase in food reserve. An unchanged resource-use repeat gathered but did not eat. Four focused tool probes produced no tool; the final probe reached its simulation limit without a terminal interface error. Sustained survival, useful manufacturing, construction and society remain unproven.
+Live Gemini runs have produced movement, balanced resource gathering and one observed eating event with a measured increase in food reserve. An unchanged resource-use repeat gathered but did not eat. Four focused tool probes produced no tool; the final probe reached its simulation limit without a terminal interface error. A longer accelerated trial reached 84 simulated minutes: water fell to 10%, with no replenishment or crafting, before an oversized gather exposed a terminal-rejection defect. That defect is now regression tested and repaired. Sustained survival, useful manufacturing, construction and society remain unproven.
 
 ## Read the study
 
@@ -16,7 +16,7 @@ Live Gemini runs have produced movement, balanced resource gathering and one obs
 | [Useful-tool protocol](TOOL-USE-PROTOCOL.md) | Task, required manufacturing evidence and amendments between attempts |
 | [Design review](RESEARCH-DESIGN-REVIEW.md) | Why the short window was inadequate, long-run changes and remaining limitations |
 | [Accelerated study](ACCELERATED-NEEDS-STUDY.md) | Six-hour clock policy, bounds and interpretation |
-| [Accelerated launch report](reports/accelerated-needs-1.md) | Verified implementation and pre-dispatch loading interruption |
+| [Accelerated study result](reports/accelerated-needs-2.md) | 84 simulated minutes, 85 decisions, navigation difficulty and a repaired rejection defect |
 | [Memory comparison](MEMORY-COMPARISON.md) | Original comparison, deferred pending the timing redesign |
 | [Observer guide](OBSERVER.md) | Minimize the panel, inspect inventory and download decision reports |
 | [Reproduction guide](REPRODUCIBILITY.md) | Verify records and run locally with a private model configuration |

@@ -23,11 +23,11 @@
     "observer": "live quantities, minimize/expand, report control and automatic cleanup observed in tool probe 4; report content generated separately from final checkpoint",
     "memoryComparison": "two declared conditions component and HTTP tested; live comparison not executed",
     "longRunMode": "eight-hour window, matching call allowance and journal capacity; clock/controller/HTTP component tests pass; setup UI checked; full eight-hour live run not performed",
-    "acceleratedRunMode": "12x resident/workshop fixed-step timing component and HTTP tested; setup UI observed; mapped world load interrupted before resident start"
+    "acceleratedRunMode": "live 84 simulated minutes and 85 Gemini decisions; stopped on oversized gather before six-hour target"
   },
   "evidence": {
     "researchTests": {
-      "passed": 91,
+      "passed": 93,
       "failed": 0,
       "command": "npm run experiment:society:test"
     },
@@ -127,10 +127,23 @@
         "Fixed-frame equivalence test uses a controlled body; it is not an accelerated full-world collision acceptance.",
         "No new claim of sustained needs maintenance, manufacturing or society."
       ]
+    },
+    "acceleratedNeedsTrial": {
+      "runId": "free-1789236888624-bcf86d",
+      "providerResponses": 85,
+      "simulatedSeconds": 5040,
+      "waterStart": 0.45,
+      "waterEnd": 0.1,
+      "balancedGathers": 16,
+      "completedRecipes": 0,
+      "terminalError": "gather-batch-too-large",
+      "repair": "Gemini gather enum1 and nonfatal domain rejection, regression tested after trial",
+      "liveRepairRetested": false,
+      "browserAndServerClosed": true
     }
   },
   "remaining": [
-    "Diagnose mapped-world loading interruption, then run the frozen accelerated needs protocol; memory comparison remains deferred",
+    "Review calibrated navigation feedback and run a separately declared follow-up with the oversized-gather repair; no sustained needs maintenance established",
     "Useful-tool goal remains unmet: evaluate planning/model choices under a frozen corrected interface; do not expand population",
     "Interior/shelter validation, complete world input pinning and longer-term memory",
     "Memory, communication and later population gates",

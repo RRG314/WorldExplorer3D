@@ -127,3 +127,19 @@ test('memory comparison returns prior intent only in its declared condition and 
  }
  assert.throws(()=>fixture({memoryCondition:'invented'}),/Unknown resident memory/);
 });
+
+test('oversized gather is recorded without mutation and the next decision can correct it',async()=>{
+ const workshop=createWorkshopService({initialState:createWorkshopState({runId:'batch-rejection',actorIds:['a'],nodes:[{id:'fiber',materialId:'research:fiber',remaining:3}]}),authorize:()=>({allowed:true,inReach:true,targetId:'fiber'}),persist:async()=>{}});
+ let calls=0;
+ const f=fixture({workshop,maxDecisions:2,decide:async o=>{
+  if(calls++===0)return {kind:'gather',targetId:'fiber',quantity:2};
+  assert.equal(o.lastOutcome.reason,'gather-batch-too-large');assert.equal(o.recentMemory.at(-1).status,'rejected');
+  return {kind:'gather',targetId:'fiber',quantity:1};
+ }});
+ await f.controller.resume();const before=workshop.snapshot();
+ const result=await f.controller.decide();assert.equal(result.status,'rejected');assert.deepEqual(workshop.snapshot(),before);
+ assert.equal(f.controller.state().status,'running');assert.equal(f.controller.state().calls,1);
+ await f.controller.step(60);await f.controller.decide();
+ const [bad,good]=f.saved().actionEvidence;assert.equal(bad.action.quantity,2);assert.equal(bad.status,'rejected');assert.deepEqual(bad.before.inventory,bad.after.inventory);
+ assert.equal(good.status,'applied');assert.equal(workshop.snapshot().nodes.fiber.remaining,2);assert.equal(good.after.inventory[0].quantity,1);
+});

@@ -54,7 +54,7 @@ export function createRunController({actorId,body,workshop,perceive,persistCheck
       try {
         await workshop.execute(actorId,{...action,operationId:`supervisor-${++serial}`,expectedRevision:workshop.snapshot().revision},Math.floor(frames/60));
       } catch(cause) {
-        const ordinary=new Set(['not-consumable','unknown-process','insufficient-material','resource-unavailable','tool-required','station-required','work-not-complete','world-permission-denied','resource-not-in-reach','carrying-capacity','occupied-cell','actor-busy','verified-shelter-required','rest-interrupted','no-active-work']);
+        const ordinary=new Set(['not-consumable','unknown-process','insufficient-material','resource-unavailable','gather-batch-too-large','tool-required','station-required','work-not-complete','world-permission-denied','resource-not-in-reach','carrying-capacity','occupied-cell','actor-busy','verified-shelter-required','rest-interrupted','no-active-work']);
         if(!ordinary.has(cause.code))throw cause;
         evidence.status='rejected';evidence.reason=cause.code;evidence.after=evidenceSnapshot(body,workshop,actorId);
         lastOutcome={action:clone(action),status:'rejected',reason:cause.code,tick:Math.floor(frames/60)};

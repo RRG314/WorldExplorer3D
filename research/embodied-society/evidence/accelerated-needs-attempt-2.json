@@ -1,0 +1,1050 @@
+{
+  "balancedGathers": 16,
+  "completedPathMeters": 524.9845696049291,
+  "completedRecipes": [],
+  "controllerCalls": 85,
+  "limitations": [
+    "State-transition self-evaluation; no independent reviewer.",
+    "Placement alone does not verify structural usefulness.",
+    "Source fingerprint covers research modules, not all external world inputs."
+  ],
+  "model": "gemini-3.1-flash-lite",
+  "profile": {
+    "food": 0.55,
+    "id": "resource-use-v1",
+    "minimumSupplyDistanceMeters": 5,
+    "rest": 0.9,
+    "water": 0.45
+  },
+  "records": [
+    {
+      "completedPathMeters": 1.7581503007422052,
+      "decision": 1,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 1.3899398548138517,
+      "decision": 2,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 1.9900910129941265,
+      "decision": 3,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "balancedGather": true,
+      "decision": 4,
+      "inventoryDelta": {
+        "research:stone": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 5,
+      "inventoryDelta": {
+        "research:stone": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 6,
+      "inventoryDelta": {
+        "research:stone": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 7,
+      "inventoryDelta": {
+        "research:stone": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 8,
+      "inventoryDelta": {
+        "research:stone": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 9,
+      "inventoryDelta": {
+        "research:stone": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 10,
+      "inventoryDelta": {
+        "research:stone": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 11,
+      "inventoryDelta": {
+        "research:stone": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 12,
+      "inventoryDelta": {
+        "research:stone": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 13,
+      "inventoryDelta": {
+        "research:stone": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 14,
+      "inventoryDelta": {
+        "research:stone": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 15,
+      "inventoryDelta": {
+        "research:stone": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 16,
+      "inventoryDelta": {
+        "research:stone": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 17,
+      "inventoryDelta": {
+        "research:stone": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 18,
+      "inventoryDelta": {
+        "research:stone": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 19,
+      "inventoryDelta": {
+        "research:stone": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "completedPathMeters": 2.1976878759277882,
+      "decision": 20,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 2.1976878759277896,
+      "decision": 21,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 2.56292245688394,
+      "decision": 22,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 1.673709222057405,
+      "decision": 23,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 0.773639608694899,
+      "decision": 24,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 0.26724508434629274,
+      "decision": 25,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 1.8274195091803551,
+      "decision": 26,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 1.2092583840699034,
+      "decision": 27,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 2.907968195503117,
+      "decision": 28,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 2.5629224568839355,
+      "decision": 29,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 2.5629224568839404,
+      "decision": 30,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 0.7531253146633108,
+      "decision": 31,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 3.1080000000000036,
+      "decision": 32,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 3.1080000000000028,
+      "decision": 33,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 3.107999999999996,
+      "decision": 34,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 2.932081335843191,
+      "decision": 35,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 3.108,
+      "decision": 36,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 3.107999999999999,
+      "decision": 37,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 3.1080000000000014,
+      "decision": 38,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 3.108000000000001,
+      "decision": 39,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 2.9149408834188426,
+      "decision": 40,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 2.376560240801542,
+      "decision": 41,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 0,
+      "decision": 42,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 3.1079999999999997,
+      "decision": 43,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 3.108000000000001,
+      "decision": 44,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 12.432000000000011,
+      "decision": 45,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 5.008436419294003,
+      "decision": 46,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 8.02148316648817,
+      "decision": 47,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 9.773604452810643,
+      "decision": 48,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 7.688767370651814,
+      "decision": 49,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 15.54000000000001,
+      "decision": 50,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 15.540000000000013,
+      "decision": 51,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 15.540000000000008,
+      "decision": 52,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 12.43200000000001,
+      "decision": 53,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 15.540000000000022,
+      "decision": 54,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 15.540000000000015,
+      "decision": 55,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 15.540000000000013,
+      "decision": 56,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 15.540000000000015,
+      "decision": 57,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 15.540000000000015,
+      "decision": 58,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 15.540000000000017,
+      "decision": 59,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 15.540000000000013,
+      "decision": 60,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 14.660406679215912,
+      "decision": 61,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 12.432000000000006,
+      "decision": 62,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 12.432000000000032,
+      "decision": 63,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 15.235431492145297,
+      "decision": 64,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 14.482986423542082,
+      "decision": 65,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 4.886802226405322,
+      "decision": 66,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 5.179999999999998,
+      "decision": 67,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 5.180000000000004,
+      "decision": 68,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 10.360000000000003,
+      "decision": 69,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 10.360000000000005,
+      "decision": 70,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 0,
+      "decision": 71,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 2.1926773565754725,
+      "decision": 72,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 0,
+      "decision": 73,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 15.540000000000052,
+      "decision": 74,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 15.540000000000004,
+      "decision": 75,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 15.540000000000006,
+      "decision": 76,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 15.375295268947669,
+      "decision": 77,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 15.540000000000013,
+      "decision": 78,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 15.540000000000013,
+      "decision": 79,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 0,
+      "decision": 80,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 14.66040667921593,
+      "decision": 81,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 10.36000000000001,
+      "decision": 82,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 15.540000000000012,
+      "decision": 83,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 10.360000000000008,
+      "decision": 84,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "decision": 85,
+      "kind": "gather",
+      "status": "proposed"
+    }
+  ],
+  "researchSourceFingerprint": "1ec6a45cf43998347ede90d58bed587d80a6320d75889905ce0afb6aa53a504d",
+  "runId": "free-1789236888624-bcf86d",
+  "schemaVersion": 1,
+  "simulatedSeconds": 5040.0,
+  "sourceSha256": [
+    "440d2be4033705880261543758961d54438efdf0f2d081befc91a189a7135919",
+    "3d278117bf14216c56df0e8381d43c94d05b2811bf239bba6e41f12b0389ddda"
+  ],
+  "status": "failed",
+  "toolChain": {
+    "meaning": "Gathered inputs, paid timed transformations and later tool-dependent gathering with measured wear; state-transition self-review.",
+    "status": "evaluated",
+    "verifiedUses": []
+  },
+  "verifiedConsumptions": 0,
+  "verifiedPlacements": 0,
+  "study": "accelerated-needs-2",
+  "date": "2026-09-12",
+  "runtimePublicCommit": "fa5b86c1a7dd8f390bd75020028cc47e8d7083cf",
+  "runtimePrivateCheckpoint": "6e11d91086777d5fe15caa8293ff5377ce9871ac",
+  "wallSecondsToFinalCheckpointFile": 780.089753,
+  "wallTimingBasis": "manifest createdAt to retained final checkpoint filesystem mtime; endpoint receipt timestamp was not independently journaled",
+  "providerCompleted": 85,
+  "briefSummariesRecorded": 85,
+  "terminalError": "gather-batch-too-large",
+  "finalNeeds": {
+    "water": 0.10000000000000109,
+    "food": 0.37499999999999806,
+    "rest": 0.7249999999999913,
+    "lastTick": 5040
+  },
+  "finalCondition": 1,
+  "initialNeeds": {
+    "water": 0.45,
+    "food": 0.55,
+    "rest": 0.9
+  },
+  "clockWindow": {
+    "id": "fast-needs-6h",
+    "label": "6 world-hours in a shorter session",
+    "maxSeconds": 21600,
+    "maxWallMs": 3000000,
+    "maxCalls": 380,
+    "clockIntervalSeconds": 30,
+    "maxEvents": 4096,
+    "timeScale": 12,
+    "minDecisionIntervalMs": 5000,
+    "minSimulatedDecisionSeconds": 60
+  },
+  "replenishmentEvents": 0,
+  "appliedGatherCount": 16,
+  "failedGather": {
+    "decision": 85,
+    "targetId": "supply-2",
+    "quantity": 2,
+    "withinReachAtDispatch": true,
+    "distanceMeters": 2.360627485031857,
+    "recordedStatus": "proposed",
+    "materialTransferred": false
+  },
+  "ownedBrowserAndServerClosed": true,
+  "humanViewRestoredVisually": true,
+  "observations": [
+    {
+      "call": 1,
+      "sha256": "be442226011fc22f07b176158d436dcf7ad8d6e1fa6a574e7bdb246399f62028"
+    },
+    {
+      "call": 2,
+      "sha256": "12da053f63210e4a61b9ad2d405c243553f962f64885f74c68549573b572297f"
+    },
+    {
+      "call": 3,
+      "sha256": "2e901491979916ff73711fa094f4869f8e6fe29eaa5ee5de83942eeccc72ab92"
+    },
+    {
+      "call": 4,
+      "sha256": "61896b65bc694cfdd1f8443180ba8e07b9c795583f64f049d9f0aa0c566f2963"
+    },
+    {
+      "call": 5,
+      "sha256": "39bd62f2b970a66441ac0333f5e4680aa326bfc446e4933108ad6f0deece9c26"
+    },
+    {
+      "call": 6,
+      "sha256": "f71db610f6dd1523456ec490fa199c2be3a975873104c95c9b14339a3f4e1051"
+    },
+    {
+      "call": 7,
+      "sha256": "4a9469e79ea6537fd787c135571400727b8889b90c0be883f75a35c5f8ce6d9f"
+    },
+    {
+      "call": 8,
+      "sha256": "8f468cf7e6e55c822c19222774b81378b8d0fba6f001832c7d6d636b3336845e"
+    },
+    {
+      "call": 9,
+      "sha256": "4421b59c7afff5d2e0d2dd3d698bafe0841e6d9c3b69ebed0a3b2a4c1971b5ea"
+    },
+    {
+      "call": 10,
+      "sha256": "1fa515ac89ad352ecce2771bb22e01f137d23c68ac6abe57f49a51a9b29746be"
+    },
+    {
+      "call": 11,
+      "sha256": "97727c82fdd75353cc48f972187caa8edd9d7917b8ea58d9f789965b0c7234ff"
+    },
+    {
+      "call": 12,
+      "sha256": "4e776d4f9eaa4950fbf02b66d0ba097943dc927610d7bad1512279a849ef4954"
+    },
+    {
+      "call": 13,
+      "sha256": "88872f75d3b2eb36ec04b0d07fa25d19691a5c1caa36f872a8fd1af8c44f8ecc"
+    },
+    {
+      "call": 14,
+      "sha256": "9d5043e3dff3906f4bc3cc3ba79b7d1dd1407be8807c52a9e4ac130319c3c289"
+    },
+    {
+      "call": 15,
+      "sha256": "a15348cdfb343da79f1276d5bd322930a9ae62a2d0327c28f9c4cb2179832886"
+    },
+    {
+      "call": 16,
+      "sha256": "3b88aef6080cd8f3ca0082bff37c57716036a0c23502bf403938bc71e73d706f"
+    },
+    {
+      "call": 17,
+      "sha256": "2b755c86bfa245d2aa91ee95366d3c27e6598f5e5b07b66681f12e0ef08ee224"
+    },
+    {
+      "call": 18,
+      "sha256": "ce6bf305d3c33e542341381541d861087a7bb7c23d9ec71e7af3e52c8cc63f2e"
+    },
+    {
+      "call": 19,
+      "sha256": "efac5c6707f6bea8df40891cb6b1f8326cbd2b0c1ec402f0a91c3d4a599af680"
+    },
+    {
+      "call": 20,
+      "sha256": "57c2cb06ec98980d429d77f80a29089efba1ced3cf70024fa4ca674c5b6f135e"
+    },
+    {
+      "call": 21,
+      "sha256": "0c1bf701948c2abe76e276b99ea628066547d24bbe66c4f13cb4a76b74618cdd"
+    },
+    {
+      "call": 22,
+      "sha256": "0e65f22b9e80e10eb4866f922b05b9ad8ff550a0ba956ba66c7d8f276a001d2d"
+    },
+    {
+      "call": 23,
+      "sha256": "623fe4557801198064f3753921bad420e4024f3dcb80611fcd6d0f41a9ed58f5"
+    },
+    {
+      "call": 24,
+      "sha256": "da03f33ce2a2fcae9113f2ad53a525d64c22b8c0bc4b36c71daf57c6ac78dc81"
+    },
+    {
+      "call": 25,
+      "sha256": "28f60f11fdd792ae0d0393a467c67b5e8af64ad3090980aafc23ef9a9ca25644"
+    },
+    {
+      "call": 26,
+      "sha256": "2d13af6b6e63adc0d461bbbedcd62b402883e335ae4c2d29c42170cc0cbfa845"
+    },
+    {
+      "call": 27,
+      "sha256": "ab1c769c0aa2184709ed198bdd06dce02980a8a11d1247019ef62bf4ae68d031"
+    },
+    {
+      "call": 28,
+      "sha256": "fb60e760a3f8708dc55bc4fa9eb6427dd32323afa655d32f091a7d9ab21c3808"
+    },
+    {
+      "call": 29,
+      "sha256": "a8e70c84e537ae7248f784ad768f3041481f07037939d9b8fe25d8d725be3f24"
+    },
+    {
+      "call": 30,
+      "sha256": "955d4435f4165721f06b70c040897212607070221a8a10eb332a20ca2880681d"
+    },
+    {
+      "call": 31,
+      "sha256": "0cc7ed2bbdc55c3f5b56d558de7c5e34dcba07a67c861a3648e0fafa4c76aeb4"
+    },
+    {
+      "call": 32,
+      "sha256": "c8ee80a28a02feabbbd5448fa973122bb85bbb0854638cda3c8a1a634efb2075"
+    },
+    {
+      "call": 33,
+      "sha256": "f70a02bb9580678ace55bcc5b85d4f65bf30cb0e2688aac091c36f07395f183c"
+    },
+    {
+      "call": 34,
+      "sha256": "2fb3b907e6b000c6cbb459ab4b0e25410fc4849a93d08a6040e457bdbd9c5486"
+    },
+    {
+      "call": 35,
+      "sha256": "2febcca849b158eb08806b1632aa849df9128462b42afba0fb317ee8dfaffb8d"
+    },
+    {
+      "call": 36,
+      "sha256": "53db66628908ed64e9aa0b672c506939a42f218d802faba8f576d2a1b7fd13b6"
+    },
+    {
+      "call": 37,
+      "sha256": "a37be3b1055af0f1cd4247e6ae38ecce3e540e817fd149d3dbf8d212c0f121e0"
+    },
+    {
+      "call": 38,
+      "sha256": "32f1dd1449190c7aefa1cef2d9a131f2e938090731cc172c3929ff08cb24a7e7"
+    },
+    {
+      "call": 39,
+      "sha256": "312b80fb222b935ab610b8caf60ae39a9f8d784985197b5cfd2fe99a44d191d4"
+    },
+    {
+      "call": 40,
+      "sha256": "c30cb27269be10670c13f90714b106bfa03c7ce9735ee9a02d4dba1f5f403904"
+    },
+    {
+      "call": 41,
+      "sha256": "2de8f09c404aab0f1e1f20c70900dc124ff494865575e7597af7ff4629406f91"
+    },
+    {
+      "call": 42,
+      "sha256": "1c1179a3129230f69d41f129d2efe959d4c011b3ef66a8bf1419b7429515f83b"
+    },
+    {
+      "call": 43,
+      "sha256": "30bbd5276105e195bc582d489fa2827365b25bf2fdd809dc81fbefaecc5eaed4"
+    },
+    {
+      "call": 44,
+      "sha256": "9d7e8c29247d93ddb0c0e0a310eba02b2a594f105f5167ed9a29a3a7ec47b988"
+    },
+    {
+      "call": 45,
+      "sha256": "a19c18412c8f3c627a705b8be4b530e210e4f2b7fd06cac5dd233f78047043ac"
+    },
+    {
+      "call": 46,
+      "sha256": "538175c49bdce2c5d0c2f3a489fcebca1e7b3a6f117133a5651534ff1d1c6bde"
+    },
+    {
+      "call": 47,
+      "sha256": "ce21ff4a5a3f157abaaf58eca590b7234771848055667ed2547496fdda896e15"
+    },
+    {
+      "call": 48,
+      "sha256": "d4d6a66530dda47b0b35ca303597816b2952be0e4a23ba948cd08bc3e251938f"
+    },
+    {
+      "call": 49,
+      "sha256": "067b5e2cbc8778c2945437d43607a96500428fd0411c72c1332bdd4840945bdc"
+    },
+    {
+      "call": 50,
+      "sha256": "169edfcdeef26d3c8a90b0f871b68692b4a39411439502591dfc4b509060a292"
+    },
+    {
+      "call": 51,
+      "sha256": "1fda5df09e09625587985f880254b75f4152b3062d58f25fa67030b4416495c0"
+    },
+    {
+      "call": 52,
+      "sha256": "202cc88da65a9c4a0bdeebffd268ecc2f6c4c8b616086418b213c50b6c324b97"
+    },
+    {
+      "call": 53,
+      "sha256": "368f48f6c32c8fc7a5b463f9e99a9bd9b1357d6f2ee214eac4b1da9bf702bdf5"
+    },
+    {
+      "call": 54,
+      "sha256": "7450f586be0788793f3f47e8012852e5cf3d90ef54d96320c1c2cb777be9b7bf"
+    },
+    {
+      "call": 55,
+      "sha256": "dbb0c06acba66c59e3627ca4400045b15fb8bde02dbc6f99a8164344659c27c2"
+    },
+    {
+      "call": 56,
+      "sha256": "0c8beca03044efa631f7dc796cf99581db58c4cccc96852a313115a4ccb1975f"
+    },
+    {
+      "call": 57,
+      "sha256": "8b4936f62d2cc310635059ac3f6398603d6a0ec8720050e67d9d50bf27d2ab24"
+    },
+    {
+      "call": 58,
+      "sha256": "cc86cd827a755465a8fdb1f7ac866a1f15bd923ca33b6bfa06127e7ff9c9c91d"
+    },
+    {
+      "call": 59,
+      "sha256": "cfd1d68f592372f10e3011716e87a0c2ec327bf2948129c377998f38846938f2"
+    },
+    {
+      "call": 60,
+      "sha256": "ad6d33e99cc826579c895b6324d47ae691b1fecf889fefa53d32d7cf34142110"
+    },
+    {
+      "call": 61,
+      "sha256": "7ba523296bf0aa5df5f4ba233788e28d752107385bc7b40954885a1c1bef778c"
+    },
+    {
+      "call": 62,
+      "sha256": "d4befe56654d7329df18340113c8a71823c7b600d773ad90f4fdeae9f941add6"
+    },
+    {
+      "call": 63,
+      "sha256": "78a71ebaf0455f5e4861dbf9352e968648a6b0f9b61454a82928641cf4fd5cec"
+    },
+    {
+      "call": 64,
+      "sha256": "63cdfd01af24bb76cd4ca47128a2e0093c52e0cc93ef89b96ce20de346056c0f"
+    },
+    {
+      "call": 65,
+      "sha256": "10a9d0b9dd5be16be51442f8291806333f1f97b53dbcc71c28c5a62e174415de"
+    },
+    {
+      "call": 66,
+      "sha256": "79aaec6420fcfb28668ac736c3b18d921c84c363c229e3741fcd5097caffd483"
+    },
+    {
+      "call": 67,
+      "sha256": "75d3572cebac266a6446c8ee4eb46d8aa0dcf7e520f77d692abeb206ecaf7a6c"
+    },
+    {
+      "call": 68,
+      "sha256": "59d6cb1b873b8f2e90f7c4313100af1910345cb13d86712e7454d953c8259f7f"
+    },
+    {
+      "call": 69,
+      "sha256": "ebc87349aa68675f7afb0864902eaf879e62140158cb6262b4b326a39ed642f2"
+    },
+    {
+      "call": 70,
+      "sha256": "b830ce1eb0d413807e59d9ab71b8f78ed0eee31b97679bd5319cd55c410a0022"
+    },
+    {
+      "call": 71,
+      "sha256": "ae3baeaa664bb58d03c1e3202be4faacbfe75fb11f928e934adc3431dc01bee0"
+    },
+    {
+      "call": 72,
+      "sha256": "d2d8fadd52e467d3075ed1a2670c0b1f5b8b1c969890f1d067f7231ad4e34c08"
+    },
+    {
+      "call": 73,
+      "sha256": "2e92f16a170225159cc5d703d828f425154350e0fc7f32924863ac6d3bc6def9"
+    },
+    {
+      "call": 74,
+      "sha256": "01feb53a262e7a6077d0e064a71ab81027da98ea622c434e716ae2b7b62bf802"
+    },
+    {
+      "call": 75,
+      "sha256": "7f6c119877d6db64a590b161e73f9d7219343c67861ef7302f73e17d75b5b882"
+    },
+    {
+      "call": 76,
+      "sha256": "7cb8638a21fba6a5507049358327e68dcbb062beb05545912d9b895bbbd9d64c"
+    },
+    {
+      "call": 77,
+      "sha256": "f67452099afa62412b7c4a5d866c023cb8c108f94c65da4daef038c31c6c9f10"
+    },
+    {
+      "call": 78,
+      "sha256": "c628f848d995145c22e806d30382031e3d46ddf7fb23ebe9bb8dc4a6dfc616cb"
+    },
+    {
+      "call": 79,
+      "sha256": "e3f9ff1b673845687825512cdb45864661ff4c30ab8824230a351cb3db3c6b40"
+    },
+    {
+      "call": 80,
+      "sha256": "7963d2ef6a451d2360a97af7b1e5b2dcd76e897090b10cc0364c8956a85bc272"
+    },
+    {
+      "call": 81,
+      "sha256": "5d439378201e8485d23398d2d019654a24a3935b34f161b972a6f2f0f8ca8b4b"
+    },
+    {
+      "call": 82,
+      "sha256": "85ea54ef851cbfd518bc8ad0582fdf670b6e24bc87e542d900f17324a133d74c"
+    },
+    {
+      "call": 83,
+      "sha256": "39fd9881c14de6334eca0264705a5d9e95b427b63dcd27218407bbfc3cb7d0c9"
+    },
+    {
+      "call": 84,
+      "sha256": "5608dd8ea91b358b5daf2fd64f1967ed66e47d05aad9172d7dbe2c234f09c7a8"
+    },
+    {
+      "call": 85,
+      "sha256": "d482dc26e8c5693c727dbb8ccc44f7c83e1349011dcbe95a28c93311bcdfa8f9"
+    }
+  ]
+}

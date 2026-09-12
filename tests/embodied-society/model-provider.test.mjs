@@ -134,3 +134,10 @@ test('faster free cadence is limited to the declared Gemini Flash Lite window',(
  assert.doesNotThrow(()=>create(fast));
  for(const change of [{minDecisionIntervalMs:4999},{runWindowId:'pilot-15m'},{provider:'groq',model:'openai/gpt-oss-20b'},{model:'gemini-3.8-flash'}])assert.throws(()=>create({...fast,...change}));
 });
+
+test('Gemini gather schema permits one unit without restricting inventory transfer quantities',async()=>{
+ const {GEMINI_ACTION_SCHEMA}=await import('../../scripts/embodied-society/model-provider.mjs');
+ const actions=GEMINI_ACTION_SCHEMA.properties.action.anyOf;
+ const gather=actions.find(s=>s.properties.kind.enum[0]==='gather');assert.deepEqual(gather.properties.quantity.enum,[1]);assert.equal(gather.properties.quantity.type,'integer');
+ const store=actions.find(s=>s.properties.kind.enum[0]==='store');assert.equal(store.properties.quantity.enum,undefined);
+});
