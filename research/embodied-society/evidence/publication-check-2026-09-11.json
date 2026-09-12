@@ -29,7 +29,11 @@
     "researchRunUrl": "https://github.com/RRG314/WorldExplorer3D/actions/runs/34660138645",
     "firstSecretScan": "failed before complete scanning: action constructed nonexistent root-parent revision",
     "secretScanRunUrl": "https://github.com/RRG314/WorldExplorer3D/actions/runs/34660138665",
-    "correction": "checksum-pinned Gitleaks 8.30.0 scans complete HEAD history; rerun required"
+    "correction": "Passed: checksum-pinned Gitleaks 8.30.0 scans complete HEAD history",
+    "verifiedPublicCommit": "67030d7681d5f0f73f781e99ac64b7a4d4592222",
+    "passingResearchRunUrl": "https://github.com/RRG314/WorldExplorer3D/actions/runs/34660275260",
+    "passingSecretScanRunUrl": "https://github.com/RRG314/WorldExplorer3D/actions/runs/34660275383",
+    "subsequentChange": "Evidence links and current action release pins added; these edits trigger their own checks."
   },
   "limitations": [
     "Automated pattern scans do not guarantee absence of every kind of sensitive information.",
