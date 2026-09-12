@@ -1,3 +1,4 @@
+import { parseMeters } from './compiler/transport-source-normalizer.js?v=4';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 
 const DRIVEABLE_HIGHWAY_TYPES = new Set([
@@ -222,7 +223,7 @@ export function linearFeaturePriority(kind, subtype = '') {
 export function linearFeatureVisualSpec(classification, tags = {}) {
   const kind = classification?.kind;
   const preset = LINEAR_FEATURE_STYLE_PRESETS[kind] || LINEAR_FEATURE_STYLE_PRESETS.footway;
-  const parsedWidth = Number.parseFloat(tags?.width);
+  const parsedWidth = parseMeters(tags?.width);
   let width = preset.width;
 
   if (kind === 'railway') {

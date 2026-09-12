@@ -98,9 +98,8 @@ export function createLinearFeatureRuntime(options = {}) {
     updateFeatureSurfaceProfile(feature, worldBaseTerrainY, { surfaceBias: spec.bias });
     appCtx.linearFeatures.push(feature);
 
-    // Navigation and physical surface semantics are data. The legacy ribbons
-    // exposed raw mapped walking paths as competing world geometry. That
-    // presentation owner has been deleted; this module publishes data only.
+    // This record feeds navigation and the resident pavement area compiler.
+    // The publication pass below provides coarse paths outside that coverage.
     return true;
   }
 

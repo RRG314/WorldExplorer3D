@@ -1,3 +1,4 @@
+import { resolveStreetSection } from '../world/compiler/street-section.js';
 import { directedSurfacePitch } from '../engine/vehicle-road-attitude.js?v=2';
 import {
   MIN_DRIVEABLE_ROAD_WIDTH_METERS,
@@ -103,23 +104,53 @@ function edgePointPair(segment, offset, sampleSurface) {
   const dz = segment.p2.z - segment.p1.z;
   const length = Math.hypot(dx, dz);
   if (!(length > 0.5)) return null;
-  const normalX = -dz / length;
-  const normalZ = dx / length;
+  const normalX = dz / length;
+  const normalZ = -dx / length;
   return {
     p1: {
       x: segment.p1.x + normalX * offset,
-      y: surfaceY(sampleSurface, segment, segment.p1, segment.sourceTStart) + 0.08,
+      y: surfaceY(sampleSurface, segment, { ...segment.p1, x: segment.p1.x + normalX * offset, z: segment.p1.z + normalZ * offset }, segment.sourceTStart) + 0.08,
       z: segment.p1.z + normalZ * offset
     },
     p2: {
       x: segment.p2.x + normalX * offset,
-      y: surfaceY(sampleSurface, segment, segment.p2, segment.sourceTEnd) + 0.08,
+      y: surfaceY(sampleSurface, segment, { ...segment.p2, x: segment.p2.x + normalX * offset, z: segment.p2.z + normalZ * offset }, segment.sourceTEnd) + 0.08,
       z: segment.p2.z + normalZ * offset
     },
     length,
     normalX,
     normalZ
   };
+}
+
+function pedestrianSurfaceSpans(pair, segment, options) {
+  const allowed = t => {
+    const x=pair.p1.x+(pair.p2.x-pair.p1.x)*t,z=pair.p1.z+(pair.p2.z-pair.p1.z)*t;
+    return options.isPedestrianSurface(x,z) && !options.isBlockedPoint?.(x,z);
+  };
+  const count=Math.max(1,Math.ceil(pair.length/2)),spans=[];
+  let start=allowed(0) ? 0 : null,previous=allowed(0);
+  const boundary=(a,b,validAtB)=>{
+    for(let i=0;i<10;i++){const m=(a+b)/2;if(allowed(m)===validAtB)b=m;else a=m;}
+    return validAtB ? b : a;
+  };
+  const at=t=>{
+    const p={x:pair.p1.x+(pair.p2.x-pair.p1.x)*t,z:pair.p1.z+(pair.p2.z-pair.p1.z)*t};
+    p.y=surfaceY(options.sampleSurface,segment,p,finite(segment.sourceTStart)+(finite(segment.sourceTEnd,1)-finite(segment.sourceTStart))*t)+.08;
+    return p;
+  };
+  for(let i=1;i<=count;i++) {
+    const t=i/count,valid=allowed(t);
+    if(valid && !previous) start=boundary((i-1)/count,t,true);
+    if(!valid && previous) {
+      const end=boundary((i-1)/count,t,false);
+      if((end-start)*pair.length>.5)spans.push({...pair,p1:at(start),p2:at(end)});
+      start=null;
+    }
+    previous=valid;
+  }
+  if(start!==null && (1-start)*pair.length>.5)spans.push({...pair,p1:at(start),p2:at(1)});
+  return spans;
 }
 
 function segmentPriority(segment) {
@@ -162,14 +193,8 @@ function pedestrianSegmentMode(segment) {
   if (featureKind(feature) === 'footway') return 'mapped_path';
   if (featureKind(feature) !== 'road') return '';
   const tags = feature?.transportRecord?.sourceTags || feature?.transportRecord?.rawTags || {};
-  const sidewalk = String(tags.sidewalk || '').trim().toLowerCase();
-  if (['no', 'none', 'separate'].includes(sidewalk)) return '';
-  const highway = roadHighwayClass(feature);
-  if (/^(?:motorway|motorway_link|trunk|trunk_link|raceway|construction|proposed)$/.test(highway)) return '';
-  if (/^(?:primary|primary_link)$/.test(highway) && !['yes', 'both', 'left', 'right'].includes(sidewalk)) return '';
-  return /^(?:secondary|secondary_link|tertiary|tertiary_link|residential|living_street|service|unclassified|road|pedestrian)$/.test(highway)
-    ? 'inferred_sidewalk'
-    : '';
+  const section = resolveStreetSection({ ...tags, highway: roadHighwayClass(feature) }, { urban: true });
+  return [section.left, section.right].some(side => side.presence === 'present') ? 'inferred_sidewalk' : '';
 }
 
 function pedestrianSegmentAllowed(segment) {
@@ -225,26 +250,30 @@ export function compilePedestrianGraph(options = {}) {
         segment.sourceTStart,
         segment.sourceTEnd
       );
-      const sidewalkOffset = Math.min(8, Math.max(2.4, width * .5 + 1.2));
+      const sidewalkOffset = width * .5;
+      const placement = Number(segment.feature?.transportRecord?.crossSection?.placement?.centerlineOffsetMeters) || 0;
       const tags = segment.feature?.transportRecord?.sourceTags || segment.feature?.transportRecord?.rawTags || {};
-      const sidewalk = String(tags.sidewalk || '').trim().toLowerCase();
       // OSM roadway geometry is the source authority. Where no separately
       // mapped footway exists, publish a clearly attributed inferred sidewalk
       // outside the road cross-section; never claim provider-mapped geometry.
-      if (sidewalk === 'left') return [sidewalkOffset];
-      if (sidewalk === 'right') return [-sidewalkOffset];
-      return [-sidewalkOffset, sidewalkOffset];
+      const section = resolveStreetSection({ ...tags, highway: roadHighwayClass(segment.feature) }, { urban: true });
+      return ['left', 'right'].filter(side => section[side].presence === 'present')
+        .map(side => (side === 'left' ? 1 : -1) * (Math.max(.3,sidewalkOffset-(side==='left'?1:-1)*placement) + section[side].widthMeters / (2 * (options.metersPerWorldUnit || 1.11))));
     })();
     for (const offset of offsets) {
       if (edges.length >= networkEdgeLimit) break;
       const pair = edgePointPair(segment, offset, options.sampleSurface);
       if (!pair) continue;
-      if (typeof options.isBlockedPoint === 'function' && (
-        options.isBlockedPoint(pair.p1.x, pair.p1.z) || options.isBlockedPoint(pair.p2.x, pair.p2.z)
-      )) continue;
-      const side = offset < 0 ? 'right' : offset > 0 ? 'left' : 'mapped';
-      addEdge(pair, segment, `${side}:forward`, pair.p1, pair.p2, mode);
-      addEdge(pair, segment, `${side}:reverse`, pair.p2, pair.p1, mode);
+      const spans=mode==='inferred_sidewalk' && typeof options.isPedestrianSurface==='function'
+        ? pedestrianSurfaceSpans(pair,segment,options) : [pair];
+      for (const span of spans) {
+        if (typeof options.isBlockedPoint === 'function' && (
+          options.isBlockedPoint(span.p1.x,span.p1.z) || options.isBlockedPoint(span.p2.x,span.p2.z)
+        )) continue;
+        const side=offset<0 ? 'right' : offset>0 ? 'left' : 'mapped';
+        addEdge(span,segment,`${side}:forward`,span.p1,span.p2,mode);
+        addEdge(span,segment,`${side}:reverse`,span.p2,span.p1,mode);
+      }
     }
   }
 

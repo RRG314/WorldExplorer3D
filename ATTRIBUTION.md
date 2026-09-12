@@ -69,3 +69,13 @@ This is the concise public attribution index. Asset-level details are in `app/as
 Attribution is presented in the app footer/legal UI, provider detail panels, source-health views, repository documentation, and bundled asset records. Optional third-party property services remain governed by their own contracts.
 
 This file is informational and is not legal advice.
+
+## Street geometry software
+
+The street surface compiler uses JavaScript Clipper 6.4.2 by Angus Johnson and
+contributors, distributed under the Boost Software License 1.0. The bundled
+source also retains the JSBN notice by Tom Wu. Source, original notices, and
+package-integrity provenance are retained in `app/vendor/clipper/`.
+[Upstream JavaScript Clipper](https://github.com/junmer/clipper-lib).
+Pavement triangulation reuses the bundled Mapbox Earcut implementation and its
+license in `functions/vendor/earcut/`.

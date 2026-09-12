@@ -1,3 +1,4 @@
+import { ctx as appCtx } from '../shared-context.js?v=55';
 import {
   createRoadSurfaceMaterials,
   disposeRoadSurfaceMaterials,
@@ -24,6 +25,12 @@ function createTerrainMaterialCacheApi(deps = {}) {
     const materials = createRoadSurfaceMaterials({
       includeMarkings: true
     });
+
+    materials.roadMainMaterial.map = appCtx.asphaltTex || null;
+    materials.roadMainMaterial.normalMap = appCtx.asphaltNormal || null;
+    materials.roadMainMaterial.roughnessMap = appCtx.asphaltRoughness || null;
+    materials.roadMainMaterial.normalScale?.set(0.18, 0.18);
+    materials.roadMainMaterial.needsUpdate = true;
 
     terrainState._roadMaterialCacheKey = key;
     terrainState._roadMaterials = {

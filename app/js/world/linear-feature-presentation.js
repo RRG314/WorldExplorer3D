@@ -6,14 +6,37 @@ const FEATURE_COLORS = Object.freeze({
   railway: 0x787878
 });
 
-function buildBatchGeometry(features, buildFeatureRibbonEdges, worldBaseTerrainY) {
+// Keep coarse mapped paths outside the resident pavement coverage. The detailed area owner
+// replaces their interiors, including incorrectly duplicated path strips through roadways.
+function outsidePaths(feature, bounds) {
+  if (!bounds || feature.kind !== 'footway' || feature.subtype !== 'sidewalk' || feature.isStructureConnector || feature.structureSemantics?.gradeSeparated || !['at_grade', undefined].includes(feature.structureSemantics?.terrainMode)) return [feature.pts];
+  const paths = [];
+  for (let i=1;i<feature.pts.length;i++) {
+    const a=feature.pts[i-1], b=feature.pts[i], dx=b.x-a.x, dz=b.z-a.z;
+    let lo=0,hi=1, hit=true;
+    for (const [p,q] of [[-dx,a.x-bounds.minX],[dx,bounds.maxX-a.x],[-dz,a.z-bounds.minZ],[dz,bounds.maxZ-a.z]]) {
+      if (Math.abs(p)<1e-9) { if(q<0)hit=false; continue; }
+      const t=q/p; if(p<0)lo=Math.max(lo,t);else hi=Math.min(hi,t);
+    }
+    const at=t=>({x:a.x+dx*t,z:a.z+dz*t});
+    if(!hit || lo>=hi) paths.push([a,b]);
+    else {if(lo>0)paths.push([a,at(lo)]);if(hi<1)paths.push([at(hi),b]);}
+  }
+  return paths;
+}
+
+function buildBatchGeometry(features, buildFeatureRibbonEdges, worldBaseTerrainY, pavementBounds) {
   const vertices = [];
   const indices = [];
   for (const feature of features) {
+    // A crossing describes pedestrian connectivity over the carriageway. A
+    // solid path ribbon here paints a second surface across the asphalt.
+    if (feature.subtype === 'crossing' && !feature.structureSemantics?.gradeSeparated) continue;
     const halfWidth = Math.max(0.25, Number(feature.width || 1) * 0.5);
+    for (const points of outsidePaths(feature, pavementBounds)) {
     const edges = buildFeatureRibbonEdges(
       feature,
-      feature.pts,
+      points,
       halfWidth,
       worldBaseTerrainY,
       { surfaceBias: feature.surfaceBias }
@@ -24,6 +47,7 @@ function buildBatchGeometry(features, buildFeatureRibbonEdges, worldBaseTerrainY
       vertices,
       indices
     );
+    }
   }
   if (vertices.length < 12 || indices.length < 6) return null;
   const geometry = new THREE.BufferGeometry();
@@ -42,7 +66,8 @@ export function publishLinearFeaturePresentation(options = {}) {
     appCtx,
     buildFeatureRibbonEdges,
     features = [],
-    worldBaseTerrainY
+    worldBaseTerrainY,
+    pavementBounds = null
   } = options;
   if (
     !appCtx?.scene ||
@@ -71,7 +96,8 @@ export function publishLinearFeaturePresentation(options = {}) {
     const geometry = buildBatchGeometry(
       groupedFeatures,
       buildFeatureRibbonEdges,
-      worldBaseTerrainY
+      worldBaseTerrainY,
+      pavementBounds
     );
     if (!geometry) continue;
     const material = new THREE.MeshStandardMaterial({

@@ -179,11 +179,10 @@ import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=
 
 const FEATURE_MIN_POLYGON_AREA = 8;
 const FEATURE_MIN_HOLE_AREA = 6;
-// Publish only drivable transport surfaces. Mapped pedestrian, rail, and cycle
-// data remain available from OSM for future validated systems, but they do not
-// become visible world geometry or competing traversal surfaces.
+// Mapped pedestrian data feeds the pavement area compiler and walking graph.
+// Keeping this disabled discards separately mapped sidewalks before compilation.
 const LINEAR_FEATURE_POLICY = Object.freeze({
-  footway: false,
+  footway: true,
   cycleway: false,
   railway: false
 });
@@ -314,7 +313,7 @@ async function refreshAuthoritativeMapData() {
   if (appCtx.onMoon || appCtx.onMars || appCtx.spaceFlight?.active) {
     throw new Error('OpenStreetMap refresh is available on Earth.');
   }
-  await invalidateOverpassCaches(appCtx.LOC, ['core', 'buildings', 'building-metadata']);
+  await invalidateOverpassCaches(appCtx.LOC, ['core', 'core-pedestrian-v2', 'buildings', 'building-metadata']);
   releaseShortbreadRuntimeCache({ includeRaw: true });
   return loadRoads();
 }

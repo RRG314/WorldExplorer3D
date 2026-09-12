@@ -1,3 +1,4 @@
+import { publishStreetPavement } from './street-pavement-runtime.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { appendUpwardRibbonGeometry } from "../road-render.js?v=4";
 import { generateStreetFurniture } from "./furniture.js?v=22";
@@ -120,6 +121,13 @@ export async function finalizeLoadedWorld(options = {}) {
   }
   if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.retireGroundFallbackPlaceholder === 'function') {
     runFinalStep('retireGroundFallbackPlaceholder', () => appCtx.retireGroundFallbackPlaceholder());
+  }
+  try {
+    appCtx.showLoad?.('Building connected sidewalks and street surfaces...');
+    loadMetrics.streetPavement = await publishStreetPavement(appCtx);
+  } catch (error) {
+    recordWorldLoadWarning(loadMetrics, 'publishStreetPavement', error);
+    appCtx.streetPavementError = String(error?.message || error);
   }
   runFinalStep('buildTraversalNetworks', () => buildTraversalNetworks());
   await yieldToMainThread();

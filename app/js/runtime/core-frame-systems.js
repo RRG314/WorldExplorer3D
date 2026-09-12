@@ -1,3 +1,4 @@
+import { updateStreetPavementFocus } from '../world/street-pavement-runtime.js';
 function createCoreFrameSystems(appCtx, hooks = {}) {
   appCtx.presentationPose = null;
   let hudTimer = 0;
@@ -133,6 +134,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
           lodTimer = 0;
           appCtx.updateStreetFurnitureVisibility?.();
           appCtx.updateVegetationFocus?.();
+          updateStreetPavementFocus(appCtx);
           appCtx.updateStructureVisualVisibility?.();
           appCtx.enforceEnvironmentSceneOwnership?.();
         }

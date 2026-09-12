@@ -307,7 +307,7 @@ export function buildWorldOverpassPlan({
       roadsRadius,
       featureRadius,
       poiRadius,
-      kind: 'core'
+      kind: 'core-pedestrian-v2'
     },
     buildingPublicationCacheMeta: {
       lat: location.lat,
@@ -395,12 +395,7 @@ export function buildWorldOverpassPlan({
             );out body;>;out skel qt;`,
     primaryQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
                 way["highway"~"^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|unclassified|living_street|service)$"]${roadsBounds};
-                way["highway"~"^(footway|pedestrian|path|corridor|steps)$"]["bridge"]${featureBounds};
-                way["highway"~"^(footway|pedestrian|path|corridor|steps)$"]["layer"]${featureBounds};
-                way["highway"~"^(footway|pedestrian|path|corridor|steps)$"]["level"]${featureBounds};
-                way["highway"~"^(footway|pedestrian|path|corridor|steps)$"]["covered"]${featureBounds};
-                way["highway"~"^(footway|pedestrian|path|corridor|steps)$"]["indoor"]${featureBounds};
-                way["highway"~"^(footway|pedestrian|path|corridor|steps)$"]["min_height"]${featureBounds};
+                way["highway"~"^(footway|pedestrian|path|corridor|steps|cycleway)$"]${featureBounds};
                 way["landuse"]${featureBounds};
                 way["area:highway"]${featureBounds};
                 way["amenity"="parking"]${featureBounds};

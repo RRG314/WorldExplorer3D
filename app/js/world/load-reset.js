@@ -125,6 +125,12 @@ export function resetWorldForReload(options = {}) {
   // A publication belongs to exactly one world-load sequence. Clearing it here
   // prevents the next feature compilation pass from appearing authoritative
   // before final terrain-aligned meshes have been created.
+  appCtx.streetPavement?.dispose?.();
+  appCtx.streetPavement = null;
+  appCtx.roadContactIndex = null;
+  appCtx._streetPavementGeneration = (appCtx._streetPavementGeneration || 0) + 1;
+  appCtx._streetPavementDirty = false;
+  appCtx._streetPavementRetryAt = 0;
   appCtx.transportSurfacePublication = null;
   if (appCtx.car) {
     appCtx.car.road = null;

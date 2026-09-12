@@ -132,6 +132,9 @@ function buildIndexedBatchMesh({
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  const uv = [];
+  for (let i = 0; i < verts.length; i += 3) uv.push(verts[i] * 1.11 / 4, verts[i + 2] * 1.11 / 4);
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   const vertexCount = verts.length / 3;
   const indexArray = vertexCount > 65535 ? new Uint32Array(indices) : new Uint16Array(indices);
   geometry.setIndex(new THREE.BufferAttribute(indexArray, 1));

@@ -16,6 +16,7 @@ import {
 } from "./road-junctions.js?v=11";
 import { appendSolidAtGradeRoadGeometry } from "./road-surface-geometry.js?v=2";
 import { roadWidthAtSegment } from "../world/road-cross-section-profile.js?v=1";
+import { createRoadContactIndex } from './road-contact-index.js?v=1';
 
 const ROAD_SURFACE_BIAS = 0.18;
 const MAX_ROAD_BATCH_VERTICES = 60000;
@@ -364,6 +365,9 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   } = deps;
 
   if (!appCtx.terrainEnabled || appCtx.roads.length === 0 || appCtx.onMoon) return;
+  const sequence = appCtx._worldLoadSequence;
+  const generation = appCtx._roadMeshGeneration = (appCtx._roadMeshGeneration || 0) + 1;
+  const isCurrent = () => sequence === appCtx._worldLoadSequence && generation === appCtx._roadMeshGeneration && !appCtx.onMoon;
   const baseRoads = appCtx.roads;
   if (baseRoads.length === 0) return;
   const now = () => globalThis.performance?.now?.() ?? Date.now();
@@ -422,38 +426,6 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     );
     await yieldToMainThread();
   }
-
-  measure('disposePreviousMeshes', () => {
-    appCtx.roadMeshes.forEach((mesh) => {
-      mesh.parent?.remove?.(mesh);
-      if (mesh.geometry) mesh.geometry.dispose();
-      if (mesh.material && !mesh.userData?.sharedRoadMaterial) {
-        if (Array.isArray(mesh.material)) {
-          mesh.material.forEach((mat) => {
-            if (mat && typeof mat.dispose === "function") mat.dispose();
-          });
-        } else if (typeof mesh.material.dispose === "function") {
-          mesh.material.dispose();
-        }
-      }
-    });
-    appCtx.replaceWorldCollection('roadMeshes');
-
-    appCtx.urbanSurfaceMeshes.forEach((mesh) => {
-      mesh.parent?.remove?.(mesh);
-      if (mesh.geometry) mesh.geometry.dispose();
-      if (mesh.material && !mesh.userData?.sharedUrbanSurfaceMaterial && typeof mesh.material.dispose === "function") {
-        mesh.material.dispose();
-      }
-    });
-    appCtx.replaceWorldCollection('urbanSurfaceMeshes');
-  });
-  appCtx.urbanSurfaceStats = {
-    sidewalkBatchCount: 0,
-    sidewalkVertices: 0,
-    sidewalkTriangles: 0,
-    skippedBuildingAprons: Number(appCtx.urbanSurfaceStats?.skippedBuildingAprons || 0)
-  };
 
   const intersections = measure('detectIntersections', () => detectRoadIntersections(baseRoads));
   await yieldToMainThread();
@@ -638,11 +610,16 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     flushRoadMainBatch();
   });
 
+  if (!isCurrent()) return;
+  const stagedRoadGroup = new THREE.Group();
+  const stagedRoadMeshes = [];
+  let stagedRoadContact;
+  try {
   measure('uploadRoadMeshes', () => {
     roadMainBatches.forEach((batch, batchIndex) => {
       buildIndexedBatchMesh({
-        scene: appCtx.scene,
-        targetList: appCtx.roadMeshes,
+        scene: stagedRoadGroup,
+        targetList: stagedRoadMeshes,
         verts: batch.verts,
         indices: batch.indices,
         material: roadMat,
@@ -656,8 +633,8 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       });
     });
     buildIndexedBatchMesh({
-      scene: appCtx.scene,
-      targetList: appCtx.roadMeshes,
+      scene: stagedRoadGroup,
+      targetList: stagedRoadMeshes,
       verts: roadSkirtBatchVerts,
       indices: roadSkirtBatchIdx,
       material: skirtMat,
@@ -665,8 +642,8 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       userData: { isRoadBatch: true, isRoadSkirt: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
     });
     buildIndexedBatchMesh({
-      scene: appCtx.scene,
-      targetList: appCtx.roadMeshes,
+      scene: stagedRoadGroup,
+      targetList: stagedRoadMeshes,
       verts: roadMarkBatchVerts,
       indices: roadMarkBatchIdx,
       material: markMat,
@@ -675,6 +652,27 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       userData: { isRoadBatch: true, isRoadMarking: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
     });
   });
+  stagedRoadContact = createRoadContactIndex(stagedRoadMeshes);
+  } catch (error) {
+    for (const mesh of stagedRoadMeshes) mesh.geometry?.dispose();
+    throw error;
+  }
+  // No asynchronous boundary inside the publication: old roads stay visible
+  // throughout compilation and are released only after every replacement exists.
+  const previousRoadMeshes = [...appCtx.roadMeshes];
+  for (const mesh of stagedRoadMeshes) appCtx.addEarthWorldObject(mesh);
+  appCtx.replaceWorldCollection('roadMeshes', stagedRoadMeshes);
+  appCtx.roadContactIndex = stagedRoadContact;
+  for (const mesh of previousRoadMeshes) {
+    mesh.parent?.remove(mesh);
+    mesh.geometry?.dispose();
+    if (!mesh.userData?.sharedRoadMaterial) {
+      for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) material?.dispose?.();
+    }
+  }
+  // The pavement owner keeps its render and collision meshes together until its
+  // own replacement is ready; road rebuilds must never dispose only the render half.
+  if (appCtx.streetPavement) appCtx._streetPavementDirty = true;
   await yieldToMainThread();
   await measureAsync('rebuildStructureVisuals', () => (
     typeof rebuildStructureVisualMeshesCooperatively === 'function'

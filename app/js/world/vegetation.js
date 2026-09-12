@@ -158,6 +158,7 @@ function isInsideWaterArea(x, z) {
 }
 
 function isVegetationPlacementBlocked(x, z, options = {}) {
+  if (Number.isFinite(appCtx.streetPavement?.sampleAt(x,z))) return true;
   if (Math.hypot(x, z) < 18) return true;
   const roadPadding = Number.isFinite(options.roadPadding) ? options.roadPadding : 4.5;
   const buildingPadding = Number.isFinite(options.buildingPadding) ? options.buildingPadding : 1.8;

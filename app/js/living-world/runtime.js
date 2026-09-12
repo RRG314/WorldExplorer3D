@@ -156,7 +156,12 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
   const pedestrianCompilation = compilePedestrianGraph({
     traversal: traversal.walk,
     entrances: catalog.entrances,
-    sampleSurface: appCtx.sampleFeatureSurfaceY,
+    metersPerWorldUnit: appCtx.METERS_PER_WORLD_UNIT || 1.11,
+    isPedestrianSurface: (x,z) => {
+      const p=appCtx.streetPavement, b=p?.coverageBounds;
+      return !b || x<b.minX || x>b.maxX || z<b.minZ || z>b.maxZ || Number.isFinite(p.sampleAt(x,z));
+    },
+    sampleSurface: (feature, x, z, projection) => appCtx.streetPavement?.sampleAt(x, z) ?? appCtx.sampleFeatureSurfaceY(feature, x, z, projection),
     isBlockedPoint: (x, z) => pedestrianPointBlocked(appCtx, x, z),
     activityAnchors,
     tier
