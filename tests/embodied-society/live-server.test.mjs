@@ -106,3 +106,18 @@ test('server freezes memory condition and strips intent from baseline dispatch d
   }finally{await server.close();await rm(directory,{recursive:true,force:true});}
  }
 });
+test('free setup declares a longer window and freezes its limits and needs rules without contacting a model',async()=>{
+ const {mkdtemp,readFile,rm}=await import('node:fs/promises');const {tmpdir}=await import('node:os');const path=await import('node:path');
+ const directory=await mkdtemp(path.join(tmpdir(),'we3d-long-config-'));let calls=0;
+ const server=await startLiveResearchServer({port:0,storageRoot:directory,fetchImpl:async()=>{calls++;throw Error('Unexpected dispatch');}});
+ try{
+  const base=`http://127.0.0.1:${server.port}`,initial=await(await fetch(base+'/research-api/status')).json();
+  const post=(name,body)=>fetch(base+'/research-api/'+name,{method:'POST',headers:{Origin:base,'X-Research-Session':initial.session},body:JSON.stringify(body)});
+  assert.equal((await post('configure',{apiKey:'configuration-test-key-only',freePlanConfirmed:true,runWindowId:'forever'})).status,400);
+  assert.equal((await post('configure',{apiKey:'configuration-test-key-only',freePlanConfirmed:true,runWindowId:'needs-8h'})).status,200);
+  const configured=await(await fetch(base+'/research-api/status')).json();assert.equal(configured.model.maxCalls,600);assert.equal(configured.runWindow.maxSeconds,28800);assert.equal(configured.runWindow.maxWallMs,36000000);
+  assert.equal((await post('start',{runId:configured.runId,worldSnapshotId:'world',manifest:{worldSnapshotId:'world',runWindow:{maxSeconds:1}}})).status,200);
+  const saved=JSON.parse(await readFile(path.join(directory,configured.runId,'manifest/workshop.json'),'utf8'));
+  assert.equal(saved.manifest.runWindow.maxSeconds,28800);assert.equal(saved.needRules.waterPerSecond,1/14400);assert.equal(calls,0);
+ }finally{await server.close();await rm(directory,{recursive:true,force:true});}
+});

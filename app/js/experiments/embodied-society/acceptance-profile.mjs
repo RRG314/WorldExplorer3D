@@ -1,5 +1,5 @@
 // Declared initial conditions, not an action policy. No starter inventory or kits.
-export const ACCEPTANCE_PROFILE=Object.freeze({id:'resource-use-v1',water:.45,food:.55,rest:.9,minimumSupplyDistanceMeters:5,maximumWallMs:20*60*1000});
+export const ACCEPTANCE_PROFILE=Object.freeze({id:'resource-use-v1',water:.45,food:.55,rest:.9,minimumSupplyDistanceMeters:5});
 export function applyAcceptanceNeeds(state){
  const copy=structuredClone(state);
  for(const actor of Object.values(copy.actors))actor.needs={...actor.needs,water:ACCEPTANCE_PROFILE.water,food:ACCEPTANCE_PROFILE.food,rest:ACCEPTANCE_PROFILE.rest};

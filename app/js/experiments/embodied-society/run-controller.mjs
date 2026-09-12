@@ -6,27 +6,30 @@ const fields = new Set(['kind','targetId','quantity','recipeId','materialId','se
 
 // Single-resident supervisor. The host supplies authenticated model dispatch,
 // filtered perception and durable checkpoint storage. This is never an agent tool.
-export function createRunController({actorId,body,workshop,perceive,persistCheckpoint,decide,maxDecisions=0,maxSeconds=900,decisionTimeoutMs=30000,wallDeadlineMs=null,now=()=>Date.now(),memoryCondition='outcomes-only'}) {
+export function createRunController({actorId,body,workshop,perceive,persistCheckpoint,decide,maxDecisions=0,maxSeconds=900,decisionTimeoutMs=30000,wallDeadlineMs=null,now=()=>Date.now(),memoryCondition='outcomes-only',clockIntervalSeconds=1}) {
   if(typeof now!=='function'||(wallDeadlineMs!==null&&!Number.isFinite(wallDeadlineMs))||!actorId || !body || !workshop || typeof perceive!=='function' || typeof persistCheckpoint!=='function' ||
       !Number.isSafeInteger(maxDecisions) || maxDecisions<0 || maxDecisions>1000 ||
-      !Number.isSafeInteger(maxSeconds) || maxSeconds<1 || maxSeconds>900 ||
+      !Number.isSafeInteger(maxSeconds) || maxSeconds<1 || maxSeconds>28800 ||
       !Number.isSafeInteger(decisionTimeoutMs) || decisionTimeoutMs<1 || decisionTimeoutMs>60000) throw Error('Invalid bounded run configuration.');
   validateMemoryCondition(memoryCondition);
+  if(!Number.isSafeInteger(clockIntervalSeconds)||clockIntervalSeconds<1||clockIntervalSeconds>30)throw Error('Invalid needs checkpoint interval.');
+  const current=()=>workshop.stateView?.()??workshop.snapshot();
+  const flushClock=()=>workshop.advanceTo(Math.floor(frames/60));
   let status='paused',frames=(workshop.snapshot().tick??0)*60,epoch=0,calls=0,serial=0,pending=null,error=null,lastOutcome=null;
   const memory=[],actionEvidence=[];let movingEvidence=null;
   let queue=Promise.resolve();
   const initialTick=frames/60;
-  function observation() {
-    const state=workshop.snapshot(),actor=state.actors[actorId];
+  function observation({includePerception=true}={}) {
+    const state=current(),actor=state.actors[actorId];
     if(!actor)throw Error('Resident missing from workshop.');
     return clone({actorId,tick:Math.floor(frames/60),body:body.observation(),needs:actor.needs,condition:actor.condition,
       experimentBudget:{maximumDecisions:maxDecisions,decisionAttempts:calls,furtherDecisions:Math.max(0,maxDecisions-calls),simulatedSecondsRemaining:Math.max(0,maxSeconds-(frames/60-initialTick)),wallSecondsRemaining:wallDeadlineMs===null?null:Math.max(0,(wallDeadlineMs-now())/1000)},
-      inventory:workshop.inspectInventory(actorId).items,job:actor.job,lastOutcome,memoryCondition,recentMemory:observedMemory(memory,memoryCondition),visible:perceive(actorId)});
+      inventory:workshop.inspectInventory(actorId).items,job:actor.job,lastOutcome,memoryCondition,recentMemory:observedMemory(memory,memoryCondition),visible:includePerception?perceive(actorId):null});
   }
   function checkpoint(reason) {
     if(movingEvidence)movingEvidence.after=evidenceSnapshot(body,workshop,actorId);
     return persistCheckpoint(clone({schemaVersion:1,runId:workshop.snapshot().runId,actorId,status,frames,calls,serial,reason,
-      workshop:workshop.snapshot(),body:body.checkpoint(),error,lastOutcome,memoryCondition,memory,actionEvidence}));
+      workshop:workshop.snapshot(),body:body.checkpoint(),error,lastOutcome,memoryCondition,clockIntervalSeconds,maxSeconds,memory,actionEvidence}));
   }
   function settleMovement(){if(movingEvidence){movingEvidence.status='movement-interrupted';movingEvidence.after=evidenceSnapshot(body,workshop,actorId);movingEvidence=null;}}
   function fail(cause) {settleMovement();status='failed';error=String(cause?.message||cause);epoch++;pending?.abort();body.pause();}
@@ -76,7 +79,7 @@ export function createRunController({actorId,body,workshop,perceive,persistCheck
     pause(){
       if(status==='ended'||status==='failed')return Promise.resolve();
       settleMovement();status='paused';epoch++;pending?.abort();body.pause();
-      return serialized(async()=>{try{await checkpoint('pause');}catch(e){fail(e);throw e;}});
+      return serialized(async()=>{try{await flushClock();await checkpoint('pause');}catch(e){fail(e);throw e;}});
     },
     step(count=1){return serialized(async()=>{
       if(status!=='running')return;
@@ -84,16 +87,17 @@ export function createRunController({actorId,body,workshop,perceive,persistCheck
       try {
         for(let n=0;n<count&&status==='running';n++) {
           if(frames/60-initialTick>=maxSeconds){settleMovement();status='ended';body.pause();break;}
-          if(workshop.snapshot().actors[actorId].condition<=0){settleMovement();status='ended';body.pause();break;}
+          if(current().actors[actorId].condition<=0){settleMovement();status='ended';body.pause();break;}
           const beforePosition=movingEvidence?body.observation().position:null;
           body.step();frames++;
           if(movingEvidence){const afterPosition=body.observation().position;
             movingEvidence.pathMeters+=Math.hypot(afterPosition.x-beforePosition.x,afterPosition.z-beforePosition.z)*(body.metersPerWorldUnit??1);
             if(body.observation().remainingFrames===0){movingEvidence.after=evidenceSnapshot(body,workshop,actorId);movingEvidence.status='movement-completed';movingEvidence=null;}
           }
-          if(frames%60===0)await workshop.advanceTo(frames/60);
+          if(frames%(60*clockIntervalSeconds)===0)await flushClock();
         }
-        if(frames%60===0||status!=='running')await checkpoint('step');
+        if(status!=='running')await flushClock();
+        if(frames%(60*clockIntervalSeconds)===0||status!=='running')await checkpoint('step');
       }catch(e){fail(e);throw e;}
     });},
     decide(){
@@ -104,7 +108,7 @@ export function createRunController({actorId,body,workshop,perceive,persistCheck
         let timer;
         try {
           if(status!=='running'||token!==epoch)return {cancelled:true};
-          calls++;await checkpoint('decision-reserved');
+          await flushClock();calls++;await checkpoint('decision-reserved');
           const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{abort.abort();reject(Error('Decision timed out.'));},decisionTimeoutMs);});
           const cancelled=new Promise((_,reject)=>abort.signal.addEventListener('abort',()=>reject(Error('Decision cancelled.')),{once:true}));
           if(abort.signal.aborted)return {cancelled:true};
@@ -117,6 +121,6 @@ export function createRunController({actorId,body,workshop,perceive,persistCheck
       });
     },
     abort(reason){fail(reason);return serialized(()=>checkpoint('host-failed'));},
-    end(){if(status==='failed')return serialized(()=>checkpoint('failed-end'));settleMovement();status='ended';epoch++;pending?.abort();body.pause();return serialized(()=>checkpoint('end'));}
+    end(){if(status==='failed')return serialized(()=>checkpoint('failed-end'));settleMovement();status='ended';epoch++;pending?.abort();body.pause();return serialized(async()=>{try{await flushClock();return await checkpoint('end');}catch(e){fail(e);throw e;}});}
   });
 }

@@ -4,11 +4,11 @@
   "fileCountExcludingThisManifest": 1603,
   "historyPolicy": "root snapshot; no private ancestors",
   "latestUpdate": {
-    "date": "2026-09-11",
-    "parentPublicCommit": "fdac707cebf124d949e8ec06e464b828b6816760",
+    "date": "2026-09-12",
+    "parentPublicCommit": "4c422313b396c25479b140e14b4f1f16c2202083",
     "productionChanged": false,
-    "scope": "Fourth tool probe, readable stated-intent report and prospective memory comparison",
-    "sourceCheckpoint": "80e0f3fe8bd4b5b5bef21ba7dca535dd37f026d3"
+    "scope": "Longer observation windows, reduced recording/display overhead and research design review",
+    "sourceCheckpoint": "edb334bb2426888d2c367ab494a34e2cad615533"
   },
   "omittedFiles": [
     ".firebaserc",

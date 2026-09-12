@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "branch": "steven/research-embodied-society",
   "parentCheckpoint": "f88af9db",
-  "date": "2026-09-11",
+  "date": "2026-09-12",
   "stage": "LIVE_RESOURCE_INTERACTION_VERIFIED_USEFUL_TOOL_MILESTONE_NOT_PASSED",
   "launchable": true,
   "productionChanged": false,
@@ -21,11 +21,12 @@
     "modelProvider": "real Gemini responses verified; other adapters transport-double tested",
     "liveServer": "implemented; actual app HTML injection and account disabling HTTP-tested",
     "observer": "live quantities, minimize/expand, report control and automatic cleanup observed in tool probe 4; report content generated separately from final checkpoint",
-    "memoryComparison": "two declared conditions component and HTTP tested; live comparison not executed"
+    "memoryComparison": "two declared conditions component and HTTP tested; live comparison not executed",
+    "longRunMode": "eight-hour window, matching call allowance and journal capacity; clock/controller/HTTP component tests pass; setup UI checked; full eight-hour live run not performed"
   },
   "evidence": {
     "researchTests": {
-      "passed": 83,
+      "passed": 87,
       "failed": 0,
       "command": "npm run experiment:society:test"
     },
@@ -83,10 +84,21 @@
       "simulatedSeconds": 900,
       "humanRestoredVisually": true,
       "browserAndServerClosed": true
+    },
+    "longRunChecks": {
+      "scope": "component and setup UI only; no additional model calls",
+      "maxSimulatedSeconds": 28800,
+      "maxWallSeconds": 36000,
+      "maxCalls": 600,
+      "idleNeedsCheckpointSeconds": 30,
+      "journalEventsMax": 4096,
+      "clockPassedOld900SecondLimit": true,
+      "eightHourNeedsCalculationVerified": true,
+      "fullLiveRunVerified": false
     }
   },
   "remaining": [
-    "Execute the predeclared WE3D-M1-v1 memory comparison; no planning benefit has been established",
+    "Revise time policy and action opportunities before running the deferred memory comparison; no planning benefit established",
     "Useful-tool goal remains unmet: evaluate planning/model choices under a frozen corrected interface; do not expand population",
     "Interior/shelter validation, complete world input pinning and longer-term memory",
     "Memory, communication and later population gates",

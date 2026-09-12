@@ -1,6 +1,6 @@
 # Bounded language-model residents in a mapped 3D world: architecture, resource use and unsuccessful tool probes
 
-World Explorer 3D research project · Technical report 0.2 · September 11, 2026
+World Explorer 3D research project · Technical report 0.3 · September 12, 2026
 Status: original project report; not submitted, peer reviewed or independently replicated.
 
 ## Abstract
@@ -55,7 +55,7 @@ The ledger inventory totals thirteen developmental runs and 105 events: 102 comp
 
 A fourth tool probe, `free-1789182975761-e32016`, tested the brief stated-intent instrument in the live world. Sixteen responses produced three completed movements (5.545 metres) and thirteen balanced gathers (eight water, five snacks). No consumption or crafting occurred before the 900-second stop. All sixteen statements and exact pre-dispatch observations were archived. Statements repeatedly deferred the tool task until after supply collection. The observer showed actual inventory quantities while minimized, and automatic termination restored the human view.
 
-The resident received recent action outcomes but not its earlier statements. A planned two-condition comparison now tests returning those statements alongside outcomes. Both conditions retain the same action and explanation schema; no prescribed sequence is supplied. The implementation is component tested, but the comparison has not run. Neither the observed statements nor a future difference in a single exploratory pair would establish a causal explanation of the resident's internal computation.
+The resident received recent action outcomes but not its earlier statements. A two-condition comparison was prepared to test returning those statements alongside outcomes. It is deferred before execution after the September 12 timing review. Both conditions retain the same action and explanation schema; no prescribed sequence is supplied. The implementation is component tested, but the comparison has not run. Neither the observed statements nor a future difference in a single exploratory pair would establish a causal explanation of the resident's internal computation.
 
 ## 7. Threats to validity
 
@@ -64,6 +64,8 @@ Selection and operator influence: setup and model/schema were changed during deb
 Implementation validity: typed actions reduce ambiguity but do not prove all authority checks. Shelter and restart behavior remain incomplete. Existing full-application acceptance and security work is separate. Physical and social fidelity are limited by game rules. No inference about human society, intelligence rankings or consciousness is supported.
 
 ## 8. Next study
+
+The [design review](../RESEARCH-DESIGN-REVIEW.md) calculates that the 900-second window reduced water by only 6.25 percentage points and food/rest by 3.125 points. It was not an adequate sustained-needs observation. An eight-hour window now has matching call, wall-time and journal allowances, with reduced idle recording and display-only perception work. These changes are component tested; no full eight-hour live study is reported. The next protocol must choose a time policy and address sparse action opportunities before interpreting a memory comparison. Rest/shelter and continuous autonomous activities remain incomplete.
 
 The next milestone is a completed chain from gathered raw inputs to a crafted tool and subsequent tool-dependent acquisition. Success requires custody, job timing, produced output and tool-wear evidence; a completed provider response or a component fixture is insufficient. The designed recipe chain requires several material actions in addition to navigation, so comparisons must retain the declared allowance and report which limit stopped each run.
 

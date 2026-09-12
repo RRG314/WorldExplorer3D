@@ -18,7 +18,7 @@ The public snapshot excludes deployment workflows and local cloud targeting file
 | Autonomous maintainer | Disabled/not implemented | OS-enforced isolation, no production authority, independent evaluator and review. |
 | Public observation/visitor forks | Not implemented | Read-only export or isolated fork, privacy review and contamination controls. |
 
-The immediate behavioral milestone remains the single-resident manufacturing-and-use requirement. The next planned study is MEMORY-COMPARISON.md's two-condition exploratory pair; it has not run. Record any engineering change needed to pass it, then freeze a new cohort. Do not substitute more documentation for missing behavior, or a single attractive video for the run inventory.
+The immediate study design is being revised under RESEARCH-DESIGN-REVIEW.md. Needs pressure and adequate action opportunities precede interpreting a memory comparison. The manufacturing-and-use requirement remains unmet; the original memory pair is deferred before execution. Record any engineering change needed to pass it, then freeze a new cohort. Do not substitute more documentation for missing behavior, or a single attractive video for the run inventory.
 
 ## Change and contribution rules
 

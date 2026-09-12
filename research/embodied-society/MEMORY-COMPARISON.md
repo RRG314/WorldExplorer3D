@@ -1,6 +1,8 @@
 # Stated-intent feedback comparison
 
-Protocol `WE3D-M1-v1` · planned, not yet executed or externally preregistered.
+Protocol `WE3D-M1-v1` · deferred before execution; not externally preregistered.
+
+The September 12 [design review](RESEARCH-DESIGN-REVIEW.md) identifies inadequate needs pressure and sparse action opportunities. The original plan below is retained for provenance. Do not execute it as the next study without a revised time-policy protocol.
 
 ## Question
 

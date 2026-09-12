@@ -47,3 +47,7 @@ The revised Gemini response contract also requests `decisionSummary`, a short st
 ## Memory-comparison provenance
 
 New runs record `memoryCondition` in their immutable start manifest and controller checkpoints. `outcomes-only` removes earlier decision summaries from model-visible recent memory; `intent-and-outcomes` includes each available statement alongside the original outcome. Both retain the private action-evidence summaries for reporting. The server pins the selected condition and bounds feedback to 20 entries and 240 characters per statement. Missing historical summaries remain missing. The fourth tool probe predates this field; its source implements outcomes-only observation, and it is not counted as one of the prospective comparison attempts.
+
+## Study windows and sparse idle checkpoints
+
+New manifests record canonical `runWindow` limits and `needRules`. Initial-condition profiles no longer set a competing wall deadline. Historical profile fields are preserved in old evidence. Long runs advance idle needs durably every 30 simulated seconds and exactly before each decision, pause and normal end; the HUD may display a needs sample up to 30 simulated seconds old. Frame time and persisted need time must not be assumed identical. Material transitions remain durable before publication. Snapshot budgets are 16 MiB for the controller checkpoint, 4 MiB for workshop state, 8 MiB for the provider ledger and 64 KiB per private observation; failures stop the run rather than discard evidence or continue unrecorded.

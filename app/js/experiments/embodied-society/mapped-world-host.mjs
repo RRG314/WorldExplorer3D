@@ -95,9 +95,9 @@ export function createMappedWorldHost({THREE,appCtx,manifest,initialState,persis
       },
       shelterAt:()=>null,transferConsented:()=>false
     }});
-    workshop=createWorkshopService({initialState,authorize:authority.authorize,persist:persistWorkshop});
+    workshop=createWorkshopService({initialState,authorize:authority.authorize,persist:persistWorkshop,maxEvents:manifest.runWindow?.maxEvents??1000});
     function perceive() {
-      validWorld();const from=body.observation().position,state=workshop.snapshot();
+      validWorld();const from=body.observation().position,state=workshop.stateView();
       const visible=[];
       for(const node of Object.values(state.nodes)) {
         if(!grants.has(node.id)||!inside(node.position)||Math.hypot(node.position.x-from.x,node.position.y-from.y,node.position.z-from.z)*units>25||!lineOfSight({from,to:node.position}))continue;
@@ -123,7 +123,7 @@ export function createMappedWorldHost({THREE,appCtx,manifest,initialState,persis
       return {worldSnapshotId:publication.id,coordinates:'World Explorer local units, +y up; yaw zero faces +z',metersPerWorldUnit:units,forwardClearance:sight,objects:visible.slice(0,32),buildSites:buildSites.filter(p=>Math.hypot(p.gx-from.x,p.gz-from.z)*units<=3)};
     }
     return Object.freeze({body,workshop,perceive,validate:validWorld,
-      reconcile(){validWorld();return projection.reconcile(workshop.snapshot());},
+      reconcile(){validWorld();return projection.reconcile(workshop.stateView());},
       dispose(){body.dispose();projection.dispose();}
     });
   }catch(error){body?.dispose();projection.dispose();throw error;}

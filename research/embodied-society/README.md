@@ -14,7 +14,8 @@ Live Gemini runs have produced movement, balanced resource gathering and one obs
 | [Results](RESULTS.md) | Successful and unsuccessful developmental attempts, with evidence links |
 | [Resource-use protocol](PROTOCOL.md) | Initial conditions, acceptance criteria and stopping rules |
 | [Useful-tool protocol](TOOL-USE-PROTOCOL.md) | Task, required manufacturing evidence and amendments between attempts |
-| [Memory comparison](MEMORY-COMPARISON.md) | Planned test of earlier stated intent alongside outcomes; not yet executed |
+| [Design review](RESEARCH-DESIGN-REVIEW.md) | Why the short window was inadequate, long-run changes and remaining limitations |
+| [Memory comparison](MEMORY-COMPARISON.md) | Original comparison, deferred pending the timing redesign |
 | [Observer guide](OBSERVER.md) | Minimize the panel, inspect inventory and download decision reports |
 | [Reproduction guide](REPRODUCIBILITY.md) | Verify records and run locally with a private model configuration |
 | [Data specification](DATA.md) | Record formats, missing evidence, provenance and privacy |

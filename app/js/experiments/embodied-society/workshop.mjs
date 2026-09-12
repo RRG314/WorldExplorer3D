@@ -179,6 +179,7 @@ export function createWorkshopService({initialState,authorize,persist,maxMassGra
         await persist(clone(next));state=next;return {tick,revision:state.revision};
       });queue=work.catch(()=>{});return work;
     },
+    stateView(){const {events,receipts,...current}=state;return clone(current);},
     snapshot(){return clone(state);},
     inspectInventory(actorId){if(!Object.hasOwn(state.actors,actorId))fail('unknown-actor');return backpack(state.actors[actorId].backpack).snapshot();}
   });

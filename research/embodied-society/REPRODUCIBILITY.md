@@ -8,7 +8,7 @@ The public package is a privacy-reviewed snapshot with its own history. The orig
 
 ## Live pilot
 
-Run `npm run experiment:society` from the repository root. Open `http://127.0.0.1:4498/research-setup` locally. Enter a key privately from the intended provider project, verify its tier, and optionally run the connection check. Open World Explorer from that page, select a destination, wait for actual world readiness, then start the resident. Use Pause/Resume/End and stop the local server afterward. The server does not retain the entered key across shutdown.
+Run `npm run experiment:society` from the repository root. Open `http://127.0.0.1:4498/research-setup` locally. Select the study window (eight simulated hours or the retained fifteen-minute pilot), then enter a key privately from the intended provider project and verify its tier. A connection check uses the same decision allowance. Open World Explorer from that page, select a destination, wait for actual world readiness, then start the resident. Use Pause/Resume/End and stop the local server afterward. The server does not retain the entered key across shutdown.
 
 A fresh key/account setup is the operator's responsibility. Free-tier eligibility, quota and model availability may change; the local zero-dollar profile cannot enforce provider billing. The launch is not a background unattended service. Map/network access is required and variable. A previous Baltimore load took roughly 83 seconds; that observation is not a timeout guarantee.
 
@@ -32,3 +32,7 @@ Re-running source is possible; exact replay of the recorded pilot is not establi
 In the mapped world, use the AI resident panel's **Minimize** and **Expand** controls. Resident item quantities remain visible when minimized. **Download decision report** exports the current run's recorded actions and effects as Markdown; download again after termination for final action states. See [the observer guide](OBSERVER.md) for ownership distinctions, stated-intent limits and interpretation. Keep exports private until reviewed for publication.
 
 For a lightweight observer-only browser check, with the repository's Playwright dependency and Chromium installed, run `node tests/embodied-society/observer-browser.mjs` from the root. It starts one temporary local fixture, checks quantities and minimize/expand at desktop and phone widths, saves screenshots under `output/verification/research-observer/`, then closes its browser and server. Its inventory changes are test inputs; it does not run a model, simulate a resident or establish live capability.
+
+## Long observation window
+
+`needs-8h` declares 28,800 simulated seconds, 36,000 wall seconds, at most 600 provider decisions, and 30-second idle needs checkpoints. The server records those limits and the unchanged need rules in the manifest. Actual needs are advanced to the current simulated second before decisions, pause and normal end. The world must stay open and the Mac awake; no unattended restart is available. The terminal launcher offers the same window choice. See the design review before interpreting this as a survival study. No full eight-hour live run has been verified.
