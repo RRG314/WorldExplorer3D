@@ -24,7 +24,13 @@
   "binaryReview": "Changed binary paths are vegetation models, attributed textures, vendor WASM and existing public showcase images; no raw capture uploads added.",
   "liveModelRunPerformedForPackaging": false,
   "deploymentPerformed": false,
-  "remoteCI": "not yet run at attestation creation",
+  "remoteCI": {
+    "firstResearchRun": "passed all research contracts and recordkeeping checks",
+    "researchRunUrl": "https://github.com/RRG314/WorldExplorer3D/actions/runs/34660138645",
+    "firstSecretScan": "failed before complete scanning: action constructed nonexistent root-parent revision",
+    "secretScanRunUrl": "https://github.com/RRG314/WorldExplorer3D/actions/runs/34660138665",
+    "correction": "checksum-pinned Gitleaks 8.30.0 scans complete HEAD history; rerun required"
+  },
   "limitations": [
     "Automated pattern scans do not guarantee absence of every kind of sensitive information.",
     "Local tests use component fixtures and transport doubles; they are not another live survival run.",
