@@ -200,7 +200,11 @@ const GroundHeight = {
   },
 
   urbanSurfaceMeshY(x, z) {
-    return this._raycastMeshY(appCtx.urbanSurfaceMeshes, x, z, 1500, Infinity);
+    // Resident pavement has already been queried through its triangle index.
+    // Raycasting it again here scans the neighborhood for every off-sidewalk
+    // walking/spawn query and also treats paint and curb faces as support.
+    const legacySurfaces = (appCtx.urbanSurfaceMeshes || []).filter(mesh => !mesh.userData?.streetPavement);
+    return this._raycastMeshY(legacySurfaces, x, z, 1500, Infinity);
   },
 
   _projectPointToFeature(feature, x, z) {

@@ -34,6 +34,7 @@ const tests = [
   'tests/earth-traversal-current.test.mjs',
   'tests/street-pavement-current.test.mjs',
   'tests/street-publication-current.test.mjs',
+  'tests/core-render-lifecycle-current.test.mjs',
   'tests/road-interior-terrain-current.test.mjs',
   'tests/road-terrain-conformance-current.test.mjs',
   'tests/road-terrain-reconciliation-current.test.mjs',

@@ -28,7 +28,7 @@ function concreteTexture(THREE) {
   ctx.strokeRect(0.5, 0.5, 127, 127);
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.encoding = THREE.sRGBEncoding;
   return texture;
 }
 
@@ -54,11 +54,11 @@ export async function publishStreetPavement(appCtx) {
       bounds={minX:Infinity,maxX:-Infinity,minZ:Infinity,maxZ:-Infinity};
       for(const p of points){bounds.minX=Math.min(bounds.minX,p.x);bounds.maxX=Math.max(bounds.maxX,p.x);bounds.minZ=Math.min(bounds.minZ,p.z);bounds.maxZ=Math.max(bounds.maxZ,p.z);}
     }
-    return bounds.minX<=coverageBounds.maxX+24 && bounds.maxX>=coverageBounds.minX-24 && bounds.minZ<=coverageBounds.maxZ+24 && bounds.maxZ>=coverageBounds.minZ-24;
+    return bounds.minX<=coverageBounds.maxX+48 && bounds.maxX>=coverageBounds.minX-48 && bounds.minZ<=coverageBounds.maxZ+48 && bounds.maxZ>=coverageBounds.minZ-48;
   };
   const current = () => sequence === appCtx._worldLoadSequence && generation === appCtx._streetPavementGeneration && !appCtx.onMoon;
   const metersPerWorldUnit = appCtx.METERS_PER_WORLD_UNIT || 1.11;
-  const managedPaths = (appCtx.linearFeatures || []).filter(f => nearby(f) && f.kind === 'footway' && f.subtype === 'sidewalk' && !f.isStructureConnector && !f.structureSemantics?.gradeSeparated && ['at_grade', undefined].includes(f.structureSemantics?.terrainMode));
+  const managedPaths = (appCtx.linearFeatures || []).filter(f => nearby(f) && f.kind === 'footway' && ['sidewalk','crossing'].includes(f.subtype) && !f.isStructureConnector && !f.structureSemantics?.gradeSeparated && ['at_grade', undefined].includes(f.structureSemantics?.terrainMode));
   const worker = new Worker(new URL('./compiler/street-pavement-worker.js', import.meta.url), { type: 'module' });
   const request = data => new Promise((resolve, reject) => {
     const timeout = setTimeout(() => { worker.terminate(); reject(new Error(`Street ${data.type} exceeded its per-chunk time budget`)); }, 15000);
@@ -77,22 +77,23 @@ export async function publishStreetPavement(appCtx) {
     transportRecord: road.transportRecord }] : []);
   const polygonRecords = items => (items || []).filter(nearby).map(item => ({ pts: item.surfaceFootprint || item.pts || item.footprint, holes: item.holes, holeRings: item.holeRings, type: item.type, tags: item.tags }));
   const input = { roads: roadRecords, buildings: polygonRecords((appCtx.buildings || []).filter(b=>!b.allowsPassageBelow)), landuses: polygonRecords(appCtx.landuses),
-    linearFeatures: managedPaths.map(f => ({ kind: f.kind, subtype: f.subtype, width: f.width, pts: f.pts, structureSemantics: f.structureSemantics })), metersPerWorldUnit, coverageBounds };
+    linearFeatures: managedPaths.map(f => ({ kind: f.kind, subtype: f.subtype, width: f.width, pts: f.pts, sourceTags:f.sourceTags, crossingNodes:f.crossingNodes, structureSemantics: f.structureSemantics })), metersPerWorldUnit, coverageBounds };
   let committed = false;
   const stagedLines = [];
   const batches = new Map();
-  const staged = [], lookup = new Map(), texture = appCtx.pavementDiffuse ? null : concreteTexture(THREE);
-  const material = new THREE.MeshStandardMaterial({ color: 0xb5b3ae, map: appCtx.pavementDiffuse || texture,
+  const staged = [], lookup = new Map(), texture = concreteTexture(THREE);
+  const material = new THREE.MeshStandardMaterial({ color: 0xffffff, map: texture,
     normalMap: appCtx.pavementNormal || null, roughnessMap: appCtx.pavementRoughness || null, roughness: 0.96, metalness: 0 });
-  material.normalScale?.set(0.22, 0.22);
+  material.normalScale?.set(0.12, 0.12);
+  const markingMaterial = new THREE.MeshStandardMaterial({color:0xeee9df,roughness:.9,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1});
   const curbMaterial = new THREE.MeshStandardMaterial({ color: 0x99978f, roughness: 0.96, side: THREE.DoubleSide });
   const ground = (x, z) => {
     const y = appCtx.terrainMeshHeightAt?.(x, z);
     return Number.isFinite(y) ? y : appCtx.elevationWorldYAtWorldXZ?.(x, z);
   };
-  const stats = { tiles: 0, triangles: 0, curbTriangles: 0, workerMs: 0, inferredFrontages: 0, managedPaths: managedPaths.length, residentRoads:roadRecords.length, residentBuildings:input.buildings.length, roads: appCtx.roads.length, roadMeshes: appCtx.roadMeshes.length, buildings: appCtx.buildings.length, worldLoadSequence: sequence };
+  const stats = { tiles: 0, triangles: 0, curbTriangles: 0, markingTriangles:0, ramps:0, workerMs: 0, inferredFrontages: 0, managedPaths: managedPaths.length, residentRoads:roadRecords.length, residentBuildings:input.buildings.length, roads: appCtx.roads.length, roadMeshes: appCtx.roadMeshes.length, buildings: appCtx.buildings.length, worldLoadSequence: sequence };
   const disposeLines = () => { for (const mesh of stagedLines) { mesh.parent?.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); } };
-  const disposeStaged = () => { worker.terminate(); for (const mesh of staged) { mesh.parent?.remove(mesh); mesh.geometry.dispose(); } texture?.dispose(); material.dispose(); curbMaterial.dispose(); };
+  const disposeStaged = () => { worker.terminate(); for (const mesh of staged) { mesh.parent?.remove(mesh); mesh.geometry.dispose(); } texture?.dispose(); material.dispose(); curbMaterial.dispose(); markingMaterial.dispose(); };
     if (new URLSearchParams(location.search).has('streetDiagnostics')) {
       let panel = document.getElementById('streetSurfaceDiagnostics');
       if (!panel) {
@@ -179,7 +180,7 @@ export async function publishStreetPavement(appCtx) {
       if (diagnostics) diagnostics.textContent = JSON.stringify({...stats,completedTiles:packet.completed,plannedTiles:packet.total},null,2);
       if (appCtx.worldLoading) appCtx.showLoad?.(`Building sidewalks: ${packet.completed} / ${packet.total}`);
       stats.workerMs += Number(packet.durationMs) || 0;
-      if (!packet.mesh.vertices.length) continue;
+      if (!packet.mesh.vertices.length && !packet.mesh.markingVertices?.length) continue;
       // The compiled profile already contains terrain-following elevation. Sample
       // its clearance at bounded segment endpoints once, rather than querying the
       // complete engineering model separately for every tessellated vertex.
@@ -216,6 +217,18 @@ export async function publishStreetPavement(appCtx) {
         if(i>0 && i%6000===0) {await yieldToMainThread();if(!current()){disposeStaged();return null;}}
       }
       for (const triangle of mesh.triangles) for (const p of triangle) p.y += sample(p.x,p.z);
+      const markingVertices=[];
+      for(let i=0;i<(mesh.markingVertices?.length || 0);i+=9) {
+        const points=[];
+        for(let j=i;j<i+9;j+=3) {
+          const x=mesh.markingVertices[j],z=mesh.markingVertices[j+2];
+          const y=appCtx.roadContactIndex?.sampleAt(x,z,ground(x,z));
+          if(!Number.isFinite(y))break;
+          points.push(x,y+.012,z);
+        }
+        if(points.length===9)markingVertices.push(...points);
+      }
+      stats.markingTriangles+=markingVertices.length/9; stats.ramps+=packet.rampCount || 0;
       stats.tiles++; stats.triangles += mesh.triangles.length; stats.curbTriangles += mesh.curbVertices.length / 9; stats.inferredFrontages += inferredFrontages;
       for (const triangle of mesh.triangles) {
         const minX = Math.floor(Math.min(...triangle.map(p => p.x)) / 4), maxX = Math.floor(Math.max(...triangle.map(p => p.x)) / 4);
@@ -225,7 +238,7 @@ export async function publishStreetPavement(appCtx) {
         }
       }
       const [ix,iz]=packet.key.split(':').map(Number);
-      for (const [positions, mat, kind] of [[mesh.vertices, material, 'sidewalk'], [mesh.curbVertices, curbMaterial, 'curb']]) {
+      for (const [positions, mat, kind] of [[mesh.vertices, material, 'sidewalk'], [mesh.curbVertices, curbMaterial, 'curb'], [markingVertices, markingMaterial, 'crossing-marking']]) {
         const key=`${Math.floor(ix/2)}:${Math.floor(iz/2)}:${kind}`;
         if(!batches.has(key)) batches.set(key,{positions:[],mat,kind});
         const target=batches.get(key).positions;

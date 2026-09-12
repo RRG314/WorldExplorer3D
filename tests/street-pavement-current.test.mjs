@@ -213,3 +213,58 @@ test('mapped urban sidewalks connect to a nearby parallel curb, with planting ex
   const protectedArea=compile({roads:[r],linearFeatures:[path],buildings:[box(0,11,48,18)],landuses:[garden]});
   assert.ok(area(protectedArea)<area(urban)-50);
 });
+
+test('mapped crossing paint stays on asphalt and explicit unmarked crossings stay unpainted',()=>{
+  const crossing={kind:'footway',subtype:'crossing',width:3,pts:[{x:20,z:-8},{x:20,z:8}],sourceTags:{'crossing:markings':'zebra'}};
+  const result=compile({roads:[road([{x:0,z:0},{x:48,z:0}])],linearFeatures:[crossing]});
+  assert.ok(result.reduce((s,r)=>s+regionArea(r.markingPolygons),0)>8);
+  for(const r of result)for(const poly of r.markingPolygons)for(const ring of poly)for(const [x,z] of ring)assert.ok(x>=18.5 && x<=21.5 && Math.abs(z)<=4.001);
+  crossing.sourceTags={'crossing:markings':'no',crossing:'zebra'};
+  assert.equal(compile({roads:[road([{x:0,z:0},{x:48,z:0}])],linearFeatures:[crossing]}).reduce((s,r)=>s+regionArea(r.markingPolygons),0),0);
+});
+
+test('lowered kerbs ramp down only at source-backed crossings and agree with mesh contact',()=>{
+  const crossing={kind:'footway',subtype:'crossing',width:2,pts:[{x:20,z:-8},{x:20,z:8}],sourceTags:{kerb:'lowered'}};
+  const result=compile({roads:[road([{x:0,z:0},{x:48,z:0}])],linearFeatures:[crossing]});
+  assert.ok(result.some(r=>r.ramps.length));
+  const surfaces=result.flatMap(r=>meshPavementTile(r.tile,r.polygons,()=>10,{curbHeight:.12,ramps:r.ramps}).triangles.flat());
+  const curb=surfaces.filter(p=>Math.abs(p.x-20)<.01 && Math.abs(Math.abs(p.z)-4)<.01);
+  assert.ok(curb.length); assert.ok(curb.every(p=>Math.abs(p.y-10)<1e-6));
+  const back=surfaces.filter(p=>Math.abs(p.x-20)<.01 && Math.abs(p.z)>=5.5);
+  assert.ok(back.length);assert.ok(back.every(p=>Math.abs(p.y-10.12)<1e-6));
+  crossing.sourceTags={};
+  assert.ok(compile({roads:[road([{x:0,z:0},{x:48,z:0}])],linearFeatures:[crossing]}).every(r=>r.ramps.length===0));
+});
+
+test('reported Baltimore building corner has continuous paving instead of a lowered terrain square',async()=>{
+  const {readFile}=await import('node:fs/promises');
+  const tile=JSON.parse(await readFile(new URL('./fixtures/streets/baltimore-reported-corner.json',import.meta.url),'utf8'));
+  const r=compilePavementTile(tile,1.11);
+  const mesh=meshPavementTile(tile,r.polygons,()=>25);
+  const point={x:3.7039674333,z:-13.8068811099};
+  const supports=mesh.triangles.filter(([a,b,c])=>{
+    const d=(b.z-c.z)*(a.x-c.x)+(c.x-b.x)*(a.z-c.z);
+    const u=((b.z-c.z)*(point.x-c.x)+(c.x-b.x)*(point.z-c.z))/d;
+    const v=((c.z-a.z)*(point.x-c.x)+(a.x-c.x)*(point.z-c.z))/d;
+    return u>=0&&v>=0&&u+v<=1;
+  });
+  assert.ok(supports.length,'the exact raycast point previously exposed terrain');
+  assert.ok(supports.flat().every(p=>Math.abs(p.y-25.108108)<1e-6));
+});
+
+test('attached urban frontages reach their walls beyond the isolated-house search distance',()=>{
+  const r=road([{x:0,z:0},{x:64,z:0}]);
+  const attached=[box(4,15,24,25),box(24,15,44,25)];
+  const detached=[box(4,15,24,25),box(26,15,44,25)];
+  const area=buildings=>compile({roads:[r],buildings}).reduce((s,p)=>s+regionArea(p.polygons),0);
+  assert.ok(area(attached)>area(detached)+200);
+  const protectedGarden={...box(4,7,44,14),type:'garden'};
+  const protectedArea=compile({roads:[r],buildings:attached,landuses:[protectedGarden]}).reduce((s,p)=>s+regionArea(p.polygons),0);
+  assert.ok(protectedArea<area(attached)-250);
+});
+
+test('frontage and corner coverage is independent of the worker cell boundary',()=>{
+  const options={roads:[road([{x:-50,z:0},{x:60,z:0}]),road([{x:32,z:-40},{x:32,z:40}])],buildings:[box(39,10,55,26),box(39,26,55,38)],metersPerWorldUnit:1,coverageBounds:{minX:-64,maxX:64,minZ:-64,maxZ:64}};
+  const area=chunkSize=>prepareStreetPavement({...options,chunkSize}).tiles.reduce((sum,t)=>sum+regionArea(compilePavementTile(t,1).polygons),0);
+  assert.ok(Math.abs(area(32)-area(64))<.1);
+});

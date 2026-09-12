@@ -486,12 +486,19 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
   let maritime = null;
   let worldDiscovery = null;
   const gameplayStartupDurationsMs = Object.create(null);
+  const traceStartup = (phase, name, durationMs) => {
+    if (new URLSearchParams(globalThis.location?.search || '').get('worldLoadTrace') === '1') {
+      console.warn(`[WorldLoadTrace] ${phase} gameplay:${name}`, JSON.stringify({durationMs}));
+    }
+  };
   const measureGameplayStartup = async (name, task) => {
     const startedAt = performance.now();
+    traceStartup('start', name);
     try {
       return await task();
     } finally {
       gameplayStartupDurationsMs[name] = Math.round(performance.now() - startedAt);
+      traceStartup('end', name, gameplayStartupDurationsMs[name]);
     }
   };
   const startupIsCurrent = () => !!(

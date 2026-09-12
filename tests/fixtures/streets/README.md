@@ -16,3 +16,10 @@ Francisco preview. Its 28 road segments and 189 nearby building edges reproduced
 a polygon-union performance defect: splitting every road into touching strips
 triggered expensive containment repair. The corrected compiler constructs one
 outline for each street side. The same public-map attribution applies.
+
+`baltimore-reported-corner.json` captures the cell containing the lowered corner
+reported at approximately 39.3098, -76.6150 on 12 September 2026. A rendered-world
+ray hit terrain at local x=3.7039674333, z=-13.8068811099 instead of pavement.
+The fixture contains only the public geometry and tags needed by the compiler;
+account data and provider configuration are omitted. It reproduces the building
+corner gap and carries the same OpenStreetMap/ODbL attribution above.

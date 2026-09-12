@@ -26,6 +26,14 @@ function execute(type, subject, clips = []) {
   }));
 }
 export const streetPolygonKernel = {
+  offset: (subject, distance) => {
+    const engine = new C.ClipperOffset(2, .05*SCALE), tree = new C.PolyTree();
+    engine.AddPaths(paths(subject), C.JoinType.jtMiter, C.EndType.etClosedPolygon);
+    engine.Execute(tree, distance*SCALE);
+    return C.JS.PolyTreeToExPolygons(tree).map(poly => [poly.outer,...poly.holes].map(ring => {
+      const pts=ring.map(p=>[p.X/SCALE,p.Y/SCALE]); return pts.concat([pts[0]]);
+    }));
+  },
   union: (subject,...rest) => execute(C.ClipType.ctUnion,subject,rest),
   intersection: (subject,other) => execute(C.ClipType.ctIntersection,subject,[other]),
   difference: (subject,other) => execute(C.ClipType.ctDifference,subject,[other])

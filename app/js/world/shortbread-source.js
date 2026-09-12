@@ -259,7 +259,7 @@ function roadTags(properties = {}) {
     footway: raw('footway'),
     sidewalk: raw('sidewalk'),
     foot: raw('foot'),
-    ...Object.fromEntries(['sidewalk:left','sidewalk:right','sidewalk:both','sidewalk:width','sidewalk:left:width','sidewalk:right:width','sidewalk:both:width','width:carriageway',...['left','right','both'].flatMap(side=>[`parking:${side}`,`parking:${side}:orientation`,`parking:${side}:width`,`parking:lane:${side}`,`parking:lane:${side}:parallel`,`parking:lane:${side}:diagonal`,`parking:lane:${side}:perpendicular`])].map(key=>[key,raw(key)])),
+    ...Object.fromEntries(['crossing','crossing:markings','kerb','tactile_paving','sidewalk:left','sidewalk:right','sidewalk:both','sidewalk:width','sidewalk:left:width','sidewalk:right:width','sidewalk:both:width','width:carriageway',...['left','right','both'].flatMap(side=>[`parking:${side}`,`parking:${side}:orientation`,`parking:${side}:width`,`parking:lane:${side}`,`parking:lane:${side}:parallel`,`parking:lane:${side}:diagonal`,`parking:lane:${side}:perpendicular`])].map(key=>[key,raw(key)])),
     tracktype: raw('tracktype'),
     bicycle: raw('bicycle'),
     horse: raw('horse'),

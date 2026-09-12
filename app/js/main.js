@@ -1,5 +1,5 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
-import { createCoreFrameSystems } from './runtime/core-frame-systems.js?v=9';
+import { createCoreFrameSystems, createCoreRenderSystem } from './runtime/core-frame-systems.js?v=9';
 import { createDebugPresentationSystem } from './runtime/debug-presentation.js?v=3';
 import { createRuntimeKernel } from './runtime/kernel.js?v=2';
 
@@ -116,17 +116,7 @@ function registerRuntimeSystems() {
   const systems = createCoreFrameSystems(appCtx, { positionTopOverlays });
   systems.forEach((system) => runtimeKernel.registerSystem(system));
   runtimeKernel.registerSystem(createDebugPresentationSystem(appCtx));
-  runtimeKernel.registerSystem({
-    id: 'core.renderer',
-    owner: 'renderer',
-    phase: 'render',
-    priority: 0,
-    update() {
-      if (shouldUseComposer()) appCtx.composer.render();
-      else appCtx.renderer.render(appCtx.scene, appCtx.camera);
-      appCtx.recordPerfRendererInfo?.(appCtx.renderer);
-    }
-  });
+  runtimeKernel.registerSystem(createCoreRenderSystem(appCtx, shouldUseComposer));
   runtimeKernel.registerSystem({
     id: 'core.performance-panel',
     owner: 'diagnostics',

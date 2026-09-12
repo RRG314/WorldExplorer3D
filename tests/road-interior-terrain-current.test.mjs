@@ -76,3 +76,13 @@ test('road proximity padding cannot support an actor outside published asphalt',
   assert.equal(GroundHeight.walkSurfaceInfo(3,3,10,{sampleRenderedMesh:false}).source,'terrain');
   assert.equal(GroundHeight.driveSurfaceInfo(3,3,true,10,{sampleRenderedMesh:false,nearestRoad:nearest}).source,'terrain');
 });
+
+test('legacy ground fallback does not rescan indexed sidewalks or use paint as support',async t=>{
+  const {ctx}=await import('../app/js/shared-context.js?v=55');
+  const {GroundHeight}=await import('../app/js/ground.js');
+  const prior=ctx.urbanSurfaceMeshes;t.after(()=>{ctx.urbanSurfaceMeshes=prior;});
+  const legacy={userData:{kind:'developed-fill'}};
+  ctx.urbanSurfaceMeshes=[legacy,{userData:{streetPavement:true,kind:'sidewalk'}},{userData:{streetPavement:true,kind:'curb'}},{userData:{streetPavement:true,kind:'crossing-marking'}}];
+  t.mock.method(GroundHeight,'_raycastMeshY',meshes=>{assert.deepEqual(meshes,[legacy]);return 4;});
+  assert.equal(GroundHeight.urbanSurfaceMeshY(0,0),4);
+});

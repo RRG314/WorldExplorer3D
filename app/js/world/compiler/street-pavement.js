@@ -1,3 +1,4 @@
+import { crossingStyle, crossingRamps, rampCurbScale } from './street-crossings.js';
 import { roadTurnFootprint } from '../../terrain/road-surface-geometry.js?v=2';
 import { streetPolygonKernel as clip } from './street-polygon-kernel.js';
 import * as triangulator from '../../../../functions/vendor/earcut/index.js';
@@ -36,16 +37,23 @@ export function prepareStreetPavement({ roads = [], buildings = [], landuses = [
       for (let iz = minZ; iz <= maxZ; iz++) {
         if (coverageBounds && (ix*chunkSize < coverageBounds.minX || (ix+1)*chunkSize > coverageBounds.maxX || iz*chunkSize < coverageBounds.minZ || (iz+1)*chunkSize > coverageBounds.maxZ)) continue;
         const key = `${ix}:${iz}`;
-        if (!tiles.has(key)) tiles.set(key, { key, ix, iz, segments: [], joins: [], paths: [], obstacles: [], areas: [], edges: [] });
+        if (!tiles.has(key)) tiles.set(key, { key, ix, iz, segments: [], joins: [], paths: [], crossings: [], obstacles: [], areas: [], edges: [] });
         tiles.get(key)[kind].push(value);
       }
   };
+  // Attached buildings provide stronger urban frontage evidence than an
+  // isolated house. Compute this once from shared footprint vertices, not from
+  // tile-dependent density, so neighboring cells make the same decision.
+  const cornerKey=p=>`${Math.round(p.x*10)}:${Math.round(p.z*10)}`;
+  const cornerOwners=new Map();
+  for(const building of buildings)for(const key of new Set(ringOf(building).map(cornerKey)))cornerOwners.set(key,(cornerOwners.get(key)||0)+1);
   for (const building of buildings) {
     const pts = ringOf(building); if (pts.length < 3) continue;
-    const item = { polygon: areaPolygon(building), bounds: box(pts) }; obstacles.push(item);
+    const attached=pts.some(p=>(cornerOwners.get(cornerKey(p))||0)>1);
+    const item = { polygon: areaPolygon(building), bounds: box(pts), building: true }; obstacles.push(item);
     for (let i = 0; i < pts.length; i++) {
       const a = pts[i], b = pts[(i + 1) % pts.length];
-      if (Math.hypot(a.x - b.x, a.z - b.z) >= 3) buildingEdges.push({ a, b, bounds: box([a, b]) });
+      if (Math.hypot(a.x - b.x, a.z - b.z) >= 3) buildingEdges.push({ a, b, extendedFrontage:attached ? 24/metersPerWorldUnit : 0, bounds: box([a, b]) });
     }
   }
   for (const land of landuses) {
@@ -62,7 +70,7 @@ export function prepareStreetPavement({ roads = [], buildings = [], landuses = [
       const point=road.pts[i];
       if (coverageBounds && !intersects(box([point]),coverageBounds,20)) continue;
       const halfWidth=roadWidthAtSegment(road,i,0)/2;
-      insert('joins',{road,previous:road.pts[i-1],point,next:road.pts[i+1],halfWidth,offset},box([point]),halfWidth+Math.abs(offset)+9/metersPerWorldUnit);
+      insert('joins',{road,previous:road.pts[i-1],point,next:road.pts[i+1],halfWidth,offset},box([point]),halfWidth+Math.abs(offset)+32/metersPerWorldUnit);
     }
     for (let index = 0; index < road.pts.length - 1; index++) {
       const a = road.pts[index], b = road.pts[index + 1], length = Math.hypot(b.x - a.x, b.z - a.z);
@@ -81,16 +89,20 @@ export function prepareStreetPavement({ roads = [], buildings = [], landuses = [
         const at = t => ({ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t });
         const segment = { road, offset, index, t0, t1, a: at(t0), b: at(t1), wa: roadWidthAtSegment(road, index, t0), wb: roadWidthAtSegment(road, index, t1) };
         segment.bounds = box([segment.a, segment.b]); segments.push(segment);
-        insert('segments', segment, segment.bounds, Math.max(segment.wa, segment.wb) / 2 + Math.abs(offset) + 9 / metersPerWorldUnit);
+        insert('segments', segment, segment.bounds, Math.max(segment.wa, segment.wb) / 2 + Math.abs(offset) + 32 / metersPerWorldUnit);
       }
     }
   }
   for (const feature of linearFeatures) {
+    if (groundFeature(feature) && feature.kind === 'footway' && feature.subtype === 'crossing' && feature.pts?.length>1) {
+      insert('crossings',feature,box(feature.pts),4/metersPerWorldUnit);
+      continue;
+    }
     if (!groundFeature(feature) || feature.kind !== 'footway' || feature.subtype !== 'sidewalk') continue;
     for (let i = 1; i < feature.pts.length; i++) {
       const a = feature.pts[i - 1], b = feature.pts[i];
       const shape = quad(a, b, feature.width / 2, feature.width / 2);
-      if (shape) { const item = { a, b, width: feature.width, polygon: shape, bounds: box([a, b]) }; paths.push(item); insert('paths', item, item.bounds, feature.width + 7 / metersPerWorldUnit); }
+      if (shape) { const item = { a, b, width: feature.width, polygon: shape, bounds: box([a, b]) }; paths.push(item); insert('paths', item, item.bounds, feature.width + 32 / metersPerWorldUnit); }
       if (i < feature.pts.length - 1) {
         for (const polygon of roadTurnFootprint({previous:a,point:b,next:feature.pts[i+1],leftDistance:feature.width/2,rightDistance:feature.width/2})) {
           const item={polygon,bounds:box([b])};paths.push(item);insert('paths',item,item.bounds,feature.width);
@@ -113,14 +125,14 @@ export function prepareStreetPavement({ roads = [], buildings = [], landuses = [
     }
   };
   for (const tile of tiles.values()) tile.bounds = { minX: tile.ix*chunkSize, maxX:(tile.ix+1)*chunkSize, minZ:tile.iz*chunkSize, maxZ:(tile.iz+1)*chunkSize };
-  assign('obstacles', obstacles); assign('edges', buildingEdges, 16);
+  assign('obstacles', obstacles, 16); assign('edges', buildingEdges, 40);
   return { tiles: [...tiles.values()].sort((a, b) => a.ix - b.ix || a.iz - b.iz), metersPerWorldUnit, chunkSize,
     managedPaths: linearFeatures.filter(f => groundFeature(f) && f.kind === 'footway' && f.subtype === 'sidewalk') };
 }
 
 function frontageDistance(point, nx, nz, edges, minimum, maximum) {
-  let best = maximum + 1;
-  for (const { a, b } of edges) {
+  let best = Infinity;
+  for (const { a, b, extendedFrontage=0 } of edges) {
     const dx = b.x - a.x, dz = b.z - a.z, length = Math.hypot(dx, dz);
     // Only street-facing, nearly parallel walls can support frontage inference.
     if (Math.abs((dx * nx + dz * nz) / length) > 0.25) continue;
@@ -129,9 +141,9 @@ function frontageDistance(point, nx, nz, edges, minimum, maximum) {
     const ax = a.x - point.x, az = a.z - point.z;
     const distance = (ax * dz - az * dx) / den;
     const t = (ax * nz - az * nx) / den;
-    if (t >= -1e-7 && t <= 1 + 1e-7 && distance >= minimum && distance <= maximum) best = Math.min(best, distance);
+    if (t >= -1e-7 && t <= 1 + 1e-7 && distance >= minimum && distance <= Math.max(maximum,minimum+extendedFrontage)) best = Math.min(best, distance);
   }
-  return best <= maximum ? best : null;
+  return Number.isFinite(best) ? best : null;
 }
 
 // Split at frontage endpoints so a short façade can meet the sidewalk even when
@@ -141,7 +153,7 @@ function splitAtFrontages(segment, edges) {
   const dx = segment.b.x-segment.a.x, dz = segment.b.z-segment.a.z;
   const lengthSq = dx*dx+dz*dz, cuts = new Set([0,1]);
   for (const edge of edges) {
-    if (!intersects(edge.bounds,segment.bounds,12)) continue;
+    if (!intersects(edge.bounds,segment.bounds,Math.max(12,(edge.extendedFrontage || 0)+Math.max(segment.wa || 0,segment.wb || 0)/2))) continue;
     const ex=edge.b.x-edge.a.x, ez=edge.b.z-edge.a.z;
     if (Math.abs(ex*dz-ez*dx)/Math.sqrt((ex*ex+ez*ez)*lengthSq)>.25) continue;
     for (const p of [edge.a,edge.b]) {
@@ -242,26 +254,71 @@ export function compilePavementTile(tile, metersPerWorldUnit = 1.11) {
     if(leftExtra || rightExtra) pavementParts.push(...roadTurnFootprint({...join,leftDistance:leftDistance+leftExtra,rightDistance:rightDistance+rightExtra}));
   }
   const b = tile.bounds, boundary = polygon([[b.minX, b.minZ], [b.maxX, b.minZ], [b.maxX, b.maxZ], [b.minX, b.maxZ]]);
-  if (!pavementParts.length) return { polygons: [], inferredFrontages: 0 };
+
   // Crop each source first: a regional polygon must not make a local union
   // operate on its entire remote boundary.
   const localParts = parts => parts.flatMap(part=>clip.intersection(part,boundary));
-  let polygons = union(localParts(pavementParts));
+  // Resolve small recesses between adjacent frontage runs as one paved area,
+  // before subtraction and height sampling. A centreline bend alone leaves a
+  // lower terrain square at the corner even when both street sides reach walls.
+  // Use a halo so this operation cannot create an artificial curb at a tile seam.
+  const closureRadius=3.5/metersPerWorldUnit;
+  const halo=closureRadius*2+.002;
+  const workingBoundary=polygon([[b.minX-halo,b.minZ-halo],[b.maxX+halo,b.minZ-halo],[b.maxX+halo,b.maxZ+halo],[b.minX-halo,b.maxZ+halo]]);
+  let polygons = union(pavementParts.flatMap(part=>clip.intersection(part,workingBoundary)));
+  if(tile.edges.length && polygons.length) {
+    const closed=clip.offset(clip.offset(polygons,closureRadius),-closureRadius);
+    const additions=clip.difference(closed,polygons);
+    if(additions.length) {
+      const buildingAreas=tile.obstacles.filter(o=>o.building).map(o=>o.polygon);
+      const frontageMask=buildingAreas.length ? clip.offset(union(buildingAreas),7/metersPerWorldUnit) : [];
+      const admitted=frontageMask.length ? clip.intersection(additions,frontageMask) : [];
+      if(admitted.length)polygons=clip.union(polygons,admitted);
+    }
+  }
+  polygons=polygons.length ? clip.intersection(polygons,boundary) : [];
   const blockers = carriageway.concat(tile.obstacles.map(o => o.polygon));
   if (polygons.length && blockers.length) polygons = clip.difference(polygons, union(localParts(blockers)));
-  return { polygons, inferredFrontages };
+  const ramps=crossingRamps(tile.crossings || [],roadEdges,metersPerWorldUnit);
+  const paintParts=[];
+  for(const crossing of tile.crossings || []) {
+    const {paint}=crossingStyle(crossing);
+    if(!paint)continue;
+    for(let i=1;i<crossing.pts.length;i++) {
+      const a=crossing.pts[i-1],b=crossing.pts[i],length=Math.hypot(b.x-a.x,b.z-a.z);
+      if(length<.01)continue;
+      const half=Math.max(.5/metersPerWorldUnit,(crossing.width || 2)/2),line=.15/metersPerWorldUnit;
+      if(paint==='lines' || paint==='ladder') {
+        paintParts.push(quad(a,b,half, -half+line),quad(a,b,-half+line,half));
+      }
+      if(paint==='zebra' || paint==='ladder') {
+        const at=t=>({x:a.x+(b.x-a.x)*t/length,z:a.z+(b.z-a.z)*t/length});
+        for(let start=0;start<length;start+=1/metersPerWorldUnit) paintParts.push(quad(at(start),at(Math.min(length,start+.5/metersPerWorldUnit)),half,half));
+      }
+    }
+  }
+  const markingPolygons=paintParts.length && carriageway.length ? clip.intersection(union(localParts(paintParts.filter(Boolean))),carriageway) : [];
+  return { polygons, inferredFrontages, ramps, markingPolygons };
 }
 
 // Regular cells keep slope interpolation local. Shared world-grid vertices produce matching tile seams.
-export function meshPavementTile(tile, polygons, sampleHeight, { cellSize = 4, curbHeight = 0.108108 } = {}) {
+export function meshPavementTile(tile, polygons, sampleHeight, { cellSize = 4, curbHeight = 0.108108, ramps = [] } = {}) {
   const vertices = [], curbVertices = [], triangles = [], b = tile.bounds;
+
   const vertex = ([x, z]) => {
     const y = sampleHeight(x, z);
     if (!Number.isFinite(y)) throw new Error('Pavement has no accepted ground height');
-    return { x, y: y + curbHeight, z };
+    return { x, y: y + curbHeight * rampCurbScale(x,z,ramps), z };
   };
-  for (let x = b.minX; x < b.maxX; x += cellSize) for (let z = b.minZ; z < b.maxZ; z += cellSize) {
-    const square = polygon([[x, z], [x + cellSize, z], [x + cellSize, z + cellSize], [x, z + cellSize]]);
+  function* meshCells() {
+    for(let x=b.minX;x<b.maxX;x+=cellSize)for(let z=b.minZ;z<b.maxZ;z+=cellSize) {
+      const nearRamp=ramps.some(r=>r.x+r.depth+r.halfWidth+1>=x && r.x-r.depth-r.halfWidth-1<=x+cellSize && r.z+r.depth+r.halfWidth+1>=z && r.z-r.depth-r.halfWidth-1<=z+cellSize);
+      const step=nearRamp ? Math.min(.5,cellSize) : cellSize;
+      for(let sx=x;sx<x+cellSize;sx+=step)for(let sz=z;sz<z+cellSize;sz+=step)yield {x:sx,z:sz,size:step};
+    }
+  }
+  for (const {x,z,size} of meshCells()) {
+    const square = polygon([[x, z], [x + size, z], [x + size, z + size], [x, z + size]]);
     for (const poly of polygons.length ? clip.intersection(polygons, square) : []) {
       const points = [], holes = [];
       for (let ri = 0; ri < poly.length; ri++) { if (ri) holes.push(points.length); points.push(...poly[ri].slice(0, -1)); }
@@ -278,17 +335,18 @@ export function meshPavementTile(tile, polygons, sampleHeight, { cellSize = 4, c
     // A chunk boundary is not a curb. Neighbors own the continuation.
     if ([b.minX, b.maxX].some(x => Math.abs(a[0] - x) < 1e-7 && Math.abs(d[0] - x) < 1e-7) ||
       [b.minZ, b.maxZ].some(z => Math.abs(a[1] - z) < 1e-7 && Math.abs(d[1] - z) < 1e-7)) continue;
+    const curbStep=ramps.length ? Math.min(.5,cellSize) : cellSize;
     const ts = new Set([0, 1]);
     for (let axis = 0; axis < 2; axis++) {
       const delta = d[axis] - a[axis]; if (Math.abs(delta) < 1e-8) continue;
-      for (let n = Math.ceil(Math.min(a[axis], d[axis]) / cellSize); n * cellSize < Math.max(a[axis], d[axis]); n++) {
-        const t = (n * cellSize - a[axis]) / delta; if (t > 0 && t < 1) ts.add(t);
+      for (let n = Math.ceil(Math.min(a[axis], d[axis]) / curbStep); n * curbStep < Math.max(a[axis], d[axis]); n++) {
+        const t = (n * curbStep - a[axis]) / delta; if (t > 0 && t < 1) ts.add(t);
       }
     }
     const ordered = [...ts].sort((x, y) => x - y);
     for (let j = 1; j < ordered.length; j++) {
       const at = t => vertex([a[0] + (d[0] - a[0]) * t, a[1] + (d[1] - a[1]) * t]);
-      const p = at(ordered[j - 1]), q = at(ordered[j]), lowP = { ...p, y: p.y - curbHeight }, lowQ = { ...q, y: q.y - curbHeight };
+      const p = at(ordered[j - 1]), q = at(ordered[j]), lowP = { ...p, y: p.y - curbHeight*rampCurbScale(p.x,p.z,ramps) }, lowQ = { ...q, y: q.y - curbHeight*rampCurbScale(q.x,q.z,ramps) };
       curbVertices.push(...[p, lowP, lowQ, p, lowQ, q].flatMap(v => [v.x, v.y, v.z]));
     }
   }

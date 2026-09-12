@@ -143,4 +143,21 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
   ];
 }
 
-export { createCoreFrameSystems };
+function createCoreRenderSystem(appCtx, shouldUseComposer) {
+  return {
+    id: 'core.renderer',
+    owner: 'renderer',
+    phase: 'render',
+    priority: 0,
+    // The title globe owns its own renderer. Keeping the regional city
+    // rendering behind it doubles graphics work during location selection.
+    enabled: () => !!appCtx.gameStarted,
+    update() {
+      if (shouldUseComposer()) appCtx.composer.render();
+      else appCtx.renderer.render(appCtx.scene, appCtx.camera);
+      appCtx.recordPerfRendererInfo?.(appCtx.renderer);
+    }
+  };
+}
+
+export { createCoreFrameSystems, createCoreRenderSystem };

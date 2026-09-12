@@ -1,0 +1,92 @@
+[
+  {
+    "screen": [
+      37,
+      17
+    ],
+    "point": {
+      "x": 3.5300916128929956,
+      "y": 25.785935572513537,
+      "z": -13.704804706915029
+    },
+    "owner": {
+      "registeredRoad": false,
+      "kind": "sidewalk",
+      "keys": [
+        "streetPavement",
+        "sharedUrbanSurfaceMaterial",
+        "kind",
+        "worldLoadSequence"
+      ]
+    },
+    "terrain": 25.513649569413285
+  },
+  {
+    "screen": [
+      66,
+      16
+    ],
+    "point": {
+      "x": 5.304871241645133,
+      "y": 25.140249194919985,
+      "z": 3.9807370403985907
+    },
+    "owner": {
+      "registeredRoad": false,
+      "keys": [
+        "isFarTerrainClipmap",
+        "isFixedLocationTerrainLod",
+        "mappedSurfaceTints",
+        "mappedSurfaceModes",
+        "terrainTextureSetsByMode",
+        "terrainTextureSet",
+        "terrainSurfaceMaterialAuthority",
+        "mappedSurfaceTintVertices",
+        "terrainSurfaceMaterialBlend",
+        "terrainTextureRepeats",
+        "terrainDetailProvenance",
+        "mappedWaterOwnershipMask",
+        "mappedWaterOwnership",
+        "renderProvenance",
+        "structureTerrainPortalDescriptors",
+        "structurePortalOriginalRaycast",
+        "structureTerrainPortalMasks"
+      ]
+    },
+    "terrain": 25.1402491893729
+  },
+  {
+    "screen": [
+      70,
+      14
+    ],
+    "point": {
+      "x": 6.189178856414598,
+      "y": 25.174968262748465,
+      "z": 6.467325836404045
+    },
+    "owner": {
+      "registeredRoad": false,
+      "keys": [
+        "isFarTerrainClipmap",
+        "isFixedLocationTerrainLod",
+        "mappedSurfaceTints",
+        "mappedSurfaceModes",
+        "terrainTextureSetsByMode",
+        "terrainTextureSet",
+        "terrainSurfaceMaterialAuthority",
+        "mappedSurfaceTintVertices",
+        "terrainSurfaceMaterialBlend",
+        "terrainTextureRepeats",
+        "terrainDetailProvenance",
+        "mappedWaterOwnershipMask",
+        "mappedWaterOwnership",
+        "renderProvenance",
+        "structureTerrainPortalDescriptors",
+        "structurePortalOriginalRaycast",
+        "structureTerrainPortalMasks"
+      ]
+    },
+    "terrain": 25.174968256283513
+  }
+]

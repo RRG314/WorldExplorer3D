@@ -31,7 +31,7 @@ notifications request refreshed coverage.
 Where width is inferred, mapped on-street parking contributes to carriageway width; explicit total widths are preserved and adjacent parking bays are excluded. Orientation-based fallback dimensions remain estimates. The source distinction follows [OSM street parking](https://wiki.openstreetmap.org/wiki/Street_parking) and [carriageway width](https://wiki.openstreetmap.org/wiki/Key:width).
 
 Road batches now have world-space asphalt UVs and reuse the existing asphalt
-textures. Pavement reuses the bundled concrete diffuse, normal and roughness maps when available, with an owned procedural fallback. Replacement road meshes are staged before disposal, and the road mesh
+textures. Pavement uses a deterministic light-concrete slab diffuse texture, with the bundled normal and roughness maps when available. This separates paving visually from the brown urban-ground material. Replacement road meshes are staged before disposal, and the road mesh
 collection is replaced so cached ground queries cannot retain disposed meshes.
 Road triangles receive additional samples where their interiors disagree with
 the terrain; planar roads retain their original triangle count. A spatial index
@@ -50,7 +50,7 @@ No production deployment or GitHub publication is part of this work.
 |---|---|---|
 | Width units, side tags, frontage boundaries, road turns, holes, obstacles and resident coverage | Executed module tests | Passing at the latest targeted run |
 | Mesh/contact agreement, failed replacement retention and superseded-world disposal | Executed runtime tests with controlled renderer/worker adapters | Passing; these are not GPU tests |
-| Full current contract suite | Executed tests, one test process at a time | 371 passed; includes the final asphalt-edge guard, resident-input filtering, parking widths and curb-clearance checks |
+| Full current contract suite | Executed tests, one test process at a time | 379 passed; includes reported-corner and cell-boundary regressions, crossing paint and ramp contact, and renderer menu/resume lifecycle checks |
 | Source/import graph | Executed source gate | Passed on the final source revision |
 | Baltimore walk from road onto sidewalk | Actual local WebGL app and normal movement controller | Sidewalk contact at y=4.8910748, player eye at y=6.5910748; screenshot and UI data retained |
 | Baltimore movement across coverage threshold | Actual local WebGL app, drone movement | New coverage published after movement; UI data and overhead image retained |
@@ -60,7 +60,7 @@ No production deployment or GitHub publication is part of this work.
 | Hilly road visual quality | Actual local WebGL inspection | Road contact matches the rendered road (75.8801498), and mapped sidewalk contact matches pavement (78.6645504). Street-level and overhead inspection performed; full release-quality acceptance remains open |
 
 Saved screenshots and UI diagnostics are in [evidence-2026-09-12](evidence-2026-09-12/).
-The two small public-map fixtures in `tests/fixtures/streets/` have their own
+The three small public-map fixtures in `tests/fixtures/streets/` have their own
 provenance and attribution. The Baltimore fixture was a completed cell, not the
 exact cell from an earlier timeout. The San Francisco fixture reproduced the
 polygon performance defect directly.
@@ -76,11 +76,9 @@ The browser runs encountered unavailable detailed-provider requests and used
 provider fallbacks. Inferred widths/frontages must not be represented as surveyed
 geometry. The historical metre/world-unit contract still spans multiple road,
 vehicle and terrain consumers; this repair does not claim a complete dimensional
-migration. Detailed curb ramps and crosswalk markings, surveyed plaza boundaries and arbitrary edited
-building entrance thresholds also require explicit acceptance cases before a
-professional release can be certified.
+migration. Crossing paint and lowered kerbs now have source-semantic, geometry and controlled WebGL checks (see below). Real-location ramp coverage, surveyed plaza boundaries and arbitrary edited building entrance thresholds still need acceptance cases before a professional release can be certified.
 
-## Final local integration check
+## Earlier local integration checkpoint
 
 The final Low-graphics Baltimore load published 137 occupied cells, 29,359 top
 triangles, 45,940 curb triangles and 70 pavement draw calls in 2,235 ms. Worker
@@ -104,9 +102,7 @@ Medium graphics caused the failure or that the broader loading defect is fixed.
 Graphics were restored to Low and the owned test world was closed.
 
 **Release status: local testing candidate, not professional-release acceptance.**
-The remaining acceptance blockers include the unresolved load stall, visual
-intersection markings and curb ramps, the legacy dimensional contract, and
-broader location/device performance coverage. The local test also logged a
+At this checkpoint, the remaining acceptance blockers included the unresolved load stall, visual intersection markings and curb ramps, the legacy dimensional contract, and broader location/device performance coverage. The follow-up below records the subsequent crossing and corner work; it does not certify release readiness. The local test also logged a
 Firebase App Check reCAPTCHA error; connected-service readiness was not tested.
 
 ## Reproduce locally
@@ -128,3 +124,89 @@ Resource handling follows the owner’s 8 GiB Mac constraint: no subagents,
 no copied dependency tree and one test world at a time. Dependency directories
 are reused through ignored local symlinks. Earlier saved work and Git history
 are preserved.
+
+
+## Follow-up: reported city corners and crossings
+
+The owner reported visible strips and lowered square corners near 39.3098,
+-76.6150. Direct scene raycasts confirmed that the squares were exposed terrain,
+not lighting artifacts. The first small-recess repair did not close the case.
+The captured geometry then identified two separate causes:
+
+- Straight-wall frontage bands omitted the space around an outside building
+  corner. Bounded polygon closing now includes the nearby building footprint,
+  followed by exact road/building/land-use subtraction. Context extends beyond
+  each worker cell before clipping, avoiding artificial cell-edge curbs.
+- The conservative frontage search stopped short of attached urban buildings.
+  Shared footprint vertices now establish stronger attached-building evidence,
+  allowing a wider search for the actual wall. Isolated buildings retain the
+  shorter search. The 24-metre extension is an inference limit, not a prescribed
+  sidewalk width or a surveyed public-access claim.
+
+All three formerly exposed test points on the two corners now raycast to the
+sidewalk mesh. `reported-corners-final-3d.png` and
+`reported-corners-final-contact.json` retain that actual-world evidence.
+
+Crossing ways retain their source tags and tagged crossing/kerb nodes. Supported
+marked crossings are clipped to carriageway polygons and draped onto the accepted
+road triangles. Explicitly unmarked crossings remain unpainted. Lowered/flush
+kerbs generate a locally refined ramp with the same triangles used for contact.
+No lowered curb is inferred solely from traffic signals. These distinctions
+follow [OSM crossing markings](https://wiki.openstreetmap.org/wiki/Key:crossing:markings)
+and [OSM kerb mapping](https://wiki.openstreetmap.org/wiki/Key:kerb).
+
+The small real-WebGL test at `scripts/verification/street-scene.html` exercises
+the actual worker and publication runtime with synthetic source geometry.
+It visually verified crossing paint, the concrete material, and a ramp meeting
+road contact at y=0.1800000072. This is controlled rendering evidence, distinct
+from the actual Baltimore location. Its ramp count includes repeated references
+across worker cells and must not be presented as a count of distinct crossings.
+
+Ground fallback no longer raycasts the indexed pavement meshes a second time,
+or considers their paint/curb faces as fallback walking support. Detailed startup
+phase tracing remains opt-in. The historical Medium stall is not considered
+resolved merely by passing geometry tests.
+
+
+### Later Medium-graphics check
+
+The Medium run at the reported street completed and remained interactive.
+It published 123 occupied cells, 27,747 pavement triangles, 41,354 curb triangles
+and 3,110 marking triangles in 7,846 ms (6,161 ms worker time). This provider
+response contained 369 resident pedestrian inputs; earlier responses at the
+same location had no resident mapped sidewalks. These differing inputs prevent
+using the timings as a controlled performance comparison.
+
+Normal walking then reached pavement at y=25.3776158082 with the eye at
+27.0776158082. The pavement index returned exactly the same support height.
+The final concrete appearance was inspected at sunset and with the Day control.
+See `reported-street-concrete-day-medium.png` and
+`reported-street-medium-walk.json`. One successful Medium run means the earlier
+stall was not reproduced in this case; it is not an all-device stability claim.
+
+
+### Menu rendering and final verification status
+
+After the successful Medium street check, changing locations through the globe
+became unresponsive. Source inspection found that the old regional city continued
+rendering behind the title globe even after `gameStarted` became false. The core
+render system now stops city drawing at the menu and resumes it on entry.
+Executable lifecycle tests cover both direct rendering and the composer path,
+including repeated menu frames with no city draws or renderer measurements.
+
+A fresh browser attempt after that change also became unresponsive during entry;
+the browser inspection timed out, and the owned tab was closed. Consequently,
+the lifecycle tests establish the renderer gate, but the complete browser
+menu/change-location journey remains **unverified**. The broader loading stall is
+**unresolved**, and another heavy retry needs a concrete diagnosis first.
+
+Final source gate: passed. Final current-contract suite: **379 passed, zero
+failed or skipped**. These checks ran sequentially with no world test active.
+The added cell-boundary regression compares the same frontage/corner geometry
+with different worker cell sizes. No coordinate-specific production rules were
+introduced. The captured Baltimore coordinates appear only in the fixture and
+verification evidence.
+
+All owned browser tabs are closed. Graphics were restored to Low through the
+settings UI; the local preview server remains available for the owner's testing.
+There was no production deployment, main-branch update or GitHub push.
