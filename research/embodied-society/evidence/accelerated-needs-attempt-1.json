@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-09-12",
+  "study": "accelerated-needs-1",
+  "runId": "free-1789215472893-107dbf",
+  "runtimeSourceCommit": "bbd52a675d8903d81c3e69ead2da029f7bd0a5b7",
+  "outcome": "interrupted-before-resident-start",
+  "providerCalls": 0,
+  "residentStarted": false,
+  "savedCheckpoint": false,
+  "browserError": "target closed while handling command",
+  "causeEstablished": false,
+  "automaticRetry": false,
+  "ownedBrowserAndServerClosed": true,
+  "nodeTestsPassed": 91,
+  "recordTestsPassed": 24,
+  "existingModelRunInventory": 13,
+  "limits": {
+    "simulatedSeconds": 21600,
+    "wallSeconds": 3000,
+    "calls": 380,
+    "timeScale": 12,
+    "minimumSimulatedDecisionSeconds": 60,
+    "minimumWallDecisionMilliseconds": 5000
+  },
+  "limitations": [
+    "No accelerated live AI trajectory was obtained.",
+    "Fixed-frame equivalence test uses a controlled body; it is not an accelerated full-world collision acceptance.",
+    "No new claim of sustained needs maintenance, manufacturing or society."
+  ]
+}

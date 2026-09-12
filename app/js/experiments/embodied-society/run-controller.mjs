@@ -85,6 +85,7 @@ export function createRunController({actorId,body,workshop,perceive,persistCheck
       if(status!=='running')return;
       if(!Number.isInteger(count)||count<1||count>60)throw Error('Step must be 1–60 physics frames.');
       try {
+        const previousCheckpointBucket=Math.floor(frames/(60*clockIntervalSeconds));
         for(let n=0;n<count&&status==='running';n++) {
           if(frames/60-initialTick>=maxSeconds){settleMovement();status='ended';body.pause();break;}
           if(current().actors[actorId].condition<=0){settleMovement();status='ended';body.pause();break;}
@@ -97,7 +98,7 @@ export function createRunController({actorId,body,workshop,perceive,persistCheck
           if(frames%(60*clockIntervalSeconds)===0)await flushClock();
         }
         if(status!=='running')await flushClock();
-        if(frames%(60*clockIntervalSeconds)===0||status!=='running')await checkpoint('step');
+        if(Math.floor(frames/(60*clockIntervalSeconds))!==previousCheckpointBucket||status!=='running')await checkpoint('step');
       }catch(e){fail(e);throw e;}
     });},
     decide(){

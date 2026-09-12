@@ -8,7 +8,7 @@ The public package is a privacy-reviewed snapshot with its own history. The orig
 
 ## Live pilot
 
-Run `npm run experiment:society` from the repository root. Open `http://127.0.0.1:4498/research-setup` locally. Select the study window (eight simulated hours or the retained fifteen-minute pilot), then enter a key privately from the intended provider project and verify its tier. A connection check uses the same decision allowance. Open World Explorer from that page, select a destination, wait for actual world readiness, then start the resident. Use Pause/Resume/End and stop the local server afterward. The server does not retain the entered key across shutdown.
+Run `npm run experiment:society` from the repository root. Open `http://127.0.0.1:4498/research-setup` locally. Select the study window (six accelerated simulated hours, eight real-time simulated hours, or the retained fifteen-minute pilot), then enter a key privately from the intended provider project and verify its tier. A connection check uses the same decision allowance. Open World Explorer from that page, select a destination, wait for actual world readiness, then start the resident. Use Pause/Resume/End and stop the local server afterward. The server does not retain the entered key across shutdown.
 
 A fresh key/account setup is the operator's responsibility. Free-tier eligibility, quota and model availability may change; the local zero-dollar profile cannot enforce provider billing. The launch is not a background unattended service. Map/network access is required and variable. A previous Baltimore load took roughly 83 seconds; that observation is not a timeout guarantee.
 
@@ -36,3 +36,5 @@ For a lightweight observer-only browser check, with the repository's Playwright 
 ## Long observation window
 
 `needs-8h` declares 28,800 simulated seconds, 36,000 wall seconds, at most 600 provider decisions, and 30-second idle needs checkpoints. The server records those limits and the unchanged need rules in the manifest. Actual needs are advanced to the current simulated second before decisions, pause and normal end. The world must stay open and the Mac awake; no unattended restart is available. The terminal launcher offers the same window choice. See the design review before interpreting this as a survival study. No full eight-hour live run has been verified.
+
+The default setup selection is now `fast-needs-6h`: see [the accelerated protocol](ACCELERATED-NEEDS-STUDY.md) for clock scope, quotas and interpretation. The existing real-time window remains available for later observation.

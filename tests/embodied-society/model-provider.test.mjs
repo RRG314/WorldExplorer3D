@@ -127,3 +127,10 @@ test('Gemini brief explanation is retained separately from executable action and
  assert.equal(writes.at(-1).events[0].decisionSummary,'Wait for the current job.');
  assert.equal(JSON.stringify(writes).includes('excluded internal content'),false);
 });
+
+test('faster free cadence is limited to the declared Gemini Flash Lite window',()=>{
+ const fast={...freeConfig,provider:'gemini',model:'gemini-3.1-flash-lite',runWindowId:'fast-needs-6h',minDecisionIntervalMs:5000};
+ const create=c=>createModelProvider({config:c,apiKey:'test-only',store:{save:async()=>{}}});
+ assert.doesNotThrow(()=>create(fast));
+ for(const change of [{minDecisionIntervalMs:4999},{runWindowId:'pilot-15m'},{provider:'groq',model:'openai/gpt-oss-20b'},{model:'gemini-3.8-flash'}])assert.throws(()=>create({...fast,...change}));
+});

@@ -22,11 +22,12 @@
     "liveServer": "implemented; actual app HTML injection and account disabling HTTP-tested",
     "observer": "live quantities, minimize/expand, report control and automatic cleanup observed in tool probe 4; report content generated separately from final checkpoint",
     "memoryComparison": "two declared conditions component and HTTP tested; live comparison not executed",
-    "longRunMode": "eight-hour window, matching call allowance and journal capacity; clock/controller/HTTP component tests pass; setup UI checked; full eight-hour live run not performed"
+    "longRunMode": "eight-hour window, matching call allowance and journal capacity; clock/controller/HTTP component tests pass; setup UI checked; full eight-hour live run not performed",
+    "acceleratedRunMode": "12x resident/workshop fixed-step timing component and HTTP tested; setup UI observed; mapped world load interrupted before resident start"
   },
   "evidence": {
     "researchTests": {
-      "passed": 87,
+      "passed": 91,
       "failed": 0,
       "command": "npm run experiment:society:test"
     },
@@ -95,10 +96,41 @@
       "clockPassedOld900SecondLimit": true,
       "eightHourNeedsCalculationVerified": true,
       "fullLiveRunVerified": false
+    },
+    "acceleratedNeedsLaunch": {
+      "schemaVersion": 1,
+      "date": "2026-09-12",
+      "study": "accelerated-needs-1",
+      "runId": "free-1789215472893-107dbf",
+      "runtimeSourceCommit": "bbd52a675d8903d81c3e69ead2da029f7bd0a5b7",
+      "outcome": "interrupted-before-resident-start",
+      "providerCalls": 0,
+      "residentStarted": false,
+      "savedCheckpoint": false,
+      "browserError": "target closed while handling command",
+      "causeEstablished": false,
+      "automaticRetry": false,
+      "ownedBrowserAndServerClosed": true,
+      "nodeTestsPassed": 91,
+      "recordTestsPassed": 24,
+      "existingModelRunInventory": 13,
+      "limits": {
+        "simulatedSeconds": 21600,
+        "wallSeconds": 3000,
+        "calls": 380,
+        "timeScale": 12,
+        "minimumSimulatedDecisionSeconds": 60,
+        "minimumWallDecisionMilliseconds": 5000
+      },
+      "limitations": [
+        "No accelerated live AI trajectory was obtained.",
+        "Fixed-frame equivalence test uses a controlled body; it is not an accelerated full-world collision acceptance.",
+        "No new claim of sustained needs maintenance, manufacturing or society."
+      ]
     }
   },
   "remaining": [
-    "Revise time policy and action opportunities before running the deferred memory comparison; no planning benefit established",
+    "Diagnose mapped-world loading interruption, then run the frozen accelerated needs protocol; memory comparison remains deferred",
     "Useful-tool goal remains unmet: evaluate planning/model choices under a frozen corrected interface; do not expand population",
     "Interior/shelter validation, complete world input pinning and longer-term memory",
     "Memory, communication and later population gates",

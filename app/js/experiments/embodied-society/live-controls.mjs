@@ -1,3 +1,4 @@
+import {simulatedDecisionReady} from './run-window.mjs';
 import {createObserverPanel} from './observer-panel.mjs';
 import {decisionReport} from './observer-report.mjs';
 import {RESEARCH_OBJECTIVES,researchObjective} from './research-objectives.mjs';
@@ -15,7 +16,7 @@ panel.hidden=true;document.body.append(panel);
 for(const objective of RESEARCH_OBJECTIVES){const option=document.createElement('option');option.value=objective.id;option.textContent=objective.label;el('objective').append(option);}
 const showObjective=()=>{el('task').textContent=researchObjective(el('objective').value).text??'General exploration: no additional task assigned.';};
 el('objective').onchange=showObjective;showObjective();
-let setup=null,host=null,controller=null,timer=null,busy=false,previousPause=false,carVisible=null,walkVisible=null,lastDecisionFrame=-60,previousCamera=null;
+let setup=null,host=null,controller=null,timer=null,busy=false,previousPause=false,carVisible=null,walkVisible=null,lastDecisionFrame=-Infinity,previousCamera=null;
 let cadence=null,starting=false;
 const resources=[];
 let humanStateCaptured=false,wallTimer=null;
@@ -78,8 +79,8 @@ async function cycle() {
   host.validate();if(ctx.paused!==true)throw Error("Human play resumed; research stopped to prevent unrecorded intervention.");
   const state=controller.state();
   if(state.calls>=state.maxDecisions&&host.body.observation().remainingFrames===0){await controller.end();refresh();disposeResearch();message('Run ended at the declared decision limit.');return;}
-  if(host.body.observation().remainingFrames===0&&state.frames-lastDecisionFrame>=60&&cadence.ready()){lastDecisionFrame=state.frames;await cadence.run(()=>controller.decide());}
-  if(controller.state().status==='running')await controller.step(4);
+  if(host.body.observation().remainingFrames===0&&simulatedDecisionReady(setup.runWindow,state.frames,lastDecisionFrame)&&cadence.ready()){lastDecisionFrame=state.frames;await cadence.run(()=>controller.decide());}
+  if(controller.state().status==='running')await controller.step(4*setup.runWindow.timeScale);
   host.reconcile();refresh();
   if(controller.state().status==='ended'){disposeResearch();message('Run ended at a declared simulation or condition limit.');}
  }catch(error){await controller.abort(error).catch(()=>{});refresh();message(`Run stopped: ${error.message}`);disposeResearch();}
@@ -130,6 +131,6 @@ el('pause').onclick=async()=>{
 };
 el('end').onclick=async()=>{clearInterval(timer);try{await controller.end();refresh();disposeResearch();}catch(error){message(error.message);restoreHuman();}};
 window.addEventListener('pagehide',()=>{controller?.end().catch(()=>{});disposeResearch();});
-try{setup=await(await fetch('/research-api/status')).json();cadence=createDecisionCadence(setup.model?.minDecisionIntervalMs??0);if(!setup.ready){message('AI configuration is required before starting.');el('details').textContent='For the free hosted pilot, use scripts/embodied-society/start-free.command. You will need a Gemini Free-tier project and API key.';}else{el('details').textContent=`${setup.model.model} · ${setup.model.accountTier==='free'?'Free-plan account required':'maximum $'+setup.model.budgetUsd} · ${setup.model.maxCalls} calls · ${setup.runWindow.maxSeconds/3600} simulated hours maximum. Finite research supplies and known recipes are declared starting conditions.`;}}
+try{setup=await(await fetch('/research-api/status')).json();if(setup.runWindow?.id==='fast-needs-6h')el('profile').value=ACCEPTANCE_PROFILE.id;cadence=createDecisionCadence(setup.model?.minDecisionIntervalMs??0);if(!setup.ready){message('AI configuration is required before starting.');el('details').textContent='For the free hosted pilot, use scripts/embodied-society/start-free.command. You will need a Gemini Free-tier project and API key.';}else{el('details').textContent=`${setup.model.model} · ${setup.model.accountTier==='free'?'Free-plan account required':'maximum $'+setup.model.budgetUsd} · ${setup.model.maxCalls} calls · ${setup.runWindow.maxSeconds/3600} simulated hours maximum · ${setup.runWindow.timeScale}× target speed. Finite research supplies and known recipes are declared starting conditions.`;}}
 catch(error){message(`Research server unavailable: ${error.message}`);}
 const readyTimer=setInterval(readiness,1000);window.addEventListener('pagehide',()=>clearInterval(readyTimer));readiness();

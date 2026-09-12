@@ -1,6 +1,6 @@
 # World Explorer embodied-agent research
 
-**Developmental research pilot · September 11, 2026 · Not peer reviewed**
+**Developmental research pilot · September 12, 2026 · Not peer reviewed**
 
 Can a language-model agent maintain itself and make useful things while acting through a body in an existing mapped 3D world? This branch investigates that question using World Explorer 3D as the environment. The present system supports one resident, finite resources, needs, designed recipes and bounded model calls. It is an experiment platform, not a demonstration of artificial human life.
 
@@ -15,6 +15,8 @@ Live Gemini runs have produced movement, balanced resource gathering and one obs
 | [Resource-use protocol](PROTOCOL.md) | Initial conditions, acceptance criteria and stopping rules |
 | [Useful-tool protocol](TOOL-USE-PROTOCOL.md) | Task, required manufacturing evidence and amendments between attempts |
 | [Design review](RESEARCH-DESIGN-REVIEW.md) | Why the short window was inadequate, long-run changes and remaining limitations |
+| [Accelerated study](ACCELERATED-NEEDS-STUDY.md) | Six-hour clock policy, bounds and interpretation |
+| [Accelerated launch report](reports/accelerated-needs-1.md) | Verified implementation and pre-dispatch loading interruption |
 | [Memory comparison](MEMORY-COMPARISON.md) | Original comparison, deferred pending the timing redesign |
 | [Observer guide](OBSERVER.md) | Minimize the panel, inspect inventory and download decision reports |
 | [Reproduction guide](REPRODUCIBILITY.md) | Verify records and run locally with a private model configuration |

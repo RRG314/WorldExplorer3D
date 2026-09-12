@@ -1,3 +1,4 @@
+import {runWindow} from '../../app/js/experiments/embodied-society/run-window.mjs';
 import {createHash} from 'node:crypto';
 import {MATERIALS,RECIPES} from '../../app/js/experiments/embodied-society/material-rules.mjs';
 
@@ -48,7 +49,9 @@ export function validateModelConfig(config) {
  const free=['groq','gemini'].includes(config?.provider)&&config?.accountTier==='free';
  if(['groq','gemini'].includes(config?.provider)&&!free)errors.push('This hosted adapter requires a Free-tier account.');
  if(free&&(!(config.provider==='gemini'?['gemini-3.8-flash','gemini-3.1-flash-lite']:['openai/gpt-oss-20b','openai/gpt-oss-120b']).includes(config.model)||config.freePlanConfirmed!==true))errors.push('Confirm a Free-tier account and choose a supported model.');
- if(free&&(!Number.isSafeInteger(config.minDecisionIntervalMs)||config.minDecisionIntervalMs<60000))errors.push('Free-plan decisions must be at least 60 seconds apart.');
+ const fast=free&&config.provider==='gemini'&&config.model==='gemini-3.1-flash-lite'&&config.runWindowId==='fast-needs-6h';
+ const minimumInterval=fast?runWindow('fast-needs-6h').minDecisionIntervalMs:60000;
+ if(free&&(!Number.isSafeInteger(config.minDecisionIntervalMs)||config.minDecisionIntervalMs<minimumInterval))errors.push('Decision spacing is below the declared Free-tier study limit.');
  if(typeof config?.model!=='string'||!config.model.trim()||config.model.length>100)errors.push('Choose a model ID.');
  for(const key of ['budgetUsd','inputUsdPerMillion','outputUsdPerMillion'])if(free?config?.[key]!==0:(!Number.isFinite(config?.[key])||config[key]<=0))errors.push(free?`Set ${key} to zero for the Free plan.`:`Set a positive ${key}.`);
  for(const [key,min,max] of [['maxCalls',1,1000],['maxOutputTokens',256,4096]])if(!Number.isSafeInteger(config?.[key])||config[key]<min||config[key]>max)errors.push(`Set ${key} between ${min} and ${max}.`);

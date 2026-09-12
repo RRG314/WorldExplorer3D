@@ -121,3 +121,22 @@ test('free setup declares a longer window and freezes its limits and needs rules
   assert.equal(saved.manifest.runWindow.maxSeconds,28800);assert.equal(saved.needRules.waterPerSecond,1/14400);assert.equal(calls,0);
  }finally{await server.close();await rm(directory,{recursive:true,force:true});}
 });
+
+test('accelerated HTTP setup freezes canonical timing in the manifest and model observation',async()=>{
+ const {mkdtemp,readFile,rm}=await import('node:fs/promises');const {tmpdir}=await import('node:os');const path=await import('node:path');
+ const directory=await mkdtemp(path.join(tmpdir(),'we3d-fast-config-'));let request;
+ const server=await startLiveResearchServer({port:0,storageRoot:directory,fetchImpl:async(url,init)=>{request=JSON.parse(init.body);return new Response(JSON.stringify({candidates:[{finishReason:'STOP',content:{parts:[{text:'{"action":{"kind":"wait"},"decisionSummary":"Observe."}'}]}}]}));}});
+ try{
+  const base=`http://127.0.0.1:${server.port}`,initial=await(await fetch(base+'/research-api/status')).json();
+  const post=(name,body)=>fetch(base+'/research-api/'+name,{method:'POST',headers:{Origin:base,'X-Research-Session':initial.session},body:JSON.stringify(body)});
+  assert.equal((await post('configure',{apiKey:'configuration-test-key-only',freePlanConfirmed:true,runWindowId:'fast-needs-6h'})).status,200);
+  const configured=await(await fetch(base+'/research-api/status')).json();assert.equal(configured.model.maxCalls,380);assert.equal(configured.model.minDecisionIntervalMs,5000);assert.equal(configured.runWindow.maxWallMs,3000000);
+  assert.equal((await post('start',{runId:configured.runId,worldSnapshotId:'world',manifest:{worldSnapshotId:'world',runWindow:{timeScale:1000}}})).status,200);
+  const saved=JSON.parse(await readFile(path.join(directory,configured.runId,'manifest/workshop.json'),'utf8'));
+  assert.equal(saved.manifest.runWindow.timeScale,12);assert.equal(saved.manifest.runWindow.maxSeconds,21600);
+  assert.equal((await post('decision',{experimentTiming:{timeScale:1000}})).status,200);
+  const observation=JSON.parse(await readFile(path.join(directory,configured.runId,'observations/call-1/workshop.json'),'utf8')).observation;
+  assert.equal(observation.experimentTiming.timeScale,12);assert.equal(observation.experimentTiming.minSimulatedDecisionSeconds,60);assert.equal(observation.experimentTiming.pendingModelRequestsFreezeSimulation,true);
+  assert.ok(request);
+ }finally{await server.close();await rm(directory,{recursive:true,force:true});}
+});

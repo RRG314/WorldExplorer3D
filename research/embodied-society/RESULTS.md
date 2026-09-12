@@ -1,6 +1,6 @@
 # Developmental results
 
-As of September 11, 2026, the strongest observed behavior is movement followed by acquisition and consumption of a finite food item. Useful manufacturing has not been demonstrated. The retained inventory contains **13 developmental runs and 105 provider ledger events**: 102 completed, one failed and two left reserved. Provider completion does not imply an action succeeded in the world.
+As of September 12, 2026, the strongest observed behavior is movement followed by acquisition and consumption of a finite food item. Useful manufacturing has not been demonstrated. The retained inventory contains **13 developmental runs and 105 provider ledger events**: 102 completed, one failed and two left reserved. Provider completion does not imply an action succeeded in the world.
 
 These attempts used different model or interface revisions. No success rate, model ranking or population inference is calculated from them. Each evidence file records the applicable source and conditions.
 
@@ -36,4 +36,8 @@ One eating event establishes a working acquisition-to-consumption path. It does 
 
 ## Next milestone
 
-The next behavioral requirement remains: manufacture a tool from gathered materials, then use it to obtain the tool-dependent resource. The [design review](RESEARCH-DESIGN-REVIEW.md) identifies inadequate needs pressure in the short window and sparse action opportunities. An eight-hour observation mode is now implemented and component tested, but has not completed a live study. The [stated-intent feedback comparison](MEMORY-COMPARISON.md) is deferred pending a revised time policy. Inspect stated intent alongside actual transitions, without treating explanations as causal proof. Do not increase population or claim a society before single-resident capability and recordkeeping are adequate.
+The next behavioral requirement remains: manufacture a tool from gathered materials, then use it to obtain the tool-dependent resource. The [design review](RESEARCH-DESIGN-REVIEW.md) identifies inadequate needs pressure in the short window and sparse action opportunities. An eight-hour observation mode is now implemented and component tested, but has not completed a live study. The [stated-intent feedback comparison](MEMORY-COMPARISON.md) is deferred while the accelerated needs study is validated. Inspect stated intent alongside actual transitions, without treating explanations as causal proof. Do not increase population or claim a society before single-resident capability and recordkeeping are adequate.
+
+## Accelerated needs study launch
+
+The owner selected a shorter accelerated observation before later real-time studies. The six-hour accelerated window is implemented and component tested. Its first mapped-world launch was interrupted during loading before resident startup: zero model calls and no checkpoint. The cause is unresolved and no automatic heavy retry was performed. This is separate from the thirteen model-run inventory, not a fourteenth behavioral trial. See the [launch report](reports/accelerated-needs-1.md) and [prospective protocol](ACCELERATED-NEEDS-STUDY.md). No longer-duration live behavior is established.
