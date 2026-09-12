@@ -5,10 +5,10 @@
   "historyPolicy": "root snapshot; no private ancestors",
   "latestUpdate": {
     "date": "2026-09-11",
-    "parentPublicCommit": "4e9725eb2d81aa3592b6df7c669dc05499821987",
+    "parentPublicCommit": "fdac707cebf124d949e8ec06e464b828b6816760",
     "productionChanged": false,
-    "scope": "Research observer, decision reporting, retained developmental evidence and technical report 0.2",
-    "sourceCheckpoint": "bdc05933a2ac6cbd140ac0df61ae1e817d3200c9"
+    "scope": "Fourth tool probe, readable stated-intent report and prospective memory comparison",
+    "sourceCheckpoint": "80e0f3fe8bd4b5b5bef21ba7dca535dd37f026d3"
   },
   "omittedFiles": [
     ".firebaserc",

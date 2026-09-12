@@ -87,3 +87,22 @@ test('connection probe consumes the same allowance and is refused after a world 
  assert.equal((await post('probe',{})).status,409);assert.equal(calls,1);
  }finally{await server.close();await rm(directory,{recursive:true,force:true});}
 });
+test('server freezes memory condition and strips intent from baseline dispatch despite incoming override',async()=>{
+ const {mkdtemp,readFile,rm}=await import('node:fs/promises');const {tmpdir}=await import('node:os');const path=await import('node:path');
+ for(const condition of ['outcomes-only','intent-and-outcomes']){
+  const directory=await mkdtemp(path.join(tmpdir(),'we3d-memory-'));let dispatched;
+  const config={runId:'memory-test',provider:'openai',model:'test-model',budgetUsd:1,inputUsdPerMillion:1,outputUsdPerMillion:2,maxCalls:1,maxOutputTokens:256};
+  const server=await startLiveResearchServer({port:0,config,apiKey:'test-only',storageRoot:directory,fetchImpl:async(url,init)=>{dispatched=JSON.parse(JSON.parse(init.body).input);return new Response(JSON.stringify({status:'completed',output:[{type:'message',content:[{type:'output_text',text:'{"kind":"wait"}'}]}]}));}});
+  try{
+   const base=`http://127.0.0.1:${server.port}`,status=await(await fetch(base+'/research-api/status')).json();
+   const post=(name,body)=>fetch(base+'/research-api/'+name,{method:'POST',headers:{Origin:base,'X-Research-Session':status.session},body:JSON.stringify(body)});
+   const body={runId:config.runId,worldSnapshotId:'world',manifest:{worldSnapshotId:'world',memoryCondition:'unknown'}};
+   assert.equal((await post('start',body)).status,400);body.manifest.memoryCondition=condition;
+   assert.equal((await post('start',body)).status,200);
+   assert.equal((await post('decision',{memoryCondition:'replace',recentMemory:[{status:'rejected',decisionSummary:'My previous intent'}]})).status,200);
+   assert.equal(dispatched.memoryCondition,condition);assert.equal(dispatched.recentMemory[0].status,'rejected');
+   assert.equal(dispatched.recentMemory[0].decisionSummary,condition==='intent-and-outcomes'?'My previous intent':undefined);
+   const manifest=JSON.parse(await readFile(path.join(directory,config.runId,'manifest/workshop.json'),'utf8'));assert.equal(manifest.manifest.memoryCondition,condition);
+  }finally{await server.close();await rm(directory,{recursive:true,force:true});}
+ }
+});

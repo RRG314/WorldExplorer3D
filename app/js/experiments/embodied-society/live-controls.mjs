@@ -62,7 +62,7 @@ function refresh() {
  message(`AI resident ${state.status}${state.pending?' · deciding':''}`);
  el('pause').disabled=!['running','paused'].includes(state.status);el('pause').textContent=state.status==='paused'?'Resume':'Pause';el('end').disabled=['ended','failed'].includes(state.status);
  el('needs').textContent=`Water ${Math.round(observation.needs.water*100)}% · Food ${Math.round(observation.needs.food*100)}% · Rest ${Math.round(observation.needs.rest*100)}%`;
- el('details').textContent=state.error||`${Math.floor(state.frames/60)} simulated seconds · ${state.calls} decisions · ${observation.inventory.length} inventory entries${observation.lastOutcome?` · Last action: ${observation.lastOutcome.action.kind} (${observation.lastOutcome.reason||observation.lastOutcome.status})`:''}`;
+ el('details').textContent=state.error||`${Math.floor(state.frames/60)} simulated seconds · ${state.calls} decisions${observation.lastOutcome?` · Last action: ${observation.lastOutcome.action.kind} (${observation.lastOutcome.reason||observation.lastOutcome.status})`:''}`;
  updateInventory(observation.inventory);
  el('report').disabled=false;
  if(!host)return;
@@ -103,17 +103,17 @@ el('start').onclick=async()=>{
   let initialState=createWorkshopState({runId:setup.runId,actorIds:['resident-1'],nodes});
   if(acceptance)initialState=applyAcceptanceNeeds(initialState);
   const wallDeadlineMs=Date.now()+ACCEPTANCE_PROFILE.maximumWallMs;
-  const manifest={wallDeadlineMs,objectiveId:el('objective').value,metersPerWorldUnit:ctx.METERS_PER_WORLD_UNIT,profile:acceptance?ACCEPTANCE_PROFILE:{id:'original-full-needs'},initialNeeds:initialState.actors['resident-1'].needs,resources:nodes,environment:'isolated-research',runId:setup.runId,worldSnapshotId:ctx.worldPublication.id,spawn:{...spawn,y:spawn.y+1.7,yaw:0},radiusMeters:40,resourceNodeIds:nodes.map(n=>n.id),buildSites:sites.filter(p=>!nodes.some(n=>n.position===p)).slice(0,24).map(p=>({gx:p.x,gy:Math.ceil((p.y+.5)*2)/2,gz:p.z}))};
+  const manifest={wallDeadlineMs,objectiveId:el('objective').value,memoryCondition:el('memory').value,metersPerWorldUnit:ctx.METERS_PER_WORLD_UNIT,profile:acceptance?ACCEPTANCE_PROFILE:{id:'original-full-needs'},initialNeeds:initialState.actors['resident-1'].needs,resources:nodes,environment:'isolated-research',runId:setup.runId,worldSnapshotId:ctx.worldPublication.id,spawn:{...spawn,y:spawn.y+1.7,yaw:0},radiusMeters:40,resourceNodeIds:nodes.map(n=>n.id),buildSites:sites.filter(p=>!nodes.some(n=>n.position===p)).slice(0,24).map(p=>({gx:p.x,gy:Math.ceil((p.y+.5)*2)/2,gz:p.z}))};
   await post('start',{runId:setup.runId,worldSnapshotId:ctx.worldPublication.id,manifest});setup.savedCheckpoint=true;
   host=createMappedWorldHost({THREE,appCtx:ctx,manifest,initialState,persistWorkshop:value=>post('workshop',value)});
   await post('workshop',initialState);nodes.forEach(resourceMarker);
   controller=createRunController({actorId:'resident-1',body:host.body,workshop:host.workshop,
    perceive:()=>({...host.perceive(),knownProcesses:RECIPES,actionGuide:{walkingMetersPerSecond:2.8*ctx.METERS_PER_WORLD_UNIT,needScale:'0 exhausted, 1 full; water/food decrease with simulated time. Carried consumables show needRestore effects.',turnRadiansPerSecond:2.6,positiveStrafe:'left: -x at yaw zero',reachMeters:3,consume:'consumes one carried item and restores its corresponding need',finish:'complete an active job only when tick reaches readyAt'},resourceOrigin:'Finite operator-placed research supplies in this isolated mapped world; not real-world stock.'}),
-   persistCheckpoint:value=>post('checkpoint',value),decide:async(observation,{signal})=>post('decision',observation,signal),maxDecisions:setup.model.maxCalls,wallDeadlineMs});
+   persistCheckpoint:value=>post('checkpoint',value),decide:async(observation,{signal})=>post('decision',observation,signal),maxDecisions:setup.model.maxCalls,wallDeadlineMs,memoryCondition:manifest.memoryCondition});
   humanStateCaptured=true;previousPause=ctx.paused;ctx.paused=true;previousCamera=ctx.updateCamera;ctx.updateCamera=()=>{const p=host.body.observation().position;ctx.camera.position.set(p.x+8,p.y+7,p.z+8);ctx.camera.lookAt(p.x,p.y-.5,p.z);};
   carVisible=ctx.carMesh?.visible;if(ctx.carMesh)ctx.carMesh.visible=false;
   walkVisible=ctx.Walk?.state?.characterMesh?.visible;if(ctx.Walk?.state?.characterMesh)ctx.Walk.state.characterMesh.visible=false;
-  el('profile').disabled=true;el('objective').disabled=true;
+  el('memory').disabled=true;el('profile').disabled=true;el('objective').disabled=true;
   wallTimer=setTimeout(async()=>{clearInterval(timer);try{await controller.end();refresh();}finally{disposeResearch();message('Run ended at the declared 20-minute wall limit.');}},Math.max(0,wallDeadlineMs-Date.now()));
   await controller.resume();timer=setInterval(cycle,1000/15);refresh();
  }catch(error){await controller?.abort(error).catch(()=>{});disposeResearch();controller=null;message(error.message);}

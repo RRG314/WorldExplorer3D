@@ -1,0 +1,287 @@
+{
+  "balancedGathers": 13,
+  "browserAndServerClosed": true,
+  "classification": "stated-intent tool probe; manufacturing outcome not achieved",
+  "completedPathMeters": 5.545106320042588,
+  "completedRecipes": [],
+  "controllerCalls": 16,
+  "decisionSummaries": [
+    {
+      "decision": 1,
+      "summary": "Moving toward the fiber source to begin gathering materials for the stone axe."
+    },
+    {
+      "decision": 2,
+      "summary": "Moving towards the nearest water supply to maintain health while heading toward material sources for crafting tools."
+    },
+    {
+      "decision": 3,
+      "summary": "Gathering water to address needs before beginning the multi-step process of crafting a stone axe to harvest timber."
+    },
+    {
+      "decision": 4,
+      "summary": "I will gather more water from the nearby supply, then move to gather fiber and branches to start crafting a stone axe for timber."
+    },
+    {
+      "decision": 5,
+      "summary": "I am gathering additional water to ensure my needs remain managed while I collect materials to craft a stone axe for timber."
+    },
+    {
+      "decision": 6,
+      "summary": "I will gather one more unit of water from the nearby supply to ensure my water levels remain stable while I begin working on the multi-step process of creating a stone axe to obtain timber."
+    },
+    {
+      "decision": 7,
+      "summary": "Continue gathering water from supply-0 to ensure sufficient reserves, as I am currently close enough to interact with it."
+    },
+    {
+      "decision": 8,
+      "summary": "I will continue gathering the remaining trail-water to finalize my supply before moving to collect materials for a stone axe."
+    },
+    {
+      "decision": 9,
+      "summary": "Gathering the final trail water supply then moving towards the fiber and branch locations to begin crafting the stone axe."
+    },
+    {
+      "decision": 10,
+      "summary": "I will gather the final trail-water unit, then move towards the snacks to satisfy my food need before gathering materials for tool production."
+    },
+    {
+      "decision": 11,
+      "summary": "Water supply is empty, moving to gather food as a priority for self-maintenance before gathering materials for tool production."
+    },
+    {
+      "decision": 12,
+      "summary": "Gathering route-snack to satisfy food needs, then will move to gather fiber for the stone-axe tool project."
+    },
+    {
+      "decision": 13,
+      "summary": "Gather additional route-snack units to ensure food needs are met before beginning tool production."
+    },
+    {
+      "decision": 14,
+      "summary": "Gathering more route-snack to maintain food levels while working toward the axe."
+    },
+    {
+      "decision": 15,
+      "summary": "Continue gathering food from supply-1 to maintain needs while preparing to gather other components for tools."
+    },
+    {
+      "decision": 16,
+      "summary": "I will collect the remaining route snacks to ensure food reserves, then I will begin gathering the basic materials required to craft a stone axe for future timber collection."
+    }
+  ],
+  "exactObservationsArchived": 16,
+  "finalInventory": [
+    {
+      "catalogId": "route-snack",
+      "quantity": 5
+    },
+    {
+      "catalogId": "trail-water",
+      "quantity": 8
+    }
+  ],
+  "humanRestoredVisually": true,
+  "limitations": [
+    "State-transition self-evaluation; no independent reviewer.",
+    "Placement alone does not verify structural usefulness.",
+    "Source fingerprint covers research modules, not all external world inputs."
+  ],
+  "model": "gemini-3.1-flash-lite",
+  "observationSha256": {
+    "call-1": "f91667e7f2563ca5a80ec3e2c5e2bc63b03c827e0fb94e85a20720083081087c",
+    "call-10": "8ba961bed212d3d93a738ec2774a9139cce53a59f6e53f9c2cd5ade9cd2d4b19",
+    "call-11": "4a65d107675c8d9471e7361b135b5b810d7526741ea0007de7e4beb29a437c89",
+    "call-12": "32c8684af107382ee078c864048ab287e31ae6b75f75b35cc34fc192e7051e01",
+    "call-13": "424650f1f366892be21a663fae76e4b7d295dde43e105a4191ef2b7c39e0b546",
+    "call-14": "461cce571df629fae5ce4fa418522bb90b713f177027f54c96faeeef6c85cbaf",
+    "call-15": "9f1e7ca0f6c3339f0cd307ed6e09faaef7781f607a35a047a05f75f104cc71aa",
+    "call-16": "0345587030dd7b5f918a4386e58845df98c435fa252fdec0929e4fca18703983",
+    "call-2": "23a32c1298c51c078149361b4ffa0b2bc7cba0f150418756b5f669a8e2c83e66",
+    "call-3": "b9067fb5d59ae79beb7e59ef73fc2ae0253e2ced9a81b8503da0fb0391d326ab",
+    "call-4": "b19af48e0fe13f90caa4b38e0d9f26bf9e73e79731f7ef6a6d878a67a67b331b",
+    "call-5": "11ef09d21c4b7f33a4903bf9b6408079d7a48b1646ac8ea3e036f4a5b75bea48",
+    "call-6": "e016a77ad0d1aee3716278359ff335d5bf01a34be60cbe8733866210467bd4be",
+    "call-7": "27c1a0560092e17b1c89b4a623ca3c4bf3e6fd5c0e5bf28d9a4c20abfe16dd8a",
+    "call-8": "667e88f4edee8f5a9acbf2e712cdea03b0e88bee7406ac36157851289f4da5de",
+    "call-9": "5401a22fdab19bbdc72f13e70c1a36c18bcb25804ae700e13b93cf076c2189a8"
+  },
+  "observerChecks": [
+    "minimize during actual run",
+    "real inventory quantity visible while minimized",
+    "expand shows same quantity",
+    "report download control exercised; downloaded file contents not independently inspected",
+    "automatic stop and human-view restoration"
+  ],
+  "operatorIntervention": "Display controls and report download only; no actor actions or world changes. Renderer and server closed after automatic stop.",
+  "profile": {
+    "food": 0.55,
+    "id": "resource-use-v1",
+    "maximumWallMs": 1200000,
+    "minimumSupplyDistanceMeters": 5,
+    "rest": 0.9,
+    "water": 0.45
+  },
+  "providerCalls": 16,
+  "publicRuntimeCommit": "fdac707cebf124d949e8ec06e464b828b6816760",
+  "publicRuntimeIdentityVerification": "All files under app/js/experiments/embodied-society and scripts/embodied-society match the recorded local source checkpoint; prospective protocol was added locally before dispatch.",
+  "records": [
+    {
+      "completedPathMeters": 1.6737092220574024,
+      "decision": 1,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 1.6737092220574004,
+      "decision": 2,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "balancedGather": true,
+      "decision": 3,
+      "inventoryDelta": {
+        "trail-water": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 4,
+      "inventoryDelta": {
+        "trail-water": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 5,
+      "inventoryDelta": {
+        "trail-water": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 6,
+      "inventoryDelta": {
+        "trail-water": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 7,
+      "inventoryDelta": {
+        "trail-water": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 8,
+      "inventoryDelta": {
+        "trail-water": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 9,
+      "inventoryDelta": {
+        "trail-water": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 10,
+      "inventoryDelta": {
+        "trail-water": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "completedPathMeters": 2.1976878759277847,
+      "decision": 11,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "balancedGather": true,
+      "decision": 12,
+      "inventoryDelta": {
+        "route-snack": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 13,
+      "inventoryDelta": {
+        "route-snack": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 14,
+      "inventoryDelta": {
+        "route-snack": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 15,
+      "inventoryDelta": {
+        "route-snack": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 16,
+      "inventoryDelta": {
+        "route-snack": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    }
+  ],
+  "researchSourceFingerprint": "b95ac6f5dbfefc1931c1229b7484ee5bb4dcccf184caee2122f69a8c6ea5a18e",
+  "runId": "free-1789182975761-e32016",
+  "schemaVersion": 1,
+  "simulatedSeconds": 900.0,
+  "sourceCommit": "954ed1a00536967ddb7af5a2c321d4cbc66237dc",
+  "sourceSha256": [
+    "546b3aee886cecc5c1da747b0ae7a3ccc58d507efa8e35c5b87dce635a85be89",
+    "6d1a9451d44541278fdc7d6807253874414cd7a80954312ba5a9dc4a704f797d"
+  ],
+  "status": "ended",
+  "summariesRecorded": 16,
+  "toolChain": {
+    "meaning": "Gathered inputs, paid timed transformations and later tool-dependent gathering with measured wear; state-transition self-review.",
+    "status": "evaluated",
+    "verifiedUses": []
+  },
+  "verifiedConsumptions": 0,
+  "verifiedPlacements": 0
+}

@@ -1,3 +1,4 @@
+import {memoryCondition as validateMemoryCondition,observedMemory} from './memory-condition.mjs';
 import {evidenceSnapshot} from './acceptance-profile.mjs';
 const clone = value => structuredClone(value);
 const verbs = new Set(['gather','craft','finish','cancel','consume','rest','build','store','retrieve']);
@@ -5,11 +6,12 @@ const fields = new Set(['kind','targetId','quantity','recipeId','materialId','se
 
 // Single-resident supervisor. The host supplies authenticated model dispatch,
 // filtered perception and durable checkpoint storage. This is never an agent tool.
-export function createRunController({actorId,body,workshop,perceive,persistCheckpoint,decide,maxDecisions=0,maxSeconds=900,decisionTimeoutMs=30000,wallDeadlineMs=null,now=()=>Date.now()}) {
+export function createRunController({actorId,body,workshop,perceive,persistCheckpoint,decide,maxDecisions=0,maxSeconds=900,decisionTimeoutMs=30000,wallDeadlineMs=null,now=()=>Date.now(),memoryCondition='outcomes-only'}) {
   if(typeof now!=='function'||(wallDeadlineMs!==null&&!Number.isFinite(wallDeadlineMs))||!actorId || !body || !workshop || typeof perceive!=='function' || typeof persistCheckpoint!=='function' ||
       !Number.isSafeInteger(maxDecisions) || maxDecisions<0 || maxDecisions>1000 ||
       !Number.isSafeInteger(maxSeconds) || maxSeconds<1 || maxSeconds>900 ||
       !Number.isSafeInteger(decisionTimeoutMs) || decisionTimeoutMs<1 || decisionTimeoutMs>60000) throw Error('Invalid bounded run configuration.');
+  validateMemoryCondition(memoryCondition);
   let status='paused',frames=(workshop.snapshot().tick??0)*60,epoch=0,calls=0,serial=0,pending=null,error=null,lastOutcome=null;
   const memory=[],actionEvidence=[];let movingEvidence=null;
   let queue=Promise.resolve();
@@ -19,12 +21,12 @@ export function createRunController({actorId,body,workshop,perceive,persistCheck
     if(!actor)throw Error('Resident missing from workshop.');
     return clone({actorId,tick:Math.floor(frames/60),body:body.observation(),needs:actor.needs,condition:actor.condition,
       experimentBudget:{maximumDecisions:maxDecisions,decisionAttempts:calls,furtherDecisions:Math.max(0,maxDecisions-calls),simulatedSecondsRemaining:Math.max(0,maxSeconds-(frames/60-initialTick)),wallSecondsRemaining:wallDeadlineMs===null?null:Math.max(0,(wallDeadlineMs-now())/1000)},
-      inventory:workshop.inspectInventory(actorId).items,job:actor.job,lastOutcome,recentMemory:memory,visible:perceive(actorId)});
+      inventory:workshop.inspectInventory(actorId).items,job:actor.job,lastOutcome,memoryCondition,recentMemory:observedMemory(memory,memoryCondition),visible:perceive(actorId)});
   }
   function checkpoint(reason) {
     if(movingEvidence)movingEvidence.after=evidenceSnapshot(body,workshop,actorId);
     return persistCheckpoint(clone({schemaVersion:1,runId:workshop.snapshot().runId,actorId,status,frames,calls,serial,reason,
-      workshop:workshop.snapshot(),body:body.checkpoint(),error,lastOutcome,memory,actionEvidence}));
+      workshop:workshop.snapshot(),body:body.checkpoint(),error,lastOutcome,memoryCondition,memory,actionEvidence}));
   }
   function settleMovement(){if(movingEvidence){movingEvidence.status='movement-interrupted';movingEvidence.after=evidenceSnapshot(body,workshop,actorId);movingEvidence=null;}}
   function fail(cause) {settleMovement();status='failed';error=String(cause?.message||cause);epoch++;pending?.abort();body.pause();}
@@ -53,19 +55,19 @@ export function createRunController({actorId,body,workshop,perceive,persistCheck
         if(!ordinary.has(cause.code))throw cause;
         evidence.status='rejected';evidence.reason=cause.code;evidence.after=evidenceSnapshot(body,workshop,actorId);
         lastOutcome={action:clone(action),status:'rejected',reason:cause.code,tick:Math.floor(frames/60)};
-        memory.push({...clone(lastOutcome),position:body.observation().position});if(memory.length>20)memory.shift();
+        memory.push({...clone(lastOutcome),decisionSummary,position:body.observation().position});if(memory.length>20)memory.shift();
         await checkpoint('action-rejected');return clone(lastOutcome);
       }
     }
     evidence.status=action.kind==='move'?'movement-queued':'applied';evidence.after=evidenceSnapshot(body,workshop,actorId);
     if(action.kind==='move')movingEvidence=evidence;
     lastOutcome={action:clone(action),status:'accepted',tick:Math.floor(frames/60)};
-    memory.push({...clone(lastOutcome),position:body.observation().position});if(memory.length>20)memory.shift();
+    memory.push({...clone(lastOutcome),decisionSummary,position:body.observation().position});if(memory.length>20)memory.shift();
     await checkpoint('action');return {accepted:true};
   }
   return Object.freeze({
     observation,
-    report:()=>clone({schemaVersion:1,runId:workshop.snapshot().runId,actorId,status,frames,calls,actionEvidence}),
+    report:()=>clone({schemaVersion:1,runId:workshop.snapshot().runId,actorId,status,frames,calls,memoryCondition,actionEvidence}),
     state:()=>({status,frames,calls,maxDecisions,pending:!!pending,error}),
     resume(){return serialized(async()=>{
       if(status!=='paused')throw Error('Only a paused run can resume.');

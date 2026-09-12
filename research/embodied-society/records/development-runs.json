@@ -981,6 +981,165 @@
         "checkpointSha256": "67e0fe04f4a2132a0ee743d13d75ff486053f6037e8b1af0f2e47613b4f5b4ca",
         "modelSha256": "3490df8a354b2579293ce9c6aa4de7af6bbcc496784c83a8d0fa1113e8499144"
       }
+    },
+    {
+      "checkpoint": {
+        "controllerCalls": 16,
+        "frames": 54000,
+        "status": "ended"
+      },
+      "providerCalls": 16,
+      "providerEvents": [
+        {
+          "call": 1,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 1966,
+            "outputTokens": 98
+          }
+        },
+        {
+          "call": 2,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2254,
+            "outputTokens": 102
+          }
+        },
+        {
+          "call": 3,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2343,
+            "outputTokens": 67
+          }
+        },
+        {
+          "call": 4,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2590,
+            "outputTokens": 71
+          }
+        },
+        {
+          "call": 5,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2679,
+            "outputTokens": 68
+          }
+        },
+        {
+          "call": 6,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2786,
+            "outputTokens": 83
+          }
+        },
+        {
+          "call": 7,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2862,
+            "outputTokens": 68
+          }
+        },
+        {
+          "call": 8,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2967,
+            "outputTokens": 68
+          }
+        },
+        {
+          "call": 9,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3061,
+            "outputTokens": 67
+          }
+        },
+        {
+          "call": 10,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3155,
+            "outputTokens": 72
+          }
+        },
+        {
+          "call": 11,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3245,
+            "outputTokens": 109
+          }
+        },
+        {
+          "call": 12,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3392,
+            "outputTokens": 70
+          }
+        },
+        {
+          "call": 13,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3642,
+            "outputTokens": 63
+          }
+        },
+        {
+          "call": 14,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3737,
+            "outputTokens": 39
+          }
+        },
+        {
+          "call": 15,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3829,
+            "outputTokens": 64
+          }
+        },
+        {
+          "call": 16,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3922,
+            "outputTokens": 76
+          }
+        }
+      ],
+      "runId": "free-1789182975761-e32016",
+      "sources": {
+        "checkpointSha256": "6d1a9451d44541278fdc7d6807253874414cd7a80954312ba5a9dc4a704f797d",
+        "modelSha256": "83383d94f2f4e00a3a80ab6ec10b1e96d544e78960009e0b43669953bf6ba150"
+      }
     }
   ],
   "schemaVersion": 1,

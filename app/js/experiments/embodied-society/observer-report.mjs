@@ -8,7 +8,7 @@ export const itemLabel=id=>id.replace(/^research:/,'').replaceAll('-',' ');
 const safe=value=>String(value??'not recorded').replace(/[\r\n]+/g,' ').replace(/([`*_[\]<>])/g,'\\$1');
 const inventory=items=>Object.entries(inventoryTotals(items)).map(([id,n])=>`${safe(itemLabel(id))}: ${n}`).join(', ')||'empty';
 export function decisionReport(record) {
- const lines=['# Resident decision report','',`Run: ${safe(record.runId)} · Resident: ${safe(record.actorId)} · Status: ${safe(record.status)}`,'',
+ const lines=['# Resident decision report','',`Memory condition: ${safe(record.memoryCondition??'not recorded in this checkpoint')}`,'',`Run: ${safe(record.runId)} · Resident: ${safe(record.actorId)} · Status: ${safe(record.status)}`,'',
  'This report separates model-stated intent from recorded world effects. Summaries are brief model outputs, not access to internal reasoning. Earlier runs did not record them. A selected action is not necessarily a successful action.',''];
  for(const event of record.actionEvidence??[]){
   const before=event.before??{},after=event.after;

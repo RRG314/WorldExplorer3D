@@ -1,3 +1,4 @@
+import {memoryCondition,observedMemory} from '../../app/js/experiments/embodied-society/memory-condition.mjs';
 import http from 'node:http';
 import {readFile,realpath,mkdir,statfs} from 'node:fs/promises';
 import path from 'node:path';
@@ -20,7 +21,7 @@ const setupHtml=`<!doctype html><html><head><meta charset="utf-8"><title>Connect
 export async function startLiveResearchServer({port=4498,config=null,apiKey=null,storageRoot=path.join(root,'output/embodied-society-live'),fetchImpl=fetch}={}) {
  const session=randomBytes(32).toString('hex');
  const digest=createHash('sha256');
- for(const name of ['observer-report','observer-panel','research-objectives','decision-cadence','acceptance-profile','material-rules','needs','resident-body','run-controller','mapped-world-host','world-authority','workshop','construction-projection','live-controls'])digest.update(name).update(await readFile(path.join(root,'app/js/experiments/embodied-society',name+'.mjs')));
+ for(const name of ['memory-condition','observer-report','observer-panel','research-objectives','decision-cadence','acceptance-profile','material-rules','needs','resident-body','run-controller','mapped-world-host','world-authority','workshop','construction-projection','live-controls'])digest.update(name).update(await readFile(path.join(root,'app/js/experiments/embodied-society',name+'.mjs')));
  for(const name of ['model-provider','live-server'])digest.update(name).update(await readFile(path.join(root,'scripts/embodied-society',name+'.mjs')));
  const sourceFingerprint=digest.digest('hex');
  let settingsErrors=validateModelConfig(config);
@@ -39,7 +40,7 @@ export async function startLiveResearchServer({port=4498,config=null,apiKey=null
  }
  if(!settingsErrors.length&&apiKey)await initializeProvider();
  const rootReal=await realpath(root);
- let activeObjective=researchObjective();
+ let activeObjective=researchObjective(),activeMemory='outcomes-only';
  let active=false,starting=false,configuring=false,probes=0,probing=false;
  const server=http.createServer(async(req,res)=>{
   const json=(status,value)=>res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'}).end(JSON.stringify(value));
@@ -73,17 +74,17 @@ export async function startLiveResearchServer({port=4498,config=null,apiKey=null
      try {
      if(await checkpointStore.load()||await workshopStore.load()||await manifestStore.load())return json(409,{error:'Run ID already used. Choose a new run ID; restart recovery is not enabled.'});
      if(body.runId!==runId||typeof body.worldSnapshotId!=='string'||body.manifest?.worldSnapshotId!==body.worldSnapshotId)return json(409,{error:'Mapped research manifest required.'});
-     let selectedObjective;try{selectedObjective=researchObjective(body.manifest.objectiveId);}catch{return json(400,{error:'Unknown research objective.'});}
+     let selectedObjective,selectedMemory;try{selectedObjective=researchObjective(body.manifest.objectiveId);selectedMemory=memoryCondition(body.manifest.memoryCondition);}catch{return json(400,{error:'Unknown research objective or memory condition.'});}
      const decisionContract={instructions:residentInstructions(config.provider),schema:config.provider==='gemini'?GEMINI_ACTION_SCHEMA:ACTION_SCHEMA};
-     await manifestStore.save({schemaVersion:1,runId,createdAt:new Date().toISOString(),sourceFingerprint,provider:config.provider,model:config.model,maxCalls:config.maxCalls,maxOutputTokens:config.maxOutputTokens,minDecisionIntervalMs:config.minDecisionIntervalMs??0,decisionContract,materialRules:{ruleset:MATERIAL_RULESET,materials:MATERIALS,recipes:RECIPES},manifest:{...body.manifest,objective:selectedObjective}});
-     activeObjective=selectedObjective;
+     await manifestStore.save({schemaVersion:1,runId,createdAt:new Date().toISOString(),sourceFingerprint,provider:config.provider,model:config.model,maxCalls:config.maxCalls,maxOutputTokens:config.maxOutputTokens,minDecisionIntervalMs:config.minDecisionIntervalMs??0,decisionContract,materialRules:{ruleset:MATERIAL_RULESET,materials:MATERIALS,recipes:RECIPES},manifest:{...body.manifest,objective:selectedObjective,memoryCondition:selectedMemory}});
+     activeObjective=selectedObjective;activeMemory=selectedMemory;
      await checkpointStore.save({schemaVersion:1,runId,status:'starting',manifest:body.manifest});active=true;return json(200,{started:true});
      }finally{starting=false;}
     }
     if(!active)return json(409,{error:'Start a mapped research session first.'});
     if(name==='/research-api/decision') {
      const abort=new AbortController();res.on('close',()=>{if(!res.writableEnded)abort.abort();});
-     return json(200,{action:await provider.decide({...body,experimentObjective:activeObjective.text},{signal:abort.signal}),decisionSummary:provider.decisionSummary(),model:provider.status()});
+     return json(200,{action:await provider.decide({...body,experimentObjective:activeObjective.text,memoryCondition:activeMemory,recentMemory:observedMemory(body.recentMemory,activeMemory)},{signal:abort.signal}),decisionSummary:provider.decisionSummary(),model:provider.status()});
     }
     if(name==='/research-api/checkpoint'||name==='/research-api/workshop') {
      if(body.runId!==runId)return json(409,{error:'Run identity mismatch.'});

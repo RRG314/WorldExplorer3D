@@ -1,6 +1,6 @@
 # Prospective useful-tool capability probe
 
-Protocol `WE3D-T1-v1` · prepared September 11, 2026 · three developmental attempts executed; not externally preregistered. See RESULTS.md for outcomes and amendments below.
+Protocol `WE3D-T1-v1` · prepared September 11, 2026 · four developmental attempts executed; not externally preregistered. See RESULTS.md for outcomes and amendments below.
 
 This is a focused capability test following the corrected resource-use repeat. It is not a claim that an unprompted resident spontaneously invents tools or develops a human-like life. Keep it separate from the general-exploration runs and their outcome counts.
 
@@ -53,3 +53,9 @@ The movement-schema-corrected attempt completed 13 provider responses. It collec
 Inspection also found that enforced decision/time budgets were absent from resident observations. This is a missing task constraint; whether it caused stockpiling is unknown. For the next developmental revision, observations explicitly report further decisions after the current reservation and remaining simulation/wall time. Material and recipe schema fields enumerate valid catalog/recipe IDs. Unusable-item and unknown-process choices become recorded nonmutating rejections with feedback within the remaining allowance, while malformed movement remains refused. Closing a failed run preserves its failed state.
 
 The local server now durably archives the exact observation, instruction and schema before each provider dispatch, with bounded per-call storage. These raw observations stay private. Failure to save an observation prevents dispatch and conservatively retains the reserved allowance. This improves diagnosis beyond later checkpoints without granting the model any new action. The wall deadline is anchored in the start manifest and shared with the model's budget observation. The same 20-call/900-simulated-second/20-minute maxima and raw-material tool objective apply; no action sequence is supplied. This is a new development configuration, not an unchanged repetition.
+
+## Development amendment T1-C: observable stated intent
+
+The next developmental attempt uses the same tool objective, `resource-use-v1` starting-needs profile, Gemini 3.1 Flash-Lite and 20-call/900-simulated-second/20-minute limits. The revised output contract requests a brief `decisionSummary` alongside each action. The statement is archived separately and shown in the decision report; it does not authorize actions and is not returned as a persistent plan. This attempt evaluates the instrument and records behavior under the changed contract. It is not an unchanged replication of T1-B and cannot isolate a planning effect.
+
+Plan one attempt, with no connection probe or in-run instruction changes. Preserve provider failures, rejected actions and unused budget. Assess the same manufacturing-and-use outcome using frozen material rules. Secondary observations are summary availability, agreement between stated intent and action outcome, and the live observer's quantity/minimize/report controls. Mark missing or truncated summaries explicitly; do not infer motives or generate retrospective explanations. Do not extend the trial to obtain a pass. Before any planning-memory comparison, define its intervention and comparison conditions separately.

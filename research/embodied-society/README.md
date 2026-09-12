@@ -4,7 +4,7 @@
 
 Can a language-model agent maintain itself and make useful things while acting through a body in an existing mapped 3D world? This branch investigates that question using World Explorer 3D as the environment. The present system supports one resident, finite resources, needs, designed recipes and bounded model calls. It is an experiment platform, not a demonstration of artificial human life.
 
-Live Gemini runs have produced movement, balanced resource gathering and one observed eating event with a measured increase in food reserve. An unchanged resource-use repeat gathered but did not eat. Three focused tool probes produced no tool; the final probe reached its simulation limit without a terminal interface error. Sustained survival, useful manufacturing, construction and society remain unproven.
+Live Gemini runs have produced movement, balanced resource gathering and one observed eating event with a measured increase in food reserve. An unchanged resource-use repeat gathered but did not eat. Four focused tool probes produced no tool; the final probe reached its simulation limit without a terminal interface error. Sustained survival, useful manufacturing, construction and society remain unproven.
 
 ## Read the study
 
@@ -14,6 +14,7 @@ Live Gemini runs have produced movement, balanced resource gathering and one obs
 | [Results](RESULTS.md) | Successful and unsuccessful developmental attempts, with evidence links |
 | [Resource-use protocol](PROTOCOL.md) | Initial conditions, acceptance criteria and stopping rules |
 | [Useful-tool protocol](TOOL-USE-PROTOCOL.md) | Task, required manufacturing evidence and amendments between attempts |
+| [Memory comparison](MEMORY-COMPARISON.md) | Planned test of earlier stated intent alongside outcomes; not yet executed |
 | [Observer guide](OBSERVER.md) | Minimize the panel, inspect inventory and download decision reports |
 | [Reproduction guide](REPRODUCIBILITY.md) | Verify records and run locally with a private model configuration |
 | [Data specification](DATA.md) | Record formats, missing evidence, provenance and privacy |
@@ -41,4 +42,4 @@ These checks do not start a model, a renderer or a deployment. Passing them esta
 
 The research branch retains the application needed to reproduce the environment. Research code is under `app/js/experiments/embodied-society/` and `scripts/embodied-society/`; the study is documented here. Production deployment configuration is excluded. Publication does not merge research into `stable` or `main`.
 
-Twelve heterogeneous developmental runs are retained in the reviewed inventory. They are not a statistical sample of interchangeable trials. Raw credentials, private observations and user records are withheld; this limits independent replay. The repository's source-available [license](../../LICENSE) applies. Cite the technical report and exact public commit using [CITATION.cff](../../CITATION.cff). No independent review or external endorsement is claimed.
+Thirteen heterogeneous developmental runs are retained in the reviewed inventory. They are not a statistical sample of interchangeable trials. Raw credentials, private observations and user records are withheld; this limits independent replay. The repository's source-available [license](../../LICENSE) applies. Cite the technical report and exact public commit using [CITATION.cff](../../CITATION.cff). No independent review or external endorsement is claimed.

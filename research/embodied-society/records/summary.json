@@ -1,17 +1,17 @@
 {
   "eventStatuses": {
-    "completed": 86,
+    "completed": 102,
     "failed": 1,
     "reserved": 2
   },
   "eventsWithMissingUsage": 3,
   "interpretation": "Provider completion does not prove world application; see separate behavioral evidence.",
   "knownTokenUsage": {
-    "inputTokens": 227848,
-    "outputTokens": 4222
+    "inputTokens": 276278,
+    "outputTokens": 5407
   },
-  "providerCalls": 89,
-  "runs": 12,
+  "providerCalls": 105,
+  "runs": 13,
   "schemaVersion": 1,
   "worldActionsApplied": null
 }

@@ -12,7 +12,7 @@ Quantities come from the workshop's authoritative state. Gathering must remove s
 
 After a run starts, **Download decision report** saves a Markdown document on your computer. It includes every recorded world-action attempt in the current run: action parameters, outcome, inventory changes, needs and measured movement. It remains available after the run ends. A download during an unfinished action is an interim record, not its final result.
 
-New Gemini calls request a brief statement of intent and relevant uncertainty alongside the action. This statement is archived separately and cannot authorize any action. It is model-generated commentary, not a faithful or complete view of internal reasoning. Earlier runs did not collect these statements; their reports explicitly mark them missing. No explanation is reconstructed after the fact.
+Gemini calls request a brief statement of intent and relevant uncertainty alongside the action. This statement is archived separately and cannot authorize any action. It is model-generated commentary, not a faithful or complete view of internal reasoning. Earlier runs did not collect these statements; their reports explicitly mark them missing. No explanation is reconstructed after the fact.
 
 Exact pre-dispatch observations have been privately archived since the third tool probe. They include the task, budget, available resources, recipes, body state and recent outcomes. The readable report is a summary of recorded action evidence, not a complete observation archive. It cannot explain why an action without evidence was chosen, or establish consciousness, understanding or human-like motivation.
 
@@ -21,3 +21,7 @@ The server stores local run records under `output/embodied-society-live/<run-id>
 ## Interpretation
 
 A provider response means the model replied. A completed movement means a measured body path. A balanced gather means supply stock decreased as custody increased. A useful-tool result requires a tool made from gathered inputs and subsequently used to obtain a tool-dependent resource. These are distinct outcomes. The current live evidence has not passed the useful-tool requirement.
+
+## Research memory setting
+
+Before starting, Experiment settings lets you choose **Recent outcomes only** or **Earlier stated intent and outcomes**. This chooses whether the next model observation includes previous summaries alongside the action outcomes. The choice is frozen for the run and appears in its manifest and report. The planned comparison is described in [MEMORY-COMPARISON.md](MEMORY-COMPARISON.md); its effectiveness has not been established.

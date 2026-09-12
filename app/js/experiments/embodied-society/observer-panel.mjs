@@ -9,7 +9,7 @@ export function createObserverPanel(document) {
  <p data-needs></p><p data-details></p>
  <button data-start disabled>Start AI resident</button> <button data-pause disabled>Pause</button> <button data-end disabled>End run</button>
  <p><button data-report disabled>Download decision report</button></p>
- <details data-panel><summary>Experiment settings</summary><label>Research objective <select data-objective></select></label><p data-task></p><label>Initial conditions <select data-profile><option value="baseline">Original full-needs pilot</option><option value="resource-use-v1">Hungry/thirsty, supplies beyond reach</option></select></label></details></div>`;
+ <details data-panel><summary>Experiment settings</summary><label>Resident memory <select data-memory><option value="outcomes-only">Recent outcomes only</option><option value="intent-and-outcomes">Earlier stated intent and outcomes</option></select></label><label>Research objective <select data-objective></select></label><p data-task></p><label>Initial conditions <select data-profile><option value="baseline">Original full-needs pilot</option><option value="resource-use-v1">Hungry/thirsty, supplies beyond reach</option></select></label></details></div>`;
  const el=name=>panel.querySelector(`[data-${name}]`);
  panel.querySelectorAll('label').forEach(label=>label.style.cssText='display:block;margin:8px 0');
  panel.querySelectorAll('select').forEach(select=>select.style.cssText='display:block;width:100%');

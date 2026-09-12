@@ -114,3 +114,16 @@ test('decision summaries survive checkpoints and report copies cannot mutate res
  report.actionEvidence[0].decisionSummary='changed';assert.equal(f.controller.report().actionEvidence[0].decisionSummary,'Approach the supplies.');
  assert.ok(report.actionEvidence[0].pathMeters>0);
 });
+test('memory comparison returns prior intent only in its declared condition and preserves actual rejection',async()=>{
+ for(const memoryCondition of ['outcomes-only','intent-and-outcomes']){
+  const f=fixture({maxDecisions:2,memoryCondition,decide:async()=>({action:{kind:'consume',materialId:'route-snack',quantity:1},decisionSummary:'Eat the snack I believe I carry.'})});
+  await f.controller.resume();await f.controller.decide();
+  const observation=f.controller.observation(),entry=observation.recentMemory[0];
+  assert.equal(observation.memoryCondition,memoryCondition);assert.equal(entry.status,'rejected');
+  assert.equal(entry.decisionSummary,memoryCondition==='intent-and-outcomes'?'Eat the snack I believe I carry.':undefined);
+  assert.equal(f.saved().memoryCondition,memoryCondition);
+  assert.equal(f.saved().actionEvidence[0].status,'rejected');
+  entry.status='accepted';assert.equal(f.controller.observation().recentMemory[0].status,'rejected');
+ }
+ assert.throws(()=>fixture({memoryCondition:'invented'}),/Unknown resident memory/);
+});

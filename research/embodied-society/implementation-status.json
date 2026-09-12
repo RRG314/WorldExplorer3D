@@ -20,11 +20,12 @@
     "mappedWorldHost": "live movement, food/water gathering and food consumption verified; shelter pending",
     "modelProvider": "real Gemini responses verified; other adapters transport-double tested",
     "liveServer": "implemented; actual app HTML injection and account disabling HTTP-tested",
-    "observer": "quantity display, minimize/expand and mobile containment browser-fixture tested; report and Gemini summary transport component tested; revised live integration not rerun"
+    "observer": "live quantities, minimize/expand, report control and automatic cleanup observed in tool probe 4; report content generated separately from final checkpoint",
+    "memoryComparison": "two declared conditions component and HTTP tested; live comparison not executed"
   },
   "evidence": {
     "researchTests": {
-      "passed": 79,
+      "passed": 83,
       "failed": 0,
       "command": "npm run experiment:society:test"
     },
@@ -72,9 +73,20 @@
         "no page errors"
       ],
       "ownedBrowserAndServerClosed": true
+    },
+    "statedIntentTrial": {
+      "runId": "free-1789182975761-e32016",
+      "providerResponses": 16,
+      "summariesRecorded": 16,
+      "balancedGathers": 13,
+      "completedRecipes": 0,
+      "simulatedSeconds": 900,
+      "humanRestoredVisually": true,
+      "browserAndServerClosed": true
     }
   },
   "remaining": [
+    "Execute the predeclared WE3D-M1-v1 memory comparison; no planning benefit has been established",
     "Useful-tool goal remains unmet: evaluate planning/model choices under a frozen corrected interface; do not expand population",
     "Interior/shelter validation, complete world input pinning and longer-term memory",
     "Memory, communication and later population gates",
