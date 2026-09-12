@@ -23,4 +23,4 @@ jobs:
           python-version: '3.13'
       - run: npm run experiment:society:test
       - run: python3 scripts/embodied-society/research-records.py check
-      - run: python3 -m unittest discover -s tests/embodied-society -p 'test_research_records.py'
+      - run: python3 -m unittest discover -s tests/embodied-society -p 'test_*.py'

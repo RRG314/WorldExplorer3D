@@ -1,0 +1,150 @@
+{
+  "balancedGathers": 8,
+  "browserAndServerClosed": true,
+  "classification": "failed developmental tool-use probe after movement-schema correction",
+  "completedPathMeters": 7.742794195970367,
+  "completedRecipes": [],
+  "controllerCalls": 13,
+  "humanRestoredVisually": true,
+  "limitations": [
+    "State-transition self-evaluation; no independent reviewer.",
+    "Placement alone does not verify structural usefulness.",
+    "Source fingerprint covers research modules, not all external world inputs."
+  ],
+  "model": "gemini-3.1-flash-lite",
+  "operatorIntervention": "Closed renderer and server after failure; no in-run changes.",
+  "profile": {
+    "food": 0.55,
+    "id": "resource-use-v1",
+    "maximumWallMs": 1200000,
+    "minimumSupplyDistanceMeters": 5,
+    "rest": 0.9,
+    "water": 0.45
+  },
+  "providerCalls": 13,
+  "records": [
+    {
+      "completedPathMeters": 1.6737092220574024,
+      "decision": 1,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 2.1976878759277905,
+      "decision": 2,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 1.6737092220573844,
+      "decision": 3,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "balancedGather": true,
+      "decision": 4,
+      "inventoryDelta": {
+        "route-snack": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 5,
+      "inventoryDelta": {
+        "route-snack": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 6,
+      "inventoryDelta": {
+        "route-snack": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 7,
+      "inventoryDelta": {
+        "route-snack": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 8,
+      "inventoryDelta": {
+        "route-snack": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 9,
+      "inventoryDelta": {
+        "route-snack": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 10,
+      "inventoryDelta": {
+        "route-snack": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 11,
+      "inventoryDelta": {
+        "route-snack": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "completedPathMeters": 2.19768787592779,
+      "decision": 12,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "decision": 13,
+      "kind": "consume",
+      "status": "proposed"
+    }
+  ],
+  "researchSourceFingerprint": "ab85cdf559b5ddd58f72be0315ef6d39937b2a2f7970ad26d650756f2e06f0ac",
+  "runId": "free-1789178295752-eb8e47",
+  "schemaVersion": 1,
+  "simulatedSeconds": 685.8,
+  "sourceCommit": "9eab7fb5",
+  "sourceSha256": [
+    "026e2e4210e53f321442d40bd2acb8b78e8f914a6e02914a1b05d50e415c9fb8",
+    "e9cfda98bdbe137b4442361a5e12fc2465c67344e02ffdb86850493ab16fc1e4"
+  ],
+  "status": "failed",
+  "terminalCause": "not-consumable: instance ID was supplied instead of catalog ID",
+  "toolChain": {
+    "meaning": "Gathered inputs, paid timed transformations and later tool-dependent gathering with measured wear; state-transition self-review.",
+    "status": "evaluated",
+    "verifiedUses": []
+  },
+  "verifiedConsumptions": 0,
+  "verifiedPlacements": 0
+}

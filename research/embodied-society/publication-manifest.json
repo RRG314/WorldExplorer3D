@@ -3,6 +3,13 @@
   "deploymentsEnabled": false,
   "fileCountExcludingThisManifest": 1603,
   "historyPolicy": "root snapshot; no private ancestors",
+  "latestUpdate": {
+    "date": "2026-09-11",
+    "parentPublicCommit": "4e9725eb2d81aa3592b6df7c669dc05499821987",
+    "productionChanged": false,
+    "scope": "Research observer, decision reporting, retained developmental evidence and technical report 0.2",
+    "sourceCheckpoint": "bdc05933a2ac6cbd140ac0df61ae1e817d3200c9"
+  },
   "omittedFiles": [
     ".firebaserc",
     ".github/workflows/deploy-pages-public.yml",

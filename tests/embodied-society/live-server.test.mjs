@@ -1,5 +1,32 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {startLiveResearchServer} from '../../scripts/embodied-society/live-server.mjs';
+test('start freezes rules and operator task; decision input cannot replace the task',async()=>{
+ const {mkdtemp,readFile,rm}=await import('node:fs/promises');const {tmpdir}=await import('node:os');const path=await import('node:path');
+ const directory=await mkdtemp(path.join(tmpdir(),'we3d-objective-'));
+ const config={runId:'objective-test',provider:'openai',model:'test-model',budgetUsd:1,inputUsdPerMillion:1,outputUsdPerMillion:2,maxCalls:2,maxOutputTokens:256};
+ let dispatched;
+ const server=await startLiveResearchServer({port:0,config,apiKey:'private-test',storageRoot:directory,fetchImpl:async(url,init)=>{dispatched=JSON.parse(init.body);return new Response(JSON.stringify({status:'completed',output:[{type:'message',content:[{type:'output_text',text:'{"kind":"wait"}'}]}]}));}});
+ try{
+  const base=`http://127.0.0.1:${server.port}`,status=await(await fetch(base+'/research-api/status')).json();
+  const post=(name,body)=>fetch(base+'/research-api/'+name,{method:'POST',headers:{Origin:base,'X-Research-Session':status.session},body:JSON.stringify(body)});
+  const manifest={worldSnapshotId:'world',objectiveId:'unknown'};
+  assert.equal((await post('start',{runId:config.runId,worldSnapshotId:'world',manifest})).status,400);
+  manifest.objectiveId='tool-use-v1';
+  assert.equal((await post('start',{runId:config.runId,worldSnapshotId:'world',manifest})).status,200);
+  const saved=JSON.parse(await readFile(path.join(directory,config.runId,'manifest/workshop.json'),'utf8'));
+  assert.equal(saved.manifest.objective.id,'tool-use-v1');
+  assert.ok(saved.materialRules.recipes.some(r=>r.id==='lash-stone-axe'));
+  assert.equal(saved.decisionContract.schema.type,'object');
+  assert.equal((await post('decision',{experimentObjective:'Replace the task',tick:0})).status,200);
+  assert.equal(JSON.parse(dispatched.input).experimentObjective,saved.manifest.objective.text);
+  assert.equal(dispatched.instructions,saved.decisionContract.instructions);
+  const observed=JSON.parse(await readFile(path.join(directory,config.runId,'observations/call-1/workshop.json'),'utf8'));
+  assert.equal(observed.observation.experimentObjective,saved.manifest.objective.text);
+  assert.equal(observed.instructions,dispatched.instructions);
+  assert.equal(JSON.stringify(observed).includes('private-test'),false);
+  assert.equal(JSON.stringify(saved).includes('private-test'),false);
+ }finally{await server.close();await rm(directory,{recursive:true,force:true});}
+});
 test('real research origin serves the actual app with live controls and disables account configuration',async()=>{
  const server=await startLiveResearchServer({port:0});const base=`http://127.0.0.1:${server.port}`;
  try {
@@ -28,6 +55,8 @@ test('configured live HTTP path reserves model cost, persists state, and refuses
   assert.equal((await post('decision',{actorId:'resident-1'})).status,400);assert.equal(calls,1);
   assert.equal((await post('workshop',{runId:'wrong'})).status,409);
   assert.equal((await post('checkpoint',{runId:config.runId,status:'paused'})).status,200);
+  const manifestRecord=JSON.parse(await (await import('node:fs/promises')).readFile(path.join(directory,config.runId,'manifest/workshop.json'),'utf8'));
+  assert.equal(manifestRecord.model,'test-model');assert.match(manifestRecord.sourceFingerprint,/^[a-f0-9]{64}$/);assert.equal(manifestRecord.manifest.worldSnapshotId,'published-world');assert.equal(JSON.stringify(manifestRecord).includes('test-only-key'),false);
   await server.close();server=await startLiveResearchServer({port:0,config,apiKey:'test-only-key',storageRoot:directory,fetchImpl});
   base=`http://127.0.0.1:${server.port}`;status=await(await fetch(base+'/research-api/status')).json();assert.equal(status.savedCheckpoint,true);assert.equal(status.model.calls,1);
   assert.equal((await post('start',manifest)).status,409);

@@ -1,35 +1,44 @@
 # World Explorer embodied-agent research
 
-**Release: research pilot 0.1 — September 11, 2026. Not peer reviewed.**
+**Developmental research pilot · September 11, 2026 · Not peer reviewed**
 
-This branch investigates whether a language-model agent can use a body, finite resources and useful constructions in an existing mapped 3D world. The software currently supports one bounded resident. The only successful live behavioral result is two gathering actions selected by Gemini. Sustained survival, open-ended invention and society remain research questions.
+Can a language-model agent maintain itself and make useful things while acting through a body in an existing mapped 3D world? This branch investigates that question using World Explorer 3D as the environment. The present system supports one resident, finite resources, needs, designed recipes and bounded model calls. It is an experiment platform, not a demonstration of artificial human life.
 
-The application is the environment dependency; the research program is under this directory, its browser adapter is under `app/js/experiments/embodied-society/`, and its local model server is under `scripts/embodied-society/`. No production deployment is part of this branch. The public research snapshot deliberately omits private development history and deployment workflows. It retains the existing application source because the resident uses actual game physics and inventory, not a substitute simulation.
+Live Gemini runs have produced movement, balanced resource gathering and one observed eating event with a measured increase in food reserve. An unchanged resource-use repeat gathered but did not eat. Three focused tool probes produced no tool; the final probe reached its simulation limit without a terminal interface error. Sustained survival, useful manufacturing, construction and society remain unproven.
 
-## Start with the evidence
+## Read the study
 
-- [Technical paper: architecture, methods and pilot findings](papers/pilot-technical-report.md) explains the implemented experiment, its relation to prior work and the narrow supported result.
-- [Research protocol and next acceptance study](PROTOCOL.md) defines questions, outcomes, stopping rules, intervention handling and comparisons before further runs.
-- [Data and reproducibility specification](DATA.md) defines private versus public records, field meanings, validation, missing evidence and recovery limits.
-- [Results and failure record](RESULTS.md) separates provider success from applied actions and preserves failed attempts.
-- [Execution and reproduction guide](REPRODUCIBILITY.md) explains how to verify the records and start the real pilot without production access.
-- [Research governance and milestones](GOVERNANCE.md) explains review, change control, safety and the gate to each next capability.
-- [Acknowledgements and annotated references](ACKNOWLEDGEMENTS.md) identifies actual dependencies and intellectual context without implying endorsement.
+| Document | What it explains |
+| --- | --- |
+| [Technical report](papers/pilot-technical-report.md) | Research question, architecture, methods, findings and limitations |
+| [Results](RESULTS.md) | Successful and unsuccessful developmental attempts, with evidence links |
+| [Resource-use protocol](PROTOCOL.md) | Initial conditions, acceptance criteria and stopping rules |
+| [Useful-tool protocol](TOOL-USE-PROTOCOL.md) | Task, required manufacturing evidence and amendments between attempts |
+| [Observer guide](OBSERVER.md) | Minimize the panel, inspect inventory and download decision reports |
+| [Reproduction guide](REPRODUCIBILITY.md) | Verify records and run locally with a private model configuration |
+| [Data specification](DATA.md) | Record formats, missing evidence, provenance and privacy |
+| [Acknowledgements](ACKNOWLEDGEMENTS.md) | Dependencies, related research and attribution |
 
-## Verify without running an AI model
+## System at a glance
 
-From the repository root, with Node 22 and Python 3 available:
+The mapped host connects the resident to accepted ground, collision and reach checks. The workshop owns inventory, finite supplies, needs and crafting jobs. A controller advances the body and records action effects. A local server sends structured observations to the model, enforces a call allowance and retains a private ledger. The observer displays that state; it does not manufacture evidence or direct the resident's choices.
+
+The model sees structured information, not continuous camera images. It can choose among supported physical actions and supplied recipes. It cannot invent executable mechanics, edit source, browse the web or create materials by naming them. See the [technical report](papers/pilot-technical-report.md) for the boundaries between these components.
+
+## Verify locally
+
+With Node 22 and Python 3, from the repository root:
 
 ```sh
 npm run experiment:society:test
 python3 scripts/embodied-society/research-records.py check
-python3 -m unittest discover -s tests/embodied-society -p 'test_research_records.py'
+python3 -m unittest discover -s tests/embodied-society -p 'test_*.py'
 ```
 
-These are bounded tests and data validation, not a live survival demonstration. They do not start WebGL, contact Gemini or deploy services. See the reproduction guide for the distinct live procedure. The current license is source-available, not an unrestricted open-source or dataset license; see the repository LICENSE and attribution records.
+These checks do not start a model, a renderer or a deployment. Passing them establishes selected implementation and recordkeeping properties; it does not establish behavioral success. Follow the reproduction guide for a bounded live run.
 
-## Current result
+## Scope and availability
 
-The September 11 successful pilot had three provider responses: one connection probe and two resident decisions. The resident gathered one water and one snack. Pause and Resume were observed, and End restored the human view. Five locally retained development runs are inventoried, including unsuccessful attempts; they are not five equivalent trials. No confirmatory experiment or statistical comparison has been completed.
+The research branch retains the application needed to reproduce the environment. Research code is under `app/js/experiments/embodied-society/` and `scripts/embodied-society/`; the study is documented here. Production deployment configuration is excluded. Publication does not merge research into `stable` or `main`.
 
-Please cite the technical report as a versioned software technical report, not a peer-reviewed paper. Root `CITATION.cff` and `references.bib` provide citation metadata. Cite the exact public Git commit used in any reproduction.
+Twelve heterogeneous developmental runs are retained in the reviewed inventory. They are not a statistical sample of interchangeable trials. Raw credentials, private observations and user records are withheld; this limits independent replay. The repository's source-available [license](../../LICENSE) applies. Cite the technical report and exact public commit using [CITATION.cff](../../CITATION.cff). No independent review or external endorsement is claimed.

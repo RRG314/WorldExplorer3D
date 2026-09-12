@@ -35,6 +35,7 @@ export function createResidentMotor({actorId,spawn,world,characterMesh=null,anim
     }
   });
   return Object.freeze({
+    metersPerWorldUnit:world.metersPerWorldUnit??1,
     command(input) {
       if(disposed||paused)throw new Error('Resident is unavailable.');
       if(!Number.isSafeInteger(input?.frames)||input.frames<1||input.frames>300)throw new Error('Action duration must be 1–300 physics frames.');

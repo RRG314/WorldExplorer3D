@@ -21,6 +21,6 @@ export function applyConsumption(actor,definition) {
   const health=createPlayerConditionModel({storage:{getItem:()=>null,setItem:()=>{}}});
   health.set(actor.condition??1,'research-hydrate',{persist:false});health.restore(definition.conditionRestore||0,'research-consumption');
   return {...actor,condition:health.snapshot().condition,needs:{...actor.needs,
-    water:Math.min(1,actor.needs.water+(definition.id==='trail-water'?.4:0)),
-    food:Math.min(1,actor.needs.food+(definition.id==='route-snack'?.3:0))}};
+    water:Math.min(1,actor.needs.water+(definition.needRestore?.water??0)),
+    food:Math.min(1,actor.needs.food+(definition.needRestore?.food??0))}};
 }

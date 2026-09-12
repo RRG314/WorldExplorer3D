@@ -1,0 +1,81 @@
+{
+  "balancedGathers": 2,
+  "completedPathMeters": 6.216000000000008,
+  "completedRecipes": [],
+  "controllerCalls": 6,
+  "limitations": [
+    "State-transition self-evaluation; no independent reviewer.",
+    "Placement alone does not verify structural usefulness.",
+    "Source fingerprint covers research modules, not all external world inputs."
+  ],
+  "model": "gemini-3.1-flash-lite",
+  "profile": {
+    "food": 0.55,
+    "id": "resource-use-v1",
+    "maximumWallMs": 1200000,
+    "minimumSupplyDistanceMeters": 5,
+    "rest": 0.9,
+    "water": 0.45
+  },
+  "records": [
+    {
+      "completedPathMeters": 3.1080000000000036,
+      "decision": 1,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 3.108000000000004,
+      "decision": 2,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "balancedGather": true,
+      "decision": 3,
+      "inventoryDelta": {
+        "trail-water": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": false,
+      "decision": 4,
+      "inventoryDelta": {},
+      "kind": "gather",
+      "status": "rejected"
+    },
+    {
+      "balancedGather": false,
+      "decision": 5,
+      "inventoryDelta": {},
+      "kind": "gather",
+      "status": "rejected"
+    },
+    {
+      "balancedGather": true,
+      "decision": 6,
+      "inventoryDelta": {
+        "trail-water": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    }
+  ],
+  "researchSourceFingerprint": "8d8f6dde476ffae3c3771190d33d71b8e85a57b3eece4ee7bfe22bb9c02f7649",
+  "runId": "free-1789173536789-36b8a5",
+  "schemaVersion": 1,
+  "simulatedSeconds": 298.4,
+  "sourceSha256": [
+    "8b01bbeed31004f2ec9ea2c87cfd081fccc8e88189766ab540cd5a7ae38bd48a",
+    "ae1296092e29fb8ee774881336f0765f652c259df7c87140408b042c9964c896"
+  ],
+  "status": "ended",
+  "verifiedConsumptions": 0,
+  "verifiedPlacements": 0,
+  "operatorIntervention": "Ended after six decisions to diagnose repeated remote gather denials and misleading health-only consumable descriptions.",
+  "classification": "developmental acceptance attempt; not a completed prospective replicate"
+}

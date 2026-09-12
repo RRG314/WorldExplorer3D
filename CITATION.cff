@@ -4,7 +4,7 @@ title: "World Explorer embodied-agent research: bounded mapped-world pilot"
 authors:
   - family-names: "Reid"
     given-names: "Steven"
-version: "0.1.0"
+version: "0.2.0"
 date-released: "2026-09-11"
 repository-code: "https://github.com/RRG314/WorldExplorer3D/tree/steven/research-embodied-society"
 url: "https://github.com/RRG314/WorldExplorer3D/tree/steven/research-embodied-society/research/embodied-society"

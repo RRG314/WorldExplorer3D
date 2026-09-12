@@ -1,0 +1,224 @@
+{
+  "balancedGathers": 14,
+  "browserAndServerClosed": true,
+  "classification": "prospective corrected-configuration repeat; not an exact external-world replay",
+  "comparisonRunId": "free-1789174500266-c75911",
+  "completedPathMeters": 11.898751503711148,
+  "completedRecipes": [],
+  "connectionProbes": 0,
+  "controllerCalls": 20,
+  "humanRestoredVisually": true,
+  "limitations": [
+    "State-transition self-evaluation; no independent reviewer.",
+    "Placement alone does not verify structural usefulness.",
+    "Source fingerprint covers research modules, not all external world inputs."
+  ],
+  "matchesPriorManifestFields": [
+    "profile",
+    "initialNeeds",
+    "resources",
+    "spawn",
+    "radiusMeters",
+    "buildSites",
+    "metersPerWorldUnit",
+    "worldSnapshotId"
+  ],
+  "model": "gemini-3.1-flash-lite",
+  "operatorIntervention": "No changes to resident or conditions. Renderer closed after automatic stop.",
+  "profile": {
+    "food": 0.55,
+    "id": "resource-use-v1",
+    "maximumWallMs": 1200000,
+    "minimumSupplyDistanceMeters": 5,
+    "rest": 0.9,
+    "water": 0.45
+  },
+  "providerCalls": 20,
+  "records": [
+    {
+      "completedPathMeters": 2.197687875927786,
+      "decision": 1,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 1.5539999999999927,
+      "decision": 2,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 2.1976878759277936,
+      "decision": 3,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "balancedGather": true,
+      "decision": 4,
+      "inventoryDelta": {
+        "trail-water": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 5,
+      "inventoryDelta": {
+        "trail-water": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 6,
+      "inventoryDelta": {
+        "trail-water": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 7,
+      "inventoryDelta": {
+        "trail-water": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 8,
+      "inventoryDelta": {
+        "trail-water": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 9,
+      "inventoryDelta": {
+        "trail-water": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 10,
+      "inventoryDelta": {
+        "trail-water": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 11,
+      "inventoryDelta": {
+        "trail-water": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "completedPathMeters": 1.5540000000000003,
+      "decision": 12,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 2.197687875927783,
+      "decision": 13,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 2.1976878759277922,
+      "decision": 14,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "balancedGather": true,
+      "decision": 15,
+      "inventoryDelta": {
+        "route-snack": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 16,
+      "inventoryDelta": {
+        "route-snack": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 17,
+      "inventoryDelta": {
+        "route-snack": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 18,
+      "inventoryDelta": {
+        "route-snack": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 19,
+      "inventoryDelta": {
+        "route-snack": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    },
+    {
+      "balancedGather": true,
+      "decision": 20,
+      "inventoryDelta": {
+        "route-snack": 1
+      },
+      "kind": "gather",
+      "status": "applied"
+    }
+  ],
+  "researchSourceFingerprint": "353d7cf9fbe447ea85413500994165e0bcf54190f0c720bdc007f56936a8446a",
+  "runId": "free-1789176286606-8773cb",
+  "schemaVersion": 1,
+  "simulatedSeconds": 900.0,
+  "sourceCommit": "04774819",
+  "sourceSha256": [
+    "a1d10973b15a617d1d8209638d2fe2ca8b2bbeab637b2afd40e700577f924e6d",
+    "f81fdde617f20360f31c69ff587d2dd6b043327b98121f4ef009104d312e70f4"
+  ],
+  "status": "ended",
+  "terminalCause": "900 simulated seconds reached first; wall timer subsequently restored human view",
+  "toolChain": {
+    "status": "unavailable-rules-not-recorded",
+    "verifiedUses": []
+  },
+  "verifiedConsumptions": 0,
+  "verifiedPlacements": 0
+}

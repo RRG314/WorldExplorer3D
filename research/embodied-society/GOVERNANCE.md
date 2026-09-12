@@ -11,8 +11,8 @@ The public snapshot excludes deployment workflows and local cloud targeting file
 | Gate | Status | Required evidence |
 |---|---|---|
 | Specification and constrained components | Implemented, component tested | Maintain action/material/permission regressions. |
-| Real mapped body and provider integration | Narrow live gathering result | Complete movement and resource interaction acceptance. |
-| Sustained needs and useful construction | Mechanics partial; live acceptance open | Consumption effects, tool chains, useful construction and shelter. |
+| Real mapped body and provider integration | Live movement, gathering and consumption observed | Repeat with frozen configuration and preserve failures. |
+| Sustained needs and useful construction | Mechanics partial; live acceptance open | Consumption repeatability, tool chains, useful construction and shelter; latest corrected tool probe did not achieve manufacturing. |
 | Durable individual life | Not complete | Restart/replay, long-term memory, provenance and lifecycle tests. |
 | Multiple residents | Not complete | Isolated memory, communication, custody, conflict and bounded performance. |
 | Autonomous maintainer | Disabled/not implemented | OS-enforced isolation, no production authority, independent evaluator and review. |

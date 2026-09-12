@@ -5,6 +5,11 @@ import { createWorkshopService } from './workshop.mjs';
 
 const finitePoint = p => p && ['x','y','z'].every(key => Number.isFinite(p[key]));
 
+export function resourceReachObservation(from,to,metersPerWorldUnit){
+ const distanceMeters=Math.hypot(to.x-from.x,to.y-from.y,to.z-from.z)*metersPerWorldUnit;
+ return {distanceMeters,withinReach:distanceMeters<=3,reachMeters:3};
+}
+
 // Operator-owned connection to an ALREADY loaded isolated World Explorer scene.
 // It never imports app-entry, initializes accounts, or creates replacement ground.
 export function createMappedWorldHost({THREE,appCtx,manifest,initialState,persistWorkshop}) {
@@ -96,7 +101,7 @@ export function createMappedWorldHost({THREE,appCtx,manifest,initialState,persis
       const visible=[];
       for(const node of Object.values(state.nodes)) {
         if(!grants.has(node.id)||!inside(node.position)||Math.hypot(node.position.x-from.x,node.position.y-from.y,node.position.z-from.z)*units>25||!lineOfSight({from,to:node.position}))continue;
-        visible.push({id:node.id,kind:'resource',materialId:node.materialId,position:{...node.position},remaining:node.remaining,requiredTool:node.requiredTool??null});
+        visible.push({id:node.id,kind:'resource',materialId:node.materialId,position:{...node.position},...resourceReachObservation(from,node.position,units),remaining:node.remaining,requiredTool:node.requiredTool??null});
       }
       for(const structure of Object.values(state.structures)) {
         const position={x:structure.block.gx,y:structure.block.gy,z:structure.block.gz};

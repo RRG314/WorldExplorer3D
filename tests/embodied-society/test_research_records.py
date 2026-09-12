@@ -28,5 +28,8 @@ class PublicRecords(unittest.TestCase):
    (d/'model/workshop.json').write_text(json.dumps({'calls':1,'secret':'private-placeholder','events':[{'call':1,'status':'failed','error':'private-placeholder','command':{'kind':'wait','private':'private-placeholder'},'usage':{'inputTokens':3,'secret':'private-placeholder'}}]}))
    result=r.make_run(d)
    self.assertNotIn('private-placeholder',json.dumps(result));self.assertIsNone(result['checkpoint']['frames'])
+ def test_controller_attempt_can_fail_before_provider_dispatch(self):
+  self.doc['runs'][0]['checkpoint']['controllerCalls']=self.doc['runs'][0]['providerCalls']+1
+  r.validate(self.doc)
  def test_provider_success_not_world_success(self):self.assertIsNone(r.summarize(self.doc)['worldActionsApplied'])
 if __name__=='__main__':unittest.main()

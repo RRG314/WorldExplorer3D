@@ -45,3 +45,13 @@ test('interrupted work can be cancelled without free output or lost escrow',asyn
  assert.equal(service.snapshot().actors.a.job,null);assert.equal(service.inspectInventory('a').items[0].quantity,2);
  await assert.rejects(service.execute('a',{kind:'finish',operationId:'finish',expectedRevision:4},10),e=>e.code==='work-not-complete');
 });
+
+test('carried consumable description and declared need effect match actual consumption',async()=>{
+ const {MATERIALS}=await import('../../app/js/experiments/embodied-society/material-rules.mjs');
+ const {applyConsumption}=await import('../../app/js/experiments/embodied-society/needs.mjs');
+ for(const [id,need,gain] of [['trail-water','water',.4],['route-snack','food',.3]]){
+  const item=MATERIALS.find(m=>m.id===id),actor={needs:{...initialNeeds(),[need]:.2},condition:1};
+  assert.equal(item.needRestore[need],gain);assert.ok(item.description.includes(need));
+  assert.ok(Math.abs(applyConsumption(actor,item).needs[need]-.2-gain)<1e-9);
+ }
+});

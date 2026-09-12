@@ -2,9 +2,12 @@ import http from 'node:http';
 import {readFile,realpath,mkdir,statfs} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {randomBytes} from 'node:crypto';
+import {randomBytes,createHash} from 'node:crypto';
 import {createSnapshotStore} from './snapshot-store.mjs';
-import {createModelProvider,validateModelConfig} from './model-provider.mjs';
+import {createModelProvider,validateModelConfig,residentInstructions,ACTION_SCHEMA,GEMINI_ACTION_SCHEMA} from './model-provider.mjs';
+
+import {MATERIALS,RECIPES,MATERIAL_RULESET} from '../../app/js/experiments/embodied-society/material-rules.mjs';
+import {researchObjective} from '../../app/js/experiments/embodied-society/research-objectives.mjs';
 
 const root=fileURLToPath(new URL('../../',import.meta.url));
 const mime={'.js':'text/javascript','.mjs':'text/javascript','.html':'text/html','.css':'text/css','.json':'application/json','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.svg':'image/svg+xml','.glb':'model/gltf-binary','.bin':'application/octet-stream','.wasm':'application/wasm','.woff2':'font/woff2','.hdr':'application/octet-stream'};
@@ -16,21 +19,27 @@ const freeGeminiConfig=()=>({runId:'free-'+Date.now()+'-'+randomBytes(3).toStrin
 const setupHtml=`<!doctype html><html><head><meta charset="utf-8"><title>Connect Gemini to World Explorer</title><style>body{max-width:620px;margin:60px auto;padding:24px;font:18px/1.6 system-ui;background:#102732;color:#eff9fc}input[type=password]{display:block;width:100%;padding:10px;box-sizing:border-box}button{padding:12px;margin-top:20px}a{color:#8be4ff}</style></head><body><h1>Connect Gemini</h1><p>Use an API key from a Google AI Studio project marked Free tier. The pilot allows up to 20 decisions, at least one minute apart.</p><form><label>Gemini API key<input name="apiKey" type="password" autocomplete="off" required></label><p><label><input name="free" type="checkbox" required> I verified this key's project is on the Free tier.</label></p><button>Connect Gemini</button></form><p role="status"></p><p>The key stays in server memory and is cleared from this form after submission. No billing is enabled. Stop the local server to discard the key.</p><script>const f=document.querySelector('form'),s=document.querySelector('[role=status]');f.onsubmit=async e=>{e.preventDefault();f.querySelector('button').disabled=true;try{const status=await(await fetch('/research-api/status')).json();const value=f.elements.apiKey.value;f.elements.apiKey.value='';const r=await fetch('/research-api/configure',{method:'POST',headers:{'Content-Type':'application/json','X-Research-Session':status.session},body:JSON.stringify({apiKey:value,freePlanConfirmed:f.elements.free.checked})});const result=await r.json();if(!r.ok)throw Error(result.error);f.remove();s.textContent='Gemini connected. Open the world to start the resident.';const a=document.createElement('a');a.href='/app/';a.textContent='Open World Explorer';s.after(a);const check=document.createElement('button');check.textContent='Test Gemini connection';check.onclick=async()=>{check.disabled=true;s.textContent='Contacting Gemini…';try{const r=await fetch('/research-api/probe',{method:'POST',headers:{'Content-Type':'application/json','X-Research-Session':status.session},body:'{}'});const result=await r.json();if(!r.ok)throw Error(result.error);s.textContent='Gemini responded successfully. No action was applied. You can now open the world.';}catch(error){s.textContent=error.message+' Wait at least 60 seconds before another connection check.';}finally{check.disabled=false;}};a.after(check);}catch(error){s.textContent=error.message;f.querySelector('button').disabled=false;}};</script></body></html>`;
 export async function startLiveResearchServer({port=4498,config=null,apiKey=null,storageRoot=path.join(root,'output/embodied-society-live'),fetchImpl=fetch}={}) {
  const session=randomBytes(32).toString('hex');
+ const digest=createHash('sha256');
+ for(const name of ['observer-report','observer-panel','research-objectives','decision-cadence','acceptance-profile','material-rules','needs','resident-body','run-controller','mapped-world-host','world-authority','workshop','construction-projection','live-controls'])digest.update(name).update(await readFile(path.join(root,'app/js/experiments/embodied-society',name+'.mjs')));
+ for(const name of ['model-provider','live-server'])digest.update(name).update(await readFile(path.join(root,'scripts/embodied-society',name+'.mjs')));
+ const sourceFingerprint=digest.digest('hex');
  let settingsErrors=validateModelConfig(config);
  let runId=config?.runId;
  if(config&&(!/^[a-zA-Z0-9_-]{1,64}$/.test(runId||'')))throw Error('Set a unique runId containing letters, digits, hyphens or underscores.');
- let provider=null,checkpointStore=null,workshopStore=null;
+ let provider=null,checkpointStore=null,workshopStore=null,manifestStore=null;
  async function initializeProvider() {
   const directory=path.join(storageRoot,runId);
   const free=await statfs(root);if(Number(free.bavail)*Number(free.bsize)<10*1024**3)throw Error('Research requires at least 10 GiB free disk.');
   await mkdir(directory,{recursive:true});
   const ledgerStore=createSnapshotStore(path.join(directory,'model'));
-  provider=createModelProvider({config,apiKey,fetchImpl,store:ledgerStore,initialLedger:await ledgerStore.load()});
+  provider=createModelProvider({config,apiKey,fetchImpl,store:ledgerStore,initialLedger:await ledgerStore.load(),recordObservation:record=>createSnapshotStore(path.join(directory,'observations',`call-${record.call}`),{maxBytes:65536}).save(record)});
   checkpointStore=createSnapshotStore(path.join(directory,'checkpoint'),{maxBytes:2*1024**2});
   workshopStore=createSnapshotStore(path.join(directory,'workshop'),{maxBytes:2*1024**2});
+  manifestStore=createSnapshotStore(path.join(directory,'manifest'),{maxBytes:2*1024**2});
  }
  if(!settingsErrors.length&&apiKey)await initializeProvider();
  const rootReal=await realpath(root);
+ let activeObjective=researchObjective();
  let active=false,starting=false,configuring=false,probes=0,probing=false;
  const server=http.createServer(async(req,res)=>{
   const json=(status,value)=>res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'}).end(JSON.stringify(value));
@@ -39,7 +48,7 @@ export async function startLiveResearchServer({port=4498,config=null,apiKey=null
    if(req.headers.host!==address)return json(403,{error:'Use the loopback research URL.'});
    const url=new URL(req.url,`http://${address}`),name=decodeURIComponent(url.pathname);
    if(name.startsWith('/research-api/')) {
-    if(name==='/research-api/status'&&req.method==='GET')return json(200,{session,ready:!!provider,runId:runId||null,model:provider?.status()??null,missing:[...settingsErrors,...(!apiKey?['Set WE3D_RESEARCH_API_KEY in the server environment.']:[])],savedCheckpoint:provider?!!await checkpointStore.load():false});
+    if(name==='/research-api/status'&&req.method==='GET')return json(200,{session,sourceFingerprint,ready:!!provider,runId:runId||null,model:provider?.status()??null,missing:[...settingsErrors,...(!apiKey?['Set WE3D_RESEARCH_API_KEY in the server environment.']:[])],savedCheckpoint:provider?!!await checkpointStore.load():false});
     if(req.method!=='POST'||req.headers.origin!==`http://${address}`||req.headers['x-research-session']!==session)return json(403,{error:'Research session required.'});
     if(name==='/research-api/configure') {
      if(provider||configuring||config)return json(409,{error:'Server already configured. Restart to change the provider.'});
@@ -62,19 +71,23 @@ export async function startLiveResearchServer({port=4498,config=null,apiKey=null
      if(active||starting||probing)return json(409,{error:'Run is already starting or active.'});
      starting=true;
      try {
-     if(await checkpointStore.load()||await workshopStore.load())return json(409,{error:'Run ID already used. Choose a new run ID; restart recovery is not enabled.'});
+     if(await checkpointStore.load()||await workshopStore.load()||await manifestStore.load())return json(409,{error:'Run ID already used. Choose a new run ID; restart recovery is not enabled.'});
      if(body.runId!==runId||typeof body.worldSnapshotId!=='string'||body.manifest?.worldSnapshotId!==body.worldSnapshotId)return json(409,{error:'Mapped research manifest required.'});
+     let selectedObjective;try{selectedObjective=researchObjective(body.manifest.objectiveId);}catch{return json(400,{error:'Unknown research objective.'});}
+     const decisionContract={instructions:residentInstructions(config.provider),schema:config.provider==='gemini'?GEMINI_ACTION_SCHEMA:ACTION_SCHEMA};
+     await manifestStore.save({schemaVersion:1,runId,createdAt:new Date().toISOString(),sourceFingerprint,provider:config.provider,model:config.model,maxCalls:config.maxCalls,maxOutputTokens:config.maxOutputTokens,minDecisionIntervalMs:config.minDecisionIntervalMs??0,decisionContract,materialRules:{ruleset:MATERIAL_RULESET,materials:MATERIALS,recipes:RECIPES},manifest:{...body.manifest,objective:selectedObjective}});
+     activeObjective=selectedObjective;
      await checkpointStore.save({schemaVersion:1,runId,status:'starting',manifest:body.manifest});active=true;return json(200,{started:true});
      }finally{starting=false;}
     }
     if(!active)return json(409,{error:'Start a mapped research session first.'});
     if(name==='/research-api/decision') {
      const abort=new AbortController();res.on('close',()=>{if(!res.writableEnded)abort.abort();});
-     return json(200,{action:await provider.decide(body,{signal:abort.signal}),model:provider.status()});
+     return json(200,{action:await provider.decide({...body,experimentObjective:activeObjective.text},{signal:abort.signal}),decisionSummary:provider.decisionSummary(),model:provider.status()});
     }
     if(name==='/research-api/checkpoint'||name==='/research-api/workshop') {
      if(body.runId!==runId)return json(409,{error:'Run identity mismatch.'});
-     await (name.endsWith('checkpoint')?checkpointStore:workshopStore).save(body);return json(200,{saved:true});
+     await (name.endsWith('checkpoint')?checkpointStore:workshopStore).save({...body,recordedAt:new Date().toISOString()});return json(200,{saved:true});
     }
     return json(404,{error:'Unknown research operation.'});
    }

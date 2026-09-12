@@ -156,6 +156,831 @@
         "checkpointSha256": "530e35718098a72ef08efc7e7b13880d3438f9175c480de123564f8a89ed9cef",
         "modelSha256": "9d78f4766afad5270e1dbb05fd2ef0901482412356730d9363a03c01f487078f"
       }
+    },
+    {
+      "checkpoint": {
+        "controllerCalls": 6,
+        "frames": 17904,
+        "status": "ended"
+      },
+      "providerCalls": 7,
+      "providerEvents": [
+        {
+          "call": 1,
+          "commandKind": "wait",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 244,
+            "outputTokens": 7
+          }
+        },
+        {
+          "call": 2,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 1535,
+            "outputTokens": 75
+          }
+        },
+        {
+          "call": 3,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 1805,
+            "outputTokens": 75
+          }
+        },
+        {
+          "call": 4,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 1887,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 5,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2110,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 6,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2222,
+            "outputTokens": 24
+          }
+        },
+        {
+          "call": 7,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2322,
+            "outputTokens": 38
+          }
+        }
+      ],
+      "runId": "free-1789173536789-36b8a5",
+      "sources": {
+        "checkpointSha256": "ae1296092e29fb8ee774881336f0765f652c259df7c87140408b042c9964c896",
+        "modelSha256": "50c35334d2c2b3aacd4dbd5c99eeb0658a62c99aa0c6add3d81ace1509fb71a1"
+      }
+    },
+    {
+      "checkpoint": {
+        "controllerCalls": 2,
+        "frames": 3356,
+        "status": "ended"
+      },
+      "providerCalls": 1,
+      "providerEvents": [
+        {
+          "call": 1,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 1764,
+            "outputTokens": 75
+          }
+        }
+      ],
+      "runId": "free-1789174167651-c430f3",
+      "sources": {
+        "checkpointSha256": "8c919e44d4de3960be89adf23484d3a5aa9689e404b3e8cddcf752d3643cbe30",
+        "modelSha256": "f75f85a14d669b5f520261bfeff3c495f54d3b7ae586f48430fb05ba69723c21"
+      }
+    },
+    {
+      "checkpoint": {
+        "controllerCalls": 20,
+        "frames": 39968,
+        "status": "ended"
+      },
+      "providerCalls": 20,
+      "providerEvents": [
+        {
+          "call": 1,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 1764,
+            "outputTokens": 57
+          }
+        },
+        {
+          "call": 2,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2056,
+            "outputTokens": 77
+          }
+        },
+        {
+          "call": 3,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2158,
+            "outputTokens": 79
+          }
+        },
+        {
+          "call": 4,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2243,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 5,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2491,
+            "outputTokens": 24
+          }
+        },
+        {
+          "call": 6,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2582,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 7,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2673,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 8,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2764,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 9,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2873,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 10,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2955,
+            "outputTokens": 24
+          }
+        },
+        {
+          "call": 11,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3045,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 12,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3136,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 13,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3227,
+            "outputTokens": 79
+          }
+        },
+        {
+          "call": 14,
+          "commandKind": "consume",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3370,
+            "outputTokens": 39
+          }
+        },
+        {
+          "call": 15,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3441,
+            "outputTokens": 75
+          }
+        },
+        {
+          "call": 16,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3550,
+            "outputTokens": 43
+          }
+        },
+        {
+          "call": 17,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3665,
+            "outputTokens": 75
+          }
+        },
+        {
+          "call": 18,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3788,
+            "outputTokens": 18
+          }
+        },
+        {
+          "call": 19,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4038,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 20,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4129,
+            "outputTokens": 24
+          }
+        }
+      ],
+      "runId": "free-1789174500266-c75911",
+      "sources": {
+        "checkpointSha256": "06fc48a92c5c51e953debf6e1f693cb32fd07a77701e732f51ebd960386066fb",
+        "modelSha256": "ff6e1fd83931e975d2f8cce09778504e095a48424860dc3051fb3055e9e9292f"
+      }
+    },
+    {
+      "checkpoint": {
+        "controllerCalls": 20,
+        "frames": 54000,
+        "status": "ended"
+      },
+      "providerCalls": 20,
+      "providerEvents": [
+        {
+          "call": 1,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 1764,
+            "outputTokens": 57
+          }
+        },
+        {
+          "call": 2,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2055,
+            "outputTokens": 59
+          }
+        },
+        {
+          "call": 3,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2137,
+            "outputTokens": 77
+          }
+        },
+        {
+          "call": 4,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2254,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 5,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2499,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 6,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2591,
+            "outputTokens": 24
+          }
+        },
+        {
+          "call": 7,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2684,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 8,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2775,
+            "outputTokens": 24
+          }
+        },
+        {
+          "call": 9,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2867,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 10,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2958,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 11,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3052,
+            "outputTokens": 24
+          }
+        },
+        {
+          "call": 12,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3144,
+            "outputTokens": 40
+          }
+        },
+        {
+          "call": 13,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3264,
+            "outputTokens": 77
+          }
+        },
+        {
+          "call": 14,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3366,
+            "outputTokens": 55
+          }
+        },
+        {
+          "call": 15,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3454,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 16,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3707,
+            "outputTokens": 24
+          }
+        },
+        {
+          "call": 17,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3803,
+            "outputTokens": 18
+          }
+        },
+        {
+          "call": 18,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3897,
+            "outputTokens": 18
+          }
+        },
+        {
+          "call": 19,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3990,
+            "outputTokens": 24
+          }
+        },
+        {
+          "call": 20,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 4084,
+            "outputTokens": 38
+          }
+        }
+      ],
+      "runId": "free-1789176286606-8773cb",
+      "sources": {
+        "checkpointSha256": "f81fdde617f20360f31c69ff587d2dd6b043327b98121f4ef009104d312e70f4",
+        "modelSha256": "a9eaee5c870729093a903b51c2b33b35afb02b104c778ade879501f4522a0598"
+      }
+    },
+    {
+      "checkpoint": {
+        "controllerCalls": 3,
+        "frames": 1656,
+        "status": "failed"
+      },
+      "providerCalls": 3,
+      "providerEvents": [
+        {
+          "call": 1,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 1822,
+            "outputTokens": 77
+          }
+        },
+        {
+          "call": 2,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2061,
+            "outputTokens": 76
+          }
+        },
+        {
+          "call": 3,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2206,
+            "outputTokens": 56
+          }
+        }
+      ],
+      "runId": "free-1789177869788-bd74aa",
+      "sources": {
+        "checkpointSha256": "b1bfa2d20ec52071957c094dbffa7204707a59b1b21381fbd96505c1e7a63ca8",
+        "modelSha256": "f8d6c8268cf1635568aa00a6884969ef3c65471886d788094ed45a39db74b4ad"
+      }
+    },
+    {
+      "checkpoint": {
+        "controllerCalls": 13,
+        "frames": 41148,
+        "status": "failed"
+      },
+      "providerCalls": 13,
+      "providerEvents": [
+        {
+          "call": 1,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 1847,
+            "outputTokens": 77
+          }
+        },
+        {
+          "call": 2,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2121,
+            "outputTokens": 55
+          }
+        },
+        {
+          "call": 3,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2206,
+            "outputTokens": 75
+          }
+        },
+        {
+          "call": 4,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2319,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 5,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2573,
+            "outputTokens": 18
+          }
+        },
+        {
+          "call": 6,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2668,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 7,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2761,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 8,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2856,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 9,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2949,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 10,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3044,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 11,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3137,
+            "outputTokens": 18
+          }
+        },
+        {
+          "call": 12,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3231,
+            "outputTokens": 77
+          }
+        },
+        {
+          "call": 13,
+          "commandKind": "consume",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3365,
+            "outputTokens": 41
+          }
+        }
+      ],
+      "runId": "free-1789178295752-eb8e47",
+      "sources": {
+        "checkpointSha256": "e9cfda98bdbe137b4442361a5e12fc2465c67344e02ffdb86850493ab16fc1e4",
+        "modelSha256": "ea11fe11b6327eabc4781913bfb5a18d7b2fb6f9fb0f20c74be47495c8823a15"
+      }
+    },
+    {
+      "checkpoint": {
+        "controllerCalls": 16,
+        "frames": 54000,
+        "status": "ended"
+      },
+      "providerCalls": 16,
+      "providerEvents": [
+        {
+          "call": 1,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 1921,
+            "outputTokens": 73
+          }
+        },
+        {
+          "call": 2,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2196,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 3,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2446,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 4,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2537,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 5,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2627,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 6,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2716,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 7,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2825,
+            "outputTokens": 55
+          }
+        },
+        {
+          "call": 8,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 2940,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 9,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3008,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 10,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3102,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 11,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3194,
+            "outputTokens": 18
+          }
+        },
+        {
+          "call": 12,
+          "commandKind": "move",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3288,
+            "outputTokens": 77
+          }
+        },
+        {
+          "call": 13,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3398,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 14,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3651,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 15,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3742,
+            "outputTokens": 38
+          }
+        },
+        {
+          "call": 16,
+          "commandKind": "gather",
+          "status": "completed",
+          "usage": {
+            "inputTokens": 3838,
+            "outputTokens": 38
+          }
+        }
+      ],
+      "runId": "free-1789179355989-ea1ce4",
+      "sources": {
+        "checkpointSha256": "67e0fe04f4a2132a0ee743d13d75ff486053f6037e8b1af0f2e47613b4f5b4ca",
+        "modelSha256": "3490df8a354b2579293ce9c6aa4de7af6bbcc496784c83a8d0fa1113e8499144"
+      }
     }
   ],
   "schemaVersion": 1,

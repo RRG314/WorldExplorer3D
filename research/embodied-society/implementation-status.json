@@ -3,7 +3,7 @@
   "branch": "steven/research-embodied-society",
   "parentCheckpoint": "f88af9db",
   "date": "2026-09-11",
-  "stage": "SINGLE_RESIDENT_LIVE_GATHERING_VERIFIED_SURVIVAL_PENDING",
+  "stage": "LIVE_RESOURCE_INTERACTION_VERIFIED_USEFUL_TOOL_MILESTONE_NOT_PASSED",
   "launchable": true,
   "productionChanged": false,
   "experimentModelCalls": null,
@@ -12,18 +12,19 @@
     "materialProcesses": "component-tested",
     "inventoryStorage": "component-tested",
     "needsAndIdleClock": "component-tested",
-    "residentWalking": "component-and-browser-fixture-tested",
+    "residentWalking": "live model-selected movements measured in actual mapped world",
     "worldAuthority": "controlled-world-query-tests",
     "constructionProjection": "component-and-browser-fixture-tested",
     "runController": "bounded live decisions and observed Pause/Resume/End",
     "controlRehearsal": "removed from launch path per owner correction",
-    "mappedWorldHost": "actual mapped-world load and two live gathering actions verified; movement/shelter acceptance pending",
+    "mappedWorldHost": "live movement, food/water gathering and food consumption verified; shelter pending",
     "modelProvider": "real Gemini responses verified; other adapters transport-double tested",
-    "liveServer": "implemented; actual app HTML injection and account disabling HTTP-tested"
+    "liveServer": "implemented; actual app HTML injection and account disabling HTTP-tested",
+    "observer": "quantity display, minimize/expand and mobile containment browser-fixture tested; report and Gemini summary transport component tested; revised live integration not rerun"
   },
   "evidence": {
     "researchTests": {
-      "passed": 59,
+      "passed": 79,
       "failed": 0,
       "command": "npm run experiment:society:test"
     },
@@ -54,10 +55,27 @@
       "valid": true,
       "preflightExitCode": 1,
       "preflightMeaning": "Expected refusal: not launchable"
+    },
+    "researchRecordTests": {
+      "passed": 24,
+      "failed": 0,
+      "command": "python3 -m unittest discover -s tests/embodied-society -p 'test_*.py'"
+    },
+    "observer": {
+      "date": "2026-09-11",
+      "scope": "lightweight browser component fixture; no model or full-world run",
+      "checks": [
+        "quantity aggregation",
+        "consumption quantity update while minimized",
+        "minimize and expand",
+        "390px mobile containment",
+        "no page errors"
+      ],
+      "ownedBrowserAndServerClosed": true
     }
   },
   "remaining": [
-    "Extend verified live Gemini gathering to movement, consumption, crafting and construction",
+    "Useful-tool goal remains unmet: evaluate planning/model choices under a frozen corrected interface; do not expand population",
     "Interior/shelter validation, complete world input pinning and longer-term memory",
     "Memory, communication and later population gates",
     "OS-enforced engineering isolation and independent evaluator",
@@ -156,6 +174,47 @@
         "This does not establish sustained autonomous survival."
       ],
       "automatedResearchTests": 59
+    },
+    "resourceUseAcceptance": {
+      "runId": "free-1789174500266-c75911",
+      "sourceCommit": "f03ece15",
+      "providerCalls": 20,
+      "completedPathMeters": 12.663054044888296,
+      "balancedGathers": 11,
+      "verifiedConsumptions": 1,
+      "completedRecipes": [],
+      "verifiedPlacements": 0,
+      "simulatedSeconds": 666.1333333333333,
+      "terminalCause": "automatic 20-minute wall limit",
+      "browserAndServerClosed": true
+    },
+    "resourceUseRepeat": {
+      "runId": "free-1789176286606-8773cb",
+      "sourceCommit": "04774819",
+      "providerCalls": 20,
+      "simulatedSeconds": 900,
+      "balancedGathers": 14,
+      "verifiedConsumptions": 0,
+      "sameRecordedInitialConditions": true
+    },
+    "toolUseProbe": {
+      "runId": "free-1789179355989-ea1ce4",
+      "sourceCommit": "cd11ac0a",
+      "providerCalls": 16,
+      "simulatedSeconds": 900.0,
+      "completedPathMeters": 6.979397097985201,
+      "balancedGathers": 12,
+      "verifiedConsumptions": 0,
+      "completedRecipes": [],
+      "toolChain": {
+        "meaning": "Gathered inputs, paid timed transformations and later tool-dependent gathering with measured wear; state-transition self-review.",
+        "status": "evaluated",
+        "verifiedUses": []
+      },
+      "terminalCause": "900 simulated seconds",
+      "exactObservationsArchived": 16,
+      "immediateSimulationStopCleanupObserved": true,
+      "browserAndServerClosed": true
     }
   },
   "launchScope": "Operator-configured, bounded local pilot only; full experiment not ready",

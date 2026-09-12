@@ -76,7 +76,7 @@ def validate(doc):
         cp=run['checkpoint'];exact(cp,['status','frames','controllerCalls'])
         if cp['status'] not in {None,'ended','paused','running','failed','aborted'}:raise ValueError('Invalid terminal status')
         if any(cp[k] is not None and not integer(cp[k]) for k in ['frames','controllerCalls']):raise ValueError('Invalid checkpoint count')
-        if cp['controllerCalls'] is not None and cp['controllerCalls'] > run['providerCalls']:raise ValueError('Controller/provider count mismatch')
+        # Controller attempts can fail before provider dispatch (for example cooldown rejection).
     return doc
 
 def summarize(doc):

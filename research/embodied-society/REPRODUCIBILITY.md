@@ -26,3 +26,9 @@ Export operates only on direct `free-*` run directories and selected snapshot fi
 ## Reproducibility limits
 
 Re-running source is possible; exact replay of the recorded pilot is not established. The provider model may change, model sampling is not pinned, all world inputs are not archived, full raw evidence is withheld and no restart importer exists. Report “attempted reproduction” with these deviations, not an exact replication. Code tests passing does not reproduce the behavioral result.
+
+## Observe and export
+
+In the mapped world, use the AI resident panel's **Minimize** and **Expand** controls. Resident item quantities remain visible when minimized. **Download decision report** exports the current run's recorded actions and effects as Markdown; download again after termination for final action states. See [the observer guide](OBSERVER.md) for ownership distinctions, stated-intent limits and interpretation. Keep exports private until reviewed for publication.
+
+For a lightweight observer-only browser check, with the repository's Playwright dependency and Chromium installed, run `node tests/embodied-society/observer-browser.mjs` from the root. It starts one temporary local fixture, checks quantities and minimize/expand at desktop and phone widths, saves screenshots under `output/verification/research-observer/`, then closes its browser and server. Its inventory changes are test inputs; it does not run a model, simulate a resident or establish live capability.

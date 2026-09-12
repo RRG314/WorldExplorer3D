@@ -1,0 +1,42 @@
+{
+  "balancedGathers": 0,
+  "completedPathMeters": 3.1079999999999974,
+  "completedRecipes": [],
+  "controllerCalls": 2,
+  "limitations": [
+    "State-transition self-evaluation; no independent reviewer.",
+    "Placement alone does not verify structural usefulness.",
+    "Source fingerprint covers research modules, not all external world inputs."
+  ],
+  "model": "gemini-3.1-flash-lite",
+  "profile": {
+    "food": 0.55,
+    "id": "resource-use-v1",
+    "maximumWallMs": 1200000,
+    "minimumSupplyDistanceMeters": 5,
+    "rest": 0.9,
+    "water": 0.45
+  },
+  "records": [
+    {
+      "completedPathMeters": 3.1079999999999974,
+      "decision": 1,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    }
+  ],
+  "researchSourceFingerprint": "9a0211a2a526f9a926e6629a5c10556c426ad28b2702a04f5d07154ea1526f16",
+  "runId": "free-1789174167651-c430f3",
+  "schemaVersion": 1,
+  "simulatedSeconds": 55.93333333333333,
+  "sourceSha256": [
+    "61650563a97fad0e06202c9714cd869fcc471e139344be5a18d61d67890e9a31",
+    "8c919e44d4de3960be89adf23484d3a5aa9689e404b3e8cddcf752d3643cbe30"
+  ],
+  "status": "ended",
+  "verifiedConsumptions": 0,
+  "verifiedPlacements": 0,
+  "classification": "infrastructure failure: client/server decision-spacing race",
+  "operatorIntervention": "Ended after client scheduling attempted a request before the server cooldown expired; no provider retry was made."
+}

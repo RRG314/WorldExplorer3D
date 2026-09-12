@@ -18,3 +18,11 @@ test('a geometrically mismatched spawn is rejected before a resident mesh is cre
  const input=options({position:{x:0,y:20,z:0},kind:'road',traversal:{walk:true},provenance:{fallback:false}});
  assert.throws(()=>createMappedWorldHost(input),/Spawn does not match/);
 });
+
+test('resource observations report the same full three-dimensional reach used by authority',async()=>{
+ const {resourceReachObservation}=await import('../../app/js/experiments/embodied-society/mapped-world-host.mjs');
+ const from={x:0,y:1.7,z:0};
+ assert.equal(resourceReachObservation(from,{x:0,y:0,z:2.7},1.11).withinReach,false);
+ assert.equal(resourceReachObservation(from,{x:0,y:0,z:1},1.11).withinReach,true);
+ assert.ok(resourceReachObservation(from,{x:0,y:0,z:2.7},1.11).distanceMeters>3);
+});

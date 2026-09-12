@@ -87,3 +87,43 @@ test('Gemini schema gives each verb its own exact fields, so gather cannot reque
  const gather=shapes.find(s=>s.properties.kind.enum[0]==='gather');assert.deepEqual(Object.keys(gather.properties).sort(),['kind','quantity','targetId']);assert.equal(gather.additionalProperties,false);
  const wait=shapes.find(s=>s.properties.kind.enum[0]==='wait');assert.deepEqual(Object.keys(wait.properties),['kind']);
 });
+
+test('movement schema bounds match host controls and normalization refuses invalid values',async()=>{
+ const {GEMINI_ACTION_SCHEMA,normalizeModelAction}=await import('../../scripts/embodied-society/model-provider.mjs');
+ const move=GEMINI_ACTION_SCHEMA.properties.action.anyOf.find(s=>s.properties.kind.enum[0]==='move');
+ for(const axis of ['move','strafe','turn','lookYaw','lookPitch']){
+  assert.equal(move.properties[axis].minimum,-1);assert.equal(move.properties[axis].maximum,1);
+  assert.throws(()=>normalizeModelAction({kind:'move',frames:30,[axis]:-1.45}),/movement axis/);
+  assert.throws(()=>normalizeModelAction({kind:'move',frames:30,[axis]:'0.5'}),/movement axis/);
+ }
+ for(const frames of [null,0,301,1.5])assert.throws(()=>normalizeModelAction({kind:'move',frames}),/duration/);
+ assert.deepEqual(normalizeModelAction({kind:'move',frames:30,lookYaw:-1}),{kind:'move',frames:30,lookYaw:-1});
+});
+
+test('material schema names catalog identities and excludes inventory instance identities',async()=>{
+ const {ACTION_SCHEMA}=await import('../../scripts/embodied-society/model-provider.mjs');
+ assert.ok(ACTION_SCHEMA.properties.materialId.enum.includes('route-snack'));
+ assert.ok(ACTION_SCHEMA.properties.materialId.enum.includes('research:stone-axe'));
+ assert.equal(ACTION_SCHEMA.properties.materialId.enum.includes('material:route-snack'),false);
+});
+test('observation persistence failure prevents provider dispatch without refunding allowance',async()=>{
+ let dispatched=false;
+ const provider=createModelProvider({config,apiKey:'key',store:{save:async()=>{}},recordObservation:async()=>{throw Error('Observation storage failed');},fetchImpl:async()=>{dispatched=true;return response({kind:'wait'});}});
+ await assert.rejects(provider.decide({}),/Observation storage/);assert.equal(dispatched,false);assert.equal(provider.status().calls,1);
+});
+
+test('a received invalid action settles as failed and retains observed token usage',async()=>{
+ let saved;
+ const provider=createModelProvider({config,apiKey:'key',store:{save:async v=>{saved=v;}},fetchImpl:async()=>response({kind:'move',frames:30,lookYaw:2})});
+ await assert.rejects(provider.decide({}),/movement axis/);
+ assert.equal(saved.events[0].status,'failed');assert.equal(saved.events[0].failureCategory,'invalid-action');
+ assert.deepEqual(saved.events[0].usage,{inputTokens:20,outputTokens:10});assert.equal(provider.status().calls,1);
+});
+test('Gemini brief explanation is retained separately from executable action and excludes thought parts',async()=>{
+ const writes=[];
+ const provider=createModelProvider({config:{provider:'gemini',model:'gemini-3.1-flash-lite',accountTier:'free',freePlanConfirmed:true,budgetUsd:0,inputUsdPerMillion:0,outputUsdPerMillion:0,maxCalls:1,maxOutputTokens:256,minDecisionIntervalMs:60000},apiKey:'private-test-key',store:{save:async value=>writes.push(structuredClone(value))},fetchImpl:async()=>new Response(JSON.stringify({candidates:[{finishReason:'STOP',content:{parts:[{thought:true,text:'excluded internal content'},{text:JSON.stringify({action:{kind:'wait'},decisionSummary:'Wait for the current job.'})}]}}]}))});
+ assert.deepEqual(await provider.decide({}),{kind:'wait'});
+ assert.equal(provider.decisionSummary(),'Wait for the current job.');
+ assert.equal(writes.at(-1).events[0].decisionSummary,'Wait for the current job.');
+ assert.equal(JSON.stringify(writes).includes('excluded internal content'),false);
+});

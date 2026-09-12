@@ -6,7 +6,7 @@ const material = (id, massGrams, capabilities = []) => Object.freeze({
   stackLimit: 64, massGrams, capabilities: Object.freeze(capabilities), verbs: ['inspect', ...(capabilities.length ? ['equip'] : [])]
 });
 export const MATERIALS = Object.freeze([
-  ...COMMERCE_ITEM_DEFINITIONS.filter(d=>['trail-water','route-snack'].includes(d.id)).map(d=>Object.freeze({...d,massGrams:d.id==='trail-water'?500:200,capabilities:Object.freeze([]),stackLimit:12})),
+  ...COMMERCE_ITEM_DEFINITIONS.filter(d=>['trail-water','route-snack'].includes(d.id)).map(d=>Object.freeze({...d,needRestore:Object.freeze(d.id==='trail-water'?{water:.4}:{food:.3}),description:d.id==='trail-water'?'Drink one carried unit to restore 0.40 water reserve (0 empty, 1 full), capped at 1; also restores the listed health amount.':'Eat one carried unit to restore 0.30 food reserve (0 empty, 1 full), capped at 1; also restores the listed health amount.',massGrams:d.id==='trail-water'?500:200,capabilities:Object.freeze([]),stackLimit:12})),
   material('branch', 500), material('stone', 500), material('fiber', 100),
   material('cord', 200), material('stone-axe', 1200, ['cut-wood']),
   material('timber', 1000), material('plank', 500),

@@ -1,0 +1,64 @@
+{
+  "balancedGathers": 0,
+  "browserAndServerClosed": true,
+  "classification": "failed developmental tool-use probe",
+  "completedPathMeters": 1.8758439379639045,
+  "completedRecipes": [],
+  "controllerCalls": 3,
+  "humanRestoredVisually": true,
+  "limitations": [
+    "State-transition self-evaluation; no independent reviewer.",
+    "Placement alone does not verify structural usefulness.",
+    "Source fingerprint covers research modules, not all external world inputs."
+  ],
+  "model": "gemini-3.1-flash-lite",
+  "operatorIntervention": "No in-run action changes. Closed renderer and server after failure.",
+  "profile": {
+    "food": 0.55,
+    "id": "resource-use-v1",
+    "maximumWallMs": 1200000,
+    "minimumSupplyDistanceMeters": 5,
+    "rest": 0.9,
+    "water": 0.45
+  },
+  "providerCalls": 3,
+  "records": [
+    {
+      "completedPathMeters": 1.098843937963896,
+      "decision": 1,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "completedPathMeters": 0.7770000000000087,
+      "decision": 2,
+      "inventoryDelta": {},
+      "kind": "move",
+      "status": "movement-completed"
+    },
+    {
+      "decision": 3,
+      "kind": "move",
+      "status": "proposed"
+    }
+  ],
+  "researchSourceFingerprint": "7f93b0d75c2c2ee79918b343cc77d21d1e84105a888d76bd48ccdee8d1018c2c",
+  "runId": "free-1789177869788-bd74aa",
+  "schemaVersion": 1,
+  "simulatedSeconds": 27.6,
+  "sourceCommit": "33680603",
+  "sourceSha256": [
+    "aba39683e361b74f2282aa46b33a05ace22e7f816da5f5283dbe24a98f01cef3",
+    "b1bfa2d20ec52071957c094dbffa7204707a59b1b21381fbd96505c1e7a63ca8"
+  ],
+  "status": "failed",
+  "terminalCause": "third action contained out-of-range lookYaw; body rejected it",
+  "toolChain": {
+    "meaning": "Gathered inputs, paid timed transformations and later tool-dependent gathering with measured wear; state-transition self-review.",
+    "status": "evaluated",
+    "verifiedUses": []
+  },
+  "verifiedConsumptions": 0,
+  "verifiedPlacements": 0
+}
