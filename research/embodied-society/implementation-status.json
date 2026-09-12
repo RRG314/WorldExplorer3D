@@ -23,11 +23,12 @@
     "observer": "live quantities, minimize/expand, report control and automatic cleanup observed in tool probe 4; report content generated separately from final checkpoint",
     "memoryComparison": "two declared conditions component and HTTP tested; live comparison not executed",
     "longRunMode": "eight-hour window, matching call allowance and journal capacity; clock/controller/HTTP component tests pass; setup UI checked; full eight-hour live run not performed",
-    "acceleratedRunMode": "live 84 simulated minutes and 85 Gemini decisions; stopped on oversized gather before six-hour target"
+    "acceleratedRunMode": "live 84 simulated minutes and 85 Gemini decisions; stopped on oversized gather before six-hour target",
+    "navigationFeedback": "normalized heading, configured control rates, relative resource bearings and offsets; tested with retained walking integrator; live follow-up not run"
   },
   "evidence": {
     "researchTests": {
-      "passed": 93,
+      "passed": 95,
       "failed": 0,
       "command": "npm run experiment:society:test"
     },
@@ -143,7 +144,7 @@
     }
   },
   "remaining": [
-    "Review calibrated navigation feedback and run a separately declared follow-up with the oversized-gather repair; no sustained needs maintenance established",
+    "Run a separately declared accelerated follow-up with calibrated navigation feedback and oversized-gather recovery; no sustained needs maintenance established",
     "Useful-tool goal remains unmet: evaluate planning/model choices under a frozen corrected interface; do not expand population",
     "Interior/shelter validation, complete world input pinning and longer-term memory",
     "Memory, communication and later population gates",

@@ -29,3 +29,14 @@ test('mapped walking queries use resident foot height and checkpoints exclude li
  resident.step();assert.equal(queried.currentY,10);assert.equal(queried.sampleRenderedMesh,false);
  assert.doesNotThrow(()=>JSON.stringify(resident.checkpoint()));assert.equal(Object.hasOwn(resident.checkpoint().walker,'_walkSupportFeature'),false);
 });
+
+test('published turn rate and normalized heading match repeated actual physics turns',()=>{
+ const a=body('turn');const rate=a.observation().controls.turnRadiansPerSecond;
+ for(let command=0;command<10;command++){a.command({turn:1,frames:300});for(let i=0;i<300;i++)a.step();}
+ const raw=a.checkpoint().walker.yaw,seen=a.observation().yaw;
+ assert.ok(Math.abs(raw-rate*50)<1e-8);assert.ok(seen>=-Math.PI&&seen<=Math.PI);
+ assert.ok(Math.abs(Math.sin(raw)-Math.sin(seen))<1e-8);
+ const before=a.observation().position;a.command({move:1,frames:60});for(let i=0;i<60;i++)a.step();
+ const after=a.observation().position,speed=a.observation().controls.forwardWorldUnitsPerSecond;
+ assert.ok(Math.abs(after.x-before.x-Math.sin(seen)*speed)<1e-8);assert.ok(Math.abs(after.z-before.z-Math.cos(seen)*speed)<1e-8);
+});

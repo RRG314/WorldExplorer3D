@@ -26,3 +26,18 @@ test('resource observations report the same full three-dimensional reach used by
  assert.equal(resourceReachObservation(from,{x:0,y:0,z:1},1.11).withinReach,true);
  assert.ok(resourceReachObservation(from,{x:0,y:0,z:2.7},1.11).distanceMeters>3);
 });
+
+test('resource bearing predicts a turn then movement using the real motor, including wrapped headings',async()=>{
+ const {targetDirectionObservation}=await import('../../app/js/experiments/embodied-society/mapped-world-host.mjs');
+ const {createResidentMotor}=await import('../../app/js/experiments/embodied-society/resident-body.mjs');
+ for(const yaw of [0,2.9,-2.9,130])for(const target of [{x:5,y:0,z:1},{x:-5,y:0,z:-1}]){
+  const a=createResidentMotor({actorId:'a',spawn:{x:0,y:1.7,z:0,yaw},world:{walkSurfaceAt:()=>({position:{y:0}}),checkBuildingCollision:()=>({collision:false})}});
+  const initial=a.observation(),d=targetDirectionObservation(initial.position,target,initial.yaw,1.11);
+  const seconds=2,axis=d.relativeBearingRadians/(initial.controls.turnRadiansPerSecond*seconds);
+  a.command({turn:axis,frames:seconds*60});for(let i=0;i<seconds*60;i++)a.step();
+  a.command({move:1,frames:60});for(let i=0;i<60;i++)a.step();
+  const after=a.observation();assert.ok(Math.hypot(target.x-after.position.x,target.z-after.position.z)<Math.hypot(target.x,target.z));
+ }
+ const left=targetDirectionObservation({x:0,y:0,z:0},{x:-2,y:5,z:0},0,1.11);assert.equal(left.leftMeters,2.22);assert.equal(left.forwardMeters,0);assert.equal(left.relativeBearingRadians,-Math.PI/2);
+ assert.equal(targetDirectionObservation({x:0,y:0,z:0},{x:0,y:5,z:0},0,1).relativeBearingRadians,null);
+});

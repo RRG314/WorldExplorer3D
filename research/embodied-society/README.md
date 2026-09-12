@@ -18,6 +18,7 @@ Live Gemini runs have produced movement, balanced resource gathering and one obs
 | [Accelerated study](ACCELERATED-NEEDS-STUDY.md) | Six-hour clock policy, bounds and interpretation |
 | [Accelerated study result](reports/accelerated-needs-2.md) | 84 simulated minutes, 85 decisions, navigation difficulty and a repaired rejection defect |
 | [Memory comparison](MEMORY-COMPARISON.md) | Original comparison, deferred pending the timing redesign |
+| [Navigation amendment](NAVIGATION-FEEDBACK.md) | Calibrated headings, control rates and resource bearings; physics verification and follow-up plan |
 | [Observer guide](OBSERVER.md) | Minimize the panel, inspect inventory and download decision reports |
 | [Reproduction guide](REPRODUCIBILITY.md) | Verify records and run locally with a private model configuration |
 | [Data specification](DATA.md) | Record formats, missing evidence, provenance and privacy |

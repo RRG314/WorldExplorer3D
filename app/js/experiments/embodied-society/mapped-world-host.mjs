@@ -1,4 +1,4 @@
-import { createResidentBody } from './resident-body.mjs';
+import { createResidentBody,normalizedHeading } from './resident-body.mjs';
 import { createConstructionProjection } from './construction-projection.mjs';
 import { createWorldAuthority } from './world-authority.mjs';
 import { createWorkshopService } from './workshop.mjs';
@@ -8,6 +8,12 @@ const finitePoint = p => p && ['x','y','z'].every(key => Number.isFinite(p[key])
 export function resourceReachObservation(from,to,metersPerWorldUnit){
  const distanceMeters=Math.hypot(to.x-from.x,to.y-from.y,to.z-from.z)*metersPerWorldUnit;
  return {distanceMeters,withinReach:distanceMeters<=3,reachMeters:3};
+}
+
+export function targetDirectionObservation(from,to,heading,metersPerWorldUnit){
+ const dx=to.x-from.x,dz=to.z-from.z;
+ const horizontalDistanceMeters=Math.hypot(dx,dz)*metersPerWorldUnit;
+ return {horizontalDistanceMeters,forwardMeters:(dx*Math.sin(heading)+dz*Math.cos(heading))*metersPerWorldUnit,leftMeters:(-dx*Math.cos(heading)+dz*Math.sin(heading))*metersPerWorldUnit,relativeBearingRadians:horizontalDistanceMeters<1e-9?null:normalizedHeading(Math.atan2(dx,dz)-heading)};
 }
 
 // Operator-owned connection to an ALREADY loaded isolated World Explorer scene.
@@ -97,11 +103,11 @@ export function createMappedWorldHost({THREE,appCtx,manifest,initialState,persis
     }});
     workshop=createWorkshopService({initialState,authorize:authority.authorize,persist:persistWorkshop,maxEvents:manifest.runWindow?.maxEvents??1000});
     function perceive() {
-      validWorld();const from=body.observation().position,state=workshop.stateView();
+      validWorld();const observedBody=body.observation(),from=observedBody.position,heading=observedBody.yaw,state=workshop.stateView();
       const visible=[];
       for(const node of Object.values(state.nodes)) {
         if(!grants.has(node.id)||!inside(node.position)||Math.hypot(node.position.x-from.x,node.position.y-from.y,node.position.z-from.z)*units>25||!lineOfSight({from,to:node.position}))continue;
-        visible.push({id:node.id,kind:'resource',materialId:node.materialId,position:{...node.position},...resourceReachObservation(from,node.position,units),remaining:node.remaining,requiredTool:node.requiredTool??null});
+        visible.push({id:node.id,kind:'resource',materialId:node.materialId,position:{...node.position},...resourceReachObservation(from,node.position,units),...targetDirectionObservation(from,node.position,heading,units),remaining:node.remaining,requiredTool:node.requiredTool??null});
       }
       for(const structure of Object.values(state.structures)) {
         const position={x:structure.block.gx,y:structure.block.gy,z:structure.block.gz};
@@ -109,7 +115,6 @@ export function createMappedWorldHost({THREE,appCtx,manifest,initialState,persis
         // Owned construction is remembered, not proof of current line of sight.
         visible.push({id:structure.id,kind:structure.kind,knowledge:'owned-construction-record',position,capabilities:structure.capabilities});
       }
-      const heading=body.observation().yaw;
       const sight=[];
       for(let ray=0;ray<9;ray++) {
         const yaw=heading-.8+ray*.2;let clearMeters=0;
@@ -118,9 +123,9 @@ export function createMappedWorldHost({THREE,appCtx,manifest,initialState,persis
           if(!inside({x,y:from.y,z})||worldCollision(x,z,.35,{actorBaseY:from.y-1.7,actorHeight:1.7}).collision||combinedBuildCollision(x,z,from.y-1.7,.65,1.7).blocked)break;
           clearMeters=distance;
         }
-        sight.push({yaw,clearMeters,maximumMeters:8});
+        sight.push({yaw:normalizedHeading(yaw),relativeBearingRadians:ray*.2-.8,clearMeters,maximumMeters:8});
       }
-      return {worldSnapshotId:publication.id,coordinates:'World Explorer local units, +y up; yaw zero faces +z',metersPerWorldUnit:units,forwardClearance:sight,objects:visible.slice(0,32),buildSites:buildSites.filter(p=>Math.hypot(p.gx-from.x,p.gz-from.z)*units<=3)};
+      return {worldSnapshotId:publication.id,coordinates:'World Explorer local units, +y up; yaw zero faces +z; yaw and relative bearings are radians in [-pi,pi]; positive bearing uses positive turn; forwardMeters and leftMeters are body-relative offsets, not a verified route',metersPerWorldUnit:units,forwardClearance:sight,objects:visible.slice(0,32),buildSites:buildSites.filter(p=>Math.hypot(p.gx-from.x,p.gz-from.z)*units<=3)};
     }
     return Object.freeze({body,workshop,perceive,validate:validWorld,
       reconcile(){validWorld();return projection.reconcile(workshop.stateView());},

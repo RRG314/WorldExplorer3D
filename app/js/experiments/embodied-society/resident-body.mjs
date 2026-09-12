@@ -4,6 +4,7 @@ import { createFieldNavigatorMesh } from '../../walking/field-navigator-mesh.js?
 import { createWalkingCharacterHelpers } from '../../walking/character.js?v=7';
 
 const finite=(value,fallback)=>Number.isFinite(value)?value:fallback;
+export const normalizedHeading=radians=>Math.atan2(Math.sin(radians),Math.cos(radians));
 const AXES=['move','strafe','turn','lookYaw','lookPitch'];
 
 // Uses the retained walking integrator with a private context, never player
@@ -51,7 +52,7 @@ export function createResidentMotor({actorId,spawn,world,characterMesh=null,anim
       if(frames>0)frames--;
     },
     checkpoint(){const {_walkSupportFeature,...walker}=state.walker;return structuredClone({walker,actions,frames,paused});},
-    observation(){const w=state.walker;return Object.freeze({actorId,mode:'walk',position:{x:w.x,y:w.y,z:w.z},yaw:w.yaw,pitch:w.pitch,onGround:w.onGround,remainingFrames:frames,paused});},
+    observation(){const w=state.walker;return Object.freeze({actorId,mode:'walk',position:{x:w.x,y:w.y,z:w.z},yaw:normalizedHeading(w.yaw),controls:{physicsFramesPerSecond:60,forwardWorldUnitsPerSecond:CFG.walkSpeed,turnRadiansPerSecond:CFG.turnSpeed,positiveTurn:'toward +x from +z',positiveStrafe:'left; toward -x at yaw zero',simultaneousMoveAndTurn:'curved path; heading changes on every physics step'},pitch:w.pitch,onGround:w.onGround,remainingFrames:frames,paused});},
     pause(){paused=true;actions={};frames=0;},
     resume(){if(disposed)throw new Error('Resident disposed.');paused=false;},
     dispose(){disposed=true;actions={};frames=0;}

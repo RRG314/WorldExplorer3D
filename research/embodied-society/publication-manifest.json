@@ -5,10 +5,10 @@
   "historyPolicy": "root snapshot; no private ancestors",
   "latestUpdate": {
     "date": "2026-09-12",
-    "parentPublicCommit": "fa5b86c1a7dd8f390bd75020028cc47e8d7083cf",
+    "parentPublicCommit": "2ad2d7d1ee35bf7db54daa21049ee390c701f10d",
     "productionChanged": false,
-    "scope": "84-minute accelerated study, complete decision report and oversized-gather recovery",
-    "sourceCheckpoint": "91c08ad4172b0807ffe7c48256fcd1bae158da6b"
+    "scope": "Calibrated navigation observations, real-motor verification and follow-up protocol",
+    "sourceCheckpoint": "dbbae2b13bcf7478d925a7a05e732eebc9cf40d5"
   },
   "omittedFiles": [
     ".firebaserc",

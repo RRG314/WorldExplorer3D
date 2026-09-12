@@ -41,3 +41,5 @@ The long mode is implemented and component tested. No eight-hour live AI run or 
 ## First longer trajectory
 
 The [84-minute accelerated trial](reports/accelerated-needs-2.md) reached materially lower water reserves but produced no replenishment or crafting. It exposed an ordinary invalid gather treated as terminal, now repaired and regression tested. Navigation also needs a calibrated interface review: accumulated yaw and unspecified turning rate made the control contract unnecessarily difficult to interpret. This is a design concern supported by source inspection, not proof of why the model wandered. Preserve the original failed trajectory and declare interface changes before another trial.
+
+The [navigation feedback amendment](NAVIGATION-FEEDBACK.md) now supplies normalized heading, quantitative control rates and relative resource bearings. Its geometry is tested against the retained walking integrator. Whether the model uses that feedback successfully remains a live-study question.

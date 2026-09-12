@@ -8,6 +8,8 @@ Start with the [research overview](research/embodied-society/README.md) and [tec
 
 The [results](research/embodied-society/RESULTS.md) retain successful and unsuccessful attempts. Fourteen heterogeneous developmental runs contain 190 provider ledger events; this is not a statistical benchmark or a peer-reviewed study. The original pre-dispatch loading interruption remains separately recorded. No full six-hour result or live retest of the gather repair is claimed.
 
+The [navigation amendment](research/embodied-society/NAVIGATION-FEEDBACK.md) now supplies calibrated control rates, normalized heading and signed bearings to visible resources. These agree with the retained walking physics in controlled tests; no new live outcome is claimed.
+
 The [accelerated protocol](research/embodied-society/ACCELERATED-NEEDS-STUDY.md) defines clock scope and limits. The [design review](research/embodied-society/RESEARCH-DESIGN-REVIEW.md) explains remaining issues; the memory comparison remains deferred. The [observer guide](research/embodied-society/OBSERVER.md) covers inventory, minimizing the panel and reports. See [reproduction](research/embodied-society/REPRODUCIBILITY.md) and [data provenance](research/embodied-society/DATA.md) for verification and withheld records.
 
 The application is retained as the environment dependency. Production configuration and deployment workflows are excluded. Publishing research does not update stable, main or the live app. Read the [publication boundaries](research/embodied-society/PUBLICATION.md), [acknowledgements](research/embodied-society/ACKNOWLEDGEMENTS.md), [citation metadata](CITATION.cff), [license](LICENSE) and [third-party attribution](ATTRIBUTION.md).
