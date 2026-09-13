@@ -33,7 +33,8 @@ export function createDriveableRoadConflictIndex(roads = [], options = {}) {
       maxZ = Math.max(maxZ, point.z);
     }
     if (![minX, maxX, minZ, maxZ].every(Number.isFinite)) continue;
-    const padding = Math.max(2, (Number(road.width) || 5) * 0.5 + 0.8);
+    const requestedPadding = typeof options.paddingForRoad === 'function' ? options.paddingForRoad(road) : NaN;
+    const padding = Number.isFinite(requestedPadding) ? Math.max(0, requestedPadding) : Math.max(2, (Number(road.width) || 5) * 0.5 + 0.8);
     const minCellX = Math.floor((minX - padding) / cellSize);
     const maxCellX = Math.floor((maxX + padding) / cellSize);
     const minCellZ = Math.floor((minZ - padding) / cellSize);

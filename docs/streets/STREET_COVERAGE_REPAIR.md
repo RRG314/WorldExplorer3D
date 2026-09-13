@@ -1,105 +1,74 @@
-# Complete pavement coverage with bounded memory
+# Pavement coverage and terrain integration
 
-The current implementation is incomplete. Roads and buildings cover a larger
-loaded region than pavement areas. `street-pavement-runtime.js` filters input to
-a 384-unit radius, compiles that window, and replaces the entire publication
-after the player moves 128 units. It has no distant area representation. A
-successful 144-cell publication therefore leaves visible streets without the
-same sidewalk treatment. Increasing this radius alone is not an acceptable fix:
-the existing window already took 28–37 seconds to publish in the measured cities.
+The street system uses one footprint compiler for both nearby sidewalks and
+complete loaded-location coverage. The detailed window remains 768 world units
+across. Its 144 possible grid cells are a local working set, not the number of
+sidewalks in a city.
 
-## What changed in this verification pass
+## Rendering and contact
 
-The loading message now describes nearby grid cells. `street-coverage.js`
-measures required street-side and mapped-sidewalk length inside and outside the
-publication window. The diagnostic quality assessment fails when loaded streets
-requiring sidewalks remain outside it. This is an audit of compilation scope;
-it cannot prove that every required sidewalk polygon was actually created.
-Explicit absence, elevated structures and unresolved rural requirements are
-handled separately. Data missing before the loaded input cannot be recovered by
-this metric.
+Nearby pavement has indexed geometry, raised curbs, crossings and walking
+contact. Contact queries interpolate the published render vertices. Terrain
+revision changes invalidate this detail; the previous publication remains until
+its replacement is ready. Unchanged flat worker packets are reused from a
+bounded 16 MiB cache. The packet fingerprint includes geometry and semantic
+inputs, so a changed source cannot reuse stale geometry.
 
-The material visibility repair, numerical clipping repair and repeatable test
-protocol are implemented. The residency redesign below is **not implemented**.
+The distant layer draws the same compiled footprints in the existing terrain
+and ground-cover materials. It adds no pavement meshes or draw calls. It follows
+the rendered terrain by construction and supplies visual coverage while nearby
+curbs and contact remain separately managed. Courtyard holes and obstacles are
+preserved. The near window masks out the distant material treatment beneath its
+raised surfaces.
 
-## Replace the publication model
+A worker indexes the entire loaded source region, including independently
+mapped sidewalks and paved areas. Cells with no pavement work are excluded using
+the same rules as the detailed compiler. Every applicable cell is then compiled
+and written to a sparse texture atlas. Diagnostics distinguish source cells,
+applicable cells, completed cells, nonempty cells and painted area. They do not
+call 144 cells complete-location coverage.
 
-1. **Index the complete loaded location once.** Retain stable source IDs,
-   semantic exclusions and footprint context in a spatial index. Compute the
-   required street cells from that index, including separately mapped sidewalks
-   and mapped pedestrian areas. Moving the player must not recreate this index.
-   Publish required/available/missing cell counts alongside length coverage.
+The atlas is at most 4096 by 4096 single-channel texels, with a separate address
+table. Resolution is one world unit per texel for the measured cities; larger
+inventories choose a coarser distant resolution without discarding cells. This
+is distant visual detail, not a survey-quality reconstruction or a replacement
+for nearby curb geometry. Existing source gaps and ambiguous setbacks remain
+uncertainties; the compiler does not invent buildings to close them.
 
-2. **Compile shared area outlines before assigning display detail.** Curbs,
-   carriageways, building fronts, explicit paving and protected land need one
-   planar ownership solution per cell with neighboring context. Close gaps only
-   where mapping or frontage evidence supports paving. An absent building is
-   not permission to pave an entire block. Keep evidence classification with
-   the resulting areas so missing source data is distinguishable from a failed
-   compiler operation.
+## Scheduling and lifecycle
 
-3. **Provide distant areas and nearby detail from those same outlines.** The
-   distant representation needs fewer terrain subdivisions and no tiny curb or
-   paint geometry. Nearby cells add detailed terrain conformance, curbs,
-   crossings and contact. Both representations must retain the same outer
-   boundaries. A distant road should not lose its surrounding paved area just
-   because detailed contact geometry is unloaded. Select detail by screen error
-   and distance, including drone/aircraft views, rather than by vehicle position
-   alone.
+Only one acknowledged geometry/coverage worker chunk is active at a time. Near
+publication waits for the current coverage chunk before starting. Completed
+coverage does not rebuild when the camera moves or terrain heights change.
+Changed source collections rebuild the coverage, retaining the previous atlas
+until the replacement is complete. World reset terminates workers, clears the
+packet cache, restores material hooks and releases textures and geometry.
 
-4. **Retain unchanged cells and replace only affected cells.** Keys must include
-   source/topology, accepted terrain and detail revisions. Keep an old accepted
-   cell visible until its replacement and contact data are ready. Release its
-   buffers and index entries after the swap. A terrain edit invalidates affected
-   cells and their shared seam context; a camera move changes residency and
-   detail selection. These are different events.
+Terrain refinement for nearby pavement bisects offending edges rather than
+splitting all three edges repeatedly. The existing error tolerance and spatial
+scale remain tested. This reduces unnecessary work on narrow frontage triangles;
+it does not waive terrain-clearance checks or make a failed city acceptable.
 
-5. **Bound the queue and resource ownership.** Use one worker, one acknowledged
-   result at a time, near-first priority and cancellation of stale requests.
-   Keep plain source data, polygon caches, mesh buffers, contact indexes and GPU
-   textures under separate measured budgets. Avoid retaining both object-heavy
-   triangle copies and their final typed buffers. Prepare upcoming cells ahead
-   of travel; do not compile the whole region synchronously before first play.
+## Validation
 
-6. **Resolve the height-field discontinuities before reducing refinement.**
-   Monaco's full runtime expanded 33,544 base triangles into 432,538. Capture
-   the actual accepted ground and at-grade road-contact field where refinement
-   concentrates. Test it for jumps and inconsistent neighbor sampling. Fix the
-   shared field or its ownership boundaries, then tessellate to a measured
-   error. Silencing this signal with a lower refinement limit can reintroduce
-   terrain penetration. Bridges and tunnels must retain their own surfaces and
-   cannot supply ground-sidewalk elevations.
+Run `npm run verify:streets` for the sequential contract suite, frozen hill
+matrix and source checks. Use the integration page at
+`/scripts/verification/street-streaming.html` for complete coverage, movement,
+return and resource disposal. The same compiler, worker and renderer integration
+are used there, with a generated slope and captured layouts. It is not a full
+city load.
 
-## Acceptance of the replacement
+Actual city routes and resource measurements are recorded in
+[the September 13 validation report](STREET_VALIDATION_2026-09-13.md).
+Release acceptance also requires the 25-second first-play and 768 MiB JavaScript
+heap targets. Earlier actual city runs fail those budgets. A passing component
+check does not override those failures or certify every location visually.
 
-Use the same recorded routes in Baltimore, Monaco and San Francisco. Verify the
-whole loaded domain's required-cell inventory, distant visible pavement, and
-near-detail coverage along each route. Record unknown or missing source areas
-explicitly. At fixed stops capture street-height and overhead views, then repeat
-after leaving, returning and changing camera orientation. Compare shared cell
-seams, polygon ownership and render/contact height against the accepted terrain.
-
-Run a repeated out-and-back traversal to prove unchanged cells are reused and
-memory stabilizes. Assert that cache eviction releases GPU buffers and contact
-indexes, stale workers cannot publish, and a cancelled initial load can recover.
-Include delayed terrain arrivals and alternating detail levels. The same tests
-must detect deliberately missing cells, buried triangles, raised bridge leakage
-and leaked resources. A percentage based only on scheduled cells is insufficient.
-
-First play must meet the existing 25-second target on the 8 GiB reference Mac;
-the initial JavaScript heap acceptance budget is 768 MiB. Measure total browser
-and GPU resources separately where available. A city that loads but misses these
-budgets fails performance acceptance. The present Monaco and San Francisco runs
-fail; no new full-city performance result is claimed for the small compiler
-optimization in this pass.
-
-## Established practice
+## Reference architecture
 
 Epic's [World Partition documentation](https://dev.epicgames.com/documentation/en-us/unreal-engine/world-partition-in-unreal-engine)
-describes a persistent world divided into cells, loaded by streaming sources.
+describes a persistent world divided into cells loaded by streaming sources.
 Its [HLOD documentation](https://dev.epicgames.com/documentation/en-us/unreal-engine/world-partition---hierarchical-level-of-detail-in-unreal-engine)
-describes less expensive representations for distant content. These support the
-separation of world coverage from resident detail. They do not supply this app's
-OSM frontage geometry or terrain contracts. The design above applies those
-principles to the app's own source, compiler, Three.js renderer and contact
-ownership; installing an Unreal feature is not the implementation proposed here.
+describes less expensive distant representations. This implementation applies
+that separation to this app's footprint compiler, Three.js terrain materials
+and nearby contact geometry; it does not depend on Unreal Engine.

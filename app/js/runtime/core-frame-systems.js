@@ -25,7 +25,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       id: 'core.input',
       owner: 'engine',
       phase: 'input',
-      enabled: () => !!appCtx.gameStarted,
+      enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading,
       update() {
         appCtx.updateControlInput?.();
       }
@@ -34,7 +34,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       id: 'core.simulation',
       owner: 'engine',
       phase: 'simulation',
-      enabled: () => !!appCtx.gameStarted,
+      enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading,
       update(frame) {
         appCtx.update(frame.dt);
       }
@@ -43,7 +43,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       id: 'core.world',
       owner: 'world',
       phase: 'world',
-      enabled: () => !!appCtx.gameStarted,
+      enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading,
       update(frame) {
         // Ship interiors are a bounded activity nested inside Space Flight.
         // Earth weather, astronomical-sky refresh, boat availability, and
@@ -76,7 +76,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       id: 'core.camera',
       owner: 'camera',
       phase: 'camera',
-      enabled: () => !!appCtx.gameStarted,
+      enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading,
       update(frame) {
         appCtx.updateCamera(frame.dt);
         appCtx.updatePlanetarySky?.();
@@ -87,7 +87,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       owner: 'platform',
       phase: 'camera',
       priority: 20,
-      enabled: () => !!appCtx.gameStarted,
+      enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading,
       update(frame) {
         appCtx.updateActivityCreator?.(frame.dt, frame.timestamp);
         appCtx.updateActivityDiscovery?.(frame.dt, frame.timestamp);
@@ -104,7 +104,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       id: 'core.presentation',
       owner: 'presentation',
       phase: 'presentation',
-      enabled: () => !!appCtx.gameStarted,
+      enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading,
       update(frame) {
         weatherUiTimer += frame.dt;
         if (weatherUiTimer >= 1) {
@@ -151,7 +151,9 @@ function createCoreRenderSystem(appCtx, shouldUseComposer) {
     priority: 0,
     // The title globe owns its own renderer. Keeping the regional city
     // rendering behind it doubles graphics work during location selection.
-    enabled: () => !!appCtx.gameStarted,
+    // During construction, only the DOM loading UI should update: rendering
+    // partial city batches competes with compilation and uploads them early.
+    enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading,
     update() {
       if (shouldUseComposer()) appCtx.composer.render();
       else appCtx.renderer.render(appCtx.scene, appCtx.camera);

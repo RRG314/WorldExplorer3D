@@ -1,0 +1,279 @@
+{
+  "note": "Heap is browser-reported JavaScript only; geometry bytes exclude textures, GPU allocations and other tabs. Inspect twice to see runtime activity.",
+  "javascriptHeapBytes": 1259990178,
+  "sceneGeometryBytes": 235819067,
+  "rendererResources": {
+    "geometries": 686,
+    "textures": 770
+  },
+  "gameStarted": true,
+  "worldLoading": false,
+  "pavementBuildActive": false,
+  "deferredWork": {
+    "budgets": {
+      "firstPlayTargetMs": 25000,
+      "frameTargetMs": 16.7,
+      "cooperativeChunkTargetMs": 8,
+      "backgroundIdleTimeoutMs": 1800,
+      "inactiveAuxiliaryRenderers": 0
+    },
+    "firstPlayReady": true,
+    "activeTask": null,
+    "firstPlayDetail": {
+      "environment": "earth",
+      "loadDurationMs": 209841,
+      "publicationSequence": 1
+    },
+    "queued": [],
+    "completed": [
+      "tutorial-runtime",
+      "analytics-runtime",
+      "earth-ambient-state-1",
+      "earth-star-catalog"
+    ]
+  },
+  "street": {
+    "tiles": 110,
+    "triangles": 113260,
+    "curbTriangles": 65902,
+    "markingTriangles": 13029,
+    "ramps": 0,
+    "workerMs": 16342,
+    "inferredFrontages": 19728,
+    "managedPaths": 199,
+    "residentRoads": 328,
+    "residentBuildings": 803,
+    "roads": 12737,
+    "roadMeshes": 41,
+    "buildings": 8041,
+    "worldLoadSequence": 1,
+    "plannedTiles": 133,
+    "highestRefinement": {
+      "cell": "-6:-2",
+      "bounds": {
+        "minX": -384,
+        "maxX": -320,
+        "minZ": -128,
+        "maxZ": -64
+      },
+      "addedTriangles": 2824,
+      "baseTriangles": 664
+    },
+    "terrainRefinementTriangles": 79733,
+    "drawCalls": 83,
+    "compilerCacheBytes": 11892476,
+    "coverageBounds": {
+      "minX": -384,
+      "maxX": 384,
+      "minZ": -384,
+      "maxZ": 384
+    },
+    "indexBytes": 1153146,
+    "positionBytes": 1847256,
+    "durationMs": 54974,
+    "sourceCoverage": {
+      "scope": "Loaded source network requiring inferred or mapped sidewalks; length within the compilation window, not proof of rendered pavement. Separately tagged sidewalks need mapped path data.",
+      "requiredSidewalkMeters": 179025.39992999795,
+      "withinCompilationWindowMeters": 25615.36105232016,
+      "outsideCompilationWindowMeters": 153410.03887767778,
+      "compilationCoveragePercent": 14.308227247271178,
+      "requiredSegments": 8498,
+      "uncoveredSegments": 6867,
+      "examples": [
+        {
+          "kind": "road-side",
+          "name": "D 2204",
+          "a": {
+            "x": -6828.31260724724,
+            "z": -2812.268145088126
+          },
+          "b": {
+            "x": -6879.473341679509,
+            "z": -2722.3908472606695
+          },
+          "uncoveredMeters": 229.58867577505555
+        },
+        {
+          "kind": "road-side",
+          "name": "D 2204",
+          "a": {
+            "x": -6739.944065955137,
+            "z": -2967.2258321156164
+          },
+          "b": {
+            "x": -6770.950571671664,
+            "z": -2912.9910982831575
+          },
+          "uncoveredMeters": 138.68888771270912
+        },
+        {
+          "kind": "road-side",
+          "name": "Route de Laghet",
+          "a": {
+            "x": -7293.410192995143,
+            "z": -237.83387503470976
+          },
+          "b": {
+            "x": -7276.356614851053,
+            "z": -185.12467707552105
+          },
+          "uncoveredMeters": 122.98647879004118
+        },
+        {
+          "kind": "road-side",
+          "name": "Route de Laghet",
+          "a": {
+            "x": -7276.356614851053,
+            "z": -185.12467707552105
+          },
+          "b": {
+            "x": -7265.504337850269,
+            "z": -123.11326185994176
+          },
+          "uncoveredMeters": 139.75755234809583
+        },
+        {
+          "kind": "road-side",
+          "name": "Route de Laghet",
+          "a": {
+            "x": -7265.504337850269,
+            "z": -123.11326185994176
+          },
+          "b": {
+            "x": -7260.853361992789,
+            "z": -106.06001007857913
+          },
+          "uncoveredMeters": 39.240970982870024
+        },
+        {
+          "kind": "road-side",
+          "name": "Route de Laghet",
+          "a": {
+            "x": -7260.853361992789,
+            "z": -106.06001007857913
+          },
+          "b": {
+            "x": -7237.598482705394,
+            "z": -70.40305394383495
+          },
+          "uncoveredMeters": 94.50547904454488
+        },
+        {
+          "kind": "road-side",
+          "name": "La Provençale",
+          "a": {
+            "x": -7263.954012564443,
+            "z": -120.01267423755735
+          },
+          "b": {
+            "x": -7260.853361992789,
+            "z": -106.06001007857913
+          },
+          "uncoveredMeters": 31.730539376645204
+        },
+        {
+          "kind": "road-side",
+          "name": "La Provençale",
+          "a": {
+            "x": -7260.853361992789,
+            "z": -106.06001007857913
+          },
+          "b": {
+            "x": -7236.048157419568,
+            "z": -67.3024390252408
+          },
+          "uncoveredMeters": 102.15492254041317
+        }
+      ],
+      "status": "incomplete"
+    }
+  },
+  "workSinceLastInspection": null,
+  "streetOverview": {
+    "status": "building",
+    "representation": "terrain material coverage",
+    "completedCells": 649,
+    "totalCells": 1657,
+    "nonemptyCells": 539,
+    "coveredSquareWorldUnits": 233227.8078431375,
+    "positionBytes": 0,
+    "retainedBytes": 7018528,
+    "drawCalls": 0,
+    "workerActive": true,
+    "sourceScope": "complete loaded location",
+    "error": null,
+    "sourceCells": 32460,
+    "excludedCells": 30803,
+    "maskResolution": 64,
+    "worldUnitsPerTexel": 1,
+    "materials": 93
+  },
+  "roadTerrainConformance": {
+    "authority": "published-at-grade-road-geometry-versus-rendered-terrain",
+    "totalSamples": 812621,
+    "issuesFound": 0,
+    "minimumDelta": 0.18,
+    "maximumDelta": 0.182,
+    "buriedSamples": 0,
+    "floatingSamples": 0,
+    "worstDeltas": []
+  },
+  "loadPhases": {
+    "prepareAcceptedGround": 101,
+    "fetchOverpass": 137,
+    "fetchFixedRegionalContext": 6162,
+    "fetchFixedRegionalStructures": 6317,
+    "waitForFixedRegionalGround": 12679,
+    "featureBudgeting": 1050,
+    "waitForTransportGround": 0,
+    "buildRoadGeometry": 1192,
+    "buildLanduseGeometry": 100,
+    "batchLanduseGeometry": 6,
+    "buildLinearFeatureData": 367,
+    "buildPoiGeometry": 13,
+    "buildStreetFurniture": 560,
+    "buildBuildingRoadGuards": 7137,
+    "buildBuildingGeometry": 8146,
+    "publishBuildingFacadeEntrances": 607,
+    "publishBuildingExteriorDetails": 31,
+    "batchBuildingGeometry": 890,
+    "publishLocationTerrain": 0,
+    "publishCompiledTransportMeshes": 64682,
+    "refreshTerrainSurfaceProfiles": 748,
+    "retireGroundFallbackPlaceholder": 0,
+    "buildTraversalNetworks": 2290,
+    "spawnPlayer": 8710,
+    "refreshMemoryMarkersForCurrentLocation": 3,
+    "refreshBlockBuilderForCurrentLocation": 0,
+    "refreshEditableWorldPresentation": 0,
+    "publishLocationWorld": 4,
+    "refreshEditableBuildingVisibility": 400,
+    "waitForTerrainSurfaceMaterials": 1
+  },
+  "geometryByLayer": {
+    "roadMeshes": 93248156,
+    "buildingMeshes": 41899656,
+    "landuseMeshes": 576832,
+    "urbanSurfaceMeshes": 6079162,
+    "linearFeatureMeshes": 691284,
+    "vegetationMeshes": 19846608
+  },
+  "quality": {
+    "status": "fail",
+    "failures": [
+      "JavaScript heap exceeds 768 MiB",
+      "first play exceeds 25000 ms",
+      "loaded streets requiring sidewalks extend beyond completed pavement coverage"
+    ],
+    "pending": [
+      "location-wide pavement areas are not complete"
+    ],
+    "refinementMultiplier": 3.3781728159393922,
+    "budgets": {
+      "javascriptHeapBytes": 805306368,
+      "pavementPositionBytes": 16777216,
+      "refinementMultiplier": 8
+    },
+    "visualStatus": "Requires camera sweep and recorded city route; performance checks cannot certify appearance."
+  }
+}

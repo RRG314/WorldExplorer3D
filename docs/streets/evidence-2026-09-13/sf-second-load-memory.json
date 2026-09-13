@@ -1,0 +1,263 @@
+{
+  "note": "Heap is browser-reported JavaScript only; geometry bytes exclude textures, GPU allocations and other tabs. Inspect twice to see runtime activity.",
+  "javascriptHeapBytes": 1478813793,
+  "sceneGeometryBytes": 414901027,
+  "rendererResources": {
+    "geometries": 1801,
+    "textures": 1104
+  },
+  "gameStarted": true,
+  "worldLoading": false,
+  "pavementBuildActive": false,
+  "deferredWork": {
+    "budgets": {
+      "firstPlayTargetMs": 25000,
+      "frameTargetMs": 16.7,
+      "cooperativeChunkTargetMs": 8,
+      "backgroundIdleTimeoutMs": 1800,
+      "inactiveAuxiliaryRenderers": 0
+    },
+    "firstPlayReady": true,
+    "activeTask": null,
+    "firstPlayDetail": {
+      "environment": "earth",
+      "loadDurationMs": 272260,
+      "publicationSequence": 1
+    },
+    "queued": [],
+    "completed": [
+      "tutorial-runtime",
+      "analytics-runtime",
+      "plane-visual",
+      "earth-ambient-state-1",
+      "earth-star-catalog"
+    ]
+  },
+  "street": {
+    "tiles": 144,
+    "triangles": 303918,
+    "curbTriangles": 87896,
+    "markingTriangles": 9738,
+    "ramps": 0,
+    "workerMs": 30321,
+    "inferredFrontages": 82048,
+    "managedPaths": 585,
+    "residentRoads": 289,
+    "residentBuildings": 1885,
+    "roads": 16208,
+    "roadMeshes": 41,
+    "buildings": 22197,
+    "worldLoadSequence": 1,
+    "plannedTiles": 144,
+    "highestRefinement": {
+      "cell": "-5:-6",
+      "bounds": {
+        "minX": -320,
+        "maxX": -256,
+        "minZ": -384,
+        "maxZ": -320
+      },
+      "addedTriangles": 7188,
+      "baseTriangles": 490
+    },
+    "terrainRefinementTriangles": 259785,
+    "drawCalls": 104,
+    "compilerCacheBytes": 12594504,
+    "coverageBounds": {
+      "minX": -384,
+      "maxX": 384,
+      "minZ": -384,
+      "maxZ": 384
+    },
+    "positionBytes": 14455872,
+    "durationMs": 55284,
+    "sourceCoverage": {
+      "scope": "Loaded source network requiring inferred or mapped sidewalks; length within the compilation window, not proof of rendered pavement. Separately tagged sidewalks need mapped path data.",
+      "requiredSidewalkMeters": 430418.1361337063,
+      "withinCompilationWindowMeters": 25798.42152111226,
+      "outsideCompilationWindowMeters": 404619.71461259405,
+      "compilationCoveragePercent": 5.993804478791332,
+      "requiredSegments": 8877,
+      "uncoveredSegments": 8289,
+      "examples": [
+        {
+          "kind": "road-side",
+          "name": "Laguna Street",
+          "a": {
+            "x": -1345.4923421915278,
+            "z": -1109.425529359953
+          },
+          "b": {
+            "x": -1347.188005343376,
+            "z": -1099.2530713039628
+          },
+          "uncoveredMeters": 22.894451797215677
+        },
+        {
+          "kind": "road-side",
+          "name": "Laguna Street",
+          "a": {
+            "x": -1347.188005343376,
+            "z": -1099.2530713039628
+          },
+          "b": {
+            "x": -1343.7966790396792,
+            "z": -1087.3851858647754
+          },
+          "uncoveredMeters": 27.401293620523965
+        },
+        {
+          "kind": "road-side",
+          "name": "Marina Boulevard",
+          "a": {
+            "x": -1345.4923421915278,
+            "z": -1109.425529359953
+          },
+          "b": {
+            "x": -1374.3186157729513,
+            "z": -1278.9644342234396
+          },
+          "uncoveredMeters": 381.778004764348
+        },
+        {
+          "kind": "road-side",
+          "name": "Marina Boulevard",
+          "a": {
+            "x": -1374.3186157729513,
+            "z": -1278.9644342234396
+          },
+          "b": {
+            "x": -1382.7969315321934,
+            "z": -1280.659803617823
+          },
+          "uncoveredMeters": 19.19447940462451
+        },
+        {
+          "kind": "road-side",
+          "name": "Marina Boulevard",
+          "a": {
+            "x": -1382.7969315321934,
+            "z": -1280.659803617823
+          },
+          "b": {
+            "x": -1494.7106995541903,
+            "z": -1263.7060921619536
+          },
+          "uncoveredMeters": 251.28320924210664
+        },
+        {
+          "kind": "road-side",
+          "name": "Marina Boulevard",
+          "a": {
+            "x": -1494.7106995541903,
+            "z": -1263.7060921619536
+          },
+          "b": {
+            "x": -1511.6673310726749,
+            "z": -1265.4014650578915
+          },
+          "uncoveredMeters": 37.831408260905214
+        },
+        {
+          "kind": "road-side",
+          "name": "Marina Boulevard",
+          "a": {
+            "x": -1511.6673310726749,
+            "z": -1265.4014650578915
+          },
+          "b": {
+            "x": -1681.233646257519,
+            "z": -1399.334694060883
+          },
+          "uncoveredMeters": 479.6990315554
+        },
+        {
+          "kind": "road-side",
+          "name": "Marina Boulevard",
+          "a": {
+            "x": -1681.233646257519,
+            "z": -1399.334694060883
+          },
+          "b": {
+            "x": -1694.7989514723065,
+            "z": -1407.8113989711483
+          },
+          "uncoveredMeters": 35.51112108988
+        }
+      ],
+      "status": "incomplete"
+    }
+  },
+  "workSinceLastInspection": null,
+  "streetOverview": {
+    "status": "failed",
+    "completedCells": 0,
+    "totalCells": 46756,
+    "triangles": 0,
+    "positionBytes": 0,
+    "drawCalls": 0,
+    "workerActive": false,
+    "sourceScope": "complete loaded location",
+    "error": "Failed to execute 'postMessage' on 'Worker': Maximum call stack size exceeded"
+  },
+  "loadPhases": {
+    "prepareAcceptedGround": 74,
+    "fetchOverpass": 255,
+    "fetchFixedRegionalContext": 2631,
+    "fetchFixedRegionalStructures": 10722,
+    "waitForFixedRegionalGround": 0,
+    "featureBudgeting": 10153,
+    "waitForTransportGround": 0,
+    "buildRoadGeometry": 10167,
+    "buildLanduseGeometry": 451,
+    "batchLanduseGeometry": 20,
+    "buildLinearFeatureData": 620,
+    "buildPoiGeometry": 48,
+    "buildStreetFurniture": 710,
+    "buildBuildingRoadGuards": 9127,
+    "buildBuildingGeometry": 12117,
+    "publishBuildingFacadeEntrances": 552,
+    "publishBuildingExteriorDetails": 95,
+    "batchBuildingGeometry": 4733,
+    "publishLocationTerrain": 0,
+    "publishCompiledTransportMeshes": 38712,
+    "refreshTerrainSurfaceProfiles": 2061,
+    "publishDeferredTransportLandmark": 308,
+    "retireGroundFallbackPlaceholder": 0,
+    "buildTraversalNetworks": 1993,
+    "spawnPlayer": 5511,
+    "refreshMemoryMarkersForCurrentLocation": 1,
+    "refreshBlockBuilderForCurrentLocation": 0,
+    "refreshEditableWorldPresentation": 1,
+    "publishLocationWorld": 14,
+    "refreshEditableBuildingVisibility": 2007,
+    "waitForTerrainSurfaceMaterials": 1
+  },
+  "geometryByLayer": {
+    "roadMeshes": 87905832,
+    "buildingMeshes": 153743266,
+    "landuseMeshes": 2290820,
+    "urbanSurfaceMeshes": 38548992,
+    "linearFeatureMeshes": 449568,
+    "vegetationMeshes": 52359690
+  },
+  "quality": {
+    "status": "fail",
+    "failures": [
+      "JavaScript heap exceeds 768 MiB",
+      "first play exceeds 25000 ms",
+      "loaded streets requiring sidewalks extend beyond completed pavement coverage",
+      "Failed to execute 'postMessage' on 'Worker': Maximum call stack size exceeded"
+    ],
+    "pending": [
+      "location-wide pavement areas are not complete"
+    ],
+    "refinementMultiplier": 6.886411528787982,
+    "budgets": {
+      "javascriptHeapBytes": 805306368,
+      "pavementPositionBytes": 16777216,
+      "refinementMultiplier": 8
+    },
+    "visualStatus": "Requires camera sweep and recorded city route; performance checks cannot certify appearance."
+  }
+}

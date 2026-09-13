@@ -1,3 +1,4 @@
+import { projectDecalTriangle } from './surface-decal-projection.js';
 // Published alongside the road meshes. Queries visit only triangles in one
 // 16-unit cell, including on the walking/vehicle paths that avoid raycasting.
 export function createRoadContactIndex(meshes, cellSize = 16) {
@@ -35,6 +36,14 @@ export function createRoadContactIndex(meshes, cellSize = 16) {
   }
   return {
     dispose() { cells.clear(); },
+    projectTriangle(points, lift = .012, requiredTerrainMode = null) {
+      const candidates=new Set();
+      const xs=points.map(p=>p.x),zs=points.map(p=>p.z);
+      for(let ix=Math.floor(Math.min(...xs)/cellSize);ix<=Math.floor(Math.max(...xs)/cellSize);ix++)
+        for(let iz=Math.floor(Math.min(...zs)/cellSize);iz<=Math.floor(Math.max(...zs)/cellSize);iz++)
+          for(const triangle of cells.get(`${ix}:${iz}`)||[])if(!requiredTerrainMode||triangle.terrainMode===requiredTerrainMode)candidates.add(triangle);
+      return projectDecalTriangle(points,candidates,lift);
+    },
     sampleAt(x, z, referenceY = NaN, requiredTerrainMode = null) {
       const bucket = cells.get(`${Math.floor(x / cellSize)}:${Math.floor(z / cellSize)}`);
       let best = null;

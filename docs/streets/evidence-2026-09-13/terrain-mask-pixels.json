@@ -1,0 +1,133 @@
+{
+  "status": "pass",
+  "checks": [
+    {
+      "name": "outside left edge at texel center",
+      "point": {
+        "x": 7.5,
+        "z": 12.5
+      },
+      "expected": "base terrain",
+      "pixel": [
+        255,
+        0,
+        0,
+        255
+      ],
+      "pass": true
+    },
+    {
+      "name": "inside left edge",
+      "point": {
+        "x": 8.5,
+        "z": 12.5
+      },
+      "expected": "pavement",
+      "pixel": [
+        128,
+        124,
+        116,
+        255
+      ],
+      "pass": true
+    },
+    {
+      "name": "courtyard hole",
+      "point": {
+        "x": 20.5,
+        "z": 20.5
+      },
+      "expected": "base terrain",
+      "pixel": [
+        255,
+        0,
+        0,
+        255
+      ],
+      "pass": true
+    },
+    {
+      "name": "outside footprint",
+      "point": {
+        "x": 44.5,
+        "z": 32.5
+      },
+      "expected": "base terrain",
+      "pixel": [
+        255,
+        0,
+        0,
+        255
+      ],
+      "pass": true
+    },
+    {
+      "name": "paved area",
+      "point": {
+        "x": 32.5,
+        "z": 32.5
+      },
+      "expected": "pavement",
+      "pixel": [
+        128,
+        124,
+        116,
+        255
+      ],
+      "pass": true
+    },
+    {
+      "name": "near detail masks the terrain layer",
+      "point": {
+        "x": 32.5,
+        "z": 32.5
+      },
+      "expected": "base terrain",
+      "pixel": [
+        255,
+        0,
+        0,
+        255
+      ],
+      "pass": true
+    },
+    {
+      "name": "terrain movement retains coverage",
+      "point": {
+        "x": 32.5,
+        "z": 32.5
+      },
+      "expected": "pavement",
+      "pixel": [
+        128,
+        124,
+        116,
+        255
+      ],
+      "pass": true
+    },
+    {
+      "name": "disposal restores base material",
+      "point": {
+        "x": 32.5,
+        "z": 32.5
+      },
+      "expected": "base terrain",
+      "pixel": [
+        255,
+        0,
+        0,
+        255
+      ],
+      "pass": true
+    },
+    {
+      "name": "material hooks restored",
+      "pass": true
+    }
+  ],
+  "renderer": {
+    "geometries": 1,
+    "textures": 0
+  }
+}

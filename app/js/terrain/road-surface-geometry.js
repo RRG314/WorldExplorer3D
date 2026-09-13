@@ -112,7 +112,7 @@ function appendTurnJoin({
 // Corner-only road quads can cut through the rendered terrain between their
 // corners. Refine only triangles whose sampled interior disagrees with their
 // plane; planar streets retain their original geometry and cost.
-export function conformRoadTriangles(vertices, indices, sampleY, surfaceBias, {maxDepth=3,tolerance=.06}={}) {
+export function conformRoadTriangles(vertices, indices, sampleY, surfaceBias, {maxDepth=3,tolerance=.06,edgeRefinement=false}={}) {
   const points=[];
   for(let i=0;i<vertices.length;i+=3)points.push({x:vertices[i],y:vertices[i+1],z:vertices[i+2],index:i/3});
   const samples=new Map(),result=[];
@@ -125,12 +125,26 @@ export function conformRoadTriangles(vertices, indices, sampleY, surfaceBias, {m
     if(p.index===null){p.index=vertices.length/3;vertices.push(p.x,p.y,p.z);}
     return p.index;
   };
-  const emit=(a,b,c,depth)=>{
-    if(depth>=maxDepth){result.push(add(a),add(b),add(c));return;}
+  const emit=(a,b,c,depth,minEdge=0)=>{
+    if(depth>=(edgeRefinement?maxDepth*3:maxDepth)){result.push(add(a),add(b),add(c));return;}
     const ab=sample((a.x+b.x)/2,(a.z+b.z)/2),bc=sample((b.x+c.x)/2,(b.z+c.z)/2),ca=sample((c.x+a.x)/2,(c.z+a.z)/2);
     const center=sample((a.x+b.x+c.x)/3,(a.z+b.z+c.z)/3);
     const error=Math.max(Math.abs(ab.y-(a.y+b.y)/2),Math.abs(bc.y-(b.y+c.y)/2),Math.abs(ca.y-(c.y+a.y)/2),Math.abs(center.y-(a.y+b.y+c.y)/3));
     if(!Number.isFinite(error) || error<=tolerance){result.push(add(a),add(b),add(c));return;}
+    if(edgeRefinement){
+      // A long, narrow frontage triangle often crosses just one terrain bend.
+      // Splitting all three edges repeatedly creates 64 children regardless of
+      // which edge needs detail. Bisect only an offending edge, using the same
+      // minimum spatial scale as the original uniform refinement.
+      const edges=[[a,b,c,ab],[b,c,a,bc],[c,a,b,ca]].map(([p,q,r,m])=>({p,q,r,m,length:Math.hypot(p.x-q.x,p.z-q.z),error:Math.abs(m.y-(p.y+q.y)/2)}));
+      if(!minEdge)minEdge=Math.max(...edges.map(e=>e.length))/2**maxDepth;
+      const offending=edges.filter(e=>e.error>tolerance&&e.length>minEdge).sort((a,b)=>b.length-a.length)[0];
+      if(offending){const {p,q,r,m}=offending;emit(p,m,r,depth+1,minEdge);emit(m,q,r,depth+1,minEdge);return;}
+      if(Math.abs(center.y-(a.y+b.y+c.y)/3)>tolerance&&edges.some(e=>e.length>minEdge)){
+        emit(a,b,center,depth+1,minEdge);emit(b,c,center,depth+1,minEdge);emit(c,a,center,depth+1,minEdge);return;
+      }
+      result.push(add(a),add(b),add(c));return;
+    }
     emit(a,ab,ca,depth+1);emit(ab,b,bc,depth+1);emit(ca,bc,c,depth+1);emit(ab,bc,ca,depth+1);
   };
   for(let i=0;i<indices.length;i+=3)emit(points[indices[i]],points[indices[i+1]],points[indices[i+2]],0);

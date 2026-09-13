@@ -6,7 +6,7 @@ export function conformPavementMesh(mesh, sampleBase, sampleTop, { tolerance = .
   const vertices = mesh.vertices;
   const indices = Array.from({ length: vertices.length / 3 }, (_, i) => i);
   const originalTriangles = indices.length / 3;
-  conformRoadTriangles(vertices, indices, sampleTop, 0, { tolerance, maxDepth });
+  conformRoadTriangles(vertices, indices, sampleTop, 0, { tolerance, maxDepth, edgeRefinement:true });
   const top = [];
   for (const i of indices) top.push(vertices[i * 3], vertices[i * 3 + 1], vertices[i * 3 + 2]);
   mesh.vertices = top;

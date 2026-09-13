@@ -114,7 +114,8 @@ function createTerrainHeightSamplingApi(deps = {}) {
       ? indexedFeatures
       : appCtx.structureTerrainCuts;
     let strongestAtGradeWeight = 0;
-    let strongestAtGradeY = terrainY;
+    let atGradeWeightedY = 0;
+    let atGradeWeightSum = 0;
     for (let i = 0; i < candidates.length; i++) {
       const cut = candidates[i];
       const feature = cut?.feature || cut;
@@ -132,21 +133,25 @@ function createTerrainHeightSamplingApi(deps = {}) {
         const width = roadWidthAtProjection(feature, projected);
         const halfWidth = width * 0.5;
         const shoulderBlend = Math.max(3.5, Math.min(8, width * 0.65));
-        const influenceRadius = halfWidth + shoulderBlend;
+        const gradedEdge = appCtx.streetFrontageGrading?.outerDistance(feature, projected, worldX, worldZ, halfWidth) ?? halfWidth;
+        const influenceRadius = gradedEdge + shoulderBlend;
         if (!Number.isFinite(projected.dist) || projected.dist > influenceRadius) continue;
         const surfaceY = sampleFeatureSurfaceY(feature, worldX, worldZ, projected);
         if (!Number.isFinite(surfaceY)) continue;
         const targetTerrainY = surfaceY - Math.max(0, Number(feature.surfaceBias) || 0.08);
         const shoulderT = Math.max(0, Math.min(1,
-          (projected.dist - halfWidth) / shoulderBlend
+          (projected.dist - gradedEdge) / shoulderBlend
         ));
-        const weight = projected.dist <= halfWidth
+        const weight = projected.dist <= gradedEdge
           ? 1
           : 1 - (shoulderT * shoulderT * (3 - 2 * shoulderT));
-        if (weight > strongestAtGradeWeight) {
-          strongestAtGradeWeight = weight;
-          strongestAtGradeY = terrainY + (targetTerrainY - terrainY) * weight;
-        }
+        // A winner-takes-all road changes height discontinuously where two
+        // shoulders overlap. Blend their absolute grades, independently of
+        // input order; retain the strongest coverage for the terrain fade.
+        const gradeWeight = weight * weight * weight * weight;
+        atGradeWeightedY += targetTerrainY * gradeWeight;
+        atGradeWeightSum += gradeWeight;
+        strongestAtGradeWeight = Math.max(strongestAtGradeWeight, weight);
         continue;
       }
       const width = Math.max(4.5, Number(cut.width) || Number(feature.width) || 6);
@@ -181,7 +186,9 @@ function createTerrainHeightSamplingApi(deps = {}) {
       adjustedY = Math.min(adjustedY, adjustedY + (targetY - adjustedY) * fade);
     }
 
-    if (strongestAtGradeWeight > 0) adjustedY = strongestAtGradeY;
+    if (atGradeWeightSum > 0) {
+      adjustedY = terrainY + (atGradeWeightedY / atGradeWeightSum - terrainY) * strongestAtGradeWeight;
+    }
 
     return adjustedY;
   }

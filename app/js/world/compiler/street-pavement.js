@@ -1,3 +1,4 @@
+import { frontageHit } from './street-frontage-geometry.js';
 import { crossingStyle, crossingRamps, rampCurbScale } from './street-crossings.js';
 import { roadTurnFootprint } from '../../terrain/road-surface-geometry.js?v=2';
 import { streetPolygonKernel as clip } from './street-polygon-kernel.js';
@@ -130,24 +131,6 @@ export function prepareStreetPavement({ roads = [], buildings = [], landuses = [
     managedPaths: linearFeatures.filter(f => groundFeature(f) && f.kind === 'footway' && f.subtype === 'sidewalk') };
 }
 
-function frontageHit(point, nx, nz, edges, minimum, maximum) {
-  let best = null;
-  for (const edge of edges) {
-    const { a, b, extendedFrontage=0 } = edge;
-    const dx = b.x - a.x, dz = b.z - a.z, length = Math.hypot(dx, dz);
-    if (Math.abs((dx * nx + dz * nz) / length) > 0.25) continue;
-    const den = nx * dz - nz * dx;
-    if (Math.abs(den) < 1e-8) continue;
-    const ax = a.x - point.x, az = a.z - point.z;
-    const distance = (ax * dz - az * dx) / den;
-    const t = (ax * nz - az * nx) / den;
-    // A close facade blocks the ray even when it lies inside the nominal
-    // sidewalk. Looking through it would mistake a rear wall for frontage.
-    if (t >= -1e-7 && t <= 1 + 1e-7 && distance >= 0 && (!best || distance < best.distance))
-      best = { edge, distance, maximum: Math.max(maximum, minimum + extendedFrontage) };
-  }
-  return best && best.distance >= minimum && best.distance <= best.maximum ? best : null;
-}
 function frontageDistance(point, nx, nz, edges, minimum, maximum) {
   return frontageHit(point,nx,nz,edges,minimum,maximum)?.distance ?? null;
 }
@@ -182,7 +165,19 @@ function splitAtFrontages(segment, edges) {
     wa:segment.wa+(segment.wb-segment.wa)*ts[i],wb:segment.wa+(segment.wb-segment.wa)*end}));
 }
 
-export function compilePavementTile(tile, metersPerWorldUnit = 1.11) {
+export function pavementTileHasWork(tile,includeMarkings=true){
+  if(!tile.paths.length&&!tile.areas.length&&(!includeMarkings||!tile.crossings?.length)){
+    const hasSide=(road,bounds)=>{
+      const tags=road.transportRecord?.sourceTags||road.tags||{},urban=tile.edges.some(edge=>intersects(edge.bounds,bounds,20));
+      const section=resolveStreetSection({...tags,highway:tags.highway||road.type},{urban});
+      return section.left.presence==='present'||section.right.presence==='present';
+    };
+    return tile.segments.some(s=>hasSide(s.road,s.bounds||box([s.a,s.b])))||(tile.joins||[]).some(j=>hasSide(j.road,box([j.point])));
+  }
+  return true;
+}
+export function compilePavementTile(tile, metersPerWorldUnit = 1.11, {includeMarkings=true} = {}) {
+  if(!pavementTileHasWork(tile,includeMarkings))return {polygons:[],inferredFrontages:0,ramps:[],markingPolygons:[]};
   const roadParts = [], pavementParts = tile.paths.map(p => p.polygon).concat(tile.areas.map(p => p.polygon));
   let inferredFrontages = 0;
   for(const s of tile.segments) {
@@ -294,9 +289,9 @@ export function compilePavementTile(tile, metersPerWorldUnit = 1.11) {
   polygons=polygons.length ? clip.intersection(polygons,boundary) : [];
   const blockers = carriageway.concat(tile.obstacles.map(o => o.polygon));
   if (polygons.length && blockers.length) polygons = clip.difference(polygons, union(localParts(blockers)));
-  const ramps=crossingRamps(tile.crossings || [],roadEdges,metersPerWorldUnit);
+  const ramps=includeMarkings?crossingRamps(tile.crossings || [],roadEdges,metersPerWorldUnit):[];
   const paintParts=[];
-  for(const crossing of tile.crossings || []) {
+  for(const crossing of includeMarkings?(tile.crossings || []):[]) {
     const {paint}=crossingStyle(crossing);
     if(!paint)continue;
     for(let i=1;i<crossing.pts.length;i++) {
@@ -317,7 +312,7 @@ export function compilePavementTile(tile, metersPerWorldUnit = 1.11) {
 }
 
 // Regular cells keep slope interpolation local. Shared world-grid vertices produce matching tile seams.
-export function meshPavementTile(tile, polygons, sampleHeight, { cellSize = 4, curbHeight = 0.108108, ramps = [] } = {}) {
+export function meshPavementTile(tile, polygons, sampleHeight, { cellSize = 4, curbHeight = 0.108108, ramps = [], includeCurbs = true, includeTriangles = true } = {}) {
   const vertices = [], curbVertices = [], triangles = [], b = tile.bounds;
   const polygonBounds = polygons.map(poly => {
     const ring = poly[0];
@@ -352,11 +347,11 @@ export function meshPavementTile(tile, polygons, sampleHeight, { cellSize = 4, c
       for (let i = 0; i < indices.length; i += 3) {
         const ps = indices.slice(i, i + 3).map(j => vertex(points[j]));
         if ((ps[1].x - ps[0].x) * (ps[2].z - ps[0].z) - (ps[1].z - ps[0].z) * (ps[2].x - ps[0].x) > 0) [ps[1], ps[2]] = [ps[2], ps[1]];
-        vertices.push(...ps.flatMap(p => [p.x, p.y, p.z])); triangles.push(ps);
+        vertices.push(...ps.flatMap(p => [p.x, p.y, p.z])); if(includeTriangles)triangles.push(ps);
       }
     }
   }
-  for (const poly of polygons) for (const ring of poly) for (let i = 1; i < ring.length; i++) {
+  if(includeCurbs) for (const poly of polygons) for (const ring of poly) for (let i = 1; i < ring.length; i++) {
     const a = ring[i - 1], d = ring[i];
     // A chunk boundary is not a curb. Neighbors own the continuation.
     if ([b.minX, b.maxX].some(x => Math.abs(a[0] - x) < 1e-7 && Math.abs(d[0] - x) < 1e-7) ||

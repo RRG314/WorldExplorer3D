@@ -1,0 +1,163 @@
+{
+  "tiles": 103,
+  "triangles": 362011,
+  "curbTriangles": 83430,
+  "markingTriangles": 2419,
+  "ramps": 0,
+  "workerMs": 1763,
+  "inferredFrontages": 18951,
+  "managedPaths": 190,
+  "residentRoads": 353,
+  "residentBuildings": 724,
+  "roads": 12818,
+  "roadMeshes": 50,
+  "buildings": 8106,
+  "worldLoadSequence": 1,
+  "plannedTiles": 134,
+  "highestRefinement": {
+    "cell": "-6:2",
+    "bounds": {
+      "minX": -384,
+      "maxX": -320,
+      "minZ": 128,
+      "maxZ": 192
+    },
+    "addedTriangles": 11843,
+    "baseTriangles": 562
+  },
+  "terrainRefinementTriangles": 330125,
+  "reusedCells": 73,
+  "drawCalls": 87,
+  "compilerCacheBytes": 14327418,
+  "coverageBounds": {
+    "minX": -448,
+    "maxX": 320,
+    "minZ": -256,
+    "maxZ": 512
+  },
+  "indexBytes": 2687160,
+  "positionBytes": 3552012,
+  "durationMs": 15102,
+  "position": {
+    "x": -246.72258706592334,
+    "y": 113.29214892702072,
+    "z": 348.60105124587716
+  },
+  "roadRendered": 7.2709981472983145,
+  "mappedAreaRendered": null,
+  "contact": {
+    "source": "terrain",
+    "y": 6.862626129316722
+  },
+  "indexedRoad": 7.270998147298688,
+  "terrain": 6.862626129316722,
+  "pavement": null,
+  "nearbyBuildings": [
+    {
+      "name": "",
+      "pts": [
+        {
+          "x": -262.29744045120884,
+          "z": 352.4581268592897
+        },
+        {
+          "x": -248.73209420022835,
+          "z": 350.5201064953667
+        },
+        {
+          "x": -248.73209420022835,
+          "z": 354.39614785133244
+        },
+        {
+          "x": -262.29744045120884,
+          "z": 355.5589607444176
+        }
+      ],
+      "distance": 2.778649307382287
+    },
+    {
+      "name": "",
+      "pts": [
+        {
+          "x": -254.93339534353373,
+          "z": 303.6202049358394
+        },
+        {
+          "x": -251.05758212896785,
+          "z": 342.768031312346
+        },
+        {
+          "x": -261.5222778082957,
+          "z": 344.70604916663206
+        },
+        {
+          "x": -266.5608349872313,
+          "z": 305.1706090317907
+        }
+      ],
+      "distance": 7.2674826275397475
+    },
+    {
+      "name": "Palais Héraclès",
+      "pts": [
+        {
+          "x": -263.07260309412203,
+          "z": 343.5432383767534
+        },
+        {
+          "x": -260.7471151653825,
+          "z": 372.2259703934583
+        },
+        {
+          "x": -275.4752053807328,
+          "z": 373.388786753992
+        },
+        {
+          "x": -275.8627867021894,
+          "z": 356.72177386487647
+        },
+        {
+          "x": -277.8006933094723,
+          "z": 344.70604916663206
+        }
+      ],
+      "distance": 17.11445281454912
+    }
+  ],
+  "road": {
+    "name": "Boulevard Albert 1er",
+    "type": "service",
+    "width": 3.8,
+    "tags": {
+      "cycleway:both": "no",
+      "highway": "service",
+      "name": "Boulevard Albert 1er",
+      "name:etymology:wikidata": "Q55008046",
+      "oneway": "yes",
+      "surface": "asphalt"
+    },
+    "section": {
+      "lanes": 1,
+      "lanesSource": "fallback:road-class",
+      "widthMeters": 3.8,
+      "widthSource": "fallback:road-class",
+      "inferredLanes": true,
+      "inferredWidth": true,
+      "parking": {
+        "left": {
+          "widthMeters": 0,
+          "source": "not-on-carriageway"
+        },
+        "right": {
+          "widthMeters": 0,
+          "source": "not-on-carriageway"
+        }
+      },
+      "placement": {
+        "raw": "",
+        "centerlineOffsetMeters": 0,
+        "status": "absent"
+      }
+    }
+  }
+}

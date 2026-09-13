@@ -117,6 +117,9 @@ const GroundHeight = {
     if (!Number.isFinite(profileY)) return true;
     const delta = Math.abs(meshY - profileY);
     const semantics = road?.structureSemantics || null;
+    // Ground-level transport follows the published graded mesh. The profile
+    // is a grading input and may differ after intersecting corridors blend.
+    if (semantics?.terrainMode === 'at_grade') return true;
     if (semantics?.terrainMode === 'subgrade' && meshY > profileY + 1.2) return false;
     if (delta <= 2.6) return true;
     const hasTransitionAnchors = Array.isArray(road?.structureTransitionAnchors) && road.structureTransitionAnchors.length > 0;

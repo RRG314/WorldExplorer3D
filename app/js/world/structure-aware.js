@@ -1,3 +1,4 @@
+import { createStreetFrontageGrading } from '../terrain/street-frontage-grading.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   assignFeatureConnections,
@@ -78,10 +79,18 @@ function publishAtGradeTerrainCorridors(roads = []) {
   // Retain only references to the canonical road objects. Per-road wrapper
   // records and a second feature map duplicated an entire metropolitan road
   // set without adding authority or query value.
+  appCtx.streetFrontageGrading?.dispose?.();
+  appCtx.streetFrontageGrading = createStreetFrontageGrading(appCtx.buildings || [], 1 / (Number(appCtx.WORLD_UNITS_PER_METER) || 1));
   appCtx.structureTerrainCuts = indexedFeatures;
   appCtx.structureTerrainCutByFeature = null;
   appCtx.structureTerrainCutIndex = createDriveableRoadConflictIndex(indexedFeatures, {
-    cellSize: 72
+    cellSize: 72,
+    // Grading includes the shoulder outside the collision footprint. Omitting
+    // it from a spatial bucket made a continuous shoulder stop at cell edges.
+    paddingForRoad: road => {
+      const width = Math.max(Number(road.width) || 5, Number(road.resolvedCrossSection?.sourceWidthMeters) || 0);
+      return width * .5 + 44 * (Number(appCtx.WORLD_UNITS_PER_METER) || 1) + Math.max(3.5, Math.min(8, width * .65));
+    }
   });
   appCtx.transportTerrainCorridorPublication = Object.freeze({
     authority: 'compiled_transport_surface',

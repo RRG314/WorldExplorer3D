@@ -1,25 +1,28 @@
 import { prepareStreetPavement, compilePavementTile, meshPavementTile } from './street-pavement.js';
-let plan = null, cursor = 0, debug = false;
-self.onmessage = ({ data }) => {
+let plan = null, cursor = 0, debug = false, cached={};
+self.onmessage = async ({ data }) => {
   try {
     if (data.type === 'prepare') {
-      debug = data.debug === true; plan = prepareStreetPavement(data.input); cursor = 0;
+      debug = data.debug === true; cached=data.cached||{};plan = prepareStreetPavement(data.input); cursor = 0;
       self.postMessage({ type: 'prepared', tiles: plan.tiles.length });
-    } else if (data.type === 'next' && plan) {
-      const tile = plan.tiles[cursor++];
+    } else if ((data.type === 'next'||data.type==='retry') && plan) {
+      const tile = data.type==='retry'?plan.tiles[cursor-1]:plan.tiles[cursor++];
       if (!tile) { self.postMessage({ type: 'complete' }); plan = null; return; }
-      if (debug) {
-        const road = r => ({type:r.type,transportRecord:{sourceTags:r.transportRecord?.sourceTags}});
-        const slim={...tile,segments:tile.segments.map(s=>({...s,road:road(s.road)})),joins:tile.joins.map(s=>({...s,road:road(s.road)}))};
-        self.postMessage({type:'trace',tile:slim});
-      }
+      const road=r=>({auditIndex:r.auditIndex,type:r.type,tags:r.tags,transportRecord:{sourceTags:r.transportRecord?.sourceTags}});
+      const slim={...tile,segments:tile.segments.map(s=>({...s,road:road(s.road)})),joins:tile.joins.map(s=>({...s,road:road(s.road)}))};
+      // Retain only the current cell in the opt-in diagnostic textarea. This
+      // must precede clipping so a timed-out polygon is reproducible as well.
+      if(debug)self.postMessage({type:'trace',tile:slim});
+      const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify({tile:slim,metersPerWorldUnit:plan.metersPerWorldUnit})));
+      const fingerprint=Array.from(new Uint8Array(digest),n=>n.toString(16).padStart(2,'0')).join('');
+      if(data.type!=='retry'&&cached[tile.key]===fingerprint){self.postMessage({type:'cached',key:tile.key,fingerprint,completed:cursor,total:plan.tiles.length});return;}
       const started = performance.now();
       const result = compilePavementTile(tile, plan.metersPerWorldUnit);
-      const mesh = result.polygons.length ? meshPavementTile(tile, result.polygons, () => 0, { curbHeight: 0.12 / plan.metersPerWorldUnit, ramps:result.ramps }) : { vertices: [], curbVertices: [], triangles: [] };
+      const mesh = result.polygons.length ? meshPavementTile(tile, result.polygons, () => 0, { curbHeight: 0.12 / plan.metersPerWorldUnit, ramps:result.ramps,includeTriangles:false }) : { vertices: [], curbVertices: [], triangles: [] };
       mesh.markingVertices=result.markingPolygons?.length ? meshPavementTile(tile,result.markingPolygons,()=>0,{curbHeight:0,cellSize:2}).vertices : [];
       delete mesh.triangles; // Contact reuses the final render buffer; do not clone point objects across threads.
       // A single acknowledged chunk is in flight. No unbounded mesh message queue.
-      self.postMessage({ type: 'tile', key: tile.key, bounds: tile.bounds,
+      self.postMessage({ type: 'tile', key: tile.key, fingerprint, bounds: tile.bounds,
         segments: tile.segments.map(s => ({ ...s, road: undefined, roadIndex: s.road.auditIndex })),
         inferredFrontages: result.inferredFrontages, ramps:result.ramps, rampCount:result.ramps?.length || 0, mesh, completed: cursor, total: plan.tiles.length,
         durationMs: Math.round(performance.now() - started) });

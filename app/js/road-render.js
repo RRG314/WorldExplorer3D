@@ -1,3 +1,9 @@
+export function createRoadMarkingMaterial({color=0xffffee,emissive=0x444444,emissiveIntensity=.3,roughness=.8}={}) {
+  // Roads use -2. Paint must stay ahead of their depth bias at grazing angles.
+  return new THREE.MeshStandardMaterial({color,emissive,emissiveIntensity,roughness,
+    polygonOffset:true,polygonOffsetFactor:-6,polygonOffsetUnits:-6});
+}
+
 function appendUpwardRibbonGeometry(leftEdge = [], rightEdge = [], vertices = [], indices = []) {
   const count = Math.min(leftEdge.length, rightEdge.length);
   if (count < 2) return false;
@@ -50,15 +56,7 @@ function createRoadSurfaceMaterials({
   };
 
   if (includeMarkings) {
-    materials.roadMarkMaterial = new THREE.MeshStandardMaterial({
-      color: 0xffffee,
-      emissive: 0x444444,
-      emissiveIntensity: 0.3,
-      roughness: 0.8,
-      polygonOffset: true,
-      polygonOffsetFactor: -6,
-      polygonOffsetUnits: -6
-    });
+    materials.roadMarkMaterial = createRoadMarkingMaterial();
   }
 
   if (includeSidewalk) {

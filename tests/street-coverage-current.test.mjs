@@ -35,3 +35,12 @@ test('moving compilation windows change coverage without changing the required n
  assert.equal(before.requiredSidewalkMeters,after.requiredSidewalkMeters);
  assert.equal(before.compilationCoveragePercent,0);assert.equal(after.compilationCoveragePercent,100);
 });
+
+test('a completion label cannot hide missing overview cells or a running worker',()=>{
+ const snapshot={street:{sourceCoverage:{status:'incomplete'}},streetOverview:{status:'complete',totalCells:400,completedCells:399,workerActive:false}};
+ assert.match(assessStreetQuality(snapshot).failures.join(' '),/inconsistent/);
+ snapshot.streetOverview.completedCells=400;snapshot.streetOverview.workerActive=true;
+ assert.match(assessStreetQuality(snapshot).failures.join(' '),/inconsistent/);
+ snapshot.streetOverview.workerActive=false;
+ assert.equal(assessStreetQuality(snapshot).failures.some(s=>/coverage|inconsistent/.test(s)),false);
+});

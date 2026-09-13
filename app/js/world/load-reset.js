@@ -126,6 +126,13 @@ export function resetWorldForReload(options = {}) {
   // prevents the next feature compilation pass from appearing authoritative
   // before final terrain-aligned meshes have been created.
   appCtx._cancelStreetPavementBuild?.();
+  appCtx.streetFrontageGrading?.dispose?.();
+  appCtx.streetFrontageGrading = null;
+  appCtx.streetOverview?.dispose?.();
+  appCtx.streetOverview = null;
+  appCtx._streetPavementCache?.clear();
+  appCtx._streetPavementCache = null;
+  appCtx._streetPavementCacheSequence = null;
   appCtx.streetPavement?.dispose?.();
   appCtx.streetPavement = null;
   appCtx.roadContactIndex?.dispose?.();

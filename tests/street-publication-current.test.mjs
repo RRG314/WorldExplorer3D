@@ -9,10 +9,10 @@ function harness(t, mode='success') {
   const resources=[];
   const install=(name,descriptor)=>{const prior=Object.getOwnPropertyDescriptor(globalThis,name);Object.defineProperty(globalThis,name,descriptor);t.after(()=>{if(prior)Object.defineProperty(globalThis,name,prior);else delete globalThis[name];});};
   class Resource { constructor(){resources.push(this);} dispose(){this.disposed=true;} }
-  class Geometry extends Resource {setAttribute(name,value){(this.attributes ||= {})[name]=value;}computeVertexNormals(){}computeBoundingSphere(){}}
+  class Geometry extends Resource {setAttribute(name,value){(this.attributes ||= {})[name]=value;}setIndex(index){this.index=index;}getIndex(){return this.index;}computeVertexNormals(){}computeBoundingSphere(){}}
   class Attribute {constructor(values){this.array=new Float32Array(values);}}
   class Mesh {constructor(geometry,material){this.geometry=geometry;this.material=material;this.userData={};}}
-  install('THREE',{value:{CanvasTexture:Resource,MeshStandardMaterial:Resource,BufferGeometry:Geometry,Float32BufferAttribute:Attribute,Mesh,RepeatWrapping:1,SRGBColorSpace:1,DoubleSide:2},configurable:true});
+  install('THREE',{value:{CanvasTexture:Resource,MeshStandardMaterial:Resource,BufferGeometry:Geometry,Float32BufferAttribute:Attribute,BufferAttribute:class{constructor(array){this.array=array;}},Mesh,RepeatWrapping:1,SRGBColorSpace:1,DoubleSide:2},configurable:true});
   install('document',{value:{createElement(){return {getContext(){return {createImageData(){return {data:new Uint8ClampedArray(128*128*4)};},putImageData(){},strokeRect(){}};}};},querySelector(){return null;}},configurable:true});
   install('location',{value:{search:''},configurable:true});
   let worker;

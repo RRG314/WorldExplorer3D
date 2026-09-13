@@ -458,9 +458,8 @@ function bootApp() {
         globalThis.dispatchEvent?.(new CustomEvent('we3d:runtime-ready'));
     });
     runBootStep('scheduleAnalyticsWarmup', () => scheduleAnalyticsWarmup(2800));
-    runBootStep('schedulePlaneVisualWarmup', () => {
-        scheduleAfterFirstPlay('plane-visual', () => appCtx.preparePlaneModeVisual?.(), { timeout: 9000 });
-    });
+    // Plane mode constructs its visual when selected; walking and driving do
+    // not need to allocate an unused aircraft after every application start.
     _booted = true;
     return { tryEnablePostProcessing };
 }

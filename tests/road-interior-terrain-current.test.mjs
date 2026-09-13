@@ -101,3 +101,11 @@ test('ground-level surface queries cannot select a bridge when the ground road e
   assert.equal(index.sampleAt(1,2,0,'at_grade'),null);
   assert.equal(index.sampleAt(1,2,0),12,'bridge contact remains available to its own traversal');
 });
+
+
+test('ground-level contact accepts signed terrain reconciliation beyond the old profile tolerance',async()=>{
+ const {GroundHeight}=await import('../app/js/ground.js');
+ const road={structureSemantics:{terrainMode:'at_grade'}};
+ for(const meshY of [5,15]){assert.equal(GroundHeight._shouldUseRoadMeshHeight(road,meshY,10),true);assert.equal(GroundHeight._resolveRoadSurfaceY(road,meshY,10),meshY);}
+ assert.equal(GroundHeight._shouldUseRoadMeshHeight({structureSemantics:{terrainMode:'subgrade'}},15,10),false);
+});

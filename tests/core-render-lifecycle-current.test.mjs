@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRuntimeKernel } from '../app/js/runtime/kernel.js';
-import { createCoreRenderSystem } from '../app/js/runtime/core-frame-systems.js';
+import { createCoreFrameSystems, createCoreRenderSystem } from '../app/js/runtime/core-frame-systems.js';
 
 for (const useComposer of [false, true]) {
   test(`city drawing stops at the menu and resumes on entry (${useComposer ? 'composer' : 'direct'})`, () => {
@@ -35,3 +35,16 @@ for (const useComposer of [false, true]) {
     kernel.dispose();
   });
 }
+
+for(const composer of [false,true])test(`loading suppresses city work and drawing until publication (${composer})`,()=>{
+ let updates=0,draws=0;
+ const app={gameStarted:true,worldLoading:true,renderer:{render:()=>draws++},composer:{render:()=>draws++},update:()=>updates++,updateControlInput:()=>updates++,updateCamera:()=>updates++,drawMinimap:()=>updates++,refreshLiveWeather:()=>updates++};
+ const kernel=createRuntimeKernel();
+ for(const system of createCoreFrameSystems(app))kernel.registerSystem(system);
+ kernel.registerSystem(createCoreRenderSystem(app,()=>composer));
+ for(let i=0;i<200;i++)kernel.runFrame(i*16);
+ assert.equal(updates,0);assert.equal(draws,0);
+ app.worldLoading=false;kernel.runFrame(3200);
+ assert.ok(updates>0);assert.equal(draws,1);
+ kernel.dispose();
+});

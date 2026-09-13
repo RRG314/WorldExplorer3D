@@ -1,0 +1,99 @@
+{
+  "busy": false,
+  "near": {
+    "tiles": 53,
+    "triangles": 9810,
+    "curbTriangles": 14414,
+    "markingTriangles": 0,
+    "ramps": 0,
+    "workerMs": 0,
+    "inferredFrontages": 11289,
+    "managedPaths": 44,
+    "residentRoads": 30,
+    "residentBuildings": 264,
+    "roads": 116,
+    "roadMeshes": 116,
+    "buildings": 1056,
+    "worldLoadSequence": 1,
+    "plannedTiles": 75,
+    "reusedCells": 75,
+    "terrainRefinementTriangles": 534,
+    "highestRefinement": {
+      "cell": "-2:1",
+      "bounds": {
+        "minX": -128,
+        "maxX": -64,
+        "minZ": 64,
+        "maxZ": 128
+      },
+      "addedTriangles": 192,
+      "baseTriangles": 462
+    },
+    "drawCalls": 36,
+    "compilerCacheBytes": 4959246,
+    "coverageBounds": {
+      "minX": -384,
+      "maxX": 384,
+      "minZ": -384,
+      "maxZ": 384
+    },
+    "positionBytes": 872064,
+    "durationMs": 826
+  },
+  "overview": {
+    "status": "complete",
+    "completedCells": 340,
+    "totalCells": 340,
+    "triangles": 18689,
+    "positionBytes": 245040,
+    "indexBytes": 112134,
+    "retainedBytes": 357174,
+    "drawCalls": 18,
+    "workerActive": false,
+    "sourceScope": "complete loaded location",
+    "error": null,
+    "sourceCells": 384,
+    "excludedCells": 44,
+    "coverageBounds": {
+      "minX": -704,
+      "maxX": 1536,
+      "minZ": -256,
+      "maxZ": 1280
+    },
+    "durationMs": 19023
+  },
+  "renderer": {
+    "geometries": 1228,
+    "textures": 1
+  },
+  "heapBytes": 45277910,
+  "history": [
+    {
+      "position": {
+        "x": 0,
+        "z": 0
+      },
+      "durationMs": 5624,
+      "reusedCells": 0,
+      "cacheBytes": 2483808
+    },
+    {
+      "position": {
+        "x": 1024,
+        "z": 1024
+      },
+      "durationMs": 6734,
+      "reusedCells": 0,
+      "cacheBytes": 4959246
+    },
+    {
+      "position": {
+        "x": 0,
+        "z": 0
+      },
+      "durationMs": 826,
+      "reusedCells": 75,
+      "cacheBytes": 4959246
+    }
+  ]
+}

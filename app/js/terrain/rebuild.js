@@ -83,7 +83,8 @@ export function shouldRenderRoadCenterMarkings(road) {
   return road?.structureSemantics?.terrainMode !== 'elevated';
 }
 
-function appendRoadCenterMarkings(road, points, targetVerts, targetIndices, widthSamplesMeters = null) {
+export function appendRoadCenterMarkings(road, points, outputVerts, outputIndices, widthSamplesMeters = null, surfaceHeightAt = (x,z)=>sampleFeatureSurfaceY(road,x,z), contactIndex = null) {
+  const targetVerts=[], targetIndices=[];
   if (
     !shouldRenderRoadCenterMarkings(road) ||
     !Array.isArray(points) ||
@@ -138,8 +139,8 @@ function appendRoadCenterMarkings(road, points, targetVerts, targetIndices, widt
         const z1 = start.z + dirZ * dashStart + normalZ * lateralOffset;
         const x2 = start.x + dirX * dashEnd + normalX * lateralOffset;
         const z2 = start.z + dirZ * dashEnd + normalZ * lateralOffset;
-        const y1 = sampleFeatureSurfaceY(road, x1, z1) + 0.012;
-        const y2 = sampleFeatureSurfaceY(road, x2, z2) + 0.012;
+        const y1 = surfaceHeightAt(x1, z1) + 0.012;
+        const y2 = surfaceHeightAt(x2, z2) + 0.012;
         if (Number.isFinite(y1) && Number.isFinite(y2)) {
           const baseVertex = targetVerts.length / 3;
           targetVerts.push(
@@ -160,6 +161,20 @@ function appendRoadCenterMarkings(road, points, targetVerts, targetIndices, widt
       }
       distanceBeforeSegment += segmentLength;
   }
+  for(let i=0;i<targetVerts.length;i+=3) targetVerts[i+1]=surfaceHeightAt(targetVerts[i],targetVerts[i+2])+.012;
+  if(contactIndex){
+    for(let i=0;i<targetIndices.length;i+=3){
+      const points=targetIndices.slice(i,i+3).map(j=>({x:targetVerts[j*3],z:targetVerts[j*3+2]}));
+      const projected=contactIndex.projectTriangle(points,.012);
+      const base=outputVerts.length/3;
+      for(const v of projected)outputVerts.push(v);
+      for(let j=0;j<projected.length/3;j++)outputIndices.push(base+j);
+    }
+    return;
+  }
+  const base=outputVerts.length/3;
+  for(const v of targetVerts)outputVerts.push(v);
+  for(const i of targetIndices)outputIndices.push(i+base);
 }
 
 export function buildRoadSkirts(leftEdge, rightEdge, skirtDepth = 1.5, baseHeightAt = null) {
@@ -220,22 +235,15 @@ export function createCompiledRoadSurfaceSampler(feature, fallbackSampler, diagn
   return (x, z) => {
     const compiledY = sampleFeatureSurfaceY(feature, x, z);
     if (Number.isFinite(compiledY)) {
-      // Detailed terrain is rebuilt to the compiled transport corridor, but
-      // the lower-resolution fixed-location terrain outside that ring is not.
-      // Reconcile only at-grade surfaces against the terrain that is actually
-      // rendered at this coordinate. This prevents a regional street from
-      // sinking below the outer LOD without lifting bridges or exposing
-      // tunnels, whose vertical profiles must remain structure-owned.
-      if (
-        feature?.structureSemantics?.terrainMode === 'at_grade' &&
-        typeof fallbackSampler === 'function'
-      ) {
-        const renderedTerrainY = Number(fallbackSampler(x, z));
-        if (Number.isFinite(renderedTerrainY) && renderedTerrainY > compiledY) {
-          if (diagnostics && typeof diagnostics === 'object') {
-            diagnostics.renderedTerrainClamps =
-              Number(diagnostics.renderedTerrainClamps || 0) + 1;
-          }
+      // At-grade terrain has already consumed the compiled corridor grades.
+      // Rendering max(profile, terrain) applied fill a second time and left
+      // the cut half of the profile hovering over its own graded ground.
+      // Read the published ground in both directions. Bridges and tunnels
+      // retain their independent engineered profiles.
+      if (feature?.structureSemantics?.terrainMode === 'at_grade' && typeof fallbackSampler === 'function') {
+        const renderedTerrainY = fallbackSampler(x, z);
+        if (Number.isFinite(renderedTerrainY)) {
+          if (diagnostics && renderedTerrainY > compiledY) diagnostics.renderedTerrainClamps = Number(diagnostics.renderedTerrainClamps || 0) + 1;
           return renderedTerrainY;
         }
       }
@@ -255,6 +263,9 @@ export function createRoadTerrainConformanceAudit() {
     totalSamples: 0,
     issuesFound: 0,
     minimumDelta: Infinity,
+    maximumDelta: -Infinity,
+    buriedSamples: 0,
+    floatingSamples: 0,
     worstDeltas: []
   };
 }
@@ -286,7 +297,16 @@ export function recordAtGradeRoadTerrainConformance(
     const delta = y - terrainY;
     audit.totalSamples += 1;
     audit.minimumDelta = Math.min(audit.minimumDelta, delta);
-    if (delta >= -0.05) continue;
+    audit.maximumDelta = Math.max(audit.maximumDelta, delta);
+    // A one-sided check accepted metre-scale floating at-grade surfaces.
+    // Allow the authored surface bias plus 0.25 world units of mesh tolerance;
+    // larger gaps need a terrain/transport reconciliation review. Structures
+    // are excluded above, so bridge clearance is not a pavement defect.
+    const allowedGap = (Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : ROAD_SURFACE_BIAS) + 0.25;
+    const buried = delta < -0.05, floating = delta > allowedGap;
+    if (!buried && !floating) continue;
+    audit.buriedSamples += Number(buried);
+    audit.floatingSamples += Number(floating);
     audit.issuesFound += 1;
     const geographic = typeof worldToLatLon === 'function'
       ? worldToLatLon(x, z)
@@ -295,6 +315,7 @@ export function recordAtGradeRoadTerrainConformance(
       sourceFeatureId: String(feature?.sourceFeatureId || feature?.id || ''),
       roadName: String(feature?.name || feature?.tags?.name || 'Unnamed road'),
       delta: Number(delta.toFixed(3)),
+      kind: buried ? 'buried' : 'floating',
       lat: Number.isFinite(geographic?.lat) ? Number(geographic.lat.toFixed(6)) : null,
       lon: Number.isFinite(geographic?.lon) ? Number(geographic.lon.toFixed(6)) : null,
       x: Number(x.toFixed(1)),
@@ -306,7 +327,7 @@ export function recordAtGradeRoadTerrainConformance(
 
 export function finalizeRoadTerrainConformanceAudit(audit) {
   const result = audit || createRoadTerrainConformanceAudit();
-  result.worstDeltas.sort((left, right) => left.delta - right.delta);
+  result.worstDeltas.sort((left, right) => Math.abs(right.delta) - Math.abs(left.delta));
   return Object.freeze({
     authority: result.authority,
     totalSamples: Number(result.totalSamples || 0),
@@ -314,6 +335,9 @@ export function finalizeRoadTerrainConformanceAudit(audit) {
     minimumDelta: Number.isFinite(result.minimumDelta)
       ? Number(result.minimumDelta.toFixed(4))
       : null,
+    maximumDelta: Number.isFinite(result.maximumDelta) ? Number(result.maximumDelta.toFixed(4)) : null,
+    buriedSamples: Number(result.buriedSamples || 0),
+    floatingSamples: Number(result.floatingSamples || 0),
     worstDeltas: Object.freeze(result.worstDeltas.slice(0, 10).map(Object.freeze))
   });
 }
@@ -411,6 +435,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       // publication after the complete transport height rebuild.
       deferVisualProfile: true
     }));
+    appCtx.streetFrontageGrading?.clearSamples?.();
     if (typeof repositionBuildingsWithTerrain === 'function') {
       measure('reprojectGroundAttachedWorld', () => repositionBuildingsWithTerrain());
     }
@@ -558,13 +583,12 @@ export async function publishCompiledTransportMeshes(deps = {}) {
         worldToLatLon
       );
       appendRoadMainGeometry(verts, indices, renderRoad.structureSemantics?.terrainMode);
-      appendRoadCenterMarkings(
-        renderRoad,
-        pts,
-        roadMarkBatchVerts,
-        roadMarkBatchIdx,
-        widthSamplesMeters
-      );
+      if(shouldRenderRoadCenterMarkings(renderRoad)) {
+        const markingSurface=createRoadContactIndex([{geometry:{attributes:{position:{array:verts}},getIndex:()=>({array:indices})},userData:{terrainMode:renderRoad.structureSemantics?.terrainMode}}]);
+        appendRoadCenterMarkings(renderRoad,pts,roadMarkBatchVerts,roadMarkBatchIdx,widthSamplesMeters,
+          (x,z)=>markingSurface.sampleAt(x,z),markingSurface);
+        markingSurface.dispose();
+      }
 
       if (shouldRenderRoadSkirts(renderRoad)) {
         const skirtDepth = roadSkirtDepth(renderRoad);

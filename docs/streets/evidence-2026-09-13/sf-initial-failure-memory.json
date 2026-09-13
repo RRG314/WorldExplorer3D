@@ -1,0 +1,96 @@
+{
+  "note": "Heap is browser-reported JavaScript only; geometry bytes exclude textures, GPU allocations and other tabs. Inspect twice to see runtime activity.",
+  "javascriptHeapBytes": 1326209493,
+  "sceneGeometryBytes": 350657253,
+  "rendererResources": {
+    "geometries": 1718,
+    "textures": 413
+  },
+  "gameStarted": true,
+  "worldLoading": false,
+  "pavementBuildActive": false,
+  "deferredWork": {
+    "budgets": {
+      "firstPlayTargetMs": 25000,
+      "frameTargetMs": 16.7,
+      "cooperativeChunkTargetMs": 8,
+      "backgroundIdleTimeoutMs": 1800,
+      "inactiveAuxiliaryRenderers": 0
+    },
+    "firstPlayReady": true,
+    "activeTask": null,
+    "firstPlayDetail": {
+      "environment": "earth",
+      "loadDurationMs": 249811,
+      "publicationSequence": 1
+    },
+    "queued": [],
+    "completed": [
+      "tutorial-runtime",
+      "analytics-runtime",
+      "plane-visual",
+      "earth-ambient-state-1",
+      "earth-star-catalog"
+    ]
+  },
+  "workSinceLastInspection": null,
+  "loadPhases": {
+    "prepareAcceptedGround": 444,
+    "fetchOverpass": 253,
+    "fetchFixedRegionalContext": 6352,
+    "fetchFixedRegionalStructures": 9540,
+    "waitForFixedRegionalGround": 18268,
+    "featureBudgeting": 9557,
+    "waitForTransportGround": 0,
+    "buildRoadGeometry": 10927,
+    "buildLanduseGeometry": 1352,
+    "batchLanduseGeometry": 35,
+    "buildLinearFeatureData": 755,
+    "buildPoiGeometry": 74,
+    "buildStreetFurniture": 443,
+    "buildBuildingRoadGuards": 7570,
+    "buildBuildingGeometry": 10534,
+    "publishBuildingFacadeEntrances": 546,
+    "publishBuildingExteriorDetails": 52,
+    "batchBuildingGeometry": 4861,
+    "publishLocationTerrain": 0,
+    "publishCompiledTransportMeshes": 49140,
+    "refreshTerrainSurfaceProfiles": 678,
+    "publishDeferredTransportLandmark": 176,
+    "retireGroundFallbackPlaceholder": 0,
+    "buildTraversalNetworks": 1464,
+    "spawnPlayer": 4363,
+    "refreshMemoryMarkersForCurrentLocation": 0,
+    "refreshBlockBuilderForCurrentLocation": 0,
+    "refreshEditableWorldPresentation": 0,
+    "publishLocationWorld": 2,
+    "refreshEditableBuildingVisibility": 294,
+    "waitForTerrainSurfaceMaterials": 0
+  },
+  "geometryByLayer": {
+    "roadMeshes": 85212424,
+    "buildingMeshes": 132299030,
+    "landuseMeshes": 2290820,
+    "urbanSurfaceMeshes": 0,
+    "linearFeatureMeshes": 377784,
+    "vegetationMeshes": 52359690
+  },
+  "quality": {
+    "status": "fail",
+    "failures": [
+      "JavaScript heap exceeds 768 MiB",
+      "first play exceeds 25000 ms"
+    ],
+    "pending": [
+      "pavement statistics unavailable",
+      "loaded street-network coverage has not been established"
+    ],
+    "refinementMultiplier": null,
+    "budgets": {
+      "javascriptHeapBytes": 805306368,
+      "pavementPositionBytes": 16777216,
+      "refinementMultiplier": 8
+    },
+    "visualStatus": "Requires camera sweep and recorded city route; performance checks cannot certify appearance."
+  }
+}
