@@ -1,21 +1,40 @@
 <!doctype html>
 <html lang="en"><meta charset="utf-8"><title>Street geometry verification</title>
 <style>body{margin:0;background:#202830;color:#eee;font:14px system-ui}#controls{position:fixed;top:12px;left:12px;background:#202830dd;padding:12px;max-width:340px}button{margin:4px;padding:8px}pre{white-space:pre-wrap}</style>
-<div id="controls"><strong>Controlled street geometry test</strong><p>Real pavement worker and renderer. Synthetic source geometry, not a real location.</p><button id="overview">Overview</button><button id="ramp">Curb ramp</button><pre id="result">Compiling…</pre></div>
+<div id="controls"><strong>Controlled street geometry test</strong><p>Real pavement worker and renderer. Synthetic source geometry, not a real location.</p><label>Terrain <select id="terrain"><option value="flat">Flat</option><option value="uphill">Uphill</option><option value="downhill">Downhill</option><option value="cross">Cross slope</option><option value="rolling">Rolling terrain</option><option value="high">High elevation</option></select></label><button id="overview">Overview</button><button id="ramp">Curb ramp</button><button id="rebuild">Rebuild paving five times</button><pre id="result">Compiling…</pre></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script type="module">
+import {conformRoadTriangles} from '../../app/js/terrain/road-surface-geometry.js?v=2';
 import {publishStreetPavement} from '../../app/js/world/street-pavement-runtime.js';
 import {createRoadContactIndex} from '../../app/js/terrain/road-contact-index.js';
+const terrainMode=new URLSearchParams(location.search).get('terrain') || 'flat';
+const base=terrainMode==='high' ? 3000 : 0;
+const surface=(x,z)=>base+(terrainMode==='uphill' ? x*.22 : terrainMode==='downhill' ? -x*.22 : terrainMode==='cross' ? z*.25 : terrainMode==='rolling' ? 2*Math.sin(x*Math.PI/12) : 0);
+document.querySelector('#terrain').value=terrainMode;document.querySelector('#terrain').onchange=e=>{location.search='?terrain='+e.target.value;};
 const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(1);renderer.outputEncoding=THREE.sRGBEncoding;document.body.appendChild(renderer.domElement);
 const scene=new THREE.Scene();scene.background=new THREE.Color('#a8bac7');scene.add(new THREE.HemisphereLight(0xffffff,0x89919a,.9));const sun=new THREE.DirectionalLight(0xffffff,.8);sun.position.set(10,30,10);scene.add(sun);
 const camera=new THREE.PerspectiveCamera(45,innerWidth/innerHeight,.1,300);
 const road={pts:[{x:-32,z:0},{x:32,z:0}],width:8,type:'residential',surfaceBias:.18,structureSemantics:{terrainMode:'at_grade'},transportRecord:{sourceTags:{highway:'residential',sidewalk:'both'}}};
-const roadGeo=new THREE.BufferGeometry();roadGeo.setAttribute('position',new THREE.Float32BufferAttribute([-32,.18,-4,-32,.18,4,32,.18,4,32,.18,-4],3));roadGeo.setIndex([0,1,2,0,2,3]);roadGeo.computeVertexNormals();const roadMesh=new THREE.Mesh(roadGeo,new THREE.MeshStandardMaterial({color:0x34383b,roughness:.95}));scene.add(roadMesh);
-const ground=new THREE.Mesh(new THREE.PlaneGeometry(120,100),new THREE.MeshStandardMaterial({color:0x817b65}));ground.rotation.x=-Math.PI/2;scene.add(ground);
+const roadGeo=new THREE.BufferGeometry();roadGeo.setAttribute('position',new THREE.Float32BufferAttribute([-32,.18,-4,-32,.18,4,32,.18,4,32,.18,-4],3));for(let i=0;i<roadGeo.attributes.position.count;i++){const p=roadGeo.attributes.position;p.setY(i,surface(p.getX(i),p.getZ(i))+.18);}const roadPositions=Array.from(roadGeo.attributes.position.array),roadIndices=[0,1,2,0,2,3];conformRoadTriangles(roadPositions,roadIndices,surface,.18,{maxDepth:6,tolerance:.02});roadGeo.setAttribute('position',new THREE.Float32BufferAttribute(roadPositions,3));roadGeo.setIndex(roadIndices);roadGeo.computeVertexNormals();const roadMesh=new THREE.Mesh(roadGeo,new THREE.MeshStandardMaterial({color:0x34383b,roughness:.95}));scene.add(roadMesh);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(120,100,120,100),new THREE.MeshStandardMaterial({color:0x817b65}));ground.geometry.rotateX(-Math.PI/2);for(let i=0;i<ground.geometry.attributes.position.count;i++){const p=ground.geometry.attributes.position;p.setY(i,surface(p.getX(i),p.getZ(i)));}ground.geometry.computeVertexNormals();scene.add(ground);
 const buildings=[{pts:[{x:-16,z:9},{x:0,z:9},{x:0,z:19},{x:-16,z:19}]},{pts:[{x:0,z:9},{x:16,z:9},{x:16,z:19},{x:0,z:19}]}];
-for(const b of buildings){const mesh=new THREE.Mesh(new THREE.BoxGeometry(16,5,10),new THREE.MeshStandardMaterial({color:0xb2a99d}));mesh.position.set((b.pts[0].x+b.pts[1].x)/2,2.5,14);scene.add(mesh);}
-const ctx={_worldLoadSequence:1,terrainEnabled:true,scene,roads:[road],roadMeshes:[roadMesh],roadContactIndex:createRoadContactIndex([roadMesh]),buildings,landuses:[],linearFeatures:[{kind:'footway',subtype:'crossing',width:3,pts:[{x:0,z:-8},{x:0,z:8}],sourceTags:{kerb:'lowered','crossing:markings':'zebra'},structureSemantics:{terrainMode:'at_grade'}}],linearFeatureMeshes:[],urbanSurfaceMeshes:[],car:{x:0,z:0},METERS_PER_WORLD_UNIT:1,terrainMeshHeightAt:()=>0,sampleFeatureSurfaceY:()=>.18,addEarthWorldObject:m=>scene.add(m)};
-function render(){renderer.render(scene,camera);}document.querySelector('#overview').onclick=()=>{camera.position.set(24,27,-30);camera.lookAt(0,0,0);render();};document.querySelector('#ramp').onclick=()=>{camera.position.set(5,1.5,-8);camera.lookAt(0,.2,-4);render();};
-try{await publishStreetPavement(ctx);document.querySelector('#result').textContent=JSON.stringify({ramps:ctx.streetPavement.stats.ramps,markingTriangles:ctx.streetPavement.stats.markingTriangles,curbSurface:ctx.streetPavement.sampleAt(0,-4),backOfRamp:ctx.streetPavement.sampleAt(0,-5.5),roadSurface:ctx.roadContactIndex.sampleAt(0,-4)},null,2);document.querySelector('#overview').click();}catch(e){document.querySelector('#result').textContent=e.stack;}
+for(const b of buildings){const mesh=new THREE.Mesh(new THREE.BoxGeometry(16,5+Math.max(...b.pts.map(p=>surface(p.x,p.z)))-Math.min(...b.pts.map(p=>surface(p.x,p.z))),10),new THREE.MeshStandardMaterial({color:0xb2a99d}));mesh.position.set((b.pts[0].x+b.pts[1].x)/2,2.5+(Math.max(...b.pts.map(p=>surface(p.x,p.z)))+Math.min(...b.pts.map(p=>surface(p.x,p.z))))/2,14);scene.add(mesh);}
+const ctx={_worldLoadSequence:1,terrainEnabled:true,scene,roads:[road],roadMeshes:[roadMesh],roadContactIndex:createRoadContactIndex([roadMesh]),buildings,landuses:[],linearFeatures:[{kind:'footway',subtype:'crossing',width:3,pts:[{x:0,z:-8},{x:0,z:8}],sourceTags:{kerb:'lowered','crossing:markings':'zebra'},structureSemantics:{terrainMode:'at_grade'}}],linearFeatureMeshes:[],urbanSurfaceMeshes:[],car:{x:0,z:0},METERS_PER_WORLD_UNIT:1,terrainMeshHeightAt:surface,sampleFeatureSurfaceY:(road,x,z)=>surface(x,z)+.18,addEarthWorldObject:m=>scene.add(m)};
+function render(){renderer.render(scene,camera);}document.querySelector('#overview').onclick=()=>{camera.position.set(24,base+27,-30);camera.lookAt(0,base,0);render();};document.querySelector('#ramp').onclick=()=>{camera.position.set(5,surface(5,-8)+1.5,-8);camera.lookAt(0,surface(0,-4)+.2,-4);render();};
+try{await publishStreetPavement(ctx);document.querySelector('#result').textContent=JSON.stringify({terrain:terrainMode,positionBytes:ctx.streetPavement.stats.positionBytes,terrainRefinementTriangles:ctx.streetPavement.stats.terrainRefinementTriangles,ramps:ctx.streetPavement.stats.ramps,markingTriangles:ctx.streetPavement.stats.markingTriangles,curbSurface:ctx.streetPavement.sampleAt(0,-4),backOfRamp:ctx.streetPavement.sampleAt(0,-5.5),roadSurface:ctx.roadContactIndex.sampleAt(0,-4)},null,2);document.querySelector('#overview').click();}catch(e){document.querySelector('#result').textContent=e.stack;}
+document.querySelector('#rebuild').onclick=async()=>{
+  const button=document.querySelector('#rebuild');button.disabled=true;
+  const samples=[];
+  try {
+    for(let i=0;i<5;i++){
+      await publishStreetPavement(ctx);render();
+      samples.push({iteration:i+1,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,
+        pavementMeshes:ctx.streetPavement.meshes.length,sceneChildren:scene.children.length,
+        positionBytes:ctx.streetPavement.stats.positionBytes,workerActive:typeof ctx._cancelStreetPavementBuild==='function',
+        javascriptHeapBytes:performance.memory?.usedJSHeapSize ?? null});
+    }
+    document.querySelector('#result').textContent=JSON.stringify({terrain:terrainMode,stableResources:samples.every(s=>s.geometries===samples[0].geometries && s.textures===samples[0].textures && s.sceneChildren===samples[0].sceneChildren && !s.workerActive),samples},null,2);
+  }catch(e){document.querySelector('#result').textContent=e.stack;}finally{button.disabled=false;}
+};
 addEventListener('resize',()=>{renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();render();});
 </script></html>

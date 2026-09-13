@@ -4,12 +4,14 @@ export function createRoadContactIndex(meshes, cellSize = 16) {
   const cells = new Map();
   for (const mesh of meshes) {
     if (mesh.userData?.isRoadSkirt || mesh.userData?.isRoadMarking) continue;
-    const positions = mesh.geometry?.getAttribute('position')?.array;
-    const indices = mesh.geometry?.getIndex()?.array;
-    if (!positions || !indices) continue;
+    const positions = (mesh.geometry?.getAttribute?.('position') || mesh.geometry?.attributes?.position)?.array;
+    const indices = mesh.geometry?.getIndex?.()?.array;
+    if (!positions) continue;
     // Road batches are authored in world coordinates with identity transforms.
-    for (let i = 0; i < indices.length; i += 3) {
-      const a = indices[i] * 3, b = indices[i + 1] * 3, c = indices[i + 2] * 3;
+    for (let i = 0; i < (indices?.length ?? positions.length / 3); i += 3) {
+      const a = indices ? indices[i] * 3 : i * 3;
+      const b = indices ? indices[i + 1] * 3 : a + 3;
+      const c = indices ? indices[i + 2] * 3 : a + 6;
       const ax = positions[a], az = positions[a + 2];
       const bx = positions[b], bz = positions[b + 2];
       const cx = positions[c], cz = positions[c + 2];
@@ -27,6 +29,7 @@ export function createRoadContactIndex(meshes, cellSize = 16) {
     }
   }
   return {
+    dispose() { cells.clear(); },
     sampleAt(x, z, referenceY = NaN) {
       const bucket = cells.get(`${Math.floor(x / cellSize)}:${Math.floor(z / cellSize)}`);
       let best = null;

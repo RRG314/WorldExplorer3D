@@ -9,6 +9,7 @@ export const RUNTIME_WORKLOAD_BUDGETS = Object.freeze({
 const queued = new Map();
 const completed = new Set();
 let firstPlayReady = false;
+let activeTask = null;
 let firstPlayDetail = null;
 
 function runWhenIdle(task, timeout) {
@@ -19,22 +20,25 @@ function runWhenIdle(task, timeout) {
   globalThis.setTimeout(task, Math.min(250, Math.max(32, timeout)));
 }
 function dispatchQueuedWork() {
-  if (!firstPlayReady) return;
-  for (const [id, entry] of queued) {
-    queued.delete(id);
-    runWhenIdle(async () => {
-      try {
-        await entry.task(firstPlayDetail);
-        completed.add(id);
-      } catch (error) {
-        console.warn(`[workload] Deferred task ${id} failed:`, error);
-      }
-    }, entry.timeout);
-  }
+  if (!firstPlayReady || activeTask !== null || queued.size === 0) return;
+  const [id, entry] = queued.entries().next().value;
+  queued.delete(id);
+  activeTask = id;
+  runWhenIdle(async () => {
+    try {
+      await entry.task(firstPlayDetail);
+      completed.add(id);
+    } catch (error) {
+      console.warn(`[workload] Deferred task ${id} failed:`, error);
+    } finally {
+      activeTask = null;
+      dispatchQueuedWork();
+    }
+  }, entry.timeout);
 }
 
 export function scheduleAfterFirstPlay(id, task, options = {}) {
-  if (!id || typeof task !== 'function' || completed.has(id) || queued.has(id)) return false;
+  if (!id || typeof task !== 'function' || completed.has(id) || queued.has(id) || activeTask === id) return false;
   queued.set(id, {
     task,
     timeout: Math.max(100, Number(options.timeout) || RUNTIME_WORKLOAD_BUDGETS.backgroundIdleTimeoutMs)
@@ -58,6 +62,7 @@ export function getWorkloadPolicySnapshot() {
   return Object.freeze({
     budgets: RUNTIME_WORKLOAD_BUDGETS,
     firstPlayReady,
+    activeTask,
     firstPlayDetail,
     queued: Object.freeze([...queued.keys()]),
     completed: Object.freeze([...completed])

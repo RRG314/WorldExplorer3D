@@ -50,7 +50,7 @@ No production deployment or GitHub publication is part of this work.
 |---|---|---|
 | Width units, side tags, frontage boundaries, road turns, holes, obstacles and resident coverage | Executed module tests | Passing at the latest targeted run |
 | Mesh/contact agreement, failed replacement retention and superseded-world disposal | Executed runtime tests with controlled renderer/worker adapters | Passing; these are not GPU tests |
-| Full current contract suite | Executed tests, one test process at a time | 379 passed; includes reported-corner and cell-boundary regressions, crossing paint and ramp contact, and renderer menu/resume lifecycle checks |
+| Full current contract suite | Executed tests, one test process at a time | 394 passed; includes corner and cell-boundary regressions, terrain curvature and slope contact, cancellation/disposal, deferred startup ordering and renderer menu/resume lifecycle checks |
 | Source/import graph | Executed source gate | Passed on the final source revision |
 | Baltimore walk from road onto sidewalk | Actual local WebGL app and normal movement controller | Sidewalk contact at y=4.8910748, player eye at y=6.5910748; screenshot and UI data retained |
 | Baltimore movement across coverage threshold | Actual local WebGL app, drone movement | New coverage published after movement; UI data and overhead image retained |
@@ -210,3 +210,71 @@ verification evidence.
 All owned browser tabs are closed. Graphics were restored to Low through the
 settings UI; the local preview server remains available for the owner's testing.
 There was no production deployment, main-branch update or GitHub push.
+
+
+## Terrain and resource follow-up
+
+The road-edge height sampled by the sidewalk now comes from the rendered road at
+that station, including changing cross slope and terrain corrections between
+segment endpoints. The worker's regular paving grid is refined locally where
+terrain bends inside a triangle; curbs follow the same base/top samplers.
+Planar slopes keep their original triangle count. The error target is 0.03 world
+units with at most three refinement levels. This is bounded approximation, not
+an exact terrain-facet intersection or a guarantee for arbitrary cliffs.
+
+Walking contact now indexes the final Float32 render buffer directly. The worker
+no longer sends a second object graph of triangle points. Disposing a publication
+clears its contact index, staging arrays and mesh references. Superseding a build
+or resetting the world terminates the old worker and settles its pending request
+immediately, including cancellation while a worker has not replied. Synchronous
+worker-send errors clear their timer and handlers too.
+
+Optional post-startup jobs now run sequentially; an active job cannot be queued
+a second time. Independent module downloads remain concurrent, while gameplay
+runtime construction was already ordered. Environment-context compilation now
+calculates a feature's center once per compilation, avoiding repeated full
+polygon scans across 25–81 cells. Its cache is local to that compilation so a
+later world cannot inherit stale coordinates. The title globe already stops its
+own animation loop on close; the earlier city-renderer menu gate is retained.
+
+### Executed checks
+
+- **394 current contracts passed**, zero failures or skips; source gate passed.
+- Runtime tests cover flat, uphill, downhill, cross-slope, below-sea-level and
+  high-elevation contact. Curved rises and hollows check interpolated pavement
+  clearance as well as matching curb/contact vertices. Existing street tests
+  retain cell-seam, mapped-side semantics and protected-area exclusion coverage.
+- Actual WebGL scene inspection covered uphill, cross-slope, high-elevation and
+  rolling terrain. The rolling case used the real worker and publication path:
+  624 additional terrain-refinement triangles, 96,948 position-buffer bytes,
+  with ramp and road contact both at y=0.1800000072. The images and raw results
+  are in the evidence folder. These are synthetic geometry cases, not additional
+  real-city acceptance runs.
+- Five sequential real-WebGL replacements held at **16 renderer geometries,
+  one texture, 18 scene objects and 12 pavement meshes**. No pavement worker
+  remained active after any replacement. No warning or error was logged in that
+  controlled scene. The JavaScript heap readings increased from approximately
+  17.9 MB to 27.3 MB during the five iterations; garbage collection was not
+  forced, and this short check does **not** establish a steady-state heap bound.
+- Separate lifecycle tests cover eight replacements, disposal of old contact
+  and owned resources, stalled-worker cancellation, and synchronous send failure.
+
+### Inspect the full app without adding a monitoring loop
+
+Open `/app/?streetDiagnostics=1`, expand **Street surface verification**, and
+choose **Inspect memory and running work**. Inspect twice to see which registered
+systems advanced between readings. The report includes browser-reported JS heap
+when available, unique scene geometry-buffer bytes, renderer geometry/texture
+counts, the pavement worker state and deferred-job state. It performs work only
+when clicked. Geometry bytes exclude textures, driver allocations and other tabs;
+JavaScript heap is not the browser's total footprint.
+
+The owner's reported 3.3 GB browser usage has **not** been attributed to one
+subsystem or proven reduced by this pass. The full-city intermittent entry stall
+also remains an open integration issue: no further heavy city instance was
+started alongside the owner's browser during this pass. These targeted repairs
+and bounded scene checks establish specific improvements, not worldwide release
+certification. Real-map bridge/tunnel transitions, arbitrary cliff/stair cases,
+terrain-edit transitions and sustained city-load memory measurements remain
+required acceptance work. The preview server is retained; all owned test tabs
+are closed. No production or GitHub changes were made.

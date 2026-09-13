@@ -17,10 +17,11 @@ self.onmessage = ({ data }) => {
       const result = compilePavementTile(tile, plan.metersPerWorldUnit);
       const mesh = result.polygons.length ? meshPavementTile(tile, result.polygons, () => 0, { curbHeight: 0.12 / plan.metersPerWorldUnit, ramps:result.ramps }) : { vertices: [], curbVertices: [], triangles: [] };
       mesh.markingVertices=result.markingPolygons?.length ? meshPavementTile(tile,result.markingPolygons,()=>0,{curbHeight:0,cellSize:2}).vertices : [];
+      delete mesh.triangles; // Contact reuses the final render buffer; do not clone point objects across threads.
       // A single acknowledged chunk is in flight. No unbounded mesh message queue.
       self.postMessage({ type: 'tile', key: tile.key, bounds: tile.bounds,
         segments: tile.segments.map(s => ({ ...s, road: undefined, roadIndex: s.road.auditIndex })),
-        inferredFrontages: result.inferredFrontages, rampCount:result.ramps?.length || 0, mesh, completed: cursor, total: plan.tiles.length,
+        inferredFrontages: result.inferredFrontages, ramps:result.ramps, rampCount:result.ramps?.length || 0, mesh, completed: cursor, total: plan.tiles.length,
         durationMs: Math.round(performance.now() - started) });
     }
   } catch (error) { self.postMessage({ type: 'error', message: String(error?.message || error) }); plan = null; }

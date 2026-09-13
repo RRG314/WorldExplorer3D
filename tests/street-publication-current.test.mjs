@@ -18,7 +18,8 @@ function harness(t, mode='success') {
   class Worker {
     constructor(){worker=this;this.next=0;}
     terminate(){this.terminated=true;}
-    postMessage(data){if(data.type==='prepare')this.prepare=data.input;queueMicrotask(()=>{
+    postMessage(data){if(mode==='clone-error')throw new Error('cannot clone source');if(data.type==='prepare')this.prepare=data.input;queueMicrotask(()=>{
+      if(mode==='pending') return;
       if(mode==='failure') return this.onmessage({data:{type:'error',message:'invalid source polygon'}});
       if(data.type==='prepare') {if(mode==='stale')ctx._worldLoadSequence++;return this.onmessage({data:{type:'prepared',tiles:1}});}
       if(this.next++) return this.onmessage({data:{type:'complete'}});
@@ -73,4 +74,58 @@ test('curb elevation follows the accepted road when its earlier profile is below
   await publishStreetPavement(h.ctx);
   assert.ok(h.ctx.streetPavement.sampleAt(.2,3.2)>10.24);
   h.ctx.streetPavement.dispose();
+});
+
+for (const [name, ground] of [
+  ['flat', () => 0], ['uphill', (x,z) => x*.3+z*.1],
+  ['downhill', (x,z) => -x*.4-z*.2], ['cross slope', (x,z) => z*.45],
+  ['below sea level', (x,z) => -80+x*.2], ['high elevation', (x,z) => 3000+x*.2+z*.1]
+]) test(`sidewalk contact shares final Float32 rendering on ${name}`, async t => {
+  const h=harness(t);h.ctx.terrainMeshHeightAt=ground;
+  h.ctx.sampleFeatureSurfaceY=(road,x,z)=>ground(x,z)+.18;
+  h.ctx.roadContactIndex={sampleAt:(x,z)=>ground(x,z)+.18};
+  await publishStreetPavement(h.ctx);
+  const p=h.ctx.streetPavement,a=p.meshes[0].geometry.attributes.position.array;
+  assert.ok(Math.abs(p.sampleAt(.2,3.2)-(.6*a[1]+.2*a[4]+.2*a[7]))<1e-10);
+  assert.equal(p.stats.positionBytes,a.byteLength);
+  p.dispose();assert.equal(p.sampleAt(.2,3.2),null);assert.equal(p.meshes.length,0);
+});
+
+test('an active worker cancels immediately without waiting for the 15 second timeout',async t=>{
+  const h=harness(t,'pending');const pending=publishStreetPavement(h.ctx);
+  assert.equal(typeof h.ctx._cancelStreetPavementBuild,'function');
+  h.ctx._cancelStreetPavementBuild();
+  assert.equal(await pending,null);assert.equal(h.worker.terminated,true);
+  assert.equal(h.worker.onmessage,null);assert.equal(h.worker.onerror,null);
+  assert.equal(h.ctx._cancelStreetPavementBuild,null);
+  assert.ok(h.resources.every(r=>r.disposed));
+});
+
+test('repeated replacements release old contact and owned GPU resources',async t=>{
+  const h=harness(t);let previous;
+  for(let i=0;i<8;i++){
+    const boundary=h.resources.length;await publishStreetPavement(h.ctx);
+    if(previous){assert.equal(previous.sampleAt(.2,3.2),null);assert.equal(previous.meshes.length,0);}
+    assert.ok(h.resources.slice(0,boundary).every(r=>r.disposed));
+    assert.equal(h.ctx.urbanSurfaceMeshes.length,1);
+    previous=h.ctx.streetPavement;
+  }
+  previous.dispose();assert.ok(h.resources.every(r=>r.disposed));
+});
+
+test('curb clearance samples changing road-edge elevation between segment endpoints',async t=>{
+  const h=harness(t);h.ctx.terrainMeshHeightAt=()=>0;h.ctx.sampleFeatureSurfaceY=()=>.18;
+  h.ctx.roadContactIndex={sampleAt:(x,z)=>.18+.4*Math.max(0,1-Math.abs(x-1))};
+  await publishStreetPavement(h.ctx);
+  const a=h.ctx.streetPavement.meshes[0].geometry.attributes.position.array;
+  assert.ok(a[7]>.6,'interior edge correction must reach the sidewalk');
+  h.ctx.streetPavement.dispose();
+});
+
+test('a synchronous worker send failure releases handlers, timer ownership and resources',async t=>{
+  const h=harness(t,'clone-error');
+  await assert.rejects(publishStreetPavement(h.ctx),/cannot clone source/);
+  assert.equal(h.ctx._cancelStreetPavementBuild,null);
+  assert.equal(h.worker.onmessage,null);assert.equal(h.worker.onerror,null);
+  assert.equal(h.worker.terminated,true);assert.ok(h.resources.every(r=>r.disposed));
 });
