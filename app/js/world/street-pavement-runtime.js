@@ -1,3 +1,5 @@
+import { assessStreetQuality } from './street-quality-assessment.js';
+import { auditStreetCoverage } from './street-coverage.js';
 import { getWorkloadPolicySnapshot } from '../runtime/workload-policy.js?v=1';
 import { conformPavementMesh } from './pavement-terrain-conformance.js';
 import { rampCurbScale } from './compiler/street-crossings.js';
@@ -125,7 +127,8 @@ export async function publishStreetPavement(appCtx) {
           const updates=Object.fromEntries(systems.map(system=>[system.id,system.updates]));
           const workSinceLastInspection=previousRuntime ? systems.filter(system=>system.updates>(previousRuntime[system.id] || 0)).map(system=>({id:system.id,updates:system.updates-(previousRuntime[system.id] || 0),lastDurationMs:system.lastDurationMs})) : null;
           previousRuntime=updates;
-          panel.querySelector('pre').textContent=JSON.stringify({
+          if(appCtx.streetPavement) appCtx.streetPavement.stats.sourceCoverage=auditStreetCoverage({...appCtx,coverageBounds:appCtx.streetPavement.coverageBounds,metersPerWorldUnit});
+          const snapshot={
             note:'Heap is browser-reported JavaScript only; geometry bytes exclude textures, GPU allocations and other tabs. Inspect twice to see runtime activity.',
             javascriptHeapBytes:performance.memory?.usedJSHeapSize ?? null,
             sceneGeometryBytes:geometryBytes,rendererResources:appCtx.renderer?.info?.memory,
@@ -133,7 +136,8 @@ export async function publishStreetPavement(appCtx) {
             pavementBuildActive:typeof appCtx._cancelStreetPavementBuild==='function',
             deferredWork:getWorkloadPolicySnapshot(),
             street:appCtx.streetPavement?.stats,workSinceLastInspection
-          },null,2);
+          };
+          panel.querySelector('pre').textContent=JSON.stringify({...snapshot,quality:assessStreetQuality(snapshot)},null,2);
         };
         const inputDetails=panel.appendChild(document.createElement('details'));
         inputDetails.appendChild(document.createElement('summary')).textContent='Compilation input';
@@ -216,7 +220,7 @@ export async function publishStreetPavement(appCtx) {
       const inferredFrontages = packet.inferredFrontages;
       const diagnostics = document.querySelector('#streetSurfaceDiagnostics pre');
       if (diagnostics) diagnostics.textContent = JSON.stringify({...stats,completedTiles:packet.completed,plannedTiles:packet.total},null,2);
-      if (appCtx.worldLoading) appCtx.showLoad?.(`Building sidewalks: ${packet.completed} / ${packet.total}`);
+      if (appCtx.worldLoading) appCtx.showLoad?.(`Compiling nearby pavement grid: ${packet.completed} / ${packet.total} cells (not whole-location coverage)`);
       stats.workerMs += Number(packet.durationMs) || 0;
       if (!packet.mesh.vertices.length && !packet.mesh.markingVertices?.length) continue;
       // The compiled profile already contains terrain-following elevation. Sample

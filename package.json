@@ -160,7 +160,8 @@
     "release:verify": "node scripts/verification/release.mjs",
     "release:finalize": "node scripts/release-finalize.mjs",
     "preview:deploy": "node scripts/firebase-hosting-preview.mjs",
-    "preview:promote": "node scripts/firebase-hosting-promote.mjs"
+    "preview:promote": "node scripts/firebase-hosting-promote.mjs",
+    "verify:streets": "node scripts/verification/streets.mjs"
   },
   "repository": {
     "type": "git",

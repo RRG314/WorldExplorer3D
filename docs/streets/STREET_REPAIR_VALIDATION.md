@@ -387,3 +387,53 @@ back to the app menu. No other world was started alongside it, and Chrome was
 not killed. The movement-dependent visual defect remains open pending this
 layer comparison; the lifecycle repair is not a visual sign-off. The local
 preview remains at http://127.0.0.1:4192/app/.
+
+
+## Cross-city verification and coverage correction, 12 September 2026
+
+Status: **not ready for whole-location acceptance**. Work is on
+`steven/street-system-rd`, following baseline `6b12dad2`; no production or GitHub
+publication occurred. The results below deliberately separate component checks
+from real loaded worlds.
+
+| Evidence | Result | Limits |
+|---|---|---|
+| GPU depth camera sweep | 10/15 failures before; 15/15 pass after removing ground-hardscape polygon offset | Controlled production material test, not every world material |
+| Targeted CPU street suite | 71/71 pass | Includes coverage, publication lifetime, polygon and terrain contracts |
+| Captured hill matrix | 6/6 pass | Monaco/SF, rotated and translated; bounded geometry/elevation fixtures |
+| Source graph gate | Pass | Does not test visual appearance or loading |
+| Monaco full app, Low | Fail: 124,795 ms first play; 1,481,165,846 heap bytes | 432,538 pavement triangles, 398,994 added by refinement |
+| San Francisco full app, Low | Fail: 182,068 ms first play; 1,418,204,342 heap bytes | 303,896 pavement triangles, 259,779 added by refinement |
+| Full loaded-location pavement coverage | Incomplete by runtime design | Hardcoded radius 384 world units; no distant pavement area layer |
+| Controlled same-position movement/return route | Not completed | Movement captures were affected by user driving/flying; not repeatable route evidence |
+
+The 144 figure means a 12 by 12 set of 64-unit grid cells, not 144 sidewalks.
+That window is approximately 852 metres across at the runtime's 1.11 metres per
+unit. Monaco's sparse window planned 133 cells and produced 110 nonempty cells.
+The visible count was mislabeled in loading text. The label now explicitly says
+nearby grid cells, and the quality assessment fails incomplete required-source
+coverage regardless of that count. Coverage is calculated on explicit diagnostic
+inspection to avoid adding a full-network scan to every frame.
+
+The depth sweep identifies a GPU defect that geometric contact tests could not
+catch: a lower hardscape surface drew over a physically higher sidewalk because
+of negative polygon offset. The production hardscape material no longer uses
+that bias. A separate numerical defect appeared in the translated SF fixture;
+local-origin polygon operations remove the observed area drift without changing
+the test tolerance. Mesh clipping also skips polygons whose bounds cannot
+intersect a mesh cell. Full-city performance was measured before these last
+compiler changes and has not been remeasured; no speedup claim is made.
+
+New evidence is under `evidence-2026-09-12/`: `street-depth-camera-sweep.*`,
+`monaco-full-app-*`, `san-francisco-full-app-*`, and the `*-hill-component-current.*`
+files. Earlier hill images are retained as earlier observations. The full-app
+images are actual app loads; hill component buildings use illustrative heights.
+The original Monaco component road overlay had a harness-only depth separation
+issue; the current image uses the corrected harness road bias. Neither component
+scene certifies terrain/road-contact continuity of the full runtime.
+
+All owned component tabs were closed. The user's Chrome tab remains at the app
+menu, and Medium graphics was restored and confirmed through the settings UI.
+The existing preview remains available on port 4192. The outstanding coverage
+repair is described in STREET_COVERAGE_REPAIR.md; this entry does not claim it is
+implemented.

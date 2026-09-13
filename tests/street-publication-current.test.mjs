@@ -1,3 +1,4 @@
+import { assessStreetQuality } from '../app/js/world/street-quality-assessment.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRoadContactIndex } from '../app/js/terrain/road-contact-index.js?v=1';
@@ -170,4 +171,13 @@ test('an interrupted first pavement build can recover without an existing public
   for(let i=0;i<100 && h.ctx._streetPavementUpdating;i++)await new Promise(resolve=>setTimeout(resolve,5));
   assert.equal(h.ctx._streetPavementUpdating,false);
   assert.ok(h.ctx.streetPavement.sampleAt(.2,3.2)>14);h.ctx.streetPavement.dispose();
+});
+
+
+test('city quality assessment fails slow, oversized pavement even when geometry exists',()=>{
+ const result=assessStreetQuality({javascriptHeapBytes:1481165846,worldLoading:false,pavementBuildActive:false,deferredWork:{firstPlayDetail:{loadDurationMs:124795},budgets:{firstPlayTargetMs:25000}},street:{triangles:432538,terrainRefinementTriangles:398994,positionBytes:18881604}});
+ assert.equal(result.status,'fail');assert.equal(result.failures.length,4);
+});
+test('missing browser measurements cannot produce a passing city assessment',()=>{
+ assert.equal(assessStreetQuality({}).status,'pending');
 });

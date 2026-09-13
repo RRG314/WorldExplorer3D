@@ -1,0 +1,25 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Street quality: captured hill districts</title>
+<style>body{margin:0;background:#202830;color:white;font:14px system-ui}aside{position:fixed;top:12px;left:12px;padding:14px;background:#101921ee;width:290px;max-height:90vh;overflow:auto}select,button{padding:8px;margin:3px}pre{white-space:pre-wrap}p{line-height:1.4}</style>
+<aside><strong>Street quality verification</strong><p>Captured map geometry and elevation. Production pavement compiler. Building heights are illustrative; this is a bounded component scene, not a full app load.</p><select id="city"><option value="monaco">Monaco</option><option value="san-francisco">San Francisco</option></select><button id="overview">Overview</button><button id="street">Low view</button><pre id="result">Compiling…</pre></aside>
+<footer style="position:fixed;right:8px;bottom:8px;background:#101921dd;padding:6px;font-size:11px"><a style="color:white" href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a> · <a style="color:white" href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md">Terrain source credits</a></footer>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script><script type="module">
+import {compileQualityCase} from './street-quality-core.js';
+import {appendSolidAtGradeRoadGeometry} from '../../app/js/terrain/road-surface-geometry.js?v=2';
+const city=new URLSearchParams(location.search).get('city')||'monaco';if(!['monaco','san-francisco'].includes(city))throw Error('Unknown city');document.querySelector('#city').value=city;document.querySelector('#city').onchange=e=>location.search='?city='+e.target.value;
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(1);renderer.outputEncoding=THREE.sRGBEncoding;document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color('#a8bac7');scene.add(new THREE.HemisphereLight(0xffffff,0x7b8271,1));const sun=new THREE.DirectionalLight(0xffffff,.8);sun.position.set(100,200,60);scene.add(sun);
+const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.5,2000);
+const fixture=await fetch('../../tests/fixtures/streets/'+city+'-hill-quality.json').then(r=>r.json());
+const {meshes,ground,report}=compileQualityCase(fixture);
+function add(vertices,indices,material){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));if(indices)g.setIndex(indices);g.computeVertexNormals();g.computeBoundingSphere();const m=new THREE.Mesh(g,material);scene.add(m);return m;}
+const terrainVertices=[],terrainIndices=[];const grid=fixture.terrain,n=grid.size;
+for(let row=0;row<n;row++)for(let col=0;col<n;col++){const x=grid.minX+col*grid.step,z=grid.minZ+row*grid.step;terrainVertices.push(x,ground(x,z),z);if(row<n-1&&col<n-1){const a=row*n+col,b=a+1,c=a+n,d=c+1;terrainIndices.push(a,c,b,b,c,d);}}
+add(terrainVertices,terrainIndices,new THREE.MeshStandardMaterial({color:0x777762,roughness:.95}));
+const concrete=new THREE.MeshStandardMaterial({color:0xd9d5cc,roughness:.96}),curb=new THREE.MeshStandardMaterial({color:0x96938d,side:THREE.DoubleSide});
+for(const m of meshes){add(m.vertices,null,concrete);add(m.curbVertices,null,curb);}
+const roads=[];for(const r of fixture.input.roads){if(r.structureSemantics.terrainMode!=='at_grade')continue;const v=[],ind=[];appendSolidAtGradeRoadGeometry({feature:r,points:r.pts,halfWidth:r.width/2,sampleTerrainY:ground,surfaceBias:.08,targetVerts:v,targetIndices:ind});if(v.length)add(v,ind,new THREE.MeshStandardMaterial({color:0x32383c,roughness:.95}));roads.push(r);}
+for(const b of fixture.input.buildings){if(!b.pts.some(p=>Math.abs(p.x)<128&&Math.abs(p.z)<128))continue;const s=new THREE.Shape();b.pts.forEach((p,i)=>i?s.lineTo(p.x,-p.z):s.moveTo(p.x,-p.z));s.closePath();const g=new THREE.ExtrudeGeometry(s,{depth:7,bevelEnabled:false});g.rotateX(-Math.PI/2);const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0xbca78e,roughness:1}));m.position.y=Math.max(...b.pts.map(p=>ground(p.x,p.z)));scene.add(m);}
+const render=()=>renderer.render(scene,camera);document.querySelector('#overview').onclick=()=>{camera.position.set(170,ground(0,0)+190,170);camera.lookAt(0,ground(0,0),0);render();};document.querySelector('#street').onclick=()=>{camera.position.set(0,ground(0,70)+7,70);camera.lookAt(0,ground(0,0)+2,0);render();};document.querySelector('#overview').click();
+report.rendered={geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,drawCalls:renderer.info.render.calls};document.querySelector('#result').textContent=JSON.stringify(report,null,2);
+addEventListener('resize',()=>{renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();render();});
+</script></html>

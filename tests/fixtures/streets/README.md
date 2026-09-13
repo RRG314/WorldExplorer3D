@@ -31,3 +31,37 @@ rays to reject an otherwise supported frontage. The regression samples the
 previously unpaved interval at local x=-24.5, z=14.5–20.5. Road records retain
 only the street-section tags used by this compiler; account and provider
 configuration are excluded. The same OpenStreetMap/ODbL attribution applies.
+
+### Hill-district quality fixtures
+
+`monaco-hill-quality.json` (43.7384, 7.4246) and
+`san-francisco-hill-quality.json` (37.7924, -122.4147) contain public OSM ways
+and a sampled elevation grid. Roads use the app's transport normalizer and
+structure classifier. Each file records the OSM database timestamp and source
+elevation tile URLs. Relations and building heights are excluded; these are
+bounded component fixtures, not complete city reconstructions. The test domain
+is 256 × 256 world units. Elevation is resampled to an 8-world-unit grid, which
+is then triangulated consistently for both the test ground and height queries.
+This does not reproduce the full app's engineering cuts or road height field.
+
+Map data © OpenStreetMap contributors, [ODbL 1.0](https://www.openstreetmap.org/copyright).
+Terrain Tiles was accessed on 12 September 2026 from the
+[AWS Open Data registry](https://registry.opendata.aws/terrain-tiles/).
+See the dataset's [source attribution](https://github.com/tilezen/joerd/blob/master/docs/attribution.md).
+The normalized map extracts retain ODbL attribution; elevation retains the
+upstream sources' attribution and licensing rather than being relabeled ODbL.
+
+To refresh these intentionally frozen fixtures, download OSM ways using the
+Overpass query below, substituting the recorded origin, then download the
+`terrainUrls` recorded in the fixture. Save the inputs using the explicit paths
+listed in `capture-street-quality-fixture.mjs`, and run that script with `monaco`
+or `san-francisco`. It performs no network calls or dependency installation.
+Review resulting geometry changes before accepting a refreshed baseline.
+
+```text
+[out:json][timeout:20];
+(way[highway](around:180,LAT,LON);
+ way[building](around:200,LAT,LON);
+ way[landuse](around:200,LAT,LON););
+out geom;
+```

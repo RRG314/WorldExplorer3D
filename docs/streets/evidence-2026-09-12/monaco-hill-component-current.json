@@ -1,0 +1,21 @@
+{
+  "name": "monaco",
+  "pass": true,
+  "failures": [],
+  "tiles": 16,
+  "roads": 64,
+  "buildings": 67,
+  "triangles": 5338,
+  "area": 9401.1126635,
+  "refinements": 30,
+  "frontages": 4263,
+  "minClearance": 0.09706810810810396,
+  "maxClearance": 0.15445992060811164,
+  "elevationRangeMeters": 73.42872000000001,
+  "durationMs": 1814,
+  "rendered": {
+    "geometries": 142,
+    "textures": 0,
+    "drawCalls": 142
+  }
+}

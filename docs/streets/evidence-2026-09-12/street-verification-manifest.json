@@ -1,0 +1,34 @@
+{
+  "date": "2026-09-12",
+  "baseRevision": "6b12dad2fee7542aedd37011d502a48c31cd786e",
+  "testedState": "Working tree after base revision. Current hill renders and CPU matrix include local-origin and mesh-bounds changes. Full-city runs preceded those compiler changes. GPU depth sweep tests the unchanged repaired material.",
+  "checks": {
+    "targetedContracts": {
+      "passed": 71,
+      "failed": 0
+    },
+    "hillCases": {
+      "passed": 6,
+      "failed": 0
+    },
+    "sourceGate": "pass",
+    "gpuDepthSweep": "15 of 15 pass",
+    "fullCityReadiness": "fail",
+    "controlledCityReturnRoutes": "not completed"
+  },
+  "sourceSha256": {
+    "app/js/world/load-landuse-pass.js": "a179e9e271dbbcdfde7a8be9ae2316f9209614246f6e196f9e897030e5123669",
+    "app/js/world/street-pavement-runtime.js": "27a5033cb903a64b033ff7cc14a3213ffff969f7ecac7b05de20dd8d1988b5d6",
+    "app/js/world/street-quality-assessment.js": "7a96a666ba464293a3107ecd05527c8e718bd21fdbb3e1489729b084e7505552",
+    "app/js/world/street-coverage.js": "dcf60decfc9e0e2618b7c6ae1f638aa5fb9473ca10a98aca6ba475b3cb3dd067",
+    "app/js/world/compiler/street-pavement.js": "40a59572f15debfce457cb1926bf0116b06bb00256f79e2b031eb7ed5a2c5c9e",
+    "app/js/world/compiler/street-polygon-kernel.js": "2059fdcac2556b938e855d0270be022005179cb43275703545ded3e64f79d8b3",
+    "scripts/verification/street-quality-core.js": "24794cec4edf4f204925a03fbeffa740313fdcea7e8fe017eb8e36b24179166f",
+    "scripts/verification/street-depth.html": "f2860869ec1dadfc80ceddedfa273d6e4d8a9909e679e5c633aedeb09d3c3215",
+    "scripts/verification/street-quality.html": "26e0d16c4e1439f038cf4c59959859b7a9894eafcb7d06a866ac184a3e30664e",
+    "scripts/verification/street-quality.mjs": "2cf5e59bb22f435c08a5fe4118bd85e419fd8f4f1b30f55e0336fccf6a5e6cc3",
+    "scripts/verification/street-routes.json": "84a9f8b2f09dfc8e36508f60f8076f67e5219588d5c43c69a6d498bd1479e67e",
+    "tests/fixtures/streets/monaco-hill-quality.json": "a813bd358aa44a8120861fdad53677d5c1e6e151b3ff1acf1cdf96e622738484",
+    "tests/fixtures/streets/san-francisco-hill-quality.json": "0e686e9a82cbe8b9b8d2ea3d46faaa428112cbe251f64d336ea737527b5b7924"
+  }
+}

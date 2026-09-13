@@ -319,6 +319,12 @@ export function compilePavementTile(tile, metersPerWorldUnit = 1.11) {
 // Regular cells keep slope interpolation local. Shared world-grid vertices produce matching tile seams.
 export function meshPavementTile(tile, polygons, sampleHeight, { cellSize = 4, curbHeight = 0.108108, ramps = [] } = {}) {
   const vertices = [], curbVertices = [], triangles = [], b = tile.bounds;
+  const polygonBounds = polygons.map(poly => {
+    const ring = poly[0];
+    let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
+    for(const [x,z] of ring){minX=Math.min(minX,x);maxX=Math.max(maxX,x);minZ=Math.min(minZ,z);maxZ=Math.max(maxZ,z);}
+    return {poly,minX,maxX,minZ,maxZ};
+  });
 
   const vertex = ([x, z]) => {
     const y = sampleHeight(x, z);
@@ -333,8 +339,13 @@ export function meshPavementTile(tile, polygons, sampleHeight, { cellSize = 4, c
     }
   }
   for (const {x,z,size} of meshCells()) {
+    // Do not send every disconnected sidewalk polygon through Clipper for
+    // every empty mesh cell. Bounds are a rejection test only; exact clipping
+    // still owns holes and all geometry in intersecting cells.
+    const candidates=polygonBounds.filter(p=>p.minX<=x+size && p.maxX>=x && p.minZ<=z+size && p.maxZ>=z).map(p=>p.poly);
+    if(!candidates.length)continue;
     const square = polygon([[x, z], [x + size, z], [x + size, z + size], [x, z + size]]);
-    for (const poly of polygons.length ? clip.intersection(polygons, square) : []) {
+    for (const poly of clip.intersection(candidates, square)) {
       const points = [], holes = [];
       for (let ri = 0; ri < poly.length; ri++) { if (ri) holes.push(points.length); points.push(...poly[ri].slice(0, -1)); }
       const indices = earcut(points.flat(), holes, 2);

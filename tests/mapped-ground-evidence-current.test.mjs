@@ -61,3 +61,11 @@ test('parking uses its mapped physical material without changing geometry owners
   assert.equal(hardscapeMaterialOptions(ctx,'parking',composition,{surface:'asphalt'}).material.color,0x777b80);
   assert.equal(hardscapeMaterialOptions(ctx,'parking',composition).material.map.name,'pavement');
 });
+
+test('physical hardscape does not override raised surfaces with a camera-dependent depth bias',()=>{
+  for(const type of ['parking','paved']){
+    const material=hardscapeMaterialOptions({},type,{polygonOffsetFactor:-3,polygonOffsetUnits:-3},{}).material;
+    assert.equal(material.polygonOffset,false);
+    assert.equal(material.depthWrite,true);
+  }
+});

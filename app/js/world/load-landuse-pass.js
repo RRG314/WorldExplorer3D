@@ -70,9 +70,10 @@ export function hardscapeMaterialOptions(appCtx, landuseType, composition, tags 
       transparent: false,
       opacity: 1,
       depthWrite: true,
-      polygonOffset: true,
-      polygonOffsetFactor: composition.polygonOffsetFactor,
-      polygonOffsetUnits: composition.polygonOffsetUnits
+      // This mesh already has a physical surface offset. A slope-scaled
+      // negative depth bias can pull it over raised sidewalks as the camera
+      // moves, even when the sidewalk is the nearest raycast surface.
+      polygonOffset: false
   };
   if (textures?.normalMap) material.normalScale = new THREE.Vector2(0.34, 0.34);
   return {
