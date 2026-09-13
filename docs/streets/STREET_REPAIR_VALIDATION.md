@@ -351,3 +351,39 @@ mixed-height road batches, misleading elevated profiles, captured Chase
 frontage, tapered frontage and front-wall occlusion. The source/entry-graph
 health gate passed with no reported failures. Automated coverage does not
 replace the outstanding exact-location and global visual checks above.
+
+## Movement-dependent visibility report, 12 September 2026
+
+The additional screenshot near 39.3018, -76.6231 shows irregular exposed ground
+inside apparent pavement. A Chrome load at that origin completed, and a
+subsequent daylight inspection returned sidewalk contact at local
+(1.760727635, 8.921200520), Y=33.684351122, with sampled terrain Y=33.571356888.
+Thus pavement geometry exists above the sampled ground at this inspected point.
+This observation alone does not identify the material or surface responsible
+for the apparent bare patch; it must not be described as proof of missing
+geometry or terrain penetration.
+
+Source inspection did establish a separate lifecycle defect: asynchronous
+terrain tile height updates and newly published tiles did not invalidate the
+pavement publication. A yielding pavement build could also sample across a
+change in physical ground or road contact. The repair versions these changes,
+rejects a build spanning revisions, marks pavement for replacement, and allows
+an interrupted initial publication to recover without an existing pavement
+object. Accepted render/contact pairs stay together until replacement. A
+successful current publication clears the dirty flag, avoiding an immediate
+redundant rebuild. No per-frame geometry rebuilding or new background worker
+was added.
+
+All 18 pavement publication tests pass, including terrain changing during
+sampling, preservation of the previous publication, and recovery of the first
+publication. The source health gate passes. These are targeted lifecycle tests;
+the full suite was not rerun for this follow-up.
+
+The opt-in screen inspector now reports pavement height and up to eight ray-hit
+layers with material depth/offset properties. A second Chrome load to inspect
+those layers became unresponsive (repeated CDP timeouts; renderer CPU reached
+357% with approximately 1.38 GB RSS). It was stopped by navigating the same tab
+back to the app menu. No other world was started alongside it, and Chrome was
+not killed. The movement-dependent visual defect remains open pending this
+layer comparison; the lifecycle repair is not a visual sign-off. The local
+preview remains at http://127.0.0.1:4192/app/.

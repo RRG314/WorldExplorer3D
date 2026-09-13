@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRoadContactIndex } from '../app/js/terrain/road-contact-index.js?v=1';
-import { publishStreetPavement } from '../app/js/world/street-pavement-runtime.js';
+import { markGroundSurfaceChanged } from '../app/js/terrain/surface-revision.js';
+import { publishStreetPavement, updateStreetPavementFocus } from '../app/js/world/street-pavement-runtime.js';
 
 function harness(t, mode='success') {
   const resources=[];
@@ -142,4 +143,31 @@ test('a sidewalk beside an overpass never borrows elevated triangles or an uncon
   for(let i=1;i<vertices.length;i+=3)assert.ok(vertices[i]<.4);
   assert.ok(h.ctx.streetPavement.sampleAt(.2,3.2)<.4);
   h.ctx.streetPavement.dispose();h.ctx.roadContactIndex.dispose();
+});
+
+
+test('terrain changes during sampling cannot replace accepted pavement with mixed heights',async t=>{
+  const h=harness(t);const previous={meshes:[],sampleAt:()=>10.3,dispose(){this.disposed=true;}};
+  h.ctx.streetPavement=previous;
+  let changed=false;
+  h.ctx.terrainMeshHeightAt=()=>{if(!changed){changed=true;markGroundSurfaceChanged(h.ctx);}return 14;};
+  assert.equal(await publishStreetPavement(h.ctx),null);
+  assert.equal(h.ctx.streetPavement,previous);assert.equal(previous.disposed,undefined);
+  assert.equal(h.ctx._streetPavementDirty,true);assert.equal(h.worker.terminated,true);
+  assert.ok(h.resources.every(r=>r.disposed));
+  await publishStreetPavement(h.ctx);
+  assert.equal(h.ctx.streetPavement.groundRevision,h.ctx._groundSurfaceRevision);
+  assert.ok(h.ctx.streetPavement.sampleAt(.2,3.2)>14);
+  assert.equal(previous.disposed,true);h.ctx.streetPavement.dispose();
+});
+
+test('an interrupted first pavement build can recover without an existing publication',async t=>{
+  const h=harness(t);let changed=false;
+  h.ctx.terrainMeshHeightAt=()=>{if(!changed){changed=true;markGroundSurfaceChanged(h.ctx);}return 14;};
+  assert.equal(await publishStreetPavement(h.ctx),null);
+  assert.equal(h.ctx.streetPavement,undefined);assert.equal(h.ctx._streetPavementDirty,true);
+  updateStreetPavementFocus(h.ctx);
+  for(let i=0;i<100 && h.ctx._streetPavementUpdating;i++)await new Promise(resolve=>setTimeout(resolve,5));
+  assert.equal(h.ctx._streetPavementUpdating,false);
+  assert.ok(h.ctx.streetPavement.sampleAt(.2,3.2)>14);h.ctx.streetPavement.dispose();
 });

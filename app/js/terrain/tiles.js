@@ -1,3 +1,4 @@
+import { markGroundSurfaceChanged } from './surface-revision.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   decodeTerrariumRGB,
@@ -688,6 +689,7 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}, options = {}) {
   mesh.userData.transportCorridorAdjustedVertices = transportCorridorAdjustedVertices;
   mesh.userData.groundUnavailableReason = null;
   mesh.visible = true;
+  markGroundSurfaceChanged(appCtx);
 
   const unitsPerMeter = (appCtx.WORLD_UNITS_PER_METER || 1) * (appCtx.TERRAIN_Y_EXAGGERATION || 1);
   const minMeters = Number.isFinite(minElevation) && unitsPerMeter > 0 ? minElevation / unitsPerMeter : 0;

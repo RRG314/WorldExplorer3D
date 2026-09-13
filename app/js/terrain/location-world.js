@@ -1,3 +1,4 @@
+import { markGroundSurfaceChanged } from './surface-revision.js';
 function createLocationTerrainApi(deps = {}) {
   const {
     appCtx,
@@ -38,6 +39,7 @@ function createLocationTerrainApi(deps = {}) {
         if (!alreadyPresent) {
           const mesh = buildTerrainTileMesh(request.z, request.tx, request.ty, terrainTileDeps);
           appCtx.terrainGroup.add(mesh);
+          markGroundSurfaceChanged(appCtx);
           // The bootstrap plane is only a loading placeholder. Accepted-ground
           // tiles can be ready synchronously, so retire it as soon as the first
           // authoritative tile is actually published instead of waiting for

@@ -1,3 +1,4 @@
+import { markGroundSurfaceChanged } from './surface-revision.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { appendUpwardRibbonGeometry, buildIndexedBatchMesh } from "../road-render.js?v=4";
 import { detectRoadIntersections } from "./intersections.js?v=5";
@@ -678,7 +679,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   }
   // The pavement owner keeps its render and collision meshes together until its
   // own replacement is ready; road rebuilds must never dispose only the render half.
-  if (appCtx.streetPavement) appCtx._streetPavementDirty = true;
+  markGroundSurfaceChanged(appCtx);
   await yieldToMainThread();
   await measureAsync('rebuildStructureVisuals', () => (
     typeof rebuildStructureVisualMeshesCooperatively === 'function'

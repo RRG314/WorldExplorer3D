@@ -37,6 +37,7 @@ export async function publishStreetPavement(appCtx) {
   const trace = (phase, detail={}) => { if(new URLSearchParams(location.search).has('streetDiagnostics')) console.info('[StreetPavement]', phase, JSON.stringify(detail)); };
   const sequence = appCtx._worldLoadSequence;
   const previous = appCtx.streetPavement;
+  const groundRevision = appCtx._groundSurfaceRevision || 0;
   const generation = appCtx._streetPavementGeneration = (appCtx._streetPavementGeneration || 0) + 1;
   const reference = focusActor(appCtx) || { x: 0, z: 0 };
   const focus = { x: Math.round((reference.x || 0)/64)*64, z: Math.round((reference.z || 0)/64)*64 };
@@ -51,7 +52,7 @@ export async function publishStreetPavement(appCtx) {
     }
     return bounds.minX<=coverageBounds.maxX+48 && bounds.maxX>=coverageBounds.minX-48 && bounds.minZ<=coverageBounds.maxZ+48 && bounds.maxZ>=coverageBounds.minZ-48;
   };
-  const current = () => sequence === appCtx._worldLoadSequence && generation === appCtx._streetPavementGeneration && !appCtx.onMoon;
+  const current = () => sequence === appCtx._worldLoadSequence && generation === appCtx._streetPavementGeneration && groundRevision === (appCtx._groundSurfaceRevision || 0) && !appCtx.onMoon;
   const metersPerWorldUnit = appCtx.METERS_PER_WORLD_UNIT || 1.11;
   const managedPaths = (appCtx.linearFeatures || []).filter(f => nearby(f) && f.kind === 'footway' && ['sidewalk','crossing'].includes(f.subtype) && !f.isStructureConnector && !f.structureSemantics?.gradeSeparated && ['at_grade', undefined].includes(f.structureSemantics?.terrainMode));
   const worker = new Worker(new URL('./compiler/street-pavement-worker.js', import.meta.url), { type: 'module' });
@@ -145,13 +146,15 @@ export async function publishStreetPavement(appCtx) {
         const pick=panel.appendChild(document.createElement('button'));pick.textContent='Inspect surface at screen position';
         pick.onclick=()=>{
           const ray=new THREE.Raycaster();ray.setFromCamera(new THREE.Vector2(Number(pickX.value)/50-1,1-Number(pickY.value)/50),appCtx.camera);
-          const hit=ray.intersectObjects(appCtx.scene.children,true).find(h=>{
+          const hits=ray.intersectObjects(appCtx.scene.children,true).filter(h=>{
             if(!h.object.isMesh)return false;
             for(let p=h.object;p;p=p.parent)if(!p.visible)return false;
             return true;
           });
+          const hit=hits[0];
           const data=hit?.object.userData || {};
-          panel.querySelector('pre').textContent=JSON.stringify({point:hit?.point,object:hit?.object.name,parent:hit?.object.parent?.name,
+          panel.querySelector('pre').textContent=JSON.stringify({layers:hits.slice(0,8).map(h=>({point:h.point,parent:h.object.parent?.name,kind:h.object.userData?.kind,landuse:h.object.userData?.landuseType,material:{type:h.object.material?.type,depthTest:h.object.material?.depthTest,offset:h.object.material?.polygonOffset,factor:h.object.material?.polygonOffsetFactor,units:h.object.material?.polygonOffsetUnits},renderOrder:h.object.renderOrder})),point:hit?.point,object:hit?.object.name,parent:hit?.object.parent?.name,
+            pavement:hit ? appCtx.streetPavement?.sampleAt(hit.point.x,hit.point.z):null,
             owner:{registeredRoad:appCtx.roadMeshes?.includes(hit?.object),isRoadBatch:data.isRoadBatch,isRoadSkirt:data.isRoadSkirt,landuseType:data.landuseType,kind:data.kind,keys:Object.keys(data)},
             indexedRoad:hit ? appCtx.roadContactIndex?.sampleAt(hit.point.x,hit.point.z,hit.point.y):null, terrain:hit ? ground(hit.point.x,hit.point.z):null, road:hit ? (()=>{const match=appCtx.findNearestRoad?.(hit.point.x,hit.point.z);const r=match?.road;return {distance:match?.dist,y:match?.y,name:r?.name,width:r?.width,pts:r?.pts,tags:r?.transportRecord?.sourceTags,semantics:r?.structureSemantics};})():null},null,2);
         };
@@ -314,13 +317,14 @@ export async function publishStreetPavement(appCtx) {
     contactIndex = createRoadContactIndex(staged.filter(mesh => mesh.userData.kind === 'sidewalk'), 4);
     batches.clear();
     stats.positionBytes = staged.reduce((sum, mesh) => sum + mesh.geometry.attributes.position.array.byteLength, 0);
-    const publication = { stats, focus, coverageBounds, meshes: staged,
+    const publication = { stats, focus, groundRevision, coverageBounds, meshes: staged,
       sampleAt: (x, z) => contactIndex.sampleAt(x, z), dispose: disposeStaged };
     if(new URLSearchParams(location.search).has('streetDiagnostics')) publication.exportLayout=()=>JSON.stringify(input);
     for (const mesh of staged) { appCtx.addEarthWorldObject(mesh); appCtx.urbanSurfaceMeshes.push(mesh); }
     stats.durationMs = Math.round(performance.now() - startedAt);
     for (const mesh of stagedLines) appCtx.addEarthWorldObject(mesh);
     appCtx.streetPavement = publication;
+    appCtx._streetPavementDirty = false;
     committed = true;
     if (previous) {
       appCtx.urbanSurfaceMeshes.splice(0, appCtx.urbanSurfaceMeshes.length, ...appCtx.urbanSurfaceMeshes.filter(m => !previous.meshes.includes(m)));
@@ -348,7 +352,7 @@ export async function publishStreetPavement(appCtx) {
 }
 
 export function updateStreetPavementFocus(appCtx) {
-  if (appCtx.worldLoading || appCtx.onMoon || !appCtx.streetPavement || appCtx._streetPavementUpdating || performance.now() < (appCtx._streetPavementRetryAt || 0)) return;
+  if (appCtx.worldLoading || appCtx.onMoon || (!appCtx.streetPavement && !appCtx._streetPavementDirty) || appCtx._streetPavementUpdating || performance.now() < (appCtx._streetPavementRetryAt || 0)) return;
   const p = focusActor(appCtx);
   if (!p || (!appCtx._streetPavementDirty && Math.hypot(p.x-appCtx.streetPavement.focus.x,p.z-appCtx.streetPavement.focus.z)<128)) return;
   appCtx._streetPavementDirty = false;
