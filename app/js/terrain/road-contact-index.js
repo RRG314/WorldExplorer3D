@@ -7,6 +7,8 @@ export function createRoadContactIndex(meshes, cellSize = 16) {
     const positions = (mesh.geometry?.getAttribute?.('position') || mesh.geometry?.attributes?.position)?.array;
     const indices = mesh.geometry?.getIndex?.()?.array;
     if (!positions) continue;
+    const ranges=mesh.userData?.surfaceRanges || [];
+    let rangeIndex=0;
     // Road batches are authored in world coordinates with identity transforms.
     for (let i = 0; i < (indices?.length ?? positions.length / 3); i += 3) {
       const a = indices ? indices[i] * 3 : i * 3;
@@ -17,7 +19,10 @@ export function createRoadContactIndex(meshes, cellSize = 16) {
       const cx = positions[c], cz = positions[c + 2];
       const denominator = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz);
       if (!Number.isFinite(denominator) || Math.abs(denominator) < 1e-9) continue;
-      const triangle = { positions, a, b, c, denominator };
+      while(rangeIndex+1<ranges.length && i>=ranges[rangeIndex].start+ranges[rangeIndex].count)rangeIndex++;
+      const range=ranges[rangeIndex];
+      const terrainMode=range && i>=range.start && i<range.start+range.count ? range.terrainMode : mesh.userData?.terrainMode;
+      const triangle = { positions, a, b, c, denominator, terrainMode };
       for (let x = Math.floor(Math.min(ax, bx, cx) / cellSize); x <= Math.floor(Math.max(ax, bx, cx) / cellSize); x++) {
         for (let z = Math.floor(Math.min(az, bz, cz) / cellSize); z <= Math.floor(Math.max(az, bz, cz) / cellSize); z++) {
           const key = `${x}:${z}`;
@@ -30,10 +35,11 @@ export function createRoadContactIndex(meshes, cellSize = 16) {
   }
   return {
     dispose() { cells.clear(); },
-    sampleAt(x, z, referenceY = NaN) {
+    sampleAt(x, z, referenceY = NaN, requiredTerrainMode = null) {
       const bucket = cells.get(`${Math.floor(x / cellSize)}:${Math.floor(z / cellSize)}`);
       let best = null;
-      for (const { positions: p, a, b, c, denominator } of bucket || []) {
+      for (const { positions: p, a, b, c, denominator, terrainMode } of bucket || []) {
+        if(requiredTerrainMode && terrainMode!==requiredTerrainMode)continue;
         const u = ((p[b + 2] - p[c + 2]) * (x - p[c]) + (p[c] - p[b]) * (z - p[c + 2])) / denominator;
         const v = ((p[c + 2] - p[a + 2]) * (x - p[c]) + (p[a] - p[c]) * (z - p[c + 2])) / denominator;
         if (u < -1e-6 || v < -1e-6 || u + v > 1.000001) continue;

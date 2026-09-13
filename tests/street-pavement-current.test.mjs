@@ -268,3 +268,27 @@ test('frontage and corner coverage is independent of the worker cell boundary',(
   const area=chunkSize=>prepareStreetPavement({...options,chunkSize}).tiles.reduce((sum,t)=>sum+regionArea(compilePavementTile(t,1).polygons),0);
   assert.ok(Math.abs(area(32)-area(64))<.1);
 });
+
+test('a continuous angled facade does not require a constant sidewalk width',()=>{
+  const result=compile({roads:[road([{x:0,z:0},{x:32,z:0}])],buildings:[{pts:[{x:0,z:-7},{x:32,z:-10},{x:32,z:-16},{x:0,z:-16}]}]});
+  const area=result.reduce((s,r)=>s+regionArea(r.polygons),0);
+  assert.ok(Math.abs(area-201.6)<.02,`Expected 32m × (4.5m frontage + 1.8m opposite sidewalk), received ${area}`);
+});
+
+test('captured Chase frontage reaches a recessed wall despite its neighbor at the endpoint',async()=>{
+  const fs=await import('node:fs/promises');
+  const {tile,metersPerWorldUnit}=JSON.parse(await fs.readFile(new URL('./fixtures/streets/baltimore-chase-frontage.json',import.meta.url),'utf8'));
+  const {polygons}=compilePavementTile(tile,metersPerWorldUnit);
+  const triangles=meshPavementTile(tile,polygons,()=>0).triangles;
+  const covers=(x,z)=>triangles.some(tri=>{
+    const signs=tri.map((a,i)=>{const b=tri[(i+1)%3];return (b.x-a.x)*(z-a.z)-(b.z-a.z)*(x-a.x);});
+    return signs.every(s=>s>=-1e-7)||signs.every(s=>s<=1e-7);
+  });
+  for(const z of [14.5,16.5,18.5,20.5])assert.ok(covers(-24.5,z),`Unpaved frontage at -24.5,${z}`);
+  assert.ok(!covers(-10,10),'building footprint remains excluded');
+});
+
+test('a close front wall prevents selecting an attached building rear wall',()=>{
+  const result=compile({roads:[road([{x:0,z:0},{x:32,z:0}])],buildings:[box(0,-15,16,-5),box(16,-15,32,-5)]});
+  assert.equal(result.reduce((s,r)=>s+r.inferredFrontages,0),0);
+});

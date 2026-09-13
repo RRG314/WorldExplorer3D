@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createRoadContactIndex } from '../app/js/terrain/road-contact-index.js?v=1';
 import { publishStreetPavement } from '../app/js/world/street-pavement-runtime.js';
 
 function harness(t, mode='success') {
@@ -128,4 +129,17 @@ test('a synchronous worker send failure releases handlers, timer ownership and r
   assert.equal(h.ctx._cancelStreetPavementBuild,null);
   assert.equal(h.worker.onmessage,null);assert.equal(h.worker.onerror,null);
   assert.equal(h.worker.terminated,true);assert.ok(h.resources.every(r=>r.disposed));
+});
+
+
+test('a sidewalk beside an overpass never borrows elevated triangles or an unconfirmed profile',async t=>{
+  const h=harness(t);h.ctx.terrainMeshHeightAt=()=>0;h.ctx.sampleFeatureSurfaceY=()=>12;
+  h.ctx.roadContactIndex=createRoadContactIndex([{userData:{terrainMode:'elevated'},geometry:{
+    attributes:{position:{array:new Float32Array([-10,12,-10,-10,12,10,10,12,10,-10,12,-10,10,12,10,10,12,-10])}}
+  }}]);
+  await publishStreetPavement(h.ctx);
+  const vertices=h.ctx.streetPavement.meshes[0].geometry.attributes.position.array;
+  for(let i=1;i<vertices.length;i+=3)assert.ok(vertices[i]<.4);
+  assert.ok(h.ctx.streetPavement.sampleAt(.2,3.2)<.4);
+  h.ctx.streetPavement.dispose();h.ctx.roadContactIndex.dispose();
 });

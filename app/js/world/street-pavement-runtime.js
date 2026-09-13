@@ -105,7 +105,7 @@ export async function publishStreetPavement(appCtx) {
       let panel = document.getElementById('streetSurfaceDiagnostics');
       if (!panel) {
         panel = document.createElement('details'); panel.id = 'streetSurfaceDiagnostics';
-        panel.style.cssText = 'position:fixed;right:8px;top:110px;z-index:9999;background:#101921;color:#fff;padding:10px;max-width:340px;font:12px monospace';
+        panel.style.cssText = 'position:fixed;right:8px;top:110px;z-index:9999;background:#101921;color:#fff;padding:10px;max-width:340px;max-height:calc(100vh - 130px);overflow:auto;font:12px monospace';
         panel.appendChild(document.createElement('summary')).textContent = 'Street surface verification';
         panel.appendChild(document.createElement('pre')); document.body.appendChild(panel);
         const memoryButton=panel.appendChild(document.createElement('button'));
@@ -138,6 +138,8 @@ export async function publishStreetPavement(appCtx) {
         inputDetails.appendChild(document.createElement('summary')).textContent='Compilation input';
         const inputField=inputDetails.appendChild(document.createElement('textarea'));inputField.id='streetCompilationInput';inputField.readOnly=true;inputField.setAttribute('aria-label','Street compilation input');
         panel.querySelector('pre').style.cssText='white-space:pre-wrap;max-height:310px;overflow:auto';
+        const layoutCapture=panel.appendChild(document.createElement('button'));layoutCapture.textContent='Capture resident layout';
+        layoutCapture.onclick=()=>{inputField.value=appCtx.streetPavement?.exportLayout?.() || '';inputDetails.open=true;};
         const pickX=panel.appendChild(document.createElement('input'));pickX.type='number';pickX.value='25';pickX.min='0';pickX.max='100';pickX.setAttribute('aria-label','Inspection horizontal percent');pickX.style.width='50px';
         const pickY=panel.appendChild(document.createElement('input'));pickY.type='number';pickY.value='57.5';pickY.min='0';pickY.max='100';pickY.setAttribute('aria-label','Inspection vertical percent');pickY.style.width='50px';
         const pick=panel.appendChild(document.createElement('button'));pick.textContent='Inspect surface at screen position';
@@ -157,7 +159,7 @@ export async function publishStreetPavement(appCtx) {
         overhead.onclick=()=>{if(appCtx.droneMode)appCtx.drone.cameraPitchOffset=-1.1;};
         const capture=panel.appendChild(document.createElement('button'));capture.textContent='Capture nearby surface geometry';
         capture.onclick=()=>{
-          const p=appCtx.Walk?.state?.walker || appCtx.car;
+          const p=focusActor(appCtx);
           const triangles=[];
           for(const mesh of appCtx.roadMeshes || []) {
             if(mesh.userData?.isRoadSkirt || mesh.userData?.isRoadMarking)continue;
@@ -219,10 +221,8 @@ export async function publishStreetPavement(appCtx) {
       // complete engineering model separately for every tessellated vertex.
       for (const s of tile.segments) {
         const clearance=(p,t)=> {
-          const profile=appCtx.sampleFeatureSurfaceY?.(s.road,p.x,p.z,{segIndex:s.index,t,x:p.x,z:p.z,dist:0});
-          const indexed=appCtx.roadContactIndex?.sampleAt(p.x,p.z,profile);
-          const height=Number.isFinite(indexed) ? indexed : profile;
           const base=ground(p.x,p.z);
+          const height=appCtx.roadContactIndex?.sampleAt(p.x,p.z,base,'at_grade');
           const roadBias=Number.isFinite(s.road?.surfaceBias) ? s.road.surfaceBias : .18;
           return Math.max(roadBias,Number.isFinite(height) && Number.isFinite(base) ? height-base : roadBias);
         };
@@ -245,7 +245,7 @@ export async function publishStreetPavement(appCtx) {
         const factor = distance > 0 ? Math.min(1, halfWidth / distance) : 0;
         const edgeX = px + (x - px) * factor, edgeZ = pz + (z - pz) * factor;
         const edgeGround = ground(edgeX, edgeZ);
-        const roadY = appCtx.roadContactIndex?.sampleAt(edgeX, edgeZ, edgeGround);
+        const roadY = appCtx.roadContactIndex?.sampleAt(edgeX, edgeZ, edgeGround, 'at_grade');
         const clearance = Number.isFinite(roadY) && Number.isFinite(edgeGround)
           ? roadY - edgeGround : s.clearanceA + (s.clearanceB - s.clearanceA) * t;
         return terrain + Math.max(0.018, clearance) * blend;
@@ -268,7 +268,7 @@ export async function publishStreetPavement(appCtx) {
         const points=[];
         for(let j=i;j<i+9;j+=3) {
           const x=mesh.markingVertices[j],z=mesh.markingVertices[j+2];
-          const y=appCtx.roadContactIndex?.sampleAt(x,z,ground(x,z));
+          const y=appCtx.roadContactIndex?.sampleAt(x,z,ground(x,z),'at_grade');
           if(!Number.isFinite(y))break;
           points.push(x,y+.012,z);
         }
@@ -316,6 +316,7 @@ export async function publishStreetPavement(appCtx) {
     stats.positionBytes = staged.reduce((sum, mesh) => sum + mesh.geometry.attributes.position.array.byteLength, 0);
     const publication = { stats, focus, coverageBounds, meshes: staged,
       sampleAt: (x, z) => contactIndex.sampleAt(x, z), dispose: disposeStaged };
+    if(new URLSearchParams(location.search).has('streetDiagnostics')) publication.exportLayout=()=>JSON.stringify(input);
     for (const mesh of staged) { appCtx.addEarthWorldObject(mesh); appCtx.urbanSurfaceMeshes.push(mesh); }
     stats.durationMs = Math.round(performance.now() - startedAt);
     for (const mesh of stagedLines) appCtx.addEarthWorldObject(mesh);

@@ -439,6 +439,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   const roadMainBatches = [];
   let roadMainBatchVerts = [];
   let roadMainBatchIdx = [];
+  let roadMainBatchRanges = [];
   const roadSkirtBatchVerts = [];
   const roadSkirtBatchIdx = [];
   const roadMarkBatchVerts = [];
@@ -458,17 +459,19 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   const roadTerrainAudit = createRoadTerrainConformanceAudit();
   const flushRoadMainBatch = () => {
     if (roadMainBatchVerts.length > 0 && roadMainBatchIdx.length > 0) {
-      roadMainBatches.push({ verts: roadMainBatchVerts, indices: roadMainBatchIdx });
+      roadMainBatches.push({ verts: roadMainBatchVerts, indices: roadMainBatchIdx, ranges: roadMainBatchRanges });
     }
     roadMainBatchVerts = [];
     roadMainBatchIdx = [];
+    roadMainBatchRanges = [];
   };
-  const appendRoadMainGeometry = (verts, indices) => {
+  const appendRoadMainGeometry = (verts, indices, terrainMode) => {
     const incomingVertices = Array.isArray(verts) ? verts.length / 3 : 0;
     const currentVertices = roadMainBatchVerts.length / 3;
     if (currentVertices > 0 && currentVertices + incomingVertices > MAX_ROAD_BATCH_VERTICES) {
       flushRoadMainBatch();
     }
+    roadMainBatchRanges.push({start:roadMainBatchIdx.length,count:indices.length,terrainMode:terrainMode || 'unknown'});
     appendIndexedGeometry(roadMainBatchVerts, roadMainBatchIdx, verts, indices);
   };
 
@@ -553,7 +556,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
         cachedTerrainHeight,
         worldToLatLon
       );
-      appendRoadMainGeometry(verts, indices);
+      appendRoadMainGeometry(verts, indices, renderRoad.structureSemantics?.terrainMode);
       appendRoadCenterMarkings(
         renderRoad,
         pts,
@@ -603,7 +606,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
         if (radius + 1e-7 < minimumHalfWidth) {
           roadSurfaceIntegrity.junctionCoverageGaps += 1;
         }
-        appendRoadMainGeometry(capVerts, capIndices);
+        appendRoadMainGeometry(capVerts, capIndices, 'at_grade');
         compactJunctionCount += 1;
       }
     }
@@ -626,6 +629,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
         renderOrder: 2,
         userData: {
           isRoadBatch: true,
+          surfaceRanges: batch.ranges,
           roadBatchIndex: batchIndex,
           sharedRoadMaterial: true,
           worldLoadSequence: appCtx._worldLoadSequence || 0
@@ -662,7 +666,9 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   const previousRoadMeshes = [...appCtx.roadMeshes];
   for (const mesh of stagedRoadMeshes) appCtx.addEarthWorldObject(mesh);
   appCtx.replaceWorldCollection('roadMeshes', stagedRoadMeshes);
+  const previousRoadContact = appCtx.roadContactIndex;
   appCtx.roadContactIndex = stagedRoadContact;
+  previousRoadContact?.dispose?.();
   for (const mesh of previousRoadMeshes) {
     mesh.parent?.remove(mesh);
     mesh.geometry?.dispose();

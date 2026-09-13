@@ -130,20 +130,35 @@ export function prepareStreetPavement({ roads = [], buildings = [], landuses = [
     managedPaths: linearFeatures.filter(f => groundFeature(f) && f.kind === 'footway' && f.subtype === 'sidewalk') };
 }
 
-function frontageDistance(point, nx, nz, edges, minimum, maximum) {
-  let best = Infinity;
-  for (const { a, b, extendedFrontage=0 } of edges) {
+function frontageHit(point, nx, nz, edges, minimum, maximum) {
+  let best = null;
+  for (const edge of edges) {
+    const { a, b, extendedFrontage=0 } = edge;
     const dx = b.x - a.x, dz = b.z - a.z, length = Math.hypot(dx, dz);
-    // Only street-facing, nearly parallel walls can support frontage inference.
     if (Math.abs((dx * nx + dz * nz) / length) > 0.25) continue;
     const den = nx * dz - nz * dx;
     if (Math.abs(den) < 1e-8) continue;
     const ax = a.x - point.x, az = a.z - point.z;
     const distance = (ax * dz - az * dx) / den;
     const t = (ax * nz - az * nx) / den;
-    if (t >= -1e-7 && t <= 1 + 1e-7 && distance >= minimum && distance <= Math.max(maximum,minimum+extendedFrontage)) best = Math.min(best, distance);
+    // A close facade blocks the ray even when it lies inside the nominal
+    // sidewalk. Looking through it would mistake a rear wall for frontage.
+    if (t >= -1e-7 && t <= 1 + 1e-7 && distance >= 0 && (!best || distance < best.distance))
+      best = { edge, distance, maximum: Math.max(maximum, minimum + extendedFrontage) };
   }
-  return Number.isFinite(best) ? best : null;
+  return best && best.distance >= minimum && best.distance <= best.maximum ? best : null;
+}
+function frontageDistance(point, nx, nz, edges, minimum, maximum) {
+  return frontageHit(point,nx,nz,edges,minimum,maximum)?.distance ?? null;
+}
+function frontageProfile(a, b, nx, nz, edges, minimum, maximum) {
+  const midpoint={x:(a.x+b.x)/2,z:(a.z+b.z)/2};
+  const hit=frontageHit(midpoint,nx,nz,edges,minimum,maximum);
+  if(!hit)return null;
+  // Each split interval belongs to its interior facade. At a shared endpoint,
+  // an adjacent building with a different setback must not truncate this one.
+  const distances=[a,midpoint,b].map(p=>frontageDistance(p,nx,nz,[hit.edge],minimum,maximum));
+  return distances.every(Number.isFinite) ? distances : null;
 }
 
 // Split at frontage endpoints so a short façade can meet the sidewalk even when
@@ -196,16 +211,16 @@ export function compilePavementTile(tile, metersPerWorldUnit = 1.11) {
       const outer=[];
       for (const s of pieces) {
         const midpoint={x:(s.a.x+s.b.x)/2,z:(s.a.z+s.b.z)/2};
-        const distances=[s.a,midpoint,s.b].map(p=>frontageDistance(p,nx*sign,nz*sign,tile.edges,path.width/2,7/metersPerWorldUnit));
+        let distances=frontageProfile(s.a,s.b,nx*sign,nz*sign,tile.edges,path.width/2,7/metersPerWorldUnit);
         const oppositeFront=frontageDistance(midpoint,-nx*sign,-nz*sign,tile.edges,path.width/2,7/metersPerWorldUnit);
-        if(!distances.every(Number.isFinite) && Number.isFinite(oppositeFront)) {
+        if(!distances && Number.isFinite(oppositeFront)) {
           // A mapped sidewalk between a close façade and a parallel carriageway
           // supports filling the small curb-side gap. Explicit obstacles still
           // cut this area below; a rural path alone cannot authorize the fill.
           const curb=[s.a,midpoint,s.b].map(p=>frontageDistance(p,nx*sign,nz*sign,roadEdges,path.width/2,path.width/2+4/metersPerWorldUnit));
-          if(curb.every(Number.isFinite))distances.splice(0,3,...curb);
+          if(curb.every(Number.isFinite))distances=curb;
         }
-        const reachesFront=distances.every(Number.isFinite) && Math.max(...distances)-Math.min(...distances)<2/metersPerWorldUnit;
+        const reachesFront=!!distances;
         if(reachesFront) inferredFrontages++;
         const a=reachesFront ? distances[0] : path.width/2,b=reachesFront ? distances[2] : path.width/2;
         outer.push([s.a.x+nx*sign*a,s.a.z+nz*sign*a],[s.b.x+nx*sign*b,s.b.z+nz*sign*b]);
@@ -232,8 +247,8 @@ export function compilePavementTile(tile, metersPerWorldUnit = 1.11) {
         let outerA=edgeA+width,outerB=edgeB+width;
         const midpoint={x:(s.a.x+s.b.x)/2,z:(s.a.z+s.b.z)/2};
         const max=Math.min(edgeA,edgeB)+7/metersPerWorldUnit;
-        const distances=[s.a,midpoint,s.b].map(p=>frontageDistance(p,nx*sign,nz*sign,tile.edges,Math.max(edgeA,edgeB)+width,max));
-        if(distances.every(Number.isFinite) && Math.max(...distances)-Math.min(...distances)<2/metersPerWorldUnit) {
+        const distances=frontageProfile(s.a,s.b,nx*sign,nz*sign,tile.edges,Math.max(edgeA,edgeB)+width,max);
+        if(distances) {
           outerA=distances[0];outerB=distances[2];inferredFrontages++;
         }
         outerPoints.push([s.a.x+nx*sign*outerA,s.a.z+nz*sign*outerA],[s.b.x+nx*sign*outerB,s.b.z+nz*sign*outerB]);

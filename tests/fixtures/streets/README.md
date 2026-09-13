@@ -23,3 +23,11 @@ ray hit terrain at local x=3.7039674333, z=-13.8068811099 instead of pavement.
 The fixture contains only the public geometry and tags needed by the compiler;
 account data and provider configuration are omitted. It reproduces the building
 corner gap and carries the same OpenStreetMap/ODbL attribution above.
+
+`baltimore-chase-frontage.json` contains the prepared cell southwest of the
+39.3025, -76.6125 origin, captured from the user's Chrome preview on
+12 September 2026. Neighboring facades with different setbacks caused endpoint
+rays to reject an otherwise supported frontage. The regression samples the
+previously unpaved interval at local x=-24.5, z=14.5–20.5. Road records retain
+only the street-section tags used by this compiler; account and provider
+configuration are excluded. The same OpenStreetMap/ODbL attribution applies.

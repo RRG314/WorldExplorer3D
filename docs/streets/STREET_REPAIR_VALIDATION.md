@@ -278,3 +278,76 @@ certification. Real-map bridge/tunnel transitions, arbitrary cliff/stair cases,
 terrain-edit transitions and sustained city-load memory measurements remain
 required acceptance work. The preview server is retained; all owned test tabs
 are closed. No production or GitHub changes were made.
+
+## Follow-up: Chrome spikes and frontage gaps, 12 September 2026
+
+The screenshots at East Biddle Street (approximately 39.3035, -76.6118)
+and East Chase Street (39.3025, -76.6125) exposed defects beyond the earlier
+corner fix. These reports are not closed by the preceding synthetic tests.
+
+Two additional causes were repaired in the shared street pipeline:
+
+- Road batches now retain each triangle range's terrain classification. Ground
+  pavement requests only at-grade road contact. A nearby bridge or underground
+  road cannot supply ground-sidewalk clearance when ground-road coverage is
+  absent. Unconfirmed road profiles no longer supply fallback clearance.
+- Frontage intervals use the facade facing their midpoint and evaluate that
+  same wall at both ends. A neighboring building's different setback no longer
+  rejects the interval. A continuous angled wall can produce a tapered sidewalk.
+  The nearest wall blocks the ray, including when it falls inside the nominal
+  sidewalk width; a rear wall cannot authorize expansion through it.
+
+The captured Chase cell adds 119 previously uncovered one-world-unit grid
+samples with the new frontage algorithm. Regression assertions cover four
+points along the recessed wall and confirm that an adjacent building footprint
+remains excluded. This is a geometric coverage result, not a measurement of
+surveyed sidewalk area. Existing water, garden, parking, rural-setback and tile
+seam checks remain applicable.
+
+The controlled WebGL overpass scene reproduces missing ground-road coverage
+next to an elevated surface at height 12. Pavement beside the bridge now samples
+0.2087500095; the unfiltered road sampler still correctly sees the bridge at 12.
+See `evidence-2026-09-12/overpass-ground-separation.png` and its text report.
+This verifies the height-contamination mechanism, but does not yet establish
+that every spike in the user's exact East Biddle scene has disappeared.
+
+The actual user browser was Chrome. The corrected frontage worker rebuilt a
+loaded Baltimore world successfully (7.855 seconds for that publication).
+That rebuild used 1,203 resident buildings and 307 resident roads. Other
+publications used different resident bounds, so their triangle counts and
+build times are not controlled before/after performance comparisons.
+The current Chrome screenshot is `evidence-2026-09-12/chrome-frontage-followup.png`.
+It is a follow-up view after movement, not a matched East Chase before/after.
+
+### Remaining release blockers
+
+Visual inspection still found bare patches. One ray at local
+(-48.56226, 266.2215), near West Read Street, hit terrain; neither a captured
+building nor a protected land-use polygon contains that point. This gap cannot
+be dismissed as a missing building without further evidence. Complete frontage
+coverage and consistent inferred block boundaries remain open.
+
+Chrome reported 1,465,832,302 bytes of JavaScript heap, 406,781,413 bytes of
+unique scene geometry buffers, 2,060 renderer geometries and 809 textures in
+an earlier loaded city. No sidewalk worker or deferred startup task was active
+at that inspection. These categories overlap and must not be added together as
+a total browser-memory figure. Retained world data, geometry and textures need
+a separate residency/lifecycle investigation. A later pavement publication
+added 78,660 terrain-refinement triangles; the height field's continuity still
+needs examination before treating that refinement cost as necessary.
+
+The selected fallback data supplied no managed sidewalk paths or crossing
+markings in the inspected publication. Visual road naming was associated from
+labels. These are limitations of the generalized input, not evidence that the
+real streets lack sidewalks or crossings.
+
+The Chrome world was returned to the location menu for final checks to avoid
+running the city renderer alongside the suite. The preview remains available
+at http://127.0.0.1:4192/app/. No live deployment, main-branch change, or GitHub
+publication was made. These repairs are not a global visual-quality sign-off.
+
+Validation for this follow-up: all 399 current contract tests passed, including
+mixed-height road batches, misleading elevated profiles, captured Chase
+frontage, tapered frontage and front-wall occlusion. The source/entry-graph
+health gate passed with no reported failures. Automated coverage does not
+replace the outstanding exact-location and global visual checks above.

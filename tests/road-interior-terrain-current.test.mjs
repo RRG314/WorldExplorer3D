@@ -86,3 +86,18 @@ test('legacy ground fallback does not rescan indexed sidewalks or use paint as s
   t.mock.method(GroundHeight,'_raycastMeshY',meshes=>{assert.deepEqual(meshes,[legacy]);return 4;});
   assert.equal(GroundHeight.urbanSurfaceMeshY(0,0),4);
 });
+
+
+test('ground-level surface queries cannot select a bridge when the ground road ends',()=>{
+  const positions=new Float32Array([
+    -4,.18,0,-4,.18,4,0,.18,4,0,.18,0,
+    -4,12,0,-4,12,4,4,12,4,4,12,0
+  ]);
+  const indices=new Uint16Array([0,1,2,0,2,3,4,5,6,4,6,7]);
+  const index=createRoadContactIndex([{userData:{surfaceRanges:[
+    {start:0,count:6,terrainMode:'at_grade'}, {start:6,count:6,terrainMode:'elevated'}
+  ]},geometry:{getAttribute:()=>({array:positions}),getIndex:()=>({array:indices})}}]);
+  assert.ok(Math.abs(index.sampleAt(-1,2,0,'at_grade')-.18)<1e-7);
+  assert.equal(index.sampleAt(1,2,0,'at_grade'),null);
+  assert.equal(index.sampleAt(1,2,0),12,'bridge contact remains available to its own traversal');
+});
