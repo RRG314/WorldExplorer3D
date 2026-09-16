@@ -446,12 +446,13 @@ try {
     localFailures
   };
 
-  if (report.ok && captureRequested) {
+  if (captureRequested) {
     const manifest = JSON.parse(await fs.readFile(path.join(servedRoot, 'build-manifest.json'), 'utf8'));
     assert.equal(manifest.sourceDirty, false, 'release evidence requires a clean immutable artifact');
-    await fs.rm(evidenceDir, { recursive: true, force: true });
+    // This directory also holds other gates' receipts. A screenshot must not
+    // erase the evidence already collected by the release matrix.
     await fs.mkdir(evidenceDir, { recursive: true });
-    const worldImage = path.join(evidenceDir, 'complete-baltimore-world.png');
+    const worldImage = path.join(evidenceDir, report.ok ? 'complete-baltimore-world.png' : 'baltimore-world-failed.png');
     await page.screenshot({ path: worldImage, fullPage: false, timeout: 120000 });
     report.screenshotsWritten.push(path.relative(root, worldImage));
   }
