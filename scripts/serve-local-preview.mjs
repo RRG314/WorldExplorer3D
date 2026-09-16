@@ -56,6 +56,19 @@ async function exists(filePath) {
 const server = http.createServer(async (req, res) => {
   try {
     const reqUrl = new URL(req.url || '/', `http://${host}:${port}`);
+    if(reqUrl.pathname==='/__preview/load-trace' && req.method==='POST' && !candidateId) {
+      if(req.headers.origin!==`http://${host}:${port}` && req.headers.origin!==`http://localhost:${port}`) {res.writeHead(403);res.end();return;}
+      let body='';
+      for await(const chunk of req) {body+=chunk;if(body.length>2048){res.writeHead(413);res.end();return;}}
+      try {
+        const value=JSON.parse(body);
+        const scope=String(value.scope || '').replace(/[^a-z-]/g,'').slice(0,24);
+        const phase=String(value.phase || '').replace(/[^a-zA-Z0-9:_-]/g,'').slice(0,100);
+        const counters=Object.fromEntries(Object.entries(value.counters || {}).filter(([key,n])=>/^[a-zA-Z]+$/.test(key) && typeof n==='number' && Number.isFinite(n)).slice(0,12));
+        console.log('[PreviewLoadTrace]',scope,phase,JSON.stringify(counters));
+      } catch {res.writeHead(400);res.end();return;}
+      res.writeHead(204,{'Cache-Control':'no-store'});res.end();return;
+    }
     if (!candidateId && await serveMutableSourceManifest({
       pathname: reqUrl.pathname,
       rootDir,

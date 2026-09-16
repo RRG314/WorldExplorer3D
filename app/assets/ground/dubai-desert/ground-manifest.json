@@ -18,7 +18,7 @@
   "correctionAttested": true,
   "sourceEvidence": {
     "sourceClassification": "digital-surface-model",
-    "correctionMethod": "worldexplorer-pmf-grid-v1",
+    "correctionMethod": "worldexplorer-pmf-boundary-reconstruction-v3",
     "sourceTiles": [
       {
         "tileId": "Copernicus_DSM_COG_10_N24_00_E055_00_DEM",
@@ -29,7 +29,14 @@
         "etag": "559b39e9c0b0e096f7dd29c36ead3804",
         "lastModified": "Mon, 09 May 2022 14:10:24 GMT"
       }
-    ]
+    ],
+    "classificationMethod": "worldexplorer-pmf-grid-v1",
+    "reconstruction": {
+      "method": "harmonic-ground-boundary",
+      "toleranceMeters": 0.00001,
+      "exteriorPolicy": "retain-source-observation",
+      "sourceArtifactSha256": "a0e1c63f3e8234c9784dcfca4da09cc1792c1a33326b4764a1d50aa1cd13ba35"
+    }
   },
   "attribution": {
     "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",

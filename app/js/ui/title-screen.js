@@ -705,6 +705,11 @@ function initTitleScreenUi({
     }
 
     await appCtx.loadRoads();
+    if(appCtx.worldLoadRuntimeState?.status==='failed') {
+      appCtx.gameStarted=false;
+      globeSelector.open();
+      return;
+    }
     scheduleAfterFirstPlay('earth-star-catalog', () => appCtx.ensureStarCatalogLoaded?.(), {
       timeout: 1800
     });
@@ -768,7 +773,16 @@ function initTitleScreenUi({
     const pending = runTitleStart();
     const tracked = pending
       .catch((error) => {
+        console.error('[title] World launch failed:',error);
+        appCtx.gameStarted=false;
+        appCtx.worldLoading=false;
         appCtx.hideLoad?.();
+        // The globe launch closes its own panel before awaiting the runtime.
+        // Restore it on failure so its status is visible instead of leaving an
+        // empty gameplay screen that looks like an indefinitely loading world.
+        document.getElementById('titleScreen')?.classList.remove('hidden');
+        globeSelector.open();
+        appCtx.showToast?.('The world could not start. The location menu has been restored.');
         throw error;
       })
       .finally(() => {

@@ -1,24 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {appendSolidAtGradeRoadGeometry} from '../app/js/terrain/road-surface-geometry.js';
-function build(sample) {
-  const verts=[],indices=[];
-  const result=appendSolidAtGradeRoadGeometry({feature:{},points:[{x:0,z:0},{x:8,z:0}],halfWidth:4,sampleTerrainY:sample,targetVerts:verts,targetIndices:indices});
-  return {verts,indices,result};
-}
-test('planar road slopes retain two triangles instead of receiving blanket subdivisions',()=>{
-  const {indices}=build((x,z)=>x*.2+z*.1);assert.equal(indices.length,6);
-});
-test('terrain rising inside the road footprint is covered between the original edge samples',()=>{
-  const sample=(x,z)=>Math.max(0,1-Math.abs(x-4)/4)*Math.max(0,1-Math.abs(z)/4);
-  const {verts,indices,result}=build(sample);assert.ok(result.surfaceTriangles>2);
-  for(let i=0;i<indices.length;i+=3){
-    const ps=indices.slice(i,i+3).map(j=>({x:verts[j*3],y:verts[j*3+1],z:verts[j*3+2]}));
-    const x=ps.reduce((s,p)=>s+p.x,0)/3,z=ps.reduce((s,p)=>s+p.z,0)/3,y=ps.reduce((s,p)=>s+p.y,0)/3;
-    assert.ok(y>=sample(x,z)-.01,`Road buried at ${x},${z}`);
-  }
-});
-
+// Road-area and crest regressions exercise the production compiler in
+// street-carriageway-regions-current.test.mjs. Retired sheet generators are
+// deliberately not retained as a second implementation for these checks.
 test('walking samples the rendered road under the actor, not its projected centerline',async t=>{
   const {GroundHeight}=await import('../app/js/ground.js');
   const road={width:8,pts:[{x:0,z:0},{x:0,z:20}],structureSemantics:{terrainMode:'at_grade'}};
@@ -108,4 +92,34 @@ test('ground-level contact accepts signed terrain reconciliation beyond the old 
  const road={structureSemantics:{terrainMode:'at_grade'}};
  for(const meshY of [5,15]){assert.equal(GroundHeight._shouldUseRoadMeshHeight(road,meshY,10),true);assert.equal(GroundHeight._resolveRoadSurfaceY(road,meshY,10),meshY);}
  assert.equal(GroundHeight._shouldUseRoadMeshHeight({structureSemantics:{terrainMode:'subgrade'}},15,10),false);
+});
+
+test('walking follows published footpath triangles instead of a stale centerline profile',async t=>{
+ const {ctx}=await import('../app/js/shared-context.js?v=55');
+ const {GroundHeight}=await import('../app/js/ground.js');
+ const previous={linearWalkContactIndex:ctx.linearWalkContactIndex,roadContactIndex:ctx.roadContactIndex,streetPavement:ctx.streetPavement};t.after(()=>Object.assign(ctx,previous));
+ ctx.linearWalkContactIndex=createRoadContactIndex([surfaceMesh(10)]);ctx.roadContactIndex=null;ctx.streetPavement=null;
+ const feature={kind:'footway',width:8,pts:[{x:0,z:-4},{x:0,z:4}],structureSemantics:{terrainMode:'at_grade'},transportSurfaceModel:{distances:new Float32Array([0,8]),pathDistances:new Float32Array([0,8]),centerHeights:new Float32Array([2,2])}};
+ t.mock.method(GroundHeight,'terrainY',()=>9);
+ t.mock.method(GroundHeight,'_nearestWalkRoad',()=>null);
+ t.mock.method(GroundHeight,'_nearestLinearWalkFeature',()=>({feature,dist:2,pt:{x:0,z:-2},segIndex:0,t:.25}));
+ t.mock.method(GroundHeight,'urbanSurfaceMeshY',()=>null);
+ t.mock.method(GroundHeight,'linearFeatureMeshY',()=>{throw Error('Walking must not raycast all paths');});
+ const support=GroundHeight.walkSurfaceInfo(-2,-2,9.5,{sampleRenderedMesh:false});
+ assert.equal(support.source,'footway');assert.equal(support.y,9.5);
+ assert.equal(GroundHeight.walkSurfaceInfo(3,3,9.5,{sampleRenderedMesh:false}).source,'terrain');
+ ctx.linearWalkContactIndex.dispose();ctx.linearWalkContactIndex=createRoadContactIndex([surfaceMesh(8)]);
+ assert.equal(GroundHeight.walkSurfaceInfo(-2,-2,9,{sampleRenderedMesh:false}).y,9,'buried path must not pull the walker below visible terrain');
+});
+
+test('replacing mapped path batches replaces walking contact and releases the old index', async () => {
+  const {refreshLinearWalkContactIndex}=await import('../app/js/terrain/road-contact-index.js');
+  const mesh=(y,kind='footway')=>({userData:{linearFeatureKind:kind},geometry:{attributes:{position:{array:new Float32Array([0,y,0,10,y,0,0,y,10])}}}});
+  const appCtx={linearFeatureMeshes:[mesh(2)]};
+  const previous=refreshLinearWalkContactIndex(appCtx);
+  assert.equal(previous.sampleAt(1,1),2);
+  appCtx.linearFeatureMeshes=[mesh(7),mesh(12,'waterway')];
+  const next=refreshLinearWalkContactIndex(appCtx);
+  assert.equal(next.sampleAt(1,1),7);
+  assert.equal(previous.sampleAt(1,1),null);
 });

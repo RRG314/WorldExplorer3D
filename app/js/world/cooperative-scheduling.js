@@ -15,3 +15,19 @@ export function yieldToMainThread() {
   }
   return new Promise((resolve) => globalThis.setTimeout(resolve, 0));
 }
+
+
+// Drain the same construction iterator used by synchronous callers. Yielding
+// changes scheduling only, never geometry, ordering or acceptance criteria.
+export async function drainCooperatively(steps, {current=()=>true, now=()=>performance.now(), yieldWork=yieldToMainThread, budgetMs=8, onSlice=()=>{}}={}) {
+  let started=now();
+  try {
+    for(;;) {
+      if(!current())throw new Error('Surface construction superseded');
+      const result=steps.next();
+      const elapsed=now()-started;
+      if(result.done){onSlice(elapsed);return result.value;}
+      if(elapsed>=budgetMs){onSlice(elapsed);await yieldWork();started=now();}
+    }
+  } finally {steps.return();}
+}

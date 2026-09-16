@@ -204,29 +204,54 @@ export function beginFixedRegionalTransportLoad(options = {}) {
   return { bounds, location: fixedLocation, outcome, radiusMeters };
 }
 
+// Reuse the already requested z14 local transport data if exact OSM is
+// unavailable. A complete bounded local source must not be replaced by the
+// coarser regional overview simply because it is also generalized.
+export function localTransportFallback(data, location) {
+  const meta=data?._shortbreadTiles,b=meta?.bounds;
+  if(meta?.zoom!==14 || meta.failed!==0 || !b || meta.loaded!==meta.requested)return null;
+  const radius=Math.min(
+    (location.lat-b.minLat)*LATITUDE_METERS_PER_DEGREE,
+    (b.maxLat-location.lat)*LATITUDE_METERS_PER_DEGREE,
+    (location.lon-b.minLon)*longitudeMetersPerDegree(location.lat),
+    (b.maxLon-location.lon)*longitudeMetersPerDegree(location.lat)
+  );
+  if(!Number.isFinite(radius)||radius<=0)return null;
+  const ways=(data.elements||[]).filter(e=>e.type==='way'&&e.tags?.highway&&e.nodes?.length>=2);
+  if(!ways.length)return null;
+  const ids=new Set(ways.flatMap(w=>w.nodes));
+  const nodes=(data.elements||[]).filter(e=>e.type==='node'&&ids.has(e.id));
+  if(nodes.length!==ids.size)return null;
+  return {data:{...data,elements:[...nodes,...ways]},radiusMeters:radius};
+}
+
 export async function completeFixedRegionalTransportLoad(options = {}) {
   const {
     appCtx,
     coreRadiusMeters,
     exactData,
     exactTransportLoaded,
+    fallbackCoreData,
     loadMetrics,
     request
   } = options;
   const outcome = await request?.outcome;
   if (outcome?.error) throw outcome.error;
   if (!outcome?.value) throw new Error('Fixed regional transport returned no source data.');
+  const local=exactTransportLoaded ? null : localTransportFallback(fallbackCoreData,request.location);
+  const hasCore=exactTransportLoaded===true || !!local;
   const regional = retainRegionalTransportOutsideCore(outcome.value, {
     location: request.location,
-    coreRadiusMeters,
-    includeCore: exactTransportLoaded !== true,
+    coreRadiusMeters: local ? Math.min(coreRadiusMeters,local.radiusMeters) : coreRadiusMeters,
+    includeCore: !hasCore,
     radiusMeters: request.radiusMeters
   });
-  const data = exactTransportLoaded
-    ? mergeFixedRegionalTransport(exactData, regional)
+  const data = hasCore
+    ? mergeFixedRegionalTransport(local?.data || exactData, regional)
     : regional;
   loadMetrics.regionalTransport = {
     ...regional._regionalContext,
+    playableCoreSource: exactTransportLoaded ? 'osm-exact' : local ? 'shortbread-z14' : 'regional-generalized',
     tiles: outcome.value._shortbreadTiles || null
   };
   appCtx.fixedRegionalContextBounds = request.bounds;

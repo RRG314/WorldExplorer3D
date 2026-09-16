@@ -1,3 +1,4 @@
+import {drainCooperatively} from './cooperative-scheduling.js?v=1';
 import { appendUpwardRibbonGeometry } from '../road-render.js?v=4';
 
 const FEATURE_COLORS = Object.freeze({
@@ -25,10 +26,11 @@ function outsidePaths(feature, bounds) {
   return paths;
 }
 
-function buildBatchGeometry(features, buildFeatureRibbonEdges, worldBaseTerrainY, pavementBounds) {
+function* buildBatchGeometry(features, buildFeatureRibbonEdges, worldBaseTerrainY, pavementBounds) {
   const vertices = [];
   const indices = [];
   for (const feature of features) {
+    yield;
     // A crossing describes pedestrian connectivity over the carriageway. A
     // solid path ribbon here paints a second surface across the asphalt.
     if (feature.subtype === 'crossing' && !feature.structureSemantics?.gradeSeparated) continue;
@@ -61,7 +63,7 @@ function buildBatchGeometry(features, buildFeatureRibbonEdges, worldBaseTerrainY
   return geometry;
 }
 
-export function publishLinearFeaturePresentation(options = {}) {
+function* linearFeaturePresentationSteps(options = {}) {
   const {
     appCtx,
     buildFeatureRibbonEdges,
@@ -79,6 +81,7 @@ export function publishLinearFeaturePresentation(options = {}) {
 
   const groups = new Map();
   for (const feature of features) {
+    yield;
     if (
       feature?.isStructureConnector ||
       !Array.isArray(feature?.pts) ||
@@ -93,7 +96,7 @@ export function publishLinearFeaturePresentation(options = {}) {
 
   let published = 0;
   for (const [kind, groupedFeatures] of groups) {
-    const geometry = buildBatchGeometry(
+    const geometry = yield* buildBatchGeometry(
       groupedFeatures,
       buildFeatureRibbonEdges,
       worldBaseTerrainY,
@@ -124,4 +127,14 @@ export function publishLinearFeaturePresentation(options = {}) {
     published += 1;
   }
   return published;
+}
+
+
+export function publishLinearFeaturePresentation(options={}){
+ const steps=linearFeaturePresentationSteps(options);let result;
+ do{result=steps.next();}while(!result.done);
+ return result.value;
+}
+export function publishLinearFeaturePresentationCooperatively(options={},schedule={}){
+ return drainCooperatively(linearFeaturePresentationSteps(options),schedule);
 }

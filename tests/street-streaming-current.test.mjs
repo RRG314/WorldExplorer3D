@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Worker as NodeWorker} from 'node:worker_threads';
 import {StreetPacketCache} from '../app/js/world/street-packet-cache.js';
+import {updateStreetOverviewFrame} from '../app/js/world/street-pavement-runtime.js';
 import {createStreetOverview} from '../app/js/world/street-overview.js';
 
 test('packet cache is bounded, rejects changed inputs and never returns mutable retained arrays',()=>{
@@ -18,9 +19,9 @@ function harness(t){
  const oldThree=globalThis.THREE,oldWorker=globalThis.Worker,resources=[];
  class Texture{constructor(data,width,height){this.image={data,width,height};resources.push(this);}dispose(){this.disposed=true;}}
  class Vector4{constructor(...v){this.set(...v);}set(...v){this.values=v;}}
- globalThis.THREE={Vector4,DataTexture:Texture,RedFormat:1,RGBAFormat:2,LinearFilter:3,NearestFilter:4};
+ globalThis.THREE={Vector2:class{set(x,y){this.x=x;this.y=y;return this;}},Vector4,DataTexture:Texture,RedFormat:1,RGBAFormat:2,LinearFilter:3,NearestFilter:4};
  const originalCompile=()=>{},material={onBeforeCompile:originalCompile,customProgramCacheKey:()=> 'terrain'};
- const ctx={_worldLoadSequence:1,_groundSurfaceRevision:0,roads:[],buildings:[],landuses:[],linearFeatures:[],urbanSurfaceMeshes:[],terrainGroup:{children:[{userData:{isTerrainMesh:true},material}]},terrainMeshHeightAt:(x,z)=>x*.2+z*.1};
+ const ctx={renderer:{copyTextureToTexture(position,source,target){assert.ok(Number.isFinite(position.x));assert.ok(source.image.data.length>0);assert.ok(resources.includes(target));}},_worldLoadSequence:1,_groundSurfaceRevision:0,roads:[],buildings:[],landuses:[],linearFeatures:[],urbanSurfaceMeshes:[],terrainGroup:{children:[{userData:{isTerrainMesh:true},material}]},terrainMeshHeightAt:(x,z)=>x*.2+z*.1};
  let calls=0,worker;
  globalThis.Worker=class{
   constructor(){worker=this;this.cursor=0;}
@@ -93,4 +94,31 @@ test('actual overview worker covers a multi-kilometre network beyond the old 144
  const excluded=await request({type:'prepare',input:{roads:[{type:'motorway',width:20,pts:[{x:-1600,z:0},{x:1600,z:0}],transportRecord:{sourceTags:{highway:'motorway',sidewalk:'no'}}}],metersPerWorldUnit:1}});
  assert.ok(excluded.sourceCells>0);assert.equal(excluded.tiles,0);assert.equal(excluded.excludedCells,excluded.sourceCells);
  assert.equal((await request({type:'next',focus:{x:0,z:0}})).type,'complete');
+});
+
+
+test('active flight advances at most one overview cell per presentation tick',async t=>{
+ const h=harness(t);h.ctx.gameStarted=true;h.ctx.planeMode={active:true};
+ const overview=createStreetOverview(h.ctx);
+ overview.step({x:500,z:500});await overview.pause();
+ assert.equal(overview.stats.completedCells,1);
+ assert.equal(overview.stats.status,'building');
+ overview.step({x:550,z:550});await overview.pause();
+ assert.equal(overview.stats.completedCells,2);
+ assert.equal(overview.stats.status,'complete');overview.dispose();
+});
+
+ test('frame advancement is single-flight and yields to detail publication and world changes',async t=>{
+ const h=harness(t),overview=createStreetOverview(h.ctx);
+ Object.assign(h.ctx,{streetOverview:overview,gameStarted:true,car:{x:0,z:0}});
+ updateStreetOverviewFrame(h.ctx);updateStreetOverviewFrame(h.ctx);
+ assert.equal(h.calls,1,'only one prepare may be in flight');
+ await overview.pause();assert.equal(overview.stats.completedCells,1);
+ for(const flag of ['worldLoading','onMoon','_streetPavementUpdating','_cancelStreetPavementBuild']){
+  h.ctx[flag]=true;updateStreetOverviewFrame(h.ctx);await overview.pause();
+  assert.equal(overview.stats.completedCells,1,flag);h.ctx[flag]=false;
+ }
+ updateStreetOverviewFrame(h.ctx);await overview.pause();
+ assert.equal(overview.stats.completedCells,2,'next frame need not wait for a 200 ms LOD tick');
+ overview.dispose();
 });

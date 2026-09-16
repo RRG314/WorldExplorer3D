@@ -1,0 +1,364 @@
+{
+  "note": "Heap is browser-reported JavaScript only; geometry bytes exclude textures, GPU allocations and other tabs. Inspect twice to see runtime activity.",
+  "javascriptHeapBytes": 1123041903,
+  "sceneGeometryBytes": 242150762,
+  "rendererResources": {
+    "geometries": 695,
+    "textures": 612
+  },
+  "gameStarted": true,
+  "worldLoading": false,
+  "pavementBuildActive": false,
+  "deferredWork": {
+    "budgets": {
+      "firstPlayTargetMs": 25000,
+      "frameTargetMs": 16.7,
+      "cooperativeChunkTargetMs": 8,
+      "backgroundIdleTimeoutMs": 1800,
+      "inactiveAuxiliaryRenderers": 0
+    },
+    "firstPlayReady": true,
+    "activeTask": null,
+    "firstPlayDetail": {
+      "environment": "earth",
+      "loadDurationMs": 176051,
+      "publicationSequence": 1
+    },
+    "queued": [],
+    "completed": [
+      "tutorial-runtime",
+      "analytics-runtime",
+      "earth-ambient-state-1",
+      "earth-star-catalog"
+    ]
+  },
+  "street": {
+    "tiles": 123,
+    "triangles": 110312,
+    "curbTriangles": 63696,
+    "markingTriangles": 0,
+    "ramps": 0,
+    "workerMs": 9318,
+    "inferredFrontages": 12861,
+    "managedPaths": 0,
+    "residentRoads": 331,
+    "residentBuildings": 1049,
+    "roads": 12018,
+    "roadMeshes": 38,
+    "buildings": 7692,
+    "worldLoadSequence": 1,
+    "plannedTiles": 140,
+    "highestRefinement": {
+      "cell": "0:3",
+      "bounds": {
+        "minX": 0,
+        "maxX": 64,
+        "minZ": 192,
+        "maxZ": 256
+      },
+      "addedTriangles": 3066,
+      "baseTriangles": 289
+    },
+    "terrainRefinementTriangles": 78966,
+    "drawCalls": 68,
+    "compilerCacheBytes": 16592006,
+    "coverageBounds": {
+      "minX": -384,
+      "maxX": 384,
+      "minZ": -384,
+      "maxZ": 384
+    },
+    "indexBytes": 1044048,
+    "positionBytes": 1642488,
+    "durationMs": 41923,
+    "sourceCoverage": {
+      "scope": "Loaded source network requiring inferred or mapped sidewalks; length within the compilation window, not proof of rendered pavement. Separately tagged sidewalks need mapped path data.",
+      "requiredSidewalkMeters": 132866.37086133214,
+      "withinCompilationWindowMeters": 27121.322356392546,
+      "outsideCompilationWindowMeters": 105745.0485049396,
+      "compilationCoveragePercent": 20.412480735774817,
+      "requiredSegments": 2183,
+      "uncoveredSegments": 1773,
+      "examples": [
+        {
+          "kind": "road-side",
+          "name": "Avenue Prince Rainier III Monaco",
+          "a": {
+            "x": -845.6184045243413,
+            "z": 59.59694605621735
+          },
+          "b": {
+            "x": -827.0149050171019,
+            "z": 19.28909825892333
+          },
+          "uncoveredMeters": 98.55431874966227
+        },
+        {
+          "kind": "road-side",
+          "name": "Avenue Prince Rainier III Monaco",
+          "a": {
+            "x": -827.0149050171019,
+            "z": 19.28909825892333
+          },
+          "b": {
+            "x": -805.3108222586559,
+            "z": -61.32578327537885
+          },
+          "uncoveredMeters": 185.3377783950696
+        },
+        {
+          "kind": "road-side",
+          "name": "Avenue Prince Rainier III Monaco",
+          "a": {
+            "x": -805.3108222586559,
+            "z": -61.32578327537885
+          },
+          "b": {
+            "x": -799.1096557562428,
+            "z": -75.27824873818645
+          },
+          "uncoveredMeters": 33.8959730366333
+        },
+        {
+          "kind": "road-side",
+          "name": "Avenue Prince Rainier III Monaco",
+          "a": {
+            "x": -799.1096557562428,
+            "z": -75.27824873818645
+          },
+          "b": {
+            "x": -785.1570311258132,
+            "z": -95.43175255828373
+          },
+          "uncoveredMeters": 54.41669915457881
+        },
+        {
+          "kind": "road-side",
+          "name": "Avenue Prince Rainier III Monaco",
+          "a": {
+            "x": -785.1570311258132,
+            "z": -95.43175255828373
+          },
+          "b": {
+            "x": -774.3049897465903,
+            "z": -120.23597182349022
+          },
+          "uncoveredMeters": 60.10487937621713
+        },
+        {
+          "kind": "road-side",
+          "name": "Avenue Prince Rainier III Monaco",
+          "a": {
+            "x": -774.3049897465903,
+            "z": -120.23597182349022
+          },
+          "b": {
+            "x": -774.3049897465903,
+            "z": -166.74360597050963
+          },
+          "uncoveredMeters": 103.24694780638312
+        },
+        {
+          "kind": "road-side",
+          "name": "Avenue Prince Rainier III Monaco",
+          "a": {
+            "x": -774.3049897465903,
+            "z": -166.74360597050963
+          },
+          "b": {
+            "x": -768.1038232441771,
+            "z": -183.79631464142676
+          },
+          "uncoveredMeters": 40.28240859675975
+        },
+        {
+          "kind": "road-side",
+          "name": "Avenue Prince Rainier III Monaco",
+          "a": {
+            "x": -726.2459493528885,
+            "z": -224.10252386748652
+          },
+          "b": {
+            "x": -710.7430330968557,
+            "z": -228.7532228535838
+          },
+          "uncoveredMeters": 35.93174164297633
+        }
+      ],
+      "status": "incomplete"
+    }
+  },
+  "workSinceLastInspection": null,
+  "streetOverview": {
+    "status": "building",
+    "representation": "terrain material coverage",
+    "completedCells": 289,
+    "totalCells": 1050,
+    "nonemptyCells": 248,
+    "coveredSquareWorldUnits": 103116.43529411763,
+    "positionBytes": 0,
+    "retainedBytes": 4343332,
+    "drawCalls": 0,
+    "workerActive": true,
+    "sourceScope": "complete loaded location",
+    "error": null,
+    "sourceCells": 31988,
+    "excludedCells": 30938,
+    "maskResolution": 64,
+    "worldUnitsPerTexel": 1,
+    "materials": 135
+  },
+  "roadTerrainConformance": {
+    "authority": "published-at-grade-road-geometry-versus-rendered-terrain",
+    "totalSamples": 740674,
+    "issuesFound": 0,
+    "profileDepartures": 544776,
+    "maximumProfileDeparture": 62.885630487373135,
+    "worstProfileDepartures": [
+      {
+        "roadName": "Via Case Paneira",
+        "x": 9879.564316219989,
+        "z": -7604.263885702876,
+        "expectedY": 206.48507690429688,
+        "renderedY": 143.59944641692374,
+        "departure": 62.885630487373135
+      },
+      {
+        "roadName": "Residential",
+        "x": 11025.908732042988,
+        "z": -6454.18011480251,
+        "expectedY": 285.1107482910154,
+        "renderedY": 236.90674452428985,
+        "departure": 48.20400376672555
+      },
+      {
+        "roadName": "Residential",
+        "x": 3246.5509038171194,
+        "z": -2514.9093342349715,
+        "expectedY": 166.03787231445312,
+        "renderedY": 121.32242547211622,
+        "departure": 44.7154468423369
+      },
+      {
+        "roadName": "Boulevard Napoléon III",
+        "x": -7788.1489409224,
+        "z": 3238.3636659131867,
+        "expectedY": 81.04095618470251,
+        "renderedY": 36.86406918782302,
+        "departure": 44.17688699687949
+      },
+      {
+        "roadName": "930000",
+        "x": -3698.1242211300873,
+        "z": 2102.1966212296725,
+        "expectedY": 16.30775260925255,
+        "renderedY": -26.847027130126953,
+        "departure": 43.15477973937951
+      },
+      {
+        "roadName": "Residential",
+        "x": -3313.0569749650126,
+        "z": 1463.1426844791783,
+        "expectedY": 162.5761260986328,
+        "renderedY": 119.4956112311306,
+        "departure": 43.08051486750222
+      },
+      {
+        "roadName": "Boulevard Georges Bueno",
+        "x": -7904.273527949816,
+        "z": -704.1373939626641,
+        "expectedY": 119.31932067871091,
+        "renderedY": 79.77079110030047,
+        "departure": 39.54852957841044
+      },
+      {
+        "roadName": "Service",
+        "x": 10395.546172725064,
+        "z": -7933.446844183718,
+        "expectedY": 102.89496612548828,
+        "renderedY": 63.76988890271033,
+        "departure": 39.12507722277795
+      },
+      {
+        "roadName": "D 21",
+        "x": -5990.707641019969,
+        "z": -2667.0541260219156,
+        "expectedY": 161.47862243652344,
+        "renderedY": 122.77162177483903,
+        "departure": 38.707000661684404
+      },
+      {
+        "roadName": "Residential",
+        "x": 3244.0509038171194,
+        "z": -2518.00861402387,
+        "expectedY": 160.1714097697648,
+        "renderedY": 121.87281016314225,
+        "departure": 38.29859960662256
+      }
+    ],
+    "minimumDelta": 0.18,
+    "maximumDelta": 0.182,
+    "buriedSamples": 0,
+    "floatingSamples": 0,
+    "worstDeltas": []
+  },
+  "loadPhases": {
+    "prepareAcceptedGround": 160,
+    "fetchOverpass": 8966,
+    "fetchFixedRegionalContext": 9152,
+    "fetchFixedRegionalStructures": 206,
+    "waitForFixedRegionalGround": 0,
+    "featureBudgeting": 7660,
+    "waitForTransportGround": 0,
+    "buildRoadGeometry": 3495,
+    "buildLanduseGeometry": 76,
+    "batchLanduseGeometry": 6,
+    "buildLinearFeatureData": 136,
+    "buildPoiGeometry": 18,
+    "buildStreetFurniture": 767,
+    "buildBuildingRoadGuards": 9877,
+    "buildBuildingGeometry": 14757,
+    "publishBuildingFacadeEntrances": 2037,
+    "publishBuildingExteriorDetails": 96,
+    "batchBuildingGeometry": 1549,
+    "publishLocationTerrain": 0,
+    "publishCompiledTransportMeshes": 62848,
+    "refreshTerrainSurfaceProfiles": 984,
+    "retireGroundFallbackPlaceholder": 0,
+    "buildTraversalNetworks": 1403,
+    "spawnPlayer": 2536,
+    "refreshMemoryMarkersForCurrentLocation": 1,
+    "refreshBlockBuilderForCurrentLocation": 0,
+    "refreshEditableWorldPresentation": 0,
+    "publishLocationWorld": 7,
+    "refreshEditableBuildingVisibility": 314,
+    "waitForTerrainSurfaceMaterials": 2
+  },
+  "geometryByLayer": {
+    "roadMeshes": 87387166,
+    "buildingMeshes": 41138532,
+    "landuseMeshes": 495922,
+    "urbanSurfaceMeshes": 5424016,
+    "linearFeatureMeshes": 102684,
+    "vegetationMeshes": 30906966
+  },
+  "quality": {
+    "status": "fail",
+    "failures": [
+      "rendered roads depart from engineered profiles; terrain agreement does not establish a valid grade",
+      "JavaScript heap exceeds 768 MiB",
+      "first play exceeds 25000 ms",
+      "loaded streets requiring sidewalks extend beyond completed pavement coverage"
+    ],
+    "pending": [
+      "location-wide pavement areas are not complete"
+    ],
+    "refinementMultiplier": 3.519173100236075,
+    "budgets": {
+      "javascriptHeapBytes": 805306368,
+      "pavementPositionBytes": 16777216,
+      "refinementMultiplier": 8
+    },
+    "visualStatus": "Requires camera sweep and recorded city route; performance checks cannot certify appearance."
+  }
+}

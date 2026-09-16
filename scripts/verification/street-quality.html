@@ -4,6 +4,7 @@
 <footer style="position:fixed;right:8px;bottom:8px;background:#101921dd;padding:6px;font-size:11px"><a style="color:white" href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a> · <a style="color:white" href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md">Terrain source credits</a></footer>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script><script type="module">
 import {compileQualityCase} from './street-quality-core.js';
+import {verifyReprojectedPathVisibility} from './street-geometry-lifecycle-check.js';
 import {appendSolidAtGradeRoadGeometry} from '../../app/js/terrain/road-surface-geometry.js?v=2';
 const city=new URLSearchParams(location.search).get('city')||'monaco';if(!['monaco','san-francisco'].includes(city))throw Error('Unknown city');document.querySelector('#city').value=city;document.querySelector('#city').onchange=e=>location.search='?city='+e.target.value;
 const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(1);renderer.outputEncoding=THREE.sRGBEncoding;document.body.append(renderer.domElement);
@@ -11,6 +12,7 @@ const scene=new THREE.Scene();scene.background=new THREE.Color('#a8bac7');scene.
 const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.5,2000);
 const fixture=await fetch('../../tests/fixtures/streets/'+city+'-hill-quality.json').then(r=>r.json());
 const {meshes,ground,report}=compileQualityCase(fixture);
+report.geometryLifecycle=verifyReprojectedPathVisibility(THREE);
 function add(vertices,indices,material){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));if(indices)g.setIndex(indices);g.computeVertexNormals();g.computeBoundingSphere();const m=new THREE.Mesh(g,material);scene.add(m);return m;}
 const terrainVertices=[],terrainIndices=[];const grid=fixture.terrain,n=grid.size;
 for(let row=0;row<n;row++)for(let col=0;col<n;col++){const x=grid.minX+col*grid.step,z=grid.minZ+row*grid.step;terrainVertices.push(x,ground(x,z),z);if(row<n-1&&col<n-1){const a=row*n+col,b=a+1,c=a+n,d=c+1;terrainIndices.push(a,c,b,b,c,d);}}
@@ -19,7 +21,13 @@ const concrete=new THREE.MeshStandardMaterial({color:0xd9d5cc,roughness:.96}),cu
 for(const m of meshes){add(m.vertices,null,concrete);add(m.curbVertices,null,curb);}
 const roads=[];for(const r of fixture.input.roads){if(r.structureSemantics.terrainMode!=='at_grade')continue;const v=[],ind=[];appendSolidAtGradeRoadGeometry({feature:r,points:r.pts,halfWidth:r.width/2,sampleTerrainY:ground,surfaceBias:.08,targetVerts:v,targetIndices:ind});if(v.length)add(v,ind,new THREE.MeshStandardMaterial({color:0x32383c,roughness:.95}));roads.push(r);}
 for(const b of fixture.input.buildings){if(!b.pts.some(p=>Math.abs(p.x)<128&&Math.abs(p.z)<128))continue;const s=new THREE.Shape();b.pts.forEach((p,i)=>i?s.lineTo(p.x,-p.z):s.moveTo(p.x,-p.z));s.closePath();const g=new THREE.ExtrudeGeometry(s,{depth:7,bevelEnabled:false});g.rotateX(-Math.PI/2);const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0xbca78e,roughness:1}));m.position.y=Math.max(...b.pts.map(p=>ground(p.x,p.z)));scene.add(m);}
-const render=()=>renderer.render(scene,camera);document.querySelector('#overview').onclick=()=>{camera.position.set(170,ground(0,0)+190,170);camera.lookAt(0,ground(0,0),0);render();};document.querySelector('#street').onclick=()=>{camera.position.set(0,ground(0,70)+7,70);camera.lookAt(0,ground(0,0)+2,0);render();};document.querySelector('#overview').click();
+const render=()=>renderer.render(scene,camera);document.querySelector('#overview').onclick=()=>{camera.position.set(170,ground(0,0)+190,170);camera.lookAt(0,ground(0,0),0);render();};document.querySelector('#street').onclick=()=>{
+ const inside=(p,ring)=>{let hit=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){const a=ring[i],b=ring[j];if((a.z>p.z)!==(b.z>p.z)&&p.x<(b.x-a.x)*(p.z-a.z)/(b.z-a.z)+a.x)hit=!hit;}return hit;};
+ const clear=s=>[.2,.4,.6,.8].every(t=>{const p={x:s.a.x+(s.b.x-s.a.x)*t,z:s.a.z+(s.b.z-s.a.z)*t};return !fixture.input.buildings.some(b=>inside(p,b.pts));});
+ const segments=roads.flatMap(r=>r.pts.slice(1).map((b,i)=>({a:r.pts[i],b,length:Math.hypot(b.x-r.pts[i].x,b.z-r.pts[i].z)}))).filter(s=>s.length>12&&[s.a,s.b].every(p=>Math.abs(p.x)<100&&Math.abs(p.z)<100)).filter(clear).sort((a,b)=>b.length-a.length);
+ const s=segments[0];if(!s)return;const at=t=>({x:s.a.x+(s.b.x-s.a.x)*t,z:s.a.z+(s.b.z-s.a.z)*t});
+ const p=at(.2),q=at(.8);camera.position.set(p.x,ground(p.x,p.z)+2,p.z);camera.lookAt(q.x,ground(q.x,q.z)+1.5,q.z);render();
+};document.querySelector('#overview').click();
 report.rendered={geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,drawCalls:renderer.info.render.calls};document.querySelector('#result').textContent=JSON.stringify(report,null,2);
 addEventListener('resize',()=>{renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();render();});
 </script></html>

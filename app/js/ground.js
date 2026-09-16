@@ -20,7 +20,7 @@ function isWalkFeatureSurfaceReachable(feature, options = {}) {
   // connected to terrain. Metadata alone cannot authorize a large vertical
   // jump; stale or pre-terrain feature heights must fall back to terrain.
   if (!semantics?.gradeSeparated) {
-    return Math.abs(surfaceY - terrainY) <= 1.25;
+    return surfaceY >= terrainY-.08 && surfaceY-terrainY <= 1.25;
   }
 
   // A new walk session starts on the rendered terrain unless a structure
@@ -343,33 +343,26 @@ const GroundHeight = {
       Number.isFinite(linear.dist) &&
       linear.dist <= Math.max(0.9, featureWidth * 0.5 + 0.8)
     );
+    const publishedLinearY=onLinear?appCtx.linearWalkContactIndex?.sampleAt(x,z,currentY):null;
     const preferLinear = !!(
       onLinear &&
       !(roadOnSurface && linear.feature?.subtype === 'crossing' && !linear.feature?.structureSemantics?.gradeSeparated) &&
       isWalkFeatureSurfaceReachable(linear?.feature, {
         currentY,
         terrainY,
-        surfaceY: Number.isFinite(linear?.pt?.x) && Number.isFinite(linear?.pt?.z)
-          ? sampleFeatureSurfaceY(linear.feature, linear.pt.x, linear.pt.z, linear)
-          : NaN
+        surfaceY: Number.isFinite(publishedLinearY)?publishedLinearY:
+          linear.feature?.structureSemantics?.gradeSeparated
+            ? sampleFeatureSurfaceY(linear.feature,x,z,linear) : NaN
       }) &&
       (!roadOnSurface || linear.dist <= (Number.isFinite(nr?.dist) ? nr.dist + 0.15 : Infinity))
     );
 
     if (preferLinear) {
       const feature = linear.feature;
-      const sampleX = Number.isFinite(linear?.pt?.x) ? linear.pt.x : x;
-      const sampleZ = Number.isFinite(linear?.pt?.z) ? linear.pt.z : z;
-      const featureBias = Number.isFinite(feature?.surfaceBias) ?
-        feature.surfaceBias :
-        Number.isFinite(feature?.bias) ?
-          feature.bias :
-          0.05;
-      const sampledY = sampleFeatureSurfaceY(feature, sampleX, sampleZ, linear);
-      const meshY = Number.isFinite(sampledY) ? sampledY : this.linearFeatureMeshY(sampleX, sampleZ);
-      const baseY = this.terrainY(sampleX, sampleZ);
+      const meshY = Number.isFinite(publishedLinearY)?publishedLinearY:
+        sampleFeatureSurfaceY(feature,x,z,linear);
       return {
-        y: Number.isFinite(meshY) ? meshY : baseY + featureBias + 0.02,
+        y: feature?.structureSemantics?.gradeSeparated ? meshY : Math.max(terrainY,meshY,roadOnSurface&&Number.isFinite(indexedRoadY)?indexedRoadY:-Infinity),
         source: String(feature?.kind || feature?.networkKind || 'path'),
         feature,
         dist: linear.dist,

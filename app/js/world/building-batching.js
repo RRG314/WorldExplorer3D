@@ -28,10 +28,10 @@ function appendMidFacadeAttributes(batch, material, exteriorPresentation, vertex
   const roofColorA = new THREE.Color(exteriorPresentation?.roofColorA ?? material?.userData?.roofSurfaceColorA ?? wallColor.getHex());
   const roofColorB = new THREE.Color(exteriorPresentation?.roofColorB ?? material?.userData?.roofSurfaceColorB ?? wallColor.getHex());
   const roofGrainScale = Number(exteriorPresentation?.roofGrainScale || material?.userData?.roofSurfaceGrainScale || 0.6);
-  const repeatX = Number(material?.map?.repeat?.x || 0.08);
-  const repeatY = Number(material?.map?.repeat?.y || (1 / 16));
-  const offsetX = Number(material?.map?.offset?.x || 0);
-  const offsetY = Number(material?.map?.offset?.y || 0);
+  const [repeatX,repeatY,offsetX,offsetY]=material.userData.facadeProjection || [
+    Number(material?.map?.repeat?.x || 0.08),Number(material?.map?.repeat?.y || (1/16)),
+    Number(material?.map?.offset?.x || 0),Number(material?.map?.offset?.y || 0)
+  ];
   for (let vertexIndex = vertexStart; vertexIndex < vertexStart + vertexCount; vertexIndex += 1) {
     const normalY = Number(batch.normals[vertexIndex * 3 + 1] || 0);
     const wallMask = Math.max(0, Math.min(1, (1 - Math.abs(normalY) - 0.18) / 0.54));

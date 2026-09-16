@@ -1,4 +1,5 @@
-import { updateStreetPavementFocus } from '../world/street-pavement-runtime.js';
+import {createGraphicsCallEvidence} from './graphics-call-evidence.js';
+import { updateStreetPavementFocus, updateStreetOverviewFrame } from '../world/street-pavement-runtime.js';
 function createCoreFrameSystems(appCtx, hooks = {}) {
   appCtx.presentationPose = null;
   let hudTimer = 0;
@@ -16,7 +17,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       priority: -100,
       update(frame) {
         appCtx.lastTime = frame.timestamp;
-        appCtx.recordPerfFrame?.(frame.dt);
+        appCtx.recordPerfFrame?.(frame.rawDelta ?? frame.dt);
         appCtx.tutorialUpdate?.(frame.dt);
         if (appCtx.renderer?.info?.autoReset === false) appCtx.renderer.info.reset?.();
       }
@@ -130,6 +131,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
         }
 
         lodTimer += frame.dt;
+        updateStreetOverviewFrame(appCtx);
         if (lodTimer > 0.2) {
           lodTimer = 0;
           appCtx.updateStreetFurnitureVisibility?.();
@@ -144,8 +146,29 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
 }
 
 function createCoreRenderSystem(appCtx, shouldUseComposer) {
+  const graphicsEvidence=typeof location!=='undefined' && new URLSearchParams(location.search).get('graphicsDiagnostics')==='1'
+    ? createGraphicsCallEvidence(appCtx.renderer.getContext()) : null;
+  appCtx.graphicsCallEvidence=graphicsEvidence;
+  const draw = () => {
+    graphicsEvidence?.begin();
+    try {
+      if (shouldUseComposer()) appCtx.composer.render();
+      else appCtx.renderer.render(appCtx.scene, appCtx.camera);
+      appCtx.recordPerfRendererInfo?.(appCtx.renderer);
+    } finally {graphicsEvidence?.end();}
+  };
+  // The completed world must have produced its first frame before the loading
+  // cover is dismissed. Use the real render path, including postprocessing.
+  appCtx.prepareFirstWorldRender = () => {
+    if (!appCtx.gameStarted || appCtx.worldLoading) throw new Error('World is not ready for its first render');
+    const started=performance.now();
+    appCtx.updateCamera?.(0);
+    draw();
+    return {durationMs:performance.now()-started,programs:appCtx.renderer?.info?.programs?.length || 0};
+  };
   return {
     id: 'core.renderer',
+    dispose(){graphicsEvidence?.dispose();if(appCtx.graphicsCallEvidence===graphicsEvidence)appCtx.graphicsCallEvidence=null;},
     owner: 'renderer',
     phase: 'render',
     priority: 0,
@@ -155,9 +178,7 @@ function createCoreRenderSystem(appCtx, shouldUseComposer) {
     // partial city batches competes with compilation and uploads them early.
     enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading,
     update() {
-      if (shouldUseComposer()) appCtx.composer.render();
-      else appCtx.renderer.render(appCtx.scene, appCtx.camera);
-      appCtx.recordPerfRendererInfo?.(appCtx.renderer);
+      draw();
     }
   };
 }

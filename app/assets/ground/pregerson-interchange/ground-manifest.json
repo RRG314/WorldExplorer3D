@@ -3,7 +3,7 @@
   "artifactId": "pregerson-interchange-ground",
   "providerId": "copernicus-dem-classified-ground-v1",
   "sourceRelease": "COP-DEM-2021:GLO-30",
-  "contentSha256": "2575b4ec34f9b3643e31eac219b026774765b6db77c7cc7b73bb84ed4a21169d",
+  "contentSha256": "a8df2bb1f56a4a040a0ca0bba07a9d95409c8e47d45a111e4725aafda4c67625",
   "spacingMeters": 90,
   "coverage": {
     "south": 33.90244288997947,
@@ -18,7 +18,7 @@
   "correctionAttested": true,
   "sourceEvidence": {
     "sourceClassification": "digital-surface-model",
-    "correctionMethod": "worldexplorer-pmf-grid-v1",
+    "correctionMethod": "worldexplorer-pmf-boundary-reconstruction-v3",
     "sourceTiles": [
       {
         "tileId": "Copernicus_DSM_COG_10_N33_00_W119_00_DEM",
@@ -29,7 +29,14 @@
         "etag": "589ba555eec6cef8977c514663b7185c",
         "lastModified": "Mon, 09 May 2022 14:16:50 GMT"
       }
-    ]
+    ],
+    "classificationMethod": "worldexplorer-pmf-grid-v1",
+    "reconstruction": {
+      "method": "harmonic-ground-boundary",
+      "toleranceMeters": 0.00001,
+      "exteriorPolicy": "retain-source-observation",
+      "sourceArtifactSha256": "2575b4ec34f9b3643e31eac219b026774765b6db77c7cc7b73bb84ed4a21169d"
+    }
   },
   "attribution": {
     "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",

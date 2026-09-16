@@ -1,6 +1,10 @@
 import * as bundle from '../../../vendor/clipper/index.js';
 const C = bundle.default || globalThis.ClipperLib;
-const SCALE = 1000;
+// Explicit integer coordinate grid shared with independent replay checks.
+export const STREET_POLYGON_GRID_WORLD = 0.001;
+export function createStreetPolygonKernel({grid = STREET_POLYGON_GRID_WORLD} = {}) {
+if (!Number.isFinite(grid) || grid <= 0) throw new RangeError('Polygon grid must be positive');
+const SCALE = 1 / grid;
 const multi = shape => typeof shape?.[0]?.[0]?.[0] === 'number' ? [shape] : shape;
 function paths(shape, origin) {
   const result = [];
@@ -44,7 +48,7 @@ function polygonResult(solution, origin) {
     for(const p of ring){minX=Math.min(minX,p.X);maxX=Math.max(maxX,p.X);minY=Math.min(minY,p.Y);maxY=Math.max(maxY,p.Y);}
     return {ring,area:Math.abs(C.Clipper.Area(ring)),minX,maxX,minY,maxY,holes:[],depth:0};
   }).sort((a,b)=>b.area-a.area);
-  const index=new Map(),wide=[],outers=[],cellSize=4000;
+  const index=new Map(),wide=[],outers=[],cellSize=4*SCALE;
   for(const item of records){
     const point=item.ring[0],candidates=[...(index.get(`${Math.floor(point.X/cellSize)}:${Math.floor(point.Y/cellSize)}`)||[]),...wide];
     let parent=null;
@@ -79,7 +83,7 @@ function execute(type, subject, clips = []) {
   if (!engine.Execute(type, solution, C.PolyFillType.pftNonZero, C.PolyFillType.pftNonZero)) throw Error('Street polygon operation failed');
   return polygonResult(solution,origin);
 }
-export const streetPolygonKernel = {
+return {
   offset: (subject, distance) => {
     const origin = originOf(subject);
     const engine = new C.ClipperOffset(2, .05*SCALE), solution = [];
@@ -91,3 +95,6 @@ export const streetPolygonKernel = {
   intersection: (subject,other) => execute(C.ClipType.ctIntersection,subject,[other]),
   difference: (subject,other) => execute(C.ClipType.ctDifference,subject,[other])
 };
+
+}
+export const streetPolygonKernel = createStreetPolygonKernel();

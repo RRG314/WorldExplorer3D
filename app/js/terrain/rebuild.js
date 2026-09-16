@@ -1,3 +1,8 @@
+import {emitLocalLoadTrace} from '../world/load-trace.js';
+import {prepareCarriagewayTiles} from '../world/compiler/street-carriageway.js';
+import {meshCarriagewayTile} from '../world/compiler/street-carriageway-mesh.js';
+import {createPavementTerrainPartitionCooperatively} from '../world/pavement-terrain-partition.js';
+import {roadPlacementOffsetWorld} from '../world/road-units.js';
 import { markGroundSurfaceChanged } from './surface-revision.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { appendUpwardRibbonGeometry, buildIndexedBatchMesh } from "../road-render.js?v=4";
@@ -11,58 +16,19 @@ import {
 } from "../structure-semantics.js?v=63";
 import { yieldToMainThread } from "../world/cooperative-scheduling.js?v=1";
 
-import {
-  computeIntersectionCapRadius,
-  shouldBuildCompactIntersectionCap
-} from "./road-junctions.js?v=11";
-import { appendSolidAtGradeRoadGeometry } from "./road-surface-geometry.js?v=2";
 import { roadWidthAtSegment } from "../world/road-cross-section-profile.js?v=1";
-import { createRoadContactIndex } from './road-contact-index.js?v=1';
+import { createRoadContactIndex, createRoadContactIndexCooperatively } from './road-contact-index.js?v=1';
 
 const ROAD_SURFACE_BIAS = 0.18;
 const MAX_ROAD_BATCH_VERTICES = 60000;
 
 export { detectRoadIntersections };
 
-function appendCompactIntersectionCap(
-  intersection,
-  targetVerts,
-  targetIndices,
-  terrainHeightAt,
-  segments = 16
-) {
-  if (!shouldBuildCompactIntersectionCap(intersection)) return false;
-  const sampleTerrain = typeof terrainHeightAt === "function" ? terrainHeightAt : () => 0;
-  const radius = computeIntersectionCapRadius(intersection);
-  const base = targetVerts.length / 3;
-  targetVerts.push(
-    Number(intersection.x),
-    Number(sampleTerrain(intersection.x, intersection.z)) + ROAD_SURFACE_BIAS + 0.004,
-    Number(intersection.z)
-  );
-  for (let index = 0; index < segments; index += 1) {
-    const angle = index / segments * Math.PI * 2;
-    const x = Number(intersection.x) + Math.cos(angle) * radius;
-    const z = Number(intersection.z) + Math.sin(angle) * radius;
-    targetVerts.push(x, Number(sampleTerrain(x, z)) + ROAD_SURFACE_BIAS + 0.004, z);
-  }
-  for (let index = 0; index < segments; index += 1) {
-    targetIndices.push(base, base + 1 + ((index + 1) % segments), base + 1 + index);
-  }
-  return true;
-}
-
-export {
-  appendCompactIntersectionCap,
-  computeIntersectionCapRadius,
-  shouldBuildCompactIntersectionCap
-};
-
 function appendIndexedGeometry(targetVerts, targetIndices, verts, indices) {
-  if (!Array.isArray(verts) || verts.length === 0) return;
+  if (!verts || verts.length === 0) return;
   const baseVertex = targetVerts.length / 3;
-  targetVerts.push(...verts);
-  if (Array.isArray(indices) && indices.length > 0) {
+  for (let i = 0; i < verts.length; i++) targetVerts.push(verts[i]);
+  if (indices && indices.length > 0) {
     for (let i = 0; i < indices.length; i++) {
       targetIndices.push(indices[i] + baseVertex);
     }
@@ -95,9 +61,7 @@ export function appendRoadCenterMarkings(road, points, outputVerts, outputIndice
   const dashLength = 6;
   const patternLength = 12;
   const laneCount = Math.max(1, Number(road?.transportRecord?.crossSection?.lanes) || 1);
-  const corridorOffset = Number(
-    road?.transportRecord?.crossSection?.placement?.centerlineOffsetMeters
-  ) || 0;
+  const corridorOffset = roadPlacementOffsetWorld(road);
   let distanceBeforeSegment = 0;
   for (let index = 0; index < points.length - 1; index += 1) {
       const start = points[index];
@@ -165,7 +129,7 @@ export function appendRoadCenterMarkings(road, points, outputVerts, outputIndice
   if(contactIndex){
     for(let i=0;i<targetIndices.length;i+=3){
       const points=targetIndices.slice(i,i+3).map(j=>({x:targetVerts[j*3],z:targetVerts[j*3+2]}));
-      const projected=contactIndex.projectTriangle(points,.012);
+      const projected=contactIndex.projectTriangle(points,.012,'at_grade');
       const base=outputVerts.length/3;
       for(const v of projected)outputVerts.push(v);
       for(let j=0;j<projected.length/3;j++)outputIndices.push(base+j);
@@ -266,6 +230,9 @@ export function createRoadTerrainConformanceAudit() {
     maximumDelta: -Infinity,
     buriedSamples: 0,
     floatingSamples: 0,
+    profileDepartures: 0,
+    maximumProfileDeparture: 0,
+    worstProfileDepartures: [],
     worstDeltas: []
   };
 }
@@ -295,6 +262,17 @@ export function recordAtGradeRoadTerrainConformance(
     const terrainY = Number(terrainHeightAt(x, z));
     if (![x, y, z, terrainY].every(Number.isFinite)) continue;
     const delta = y - terrainY;
+    // Independent reference: agreeing with a distorted terrain surface must
+    // not certify a road that has lost its engineered profile.
+    const expectedY=sampleFeatureSurfaceY(feature,x,z);
+    const profileDeparture=Number.isFinite(expectedY) ? Math.abs(y-expectedY) : 0;
+    audit.maximumProfileDeparture=Math.max(audit.maximumProfileDeparture,profileDeparture);
+    if(profileDeparture>.25){
+      audit.profileDepartures++;
+      audit.worstProfileDepartures.push({roadName:feature.name||'Unnamed road',x,z,expectedY,renderedY:y,departure:profileDeparture});
+      audit.worstProfileDepartures.sort((a,b)=>b.departure-a.departure);
+      audit.worstProfileDepartures.length=Math.min(10,audit.worstProfileDepartures.length);
+    }
     audit.totalSamples += 1;
     audit.minimumDelta = Math.min(audit.minimumDelta, delta);
     audit.maximumDelta = Math.max(audit.maximumDelta, delta);
@@ -332,6 +310,9 @@ export function finalizeRoadTerrainConformanceAudit(audit) {
     authority: result.authority,
     totalSamples: Number(result.totalSamples || 0),
     issuesFound: Number(result.issuesFound || 0),
+    profileDepartures: Number(result.profileDepartures || 0),
+    maximumProfileDeparture: Number(result.maximumProfileDeparture || 0),
+    worstProfileDepartures: Object.freeze((result.worstProfileDepartures || []).map(Object.freeze)),
     minimumDelta: Number.isFinite(result.minimumDelta)
       ? Number(result.minimumDelta.toFixed(4))
       : null,
@@ -398,20 +379,26 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   const now = () => globalThis.performance?.now?.() ?? Date.now();
   const publicationStartedAt = now();
   const phaseDurationsMs = Object.create(null);
+  const diagnosticsEnabled=typeof location!=='undefined' && new URLSearchParams(location.search).has('streetDiagnostics');
+  const trace=(phase,detail={})=>{emitLocalLoadTrace('transport',phase,detail);if(diagnosticsEnabled)console.info('[TransportSurface]',phase,JSON.stringify(detail));};
   const measure = (name, task) => {
+    trace(name+':start');
     const startedAt = now();
     try {
       return task();
     } finally {
       phaseDurationsMs[name] = Number((now() - startedAt).toFixed(2));
+      trace(name+':end',{milliseconds:phaseDurationsMs[name]});
     }
   };
   const measureAsync = async (name, task) => {
+    trace(name+':start');
     const startedAt = now();
     try {
       return await task();
     } finally {
       phaseDurationsMs[name] = Number((now() - startedAt).toFixed(2));
+      trace(name+':end',{milliseconds:phaseDurationsMs[name]});
     }
   };
 
@@ -430,11 +417,14 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     await yieldToMainThread();
   }
   if (typeof applyTransportTerrainCorridors === 'function') {
-    measure('applyTransportTerrainCorridors', () => applyTransportTerrainCorridors({
+    await measureAsync('applyTransportTerrainCorridors', () => applyTransportTerrainCorridors({
+      isCurrent,
+      yieldBetweenTiles: yieldToMainThread,
       // finalizeLoadedWorld owns the one semantic terrain-material
       // publication after the complete transport height rebuild.
       deferVisualProfile: true
     }));
+    if(!isCurrent())return;
     appCtx.streetFrontageGrading?.clearSamples?.();
     if (typeof repositionBuildingsWithTerrain === 'function') {
       measure('reprojectGroundAttachedWorld', () => repositionBuildingsWithTerrain());
@@ -455,11 +445,8 @@ export async function publishCompiledTransportMeshes(deps = {}) {
 
   const intersections = measure('detectIntersections', () => detectRoadIntersections(baseRoads));
   await yieldToMainThread();
-  // Do not bend road profiles into a separately fitted junction plane. Those
-  // large convex envelopes were wider than the actual carriageway and caused
-  // visible polygon fans and edge bumps on slopes. Solid road footprints
-  // remain authoritative; only a compact terrain-draped center cap closes a
-  // physically connected two-or-more-branch junction.
+  // Junction footprints are resolved by the same planar union as road
+  // segments. No stacked circular cap is published over the intersection.
   for (const road of baseRoads) road.junctionTransitions = [];
 
   const roadMainBatches = [];
@@ -471,8 +458,9 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   const roadMarkBatchVerts = [];
   const roadMarkBatchIdx = [];
   const roadSurfaceIntegrity = {
-    authority: 'solid-at-grade-segments-and-bounded-turn-joins',
-    surfaceHeightAuthority: 'compiled_transport_surface_profile',
+    authority: 'unioned-carriageway-regions',
+    surfaceHeightAuthority: 'partitioned-published-terrain',
+    carriagewayRegions: 0,
     segmentQuads: 0,
     turnJoins: 0,
     surfaceTriangles: 0,
@@ -492,7 +480,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     roadMainBatchRanges = [];
   };
   const appendRoadMainGeometry = (verts, indices, terrainMode) => {
-    const incomingVertices = Array.isArray(verts) ? verts.length / 3 : 0;
+    const incomingVertices = verts ? verts.length / 3 : 0;
     const currentVertices = roadMainBatchVerts.length / 3;
     if (currentVertices > 0 && currentVertices + incomingVertices > MAX_ROAD_BATCH_VERTICES) {
       flushRoadMainBatch();
@@ -505,7 +493,8 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   const roadMat = sharedRoadMaterials.roadMat;
   const skirtMat = sharedRoadMaterials.skirtMat;
   const markMat = sharedRoadMaterials.markMat;
-  await measureAsync('buildRoadRibbons', async () => {
+  const atGradeRoads=[];
+  await measureAsync('buildStructureRibbons', async () => {
     let sliceStartedAt = now();
     const publishedSharedSurfaces = new Set();
     for (let roadIndex = 0; roadIndex < baseRoads.length; roadIndex += 1) {
@@ -531,6 +520,27 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       // junctions with fan polygons, exposing circles and triangle boundaries.
       const pts = basePts;
       if (!Array.isArray(pts) || pts.length < 2) continue;
+      if(renderRoad.structureSemantics?.terrainMode==='at_grade') {
+        atGradeRoads.push({road:renderRoad,points:pts,widths:sharedSurface ? null : mapPublishedPointsToCrossSectionWidths(road,pts)});
+        // Keep the independent profile audit after retiring per-road meshes.
+        // Sample each source's cross-section; agreement among rendered layers
+        // must not hide departure from the intended transport profile.
+        const auditVertices=[];
+        const stride=Math.max(1,Math.floor(pts.length/32));
+        for(let i=0;i<pts.length;i+=stride) {
+          const p=pts[i],q=pts[Math.min(i+1,pts.length-1)] || p;
+          const prev=i===pts.length-1 ? pts[i-1] : p;
+          const dx=q.x-prev.x,dz=q.z-prev.z,length=Math.hypot(dx,dz)||1;
+          for(const side of [-1,0,1]) {
+            const x=p.x-dz/length*hw*side,z=p.z+dx/length*hw*side;
+            auditVertices.push(x,cachedTerrainHeight(x,z)+ROAD_SURFACE_BIAS,z);
+          }
+        }
+        recordAtGradeRoadTerrainConformance(roadTerrainAudit,renderRoad,auditVertices,cachedTerrainHeight,worldToLatLon);
+        if(now()-sliceStartedAt>=24) {await yieldToMainThread();sliceStartedAt=now();}
+        if(!isCurrent())return;
+        continue;
+      }
 
       const verts = [];
       const indices = [];
@@ -539,42 +549,14 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       const roadTerrainSampler = renderRoad?.structureSemantics?.terrainMode === "at_grade" ?
         cachedTerrainHeight :
         cachedBaseTerrainHeight;
-      const compiledRoadSurfaceSampler = createCompiledRoadSurfaceSampler(
-        renderRoad,
-        roadTerrainSampler,
-        roadSurfaceIntegrity
-      );
       const surfaceBias = Number.isFinite(renderRoad?.surfaceBias)
         ? renderRoad.surfaceBias
         : ROAD_SURFACE_BIAS;
       let widthSamplesMeters = null;
-      if (renderRoad?.structureSemantics?.terrainMode === 'at_grade') {
-        widthSamplesMeters = sharedSurface
-          ? null
-          : mapPublishedPointsToCrossSectionWidths(road, pts);
-        const integrity = appendSolidAtGradeRoadGeometry({
-          feature: renderRoad,
-          points: pts,
-          halfWidth: hw,
-          widthSamplesMeters,
-          sampleTerrainY: compiledRoadSurfaceSampler,
-          surfaceBias,
-          targetVerts: verts,
-          targetIndices: indices
-        });
-        roadSurfaceIntegrity.segmentQuads += integrity.segmentQuads;
-        roadSurfaceIntegrity.turnJoins += integrity.turnJoins;
-        roadSurfaceIntegrity.surfaceTriangles += integrity.surfaceTriangles;
-        roadSurfaceIntegrity.foldedTriangles += integrity.foldedTriangles;
-        roadSurfaceIntegrity.degenerateTriangles += integrity.degenerateTriangles;
-      } else {
-        const ribbonEdges = buildFeatureRibbonEdges(renderRoad, pts, hw, roadTerrainSampler, {
-          surfaceBias
-        });
-        leftEdge.push(...ribbonEdges.leftEdge);
-        rightEdge.push(...ribbonEdges.rightEdge);
-        appendUpwardRibbonGeometry(leftEdge, rightEdge, verts, indices);
-      }
+      const ribbonEdges = buildFeatureRibbonEdges(renderRoad, pts, hw, roadTerrainSampler, {surfaceBias});
+      leftEdge.push(...ribbonEdges.leftEdge);
+      rightEdge.push(...ribbonEdges.rightEdge);
+      appendUpwardRibbonGeometry(leftEdge, rightEdge, verts, indices);
       recordAtGradeRoadTerrainConformance(
         roadTerrainAudit,
         renderRoad,
@@ -613,32 +595,47 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   });
   await yieldToMainThread();
 
-  let compactJunctionCount = 0;
-  measure('buildJunctionCaps', () => {
-    for (const intersection of intersections) {
-      const capVerts = [];
-      const capIndices = [];
-      if (appendCompactIntersectionCap(
-        intersection,
-        capVerts,
-        capIndices,
-        cachedTerrainHeight
-      )) {
-        const radius = computeIntersectionCapRadius(intersection);
-        const minimumHalfWidth = Math.min(...intersection.roads.map((branch) =>
-          Math.max(0.6, Number(branch?.width || intersection.maxWidth || 8) * 0.5)
-        ));
-        if (radius + 1e-7 < minimumHalfWidth) {
-          roadSurfaceIntegrity.junctionCoverageGaps += 1;
+  if(!isCurrent())return;
+  await measureAsync('buildCarriagewayRegions',async()=>{
+    const partition=await createPavementTerrainPartitionCooperatively(appCtx.terrainGroup?.children || [],{includeFarTerrain:true,current:isCurrent,yieldWork:yieldToMainThread});
+    try {
+      trace('indexCarriageways:start',{roads:atGradeRoads.length});
+      const tiles=prepareCarriagewayTiles(atGradeRoads.map(entry=>entry.road));
+      trace('indexCarriageways:end',{tiles:tiles.length});
+      let sliceStartedAt=now();
+      for(const [tileIndex,tile] of tiles.entries()) {
+        if(!isCurrent())return;
+        if(tileIndex%128===0)trace('meshCarriageway:progress',{completed:tileIndex,total:tiles.length,key:tile.key});
+        const mesh=meshCarriagewayTile(tile,(x,z)=>cachedTerrainHeight(x,z)+ROAD_SURFACE_BIAS,partition);
+        if(mesh.indices.length) {
+          appendRoadMainGeometry(mesh.positions,mesh.indices,'at_grade');
+          roadSurfaceIntegrity.carriagewayRegions++;
+          roadSurfaceIntegrity.surfaceTriangles+=mesh.indices.length/3;
         }
-        appendRoadMainGeometry(capVerts, capIndices, 'at_grade');
-        compactJunctionCount += 1;
+        if(now()-sliceStartedAt>=24) {await yieldToMainThread();sliceStartedAt=now();}
       }
-    }
+    } finally {partition.dispose();}
     flushRoadMainBatch();
+  });
+  if(!isCurrent())return;
+  await measureAsync('projectGroundRoadMarkings',async()=>{
+    const support=createRoadContactIndex(roadMainBatches.map(batch=>({geometry:{attributes:{position:{array:batch.verts}},getIndex:()=>({array:batch.indices})},userData:{surfaceRanges:batch.ranges}})));
+    try {
+      let sliceStartedAt=now();
+      for(const {road,points,widths} of atGradeRoads) {
+        if(!isCurrent())return;
+        if(shouldRenderRoadCenterMarkings(road)) {
+          const groundSupport={sampleAt:(x,z)=>support.sampleAt(x,z,NaN,'at_grade'),projectTriangle:(points,lift)=>support.projectTriangle(points,lift,'at_grade')};
+          appendRoadCenterMarkings(road,points,roadMarkBatchVerts,roadMarkBatchIdx,widths,groundSupport.sampleAt,groundSupport);
+        }
+        if(now()-sliceStartedAt>=24) {await yieldToMainThread();sliceStartedAt=now();}
+      }
+    } finally {support.dispose();}
   });
 
   if (!isCurrent()) return;
+  const publishedVertexCount=roadMainBatches.reduce((sum,batch)=>sum+batch.verts.length/3,0)+roadSkirtBatchVerts.length/3+roadMarkBatchVerts.length/3;
+  const publishedTriangleCount=roadMainBatches.reduce((sum,batch)=>sum+batch.indices.length/3,0)+roadSkirtBatchIdx.length/3+roadMarkBatchIdx.length/3;
   const stagedRoadGroup = new THREE.Group();
   const stagedRoadMeshes = [];
   let stagedRoadContact;
@@ -681,8 +678,16 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       userData: { isRoadBatch: true, isRoadMarking: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
     });
   });
-  stagedRoadContact = createRoadContactIndex(stagedRoadMeshes);
+  // BufferGeometry owns independent typed arrays now. Release construction
+  // arrays before building contacts, when both old and new worlds coexist.
+  for(const batch of roadMainBatches){batch.verts.length=0;batch.indices.length=0;}
+  roadMainBatches.length=0;
+  roadSkirtBatchVerts.length=roadSkirtBatchIdx.length=0;
+  roadMarkBatchVerts.length=roadMarkBatchIdx.length=0;
+  stagedRoadContact = await measureAsync('buildRoadContacts',()=>createRoadContactIndexCooperatively(stagedRoadMeshes,16,{current:isCurrent,yieldWork:yieldToMainThread}));
+  if(!isCurrent())throw new Error('Road publication superseded');
   } catch (error) {
+    stagedRoadContact?.dispose();
     for (const mesh of stagedRoadMeshes) mesh.geometry?.dispose();
     throw error;
   }
@@ -723,20 +728,14 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     transportGraphId: appCtx.transportNetworkModel?.id || null,
     roadCount: baseRoads.length,
     meshCount: appCtx.roadMeshes.length,
-    intersectionCount: compactJunctionCount,
+    intersectionCount: intersections.filter(i=>!i.hasGradeSeparatedRoad).length,
     topologyIntersectionCount: intersections.filter((intersection) =>
       !intersection?.hasGradeSeparatedRoad
     ).length,
     compiledSampleCount: baseRoads.reduce((total, road) =>
       total + Number(road?.transportSurfaceModel?.distances?.length || 0), 0),
-    vertices:
-      roadMainBatches.reduce((sum, batch) => sum + batch.verts.length / 3, 0) +
-      roadSkirtBatchVerts.length / 3 +
-      roadMarkBatchVerts.length / 3,
-    triangles:
-      roadMainBatches.reduce((sum, batch) => sum + batch.indices.length / 3, 0) +
-      roadSkirtBatchIdx.length / 3 +
-      roadMarkBatchIdx.length / 3,
+    vertices: publishedVertexCount,
+    triangles: publishedTriangleCount,
     roadSurfaceIntegrity: Object.freeze({ ...roadSurfaceIntegrity }),
     roadTerrainConformance,
     phaseDurationsMs: Object.freeze({

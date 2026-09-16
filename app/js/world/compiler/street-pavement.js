@@ -1,7 +1,12 @@
-import { frontageHit } from './street-frontage-geometry.js';
+import {frontageCornerRegions} from './street-frontage-corners.js';
+import {streetRoadSegments,unionCarriageway} from './street-carriageway.js';
+import {roadPlacementOffsetWorld} from '../road-units.js';
+import {createStreetCarriagewayBarriers,frontageBlocked} from './street-carriageway-barriers.js';
+import { createStreetFrontagePolicy, streetFootprint, streetScale, isGroundStreet, streetSideEdge, FRONTAGE_RULES } from './street-frontage-policy.js';
+import { frontageHit, splitFrontageIntervals } from './street-frontage-geometry.js';
 import { crossingStyle, crossingRamps, rampCurbScale } from './street-crossings.js';
 import { roadTurnFootprint } from '../../terrain/road-surface-geometry.js?v=2';
-import { streetPolygonKernel as clip } from './street-polygon-kernel.js';
+import { streetPolygonKernel as clip, createStreetPolygonKernel } from './street-polygon-kernel.js';
 import * as triangulator from '../../../../functions/vendor/earcut/index.js';
 import { resolveStreetSection } from './street-section.js';
 import { roadWidthAtSegment } from '../road-cross-section-profile.js?v=1';
@@ -9,14 +14,13 @@ const earcut = triangulator.default || globalThis.earcut;
 const snap = n => Math.round(n * 1000) / 1000;
 const polygon = points => { const ring = points.map(([x,z]) => [snap(x),snap(z)]); return [ring.concat([ring[0]])]; };
 const union = parts => parts.length ? clip.union(parts[0], ...parts.slice(1)) : [];
-const ringOf = item => item?.pts || item?.footprint || [];
+const ringOf = item => item?.surfaceFootprint || item?.pts || item?.footprint || [];
 const box = points => ({ minX: Math.min(...points.map(p => p.x)), maxX: Math.max(...points.map(p => p.x)), minZ: Math.min(...points.map(p => p.z)), maxZ: Math.max(...points.map(p => p.z)) });
 const intersects = (a, b, pad = 0) => a.minX <= b.maxX + pad && a.maxX >= b.minX - pad && a.minZ <= b.maxZ + pad && a.maxZ >= b.minZ - pad;
 const areaPolygon = item => [ringOf(item), ...(item.holeRings || item.holes || [])].map(r => {
   const points = r.map(p => [p.x, p.z]); return points.concat([points[0]]);
 });
-const groundFeature = f => !f.isStructureConnector && ['at_grade', undefined].includes(f.structureSemantics?.terrainMode) &&
-  !f.structureSemantics?.gradeSeparated && !f.structureSemantics?.rampCandidate;
+const groundFeature = isGroundStreet;
 const quad = (a, b, leftA, rightA, leftB = leftA, rightB = rightA) => {
   const length = Math.hypot(b.x - a.x, b.z - a.z);
   if (length < 1e-6) return null;
@@ -25,8 +29,66 @@ const quad = (a, b, leftA, rightA, leftB = leftA, rightB = rightA) => {
     [b.x - nx * rightB, b.z - nz * rightB], [b.x + nx * leftB, b.z + nz * leftB]]);
 };
 
+// Construction regions are fixed in world space. Output chunk size is a
+// packaging choice and must never alter facade selection or boolean order.
+export const STREET_DESIGN_REGION_SIZE = 64;
+// Cropping accepted sloping edges must not snap them onto the coarser design
+// grid again: that can fold a narrow boundary fragment back across itself.
+export const STREET_OUTPUT_CLIP_GRID_WORLD = 0.000001;
+const outputClip = createStreetPolygonKernel({grid:STREET_OUTPUT_CLIP_GRID_WORLD});
+const compiledRegions = new WeakMap();
+export function prepareStreetPavement(input = {}) {
+  const chunkSize = input.chunkSize ?? STREET_DESIGN_REGION_SIZE;
+  if (!Number.isFinite(chunkSize) || chunkSize <= 0) throw new RangeError('Street chunk size must be positive');
+  const requested = input.coverageBounds;
+  const coverageBounds = requested && {
+    minX: Math.floor(requested.minX / STREET_DESIGN_REGION_SIZE) * STREET_DESIGN_REGION_SIZE,
+    minZ: Math.floor(requested.minZ / STREET_DESIGN_REGION_SIZE) * STREET_DESIGN_REGION_SIZE,
+    maxX: Math.ceil(requested.maxX / STREET_DESIGN_REGION_SIZE) * STREET_DESIGN_REGION_SIZE,
+    maxZ: Math.ceil(requested.maxZ / STREET_DESIGN_REGION_SIZE) * STREET_DESIGN_REGION_SIZE
+  };
+  const plan = prepareStreetRegions({...input, chunkSize:STREET_DESIGN_REGION_SIZE, coverageBounds});
+  if (chunkSize === STREET_DESIGN_REGION_SIZE && (!requested || Object.keys(coverageBounds).every(k=>coverageBounds[k]===requested[k]))) return plan;
+  const outputs = new Map();
+  for (const region of plan.tiles) {
+    const b=region.bounds;
+    for(let ix=Math.floor(b.minX/chunkSize);ix<Math.ceil(b.maxX/chunkSize);ix++)
+      for(let iz=Math.floor(b.minZ/chunkSize);iz<Math.ceil(b.maxZ/chunkSize);iz++) {
+        const bounds={minX:ix*chunkSize,maxX:(ix+1)*chunkSize,minZ:iz*chunkSize,maxZ:(iz+1)*chunkSize};
+        if(requested && (bounds.maxX<=requested.minX || bounds.minX>=requested.maxX || bounds.maxZ<=requested.minZ || bounds.minZ>=requested.maxZ))continue;
+        if(requested){bounds.minX=Math.max(bounds.minX,requested.minX);bounds.maxX=Math.min(bounds.maxX,requested.maxX);bounds.minZ=Math.max(bounds.minZ,requested.minZ);bounds.maxZ=Math.min(bounds.maxZ,requested.maxZ);}
+        const key=`${ix}:${iz}`;
+        if(!outputs.has(key))outputs.set(key,{key,ix,iz,bounds,designRegions:[]});
+        outputs.get(key).designRegions.push(region);
+      }
+  }
+  for(const output of outputs.values())for(const kind of ['segments','joins','paths','crossings','obstacles','areas','edges','frontageBarriers'])
+    output[kind]=[...new Set(output.designRegions.flatMap(r=>r[kind]||[]))];
+  return {...plan,chunkSize,tiles:[...outputs.values()].sort((a,b)=>a.ix-b.ix||a.iz-b.iz)};
+}
+
+function compilePackagedRegions(tile, metersPerWorldUnit, options) {
+  const b=tile.bounds,boundary=polygon([[b.minX,b.minZ],[b.maxX,b.minZ],[b.maxX,b.maxZ],[b.minX,b.maxZ]]);
+  const result={polygons:[],markingPolygons:[],ramps:[],inferredFrontages:0};
+  for(const region of tile.designRegions){
+    const key=`${metersPerWorldUnit}:${options.includeMarkings!==false}`;
+    let cache=compiledRegions.get(region);if(!cache){cache=new Map();compiledRegions.set(region,cache);}
+    if(!cache.has(key))cache.set(key,compilePavementTile(region,metersPerWorldUnit,options));
+    const compiled=cache.get(key);
+    const contained=region.bounds.minX>=b.minX&&region.bounds.maxX<=b.maxX&&region.bounds.minZ>=b.minZ&&region.bounds.maxZ<=b.maxZ;
+    for(const kind of ['polygons','markingPolygons'])result[kind].push(...(contained?compiled[kind]:compiled[kind].flatMap(p=>outputClip.intersection(p,boundary))));
+    result.ramps.push(...compiled.ramps);result.inferredFrontages+=compiled.inferredFrontages;
+  }
+  // Adjacent accepted regions share only their boundary. Preserve the pieces:
+  // another union here would redesign rounded shared edges during packaging.
+  return result;
+}
+
 // All spatial indexing uses world coordinates; dimensions supplied in metres are converted once.
-export function prepareStreetPavement({ roads = [], buildings = [], landuses = [], linearFeatures = [], metersPerWorldUnit = 1.11, chunkSize = 64, coverageBounds = null }) {
+function prepareStreetRegions({ roads = [], buildings = [], landuses = [], linearFeatures = [], metersPerWorldUnit = 1.11, chunkSize = 64, coverageBounds = null }) {
+  streetScale(metersPerWorldUnit);
+  const frontageBarriers=createStreetCarriagewayBarriers(roads);
+  const frontagePolicy = createStreetFrontagePolicy(buildings, metersPerWorldUnit);
   const segments = [], paths = [], obstacles = [], mappedAreas = [], buildingEdges = [];
   const tiles = new Map();
   const insert = (kind, value, bounds, pad = 0) => {
@@ -42,20 +104,10 @@ export function prepareStreetPavement({ roads = [], buildings = [], landuses = [
         tiles.get(key)[kind].push(value);
       }
   };
-  // Attached buildings provide stronger urban frontage evidence than an
-  // isolated house. Compute this once from shared footprint vertices, not from
-  // tile-dependent density, so neighboring cells make the same decision.
-  const cornerKey=p=>`${Math.round(p.x*10)}:${Math.round(p.z*10)}`;
-  const cornerOwners=new Map();
-  for(const building of buildings)for(const key of new Set(ringOf(building).map(cornerKey)))cornerOwners.set(key,(cornerOwners.get(key)||0)+1);
+  for (const edge of frontagePolicy.edges) buildingEdges.push(edge);
   for (const building of buildings) {
-    const pts = ringOf(building); if (pts.length < 3) continue;
-    const attached=pts.some(p=>(cornerOwners.get(cornerKey(p))||0)>1);
-    const item = { polygon: areaPolygon(building), bounds: box(pts), building: true }; obstacles.push(item);
-    for (let i = 0; i < pts.length; i++) {
-      const a = pts[i], b = pts[(i + 1) % pts.length];
-      if (Math.hypot(a.x - b.x, a.z - b.z) >= 3) buildingEdges.push({ a, b, extendedFrontage:attached ? 24/metersPerWorldUnit : 0, bounds: box([a, b]) });
-    }
+    const pts = streetFootprint(building); if (!pts.length) continue;
+    obstacles.push({ polygon: areaPolygon(building), bounds: box(pts), building: true });
   }
   for (const land of landuses) {
     if (ringOf(land).length < 3) continue;
@@ -66,32 +118,18 @@ export function prepareStreetPavement({ roads = [], buildings = [], landuses = [
   }
   for (const road of roads) {
     if (!groundFeature(road) || !Array.isArray(road.pts)) continue;
-    const offset = Number(road.transportRecord?.crossSection?.placement?.centerlineOffsetMeters) || 0;
+    const offset = roadPlacementOffsetWorld(road);
     for (let i=1;i<road.pts.length-1;i++) {
       const point=road.pts[i];
       if (coverageBounds && !intersects(box([point]),coverageBounds,20)) continue;
       const halfWidth=roadWidthAtSegment(road,i,0)/2;
-      insert('joins',{road,previous:road.pts[i-1],point,next:road.pts[i+1],halfWidth,offset},box([point]),halfWidth+Math.abs(offset)+32/metersPerWorldUnit);
+      insert('joins',{road,section:frontagePolicy.section(road,i),previous:road.pts[i-1],point,next:road.pts[i+1],halfWidth,offset},box([point]),halfWidth+Math.abs(offset)+32/metersPerWorldUnit);
     }
-    for (let index = 0; index < road.pts.length - 1; index++) {
-      const a = road.pts[index], b = road.pts[index + 1], length = Math.hypot(b.x - a.x, b.z - a.z);
-      if (length < 0.01 || (coverageBounds && !intersects(box([a,b]), coverageBounds, Math.max(road.width || 8, 20)))) continue;
-      // Preserve interior width constraints instead of replacing them with an endpoint-only width.
-      const breaks = new Set([0, 1]);
-      const constrained = Number(road.resolvedCrossSection?.constrainedSegmentCount) > 0;
-      const count = Math.ceil(length / (constrained ? 6 : chunkSize / 2));
-      for (let j = 1; j < count; j++) breaks.add(j / count);
-      for (const profile of road.resolvedCrossSection?.segmentProfiles?.[index] || []) {
-        breaks.add(Math.max(0, Math.min(1, profile.startT))); breaks.add(Math.max(0, Math.min(1, profile.endT)));
-      }
-      const ts = [...breaks].filter(Number.isFinite).sort((x, y) => x - y);
-      for (let j = 1; j < ts.length; j++) {
-        const t0 = ts[j - 1], t1 = ts[j];
-        const at = t => ({ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t });
-        const segment = { road, offset, index, t0, t1, a: at(t0), b: at(t1), wa: roadWidthAtSegment(road, index, t0), wb: roadWidthAtSegment(road, index, t1) };
-        segment.bounds = box([segment.a, segment.b]); segments.push(segment);
-        insert('segments', segment, segment.bounds, Math.max(segment.wa, segment.wb) / 2 + Math.abs(offset) + 32 / metersPerWorldUnit);
-      }
+    for (const segment of streetRoadSegments(road)) {
+      if(coverageBounds && !intersects(segment.bounds,coverageBounds,Math.max(segment.wa,segment.wb,20)))continue;
+      segment.section=frontagePolicy.section(road,segment.index);
+      segments.push(segment);
+      insert('segments',segment,segment.bounds,Math.max(segment.wa,segment.wb)/2+Math.abs(offset)+32/metersPerWorldUnit);
     }
   }
   for (const feature of linearFeatures) {
@@ -126,7 +164,12 @@ export function prepareStreetPavement({ roads = [], buildings = [], landuses = [
     }
   };
   for (const tile of tiles.values()) tile.bounds = { minX: tile.ix*chunkSize, maxX:(tile.ix+1)*chunkSize, minZ:tile.iz*chunkSize, maxZ:(tile.iz+1)*chunkSize };
-  assign('obstacles', obstacles, 16); assign('edges', buildingEdges, 40);
+  assign('obstacles', obstacles, 16); assign('edges', buildingEdges, 44/metersPerWorldUnit);
+  for(const tile of tiles.values()) {
+    const point={x:(tile.bounds.minX+tile.bounds.maxX)/2,z:(tile.bounds.minZ+tile.bounds.maxZ)/2};
+    tile.frontageBarriers=frontageBarriers.query(point,chunkSize+44/metersPerWorldUnit);
+  }
+  frontagePolicy.dispose();frontageBarriers.dispose();
   return { tiles: [...tiles.values()].sort((a, b) => a.ix - b.ix || a.iz - b.iz), metersPerWorldUnit, chunkSize,
     managedPaths: linearFeatures.filter(f => groundFeature(f) && f.kind === 'footway' && f.subtype === 'sidewalk') };
 }
@@ -134,63 +177,35 @@ export function prepareStreetPavement({ roads = [], buildings = [], landuses = [
 function frontageDistance(point, nx, nz, edges, minimum, maximum) {
   return frontageHit(point,nx,nz,edges,minimum,maximum)?.distance ?? null;
 }
-function frontageProfile(a, b, nx, nz, edges, minimum, maximum) {
+function frontageProfile(a, b, nx, nz, edges, minimum, maximum, barriers=[], excludeRoad) {
   const midpoint={x:(a.x+b.x)/2,z:(a.z+b.z)/2};
   const hit=frontageHit(midpoint,nx,nz,edges,minimum,maximum);
-  if(!hit)return null;
+  if(!hit || frontageBlocked(midpoint,nx,nz,hit.distance,barriers,excludeRoad))return null;
   // Each split interval belongs to its interior facade. At a shared endpoint,
   // an adjacent building with a different setback must not truncate this one.
-  const distances=[a,midpoint,b].map(p=>frontageDistance(p,nx,nz,[hit.edge],minimum,maximum));
+  const distances=[a,midpoint,b].map(p=>frontageDistance(p,nx,nz,[hit.edge],0,Infinity));
   return distances.every(Number.isFinite) ? distances : null;
-}
-
-// Split at frontage endpoints so a short façade can meet the sidewalk even when
-// its source road is a long generalized segment. Cuts use source coordinates,
-// independently of tile boundaries, keeping adjoining cells consistent.
-function splitAtFrontages(segment, edges) {
-  const dx = segment.b.x-segment.a.x, dz = segment.b.z-segment.a.z;
-  const lengthSq = dx*dx+dz*dz, cuts = new Set([0,1]);
-  for (const edge of edges) {
-    if (!intersects(edge.bounds,segment.bounds,Math.max(12,(edge.extendedFrontage || 0)+Math.max(segment.wa || 0,segment.wb || 0)/2))) continue;
-    const ex=edge.b.x-edge.a.x, ez=edge.b.z-edge.a.z;
-    if (Math.abs(ex*dz-ez*dx)/Math.sqrt((ex*ex+ez*ez)*lengthSq)>.25) continue;
-    for (const p of [edge.a,edge.b]) {
-    const t = ((p.x-segment.a.x)*dx+(p.z-segment.a.z)*dz)/lengthSq;
-    if (t>0.00001 && t<0.99999) cuts.add(t);
-    }
-  }
-  const ts = [...cuts].sort((a,b)=>a-b);
-  const at = t => ({x:segment.a.x+dx*t,z:segment.a.z+dz*t});
-  return ts.slice(1).map((end,i)=>({...segment,a:at(ts[i]),b:at(end),
-    wa:segment.wa+(segment.wb-segment.wa)*ts[i],wb:segment.wa+(segment.wb-segment.wa)*end}));
 }
 
 export function pavementTileHasWork(tile,includeMarkings=true){
   if(!tile.paths.length&&!tile.areas.length&&(!includeMarkings||!tile.crossings?.length)){
-    const hasSide=(road,bounds)=>{
+    const hasSide=(road,bounds,resolved)=>{
       const tags=road.transportRecord?.sourceTags||road.tags||{},urban=tile.edges.some(edge=>intersects(edge.bounds,bounds,20));
-      const section=resolveStreetSection({...tags,highway:tags.highway||road.type},{urban});
+      const section=resolved || resolveStreetSection({...tags,highway:tags.highway||road.type},{urban});
       return section.left.presence==='present'||section.right.presence==='present';
     };
-    return tile.segments.some(s=>hasSide(s.road,s.bounds||box([s.a,s.b])))||(tile.joins||[]).some(j=>hasSide(j.road,box([j.point])));
+    return tile.segments.some(s=>hasSide(s.road,s.bounds||box([s.a,s.b]),s.section))||(tile.joins||[]).some(j=>hasSide(j.road,box([j.point]),j.section));
   }
   return true;
 }
 export function compilePavementTile(tile, metersPerWorldUnit = 1.11, {includeMarkings=true} = {}) {
+  if(tile.designRegions)return compilePackagedRegions(tile,metersPerWorldUnit,{includeMarkings});
   if(!pavementTileHasWork(tile,includeMarkings))return {polygons:[],inferredFrontages:0,ramps:[],markingPolygons:[]};
-  const roadParts = [], pavementParts = tile.paths.map(p => p.polygon).concat(tile.areas.map(p => p.polygon));
+  const pavementParts = tile.paths.map(p => p.polygon).concat(tile.areas.map(p => p.polygon));
   let inferredFrontages = 0;
-  for(const s of tile.segments) {
-    const offset=s.offset || 0;
-    const shape=quad(s.a,s.b,Math.max(.3,s.wa/2-offset),Math.max(.3,s.wa/2+offset),Math.max(.3,s.wb/2-offset),Math.max(.3,s.wb/2+offset));
-    if(shape)roadParts.push(shape);
-  }
-  for(const join of tile.joins || []) {
-    roadParts.push(...roadTurnFootprint({...join,leftDistance:Math.max(.3,join.halfWidth+join.offset),rightDistance:Math.max(.3,join.halfWidth-join.offset)}));
-  }
-  // Frontage rays must meet the exterior of the complete carriageway, not
-  // internal rectangle caps where two source road segments meet.
-  const carriageway=union(roadParts),roadEdges=[];
+  // Share the actual road footprint with rendering. Internal rectangle caps
+  // and overlapping source ways are not frontage boundaries.
+  const carriageway=unionCarriageway(tile,{clipToBounds:false}),roadEdges=[];
   for(const poly of carriageway)for(const ring of poly)for(let i=1;i<ring.length;i++) {
     const a={x:ring[i-1][0],z:ring[i-1][1]},b={x:ring[i][0],z:ring[i][1]};
     if(Math.hypot(b.x-a.x,b.z-a.z)>1e-6)roadEdges.push({a,b,bounds:box([a,b])});
@@ -201,8 +216,8 @@ export function compilePavementTile(tile, metersPerWorldUnit = 1.11, {includeMar
     if (!path.a || !path.b) continue;
     const length=Math.hypot(path.b.x-path.a.x,path.b.z-path.a.z);
     const nx=(path.b.z-path.a.z)/length,nz=-(path.b.x-path.a.x)/length;
-    const pieces=splitAtFrontages({...path,wa:path.width,wb:path.width},tile.edges.concat(roadEdges));
     for (const sign of [-1,1]) {
+      const pieces=splitFrontageIntervals({...path,wa:path.width,wb:path.width},tile.edges.concat(roadEdges),{nx:nx*sign,nz:nz*sign,minimumA:path.width/2,maximumA:7/metersPerWorldUnit});
       const outer=[];
       for (const s of pieces) {
         const midpoint={x:(s.a.x+s.b.x)/2,z:(s.a.z+s.b.z)/2};
@@ -231,18 +246,19 @@ export function compilePavementTile(tile, metersPerWorldUnit = 1.11, {includeMar
     const nx=(original.b.z-original.a.z)/length,nz=-(original.b.x-original.a.x)/length;
     const urban=tile.edges.some(e=>intersects(e.bounds,original.bounds,20));
     const tags=original.road.transportRecord?.sourceTags || original.road.tags || {};
-    const section=resolveStreetSection({...tags,highway:tags.highway || original.road.type},{urban});
-    const pieces=splitAtFrontages(original,tile.edges);
+    const section=original.section || resolveStreetSection({...tags,highway:tags.highway || original.road.type},{urban});
     for(const [side,sign] of [['left',1],['right',-1]]) {
       if(section[side].presence!=='present') continue;
       const width=section[side].widthMeters/metersPerWorldUnit;
+      const edgeStart=streetSideEdge(original.road,original.wa/2,sign),edgeEnd=streetSideEdge(original.road,original.wb/2,sign);
+      const pieces=splitFrontageIntervals(original,tile.edges,{nx:nx*sign,nz:nz*sign,minimumA:edgeStart+width,minimumB:edgeEnd+width,maximumA:edgeStart+FRONTAGE_RULES.ordinaryReach/metersPerWorldUnit,maximumB:edgeEnd+FRONTAGE_RULES.ordinaryReach/metersPerWorldUnit});
       const outerPoints=[];
       for(const s of pieces) {
-        const edgeA=Math.max(.3,s.wa/2-sign*offset),edgeB=Math.max(.3,s.wb/2-sign*offset);
+        const edgeA=streetSideEdge(s.road,s.wa/2,sign),edgeB=streetSideEdge(s.road,s.wb/2,sign);
         let outerA=edgeA+width,outerB=edgeB+width;
         const midpoint={x:(s.a.x+s.b.x)/2,z:(s.a.z+s.b.z)/2};
-        const max=Math.min(edgeA,edgeB)+7/metersPerWorldUnit;
-        const distances=frontageProfile(s.a,s.b,nx*sign,nz*sign,tile.edges,Math.max(edgeA,edgeB)+width,max);
+        const max=(s.frontageMaximumA+s.frontageMaximumB)/2;
+        const distances=frontageProfile(s.a,s.b,nx*sign,nz*sign,tile.edges,(s.frontageMinimumA+s.frontageMinimumB)/2,max,tile.frontageBarriers,original.road);
         if(distances) {
           outerA=distances[0];outerB=distances[2];inferredFrontages++;
         }
@@ -257,7 +273,7 @@ export function compilePavementTile(tile, metersPerWorldUnit = 1.11, {includeMar
     const leftDistance=Math.max(.3,join.halfWidth+join.offset), rightDistance=Math.max(.3,join.halfWidth-join.offset);
     const tags=join.road.transportRecord?.sourceTags || join.road.tags || {};
     const urban=tile.edges.some(e=>intersects(e.bounds,box([join.point]),20));
-    const section=resolveStreetSection({...tags,highway:tags.highway || join.road.type},{urban});
+    const section=join.section || resolveStreetSection({...tags,highway:tags.highway || join.road.type},{urban});
     // Renderer normals are opposite source-way sidewalk left/right normals.
     const leftExtra=section.right.presence==='present' ? section.right.widthMeters/metersPerWorldUnit : 0;
     const rightExtra=section.left.presence==='present' ? section.left.widthMeters/metersPerWorldUnit : 0;
@@ -268,25 +284,11 @@ export function compilePavementTile(tile, metersPerWorldUnit = 1.11, {includeMar
   // Crop each source first: a regional polygon must not make a local union
   // operate on its entire remote boundary.
   const localParts = parts => parts.flatMap(part=>clip.intersection(part,boundary));
-  // Resolve small recesses between adjacent frontage runs as one paved area,
-  // before subtraction and height sampling. A centreline bend alone leaves a
-  // lower terrain square at the corner even when both street sides reach walls.
-  // Use a halo so this operation cannot create an artificial curb at a tile seam.
-  const closureRadius=3.5/metersPerWorldUnit;
-  const halo=closureRadius*2+.002;
-  const workingBoundary=polygon([[b.minX-halo,b.minZ-halo],[b.maxX+halo,b.minZ-halo],[b.maxX+halo,b.maxZ+halo],[b.minX-halo,b.maxZ+halo]]);
-  let polygons = union(pavementParts.flatMap(part=>clip.intersection(part,workingBoundary)));
-  if(tile.edges.length && polygons.length) {
-    const closed=clip.offset(clip.offset(polygons,closureRadius),-closureRadius);
-    const additions=clip.difference(closed,polygons);
-    if(additions.length) {
-      const buildingAreas=tile.obstacles.filter(o=>o.building).map(o=>o.polygon);
-      const frontageMask=buildingAreas.length ? clip.offset(union(buildingAreas),7/metersPerWorldUnit) : [];
-      const admitted=frontageMask.length ? clip.intersection(additions,frontageMask) : [];
-      if(admitted.length)polygons=clip.union(polygons,admitted);
-    }
-  }
-  polygons=polygons.length ? clip.intersection(polygons,boundary) : [];
+  // Corner ownership comes from adjoining paved facades and actual curbs.
+  // Cropping cannot change that construction: no tile-local closing filter.
+  const corners=frontageCornerRegions(tile.obstacles.filter(o=>o.building).map(o=>o.polygon),pavementParts,roadEdges,metersPerWorldUnit);
+  const polygonsToUnion=pavementParts.concat(corners);
+  let polygons=union(localParts(polygonsToUnion));
   const blockers = carriageway.concat(tile.obstacles.map(o => o.polygon));
   if (polygons.length && blockers.length) polygons = clip.difference(polygons, union(localParts(blockers)));
   const ramps=includeMarkings?crossingRamps(tile.crossings || [],roadEdges,metersPerWorldUnit):[];
@@ -351,7 +353,8 @@ export function meshPavementTile(tile, polygons, sampleHeight, { cellSize = 4, c
       }
     }
   }
-  if(includeCurbs) for (const poly of polygons) for (const ring of poly) for (let i = 1; i < ring.length; i++) {
+  const curbPolygons=includeCurbs && tile.designRegions?.length>1 && polygons.length ? outputClip.union(polygons) : polygons;
+  if(includeCurbs) for (const poly of curbPolygons) for (const ring of poly) for (let i = 1; i < ring.length; i++) {
     const a = ring[i - 1], d = ring[i];
     // A chunk boundary is not a curb. Neighbors own the continuation.
     if ([b.minX, b.maxX].some(x => Math.abs(a[0] - x) < 1e-7 && Math.abs(d[0] - x) < 1e-7) ||

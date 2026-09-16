@@ -154,3 +154,33 @@ test('markings split at road folds and never bridge an unsupported gap',async()=
  assert.equal(index.projectTriangle([{x:0,z:0},{x:1,z:0},{x:0,z:1}],.012,'elevated').length,0);
  index.dispose();
 });
+
+test('independent profile audit rejects a distorted road even when terrain clearance is exact', () => {
+ const audit=createRoadTerrainConformanceAudit(),feature=atGradeFeature();
+ feature.surfaceBias=.18;
+ recordAtGradeRoadTerrainConformance(audit,feature,[5,4,0],()=>3.82);
+ const result=finalizeRoadTerrainConformanceAudit(audit);
+ assert.equal(result.issuesFound,0);
+ assert.equal(result.profileDepartures,1);
+ assert.equal(result.maximumProfileDeparture,2);
+ assert.equal(result.worstProfileDepartures[0].expectedY,2);
+});
+
+test('frontage influence pruning preserves the full height field including attached rows and wide mapped sidewalks',async()=>{
+ const {createStreetFrontageGrading}=await import('../app/js/terrain/street-frontage-grading.js');
+ const {createTerrainHeightSamplingApi}=await import('../app/js/terrain/height-sampling.js');
+ for(const tags of [{sidewalk:'both'},{sidewalk:'no'},{sidewalk:'both','sidewalk:width':'60'}]){
+  const road=atGradeFeature();road.width=4;road.type='residential';road.tags=tags;
+  const buildings=[{pts:[{x:0,z:20},{x:10,z:20},{x:10,z:30},{x:0,z:30}]},{pts:[{x:10,z:20},{x:20,z:20},{x:20,z:30},{x:10,z:30}]}];
+  const full=createStreetFrontageGrading(buildings,1),pruned=createStreetFrontageGrading(buildings,1);
+  const make=frontage=>createTerrainHeightSamplingApi({appCtx:{structureTerrainCuts:[road],streetFrontageGrading:frontage},elevationWorldYAtWorldXZ:()=>10});
+  const a=make({outerDistance:full.outerDistance}),b=make(pruned);
+  for(let x=.25;x<10;x+=.5)for(let z=-110;z<=110;z+=1.25){
+   const input=10+x*.5-z*.2;
+   assert.equal(b.applyStructureTerrainCuts(x,z,input),a.applyStructureTerrainCuts(x,z,input));
+  }
+  assert.ok(pruned.stats().outsideInfluence>0);
+  assert.ok(pruned.stats().queries<=full.stats().queries);
+  full.dispose();pruned.dispose();
+ }
+});

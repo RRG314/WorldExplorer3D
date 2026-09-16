@@ -5,6 +5,7 @@ export function assessStreetQuality(snapshot){
  const failures=[],pending=[];const s=snapshot.street||{},b=STREET_QUALITY_BUDGETS;
  const overview=snapshot.streetOverview;
  const overviewComplete=overview?.status==='complete'&&Number.isInteger(overview.totalCells)&&overview.completedCells===overview.totalCells&&overview.workerActive===false&&!overview.error;
+ if(snapshot.roadTerrainConformance?.profileDepartures>0)failures.push('rendered roads depart from engineered profiles; terrain agreement does not establish a valid grade');
  if(snapshot.roadTerrainConformance?.issuesFound>0)failures.push('at-grade road surfaces separate from rendered terrain; inspect floating/buried samples');
  if(snapshot.worldLoading||snapshot.pavementBuildActive)pending.push('world or pavement publication still running');
  if(!Number.isFinite(snapshot.javascriptHeapBytes))pending.push('JavaScript heap unavailable');

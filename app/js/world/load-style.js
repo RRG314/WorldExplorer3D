@@ -270,60 +270,7 @@ export function pickRoofColor(bSeed) {
 }
 
 export function getPerfModeValue() {
-  const mode = typeof appCtx.getPerfMode === 'function' ? appCtx.getPerfMode() : appCtx.perfMode;
-  return mode === 'baseline' ? 'baseline' : 'rdt';
-}
-
-export function decimateRoadCenterlineByDepth(pts, roadType, tileDepth, mode = getPerfModeValue()) {
-  if (!Array.isArray(pts) || pts.length < 3) return pts;
-  if (mode === 'baseline') return pts;
-
-  const depth = Math.max(0, tileDepth | 0);
-  if (depth < 4) return pts;
-
-  let minSpacing =
-    depth >= 6 ? 16 :
-    depth === 5 ? 12 :
-    8;
-  if (roadType?.includes('motorway') || roadType?.includes('trunk')) {
-    minSpacing *= 0.75;
-  } else if (roadType?.includes('service') || roadType?.includes('residential')) {
-    minSpacing *= 1.15;
-  }
-
-  const maxStraightTurn =
-    depth >= 6 ? 0.20 :
-    depth === 5 ? 0.24 :
-    0.28;
-
-  const out = [pts[0]];
-  let lastKept = pts[0];
-
-  for (let i = 1; i < pts.length - 1; i++) {
-    const prev = pts[i - 1];
-    const curr = pts[i];
-    const next = pts[i + 1];
-    const dLast = Math.hypot(curr.x - lastKept.x, curr.z - lastKept.z);
-    const ax = curr.x - prev.x;
-    const az = curr.z - prev.z;
-    const bx = next.x - curr.x;
-    const bz = next.z - curr.z;
-    const al = Math.hypot(ax, az);
-    const bl = Math.hypot(bx, bz);
-    let turn = 0;
-
-    if (al > 1e-6 && bl > 1e-6) {
-      const dot = (ax * bx + az * bz) / (al * bl);
-      turn = Math.acos(Math.max(-1, Math.min(1, dot)));
-    }
-    if (!(turn > maxStraightTurn) && dLast < minSpacing) continue;
-    out.push(curr);
-    lastKept = curr;
-  }
-
-  const last = pts[pts.length - 1];
-  if (out[out.length - 1] !== last) out.push(last);
-  return out;
+  return 'baseline';
 }
 
 export function poiKeyFromTags(tags = {}) {

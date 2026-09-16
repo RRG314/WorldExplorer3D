@@ -1,0 +1,7 @@
+{
+  "engineRevision": "128",
+  "scope": "Same reprojected mesh vertices and camera; compare retained old bounds with recomputed bounds",
+  "staleBoundsVisible": false,
+  "repairedBoundsVisible": true,
+  "newBoundingCenterY": 100.05000305175781
+}

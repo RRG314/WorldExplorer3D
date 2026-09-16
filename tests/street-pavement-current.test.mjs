@@ -185,7 +185,7 @@ test('separately mapped sidewalks join bends and fill a close frontage without p
   const area=result=>result.reduce((s,r)=>s+regionArea(r.polygons),0);
   assert.ok(area(near)>area(plain)+40);
   assert.ok(near.some(r=>r.inferredFrontages>0));
-  assert.equal(area(far),area(plain));
+  assert.ok(Math.abs(area(far)-area(plain))<1e-8);
   const triangles=near.flatMap(r=>meshPavementTile(r.tile,r.polygons,()=>0).triangles);
   for(const tri of triangles){const x=tri.reduce((s,p)=>s+p.x,0)/3,z=tri.reduce((s,p)=>s+p.z,0)/3;assert.ok(!(x>10&&x<30&&z>3&&z<6));}
 });

@@ -265,14 +265,18 @@ function surfaceTextureRepeat(textureId, facadeStyle, lodTier) {
   return facadeTextureRepeat(facadeStyle);
 }
 
-function facadeTexture(appCtx, textureId, facadeStyle, variant = 0, lodTier = 'near') {
-  const variantIndex = Math.max(0, Math.min(3, Number(variant) | 0));
-  const projectionKey = lodTier === 'mid' ? facadeStyle : 'surface';
-  const poolKey = `${lodTier}:${textureId}:${projectionKey}:v${variantIndex}`;
+export function facadeTextureProjection(textureId, facadeStyle, variant = 0, lodTier = 'near') {
+  const index=Math.max(0,Math.min(3,Number(variant)|0));
+  const repeat=surfaceTextureRepeat(textureId,facadeStyle,lodTier);
+  return [repeat.x*[0.94,1,1.08,0.98][index],repeat.y*[1,0.98,1.04,0.96][index],
+    [0.04,0.223,0.447,0.691][index],lodTier==='mid'?0:[0.03,0.29,0.57,0.81][index]];
+}
+
+function facadeTexture(appCtx, textureId) {
+  const url = FACADE_TEXTURES[textureId] || FACADE_TEXTURES.neutral;
+  const poolKey = url;
   const cached = facadeTexturePool.get(poolKey);
   if (cached) return cached;
-  const url = FACADE_TEXTURES[textureId] || FACADE_TEXTURES.neutral;
-  const repeat = surfaceTextureRepeat(textureId, facadeStyle, lodTier);
   const texture = new THREE.TextureLoader().load(
     url,
     () => {
@@ -286,18 +290,11 @@ function facadeTexture(appCtx, textureId, facadeStyle, variant = 0, lodTier = 'n
       texture.userData.loadStatus = 'failed';
     }
   );
-  texture.name = `building-facade-surface:${textureId}:${facadeStyle}:v${variantIndex}`;
+  texture.name = `building-facade-image:${url}`;
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
-  const repeatScaleX = [0.94, 1, 1.08, 0.98][variantIndex];
-  const repeatScaleY = [1, 0.98, 1.04, 0.96][variantIndex];
-  texture.repeat.set(repeat.x * repeatScaleX, repeat.y * repeatScaleY);
-  // Preserve the proven deterministic facade phasing from the Phase 4
-  // renderer without recreating a texture per building.
-  // V stays aligned across buildings so a wall begins with a complete
-  // storey instead of a random horizontal slice. U phasing is enough to
-  // prevent identical neighboring window columns.
-  texture.offset.set([0.04, 0.223, 0.447, 0.691][variantIndex], lodTier === 'mid' ? 0 : [0.03, 0.29, 0.57, 0.81][variantIndex]);
+  // Projection belongs to the material/vertex attributes, not the shared
+  // image. One GPU image serves every deterministic facade variation.
   texture.minFilter = THREE.LinearMipmapLinearFilter;
   texture.magFilter = THREE.LinearFilter;
   texture.generateMipmaps = true;
@@ -307,9 +304,7 @@ function facadeTexture(appCtx, textureId, facadeStyle, variant = 0, lodTier = 'n
   texture.anisotropy = Math.max(1, Math.min(8, maximumAnisotropy));
   texture.userData = {
     owner: 'engine/building-facade-materials',
-    facadeStyle,
     facadeTextureId: textureId,
-    facadeVariant: variantIndex,
     source: url.includes('/polyhaven-') ? 'poly-haven-cc0-surface' : 'project-authored-static-atlas',
     assetUrl: url,
     loadStatus: 'loading',
@@ -353,12 +348,7 @@ function facadeEntranceAtlas(appCtx) {
 }
 
 function applyWallOnlyFacadeMap(material, roof, entranceAtlas, exteriorProfile) {
-  const facadeProjection = new THREE.Vector4(
-    Number(material.map?.repeat?.x || 0.08),
-    Number(material.map?.repeat?.y || (1 / 16)),
-    Number(material.map?.offset?.x || 0),
-    Number(material.map?.offset?.y || 0)
-  );
+  const facadeProjection = new THREE.Vector4(...material.userData.facadeProjection);
   const roofA = new THREE.Color(roof.colorA);
   const roofB = new THREE.Color(roof.colorB);
   const grainScale = Number(roof.grainScale || 0.6);
@@ -634,14 +624,16 @@ export function getBuildingMaterial(engineContext, buildingType, buildingSeed, b
       : { roughness: 0.9, metalness: 0 };
   const material = new THREE.MeshStandardMaterial({
     color: lodTier === 'mid' ? 0xffffff : tint,
-    map: facadeTexture(appCtx, lodTextureId, textureProjectionStyle, facadeVariant, lodTier),
+    map: facadeTexture(appCtx, lodTextureId),
     roughness: lodTier === 'mid' ? midSurface.roughness : profile.roughness,
     metalness: lodTier === 'mid' ? midSurface.metalness : Math.max(profile.metalness, roof.metalness * 0.08)
   });
-  material.userData = { facadeVariant };
+  const projection=facadeTextureProjection(lodTextureId,textureProjectionStyle,facadeVariant,lodTier);
+  material.userData = { facadeVariant,facadeProjection:projection };
   applyWallOnlyFacadeMap(material, roof, entranceAtlas, exteriorProfile);
   material.name = `building-exterior:${key}`;
   material.userData = {
+    facadeProjection: projection,
     buildingBatchKey: `building-exterior:${key}`,
     buildingExterior: true,
     facadeAtlas: true,

@@ -22,33 +22,67 @@ function createLocationTerrainApi(deps = {}) {
   let publicationGeneration = 0;
   const pendingTerrainMeshes = new Map();
   let terrainDrainScheduled = false;
+  let drainError=null;
+  const drainWaiters=new Set();
+  const excludedTerrainMeshes=new Map();
+  const settleDrain=(status,error=null)=>{
+    appCtx.locationTerrainPublication=Object.freeze({generation:publicationGeneration,status,
+      excludedTiles:Object.freeze([...excludedTerrainMeshes].map(([key,reason])=>Object.freeze({key,reason})))});
+    for(const waiter of drainWaiters)error ? waiter.reject(error) : waiter.resolve({generation:publicationGeneration,status});
+    drainWaiters.clear();
+  };
+  function waitForLocationTerrainPublication() {
+    if(drainError)return Promise.reject(drainError);
+    if(!pendingTerrainMeshes.size&&!terrainDrainScheduled)return Promise.resolve({generation:publicationGeneration,status:'settled'});
+    return new Promise((resolve,reject)=>drainWaiters.add({resolve,reject}));
+  }
+
 
   function scheduleTerrainMeshDrain() {
     if (terrainDrainScheduled || pendingTerrainMeshes.size === 0) return;
     terrainDrainScheduled = true;
-    const run = () => {
-      terrainDrainScheduled = false;
+    const run = async () => {
       const next = pendingTerrainMeshes.entries().next().value;
-      if (!next) return;
+      if (!next) {terrainDrainScheduled=false;settleDrain('settled');return;}
       const [key, request] = next;
       pendingTerrainMeshes.delete(key);
-      if (request.generation === publicationGeneration) {
+      try {
+        if (request.generation !== publicationGeneration) return;
         const alreadyPresent = appCtx.terrainGroup?.children?.some(
           (mesh) => getTerrainMeshKey(mesh) === key
         );
         if (!alreadyPresent) {
+          // A constructed but hidden fallback tile is not published terrain.
+          // Wait for its source before fixing the far mesh's ownership holes;
+          // otherwise a late image decode can introduce an overlapping tile.
+          if (request.requiresSourceTile) {
+            const tile=getOrLoadTerrainTile?.(request.z,request.tx,request.ty,terrainTileDeps);
+            if(!tile?.loaded)await tile?.ready;
+            if(request.generation!==publicationGeneration)return;
+            if(!tile?.loaded)throw new Error(`Terrain source ${key} did not become ready for publication`);
+          }
           const mesh = buildTerrainTileMesh(request.z, request.tx, request.ty, terrainTileDeps);
+          if(mesh.userData?.pendingTerrainTile || mesh.visible===false){
+            mesh.geometry?.dispose?.();
+            if(request.requiresSourceTile)throw new Error(`Terrain mesh ${key} has no publishable height surface`);
+            // The accepted artifact may cover only part of the detailed ring.
+            // Exclude unavailable tiles explicitly; far terrain owns these
+            // cells for this generation and no hidden near mesh can appear later.
+            excludedTerrainMeshes.set(key,mesh.userData?.groundUnavailableReason || 'accepted-ground-unavailable');
+            return;
+          }
           appCtx.terrainGroup.add(mesh);
           markGroundSurfaceChanged(appCtx);
-          // The bootstrap plane is only a loading placeholder. Accepted-ground
-          // tiles can be ready synchronously, so retire it as soon as the first
-          // authoritative tile is actually published instead of waiting for
-          // the unrelated world-detail finalizer.
           appCtx.retireGroundFallbackPlaceholder?.();
         }
+      } catch(error) {
+        if(request.generation===publicationGeneration){drainError=error;pendingTerrainMeshes.clear();settleDrain('failed',error);}
+      } finally {
+        terrainDrainScheduled=false;
+        appCtx.setPerfLiveStat?.('terrainMeshQueue', pendingTerrainMeshes.size);
+        if(pendingTerrainMeshes.size>0)scheduleTerrainMeshDrain();
+        else if(!drainError)settleDrain('settled');
       }
-      appCtx.setPerfLiveStat?.('terrainMeshQueue', pendingTerrainMeshes.size);
-      if (pendingTerrainMeshes.size > 0) scheduleTerrainMeshDrain();
     };
     if (typeof requestIdleCallback === 'function') requestIdleCallback(run, { timeout: 120 });
     else setTimeout(run, 0);
@@ -56,6 +90,9 @@ function createLocationTerrainApi(deps = {}) {
 
   function resetLocationTerrainPublication() {
     publishedLocationKey = null;
+    settleDrain('superseded');
+    drainError=null;
+    excludedTerrainMeshes.clear();
     publicationGeneration += 1;
     pendingTerrainMeshes.clear();
     resetFarTerrainClipmap?.();
@@ -139,6 +176,9 @@ function createLocationTerrainApi(deps = {}) {
     if (publishedLocationKey === locationKey) return false;
 
     publishedLocationKey = locationKey;
+    settleDrain('superseded');
+    drainError=null;
+    excludedTerrainMeshes.clear();
     publicationGeneration += 1;
     const generation = publicationGeneration;
     pendingTerrainMeshes.clear();
@@ -165,6 +205,7 @@ function createLocationTerrainApi(deps = {}) {
           tx,
           ty,
           generation,
+          requiresSourceTile: !usesAcceptedGround,
           distance: dx * dx + dy * dy
         });
       }
@@ -190,6 +231,7 @@ function createLocationTerrainApi(deps = {}) {
 
   return {
     publishLocationTerrain,
+    waitForLocationTerrainPublication,
     resetLocationTerrainPublication
   };
 }

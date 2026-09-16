@@ -1,3 +1,4 @@
+import {createPavementTerrainPartition} from '../../app/js/world/pavement-terrain-partition.js';
 import {prepareStreetPavement,compilePavementTile,meshPavementTile} from '../../app/js/world/compiler/street-pavement.js';
 import {conformPavementMesh} from '../../app/js/world/pavement-terrain-conformance.js';
 
@@ -9,6 +10,9 @@ export function terrainSampler(grid){return (x,z)=>{
 };}
 export function compileQualityCase(fixture){
  const started=performance.now(),ground=terrainSampler(fixture.terrain),mpu=fixture.input.metersPerWorldUnit;
+ const grid=fixture.terrain,terrainPositions=new Float32Array(grid.size*grid.size*3);
+ for(let row=0;row<grid.size;row++)for(let col=0;col<grid.size;col++){const i=(row*grid.size+col)*3;terrainPositions[i]=grid.minX+col*grid.step;terrainPositions[i+1]=grid.heights[row*grid.size+col];terrainPositions[i+2]=grid.minZ+row*grid.step;}
+ const partitionSurface=createPavementTerrainPartition([{userData:{isTerrainMesh:true},position:{x:0,z:0},geometry:{parameters:{widthSegments:grid.size-1},attributes:{position:{array:terrainPositions,getX:i=>terrainPositions[i*3],getZ:i=>terrainPositions[i*3+2]}}}}]);
  const plan=prepareStreetPavement(fixture.input),meshes=[],failures=[];let area=0,triangles=0,refinements=0,minClearance=Infinity,maxClearance=-Infinity,frontages=0;
  for(const tile of plan.tiles){
   const result=compilePavementTile(tile,mpu);frontages+=result.inferredFrontages;
@@ -16,7 +20,7 @@ export function compileQualityCase(fixture){
   // Test physical ground clearance independently of a road-contact bonus.
   // This is the lowest ordinary sidewalk elevation used by the runtime.
   const mesh=meshPavementTile(tile,result.polygons,base,{curbHeight:.12/mpu});
-  refinements+=conformPavementMesh(mesh,base,top);meshes.push(mesh);
+  refinements+=conformPavementMesh(mesh,base,top,{partitionSurface});meshes.push(mesh);
   const p=mesh.vertices;triangles+=p.length/9;
   for(let i=0;i<p.length;i+=9){
    const ax=p[i],az=p[i+2],bx=p[i+3],bz=p[i+5],cx=p[i+6],cz=p[i+8];

@@ -2,6 +2,8 @@
 
 Updated September 10, 2026 · Source baseline `53452516` · Version 5.2.0.
 
+September 15 performance audit supplement: [current ownership and scheduling](audits/2026-09-15-performance/architecture-and-ownership.md), [verified release/test findings and remaining measurements](audits/2026-09-15-performance/README.md). The dated findings below are historical unless reverified in that report.
+
 This map describes current responsibilities and data flow. It replaces accumulated dated rollout notes; earlier detail remains in Git and specialist documents. An architecture boundary describes where responsibility belongs, not proof that every path enforces it correctly. See [system inventory](SYSTEM_INVENTORY.md), [source reference](SYSTEM_INVENTORY_REFERENCE.md) and [confirmed audit findings](audits/2026-09-10/README.md).
 
 ## Application overview
@@ -119,3 +121,7 @@ The backend targets Node 22; hosting uses esbuild and static assets. Node contra
 No build, browser, emulator or deployment was run for this documentation update. Root `AGENTS.md` limits this 8 GiB workstation to one task at a time and requires explicit authorization before heavy checks. Saved candidates are bounded by the local tooling safeguard added during cleanup.
 
 Cloud alerting, backups, restore tests and physical-device performance remain operational verification items, not inferred guarantees. Use [the repair plan](audits/2026-09-10/repair-plan.md) for completion criteria and [the evidence ledger](audits/2026-09-10/tests-and-evidence.md) for actual results.
+
+### RDT restoration (16 September 2026)
+
+`app/js/rdt.js` again owns depth, deterministic identity and the bounded opt-in noise cache. `procedural-random.js` is a compatibility entry that aliases `worldSeed` to the same `rdtSeed`; it does not maintain a second generator. `reality-capture/rdt-building-index.js` applies occupancy-driven RDT partitioning to exact nearby-building selection, owned and cleared by the capture presentation runtime. It validates coordinate/identity changes before reusing bounds. Rendering, collision, feature eligibility and road elevation remain under their existing owners. The performance-mode label remains the baseline coverage policy; capture diagnostics separately identify `rdt-spatial`. See the restoration audit for measured scope and unresolved world-load acceptance.

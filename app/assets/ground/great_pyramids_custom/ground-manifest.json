@@ -3,7 +3,7 @@
   "artifactId": "great_pyramids_custom-ground",
   "providerId": "copernicus-dem-classified-ground-v1",
   "sourceRelease": "COP-DEM-2021:GLO-30",
-  "contentSha256": "ba7efa5d15e073c1117963302907f0ca234715ddedc01be84ef1bb24e8a34194",
+  "contentSha256": "005871b94234f78693884420899406c16d7d41f6e470033adf3251e2be19a564",
   "spacingMeters": 90,
   "coverage": {
     "south": 29.950743891640013,
@@ -18,7 +18,7 @@
   "correctionAttested": true,
   "sourceEvidence": {
     "sourceClassification": "digital-surface-model",
-    "correctionMethod": "worldexplorer-pmf-grid-v1",
+    "correctionMethod": "worldexplorer-pmf-boundary-reconstruction-v3",
     "sourceTiles": [
       {
         "tileId": "Copernicus_DSM_COG_10_N29_00_E031_00_DEM",
@@ -38,7 +38,14 @@
         "etag": "65da170d004a9089881b7cfbf399bb33",
         "lastModified": "Mon, 09 May 2022 14:14:22 GMT"
       }
-    ]
+    ],
+    "classificationMethod": "worldexplorer-pmf-grid-v1",
+    "reconstruction": {
+      "method": "harmonic-ground-boundary",
+      "toleranceMeters": 0.00001,
+      "exteriorPolicy": "retain-source-observation",
+      "sourceArtifactSha256": "ba7efa5d15e073c1117963302907f0ca234715ddedc01be84ef1bb24e8a34194"
+    }
   },
   "attribution": {
     "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",

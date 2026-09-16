@@ -1,0 +1,562 @@
+{
+  "note": "Legacy browser heap estimate may include shared contexts or omit workers; it is not isolated tab memory. Geometry bytes exclude textures and GPU overhead. Inspect twice to see runtime activity.",
+  "javascriptHeapBytes": 906577400,
+  "sceneGeometryBytes": 174170689,
+  "rendererResources": {
+    "geometries": 749,
+    "textures": 285
+  },
+  "gameStarted": true,
+  "worldLoading": false,
+  "pavementBuildActive": false,
+  "deferredWork": {
+    "budgets": {
+      "firstPlayTargetMs": 25000,
+      "frameTargetMs": 16.7,
+      "cooperativeChunkTargetMs": 8,
+      "backgroundIdleTimeoutMs": 1800,
+      "inactiveAuxiliaryRenderers": 0
+    },
+    "firstPlayReady": true,
+    "activeTask": null,
+    "firstPlayDetail": {
+      "environment": "earth",
+      "loadDurationMs": 146554,
+      "publicationSequence": 1
+    },
+    "queued": [],
+    "completed": [
+      "tutorial-runtime",
+      "analytics-runtime",
+      "earth-ambient-state-1",
+      "earth-star-catalog"
+    ]
+  },
+  "street": {
+    "tiles": 127,
+    "triangles": 144852,
+    "curbTriangles": 82868,
+    "markingTriangles": 18398,
+    "ramps": 0,
+    "workerMs": 15377,
+    "inferredFrontages": 40048,
+    "managedPaths": 203,
+    "residentRoads": 328,
+    "residentBuildings": 1056,
+    "roads": 12793,
+    "roadMeshes": 19,
+    "buildings": 9417,
+    "worldLoadSequence": 1,
+    "plannedTiles": 140,
+    "highestRefinement": {
+      "cell": "-3:4",
+      "bounds": {
+        "minX": -192,
+        "maxX": -128,
+        "minZ": 256,
+        "maxZ": 320
+      },
+      "addedTriangles": 1867,
+      "baseTriangles": 816
+    },
+    "terrainRefinementTriangles": 103314,
+    "drawCalls": 96,
+    "compilerCacheBytes": 16737190,
+    "coverageBounds": {
+      "minX": -384,
+      "maxX": 384,
+      "minZ": -384,
+      "maxZ": 384
+    },
+    "indexBytes": 1474890,
+    "positionBytes": 2362224,
+    "durationMs": 53831,
+    "sourceCoverage": {
+      "scope": "Loaded source network requiring inferred or mapped sidewalks; length within the compilation window, not proof of rendered pavement. Separately tagged sidewalks need mapped path data.",
+      "requiredSidewalkMeters": 185063.08886665315,
+      "withinCompilationWindowMeters": 29911.30589625815,
+      "outsideCompilationWindowMeters": 155151.782970395,
+      "compilationCoveragePercent": 16.162761617910032,
+      "requiredSegments": 8642,
+      "uncoveredSegments": 6852,
+      "examples": [
+        {
+          "kind": "road-side",
+          "name": "D 2204",
+          "a": {
+            "x": -6806.489704968964,
+            "z": -2682.2681450880737
+          },
+          "b": {
+            "x": -6857.649328613873,
+            "z": -2592.390847260617
+          },
+          "uncoveredMeters": 229.58745588799545
+        },
+        {
+          "kind": "road-side",
+          "name": "D 2204",
+          "a": {
+            "x": -6718.1230823095775,
+            "z": -2837.225832115564
+          },
+          "b": {
+            "x": -6749.128914821643,
+            "z": -2782.991098283105
+          },
+          "uncoveredMeters": 138.6881459576076
+        },
+        {
+          "kind": "road-side",
+          "name": "Route de Laghet",
+          "a": {
+            "x": -7271.577192649949,
+            "z": -107.83387503465747
+          },
+          "b": {
+            "x": -7254.523984768313,
+            "z": -55.12467707546875
+          },
+          "uncoveredMeters": 122.98622576150392
+        },
+        {
+          "kind": "road-side",
+          "name": "Route de Laghet",
+          "a": {
+            "x": -7254.523984768313,
+            "z": -55.12467707546875
+          },
+          "b": {
+            "x": -7243.67194338909,
+            "z": 6.886738140110538
+          },
+          "uncoveredMeters": 139.7574621781129
+        },
+        {
+          "kind": "road-side",
+          "name": "Route de Laghet",
+          "a": {
+            "x": -7243.67194338909,
+            "z": 6.886738140110538
+          },
+          "b": {
+            "x": -7239.021068512281,
+            "z": 23.93998992147317
+          },
+          "uncoveredMeters": 39.24091199752159
+        },
+        {
+          "kind": "road-side",
+          "name": "Route de Laghet",
+          "a": {
+            "x": -7239.021068512281,
+            "z": 23.93998992147317
+          },
+          "b": {
+            "x": -7215.766694128231,
+            "z": 59.59694605621735
+          },
+          "uncoveredMeters": 94.50486673928398
+        },
+        {
+          "kind": "road-side",
+          "name": "La Provençale",
+          "a": {
+            "x": -7242.1216517634875,
+            "z": 9.987325762494947
+          },
+          "b": {
+            "x": -7239.021068512281,
+            "z": 23.93998992147317
+          },
+          "uncoveredMeters": 31.730506955838493
+        },
+        {
+          "kind": "road-side",
+          "name": "La Provençale",
+          "a": {
+            "x": -7239.021068512281,
+            "z": 23.93998992147317
+          },
+          "b": {
+            "x": -7214.216402502629,
+            "z": 62.697560974811495
+          },
+          "uncoveredMeters": 102.15427804016262
+        }
+      ],
+      "status": "incomplete"
+    }
+  },
+  "workSinceLastInspection": null,
+  "streetOverview": {
+    "status": "building",
+    "representation": "terrain material coverage",
+    "completedCells": 262,
+    "totalCells": 1779,
+    "nonemptyCells": 231,
+    "coveredSquareWorldUnits": 123208.03529411764,
+    "positionBytes": 0,
+    "retainedBytes": 7530528,
+    "drawCalls": 0,
+    "workerActive": true,
+    "sourceScope": "complete loaded location",
+    "error": null,
+    "sourceCells": 32843,
+    "excludedCells": 31064,
+    "maskResolution": 64,
+    "worldUnitsPerTexel": 1,
+    "materials": 121
+  },
+  "frameTiming": {
+    "windowFrames": 1800,
+    "over16_7": 683,
+    "over33_3": 193,
+    "over50": 0,
+    "over100": 0,
+    "maxFrameMs": 35.4,
+    "session": {
+      "frames": 3688,
+      "over16_7": 1905,
+      "over33_3": 312,
+      "over50": 15,
+      "over100": 8,
+      "maxFrameMs": 1635.3
+    },
+    "p95Ms": 33.4,
+    "p99Ms": 35.3
+  },
+  "aircraft": {
+    "x": 36.803946351204516,
+    "y": 65.83771805464383,
+    "z": -26.25234085529021,
+    "speed": 0,
+    "airborne": false
+  },
+  "groundMode": "accepted-ground",
+  "groundProvenance": {
+    "generation": 2,
+    "status": "accepted",
+    "reason": null,
+    "location": {
+      "latitude": 43.7397,
+      "longitude": 7.4243000000000166
+    },
+    "artifactId": "monaco-ground",
+    "providerId": "copernicus-dem-classified-ground-v1",
+    "sourceRelease": "COP-DEM-2021:GLO-30",
+    "verticalDatum": "EGM2008",
+    "contentSha256": "fd6fdfbf2071215155e5da06776d46d1b1d679abdb66616528c53cfb2baae49d",
+    "artifactCount": 1,
+    "artifactIds": [
+      "monaco-ground"
+    ],
+    "contentSha256s": [
+      "fd6fdfbf2071215155e5da06776d46d1b1d679abdb66616528c53cfb2baae49d"
+    ]
+  },
+  "terrainOwnership": {
+    "generation": 2,
+    "status": "settled",
+    "excludedTiles": [
+      {
+        "key": "15/17059/11945",
+        "reason": "outside-accepted-ground-stack"
+      },
+      {
+        "key": "15/17058/11945",
+        "reason": "outside-accepted-ground-stack"
+      },
+      {
+        "key": "15/17060/11945",
+        "reason": "outside-accepted-ground-stack"
+      },
+      {
+        "key": "15/17057/11945",
+        "reason": "outside-accepted-ground-stack"
+      },
+      {
+        "key": "15/17061/11945",
+        "reason": "outside-accepted-ground-stack"
+      },
+      {
+        "key": "15/17056/11947",
+        "reason": "outside-accepted-ground-stack"
+      },
+      {
+        "key": "15/17059/11944",
+        "reason": "outside-accepted-ground-stack"
+      },
+      {
+        "key": "15/17062/11947",
+        "reason": "outside-accepted-ground-stack"
+      },
+      {
+        "key": "15/17056/11946",
+        "reason": "outside-accepted-ground-stack"
+      },
+      {
+        "key": "15/17056/11948",
+        "reason": "outside-accepted-ground-stack"
+      },
+      {
+        "key": "15/17058/11944",
+        "reason": "outside-accepted-ground-stack"
+      },
+      {
+        "key": "15/17060/11944",
+        "reason": "outside-accepted-ground-stack"
+      },
+      {
+        "key": "15/17062/11946",
+        "reason": "outside-accepted-ground-stack"
+      },
+      {
+        "key": "15/17062/11948",
+        "reason": "outside-accepted-ground-stack"
+      },
+      {
+        "key": "15/17056/11945",
+        "reason": "outside-accepted-ground-stack"
+      },
+      {
+        "key": "15/17056/11949",
+        "reason": "outside-accepted-ground-stack"
+      },
+      {
+        "key": "15/17057/11944",
+        "reason": "outside-accepted-ground-stack"
+      },
+      {
+        "key": "15/17061/11944",
+        "reason": "outside-accepted-ground-stack"
+      },
+      {
+        "key": "15/17062/11945",
+        "reason": "outside-accepted-ground-stack"
+      },
+      {
+        "key": "15/17062/11949",
+        "reason": "outside-accepted-ground-stack"
+      },
+      {
+        "key": "15/17056/11944",
+        "reason": "outside-accepted-ground-stack"
+      },
+      {
+        "key": "15/17056/11950",
+        "reason": "outside-accepted-ground-stack"
+      },
+      {
+        "key": "15/17062/11944",
+        "reason": "outside-accepted-ground-stack"
+      },
+      {
+        "key": "15/17062/11950",
+        "reason": "outside-accepted-ground-stack"
+      }
+    ]
+  },
+  "terrainCompilation": {
+    "authority": "compiled_transport_surface",
+    "heightSamplingAuthority": "rendered-triangle-barycentric",
+    "terrainMeshes": 25,
+    "corridorCount": 12137,
+    "heightCompilationYields": 1423,
+    "maximumHeightCompilationChunkMs": 162.5,
+    "adjustedVertices": 37234,
+    "terrainSeams": {
+      "authority": "one-shared-world-height-per-terrain-edge-coordinate",
+      "meshCount": 25,
+      "sharedVertices": 3846,
+      "maximumDeltaBefore": 0.15258012391336706
+    }
+  },
+  "contactIndexes": {
+    "roads": {
+      "triangles": 1347390,
+      "cells": 195023,
+      "cellReferences": 2759063,
+      "recordBytes": 38129980,
+      "bucketBytes": 11036252
+    },
+    "walkways": {
+      "triangles": 17466,
+      "cells": 7057,
+      "cellReferences": 37805,
+      "recordBytes": 489048,
+      "bucketBytes": 151220
+    }
+  },
+  "heightSamplingCaches": {
+    "terrainEntries": 40357,
+    "baseEntries": 41707,
+    "maximumEntriesPerCache": 65536
+  },
+  "roadTerrainConformance": {
+    "authority": "published-at-grade-road-geometry-versus-rendered-terrain",
+    "totalSamples": 442629,
+    "issuesFound": 0,
+    "profileDepartures": 259003,
+    "maximumProfileDeparture": 80.4922156369156,
+    "worstProfileDepartures": [
+      {
+        "roadName": "Unclassified",
+        "x": -1657.07904031419,
+        "z": -7572.787427194472,
+        "expectedY": 491.455523042001,
+        "renderedY": 410.9633074050854,
+        "departure": 80.4922156369156
+      },
+      {
+        "roadName": "Unclassified",
+        "x": -1654.870633089255,
+        "z": -7572.345185477047,
+        "expectedY": 491.455523042001,
+        "renderedY": 411.5351464225062,
+        "departure": 79.92037661949479
+      },
+      {
+        "roadName": "Unclassified",
+        "x": -1652.6622258643201,
+        "z": -7571.902943759623,
+        "expectedY": 491.5825873810901,
+        "renderedY": 412.1303353119628,
+        "departure": 79.45225206912727
+      },
+      {
+        "roadName": "Unclassified",
+        "x": -1644.205986098812,
+        "z": -7606.2928780698685,
+        "expectedY": 487.2319205177467,
+        "renderedY": 409.5475036184048,
+        "departure": 77.6844168993419
+      },
+      {
+        "roadName": "Unclassified",
+        "x": -1642.4683000844288,
+        "z": -7604.860018159343,
+        "expectedY": 487.2319205177467,
+        "renderedY": 410.1620054717639,
+        "departure": 77.06991504598278
+      },
+      {
+        "roadName": "Unclassified",
+        "x": -1642.5095852439715,
+        "z": -7545.978272533996,
+        "expectedY": 495.0585929619195,
+        "renderedY": 418.08573433865735,
+        "departure": 76.97285862326214
+      },
+      {
+        "roadName": "Unclassified",
+        "x": -1640.9180084588254,
+        "z": -7547.571860794733,
+        "expectedY": 494.9730940629442,
+        "renderedY": 418.2570161653619,
+        "departure": 76.7160778975823
+      },
+      {
+        "roadName": "Unclassified",
+        "x": -1639.3264316736793,
+        "z": -7549.16544905547,
+        "expectedY": 494.9730940629442,
+        "renderedY": 418.4282979920664,
+        "departure": 76.5447960708778
+      },
+      {
+        "roadName": "Unclassified",
+        "x": -1640.7306140700457,
+        "z": -7603.427158248817,
+        "expectedY": 487.2828757725515,
+        "renderedY": 410.7765073251231,
+        "departure": 76.50636844742843
+      },
+      {
+        "roadName": "Unclassified",
+        "x": -1630.529642942723,
+        "z": -7521.790179815908,
+        "expectedY": 498.2976401660499,
+        "renderedY": 424.229150256287,
+        "departure": 74.06848990976289
+      }
+    ],
+    "minimumDelta": 0.18,
+    "maximumDelta": 0.18,
+    "buriedSamples": 0,
+    "floatingSamples": 0,
+    "worstDeltas": []
+  },
+  "transportPhases": {
+    "refreshStructureProfiles": 5732.7,
+    "applyTransportTerrainCorridors": 30924.4,
+    "reprojectGroundAttachedWorld": 87,
+    "refreshPublishedTerrainStructureAssemblies": 1747.3,
+    "detectIntersections": 796.1,
+    "buildStructureRibbons": 1865.7,
+    "buildCarriagewayRegions": 13062.8,
+    "projectGroundRoadMarkings": 587.5,
+    "uploadRoadMeshes": 165.4,
+    "rebuildStructureVisuals": 270.7,
+    "total": 55725.9
+  },
+  "loadPhases": {
+    "prepareAcceptedGround": 96,
+    "fetchOverpass": 255,
+    "fetchFixedRegionalContext": 1551,
+    "fetchFixedRegionalStructures": 1421,
+    "waitForFixedRegionalGround": 2656,
+    "featureBudgeting": 1221,
+    "waitForTransportGround": 1,
+    "buildRoadGeometry": 1313,
+    "buildLanduseGeometry": 93,
+    "batchLanduseGeometry": 9,
+    "buildLinearFeatureData": 398,
+    "buildPoiGeometry": 18,
+    "buildStreetFurniture": 806,
+    "buildBuildingRoadGuards": 4204,
+    "buildBuildingGeometry": 5759,
+    "publishBuildingFacadeEntrances": 708,
+    "publishBuildingExteriorDetails": 48,
+    "batchBuildingGeometry": 447,
+    "publishLocationTerrain": 1,
+    "publishCompiledTransportMeshes": 55728,
+    "refreshTerrainSurfaceProfiles": 583,
+    "retireGroundFallbackPlaceholder": 0,
+    "buildTraversalNetworks": 449,
+    "spawnPlayer": 1523,
+    "refreshMemoryMarkersForCurrentLocation": 1,
+    "refreshBlockBuilderForCurrentLocation": 0,
+    "refreshEditableWorldPresentation": 0,
+    "publishLocationWorld": 1,
+    "refreshEditableBuildingVisibility": 89,
+    "waitForTerrainSurfaceMaterials": 0
+  },
+  "geometryByLayer": {
+    "roadMeshes": 45103398,
+    "buildingMeshes": 48604680,
+    "landuseMeshes": 697290,
+    "urbanSurfaceMeshes": 7774154,
+    "linearFeatureMeshes": 686844,
+    "vegetationMeshes": 18906936
+  },
+  "quality": {
+    "status": "fail",
+    "failures": [
+      "rendered roads depart from engineered profiles; terrain agreement does not establish a valid grade",
+      "JavaScript heap exceeds 768 MiB",
+      "first play exceeds 25000 ms",
+      "loaded streets requiring sidewalks extend beyond completed pavement coverage"
+    ],
+    "pending": [
+      "location-wide pavement areas are not complete"
+    ],
+    "refinementMultiplier": 3.4872165246280513,
+    "budgets": {
+      "javascriptHeapBytes": 805306368,
+      "pavementPositionBytes": 16777216,
+      "refinementMultiplier": 8
+    },
+    "visualStatus": "Requires camera sweep and recorded city route; performance checks cannot certify appearance."
+  }
+}

@@ -337,7 +337,7 @@ function createFarFieldTerrainApi(deps = {}) {
           { x: center.x - widthWorld * 0.5, z: center.z + depthWorld * 0.5 }
         ];
         const massing = resolveFarBuildingMassing(building, footprint, areaWorld, unitsPerMeter, {
-          worldSeed: appCtx.rdtSeed
+          worldSeed: appCtx.worldSeed
         });
         if (!massing) continue;
         if (massing.heightSource === 'explicit_height' || massing.heightSource === 'levels') {
@@ -395,7 +395,7 @@ function createFarFieldTerrainApi(deps = {}) {
       if (!Number.isFinite(groundMeters)) continue;
       const baseY = groundMeters * unitsPerMeter * yExaggeration + 0.25;
       const massing = resolveFarBuildingMassing(building, footprint, area, unitsPerMeter, {
-        worldSeed: appCtx.rdtSeed
+        worldSeed: appCtx.worldSeed
       });
       if (!massing) continue;
       if (massing.heightSource === 'explicit_height' || massing.heightSource === 'levels') {
@@ -505,6 +505,11 @@ function createFarFieldTerrainApi(deps = {}) {
       }).catch(() => null))
     ]);
     if (requestGeneration !== generation) return;
+    // The detailed mesh queue must settle before the far mesh chooses its
+    // holes. Otherwise late near tiles cover a far surface that was compiled
+    // through their still-empty slots, leaving two terrain owners.
+    await appCtx.waitForLocationTerrainPublication?.();
+    if(requestGeneration!==generation || signal.aborted)return;
     appCtx.fixedLocationMappedSurfaceContext = mappedContext;
     let detailedMappedSurfaceTintVertices = 0;
     for (const detailedMesh of appCtx.terrainGroup?.children || []) {

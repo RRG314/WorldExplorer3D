@@ -1,3 +1,4 @@
+import {setTerrainWorldGrid} from './world-grid.js';
 import { markGroundSurfaceChanged } from './surface-revision.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
@@ -469,16 +470,13 @@ export function buildTerrainTileMesh(z, tx, ty, deps = {}) {
   const pNW = appCtx.geoToWorld(bounds.latN, bounds.lonW);
   const pNE = appCtx.geoToWorld(bounds.latN, bounds.lonE);
   const pSW = appCtx.geoToWorld(bounds.latS, bounds.lonW);
-  const pCenter = appCtx.geoToWorld((bounds.latN + bounds.latS) * 0.5, (bounds.lonW + bounds.lonE) * 0.5);
 
   const width = Math.hypot(pNE.x - pNW.x, pNE.z - pNW.z);
   const depth = Math.hypot(pSW.x - pNW.x, pSW.z - pNW.z);
 
-  const cx = pCenter.x;
-  const cz = pCenter.z;
-
   const geo = new THREE.PlaneGeometry(width, depth, appCtx.TERRAIN_SEGMENTS, appCtx.TERRAIN_SEGMENTS);
   geo.rotateX(-Math.PI / 2);
+  setTerrainWorldGrid(geo.attributes.position, appCtx.TERRAIN_SEGMENTS, pNW, pNE, pSW);
 
   // Keep blades/soil detail at pedestrian scale, not a 25-unit carpet.
   // The same UV transform feeds diffuse, normal and roughness maps.
@@ -499,7 +497,7 @@ export function buildTerrainTileMesh(z, tx, ty, deps = {}) {
 
   const mesh = new THREE.Mesh(geo, mat);
   mesh.renderOrder = 0;
-  mesh.position.set(cx, 0, cz);
+  mesh.position.set(0, 0, 0);
   mesh.receiveShadow = true;
   mesh.castShadow = false;
   mesh.frustumCulled = false;
@@ -527,6 +525,31 @@ export function buildTerrainTileMesh(z, tx, ty, deps = {}) {
 }
 
 export function applyHeightsToTerrainMesh(mesh, deps = {}, options = {}) {
+  // Initial tile construction remains synchronous. Both drivers consume the
+  // same calculation and publication code, so scheduling cannot change heights.
+  for (const _ of terrainHeightSteps(mesh, deps, options)) void _;
+}
+
+export async function applyHeightsToTerrainMeshCooperatively(mesh, deps = {}, options = {}) {
+  const steps=terrainHeightSteps(mesh,deps,options);
+  const yieldControl=options.yieldControl || (()=>new Promise(resolve=>setTimeout(resolve,0)));
+  const budget=Math.max(0,Number(options.sliceBudgetMs ?? 8));
+  let started=performance.now(),maximumChunkMs=0,yields=0;
+  try {
+    for (;;) {
+      if(options.isCurrent?.()===false)return false;
+      const next=steps.next();
+      const elapsed=performance.now()-started;maximumChunkMs=Math.max(maximumChunkMs,elapsed);
+      if(next.done){
+        if(next.value===true)mesh.userData.heightCompilationScheduling={yields,maximumChunkMs,sliceBudgetMs:budget};
+        return next.value===true;
+      }
+      if(elapsed>=budget){yields++;await yieldControl();started=performance.now();}
+    }
+  } finally {steps.return();}
+}
+
+function* terrainHeightSteps(mesh, deps = {}, options = {}) {
   const info = mesh.userData?.terrainTile;
   if (!info) return;
 
@@ -673,6 +696,9 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}, options = {}) {
     elevations.push(y);
     minElevation = Math.min(minElevation, y);
     maxElevation = Math.max(maxElevation, y);
+    // Heights are staged in elevations; yielding does not expose a partly
+    // rewritten tile or move its origin underneath existing contact queries.
+    if((i+1)%128===0)yield;
   }
 
   mesh.position.y = minElevation - 10;
@@ -682,6 +708,8 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}, options = {}) {
 
   pos.needsUpdate = true;
   mesh.geometry.computeVertexNormals();
+  mesh.geometry.boundingBox = null;
+  mesh.geometry.boundingSphere = null;
   stitchTerrainMeshEdges(appCtx, mesh);
   mesh.userData.pendingTerrainTile = false;
   mesh.userData.baseTerrainWorldY = nextBaseElevations;
@@ -710,6 +738,7 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}, options = {}) {
   if (options.refreshVisualProfile !== false) {
     applyTerrainVisualProfile(mesh, classifyTerrainVisualProfile(bounds, minMeters, maxMeters, elevationStats));
   }
+  return true;
 }
 
 export {

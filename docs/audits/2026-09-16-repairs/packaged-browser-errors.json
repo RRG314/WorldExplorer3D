@@ -1,0 +1,32 @@
+[
+  {
+    "level": "error",
+    "message": "Error: Production Firebase is blocked outside the live site. Use staging or emulators for testing.\n    at assertFirebaseEnvironment (http://127.0.0.1:4193/js/firebase-environment-policy.js:11:54)\n    at readFirebaseConfig (http://127.0.0.1:4193/js/firebase-init.js?v=57:62:10)\n    at hasFirebaseConfig (http://127.0.0.1:4193/js/firebase-init.js?v=57:66:12)\n    at http://127.0.0.1:4193/app/js/bundles/app-auth-shell-6XVJVALV.js:1:5223",
+    "timestamp": "2026-09-16T11:20:44.052Z",
+    "url": "http://127.0.0.1:4193/js/firebase-environment-policy.js"
+  },
+  {
+    "level": "error",
+    "message": "Error: Production Firebase is blocked outside the live site. Use staging or emulators for testing.\n    at assertFirebaseEnvironment (http://127.0.0.1:4193/js/firebase-environment-policy.js:11:54)\n    at readFirebaseConfig (http://127.0.0.1:4193/js/firebase-init.js?v=57:62:10)\n    at initFirebase (http://127.0.0.1:4193/js/firebase-init.js?v=57:71:18)\n    at getFirebaseAuth (http://127.0.0.1:4193/js/auth-ui.js?v=55:20:20)\n    at Object.getCurrentUser (http://127.0.0.1:4193/js/auth-ui.js?v=55:146:16)\n    at cp (http://127.0.0.1:4193/app/js/bundles/app-entry-YOF4DFKL.js:1:10548)\n    at Object.load (http://127.0.0.1:4193/app/js/bundles/app-entry-YOF4DFKL.js:326:159709)\n    at http://127.0.0.1:4193/app/js/bundles/app-entry-YOF4DFKL.js:1:12396",
+    "timestamp": "2026-09-16T11:20:44.054Z",
+    "url": "http://127.0.0.1:4193/js/firebase-environment-policy.js"
+  },
+  {
+    "level": "error",
+    "message": "Error: Production Firebase is blocked outside the live site. Use staging or emulators for testing.\n    at assertFirebaseEnvironment (http://127.0.0.1:4193/js/firebase-environment-policy.js:11:54)\n    at readFirebaseConfig (http://127.0.0.1:4193/js/firebase-init.js?v=57:62:10)\n    at initFirebase (http://127.0.0.1:4193/js/firebase-init.js?v=57:71:18)\n    at getFirebaseAuth (http://127.0.0.1:4193/js/auth-ui.js?v=55:20:20)\n    at observeAuth (http://127.0.0.1:4193/js/auth-ui.js?v=55:68:16)\n    at http://127.0.0.1:4193/app/js/bundles/chunk-SQBTLWWW.js:111:124713",
+    "timestamp": "2026-09-16T11:20:44.054Z",
+    "url": "http://127.0.0.1:4193/js/firebase-environment-policy.js"
+  },
+  {
+    "level": "warn",
+    "message": "[WorldLoad] Applied adaptive limits (roads 16741/39020, buildings 126/138, landuse 1773/2225, pois 5516/6521).",
+    "timestamp": "2026-09-16T11:20:44.059Z",
+    "url": "http://127.0.0.1:4193/app/js/bundles/chunk-SQBTLWWW.js"
+  },
+  {
+    "level": "warn",
+    "message": "[WorldLoad] Essential Earth gameplay runtime startup failed: Error: Production Firebase is blocked outside the live site. Use staging or emulators for testing.\n    at assertFirebaseEnvironment (http://127.0.0.1:4193/js/firebase-environment-policy.js:11:54)\n    at readFirebaseConfig (http://127.0.0.1:4193/js/firebase-init.js?v=57:62:10)\n    at initFirebase (http://127.0.0.1:4193/js/firebase-init.js?v=57:71:18)\n    at getFirebaseAuth (http://127.0.0.1:4193/js/auth-ui.js?v=55:20:20)\n    at getCurrentUser (http://127.0.0.1:4193/js/auth-ui.js?v=55:146:16)\n    at Module.ia (http://127.0.0.1:4193/app/js/bundles/chunk-HFUA3FKX.js:19:49312)\n    at http://127.0.0.1:4193/app/js/bundles/chunk-SQBTLWWW.js:103:162940\n    at v (http://127.0.0.1:4193/app/js/bundles/chunk-SQBTLWWW.js:103:162098)\n    at td (http://127.0.0.1:4193/app/js/bundles/chunk-SQBTLWWW.js:103:162917)\n    at async Object.jM [as loadRoads] (http://127.0.0.1:4193/app/js/bundles/chunk-SQBTLWWW.js:111:113973)",
+    "timestamp": "2026-09-16T11:20:44.077Z",
+    "url": "http://127.0.0.1:4193/app/js/bundles/chunk-SQBTLWWW.js"
+  }
+]

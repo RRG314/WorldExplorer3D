@@ -1,0 +1,156 @@
+{
+  "tiles": 127,
+  "triangles": 143626,
+  "curbTriangles": 82868,
+  "markingTriangles": 18403,
+  "ramps": 0,
+  "workerMs": 3609,
+  "inferredFrontages": 40048,
+  "managedPaths": 203,
+  "residentRoads": 328,
+  "residentBuildings": 1056,
+  "roads": 12793,
+  "roadMeshes": 19,
+  "buildings": 9417,
+  "worldLoadSequence": 1,
+  "maxPublicationSliceMs": 10.800000011920929,
+  "plannedTiles": 140,
+  "maxConformanceSliceMs": 164.69999998807907,
+  "highestRefinement": {
+    "cell": "-3:4",
+    "bounds": {
+      "minX": -192,
+      "maxX": -128,
+      "minZ": 256,
+      "maxZ": 320
+    },
+    "addedTriangles": 1867,
+    "baseTriangles": 816
+  },
+  "terrainRefinementTriangles": 102088,
+  "drawCalls": 96,
+  "compilerCacheBytes": 16737052,
+  "coverageBounds": {
+    "minX": -384,
+    "maxX": 384,
+    "minZ": -384,
+    "maxZ": 384
+  },
+  "indexBytes": 1468248,
+  "positionBytes": 2351760,
+  "durationMs": 10740,
+  "position": {
+    "x": 37.7572366199112,
+    "y": 66.33315428418862,
+    "z": -21.895000000071718
+  },
+  "roadRendered": 64.63315428418878,
+  "mappedAreaRendered": null,
+  "contact": {
+    "source": "footway",
+    "y": 64.63315428418862
+  },
+  "indexedRoad": 64.63315428418862,
+  "terrain": 64.45315666145044,
+  "pavement": null,
+  "nearbyBuildings": [
+    {
+      "name": "Park Palace",
+      "pts": [
+        {
+          "x": 33.396947192720226,
+          "z": -26.05690616235279
+        },
+        {
+          "x": 20.219468375092315,
+          "z": -1.6398695350972048
+        },
+        {
+          "x": 4.328979212658665,
+          "z": -10.94160951709
+        },
+        {
+          "x": 19.056749655889856,
+          "z": -34.583466924686945
+        }
+      ],
+      "distance": 6.027734797791498
+    },
+    {
+      "name": "Park Palace",
+      "pts": [
+        {
+          "x": 26.80820778390627,
+          "z": -43.8851557248654
+        },
+        {
+          "x": 34.947238818323505,
+          "z": -60.938214326711204
+        },
+        {
+          "x": 53.163165419162084,
+          "z": -53.18683007544678
+        },
+        {
+          "x": 45.02413438474485,
+          "z": -36.13374939277492
+        }
+      ],
+      "distance": 15.985924664927895
+    },
+    {
+      "name": "",
+      "pts": [
+        {
+          "x": 60.9146235471785,
+          "z": -50.08627356346551
+        },
+        {
+          "x": 70.2163733007982,
+          "z": -46.2105756668052
+        },
+        {
+          "x": 64.40277970478589,
+          "z": -33.42075480929907
+        },
+        {
+          "x": 55.48860285756701,
+          "z": -36.90889047902601
+        }
+      ],
+      "distance": 23.233989239214065
+    }
+  ],
+  "road": {
+    "name": "Service",
+    "type": "service",
+    "width": 3.423423423423423,
+    "tags": {
+      "access": "private",
+      "highway": "service"
+    },
+    "section": {
+      "lanes": 2,
+      "lanesSource": "fallback:road-class",
+      "widthMeters": 3.8,
+      "widthSource": "fallback:road-class",
+      "inferredLanes": true,
+      "inferredWidth": true,
+      "parking": {
+        "left": {
+          "widthMeters": 0,
+          "source": "not-on-carriageway"
+        },
+        "right": {
+          "widthMeters": 0,
+          "source": "not-on-carriageway"
+        }
+      },
+      "placement": {
+        "raw": "",
+        "centerlineOffsetMeters": 0,
+        "status": "absent"
+      }
+    }
+  }
+}

@@ -1,3 +1,4 @@
+import {SurfacePublicationError} from './surface-publication-error.js';
 import { publishStreetPavement } from './street-pavement-runtime.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { appendUpwardRibbonGeometry } from "../road-render.js?v=4";
@@ -80,6 +81,8 @@ export async function finalizeLoadedWorld(options = {}) {
       transportPublication = await appCtx.publishCompiledTransportMeshes();
     } catch (error) {
       recordWorldLoadWarning(loadMetrics, 'publishCompiledTransportMeshes', error);
+      if(error?.name==='AbortError')throw error;
+      throw new SurfacePublicationError('roads',error);
     } finally {
       endLoadPhase('publishCompiledTransportMeshes');
     }
@@ -128,6 +131,8 @@ export async function finalizeLoadedWorld(options = {}) {
   } catch (error) {
     recordWorldLoadWarning(loadMetrics, 'publishStreetPavement', error);
     appCtx.streetPavementError = String(error?.message || error);
+    if(error?.name==='AbortError')throw error;
+    throw new SurfacePublicationError('pavement',error);
   }
   runFinalStep('buildTraversalNetworks', () => buildTraversalNetworks());
   await yieldToMainThread();
@@ -158,7 +163,7 @@ export async function finalizeLoadedWorld(options = {}) {
 }
 
 export function createSyntheticFallbackWorld(options = {}) {
-  const perfModeNow = options.perfModeNow || 'rdt';
+  const perfModeNow = 'baseline';
   const registerBuildingCollision = typeof options.registerBuildingCollision === 'function' ? options.registerBuildingCollision : () => null;
   const getRoadSubdivisionStep = typeof options.getRoadSubdivisionStep === 'function' ? options.getRoadSubdivisionStep : () => 3;
   const polylineBounds = typeof options.polylineBounds === 'function' ? options.polylineBounds : () => null;

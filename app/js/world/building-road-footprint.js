@@ -1,3 +1,4 @@
+import {roadMetersPerWorldUnit,roadPlacementOffsetWorld} from './road-units.js';
 import { yieldToMainThread as defaultYieldToMainThread } from './cooperative-scheduling.js?v=1';
 import {
   MIN_DRIVEABLE_ROAD_WIDTH_METERS,
@@ -9,10 +10,8 @@ const BUILDING_EDGE_CLEARANCE_METERS = 0.12;
 
 export async function createBuildingRoadFootprintGuards(options = {}) {
   const roads = Array.isArray(options.roads) ? options.roads : [];
-  const useRdtBudgeting = options.useRdtBudgeting === true;
-  const rdtLoadComplexity = Number(options.rdtLoadComplexity || 0);
   const roadBuildingCellSize = 120;
-  const buildingRoadRadiusCells = useRdtBudgeting ? (rdtLoadComplexity >= 6 ? 5 : 4) : 3;
+  const buildingRoadRadiusCells = 3;
   const roadCoverageCells = new Set();
   const roadCenterlineCellSize = 120;
   const roadCenterlineCells = new Map();
@@ -43,6 +42,11 @@ export async function createBuildingRoadFootprintGuards(options = {}) {
   const markRoadCorridorCell = (x, z, radius) =>
     markCell(roadCorridorCells, roadCorridorCellSize, x, z, radius);
   const registerRoadCenterlineSegment = (p0, p1, radius, road, segIndex, indexRadius = radius) => {
+    const offset=roadPlacementOffsetWorld(road),dx=p1.x-p0.x,dz=p1.z-p0.z,length=Math.hypot(dx,dz);
+    if(offset&&length>0){
+      const shiftX=-dz/length*offset,shiftZ=dx/length*offset;
+      p0={x:p0.x+shiftX,z:p0.z+shiftZ};p1={x:p1.x+shiftX,z:p1.z+shiftZ};
+    }
     const segmentIndex = roadCenterlineSegments.length;
     roadCenterlineSegments.push({ p0, p1, radius, road, segIndex });
     const minCellX = Math.floor((Math.min(p0.x, p1.x) - indexRadius) / roadCenterlineCellSize);
@@ -290,8 +294,9 @@ export async function createBuildingRoadFootprintGuards(options = {}) {
       const road = segment?.road;
       if (!road) continue;
       const distance = segmentToFootprintDistance(segment, points);
-      const sourceWidth = sourceRoadWidthMeters(road);
-      const halfWidth = Math.max(0.6, sourceWidth * 0.5);
+      const scale=roadMetersPerWorldUnit(road);
+      const sourceWidth = sourceRoadWidthMeters(road)/scale;
+      const halfWidth = Math.max(0.6/scale, sourceWidth * 0.5);
       if (!(distance < halfWidth - 1e-7)) continue;
 
       const terrainMode = String(road?.structureSemantics?.terrainMode || 'at_grade');
@@ -326,8 +331,8 @@ export async function createBuildingRoadFootprintGuards(options = {}) {
         });
       }
 
-      const resolvedHalfWidth = distance - BUILDING_EDGE_CLEARANCE_METERS;
-      if (resolvedHalfWidth < MIN_PUBLISHED_ROAD_WIDTH_METERS * 0.5) {
+      const resolvedHalfWidth = distance - BUILDING_EDGE_CLEARANCE_METERS/scale;
+      if (resolvedHalfWidth < MIN_PUBLISHED_ROAD_WIDTH_METERS/scale * 0.5) {
         return Object.freeze({
           action: 'suppress_building',
           reason: 'insufficient_centerline_clearance',
@@ -338,8 +343,8 @@ export async function createBuildingRoadFootprintGuards(options = {}) {
       const resolvedWidth = resolvedHalfWidth * 2;
       const interval = footprintProjectionInterval(segment, points);
       const previous = constraints.get(segment);
-      if (!previous || resolvedWidth < previous.resolvedWidth) {
-        constraints.set(segment, { resolvedWidth, distance, ...interval });
+      if (!previous || resolvedWidth*scale < previous.resolvedWidth) {
+        constraints.set(segment, { resolvedWidth:resolvedWidth*scale, distance:distance*scale, ...interval });
       }
     }
 
@@ -412,7 +417,7 @@ export async function createBuildingRoadFootprintGuards(options = {}) {
         segmentStartDistancesMeters[index] = segmentStartDistancesMeters[index - 1] + Math.hypot(
           Number(previousEnd.x) - Number(previousStart.x),
           Number(previousEnd.z) - Number(previousStart.z)
-        );
+        )*roadMetersPerWorldUnit(road);
       }
       const sortedSegmentProfiles = builder.profiles.map((profiles) => Object.freeze(
         profiles.slice().sort((left, right) =>
@@ -426,7 +431,7 @@ export async function createBuildingRoadFootprintGuards(options = {}) {
       for (let segmentIndex = 0; segmentIndex < sortedSegmentProfiles.length; segmentIndex += 1) {
         const start = road.pts[segmentIndex];
         const end = road.pts[segmentIndex + 1];
-        const length = Math.hypot(Number(end.x) - Number(start.x), Number(end.z) - Number(start.z));
+        const length = Math.hypot(Number(end.x) - Number(start.x), Number(end.z) - Number(start.z))*roadMetersPerWorldUnit(road);
         for (const profile of sortedSegmentProfiles[segmentIndex]) {
           intervalProfiles.push(Object.freeze({
             ...profile,
@@ -518,7 +523,7 @@ export async function createBuildingRoadFootprintGuards(options = {}) {
   };
 
   const isBuildingNearLoadedRoad = (points) => {
-    if (useRdtBudgeting || !points?.length || roadCoverageCells.size === 0) return true;
+    if (!points?.length || roadCoverageCells.size === 0) return true;
     const center = points.reduce(
       (value, point) => ({ x: value.x + point.x, z: value.z + point.z }),
       { x: 0, z: 0 }

@@ -28,20 +28,31 @@ test('near and overview height contract clears at-grade road edges and ignores e
  assert.ok(fallback(32,4)<ground(32,4)+1);
 });
 
-test('frontage refinement reduces triangles at a terrain fold without increasing sampled error',async()=>{
- const {conformRoadTriangles}=await import('../app/js/terrain/road-surface-geometry.js');
- for(const width of [.02,.2,1,4]){
-  const sample=(x,z)=>.2*x+.1*z+.3*Math.max(0,x-1.7),results=[];
-  for(const edgeRefinement of [false,true]){
-   const vertices=[0,sample(0,0),0,4,sample(4,0),0,4,sample(4,width),width],indices=[0,2,1];
-   conformRoadTriangles(vertices,indices,sample,0,{maxDepth:3,tolerance:.03,edgeRefinement});
-   let error=0;
-   for(let i=0;i<indices.length;i+=3)for(const weights of [[.5,.5,0],[.5,0,.5],[0,.5,.5],[1/3,1/3,1/3],[.2,.3,.5]]){
-    const p=[0,0,0];for(let j=0;j<3;j++)for(let k=0;k<3;k++)p[k]+=vertices[indices[i+j]*3+k]*weights[j];
-    error=Math.max(error,Math.abs(p[1]-sample(p[0],p[2])));
-   }
-   results.push({triangles:indices.length/3,error});
-  }
-  assert.ok(results[1].triangles<results[0].triangles);assert.ok(results[1].error<=.0300001);
- }
+test('pavement clearance stays continuous when the nearest unequal-width street changes',()=>{
+ const ground=()=>0;
+ const segments=[{a:{x:0,z:0},b:{x:20,z:0},wa:2,wb:2,road:{surfaceBias:.18}},{a:{x:0,z:10},b:{x:20,z:10},wa:4,wb:4,road:{surfaceBias:.18}}];
+ const sample=createPavementBaseSampler({segments,ground,roadContactIndex:{sampleAt:()=>.18}});
+ assert.ok(Math.abs(sample(10,4.99999)-sample(10,5.00001))<1e-5);
+ assert.ok(Math.abs(sample(10,1)-.18)<1e-9);assert.ok(Math.abs(sample(10,8)-.18)<1e-9);
+ const reverse=createPavementBaseSampler({segments:[...segments].reverse(),ground,roadContactIndex:{sampleAt:()=>.18}});
+ for(let z=1;z<=8;z+=.01){assert.ok(Math.abs(sample(10,z)-reverse(10,z))<1e-10);assert.ok(Math.abs(sample(10,z+.001)-sample(10,z))/.001<.08);}
+});
+
+test('pavement clearance uses the placed carriageway and physical shoulder distance',()=>{
+ const sample=createPavementBaseSampler({segments:[{a:{x:0,z:0},b:{x:20,z:0},wa:4,wb:4,offset:2,road:{surfaceBias:.18,metersPerWorldUnit:2}}],ground:()=>0});
+ assert.equal(sample(10,4),.18);
+ assert.ok(Math.abs(sample(10,6)-.09)<1e-10);
+ assert.equal(sample(10,8),.018);
+});
+
+test('indexing drops render-precision collapse while preserving vertical curbs and thin valid faces',()=>{
+ const input=[
+  1000000,0,0,1000000.001,0,0,1000000,0,1,
+  0,0,0,0,1,0,0,1,1,
+  0,0,0,1,0,0,1,0,.000001
+ ];
+ const mesh=indexPavementPositions(input);
+ assert.equal(mesh.collapsedTriangles,1);assert.equal(mesh.indices.length,6);
+ assert.deepEqual([...mesh.indices].flatMap(i=>[...mesh.positions.slice(i*3,i*3+3)]),[...new Float32Array(input.slice(9))]);
+ assert.throws(()=>indexPavementPositions([0,0,0]),/Invalid pavement triangle/);
 });

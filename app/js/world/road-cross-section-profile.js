@@ -1,3 +1,4 @@
+import {roadMetersPerWorldUnit} from './road-units.js';
 const MIN_PUBLISHED_ROAD_WIDTH_METERS = 1.2;
 const MIN_DRIVEABLE_ROAD_WIDTH_METERS = 4.8;
 const WIDTH_TRANSITION_METERS = 8;
@@ -12,7 +13,7 @@ function finiteWidth(value, fallback = 4) {
 function sourceRoadWidthMeters(feature) {
   return finiteWidth(
     feature?.resolvedCrossSection?.sourceWidthMeters,
-    feature?.transportRecord?.crossSection?.widthMeters || feature?.width
+    feature?.transportRecord?.crossSection?.widthMeters || Number(feature?.width)*roadMetersPerWorldUnit(feature)
   );
 }
 
@@ -43,14 +44,14 @@ function smoothstep(value) {
   return t * t * (3 - 2 * t);
 }
 
-function roadWidthAtSegment(feature, segmentIndex = 0, segmentT = 0.5) {
+function roadWidthAtSegmentMeters(feature, segmentIndex = 0, segmentT = 0.5) {
   const sourceWidth = sourceRoadWidthMeters(feature);
   const widths = segmentWidths(feature);
-  if (!widths || widths.length === 0) return finiteWidth(feature?.width, sourceWidth);
+  if (!widths || widths.length === 0) return sourceWidth;
 
   const index = Math.max(0, Math.min(widths.length - 1, Number(segmentIndex) || 0));
   const localWidth = finiteWidth(widths[index], sourceWidth);
-  const length = segmentLength(feature, index);
+  const length = segmentLength(feature, index)*roadMetersPerWorldUnit(feature);
   const t = Math.max(0, Math.min(1, Number(segmentT) || 0));
   const intervalProfiles = feature?.resolvedCrossSection?.intervalProfiles;
   const segmentStartDistances = feature?.resolvedCrossSection?.segmentStartDistancesMeters;
@@ -118,6 +119,10 @@ function roadWidthAtSegment(feature, segmentIndex = 0, segmentT = 0.5) {
   return finiteWidth(resolvedWidth, sourceWidth);
 }
 
+function roadWidthAtSegment(feature,segmentIndex=0,segmentT=.5) {
+  return roadWidthAtSegmentMeters(feature,segmentIndex,segmentT)/roadMetersPerWorldUnit(feature);
+}
+
 function roadWidthAtProjection(feature, projection = null) {
   return roadWidthAtSegment(
     feature,
@@ -143,7 +148,7 @@ function minimumRoadWidthOnInterval(feature, segmentIndex = 0, startT = 0, endT 
 
 function roadSegmentIsDriveable(feature, segmentIndex = 0, startT = 0, endT = 1) {
   return feature?.driveable !== false &&
-    minimumRoadWidthOnInterval(feature, segmentIndex, startT, endT) >=
+    minimumRoadWidthOnInterval(feature, segmentIndex, startT, endT)*roadMetersPerWorldUnit(feature) >=
       MIN_DRIVEABLE_ROAD_WIDTH_METERS;
 }
 

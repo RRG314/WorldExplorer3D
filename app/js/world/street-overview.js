@@ -1,6 +1,5 @@
 import {streetSourceInput} from './street-source-input.js';
 import {createPavementTerrainMask} from './pavement-terrain-mask.js';
-import {yieldToMainThread} from './cooperative-scheduling.js?v=1';
 
 // Complete source coverage lives in the terrain material. Raised geometry and
 // walking contact are published separately near the player. Terrain movement
@@ -8,6 +7,7 @@ import {yieldToMainThread} from './cooperative-scheduling.js?v=1';
 export function createStreetOverview(appCtx,{onComplete=()=>{}}={}){
  const sequence=appCtx._worldLoadSequence,startedAt=performance.now();
  let worker=null,pending=null,active=null,disposed=false,sources=[],prepared=false,mask=null,stagedMask=null,completedBounds=null;
+ let materialSyncAt=-Infinity;
  const sourceLists=()=>[appCtx.roads,appCtx.buildings,appCtx.landuses,appCtx.linearFeatures];
  const sourcesMatch=()=>sourceLists().every((list,i)=>sources[i]?.list===list&&sources[i]?.length===(list?.length||0));
  const valid=()=>!disposed&&sequence===appCtx._worldLoadSequence&&!appCtx.onMoon;
@@ -21,7 +21,9 @@ export function createStreetOverview(appCtx,{onComplete=()=>{}}={}){
  function setDetailBounds(bounds){mask?.setDetailBounds(bounds);stagedMask?.setDetailBounds(bounds);}
  async function advance(focus){
    if(!worker){
-     worker=new Worker(new URL('./compiler/street-overview-worker.js',import.meta.url),{type:'module'});stats.workerActive=true;
+     const workerUrl=globalThis.__WORLD_EXPLORER_PRODUCTION__?.streetOverviewWorkerUrl ||
+       new URL('./compiler/street-overview-worker.js',import.meta.url);
+     worker=new Worker(workerUrl,{type:'module'});stats.workerActive=true;
      worker.onmessage=event=>event.data.type==='error'?pending?.reject(new Error(event.data.message)):pending?.resolve(event.data);
      worker.onerror=event=>pending?.reject(new Error(event.message));
    }
@@ -38,39 +40,34 @@ export function createStreetOverview(appCtx,{onComplete=()=>{}}={}){
    const target=stagedMask||mask;
    const packet=await request({type:'next',focus,resolution:target.layout.resolution});
    if(!valid()||!sourcesMatch())return;
-   if(packet.type==='complete'){complete();return;}
-   target.publish(packet.key,packet.mask);stats.completedCells++;
+   if(packet.type==='complete'){await complete();return;}
+   target.publish(packet.key,packet.mask);stats.completedCells++;stats.uploads={...target.uploadStats};
    if(packet.coveredSquareWorldUnits>0)stats.nonemptyCells++;
    stats.coveredSquareWorldUnits+=packet.coveredSquareWorldUnits||0;
-   if(!packet.remaining)complete();
+   if(!packet.remaining)await complete();
  }
- function complete(){
+ async function complete(){
    if(stats.completedCells!==stats.totalCells)throw new Error('Location pavement ended before every planned cell was published');
    if(stagedMask){mask?.dispose();mask=stagedMask;stagedMask=null;}
    const l=mask.layout;
    completedBounds=stats.totalCells?{minX:l.minX*64,maxX:(l.minX+l.lookupWidth)*64,minZ:l.minZ*64,maxZ:(l.minZ+l.lookupHeight)*64}:null;
    stats.status='complete';stats.coverageBounds=completedBounds;stats.durationMs=Math.round(performance.now()-startedAt);
    worker?.terminate();worker=null;prepared=false;stats.workerActive=false;
-   stats.materials=mask.syncMaterials();onComplete(completedBounds);
+   stats.materials=mask.syncMaterials();await onComplete(completedBounds);
  }
  function step(focus){
    setDetailBounds(appCtx.streetPavement?.coverageBounds);
    if(!valid())return;
-   if(mask)stats.materials=mask.syncMaterials();
+   const now=performance.now();
+   if(mask&&now-materialSyncAt>=500){stats.materials=mask.syncMaterials();materialSyncAt=now;}
    if(active)return;
    if((stats.status==='failed'||stats.status==='complete')&&sourcesMatch())return;
    if(stats.status==='failed'){prepared=false;stats.error=null;}
    stats.status='building';
    const coordinate=value=>Number.isFinite(Number(value))?Number(value):0;
    const point={x:coordinate(focus?.x),z:coordinate(focus?.z)};
-   active=(async()=>{
-     const started=performance.now();
-     do{
-       await advance(point);
-       if(stats.status==='complete'||!valid()||appCtx._streetPavementUpdating||!appCtx.gameStarted)break;
-       await yieldToMainThread();
-     }while(performance.now()-started<80);
-   })().catch(error=>{if(valid()){stats.status='failed';stats.error=String(error.message);worker?.terminate();worker=null;stats.workerActive=false;}}).finally(()=>{active=null;});
+   // At most one acknowledged cell per rendered frame, never an 80 ms burst.
+   active=advance(point).catch(error=>{if(valid()){stats.status='failed';stats.error=String(error.message);worker?.terminate();worker=null;stats.workerActive=false;}}).finally(()=>{active=null;});
  }
  function dispose(){disposed=true;worker?.terminate();pending?.reject(new Error('Overview disposed'));mask?.dispose();stagedMask?.dispose();mask=stagedMask=null;stats.status='disposed';stats.retainedBytes=0;stats.workerActive=false;}
  return {stats,step,setDetailBounds,get completedBounds(){return completedBounds;},pause:()=>active||Promise.resolve(),dispose};

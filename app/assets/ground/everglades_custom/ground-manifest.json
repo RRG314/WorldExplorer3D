@@ -3,7 +3,7 @@
   "artifactId": "everglades_custom-ground",
   "providerId": "copernicus-dem-classified-ground-v1",
   "sourceRelease": "COP-DEM-2021:GLO-30",
-  "contentSha256": "6df58389baa75431da955790b81d4c85049245b82848b07ab1a143f4c81de299",
+  "contentSha256": "7d0dffc3413cb86e29963359542245f9784476d0c597bb57976d5fe50e36984c",
   "spacingMeters": 90,
   "coverage": {
     "south": 25.257126345302023,
@@ -18,7 +18,7 @@
   "correctionAttested": true,
   "sourceEvidence": {
     "sourceClassification": "digital-surface-model",
-    "correctionMethod": "worldexplorer-pmf-grid-v1",
+    "correctionMethod": "worldexplorer-pmf-boundary-reconstruction-v3",
     "sourceTiles": [
       {
         "tileId": "Copernicus_DSM_COG_10_N25_00_W081_00_DEM",
@@ -29,7 +29,14 @@
         "etag": "2bf6080d251e4482d507a3ef0035c17c",
         "lastModified": "Mon, 09 May 2022 14:11:20 GMT"
       }
-    ]
+    ],
+    "classificationMethod": "worldexplorer-pmf-grid-v1",
+    "reconstruction": {
+      "method": "harmonic-ground-boundary",
+      "toleranceMeters": 0.00001,
+      "exteriorPolicy": "retain-source-observation",
+      "sourceArtifactSha256": "6df58389baa75431da955790b81d4c85049245b82848b07ab1a143f4c81de299"
+    }
   },
   "attribution": {
     "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",

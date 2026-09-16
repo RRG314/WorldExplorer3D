@@ -1,3 +1,4 @@
+import {execFileSync} from 'node:child_process';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
@@ -39,13 +40,10 @@ import { reconcileExactGraphNodeConstraints } from '../../app/js/world/compiler/
 import { fetchCompleteArchiveTileBatch } from '../../app/js/world/overture-building-source.js';
 import { resolveCustomLocationArrival } from '../../app/js/world/spawn-location-arrival.js';
 import { resolveFarBuildingMassing } from '../../app/js/terrain/far-building-massing.js';
-import { appendSolidAtGradeRoadGeometry } from '../../app/js/terrain/road-surface-geometry.js';
+import { prepareCarriagewayTiles } from '../../app/js/world/compiler/street-carriageway.js';
+import { meshCarriagewayTile } from '../../app/js/world/compiler/street-carriageway-mesh.js';
 import { interpolateRenderedTerrainCell } from '../../app/js/terrain/height-sampling.js';
 import { stitchTerrainGroupEdges } from '../../app/js/terrain/seams.js';
-import {
-  computeIntersectionCapRadius,
-  shouldBuildCompactIntersectionCap
-} from '../../app/js/terrain/road-junctions.js';
 import { detectRoadIntersections } from '../../app/js/terrain/intersections.js';
 import { createCompiledRoadSurfaceSampler } from '../../app/js/terrain/rebuild.js';
 import { compileTrafficGraph } from '../../app/js/living-world/navigation-graphs.js';
@@ -53,6 +51,8 @@ import {
   OVERTURE_RELEASE_POLICY,
   overtureThemeArchiveUrl
 } from '../../app/js/world/overture-tile-source.js';
+
+execFileSync(process.execPath,['--experimental-vm-modules',fileURLToPath(new URL('./module-syntax.mjs',import.meta.url))],{stdio:'inherit',timeout:30000});
 
 const root = process.cwd();
 const reportPath = path.join(root, 'output', 'verification', 'source', 'report.json');
@@ -1342,55 +1342,28 @@ const indexedSurfaceContainsPoint = (verts, indices, point) => {
   }
   return false;
 };
-const sharpTurnVerts = [];
-const sharpTurnIndices = [];
-const sharpTurnIntegrity = appendSolidAtGradeRoadGeometry({
-  feature: {
-    structureSemantics: { terrainMode: 'at_grade' },
-    transportRecord: { crossSection: { placement: { centerlineOffsetMeters: 0 } } }
-  },
-  points: [
-    { x: 0, z: 0 },
-    { x: 2, z: 0 },
-    { x: 0.2, z: 0.35 },
-    { x: 2.2, z: 0.7 }
-  ],
-  halfWidth: 3.5,
-  sampleTerrainY: () => 0,
-  targetVerts: sharpTurnVerts,
-  targetIndices: sharpTurnIndices
-});
-if (sharpTurnIntegrity.segmentQuads !== 3 ||
-    sharpTurnIntegrity.turnJoins < 2 ||
-    sharpTurnIntegrity.foldedTriangles !== 0 ||
-    sharpTurnIntegrity.degenerateTriangles !== 0 ||
-    sharpTurnIndices.length / 3 !== sharpTurnIntegrity.surfaceTriangles) {
-  roadSurfaceFootprintFailures.push('sharp mapped turn did not publish solid non-folding segment and join geometry');
-}
-const outerTurnVerts = [];
-const outerTurnIndices = [];
-appendSolidAtGradeRoadGeometry({
-  feature: {
-    structureSemantics: { terrainMode: 'at_grade' },
-    transportRecord: { crossSection: { placement: { centerlineOffsetMeters: 0 } } }
-  },
-  points: [{ x: 0, z: 0 }, { x: 10, z: 0 }, { x: 10, z: 10 }],
-  halfWidth: 2,
-  sampleTerrainY: () => 0,
-  targetVerts: outerTurnVerts,
-  targetIndices: outerTurnIndices
-});
-if (!indexedSurfaceContainsPoint(outerTurnVerts, outerTurnIndices, { x: 11, z: -1 })) {
-  roadSurfaceFootprintFailures.push('road turn join filled the already-covered inside instead of the exposed outer wedge');
-}
-const twoBranchJunction = {
-  hasGradeSeparatedRoad: false,
-  maxWidth: 9,
-  roads: [{ width: 9 }, { width: 5 }]
+const compileGroundFixture = roads => {
+  const verts=[],indices=[];
+  for(const tile of prepareCarriagewayTiles(roads.map(r=>({...r,metersPerWorldUnit:1,structureSemantics:{terrainMode:'at_grade'}})))){
+    const mesh=meshCarriagewayTile(tile,()=>0,vertices=>vertices),offset=verts.length/3;
+    verts.push(...mesh.positions);indices.push(...Array.from(mesh.indices,i=>i+offset));
+  }
+  return {verts,indices};
 };
-if (!shouldBuildCompactIntersectionCap(twoBranchJunction) ||
-    computeIntersectionCapRadius(twoBranchJunction) !== 2.5) {
-  roadSurfaceFootprintFailures.push('two-branch mapped junction did not receive narrowest-connected-half-width closure');
+const sharp=compileGroundFixture([{width:7,pts:[{x:0,z:0},{x:2,z:0},{x:.2,z:.35},{x:2.2,z:.7}]}]);
+if(!sharp.indices.length)roadSurfaceFootprintFailures.push('sharp mapped turn produced no carriageway geometry');
+for(let i=0;i<sharp.indices.length;i+=3){
+  const [a,b,c]=sharp.indices.slice(i,i+3).map(j=>j*3),p=sharp.verts;
+  const signed=(p[b]-p[a])*(p[c+2]-p[a+2])-(p[b+2]-p[a+2])*(p[c]-p[a]);
+  if(!(signed<0)){roadSurfaceFootprintFailures.push('production carriageway contains a folded or collapsed top triangle');break;}
+}
+const outer=compileGroundFixture([{width:4,pts:[{x:0,z:0},{x:10,z:0},{x:10,z:10}]}]);
+if(!indexedSurfaceContainsPoint(outer.verts,outer.indices,{x:11,z:-1})){
+  roadSurfaceFootprintFailures.push('production road turn omitted its exposed outer wedge');
+}
+const crossing=compileGroundFixture([{width:9,pts:[{x:-10,z:0},{x:10,z:0}]},{width:5,pts:[{x:0,z:-10},{x:0,z:10}]}]);
+if(![{x:0,z:0},{x:-9,z:4},{x:2,z:-9}].every(p=>indexedSurfaceContainsPoint(crossing.verts,crossing.indices,p)) || indexedSurfaceContainsPoint(crossing.verts,crossing.indices,{x:4,z:-8})){
+  roadSurfaceFootprintFailures.push('production junction does not preserve its incident carriageways and corner exclusion');
 }
 const sourceTopologyJunctions = detectRoadIntersections([
   {

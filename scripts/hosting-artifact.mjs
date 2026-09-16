@@ -38,7 +38,9 @@ const GAME_RUNTIME_ENTRYPOINTS = Object.freeze({
   'capture-review': 'app/js/reality-capture/result-viewer.js',
   'multiplayer-rooms': 'app/js/multiplayer/rooms.js',
   'multiplayer-artifacts': 'app/js/multiplayer/artifacts.js',
-  'tunnel-solid-worker': 'app/js/world/compiler/tunnel-solid-worker.js'
+  'tunnel-solid-worker': 'app/js/world/compiler/tunnel-solid-worker.js',
+  'street-pavement-worker': 'app/js/world/compiler/street-pavement-worker.js',
+  'street-overview-worker': 'app/js/world/compiler/street-overview-worker.js'
 });
 const ROOT_SHARED_MODULE_DIR = path.join(ROOT, 'js');
 const GAME_SHARED_CONTEXT_MODULE = 'app/js/shared-context.js';
@@ -230,6 +232,8 @@ async function rewriteGameHtml(runtime, groundData) {
   const productionConfig = canonicalJson({
     appEntrypoint: `./${runtime.entries['app-entry'].replace(/^js\/bundles\//, '')}`,
     tunnelSolidWorkerUrl: `/app/${runtime.entries['tunnel-solid-worker']}`,
+    streetPavementWorkerUrl: `/app/${runtime.entries['street-pavement-worker']}`,
+    streetOverviewWorkerUrl: `/app/${runtime.entries['street-overview-worker']}`,
     groundCatalogUrl: groundData.catalogUrl,
     groundReleaseId: groundData.releaseId
   }).trim();
@@ -483,12 +487,18 @@ async function verifyArtifact() {
   const captureHtml = await fs.readFile(path.join(OUTPUT_DIR, 'app', 'capture.html'), 'utf8');
   const adminModule = await fs.readFile(path.join(OUTPUT_DIR, 'js', 'admin-dashboard.js'), 'utf8');
   for (const [name, entry] of Object.entries(runtimePackaging.entries || {})) {
+    if (!expectedFiles[`app/${entry}`]) {
+      throw new Error(`Packaged runtime entry is missing: ${name} -> ${entry}`);
+    }
     const referenced = (name === 'account-social'||name === 'account-contributions') ? accountHtml.includes(`../app/${entry}`)
       : name === 'capture-phone' ? captureHtml.includes(entry)
       : name === 'capture-review' ? adminModule.includes(`../app/${entry}`) : gameHtml.includes(entry);
     if (!referenced && !INDIRECT_RUNTIME_ENTRYPOINTS.has(name)) {
       throw new Error(`Game HTML does not reference bundled entry: ${entry}`);
     }
+  }
+  for (const name of Object.keys(GAME_RUNTIME_ENTRYPOINTS)) {
+    if (!runtimePackaging.entries?.[name]) throw new Error(`Missing runtime entry: ${name}`);
   }
   const configuredAppEntrypoint = `./${path.basename(runtimePackaging.entries?.['app-entry'] || '')}`;
   if (

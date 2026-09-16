@@ -41,7 +41,7 @@ function readSharedExperienceParams() {
     name: params.get('lname') || null,
     launch: params.has('launch') ? normalizeLaunch(params.get('launch')) : null,
     gameMode: normalizeGameMode(params.get('gm')),
-    perfMode: params.get('pm') === 'baseline' ? 'baseline' : params.get('pm') === 'rdt' ? 'rdt' : null,
+    perfMode: params.has('pm') ? 'baseline' : null,
     seed: toNum('seed'),
     travelMode: normalizeTravelMode(params.get('mode')),
     camMode: (() => {
@@ -225,7 +225,7 @@ function initShareUi({ bindTouchFriendlyPress, closeAllFloatMenus, getTitleLaunc
     if (launchMode) params.set('launch', launchMode);
     if (appCtx.gameMode) params.set('gm', appCtx.gameMode);
     if (typeof appCtx.getPerfMode === 'function') params.set('pm', appCtx.getPerfMode());
-    const seedValue = Number.isFinite(Number(appCtx.sharedSeedOverride)) ? Number(appCtx.sharedSeedOverride) : Number(appCtx.rdtSeed);
+    const seedValue = Number.isFinite(Number(appCtx.sharedSeedOverride)) ? Number(appCtx.sharedSeedOverride) : Number(appCtx.worldSeed);
     if (Number.isFinite(seedValue)) params.set('seed', String((Math.floor(seedValue) | 0) >>> 0));
     const cameraMode = !appCtx.gameStarted && pending && Number.isFinite(pending.camMode) ? pending.camMode : appCtx.camMode;
     if (Number.isFinite(cameraMode)) params.set('camMode', String(Math.max(0, Math.min(2, cameraMode | 0))));

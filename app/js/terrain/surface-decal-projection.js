@@ -2,8 +2,20 @@
 // Every output face is coplanar with its support, including terrain folds.
 export function projectDecalTriangle(points, supports, lift = .012) {
   const output=[];
+  const minX=Math.min(...points.map(p=>p.x)),maxX=Math.max(...points.map(p=>p.x));
+  const minZ=Math.min(...points.map(p=>p.z)),maxZ=Math.max(...points.map(p=>p.z));
   for(const t of supports){
     const p=t.positions;
+    const ax=p[t.a],az=p[t.a+2],bx=p[t.b],bz=p[t.b+2],cx=p[t.c],cz=p[t.c+2];
+    const supportArea=(bx-ax)*(cz-az)-(bz-az)*(cx-ax);
+    if(Math.abs(supportArea)<1e-9)continue;
+    // The clipping half-planes include a 1e-9 tolerance. Expand the bounds
+    // by the corresponding worst vertex displacement, including thin faces,
+    // so this broad-phase rejection cannot remove accepted seam fragments.
+    const marginX=1e-9*(Math.abs(bx-ax)+Math.abs(cx-bx)+Math.abs(ax-cx))/Math.abs(supportArea);
+    const marginZ=1e-9*(Math.abs(bz-az)+Math.abs(cz-bz)+Math.abs(az-cz))/Math.abs(supportArea);
+    if(maxX<Math.min(ax,bx,cx)-marginX || minX>Math.max(ax,bx,cx)+marginX ||
+       maxZ<Math.min(az,bz,cz)-marginZ || minZ>Math.max(az,bz,cz)+marginZ)continue;
     const corners=[t.a,t.b,t.c].map(i=>({x:p[i],y:p[i+1],z:p[i+2]}));
     const [a,b,c]=corners;
     const area=(b.x-a.x)*(c.z-a.z)-(b.z-a.z)*(c.x-a.x);

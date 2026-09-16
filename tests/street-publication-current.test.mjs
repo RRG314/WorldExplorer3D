@@ -18,6 +18,9 @@ function harness(t, mode='success') {
   let worker;
   const ctx={_worldLoadSequence:1,terrainEnabled:true,scene:{},roads:[{pts:[{x:0,z:0},{x:10,z:0}],width:4}],roadMeshes:[],buildings:[],landuses:[],linearFeatures:[],linearFeatureMeshes:[],urbanSurfaceMeshes:[],car:{x:0,z:0},
     terrainMeshHeightAt:()=>10,sampleFeatureSurfaceY:()=>10.18,addEarthWorldObject(mesh){mesh.parent={remove(){}};}};
+  // Publication tests provide real support topology. Heights below remain
+  // controlled by each test's explicit sampler; missing support is tested separately.
+  ctx.terrainGroup={children:[{visible:true,userData:{isTerrainMesh:true},position:{x:0,y:0,z:0},geometry:{parameters:{widthSegments:1},attributes:{position:{array:new Float32Array([-16,0,-16,16,0,-16,-16,0,16,16,0,16])}}}}]};
   class Worker {
     constructor(){worker=this;this.next=0;}
     terminate(){this.terminated=true;}
@@ -180,4 +183,41 @@ test('city quality assessment fails slow, oversized pavement even when geometry 
 });
 test('missing browser measurements cannot produce a passing city assessment',()=>{
  assert.equal(assessStreetQuality({}).status,'pending');
+});
+
+
+test('missing terrain rejects replacement and disposes staged resources instead of approximating it',async t=>{
+  const h=harness(t),previous={meshes:[],sampleAt:()=>11,dispose(){this.disposed=true;}};
+  h.ctx.streetPavement=previous;h.ctx.terrainGroup.children=[];
+  await assert.rejects(publishStreetPavement(h.ctx),/incomplete or overlapping terrain support/);
+  assert.equal(h.ctx.streetPavement,previous);assert.equal(previous.disposed,undefined);
+  assert.equal(h.worker.terminated,true);assert.ok(h.resources.every(r=>r.disposed));
+});
+
+
+test('low flight traverses accepted detail without repeatedly replacing it',async t=>{
+ const h=harness(t);await publishStreetPavement(h.ctx);
+ h.ctx.gameStarted=true;h.ctx.planeMode={active:true,x:0,y:30,z:0};
+ let overviewTicks=0;h.ctx.streetOverview={step(){overviewTicks++;}};
+ const previous=h.ctx.streetPavement,worker=h.worker;
+ for(const height of [-80,0,3000]) {
+  h.ctx.terrainMeshHeightAt=()=>height;h.ctx.planeMode.y=height+20;
+  for(const [x,z] of [[0,0],[140,0],[220,220],[-220,220],[-220,-220],[220,-220]]){
+   Object.assign(h.ctx.planeMode,{x,z});updateStreetPavementFocus(h.ctx);
+   assert.equal(h.ctx._streetPavementUpdating,undefined);
+   assert.equal(h.ctx.streetPavement,previous);
+   assert.equal(h.worker,worker);
+  }
+ }
+ assert.equal(overviewTicks,18);previous.dispose();
+});
+
+test('approaching the detail boundary still schedules replacement',async t=>{
+ const h=harness(t,'pending');
+ h.ctx.streetPavement={focus:{x:0,z:0},coverageBounds:{minX:-384,maxX:384,minZ:-384,maxZ:384}};
+ h.ctx.car.x=257;updateStreetPavementFocus(h.ctx);
+ assert.equal(h.ctx._streetPavementUpdating,true);
+ h.ctx._cancelStreetPavementBuild();
+ for(let i=0;i<10 && h.ctx._streetPavementUpdating;i++)await new Promise(r=>setTimeout(r,1));
+ assert.equal(h.ctx._streetPavementUpdating,false);assert.equal(h.worker.terminated,true);
 });

@@ -46,7 +46,6 @@ import {
   initWorldBudgets,
   limitNodesByTileBudget,
   limitWaysByTileBudget,
-  rdtDepthForFeatureTile,
   wayCenterLatLon
 } from "./world/budgets.js?v=16";
 import { publishLocationWorld } from "./world/publication.js?v=2";
@@ -84,7 +83,6 @@ import {
   worldLinePointsFromLonLat
 } from "./world/load-geometry.js?v=28";
 import {
-  decimateRoadCenterlineByDepth,
   getPerfModeValue,
   isDriveableHighwayTag,
   linearFeaturePriority,
@@ -236,7 +234,6 @@ const { loadRoads: loadOsmRoads, isVehicleRoad, isInsideWaterArea } = createWorl
   cloneStructureSemantics,
   createSyntheticFallbackWorld,
   decimatePoints,
-  decimateRoadCenterlineByDepth,
   earthSceneSuppressed,
   fetchOverpassJSON,
   fetchGlobalBuildingData,
@@ -266,7 +263,6 @@ const { loadRoads: loadOsmRoads, isVehicleRoad, isInsideWaterArea } = createWorl
   pointInPolygon,
   polylineBounds,
   prepareWorldFeatureSelections,
-  rdtDepthForFeatureTile,
   recordWorldLoadWarning,
   refreshStructureAwareFeatureProfiles,
   refreshStructureAwareFeatureProfilesCooperatively,

@@ -1,3 +1,4 @@
+import {roadPlacementOffsetWorld,roadMetersPerWorldUnit} from '../world/road-units.js';
 import { resolveStreetSection } from '../world/compiler/street-section.js';
 import { directedSurfacePitch } from '../engine/vehicle-road-attitude.js?v=2';
 import {
@@ -251,7 +252,7 @@ export function compilePedestrianGraph(options = {}) {
         segment.sourceTEnd
       );
       const sidewalkOffset = width * .5;
-      const placement = Number(segment.feature?.transportRecord?.crossSection?.placement?.centerlineOffsetMeters) || 0;
+      const placement = roadPlacementOffsetWorld(segment.feature);
       const tags = segment.feature?.transportRecord?.sourceTags || segment.feature?.transportRecord?.rawTags || {};
       // OSM roadway geometry is the source authority. Where no separately
       // mapped footway exists, publish a clearly attributed inferred sidewalk
@@ -430,7 +431,7 @@ export function compileTrafficGraph(options = {}) {
       segment.sourceTStart,
       segment.sourceTEnd
     );
-    if (width < MIN_DRIVEABLE_ROAD_WIDTH_METERS) continue;
+    if (width*roadMetersPerWorldUnit(segment.feature) < MIN_DRIVEABLE_ROAD_WIDTH_METERS) continue;
     const laneOffset = Math.min(2.25, width * 0.24);
     const forwardOffset = driveOnLeft ? laneOffset : -laneOffset;
     const reverseOffset = -forwardOffset;

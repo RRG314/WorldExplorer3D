@@ -25,6 +25,9 @@ function systemSnapshot(record) {
     fixedUpdates: record.fixedUpdates,
     failures: record.failures,
     lastDurationMs: Number(record.lastDurationMs.toFixed(3)),
+    maxDurationMs: Number(record.maxDurationMs.toFixed(3)),
+    slowUpdates: record.slowUpdates,
+    lastSlowFrame: record.lastSlowFrame,
     lastError: record.lastError
   };
 }
@@ -88,6 +91,9 @@ function createRuntimeKernel(options = {}) {
       fixedUpdates: 0,
       failures: 0,
       lastDurationMs: 0,
+      maxDurationMs: 0,
+      slowUpdates: 0,
+      lastSlowFrame: null,
       lastError: ''
     };
     systems.set(id, record);
@@ -130,6 +136,8 @@ function createRuntimeKernel(options = {}) {
       if (method === 'fixedUpdate') record.fixedUpdates++;
       else record.updates++;
       record.lastDurationMs = Math.max(0, now() - startedAt);
+      record.maxDurationMs = Math.max(record.maxDurationMs,record.lastDurationMs);
+      if(record.lastDurationMs>16.7){record.slowUpdates++;record.lastSlowFrame=frameNumber;}
     } catch (error) {
       record.failures++;
       record.lastError = error instanceof Error ? error.message : String(error);
@@ -171,6 +179,7 @@ function createRuntimeKernel(options = {}) {
       ...sharedContext,
       timestamp: currentTimestamp,
       dt,
+      rawDelta,
       fixedDelta,
       frameNumber,
       flags: Object.create(null),

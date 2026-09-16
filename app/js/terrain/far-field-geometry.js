@@ -253,17 +253,11 @@ function createFarFieldGeometryPlanner(deps = {}) {
     const northWest = appCtx.geoToWorld(bounds.latN, bounds.lonW);
     const northEast = appCtx.geoToWorld(bounds.latN, bounds.lonE);
     const southWest = appCtx.geoToWorld(bounds.latS, bounds.lonW);
-    const center = appCtx.geoToWorld(
-      (bounds.latN + bounds.latS) * 0.5,
-      (bounds.lonW + bounds.lonE) * 0.5
-    );
-    const width = Math.hypot(northEast.x - northWest.x, northEast.z - northWest.z);
-    const depth = Math.hypot(southWest.x - northWest.x, southWest.z - northWest.z);
     return {
-      minX: center.x - width * 0.5,
-      maxX: center.x + width * 0.5,
-      minZ: center.z - depth * 0.5,
-      maxZ: center.z + depth * 0.5
+      minX: Math.fround(northWest.x),
+      maxX: Math.fround(northEast.x),
+      minZ: Math.fround(northWest.z),
+      maxZ: Math.fround(southWest.z)
     };
   }
 
@@ -275,7 +269,13 @@ function createFarFieldGeometryPlanner(deps = {}) {
         const tx = centerX + dx;
         const ty = centerY + dy;
         if (!publishedTiles.has(`${z}/${tx}/${ty}`)) continue;
-        coverage.push(detailedTileWorldBounds(z, tx, ty));
+        const mesh=appCtx.terrainGroup.children.find(m=>m.userData?.terrainTileKey===`${z}/${tx}/${ty}` && m.visible && !m.userData?.pendingTerrainTile);
+        const p=mesh?.geometry?.attributes?.position,n=mesh?.geometry?.parameters?.widthSegments;
+        if(p&&Number.isInteger(n)&&n>0)coverage.push({
+          minX:Math.fround(p.getX(0)+mesh.position.x),maxX:Math.fround(p.getX(n)+mesh.position.x),
+          minZ:Math.fround(p.getZ(0)+mesh.position.z),maxZ:Math.fround(p.getZ(n*(n+1))+mesh.position.z)
+        });
+        else coverage.push(detailedTileWorldBounds(z, tx, ty));
       }
     }
     return coverage;
@@ -480,8 +480,9 @@ function createFarFieldGeometryPlanner(deps = {}) {
     const boundaryLines=collectDetailBoundaryLines(appCtx.terrainGroup?.children);
     const boundaryTriangles=new Map();
     const boundaryBindings=new Map(),pointsByIndex=new Map();
+    let positionData=positions;
     const point=index=>{
-      if(!pointsByIndex.has(index))pointsByIndex.set(index,{x:positions[index*3],y:positions[index*3+1],z:positions[index*3+2]});
+      if(!pointsByIndex.has(index))pointsByIndex.set(index,{x:positionData[index*3],y:positionData[index*3+1],z:positionData[index*3+2]});
       return pointsByIndex.get(index);
     };
     const xRange = spec.outer.maxX - spec.outer.minX || 1;
@@ -615,6 +616,15 @@ function createFarFieldGeometryPlanner(deps = {}) {
     geometry.computeVertexNormals();
     geometry.computeBoundingSphere();
     const worldYs=new Float32Array(surfaceWorldYs);
+    const publishedTints=new Float32Array(mappedSurfaceTints);
+    const boundaryAdditionalVertices=positions.length/3-xValues.length*zValues.length;
+    // Boundary refresh survives for this world's lifetime. It must retain
+    // published buffers and seam points only, not every construction vertex
+    // and the boxed-number arrays used before BufferGeometry publication.
+    positionData=geometry.attributes.position.array;
+    for(const index of pointsByIndex.keys())if(!boundaryBindings.has(index))pointsByIndex.delete(index);
+    positions.length=0;colors.length=0;uvs.length=0;indices.length=0;
+    surfaceWorldYs.length=0;mappedSurfaceTints.length=0;
     const refreshBoundaryHeights=meshes=>{
       const lines=collectDetailBoundaryLines(meshes),attribute=geometry.attributes.position;
       let changed=0;
@@ -636,11 +646,11 @@ function createFarFieldGeometryPlanner(deps = {}) {
       minElevationMeters,
       maxElevationMeters,
       waterMaskedVertices: maskStats.waterMaskedVertices,
-      mappedSurfaceTints: new Float32Array(mappedSurfaceTints),
+      mappedSurfaceTints: publishedTints,
       mappedSurfaceModes,
       coverage: {
         boundaryTransitionCells:boundaryTriangles.size,
-        boundaryAdditionalVertices:positions.length/3-xValues.length*zValues.length,
+        boundaryAdditionalVertices,
         totalCells: (xValues.length - 1) * (zValues.length - 1),
         farOwnedCells,
         detailedOwnedCells,

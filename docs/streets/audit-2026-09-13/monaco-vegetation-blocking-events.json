@@ -1,0 +1,602 @@
+[
+  {
+    "level": "info",
+    "message": "[TransportSurface] refreshStructureProfiles:end {\"milliseconds\":3259.7}",
+    "timestamp": "2026-09-15T13:26:31.136Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] applyTransportTerrainCorridors:start {}",
+    "timestamp": "2026-09-15T13:26:31.136Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] applyTransportTerrainCorridors:end {\"milliseconds\":26801.7}",
+    "timestamp": "2026-09-15T13:26:31.136Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] reprojectGroundAttachedWorld:start {}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] reprojectGroundAttachedWorld:end {\"milliseconds\":44.8}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] refreshPublishedTerrainStructureAssemblies:start {}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] refreshPublishedTerrainStructureAssemblies:end {\"milliseconds\":956.4}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] detectIntersections:start {}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] detectIntersections:end {\"milliseconds\":609.6}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] buildStructureRibbons:start {}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] buildStructureRibbons:end {\"milliseconds\":1288.5}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] buildCarriagewayRegions:start {}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] indexCarriageways:start {\"roads\":12256}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] indexCarriageways:end {\"tiles\":8353}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":0,\"total\":8353,\"key\":\"-104:39\"}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":128,\"total\":8353,\"key\":\"-98:19\"}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":256,\"total\":8353,\"key\":\"-95:-1\"}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":384,\"total\":8353,\"key\":\"-93:4\"}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":512,\"total\":8353,\"key\":\"-91:-45\"}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":640,\"total\":8353,\"key\":\"-90:18\"}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":768,\"total\":8353,\"key\":\"-88:-3\"}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":896,\"total\":8353,\"key\":\"-86:-12\"}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":1024,\"total\":8353,\"key\":\"-84:-31\"}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":1152,\"total\":8353,\"key\":\"-82:-12\"}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":1280,\"total\":8353,\"key\":\"-80:-23\"}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":1408,\"total\":8353,\"key\":\"-79:30\"}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":1536,\"total\":8353,\"key\":\"-77:27\"}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":1664,\"total\":8353,\"key\":\"-75:0\"}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":1792,\"total\":8353,\"key\":\"-73:-74\"}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":1920,\"total\":8353,\"key\":\"-72:9\"}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":2048,\"total\":8353,\"key\":\"-70:-46\"}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":2176,\"total\":8353,\"key\":\"-68:-64\"}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":2304,\"total\":8353,\"key\":\"-67:32\"}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":2432,\"total\":8353,\"key\":\"-65:18\"}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":2560,\"total\":8353,\"key\":\"-63:8\"}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":2688,\"total\":8353,\"key\":\"-61:-15\"}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":2816,\"total\":8353,\"key\":\"-59:-55\"}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":2944,\"total\":8353,\"key\":\"-58:29\"}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":3072,\"total\":8353,\"key\":\"-56:-17\"}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":3200,\"total\":8353,\"key\":\"-55:31\"}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":3328,\"total\":8353,\"key\":\"-53:-40\"}",
+    "timestamp": "2026-09-15T13:26:31.137Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":3456,\"total\":8353,\"key\":\"-52:21\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":3584,\"total\":8353,\"key\":\"-50:-32\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":3712,\"total\":8353,\"key\":\"-49:40\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":3840,\"total\":8353,\"key\":\"-47:5\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":3968,\"total\":8353,\"key\":\"-45:14\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":4096,\"total\":8353,\"key\":\"-43:1\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":4224,\"total\":8353,\"key\":\"-41:1\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":4352,\"total\":8353,\"key\":\"-38:-80\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":4480,\"total\":8353,\"key\":\"-35:-63\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":4608,\"total\":8353,\"key\":\"-32:-46\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":4736,\"total\":8353,\"key\":\"-30:9\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":4864,\"total\":8353,\"key\":\"-27:4\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":4992,\"total\":8353,\"key\":\"-25:5\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":5120,\"total\":8353,\"key\":\"-21:-46\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":5248,\"total\":8353,\"key\":\"-18:13\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":5376,\"total\":8353,\"key\":\"-13:-31\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":5504,\"total\":8353,\"key\":\"-10:-35\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":5632,\"total\":8353,\"key\":\"-7:-19\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":5760,\"total\":8353,\"key\":\"-4:-20\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":5888,\"total\":8353,\"key\":\"-1:-29\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":6016,\"total\":8353,\"key\":\"2:-14\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":6144,\"total\":8353,\"key\":\"6:-21\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":6272,\"total\":8353,\"key\":\"10:-70\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":6400,\"total\":8353,\"key\":\"13:-80\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":6528,\"total\":8353,\"key\":\"16:-43\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":6656,\"total\":8353,\"key\":\"19:-33\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":6784,\"total\":8353,\"key\":\"24:-38\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":6912,\"total\":8353,\"key\":\"27:-12\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":7040,\"total\":8353,\"key\":\"30:-13\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":7168,\"total\":8353,\"key\":\"33:-21\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":7296,\"total\":8353,\"key\":\"36:-37\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":7424,\"total\":8353,\"key\":\"40:-41\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":7552,\"total\":8353,\"key\":\"45:-41\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":7680,\"total\":8353,\"key\":\"56:-37\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":7808,\"total\":8353,\"key\":\"71:-56\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":7936,\"total\":8353,\"key\":\"76:-50\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":8064,\"total\":8353,\"key\":\"83:-47\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":8192,\"total\":8353,\"key\":\"90:-59\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] meshCarriageway:progress {\"completed\":8320,\"total\":8353,\"key\":\"97:-49\"}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] buildCarriagewayRegions:end {\"milliseconds\":12804.4}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] projectGroundRoadMarkings:start {}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] projectGroundRoadMarkings:end {\"milliseconds\":587.7}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] uploadRoadMeshes:start {}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] uploadRoadMeshes:end {\"milliseconds\":152.4}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] rebuildStructureVisuals:start {}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[TransportSurface] rebuildStructureVisuals:end {\"milliseconds\":235.9}",
+    "timestamp": "2026-09-15T13:26:31.138Z",
+    "url": "http://127.0.0.1:4192/app/js/terrain/rebuild.js?v=54"
+  },
+  {
+    "level": "info",
+    "message": "[StreetPavement] prepared {\"tiles\":140,\"paths\":203}",
+    "timestamp": "2026-09-15T13:26:31.254Z",
+    "url": "http://127.0.0.1:4192/app/js/world/street-pavement-runtime.js"
+  },
+  {
+    "level": "info",
+    "message": "[StreetPavement] cell {\"completed\":16,\"total\":140}",
+    "timestamp": "2026-09-15T13:26:32.841Z",
+    "url": "http://127.0.0.1:4192/app/js/world/street-pavement-runtime.js"
+  },
+  {
+    "level": "info",
+    "message": "[StreetPavement] cell {\"completed\":32,\"total\":140}",
+    "timestamp": "2026-09-15T13:26:34.526Z",
+    "url": "http://127.0.0.1:4192/app/js/world/street-pavement-runtime.js"
+  },
+  {
+    "level": "info",
+    "message": "[StreetPavement] cell {\"completed\":48,\"total\":140}",
+    "timestamp": "2026-09-15T13:26:35.915Z",
+    "url": "http://127.0.0.1:4192/app/js/world/street-pavement-runtime.js"
+  },
+  {
+    "level": "info",
+    "message": "[StreetPavement] cell {\"completed\":64,\"total\":140}",
+    "timestamp": "2026-09-15T13:26:37.366Z",
+    "url": "http://127.0.0.1:4192/app/js/world/street-pavement-runtime.js"
+  },
+  {
+    "level": "info",
+    "message": "[StreetPavement] cell {\"completed\":80,\"total\":140}",
+    "timestamp": "2026-09-15T13:26:38.799Z",
+    "url": "http://127.0.0.1:4192/app/js/world/street-pavement-runtime.js"
+  },
+  {
+    "level": "info",
+    "message": "[StreetPavement] cell {\"completed\":96,\"total\":140}",
+    "timestamp": "2026-09-15T13:26:40.410Z",
+    "url": "http://127.0.0.1:4192/app/js/world/street-pavement-runtime.js"
+  },
+  {
+    "level": "info",
+    "message": "[StreetPavement] cell {\"completed\":112,\"total\":140}",
+    "timestamp": "2026-09-15T13:26:41.706Z",
+    "url": "http://127.0.0.1:4192/app/js/world/street-pavement-runtime.js"
+  },
+  {
+    "level": "info",
+    "message": "[StreetPavement] cell {\"completed\":128,\"total\":140}",
+    "timestamp": "2026-09-15T13:26:42.753Z",
+    "url": "http://127.0.0.1:4192/app/js/world/street-pavement-runtime.js"
+  },
+  {
+    "level": "info",
+    "message": "[StreetPavement] mapped-paths-start {\"features\":2693}",
+    "timestamp": "2026-09-15T13:26:43.724Z",
+    "url": "http://127.0.0.1:4192/app/js/world/street-pavement-runtime.js"
+  },
+  {
+    "level": "info",
+    "message": "[StreetPavement] mapped-paths-complete {\"batches\":1}",
+    "timestamp": "2026-09-15T13:26:43.805Z",
+    "url": "http://127.0.0.1:4192/app/js/world/street-pavement-runtime.js"
+  },
+  {
+    "level": "info",
+    "message": "[StreetPavement] published {\"tiles\":127,\"triangles\":144852,\"curbTriangles\":82868,\"markingTriangles\":18398,\"ramps\":0,\"workerMs\":3652,\"inferredFrontages\":40048,\"managedPaths\":203,\"residentRoads\":328,\"residentBuildings\":1056,\"roads\":12793,\"roadMeshes\":19,\"buildings\":9417,\"worldLoadSequence\":1,\"plannedTiles\":140,\"maxPublicationSliceMs\":10.800000011920929,\"maxConformanceSliceMs\":16.200000047683716,\"highestRefinement\":{\"cell\":\"-3:4\",\"bounds\":{\"minX\":-192,\"maxX\":-128,\"minZ\":256,\"maxZ\":320},\"addedTriangles\":1867,\"baseTriangles\":816},\"terrainRefinementTriangles\":103314,\"drawCalls\":96,\"compilerCacheBytes\":16737056,\"coverageBounds\":{\"minX\":-384,\"maxX\":384,\"minZ\":-384,\"maxZ\":384},\"indexBytes\":1474890,\"positionBytes\":2362224,\"durationMs\":12908}",
+    "timestamp": "2026-09-15T13:26:43.889Z",
+    "url": "http://127.0.0.1:4192/app/js/world/street-pavement-runtime.js"
+  },
+  {
+    "level": "info",
+    "message": "[Vegetation refresh] {\"collectionMs\":363.60000002384186,\"disposalMs\":0.10000002384185791,\"publicationMs\":13.599999964237213,\"totalMs\":377.30000001192093,\"candidates\":982,\"instances\":982}",
+    "timestamp": "2026-09-15T13:26:46.666Z",
+    "url": "http://127.0.0.1:4192/app/js/world/furniture.js?v=22"
+  }
+]

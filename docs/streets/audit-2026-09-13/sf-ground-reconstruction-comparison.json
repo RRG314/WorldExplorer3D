@@ -1,0 +1,11 @@
+{
+  "scope": "Identical captured San Francisco 1-world-unit sample lattice; ground only, not a rendered-world acceptance test",
+  "before": {
+    "maximumAxisGrade": 0.5698480954437315,
+    "edgesAbove50": 305
+  },
+  "after": {
+    "maximumAxisGrade": 0.21620704954081305,
+    "edgesAbove50": 0
+  }
+}

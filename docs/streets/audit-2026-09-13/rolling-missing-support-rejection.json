@@ -1,0 +1,17 @@
+{
+  "test": "real worker and renderer: missing terrain support rejects staged replacement",
+  "pass": true,
+  "failure": "Pavement has incomplete or overlapping terrain support: {\"sourceArea\":57.60000000000002,\"coveredArea\":0,\"difference\":-57.60000000000002}",
+  "retained": true,
+  "workerActive": false,
+  "before": {
+    "geometries": 16,
+    "textures": 1,
+    "sceneChildren": 18
+  },
+  "after": {
+    "geometries": 16,
+    "textures": 1,
+    "sceneChildren": 18
+  }
+}

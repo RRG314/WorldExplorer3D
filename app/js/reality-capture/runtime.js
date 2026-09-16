@@ -1,3 +1,5 @@
+import {createRdtCaptureSelector} from './rdt-building-index.js';
+import { buildingCenter } from './nearby-buildings.js';
 import {readCaptureIntent,clearCaptureIntent} from './capture-intent.js';
 import { listApprovedExteriorRepresentations } from '../../../js/community-reality-capture-api.js?v=4';
 import { worldModificationIdentityForLocation } from '../editable-world/model.js?v=1';
@@ -9,28 +11,13 @@ import { createNearbyCaptureRefresh } from './nearby-refresh.js?v=1';
 const MAX_RUNTIME_VERTICES = 1_500_000;
 const instances = new Map();
 let refreshSerial = 0;
+const captureSelector=createRdtCaptureSelector();
 
 function finite(value, fallback = 0) {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
 }
 
-function buildingCenter(building) {
-  if (Number.isFinite(building?.centerX) && Number.isFinite(building?.centerZ)) {
-    return { x: building.centerX, z: building.centerZ };
-  }
-  const points = Array.isArray(building?.pts) ? building.pts : [];
-  if (points.length) {
-    return {
-      x: points.reduce((sum, point) => sum + finite(point.x), 0) / points.length,
-      z: points.reduce((sum, point) => sum + finite(point.z), 0) / points.length
-    };
-  }
-  return {
-    x: (finite(building?.minX) + finite(building?.maxX)) * 0.5,
-    z: (finite(building?.minZ) + finite(building?.maxZ)) * 0.5
-  };
-}
 
 function disposeObject(root) {
   root?.parent?.remove(root);
@@ -88,6 +75,8 @@ function removeInstance(appCtx, representationId) {
 
 export function clearCommunityRealityCapturePresentation(appCtx) {
   refreshSerial += 1;
+  appCtx.captureNearbySelection = null;
+  captureSelector.clear();
   [...instances.keys()].forEach((sourceBuildingId) => removeInstance(appCtx, sourceBuildingId));
   publishCaptureEntryBuildings(appCtx);
   appCtx.communityRealityCapturePresentation = Object.freeze({ worldId: '', approved: 0, loaded: 0, failed: 0 });
@@ -172,7 +161,11 @@ export async function refreshCommunityRealityCapturePresentation(appCtx) {
       for(const r of local)if(!instances.has(r.representationId))await attachRepresentation(appCtx,r,worldId,sequence,serial);
     }
     const actor=appCtx.activeTransportActor?.()?.position||appCtx.Walk?.state?.walker||appCtx.car||{x:0,z:0};
-    const nearby=[...new Set((appCtx.buildings||[]).filter(b=>b.sourceBuildingId).map(b=>({id:String(b.sourceBuildingId),center:buildingCenter(b)})).sort((a,b)=>Math.hypot(a.center.x-actor.x,a.center.z-actor.z)-Math.hypot(b.center.x-actor.x,b.center.z-actor.z)).map(b=>b.id))].slice(0,60);
+    const selectionStarted=performance.now();
+    const selection=captureSelector.select(appCtx.buildings || [],actor,appCtx._worldLoadSequence);
+    const nearby=selection.ids;
+    appCtx.captureNearbySelection={durationMs:performance.now()-selectionStarted,
+      buildings:appCtx.buildings?.length || 0,selected:nearby.length,...selection.stats};
     const response = await listApprovedExteriorRepresentations(worldId,nearby);
     if(serial!==refreshSerial)return null;
     const localBuildings=new Set(local.map(r=>r.sourceBuildingId));

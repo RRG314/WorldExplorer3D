@@ -1,0 +1,420 @@
+{
+  "note": "Legacy browser heap estimate may include shared contexts or omit workers; it is not isolated tab memory. Geometry bytes exclude textures and GPU overhead. Inspect twice to see runtime activity.",
+  "javascriptHeapBytes": 1603306019,
+  "sceneGeometryBytes": 388256592,
+  "rendererResources": {
+    "geometries": 882,
+    "textures": 295
+  },
+  "gameStarted": true,
+  "worldLoading": false,
+  "pavementBuildActive": false,
+  "deferredWork": {
+    "budgets": {
+      "firstPlayTargetMs": 25000,
+      "frameTargetMs": 16.7,
+      "cooperativeChunkTargetMs": 8,
+      "backgroundIdleTimeoutMs": 1800,
+      "inactiveAuxiliaryRenderers": 0
+    },
+    "firstPlayReady": true,
+    "activeTask": null,
+    "firstPlayDetail": {
+      "environment": "earth",
+      "loadDurationMs": 168034,
+      "publicationSequence": 1
+    },
+    "queued": [],
+    "completed": [
+      "tutorial-runtime",
+      "analytics-runtime",
+      "earth-ambient-state-1",
+      "earth-star-catalog"
+    ]
+  },
+  "street": {
+    "tiles": 114,
+    "triangles": 89839,
+    "curbTriangles": 32384,
+    "markingTriangles": 0,
+    "ramps": 0,
+    "workerMs": 1291,
+    "inferredFrontages": 14092,
+    "managedPaths": 0,
+    "residentRoads": 308,
+    "residentBuildings": 1181,
+    "roads": 18110,
+    "roadMeshes": 35,
+    "buildings": 25554,
+    "worldLoadSequence": 1,
+    "plannedTiles": 143,
+    "highestRefinement": {
+      "cell": "-2:1",
+      "bounds": {
+        "minX": -128,
+        "maxX": -64,
+        "minZ": 64,
+        "maxZ": 128
+      },
+      "addedTriangles": 1238,
+      "baseTriangles": 366
+    },
+    "terrainRefinementTriangles": 67260,
+    "drawCalls": 66,
+    "compilerCacheBytes": 11697310,
+    "coverageBounds": {
+      "minX": -384,
+      "maxX": 384,
+      "minZ": -384,
+      "maxZ": 384
+    },
+    "indexBytes": 732876,
+    "positionBytes": 1103364,
+    "durationMs": 6101,
+    "sourceCoverage": {
+      "scope": "Loaded source network requiring inferred or mapped sidewalks; length within the compilation window, not proof of rendered pavement. Separately tagged sidewalks need mapped path data.",
+      "requiredSidewalkMeters": 596620.1965488573,
+      "withinCompilationWindowMeters": 19893.279005063403,
+      "outsideCompilationWindowMeters": 576726.9175437939,
+      "compilationCoveragePercent": 3.334328794119919,
+      "requiredSegments": 2908,
+      "uncoveredSegments": 2819,
+      "examples": [
+        {
+          "kind": "road-side",
+          "name": "North Greene Street",
+          "a": {
+            "x": -942.4291837355339,
+            "z": 872.6258645666007
+          },
+          "b": {
+            "x": -946.995278027188,
+            "z": 862.2470915597091
+          },
+          "uncoveredMeters": 25.172112580705928
+        },
+        {
+          "kind": "road-side",
+          "name": "North Greene Street",
+          "a": {
+            "x": -946.995278027188,
+            "z": 862.2470915597091
+          },
+          "b": {
+            "x": -952.3915712809611,
+            "z": 855.1895346997185
+          },
+          "uncoveredMeters": 19.722934004355505
+        },
+        {
+          "kind": "road-side",
+          "name": "North Greene Street",
+          "a": {
+            "x": -952.3915712809611,
+            "z": 855.1895346997185
+          },
+          "b": {
+            "x": -1138.7712382766608,
+            "z": 655.5051389554478
+          },
+          "uncoveredMeters": 606.3942828001532
+        },
+        {
+          "kind": "road-side",
+          "name": "North Greene Street",
+          "a": {
+            "x": -1138.7712382766608,
+            "z": 655.5051389554478
+          },
+          "b": {
+            "x": -1230.0931241097433,
+            "z": 560.0239687382214
+          },
+          "uncoveredMeters": 293.3118297935138
+        },
+        {
+          "kind": "road-side",
+          "name": "North Greene Street",
+          "a": {
+            "x": -1230.0931241097433,
+            "z": 560.0239687382214
+          },
+          "b": {
+            "x": -1483.3038075560169,
+            "z": 293.51385374951633
+          },
+          "uncoveredMeters": 816.1128588218428
+        },
+        {
+          "kind": "road-side",
+          "name": "South Howard Street",
+          "a": {
+            "x": -579.6322372895614,
+            "z": 1592.9502948964114
+          },
+          "b": {
+            "x": -577.5567398842641,
+            "z": 1659.796837655847
+          },
+          "uncoveredMeters": 148.47083772683123
+        },
+        {
+          "kind": "road-side",
+          "name": "South Howard Street",
+          "a": {
+            "x": -577.5567398842641,
+            "z": 1659.796837655847
+          },
+          "b": {
+            "x": -574.6510435168478,
+            "z": 1718.7551875153417
+          },
+          "uncoveredMeters": 131.04639671986547
+        },
+        {
+          "kind": "road-side",
+          "name": "West Lombard Street",
+          "a": {
+            "x": -1294.4335436739602,
+            "z": 1648.586503345939
+          },
+          "b": {
+            "x": -1335.943491779907,
+            "z": 1652.3232794540377
+          },
+          "uncoveredMeters": 92.52472331340144
+        }
+      ],
+      "status": "incomplete"
+    }
+  },
+  "workSinceLastInspection": null,
+  "streetOverview": {
+    "status": "building",
+    "representation": "terrain material coverage",
+    "completedCells": 770,
+    "totalCells": 3901,
+    "nonemptyCells": 696,
+    "coveredSquareWorldUnits": 358474.95294117666,
+    "positionBytes": 0,
+    "retainedBytes": 16027312,
+    "drawCalls": 0,
+    "workerActive": true,
+    "sourceScope": "complete loaded location",
+    "error": null,
+    "sourceCells": 82813,
+    "excludedCells": 78912,
+    "maskResolution": 64,
+    "worldUnitsPerTexel": 1,
+    "materials": 139
+  },
+  "groundMode": "accepted-ground",
+  "groundProvenance": {
+    "generation": 2,
+    "status": "accepted",
+    "reason": null,
+    "location": {
+      "latitude": 39.3035,
+      "longitude": -76.61180000000002
+    },
+    "artifactId": "baltimore-ground",
+    "providerId": "usgs-3dep-best-available",
+    "sourceRelease": "USGS-3DEP:20260511",
+    "verticalDatum": "EGM2008",
+    "contentSha256": "a3b3c9372f4873e77336c4c25e0b4ba28d24fddded59e50cd1b9d9f7100140f0",
+    "artifactCount": 1,
+    "artifactIds": [
+      "baltimore-ground"
+    ],
+    "contentSha256s": [
+      "a3b3c9372f4873e77336c4c25e0b4ba28d24fddded59e50cd1b9d9f7100140f0"
+    ]
+  },
+  "contactIndexes": {
+    "roads": {
+      "triangles": 2452399,
+      "cells": 450850,
+      "cellReferences": 4552669,
+      "recordBytes": 69178256,
+      "bucketBytes": 18210676
+    },
+    "walkways": {
+      "triangles": 626,
+      "cells": 1494,
+      "cellReferences": 3531,
+      "recordBytes": 17528,
+      "bucketBytes": 14124
+    }
+  },
+  "heightSamplingCaches": {
+    "terrainEntries": 49186,
+    "baseEntries": 57068,
+    "maximumEntriesPerCache": 65536
+  },
+  "roadTerrainConformance": {
+    "authority": "published-at-grade-road-geometry-versus-rendered-terrain",
+    "totalSamples": 970302,
+    "issuesFound": 0,
+    "profileDepartures": 179394,
+    "maximumProfileDeparture": 22.61584864032453,
+    "worstProfileDepartures": [
+      {
+        "roadName": "Baltimore National Pike",
+        "x": -12809.806325119793,
+        "z": 952.2954607946293,
+        "expectedY": 41.1465873718262,
+        "renderedY": 63.76243601215073,
+        "departure": 22.61584864032453
+      },
+      {
+        "roadName": "Baltimore National Pike",
+        "x": -12807.431895751675,
+        "z": 949.6449091179949,
+        "expectedY": 41.14658737182618,
+        "renderedY": 63.666303759762926,
+        "departure": 22.519716387936747
+      },
+      {
+        "roadName": "Baltimore National Pike",
+        "x": -12805.057466383558,
+        "z": 946.9943574413604,
+        "expectedY": 41.14658737182616,
+        "renderedY": 63.570171507375115,
+        "departure": 22.423584135548957
+      },
+      {
+        "roadName": "Baltimore National Pike",
+        "x": -12824.696345214572,
+        "z": 938.9566146530605,
+        "expectedY": 38.74767684936519,
+        "renderedY": 60.56658507114402,
+        "departure": 21.818908221778827
+      },
+      {
+        "roadName": "Baltimore National Pike",
+        "x": -12839.58636530935,
+        "z": 925.6177685114914,
+        "expectedY": 36.34876251220706,
+        "renderedY": 58.03470721174969,
+        "departure": 21.68594469954263
+      },
+      {
+        "roadName": "Baltimore National Pike",
+        "x": -12805.460817677927,
+        "z": 946.4627513606056,
+        "expectedY": 41.933963775634766,
+        "renderedY": 63.55086911851135,
+        "departure": 21.616905342876585
+      },
+      {
+        "roadName": "Baltimore National Pike",
+        "x": -12837.211935941232,
+        "z": 922.9672168348569,
+        "expectedY": 36.34876251220704,
+        "renderedY": 57.95307545705484,
+        "departure": 21.6043129448478
+      },
+      {
+        "roadName": "Baltimore National Pike",
+        "x": -12834.837506573114,
+        "z": 920.3166651582225,
+        "expectedY": 36.34876251220702,
+        "renderedY": 57.87144370235998,
+        "departure": 21.522681190152966
+      },
+      {
+        "roadName": "Baltimore National Pike",
+        "x": -12803.093436659312,
+        "z": 943.8059024512038,
+        "expectedY": 41.933963775634766,
+        "renderedY": 63.122886358198336,
+        "departure": 21.18892258256357
+      },
+      {
+        "roadName": "Baltimore National Pike",
+        "x": -12780.026284930236,
+        "z": 978.9731530777674,
+        "expectedY": 45.944412231445355,
+        "renderedY": 66.98326424105697,
+        "departure": 21.038852009611617
+      }
+    ],
+    "minimumDelta": 0.18,
+    "maximumDelta": 0.18,
+    "buriedSamples": 0,
+    "floatingSamples": 0,
+    "worstDeltas": []
+  },
+  "transportPhases": {
+    "refreshStructureProfiles": 5179.6,
+    "applyTransportTerrainCorridors": 50224.5,
+    "reprojectGroundAttachedWorld": 49,
+    "refreshPublishedTerrainStructureAssemblies": 1184,
+    "detectIntersections": 1617.1,
+    "buildStructureRibbons": 2794.1,
+    "buildCarriagewayRegions": 33315.9,
+    "projectGroundRoadMarkings": 1606.8,
+    "uploadRoadMeshes": 333,
+    "rebuildStructureVisuals": 268.4,
+    "total": 97670.5
+  },
+  "loadPhases": {
+    "prepareAcceptedGround": 77,
+    "fetchOverpass": 9251,
+    "fetchFixedRegionalContext": 9533,
+    "fetchFixedRegionalStructures": 288,
+    "waitForFixedRegionalGround": 7186,
+    "featureBudgeting": 2482,
+    "waitForTransportGround": 1,
+    "buildRoadGeometry": 2222,
+    "buildLanduseGeometry": 116,
+    "batchLanduseGeometry": 9,
+    "buildLinearFeatureData": 60,
+    "buildPoiGeometry": 14,
+    "buildStreetFurniture": 366,
+    "buildBuildingRoadGuards": 5852,
+    "buildBuildingGeometry": 8395,
+    "publishBuildingFacadeEntrances": 404,
+    "publishBuildingExteriorDetails": 17,
+    "batchBuildingGeometry": 1248,
+    "publishLocationTerrain": 0,
+    "publishCompiledTransportMeshes": 97671,
+    "refreshTerrainSurfaceProfiles": 857,
+    "retireGroundFallbackPlaceholder": 0,
+    "buildTraversalNetworks": 1539,
+    "spawnPlayer": 466,
+    "refreshMemoryMarkersForCurrentLocation": 0,
+    "refreshBlockBuilderForCurrentLocation": 0,
+    "refreshEditableWorldPresentation": 0,
+    "publishLocationWorld": 2,
+    "refreshEditableBuildingVisibility": 556,
+    "waitForTerrainSurfaceMaterials": 0
+  },
+  "geometryByLayer": {
+    "roadMeshes": 91643720,
+    "buildingMeshes": 135594156,
+    "landuseMeshes": 1128678,
+    "urbanSurfaceMeshes": 3675180,
+    "linearFeatureMeshes": 26316,
+    "vegetationMeshes": 79779108
+  },
+  "quality": {
+    "status": "fail",
+    "failures": [
+      "rendered roads depart from engineered profiles; terrain agreement does not establish a valid grade",
+      "JavaScript heap exceeds 768 MiB",
+      "first play exceeds 25000 ms",
+      "loaded streets requiring sidewalks extend beyond completed pavement coverage"
+    ],
+    "pending": [
+      "location-wide pavement areas are not complete"
+    ],
+    "refinementMultiplier": 3.978874175118473,
+    "budgets": {
+      "javascriptHeapBytes": 805306368,
+      "pavementPositionBytes": 16777216,
+      "refinementMultiplier": 8
+    },
+    "visualStatus": "Requires camera sweep and recorded city route; performance checks cannot certify appearance."
+  }
+}

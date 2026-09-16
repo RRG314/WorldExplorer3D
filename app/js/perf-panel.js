@@ -86,8 +86,6 @@ export function createPerfPanelApi({ appCtx, constants, perfStats, state }) {
     const counts = live.worldCounts || {};
     const spikes = live.spikes || getPerfSpikeMetrics(false);
     const quality = live.quality || getDynamicBudgetState();
-    const rdtNoise = live.rdtNoise || {};
-    const rdtNoiseStatus = rdtNoise.enabled ? `ON ${String(rdtNoise.variant || 'standard').toUpperCase()}` : 'OFF';
     const lines = [
       `MODE: ${String(getPerfMode()).toUpperCase()}`,
       `FPS: ${(live.fpsCurrent || 0).toFixed(1)} CUR | ${(live.fps || 0).toFixed(1)} AVG | FRAME: ${(live.frameMs || 0).toFixed(1)} ms`,
@@ -96,8 +94,6 @@ export function createPerfPanelApi({ appCtx, constants, perfStats, state }) {
       `GEO: ${formatPerfNumber(renderer.geometries)} | TEX: ${formatPerfNumber(renderer.textures)} | PROG: ${formatPerfNumber(renderer.programs)}`,
       `LOAD: ${Number.isFinite(lastLoad.loadMs) ? `${lastLoad.loadMs} ms` : '--'}`,
       `FEATURES: R${counts.roads || 0} B${counts.buildings || 0} P${counts.poiMeshes || 0} L${counts.landuseMeshes || 0}`,
-      `RDT-NOISE: ${rdtNoiseStatus} | EDGE ${(Number(rdtNoise.edgeAvgAbsOffset) || 0).toFixed(2)}m/${(Number(rdtNoise.terrainEdgeAvgAbsOffset) || 0).toFixed(2)}m`,
-      `ROAD MASK: ${(Number(rdtNoise.landuseMaskedPct) || 0).toFixed(1)}% (${Number(rdtNoise.landuseVertices) || 0}) | SAMPLES ${(Number(rdtNoise.edgeSamples) || 0) + (Number(rdtNoise.terrainEdgeSamples) || 0)}`,
       `LOD: NEAR ${lod.near || 0} | MID ${lod.mid || 0}`,
       `SPIKES: >33 ${spikes.over33_3 || 0} | >50 ${spikes.over50 || 0} | MAX ${(spikes.maxFrameMs || 0).toFixed(1)} ms`,
       `TERRAIN RING: ${Number.isFinite(live.terrainRing) ? live.terrainRing : '--'} | SPEED ${Math.round(live.speedMph || 0)} mph`

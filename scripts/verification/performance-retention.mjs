@@ -162,6 +162,8 @@ async function measureMode(client, id, sampleMs = 5_000) {
     return new Promise((resolve) => {
     const deltas = [];
     const startedAt = performance.now();
+    const startActor = globalThis.getWorldExplorerRuntimeDiagnostics?.()?.activeActor;
+    const startPosition = startActor?.position ? {x:startActor.position.x,z:startActor.position.z} : null;
     let previous = startedAt;
     const frame = (now) => {
       if (now > previous) deltas.push(now - previous);
@@ -171,6 +173,9 @@ async function measureMode(client, id, sampleMs = 5_000) {
         const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
         resolve({
           deltas,
+          elapsedMs: now-startedAt,
+          startPosition,
+          endPosition: diagnostics.activeActor?.position ? {x:diagnostics.activeActor.position.x,z:diagnostics.activeActor.position.z} : null,
           diagnostics: {
             renderer: diagnostics.renderer || {},
             worldCounts: diagnostics.worldCounts || null,
@@ -192,6 +197,9 @@ async function measureMode(client, id, sampleMs = 5_000) {
   return {
     id,
     sampleMs,
+    elapsedMs: raw.elapsedMs,
+    distanceWorldUnits: raw.startPosition && raw.endPosition
+      ? Math.hypot(raw.endPosition.x-raw.startPosition.x,raw.endPosition.z-raw.startPosition.z) : null,
     frames: deltas.length,
     averageFps: 1000 / averageFrameMs,
     averageFrameMs,
@@ -247,7 +255,7 @@ async function runDesktop() {
     const driveActivationMs = await selectMode(client.page, 'drive', '#fDriving');
     const drive = { ...(await measureMode(client, 'drive', auditOnly ? 1_500 : 5_000)), activationMs: driveActivationMs };
     const planeActivationMs = await selectMode(client.page, 'plane', '#fPlane');
-    const plane = { ...(await measureMode(client, 'plane', auditOnly ? 1_500 : 5_000)), activationMs: planeActivationMs };
+    const plane = { ...(await measureMode(client, 'plane', auditOnly ? 1_500 : 90_000)), activationMs: planeActivationMs };
     const modes = [walk, drive, plane];
     const baselineCounts = walk.worldCounts;
     const releases = [];
@@ -283,6 +291,7 @@ async function runDesktop() {
       modeActivationResponsive: modes.every((mode) => mode.activationMs <= limit.maximumModeActivationMs),
       completeWorld: modes.every((mode) => Number(mode.worldCounts?.buildings) > 0 && Number(mode.worldCounts?.roads) > 0 && Number(mode.worldCounts?.terrainTiles) > 0),
       modesWithinBudgets: modesWithinBudgets(modes, budgets.desktopTier),
+      sustainedFlightObserved: !auditOnly && plane.elapsedMs >= 90_000 && plane.distanceWorldUnits >= 1_000,
       teardownClearsWorldOwners: releases.every((entry) =>
         Number(entry?.after?.roads || 0) <= budgets.retention.maximumRetainedRoads &&
         Number(entry?.after?.buildings || 0) <= budgets.retention.maximumRetainedBuildings &&

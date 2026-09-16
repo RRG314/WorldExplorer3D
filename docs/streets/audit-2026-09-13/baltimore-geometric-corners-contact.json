@@ -1,0 +1,304 @@
+{
+  "tiles": 121,
+  "triangles": 102025,
+  "curbTriangles": 41972,
+  "markingTriangles": 14602,
+  "ramps": 0,
+  "workerMs": 3073,
+  "inferredFrontages": 53723,
+  "managedPaths": 432,
+  "residentRoads": 344,
+  "residentBuildings": 1176,
+  "roads": 17701,
+  "roadMeshes": 32,
+  "buildings": 27604,
+  "worldLoadSequence": 1,
+  "plannedTiles": 142,
+  "highestRefinement": {
+    "cell": "3:-6",
+    "bounds": {
+      "minX": 192,
+      "maxX": 256,
+      "minZ": -384,
+      "maxZ": -320
+    },
+    "addedTriangles": 1391,
+    "baseTriangles": 534
+  },
+  "terrainRefinementTriangles": 74270,
+  "drawCalls": 92,
+  "compilerCacheBytes": 12790734,
+  "coverageBounds": {
+    "minX": -384,
+    "maxX": 384,
+    "minZ": -384,
+    "maxZ": 384
+  },
+  "indexBytes": 950604,
+  "positionBytes": 1471752,
+  "durationMs": 7325,
+  "sourceCoverage": {
+    "scope": "Loaded source network requiring inferred or mapped sidewalks; length within the compilation window, not proof of rendered pavement. Separately tagged sidewalks need mapped path data.",
+    "requiredSidewalkMeters": 647984.8064657514,
+    "withinCompilationWindowMeters": 21087.5130680653,
+    "outsideCompilationWindowMeters": 626897.2933976861,
+    "compilationCoveragePercent": 3.2543221473171777,
+    "requiredSegments": 12849,
+    "uncoveredSegments": 12101,
+    "examples": [
+      {
+        "kind": "road-side",
+        "name": "Southwestern Boulevard",
+        "a": {
+          "x": -6207.13590201273,
+          "z": 6586.190375379885
+        },
+        "b": {
+          "x": -6173.927943527973,
+          "z": 6331.915222112628
+        },
+        "uncoveredMeters": 569.2844570497554
+      },
+      {
+        "kind": "road-side",
+        "name": "Southwestern Boulevard",
+        "a": {
+          "x": -6170.607147679497,
+          "z": 6267.101461007485
+        },
+        "b": {
+          "x": -6167.286351831021,
+          "z": 6039.427098069438
+        },
+        "uncoveredMeters": 505.49084706521
+      },
+      {
+        "kind": "road-side",
+        "name": "Southwestern Boulevard",
+        "a": {
+          "x": -6167.286351831021,
+          "z": 6039.427098069438
+        },
+        "b": {
+          "x": -6172.267545603735,
+          "z": 6009.514227353919
+        },
+        "uncoveredMeters": 67.32100588236241
+      },
+      {
+        "kind": "road-side",
+        "name": "Southwestern Boulevard",
+        "a": {
+          "x": -6172.267545603735,
+          "z": 6009.514227353919
+        },
+        "b": {
+          "x": -6177.248739376449,
+          "z": 6039.427098069438
+        },
+        "uncoveredMeters": 67.32100588236241
+      },
+      {
+        "kind": "road-side",
+        "name": "Southwestern Boulevard",
+        "a": {
+          "x": -6177.248739376449,
+          "z": 6039.427098069438
+        },
+        "b": {
+          "x": -6177.248739376449,
+          "z": 6228.878241581981
+        },
+        "uncoveredMeters": 420.58153859784403
+      },
+      {
+        "kind": "road-side",
+        "name": "Southwestern Boulevard",
+        "a": {
+          "x": -6187.211126921876,
+          "z": 6381.772368915506
+        },
+        "b": {
+          "x": -6212.117095785444,
+          "z": 6586.190375379885
+        },
+        "uncoveredMeters": 457.1638655974932
+      },
+      {
+        "kind": "road-side",
+        "name": "Southwestern Boulevard",
+        "a": {
+          "x": -6129.097199573551,
+          "z": 4811.442465610582
+        },
+        "b": {
+          "x": -6112.493220331172,
+          "z": 4738.335142867811
+        },
+        "uncoveredMeters": 166.43150283672324
+      },
+      {
+        "kind": "road-side",
+        "name": "Southwestern Boulevard",
+        "a": {
+          "x": -6112.493220331172,
+          "z": 4738.335142867811
+        },
+        "b": {
+          "x": -6084.2664556191285,
+          "z": 4635.321572875739
+        },
+        "uncoveredMeters": 237.11996406954367
+      }
+    ],
+    "status": "incomplete"
+  },
+  "position": {
+    "x": -11.634432122629724,
+    "y": 21.550351357654304,
+    "z": 12.69992921441038
+  },
+  "roadRendered": null,
+  "mappedAreaRendered": null,
+  "contact": {
+    "source": "sidewalk",
+    "y": 19.850351357654304
+  },
+  "indexedRoad": null,
+  "terrain": 19.57747493466865,
+  "pavement": 19.850351357654304,
+  "nearbyBuildings": [
+    {
+      "name": "",
+      "pts": [
+        {
+          "x": -25.47443007517545,
+          "z": 0.032366729385557846
+        },
+        {
+          "x": -22.153634226699733,
+          "z": 0.032366729385557846
+        },
+        {
+          "x": -20.49323630246187,
+          "z": 23.69307725160752
+        },
+        {
+          "x": -23.814032150937592,
+          "z": 24.108178148196657
+        },
+        {
+          "x": -24.229131631997056,
+          "z": 18.296767809999892
+        },
+        {
+          "x": -22.568733707759197,
+          "z": 18.296767809999892
+        },
+        {
+          "x": -22.568733707759197,
+          "z": 17.051466222994804
+        },
+        {
+          "x": -23.39893266987813,
+          "z": 15.80616485483688
+        },
+        {
+          "x": -23.814032150937592,
+          "z": 11.655161902979216
+        },
+        {
+          "x": -24.644231113056524,
+          "z": 11.655161902979216
+        }
+      ],
+      "distance": 11.768382450092483
+    },
+    {
+      "name": "",
+      "pts": [
+        {
+          "x": -22.153634226699733,
+          "z": 0.032366729385557846
+        },
+        {
+          "x": -16.757340972926684,
+          "z": -0.3827327404337666
+        },
+        {
+          "x": -15.927142010807755,
+          "z": 23.69307725160752
+        },
+        {
+          "x": -20.49323630246187,
+          "z": 23.69307725160752
+        }
+      ],
+      "distance": 11.801553370289554
+    },
+    {
+      "name": "",
+      "pts": [
+        {
+          "x": -30.04052436682957,
+          "z": 27.84408734299859
+        },
+        {
+          "x": -15.512042529748289,
+          "z": 27.013885129179016
+        },
+        {
+          "x": -15.096943048688825,
+          "z": 30.749795872964114
+        },
+        {
+          "x": -30.04052436682957,
+          "z": 31.164897193036722
+        }
+      ],
+      "distance": 14.829875130942074
+    }
+  ],
+  "road": {
+    "name": "Guilford Avenue",
+    "type": "tertiary",
+    "width": 5.495495495495494,
+    "tags": {
+      "highway": "tertiary",
+      "lanes": "2",
+      "maxspeed": "30 mph",
+      "name": "Guilford Avenue",
+      "oneway": "yes",
+      "surface": "asphalt",
+      "tiger:cfcc": "A41",
+      "tiger:county": "Baltimore-City, MD",
+      "tiger:name_base": "Guilford",
+      "tiger:name_type": "Ave",
+      "tiger:zip_left": "21202",
+      "tiger:zip_right": "21202"
+    },
+    "section": {
+      "lanes": 2,
+      "lanesSource": "source:lanes",
+      "widthMeters": 6.1,
+      "widthSource": "derived:lanes",
+      "inferredLanes": false,
+      "inferredWidth": true,
+      "parking": {
+        "left": {
+          "widthMeters": 0,
+          "source": "not-on-carriageway"
+        },
+        "right": {
+          "widthMeters": 0,
+          "source": "not-on-carriageway"
+        }
+      },
+      "placement": {
+        "raw": "",
+        "centerlineOffsetMeters": 0,
+        "status": "absent"
+      }
+    }
+  }
+}

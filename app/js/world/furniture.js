@@ -1,8 +1,10 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import {disposeVegetationBatch} from './vegetation-models.js';
+import {disposeVegetationBatch,renderVegetationModelsCooperatively} from './vegetation-models.js';
+import {publishVegetationCooperatively} from './vegetation-publication.js';
 import {
   buildWorldVegetationInstancing,
-  collectWorldVegetationPlacements
+  collectWorldVegetationPlacements,
+  collectWorldVegetationPlacementsCooperatively
 } from "./vegetation.js?v=10";
 import {
   registerStreetLamp,
@@ -16,6 +18,7 @@ let signTextureCache = new Map();
 let signTextGeometry = null;
 let worldCoverVegetationTimer = null;
 let vegetationFocus = null;
+let vegetationRefreshRevision = 0;
 
 const STREET_FURNITURE_VISIBILITY = Object.freeze({
   street_lamp: Object.freeze({ enter: 360, exit: 430 }),
@@ -635,11 +638,44 @@ export function generateStreetFurniture(options = {}) {
 }
 
 export function refreshWorldCoverVegetation() {
+  vegetationRefreshRevision++;
+  const started = performance.now();
   const point=appCtx.activeTransportActor?.()?.position || {x:0,z:0};
   vegetationFocus={x:point.x,z:point.z};
+  const placements = collectWorldVegetationPlacements();
+  const collected = performance.now();
   (appCtx.vegetationMeshes || []).forEach(disposeVegetationBatch);
   appCtx.clearWorldCollections?.(['vegetationMeshes', 'vegetationFeatures']);
-  return buildWorldVegetationInstancing(collectWorldVegetationPlacements());
+  const disposed = performance.now();
+  const count = buildWorldVegetationInstancing(placements);
+  const completed = performance.now();
+  appCtx.vegetationRefreshTiming = {
+    collectionMs: collected-started, disposalMs: disposed-collected,
+    publicationMs: completed-disposed, totalMs: completed-started,
+    candidates: placements.length, instances: count
+  };
+  if (completed-started > 50) console.info('[Vegetation refresh]', JSON.stringify(appCtx.vegetationRefreshTiming));
+  return count;
+}
+
+async function refreshVegetationInBackground(revision,loadSequence) {
+  const started=performance.now();
+  const pavement=appCtx.streetPavement;
+  const current=()=>revision===vegetationRefreshRevision && loadSequence===appCtx._worldLoadSequence && pavement===appCtx.streetPavement;
+  let maxSliceMs=0;
+  try {
+    const count=await publishVegetationCooperatively(appCtx,{
+      collect:collectWorldVegetationPlacementsCooperatively,
+      render:renderVegetationModelsCooperatively,dispose:disposeVegetationBatch,current,
+      onSlice:ms=>{maxSliceMs=Math.max(maxSliceMs,ms);}
+    });
+    if(current() && count!==null){
+      appCtx.vegetationRefreshTiming={totalMs:performance.now()-started,maxSliceMs,instances:count,cooperative:true};
+      console.info('[Vegetation refresh]',JSON.stringify(appCtx.vegetationRefreshTiming));
+    }
+  } catch(error) {
+    if(current())console.warn('[Vegetation refresh] replacement failed; previous vegetation retained',error);
+  }
 }
 
 export function updateVegetationFocus() {
@@ -653,6 +689,7 @@ export function updateVegetationFocus() {
 }
 
 export function scheduleWorldCoverVegetationRefresh() {
+  const revision=++vegetationRefreshRevision;
   if (worldCoverVegetationTimer) globalThis.clearTimeout(worldCoverVegetationTimer);
   const loadSequence = appCtx._worldLoadSequence;
   worldCoverVegetationTimer = globalThis.setTimeout(() => {
@@ -665,7 +702,7 @@ export function scheduleWorldCoverVegetationRefresh() {
       scheduleWorldCoverVegetationRefresh();
       return;
     }
-    refreshWorldCoverVegetation();
+    void refreshVegetationInBackground(revision,loadSequence);
   }, 800);
 }
 
@@ -678,6 +715,7 @@ export function flushWorldCoverVegetationRefresh() {
 }
 
 export function resetWorldFurnitureCaches() {
+  vegetationRefreshRevision++;
   vegetationFocus = null;
   if (worldCoverVegetationTimer) globalThis.clearTimeout(worldCoverVegetationTimer);
   worldCoverVegetationTimer = null;

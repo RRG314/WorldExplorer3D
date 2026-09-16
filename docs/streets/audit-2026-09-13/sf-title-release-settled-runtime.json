@@ -1,0 +1,128 @@
+{
+  "note": "Heap is browser-reported JavaScript only; geometry bytes exclude textures, GPU allocations and other tabs. Inspect twice to see runtime activity.",
+  "javascriptHeapBytes": 269859092,
+  "sceneGeometryBytes": 3642252,
+  "rendererResources": {
+    "geometries": 32,
+    "textures": 35
+  },
+  "gameStarted": false,
+  "worldLoading": false,
+  "pavementBuildActive": false,
+  "deferredWork": {
+    "budgets": {
+      "firstPlayTargetMs": 25000,
+      "frameTargetMs": 16.7,
+      "cooperativeChunkTargetMs": 8,
+      "backgroundIdleTimeoutMs": 1800,
+      "inactiveAuxiliaryRenderers": 0
+    },
+    "firstPlayReady": true,
+    "activeTask": null,
+    "firstPlayDetail": {
+      "environment": "earth",
+      "loadDurationMs": 151191,
+      "publicationSequence": 1
+    },
+    "queued": [],
+    "completed": [
+      "tutorial-runtime",
+      "analytics-runtime",
+      "earth-ambient-state-1",
+      "earth-star-catalog"
+    ]
+  },
+  "workSinceLastInspection": [
+    {
+      "id": "core.frame-metrics",
+      "updates": 4004,
+      "lastDurationMs": 0.1
+    }
+  ],
+  "groundMode": "accepted-ground",
+  "groundProvenance": {
+    "generation": 2,
+    "status": "accepted",
+    "reason": null,
+    "location": {
+      "latitude": 37.7923,
+      "longitude": -122.4144
+    },
+    "artifactId": "sanfrancisco-ground",
+    "providerId": "copernicus-dem-classified-ground-v1",
+    "sourceRelease": "COP-DEM-2021:GLO-30",
+    "verticalDatum": "EGM2008",
+    "contentSha256": "cba18b38df50f0030f21d07ef58fb32ff2ff7994c2ea206667e2732782567cf2",
+    "artifactCount": 1,
+    "artifactIds": [
+      "sanfrancisco-ground"
+    ],
+    "contentSha256s": [
+      "cba18b38df50f0030f21d07ef58fb32ff2ff7994c2ea206667e2732782567cf2"
+    ]
+  },
+  "contactIndexes": {},
+  "heightSamplingCaches": {
+    "terrainEntries": 0,
+    "baseEntries": 0,
+    "maximumEntriesPerCache": 65536
+  },
+  "loadPhases": {
+    "prepareAcceptedGround": 34,
+    "fetchOverpass": 237,
+    "fetchFixedRegionalContext": 2045,
+    "fetchFixedRegionalStructures": 2130,
+    "waitForFixedRegionalGround": 3423,
+    "featureBudgeting": 1663,
+    "waitForTransportGround": 0,
+    "buildRoadGeometry": 1578,
+    "buildLanduseGeometry": 140,
+    "batchLanduseGeometry": 11,
+    "buildLinearFeatureData": 401,
+    "buildPoiGeometry": 43,
+    "buildStreetFurniture": 379,
+    "buildBuildingRoadGuards": 3890,
+    "buildBuildingGeometry": 6215,
+    "publishBuildingFacadeEntrances": 326,
+    "publishBuildingExteriorDetails": 38,
+    "batchBuildingGeometry": 809,
+    "publishLocationTerrain": 0,
+    "publishCompiledTransportMeshes": 72730,
+    "refreshTerrainSurfaceProfiles": 613,
+    "publishDeferredTransportLandmark": 229,
+    "retireGroundFallbackPlaceholder": 0,
+    "buildTraversalNetworks": 331,
+    "spawnPlayer": 685,
+    "refreshMemoryMarkersForCurrentLocation": 0,
+    "refreshBlockBuilderForCurrentLocation": 0,
+    "refreshEditableWorldPresentation": 0,
+    "publishLocationWorld": 2,
+    "refreshEditableBuildingVisibility": 291,
+    "waitForTerrainSurfaceMaterials": 0
+  },
+  "geometryByLayer": {
+    "roadMeshes": 0,
+    "buildingMeshes": 0,
+    "landuseMeshes": 0,
+    "urbanSurfaceMeshes": 0,
+    "linearFeatureMeshes": 0,
+    "vegetationMeshes": 0
+  },
+  "quality": {
+    "status": "fail",
+    "failures": [
+      "first play exceeds 25000 ms"
+    ],
+    "pending": [
+      "pavement statistics unavailable",
+      "loaded street-network coverage has not been established"
+    ],
+    "refinementMultiplier": null,
+    "budgets": {
+      "javascriptHeapBytes": 805306368,
+      "pavementPositionBytes": 16777216,
+      "refinementMultiplier": 8
+    },
+    "visualStatus": "Requires camera sweep and recorded city route; performance checks cannot certify appearance."
+  }
+}

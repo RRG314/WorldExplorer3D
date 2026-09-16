@@ -1,0 +1,392 @@
+{
+  "note": "Heap is browser-reported JavaScript only; geometry bytes exclude textures, GPU allocations and other tabs. Inspect twice to see runtime activity.",
+  "javascriptHeapBytes": 1116268783,
+  "sceneGeometryBytes": 360845791,
+  "rendererResources": {
+    "geometries": 1047,
+    "textures": 306
+  },
+  "gameStarted": true,
+  "worldLoading": false,
+  "pavementBuildActive": false,
+  "deferredWork": {
+    "budgets": {
+      "firstPlayTargetMs": 25000,
+      "frameTargetMs": 16.7,
+      "cooperativeChunkTargetMs": 8,
+      "backgroundIdleTimeoutMs": 1800,
+      "inactiveAuxiliaryRenderers": 0
+    },
+    "firstPlayReady": true,
+    "activeTask": null,
+    "firstPlayDetail": {
+      "environment": "earth",
+      "loadDurationMs": 160363,
+      "publicationSequence": 1
+    },
+    "queued": [],
+    "completed": [
+      "tutorial-runtime",
+      "analytics-runtime",
+      "earth-ambient-state-1",
+      "earth-star-catalog"
+    ]
+  },
+  "street": {
+    "tiles": 144,
+    "triangles": 158666,
+    "curbTriangles": 71256,
+    "markingTriangles": 32027,
+    "ramps": 0,
+    "workerMs": 5451,
+    "inferredFrontages": 81380,
+    "managedPaths": 583,
+    "residentRoads": 299,
+    "residentBuildings": 1866,
+    "roads": 15578,
+    "roadMeshes": 37,
+    "buildings": 19220,
+    "worldLoadSequence": 1,
+    "plannedTiles": 144,
+    "highestRefinement": {
+      "cell": "-3:-6",
+      "bounds": {
+        "minX": -192,
+        "maxX": -128,
+        "minZ": -384,
+        "maxZ": -320
+      },
+      "addedTriangles": 1492,
+      "baseTriangles": 625
+    },
+    "terrainRefinementTriangles": 114320,
+    "drawCalls": 103,
+    "compilerCacheBytes": 15672032,
+    "coverageBounds": {
+      "minX": -384,
+      "maxX": 384,
+      "minZ": -384,
+      "maxZ": 384
+    },
+    "indexBytes": 1571694,
+    "positionBytes": 2513892,
+    "durationMs": 9925,
+    "sourceCoverage": {
+      "scope": "Loaded source network requiring inferred or mapped sidewalks; length within the compilation window, not proof of rendered pavement. Separately tagged sidewalks need mapped path data.",
+      "requiredSidewalkMeters": 386743.5085105951,
+      "withinCompilationWindowMeters": 25191.480966613162,
+      "outsideCompilationWindowMeters": 361552.0275439819,
+      "compilationCoveragePercent": 6.5137437118541905,
+      "requiredSegments": 8685,
+      "uncoveredSegments": 8118,
+      "examples": [
+        {
+          "kind": "road-side",
+          "name": "Laguna Street",
+          "a": {
+            "x": -1369.2012844594572,
+            "z": -1119.425529360285
+          },
+          "b": {
+            "x": -1370.8969499062903,
+            "z": -1109.2530713042947
+          },
+          "uncoveredMeters": 22.894452634928935
+        },
+        {
+          "kind": "road-side",
+          "name": "Laguna Street",
+          "a": {
+            "x": -1370.8969499062903,
+            "z": -1109.2530713042947
+          },
+          "b": {
+            "x": -1367.5056190126238,
+            "z": -1097.3851858651074
+          },
+          "uncoveredMeters": 27.40129642024362
+        },
+        {
+          "kind": "road-side",
+          "name": "Marina Boulevard",
+          "a": {
+            "x": -1369.2012844594572,
+            "z": -1119.425529360285
+          },
+          "b": {
+            "x": -1398.0275970556233,
+            "z": -1288.9644342237716
+          },
+          "uncoveredMeters": 381.7780192825416
+        },
+        {
+          "kind": "road-side",
+          "name": "Marina Boulevard",
+          "a": {
+            "x": -1398.0275970556233,
+            "z": -1288.9644342237716
+          },
+          "b": {
+            "x": -1406.5059242897898,
+            "z": -1290.659803618155
+          },
+          "uncoveredMeters": 19.19450438442933
+        },
+        {
+          "kind": "road-side",
+          "name": "Marina Boulevard",
+          "a": {
+            "x": -1406.5059242897898,
+            "z": -1290.659803618155
+          },
+          "b": {
+            "x": -1518.4198437807884,
+            "z": -1273.7060921622856
+          },
+          "uncoveredMeters": 251.28354171004213
+        },
+        {
+          "kind": "road-side",
+          "name": "Marina Boulevard",
+          "a": {
+            "x": -1518.4198437807884,
+            "z": -1273.7060921622856
+          },
+          "b": {
+            "x": -1535.3764982491214,
+            "z": -1275.4014650582235
+          },
+          "uncoveredMeters": 37.83145895680655
+        },
+        {
+          "kind": "road-side",
+          "name": "Marina Boulevard",
+          "a": {
+            "x": -1535.3764982491214,
+            "z": -1275.4014650582235
+          },
+          "b": {
+            "x": -1704.9430429324523,
+            "z": -1409.334694061215
+          },
+          "uncoveredMeters": 479.6994313681403
+        },
+        {
+          "kind": "road-side",
+          "name": "Marina Boulevard",
+          "a": {
+            "x": -1764.2913335716182,
+            "z": -1421.2020782139234
+          },
+          "b": {
+            "x": -2620.6023842224395,
+            "z": -1283.8783237057783
+          },
+          "uncoveredMeters": 1925.299948781197
+        }
+      ],
+      "status": "incomplete"
+    }
+  },
+  "workSinceLastInspection": null,
+  "streetOverview": {
+    "status": "building",
+    "representation": "terrain material coverage",
+    "completedCells": 874,
+    "totalCells": 2790,
+    "nonemptyCells": 856,
+    "coveredSquareWorldUnits": 592038.0431372543,
+    "positionBytes": 0,
+    "retainedBytes": 11523344,
+    "drawCalls": 0,
+    "workerActive": true,
+    "sourceScope": "complete loaded location",
+    "error": null,
+    "sourceCells": 46106,
+    "excludedCells": 43316,
+    "maskResolution": 64,
+    "worldUnitsPerTexel": 1,
+    "materials": 273
+  },
+  "groundMode": "accepted-ground",
+  "groundProvenance": {
+    "generation": 2,
+    "status": "accepted",
+    "reason": null,
+    "location": {
+      "latitude": 37.7923,
+      "longitude": -122.4144
+    },
+    "artifactId": "sanfrancisco-ground",
+    "providerId": "copernicus-dem-classified-ground-v1",
+    "sourceRelease": "COP-DEM-2021:GLO-30",
+    "verticalDatum": "EGM2008",
+    "contentSha256": "cba18b38df50f0030f21d07ef58fb32ff2ff7994c2ea206667e2732782567cf2",
+    "artifactCount": 1,
+    "artifactIds": [
+      "sanfrancisco-ground"
+    ],
+    "contentSha256s": [
+      "cba18b38df50f0030f21d07ef58fb32ff2ff7994c2ea206667e2732782567cf2"
+    ]
+  },
+  "heightSamplingCaches": {
+    "terrainEntries": 51845,
+    "baseEntries": 32906,
+    "maximumEntriesPerCache": 65536
+  },
+  "roadTerrainConformance": {
+    "authority": "published-at-grade-road-geometry-versus-rendered-terrain",
+    "totalSamples": 1057157,
+    "issuesFound": 0,
+    "profileDepartures": 412666,
+    "maximumProfileDeparture": 59.85987793071203,
+    "worstProfileDepartures": [
+      {
+        "roadName": "Residential",
+        "x": -3766.5489378073516,
+        "z": -7497.95390524565,
+        "expectedY": 33.485945119608324,
+        "renderedY": -26.373932811103707,
+        "departure": 59.85987793071203
+      },
+      {
+        "roadName": "Residential",
+        "x": -3765.0759329476205,
+        "z": -7500.746581382541,
+        "expectedY": 33.22041838430972,
+        "renderedY": -25.88616739087142,
+        "departure": 59.10658577518114
+      },
+      {
+        "roadName": "Residential",
+        "x": -3758.4461890328366,
+        "z": -7503.82518949871,
+        "expectedY": 32.423838089325876,
+        "renderedY": -26.55733814424676,
+        "departure": 58.98117623357264
+      },
+      {
+        "roadName": "Residential",
+        "x": -3758.878831759198,
+        "z": -7503.191629717288,
+        "expectedY": 32.42383808932588,
+        "renderedY": -26.500674907994295,
+        "departure": 58.92451299732018
+      },
+      {
+        "roadName": "Residential",
+        "x": -3763.2796396134836,
+        "z": -7502.460533869264,
+        "expectedY": 32.95489164901104,
+        "renderedY": -25.918633901725975,
+        "departure": 58.873525550737014
+      },
+      {
+        "roadName": "Residential",
+        "x": -3767.518803230567,
+        "z": -7501.190076196155,
+        "expectedY": 33.485945119608374,
+        "renderedY": -24.813237017843917,
+        "departure": 58.29918213745229
+      },
+      {
+        "roadName": "Residential",
+        "x": -3775.9971304647333,
+        "z": -7498.649160849939,
+        "expectedY": 34.54805206080302,
+        "renderedY": -22.602443250079467,
+        "departure": 57.15049531088249
+      },
+      {
+        "roadName": "Residential",
+        "x": -3805.872531558923,
+        "z": -7489.157630516853,
+        "expectedY": 38.3001020754563,
+        "renderedY": -15.011687364704116,
+        "departure": 53.31178944016042
+      },
+      {
+        "roadName": "Residential",
+        "x": -3806.500228266165,
+        "z": -7489.246867034717,
+        "expectedY": 38.3001020754563,
+        "renderedY": -14.743163759528956,
+        "departure": 53.043265834985256
+      },
+      {
+        "roadName": "Residential",
+        "x": -3745.374304551287,
+        "z": -7496.000522432567,
+        "expectedY": 30.607007018042914,
+        "renderedY": -20.408492561236585,
+        "departure": 51.0154995792795
+      }
+    ],
+    "minimumDelta": 0.18,
+    "maximumDelta": 0.182,
+    "buriedSamples": 0,
+    "floatingSamples": 0,
+    "worstDeltas": []
+  },
+  "loadPhases": {
+    "prepareAcceptedGround": 52,
+    "fetchOverpass": 6531,
+    "fetchFixedRegionalContext": 6835,
+    "fetchFixedRegionalStructures": 11597,
+    "waitForFixedRegionalGround": 0,
+    "featureBudgeting": 1674,
+    "waitForTransportGround": 0,
+    "buildRoadGeometry": 1872,
+    "buildLanduseGeometry": 139,
+    "batchLanduseGeometry": 13,
+    "buildLinearFeatureData": 453,
+    "buildPoiGeometry": 52,
+    "buildStreetFurniture": 373,
+    "buildBuildingRoadGuards": 4121,
+    "buildBuildingGeometry": 6445,
+    "publishBuildingFacadeEntrances": 347,
+    "publishBuildingExteriorDetails": 37,
+    "batchBuildingGeometry": 843,
+    "publishLocationTerrain": 0,
+    "publishCompiledTransportMeshes": 74729,
+    "refreshTerrainSurfaceProfiles": 624,
+    "publishDeferredTransportLandmark": 211,
+    "retireGroundFallbackPlaceholder": 0,
+    "buildTraversalNetworks": 271,
+    "spawnPlayer": 712,
+    "refreshMemoryMarkersForCurrentLocation": 0,
+    "refreshBlockBuilderForCurrentLocation": 0,
+    "refreshEditableWorldPresentation": 0,
+    "publishLocationWorld": 1,
+    "refreshEditableBuildingVisibility": 290,
+    "waitForTerrainSurfaceMaterials": 0
+  },
+  "geometryByLayer": {
+    "roadMeshes": 86160348,
+    "buildingMeshes": 131151806,
+    "landuseMeshes": 2247282,
+    "urbanSurfaceMeshes": 8275406,
+    "linearFeatureMeshes": 452256,
+    "vegetationMeshes": 54336390
+  },
+  "quality": {
+    "status": "fail",
+    "failures": [
+      "rendered roads depart from engineered profiles; terrain agreement does not establish a valid grade",
+      "JavaScript heap exceeds 768 MiB",
+      "first play exceeds 25000 ms",
+      "loaded streets requiring sidewalks extend beyond completed pavement coverage"
+    ],
+    "pending": [
+      "location-wide pavement areas are not complete"
+    ],
+    "refinementMultiplier": 3.577910070806837,
+    "budgets": {
+      "javascriptHeapBytes": 805306368,
+      "pavementPositionBytes": 16777216,
+      "refinementMultiplier": 8
+    },
+    "visualStatus": "Requires camera sweep and recorded city route; performance checks cannot certify appearance."
+  }
+}

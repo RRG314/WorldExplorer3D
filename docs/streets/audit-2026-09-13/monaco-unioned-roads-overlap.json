@@ -1,0 +1,11 @@
+{
+  "source": "docs/streets/audit-2026-09-13/monaco-unioned-roads-surfaces.json",
+  "triangles": 623,
+  "degenerateTriangles": 2,
+  "overlappingPairs": 0,
+  "pairwiseOverlapArea": 0,
+  "maximumPairArea": 0,
+  "areaTolerance": 0.000001,
+  "examples": [],
+  "scope": "Captured road triangles only. Intentional grade-separated crossings require separate layer review."
+}

@@ -123,7 +123,6 @@ export function prepareWorldFeatureSelections(options = {}) {
   const nodes = options.nodes || {};
   const loadMetrics = options.loadMetrics || {};
   const tileBudgetCfg = options.tileBudgetCfg || {};
-  const useRdtBudgeting = options.useRdtBudgeting === true;
   const enableLinearFeatures = options.enableLinearFeatures === true;
   const maxRoadWays = Number(options.maxRoadWays || 0);
   const maxBuildingWays = Number(options.maxBuildingWays || 0);
@@ -254,7 +253,6 @@ export function prepareWorldFeatureSelections(options = {}) {
     basePerTile: tileBudgetCfg.roadsPerTile,
     minPerTile: tileBudgetCfg.roadsMinPerTile,
     tileDegrees: tileBudgetCfg.tileDegrees,
-    useRdt: useRdtBudgeting,
     compareFn: (a, b) => roadTypePriority(b.tags?.highway) - roadTypePriority(a.tags?.highway)
   });
   const selectedRegionalConnectors = limitWaysByTileBudget(regionalPartition.connectors, nodes, {
@@ -337,9 +335,8 @@ export function prepareWorldFeatureSelections(options = {}) {
     basePerTile: tileBudgetCfg.buildingsPerTile,
     minPerTile: tileBudgetCfg.buildingsMinPerTile,
     tileDegrees: tileBudgetCfg.tileDegrees,
-    useRdt: useRdtBudgeting,
     spreadAcrossArea: true,
-    coreRatio: useRdtBudgeting ? 0.35 : 0.45
+    coreRatio: 0.45
   });
 
   const landuseWays = limitWaysByTileBudget(allLanduseWays, nodes, {
@@ -347,7 +344,6 @@ export function prepareWorldFeatureSelections(options = {}) {
     basePerTile: tileBudgetCfg.landusePerTile,
     minPerTile: tileBudgetCfg.landuseMinPerTile,
     tileDegrees: tileBudgetCfg.tileDegrees,
-    useRdt: useRdtBudgeting
   });
 
   const waterwayWays = limitWaysByTileBudget(allWaterwayWays, nodes, {
@@ -355,7 +351,6 @@ export function prepareWorldFeatureSelections(options = {}) {
     basePerTile: Math.max(12, Math.floor(tileBudgetCfg.landusePerTile * 0.7)),
     minPerTile: Math.max(6, Math.floor(tileBudgetCfg.landuseMinPerTile * 0.6)),
     tileDegrees: tileBudgetCfg.tileDegrees,
-    useRdt: useRdtBudgeting
   });
 
   const railwayWays = enableLinearFeatures ? limitWaysByTileBudget(allRailwayWays, nodes, {
@@ -363,7 +358,6 @@ export function prepareWorldFeatureSelections(options = {}) {
     basePerTile: Math.max(6, Math.floor(tileBudgetCfg.roadsPerTile * 0.22)),
     minPerTile: Math.max(2, Math.floor(tileBudgetCfg.roadsMinPerTile * 0.18)),
     tileDegrees: tileBudgetCfg.tileDegrees,
-    useRdt: useRdtBudgeting,
     compareFn: (a, b) =>
       linearFeaturePriority('railway', classifyLinearFeatureTags(b.tags)?.subtype) -
       linearFeaturePriority('railway', classifyLinearFeatureTags(a.tags)?.subtype)
@@ -374,7 +368,6 @@ export function prepareWorldFeatureSelections(options = {}) {
     basePerTile: Math.max(10, Math.floor(tileBudgetCfg.landusePerTile * 0.55)),
     minPerTile: Math.max(4, Math.floor(tileBudgetCfg.landuseMinPerTile * 0.5)),
     tileDegrees: tileBudgetCfg.tileDegrees,
-    useRdt: useRdtBudgeting,
     spreadAcrossArea: true,
     coreRatio: 0.45,
     compareFn: (a, b) =>
@@ -387,7 +380,6 @@ export function prepareWorldFeatureSelections(options = {}) {
     basePerTile: Math.max(8, Math.floor(tileBudgetCfg.landusePerTile * 0.36)),
     minPerTile: Math.max(3, Math.floor(tileBudgetCfg.landuseMinPerTile * 0.32)),
     tileDegrees: tileBudgetCfg.tileDegrees,
-    useRdt: useRdtBudgeting,
     spreadAcrossArea: true,
     coreRatio: 0.45,
     compareFn: (a, b) =>
@@ -400,7 +392,6 @@ export function prepareWorldFeatureSelections(options = {}) {
     basePerTile: Math.max(3, Math.floor(tileBudgetCfg.landusePerTile * 0.16)),
     minPerTile: 1,
     tileDegrees: tileBudgetCfg.tileDegrees,
-    useRdt: useRdtBudgeting,
     compareFn: (a, b) => {
       const aSemantics = classifyStructureSemantics(a.tags || {}, { featureKind: 'footway', subtype: a.tags?.highway || '' });
       const bSemantics = classifyStructureSemantics(b.tags || {}, { featureKind: 'footway', subtype: b.tags?.highway || '' });
@@ -415,7 +406,6 @@ export function prepareWorldFeatureSelections(options = {}) {
     basePerTile: Math.max(6, Math.floor(tileBudgetCfg.landusePerTile * 0.22)),
     minPerTile: Math.max(2, Math.floor(tileBudgetCfg.landuseMinPerTile * 0.18)),
     tileDegrees: tileBudgetCfg.tileDegrees,
-    useRdt: useRdtBudgeting
   });
 
   const treeRowWays = limitWaysByTileBudget(allTreeRowWays, nodes, {
@@ -423,7 +413,6 @@ export function prepareWorldFeatureSelections(options = {}) {
     basePerTile: Math.max(3, Math.floor(tileBudgetCfg.landusePerTile * 0.14)),
     minPerTile: 1,
     tileDegrees: tileBudgetCfg.tileDegrees,
-    useRdt: useRdtBudgeting,
     spreadAcrossArea: true,
     coreRatio: 0.5
   });
@@ -433,7 +422,6 @@ export function prepareWorldFeatureSelections(options = {}) {
     basePerTile: tileBudgetCfg.poiPerTile,
     minPerTile: tileBudgetCfg.poiMinPerTile,
     tileDegrees: tileBudgetCfg.tileDegrees,
-    useRdt: useRdtBudgeting
   });
 
   loadMetrics.roads.requested = allRoadWays.length;

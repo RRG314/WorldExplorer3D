@@ -1,0 +1,1 @@
+{"status":"failed","stage":"independent polygon-clipping comparison","reason":"Unable to complete output ring starting at [-379.57, -0.001]. Last matching segment found ends at [-379.523, -0.005].","scope":"Comparison experiment failed; no passing geometry result. Not used as a production fallback."}

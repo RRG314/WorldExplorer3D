@@ -57,7 +57,8 @@ test('mobile world load policy bounds provider time and geometry without changin
     assert.equal(mobile.regionalContextRadiusMeters, 6_000);
     assert.ok(mobile.maxBuildingWays < desktop.maxBuildingWays);
     assert.ok(mobile.maxRoadWays < desktop.maxRoadWays);
-    assert.equal(desktop.maxTotalLoadMs, 44_000);
+    // Legacy mode arguments now use the production policy, independent of hash depth.
+    assert.equal(desktop.maxTotalLoadMs, 62_000);
     assert.equal(desktop.regionalContextRadiusMeters, 14_000);
   } finally {
     appCtx.isLikelyMobileDevice = previousMobileDetector;

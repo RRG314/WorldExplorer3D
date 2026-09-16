@@ -3,7 +3,7 @@
   "artifactId": "antarctica-ground",
   "providerId": "copernicus-dem-classified-ground-v1",
   "sourceRelease": "COP-DEM-2021:GLO-30",
-  "contentSha256": "0bef6158ec20c567f79d0956f204d81a5128d84d5fe75c398db226a7af1e0e20",
+  "contentSha256": "8c6c629b558caeabd462359d5962ed2183b1d58c75799f2d2aa51f7c4d2ca51e",
   "spacingMeters": 90,
   "coverage": {
     "south": -77.85269927558262,
@@ -18,7 +18,7 @@
   "correctionAttested": true,
   "sourceEvidence": {
     "sourceClassification": "digital-surface-model",
-    "correctionMethod": "worldexplorer-pmf-grid-v1",
+    "correctionMethod": "worldexplorer-pmf-boundary-reconstruction-v3",
     "sourceTiles": [
       {
         "tileId": "Copernicus_DSM_COG_10_S78_00_E166_00_DEM",
@@ -29,7 +29,14 @@
         "etag": "567f4df64591ab6e4e46d4db45714c7d",
         "lastModified": "Mon, 09 May 2022 15:13:27 GMT"
       }
-    ]
+    ],
+    "classificationMethod": "worldexplorer-pmf-grid-v1",
+    "reconstruction": {
+      "method": "harmonic-ground-boundary",
+      "toleranceMeters": 0.00001,
+      "exteriorPolicy": "retain-source-observation",
+      "sourceArtifactSha256": "0bef6158ec20c567f79d0956f204d81a5128d84d5fe75c398db226a7af1e0e20"
+    }
   },
   "attribution": {
     "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",

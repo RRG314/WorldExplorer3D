@@ -3,10 +3,9 @@ import { createPerfPanelApi } from "./perf-panel.js?v=1";
 import { createPerfRendererInfoApi } from "./perf-renderer.js?v=1";
 import { createPerfSettingsApi } from "./perf-settings.js?v=1";
 import { carSpeedToMph } from "./physics/vehicle-speed-units.js?v=2";
-// perf.js - Runtime performance mode + benchmark telemetry for RDT comparisons
+// Runtime presentation quality and performance telemetry.
 // ============================================================================
 
-const PERF_MODE_RDT = 'rdt';
 const PERF_MODE_BASELINE = 'baseline';
 const PERF_STORAGE_MODE_KEY = 'worldExplorerPerfMode';
 const PERF_STORAGE_OVERLAY_KEY = 'worldExplorerPerfOverlay';
@@ -47,7 +46,9 @@ let _perfSessionSpikeOver50 = 0;
 let _perfSessionSpikeOver100 = 0;
 let _perfSessionSpikeSamples = 0;
 
-const _perfFrameSpikeWindow = new Float32Array(PERF_SPIKE_WINDOW_SIZE);
+// Retain the same precision used by threshold increments. Rounding samples
+// to Float32 can change their bucket when removed, drifting counters negative.
+const _perfFrameSpikeWindow = new Float64Array(PERF_SPIKE_WINDOW_SIZE);
 let _perfFrameSpikeWriteIdx = 0;
 let _perfFrameSpikeCount = 0;
 let _perfWindowSpikeOver16_7 = 0;
@@ -65,7 +66,6 @@ const perfSettingsApi = createPerfSettingsApi({
   appCtx,
   constants: {
     PERF_MODE_BASELINE,
-    PERF_MODE_RDT,
     PERF_QUALITY_TIER_BALANCED,
     PERF_QUALITY_TIER_PERFORMANCE,
     PERF_QUALITY_TIER_QUALITY
@@ -100,17 +100,6 @@ const perfStats = {
     terrainRing: typeof appCtx.TERRAIN_RING === 'number' ? appCtx.TERRAIN_RING : 0,
     lodVisible: { near: 0, mid: 0 },
     worldCounts: { roads: 0, buildings: 0, poiMeshes: 0, landuseMeshes: 0 },
-    rdtNoise: {
-      enabled: !!appCtx.rdtNoiseEnabled,
-      variant: appCtx.rdtNoiseVariant || 'standard',
-      chaos: Number.isFinite(Number(appCtx.rdtNoiseChaos)) ? Number(appCtx.rdtNoiseChaos) : 0,
-      edgeSamples: 0,
-      edgeAvgAbsOffset: 0,
-      terrainEdgeSamples: 0,
-      terrainEdgeAvgAbsOffset: 0,
-      landuseVertices: 0,
-      landuseMaskedPct: 0
-    },
     quality: {
       auto: true,
       tier: PERF_QUALITY_TIER_BALANCED,
@@ -501,8 +490,7 @@ const {
   updatePerfPanel
 } = perfPanelApi;
 
-// RDT remains available for explicit diagnostics, but the product runtime is
-// quality-first. Migrate stale settings left by the removed RDT controls.
+// Migrate stale settings; experimental workload policies are retired.
 setPerfMode(PERF_MODE_BASELINE, { persist: false });
 writeStorage(PERF_STORAGE_MODE_KEY, PERF_MODE_BASELINE);
 // Always start hidden so benchmark diagnostics are opt-in for every session.
@@ -528,7 +516,6 @@ Object.assign(appCtx, {
   PERF_QUALITY_TIER_PERFORMANCE,
   PERF_QUALITY_TIER_QUALITY,
   PERF_MODE_BASELINE,
-  PERF_MODE_RDT,
   capturePerfSnapshot,
   copyPerfSnapshotToClipboard,
   finishPerfLoad,
@@ -557,7 +544,6 @@ export {
   PERF_QUALITY_TIER_PERFORMANCE,
   PERF_QUALITY_TIER_QUALITY,
   PERF_MODE_BASELINE,
-  PERF_MODE_RDT,
   capturePerfSnapshot,
   copyPerfSnapshotToClipboard,
   finishPerfLoad,

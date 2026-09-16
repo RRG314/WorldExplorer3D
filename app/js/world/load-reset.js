@@ -1,3 +1,4 @@
+import { releaseLocationModels } from './release-location-models.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { clearBuildingExteriorMaterialPool } from "../engine/building-facade-materials.js?v=16";
 import { clearBuildingExteriorDetails } from './building-exterior-details.js?v=1';
@@ -90,6 +91,7 @@ export function resetWorldForReload(options = {}) {
   appCtx.transportFacilityVisual?.dispose?.();
   appCtx.transportFacilityVisual = null;
   appCtx.transportFacilityGraph = null;
+  releaseLocationModels(appCtx);
 
   if (typeof appCtx.resetEarthStreaming !== 'function') {
     throw new Error('Earth streaming lifecycle owner is unavailable during world reset.');
@@ -126,6 +128,8 @@ export function resetWorldForReload(options = {}) {
   // prevents the next feature compilation pass from appearing authoritative
   // before final terrain-aligned meshes have been created.
   appCtx._cancelStreetPavementBuild?.();
+  appCtx.structureTerrainProjectionIndex?.dispose?.();
+  appCtx.structureTerrainProjectionIndex=null;
   appCtx.streetFrontageGrading?.dispose?.();
   appCtx.streetFrontageGrading = null;
   appCtx.streetOverview?.dispose?.();
@@ -137,9 +141,12 @@ export function resetWorldForReload(options = {}) {
   appCtx.streetPavement = null;
   appCtx.roadContactIndex?.dispose?.();
   appCtx.roadContactIndex = null;
+  appCtx.linearWalkContactIndex?.dispose?.();
+  appCtx.linearWalkContactIndex = null;
   appCtx._streetPavementGeneration = (appCtx._streetPavementGeneration || 0) + 1;
   appCtx._streetPavementDirty = false;
   appCtx._streetPavementRetryAt = 0;
+  appCtx._streetMotion = null;
   appCtx.transportSurfacePublication = null;
   if (appCtx.car) {
     appCtx.car.road = null;

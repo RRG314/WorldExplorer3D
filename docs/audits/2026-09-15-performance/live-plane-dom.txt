@@ -1,0 +1,70 @@
+- img "Interactive 3D world view"
+- link "Skip to world controls":
+  - /url: "#globeSelectorStartBtn"
+- status
+- text: ◉ 3D
+- generic "5.2.0+db62593ba377.6342cddaba06fc68.production":
+  - text: WORLD EXPLORER
+  - button "Collapse HUD" [expanded]: "-"
+  - generic: "149"
+  - text: KTS
+  - generic: ALT 119
+  - generic: ☁️ Overcast • 60°F
+  - generic: Feels 57°F • 90% humidity • Wind 14 mph W
+  - generic: 5:04:02 PM
+  - progressbar "Player plane health"
+  - generic: Flight
+  - generic: San Francisco, California, United States
+  - generic: BRK
+  - generic: PWR
+  - generic: AIR
+  - text: V5.2.0 · db62593
+- generic: 37.7775, -122.4114 | E 81°
+- link "OSM":
+  - /url: https://www.openstreetmap.org/edit?editor=id#map=19/37.7775304/-122.4113907
+- text: › › › › + + +
+- status:
+  - generic: Exit aircraft
+  - generic: Explorer aerobatic jet · parachute ready after exit
+  - generic: E
+- img "Interactive 3D world view"
+- generic "Minimap zoom controls":
+  - button "Zoom in on minimap": +
+  - generic: Z 15
+  - button "Zoom out on minimap": −
+- text: + + + + + + + + +
+- button "Open Explore":
+  - generic: ⌖
+  - generic: Explore
+- text: EXPLORE
+- button "Open Travel":
+  - generic: ◈
+  - generic: Travel
+- text: TRAVEL
+- button "Open Backpack":
+  - generic: ▣
+  - generic: Backpack
+- text: BACKPACK
+- button "Open Community":
+  - generic: ◎
+  - generic: Community
+- text: COMMUNITY
+- button "Open Real Estate":
+  - generic: ⌂
+  - generic: Real Estate
+- text: REAL ESTATE
+- button "Open current controls":
+  - generic: ⚙️
+  - text: Controls
+- button "🏠 Main Menu"
+- generic "Quick world controls":
+  - 'button "Change time of day. Current: Live Day"':
+  - 'button "Change weather. Current: Live"':
+- button "Share This Experience":
+- complementary "Room chat":
+  - generic: Room Chat
+  - button "Close"
+  - generic: Join a room to enable chat.
+  - textbox "Send message (max 500 chars)"
+  - button "Send"
+  - generic: "Safety rules: no links, no personal contact info, and no harassment. Use Report on abusive messages."

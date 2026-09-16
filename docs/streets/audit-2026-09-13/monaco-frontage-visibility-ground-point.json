@@ -1,0 +1,152 @@
+{
+  "layers": [
+    {
+      "point": {
+        "x": 35.50165214426218,
+        "y": 64.88245786609335,
+        "z": -22.882799619944763
+      },
+      "parent": "TerrainGroup",
+      "material": {
+        "type": "MeshStandardMaterial",
+        "depthTest": true,
+        "offset": true,
+        "factor": 1,
+        "units": 1
+      },
+      "renderOrder": 0
+    },
+    {
+      "point": {
+        "x": -134409.3452093488,
+        "y": -152488.89625411035,
+        "z": -225000
+      },
+      "parent": "Earth Runtime Root",
+      "material": {
+        "type": "ShaderMaterial",
+        "depthTest": false,
+        "offset": false,
+        "factor": 0,
+        "units": 0
+      },
+      "renderOrder": -10000
+    }
+  ],
+  "point": {
+    "x": 35.50165214426218,
+    "y": 64.88245786609335,
+    "z": -22.882799619944763
+  },
+  "object": "",
+  "parent": "TerrainGroup",
+  "pavement": null,
+  "owner": {
+    "registeredRoad": false,
+    "keys": [
+      "terrainTile",
+      "terrainTileKey",
+      "isTerrainMesh",
+      "terrainTextureRepeats",
+      "renderProvenance",
+      "pendingTerrainTile",
+      "baseTerrainWorldY",
+      "waterMaskedVertices",
+      "transportCorridorAdjustedVertices",
+      "groundUnavailableReason",
+      "minElevation",
+      "maxElevation",
+      "minElevationMeters",
+      "maxElevationMeters",
+      "elevationStatsMeters",
+      "terrainTextureSetsByMode",
+      "terrainTextureSet",
+      "terrainVisualProfile",
+      "terrainSurfaceMaterialAuthority",
+      "mappedSemanticTintVertices",
+      "mappedSemanticTintContext",
+      "mappedDetailedGroundIndex",
+      "mappedSemanticAttributeVersions",
+      "terrainReliefMaterialAuthority",
+      "terrainSurfaceMaterialBlend",
+      "worldCoverStatus",
+      "worldCoverAbortController",
+      "worldCoverPromise",
+      "worldCoverResult",
+      "worldCoverSummary",
+      "worldCoverSurfaceMode",
+      "terrainDetailProvenance",
+      "heightCompilationScheduling",
+      "structureTerrainPortalDescriptors",
+      "structurePortalOriginalRaycast",
+      "structureTerrainPortalMasks"
+    ]
+  },
+  "indexedRoad": null,
+  "terrain": 64.88245739956044,
+  "road": {
+    "distance": 2.412593032298105,
+    "y": 64.69356986336614,
+    "name": "Service",
+    "width": 3.423423423423423,
+    "pts": [
+      {
+        "x": 22.787279811872164,
+        "z": 10.989999999821976
+      },
+      {
+        "x": 22.92455258183016,
+        "z": 6.8999999996322
+      },
+      {
+        "x": 24.102208450383397,
+        "z": 2.239999999886777
+      },
+      {
+        "x": 32.222976525789846,
+        "z": -16.159999999842967
+      },
+      {
+        "x": 35.90766666677099,
+        "z": -20.040000000420832
+      },
+      {
+        "x": 38.486949765438546,
+        "z": -22.28000000030761
+      }
+    ],
+    "tags": {
+      "access": "private",
+      "highway": "service"
+    },
+    "semantics": {
+      "featureCategory": "road",
+      "structureKind": "at_grade",
+      "terrainMode": "at_grade",
+      "gradeSeparated": false,
+      "topologySeparated": false,
+      "isBridge": false,
+      "isTunnel": false,
+      "culvert": false,
+      "covered": false,
+      "indoor": false,
+      "buildingPassage": false,
+      "underground": false,
+      "cutting": false,
+      "embankment": false,
+      "skywalk": false,
+      "placement": "",
+      "layer": 0,
+      "level": null,
+      "verticalOrder": 0,
+      "deckClearance": 0,
+      "cutDepth": 0,
+      "explicitBaseOffset": 0,
+      "physicalStructureEvidence": false,
+      "elevatedConnectorCandidate": false,
+      "rampCandidate": false,
+      "verticalGroup": "at_grade:0:at_grade",
+      "embeddedInBuilding": false
+    }
+  }
+}

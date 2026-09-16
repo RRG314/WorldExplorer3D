@@ -2,7 +2,7 @@
 // Import order mirrors legacy runtime dependencies.
 import { getCurrentUser, observeAuth } from '../../js/auth-ui.js?v=55';
 import { setupAnalyticsConsentUi } from '../../js/analytics-consent.js?v=3';
-import './rdt.js?v=55';
+import './procedural-random.js?v=1';
 import './config.js?v=63';
 import { ctx as appCtx } from './shared-context.js?v=55';
 import { createAccountService } from './platform/account-service.js?v=1';

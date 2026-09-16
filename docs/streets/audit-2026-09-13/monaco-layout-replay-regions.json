@@ -1,0 +1,305 @@
+{
+  "scope": "Complete saved layout extent; horizontal pavement partition invariance only. Does not certify heights, movement or missing source data.",
+  "sourceOutlineGridWorld": 0.001,
+  "booleanGridWorld": 0.001,
+  "boundaryAllowanceWorld": 0.002,
+  "coverageBounds": {
+    "minX": -384,
+    "maxX": 384,
+    "minZ": -384,
+    "maxZ": 384
+  },
+  "sourceCounts": {
+    "roads": 328,
+    "buildings": 1056,
+    "landuses": 203,
+    "linearFeatures": 208
+  },
+  "reports": [
+    {
+      "chunkSize": 64,
+      "tiles": 140,
+      "area": 70128.82511350002,
+      "milliseconds": 3368.015167,
+      "differenceArea": 0,
+      "beyondRoundingArea": 0,
+      "maximumSampledBoundaryDistance": 0,
+      "differences": []
+    },
+    {
+      "chunkSize": 32,
+      "tiles": 560,
+      "area": 70128.82928350002,
+      "milliseconds": 5108.268749999999,
+      "differenceArea": 0.18583949999836272,
+      "beyondRoundingArea": 0.002419500000002075,
+      "maximumSampledBoundaryDistance": 4.12053809331124,
+      "differences": [
+        {
+          "bounds": {
+            "minX": -128,
+            "maxX": -64,
+            "minZ": 192,
+            "maxZ": 256
+          },
+          "differenceArea": 0.015438500000347383,
+          "beyondRoundingArea": 0,
+          "maximumSampledBoundaryDistance": 2.410525668811671
+        },
+        {
+          "bounds": {
+            "minX": 64,
+            "maxX": 128,
+            "minZ": 192,
+            "maxZ": 256
+          },
+          "differenceArea": 0.014268500000048256,
+          "beyondRoundingArea": 0,
+          "maximumSampledBoundaryDistance": 0.05903388857260439
+        },
+        {
+          "bounds": {
+            "minX": 128,
+            "maxX": 192,
+            "minZ": 192,
+            "maxZ": 256
+          },
+          "differenceArea": 0.012868999999679248,
+          "beyondRoundingArea": 0,
+          "maximumSampledBoundaryDistance": 0.001976743395310473
+        },
+        {
+          "bounds": {
+            "minX": -64,
+            "maxX": 0,
+            "minZ": 256,
+            "maxZ": 320
+          },
+          "differenceArea": 0.012679499999167414,
+          "beyondRoundingArea": 0,
+          "maximumSampledBoundaryDistance": 0.0004554249073346108
+        },
+        {
+          "bounds": {
+            "minX": -128,
+            "maxX": -64,
+            "minZ": 256,
+            "maxZ": 320
+          },
+          "differenceArea": 0.010734499999109859,
+          "beyondRoundingArea": 0,
+          "maximumSampledBoundaryDistance": 0.00042147078205065423
+        },
+        {
+          "bounds": {
+            "minX": -192,
+            "maxX": -128,
+            "minZ": 256,
+            "maxZ": 320
+          },
+          "differenceArea": 0.010618500000084208,
+          "beyondRoundingArea": 0,
+          "maximumSampledBoundaryDistance": 0.1013326996561121
+        },
+        {
+          "bounds": {
+            "minX": -256,
+            "maxX": -192,
+            "minZ": 0,
+            "maxZ": 64
+          },
+          "differenceArea": 0.007890000000034827,
+          "beyondRoundingArea": 0,
+          "maximumSampledBoundaryDistance": 0.7145641725412164
+        },
+        {
+          "bounds": {
+            "minX": -192,
+            "maxX": -128,
+            "minZ": 128,
+            "maxZ": 192
+          },
+          "differenceArea": 0.007646500000045062,
+          "beyondRoundingArea": 0,
+          "maximumSampledBoundaryDistance": 0.031144823004799396
+        },
+        {
+          "bounds": {
+            "minX": -64,
+            "maxX": 0,
+            "minZ": 192,
+            "maxZ": 256
+          },
+          "differenceArea": 0.0073650000000822224,
+          "beyondRoundingArea": 0,
+          "maximumSampledBoundaryDistance": 0.0004787267964959787
+        },
+        {
+          "bounds": {
+            "minX": 128,
+            "maxX": 192,
+            "minZ": -256,
+            "maxZ": -192
+          },
+          "differenceArea": 0.0063219999998942455,
+          "beyondRoundingArea": 0,
+          "maximumSampledBoundaryDistance": 0.00043246835004272384
+        },
+        {
+          "bounds": {
+            "minX": 192,
+            "maxX": 256,
+            "minZ": -320,
+            "maxZ": -256
+          },
+          "differenceArea": 0.005405500000107814,
+          "beyondRoundingArea": 0,
+          "maximumSampledBoundaryDistance": 0.41486407412545473
+        },
+        {
+          "bounds": {
+            "minX": -384,
+            "maxX": -320,
+            "minZ": 0,
+            "maxZ": 64
+          },
+          "differenceArea": 0.005270999999964283,
+          "beyondRoundingArea": 0,
+          "maximumSampledBoundaryDistance": 0.10072239075798192
+        }
+      ]
+    },
+    {
+      "chunkSize": 128,
+      "tiles": 36,
+      "area": 70128.82511350002,
+      "milliseconds": 5015.8831249999985,
+      "differenceArea": 0.003418999999975784,
+      "beyondRoundingArea": 0.004118499999991173,
+      "maximumSampledBoundaryDistance": 4.12053809331124,
+      "differences": [
+        {
+          "bounds": {
+            "minX": -384,
+            "maxX": -320,
+            "minZ": -128,
+            "maxZ": -64
+          },
+          "differenceArea": 0.0011475000000059532,
+          "beyondRoundingArea": 0,
+          "maximumSampledBoundaryDistance": 0.6929921676897977
+        },
+        {
+          "bounds": {
+            "minX": -256,
+            "maxX": -192,
+            "minZ": 320,
+            "maxZ": 384
+          },
+          "differenceArea": 0.0010849999999826727,
+          "beyondRoundingArea": 0,
+          "maximumSampledBoundaryDistance": 0.4994443737690889
+        },
+        {
+          "bounds": {
+            "minX": 128,
+            "maxX": 192,
+            "minZ": -192,
+            "maxZ": -128
+          },
+          "differenceArea": 0.00027399999998864444,
+          "beyondRoundingArea": 0,
+          "maximumSampledBoundaryDistance": 2.111629702272655
+        },
+        {
+          "bounds": {
+            "minX": 192,
+            "maxX": 256,
+            "minZ": -256,
+            "maxZ": -192
+          },
+          "differenceArea": 0.0002110000000010202,
+          "beyondRoundingArea": 0.0000010000000000095496,
+          "maximumSampledBoundaryDistance": 3.134254671433631
+        },
+        {
+          "bounds": {
+            "minX": -384,
+            "maxX": -320,
+            "minZ": 256,
+            "maxZ": 320
+          },
+          "differenceArea": 0.00015999999999709302,
+          "beyondRoundingArea": 0,
+          "maximumSampledBoundaryDistance": 2.467563452885414
+        },
+        {
+          "bounds": {
+            "minX": -384,
+            "maxX": -320,
+            "minZ": -64,
+            "maxZ": 0
+          },
+          "differenceArea": 0.00014299999999661892,
+          "beyondRoundingArea": 0.00008700000000288429,
+          "maximumSampledBoundaryDistance": 0.27658633371878105
+        },
+        {
+          "bounds": {
+            "minX": 64,
+            "maxX": 128,
+            "minZ": -192,
+            "maxZ": -128
+          },
+          "differenceArea": 0.00013949999999669945,
+          "beyondRoundingArea": 0,
+          "maximumSampledBoundaryDistance": 4.12053809331124
+        },
+        {
+          "bounds": {
+            "minX": -256,
+            "maxX": -192,
+            "minZ": -128,
+            "maxZ": -64
+          },
+          "differenceArea": 0.00008750000000634639,
+          "beyondRoundingArea": 0.0000015000000000143244,
+          "maximumSampledBoundaryDistance": 2.239177750073109
+        },
+        {
+          "bounds": {
+            "minX": 128,
+            "maxX": 192,
+            "minZ": -384,
+            "maxZ": -320
+          },
+          "differenceArea": 0.00007400000000170118,
+          "beyondRoundingArea": 0.0004029999999959615,
+          "maximumSampledBoundaryDistance": 1.4878071111538482
+        },
+        {
+          "bounds": {
+            "minX": -64,
+            "maxX": 0,
+            "minZ": -64,
+            "maxZ": 0
+          },
+          "differenceArea": 0.000049499999999886515,
+          "beyondRoundingArea": 0,
+          "maximumSampledBoundaryDistance": 0.5692213980517664
+        },
+        {
+          "bounds": {
+            "minX": -384,
+            "maxX": -320,
+            "minZ": 128,
+            "maxZ": 192
+          },
+          "differenceArea": 0.00003149999999863852,
+          "beyondRoundingArea": 0,
+          "maximumSampledBoundaryDistance": 0.7450068599446249
+        }
+      ]
+    }
+  ]
+}

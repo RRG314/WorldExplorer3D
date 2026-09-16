@@ -1,3 +1,5 @@
+import {emitLocalLoadTrace} from './load-trace.js';
+import {isSurfacePublicationError,finishFailedSurfaceLoad} from './surface-publication-error.js';
 import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=11";
 import { createWorldLandusePass } from "./load-landuse-pass.js?v=40";
 import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=9";
@@ -98,7 +100,6 @@ export function createWorldRoadLoader(deps = {}) {
     cloneStructureSemantics,
     createSyntheticFallbackWorld,
     decimatePoints,
-    decimateRoadCenterlineByDepth,
     earthSceneSuppressed,
     fetchOverpassJSON,
     fetchGlobalBuildingData,
@@ -127,7 +128,6 @@ export function createWorldRoadLoader(deps = {}) {
     poiKeyFromTags,
     polylineBounds,
     prepareWorldFeatureSelections,
-    rdtDepthForFeatureTile,
     recordWorldLoadWarning,
     refreshStructureAwareFeatureProfiles,
     registerWaterWaveMaterial,
@@ -200,7 +200,10 @@ export function createWorldRoadLoader(deps = {}) {
     pointInPolygon: deps.pointInPolygon
   });
   async function loadRoadsInternal(retryPass = 0) {
+    emitLocalLoadTrace('startup','editable-world:start');
     await appCtx.ensureEditableWorldRuntime?.();
+    emitLocalLoadTrace('startup','editable-world:end');
+    emitLocalLoadTrace('startup','world-session:start');
     const session = createWorldLoadRuntimeSession({
       appCtx,
       clearBuildingSpatialIndex,
@@ -217,6 +220,7 @@ export function createWorldRoadLoader(deps = {}) {
       sameLocation
     });
     if (session.aborted) return;
+    try {
     appCtx.showGroundFallbackPlaceholder?.();
     const {
       endLoadPhase,
@@ -228,13 +232,11 @@ export function createWorldRoadLoader(deps = {}) {
       perfModeNow,
       phaseTotals,
       releaseWorldLoadCancellation,
-      rdtLoadComplexity,
       runtimeState,
       restoreRequestedSelection,
       runProviderWork,
       startLoadPhase,
       syncWorldSessionState,
-      useRdtBudgeting,
       useSyntheticFallbackRoads,
       worldSession
     } = session;
@@ -578,12 +580,14 @@ export function createWorldRoadLoader(deps = {}) {
           runProviderWork,
           timeoutMs: Math.min(optionalProviderTimeoutMs, overpassTimeoutMs)
         });
+        const generalizedTransportFacilityResult = await generalizedTransportFacilityRequest;
         try {
           data = await completeFixedRegionalTransportLoad({
             appCtx,
             coreRadiusMeters: loadedRadiusWorld * Number(appCtx.METERS_PER_WORLD_UNIT || 1),
             exactData: data,
             exactTransportLoaded,
+            fallbackCoreData: generalizedTransportFacilityResult.facilityData,
             loadMetrics,
             request: regionalRequest
           });
@@ -678,7 +682,7 @@ export function createWorldRoadLoader(deps = {}) {
           inventoryAuthority: 'world-explorer-gameplay'
         };
         runtimeState.commercePlaces = loadMetrics.commercePlaces;
-        const generalizedTransportFacilityResult = await generalizedTransportFacilityRequest;
+
         const exactFacilityElements = selectExactFacilityElements(exactSupplementData);
         const generalizedFacilityElements = generalizedTransportFacilityResult.facilityData?.elements || [];
         const facilityElements = new Map(generalizedFacilityElements.map((element) => [
@@ -788,7 +792,7 @@ export function createWorldRoadLoader(deps = {}) {
             maxBuildingWays, maxLanduseWays, maxPoiNodes, maxRoadWays,
             maxTreeNodes: MAX_TREE_NODES, maxTreeRowWays: MAX_TREE_ROW_WAYS,
             poiKeyFromTags, roadTypePriority: deps.roadTypePriority,
-            tileBudgetCfg, useRdtBudgeting
+            tileBudgetCfg
           }
         });
         const selection = normalized.rawSelection;
@@ -855,7 +859,6 @@ export function createWorldRoadLoader(deps = {}) {
         const roadFeatureCompilation = await buildRoadGeometryPass({
           classifyStructureSemantics,
           cloneStructureSemantics,
-          decimateRoadCenterlineByDepth,
           endLoadPhase,
           featureTileKeyForLatLon,
           geometryGuards: regionalRoadGeometryGuards,
@@ -864,13 +867,11 @@ export function createWorldRoadLoader(deps = {}) {
           nodes: normalizedSelection.nodes,
           perfModeNow,
           polylineBounds,
-          rdtDepthForFeatureTile,
           roadWays: normalizedSelection.roadWays,
           sanitizeWorldPathPoints,
           showLoad: appCtx.showLoad,
           startLoadPhase,
           tileBudgetCfg,
-          useRdtBudgeting,
           wayCenterLatLon,
           worldBaseTerrainY
         });
@@ -1006,7 +1007,6 @@ export function createWorldRoadLoader(deps = {}) {
             metadataTimeoutMs: optionalProviderTimeoutMs,
             pickBuildingBaseColor,
             query: buildingPublicationQuery,
-            rdtLoadComplexity,
             recordLoadWarning,
             registerBuildingCollision,
             sanitizeWorldFootprintPoints,
@@ -1018,7 +1018,6 @@ export function createWorldRoadLoader(deps = {}) {
             waterStructureDeadlineMs: loadDeadline,
             waterStructureQuery,
             waterStructureTimeoutMs: optionalProviderTimeoutMs,
-            useRdtBudgeting
           });
           appCtx.showLoad('Loading buildings and preparing the world...');
           await loadBuildingDetail();
@@ -1064,6 +1063,7 @@ export function createWorldRoadLoader(deps = {}) {
         if (!isActiveLoadContext()) {
           return finishSupersededWorldLoadRuntimeSession(session, 'superseded-after-provider-error');
         }
+        if(isSurfacePublicationError(err))throw err;
         if (String(err?.message || err).includes('All Overpass endpoints failed')) {
           providerUnavailable = true;
           loadMetrics.providerUnavailable = true;
@@ -1140,6 +1140,10 @@ export function createWorldRoadLoader(deps = {}) {
       syncWorldSessionState,
       worldSession
     });
+    } catch(error) {
+      if(isSurfacePublicationError(error))return finishFailedSurfaceLoad(session,error);
+      throw error;
+    }
   }
 
   const { loadWorld: loadRoads } = createWorldLoadCoordinator({

@@ -105,8 +105,6 @@ export async function buildBuildingGeometryPass(options = {}) {
       .map((record) => record?.identity?.featureId)
       .filter(Boolean)
   );
-  const useRdtBudgeting = options.useRdtBudgeting === true;
-  const rdtLoadComplexity = Number(options.rdtLoadComplexity || 0);
   const featureMinPolygonArea = Number.isFinite(options.featureMinPolygonArea) ? options.featureMinPolygonArea : 8;
   const startLoadPhase = typeof options.startLoadPhase === 'function' ? options.startLoadPhase : () => {};
   const endLoadPhase = typeof options.endLoadPhase === 'function' ? options.endLoadPhase : () => {};
@@ -144,8 +142,6 @@ export async function buildBuildingGeometryPass(options = {}) {
     sampleFootprintCoverage
   } = await createBuildingRoadFootprintGuards({
     roads: appCtx.roads,
-    useRdtBudgeting,
-    rdtLoadComplexity,
     yieldToMainThread
   });
   endLoadPhase('buildBuildingRoadGuards');
@@ -402,7 +398,7 @@ export async function buildBuildingGeometryPass(options = {}) {
     const suppressGroundApron =
       structureSemantics.terrainMode === 'elevated' ||
       roadCoreConflict;
-    const colliderDetail = useRdtBudgeting && lodTier !== 'near' && !roadCoreConflict ? 'bbox' : 'full';
+    const colliderDetail = 'full';
 
     const sampleTerrainY = (x, z) => {
       const meshHeight = typeof appCtx.terrainMeshHeightAt === 'function'

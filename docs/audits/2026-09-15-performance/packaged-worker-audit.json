@@ -1,0 +1,31 @@
+{
+  "workerReferences": [
+    {
+      "bundle": "dist/app/js/bundles/chunk-IPSJ6TRZ.js",
+      "workerUrl": "./compiler/street-overview-worker.js",
+      "target": "dist/app/js/bundles/compiler/street-overview-worker.js",
+      "exists": false
+    },
+    {
+      "bundle": "dist/app/js/bundles/chunk-IPSJ6TRZ.js",
+      "workerUrl": "./compiler/street-pavement-worker.js",
+      "target": "dist/app/js/bundles/compiler/street-pavement-worker.js",
+      "exists": false
+    },
+    {
+      "bundle": "dist/app/js/bundles/chunk-WG7K563D.js",
+      "workerUrl": "./tunnel-solid-worker.js",
+      "target": "dist/app/js/bundles/tunnel-solid-worker.js",
+      "exists": false
+    }
+  ],
+  "workerFiles": [
+    "dist/app/assets/models/characters/city-explorer-woman-worker-v1.glb",
+    "dist/app/js/bundles/tunnel-solid-worker-QE45BBEJ.js"
+  ],
+  "interpretation": {
+    "street-overview-worker": "Missing packaged target; no production URL override in source.",
+    "street-pavement-worker": "Missing packaged target; no production URL override in source.",
+    "tunnel-solid-worker": "Regex sees development fallback; production metadata points to existing hashed worker, so this is NOT a confirmed missing worker."
+  }
+}

@@ -1,7 +1,6 @@
 export function createPerfSettingsApi({ appCtx, constants, state }) {
   const {
     PERF_MODE_BASELINE,
-    PERF_MODE_RDT,
     PERF_QUALITY_TIER_BALANCED,
     PERF_QUALITY_TIER_PERFORMANCE,
     PERF_QUALITY_TIER_QUALITY
@@ -34,7 +33,8 @@ export function createPerfSettingsApi({ appCtx, constants, state }) {
   }
 
   function normalizePerfMode(mode) {
-    return mode === PERF_MODE_BASELINE ? PERF_MODE_BASELINE : PERF_MODE_RDT;
+    // Older shared links and stored settings cannot reactivate experimental budgets.
+    return PERF_MODE_BASELINE;
   }
 
   function normalizePerfQualityTier(tier) {
