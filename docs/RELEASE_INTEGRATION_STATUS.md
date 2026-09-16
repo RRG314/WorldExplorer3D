@@ -59,7 +59,8 @@ the current carriageway/pavement publisher would not constitute clean integratio
 3. Execution evidence records artifact-manifest hashes. Artifact-dependent gate
    results cannot be reused for a different environment/build from the same source.
    Final readiness rejects missing/changed manifests. Asset-integrity verification
-   remains responsible for checking the actual delivered files against hashes.
+   remains responsible for checking the actual delivered files against hashes
+   and is never reused from a cached receipt.
 4. The complete street CPU suite is now a required candidate gate and CP2
    requirement, in addition to packaged worker and rendered-world checks.
 5. Production baseline metadata and the source-of-truth document now distinguish

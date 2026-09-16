@@ -98,7 +98,9 @@ function gateEvidencePath(id) {
 }
 
 function reusableGateEvidence(id, gate) {
-  if (freshExecution) return null;
+  // Files can change without updating their manifests. Always re-hash the
+  // delivered artifact instead of trusting a cached integrity receipt.
+  if (freshExecution || id === 'artifact-integrity') return null;
   const target = gateEvidencePath(id);
   if (!existsSync(target)) return null;
   try {
