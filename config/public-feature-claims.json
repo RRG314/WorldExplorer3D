@@ -15,7 +15,7 @@
     {
       "id": "fixed-location-earth",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "Choose a location, step into the world" },
+      "source": { "file": "README.md", "pattern": "Choose a location, step into a bounded playable world" },
       "evidenceCommands": ["verify:world", "verify:assembled-locations", "verify:artifact-runtime"]
     },
     {
