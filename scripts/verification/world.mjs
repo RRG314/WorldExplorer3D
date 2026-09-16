@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { completeWorldReady } from './complete-world-readiness.mjs';
 
 const root = process.cwd();
 const externalUrl = String(process.env.WE3D_VERIFY_BASE_URL || '').replace(/\/$/, '');
@@ -212,20 +213,7 @@ async function waitForCompleteWorld() {
   while (Date.now() < deadline) {
     const intervalTimeout = Math.max(1, Math.min(60_000, deadline - Date.now()));
     try {
-      await page.waitForFunction(() => {
-        const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
-        const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
-        return state.gameStarted === true && state.worldLoading === false &&
-          diagnostics.surfaceChain?.surfaces?.terrain?.kind === 'terrain' &&
-          Number.isFinite(Number(diagnostics.surfaceChain?.surfaces?.terrain?.y)) &&
-          Number(diagnostics.worldCounts?.roads || 0) > 0 &&
-          Number(diagnostics.worldCounts?.buildingMeshes || 0) > 0 &&
-          Number(diagnostics.transportStructures?.publishedBodies || 0) > 0 &&
-          Number(diagnostics.visualOwners?.water?.surfaceCount || 0) > 0 &&
-          diagnostics.livingWorld?.active === true &&
-          diagnostics.urbanSandbox?.active === true &&
-          diagnostics.worldDiscovery?.active === true;
-      }, null, { timeout: intervalTimeout });
+      await page.waitForFunction(completeWorldReady, null, { timeout: intervalTimeout, polling: 500 });
       return;
     } catch (error) {
       latest = await worldReadinessSnapshot().catch(() => null);

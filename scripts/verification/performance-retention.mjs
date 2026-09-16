@@ -112,7 +112,7 @@ async function waitForPlayable(page) {
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.();
     return state?.gameStarted === true && state.worldLoading === false &&
       Number(state.worldCounts?.buildings || 0) > 0 && Number(state.worldCounts?.roads || 0) > 0;
-  }, null, { timeout: 300_000 });
+  }, null, { timeout: 300_000, polling: 500 });
   await page.waitForTimeout(2_500);
 }
 
@@ -151,7 +151,7 @@ async function selectMode(page, expected, selector) {
   assert.equal(await page.locator(selector).isVisible(), true, `${selector} is not a visible Travel action.`);
   const startedAt = performance.now();
   await page.locator(selector).click();
-  await page.waitForFunction((mode) => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.mode === mode, expected, { timeout: 20_000 });
+  await page.waitForFunction((mode) => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.mode === mode, expected, { timeout: 20_000, polling: 500 });
   const activationMs = Math.round(performance.now() - startedAt);
   await page.waitForTimeout(1_200);
   return activationMs;
@@ -161,9 +161,9 @@ async function measureMode(client, id, sampleMs = 5_000) {
   const raw = await client.page.evaluate(async (durationMs) => {
     return new Promise((resolve) => {
     const deltas = [];
-    const startedAt = performance.now();
     const startActor = globalThis.getWorldExplorerRuntimeDiagnostics?.()?.activeActor;
     const startPosition = startActor?.position ? {x:startActor.position.x,z:startActor.position.z} : null;
+    const startedAt = performance.now();
     let previous = startedAt;
     const frame = (now) => {
       if (now > previous) deltas.push(now - previous);

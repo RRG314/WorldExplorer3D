@@ -128,14 +128,16 @@ try {
       if (await consent.isVisible()) await consent.click();
       await page.getByRole('button', { name: 'Explore', exact: true }).click();
       await page.waitForFunction(() => {
+        if (document.querySelector('#loading.show')) return false;
         const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+        if (state.gameStarted !== true || state.worldLoading !== false) return false;
         const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
         return state.gameStarted === true && state.worldLoading === false &&
           diagnostics.surfaceChain?.surfaces?.terrain?.kind === 'terrain' &&
           Number.isFinite(Number(diagnostics.surfaceChain?.surfaces?.terrain?.y)) &&
           Number(diagnostics.worldCounts?.roads || 0) > 0 &&
           diagnostics.livingWorld?.active === true && diagnostics.urbanSandbox?.active === true;
-      }, null, { timeout: 360000 });
+      }, null, { timeout: 360000, polling: 500 });
       await page.waitForTimeout(3000);
 
       const snapshot = await page.evaluate(() => {
