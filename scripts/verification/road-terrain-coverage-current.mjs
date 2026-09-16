@@ -84,8 +84,10 @@ try {
       outerTerrainReady: diagnostics.farTerrainClipmap?.status === 'ready',
       atGradeAuditRan: Number(conformance?.totalSamples || 0) > 0,
       noAtGradeRoadBelowTerrain: Number(conformance?.issuesFound ?? -1) === 0,
-      roadGeometryValid: Number(roadSurfaceIntegrity?.foldedTriangles || 0) === 0 &&
-        Number(roadSurfaceIntegrity?.degenerateTriangles || 0) === 0,
+      roadGeometryValid: roadSurfaceIntegrity?.geometryMeasurementAuthority === 'published-buffer-geometry-triangles' &&
+        roadSurfaceIntegrity?.downwardFacingTriangles === 0 &&
+        roadSurfaceIntegrity?.invalidTriangles === 0 &&
+        roadSurfaceIntegrity?.zeroFootprintTriangles === 0,
       selectionWithinGlobalBudget: Number(selection?.uniqueSelected || 0) <= 20_000,
       substantialRegionalCoverage: Number(selection?.available || 0) === 0 ||
         Number(selection?.uniqueSelected || 0) >= Math.min(20_000, Number(selection?.available || 0)) * 0.9,

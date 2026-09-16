@@ -1,3 +1,5 @@
+import { STREET_POLYGON_GRID_WORLD } from '../world/compiler/street-polygon-kernel.js';
+import { measurePublishedRoadTriangles, roadSourceCoordinateTolerance } from './published-road-integrity.js';
 import {emitLocalLoadTrace} from '../world/load-trace.js';
 import {prepareCarriagewayTiles} from '../world/compiler/street-carriageway.js';
 import {meshCarriagewayTile} from '../world/compiler/street-carriageway-mesh.js';
@@ -460,15 +462,23 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   const roadSurfaceIntegrity = {
     authority: 'unioned-carriageway-regions',
     surfaceHeightAuthority: 'partitioned-published-terrain',
+    geometryMeasurementAuthority: 'published-buffer-geometry-triangles',
+    junctionMeasurementAuthority: 'published-at-grade-contact-index',
+    junctionPrecisionAuthority: 'compiler-grid-and-float32-rounding-bound',
+    invalidTriangles: 0,
+    removedZeroFootprintTriangles: 0,
+    correctedDownwardTriangles: 0,
+    junctionSamples: 0,
+    junctionPrecisionContacts: 0,
+    junctionExactContactMisses: 0,
+    maximumJunctionContactDistance: 0,
+    maximumJunctionCoordinateTolerance: 0,
+    junctionCoverageExamples: [],
     carriagewayRegions: 0,
-    segmentQuads: 0,
-    turnJoins: 0,
     surfaceTriangles: 0,
-    foldedTriangles: 0,
-    degenerateTriangles: 0,
-    junctionCoverageGaps: 0,
-    compiledSurfaceFallbacks: 0,
-    renderedTerrainClamps: 0
+    downwardFacingTriangles: 0,
+    zeroFootprintTriangles: 0,
+    junctionCoverageGaps: 0
   };
   const roadTerrainAudit = createRoadTerrainConformanceAudit();
   const flushRoadMainBatch = () => {
@@ -610,7 +620,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
         if(mesh.indices.length) {
           appendRoadMainGeometry(mesh.positions,mesh.indices,'at_grade');
           roadSurfaceIntegrity.carriagewayRegions++;
-          roadSurfaceIntegrity.surfaceTriangles+=mesh.indices.length/3;
+
         }
         if(now()-sliceStartedAt>=24) {await yieldToMainThread();sliceStartedAt=now();}
       }
@@ -635,7 +645,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
 
   if (!isCurrent()) return;
   const publishedVertexCount=roadMainBatches.reduce((sum,batch)=>sum+batch.verts.length/3,0)+roadSkirtBatchVerts.length/3+roadMarkBatchVerts.length/3;
-  const publishedTriangleCount=roadMainBatches.reduce((sum,batch)=>sum+batch.indices.length/3,0)+roadSkirtBatchIdx.length/3+roadMarkBatchIdx.length/3;
+
   const stagedRoadGroup = new THREE.Group();
   const stagedRoadMeshes = [];
   let stagedRoadContact;
@@ -685,6 +695,40 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   roadSkirtBatchVerts.length=roadSkirtBatchIdx.length=0;
   roadMarkBatchVerts.length=roadMarkBatchIdx.length=0;
   stagedRoadContact = await measureAsync('buildRoadContacts',()=>createRoadContactIndexCooperatively(stagedRoadMeshes,16,{current:isCurrent,yieldWork:yieldToMainThread}));
+  await measureAsync('measurePublishedRoadIntegrity', async () => {
+    let sliceStartedAt = now();
+    for (const mesh of stagedRoadMeshes) {
+      if (mesh.userData?.isRoadSkirt || mesh.userData?.isRoadMarking) continue;
+      roadSurfaceIntegrity.removedZeroFootprintTriangles += mesh.userData.removedZeroFootprintTriangles || 0;
+      roadSurfaceIntegrity.correctedDownwardTriangles += mesh.userData.correctedDownwardTriangles || 0;
+      const measured = measurePublishedRoadTriangles(mesh.geometry?.attributes?.position?.array, mesh.geometry?.getIndex?.()?.array);
+      for (const [key, value] of Object.entries(measured)) roadSurfaceIntegrity[key] += value;
+      if (now() - sliceStartedAt >= 24) { await yieldToMainThread(); sliceStartedAt = now(); }
+      if (!isCurrent()) return;
+    }
+    for (const intersection of intersections) {
+      if (intersection.hasGradeSeparatedRoad) continue;
+      roadSurfaceIntegrity.junctionSamples++;
+      const height = stagedRoadContact.sampleAt(intersection.x, intersection.z, NaN, 'at_grade');
+      if (!Number.isFinite(height)) {
+        roadSurfaceIntegrity.junctionExactContactMisses++;
+        const tolerance = roadSourceCoordinateTolerance(intersection.x, intersection.z, STREET_POLYGON_GRID_WORLD);
+        roadSurfaceIntegrity.maximumJunctionCoordinateTolerance = Math.max(roadSurfaceIntegrity.maximumJunctionCoordinateTolerance, tolerance);
+        const nearest = stagedRoadContact.nearestSurfaceAt(intersection.x, intersection.z, tolerance, 'at_grade');
+        if (nearest) {
+          roadSurfaceIntegrity.junctionPrecisionContacts++;
+          roadSurfaceIntegrity.maximumJunctionContactDistance = Math.max(roadSurfaceIntegrity.maximumJunctionContactDistance, nearest.distance);
+        } else {
+          roadSurfaceIntegrity.junctionCoverageGaps++;
+          if (roadSurfaceIntegrity.junctionCoverageExamples.length < 12) {
+            roadSurfaceIntegrity.junctionCoverageExamples.push({x:intersection.x,z:intersection.z,tolerance});
+          }
+        }
+      }
+      if (now() - sliceStartedAt >= 24) { await yieldToMainThread(); sliceStartedAt = now(); }
+      if (!isCurrent()) return;
+    }
+  });
   if(!isCurrent())throw new Error('Road publication superseded');
   } catch (error) {
     stagedRoadContact?.dispose();
@@ -735,7 +779,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     compiledSampleCount: baseRoads.reduce((total, road) =>
       total + Number(road?.transportSurfaceModel?.distances?.length || 0), 0),
     vertices: publishedVertexCount,
-    triangles: publishedTriangleCount,
+    triangles: stagedRoadMeshes.reduce((sum,mesh)=>sum+(mesh.geometry?.getIndex?.()?.count || 0)/3,0),
     roadSurfaceIntegrity: Object.freeze({ ...roadSurfaceIntegrity }),
     roadTerrainConformance,
     phaseDurationsMs: Object.freeze({

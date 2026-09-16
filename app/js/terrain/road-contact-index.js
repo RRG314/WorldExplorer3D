@@ -100,6 +100,34 @@ function* roadContactIndexSteps(meshes, cellSize = 16, {bounds} = {}) {
   return {
     stats(){return {triangles:triangleCount,cells:cells.size,cellReferences,bucketAllocations:buckets.length ? 1 : 0,recordBytes:records.byteLength+denominators.byteLength,bucketBytes};},
     dispose(){buckets=new Uint32Array();cells.clear();sources.length=0;modes.length=0;records=new Uint32Array();denominators=new Float64Array();triangleCount=0;cellReferences=0;bucketBytes=0;},
+    // Diagnostic distance to actual uploaded tops, not an expanded collision
+    // surface. Callers supply an explicit bound and retain the measured distance.
+    nearestSurfaceAt(x,z,maxDistance,requiredTerrainMode=null) {
+      if (!Number.isFinite(maxDistance) || maxDistance < 0) throw new RangeError('Invalid surface distance bound');
+      let best = null;
+      for (let ix=Math.floor((x-maxDistance)/cellSize);ix<=Math.floor((x+maxDistance)/cellSize);ix++) {
+        for (let iz=Math.floor((z-maxDistance)/cellSize);iz<=Math.floor((z+maxDistance)/cellSize);iz++) {
+          const start=cells.get(`${ix}:${iz}`);
+          if(start===undefined)continue;
+          for(let i=start+1,end=i+buckets[start];i<end;i++) {
+            const id=buckets[i],offset=id*5;
+            if(requiredTerrainMode&&modes[records[offset+4]]!==requiredTerrainMode)continue;
+            const p=sources[records[offset]],a=records[offset+1],b=records[offset+2],c=records[offset+3];
+            const u=((p[b+2]-p[c+2])*(x-p[c])+(p[c]-p[b])*(z-p[c+2]))/denominators[id];
+            const v=((p[c+2]-p[a+2])*(x-p[c])+(p[a]-p[c])*(z-p[c+2]))/denominators[id];
+            if(u>=0&&v>=0&&u+v<=1)return {distance:0,x,z,y:u*p[a+1]+v*p[b+1]+(1-u-v)*p[c+1]};
+            for(let edge=0;edge<3;edge++) {
+              const from=edge===0?a:edge===1?b:c,to=edge===0?b:edge===1?c:a;
+              const dx=p[to]-p[from],dz=p[to+2]-p[from+2],lengthSquared=dx*dx+dz*dz;
+              const t=lengthSquared?Math.max(0,Math.min(1,((x-p[from])*dx+(z-p[from+2])*dz)/lengthSquared)):0;
+              const px=p[from]+t*dx,pz=p[from+2]+t*dz,distance=Math.hypot(px-x,pz-z);
+              if(distance<=maxDistance&&(!best||distance<best.distance))best={distance,x:px,z:pz,y:p[from+1]+t*(p[to+1]-p[from+1])};
+            }
+          }
+        }
+      }
+      return best;
+    },
     projectTriangle(points,lift=.012,requiredTerrainMode=null) {
       const candidates=new Set(),xs=points.map(p=>p.x),zs=points.map(p=>p.z);
       for(let ix=Math.floor(Math.min(...xs)/cellSize);ix<=Math.floor(Math.max(...xs)/cellSize);ix++)

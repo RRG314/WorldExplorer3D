@@ -136,3 +136,24 @@ The fixture now includes the actual bottom menu and settings button. It exposed
 settings overlapping Run (or the movement pad in southpaw mode) and the bottom
 menu intercepting landscape controls. Settings now clears the action targets;
 landscape controls sit above the bottom menu. All 24 expanded hit-test cases pass.
+
+Actual uploaded road geometry now supplies the integrity counters. Road tops are
+normalized at Float32 precision before normals and contacts are built: zero
+horizontal footprints are removed, downward winding is corrected, and index
+ranges retain their terrain modes. This preserves surviving triangle footprints;
+it does not claim to eliminate overlaps. The assembled and terrain verifiers
+require measured data rather than accepting absent counters as zero.
+
+Junction coverage is measured against actual uploaded contact triangles. It
+records exact-coordinate misses separately from distances within the compiler's
+0.001 grid and Float32 rounding bound. Physical contact remains unexpanded. The
+JFX investigation identified two phantom junctions beyond the geometry boundary:
+road source topology now includes only source points retained by publication,
+while original source node IDs remain available for provenance. Behavior tests
+reproduce the phantom-junction failure and verify clipping and subdivision.
+
+Each assembled location now owns a separate browser, saves its result immediately,
+and stops the matrix at its first failure. Diagnostic location filters are cleared
+by the release runner so they cannot certify a complete representative-world gate.
+Current execution details and incomplete checks remain in the ignored evidence
+ledger at `output/release-integration/RESULTS.md`.

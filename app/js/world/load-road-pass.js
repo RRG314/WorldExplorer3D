@@ -1,3 +1,4 @@
+import {publishedRoadSourceTopology} from './road-source-topology.js';
 import {roadDimensionsFromSource} from './road-units.js';
 import {streetScaleForWorld} from './compiler/street-frontage-policy.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
@@ -122,20 +123,16 @@ export async function buildRoadGeometryPass(options = {}) {
     const sourceRoadPts = pts;
     if (sourceRoadPts.length < 2) continue;
 
+    const sourceTopologyNodes = publishedRoadSourceTopology(rawNodeRecords, rawPts, sourceRoadPts);
     const roadFeature = {
       pts: sourceRoadPts,
       ...dimensions,
       limit,
       name,
       sourceFeatureId: transportRecord.identity,
-      sourceNodeIds: Object.freeze((way.nodes || []).map(String)),
-      sourceTopologyNodes: Object.freeze(rawNodeRecords.map((entry, index) =>
-        Object.freeze({
-          id: entry.id,
-          x: rawPts[index].x,
-          z: rawPts[index].z
-        })
-      )),
+      originalSourceNodeIds: Object.freeze((way.nodes || []).map(String)),
+      sourceNodeIds: Object.freeze(sourceTopologyNodes.map(node => node.id)),
+      sourceTopologyNodes,
       transportRecord,
       type,
       surfaceTag: String(way.tags?.surface || '').toLowerCase(),

@@ -44,8 +44,8 @@ if (capture) await fs.mkdir(evidenceDir, { recursive: true });
 // contexts can occasionally stop answering Playwright's graceful close even
 // after every context has closed. BrowserServer gives this verifier a bounded
 // process fallback instead of leaking Chrome into later performance gates.
-const browserServer = await chromium.launchServer({ headless: true, channel: 'chrome' });
-const browser = await chromium.connect(browserServer.wsEndpoint());
+let browserServer = null;
+let browser = null;
 const results = [];
 
 async function closeWithin(label, close, timeoutMs = 8_000) {
@@ -90,6 +90,8 @@ try {
   for (const location of locations) {
     const locationStartedAt = performance.now();
     console.error(`[assembled-locations] START ${location.id}`);
+    browserServer = await chromium.launchServer({ headless: true, channel: 'chrome' });
+    browser = await chromium.connect(browserServer.wsEndpoint());
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     const page = await context.newPage();
     const browserErrors = [];
@@ -270,14 +272,19 @@ try {
         compiledRoadGradesWithinDesignBounds: Number(snapshot.transportGradeProfile?.violationCount || 0) === 0,
         solidRoadSurfaceFootprints:
           snapshot.roadSurfaceIntegrity?.authority ===
-            'solid-at-grade-segments-and-bounded-turn-joins' &&
+            'unioned-carriageway-regions' &&
           snapshot.roadSurfaceIntegrity?.surfaceHeightAuthority ===
-            'compiled_transport_surface_profile' &&
-          Number(snapshot.roadSurfaceIntegrity?.segmentQuads || 0) > 0 &&
-          Number(snapshot.roadSurfaceIntegrity?.foldedTriangles || 0) === 0 &&
-          Number(snapshot.roadSurfaceIntegrity?.degenerateTriangles || 0) === 0 &&
-          Number(snapshot.roadSurfaceIntegrity?.junctionCoverageGaps || 0) === 0 &&
-          Number(snapshot.roadSurfaceIntegrity?.compiledSurfaceFallbacks || 0) === 0,
+            'partitioned-published-terrain'
+          && snapshot.roadSurfaceIntegrity?.geometryMeasurementAuthority === 'published-buffer-geometry-triangles'
+          && snapshot.roadSurfaceIntegrity?.junctionMeasurementAuthority === 'published-at-grade-contact-index'
+          && snapshot.roadSurfaceIntegrity?.junctionPrecisionAuthority === 'compiler-grid-and-float32-rounding-bound' &&
+          Number(snapshot.roadSurfaceIntegrity?.junctionSamples || 0) > 0 &&
+          Number(snapshot.roadSurfaceIntegrity?.carriagewayRegions || 0) > 0 &&
+          Number(snapshot.roadSurfaceIntegrity?.surfaceTriangles || 0) > 0 &&
+          snapshot.roadSurfaceIntegrity?.invalidTriangles === 0 &&
+          snapshot.roadSurfaceIntegrity?.downwardFacingTriangles === 0 &&
+          snapshot.roadSurfaceIntegrity?.zeroFootprintTriangles === 0 &&
+          snapshot.roadSurfaceIntegrity?.junctionCoverageGaps === 0,
         oneAtGradeTransportTerrainAuthority:
           snapshot.atGradeTerrainAuthority?.authority === 'compiled_transport_surface' &&
           Number(snapshot.atGradeTerrainAuthority?.roadCount || 0) > 0 &&
@@ -406,13 +413,21 @@ try {
         localFailures
       });
     } finally {
-      await context.close().catch(() => {});
+      // Persist the completed case before potentially slow browser cleanup.
+      await fs.writeFile(reportPath, `${JSON.stringify({ ok: false, complete: false,
+        generatedAt: new Date().toISOString(), requestedLocations: locations.map(x => x.id),
+        contract: 'complete-assembled-gameplay-representative-location-matrix',
+        forceTransportFallback, results }, null, 2)}\n`);
+      await closeWithin('context', () => context.close());
+      if (!await terminateOwnedBrowserProcess()) cleanupError = 'Location browser did not exit';
       const latest = results.at(-1);
+      console.error(JSON.stringify({ event: 'assembled-location-result', id: location.id, ok: latest?.ok, checks: latest?.checks, error: latest?.error }));
       console.error(
         `[assembled-locations] ${latest?.ok ? 'PASS' : 'FAIL'} ${location.id} ` +
         `(${Math.round(performance.now() - locationStartedAt)} ms)`
       );
     }
+    if (!results.at(-1)?.ok || cleanupError) break;
   }
 } finally {
   const browserProcessClosed = await terminateOwnedBrowserProcess();
@@ -423,7 +438,10 @@ try {
 }
 
 const report = {
-  ok: results.every((result) => result.ok) && cleanupError === null,
+  ok: results.length === locations.length && results.every((result) => result.ok) && cleanupError === null,
+  complete: results.length === locations.length,
+  scope: requestedLocations.size > 0 ? 'diagnostic-subset' : 'full',
+  requestedLocations: locations.map(location => location.id),
   generatedAt: new Date().toISOString(),
   contract: 'complete-assembled-gameplay-representative-location-matrix',
   captureEnabled: capture,

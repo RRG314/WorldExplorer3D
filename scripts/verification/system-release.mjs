@@ -89,6 +89,8 @@ const artifactServer = shouldRun && selected.some(([, gate]) => gate.artifactReq
   : null;
 const verificationEnvironment = {
   ...process.env,
+  // A diagnostic location filter must never certify the complete release gate.
+  WE3D_VERIFY_LOCATIONS: '',
   WE3D_VERIFY_ROOT: artifactRoot,
   ...(artifactServer ? { WE3D_VERIFY_BASE_URL: `http://127.0.0.1:${artifactServer.port}` } : {})
 };
