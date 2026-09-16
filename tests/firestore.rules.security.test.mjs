@@ -668,16 +668,16 @@ await runCheck('signed-in invite-code joiner can read private room metadata', as
   await assertSucceeds(getDoc(doc(joinerDb, 'rooms', ROOM_ID)));
 });
 
-await runCheck('signed-in invite-code joiner can count players before membership', async () => {
-  await assertSucceeds(getDocs(collection(joinerDb, 'rooms', ROOM_ID, 'players')));
+await runCheck('private roster is hidden until server admission', async () => {
+  await assertFails(getDocs(collection(joinerDb, 'rooms', ROOM_ID, 'players')));
 });
 
 await runCheck('signed-in user cannot enumerate all private rooms', async () => {
   await assertFails(getDocs(collection(joinerDb, 'rooms')));
 });
 
-await runCheck('signed-in invite-code joiner can create own membership', async () => {
-  await assertSucceeds(setDoc(
+await runCheck('invite holder cannot bypass server admission with a direct membership write', async () => {
+  await assertFails(setDoc(
     doc(joinerDb, 'rooms', ROOM_ID, 'players', JOINER_UID),
     playerDoc(JOINER_UID, 'Private Room Joiner', 'member')
   ));

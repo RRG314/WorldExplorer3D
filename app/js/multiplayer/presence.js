@@ -1,3 +1,4 @@
+import { postProtectedFunction } from '../../../js/function-api.js?v=3';
 import {
   collection,
   doc,
@@ -202,6 +203,8 @@ function movedBeyondThreshold(prevPose, nextPose) {
   return yawDelta >= ROTATE_THRESHOLD_RAD || pitchDelta >= ROTATE_THRESHOLD_RAD;
 }
 
+let lastAdmissionAttemptAt = 0;
+
 async function writePresence(force = false) {
   if (!activeRoomId || typeof getPose !== 'function' || inFlightWrite) return;
 
@@ -219,10 +222,20 @@ async function writePresence(force = false) {
   const movementReached = movedBeyondThreshold(lastSentPose?.pose, normalized.pose);
   if (!force && !intervalReached && !movementReached) return;
 
+  const writingRoomId = activeRoomId;
   inFlightWrite = true;
   try {
     const { db } = getServices();
-    const playerRef = doc(db, ROOM_COLLECTION, activeRoomId, PLAYER_COLLECTION, user.uid);
+    if (now - lastWriteAt >= PRESENCE_TTL_MS) {
+      if (now - lastAdmissionAttemptAt < 15_000) return;
+      lastAdmissionAttemptAt = now;
+      await postProtectedFunction('/joinRoom', {
+        roomCode: writingRoomId, displayName: getDisplayName(user)
+      }, { label: 'Room reconnection' });
+      if (activeRoomId === writingRoomId) lastWriteAt = Date.now();
+      return; // The server wrote presence; respect the normal heartbeat throttle.
+    }
+    const playerRef = doc(db, ROOM_COLLECTION, writingRoomId, PLAYER_COLLECTION, user.uid);
     await setDoc(playerRef, {
       uid: user.uid,
       displayName: getDisplayName(user),
@@ -234,8 +247,10 @@ async function writePresence(force = false) {
       joinCode: activeRoomId
     }, { merge: true });
 
-    lastWriteAt = now;
-    lastSentPose = normalized;
+    if (activeRoomId === writingRoomId) {
+      lastWriteAt = now;
+      lastSentPose = normalized;
+    }
   } catch (err) {
     console.warn('[multiplayer][presence] write failed:', err);
   } finally {
@@ -308,6 +323,7 @@ function startPresence(roomId, getPoseFn) {
   stopPresence();
 
   activeRoomId = normalizedRoomId;
+  lastAdmissionAttemptAt = 0;
   getPose = getPoseFn;
   lastSamplePose = null;
   lastSampleAt = 0;

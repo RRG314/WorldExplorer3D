@@ -1,3 +1,4 @@
+const { admitRoomPlayer } = require('./room-admission');
 const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
 const crypto = require('node:crypto');
@@ -885,6 +886,7 @@ async function deleteRoomTree(roomRef) {
   // explicit path is still used by emulators and older runtimes.
   const subcollections = [
     'players',
+    'admission',
     'chat',
     'chatState',
     'artifacts',
@@ -1741,6 +1743,22 @@ exports.deleteAccount = functions.runWith({timeoutSeconds:540,memory:'512MB',inv
   } catch (err) {
     console.error('[deleteAccount] failed:', err);
     res.status(500).json({ error: 'Unable to delete account right now.' });
+  }
+});
+
+exports.joinRoom = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed.' }); return; }
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+  try {
+    const result = await admitRoomPlayer({ db, uid: auth.uid,
+      roomCode: String(req.body?.roomCode || '').trim().toUpperCase(),
+      displayName: req.body?.displayName || auth.name || 'Explorer' });
+    res.status(200).json(result);
+  } catch (error) {
+    if (!error.status) console.error('[joinRoom] failed:', error);
+    res.status(error.status || 500).json({ error: error.status ? error.message : 'Unable to join this room right now.' });
   }
 });
 

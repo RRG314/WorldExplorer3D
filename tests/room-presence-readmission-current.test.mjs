@@ -1,0 +1,39 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import vm from 'node:vm';
+import { readFile } from 'node:fs/promises';
+const source = (await readFile(new URL('../app/js/multiplayer/presence.js', import.meta.url), 'utf8'))
+  .replace(/import[\s\S]*?from\s+'[^']+';\n/g, '')
+  .replace(/export\s*\{[\s\S]*?\};\s*$/, '');
+function harness({ rejected = false } = {}) {
+  let now = 100_000;
+  const calls = [];
+  const context = vm.createContext({
+    Date: { now: () => now }, console: { warn() {} },
+    initFirebase: () => ({ db: {} }), getCurrentUser: () => ({ uid: 'member', displayName: 'Member' }),
+    doc: (...args) => args, serverTimestamp: () => 'server-time', Timestamp: { fromMillis: n => n },
+    setDoc: async (...args) => calls.push(['write', ...args]),
+    postProtectedFunction: async (...args) => { calls.push(['admit', ...args]); if (rejected) throw new Error('Room full'); }
+  });
+  vm.runInContext(source + "\nactiveRoomId='ROOM01';getPose=()=>({});lastWriteAt=Date.now();", context);
+  return { calls, advance: ms => { now += ms; }, write: () => context.writePresence(false) };
+}
+test('expired presence requests server admission instead of reviving its document', async () => {
+  const h = harness(); h.advance(91_000); await h.write();
+  assert.deepEqual(h.calls.map(c => c[0]), ['admit']);
+  assert.equal(h.calls[0][1], '/joinRoom');
+  assert.equal(h.calls[0][2].roomCode, 'ROOM01');
+  h.advance(2100); await h.write();
+  assert.deepEqual(h.calls.map(c => c[0]), ['admit', 'write']);
+});
+test('full-room reconnection does not fall back to direct writes and backs off', async () => {
+  const h = harness({ rejected: true }); h.advance(91_000); await h.write();
+  h.advance(2100); await h.write();
+  assert.deepEqual(h.calls.map(c => c[0]), ['admit']);
+  h.advance(15_000); await h.write();
+  assert.deepEqual(h.calls.map(c => c[0]), ['admit', 'admit']);
+});
+test('an active presence uses the ordinary bounded heartbeat', async () => {
+  const h = harness(); h.advance(2100); await h.write();
+  assert.deepEqual(h.calls.map(c => c[0]), ['write']);
+});

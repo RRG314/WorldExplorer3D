@@ -81,7 +81,7 @@ silently retry the earlier interrupted world checks. Diagnose the first failure
 and preserve logs. A clean CI run and physical-device/connected-service acceptance
 remain additional evidence requirements.
 
-Production blockers already established by the audit and development records:
+Historical leads still requiring current acceptance evidence (not assumed current failures):
 
 - Slow world startup and street resource costs; missing independent grades,
   frontage completeness, regional publication and residency acceptance.
@@ -94,3 +94,25 @@ The live app remains unchanged. This branch may be reviewed and tested without
 merging or deploying it. Full production approval requires current execution
 receipts, resolved blockers, an explicit release scope/version, compatible backend
 and data changes, and a separate authorized promotion.
+
+## Repairs verified during authorized execution
+
+The actual packaged Baltimore journey passed all 29 assertions at `484e578a`.
+The full matrix then stopped at mobile-load when its shared Chrome process crossed
+our 3 GiB test-process guard. Giving each mobile cold-start journey its own browser
+and avoiding full diagnostics during loading produced a passing diagnostic run:
+30.1 seconds normal entry, 30.4 seconds GPS permission to play; 2.4 GiB peak RSS.
+The complete matrix must still pass against the final clean artifact.
+
+A real Firestore emulator reproduction admitted three simultaneous joiners into
+a two-player room with one existing occupant. Admission now goes through the
+`joinRoom` HTTP function and a shared per-room transaction lock. Direct membership
+creation and expired-lease revival are denied by rules. Heartbeats have bounded
+expiry; reconnecting after expiry requests admission again. Private rosters no
+longer need to be readable by nonmembers for client-side counting.
+
+This is a coordinated backend/client/rules change: publish and verify the new
+function before switching the client; enforce the accompanying rules with the
+release. Older clients cannot create memberships after rule activation and must
+reload the current app. Never deploy the rules alone or silently fall back to the
+unsafe client-only admission path. No such deployment has been performed.

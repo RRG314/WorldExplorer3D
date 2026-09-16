@@ -1,3 +1,4 @@
+import { postProtectedFunction } from '../../../js/function-api.js?v=3';
 import {
   collection,
   Timestamp,
@@ -39,18 +40,15 @@ import {
   ROOM_CREATE_RETRY_BASE_MS,
   ROOM_CREATE_RETRY_STEP_MS,
   ROOM_PRESENCE_LEAVE_TTL_MS,
-  ROOM_PRESENCE_TTL_MS,
   ROOM_STATE_COLLECTION,
   USERS_COLLECTION,
   VALID_PAINT_TOUCH_MODES,
   buildDefaultPose,
-  buildPlayerPresencePayload,
   cloneObject,
   deriveRoomDeterministicSeed,
   firestoreRuleIntOrNull,
   formatRoomCreateDeniedMessage,
   hashStringToUint32,
-  isPlayerPresenceActive,
   modeForWorldKind,
   normalizeCityKey,
   normalizeCode,
@@ -93,22 +91,6 @@ function requireSignedInUser() {
     throw new Error('Sign in is required to use multiplayer.');
   }
   return user;
-}
-
-async function countActivePlayers(roomCode, maxPlayers) {
-  const { db } = getServices();
-  const code = normalizeCode(roomCode);
-  if (!code) return 0;
-  const limitSize = Math.max(4, Math.min(96, Math.floor(Number(maxPlayers) || DEFAULT_MAX_PLAYERS) + 12));
-  const playersRef = collection(db, ROOM_COLLECTION, code, PLAYER_COLLECTION);
-  const playersSnap = await getDocs(query(playersRef, limit(limitSize)));
-  const nowMs = Date.now();
-  let active = 0;
-  playersSnap.forEach((playerSnap) => {
-    const data = playerSnap.data() || {};
-    if (isPlayerPresenceActive(data, nowMs)) active += 1;
-  });
-  return active;
 }
 
 function myRoomsCollection(db, uid) {
@@ -366,37 +348,7 @@ async function createRoom(options = {}) {
     throw new Error('Unable to reserve a room code. Please retry.');
   }
 
-  const ownerPlayerRef = doc(db, ROOM_COLLECTION, createdCode, PLAYER_COLLECTION, user.uid);
-  let ownerJoinedAt = null;
-  let ownerRole = 'owner';
-  try {
-    const existingOwnerSnap = await getDoc(ownerPlayerRef);
-    if (existingOwnerSnap.exists()) {
-      const existingOwner = existingOwnerSnap.data() || {};
-      if (existingOwner.joinedAt && typeof existingOwner.joinedAt.toMillis === 'function') {
-        ownerJoinedAt = existingOwner.joinedAt;
-      }
-      ownerRole = normalizePlayerRole(existingOwner.role, 'owner');
-    }
-  } catch (err) {
-    if (String(err?.code || '') !== 'permission-denied') throw err;
-  }
-
-  try {
-    await setDoc(ownerPlayerRef, buildPlayerPresencePayload({
-      uid: user.uid,
-      displayName,
-      joinedAt: ownerJoinedAt || serverTimestamp(),
-      role: ownerRole,
-      joinCode: createdCode,
-      world
-    }), { merge: true });
-  } catch (err) {
-    if (String(err?.code || '') === 'permission-denied') {
-      throw new Error('Room created, but owner presence could not be written. Check sign-in state and Firestore rules.');
-    }
-    throw err;
-  }
+  await postProtectedFunction('/joinRoom', { roomCode: createdCode, displayName }, { label: 'Room admission' });
 
   const roomSnap = await getDoc(doc(db, ROOM_COLLECTION, createdCode));
   const room = toRoomObject(roomSnap);
@@ -443,49 +395,7 @@ async function joinRoomByCode(codeInput, options = {}) {
   }
 
   const displayName = resolveDisplayName(user, options.displayName);
-  const playerRef = doc(db, ROOM_COLLECTION, code, PLAYER_COLLECTION, user.uid);
-  let preservedJoinedAt = null;
-  let preservedRole = 'member';
-  let hasExistingMembership = false;
-
-  try {
-    const existingPlayerSnap = await getDoc(playerRef);
-    if (existingPlayerSnap.exists()) {
-      hasExistingMembership = true;
-      const existingPlayer = existingPlayerSnap.data() || {};
-      if (existingPlayer.joinedAt && typeof existingPlayer.joinedAt.toMillis === 'function') {
-        preservedJoinedAt = existingPlayer.joinedAt;
-      }
-      preservedRole = normalizePlayerRole(existingPlayer.role, 'member');
-    }
-  } catch (err) {
-    // If we cannot read an existing player doc yet, proceed with a create-style payload.
-    if (String(err?.code || '') !== 'permission-denied') throw err;
-  }
-
-  if (!hasExistingMembership) {
-    const cap = normalizeMaxPlayers(room.maxPlayers);
-    const activePlayers = await countActivePlayers(code, cap);
-    if (activePlayers >= cap) {
-      throw new Error(`Room is full (${cap} players max for stable performance). Try another room or retry shortly.`);
-    }
-  }
-
-  try {
-    await setDoc(playerRef, buildPlayerPresencePayload({
-      uid: user.uid,
-      displayName,
-      joinedAt: preservedJoinedAt || serverTimestamp(),
-      role: preservedRole,
-      joinCode: code,
-      world: room.world
-    }), { merge: true });
-  } catch (err) {
-    if (String(err?.code || '') === 'permission-denied') {
-      throw new Error('Room join denied. Check room code and ensure your plan includes multiplayer.');
-    }
-    throw err;
-  }
+  await postProtectedFunction('/joinRoom', { roomCode: code, displayName }, { label: 'Room admission' });
   setCurrentRoom(room);
   try {
     const role = room && room.ownerUid === user.uid ? 'owner' : 'member';

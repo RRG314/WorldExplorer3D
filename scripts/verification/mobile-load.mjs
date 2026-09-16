@@ -13,10 +13,14 @@ const baseUrl = externalUrl || `http://127.0.0.1:${server.port}`;
 // answering the graceful close command after consecutive WebGL contexts even
 // though those contexts have closed. BrowserServer gives this bounded verifier
 // a supported kill fallback instead of leaving an orphaned process behind.
-const browserServer = await chromium.launchServer({ headless: true, channel: 'chrome' });
-const browser = await chromium.connect(browserServer.wsEndpoint());
+const ownedBrowserServers = new Set();
 
 async function createMobilePage() {
+  // A closed context can leave GPU allocations in the shared browser process.
+  // Give each cold-start journey its own process and reclaim it before the next.
+  const browserServer = await chromium.launchServer({ headless: true, channel: 'chrome' });
+  ownedBrowserServers.add(browserServer);
+  const browser = await chromium.connect(browserServer.wsEndpoint());
   const context = await browser.newContext({
     ...devices['iPhone 13'],
     viewport: { width: 390, height: 844 },
@@ -33,7 +37,7 @@ async function createMobilePage() {
       localFailures.push({ url: response.url(), status: response.status() });
     }
   });
-  return { context, page, browserErrors, localFailures };
+  return { context, page, browserServer, browserErrors, localFailures };
 }
 
 async function waitForPlayable(page, requireLiveGps = false) {
@@ -41,8 +45,9 @@ async function waitForPlayable(page, requireLiveGps = false) {
   let last = null;
   while (performance.now() - startedAt < 180_000) {
     last = await page.evaluate((liveGps) => {
-      const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
       const loadingVisible = document.getElementById('loading')?.classList.contains('show') === true;
+      if (loadingVisible) return { ready: false, loadingVisible };
+      const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
       return {
         ready: state.gameStarted === true && state.worldLoading === false && !loadingVisible &&
           Number(state.worldCounts?.roads || 0) > 0 &&
@@ -114,7 +119,10 @@ async function runStandardJourney() {
       localFailures: client.localFailures
     };
   } finally {
-    await client.context.close();
+    if (!await terminateOwnedBrowserProcess(client.browserServer)) {
+      throw new Error('Mobile journey browser failed to release its process.');
+    }
+    ownedBrowserServers.delete(client.browserServer);
   }
 }
 
@@ -143,7 +151,10 @@ async function runLiveGpsJourney() {
       localFailures: client.localFailures
     };
   } finally {
-    await client.context.close();
+    if (!await terminateOwnedBrowserProcess(client.browserServer)) {
+      throw new Error('Mobile journey browser failed to release its process.');
+    }
+    ownedBrowserServers.delete(client.browserServer);
   }
 }
 
@@ -186,6 +197,7 @@ async function terminateOwnedBrowserProcess(browserServer, timeoutMs = 4_000) {
 let verificationError = null;
 try {
   const standard = await runStandardJourney();
+  console.error(JSON.stringify({ mobileStandardCompleted: standard }));
   const liveGps = await runLiveGpsJourney();
   const checks = {
     standardFirstPlayUnder38Seconds: standard.firstPlayableMs <= 38_000,
@@ -227,7 +239,10 @@ try {
   verificationError = error;
   console.error(error?.stack || error);
 } finally {
-  const browserProcessClosed = await terminateOwnedBrowserProcess(browserServer);
+  let browserProcessClosed = true;
+  for (const browserServer of ownedBrowserServers) {
+    browserProcessClosed = await terminateOwnedBrowserProcess(browserServer) && browserProcessClosed;
+  }
   const serverClosed = !server || await closeWithin('server', () => server.close(), 3_000);
   if ((!browserProcessClosed || !serverClosed) && !verificationError) {
     verificationError = new Error('Mobile verification passed its gameplay assertions but did not release its runtime resources.');

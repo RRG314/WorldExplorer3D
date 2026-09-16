@@ -10,6 +10,8 @@ for (const variable of ['FIREBASE_AUTH_EMULATOR_HOST', 'FIRESTORE_EMULATOR_HOST'
 }
 
 const steps = [
+  { id: 'room-admission-http', command: [process.execPath, '--test', 'tests/room-admission-http-emulator.test.mjs'] },
+  { id: 'room-admission', command: [process.execPath, '--test', '--test-concurrency=1', 'tests/room-admission-emulator.test.mjs'] },
   { id: 'storage-rules', command: [process.execPath, '--test', '--test-concurrency=1', 'tests/storage.rules.reality-capture.test.mjs'] },
   { id: 'firestore-rules', command: [process.execPath, '--test', 'tests/firestore.rules.security.test.mjs'] },
   { id: 'discovery-receipts', command: [process.execPath, '--test', 'tests/discovery-receipt-endpoint-current.test.mjs'] },

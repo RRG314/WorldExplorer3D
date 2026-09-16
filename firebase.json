@@ -103,6 +103,10 @@
     ],
     "rewrites": [
       {
+        "source": "/joinRoom",
+        "function": "joinRoom"
+      },
+      {
         "source": "/getPublicSiteStats",
         "function": "getPublicSiteStats"
       },
