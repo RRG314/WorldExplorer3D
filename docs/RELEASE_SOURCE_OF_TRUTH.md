@@ -1,4 +1,21 @@
-# One working branch, two deployment environments
+# Release source identities
+
+## September 16 forensic reconciliation and integration candidate
+
+Observed production: `5.2.0+db62593ba377.6342cddaba06fc68.production`;
+observed staging: `5.2.0+d73394916971.56b6bfc3840ee72e.staging`. These were
+verified from public manifests and Firebase live-channel history on September 16.
+The September 8 publication below was followed by a rollback and redeployment.
+
+The preserved integration worktree is
+`/Users/stevenreid/Developer/WorldExplorer3D-release-integration`, branch
+`steven/post-5.2-release-integration`. Its initial source checkpoint is
+`3a58be2fc35f361834827075efd43a1e418451e0`, incorporating the audited street
+working tree. It is an unreleased candidate, not production approval. See
+[release integration status](RELEASE_INTEGRATION_STATUS.md).
+
+Everything below records earlier states. References to “now,” “current,” or a
+working branch in those historical sections are not current deployment claims.
 
 ## September 8 production publication
 

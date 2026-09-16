@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { runLoggedStep } from './run-logged-step.mjs';
-import { currentBaseline, evidencePath } from './execution-evidence.mjs';
+import { currentBaseline, evidencePath, currentArtifactIdentity, sameArtifactIdentity } from './execution-evidence.mjs';
 import { startStaticServer } from './static-server.mjs';
 
 const root = process.cwd();
@@ -83,6 +83,7 @@ mkdirSync(outputDir, { recursive: true });
 const results = [];
 const startedAt = new Date().toISOString();
 const baseline = currentBaseline(root);
+const artifactIdentity = currentArtifactIdentity(root, artifactRoot);
 const artifactServer = shouldRun && selected.some(([, gate]) => gate.artifactRequired)
   ? await startStaticServer({ rootDir: path.resolve(root, artifactRoot), ports: [4481, 4482, 4483] })
   : null;
@@ -106,6 +107,7 @@ function reusableGateEvidence(id, gate) {
     if (prior.baseline?.headCommit !== baseline.headCommit ||
       prior.baseline?.workspaceFingerprint !== baseline.workspaceFingerprint) return null;
     if (JSON.stringify(prior.command) !== JSON.stringify(gate.command)) return null;
+    if (gate.artifactRequired && !sameArtifactIdentity(prior.artifactIdentity, artifactIdentity)) return null;
     return prior;
   } catch {
     return null;
@@ -123,6 +125,7 @@ function writeGateEvidence(id, gate, record) {
     id,
     command: gate.command,
     baseline,
+    artifactIdentity,
     completedAt: new Date().toISOString(),
     ...record,
     reused: false
@@ -184,6 +187,7 @@ const report = {
   startedAt,
   completedAt: new Date().toISOString(),
   baseline,
+  artifactIdentity,
   results
 };
 const isCompleteScope = requestedGates.size === 0;
@@ -191,25 +195,30 @@ if (isCompleteScope) {
   const completedBaseline = currentBaseline(root);
   const stableBaseline = completedBaseline.headCommit === baseline.headCommit &&
     completedBaseline.workspaceFingerprint === baseline.workspaceFingerprint;
+  const stableArtifact = sameArtifactIdentity(artifactIdentity, currentArtifactIdentity(root, artifactRoot));
   const executionEvidence = {
     schemaVersion: 1,
     contract: 'world-explorer-execution-evidence-v1',
     targetVersion: config.targetVersion,
     scope: requestedScope,
-    ok: report.ok && stableBaseline,
+    ok: report.ok && stableBaseline && stableArtifact,
     baseline,
     completedBaseline,
+    artifactIdentity,
     artifactRoot,
     startedAt,
     completedAt: report.completedAt,
     outputDir,
     results,
-    failures: stableBaseline ? [] : ['the source working tree changed while the matrix was running']
+    failures: [
+      ...(!stableBaseline ? ['the source working tree changed while the matrix was running'] : []),
+      ...(!stableArtifact ? ['artifact manifests missing or changed while the matrix was running'] : [])
+    ]
   };
   const currentEvidencePath = evidencePath(root, requestedScope);
   mkdirSync(path.dirname(currentEvidencePath), { recursive: true });
   writeFileSync(currentEvidencePath, `${JSON.stringify(executionEvidence, null, 2)}\n`, 'utf8');
-  if (!stableBaseline) report.ok = false;
+  if (!stableBaseline || !stableArtifact) report.ok = false;
 }
 // Write the human-readable run report after the baseline stability decision.
 // Previously a tree mutation could correctly fail execution evidence while the

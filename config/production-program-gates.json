@@ -4,7 +4,7 @@
   "targetVersion": "5.2.0",
   "productionBaseline": {
     "version": "5.2.0",
-    "releaseCommit": "a5f7d7372731d7b5697821437d2ebec307f8ecf8"
+    "releaseCommit": "db62593ba377e276e5079c78238fa3a83e501c93"
   },
   "roadmap": "ROADMAP.md",
   "acceptanceContract": "RELEASE_NOTES_5.2.0.md",
@@ -14,7 +14,7 @@
   "executionGateRequirements": {
     "CP0": ["source-graph", "artifact-world", "explorer-browser"],
     "CP1": ["assembled-worlds", "assembled-fallback", "provider-release"],
-    "CP2": ["assembled-worlds", "actors-vehicles", "terrain-boundary"],
+    "CP2": ["street-geometry", "street-workers", "assembled-worlds", "actors-vehicles", "terrain-boundary"],
     "CP3": ["interiors", "poi-lifecycle"],
     "CP4": ["tutorial-controls", "mobile-controls", "commerce-coherence"],
     "CP5": ["urban-sandbox", "urban-equipment", "actors-vehicles"],

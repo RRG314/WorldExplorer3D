@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import crypto from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import { readReleaseSourceIdentity, assertReleaseSourceIdentity } from './lib/release-source-identity.mjs';
 import { build as buildJavaScript } from 'esbuild';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -72,14 +72,6 @@ function readFlag(name, fallback = '') {
   if (exact) return exact.slice(name.length + 1);
   const index = process.argv.indexOf(name);
   return index >= 0 && index + 1 < process.argv.length ? process.argv[index + 1] : fallback;
-}
-
-function git(args, fallback = '') {
-  try {
-    return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim();
-  } catch {
-    return fallback;
-  }
 }
 
 async function listFiles(directory, base = '') {
@@ -350,6 +342,8 @@ async function packageLockSha256() {
 }
 
 async function buildArtifact(environment) {
+  // Check provenance before replacing any generated artifact.
+  const sourceIdentity = readReleaseSourceIdentity(ROOT);
   const sourceFiles = await collectSourceFiles();
   const config = JSON.parse(await fs.readFile(firebaseConfigPath(environment), 'utf8'));
   const sourceReleases = await sourceReleaseFingerprint(sourceFiles);
@@ -369,12 +363,10 @@ async function buildArtifact(environment) {
 
   const files = await hashOutputFiles();
   const packageJson = await readPackage();
-  const commit = git(['rev-parse', 'HEAD'], 'unknown');
+  const { commit, commitTime, sourceDirty: dirty } = sourceIdentity;
   const shortCommit = commit.slice(0, 12);
   const contentHash = sha256(canonicalJson(files));
   const fingerprint = await sourceFingerprint(sourceFiles, environment, config);
-  const dirty = git(['status', '--porcelain'], '').length > 0;
-  const commitTime = git(['show', '-s', '--format=%cI', 'HEAD'], 'unknown');
   const dependencyLockSha256 = await packageLockSha256();
   const buildId = `${packageJson.version}+${shortCommit}.${contentHash.slice(0, 16)}.${environment}`;
   const assetManifest = { schemaVersion: 1, files };
@@ -516,7 +508,9 @@ async function verifyArtifact() {
   const contentHash = sha256(canonicalJson(expectedFiles));
   const fingerprint = await sourceFingerprint(sourceFiles, environment, config);
   const dependencyLockSha256 = await packageLockSha256();
-  const commit = git(['rev-parse', 'HEAD'], 'unknown');
+  const sourceIdentity = readReleaseSourceIdentity(ROOT);
+  assertReleaseSourceIdentity(buildManifest, sourceIdentity);
+  const { commit } = sourceIdentity;
   const buildId = `${packageJson.version}+${commit.slice(0, 12)}.${contentHash.slice(0, 16)}.${environment}`;
   const assetManifestSha256 = sha256(canonicalJson(assetManifest));
   if (
