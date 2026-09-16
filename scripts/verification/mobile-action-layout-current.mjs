@@ -18,7 +18,9 @@ try {
     const pack = document.getElementById('urbanEquipmentToggle');
     const stack = document.getElementById('mobileActionStack');
     pack.classList.add('mobilePackAction'); stack.append(pack);
-    document.body.replaceChildren(controls);
+    const menus = document.getElementById('floatMenuContainer');
+    menus.classList.add('show');
+    document.body.replaceChildren(controls, menus);
     await document.fonts.ready;
   });
   for (const viewport of [{ width: 390, height: 844 }, { width: 360, height: 740 }, { width: 844, height: 390 }]) {
@@ -36,7 +38,7 @@ try {
         packButton.hidden = !pack; packButton.classList.toggle('mobile-mode-hidden', !pack);
         document.getElementById('mobileActionPrimary').textContent = 'Jump';
         document.getElementById('mobileActionSecondary').textContent = 'Run';
-        const ids = ['mobileMovePad','mobileLookPad','mobileActionPrimary','mobileActionSecondary', ...(equipment ? ['mobileEquipmentUse'] : []), ...(pack ? ['urbanEquipmentToggle'] : [])];
+        const ids = ['controlsBarBtn','mobileMovePad','mobileLookPad','mobileActionPrimary','mobileActionSecondary', ...(equipment ? ['mobileEquipmentUse'] : []), ...(pack ? ['urbanEquipmentToggle'] : [])];
         const targets = ids.map(id => {
           const node = document.getElementById(id), r = node.getBoundingClientRect();
           const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);

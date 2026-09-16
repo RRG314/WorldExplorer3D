@@ -27,5 +27,18 @@
 #mobileTouchControls #mobileActionStack.has-equipment-action #mobileEquipmentUse{grid-column:1;grid-row:2;min-width:58px;width:58px;padding:6px 4px}
 }
 @media(max-width:390px){#mobileTouchControls{--mobile-edge:10px}#mobileTouchControls .mobilePad{width:122px;height:122px}#mobileTouchControls #mobileLookPad{width:108px;height:108px;bottom:calc(var(--mobile-bottom) + 128px)}#mobileTouchControls #mobileActionStack{width:108px}#mobileTouchControls .mobileActionBtn{min-width:108px}}
-@media(max-height:560px) and (orientation:landscape) and (pointer:coarse){#mobileTouchControls{--mobile-edge:12px;--mobile-bottom:max(18px,env(safe-area-inset-bottom))}#mobileTouchControls .mobilePad{width:112px;height:112px}#mobileTouchControls #mobileLookPad{right:calc(var(--mobile-edge) + var(--mobile-action-width,108px) + 16px);bottom:var(--mobile-bottom);width:100px;height:100px}#mobileTouchControls #mobileActionStack{width:108px}#mobileTouchControls .mobileActionBtn{min-width:108px;min-height:46px}#mobileTouchControls[data-handedness="southpaw"] #mobileLookPad{left:calc(var(--mobile-edge) + var(--mobile-action-width,108px) + 16px);right:auto}}
+@media(max-height:560px) and (orientation:landscape) and (pointer:coarse){#mobileTouchControls{--mobile-edge:12px;--mobile-bottom:max(78px,calc(64px + env(safe-area-inset-bottom)))}#mobileTouchControls .mobilePad{width:112px;height:112px}#mobileTouchControls #mobileLookPad{right:calc(var(--mobile-edge) + var(--mobile-action-width,108px) + 16px);bottom:var(--mobile-bottom);width:100px;height:100px}#mobileTouchControls #mobileActionStack{width:108px}#mobileTouchControls .mobileActionBtn{min-width:108px;min-height:46px}#mobileTouchControls[data-handedness="southpaw"] #mobileLookPad{left:calc(var(--mobile-edge) + var(--mobile-action-width,108px) + 16px);right:auto}}
+/* Settings sits above the movement pad, clear of both action layouts. */
+@media(max-width:760px),(pointer:coarse){
+body:has(#mobileTouchControls.show) #controlsMenu{position:fixed;left:16px;right:auto;bottom:calc(max(92px,calc(76px + env(safe-area-inset-bottom))) + 144px)}
+body:has(#mobileTouchControls.show[data-handedness="southpaw"]) #controlsMenu{left:auto;right:16px}
+}
+@media(max-width:390px){
+body:has(#mobileTouchControls.show) #controlsMenu{left:10px;bottom:calc(max(92px,calc(76px + env(safe-area-inset-bottom))) + 134px)}
+body:has(#mobileTouchControls.show[data-handedness="southpaw"]) #controlsMenu{left:auto;right:10px}
+}
+@media(max-height:560px) and (orientation:landscape) and (pointer:coarse){
+body:has(#mobileTouchControls.show) #controlsMenu,body:has(#mobileTouchControls.show[data-handedness="southpaw"]) #controlsMenu{left:calc(50% - 22px);right:auto;bottom:max(78px,calc(64px + env(safe-area-inset-bottom)))}
+}
+
 }

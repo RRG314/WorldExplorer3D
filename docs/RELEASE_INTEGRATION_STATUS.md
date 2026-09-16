@@ -131,3 +131,8 @@ emulated touch point. Executing the app's actual device detector in Chrome
 confirmed that profile selected desktop budgets; the iPhone profile selects
 mobile budgets. The verifier now uses a complete iPhone profile and asserts the
 mobile world budget, with loading-aware diagnostic polling.
+
+The fixture now includes the actual bottom menu and settings button. It exposed
+settings overlapping Run (or the movement pad in southpaw mode) and the bottom
+menu intercepting landscape controls. Settings now clears the action targets;
+landscape controls sit above the bottom menu. All 24 expanded hit-test cases pass.
