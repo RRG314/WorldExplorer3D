@@ -185,7 +185,12 @@ try {
     const rect = (element) => element ? element.getBoundingClientRect().toJSON() : null;
     const lookRect = look?.getBoundingClientRect();
     const lookHit = lookRect ? document.elementFromPoint(lookRect.left + lookRect.width / 2, lookRect.top + lookRect.height / 2) : null;
-    return { tutorial: rect(tutorial), look: rect(look), pack: rect(pack), lookHit: lookHit?.closest?.('#mobileLookPad')?.id || lookHit?.id || '' };
+    const actionTargets = ['mobileActionPrimary','mobileActionSecondary','mobileEquipmentUse','urbanEquipmentToggle'].map(id => document.getElementById(id)).filter(element => element && !element.hidden && getComputedStyle(element).display !== 'none').map(element => {
+      const box = element.getBoundingClientRect();
+      const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+      return { id: element.id, hit: element === hit || element.contains(hit) };
+    });
+    return { tutorial: rect(tutorial), look: rect(look), pack: rect(pack), actionTargets, lookHit: lookHit?.closest?.('#mobileLookPad')?.id || lookHit?.id || '' };
   });
   await page.screenshot({ path: 'output/verification/mobile-controls/walk-onboarding-mobile.png', fullPage: true });
   const packUi = await page.evaluate(() => {
@@ -328,6 +333,7 @@ try {
     southpawSurvivesReload: savedSouthpawSettings?.handedness === 'southpaw' &&
       reloadedSouthpawLayout.move.x > reloadedSouthpawLayout.width / 2 && reloadedSouthpawLayout.look.x < reloadedSouthpawLayout.width / 2,
     resetRestoresStandard: resetLayout.move.x < resetLayout.width / 2 && resetLayout.look.x > resetLayout.width / 2,
+    actionButtonsReceiveTouches: onboardingLayout.actionTargets.length >= 2 && onboardingLayout.actionTargets.every(target => target.hit),
     onboardingClearOfLookControl: onboardingLayout.lookHit === 'mobileLookPad',
     walkingPackClearOfLookControl: !onboardingLayout.pack || onboardingLayout.pack.x + onboardingLayout.pack.width < onboardingLayout.look.x,
     packIsIntegratedWithActionDock: packUi.parent === 'mobileActionStack' && packUi.integrated && packUi.position === 'static',

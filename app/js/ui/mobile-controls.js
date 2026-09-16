@@ -587,6 +587,7 @@ function initMobileControls() {
     }
     urbanEquipmentToggle?.classList.toggle('mobile-mode-hidden', !showPackAction);
     mobileActionStack?.classList.toggle('has-pack-action', !!showPackAction);
+    mobileActionStack?.classList.toggle('has-equipment-action', !!showEquipmentUse);
     mobileTouchControls.classList.add('show');
   }
 

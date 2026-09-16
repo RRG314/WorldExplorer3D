@@ -68,7 +68,7 @@ the current carriageway/pavement publisher would not constitute clean integratio
 
 ## Acceptance before production
 
-The configured matrix now contains 45 candidate gates, one backend gate and two
+The configured matrix now contains 46 candidate gates, one backend gate and two
 optional component gates. It includes source/contracts, packaged workers,
 desktop/mobile controls, environments, games, travel, capture fixtures, persistence,
 performance and backend authority. A passing structural gate is not a passing matrix.
@@ -116,3 +116,12 @@ function before switching the client; enforce the accompanying rules with the
 release. Older clients cannot create memberships after rule activation and must
 reload the current app. Never deploy the rules alone or silently fall back to the
 unsafe client-only admission path. No such deployment has been performed.
+
+
+Screenshot inspection found that equipped-item Use introduced a third action row,
+placing Jump beneath the look pad. A real Chrome layout fixture reproduced blocked
+touch targets across portrait and landscape layouts. Equipment Use now shares the
+existing two-row action footprint with Pack; the landscape look pad accounts for
+that footprint's width. All 24 viewport/handedness/equipment/pack combinations pass
+geometry and actual browser hit tests. The full runtime controls gate now checks
+that every visible action button receives touches; the fixture is also required.

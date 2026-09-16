@@ -16,14 +16,14 @@
     "CP1": ["assembled-worlds", "assembled-fallback", "provider-release"],
     "CP2": ["street-geometry", "street-workers", "assembled-worlds", "actors-vehicles", "terrain-boundary"],
     "CP3": ["interiors", "poi-lifecycle"],
-    "CP4": ["tutorial-controls", "mobile-controls", "commerce-coherence"],
+    "CP4": ["tutorial-controls", "mobile-action-layout", "mobile-controls", "commerce-coherence"],
     "CP5": ["urban-sandbox", "urban-equipment", "actors-vehicles"],
     "CP6": ["commerce-coherence", "world-economy", "maryland-parcels"],
     "CP7": ["live-gps", "walking-field", "regional-world"],
     "CP8": ["fishing", "fishing-recovery", "environments"],
     "CP9": ["gameplay-menu", "hotbar-actions", "backend"],
     "CP10": ["mobile-load", "performance", "space-release"],
-    "CP11": ["accessibility", "mobile-controls", "space-release", "artifact-integrity", "release-identity", "backend"]
+    "CP11": ["accessibility", "mobile-action-layout", "mobile-controls", "space-release", "artifact-integrity", "release-identity", "backend"]
   },
   "checkpoints": {
     "CP0": {
