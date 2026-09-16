@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 
 const root = process.cwd();
@@ -10,7 +10,7 @@ const servedRoot = requestedRoot ? path.resolve(root, requestedRoot) : root;
 const server = await startStaticServer({ rootDir: servedRoot, ports: [4391, 4392, 4393] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
-const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+const context = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height: 844 } });
 const page = await context.newPage();
 const cdp = await context.newCDPSession(page);
 const browserErrors = [];
@@ -153,8 +153,9 @@ async function layoutSnapshot() {
 
 async function waitForInteractiveWorld() {
   await page.waitForFunction(() => {
-    const state = globalThis.getWorldExplorerRuntimeDiagnostics?.();
     const loadingVisible = document.getElementById('loading')?.classList.contains('show') === true;
+    if (loadingVisible) { globalThis.__WE3D_VERIFY_INTERACTIVE_SINCE__ = 0; return false; }
+    const state = globalThis.getWorldExplorerRuntimeDiagnostics?.();
     const titleVisible = !document.getElementById('titleScreen')?.classList.contains('hidden');
     const ready = state?.gameStarted === true && state.worldLoading === false && !loadingVisible && !titleVisible;
     if (!ready) {
@@ -163,7 +164,7 @@ async function waitForInteractiveWorld() {
     }
     globalThis.__WE3D_VERIFY_INTERACTIVE_SINCE__ ||= performance.now();
     return performance.now() - globalThis.__WE3D_VERIFY_INTERACTIVE_SINCE__ >= 2_500;
-  }, null, { timeout: 300_000 });
+  }, null, { timeout: 300_000, polling: 500 });
 }
 
 try {
@@ -327,6 +328,7 @@ try {
   const resetWalkState = await diagnostics();
 
   const checks = {
+    mobileWorldBudgetActive: Number(walkBefore.worldLoad?.loadMetrics?.loadProfile?.dynamicBudgetScale ?? walkBefore.worldLoad?.loadProfile?.dynamicBudgetScale ?? Infinity) <= 0.28,
     standardMoveLeft: standardLayout.move.x + standardLayout.move.width / 2 < standardLayout.width / 2,
     standardLookAndActionRight: standardLayout.look.x > standardLayout.width / 2 && standardLayout.primary.x > standardLayout.width / 2,
     southpawActuallySwaps: southpawLayout.move.x > southpawLayout.width / 2 && southpawLayout.look.x < southpawLayout.width / 2,

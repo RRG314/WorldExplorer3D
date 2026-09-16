@@ -125,3 +125,9 @@ existing two-row action footprint with Pack; the landscape look pad accounts for
 that footprint's width. All 24 viewport/handedness/equipment/pack combinations pass
 geometry and actual browser hit tests. The full runtime controls gate now checks
 that every visible action button receives touches; the fixture is also required.
+
+The mobile-controls verifier previously combined a desktop user agent with one
+emulated touch point. Executing the app's actual device detector in Chrome
+confirmed that profile selected desktop budgets; the iPhone profile selects
+mobile budgets. The verifier now uses a complete iPhone profile and asserts the
+mobile world budget, with loading-aware diagnostic polling.
