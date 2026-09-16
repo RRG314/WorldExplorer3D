@@ -1,4 +1,5 @@
 import {roadMetersPerWorldUnit,roadPlacementOffsetWorld} from './road-units.js';
+import {createCellCoverage} from './cell-coverage.js';
 import { yieldToMainThread as defaultYieldToMainThread } from './cooperative-scheduling.js?v=1';
 import {
   MIN_DRIVEABLE_ROAD_WIDTH_METERS,
@@ -18,7 +19,7 @@ export async function createBuildingRoadFootprintGuards(options = {}) {
   const roadCenterlineSegments = [];
   const roadCrossSectionBuilders = new Map();
   const roadCorridorCellSize = 4;
-  const roadCorridorCells = new Set();
+  const roadCorridorCells = createCellCoverage();
   const yieldEveryRoads = Math.max(1, Math.floor(Number(options.yieldEveryRoads) || 32));
   const yieldEverySegmentSamples = Math.max(
     32,
@@ -31,16 +32,8 @@ export async function createBuildingRoadFootprintGuards(options = {}) {
   let segmentYieldCount = 0;
   const cellKey = (x, z, size) => `${Math.floor(x / size)},${Math.floor(z / size)}`;
 
-  const markCell = (cells, size, x, z, radiusCells) => {
-    const cx = Math.floor(x / size);
-    const cz = Math.floor(z / size);
-    const radius = Math.max(0, radiusCells | 0);
-    for (let dx = -radius; dx <= radius; dx++) {
-      for (let dz = -radius; dz <= radius; dz++) cells.add(`${cx + dx},${cz + dz}`);
-    }
-  };
   const markRoadCorridorCell = (x, z, radius) =>
-    markCell(roadCorridorCells, roadCorridorCellSize, x, z, radius);
+    roadCorridorCells.addSquare(Math.floor(x / roadCorridorCellSize), Math.floor(z / roadCorridorCellSize), Math.max(0, radius | 0));
   const registerRoadCenterlineSegment = (p0, p1, radius, road, segIndex, indexRadius = radius) => {
     const offset=roadPlacementOffsetWorld(road),dx=p1.x-p0.x,dz=p1.z-p0.z,length=Math.hypot(dx,dz);
     if(offset&&length>0){
@@ -549,7 +542,7 @@ export async function createBuildingRoadFootprintGuards(options = {}) {
         (stats.inside >= Math.max(3, Math.ceil(stats.total * 0.24)) && overlapRatio >= 0.18);
     },
     pointOnRoadCore,
-    pointOnRoadCorridor: (x, z) => roadCorridorCells.has(cellKey(x, z, roadCorridorCellSize)),
+    pointOnRoadCorridor: (x, z) => roadCorridorCells.has(Math.floor(x / roadCorridorCellSize), Math.floor(z / roadCorridorCellSize)),
     publishRoadCrossSectionProfiles,
     resolveFootprintTransportAuthority,
     sampleFootprintCoverage,

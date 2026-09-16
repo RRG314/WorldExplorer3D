@@ -73,8 +73,10 @@ optional component gates. It includes source/contracts, packaged workers,
 desktop/mobile controls, environments, games, travel, capture fixtures, persistence,
 performance and backend authority. A passing structural gate is not a passing matrix.
 
-Run bounded checks sequentially on this 8 GiB machine. `AGENTS.md` requires explicit
-owner authorization for whole-world browser/emulator/full-matrix workloads. Do not
+Run bounded checks sequentially on this 8 GiB machine. On September 16 the owner
+explicitly authorized browser/emulator/full-matrix work and repairs, superseding
+the earlier permission limitation for this effort. Monitor actual CPU/memory
+pressure and close each owned workload before the next. Do not
 silently retry the earlier interrupted world checks. Diagnose the first failure
 and preserve logs. A clean CI run and physical-device/connected-service acceptance
 remain additional evidence requirements.
