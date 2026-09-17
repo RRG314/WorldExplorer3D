@@ -15,8 +15,10 @@ integrate useful improvements cleanly, and establish production release readines
 - Existing isolated audit copy was moved here, with its former temporary path
   retained as a symlink. Fifty omitted tracked reference files were added from
   the original checkout. No original worktree, branch or deployed app was reset.
-- Installed dependencies are symlinks to the existing street checkout's modules;
-  clean-runner installation remains an independent release requirement.
+- Root and Functions dependencies were installed independently in this candidate
+  with `npm ci` from the preserved lockfiles. Earlier dependency symlink targets
+  were left untouched. Both fresh npm security audits reported zero known
+  vulnerabilities. A separate CI runner remains independent release evidence.
 
 The initial commit is a preservation checkpoint, not an assertion that every
 included change is correct. Existing generated test output is not fresh evidence
