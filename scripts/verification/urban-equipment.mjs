@@ -17,7 +17,7 @@ const server = externalUrl ? null : await startStaticServer({
   ports: [4400, 4401, 4402, 4403]
 });
 const baseUrl = externalUrl || `http://127.0.0.1:${server.port}`;
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await context.newPage();
 const browserErrors = [];

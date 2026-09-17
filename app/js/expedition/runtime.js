@@ -1,3 +1,4 @@
+import { publishMissionMarkup } from './mission-dom.js';
 import { DEFAULT_CREW, getPropulsionProfile, getShipProfile, PROPULSION_PROFILES, SHIP_PROFILES } from './catalog.js?v=2';
 import { assessExpeditionReadiness, createExpeditionPlan, totalCargoMass, withExpeditionChanges } from './model.js?v=12';
 import {
@@ -1192,7 +1193,7 @@ function renderMission() {
       ? `<div class="expeditionShipAction"><button id="expeditionEarthPod" class="expeditionPrimary" type="button">${earthPodReady ? `Return to ${STARSHIP_NAME} in Pathfinder` : `Launch Pathfinder to ${STARSHIP_NAME}`}</button><small>Depart from the currently loaded Earth location, fly manually to ${STARSHIP_NAME}, and dock with the same saved Expedition.</small></div>`
       : `<div class="expeditionShipAction"><button id="expeditionEnterShip" class="expeditionPrimary" type="button">${expedition.pendingEvent ? `Respond aboard ${STARSHIP_NAME}` : `Enter ${STARSHIP_NAME}`}</button><small>${expedition.pendingEvent ? `Follow the highlighted route to ${String(expedition.pendingEvent.roomId || 'the affected station').replaceAll('-', ' ')} and interact with the equipment there.` : 'Walk the ship, meet the crew, inspect systems, and return to the same flight.'}</small></div>`
     : '';
-  host.innerHTML = `
+  const missionMarkup = `
     ${readinessMarkup(expedition)}
     ${sharedMissionMarkup()}
     <section class="expeditionCampaignStatus"><span>${String(phase).replaceAll('-', ' ')}</span><h3>Current objective</h3><p>${objective}</p><small>WIN CONDITION · Complete the Proxima b survey, return its evidence to ${STARSHIP_NAME}, and publish the analysis.</small></section>
@@ -1203,6 +1204,7 @@ function renderMission() {
     ${contacts.length ? `<section class="expeditionContacts"><h3>Route Contacts</h3>${contacts.map((contact) => `<p><strong>${contact.designation}</strong><span>${contact.spectralClass} · ${contact.worldClass} · ${String(contact.status).replaceAll('-', ' ')}</span>${!expedition.activeLocalContactId && ['available', 'returned'].includes(contact.localOperationState) ? `<button type="button" data-enter-contact="${contact.id}">Enter local Space</button>` : ''}</p>`).join('')}</section>` : ''}
     ${outpostMarkup(expedition)}
     <section class="expeditionLog"><h3>Captain's Log</h3>${log.map((entry) => `<p><span>${entry.kind}</span>${entry.message}</p>`).join('')}</section>`;
+  if (!publishMissionMarkup(host, missionMarkup)) return;
 
   document.getElementById('expeditionShareCreate')?.addEventListener('click', async () => {
     try {

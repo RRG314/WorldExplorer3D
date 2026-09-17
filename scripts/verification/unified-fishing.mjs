@@ -9,7 +9,7 @@ const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
 const servedRoot = requestedRoot ? path.resolve(root, requestedRoot) : root;
 const server = await startStaticServer({ rootDir: servedRoot, ports: [4383, 4384, 4385] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
 const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 const page = await context.newPage();
 const browserErrors = [];

@@ -7,7 +7,7 @@ const baseUrl = String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:419
 const outputDir = path.resolve('output/verification/player-navigation-current');
 await fs.mkdir(outputDir, { recursive: true });
 
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
 const failures = [];
 const browserErrors = [];
 

@@ -8,7 +8,7 @@ const root = process.cwd();
 const servedRoot = path.resolve(root, process.env.WE3D_VERIFY_ROOT || root);
 const server = await startStaticServer({ rootDir: servedRoot, ports: [4434, 4435, 4436] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
 const outputRoot = path.join(root, 'output', 'verification', 'accessibility-release');
 const requestedProfile = String(process.env.WE3D_VERIFY_PROFILE || 'all').trim().toLowerCase();
 assert.ok(['all', 'desktop', 'mobile'].includes(requestedProfile), `Unsupported WE3D_VERIFY_PROFILE: ${requestedProfile}`);

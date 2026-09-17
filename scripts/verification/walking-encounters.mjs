@@ -11,7 +11,7 @@ const externalUrl = String(process.env.WE3D_VERIFY_BASE_URL || '').replace(/\/$/
 const server = externalUrl ? null : await startStaticServer({ rootDir: servedRoot, ports: [4394, 4395, 4396] });
 const baseUrl = externalUrl || `http://127.0.0.1:${server.port}`;
 const origin = new URL(baseUrl).origin;
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
 const browserErrors = [];
 const localFailures = [];
 

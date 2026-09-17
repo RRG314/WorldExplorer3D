@@ -18,7 +18,7 @@ const ownedBrowserServers = new Set();
 async function createMobilePage() {
   // A closed context can leave GPU allocations in the shared browser process.
   // Give each cold-start journey its own process and reclaim it before the next.
-  const browserServer = await chromium.launchServer({ headless: true, channel: 'chrome' });
+  const browserServer = await chromium.launchServer({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
   ownedBrowserServers.add(browserServer);
   const browser = await chromium.connect(browserServer.wsEndpoint());
   const context = await browser.newContext({

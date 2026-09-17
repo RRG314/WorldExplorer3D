@@ -1,0 +1,45 @@
+import assert from 'node:assert/strict';
+import { chromium } from 'playwright';
+import { startStaticServer } from './static-server.mjs';
+const server = await startStaticServer({ rootDir: process.cwd(), ports: [4491, 4492] });
+const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+try {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await page.goto(`http://127.0.0.1:${server.port}/404.html`);
+  const result = await page.evaluate(async () => {
+    const { publishMissionMarkup } = await import('/app/js/expedition/mission-dom.js');
+    document.body.innerHTML = '<main id="mission"></main>';
+    const host = document.getElementById('mission');
+    const markup = revision => `<section class="expeditionShared"><span>REVISION ${revision}</span><button id="ready">Ready</button></section>`;
+    publishMissionMarkup(host, markup(4));
+    const section = host.firstElementChild;
+    const ready = document.getElementById('ready');
+    ready.focus();
+    let activations = 0;
+    ready.addEventListener('click', () => activations++);
+    let mutations = 0;
+    const observer = new MutationObserver(records => mutations += records.length);
+    observer.observe(host, { subtree: true, childList: true, attributes: true });
+    const duplicateChanged = publishMissionMarkup(host, markup(4));
+    await Promise.resolve();
+    const unchanged = !duplicateChanged && mutations === 0 && document.activeElement === ready;
+    ready.click();
+    const changed = publishMissionMarkup(host, markup(5));
+    await Promise.resolve();
+    const retainedSection = section === host.firstElementChild && section.isConnected;
+    const restoredFocus = document.activeElement.id === 'ready';
+    section.scrollIntoView();
+    const currentText = section.textContent;
+    publishMissionMarkup(host, '<p>Expedition ended</p>');
+    observer.disconnect();
+    return { unchanged, activations, changed, retainedSection, restoredFocus, currentText, removed: !section.isConnected };
+  });
+  assert.equal(result.unchanged, true);
+  assert.equal(result.activations, 1);
+  assert.equal(result.changed, true);
+  assert.equal(result.retainedSection, true);
+  assert.equal(result.restoredFocus, true);
+  assert.match(result.currentText, /REVISION 5/);
+  assert.equal(result.removed, true);
+  console.log(JSON.stringify({ ok: true, ...result }));
+} finally { await browser.close(); await server.close(); }
