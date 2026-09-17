@@ -7,7 +7,8 @@ import { startStaticServer } from './static-server.mjs';
 const root = process.cwd();
 const outputDir = path.join(root, 'output', 'verification', 'interstellar-shared');
 await fs.mkdir(outputDir, { recursive: true });
-const server = await startStaticServer({ rootDir: root, ports: [4390, 4391, 4392] });
+const servedRoot = path.resolve(process.env.WE3D_VERIFY_ROOT || root);
+const server = await startStaticServer({ rootDir: servedRoot, ports: [4390, 4391, 4392] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
 const projectId = String(process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || 'we3d-staging-20260712');
 const functionsOrigin = `http://127.0.0.1:5001/${projectId}/us-central1`;
@@ -65,23 +66,17 @@ async function openMultiplayer(player) {
 }
 
 async function openSharedPlanner(player) {
-  await player.page.evaluate(async () => {
-    const [runtime, rooms] = await Promise.all([
-      import('/app/js/expedition/runtime.js?v=13'), import('/app/js/multiplayer/rooms.js?v=67')
-    ]);
-    runtime.openExpeditionPlanner({
-      getCurrentMultiplayerRoom: () => rooms.getCurrentRoom(),
-      showToast: () => {},
-      updateExpeditionShipRecord: () => {}
-    });
-  });
+  await player.page.waitForFunction(() =>
+    JSON.parse(globalThis.render_game_to_text?.() || '{}').modes?.space === true,
+  null, { timeout: 120_000 });
+  if (await player.page.locator('#roomPanelCloseBtn').isVisible()) {
+    await player.page.locator('#roomPanelCloseBtn').click();
+  }
+  if (!await player.page.locator('#sfExpeditionBtn').isVisible()) {
+    await player.page.locator('#sfHudToggle').click();
+  }
+  await player.page.locator('#sfExpeditionBtn').click();
   await player.page.locator('#expeditionOverlay').waitFor({ state: 'visible' });
-  await player.page.locator('#expeditionOverlay').evaluate((element) => {
-    // This focused verifier opens the room panel before an Earth world is
-    // needed. Keep unrelated background map loading from obscuring the panel
-    // being inspected; gameplay verifiers exercise the normal world boundary.
-    element.style.zIndex = '2147483647';
-  });
 }
 
 let owner;

@@ -8,7 +8,11 @@ function readWorldContext() {
     ? sanitizeText(appCtx.customLoc?.name || 'Custom', 80)
     : sanitizeText(appCtx.LOCS?.[appCtx.selLoc]?.name || appCtx.selLoc || 'Custom', 80);
 
-  const kind = appCtx.spaceFlight?.active ? 'space' : appCtx.onMoon ? 'moon' : 'earth';
+  // Before play begins, no environment runtime is active yet. Room creation
+  // must honor the selected title destination instead of starting Earth.
+  const selectedKind = !appCtx.gameStarted && ['space', 'moon'].includes(appCtx.loadingScreenMode)
+    ? appCtx.loadingScreenMode : 'earth';
+  const kind = appCtx.spaceFlight?.active ? 'space' : appCtx.onMoon ? 'moon' : selectedKind;
   return {
     kind,
     lat,
