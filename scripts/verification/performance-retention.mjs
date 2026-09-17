@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { sampleFrameWindow } from './frame-window.mjs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
@@ -8,7 +9,9 @@ const verifyRoot = process.env.WE3D_VERIFY_ROOT || root;
 const budgets = JSON.parse(await readFile(`${root}/config/performance-budgets.json`, 'utf8'));
 const server = await startStaticServer({ rootDir: verifyRoot, ports: [4421, 4422, 4423] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
-let browser = await chromium.launch({ headless: true, channel: 'chrome' });
+// Keep GC within this 8 GiB host's test-process envelope; acceptance budgets stay unchanged.
+const browserOptions = { headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280'] };
+let browser = await chromium.launch(browserOptions);
 const requestedProfile = String(process.env.WE3D_VERIFY_PROFILE || 'all').trim().toLowerCase();
 const auditOnly = process.env.WE3D_VERIFY_AUDIT_ONLY === '1';
 assert.ok(['all', 'desktop', 'mobile'].includes(requestedProfile), `Unsupported WE3D_VERIFY_PROFILE: ${requestedProfile}`);
@@ -158,38 +161,12 @@ async function selectMode(page, expected, selector) {
 }
 
 async function measureMode(client, id, sampleMs = 5_000) {
-  const raw = await client.page.evaluate(async (durationMs) => {
-    return new Promise((resolve) => {
-    const deltas = [];
-    const startActor = globalThis.getWorldExplorerRuntimeDiagnostics?.()?.activeActor;
-    const startPosition = startActor?.position ? {x:startActor.position.x,z:startActor.position.z} : null;
-    const startedAt = performance.now();
-    let previous = startedAt;
-    const frame = (now) => {
-      if (now > previous) deltas.push(now - previous);
-      previous = now;
-      if (now - startedAt < durationMs) requestAnimationFrame(frame);
-      else {
-        const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
-        resolve({
-          deltas,
-          elapsedMs: now-startedAt,
-          startPosition,
-          endPosition: diagnostics.activeActor?.position ? {x:diagnostics.activeActor.position.x,z:diagnostics.activeActor.position.z} : null,
-          diagnostics: {
-            renderer: diagnostics.renderer || {},
-            worldCounts: diagnostics.worldCounts || null,
-            // Production artifacts bundle the module graph, so source-only module
-            // URLs are intentionally absent. Keep the release measurement on the
-            // public diagnostics contract instead of importing private source.
-            drawCallBreakdown: diagnostics.performance?.drawCallBreakdown || []
-          }
-        });
-      }
-    };
-    requestAnimationFrame(frame);
-    });
-  }, sampleMs);
+  const raw = await client.page.evaluate(sampleFrameWindow, sampleMs);
+  assert.ok(raw.deltas.length > 0, 'Frame sample must contain intervals');
+  assert.ok(raw.elapsedMs >= sampleMs, 'Frame sample must cover the requested duration');
+  assert.ok(raw.deltas.every((value) => Number.isFinite(value) && value > 0), 'Frame intervals must be positive');
+  assert.ok(Math.abs(raw.deltas.reduce((sum, value) => sum + value, 0) - raw.elapsedMs) < 0.001,
+    'Frame intervals must sum to the measured window');
   const deltas = raw.deltas.filter((value) => Number.isFinite(value) && value > 0);
   const averageFrameMs = deltas.reduce((sum, value) => sum + value, 0) / Math.max(1, deltas.length);
   const rawJsHeapUsedBytes = await heapUsedBytes(client.cdp);
@@ -358,7 +335,7 @@ try {
     // inflate its cold-start memory or affect its measurement.
     if (desktop) {
       await browser.close();
-      browser = await chromium.launch({ headless: true, channel: 'chrome' });
+      browser = await chromium.launch(browserOptions);
     }
     console.log('[performance-retention] starting mobile');
     mobileRegression = await runMobileRegression();
