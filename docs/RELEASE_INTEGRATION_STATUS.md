@@ -169,9 +169,24 @@ startup claim. The road precision diagnostic also accounts for both input-grid
 and computed-intersection rounding before Float32 upload; physical collision
 surfaces remain unchanged by that diagnostic allowance.
 
-Assembled-world correctness runs use a 1,536 MiB Chrome old-space cap on this
-8 GiB workstation, alongside the unchanged 3 GiB aggregate process-RSS guard.
+The first assembled-world correctness run used a 1,536 MiB Chrome old-space cap
+on this 8 GiB workstation, alongside the unchanged 3,000 MiB aggregate RSS guard.
 World content and assertions are unchanged; the report records this browser
 budget. A Golden Gate diagnostic passed all 27 checks at 2,568 MiB peak owned
 RSS after an uncapped run crossed the guard. Correctness under this heap cap is
 not a substitute for the separate performance or physical-device gates.
+
+## Complete gate scope and workstation headroom
+
+The release runner removes inherited diagnostic location, profile, resume,
+shortened-audit and forced-fallback switches before starting gates. Separate
+gate commands still select their required scenario. Emulator addresses and
+artifact/resource settings are preserved. This prevents a developer's partial
+test session from silently narrowing release coverage.
+
+The assembled-world correctness browser uses a 1,280 MiB V8 old-space cap.
+A full matrix with the previous 1,536 MiB cap crossed the unchanged 3,000 MiB
+owned-process guard during Manhattan's provider-outage load. The isolated
+Manhattan journey passed all 27 assertions with the lower cap, peaking at
+2,768 MiB aggregate RSS. This is correctness-test headroom, not performance
+or physical-phone acceptance. Full final-artifact gates remain required.

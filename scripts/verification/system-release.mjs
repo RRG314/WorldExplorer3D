@@ -4,6 +4,7 @@ import process from 'node:process';
 import { runLoggedStep } from './run-logged-step.mjs';
 import { currentBaseline, evidencePath, currentArtifactIdentity, sameArtifactIdentity } from './execution-evidence.mjs';
 import { startStaticServer } from './static-server.mjs';
+import { completeReleaseEnvironment } from './release-environment.mjs';
 
 const root = process.cwd();
 const config = JSON.parse(readFileSync(path.join(root, 'config/system-release-gates.json'), 'utf8'));
@@ -88,10 +89,7 @@ const artifactServer = shouldRun && selected.some(([, gate]) => gate.artifactReq
   ? await startStaticServer({ rootDir: path.resolve(root, artifactRoot), ports: [4481, 4482, 4483] })
   : null;
 const verificationEnvironment = {
-  ...process.env,
-  // A diagnostic location filter must never certify the complete release gate.
-  WE3D_VERIFY_LOCATIONS: '',
-  WE3D_BACKEND_FROM: '',
+  ...completeReleaseEnvironment(process.env),
   WE3D_VERIFY_ROOT: artifactRoot,
   ...(artifactServer ? { WE3D_VERIFY_BASE_URL: `http://127.0.0.1:${artifactServer.port}` } : {})
 };
