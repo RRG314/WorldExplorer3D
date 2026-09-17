@@ -67,6 +67,13 @@ try {
   });
   assert.equal(advanced.phase, 'approach', `Assisted ${destinationLabel} course stopped: ${JSON.stringify(advanced)}.`);
   assert.ok(advanced.minimumForwardDot > 0.98, `Assisted flight moved backward relative to the craft: ${JSON.stringify(advanced)}.`);
+  // Advancing the journey above does not run the frame-owned HUD update.
+  // Observe the real entry control once that update has consumed the new state.
+  await page.waitForFunction((label) => {
+    const button = document.getElementById('sfLandBtn');
+    return button?.disabled === false &&
+      button.textContent?.trim().toUpperCase() === `ENTER ${label.toUpperCase()} ATMOSPHERE`;
+  }, destinationLabel, { timeout: 10_000 });
   const before = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     return {

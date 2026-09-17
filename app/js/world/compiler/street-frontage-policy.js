@@ -26,14 +26,17 @@ export function streetFootprint(building) {
   const pts = building.surfaceFootprint || building.pts || building.footprint || [];
   return !building.allowsPassageBelow && pts.length >= 3 && pts.every(p => Number.isFinite(p.x) && Number.isFinite(p.z)) ? pts : [];
 }
-const bounds = pts => ({ minX: Math.min(...pts.map(p=>p.x)), maxX: Math.max(...pts.map(p=>p.x)), minZ: Math.min(...pts.map(p=>p.z)), maxZ: Math.max(...pts.map(p=>p.z)) });
+const bounds = (a,b) => ({ minX: Math.min(a.x,b.x), maxX: Math.max(a.x,b.x), minZ: Math.min(a.z,b.z), maxZ: Math.max(a.z,b.z) });
 function pointSegment(p,a,b) {
   const dx=b.x-a.x,dz=b.z-a.z,l=dx*dx+dz*dz;
   const t=l ? Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.z-a.z)*dz)/l)) : 0;
   return Math.hypot(p.x-a.x-dx*t,p.z-a.z-dz*t);
 }
+const cross=(p,q,r)=>(q.x-p.x)*(r.z-p.z)-(q.z-p.z)*(r.x-p.x);
 function segmentDistance(a,b,c,d) {
-  const cross=(p,q,r)=>(q.x-p.x)*(r.z-p.z)-(q.z-p.z)*(r.x-p.x);
+  // Terrain frontage samples are points, not nonzero road segments. Their
+  // distance needs one projection; the other three cannot be closer.
+  if(a.x===b.x && a.z===b.z)return pointSegment(a,c,d);
   if(cross(a,b,c)*cross(a,b,d)<0 && cross(c,d,a)*cross(c,d,b)<0)return 0;
   return Math.min(pointSegment(a,c,d),pointSegment(b,c,d),pointSegment(c,a,b),pointSegment(d,a,b));
 }
@@ -51,7 +54,7 @@ export function createStreetFrontagePolicy(buildings = [], metersPerWorldUnit = 
       const a=pts[i],b=pts[(i+1)%pts.length];
       const length=Math.hypot(b.x-a.x,b.z-a.z)*scale;
       if(length<1e-8)continue;
-      const edge={a,b,bounds:bounds([a,b]),facadeEligible:length>=FRONTAGE_RULES.minimumFacade-1e-8,extendedFrontage:attached ? FRONTAGE_RULES.attachedReach/scale : 0};edges.push(edge);
+      const edge={a,b,bounds:bounds(a,b),facadeEligible:length>=FRONTAGE_RULES.minimumFacade-1e-8,extendedFrontage:attached ? FRONTAGE_RULES.attachedReach/scale : 0};edges.push(edge);
       const box=edge.bounds;
       for(let x=Math.floor(box.minX/cell);x<=Math.floor(box.maxX/cell);x++)for(let z=Math.floor(box.minZ/cell);z<=Math.floor(box.maxZ/cell);z++){
         const k=`${x}:${z}`;if(!buckets.has(k))buckets.set(k,[]);buckets.get(k).push(edge);
@@ -59,9 +62,11 @@ export function createStreetFrontagePolicy(buildings = [], metersPerWorldUnit = 
     }
   }
   function query(a,b=a,pad=0){
-    const box=bounds([a,b]),seen=new Set();
+    const box=bounds(a,b),seen=new Set();
     for(let x=Math.floor((box.minX-pad)/cell);x<=Math.floor((box.maxX+pad)/cell);x++)for(let z=Math.floor((box.minZ-pad)/cell);z<=Math.floor((box.maxZ+pad)/cell);z++)for(const edge of buckets.get(`${x}:${z}`)||[])seen.add(edge);
-    return [...seen].filter(e=>segmentDistance(a,b,e.a,e.b)<=pad+1e-8);
+    const result=[];
+    for(const edge of seen)if(segmentDistance(a,b,edge.a,edge.b)<=pad+1e-8)result.push(edge);
+    return result;
   }
   return { edges, query,
     section(road,index=0){

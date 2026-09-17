@@ -158,7 +158,8 @@ function pointInLonLatRing(lon, lat, ring) {
     const yi = Number(ring[i]?.[1]);
     const xj = Number(ring[j]?.[0]);
     const yj = Number(ring[j]?.[1]);
-    if (![xi, yi, xj, yj].every(Number.isFinite)) continue;
+    if (!Number.isFinite(xi) || !Number.isFinite(yi) ||
+        !Number.isFinite(xj) || !Number.isFinite(yj)) continue;
     const intersects = ((yi > lat) !== (yj > lat)) &&
       lon < (xj - xi) * (lat - yi) / ((yj - yi) || 1e-12) + xi;
     if (intersects) inside = !inside;
@@ -173,7 +174,10 @@ function pointInMappedWaterArea(lon, lat, area) {
     (lon < bounds.minLon || lon > bounds.maxLon || lat < bounds.minLat || lat > bounds.maxLat)
   ) return false;
   if (!pointInLonLatRing(lon, lat, area?.outer || [])) return false;
-  return !(area?.holes || []).some((hole) => pointInLonLatRing(lon, lat, hole));
+  for (const hole of area?.holes || []) {
+    if (pointInLonLatRing(lon, lat, hole)) return false;
+  }
+  return true;
 }
 
 function pointInMappedLandArea(lon, lat, area) {
@@ -183,7 +187,10 @@ function pointInMappedLandArea(lon, lat, area) {
     (lon < bounds.minLon || lon > bounds.maxLon || lat < bounds.minLat || lat > bounds.maxLat)
   ) return false;
   if (!pointInLonLatRing(lon, lat, area?.outer || [])) return false;
-  return !(area?.holes || []).some((hole) => pointInLonLatRing(lon, lat, hole));
+  for (const hole of area?.holes || []) {
+    if (pointInLonLatRing(lon, lat, hole)) return false;
+  }
+  return true;
 }
 
 function createLandAreaSpatialBucket(areas, gridSize = 16) {
