@@ -39,9 +39,11 @@ try {
 
   await page.selectOption('#spaceDestinationSelect', destinationBodyId);
   await page.waitForFunction((bodyId) => JSON.parse(globalThis.render_game_to_text?.() || '{}').spaceFlight?.destinationBodyId === bodyId, destinationBodyId);
-  if (!await page.locator('#sfAssistBtn').isVisible() && await page.locator('#sfHudToggle').isVisible()) {
-    await page.locator('#sfHudToggle').click();
-  }
+  // Visibility can change between separate checks while the HUD initializes.
+  // Wait for its control, then use the explicit state so opening never closes it.
+  const hudToggle = page.locator('#sfHudToggle');
+  await hudToggle.waitFor({ state: 'visible' });
+  if (await hudToggle.getAttribute('aria-expanded') === 'false') await hudToggle.click();
   await page.locator('#sfAssistBtn').click();
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').spaceFlight?.assist?.active === true);
 

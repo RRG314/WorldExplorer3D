@@ -592,6 +592,19 @@ try {
       await page.keyboard.up('ArrowUp');
       await page.waitForTimeout(2750);
       const second = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.());
+      // Releasing the accelerator still leaves the car coasting, and terrain
+      // suspension can legitimately be settling at that instant. Preserve the
+      // moving snapshot, then test settled contact after normal braking.
+      await page.keyboard.down('Space');
+      try {
+        await page.waitForFunction(() => {
+          const actor = globalThis.getWorldExplorerRuntimeDiagnostics?.()?.activeActor;
+          return actor?.mode === 'drive' && actor.contact?.grounded === true &&
+            Math.hypot(Number(actor.velocity?.x || 0), Number(actor.velocity?.z || 0)) < 0.1;
+        }, null, { timeout: 15_000, polling: 250 });
+        await page.waitForTimeout(500);
+      } finally { await page.keyboard.up('Space'); }
+      const settled = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.());
       const vehicles = second?.urbanSandbox?.vehicles || [];
       const envelopes = vehicles.map((vehicle) => ({
         id: vehicle.id,
@@ -618,12 +631,12 @@ try {
           playerDriveMeters >= 0.25,
         playerVehicleRetainsPublishedSurfaceContact:
           first?.surfaceChain?.surfaces?.drive?.kind === 'road' &&
-          ['road', 'terrain'].includes(String(second?.surfaceChain?.surfaces?.drive?.kind || '')) &&
-          Number(second?.surfaceChain?.actor?.vehicleContact?.sampleCount || 0) >= 1 &&
-          Number(second?.surfaceChain?.actor?.vehicleContact?.supportSampleCount || 0) >= 1 &&
-          Number.isFinite(Number(second?.surfaceChain?.actor?.vehicleContact?.chassisClearance)) &&
-          Number(second?.surfaceChain?.actor?.vehicleContact?.chassisClearance) >= -0.002 &&
-          Number(second?.surfaceChain?.actor?.vehicleContact?.chassisClearance) <= 0.12,
+          ['road', 'terrain'].includes(String(settled?.surfaceChain?.surfaces?.drive?.kind || '')) &&
+          Number(settled?.surfaceChain?.actor?.vehicleContact?.sampleCount || 0) >= 1 &&
+          Number(settled?.surfaceChain?.actor?.vehicleContact?.supportSampleCount || 0) >= 1 &&
+          Number.isFinite(Number(settled?.surfaceChain?.actor?.vehicleContact?.chassisClearance)) &&
+          Number(settled?.surfaceChain?.actor?.vehicleContact?.chassisClearance) >= -0.002 &&
+          Number(settled?.surfaceChain?.actor?.vehicleContact?.chassisClearance) <= 0.12,
         canonicalFarNpc: Number(population.pedestrians || 0) === 0 ||
           population.pedestrianRepresentation === 'curated-only-local-models' &&
           Number(population.proceduralPedestrianMeshes || 0) === 0,
@@ -699,7 +712,12 @@ try {
         playerEndSurfaceKind: second?.surfaceChain?.surfaces?.drive?.kind || null,
         playerDriveSurfaceId: second?.surfaceChain?.surfaces?.drive?.feature?.id || null,
         playerFeetMinusDriveSurface: Number(second?.surfaceChain?.deltas?.feetMinusDriveSurface),
-        playerVehicleContact: second?.surfaceChain?.actor?.vehicleContact || null,
+        movingVehicleContact: second?.surfaceChain?.actor?.vehicleContact || null,
+        movingVehicleGrounded: second?.surfaceChain?.actor?.grounded ?? null,
+        movingVehicleVelocity: second?.activeActor?.velocity || null,
+        settledVehicleGrounded: settled?.surfaceChain?.actor?.grounded ?? null,
+        settledVehicleVelocity: settled?.activeActor?.velocity || null,
+        playerVehicleContact: settled?.surfaceChain?.actor?.vehicleContact || null,
         envelopes,
         browserErrors,
         localFailures
