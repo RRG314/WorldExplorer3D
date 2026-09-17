@@ -52,8 +52,24 @@ test('precision-distance audit finds a rounded edge across a contact-index cell 
   contacts.dispose();
 });
 test('precision bounds follow compiler grid and Float32 scale rather than road width', () => {
-  assert.ok(roadSourceCoordinateTolerance(1,1,0.001)<0.00071);
-  assert.ok(roadSourceCoordinateTolerance(12000,12000,0.001)<0.0014);
-  assert.ok(roadSourceCoordinateTolerance(20000,20000,0.001)<0.0021);
+  assert.ok(roadSourceCoordinateTolerance(1,1,0.001)<0.001415);
+  assert.ok(roadSourceCoordinateTolerance(12000,12000,0.001)<0.00211);
+  assert.ok(roadSourceCoordinateTolerance(20000,20000,0.001)<0.0028);
   assert.throws(()=>roadSourceCoordinateTolerance(NaN,0,0.001),/Invalid road precision/);
+});
+
+test('captured London terminal stays within input plus intersection rounding, not a single snap', () => {
+  // Local projection of the actual 653be643 uploaded Ebury Street corner.
+  const positions=new Float32Array([
+    -1207.8173828125,13.054367065429688,1217.4971923828125,
+    -1209.30419921875,12.924832344055176,1217.4971923828125,
+    -1208.1280517578125,13.158637046813965,1218.1639404296875
+  ]);
+  const contacts=createRoadContactIndex([{geometry:{attributes:{position:{array:positions}}}}]);
+  const x=-1208.1270890110407,z=1218.1639759070606;
+  const nearest=contacts.nearestSurfaceAt(x,z,0.01);
+  assert.ok(Math.abs(nearest.distance-0.0008876494082588075)<1e-10);
+  assert.equal(contacts.nearestSurfaceAt(x,z,0.0007934235269368585),null);
+  assert.ok(contacts.nearestSurfaceAt(x,z,roadSourceCoordinateTolerance(x,z,0.001)));
+  contacts.dispose();
 });

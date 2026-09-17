@@ -721,7 +721,14 @@ export async function publishCompiledTransportMeshes(deps = {}) {
         } else {
           roadSurfaceIntegrity.junctionCoverageGaps++;
           if (roadSurfaceIntegrity.junctionCoverageExamples.length < 12) {
-            roadSurfaceIntegrity.junctionCoverageExamples.push({x:intersection.x,z:intersection.z,tolerance});
+            roadSurfaceIntegrity.junctionCoverageExamples.push({x:intersection.x,z:intersection.z,tolerance,
+              nearestSurface: stagedRoadContact.nearestSurfaceAt(intersection.x,intersection.z,4,'at_grade'),
+              branches: intersection.roads.map(branch => {
+                const road=baseRoads[branch.roadIdx];
+                return {...branch,name:road?.name,sourceFeatureId:road?.sourceFeatureId,
+                  mode:road?.structureSemantics?.terrainMode,sharedSurface:road?.transportSurfacePresentation?.id,
+                  sourceWidth:road?.width,placementOffset:roadPlacementOffsetWorld(road)};
+              })});
           }
         }
       }

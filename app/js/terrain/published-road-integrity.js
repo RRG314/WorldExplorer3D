@@ -59,11 +59,12 @@ export function normalizePublishedRoadIndices(positions, indices, ranges) {
     correctedDownwardTriangles: measured.downwardFacingTriangles };
 }
 
-// Half a compiler grid step per axis, plus half a Float32 ULP at the
-// neighbouring coordinate. The extra unit covers the local search boundary
-// across powers of two; this remains a sub-centimetre numerical bound here.
+// The polygon kernel rounds input coordinates and computed intersections to
+// its integer grid (two half-step roundings), then publication rounds to
+// Float32. Include both grid roundings rather than treating overlay output as
+// a single input snap. The extra unit covers a neighbouring Float32 binade.
 export function roadSourceCoordinateTolerance(x, z, grid) {
   if (![x,z,grid].every(Number.isFinite) || grid <= 0) throw new RangeError('Invalid road precision input');
   const roundingBound = value => 2 ** (Math.floor(Math.log2(Math.abs(value)+1))-24);
-  return Math.hypot(grid/2+roundingBound(x), grid/2+roundingBound(z));
+  return Math.hypot(grid+roundingBound(x), grid+roundingBound(z));
 }

@@ -157,3 +157,14 @@ and stops the matrix at its first failure. Diagnostic location filters are clear
 by the release runner so they cannot certify a complete representative-world gate.
 Current execution details and incomplete checks remain in the ignored evidence
 ledger at `output/release-integration/RESULTS.md`.
+
+The London CPU profile identified exhaustive POI-to-building association during
+world finalization. Batch association now indexes full building footprints once,
+retains input order for tie-breaking, handles large footprints separately, and
+rebuilds from each supplied publication. Differential tests preserve the exact
+association records, including containment, doors, radius limits and edited
+buildings. A synthetic 4,000-building/1,000-POI benchmark measured median 1,016 ms
+exhaustive versus 10.9 ms indexed; this is a subsystem result, not a whole-world
+startup claim. The road precision diagnostic also accounts for both input-grid
+and computed-intersection rounding before Float32 upload; physical collision
+surfaces remain unchanged by that diagnostic allowance.
