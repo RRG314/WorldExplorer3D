@@ -6,7 +6,7 @@ const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 try {
   const page = await browser.newPage();
   await page.goto(`http://127.0.0.1:${server.port}/app/js/ui/accessibility.js`);
-  await page.setContent(`<style>[hidden],.hidden{display:none!important}</style><button id="launch">Open</button><div id="hud"></div><div id="controls"></div><div id="dialogs"></div><div id="accessibilityAnnouncements" aria-live="polite"></div>`);
+  await page.setContent(`<style>[hidden],.hidden{display:none!important}</style><button id="launch">Open</button><div id="hud"></div><div id="controls"></div><div id="dialogs"></div><div hidden><section role="dialog" aria-modal="true"><div id="locationSearchStatus"></div><div id="perfSettingsStatus"></div><div id="roomPanelStatus"></div></section></div><div id="accessibilityAnnouncements" aria-live="polite"></div>`);
   const result = await page.evaluate(async () => {
     const {initAccessibility} = await import('/app/js/ui/accessibility.js');
     const api = initAccessibility();
@@ -20,7 +20,7 @@ try {
     // Install a closed modal: it must not be repeatedly measured for HUD text.
     document.getElementById('dialogs').innerHTML = '<section role="dialog" aria-modal="true" hidden id="testDialog" tabindex="-1"><button id="first">First</button><button id="last">Last</button></section>';
     await tick(); layoutReads = 0; documentScans = 0;
-    for(let i=0;i<40;i++){hud.textContent=String(i);hud.className=i%2?'fast':'slow';await tick();}
+    for(let i=0;i<40;i++){hud.innerHTML=`<span>${i}</span>`;hud.className=i%2?'fast':'slow';await tick();}
     const idle = {layoutReads, documentScans};
     document.getElementById('controls').innerHTML='<div class="floatItem" id="dynamic">Fly</div><div id="ctrlHeader">Controls</div><div id="ctrlContent" class="hidden"></div>';
     await tick();

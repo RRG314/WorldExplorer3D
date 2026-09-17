@@ -66,6 +66,9 @@ function initAccessibility() {
     ...(scope instanceof HTMLElement && scope.matches(selector) ? [scope] : []),
     ...scope.querySelectorAll(selector)
   ];
+  const setAttributeIfChanged = (element, name, value) => {
+    if (element.getAttribute(name) !== value) element.setAttribute(name, value);
+  };
   const upgradeSemantics = (scope = document) => {
     within(scope, '.floatItem, .mode, .loc, #ctrlHeader').forEach((element) => {
       if (!(element instanceof HTMLElement) || element.dataset.we3dKeyboardButton === 'true') return;
@@ -79,22 +82,19 @@ function initAccessibility() {
       });
     });
     within(scope, '.floatItem, .mode, .loc').forEach((element) => {
-      element.setAttribute('aria-pressed', String(element.classList.contains('on') || element.classList.contains('sel')));
+      setAttributeIfChanged(element, 'aria-pressed', String(element.classList.contains('on') || element.classList.contains('sel')));
     });
     const controlsHeader = document.getElementById('ctrlHeader');
     const controlsContent = document.getElementById('ctrlContent');
-    if (controlsHeader && controlsContent) {
-      controlsHeader.setAttribute('aria-controls', 'ctrlContent');
-      controlsHeader.setAttribute('aria-expanded', String(!controlsContent.classList.contains('hidden')));
+    if (controlsHeader && controlsContent && (scope === document || scope.contains(controlsHeader) || scope.contains(controlsContent))) {
+      setAttributeIfChanged(controlsHeader, 'aria-controls', 'ctrlContent');
+      setAttributeIfChanged(controlsHeader, 'aria-expanded', String(!controlsContent.classList.contains('hidden')));
     }
-    [
-      'locationSearchStatus', 'perfSettingsStatus', 'urbanEquipmentStatus',
-      'gameShareStatus', 'roomPanelStatus'
-    ].forEach((id) => {
-      const element = document.getElementById(id);
-      if (!element) return;
-      element.setAttribute('role', 'status');
-      element.setAttribute('aria-live', 'polite');
+    // New HUD nodes must not rewrite status roles in unrelated closed dialogs:
+    // even setting the same role triggers our modal visibility observer.
+    within(scope, '#locationSearchStatus, #perfSettingsStatus, #urbanEquipmentStatus, #gameShareStatus, #roomPanelStatus').forEach((element) => {
+      setAttributeIfChanged(element, 'role', 'status');
+      setAttributeIfChanged(element, 'aria-live', 'polite');
     });
     within(scope, 'canvas').forEach((canvas) => {
       if (canvas.hasAttribute('aria-label') || canvas.getAttribute('aria-hidden') === 'true') return;
