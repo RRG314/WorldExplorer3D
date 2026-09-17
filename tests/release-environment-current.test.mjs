@@ -8,7 +8,10 @@ test('a developer diagnostic session cannot narrow release coverage', () => {
     WE3D_BACKEND_FROM: 'account-backend', WE3D_HOTBAR_RESUME_STAGE: '4',
     WE3D_HOTBAR_ONLY_ACTION: 'mobile', WE3D_VERIFY_PROFILE: 'mobile',
     WE3D_VERIFY_AUDIT_ONLY: '1', WE3D_VERIFY_INITIAL_ONLY: '1',
-    WE3D_VERIFY_SLICE_ONLY: '1', WE3D_FORCE_TRANSPORT_FALLBACK: '1'
+    WE3D_VERIFY_SLICE_ONLY: '1', WE3D_FORCE_TRANSPORT_FALLBACK: '1',
+    WE3D_URBAN_SCOPE: 'vehicle', WE3D_VERIFY_JOURNEY: 'maryland',
+    WE3D_VIEWPORT_SCOPE: 'mobile', WE3D_BLOCKS_SCOPE: 'build',
+    WE3D_ROAD_TERRAIN_JOURNEY: 'one', WE3D_TRANSPORT_FACILITY_JOURNEY: 'one'
   };
   assert.deepEqual(completeReleaseEnvironment(diagnosticSession), {});
   assert.equal(diagnosticSession.WE3D_VERIFY_PROFILE, 'mobile');

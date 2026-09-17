@@ -10,7 +10,10 @@ const servedRoot = requestedRoot ? path.resolve(root, requestedRoot) : root;
 const server = await startStaticServer({ rootDir: servedRoot, ports: [4389, 4390, 4391] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
 const reportPath = path.join(root, 'output', 'verification', 'interiors', 'report.json');
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const launchBrowser = () => chromium.launch({
+  headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280']
+});
+let browser = await launchBrowser();
 let context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
 let page = await context.newPage();
 const browserErrors = [];
@@ -586,6 +589,8 @@ try {
   mobileParams.set('rz', String(afterExit.walker.z));
   mobileParams.set('yaw', '0');
   await context.close();
+  await browser.close();
+  browser = await launchBrowser();
   context = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height: 844 } });
   page = await context.newPage();
   bindPageEvidence(page);
@@ -669,6 +674,7 @@ try {
   const report = {
     ok: Object.values(checks).every(Boolean),
     contract: 'published-multifloor-building-keyboard-touch-lifecycle-v2',
+    browserBudget: { maxOldSpaceMiB: 1280, freshBrowserPerDevice: true },
     checks,
     target,
     approach,

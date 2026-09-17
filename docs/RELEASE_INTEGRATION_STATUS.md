@@ -114,7 +114,18 @@ and saved walking-session restoration now use the full player radius for that
 check; fresh arrivals retain their wider margin. A regression using the captured
 Baltimore footprint fails before the fix and passes afterward, including rejection
 of poses inside or too close to walls. Source validation and all 490 current
-contracts pass. The full rebuilt desktop/mobile journey still needs acceptance.
+contracts pass. A focused real phone-sized browser check restored the exact saved
+horizontal position and passed touch entry/exit/re-entry (45.3 s, 2494 MiB peak).
+The preceding full run passed desktop traversal but hit the 3000 MiB process
+guard during mobile startup. The complete verifier now uses a fresh Chrome
+process for each device stage and a 1280 MiB JavaScript old-space cap. The full
+rebuilt desktop/mobile journey still needs acceptance; neither the memory stop
+nor the focused diagnostic is counted as its pass.
+
+Release environment isolation also strips all six additional discovered scope
+selectors for urban, regional, viewport, block, road-terrain and transport-facility
+diagnostics. They were unset during these runs, but must not silently narrow a
+future release gate. The expanded environment regression test passes.
 
 Terrain-boundary diagnostics passed with temporary registered staging App Check
 debug attestation (70.5 seconds, 2518 MiB peak). The original localhost run correctly
