@@ -600,6 +600,10 @@ try {
   markStage('mobile-loaded', { mobileRestored });
   assert.ok(Math.hypot(mobileRestored.walker.x - afterExit.walker.x, mobileRestored.walker.z - afterExit.walker.z) < 0.6,
     `Walking share link did not restore the exterior pose: ${JSON.stringify({ expected: afterExit.walker, actual: mobileRestored.walker })}`);
+  // A fresh phone profile starts with movement guidance, which deliberately
+  // owns prompt visibility. Dismiss it through the same control a player uses.
+  const tutorialLater = page.getByRole('button', { name: 'Show this tutorial step later', exact: true });
+  if (await tutorialLater.isVisible()) await tutorialLater.tap();
   // Fresh provider data can move an inferred doorway slightly. Verify the saved
   // pose first, then approach this load's published entrance for the same building.
   const mobileTarget = await page.evaluate((key) =>
@@ -613,6 +617,7 @@ try {
     return prompt?.classList.contains('show') === true &&
       globalThis.getWorldExplorerRuntimeDiagnostics?.().interior?.promptTargetKey === key;
   }, target.key, { timeout: 10_000 });
+  await page.locator('#interiorPrompt.show').waitFor({ state: 'visible', timeout: 10_000 });
   const mobileEnterBounds = await page.locator('#interiorPrompt.show').evaluate((element) => {
     const bounds = element.getBoundingClientRect();
     return { left: bounds.left, right: bounds.right, top: bounds.top, bottom: bounds.bottom };
