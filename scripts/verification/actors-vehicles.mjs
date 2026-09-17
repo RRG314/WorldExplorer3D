@@ -496,12 +496,59 @@ const requested = new Set(String(process.env.WE3D_ACTOR_VEHICLE_LOCATIONS || '')
 const selectedLocations = requested.size ? locations.filter((location) => requested.has(location.id)) : locations;
 assert.ok(selectedLocations.length > 0, 'No actor/vehicle verification locations selected.');
 
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const results = [];
+const browserBudget = { engine: 'installed-chrome', maxOldSpaceMiB: 1280 };
+async function boundedClose(close, timeoutMs = 8000) {
+  let timer;
+  try {
+    return await Promise.race([
+      Promise.resolve().then(close).then(() => true, () => false),
+      new Promise(resolve => { timer = setTimeout(() => resolve(false), timeoutMs); })
+    ]);
+  } finally { clearTimeout(timer); }
+}
+async function closeOwnedBrowser(browser, browserServer) {
+  // A remotely connected Browser.close() disconnects its client; the launch
+  // server owns the actual Chrome process and must close it.
+  if (await boundedClose(() => browserServer.close())) return;
+  const child = browserServer.process();
+  if (!child || child.exitCode !== null || child.signalCode) return;
+  console.error('[actors-vehicles] Graceful browser close stalled; stopping its owned process.');
+  const waitForExit = () => new Promise(resolve => {
+    if (child.exitCode !== null || child.signalCode) return resolve();
+    child.once('exit', resolve);
+  });
+  child.kill('SIGTERM');
+  if (await boundedClose(waitForExit, 4000)) return;
+  child.kill('SIGKILL');
+  assert.ok(await boundedClose(waitForExit, 2000), 'Owned actor-test browser did not exit.');
+}
+async function saveReport(complete = false) {
+  const report = {
+    ok: complete && results.length === selectedLocations.length && results.every(result => result.ok),
+    complete,
+    scope: requested.size ? 'diagnostic-subset' : 'full',
+    requestedLocations: selectedLocations.map(location => location.id),
+    generatedAt: new Date().toISOString(),
+    contract: 'current-rendered-actors-and-vehicles',
+    captureEnabled: capture, browserBudget, results
+  };
+  await fs.writeFile(path.join(evidenceDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
+  return report;
+}
 try {
   for (const location of selectedLocations) {
-    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-    const page = await context.newPage();
+    console.error(`[actors-vehicles] START ${location.id}`);
+    const browserServer = await chromium.launchServer({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280'] });
+    let browser, context, page;
+    try {
+      browser = await chromium.connect(browserServer.wsEndpoint());
+      context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      page = await context.newPage();
+    } catch (error) {
+      await closeOwnedBrowser(browser, browserServer);
+      throw error;
+    }
     const browserErrors = [];
     const localFailures = [];
     page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
@@ -522,17 +569,19 @@ try {
       await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120000 });
       await page.getByRole('button', { name: 'Explore', exact: true }).click();
       await page.waitForFunction(() => {
+        if (document.getElementById('loading')?.classList.contains('show')) return false;
         const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
         return diagnostics.gameStarted === true && diagnostics.worldLoading === false &&
           diagnostics.livingWorld?.active === true && diagnostics.urbanSandbox?.active === true;
-      }, null, { timeout: 360000 });
+      }, null, { timeout: 360000, polling: 500 });
       await page.waitForTimeout(5000);
-      const environmentButton = page.getByRole('button', { name: 'Environment controls' });
-      if (await environmentButton.isVisible().catch(() => false)) {
-        await environmentButton.click();
-        await page.locator('#fTimeOfDay').click();
-        await page.waitForTimeout(1000);
+      const timeControl = page.locator('#quickTimeOfDay');
+      await timeControl.waitFor({ state: 'visible' });
+      for (let attempt = 0; attempt < 5 && await timeControl.getAttribute('data-mode') !== 'day'; attempt += 1) {
+        await timeControl.click();
       }
+      assert.equal(await timeControl.getAttribute('data-mode'), 'day', 'Actor screenshots require the visible Day setting.');
+      await page.waitForTimeout(1000);
       const first = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.());
       await page.keyboard.down('ArrowUp');
       await page.waitForTimeout(1250);
@@ -622,7 +671,7 @@ try {
         noBrowserErrors: browserErrors.length === 0,
         noFailedLocalResources: localFailures.length === 0
       };
-      if (capture && Object.values(checks).every(Boolean)) {
+      if (capture) {
         await page.screenshot({ path: path.join(captureDir, `${location.id}.png`) });
       }
       results.push({
@@ -653,22 +702,22 @@ try {
       });
     } catch (error) {
       results.push({ id: location.id, ok: false, error: String(error?.stack || error), browserErrors, localFailures });
+      if (capture) await page.screenshot({ path: path.join(captureDir, `${location.id}-error.png`), timeout: 5000 }).catch(() => {});
     } finally {
-      await context.close().catch(() => {});
+      try { await saveReport(); }
+      finally {
+        await boundedClose(() => context.close());
+        await closeOwnedBrowser(browser, browserServer);
+      }
     }
+    const latest = results.at(-1);
+    console.error(`[actors-vehicles] ${latest.ok ? 'PASS' : 'FAIL'} ${location.id}`, Object.entries(latest.checks || {}).filter(([, value]) => !value).map(([name]) => name));
+    if (!latest.ok) break;
   }
 } finally {
-  await browser.close().catch(() => {});
   await server.close().catch(() => {});
 }
 
-const report = {
-  ok: results.every((result) => result.ok),
-  generatedAt: new Date().toISOString(),
-  contract: 'current-rendered-actors-and-vehicles',
-  captureEnabled: capture,
-  results
-};
-await fs.writeFile(path.join(evidenceDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
+const report = await saveReport(results.length === selectedLocations.length);
 console.log(JSON.stringify(report, null, 2));
 assert.equal(report.ok, true, `Actor/vehicle verification failed; see ${path.relative(root, path.join(evidenceDir, 'report.json'))}`);

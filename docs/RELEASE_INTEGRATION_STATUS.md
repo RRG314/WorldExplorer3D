@@ -190,3 +190,10 @@ owned-process guard during Manhattan's provider-outage load. The isolated
 Manhattan journey passed all 27 assertions with the lower cap, peaking at
 2,768 MiB aggregate RSS. This is correctness-test headroom, not performance
 or physical-phone acceptance. Full final-artifact gates remain required.
+
+Actor/vehicle verification now runs one capped Chrome server per location, checks
+loading visibility before polling diagnostics at 500 ms, and persists each
+location's results and screenshots even on failure. It selects Day through the
+current visible time control; the removed Environment-controls selector had
+silently skipped that step. BrowserServer owns process shutdown. A small real
+Chrome lifecycle probe confirmed server close terminates that process.
