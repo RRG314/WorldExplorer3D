@@ -152,6 +152,20 @@ peak 2210 MiB. Denial removed analytics cookies; re-grant started exactly one
 current session. This is local event-formation evidence, not production delivery
 verification. No production or staging analytics configuration was changed.
 
+At clean 89a30976, Explorer passed all 11 browser checks in 147.6 seconds. The
+regional matrix passed Tokyo, London and Seattle, then its ten-minute aggregate
+timeout interrupted Los Angeles. Regional verification now retains an incremental
+report, saves failures, uses a fresh capped browser per location, and skips costly
+diagnostics while the loading cover is visible. The six-world aggregate allowance
+is 30 minutes; each world's 300-second readiness limit is unchanged. The report
+explicitly distinguishes Tokyo's field-lead gameplay check from guide/layout-only
+coverage elsewhere. A complete six-location receipt remains required.
+
+A September 17 preservation refresh matched all 1880 original source hashes and
+the original street, old app and Oeis HEAD/status records. The live manifest still
+identifies production commit db62593ba377. Evidence is retained under
+`output/release-integration/live-checks/`.
+
 London ground accuracy remains an unresolved release-quality question. Comparing
 the actual production and candidate artifacts found 191 changed grid samples
 (maximum 16.74 m). Seven independent Environment Agency 1 m DTM point queries

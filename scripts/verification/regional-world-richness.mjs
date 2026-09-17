@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
@@ -9,7 +9,8 @@ const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
 const servedRoot = requestedRoot ? path.resolve(process.cwd(), requestedRoot) : process.cwd();
 const server = externalUrl ? null : await startStaticServer({ rootDir: servedRoot, ports: [4497, 4498, 4499] });
 const baseUrl = externalUrl || `http://127.0.0.1:${server.port}`;
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const outputDir = 'output/verification/regional-world-richness';
+const reportPath = path.join(outputDir, 'report.json');
 const allJourneys = [
   { id: 'tokyo', lat: 35.6762, lon: 139.6503, packId: 'jp-kanto-urban-nature', width: 1365, height: 900 },
   { id: 'london', lat: 51.5074, lon: -0.1278, packId: 'eu-atlantic-urban-nature', width: 1365, height: 900 },
@@ -24,9 +25,10 @@ assert.ok(journeys.length > 0, `Unknown regional journey filter: ${journeyFilter
 
 async function waitForWorld(page) {
   await page.waitForFunction(() => {
+    if (document.getElementById('loading')?.classList.contains('show')) return false;
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.();
     return state?.gameStarted === true && state.worldLoading === false && state.worldDiscovery?.active === true;
-  }, null, { timeout: 300_000 });
+  }, null, { timeout: 300_000, polling: 500 });
 }
 
 async function enterCoordinates(page, journey) {
@@ -103,6 +105,17 @@ async function startRegionalFieldLead(page, journey) {
 }
 
 async function inspectJourney(journey) {
+  const browser = await chromium.launch({
+    headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280']
+  });
+  try {
+    return await inspectJourneyInBrowser(browser, journey);
+  } finally {
+    await browser.close();
+  }
+}
+
+async function inspectJourneyInBrowser(browser, journey) {
   const pageErrors = [];
   const providerWarnings = [];
   const localFailures = [];
@@ -178,25 +191,46 @@ async function inspectJourney(journey) {
     };
     return {
       id: journey.id, mobile: journey.mobile === true, screenshotPath, snapshot, fieldLead, checks,
+      fieldLeadChecked: fieldLead !== null,
       pageErrors, providerWarnings, localFailures, ok: Object.values(checks).every(Boolean)
     };
+  } catch (error) {
+    const state = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.() || null).catch(() => null);
+    await writeFile(path.join(outputDir, `${journey.id}-failure.json`), JSON.stringify({
+      error: String(error?.stack || error), state, pageErrors, providerWarnings, localFailures
+    }, null, 2));
+    await page.screenshot({ path: path.join(outputDir, `${journey.id}-failure.png`), timeout: 10000 }).catch(() => {});
+    throw error;
   } finally {
     await context.close();
   }
 }
 
+const report = {
+  contract: 'regional-world-richness-v1', ok: false, complete: false, servedRoot,
+  requestedJourneys: journeys.map(journey => journey.id), results: [],
+  browserBudget: { maxOldSpaceMiB: 1280, freshBrowserPerJourney: true }
+};
 try {
   await mkdir('output/release-evidence/current', { recursive: true });
-  const results = [];
+  await mkdir(outputDir, { recursive: true });
+  await writeFile(reportPath, JSON.stringify(report, null, 2));
   for (const journey of journeys) {
+    console.log(`[regional-world] START ${journey.id}`);
     const result = await inspectJourney(journey);
-    results.push(result);
+    report.results.push(result);
+    await writeFile(reportPath, JSON.stringify(report, null, 2));
     console.log(JSON.stringify({ id: result.id, ok: result.ok, packId: result.snapshot.packId, fieldLead: result.fieldLead, checks: result.checks }, null, 2));
   }
-  const report = { contract: 'regional-world-richness-v1', ok: results.every((entry) => entry.ok), results };
+  report.ok = report.results.every((entry) => entry.ok);
+  report.complete = journeyFilter === '' && report.results.length === allJourneys.length;
+  await writeFile(reportPath, JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
   assert.equal(report.ok, true, 'One or more regional world-richness journeys failed.');
+} catch (error) {
+  report.error = String(error?.stack || error);
+  await writeFile(reportPath, JSON.stringify(report, null, 2));
+  throw error;
 } finally {
-  await browser.close();
   await server?.close();
 }
