@@ -57,6 +57,23 @@ async function createPlayer(label) {
   }, { functionsBase: functionsOrigin, firebaseConfig: emulatorFirebaseConfig });
   const page = await context.newPage();
   const browserErrors = [];
+  const interactionTrace = [];
+  page.on('console', message => {
+    if (['warning', 'error'].includes(message.type())) interactionTrace.push({ type: message.type(), text: message.text() });
+  });
+  page.on('request', request => {
+    if (/UrbanVehicle/.test(request.url())) interactionTrace.push({ type: 'vehicle-request', method: request.method(), url: request.url() });
+  });
+  await page.addInitScript(() => {
+    globalThis.__multiplayerInputTrace = [];
+    globalThis.addEventListener('keydown', event => {
+      if (event.code !== 'KeyE') return;
+      globalThis.__multiplayerInputTrace.push({ type: 'keydown', repeat: event.repeat, target: event.target?.tagName, prompt: document.getElementById('urbanVehiclePrompt')?.textContent, urban: globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox });
+    }, true);
+    globalThis.addEventListener('we3d:context-interaction-completed', event => {
+      globalThis.__multiplayerInputTrace.push({ type: 'completed', detail: event.detail });
+    });
+  });
   page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   const params = new URLSearchParams({
     loc: 'custom', lat: '39.2904', lon: '-76.6122', lname: 'Baltimore',
@@ -95,7 +112,7 @@ async function createPlayer(label) {
     email: `${label}-${runId}@example.test`,
     displayName: label === 'owner' ? 'Room Owner' : 'Room Member'
   });
-  return { context, page, identity, browserErrors };
+  return { context, page, identity, browserErrors, interactionTrace };
 }
 
 function wrapYaw(value) {
@@ -463,6 +480,10 @@ try {
     contract: 'two-authenticated-clients-bounded-room-convergence',
     generatedAt: new Date().toISOString(),
     checks,
+    interactionTrace: {
+      owner: await owner.page.evaluate(() => globalThis.__multiplayerInputTrace || []),
+      member: await member.page.evaluate(() => globalThis.__multiplayerInputTrace || [])
+    },
     evidence: {
       roomCode: room.code,
       roomVisibility: room.visibility,
@@ -487,8 +508,11 @@ try {
     clients[label] = await player.page.evaluate(() => ({
       diagnostics: globalThis.getWorldExplorerRuntimeDiagnostics?.() || null,
       focusedElement: document.activeElement?.id || document.activeElement?.tagName || '',
-      vehiclePrompt: document.getElementById('urbanVehiclePrompt')?.textContent || ''
+      vehiclePrompt: document.getElementById('urbanVehiclePrompt')?.textContent || '',
+      inputTrace: globalThis.__multiplayerInputTrace || []
     })).catch(failure => ({ captureError: String(failure) }));
+    clients[label].interactionTrace = player.interactionTrace;
+    clients[label].browserErrors = player.browserErrors;
     await player.page.screenshot({ path: path.join(path.dirname(reportPath), `${label}-failure.png`), timeout: 5000 }).catch(() => {});
   }
   await fs.mkdir(path.dirname(reportPath), { recursive: true });
