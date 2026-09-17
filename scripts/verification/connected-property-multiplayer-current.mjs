@@ -19,7 +19,7 @@ if (!admin.apps.length) admin.initializeApp({ projectId });
 const adminDb = admin.firestore();
 const functionsOrigin = `http://127.0.0.1:5001/${projectId}/us-central1`;
 const firebaseConfig = JSON.parse(await fs.readFile(path.join(root, 'config/firebase.staging.json'), 'utf8'));
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=768'] });
 const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const browserFailures = [];
 const useRealWorld = process.env.WE3D_PROPERTY_REAL_WORLD === '1';

@@ -13,7 +13,7 @@ const outputDir = path.resolve('output/verification/world-economy-cargo');
 await fs.mkdir(outputDir, { recursive: true });
 // Bound this multi-page gameplay verifier on the owner's 8 GiB Mac.
 // This is functional custody evidence, not a performance-budget measurement.
-const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280'] });
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
 const failures = [];
 
 async function state(page) {

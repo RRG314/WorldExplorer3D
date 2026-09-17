@@ -16,7 +16,7 @@ const pageErrors = [];
 
 async function withJourney(name, mobile, run) {
   const browser = await chromium.launch({
-    headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280']
+    headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024']
   });
   let page;
   try {
@@ -433,7 +433,7 @@ failures.push(...pageErrors, ...localRequestFailures);
 const report = {
   ok: failures.length === 0, baseUrl, completed, failures,
   complete: !onlyAction && resumeStage === 0,
-  browserBudget: { maxOldSpaceMiB: 1280, freshBrowserPerJourney: true }
+  browserBudget: { maxOldSpaceMiB: 1024, freshBrowserPerJourney: true }
 };
 await fs.writeFile(path.join(outputDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
 console.log(JSON.stringify(report, null, 2));

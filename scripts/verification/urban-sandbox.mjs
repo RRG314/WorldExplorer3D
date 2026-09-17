@@ -19,7 +19,7 @@ const localFailures = [];
 
 async function createJourneyBrowser() {
   const browser = await chromium.launch({
-    headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280']
+    headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024']
   });
   try {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
@@ -867,7 +867,7 @@ try {
   await mkdir(path.dirname(reportPath), { recursive: true });
   report.scope = requestedScope;
   report.complete = requestedScope === 'all';
-  report.browserBudget = { maxOldSpaceMiB: 1280, freshBrowserPerJourney: true };
+  report.browserBudget = { maxOldSpaceMiB: 1024, freshBrowserPerJourney: true };
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   console.log(JSON.stringify(report, null, 2));
   assert.equal(report.ok, true, `Urban Sandbox ${requestedScope} normal-input journey failed.`);

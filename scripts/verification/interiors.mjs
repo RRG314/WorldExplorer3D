@@ -11,7 +11,7 @@ const server = await startStaticServer({ rootDir: servedRoot, ports: [4389, 4390
 const baseUrl = `http://127.0.0.1:${server.port}`;
 const reportPath = path.join(root, 'output', 'verification', 'interiors', 'report.json');
 const launchBrowser = () => chromium.launch({
-  headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280']
+  headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024']
 });
 let browser = await launchBrowser();
 let context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
@@ -674,7 +674,7 @@ try {
   const report = {
     ok: Object.values(checks).every(Boolean),
     contract: 'published-multifloor-building-keyboard-touch-lifecycle-v2',
-    browserBudget: { maxOldSpaceMiB: 1280, freshBrowserPerDevice: true },
+    browserBudget: { maxOldSpaceMiB: 1024, freshBrowserPerDevice: true },
     checks,
     target,
     approach,

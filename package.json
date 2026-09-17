@@ -14,7 +14,7 @@
     "verify:source": "node scripts/verification/source.mjs",
     "verify:current-contracts": "node scripts/verification/current-contracts.mjs",
     "verify:system-release": "node scripts/verification/system-release.mjs",
-    "verify:backend-release": "firebase emulators:exec --only auth,firestore,storage,functions --project we3d-staging-20260712 \"node scripts/verification/backend-release.mjs\"",
+    "verify:backend-release": "node scripts/verification/backend-environment.mjs",
     "verify:painttown": "node tests/painttown.integration.test.mjs",
     "verify:provider-release": "node scripts/verification/provider-release.mjs",
     "verify:firestore-rules": "firebase emulators:exec --only firestore --project we3d-staging-20260712 \"node --test tests/firestore.rules.security.test.mjs\"",

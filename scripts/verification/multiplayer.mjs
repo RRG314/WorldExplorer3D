@@ -27,8 +27,8 @@ const moduleUrls = requestedRoot
   : sourceModuleUrls;
 // Correctness coverage retains both complete worlds; performance is measured
 // separately. Bound old-space allocation on the small-memory verification host.
-const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280'] });
-const browserBudget = { maxOldSpaceMiB: 1280, worldInitialization: 'sequential', simultaneouslyActiveWorlds: 2 };
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
+const browserBudget = { maxOldSpaceMiB: 1024, worldInitialization: 'sequential', simultaneouslyActiveWorlds: 2 };
 async function recordStage(stage) {
   console.log(`[multiplayer] ${stage}`);
   await fs.mkdir(path.dirname(reportPath), { recursive: true });

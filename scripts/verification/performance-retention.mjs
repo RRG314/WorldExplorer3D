@@ -8,7 +8,7 @@ const verifyRoot = process.env.WE3D_VERIFY_ROOT || root;
 const budgets = JSON.parse(await readFile(`${root}/config/performance-budgets.json`, 'utf8'));
 const server = await startStaticServer({ rootDir: verifyRoot, ports: [4421, 4422, 4423] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+let browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const requestedProfile = String(process.env.WE3D_VERIFY_PROFILE || 'all').trim().toLowerCase();
 const auditOnly = process.env.WE3D_VERIFY_AUDIT_ONLY === '1';
 assert.ok(['all', 'desktop', 'mobile'].includes(requestedProfile), `Unsupported WE3D_VERIFY_PROFILE: ${requestedProfile}`);
@@ -350,6 +350,13 @@ try {
     console.log('[performance-retention] desktop complete');
   }
   if (requestedProfile !== 'desktop') {
+    // Retention is measured within the desktop journey. Use a fresh process
+    // for the independent mobile profile so desktop GPU/native caches cannot
+    // inflate its cold-start memory or affect its measurement.
+    if (desktop) {
+      await browser.close();
+      browser = await chromium.launch({ headless: true, channel: 'chrome' });
+    }
     console.log('[performance-retention] starting mobile');
     mobileRegression = await runMobileRegression();
     await writeFile('output/verification/performance-retention/report-mobile.json', `${JSON.stringify(mobileRegression, null, 2)}\n`);

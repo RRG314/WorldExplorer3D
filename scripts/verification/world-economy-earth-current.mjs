@@ -12,7 +12,7 @@ const baseUrl = staticServer
 const outputDir = path.resolve('output/verification/world-economy-earth');
 await fs.mkdir(outputDir, { recursive: true });
 // Bound functional gameplay verification; performance budgets use their own harness.
-const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280'] });
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
 const failures = [];
 
 async function run() {

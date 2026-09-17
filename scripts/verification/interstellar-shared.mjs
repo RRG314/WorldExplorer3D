@@ -12,7 +12,7 @@ const baseUrl = `http://127.0.0.1:${server.port}`;
 const projectId = String(process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || 'we3d-staging-20260712');
 const functionsOrigin = `http://127.0.0.1:5001/${projectId}/us-central1`;
 const firebaseConfig = JSON.parse(await fs.readFile(path.join(root, 'config/firebase.staging.json'), 'utf8'));
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=768'] });
 const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const failures = [];
 

@@ -11,7 +11,7 @@ const baseUrl = `http://127.0.0.1:${server.port}`;
 const outputDir = path.join(root, 'output', 'verification', 'analytics-lifecycle');
 const stagingConfig = JSON.parse(await fs.readFile(path.join(root, 'config', 'firebase.staging.json'), 'utf8'));
 const safeConfig = Object.freeze({ ...stagingConfig, measurementId: 'G-WE3DLOCAL', appCheckSiteKey: '' });
-const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280'] });
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
 
 async function createContext(options) {
   const context = await browser.newContext(options);
