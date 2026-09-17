@@ -10,6 +10,7 @@ import {
   pointInMappedLandArea,
   pointInMappedWaterArea
 } from './far-field-mapped-context.js?v=20';
+import { buildFarBuildingInstanceBatches } from './far-building-instance-batches.js?v=1';
 import { resolveFarBuildingMassing } from './far-building-massing.js?v=2';
 import { applyFarBuildingFacadeDetail } from './far-building-facade-material.js?v=4';
 import { loadFarTerrainElevationWithParentFallback } from './far-field-elevation-loader.js?v=2';
@@ -683,23 +684,23 @@ function createFarFieldTerrainApi(deps = {}) {
       applyTerrainPortalMasksForContext(appCtx, appCtx.structureTerrainPortalDescriptors);
     }
     if (builtBuildings) {
-      const buildingMaterial = applyFarBuildingFacadeDetail(new THREE.MeshStandardMaterial({
+      const buildingMaterial = builtBuildings.geometry ? applyFarBuildingFacadeDetail(new THREE.MeshStandardMaterial({
         color: 0xffffff,
         vertexColors: true,
         roughness: 0.92,
         metalness: 0,
         side: THREE.DoubleSide,
         fog: true
-      }));
-      farContextMesh = builtBuildings.geometry
+      })) : null;
+      const buildingContext = builtBuildings.geometry
         ? new THREE.Mesh(builtBuildings.geometry, buildingMaterial)
         : new THREE.Group();
-      farContextMesh.name = 'FarMappedBuildingContext';
-      farContextMesh.renderOrder = 1;
-      farContextMesh.castShadow = false;
-      farContextMesh.receiveShadow = false;
-      farContextMesh.userData.isFarMappedContext = true;
-      farContextMesh.userData.renderProvenance = {
+      buildingContext.name = 'FarMappedBuildingContext';
+      buildingContext.renderOrder = 1;
+      buildingContext.castShadow = false;
+      buildingContext.receiveShadow = false;
+      buildingContext.userData.isFarMappedContext = true;
+      buildingContext.userData.renderProvenance = {
         version: 1,
         profile: 'far-mapped-building-massing',
         provider: 'openstreetmap',
@@ -710,8 +711,6 @@ function createFarFieldTerrainApi(deps = {}) {
         fallback: false
       };
       if (builtBuildings.instances.length > 0) {
-        const instanceGeometry = new THREE.BoxGeometry(1, 1, 1);
-        instanceGeometry.translate(0, 0.5, 0);
         const instanceMaterial = applyFarBuildingFacadeDetail(new THREE.MeshStandardMaterial({
           color: 0xffffff,
           roughness: 0.94,
@@ -719,38 +718,22 @@ function createFarFieldTerrainApi(deps = {}) {
           side: THREE.FrontSide,
           fog: true
         }));
-        const instanceMesh = new THREE.InstancedMesh(
-          instanceGeometry,
-          instanceMaterial,
-          builtBuildings.instances.length
-        );
-        const matrix = new THREE.Matrix4();
-        const position = new THREE.Vector3();
-        const rotation = new THREE.Quaternion();
-        const scale = new THREE.Vector3();
-        const color = new THREE.Color();
-        const up = new THREE.Vector3(0, 1, 0);
-        for (let index = 0; index < builtBuildings.instances.length; index += 1) {
-          const building = builtBuildings.instances[index];
-          position.set(building.x, building.baseY, building.z);
-          rotation.setFromAxisAngle(up, building.rotationY);
-          scale.set(building.width, building.height, building.depth);
-          matrix.compose(position, rotation, scale);
-          instanceMesh.setMatrixAt(index, matrix);
-          color.setRGB(building.color[0], building.color[1], building.color[2]);
-          instanceMesh.setColorAt(index, color);
-          if ((index + 1) % 12000 === 0) await yieldToMainThread();
+        try {
+          const batches = await buildFarBuildingInstanceBatches(
+            THREE, builtBuildings.instances, instanceMaterial, { yieldControl: yieldToMainThread }
+          );
+          for (const batch of batches) buildingContext.add(batch);
+        } catch (error) {
+          disposeFarFieldMesh(buildingContext);
+          instanceMaterial.dispose();
+          throw error;
         }
-        instanceMesh.instanceMatrix.needsUpdate = true;
-        if (instanceMesh.instanceColor) instanceMesh.instanceColor.needsUpdate = true;
-        instanceMesh.name = 'FarMappedBuildingInstances';
-        instanceMesh.renderOrder = 1;
-        instanceMesh.castShadow = false;
-        instanceMesh.receiveShadow = false;
-        instanceMesh.frustumCulled = false;
-        instanceMesh.userData.isFarMappedBuildingInstances = true;
-        farContextMesh.add(instanceMesh);
       }
+      if (requestGeneration !== generation) {
+        disposeFarFieldMesh(buildingContext);
+        return;
+      }
+      farContextMesh = buildingContext;
       appCtx.terrainGroup.add(farContextMesh);
     }
     farWaterMesh = createFarWaterMesh(builtWater, FAR_CONTEXT_HALF_EXTENT_METERS);

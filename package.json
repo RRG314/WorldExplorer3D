@@ -197,7 +197,8 @@
     "geotiff": "^3.0.5",
     "manifold-3d": "3.5.3",
     "meshoptimizer": "^1.2.0",
-    "playwright": "^1.61.0"
+    "playwright": "^1.61.0",
+    "three": "0.128.0"
   },
   "dependencies": {
     "qrcode": "1.5.4"
