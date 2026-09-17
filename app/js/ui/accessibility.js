@@ -20,8 +20,9 @@ const FOCUSABLE = [
 function visible(element) {
   if (!(element instanceof HTMLElement) || element.hidden || element.getAttribute('aria-hidden') === 'true') return false;
   const style = getComputedStyle(element);
+  if (style.display === 'none' || style.visibility === 'hidden') return false;
   const rect = element.getBoundingClientRect();
-  return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+  return rect.width > 0 && rect.height > 0;
 }
 
 function loadSettings() {
@@ -61,8 +62,12 @@ function initAccessibility() {
   let activeModal = null;
   let restoreFocus = null;
 
-  const upgradeSemantics = () => {
-    document.querySelectorAll('.floatItem, .mode, .loc, #ctrlHeader').forEach((element) => {
+  const within = (scope, selector) => [
+    ...(scope instanceof HTMLElement && scope.matches(selector) ? [scope] : []),
+    ...scope.querySelectorAll(selector)
+  ];
+  const upgradeSemantics = (scope = document) => {
+    within(scope, '.floatItem, .mode, .loc, #ctrlHeader').forEach((element) => {
       if (!(element instanceof HTMLElement) || element.dataset.we3dKeyboardButton === 'true') return;
       element.dataset.we3dKeyboardButton = 'true';
       element.setAttribute('role', 'button');
@@ -73,7 +78,7 @@ function initAccessibility() {
         element.click();
       });
     });
-    document.querySelectorAll('.floatItem, .mode, .loc').forEach((element) => {
+    within(scope, '.floatItem, .mode, .loc').forEach((element) => {
       element.setAttribute('aria-pressed', String(element.classList.contains('on') || element.classList.contains('sel')));
     });
     const controlsHeader = document.getElementById('ctrlHeader');
@@ -91,7 +96,7 @@ function initAccessibility() {
       element.setAttribute('role', 'status');
       element.setAttribute('aria-live', 'polite');
     });
-    document.querySelectorAll('canvas').forEach((canvas) => {
+    within(scope, 'canvas').forEach((canvas) => {
       if (canvas.hasAttribute('aria-label') || canvas.getAttribute('aria-hidden') === 'true') return;
       canvas.setAttribute('role', 'img');
       canvas.setAttribute('aria-label', canvas.id === 'largeMapCanvas' ? 'Interactive world map' : 'Interactive 3D world view');
@@ -137,11 +142,16 @@ function initAccessibility() {
     apply();
   });
 
-  const modalCandidates = () => [...document.querySelectorAll([
-    'dialog[open]', '[role="dialog"][aria-modal="true"]',
-    '#globeHubOverlay:not([hidden])', '#roomPanelModal.show',
-    '#pauseScreen.show', '#resultScreen.show', '#caughtScreen.show'
-  ].join(','))].filter(visible);
+  // Cache candidate elements, not visibility: visibility is reevaluated only
+  // when a candidate, its ancestors, or its contents actually change.
+  const modalSelector = 'dialog, [role="dialog"][aria-modal="true"], #globeHubOverlay, #roomPanelModal, #pauseScreen, #resultScreen, #caughtScreen';
+  const modalElements = new Set(document.querySelectorAll(modalSelector));
+  const modalCandidates = () => [...modalElements].filter((element) => {
+    if (!element.isConnected) return false;
+    if (element.matches('dialog') && !element.open) return false;
+    if (element.matches('#roomPanelModal, #pauseScreen, #resultScreen, #caughtScreen') && !element.classList.contains('show')) return false;
+    return visible(element);
+  }).sort((a, b) => a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1);
 
   const syncModal = () => {
     const next = modalCandidates().at(-1) || null;
@@ -189,15 +199,51 @@ function initAccessibility() {
     (first || activeModal).focus?.({ preventScroll: true });
   });
 
-  const observer = new MutationObserver(() => {
-    upgradeSemantics();
-    syncModal();
+  const observer = new MutationObserver((records) => {
+    let modalChanged = false;
+    for (const record of records) {
+      const target = record.target;
+      if (!(target instanceof HTMLElement)) continue;
+      if (record.type === 'childList') {
+        for (const node of record.addedNodes) {
+          if (!(node instanceof HTMLElement)) continue;
+          upgradeSemantics(node);
+          for (const modal of within(node, modalSelector)) {
+            modalElements.add(modal);
+            modalChanged = true;
+          }
+        }
+      } else {
+        // Class changes need only update the affected toggle, not every
+        // control in the application (HUD text/classes change every frame).
+        if (target.matches('.floatItem, .mode, .loc, #ctrlHeader') && target.dataset.we3dKeyboardButton !== 'true') upgradeSemantics(target);
+        if (target.matches('.floatItem, .mode, .loc')) {
+          target.setAttribute('aria-pressed', String(target.classList.contains('on') || target.classList.contains('sel')));
+        }
+        if (target.id === 'ctrlContent') {
+          document.getElementById('ctrlHeader')?.setAttribute('aria-expanded', String(!target.classList.contains('hidden')));
+        }
+        if (target.matches(modalSelector)) {
+          modalElements.add(target);
+          modalChanged = true;
+        } else if (modalElements.delete(target)) modalChanged = true;
+      }
+      for (const modal of modalElements) {
+        if (!modal.isConnected) {
+          modalElements.delete(modal);
+          modalChanged = true;
+        } else if (target === modal || target.contains(modal) || modal.contains(target)) {
+          modalChanged = true;
+        }
+      }
+    }
+    if (modalChanged) syncModal();
   });
   observer.observe(document.body, {
     subtree: true,
     childList: true,
     attributes: true,
-    attributeFilter: ['class', 'hidden', 'open', 'aria-hidden']
+    attributeFilter: ['class', 'hidden', 'open', 'aria-hidden', 'style', 'role', 'aria-modal']
   });
   apply({ persist: false, announce: false });
   upgradeSemantics();

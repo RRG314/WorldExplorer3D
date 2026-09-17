@@ -70,7 +70,7 @@
     "verify:mobile-controls": "node scripts/verification/mobile-controls.mjs",
     "verify:mobile-load": "node scripts/verification/mobile-load.mjs",
     "verify:player-reported-blockers": "node scripts/verification/player-reported-blockers.mjs",
-    "verify:accessibility-release": "node scripts/verification/accessibility-release.mjs",
+    "verify:accessibility-release": "node scripts/verification/accessibility-mutations-current.mjs && node scripts/verification/accessibility-release.mjs",
     "verify:release-identity": "node scripts/verification/release-identity.mjs",
     "verify:release-licensing": "node --test tests/release-licensing-current.test.mjs",
     "verify:cross-platform": "node scripts/verification/cross-platform-browser-current.mjs",
