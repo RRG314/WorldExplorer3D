@@ -77,13 +77,19 @@ export function initFirebase() {
   const auth = getAuth(app);
   const db = getFirestore(app);
   const storage = getStorage(app);
-  if (!cachedAppCheck && config.appCheckSiteKey) {
+  const emulator = readEmulatorConfig();
+  const loopbackHosts = ['localhost', '127.0.0.1', '[::1]'];
+  const localEmulator = emulator && loopbackHosts.includes(emulator.host) &&
+    loopbackHosts.includes(globalThis.location?.hostname) &&
+    ['http:', 'https:'].includes(globalThis.location?.protocol);
+  // Local emulators do not validate App Check. Avoid starting remote CAPTCHA
+  // frames for them; hosted staging/production retain ordinary attestation.
+  if (!localEmulator && !cachedAppCheck && config.appCheckSiteKey) {
     cachedAppCheck = initializeAppCheck(app, {
       provider: new ReCaptchaEnterpriseProvider(config.appCheckSiteKey),
       isTokenAutoRefreshEnabled: true
     });
   }
-  const emulator = readEmulatorConfig();
   if (emulator) {
     connectAuthEmulator(auth, `http://${emulator.host}:${emulator.authPort}`, { disableWarnings: true });
     connectFirestoreEmulator(db, emulator.host, emulator.firestorePort);
