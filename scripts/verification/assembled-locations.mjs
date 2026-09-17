@@ -90,7 +90,12 @@ try {
   for (const location of locations) {
     const locationStartedAt = performance.now();
     console.error(`[assembled-locations] START ${location.id}`);
-    browserServer = await chromium.launchServer({ headless: true, channel: 'chrome' });
+    browserServer = await chromium.launchServer({
+      headless: true, channel: 'chrome',
+      // Bound correctness-test allocation on the 8 GiB workstation. This does
+      // not change world budgets or stand in for the separate performance gate.
+      args: ['--js-flags=--max-old-space-size=1536']
+    });
     browser = await chromium.connect(browserServer.wsEndpoint());
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     const page = await context.newPage();
@@ -445,6 +450,7 @@ const report = {
   generatedAt: new Date().toISOString(),
   contract: 'complete-assembled-gameplay-representative-location-matrix',
   captureEnabled: capture,
+  browserBudget: { engine: 'installed-chrome', maxOldSpaceMiB: 1536 },
   forceTransportFallback,
   cleanupError,
   results

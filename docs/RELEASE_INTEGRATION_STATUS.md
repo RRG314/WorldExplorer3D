@@ -168,3 +168,10 @@ exhaustive versus 10.9 ms indexed; this is a subsystem result, not a whole-world
 startup claim. The road precision diagnostic also accounts for both input-grid
 and computed-intersection rounding before Float32 upload; physical collision
 surfaces remain unchanged by that diagnostic allowance.
+
+Assembled-world correctness runs use a 1,536 MiB Chrome old-space cap on this
+8 GiB workstation, alongside the unchanged 3 GiB aggregate process-RSS guard.
+World content and assertions are unchanged; the report records this browser
+budget. A Golden Gate diagnostic passed all 27 checks at 2,568 MiB peak owned
+RSS after an uncapped run crossed the guard. Correctness under this heap cap is
+not a substitute for the separate performance or physical-device gates.
