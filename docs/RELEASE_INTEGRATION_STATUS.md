@@ -166,6 +166,17 @@ the original street, old app and Oeis HEAD/status records. The live manifest sti
 identifies production commit db62593ba377. Evidence is retained under
 `output/release-integration/live-checks/`.
 
+Walking field verification exposed a lost invitation: the transient Track Lead
+notice expires or yields to a nearby action, and opening Today also cleared the
+director's offered lead. Today now provides a persistent Track Lead control;
+menus pause lead generation while retaining a valid existing invitation. Claims,
+capability changes, distance, other active tasks and leaving Earth walking still
+invalidate it. Ambient notices stay suppressed over pause/map/fishing screens.
+The browser regression failed on the old artifact at the missing persistent
+control, and captured the lead cleared on opening Today. Two new director
+regressions failed before the repair; all four now pass, with 494 current
+contracts passing. Complete rebuilt free-roam/GPS browser acceptance follows.
+
 London ground accuracy remains an unresolved release-quality question. Comparing
 the actual production and candidate artifacts found 191 changed grid samples
 (maximum 16.74 m). Seven independent Environment Agency 1 m DTM point queries

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
@@ -24,9 +24,10 @@ async function instrument(page) {
 
 async function waitForWorld(page) {
   await page.waitForFunction(() => {
+    if (document.getElementById('loading')?.classList.contains('show')) return false;
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.();
     return state?.gameStarted === true && state.worldLoading === false && state.worldDiscovery?.active === true;
-  }, null, { timeout: 240_000 });
+  }, null, { timeout: 240_000, polling: 500 });
 }
 
 async function inspectDirectPromptPlacement(page) {
@@ -181,7 +182,25 @@ async function waitForLead(page, expectedMode, movePastDirectInteraction) {
 }
 
 async function acceptLead(page, lead) {
-  await page.locator('#discoveryContextOpenBtn').click();
+  // A short notice can expire or yield to a closer world action before a
+  // person taps it. Verify the persistent normal-input route after expiry.
+  await page.waitForTimeout(8000);
+  assert.equal(await page.locator('#discoveryContextPrompt.show').isVisible(), false,
+    'The transient field lead should expire while the underlying lead remains available.');
+  await page.locator('#exploreBtn').click();
+  await page.locator('#fWorldDiscovery').click();
+  await page.locator('#discoveryPanel.show').waitFor({ state: 'visible' });
+  await page.locator('[data-discovery-tab="today"]').click();
+  const persistentLead = page.locator('#discoveryEncounterLeadBtn');
+  await persistentLead.waitFor({ state: 'visible', timeout: 10000 });
+  await persistentLead.scrollIntoViewIfNeeded();
+  const leadBox = await persistentLead.boundingBox();
+  assert.ok(leadBox && leadBox.height >= 44 && leadBox.x >= 0 && leadBox.x + leadBox.width <= 390,
+    'Persistent Track Lead must provide a usable phone-sized target without horizontal overflow.');
+  const currentLead = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery?.encounterLead);
+  assert.equal(currentLead?.slotId, lead.slotId, 'Today must retain the same offered lead.');
+  await page.screenshot({ path: `output/release-evidence/current/baltimore-ecology-${lead.mode}-persistent-lead-mobile.png` });
+  await persistentLead.click();
   try {
     await page.waitForFunction((slotId) => {
       const discovery = globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery;
@@ -195,6 +214,8 @@ async function acceptLead(page, lead) {
     });
     throw new Error(`Encounter lead did not start: ${JSON.stringify({ requested: lead, diagnostics })}`, { cause: error });
   }
+  assert.equal(await page.locator('#discoveryEncounterLeadBtn').evaluate(button => button.hidden), true,
+    'The persistent invitation must hide after its lead is accepted.');
   return page.evaluate(() => {
     const discovery = globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery;
     const quick = document.getElementById('discoveryQuickToolBtn');
@@ -344,6 +365,16 @@ try {
   };
   console.log(JSON.stringify(output, null, 2));
   assert.equal(report.ok, true, 'Walking encounter journey failed.');
+} catch (error) {
+  const pages = browser.contexts().flatMap(context => context.pages());
+  const states = [];
+  for (const page of pages) {
+    states.push(await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.() || null).catch(() => null));
+  }
+  await writeFile('output/release-evidence/current/walking-field-failure.json', JSON.stringify({
+    error: String(error?.stack || error), states, browserErrors, localFailures
+  }, null, 2));
+  throw error;
 } finally {
   await browser.close();
   await server?.close();

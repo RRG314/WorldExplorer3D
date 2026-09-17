@@ -246,6 +246,7 @@ function createDiscoveryUi(state) {
   const elements = {
     panel: byId('discoveryPanel'), close: byId('discoveryCloseBtn'), help: byId('discoveryHelpBtn'), quick: byId('discoveryQuickToolBtn'), menu: byId('fWorldDiscovery'),
     todayBackpack: byId('discoveryOpenBackpackTodayBtn'),
+    encounterLead: byId('discoveryEncounterLeadBtn'), encounterLeadDetail: byId('discoveryEncounterLeadDetail'),
     title: byId('discoveryPanelTitle'), actions: byId('discoveryActionList'), quickLabel: byId('discoveryQuickToolBtn')?.querySelector('strong'),
     quickSignal: byId('discoveryQuickSignal'), prompt: byId('discoveryContextPrompt'), promptText: byId('discoveryContextText'),
     promptOpen: byId('discoveryContextOpenBtn'), phase: byId('discoveryPhase'), bearing: byId('discoveryBearing'),
@@ -656,6 +657,9 @@ function createDiscoveryUi(state) {
     if (state.encounterLead?.available) void state.startEncounterLead?.();
     else setOpen(true);
   });
+  listen(elements.encounterLead, 'click', () => {
+    if (state.encounterLead?.available) void state.startEncounterLead?.();
+  });
   listen(elements.close, 'click', () => setOpen(false));
   listen(elements.help, 'click', () => void state.showSectionTutorial?.(activeTab === 'today' ? 'workspace' : activeTab, true));
   listen(elements.guideHelpButton, 'click', () => {
@@ -783,12 +787,23 @@ function createDiscoveryUi(state) {
     const operationActive = !!snapshot?.active && !['complete', 'collected', 'recorded', 'left'].includes(snapshot?.phase);
     elements.quick?.classList.toggle('show', state.active && !open && operationActive && (detectorAvailable || activityId !== 'metal-detect'));
     const encounterLead = state.encounterLead || null;
+    // Keep the same lead reachable in Today after its transient notice expires
+    // or yields to a nearby world interaction. Do not replace an active task.
+    if (elements.encounterLead) {
+      const available = encounterLead?.available === true && !operationActive;
+      elements.encounterLead.hidden = !available;
+      elements.encounterLead.disabled = !available;
+      if (elements.encounterLeadDetail) elements.encounterLeadDetail.textContent = available
+        ? `${encounterLead.leadLabel} · ${Math.ceil(Number(encounterLead.distanceMeters || 0))} m ${compactCompassDirection(encounterLead.bearingDegrees)} · field lead`
+        : '';
+    }
     // A world-space action within reach (observe wildlife, enter a vehicle,
     // inspect an object) is more urgent than a broader walking lead. The lead
     // remains available and returns as soon as the direct interaction clears.
     const directInteraction = state.appCtx.resolvePrimaryContextInteraction?.() || null;
     const interiorInteraction = document.getElementById('interiorPrompt')?.classList.contains('show') === true;
-    const encounterPromptEligible = !open && !operationActive && !directInteraction && !interiorInteraction && encounterLead?.available === true;
+    const ambientBlocked = state.appCtx.paused || state.appCtx.showLargeMap || state.appCtx.getFishingSnapshot?.().open === true;
+    const encounterPromptEligible = !open && !ambientBlocked && !operationActive && !directInteraction && !interiorInteraction && encounterLead?.available === true;
     const encounterRevision = Number(encounterLead?.revision);
     const promptNow = typeof performance !== 'undefined' ? performance.now() : Date.now();
     if (!encounterLead?.available) {

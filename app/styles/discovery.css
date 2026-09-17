@@ -69,6 +69,7 @@ body:has(#urbanVehiclePrompt.show) #discoveryContextPrompt,body:has(#interiorPro
   .discoveryModeNote b{font-size:8px}
   .discoveryBackpackEntry{width:100%;min-height:48px;display:grid;grid-template-columns:28px minmax(0,1fr) auto;align-items:center;gap:9px;margin:10px 0 12px;padding:8px 11px;border:1px solid rgba(87,151,224,.48);background:linear-gradient(90deg,rgba(45,125,255,.16),rgba(11,27,40,.82));color:#e9f4ff;text-align:left;cursor:pointer}
   .discoveryBackpackEntry:hover,.discoveryBackpackEntry:focus-visible{border-color:#6aaeff;background:linear-gradient(90deg,rgba(45,125,255,.25),rgba(11,27,40,.9))}
+  .discoveryEncounterLead{grid-template-columns:26px minmax(0,1fr)}.discoveryEncounterLead>small{grid-column:2}.discoveryEncounterLead[hidden]{display:none}
   .discoveryBackpackEntry>span{color:#72aff5;font-size:18px;text-align:center}.discoveryBackpackEntry>strong{font:700 10px Orbitron,sans-serif;text-transform:uppercase}.discoveryBackpackEntry>small{color:#8da3b0;font:600 8px Orbitron,sans-serif;text-transform:uppercase}
   .discoverySectionHead{height:29px;font-size:10px}
   .discoveryActionChip{min-height:50px;padding-block:9px;font-size:11px}

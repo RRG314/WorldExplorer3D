@@ -6,6 +6,7 @@ import process from 'node:process';
 // an Architecture Map ownership boundary.
 const tests = [
   'tests/walking-pose-restoration-current.test.mjs',
+  'tests/walking-lead-persistence-current.test.mjs',
   'tests/interior-spawn-clearance-current.test.mjs',
   'tests/release-environment-current.test.mjs',
   'tests/poi-building-association-current.test.mjs',
