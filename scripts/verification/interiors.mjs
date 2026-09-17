@@ -16,6 +16,11 @@ let page = await context.newPage();
 const browserErrors = [];
 const browserConsole = [];
 const localFailures = [];
+const progress = { stage: 'desktop-load' };
+function markStage(stage, evidence = {}) {
+  Object.assign(progress, evidence, { stage });
+  console.log(`[interiors] ${stage}`);
+}
 function bindPageEvidence(targetPage) {
   targetPage.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   targetPage.on('console', (message) => {
@@ -29,7 +34,7 @@ bindPageEvidence(page);
 
 const params = new URLSearchParams({
   loc: 'custom', lat: '39.28378', lon: '-76.61244', lname: 'Baltimore Visitor Center',
-  launch: 'earth', gm: 'free', mode: 'walk'
+  launch: 'earth', gm: 'free', mode: 'walking'
 });
 
 async function waitForWorld() {
@@ -40,10 +45,11 @@ async function waitForWorld() {
     await page.locator('#globeSelectorStartBtn').click();
   }
   await page.waitForFunction(() => {
+    if (document.getElementById('loading')?.classList.contains('show')) return false;
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return diagnostics.gameStarted === true && diagnostics.worldLoading === false && diagnostics.modes?.walking === true &&
       Number(diagnostics.worldCounts?.buildings || 0) > 0;
-  }, null, { timeout: 300_000 });
+  }, null, { timeout: 300_000, polling: 500 });
   await page.waitForTimeout(2_500);
 }
 
@@ -494,6 +500,7 @@ try {
   assert.ok(target, 'No published enterable building support was available within 650 meters.');
 
   const approach = await walkToInteriorPrompt(target);
+  markStage('desktop-approach', { target, approach });
   assert.equal(
     approach.reached,
     true,
@@ -523,6 +530,7 @@ try {
   }
   await page.waitForTimeout(1_000);
   const inside = await interiorOwnershipSnapshot(target.sourceBuildingId);
+  markStage('desktop-entered', { exteriorBefore, inside });
   await mkdir('output/release-evidence/current', { recursive: true });
   await page.screenshot({ path: 'output/release-evidence/current/interior-entered-desktop.png', fullPage: true });
 
@@ -569,6 +577,7 @@ try {
   await page.keyboard.press('KeyE');
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().interior?.active === false, null, { timeout: 10_000 });
   const afterExit = await interiorOwnershipSnapshot(target.sourceBuildingId);
+  markStage('desktop-complete', { stairTraversal, elevatorArrival, elevatorUpperArrival, wallContact, wallRecovery, afterExit });
   await page.screenshot({ path: 'output/release-evidence/current/interior-exited-desktop.png', fullPage: true });
 
   const mobileParams = new URLSearchParams(params);
@@ -582,6 +591,10 @@ try {
   bindPageEvidence(page);
   await page.goto(`${baseUrl}/app/?${mobileParams}`, { waitUntil: 'load', timeout: 120_000 });
   await waitForWorld();
+  const mobileRestored = await interiorOwnershipSnapshot(target.sourceBuildingId);
+  markStage('mobile-loaded', { mobileRestored });
+  assert.ok(Math.hypot(mobileRestored.walker.x - afterExit.walker.x, mobileRestored.walker.z - afterExit.walker.z) < 0.6,
+    `Walking share link did not restore the exterior pose: ${JSON.stringify({ expected: afterExit.walker, actual: mobileRestored.walker })}`);
   await page.waitForFunction(() => {
     const prompt = document.querySelector('#interiorPrompt');
     return prompt?.classList.contains('show') === true && /enter/i.test(prompt.textContent || '');
@@ -691,6 +704,7 @@ try {
     contract: 'published-multifloor-building-keyboard-touch-lifecycle-v2',
     failedAt: new Date().toISOString(),
     error: String(error?.stack || error),
+    progress,
     diagnostics: await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.() || null).catch(() => null),
     browserErrors,
     browserConsole,

@@ -99,6 +99,26 @@ and data changes, and a separate authorized promotion.
 
 ## Repairs verified during authorized execution
 
+The September 17 continuation found another current defect in a real Baltimore
+interior journey: entry placed the walker against a generated partition and
+subsequent normal input could rotate but not move. The five-point spawn clearance
+test missed thin walls between its samples. Clearance now measures the complete
+0.35 m walker footprint against polygon edges and refuses an unsafe fallback;
+failed generated construction releases its allocated geometry/materials. Three
+regression cases, including previously failing thin/diagonal walls, now pass.
+The source check and all 489 current contracts pass. A rebuilt full interior
+journey is still required; the separate mobile pose-restoration failure remains
+open until that journey reaches it.
+
+Terrain-boundary diagnostics passed with temporary registered staging App Check
+debug attestation (70.5 seconds, 2518 MiB peak). The original localhost run correctly
+failed on App Check/HTTP 401. The credential was revoked and its private file
+removed after testing. The verifier supports `WE3D_STAGING_APP_CHECK_FILE` only
+for loopback staging, labels debug attestation in its report, and preserves failed
+geometry evidence. This does not certify production reCAPTCHA attestation or
+change application enforcement. These diagnostics are not final clean-artifact
+release receipts.
+
 The actual packaged Baltimore journey passed all 29 assertions at `484e578a`.
 The full matrix then stopped at mobile-load when its shared Chrome process crossed
 our 3 GiB test-process guard. Giving each mobile cold-start journey its own browser

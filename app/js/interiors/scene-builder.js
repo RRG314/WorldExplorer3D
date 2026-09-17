@@ -26,6 +26,7 @@ import {
 import {
   constrainPointToFootprint,
   findInteriorAnchor,
+  polygonEdgeClearance,
   prepareInteriorFeaturePlan
 } from "./planner.js?v=6";
 import {
@@ -39,30 +40,26 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-function pointInsideCollider(x, z, collider) {
-  if (!collider || collider.collisionDisabled) return false;
-  if (x < collider.minX || x > collider.maxX || z < collider.minZ || z > collider.maxZ) return false;
-  return Array.isArray(collider.pts) && collider.pts.length >= 3
-    ? pointInPolygonSafe(x, z, collider.pts)
-    : true;
-}
-
-function interiorSpawnIsClear(point, footprint, colliders) {
+export function interiorSpawnIsClear(point, footprint, colliders) {
   if (!pointInPolygonSafe(point.x, point.z, footprint)) return false;
-  const radius = 0.34;
-  const samples = [
-    [0, 0],
-    [radius, 0],
-    [-radius, 0],
-    [0, radius],
-    [0, -radius]
-  ];
-  return !samples.some(([dx, dz]) =>
-    colliders.some((collider) => pointInsideCollider(point.x + dx, point.z + dz, collider))
-  );
+  const radius = 0.35;
+  // Discrete probes can step completely across a thin wall. Compare the full
+  // walker disc against every edge, as the movement collision authority does.
+  if (polygonEdgeClearance(point, footprint) <= radius) return false;
+  return !colliders.some((collider) => {
+    if (!collider || collider.collisionDisabled) return false;
+    if (point.x < collider.minX - radius || point.x > collider.maxX + radius ||
+        point.z < collider.minZ - radius || point.z > collider.maxZ + radius) return false;
+    if (Array.isArray(collider.pts) && collider.pts.length >= 3) {
+      return pointInPolygonSafe(point.x, point.z, collider.pts) || polygonEdgeClearance(point, collider.pts) <= radius;
+    }
+    const x = Math.max(collider.minX, Math.min(point.x, collider.maxX));
+    const z = Math.max(collider.minZ, Math.min(point.z, collider.maxZ));
+    return Math.hypot(point.x - x, point.z - z) <= radius;
+  });
 }
 
-function chooseClearInteriorSpawn(desired, center, footprint, colliders) {
+export function chooseClearInteriorSpawn(desired, center, footprint, colliders) {
   const candidates = [];
   const push = (x, z) => candidates.push({ x, z });
   const dx = center.x - desired.x;
@@ -91,7 +88,18 @@ function chooseClearInteriorSpawn(desired, center, footprint, colliders) {
     };
     if (interiorSpawnIsClear(forward, footprint, colliders)) return candidate;
   }
-  return center;
+  return null;
+}
+
+function disposeFailedConstruction(group) {
+  const resources = new Set();
+  group.traverse((object) => {
+    if (object.geometry) resources.add(object.geometry);
+    for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+      if (material) resources.add(material);
+    }
+  });
+  for (const resource of resources) resource.dispose?.();
 }
 
 function pointDistanceToSegment(point, start, end) {
@@ -428,6 +436,10 @@ function buildInteriorLevelScene(definition, options = {}) {
     y: floorY + INTERIOR_FLOOR_OFFSET
   };
   const clearEntryPoint = chooseClearInteriorSpawn(surfaceEntryPoint, centroid, shellFootprint, dynamicColliders);
+  if (!clearEntryPoint) {
+    disposeFailedConstruction(group);
+    throw new Error('No clear entrance position fits in this interior.');
+  }
   const resolvedEntryPoint = {
     x: clearEntryPoint.x,
     z: clearEntryPoint.z,
@@ -730,21 +742,27 @@ export function buildInteriorScene(definition, options = {}) {
   root.name = `interior:${definition.key}:published-floors`;
   root.userData.activeFloorId = interiorFloorIdentity(floorPlan, activeLevel).id;
   const connector = floorPlan.connectorEligible ? connectorLayout(footprint, polygonCentroid(footprint) || { x: 0, z: 0 }) : null;
-  const levelStates = loadedLevels.map((level) => {
-    const state = buildInteriorLevelScene(floorDefinition(definition, level), {
-      suppressLights: level !== activeLevel,
-      suppressPartitions: options.curatedHome === true,
-      connectorLayout: connector,
-      storyHeight: floorPlan.storyHeight,
-      floorBaseY: Number.isFinite(options.floorBaseY) ? Number(options.floorBaseY) : undefined
+  let levelStates;
+  try {
+    levelStates = loadedLevels.map((level) => {
+      const state = buildInteriorLevelScene(floorDefinition(definition, level), {
+        suppressLights: level !== activeLevel,
+        suppressPartitions: options.curatedHome === true,
+        connectorLayout: connector,
+        storyHeight: floorPlan.storyHeight,
+        floorBaseY: Number.isFinite(options.floorBaseY) ? Number(options.floorBaseY) : undefined
+      });
+      state.group.name = `interior:${definition.key}:floor:${level}`;
+      state.group.userData.floorId = interiorFloorIdentity(floorPlan, level).id;
+      state.walkSurfaces.forEach((surface) => { surface.floorLevel = level; });
+      state.dynamicColliders.forEach((collider) => { collider.floorLevel = level; });
+      root.add(state.group);
+      return { level, ...state };
     });
-    state.group.name = `interior:${definition.key}:floor:${level}`;
-    state.group.userData.floorId = interiorFloorIdentity(floorPlan, level).id;
-    state.walkSurfaces.forEach((surface) => { surface.floorLevel = level; });
-    state.dynamicColliders.forEach((collider) => { collider.floorLevel = level; });
-    root.add(state.group);
-    return { level, ...state };
-  });
+  } catch (error) {
+    disposeFailedConstruction(root);
+    throw error;
+  }
   const activeState = levelStates.find((state) => state.level === activeLevel) || levelStates[0];
   const walkSurfaces = levelStates.flatMap((state) => state.walkSurfaces);
   const dynamicColliders = levelStates.flatMap((state) => state.dynamicColliders);

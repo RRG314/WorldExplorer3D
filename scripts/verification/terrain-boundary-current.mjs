@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 
 const baseUrl = String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4192').replace(/\/$/, '');
 const evidenceDir = path.resolve('output/release-evidence/current/terrain-boundary');
@@ -9,6 +10,7 @@ await fs.mkdir(evidenceDir, { recursive: true });
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 const failures = [];
+const report = { ok: false, samples: [], surfaceChain: null, failures };
 const optionalExternalFailures = [];
 const isOptionalExternalUrl = (url) => /(?:overpass-api\.de|overpass\.private\.coffee|google-analytics\.com)\//i.test(String(url || ''));
 page.on('pageerror', (error) => failures.push(`pageerror: ${error.stack || error}`));
@@ -25,6 +27,7 @@ page.on('requestfailed', (request) => {
 });
 
 try {
+  report.attestation = await configureStagingAppCheck(page, baseUrl);
   const params = new URLSearchParams({
     loc: 'custom', lat: '39.6612', lon: '-76.8847', lname: 'Manchester Maryland',
     launch: 'earth', gm: 'free', mode: 'walk', terrainBoundary: String(Date.now())
@@ -34,9 +37,10 @@ try {
   await page.waitForFunction(() => document.getElementById('globeSelectorStartBtn')?.disabled === false, null, { timeout: 120_000 });
   await page.locator('#globeSelectorStartBtn').click();
   await page.waitForFunction(() => {
+    if (document.getElementById('loading')?.classList.contains('show')) return false;
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return state.gameStarted === true && state.worldLoading === false && state.livingWorld?.active === true;
-  }, null, { timeout: 360_000 });
+  }, null, { timeout: 360_000, polling: 500 });
 
   const samples = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
@@ -53,6 +57,7 @@ try {
       };
     });
   });
+  report.samples = samples;
   const farOwned = samples.filter((sample) => Number.isFinite(sample.far));
   assert.ok(farOwned.length >= 3, JSON.stringify(samples));
   assert.ok(farOwned.every((sample) => Math.abs(sample.renderedMinusFar) <= 0.01), JSON.stringify(samples));
@@ -77,6 +82,7 @@ try {
   await page.waitForTimeout(500);
 
   const state = await page.evaluate(() => JSON.parse(globalThis.render_game_to_text?.() || '{}'));
+  report.surfaceChain = state.surfaceChain;
   assert.equal(state.surfaceChain?.actor?.mode, 'drive');
   assert.ok(Number(state.surfaceChain?.actor?.vehicleContact?.supportSampleCount || 0) >= 1, JSON.stringify(state.surfaceChain));
   assert.ok(Number(state.surfaceChain?.actor?.vehicleContact?.chassisClearance) >= -0.002, JSON.stringify(state.surfaceChain));
@@ -85,9 +91,17 @@ try {
   ) <= 0.02, JSON.stringify(state.surfaceChain));
   assert.deepEqual(failures, []);
   await page.screenshot({ path: path.join(evidenceDir, 'manchester-car-over-boundary.png'), fullPage: false });
-  const report = { ok: true, samples, surfaceChain: state.surfaceChain, failures, optionalExternalFailures };
-  await fs.writeFile(path.join(evidenceDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
+  report.ok = true;
   console.log(JSON.stringify(report, null, 2));
+} catch (error) {
+  report.error = String(error?.stack || error);
+  await page.screenshot({ path: path.join(evidenceDir, 'failure.png'), timeout: 10_000 }).catch(() => {});
+  throw error;
 } finally {
-  await browser.close();
+  report.optionalExternalFailures = optionalExternalFailures;
+  try {
+    await fs.writeFile(path.join(evidenceDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
+  } finally {
+    await browser.close();
+  }
 }
