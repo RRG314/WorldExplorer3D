@@ -1,3 +1,4 @@
+import { setDomText, setDomAttribute, setDomHidden, setDomClass } from './ui/dom-state.js?v=1';
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 import { updateNightLighting } from "./engine/night-lighting.js?v=8";
 import { updateStableDirectionalShadow } from "./engine/shadow-policy.js?v=2";
@@ -142,8 +143,8 @@ function clampText(value, maxLen = 64) {
 function setHudUnitLabels(unitLabel, limitLabel) {
   const speedUnitEl = document.getElementById('speedUnitLabel');
   const limitLabelEl = document.getElementById('limitLabel');
-  if (speedUnitEl) speedUnitEl.textContent = unitLabel;
-  if (limitLabelEl) limitLabelEl.textContent = limitLabel;
+  if (speedUnitEl) setDomText(speedUnitEl, unitLabel);
+  if (limitLabelEl) setDomText(limitLabelEl, limitLabel);
 }
 
 function setStreetAndLocation(roadLabel, locationLabel) {
@@ -165,10 +166,11 @@ function setStreetAndLocation(roadLabel, locationLabel) {
 
   if (!normalizedRoad) normalizedRoad = 'Exploring';
 
-  if (streetEl) streetEl.textContent = clampText(normalizedRoad, 32);
+  if (streetEl) setDomText(streetEl, clampText(normalizedRoad, 32));
   if (locationEl) {
-    locationEl.textContent = clampText(normalizedLocation, 52);
-    locationEl.style.display = normalizedLocation ? '' : 'none';
+    setDomText(locationEl, clampText(normalizedLocation, 52));
+    const display = normalizedLocation ? '' : 'none';
+    if (locationEl.style.display !== display) locationEl.style.display = display;
   }
 }
 
@@ -179,11 +181,12 @@ function updateConditionBar(condition = 1, label = 'Explorer') {
   const value = clampValue(Number(condition), 0, 1);
   const percent = Math.round(value * 100);
   const state = value <= .25 ? 'critical' : value <= .6 ? 'injured' : 'healthy';
-  fill.style.width = `${percent}%`;
-  fill.dataset.state = state;
-  bar.setAttribute('aria-label', `${label} health`);
-  bar.setAttribute('aria-valuenow', String(percent));
-  bar.title = `${label} health · ${percent}%`;
+  const width = `${percent}%`;
+  if (fill.style.width !== width) fill.style.width = width;
+  setDomAttribute(fill, 'data-state', state);
+  setDomAttribute(bar, 'aria-label', `${label} health`);
+  setDomAttribute(bar, 'aria-valuenow', percent);
+  setDomAttribute(bar, 'title', `${label} health · ${percent}%`);
 }
 
 function explorerCondition() {
@@ -223,7 +226,7 @@ function coordsHudText(worldX, worldZ, yawRad, pitchDeg = null) {
 function updateCoordinatesHud(worldX, worldZ, yawRad, pitchDeg = null) {
   const coords = document.getElementById('coords');
   const text = document.getElementById('coordsText') || coords;
-  if (text) text.textContent = coordsHudText(worldX, worldZ, yawRad, pitchDeg);
+  if (text) setDomText(text, coordsHudText(worldX, worldZ, yawRad, pitchDeg));
 
   const earthCoordinatesAvailable = !appCtx.onMoon && !appCtx.onMars && !appCtx.spaceFlight?.active;
   let osmUrl = 'https://www.openstreetmap.org';
@@ -232,9 +235,9 @@ function updateCoordinatesHud(worldX, worldZ, yawRad, pitchDeg = null) {
     osmUrl = `https://www.openstreetmap.org/edit?editor=id#map=19/${geo.lat.toFixed(7)}/${geo.lon.toFixed(7)}`;
   }
   document.querySelectorAll('[data-osm-location-link]').forEach((link) => {
-    link.href = osmUrl;
-    link.hidden = !earthCoordinatesAvailable;
-    link.setAttribute('aria-disabled', earthCoordinatesAvailable ? 'false' : 'true');
+    setDomAttribute(link, 'href', osmUrl);
+    setDomHidden(link, !earthCoordinatesAvailable);
+    setDomAttribute(link, 'aria-disabled', earthCoordinatesAvailable ? 'false' : 'true');
   });
 }
 
@@ -637,16 +640,16 @@ function updateHUD() {
     const shoreline = shorelineKnown && Number.isFinite(appCtx.boatMode.shorelineDistance) ?
       Math.round(appCtx.boatMode.shorelineDistance) : null;
     setHudUnitLabels('KTS', 'SEA');
-    document.getElementById('speed').textContent = `${knots}`;
-    document.getElementById('speed').classList.toggle('fast', knots >= 18);
-    document.getElementById('limit').textContent = getSeaStateLabel();
+    setDomText(document.getElementById('speed'), `${knots}`);
+    setDomClass(document.getElementById('speed'), 'fast', knots >= 18);
+    setDomText(document.getElementById('limit'), getSeaStateLabel());
     setStreetAndLocation(seaLabel, shoreline != null ? `${locationName()} • ${shoreline}m to shore` : locationName());
     updateConditionBar(appCtx.boatMode?.condition ?? 1, 'Vessel');
-    document.getElementById('indBrake').classList.toggle('on', !!appCtx.keys.Space);
-    document.getElementById('indBoost').classList.toggle('on', Math.abs(appCtx.boat.speed) > 18);
-    document.getElementById('indBoost').textContent = 'WAKE';
-    document.getElementById('indDrift').classList.toggle('on', Math.abs(appCtx.boat.roll) > 0.06 || Math.abs(appCtx.boat.pitch) > 0.05);
-    document.getElementById('indDrift').textContent = 'SEA';
+    setDomClass(document.getElementById('indBrake'), 'on', !!appCtx.keys.Space);
+    setDomClass(document.getElementById('indBoost'), 'on', Math.abs(appCtx.boat.speed) > 18);
+    setDomText(document.getElementById('indBoost'), 'WAKE');
+    setDomClass(document.getElementById('indDrift'), 'on', Math.abs(appCtx.boat.roll) > 0.06 || Math.abs(appCtx.boat.pitch) > 0.05);
+    setDomText(document.getElementById('indDrift'), 'SEA');
     updateCoordinatesHud(appCtx.boat.x, appCtx.boat.z, appCtx.boat.angle);
     return;
   }
@@ -657,17 +660,17 @@ function updateHUD() {
     const altitude = Math.max(0, Math.round(plane.y - groundY));
     const knots = Math.max(0, Math.round(worldUnitsPerSecondToKnots(plane.speed, appCtx.METERS_PER_WORLD_UNIT)));
     setHudUnitLabels('KTS', 'ALT');
-    document.getElementById('speed').textContent = `${knots}`;
-    document.getElementById('speed').classList.toggle('fast', knots > 120);
-    document.getElementById('limit').textContent = `${altitude}`;
+    setDomText(document.getElementById('speed'), `${knots}`);
+    setDomClass(document.getElementById('speed'), 'fast', knots > 120);
+    setDomText(document.getElementById('limit'), `${altitude}`);
     setStreetAndLocation(plane.airborne ? 'Flight' : 'Taxi', locationName());
     const planeIsUnlimited = plane.durabilityPolicy === 'exploration_unlimited';
     updateConditionBar(plane.condition ?? 1, planeIsUnlimited ? 'Player plane' : 'Aircraft');
-    document.getElementById('indBrake').classList.toggle('on', Number(appCtx.readControlActions?.('plane')?.brake) > 0.05 && !plane.airborne);
-    document.getElementById('indBoost').classList.toggle('on', plane.throttle > 0.82);
-    document.getElementById('indBoost').textContent = 'PWR';
-    document.getElementById('indDrift').classList.toggle('on', plane.airborne);
-    document.getElementById('indDrift').textContent = plane.stalled ? 'STALL' : plane.airborne ? 'AIR' : 'GEAR';
+    setDomClass(document.getElementById('indBrake'), 'on', Number(appCtx.readControlActions?.('plane')?.brake) > 0.05 && !plane.airborne);
+    setDomClass(document.getElementById('indBoost'), 'on', plane.throttle > 0.82);
+    setDomText(document.getElementById('indBoost'), 'PWR');
+    setDomClass(document.getElementById('indDrift'), 'on', plane.airborne);
+    setDomText(document.getElementById('indDrift'), plane.stalled ? 'STALL' : plane.airborne ? 'AIR' : 'GEAR');
     updateCoordinatesHud(plane.x, plane.z, plane.yaw);
     return;
   }
@@ -690,15 +693,15 @@ function updateHUD() {
     // Keep the primary readout semantically consistent across traversal modes:
     // speed stays speed, while the secondary value carries height.
     setHudUnitLabels('MPH', 'HEIGHT');
-    document.getElementById('speed').textContent = `${droneSpeedMph}`;
-    document.getElementById('speed').classList.remove('fast');
-    document.getElementById('limit').textContent = `${altitudeMeters}m`;
+    setDomText(document.getElementById('speed'), `${droneSpeedMph}`);
+    setDomClass(document.getElementById('speed'), 'fast', false);
+    setDomText(document.getElementById('limit'), `${altitudeMeters}m`);
     setStreetAndLocation('Drone View', locationName());
     updateConditionBar(explorerCondition(), 'Explorer');
-    document.getElementById('indBrake').classList.remove('on');
-    document.getElementById('indBoost').classList.remove('on');
-    document.getElementById('indDrift').classList.remove('on');
-    document.getElementById('indDrift').textContent = 'DRONE';
+    setDomClass(document.getElementById('indBrake'), 'on', false);
+    setDomClass(document.getElementById('indBoost'), 'on', false);
+    setDomClass(document.getElementById('indDrift'), 'on', false);
+    setDomText(document.getElementById('indDrift'), 'DRONE');
     updateCoordinatesHud(appCtx.drone.x, appCtx.drone.z, appCtx.drone.yaw);
 
     return;
@@ -741,9 +744,9 @@ function updateHUD() {
     }
 
     setHudUnitLabels('MPH', 'LIMIT');
-    document.getElementById('speed').textContent = mph;
-    document.getElementById('speed').classList.remove('fast');
-    document.getElementById('limit').textContent = activeInterior ? '' : (walkSurface?.limit ? walkSurface.limit || 25 : '');
+    setDomText(document.getElementById('speed'), mph);
+    setDomClass(document.getElementById('speed'), 'fast', false);
+    setDomText(document.getElementById('limit'), activeInterior ? '' : (walkSurface?.limit ? walkSurface.limit || 25 : ''));
     const planetaryWalkLabel = appCtx.onMars ? 'Martian Surface' : appCtx.onMoon ? 'Lunar Surface' : null;
     const walkLabel = planetaryWalkLabel || (
       walkSurface && typeof appCtx.surfaceDisplayName === 'function'
@@ -757,10 +760,10 @@ function updateHUD() {
       activeInterior ? `${locName} • On-demand` : locName
     );
     updateConditionBar(explorerCondition(), 'Explorer');
-    document.getElementById('indBrake').classList.remove('on');
-    document.getElementById('indBoost').classList.remove('on');
-    document.getElementById('indDrift').textContent = running ? 'RUN' : 'WALK';
-    document.getElementById('indDrift').classList.toggle('on', running);
+    setDomClass(document.getElementById('indBrake'), 'on', false);
+    setDomClass(document.getElementById('indBoost'), 'on', false);
+    setDomText(document.getElementById('indDrift'), running ? 'RUN' : 'WALK');
+    setDomClass(document.getElementById('indDrift'), 'on', running);
 
     // Use WALKER position for coordinates
     updateCoordinatesHud(
@@ -777,18 +780,18 @@ function updateHUD() {
   const limit = appCtx.onMars ? 15 : appCtx.onMoon ? 12 : appCtx.car.road?.limit || 25;
   const locName = locationName();
   setHudUnitLabels('MPH', 'LIMIT');
-  document.getElementById('speed').textContent = mph;
-  document.getElementById('speed').classList.toggle('fast', mph > limit || appCtx.car.boost);
-  document.getElementById('limit').textContent = limit;
+  setDomText(document.getElementById('speed'), mph);
+  setDomClass(document.getElementById('speed'), 'fast', mph > limit || appCtx.car.boost);
+  setDomText(document.getElementById('limit'), limit);
   const planetarySurfaceLabel = appCtx.onMars ? 'Martian Surface' : appCtx.onMoon ? 'Lunar Surface' : null;
   setStreetAndLocation(planetarySurfaceLabel || appCtx.car.road?.name || 'Exploring', locName);
   updateConditionBar(appCtx.car.condition ?? 1, appCtx.car.durabilityPolicy === 'exploration_unlimited' ? 'BMW' : 'Vehicle');
-  document.getElementById('indBrake').classList.toggle('on', appCtx.keys.Space);
-  document.getElementById('indBoost').classList.toggle('on', appCtx.car.boost);
+  setDomClass(document.getElementById('indBrake'), 'on', appCtx.keys.Space);
+  setDomClass(document.getElementById('indBoost'), 'on', appCtx.car.boost);
   const isDrifting = appCtx.car.isDrifting === true && Math.abs(appCtx.car.driftAngle) > 0.08;
-  document.getElementById('indDrift').classList.toggle('on', isDrifting);
-  if (isDrifting) document.getElementById('indDrift').textContent = 'DRIFT ' + Math.round(Math.abs(appCtx.car.driftAngle) * 180 / Math.PI) + '°';else
-  document.getElementById('indDrift').textContent = 'DRIFT';
+  setDomClass(document.getElementById('indDrift'), 'on', isDrifting);
+  if (isDrifting) setDomText(document.getElementById('indDrift'), 'DRIFT ' + Math.round(Math.abs(appCtx.car.driftAngle) * 180 / Math.PI) + '°');else
+  setDomText(document.getElementById('indDrift'), 'DRIFT');
   updateCoordinatesHud(appCtx.car.x, appCtx.car.z, appCtx.car.angle);
 
 }

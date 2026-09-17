@@ -1,3 +1,4 @@
+import { setDomText, setDomAttribute, setDomHidden, setDomClass } from '../ui/dom-state.js?v=1';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { carSpeedToMph, mphToCarSpeed } from '../physics/vehicle-speed-units.js?v=2';
 import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleMassKg } from '../engine/vehicle-catalog.js?v=6';
@@ -2421,54 +2422,53 @@ function performInteraction(state, candidate) {
   return state.roomAuthorityRuntime?.requestVehicleEntry(vehicle) === true;
 }
 
+const PROMPT_ACTION_LABELS = Object.freeze({
+  talk_npc: 'Talk', loot_npc: 'Search', loot_responder: 'Collect gear',
+  collect_loot: 'Collect', inspect_object: 'Inspect', visit_store: 'Visit'
+});
+
 function updatePrompt(state) {
   const prompt = state.prompt;
   if (!prompt?.root) return;
   if (appCtx.getEnv?.() !== 'EARTH' || appCtx.oceanMode?.active || appCtx.spaceFlight?.active || appCtx.activePlanetaryBodyId) {
-    prompt.secondaryKey.hidden = true;
-    prompt.secondaryButton.hidden = true;
-    prompt.takeKey.hidden = true;
-    prompt.takeButton.hidden = true;
-    prompt.root.classList.remove('show');
-    prompt.root.setAttribute('aria-hidden', 'true');
+    setDomHidden(prompt.secondaryKey, true);
+    setDomHidden(prompt.secondaryButton, true);
+    setDomHidden(prompt.takeKey, true);
+    setDomHidden(prompt.takeButton, true);
+    setDomClass(prompt.root, 'show', false);
+    setDomAttribute(prompt.root, 'aria-hidden', 'true');
     return;
   }
   const candidate = appCtx.resolvePrimaryContextInteraction?.() || interactionCandidate(state);
   const transientStatus = state.statusUntil > now() ? state.statusMessage : '';
   if (!candidate && !transientStatus) {
-    prompt.root.classList.remove('familiar');
-    prompt.secondaryKey.hidden = true;
-    prompt.secondaryButton.hidden = true;
-    prompt.takeKey.hidden = true;
-    prompt.takeButton.hidden = true;
-    prompt.root.classList.remove('show');
-    prompt.root.setAttribute('aria-hidden', 'true');
+    setDomClass(prompt.root, 'familiar', false);
+    setDomHidden(prompt.secondaryKey, true);
+    setDomHidden(prompt.secondaryButton, true);
+    setDomHidden(prompt.takeKey, true);
+    setDomHidden(prompt.takeButton, true);
+    setDomClass(prompt.root, 'show', false);
+    setDomAttribute(prompt.root, 'aria-hidden', 'true');
     return;
   }
-  prompt.root.classList.add('show');
-  prompt.root.classList.toggle('familiar', !transientStatus && candidate?.familiar === true);
-  prompt.root.setAttribute('aria-hidden', 'false');
-  prompt.title.textContent = transientStatus || candidate.label;
-  prompt.meta.textContent = transientStatus || candidate?.familiar === true
+  setDomClass(prompt.root, 'show', true);
+  setDomClass(prompt.root, 'familiar', !transientStatus && candidate?.familiar === true);
+  setDomAttribute(prompt.root, 'aria-hidden', 'false');
+  setDomText(prompt.title, transientStatus || candidate.label);
+  setDomText(prompt.meta, transientStatus || candidate?.familiar === true
     ? ''
-    : `${candidate.detail}${candidate.distance ? ` • ${candidate.distance.toFixed(1)} m` : ''}`;
-  prompt.key.textContent = appCtx.getControlPromptLabel?.('interact') || appCtx.getControlBindingLabel?.('interact') || 'E';
-  prompt.button.textContent = candidate?.label || (candidate?.action === 'exit_vehicle' ? 'Exit' : 'Enter');
-  if (candidate?.action === 'talk_npc') prompt.button.textContent = 'Talk';
-  if (candidate?.action === 'loot_npc') prompt.button.textContent = 'Search';
-  if (candidate?.action === 'loot_responder') prompt.button.textContent = 'Collect gear';
-  if (candidate?.action === 'collect_loot') prompt.button.textContent = 'Collect';
-  if (candidate?.action === 'inspect_object') prompt.button.textContent = 'Inspect';
-  if (candidate?.action === 'visit_store') prompt.button.textContent = 'Visit';
-  prompt.button.disabled = !candidate?.available;
-  prompt.button.hidden = !!transientStatus;
+    : `${candidate.detail}${candidate.distance ? ` • ${candidate.distance.toFixed(1)} m` : ''}`);
+  setDomText(prompt.key, appCtx.getControlPromptLabel?.('interact') || appCtx.getControlBindingLabel?.('interact') || 'E');
+  setDomText(prompt.button, PROMPT_ACTION_LABELS[candidate?.action] || candidate?.label || (candidate?.action === 'exit_vehicle' ? 'Exit' : 'Enter'));
+  if (prompt.button.disabled !== !candidate?.available) prompt.button.disabled = !candidate?.available;
+  setDomHidden(prompt.button, !!transientStatus);
   const showSecondary = !transientStatus && !!candidate?.secondaryLabel && appCtx.Walk?.state?.mode === 'walk';
-  prompt.secondaryKey.hidden = !showSecondary;
-  prompt.secondaryButton.hidden = !showSecondary;
-  prompt.secondaryButton.textContent = candidate?.secondaryLabel || 'Use';
+  setDomHidden(prompt.secondaryKey, !showSecondary);
+  setDomHidden(prompt.secondaryButton, !showSecondary);
+  setDomText(prompt.secondaryButton, candidate?.secondaryLabel || 'Use');
   const showTake = !transientStatus && (candidate?.action === 'talk_npc' || candidate?.action === 'loot_npc' || candidate?.action === 'loot_responder');
-  prompt.takeKey.hidden = !showTake;
-  prompt.takeButton.hidden = !showTake;
+  setDomHidden(prompt.takeKey, !showTake);
+  setDomHidden(prompt.takeButton, !showTake);
 }
 
 function snapshot(state) {

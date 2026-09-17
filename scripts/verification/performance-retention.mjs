@@ -252,10 +252,13 @@ async function runDesktop() {
     const launch = await launchWorld(client);
     const walkActivationMs = await selectMode(client.page, 'walk', '#fWalk');
     const walk = { ...(await measureMode(client, 'walk', auditOnly ? 1_500 : 5_000)), activationMs: walkActivationMs };
+    console.log('[performance-retention] desktop walk', JSON.stringify({ fps: walk.averageFps, withinBudgets: modesWithinBudgets([walk], budgets.desktopTier) }));
     const driveActivationMs = await selectMode(client.page, 'drive', '#fDriving');
     const drive = { ...(await measureMode(client, 'drive', auditOnly ? 1_500 : 5_000)), activationMs: driveActivationMs };
+    console.log('[performance-retention] desktop drive', JSON.stringify({ fps: drive.averageFps, withinBudgets: modesWithinBudgets([drive], budgets.desktopTier) }));
     const planeActivationMs = await selectMode(client.page, 'plane', '#fPlane');
     const plane = { ...(await measureMode(client, 'plane', auditOnly ? 1_500 : 90_000)), activationMs: planeActivationMs };
+    console.log('[performance-retention] desktop plane', JSON.stringify({ fps: plane.averageFps, withinBudgets: modesWithinBudgets([plane], budgets.desktopTier) }));
     const modes = [walk, drive, plane];
     const baselineCounts = walk.worldCounts;
     const releases = [];
