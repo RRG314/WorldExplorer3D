@@ -201,7 +201,7 @@ async function walkToInteriorPrompt(target, maxSteps = 1_400) {
       };
     }, target.approachTarget);
     if (step % 20 === 0) path.push(state);
-    if (state.promptVisible && /enter/i.test(state.promptText) && state.promptTargetKey === target.key) {
+    if (state.promptVisible && state.promptTargetKey === target.key) {
       return { reached: true, steps: step, path, final: state };
     }
     assert.equal(Number.isFinite(state.x) && Number.isFinite(state.z) && Number.isFinite(state.yaw), true, 'Walking actor state became unavailable.');
@@ -600,10 +600,19 @@ try {
   markStage('mobile-loaded', { mobileRestored });
   assert.ok(Math.hypot(mobileRestored.walker.x - afterExit.walker.x, mobileRestored.walker.z - afterExit.walker.z) < 0.6,
     `Walking share link did not restore the exterior pose: ${JSON.stringify({ expected: afterExit.walker, actual: mobileRestored.walker })}`);
-  await page.waitForFunction(() => {
+  // Fresh provider data can move an inferred doorway slightly. Verify the saved
+  // pose first, then approach this load's published entrance for the same building.
+  const mobileTarget = await page.evaluate((key) =>
+    globalThis.getWorldExplorerRuntimeDiagnostics?.().interior?.candidates?.find((candidate) => candidate.key === key), target.key);
+  assert.ok(mobileTarget, 'The same building is absent from the mobile world.');
+  const mobileApproach = await walkToInteriorPrompt(mobileTarget);
+  markStage('mobile-approached', { mobileTarget, mobileApproach });
+  assert.equal(mobileApproach.reached, true, 'Mobile walker could not reach the published entrance.');
+  await page.waitForFunction((key) => {
     const prompt = document.querySelector('#interiorPrompt');
-    return prompt?.classList.contains('show') === true && /enter/i.test(prompt.textContent || '');
-  }, null, { timeout: 10_000 });
+    return prompt?.classList.contains('show') === true &&
+      globalThis.getWorldExplorerRuntimeDiagnostics?.().interior?.promptTargetKey === key;
+  }, target.key, { timeout: 10_000 });
   const mobileEnterBounds = await page.locator('#interiorPrompt.show').evaluate((element) => {
     const bounds = element.getBoundingClientRect();
     return { left: bounds.left, right: bounds.right, top: bounds.top, bottom: bounds.bottom };
@@ -616,10 +625,11 @@ try {
   await tapVisibleInteriorPrompt();
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().interior?.active === false, null, { timeout: 10_000 });
   const mobileExited = await interiorOwnershipSnapshot(target.sourceBuildingId);
-  await page.waitForFunction(() => {
+  await page.waitForFunction((key) => {
     const prompt = document.querySelector('#interiorPrompt');
-    return prompt?.classList.contains('show') === true && /enter/i.test(prompt.textContent || '');
-  }, null, { timeout: 10_000 });
+    return prompt?.classList.contains('show') === true &&
+      globalThis.getWorldExplorerRuntimeDiagnostics?.().interior?.promptTargetKey === key;
+  }, target.key, { timeout: 10_000 });
   await tapVisibleInteriorPrompt();
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().interior?.active === true, null, { timeout: 30_000 });
   const mobileReentered = await interiorOwnershipSnapshot(target.sourceBuildingId);
@@ -691,6 +701,8 @@ try {
     wallRecovery,
     afterExit,
     mobileEnterBounds,
+    mobileTarget,
+    mobileApproach,
     mobileEntered,
     mobileExited,
     mobileReentered,
