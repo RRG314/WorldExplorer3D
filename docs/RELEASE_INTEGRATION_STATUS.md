@@ -197,6 +197,18 @@ independent new source. The public main/release branches are not changed. The
 precondition and resulting tree/ancestry evidence are saved under
 `output/release-integration/live-checks/`.
 
+Local merge 4ee42ac2 records that equivalent public-main snapshot. Its tree is
+identical to its first parent a44f2f05, and both public main and deployed
+production are now ancestors. A main-to-candidate merge preview returns the
+candidate tree without conflicts. No public branch was moved or pushed.
+
+The staging App Check helper now overrides only the loopback configuration
+module when a valid private credential is supplied. A tiny browser fixture
+reproduced the packaged production script overwriting the old init-only override;
+it passes after the repair. The report explicitly records the configuration
+override. This allows local functional testing of a production-configured artifact
+without contacting production Firebase; it does not certify production attestation.
+
 London ground accuracy remains an unresolved release-quality question. Comparing
 the actual production and candidate artifacts found 191 changed grid samples
 (maximum 16.74 m). Seven independent Environment Agency 1 m DTM point queries
