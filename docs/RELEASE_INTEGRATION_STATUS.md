@@ -141,6 +141,17 @@ MiB, and saves failure state. Its aggregate allowance is 20 minutes for four
 world starts; individual gameplay timeouts and performance limits remain intact.
 These harness changes require fresh complete receipts before release acceptance.
 
+Analytics verification reproduced `measurement_id_missing`: the shipped staging
+configuration replaced an init-script override, and staging deliberately has no
+analytics measurement ID. The verifier also served source despite requiring an
+artifact. It now serves the selected artifact and uses an explicit synthetic
+measurement ID, real analytics SDK, locally intercepted configuration/collection,
+and blocked installation registration. All five destinations plus storage-blocked,
+default, denied and granted consent transitions passed in 141.2 seconds, sampled
+peak 2210 MiB. Denial removed analytics cookies; re-grant started exactly one
+current session. This is local event-formation evidence, not production delivery
+verification. No production or staging analytics configuration was changed.
+
 London ground accuracy remains an unresolved release-quality question. Comparing
 the actual production and candidate artifacts found 191 changed grid samples
 (maximum 16.74 m). Seven independent Environment Agency 1 m DTM point queries
