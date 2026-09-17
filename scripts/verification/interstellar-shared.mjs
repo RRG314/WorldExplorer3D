@@ -85,6 +85,9 @@ try {
   owner = await createPlayer('Captain Rowan', { width: 1440, height: 900 });
   member = await createPlayer('Engineer Vale', { width: 390, height: 844 });
   await openMultiplayer(owner);
+  // Opening the globe's multiplayer destination selects its Earth context.
+  // Explicitly choose Space before creating this interstellar room.
+  await owner.page.locator('#spaceLaunchToggle').evaluate(button => button.click());
   await owner.page.locator('#mpTitleRoomNameInput').fill('Shared Interstellar Crew');
   await owner.page.locator('#mpTitleLocationTagInput').fill('Solar System');
   await owner.page.locator('#mpTitleCreateBtn').click();
@@ -100,6 +103,14 @@ try {
   }
   const roomCode = String(await owner.page.locator('#roomPanelRoomCode').textContent()).match(/\b[A-Z2-9]{6}\b/)?.[0] || '';
   assert.match(roomCode, /^[A-Z2-9]{6}$/);
+  const roomWorld = await owner.page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return { world: ctx.getCurrentMultiplayerRoom?.()?.world,
+      selected: ctx.loadingScreenMode, gameStarted: ctx.gameStarted,
+      spaceActive: ctx.spaceFlight?.active, worldLoading: ctx.worldLoading };
+  });
+  console.log('[interstellar-shared] created room world', JSON.stringify(roomWorld));
+  assert.equal(roomWorld.world?.kind, 'space', JSON.stringify(roomWorld));
 
   await openMultiplayer(member);
   await member.page.locator('#mpTitleCodeInput').fill(roomCode);
