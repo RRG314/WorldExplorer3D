@@ -582,6 +582,10 @@ try {
       }
       assert.equal(await timeControl.getAttribute('data-mode'), 'day', 'Actor screenshots require the visible Day setting.');
       await page.waitForTimeout(1000);
+      // Focused buttons deliberately retain keyboard input for accessibility.
+      // Return to the visible world before testing the driving controls.
+      await page.locator('body > canvas:not(#minimap)').click();
+      assert.equal(await page.evaluate(() => document.activeElement?.matches('button,input,textarea,select,[contenteditable="true"]')), false);
       const first = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.());
       await page.keyboard.down('ArrowUp');
       await page.waitForTimeout(1250);
