@@ -186,6 +186,7 @@ function showPrompt(stage, config = {}) {
   runtime.actionBtn.hidden = !(config.actionLabel && runtime.currentButtonAction);
   runtime.actionBtn.textContent = config.actionLabel || '';
   runtime.skipBtn.hidden = config.contextual === true;
+  runtime.card.dataset.tutorialStage = stage;
   runtime.card.hidden = false;
   setExpanded(config.expanded === true);
   tutorialTelemetry('we3d_tutorial_step', { action: 'presented', step_id: stage });

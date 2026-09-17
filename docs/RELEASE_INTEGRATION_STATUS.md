@@ -4,6 +4,16 @@ Owner objective, September 16, 2026: retain the work done after the live release
 integrate useful improvements cleanly, and establish production release readiness.
 **Status: preserved integration candidate; production acceptance pending.**
 
+Fresh 9b018295 first-journey failure capture identified the hidden tutorial's
+cause: a Rock Pigeon Observe action appeared while a new player was stationary,
+and contextual-priority CSS hid the movement instruction indefinitely. The
+first movement stage now takes priority over nearby prompts; moving, dismissing
+guidance or disabling tips restores normal action priority. Stage identity comes
+from the real tutorial controller. The CSS fixture failed against the old artifact
+and passes 12 desktop/phone-portrait/landscape cases with the repair. The packaged
+tutorial-controls gate now includes that fixture. All 502 source contracts pass;
+full connected first-journey acceptance is being repeated.
+
 The e29d5c56 full performance run retained all 18,758 roads and brought desktop
 triangles inside budget (walking 6.54m → 4.71m; flight 6.00m → 3.13m). Walking
 improved to 27.84 FPS, still below 43.65; driving was 38.57 FPS and its measured

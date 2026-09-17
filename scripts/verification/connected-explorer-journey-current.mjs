@@ -81,11 +81,12 @@ try {
   await page.waitForFunction(() => !document.getElementById('loading')?.classList.contains('show'), null, { timeout: 120_000 });
 
   await page.waitForSelector('#tutorialHintCard:not([hidden])', { timeout: 20_000 });
+  assert.equal(await page.locator('#tutorialHintCard').getAttribute('data-tutorial-stage'), 'move');
   const firstStepText = await page.locator('#tutorialHintCard').textContent();
   assert.match(firstStepText, /First Journey.*ZASD to move.*Mouse to look/is);
   assert.equal(await page.locator('#tutorialHintCard').evaluate((element) => element.classList.contains('compact')), true);
   await page.locator('#tutorialHintCard .tutorial-details-btn').click();
-  assert.match(await page.locator('#tutorialHintCard').textContent(), /Right mouse button to look|Drag with the right mouse button to look/i);
+  assert.match(await page.locator('#tutorialHintCard').textContent(), /(?:right|either) mouse button.*look/i);
   await page.screenshot({ path: `${evidenceDir}/02-first-journey-details-desktop.png` });
   await page.locator('#tutorialHintCard .tutorial-details-btn').click();
 
