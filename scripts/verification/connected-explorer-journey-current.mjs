@@ -51,7 +51,8 @@ async function moveWithRemappedForwardKey() {
     }
     await hold(attempt % 2 === 0 ? 'KeyA' : 'KeyD', 160);
   }
-  throw new Error(`Remapped forward key did not advance the live tutorial: ${JSON.stringify(await tutorialState())}`);
+  const after = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor || null);
+  throw new Error(`Remapped forward key did not advance the live tutorial: ${JSON.stringify({before,after,tutorial:await tutorialState()})}`);
 }
 
 try {
@@ -90,6 +91,9 @@ try {
   await page.screenshot({ path: `${evidenceDir}/02-first-journey-details-desktop.png` });
   await page.locator('#tutorialHintCard .tutorial-details-btn').click();
 
+  // Return focus from Details to the world, as a player does before moving.
+  // Gameplay deliberately ignores key presses aimed at a focused UI button.
+  await page.locator('canvas').first().click({position:{x:400,y:350}});
   const moved = await moveWithRemappedForwardKey();
   assert.equal((await tutorialState())?.stage, 'interact');
   const beforePosition = moved.before?.position || moved.before;
@@ -175,15 +179,22 @@ try {
   console.log(JSON.stringify(report, null, 2));
   assert.equal(report.ok, true);
 } catch (error) {
-  const state = await page.evaluate(() => ({
+  const state = await page.evaluate(async () => {
+    let tutorialRuntime;
+    try {
+      const {ctx} = await import('/app/js/shared-context.js?v=55');
+      tutorialRuntime = {snapshot:ctx.getTutorialSnapshot?.(), updateType:typeof ctx.tutorialUpdate, gameStarted:ctx.gameStarted, walkMode:ctx.Walk?.state?.mode, walker:ctx.Walk?.state?.walker ? {x:ctx.Walk.state.walker.x,y:ctx.Walk.state.walker.y,z:ctx.Walk.state.walker.z} : null};
+    } catch (error) {tutorialRuntime={error:String(error?.stack||error)};}
+    return ({
+    tutorialRuntime,
     tutorial: JSON.parse(localStorage.getItem('worldExplorer3D.tutorialState.v5') || 'null'),
-    elements: ['tutorialHintCard','urbanVehiclePrompt','interiorPrompt','boatPrompt','discoveryContextPrompt','controlsTab','worldSelectionNotice','urbanEquipment'].map(id => {
+    elements: ['tutorialHintCard','urbanVehiclePrompt','interiorPrompt','boatPrompt','discoveryContextPrompt','controlsTab','ctrlContent','worldSelectionNotice','urbanEquipment'].map(id => {
       const element=document.getElementById(id);
       return {id, hidden:element?.hidden, classes:element?.className, display:element?getComputedStyle(element).display:null, text:element?.textContent?.slice(0,1000)};
     }),
     openMenus:[...document.querySelectorAll('.floatMenu.open')].map(e=>e.id),
     runtime:globalThis.getWorldExplorerRuntimeDiagnostics?.()
-  })).catch(()=>null);
+  }); }).catch(error=>({captureError:String(error?.stack||error)}));
   await writeFile(`${evidenceDir}/failure.json`,JSON.stringify({ok:false,error:String(error?.stack||error),state},null,2)+'\n');
   await page.screenshot({path:`${evidenceDir}/failure.png`}).catch(()=>{});
   throw error;

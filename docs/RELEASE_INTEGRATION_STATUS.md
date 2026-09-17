@@ -12,7 +12,13 @@ guidance or disabling tips restores normal action priority. Stage identity comes
 from the real tutorial controller. The CSS fixture failed against the old artifact
 and passes 12 desktop/phone-portrait/landscape cases with the repair. The packaged
 tutorial-controls gate now includes that fixture. All 502 source contracts pass;
-full connected first-journey acceptance is being repeated.
+the corrected packaged connected first-journey replay passed in 100.7 seconds
+(2383 MiB peak owned RSS), including movement, nearby action, Explorer completion
+and mobile layout. The earlier movement replay
+left Details focused, which correctly suppresses gameplay key handling. Fresh
+runtime snapshots showed the player stationary; an earlier cross-run position
+comparison was not evidence of movement. The verifier now clicks the world
+before moving and records paired positions when a movement attempt fails.
 
 The e29d5c56 full performance run retained all 18,758 roads and brought desktop
 triangles inside budget (walking 6.54m → 4.71m; flight 6.00m → 3.13m). Walking
@@ -30,16 +36,6 @@ range and tie ordering; world invalidation retires its cache. A 30,000-segment,
 frames no longer run planetary sky updates. That regression failed before the
 repair; planetary updates still pass. All 502 current contracts pass. These are
 component/dispatch results; fresh packaged gameplay/performance remains required.
-
-The latest completed a5d25f4d performance gate failed desktop frame-rate,
-mode-activation and triangle budgets; mobile emulation and repeated desktop
-teardown/reload passed. A reversible browser diagnostic showed that simply
-enabling culling on world-spanning road batches does not solve the workload.
-Road publication now groups complete incoming surfaces spatially and enables
-frustum culling for those static main meshes. No surface is removed or simplified;
-three regression cases preserve exact triangles, modes, deterministic publication
-and stacked collision support. All 497 current contracts pass. Fresh packaged
-performance and world validation are still required for this change.
 
 The space verifier's Moon assertion incorrectly treated net multi-body gravity
 as a single body's field. An isolated-body diagnostic passed; verification now
