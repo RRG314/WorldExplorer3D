@@ -11,7 +11,9 @@ const baseUrl = staticServer
   : String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4192').replace(/\/$/, '');
 const outputDir = path.resolve('output/verification/world-economy-cargo');
 await fs.mkdir(outputDir, { recursive: true });
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+// Bound this multi-page gameplay verifier on the owner's 8 GiB Mac.
+// This is functional custody evidence, not a performance-budget measurement.
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280'] });
 const failures = [];
 
 async function state(page) {

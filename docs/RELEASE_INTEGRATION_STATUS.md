@@ -4,6 +4,14 @@ Owner objective, September 16, 2026: retain the work done after the live release
 integrate useful improvements cleanly, and establish production release readiness.
 **Status: preserved integration candidate; production acceptance pending.**
 
+The final-artifact connected first journey passed in 96.8 seconds. The economy
+model tests and mapped Earth-store purchase also passed, but the uncapped cargo
+verifier crossed the 3000 MiB owned-process guard during its Earth load. Applying
+the same 1280 MiB JavaScript heap cap as the other heavy functional verifiers let
+the full Earth-material purchase → ship Cargo Hold custody flow pass in 95.7 s,
+peak owned RSS2693 MiB. Its assertions and 120 s load timeout are unchanged;
+this functional harness cap does not modify application or performance budgets.
+
 The clean f1a1cd27 full performance run completed in 428.4 s, peak owned RSS
 2692 MiB, with mobile passing. Walking improved to 40.00 FPS (p95/p99 33.4 ms),
 but still misses 43.65. Driving measured 35.93 FPS, p99 83.4 ms and 1293 ms
