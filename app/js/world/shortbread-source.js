@@ -1,3 +1,4 @@
+import { markRoadsAtMissingTiles } from './shortbread-missing-coverage.js';
 import { createRoadNameResolver } from './shortbread-road-labels.js?v=1';
 import { yieldToMainThread } from './cooperative-scheduling.js?v=1';
 import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js?v=1';
@@ -630,13 +631,15 @@ async function fetchTileCoverage(lat, lon, radius, zoom, options = {}) {
   const tiles = settled
     .filter((entry) => entry.status === 'fulfilled' && entry.value)
     .map((entry) => entry.value);
+  const missingTiles = coordinates.filter((_coordinate, index) => settled[index]?.status === 'rejected')
+    .map(({ x, y }) => ({ x, y, z: zoom }));
   const successfulTiles = settled.filter((entry) => entry.status === 'fulfilled').length;
   if (tiles.length === 0) {
-    if (successfulTiles > 0) return { tiles, requestedTiles: coordinates.length, bounds, metrics };
+    if (successfulTiles > 0) return { tiles, requestedTiles: coordinates.length, bounds, metrics, missingTiles };
     const reason = settled.find((entry) => entry.status === 'rejected')?.reason;
     throw new Error(`Shortbread coverage unavailable: ${reason?.message || reason || 'no tiles'}`);
   }
-  return { tiles, requestedTiles: coordinates.length, bounds, metrics };
+  return { tiles, requestedTiles: coordinates.length, bounds, metrics, missingTiles };
 }
 
 export async function fetchShortbreadWorldData(options = {}) {
@@ -650,7 +653,7 @@ export async function fetchShortbreadWorldData(options = {}) {
     : coverageBounds
       ? selectShortbreadZoomForBounds(coverageBounds, options)
       : SHORTBREAD_ZOOM;
-  const { tiles, requestedTiles, bounds, metrics } = await fetchTileCoverage(
+  const { tiles, requestedTiles, bounds, metrics, missingTiles } = await fetchTileCoverage(
     lat,
     lon,
     options.radius,
@@ -662,13 +665,7 @@ export async function fetchShortbreadWorldData(options = {}) {
     : ['streets', 'land', 'sites', 'pois', 'street_polygons'];
   if (includeBuildings && !layerNames.includes('buildings')) layerNames.push('buildings');
   const elements = await convertTilesToElements(tiles, layerNames, bounds);
-  if (metrics.rejected > 0) {
-    for (const element of elements) {
-      if (element?.type === 'way' && element?.tags?.highway) {
-        element.tags._sourceTruncated = 'yes';
-      }
-    }
-  }
+  const affectedRoads = markRoadsAtMissingTiles(elements, missingTiles);
   return {
     elements,
     _overpassSource: 'shortbread-vector',
@@ -678,7 +675,10 @@ export async function fetchShortbreadWorldData(options = {}) {
       loaded: metrics.fulfilled,
       decoded: tiles.length,
       requested: requestedTiles,
-      failed: metrics.rejected,
+      failed: missingTiles.length,
+      missingTiles,
+      affectedRoads,
+      coverageComplete: missingTiles.length === 0,
       maxInFlight: metrics.maxInFlight,
       zoom,
       bounds,
