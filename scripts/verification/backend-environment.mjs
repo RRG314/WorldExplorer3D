@@ -11,7 +11,7 @@ export function backendVerificationCommand(environment = process.env) {
   // start a second emulator set on the same ports in that case.
   return configured.length
     ? [process.execPath, 'scripts/verification/backend-release.mjs']
-    : ['firebase', 'emulators:exec', '--only', 'auth,firestore,storage,functions', '--project', 'we3d-staging-20260712', 'node scripts/verification/backend-release.mjs'];
+    : [process.execPath, 'scripts/verification/backend-isolated.mjs'];
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

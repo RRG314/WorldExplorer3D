@@ -12,8 +12,15 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 const failures = [];
 const report = { ok: false, samples: [], surfaceChain: null, failures };
 const optionalExternalFailures = [];
+const cancelledProviderRequests = [];
 const isOptionalExternalUrl = (url) => /(?:overpass-api\.de|overpass\.private\.coffee|google-analytics\.com)\//i.test(String(url || ''));
 page.on('pageerror', (error) => failures.push(`pageerror: ${error.stack || error}`));
+page.on('response', (response) => {
+  if (response.status() >= 400 && (response.url().startsWith(`${baseUrl}/`) ||
+      response.url().startsWith('https://vector.openstreetmap.org/shortbread_v1/'))) {
+    failures.push(`HTTP ${response.status()}: ${response.url()}`);
+  }
+});
 page.on('console', (message) => {
   if (message.type() !== 'error') return;
   const location = message.location();
@@ -23,6 +30,14 @@ page.on('console', (message) => {
 });
 page.on('requestfailed', (request) => {
   const entry = `requestfailed: ${request.failure()?.errorText || 'unknown'} ${request.url()}`;
+  // The tile provider aborts bounded requests after its deadline or when their
+  // last consumer releases them. Keep those cancellations as evidence; local
+  // failures, HTTP errors and other provider failures remain gate failures.
+  if (request.failure()?.errorText === 'net::ERR_ABORTED' &&
+      /^https:\/\/vector\.openstreetmap\.org\/shortbread_v1\/\d+\/\d+\/\d+\.mvt$/.test(request.url())) {
+    cancelledProviderRequests.push(entry);
+    return;
+  }
   (isOptionalExternalUrl(request.url()) ? optionalExternalFailures : failures).push(entry);
 });
 
@@ -82,6 +97,13 @@ try {
   await page.waitForTimeout(500);
 
   const state = await page.evaluate(() => JSON.parse(globalThis.render_game_to_text?.() || '{}'));
+  report.worldLoad = await page.evaluate(() => {
+    const load = globalThis.getWorldExplorerRuntimeDiagnostics?.().worldLoad;
+    return { status: load?.status, geometryReady: load?.geometryReady,
+      providers: load?.session?.providers, outstandingProviderWork: load?.session?.outstandingProviderWork };
+  });
+  assert.equal(report.worldLoad.status, 'ready');
+  assert.equal(report.worldLoad.geometryReady, true);
   report.surfaceChain = state.surfaceChain;
   assert.equal(state.surfaceChain?.actor?.mode, 'drive');
   assert.ok(Number(state.surfaceChain?.actor?.vehicleContact?.supportSampleCount || 0) >= 1, JSON.stringify(state.surfaceChain));
@@ -99,6 +121,7 @@ try {
   throw error;
 } finally {
   report.optionalExternalFailures = optionalExternalFailures;
+  report.cancelledProviderRequests = cancelledProviderRequests;
   try {
     await fs.writeFile(path.join(evidenceDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
   } finally {
