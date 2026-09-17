@@ -45,6 +45,7 @@ function cloneModelGraph(source, policy = {}) {
   const clone = source.clone(true);
   const sourceToClone = new Map();
   const cloneToSource = new Map();
+  const skeletons = new Map();
   parallelTraverse(source, clone, (sourceNode, cloneNode) => {
     sourceToClone.set(sourceNode, cloneNode);
     cloneToSource.set(cloneNode, sourceNode);
@@ -61,9 +62,21 @@ function cloneModelGraph(source, policy = {}) {
     }
     if (!object.isSkinnedMesh) return;
     const sourceMesh = cloneToSource.get(object);
-    object.skeleton = sourceMesh.skeleton.clone();
+    // GLTFLoader r128 creates a Skeleton for each mesh primitive. Equivalent
+    // skins share one palette within this instance, never across characters.
+    const sourceSkeleton = sourceMesh.skeleton;
+    const skinKey = JSON.stringify([
+      sourceSkeleton.bones.map((bone) => bone.uuid),
+      sourceSkeleton.boneInverses.map((inverse) => inverse.elements)
+    ]);
+    let skeleton = skeletons.get(skinKey);
+    if (!skeleton) {
+      skeleton = sourceSkeleton.clone();
+      skeleton.bones = sourceSkeleton.bones.map((bone) => sourceToClone.get(bone));
+      skeletons.set(skinKey, skeleton);
+    }
+    object.skeleton = skeleton;
     object.bindMatrix.copy(sourceMesh.bindMatrix);
-    object.skeleton.bones = sourceMesh.skeleton.bones.map((bone) => sourceToClone.get(bone));
     object.bind(object.skeleton, object.bindMatrix);
   });
   return clone;
@@ -127,4 +140,4 @@ async function loadModelAsset(THREE, assetId, options = {}) {
   });
 }
 
-export { loadModelAsset };
+export { cloneModelGraph, disposeModelInstance, loadModelAsset };

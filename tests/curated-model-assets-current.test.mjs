@@ -195,7 +195,7 @@ test('player retains recovery while every NPC role is curated-only', () => {
   assert.match(shipInterior, /proceduralCharacterMeshCount\s*=\s*0/);
   assert.match(shipInterior, /failClosed:\s*true/);
   assert.match(shipInterior, /crewMeshes\.forEach\(\(mesh\) => mesh\.userData\.disposeCuratedCharacter/);
-  assert.match(loader, /object\.skeleton\s*=\s*sourceMesh\.skeleton\.clone\(\)/);
+  assert.match(loader, /skeleton\.bones = sourceSkeleton\.bones\.map/);
   assert.match(loader, /instancePolicy/);
   assert.match(loader, /removeFromParent/);
 });
