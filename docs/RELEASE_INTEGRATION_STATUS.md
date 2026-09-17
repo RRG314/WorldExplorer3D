@@ -4,6 +4,13 @@ Owner objective, September 16, 2026: retain the work done after the live release
 integrate useful improvements cleanly, and establish production release readiness.
 **Status: preserved integration candidate; production acceptance pending.**
 
+Combined economy acceptance remains incomplete: after the Earth verifier also
+received the 1280 MiB heap cap, its purchase passed, but the following cargo
+browser load crossed the guard at 3044 MiB (110.8 s combined elapsed). Both flows
+have passed separately; that is not a passing complete economy receipt. The
+resource cap remains in both functional verifiers, with all assertions/timeouts
+unchanged. No further identical combined rerun is justified by these results.
+
 The final-artifact connected first journey passed in 96.8 seconds. The economy
 model tests and mapped Earth-store purchase also passed, but the uncapped cargo
 verifier crossed the 3000 MiB owned-process guard during its Earth load. Applying

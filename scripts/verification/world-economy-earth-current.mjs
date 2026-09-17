@@ -11,7 +11,8 @@ const baseUrl = staticServer
   : String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4192').replace(/\/$/, '');
 const outputDir = path.resolve('output/verification/world-economy-earth');
 await fs.mkdir(outputDir, { recursive: true });
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+// Bound functional gameplay verification; performance budgets use their own harness.
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280'] });
 const failures = [];
 
 async function run() {
