@@ -20,9 +20,9 @@ import { yieldToMainThread } from "../world/cooperative-scheduling.js?v=1";
 
 import { roadWidthAtSegment } from "../world/road-cross-section-profile.js?v=1";
 import { createRoadContactIndex, createRoadContactIndexCooperatively } from './road-contact-index.js?v=1';
+import { createSpatialRoadBatches } from './spatial-road-batches.js';
 
 const ROAD_SURFACE_BIAS = 0.18;
-const MAX_ROAD_BATCH_VERTICES = 60000;
 
 export { detectRoadIntersections };
 
@@ -451,10 +451,8 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   // segments. No stacked circular cap is published over the intersection.
   for (const road of baseRoads) road.junctionTransitions = [];
 
-  const roadMainBatches = [];
-  let roadMainBatchVerts = [];
-  let roadMainBatchIdx = [];
-  let roadMainBatchRanges = [];
+  const roadBatchBuilder = createSpatialRoadBatches();
+  const roadMainBatches = roadBatchBuilder.batches;
   const roadSkirtBatchVerts = [];
   const roadSkirtBatchIdx = [];
   const roadMarkBatchVerts = [];
@@ -481,23 +479,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     junctionCoverageGaps: 0
   };
   const roadTerrainAudit = createRoadTerrainConformanceAudit();
-  const flushRoadMainBatch = () => {
-    if (roadMainBatchVerts.length > 0 && roadMainBatchIdx.length > 0) {
-      roadMainBatches.push({ verts: roadMainBatchVerts, indices: roadMainBatchIdx, ranges: roadMainBatchRanges });
-    }
-    roadMainBatchVerts = [];
-    roadMainBatchIdx = [];
-    roadMainBatchRanges = [];
-  };
-  const appendRoadMainGeometry = (verts, indices, terrainMode) => {
-    const incomingVertices = verts ? verts.length / 3 : 0;
-    const currentVertices = roadMainBatchVerts.length / 3;
-    if (currentVertices > 0 && currentVertices + incomingVertices > MAX_ROAD_BATCH_VERTICES) {
-      flushRoadMainBatch();
-    }
-    roadMainBatchRanges.push({start:roadMainBatchIdx.length,count:indices.length,terrainMode:terrainMode || 'unknown'});
-    appendIndexedGeometry(roadMainBatchVerts, roadMainBatchIdx, verts, indices);
-  };
+  const appendRoadMainGeometry = roadBatchBuilder.append;
 
   const sharedRoadMaterials = typeof getSharedRoadMaterials === "function" ? getSharedRoadMaterials() : {};
   const roadMat = sharedRoadMaterials.roadMat;
@@ -625,7 +607,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
         if(now()-sliceStartedAt>=24) {await yieldToMainThread();sliceStartedAt=now();}
       }
     } finally {partition.dispose();}
-    flushRoadMainBatch();
+    roadBatchBuilder.finish();
   });
   if(!isCurrent())return;
   await measureAsync('projectGroundRoadMarkings',async()=>{
@@ -659,10 +641,12 @@ export async function publishCompiledTransportMeshes(deps = {}) {
         indices: batch.indices,
         material: roadMat,
         renderOrder: 2,
+        frustumCulled: true,
         userData: {
           isRoadBatch: true,
           surfaceRanges: batch.ranges,
           roadBatchIndex: batchIndex,
+          roadSpatialKey: batch.spatialKey,
           sharedRoadMaterial: true,
           worldLoadSequence: appCtx._worldLoadSequence || 0
         }

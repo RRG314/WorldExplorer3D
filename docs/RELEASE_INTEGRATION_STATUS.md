@@ -4,6 +4,26 @@ Owner objective, September 16, 2026: retain the work done after the live release
 integrate useful improvements cleanly, and establish production release readiness.
 **Status: preserved integration candidate; production acceptance pending.**
 
+The latest completed a5d25f4d performance gate failed desktop frame-rate,
+mode-activation and triangle budgets; mobile emulation and repeated desktop
+teardown/reload passed. A reversible browser diagnostic showed that simply
+enabling culling on world-spanning road batches does not solve the workload.
+Road publication now groups complete incoming surfaces spatially and enables
+frustum culling for those static main meshes. No surface is removed or simplified;
+three regression cases preserve exact triangles, modes, deterministic publication
+and stacked collision support. All 497 current contracts pass. Fresh packaged
+performance and world validation are still required for this change.
+
+The space verifier's Moon assertion incorrectly treated net multi-body gravity
+as a single body's field. An isolated-body diagnostic passed; verification now
+checks each local field and Earth–Moon superposition. The complete space suite
+passed with that repair against the packaged runtime. The first-journey verifier
+still reported a hidden tutorial card after world entry, and the cargo verifier
+timed out during Earth startup. Loading polls now skip expensive diagnostics
+behind the cover and use 500 ms intervals without extending either requirement;
+tutorial failures retain actual UI/runtime state and a screenshot. These failures
+are not declared resolved by the harness changes.
+
 ## Candidate and preserved work
 
 - Production observed by the forensic audit: `db62593ba377e276e5079c78238fa3a83e501c93`.

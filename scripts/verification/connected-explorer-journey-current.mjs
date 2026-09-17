@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
@@ -74,9 +74,10 @@ try {
 
   await page.locator('#globeSelectorStartBtn').click();
   await page.waitForFunction(() => {
+    if (document.getElementById('loading')?.classList.contains('show')) return false;
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.();
     return diagnostics?.gameStarted === true && diagnostics.worldLoading === false;
-  }, null, { timeout: 360_000 });
+  }, null, { timeout: 360_000, polling: 500 });
   await page.waitForFunction(() => !document.getElementById('loading')?.classList.contains('show'), null, { timeout: 120_000 });
 
   await page.waitForSelector('#tutorialHintCard:not([hidden])', { timeout: 20_000 });
@@ -172,6 +173,19 @@ try {
   report.ok = report.ok && Object.values(report.checks).every(Boolean);
   console.log(JSON.stringify(report, null, 2));
   assert.equal(report.ok, true);
+} catch (error) {
+  const state = await page.evaluate(() => ({
+    tutorial: JSON.parse(localStorage.getItem('worldExplorer3D.tutorialState.v5') || 'null'),
+    elements: ['tutorialHintCard','urbanVehiclePrompt','interiorPrompt','boatPrompt','discoveryContextPrompt','controlsTab','worldSelectionNotice','urbanEquipment'].map(id => {
+      const element=document.getElementById(id);
+      return {id, hidden:element?.hidden, classes:element?.className, display:element?getComputedStyle(element).display:null, text:element?.textContent?.slice(0,1000)};
+    }),
+    openMenus:[...document.querySelectorAll('.floatMenu.open')].map(e=>e.id),
+    runtime:globalThis.getWorldExplorerRuntimeDiagnostics?.()
+  })).catch(()=>null);
+  await writeFile(`${evidenceDir}/failure.json`,JSON.stringify({ok:false,error:String(error?.stack||error),state},null,2)+'\n');
+  await page.screenshot({path:`${evidenceDir}/failure.png`}).catch(()=>{});
+  throw error;
 } finally {
   await context.close();
   await browser.close();

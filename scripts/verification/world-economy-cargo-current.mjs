@@ -39,9 +39,10 @@ async function buyEarthMaterial(context) {
     await searchResult.click();
     await page.locator('#globeSelectorStartBtn').click();
     await page.waitForFunction(() => {
+      if (document.getElementById('loading')?.classList.contains('show')) return false;
       const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
       return snapshot.gameStarted && !snapshot.worldLoading && snapshot.urbanSandbox?.active;
-    }, null, { timeout: 120_000 });
+    }, null, { timeout: 120_000, polling: 500 });
 
     const places = await page.evaluate(() => {
       const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');

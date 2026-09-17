@@ -30,9 +30,10 @@ async function run() {
     await searchResult.click();
     await page.locator('#globeSelectorStartBtn').click();
     await page.waitForFunction(() => {
+      if (document.getElementById('loading')?.classList.contains('show')) return false;
       const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
       return state.gameStarted && !state.worldLoading && state.urbanSandbox?.active;
-    }, null, { timeout: 120_000 });
+    }, null, { timeout: 120_000, polling: 500 });
     const places = await page.evaluate(() => {
       const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
       return snapshot.urbanSandbox?.commerce?.stores || [];
