@@ -500,7 +500,9 @@ export function buildTerrainTileMesh(z, tx, ty, deps = {}) {
   mesh.position.set(0, 0, 0);
   mesh.receiveShadow = true;
   mesh.castShadow = false;
-  mesh.frustumCulled = false;
+  // Height publication, seam stitching and reprojection invalidate the bounds;
+  // Three rebuilds the sphere from the current vertices before culling.
+  mesh.frustumCulled = true;
   mesh.userData = { terrainTile: { z, tx, ty, bounds } };
   mesh.userData.terrainTileKey = terrainTileMeshKey(z, tx, ty);
   mesh.userData.isTerrainMesh = true;

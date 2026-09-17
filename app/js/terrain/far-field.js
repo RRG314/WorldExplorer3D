@@ -627,7 +627,8 @@ function createFarFieldTerrainApi(deps = {}) {
     const mesh = new THREE.Mesh(built.geometry, material);
     mesh.name = 'FixedLocationTerrainLod';
     mesh.renderOrder = 0;
-    mesh.frustumCulled = false;
+    // The geometry planner computes bounds and refreshes them after seam edits.
+    mesh.frustumCulled = true;
     mesh.receiveShadow = true;
     mesh.castShadow = false;
     mesh.userData.isFarTerrainClipmap = true;
