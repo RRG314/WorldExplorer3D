@@ -177,6 +177,26 @@ control, and captured the lead cleared on opening Today. Two new director
 regressions failed before the repair; all four now pass, with 494 current
 contracts passing. Complete rebuilt free-roam/GPS browser acceptance follows.
 
+The rebuilt b3073372 complete walking-field gate passed in 252.3 seconds, including
+both free-roam and GPS acceptance after notice expiry, matching lead identity,
+phone target size/fit and invitation cleanup. Fishing passed in 174.2 seconds,
+fishing loss/recovery in 144.6 seconds, and environment entry in 47.4 seconds.
+PaintTown initially failed on localhost App Check rejection; the same gameplay
+checks passed with registered temporary staging debug attestation (50.4 seconds,
+2373 MiB sampled peak). That credential was revoked and removed. Its verifier
+now supports the existing private staging credential helper and labels this
+evidence as distinct from production attestation.
+
+Public `main` remains 6c777919, whose tree is exactly
+`f80b2c4c05966c30058f9d8532140aacab62fe56`: the tree of production's parent
+f8b5a936. It is a separate squash commit, not an ancestor of the original street
+candidate. Its 18-path difference from deployed db62593b is exactly that deployed
+hotfix. Recording this already-included snapshot in the local integration
+ancestry preserves the candidate tree and avoids treating the public sync as
+independent new source. The public main/release branches are not changed. The
+precondition and resulting tree/ancestry evidence are saved under
+`output/release-integration/live-checks/`.
+
 London ground accuracy remains an unresolved release-quality question. Comparing
 the actual production and candidate artifacts found 191 changed grid samples
 (maximum 16.74 m). Seven independent Environment Agency 1 m DTM point queries

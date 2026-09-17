@@ -4,6 +4,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { chromium, devices } from 'playwright';
 import { startStaticServer } from '../scripts/verification/static-server.mjs';
+import { configureStagingAppCheck } from '../scripts/verification/staging-app-check.mjs';
 import { deriveRoomDeterministicSeed } from '../app/js/multiplayer/rooms-seed-model.js';
 
 const VERIFY_ROOT = process.env.WE3D_VERIFY_ROOT || process.cwd();
@@ -180,6 +181,7 @@ async function run() {
       screen: { width: 1280, height: 800 }
     });
     const page = await context.newPage();
+    report.appCheck = await configureStagingAppCheck(page, APP_URL);
     page.on('console', (msg) => {
       if (msg.type() === 'error') {
         const message = `console.error: ${msg.text()}`;
