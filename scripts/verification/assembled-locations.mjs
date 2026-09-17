@@ -103,6 +103,12 @@ try {
     const browserConsole = [];
     const localFailures = [];
     page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
+    page.on('crash', () => {
+      browserErrors.push('Browser renderer crashed during assembled-world verification');
+      // Chromium can leave a polling request pending after renderer OOM.
+      // Closing this owned page makes the failed case finish immediately.
+      void page.close().catch(() => {});
+    });
     page.on('console', (message) => {
       if (!['warning', 'error'].includes(message.type())) return;
       if (browserConsole.length < 120) {

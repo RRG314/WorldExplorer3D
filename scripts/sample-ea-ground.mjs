@@ -6,7 +6,7 @@ const coords=JSON.parse(await fs.readFile(`${base}/coordinates.json`));
 const rows=coords.samples.map(s=>({...s,sum:0,sumSquared:0,valid:0,total:0,sourceTiles:[]}));
 const inside=(x,y,p)=>p.every((a,i)=>{const b=p[(i+1)%p.length];return (b[0]-a[0])*(y-a[1])-(b[1]-a[1])*(x-a[0])>=-1e-6;});
 const metadata=[];
-for(const filename of (await fs.readdir(base)).filter(n=>n.endsWith('.tif'))){
+for(const filename of (await fs.readdir(base)).sort().filter(n=>n.endsWith('.tif'))){
  const file=await fromFile(`${base}/${filename}`);
  try {
   const image=await file.getImage();const [ox,oy]=image.getOrigin();const [dx,dy]=image.getResolution();const width=image.getWidth(),height=image.getHeight(),nodata=image.getGDALNoData();

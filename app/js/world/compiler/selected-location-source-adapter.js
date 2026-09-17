@@ -110,6 +110,28 @@ export function diagnoseDistrictGroundSource(sample = null, options = {}) {
   });
 }
 
+// Provider responses cover a much wider area than the retained district.
+// Normalize only referenced geometry nodes plus tagged point observations.
+// The latter also feed mapped street furniture outside the POI budget.
+function retainedSelectionNodes(nodes = {}, selection = {}) {
+  const referenced = new Set();
+  for (const key of ['roadWays', 'buildingWays', 'landuseWays', 'waterwayWays',
+    'railwayWays', 'footwayWays', 'cyclewayWays', 'structureConnectorWays',
+    'treeRowWays', 'treeNodes', 'poiNodes']) {
+    for (const feature of selection[key] || []) {
+      if (feature?.type === 'node') referenced.add(String(feature.id));
+      else for (const id of feature?.nodes || []) referenced.add(String(id));
+    }
+  }
+  const retained = {};
+  for (const id in nodes) {
+    if (!Object.hasOwn(nodes, id)) continue;
+    const node = nodes[id];
+    if (referenced.has(String(id)) || (node?.tags && Object.keys(node.tags).length)) retained[id] = node;
+  }
+  return retained;
+}
+
 export function adaptSelectedLocationSource(options = {}) {
   const location = options.location || {};
   const selection = options.selection || {};
@@ -131,7 +153,7 @@ export function adaptSelectedLocationSource(options = {}) {
       retrieval: options.data?._overpassSource || 'vector-source',
       license: 'ODbL-1.0'
     },
-    nodes: options.nodes,
+    nodes: retainedSelectionNodes(options.nodes, selection),
     featureCollections: {
       roads: selection.roadWays,
       buildings: selection.buildingWays,
