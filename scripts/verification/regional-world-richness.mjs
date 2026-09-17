@@ -106,7 +106,7 @@ async function startRegionalFieldLead(page, journey) {
 
 async function inspectJourney(journey) {
   const browser = await chromium.launch({
-    headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024']
+    headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280']
   });
   try {
     return await inspectJourneyInBrowser(browser, journey);
@@ -209,7 +209,7 @@ async function inspectJourneyInBrowser(browser, journey) {
 const report = {
   contract: 'regional-world-richness-v1', ok: false, complete: false, servedRoot,
   requestedJourneys: journeys.map(journey => journey.id), results: [],
-  browserBudget: { maxOldSpaceMiB: 1024, freshBrowserPerJourney: true }
+  browserBudget: { maxOldSpaceMiB: 1280, freshBrowserPerJourney: true }
 };
 try {
   await mkdir('output/release-evidence/current', { recursive: true });

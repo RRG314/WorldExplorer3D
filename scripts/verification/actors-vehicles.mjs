@@ -497,7 +497,7 @@ const selectedLocations = requested.size ? locations.filter((location) => reques
 assert.ok(selectedLocations.length > 0, 'No actor/vehicle verification locations selected.');
 
 const results = [];
-const browserBudget = { engine: 'installed-chrome', maxOldSpaceMiB: 1024 };
+const browserBudget = { engine: 'installed-chrome', maxOldSpaceMiB: 1280 };
 async function boundedClose(close, timeoutMs = 8000) {
   let timer;
   try {
@@ -539,7 +539,7 @@ async function saveReport(complete = false) {
 try {
   for (const location of selectedLocations) {
     console.error(`[actors-vehicles] START ${location.id}`);
-    const browserServer = await chromium.launchServer({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
+    const browserServer = await chromium.launchServer({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280'] });
     let browser, context, page;
     try {
       browser = await chromium.connect(browserServer.wsEndpoint());
