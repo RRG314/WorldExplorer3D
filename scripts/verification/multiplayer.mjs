@@ -25,7 +25,15 @@ const moduleUrls = requestedRoot
     return { rooms: `/app/${rooms}`, artifacts: `/app/${artifacts}` };
   })
   : sourceModuleUrls;
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+// Correctness coverage retains both complete worlds; performance is measured
+// separately. Bound old-space allocation on the small-memory verification host.
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280'] });
+const browserBudget = { maxOldSpaceMiB: 1280, worldInitialization: 'sequential', simultaneouslyActiveWorlds: 2 };
+async function recordStage(stage) {
+  console.log(`[multiplayer] ${stage}`);
+  await fs.mkdir(path.dirname(reportPath), { recursive: true });
+  await fs.writeFile(reportPath, `${JSON.stringify({ ok: false, complete: false, stage, browserBudget }, null, 2)}\n`);
+}
 const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const firebaseProjectId = String(process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || 'we3d-staging-20260712');
 const functionsOrigin = `http://127.0.0.1:5001/${firebaseProjectId}/us-central1`;
@@ -121,10 +129,11 @@ async function launchRoomWorld(player) {
     await start.click();
   }
   await player.page.waitForFunction(() => {
+    if (document.getElementById('loading')?.classList.contains('show')) return false;
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return state.gameStarted === true && state.worldLoading === false && state.activeActor?.mode === 'walk' &&
       state.urbanSandbox?.active === true && Number(state.urbanSandbox?.vehicleCount || 0) > 0;
-  }, null, { timeout: 360_000 });
+  }, null, { timeout: 360_000, polling: 500 });
   await player.page.waitForTimeout(1_500);
   const skip = player.page.getByRole('button', { name: 'Skip guide', exact: true });
   if (await skip.isVisible().catch(() => false)) {
@@ -265,6 +274,10 @@ try {
     return String(activeRoomText || '').match(/\b[A-Z2-9]{6}\b/)?.[0] || '';
   }
 
+  // Creating/joining a room itself launches its world. Wait here, before the
+  // second join, rather than merely serializing waits after both have started.
+  await recordStage('owner room created; loading owner world before member joins');
+  await launchRoomWorld(owner);
   const memberJoinedRoomCode = await joinThroughNormalControls(member, room.code);
 
   const artifactTitle = `Shared release artifact ${runId}`;
@@ -308,7 +321,9 @@ try {
     return snapshot.size;
   }, room.code);
 
-  await Promise.all([launchRoomWorld(owner), launchRoomWorld(member)]);
+  await recordStage('room UI and shared artifact completed; loading member world');
+  await launchRoomWorld(member);
+  await recordStage('both worlds ready; verifying shared vehicle and movement');
   const sharedVehicleCandidates = await owner.page.evaluate(() => {
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     const actor = state.activeActor?.position || {};
@@ -385,8 +400,13 @@ try {
   await owner.page.waitForTimeout(1_100);
   await owner.page.keyboard.up('ArrowUp');
   await owner.page.keyboard.down('Space');
-  await owner.page.waitForTimeout(850);
-  await owner.page.keyboard.up('Space');
+  try {
+    // The visible exit action requires low speed plus a stability interval.
+    // Fixed-duration braking can press E before that action becomes available.
+    await owner.page.waitForFunction(() =>
+      globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.interaction?.action === 'exit_vehicle',
+    null, { timeout: 12_000, polling: 250 });
+  } finally { await owner.page.keyboard.up('Space'); }
   await owner.page.keyboard.press('KeyE');
   await owner.page.waitForFunction((vehicleId) => {
     const urban = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox;
@@ -438,6 +458,8 @@ try {
   assert.ok(Object.values(checks).every(Boolean), 'Two-client multiplayer verification failed.');
   const report = {
     ok: true,
+    complete: true,
+    browserBudget,
     contract: 'two-authenticated-clients-bounded-room-convergence',
     generatedAt: new Date().toISOString(),
     checks,
@@ -458,6 +480,20 @@ try {
   await fs.mkdir(path.dirname(reportPath), { recursive: true });
   await fs.writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   console.log(JSON.stringify(report, null, 2));
+} catch (error) {
+  const clients = {};
+  for (const [label, player] of [['owner', owner], ['member', member]]) {
+    if (!player?.page) continue;
+    clients[label] = await player.page.evaluate(() => ({
+      diagnostics: globalThis.getWorldExplorerRuntimeDiagnostics?.() || null,
+      focusedElement: document.activeElement?.id || document.activeElement?.tagName || '',
+      vehiclePrompt: document.getElementById('urbanVehiclePrompt')?.textContent || ''
+    })).catch(failure => ({ captureError: String(failure) }));
+    await player.page.screenshot({ path: path.join(path.dirname(reportPath), `${label}-failure.png`), timeout: 5000 }).catch(() => {});
+  }
+  await fs.mkdir(path.dirname(reportPath), { recursive: true });
+  await fs.writeFile(reportPath, `${JSON.stringify({ ok: false, complete: false, error: String(error?.stack || error), browserBudget, clients }, null, 2)}\n`);
+  throw error;
 } finally {
   // Firebase keeps streaming connections open in both player contexts. Closing
   // either context sequentially can wait forever and prevent Playwright from

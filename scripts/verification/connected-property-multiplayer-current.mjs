@@ -148,10 +148,10 @@ async function waitForStatus(page, pattern) {
 let owner;
 let buyer;
 try {
-  [owner, buyer] = await Promise.all([
-    createPlayer('Owner Rowan', { width: 1440, height: 900 }),
-    createPlayer('Buyer Vale', { width: 390, height: 844 })
-  ]);
+  // Keep both authenticated clients for the transaction/listener assertions,
+  // but do not compile two application shells concurrently on small hosts.
+  owner = await createPlayer('Owner Rowan', { width: 1440, height: 900 });
+  buyer = await createPlayer('Buyer Vale', { width: 390, height: 844 });
   const room = await createSharedRoom(owner);
   await joinSharedRoom(buyer, room.code);
 
@@ -213,10 +213,8 @@ try {
   assert.ok(Number(persisted.wallet.credits) > 0 && Number(persisted.wallet.credits) < STARTING_CREDITS);
   assert.equal(Number(persisted.wallet.currencyVersion), 2);
 
-  await Promise.all([
-    owner.page.screenshot({ path: path.join(outputDir, 'desktop-owner-after-sale.png'), fullPage: true }),
-    buyer.page.screenshot({ path: path.join(outputDir, 'mobile-buyer-owned.png'), fullPage: true })
-  ]);
+  await owner.page.screenshot({ path: path.join(outputDir, 'desktop-owner-after-sale.png'), fullPage: true });
+  await buyer.page.screenshot({ path: path.join(outputDir, 'mobile-buyer-owned.png'), fullPage: true });
   const report = {
     ok: browserFailures.length === 0,
     roomCode: room.code,

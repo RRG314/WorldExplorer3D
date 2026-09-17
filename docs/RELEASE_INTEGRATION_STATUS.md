@@ -199,3 +199,18 @@ location's results and screenshots even on failure. It selects Day through the
 current visible time control; the removed Environment-controls selector had
 silently skipped that step. BrowserServer owns process shutdown. A small real
 Chrome lifecycle probe confirmed server close terminates that process.
+
+Backend property clients initialize and capture screenshots sequentially while
+retaining both authenticated clients for transactions and listeners. The full
+multiplayer verifier waits for the owner's complete world before joining the
+member (room UI itself starts world loading), uses a 1,280 MiB old-space cap, and
+retains both worlds for walking, vehicle ownership, release and takeover. It
+brakes until the actual exit action appears, preserving the low-speed/stability
+rules. Failed runs retain runtime snapshots and screenshots.
+
+The corrected multiplayer and account diagnostic passed in 529.5 seconds with
+2,641 MiB peak aggregate RSS. All twelve backend stages have passed across
+local runs, but a complete final-artifact backend receipt is still required.
+The outer twelve-stage backend gate allows 20 minutes: its prior ten-minute
+default left almost no time for other stages after the 510-second multiplayer
+case. Individual test limits and the separate performance budgets are unchanged.
