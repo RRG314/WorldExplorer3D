@@ -106,9 +106,15 @@ test missed thin walls between its samples. Clearance now measures the complete
 0.35 m walker footprint against polygon edges and refuses an unsafe fallback;
 failed generated construction releases its allocated geometry/materials. Three
 regression cases, including previously failing thin/diagonal walls, now pass.
-The source check and all 489 current contracts pass. A rebuilt full interior
-journey is still required; the separate mobile pose-restoration failure remains
-open until that journey reaches it.
+The rebuilt 94835a4c artifact passed desktop entry, stairs, elevator round trips,
+wall collision/recovery and exit. Its mobile reload then reproduced a separate
+47.7 m displacement: a saved safe doorway pose passed the real 0.28/0.35 m walking
+collision checks but failed the 1.5 m fresh-arrival margin. Shared walking poses
+and saved walking-session restoration now use the full player radius for that
+check; fresh arrivals retain their wider margin. A regression using the captured
+Baltimore footprint fails before the fix and passes afterward, including rejection
+of poses inside or too close to walls. Source validation and all 490 current
+contracts pass. The full rebuilt desktop/mobile journey still needs acceptance.
 
 Terrain-boundary diagnostics passed with temporary registered staging App Check
 debug attestation (70.5 seconds, 2518 MiB peak). The original localhost run correctly

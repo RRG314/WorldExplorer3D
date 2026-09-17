@@ -76,7 +76,9 @@ function evaluateWalkSpawnCandidate(x, z, options = {}) {
     if (!standingOnRoof) return { valid: false, reason: "inside_building", terrainY };
   }
   const buildingCheck = !standingOnRoof && typeof appCtx.checkBuildingCollision === "function" ?
-    appCtx.checkBuildingCollision(x, z, 1.5, {
+    // A saved walking pose may validly stand close to a doorway. Validate the
+    // full player radius instead of moving it to satisfy fresh-arrival padding.
+    appCtx.checkBuildingCollision(x, z, options.restorePose === true ? 0.35 : 1.5, {
       actorBaseY: collisionBaseY,
       actorHeight: 1.9
     }) :
@@ -483,6 +485,7 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
   if (mode === "walk") {
     const direct = evaluateWalkSpawnCandidate(x, z, {
       angle,
+      restorePose: options.restorePose === true,
       feetY: options.feetY,
       preserveElevatedSurface: options.preserveElevatedSurface,
       preferredRoad: options.preferredRoad || null,

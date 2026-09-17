@@ -147,7 +147,8 @@ function initShareUi({ bindTouchFriendlyPress, closeAllFloatMenus, getTitleLaunc
           feetY: Number.isFinite(y) ? y - 1.7 : undefined,
           preserveElevatedSurface: Number.isFinite(y),
           preferredRoad,
-          source: 'shared_walk_pose'
+          source: 'shared_walk_pose',
+          restorePose: true
         });
         appCtx.applyResolvedWorldSpawn(restored, { mode: 'walk', syncCar: true, syncWalker: true });
       }

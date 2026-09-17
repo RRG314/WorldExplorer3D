@@ -140,7 +140,8 @@ function restorePoseFromSession() {
     appCtx.resolveSafeWorldSpawn(targetX, targetZ, {
       mode: targetMode,
       angle: targetAngle,
-      source: 'earth_resume'
+      source: 'earth_resume',
+      restorePose: targetMode === 'walk' && !!pose
     }) :
     {
       valid: true,
