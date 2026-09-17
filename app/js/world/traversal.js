@@ -1,5 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { roadSegmentIsDriveable } from './road-cross-section-profile.js?v=1';
+import { createTraversalSegmentIndex } from './traversal-segment-index.js';
 
 const TRAVERSAL_NODE_GRID = 2.5;
 const TRAVERSAL_MAX_ANCHOR_DISTANCE = {
@@ -22,6 +23,7 @@ const runtime = {
 };
 
 let traversalNetworksDirty = true;
+let traversalSegmentIndexes = new WeakMap();
 
 export function initWorldTraversal(deps = {}) {
   if (typeof deps.enableLinearFeatures === 'function') runtime.enableLinearFeatures = deps.enableLinearFeatures;
@@ -93,6 +95,7 @@ export function traversableFeaturesForMode(mode = 'walk') {
 
 export function invalidateTraversalNetworks(reason = 'world_data_change') {
   traversalNetworksDirty = true;
+  traversalSegmentIndexes = new WeakMap();
   appCtx.traversalNetworks = { walk: null, drive: null };
   return reason;
 }
@@ -347,10 +350,15 @@ function findNearestTraversalFeatures(x, z, options = {}) {
     Math.max(4, options.maxDistance) :
     TRAVERSAL_MAX_ANCHOR_DISTANCE[mode];
   const maximumCandidates = Math.max(1, Math.min(8, Number(options.maximumCandidates) || 4));
+  let index = traversalSegmentIndexes.get(segments);
+  if (!index || index.segmentCount !== segments.length) {
+    index = { segmentCount: segments.length, lookup: createTraversalSegmentIndex(segments) };
+    traversalSegmentIndexes.set(segments, index);
+  }
 
   const candidates = [];
-  for (let i = 0; i < segments.length; i++) {
-    const segment = segments[i];
+  for (const id of index.lookup.query(x, z, maxDistance)) {
+    const segment = segments[id];
     if (excludeRoads && traversalFeatureKind(segment.feature) === 'road') continue;
     const projected = projectPointToSegment(x, z, segment.p1, segment.p2);
     if (!Number.isFinite(projected.dist) || projected.dist > maxDistance) continue;

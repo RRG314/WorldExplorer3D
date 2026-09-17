@@ -4,6 +4,23 @@ Owner objective, September 16, 2026: retain the work done after the live release
 integrate useful improvements cleanly, and establish production release readiness.
 **Status: preserved integration candidate; production acceptance pending.**
 
+The e29d5c56 full performance run retained all 18,758 roads and brought desktop
+triangles inside budget (walking 6.54m → 4.71m; flight 6.00m → 3.13m). Walking
+improved to 27.84 FPS, still below 43.65; driving was 38.57 FPS and its measured
+activation was 1026 ms against 1000 ms. Mobile and all retention/coverage checks
+passed. This remains a failed full performance gate, not release approval.
+
+A subsequent packaged-runtime CPU profile attributed about 3.5 s of a 10 s
+walking sample to repeated traversal searches, and 0.88 s of a driving sample
+to an inactive Mars-atmosphere name search through the Earth scene. Traversal
+now uses a bounded spatial broad phase with exact original projection, weighting,
+range and tie ordering; world invalidation retires its cache. A 30,000-segment,
+400-query comparison against e29d5c56 returned exactly equal results and took
+10.36 ms versus 311.49 ms, with a 22.18 ms initial index/query cost. Earth/space
+frames no longer run planetary sky updates. That regression failed before the
+repair; planetary updates still pass. All 502 current contracts pass. These are
+component/dispatch results; fresh packaged gameplay/performance remains required.
+
 The latest completed a5d25f4d performance gate failed desktop frame-rate,
 mode-activation and triangle budgets; mobile emulation and repeated desktop
 teardown/reload passed. A reversible browser diagnostic showed that simply
