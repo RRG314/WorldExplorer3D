@@ -130,6 +130,17 @@ peak 2438 MiB. The aggregate three-world gate now allows 20 minutes; its individ
 gameplay assertions/timeouts and performance budgets are unchanged. A complete
 clean urban gate receipt is still required.
 
+The clean 22766d2d run passed equipment (14 checks), tutorial controls, commerce,
+and the full desktop/mobile menu gate. Urban arrest and medical recovery passed,
+but vehicle startup again crossed the process guard at 3025 MiB. A separate
+hotbar run passed every desktop action through free space flight and direct Moon
+travel, then reached the same sampled peak during mobile startup. Neither
+interrupted gate is counted as complete. Hotbar verification now closes each
+independent journey's browser before creating the next, caps old-space at 1280
+MiB, and saves failure state. Its aggregate allowance is 20 minutes for four
+world starts; individual gameplay timeouts and performance limits remain intact.
+These harness changes require fresh complete receipts before release acceptance.
+
 London ground accuracy remains an unresolved release-quality question. Comparing
 the actual production and candidate artifacts found 191 changed grid samples
 (maximum 16.74 m). Seven independent Environment Agency 1 m DTM point queries

@@ -7,14 +7,37 @@ const baseUrl = String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:419
 const outputDir = path.resolve('output/verification/hotbar-actions-current');
 await fs.mkdir(outputDir, { recursive: true });
 
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
-const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const resumeStage = Number(process.env.WE3D_HOTBAR_RESUME_STAGE || 0);
 const onlyAction = String(process.env.WE3D_HOTBAR_ONLY_ACTION || '');
 const failures = [];
 const completed = [];
 const localRequestFailures = [];
 const pageErrors = [];
+
+async function withJourney(name, mobile, run) {
+  const browser = await chromium.launch({
+    headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280']
+  });
+  let page;
+  try {
+    const context = await browser.newContext({
+      viewport: mobile ? { width: 390, height: 844 } : { width: 1440, height: 900 },
+      hasTouch: mobile, isMobile: mobile
+    });
+    page = await context.newPage();
+    watchPage(page);
+    return await run(page);
+  } catch (error) {
+    const state = page ? await snapshot(page).catch(() => null) : null;
+    await fs.writeFile(path.join(outputDir, `${name}-failure.json`), JSON.stringify({
+      error: String(error?.stack || error), completed, state, pageErrors, localRequestFailures
+    }, null, 2));
+    await page?.screenshot({ path: path.join(outputDir, `${name}-failure.png`), timeout: 10000 }).catch(() => {});
+    throw error;
+  } finally {
+    await browser.close();
+  }
+}
 
 function mark(label, details = '') {
   completed.push({ label, details });
@@ -159,10 +182,11 @@ async function verifyEarthActions(page) {
   await page.locator('#mapSearchBtn').click();
   await page.locator('#largeMap').waitFor({ state: 'hidden', timeout: 20_000 });
   await page.waitForFunction((priorSequence) => {
+    if (document.getElementById('loading')?.classList.contains('show')) return false;
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return diagnostics.worldLoading === false
       && Number(diagnostics.livingWorld?.sequence || 0) > priorSequence;
-  }, worldSequenceBeforeSearch, { timeout: 180_000 });
+  }, worldSequenceBeforeSearch, { timeout: 180_000, polling: 500 });
   await page.locator('#loading.show').waitFor({ state: 'hidden', timeout: 180_000 });
   const searchedLocation = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
@@ -343,9 +367,7 @@ async function verifyEnvironmentAndSpaceActions(page) {
   await page.screenshot({ path: path.join(outputDir, 'desktop-solis-reach.png'), fullPage: true });
 }
 
-async function verifyIsolatedSpaceAction(actionId, label, predicate) {
-  const page = await context.newPage();
-  watchPage(page);
+async function verifyIsolatedSpaceAction(page, actionId, label, predicate) {
   await startEarth(page, actionId);
   await clickMenuItem(page, 'travelBtn', 'travelMenu', actionId);
   try {
@@ -355,13 +377,9 @@ async function verifyIsolatedSpaceAction(actionId, label, predicate) {
     throw new Error(`${label} did not reach its end state. Current state: ${JSON.stringify(state)}\n${error?.stack || error}`);
   }
   mark(label);
-  await page.close();
 }
 
-async function verifyMobileAccess() {
-  const mobileContext = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
-  const page = await mobileContext.newPage();
-  watchPage(page);
+async function verifyMobileAccess(page) {
   await startEarth(page, 'mobile');
   await clickMenuItem(page, 'exploreBtn', 'exploreMenu', 'fWorldDiscovery');
   await page.locator('#discoveryPanel[aria-hidden="false"]').waitFor({ state: 'visible', timeout: 20_000 });
@@ -387,37 +405,36 @@ async function verifyMobileAccess() {
   assert.equal(await page.locator('#ctrlContent').evaluate((el) => el.classList.contains('hidden')), false);
   await page.screenshot({ path: path.join(outputDir, 'mobile-hotbar-access.png'), fullPage: true });
   mark('Mobile 390×844 access', 'all five roots and Controls accept one touch without double-toggle');
-  await mobileContext.close();
 }
 
 try {
   if (!onlyAction) {
-    const page = await context.newPage();
-    watchPage(page);
-    await startEarth(page, 'main');
-    await verifyEarthActions(page);
-    await verifyEnvironmentAndSpaceActions(page);
-    await page.close();
+    await withJourney('main', false, async (page) => {
+      await startEarth(page, 'main');
+      await verifyEarthActions(page);
+      await verifyEnvironmentAndSpaceActions(page);
+    });
   }
 
-  if (!onlyAction || onlyAction === 'fSpaceRocket') await verifyIsolatedSpaceAction('fSpaceRocket', 'Travel · Free Space Flight', () => {
+  if (!onlyAction || onlyAction === 'fSpaceRocket') await withJourney('space-flight', false, (page) => verifyIsolatedSpaceAction(page, 'fSpaceRocket', 'Travel · Free Space Flight', () => {
     const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
     return state.modes?.space === true && state.spaceFlight?.controlMode === 'flying';
-  });
-  if (!onlyAction || onlyAction === 'fSpaceDirect') await verifyIsolatedSpaceAction('fSpaceDirect', 'Travel · Direct to Moon', () => {
+  }));
+  if (!onlyAction || onlyAction === 'fSpaceDirect') await withJourney('moon', false, (page) => verifyIsolatedSpaceAction(page, 'fSpaceDirect', 'Travel · Direct to Moon', () => {
     const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
     return state.environment === 'MOON' && state.worldLoading === false;
-  });
-  if (!onlyAction || onlyAction === 'mobile') await verifyMobileAccess();
+  }));
+  if (!onlyAction || onlyAction === 'mobile') await withJourney('mobile', true, verifyMobileAccess);
 } catch (error) {
   failures.push(String(error?.stack || error));
-} finally {
-  await context.close();
-  await browser.close();
 }
 
 failures.push(...pageErrors, ...localRequestFailures);
-const report = { ok: failures.length === 0, baseUrl, completed, failures };
+const report = {
+  ok: failures.length === 0, baseUrl, completed, failures,
+  complete: !onlyAction && resumeStage === 0,
+  browserBudget: { maxOldSpaceMiB: 1280, freshBrowserPerJourney: true }
+};
 await fs.writeFile(path.join(outputDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
 console.log(JSON.stringify(report, null, 2));
 assert.deepEqual(failures, []);
