@@ -16,9 +16,10 @@ const pageErrors = [];
 
 async function withJourney(name, mobile, run) {
   const browser = await chromium.launch({
-    headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024']
+    headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280']
   });
   let page;
+  let crashed = false;
   try {
     const context = await browser.newContext({
       viewport: mobile ? { width: 390, height: 844 } : { width: 1440, height: 900 },
@@ -26,13 +27,17 @@ async function withJourney(name, mobile, run) {
     });
     page = await context.newPage();
     watchPage(page);
-    return await run(page);
+    const crash = new Promise((_, reject) => page.once('crash', () => {
+      crashed = true;
+      reject(new Error(`Gameplay renderer crashed during ${name}.`));
+    }));
+    return await Promise.race([run(page), crash]);
   } catch (error) {
-    const state = page ? await snapshot(page).catch(() => null) : null;
+    const state = page && !crashed ? await snapshot(page).catch(() => null) : null;
     await fs.writeFile(path.join(outputDir, `${name}-failure.json`), JSON.stringify({
       error: String(error?.stack || error), completed, state, pageErrors, localRequestFailures
     }, null, 2));
-    await page?.screenshot({ path: path.join(outputDir, `${name}-failure.png`), timeout: 10000 }).catch(() => {});
+    if (!crashed) await page?.screenshot({ path: path.join(outputDir, `${name}-failure.png`), timeout: 10000 }).catch(() => {});
     throw error;
   } finally {
     await browser.close();
@@ -433,7 +438,7 @@ failures.push(...pageErrors, ...localRequestFailures);
 const report = {
   ok: failures.length === 0, baseUrl, completed, failures,
   complete: !onlyAction && resumeStage === 0,
-  browserBudget: { maxOldSpaceMiB: 1024, freshBrowserPerJourney: true }
+  browserBudget: { maxOldSpaceMiB: 1280, freshBrowserPerJourney: true }
 };
 await fs.writeFile(path.join(outputDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
 console.log(JSON.stringify(report, null, 2));

@@ -29,6 +29,25 @@ async function listen(rootDir, host, port) {
   const server = http.createServer(async (request, response) => {
     try {
       const requestUrl = new URL(request.url || '/', `http://${host}:${port}`);
+      // Match the local preview's read-only backend route. A static 404 here
+      // prevents real DeFlock journeys from exercising their production source.
+      if (requestUrl.pathname === '/api/geospatial/deflock-cameras') {
+        response.setHeader('Content-Type', 'application/json; charset=utf-8');
+        response.setHeader('Cache-Control', 'no-store');
+        if (request.method !== 'GET') {
+          response.writeHead(405).end(JSON.stringify({ error: 'Method not allowed.' }));
+          return;
+        }
+        try {
+          const { default: geospatial } = await import('../../functions/geospatial.js');
+          const payload = await geospatial.queryDeFlockCameras(Object.fromEntries(requestUrl.searchParams));
+          response.writeHead(200).end(JSON.stringify(payload));
+        } catch (error) {
+          response.writeHead(Number(error?.statusCode) || (error?.name === 'AbortError' ? 504 : 502))
+            .end(JSON.stringify({ error: error?.message || 'Mapped camera data is unavailable.' }));
+        }
+        return;
+      }
       if (await serveMutableSourceManifest({
         pathname: requestUrl.pathname,
         rootDir,
