@@ -48,6 +48,11 @@ function positionOverlayBetween(overlay, leftRect, rightRect) {
 
 function positionTopOverlays() {
   if (!appCtx.gameStarted) return;
+  const debugOverlay = document.getElementById('debugOverlay');
+  const perfPanel = document.getElementById('perfPanel');
+  const debugVisible = !!debugOverlay && debugOverlay.style.display !== 'none';
+  const perfVisible = !!perfPanel && perfPanel.style.display !== 'none';
+  if (!debugVisible && !perfVisible) return;
   const hudRect = isVisibleRect(document.getElementById('hud'));
   const menuRect = isVisibleRect(document.getElementById('mainMenuBtn'));
   if (!hudRect || !menuRect) return;
@@ -60,12 +65,10 @@ function positionTopOverlays() {
     width: 1,
     height: 1
   };
-  const debugOverlay = document.getElementById('debugOverlay');
-  if (debugOverlay && debugOverlay.style.display !== 'none') {
+  if (debugVisible) {
     positionOverlayBetween(debugOverlay, hudRect, centerRect);
   }
-  const perfPanel = document.getElementById('perfPanel');
-  if (perfPanel && perfPanel.style.display !== 'none') {
+  if (perfVisible) {
     positionOverlayBetween(perfPanel, centerRect, menuRect);
   }
 }

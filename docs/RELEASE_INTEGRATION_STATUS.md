@@ -4,6 +4,20 @@ Owner objective, September 16, 2026: retain the work done after the live release
 integrate useful improvements cleanly, and establish production release readiness.
 **Status: preserved integration candidate; production acceptance pending.**
 
+The clean f1a1cd27 full performance run completed in 428.4 s, peak owned RSS
+2692 MiB, with mobile passing. Walking improved to 40.00 FPS (p95/p99 33.4 ms),
+but still misses 43.65. Driving measured 35.93 FPS, p99 83.4 ms and 1293 ms
+activation. Desktop triangles, first play, sustained flight, retention, coverage
+and resource checks passed. This remains a failed performance gate.
+
+A subsequent CPU profile identified unnecessary HUD/menu geometry reads when both
+diagnostic overlays are hidden. The layout function now returns before those
+reads; both hidden/show/hide regressions failed before and pass after. All 504
+current contracts pass. An isolated broad matrix-freeze diagnostic was restored
+and rejected as a production change: baseline/frozen/restored were 42.28/43.12/
+43.70 FPS, with changing draw counts, and the root contains animated population,
+animals and vehicles. It did not establish a causal benefit or safe optimization.
+
 Fresh 9b018295 first-journey failure capture identified the hidden tutorial's
 cause: a Rock Pigeon Observe action appeared while a new player was stationary,
 and contextual-priority CSS hid the movement instruction indefinitely. The
