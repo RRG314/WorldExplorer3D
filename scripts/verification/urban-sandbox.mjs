@@ -14,9 +14,31 @@ const server = await startStaticServer({ rootDir: servedRoot, ports: [4410, 4411
 const baseUrl = `http://127.0.0.1:${server.port}`;
 const reportPath = path.join(root, 'output', 'verification', 'urban-sandbox',
   requestedScope === 'all' ? 'report.json' : `report-${requestedScope}.json`);
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const browserErrors = [];
 const localFailures = [];
+
+async function createJourneyBrowser() {
+  const browser = await chromium.launch({
+    headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280']
+  });
+  try {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    return { browser, context, page: await context.newPage() };
+  } catch (error) {
+    await browser.close();
+    throw error;
+  }
+}
+
+async function saveJourneyFailure(page, journey, error) {
+  const directory = path.join(root, 'output', 'release-evidence', 'current', 'urban-sandbox');
+  await mkdir(directory, { recursive: true });
+  const state = await diagnostics(page).catch(() => null);
+  await writeFile(path.join(directory, `${journey}-failure.json`), JSON.stringify({
+    ok: false, journey, error: String(error?.stack || error), state, browserErrors, localFailures
+  }, null, 2));
+  await page.screenshot({ path: path.join(directory, `${journey}-failure.png`), timeout: 10000 }).catch(() => {});
+}
 
 function bindEvidence(page) {
   page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
@@ -168,11 +190,12 @@ async function launchBaltimore(page) {
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   await page.getByRole('button', { name: 'Explore', exact: true }).click();
   await page.waitForFunction(() => {
+    if (document.getElementById('loading')?.classList.contains('show')) return false;
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return state.gameStarted === true && state.worldLoading === false && state.activeActor?.mode === 'walk' &&
       state.livingWorld?.active === true && state.urbanSandbox?.active === true &&
       Number(state.urbanSandbox?.vehicleCount || 0) > 0;
-  }, null, { timeout: 360_000 });
+  }, null, { timeout: 360_000, polling: 500 });
   await page.waitForTimeout(2_000);
   const skip = page.getByRole('button', { name: 'Skip guide', exact: true });
   if (await skip.isVisible().catch(() => false)) await skip.click();
@@ -469,8 +492,7 @@ async function verifyCustodyIncidentEnded(page) {
 }
 
 async function runVehicleEquipmentJourney() {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-  const page = await context.newPage();
+  const { browser, context, page } = await createJourneyBrowser();
   bindEvidence(page);
   try {
     const ready = await launchBaltimore(page);
@@ -601,14 +623,16 @@ async function runVehicleEquipmentJourney() {
       parachuteBefore: parachuteBefore.urbanSandbox.parachute,
       parachuteGroundRecovery: parachuteGroundRecovery.urbanSandbox.parachute
     };
+  } catch (error) {
+    await saveJourneyFailure(page, 'vehicle', error);
+    throw error;
   } finally {
-    await context.close();
+    try { await context.close(); } finally { await browser.close(); }
   }
 }
 
 async function runArrestRecoveryJourney() {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-  const page = await context.newPage();
+  const { browser, context, page } = await createJourneyBrowser();
   bindEvidence(page);
   try {
     await launchBaltimore(page);
@@ -645,14 +669,16 @@ async function runArrestRecoveryJourney() {
     assert.equal(Number(ended.after.urbanSandbox?.responders?.activeCount || 0), 0, 'Responders from the completed custody incident remained active.');
     assert.ok(ended.moved > .2, 'Normal walking control did not recover after custody release.');
     return { witnessedResponse, responderArrived, custody, recovered, ended };
+  } catch (error) {
+    await saveJourneyFailure(page, 'arrest', error);
+    throw error;
   } finally {
-    await context.close();
+    try { await context.close(); } finally { await browser.close(); }
   }
 }
 
 async function runMedicalRecoveryJourney() {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-  const page = await context.newPage();
+  const { browser, context, page } = await createJourneyBrowser();
   bindEvidence(page);
   try {
     await launchBaltimore(page);
@@ -683,8 +709,11 @@ async function runMedicalRecoveryJourney() {
     assert.equal(custody.urbanSandbox?.custody?.type, 'hospital', 'Normal movement and responder impacts did not resolve to mapped hospital recovery.');
     const recovered = await continueFromCustody(page);
     return { witnessedResponse, before, custody, recovered };
+  } catch (error) {
+    await saveJourneyFailure(page, 'medical', error);
+    throw error;
   } finally {
-    await context.close();
+    try { await context.close(); } finally { await browser.close(); }
   }
 }
 
@@ -836,10 +865,12 @@ try {
   };
   }
   await mkdir(path.dirname(reportPath), { recursive: true });
+  report.scope = requestedScope;
+  report.complete = requestedScope === 'all';
+  report.browserBudget = { maxOldSpaceMiB: 1280, freshBrowserPerJourney: true };
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   console.log(JSON.stringify(report, null, 2));
   assert.equal(report.ok, true, `Urban Sandbox ${requestedScope} normal-input journey failed.`);
 } finally {
-  await browser.close();
   await server.close();
 }

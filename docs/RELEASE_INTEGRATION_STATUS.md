@@ -118,9 +118,28 @@ contracts pass. A focused real phone-sized browser check restored the exact save
 horizontal position and passed touch entry/exit/re-entry (45.3 s, 2494 MiB peak).
 The preceding full run passed desktop traversal but hit the 3000 MiB process
 guard during mobile startup. The complete verifier now uses a fresh Chrome
-process for each device stage and a 1280 MiB JavaScript old-space cap. The full
-rebuilt desktop/mobile journey still needs acceptance; neither the memory stop
-nor the focused diagnostic is counted as its pass.
+process for each device stage and a 1280 MiB JavaScript old-space cap. Neither
+the memory stop nor the focused diagnostic is counted as a complete gate pass.
+
+The clean 09939be3 artifact subsequently passed the entire desktop/mobile interior
+gate in 326.4 seconds, with sampled peak 2539 MiB, and POI lifecycle passed.
+Urban arrest and medical recovery then passed, but the process guard stopped
+the third world at 3090 MiB. A fresh capped browser for each urban journey let
+the complete vehicle/equipment diagnostic pass all 11 assertions in 207 seconds,
+peak 2438 MiB. The aggregate three-world gate now allows 20 minutes; its individual
+gameplay assertions/timeouts and performance budgets are unchanged. A complete
+clean urban gate receipt is still required.
+
+London ground accuracy remains an unresolved release-quality question. Comparing
+the actual production and candidate artifacts found 191 changed grid samples
+(maximum 16.74 m). Seven independent Environment Agency 1 m DTM point queries
+show substantial differences in local relief, including an adjacent pair where
+the app rises 10.35 m and DTM falls 1.44 m. Two additional queries were denied.
+The app uses EGM2008 and the DTM uses ODN; point queries and coarse-grid samples
+also differ. This preliminary comparison does not establish a transformed,
+survey-grade replacement. No data values were changed on this basis. The source
+and reproducible query URLs are in `output/release-integration/live-checks/london-independent-dtm-samples.json`.
+[Environment Agency dataset](https://environment.data.gov.uk/dataset/13787b9a-26a4-4775-8523-806d13af58fc)
 
 Release environment isolation also strips all six additional discovered scope
 selectors for urban, regional, viewport, block, road-terrain and transport-facility

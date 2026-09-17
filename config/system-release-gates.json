@@ -24,7 +24,7 @@
     "terrain-boundary": { "scope": "candidate", "command": ["npm", "run", "verify:terrain-boundary"], "artifactRequired": true },
     "interiors": { "scope": "candidate", "command": ["npm", "run", "verify:interiors"], "artifactRequired": true },
     "poi-lifecycle": { "scope": "candidate", "command": ["npm", "run", "verify:poi-lifecycle"], "artifactRequired": false },
-    "urban-sandbox": { "scope": "candidate", "command": ["npm", "run", "verify:urban-sandbox"], "artifactRequired": true },
+    "urban-sandbox": { "scope": "candidate", "command": ["npm", "run", "verify:urban-sandbox"], "artifactRequired": true, "timeoutMs": 1200000 },
     "urban-equipment": { "scope": "candidate", "command": ["npm", "run", "verify:urban-equipment"], "artifactRequired": true },
     "tutorial-controls": { "scope": "candidate", "command": ["npm", "run", "verify:tutorial-controls"], "artifactRequired": true },
     "commerce-coherence": { "scope": "candidate", "command": ["npm", "run", "verify:commerce-coherence"], "artifactRequired": false },
