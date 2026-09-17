@@ -2,6 +2,20 @@ export const GROUND_ARTIFACT_SCHEMA_VERSION = 1;
 export const GROUND_TARGET_VERTICAL_DATUM = 'EGM2008';
 
 const PROVIDERS = Object.freeze({
+  'ea-lidar-composite-dtm-2022': Object.freeze({
+    id: 'ea-lidar-composite-dtm-2022',
+    label: 'Environment Agency LIDAR Composite 2022 bare-earth DTM',
+    sourceKind: 'bare-earth-dem',
+    sourceClassification: 'accepted-ground',
+    nativeVerticalDatum: 'ODN (OSGM15); artifact transformed to EGM2008',
+    nominalResolutionMeters: 2,
+    coverage: 'England; artifact coverage manifest required',
+    licenseStatus: 'open-government-licence-v3-with-attribution',
+    runtimeDelivery: 'precompiled-artifact-only',
+    priority: 100,
+    sourceDocument: 'https://environment.data.gov.uk/survey',
+    datumDocument: 'https://cdn.proj.org/uk_os_OSGM15_GB.tif'
+  }),
   'usgs-3dep-best-available': Object.freeze({
     id: 'usgs-3dep-best-available',
     label: 'USGS 3DEP bare-earth DEM (best available)',
