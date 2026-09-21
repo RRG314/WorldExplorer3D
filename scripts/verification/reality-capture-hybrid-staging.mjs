@@ -17,7 +17,7 @@ const browser=await chromium.launch({channel:'chrome',headless:true});
 const page=await browser.newPage({viewport:{width:390,height:844}});page.setDefaultTimeout(20000);
 page.on('dialog',dialog=>dialog.accept());
 let account,config,captureId,continuedId,deleted=false;
-let attestation;
+let attestation, report;
 try{
   {
     attestation=await stagingCaptureAttestation();
@@ -122,11 +122,18 @@ try{
   assert.equal(continued.ready,true);assert.equal(continued.photoCount,home?3:2);assert.equal(continued.placements,home?3:1);assert.equal(continued.hasLayout,home);assert.equal(continued.sameRetry,true);assert.equal(continued.libraryCount,2);assert.equal(continued.submission,null);
   await page.evaluate(async id=>(await import('/js/community-reality-capture-api.js?v=4')).deleteRealityCapture(id),continuedId);continuedId=null;
   await page.evaluate(async id=>(await import('/js/community-reality-capture-api.js?v=4')).deleteRealityCapture(id),captureId);deleted=true;
-  await mkdir('output/verification/reality-capture-hybrid',{recursive:true});await writeFile(`output/verification/reality-capture-hybrid/${home?'home-staging':production?'production':'staging'}-report.json`,JSON.stringify({passed:true,origin,home,...result,afterReload,manual,fixtureDeleted:true,automationAttestation:!!attestation,limitations:'Synthetic photo with real upload/validation/CPU submission. No physical phone, public approval or world acceptance.'},null,2));console.log('Live manual photo upload, validation, save, CPU submission, cost gates and cleanup passed. No reconstruction launched.');
+  report={passed:false,origin,home,...result,afterReload,manual,fixtureDeleted:true,automationAttestation:!!attestation,limitations:'Synthetic photo with real upload/validation/CPU submission. No physical phone, public approval or world acceptance.'};
 }finally{
-  if(continuedId)await page.evaluate(async id=>(await import('/js/community-reality-capture-api.js?v=4')).deleteRealityCapture(id),continuedId).catch(()=>{});
-  if(captureId&&!deleted)await page.evaluate(async id=>(await import('/js/community-reality-capture-api.js?v=4')).deleteRealityCapture(id),captureId).catch(()=>{});
-  if(account?.idToken&&config)await page.evaluate(async()=>(await import('/js/function-api.js?v=1')).postProtectedFunction('/deleteAccount',{confirmation:'DELETE'})).catch(error=>{console.error('Disposable account cleanup needs retry:',account.localId,error.message);throw error;});
-  try { await browser.close(); }
-  finally { await attestation?.cleanup(); }
+  const cleanupErrors=[];
+  const attempt=async(label,action)=>{try{await action();}catch(error){cleanupErrors.push({label,error:String(error.message||error)});}};
+  if(continuedId)await attempt('continued capture',()=>page.evaluate(async id=>(await import('/js/community-reality-capture-api.js?v=4')).deleteRealityCapture(id),continuedId));
+  if(captureId&&!deleted)await attempt('original capture',()=>page.evaluate(async id=>(await import('/js/community-reality-capture-api.js?v=4')).deleteRealityCapture(id),captureId));
+  if(account?.idToken&&config)await attempt(`disposable account ${account.localId}`,()=>page.evaluate(async()=>(await import('/js/function-api.js?v=1')).postProtectedFunction('/deleteAccount',{confirmation:'DELETE'})));
+  await attempt('browser',()=>browser.close());
+  await attempt('staging attestation',()=>attestation?.cleanup());
+  report={...report,passed:!!report&&!cleanupErrors.length,cleanupErrors,completedAt:new Date().toISOString()};
+  await mkdir('output/verification/reality-capture-hybrid',{recursive:true});
+  await writeFile(`output/verification/reality-capture-hybrid/${home?'home-staging':'staging'}-report.json`,JSON.stringify(report,null,2));
+  if(cleanupErrors.length)throw new Error(`Capture acceptance cleanup failed: ${JSON.stringify(cleanupErrors)}`);
+  if(report.passed)console.log('Live manual photo upload, validation, save, CPU submission, cost gates, account deletion and attestation cleanup passed. No reconstruction launched.');
 }

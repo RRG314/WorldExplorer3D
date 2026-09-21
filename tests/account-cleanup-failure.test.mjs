@@ -26,3 +26,15 @@ test('user deletion propagates failure instead of continuing to identity deletio
  vm.createContext(scope);vm.runInContext(source.slice(source.indexOf('async function deleteUserData'),source.indexOf('\nfunction timestampToMillis')),scope);
  await assert.rejects(scope.deleteUserData('owner'),e=>e===error);
 });
+
+// Emulators do not enforce hosted collection-group indexes. Keep the deployment
+// manifest paired with the real cleanup queries so deletion cannot strand Auth.
+test('every account cleanup collection-group equality query has a deployed index', async () => {
+ const config=JSON.parse(await readFile(new URL('../firestore.indexes.json',import.meta.url),'utf8'));
+ const queries=[...source.matchAll(/collectionGroup\('([^']+)'\)\.where\('([^']+)', '==', uid\)/g)];
+ assert.ok(queries.length>=9,'Account cleanup query inventory must not be empty');
+ for(const [,group,field] of queries){
+  const override=config.fieldOverrides.find(row=>row.collectionGroup===group&&row.fieldPath===field);
+  assert.ok(override?.indexes.some(index=>index.queryScope==='COLLECTION_GROUP'&&index.order==='ASCENDING'),`${group}.${field} requires a collection-group equality index`);
+ }
+});

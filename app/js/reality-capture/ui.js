@@ -790,7 +790,7 @@ async function previewResult() {
     const bytes = await response.arrayBuffer();
     assertCurrent(session);
     if (bytes.byteLength > 20 * 1024 * 1024) throw Error('This model exceeds the preview limit.');
-    const { createCaptureViewer } = await import('./result-viewer.js?v=1');
+    const { createCaptureViewer } = await import('./result-viewer.js?v=2');
     assertCurrent(session);
     session.viewer?.dispose();
     const submitted=session.serverCapture.hybridSubmission;

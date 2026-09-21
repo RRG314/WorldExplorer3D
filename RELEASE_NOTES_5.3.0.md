@@ -18,9 +18,14 @@ release approval requires current artifact, backend and owner acceptance evidenc
   uses USGS and regional evidence.
 - Runtime changes reduce repeated DOM updates, share facade textures and
   equivalent skeleton data, and cull terrain and regional buildings by view.
+  Nearby road-junction lookup uses a spatial index while preserving junction
+  identities and geometry.
   A controlled comparison must establish any performance improvement claim.
 - Reliability changes cover doorway clearance, walking pose restoration,
   mobile control overlap, room admission, world teardown and release identity.
+  Account deletion includes the hosted collection-group indexes required for
+  complete cleanup. Interior previews open facing into the room with a wider
+  view and retain mouse/touch look controls.
 
 Acceptance must include functional UI and deployed staging service journeys,
 shader/geometry checks and reviewed facade screenshots, actual moving walk/drive
@@ -29,4 +34,5 @@ render comparisons, and a physical phone walkthrough. Passing source tests or
 emulated touch tests alone does not satisfy these requirements.
 
 Production promotion requires approval of the exact tested build. Preserve a
-rollback artifact and deploy compatible backend changes before the frontend.
+rollback artifact, wait for required database indexes to become ready, and
+deploy compatible backend changes before the frontend.

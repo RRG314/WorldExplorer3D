@@ -243,11 +243,44 @@ function getOrCreateIntersection(intersections, spatialMap, x, z, surfaceGroup =
   return intersection;
 }
 
-function nearbyAtGradeIntersection(intersections, x, z) {
-  return intersections.find((intersection) =>
-    !intersection.hasGradeSeparatedRoad &&
-    Math.hypot(intersection.x - x, intersection.z - z) <= INTERSECTION_MERGE_RADIUS
-  ) || null;
+export function createAtGradeIntersectionLookup(intersections) {
+  const cells = new Map(), entries = new Map();
+  const keyFor = (x, z) => `${Math.floor(x / INTERSECTION_CLUSTER_SIZE)},${Math.floor(z / INTERSECTION_CLUSTER_SIZE)}`;
+  const update = (intersection) => {
+    const key = keyFor(intersection.x, intersection.z);
+    let entry = entries.get(intersection);
+    if (entry?.key === key) return;
+    if (entry) {
+      const previous = cells.get(entry.key);
+      previous.delete(entry);
+      if (!previous.size) cells.delete(entry.key);
+      entry.key = key;
+    } else {
+      entry = { intersection, key, order: entries.size };
+      entries.set(intersection, entry);
+    }
+    if (!cells.has(key)) cells.set(key, new Set());
+    cells.get(key).add(entry);
+  };
+  intersections.forEach(update);
+  return {
+    update,
+    find(x, z) {
+      let first = null;
+      for (let cx = Math.floor((x - INTERSECTION_MERGE_RADIUS) / INTERSECTION_CLUSTER_SIZE); cx <= Math.floor((x + INTERSECTION_MERGE_RADIUS) / INTERSECTION_CLUSTER_SIZE); cx++) {
+        for (let cz = Math.floor((z - INTERSECTION_MERGE_RADIUS) / INTERSECTION_CLUSTER_SIZE); cz <= Math.floor((z + INTERSECTION_MERGE_RADIUS) / INTERSECTION_CLUSTER_SIZE); cz++) {
+          for (const entry of cells.get(`${cx},${cz}`) || []) {
+            const intersection = entry.intersection;
+            // Preserve Array.find's insertion-order choice, including ties
+            // across cell boundaries. Grade status may change after indexing.
+            if ((!first || entry.order < first.order) && !intersection.hasGradeSeparatedRoad &&
+                Math.hypot(intersection.x - x, intersection.z - z) <= INTERSECTION_MERGE_RADIUS) first = entry;
+          }
+        }
+      }
+      return first?.intersection || null;
+    }
+  };
 }
 
 export function detectRoadIntersections(roads) {
@@ -368,6 +401,7 @@ export function detectRoadIntersections(roads) {
     }
   }
 
+  const nearbyIntersections = createAtGradeIntersectionLookup(intersections);
   const candidatePairs = collectRoadCandidatePairs(roadInfos);
   for (let i = 0; i < candidatePairs.length; i++) {
     const [aIndex, bIndex] = candidatePairs[i];
@@ -395,8 +429,7 @@ export function detectRoadIntersections(roads) {
           (segB === roadB.road.pts.length - 2 && intersectionPoint.u >= 1 - INTERSECTION_ENDPOINT_EPSILON);
         if (sharedEndpointA && sharedEndpointB) continue;
 
-        const intersection = nearbyAtGradeIntersection(
-          intersections,
+        const intersection = nearbyIntersections.find(
           intersectionPoint.x,
           intersectionPoint.z
         ) || getOrCreateIntersection(
@@ -406,6 +439,8 @@ export function detectRoadIntersections(roads) {
           intersectionPoint.z,
           'at_grade'
         );
+        // A newly created or averaged intersection can move across a cell.
+        nearbyIntersections.update(intersection);
         registerRoadIntersectionBranches(intersection, roadA.road, roadA.roadIdx, segA, intersectionPoint.t, intersectionPoint);
         registerRoadIntersectionBranches(intersection, roadB.road, roadB.roadIdx, segB, intersectionPoint.u, intersectionPoint);
       }

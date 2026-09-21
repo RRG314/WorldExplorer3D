@@ -2,7 +2,7 @@ import './capture-theme.js';
 import {layoutEntrance} from '../../../functions/interior-layout.mjs';
 import {listRealityCaptureModeration,getRealityCaptureModerationDetail,moderateRealityCapture,listMyRealityCaptures} from '../../../js/community-reality-capture-api.js?v=4';
 import {captureLabel,captureWorkflow} from './workflow-presentation.js';
-import {createCaptureViewer} from './result-viewer.js?v=1';
+import {createCaptureViewer} from './result-viewer.js?v=2';
 
 export function captureWorldUrl(building){
   const url=new URL('/app/',location.href);url.search=new URLSearchParams({loc:'custom',lat:String(building.lat),lon:String(building.lon),lname:building.label||'My building',launch:'earth',mode:'walk'});return url.href;

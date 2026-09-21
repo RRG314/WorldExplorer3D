@@ -96,6 +96,7 @@ export async function createCaptureViewer(host, bytes, signal, options = {}) {
   const draw = () => { if (!disposed && !document.hidden) renderer.render(scene, camera); };
   const reset = () => {
     controls.enableZoom=true;controls.enablePan=true;
+    camera.fov=50;
     if(options.homeLayout)model.traverse(o=>{if(o.userData.kind==='ceiling')o.visible=false;});
     const box = new T.Box3().setFromObject(model);
     if (reference.children.length) box.union(new T.Box3().setFromObject(reference));
@@ -132,7 +133,7 @@ export async function createCaptureViewer(host, bytes, signal, options = {}) {
       if(disposed)return;
       if(options.homeLayout)model.traverse(o=>{if(o.userData.kind==='ceiling')o.visible=true;});
       camera.position.set(position.x,position.y,position.z);
-      camera.near=.03;camera.updateProjectionMatrix();
+      camera.near=.03;camera.fov=70;camera.updateProjectionMatrix();
       controls.target.copy(camera.position).add(new T.Vector3(direction.x||0,direction.y||0,direction.z||0).normalize().multiplyScalar(.01));
       controls.minDistance=.01;controls.maxDistance=.01;controls.enableZoom=false;controls.enablePan=false;
       controls.update();draw();

@@ -8,7 +8,7 @@ import {roadPlacementOffsetWorld} from '../world/road-units.js';
 import { markGroundSurfaceChanged } from './surface-revision.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { appendUpwardRibbonGeometry, buildIndexedBatchMesh } from "../road-render.js?v=4";
-import { detectRoadIntersections } from "./intersections.js?v=5";
+import { detectRoadIntersections } from "./intersections.js?v=6";
 import { boundsIntersectLocal } from "./context-utils.js?v=1";
 import {
   buildFeatureRibbonEdges,

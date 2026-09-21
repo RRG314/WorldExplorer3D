@@ -1,10 +1,11 @@
+import {interiorPreviewPose} from './interior-preview-pose.js';
 import {mountCaptureStep} from './workspace-navigation.js';
 import './capture-theme.js';
 import {makeStarterLayout,makeEmptyLayout,normalizeLayout,assertPlayableLayout,floorWalls,roomRing,wallKey,layoutRoomDescriptor,roomInteriorPoint,splitRoom} from '../../../functions/interior-layout.mjs';
 import {loadClassicScript} from '../modules/script-loader.js?v=56';
 import {vendorScriptsCritical} from '../modules/manifest.js?v=597';
 import {buildAuthoredInterior} from '../interiors/authored-geometry.js';
-import {createCaptureViewer} from './result-viewer.js?v=1';
+import {createCaptureViewer} from './result-viewer.js?v=2';
 import {loadLocalCaptureDraft,saveLocalCaptureDraft,deleteLocalCaptureDraft} from './local-draft-store.js?v=1';
 import {capturePhoneUrl} from './capture-session.js?v=1';
 import {joinPlanWalls,nearestPlanWall,snapPlanPoint} from './layout-drawing.js';
@@ -211,7 +212,7 @@ export async function openHomeLayoutEditor({capture,save,signal,photos=[],loadPh
       selectedSurface=layoutRoomDescriptor(layout,room().id).surfaceIds.indexOf(surfaceId);
       if(selectedSurface>=0)void openRoomPhotos();
     }});
-    if(inside){const center=roomInteriorPoint(roomRing(floor(),room()));if(!center)throw Error('This room needs more clear floor space for an inside view.');viewer.setInside?.({x:center.x,y:floor().elevation+1.6,z:center.z});}
+    if(inside){const pose=interiorPreviewPose(roomRing(floor(),room()),floor().elevation,floor().height);if(!pose)throw Error('This room needs more clear floor space for an inside view.');viewer.setInside?.(pose.position,pose.direction);}
   }catch(e){status(e.message);}finally{for(const element of dialog.querySelectorAll('[data-floor],[data-room],[data-plan-mode],[data-3d-mode],[data-inside]'))element.disabled=false;}}
   $('[data-start]').onclick=()=>{try{const values=Object.fromEntries([...dialog.querySelectorAll('[data-count]')].map(e=>[e.dataset.count,Number(e.value)]));if(roomPhotos.some(e=>e.patches.length))throw Error('This home already has placed photos. Edit its existing corners instead of replacing the whole plan');if($('[data-use-unit]').checked){const x=Number($('[data-unit-x]').value),z=Number($('[data-unit-z]').value),w=Number($('[data-unit-width]').value),d=Number($('[data-unit-depth]').value);if(w<2||d<2)throw Error('The unit needs at least two metres in each direction');values.unitOutline=[{x,z},{x:x+w,z},{x:x+w,z:z+d},{x,z:z+d}];}values.unitLabel=$('[data-unit-label]').value;const next=makeStarterLayout(envelope,values);if(layout){remember(snapshot());next.id=layout.id;}layout=next;floorIndex=roomIndex=cornerIndex=0;render();persist();}catch(e){status(`${e.message} Adjust the room count or dimensions; the building has not been changed.`);}};
   const refreshSelectedView=()=>{render();if(viewMode!=='plan')void show3D(viewMode==='inside');};

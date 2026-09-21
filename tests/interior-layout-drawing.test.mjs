@@ -38,3 +38,22 @@ test('adding an adjacent room preserves an existing doorway across split wall se
  drawRectangleRoom(f,null,{x:1,z:1},{x:6,z:10});const wall=floorWalls(f).find(w=>w.a.x===6&&w.b.x===6);f.doors.push({id:'entry',wall:wall.id,offset:2,width:.9,height:2,entry:true});
  drawRectangleRoom(f,null,{x:6,z:6},{x:10,z:10});const valid=normalizeLayout(layout,envelope);assert.equal(valid.floors[0].doors.length,1);assert.equal(valid.floors[0].doors[0].id,'entry');assert.equal(valid.floors[0].doors[0].entry,true);
 });
+
+test('inside preview faces along a long room and keeps eye height below low ceilings',async()=>{
+ const {interiorPreviewPose}=await import('../app/js/reality-capture/interior-preview-pose.js');
+ for(const angle of [0,.71]){
+  const c=Math.cos(angle),s=Math.sin(angle);
+  const ring=[[0,0],[20,0],[20,3],[0,3]].map(([x,z])=>({x:c*x-s*z,z:s*x+c*z}));
+  const pose=interiorPreviewPose(ring,8,1.9);
+  assert.ok(Math.abs(pose.direction.x*c+pose.direction.z*s)>.95,'Initial view follows the long axis rather than the close wall');
+  assert.ok(pose.position.y>8&&pose.position.y<9.9);
+ }
+});
+test('inside preview stays in concave room space and rejects unwalkably narrow rooms',async()=>{
+ const {interiorPreviewPose}=await import('../app/js/reality-capture/interior-preview-pose.js');
+ const {pointInRoom}=await import('../functions/interior-layout.mjs');
+ const ring=[[0,0],[10,0],[10,2],[2,2],[2,10],[0,10]].map(([x,z])=>({x,z}));
+ const pose=interiorPreviewPose(ring);
+ for(let d=0;d<5;d+=.1)assert.ok(pointInRoom({x:pose.position.x+pose.direction.x*d,z:pose.position.z+pose.direction.z*d},ring));
+ assert.equal(interiorPreviewPose([{x:0,z:0},{x:10,z:0},{x:10,z:.4},{x:0,z:.4}]),null);
+});

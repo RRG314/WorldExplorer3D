@@ -43,6 +43,17 @@ try{for(const width of [1100,412]){
  await page.locator('[data-room-shape]').selectOption('L');await page.locator('[data-add-room]').click();assert.equal(await polygons().count(),2);assert.equal(await page.locator('[data-corner-handle]').count(),6);
  await page.locator('[data-more-tools] > summary').click();await page.locator('[data-delete-room]').click();assert.equal(await polygons().count(),1);await page.locator('[data-undo]').click();assert.equal(await polygons().count(),2);
  await page.locator('[data-plan]').scrollIntoViewIfNeeded();await page.screenshot({path:`${output}/${width}-custom-plan.png`});
+ const planBeforeView=await polygons().first().getAttribute('points');
+ await page.locator('[data-inside]').click();
+ const insideCanvas=page.locator('[data-viewer] canvas');await insideCanvas.waitFor({state:'visible'});
+ await page.locator('[data-inside]').waitFor({state:'visible'});
+ await page.waitForFunction(()=>!document.querySelector('[data-inside]').disabled);
+ const insideBefore=await insideCanvas.screenshot({path:`${output}/${width}-inside.png`});
+ await drag(insideCanvas,60,20,width<700);
+ const insideAfter=await insideCanvas.screenshot({path:`${output}/${width}-inside-look.png`});
+ assert.notDeepEqual(insideBefore,insideAfter,'Mouse/touch look changes the rendered room');
+ await page.locator('[data-plan-mode]').click();
+ assert.equal(await polygons().first().getAttribute('points'),planBeforeView,'Looking around does not change the authored room');
  assert.deepEqual(errors,[]);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
  await context.close();console.log(`${width}: rotated concave outline, add, mouse/touch corner, wall, custom polygon, move, save/reopen, L room, delete/undo passed.`);
 }}finally{await browser.close();await server.close();}
