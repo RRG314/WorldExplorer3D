@@ -16,7 +16,7 @@ import {
 import {
   batchMidLodBuildingMeshes,
   batchNearLodBuildingMeshes
-} from "./building-batching.js?v=13";
+} from "./building-batching.js?v=14";
 import { curatedLandmarksNear } from "./landmark-catalog.js?v=9";
 import { compileBuildingProvenance } from './building-provenance-model.js?v=1';
 import { createBuildingRoadFootprintGuards } from './building-road-footprint.js?v=8';
@@ -29,7 +29,7 @@ import { yieldToMainThread as defaultYieldToMainThread } from './cooperative-sch
 import { isImplausibleTallBuildingFootprint } from './building-geometry-quality.js?v=1';
 import { publishBuildingFacadeEntrances } from './building-facade-entrances.js?v=4';
 import { publishBuildingExteriorDetails } from './building-exterior-details.js?v=2';
-import { resolveBuildingExteriorPresentation } from '../engine/building-facade-materials.js?v=17';
+import { resolveBuildingExteriorPresentation } from '../engine/building-facade-materials.js?v=18';
 import { mappedBuildingAddress } from '../real-estate/public-address.js?v=1';
 
 export function requiresLoadedRoadCoverageForBuilding(tags = {}) {

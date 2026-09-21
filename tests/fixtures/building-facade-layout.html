@@ -5,31 +5,36 @@ import {appendMidFacadeAttributes,createMidFacadeBatchMaterial} from '/app/js/wo
 const before=new URLSearchParams(location.search).has('before');
 const mid=new URLSearchParams(location.search).has('mid');
 const {publishBuildingExteriorDetails}=await import('/app/js/world/building-exterior-details.js');
-const {getBuildingMaterial,buildingExteriorMaterialPoolSnapshot}=await import(before?'/output/release-integration/audit-2026-09-21/before-material.mjs':'/app/js/engine/building-facade-materials.js');
+const {getBuildingMaterial,resolveBuildingExteriorPresentation,buildingExteriorMaterialPoolSnapshot}=await import(before?'/output/release-integration/audit-2026-09-21/before-material.mjs':'/app/js/engine/building-facade-materials.js');
 const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(1);renderer.outputEncoding=THREE.sRGBEncoding;document.body.append(renderer.domElement);
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xcbd7df);scene.add(new THREE.HemisphereLight(0xe7f4ff,0x706757,1));const light=new THREE.DirectionalLight(0xfff3df,1.1);light.position.set(20,40,30);scene.add(light);
 const camera=new THREE.PerspectiveCamera(38,innerWidth/innerHeight,.1,400);camera.position.set(29,24,57);camera.lookAt(16,7,0);
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(150,100),new THREE.MeshStandardMaterial({color:0xd3cec4}));ground.rotation.x=-Math.PI/2;ground.position.y=-.01;scene.add(ground);
 const cases=[{type:'house',width:6.1,height:10.7,material:'brick',levels:3},{type:'apartments',width:8.3,height:15.2,material:'stone',levels:5},{type:'office',width:10.7,height:21.4,material:'glass',levels:6},{type:'house',width:3.1,height:7.9,material:'stucco',levels:2}];
-const details=[],records=[],entrances=new Map();let x=0;
+const details=[],probes=[],records=[],entrances=new Map();let x=0;
 for(let i=0;i<cases.length;i++){
  const c=cases[i],shape=new THREE.Shape();shape.moveTo(0,0);shape.lineTo(c.width,0);shape.lineTo(c.width,-6);shape.lineTo(0,-6);shape.closePath();
  const geo=new THREE.ExtrudeGeometry(shape,{depth:c.height,bevelEnabled:false}).rotateX(-Math.PI/2);
- const mat=getBuildingMaterial({renderer},c.type,100+i*13,0xaaaaaa,{facadeMaterial:c.material,heightMeters:c.height,footprintWidth:c.width,footprintDepth:6,footprintArea:c.width*6,levels:c.levels,lodTier:mid?'mid':'near'});
+ const options={facadeMaterial:c.material,heightMeters:c.height,footprintWidth:c.width,footprintDepth:6,footprintArea:c.width*6,levels:c.levels,lodTier:mid?'mid':'near'};
+ const resolved=resolveBuildingExteriorPresentation({renderer},c.type,100+i*13,0xaaaaaa,options);
+ const mat=getBuildingMaterial({renderer},c.type,100+i*13,0xaaaaaa,{...options,resolvedPresentation:resolved});
  const plan=attachBuildingFacadeLayout(geo,{...mat.userData.exteriorProfile,levels:c.levels});
  geo.setAttribute('facadeEntrance',new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count*4),4));
  // Preserve the production world-space merge behavior in both compared cases.
  const batch={positions:[],normals:[],uvs:[],indices:[],facadeLayouts:[],facadeOpenings:[],facadeEntrances:[],...(mid?{colors:[],facadeParams:[],roofAParams:[],roofColorsB:[]}: {})};
  appendGeometryWithTransform(batch,geo,new THREE.Matrix4().makeTranslation(x,17.43,0));
- if(mid)appendMidFacadeAttributes(batch,mat,null,0,geo.attributes.position.count);
+ if(mid)appendMidFacadeAttributes(batch,mat,{wallColor:resolved.tintHex,roofColorA:resolved.roof.colorA,roofColorB:resolved.roof.colorB,roofGrainScale:resolved.roof.grainScale},0,geo.attributes.position.count);
  const mesh=new THREE.Mesh(buildMergedGeometry(batch),mid?createMidFacadeBatchMaterial(mat,'fixture'):mat);mesh.position.y=-17.43;scene.add(mesh);geo.dispose();
  records.push({position:{y:0},material:mat,userData:{buildingFootprint:[{x,z:0},{x:x+c.width,z:0},{x:x+c.width,z:6},{x,z:6}],lodTier:'near',exteriorProfile:mat.userData.exteriorProfile,sourceBuildingId:String(i),buildingSeed:100+i*13,bodyHeightMeters:c.height,heightMeters:c.height,levels:c.levels}});
  entrances.set(String(i),{x:x+c.width/2,z:6,y:0,approachY:0,normalX:0,normalZ:1});
+ const bayWidth=c.width/Math.max(1,Math.round(c.width/(c.material==='glass'?2.35:mat.userData.exteriorProfile.window.bayWidth)));
+ probes.push({type:c.type,point:new THREE.Vector3(x+.60*bayWidth,plan.foundation+1.60*plan.floorHeight,6.001)});
  details.push({type:c.type,...plan});x+=c.width+.6;
 }
 if(!before&&!mid)publishBuildingExteriorDetails({buildingMeshes:records,buildingEntranceByBuilding:entrances,addEarthWorldObject:mesh=>scene.add(mesh)},{tier:'balanced'});
 function render(){renderer.render(scene,camera);}
-window.advanceTime=async()=>render();window.render_game_to_text=()=>JSON.stringify({mode:before?'before':mid?'after-mid':'after',ready:window.ready,cases:details,renderer:{calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,glError:renderer.getContext().getError(),contextLost:renderer.getContext().isContextLost()},textures:buildingExteriorMaterialPoolSnapshot()});
+function windowSamples(){const gl=renderer.getContext();return probes.map(({type,point})=>{const p=point.clone().project(camera),rgba=new Uint8Array(4);gl.readPixels(Math.floor((p.x+1)*innerWidth/2),Math.floor((p.y+1)*innerHeight/2),1,1,gl.RGBA,gl.UNSIGNED_BYTE,rgba);return {type,rgba:[...rgba]};});}
+window.advanceTime=async()=>render();window.render_game_to_text=()=>JSON.stringify({mode:before?'before':mid?'after-mid':'after',ready:window.ready,cases:details,windowSamples:windowSamples(),renderer:{calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,glError:renderer.getContext().getError(),contextLost:renderer.getContext().isContextLost(),attributeCounts:renderer.info.programs.map(p=>Object.keys(p.getAttributes()).length)},textures:buildingExteriorMaterialPoolSnapshot()});
 const deadline=performance.now()+10000;while(buildingExteriorMaterialPoolSnapshot().textures.some(t=>t.status==='loading')&&performance.now()<deadline)await new Promise(r=>setTimeout(r,50));
 window.ready=true;document.getElementById('caption').textContent=(before?'BEFORE':'AFTER')+' · same geometry, elevation, camera and lighting · masonry / apartments / curtain wall / narrow house';render();
 </script></body></html>

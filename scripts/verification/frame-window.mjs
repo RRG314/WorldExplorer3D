@@ -1,5 +1,12 @@
 // Self-contained browser evaluator, also exercised with deterministic frame clocks.
 export async function sampleFrameWindow(durationMs) {
+  const options = typeof durationMs === 'object' ? durationMs : null;
+  const targetDistance = Number(options?.targetDistance || 0);
+  const routeActor = options?.actorKey ? globalThis[options.actorKey] : null;
+  if (targetDistance > 0 && (!routeActor || !Number.isFinite(routeActor.x) || !Number.isFinite(routeActor.z))) {
+    throw new Error('A distance sample needs a live actor position reference.');
+  }
+  durationMs = options ? options.durationMs : durationMs;
   return new Promise((resolve) => {
     const deltas = [];
     const startActor = globalThis.getWorldExplorerRuntimeDiagnostics?.()?.activeActor;
@@ -17,12 +24,16 @@ export async function sampleFrameWindow(durationMs) {
       if (startedAt === null) startedAt = now;
       else deltas.push(now - previous);
       previous = now;
-      if (now - startedAt < durationMs) requestAnimationFrame(frame);
+      // Read only two coordinates per frame, not the full world diagnostics.
+      const routeComplete = targetDistance > 0 && startPosition &&
+        Math.hypot(routeActor.x-startPosition.x,routeActor.z-startPosition.z) >= targetDistance;
+      if (now - startedAt < durationMs && !routeComplete) requestAnimationFrame(frame);
       else {
         const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
         resolve({
           deltas,
           elapsedMs: now-startedAt,
+          routeComplete: Boolean(routeComplete),
           startPosition,
           endPosition: diagnostics.activeActor?.position ? {x:diagnostics.activeActor.position.x,z:diagnostics.activeActor.position.z} : null,
           diagnostics: {

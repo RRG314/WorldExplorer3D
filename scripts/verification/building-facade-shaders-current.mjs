@@ -29,8 +29,14 @@ try {
       assert.ok(state.renderer.calls > 0);
       assert.equal(state.renderer.glError, 0);
       assert.equal(state.renderer.contextLost, false);
+      assert.ok(state.renderer.attributeCounts.every(count => count <= 8), "Facade exceeds the WebGL minimum vertex attribute budget");
       assert.ok(state.textures.textures.every(texture => texture.status === 'ready'));
     } finally { await page.close(); }
+  }
+  for (let i=0;i<4;i++) {
+    const near=results[0].state.windowSamples[i].rgba;
+    const mid=results[1].state.windowSamples[i].rgba;
+    assert.ok(near.slice(0,3).every((channel,k)=>Math.abs(channel-mid[k])<=12), `Window glass changes color across LOD: ${near} vs ${mid}`);
   }
 } finally {
   await writeFile(`${output}/report.json`, JSON.stringify({ evidenceScope: 'source-fixture-shader-compilation', results }, null, 2));

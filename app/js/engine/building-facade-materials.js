@@ -354,6 +354,10 @@ function applyWallOnlyFacadeMap(material, roof, entranceAtlas, exteriorProfile) 
   const roofB = new THREE.Color(roof.colorB);
   const grainScale = Number(roof.grainScale || 0.6);
   material.onBeforeCompile = (shader) => {
+    // Facades use wall-local coordinates; remove the unused standard map UV
+    // varying so merged buildings stay within eight vertex attribute slots.
+    shader.vertexShader = shader.vertexShader.replace('#include <uv_vertex>', '');
+
     shader.uniforms.facadeEntranceAtlas = { value: entranceAtlas };
     shader.uniforms.facadeProjection = { value: facadeProjection };
     shader.uniforms.facadeRoofA = { value: roofA };
@@ -411,7 +415,11 @@ function applyWallOnlyFacadeMap(material, roof, entranceAtlas, exteriorProfile) 
         '  vec4 facadeTexel = mapTexelToLinear(texture2D(map, facadeUv));',
         '  float roofGrain = facadeRoofNoise(vFacadeRoofPosition * facadeRoofGrainScale);',
         '  vec3 roofSurface = mix(facadeRoofA, facadeRoofB, 0.18 + roofGrain * 0.64);',
-        '  diffuseColor.rgb = mix(roofSurface, diffuseColor.rgb * facadeTexel.rgb, vFacadeWallMask);',
+        '  vec3 facadeBase = diffuseColor.rgb;',
+        '#ifdef USE_COLOR',
+        '  facadeBase *= vColor.rgb;',
+        '#endif',
+        '  diffuseColor.rgb = mix(roofSurface, facadeBase * facadeTexel.rgb, vFacadeWallMask);',
         '  diffuseColor.a *= facadeTexel.a;',
         '  vec4 openingLayout = vFacadeLayout;',
         '  float fittedBayWidth = vFacadeLayout.z / max(vFacadeLayout.x, 0.0001);',
@@ -445,7 +453,7 @@ function applyWallOnlyFacadeMap(material, roof, entranceAtlas, exteriorProfile) 
       ].join('\n')
     );
   };
-  material.customProgramCacheKey = () => 'building-facade-local-layout-v8-fitted-floors-bays';
+  material.customProgramCacheKey = () => 'building-facade-local-layout-v9-fitted-floors-bays';
 }
 
 export function resolveBuildingExteriorPresentation(engineContext, buildingType, buildingSeed, baseColorHex, options = {}) {
@@ -564,11 +572,15 @@ export function getBuildingMaterial(engineContext, buildingType, buildingSeed, b
   if (cached) return cached;
 
   const entranceAtlas = facadeEntranceAtlas(appCtx);
+  // Mid-distance colors, roof surfaces and openings are per-vertex. Keep
+  // equivalent masonry/glass response shared so small catalog roughness
+  // differences do not split each spatial batch into extra draw calls.
+  const midGlass = catalogMaterial.surfacePattern === 'glass';
   const material = new THREE.MeshStandardMaterial({
     color: lodTier === 'mid' ? 0xffffff : tint,
     map: facadeTexture(appCtx, lodTextureId),
-    roughness: profile.roughness,
-    metalness: Math.max(profile.metalness, roof.metalness * 0.08),
+    roughness: lodTier === 'mid' ? (midGlass ? 0.32 : 0.9) : profile.roughness,
+    metalness: lodTier === 'mid' ? (midGlass ? 0.16 : 0) : Math.max(profile.metalness, roof.metalness * 0.08),
     vertexColors: lodTier === 'mid'
   });
   const projection=facadeTextureProjection(lodTextureId,textureProjectionStyle,facadeVariant,lodTier);

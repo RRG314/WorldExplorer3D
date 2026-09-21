@@ -13,11 +13,12 @@ test('four facade phases share one image while preserving independent shader pro
  const materials=[];
  for(const lodTier of ['near','mid'])for(let facadeVariant=0;facadeVariant<4;facadeVariant++){
   const projection=facadeTextureProjection('brick','townhouse',facadeVariant,lodTier);
-  const resolvedPresentation={mappedFamily:false,mappedColor:false,materialId:'brick',catalogMaterial:{texture:'brick'},exteriorProfile:{category:'residential',storefrontStyle:'none',familyId:'test'},family:'brick',profile:{roughness:.9,metalness:0},lodTier,presentation:{facadeStyle:'townhouse'},roof:{key:'roof',metalness:0,colorA:0,colorB:0},facadeStyle:'townhouse',facadeAtlasStyle:'brick',facadeVariant,lodTextureId:'brick',textureProjectionStyle:'townhouse',tintHex:123};
+  const resolvedPresentation={mappedFamily:false,mappedColor:false,materialId:'brick',catalogMaterial:{texture:'brick'},exteriorProfile:{category:'residential',storefrontStyle:'none',familyId:'test'},family:'brick',profile:{roughness:.86+facadeVariant*.02,metalness:0},lodTier,presentation:{facadeStyle:'townhouse'},roof:{key:'roof',metalness:0,colorA:0,colorB:0},facadeStyle:'townhouse',facadeAtlasStyle:'brick',facadeVariant,lodTextureId:'brick',textureProjectionStyle:'townhouse',tintHex:123};
   const material=getBuildingMaterial({},'house',facadeVariant,0,{resolvedPresentation});
   const shader={uniforms:{},vertexShader:'',fragmentShader:''};material.onBeforeCompile(shader);
   assert.deepEqual(shader.uniforms.facadeProjection.value.values,projection);
   assert.deepEqual(material.userData.facadeProjection,projection);
+  assert.equal(material.roughness,lodTier==='mid'?.9:.86+facadeVariant*.02,'Small masonry roughness differences must not fragment mid batches');
   materials.push(material);
  }
  assert.equal(new Set(materials.map(m=>m.map)).size,1);

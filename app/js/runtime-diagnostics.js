@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { buildingExteriorMaterialPoolSnapshot } from './engine/building-facade-materials.js?v=17';
+import { buildingExteriorMaterialPoolSnapshot } from './engine/building-facade-materials.js?v=18';
 
 const diagnosticsParams = new URLSearchParams(globalThis.location?.search || '');
 // Production-like local runs must behave exactly like the deployed build.

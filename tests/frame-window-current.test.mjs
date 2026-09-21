@@ -35,3 +35,27 @@ test('slow frames inside the full measurement window remain counted', async () =
   assert.deepEqual(Array.from(result.deltas), [20, 370, 20]);
   assert.equal(result.elapsedMs, 410);
 });
+
+test('a moving route measures frames until the same distance, independently of frame rate', async () => {
+  for (const interval of [20,50]) {
+    const actor={x:0,z:0};let timestamp=100,diagnosticReads=0;
+    const context=vm.createContext({actor,performance:{now:()=>100},
+      requestAnimationFrame(callback){queueMicrotask(()=>{timestamp+=interval;actor.x=(timestamp-100)/10;callback(timestamp);});},
+      getWorldExplorerRuntimeDiagnostics(){diagnosticReads++;return {activeActor:{position:actor}};}
+    });
+    const result=await vm.runInContext(`(${sampleFrameWindow.toString()})({durationMs:2000,targetDistance:20,actorKey:'actor'})`,context);
+    assert.equal(result.routeComplete,true);assert.equal(result.endPosition.x,20);
+    assert.equal(result.deltas.reduce((a,b)=>a+b,0),result.elapsedMs);
+    assert.equal(diagnosticReads,2,'World diagnostics must not be polled every frame');
+  }
+});
+
+test('a blocked route times out without claiming movement', async () => {
+  let timestamp=100;const actor={x:0,z:0};
+  const context=vm.createContext({actor,performance:{now:()=>100},
+    requestAnimationFrame(callback){queueMicrotask(()=>callback(timestamp+=20));},
+    getWorldExplorerRuntimeDiagnostics:()=>({activeActor:{position:actor}})
+  });
+  const result=await vm.runInContext(`(${sampleFrameWindow.toString()})({durationMs:100,targetDistance:20,actorKey:'actor'})`,context);
+  assert.equal(result.routeComplete,false);assert.equal(result.elapsedMs,100);assert.equal(result.endPosition.x,0);
+});
