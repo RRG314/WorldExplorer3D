@@ -1455,6 +1455,8 @@ const staleGeneratedImages = outputFiles
   .filter((relative) => /\.(?:png|jpe?g|webp)$/i.test(relative) &&
     !relative.startsWith('output/verification/') &&
     !relative.startsWith('output/playwright/') &&
+    // Dated release audits retain original failed and corrected browser captures.
+    !/^output\/release-integration\/audit-\d{4}-\d{2}-\d{2}\//.test(relative) &&
     // Private research-document renders are not release artwork and output/
     // is excluded by the hosting source allowlist. Preserve research evidence
     // rather than fail application health because a PDF was rendered locally.

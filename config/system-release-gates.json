@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "targetVersion": "5.2.0",
+  "targetVersion": "5.3.0",
   "documents": {
     "docs/SYSTEM_INVENTORY.md": ["Product model", "Player systems", "World systems", "Data and truth boundaries", "Persistence and backend", "Repository map", "Current limits"],
     "docs/ARCHITECTURE_MAP.md": ["Application overview", "Earth world flow", "Player movement and cameras", "Character, companions, and urban play", "Field exploration and progression", "Planetary and space environments", "Quick Build and persistent Blocks", "Multiplayer and backend", "Data classification", "Release shape"]
@@ -11,6 +11,7 @@
     "public-claims": { "scope": "candidate", "command": ["npm", "run", "audit:release-claims"], "artifactRequired": false },
     "current-contracts": { "scope": "candidate", "command": ["npm", "run", "verify:current-contracts"], "artifactRequired": false },
     "artifact-world": { "scope": "candidate", "command": ["npm", "run", "verify:artifact-runtime"], "artifactRequired": true, "timeoutMs": 360000 },
+    "facade-shaders": { "scope": "candidate", "command": ["node", "scripts/verification/building-facade-shaders-current.mjs"], "artifactRequired": false, "timeoutMs": 60000 },
     "street-geometry": { "scope": "candidate", "command": ["npm", "run", "verify:streets"], "artifactRequired": false },
     "street-workers": { "scope": "candidate", "command": ["node", "scripts/verification/street-worker-artifact.mjs"], "artifactRequired": true },
     "mobile-load": { "scope": "candidate", "command": ["npm", "run", "verify:mobile-load"], "artifactRequired": true, "timeoutMs": 180000 },
@@ -60,7 +61,7 @@
   "systems": [
     { "id": "boot-and-release", "documents": ["Product model", "Player systems", "World systems", "Session and boot", "Application overview", "Release shape", "Repository map"], "assertions": ["one current module graph", "one immutable artifact identity", "public pages and game boot from that artifact", "the landing explorer total renders without exposing account data"], "gates": ["source-graph", "release-contracts", "public-claims", "artifact-world", "gameplay-menu", "hotbar-actions", "landing-user-count", "artifact-integrity", "release-identity"] },
     { "id": "earth-compilation", "documents": ["World selection", "Earth traversal", "Earth compilation", "Earth world flow"], "assertions": ["one bounded selected location publishes", "provider failure cannot replace the active world", "representative urban rural coastal and structure locations load"], "gates": ["artifact-world", "assembled-worlds", "assembled-fallback", "provider-release"] },
-    { "id": "terrain-transport-buildings", "documents": ["Terrain and ground", "Roads and structures", "Buildings and interiors"], "assertions": ["accepted terrain owns contact", "compiled roads and structures own traversal", "building entry floors stairs elevators collision and exit work"], "gates": ["current-contracts", "street-geometry", "street-workers", "assembled-worlds", "actors-vehicles", "terrain-boundary", "interiors", "poi-lifecycle"] },
+    { "id": "terrain-transport-buildings", "documents": ["Terrain and ground", "Roads and structures", "Buildings and interiors"], "assertions": ["accepted terrain owns contact", "compiled roads and structures own traversal", "building entry floors stairs elevators collision and exit work"], "gates": ["current-contracts", "facade-shaders", "street-geometry", "street-workers", "assembled-worlds", "actors-vehicles", "terrain-boundary", "interiors", "poi-lifecycle"] },
     { "id": "movement-cameras-mobile", "documents": ["Mobile play", "Input and cameras", "Player movement and cameras"], "assertions": ["semantic actions drive each actor", "touch left and right follow the visible camera frame", "camera follows during movement", "HUD units match physical mode"], "gates": ["current-contracts", "player-blockers", "mobile-action-layout", "mobile-controls", "tutorial-controls"] },
     { "id": "field-progression", "documents": ["Field exploration", "Field and progression", "Field exploration and progression"], "assertions": ["one Backpack Journal Guide and progression authority", "typed activities update retained goals", "generated leads use honest player language"], "gates": ["current-contracts", "explorer-browser", "walking-field"] },
     { "id": "regional-ecology-live-gps", "documents": ["Regional ecology", "Live GPS", "Data and truth boundaries", "Data classification"], "assertions": ["regional packs preserve provenance and sensitive-species policy", "normal walking and Live GPS share field authority", "Live GPS permission reaches play within budget"], "gates": ["current-contracts", "regional-world", "live-gps", "mobile-load"] },

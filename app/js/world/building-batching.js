@@ -1,3 +1,4 @@
+import { FACADE_OPENINGS_GLSL } from './building-facade-layout.js?v=1';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   boundingSphereCenter,
@@ -5,7 +6,7 @@ import {
   disposeSceneMesh,
   materialBatchKey,
   appendGeometryWithTransform
-} from "./geometry-batching.js?v=6";
+} from "./geometry-batching.js?v=7";
 import { yieldToMainThread as defaultYieldToMainThread } from './cooperative-scheduling.js?v=1';
 
 const NEAR_BUILDING_BATCH_CELL_METERS = 360;
@@ -19,7 +20,7 @@ function midFacadeBatchKey(material) {
   return `building-mid-facade:${atlas}:${roughness}:${metalness}`;
 }
 
-function appendMidFacadeAttributes(batch, material, exteriorPresentation, vertexStart, vertexCount) {
+export function appendMidFacadeAttributes(batch, material, exteriorPresentation, vertexStart, vertexCount) {
   const wallColor = Number.isFinite(Number(exteriorPresentation?.wallColor))
     ? new THREE.Color(Number(exteriorPresentation.wallColor))
     : material?.color instanceof THREE.Color
@@ -42,12 +43,14 @@ function appendMidFacadeAttributes(batch, material, exteriorPresentation, vertex
   }
 }
 
-function createMidFacadeBatchMaterial(sourceMaterial, batchKey) {
+export function createMidFacadeBatchMaterial(sourceMaterial, batchKey) {
   const material = sourceMaterial.clone();
   material.color.setHex(0xffffff);
   material.vertexColors = true;
   material.onBeforeCompile = (shader) => {
     shader.vertexShader = [
+      'attribute vec4 facadeLayout; attribute vec4 facadeOpening;',
+      'varying vec4 vFacadeLayout; varying vec4 vFacadeOpening;',
       'attribute vec4 buildingFacadeParams;',
       'attribute vec4 buildingRoofAParams;',
       'attribute vec4 buildingRoofColorB;',
@@ -56,29 +59,28 @@ function createMidFacadeBatchMaterial(sourceMaterial, batchKey) {
       'varying vec4 vBuildingRoofColorB;',
       'varying float vBuildingWallMask;',
       'varying vec2 vBuildingRoofPosition;',
-      'varying vec2 vBuildingFacadeWorldPosition;',
       shader.vertexShader
     ].join('\n');
     shader.vertexShader = shader.vertexShader.replace(
       '#include <beginnormal_vertex>',
       [
         '#include <beginnormal_vertex>',
+        'vFacadeLayout = facadeLayout; vFacadeOpening = facadeOpening;',
         'vBuildingFacadeParams = buildingFacadeParams;',
         'vBuildingRoofAParams = buildingRoofAParams;',
         'vBuildingRoofColorB = buildingRoofColorB;',
         'vBuildingWallMask = smoothstep(0.18, 0.72, 1.0 - abs(objectNormal.y));',
-        'vBuildingRoofPosition = position.xz;',
-        'float buildingFacadeHorizontal = abs(objectNormal.x) > abs(objectNormal.z) ? position.z : position.x;',
-        'vBuildingFacadeWorldPosition = vec2(buildingFacadeHorizontal, position.y);'
+        'vBuildingRoofPosition = position.xz;'
       ].join('\n')
     );
     shader.fragmentShader = [
+      'varying vec4 vFacadeLayout; varying vec4 vFacadeOpening;',
+      FACADE_OPENINGS_GLSL,
       'varying vec4 vBuildingFacadeParams;',
       'varying vec4 vBuildingRoofAParams;',
       'varying vec4 vBuildingRoofColorB;',
       'varying float vBuildingWallMask;',
       'varying vec2 vBuildingRoofPosition;',
-      'varying vec2 vBuildingFacadeWorldPosition;',
       'float buildingMidRoofHash(vec2 p) {',
       '  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);',
       '}',
@@ -98,17 +100,18 @@ function createMidFacadeBatchMaterial(sourceMaterial, batchKey) {
       '#include <map_fragment>',
       [
         '#ifdef USE_MAP',
-        '  vec2 buildingFacadeUv = vBuildingFacadeWorldPosition * vBuildingFacadeParams.xy + vBuildingFacadeParams.zw;',
+        '  vec2 buildingFacadeUv = vFacadeLayout.zw * vBuildingFacadeParams.xy + vBuildingFacadeParams.zw;',
         '  vec4 buildingFacadeTexel = mapTexelToLinear(texture2D(map, buildingFacadeUv));',
         '  float buildingRoofGrain = buildingMidRoofNoise(vBuildingRoofPosition * vBuildingRoofAParams.w);',
         '  vec3 buildingRoofSurface = mix(vBuildingRoofAParams.rgb, vBuildingRoofColorB.rgb, 0.18 + buildingRoofGrain * 0.64);',
         '  diffuseColor.rgb = mix(buildingRoofSurface, diffuseColor.rgb * buildingFacadeTexel.rgb, vBuildingWallMask);',
+        '  if (vBuildingWallMask > 0.5) diffuseColor.rgb = facadeOpenings(diffuseColor.rgb, vFacadeLayout, vFacadeOpening);',
         '  diffuseColor.a *= mix(1.0, buildingFacadeTexel.a, vBuildingWallMask);',
         '#endif'
       ].join('\n')
     );
   };
-  material.customProgramCacheKey = () => 'building-mid-facade-batch-v3-production-shader-parity';
+  material.customProgramCacheKey = () => 'building-mid-facade-batch-v4-fitted-wall-layout';
   material.userData = {
     ...(material.userData || {}),
     buildingMidFacadeBatch: true,
@@ -228,7 +231,7 @@ async function batchBuildingMeshesByTier(tiers = ['near'], options = {}) {
         continue;
       }
 
-      const batch = { positions: [], normals: [], uvs: [], indices: [] };
+      const batch = { positions: [], normals: [], uvs: [], indices: [], facadeLayouts: [], facadeOpenings: [] };
       if (group.lodTier === 'near') batch.facadeEntrances = [];
       if (group.midFacadeBatch) {
         batch.colors = [];

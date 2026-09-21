@@ -1,3 +1,4 @@
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -21,12 +22,13 @@ const catalog = {
 const pilots = requested.map((id) => ({ id, ...(catalog[id] || catalog.baltimore) }));
 
 await mkdir(outputDir, { recursive: true });
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280'] });
 const results = [];
 
 async function launchPilot(pilot) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
   const page = await context.newPage();
+  await configureStagingAppCheck(page, baseUrl);
   const errors = [];
   const failedResponses = [];
   page.on('pageerror', (error) => errors.push(String(error?.stack || error)));

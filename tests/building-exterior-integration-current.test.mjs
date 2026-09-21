@@ -29,7 +29,7 @@ test('facade material selection preserves mapped tags and uses bounded shared te
   assert.match(material, /materialClaim: mappedFamily \? 'mapped'/);
   assert.match(material, /colorClaim: mappedColor \? 'mapped'/);
   assert.match(material, /sharedRuntimeTexture: true/);
-  assert.match(material, /building-facade-world-projection-v7/);
+  assert.match(material, /building-facade-local-layout-v8/);
   assert.doesNotMatch(material, /new THREE\.TextureLoader\(\).*forEach/);
 });
 

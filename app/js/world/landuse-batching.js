@@ -5,7 +5,7 @@ import {
   buildMergedGeometry,
   disposeSceneMesh,
   materialBatchKey
-} from "./geometry-batching.js?v=6";
+} from "./geometry-batching.js?v=7";
 
 export function batchLanduseMeshes() {
   try {

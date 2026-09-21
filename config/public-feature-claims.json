@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "targetVersion": "5.2.0",
+  "targetVersion": "5.3.0",
   "publicFiles": ["index.html", "about/index.html", "README.md", "github-pages/index.html", "app/index.html"],
   "allowedStatuses": ["review-required", "source-verified", "candidate-verified", "excluded"],
   "forbiddenPublicPatterns": [

@@ -5,6 +5,12 @@ import process from 'node:process';
 // tests. Every file corresponds to a retained System Inventory capability or
 // an Architecture Map ownership boundary.
 const tests = [
+  'tests/building-facade-layout-current.test.mjs',
+  'tests/building-exterior-catalog-current.test.mjs',
+  'tests/building-exterior-integration-current.test.mjs',
+  'tests/facade-texture-sharing-current.test.mjs',
+  'tests/capture-facade-geometry-current.test.mjs',
+  'tests/geology-data.test.mjs',
   'tests/shortbread-partial-coverage-current.test.mjs',
   'tests/model-skeleton-sharing-current.test.mjs',
   'tests/frame-window-current.test.mjs',

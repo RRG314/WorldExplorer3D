@@ -1,7 +1,8 @@
+import { facadeFloorPlan } from './building-facade-layout.js?v=1';
 import {
   appendGeometryWithTransform,
   buildMergedGeometry
-} from './geometry-batching.js?v=6';
+} from './geometry-batching.js?v=7';
 import { buildingExteriorCatalogSnapshot } from './building-exterior-catalog.js?v=1';
 
 const DETAIL_LIMITS = Object.freeze({ low: 0, performance: 72, balanced: 150, quality: 240 });
@@ -236,9 +237,9 @@ function addFireEscape(addBox, edge, baseY, topY, profile, seed, counters) {
   if (!profile.details.includes('fire_escape') || topY - baseY < 11 || edge.length < 4) return;
   const width = Math.min(2.8, edge.length * 0.38);
   const tangentOffset = (seed & 1 ? -1 : 1) * Math.min(edge.length * 0.22, Math.max(0, (edge.length - width) * 0.42));
-  const floors = Math.min(3, Math.max(1, Math.floor((topY - baseY - 5) / 3.1)));
+  const floors = Math.min(3, Math.max(1, Math.floor((topY - baseY - 5) / finite(profile.window?.floorHeight,3.1))));
   for (let index = 0; index < floors; index += 1) {
-    const y = baseY + 4.7 + index * 3.1;
+    const y = baseY + finite(profile.window?.floorHeight,3.1) * (1 + index);
     addFacadeBeam(addBox, 'dark-metal', edge, width, 0.09, 0.72, y, tangentOffset, 0.39);
     addRailings(addBox, edge, tangentOffset, width, y + 0.04, 0.68);
   }
@@ -271,6 +272,32 @@ function addChimney(addBox, mesh, profile, seed, counters) {
   const offset = ((seed >>> 9) % 3 - 1) * 0.45;
   addBox('trim', 0.58, 1.25, 0.58, center.x + offset, topY + 0.62, center.z - offset, 0);
   counters.modules.chimney = (counters.modules.chimney || 0) + 1;
+}
+
+
+function addFittedWindowTrim(addBox, edge, mesh, profile, entrance, counters) {
+  // Bounded close detail. All other windows keep the identical shader layout.
+  if (Math.hypot(edge.x, edge.z) > 90 || profile.material?.surfacePattern === 'glass' || edge.length < 1.4) return;
+  const plan=facadeFloorPlan(finite(mesh.userData.bodyHeightMeters), {
+    ...profile, levels: Math.max(1, finite(mesh.userData.levels)-finite(mesh.userData.buildingSemantics?.buildingMinLevel)),
+    foundation: finite(mesh.userData.terrainFoundationRise)
+  });
+  const bays=Math.max(1,Math.round(edge.length/Math.max(1.8,finite(profile.window?.bayWidth,3.4))));
+  const bayWidth=edge.length/bays;
+  for(let floor=0;floor<Math.min(2,plan.floors);floor++)for(let bay=0;bay<bays;bay++){
+    if((counters.modules.fitted_window_frame||0)>=192)return;
+    const shop=floor===0 && finite(profile.storefront?.glazing)>0;
+    const w=bayWidth*(shop?profile.storefront.glazing*.94:finite(profile.window?.width,.55));
+    const h=plan.floorHeight*(shop?.78:finite(profile.window?.height,.56));
+    const along=-edge.length/2+(bay+.5)*bayWidth;
+    const y=finite(mesh.position.y)+plan.foundation+(floor+.55)*plan.floorHeight;
+    const entranceAlong=entrance?(entrance.x-edge.x)*edge.tangentX+(entrance.z-edge.z)*edge.tangentZ:Infinity;
+    if(floor===0 && Math.abs(along-entranceAlong)<bayWidth*finite(profile.window?.width,.55)/2+1.2)continue;
+    addFacadeBeam(addBox,'trim',edge,w+.16,.09,.16,y-h/2-.04,along,.075);
+    addFacadeBeam(addBox,'trim',edge,w+.12,.075,.10,y+h/2+.025,along,.045);
+    for(const side of [-1,1])addFacadeBeam(addBox,'dark-metal',edge,.055,h,.06,y,along+side*w/2,.025);
+    counters.modules.fitted_window_frame=(counters.modules.fitted_window_frame||0)+1;
+  }
 }
 
 function distribution(values) {
@@ -324,12 +351,15 @@ export function publishBuildingExteriorDetails(appCtx, options = {}) {
     storefronts.set(profile.storefrontStyle, (storefronts.get(profile.storefrontStyle) || 0) + 1);
     combinations.add([profile.familyId, profile.materialId, profile.windowStyle, profile.doorStyle, profile.storefrontStyle].join('|'));
 
+    addFittedWindowTrim(addBox, edge, mesh, profile, entrance, counters);
     addCornice(addBox, edge, topY, profile, counters);
     addStorefrontAwning(addBox, edge, baseY, profile, seed, counters);
     addEntryStep(addBox, edge, entrance, profile, mesh, counters);
     addPorch(addBox, edge, entrance, profile, counters);
-    addBalconies(addBox, edge, baseY, topY, profile, seed, counters);
-    addFireEscape(addBox, edge, baseY, topY, profile, seed, counters);
+    const fittedFloors = facadeFloorPlan(topY-baseY,{...profile,levels:Math.max(1,finite(mesh.userData.levels)-finite(mesh.userData.buildingSemantics?.buildingMinLevel)),foundation:finite(mesh.userData.terrainFoundationRise)});
+    const alignedProfile = {...profile,window:{...profile.window,floorHeight:fittedFloors.floorHeight}};
+    addBalconies(addBox, edge, baseY+fittedFloors.foundation, topY, alignedProfile, seed, counters);
+    addFireEscape(addBox, edge, baseY+fittedFloors.foundation, topY, alignedProfile, seed, counters);
     addServiceFront(addBox, edge, baseY, profile, counters);
     addChimney(addBox, mesh, profile, seed, counters);
   }

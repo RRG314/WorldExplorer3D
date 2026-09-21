@@ -1,7 +1,7 @@
 import { releaseLocationModels } from './release-location-models.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { clearBuildingExteriorMaterialPool } from "../engine/building-facade-materials.js?v=16";
-import { clearBuildingExteriorDetails } from './building-exterior-details.js?v=1';
+import { clearBuildingExteriorMaterialPool } from "../engine/building-facade-materials.js?v=17";
+import { clearBuildingExteriorDetails } from './building-exterior-details.js?v=2';
 
 const MATERIAL_TEXTURE_KEYS = Object.freeze([
   'map', 'alphaMap', 'aoMap', 'bumpMap', 'displacementMap', 'emissiveMap',

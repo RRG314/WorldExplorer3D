@@ -1,3 +1,4 @@
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import { sampleFrameWindow } from './frame-window.mjs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -28,6 +29,7 @@ function metricValue(metrics, name) {
 async function createMeasuredClient(contextOptions) {
   const context = await browser.newContext(contextOptions);
   const page = await context.newPage();
+  await configureStagingAppCheck(page, baseUrl);
   const cdp = await context.newCDPSession(page);
   await cdp.send('Network.enable');
   await cdp.send('Performance.enable');
@@ -160,8 +162,15 @@ async function selectMode(page, expected, selector) {
   return activationMs;
 }
 
-async function measureMode(client, id, sampleMs = 5_000) {
-  const raw = await client.page.evaluate(sampleFrameWindow, sampleMs);
+async function measureMode(client, id, sampleMs = 5_000, movementKey = null) {
+  if (movementKey) {
+    // Focus the world through a real pointer action, then hold the actual control.
+    await client.page.mouse.click(720, 400);
+    await client.page.keyboard.down(movementKey);
+  }
+  let raw;
+  try { raw = await client.page.evaluate(sampleFrameWindow, sampleMs); }
+  finally { if (movementKey) await client.page.keyboard.up(movementKey); }
   assert.ok(raw.deltas.length > 0, 'Frame sample must contain intervals');
   assert.ok(raw.elapsedMs >= sampleMs, 'Frame sample must cover the requested duration');
   assert.ok(raw.deltas.every((value) => Number.isFinite(value) && value > 0), 'Frame intervals must be positive');
@@ -173,6 +182,8 @@ async function measureMode(client, id, sampleMs = 5_000) {
   const jsHeapUsedBytes = await heapUsedBytes(client.cdp, true);
   return {
     id,
+    scenario: movementKey ? 'controlled-moving-route' : id === 'plane' ? 'autonomous-flight' : 'stationary-mode',
+    inputDuringSample: movementKey ? { key: movementKey, heldForMs: sampleMs } : 'none',
     sampleMs,
     elapsedMs: raw.elapsedMs,
     distanceWorldUnits: raw.startPosition && raw.endPosition
@@ -230,13 +241,15 @@ async function runDesktop() {
     const walkActivationMs = await selectMode(client.page, 'walk', '#fWalk');
     const walk = { ...(await measureMode(client, 'walk', auditOnly ? 1_500 : 5_000)), activationMs: walkActivationMs };
     console.log('[performance-retention] desktop walk', JSON.stringify({ fps: walk.averageFps, withinBudgets: modesWithinBudgets([walk], budgets.desktopTier) }));
+    const walkMoving = await measureMode(client, 'walk-moving', 5_000, 'w');
     const driveActivationMs = await selectMode(client.page, 'drive', '#fDriving');
     const drive = { ...(await measureMode(client, 'drive', auditOnly ? 1_500 : 5_000)), activationMs: driveActivationMs };
     console.log('[performance-retention] desktop drive', JSON.stringify({ fps: drive.averageFps, withinBudgets: modesWithinBudgets([drive], budgets.desktopTier) }));
+    const driveMoving = await measureMode(client, 'drive-moving', 5_000, 'w');
     const planeActivationMs = await selectMode(client.page, 'plane', '#fPlane');
     const plane = { ...(await measureMode(client, 'plane', auditOnly ? 1_500 : 90_000)), activationMs: planeActivationMs };
     console.log('[performance-retention] desktop plane', JSON.stringify({ fps: plane.averageFps, withinBudgets: modesWithinBudgets([plane], budgets.desktopTier) }));
-    const modes = [walk, drive, plane];
+    const modes = [walk, walkMoving, drive, driveMoving, plane];
     const baselineCounts = walk.worldCounts;
     const releases = [];
     const reloadCounts = [];
@@ -268,9 +281,10 @@ async function runDesktop() {
     const releaseTextures = releases.map((entry) => Number(entry?.after?.rendererTextures || 0));
     const checks = {
       firstPlayableWithinBudget: launch.firstPlayableMs <= limit.firstPlayableMs,
-      modeActivationResponsive: modes.every((mode) => mode.activationMs <= limit.maximumModeActivationMs),
+      modeActivationResponsive: modes.filter((mode) => mode.activationMs !== undefined).every((mode) => mode.activationMs <= limit.maximumModeActivationMs),
       completeWorld: modes.every((mode) => Number(mode.worldCounts?.buildings) > 0 && Number(mode.worldCounts?.roads) > 0 && Number(mode.worldCounts?.terrainTiles) > 0),
       modesWithinBudgets: modesWithinBudgets(modes, budgets.desktopTier),
+      movingGroundRoutesObserved: walkMoving.distanceWorldUnits >= 2 && driveMoving.distanceWorldUnits >= 5,
       sustainedFlightObserved: !auditOnly && plane.elapsedMs >= 90_000 && plane.distanceWorldUnits >= 1_000,
       teardownClearsWorldOwners: releases.every((entry) =>
         Number(entry?.after?.roads || 0) <= budgets.retention.maximumRetainedRoads &&
@@ -305,7 +319,7 @@ async function runMobileRegression() {
     const checks = {
       viewportIs390x844: await client.page.evaluate(() => innerWidth === 390 && innerHeight === 844),
       firstPlayableWithinBudget: launch.firstPlayableMs <= limit.firstPlayableMs,
-      modeActivationResponsive: modes.every((mode) => mode.activationMs <= limit.maximumModeActivationMs),
+      modeActivationResponsive: modes.filter((mode) => mode.activationMs !== undefined).every((mode) => mode.activationMs <= limit.maximumModeActivationMs),
       completeWorld: modes.every((mode) => Number(mode.worldCounts?.buildings) > 0 && Number(mode.worldCounts?.roads) > 0 && Number(mode.worldCounts?.terrainTiles) > 0),
       modesWithinBudgets: modesWithinBudgets(modes, budgets.mobileRegressionTier),
       transferWithinBudget: transferWithinBudget(transfer, limit),
@@ -349,6 +363,12 @@ try {
     generatedAt: new Date().toISOString(),
     baseUrl,
     writesProduction: false,
+    evidenceScope: {
+      kind: 'single-artifact-budget-and-retention',
+      comparativeImprovementEstablished: false,
+      movingWalkAndDriveMeasured: desktop?.checks?.movingGroundRoutesObserved === true,
+      reason: 'Stationary and controlled moving samples are separate. A live-versus-candidate comparison with matched data, routes, quality, hardware, and repeated cold/warm trials is required to establish improvement.'
+    },
     budgets,
     desktop,
     mobileRegression,
