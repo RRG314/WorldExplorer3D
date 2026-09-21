@@ -1,0 +1,17 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="/favicon.svg"><style>body{margin:0}canvas{display:block}</style><script src="/node_modules/three/build/three.min.js"></script><script src="/node_modules/three/examples/js/loaders/GLTFLoader.js"></script><script type="module">
+import {modelAssetsForRole} from '/app/js/assets/model-asset-catalog.js';
+import {batchStaticModelTemplate} from '/app/js/assets/static-model-batching.js';
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(1200,800);renderer.outputEncoding=THREE.sRGBEncoding;document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0xc8d2d7);scene.add(new THREE.HemisphereLight(0xffffff,0x5c6570,1));const sun=new THREE.DirectionalLight(0xffffff,1);sun.position.set(20,35,20);scene.add(sun);
+const camera=new THREE.PerspectiveCamera(35,1.5,.1,500);camera.position.set(19,25,33);camera.lookAt(0,0,0);
+const models=[],loader=new THREE.GLTFLoader();
+for(const [i,record] of modelAssetsForRole('road-vehicle-presentation').entries()){
+ const gltf=await loader.loadAsync(record.url),root=gltf.scene,box=new THREE.Box3().setFromObject(root),size=box.getSize(new THREE.Vector3()),center=box.getCenter(new THREE.Vector3());
+ const parent=new THREE.Group(),scale=6/Math.max(size.x,size.z);parent.scale.setScalar(scale);root.position.sub(center);root.position.y-=box.min.y-center.y;parent.add(root);parent.position.set((i%3-1)*9,0,(Math.floor(i/3)-1)*9);scene.add(parent);models.push({id:record.id,root,animations:gltf.animations});
+}
+let results=[],delta=null;function render(){renderer.render(scene,camera);}
+function pixels(){const a=new Uint8Array(1200*800*4);renderer.getContext().readPixels(0,0,1200,800,renderer.getContext().RGBA,renderer.getContext().UNSIGNED_BYTE,a);return a;}
+window.applyBatching=()=>{render();const before=pixels(),beforeCalls=renderer.info.render.calls,beforeTriangles=renderer.info.render.triangles;results=models.map(m=>({id:m.id,...batchStaticModelTemplate(THREE,m.root,m.animations)}));render();const after=pixels();let changed=0,total=0,max=0;for(let i=0;i<before.length;i+=4){let d=0;for(let c=0;c<3;c++)d=Math.max(d,Math.abs(before[i+c]-after[i+c]));if(d>8)changed++;total+=d;max=Math.max(max,d);}delta={changedFraction:changed/(1200*800),meanMaxChannelDifference:total/(1200*800),maximum:max,beforeCalls,afterCalls:renderer.info.render.calls,beforeTriangles,afterTriangles:renderer.info.render.triangles};return delta;};
+window.advanceTime=async()=>render();window.render_game_to_text=()=>JSON.stringify({ready:true,results,delta,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,glError:renderer.getContext().getError()});render();window.ready=true;
+if(new URLSearchParams(location.search).has('batched'))window.applyBatching();
+</script>

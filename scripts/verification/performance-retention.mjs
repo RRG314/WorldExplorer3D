@@ -247,7 +247,20 @@ async function runDesktop() {
     console.log('[performance-retention] desktop drive', JSON.stringify({ fps: drive.averageFps, withinBudgets: modesWithinBudgets([drive], budgets.desktopTier) }));
     const driveMoving = await measureMode(client, 'drive-moving', 5_000, 'w');
     const planeActivationMs = await selectMode(client.page, 'plane', '#fPlane');
-    const plane = { ...(await measureMode(client, 'plane', auditOnly ? 1_500 : 90_000)), activationMs: planeActivationMs };
+    // Exercise the actual throttle and climb controls. An idle aircraft spawned
+    // from a city street can hit the next block; that is not sustained-flight
+    // performance evidence. Do not teleport, disable collisions, or inject speed.
+    await client.page.mouse.click(720, 400);
+    const flightBefore = await client.page.evaluate(async () => (await import('/app/js/shared-context.js?v=55')).ctx.getPlaneSnapshot());
+    await client.page.keyboard.down('Space');
+    await client.page.keyboard.down('s');
+    try { await client.page.waitForTimeout(2_000); }
+    finally { await client.page.keyboard.up('s'); await client.page.keyboard.up('Space'); }
+    const flightAfter = await client.page.evaluate(async () => (await import('/app/js/shared-context.js?v=55')).ctx.getPlaneSnapshot());
+    assert.ok(flightAfter.pitch > .05 && flightAfter.y > flightBefore.y && flightAfter.throttle > flightBefore.throttle,
+      'Real pitch/throttle input must establish a climb before sustained flight');
+    const plane = { ...(await measureMode(client, 'plane', auditOnly ? 1_500 : 90_000, 'Space')), activationMs: planeActivationMs,
+      preparation: { keys: ['s', 'Space'], heldForMs: 2_000, before: flightBefore, after: flightAfter } };
     console.log('[performance-retention] desktop plane', JSON.stringify({ fps: plane.averageFps, withinBudgets: modesWithinBudgets([plane], budgets.desktopTier) }));
     const modes = [walk, walkMoving, drive, driveMoving, plane];
     const baselineCounts = walk.worldCounts;

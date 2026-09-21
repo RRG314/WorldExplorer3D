@@ -453,10 +453,15 @@ export async function publishCompiledTransportMeshes(deps = {}) {
 
   const roadBatchBuilder = createSpatialRoadBatches();
   const roadMainBatches = roadBatchBuilder.batches;
-  const roadSkirtBatchVerts = [];
-  const roadSkirtBatchIdx = [];
-  const roadMarkBatchVerts = [];
-  const roadMarkBatchIdx = [];
+  // Accessories keep their exact geometry, but no longer force every marking
+  // and bridge skirt in the region through the GPU from every street view.
+  const roadSkirtBuilder = createSpatialRoadBatches();
+  const roadMarkBuilder = createSpatialRoadBatches();
+  const appendMarkings = (road, points, widths, sampleHeight, support) => {
+    const verts = [], indices = [];
+    appendRoadCenterMarkings(road, points, verts, indices, widths, sampleHeight, support);
+    roadMarkBuilder.append(verts, indices, road.structureSemantics?.terrainMode);
+  };
   const roadSurfaceIntegrity = {
     authority: 'unioned-carriageway-regions',
     surfaceHeightAuthority: 'partitioned-published-terrain',
@@ -559,7 +564,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       appendRoadMainGeometry(verts, indices, renderRoad.structureSemantics?.terrainMode);
       if(shouldRenderRoadCenterMarkings(renderRoad)) {
         const markingSurface=createRoadContactIndex([{geometry:{attributes:{position:{array:verts}},getIndex:()=>({array:indices})},userData:{terrainMode:renderRoad.structureSemantics?.terrainMode}}]);
-        appendRoadCenterMarkings(renderRoad,pts,roadMarkBatchVerts,roadMarkBatchIdx,widthSamplesMeters,
+        appendMarkings(renderRoad,pts,widthSamplesMeters,
           (x,z)=>markingSurface.sampleAt(x,z),markingSurface);
         markingSurface.dispose();
       }
@@ -573,7 +578,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
           renderRoad?.structureSemantics?.terrainMode === "at_grade" ? roadTerrainSampler : null
         );
         if (skirtData.verts.length > 0) {
-          appendIndexedGeometry(roadSkirtBatchVerts, roadSkirtBatchIdx, skirtData.verts, skirtData.indices);
+          roadSkirtBuilder.append(skirtData.verts, skirtData.indices, renderRoad.structureSemantics?.terrainMode);
         }
       }
       // Large regional locations can publish tens of thousands of ribbons.
@@ -618,7 +623,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
         if(!isCurrent())return;
         if(shouldRenderRoadCenterMarkings(road)) {
           const groundSupport={sampleAt:(x,z)=>support.sampleAt(x,z,NaN,'at_grade'),projectTriangle:(points,lift)=>support.projectTriangle(points,lift,'at_grade')};
-          appendRoadCenterMarkings(road,points,roadMarkBatchVerts,roadMarkBatchIdx,widths,groundSupport.sampleAt,groundSupport);
+          appendMarkings(road,points,widths,groundSupport.sampleAt,groundSupport);
         }
         if(now()-sliceStartedAt>=24) {await yieldToMainThread();sliceStartedAt=now();}
       }
@@ -626,7 +631,10 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   });
 
   if (!isCurrent()) return;
-  const publishedVertexCount=roadMainBatches.reduce((sum,batch)=>sum+batch.verts.length/3,0)+roadSkirtBatchVerts.length/3+roadMarkBatchVerts.length/3;
+  roadSkirtBuilder.finish();
+  roadMarkBuilder.finish();
+  const allRoadBatches = [...roadMainBatches, ...roadSkirtBuilder.batches, ...roadMarkBuilder.batches];
+  const publishedVertexCount=allRoadBatches.reduce((sum,batch)=>sum+batch.verts.length/3,0);
 
   const stagedRoadGroup = new THREE.Group();
   const stagedRoadMeshes = [];
@@ -652,32 +660,37 @@ export async function publishCompiledTransportMeshes(deps = {}) {
         }
       });
     });
-    buildIndexedBatchMesh({
+    for (const batch of roadSkirtBuilder.batches) buildIndexedBatchMesh({
       scene: stagedRoadGroup,
       targetList: stagedRoadMeshes,
-      verts: roadSkirtBatchVerts,
-      indices: roadSkirtBatchIdx,
+      verts: batch.verts,
+      indices: batch.indices,
       material: skirtMat,
       renderOrder: 1,
-      userData: { isRoadBatch: true, isRoadSkirt: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
+      frustumCulled: true,
+      userData: { isRoadBatch: true, isRoadSkirt: true, sharedRoadMaterial: true,
+        roadSpatialKey: batch.spatialKey, worldLoadSequence: appCtx._worldLoadSequence || 0 }
     });
-    buildIndexedBatchMesh({
+    for (const batch of roadMarkBuilder.batches) buildIndexedBatchMesh({
       scene: stagedRoadGroup,
       targetList: stagedRoadMeshes,
-      verts: roadMarkBatchVerts,
-      indices: roadMarkBatchIdx,
+      verts: batch.verts,
+      indices: batch.indices,
       material: markMat,
       renderOrder: 4,
       receiveShadow: false,
-      userData: { isRoadBatch: true, isRoadMarking: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
+      frustumCulled: true,
+      userData: { isRoadBatch: true, isRoadMarking: true, sharedRoadMaterial: true,
+        roadSpatialKey: batch.spatialKey, worldLoadSequence: appCtx._worldLoadSequence || 0 }
     });
   });
   // BufferGeometry owns independent typed arrays now. Release construction
   // arrays before building contacts, when both old and new worlds coexist.
-  for(const batch of roadMainBatches){batch.verts.length=0;batch.indices.length=0;}
+  for(const batch of allRoadBatches){batch.verts.length=0;batch.indices.length=0;}
+  allRoadBatches.length=0;
   roadMainBatches.length=0;
-  roadSkirtBatchVerts.length=roadSkirtBatchIdx.length=0;
-  roadMarkBatchVerts.length=roadMarkBatchIdx.length=0;
+  roadSkirtBuilder.batches.length=0;
+  roadMarkBuilder.batches.length=0;
   stagedRoadContact = await measureAsync('buildRoadContacts',()=>createRoadContactIndexCooperatively(stagedRoadMeshes,16,{current:isCurrent,yieldWork:yieldToMainThread}));
   await measureAsync('measurePublishedRoadIntegrity', async () => {
     let sliceStartedAt = now();

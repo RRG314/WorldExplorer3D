@@ -53,3 +53,21 @@ test('collision support and stacked surface selection are identical after regrou
     assert.equal(after.sampleAt(5000,5000,NaN,'at_grade'),null,'regrouping does not create physical support in a gap');
   } finally {before.dispose();after.dispose();}
 });
+
+
+test('published lane markings and bridge skirts retain every triangle across distant batches', async () => {
+  const {appendRoadCenterMarkings,buildRoadSkirts}=await import('../app/js/terrain/rebuild.js');
+  const inputs=[];
+  for(const x of [0,10000,-10000,1019]) {
+    const points=[{x,z:0},{x:x+35,z:12},{x:x+85,z:18}];
+    const verts=[],indices=[];
+    appendRoadCenterMarkings({type:'primary',width:12,transportRecord:{crossSection:{lanes:3}}},points,verts,indices,null,(x,z)=>4+x*.0001+z*.003);
+    assert.ok(indices.length>0);
+    inputs.push({verts,indices,mode:'markings'});
+    const skirt=buildRoadSkirts(points.map(p=>({...p,y:20})),points.map(p=>({...p,z:p.z+10,y:20})),2,()=>0);
+    inputs.push({...skirt,mode:'skirts'});
+  }
+  const output=build(inputs,{maxVertices:100});
+  assert.deepEqual(triangles(output),triangles(originalBatches(inputs)));
+  assert.ok(new Set(output.map(b=>b.spatialKey)).size>=3);
+});

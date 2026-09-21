@@ -1,4 +1,4 @@
-import { loadModelAsset } from '../assets/model-asset-runtime.js?v=15';
+import { loadModelAsset } from '../assets/model-asset-runtime.js?v=16';
 import { keyboardBindingCode, keyboardBindingLabel, keyMatchesKeyboardAction } from '../controls/keyboard-bindings.js?v=3';
 import { createSolisReachExteriorMesh } from './solis-reach-exterior-mesh.js?v=1';
 

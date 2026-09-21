@@ -1,3 +1,4 @@
+import {batchStaticModelTemplate} from './static-model-batching.js?v=1';
 import { getModelAsset } from './model-asset-catalog.js?v=16';
 
 const templateLoads = new Map();
@@ -21,7 +22,12 @@ function loadTemplate(THREE, record) {
           reject(new Error(`${record.label} does not contain a scene.`));
           return;
         }
-        resolve(Object.freeze({ root, animations: Object.freeze([...(gltf?.animations || [])]) }));
+        try {
+          if (record.roles.includes('road-vehicle-presentation')) {
+            root.userData.staticModelBatching = batchStaticModelTemplate(THREE, root, gltf?.animations || []);
+          }
+          resolve(Object.freeze({ root, animations: Object.freeze([...(gltf?.animations || [])]) }));
+        } catch (error) { reject(error); }
       },
       undefined,
       reject

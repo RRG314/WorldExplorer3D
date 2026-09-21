@@ -1,5 +1,5 @@
 import {drainCooperatively} from './cooperative-scheduling.js?v=1';
-import {loadModelAsset} from '../assets/model-asset-runtime.js?v=15';
+import {loadModelAsset} from '../assets/model-asset-runtime.js?v=16';
 import {vegetationIdentitySeed} from './vegetation-spatial.js';
 
 const models = new Map();

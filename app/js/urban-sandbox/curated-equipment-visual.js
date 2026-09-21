@@ -1,4 +1,4 @@
-import { loadModelAsset } from '../assets/model-asset-runtime.js?v=15';
+import { loadModelAsset } from '../assets/model-asset-runtime.js?v=16';
 
 const CURATED_EQUIPMENT_ASSET_BY_ID = Object.freeze({
   'pulse-sidearm': 'equipment-explorer-pulse-sidearm-v1',

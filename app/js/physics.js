@@ -3,7 +3,7 @@ import { ctx as appCtx } from "./shared-context.js?v=55";
 import { constrainTunnelActorCeiling } from './world/compiler/tunnel-space-query.js';
 import { isRoadSurfaceReachable } from "./structure-semantics.js?v=63";
 import { updateDrone } from "./physics/drone-flight.js?v=11";
-import { updatePlane } from "./plane-mode.js?v=36";
+import { updatePlane } from "./plane-mode.js?v=37";
 import {
   createEarthVehicleGroundContactSampler,
   stabilizeEarthVehicleSurfaceY,
