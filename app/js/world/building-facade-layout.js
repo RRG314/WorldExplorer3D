@@ -60,6 +60,12 @@ export function attachBuildingFacadeLayout(geometry, options = {}) {
 // Both near and merged-mid materials use precisely the same opening positions.
 // Surface imagery supplies masonry grain; no prepainted window image owns layout.
 export const FACADE_OPENINGS_GLSL = `
+// The catalog owns wall color. Photographed grain modulates its brightness;
+// it must not multiply a second dark/weathered albedo into the whole building.
+vec3 facadeWallSurface(vec3 tint, vec3 grain) {
+  float luminance=dot(grain,vec3(0.2126,0.7152,0.0722));
+  return tint*(0.65+0.55*sqrt(clamp(luminance,0.0,1.0)));
+}
 float facadeBox(vec2 p, vec2 halfSize, float feather) {
   vec2 edge=1.0-smoothstep(halfSize,halfSize+vec2(feather),abs(p));
   return edge.x*edge.y;

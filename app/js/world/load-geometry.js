@@ -4,7 +4,7 @@ import {
   normalizeLanduseSurfaceType
 } from "../surface-rules.js?v=18";
 import { geometryHasFinitePositions } from "./geometry-batching.js?v=7";
-import { resolveBuildingExteriorPresentation } from '../engine/building-facade-materials.js?v=18';
+import { resolveBuildingExteriorPresentation } from '../engine/building-facade-materials.js?v=19';
 import {
   fetchShortbreadTile,
   vectorTileRangeForBounds

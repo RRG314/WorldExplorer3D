@@ -1,4 +1,4 @@
-import { FACADE_OPENINGS_GLSL } from './building-facade-layout.js?v=1';
+import { FACADE_OPENINGS_GLSL } from './building-facade-layout.js?v=2';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   boundingSphereCenter,
@@ -109,14 +109,14 @@ export function createMidFacadeBatchMaterial(sourceMaterial, batchKey) {
         '  vec4 buildingFacadeTexel = mapTexelToLinear(texture2D(map, buildingFacadeUv));',
         '  float buildingRoofGrain = buildingMidRoofNoise(vBuildingRoofPosition * vBuildingRoofAParams.w);',
         '  vec3 buildingRoofSurface = mix(vBuildingRoofAParams.rgb, vBuildingRoofColorB.rgb, 0.18 + buildingRoofGrain * 0.64);',
-        '  diffuseColor.rgb = mix(buildingRoofSurface, diffuseColor.rgb * vColor.rgb * buildingFacadeTexel.rgb, vBuildingWallMask);',
+        '  diffuseColor.rgb = mix(buildingRoofSurface, facadeWallSurface(diffuseColor.rgb * vColor.rgb, buildingFacadeTexel.rgb), vBuildingWallMask);',
         '  if (vBuildingWallMask > 0.5) diffuseColor.rgb = facadeOpenings(diffuseColor.rgb, vFacadeLayout, vFacadeOpening);',
         '  diffuseColor.a *= mix(1.0, buildingFacadeTexel.a, vBuildingWallMask);',
         '#endif'
       ].join('\n')
     );
   };
-  material.customProgramCacheKey = () => 'building-mid-facade-batch-v5-fitted-wall-layout';
+  material.customProgramCacheKey = () => 'building-mid-facade-batch-v6-catalog-albedo';
   material.userData = {
     ...(material.userData || {}),
     buildingMidFacadeBatch: true,

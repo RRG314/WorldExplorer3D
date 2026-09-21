@@ -1,4 +1,4 @@
-import { FACADE_OPENINGS_GLSL } from '../world/building-facade-layout.js?v=1';
+import { FACADE_OPENINGS_GLSL } from '../world/building-facade-layout.js?v=2';
 import {
   MATERIAL_VARIANTS,
   buildingExteriorCatalogSnapshot,
@@ -419,7 +419,7 @@ function applyWallOnlyFacadeMap(material, roof, entranceAtlas, exteriorProfile) 
         '#ifdef USE_COLOR',
         '  facadeBase *= vColor.rgb;',
         '#endif',
-        '  diffuseColor.rgb = mix(roofSurface, facadeBase * facadeTexel.rgb, vFacadeWallMask);',
+        '  diffuseColor.rgb = mix(roofSurface, facadeWallSurface(facadeBase, facadeTexel.rgb), vFacadeWallMask);',
         '  diffuseColor.a *= facadeTexel.a;',
         '  vec4 openingLayout = vFacadeLayout;',
         '  float fittedBayWidth = vFacadeLayout.z / max(vFacadeLayout.x, 0.0001);',
@@ -453,7 +453,7 @@ function applyWallOnlyFacadeMap(material, roof, entranceAtlas, exteriorProfile) 
       ].join('\n')
     );
   };
-  material.customProgramCacheKey = () => 'building-facade-local-layout-v9-fitted-floors-bays';
+  material.customProgramCacheKey = () => 'building-facade-local-layout-v10-catalog-albedo';
 }
 
 export function resolveBuildingExteriorPresentation(engineContext, buildingType, buildingSeed, baseColorHex, options = {}) {
@@ -502,7 +502,7 @@ export function resolveBuildingExteriorPresentation(engineContext, buildingType,
   const textureProjectionStyle = lodTier === 'mid' ? presentation.facadeStyle : facadeStyle;
   const tint = color.clone().lerp(
     new THREE.Color(0xffffff),
-    mappedColor ? 0.5 : mappedFamily ? 0.34 : 0.7
+    mappedColor ? 0 : 0.10
   );
   return Object.freeze({
     mappedFamily,

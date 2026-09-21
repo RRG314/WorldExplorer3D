@@ -11,6 +11,7 @@ const scene=new THREE.Scene();scene.background=new THREE.Color(0xcbd7df);scene.a
 const camera=new THREE.PerspectiveCamera(38,innerWidth/innerHeight,.1,400);camera.position.set(29,24,57);camera.lookAt(16,7,0);
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(150,100),new THREE.MeshStandardMaterial({color:0xd3cec4}));ground.rotation.x=-Math.PI/2;ground.position.y=-.01;scene.add(ground);
 const cases=[{type:'house',width:6.1,height:10.7,material:'brick',levels:3},{type:'apartments',width:8.3,height:15.2,material:'stone',levels:5},{type:'office',width:10.7,height:21.4,material:'glass',levels:6},{type:'house',width:3.1,height:7.9,material:'stucco',levels:2}];
+if(new URLSearchParams(location.search).has('concrete'))cases[1].material='concrete';
 const details=[],probes=[],records=[],entrances=new Map();let x=0;
 for(let i=0;i<cases.length;i++){
  const c=cases[i],shape=new THREE.Shape();shape.moveTo(0,0);shape.lineTo(c.width,0);shape.lineTo(c.width,-6);shape.lineTo(0,-6);shape.closePath();
