@@ -1,3 +1,4 @@
+import {publicProviderFixtureRequest} from './provider-fixture-key.mjs';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
@@ -43,7 +44,7 @@ for (const [label, root] of Object.entries(roots)) {
 const report = { mode: record ? 'record-public-fixtures' : 'controlled-replay', startedAt: new Date().toISOString(), manifests,
   scope: { hardware: 'current physical desktop', viewport: '1440x900 at DPR 1', renderQuality: 'med', dynamicQuality: 'locked balanced',
     daylight: 'day', controls: 'real W key along fixed starts/headings for 12 m walk and 75 m drive; 20 second timeout', cache: 'cold context followed by same-context persisted-data reload; HTTP cache disabled by routing',
-    network: 'public providers replayed locally; authenticated staging attestation remains live',
+    network: 'public providers replayed locally; Overpass mirrors/timeouts share one complete response per identical data query; authenticated staging attestation remains live',
     exclusions: ['hosted CDN latency', 'physical-phone performance', 'all possible places and routes'] }, trials: [] };
 const save = () => writeFile(path.join(output, record ? 'record-report.json' : 'report.json'), JSON.stringify(report, null, 2));
 const percentile = (values, p) => [...values].sort((a,b)=>a-b)[Math.ceil(values.length*p)-1];
@@ -90,13 +91,19 @@ async function trial(label, round) {
       misses.push({url:url.origin+url.pathname,reason:'Uncontrolled external origin'});
       return route.abort('failed');
     }
-    const key = digest(JSON.stringify([request.method(), url.href, request.headers().range || '', request.postData() || '']));
+    const requestShape={method:request.method(),url:url.href,range:request.headers().range||'',body:request.postData()||''};
+    const fixture=publicProviderFixtureRequest(requestShape);
+    const key=digest(JSON.stringify(fixture.key));
+    const legacyKey=digest(JSON.stringify([requestShape.method,requestShape.url,requestShape.range,requestShape.body]));
     const work = (async () => {
-      const entry = cache[key];
+      const legacy=record&&fixture.semanticOverpass&&cache[legacyKey]?.status===200?cache[legacyKey]:null;
+      const entry=cache[key]||legacy;
       if (entry) {
         if (entry.aborted) return route.abort('failed');
         const body = await readFile(path.join(cacheRoot, entry.sha256));
         assert.equal(digest(body), entry.sha256, 'Provider fixture changed');
+        if(fixture.semanticOverpass)assert.ok(!JSON.parse(body).remark,'Incomplete Overpass fixture');
+        if(legacy)cache[key]={...entry,query:fixture.key[1],semanticOverpass:true};
         return route.fulfill({ status:entry.status, headers:entry.headers, body });
       }
       if (!record) { misses.push({url:url.href,range:request.headers().range || ''}); return route.abort('failed'); }
@@ -106,11 +113,13 @@ async function trial(label, round) {
         const headers = Object.fromEntries(Object.entries(response.headers()).filter(([key])=>
           ['content-type','content-range','accept-ranges','access-control-allow-origin','cache-control','etag','last-modified'].includes(key)));
         await writeFile(path.join(cacheRoot,sha256),body,{mode:0o600});
-        cache[key] = { url:url.href, range:request.headers().range || '', status:response.status(), headers, sha256, bytes:body.length };
-        await route.fulfill({status:response.status(),headers,body});
+        const complete=!fixture.semanticOverpass||(response.status()===200&&!JSON.parse(body).remark);
+        if(complete)cache[key] = { url:url.href, range:request.headers().range || '', status:response.status(), headers, sha256, bytes:body.length,...(fixture.semanticOverpass?{query:fixture.key[1],semanticOverpass:true}:{}) };
+        else providerErrors.push({url:url.href,status:response.status(),error:'Incomplete Overpass response excluded from normal replay fixtures'});
+        await route.fulfill({status:response.status(),headers,body}).catch(()=>{});
       } catch (error) {
         // Preserve unavailable upstream data as unavailable in both builds.
-        cache[key] = {url:url.href,aborted:true};
+        if(!fixture.semanticOverpass)cache[key] = {url:url.href,aborted:true};
         providerErrors.push({url:url.href,error:String(error).split('\n')[0]});
         await route.abort('failed').catch(()=>{});
       }

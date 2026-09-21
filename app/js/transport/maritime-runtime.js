@@ -1,6 +1,6 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { MARITIME_CATALOG } from './maritime-catalog.js?v=1';
-import { createVesselVisual, updateVesselVisual } from './vessel-visual-recipe.js?v=7';
+import { createVesselVisual, updateVesselVisual } from './vessel-visual-recipe.js?v=8';
 import { ENTITY_LIFECYCLE_MS, lifecycleExpired, markLifecycleStart } from '../runtime/entity-lifecycle-policy.js?v=1';
 import { advanceAmbientRouteMotion, ambientRouteSnapshot, createAmbientRouteMotion } from './ambient-route-motion.js?v=1';
 

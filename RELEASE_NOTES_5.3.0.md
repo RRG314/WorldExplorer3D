@@ -20,6 +20,8 @@ release approval requires current artifact, backend and owner acceptance evidenc
   equivalent skeleton data, and cull terrain and regional buildings by view.
   Nearby road-junction lookup uses a spatial index while preserving junction
   identities and geometry.
+  Static boat parts sharing a material are batched; navigation lights, damage
+  panels and smoke retain independent behavior.
   A controlled comparison must establish any performance improvement claim.
 - Reliability changes cover doorway clearance, walking pose restoration,
   mobile control overlap, room admission, world teardown and release identity.
