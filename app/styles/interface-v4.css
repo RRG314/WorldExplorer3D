@@ -13,6 +13,10 @@
   --wx-yellow: #f4b942;
   --wx-red: #ef5b5b;
   --wx-bar-height: 72px;
+  --wx-world-controls-top: 66px;
+  --wx-world-control-size: 30px;
+  --wx-world-controls-row-height: 30px;
+  --wx-live-gps-top: calc(var(--wx-world-controls-top) + var(--wx-world-controls-row-height) + 8px);
 }
 
 html, body { background: var(--wx-bg); color: var(--wx-text); }
@@ -379,7 +383,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 #hudClockDisplay { position: static; width: 100%; margin-top: 8px; padding-top: 6px; transform: none; border-top: 1px solid var(--wx-line-soft); }
 #worldQuickControls {
   position: fixed;
-  top: 66px;
+  top: var(--wx-world-controls-top);
   right: 16px;
   z-index: 10019;
   display: none;
@@ -397,9 +401,9 @@ body.activity-browser-open #worldQuickControls,
 body:has(#largeMap.show) #worldQuickControls,
 body:has(#propertyPanel.show) #worldQuickControls { display: none !important; }
 .worldQuickControl {
-  min-width: 30px;
-  width: 30px;
-  height: 30px;
+  min-width: var(--wx-world-control-size);
+  width: var(--wx-world-control-size);
+  height: var(--wx-world-control-size);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -581,6 +585,7 @@ body.deflock-active .floatBtn::after {
 
 /* Mobile play shell */
 @media (max-width: 760px), (pointer: coarse) {
+  :root { --wx-world-controls-top: max(74px, calc(env(safe-area-inset-top) + 66px)); --wx-world-control-size: 34px; --wx-world-controls-row-height: 46px; }
   :root { --wx-bar-height: 64px; }
   #titleScreen { overflow-y: auto; }
   #titleScreen::after { display: none; }
@@ -627,8 +632,8 @@ body.deflock-active .floatBtn::after {
   .hud-label span:not(#speedUnitLabel) { display: none; }
   #weatherPanel { display: contents !important; }
   #weatherLine,#weatherTimeLine,#weatherMetaLine { display: none !important; }
-  #worldQuickControls { position: fixed; top: 74px; right: 8px; justify-content: flex-end; gap: 4px; margin: 0; padding: 0; border: 0; pointer-events: auto; }
-  .worldQuickControl { min-width: 34px; width: 34px; height: 34px; padding: 0; border-radius: 50%; }
+  #worldQuickControls { position: fixed; top: var(--wx-world-controls-top); right: 8px; justify-content: flex-end; gap: 4px; margin: 0; padding: 0; border: 0; pointer-events: auto; }
+  .worldQuickControl { min-width: var(--wx-world-control-size); width: var(--wx-world-control-size); height: var(--wx-world-control-size); padding: 0; border-radius: 50%; }
   .worldQuickControl svg { width: 15px; height: 15px; }
   .worldQuickControl span { display: none; }
   #weatherTimeLine, #weatherMetaLine { display: none; }
@@ -636,7 +641,7 @@ body.deflock-active .floatBtn::after {
   #street { grid-column: 2; grid-row: 1; overflow: hidden; font: 600 10px/1.2 Orbitron, sans-serif; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
   .mainMenuBtn { width: 58px; height: 66px; padding: 0; overflow: hidden; font-size: 0; pointer-events: auto; z-index: 10020; }
   .mainMenuBtn::before { content: '☰'; font: 28px/1 Inter, sans-serif; }
-  #gameShareFloatBtn { top: 74px; right: 88px; width: 46px; height: 46px; border-radius: 50%; }
+  #gameShareFloatBtn { top: var(--wx-world-controls-top); right: 88px; width: 46px; height: 46px; border-radius: 50%; }
   #minimap { top: 78px; bottom: auto; left: 10px; width: min(190px, 48vw); height: min(190px, 48vw); border-radius: 8px; }
   #coords { top: calc(78px + min(190px, 48vw) - 38px); bottom: auto !important; left: 10px !important; width: min(190px, 48vw); min-height: 38px; font-size: 9px; background: rgba(3, 9, 14, 0.86); border-radius: 0 0 8px 8px; }
   #coords { z-index: 102; }
@@ -718,6 +723,12 @@ body.deflock-active .floatBtn::after {
     right: 12px !important;
     min-height: 44px;
   }
+}
+
+/* A central status panel leaves both landscape thumb-control zones free. */
+@media (max-height: 560px) and (orientation: landscape) and (pointer: coarse) {
+  :root { --wx-live-gps-top: var(--wx-world-controls-top); }
+  #liveGpsHud { left: 50%; right: auto; width: min(320px, calc(100vw - 32px)); transform: translateX(-50%); }
 }
 
 @media (max-height: 560px) and (orientation: landscape) {

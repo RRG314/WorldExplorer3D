@@ -54,9 +54,48 @@ try {
       results.push({ viewport, handedness, equipment, pack, ...result });
     }
   }
-  const report = { ok: results.every(r=>r.ok), evidence: 'Actual app markup/styles in Chrome; layout fixture without world runtime', results };
+  const gpsResults = [];
+  for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }, { width: 1440, height: 900 }]) {
+    const gpsContext = await browser.newContext({ viewport, hasTouch: viewport.width < 1000, isMobile: viewport.width < 1000 });
+    const gpsPage = await gpsContext.newPage();
+    try {
+      await gpsPage.setContent(html.replace('<head>', `<head><base href="${base}">`), { waitUntil: 'load' });
+      const layout = await gpsPage.evaluate((mobile) => {
+        for (const id of ['titleScreen', 'globeSelectorScreen', 'loading']) {
+          const node = document.getElementById(id);
+          if (node) node.style.display = 'none';
+        }
+        document.body.classList.add('live-gps-active');
+        const gps = document.getElementById('liveGpsHud');
+        gps.classList.add('show');
+        if (mobile) document.getElementById('mobileTouchControls').className = 'show mode-walking';
+        document.getElementById('liveGpsStatus').textContent = 'GPS connected. Keep this screen open while exploring.';
+        const quick = document.getElementById('worldQuickControls');
+        quick.hidden = false;
+        quick.classList.add('show');
+        const share = document.getElementById('gameShareFloatBtn');
+        share.hidden = false;
+        share.style.display = 'flex';
+        const box = node => { const r = node.getBoundingClientRect(); return { x:r.x, y:r.y, right:r.right, bottom:r.bottom, width:r.width, height:r.height }; };
+        const gpsBox = box(gps);
+        const controls = [quick, share].map(node => ({ id:node.id, ...box(node) }));
+        const overlaps = controls.filter(r => r.width > 0 && r.height > 0 && r.x < gpsBox.right && gpsBox.x < r.right && r.y < gpsBox.bottom && gpsBox.y < r.bottom);
+        const playTargets = mobile ? ['mobileMovePad', 'mobileLookPad', 'mobileActionPrimary', 'mobileActionSecondary'].map(id => document.getElementById(id)) : [];
+        const targets = [...quick.querySelectorAll('button'), ...gps.querySelectorAll('button:not([hidden])'), ...playTargets].map(node => {
+          const r = node.getBoundingClientRect();
+          const hit = document.elementFromPoint(r.x+r.width/2, r.y+r.height/2);
+          return { id:node.id, hit:node === hit || node.contains(hit) };
+        });
+        return { gpsBox, controls, overlaps, targets, ok:overlaps.length === 0 && targets.every(t=>t.hit) && gpsBox.bottom <= innerHeight };
+      }, viewport.width < 1000);
+      gpsResults.push({ viewport, ...layout });
+      await mkdir('output/verification/mobile-action-layout', { recursive: true });
+      await gpsPage.screenshot({ path:`output/verification/mobile-action-layout/gps-${viewport.width}x${viewport.height}.png` });
+    } finally { await gpsContext.close(); }
+  }
+  const report = { ok: results.every(r=>r.ok) && gpsResults.every(r=>r.ok), evidence: 'Actual app markup/styles in Chrome; layout fixture without world runtime', results, gpsResults };
   const output = path.resolve('output/verification/mobile-action-layout'); await mkdir(output, { recursive: true });
   await writeFile(path.join(output, 'report.json'), JSON.stringify(report,null,2));
-  console.log(JSON.stringify({ ok: report.ok, cases: results.length, failures: results.filter(r=>!r.ok) },null,2));
+  console.log(JSON.stringify({ ok: report.ok, cases: results.length + gpsResults.length, failures: [...results, ...gpsResults].filter(r=>!r.ok) },null,2));
   assert.equal(report.ok, true, 'Mobile action targets overlap or cannot receive touches');
 } finally { await browser.close(); await server.close(); }
