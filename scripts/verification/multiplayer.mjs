@@ -470,7 +470,7 @@ try {
     return { authority: urban.authority, vehicle: urban.vehicles.find((entry) => entry.id === vehicleId) };
   }, sharedVehicle.id);
   await member.page.keyboard.press('KeyE');
-  await member.page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.phase === 'walking', null, { timeout: 12_000 });
+  await member.page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.phase === 'walking', null, roomStateWait);
 
   const checks = {
     distinctAuthenticatedPlayers: owner.identity.uid !== member.identity.uid,

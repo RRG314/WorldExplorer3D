@@ -66,7 +66,9 @@ function createUrbanVehicleVisual(THREE, definition = {}) {
       material.color.set(material.userData.curatedFleetBaseColor).multiplyScalar(1 - damage.dirt * .34);
       material.needsUpdate = true;
     });
-    root.rotation.z = damage.band === 'disabled' ? .035 : 0;
+    // Ground attitude belongs to the pose controller; damage must not reset it.
+    const model = attachmentRoot?.children?.[0];
+    if (model) model.rotation.z = damage.band === 'disabled' ? .035 : 0;
     return damage;
   };
 

@@ -13,6 +13,70 @@ import { resolveCharacterCapability } from '../app/js/character/capability-resol
 import { groundVehicleTuning } from '../app/js/character/vehicle-assistance.js';
 import { compileTrafficGraph } from '../app/js/living-world/navigation-graphs.js';
 import { createTrafficVehicleSurfaceSampler } from '../app/js/living-world/runtime.js';
+import { resolveVehicleRoadContactPose } from '../app/js/engine/vehicle-road-attitude.js';
+import { edgeLookup } from '../app/js/living-world/population.js';
+import * as THREE from 'three';
+import { syncCuratedVehicleGroundPivot } from '../app/js/urban-sandbox/curated-traffic-vehicle.js';
+import { vehicleWheelContactLayout, VEHICLE_ROOT_TO_GROUND_METERS } from '../app/js/engine/vehicle-catalog.js';
+
+test('rendered wheel anchors stay on the sampled plane through pitch, bank and fade', () => {
+  const variant = { width: 2, length: 10.4 };
+  const layout = vehicleWheelContactLayout(variant);
+  const surface = (x, z) => 7 + .2 * x + .4 * z;
+  const pose = resolveVehicleRoadContactPose({ x: 12, z: -5, yaw: 1.17, variant, sampleSurface: surface });
+  for (const scale of [1, .3]) {
+    const host = new THREE.Group();
+    const visual = new THREE.Group();
+    host.add(visual);
+    host.userData.curatedTrafficVehicleAttachment = { visual };
+    host.position.set(pose.x, pose.y + VEHICLE_ROOT_TO_GROUND_METERS * scale, pose.z);
+    host.rotation.order = 'YXZ';
+    host.rotation.set(pose.pitch, pose.yaw, pose.roll);
+    host.scale.setScalar(scale);
+    syncCuratedVehicleGroundPivot(host);
+    host.updateMatrixWorld(true);
+    for (const side of [-1, 1]) for (const front of [-1, 1]) {
+      const point = new THREE.Vector3(side * layout.halfTrack, 0, front * layout.halfWheelbase)
+        .applyMatrix4(visual.matrixWorld);
+      assert.ok(Math.abs(point.y - surface(point.x, point.z)) < 1e-7,
+        'Actual Three.js mesh transform must agree with wheel-contact diagnostics.');
+    }
+  }
+});
+
+test('long traffic vehicles contact a planar grade at their rotated wheel positions', () => {
+  for (const length of [3.65, 10.4]) for (const yaw of [0, 1.17, Math.PI]) {
+    const pose = resolveVehicleRoadContactPose({
+      x: 12, z: -5, yaw, variant: { width: 2, length },
+      sampleSurface: (x, z) => 7 + .2 * x + .4 * z
+    });
+    const forwardSlope = .2 * Math.sin(yaw) + .4 * Math.cos(yaw);
+    const rightSlope = .2 * Math.cos(yaw) - .4 * Math.sin(yaw);
+    assert.ok(Math.abs(pose.pitch + Math.atan(forwardSlope)) < 1e-7);
+    assert.ok(Math.abs(pose.roll - Math.atan(rightSlope * Math.cos(pose.pitch))) < 1e-7);
+    assert.ok(pose.maximumWheelGap < 1e-7, 'A rigid planar road must not leave a wheel floating.');
+    assert.ok(pose.maximumWheelPenetration < 1e-7);
+  }
+});
+
+test('unrepresentable road twist is reported honestly and missing samples retain fallback', () => {
+  const pose = resolveVehicleRoadContactPose({
+    variant: { width: 2, length: 5 }, sampleSurface: (x, z) => x * z
+  });
+  assert.ok(pose.maximumWheelGap > .22);
+  assert.equal(pose.contactAnomaly.length, 4);
+  assert.equal(resolveVehicleRoadContactPose({ y: 12, sampleSurface: () => null }).authority, 'edge-plane-fallback');
+});
+
+test('inferred traffic links cannot jump between stacked roads or steep short gaps', () => {
+  const edge = (from, to, p1, p2) => ({ from, to, p1, p2 });
+  const incoming = edge(0, 1, { x: 0, y: 6, z: -10 }, { x: 0, y: 6, z: 0 });
+  const beneath = edge(2, 3, { x: 0, y: 0, z: 1 }, { x: 0, y: 0, z: 11 });
+  const steepGap = edge(4, 5, { x: 0, y: 7, z: 1 }, { x: 0, y: 7, z: 11 });
+  const continuation = edge(6, 7, { x: 0, y: 6.2, z: 2 }, { x: 0, y: 7, z: 12 });
+  const lookup = edgeLookup({ edges: [incoming, beneath, steepGap, continuation] }, { connectNearby: true });
+  assert.deepEqual(lookup.get(incoming.to), [3]);
+});
 
 test('the normal road-car ceiling is the advertised 120 mph', () => {
   assert.equal(carSpeedToMph(ROAD_CAR_CONFIG.maxSpd), 120);

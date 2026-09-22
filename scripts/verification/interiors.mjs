@@ -4,6 +4,7 @@ import path from 'node:path';
 import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 import { stepGameplayKeys } from './gameplay-simulation.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 
 const root = process.cwd();
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
@@ -35,6 +36,7 @@ function bindPageEvidence(targetPage) {
   });
 }
 bindPageEvidence(page);
+await configureStagingAppCheck(page, baseUrl);
 
 const params = new URLSearchParams({
   loc: 'custom', lat: '39.28378', lon: '-76.61244', lname: 'Baltimore Visitor Center',
@@ -575,6 +577,7 @@ try {
   context = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height: 844 } });
   page = await context.newPage();
   bindPageEvidence(page);
+  await configureStagingAppCheck(page, baseUrl);
   await page.goto(`${baseUrl}/app/?${mobileParams}`, { waitUntil: 'load', timeout: 120_000 });
   await waitForWorld();
   const mobileRestored = await interiorOwnershipSnapshot(target.sourceBuildingId);
@@ -587,6 +590,7 @@ try {
   if (await tutorialLater.isVisible()) await tutorialLater.tap();
   // Fresh provider data can move an inferred doorway slightly. Verify the saved
   // pose first, then approach this load's published entrance for the same building.
+  await openNearbyInteriorDirectory();
   const mobileTarget = await page.evaluate((key) =>
     globalThis.getWorldExplorerRuntimeDiagnostics?.().interior?.candidates?.find((candidate) => candidate.key === key), target.key);
   assert.ok(mobileTarget, 'The same building is absent from the mobile world.');

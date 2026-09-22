@@ -1,10 +1,11 @@
 import { createPedestrianSpacing } from './pedestrian-spacing.js';
 import { selectVehicleVariant, VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=6';
-import { resolveVehicleRoadContactPose } from '../engine/vehicle-road-attitude.js?v=2';
+import { resolveVehicleRoadContactPose } from '../engine/vehicle-road-attitude.js?v=3';
 import {
   attachCuratedTrafficVehicle,
+  syncCuratedVehicleGroundPivot,
   disposeCuratedTrafficVehicle
-} from '../urban-sandbox/curated-traffic-vehicle.js?v=4';
+} from '../urban-sandbox/curated-traffic-vehicle.js?v=5';
 import {
   attachCuratedExplorerCharacter,
   disposeCuratedCharacter,
@@ -61,7 +62,7 @@ const PANTS_PALETTE = Object.freeze([0x202832, 0x34393d, 0x3e4854, 0x443b36, 0x2
 const HAIR_PALETTE = Object.freeze([0x171513, 0x38271d, 0x6b4a2f, 0x8b735b, 0x2d2422]);
 const VEHICLE_PALETTE = Object.freeze([0x4f7588, 0x718269, 0xa64b41, 0xbdb59d, 0x536270, 0x886d50, 0x705d85, 0xc5b94d]);
 
-function edgeLookup(graph, options = {}) {
+export function edgeLookup(graph, options = {}) {
   const outgoing = new Map();
   if (!Array.isArray(graph?.edges)) return outgoing;
   for (let index = 0; index < graph.edges.length; index += 1) {
@@ -79,6 +80,10 @@ function edgeLookup(graph, options = {}) {
       if (candidateIndex === index) return null;
       const distance = Math.hypot(candidate.p1.x - edge.p2.x, candidate.p1.z - edge.p2.z);
       if (distance > 18) return null;
+      // Proximity alone cannot connect an overpass to the street beneath it,
+      // or invent a steep ramp across a short gap between unrelated profiles.
+      const rise = Math.abs(Number(candidate.p1.y) - Number(edge.p2.y));
+      if (!Number.isFinite(rise) || rise > .12 + distance * .2) return null;
       const candidateHeading = Math.atan2(candidate.p2.x - candidate.p1.x, candidate.p2.z - candidate.p1.z);
       const headingDelta = Math.abs(Math.atan2(Math.sin(candidateHeading - heading), Math.cos(candidateHeading - heading)));
       return { candidateIndex, score: distance + headingDelta * 3.5 };
@@ -697,13 +702,16 @@ export function createLivingWorldPopulation(options = {}) {
         sampledWheelContacts: Number(pose.sampledWheelContacts || 0),
         maximumWheelPenetration: Number(pose.maximumWheelPenetration || 0),
         maximumWheelGap: Number(pose.maximumWheelGap || 0),
-        previousMaximumWheelPenetration: Number(pose.previousMaximumWheelPenetration || 0)
+        previousMaximumWheelPenetration: Number(pose.previousMaximumWheelPenetration || 0),
+        contactAnomaly: pose.contactAnomaly || null
       });
-      host.position.set(pose.x, pose.y + VEHICLE_ROOT_TO_GROUND_METERS, pose.z);
+      const scale = Math.max(.001, agent.visibility);
+      host.position.set(pose.x, pose.y + VEHICLE_ROOT_TO_GROUND_METERS * scale, pose.z);
       host.rotation.order = 'YXZ';
       host.rotation.set(Number(pose.pitch || 0), pose.yaw, Number(pose.roll || 0));
+      syncCuratedVehicleGroundPivot(host);
       host.visible = agent.visibility > .01 && agent.promoted !== true;
-      host.scale.setScalar(Math.max(.001, agent.visibility));
+      host.scale.setScalar(scale);
     });
   };
 
@@ -944,6 +952,10 @@ export function createLivingWorldPopulation(options = {}) {
         fourWheelContactVehicles: contactSamples.length,
         maximumWheelPenetration: Math.max(0, ...contactSamples.map((contact) => Number(contact.maximumWheelPenetration || 0))),
         maximumWheelGap: Math.max(0, ...contactSamples.map((contact) => Number(contact.maximumWheelGap || 0))),
+        contactAnomalies: vehicles.filter(agent => agent.wheelContact?.contactAnomaly).slice(0, 8).map(agent => ({
+          id: agent.id, variant: agent.variant?.id, edge: agent.bridge || trafficGraph.edges[agent.edgeIndex],
+          contacts: agent.wheelContact.contactAnomaly
+        })),
         previousMaximumWheelPenetration: Math.max(0, ...contactSamples.map((contact) => Number(contact.previousMaximumWheelPenetration || 0))),
         entranceVirtualizations: pedestrians.reduce((sum, agent) => sum + Number(agent.virtualizedEntries || 0), 0)
       });

@@ -15,6 +15,18 @@ const CURATED_TRAFFIC_ASSET_BY_VARIANT = Object.freeze({
 
 const CURATED_RESPONDER_ASSET_ID = 'traffic-police-response-v1';
 
+function syncCuratedVehicleGroundPivot(host) {
+  const visual = host?.userData?.curatedTrafficVehicleAttachment?.visual;
+  if (!visual) return;
+  const pitch = Number(host.rotation?.x || 0);
+  const roll = Number(host.rotation?.z || 0);
+  const height = VEHICLE_ROOT_TO_GROUND_METERS;
+  // The host is positioned above the ground vertically. Inverse-rotate that
+  // offset so its mesh still rotates about the sampled ground-contact center.
+  visual.position.set(-height * Math.sin(roll) * Math.cos(pitch),
+    -height * Math.cos(roll) * Math.cos(pitch), height * Math.sin(pitch));
+}
+
 function prepareTrafficVisual(THREE, instance, options = {}) {
   const { record, root: source } = instance;
   source.updateMatrixWorld(true);
@@ -115,6 +127,7 @@ async function attachCuratedTrafficVehicle(THREE, host, options = {}) {
     host.userData.curatedTrafficVehicleLoadFailed = false;
     host.userData.curatedTrafficVehicleAttachment = Object.freeze({ instance, visual });
     host.userData.onCuratedTrafficAttached?.(instance.record.id);
+    syncCuratedVehicleGroundPivot(host);
     return true;
   } catch (error) {
     host.userData.curatedTrafficVehicleLoadStarted = false;
@@ -128,5 +141,6 @@ export {
   CURATED_TRAFFIC_ASSET_BY_VARIANT,
   CURATED_RESPONDER_ASSET_ID,
   attachCuratedTrafficVehicle,
+  syncCuratedVehicleGroundPivot,
   disposeCuratedTrafficVehicle
 };

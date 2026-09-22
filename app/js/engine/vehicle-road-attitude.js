@@ -35,61 +35,56 @@ function resolveVehicleRoadContactPose(options = {}) {
   const forwardZ = Math.cos(yaw);
   const rightX = Math.cos(yaw);
   const rightZ = -Math.sin(yaw);
-  const contacts = [];
-
-  for (const front of [-1, 1]) {
-    for (const side of [-1, 1]) {
-      const contactX = x + forwardX * front * layout.halfWheelbase + rightX * side * layout.halfTrack;
-      const contactZ = z + forwardZ * front * layout.halfWheelbase + rightZ * side * layout.halfTrack;
-      const surfaceY = Number(sampleSurface?.(contactX, contactZ, { front, side }));
-      contacts.push({ front, side, x: contactX, z: contactZ, y: surfaceY });
+  // Wheel positions change in X/Z when the chassis pitches and rolls. Sampling
+  // the unrotated footprint then rotating only Y made long vehicles float on
+  // grades even when the published road was a perfectly planar surface.
+  const footprint = (pitch, roll) => {
+    const contacts = [];
+    for (const front of [-1, 1]) for (const side of [-1, 1]) {
+      const localX = side * layout.halfTrack;
+      const localZ = front * layout.halfWheelbase;
+      const lateral = Math.cos(roll) * localX;
+      const longitudinal = Math.sin(pitch) * Math.sin(roll) * localX + Math.cos(pitch) * localZ;
+      const contactX = x + rightX * lateral + forwardX * longitudinal;
+      const contactZ = z + rightZ * lateral + forwardZ * longitudinal;
+      const sample = sampleSurface?.(contactX, contactZ, { front, side });
+      contacts.push({ front, side, x: contactX, z: contactZ, y: sample == null ? NaN : Number(sample) });
     }
+    return contacts;
+  };
+  const fallback = () => Object.freeze({
+    x, y, z, yaw, pitch: fallbackPitch, roll: fallbackRoll,
+    sampledWheelContacts: 0, maximumWheelPenetration: 0, maximumWheelGap: 0,
+    previousMaximumWheelPenetration: 0, authority: 'edge-plane-fallback'
+  });
+  const poseDelta = (pitch, roll, contact) =>
+    Math.cos(pitch) * Math.sin(roll) * contact.side * layout.halfTrack -
+    Math.sin(pitch) * contact.front * layout.halfWheelbase;
+  let pitch = clamp(fallbackPitch, -.55, .55);
+  let roll = clamp(fallbackRoll, -.55, .55);
+  let contacts = footprint(pitch, roll);
+  if (!sampleSurface || contacts.some(contact => !Number.isFinite(contact.y))) return fallback();
+  const previousMaximumWheelPenetration = Math.max(0, ...contacts.map(contact =>
+    contact.y - (y + poseDelta(fallbackPitch, fallbackRoll, contact))));
+  for (let iteration = 0; iteration < 3; iteration += 1) {
+    const average = (axis, sign) => contacts.filter(contact => contact[axis] === sign)
+      .reduce((sum, contact) => sum + contact.y, 0) * .5;
+    const forwardSlope = (average('front', 1) - average('front', -1)) /
+      (2 * layout.halfWheelbase * Math.cos(pitch));
+    const rightSlope = ((average('side', 1) - average('side', -1)) / (2 * layout.halfTrack) -
+      forwardSlope * Math.sin(pitch) * Math.sin(roll)) / Math.cos(roll);
+    const nextPitch = clamp(-Math.atan(forwardSlope), -.55, .55);
+    const nextRoll = clamp(Math.atan(rightSlope * Math.cos(nextPitch)), -.55, .55);
+    if (Math.abs(nextPitch - pitch) + Math.abs(nextRoll - roll) < 1e-7) break;
+    pitch = nextPitch;
+    roll = nextRoll;
+    contacts = footprint(pitch, roll);
+    if (contacts.some(contact => !Number.isFinite(contact.y))) return fallback();
   }
-
-  if (!sampleSurface || contacts.some((contact) => !Number.isFinite(contact.y))) {
-    return Object.freeze({
-      x, y, z, yaw,
-      pitch: fallbackPitch,
-      roll: fallbackRoll,
-      sampledWheelContacts: 0,
-      maximumWheelPenetration: 0,
-      maximumWheelGap: 0,
-      previousMaximumWheelPenetration: 0,
-      authority: 'edge-plane-fallback'
-    });
-  }
-
-  const frontAverage = contacts.filter((contact) => contact.front > 0)
-    .reduce((sum, contact) => sum + contact.y, 0) * 0.5;
-  const rearAverage = contacts.filter((contact) => contact.front < 0)
-    .reduce((sum, contact) => sum + contact.y, 0) * 0.5;
-  const rightAverage = contacts.filter((contact) => contact.side > 0)
-    .reduce((sum, contact) => sum + contact.y, 0) * 0.5;
-  const leftAverage = contacts.filter((contact) => contact.side < 0)
-    .reduce((sum, contact) => sum + contact.y, 0) * 0.5;
-  const track = layout.halfTrack * 2;
-  const pitch = directedSurfacePitch(
-    { x: 0, y: rearAverage, z: -layout.halfWheelbase },
-    { x: 0, y: frontAverage, z: layout.halfWheelbase }
-  );
-  const rollDenominator = Math.max(1e-6, track * Math.cos(pitch));
-  const roll = Math.asin(clamp((rightAverage - leftAverage) / rollDenominator, -0.5227, 0.5227));
-  const averageY = contacts.reduce((sum, contact) => sum + contact.y, 0) / contacts.length;
-  const poseDelta = (posePitch, poseRoll, contact) =>
-    Math.cos(posePitch) * Math.sin(poseRoll) * contact.side * layout.halfTrack -
-    Math.sin(posePitch) * contact.front * layout.halfWheelbase;
-  const previousMaximumWheelPenetration = Math.max(0, ...contacts.map((contact) =>
-    contact.y - (y + poseDelta(fallbackPitch, fallbackRoll, contact))
-  ));
-  const predictedDelta = (contact) =>
-    poseDelta(pitch, roll, contact);
-  const baseY = averageY - contacts.reduce((sum, contact) => sum + predictedDelta(contact), 0) / contacts.length;
-  // A mildly twisted/crowned surface cannot be represented by one rigid plane.
-  // Lift only enough to keep every visible wheel at or above its road contact;
-  // the remaining positive clearance is suspension travel, never penetration.
-  const lift = Math.max(0, ...contacts.map((contact) => contact.y - (baseY + predictedDelta(contact))));
-  const resolvedY = baseY + lift;
-  const gaps = contacts.map((contact) => resolvedY + predictedDelta(contact) - contact.y);
+  // A rigid chassis cannot fit an arbitrarily twisted surface. Preserve actual
+  // residuals and lift only to prevent penetration; never clamp reported gaps.
+  const resolvedY = Math.max(...contacts.map(contact => contact.y - poseDelta(pitch, roll, contact)));
+  const gaps = contacts.map(contact => resolvedY + poseDelta(pitch, roll, contact) - contact.y);
 
   return Object.freeze({
     x, y: resolvedY, z, yaw, pitch, roll,
@@ -97,6 +92,7 @@ function resolveVehicleRoadContactPose(options = {}) {
     maximumWheelPenetration: Math.max(0, ...gaps.map((gap) => -gap)),
     maximumWheelGap: Math.max(0, ...gaps),
     previousMaximumWheelPenetration,
+    contactAnomaly: Math.max(0, ...gaps) > .22 ? contacts.map((contact, index) => ({ ...contact, gap: gaps[index] })) : null,
     authority: 'published-road-four-wheel-contact'
   });
 }

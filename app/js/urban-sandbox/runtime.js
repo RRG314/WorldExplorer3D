@@ -14,14 +14,15 @@ import {
 import { createUrbanNpcVisual } from './npc-visuals.js?v=9';
 import { nearestMappedFacility } from './facility-model.js?v=3';
 import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=4';
-import { createUrbanResponderRuntime } from './responder-runtime.js?v=29';
-import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=7';
-import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=11';
+import { createUrbanResponderRuntime } from './responder-runtime.js?v=30';
+import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=8';
+import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=12';
 import {
   attachCuratedTrafficVehicle,
+  syncCuratedVehicleGroundPivot,
   CURATED_TRAFFIC_ASSET_BY_VARIANT,
   disposeCuratedTrafficVehicle
-} from './curated-traffic-vehicle.js?v=4';
+} from './curated-traffic-vehicle.js?v=5';
 import { applyConditionImpact } from './impact-model.js?v=1';
 import { dampCrashMotion, resolveCrashImpact } from './crash-physics.js?v=1';
 import { sampleSweptContact } from '../physics/swept-contact.js?v=1';
@@ -134,6 +135,7 @@ function syncVehiclePose(vehicle, pose) {
     vehicle.visual.root.position.set(vehicle.x, vehicle.y, vehicle.z);
     vehicle.visual.root.rotation.order = 'YXZ';
     vehicle.visual.root.rotation.set(vehicle.pitch, vehicle.yaw, vehicle.roll);
+    syncCuratedVehicleGroundPivot(vehicle.visual.root);
     vehicle.visual.root.updateMatrixWorld(true);
   }
 }
@@ -1719,6 +1721,7 @@ function mountVehicleForDriving(state, vehicle) {
   vehicle.visual.root.removeFromParent?.();
   vehicle.visual.root.position.set(0, 0, 0);
   vehicle.visual.root.rotation.set(0, 0, 0);
+  syncCuratedVehicleGroundPivot(vehicle.visual.root);
   appCtx.carMesh.add(vehicle.visual.root);
   vehicle.attachedToPlayer = true;
   vehicle.occupied = true;

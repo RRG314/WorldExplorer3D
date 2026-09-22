@@ -709,6 +709,7 @@ try {
         fourWheelContactVehicles: Number(activePopulation.fourWheelContactVehicles || 0),
         maximumWheelPenetration: Number(activePopulation.maximumWheelPenetration || 0),
         maximumWheelGap: Number(activePopulation.maximumWheelGap || 0),
+        trafficContactAnomalies: activePopulation.contactAnomalies || [],
         previousMaximumWheelPenetration: Number(activePopulation.previousMaximumWheelPenetration || 0),
         playerDriveMeters,
         playerStartSurfaceKind: first?.surfaceChain?.surfaces?.drive?.kind || null,

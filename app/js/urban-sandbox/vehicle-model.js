@@ -1,5 +1,5 @@
 import { PARKED_VEHICLE_CATALOG, VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=6';
-import { directedSurfacePitch, resolveVehicleRoadContactPose } from '../engine/vehicle-road-attitude.js?v=2';
+import { directedSurfacePitch, resolveVehicleRoadContactPose } from '../engine/vehicle-road-attitude.js?v=3';
 
 // Compatibility export only. Parked and traffic vehicles now share one data owner.
 const URBAN_VEHICLE_CATALOG = PARKED_VEHICLE_CATALOG;

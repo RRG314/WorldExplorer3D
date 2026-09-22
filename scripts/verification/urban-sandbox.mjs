@@ -65,7 +65,17 @@ function wrapYaw(value) {
 }
 
 async function inputStep(page, key, milliseconds) {
-  return stepGameplayKeys(page, key, milliseconds);
+  try {
+    return await stepGameplayKeys(page, key, milliseconds);
+  } catch (error) {
+    // Contact can open custody between the navigation observation and input.
+    // Stop at that real outcome; never blur or drive through the custody UI.
+    const state = await actorState(page);
+    if (state.custody?.active && /focused UI control|Navigation simulation did not advance/.test(String(error))) {
+      return { interruptedBy: 'custody', custody: state.custody };
+    }
+    throw error;
+  }
 }
 
 async function actorState(page, target = null) {
@@ -140,6 +150,7 @@ async function walkTo(page, target, options = {}) {
     const state = await actorState(page, target);
     if (options.trace && step % 10 === 0) console.log(JSON.stringify({ event: 'urban-approach', step, target, actor: state }));
     start ||= state;
+    if (state.custody?.active) return { reached: false, interruptedBy: 'custody', start, final: state, steps: step };
     if (interactionVehicleId && state.interaction?.action === 'enter_vehicle') {
       const current = await diagnostics(page);
       if (current.urbanSandbox?.nearbyVehicleId === interactionVehicleId) {

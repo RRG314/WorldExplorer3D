@@ -1,6 +1,6 @@
 import {roadPlacementOffsetWorld,roadMetersPerWorldUnit} from '../world/road-units.js';
 import { resolveStreetSection } from '../world/compiler/street-section.js';
-import { directedSurfacePitch } from '../engine/vehicle-road-attitude.js?v=2';
+import { directedSurfacePitch } from '../engine/vehicle-road-attitude.js?v=3';
 import {
   MIN_DRIVEABLE_ROAD_WIDTH_METERS,
   minimumRoadWidthOnInterval,
