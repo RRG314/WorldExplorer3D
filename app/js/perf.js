@@ -62,6 +62,12 @@ let _perfAutoQualityLowStreak = 0;
 let _perfAutoQualityHighStreak = 0;
 let _perfAutoQualityLastChangeAt = 0;
 let _perfAutoQualityLastReason = 'init';
+let _perfWasActiveGameplay = false;
+// A hidden tab may receive no animation frames at all. Invalidate its sample
+// on visibility transitions so the first returning delta is not a GPU sample.
+globalThis.document?.addEventListener?.('visibilitychange', () => {
+  _perfWasActiveGameplay = false;
+});
 const perfSettingsApi = createPerfSettingsApi({
   appCtx,
   constants: {
@@ -428,6 +434,27 @@ function finishPerfLoad(summary = {}) {
 function recordPerfFrame(dt) {
   if (!Number.isFinite(dt) || dt <= 0) return;
 
+  const activeGameplay = appCtx.gameStarted === true && !appCtx.worldLoading && !globalThis.document?.hidden;
+  const enteringGameplay = activeGameplay && !_perfWasActiveGameplay;
+  _perfWasActiveGameplay = activeGameplay;
+  if (enteringGameplay) {
+    // Loading and title telemetry remain available in session/load totals,
+    // but must not reduce world detail for the next thirty seconds of play.
+    _perfFrameSpikeWindow.fill(0);
+    _perfFrameSpikeWriteIdx = _perfFrameSpikeCount = 0;
+    _perfWindowSpikeOver16_7 = _perfWindowSpikeOver33_3 = 0;
+    _perfWindowSpikeOver50 = _perfWindowSpikeOver100 = _perfWindowMaxFrameMs = 0;
+    _perfFps = _perfFpsCurrent = _perfFrameMs = _perfFrameAccum = _perfFrameCount = 0;
+    _perfAutoQualityEvalClock = _perfAutoQualityCooldown = 0;
+    _perfAutoQualityLowStreak = _perfAutoQualityHighStreak = 0;
+    perfStats.live.fps = perfStats.live.fpsCurrent = perfStats.live.frameMs = 0;
+    perfStats.live.spikes = getPerfSpikeMetrics(false);
+    perfStats.live.quality = getDynamicBudgetState();
+    // This delta can straddle construction or a background pause. The next
+    // frame begins the actual gameplay measurement window.
+    return;
+  }
+
   const frameMs = dt * 1000;
   _perfFpsCurrent = Math.max(0, Math.min(240, 1 / dt));
   _recordPerfSpikeFrame(frameMs);
@@ -464,7 +491,7 @@ function recordPerfFrame(dt) {
     return 0;
   })();
   perfStats.live.speedMph = currentSpeedMph;
-  _stepPerfAutoQuality(dt, perfStats.live.fps, perfStats.live.frameMs);
+  if (activeGameplay) _stepPerfAutoQuality(dt, perfStats.live.fps, perfStats.live.frameMs);
   perfStats.live.quality = getDynamicBudgetState();
 }
 const { recordPerfRendererInfo } = createPerfRendererInfoApi({ appCtx, perfStats });

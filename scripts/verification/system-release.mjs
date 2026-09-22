@@ -135,6 +135,27 @@ function writeGateEvidence(id, gate, record) {
   }, null, 2)}\n`, 'utf8');
 }
 
+let executionStarted = false;
+function markGateStarted(id, gate) {
+  // Persist before spawning. A resource guard, cancelled CI job or crash can
+  // terminate this process before the normal completion writer is reached.
+  // An older green result must not survive that interruption as current proof.
+  writeGateEvidence(id, gate, {
+    ok: false, state: 'running', startedAt: new Date().toISOString(), completedAt: null
+  });
+  if (executionStarted) return;
+  executionStarted = true;
+  const target = evidencePath(root, requestedScope);
+  mkdirSync(path.dirname(target), { recursive: true });
+  writeFileSync(target, `${JSON.stringify({
+    schemaVersion: 1, contract: 'world-explorer-execution-evidence-v1',
+    targetVersion: config.targetVersion, scope: requestedScope,
+    ok: false, state: 'running', baseline, artifactIdentity, artifactRoot,
+    startedAt, completedAt: null, outputDir, results: [],
+    failures: ['Verification started; the complete scope has not finished.']
+  }, null, 2)}\n`, 'utf8');
+}
+
 try {
   for (const [id, gate] of selected) {
     const prior = reusableGateEvidence(id, gate);
@@ -154,6 +175,7 @@ try {
       continue;
     }
     console.log(`[system-release] START ${id} (${results.length + 1}/${selected.length})`);
+    markGateStarted(id, gate);
     const result = await runLoggedStep(gate.command, {
       cwd: root,
       env: verificationEnvironment,
@@ -162,6 +184,7 @@ try {
     });
     const record = {
       id,
+      state: 'completed',
       ok: result.ok,
       durationMs: result.durationMs,
       status: result.status,
@@ -204,6 +227,7 @@ if (isCompleteScope) {
     contract: 'world-explorer-execution-evidence-v1',
     targetVersion: config.targetVersion,
     scope: requestedScope,
+    state: 'completed',
     ok: report.ok && stableBaseline && stableArtifact,
     baseline,
     completedBaseline,
