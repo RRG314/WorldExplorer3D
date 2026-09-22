@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { searchPlaces } from '../places/place-search.js?v=3';
+import { searchPlaces } from '../places/place-search.js?v=4';
 import { createGlobeSelectorScene } from './globe-selector/scene.js?v=22';
 import { createGlobeSelectorLaunch } from './globe-selector/launch.js?v=2';
 import { getGlobeSelectorElements } from './globe-selector/dom.js?v=4';
@@ -474,7 +474,8 @@ function createGlobeSelector(options = {}) {
     }
 
     searchController?.abort();
-    searchController = new AbortController();
+    const controller = new AbortController();
+    searchController = controller;
     if (searchStatus) {
       searchStatus.textContent = 'Searching places…';
       searchStatus.style.color = '#64748b';
@@ -485,7 +486,8 @@ function createGlobeSelector(options = {}) {
       searchInFlight = true;
       if (searchBtn) searchBtn.disabled = true;
       if (mobileSearchBtn) mobileSearchBtn.disabled = true;
-      const results = await searchPlaces(query, { signal: searchController.signal });
+      const results = await searchPlaces(query, { signal: controller.signal });
+      if (controller !== searchController) return;
       if (!results.length) throw new Error('No matching places. Try a city, landmark, airport, or coordinates.');
       renderSearchResults(results);
       selectSearchResult(results[0]);
@@ -495,15 +497,17 @@ function createGlobeSelector(options = {}) {
         searchStatus.style.color = '#059669';
       }
     } catch (error) {
-      if (error?.name === 'AbortError') return;
+      if (controller !== searchController || error?.name === 'AbortError') return;
       if (searchStatus) {
         searchStatus.textContent = error?.message || 'Place search is unavailable right now.';
         searchStatus.style.color = '#dc2626';
       }
     } finally {
-      searchInFlight = false;
-      if (searchBtn) searchBtn.disabled = false;
-      if (mobileSearchBtn) mobileSearchBtn.disabled = false;
+      if (controller === searchController) {
+        searchInFlight = false;
+        if (searchBtn) searchBtn.disabled = false;
+        if (mobileSearchBtn) mobileSearchBtn.disabled = false;
+      }
     }
   }
 

@@ -11,6 +11,7 @@ const tests = [
   'tests/browser-function-invokers-current.test.cjs',
   'tests/backend-emulator-parameters-current.test.mjs',
   'tests/room-session-lifecycle-current.test.mjs',
+  'tests/place-search-lifecycle-current.test.mjs',
   'tests/airport-aviation-integration-current.test.mjs',
   'tests/airport-surface-authority-current.test.mjs',
   'tests/analytics-page-context-current.test.mjs',

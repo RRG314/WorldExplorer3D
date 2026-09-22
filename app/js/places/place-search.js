@@ -3,6 +3,7 @@ const CACHE_KEY = 'world-explorer-place-search-v1';
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const CACHE_LIMIT = 40;
 const MIN_REQUEST_INTERVAL_MS = 1050;
+const REQUEST_TIMEOUT_MS = 10_000;
 
 const memoryCache = new Map();
 const inFlight = new Map();
@@ -136,18 +137,30 @@ function queueProviderRequest(url, signal) {
     if (waitMs) await new Promise((resolve) => setTimeout(resolve, waitMs));
     if (signal?.aborted) throw new DOMException('Search cancelled', 'AbortError');
     lastRequestAt = Date.now();
-    const response = await fetch(url, {
-      signal,
-      headers: { Accept: 'application/json' }
-    });
-    if (!response.ok) throw new Error(`Place search is unavailable (${response.status}).`);
-    return response.json();
+    const controller = new AbortController();
+    const cancel = () => controller.abort(signal?.reason);
+    signal?.addEventListener('abort', cancel, { once: true });
+    const timer = setTimeout(() => controller.abort(new Error('Place search timed out. Try again or enter coordinates.')), REQUEST_TIMEOUT_MS);
+    try {
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: { Accept: 'application/json' }
+      });
+      if (!response.ok) throw new Error(`Place search is unavailable (${response.status}).`);
+      const payload = await response.json();
+      if (controller.signal.aborted) throw controller.signal.reason;
+      return payload;
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', cancel);
+    }
   });
   networkQueue = request.catch(() => undefined);
   return request;
 }
 
 async function searchPlaces(query, options = {}) {
+  if (options.signal?.aborted) throw new DOMException('Search cancelled', 'AbortError');
   const clean = String(query || '').trim();
   if (!clean) return [];
   const coordinate = parseCoordinates(clean);
@@ -155,7 +168,9 @@ async function searchPlaces(query, options = {}) {
   const key = normalizedKey(clean);
   const cached = getCached(key);
   if (cached) return cached;
-  if (inFlight.has(key)) return inFlight.get(key);
+  // Independently cancellable consumers must not inherit another UI's signal.
+  // Unsignalled callers can still share the bounded provider request.
+  if (!options.signal && inFlight.has(key)) return inFlight.get(key);
 
   const params = new URLSearchParams({
     q: providerQuery(clean),
@@ -174,8 +189,8 @@ async function searchPlaces(query, options = {}) {
       setCached(key, results);
       return results;
     })
-    .finally(() => inFlight.delete(key));
-  inFlight.set(key, promise);
+    .finally(() => { if (inFlight.get(key) === promise) inFlight.delete(key); });
+  if (!options.signal) inFlight.set(key, promise);
   return promise;
 }
 

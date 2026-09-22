@@ -37,7 +37,8 @@ async function buyEarthMaterial(context) {
     await page.goto(`${baseUrl}/app/?diagnostics=1`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
     await page.waitForFunction(() => document.getElementById('startBtn')?.disabled === false, null, { timeout: 120_000 });
     if (await page.locator('#analyticsConsentDenyBtn').isVisible()) await page.locator('#analyticsConsentDenyBtn').click();
-    await page.locator('#globeLocationSearch').fill('Baltimore, Maryland');
+    // Use the supported coordinate search to isolate cargo custody from geocoder availability.
+    await page.locator('#globeLocationSearch').fill('39.2904, -76.6122');
     await page.locator('#globeLocationSearchBtn').click();
     const searchResult = page.locator('#globeLocationSearchResults [role="option"]').first();
     await searchResult.waitFor({ state: 'visible', timeout: 30_000 });
