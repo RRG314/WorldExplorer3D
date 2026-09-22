@@ -159,7 +159,7 @@ async function waitForLead(page, expectedMode, movePastDirectInteraction) {
   await page.waitForFunction(() => {
     const prompt = document.getElementById('discoveryContextPrompt');
     return globalThis.__WE3D_WALKING_NOTICE_EVIDENCE__ || (prompt?.classList.contains('show') && getComputedStyle(prompt).display !== 'none');
-  }, null, { timeout: 20_000 });
+  }, null, { timeout: process.env.CI ? 120_000 : 20_000, polling: 250 });
   const tutorialClose = page.locator('#tutorialHintCard .tutorial-icon-btn');
   if (await tutorialClose.isVisible()) await tutorialClose.click();
   const snapshotHandle = await page.waitForFunction((mode) => {
@@ -217,7 +217,7 @@ async function waitForLead(page, expectedMode, movePastDirectInteraction) {
       wildlife: state.worldDiscovery.wildlife,
       visiblePromptLayers
     };
-  }, expectedMode, { timeout: 20_000 });
+  }, expectedMode, { timeout: process.env.CI ? 120_000 : 20_000, polling: 250 });
   const result = await snapshotHandle.jsonValue();
   await snapshotHandle.dispose();
   return { ...result, directInteraction };
@@ -248,7 +248,7 @@ async function acceptLead(page, lead) {
       const discovery = globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery;
       return discovery?.interaction?.active === true && discovery.interaction.targetId === slotId &&
         discovery.encounterLead?.available === false;
-    }, lead.slotId, { timeout: 20_000 });
+    }, lead.slotId, { timeout: process.env.CI ? 120_000 : 20_000, polling: 250 });
   } catch (error) {
     const diagnostics = await page.evaluate(() => {
       const discovery = globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery;
@@ -293,7 +293,7 @@ try {
   await freePage.locator('#travelBtn').click();
   await freePage.waitForSelector('#travelMenu.open', { timeout: 10_000 });
   await freePage.locator('#fWalk').click();
-  await freePage.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.mode === 'walk', null, { timeout: 20_000 });
+  await freePage.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.mode === 'walk', null, { timeout: process.env.CI ? 120_000 : 20_000, polling: 250 });
   const freeLead = await waitForLead(freePage, 'free-roam', async () => {
     assert.equal(await moveAwayFromDirectInteraction(freePage, freeCdp), true,
       'Normal mobile walking must clear the nearby direct interaction before the field lead appears.');

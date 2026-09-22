@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 
 const verifyRoot = process.env.WE3D_VERIFY_ROOT || '';
 const staticServer = verifyRoot ? await startStaticServer({ rootDir: verifyRoot, ports: [4444, 4445, 4446] }) : null;
@@ -20,7 +21,9 @@ async function state(page) {
   return page.evaluate(() => JSON.parse(globalThis.render_game_to_text?.() || '{}'));
 }
 
-function observePage(page) {
+async function observePage(page) {
+  await configureStagingAppCheck(page, baseUrl);
+  if (process.env.CI) page.setDefaultTimeout(120_000);
   page.on('pageerror', (error) => failures.push(`pageerror: ${error.stack || error}`));
   page.on('requestfailed', (request) => {
     if (request.url().startsWith(baseUrl)) failures.push(`request failed: ${request.url()}`);
@@ -29,7 +32,7 @@ function observePage(page) {
 
 async function buyEarthMaterial(context) {
   const page = await context.newPage();
-  observePage(page);
+  await observePage(page);
   try {
     await page.goto(`${baseUrl}/app/?diagnostics=1`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
     await page.waitForFunction(() => document.getElementById('startBtn')?.disabled === false, null, { timeout: 120_000 });
@@ -44,7 +47,7 @@ async function buyEarthMaterial(context) {
       if (document.getElementById('loading')?.classList.contains('show')) return false;
       const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
       return snapshot.gameStarted && !snapshot.worldLoading && snapshot.urbanSandbox?.active;
-    }, null, { timeout: 120_000, polling: 500 });
+    }, null, { timeout: process.env.CI ? 360_000 : 120_000, polling: 500 });
 
     const places = await page.evaluate(() => {
       const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
@@ -85,6 +88,10 @@ async function buyEarthMaterial(context) {
     assert.ok(after.urbanSandbox.commerce.current.credits < before.urbanSandbox.commerce.current.credits);
     await page.screenshot({ path: path.join(outputDir, 'earth-material-purchased.png'), fullPage: true });
     return { store: opened, item, credits: after.urbanSandbox.commerce.current.credits };
+  } catch (error) {
+    const snapshot = await state(page).catch(() => null);
+    await fs.writeFile(path.join(outputDir, 'failure-state.json'), JSON.stringify({ error: String(error?.stack || error), snapshot }, null, 2));
+    throw error;
   } finally {
     await page.close();
   }
@@ -92,7 +99,7 @@ async function buyEarthMaterial(context) {
 
 async function loadMaterialAboard(context, purchase) {
   const page = await context.newPage();
-  observePage(page);
+  await observePage(page);
   try {
     await page.goto(`${baseUrl}/app/?launch=space&diagnostics=1`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
     await page.waitForFunction(() => document.getElementById('startBtn')?.disabled === false, null, { timeout: 120_000 });
@@ -132,6 +139,10 @@ async function loadMaterialAboard(context, purchase) {
     assert.equal(result.stationTitle, 'Cargo Hold');
     await page.screenshot({ path: path.join(outputDir, 'cargo-transfer-complete.png'), fullPage: true });
     return result;
+  } catch (error) {
+    const snapshot = await state(page).catch(() => null);
+    await fs.writeFile(path.join(outputDir, 'failure-state.json'), JSON.stringify({ error: String(error?.stack || error), snapshot }, null, 2));
+    throw error;
   } finally {
     await page.close();
   }

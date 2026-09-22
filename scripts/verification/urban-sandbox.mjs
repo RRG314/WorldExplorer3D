@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { stepGameplayKeys } from './gameplay-simulation.mjs';
 
 const root = process.cwd();
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
@@ -64,9 +65,7 @@ function wrapYaw(value) {
 }
 
 async function inputStep(page, key, milliseconds) {
-  await page.keyboard.down(key);
-  await page.evaluate((duration) => globalThis.advanceTime?.(duration), milliseconds);
-  await page.keyboard.up(key);
+  return stepGameplayKeys(page, key, milliseconds);
 }
 
 async function actorState(page, target = null) {
@@ -95,13 +94,12 @@ async function turnToward(page, target, tolerance = 0.16, maxSteps = 160, option
     const desired = Math.atan2(Number(target.x) - state.x, Number(target.z) - state.z);
     const delta = wrapYaw(desired - state.yaw);
     if (Math.abs(delta) <= tolerance) return state;
-    if (options.keepMoving === true) await page.keyboard.down('ArrowUp');
     // Use coarse real-input turns while far away, then shorten the input burst
     // near the target. A fixed 55 ms burst can straddle the tolerance forever
     // on a busy renderer even though the interaction is already available.
     const turnDurationMs = Math.abs(delta) > 0.7 ? 55 : Math.abs(delta) > 0.3 ? 32 : 16;
-    await inputStep(page, delta > 0 ? 'ArrowLeft' : 'ArrowRight', turnDurationMs);
-    if (options.keepMoving === true) await page.keyboard.up('ArrowUp');
+    const turnKey = delta > 0 ? 'ArrowLeft' : 'ArrowRight';
+    await inputStep(page, options.keepMoving === true ? ['ArrowUp', turnKey] : turnKey, turnDurationMs);
   }
   const final = await actorState(page, target);
   const desired = Math.atan2(Number(target.x) - final.x, Number(target.z) - final.z);
@@ -158,10 +156,8 @@ async function walkTo(page, target, options = {}) {
       // blocked movement sent the verifier on a detour before it even walked.
       continue;
     } else {
-      if (state.distance > 20) await page.keyboard.down('ShiftLeft');
       const movementPulseMs = state.distance > 20 ? 520 : state.distance > 8 ? 260 : state.distance > 3 ? 140 : 80;
-      await inputStep(page, 'ArrowUp', movementPulseMs);
-      if (state.distance > 20) await page.keyboard.up('ShiftLeft');
+      await inputStep(page, state.distance > 20 ? ['ShiftLeft', 'ArrowUp'] : 'ArrowUp', movementPulseMs);
     }
     stagnant = state.distance >= previousDistance - 0.008 ? stagnant + 1 : 0;
     previousDistance = state.distance;
@@ -178,9 +174,7 @@ async function walkTo(page, target, options = {}) {
         previousDistance = Infinity;
         continue;
       }
-      if (state.distance > 20) await page.keyboard.down('ShiftLeft');
-      await inputStep(page, 'ArrowUp', Math.max(900, Math.min(5_200, state.distance * 125)));
-      if (state.distance > 20) await page.keyboard.up('ShiftLeft');
+      await inputStep(page, state.distance > 20 ? ['ShiftLeft', 'ArrowUp'] : 'ArrowUp', Math.max(900, Math.min(5_200, state.distance * 125)));
       stagnant = 0;
       previousDistance = Infinity;
       continue;
@@ -737,7 +731,7 @@ async function runMedicalRecoveryJourney() {
 let report;
 try {
   if (requestedScope === 'arrest') {
-    console.log(JSON.stringify({evidenceScope:'urban functional input; not rendering performance',deviceScaleFactor:process.env.CI ? .5 : 1}));
+    console.log(JSON.stringify({evidenceScope:'urban functional input; deterministic DOM keyboard navigation; not rendering performance',deviceScaleFactor:process.env.CI ? .5 : 1}));
   console.log('[urban-sandbox] START arrest recovery');
     const arrest = await runArrestRecoveryJourney();
     const facility = arrest.custody.urbanSandbox.custody?.facility || {};
@@ -812,7 +806,7 @@ try {
     report = { ok: Object.values(checks).every(Boolean), contract: 'urban-sandbox-vehicle-scope-v1', servedRoot, checks, browserErrors, localFailures };
     console.log('[urban-sandbox] PASS vehicle and equipment');
   } else {
-  console.log(JSON.stringify({evidenceScope:'urban functional input; not rendering performance',deviceScaleFactor:process.env.CI ? .5 : 1}));
+  console.log(JSON.stringify({evidenceScope:'urban functional input; deterministic DOM keyboard navigation; not rendering performance',deviceScaleFactor:process.env.CI ? .5 : 1}));
   console.log('[urban-sandbox] START arrest recovery');
   const arrest = await runArrestRecoveryJourney();
   console.log('[urban-sandbox] PASS arrest recovery');
