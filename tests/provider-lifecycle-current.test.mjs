@@ -39,7 +39,10 @@ test('cancelled response cannot publish or contaminate the next map request', as
 test('each serial fallback receives a useful share of the remaining deadline', () => {
   assert.equal(overpassAttemptBudget(12000, 2), 5975);
   assert.equal(overpassAttemptBudget(6000, 1), 5950);
-  assert.equal(OVERPASS_ENDPOINTS.filter(url => url.includes('overpass-api.de')).length, 1);
+  assert.ok(OVERPASS_ENDPOINTS.length > 0);
+  assert.equal(new Set(OVERPASS_ENDPOINTS).size, OVERPASS_ENDPOINTS.length);
+  assert.equal(OVERPASS_ENDPOINTS.some(url => new URL(url).hostname.endsWith('overpass-api.de')), false,
+    'The shared application policy must not retry a service that declines this usage');
 });
 
 test('nearby city cancellation is honored even when a cached city result exists', async () => {

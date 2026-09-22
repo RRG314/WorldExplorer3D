@@ -171,6 +171,42 @@
         "function": "commitUrbanImpacts"
       },
       {
+        "source": "/claimExplorerDiscovery",
+        "function": "claimExplorerDiscovery"
+      },
+      {
+        "source": "/listExplorerDiscoveries",
+        "function": "listExplorerDiscoveries"
+      },
+      {
+        "source": "/createDiscoveryTrade",
+        "function": "createDiscoveryTrade"
+      },
+      {
+        "source": "/acceptDiscoveryTrade",
+        "function": "acceptDiscoveryTrade"
+      },
+      {
+        "source": "/cancelDiscoveryTrade",
+        "function": "cancelDiscoveryTrade"
+      },
+      {
+        "source": "/commitExplorerCommerceAction",
+        "function": "commitExplorerCommerceAction"
+      },
+      {
+        "source": "/settleExplorerCommerceOutcome",
+        "function": "settleExplorerCommerceOutcome"
+      },
+      {
+        "source": "/saveExplorerPlayerCondition",
+        "function": "saveExplorerPlayerCondition"
+      },
+      {
+        "source": "/claimDeFlockVirtualDisable",
+        "function": "claimDeFlockVirtualDisable"
+      },
+      {
         "source": "/commitWorldPropertyAction",
         "function": "commitWorldPropertyAction"
       },

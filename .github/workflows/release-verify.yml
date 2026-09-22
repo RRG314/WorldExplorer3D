@@ -6,18 +6,19 @@ on:
       scope:
         description: Verification scope (never deploys)
         type: choice
-        options: [full, backend]
+        options: [full, backend, functional]
         default: full
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.scope }}
+  cancel-in-progress: false
 
 jobs:
   verify:
+    if: inputs.scope != 'functional'
     timeout-minutes: 120
     runs-on: ubuntu-latest
     env:
@@ -85,3 +86,51 @@ jobs:
             /tmp/worldexplorer3d-verification/
           if-no-files-found: warn
           retention-days: 14
+
+  functional:
+    if: inputs.scope == 'functional'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+          - group: contracts
+            gates: source-graph,release-contracts,public-claims,current-contracts,facade-shaders,street-geometry,street-workers,provider-release,poi-lifecycle,commerce-coherence,landing-user-count,artifact-integrity,release-identity,capture-local,capture-editor-fixture,capture-review-fixture,capture-entry-fixture
+          - group: entry
+            gates: artifact-world,mobile-load,player-blockers,mobile-action-layout,mobile-controls,tutorial-controls,gameplay-menu,hotbar-actions,accessibility,analytics-lifecycle
+          - group: geography
+            gates: assembled-worlds,assembled-fallback,actors-vehicles,terrain-boundary,interiors,regional-world
+          - group: activities
+            gates: urban-sandbox,urban-equipment,explorer-browser,live-gps,walking-field,painttown,world-economy,maryland-parcels
+          - group: environments
+            gates: fishing,fishing-recovery,environments,space-release,connected-journey
+    # These Linux jobs establish functional evidence. The performance gate is
+    # deliberately separate: its declared authority is the physical M1 Mac.
+    env:
+      WE3D_VERIFY_ROOT: dist
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm ci --prefix functions
+      - run: npx playwright install --with-deps chromium chrome
+      - name: Build immutable staging artifact
+        run: node scripts/hosting-artifact.mjs build --firebase-env staging
+      - name: Verify functional group
+        run: node scripts/verification/system-release.mjs --run --scope=candidate --gate=${{ matrix.gates }}
+      - name: Preserve functional evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: functional-${{ matrix.group }}-${{ github.sha }}
+          path: |
+            output/release-evidence/
+            output/verification/
+            /tmp/worldexplorer3d-verification/
+          if-no-files-found: warn
+          retention-days: 7
