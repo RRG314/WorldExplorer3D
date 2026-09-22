@@ -2,7 +2,7 @@ import { ambientNotices } from '../ui/ambient-notices.js';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { createTutorialUi } from './ui.js?v=5';
 import { createCurrentJourneyUi } from './current-journey.js?v=4';
-import { panelIsVisiblyOpen } from './visibility-contract.js?v=1';
+import { panelIsVisiblyOpen, worldPresentationReady } from './visibility-contract.js?v=1';
 
 const STORAGE_KEY = 'worldExplorer3D.tutorialState.v5';
 const PREVIOUS_STORAGE_KEY = 'worldExplorer3D.tutorialState.v4';
@@ -183,7 +183,7 @@ function playerPosition() {
 }
 
 function showPrompt(stage, config = {}) {
-  if (!appCtx.gameStarted || appCtx.worldLoading) return false;
+  if (!worldPresentationReady(appCtx)) return false;
   if (!runtime.state.enabled || runtime.state.skipped || (runtime.state.completed && !config.contextual)) return false;
   if (!config.contextual && runtime.sessionPresented.has(stage)) return false;
   if (uiBlocksTutorial() || (stage !== STAGES.MOVE && directActionVisible())) return false;
@@ -242,7 +242,7 @@ function openExplorerJournal() {
 }
 
 function presentCurrentStage() {
-  if (!runtime.state.enabled || runtime.state.completed || runtime.state.skipped || !appCtx.gameStarted || appCtx.worldLoading) {
+  if (!runtime.state.enabled || runtime.state.completed || runtime.state.skipped || !worldPresentationReady(appCtx)) {
     hidePrompt();
     return;
   }
@@ -445,7 +445,7 @@ function tutorialUpdate(dt = 0) {
   runtime.currentJourneyUi?.update?.(dt);
   // Initialization can finish while the world is still compiling. Do not spend
   // the one-shot invitation or count spawn placement as player movement.
-  if (!appCtx.gameStarted || appCtx.worldLoading) {
+  if (!worldPresentationReady(appCtx)) {
     hidePrompt();
     runtime.movementOrigin = null;
     runtime.lastPosition = null;

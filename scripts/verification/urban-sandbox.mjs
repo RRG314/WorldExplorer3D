@@ -22,7 +22,7 @@ async function createJourneyBrowser() {
     headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024']
   });
   try {
-    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: process.env.CI ? 0.5 : 1 });
     return { browser, context, page: await context.newPage() };
   } catch (error) {
     await browser.close();
@@ -89,6 +89,7 @@ async function actorState(page, target = null) {
 
 async function turnToward(page, target, tolerance = 0.16, maxSteps = 160, options = {}) {
   for (let step = 0; step < maxSteps; step += 1) {
+    if (Date.now() >= (options.deadline || Infinity)) break;
     const state = await actorState(page, target);
     if (state.custody?.active) return state;
     const desired = Math.atan2(Number(target.x) - state.x, Number(target.z) - state.z);
@@ -133,7 +134,13 @@ async function walkTo(page, target, options = {}) {
   let start = null;
   let detourCount = 0;
   for (let step = 0; step < maxSteps; step += 1) {
+    if (Date.now() >= (options.deadline || Infinity)) break;
+    if (options.resolveTarget) {
+      target = await options.resolveTarget();
+      if (!target) return { reached: false, blocked: false, targetMissing: true, start, steps: step };
+    }
     const state = await actorState(page, target);
+    if (options.trace && step % 10 === 0) console.log(JSON.stringify({ event: 'urban-approach', step, target, actor: state }));
     start ||= state;
     if (interactionVehicleId && state.interaction?.action === 'enter_vehicle') {
       const current = await diagnostics(page);
@@ -161,7 +168,7 @@ async function walkTo(page, target, options = {}) {
         x: state.x + Math.sin(desired + side * Math.PI / 2) * 9,
         z: state.z + Math.cos(desired + side * Math.PI / 2) * 9
       };
-      const turned = await turnToward(page, tangent, .16, 160).then(() => true, () => false);
+      const turned = await turnToward(page, tangent, .16, 160, { deadline: options.deadline }).then(() => true, () => false);
       if (!turned) {
         stagnant = 0;
         previousDistance = Infinity;
@@ -293,7 +300,7 @@ async function walkNearAmbientWitness(page, stopDistance = 5) {
   assert.ok(witness, 'The loaded Baltimore world did not publish a simulated pedestrian witness.');
   let witnessId = String(witness.id || '');
   const excludedWitnessIds = new Set();
-  const deadline = Date.now() + 70_000;
+  const deadline = Date.now() + (process.env.CI ? 180_000 : 70_000);
   let approach = null;
   const trace = [];
   while (Date.now() < deadline) {
@@ -309,10 +316,16 @@ async function walkNearAmbientWitness(page, stopDistance = 5) {
     approach = await walkTo(page, witness, {
       stopDistance,
       maxSteps: 90,
+      deadline,
+      resolveTarget: () => selectWitness(witnessId),
+      trace: true,
       stagnantLimit: 18,
       detour: true
     });
-    if (approach.reached) return { witness: await selectWitness(witnessId), approach };
+    if (approach.reached) {
+      const current = await selectWitness(witnessId);
+      if (current && (await actorState(page, current)).distance <= stopDistance) return { witness: current, approach };
+    }
     trace.push({ witnessId, detailed: witness.detailed, actor, approach });
     const materiallyCloser = Number(approach.final?.distance ?? Infinity) < actor.distance - .5;
     if (!approach.blocked && materiallyCloser) continue;
@@ -720,7 +733,8 @@ async function runMedicalRecoveryJourney() {
 let report;
 try {
   if (requestedScope === 'arrest') {
-    console.log('[urban-sandbox] START arrest recovery');
+    console.log(JSON.stringify({evidenceScope:'urban functional input; not rendering performance',deviceScaleFactor:process.env.CI ? .5 : 1}));
+  console.log('[urban-sandbox] START arrest recovery');
     const arrest = await runArrestRecoveryJourney();
     const facility = arrest.custody.urbanSandbox.custody?.facility || {};
     const checks = {
@@ -794,6 +808,7 @@ try {
     report = { ok: Object.values(checks).every(Boolean), contract: 'urban-sandbox-vehicle-scope-v1', servedRoot, checks, browserErrors, localFailures };
     console.log('[urban-sandbox] PASS vehicle and equipment');
   } else {
+  console.log(JSON.stringify({evidenceScope:'urban functional input; not rendering performance',deviceScaleFactor:process.env.CI ? .5 : 1}));
   console.log('[urban-sandbox] START arrest recovery');
   const arrest = await runArrestRecoveryJourney();
   console.log('[urban-sandbox] PASS arrest recovery');

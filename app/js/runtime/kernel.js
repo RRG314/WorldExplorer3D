@@ -236,7 +236,7 @@ function createRuntimeKernel(options = {}) {
 
     // Manual stepping ends at the current real clock so the next browser frame
     // cannot count the simulated duration a second time.
-    previousTimestamp = endTimestamp;
+    previousTimestamp = now();
     if (wasRunning) scheduleNextFrame();
     return Object.freeze({
       requestedMs,

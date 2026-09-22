@@ -10,4 +10,9 @@ function panelIsVisiblyOpen(element, content = null) {
   return classContains(element, 'show') || classContains(element, 'bar-open') || element.getAttribute?.('aria-hidden') === 'false';
 }
 
-export { panelIsVisiblyOpen };
+function worldPresentationReady(appCtx, documentRoot = globalThis.document) {
+  return !!appCtx.gameStarted && !appCtx.worldLoading &&
+    !classContains(documentRoot?.getElementById?.('loading'), 'show');
+}
+
+export { panelIsVisiblyOpen, worldPresentationReady };

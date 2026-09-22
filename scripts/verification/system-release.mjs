@@ -15,6 +15,7 @@ const requestedScope = scopeArg ? scopeArg.slice('--scope='.length) : 'candidate
 const gateArg = process.argv.find((arg) => arg.startsWith('--gate='));
 const requestedGates = new Set(gateArg ? gateArg.slice('--gate='.length).split(',').filter(Boolean) : []);
 const freshExecution = process.argv.includes('--fresh');
+const continueOnFailure = process.argv.includes('--continue-on-failure');
 const failures = [];
 
 if (config.schemaVersion !== 1) failures.push('schemaVersion must be 1');
@@ -196,7 +197,7 @@ try {
     results.push(record);
     writeGateEvidence(id, gate, record);
     console.log(`[system-release] ${record.ok ? 'PASS' : 'FAIL'} ${id} (${record.durationMs} ms)`);
-    if (!record.ok) break;
+    if (!record.ok && !continueOnFailure) break;
   }
 } finally {
   await artifactServer?.close?.();
@@ -205,6 +206,7 @@ try {
 const report = {
   ok: results.length === selected.length && results.every((entry) => entry.ok),
   contract: 'world-explorer-system-release-v1',
+  continueOnFailure,
   targetVersion: config.targetVersion,
   scope: requestedScope,
   artifactRoot,

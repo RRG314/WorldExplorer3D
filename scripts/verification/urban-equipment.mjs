@@ -113,6 +113,7 @@ try {
   await page.getByRole('button', { name: 'Explore', exact: true }).click();
 
   await page.waitForFunction(() => {
+    if (document.getElementById('loading')?.classList.contains('show')) return false;
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return diagnostics.gameStarted === true && diagnostics.worldLoading === false &&
       diagnostics.environment === 'EARTH' &&
@@ -311,6 +312,12 @@ try {
       captureRequested,
       screenshotsWritten: [],
       error: String(error?.stack || error),
+      state: await snapshot().catch(() => null),
+      inputOwner: await page.evaluate(() => ({
+        activeElement: document.activeElement?.outerHTML,
+        loading: document.getElementById('loading')?.className,
+        globe: document.getElementById('globeSelectorScreen')?.className
+      })).catch(() => null),
       browserErrors,
       localFailures
     };

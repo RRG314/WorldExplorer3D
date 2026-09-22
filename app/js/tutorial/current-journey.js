@@ -1,3 +1,4 @@
+import { worldPresentationReady } from './visibility-contract.js?v=1';
 const ACTIVE_FIELD_PHASES = new Set([
   'sweeping', 'signal', 'classified', 'excavating', 'seeking', 'observing', 'revealed'
 ]);
@@ -192,7 +193,7 @@ function createCurrentJourneyUi(appCtx, options = {}) {
     elapsed = 0;
     const tutorial = options.getTutorialSnapshot?.() || null;
     const hiddenForFirstJourney = tutorial?.enabled && !tutorial.completed && !tutorial.skipped;
-    if (!appCtx.gameStarted || appCtx.worldLoading || hiddenForFirstJourney) {
+    if (!worldPresentationReady(appCtx) || hiddenForFirstJourney) {
       if (card) card.hidden = true;
       return;
     }

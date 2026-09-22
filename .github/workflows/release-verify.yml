@@ -93,7 +93,7 @@ jobs:
             throw new Error('Select explicit candidate gate IDs. Physical-Mac performance cannot run here.');
           }
           JS
-          node scripts/verification/system-release.mjs --run --scope=candidate "--gate=$WE3D_CANDIDATE_GATES"
+          node scripts/verification/system-release.mjs --run --scope=candidate --continue-on-failure "--gate=$WE3D_CANDIDATE_GATES"
 
       - name: Preserve verification evidence
         if: always()
@@ -142,7 +142,7 @@ jobs:
       - name: Build immutable staging artifact
         run: node scripts/hosting-artifact.mjs build --firebase-env staging
       - name: Verify functional group
-        run: node scripts/verification/system-release.mjs --run --scope=candidate --gate=${{ matrix.gates }}
+        run: node scripts/verification/system-release.mjs --run --scope=candidate --continue-on-failure --gate=${{ matrix.gates }}
       - name: Preserve functional evidence
         if: always()
         uses: actions/upload-artifact@v4
