@@ -176,7 +176,9 @@ function createCoreRenderSystem(appCtx, shouldUseComposer) {
     // rendering behind it doubles graphics work during location selection.
     // During construction, only the DOM loading UI should update: rendering
     // partial city batches competes with compilation and uploads them early.
-    enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading,
+    // Manual pause retains the last frame beneath its dimmed dialog. Network
+    // listeners and lease heartbeats remain alive without redrawing the city.
+    enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading && !appCtx.hasPauseReason?.('manual_pause'),
     update() {
       draw();
     }

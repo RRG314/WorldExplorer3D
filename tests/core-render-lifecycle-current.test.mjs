@@ -3,6 +3,25 @@ import assert from 'node:assert/strict';
 import { createRuntimeKernel } from '../app/js/runtime/kernel.js';
 import { createCoreFrameSystems, createCoreRenderSystem } from '../app/js/runtime/core-frame-systems.js';
 
+for (const composer of [false, true]) test(`manual pause releases drawing while other pause owners retain their presentation (${composer})`, () => {
+  let draws = 0, networkTicks = 0;
+  const reasons = new Set();
+  const app = { gameStarted: true, paused: false, hasPauseReason: reason => reasons.has(reason),
+    renderer: { render: () => draws++ }, composer: { render: () => draws++ } };
+  const kernel = createRuntimeKernel();
+  kernel.registerSystem(createCoreRenderSystem(app, () => composer));
+  kernel.registerSystem({ id: 'network', phase: 'presentation', update: () => networkTicks++ });
+  kernel.runFrame(0);
+  reasons.add('manual_pause'); app.paused = true;
+  for (let frame = 1; frame < 100; frame++) kernel.runFrame(frame * 16);
+  assert.equal(draws, 1); assert.equal(networkTicks, 100);
+  reasons.delete('manual_pause'); reasons.add('activity');
+  kernel.runFrame(1600); assert.equal(draws, 2, 'a different activity can still need the world renderer');
+  reasons.clear(); app.paused = false;
+  kernel.runFrame(1616); assert.equal(draws, 3, 'normal play resumes immediately');
+  kernel.dispose();
+});
+
 for (const useComposer of [false, true]) {
   test(`city drawing stops at the menu and resumes on entry (${useComposer ? 'composer' : 'direct'})`, () => {
     const draws = [];

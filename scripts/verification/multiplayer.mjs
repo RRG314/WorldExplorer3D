@@ -38,7 +38,8 @@ const deviceScaleFactor = process.env.CI ? 0.5 : 1;
 // compiles. Match the CI action allowance; retain the normal local deadline.
 const roomStateWait = { timeout: process.env.CI ? 120_000 : 20_000, polling: 250 };
 const browserBudget = {
-  maxOldSpaceMiB: 1024, worldInitialization: 'sequential', simultaneouslyActiveWorlds: 2,
+  maxOldSpaceMiB: 1024, worldInitialization: 'sequential', simultaneouslyLoadedWorlds: 2,
+  foregroundGameplayWorlds: 1, waitingClient: 'normal manual-pause UI; network listeners remain active',
   viewport: { width: 1280, height: 800 }, deviceScaleFactor, roomStateWait,
   navigationTiming: 'dom-keyboard-runtime-fixed-step',
   evidenceScope: 'multiplayer-functional'
@@ -248,6 +249,27 @@ async function walkToVehicle(player, vehicleId, maxSteps = 1_200) {
 
 let owner;
 let member;
+const pauseReceipts = [];
+async function pauseWaitingPlayer(player) {
+  await player.page.bringToFront();
+  await player.page.locator('body > canvas:not(#minimap)').click();
+  await player.page.keyboard.press('Escape');
+  await player.page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().paused === true &&
+    document.getElementById('pauseScreen')?.classList.contains('show'), null, roomStateWait);
+  const renderedFrames = () => player.page.evaluate(() =>
+    globalThis.getWorldExplorerRuntimeDiagnostics?.().runtimeKernel?.phases?.render?.find(system => system.id === 'core.renderer')?.updates);
+  const before = await renderedFrames();
+  await player.page.waitForTimeout(500);
+  const after = await renderedFrames();
+  assert.ok(Number.isFinite(before) && before === after, 'Manual pause must stop city drawing while the other client plays.');
+  pauseReceipts.push({ before, after });
+}
+async function resumePlayer(player) {
+  await player.page.bringToFront();
+  await player.page.locator('#resumeBtn').click();
+  await player.page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().paused === false, null, roomStateWait);
+  await player.page.locator('body > canvas:not(#minimap)').click();
+}
 try {
   owner = await createPlayer('owner');
   member = await createPlayer('member');
@@ -314,6 +336,7 @@ try {
   // second join, rather than merely serializing waits after both have started.
   await recordStage('owner room created; loading owner world before member joins');
   await launchRoomWorld(owner);
+  await pauseWaitingPlayer(owner);
   const memberJoinedRoomCode = await joinThroughNormalControls(member, room.code);
 
   const artifactTitle = `Shared release artifact ${runId}`;
@@ -359,6 +382,8 @@ try {
 
   await recordStage('room UI and shared artifact completed; loading member world');
   await launchRoomWorld(member);
+  await pauseWaitingPlayer(member);
+  await resumePlayer(owner);
   await recordStage('both worlds ready; verifying shared vehicle and movement');
   const sharedVehicleCandidates = await owner.page.evaluate(() => {
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
@@ -434,6 +459,7 @@ try {
 
   // Cross the server's 15-second lease interval before testing release. This
   // proves liveness, rather than a claim observed only before its first expiry.
+  await pauseWaitingPlayer(owner);
   await owner.page.waitForTimeout(16_000);
   const retainedLease = await owner.page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox);
   assert.equal(retainedLease?.phase, 'driving', 'The room vehicle lease expired while its driver remained active.');
@@ -443,6 +469,7 @@ try {
     return vehicle?.roomOccupiedByOther === true && !!vehicle.roomLeaseOwnerUid;
   }, sharedVehicle.id, roomStateWait);
 
+  await resumePlayer(owner);
   await owner.page.keyboard.down('ArrowUp');
   await owner.page.waitForTimeout(1_100);
   await owner.page.keyboard.up('ArrowUp');
@@ -474,6 +501,8 @@ try {
   assert.ok(Math.abs(memberReleasedPose.pitch - ownerReleased.vehicle.pitch) <= .0002 &&
     Math.abs(memberReleasedPose.roll - ownerReleased.vehicle.roll) <= .0002,
   'Released shared vehicle lost its road pitch or bank on the receiving client.');
+  await pauseWaitingPlayer(owner);
+  await resumePlayer(member);
   const memberReach = await walkToVehicle(member, sharedVehicle.id);
   assert.ok(memberReach.reached,
     `Room member could not reach the released shared vehicle with normal walking input: ${JSON.stringify(memberReach)}`);
@@ -513,6 +542,7 @@ try {
     ok: true,
     complete: true,
     browserBudget,
+    pauseReceipts,
     contract: 'two-authenticated-clients-bounded-room-convergence',
     generatedAt: new Date().toISOString(),
     checks,

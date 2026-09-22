@@ -1,5 +1,5 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
-import { createCoreFrameSystems, createCoreRenderSystem } from './runtime/core-frame-systems.js?v=9';
+import { createCoreFrameSystems, createCoreRenderSystem } from './runtime/core-frame-systems.js?v=10';
 import { createDebugPresentationSystem } from './runtime/debug-presentation.js?v=3';
 import { createRuntimeKernel } from './runtime/kernel.js?v=2';
 

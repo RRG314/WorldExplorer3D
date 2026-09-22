@@ -30,6 +30,20 @@ source=source.replace('if (freshErrors.length) {', 'if (freshErrors.length) { pr
 // WebGL's default non-preserved drawing buffer may be cleared before toDataURL.
 // Capture the composited page instead, including the real player-facing HUD.
 source=source.replace('await captureScreenshot(page, canvas, shotPath);', 'await page.screenshot({path:shotPath, type:"png"});\nfs.writeFileSync(path.join(args.screenshotDir,"runtime.json"),JSON.stringify(await page.evaluate(()=>window.getWorldExplorerRuntimeDiagnostics?.()),null,2));');
+if(process.env.WE3D_TEST_PAUSE==='1') source=source.replace('await doChoreography(page, canvas, steps);', `await doChoreography(page, canvas, steps);
+if(i===0){
+ await page.locator('body > canvas:not(#minimap)').click();
+ await page.keyboard.press('Escape');
+ await page.locator('#pauseScreen.show').waitFor({state:'visible'});
+ const readFrames=()=>page.evaluate(()=>window.getWorldExplorerRuntimeDiagnostics?.().runtimeKernel?.phases?.render?.find(s=>s.id==='core.renderer')?.updates);
+ const before=await readFrames();await page.waitForTimeout(750);const paused=await readFrames();
+ if(!Number.isFinite(before)||paused!==before)throw new Error('Manual pause continued drawing the city');
+ await page.screenshot({path:path.join(args.screenshotDir,'paused.png')});
+ await page.locator('#resumeBtn').click();await page.locator('body > canvas:not(#minimap)').click();
+ await page.waitForTimeout(500);const resumed=await readFrames();
+ if(!(resumed>paused))throw new Error('Rendering did not resume after the pause dialog');
+ fs.writeFileSync(path.join(args.screenshotDir,'pause.json'),JSON.stringify({ok:true,before,paused,resumed},null,2));
+}`);
 if(process.env.WE3D_TEST_DAY==='1') source=source.replace('await doChoreography(page, canvas, steps);', `await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setTimeOfDay?.('day');ctx.setWeatherMode?.('clear');});\nawait doChoreography(page, canvas, steps);`);
 if(process.env.WE3D_TEST_MOBILE==='1') source=source.replace('const page = await browser.newPage();','const page = await browser.newPage({viewport:{width:412,height:915},isMobile:true,hasTouch:true,deviceScaleFactor:1,userAgent:"Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36"});');
 if(process.env.WE3D_REAL_GPU==='1') source=source.replace('args: ["--use-gl=angle", "--use-angle=swiftshader"],','channel:"chrome",');
