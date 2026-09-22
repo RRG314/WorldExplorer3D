@@ -88,6 +88,7 @@ try {
   // Opening the globe's multiplayer destination selects its Earth context.
   // Explicitly choose Space before creating this interstellar room.
   await owner.page.locator('#spaceLaunchToggle').evaluate(button => button.click());
+  await owner.page.locator('#mpCreateRoomDetails > summary').click();
   await owner.page.locator('#mpTitleRoomNameInput').fill('Shared Interstellar Crew');
   await owner.page.locator('#mpTitleLocationTagInput').fill('Solar System');
   await owner.page.locator('#mpTitleCreateBtn').click();

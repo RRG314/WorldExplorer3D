@@ -5,18 +5,18 @@ import { readFile } from 'node:fs/promises';
 const source = (await readFile(new URL('../app/js/multiplayer/presence.js', import.meta.url), 'utf8'))
   .replace(/import[\s\S]*?from\s+'[^']+';\n/g, '')
   .replace(/export\s*\{[\s\S]*?\};\s*$/, '');
-function harness({ rejected = false } = {}) {
+function harness({ rejected = false, writeImpl = async () => {} } = {}) {
   let now = 100_000;
   const calls = [];
   const context = vm.createContext({
     Date: { now: () => now }, console: { warn() {} },
     initFirebase: () => ({ db: {} }), getCurrentUser: () => ({ uid: 'member', displayName: 'Member' }),
     doc: (...args) => args, serverTimestamp: () => 'server-time', Timestamp: { fromMillis: n => n },
-    setDoc: async (...args) => calls.push(['write', ...args]),
+    setDoc: async (...args) => { calls.push(['write', ...args]); await writeImpl(); },
     postProtectedFunction: async (...args) => { calls.push(['admit', ...args]); if (rejected) throw new Error('Room full'); }
   });
   vm.runInContext(source + "\nactiveRoomId='ROOM01';getPose=()=>({});lastWriteAt=Date.now();", context);
-  return { calls, advance: ms => { now += ms; }, write: (force = false) => context.writePresence(force) };
+  return { calls, switchRoom: () => vm.runInContext("void stopPresence({releaseLease:false});activeRoomId='ROOM02';getPose=()=>({});lastWriteAt=Date.now();", context), advance: ms => { now += ms; }, write: (force = false) => context.writePresence(force) };
 }
 test('expired presence requests server admission instead of reviving its document', async () => {
   const h = harness(); h.advance(91_000); await h.write();
@@ -42,4 +42,13 @@ test('visibility events cannot bypass the server heartbeat spacing', async () =>
   const h = harness();await h.write(true);h.advance(2000);await h.write(true);
   assert.equal(h.calls.length,0);h.advance(251);await h.write(true);
   assert.deepEqual(h.calls.map(c=>c[0]),['write']);
+});
+
+
+test('completion of an old room heartbeat cannot release the new room write lock', async () => {
+  const pending=[];const h=harness({writeImpl:()=>new Promise(resolve=>pending.push(resolve))});
+  h.advance(2500);const old=h.write();h.switchRoom();h.advance(2500);const current=h.write();
+  assert.equal(pending.length,2);pending[0]();await old;
+  h.advance(2500);await h.write();assert.equal(pending.length,2);
+  pending[1]();await current;
 });

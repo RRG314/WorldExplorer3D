@@ -124,7 +124,7 @@ export function createUiRoomRoomActionsApi({
         const authed = getCurrentUser();
         if (authed) callbacks.setAuthUser?.(authed);
       }
-      await activateRoom(room, "joined room");
+      if (!await activateRoom(room, "joined room")) return null;
       await bumpExplorerLeaderboard({ roomsJoined: 1 }).catch(() => {});
       emitProductTelemetry('room_join', {
         source: 'code',
@@ -237,7 +237,7 @@ export function createUiRoomRoomActionsApi({
         locationTag: effectiveLocationTag ? { label: effectiveLocationTag, city: effectiveLocationTag, kind: world.kind } : null
       });
 
-      await activateRoom(room, "created room");
+      if (!await activateRoom(room, "created room")) return null;
       await bumpExplorerLeaderboard({ roomsJoined: 1 }).catch(() => {});
       emitProductTelemetry('room_create', {
         visibility: room.visibility || visibility,
@@ -308,7 +308,7 @@ export function createUiRoomRoomActionsApi({
     const roomName = `Weekly City • ${weekly.city} (Week ${weekly.week})`;
 
     async function finalizeJoin(room, originLabel) {
-      await activateRoom(room, originLabel);
+      if (!await activateRoom(room, originLabel)) return null;
       await bumpExplorerLeaderboard({ roomsJoined: 1 }).catch(() => {});
       emitProductTelemetry('room_join', {
         source: 'weekly_city',

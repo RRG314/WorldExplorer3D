@@ -36,6 +36,7 @@ let lastSentPose = null;
 let lastSamplePose = null;
 let lastSampleAt = 0;
 let inFlightWrite = false;
+let presenceGeneration = 0;
 let releaseVisibilityListener = null;
 
 function getServices() {
@@ -224,6 +225,8 @@ async function writePresence(force = false) {
   if (!force && !intervalReached && !movementReached) return;
 
   const writingRoomId = activeRoomId;
+  const writingGeneration = presenceGeneration;
+  const isCurrent = () => presenceGeneration === writingGeneration && activeRoomId === writingRoomId;
   inFlightWrite = true;
   try {
     const { db } = getServices();
@@ -233,7 +236,7 @@ async function writePresence(force = false) {
       await postProtectedFunction('/joinRoom', {
         roomCode: writingRoomId, displayName: getDisplayName(user)
       }, { label: 'Room reconnection' });
-      if (activeRoomId === writingRoomId) lastWriteAt = Date.now();
+      if (isCurrent()) lastWriteAt = Date.now();
       return; // The server wrote presence; respect the normal heartbeat throttle.
     }
     const playerRef = doc(db, ROOM_COLLECTION, writingRoomId, PLAYER_COLLECTION, user.uid);
@@ -245,21 +248,23 @@ async function writePresence(force = false) {
       mode: normalized.mode,
       frame: normalized.frame,
       pose: normalized.pose,
-      joinCode: activeRoomId
+      joinCode: writingRoomId
     }, { merge: true });
 
-    if (activeRoomId === writingRoomId) {
+    if (isCurrent()) {
       lastWriteAt = Date.now();
       lastSentPose = normalized;
     }
   } catch (err) {
     console.warn('[multiplayer][presence] write failed:', err);
   } finally {
-    inFlightWrite = false;
+    if (isCurrent()) inFlightWrite = false;
   }
 }
 
 async function stopPresence({ releaseLease = true } = {}) {
+  presenceGeneration += 1;
+  inFlightWrite = false;
   if (heartbeatTimer) {
     clearInterval(heartbeatTimer);
     heartbeatTimer = null;

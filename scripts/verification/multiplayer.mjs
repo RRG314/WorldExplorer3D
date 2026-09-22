@@ -244,6 +244,7 @@ try {
   }
 
   await openMultiplayerTitleControls(owner);
+  await owner.page.locator('#mpCreateRoomDetails > summary').click();
   await owner.page.locator('#mpTitleRoomNameInput').fill('Release multiplayer verification');
   await owner.page.locator('#mpTitleLocationTagInput').fill('Baltimore');
   await owner.page.locator('#mpTitleCreateBtn').click();

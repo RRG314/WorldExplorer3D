@@ -56,7 +56,11 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
       return;
     }
 
+    if (!state.authUser?.uid) return false;
     clearSubscriptions();
+    const generation = state.roomSessionGeneration;
+    const uid = state.authUser?.uid;
+    const isCurrent = () => state.roomSessionGeneration === generation && state.authUser?.uid === uid;
     await appCtx.ensureEditableWorldRuntime?.();
     const [{
       listenRoomWorldModifications,
@@ -71,6 +75,7 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
       import('./world-modifications.js?v=1'),
       import('../editable-world/room-model.js?v=1')
     ]);
+    if (!isCurrent()) return false;
     state.currentRoom = room;
     emitTutorialEvent("room_created_or_toggled", {
       roomCode: normalizeCode(room.code || room.id || ""),
@@ -133,6 +138,7 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
     updateToggleStates();
 
     state.unsubRoom = listenRoom(room.id, async (nextRoom) => {
+      if (!isCurrent()) return;
       if (!nextRoom) {
         setStatus("Room was closed or became unavailable.", true);
         await runtime.deactivateRoom(true);
@@ -141,14 +147,16 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
       state.currentRoom = nextRoom;
       applyRoomPaintMultiplayerConfig(nextRoom);
       await syncRoomWorldContext(nextRoom, false);
+      if (!isCurrent()) return;
       renderRoomMeta();
       updateToggleStates();
       publishMapRoomsToContext();
     }, {
-      onError: () => setStatus("Room connection interrupted. Retrying without discarding the session.", true)
+      onError: () => isCurrent() && setStatus("Room connection interrupted. Retrying without discarding the session.", true)
     });
 
     state.unsubPlayers = listenPlayers(room.id, (players) => {
+      if (!isCurrent()) return;
       state.players = players;
       renderPlayerList();
       recordRecentPlayers(room.code, currentRoomName(), players).catch((err) => {
@@ -160,32 +168,36 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
         state.ghostManager.updateGhosts(players);
       }
     }, {
-      onError: () => setStatus("Player presence is reconnecting; the room remains active.", true)
+      onError: () => isCurrent() && setStatus("Player presence is reconnecting; the room remains active.", true)
     });
 
     state.unsubChat = listenChat(room.id, (messages) => {
+      if (!isCurrent()) return;
       state.messages = messages;
       renderChat();
     }, {
-      onError: () => setStatus("Room chat is reconnecting; visible messages were kept.", true)
+      onError: () => isCurrent() && setStatus("Room chat is reconnecting; visible messages were kept.", true)
     });
 
     state.unsubArtifacts = listenArtifacts(room.id, (artifacts) => {
+      if (!isCurrent()) return;
       state.artifacts = artifacts;
       renderArtifacts();
     }, {
-      onError: () => setStatus("Shared artifacts are reconnecting; existing items were kept.", true)
+      onError: () => isCurrent() && setStatus("Shared artifacts are reconnecting; existing items were kept.", true)
     });
 
     state.unsubRoomActivities = listenRoomActivities(room.id, (activities) => {
+      if (!isCurrent()) return;
       state.roomActivities = Array.isArray(activities) ? activities : [];
       renderRoomActivities();
       publishMapRoomsToContext();
     }, {
-      onError: () => setStatus("Room activities are reconnecting; current games were kept.", true)
+      onError: () => isCurrent() && setStatus("Room activities are reconnecting; current games were kept.", true)
     });
 
     state.unsubRoomActivityState = listenRoomActivityState(room.id, async (activityState) => {
+      if (!isCurrent()) return;
       state.activeRoomActivity = activityState;
       renderRoomActivities();
       publishMapRoomsToContext();
@@ -207,31 +219,35 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
         appCtx.stopSharedRoomActivityRuntime({ source: "room_activity_stop" });
       }
     }, {
-      onError: () => setStatus("The active room game is reconnecting without resetting progress.", true)
+      onError: () => isCurrent() && setStatus("The active room game is reconnecting without resetting progress.", true)
     });
 
     state.unsubSharedBlocks = listenSharedBlocks(room.id, (blocks) => {
+      if (!isCurrent()) return;
       if (typeof appCtx.setSharedBuildEntries === "function") {
         appCtx.setSharedBuildEntries(Array.isArray(blocks) ? blocks : []);
       }
     }, {
-      onError: () => setStatus("Shared builds are reconnecting; existing blocks were kept.", true)
+      onError: () => isCurrent() && setStatus("Shared builds are reconnecting; existing blocks were kept.", true)
     });
 
     state.unsubWorldModifications = listenRoomWorldModifications(room, (rows) => {
+      if (!isCurrent()) return;
       appCtx.setSharedEditableWorldRows?.(rows);
     }, {
-      onError: () => setStatus('Shared world edits are reconnecting; the last committed room world remains visible.', true)
+      onError: () => isCurrent() && setStatus('Shared world edits are reconnecting; the last committed room world remains visible.', true)
     });
 
     state.unsubHomeBase = listenHomeBase(room.id, (homeBase) => {
+      if (!isCurrent()) return;
       state.homeBase = homeBase;
       renderHomeBase();
     }, {
-      onError: () => setStatus("Home base data is reconnecting; the current marker was kept.", true)
+      onError: () => isCurrent() && setStatus("Home base data is reconnecting; the current marker was kept.", true)
     });
 
     state.unsubPaintClaims = listenPaintClaims(room.id, (claims) => {
+      if (!isCurrent()) return;
       if (typeof appCtx.applyPaintTownRemoteClaimsFromSync === "function") {
         appCtx.applyPaintTownRemoteClaimsFromSync({
           roomId: room.id,
@@ -239,11 +255,12 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
         });
       }
     }, {
-      onError: () => setStatus("Paint Town is reconnecting; visible paint was kept.", true)
+      onError: () => isCurrent() && setStatus("Paint Town is reconnecting; visible paint was kept.", true)
     });
 
     startPresence(room.id, helpers.readPoseSnapshot);
     await syncRoomWorldContext(room, false, true);
+    if (!isCurrent()) return false;
 
     const invite = helpers.buildInviteLink(room.code);
     if (invite) {
@@ -254,6 +271,7 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
 
     setStatus(`Connected to ${originLabel}: ${room.code} (seed ${deriveRoomDeterministicSeed(room)}).`);
     publishMapRoomsToContext();
+    return true;
   }
 
   return {

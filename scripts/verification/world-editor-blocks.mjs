@@ -668,6 +668,7 @@ async function waitForCurrentRoom(page, expectedCode = '') {
 async function createRoomThroughVisibleTitleUi(page) {
   await openVisibleMultiplayerTab(page);
   await page.locator('#mpTitleVisibilitySelect').selectOption('private');
+  await page.locator('#mpCreateRoomDetails > summary').click();
   await page.locator('#mpTitleRoomNameInput').fill(`Blocks acceptance ${runId}`);
   await page.locator('#mpTitleLocationTagInput').fill('Baltimore Inner Harbor');
   await page.locator('#mpTitleCreateBtn').click();

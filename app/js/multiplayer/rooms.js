@@ -78,6 +78,12 @@ import {
 import { createMultiplayerRoomsDirectoryApi } from './rooms-directory.js?v=2';
 
 let currentRoom = null;
+let roomRequestGeneration = 0;
+function assertCurrentRoomRequest(generation, uid = null) {
+  if (generation !== roomRequestGeneration || (uid && getCurrentUser()?.uid !== uid)) {
+    throw new DOMException('Room request superseded by another session', 'AbortError');
+  }
+}
 
 function getServices() {
   const services = initFirebase();
@@ -185,6 +191,7 @@ function setCurrentRoom(nextRoom) {
 }
 
 async function createRoom(options = {}) {
+  const generation = ++roomRequestGeneration;
   const { db } = getServices();
   const user = requireSignedInUser();
   const displayName = resolveDisplayName(user, options.displayName);
@@ -340,6 +347,7 @@ async function createRoom(options = {}) {
     throw new Error('Unable to reserve a room code. Please retry.');
   }
 
+  assertCurrentRoomRequest(generation, user.uid);
   await postProtectedFunction('/joinRoom', { roomCode: createdCode, displayName }, { label: 'Room admission' });
 
   const roomSnap = await getDoc(doc(db, ROOM_COLLECTION, createdCode));
@@ -348,16 +356,20 @@ async function createRoom(options = {}) {
     throw new Error('Room creation succeeded but room could not be loaded.');
   }
 
+  assertCurrentRoomRequest(generation, user.uid);
   setCurrentRoom(room);
   try {
     await upsertMyRoomRecord(room, 'owner');
   } catch (err) {
     console.warn('[multiplayer][rooms] Failed to persist room in myRooms after create:', err);
   }
+  assertCurrentRoomRequest(generation, user.uid);
   return room;
 }
 
 async function joinRoomByCode(codeInput, options = {}) {
+  const generation = ++roomRequestGeneration;
+  const startingUid = getCurrentUser()?.uid;
   const { db } = getServices();
   const code = normalizeCode(codeInput);
   if (code.length !== ROOM_CODE_LENGTH) {
@@ -375,6 +387,7 @@ async function joinRoomByCode(codeInput, options = {}) {
     throw new Error('Could not read room details.');
   }
 
+  assertCurrentRoomRequest(generation, startingUid);
   let user = getCurrentUser();
   if (!user || !user.uid) {
     if (room.visibility !== 'public') {
@@ -387,7 +400,9 @@ async function joinRoomByCode(codeInput, options = {}) {
   }
 
   const displayName = resolveDisplayName(user, options.displayName);
+  assertCurrentRoomRequest(generation, user.uid);
   await postProtectedFunction('/joinRoom', { roomCode: code, displayName }, { label: 'Room admission' });
+  assertCurrentRoomRequest(generation, user.uid);
   setCurrentRoom(room);
   try {
     const role = room && room.ownerUid === user.uid ? 'owner' : 'member';
@@ -395,10 +410,12 @@ async function joinRoomByCode(codeInput, options = {}) {
   } catch (err) {
     console.warn('[multiplayer][rooms] Failed to persist room in myRooms after join:', err);
   }
+  assertCurrentRoomRequest(generation, user.uid);
   return room;
 }
 
 async function leaveRoom() {
+  roomRequestGeneration += 1;
   const user = getCurrentUser();
   const room = currentRoom ? cloneObject(currentRoom) : null;
 
