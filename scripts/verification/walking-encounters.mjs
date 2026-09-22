@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 
 const root = process.cwd();
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
@@ -16,6 +17,39 @@ const browserErrors = [];
 const localFailures = [];
 
 async function instrument(page) {
+  await configureStagingAppCheck(page, baseUrl);
+  // A seven-second invitation may expire while a remote runner completes the
+  // preceding click. Observe its actual visible layout when it is presented;
+  // the journey below still accepts the same lead through its persistent UI.
+  await page.addInitScript(() => {
+    addEventListener('DOMContentLoaded', () => {
+      const prompt = document.getElementById('discoveryContextPrompt');
+      if (!prompt) return;
+      const observer = new MutationObserver(() => {
+        if (globalThis.__WE3D_WALKING_NOTICE_EVIDENCE__ || !prompt.classList.contains('show') ||
+            getComputedStyle(prompt).display === 'none') return;
+        const lead = globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery?.encounterLead;
+        if (!lead?.available) return;
+        const rect = element => {
+          const box = element?.getBoundingClientRect();
+          return box ? {left:box.left,right:box.right,top:box.top,bottom:box.bottom,width:box.width,height:box.height} : null;
+        };
+        const box = rect(prompt), button = rect(document.getElementById('discoveryContextOpenBtn'));
+        const overlaps = other => !!box && !!other && box.left < other.right && box.right > other.left && box.top < other.bottom && box.bottom > other.top;
+        globalThis.__WE3D_WALKING_NOTICE_EVIDENCE__ = {
+          slotId: lead.slotId, mode: lead.mode,
+          covered: document.getElementById('loading')?.classList.contains('show') === true,
+          promptText: document.getElementById('discoveryContextText')?.textContent || '',
+          promptButton: document.getElementById('discoveryContextOpenBtn')?.textContent || '',
+          promptMode: prompt.dataset.mode,
+          promptClearsMobileControls: ['mobileMovePad','mobileLookPad'].every(id => !overlaps(rect(document.getElementById(id)))),
+          promptButtonUsable: !!button && button.width >= 44 && button.height >= 44 && button.left >= 0 && button.right <= innerWidth && button.left >= box.left && button.right <= box.right
+        };
+        observer.disconnect();
+      });
+      observer.observe(prompt, {attributes:true, childList:true, subtree:true});
+    });
+  });
   page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   page.on('response', (response) => {
     if (response.url().startsWith(baseUrl) && response.status() >= 400) localFailures.push({ url: response.url(), status: response.status() });
@@ -110,7 +144,7 @@ async function waitForLead(page, expectedMode, movePastDirectInteraction) {
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.();
     return state?.worldDiscovery?.encounterLead?.available === true &&
       state.worldDiscovery.encounterLead.mode === mode;
-  }, expectedMode, { timeout: 30_000 });
+  }, expectedMode, { timeout: process.env.CI ? 120_000 : 30_000, polling:500 });
   const directInteraction = await page.evaluate(() => {
     const direct = document.getElementById('urbanVehiclePrompt');
     const lead = document.getElementById('discoveryContextPrompt');
@@ -124,7 +158,7 @@ async function waitForLead(page, expectedMode, movePastDirectInteraction) {
   }
   await page.waitForFunction(() => {
     const prompt = document.getElementById('discoveryContextPrompt');
-    return prompt?.classList.contains('show') && getComputedStyle(prompt).display !== 'none';
+    return globalThis.__WE3D_WALKING_NOTICE_EVIDENCE__ || (prompt?.classList.contains('show') && getComputedStyle(prompt).display !== 'none');
   }, null, { timeout: 20_000 });
   const tutorialClose = page.locator('#tutorialHintCard .tutorial-icon-btn');
   if (await tutorialClose.isVisible()) await tutorialClose.click();
@@ -139,6 +173,14 @@ async function waitForLead(page, expectedMode, movePastDirectInteraction) {
     const moveBox = document.getElementById('mobileMovePad')?.getBoundingClientRect();
     const lookBox = document.getElementById('mobileLookPad')?.getBoundingClientRect();
     const promptText = document.getElementById('discoveryContextText')?.textContent || '';
+    const observed = globalThis.__WE3D_WALKING_NOTICE_EVIDENCE__;
+    if (observed?.mode === mode && observed.slotId === state?.worldDiscovery?.encounterLead?.slotId) {
+      if (observed.covered) throw new Error('Walking invitation was consumed behind the loading cover.');
+      if (!observed.promptText.includes(state.worldDiscovery.encounterLead.leadLabel)) return null;
+      return {...observed, lead:state.worldDiscovery.encounterLead,
+        regionalEcology:state.worldDiscovery.regionalEcology, creatureQuality:state.worldDiscovery.creatureQuality,
+        wildlife:state.worldDiscovery.wildlife, noticeEvidence:'observed-visible-layout-before-expiry'};
+    }
     if (!state?.worldDiscovery?.encounterLead?.available ||
       state.worldDiscovery.encounterLead.mode !== mode ||
       !prompt?.classList.contains('show') || getComputedStyle(prompt).display === 'none' ||
@@ -369,7 +411,14 @@ try {
   const pages = browser.contexts().flatMap(context => context.pages());
   const states = [];
   for (const page of pages) {
-    states.push(await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.() || null).catch(() => null));
+    states.push(await page.evaluate(() => ({
+      ...globalThis.getWorldExplorerRuntimeDiagnostics?.(),
+      noticeEvidence:globalThis.__WE3D_WALKING_NOTICE_EVIDENCE__ || null,
+      promptState:['loading','discoveryContextPrompt','urbanVehiclePrompt','interiorPrompt'].map(id => {
+        const element=document.getElementById(id);
+        return {id,classes:element?.className,hidden:element?.hidden,display:element?getComputedStyle(element).display:null};
+      })
+    })).catch(() => null));
   }
   await writeFile('output/release-evidence/current/walking-field-failure.json', JSON.stringify({
     error: String(error?.stack || error), states, browserErrors, localFailures

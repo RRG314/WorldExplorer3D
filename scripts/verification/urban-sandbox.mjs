@@ -152,7 +152,11 @@ async function walkTo(page, target, options = {}) {
     const desired = Math.atan2(Number(target.x) - state.x, Number(target.z) - state.z);
     const delta = wrapYaw(desired - state.yaw);
     if (Math.abs(delta) > 0.13) {
-      await inputStep(page, delta > 0 ? 'ArrowLeft' : 'ArrowRight', 55);
+      const pulseMs = Math.abs(delta) > 0.7 ? 55 : Math.abs(delta) > 0.3 ? 32 : 16;
+      await inputStep(page, delta > 0 ? 'ArrowLeft' : 'ArrowRight', pulseMs);
+      // Facing a target cannot reduce its distance. Counting these turns as
+      // blocked movement sent the verifier on a detour before it even walked.
+      continue;
     } else {
       if (state.distance > 20) await page.keyboard.down('ShiftLeft');
       const movementPulseMs = state.distance > 20 ? 520 : state.distance > 8 ? 260 : state.distance > 3 ? 140 : 80;
@@ -300,7 +304,7 @@ async function walkNearAmbientWitness(page, stopDistance = 5) {
   assert.ok(witness, 'The loaded Baltimore world did not publish a simulated pedestrian witness.');
   let witnessId = String(witness.id || '');
   const excludedWitnessIds = new Set();
-  const deadline = Date.now() + (process.env.CI ? 180_000 : 70_000);
+  const deadline = Date.now() + (process.env.CI ? 300_000 : 70_000);
   let approach = null;
   const trace = [];
   while (Date.now() < deadline) {

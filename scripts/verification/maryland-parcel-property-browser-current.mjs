@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 
 const servedRoot = path.resolve(process.cwd(), String(process.env.WE3D_VERIFY_ROOT || '.'));
 const externalUrl = String(process.env.WE3D_VERIFY_BASE_URL || '').replace(/\/$/, '');
@@ -14,6 +15,7 @@ await mkdir(evidenceDir, { recursive: true });
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await context.newPage();
+await configureStagingAppCheck(page, baseUrl);
 const browserErrors = [];
 const failedLocalResources = [];
 const parcelRequests = [];
@@ -36,9 +38,10 @@ async function launchBaltimore() {
   await page.locator('#globeCustomLon').fill('-76.6122');
   await page.locator('#globeSelectorStartBtn').click();
   await page.waitForFunction(() => {
+    if (document.getElementById('loading')?.classList.contains('show')) return false;
     const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
     return state.gameStarted === true && state.worldLoading === false && state.worldCounts?.buildings > 0;
-  }, null, { timeout: 180_000 });
+  }, null, { timeout: process.env.CI ? 360_000 : 180_000, polling:500 });
 }
 
 async function openPropertyHub() {
@@ -116,6 +119,9 @@ try {
     desktopAndMobileFit: true,
     evidenceDir
   }, null, 2));
+} catch (error) {
+  await writeFile(path.join(evidenceDir, 'failure.json'), JSON.stringify({error:String(error),state:await diagnostics().catch(()=>null),browserErrors,failedLocalResources},null,2));
+  throw error;
 } finally {
   await context.close();
   await browser.close();

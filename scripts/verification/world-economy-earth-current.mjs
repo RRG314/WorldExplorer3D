@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 
 const verifyRoot = process.env.WE3D_VERIFY_ROOT || '';
 const staticServer = verifyRoot ? await startStaticServer({ rootDir: verifyRoot, ports: [4441, 4442, 4443] }) : null;
@@ -18,6 +19,7 @@ const failures = [];
 async function run() {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
+  await configureStagingAppCheck(page, baseUrl);
   page.on('pageerror', (error) => failures.push(`pageerror: ${error.stack || error}`));
   page.on('requestfailed', (request) => { if (request.url().startsWith(baseUrl)) failures.push(`request failed: ${request.url()}`); });
   try {
@@ -34,7 +36,7 @@ async function run() {
       if (document.getElementById('loading')?.classList.contains('show')) return false;
       const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
       return state.gameStarted && !state.worldLoading && state.urbanSandbox?.active;
-    }, null, { timeout: 120_000, polling: 500 });
+    }, null, { timeout: process.env.CI ? 360_000 : 120_000, polling: 500 });
     const places = await page.evaluate(() => {
       const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
       return snapshot.urbanSandbox?.commerce?.stores || [];
@@ -79,6 +81,13 @@ async function run() {
     assert.ok(after.credits < beforeCredits, JSON.stringify({ beforeCredits, after }));
     assert.ok(after.backpackLabels.includes(itemLabel), JSON.stringify({ itemLabel, after }));
     return { placeCount: places.length, kinds: [...new Set(places.map((place) => place.kind))], target, ui, itemLabel, afterCredits: after.credits };
+  } catch (error) {
+    const state = await page.evaluate(() => {
+      const d = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
+      return {gameStarted:d.gameStarted,worldLoading:d.worldLoading,worldCounts:d.worldCounts,worldLoad:d.worldLoad,errors:d.runtimeErrors};
+    }).catch(() => null);
+    await fs.writeFile(path.join(outputDir, 'failure.json'), JSON.stringify({error:String(error),state},null,2));
+    throw error;
   } finally {
     await context.close();
   }

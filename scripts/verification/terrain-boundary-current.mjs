@@ -30,11 +30,12 @@ page.on('console', (message) => {
 });
 page.on('requestfailed', (request) => {
   const entry = `requestfailed: ${request.failure()?.errorText || 'unknown'} ${request.url()}`;
-  // The tile provider aborts bounded requests after its deadline or when their
+  // These providers abort bounded requests after their deadline or when their
   // last consumer releases them. Keep those cancellations as evidence; local
   // failures, HTTP errors and other provider failures remain gate failures.
   if (request.failure()?.errorText === 'net::ERR_ABORTED' &&
-      /^https:\/\/vector\.openstreetmap\.org\/shortbread_v1\/\d+\/\d+\/\d+\.mvt$/.test(request.url())) {
+      (/^https:\/\/vector\.openstreetmap\.org\/shortbread_v1\/\d+\/\d+\/\d+\.mvt$/.test(request.url()) ||
+       /^https:\/\/marine-api\.open-meteo\.com\/v1\/marine\?/.test(request.url()))) {
     cancelledProviderRequests.push(entry);
     return;
   }
