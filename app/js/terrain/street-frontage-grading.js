@@ -1,4 +1,4 @@
-import {createStreetCarriagewayBarriers,frontageBlocked} from '../world/compiler/street-carriageway-barriers.js';
+import {createStreetCarriagewayBarriers} from '../world/compiler/street-carriageway-barriers.js';
 import { frontageHit } from '../world/compiler/street-frontage-geometry.js';
 import { createStreetFrontagePolicy, streetScale, streetSideEdge, FRONTAGE_RULES } from '../world/compiler/street-frontage-policy.js';
 
@@ -35,7 +35,7 @@ export function createStreetFrontageGrading(buildings = [], metersPerWorldUnit =
         stats.queries++;
         const edges=policy.query({x:px,z:pz},undefined,reach);
         const hit=frontageHit({x:px,z:pz},nx*sign,nz*sign,edges,outer,edge+FRONTAGE_RULES.ordinaryReach/scale);
-        if(hit && !frontageBlocked({x:px,z:pz},nx*sign,nz*sign,hit.distance,barriers.query({x:px,z:pz},hit.distance,road)))outer=hit.distance;
+        if(hit && !barriers.blocksRay({x:px,z:pz},nx*sign,nz*sign,hit.distance,road))outer=hit.distance;
       }
       // This cache is local to one terrain publication; bound long source roads.
       if(roadCache && roadCache.size<256 && sampleCount<20000){roadCache.set(cacheKey,outer);sampleCount++;}

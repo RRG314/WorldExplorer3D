@@ -71,3 +71,32 @@ test('visibility barriers use exactly the rendered curved and tapered road footp
   }
   assert.ok(checked>300);barriers.dispose();
 });
+
+test('packed barrier queries preserve exact footprints across buffer chunks and disposal',async()=>{
+  const {createStreetCarriagewayBarriers,frontageBlocked}=await import('../app/js/world/compiler/street-carriageway-barriers.js');
+  const roads=Array.from({length:400},(_,i)=>({
+    pts:[{x:i*64-12800,z:-100.123456789},{x:i*64-12750,z:10.987654321},{x:i*64-12730,z:35}],
+    width:7.25,type:'residential',structureSemantics:{terrainMode:'at_grade'}
+  }));
+  const barriers=createStreetCarriagewayBarriers(roads);
+  assert.ok(barriers.stats().edges>4096,'exercise multiple storage chunks');
+  for(const road of roads.filter((_,i)=>i%19===0)) {
+    const point={x:road.pts[0].x-40,z:-50};
+    for(const exclude of [undefined,road]) {
+      const edges=barriers.query(point,150,exclude);
+      assert.ok(edges.length>0);
+      assert.equal(barriers.query(point,150,exclude)[0],edges[0],'shared pavement cells retain edge identity');
+      assert.ok(edges.every(edge=>roads.includes(edge.road)&&edge.road!==exclude));
+      for(const angle of [0,.2,.6,1.2,Math.PI]) {
+        assert.equal(barriers.blocksRay(point,Math.cos(angle),Math.sin(angle),150,exclude),
+          frontageBlocked(point,Math.cos(angle),Math.sin(angle),150,edges));
+      }
+    }
+  }
+  const before=barriers.stats();
+  assert.ok(before.bufferBytes<=before.edges*36+4096*36,'packed storage remains bounded per edge');
+  barriers.dispose();
+  assert.deepEqual(barriers.stats(),{edges:0,bufferBytes:0,cells:0});
+  assert.deepEqual(barriers.query({x:0,z:0},20000),[]);
+  assert.equal(barriers.blocksRay({x:0,z:0},1,0,100),false);
+});
