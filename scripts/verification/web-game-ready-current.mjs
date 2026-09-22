@@ -41,10 +41,9 @@ await doChoreography(page, canvas, steps);`);
 if(process.env.WE3D_TEST_BOAT==='1') source=source.replace('await page.screenshot({path:shotPath, type:"png"});', `await page.screenshot({path:shotPath, type:"png"});
 const water = await page.evaluate(async()=>{
  const {ctx}=await import('/app/js/shared-context.js?v=55');
- const {waterSurfaceBaseYAt}=await import('/app/js/boat-mode/water-query.js?v=21');
  const meshes=[]; ctx.scene.updateMatrixWorld(true);
  ctx.scene.traverse(mesh=>{if(mesh.isMesh && mesh.visible && mesh.material?.userData?.weWaterWaveConfig)meshes.push(mesh);});
- const base=waterSurfaceBaseYAt(ctx.boat.x,ctx.boat.z,ctx.boatMode.currentWater);
+ const base=ctx.sampleDynamicWaterAt(ctx.boat.x,ctx.boat.z,ctx.boatMode.currentWater).baseY;
  const rays=[[0,0],[5,0],[-5,0],[0,5],[0,-5]].map(([dx,dz])=>{
   const ray=new THREE.Raycaster(new THREE.Vector3(ctx.boat.x+dx,base+10000,ctx.boat.z+dz),new THREE.Vector3(0,-1,0));
   return {dx,dz,hits:ray.intersectObjects(meshes,false).map(h=>({name:h.object.name,y:h.point.y,far:h.object.userData.isFarMappedWaterContext===true}))};
@@ -53,6 +52,16 @@ const water = await page.evaluate(async()=>{
 });
 fs.writeFileSync(path.join(args.screenshotDir,'water-'+i+'.json'),JSON.stringify(water,null,2));
 if(water.glError!==0 || !water.rays[0].hits.length || water.rays.some(ray=>ray.hits.some(hit=>hit.far || hit.y>water.base+1)))throw Error('Duplicate elevated water surface or rendering failure');`);
+if(process.env.WE3D_TEST_BOAT==='1') source=source.replace('await browser.close();', `await page.locator('#travelBtn').click(); await page.locator('#fWalk').click();
+await page.waitForFunction(()=>window.getWorldExplorerRuntimeDiagnostics?.().modes?.boat===false,null,{timeout:10000});
+const exitState=await page.evaluate(async()=>{
+ const {ctx}=await import('/app/js/shared-context.js?v=55');
+ return {mode:ctx.Walk.state.mode,patchVisible:ctx.boatMode.waterPatch?.visible,boatVisible:ctx.boatMode.mesh?.visible};
+});
+fs.writeFileSync(path.join(args.screenshotDir,'exit.json'),JSON.stringify(exitState,null,2));
+await page.screenshot({path:path.join(args.screenshotDir,'exit.png')});
+if(exitState.mode!=='walk' || exitState.patchVisible || exitState.boatVisible)throw Error('Boat exit failed to restore walking and remove boat effects');
+await browser.close();`);
 if(process.env.WE3D_GROUND_EVIDENCE==='1') source=source.replace('await page.screenshot({path:shotPath, type:"png"});', `await page.screenshot({path:shotPath, type:"png"});
 fs.writeFileSync(path.join(args.screenshotDir,'ground.json'),JSON.stringify(await page.evaluate(async()=>{
  const {ctx}=await import('/app/js/shared-context.js?v=55');
