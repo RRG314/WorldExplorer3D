@@ -6,14 +6,18 @@ on:
       scope:
         description: Verification scope (never deploys)
         type: choice
-        options: [full, backend, functional]
+        options: [full, backend, functional, candidate]
         default: full
+      gates:
+        description: Candidate gate IDs, comma separated (candidate scope only; no performance gate)
+        type: string
+        default: artifact-world
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.scope }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.scope }}-${{ inputs.scope == 'candidate' && inputs.gates || 'all' }}
   cancel-in-progress: false
 
 jobs:
@@ -62,11 +66,11 @@ jobs:
         run: npx playwright install --with-deps chromium chrome
 
       - name: Full release verification
-        if: inputs.scope != 'backend'
+        if: inputs.scope == 'full'
         run: npm run release:verify
 
       - name: Build immutable staging artifact
-        if: inputs.scope == 'backend'
+        if: inputs.scope == 'backend' || inputs.scope == 'candidate'
         run: node scripts/hosting-artifact.mjs build --firebase-env staging
 
       - name: Verify all backend stages against isolated emulators
@@ -74,6 +78,22 @@ jobs:
         run: node scripts/verification/system-release.mjs --run --scope=backend
         env:
           WE3D_VERIFY_ROOT: dist
+
+      - name: Verify selected candidate gates
+        if: inputs.scope == 'candidate'
+        env:
+          WE3D_VERIFY_ROOT: dist
+          WE3D_CANDIDATE_GATES: ${{ inputs.gates }}
+        run: |
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs';
+          const config=JSON.parse(fs.readFileSync('config/system-release-gates.json','utf8'));
+          const ids=String(process.env.WE3D_CANDIDATE_GATES||'').split(',');
+          if(ids.some(id=>!id||config.gates[id]?.scope!=='candidate'||id==='performance')) {
+            throw new Error('Select explicit candidate gate IDs. Physical-Mac performance cannot run here.');
+          }
+          JS
+          node scripts/verification/system-release.mjs --run --scope=candidate "--gate=$WE3D_CANDIDATE_GATES"
 
       - name: Preserve verification evidence
         if: always()
