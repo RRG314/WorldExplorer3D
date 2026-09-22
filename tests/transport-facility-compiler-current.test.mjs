@@ -47,7 +47,10 @@ test('the single primary query requests exact airport, civic, commerce, road, an
   assert.equal((plan.transportFacilityQuery.match(/\[out:json\]/g) || []).length, 1);
   assert.match(plan.primaryQuery, /nwr\["aeroway"~"\^\(aerodrome\|heliport\|runway/);
   assert.match(plan.primaryQuery, /nwr\["amenity"~"\^\(police\|hospital\)\$"\]/);
-  assert.match(plan.primaryQuery, /nwr\["shop"="convenience"\]/);
+  const shopPattern = plan.primaryQuery.match(/nwr\["shop"~"([^"\n]+)"\]/)?.[1];
+  assert.ok(shopPattern, 'commerce query must specify its accepted shop types');
+  assert.ok(new RegExp(shopPattern).test('convenience'));
+  assert.equal(new RegExp(shopPattern).test('not-a-shop'), false);
   assert.equal((plan.primaryQuery.match(/\[out:json\]/g) || []).length, 1);
   assert.ok(plan.transportFacilityCacheMeta.featureRadius >= .036, 'airport coverage cannot be clipped to a city-block radius');
 });

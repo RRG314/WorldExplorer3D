@@ -1,10 +1,6 @@
 import { distanceKmBetween, normalizeCityRecord } from './helpers.js?v=9';
 
-const OVERPASS_ENDPOINTS = [
-  'https://lz4.overpass-api.de/api/interpreter',
-  'https://overpass.private.coffee/api/interpreter',
-  'https://overpass-api.de/api/interpreter'
-];
+import { fetchOverpassJSON } from '../../world/osm-loader.js?v=29';
 
 export const CURATED_DESTINATIONS = [
   ['great-pyramids', 'Great Pyramids of Giza', 29.9792, 31.1342, 'Landmark'],
@@ -137,7 +133,7 @@ function mergeNearbyCities(primary, fallback) {
 }
 
 function nearbyCacheKey(lat, lon) {
-  return `${Number(lat).toFixed(1)},${Number(lon).toFixed(1)}`;
+  return `${Number(lat).toFixed(5)},${Number(lon).toFixed(5)}`;
 }
 
 function parseNearbyElements(elements, lat, lon) {
@@ -168,32 +164,26 @@ function parseNearbyElements(elements, lat, lon) {
     .slice(0, 12);
 }
 
-async function fetchFromEndpoint(endpoint, query, signal) {
-  const response = await fetch(`${endpoint}?data=${encodeURIComponent(query)}`, { signal });
-  if (!response.ok) throw new Error(`Nearby places HTTP ${response.status}`);
-  return response.json();
-}
-
 export async function fetchNearbyCities(lat, lon, options = {}) {
+  if (options.signal?.aborted) throw options.signal.reason || new DOMException('Nearby cities cancelled', 'AbortError');
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return [];
   const key = nearbyCacheKey(lat, lon);
-  if (nearbyCache.has(key)) return nearbyCache.get(key);
+  const cached = nearbyCache.get(key);
+  if (cached?.expiresAt > Date.now()) return cached.cities;
   const fallbackCities = nearbyMajorCities(lat, lon);
-
-  const query = `[out:json][timeout:12];node(around:160934,${lat.toFixed(5)},${lon.toFixed(5)})["place"="city"]["name"];out body 80;`;
-  let lastError = null;
-  for (const endpoint of OVERPASS_ENDPOINTS) {
-    try {
-      const payload = await fetchFromEndpoint(endpoint, query, options.signal);
-      const cities = mergeNearbyCities(parseNearbyElements(payload?.elements, lat, lon), fallbackCities);
-      nearbyCache.set(key, cities);
-      return cities;
-    } catch (error) {
-      if (options.signal?.aborted) throw error;
-      lastError = error;
-    }
+  const query = `[out:json][timeout:8];node(around:160934,${lat.toFixed(5)},${lon.toFixed(5)})["place"="city"]["name"];out body 80;`;
+  let cities = fallbackCities;
+  let ttlMs = 10_000;
+  try {
+    const payload = await fetchOverpassJSON(query, 8000, Infinity, null, options);
+    if (options.signal?.aborted) throw options.signal.reason || new DOMException('Nearby cities cancelled', 'AbortError');
+    cities = mergeNearbyCities(parseNearbyElements(payload?.elements, lat, lon), fallbackCities);
+    ttlMs = 10 * 60 * 1000;
+  } catch (error) {
+    if (options.signal?.aborted) throw error;
   }
-  if (lastError && options.signal?.aborted) throw lastError;
-  nearbyCache.set(key, fallbackCities);
-  return fallbackCities;
+  nearbyCache.delete(key);
+  nearbyCache.set(key, { cities, expiresAt: Date.now() + ttlMs });
+  while (nearbyCache.size > 32) nearbyCache.delete(nearbyCache.keys().next().value);
+  return cities;
 }

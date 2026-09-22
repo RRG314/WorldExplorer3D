@@ -34,7 +34,7 @@ test('every current road family uses the shared playable transport contract', ()
   }
 });
 
-test('one visual recipe owns the dimensions and wheel contact layout for all road LODs', async () => {
+test('one vehicle catalog owns detailed geometry, curated traffic dimensions and wheel contacts', async () => {
   for (const vehicle of VEHICLE_CATALOG) {
     const recipe = roadVehicleVisualRecipe(vehicle);
     assert.equal(recipe.width, vehicle.width, vehicle.id);
@@ -46,7 +46,9 @@ test('one visual recipe owns the dimensions and wheel contact layout for all roa
   }
   const population = await source('../app/js/living-world/population.js');
   const detailed = await source('../app/js/urban-sandbox/vehicle-visuals.js');
-  assert.match(population, /roadVehicleVisualRecipe\(agent\.variant\)/);
+  assert.match(population, /attachCuratedTrafficVehicle\(/);
+  assert.match(population, /dimensionsMeters: agent\.variant/);
+  assert.match(population, /resolveVehicleRoadContactPose\(/);
   assert.match(detailed, /roadVehicleVisualRecipe\(variant\)/);
   assert.doesNotMatch(population, /function vehicleWheelContactLayout/);
 });

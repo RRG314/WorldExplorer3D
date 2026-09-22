@@ -566,11 +566,11 @@ function createFarFieldTerrainApi(deps = {}) {
     const buildingGeometryBuildMs = performance.now() - buildingBuildStartedAt;
     const waterBuildStartedAt = performance.now();
     const builtWater = buildFarWaterGeometry(appCtx, mappedContext, spec.inner);
-    const publishedWaterAreaIdentities = builtWater?.publishedAreaIdentities;
+    const publishedWaterAreaIdentities = builtWater?.publishedAreaIdentities || new Set();
     const fixedRegionalStructureWaterAreas = (mappedContext?.waterAreas || [])
       .filter((area) =>
         Number.isFinite(Number(area?.surfaceMeters)) &&
-        (!publishedWaterAreaIdentities || publishedWaterAreaIdentities.has(String(area?.identity || '')))
+        publishedWaterAreaIdentities.has(String(area?.identity || ''))
       )
       .map((area) => {
         const pts = (area.outer || []).map((coordinate) => {
@@ -592,7 +592,7 @@ function createFarFieldTerrainApi(deps = {}) {
       appCtx,
       mappedContext,
       spec,
-      builtWater?.publishedAreaIdentities
+      publishedWaterAreaIdentities
     );
     const waterTerrainMaskBuildMs = performance.now() - waterMaskBuildStartedAt;
     if (requestGeneration !== generation) {

@@ -52,9 +52,10 @@ function recordMatchesLocation(record, meta) {
   if (stored) {
     return Math.abs(Number(stored.lat) - Number(meta.lat)) <= 1e-7 &&
       Math.abs(Number(stored.lon) - Number(meta.lon)) <= 1e-7 &&
-      (!stored.kind || !meta.kind || stored.kind === meta.kind) &&
+      String(stored.kind || '') === String(meta.kind || '') &&
       Number(stored.roadsRadius) + 1e-9 >= Number(meta.roadsRadius) &&
-      Number(stored.featureRadius) + 1e-9 >= Number(meta.featureRadius);
+      Number(stored.featureRadius) + 1e-9 >= Number(meta.featureRadius) &&
+      Number(stored.poiRadius) + 1e-9 >= Number(meta.poiRadius);
   }
   const parts = String(record.key || '').split(':');
   return parts.length >= 5 &&
@@ -64,7 +65,7 @@ function recordMatchesLocation(record, meta) {
     Number(parts[3]) + 1e-9 >= Number(meta.featureRadius);
 }
 
-export async function readPersistentOverpassFallback(meta) {
+export async function readPersistentOverpassFallback(meta, queryKey = null) {
   if (!meta) return null;
   const db = await openDatabase();
   if (!db) return null;
@@ -81,6 +82,7 @@ export async function readPersistentOverpassFallback(meta) {
       const record = cursor.value;
       if (
         Date.now() - Number(record?.savedAt || 0) <= CACHE_TTL_MS &&
+        (!queryKey || record.key === queryKey) &&
         recordMatchesLocation(record, meta)
       ) {
         resolve(record);

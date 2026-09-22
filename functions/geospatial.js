@@ -5,11 +5,6 @@ const PANORAMAX_API = 'https://panoramax.openstreetmap.fr/api';
 const KARTAVIEW_API = 'https://api.openstreetcam.org/2.0/photo/';
 const OPENSKY_API = 'https://opensky-network.org/api/states/all';
 const ADSB_LOL_API = 'https://api.adsb.lol/v2/point';
-const DEFLOCK_OVERPASS_ENDPOINTS = Object.freeze([
-  'https://lz4.overpass-api.de/api/interpreter',
-  'https://overpass.private.coffee/api/interpreter',
-  'https://overpass-api.de/api/interpreter'
-]);
 const MEMORY_CACHE = new Map();
 const AIRCRAFT_CACHE = new Map();
 const DEFLOCK_CACHE = new Map();
@@ -194,6 +189,7 @@ async function fetchDeFlockOverpass(endpoint, overpassQuery, options, controller
     const payload = typeof response.json === 'function'
       ? await response.json()
       : JSON.parse(await response.text());
+    if (controller.signal.aborted) throw new DOMException('Mapped camera provider timed out', 'AbortError');
     if (!Array.isArray(payload?.elements)) throw new Error('Upstream returned an invalid Overpass payload.');
     return { endpoint, payload };
   } finally {
@@ -210,15 +206,29 @@ async function queryDeFlockCameras(input = {}, options = {}) {
     return { ...cached.value, cache: 'memory', cacheAgeMs: now - cached.savedAt };
   }
 
+  const { OVERPASS_ENDPOINTS, overpassAttemptBudget } = await import('./overpass-provider-policy.mjs');
   const endpoints = Array.isArray(options.endpoints) && options.endpoints.length
     ? options.endpoints
-    : DEFLOCK_OVERPASS_ENDPOINTS;
+    : OVERPASS_ENDPOINTS;
   const controllers = [];
   const overpassQuery = buildDeFlockOverpassQuery(query);
   try {
-    const winner = await Promise.any(endpoints.map((endpoint) => (
-      fetchDeFlockOverpass(String(endpoint), overpassQuery, options, controllers)
-    )));
+    const uniqueEndpoints = [...new Set(endpoints)];
+    const deadline = performance.now() + (Number(options.timeoutMs) || 14000);
+    let winner = null;
+    let lastError = null;
+    for (let index = 0; index < uniqueEndpoints.length; index += 1) {
+      const remainingMs = deadline - performance.now();
+      if (remainingMs <= 0) break;
+      try {
+        winner = await fetchDeFlockOverpass(String(uniqueEndpoints[index]), overpassQuery, {
+          ...options,
+          timeoutMs: overpassAttemptBudget(remainingMs, uniqueEndpoints.length - index)
+        }, controllers);
+        break;
+      } catch (error) { lastError = error; }
+    }
+    if (!winner) throw lastError || new Error('Mapped camera provider deadline expired');
     controllers.forEach((controller) => controller.abort());
     const value = {
       schemaVersion: 1,

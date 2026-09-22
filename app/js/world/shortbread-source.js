@@ -149,6 +149,9 @@ function waitForSharedTileRequest(entry, signal, z, x, y) {
 }
 
 export async function fetchShortbreadTile(z, x, y, options = {}) {
+  const externalSignal = options.signal || null;
+  if (externalSignal?.aborted) throw shortbreadAbortError(z, x, y);
+  const loadVectorTileLib = options.loadVectorTileLib || getVectorTileLib;
   const cacheKey = `${tileTemplate()}:${z}/${x}/${y}`;
   const cached = decodedTileCache.get(cacheKey);
   if (cached) {
@@ -160,7 +163,8 @@ export async function fetchShortbreadTile(z, x, y, options = {}) {
   if (rawCached) {
     rawTileCache.delete(cacheKey);
     rawTileCache.set(cacheKey, rawCached);
-    const { Pbf, VectorTile } = await getVectorTileLib();
+    const { Pbf, VectorTile } = await loadVectorTileLib();
+    if (externalSignal?.aborted) throw shortbreadAbortError(z, x, y);
     const record = { tile: new VectorTile(new Pbf(rawCached.bytes)), z, x, y };
     decodedTileCache.set(cacheKey, record);
     while (decodedTileCache.size > SHORTBREAD_DECODED_TILE_CACHE_LIMIT) {
@@ -168,21 +172,21 @@ export async function fetchShortbreadTile(z, x, y, options = {}) {
     }
     return record;
   }
-  const externalSignal = options.signal || null;
-  if (externalSignal?.aborted) throw shortbreadAbortError(z, x, y);
   let entry = pendingTileRequests.get(cacheKey);
-  if (!entry) {
+  if (!entry || entry.controller.signal.aborted) {
     const controller = new AbortController();
     entry = { controller, consumers: new Set(), promise: null, settled: false };
     const timeoutId = setTimeout(() => controller.abort(), SHORTBREAD_FETCH_TIMEOUT_MS);
     entry.promise = (async () => {
-      const { Pbf, VectorTile } = await getVectorTileLib();
+      const { Pbf, VectorTile } = await loadVectorTileLib();
+      if (controller.signal.aborted) throw shortbreadAbortError(z, x, y);
       const response = await fetch(tileUrl(z, x, y), {
         signal: controller.signal,
         cache: 'default'
       });
       if (!response.ok) throw new Error(`Shortbread tile ${z}/${x}/${y}: HTTP ${response.status}`);
       const bytes = new Uint8Array(await response.arrayBuffer());
+      if (controller.signal.aborted) throw shortbreadAbortError(z, x, y);
       cacheRawTile(cacheKey, bytes);
       const record = { tile: new VectorTile(new Pbf(bytes)), z, x, y };
       decodedTileCache.set(cacheKey, record);
