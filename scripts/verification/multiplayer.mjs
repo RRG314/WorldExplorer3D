@@ -432,6 +432,17 @@ try {
     return { authority: urban.authority, vehicle: urban.vehicles.find((entry) => entry.id === vehicleId) };
   }, sharedVehicle.id);
 
+  // Cross the server's 15-second lease interval before testing release. This
+  // proves liveness, rather than a claim observed only before its first expiry.
+  await owner.page.waitForTimeout(16_000);
+  const retainedLease = await owner.page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox);
+  assert.equal(retainedLease?.phase, 'driving', 'The room vehicle lease expired while its driver remained active.');
+  assert.equal(retainedLease?.activeVehicleId, sharedVehicle.id);
+  await member.page.waitForFunction((vehicleId) => {
+    const vehicle = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.vehicles?.find(entry => entry.id === vehicleId);
+    return vehicle?.roomOccupiedByOther === true && !!vehicle.roomLeaseOwnerUid;
+  }, sharedVehicle.id, roomStateWait);
+
   await owner.page.keyboard.down('ArrowUp');
   await owner.page.waitForTimeout(1_100);
   await owner.page.keyboard.up('ArrowUp');

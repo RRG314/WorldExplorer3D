@@ -3,6 +3,7 @@ import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { advanceGameplay } from './gameplay-simulation.mjs';
 
 const root = process.cwd();
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
@@ -84,11 +85,18 @@ async function touchStraightnessProbe(selector) {
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point(start)] });
   await page.waitForTimeout(80);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [point(end)] });
-  await page.waitForTimeout(450);
-  const middle = await diagnostics();
-  await page.waitForTimeout(650);
-  const after = await diagnostics();
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  let middle, after;
+  const timingReceipts = [];
+  try {
+    // This checks trajectory under a held real touch, not runner frame rate.
+    // A busy cloud renderer can simulate too little in a 450ms wall-clock wait.
+    timingReceipts.push(await advanceGameplay(page, 450));
+    middle = await diagnostics();
+    timingReceipts.push(await advanceGameplay(page, 650));
+    after = await diagnostics();
+  } finally {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  }
   await page.waitForTimeout(150);
   const positions = {
     before: before.activeActor?.position,
@@ -96,6 +104,7 @@ async function touchStraightnessProbe(selector) {
     after: after.activeActor?.position
   };
   return {
+    timing: 'trusted-touch-runtime-fixed-step', timingReceipts,
     ...positions,
     firstDistance: distance(positions.before, positions.middle),
     secondDistance: distance(positions.middle, positions.after),

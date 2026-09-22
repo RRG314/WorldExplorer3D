@@ -13,6 +13,51 @@ function resolveRoomVehicleLease(remote, actorUid, currentTime = Date.now()) {
   });
 }
 
+// Lease liveness follows wall time, not animation progress. A slow entry or
+// paused rendering must not consume the server lease before a pose is sent.
+function createVehicleLeaseHeartbeat(options) {
+  let timer = null;
+  let generation = 0;
+  let inFlight = null;
+  const schedule = options.setInterval || globalThis.setInterval;
+  const unschedule = options.clearInterval || globalThis.clearInterval;
+  function stop() {
+    generation += 1;
+    if (timer !== null) unschedule(timer);
+    timer = null;
+    inFlight = null;
+  }
+  async function tick() {
+    if (timer === null || inFlight) return;
+    const lease = options.getLease();
+    if (!lease) { stop(); return; }
+    const run = { generation, lease };
+    inFlight = run;
+    const stillCurrent = () => {
+      const current = options.getLease();
+      return timer !== null && generation === run.generation &&
+        current?.authority === lease.authority && current?.vehicle === lease.vehicle;
+    };
+    try {
+      const result = await lease.authority.updateVehicle(lease.vehicle, options.vehiclePose(lease.vehicle));
+      if (stillCurrent() && result?.accepted === false) {
+        stop();
+        options.onRejected(lease.vehicle, result);
+      }
+    } catch (error) {
+      if (stillCurrent()) options.onError?.(error);
+    } finally {
+      if (inFlight === run) inFlight = null;
+    }
+  }
+  function start() {
+    stop();
+    timer = schedule(() => { void tick(); }, 1000);
+    void tick();
+  }
+  return Object.freeze({ start, stop, tick });
+}
+
 function createUrbanRoomAuthorityRuntime(options = {}) {
   const state = options.state;
   let disposed = false;
@@ -20,11 +65,30 @@ function createUrbanRoomAuthorityRuntime(options = {}) {
   let syncGeneration = 0;
   let pendingVehicleId = '';
   let impactPending = false;
-  let poseElapsed = 0;
   let leaseSweepElapsed = 0;
 
   const active = () => !disposed && options.isActive();
   const currentRoom = () => appCtx.getCurrentMultiplayerRoom?.() || null;
+  const leasedVehicle = () => state.transition?.vehicle || state.activeVehicle;
+  function revokeVehicleControl(vehicle) {
+    options.cancelVehicleEntry?.(vehicle);
+    if (state.activeVehicle === vehicle) {
+      appCtx.car.speed = 0;
+      appCtx.car.vFwd = 0;
+      appCtx.car.vLat = 0;
+      options.beginExit();
+    }
+  }
+  const heartbeat = createVehicleLeaseHeartbeat({
+    getLease: () => active() && state.authority && leasedVehicle()
+      ? { authority: state.authority, vehicle: leasedVehicle() } : null,
+    vehiclePose: options.vehiclePose,
+    onRejected(vehicle) {
+      revokeVehicleControl(vehicle);
+      options.setStatus('This room vehicle lease ended. Control was released safely.', 2600);
+    },
+    onError: () => options.setStatus('Vehicle synchronization is reconnecting.', 1600)
+  });
 
   function applyEntities(entities = []) {
     if (!active()) return;
@@ -67,9 +131,13 @@ function createUrbanRoomAuthorityRuntime(options = {}) {
     const nextKey = roomIdentity(room);
     if (nextKey === roomKey && (state.authority || !room)) return state.authority;
     const generation = ++syncGeneration;
-    if (state.activeVehicle && state.authority) {
-      state.authority.releaseVehicle(state.activeVehicle, options.vehiclePose(state.activeVehicle)).catch(() => {});
+    heartbeat.stop();
+    pendingVehicleId = '';
+    const previousVehicle = leasedVehicle();
+    if (previousVehicle && state.authority) {
+      state.authority.releaseVehicle(previousVehicle, options.vehiclePose(previousVehicle)).catch(() => {});
     }
+    if (room && previousVehicle) revokeVehicleControl(previousVehicle);
     state.authority?.dispose?.();
     state.authority = null;
     roomKey = nextKey;
@@ -105,18 +173,24 @@ function createUrbanRoomAuthorityRuntime(options = {}) {
     }
     pendingVehicleId = vehicle.id;
     options.setStatus('Claiming this vehicle for your room session…', 2600);
-    state.authority.claimVehicle(vehicle, options.vehiclePose(vehicle)).then((result) => {
-      if (!active() || pendingVehicleId !== vehicle.id) return;
+    const authority = state.authority;
+    const generation = syncGeneration;
+    authority.claimVehicle(vehicle, options.vehiclePose(vehicle)).then((result) => {
+      if (!active() || generation !== syncGeneration || state.authority !== authority || pendingVehicleId !== vehicle.id) return;
       pendingVehicleId = '';
       if (!result?.accepted) {
         options.setStatus(result?.reason === 'occupied' ? 'Another player is using this vehicle.' : 'The room did not authorize this vehicle.', 2400);
         return;
       }
-      vehicle.roomLeaseOwnerUid = state.authority.actorUid;
+      vehicle.roomLeaseOwnerUid = authority.actorUid;
       vehicle.roomOccupiedByOther = false;
-      options.enterVehicle(vehicle);
+      if (options.enterVehicle(vehicle) === false) {
+        authority.releaseVehicle(vehicle, options.vehiclePose(vehicle)).catch(() => {});
+        return;
+      }
+      heartbeat.start();
     }).catch((error) => {
-      if (!active()) return;
+      if (!active() || generation !== syncGeneration || state.authority !== authority || pendingVehicleId !== vehicle.id) return;
       pendingVehicleId = '';
       options.setStatus(String(error?.message || 'Vehicle authority is unavailable.'), 2800);
     });
@@ -143,25 +217,9 @@ function createUrbanRoomAuthorityRuntime(options = {}) {
       }
     }
     impactPending = state.authorityImpactPending === true;
-    if (!state.activeVehicle?.attachedToPlayer) {
-      poseElapsed = 0;
-      return;
+    if (state.activeVehicle?.attachedToPlayer) {
+      options.syncVehiclePose(state.activeVehicle, options.vehiclePose(state.activeVehicle));
     }
-    options.syncVehiclePose(state.activeVehicle, options.vehiclePose(state.activeVehicle));
-    poseElapsed += dt;
-    if (!state.authority || poseElapsed < .9) return;
-    poseElapsed = 0;
-    const vehicle = state.activeVehicle;
-    state.authority.updateVehicle(vehicle, options.vehiclePose(vehicle)).then((result) => {
-      if (!active() || !state.activeVehicle || result?.accepted !== false) return;
-      appCtx.car.speed = 0;
-      appCtx.car.vFwd = 0;
-      appCtx.car.vLat = 0;
-      options.beginExit();
-      options.setStatus('This room vehicle lease ended. Control was released safely.', 2600);
-    }).catch(() => {
-      if (active()) options.setStatus('Vehicle synchronization is reconnecting.', 1600);
-    });
   }
 
   function snapshot() {
@@ -198,8 +256,10 @@ function createUrbanRoomAuthorityRuntime(options = {}) {
 
   function dispose() {
     if (disposed) return false;
-    if (state.activeVehicle && state.authority) {
-      state.authority.releaseVehicle(state.activeVehicle, options.vehiclePose(state.activeVehicle)).catch(() => {});
+    heartbeat.stop();
+    const vehicle = leasedVehicle();
+    if (vehicle && state.authority) {
+      state.authority.releaseVehicle(vehicle, options.vehiclePose(vehicle)).catch(() => {});
     }
     disposed = true;
     syncGeneration += 1;
@@ -215,4 +275,4 @@ function createUrbanRoomAuthorityRuntime(options = {}) {
   return Object.freeze({ civicSnapshot, dispose, reportCivicEvent, requestVehicleEntry, resolveCivicOutcome, snapshot, sync, update });
 }
 
-export { createUrbanRoomAuthorityRuntime, resolveRoomVehicleLease };
+export { createUrbanRoomAuthorityRuntime, createVehicleLeaseHeartbeat, resolveRoomVehicleLease };

@@ -13,7 +13,7 @@ import {
 } from './curated-equipment-visual.js?v=2';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=9';
 import { nearestMappedFacility } from './facility-model.js?v=3';
-import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=4';
+import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=5';
 import { createUrbanResponderRuntime } from './responder-runtime.js?v=30';
 import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=8';
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=12';
@@ -3142,6 +3142,11 @@ function startUrbanSandboxRuntime(options = {}) {
     syncVehiclePose,
     setStatus: (message, duration) => setStatus(state, message, duration),
     enterVehicle: (vehicle) => enterVehicleAfterClaim(state, vehicle),
+    cancelVehicleEntry: (vehicle) => {
+      if (state.transition?.kind !== 'enter' || state.transition.vehicle !== vehicle) return;
+      setDoorProgress(vehicle, 0);
+      state.transition = null;
+    },
     beginExit: () => beginExit(state)
   });
   state.reportCivicEvent = (event) => reportCivicEvent(state, event);
