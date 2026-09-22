@@ -3,7 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
-import { stepGameplayKeys } from './gameplay-simulation.mjs';
+import { advanceGameplay, stepGameplayKeys } from './gameplay-simulation.mjs';
 
 const root = process.cwd();
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
@@ -551,20 +551,24 @@ async function runVehicleEquipmentJourney() {
       return urban?.phase === 'driving' && urban.activeVehicleId === vehicleId;
     }, vehicle.id, { timeout: 8_000 });
     const entered = await diagnostics(page);
+    // Preserve trusted keyboard input while measuring actual simulation time.
+    // A slow cloud renderer can consume the entire wall wait in one frame.
+    const driveReceipts = [];
     await page.keyboard.down('ArrowUp');
-    await page.waitForTimeout(1_250);
-    await page.keyboard.up('ArrowUp');
+    try { driveReceipts.push(await advanceGameplay(page, 1_250)); }
+    finally { await page.keyboard.up('ArrowUp'); }
     await page.keyboard.down('Space');
-    await page.waitForTimeout(900);
-    await page.keyboard.up('Space');
+    try { driveReceipts.push(await advanceGameplay(page, 900)); }
+    finally { await page.keyboard.up('Space'); }
     const driven = await diagnostics(page);
     const enteredVehicle = entered.urbanSandbox.vehicles.find((entry) => entry.id === vehicle.id);
     const drivenVehicle = driven.urbanSandbox.vehicles.find((entry) => entry.id === vehicle.id);
     const drivenMeters = Math.hypot(drivenVehicle.x - enteredVehicle.x, drivenVehicle.z - enteredVehicle.z);
     await page.waitForFunction(() => {
       const urban = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox;
-      return urban?.interaction?.action === 'exit_vehicle' && Number(urban.interaction?.data?.speed || 0) <= 1.25;
-    }, null, { timeout: 6_000 });
+      return urban?.interaction?.action === 'exit_vehicle' &&
+        Number.isFinite(urban.playerVehicle?.worldVelocityMps) && urban.playerVehicle.worldVelocityMps <= 1.4;
+    }, null, { timeout: process.env.CI ? 30_000 : 6_000, polling: 100 });
     await page.keyboard.press('KeyE');
     await page.waitForFunction((vehicleId) => {
       const urban = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox;
@@ -637,6 +641,7 @@ async function runVehicleEquipmentJourney() {
       entered,
       driven,
       drivenMeters,
+      driveTiming: { mode: 'trusted-keyboard-runtime-fixed-step', receipts: driveReceipts },
       exiting,
       exited,
       retainedVehicle,

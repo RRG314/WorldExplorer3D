@@ -21,7 +21,7 @@
     "assembled-worlds": { "scope": "candidate", "command": ["npm", "run", "verify:assembled-locations"], "artifactRequired": true, "timeoutMs": 1200000 },
     "assembled-fallback": { "scope": "candidate", "command": ["npm", "run", "verify:assembled-locations-fallback"], "artifactRequired": true, "timeoutMs": 1200000 },
     "provider-release": { "scope": "candidate", "command": ["npm", "run", "verify:provider-release"], "artifactRequired": false },
-    "actors-vehicles": { "scope": "candidate", "command": ["npm", "run", "verify:actors-vehicles"], "artifactRequired": true },
+    "actors-vehicles": { "scope": "candidate", "command": ["npm", "run", "verify:actors-vehicles"], "artifactRequired": true, "timeoutMs": 1200000 },
     "terrain-boundary": { "scope": "candidate", "command": ["npm", "run", "verify:terrain-boundary"], "artifactRequired": true },
     "interiors": { "scope": "candidate", "command": ["npm", "run", "verify:interiors"], "artifactRequired": true },
     "poi-lifecycle": { "scope": "candidate", "command": ["npm", "run", "verify:poi-lifecycle"], "artifactRequired": false },
