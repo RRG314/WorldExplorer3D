@@ -25,13 +25,11 @@ function compareSourceIds(a, b) {
 }
 
 function immutableTags(tags = {}) {
-  const normalized = {};
-  for (const key of Object.keys(tags).sort()) {
-    const value = tags[key];
-    if (value == null) continue;
-    normalized[String(key)] = String(value);
-  }
-  return Object.freeze(normalized);
+  // Construct a compact property shape instead of adding arbitrary keys one at
+  // a time (which promotes larger OSM tag sets to per-object dictionaries).
+  return Object.freeze(Object.fromEntries(Object.keys(tags).sort()
+    .filter((key) => tags[key] != null)
+    .map((key) => [key, String(tags[key])])));
 }
 
 function providerSourceId(provider, type, id) {

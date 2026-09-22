@@ -249,13 +249,13 @@ function stableSourceIdentity(source = {}, tags = {}) {
 }
 
 export function normalizeTransportSource(source = {}, tags = {}) {
-  const rawTags = {};
-  for (const key of TRANSPORT_RAW_TAG_KEYS) rawTags[key] = sourceString(tags[key]);
-  const sourceTags = {};
-  for (const key of Object.keys(tags).sort()) {
-    if (tags[key] == null) continue;
-    sourceTags[String(key)] = String(tags[key]);
-  }
+  // These fixed keys recur for every road. Construct the complete shape once
+  // per record so V8 can share its layout instead of retaining dictionaries.
+  const rawTags = Object.fromEntries(TRANSPORT_RAW_TAG_KEYS.map((key) =>
+    [key, sourceString(tags[key])]));
+  const sourceTags = Object.fromEntries(Object.keys(tags).sort()
+    .filter((key) => tags[key] != null)
+    .map((key) => [key, String(tags[key])]));
   const sourceCompleteness = source.completeness === 'generalized' ||
     tags._sourceCompleteness === 'generalized'
     ? 'generalized'

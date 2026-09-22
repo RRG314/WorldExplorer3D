@@ -28,7 +28,15 @@ const moduleUrls = requestedRoot
 // Correctness coverage retains both complete worlds; performance is measured
 // separately. Bound old-space allocation on the small-memory verification host.
 const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
-const browserBudget = { maxOldSpaceMiB: 1024, worldInitialization: 'sequential', simultaneouslyActiveWorlds: 2 };
+// The Linux runner uses software rasterization. Reduce only its backing-store
+// pixels, retaining the desktop CSS viewport, complete city data and two live
+// clients. This is functional backend evidence, never FPS/visual acceptance.
+const deviceScaleFactor = process.env.CI ? 0.5 : 1;
+const browserBudget = {
+  maxOldSpaceMiB: 1024, worldInitialization: 'sequential', simultaneouslyActiveWorlds: 2,
+  viewport: { width: 1280, height: 800 }, deviceScaleFactor,
+  evidenceScope: 'multiplayer-functional'
+};
 async function recordStage(stage) {
   console.log(`[multiplayer] ${stage}`);
   await fs.mkdir(path.dirname(reportPath), { recursive: true });
@@ -40,7 +48,7 @@ const functionsOrigin = `http://127.0.0.1:5001/${firebaseProjectId}/us-central1`
 const emulatorFirebaseConfig = JSON.parse(await fs.readFile(path.join(root, 'config/firebase.staging.json'), 'utf8'));
 
 async function createPlayer(label) {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const context = await browser.newContext({ viewport: browserBudget.viewport, deviceScaleFactor });
   await context.addInitScript(({ functionsBase, firebaseConfig }) => {
     // Firestore emulator data is namespaced by the Firebase app project ID.
     // Match the Functions emulator project so browser writes and Admin SDK
@@ -56,6 +64,8 @@ async function createPlayer(label) {
     globalThis.WORLD_EXPLORER_FUNCTIONS_ORIGIN = functionsBase;
   }, { functionsBase: functionsOrigin, firebaseConfig: emulatorFirebaseConfig });
   const page = await context.newPage();
+  // Two stable frames on a software GPU can exceed Playwright's 30s default.
+  if (process.env.CI) page.setDefaultTimeout(120_000);
   const browserErrors = [];
   const interactionTrace = [];
   page.on('console', message => {

@@ -24,3 +24,30 @@ test('retention preserves selected topology, point features, tree rows and mappe
 test('retention still rejects a missing node referenced by selected geometry',()=>{
  const f=fixture();delete f.nodes[2];assert.throws(()=>adaptSelectedLocationSource(f),/missing nodes: 2/);
 });
+
+test('district and transport normalization preserve tags as immutable own data properties', async () => {
+ const {normalizeTransportSource, TRANSPORT_RAW_TAG_KEYS} = await import('../app/js/world/compiler/transport-source-normalizer.js');
+ const tags = JSON.parse('{"__proto__":"mapped-value","constructor":"source-value","highway":"residential","width":7.5,"lit":false,"empty":"","missing":null}');
+ const f=fixture(); f.selection.roadWays[0].tags=tags;
+ const district=adaptSelectedLocationSource(f).selection.roadWays[0];
+ const transport=normalizeTransportSource({id:1},tags);
+ for(const normalized of [district.tags, transport.sourceTags]) {
+  assert.equal(Object.getPrototypeOf(normalized),Object.prototype);
+  assert.equal(Object.hasOwn(normalized,'__proto__'),true);
+  assert.equal(normalized.__proto__,'mapped-value');
+  assert.equal(normalized.constructor,'source-value');
+  assert.equal(normalized.width,'7.5');
+  assert.equal(normalized.lit,'false');
+  assert.equal(normalized.empty,'');
+  assert.equal(Object.hasOwn(normalized,'missing'),false);
+  assert.ok(Object.isFrozen(normalized));
+ }
+ assert.deepEqual(Object.keys(transport.rawTags),[...TRANSPORT_RAW_TAG_KEYS]);
+ assert.equal(transport.rawTags.width,'7.5');
+ assert.equal(transport.rawTags.bridge,'');
+ assert.ok(Object.isFrozen(transport.rawTags));
+ assert.equal(transport.crossSection.widthMeters,7.5);
+ tags.width=90;
+ assert.equal(district.tags.width,'7.5');
+ assert.equal(transport.rawTags.width,'7.5');
+});
