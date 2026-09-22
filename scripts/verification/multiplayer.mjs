@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { stepGameplayKeys } from './gameplay-simulation.mjs';
 
 const root = process.cwd();
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
@@ -39,6 +40,7 @@ const roomStateWait = { timeout: process.env.CI ? 120_000 : 20_000, polling: 250
 const browserBudget = {
   maxOldSpaceMiB: 1024, worldInitialization: 'sequential', simultaneouslyActiveWorlds: 2,
   viewport: { width: 1280, height: 800 }, deviceScaleFactor, roomStateWait,
+  navigationTiming: 'dom-keyboard-runtime-fixed-step',
   evidenceScope: 'multiplayer-functional'
 };
 async function recordStage(stage) {
@@ -137,9 +139,7 @@ function wrapYaw(value) {
 }
 
 async function inputStep(page, key, milliseconds) {
-  await page.keyboard.down(key);
-  await page.evaluate((duration) => globalThis.advanceTime?.(duration), milliseconds);
-  await page.keyboard.up(key);
+  return stepGameplayKeys(page, key, milliseconds);
 }
 
 async function launchRoomWorld(player) {
@@ -195,6 +195,7 @@ async function launchRoomWorld(player) {
 }
 
 async function walkToVehicle(player, vehicleId, maxSteps = 1_200) {
+  await player.page.bringToFront();
   let previousDistance = Infinity;
   let stagnant = 0;
   let recoveries = 0;
@@ -222,8 +223,11 @@ async function walkToVehicle(player, vehicleId, maxSteps = 1_200) {
     }
     const desired = Math.atan2(state.targetX - state.x, state.targetZ - state.z);
     const delta = wrapYaw(desired - state.yaw);
-    if (Math.abs(delta) > 0.13) await inputStep(player.page, delta > 0 ? 'ArrowLeft' : 'ArrowRight', 55);
-    else await inputStep(player.page, 'ArrowUp', state.distance > 18 ? 140 : 90);
+    if (Math.abs(delta) > 0.13) {
+      await inputStep(player.page, delta > 0 ? 'ArrowLeft' : 'ArrowRight', Math.abs(delta) > 0.7 ? 55 : 16);
+      continue; // Only translation can establish a blocked route.
+    }
+    await inputStep(player.page, 'ArrowUp', state.distance > 18 ? 140 : 90);
     stagnant = state.distance >= previousDistance - 0.008 ? stagnant + 1 : 0;
     previousDistance = state.distance;
     if (stagnant > 32) {
@@ -391,7 +395,7 @@ try {
     await owner.page.waitForFunction((vehicleId) => {
       const urban = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox;
       return urban?.phase === 'driving' && urban.activeVehicleId === vehicleId && urban.authority?.mode === 'room';
-    }, sharedVehicle.id, { timeout: 20_000 });
+    }, sharedVehicle.id, roomStateWait);
   } catch (error) {
     const vehicleEntryState = await owner.page.evaluate((vehicleId) => {
       const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
@@ -422,7 +426,7 @@ try {
     const vehicle = urban?.vehicles?.find((entry) => entry.id === vehicleId);
     return urban?.authority?.mode === 'room' && urban.authority.synchronizedEntities > 0 &&
       vehicle?.roomOccupiedByOther === true && !!vehicle.roomLeaseOwnerUid;
-  }, sharedVehicle.id, { timeout: 20_000 });
+  }, sharedVehicle.id, roomStateWait);
   const memberObservedLease = await member.page.evaluate((vehicleId) => {
     const urban = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox;
     return { authority: urban.authority, vehicle: urban.vehicles.find((entry) => entry.id === vehicleId) };
@@ -452,7 +456,7 @@ try {
   await member.page.waitForFunction((vehicleId) => {
     const vehicle = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.vehicles?.find((entry) => entry.id === vehicleId);
     return vehicle && vehicle.roomOccupiedByOther === false && !vehicle.roomLeaseOwnerUid;
-  }, sharedVehicle.id, { timeout: 20_000 });
+  }, sharedVehicle.id, roomStateWait);
   const memberReach = await walkToVehicle(member, sharedVehicle.id);
   assert.ok(memberReach.reached,
     `Room member could not reach the released shared vehicle with normal walking input: ${JSON.stringify(memberReach)}`);
@@ -460,7 +464,7 @@ try {
   await member.page.waitForFunction((vehicleId) => {
     const urban = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox;
     return urban?.phase === 'driving' && urban.activeVehicleId === vehicleId && urban.authority?.mode === 'room';
-  }, sharedVehicle.id, { timeout: 20_000 });
+  }, sharedVehicle.id, roomStateWait);
   const memberClaimedAfterRelease = await member.page.evaluate((vehicleId) => {
     const urban = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox;
     return { authority: urban.authority, vehicle: urban.vehicles.find((entry) => entry.id === vehicleId) };

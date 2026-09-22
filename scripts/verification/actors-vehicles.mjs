@@ -630,7 +630,11 @@ try {
           second?.surfaceChain?.actor?.mode === 'drive' &&
           playerDriveMeters >= 0.25,
         playerVehicleRetainsPublishedSurfaceContact:
-          first?.surfaceChain?.surfaces?.drive?.kind === 'road' &&
+          // Custom coordinates preserve their published arrival, which may be
+          // terrain. Verify real support at both ends, without teleporting to a road.
+          ['road', 'terrain'].includes(String(first?.surfaceChain?.surfaces?.drive?.kind || '')) &&
+          first?.surfaceChain?.actor?.grounded === true &&
+          Number(first?.surfaceChain?.actor?.vehicleContact?.supportSampleCount || 0) >= 1 &&
           ['road', 'terrain'].includes(String(settled?.surfaceChain?.surfaces?.drive?.kind || '')) &&
           Number(settled?.surfaceChain?.actor?.vehicleContact?.sampleCount || 0) >= 1 &&
           Number(settled?.surfaceChain?.actor?.vehicleContact?.supportSampleCount || 0) >= 1 &&
@@ -708,6 +712,8 @@ try {
         previousMaximumWheelPenetration: Number(activePopulation.previousMaximumWheelPenetration || 0),
         playerDriveMeters,
         playerStartSurfaceKind: first?.surfaceChain?.surfaces?.drive?.kind || null,
+        playerStartVehicleContact: first?.surfaceChain?.actor?.vehicleContact || null,
+        playerStartGrounded: first?.surfaceChain?.actor?.grounded ?? null,
         playerStartSurfaceId: first?.surfaceChain?.surfaces?.drive?.feature?.id || null,
         playerEndSurfaceKind: second?.surfaceChain?.surfaces?.drive?.kind || null,
         playerDriveSurfaceId: second?.surfaceChain?.surfaces?.drive?.feature?.id || null,

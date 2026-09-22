@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { stepGameplayKeys } from './gameplay-simulation.mjs';
 
 const root = process.cwd();
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
@@ -19,7 +20,7 @@ let page = await context.newPage();
 const browserErrors = [];
 const browserConsole = [];
 const localFailures = [];
-const progress = { stage: 'desktop-load' };
+const progress = { stage: 'desktop-load', navigationTiming: 'dom-keyboard-runtime-fixed-step' };
 function markStage(stage, evidence = {}) {
   Object.assign(progress, evidence, { stage });
   console.log(`[interiors] ${stage}`);
@@ -161,9 +162,7 @@ async function walkToInteriorPrompt(target, maxSteps = 1_400) {
       );
       const delta = wrapYaw(targetYaw - yaw);
       if (Math.abs(delta) <= 0.11) return true;
-      await page.keyboard.down(delta > 0 ? 'ArrowLeft' : 'ArrowRight');
-      await page.evaluate(() => globalThis.advanceTime?.(70));
-      await page.keyboard.up(delta > 0 ? 'ArrowLeft' : 'ArrowRight');
+      await stepGameplayKeys(page, delta > 0 ? 'ArrowLeft' : 'ArrowRight', Math.abs(delta) > 0.7 ? 55 : 16);
     }
     return false;
   };
@@ -175,11 +174,7 @@ async function walkToInteriorPrompt(target, maxSteps = 1_400) {
     const turned = await turnTowardYaw(tangentYaw);
     if (!turned) return false;
     const detourDurationMs = Math.max(900, Math.min(5_200, Number(remainingDistance || 0) * 125));
-    await page.keyboard.down('ShiftLeft');
-    await page.keyboard.down('ArrowUp');
-    await page.evaluate((durationMs) => globalThis.advanceTime?.(durationMs), detourDurationMs);
-    await page.keyboard.up('ArrowUp');
-    await page.keyboard.up('ShiftLeft');
+    await stepGameplayKeys(page, ['ShiftLeft', 'ArrowUp'], detourDurationMs);
     return true;
   };
 
@@ -210,16 +205,11 @@ async function walkToInteriorPrompt(target, maxSteps = 1_400) {
     const yawDelta = wrapYaw(desiredYaw - state.yaw);
     if (Math.abs(yawDelta) > 0.14) {
       const turnKey = yawDelta > 0 ? 'ArrowLeft' : 'ArrowRight';
-      await page.keyboard.down(turnKey);
-      await page.evaluate(() => globalThis.advanceTime?.(70));
-      await page.keyboard.up(turnKey);
+      await stepGameplayKeys(page, turnKey, Math.abs(yawDelta) > 0.7 ? 55 : 16);
+      continue; // Turning cannot demonstrate blocked translation.
     } else {
       const running = state.distance > 24;
-      if (running) await page.keyboard.down('ShiftLeft');
-      await page.keyboard.down('ArrowUp');
-      await page.evaluate(() => globalThis.advanceTime?.(140));
-      await page.keyboard.up('ArrowUp');
-      if (running) await page.keyboard.up('ShiftLeft');
+      await stepGameplayKeys(page, running ? ['ShiftLeft', 'ArrowUp'] : 'ArrowUp', 140);
     }
     if (state.distance >= previousDistance - 0.015) stagnant += 1;
     else stagnant = 0;
@@ -271,13 +261,10 @@ async function walkToPoint(target, options = {}) {
     const yawDelta = wrapYaw(desiredYaw - state.yaw);
     if (Math.abs(yawDelta) > 0.12) {
       const turnKey = yawDelta > 0 ? 'ArrowLeft' : 'ArrowRight';
-      await page.keyboard.down(turnKey);
-      await page.evaluate(() => globalThis.advanceTime?.(55));
-      await page.keyboard.up(turnKey);
+      await stepGameplayKeys(page, turnKey, Math.abs(yawDelta) > 0.7 ? 55 : 16);
+      continue; // Turning cannot demonstrate blocked translation.
     } else {
-      await page.keyboard.down('ArrowUp');
-      await page.evaluate(() => globalThis.advanceTime?.(90));
-      await page.keyboard.up('ArrowUp');
+      await stepGameplayKeys(page, 'ArrowUp', 90);
     }
     if (state.distance >= previousDistance - 0.008) stagnant += 1;
     else stagnant = 0;
@@ -293,14 +280,10 @@ async function walkToPoint(target, options = {}) {
         const delta = wrapYaw(tangentYaw - yaw);
         if (Math.abs(delta) <= 0.11) break;
         const turnKey = delta > 0 ? 'ArrowLeft' : 'ArrowRight';
-        await page.keyboard.down(turnKey);
-        await page.evaluate(() => globalThis.advanceTime?.(65));
-        await page.keyboard.up(turnKey);
+        await stepGameplayKeys(page, turnKey, Math.abs(delta) > 0.7 ? 55 : 16);
       }
       const detourDurationMs = Math.max(700, Math.min(2_500, state.distance * 160));
-      await page.keyboard.down('ArrowUp');
-      await page.evaluate((durationMs) => globalThis.advanceTime?.(durationMs), detourDurationMs);
-      await page.keyboard.up('ArrowUp');
+      await stepGameplayKeys(page, 'ArrowUp', detourDurationMs);
       path.push({ ...state, detour: detourCount });
       stagnant = 0;
       previousDistance = Infinity;
@@ -426,9 +409,7 @@ async function climbPublishedStairs() {
 
 async function backAwayFromWall() {
   const before = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.position || null);
-  await page.keyboard.down('ArrowDown');
-  await page.evaluate(() => globalThis.advanceTime?.(1_200));
-  await page.keyboard.up('ArrowDown');
+  await stepGameplayKeys(page, 'ArrowDown', 1_200);
   const after = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.position || null);
   return {
     before,

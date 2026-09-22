@@ -113,7 +113,17 @@ async function touchHold(page, cdp, selector, deltaX, deltaY, holdMs = 1_050) {
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point(start)] });
   await page.waitForTimeout(70);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [point(end)] });
-  const simulation = await advanceGameplay(page, holdMs);
+  // Ocean owns a separate RAF loop; the earth kernel is deliberately suspended.
+  const simulation = before?.activeActor?.mode === 'ocean'
+    ? await (async () => {
+      const started = Date.now();
+      await page.waitForFunction((position) => {
+        const actor = globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor;
+        return actor?.mode === 'ocean' && Math.hypot(actor.position.x - position.x, actor.position.z - position.z) > 0.8;
+      }, before.activeActor.position, { timeout: 15000, polling: 100 });
+      return { timing: 'dedicated-ocean-wall-clock', elapsedMs: Date.now() - started };
+    })()
+    : await advanceGameplay(page, holdMs);
   const held = await page.evaluate(() => ({
     diagnostics: globalThis.getWorldExplorerRuntimeDiagnostics?.(),
     hud: {
@@ -314,7 +324,8 @@ try {
     planeSpeedUsesKnots: planeMove.held.hud.unit === 'KTS' && planeMove.held.hud.secondaryLabel === 'ALT' &&
       planeMove.held.hud.speed > 0 && planeMove.held.hud.speed < 500,
     oceanSpeedUsesKnots: oceanMove.held.hud.unit === 'KTS' && oceanMove.held.hud.secondaryLabel === 'DEPTH' &&
-      /m$/.test(oceanMove.held.hud.secondary) && oceanMove.held.hud.speed > 0 && oceanMove.held.hud.speed < 100,
+      /m$/.test(oceanMove.held.hud.secondary) && oceanMove.held.hud.speed > 0 && oceanMove.held.hud.speed < 100 &&
+      horizontalDistance(oceanMove.before.activeActor?.position, oceanMove.held.diagnostics?.activeActor?.position) > 0.8,
     bottomMenuOwnsHudArea: menuOwnership.menuOpen && menuOwnership.prompts.every((prompt) =>
       prompt.display === 'none' && prompt.overlap === false
     ),
@@ -322,7 +333,7 @@ try {
     noFailedLocalResources: localFailures.length === 0
   };
   const report = {
-    timing: 'runtime-fixed-step',
+    timing: 'earth-fixed-step-and-ocean-live-raf',
     simulationReceipts: [rightMove, leftMove, forwardMove, driveMove, droneMove, planeMove, oceanMove].map(move => move.simulation),
     ok: Object.values(checks).every(Boolean),
     contract: 'player-reported-release-blockers-v1',

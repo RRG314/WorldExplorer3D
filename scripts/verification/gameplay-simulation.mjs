@@ -11,6 +11,44 @@ export async function advanceGameplay(page, milliseconds) {
   return receipt;
 }
 
+// Route instrumented navigation through the real DOM keyboard handlers and
+// simulation in one browser task. Separate protocol down/step/up calls allow
+// live RAF turns between commands, so runner latency changes the steering.
+// This proves functional navigation, not trusted hardware input or frame rate.
+export async function stepGameplayKeys(page, keys, milliseconds) {
+  assert.ok(Number.isFinite(milliseconds) && milliseconds > 0 && milliseconds <= 6000);
+  const codes = Array.isArray(keys) ? keys : [keys];
+  assert.ok(codes.length > 0 && codes.every(code => /^(Arrow(Up|Down|Left|Right)|ShiftLeft)$/.test(code)));
+  const receipts = await page.evaluate(({ codes, milliseconds }) => {
+    const target = document.activeElement || document.body;
+    if (target?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target?.tagName)) {
+      throw new Error('Gameplay navigation is blocked by a focused UI control.');
+    }
+    const dispatch = (type, code) => target.dispatchEvent(new KeyboardEvent(type, {
+      code, key: code === 'ShiftLeft' ? 'Shift' : code,
+      shiftKey: codes.includes('ShiftLeft') && type === 'keydown', bubbles: true, cancelable: true
+    }));
+    try {
+      for (const code of codes) dispatch('keydown', code);
+      const result = [];
+      for (let remaining = milliseconds; remaining > 0;) {
+        const duration = Math.min(2000, remaining);
+        result.push({ duration, receipt: globalThis.advanceTime?.(duration) });
+        remaining -= duration;
+      }
+      return result;
+    } finally {
+      for (const code of [...codes].reverse()) dispatch('keyup', code);
+    }
+  }, { codes, milliseconds });
+  for (const { duration, receipt } of receipts) {
+    assert.ok(receipt && Math.abs(receipt.simulatedMs - duration) < 0.001 &&
+      receipt.frames > 0 && receipt.suspendedFrames === 0,
+    `Navigation simulation did not advance: ${JSON.stringify(receipt)}`);
+  }
+  return { timing: 'dom-keyboard-runtime-fixed-step', receipts };
+}
+
 export async function advanceUntilFishingStage(page, stage, maximumMs = 10000) {
   let simulatedMs = 0;
   while (true) {
