@@ -47,7 +47,9 @@ function normalizeEntity(snapshot) {
       x: finiteNumber(data.pose?.x),
       y: finiteNumber(data.pose?.y),
       z: finiteNumber(data.pose?.z),
-      yaw: finiteNumber(data.pose?.yaw)
+      yaw: finiteNumber(data.pose?.yaw),
+      pitch: Math.max(-.55, Math.min(.55, finiteNumber(data.pose?.pitch))),
+      roll: Math.max(-.55, Math.min(.55, finiteNumber(data.pose?.roll)))
     }),
     condition: Math.max(0, Math.min(1, finiteNumber(data.condition, 1))),
     leaseOwnerUid: String(data.leaseOwnerUid || ''),

@@ -41,7 +41,9 @@ function normalizePose(input = {}) {
     x: clamp(finiteNumber(input.x, 0), -25_000, 25_000),
     y: clamp(finiteNumber(input.y, 0), -2_000, 20_000),
     z: clamp(finiteNumber(input.z, 0), -25_000, 25_000),
-    yaw: clamp(finiteNumber(input.yaw, 0), -Math.PI * 4, Math.PI * 4)
+    yaw: clamp(finiteNumber(input.yaw, 0), -Math.PI * 4, Math.PI * 4),
+    pitch: clamp(finiteNumber(input.pitch, 0), -.55, .55),
+    roll: clamp(finiteNumber(input.roll, 0), -.55, .55)
   });
 }
 

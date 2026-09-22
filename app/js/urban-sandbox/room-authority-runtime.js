@@ -144,7 +144,7 @@ function createUrbanRoomAuthorityRuntime(options = {}) {
     state.remoteEntities.clear();
     if (!room) return null;
     try {
-      const { createUrbanRoomAuthority } = await import('../multiplayer/urban-sandbox.js?v=2');
+      const { createUrbanRoomAuthority } = await import('../multiplayer/urban-sandbox.js?v=3');
       if (!active() || generation !== syncGeneration) return null;
       state.authority = createUrbanRoomAuthority({
         room,

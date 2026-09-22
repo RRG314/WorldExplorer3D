@@ -459,7 +459,7 @@ try {
     const urban = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox;
     return urban?.phase === 'walking' && !urban.activeVehicleId &&
       urban.vehicles.some((entry) => entry.id === vehicleId && entry.attachedToPlayer === false);
-  }, sharedVehicle.id, { timeout: 12_000 });
+  }, sharedVehicle.id, roomStateWait);
   const ownerReleased = await owner.page.evaluate((vehicleId) => {
     const urban = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox;
     return { authority: urban.authority, vehicle: urban.vehicles.find((entry) => entry.id === vehicleId) };
@@ -468,6 +468,12 @@ try {
     const vehicle = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.vehicles?.find((entry) => entry.id === vehicleId);
     return vehicle && vehicle.roomOccupiedByOther === false && !vehicle.roomLeaseOwnerUid;
   }, sharedVehicle.id, roomStateWait);
+  const memberReleasedPose = await member.page.evaluate((vehicleId) =>
+    globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.vehicles?.find(entry => entry.id === vehicleId),
+  sharedVehicle.id);
+  assert.ok(Math.abs(memberReleasedPose.pitch - ownerReleased.vehicle.pitch) <= .0002 &&
+    Math.abs(memberReleasedPose.roll - ownerReleased.vehicle.roll) <= .0002,
+  'Released shared vehicle lost its road pitch or bank on the receiving client.');
   const memberReach = await walkToVehicle(member, sharedVehicle.id);
   assert.ok(memberReach.reached,
     `Room member could not reach the released shared vehicle with normal walking input: ${JSON.stringify(memberReach)}`);
@@ -525,7 +531,9 @@ try {
       artifactTitle: sharedArtifact.title,
       sharedVehicleId: sharedVehicle.id,
       firstLeaseOwnerUid: memberObservedLease.vehicle?.roomLeaseOwnerUid,
-      secondLeaseOwnerUid: memberClaimedAfterRelease.vehicle?.roomLeaseOwnerUid
+      secondLeaseOwnerUid: memberClaimedAfterRelease.vehicle?.roomLeaseOwnerUid,
+      leaseHeldBeyondInitialExpiry: retainedLease.phase === 'driving',
+      releasedPose: { owner: ownerReleased.vehicle, member: memberReleasedPose }
     }
   };
   await fs.mkdir(path.dirname(reportPath), { recursive: true });

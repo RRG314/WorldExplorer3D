@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import urbanBackend from '../functions/urban-sandbox.js';
 import { createVehicleLeaseHeartbeat, resolveRoomVehicleLease } from '../app/js/urban-sandbox/room-authority-runtime.js';
 
 test('room vehicle lease state clears expired and missing ownership', () => {
@@ -98,4 +99,29 @@ test('room lease network failures retry without falsely accepting or rejecting o
   await h.heartbeat.tick();
   assert.equal(calls, 2);
   h.heartbeat.stop();
+});
+
+
+test('shared vehicle claims and release preserve bounded road pitch and bank', async () => {
+  let stored;
+  const timestampFromMs = value => ({ toMillis: () => value });
+  const runTransaction = callback => callback({
+    get: async () => ({ exists: !!stored, data: () => stored }),
+    set: (_ref, value) => { stored = value; },
+    update: (_ref, patch) => { stored = { ...stored, ...patch }; }
+  });
+  const base = { runTransaction, entityRef: {}, uid: 'driver', timestampFromMs };
+  const input = { entityId: 'car:1', worldSeed: 'earth:test', pose: { x: 0, y: 12, z: 0, yaw: 1, pitch: -.2, roll: .1 } };
+  const claim = await urbanBackend.claimUrbanVehicleLease({ ...base, input, nowMs: 1000 });
+  assert.equal(claim.accepted, true);
+  assert.equal(stored.pose.pitch, -.2);
+  assert.equal(stored.pose.roll, .1);
+  const released = await urbanBackend.updateUrbanVehicleLease({ ...base, input: { ...input, pose: { ...input.pose, pitch: .3, roll: -.12 } }, nowMs: 2000, release: true });
+  assert.equal(released.accepted, true);
+  assert.equal(stored.pose.pitch, .3);
+  assert.equal(stored.pose.roll, -.12);
+  assert.equal(stored.leaseOwnerUid, '');
+  assert.equal(urbanBackend.normalizePose({ pitch: 10, roll: -10 }).pitch, .55);
+  assert.equal(urbanBackend.normalizePose({ pitch: 10, roll: -10 }).roll, -.55);
+  assert.equal(urbanBackend.normalizePose({}).pitch, 0, 'Existing records and older clients remain compatible.');
 });
