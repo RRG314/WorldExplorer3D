@@ -193,7 +193,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     return auth;
   }
 
-  const createRealityCaptureDraft = functions.runWith({ timeoutSeconds: 120, memory: '512MB', maxInstances: 2 }).region('us-central1').https.onRequest(async (req, res) => {
+  const createRealityCaptureDraft = functions.runWith({ timeoutSeconds: 120, memory: '512MB', maxInstances: 2 }).region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
     const auth = await guard(req, res);
     if (!auth) return;
     try {
@@ -279,7 +279,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     }
   });
 
-  const reserveRealityCapturePhoto = functions.region('us-central1').https.onRequest(async (req, res) => {
+  const reserveRealityCapturePhoto = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
     const auth = await guard(req, res);
     if (!auth) return;
     try {
@@ -307,7 +307,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     } catch (error) { sendKnownError(res, error); }
   });
 
-  const createRealityCaptureUploadUrl=functions.region('us-central1').https.onRequest(async(req,res)=>{
+  const createRealityCaptureUploadUrl=functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async(req,res)=>{
     const auth=await guard(req,res);if(!auth)return;
     try{
       const captureId=clean(req.body?.captureId,180),photoId=clean(req.body?.photoId,32),size=req.body?.size,sha256=req.body?.sha256;
@@ -326,7 +326,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     }catch(e){sendKnownError(res,e);}
   });
 
-  const retryRealityCapture = functions.region('us-central1').https.onRequest(async (req, res) => {
+  const retryRealityCapture = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
     const auth = await guard(req, res);
     if (!auth) return;
     // Paid reconstruction is a development capability, not public admission.
@@ -348,7 +348,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     } catch (error) { sendKnownError(res, error); }
   });
 
-  const listMyRealityCaptures = functions.region('us-central1').https.onRequest(async (req, res) => {
+  const listMyRealityCaptures = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
     const auth = await guard(req, res);
     if (!auth) return;
     try {
@@ -373,7 +373,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
   });
 
   // A handoff URL identifies a capture; it is never a bearer credential.
-  const getMyRealityCapture = functions.region('us-central1').https.onRequest(async (req, res) => {
+  const getMyRealityCapture = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
     const auth = await guard(req, res);
     if (!auth) return;
     try {
@@ -411,7 +411,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     }
   });
 
-  const saveRealityCaptureHybridPreview = functions.region('us-central1').https.onRequest(async (req,res)=>{
+  const saveRealityCaptureHybridPreview = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req,res)=>{
     const auth=await guard(req,res); if(!auth)return;
     try {
       const captureId=clean(req.body?.captureId,180);
@@ -431,7 +431,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     }catch(error){sendKnownError(res,error);}
   });
 
-  const finalizeRealityCaptureUpload = functions.region('us-central1').runWith({ memory: '512MB', timeoutSeconds: 300, maxInstances: 2 }).https.onRequest(async (req, res) => {
+  const finalizeRealityCaptureUpload = functions.region('us-central1').runWith({ memory: '512MB', timeoutSeconds: 300, maxInstances: 2 }).runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
     const auth = await guard(req, res);
     if (!auth) return;
     const mode = req.body?.mode || 'manual';
@@ -490,7 +490,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     }
   });
 
-  const submitRealityCaptureHybrid = functions.region('us-central1').runWith({memory:'1GB',timeoutSeconds:120,maxInstances:2}).https.onRequest(async(req,res)=>{
+  const submitRealityCaptureHybrid = functions.region('us-central1').runWith({memory:'1GB',timeoutSeconds:120,maxInstances:2}).runWith({ invoker: 'public' }).https.onRequest(async(req,res)=>{
     const auth=await guard(req,res);if(!auth)return;
     try{
       const captureId=clean(req.body?.captureId,180);if(!/^[a-zA-Z0-9_-]{1,180}$/.test(captureId))throw Error('invalid_capture_id');
@@ -518,7 +518,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     }catch(e){sendKnownError(res,e);}
   });
 
-  const deleteRealityCapture = functions.region('us-central1').https.onRequest(async (req, res) => {
+  const deleteRealityCapture = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
     const auth = await guard(req, res);
     if (!auth) return;
     const captureId = clean(req.body?.captureId, 180);
@@ -566,7 +566,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     }
   });
 
-  const resolvePrivateSpaceEntry = functions.region('us-central1').https.onRequest(async (req, res) => {
+  const resolvePrivateSpaceEntry = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
     const auth = await guard(req, res);
     if (!auth) return;
     try {
@@ -599,7 +599,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     }
   });
 
-  const resolveBuildingInteriorRepresentation = functions.region('us-central1').https.onRequest(async (req, res) => {
+  const resolveBuildingInteriorRepresentation = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
     const auth = await guard(req, res);
     if (!auth) return;
     try {
@@ -674,7 +674,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     }
   });
 
-  const resolveBuildingExteriorRepresentation = functions.region('us-central1').https.onRequest(async (req, res) => {
+  const resolveBuildingExteriorRepresentation = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
     if (setCors(req, res)) return;
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
     if (verifyAppCheck && !(await verifyAppCheck(req, res, { required: true }))) return;
@@ -711,7 +711,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     }
   });
 
-  const listApprovedExteriorRepresentations = functions.region('us-central1').https.onRequest(async (req, res) => {
+  const listApprovedExteriorRepresentations = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
     if (setCors(req, res)) return;
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
     if (verifyAppCheck && !(await verifyAppCheck(req, res, { required: true }))) return;
@@ -768,7 +768,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     }
   });
 
-  const updatePrivateSpaceAccess = functions.region('us-central1').https.onRequest(async (req, res) => {
+  const updatePrivateSpaceAccess = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
     const auth = await guard(req, res);
     if (!auth) return;
     try {
@@ -815,7 +815,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     }
   });
 
-  const requestPrivateSpaceAccess = functions.region('us-central1').https.onRequest(async (req, res) => {
+  const requestPrivateSpaceAccess = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
     const auth = await guard(req, res);
     if (!auth) return;
     try {
@@ -853,7 +853,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     }
   });
 
-  const decidePrivateSpaceAccessRequest = functions.region('us-central1').https.onRequest(async (req, res) => {
+  const decidePrivateSpaceAccessRequest = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
     const auth = await guard(req, res);
     if (!auth) return;
     try {
@@ -905,7 +905,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     }
   });
 
-  const moderateRealityCapture = functions.region('us-central1').https.onRequest(async (req, res) => {
+  const moderateRealityCapture = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
     if (setCors(req, res)) return;
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
     if (verifyAppCheck && !(await verifyAppCheck(req, res, { required: true }))) return;
@@ -1021,7 +1021,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     }
   });
 
-  const listRealityCaptureModeration = functions.region('us-central1').https.onRequest(async (req, res) => {
+  const listRealityCaptureModeration = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
     if (setCors(req, res)) return;
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
     if (verifyAppCheck && !(await verifyAppCheck(req, res, { required: true }))) return;
@@ -1042,7 +1042,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     }
   });
 
-  const getRealityCaptureModerationDetail = functions.region('us-central1').https.onRequest(async (req, res) => {
+  const getRealityCaptureModerationDetail = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
     if (setCors(req, res)) return;
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
     if (verifyAppCheck && !(await verifyAppCheck(req, res, { required: true }))) return;
@@ -1079,7 +1079,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     }
   });
 
-  const getRealityCaptureAssetAccess = functions.region('us-central1').https.onRequest(async (req, res) => {
+  const getRealityCaptureAssetAccess = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
     const auth = await guard(req, res);
     if (!auth) return;
     try {
@@ -1132,7 +1132,7 @@ function buildCommunityRealityCaptureExports(helpers = {}) {
     }
   });
 
-  const retryRealityCaptureReviewEmail=functions.region('us-central1').https.onRequest(async(req,res)=>{
+  const retryRealityCaptureReviewEmail=functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async(req,res)=>{
     if(setCors(req,res))return;
     if(req.method!=='POST')return res.status(405).json({error:'Method not allowed.'});
     if(verifyAppCheck&&!(await verifyAppCheck(req,res,{required:true})))return;

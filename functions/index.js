@@ -1,5 +1,8 @@
 const { admitRoomPlayer } = require('./room-admission');
 const functions = require('firebase-functions/v1');
+// Browser HTTP routes use Firebase ID tokens inside verifyAuth/requireModerator.
+// Declare public transport invocation explicitly: updates otherwise preserve
+// stale IAM denials before those handlers run. Background workers stay separate.
 const admin = require('firebase-admin');
 const crypto = require('node:crypto');
 const { FieldValue, Timestamp: AdminTimestamp } = require('firebase-admin/firestore');
@@ -1148,7 +1151,7 @@ async function upsertPlanFromSubscription({ uid, customerId, subscriptionId, sta
   );
 }
 
-exports.getPublicSiteStats = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.getPublicSiteStats = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed.' });
   try {
@@ -1161,7 +1164,7 @@ exports.getPublicSiteStats = functions.region('us-central1').https.onRequest(asy
   }
 });
 
-exports.createCheckoutSession = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.createCheckoutSession = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
@@ -1246,7 +1249,7 @@ exports.createCheckoutSession = functions.region('us-central1').https.onRequest(
   }
 });
 
-exports.createPortalSession = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.createPortalSession = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
@@ -1293,7 +1296,7 @@ exports.createPortalSession = functions.region('us-central1').https.onRequest(as
   }
 });
 
-exports.startTrial = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.startTrial = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
@@ -1405,7 +1408,7 @@ exports.startTrial = functions.region('us-central1').https.onRequest(async (req,
   }
 });
 
-exports.enableAdminTester = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.enableAdminTester = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
@@ -1473,7 +1476,7 @@ exports.enableAdminTester = functions.region('us-central1').https.onRequest(asyn
   }
 });
 
-exports.getAccountOverview = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.getAccountOverview = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
@@ -1564,7 +1567,7 @@ exports.getAccountOverview = functions.region('us-central1').https.onRequest(asy
   }
 });
 
-exports.listBillingReceipts = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.listBillingReceipts = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
@@ -1636,7 +1639,7 @@ exports.listBillingReceipts = functions.region('us-central1').https.onRequest(as
   }
 });
 
-exports.updateAccountProfile = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.updateAccountProfile = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
@@ -1746,7 +1749,7 @@ exports.deleteAccount = functions.runWith({timeoutSeconds:540,memory:'512MB',inv
   }
 });
 
-exports.joinRoom = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.joinRoom = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed.' }); return; }
   const auth = await verifyAuth(req, res);
@@ -1762,7 +1765,7 @@ exports.joinRoom = functions.region('us-central1').https.onRequest(async (req, r
   }
 });
 
-exports.claimDeFlockVirtualDisable = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.claimDeFlockVirtualDisable = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
@@ -1897,7 +1900,7 @@ function urbanCivicAgencyForRoom(room = {}) {
   return 'Local civic response';
 }
 
-exports.claimUrbanVehicle = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.claimUrbanVehicle = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
   const auth = await verifyAuth(req, res);
@@ -1961,10 +1964,10 @@ async function handleUrbanVehicleLeaseUpdate(req, res, release = false) {
   }
 }
 
-exports.updateUrbanVehicle = functions.region('us-central1').https.onRequest((req, res) => handleUrbanVehicleLeaseUpdate(req, res, false));
-exports.releaseUrbanVehicle = functions.region('us-central1').https.onRequest((req, res) => handleUrbanVehicleLeaseUpdate(req, res, true));
+exports.updateUrbanVehicle = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest((req, res) => handleUrbanVehicleLeaseUpdate(req, res, false));
+exports.releaseUrbanVehicle = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest((req, res) => handleUrbanVehicleLeaseUpdate(req, res, true));
 
-exports.commitWorldPropertyAction = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.commitWorldPropertyAction = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
   const auth = await verifyAuth(req, res);
@@ -2073,7 +2076,7 @@ exports.commitWorldPropertyAction = functions.region('us-central1').https.onRequ
   }
 });
 
-exports.commitExplorerCommerceAction = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.commitExplorerCommerceAction = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
   const auth = await verifyAuth(req, res);
@@ -2109,7 +2112,7 @@ exports.commitExplorerCommerceAction = functions.region('us-central1').https.onR
   }
 });
 
-exports.settleExplorerCommerceOutcome = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.settleExplorerCommerceOutcome = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
   const auth = await verifyAuth(req, res);
@@ -2140,7 +2143,7 @@ exports.settleExplorerCommerceOutcome = functions.region('us-central1').https.on
   }
 });
 
-exports.saveExplorerPlayerCondition = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.saveExplorerPlayerCondition = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
   const auth = await verifyAuth(req, res);
@@ -2161,7 +2164,7 @@ exports.saveExplorerPlayerCondition = functions.region('us-central1').https.onRe
   }
 });
 
-exports.commitUrbanImpacts = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.commitUrbanImpacts = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
   const auth = await verifyAuth(req, res);
@@ -2211,7 +2214,7 @@ exports.commitUrbanImpacts = functions.region('us-central1').https.onRequest(asy
   }
 });
 
-exports.commitUrbanCivicEvent = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.commitUrbanCivicEvent = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
   const auth = await verifyAuth(req, res);
@@ -2248,7 +2251,7 @@ exports.commitUrbanCivicEvent = functions.region('us-central1').https.onRequest(
   }
 });
 
-exports.resolveUrbanCivicOutcome = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.resolveUrbanCivicOutcome = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
   const auth = await verifyAuth(req, res);
@@ -2306,7 +2309,7 @@ async function requireExpeditionRoomContext(req, res, auth) {
   return { roomCode, roomRef, room, player };
 }
 
-exports.mutateSharedExpedition = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.mutateSharedExpedition = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
   const auth = await verifyAuth(req, res);
@@ -2381,7 +2384,7 @@ exports.mutateSharedExpedition = functions.region('us-central1').https.onRequest
   }
 });
 
-exports.submitContribution = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.submitContribution = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
@@ -2456,7 +2459,7 @@ exports.submitContribution = functions.region('us-central1').https.onRequest(asy
   }
 });
 
-exports.getContributionModerationOverview = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.getContributionModerationOverview = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
@@ -2488,7 +2491,7 @@ exports.getContributionModerationOverview = functions.region('us-central1').http
   }
 });
 
-exports.listContributionSubmissions = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.listContributionSubmissions = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
@@ -2556,7 +2559,7 @@ exports.listContributionSubmissions = functions.region('us-central1').https.onRe
   }
 });
 
-exports.moderateContributionSubmission = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.moderateContributionSubmission = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
@@ -2622,7 +2625,7 @@ exports.moderateContributionSubmission = functions.region('us-central1').https.o
   }
 });
 
-exports.stripeWebhook = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.stripeWebhook = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (req.method !== 'POST') {
     res.status(405).send('Method not allowed');
     return;

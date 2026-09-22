@@ -40,7 +40,7 @@ function createEndpoint({ existing = false } = {}) {
   };
   const functions = {
     region() {
-      return { https: { onRequest: (handler) => handler } };
+      return { runWith() { return this; }, https: { onRequest: (handler) => handler } };
     }
   };
   const { claimExplorerDiscovery } = buildDiscoveryExports({

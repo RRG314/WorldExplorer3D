@@ -531,7 +531,7 @@ async function queryStreetImagery(input = {}, options = {}) {
 
 function buildGeospatialExports({ functions, setCors }) {
   return {
-    getDeFlockCameras: functions.region('us-central1').https.onRequest(async (req, res) => {
+    getDeFlockCameras: functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
       if (setCors(req, res)) return;
       if (req.method !== 'GET') {
         res.status(405).json({ error: 'Method not allowed.' });
@@ -547,7 +547,7 @@ function buildGeospatialExports({ functions, setCors }) {
         res.status(status).json({ error: error?.message || 'Mapped camera data is unavailable.' });
       }
     }),
-    getStreetImagery: functions.region('us-central1').https.onRequest(async (req, res) => {
+    getStreetImagery: functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
       if (setCors(req, res)) return;
       if (req.method !== 'GET') {
         res.status(405).json({ error: 'Method not allowed.' });
@@ -563,7 +563,7 @@ function buildGeospatialExports({ functions, setCors }) {
         res.status(status).json({ error: status === 504 ? 'Street imagery provider timed out.' : (error?.message || 'Street imagery unavailable.') });
       }
     }),
-    getAircraftStates: functions.region('us-central1').https.onRequest(async (req, res) => {
+    getAircraftStates: functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
       if (setCors(req, res)) return;
       if (req.method !== 'GET') {
         res.status(405).json({ error: 'Method not allowed.' });

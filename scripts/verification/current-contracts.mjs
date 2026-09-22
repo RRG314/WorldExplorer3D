@@ -8,6 +8,7 @@ const tests = [
   'tests/release-interruption-evidence-current.test.mjs',
   'tests/perf-active-play-quality-current.test.mjs',
   'tests/hosting-api-routes-current.test.mjs',
+  'tests/browser-function-invokers-current.test.cjs',
   'tests/backend-emulator-parameters-current.test.mjs',
   'tests/room-session-lifecycle-current.test.mjs',
   'tests/airport-aviation-integration-current.test.mjs',

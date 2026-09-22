@@ -62,7 +62,7 @@ function buildDiscoveryExports({ functions, setCors, verifyAuth, db, admin }) {
   const region = functions.region('us-central1');
   const serverTimestamp = () => FieldValue.serverTimestamp();
 
-  const claimExplorerDiscovery = region.https.onRequest(async (req, res) => {
+  const claimExplorerDiscovery = region.runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
     if (setCors(req, res)) return;
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
     const auth = await verifyAuth(req, res);
@@ -105,7 +105,7 @@ function buildDiscoveryExports({ functions, setCors, verifyAuth, db, admin }) {
     }
   });
 
-  const createDiscoveryTrade = region.https.onRequest(async (req, res) => {
+  const createDiscoveryTrade = region.runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
     if (setCors(req, res)) return;
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
     const auth = await verifyAuth(req, res);
@@ -137,7 +137,7 @@ function buildDiscoveryExports({ functions, setCors, verifyAuth, db, admin }) {
     }
   });
 
-  const listExplorerDiscoveries = region.https.onRequest(async (req, res) => {
+  const listExplorerDiscoveries = region.runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
     if (setCors(req, res)) return;
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
     const auth = await verifyAuth(req, res);
@@ -170,7 +170,7 @@ function buildDiscoveryExports({ functions, setCors, verifyAuth, db, admin }) {
     }
   });
 
-  const acceptDiscoveryTrade = region.https.onRequest(async (req, res) => {
+  const acceptDiscoveryTrade = region.runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
     if (setCors(req, res)) return;
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
     const auth = await verifyAuth(req, res);
@@ -217,7 +217,7 @@ function buildDiscoveryExports({ functions, setCors, verifyAuth, db, admin }) {
     }
   });
 
-  const cancelDiscoveryTrade = region.https.onRequest(async (req, res) => {
+  const cancelDiscoveryTrade = region.runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
     if (setCors(req, res)) return;
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
     const auth = await verifyAuth(req, res);
