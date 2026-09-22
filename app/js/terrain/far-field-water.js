@@ -19,7 +19,38 @@ function worldRing(appCtx, ring) {
   }).filter(Boolean);
 }
 
-function buildFarWaterGeometry(appCtx, mappedContext) {
+// Partition a convex triangle at the detailed-world boundary. Publishing both
+// LODs here is unsafe: the regional polygon's single DEM datum can sit above
+// the detailed surface of a descending river, forming a visible water ceiling.
+export function waterPolygonOutsideDetailedBounds(points, bounds) {
+  if (!bounds) return [points];
+  const outside = [];
+  let remainder = points;
+  const edges = [
+    ['x', bounds.minX, 1], ['x', bounds.maxX, -1],
+    ['y', bounds.minZ, 1], ['y', bounds.maxZ, -1]
+  ];
+  for (const [axis, edge, direction] of edges) {
+    if (remainder.length < 3) break;
+    const insidePart = [], outsidePart = [];
+    for (let i = 0; i < remainder.length; i++) {
+      const a = remainder[i], b = remainder[(i + 1) % remainder.length];
+      const da = (a[axis] - edge) * direction, db = (b[axis] - edge) * direction;
+      (da >= 0 ? insidePart : outsidePart).push(a);
+      if ((da < 0 && db > 0) || (da > 0 && db < 0)) {
+        const t = da / (da - db);
+        const intersection = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+        insidePart.push(intersection);
+        outsidePart.push(intersection);
+      } else if (da === 0) outsidePart.push(a);
+    }
+    if (outsidePart.length >= 3) outside.push(outsidePart);
+    remainder = insidePart;
+  }
+  return outside;
+}
+
+function buildFarWaterGeometry(appCtx, mappedContext, detailedBounds = null) {
   const positions = [];
   const indices = [];
   const unitsPerMeter = Number(appCtx.WORLD_UNITS_PER_METER || 1);
@@ -40,15 +71,21 @@ function buildFarWaterGeometry(appCtx, mappedContext) {
     if (!triangles.length) continue;
     const points = [contour, ...holes].flat();
     const y = area.surfaceMeters * unitsPerMeter * yExaggeration + FAR_WATER_SURFACE_CLEARANCE_WORLD;
+    const firstIndex = indices.length;
     for (const triangle of triangles) {
-      const baseIndex = positions.length / 3;
-      // XY-to-XZ changes handedness, so reverse the winding to match the
-      // upward-facing detailed mapped-water geometry and its lighting.
-      for (const pointIndex of [triangle[0], triangle[2], triangle[1]]) {
-        positions.push(points[pointIndex].x, y, points[pointIndex].y);
+      for (const polygon of waterPolygonOutsideDetailedBounds(triangle.map(index => points[index]), detailedBounds)) {
+        for (let i = 1; i + 1 < polygon.length; i++) {
+          // XY-to-XZ reverses handedness; retain upward-facing water normals.
+          const corners = [polygon[0], polygon[i + 1], polygon[i]];
+          const [a, b, c] = corners;
+          if (Math.abs((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) < 1e-8) continue;
+          const baseIndex = positions.length / 3;
+          for (const point of corners) positions.push(point.x, y, point.y);
+          indices.push(baseIndex, baseIndex + 1, baseIndex + 2);
+        }
       }
-      indices.push(baseIndex, baseIndex + 1, baseIndex + 2);
     }
+    if (indices.length === firstIndex) continue;
     polygons += 1;
     if (area.identity) publishedAreaIdentities.add(String(area.identity));
   }
@@ -59,7 +96,7 @@ function buildFarWaterGeometry(appCtx, mappedContext) {
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   geometry.computeBoundingSphere();
-  return { geometry, polygons, triangles: indices.length / 3, publishedAreaIdentities };
+  return { geometry, polygons, triangles: indices.length / 3, publishedAreaIdentities, detailedBounds };
 }
 
 async function buildMappedWaterTerrainOwnershipMask(appCtx, mappedContext, spec, publishedAreaIdentities = null) {
@@ -214,7 +251,8 @@ function createFarWaterMesh(builtWater, contextHalfExtentMeters) {
   mesh.receiveShadow = false;
   mesh.userData.isFarMappedWaterContext = true;
   mesh.userData.visualOwnership = 'shared-mapped-water-profile';
-  mesh.userData.coverageOwnership = 'continuous-regional-baseline-with-detailed-refinement';
+  mesh.userData.coverageOwnership = 'regional-water-outside-detailed-world';
+  mesh.userData.detailedWaterExclusion = builtWater.detailedBounds || null;
   mesh.userData.renderProvenance = {
     version: 1,
     profile: 'far-mapped-water-polygon-lod',

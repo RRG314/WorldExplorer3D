@@ -24,12 +24,35 @@ for(const [before,after] of patches){
 }
 // A failed start is a failed test, not a successful menu screenshot.
 source=source.replace('console.warn("Failed to click selector", args.clickSelector, err);','throw err;');
+// The generic client captures console errors but exits successfully. A release
+// check must retain that evidence and fail after closing its owned browser.
+source=source.replace('if (freshErrors.length) {', 'if (freshErrors.length) { process.exitCode = 1;');
 // WebGL's default non-preserved drawing buffer may be cleared before toDataURL.
 // Capture the composited page instead, including the real player-facing HUD.
 source=source.replace('await captureScreenshot(page, canvas, shotPath);', 'await page.screenshot({path:shotPath, type:"png"});\nfs.writeFileSync(path.join(args.screenshotDir,"runtime.json"),JSON.stringify(await page.evaluate(()=>window.getWorldExplorerRuntimeDiagnostics?.()),null,2));');
 if(process.env.WE3D_TEST_DAY==='1') source=source.replace('await doChoreography(page, canvas, steps);', `await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setTimeOfDay?.('day');ctx.setWeatherMode?.('clear');});\nawait doChoreography(page, canvas, steps);`);
 if(process.env.WE3D_TEST_MOBILE==='1') source=source.replace('const page = await browser.newPage();','const page = await browser.newPage({viewport:{width:412,height:915},isMobile:true,hasTouch:true,deviceScaleFactor:1,userAgent:"Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36"});');
 if(process.env.WE3D_REAL_GPU==='1') source=source.replace('args: ["--use-gl=angle", "--use-angle=swiftshader"],','channel:"chrome",');
+if(process.env.WE3D_TEST_BOAT==='1') source=source.replace('await doChoreography(page, canvas, steps);', `if (!await page.evaluate(()=>window.getWorldExplorerRuntimeDiagnostics?.().modes?.boat)) {
+ await page.locator('#travelBtn').click(); await page.locator('#fBoat').click();
+ await page.waitForFunction(()=>window.getWorldExplorerRuntimeDiagnostics?.().modes?.boat===true,null,{timeout:15000});
+}
+await doChoreography(page, canvas, steps);`);
+if(process.env.WE3D_TEST_BOAT==='1') source=source.replace('await page.screenshot({path:shotPath, type:"png"});', `await page.screenshot({path:shotPath, type:"png"});
+const water = await page.evaluate(async()=>{
+ const {ctx}=await import('/app/js/shared-context.js?v=55');
+ const {waterSurfaceBaseYAt}=await import('/app/js/boat-mode/water-query.js?v=21');
+ const meshes=[]; ctx.scene.updateMatrixWorld(true);
+ ctx.scene.traverse(mesh=>{if(mesh.isMesh && mesh.visible && mesh.material?.userData?.weWaterWaveConfig)meshes.push(mesh);});
+ const base=waterSurfaceBaseYAt(ctx.boat.x,ctx.boat.z,ctx.boatMode.currentWater);
+ const rays=[[0,0],[5,0],[-5,0],[0,5],[0,-5]].map(([dx,dz])=>{
+  const ray=new THREE.Raycaster(new THREE.Vector3(ctx.boat.x+dx,base+10000,ctx.boat.z+dz),new THREE.Vector3(0,-1,0));
+  return {dx,dz,hits:ray.intersectObjects(meshes,false).map(h=>({name:h.object.name,y:h.point.y,far:h.object.userData.isFarMappedWaterContext===true}))};
+ });
+ return {base,boat:{x:ctx.boat.x,y:ctx.boat.y,z:ctx.boat.z},rays,glError:ctx.renderer.getContext().getError()};
+});
+fs.writeFileSync(path.join(args.screenshotDir,'water-'+i+'.json'),JSON.stringify(water,null,2));
+if(water.glError!==0 || !water.rays[0].hits.length || water.rays.some(ray=>ray.hits.some(hit=>hit.far || hit.y>water.base+1)))throw Error('Duplicate elevated water surface or rendering failure');`);
 if(process.env.WE3D_GROUND_EVIDENCE==='1') source=source.replace('await page.screenshot({path:shotPath, type:"png"});', `await page.screenshot({path:shotPath, type:"png"});
 fs.writeFileSync(path.join(args.screenshotDir,'ground.json'),JSON.stringify(await page.evaluate(async()=>{
  const {ctx}=await import('/app/js/shared-context.js?v=55');
