@@ -1,5 +1,5 @@
 import {drainCooperatively} from '../world/cooperative-scheduling.js?v=1';
-import { projectDecalTriangle } from './surface-decal-projection.js';
+import { projectDecalPolygon } from './surface-decal-projection.js';
 
 export function selectLinearWalkContactMeshes(meshes=[]) {
   return meshes.filter(mesh=>{
@@ -97,6 +97,21 @@ function* roadContactIndexSteps(meshes, cellSize = 16, {bounds} = {}) {
   bucketBytes=buckets.byteLength;
   // No compilation-only mesh/indices references survive the constructor.
   descriptors.length=0;modeCodes.clear();
+  function projectPolygon(points,lift=.012,requiredTerrainMode=null) {
+      const candidates=new Set(),xs=points.map(p=>p.x),zs=points.map(p=>p.z);
+      for(let ix=Math.floor(Math.min(...xs)/cellSize);ix<=Math.floor(Math.max(...xs)/cellSize);ix++)
+        for(let iz=Math.floor(Math.min(...zs)/cellSize);iz<=Math.floor(Math.max(...zs)/cellSize);iz++)
+          {
+            const start=cells.get(`${ix}:${iz}`);
+            if(start===undefined)continue;
+            for(let i=start+1,end=i+buckets[start];i<end;i++) {
+              const id=buckets[i];
+              if(!requiredTerrainMode||modes[records[id*5+4]]===requiredTerrainMode)candidates.add(id);
+            }
+          }
+      function* supports(){for(const id of candidates){const offset=id*5;yield {positions:sources[records[offset]],a:records[offset+1],b:records[offset+2],c:records[offset+3],denominator:denominators[id]};}}
+      return projectDecalPolygon(points,supports(),lift);
+    }
   return {
     stats(){return {triangles:triangleCount,cells:cells.size,cellReferences,bucketAllocations:buckets.length ? 1 : 0,recordBytes:records.byteLength+denominators.byteLength,bucketBytes};},
     dispose(){buckets=new Uint32Array();cells.clear();sources.length=0;modes.length=0;records=new Uint32Array();denominators=new Float64Array();triangleCount=0;cellReferences=0;bucketBytes=0;},
@@ -128,21 +143,8 @@ function* roadContactIndexSteps(meshes, cellSize = 16, {bounds} = {}) {
       }
       return best;
     },
-    projectTriangle(points,lift=.012,requiredTerrainMode=null) {
-      const candidates=new Set(),xs=points.map(p=>p.x),zs=points.map(p=>p.z);
-      for(let ix=Math.floor(Math.min(...xs)/cellSize);ix<=Math.floor(Math.max(...xs)/cellSize);ix++)
-        for(let iz=Math.floor(Math.min(...zs)/cellSize);iz<=Math.floor(Math.max(...zs)/cellSize);iz++)
-          {
-            const start=cells.get(`${ix}:${iz}`);
-            if(start===undefined)continue;
-            for(let i=start+1,end=i+buckets[start];i<end;i++) {
-              const id=buckets[i];
-              if(!requiredTerrainMode||modes[records[id*5+4]]===requiredTerrainMode)candidates.add(id);
-            }
-          }
-      function* supports(){for(const id of candidates){const offset=id*5;yield {positions:sources[records[offset]],a:records[offset+1],b:records[offset+2],c:records[offset+3],denominator:denominators[id]};}}
-      return projectDecalTriangle(points,supports(),lift);
-    },
+    projectPolygon,
+    projectTriangle: projectPolygon,
     sampleAt(x,z,referenceY=NaN,requiredTerrainMode=null) {
       const start=cells.get(`${Math.floor(x/cellSize)}:${Math.floor(z/cellSize)}`);
       if(start===undefined)return null;

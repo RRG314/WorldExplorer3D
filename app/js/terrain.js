@@ -59,7 +59,7 @@ import {
   buildRoadSkirts,
   detectRoadIntersections,
   publishCompiledTransportMeshes
-} from "./terrain/rebuild.js?v=56";
+} from "./terrain/rebuild.js?v=57";
 import {
   disableRoadDebugMode as disableRoadDebugModeInternal,
   toggleRoadDebugMode as toggleRoadDebugModeInternal,

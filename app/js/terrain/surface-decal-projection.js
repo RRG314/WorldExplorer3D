@@ -1,6 +1,6 @@
-// Clip a marking to the published road triangles before assigning height.
+// Clip a convex marking polygon to published road triangles before assigning height.
 // Every output face is coplanar with its support, including terrain folds.
-export function projectDecalTriangle(points, supports, lift = .012) {
+export function projectDecalPolygon(points, supports, lift = .012) {
   const output=[];
   const minX=Math.min(...points.map(p=>p.x)),maxX=Math.max(...points.map(p=>p.x));
   const minZ=Math.min(...points.map(p=>p.z)),maxZ=Math.max(...points.map(p=>p.z));
@@ -47,3 +47,6 @@ export function projectDecalTriangle(points, supports, lift = .012) {
   }
   return output;
 }
+
+// Retain the triangle entry point for existing surface callers.
+export const projectDecalTriangle = projectDecalPolygon;

@@ -1,0 +1,17 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="/favicon.svg"><style>body{margin:0}canvas{display:block}</style><script src="/node_modules/three/build/three.min.js"></script><script type="module">
+import {appendRoadCenterMarkings} from '/app/js/terrain/rebuild.js';
+import {createRoadContactIndex} from '/app/js/terrain/road-contact-index.js';
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(1000,650);document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0xaab8c1);scene.add(new THREE.HemisphereLight(0xffffff,0x526374,1));const light=new THREE.DirectionalLight(0xffffff,.8);light.position.set(20,40,15);scene.add(light);
+const camera=new THREE.PerspectiveCamera(45,1000/650,.1,500);camera.position.set(29,22,27);camera.lookAt(14,0,0);
+const positions=[],indices=[],height=x=>.05*x+Math.max(0,x-14)*.15;
+for(const [a,b]of [[0,8],[12,14],[14,30]]){const base=positions.length/3;positions.push(a,height(a),-6,a,height(a),6,b,height(b),-6,b,height(b),6);indices.push(base,base+1,base+2,base+2,base+1,base+3);}
+const roadGeometry=new THREE.BufferGeometry();roadGeometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));roadGeometry.setIndex(indices);roadGeometry.computeVertexNormals();const roadMesh=new THREE.Mesh(roadGeometry,new THREE.MeshStandardMaterial({color:0x303236,roughness:.95}));roadMesh.userData.terrainMode='at_grade';scene.add(roadMesh);
+const index=createRoadContactIndex([roadMesh]),road={type:'primary',width:12,transportRecord:{crossSection:{lanes:3}}},points=[{x:-2,z:0},{x:32,z:0}];
+function geometry(quad){const vertices=[],faces=[];appendRoadCenterMarkings(road,points,vertices,faces,null,(x,z)=>index.sampleAt(x,z),quad?index:{projectTriangle:index.projectTriangle});const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));g.setIndex(faces);g.computeVertexNormals();return g;}
+const paint=new THREE.Mesh(geometry(false),new THREE.MeshStandardMaterial({color:0xffffee,emissive:0x444444,emissiveIntensity:.3,roughness:.8}));scene.add(paint);let result=null;
+const render=()=>renderer.render(scene,camera);
+function pixels(){const gl=renderer.getContext(),buffer=new Uint8Array(1000*650*4);gl.readPixels(0,0,1000,650,gl.RGBA,gl.UNSIGNED_BYTE,buffer);return buffer;}
+window.applyPolygons=()=>{render();const before=pixels(),beforeTriangles=renderer.info.render.triangles;paint.geometry.dispose();paint.geometry=geometry(true);render();const after=pixels();let changed=0,max=0;for(let i=0;i<before.length;i+=4){let d=0;for(let c=0;c<3;c++)d=Math.max(d,Math.abs(before[i+c]-after[i+c]));if(d>8)changed++;max=Math.max(max,d);}return result={changedFraction:changed/(1000*650),maximum:max,beforeTriangles,afterTriangles:renderer.info.render.triangles};};
+window.render_game_to_text=()=>JSON.stringify({ready:true,result,glError:renderer.getContext().getError()});window.advanceTime=async()=>render();render();window.ready=true;if(new URLSearchParams(location.search).has('polygons'))window.applyPolygons();
+</script>

@@ -129,12 +129,26 @@ export function appendRoadCenterMarkings(road, points, outputVerts, outputIndice
   }
   for(let i=0;i<targetVerts.length;i+=3) targetVerts[i+1]=surfaceHeightAt(targetVerts[i],targetVerts[i+2])+.012;
   if(contactIndex){
-    for(let i=0;i<targetIndices.length;i+=3){
-      const points=targetIndices.slice(i,i+3).map(j=>({x:targetVerts[j*3],z:targetVerts[j*3+2]}));
-      const projected=contactIndex.projectTriangle(points,.012,'at_grade');
-      const base=outputVerts.length/3;
-      for(const v of projected)outputVerts.push(v);
-      for(let j=0;j<projected.length/3;j++)outputIndices.push(base+j);
+    // Clip each complete dash once. Splitting its rectangle first introduces
+    // an arbitrary diagonal into every terrain-support fragment, doubling
+    // queries and creating extra triangles on the same planar surface.
+    if (typeof contactIndex.projectPolygon === 'function') {
+      for (let start = 0; start < targetVerts.length; start += 12) {
+        const points = [0, 2, 3, 1].map(vertex => ({x:targetVerts[start+vertex*3],z:targetVerts[start+vertex*3+2]}));
+        const projected = contactIndex.projectPolygon(points,.012,'at_grade');
+        const base = outputVerts.length / 3;
+        for (const value of projected) outputVerts.push(value);
+        for (let index = 0; index < projected.length / 3; index++) outputIndices.push(base + index);
+      }
+    } else {
+      // Compatibility for callers that only expose the triangle interface.
+      for(let i=0;i<targetIndices.length;i+=3){
+        const points=targetIndices.slice(i,i+3).map(j=>({x:targetVerts[j*3],z:targetVerts[j*3+2]}));
+        const projected=contactIndex.projectTriangle(points,.012,'at_grade');
+        const base=outputVerts.length/3;
+        for(const v of projected)outputVerts.push(v);
+        for(let j=0;j<projected.length/3;j++)outputIndices.push(base+j);
+      }
     }
     return;
   }
@@ -622,7 +636,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       for(const {road,points,widths} of atGradeRoads) {
         if(!isCurrent())return;
         if(shouldRenderRoadCenterMarkings(road)) {
-          const groundSupport={sampleAt:(x,z)=>support.sampleAt(x,z,NaN,'at_grade'),projectTriangle:(points,lift)=>support.projectTriangle(points,lift,'at_grade')};
+          const groundSupport={sampleAt:(x,z)=>support.sampleAt(x,z,NaN,'at_grade'),projectTriangle:(points,lift)=>support.projectTriangle(points,lift,'at_grade'),projectPolygon:(points,lift)=>support.projectPolygon(points,lift,'at_grade')};
           appendMarkings(road,points,widths,groundSupport.sampleAt,groundSupport);
         }
         if(now()-sliceStartedAt>=24) {await yieldToMainThread();sliceStartedAt=now();}
