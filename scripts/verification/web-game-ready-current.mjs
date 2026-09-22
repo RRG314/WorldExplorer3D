@@ -52,7 +52,7 @@ const water = await page.evaluate(async()=>{
 });
 fs.writeFileSync(path.join(args.screenshotDir,'water-'+i+'.json'),JSON.stringify(water,null,2));
 if(water.glError!==0 || !water.rays[0].hits.length || water.rays.some(ray=>ray.hits.some(hit=>hit.far || hit.y>water.base+1)))throw Error('Duplicate elevated water surface or rendering failure');`);
-if(process.env.WE3D_TEST_BOAT==='1') source=source.replace('await browser.close();', `await page.locator('#travelBtn').click(); await page.locator('#fWalk').click();
+if(process.env.WE3D_TEST_BOAT==='1') source=source.replace('await browser.close();', `await page.locator('#travelBtn').click(); await page.locator('#fBoat').click();
 await page.waitForFunction(()=>window.getWorldExplorerRuntimeDiagnostics?.().modes?.boat===false,null,{timeout:10000});
 const exitState=await page.evaluate(async()=>{
  const {ctx}=await import('/app/js/shared-context.js?v=55');
