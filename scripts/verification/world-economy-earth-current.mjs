@@ -66,7 +66,7 @@ async function run() {
     assert.match(ui.source, /game stock/i);
     assert.match(ui.source, /OpenStreetMap/i);
     assert.ok(ui.buyCount > 0);
-    await page.screenshot({ path: path.join(outputDir, 'mapped-business-open.png'), fullPage: true });
+    await page.screenshot({ path: path.join(outputDir, 'mapped-business-open.png'), fullPage: false });
     const beforeCredits = Number(ui.credits.replace(/[^\d]/g, '') || 0);
     const buy = page.locator('#urbanStoreStock [data-store-action="buy"]:not([disabled])').first();
     const itemLabel = String(await buy.locator('xpath=..').locator('strong').textContent());

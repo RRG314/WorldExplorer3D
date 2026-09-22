@@ -99,7 +99,7 @@ async function startRegionalFieldLead(page, journey) {
   }, journey.packId);
   await page.screenshot({
     path: `output/release-evidence/current/regional-richness-${journey.id}-field-lead-desktop.png`,
-    fullPage: true
+    fullPage: false
   });
   return result;
 }
@@ -169,7 +169,7 @@ async function inspectJourneyInBrowser(browser, journey) {
       };
     });
     const screenshotPath = `output/release-evidence/current/regional-richness-${journey.id}-${journey.mobile ? 'mobile' : 'desktop'}.png`;
-    await page.screenshot({ path: screenshotPath, fullPage: true });
+    await page.screenshot({ path: screenshotPath, fullPage: false });
     const fieldLead = journey.id === 'tokyo' ? await startRegionalFieldLead(page, journey) : null;
     const checks = {
       correctRegionalPack: snapshot.packId === journey.packId,

@@ -202,7 +202,7 @@ try {
     });
     return { tutorial: rect(tutorial), look: rect(look), pack: rect(pack), actionTargets, lookHit: lookHit?.closest?.('#mobileLookPad')?.id || lookHit?.id || '' };
   });
-  await page.screenshot({ path: 'output/verification/mobile-controls/walk-onboarding-mobile.png', fullPage: true });
+  await page.screenshot({ path: 'output/verification/mobile-controls/walk-onboarding-mobile.png', fullPage: false });
   const packUi = await page.evaluate(() => {
     const pack = document.getElementById('urbanEquipmentToggle');
     return {
@@ -229,7 +229,7 @@ try {
       closeHitId: closeHit?.closest?.('#urbanEquipmentCloseBtn')?.id || closeHit?.id || ''
     };
   });
-  await page.screenshot({ path: 'output/verification/mobile-controls/backpack-mobile.png', fullPage: true });
+  await page.screenshot({ path: 'output/verification/mobile-controls/backpack-mobile.png', fullPage: false });
   await page.locator('#urbanEquipmentCloseBtn').click();
   await page.waitForFunction(() => !document.getElementById('urbanEquipment')?.classList.contains('show'), null, { timeout: 10_000 });
   await page.locator('#minimap').click();
@@ -252,7 +252,7 @@ try {
   }));
   await page.locator('#mapZoomIn').click();
   const mapZoomed = await page.locator('#zoomLevel').textContent();
-  await page.screenshot({ path: 'output/verification/mobile-controls/map-explorer-mobile.png', fullPage: true });
+  await page.screenshot({ path: 'output/verification/mobile-controls/map-explorer-mobile.png', fullPage: false });
   await page.locator('#mapRecenter').click();
   const mapRecentered = await page.evaluate(() => !document.getElementById('largeMap')?.classList.contains('browsing'));
   await page.locator('#mapClose').click();
@@ -268,7 +268,7 @@ try {
   const walkLooked = await diagnostics();
   await page.waitForTimeout(2_300);
   const walkRecentered = await diagnostics();
-  await page.screenshot({ path: 'output/verification/mobile-controls/walk-standard-mobile.png', fullPage: true });
+  await page.screenshot({ path: 'output/verification/mobile-controls/walk-standard-mobile.png', fullPage: false });
 
   await page.locator('#controlsBarBtn').click();
   await page.waitForSelector('#controlsTab.bar-open #mobileControlSettings', { timeout: 10_000 });
@@ -289,7 +289,7 @@ try {
     desktopInstructionsVisible: ['drivingControls', 'boatControls', 'walkingControls', 'droneControls', 'planeControls', 'rocketControls', 'oceanControls']
       .some((id) => getComputedStyle(document.getElementById(id)).display !== 'none')
   }));
-  await page.screenshot({ path: 'output/verification/mobile-controls/settings-mobile.png', fullPage: true });
+  await page.screenshot({ path: 'output/verification/mobile-controls/settings-mobile.png', fullPage: false });
   await page.locator('#ctrlHeader').click();
   const southpawLayout = await layoutSnapshot();
   const savedSouthpawSettings = await page.evaluate(() => JSON.parse(localStorage.getItem('world-explorer-mobile-controls-v1') || 'null'));
@@ -303,13 +303,13 @@ try {
   const driveLooked = await diagnostics();
   await page.waitForTimeout(2_500);
   const driveRecentered = await diagnostics();
-  await page.screenshot({ path: 'output/verification/mobile-controls/drive-standard-mobile.png', fullPage: true });
+  await page.screenshot({ path: 'output/verification/mobile-controls/drive-standard-mobile.png', fullPage: false });
 
   await mode('drone', '#fDrone');
   const droneBefore = await diagnostics();
   await touchDrag('#mobileMovePad', 30, -46, 1_250);
   const droneControlled = await diagnostics();
-  await page.screenshot({ path: 'output/verification/mobile-controls/drone-southpaw-mobile.png', fullPage: true });
+  await page.screenshot({ path: 'output/verification/mobile-controls/drone-southpaw-mobile.png', fullPage: false });
 
   await mode('plane', '#fPlane');
   const planeBefore = await diagnostics();
@@ -318,7 +318,7 @@ try {
   await touchDrag('#mobileLookPad', 42, 0, 900);
   const planeLooked = await diagnostics();
   const planeRecentered = await waitForCameraRecenter(7, 6_000);
-  await page.screenshot({ path: 'output/verification/mobile-controls/plane-standard-mobile.png', fullPage: true });
+  await page.screenshot({ path: 'output/verification/mobile-controls/plane-standard-mobile.png', fullPage: false });
 
   await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
   await page.reload({ waitUntil: 'load', timeout: 120_000 });

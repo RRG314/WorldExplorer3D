@@ -339,7 +339,7 @@ async function verifyEarthActions(page) {
   mark('Context · Current Controls');
   }
 
-  await page.screenshot({ path: path.join(outputDir, 'desktop-earth-actions.png'), fullPage: true });
+  await page.screenshot({ path: path.join(outputDir, 'desktop-earth-actions.png'), fullPage: false });
 }
 
 async function verifyEnvironmentAndSpaceActions(page) {
@@ -369,7 +369,7 @@ async function verifyEnvironmentAndSpaceActions(page) {
   const interior = (await snapshot(page)).expeditionShipInterior;
   assert.ok(interior?.crewActors?.length >= 1, JSON.stringify(interior));
   mark('Travel · Board Solis Reach', 'playable ship interior reached');
-  await page.screenshot({ path: path.join(outputDir, 'desktop-solis-reach.png'), fullPage: true });
+  await page.screenshot({ path: path.join(outputDir, 'desktop-solis-reach.png'), fullPage: false });
 }
 
 async function verifyIsolatedSpaceAction(page, actionId, label, predicate) {
@@ -408,7 +408,7 @@ async function verifyMobileAccess(page) {
   await page.locator('#controlsBarBtn').click();
   assert.notEqual(await page.locator('#controlsTab').evaluate((el) => getComputedStyle(el).display), 'none');
   assert.equal(await page.locator('#ctrlContent').evaluate((el) => el.classList.contains('hidden')), false);
-  await page.screenshot({ path: path.join(outputDir, 'mobile-hotbar-access.png'), fullPage: true });
+  await page.screenshot({ path: path.join(outputDir, 'mobile-hotbar-access.png'), fullPage: false });
   mark('Mobile 390×844 access', 'all five roots and Controls accept one touch without double-toggle');
 }
 

@@ -210,7 +210,7 @@ try {
   const rightMove = await touchHold(mobile, cdp, '#mobileMovePad', 48, 0, 1_050);
   const leftMove = await touchHold(mobile, cdp, '#mobileMovePad', -48, 0, 1_050);
   const forwardMove = await touchHold(mobile, cdp, '#mobileMovePad', 0, -52, 1_050);
-  await mobile.screenshot({ path: path.join(outputDir, 'walking-controls-mobile.png'), fullPage: true });
+  await mobile.screenshot({ path: path.join(outputDir, 'walking-controls-mobile.png'), fullPage: false });
 
   const promptSelector = '#urbanVehiclePrompt.show, #discoveryContextPrompt.show, #interiorPrompt.show, #boatPrompt.show';
   let promptAppeared = false;
@@ -245,7 +245,7 @@ try {
       prompts
     };
   }, promptAppeared);
-  await mobile.screenshot({ path: path.join(outputDir, 'bottom-menu-mobile.png'), fullPage: true });
+  await mobile.screenshot({ path: path.join(outputDir, 'bottom-menu-mobile.png'), fullPage: false });
 
   await switchTravelMode(mobile, '#fDriving', 'drive', 'mode-driving');
   const driveMove = await touchHold(mobile, cdp, '#mobileMovePad', 0, -52, 1_350);
@@ -253,7 +253,7 @@ try {
   const droneMove = await touchHold(mobile, cdp, '#mobileMovePad', 0, -52, 1_200);
   await switchTravelMode(mobile, '#fPlane', 'plane', 'mode-plane');
   const planeMove = await touchHold(mobile, cdp, '#mobileMovePad', 0, -52, 1_200);
-  await mobile.screenshot({ path: path.join(outputDir, 'plane-speed-mobile.png'), fullPage: true });
+  await mobile.screenshot({ path: path.join(outputDir, 'plane-speed-mobile.png'), fullPage: false });
 
   await mobileContext.close();
   mobileContext = await browser.newContext({
@@ -298,7 +298,7 @@ try {
     throw new Error(`Ocean mobile controls did not become visible: ${JSON.stringify(oceanUiState)}`, { cause: error });
   }
   const oceanMove = await touchHold(oceanMobile, oceanCdp, '#mobileMovePad', 0, -52, 1_250);
-  await oceanMobile.screenshot({ path: path.join(outputDir, 'ocean-speed-mobile.png'), fullPage: true });
+  await oceanMobile.screenshot({ path: path.join(outputDir, 'ocean-speed-mobile.png'), fullPage: false });
 
   const rightProjection = screenRightProjection(rightMove.before, rightMove.held.diagnostics);
   const leftProjection = screenRightProjection(leftMove.before, leftMove.held.diagnostics);

@@ -168,7 +168,7 @@ try {
       };
     }));
     await mkdir('output/verification/live-gps-field', { recursive: true });
-    await page.screenshot({ path: 'output/verification/live-gps-field/shore-fishing-mobile.png', fullPage: true });
+    await page.screenshot({ path: 'output/verification/live-gps-field/shore-fishing-mobile.png', fullPage: false });
     await page.locator('#fishingCloseBtn').click();
     await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().fishing?.open === false, null, { timeout: 10_000 });
     exitRecovered = true;

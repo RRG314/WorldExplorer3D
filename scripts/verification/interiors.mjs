@@ -455,6 +455,22 @@ async function tapVisibleInteriorPrompt() {
   return bounds;
 }
 
+async function mobileInteriorPromptLayout() {
+  return page.evaluate(() => {
+    const prompt = document.getElementById('interiorPrompt');
+    const rect = prompt.getBoundingClientRect();
+    const controls = ['mobileMovePad', 'mobileLookPad', 'mobileActionPrimary', 'mobileActionSecondary']
+      .map(id => {
+        const node = document.getElementById(id), r = node.getBoundingClientRect();
+        const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+        return { id, hit: node === hit || node.contains(hit),
+          overlapsPrompt: r.x < rect.right && r.right > rect.left && r.y < rect.bottom && r.bottom > rect.top };
+      });
+    return { prompt: rect.toJSON(), controls,
+      ok: controls.every(control => control.hit && !control.overlapsPrompt) };
+  });
+}
+
 async function chooseElevatorFloor(level) {
   await page.waitForSelector('#interiorElevatorFloorPicker', { timeout: 10_000 });
   const choices = await page.locator('#interiorElevatorFloorPicker [data-elevator-level]').evaluateAll((buttons) =>
@@ -518,7 +534,7 @@ try {
   const inside = await interiorOwnershipSnapshot(target.sourceBuildingId);
   markStage('desktop-entered', { exteriorBefore, inside });
   await mkdir('output/release-evidence/current', { recursive: true });
-  await page.screenshot({ path: 'output/release-evidence/current/interior-entered-desktop.png', fullPage: true });
+  await page.screenshot({ path: 'output/release-evidence/current/interior-entered-desktop.png', fullPage: false });
 
   const stairTraversal = await climbPublishedStairs();
   assert.equal(
@@ -529,7 +545,7 @@ try {
     true,
     `Published stairs were not traversable through normal walking input: ${JSON.stringify(stairTraversal)}`
   );
-  await page.screenshot({ path: 'output/release-evidence/current/interior-stairs-desktop.png', fullPage: true });
+  await page.screenshot({ path: 'output/release-evidence/current/interior-stairs-desktop.png', fullPage: false });
 
   const elevatorPrepared = await prepareInteriorInteraction('elevator');
   assert.equal(
@@ -541,7 +557,7 @@ try {
   await page.keyboard.press('KeyE');
   const elevatorPickerDown = await chooseElevatorFloor(0);
   const elevatorArrival = await interiorOwnershipSnapshot(target.sourceBuildingId);
-  await page.screenshot({ path: 'output/release-evidence/current/interior-elevator-desktop.png', fullPage: true });
+  await page.screenshot({ path: 'output/release-evidence/current/interior-elevator-desktop.png', fullPage: false });
 
   const elevatorUpPrepared = await prepareInteriorInteraction('elevator');
   assert.equal(elevatorUpPrepared?.promptVisible, true, 'Lobby did not retain its elevator interaction.');
@@ -564,7 +580,7 @@ try {
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().interior?.active === false, null, { timeout: 10_000 });
   const afterExit = await interiorOwnershipSnapshot(target.sourceBuildingId);
   markStage('desktop-complete', { stairTraversal, elevatorArrival, elevatorUpperArrival, wallContact, wallRecovery, afterExit });
-  await page.screenshot({ path: 'output/release-evidence/current/interior-exited-desktop.png', fullPage: true });
+  await page.screenshot({ path: 'output/release-evidence/current/interior-exited-desktop.png', fullPage: false });
 
   const mobileParams = new URLSearchParams(params);
   mobileParams.set('rx', String(afterExit.walker.x));
@@ -607,6 +623,7 @@ try {
     const bounds = element.getBoundingClientRect();
     return { left: bounds.left, right: bounds.right, top: bounds.top, bottom: bounds.bottom };
   });
+  const mobileEntryLayout = await mobileInteriorPromptLayout();
   await tapVisibleInteriorPrompt();
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().interior?.active === true, null, { timeout: 30_000 });
   const mobileEntered = await interiorOwnershipSnapshot(target.sourceBuildingId);
@@ -623,7 +640,10 @@ try {
   await tapVisibleInteriorPrompt();
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().interior?.active === true, null, { timeout: 30_000 });
   const mobileReentered = await interiorOwnershipSnapshot(target.sourceBuildingId);
-  await page.screenshot({ path: 'output/release-evidence/current/interior-mobile.png', fullPage: true });
+  const mobileInsideLayout = await mobileInteriorPromptLayout();
+  // Full-page capture with even a four-pixel overflow changes Chrome's mobile
+  // media layout. Capture the game viewport and verify its real touch targets.
+  await page.screenshot({ path: 'output/release-evidence/current/interior-mobile.png', fullPage: false });
 
   await page.reload({ waitUntil: 'load', timeout: 120_000 });
   await waitForWorld();
@@ -665,6 +685,7 @@ try {
     exteriorOwnershipRestored: afterExit.colliderCount === 0 && afterExit.buildingCollisionDisabled === false,
     mobilePromptFitsViewport: mobileEnterBounds.left >= 0 && mobileEnterBounds.right <= 390 &&
       mobileEnterBounds.top >= 0 && mobileEnterBounds.bottom <= 844,
+    mobilePromptKeepsControlsClear: mobileEntryLayout.ok && mobileInsideLayout.ok,
     contextualTouchEntryExitRecovery: mobileEntered.active === true && mobileExited.active === false &&
       mobileExited.colliderCount === 0 && mobileReentered.active === true && mobileReentered.key === target.key,
     reloadTearsDownInterior: afterReload.diagnostics.active === false,
@@ -691,6 +712,8 @@ try {
     wallRecovery,
     afterExit,
     mobileEnterBounds,
+    mobileEntryLayout,
+    mobileInsideLayout,
     mobileTarget,
     mobileApproach,
     mobileEntered,

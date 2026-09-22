@@ -298,9 +298,9 @@ try {
     assert.equal(await moveAwayFromDirectInteraction(freePage, freeCdp), true,
       'Normal mobile walking must clear the nearby direct interaction before the field lead appears.');
   });
-  await freePage.screenshot({ path: 'output/release-evidence/current/baltimore-ecology-free-roam-lead-mobile.png', fullPage: true });
+  await freePage.screenshot({ path: 'output/release-evidence/current/baltimore-ecology-free-roam-lead-mobile.png', fullPage: false });
   const freeAccepted = await acceptLead(freePage, freeLead.lead);
-  await freePage.screenshot({ path: 'output/release-evidence/current/baltimore-ecology-free-roam-tracking-mobile.png', fullPage: true });
+  await freePage.screenshot({ path: 'output/release-evidence/current/baltimore-ecology-free-roam-tracking-mobile.png', fullPage: false });
   await freeContext.close();
 
   const gpsContext = await browser.newContext({
@@ -329,9 +329,9 @@ try {
   const gpsLead = await waitForLead(gpsPage, 'live-gps', async () => {
     await gpsContext.setGeolocation({ latitude: 39.2907, longitude: -76.6122, accuracy: 6 });
   });
-  await gpsPage.screenshot({ path: 'output/release-evidence/current/baltimore-ecology-live-gps-lead-mobile.png', fullPage: true });
+  await gpsPage.screenshot({ path: 'output/release-evidence/current/baltimore-ecology-live-gps-lead-mobile.png', fullPage: false });
   const gpsAccepted = await acceptLead(gpsPage, gpsLead.lead);
-  await gpsPage.screenshot({ path: 'output/release-evidence/current/baltimore-ecology-live-gps-tracking-mobile.png', fullPage: true });
+  await gpsPage.screenshot({ path: 'output/release-evidence/current/baltimore-ecology-live-gps-tracking-mobile.png', fullPage: false });
   await gpsContext.close();
 
   const checks = {

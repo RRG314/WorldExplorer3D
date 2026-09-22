@@ -103,7 +103,7 @@ try {
     gesture: document.querySelector('#fishingGestureLabel')?.textContent || ''
   }));
   await mkdir('output/release-evidence/current', { recursive: true });
-  await page.screenshot({ path: 'output/release-evidence/current/fishing-line-loss-mobile.png', fullPage: true });
+  await page.screenshot({ path: 'output/release-evidence/current/fishing-line-loss-mobile.png', fullPage: false });
 
   const recordsAfterLoss = await catchRecordCount();
   await page.locator('#fishingActionBtn').click();
@@ -128,7 +128,7 @@ try {
       modesButtonOwnsHit: !!button && (hit === button || button.contains(hit))
     };
   });
-  await page.screenshot({ path: 'output/release-evidence/current/fishing-teardown-recovery-mobile.png', fullPage: true });
+  await page.screenshot({ path: 'output/release-evidence/current/fishing-teardown-recovery-mobile.png', fullPage: false });
   const recordsAfterClose = await catchRecordCount();
 
   await page.locator('#exploreBtn').click();

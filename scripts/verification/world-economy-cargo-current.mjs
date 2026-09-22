@@ -87,7 +87,7 @@ async function buyEarthMaterial(context) {
     const item = after.backpack.items.find((entry) => entry.catalogId === materialCatalogId);
     assert.ok(item, JSON.stringify(after.backpack));
     assert.ok(after.urbanSandbox.commerce.current.credits < before.urbanSandbox.commerce.current.credits);
-    await page.screenshot({ path: path.join(outputDir, 'earth-material-purchased.png'), fullPage: true });
+    await page.screenshot({ path: path.join(outputDir, 'earth-material-purchased.png'), fullPage: false });
     return { store: opened, item, credits: after.urbanSandbox.commerce.current.credits };
   } catch (error) {
     const snapshot = await state(page).catch(() => null);
@@ -121,7 +121,7 @@ async function loadMaterialAboard(context, purchase) {
     const transfer = page.locator('#shipStationPanel [data-ship-action="load-backpack-materials"]');
     await transfer.waitFor({ state: 'visible' });
     const before = await state(page);
-    await page.screenshot({ path: path.join(outputDir, 'cargo-transfer-ready.png'), fullPage: true });
+    await page.screenshot({ path: path.join(outputDir, 'cargo-transfer-ready.png'), fullPage: false });
     await transfer.click();
     await page.waitForFunction((feedstock) => {
       const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
@@ -138,7 +138,7 @@ async function loadMaterialAboard(context, purchase) {
     assert.equal(result.materialStillCarried, false, JSON.stringify(result));
     assert.equal(result.feedstockKg - result.beforeFeedstockKg, result.earthLoadedKg, JSON.stringify(result));
     assert.equal(result.stationTitle, 'Cargo Hold');
-    await page.screenshot({ path: path.join(outputDir, 'cargo-transfer-complete.png'), fullPage: true });
+    await page.screenshot({ path: path.join(outputDir, 'cargo-transfer-complete.png'), fullPage: false });
     return result;
   } catch (error) {
     const snapshot = await state(page).catch(() => null);

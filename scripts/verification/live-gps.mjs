@@ -103,7 +103,7 @@ try {
       .map((entry) => entry.textContent?.replace(/\s+/g, ' ').trim() || '')
   }));
   await mkdir('output/verification/live-gps-field', { recursive: true });
-  await page.screenshot({ path: 'output/verification/live-gps-field/field-today-mobile.png', fullPage: true });
+  await page.screenshot({ path: 'output/verification/live-gps-field/field-today-mobile.png', fullPage: false });
   const fieldBefore = await snapshot();
   const firstObjective = fieldBefore.worldDiscovery?.fieldExpedition?.objectives?.[0];
   assert.ok(firstObjective?.targetWorld, 'Field Today must expose a deterministic first objective to diagnostics.');
@@ -133,7 +133,7 @@ try {
   await page.locator('#discoveryPrimaryBtn').click();
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery?.fieldExpedition?.completedCount === 1, null, { timeout: 30_000 });
   const firstStopRecorded = await snapshot();
-  await page.screenshot({ path: 'output/verification/live-gps-field/first-stop-recorded-mobile.png', fullPage: true });
+  await page.screenshot({ path: 'output/verification/live-gps-field/first-stop-recorded-mobile.png', fullPage: false });
   await page.locator('#discoveryCloseBtn').click();
 
   let currentLatitude = targetLatitude;
@@ -183,7 +183,7 @@ try {
     if (expectedCompleted < 3) await page.locator('#discoveryCloseBtn').click();
   }
   const expeditionComplete = await snapshot();
-  await page.screenshot({ path: 'output/verification/live-gps-field/expedition-complete-mobile.png', fullPage: true });
+  await page.screenshot({ path: 'output/verification/live-gps-field/expedition-complete-mobile.png', fullPage: false });
   await page.locator('#discoveryCloseBtn').click();
 
   await cdp.send('Emulation.setGeolocationOverride', {

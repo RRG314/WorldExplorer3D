@@ -102,7 +102,7 @@ async function verify(viewport, name) {
   markPhase(`${name}:property-home`);
   await page.locator('.propertyHubTabs [data-property-view="home"]').click();
   assert.equal(await page.locator('.propertyHubTabs [data-property-view="home"]').getAttribute('aria-selected'), 'true');
-  await page.screenshot({ path: path.join(outputDir, `${name}-real-estate.png`), fullPage: true });
+  await page.screenshot({ path: path.join(outputDir, `${name}-real-estate.png`), fullPage: false });
   await page.locator('#closePropertyPanelBtn').click();
 
   await openMenu(page, 'realEstateFloatBtn', 'realEstateMenu');
@@ -115,7 +115,7 @@ async function verify(viewport, name) {
   if (touch) assert.notEqual(await page.locator('#controlsTab').evaluate((element) => getComputedStyle(element).display), 'none');
 
   assert.deepEqual(runtimeRequests.filter((url) => /\/js\/(?:editor|activity-editor)\//.test(url)), []);
-  await page.screenshot({ path: path.join(outputDir, `${name}-navigation.png`), fullPage: true });
+  await page.screenshot({ path: path.join(outputDir, `${name}-navigation.png`), fullPage: false });
   await context.close();
   activePage = null;
   markPhase(`${name}:complete`);

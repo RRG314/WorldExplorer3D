@@ -135,7 +135,7 @@ async function verifyGrantedDestination(destination) {
       await page.waitForTimeout(250);
     }
     const collectionEvidence = collectionRequests.join('\n');
-    await page.screenshot({ path: path.join(outputDir, `${destination.id}-analytics-ready.png`), fullPage: true });
+    await page.screenshot({ path: path.join(outputDir, `${destination.id}-analytics-ready.png`), fullPage: false });
     assert.equal(snapshot.consent, 'granted', `${destination.id}: ${JSON.stringify({ consentEvidence, snapshot })}`);
     assert.equal(snapshot.deliveryState, 'ready_explicit');
     assert.equal(snapshot.worldSessionCount, 1);

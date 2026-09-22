@@ -148,7 +148,7 @@ try {
   });
   const bodyText = await page.locator('body').innerText();
   await mkdir('output/release-evidence/current', { recursive: true });
-  await page.screenshot({ path: 'output/release-evidence/current/unified-boat-fishing-mobile.png', fullPage: true });
+  await page.screenshot({ path: 'output/release-evidence/current/unified-boat-fishing-mobile.png', fullPage: false });
 
   await page.locator('#fishingCloseBtn').click();
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().fishing?.open === false, null, { timeout: 10_000 });
@@ -169,10 +169,10 @@ try {
   const guideText = await page.locator('#discoveryFieldGuideList').innerText();
   await page.locator('#discoveryGuideHelpBtn').click();
   const guideHelpText = await page.locator('#discoveryGuideHelp').innerText();
-  await page.screenshot({ path: 'output/release-evidence/current/unified-fishing-guide-mobile.png', fullPage: true });
+  await page.screenshot({ path: 'output/release-evidence/current/unified-fishing-guide-mobile.png', fullPage: false });
   await page.locator('#discoveryGuideHelpBtn').click();
   await page.locator('#discoveryFieldGuideList').scrollIntoViewIfNeeded();
-  await page.screenshot({ path: 'output/release-evidence/current/unified-fishing-guide-catch-mobile.png', fullPage: true });
+  await page.screenshot({ path: 'output/release-evidence/current/unified-fishing-guide-catch-mobile.png', fullPage: false });
 
   const inViewport = (entry) => entry?.visible === true && entry.left >= 0 && entry.top >= 0 && entry.right <= 390 && entry.bottom <= 844;
 

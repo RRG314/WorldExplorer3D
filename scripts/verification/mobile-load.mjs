@@ -105,7 +105,7 @@ async function runStandardJourney() {
     await waitForPlayable(client.page, false);
     const firstPlayableMs = Math.round(performance.now() - startedAt);
     const diagnostics = await client.page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.() || {});
-    await client.page.screenshot({ path: '/tmp/worldexplorer-mobile-load-standard.png', fullPage: true });
+    await client.page.screenshot({ path: '/tmp/worldexplorer-mobile-load-standard.png', fullPage: false });
     return {
       titleReadyMs,
       firstPlayableMs,
@@ -139,7 +139,7 @@ async function runLiveGpsJourney() {
     const permissionToPlayableMs = Math.round(performance.now() - permissionStartedAt);
     const entryToPlayableMs = Math.round(performance.now() - startedAt);
     const diagnostics = await client.page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.() || {});
-    await client.page.screenshot({ path: '/tmp/worldexplorer-mobile-load-live-gps.png', fullPage: true });
+    await client.page.screenshot({ path: '/tmp/worldexplorer-mobile-load-live-gps.png', fullPage: false });
     return {
       titleReadyMs,
       entryToPlayableMs,
