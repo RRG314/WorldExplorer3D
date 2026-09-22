@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { decodeFloatElevationTiff, isPolarElevationTile, mergePolarElevation, polarElevationUrl, polarSourceAt } from '../app/js/terrain/polar-elevation-source.js';
+import { decodeFloatElevationTiff, isPolarElevationTile, mergePolarElevation, polarElevationUrl, polarSourceAt, resamplePolarRaster } from '../app/js/terrain/polar-elevation-source.js';
 
 function rasterFixture(values = [2.8, 10, -9999, 35], big = false) {
   const buffer = new ArrayBuffer(192), v = new DataView(buffer), little = !big;
@@ -44,10 +44,33 @@ test('provider work is bounded and world teardown cancels both active and queued
   });
   const controllers=Array.from({length:10},()=>new AbortController());
   try {
-    const jobs=controllers.map((c,i)=>fetchPolarElevationTile(15,10553+i,24191,{signal:c.signal}));
+    const jobs=controllers.map((c,i)=>fetchPolarElevationTile(15,10553+i*8,24191,{signal:c.signal}));
     assert.equal(started,3);
     controllers.slice(3).forEach(c=>c.abort());controllers.slice(0,3).forEach(c=>c.abort());
     assert.deepEqual(await Promise.all(jobs),Array(10).fill(null));
     assert.equal(peak,3);assert.equal(active,0);assert.equal(started,3);
   } finally {controllers.forEach(c=>c.abort());globalThis.fetch=originalFetch;}
+});
+
+
+test('regional polar resampling preserves a measured plane and shared fine-tile edges',()=>{
+ const raster={width:256,height:256,values:Float32Array.from({length:65536},(_,i)=>1000+(i%256)*2+Math.floor(i/256)*3)};
+ const a=resamplePolarRaster(raster,15,16384,29089,12),b=resamplePolarRaster(raster,15,16385,29089,12);
+ assert.ok(Math.abs(a.values[0]-(1000+255/8*3))<.001);
+ for(let row=0;row<256;row++)assert.equal(a.values[row*256+255],b.values[row*256]);
+ raster.values.fill(NaN);assert.ok(Number.isNaN(resamplePolarRaster(raster,15,16384,29089,12).values[0]));
+});
+test('fine polar meshes share a request and one cancellation does not cancel another consumer',async()=>{
+ const {fetchPolarElevationTile}=await import('../app/js/terrain/polar-elevation-source.js');const original=globalThis.fetch;let started=0,aborted=0;
+ globalThis.fetch=(_url,{signal})=>new Promise((_resolve,reject)=>{started++;signal.addEventListener('abort',()=>{aborted++;reject(Error('aborted'));});});
+ const a=new AbortController(),b=new AbortController();
+ try {const one=fetchPolarElevationTile(15,16384,29089,{signal:a.signal}),two=fetchPolarElevationTile(15,16385,29089,{signal:b.signal});assert.equal(started,1);a.abort();assert.equal(await one,null);assert.equal(aborted,0);b.abort();assert.equal(await two,null);assert.equal(aborted,1);await new Promise(resolve=>setImmediate(resolve));}finally{a.abort();b.abort();globalThis.fetch=original;}
+});
+
+test('an interior ice-sheet load cannot certify the -500m legacy fallback as a real surface',async()=>{
+ const {selectedPolarSurfaceReady}=await import('../app/js/world/load-terrain-readiness.js');
+ const ctx={LOC:{lat:-80},worldLoadRuntimeState:{groundMode:'polar-cryosphere-local'},terrainSourceSampleAtWorldXZ:()=>({available:true,elevationMeters:-500,provenance:{dataset:'Mapzen Terrain Tiles'}})};
+ assert.equal(selectedPolarSurfaceReady(ctx),false);
+ ctx.terrainSourceSampleAtWorldXZ=()=>({available:true,elevationMeters:2338,provenance:{dataset:'Reference Elevation Model of Antarctica'}});assert.equal(selectedPolarSurfaceReady(ctx),true);
+ ctx.LOC.lat=40;assert.equal(selectedPolarSurfaceReady(ctx),true);
 });

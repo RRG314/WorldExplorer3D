@@ -1,3 +1,9 @@
+export function selectedPolarSurfaceReady(appCtx) {
+  if (appCtx.worldLoadRuntimeState?.groundMode !== 'polar-cryosphere-local' || Number(appCtx.LOC?.lat) > -75) return true;
+  const sample = appCtx.terrainSourceSampleAtWorldXZ?.(0, 0);
+  return sample?.available === true && sample?.provenance?.dataset === 'Reference Elevation Model of Antarctica';
+}
+
 export async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
   if (!appCtx.terrainEnabled || appCtx.onMoon) return false;
   const waitForCoverage = appCtx.waitForTerrainCoverageAt;

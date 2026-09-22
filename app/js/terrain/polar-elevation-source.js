@@ -73,14 +73,14 @@ function pump() {
     job.run().then(job.resolve, error => { job.onError?.(String(error)); job.resolve(null); }).finally(() => { active--; pump(); });
   }
 }
-export function fetchPolarElevationTile(z, x, y, { signal, onError, priority = 0 } = {}) {
+function fetchPolarRaster(z, x, y, { signal, onError, priority = 0 } = {}) {
   if (!isPolarElevationTile(z, x, y)) return Promise.resolve(null);
   return new Promise(resolve => {
     const job = { signal, resolve, onError, priority, async run() {
       const controller = new AbortController();
       const abort = () => controller.abort();
       signal?.addEventListener('abort', abort, { once: true });
-      const timeout = setTimeout(abort, 4500);
+      const timeout = setTimeout(abort, 8000);
       try {
         const response = await fetch(polarElevationUrl(z, x, y), { signal: controller.signal });
         if (!response.ok || Number(response.headers.get('content-length')) > 2 * 1024 * 1024) throw Error('Polar elevation unavailable');
@@ -94,6 +94,53 @@ export function fetchPolarElevationTile(z, x, y, { signal, onError, priority = 0
     signal?.addEventListener('abort', job.cancelQueued, { once: true });
     pump();
   });
+}
+// Share regional source rasters instead of issuing an export for every tiny
+// near mesh. At 80S a z12 raster is about 7m per source sample; finer meshes
+// interpolate that measured surface, without claiming extra source resolution.
+const regionalRasters = new Map();
+export function resamplePolarRaster(raster, z, x, y, sourceZoom) {
+  if (!raster || z === sourceZoom) return raster;
+  const factor = 2 ** (z - sourceZoom), values = new Float32Array(256 * 256);
+  const offsetX = x % factor, offsetY = y % factor;
+  for (let row = 0; row < 256; row++) for (let col = 0; col < 256; col++) {
+    const u = (offsetX + col / 255) / factor * (raster.width - 1);
+    const v = (offsetY + row / 255) / factor * (raster.height - 1);
+    const x0 = Math.floor(u), y0 = Math.floor(v), x1 = Math.min(raster.width - 1, x0 + 1), y1 = Math.min(raster.height - 1, y0 + 1);
+    const a = raster.values[y0 * raster.width + x0], b = raster.values[y0 * raster.width + x1];
+    const c = raster.values[y1 * raster.width + x0], d = raster.values[y1 * raster.width + x1];
+    values[row * 256 + col] = [a,b,c,d].every(Number.isFinite)
+      ? (a * (1 - (u - x0)) + b * (u - x0)) * (1 - (v - y0)) + (c * (1 - (u - x0)) + d * (u - x0)) * (v - y0) : NaN;
+  }
+  return { values, width: 256, height: 256 };
+}
+export async function fetchPolarElevationTile(z, x, y, {signal, onError, priority = 0} = {}) {
+  if (signal?.aborted || !isPolarElevationTile(z,x,y)) return null;
+  const sourceZoom = Math.min(z,12), factor = 2 ** (z-sourceZoom);
+  const sx = Math.floor(x/factor), sy = Math.floor(y/factor), key = `${sourceZoom}/${sx}/${sy}`;
+  let entry = regionalRasters.get(key);
+  if (!entry) {
+    entry = {controller:new AbortController(), users:0, settled:false, error:''};
+    regionalRasters.set(key,entry);
+    entry.promise = fetchPolarRaster(sourceZoom,sx,sy,{signal:entry.controller.signal,priority,onError:error=>{entry.error=error;}}).then(raster=>{
+      entry.settled=true;
+      if (!raster && regionalRasters.get(key)===entry) regionalRasters.delete(key);
+      // A bounded decoded cache also shares data with later distant meshes.
+      for (const [oldKey,old] of regionalRasters) if (regionalRasters.size>12 && old.settled && oldKey!==key) regionalRasters.delete(oldKey);
+      return raster;
+    });
+  }
+  entry.users++;
+  let cancel;
+  const cancelled = new Promise(resolve=>{cancel=()=>resolve(null);signal?.addEventListener('abort',cancel,{once:true});});
+  try {
+    const raster=await Promise.race([entry.promise,cancelled]);
+    if (!raster && !signal?.aborted && entry.error) onError?.(entry.error);
+    return signal?.aborted ? null : resamplePolarRaster(raster,z,x,y,sourceZoom);
+  } finally {
+    signal?.removeEventListener('abort',cancel);
+    if (--entry.users===0 && !entry.settled) {entry.controller.abort();if(regionalRasters.get(key)===entry)regionalRasters.delete(key);}
+  }
 }
 export function mergePolarElevation(fallback, raster) {
   if (!raster || raster.values.length !== fallback.length) return null;

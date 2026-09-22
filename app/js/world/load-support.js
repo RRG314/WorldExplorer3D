@@ -1,4 +1,5 @@
 import {SurfacePublicationError} from './surface-publication-error.js';
+import {selectedPolarSurfaceReady} from './load-terrain-readiness.js?v=2';
 import { publishStreetPavement } from './street-pavement-runtime.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { appendUpwardRibbonGeometry } from "../road-render.js?v=4";
@@ -68,6 +69,9 @@ export async function finalizeLoadedWorld(options = {}) {
       try { await appCtx.waitForLocationTerrainPublication(); }
       catch (error) { throw new SurfacePublicationError('terrain', error); }
       finally { endLoadPhase('waitForLocationTerrainPublication'); }
+    }
+    if (!selectedPolarSurfaceReady(appCtx)) {
+      throw new SurfacePublicationError('terrain', new Error('Antarctic surface elevation is unavailable. Please retry this location.'));
     }
   }
   const transportWillRebuildTerrain = appCtx.terrainEnabled && !appCtx.onMoon &&
