@@ -32,9 +32,13 @@ const browser = await chromium.launch({ headless: true, channel: 'chrome', args:
 // pixels, retaining the desktop CSS viewport, complete city data and two live
 // clients. This is functional backend evidence, never FPS/visual acceptance.
 const deviceScaleFactor = process.env.CI ? 0.5 : 1;
+// Admission starts world compilation immediately. A UI receipt must not depend
+// on requestAnimationFrame being scheduled by the software GPU while that world
+// compiles. Match the CI action allowance; retain the normal local deadline.
+const roomStateWait = { timeout: process.env.CI ? 120_000 : 20_000, polling: 250 };
 const browserBudget = {
   maxOldSpaceMiB: 1024, worldInitialization: 'sequential', simultaneouslyActiveWorlds: 2,
-  viewport: { width: 1280, height: 800 }, deviceScaleFactor,
+  viewport: { width: 1280, height: 800 }, deviceScaleFactor, roomStateWait,
   evidenceScope: 'multiplayer-functional'
 };
 async function recordStage(stage) {
@@ -261,7 +265,7 @@ try {
   try {
     await owner.page.waitForFunction(() =>
       /\b[A-Z2-9]{6}\b/.test(String(document.getElementById('roomPanelRoomCode')?.textContent || '').trim()),
-    null, { timeout: 30_000 });
+    null, { ...roomStateWait, timeout: process.env.CI ? roomStateWait.timeout : 30_000 });
   } catch (error) {
     const ui = await owner.page.evaluate(() => ({
       titleStatus: document.getElementById('mpTitleStatus')?.textContent || '',
@@ -289,7 +293,7 @@ try {
       await player.page.waitForFunction((code) => {
         const roomCodeText = document.getElementById('roomPanelRoomCode')?.textContent || '';
         return String(roomCodeText).includes(code);
-      }, roomCode, { timeout: 20_000 });
+      }, roomCode, roomStateWait);
     } catch (error) {
       const ui = await player.page.evaluate(() => ({
         titleStatus: document.getElementById('mpTitleStatus')?.textContent || '',
