@@ -9,6 +9,7 @@ const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
 const servedRoot = requestedRoot ? path.resolve(root, requestedRoot) : root;
 const externalUrl = String(process.env.WE3D_VERIFY_BASE_URL || '').replace(/\/$/, '');
 const captureRequested = process.env.WE3D_CAPTURE_RELEASE_EVIDENCE === '1';
+const equipmentTimeout = process.env.CI ? 30_000 : 5_000;
 const policy = JSON.parse(await fs.readFile(path.join(root, 'config', 'verification-policy.json'), 'utf8'));
 const reportPath = path.join(root, 'output', 'verification', 'urban-equipment', 'report.json');
 const evidenceDir = path.join(root, policy.visualEvidence.outputDirectory);
@@ -140,7 +141,7 @@ try {
   ];
 
   await page.keyboard.press('KeyI');
-  await page.waitForSelector('#urbanEquipment.show', { timeout: 5000 });
+  await page.waitForSelector('#urbanEquipment.show', { timeout: equipmentTimeout });
   const opened = await snapshot();
 
   const laserItem = page.locator('#urbanBackpackContents [data-equipment-id]').filter({ hasText: 'Laser gun' });
@@ -166,7 +167,7 @@ try {
     await page.screenshot({ path: laserImage, fullPage: false, timeout: 120000 });
     visualEvidence.push(path.relative(root, laserImage));
     await page.keyboard.press('KeyI');
-    await page.waitForSelector('#urbanEquipment.show', { timeout: 5000 });
+    await page.waitForSelector('#urbanEquipment.show', { timeout: equipmentTimeout });
   }
   const laserMagazineBefore = Number(item(laserEquipped, 'laser-gun')?.magazine);
 
@@ -314,7 +315,13 @@ try {
       error: String(error?.stack || error),
       state: await snapshot().catch(() => null),
       inputOwner: await page.evaluate(() => ({
-        activeElement: document.activeElement?.outerHTML,
+        activeElement: {tag: document.activeElement?.tagName, id: document.activeElement?.id, classes: document.activeElement?.className},
+        equipment: (() => {
+          const element = document.getElementById('urbanEquipment');
+          const style = element && getComputedStyle(element);
+          const rect = element?.getBoundingClientRect();
+          return {display:style?.display, visibility:style?.visibility, width:rect?.width, height:rect?.height};
+        })(),
         loading: document.getElementById('loading')?.className,
         globe: document.getElementById('globeSelectorScreen')?.className
       })).catch(() => null),

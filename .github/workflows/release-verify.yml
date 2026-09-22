@@ -111,7 +111,21 @@ jobs:
         env:
           WE3D_VERIFY_ROOT: dist
           WE3D_CANDIDATE_GATES: ${{ inputs.gates }}
+          WE3D_STAGING_APP_CHECK_CREDENTIAL: ${{ secrets.WE3D_STAGING_APP_CHECK_CREDENTIAL }}
         run: |
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          const credential = process.env.WE3D_STAGING_APP_CHECK_CREDENTIAL;
+          if (credential) {
+            const file = path.join(process.env.RUNNER_TEMP, 'we3d-staging-appcheck.private.json');
+            fs.writeFileSync(file, credential, {mode:0o600});
+          }
+          JS
+          unset WE3D_STAGING_APP_CHECK_CREDENTIAL
+          if [ -f "$RUNNER_TEMP/we3d-staging-appcheck.private.json" ]; then
+            export WE3D_STAGING_APP_CHECK_FILE="$RUNNER_TEMP/we3d-staging-appcheck.private.json"
+          fi
           node --input-type=module - <<'JS'
           import fs from 'node:fs';
           const config=JSON.parse(fs.readFileSync('config/system-release-gates.json','utf8'));
@@ -121,6 +135,10 @@ jobs:
           }
           JS
           node scripts/verification/system-release.mjs --run --scope=candidate --continue-on-failure "--gate=$WE3D_CANDIDATE_GATES"
+
+      - name: Remove temporary staging credential file
+        if: always()
+        run: rm -f "$RUNNER_TEMP/we3d-staging-appcheck.private.json"
 
       - name: Preserve verification evidence
         if: always()

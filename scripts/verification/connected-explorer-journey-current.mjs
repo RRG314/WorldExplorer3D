@@ -56,6 +56,37 @@ async function moveWithRemappedForwardKey() {
   throw new Error(`Remapped forward key did not advance the live tutorial: ${JSON.stringify({before,after,tutorial:await tutorialState()})}`);
 }
 
+async function approachNearbyAction() {
+  // Completing the movement lesson does not imply an interaction is in reach.
+  // Read a published parked-car approach and walk there through normal input.
+  const deadline = Date.now() + (process.env.CI ? 180_000 : 90_000);
+  let last;
+  while (Date.now() < deadline) {
+    last = await page.evaluate(() => {
+      const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
+      const actor = state.activeActor;
+      const vehicles = (state.urbanSandbox?.vehicles || []).filter(v => !v.occupied && !v.ambientTraffic);
+      const distance = v => Math.hypot(v.driverDoor.x - actor.position.x, v.driverDoor.z - actor.position.z);
+      const target = vehicles.filter(v => v.driverDoor).sort((a, b) => distance(a) - distance(b))[0];
+      const prompt = document.getElementById('urbanVehiclePrompt');
+      return {actor, target, action:state.urbanSandbox?.interaction,
+        visible:!!prompt?.classList.contains('show') && getComputedStyle(prompt).display !== 'none'};
+    });
+    if (last.visible && last.action) return last;
+    assert.ok(last.target && last.actor?.mode === 'walk', `No walking approach: ${JSON.stringify(last)}`);
+    const dx = last.target.driverDoor.x - last.actor.position.x;
+    const dz = last.target.driverDoor.z - last.actor.position.z;
+    const angle = Math.atan2(dx, dz) - last.actor.orientation.yaw;
+    const delta = Math.atan2(Math.sin(angle), Math.cos(angle));
+    if (Math.abs(delta) > 0.12) {
+      await hold(delta > 0 ? 'ArrowLeft' : 'ArrowRight', Math.abs(delta) > 0.5 ? 140 : 24);
+    } else {
+      await hold('KeyZ', Math.hypot(dx, dz) > 4 ? 400 : 100);
+    }
+  }
+  throw new Error(`Could not reach a nearby action using normal input: ${JSON.stringify(last)}`);
+}
+
 try {
   await mkdir(evidenceDir, { recursive: true });
   await page.goto(`${baseUrl}/app/`, { waitUntil: 'load', timeout: 120_000 });
@@ -102,6 +133,7 @@ try {
   assert.notDeepEqual(afterPosition, beforePosition, 'The remapped key must move the active actor in the live world.');
   // The interaction stage yields its optional lesson to the actual nearby
   // action. Assert that visible action below, not unpresented hidden card copy.
+  const approachedAction = await approachNearbyAction();
   await page.waitForSelector('#urbanVehiclePrompt.show', { timeout: 20_000 });
   const promptPriority = await page.evaluate(() => {
     const prompt = document.getElementById('urbanVehiclePrompt');
@@ -173,6 +205,7 @@ try {
       noFailedLocalResources: failedLocalResources.length === 0
     },
     statusSemantics,
+    approachedAction,
     touchLayout,
     browserErrors,
     failedLocalResources
