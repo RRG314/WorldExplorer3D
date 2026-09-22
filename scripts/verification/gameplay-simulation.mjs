@@ -19,7 +19,7 @@ export async function stepGameplayKeys(page, keys, milliseconds) {
   assert.ok(Number.isFinite(milliseconds) && milliseconds > 0 && milliseconds <= 6000);
   const codes = Array.isArray(keys) ? keys : [keys];
   assert.ok(codes.length > 0 && codes.every(code => /^(Arrow(Up|Down|Left|Right)|ShiftLeft)$/.test(code)));
-  const receipts = await page.evaluate(({ codes, milliseconds }) => {
+  const receipts = await page.evaluate(async ({ codes, milliseconds }) => {
     const target = document.activeElement || document.body;
     if (target?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target?.tagName)) {
       throw new Error('Gameplay navigation is blocked by a focused UI control.');
@@ -33,7 +33,7 @@ export async function stepGameplayKeys(page, keys, milliseconds) {
       const result = [];
       for (let remaining = milliseconds; remaining > 0;) {
         const duration = Math.min(2000, remaining);
-        result.push({ duration, receipt: globalThis.advanceTime?.(duration) });
+        result.push({ duration, receipt: await globalThis.advanceTime?.(duration) });
         remaining -= duration;
       }
       return result;

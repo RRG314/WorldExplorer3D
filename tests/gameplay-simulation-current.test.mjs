@@ -24,7 +24,7 @@ test('instrumented navigation bounds simulation and releases every key after suc
     const page = { evaluate: async (fn, args) => vm.runInNewContext(`(${fn.toString()})(args)`, {
       args, document: { activeElement: target },
       KeyboardEvent: class { constructor(type, options) { Object.assign(this, options, { type }); } },
-      advanceTime(duration) {
+      async advanceTime(duration) {
         assert.deepEqual([...pressed], ['ShiftLeft', 'ArrowUp']);
         durations.push(duration);
         if (failure) throw new Error('simulation failed');
