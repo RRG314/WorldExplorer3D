@@ -8,6 +8,11 @@ on:
         type: choice
         options: [full, backend, functional, candidate]
         default: full
+      runner:
+        description: Standard runner for targeted verification (never a physical-Mac performance receipt)
+        type: choice
+        options: [ubuntu-latest, macos-14]
+        default: ubuntu-latest
       gates:
         description: Candidate gate IDs, comma separated (candidate scope only; no performance gate)
         type: string
@@ -17,14 +22,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.scope }}-${{ inputs.scope == 'candidate' && inputs.gates || 'all' }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.scope }}-${{ inputs.scope == 'candidate' && inputs.gates || 'all' }}-${{ inputs.runner || 'ubuntu-latest' }}
   cancel-in-progress: false
 
 jobs:
   verify:
     if: inputs.scope != 'functional'
     timeout-minutes: 120
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     env:
       JAVA_TOOL_OPTIONS: -Xmx512m
     steps:
@@ -64,6 +69,28 @@ jobs:
 
       - name: Install Playwright
         run: npx playwright install --with-deps chromium chrome
+
+      - name: Record actual browser graphics backend
+        run: |
+          node --input-type=module - <<'JS'
+          import { chromium } from 'playwright';
+          import fs from 'node:fs/promises';
+          import os from 'node:os';
+          const browser = await chromium.launch({headless:true,channel:'chrome'});
+          try {
+            const page = await browser.newPage();
+            const graphics = await page.evaluate(() => {
+              const gl = document.createElement('canvas').getContext('webgl2');
+              if (!gl) throw new Error('WebGL2 is unavailable on this verification runner');
+              const info = gl.getExtension('WEBGL_debug_renderer_info');
+              return {renderer:info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER),version:gl.getParameter(gl.VERSION)};
+            });
+            const report = {platform:process.platform,architecture:process.arch,cpuCount:os.cpus().length,totalMemory:os.totalmem(),browser:browser.version(),graphics,evidenceScope:'remote functional verification only'};
+            await fs.mkdir('output/verification',{recursive:true});
+            await fs.writeFile('output/verification/runner-graphics.json',JSON.stringify(report,null,2));
+            console.log(JSON.stringify(report));
+          } finally {await browser.close();}
+          JS
 
       - name: Full release verification
         if: inputs.scope == 'full'
