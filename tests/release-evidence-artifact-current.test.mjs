@@ -6,6 +6,9 @@ import path from 'node:path';
 import { currentArtifactIdentity, sameArtifactIdentity, compareEvidenceToBaseline } from '../scripts/verification/execution-evidence.mjs';
 
 test('release evidence cannot transfer between artifacts from the same source commit', (t) => {
+  const previousRoot = process.env.WE3D_VERIFY_ROOT;
+  process.env.WE3D_VERIFY_ROOT = 'dist'; // This fixture owns its artifact directory.
+  t.after(() => { if (previousRoot === undefined) delete process.env.WE3D_VERIFY_ROOT; else process.env.WE3D_VERIFY_ROOT = previousRoot; });
   const root = mkdtempSync(path.join(tmpdir(), 'we3d-artifact-evidence-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   mkdirSync(path.join(root, 'dist'));

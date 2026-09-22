@@ -812,3 +812,10 @@ body:has(#worldSelectionNotice:not([hidden])) .tutorial-card { display: none !im
     width: min(310px, calc(100vw - 24px));
   }
 }
+
+/* The lobby is hosted on a dark panel; keep secondary guidance readable. */
+#globeHubPanelHost .mp-plan-state{color:#b6c5d7}
+#globeHubPanelHost .mp-plan-state.warn{color:#fca5a5}
+#mpCreateRoomDetails{margin:14px 0;padding:10px 0;border-block:1px solid rgba(148,163,184,.25)}
+#mpCreateRoomDetails>summary{cursor:pointer;min-height:32px;line-height:32px}
+#terrainImageryCredit { color: #b7d8e8; font-size: 9px; white-space: nowrap; }

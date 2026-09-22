@@ -16,24 +16,30 @@ function harness({ rejected = false } = {}) {
     postProtectedFunction: async (...args) => { calls.push(['admit', ...args]); if (rejected) throw new Error('Room full'); }
   });
   vm.runInContext(source + "\nactiveRoomId='ROOM01';getPose=()=>({});lastWriteAt=Date.now();", context);
-  return { calls, advance: ms => { now += ms; }, write: () => context.writePresence(false) };
+  return { calls, advance: ms => { now += ms; }, write: (force = false) => context.writePresence(force) };
 }
 test('expired presence requests server admission instead of reviving its document', async () => {
   const h = harness(); h.advance(91_000); await h.write();
   assert.deepEqual(h.calls.map(c => c[0]), ['admit']);
   assert.equal(h.calls[0][1], '/joinRoom');
   assert.equal(h.calls[0][2].roomCode, 'ROOM01');
-  h.advance(2100); await h.write();
+  h.advance(2500); await h.write();
   assert.deepEqual(h.calls.map(c => c[0]), ['admit', 'write']);
 });
 test('full-room reconnection does not fall back to direct writes and backs off', async () => {
   const h = harness({ rejected: true }); h.advance(91_000); await h.write();
-  h.advance(2100); await h.write();
+  h.advance(2500); await h.write();
   assert.deepEqual(h.calls.map(c => c[0]), ['admit']);
   h.advance(15_000); await h.write();
   assert.deepEqual(h.calls.map(c => c[0]), ['admit', 'admit']);
 });
 test('an active presence uses the ordinary bounded heartbeat', async () => {
-  const h = harness(); h.advance(2100); await h.write();
+  const h = harness(); h.advance(2500); await h.write();
   assert.deepEqual(h.calls.map(c => c[0]), ['write']);
+});
+
+test('visibility events cannot bypass the server heartbeat spacing', async () => {
+  const h = harness();await h.write(true);h.advance(2000);await h.write(true);
+  assert.equal(h.calls.length,0);h.advance(251);await h.write(true);
+  assert.deepEqual(h.calls.map(c=>c[0]),['write']);
 });

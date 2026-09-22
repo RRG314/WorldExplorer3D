@@ -630,8 +630,14 @@ function createUrbanEquipmentRuntime(options = {}) {
     const kind = equipment.projectileKind || 'pulse';
     const speed = Number(equipment.projectileSpeed || 48);
     const aimPoint = reticleAimPoint(equipment, actor, direction);
+    const muzzleOrigin = equipment.category === 'sidearm' ? state.equipmentVisual?.muzzleWorldPosition?.() : null;
+    const muzzleObstruction = muzzleOrigin ? segmentWorldContact(
+      new THREE.Vector3(actor.x, actor.y - .52, actor.z),
+      new THREE.Vector3(muzzleOrigin.x, muzzleOrigin.y, muzzleOrigin.z)
+    ) : null;
     const launch = resolvePlayerProjectileLaunch({
       actor,
+      muzzleOrigin,
       aimDirection: direction,
       aimPoint,
       kind,
@@ -686,7 +692,10 @@ function createUrbanEquipmentRuntime(options = {}) {
         radius: 38, audibleRadius: kind === 'paintball' ? 18 : 34, maximumWitnesses: 4
       });
     }
-    setStatus(kind === 'thrown-charge' ? 'Grenade thrown.' : `${equipment.label} fired.`);
+    // Repeated shots communicate through recoil, reticle and impact feedback,
+    // not an interrupting status invitation on every trigger pull.
+    if (kind === 'thrown-charge') setStatus('Grenade thrown.');
+    if (muzzleObstruction) resolveProjectile(projectile, muzzleObstruction.position);
   }
 
   function fireNpcProjectile(options = {}) {

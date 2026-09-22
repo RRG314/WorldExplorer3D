@@ -1,3 +1,4 @@
+import { attachRegionalImagery } from './regional-imagery.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   classifyTerrainSurfaceProfile as classifySharedTerrainSurfaceProfile
@@ -343,7 +344,9 @@ function ensureTerrainSemanticTextureSets(mesh, repeats) {
 
 export function applyTerrainSemanticMaterialBlend(mesh, repeats = 12) {
   const textureSets = ensureTerrainSemanticTextureSets(mesh, repeats);
-  return configureTerrainSurfaceMaterialBlend(mesh, textureSets);
+  const configured = configureTerrainSurfaceMaterialBlend(mesh, textureSets);
+  if (configured) attachRegionalImagery(mesh, appCtx, mesh.material.userData.terrainSurfaceMaterialBlend.uniforms);
+  return configured;
 }
 
 let cachedGroundFallbackMesh = null;

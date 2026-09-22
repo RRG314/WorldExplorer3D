@@ -196,9 +196,6 @@ function createLocationTerrainApi(deps = {}) {
         const ty = centerTile.y + dy;
         const key = terrainTileMeshKey(appCtx.TERRAIN_ZOOM, tx, ty);
         if (existingKeys.has(key)) continue;
-        if (!usesAcceptedGround) {
-          getOrLoadTerrainTile?.(appCtx.TERRAIN_ZOOM, tx, ty, terrainTileDeps);
-        }
         missing.push({
           key,
           z: appCtx.TERRAIN_ZOOM,
@@ -211,6 +208,7 @@ function createLocationTerrainApi(deps = {}) {
       }
     }
     missing.sort((a, b) => a.distance - b.distance).forEach((request) => {
+      if (!usesAcceptedGround) getOrLoadTerrainTile?.(request.z, request.tx, request.ty, terrainTileDeps);
       pendingTerrainMeshes.set(request.key, request);
     });
     scheduleTerrainMeshDrain();

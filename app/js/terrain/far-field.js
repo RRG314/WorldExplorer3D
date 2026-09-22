@@ -235,7 +235,7 @@ function createFarFieldTerrainApi(deps = {}) {
       return detailedMode;
     }
     const worldHint = String(appCtx.worldSurfaceProfile?.terrainModeHint || '');
-    if (worldHint === 'snow' || worldHint === 'sand') return worldHint;
+    if (['snow', 'snowRock', 'rock', 'sand'].includes(worldHint)) return worldHint;
     const semantic = classifyWorldCoverSurface(worldCoverResult, Number(appCtx.LOC?.lat || 0));
     return resolveWorldCoverDetailMode(semantic, worldCoverResult);
   }
@@ -649,25 +649,27 @@ function createFarFieldTerrainApi(deps = {}) {
       appCtx.LOC.lat,
       appCtx.LOC.lon
     );
+    const hasPolarSurface = !acceptedRegionalGround && !elevationFallbackMode &&
+      [...loadedTiles.values()].some(tile => Number(tile?.polarSampleCount || 0) > 0);
     mesh.userData.renderProvenance = {
       version: 1,
       profile: 'fixed-location-terrain-lod',
       provider: acceptedRegionalGround
         ? centerAcceptedGround?.providerId
-        : elevationFallbackMode ? 'accepted-ground-flat-datum' : 'mapzen-terrarium',
+        : elevationFallbackMode ? 'accepted-ground-flat-datum' : hasPolarSurface ? 'rema-mapzen-surface-composite' : 'mapzen-terrarium',
       dataset: acceptedRegionalGround
         ? centerAcceptedGround?.artifactId
         : elevationFallbackMode
         ? 'Degraded fixed-location flat datum with mapped surface semantics'
-        : 'Mapzen Terrarium elevation-derived landscape',
-      verticalDatum: centerAcceptedGround?.verticalDatum || null,
+        : hasPolarSurface ? 'REMA orthometric surface with Mapzen void fallback' : 'Mapzen Terrarium elevation-derived landscape',
+      verticalDatum: centerAcceptedGround?.verticalDatum || (hasPolarSurface ? 'EGM2008 for REMA samples; mixed-source datum for fallback cells' : null),
       normalizationOffsetMeters: offsetMeters,
       layer: 'terrain',
       role: 'fixed-location-terrain-lod',
       sources: [
         ...(acceptedRegionalGround
           ? [centerAcceptedGround?.artifactId].filter(Boolean)
-          : elevationFallbackMode ? ['accepted-ground-flat-datum'] : ['mapzen-terrarium']),
+          : elevationFallbackMode ? ['accepted-ground-flat-datum'] : hasPolarSurface ? ['pgc-rema-orthometric', 'mapzen-terrarium'] : ['mapzen-terrarium']),
         'openstreetmap-shortbread',
         ...(worldCoverContext ? ['esa-worldcover-2021'] : [])
       ],
@@ -757,7 +759,7 @@ function createFarFieldTerrainApi(deps = {}) {
       elevationFallbackMode,
       groundAuthority: acceptedRegionalGround
         ? 'accepted-ground-stack'
-        : elevationFallbackMode || 'mapzen-terrarium-offset',
+        : elevationFallbackMode || (hasPolarSurface ? 'rema-mapzen-surface-composite' : 'mapzen-terrarium-offset'),
       fallbackElevationMeters,
       offsetMeters,
       columns: built.columns,

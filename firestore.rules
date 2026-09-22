@@ -785,14 +785,12 @@ service cloud.firestore {
         (!('roomCreateCount' in request.resource.data) ||
           (
             request.resource.data.roomCreateCount is int &&
-            request.resource.data.roomCreateCount >= 0 &&
-            request.resource.data.roomCreateCount <= 10000
+            request.resource.data.roomCreateCount == 0
           )) &&
         (!('roomCreateLimit' in request.resource.data) ||
           (
             request.resource.data.roomCreateLimit is int &&
-            request.resource.data.roomCreateLimit >= 0 &&
-            request.resource.data.roomCreateLimit <= 10000
+            request.resource.data.roomCreateLimit == planRoomCreateLimit('free')
           )) &&
         request.resource.data.createdAt is timestamp &&
         request.resource.data.updatedAt is timestamp;

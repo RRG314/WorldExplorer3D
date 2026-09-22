@@ -1,3 +1,4 @@
+import { fetchPolarElevationTile, isPolarElevationTile, mergePolarElevation, polarSourceAt } from './polar-elevation-source.js';
 import {setTerrainWorldGrid} from './world-grid.js';
 import { markGroundSurfaceChanged } from './surface-revision.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
@@ -65,6 +66,7 @@ function touchTerrainTile(tile) {
 
 function failTerrainTileAttempt(tile, reason) {
   if (!tile || tile.evicted || tile.failed) return;
+  tile.polarAbort?.abort();
   tile.loaded = false;
   tile.loading = false;
   tile.failed = true;
@@ -94,8 +96,16 @@ function startTerrainTileAttempt(tile, z, x, y, deps) {
   tile.failed = false;
   tile.lastError = "";
   img.crossOrigin = "anonymous";
+  tile.polarAbort?.abort();
+  tile.polarAbort = new AbortController();
+  const selectedTile = latLonToTileXY(Number(appCtx.LOC?.lat || 0), Number(appCtx.LOC?.lon || 0), z);
+  const polarRequest = fetchPolarElevationTile(z, x, y, {
+    signal: tile.polarAbort.signal,
+    priority: Math.hypot(x - selectedTile.x, y - selectedTile.y) + Math.max(0, 15 - z) * 100,
+    onError: error => { tile.polarError = error; }
+  });
 
-  img.onload = () => {
+  img.onload = async () => {
     if (tile.evicted || tile.attempts !== attempt) {
       resolveReady(false);
       return;
@@ -113,6 +123,11 @@ function startTerrainTileAttempt(tile, z, x, y, deps) {
         elev[i] = decodeTerrariumRGB(data[p], data[p + 1], data[p + 2]);
       }
 
+      const polar = await polarRequest;
+      if (tile.evicted || tile.failed || tile.attempts !== attempt) { resolveReady(false); return; }
+      const merged = mergePolarElevation(elev, polar);
+      tile.polarMask = merged?.mask || null;
+      tile.polarSampleCount = merged?.count || 0;
       tile.loaded = true;
       tile.loading = false;
       tile.failed = false;
@@ -253,6 +268,7 @@ function releaseTerrainTile(tile) {
     tile.img.onerror = null;
     tile.img.src = '';
   }
+  tile.polarAbort?.abort();
   tile.img = null;
   tile.elev = null;
   tile.ready = null;
@@ -301,7 +317,7 @@ function waitForTerrainTileReady(z, x, y, deadline, deps, options = {}) {
     getOrLoadTerrainTile, failTerrainTileAttempt, terrainNow,
     cancelTile: (tileZ, tileX, tileY) => cancelTileRequest(appCtx.terrainTileCache, tileZ, tileX, tileY),
     maxAttempts: TERRAIN_TILE_MAX_ATTEMPTS,
-    attemptTimeoutMs: TERRAIN_TILE_ATTEMPT_TIMEOUT_MS
+    attemptTimeoutMs: isPolarElevationTile(z, x, y) ? 11000 : TERRAIN_TILE_ATTEMPT_TIMEOUT_MS
   });
 }
 
@@ -425,6 +441,7 @@ export function terrainSourceSampleAtLatLon(lat, lon, deps = {}) {
     longitude: lon,
     zoom: appCtx.TERRAIN_ZOOM,
     tile,
+    sourceFacts: polarSourceAt(tile, tilePoint.xf - tilePoint.x, tilePoint.yf - tilePoint.y) || undefined,
     clampElevationMeters: deps.clampElevationMeters
   });
 }
@@ -443,6 +460,7 @@ export function peekTerrainSourceSampleAtLatLon(lat, lon, deps = {}) {
     longitude: lon,
     zoom: appCtx.TERRAIN_ZOOM,
     tile: peekTerrainTile(appCtx.TERRAIN_ZOOM, tilePoint.x, tilePoint.y),
+    sourceFacts: polarSourceAt(peekTerrainTile(appCtx.TERRAIN_ZOOM, tilePoint.x, tilePoint.y), tilePoint.xf - tilePoint.x, tilePoint.yf - tilePoint.y) || undefined,
     clampElevationMeters: deps.clampElevationMeters
   });
 }
@@ -639,8 +657,8 @@ function* terrainHeightSteps(mesh, deps = {}, options = {}) {
         mesh.userData.renderProvenance = {
           version: 1,
           profile: 'worldwide-terrain-fallback',
-          provider: 'mapzen-terrarium',
-          dataset: 'Mapzen Terrain Tiles',
+          provider: tile.polarSampleCount ? 'pgc-rema-orthometric-with-mapzen-voids' : 'mapzen-terrarium',
+          dataset: tile.polarSampleCount ? 'REMA orthometric surface with Mapzen void fallback' : 'Mapzen Terrain Tiles',
           release: '',
           verticalDatum: 'mixed-source',
           tileKey: mesh.userData.terrainTileKey,

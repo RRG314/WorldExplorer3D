@@ -1,3 +1,4 @@
+import { ambientNotices } from '../ui/ambient-notices.js';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { createTutorialUi } from './ui.js?v=5';
 import { createCurrentJourneyUi } from './current-journey.js?v=4';
@@ -43,6 +44,7 @@ function defaultState() {
   return {
     version: TUTORIAL_VERSION,
     enabled: true,
+    mobileHintsConsent: false,
     completed: false,
     skipped: false,
     stage: STAGES.MOVE,
@@ -108,6 +110,7 @@ function normalizeState(input) {
   return {
     ...base,
     enabled: input?.enabled !== false,
+    mobileHintsConsent: input?.mobileHintsConsent === true,
     completed: input?.completed === true,
     skipped: input?.skipped === true,
     stage: input?.completed === true ? STAGES.COMPLETE : stage,
@@ -153,7 +156,16 @@ const tutorialUi = createTutorialUi({
   setTutorialEnabled: (enabled) => setTutorialEnabled(enabled),
   restartTutorial: () => restartTutorial()
 });
-const { createCardIfNeeded, ensureSettingsControls, hidePrompt, updateSettingsStatus, setExpanded } = tutorialUi;
+const { createCardIfNeeded, ensureSettingsControls, hidePrompt: hideTutorialCard, updateSettingsStatus, setExpanded } = tutorialUi;
+
+function hidePrompt() {
+  ambientNotices.release('tutorial');
+  hideTutorialCard();
+}
+function directActionVisible() {
+  return !!appCtx.resolvePrimaryContextInteraction?.() ||
+    document.getElementById('interiorPrompt')?.classList.contains('show') === true;
+}
 
 function playerPosition() {
   const target = appCtx.Walk?.state?.mode === 'walk' && appCtx.Walk.state.walker
@@ -173,9 +185,12 @@ function playerPosition() {
 function showPrompt(stage, config = {}) {
   if (!runtime.state.enabled || runtime.state.skipped || (runtime.state.completed && !config.contextual)) return false;
   if (!config.contextual && runtime.sessionPresented.has(stage)) return false;
-  if (uiBlocksTutorial()) return false;
+  if (uiBlocksTutorial() || directActionVisible()) return false;
+  const defaultDurationMs = Math.max(6000, Number(config.autoHideMs) || 8000);
+  const durationMs = globalThis.getWorldExplorerAccessibilityNoticeMs?.(defaultDurationMs) ?? defaultDurationMs;
+  if (!ambientNotices.request('tutorial', stage, { durationMs })) return false;
   createCardIfNeeded();
-  if (!runtime.card) return false;
+  if (!runtime.card) { ambientNotices.release('tutorial'); return false; }
   runtime.sessionPresented.add(stage);
   runtime.currentStage = stage;
   runtime.currentButtonAction = typeof config.onAction === 'function' ? config.onAction : null;
@@ -193,9 +208,8 @@ function showPrompt(stage, config = {}) {
 
   if (runtime.dismissTimer) clearTimeout(runtime.dismissTimer);
   runtime.dismissTimer = 0;
-  if (config.contextual) {
-    const preferredMs = globalThis.getWorldExplorerAccessibilityNoticeMs?.(Math.max(6000, Number(config.autoHideMs) || 10000))
-      ?? Math.max(6000, Number(config.autoHideMs) || 10000);
+  {
+    const preferredMs = durationMs;
     if (Number.isFinite(preferredMs)) {
       runtime.dismissTimer = window.setTimeout(() => dismissCurrentPrompt('auto_hidden'), preferredMs);
     }
@@ -428,7 +442,7 @@ function tutorialUpdate(dt = 0) {
   if (!runtime.initialized) return;
   detectContextTransitions();
   runtime.currentJourneyUi?.update?.(dt);
-  const activePanel = uiBlocksTutorial();
+  const activePanel = uiBlocksTutorial() || directActionVisible();
   if (activePanel) {
     if (runtime.card && !runtime.card.hidden) hidePrompt();
     return;
@@ -452,6 +466,7 @@ function tutorialUpdate(dt = 0) {
 
 function setTutorialEnabled(enabled) {
   runtime.state.enabled = !!enabled;
+  runtime.state.mobileHintsConsent = true;
   if (enabled) runtime.state.skipped = false;
   else if (!runtime.state.completed) runtime.state.skipped = true;
   saveState();
@@ -461,7 +476,9 @@ function setTutorialEnabled(enabled) {
 }
 
 function restartTutorial() {
+  ambientNotices.reset('tutorial');
   runtime.state = defaultState();
+  runtime.state.mobileHintsConsent = true;
   runtime.state.startedAtMs = Date.now();
   runtime.state.analyticsBegan = true;
   runtime.sessionPresented.clear();
@@ -493,6 +510,9 @@ function initTutorial(appContext = null) {
   if (runtime.initialized) return;
   if (appContext && typeof appContext === 'object') Object.assign(appCtx, appContext);
   runtime.state = loadState();
+  // Phone controls are already labelled. Optional teaching cards are opened
+  // from Learning settings, rather than covering play on every fresh install.
+  if (appCtx.isLikelyMobileDevice?.() && !runtime.state.mobileHintsConsent) runtime.state.enabled = false;
   createCardIfNeeded();
   ensureSettingsControls();
   runtime.previous = {

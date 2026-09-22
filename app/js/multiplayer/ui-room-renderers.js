@@ -44,6 +44,8 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
   }
 
   function setStatus(message, warn = false) {
+    state.lastActionStatus = String(message || '');
+    state.lastActionStatusWarn = warn === true;
     if (refs.titleStatus) {
       refs.titleStatus.textContent = message || "";
       refs.titleStatus.style.color = warn ? "#ef4444" : "#64748b";
@@ -64,12 +66,11 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
     if (!refs.titleBrowseList) return;
 
     if (!state.browseRooms.length) {
-      if (state.browseCityKey) {
-        refs.titleBrowseList.innerHTML = '<li class="mpRoomEmpty">No public rooms found for that city tag.</li>';
-      } else {
-        refs.titleBrowseList.innerHTML =
-          '<li class="mpRoomEmpty">Search a city to find public rooms (view-only if signed out).</li>';
-      }
+      const message = state.browsePhase === 'loading' ? 'Loading public rooms…' :
+        state.browsePhase === 'error' ? 'Room directory unavailable. Try Browse again.' :
+        state.browseCityKey ? 'No public rooms with this city tag. Clear the filter to browse all rooms.' :
+        state.browsePhase === 'ready' ? 'No public rooms yet. Create one or use an invite code.' : 'Browse public rooms; city filter is optional.';
+      refs.titleBrowseList.innerHTML = `<li class="mpRoomEmpty">${message}</li>`;
       publishMapRoomsToContext();
       return;
     }
@@ -82,7 +83,7 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
         const locationLabel = safeHtml(room.locationTag?.label || room.locationTag?.city || "Unknown location", 80);
         const joinButton = state.authUser
           ? `<button class="mp-btn secondary mpRoomJoinBtn" data-room-code="${escapeHtml(code)}" type="button">Join</button>`
-          : '<button class="mp-btn secondary mpRoomJoinBtn" type="button" disabled title="Sign in to join">View</button>';
+          : `<button class="mp-btn secondary mpRoomJoinBtn" data-room-code="${escapeHtml(code)}" type="button">Sign in to join</button>`;
         return `<li class="mpRoomItem"><div class="mpRoomInfo"><div class="mpRoomName">${roomName}</div><div class="mpRoomMeta">${locationLabel} • ${escapeHtml(worldKind)} • ${escapeHtml(code)}</div></div>${joinButton}</li>`;
       })
       .join("");
@@ -124,7 +125,7 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
         const locationLabel = safeHtml(room.locationTag?.label || room.locationTag?.city || "Unknown location", 80);
         const joinButton = state.authUser
           ? `<button class="mp-btn secondary mpRoomJoinBtn" data-room-code="${escapeHtml(code)}" type="button">Join</button>`
-          : '<button class="mp-btn secondary mpRoomJoinBtn" type="button" disabled title="Sign in to join">View</button>';
+          : `<button class="mp-btn secondary mpRoomJoinBtn" data-room-code="${escapeHtml(code)}" type="button">Sign in to join</button>`;
         return `<li class="mpRoomItem"><div class="mpRoomInfo"><div class="mpRoomName">${roomName}</div><div class="mpRoomMeta">${locationLabel} • ${escapeHtml(code)}</div></div>${joinButton}</li>`;
       })
       .join("");
@@ -397,6 +398,7 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
       refs.floatGhosts.classList.toggle("disabled", !hasRoom);
     }
     if (refs.floatChat) {
+      refs.floatChat.hidden = !hasRoom;
       refs.floatChat.classList.toggle("on", state.chatOpen);
       refs.floatChat.classList.toggle("disabled", !hasRoom);
     }

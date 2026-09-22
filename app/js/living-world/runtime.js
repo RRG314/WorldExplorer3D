@@ -176,6 +176,7 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
   });
   const sampleVehicleSurface = createTrafficVehicleSurfaceSampler(appCtx, trafficCompilation);
   const population = createLivingWorldPopulation({
+    latitude: appCtx.LOC?.lat,
     pedestrianGraph: pedestrianCompilation.publication,
     trafficGraph: trafficCompilation.publication,
     random: createWorldRandom(worldIdentity, 0x4c495645),

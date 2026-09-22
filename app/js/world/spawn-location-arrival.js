@@ -7,7 +7,6 @@ function resolveCustomLocationArrival(deps, mode = 'walk', options = {}) {
     findGradeSeparatedRoadAt,
     isSubgradeArrival,
     resolveSafeWorldSpawn,
-    searchNearestSafeRoadSpawn,
     tryAutoEnterBoatAt
   } = deps;
   const requestedArrivalMode = String(appCtx.customLoc?.arrivalMode || 'auto');
@@ -78,30 +77,15 @@ function resolveCustomLocationArrival(deps, mode = 'walk', options = {}) {
   }
 
   const verifiedOcean = appCtx.worldLoadRuntimeState?.surfaceDomain?.kind === 'ocean';
-  if (!verifiedOcean && Array.isArray(appCtx.roads) && appCtx.roads.length > 0) {
-    const mappedWalkApproach = mode === 'walk'
-      ? searchNearestSafeRoadSpawn(0, 0, {
-          mode: 'walk',
-          angle: appCtx.Walk?.state?.walker?.angle,
-          maxDistance: 160
-        })
-      : null;
-    if (
-      mappedWalkApproach?.valid &&
-      !isSubgradeArrival(mappedWalkApproach)
-    ) {
-      // searchNearestSafeRoadSpawn already resolves the nearest valid mapped
-      // surface inside the published fixed-location world. Reapplying a
-      // smaller origin-distance cutoff here discarded that authoritative
-      // result and stranded rural arrivals on empty terrain even when a road
-      // was visible just beyond the arbitrary threshold.
-      mappedWalkApproach.source = options.source || 'custom_mapped_walk_approach';
-      return applyResolvedWorldSpawn(mappedWalkApproach, options);
-    }
-    const landApproach = resolveSafeWorldSpawn(exactRoad?.x || 0, exactRoad?.z || 0, {
+  if (!verifiedOcean) {
+    // Walking destinations belong to the selected coordinates. A distant road
+    // returned by the structure lookup must not relocate a canyon/mountain visit.
+    const landApproach = resolveSafeWorldSpawn(0, 0, {
       ...arrivalOptions,
       mode,
       preferRoad: mode === 'drive',
+      maxGroundRadius: 96,
+      maxRoadDistance: mode === 'walk' ? 160 : undefined,
       source: options.source || 'custom_land_approach'
     });
     if (landApproach?.valid && !isSubgradeArrival(landApproach)) {
@@ -115,7 +99,7 @@ function resolveCustomLocationArrival(deps, mode = 'walk', options = {}) {
     source: options.source || 'custom_location'
   });
   if (boatSpawn) return boatSpawn;
-  return applySpawnTarget(exactRoad?.x || 0, exactRoad?.z || 0, {
+  return applySpawnTarget(0, 0, {
     ...arrivalOptions,
     mode,
     feetY: Number.isFinite(structureFeetY) ? structureFeetY : options.feetY,

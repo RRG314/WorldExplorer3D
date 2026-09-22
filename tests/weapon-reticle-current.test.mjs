@@ -134,3 +134,13 @@ test('NPC projectile aim leads a moving explorer without becoming perfectly accu
   assert.ok(target.x > 0, 'aim should lead the moving target');
   assert.ok(target.accuracy < 1 && target.accuracy >= .25);
 });
+
+
+test('a loaded model muzzle is the projectile origin and still converges on the reticle', () => {
+  const muzzleOrigin = { x: .28, y: 1.38, z: .84 }, target = { x: 1, y: 2, z: 30 };
+  const input = { actor: { x: 0, y: 1.7, z: 0 }, muzzleOrigin, aimDirection: { x: 0, y: 0, z: 1 }, aimPoint: target, speed: 72 };
+  const result = resolvePlayerProjectileLaunch(input);
+  assert.deepEqual(result.origin, muzzleOrigin);
+  for (const axis of ['x', 'y', 'z']) assert.ok(Math.abs(result.origin[axis] + result.velocity[axis] * result.expectedFlightSeconds - target[axis]) < 1e-5);
+  assert.notDeepEqual(resolvePlayerProjectileLaunch({ ...input, muzzleOrigin: { x: 100, y: 1, z: 100 } }).origin, { x: 100, y: 1, z: 100 });
+});

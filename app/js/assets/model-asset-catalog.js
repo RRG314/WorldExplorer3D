@@ -111,7 +111,8 @@ const MODEL_ASSET_CATALOG = Object.freeze([
     sourceUrl: 'https://quaternius.com/packs/scifimodularguns.html',
     attribution: 'Sci-Fi Modular Gun Pack — Pistol 2 by Quaternius',
     sourceUpAxis: 'z',
-    targetLengthMeters: .58,
+    targetLengthMeters: .32,
+    gripOffsetMeters: Object.freeze({ x: 0, y: -.045, z: .08 }),
     collisionPolicy: 'existing-equipment-and-projectile-authority',
     instancePolicy: Object.freeze({ geometry: 'shared', materials: 'clone' }),
     budgets: Object.freeze({ bytes: 54_000, triangles: 1_700, maxInstances: 24, textureEdgePixels: 0 })
@@ -128,6 +129,7 @@ const MODEL_ASSET_CATALOG = Object.freeze([
     attribution: 'Sci-Fi Modular Gun Pack — AR 3 by Quaternius',
     sourceUpAxis: 'z',
     targetLengthMeters: .84,
+    gripOffsetMeters: Object.freeze({ x: 0, y: -.11, z: .25 }),
     collisionPolicy: 'existing-equipment-and-projectile-authority',
     instancePolicy: Object.freeze({ geometry: 'shared', materials: 'clone' }),
     budgets: Object.freeze({ bytes: 102_000, triangles: 3_200, maxInstances: 16, textureEdgePixels: 0 })

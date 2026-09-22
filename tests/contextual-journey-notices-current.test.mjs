@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   AMBIENT_JOURNEY_RADIUS_METERS,
+  createCurrentJourneyUi,
   deriveFieldJourney
 } from '../app/js/tutorial/current-journey.js';
 
@@ -52,4 +53,16 @@ test('an activity the player already started remains available regardless of dis
   assert.equal(journey.eyebrow, 'FIELD ACTIVITY');
   assert.equal(journey.title, 'Track wildlife');
   assert.equal(journey.transient, undefined);
+});
+
+test('mobile tracking leaves unsolicited suggestions in Today but shows a started activity',()=>{
+  const previous=globalThis.document;
+  const nodes=new Map();globalThis.document={getElementById(id){if(!nodes.has(id))nodes.set(id,{hidden:true,addEventListener(){}});return nodes.get(id);}};
+  try {
+    let snapshot={active:true,interaction:{phase:'idle'},fieldExpedition:{objectives:[{targetLabel:'Stop',distanceMeters:12}]}};
+    const ui=createCurrentJourneyUi({gameStarted:true,isLikelyMobileDevice:()=>true,worldDiscoveryRuntimeSnapshot:()=>snapshot});
+    ui.update(1);assert.equal(nodes.get('currentJourneyCard').hidden,true);
+    snapshot={active:true,interaction:{phase:'seeking'},activeActivityId:'survey',actions:[{id:'survey',label:'Survey'}]};
+    ui.update(1);assert.equal(nodes.get('currentJourneyCard').hidden,false);assert.equal(nodes.get('currentJourneyTitle').textContent,'Survey');
+  } finally {if(previous===undefined)delete globalThis.document;else globalThis.document=previous;}
 });

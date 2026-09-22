@@ -51,14 +51,13 @@ function createMultiplayerRoomsDirectoryApi(context) {
     const { db } = getServices();
 
     const cityKey = normalizeCityKey(cityInput);
-    if (!cityKey) return [];
 
     const resultLimit = Math.max(1, Math.min(50, Math.floor(Number(options.resultLimit || PUBLIC_ROOM_RESULT_LIMIT))));
 
     const roomsRef = collection(db, ROOM_COLLECTION);
     const q = query(
       roomsRef,
-      where('cityKey', '==', cityKey),
+      ...(cityKey ? [where('cityKey', '==', cityKey)] : []),
       where('visibility', '==', 'public'),
       orderBy('createdAt', 'desc'),
       limit(resultLimit)
@@ -108,8 +107,8 @@ function createMultiplayerRoomsDirectoryApi(context) {
     let db;
     try {
       ({ db } = getServices());
-    } catch (_) {
-      callback([]);
+    } catch (error) {
+      options.onError?.(error);
       return () => {};
     }
 
@@ -130,7 +129,7 @@ function createMultiplayerRoomsDirectoryApi(context) {
       callback(rows);
     }, (err) => {
       console.warn('[multiplayer][rooms] listenMyRooms failed:', err);
-      callback([]);
+      options.onError?.(err);
     });
   }
 
@@ -145,8 +144,8 @@ function createMultiplayerRoomsDirectoryApi(context) {
     let db;
     try {
       ({ db } = getServices());
-    } catch (_) {
-      callback([]);
+    } catch (error) {
+      options.onError?.(error);
       return () => {};
     }
 
@@ -167,7 +166,7 @@ function createMultiplayerRoomsDirectoryApi(context) {
       callback(sortRoomsByCreatedAtDesc(rows));
     }, (err) => {
       console.warn('[multiplayer][rooms] listenOwnedRooms failed:', err);
-      callback([]);
+      options.onError?.(err);
     });
   }
 

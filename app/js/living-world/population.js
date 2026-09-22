@@ -1,3 +1,4 @@
+import { createPedestrianSpacing } from './pedestrian-spacing.js';
 import { selectVehicleVariant, VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=6';
 import { resolveVehicleRoadContactPose } from '../engine/vehicle-road-attitude.js?v=2';
 import {
@@ -129,8 +130,9 @@ function physicalEdgeKey(edge) {
 
 function pedestrianPathOffset(edge, random) {
   const spread = edge?.role === 'entrance' ? .22 : edge?.role === 'crossing' ? .3 : .62;
-  const raw = (random() * 2 - 1) * spread;
-  return Math.abs(raw) < .12 ? (raw < 0 ? -.12 : .12) : raw;
+  // Each directed edge keeps walkers to its right. Reverse edges therefore
+  // use the opposite physical side instead of random head-on lanes.
+  return -(spread * .75 + random() * spread * .25);
 }
 
 function spawnCandidate(graph, random, kind, reference) {
@@ -173,7 +175,7 @@ function planAgentSpawns(count, graph, random, kind, reference = null) {
       }
       if (kind === 'pedestrian' && score < .01) break;
     }
-    placements.push(best);
+    if (best && (kind !== 'pedestrian' || placements.every(other => Math.hypot(best.x - other.x, best.z - other.z) >= 1.1))) placements.push(best);
   }
   return placements;
 }
@@ -191,7 +193,7 @@ function createAgents(count, graph, random, kind, reference = null) {
   if (!graph?.edges?.length) return [];
   const spawnPlan = planAgentSpawns(count, graph, random, kind, reference);
   const agents = [];
-  for (let index = 0; index < count; index += 1) {
+  for (let index = 0; index < spawnPlan.length; index += 1) {
     const spawn = spawnPlan[index];
     const edgeIndex = spawn.edgeIndex;
     const edge = graph.edges[edgeIndex];
@@ -299,7 +301,31 @@ function relocateAgent(agent, graph, random, kind, reference) {
   agent.relocationCooldown = POPULATION_VISIBILITY_POLICY.relocationHideSeconds;
 }
 
+export function yieldToOpposingPedestrian(agent, agents, graph) {
+  const edge = graph.edges[agent.edgeIndex];
+  if (!edge || agent.bridge) return false;
+  const key = physicalEdgeKey(edge);
+  const opponent = agents.find(other => {
+    if (other === agent || other.bridge || String(other.id) >= String(agent.id)) return false;
+    const otherEdge = graph.edges[other.edgeIndex];
+    if (!otherEdge || physicalEdgeKey(otherEdge) !== key) return false;
+    const dot = (edge.p2.x - edge.p1.x) * (otherEdge.p2.x - otherEdge.p1.x) + (edge.p2.z - edge.p1.z) * (otherEdge.p2.z - otherEdge.p1.z);
+    const a = edgePoint(edge, agent.progress, agent.pathOffset), b = edgePoint(otherEdge, other.progress, other.pathOffset);
+    return dot < 0 && Math.hypot(a.x - b.x, a.z - b.z) < 1.2;
+  });
+  if (!opponent) return false;
+  const reverse = graph.edges.findIndex(candidate => candidate !== edge && physicalEdgeKey(candidate) === key &&
+    Math.hypot(candidate.p1.x - edge.p2.x, candidate.p1.z - edge.p2.z) < .05);
+  if (reverse < 0) return false;
+  agent.edgeIndex = reverse;
+  agent.progress = Math.max(0, edge.length - agent.progress);
+  agent.pathOffset = -(agent.pathOffset || 0);
+  agent.spacingWait = 0; agent.currentSpeed = 0; agent.waitReason = 'yielding_on_path';
+  return true;
+}
+
 function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {}) {
+  const spacing = kind === 'pedestrian' ? createPedestrianSpacing(agents, agent => agentPose(agent, graph)) : null;
   const occupancy = new Map();
   if (kind === 'vehicle') {
     agents.forEach((agent) => {
@@ -331,7 +357,11 @@ function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {})
       continue;
     }
     if (agent.bridge) {
-      const bridgeSpeed = agent.speed * .72;
+      let bridgeSpeed = agent.speed * .72;
+      if (spacing) {
+        const bridge = agent.bridge, length = Math.max(.01, bridge.length);
+        bridgeSpeed *= spacing.limit(agent, (bridge.p2.x - bridge.p1.x) / length * bridgeSpeed * dt, (bridge.p2.z - bridge.p1.z) / length * bridgeSpeed * dt);
+      }
       agent.currentSpeed = bridgeSpeed;
       agent.motionTime += bridgeSpeed * dt * (kind === 'vehicle' ? .42 : 3.1);
       agent.bridge.progress += bridgeSpeed * dt;
@@ -341,6 +371,7 @@ function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {})
         agent.progress = overflow;
         agent.bridge = null;
       }
+      spacing?.update(agent, agentPose(agent, graph));
       continue;
     }
     const edge = graph.edges[agent.edgeIndex];
@@ -402,6 +433,18 @@ function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {})
         }
       }
       if (edge.role === 'crossing') speed *= behavior.crossingBlocked?.(edge) ? 0 : .86;
+      const length = Math.max(.01, Math.hypot(edge.p2.x - edge.p1.x, edge.p2.z - edge.p1.z));
+      const fraction = spacing.limit(agent, (edge.p2.x - edge.p1.x) / length * speed * dt * stride, (edge.p2.z - edge.p1.z) / length * speed * dt * stride);
+      speed *= fraction;
+      agent.waitReason = fraction < 1 ? 'pedestrian_spacing' : '';
+      agent.spacingWait = fraction < .05 ? (agent.spacingWait || 0) + dt * stride : 0;
+      // A narrow mapped approach may have no passing room. One walker yields
+      // by retracing the same path to a junction, never stepping into traffic.
+      if (agent.spacingWait > 1.5 && yieldToOpposingPedestrian(agent, agents, graph)) {
+        spacing.update(agent, agentPose(agent, graph));
+        continue;
+      }
+
     }
     agent.waiting = speed < agent.speed * .5;
     agent.currentSpeed = speed;
@@ -449,6 +492,7 @@ function advanceAgents(agents, graph, outgoing, random, dt, kind, behavior = {})
       transitionEdge = nextEdge;
       if (!nextEdge || agent.progress < nextEdge.length) break;
     }
+    spacing?.update(agent, agentPose(agent, graph));
   }
 }
 
@@ -465,7 +509,7 @@ function updateAgentVisibility(agent, distance, activeRatio, dt, policy = POPULA
 
 export function createLivingWorldPopulation(options = {}) {
   const tier = String(options.tier || 'balanced').toLowerCase();
-  const initialDemand = resolveLivingWorldDemand({ tier, timePhase: options.getTimePhase?.(), liveFlow: options.getTrafficFlow?.() });
+  const initialDemand = resolveLivingWorldDemand({ latitude: options.latitude, tier, timePhase: options.getTimePhase?.(), liveFlow: options.getTrafficFlow?.() });
   const budget = initialDemand;
   const pedestrianGraph = options.pedestrianGraph;
   const trafficGraph = options.trafficGraph;
@@ -538,6 +582,7 @@ export function createLivingWorldPopulation(options = {}) {
   let elapsedSeconds = 0;
   const referencePosition = () => options.getReferencePosition?.() || null;
   const currentDemand = () => resolveLivingWorldDemand({
+    latitude: options.latitude,
     tier,
     timePhase: options.getTimePhase?.(),
     liveFlow: options.getTrafficFlow?.()

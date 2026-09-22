@@ -17,6 +17,15 @@ test('a failed road publication never marks a partial world playable',async t=>{
   assert.equal(marked,false);assert.equal(spawned,false);
 });
 
+test('roadless terrain failure cannot spawn a player on the loading placeholder',async t=>{
+  const saved={...ctx};t.after(()=>{for(const key of Object.keys(ctx))delete ctx[key];Object.assign(ctx,saved);});
+  let marked=false,spawned=false,waited=false;
+  Object.assign(ctx,{terrainEnabled:true,onMoon:false,roads:[],publishLocationTerrain:()=>true,
+    waitForLocationTerrainPublication:async()=>{waited=true;throw Error('missing Antarctic elevation');}});
+  await assert.rejects(finalizeLoadedWorld({markLoaded:()=>{marked=true;},spawnPlayer:()=>{spawned=true;}}),error=>isSurfacePublicationError(error)&&error.stage==='terrain');
+  assert.equal(waited,true);assert.equal(marked,false);assert.equal(spawned,false);
+});
+
 test('surface failure cancels work and retires staging without starting gameplay',()=>{
   const calls=[],runtimeState={sequence:9,status:'loading',activePhases:['roads']};
   const appCtx={worldLoading:true,initialEarthWorldReady:true,

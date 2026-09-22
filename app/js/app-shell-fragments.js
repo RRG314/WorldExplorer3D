@@ -65,6 +65,7 @@ const APP_SHELL_FRAGMENT_HTML = `
       </div>
       <div class="mp-row">
         <button id="roomPanelCreateBtn" class="mp-btn primary" type="button">Create Room Here</button>
+        <button id="roomChatToggleBtn" class="mp-btn secondary" type="button" disabled>Room Chat</button>
         <button id="roomPanelInviteBtn" class="mp-btn secondary" type="button">Invite Link</button>
         <button id="roomPanelLeaveBtn" class="mp-btn secondary" type="button">Leave Room</button>
         <button id="roomPanelTrialBtn" class="mp-btn warn" type="button">Account / Donations</button>

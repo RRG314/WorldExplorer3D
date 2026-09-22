@@ -242,7 +242,7 @@ function surfaceKindFromWalkInfo(info = {}) {
   return SURFACE_KIND.TERRAIN;
 }
 
-function terrainProvenance(appCtx) {
+function terrainProvenance(appCtx, x, z) {
   const ground = appCtx.getAcceptedGroundRuntimeSnapshot?.() || null;
   if (ground?.status === 'accepted') return {
     provider: ground.providerId,
@@ -254,6 +254,12 @@ function terrainProvenance(appCtx) {
     fallback: false
   };
   if (appCtx.worldLoadRuntimeState?.groundMode === 'worldwide-terrain-fallback') {
+    const sample = appCtx.peekTerrainSourceSampleAtWorldXZ?.(x, z);
+    if (sample?.available && sample.provenance?.runtimeClassification === 'surface-elevation-fallback') return {
+      provider: 'pgc-rema-orthometric', dataset: sample.provenance.dataset,
+      source: 'polar_surface_elevation_fallback', verticalDatum: sample.provenance.verticalDatum,
+      confidence: .6, fallback: true
+    };
     return {
       provider: 'mapzen-terrarium',
       dataset: 'Mapzen Terrain Tiles',
@@ -301,7 +307,7 @@ function createSurfaceQuery(appCtx, GroundHeight) {
       kind: SURFACE_KIND.TERRAIN,
       profile: profile(),
       metersPerWorldUnit: units(),
-      provenance: terrainProvenance(appCtx)
+      provenance: terrainProvenance(appCtx, x, z)
     });
   }
 
@@ -325,7 +331,7 @@ function createSurfaceQuery(appCtx, GroundHeight) {
       distance: usesAirportSurface ? 0 : info.dist,
       provenance: usesAirportSurface
         ? airportSurfaceProvenance
-        : kind === SURFACE_KIND.TERRAIN ? terrainProvenance(appCtx) : {},
+        : kind === SURFACE_KIND.TERRAIN ? terrainProvenance(appCtx, x, z) : {},
       traversal: { drive: kind === SURFACE_KIND.ROAD || kind === SURFACE_KIND.TERRAIN }
     });
   }
@@ -353,7 +359,7 @@ function createSurfaceQuery(appCtx, GroundHeight) {
       distance: usesAirportSurface ? 0 : info.roadDist,
       provenance: usesAirportSurface
         ? airportSurfaceProvenance
-        : road ? {} : terrainProvenance(appCtx)
+        : road ? {} : terrainProvenance(appCtx, x, z)
     });
   }
 

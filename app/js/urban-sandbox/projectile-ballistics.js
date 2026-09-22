@@ -75,7 +75,11 @@ function resolvePlayerProjectileLaunch(input = {}) {
   const speed = Math.max(0.1, finite(input.speed, 48));
   const range = Math.max(1, finite(input.range, 40));
   const aimDirection = normalized(input.aimDirection);
-  const origin = playerMuzzleOrigin(input.actor, aimDirection);
+  const fallbackOrigin = playerMuzzleOrigin(input.actor, aimDirection);
+  const muzzle = input.muzzleOrigin;
+  const hasMuzzle = muzzle && [muzzle.x, muzzle.y, muzzle.z].every(Number.isFinite) &&
+    Math.hypot(muzzle.x - fallbackOrigin.x, muzzle.y - fallbackOrigin.y, muzzle.z - fallbackOrigin.z) <= 2.5;
+  const origin = hasMuzzle ? Object.freeze({ x: muzzle.x, y: muzzle.y, z: muzzle.z }) : fallbackOrigin;
   const target = input.aimPoint || {
     x: origin.x + aimDirection.x * range,
     y: origin.y + aimDirection.y * range,

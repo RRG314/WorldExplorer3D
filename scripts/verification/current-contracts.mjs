@@ -5,6 +5,17 @@ import process from 'node:process';
 // tests. Every file corresponds to a retained System Inventory capability or
 // an Architecture Map ownership boundary.
 const tests = [
+  'tests/earth-atmosphere-color-current.test.mjs',
+  'tests/contextual-journey-notices-current.test.mjs',
+  'tests/street-publication-failure-current.test.mjs',
+  'tests/terrain-publication-order-current.test.mjs',
+  'tests/held-equipment-pose-current.test.mjs',
+  'tests/roadside-placement-current.test.mjs',
+  'tests/location-quality-current.test.mjs',
+  'tests/polar-elevation-current.test.mjs',
+  'tests/regional-imagery-current.test.mjs',
+  'tests/ambient-notices-current.test.mjs',
+  'tests/pedestrian-spacing-current.test.mjs',
   'tests/road-marking-polygons-current.test.mjs',
   'tests/plane-launch-clearance-current.test.mjs',
   'tests/provider-fixture-key-current.test.mjs',
@@ -22,6 +33,7 @@ const tests = [
   'tests/far-building-instance-batches-current.test.mjs',
   'tests/firebase-emulator-attestation-current.test.mjs',
   'tests/room-title-world-current.test.mjs',
+  'tests/room-discovery-current.test.mjs',
   'tests/terrain-sampling-geometry-current.test.mjs',
   'tests/selected-source-node-retention-current.test.mjs',
   'tests/ea-london-ground-current.test.mjs',

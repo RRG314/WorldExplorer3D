@@ -1,3 +1,4 @@
+import { ambientNotices } from '../ui/ambient-notices.js';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { buildActivityCatalog, currentReferencePose } from './catalog.js?v=5';
 import { getStoredActivityById, listStoredActivities, removeStoredActivity } from './library.js?v=3';
@@ -234,16 +235,19 @@ function renderPrompt() {
   const refsNow = refs();
   if (!refsNow.prompt || !state.promptEnabled || state.active || appCtx.mapLayers?.activities === false || getRuntimeSnapshot().active) {
     refsNow.prompt?.classList.remove('show');
+    ambientNotices.release('activity');
     return;
   }
   const candidate = state.catalog.find((entry) => entry.id === state.nearbyPromptId) || null;
   if (!candidate) {
     refsNow.prompt.classList.remove('show');
+    ambientNotices.release('activity');
     return;
   }
   refsNow.promptTitle.textContent = `${candidate.icon} ${candidate.title}`;
   refsNow.promptMeta.textContent = `${candidate.locationLabel} • ${Math.round(candidate.distanceMeters)}m • ${candidate.traversalMode}`;
-  refsNow.prompt.classList.add('show');
+  const blocked = !!(appCtx.paused || appCtx.showLargeMap || appCtx.activeInterior || appCtx.resolvePrimaryContextInteraction?.() || document.getElementById('interiorPrompt')?.classList.contains('show'));
+  refsNow.prompt.classList.toggle('show', ambientNotices.request('activity', candidate.id, { durationMs: 7000, blocked }));
 }
 
 function renderRunHud() {

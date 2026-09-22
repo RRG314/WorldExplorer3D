@@ -144,6 +144,8 @@ function initMultiplayerPlatform() {
     chatOpen: false,
     browseCityKey: '',
     browseRooms: [],
+    browsePhase: 'idle',
+    browseRequestId: 0,
     featuredRooms: [],
     friends: [],
     recentPlayers: [],
@@ -437,7 +439,7 @@ function initMultiplayerPlatform() {
     applyEntitlementCopy();
     attemptPendingRoomJoin();
     updateToggleStates();
-    renderBrowseRooms();
+    handleBrowseRooms();
     renderFeaturedRooms();
     renderFriends();
     renderRecentPlayers();
@@ -469,7 +471,7 @@ function initMultiplayerPlatform() {
     renderArtifacts();
     renderRoomActivities();
     renderHomeBase();
-    renderBrowseRooms();
+    handleBrowseRooms();
     renderFeaturedRooms();
     renderFriends();
     renderRecentPlayers();

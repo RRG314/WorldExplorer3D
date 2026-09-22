@@ -54,14 +54,17 @@ function resolveLivingWorldDemand(options = {}) {
   const phase = String(options.timePhase || 'day').toLowerCase();
   const time = TIME_DEMAND[phase] || TIME_DEMAND.day;
   const flow = normalizeTrafficFlowSnapshot(options.liveFlow, options);
+  const antarctic = Number(options.latitude) <= -60;
   const vehicleDemandScale = flow.available ? flow.demandScale : 1;
   const vehicleSpeedScale = flow.available ? flow.speedScale : 1;
   return Object.freeze({
     tier: LIVING_WORLD_DEMAND_BY_TIER[tier] ? tier : 'balanced',
     phase: TIME_DEMAND[phase] ? phase : 'day',
     activityBand: time.label,
-    pedestrians: base.pedestrians,
-    vehicles: base.vehicles,
+    // Simulation density is an inference, not a count of real residents. A
+    // polar research site must not inherit a city-sized road population.
+    pedestrians: antarctic ? Math.min(4, base.pedestrians) : base.pedestrians,
+    vehicles: antarctic ? 0 : base.vehicles,
     pedestrianActiveRatio: clamp(time.pedestrians, .35, 1),
     vehicleActiveRatio: clamp(time.vehicles * vehicleDemandScale, .4, 1),
     pedestrianRadius: base.pedestrianRadius,

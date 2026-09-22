@@ -4,6 +4,11 @@ import {readFile} from 'node:fs/promises';
 import {spawn} from 'node:child_process';
 const client=process.env.WE3D_GAME_CLIENT || '/Users/stevenreid/.codex/skills/develop-web-game/scripts/web_game_playwright_client.js';
 let source=await readFile(client,'utf8');
+if (process.env.WE3D_STAGING_APP_CHECK_FILE) {
+ const {token} = JSON.parse(await readFile(process.env.WE3D_STAGING_APP_CHECK_FILE, 'utf8'));
+ source = source.replace('await page.goto(args.url, { waitUntil: "domcontentloaded" });', `await page.addInitScript(token => { globalThis.FIREBASE_APPCHECK_DEBUG_TOKEN = token; }, ${JSON.stringify(token)});\nawait page.goto(args.url, { waitUntil: "domcontentloaded" });`);
+}
+source = source.replace('await page.click(args.clickSelector, { timeout: 5000 });', 'if (await page.locator("#analyticsConsentDenyBtn").isVisible()) await page.locator("#analyticsConsentDenyBtn").click(); await page.click(args.clickSelector, { timeout: 5000 });');
 const patches=[
  ['await page.waitForTimeout(500);', `await page.waitForFunction(() => window.__WE3D_RUNTIME_READY__, null, {timeout:45000});`],
  ['await page.click(args.clickSelector, { timeout: 5000 });', 'await page.click(args.clickSelector, { timeout: 15000 });'],
@@ -22,7 +27,7 @@ source=source.replace('console.warn("Failed to click selector", args.clickSelect
 // WebGL's default non-preserved drawing buffer may be cleared before toDataURL.
 // Capture the composited page instead, including the real player-facing HUD.
 source=source.replace('await captureScreenshot(page, canvas, shotPath);', 'await page.screenshot({path:shotPath, type:"png"});\nfs.writeFileSync(path.join(args.screenshotDir,"runtime.json"),JSON.stringify(await page.evaluate(()=>window.getWorldExplorerRuntimeDiagnostics?.()),null,2));');
-if(process.env.WE3D_TEST_DAY==='1') source=source.replace('await doChoreography(page, canvas, steps);', `await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setTimeOfDay?.('day');});\nawait doChoreography(page, canvas, steps);`);
+if(process.env.WE3D_TEST_DAY==='1') source=source.replace('await doChoreography(page, canvas, steps);', `await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.setTimeOfDay?.('day');ctx.setWeatherMode?.('clear');});\nawait doChoreography(page, canvas, steps);`);
 if(process.env.WE3D_TEST_MOBILE==='1') source=source.replace('const page = await browser.newPage();','const page = await browser.newPage({viewport:{width:412,height:915},isMobile:true,hasTouch:true,deviceScaleFactor:1,userAgent:"Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36"});');
 if(process.env.WE3D_REAL_GPU==='1') source=source.replace('args: ["--use-gl=angle", "--use-angle=swiftshader"],','channel:"chrome",');
 if(process.env.WE3D_GROUND_EVIDENCE==='1') source=source.replace('await page.screenshot({path:shotPath, type:"png"});', `await page.screenshot({path:shotPath, type:"png"});
@@ -33,7 +38,7 @@ fs.writeFileSync(path.join(args.screenshotDir,'ground.json'),JSON.stringify(awai
  meshes:(ctx.terrainGroup?.children||[]).filter(m=>m.userData?.isTerrainMesh).slice(0,8).map(m=>({
   profile:m.userData.terrainVisualProfile,tinted:m.userData.mappedSemanticTintVertices,
   repeats:m.userData.terrainTextureRepeats,color:m.material?.color?.getHexString(),
-  map:m.material?.map?.image?.src,worldCover:m.userData.worldCoverResult?.stats}))};
+  map:m.material?.map?.image?.src,imagery:m.userData.regionalImagery,worldCover:m.userData.worldCoverResult?.stats}))};
 }),null,2));`);
 if(process.env.WE3D_BUILDING_PARITY==='1') source=source.replace('await page.screenshot({path:shotPath, type:"png"});', `await page.screenshot({path:shotPath, type:"png"});
 fs.writeFileSync(path.join(args.screenshotDir,'buildings.json'),JSON.stringify(await page.evaluate(async()=>{

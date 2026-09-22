@@ -426,6 +426,16 @@ function createGhostManager(scene, options = {}) {
       animateProxy(entry, dtSeconds);
       entry.holder.position.set(entry.current.x, entry.current.y, entry.current.z);
       entry.holder.rotation.y = entry.currentYaw;
+      const camera = options.getCamera?.();
+      const tag = entry.nameTag?.sprite;
+      if (camera?.position && tag) {
+        const distance = camera.position.distanceTo(entry.holder.position);
+        const viewportHeight = Math.max(240, Number(options.getViewportHeight?.() || globalThis.innerHeight || 720));
+        const span = 2 * Math.tan((Number(camera.fov) || 50) * Math.PI / 360) * distance;
+        const width = Math.min(2.4, span * 120 / viewportHeight);
+        tag.scale.set(width, width / 4, 1);
+        tag.visible = distance > 2 && distance < 100;
+      }
     }
   }
 

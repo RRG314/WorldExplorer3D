@@ -24,6 +24,20 @@ function prepareCuratedEquipmentVisual(THREE, instance) {
   const bounds = new THREE.Box3().setFromObject(source);
   const size = bounds.getSize(new THREE.Vector3());
   const center = bounds.getCenter(new THREE.Vector3());
+  // Locate the barrel end from the foremost mesh vertices in the imported
+  // forward (+X) axis, rather than guessing an offset from the player's chest.
+  const tip = new THREE.Vector3();
+  let tipCount = 0;
+  source.traverse(object => {
+    const position = object?.geometry?.attributes?.position;
+    if (!object.isMesh || !position) return;
+    const point = new THREE.Vector3();
+    for (let i = 0; i < position.count; i++) {
+      point.fromBufferAttribute(position, i).applyMatrix4(object.matrixWorld);
+      if (point.x >= bounds.max.x - size.x * .015) { tip.add(point); tipCount++; }
+    }
+  });
+  if (tipCount) tip.multiplyScalar(1 / tipCount); else tip.set(bounds.max.x, center.y, center.z);
   const scale = Number(record.targetLengthMeters || .6) / Math.max(.001, size.x);
   source.position.x -= bounds.min.x;
   source.position.y -= center.y;
@@ -38,7 +52,14 @@ function prepareCuratedEquipmentVisual(THREE, instance) {
   visual.name = `${record.label} curated visual`;
   visual.rotation.y = -Math.PI * .5;
   visual.add(normalized);
+  const grip = record.gripOffsetMeters || { x: 0, y: 0, z: 0 };
+  visual.position.set(-grip.x, -grip.y, -grip.z);
   visual.userData.curatedEquipmentAssetId = record.id;
+  visual.userData.muzzleInHost = Object.freeze({
+    x: -(tip.z - center.z) * scale - grip.x,
+    y: (tip.y - center.y) * scale - grip.y,
+    z: (tip.x - bounds.min.x) * scale - grip.z
+  });
   visual.userData.presentationOnly = true;
   visual.userData.gameplayAuthority = record.collisionPolicy;
   visual.userData.importDimensions = Object.freeze({ x: size.x, y: size.y, z: size.z, scale });

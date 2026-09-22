@@ -197,7 +197,9 @@ function createCurrentJourneyUi(appCtx, options = {}) {
       return;
     }
     const journey = deriveSpaceJourney(appCtx) || deriveFieldJourney(appCtx);
-    if (!journey) {
+    // Nearby suggestions remain discoverable in Today. On a phone only an
+    // activity the player actually started earns an in-game tracking card.
+    if (!journey || (journey.transient && appCtx.isLikelyMobileDevice?.())) {
       if (card) card.hidden = true;
       return;
     }

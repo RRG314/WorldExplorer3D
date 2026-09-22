@@ -122,7 +122,7 @@ function updateCuratedCharacterAnimation(host, isMoving, deltaTime, isRunning = 
   if (!mixer) return false;
   mixer.update(Math.max(0, Number(deltaTime) || 0));
   const actions = host.userData.characterActions || {};
-  const armed = !!host?.userData?.heldEquipmentId;
+  const armed = !!host?.userData?.heldEquipmentId && host.userData.weaponPose !== 'holstered';
   const target = armed
     ? isMoving && actions.armedRun ? 'armedRun' : actions.armedIdle ? 'armedIdle' : 'idle'
     : isRunning && actions.run ? 'run' : isMoving && actions.walk ? 'walk' : 'idle';

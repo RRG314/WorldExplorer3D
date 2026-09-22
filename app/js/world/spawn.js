@@ -262,7 +262,8 @@ function searchNearestSafeRoadSpawn(targetX, targetZ, options = {}) {
   const traversableFeatures = worldSpawnDeps.traversableFeaturesForMode(requestedMode);
   if (!Array.isArray(traversableFeatures) || traversableFeatures.length === 0) return null;
   const maxDistance = Number.isFinite(options.maxDistance) ? Math.max(32, options.maxDistance) : 220;
-  const limits = [maxDistance, Infinity];
+  // An explicit bound is a destination contract, not a first-pass hint.
+  const limits = Number.isFinite(options.maxDistance) || requestedMode === "walk" ? [maxDistance] : [maxDistance, Infinity];
   const shortlistLimit = requestedMode === "drive" ? 18 : 12;
 
   const sampleSegmentCandidates = (p1, p2) => {
@@ -494,18 +495,19 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
     });
     if (direct.valid && (!isSubgradeArrival(direct) || preservesOccupiedTunnel(direct, options))) return direct;
 
+    // Explore the selected terrain before moving a walking arrival to a road.
+    const groundFallback = searchNearestSafeGroundSpawn(x, z, {
+      angle,
+      maxRadius: options.maxGroundRadius
+    });
+    if (groundFallback) return groundFallback;
+
     const surfaceFallback = searchNearestSafeRoadSpawn(x, z, {
       mode: "walk",
       angle,
       maxDistance: options.maxRoadDistance
     });
     if (surfaceFallback) return surfaceFallback;
-
-    const groundFallback = searchNearestSafeGroundSpawn(x, z, {
-      angle,
-      maxRadius: options.maxGroundRadius
-    });
-    if (groundFallback) return groundFallback;
 
     return fallbackResolvedSpawn("walk", { x, z, angle, source: "walk_fallback" });
   }

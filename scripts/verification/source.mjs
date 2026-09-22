@@ -305,7 +305,7 @@ const ruralMappedApproach = {
   valid: true,
   mode: 'walk',
   x: 0,
-  z: 176.2245,
+  z: 12,
   road: Object.freeze({
     id: 'verification:rural-mapped-road',
     structureSemantics: Object.freeze({ terrainMode: 'at_grade' })
@@ -327,16 +327,18 @@ resolveCustomLocationArrival({
   featuredArrivalNear: () => null,
   findGradeSeparatedRoadAt: () => null,
   isSubgradeArrival: (spawn) => spawn?.road?.structureSemantics?.terrainMode === 'subgrade',
-  resolveSafeWorldSpawn: () => null,
-  searchNearestSafeRoadSpawn: () => ruralMappedApproach,
+  resolveSafeWorldSpawn: (x, z, options) => {
+    if (x !== 0 || z !== 0 || options.maxRoadDistance !== 160) return null;
+    return { ...ruralMappedApproach, source: options.source };
+  },
   tryAutoEnterBoatAt: () => null
 }, 'walk', { source: 'verification:rural-arrival' });
 if (
-  appliedRuralArrival !== ruralMappedApproach ||
+  appliedRuralArrival?.z !== ruralMappedApproach.z ||
   appliedRuralArrival?.source !== 'verification:rural-arrival'
 ) {
   groundAuthorityFailures.push(
-    'fixed-location walk arrival discarded the nearest safe mapped approach outside the retired 160 m cutoff'
+    'fixed-location walk arrival did not preserve the selected origin and bounded local safety search'
   );
 }
 const hillsideRoadFixture = {

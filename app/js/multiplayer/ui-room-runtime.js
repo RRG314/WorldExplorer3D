@@ -330,6 +330,8 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     if (!appCtx.scene) return;
 
     state.ghostManager = createGhostManager(appCtx.scene, {
+      getCamera: () => appCtx.camera,
+      getViewportHeight: () => appCtx.renderer?.domElement?.clientHeight || globalThis.innerHeight,
       getSelfUid: () => state.authUser?.uid || state.entitlement.uid || "",
       getLocalFrame: () => helpers.readPoseSnapshot?.()?.frame || null
     });
@@ -424,7 +426,7 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
       state.unsubOwnedRooms = listenMyRooms((rows) => {
         state.ownedRooms = rows;
         renderOwnedRooms();
-      });
+      }, { onError: () => setStatus('Saved rooms could not be refreshed. Reload the app to reconnect.', true) });
     }
     ensureLeaderboardSubscription();
   }
@@ -443,6 +445,9 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     renderers.refreshPlanLabel();
 
     const allowed = canUseMultiplayer(state.entitlement);
+    // Account refresh is background state, not the result of the player's
+    // create/join action. Keep its pending/error outcome until their next action.
+    if (state.authUser && (state.roomCreateBusy || state.roomJoinBusy || state.lastActionStatusWarn)) return;
     if (!state.authUser) {
       if (state.pendingRoomCode) {
         setStatus(`Invite detected for room ${state.pendingRoomCode}. Sign in to continue.`);

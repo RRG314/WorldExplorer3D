@@ -2,6 +2,7 @@ import { postProtectedFunction } from '../../../js/function-api.js?v=3';
 import {
   collection,
   doc,
+  deleteDoc,
   limit,
   onSnapshot,
   orderBy,
@@ -17,14 +18,14 @@ import { normalizeCode } from './rooms.js?v=67';
 const ROOM_COLLECTION = 'rooms';
 const PLAYER_COLLECTION = 'players';
 const PRESENCE_TTL_MS = 90 * 1000;
-const HEARTBEAT_INTERVAL_MS = 2000;
-const MIN_WRITE_INTERVAL_MS = 2000;
+const HEARTBEAT_INTERVAL_MS = 2500;
+// Rules require strictly more than two server seconds; include jitter headroom.
+const MIN_WRITE_INTERVAL_MS = 2250;
 const MOVE_THRESHOLD_METERS = 0.5;
 const ROTATE_THRESHOLD_RAD = 0.05;
 const STALE_LAST_SEEN_MS = 45 * 1000;
 const STALE_CLOCK_SKEW_TOLERANCE_MS = 2 * 60 * 1000;
 const MAX_PLAYER_DOCS_READ = 32;
-const LEAVE_TTL_MS = 1000;
 const ALLOWED_MODES = new Set(['drive', 'walk', 'drone', 'space', 'moon']);
 
 let activeRoomId = null;
@@ -212,7 +213,7 @@ async function writePresence(force = false) {
   if (!user || !user.uid) return;
 
   const now = Date.now();
-  if (!force && now - lastWriteAt < MIN_WRITE_INTERVAL_MS) return;
+  if (now - lastWriteAt < MIN_WRITE_INTERVAL_MS) return;
 
   const normalized = enrichPoseVelocity(
     normalizePosePayload(getPose() || {}),
@@ -248,7 +249,7 @@ async function writePresence(force = false) {
     }, { merge: true });
 
     if (activeRoomId === writingRoomId) {
-      lastWriteAt = now;
+      lastWriteAt = Date.now();
       lastSentPose = normalized;
     }
   } catch (err) {
@@ -258,7 +259,7 @@ async function writePresence(force = false) {
   }
 }
 
-async function stopPresence() {
+async function stopPresence({ releaseLease = true } = {}) {
   if (heartbeatTimer) {
     clearInterval(heartbeatTimer);
     heartbeatTimer = null;
@@ -279,14 +280,12 @@ async function stopPresence() {
   lastSampleAt = 0;
   lastWriteAt = 0;
 
-  if (!roomId || !user || !user.uid) return;
+  if (!releaseLease || !roomId || !user || !user.uid) return;
 
   try {
     const { db } = getServices();
     const playerRef = doc(db, ROOM_COLLECTION, roomId, PLAYER_COLLECTION, user.uid);
-    await setDoc(playerRef, {
-      expiresAt: Timestamp.fromMillis(Date.now() + LEAVE_TTL_MS)
-    }, { merge: true });
+    await deleteDoc(playerRef);
   } catch (_) {
     // Best effort only.
   }
@@ -320,7 +319,8 @@ function startPresence(roomId, getPoseFn) {
     throw new Error('startPresence requires a pose provider function.');
   }
 
-  stopPresence();
+  // Rebinding the same admitted room must not expire its new membership.
+  void stopPresence({ releaseLease: activeRoomId !== normalizedRoomId });
 
   activeRoomId = normalizedRoomId;
   lastAdmissionAttemptAt = 0;

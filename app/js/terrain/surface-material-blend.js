@@ -254,6 +254,10 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
     const previousProgramCacheKey = material.customProgramCacheKey?.bind(material);
     state = {
       uniforms: {
+        terrainRegionalMap: { value: null },
+        terrainRegionalReady: { value: 0 },
+        terrainLocalMap: { value: null },
+        terrainLocalReady: { value: 0 },
         terrainUrbanMap: { value: null },
         terrainSandMap: { value: null },
         terrainForestMap: { value: null },
@@ -270,6 +274,9 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
     material.onBeforeCompile = (shader, renderer) => {
       previousOnBeforeCompile?.(shader, renderer);
       Object.assign(shader.uniforms, state.uniforms);
+      shader.vertexShader = '#ifdef WE3D_TERRAIN_REGIONAL_IMAGE\nattribute vec2 terrainGeographicUv;\nvarying vec2 vTerrainGeographicUv;\n#endif\n' + shader.vertexShader;
+      shader.fragmentShader = '#ifdef WE3D_TERRAIN_REGIONAL_IMAGE\nuniform sampler2D terrainRegionalMap;\nuniform float terrainRegionalReady;\nuniform sampler2D terrainLocalMap;\nuniform float terrainLocalReady;\nvarying vec2 vTerrainGeographicUv;\n#endif\n' + shader.fragmentShader;
+      shader.vertexShader = shader.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\n#ifdef WE3D_TERRAIN_REGIONAL_IMAGE\nvTerrainGeographicUv = terrainGeographicUv;\n#endif');
       shader.fragmentShader = '#ifdef WE3D_TERRAIN_SNOW_MAP\nuniform sampler2D terrainSnowMap;\n#endif\n' + shader.fragmentShader;
       shader.fragmentShader = 'uniform float terrainColdGround;\nuniform float terrainSnowUvScale;\nuniform float terrainBaseSnowNormal;\n' + shader.fragmentShader;
       // Rock on steep faces needs vertical projection, not stretched ground UVs.
@@ -329,9 +336,10 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
             '    terrainSnowColor.rgb *= mix(vec3(0.88), vec3(1.06), snowMacro);',
             '  #endif',
             '#endif',
-            'terrainGrassColor.rgb = mix(terrainGrassColor.rgb, vec3(0.42, 0.36, 0.22), terrainAridWarmth * 0.72);',
+            'terrainGrassColor.rgb *= mix(vec3(1.0), vec3(1.08, 0.91, 0.76), terrainAridWarmth);',
             'terrainGrassColor.rgb = mix(terrainGrassColor.rgb, vec3(0.30, 0.32, 0.23), terrainColdGround * 0.58);',
-            'terrainRockColor.rgb = mix(terrainRockColor.rgb, vec3(0.58, 0.31, 0.15), terrainAridWarmth);',
+            // Preserve measured texture contrast. Aridity is not evidence of red sandstone.
+            'terrainRockColor.rgb *= mix(vec3(1.0), vec3(1.06, 0.98, 0.90), terrainAridWarmth);',
             'float terrainRockBand = 0.5 + 0.5 * sin(vTerrainWorldHeight * 0.045 + sin(vTerrainWorldHorizontal * 0.013) * 0.8);',
             'terrainRockColor.rgb *= mix(0.94, 1.06, smoothstep(0.12, 0.88, terrainRockBand));',
             'float terrainSnowWeight = clamp(vTerrainSurfaceMixB.y, 0.0, 1.0);',
@@ -343,12 +351,37 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
             'terrainSurfaceColor += terrainSoilColor * max(0.0, vTerrainSurfaceMixA.w);',
             'terrainSurfaceColor += terrainRockColor * max(0.0, vTerrainSurfaceMixB.x);',
             'terrainSurfaceColor += terrainSnowColor * terrainSnowWeight;',
+            '#ifdef WE3D_TERRAIN_REGIONAL_IMAGE',
+            '  vec2 regionalEdge = min(vTerrainGeographicUv, vec2(1.0) - vTerrainGeographicUv);',
+            '  float regionalWeight = terrainRegionalReady * smoothstep(0.0, 0.04, min(regionalEdge.x, regionalEdge.y));',
+            '  regionalWeight *= (1.0 - clamp(vTerrainSurfaceMixA.x + terrainSnowWeight, 0.0, 1.0));',
+            // One geographic colour field across every LOD, with metre-scale texture detail.
+            // Exact hardscape and snow remain controlled by mapped surfaces/weather.
+            '  vec3 regionalColor = mapTexelToLinear(texture2D(terrainRegionalMap, clamp(vTerrainGeographicUv, 0.0, 1.0))).rgb;',
+            '  vec2 localUv = (vTerrainGeographicUv - vec2(0.5)) * (40000.0 / 6000.0) + vec2(0.5);',
+            '  vec2 localEdge = min(localUv, vec2(1.0) - localUv);',
+            '  float localWeight = terrainLocalReady * smoothstep(0.0, 0.12, min(localEdge.x, localEdge.y));',
+            '  regionalColor = mix(regionalColor, mapTexelToLinear(texture2D(terrainLocalMap, clamp(localUv, 0.0, 1.0))).rgb, localWeight);',
+            '  regionalWeight = max(regionalWeight, localWeight * (1.0 - clamp(vTerrainSurfaceMixA.x + terrainSnowWeight, 0.0, 1.0)));',
+            '  float regionalLuminance = dot(regionalColor, vec3(0.2126, 0.7152, 0.0722));',
+            // Compress baked illumination before applying the scene lighting a second time.
+            // This is approximate delighting, not a claim of measured reflectance.
+            '  regionalColor *= (0.015 + 0.35 * sqrt(max(regionalLuminance, 0.0))) / max(regionalLuminance, 0.015);',
+            '  regionalColor = mix(vec3(0.05), regionalColor, smoothstep(0.008, 0.035, regionalLuminance));',
+            '  float regionalDetail = clamp(dot(terrainSurfaceColor.rgb, vec3(0.2126, 0.7152, 0.0722)) / 0.22, 0.40, 1.65);',
+            '  regionalDetail = mix(regionalDetail, 1.0, smoothstep(60.0, 350.0, length(vViewPosition)));',
+            '  terrainSurfaceColor.rgb = mix(terrainSurfaceColor.rgb, regionalColor * regionalDetail, regionalWeight);',
+            '#endif',
             'diffuseColor *= terrainSurfaceColor;'
           ].join('\n')
         )
         .replace(
+          '#include <color_fragment>',
+          '#ifdef WE3D_TERRAIN_REGIONAL_IMAGE\n#ifdef USE_COLOR\ndiffuseColor.rgb *= mix(vColor, vec3(1.0), regionalWeight);\n#endif\n#else\n#include <color_fragment>\n#endif'
+        )
+        .replace(
           '#include <normal_fragment_maps>',
-          'vec3 terrainGeometricNormal = normal;\n#include <normal_fragment_maps>\nfloat snowNormalDetail = terrainBaseSnowNormal * (1.0 - smoothstep(8.0, 35.0, length(vViewPosition)));\nnormal = normalize(mix(normal, terrainGeometricNormal, clamp(dot(vTerrainSurfaceMixA, vec4(1.0)) + vTerrainSurfaceMixB.x + vTerrainSurfaceMixB.y * (1.0 - snowNormalDetail), 0.0, 1.0)));'
+          'vec3 terrainGeometricNormal = normal;\n#include <normal_fragment_maps>\nfloat terrainNormalFade = smoothstep(20.0, 100.0, length(vViewPosition));\nfloat snowNormalDetail = terrainBaseSnowNormal * (1.0 - smoothstep(8.0, 35.0, length(vViewPosition)));\nnormal = normalize(mix(normal, terrainGeometricNormal, max(terrainNormalFade, clamp(dot(vTerrainSurfaceMixA, vec4(1.0)) + vTerrainSurfaceMixB.x + vTerrainSurfaceMixB.y * (1.0 - snowNormalDetail), 0.0, 1.0))));'
         )
         .replace(
           '#include <roughnessmap_fragment>',
@@ -357,9 +390,11 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
     };
     material.customProgramCacheKey = () => [
       previousProgramCacheKey?.() || '',
-      'terrain-semantic-pbr-material-mix-v9'
+      'terrain-semantic-pbr-material-mix-v13'
     ].join(':');
   }
+  if (!state.uniforms.terrainRegionalMap.value) state.uniforms.terrainRegionalMap.value = material.map;
+  if (!state.uniforms.terrainLocalMap.value) state.uniforms.terrainLocalMap.value = material.map;
   state.uniforms.terrainUrbanMap.value = textureSets.urban?.map || material.map;
   state.uniforms.terrainSandMap.value = textureSets.sand?.map || material.map;
   state.uniforms.terrainForestMap.value = textureSets.forest?.map || material.map;

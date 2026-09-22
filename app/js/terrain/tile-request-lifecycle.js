@@ -5,6 +5,7 @@ export function cancelTerrainTileRequest(cache, z, x, y) {
   cache.delete(key);
   tile.evicted = true;
   tile.loading = false;
+  tile.polarAbort?.abort();
   if (tile.img) {
     tile.img.onload = null;
     tile.img.onerror = null;

@@ -61,6 +61,14 @@ export async function finalizeLoadedWorld(options = {}) {
   if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.publishLocationTerrain === 'function') {
     runFinalStep('publishLocationTerrain', () => appCtx.publishLocationTerrain());
     await yieldToMainThread();
+    // Roadless locations need the same physical-surface publication barrier
+    // that the transport compiler enforces in cities, before player spawn.
+    if (!appCtx.roads?.length && typeof appCtx.waitForLocationTerrainPublication === 'function') {
+      startLoadPhase('waitForLocationTerrainPublication');
+      try { await appCtx.waitForLocationTerrainPublication(); }
+      catch (error) { throw new SurfacePublicationError('terrain', error); }
+      finally { endLoadPhase('waitForLocationTerrainPublication'); }
+    }
   }
   const transportWillRebuildTerrain = appCtx.terrainEnabled && !appCtx.onMoon &&
     Array.isArray(appCtx.roads) && appCtx.roads.length > 0 &&

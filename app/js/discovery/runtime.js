@@ -1,3 +1,4 @@
+import { ambientNotices } from '../ui/ambient-notices.js';
 import { BUILTIN_DISCOVERY_CATALOGS, COMPANION_CATALOG, TOOL_CATALOG, validateDiscoveryCatalogs } from './catalog.js?v=4';
 import { createCompanionRuntime } from './companion-runtime.js?v=10';
 import { auditRegionalCreatureQuality } from './creature-quality.js?v=1';
@@ -275,8 +276,6 @@ function createDiscoveryUi(state) {
   let guideRecords = [];
   let journalRecords = [];
   let expeditionSignature = '';
-  let encounterPromptRevision = -1;
-  let encounterPromptShownAt = 0;
 
   function listen(element, type, handler) {
     if (!element) return;
@@ -804,19 +803,11 @@ function createDiscoveryUi(state) {
     const interiorInteraction = document.getElementById('interiorPrompt')?.classList.contains('show') === true;
     const ambientBlocked = state.appCtx.paused || state.appCtx.showLargeMap || state.appCtx.getFishingSnapshot?.().open === true;
     const encounterPromptEligible = !open && !ambientBlocked && !operationActive && !directInteraction && !interiorInteraction && encounterLead?.available === true;
-    const encounterRevision = Number(encounterLead?.revision);
-    const promptNow = typeof performance !== 'undefined' ? performance.now() : Date.now();
-    if (!encounterLead?.available) {
-      encounterPromptRevision = -1;
-      encounterPromptShownAt = 0;
-    } else if (encounterPromptEligible && encounterRevision !== encounterPromptRevision) {
-      encounterPromptRevision = encounterRevision;
-      encounterPromptShownAt = promptNow;
-    }
-    // A field lead is an invitation, not a permanent HUD layer. Keep the
-    // underlying lead available in Explorer after this short notice expires.
     const preferredNoticeMs = globalThis.getWorldExplorerAccessibilityNoticeMs?.(7000) ?? 7000;
-    const showEncounterLead = encounterPromptEligible && (!Number.isFinite(preferredNoticeMs) || promptNow - encounterPromptShownAt < preferredNoticeMs);
+    const showEncounterLead = ambientNotices.request('discovery', `${state.worldIdentityId || ''}:${encounterLead?.revision}`, {
+      durationMs: preferredNoticeMs,
+      blocked: !encounterPromptEligible
+    });
     elements.prompt?.classList.toggle('show', showEncounterLead);
     if (elements.prompt) {
       elements.prompt.dataset.tone = encounterLead?.tone || 'field';

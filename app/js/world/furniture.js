@@ -10,6 +10,8 @@ import {
   registerStreetLamp,
   resetStreetLampFixtures
 } from "../engine/night-lighting.js?v=8";
+import { createRoadsidePlacementResolver, isGroundRoad } from './roadside-placement.js';
+import { isPointInsideWaterFootprint } from '../boat-mode/water-query.js?v=21';
 import { roadWidthAtSegment } from './road-cross-section-profile.js?v=1';
 
 let furnitureMaterialsReady = false;
@@ -161,6 +163,9 @@ function getSignMaterial(name) {
 }
 
 function createStreetSign(x, z, name, roadAngle) {
+  const placement = fitFixture(x, z);
+  if (!placement) return null;
+  x = placement.x; z = placement.z;
   const group = new THREE.Group();
 
   const pole = new THREE.Mesh(geoSignPole, matPole);
@@ -190,9 +195,11 @@ function createStreetSign(x, z, name, roadAngle) {
   markFurniture(group, 'street_name_sign', 'road_name_inference');
   appCtx.addEarthWorldObject(group);
   appCtx.streetFurnitureMeshes.push(group);
+  return group;
 }
 
 function roadLightingEligible(road, point) {
+  if (!isGroundRoad(road)) return false;
   const lit = String(road?.litTag || '').toLowerCase();
   if (lit === 'no' || lit === 'false' || lit === '0') return false;
   if (lit === 'yes' || lit === 'true' || lit === '1' || lit === 'automatic') return true;
@@ -281,6 +288,9 @@ export function updateStreetFurnitureVisibility(reference = activeFurnitureRefer
 }
 
 function createLightPost(x, z, provenance = 'inferred', roadTarget = null) {
+  const placement = fitFixture(x, z);
+  if (!placement) return null;
+  x = placement.x; z = placement.z;
   const group = new THREE.Group();
 
   const pole = new THREE.Mesh(geoLampPole, matPole);
@@ -316,9 +326,13 @@ function createLightPost(x, z, provenance = 'inferred', roadTarget = null) {
   registerStreetLamp(group, head, Number.isFinite(targetX) && Number.isFinite(targetZ)
     ? { x: targetX, z: targetZ }
     : { x: x + 3.1, z });
+  return group;
 }
 
 function createTrashCan(x, z, provenance = 'inferred') {
+  const placement = fitFixture(x, z);
+  if (!placement) return null;
+  x = placement.x; z = placement.z;
   const group = new THREE.Group();
 
   const body = new THREE.Mesh(geoTrashBody, matTrashBody);
@@ -334,9 +348,13 @@ function createTrashCan(x, z, provenance = 'inferred') {
   markFurniture(group, 'waste_basket', provenance);
   appCtx.addEarthWorldObject(group);
   appCtx.streetFurnitureMeshes.push(group);
+  return group;
 }
 
 function createTrafficSignal(x, z, yaw = 0, provenance = 'inferred', control = {}) {
+  const placement = fitFixture(x, z);
+  if (!placement) return null;
+  x = placement.x; z = placement.z;
   const group = new THREE.Group();
   const pole = new THREE.Mesh(geoLampPole, matPole);
   pole.scale.set(.8, .83, .8);
@@ -376,9 +394,13 @@ function createTrafficSignal(x, z, yaw = 0, provenance = 'inferred', control = {
   group.userData.setTrafficSignalState('red');
   appCtx.addEarthWorldObject(group);
   appCtx.streetFurnitureMeshes.push(group);
+  return group;
 }
 
 function createStopSign(x, z, yaw = 0, provenance = 'inferred') {
+  const placement = fitFixture(x, z);
+  if (!placement) return null;
+  x = placement.x; z = placement.z;
   const group = new THREE.Group();
   const pole = new THREE.Mesh(geoSignPole, matPole);
   pole.scale.set(.72, .88, .72);
@@ -394,6 +416,7 @@ function createStopSign(x, z, yaw = 0, provenance = 'inferred') {
   markFurniture(group, 'stop_sign', provenance);
   appCtx.addEarthWorldObject(group);
   appCtx.streetFurnitureMeshes.push(group);
+  return group;
 }
 
 function stableUnit(value = '') {
@@ -405,38 +428,22 @@ function stableUnit(value = '') {
   return (hash >>> 0) / 4294967296;
 }
 
-function nearestRoadsidePoint(point) {
-  let best = null;
-  for (const road of appCtx.roads || []) {
-    if (!Array.isArray(road?.pts) || /motorway|trunk|track/i.test(String(road.type || ''))) continue;
-    for (let index = 0; index < road.pts.length - 1; index += 1) {
-      const p1 = road.pts[index];
-      const p2 = road.pts[index + 1];
-      const dx = p2.x - p1.x;
-      const dz = p2.z - p1.z;
-      const lengthSq = dx * dx + dz * dz;
-      if (lengthSq <= .01) continue;
-      const t = Math.max(0, Math.min(1, ((point.x - p1.x) * dx + (point.z - p1.z) * dz) / lengthSq));
-      const x = p1.x + dx * t;
-      const z = p1.z + dz * t;
-      const distance = Math.hypot(point.x - x, point.z - z);
-      if (best && distance >= best.distance) continue;
-      const length = Math.sqrt(lengthSq);
-      const side = ((point.x - x) * (-dz / length) + (point.z - z) * (dx / length)) >= 0 ? 1 : -1;
-      const offset = roadWidthAtSegment(road, index, t) * .5 + 1.35;
-      best = {
-        x: x + (-dz / length) * offset * side,
-        z: z + (dx / length) * offset * side,
-        centerX: x,
-        centerZ: z,
-        distance,
-        yaw: Math.atan2(dx, dz),
-        road,
-        segmentIndex: index
-      };
-    }
-  }
-  return best && best.distance <= 42 ? best : null;
+let roadsideResolver = null;
+function fixtureObstacleAt(x, z) {
+  if (isPointInsideWaterFootprint(x, z)) return true;
+  const buildings = appCtx.getNearbyBuildings?.(x, z, 4) || [];
+  return buildings.some(building => {
+    if (building.collisionDisabled || x < building.minX - .5 || x > building.maxX + .5 || z < building.minZ - .5 || z > building.maxZ + .5) return false;
+    return !building.pts?.length || !appCtx.pointInPolygon || appCtx.pointInPolygon(x, z, building.pts);
+  });
+}
+function nearestRoadsidePoint(point, options = {}) {
+  return roadsideResolver?.resolve(point, options) || null;
+}
+function fitFixture(x, z, preferOriginal = true) {
+  const point = nearestRoadsidePoint({ x, z }, { preferOriginal });
+  if (point) roadsideResolver.reserve(point);
+  return point;
 }
 
 function trafficControlPlacements(mappedFurnitureNodes = [], roads = appCtx.roads || []) {
@@ -493,6 +500,7 @@ export function generateStreetFurniture(options = {}) {
   initFurnitureMaterials();
   initFurnitureGeometries();
   resetStreetLampFixtures();
+  roadsideResolver = createRoadsidePlacementResolver(appCtx.roads || [], { blocked: fixtureObstacleAt });
 
   const budget = getStreetFurnitureBudget();
   const semanticPlacements = trafficControlPlacements(options.mappedFurnitureNodes);
@@ -503,21 +511,25 @@ export function generateStreetFurniture(options = {}) {
     return Math.hypot(left.x, left.z) - Math.hypot(right.x, right.z);
   });
   const publishedTrafficControls = [];
-  let totalControls = 0;
+  let totalControls = 0, totalLamps = 0, totalTrash = 0;
   orderedPlacements.forEach((placement) => {
     if (placement.kind === 'street_lamp') {
+      if (totalLamps >= budget.maxLampsTotal) return;
       const roadside = nearestRoadsidePoint(placement);
-      return createLightPost(placement.x, placement.z, placement.provenance, roadside
+      if (createLightPost(placement.x, placement.z, placement.provenance, roadside
         ? { x: roadside.centerX, z: roadside.centerZ }
-        : null);
+        : null)) totalLamps += 1;
+      return;
     }
-    if (placement.kind === 'waste_basket') return createTrashCan(placement.x, placement.z, placement.provenance);
-    if (totalControls >= budget.maxTrafficControls) return;
+    if (placement.kind === 'waste_basket') {
+      if (totalTrash < budget.maxTrashTotal && createTrashCan(placement.x, placement.z, placement.provenance)) totalTrash += 1;
+      return;
+    }
     const roadside = nearestRoadsidePoint(placement);
     // OSM control nodes often sit on the road centerline because they describe
     // routing semantics. Never turn that logical point into a physical pole in
     // the travel lane. An unmatched control remains semantic-only.
-    if (!roadside) {
+    if (!roadside || totalControls >= budget.maxTrafficControls) {
       publishedTrafficControls.push(Object.freeze({
         ...placement,
         fixtureX: null,
@@ -525,7 +537,6 @@ export function generateStreetFurniture(options = {}) {
         fixtureYaw: null,
         placement: 'semantic-only'
       }));
-      totalControls += 1;
       return;
     }
     const published = Object.freeze({
@@ -535,15 +546,14 @@ export function generateStreetFurniture(options = {}) {
       fixtureYaw: roadside.yaw,
       placement: 'outside-road-envelope'
     });
-    if (placement.kind === 'traffic_signal') createTrafficSignal(
+    const fixture = placement.kind === 'traffic_signal' ? createTrafficSignal(
       roadside.x,
       roadside.z,
       roadside.yaw,
       placement.provenance,
       published
-    );
-    else createStopSign(roadside.x, roadside.z, roadside.yaw, placement.provenance);
-    publishedTrafficControls.push(published);
+    ) : createStopSign(roadside.x, roadside.z, roadside.yaw, placement.provenance);
+    publishedTrafficControls.push(fixture ? Object.freeze({ ...published, fixtureX: fixture.position.x, fixtureZ: fixture.position.z }) : Object.freeze({ ...published, fixtureX: null, fixtureZ: null, placement: 'semantic-only' }));
     totalControls += 1;
   });
   appCtx.trafficControlPlacements = Object.freeze(publishedTrafficControls);
@@ -552,6 +562,7 @@ export function generateStreetFurniture(options = {}) {
   let totalSigns = 0;
   appCtx.roads.forEach((road) => {
     if (totalSigns >= budget.maxSignsTotal) return;
+    if (!isGroundRoad(road)) return;
     if (!road.name || road.name === road.type.charAt(0).toUpperCase() + road.type.slice(1)) return;
     if (signedRoads.has(road.name)) return;
     signedRoads.add(road.name);
@@ -589,7 +600,6 @@ export function generateStreetFurniture(options = {}) {
   refreshWorldCoverVegetation();
 
   const lampSpacing = budget.lampSpacing;
-  let totalLamps = 0;
   appCtx.roads.forEach((road) => {
     if (totalLamps >= budget.maxLampsTotal) return;
     if (road.width < budget.minLampRoadWidth) return;
@@ -615,14 +625,12 @@ export function generateStreetFurniture(options = {}) {
         const lx = p1.x + nx * offset;
         const lz = p1.z + nz * offset;
         if (!semanticPlacements.some((placement) => placement.kind === 'street_lamp' && Math.hypot(placement.x - lx, placement.z - lz) < 18)) {
-          createLightPost(lx, lz, 'inferred', { x: p1.x, z: p1.z });
+          if (createLightPost(lx, lz, 'inferred', { x: p1.x, z: p1.z })) totalLamps += 1;
         }
-        totalLamps += 1;
       }
     }
   });
 
-  let totalTrash = 0;
   appCtx.pois.forEach((poi, i) => {
     if (totalTrash >= budget.maxTrashTotal) return;
     if (i % budget.trashEveryNthPoi !== 0) return;
@@ -632,8 +640,7 @@ export function generateStreetFurniture(options = {}) {
     const angle = unit * Math.PI * 2;
     const position = roadside || { x: poi.x + Math.cos(angle) * offset, z: poi.z + Math.sin(angle) * offset };
     if (semanticPlacements.some((placement) => placement.kind === 'waste_basket' && Math.hypot(placement.x - position.x, placement.z - position.z) < 16)) return;
-    createTrashCan(position.x, position.z);
-    totalTrash += 1;
+    if (createTrashCan(position.x, position.z)) totalTrash += 1;
   });
 }
 

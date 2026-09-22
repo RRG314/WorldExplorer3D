@@ -158,6 +158,7 @@ function createUiRoomEventsApi(context) {
         return;
       }
       setChatOpen(!state.chatOpen);
+      if (state.chatOpen) closeRoomPanel();
     });
 
     refs.chatCloseBtn?.addEventListener('click', () => setChatOpen(false));

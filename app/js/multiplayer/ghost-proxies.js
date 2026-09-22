@@ -48,11 +48,11 @@ function createNameTag(THREE, labelText) {
     map: texture,
     transparent: true,
     depthWrite: false,
-    depthTest: false
+    depthTest: true
   });
 
   const sprite = new THREE.Sprite(material);
-  sprite.scale.set(8, 2, 1);
+  sprite.scale.set(2.4, .6, 1);
 
   return { canvas, texture, sprite };
 }

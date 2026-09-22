@@ -1,3 +1,4 @@
+import { ensureRoomUserProfile } from './rooms-profile.js';
 import { postProtectedFunction } from '../../../js/function-api.js?v=3';
 import {
   collection,
@@ -7,6 +8,7 @@ import {
   doc,
   getDoc,
   getDocFromServer,
+  runTransaction,
   getDocs,
   limit,
   onSnapshot,
@@ -211,20 +213,10 @@ async function createRoom(options = {}) {
     }
   }
 
-  async function ensureUserProfile() {
-    let snap = await getDoc(userRef);
-    if (snap.exists()) return snap;
-
-    await setDoc(userRef, {
-      uid: user.uid,
-      email: String(user.email || '').trim().slice(0, 320),
-      displayName: displayName.slice(0, 60),
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    }, { merge: true });
-    snap = await getDoc(userRef);
-    return snap;
-  }
+  const ensureUserProfile = () => ensureRoomUserProfile({
+    db, userRef, runTransaction, serverTimestamp, getDocFromServer,
+    profile: { uid: user.uid, email: String(user.email || '').trim().slice(0, 320), displayName: displayName.slice(0, 60) }
+  });
 
   let profileSnap = await ensureUserProfile();
   let didServerProfileRefresh = false;
@@ -416,9 +408,7 @@ async function leaveRoom() {
   try {
     const { db } = getServices();
     const playerRef = doc(db, ROOM_COLLECTION, room.id, PLAYER_COLLECTION, user.uid);
-    await setDoc(playerRef, {
-      expiresAt: Timestamp.fromMillis(Date.now() + ROOM_PRESENCE_LEAVE_TTL_MS)
-    }, { merge: true });
+    await deleteDoc(playerRef);
   } catch (_) {
     // Keep local state clean even if network write fails.
   }

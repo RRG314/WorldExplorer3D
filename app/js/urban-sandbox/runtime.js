@@ -1133,9 +1133,9 @@ function promotePedestrian(state, source) {
   if (!promoted) return null;
   const promotedId = `urban-npc:${state.worldIdentity}:${promoted.id}`;
   const possessionSeed = [...promotedId].reduce((sum, char) => (sum * 33 + char.charCodeAt(0)) >>> 0, 5381);
-  const heldEquipment = possessionSeed % 13 === 0
-    ? 'compact-sidearm'
-    : possessionSeed % 17 === 0 ? 'laser-gun' : possessionSeed % 11 === 0 ? 'paintball-gun' : '';
+  // Ambient population supplies civilians. Equipment belongs to an explicit
+  // encounter/responder role, never a random hash of a passerby's identity.
+  const heldEquipment = promoted.combatRole === 'armed-local' ? String(promoted.heldEquipment || '') : '';
   const definition = {
     ...promoted,
     id: promotedId,
