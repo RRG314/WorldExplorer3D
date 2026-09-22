@@ -183,9 +183,10 @@ function playerPosition() {
 }
 
 function showPrompt(stage, config = {}) {
+  if (!appCtx.gameStarted || appCtx.worldLoading) return false;
   if (!runtime.state.enabled || runtime.state.skipped || (runtime.state.completed && !config.contextual)) return false;
   if (!config.contextual && runtime.sessionPresented.has(stage)) return false;
-  if (uiBlocksTutorial() || directActionVisible()) return false;
+  if (uiBlocksTutorial() || (stage !== STAGES.MOVE && directActionVisible())) return false;
   const defaultDurationMs = Math.max(6000, Number(config.autoHideMs) || 8000);
   const durationMs = globalThis.getWorldExplorerAccessibilityNoticeMs?.(defaultDurationMs) ?? defaultDurationMs;
   if (!ambientNotices.request('tutorial', stage, { durationMs })) return false;
@@ -241,7 +242,7 @@ function openExplorerJournal() {
 }
 
 function presentCurrentStage() {
-  if (!runtime.state.enabled || runtime.state.completed || runtime.state.skipped || !appCtx.gameStarted) {
+  if (!runtime.state.enabled || runtime.state.completed || runtime.state.skipped || !appCtx.gameStarted || appCtx.worldLoading) {
     hidePrompt();
     return;
   }
@@ -288,6 +289,7 @@ function setStage(nextStage, reason = 'progress') {
   if (!STAGE_ORDER.includes(nextStage) || runtime.state.stage === nextStage) return false;
   const previous = runtime.state.stage;
   runtime.state.stage = nextStage;
+  hidePrompt();
   runtime.sessionPresented.delete(nextStage);
   saveState();
   tutorialTelemetry('we3d_tutorial_step', { action: 'completed', step_id: previous, result: reason });
@@ -440,9 +442,19 @@ function detectContextTransitions() {
 
 function tutorialUpdate(dt = 0) {
   if (!runtime.initialized) return;
-  detectContextTransitions();
   runtime.currentJourneyUi?.update?.(dt);
-  const activePanel = uiBlocksTutorial() || directActionVisible();
+  // Initialization can finish while the world is still compiling. Do not spend
+  // the one-shot invitation or count spawn placement as player movement.
+  if (!appCtx.gameStarted || appCtx.worldLoading) {
+    hidePrompt();
+    runtime.movementOrigin = null;
+    runtime.lastPosition = null;
+    return;
+  }
+  detectContextTransitions();
+  // An enabled first movement lesson owns its short teaching slot. Thereafter
+  // nearby actions take priority, matching the card/prompt CSS contract.
+  const activePanel = uiBlocksTutorial() || (runtime.state.stage !== STAGES.MOVE && directActionVisible());
   if (activePanel) {
     if (runtime.card && !runtime.card.hidden) hidePrompt();
     return;

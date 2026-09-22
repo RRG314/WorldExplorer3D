@@ -14,3 +14,14 @@ export const backendSteps = [
 ];
 
 export const backendGroups = [backendSteps.slice(0, 8), ...backendSteps.slice(8).map(step => [step])];
+
+// Both wrappers use these deadlines. CI compiles two complete Earth worlds
+// serially before exercising shared vehicles; emulator startup/teardown must
+// fit outside the browser's allowance rather than silently overriding it.
+export function backendStageTimeoutMs(step, environment = process.env) {
+  return environment.CI && step.id === 'multiplayer' ? 900_000 : 600_000;
+}
+export function backendGroupTimeoutMs(group, environment = process.env) {
+  const stageMs = Math.max(...group.map(step => backendStageTimeoutMs(step, environment)));
+  return stageMs > 600_000 ? stageMs + 60_000 : 600_000;
+}

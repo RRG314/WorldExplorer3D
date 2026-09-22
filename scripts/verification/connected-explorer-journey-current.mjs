@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { advanceGameplay } from './gameplay-simulation.mjs';
 
 const servedRoot = path.resolve(process.cwd(), String(process.env.WE3D_VERIFY_ROOT || '.'));
 const externalUrl = String(process.env.WE3D_VERIFY_BASE_URL || '').replace(/\/$/, '');
@@ -35,7 +36,7 @@ function tutorialState() {
 async function hold(code, durationMs, modifiers = []) {
   for (const modifier of modifiers) await page.keyboard.down(modifier);
   await page.keyboard.down(code);
-  await page.waitForTimeout(durationMs);
+  await advanceGameplay(page, durationMs);
   await page.keyboard.up(code);
   for (const modifier of [...modifiers].reverse()) await page.keyboard.up(modifier);
 }
@@ -99,8 +100,8 @@ try {
   const beforePosition = moved.before?.position || moved.before;
   const afterPosition = moved.after?.position || moved.after;
   assert.notDeepEqual(afterPosition, beforePosition, 'The remapped key must move the active actor in the live world.');
-  assert.match(await page.locator('#tutorialHintCard').textContent(), /Try one nearby action/i);
-  assert.match(await page.locator('#tutorialHintCard').textContent(), /visible door, person, parked vehicle, or usable object/i);
+  // The interaction stage yields its optional lesson to the actual nearby
+  // action. Assert that visible action below, not unpresented hidden card copy.
   await page.waitForSelector('#urbanVehiclePrompt.show', { timeout: 20_000 });
   const promptPriority = await page.evaluate(() => {
     const prompt = document.getElementById('urbanVehiclePrompt');
@@ -154,6 +155,7 @@ try {
 
   const finalState = await tutorialState();
   const report = {
+    inputTiming: 'runtime-fixed-step; not rendering performance',
     ok: browserErrors.length === 0 && failedLocalResources.length === 0,
     journey: 'optional-first-journey-v5',
     checks: {

@@ -166,6 +166,7 @@ const tests = [
   'tests/selected-source-node-retention-current.test.mjs',
   'tests/ea-london-ground-current.test.mjs',
   'tests/backend-environment-current.test.mjs',
+  'tests/gameplay-simulation-current.test.mjs',
   'tests/walking-pose-restoration-current.test.mjs',
   'tests/walking-lead-persistence-current.test.mjs',
   'tests/interior-spawn-clearance-current.test.mjs',

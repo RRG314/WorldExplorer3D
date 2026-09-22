@@ -10,6 +10,9 @@ await fs.mkdir(outputDir, { recursive: true });
 const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
 const failures = [];
 const browserErrors = [];
+let activePage = null;
+let phase = 'initializing';
+function markPhase(value) { phase = value; console.log(`[gameplay-menu] ${value}`); }
 
 async function startEarth(page) {
   await page.goto(`${baseUrl}/app/?navigation=${Date.now()}`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
@@ -26,6 +29,7 @@ async function startEarth(page) {
 }
 
 async function openMenu(page, buttonId, menuId) {
+  markPhase(`${phase.split(':')[0]}:${buttonId}`);
   await page.locator(`#${buttonId}`).click();
   await page.waitForTimeout(450);
   assert.equal(await page.locator(`#${menuId}`).evaluate((menu) => menu.classList.contains('open')), true, `${buttonId} did not stay open`);
@@ -34,8 +38,11 @@ async function openMenu(page, buttonId, menuId) {
 
 async function verify(viewport, name) {
   const touch = viewport.width <= 760;
-  const context = await browser.newContext({ viewport, hasTouch: touch, isMobile: touch });
+  const context = await browser.newContext({ viewport, deviceScaleFactor: process.env.CI ? 0.5 : 1, hasTouch: touch, isMobile: touch });
   const page = await context.newPage();
+  activePage = page;
+  page.setDefaultTimeout(process.env.CI ? 60_000 : 20_000);
+  markPhase(`${name}:loading`);
   const runtimeRequests = [];
   page.on('request', (request) => runtimeRequests.push(request.url()));
   page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
@@ -92,6 +99,7 @@ async function verify(viewport, name) {
   assert.equal(await page.locator('.propertyHubTabs [data-property-view="offers"], .propertyHubTabs [data-property-view="storage"], .propertyHubTabs [data-property-view="market"]').count(), 0);
   await page.locator('.propertyHubTabs [data-property-view="nearby"]').click();
   assert.equal(await page.locator('.propertyHubTabs [data-property-view="nearby"]').getAttribute('aria-selected'), 'true');
+  markPhase(`${name}:property-home`);
   await page.locator('.propertyHubTabs [data-property-view="home"]').click();
   assert.equal(await page.locator('.propertyHubTabs [data-property-view="home"]').getAttribute('aria-selected'), 'true');
   await page.screenshot({ path: path.join(outputDir, `${name}-real-estate.png`), fullPage: true });
@@ -109,6 +117,8 @@ async function verify(viewport, name) {
   assert.deepEqual(runtimeRequests.filter((url) => /\/js\/(?:editor|activity-editor)\//.test(url)), []);
   await page.screenshot({ path: path.join(outputDir, `${name}-navigation.png`), fullPage: true });
   await context.close();
+  activePage = null;
+  markPhase(`${name}:complete`);
   return { viewport, labels, exploreText, travelText, backpackText, communityText, realEstateText };
 }
 
@@ -122,12 +132,23 @@ try {
   };
 } catch (error) {
   failures.push(String(error?.stack || error));
+  const state = await activePage?.evaluate(() => ({
+    diagnostics: globalThis.getWorldExplorerRuntimeDiagnostics?.(),
+    text: document.body.innerText,
+    tabs: [...document.querySelectorAll('.propertyHubTabs button')].map(button => {
+      const rect = button.getBoundingClientRect();
+      return { text: button.textContent, bounds: rect.toJSON(),
+        hit: document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)?.outerHTML };
+    })
+  })).catch(() => null);
+  await fs.writeFile(path.join(outputDir, 'failure.json'), JSON.stringify({ phase, state, failures }, null, 2));
+  await activePage?.screenshot({ path: path.join(outputDir, 'failure.png'), timeout: 15_000 }).catch(() => {});
 } finally {
   await browser.close();
 }
 
 failures.push(...browserErrors);
-const report = { ok: failures.length === 0, baseUrl, result, failures };
+const report = { phase, evidenceScope: 'functional navigation; not rendering performance', deviceScaleFactor: process.env.CI ? 0.5 : 1, ok: failures.length === 0, baseUrl, result, failures };
 await fs.writeFile(path.join(outputDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
 console.log(JSON.stringify(report, null, 2));
 assert.deepEqual(failures, []);

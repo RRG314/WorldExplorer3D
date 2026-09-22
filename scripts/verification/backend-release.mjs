@@ -1,4 +1,4 @@
-import { backendSteps } from './backend-steps.mjs';
+import { backendSteps, backendStageTimeoutMs } from './backend-steps.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
@@ -33,12 +33,14 @@ for (const step of selectedSteps) {
   const result = await runLoggedStep(step.command, {
     cwd: process.cwd(),
     env: { ...process.env, ...(step.environment || {}) },
+    timeoutMs: backendStageTimeoutMs(step),
     logPath: path.join(outputDir, `${step.id}.log`)
   });
   const record = {
     id: step.id,
     ok: result.ok,
     durationMs: result.durationMs,
+    timeoutMs: backendStageTimeoutMs(step),
     status: result.status,
     signal: result.signal,
     error: result.error

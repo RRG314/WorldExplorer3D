@@ -56,7 +56,7 @@
     "capture-editor-fixture": {"scope": "candidate", "command": ["node", "scripts/verification/interior-reshape-ui.mjs"], "artifactRequired": false},
     "capture-review-fixture": {"scope": "candidate", "command": ["node", "scripts/verification/capture-review-workspace-ui.mjs"], "artifactRequired": false},
     "capture-entry-fixture": {"scope": "candidate", "command": ["node", "scripts/verification/captured-home-entry-ui.mjs"], "artifactRequired": false},
-    "backend": { "scope": "backend", "command": ["npm", "run", "verify:backend-release"], "artifactRequired": true, "timeoutMs": 1200000 }
+    "backend": { "scope": "backend", "command": ["npm", "run", "verify:backend-release"], "artifactRequired": true, "timeoutMs": 1800000 }
   },
   "systems": [
     { "id": "boot-and-release", "documents": ["Product model", "Player systems", "World systems", "Session and boot", "Application overview", "Release shape", "Repository map"], "assertions": ["one current module graph", "one immutable artifact identity", "public pages and game boot from that artifact", "the landing explorer total renders without exposing account data"], "gates": ["source-graph", "release-contracts", "public-claims", "artifact-world", "gameplay-menu", "hotbar-actions", "landing-user-count", "artifact-integrity", "release-identity"] },

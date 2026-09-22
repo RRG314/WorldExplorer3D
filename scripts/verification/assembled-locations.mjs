@@ -269,12 +269,16 @@ try {
           Number(snapshot.surfaceChain?.surfaces?.walk?.feature?.structureVisual?.visibleMeshCount || 0) > 0
         ),
         mappedRuralArrival: location.id !== 'iowa-rural' || (
-          snapshot.surfaceChain?.surfaces?.walk?.kind === 'road' &&
-          !!snapshot.surfaceChain?.surfaces?.walk?.feature?.transportSource?.identity &&
+          // Walking arrivals preserve the selected farmland coordinates;
+          // snapping to a road kilometres away would violate destination truth.
+          ['terrain', 'road'].includes(snapshot.surfaceChain?.surfaces?.walk?.kind) &&
+          snapshot.surfaceChain?.actor?.grounded === true &&
+          snapshot.surfaceChain?.buildingCollision?.collision === false &&
+          Math.abs(Number(snapshot.surfaceChain?.deltas?.feetMinusWalkSurface)) <= 0.35 &&
           Math.hypot(
-            Number(snapshot.surfaceChain?.world?.x || 0),
-            Number(snapshot.surfaceChain?.world?.z || 0)
-          ) <= 2700
+            Number(snapshot.surfaceChain?.world?.x),
+            Number(snapshot.surfaceChain?.world?.z)
+          ) <= 96
         ),
         exactStructureConnectionsContinuous: Number(snapshot.transportContinuity?.discontinuityCount || 0) === 0,
         generalizedStructureEndpointsSupported:

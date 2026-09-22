@@ -3,6 +3,7 @@ import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { advanceGameplay } from './gameplay-simulation.mjs';
 
 const root = process.cwd();
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
@@ -112,7 +113,7 @@ async function touchHold(page, cdp, selector, deltaX, deltaY, holdMs = 1_050) {
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point(start)] });
   await page.waitForTimeout(70);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [point(end)] });
-  await page.waitForTimeout(holdMs);
+  const simulation = await advanceGameplay(page, holdMs);
   const held = await page.evaluate(() => ({
     diagnostics: globalThis.getWorldExplorerRuntimeDiagnostics?.(),
     hud: {
@@ -125,7 +126,7 @@ async function touchHold(page, cdp, selector, deltaX, deltaY, holdMs = 1_050) {
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await page.waitForTimeout(120);
   const after = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.());
-  return { before, held, after, holdMs };
+  return { before, held, after, holdMs, simulation };
 }
 
 let desktopContext;
@@ -321,6 +322,8 @@ try {
     noFailedLocalResources: localFailures.length === 0
   };
   const report = {
+    timing: 'runtime-fixed-step',
+    simulationReceipts: [rightMove, leftMove, forwardMove, driveMove, droneMove, planeMove, oceanMove].map(move => move.simulation),
     ok: Object.values(checks).every(Boolean),
     contract: 'player-reported-release-blockers-v1',
     checks,

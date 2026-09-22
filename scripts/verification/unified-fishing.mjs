@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { advanceGameplay, advanceUntilFishingStage } from './gameplay-simulation.mjs';
 
 const root = process.cwd();
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
@@ -10,7 +11,7 @@ const servedRoot = requestedRoot ? path.resolve(root, requestedRoot) : root;
 const server = await startStaticServer({ rootDir: servedRoot, ports: [4383, 4384, 4385] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
 const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
-const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: process.env.CI ? 0.5 : 1, hasTouch: true, isMobile: true });
 const page = await context.newPage();
 const browserErrors = [];
 const localFailures = [];
@@ -101,7 +102,7 @@ try {
     return { action: snapshot('#fishingActionBtn'), close: snapshot('#fishingCloseBtn') };
   });
   await page.locator('#fishingActionBtn').click();
-  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().fishing?.stage === 'bite', null, { timeout: 20_000 });
+  await advanceUntilFishingStage(page, 'bite');
   await page.locator('#fishingActionBtn').click();
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().fishing?.stage === 'fighting', null, { timeout: 10_000 });
   await page.locator('#fishingDrag').evaluate((element) => {
@@ -117,7 +118,7 @@ try {
     await page.keyboard.press(counterKey);
     const pressureKey = Number(fishing.tension) > 0.76 ? 'KeyQ' : 'Space';
     await page.keyboard.down(pressureKey);
-    await page.evaluate(() => globalThis.advanceTime?.(120));
+    await advanceGameplay(page, 120);
     await page.keyboard.up(pressureKey);
   }
 
@@ -214,6 +215,9 @@ try {
     noFailedLocalResources: localFailures.length === 0
   };
   const report = {
+    timing: 'runtime-fixed-step',
+    evidenceScope: 'functional; not rendering performance',
+    deviceScaleFactor: process.env.CI ? 0.5 : 1,
     ok: Object.values(checks).every(Boolean),
     contract: 'unified-water-fish-authority-boat-catch-journal-guide',
     checks,
@@ -233,6 +237,13 @@ try {
   };
   console.log(JSON.stringify(report, null, 2));
   assert.equal(report.ok, true, 'Unified boat fishing authority journey failed.');
+} catch (error) {
+  const directory = 'output/verification/unified-fishing';
+  await mkdir(directory, { recursive: true });
+  const state = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.()).catch(() => null);
+  await writeFile(`${directory}/failure.json`, JSON.stringify({ ok: false, error: String(error?.stack || error), state, browserErrors, localFailures }, null, 2));
+  await page.screenshot({ path: `${directory}/failure.png`, timeout: 15_000 }).catch(() => {});
+  throw error;
 } finally {
   await context.close();
   await browser.close();
