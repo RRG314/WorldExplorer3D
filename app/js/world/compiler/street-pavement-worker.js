@@ -1,4 +1,5 @@
 import { prepareStreetPavement, compilePavementTile, meshPavementTile } from './street-pavement.js';
+import { serializeStreetPavementFingerprint } from './street-pavement-fingerprint.js';
 let plan = null, cursor = 0, debug = false, cached={};
 self.onmessage = async ({ data }) => {
   try {
@@ -8,12 +9,14 @@ self.onmessage = async ({ data }) => {
     } else if ((data.type === 'next'||data.type==='retry') && plan) {
       const tile = data.type==='retry'?plan.tiles[cursor-1]:plan.tiles[cursor++];
       if (!tile) { self.postMessage({ type: 'complete' }); plan = null; return; }
-      const road=r=>({auditIndex:r.auditIndex,type:r.type,tags:r.tags,transportRecord:{sourceTags:r.transportRecord?.sourceTags}});
-      const slim={...tile,segments:tile.segments.map(s=>({...s,road:road(s.road)})),joins:tile.joins.map(s=>({...s,road:road(s.road)}))};
       // Retain only the current cell in the opt-in diagnostic textarea. This
       // must precede clipping so a timed-out polygon is reproducible as well.
-      if(debug)self.postMessage({type:'trace',tile:slim});
-      const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify({tile:slim,metersPerWorldUnit:plan.metersPerWorldUnit})));
+      if(debug) {
+        const road=r=>({auditIndex:r.auditIndex,type:r.type,tags:r.tags,transportRecord:{sourceTags:r.transportRecord?.sourceTags}});
+        const slim={...tile,segments:tile.segments.map(s=>({...s,road:road(s.road)})),joins:tile.joins.map(s=>({...s,road:road(s.road)}))};
+        self.postMessage({type:'trace',tile:slim});
+      }
+      const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(serializeStreetPavementFingerprint(tile,plan.metersPerWorldUnit)));
       const fingerprint=Array.from(new Uint8Array(digest),n=>n.toString(16).padStart(2,'0')).join('');
       if(data.type!=='retry'&&cached[tile.key]===fingerprint){self.postMessage({type:'cached',key:tile.key,fingerprint,completed:cursor,total:plan.tiles.length});return;}
       const started = performance.now();

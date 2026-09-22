@@ -2,6 +2,26 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {indexPavementPositions} from '../app/js/world/pavement-indexed-mesh.js';
 import {createPavementBaseSampler} from '../app/js/world/pavement-height-sampler.js';
+import {serializeStreetPavementFingerprint} from '../app/js/world/compiler/street-pavement-fingerprint.js';
+
+test('pavement cache keys retain geometry and shared road ownership without expanding each edge owner',()=>{
+ const road={auditIndex:7,type:'residential',tags:{sidewalk:'both'},pts:Array.from({length:1000},(_,i)=>({x:i,z:i*.1})),resolvedCrossSection:{placementOffset:1}};
+ const tile={key:'0:0',segments:[{road,a:{x:0,z:0},b:{x:10,z:1}}],joins:[{road,point:{x:5,z:.5}}],frontageBarriers:Array.from({length:1000},(_,i)=>({a:{x:i,z:0},b:{x:i+1,z:1},road}))};
+ const before=JSON.stringify(tile),key=serializeStreetPavementFingerprint(tile,1.11),snapshot=JSON.parse(key);
+ assert.equal(JSON.stringify(tile),before,'fingerprinting must not mutate compilation input');
+ assert.equal(snapshot.roads.length,1);
+ assert.deepEqual(snapshot.roads[0],road);
+ assert.equal(snapshot.tile.segments[0].road.roadIndex,snapshot.tile.frontageBarriers[999].road.roadIndex);
+ assert.ok(key.length<before.length*.02,'shared road point lists must not grow once per visibility edge');
+ assert.equal(serializeStreetPavementFingerprint(structuredClone(tile),1.11),key);
+ const change=mutate=>{const copy=structuredClone(tile);mutate(copy);assert.notEqual(serializeStreetPavementFingerprint(copy,1.11),key);};
+ change(t=>{t.frontageBarriers[0].a.x+=.001;});
+ change(t=>{t.segments[0].road.tags.sidewalk='no';});
+ change(t=>{t.segments[0].road.resolvedCrossSection.placementOffset=2;});
+ change(t=>{t.segments[0].road.pts[500].z+=1;});
+ change(t=>{t.frontageBarriers[0].road=structuredClone(t.frontageBarriers[0].road);});
+ assert.notEqual(serializeStreetPavementFingerprint(tile,1),key);
+});
 
 test('indexed pavement preserves every rendered triangle and reduces a dense grid about one third of flat position bytes',()=>{
  const vertices=[];
