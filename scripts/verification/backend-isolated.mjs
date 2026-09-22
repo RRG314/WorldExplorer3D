@@ -1,3 +1,4 @@
+import { prepareBackendEmulatorParameters } from './backend-emulator-parameters.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { backendGroups, backendSteps } from './backend-steps.mjs';
@@ -10,6 +11,10 @@ const outputDir = path.join('/tmp', 'worldexplorer3d-verification', 'backend-iso
   new Date().toISOString().replace(/[:.]/g, '-'));
 mkdirSync(outputDir, { recursive: true });
 const results = [];
+const cleanupParameters = prepareBackendEmulatorParameters();
+const onTermination = () => { cleanupParameters(); process.exit(143); };
+process.once('SIGTERM', onTermination);
+try {
 for (const group of backendGroups) {
   const ids = group.map(step => step.id);
   console.log(`[backend-isolated] START ${ids.join(', ')}`);
@@ -21,6 +26,10 @@ for (const group of backendGroups) {
     logPath: path.join(outputDir, `${ids[0]}.log`), timeoutMs: 600_000 });
   results.push({ stages: ids, ...result });
   if (!result.ok) break;
+}
+} finally {
+  process.removeListener('SIGTERM', onTermination);
+  cleanupParameters();
 }
 const report = {
   ok: results.length === backendGroups.length && results.every(result => result.ok),
