@@ -267,11 +267,8 @@
   </footer>
 
   <script type="module">
-    import { hasFirebaseConfig } from './js/firebase-init.js?v=57';
-    import { ensureSignedIn } from './js/auth-ui.js?v=55';
-    import { redirectToCheckout } from './js/billing.js?v=58';
-    import { hydratePublicExplorerCount } from './js/public-site-stats.js?v=1';
-    import { hydrateLandingPageFromPublishedContent } from './js/site-content.js?v=1';
+    import { hasFirebaseConfig } from './js/firebase-config.js';
+    import { hydratePublicExplorerCount } from './js/public-site-stats.js?v=2';
 
     fetch('./build-manifest.json', { cache: 'no-store' }).then(async (response) => {
       if (!response.ok) return;
@@ -289,6 +286,14 @@
     const donateProBtn = document.getElementById('donateProBtn');
     const statusEl = document.getElementById('multiplayerStatus');
 
+    async function loadSignIn() {
+      try {
+        return await import('./js/auth-ui.js?v=55');
+      } catch (_) {
+        throw new Error('Sign-in could not load. Check your connection and try again.');
+      }
+    }
+
     function setStatus(message, isError = false) {
       statusEl.textContent = message || '';
       statusEl.style.color = isError ? 'var(--danger)' : 'var(--muted)';
@@ -305,6 +310,7 @@
           return;
         }
 
+        const { ensureSignedIn } = await loadSignIn();
         const user = await ensureSignedIn();
         if (!user) {
           setStatus('Finish signing in to enter multiplayer.');
@@ -333,12 +339,14 @@
           return;
         }
 
+        const { ensureSignedIn } = await loadSignIn();
         const user = await ensureSignedIn();
         if (!user) {
           setStatus('Finish signing in to continue the donation checkout.');
           return;
         }
 
+        const { redirectToCheckout } = await import('./js/billing.js?v=58');
         await redirectToCheckout(plan);
       } catch (err) {
         console.error('[landing] Donation checkout failed:', err);
@@ -351,7 +359,9 @@
     donateSupporterBtn?.addEventListener('click', () => startDonationCheckout('supporter', donateSupporterBtn, 'Supporter'));
     donateProBtn?.addEventListener('click', () => startDonationCheckout('pro', donateProBtn, 'Pro'));
 
-    hydrateLandingPageFromPublishedContent(document).catch((error) => {
+    import('./js/site-content.js?v=1').then(({ hydrateLandingPageFromPublishedContent }) =>
+      hydrateLandingPageFromPublishedContent(document)
+    ).catch((error) => {
       console.warn('[landing] Published site content unavailable:', error);
     });
     hydratePublicExplorerCount(document).catch(() => {});
