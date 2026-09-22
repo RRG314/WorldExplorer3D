@@ -28,7 +28,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link rel="stylesheet" href="styles/universe.css?v=9">
 <link rel="stylesheet" href="styles/fishing-game.css?v=6">
 <link rel="stylesheet" href="styles/interface-v4.css?v=31">
-<link rel="stylesheet" href="styles/start-hub.css?v=18">
+<link rel="stylesheet" href="styles/start-hub.css?v=19">
 <link rel="stylesheet" href="styles/discovery.css?v=17">
 <link rel="stylesheet" href="styles/tutorial.css?v=15">
 <link rel="stylesheet" href="styles/ar.css?v=1">
@@ -575,6 +575,10 @@ How Connected Data Is Used
   <input id="globeMobileLocationSearch" type="text" placeholder="Search city or place" aria-label="Search city or place">
   <button id="globeMobileLocationSearchBtn" type="button">Search</button>
 </div>
+<div class="globe-search-feedback">
+<div id="globeLocationSearchStatus" role="status" aria-live="polite" style="font-size:12px;min-height:16px;color:#64748b">Search for a place or choose one from the globe.</div>
+<div id="globeLocationSearchResults" class="globe-location-search-results" role="listbox" aria-label="Place search results" hidden></div>
+</div>
 <div class="globe-selector-stat">
 <div class="globe-selector-stat-label">Selected Coordinates</div>
 <div id="globeSelectorLatLon" class="globe-selector-stat-value">No point selected</div>
@@ -590,8 +594,6 @@ How Connected Data Is Used
 <button id="globeSelectorLiveEarthModeBtn" class="globe-selector-mode-tab" type="button">Live Earth</button>
 </div>
 <div id="globeSelectorExplorePanel" class="globe-selector-mode-panel active">
-<div id="globeLocationSearchStatus" style="font-size:11px;min-height:14px;color:#64748b">Search for a place or choose one from the globe.</div>
-<div id="globeLocationSearchResults" class="globe-location-search-results" role="listbox" aria-label="Place search results" hidden></div>
 <div class="globe-selector-field-label">Manual Coordinates</div>
 <div class="globe-selector-row globe-selector-coordinate-row">
 <input id="globeCustomLat" type="number" step="0.0001" placeholder="Latitude">

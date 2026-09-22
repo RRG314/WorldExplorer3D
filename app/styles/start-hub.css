@@ -79,6 +79,7 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 .globe-destination-bar { background: var(--hub-bar); }
 .globe-selector-side { background: var(--hub-panel); }
 .globe-selector-side:has(#globeSelectorLiveEarthPanel.active) .globe-location-entry-pair,
+.globe-selector-side:has(#globeSelectorLiveEarthPanel.active) .globe-search-feedback,
 .globe-selector-side:has(#globeSelectorLiveEarthPanel.active) .globe-selector-stat,
 .globe-selector-side:has(#globeSelectorLiveEarthPanel.active) .globe-selector-actions {
   display: none;
@@ -98,6 +99,7 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 .globe-selector-mode-tab.active,
 .globe-selector-city-tab.active { color: var(--hub-text); background: var(--hub-active); border-color: var(--hub-blue); }
 #globeLocationSearchStatus { color: var(--hub-muted) !important; }
+.globe-search-feedback { display: grid; gap: 6px; }
 .globe-location-search-results {
   display: grid;
   gap: 5px;
