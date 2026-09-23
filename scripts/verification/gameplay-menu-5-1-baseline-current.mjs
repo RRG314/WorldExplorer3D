@@ -1,3 +1,4 @@
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -47,6 +48,7 @@ async function verify(viewport, name) {
   markPhase(`${name}:loading`);
   const runtimeRequests = [];
   page.on('request', (request) => runtimeRequests.push(request.url()));
+  collectBrowserGraphicsErrors(page, browserErrors);
   page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   await startEarth(page);
 

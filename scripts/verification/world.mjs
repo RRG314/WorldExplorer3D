@@ -1,3 +1,4 @@
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -52,6 +53,7 @@ function isExpectedStaticBackendMiss(resourceUrl) {
 }
 
 function attachDiagnostics(targetPage) {
+  collectBrowserGraphicsErrors(targetPage, browserErrors);
   targetPage.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   targetPage.on('response', (response) => {
     if (response.url().startsWith(baseUrl) && response.status() >= 400) {

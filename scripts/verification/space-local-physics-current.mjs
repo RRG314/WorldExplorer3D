@@ -1,3 +1,4 @@
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
@@ -8,6 +9,7 @@ const context = await browser.newContext({ viewport: { width: 1280, height: 800 
 const page = await context.newPage();
 await configureStagingAppCheck(page, baseUrl);
 const pageErrors = [];
+collectBrowserGraphicsErrors(page, pageErrors);
 page.on('pageerror', (error) => pageErrors.push(String(error?.stack || error)));
 
 try {
