@@ -543,7 +543,7 @@ try {
   for (const location of selectedLocations) {
     console.error(`[actors-vehicles] START ${location.id}`);
     const browserServer = await chromium.launchServer({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280'] });
-    let browser, context, page;
+    let browser, context, page, cpuProfiler;
     try {
       browser = await chromium.connect(browserServer.wsEndpoint());
       context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
@@ -581,6 +581,12 @@ try {
           diagnostics.livingWorld?.active === true && diagnostics.urbanSandbox?.active === true;
       }, null, { timeout: 360000, polling: 500 });
       await page.waitForTimeout(5000);
+      if (process.env.CI) {
+        cpuProfiler = await context.newCDPSession(page);
+        await cpuProfiler.send('Profiler.enable');
+        await cpuProfiler.send('Profiler.setSamplingInterval', { interval: 2000 });
+        await cpuProfiler.send('Profiler.start');
+      }
       const timeControl = page.locator('#quickTimeOfDay');
       await timeControl.waitFor({ state: 'visible' });
       for (let attempt = 0; attempt < 5 && await timeControl.getAttribute('data-mode') !== 'day'; attempt += 1) {
@@ -742,6 +748,22 @@ try {
       results.push({ id: location.id, ok: false, error: String(error?.stack || error), browserErrors, localFailures });
       await page.screenshot({ path: path.join(evidenceDir, `${location.id}-error.png`), timeout: 5000 }).catch(() => {});
     } finally {
+      if (cpuProfiler) {
+        try {
+          const { profile } = await cpuProfiler.send('Profiler.stop');
+          await fs.writeFile(path.join(evidenceDir, `${location.id}-interaction.cpuprofile`), JSON.stringify(profile));
+          const frames = new Map(profile.nodes.map(node => [node.id, node.callFrame]));
+          const totals = new Map();
+          for (let index = 0; index < (profile.samples || []).length; index++) {
+            const id = profile.samples[index]; totals.set(id, (totals.get(id) || 0) + (profile.timeDeltas[index] || 0));
+          }
+          await fs.writeFile(path.join(evidenceDir, `${location.id}-cpu-summary.json`), JSON.stringify({
+            scope: 'remote interaction diagnosis; not physical performance acceptance',
+            durationMs: (profile.endTime - profile.startTime) / 1000,
+            topSamples: [...totals].sort((a,b) => b[1] - a[1]).slice(0, 40).map(([id, us]) => ({ milliseconds: us / 1000, ...frames.get(id) }))
+          }, null, 2));
+        } catch (error) { console.error('CPU diagnostic capture failed:', error.message); }
+      }
       try { await saveReport(); }
       finally {
         await boundedClose(() => context.close());

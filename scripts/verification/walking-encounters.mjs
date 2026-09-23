@@ -1,3 +1,4 @@
+import { createGpsFixStream } from './gps-fix-stream.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -15,6 +16,7 @@ const origin = new URL(baseUrl).origin;
 const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
 const browserErrors = [];
 const localFailures = [];
+let gpsFixStream = null;
 
 async function instrument(page) {
   await configureStagingAppCheck(page, baseUrl);
@@ -309,6 +311,8 @@ try {
   });
   await gpsContext.grantPermissions(['geolocation'], { origin });
   const gpsPage = await gpsContext.newPage();
+  gpsFixStream = createGpsFixStream(await gpsContext.newCDPSession(gpsPage));
+  await gpsFixStream.send('Emulation.setGeolocationOverride', { latitude: 39.2904, longitude: -76.6122, accuracy: 6, speed: 0, heading: 0 });
   await instrument(gpsPage);
   await gpsPage.goto(`${baseUrl}/app/`, { waitUntil: 'load', timeout: 120_000 });
   await gpsPage.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
@@ -327,11 +331,13 @@ try {
   await gpsPage.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().liveGps?.active === true, null, { timeout: 60_000 });
   const gpsDirectPromptPlacement = await inspectDirectPromptPlacement(gpsPage);
   const gpsLead = await waitForLead(gpsPage, 'live-gps', async () => {
-    await gpsContext.setGeolocation({ latitude: 39.2907, longitude: -76.6122, accuracy: 6 });
+    await gpsFixStream.send('Emulation.setGeolocationOverride', { latitude: 39.2907, longitude: -76.6122, accuracy: 6, speed: 0, heading: 0 });
   });
   await gpsPage.screenshot({ path: 'output/release-evidence/current/baltimore-ecology-live-gps-lead-mobile.png', fullPage: false });
   const gpsAccepted = await acceptLead(gpsPage, gpsLead.lead);
   await gpsPage.screenshot({ path: 'output/release-evidence/current/baltimore-ecology-live-gps-tracking-mobile.png', fullPage: false });
+  await gpsFixStream.stop();
+  gpsFixStream = null;
   await gpsContext.close();
 
   const checks = {
@@ -425,6 +431,6 @@ try {
   }, null, 2));
   throw error;
 } finally {
-  await browser.close();
-  await server?.close();
+  try { await gpsFixStream?.stop(); }
+  finally { await browser.close(); await server?.close(); }
 }

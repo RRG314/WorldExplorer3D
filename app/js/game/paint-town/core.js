@@ -226,6 +226,8 @@ export function setPaintTownPlayerColor(colorHex) {
   updatePaintTownHud();
 }
 
+const boundPaintTownHuds = new WeakSet();
+
 export function updatePaintTownHud(message = "", options = {}) {
   const state = ensurePaintTownState();
   const hud = ensurePaintTownHud();
@@ -251,52 +253,81 @@ export function updatePaintTownHud(message = "", options = {}) {
     countText,
     state.hudExpanded ? "expanded" : "compact",
     state.activeTool,
+    rules.paintTouchMode,
+    canGun,
     normalizePaintColorHex(state.playerColorHex, PAINT_TOWN_DEFAULT_COLOR.hex),
     hint
   ].join("|");
   if (!force && hudSignature === state.hudRenderSig) return;
   state.hudRenderSig = hudSignature;
 
-  if (!state.hudExpanded) {
-    hud.innerHTML =
-      `<button type="button" data-paint-toggle="open" style="display:flex;align-items:center;gap:12px;width:100%;background:transparent;border:0;color:#f8fafc;padding:0;margin:0;font:inherit;cursor:pointer">` +
-      `<span style="font-weight:700">Time ${timeText}</span>` +
-      `<span style="font-weight:700">Painted ${countText}</span>` +
-      `<span style="margin-left:auto;color:#cbd5e1;font-size:12px">▾</span>` +
-      `</button>`;
-  } else {
-    const colorButtons = PAINT_TOWN_COLORS.map((entry) => {
-      const normalizedEntryHex = normalizePaintColorHex(entry.hex);
-      const active = normalizePaintColorHex(state.playerColorHex) === normalizedEntryHex;
-      return `<button type="button" data-paint-color="${normalizedEntryHex}" title="${entry.name}" style="width:20px;height:20px;border-radius:999px;border:${active ? "2px solid #f8fafc" : "1px solid rgba(248,250,252,0.35)"};background:${normalizedEntryHex};cursor:pointer;padding:0;outline:none"></button>`;
-    }).join("");
-
-    const toolButtons = [
-      { id: "touch", label: rules.paintTouchMode === "roof" ? "Touch (Roof)" : "Touch", enabled: canTouch },
-      { id: "gun", label: "Paintball Gun", enabled: canGun }
-    ].map((tool) => {
-      const active = state.activeTool === tool.id;
-      const disabled = !tool.enabled;
-      return `<button type="button" data-paint-tool="${tool.id}" ${disabled ? "disabled" : ""} style="border:${active ? "1px solid #f8fafc" : "1px solid rgba(148,163,184,0.55)"};background:${active ? "rgba(30,64,175,0.45)" : "rgba(15,23,42,0.45)"};color:${disabled ? "#64748b" : "#e2e8f0"};border-radius:8px;padding:5px 9px;font-size:11px;font-weight:600;cursor:${disabled ? "not-allowed" : "pointer"}">${tool.label}</button>`;
-    }).join("");
-
-    const selectedColorName = paintColorNameFromHex(state.playerColorHex);
-    hud.innerHTML =
-      `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">` +
-      `<div style="font-weight:700;color:#fecaca">🟥 Paint the Town</div>` +
-      `<button type="button" data-paint-toggle="close" style="margin-left:auto;border:1px solid rgba(148,163,184,0.6);background:rgba(15,23,42,0.45);color:#e2e8f0;border-radius:8px;padding:3px 8px;font-size:11px;cursor:pointer">Collapse</button>` +
-      `</div>` +
-      `<div style="font-weight:600">Time: ${timeText} • Buildings: ${countText}</div>` +
-      `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:7px">${toolButtons}</div>` +
-      `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:7px"><span style="font-size:11px;color:#cbd5e1">Color:</span>${colorButtons}<span style="font-size:11px;color:#cbd5e1">(${selectedColorName})</span></div>` +
-      `<div style="margin-top:6px;color:#cbd5e1;font-size:11px">Press Ctrl (Control) to fire paintballs. Gun shots arc with gravity, so aim higher for far targets.</div>` +
-      (hint ? `<div style="margin-top:4px;color:#cbd5e1;font-size:11px">${hint}</div>` : "");
+  // Time/score/hint changes must not replace controls during pointer or
+  // keyboard input. Only expanding/collapsing changes the DOM structure.
+  const layout = state.hudExpanded ? "expanded" : "compact";
+  if (hud.dataset.paintLayout !== layout) {
+    const restoreToggleFocus = hud.contains(document.activeElement);
+    if (!state.hudExpanded) {
+      hud.innerHTML =
+        `<button type="button" data-paint-toggle="open" aria-expanded="false" style="display:flex;align-items:center;gap:12px;width:100%;background:transparent;border:0;color:#f8fafc;padding:0;margin:0;font:inherit;cursor:pointer">` +
+        `<span data-paint-time style="font-weight:700"></span>` +
+        `<span data-paint-count style="font-weight:700"></span>` +
+        `<span style="margin-left:auto;color:#cbd5e1;font-size:12px">▾</span></button>`;
+    } else {
+      const colorButtons = PAINT_TOWN_COLORS.map(entry =>
+        `<button type="button" data-paint-color="${normalizePaintColorHex(entry.hex)}" title="${entry.name}" aria-label="${entry.name}" style="width:20px;height:20px;border-radius:999px;background:${normalizePaintColorHex(entry.hex)};cursor:pointer;padding:0"></button>`
+      ).join("");
+      const toolButtons = ["touch", "gun"].map(id =>
+        `<button type="button" data-paint-tool="${id}" style="border-radius:8px;padding:5px 9px;font-size:11px;font-weight:600"></button>`
+      ).join("");
+      hud.innerHTML =
+        `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">` +
+        `<div style="font-weight:700;color:#fecaca">🟥 Paint the Town</div>` +
+        `<button type="button" data-paint-toggle="close" aria-expanded="true" style="margin-left:auto;border:1px solid rgba(148,163,184,0.6);background:rgba(15,23,42,0.45);color:#e2e8f0;border-radius:8px;padding:3px 8px;font-size:11px;cursor:pointer">Collapse</button></div>` +
+        `<div style="font-weight:600"><span data-paint-time></span> • <span data-paint-count></span></div>` +
+        `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:7px">${toolButtons}</div>` +
+        `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:7px"><span style="font-size:11px;color:#cbd5e1">Color:</span>${colorButtons}<span data-paint-color-name style="font-size:11px;color:#cbd5e1"></span></div>` +
+        `<div data-paint-gun-help style="margin-top:6px;color:#cbd5e1;font-size:11px">Press Ctrl (Control) to fire paintballs. Gun shots arc with gravity, so aim higher for far targets.</div>` +
+        `<div data-paint-hint style="margin-top:4px;color:#cbd5e1;font-size:11px"></div>`;
+    }
+    hud.dataset.paintLayout = layout;
+    if (restoreToggleFocus) hud.querySelector('[data-paint-toggle]')?.focus({ preventScroll: true });
+  }
+  const setText = (selector, value) => {
+    const node = hud.querySelector(selector);
+    if (node && node.textContent !== value) node.textContent = value;
+  };
+  setText('[data-paint-time]', `${state.hudExpanded ? "Time:" : "Time"} ${timeText}`);
+  setText('[data-paint-count]', `${state.hudExpanded ? "Buildings:" : "Painted"} ${countText}`);
+  if (state.hudExpanded) {
+    setText('[data-paint-color-name]', `(${paintColorNameFromHex(state.playerColorHex)})`);
+    setText('[data-paint-hint]', hint);
+    hud.querySelector('[data-paint-hint]').hidden = !hint;
+    hud.querySelector('[data-paint-gun-help]').hidden = !canGun;
+    for (const button of hud.querySelectorAll('[data-paint-tool]')) {
+      const id = button.dataset.paintTool;
+      const active = state.activeTool === id;
+      const enabled = id === 'touch' ? canTouch : canGun;
+      button.disabled = !enabled;
+      button.setAttribute('aria-pressed', String(active));
+      const label = id === 'touch' ? (rules.paintTouchMode === 'roof' ? 'Touch (Roof)' : 'Touch') : 'Paintball Gun';
+      if (button.textContent !== label) button.textContent = label;
+      button.style.border = active ? '1px solid #f8fafc' : '1px solid rgba(148,163,184,0.55)';
+      button.style.background = active ? 'rgba(30,64,175,0.45)' : 'rgba(15,23,42,0.45)';
+      button.style.color = enabled ? '#e2e8f0' : '#64748b';
+      button.style.cursor = enabled ? 'pointer' : 'not-allowed';
+    }
+    for (const button of hud.querySelectorAll('[data-paint-color]')) {
+      const active = normalizePaintColorHex(state.playerColorHex) === button.dataset.paintColor;
+      button.style.border = active ? '2px solid #f8fafc' : '1px solid rgba(248,250,252,0.35)';
+      button.setAttribute('aria-pressed', String(active));
+    }
   }
 
   hud.style.display = "block";
   hud.classList.add("show");
 
-  if (!state.hudBound) {
+  if (!boundPaintTownHuds.has(hud)) {
+    boundPaintTownHuds.add(hud);
     state.hudBound = true;
     hud.addEventListener("click", (event) => {
       const target = event.target;

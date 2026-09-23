@@ -17,7 +17,7 @@
     "verify:test-sensitivity": "node scripts/verification/contract-sensitivity.mjs",
     "verify:system-release": "node scripts/verification/system-release.mjs",
     "verify:backend-release": "node scripts/verification/backend-environment.mjs",
-    "verify:painttown": "node tests/painttown.integration.test.mjs",
+    "verify:painttown": "node scripts/verification/painttown-hud-current.mjs && node tests/painttown.integration.test.mjs",
     "verify:provider-release": "node scripts/verification/provider-release.mjs",
     "verify:firestore-rules": "firebase emulators:exec --only firestore --project we3d-staging-20260712 \"node --test tests/firestore.rules.security.test.mjs\"",
     "verify:reality-capture:local": "node --test --test-concurrency=1 tests/capture-session-current.test.mjs tests/reality-capture-authority-current.test.cjs tests/reality-capture-glb-current.test.cjs tests/reality-capture-presentation-current.test.mjs tests/reality-capture-http-security-current.test.cjs tests/reality-capture-providers-current.test.cjs tests/reality-capture-decoder-current.test.cjs",

@@ -13,7 +13,7 @@ const all = (await fs.readdir('tests')).filter(name => /\.test\.(?:mjs|cjs|js)$/
 const externalOwners = new Map(backendSteps.flatMap(step => step.command.filter(arg => all.includes(arg))
   .map(file => [file, `backend:${step.id}`])));
 const packageJson = JSON.parse(await fs.readFile('package.json', 'utf8'));
-if (packageJson.scripts['verify:painttown'] === 'node tests/painttown.integration.test.mjs') {
+if (String(packageJson.scripts['verify:painttown'] || '').split(/\s*&&\s*/).includes('node tests/painttown.integration.test.mjs')) {
   externalOwners.set('tests/painttown.integration.test.mjs', 'candidate:painttown');
 }
 const unselectedFiles = all.filter(file => !currentContractTests.includes(file)).sort();

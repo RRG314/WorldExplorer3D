@@ -169,3 +169,11 @@ unchanged. Each completed action records simulated and wall time before the
 next action; this is controls/layout evidence, not default-quality or phone FPS.
 Actor/vehicle visual checks retain their original rendering profile and now
 capture failed screenshots and graphics diagnostics even without --capture.
+
+
+Paint the Town now has a small real-browser DOM regression before its full game
+journey. It exercises the shipped HUD module: timer/score/color updates preserve
+controls and keyboard focus, room rules disable unavailable tools, and hint text
+cannot create HTML elements. The old module failed five of nine assertions. The
+fixture is registered in the existing painttown gate; it does not replace the
+full painting/weapon journey. Inventory accepts this explicit sequential command.
