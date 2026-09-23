@@ -61,13 +61,11 @@ async function moveWithRemappedForwardKey() {
 }
 
 async function approachNearbyAction() {
-  // Completing the movement lesson does not imply an interaction is in reach.
-  // Read a published person or parked-car approach and walk there through
-  // normal input. A city need not have a parked car near its arrival point.
   const deadline = Date.now() + (process.env.CI ? 180_000 : 90_000);
-  let last;
+  let last, route = [], targetId = null;
+  const trace = [];
   while (Date.now() < deadline) {
-    last = await page.evaluate(async () => {
+    last = await page.evaluate(async ({ route, targetId }) => {
       const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
       const actor = state.activeActor;
       const targets = [
@@ -77,71 +75,70 @@ async function approachNearbyAction() {
           .map(npc => ({ id: npc.id, kind: 'person', x: npc.x, z: npc.z }))
       ];
       const distance = target => Math.hypot(target.x - actor.position.x, target.z - actor.position.z);
-      const target = targets.sort((a, b) => distance(a) - distance(b))[0];
-      // A person on the opposite pavement may be close in Euclidean distance
-      // but behind a solid building. Read the real collider to plan a bounded
-      // walking route; all movement still goes through the DOM input handlers.
-      const { ctx } = await import('/app/js/shared-context.js?v=55');
-      const origin = actor?.position;
-      let waypoint = target;
-      if (origin && target && typeof ctx.checkBuildingCollision === 'function') {
+      let target = targets.find(candidate => candidate.id === targetId) || targets.sort((a,b) => distance(a)-distance(b))[0];
+      const prompt = document.getElementById('urbanVehiclePrompt');
+      const visible = !!prompt?.classList.contains('show') && getComputedStyle(prompt).display !== 'none';
+      if (visible && state.urbanSandbox?.interaction) return { actor, target, route, visible, action: state.urbanSandbox.interaction };
+      while (route.length && distance(route[0]) < .6) route.shift();
+      if (!route.length && actor && target) {
+        // Read-only navigation over real building footprints. Keep this route
+        // until its waypoints are reached; replanning a differently aligned
+        // grid every step can reverse direction on opposite sides of a wall.
+        const { ctx } = await import('/app/js/shared-context.js?v=55');
+        const origin = actor.position;
         const spacing = 2;
-        const nearby = targets.filter(candidate => distance(candidate) < 90);
-        const key = (x, z) => `${x},${z}`;
+        const nearby = targetId ? [target] : targets.filter(candidate => distance(candidate) < 90);
         const point = node => ({ x: origin.x + node.x * spacing, z: origin.z + node.z * spacing });
-        const clear = (x, z) => !ctx.checkBuildingCollision(x, z, .4, {
-          actorBaseY: origin.y - 1.7, actorHeight: 1.7
-        })?.collision;
-        const heuristic = node => Math.min(...nearby.map(candidate => Math.hypot(candidate.x - point(node).x, candidate.z - point(node).z))) / spacing;
-        const queue = [{ x: 0, z: 0, cost: 0, parent: null }];
+        // Conservative 2D footprints avoid using the actor's current elevation
+        // to classify walls dozens of meters away on sloping terrain.
+        const clear = (x,z) => !ctx.checkBuildingCollision(x,z,.4)?.collision;
+        const heuristic = node => Math.min(...nearby.map(candidate => Math.hypot(candidate.x-point(node).x,candidate.z-point(node).z))) / spacing;
+        const queue = [{ x:0, z:0, cost:0, parent:null }];
         const seen = new Set(['0,0']);
-        let reached = null;
-        for (let visited = 0; queue.length && visited < 6400; visited += 1) {
-          queue.sort((a, b) => a.cost + heuristic(a) - b.cost - heuristic(b));
-          const node = queue.shift();
-          const at = point(node);
-          if (nearby.some(candidate => Math.hypot(candidate.x - at.x, candidate.z - at.z) < 2)) { reached = node; break; }
-          for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
-            const next = { x: node.x + dx, z: node.z + dz, cost: node.cost + 1, parent: node };
-            const id = key(next.x, next.z);
-            if (Math.abs(next.x) > 45 || Math.abs(next.z) > 45 || seen.has(id)) continue;
-            seen.add(id);
-            const to = point(next);
-            if (clear(to.x, to.z) && clear((at.x + to.x) / 2, (at.z + to.z) / 2)) queue.push(next);
+        let reached;
+        for (let visited=0; queue.length && visited<6400; visited++) {
+          queue.sort((a,b) => a.cost+heuristic(a)-b.cost-heuristic(b));
+          const node = queue.shift(), at = point(node);
+          const goal = nearby.find(candidate => Math.hypot(candidate.x-at.x,candidate.z-at.z)<2);
+          if (goal) { reached=node; target=goal; break; }
+          for (const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+            const next = { x:node.x+dx, z:node.z+dz, cost:node.cost+1, parent:node };
+            const key = `${next.x},${next.z}`;
+            if (Math.abs(next.x)>45 || Math.abs(next.z)>45 || seen.has(key)) continue;
+            seen.add(key);
+            const to=point(next);
+            if (clear(to.x,to.z) && clear((at.x+to.x)/2,(at.z+to.z)/2)) queue.push(next);
           }
         }
-        if (reached?.parent) {
-          const route = [];
-          for (let node = reached; node.parent; node = node.parent) route.unshift(node);
-          // Keep straight sections together so the verifier doesn't stop and
-          // turn at every grid cell. Replan against the actor's actual position.
-          let last = route[0];
-          const direction = { x: last.x, z: last.z };
-          for (const node of route.slice(1)) {
-            if (node.x - last.x !== direction.x || node.z - last.z !== direction.z) break;
-            last = node;
-          }
-          waypoint = point(last);
-        } else if (!reached) waypoint = null;
+        if (reached) {
+          const nodes=[];
+          for (let node=reached; node.parent; node=node.parent) nodes.unshift(node);
+          // Keep corners, merge straight sections, and approach the final
+          // interaction without assigning actor, ownership, or tutorial state.
+          route=nodes.filter((node,index) => !nodes[index+1] ||
+            node.x-node.parent.x !== nodes[index+1].x-node.x ||
+            node.z-node.parent.z !== nodes[index+1].z-node.z).map(point);
+          if (!route.length) route=[{x:target.x,z:target.z}];
+        }
       }
-      const prompt = document.getElementById('urbanVehiclePrompt');
-      return {actor, target, waypoint, action:state.urbanSandbox?.interaction,
-        visible:!!prompt?.classList.contains('show') && getComputedStyle(prompt).display !== 'none'};
-    });
-    if (last.visible && last.action) return last;
-    assert.ok(last.target && last.actor?.mode === 'walk', `No walking approach: ${JSON.stringify(last)}`);
-    assert.ok(last.waypoint, `No collision-free approach to a nearby action: ${JSON.stringify(last)}`);
-    const dx = last.waypoint.x - last.actor.position.x;
-    const dz = last.waypoint.z - last.actor.position.z;
-    const angle = Math.atan2(dx, dz) - last.actor.orientation.yaw;
-    const delta = Math.atan2(Math.sin(angle), Math.cos(angle));
-    if (Math.abs(delta) > 0.12) {
-      await stepGameplayKeys(page, [delta > 0 ? 'ArrowLeft' : 'ArrowRight'], Math.min(500, Math.max(20, Math.abs(delta) / 2.6 * 1000)));
+      return { actor, target, route, visible, action:state.urbanSandbox?.interaction };
+    }, { route, targetId });
+    if (last.visible && last.action) return {...last, navigationTrace:trace};
+    route=last.route; targetId=last.target?.id;
+    assert.ok(route.length && last.actor?.mode==='walk', `No collision-free walking approach: ${JSON.stringify(last)}`);
+    const waypoint=route[0], position=last.actor.position;
+    trace.push({position,waypoint,targetId,remainingWaypoints:route.length});
+    if (trace.length>24) trace.shift();
+    const dx=waypoint.x-position.x, dz=waypoint.z-position.z;
+    const angle=Math.atan2(dx,dz)-last.actor.orientation.yaw;
+    const delta=Math.atan2(Math.sin(angle),Math.cos(angle));
+    if (Math.abs(delta)>.08) {
+      await stepGameplayKeys(page,[delta>0?'ArrowLeft':'ArrowRight'],Math.min(500,Math.max(20,Math.abs(delta)/2.6*1000)));
     } else {
-      await stepGameplayKeys(page, ['ArrowUp'], Math.hypot(dx, dz) > 4 ? 600 : 150);
+      await stepGameplayKeys(page,['ArrowUp'],Math.min(2000,Math.max(75,(Math.hypot(dx,dz)-.2)/2.8*1000)));
     }
   }
-  throw new Error(`Could not reach a nearby action using normal input: ${JSON.stringify(last)}`);
+  throw new Error(`Could not reach a nearby action using normal input: ${JSON.stringify({last,trace})}`);
 }
 
 try {
