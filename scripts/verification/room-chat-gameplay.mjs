@@ -4,6 +4,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
+import { pauseWaitingPlayer } from './pause-waiting-player.mjs';
 import { selectLowRenderQuality } from './render-quality-ui.mjs';
 
 for (const key of ['FIREBASE_AUTH_EMULATOR_HOST', 'FIRESTORE_EMULATOR_HOST']) {
@@ -14,7 +15,7 @@ const config = JSON.parse(await fs.readFile('config/firebase.staging.json'));
 const out = 'output/verification/room-chat-gameplay';
 await fs.mkdir(out, { recursive: true });
 const report = { ok: false, checks: [], errors: [], buildId: JSON.parse(await fs.readFile(path.join(root, 'build-manifest.json'))).buildId,
-  browserBudget: { renderQuality: process.env.CI ? 'low (normal Settings UI)' : 'default', deviceScaleFactor: process.env.CI ? .5 : 1, evidenceScope: 'two full clients; functional chat/movement, not performance or default-quality graphics acceptance' } };
+  browserBudget: { renderQuality: process.env.CI ? 'low (normal Settings UI)' : 'default', deviceScaleFactor: process.env.CI ? .5 : 1, foregroundGameplayWorlds: 1, waitingClient: 'normal manual pause; network remains active', evidenceScope: 'two full clients; one rendering at a time; functional chat/movement, not simultaneous-rendering, performance or default-quality graphics acceptance' } };
 const server = await startStaticServer({ rootDir: root, ports: [4491, 4492] });
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const pages = [];
@@ -54,6 +55,7 @@ try {
   await ready(owner.page);
   const code = (await owner.page.locator('#roomPanelRoomCode').textContent()).match(/\b[A-Z2-9]{6}\b/)?.[0];
   assert.ok(code);
+  report.ownerPause = await pauseWaitingPlayer(owner.page);
   const member = await boot('member', true);
   await member.page.locator('#mpTitleCodeInput').fill(code);
   await member.page.locator('#mpTitleJoinBtn').click();

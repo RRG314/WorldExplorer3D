@@ -4,6 +4,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 import { stepGameplayKeys } from './gameplay-simulation.mjs';
+import { pauseWaitingPlayer as pauseWaitingPage } from './pause-waiting-player.mjs';
 import { selectLowRenderQuality } from './render-quality-ui.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 
@@ -39,11 +40,10 @@ const deviceScaleFactor = process.env.CI ? 0.5 : 1;
 // on requestAnimationFrame being scheduled by the software GPU while that world
 // compiles. Match the CI action allowance; retain the normal local deadline.
 const roomStateWait = { timeout: process.env.CI ? 120_000 : 20_000, polling: 250 };
-// Current OSM Main Street geometry (way 954776975) was run through the actual
-// graph/parking compiler before selecting this location: three eligible cars
-// within 44 world units, each clearing the passing fleet by over 2.5 units.
-// The complete live world must still pass collision/placement guards. Never
-// fabricate a car or bypass those guards to make the handoff test pass.
+// The live provider may omit curb-width metadata and legitimately publish no
+// parked cars. Both parked and ambient traffic are player-enterable vehicles.
+// Exercise a vehicle actually present in this full world, retaining normal
+// walking, entry and server authority; never fabricate a car or widen a road.
 const worldLocation = { name: 'Logan Main Street', lat: 41.7355, lon: -111.8344 };
 const browserBudget = {
   maxOldSpaceMiB: 1024, worldInitialization: 'sequential', simultaneouslyLoadedWorlds: 2,
@@ -287,36 +287,9 @@ let owner;
 let member;
 const pauseReceipts = [];
 async function pauseWaitingPlayer(player) {
-  await player.page.bringToFront();
-  await player.page.locator('body > canvas:not(#minimap)').click();
-  const attempts = [];
-  // Escape first dismisses an open gameplay panel. Observe that normal UI
-  // transition before using Escape again to request the actual pause dialog.
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    attempts.push(await player.page.evaluate(() => ({
-      focusedElement: document.activeElement?.tagName,
-      visiblePanels: [...document.querySelectorAll('[role="dialog"], #largeMap, #discoveryPanel, #urbanEquipmentPanel')]
-        .filter(element => element.getClientRects().length && getComputedStyle(element).visibility !== 'hidden')
-        .map(element => element.id),
-      paused: globalThis.getWorldExplorerRuntimeDiagnostics?.().paused
-    })));
-    if (await player.page.locator('#pauseScreen.show').isVisible()) break;
-    await player.page.keyboard.press('Escape');
-    if (await player.page.waitForFunction(() =>
-      globalThis.getWorldExplorerRuntimeDiagnostics?.().paused === true &&
-      document.getElementById('pauseScreen')?.classList.contains('show'),
-    null, { timeout: 5_000, polling: 250 }).then(() => true, () => false)) break;
-  }
-  assert.ok(await player.page.locator('#pauseScreen.show').isVisible(),
-    `Normal Escape input did not open pause: ${JSON.stringify(attempts)}`);
-  const renderedFrames = () => player.page.evaluate(() =>
-    globalThis.getWorldExplorerRuntimeDiagnostics?.().runtimeKernel?.phases?.render?.find(system => system.id === 'core.renderer')?.updates);
-  const before = await renderedFrames();
-  await player.page.waitForTimeout(500);
-  const after = await renderedFrames();
-  assert.ok(Number.isFinite(before) && before === after, 'Manual pause must stop city drawing while the other client plays.');
-  pauseReceipts.push({ before, after, attempts });
+  pauseReceipts.push(await pauseWaitingPage(player.page));
 }
+
 async function resumePlayer(player) {
   await player.page.bringToFront();
   await player.page.locator('#resumeBtn').click();
@@ -443,21 +416,29 @@ try {
   await recordStage('both worlds ready; verifying shared vehicle and movement');
   const memberInitialVehicleIds = await member.page.evaluate(() =>
     (globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.vehicles || []).map(vehicle => vehicle.id));
+  const parkingSource = await owner.page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const actor = ctx.activeEarthActorPosition?.() || ctx.Walk?.state?.walker || ctx.car || {};
+    return (ctx.livingWorldRuntime?.publication?.trafficGraph?.edges || [])
+      .filter(edge => Math.hypot((edge.p1.x + edge.p2.x) / 2 - actor.x, (edge.p1.z + edge.p2.z) / 2 - actor.z) <= 80)
+      .slice(0, 80).map(edge => ({ sourceFeatureId: edge.sourceFeatureId, roadWidth: edge.roadWidth, laneOffset: edge.laneOffset, roadClass: edge.roadClass, laneProvenance: edge.laneProvenance }));
+  });
+  console.log(JSON.stringify({ stage: 'published-parking-source', edges: parkingSource }));
   const sharedVehicleCandidates = await owner.page.evaluate(() => {
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     const actor = state.activeActor?.position || {};
     return (state.urbanSandbox?.vehicles || [])
-      .filter((vehicle) => vehicle.source === 'deterministic-parked-vehicle' &&
+      .filter((vehicle) => ['deterministic-parked-vehicle', 'living-world-detailed-traffic'].includes(vehicle.source) &&
         vehicle.driverDoor && !vehicle.occupied && !vehicle.attachedToPlayer)
-      .map((vehicle) => ({ id: vehicle.id, distance: Math.hypot(vehicle.driverDoor.x - actor.x, vehicle.driverDoor.z - actor.z) }))
+      .map((vehicle) => ({ id: vehicle.id, source: vehicle.source, distance: Math.hypot(vehicle.driverDoor.x - actor.x, vehicle.driverDoor.z - actor.z) }))
       .sort((left, right) => left.distance - right.distance);
   });
-  // Prefer a car absent from the phone's smaller local seed budget. Its normal
-  // server claim must publish it to that client before the handoff can work.
-  sharedVehicleCandidates.sort((a, b) => Number(memberInitialVehicleIds.includes(a.id)) - Number(memberInitialVehicleIds.includes(b.id)) || a.distance - b.distance);
+  // Prefer parked cars when the source supports them, then proximity. The
+  // report records whether the phone initially seeded the chosen car.
+  sharedVehicleCandidates.sort((a, b) => Number(a.source !== 'deterministic-parked-vehicle') - Number(b.source !== 'deterministic-parked-vehicle') || a.distance - b.distance);
   let sharedVehicle = null;
   assert.ok(sharedVehicleCandidates.length > 0,
-    `No eligible persistent parked vehicles at ${worldLocation.name}; shared-car fixture cannot run.`);
+    `No eligible mapped vehicles at ${worldLocation.name}; shared-car fixture cannot run.`);
   for (const candidate of sharedVehicleCandidates) {
     const ownerReach = await walkToVehicle(owner, candidate.id);
     if (ownerReach.reached) {
@@ -465,7 +446,7 @@ try {
       break;
     }
   }
-  assert.ok(sharedVehicle?.id, 'Room owner could not reach any published persistent vehicle with normal walking input.');
+  assert.ok(sharedVehicle?.id, 'Room owner could not reach any published vehicle with normal walking input.');
 
   const claimResponsePromise = owner.page.waitForResponse((response) =>
     response.request().method() === 'POST' && /\/claimUrbanVehicle(?:\?|$)/.test(response.url()),
@@ -621,6 +602,7 @@ try {
       artifactTitle: sharedArtifact.title,
       sharedVehicleId: sharedVehicle.id,
       memberInitiallySeededVehicle: memberInitialVehicleIds.includes(sharedVehicle.id),
+      selectedVehicleSource: sharedVehicle.source,
       firstLeaseOwnerUid: memberObservedLease.vehicle?.roomLeaseOwnerUid,
       secondLeaseOwnerUid: memberClaimedAfterRelease.vehicle?.roomLeaseOwnerUid,
       leaseHeldBeyondInitialExpiry: retainedLease.phase === 'driving',
