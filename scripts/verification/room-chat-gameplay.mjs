@@ -15,11 +15,15 @@ const config = JSON.parse(await fs.readFile('config/firebase.staging.json'));
 const out = 'output/verification/room-chat-gameplay';
 await fs.mkdir(out, { recursive: true });
 const report = { ok: false, checks: [], errors: [], buildId: JSON.parse(await fs.readFile(path.join(root, 'build-manifest.json'))).buildId,
-  browserBudget: { renderQuality: process.env.CI ? 'low (normal Settings UI)' : 'default', deviceScaleFactor: process.env.CI ? .5 : 1, foregroundGameplayWorlds: 1, waitingClient: 'normal manual pause; network remains active', evidenceScope: 'two full clients; one rendering at a time; functional chat/movement, not simultaneous-rendering, performance or default-quality graphics acceptance' } };
+  browserBudget: { renderQuality: process.env.CI ? 'low (normal Settings UI)' : 'default', deviceScaleFactor: process.env.CI ? .5 : 1, foregroundGameplayWorlds: 1, browserProcesses: 2, waitingClient: 'normal manual pause; network remains active', evidenceScope: 'two full clients; one rendering at a time; functional chat/movement, not simultaneous-rendering, performance or default-quality graphics acceptance' } };
 const server = await startStaticServer({ rootDir: root, ports: [4491, 4492] });
-const browser = await chromium.launch({ channel: 'chrome', headless: true });
+const browsers = [];
 const pages = [];
 async function boot(label, mobile) {
+  // Separate devices do not share one Chrome GPU process or its allocation
+  // quota. Keep client identities and render resources independently owned.
+  const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--js-flags=--max-old-space-size=1024'] });
+  browsers.push(browser);
   const context = await browser.newContext({ viewport: mobile ? { width: 412, height: 915 } : { width: 1100, height: 760 }, isMobile: mobile, hasTouch: mobile, deviceScaleFactor: report.browserBudget.deviceScaleFactor });
   await context.addInitScript(config => {
     globalThis.WORLD_EXPLORER_FIREBASE = config;
@@ -92,7 +96,7 @@ try {
   report.error = String(error.stack || error);
   for (const [i, page] of pages.entries()) await page.screenshot({ path: `${out}/failure-${i}.png`, timeout: 10000 }).catch(() => {});
 } finally {
-  await browser.close();
+  await Promise.allSettled(browsers.map(browser => browser.close()));
   await server.close();
   await fs.writeFile(`${out}/report.json`, JSON.stringify(report, null, 2));
 }
