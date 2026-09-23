@@ -1,4 +1,5 @@
-# Historical browser test actor-state property, not an authentication secret:
-# actorKey: '__WE3D_COMPARISON_ACTOR__'. This exact line was later removed.
-# Limit the exception to this commit/path/rule/line; do not allow general keys.
+# Historical browser-test actor-state property, not a credential.
+# Exceptions apply only to the reviewed commit/path/rule/line findings.
 49a2b632cf4a825eb4e5ef8cb3533079911a1c94:scripts/verification/performance-comparison.mjs:generic-api-key:67
+# The explanatory comment originally repeated that same non-secret literal.
+57c880d84922e29e330e5f6e7a67e524d414ce82:.gitleaksignore:generic-api-key:2
