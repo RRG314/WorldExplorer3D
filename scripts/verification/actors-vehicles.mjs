@@ -730,6 +730,7 @@ try {
         settledVehicleVelocity: settled?.activeActor?.velocity || null,
         playerVehicleContact: settled?.surfaceChain?.actor?.vehicleContact || null,
         envelopes,
+        runtimeErrors: second?.runtimeErrors || [],
         browserErrors,
         localFailures
       });

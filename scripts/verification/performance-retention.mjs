@@ -5,6 +5,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 import { requirePerformanceHost, requireHardwareGraphics } from './performance-host.mjs';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 
 // Reject cloud/other hardware before opening a browser or loading a world.
 const hostAuthority = requirePerformanceHost();
@@ -41,6 +42,7 @@ async function createMeasuredClient(contextOptions) {
   const transfers = new Map();
   const browserErrors = [];
   const localFailures = [];
+  collectBrowserGraphicsErrors(page, browserErrors);
   page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   page.on('response', (response) => {
     if (response.url().startsWith(baseUrl) && response.status() >= 400) {

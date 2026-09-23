@@ -9,11 +9,11 @@ making release claims. Historical notes are leads, not current proof.
 - Work here: `/Users/stevenreid/Developer/WorldExplorer3D-release-integration`.
   Branch: `steven/post-5.2-release-integration`; draft PR #87 targets `stable`.
   Do not edit the older Documents checkout.
-- Last live Hosting read at 13:17 UTC: production is
+- Last live Hosting read at 14:13 UTC: production is
   `5.2.0+db62593ba377.6342cddaba06fc68.production`; staging is
-  `5.3.0+9b3d35b56c2a.327bb975810a64af.staging`.
-  The later mobile vehicle-prompt fix is not yet deployed. Production rules
-  are unchanged. Check the hosted manifests for subsequent deployment receipts.
+  `5.3.0+a54d03456814.6fcbfc0f54adbfef.staging`.
+  Staging includes the verified mobile vehicle-prompt fix. Production Hosting
+  and rules are unchanged. Hosted manifests and prompt CSS match local bytes.
 - Backend/index read at 13:20–13:21 UTC: 78/78 Functions ACTIVE, no missing
   browser handlers, all required index definitions READY. Worker invocation
   is restricted to its dedicated service account. The authorized backend
@@ -32,10 +32,11 @@ to their execution paths. A real facade cleanup check catches a retained-object
 mutation that four source-text checks missed. Executed-case reports and test
 inventory now distinguish scope and reject unassigned/skipped/TODO tests.
 
-CI 35870266758 passes 1,289 cases on 2196eb25. Subsequent verification-only host
-guard tests add three cases; use the current CI report for the final total.
+CI 35871852823 passes 1,292 cases across 266 files on a54d0345, with zero
+failures, skipped cases, or TODOs. This is component/source evidence only.
 The physical-performance script now checks the actual M1 Mac mini hardware,
-rejects CI/software rendering, and records host/renderer/browser authority.
+rejects CI/software rendering, and records host/renderer/browser authority. GPU console errors also invalidate
+performance acceptance even when no JavaScript exception occurs.
 The remote workflow's obsolete duplicate functional list and cloud "full"
 physical-release path were removed. Remote results remain functional evidence.
 
@@ -47,11 +48,15 @@ package has an identical complete asset manifest to 7c7716bd. The Linux backend
 rerun passed 12/13 stages but hit a screenshot deadline on SwiftShader before
 vehicle handoff; it remains a failed/incomplete run.
 
-Current remote verification requests on 2196eb25:
-- 35870313727: all 49 candidate gates except physical performance, macos-14.
-- 35870819087: the complete backend gate, macos-14, unchanged assertions.
+Remote verification on 2196eb25 (all packaged asset bytes match a54d0345):
+- 35870313727: all 49 candidate gates except physical performance, macos-14;
+  still running, with graphics failures in Golden Gate fallback and Monaco
+  actor checks. This is not a passing candidate matrix.
+- 35870819087: PASS, all 13 backend stages. Includes two independent clients,
+  room create/join, shared state, vehicle lease renewal/release/handoff, property
+  purchase, and chat-close-to-driving recovery. Remote functional scope only.
 
-These are requests, not passing receipts. Follow
+Follow
 `output/release-integration/test-confidence-2026-09-23/AUDIT.md` for their actual
 outcomes, artifact identities, failures, and temporary credential cleanup.
 Earlier regional/city/planetary results retain their own source/artifact scope;

@@ -72,7 +72,9 @@ separate from component and remote browser evidence.
 `verify:performance-retention` checks the actual host before opening a browser:
 macOS, native ARM, Macmini9,1, Apple M1, 8 GiB, and no CI runner. It also requires
 an M1 hardware WebGL renderer and records the host, renderer, and browser version
-with the measurements. Passing host eligibility alone is not a performance pass.
+with the measurements. Shader, driver, and context-loss console errors also
+invalidate the performance result; JavaScript exceptions alone are insufficient.
+Passing host eligibility alone is not a performance pass.
 `release:verify` performs the same host preflight before starting its full matrix.
 
 The remote workflow offers explicit candidate/diagnostic gate selections and the
