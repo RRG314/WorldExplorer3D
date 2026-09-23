@@ -3,7 +3,7 @@ import {mountCaptureStep} from './workspace-navigation.js';
 import './capture-theme.js';
 import {makeStarterLayout,makeEmptyLayout,normalizeLayout,assertPlayableLayout,floorWalls,roomRing,wallKey,layoutRoomDescriptor,roomInteriorPoint,splitRoom} from '../../../functions/interior-layout.mjs';
 import {loadClassicScript} from '../modules/script-loader.js?v=56';
-import {vendorScriptsCritical} from '../modules/manifest.js?v=599';
+import {vendorScriptsCritical} from '../modules/manifest.js?v=600';
 import {buildAuthoredInterior} from '../interiors/authored-geometry.js';
 import {createCaptureViewer} from './result-viewer.js?v=2';
 import {loadLocalCaptureDraft,saveLocalCaptureDraft,deleteLocalCaptureDraft} from './local-draft-store.js?v=1';

@@ -42,7 +42,7 @@ import {
   isWalkModeActive,
   isDroneModeActive
 } from './ui-room-support.js?v=2';
-import { readPoseSnapshot, readWorldContext } from './ui-room-pose.js?v=3';
+import { readPoseSnapshot, readWorldContext } from './ui-room-pose.js?v=4';
 
 let singleton = null;
 function initMultiplayerPlatform() {

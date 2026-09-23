@@ -114,6 +114,15 @@ async function createPlayer(label) {
     // City data, physics, room authority and server lease deadlines are unchanged.
     await selectLowRenderQuality(page);
   }
+  // Select the requested city through the same fields the player uses, then
+  // verify saved and loaded coordinates as well as its human-readable label.
+  await page.locator('#globeCustomLat').fill(String(worldLocation.lat));
+  await page.locator('#globeCustomLon').fill(String(worldLocation.lon));
+  await page.locator('#globeCustomLon').press('Enter');
+  await page.waitForFunction(({lat,lon}) => {
+    const text=document.getElementById('globeSelectorLatLon')?.textContent || '';
+    return text.includes(lat.toFixed(4)) && text.includes(lon.toFixed(4));
+  },worldLocation);
   const identity = await page.evaluate(async ({ email, displayName }) => {
     const services = globalThis.WorldExplorerFirebase?.initFirebase?.();
     if (!services?.auth || !services?.db) throw new Error('Firebase emulator services did not initialize.');
@@ -182,6 +191,9 @@ async function launchRoomWorld(player) {
     return state.gameStarted === true && state.worldLoading === false && state.activeActor?.mode === 'walk' &&
       state.urbanSandbox?.active === true && Number(state.urbanSandbox?.vehicleCount || 0) > 0;
   }, null, { timeout: 360_000, polling: 500 });
+  const origin = await player.page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().earthOrigin);
+  assert.ok(Math.abs(origin?.lat-worldLocation.lat)<1e-6 && Math.abs(origin?.lon-worldLocation.lon)<1e-6,
+    `Loaded room world differs from selected city: ${JSON.stringify({expected:worldLocation,actual:origin})}`);
   await player.page.waitForTimeout(1_500);
   const skip = player.page.getByRole('button', { name: 'Skip guide', exact: true });
   if (await skip.isVisible().catch(() => false)) {
@@ -342,8 +354,11 @@ try {
     const firestore = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js');
     const snapshot = await firestore.getDoc(firestore.doc(services.db, 'rooms', code));
     const data = snapshot.data() || {};
-    return { code, visibility: String(data.visibility || ''), maxPlayers: Number(data.maxPlayers || 0) };
+    return { code, world: data.world, visibility: String(data.visibility || ''), maxPlayers: Number(data.maxPlayers || 0) };
   }, roomCode);
+
+  assert.ok(Math.abs(room.world?.lat-worldLocation.lat)<1e-6 && Math.abs(room.world?.lon-worldLocation.lon)<1e-6,
+    `Created room differs from selected city: ${JSON.stringify(room.world)}`);
 
   async function joinThroughNormalControls(player, roomCode) {
     await openMultiplayerTitleControls(player);
