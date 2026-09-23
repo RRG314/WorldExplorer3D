@@ -93,6 +93,7 @@ function createUrbanRoomAuthorityRuntime(options = {}) {
   function applyEntities(entities = []) {
     if (!active()) return;
     state.remoteEntities = new Map(entities.map((entity) => [entity.entityId, entity]));
+    options.reconcileVehicles?.();
     const currentTime = Date.now();
     for (const vehicle of state.vehicles) {
       const remote = state.remoteEntities.get(vehicle.id);
@@ -142,6 +143,7 @@ function createUrbanRoomAuthorityRuntime(options = {}) {
     state.authority = null;
     roomKey = nextKey;
     state.remoteEntities.clear();
+    options.reconcileVehicles?.();
     if (!room) return null;
     try {
       const { createUrbanRoomAuthority } = await import('../multiplayer/urban-sandbox.js?v=3');
@@ -201,6 +203,7 @@ function createUrbanRoomAuthorityRuntime(options = {}) {
     leaseSweepElapsed += Math.max(0, Number(dt) || 0);
     if (leaseSweepElapsed >= .5) {
       leaseSweepElapsed = 0;
+      options.reconcileVehicles?.();
       const currentTime = Date.now();
       for (const vehicle of state.vehicles) {
         const remote = state.remoteEntities.get(vehicle.id);
@@ -267,6 +270,7 @@ function createUrbanRoomAuthorityRuntime(options = {}) {
     state.authority?.dispose?.();
     state.authority = null;
     state.remoteEntities.clear();
+    options.reconcileVehicles?.();
     return true;
   }
 

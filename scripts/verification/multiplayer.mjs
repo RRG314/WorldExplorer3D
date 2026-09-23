@@ -47,6 +47,7 @@ const browserBudget = {
   maxOldSpaceMiB: 1024, worldInitialization: 'sequential', simultaneouslyLoadedWorlds: 2,
   foregroundGameplayWorlds: 1, waitingClient: 'normal manual-pause UI; network listeners remain active',
   viewport: { width: 1280, height: 800 }, deviceScaleFactor, roomStateWait,
+  memberViewport: { width: 390, height: 844 },
   navigationTiming: 'dom-keyboard-runtime-fixed-step',
   evidenceScope: 'multiplayer-functional', worldLocation
 };
@@ -62,7 +63,11 @@ const functionsOrigin = `http://127.0.0.1:5001/${firebaseProjectId}/us-central1`
 const emulatorFirebaseConfig = JSON.parse(await fs.readFile(path.join(root, 'config/firebase.staging.json'), 'utf8'));
 
 async function createPlayer(label) {
-  const context = await browser.newContext({ viewport: browserBudget.viewport, deviceScaleFactor });
+  const mobile = label === 'member';
+  const context = await browser.newContext({
+    viewport: mobile ? browserBudget.memberViewport : browserBudget.viewport,
+    deviceScaleFactor, isMobile: mobile, hasTouch: mobile
+  });
   await context.addInitScript(({ functionsBase, firebaseConfig }) => {
     // Firestore emulator data is namespaced by the Firebase app project ID.
     // Match the Functions emulator project so browser writes and Admin SDK
@@ -434,6 +439,8 @@ try {
   await pauseWaitingPlayer(member);
   await resumePlayer(owner);
   await recordStage('both worlds ready; verifying shared vehicle and movement');
+  const memberInitialVehicleIds = await member.page.evaluate(() =>
+    (globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.vehicles || []).map(vehicle => vehicle.id));
   const sharedVehicleCandidates = await owner.page.evaluate(() => {
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     const actor = state.activeActor?.position || {};
@@ -443,6 +450,9 @@ try {
       .map((vehicle) => ({ id: vehicle.id, distance: Math.hypot(vehicle.driverDoor.x - actor.x, vehicle.driverDoor.z - actor.z) }))
       .sort((left, right) => left.distance - right.distance);
   });
+  // Prefer a car absent from the phone's smaller local seed budget. Its normal
+  // server claim must publish it to that client before the handoff can work.
+  sharedVehicleCandidates.sort((a, b) => Number(memberInitialVehicleIds.includes(a.id)) - Number(memberInitialVehicleIds.includes(b.id)) || a.distance - b.distance);
   let sharedVehicle = null;
   assert.ok(sharedVehicleCandidates.length > 0,
     `No eligible persistent parked vehicles at ${worldLocation.name}; shared-car fixture cannot run.`);
@@ -454,9 +464,6 @@ try {
     }
   }
   assert.ok(sharedVehicle?.id, 'Room owner could not reach any published persistent vehicle with normal walking input.');
-  await member.page.waitForFunction((vehicleId) =>
-    globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.vehicles?.some((vehicle) => vehicle.id === vehicleId),
-  sharedVehicle.id, { timeout: 15_000 });
 
   const claimResponsePromise = owner.page.waitForResponse((response) =>
     response.request().method() === 'POST' && /\/claimUrbanVehicle(?:\?|$)/.test(response.url()),
@@ -611,6 +618,7 @@ try {
       artifactId: sharedArtifact.id,
       artifactTitle: sharedArtifact.title,
       sharedVehicleId: sharedVehicle.id,
+      memberInitiallySeededVehicle: memberInitialVehicleIds.includes(sharedVehicle.id),
       firstLeaseOwnerUid: memberObservedLease.vehicle?.roomLeaseOwnerUid,
       secondLeaseOwnerUid: memberClaimedAfterRelease.vehicle?.roomLeaseOwnerUid,
       leaseHeldBeyondInitialExpiry: retainedLease.phase === 'driving',

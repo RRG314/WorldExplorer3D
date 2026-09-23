@@ -862,6 +862,16 @@ export function createLivingWorldPopulation(options = {}) {
       refreshVehiclePresentation();
       return promoted ? Object.freeze({ ...promoted, promoted: true, speed: 0 }) : null;
     },
+    restoreRoomVehicle(agentId) {
+      const agent = vehicles.find((entry) => entry.id === String(agentId || ''));
+      if (!agent || !agent.promoted || agent.detailPromoted) return false;
+      agent.promoted = false;
+      agent.currentSpeed = 0;
+      agent.visibility = 0;
+      agent.visibleTarget = true;
+      refreshVehiclePresentation();
+      return true;
+    },
     promoteVehicleDetail(agentId) {
       const agent = vehicles.find((entry) => entry.id === String(agentId || ''));
       if (!agent || agent.promoted) return null;

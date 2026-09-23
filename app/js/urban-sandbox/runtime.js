@@ -13,7 +13,8 @@ import {
 } from './curated-equipment-visual.js?v=2';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=9';
 import { nearestMappedFacility } from './facility-model.js?v=3';
-import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=5';
+import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=6';
+import { reconcilePublishedRoomVehicles } from './room-vehicle-reconciliation.js?v=1';
 import { createUrbanResponderRuntime } from './responder-runtime.js?v=31';
 import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=9';
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=12';
@@ -3140,6 +3141,28 @@ function startUrbanSandboxRuntime(options = {}) {
     isActive: () => activeWorldMatches(state),
     vehiclePose,
     syncVehiclePose,
+    reconcileVehicles: () => reconcilePublishedRoomVehicles(state, {
+      reference: civicActorPosition(state),
+      claimTrafficAgent: (entityId) => {
+        const prefix = `traffic:${state.worldIdentity}:`;
+        if (!entityId.startsWith(prefix)) return null;
+        const agentId = entityId.slice(prefix.length);
+        return state.population?.promoteVehicle?.(agentId) ? agentId : null;
+      },
+      releaseTrafficAgent: agentId => state.population?.restoreRoomVehicle?.(agentId),
+      createVehicle: (definition) => {
+        const visual = createUrbanVehicleVisual(THREE, definition);
+        const vehicle = { ...definition, visual, attachedToPlayer: false, occupied: false, driver: '' };
+        syncVehiclePose(vehicle, definition);
+        state.group.add(visual.root);
+        // Attach after publication so asynchronous asset ownership can be checked.
+        queueMicrotask(() => {
+          if (activeWorldMatches(state) && state.vehicles.includes(vehicle)) attachCuratedTrafficDetail(state, vehicle);
+        });
+        return vehicle;
+      },
+      disposeVehicle: vehicle => vehicle.visual.dispose()
+    }),
     setStatus: (message, duration) => setStatus(state, message, duration),
     enterVehicle: (vehicle) => enterVehicleAfterClaim(state, vehicle),
     cancelVehicleEntry: (vehicle) => {
