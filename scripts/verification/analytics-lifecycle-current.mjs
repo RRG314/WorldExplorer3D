@@ -84,10 +84,13 @@ async function openStartHub(page) {
 
 async function verifyGrantedDestination(destination) {
   const context = await createContext({ viewport: { width: 1440, height: 900 } });
-  await context.addInitScript((config) => {
+  await context.addInitScript(({config, origin}) => {
+    // Playwright runs this in third-party/sandboxed frames too. Seed only our
+    // owned page; a provider iframe is not an app storage-failure fixture.
+    if (location.origin !== origin) return;
     globalThis.WORLD_EXPLORER_FIREBASE = config;
     localStorage.setItem('worldExplorer3D.analyticsConsent.v1', 'granted');
-  }, safeConfig);
+  }, {config: safeConfig, origin: new URL(baseUrl).origin});
   const page = await context.newPage();
   const browserErrors = [];
   const failedLocalResources = [];

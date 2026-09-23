@@ -22,6 +22,9 @@ function drawMinimap() {
 }
 
 function drawLargeMap() {
+  // UI setup synchronizes zoom before a world is selected. A closed map must
+  // not paint or fetch tiles for the default location. Opening draws immediately.
+  if (!appCtx.showLargeMap) return;
   drawMapOnCanvas(largeMapCtx, 800, 800, true);
 }
 

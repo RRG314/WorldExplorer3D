@@ -112,6 +112,10 @@ try {
   await page.keyboard.press('KeyZ');
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('worldExplorer3D.keyboardBindings.v1') || '{}').move_forward === 'KeyZ');
   assert.match(await page.locator('#keyboardBindingSettings').textContent(), /Move \/ accelerate\s*Z\s*Change/is);
+  // Use the shipped accessibility preference so an 8-second optional hint
+  // cannot expire while a software-rendered CI frame is finishing.
+  await page.locator('#accessibilityNoticeDuration').selectOption('persistent');
+  assert.equal(await page.evaluate(() => globalThis.getWorldExplorerAccessibilityNoticeMs(8000) === Infinity), true);
   await page.screenshot({ path: `${evidenceDir}/01-configurable-controls-desktop.png` });
   await page.locator('[data-globe-destination="location"]').first().click();
 

@@ -85,6 +85,8 @@ try {
       presentation: phases.presentation.find(row => row.id === 'core.presentation').updates,
       renderer: phases.render.find(row => row.id === 'core.renderer').updates };
   });
+  report.mapRequestsBeforeLaunch = report.mapRequests.slice();
+  assert.equal(report.mapRequestsBeforeLaunch.length, 0, 'Closed title map must not request tiles for the default city');
   const heldBefore = await launchSnapshot();
   await page.waitForTimeout(750);
   const heldAfter = await launchSnapshot();

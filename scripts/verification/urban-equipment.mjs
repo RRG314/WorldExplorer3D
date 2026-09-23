@@ -158,7 +158,7 @@ try {
   await page.waitForFunction(() => {
     const sandbox = globalThis.getWorldExplorerRuntimeDiagnostics?.()?.urbanSandbox;
     return sandbox?.equipment?.equippedId === 'laser-gun';
-  }, null, { timeout: 5000, polling: 100 });
+  }, null, { timeout: equipmentTimeout, polling: 100 });
   await page.waitForTimeout(4000);
   const laserEquipped = await snapshot();
   if (captureRequested) {
@@ -179,21 +179,21 @@ try {
     const laser = sandbox?.equipment?.items?.find((entry) => entry.id === 'laser-gun');
     return Number(laser?.magazine) === before - 1 &&
       sandbox?.projectileRuntime?.lastProjectileAction?.equipmentId === 'laser-gun';
-  }, laserMagazineBefore, { timeout: 5000, polling: 100 });
+  }, laserMagazineBefore, { timeout: equipmentTimeout, polling: 100 });
   const laserUsed = await snapshot();
 
   await page.keyboard.press('Digit2');
   await page.waitForFunction(() => {
     return globalThis.getWorldExplorerRuntimeDiagnostics?.()?.urbanSandbox?.equipment?.equippedId === 'flashlight';
-  }, null, { timeout: 5000, polling: 100 });
+  }, null, { timeout: equipmentTimeout, polling: 100 });
   await page.keyboard.press('KeyV');
   await page.waitForFunction(() => {
     return globalThis.getWorldExplorerRuntimeDiagnostics?.()?.urbanSandbox?.equipment?.flashlightEnabled === true;
-  }, null, { timeout: 5000, polling: 100 });
+  }, null, { timeout: equipmentTimeout, polling: 100 });
   const flashlightUsed = await snapshot();
 
   await page.keyboard.press('Escape');
-  await page.waitForFunction(() => document.querySelector('#urbanEquipment')?.classList.contains('show') !== true, null, { timeout: 5000, polling: 100 });
+  await page.waitForFunction(() => document.querySelector('#urbanEquipment')?.classList.contains('show') !== true, null, { timeout: equipmentTimeout, polling: 100 });
   const closed = await snapshot();
 
   const finalItems = closed.equipment?.items || [];

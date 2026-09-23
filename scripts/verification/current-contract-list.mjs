@@ -198,6 +198,7 @@ export const currentContractTests = [
   'tests/traversal-segment-index-current.test.mjs',
   'tests/planetary-sky-frame-current.test.mjs',
   'tests/hidden-debug-overlay-layout-current.test.mjs',
+  'tests/hidden-map-network-current.test.mjs',
   'tests/room-presence-readmission-current.test.mjs',
   'tests/cell-coverage-current.test.mjs',
   'tests/world-readiness-polling-current.test.mjs',
