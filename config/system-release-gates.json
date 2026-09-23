@@ -6,6 +6,7 @@
     "docs/ARCHITECTURE_MAP.md": ["Application overview", "Earth world flow", "Player movement and cameras", "Character, companions, and urban play", "Field exploration and progression", "Planetary and space environments", "Quick Build and persistent Blocks", "Multiplayer and backend", "Data classification", "Release shape"]
   },
   "gates": {
+    "assembled-manhattan-diagnostic": { "scope": "diagnostic", "command": ["env", "WE3D_VERIFY_LOCATIONS=manhattan", "node", "scripts/verification/assembled-locations.mjs"], "artifactRequired": true, "timeoutMs": 600000 },
     "chat-billing-diagnostic": { "scope": "diagnostic", "command": ["node", "scripts/verification/backend-isolated.mjs", "--stages=room-chat-gameplay,account-backend"], "artifactRequired": true, "timeoutMs": 1200000 },
     "planetary-cache": { "scope": "diagnostic", "command": ["node", "scripts/verification/planetary-cache-current.mjs"], "artifactRequired": true, "timeoutMs": 240000 },
     "multiplayer-diagnostic": { "scope": "diagnostic", "command": ["node", "scripts/verification/backend-isolated.mjs", "--stages=multiplayer"], "artifactRequired": true, "timeoutMs": 1020000 },

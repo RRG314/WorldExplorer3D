@@ -11,14 +11,16 @@ test('graphics acceptance catches shader and driver failures even without a page
   emit('error', 'THREE.WebGLProgram: shader error: 0 35715 false gl.getProgramInfoLog');
   emit('warning', '[.WebGL-0x124000d4a00] GL_INVALID_OPERATION: Error: 0x00000502, CreateRenderPipelineState:123. Internal error.');
   emit('warning', 'WebGL: CONTEXT_LOST_WEBGL: loseContext: context lost');
-  assert.equal(errors.length, 3);
+  emit('warning', 'WebGL: INVALID_OPERATION: delete: object does not belong to this context');
+  emit('warning', 'WebGL: OUT_OF_MEMORY: bufferData: out of memory');
+  assert.equal(errors.length, 5);
   emit('warning', '[WorldLoad] Overpass provider unavailable; using mapped transport fallback');
   emit('error', 'FirebaseError: AppCheck: ReCAPTCHA error.');
   emit('warning', 'Canvas2D: Multiple readback operations using getImageData');
-  assert.equal(errors.length, 3, 'Provider failures stay separate from graphics acceptance');
+  assert.equal(errors.length, 5, 'Provider failures stay separate from graphics acceptance');
   stop();
   emit('error', 'THREE.WebGLRenderer: Context Lost.');
-  assert.equal(errors.length, 3, 'Listener can be removed on teardown');
+  assert.equal(errors.length, 5, 'Listener can be removed on teardown');
 });
 
 test('repeated driver failures cannot flood the verification report', () => {

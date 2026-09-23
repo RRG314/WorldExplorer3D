@@ -4,7 +4,7 @@ export function collectBrowserGraphicsErrors(page, errors) {
   const onConsole = (message) => {
     if (!['warning', 'error'].includes(message.type())) return;
     const text = message.text();
-    if (!/THREE\.WebGL(?:Program|Shader|Renderer).*\b(?:error|context lost)\b|GL_(?:INVALID_OPERATION|INVALID_VALUE|INVALID_ENUM|OUT_OF_MEMORY)|CONTEXT_LOST_WEBGL|WebGL.*context (?:was )?lost/i.test(text)) return;
+    if (!/THREE\.WebGL(?:Program|Shader|Renderer).*\b(?:error|context lost)\b|GL_(?:INVALID_OPERATION|INVALID_VALUE|INVALID_ENUM|OUT_OF_MEMORY)|WebGL:\s*(?:INVALID_OPERATION|INVALID_VALUE|INVALID_ENUM|OUT_OF_MEMORY)\b|CONTEXT_LOST_WEBGL|WebGL.*context (?:was )?lost/i.test(text)) return;
     if (errors.length < 20) errors.push(`graphics: ${text.slice(0, 65536)}`);
   };
   page.on('console', onConsole);
