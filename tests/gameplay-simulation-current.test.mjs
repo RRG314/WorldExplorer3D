@@ -67,7 +67,7 @@ test('fishing stage observation terminates on actual target, loss, or simulation
 async function urbanApproachHarness(moves) {
   const { readFile } = await import('node:fs/promises');
   const source = await readFile(new URL('../scripts/verification/urban-sandbox.mjs', import.meta.url), 'utf8');
-  const body = source.slice(source.indexOf('async function walkTo('), source.indexOf('\nasync function launchBaltimore('));
+  const body = source.slice(source.indexOf('async function walkTo('), source.indexOf('\nasync function launchEarth('));
   let step = 0;
   const walkTo = vm.runInNewContext(`(${body})`, {
     actorState: async () => ({ x: 0, z: moves ? step : 0, yaw: 0, distance: moves ? 100 + step * 9 : 100 - step * 10 }),

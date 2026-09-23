@@ -204,14 +204,17 @@ async function walkTo(page, target, options = {}) {
   return { reached: false, blocked: false, start, final: await actorState(page, target), steps: completedSteps, stepBudget: maxSteps };
 }
 
-async function launchBaltimore(page) {
+async function launchEarth(page, location = { lat: 39.2904, lon: -76.6122, name: 'Baltimore Inner Harbor' }) {
   const params = new URLSearchParams({
-    loc: 'custom', lat: '39.2904', lon: '-76.6122', lname: 'Baltimore Inner Harbor',
+    loc: 'custom', lat: String(location.lat), lon: String(location.lon), lname: location.name,
     launch: 'earth', gm: 'free', mode: 'walk'
   });
   await page.goto(`${baseUrl}/app/?${params}`, { waitUntil: 'load', timeout: 120_000 });
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   if (process.env.CI) await selectLowRenderQuality(page);
+  await page.locator('#globeCustomLat').fill(String(location.lat));
+  await page.locator('#globeCustomLon').fill(String(location.lon));
+  await page.locator('#globeCustomLon').press('Enter');
   await page.getByRole('button', { name: 'Explore', exact: true }).click();
   await page.waitForFunction(() => {
     if (document.getElementById('loading')?.classList.contains('show')) return false;
@@ -223,7 +226,10 @@ async function launchBaltimore(page) {
   await page.waitForTimeout(2_000);
   const skip = page.getByRole('button', { name: 'Skip guide', exact: true });
   if (await skip.isVisible().catch(() => false)) await skip.click();
-  return diagnostics(page);
+  const ready = await diagnostics(page);
+  assert.ok(Math.abs(ready.earthOrigin?.lat - location.lat) < 1e-6 && Math.abs(ready.earthOrigin?.lon - location.lon) < 1e-6,
+    `Loaded urban fixture differs from selected coordinates: ${JSON.stringify({ location, origin: ready.earthOrigin })}`);
+  return ready;
 }
 
 async function reachableVehicleCandidates(page) {
@@ -525,18 +531,25 @@ async function runVehicleEquipmentJourney() {
   const { browser, context, page } = await createJourneyBrowser();
   bindEvidence(page);
   try {
-    const ready = await launchBaltimore(page);
-    const candidates = await reachableVehicleCandidates(page);
-    assert.ok(candidates.length > 0, 'Baltimore did not publish an enterable urban vehicle.');
+    // This actual road point has demonstrated normal entry and two-client
+    // handoff. Baltimore's selected point can supply only one departing car.
+    const ready = await launchEarth(page, { lat: 41.735329, lon: -111.834912, name: 'Logan Main Street' });
+    const vehicleDeadline = Date.now() + (process.env.CI ? 180_000 : 70_000);
+    const attempted = new Set();
     let vehicle = null;
     let approach = null;
     const approachEvidence = [];
-    for (const candidate of candidates) {
+    while (Date.now() < vehicleDeadline) {
+      const candidates = await reachableVehicleCandidates(page);
+      const candidate = candidates.find(entry => !attempted.has(entry.id));
+      if (!candidate) { await page.waitForTimeout(500); continue; }
+      attempted.add(candidate.id);
       const result = await walkTo(page, candidate.driverDoor, {
         interactionVehicleId: candidate.id,
         // Traffic keeps moving until the normal player interaction claims it.
         resolveTarget: async () => (await diagnostics(page)).urbanSandbox?.vehicles?.find(entry => entry.id === candidate.id)?.driverDoor || null,
         maxSteps: 420,
+        deadline: vehicleDeadline,
         stagnantLimit: 24,
         detour: true
       });
@@ -677,7 +690,7 @@ async function runArrestRecoveryJourney() {
   const { browser, context, page } = await createJourneyBrowser();
   bindEvidence(page);
   try {
-    await launchBaltimore(page);
+    await launchEarth(page);
     const witnessedResponse = await triggerWitnessedAssaultResponse(page);
     await page.waitForFunction(() => Number(globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.responders?.activeCount || 0) > 0, null, { timeout: 45_000 });
     const responderArrived = await meetResponderUntilOfficer(page);
@@ -723,7 +736,7 @@ async function runMedicalRecoveryJourney() {
   const { browser, context, page } = await createJourneyBrowser();
   bindEvidence(page);
   try {
-    await launchBaltimore(page);
+    await launchEarth(page);
     const witnessedResponse = await triggerWitnessedWeaponResponse(page);
     await page.waitForFunction(() => Number(globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.responders?.activeCount || 0) > 0, null, { timeout: 45_000 });
     const before = await meetResponderUntilOfficer(page, 50_000);
@@ -842,15 +855,15 @@ try {
     report = { ok: Object.values(checks).every(Boolean), contract: 'urban-sandbox-vehicle-scope-v1', servedRoot, checks, evidence: { transitionTiming: primary.transitionTiming }, browserErrors, localFailures };
     console.log('[urban-sandbox] PASS vehicle and equipment');
   } else {
+  console.log('[urban-sandbox] START vehicle and equipment');
+  const primary = await runVehicleEquipmentJourney();
+  console.log('[urban-sandbox] PASS vehicle and equipment');
   console.log('[urban-sandbox] START arrest recovery');
   const arrest = await runArrestRecoveryJourney();
   console.log('[urban-sandbox] PASS arrest recovery');
   console.log('[urban-sandbox] START medical recovery');
   const medical = await runMedicalRecoveryJourney();
   console.log('[urban-sandbox] PASS medical recovery');
-  console.log('[urban-sandbox] START vehicle and equipment');
-  const primary = await runVehicleEquipmentJourney();
-  console.log('[urban-sandbox] PASS vehicle and equipment');
   const vehicleAfterExit = primary.exited.urbanSandbox.vehicles.filter((entry) => entry.id === primary.vehicle.id);
   const custodyFacility = arrest.custody.urbanSandbox.custody?.facility || {};
   const medicalFacility = medical.custody.urbanSandbox.custody?.facility || {};
@@ -900,6 +913,7 @@ try {
     servedRoot,
     checks,
     evidence: {
+      vehicleLocation: primary.ready.earthOrigin,
       vehicleId: primary.vehicle.id,
       drivenMeters: primary.drivenMeters,
       transitionTiming: primary.transitionTiming,
