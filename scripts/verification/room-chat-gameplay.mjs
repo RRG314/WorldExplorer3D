@@ -6,6 +6,7 @@ import { startStaticServer } from './static-server.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { pauseWaitingPlayer } from './pause-waiting-player.mjs';
 import { selectLowRenderQuality } from './render-quality-ui.mjs';
+import { advanceGameplay } from './gameplay-simulation.mjs';
 
 for (const key of ['FIREBASE_AUTH_EMULATOR_HOST', 'FIRESTORE_EMULATOR_HOST']) {
   assert.ok(process.env[key], `Refusing non-emulator account creation: ${key}`);
@@ -76,18 +77,43 @@ try {
     const sdk = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js');
     return (await sdk.getDocFromServer(sdk.doc(WorldExplorerFirebase.initFirebase().db, 'rooms', code, 'players', uid))).data().pose;
   }, { code, uid: member.uid });
-  const before = await readPose();
+  const readLocalPose = () => member.page.evaluate(async () => {
+    const { readPoseSnapshot } = await import('/app/js/multiplayer/ui-room-pose.js?v=4');
+    return readPoseSnapshot().pose;
+  });
+  const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+  const localBefore = await readLocalPose();
+  let before;
+  const spawnDeadline = Date.now() + 20000;
+  do {
+    before = await readPose();
+    if (before && distance(before, localBefore) < .25) break;
+    await member.page.waitForTimeout(250);
+  } while (Date.now() < spawnDeadline);
+  assert.ok(before && distance(before, localBefore) < .25,
+    `Remote baseline must match the loaded spawn, not the room's initial placeholder: ${JSON.stringify({ before, localBefore })}`);
+  report.spawnBaseline = { local: localBefore, committed: before };
   await member.page.locator('#roomChatCloseBtn').click();
   const hidden = await member.page.locator('#roomChatDrawer').evaluate(e => e.inert && e.getAttribute('aria-hidden') === 'true' && !e.contains(document.activeElement));
   assert.equal(hidden, true);
   // No canvas click or focus manipulation between closing chat and movement.
   await member.page.keyboard.down('KeyW');
-  await member.page.waitForTimeout(1800);
-  await member.page.keyboard.up('KeyW');
-  await owner.page.waitForTimeout(5000);
-  const after = await readPose();
-  report.movement = { before, after, displacement: Math.hypot(after.x - before.x, after.z - before.z) };
-  assert.ok(report.movement.displacement > 1, 'Movement after chat close must reach the other client');
+  try { report.inputSimulation = await advanceGameplay(member.page, 2000); }
+  finally { await member.page.keyboard.up('KeyW'); }
+  const localAfter = await readLocalPose();
+  assert.ok(distance(localBefore, localAfter) > 1, 'Closing chat must restore actual local driving input');
+  let after;
+  const movementDeadline = Date.now() + 20000;
+  do {
+    after = await readPose();
+    if (after && distance(before, after) > 1) break;
+    await member.page.waitForTimeout(250);
+  } while (Date.now() < movementDeadline);
+  report.movement = { before, after, localBefore, localAfter,
+    displacement: after ? distance(before, after) : 0,
+    timing: 'real DOM keyboard plus two seconds of runtime fixed-step simulation; not a performance measurement' };
+  assert.ok(report.movement.displacement > 1 && report.movement.displacement < 100,
+    'Movement after chat close must reach the other client from the loaded spawn without a world-sized jump');
   report.checks.push('Closing chat restores normal driving with no extra pointer action; the other client reads changed committed position');
   await member.page.screenshot({ path: `${out}/chat-closed-driving.png` });
   assert.deepEqual(report.errors, []);
