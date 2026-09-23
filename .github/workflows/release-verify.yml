@@ -165,7 +165,7 @@ jobs:
           - group: contracts
             gates: source-graph,release-contracts,public-claims,current-contracts,facade-shaders,street-geometry,street-workers,provider-release,poi-lifecycle,commerce-coherence,landing-user-count,artifact-integrity,release-identity,capture-local,capture-editor-fixture,capture-review-fixture,capture-entry-fixture
           - group: entry
-            gates: artifact-world,mobile-load,player-blockers,mobile-action-layout,mobile-controls,tutorial-controls,gameplay-menu,hotbar-actions,accessibility,analytics-lifecycle
+            gates: artifact-world,mobile-load,player-blockers,mobile-action-layout,title-header-layout,mobile-controls,tutorial-controls,gameplay-menu,hotbar-actions,accessibility,analytics-lifecycle
           - group: geography
             gates: assembled-worlds,assembled-fallback,actors-vehicles,terrain-boundary,interiors,regional-world
           - group: activities

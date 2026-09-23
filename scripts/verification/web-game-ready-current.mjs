@@ -27,6 +27,12 @@ if(process.env.WE3D_EXPECT_ENVIRONMENT) source=source.replace('await doChoreogra
  return s?.environment===expected && s.gameStarted && !s.worldLoading && !s.planetary?.traveling && !document.getElementById('loading')?.classList.contains('show');
 }, ${JSON.stringify(process.env.WE3D_EXPECT_ENVIRONMENT)}, {timeout:90000});
 await doChoreography(page, canvas, steps);`);
+if(process.env.WE3D_TEST_TITLE_AUTH==='1') source=source.replace('await page.click(args.clickSelector, { timeout: 15000 });', `await page.locator('#appSignInBtn').click();
+await page.locator('#authFloatPanel:not([hidden])').waitFor({state:'visible',timeout:10000});
+await page.screenshot({path:path.join(args.screenshotDir,'title-auth.png')});
+await page.locator('#appSignInBtn').click();
+await page.locator('#authFloatPanel').waitFor({state:'hidden',timeout:10000});
+await page.click(args.clickSelector, { timeout: 15000 });`);
 // A failed start is a failed test, not a successful menu screenshot.
 source=source.replace('console.warn("Failed to click selector", args.clickSelector, err);','throw err;');
 // The generic client captures console errors but exits successfully. A release

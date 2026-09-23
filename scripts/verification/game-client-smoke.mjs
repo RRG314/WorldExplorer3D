@@ -17,7 +17,7 @@ try {
     '--url', `http://127.0.0.1:${server.port}/app/?launch=moon&gm=free`,
     '--actions-json', JSON.stringify({ steps: [{ buttons: ['up'], frames: 24 }, { buttons: [], frames: 6 }] }),
     '--click-selector', '#globeSelectorMoonBtn', '--iterations', '2', '--pause-ms', '500', '--screenshot-dir', out
-  ], { stdio: 'inherit', env: { ...process.env, WE3D_REAL_GPU: '1', WE3D_TEST_MOBILE: '1', WE3D_TEST_PAUSE: '1', WE3D_EXPECT_ENVIRONMENT: 'MOON' } });
+  ], { stdio: 'inherit', env: { ...process.env, WE3D_REAL_GPU: '1', WE3D_TEST_MOBILE: '1', WE3D_TEST_PAUSE: '1', WE3D_EXPECT_ENVIRONMENT: 'MOON', WE3D_TEST_TITLE_AUTH:'1' } });
   const code = await new Promise((resolve, reject) => {
     child.once('error', reject);
     child.once('exit', value => resolve(value ?? 1));

@@ -36,13 +36,13 @@ html[data-hub-theme="day"] {
 #titleScreen { display: none; }
 body.start-hub-open { overflow: hidden; background: var(--hub-bg); }
 body.start-hub-open #envDebug { display: none; }
+/* The account action participates in the toolbar layout, so it cannot
+   float over search or appearance controls at intermediate widths. */
 body.start-hub-open #appSignInBtn {
   display: block !important;
-  position: fixed;
+  position: static;
+  flex: 0 1 auto;
   z-index: 10004;
-  top: 16px;
-  right: 258px;
-  left: auto !important;
   width: auto;
   height: 40px;
   padding: 0 14px;
@@ -148,7 +148,7 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 
 .globe-selector-top {
   display: grid;
-  grid-template-columns: minmax(260px, 640px) 1fr;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 20px;
   padding: 0 18px 0 24px;
@@ -678,7 +678,8 @@ body.start-hub-open #flowerChallengePanel {
   }
   .deflock-live-detail .globe-selector-live-action-btn { min-height: 42px; flex: 1 1 130px; }
   .globe-selector-street-list { grid-template-columns: 1fr; }
-  body.start-hub-open #appSignInBtn { top: 12px; right: 190px; height: 36px; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  body.start-hub-open #appSignInBtn { height: 36px; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  body.start-hub-open #authFloatPanel { top: 106px; max-height: calc(100dvh - 118px); overflow-y: auto; }
   #globeSelectorScreen .globe-selector-shell {
     grid-template-columns: 1fr;
     grid-template-rows: 62px minmax(250px, 43vh) minmax(230px, 1fr) 86px 68px;
@@ -691,14 +692,15 @@ body.start-hub-open #flowerChallengePanel {
     z-index: 3;
     grid-column: 1;
     grid-row: 1;
-    grid-template-columns: minmax(0, 1fr) auto;
-    padding: 0 10px 0 43%;
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 44px;
+    padding: 0 10px;
     pointer-events: none;
   }
   .globe-hub-search { display: none; }
   .globe-hub-tools { pointer-events: auto; }
-  .globe-hub-tools button { width: 36px; height: 36px; }
-  .globe-hub-tools button:first-child { display: none; }
+  .globe-hub-tools button { flex-shrink: 0; width: 36px; height: 36px; }
+  .globe-hub-tools #globeHubShareBtn { display: none; }
   .globe-selector-stage { grid-column: 1; grid-row: 2; min-height: 250px; }
   .globe-selector-side { grid-column: 1; grid-row: 3; border-left: 0; border-top: 1px solid var(--hub-line); }
   .globe-selector-side::before {
@@ -763,9 +765,9 @@ body.start-hub-open #flowerChallengePanel {
 }
 
 @media (max-width: 520px) {
-  body.start-hub-open #appSignInBtn { right: 172px; max-width: 92px; padding: 0 8px; font-size: 8px; }
+  body.start-hub-open #appSignInBtn { max-width: 92px; padding: 0 8px; font-size: 8px; }
   .globe-selector-brand { padding-left: 8px; padding-right: 58%; font-size: 8px; }
-  .globe-selector-top { padding-left: 48%; padding-right: 6px; }
+  .globe-selector-top { padding-left: 10px; padding-right: 10px; }
   .globe-hub-tools { gap: 4px; }
   .globe-hub-tools button { width: 34px; height: 34px; font-size: 15px; }
   .globe-destination-bar button { gap: 0; font-size: 0; }

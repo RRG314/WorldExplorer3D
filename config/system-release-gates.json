@@ -17,6 +17,7 @@
     "street-workers": { "scope": "candidate", "command": ["node", "scripts/verification/street-worker-artifact.mjs"], "artifactRequired": true },
     "mobile-load": { "scope": "candidate", "command": ["npm", "run", "verify:mobile-load"], "artifactRequired": true, "timeoutMs": 180000 },
     "player-blockers": { "scope": "candidate", "command": ["npm", "run", "verify:player-reported-blockers"], "artifactRequired": true },
+    "title-header-layout": { "scope": "candidate", "command": ["node", "scripts/verification/title-header-layout-current.mjs"], "artifactRequired": true, "timeoutMs": 60000 },
     "mobile-action-layout": { "scope": "candidate", "command": ["node", "scripts/verification/mobile-action-layout-current.mjs"], "artifactRequired": true, "timeoutMs": 60000 },
     "mobile-controls": { "scope": "candidate", "command": ["npm", "run", "verify:mobile-controls"], "artifactRequired": true },
     "assembled-worlds": { "scope": "candidate", "command": ["npm", "run", "verify:assembled-locations"], "artifactRequired": true, "timeoutMs": 1200000 },

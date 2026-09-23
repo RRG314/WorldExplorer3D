@@ -28,7 +28,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link rel="stylesheet" href="styles/universe.css?v=9">
 <link rel="stylesheet" href="styles/fishing-game.css?v=6">
 <link rel="stylesheet" href="styles/interface-v4.css?v=32">
-<link rel="stylesheet" href="styles/start-hub.css?v=19">
+<link rel="stylesheet" href="styles/start-hub.css?v=20">
 <link rel="stylesheet" href="styles/discovery.css?v=17">
 <link rel="stylesheet" href="styles/tutorial.css?v=15">
 <link rel="stylesheet" href="styles/ar.css?v=1">
@@ -41,7 +41,6 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <a class="we3d-skip-link" href="#globeSelectorStartBtn">Skip to world controls</a>
 <div id="accessibilityAnnouncements" class="we3d-visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="fileLaunchError" role="alert"><div><strong>World Explorer needs a local web server.</strong><code>npm run dev</code></div></div>
-<button id="appSignInBtn" class="auth-float-toggle" type="button" aria-expanded="false" aria-controls="authFloatPanel">Sign In / Sign Up</button>
 <aside id="authFloatPanel" class="auth-float-panel" hidden>
   <div id="authFormBlock" class="auth-form-block">
     <div class="auth-tabs">
@@ -553,6 +552,7 @@ How Connected Data Is Used
 <button id="globeLocationSearchBtn" type="button">Search</button>
 </div>
 <div class="globe-hub-tools" aria-label="Account and application tools">
+<button id="appSignInBtn" class="auth-float-toggle" type="button" aria-expanded="false" aria-controls="authFloatPanel">Sign In / Sign Up</button>
 <button id="globeHubShareBtn" type="button" title="Share World Explorer" aria-label="Share World Explorer">↗</button>
 <button id="globeHubThemeBtn" type="button" title="Switch to light appearance" aria-label="Switch to light appearance" aria-pressed="false">☼</button>
 <button type="button" data-globe-destination="settings" title="Settings" aria-label="Open settings">⚙</button>
