@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 
@@ -9,6 +12,8 @@ const server = externalUrl ? null : await startStaticServer({
   ports: [4397, 4398, 4399]
 });
 const baseUrl = externalUrl || `http://127.0.0.1:${server.port}`;
+const evidenceDir = 'output/verification/mobile-load';
+await fs.mkdir(evidenceDir, {recursive: true});
 // Own the browser process explicitly. Installed Chrome can occasionally stop
 // answering the graceful close command after consecutive WebGL contexts even
 // though those contexts have closed. BrowserServer gives this bounded verifier
@@ -31,13 +36,23 @@ async function createMobilePage() {
   const page = await context.newPage();
   const browserErrors = [];
   const localFailures = [];
+  const providerFailures = [];
+  collectBrowserGraphicsErrors(page, browserErrors);
+  const attestation = await configureStagingAppCheck(page, baseUrl);
   page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   page.on('response', (response) => {
+    if (!response.url().startsWith(baseUrl) && response.status() >= 400) {
+      providerFailures.push({url: response.url(), status: response.status()});
+    }
     if (response.url().startsWith(baseUrl) && response.status() >= 400) {
       localFailures.push({ url: response.url(), status: response.status() });
     }
   });
-  return { context, page, browserServer, browserErrors, localFailures };
+  page.on('requestfailed', request => {
+    const failure = {url: request.url(), reason: request.failure()?.errorText};
+    (request.url().startsWith(baseUrl) ? localFailures : providerFailures).push(failure);
+  });
+  return { context, page, browserServer, browserErrors, localFailures, providerFailures, attestation };
 }
 
 async function waitForPlayable(page, requireLiveGps = false) {
@@ -70,6 +85,11 @@ async function waitForPlayable(page, requireLiveGps = false) {
       };
     }, requireLiveGps);
     if (last.ready) break;
+    if (last.gameStarted && !last.worldLoading && !last.loadingVisible &&
+        last.worldLoad?.status === 'ready' &&
+        (!last.worldCounts?.roads || !last.worldCounts?.buildings)) {
+      throw new Error(`Mobile load finished without mapped city geometry: ${JSON.stringify(last)}`);
+    }
     const elapsedMs = Math.round(performance.now() - startedAt);
     if (elapsedMs % 20_000 < 1_200) {
       console.error(JSON.stringify({ mobileLoadProgressMs: elapsedMs, ...last }));
@@ -105,7 +125,7 @@ async function runStandardJourney() {
     await waitForPlayable(client.page, false);
     const firstPlayableMs = Math.round(performance.now() - startedAt);
     const diagnostics = await client.page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.() || {});
-    await client.page.screenshot({ path: '/tmp/worldexplorer-mobile-load-standard.png', fullPage: false });
+    await client.page.screenshot({ path: `${evidenceDir}/standard.png`, fullPage: false });
     return {
       titleReadyMs,
       firstPlayableMs,
@@ -116,8 +136,13 @@ async function runStandardJourney() {
         diagnostics.worldLoad?.loadMetrics?.regionalTransportSelection || null,
       farTerrain: diagnostics.farTerrain || diagnostics.terrain?.farField || null,
       browserErrors: client.browserErrors,
-      localFailures: client.localFailures
+      localFailures: client.localFailures,
+      providerFailures: client.providerFailures,
+      attestation: client.attestation
     };
+  } catch (error) {
+    await saveFailure(client, error);
+    throw error;
   } finally {
     if (!await terminateOwnedBrowserProcess(client.browserServer)) {
       throw new Error('Mobile journey browser failed to release its process.');
@@ -139,7 +164,7 @@ async function runLiveGpsJourney() {
     const permissionToPlayableMs = Math.round(performance.now() - permissionStartedAt);
     const entryToPlayableMs = Math.round(performance.now() - startedAt);
     const diagnostics = await client.page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.() || {});
-    await client.page.screenshot({ path: '/tmp/worldexplorer-mobile-load-live-gps.png', fullPage: false });
+    await client.page.screenshot({ path: `${evidenceDir}/live-gps.png`, fullPage: false });
     return {
       titleReadyMs,
       entryToPlayableMs,
@@ -148,14 +173,28 @@ async function runLiveGpsJourney() {
       worldCounts: diagnostics.worldCounts,
       phases: diagnostics.worldLoad?.phaseTotals || diagnostics.worldLoad?.loadMetrics?.phases || null,
       browserErrors: client.browserErrors,
-      localFailures: client.localFailures
+      localFailures: client.localFailures,
+      providerFailures: client.providerFailures,
+      attestation: client.attestation
     };
+  } catch (error) {
+    await saveFailure(client, error);
+    throw error;
   } finally {
     if (!await terminateOwnedBrowserProcess(client.browserServer)) {
       throw new Error('Mobile journey browser failed to release its process.');
     }
     ownedBrowserServers.delete(client.browserServer);
   }
+}
+
+async function saveFailure(client, error) {
+  const state = await client.page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.()).catch(() => null);
+  await fs.writeFile(`${evidenceDir}/failure.json`, JSON.stringify({
+    ok: false, error: String(error?.stack || error), state, attestation: client.attestation,
+    browserErrors: client.browserErrors, localFailures: client.localFailures, providerFailures: client.providerFailures
+  }, null, 2));
+  await client.page.screenshot({path: `${evidenceDir}/failure.png`, timeout: 10000}).catch(() => {});
 }
 
 async function closeWithin(label, close, timeoutMs = 8_000) {
@@ -233,6 +272,7 @@ try {
     standard,
     liveGps
   };
+  await fs.writeFile(`${evidenceDir}/report.json`, JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
   assert.equal(report.ok, true, 'Mobile cold-start and Live GPS timing journey failed.');
 } catch (error) {

@@ -1,112 +1,120 @@
 # Current release work
 
-Updated September 23, 2026. This is the integration branch's starting point.
-Recheck Git, artifact identities, execution receipts, and cloud state before
-making release claims. Historical notes are leads, not current proof.
+Updated September 23, 2026. Verify the receipts below before making release
+claims. Historical notes are leads, not current evidence or instructions.
 
-## Source and deployed state
+## Work and identities
 
-- Work here: `/Users/stevenreid/Developer/WorldExplorer3D-release-integration`.
-  Branch: `steven/post-5.2-release-integration`; draft PR #87 targets `stable`.
-  Do not edit the older Documents checkout.
-- Last live Hosting read at 15:22 UTC: production is
-  `5.2.0+db62593ba377.6342cddaba06fc68.production`; staging is
-  `5.3.0+a54d03456814.6fcbfc0f54adbfef.staging`.
-  Staging includes the verified mobile vehicle-prompt fix. Production Hosting
-  and rules are unchanged. Hosted manifests and prompt CSS match local bytes.
-- Backend/index read at 15:22 UTC: 78/78 Functions ACTIVE, no missing
-  browser handlers, all required index definitions READY. Worker invocation
-  is restricted to its dedicated service account. The authorized backend
-  reconciliation is complete; this does not establish frontend acceptance.
-- Source repairs remove movement-loop diagnostic sorting, bound generated
-  planetary resources to two recent worlds, detach the prior planet on
-  transitions, and add the capture-email retry route. The runtime import graph
-  has no verification modules or duplicate module identities. Diagnostics are
-  on-demand inspection; adaptive quality and player Memories are runtime features.
+Work only in `/Users/stevenreid/Developer/WorldExplorer3D-release-integration`,
+branch `steven/post-5.2-release-integration`, draft PR #87 into `stable`.
+Read `git status` and `git rev-parse HEAD` for current source. Do not edit the
+older Documents checkout. Do not merge or promote production frontend yet.
 
-## Current verification findings
+Latest checked production Hosting:
+`5.2.0+db62593ba377.6342cddaba06fc68.production`.
+Latest checked hosted staging:
+`5.3.0+a54d03456814.6fcbfc0f54adbfef.staging`.
+The local 45bbf1f8 staging package is newer: asset digest a120b7ab5ef75a5a.
+Re-read hosted manifests; a browser query parameter is not build identity.
 
-The original 1,222 cases were Node component/source checks, not browser journeys.
-Twelve omitted component files and the room-profile emulator tests were added
-to their execution paths. A real facade cleanup check catches a retained-object
-mutation that four source-text checks missed. Executed-case reports and test
-inventory now distinguish scope and reject unassigned/skipped/TODO tests.
+Current detailed ledger (ignored generated evidence, updated independently of
+source commits): `output/release-integration/test-confidence-2026-09-23/`.
+Start with `latest-summary.json`, `OPEN-FINDINGS.md`, and recorded run receipts.
+CI run source identities and artifact hashes must not be relabeled for later
+commits. `AUDIT-HISTORY.md` and dated progress entries preserve past work only.
 
-CI 35880746836 passes 1,300 cases across 269 files on 6f72f233, with zero
-failures, skipped cases, or TODOs. This is component/source evidence only.
-The physical-performance script checks actual M1 hardware, rejects CI/software
-rendering, and records host/renderer/browser authority. GPU errors invalidate
-acceptance. The remote workflow has no cloud substitute for physical performance.
+## Confirmed product repairs
 
-Current product repairs (latest product commit 4937d8c9):
-- Vehicle-prompt shells pass pointer input through; action buttons stay interactive.
-- Terrain portal hooks preserve pavement composition and stable uniform/texture
-  ownership. An actual GPU before/after fixture reproduces and verifies the repair.
-- Core frame systems stay suspended while asynchronous title launch imports the
-  requested world. Kernel tests pass; a held-import packaged browser check is pending.
+- Mobile vehicle-prompt shells pass input through; their buttons stay interactive.
+- Terrain portal/pavement shader composition preserves uniforms and texture
+  ownership; an actual GPU before/after fixture reproduces the repaired defect.
+- Core frame work stays suspended while title launch imports the selected world.
+  Held-import packaged browser checks show no default-world presentation/render.
+- A closed large map no longer paints or fetches 49 default-city tiles during
+  zoom-control setup. The actual painter/cache/UI regression fails old code and
+  passes the fix, including open/zoom/close/reopen. Packaged recheck is pending.
+- Profile creation, subscription updates and trial admission use transactions;
+  concurrent room counts and paid plans cannot be overwritten by stale reads.
+  Four focused concurrency cases fail the old implementation and pass the repair.
 
-Current verification repairs preserve child-process ownership and timeouts, retain
-strict GPU/network error checks, re-observe moving vehicles instead of chasing stale
-positions, and isolate independent analytics cold starts. Test counts are never a
-substitute for functional, service, graphics or physical-device evidence.
+Earlier source repairs remove movement-loop diagnostic sorting, bound generated
+planet resources to two recent worlds, detach the previous planet on transitions,
+and add capture-email retry. Runtime graph inspection found no verification
+modules or duplicate module identities; source bytes are not RAM or FPS evidence.
 
-Remote state at 15:41 UTC (recheck job receipts):
-- 35880072088 on 4937d8c9: six targeted terrain/launch/world gates still running.
-- 35880778523, 35880785979, 35880789896 on 6f72f233: all 50 non-performance
-  candidate gates split across three isolated runners; still running.
-- 35880793340 on 6f72f233: FAIL, 12/13 backend stages. Multiplayer shared-vehicle
-  admission/renewal/handoff passes. Room chat failed during second-client startup
-  with a Metal GPU allocation error. Separate browser-process ownership is being
-  checked; no graphics error is ignored or relabeled as passing.
-- Earlier 35870819087 passed 13/13 on 2196eb25, before subsequent product repairs.
-  It remains historical evidence, not current complete backend acceptance.
+## Backend and services
 
-Physical performance attempt on 6f72f233 was stopped by the resource guard after
-10.5 seconds for 338 MiB swap growth. All owned processes were closed; ordinary
-Chrome remains open. No sustained clean performance result exists. Do not repeat
-heavy local work until host conditions change. The phone walkthrough is deferred.
+The authorized backend/index reconciliation found 78/78 Functions ACTIVE and all
+required indexes READY, with no missing browser handlers. Capture worker invoke
+access is restricted to its dedicated service account.
 
-Live billing inspection found the endpoint omitted customer.subscription.updated,
-although the deployed handler supports it. That event was added at 15:35 UTC,
-preserving the endpoint, existing event list, API version and secrets. Read-back
-confirms it is enabled. Both live price/product configurations are active. Signed
-HTTP/emulator entitlement checks are being added; no payment has been charged and
-no live checkout journey is claimed.
+On September 23, the five account-related Functions were repaired and deployed
+to staging and production (production completed 16:04:53 UTC), preserving all
+existing parameters/secrets. Read-back confirms ACTIVE; production HTTP auth and
+signature guards pass. No production frontend Hosting or restrictive rules changed.
 
-Follow `output/release-integration/test-confidence-2026-09-23/AUDIT.md` and
-`latest-summary.json` for exact receipts and unresolved findings. Historical notes
-are not current proof. Temporary staging App Check credentials must be removed
-after all active candidate consumers finish. Hosted staging remains a54d0345;
-local dist is 6f72f233. Production frontend Hosting and rules are unchanged.
+The live Stripe endpoint was missing customer.subscription.updated. That event
+was added at 15:35 UTC while preserving endpoint/API version/other events/secrets;
+read-back confirms the repair. Live prices/products are active. No charge was made.
+Staging's existing Stripe key and signing secret are empty. Signed emulator HTTP
+checks cover billing persistence, but no real hosted checkout is accepted.
 
-## Release path and remaining acceptance
+## What tests establish
 
-Release preparation requires complete current staging evidence before converting
-only Firebase configuration to production. It verifies all other asset bytes,
-source identity, and final owner acceptance. Production preview/promotion cannot
-skip finalization; promotion pins the reviewed immutable Hosting version.
-See `docs/TEST-AND-RELEASE-EVIDENCE.md`. Never manufacture approval/evidence files.
+The original 1,222 cases were Node component/source tests, not player journeys.
+Twelve omitted component files and room-profile emulator cases were restored.
+Current source/component checks execute 1,306 cases in 271 files, with no skips,
+TODOs, duplicate files or unassigned tests. A cleanup mutation survives four text
+checks but fails an actual Three.js lifecycle check. This is one demonstrated
+sensitivity difference, not a quality score for every test.
 
-Full current candidate/backend acceptance, clean sustained physical-device
-performance, and the deferred owner phone walkthrough remain outstanding until
-supported by receipts. Experimental GPU reconstruction is unprovisioned and
-claim-gated; public capture uses manual placement. No live payment or email
-journey has been claimed from emulator checks.
+Full backend run 35885471966 on 2400785b passes all 13 isolated-emulator stages,
+including actual HTTP trial concurrency/signed billing and independent browser
+room admission, lease/handoff, chat and replicated movement. Chat evidence uses
+normal low-quality Settings and one foreground-rendering world at a time; it is
+not simultaneous-rendering, default-quality, live billing or performance acceptance.
+The earlier chat receipt starting from placeholder 0,0 is invalid movement proof.
 
-## Useful commands and operating constraints
+The 50 non-performance candidate gates on 6f72f233 completed 43/50. Their seven
+failures remain failures: smoke, assembled-worlds, equipment, analytics, terrain
+boundary, connected journey, mobile load. Other-source passing rechecks do not
+convert that run into a complete passing matrix. Follow the current ledger for
+new repaired/affected checks and exact source identities.
 
-- `npm run verify:pr`: source/tooling syntax and coherence, component checks,
-  inventory and the isolated cleanup sensitivity experiment.
-- `node scripts/audit-runtime-startup.mjs`: module reachability/source bytes,
-  not measured RAM or FPS.
-- `node scripts/verification/performance-host.mjs`: host eligibility only.
-- `scripts/verification/`: separate test programs, not game entrypoints.
-- `progress.md`, `docs/audits/`, and dated `output/` folders: historical evidence
-  at their stated times, not overriding instructions.
+Confirmed test-harness issues include third-party-frame storage seeding, expired
+brief tutorial hints, stale moving-vehicle observations and missing staging-only
+App Check setup. Fixes preserve real input/state assertions and graphics errors.
+Mobile load now records provider failures and final-world state before cleanup;
+its mapped-world and timing assertions remain. It is touch/mobile Chrome emulation,
+not a physical iPhone performance result.
 
-Keep ordinary Chrome open. Run one bounded local workload at a time on this
-8 GiB Mac; avoid performance measurements under memory/CPU pressure. Preserve
-source/history, user data and the live rollback, with at most four recognized
-saved candidates. Temporary staging App Check registration/secret/file must be
-removed after the remote functional checks. Frontend Hosting/rule rollout still
-requires coordinated acceptance; backend deployment is not its substitute.
+Virtual-Mac graphics failures include allocation errors/context loss and shader
+errors with empty compiler logs. Linux Manhattan and seven-city fallback passes
+narrow the investigation; they do not certify hardware performance. Graphics
+errors invalidate acceptance and are never ignored to obtain a passing result.
+
+## Remaining release acceptance and resources
+
+Complete current candidate/backend artifact evidence, clean sustained physical
+M1 performance, and the owner phone walkthrough remain required. A 6f72 physical
+attempt stopped after 10.5 seconds for 338 MiB swap growth; all owned processes
+were closed. That is an interrupted check, not an app FPS failure or a pass.
+The Mac remains under warning memory pressure. Keep ordinary Chrome open.
+
+Run one bounded local workload at a time. Do not blindly restart heavy work after
+a resource stop. Preserve source/history, user data, live rollback and current dist;
+keep at most four recognized saved candidates. Roughly 13 GiB remains free.
+
+Temporary staging App Check credentials are private, outside the package. The
+active registration, GitHub secret and private local file must be revoked/removed
+only after all current remote consumers finish. Inspect the lifecycle receipt in
+`output/release-integration/live-checks/remote-appcheck-lifecycle.json` first.
+
+Production preparation must retain complete current staging evidence, replace only
+three Firebase configuration assets, prove all other asset bytes identical, and
+require real owner acceptance. Promotion pins an immutable Hosting version and
+cannot skip finalization. See `docs/TEST-AND-RELEASE-EVIDENCE.md`. Never manufacture
+approval files, reuse interrupted receipts as passes, or silently bypass a gate.
+Experimental GPU reconstruction remains unprovisioned and claim-gated; manual
+capture placement is available. No live payment or email journey is claimed from
+emulator results.
