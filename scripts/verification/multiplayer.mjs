@@ -84,7 +84,7 @@ async function createPlayer(label) {
   await page.addInitScript(() => {
     globalThis.__multiplayerInputTrace = [];
     globalThis.addEventListener('keydown', event => {
-      if (event.code !== 'KeyE') return;
+      if (!['KeyE', 'Escape'].includes(event.code)) return;
       globalThis.__multiplayerInputTrace.push({ type: 'keydown', repeat: event.repeat, target: event.target?.tagName, prompt: document.getElementById('urbanVehiclePrompt')?.textContent, urban: globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox });
     }, true);
     globalThis.addEventListener('we3d:context-interaction-completed', event => {
@@ -253,16 +253,33 @@ const pauseReceipts = [];
 async function pauseWaitingPlayer(player) {
   await player.page.bringToFront();
   await player.page.locator('body > canvas:not(#minimap)').click();
-  await player.page.keyboard.press('Escape');
-  await player.page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().paused === true &&
-    document.getElementById('pauseScreen')?.classList.contains('show'), null, roomStateWait);
+  const attempts = [];
+  // Escape first dismisses an open gameplay panel. Observe that normal UI
+  // transition before using Escape again to request the actual pause dialog.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    attempts.push(await player.page.evaluate(() => ({
+      focusedElement: document.activeElement?.tagName,
+      visiblePanels: [...document.querySelectorAll('[role="dialog"], #largeMap, #discoveryPanel, #urbanEquipmentPanel')]
+        .filter(element => element.getClientRects().length && getComputedStyle(element).visibility !== 'hidden')
+        .map(element => element.id),
+      paused: globalThis.getWorldExplorerRuntimeDiagnostics?.().paused
+    })));
+    if (await player.page.locator('#pauseScreen.show').isVisible()) break;
+    await player.page.keyboard.press('Escape');
+    if (await player.page.waitForFunction(() =>
+      globalThis.getWorldExplorerRuntimeDiagnostics?.().paused === true &&
+      document.getElementById('pauseScreen')?.classList.contains('show'),
+    null, { timeout: 5_000, polling: 250 }).then(() => true, () => false)) break;
+  }
+  assert.ok(await player.page.locator('#pauseScreen.show').isVisible(),
+    `Normal Escape input did not open pause: ${JSON.stringify(attempts)}`);
   const renderedFrames = () => player.page.evaluate(() =>
     globalThis.getWorldExplorerRuntimeDiagnostics?.().runtimeKernel?.phases?.render?.find(system => system.id === 'core.renderer')?.updates);
   const before = await renderedFrames();
   await player.page.waitForTimeout(500);
   const after = await renderedFrames();
   assert.ok(Number.isFinite(before) && before === after, 'Manual pause must stop city drawing while the other client plays.');
-  pauseReceipts.push({ before, after });
+  pauseReceipts.push({ before, after, attempts });
 }
 async function resumePlayer(player) {
   await player.page.bringToFront();
