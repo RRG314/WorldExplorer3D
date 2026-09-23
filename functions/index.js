@@ -1041,60 +1041,58 @@ async function assertStripeCustomerOwnership(stripe, customerId, uid, expectedEm
 
 async function ensureUserDoc(uid, email, displayName) {
   const ref = db.collection('users').doc(uid);
-  const snap = await ref.get();
   const normalizedDisplayName = normalizeDisplayName(displayName);
+  const result = await db.runTransaction(async transaction => {
+    const snap = await transaction.get(ref);
 
-  if (snap.exists) {
-    const existing = snap.data() || {};
-    const plan = normalizePlan(existing.plan);
-    const roomCreateCount = normalizeRoomCreateCount(existing.roomCreateCount);
-    const existingLimit = Number.isFinite(Number(existing.roomCreateLimit))
-      ? Math.max(0, Math.min(10000, Math.floor(Number(existing.roomCreateLimit))))
-      : null;
-    const isAdminOverride = String(existing.subscriptionStatus || '').toLowerCase() === 'admin';
-    const roomCreateLimit = isAdminOverride
-      ? Math.max(existingLimit || 0, ADMIN_TEST_ROOM_CREATE_LIMIT)
-      : roomCreateLimitForPlan(plan);
-    await ref.set(
-      {
-        email: email || existing.email || '',
-        displayName: normalizedDisplayName || existing.displayName || 'Explorer',
+    if (snap.exists) {
+      const existing = snap.data() || {};
+      const plan = normalizePlan(existing.plan);
+      const roomCreateCount = normalizeRoomCreateCount(existing.roomCreateCount);
+      const existingLimit = Number.isFinite(Number(existing.roomCreateLimit))
+        ? Math.max(0, Math.min(10000, Math.floor(Number(existing.roomCreateLimit))))
+        : null;
+      const isAdminOverride = String(existing.subscriptionStatus || '').toLowerCase() === 'admin';
+      const roomCreateLimit = isAdminOverride
+        ? Math.max(existingLimit || 0, ADMIN_TEST_ROOM_CREATE_LIMIT)
+        : roomCreateLimitForPlan(plan);
+      transaction.set(ref,
+        {
+          email: email || existing.email || '',
+          displayName: normalizedDisplayName || existing.displayName || 'Explorer',
+          roomCreateCount,
+          roomCreateLimit,
+          updatedAt: FieldValue.serverTimestamp()
+        },
+        { merge: true }
+      );
+      return {
+        ...existing,
         roomCreateCount,
-        roomCreateLimit,
-        updatedAt: FieldValue.serverTimestamp()
-      },
-      { merge: true }
-    );
-    await ensureCreatorProfileDoc(db, uid, {
-      username: normalizedDisplayName || existing.displayName || 'Explorer'
-    });
-    return {
-      ...existing,
-      roomCreateCount,
-      roomCreateLimit
+        roomCreateLimit
+      };
+    }
+
+    const plan = 'free';
+    const created = {
+      uid,
+      email: email || '',
+      displayName: normalizedDisplayName || 'Explorer',
+      plan,
+      trialEndsAt: null,
+      subscriptionStatus: 'none',
+      entitlements: planEntitlements(plan),
+      roomCreateCount: 0,
+      roomCreateLimit: roomCreateLimitForPlan(plan),
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp()
     };
-  }
 
-  const plan = 'free';
-  const created = {
-    uid,
-    email: email || '',
-    displayName: normalizedDisplayName || 'Explorer',
-    plan,
-    trialEndsAt: null,
-    subscriptionStatus: 'none',
-    entitlements: planEntitlements(plan),
-    roomCreateCount: 0,
-    roomCreateLimit: roomCreateLimitForPlan(plan),
-    createdAt: FieldValue.serverTimestamp(),
-    updatedAt: FieldValue.serverTimestamp()
-  };
-
-  await ref.set(created, { merge: true });
-  await ensureCreatorProfileDoc(db, uid, {
-    username: normalizedDisplayName || 'Explorer'
+    transaction.set(ref, created, { merge: true });
+    return created;
   });
-  return created;
+  await ensureCreatorProfileDoc(db, uid, { username: normalizedDisplayName || result.displayName || 'Explorer' });
+  return result;
 }
 
 async function resolveUidFromCustomer(customerId) {
@@ -1104,51 +1102,42 @@ async function resolveUidFromCustomer(customerId) {
   return snap.docs[0].id;
 }
 
-async function resolveFallbackPlan(uid) {
-  const snap = await db.collection('users').doc(uid).get();
-  const data = snap.exists ? snap.data() || {} : {};
-  const trialEndsAt = data.trialEndsAt && typeof data.trialEndsAt.toMillis === 'function' ? data.trialEndsAt.toMillis() : null;
-
-  if (trialEndsAt && trialEndsAt > Date.now()) {
-    return 'trial';
-  }
-
-  return 'free';
-}
-
 async function upsertPlanFromSubscription({ uid, customerId, subscriptionId, status, priceId }) {
   if (!uid) return;
 
   const cfg = stripeConfig();
   const paidPlan = planFromPriceId(priceId, cfg);
   const active = hasActiveSubscription(status);
-  const fallbackPlan = active ? 'free' : await resolveFallbackPlan(uid);
-  const plan = active ? normalizePlan(paidPlan) : fallbackPlan;
   const userRef = db.collection('users').doc(uid);
-  const userSnap = await userRef.get();
-  const userData = userSnap.exists ? userSnap.data() || {} : {};
-  const roomCreateCount = normalizeRoomCreateCount(userData.roomCreateCount);
-  const isAdminOverride = String(userData.subscriptionStatus || '').toLowerCase() === 'admin';
-  const existingLimit = Number.isFinite(Number(userData.roomCreateLimit))
-    ? Math.max(0, Math.min(10000, Math.floor(Number(userData.roomCreateLimit))))
-    : 0;
-  const roomCreateLimit = isAdminOverride
-    ? Math.max(existingLimit, ADMIN_TEST_ROOM_CREATE_LIMIT)
-    : roomCreateLimitForPlan(plan);
+  await db.runTransaction(async transaction => {
+    const userSnap = await transaction.get(userRef);
+    const userData = userSnap.exists ? userSnap.data() || {} : {};
+    const trialEndsAtMs = timestampToMillis(userData.trialEndsAt) || timestampToMillis(userData.trialEndsAtMs);
+    const fallbackPlan = trialEndsAtMs > Date.now() ? 'trial' : 'free';
+    const plan = active ? normalizePlan(paidPlan) : fallbackPlan;
+    const roomCreateCount = normalizeRoomCreateCount(userData.roomCreateCount);
+    const isAdminOverride = String(userData.subscriptionStatus || '').toLowerCase() === 'admin';
+    const existingLimit = Number.isFinite(Number(userData.roomCreateLimit))
+      ? Math.max(0, Math.min(10000, Math.floor(Number(userData.roomCreateLimit))))
+      : 0;
+    const roomCreateLimit = isAdminOverride
+      ? Math.max(existingLimit, ADMIN_TEST_ROOM_CREATE_LIMIT)
+      : roomCreateLimitForPlan(plan);
 
-  await userRef.set(
-    {
-      stripeCustomerId: customerId || null,
-      stripeSubscriptionId: subscriptionId || null,
-      subscriptionStatus: status || 'none',
-      plan,
-      entitlements: planEntitlements(plan),
-      roomCreateCount,
-      roomCreateLimit,
-      updatedAt: FieldValue.serverTimestamp()
-    },
-    { merge: true }
-  );
+    transaction.set(userRef,
+      {
+        stripeCustomerId: customerId || null,
+        stripeSubscriptionId: subscriptionId || null,
+        subscriptionStatus: status || 'none',
+        plan,
+        entitlements: planEntitlements(plan),
+        roomCreateCount,
+        roomCreateLimit,
+        updatedAt: FieldValue.serverTimestamp()
+      },
+      { merge: true }
+    );
+  });
 }
 
 exports.getPublicSiteStats = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
@@ -1308,100 +1297,103 @@ exports.startTrial = functions.region('us-central1').runWith({ invoker: 'public'
 
   try {
     const authUser = await admin.auth().getUser(auth.uid);
-    const existing = await ensureUserDoc(auth.uid, authUser.email || '', authUser.displayName || '');
-    const nowMs = Date.now();
+    await ensureUserDoc(auth.uid, authUser.email || '', authUser.displayName || '');
+    const userRef = db.collection('users').doc(auth.uid);
+    const outcome = await db.runTransaction(async transaction => {
+      const snapshot = await transaction.get(userRef);
+      const existing = snapshot.data() || {};
+      const nowMs = Date.now();
 
-    const existingPlan = normalizePlan(existing.plan);
-    const subscriptionStatus = String(existing.subscriptionStatus || 'none');
-    const trialEndsAtMs = timestampToMillis(existing.trialEndsAt) || timestampToMillis(existing.trialEndsAtMs);
-    const trialConsumedAtMs = timestampToMillis(existing.trialConsumedAt) || timestampToMillis(existing.trialConsumedAtMs);
+      const existingPlan = normalizePlan(existing.plan);
+      const subscriptionStatus = String(existing.subscriptionStatus || 'none');
+      const trialEndsAtMs = timestampToMillis(existing.trialEndsAt) || timestampToMillis(existing.trialEndsAtMs);
+      const trialConsumedAtMs = timestampToMillis(existing.trialConsumedAt) || timestampToMillis(existing.trialConsumedAtMs);
 
-    if (existingPlan === 'supporter' || existingPlan === 'pro' || hasActiveSubscription(subscriptionStatus)) {
-      res.status(200).json({
-        status: 'already-paid',
-        plan: existingPlan,
-        trialEndsAtMs: trialEndsAtMs || null
-      });
-      return;
-    }
-
-    if (existingPlan === 'trial' && trialEndsAtMs && trialEndsAtMs > nowMs) {
-      const trialEndsAtIsTimestamp = existing.trialEndsAt && typeof existing.trialEndsAt.toMillis === 'function';
-      const trialStartsAtIsTimestamp = existing.trialStartsAt && typeof existing.trialStartsAt.toMillis === 'function';
-      const trialConsumedAtIsTimestamp = existing.trialConsumedAt && typeof existing.trialConsumedAt.toMillis === 'function';
-
-      if (!trialEndsAtIsTimestamp || !trialStartsAtIsTimestamp || !trialConsumedAtIsTimestamp) {
-        const normalizedTrialEndsAt = AdminTimestamp.fromMillis(trialEndsAtMs);
-        const normalizedTrialStartMs = trialStartsAtIsTimestamp
-          ? existing.trialStartsAt.toMillis()
-          : Math.max(nowMs - TRIAL_DURATION_MS, trialEndsAtMs - TRIAL_DURATION_MS);
-        const normalizedTrialStartsAt = AdminTimestamp.fromMillis(normalizedTrialStartMs);
-        const normalizedTrialConsumedAt = trialConsumedAtIsTimestamp
-          ? existing.trialConsumedAt
-          : normalizedTrialStartsAt;
-        const roomCreateCount = normalizeRoomCreateCount(existing.roomCreateCount);
-        const roomCreateLimit = Math.max(
-          roomCreateLimitForPlan('trial'),
-          normalizeRoomCreateLimit(existing.roomCreateLimit)
-        );
-
-        await db.collection('users').doc(auth.uid).set(
-          {
-            plan: 'trial',
-            trialStartsAt: normalizedTrialStartsAt,
-            trialEndsAt: normalizedTrialEndsAt,
-            trialConsumedAt: normalizedTrialConsumedAt,
-            entitlements: planEntitlements('trial'),
-            roomCreateCount,
-            roomCreateLimit,
-            updatedAt: FieldValue.serverTimestamp()
-          },
-          { merge: true }
-        );
+      if (existingPlan === 'supporter' || existingPlan === 'pro' || hasActiveSubscription(subscriptionStatus)) {
+        return { status: 200, body: {
+          status: 'already-paid',
+          plan: existingPlan,
+          trialEndsAtMs: trialEndsAtMs || null
+        } };
       }
 
-      res.status(200).json({
-        status: 'already-active',
+      if (existingPlan === 'trial' && trialEndsAtMs && trialEndsAtMs > nowMs) {
+        const trialEndsAtIsTimestamp = existing.trialEndsAt && typeof existing.trialEndsAt.toMillis === 'function';
+        const trialStartsAtIsTimestamp = existing.trialStartsAt && typeof existing.trialStartsAt.toMillis === 'function';
+        const trialConsumedAtIsTimestamp = existing.trialConsumedAt && typeof existing.trialConsumedAt.toMillis === 'function';
+
+        if (!trialEndsAtIsTimestamp || !trialStartsAtIsTimestamp || !trialConsumedAtIsTimestamp) {
+          const normalizedTrialEndsAt = AdminTimestamp.fromMillis(trialEndsAtMs);
+          const normalizedTrialStartMs = trialStartsAtIsTimestamp
+            ? existing.trialStartsAt.toMillis()
+            : Math.max(nowMs - TRIAL_DURATION_MS, trialEndsAtMs - TRIAL_DURATION_MS);
+          const normalizedTrialStartsAt = AdminTimestamp.fromMillis(normalizedTrialStartMs);
+          const normalizedTrialConsumedAt = trialConsumedAtIsTimestamp
+            ? existing.trialConsumedAt
+            : normalizedTrialStartsAt;
+          const roomCreateCount = normalizeRoomCreateCount(existing.roomCreateCount);
+          const roomCreateLimit = Math.max(
+            roomCreateLimitForPlan('trial'),
+            normalizeRoomCreateLimit(existing.roomCreateLimit)
+          );
+
+          transaction.set(userRef,
+            {
+              plan: 'trial',
+              trialStartsAt: normalizedTrialStartsAt,
+              trialEndsAt: normalizedTrialEndsAt,
+              trialConsumedAt: normalizedTrialConsumedAt,
+              entitlements: planEntitlements('trial'),
+              roomCreateCount,
+              roomCreateLimit,
+              updatedAt: FieldValue.serverTimestamp()
+            },
+            { merge: true }
+          );
+        }
+
+        return { status: 200, body: {
+          status: 'already-active',
+          plan: 'trial',
+          trialEndsAtMs
+        } };
+      }
+
+      if (trialConsumedAtMs || (trialEndsAtMs && trialEndsAtMs <= nowMs)) {
+        return { status: 403, body: {
+          error: 'Trial already used. Upgrade to Supporter or Pro for multiplayer access.'
+        } };
+      }
+
+      const trialStartsAt = AdminTimestamp.fromMillis(nowMs);
+      const trialEndsAt = AdminTimestamp.fromMillis(nowMs + TRIAL_DURATION_MS);
+      const roomCreateCount = normalizeRoomCreateCount(existing.roomCreateCount);
+      const roomCreateLimit = roomCreateLimitForPlan('trial');
+      transaction.set(userRef,
+        {
+          uid: auth.uid,
+          email: authUser.email || existing.email || '',
+          displayName: authUser.displayName || existing.displayName || '',
+          plan: 'trial',
+          subscriptionStatus,
+          trialStartsAt,
+          trialEndsAt,
+          trialConsumedAt: trialStartsAt,
+          entitlements: planEntitlements('trial'),
+          roomCreateCount,
+          roomCreateLimit,
+          updatedAt: FieldValue.serverTimestamp()
+        },
+        { merge: true }
+      );
+
+      return { status: 200, body: {
+        status: 'activated',
         plan: 'trial',
-        trialEndsAtMs
-      });
-      return;
-    }
-
-    if (trialConsumedAtMs || (trialEndsAtMs && trialEndsAtMs <= nowMs)) {
-      res.status(403).json({
-        error: 'Trial already used. Upgrade to Supporter or Pro for multiplayer access.'
-      });
-      return;
-    }
-
-    const trialStartsAt = AdminTimestamp.fromMillis(nowMs);
-    const trialEndsAt = AdminTimestamp.fromMillis(nowMs + TRIAL_DURATION_MS);
-    const roomCreateCount = normalizeRoomCreateCount(existing.roomCreateCount);
-    const roomCreateLimit = roomCreateLimitForPlan('trial');
-    await db.collection('users').doc(auth.uid).set(
-      {
-        uid: auth.uid,
-        email: authUser.email || existing.email || '',
-        displayName: authUser.displayName || existing.displayName || '',
-        plan: 'trial',
-        subscriptionStatus,
-        trialStartsAt,
-        trialEndsAt,
-        trialConsumedAt: trialStartsAt,
-        entitlements: planEntitlements('trial'),
-        roomCreateCount,
-        roomCreateLimit,
-        updatedAt: FieldValue.serverTimestamp()
-      },
-      { merge: true }
-    );
-
-    res.status(200).json({
-      status: 'activated',
-      plan: 'trial',
-      trialEndsAtMs: nowMs + TRIAL_DURATION_MS
+        trialEndsAtMs: nowMs + TRIAL_DURATION_MS
+      } };
     });
+    res.status(outcome.status).json(outcome.body);
   } catch (err) {
     console.error('[startTrial] failed:', err);
     res.status(500).json({ error: 'Unable to start trial right now.' });
@@ -1444,7 +1436,6 @@ exports.enableAdminTester = functions.region('us-central1').runWith({ invoker: '
       authUser.email || '',
       authUser.displayName || ''
     );
-    const roomCreateCount = normalizeRoomCreateCount(existingDoc.roomCreateCount);
     const roomCreateLimit = ADMIN_TEST_ROOM_CREATE_LIMIT;
 
     await db.collection('users').doc(auth.uid).set(
@@ -1455,7 +1446,6 @@ exports.enableAdminTester = functions.region('us-central1').runWith({ invoker: '
         plan: 'pro',
         subscriptionStatus: 'admin',
         entitlements: planEntitlements('pro'),
-        roomCreateCount,
         roomCreateLimit,
         updatedAt: FieldValue.serverTimestamp()
       },

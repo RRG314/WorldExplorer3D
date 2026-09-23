@@ -44,7 +44,10 @@ assert.equal(updated.status, 200, JSON.stringify(updated.body));
 assert.equal(updated.body.displayName, 'Release Explorer');
 assert.equal(updated.body.creatorProfile.bio, 'Exploring Earth and beyond.');
 
-const activated = await post('/startTrial');
+const concurrentTrials = await Promise.all([post('/startTrial'), post('/startTrial')]);
+assert.deepEqual(concurrentTrials.map(result => result.body.status).sort(), ['activated', 'already-active']);
+assert.equal(concurrentTrials[0].body.trialEndsAtMs, concurrentTrials[1].body.trialEndsAtMs);
+const activated = concurrentTrials.find(result => result.body.status === 'activated');
 assert.equal(activated.status, 200, JSON.stringify(activated.body));
 assert.equal(activated.body.status, 'activated');
 assert.equal(activated.body.plan, 'trial');
@@ -88,6 +91,7 @@ console.log(JSON.stringify({
     overviewLoaded: true,
     profilePersisted: true,
     trialActivatedOnce: true,
+    concurrentTrialAdmission: true,
     emptyBillingHistoryHandled: true,
     refreshedOverviewMatches: true,
     deletionRequiresExactConfirmation: true,

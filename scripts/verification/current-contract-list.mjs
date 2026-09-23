@@ -23,6 +23,7 @@ export const currentContractTests = [
   'tests/hosting-api-routes-current.test.mjs',
   'tests/browser-function-invokers-current.test.cjs',
   'tests/backend-emulator-parameters-current.test.mjs',
+  'tests/account-state-concurrency-current.test.mjs',
   'tests/room-session-lifecycle-current.test.mjs',
   'tests/room-chat-focus-current.test.mjs',
   'tests/parked-vehicle-identity-current.test.mjs',
