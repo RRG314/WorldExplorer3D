@@ -1,3 +1,4 @@
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
@@ -146,6 +147,7 @@ try {
 
   desktopContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const desktop = await desktopContext.newPage();
+  await configureStagingAppCheck(desktop, baseUrl);
   observe(desktop);
   await desktop.goto(`${baseUrl}/app/`, { waitUntil: 'load', timeout: 120_000 });
   await waitForRuntime(desktop);
@@ -177,6 +179,7 @@ try {
     viewport: { width: 390, height: 844 }
   });
   const mobile = await mobileContext.newPage();
+  await configureStagingAppCheck(mobile, baseUrl);
   const cdp = await mobileContext.newCDPSession(mobile);
   observe(mobile);
   await mobile.goto(`${baseUrl}/app/`, { waitUntil: 'load', timeout: 120_000 });
@@ -261,6 +264,7 @@ try {
     viewport: { width: 390, height: 844 }
   });
   const oceanMobile = await mobileContext.newPage();
+  await configureStagingAppCheck(oceanMobile, baseUrl);
   const oceanCdp = await mobileContext.newCDPSession(oceanMobile);
   observe(oceanMobile);
   await oceanMobile.goto(`${baseUrl}/app/`, { waitUntil: 'load', timeout: 120_000 });

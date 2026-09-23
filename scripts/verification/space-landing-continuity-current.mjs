@@ -1,3 +1,4 @@
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
@@ -18,6 +19,7 @@ const context = await browser.newContext({
   hasTouch: mobile
 });
 const page = await context.newPage();
+await configureStagingAppCheck(page, baseUrl);
 const browserErrors = [];
 const failedLocalResources = [];
 page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));

@@ -1,3 +1,4 @@
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -546,6 +547,7 @@ try {
       browser = await chromium.connect(browserServer.wsEndpoint());
       context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
       page = await context.newPage();
+      await configureStagingAppCheck(page, baseUrl);
     } catch (error) {
       await closeOwnedBrowser(browser, browserServer);
       throw error;

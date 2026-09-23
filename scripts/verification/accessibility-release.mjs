@@ -1,3 +1,5 @@
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -56,7 +58,9 @@ async function semanticAudit(page) {
 async function runDesktop() {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
   const page = await context.newPage();
+  await configureStagingAppCheck(page, baseUrl);
   const browserErrors = [];
+  collectBrowserGraphicsErrors(page, browserErrors);
   const localFailures = [];
   page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   page.on('response', (response) => {
@@ -172,7 +176,9 @@ async function runDesktop() {
 async function runMobile() {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 });
   const page = await context.newPage();
+  await configureStagingAppCheck(page, baseUrl);
   const browserErrors = [];
+  collectBrowserGraphicsErrors(page, browserErrors);
   const localFailures = [];
   page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   page.on('response', (response) => {

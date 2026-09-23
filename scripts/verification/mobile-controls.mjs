@@ -1,3 +1,5 @@
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
@@ -13,8 +15,10 @@ const baseUrl = `http://127.0.0.1:${server.port}`;
 const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
 const context = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height: 844 } });
 const page = await context.newPage();
+await configureStagingAppCheck(page, baseUrl);
 const cdp = await context.newCDPSession(page);
 const browserErrors = [];
+  collectBrowserGraphicsErrors(page, browserErrors);
 const localFailures = [];
 page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
 page.on('response', (response) => {

@@ -1,3 +1,4 @@
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -21,11 +22,8 @@ const server = externalUrl ? null : await startStaticServer({
 const baseUrl = externalUrl || `http://127.0.0.1:${server.port}`;
 const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-if (process.env.WE3D_STAGING_APP_CHECK_FILE) {
-  const {token} = JSON.parse(await fs.readFile(process.env.WE3D_STAGING_APP_CHECK_FILE, 'utf8'));
-  await context.addInitScript(token => { globalThis.FIREBASE_APPCHECK_DEBUG_TOKEN = token; }, token);
-}
 const page = await context.newPage();
+await configureStagingAppCheck(page, baseUrl);
 const browserErrors = [];
 collectBrowserGraphicsErrors(page, browserErrors);
 const localFailures = [];

@@ -1,3 +1,5 @@
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -26,6 +28,7 @@ async function withJourney(name, mobile, run) {
       hasTouch: mobile, isMobile: mobile
     });
     page = await context.newPage();
+    await configureStagingAppCheck(page, baseUrl);
     watchPage(page);
     const crash = new Promise((_, reject) => page.once('crash', () => {
       crashed = true;
@@ -50,6 +53,7 @@ function mark(label, details = '') {
 }
 
 function watchPage(page) {
+  collectBrowserGraphicsErrors(page, pageErrors);
   page.on('pageerror', (error) => pageErrors.push(String(error?.stack || error)));
   page.on('requestfailed', (request) => {
     const reason = request.failure()?.errorText || '';

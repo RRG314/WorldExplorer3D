@@ -1,3 +1,4 @@
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
@@ -24,6 +25,7 @@ const context = await browser.newContext({
 });
 await context.grantPermissions(['geolocation'], { origin });
 const page = await context.newPage();
+await configureStagingAppCheck(page, baseUrl);
 const cdp = await context.newCDPSession(page);
 const browserErrors = [];
 const localFailures = [];

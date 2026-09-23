@@ -1,3 +1,4 @@
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -26,7 +27,9 @@ async function createJourneyBrowser() {
   });
   try {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: process.env.CI ? 0.5 : 1 });
-    return { browser, context, page: await context.newPage() };
+    const page = await context.newPage();
+    await configureStagingAppCheck(page, baseUrl);
+    return { browser, context, page };
   } catch (error) {
     await browser.close();
     throw error;

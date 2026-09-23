@@ -1,3 +1,4 @@
+import { selectLowRenderQuality } from './render-quality-ui.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -91,15 +92,17 @@ async function approachNearbyAction() {
         const clear = (x, z) => !ctx.checkBuildingCollision(x, z, .4, {
           actorBaseY: origin.y - 1.7, actorHeight: 1.7
         })?.collision;
-        const queue = [{ x: 0, z: 0, parent: null }];
+        const heuristic = node => Math.min(...nearby.map(candidate => Math.hypot(candidate.x - point(node).x, candidate.z - point(node).z))) / spacing;
+        const queue = [{ x: 0, z: 0, cost: 0, parent: null }];
         const seen = new Set(['0,0']);
         let reached = null;
-        for (let index = 0; index < queue.length && index < 6400; index += 1) {
-          const node = queue[index];
+        for (let visited = 0; queue.length && visited < 6400; visited += 1) {
+          queue.sort((a, b) => a.cost + heuristic(a) - b.cost - heuristic(b));
+          const node = queue.shift();
           const at = point(node);
           if (nearby.some(candidate => Math.hypot(candidate.x - at.x, candidate.z - at.z) < 2)) { reached = node; break; }
           for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
-            const next = { x: node.x + dx, z: node.z + dz, parent: node };
+            const next = { x: node.x + dx, z: node.z + dz, cost: node.cost + 1, parent: node };
             const id = key(next.x, next.z);
             if (Math.abs(next.x) > 45 || Math.abs(next.z) > 45 || seen.has(id)) continue;
             seen.add(id);
@@ -147,6 +150,7 @@ try {
   await page.goto(`${baseUrl}/app/`, { waitUntil: 'load', timeout: 120_000 });
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   await page.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
+  if (process.env.CI) await selectLowRenderQuality(page);
 
   // Configure an actual action before entering the world. This verifies the
   // player-facing settings, saved authority, and runtime consumer together.
@@ -247,6 +251,7 @@ try {
   const finalState = await tutorialState();
   const report = {
     inputTiming: 'runtime-fixed-step; not rendering performance',
+    renderQuality: process.env.CI ? 'low (normal Settings UI); functional tutorial only' : 'default',
     ok: browserErrors.length === 0 && failedLocalResources.length === 0,
     journey: 'optional-first-journey-v5',
     checks: {

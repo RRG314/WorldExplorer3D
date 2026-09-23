@@ -1,3 +1,4 @@
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
@@ -40,6 +41,7 @@ const baseUrl = externalUrl || `http://127.0.0.1:${server.port}`;
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await context.newPage();
+await configureStagingAppCheck(page, baseUrl);
 const browserErrors = [];
 const localFailures = [];
 const expectedStaticBackendMisses = [];
@@ -80,6 +82,7 @@ attachDiagnostics(page);
 
 async function verifyPlatformSurfaces() {
   const platformPage = await context.newPage();
+  await configureStagingAppCheck(platformPage, baseUrl);
   attachDiagnostics(platformPage);
   try {
     await platformPage.goto(`${baseUrl}/account/`, { waitUntil: 'load', timeout: 120000 });

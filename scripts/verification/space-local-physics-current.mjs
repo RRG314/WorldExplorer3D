@@ -1,3 +1,4 @@
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 
@@ -5,6 +6,7 @@ const baseUrl = String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:419
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const page = await context.newPage();
+await configureStagingAppCheck(page, baseUrl);
 const pageErrors = [];
 page.on('pageerror', (error) => pageErrors.push(String(error?.stack || error)));
 

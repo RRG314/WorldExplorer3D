@@ -1,3 +1,4 @@
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -40,6 +41,7 @@ async function verify(viewport, name) {
   const touch = viewport.width <= 760;
   const context = await browser.newContext({ viewport, deviceScaleFactor: process.env.CI ? 0.5 : 1, hasTouch: touch, isMobile: touch });
   const page = await context.newPage();
+  await configureStagingAppCheck(page, baseUrl);
   activePage = page;
   page.setDefaultTimeout(process.env.CI ? 60_000 : 20_000);
   markPhase(`${name}:loading`);
