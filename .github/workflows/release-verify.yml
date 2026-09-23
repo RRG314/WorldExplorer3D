@@ -1,4 +1,5 @@
 name: Remote Release Verification
+run-name: "Verify ${{ inputs.scope }}: ${{ inputs.scope == 'backend' && 'all backend stages' || inputs.gates }}"
 
 on:
   workflow_dispatch:
