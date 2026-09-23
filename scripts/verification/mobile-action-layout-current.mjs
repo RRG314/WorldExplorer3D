@@ -3,6 +3,7 @@ import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { showWorldSelectionNotice } from '../../app/js/interaction/world-click-router.js';
 const root = path.resolve(process.env.WE3D_VERIFY_ROOT || '.');
 const server = await startStaticServer({ rootDir: root, ports: [4467, 4468] });
 const base = `http://127.0.0.1:${server.port}/app/`;
@@ -54,6 +55,36 @@ try {
       results.push({ viewport, handedness, equipment, pack, ...result });
     }
   }
+  const selectionResults = [];
+  await page.addScriptTag({ content: `globalThis.showSelectionForLayout = ${showWorldSelectionNotice.toString()};` });
+  for (const viewport of [{ width: 360, height: 640 }, { width: 390, height: 844 }, { width: 412, height: 915 }, { width: 844, height: 390 }]) {
+    await page.setViewportSize(viewport);
+    for (const handedness of ['standard', 'southpaw']) {
+      const result = await page.evaluate((handedness) => {
+        const controls = document.getElementById('mobileTouchControls');
+        controls.dataset.handedness = handedness;
+        globalThis.showSelectionForLayout('The Munsey Building',
+          'Approach an entrance to enter, open Real Estate, or help improve this mapped place.',
+          { label: 'Improve this place', onClick() {} });
+        const card = document.getElementById('worldSelectionNotice');
+        const bounds = node => { const r = node.getBoundingClientRect(); return { x:r.x, y:r.y, right:r.right, bottom:r.bottom, width:r.width, height:r.height }; };
+        const cardBox = bounds(card);
+        const targets = ['controlsBarBtn', 'mobileMovePad', 'mobileLookPad', 'mobileActionPrimary', 'mobileActionSecondary', 'mobileEquipmentUse', 'urbanEquipmentToggle'].map(id => document.getElementById(id));
+        const blocked = targets.filter(node => {
+          const r = bounds(node), hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+          return (r.x < cardBox.right && cardBox.x < r.right && r.y < cardBox.bottom && cardBox.y < r.bottom) || !(hit === node || node.contains(hit));
+        }).map(node => node.id);
+        const actions = [...card.querySelectorAll('button:not([hidden])')].map(node => {
+          const r = bounds(node), hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+          return { ...r, hit: hit === node || node.contains(hit) };
+        });
+        return { cardBox, blocked, actions, ok: blocked.length === 0 && cardBox.x >= 0 && cardBox.right <= innerWidth && cardBox.y >= 0 && cardBox.bottom <= innerHeight && actions.every(r => r.hit && r.width >= 44 && r.height >= 44) };
+      }, handedness);
+      selectionResults.push({ viewport, handedness, ...result });
+      await mkdir('output/verification/mobile-action-layout', { recursive: true });
+      await page.screenshot({ path: `output/verification/mobile-action-layout/selection-${viewport.width}x${viewport.height}-${handedness}.png` });
+    }
+  }
   const gpsResults = [];
   for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }, { width: 1440, height: 900 }]) {
     const gpsContext = await browser.newContext({ viewport, hasTouch: viewport.width < 1000, isMobile: viewport.width < 1000 });
@@ -93,9 +124,9 @@ try {
       await gpsPage.screenshot({ path:`output/verification/mobile-action-layout/gps-${viewport.width}x${viewport.height}.png` });
     } finally { await gpsContext.close(); }
   }
-  const report = { ok: results.every(r=>r.ok) && gpsResults.every(r=>r.ok), evidence: 'Actual app markup/styles in Chrome; layout fixture without world runtime', results, gpsResults };
+  const report = { ok: results.every(r=>r.ok) && gpsResults.every(r=>r.ok) && selectionResults.every(r=>r.ok), evidence: 'Actual app markup/styles and selection-card renderer in Chrome; layout fixture without world runtime', results, gpsResults, selectionResults };
   const output = path.resolve('output/verification/mobile-action-layout'); await mkdir(output, { recursive: true });
   await writeFile(path.join(output, 'report.json'), JSON.stringify(report,null,2));
-  console.log(JSON.stringify({ ok: report.ok, cases: results.length + gpsResults.length, failures: [...results, ...gpsResults].filter(r=>!r.ok) },null,2));
+  console.log(JSON.stringify({ ok: report.ok, cases: results.length + gpsResults.length + selectionResults.length, failures: [...results, ...gpsResults, ...selectionResults].filter(r=>!r.ok) },null,2));
   assert.equal(report.ok, true, 'Mobile action targets overlap or cannot receive touches');
 } finally { await browser.close(); await server.close(); }

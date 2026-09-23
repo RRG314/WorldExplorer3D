@@ -816,12 +816,30 @@ body:has(#worldSelectionNotice:not([hidden])) .tutorial-card { display: none !im
 
 .world-selection-notice [data-world-selection-action][hidden] { display: none; }
 
-@media (max-width: 700px) {
+@media (max-width: 700px), (pointer: coarse) {
   .world-selection-notice {
     right: 12px;
-    bottom: max(142px, calc(env(safe-area-inset-bottom) + 134px));
+    top: calc(var(--wx-world-controls-top) + var(--wx-world-controls-row-height) + 8px);
+    bottom: auto;
     width: min(310px, calc(100vw - 24px));
   }
+}
+
+@media (max-height: 560px) and (orientation: landscape) and (pointer: coarse) {
+  .world-selection-notice {
+    left: 50%;
+    right: auto;
+    top: max(70px, calc(env(safe-area-inset-top) + 66px));
+    transform: translateX(-50%);
+    width: min(600px, calc(100vw - 24px));
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+  }
+  .world-selection-notice .worldSelectionActions { flex: 0 0 auto; width: auto; }
+  .world-selection-notice strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .world-selection-notice span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 }
 
 /* The lobby is hosted on a dark panel; keep secondary guidance readable. */
