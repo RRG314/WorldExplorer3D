@@ -143,3 +143,12 @@ runtime receipt. Walking uses short synchronous fixed-step bursts, with network
 work between bursts. Driving and braking retain network yields inside each burst
 so real server leases can renew. Vehicle proximity, motion, claim and release
 assertions remain unchanged, as does the 900-second total deadline.
+
+The mobile-controls functional camera check waits the real idle delay, then
+records bounded simulation steps to the original heading/trailing thresholds.
+Walking/driving/plane allowances remain 2.3/2.5/6 seconds split between a one-second
+idle delay and at most 1.3/1.5/5 seconds of simulation. It rejects held controls,
+suspended/incomplete simulation and exhausted recovery budgets. The earlier
+software-rendered wall-clock observations (drive 31.63 degrees after 2.5s and
+plane 9.42 degrees after 6s) remain failed responsiveness evidence; this functional
+check does not turn them into physical-phone latency acceptance.

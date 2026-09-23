@@ -92,3 +92,31 @@ export async function enterNearbyVehicle(page, vehicleId) {
     `Normal vehicle interaction did not open the selected door: ${JSON.stringify({ phase: urban?.phase, vehicle })}`);
   return { ...result, timing: 'dom-keyboard-runtime-fixed-step' };
 }
+
+// Camera easing is simulation-driven while the saved mobile idle delay is real
+// time. Keep both clocks explicit; this proves recovery, not device latency.
+export async function settleReleasedCamera(page, { maximumHeadingDegrees, minimumTrailingDistance, maximumSimulationMs, idleDelayMs = 1000 }) {
+  assert.ok(maximumHeadingDegrees > 0 && minimumTrailingDistance > 0);
+  assert.ok(maximumSimulationMs > 0 && maximumSimulationMs <= 6000 && idleDelayMs >= 900);
+  const started = Date.now();
+  await page.waitForTimeout(idleDelayMs);
+  const read = () => page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.() || {});
+  const afterIdle = await read();
+  let state = afterIdle, simulatedMs = 0;
+  const receipts = [];
+  while (true) {
+    assert.ok(state.mobileControls?.look?.active !== true && state.mobileControls?.move?.active !== true,
+      'Camera recovery requires released touch controls');
+    const camera = state.cameraFollow;
+    if (Number(camera?.headingAlignmentDegrees) < maximumHeadingDegrees &&
+        Number(camera?.trailingDistance) > minimumTrailingDistance) {
+      return { state, afterIdleCamera: afterIdle.cameraFollow, simulatedMs, idleDelayMs,
+        wallElapsedMs: Date.now() - started, receipts, evidenceScope: 'functional recovery; not wall-clock latency acceptance' };
+    }
+    assert.ok(simulatedMs < maximumSimulationMs, `Camera failed to recover within simulation budget: ${JSON.stringify({ simulatedMs, camera })}`);
+    const receipt = await advanceGameplay(page, Math.min(250, maximumSimulationMs - simulatedMs));
+    receipts.push(receipt);
+    simulatedMs += receipt.simulatedMs;
+    state = await read();
+  }
+}

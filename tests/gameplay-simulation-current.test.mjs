@@ -235,3 +235,31 @@ test('GPS heartbeat failures surface and cannot leave an orphan timer', async ()
  assert.equal(tick,null);assert.throws(()=>stream.assertHealthy(),/GPS protocol failed/);
  await assert.rejects(stream.stop(),/GPS protocol failed/);
 });
+
+
+test('functional camera recovery respects idle delay, simulation cap and released input', async () => {
+  const { settleReleasedCamera } = await import('../scripts/verification/gameplay-simulation.mjs');
+  for (const scenario of ['recovers', 'stuck', 'held', 'invalid-clock']) {
+    let simulated = 0, waited = 0;
+    const page = {
+      waitForTimeout: async ms => { waited += ms; },
+      evaluate: async (_fn, duration) => {
+        if (duration) {
+          simulated += duration;
+          return { simulatedMs: scenario === 'invalid-clock' ? 0 : duration, frames: 15, suspendedFrames: 0 };
+        }
+        return { cameraFollow: { headingAlignmentDegrees: scenario === 'recovers' ? 60 * Math.exp(-4.2 * simulated / 1000) : 60, trailingDistance: 5 },
+          mobileControls: { look: { active: scenario === 'held' }, move: { active: false } } };
+      }
+    };
+    const run = settleReleasedCamera(page, { maximumHeadingDegrees: 6, minimumTrailingDistance: 2, maximumSimulationMs: 1500 });
+    if (scenario === 'recovers') {
+      const receipt = await run;
+      assert.equal(receipt.simulatedMs, 750);
+      assert.equal(receipt.receipts.length, 3);
+      assert.ok(receipt.state.cameraFollow.headingAlignmentDegrees < 6);
+    } else await assert.rejects(run, /failed to recover|released touch|did not advance/);
+    assert.equal(waited, 1000);
+    assert.ok(simulated <= 1500);
+  }
+});

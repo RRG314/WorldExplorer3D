@@ -7,7 +7,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
-import { advanceGameplay } from './gameplay-simulation.mjs';
+import { advanceGameplay, settleReleasedCamera } from './gameplay-simulation.mjs';
 
 const root = process.cwd();
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
@@ -52,14 +52,7 @@ page.on('response', (response) => {
 });
 
 const diagnostics = () => page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.() || {});
-async function waitForCameraRecenter(maximumHeadingDegrees, timeoutMs) {
-  await page.waitForFunction((maximumHeading) => {
-    const camera = globalThis.getWorldExplorerRuntimeDiagnostics?.().cameraFollow;
-    return Number(camera?.headingAlignmentDegrees) < maximumHeading &&
-      Number(camera?.trailingDistance) > 2;
-  }, maximumHeadingDegrees, { timeout: timeoutMs }).catch(() => {});
-  return diagnostics();
-}
+
 const distance = (a, b) => Math.hypot(Number(a?.x) - Number(b?.x), Number(a?.z) - Number(b?.z));
 // Walking is calibrated near a normal human pace. These journeys must prove
 // sustained directional movement without assuming vehicle-like displacement.
@@ -309,8 +302,8 @@ try {
   const walkMoved = await diagnostics();
   await touchDrag('#mobileLookPad', 43, 0, 950);
   const walkLooked = await diagnostics();
-  await page.waitForTimeout(2_300);
-  const walkRecentered = await diagnostics();
+  const walkRecovery = await settleReleasedCamera(page, { maximumHeadingDegrees: 5, minimumTrailingDistance: 1, maximumSimulationMs: 1300 });
+  const walkRecentered = walkRecovery.state;
   await page.screenshot({ path: 'output/verification/mobile-controls/walk-standard-mobile.png', fullPage: false });
 
   await page.locator('#controlsBarBtn').click();
@@ -344,8 +337,8 @@ try {
   const driveMoved = await diagnostics();
   await touchDrag('#mobileLookPad', 43, 0, 900);
   const driveLooked = await diagnostics();
-  await page.waitForTimeout(2_500);
-  const driveRecentered = await diagnostics();
+  const driveRecovery = await settleReleasedCamera(page, { maximumHeadingDegrees: 6, minimumTrailingDistance: 2, maximumSimulationMs: 1500 });
+  const driveRecentered = driveRecovery.state;
   await page.screenshot({ path: 'output/verification/mobile-controls/drive-standard-mobile.png', fullPage: false });
 
   await mode('drone', '#fDrone');
@@ -360,7 +353,8 @@ try {
   const planeControlled = await diagnostics();
   await touchDrag('#mobileLookPad', 42, 0, 900);
   const planeLooked = await diagnostics();
-  const planeRecentered = await waitForCameraRecenter(7, 6_000);
+  const planeRecovery = await settleReleasedCamera(page, { maximumHeadingDegrees: 7, minimumTrailingDistance: 2, maximumSimulationMs: 5000 });
+  const planeRecentered = planeRecovery.state;
   await page.screenshot({ path: 'output/verification/mobile-controls/plane-standard-mobile.png', fullPage: false });
 
   await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
@@ -453,6 +447,7 @@ try {
       planeBefore: planeBefore.activeActor?.orientation,
       planeAfter: planeControlled.activeActor?.orientation
     },
+    cameraRecoveryTiming: [walkRecovery, driveRecovery, planeRecovery].map(({ state, ...timing }) => timing),
     browserErrors, localFailures, memorySnapshots, authIframeRequests, touchTimingReceipts
   };
   await writeFile('output/verification/mobile-controls/report.json', JSON.stringify(report, null, 2));
