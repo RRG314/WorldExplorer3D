@@ -1,3 +1,4 @@
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -27,6 +28,7 @@ function markStage(stage, evidence = {}) {
   console.log(`[interiors] ${stage}`);
 }
 function bindPageEvidence(targetPage) {
+  collectBrowserGraphicsErrors(targetPage, browserErrors);
   targetPage.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   targetPage.on('console', (message) => {
     if (['warning', 'error'].includes(message.type())) browserConsole.push(`${message.type()}: ${message.text()}`);

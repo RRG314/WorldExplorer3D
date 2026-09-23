@@ -1,3 +1,5 @@
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
+import { installBrowserGraphicsProbe } from './browser-graphics-probe.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -20,6 +22,8 @@ async function run() {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
   await configureStagingAppCheck(page, baseUrl);
+  collectBrowserGraphicsErrors(page, failures);
+  await installBrowserGraphicsProbe(page, path.join(outputDir, 'graphics-failure.json'));
   page.on('pageerror', (error) => failures.push(`pageerror: ${error.stack || error}`));
   page.on('requestfailed', (request) => { if (request.url().startsWith(baseUrl)) failures.push(`request failed: ${request.url()}`); });
   try {

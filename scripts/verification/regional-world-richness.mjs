@@ -1,3 +1,4 @@
+import { installBrowserGraphicsProbe } from './browser-graphics-probe.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -144,6 +145,7 @@ async function inspectJourneyInBrowser(browser, journey) {
   });
   const page = await context.newPage();
   collectBrowserGraphicsErrors(page, pageErrors);
+await installBrowserGraphicsProbe(page, `output/verification/regional-world-richness/${journey.id}-graphics-failure.json`);
   await configureStagingAppCheck(page, baseUrl);
   page.on('pageerror', (error) => pageErrors.push(String(error?.stack || error)));
   page.on('console', (message) => {

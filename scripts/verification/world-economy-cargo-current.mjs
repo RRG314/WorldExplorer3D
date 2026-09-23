@@ -1,3 +1,5 @@
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
+import { installBrowserGraphicsProbe } from './browser-graphics-probe.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -21,7 +23,10 @@ async function state(page) {
   return page.evaluate(() => JSON.parse(globalThis.render_game_to_text?.() || '{}'));
 }
 
+let observedPages = 0;
 async function observePage(page) {
+  collectBrowserGraphicsErrors(page, failures);
+  await installBrowserGraphicsProbe(page, path.join(outputDir, `graphics-failure-${++observedPages}.json`));
   await configureStagingAppCheck(page, baseUrl);
   if (process.env.CI) page.setDefaultTimeout(120_000);
   page.on('pageerror', (error) => failures.push(`pageerror: ${error.stack || error}`));

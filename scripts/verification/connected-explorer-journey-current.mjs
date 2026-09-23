@@ -1,3 +1,4 @@
+import { installBrowserGraphicsProbe } from './browser-graphics-probe.mjs';
 import { selectLowRenderQuality } from './render-quality-ui.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -19,6 +20,7 @@ const page = await context.newPage();
 const browserErrors = [];
 const failedLocalResources = [];
 collectBrowserGraphicsErrors(page, browserErrors);
+await installBrowserGraphicsProbe(page, 'output/verification/connected-explorer-journey/graphics-failure.json');
 
 page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
 page.on('response', (response) => {
