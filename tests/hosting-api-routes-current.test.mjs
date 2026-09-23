@@ -13,7 +13,12 @@ async function clientCalls(directory) {
     if (entry.isDirectory()) calls.push(...await clientCalls(url));
     else if (entry.name.endsWith('.js')) {
       const source = await readFile(url, 'utf8');
-      for (const match of source.matchAll(/(?:postProtectedFunction|postAppCheckedFunction)\(\s*['"](\/[^'"]+)['"]/g)) {
+      const callers = new Set(['postProtectedFunction', 'postAppCheckedFunction']);
+      // Capture APIs use a local endpoint(path, body) wrapper. Discover thin
+      // forwarding helpers too; otherwise those routes silently escape audit.
+      for (const wrapper of source.matchAll(/function\s+(\w+)\(\s*(\w+)[^)]*\)\s*\{\s*return\s+(?:postProtectedFunction|postAppCheckedFunction)\(\s*\2\s*[,)]/g)) callers.add(wrapper[1]);
+      const pattern = new RegExp(`(?:${[...callers].join('|')})\\(\\s*['"](\\/[^'"]+)['"]`, 'g');
+      for (const match of source.matchAll(pattern)) {
         calls.push({ path: match[1], file: url.pathname });
       }
     }
