@@ -14,8 +14,8 @@ import {
 import { createUrbanNpcVisual } from './npc-visuals.js?v=9';
 import { nearestMappedFacility } from './facility-model.js?v=3';
 import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=5';
-import { createUrbanResponderRuntime } from './responder-runtime.js?v=30';
-import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=8';
+import { createUrbanResponderRuntime } from './responder-runtime.js?v=31';
+import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=9';
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=12';
 import {
   attachCuratedTrafficVehicle,

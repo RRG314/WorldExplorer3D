@@ -16,7 +16,7 @@ import {
   updateCuratedCharacterAnimation
 } from '../walking/curated-explorer-character.js?v=8';
 import { createResponderResponseModel, responderAgencyProfile, responderApproachSpeed } from './responder-model.js?v=4';
-import { vehicleDoorPosition } from './vehicle-model.js?v=8';
+import { vehicleDoorPosition } from './vehicle-model.js?v=9';
 import { applyConditionImpact } from './impact-model.js?v=1';
 import { applyTransportDamage } from '../transport/damage-model.js?v=1';
 import { resolveVehicleRoadContactPose } from '../engine/vehicle-road-attitude.js?v=3';

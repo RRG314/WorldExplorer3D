@@ -14,12 +14,12 @@ function hashText(value = '') {
   return hash >>> 0;
 }
 
-function stableVehicleDefinition(worldIdentity, edgeIndex, slot = 0) {
-  const seed = hashText(`${worldIdentity}:${edgeIndex}:${slot}`);
+function stableVehicleDefinition(worldIdentity, anchorKey, slot = 0) {
+  const seed = hashText(`${worldIdentity}:${anchorKey}:${slot}`);
   const variant = URBAN_VEHICLE_CATALOG[seed % URBAN_VEHICLE_CATALOG.length];
   const palette = [variant.color, 0x2f3d4a, 0x9b9a8d, 0x6f3e39, 0x426255, 0x6b587b];
   return Object.freeze({
-    id: `urban-vehicle:${hashText(`${worldIdentity}:${edgeIndex}:${slot}:vehicle`).toString(16)}`,
+    id: `urban-vehicle:${hashText(`${worldIdentity}:${anchorKey}:${slot}:vehicle`).toString(16)}`,
     variant,
     color: palette[(seed >>> 5) % palette.length],
     condition: 1,
@@ -33,6 +33,17 @@ function stableVehicleDefinition(worldIdentity, edgeIndex, slot = 0) {
 
 function edgeYaw(edge) {
   return Math.atan2(Number(edge?.p2?.x || 0) - Number(edge?.p1?.x || 0), Number(edge?.p2?.z || 0) - Number(edge?.p1?.z || 0));
+}
+
+function parkingAnchorKey(edge) {
+  // Graph array indices and selection slots vary with provider order, nearby
+  // obstacles and client budgets. Bind the car to its actual directed segment.
+  // Millimetre planar coordinates ignore irrelevant floating-point/ground-Y
+  // differences while keeping adjacent spans and opposite lanes distinct.
+  return JSON.stringify([
+    'parking-v2', String(edge.sourceFeatureId || ''), String(edge.direction || ''),
+    ...[edge.p1.x, edge.p1.z, edge.p2.x, edge.p2.z].map(value => Number(value).toFixed(3))
+  ]);
 }
 
 function parkedVehicleAnchors(graph, reference = {}, options = {}) {
@@ -53,16 +64,16 @@ function parkedVehicleAnchors(graph, reference = {}, options = {}) {
     distance >= minDistance && distance <= maxDistance &&
     Number(edge?.length || 0) >= 12 &&
     !/motorway|trunk/i.test(String(edge?.roadClass || ''))
-  )).sort((a, b) => {
+  )).map(candidate => ({ ...candidate, anchorKey: parkingAnchorKey(candidate.edge) })).sort((a, b) => {
     const parkingPriority = (entry) => /residential|living_street|service|unclassified/i.test(String(entry.edge?.roadClass || '')) ? 0 : 1;
-    return parkingPriority(a) - parkingPriority(b) || a.distance - b.distance || a.edgeIndex - b.edgeIndex;
+    return parkingPriority(a) - parkingPriority(b) || a.distance - b.distance || (a.anchorKey < b.anchorKey ? -1 : a.anchorKey > b.anchorKey ? 1 : 0);
   });
 
   const selected = [];
   for (const candidate of candidates) {
     if (selected.length >= count) break;
     const yaw = edgeYaw(candidate.edge);
-    const definition = stableVehicleDefinition(worldIdentity, candidate.edgeIndex, selected.length);
+    const definition = stableVehicleDefinition(worldIdentity, candidate.anchorKey);
     // Traffic graph positions are lane centers, not road centerlines. Move to
     // the curb on the lane's outside only; choosing a random side can put a
     // parked vehicle back in the opposing or through lane.

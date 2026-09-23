@@ -36,7 +36,7 @@ function installOnDemandEarth(appCtx) {
     if (!modulePromise) {
       const started=performance.now();
       emitLocalLoadTrace('startup','earth-module:start');
-      modulePromise = import('./earth-runtime.js?v=198').then(module=>{
+      modulePromise = import('./earth-runtime.js?v=199').then(module=>{
         emitLocalLoadTrace('startup','earth-module:end',{durationMs:performance.now()-started});
         return module;
       }).catch((error) => {
