@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { MARYLAND_JURISDICTIONS, MARYLAND_PARCEL_SOURCE, QUERY_FIELDS } from '../../app/js/gis/maryland-parcel-core.js';
+import { MARYLAND_JURISDICTIONS, MARYLAND_PARCEL_SOURCE, QUERY_FIELDS, buildMarylandParcelQueryUrl, normalizeMarylandParcelFeature } from '../../app/js/gis/maryland-parcel-core.js';
 
 const queryUrl = `${MARYLAND_PARCEL_SOURCE.layerUrl}/query`;
 
@@ -23,13 +23,9 @@ for (const forbidden of ['OWNADD1', 'OWNADD2', 'OWNCITY', 'OWNSTATE', 'OWNERZIP'
   assert.equal(QUERY_FIELDS.includes(forbidden), false, `${forbidden} must not be requested`);
 }
 
-const distinct = await query({
-  f: 'json', where: '1=1', outFields: 'JURSCODE', returnDistinctValues: true,
-  returnGeometry: false, orderByFields: 'JURSCODE'
-});
-const liveCodes = new Set((distinct.features || []).map((feature) => feature.attributes?.JURSCODE).filter(Boolean));
-assert.deepEqual([...liveCodes].sort(), Object.keys(MARYLAND_JURISDICTIONS).sort());
-
+// Do not scan the statewide layer for DISTINCT JURSCODE: the live service
+// indexes OBJECTID and Shape, but not JURSCODE. The bounded samples below
+// prove that every supported jurisdiction supplies a stable parcel record.
 const coverage = [];
 for (const [code, name] of Object.entries(MARYLAND_JURISDICTIONS)) {
   const sample = await query({
@@ -42,10 +38,22 @@ for (const [code, name] of Object.entries(MARYLAND_JURISDICTIONS)) {
   coverage.push({ code, name, status: 'SUPPORTED', sampleGeometryDate: record.POLYDATE || null });
 }
 
+// Exercise the production spatial query and normalization as well as metadata.
+// County attribute samples alone cannot establish usable in-world geometry.
+const spatialUrl = buildMarylandParcelQueryUrl({ lat: 39.29, lon: -76.61, radiusM: 120, limit: 5 });
+const spatial = await query(Object.fromEntries(new URL(spatialUrl).searchParams));
+assert.equal(spatial.type, 'FeatureCollection');
+assert.ok(spatial.features?.length > 0, 'Baltimore spatial query returned no parcels');
+assert.ok(spatial.features.length <= 5, 'Provider ignored the bounded record count');
+const parcels = spatial.features.map(normalizeMarylandParcelFeature);
+assert.ok(parcels.every(Boolean), 'Live parcel geometry or identity failed production normalization');
+assert.ok(parcels.every((parcel) => parcel.jurisdictionCode === 'BACI'), 'Unexpected spatial jurisdiction');
+
 console.log(JSON.stringify({
   ok: true,
   source: MARYLAND_PARCEL_SOURCE.id,
   itemId: MARYLAND_PARCEL_SOURCE.itemId,
   coverage,
+  spatial: { location: { lat: 39.29, lon: -76.61 }, radiusM: 120, limit: 5, normalizedParcels: parcels.length },
   privacy: { requestedFields: QUERY_FIELDS, ownerFieldsRequested: false }
 }, null, 2));
