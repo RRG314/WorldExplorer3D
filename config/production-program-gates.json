@@ -28,7 +28,7 @@
   "checkpoints": {
     "CP0": {
       "name": "Current feature evidence",
-      "minimumDecision": "Retain only public feature claims backed by current source evidence and fresh normal-input journeys on the immutable 5.2 candidate.",
+      "minimumDecision": "Retain only public feature claims backed by current source evidence and fresh normal-input journeys on the immutable target-version candidate.",
       "requiredCommands": ["verify:source", "verify:world", "verify:artifact-runtime", "verify:release-claims", "verify:explorer-coherence-browser", "verify:regional-guide-new-york"],
       "openItems": []
     },
@@ -94,7 +94,7 @@
     },
     "CP11": {
       "name": "UI, accessibility, presentation, and release identity",
-      "minimumDecision": "Require keyboard and 390x844 touch completion of every retained primary flow, honest public claims, inspected runtime captures, and one immutable 5.2 identity.",
+      "minimumDecision": "Require keyboard and 390x844 touch completion of every retained primary flow, honest public claims, inspected runtime captures, and one immutable target-version identity.",
       "requiredCommands": ["verify:accessibility-release", "verify:mobile-controls", "verify:player-reported-blockers", "verify:connected-explorer-journey", "verify:current-space-journey", "verify:landing-user-count", "verify:analytics-lifecycle", "verify:release-claims", "verify:source", "verify:hosting", "verify:release-identity", "release:verify"],
       "openItems": []
     }
