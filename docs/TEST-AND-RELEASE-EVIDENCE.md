@@ -113,8 +113,12 @@ phone GPS watch. The field-observation verifier supplies fresh fixes until the
 selected target actually reveals, retaining the same bounded 30-second wait.
 It never assigns field progress or bypasses the application's stale-signal rules.
 
-The full mobile-controls functional gate has a 15-minute overall deadline. The
-instrumented Linux run reached walking, driving, drone, plane, reload and restored
-walking before the old 10-minute wrapper killed its final settings-reset check.
-Individual action deadlines remain unchanged. This wrapper allowance is not a
-startup, FPS or phone-performance budget; the physical M1 limits remain unchanged.
+The full mobile-controls functional gate has a 30-minute overall deadline on the
+verification runner. Once touch holds advanced the complete requested simulation
+duration, the Linux software-renderer run reached drone mode without context loss
+in captured snapshots but exhausted the 15-minute overall deadline. Every simulated
+frame still executes the real rendering path; a short simulated hold can therefore
+take much longer in wall time on this runner. Each touch action now retains its
+simulation receipt and elapsed wall time, even if a later stage times out.
+Movement thresholds and per-action deadlines are unchanged. This overall allowance
+is not a mobile latency/FPS budget or a physical-performance acceptance result.

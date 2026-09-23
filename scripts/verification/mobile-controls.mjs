@@ -85,10 +85,15 @@ async function touchDrag(selector, deltaX, deltaY, holdMs = 900) {
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [point(end)] });
   try {
     if (selector === '#largeMapCanvas') await page.waitForTimeout(holdMs);
-    else touchTimingReceipts.push({ selector, holdMs, receipt: await advanceGameplay(page, holdMs) });
+    else {
+      const startedAt = Date.now();
+      const receipt = await advanceGameplay(page, holdMs);
+      touchTimingReceipts.push({ selector, holdMs, receipt, wallElapsedMs: Date.now() - startedAt });
+    }
   } finally {
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   }
+  await writeFile('output/verification/mobile-controls/touch-timing.json', JSON.stringify(touchTimingReceipts, null, 2));
   await page.waitForTimeout(90);
 }
 
