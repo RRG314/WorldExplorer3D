@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { weatherStateService } from './state-service.js?v=1';
+import { weatherStateService } from './state-service.js?v=2';
 
 const PLACE_API_TIMEOUT_MS = 6500;
 const PLACE_LOCATION_PRECISION = 2;
@@ -130,7 +130,10 @@ async function refreshLivePlace(location, force = false) {
   if (!Number.isFinite(location?.lat) || !Number.isFinite(location?.lon)) return appCtx.livePlaceState || null;
   const key = placeCacheKey(location.lat, location.lon);
   const cached = weatherStateService.getCachedPlace(key);
-  if (!force && cached) return assignResolvedPlace(cached, location);
+  if (!force && cached) {
+    _pendingPlaceRequest = null;
+    return assignResolvedPlace(cached, location);
+  }
   if (_pendingPlaceRequest?.key === key && !force) {
     try {
       await _pendingPlaceRequest.promise;
@@ -139,13 +142,18 @@ async function refreshLivePlace(location, force = false) {
     }
     return appCtx.livePlaceState || null;
   }
+  if (appCtx.livePlaceState?.key !== key) weatherStateService.setPlaceState(null);
+  const fallback = getFallbackPlaceLabel(location);
+  const request = { key, promise: null };
+  const publish = (place) => _pendingPlaceRequest === request ? assignResolvedPlace(place?.display ? place : fallback, location) : appCtx.livePlaceState || null;
   const promise = fetchPlaceForLocation(location.lat, location.lon).then((place) => {
-    weatherStateService.setCachedPlace(key, place);
-    return assignResolvedPlace(place, location);
-  }).catch(() => assignResolvedPlace(getFallbackPlaceLabel(location), location)).finally(() => {
-    if (_pendingPlaceRequest?.key === key) _pendingPlaceRequest = null;
+    if (_pendingPlaceRequest === request || !weatherStateService.getCachedPlace(key)) weatherStateService.setCachedPlace(key, place);
+    return publish(place);
+  }).catch(() => publish(fallback)).finally(() => {
+    if (_pendingPlaceRequest === request) _pendingPlaceRequest = null;
   });
-  _pendingPlaceRequest = { key, promise };
+  request.promise = promise;
+  _pendingPlaceRequest = request;
   return await promise;
 }
 

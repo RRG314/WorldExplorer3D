@@ -12,9 +12,9 @@ import {
   refreshLivePlace,
   uniqueNonEmptyParts,
   weatherCacheKey
-} from './weather/place-resolver.js?v=2';
+} from './weather/place-resolver.js?v=3';
 import { weatherCodeDescriptor } from './weather/catalog.js?v=1';
-import { weatherStateService } from './weather/state-service.js?v=1';
+import { weatherStateService } from './weather/state-service.js?v=2';
 import { operationalFeedService } from './geospatial/operational-feeds.js?v=1';
 import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 
@@ -409,6 +409,8 @@ function applyWeatherPresentation() {
 
 function buildLiveWeatherState(location, payload) {
   const current = payload?.current || {};
+  const place = appCtx.livePlaceState;
+  const matchingPlace = place && haversineKm(place.lat, place.lon, location.lat, location.lon) < WEATHER_MOVE_THRESHOLD_KM ? place : null;
   const descriptor = weatherCodeDescriptor(current.weather_code);
   return {
     source: 'live',
@@ -440,8 +442,8 @@ function buildLiveWeatherState(location, payload) {
     snowfallCm: roundTo(Number(current.snowfall), 1),
     visibilityM: roundTo(Number(current.visibility), 0),
     isDay: Number(current.is_day) === 1,
-    locationDisplay: String(appCtx.livePlaceState?.display || '').trim(),
-    locationShortLabel: String(appCtx.livePlaceState?.shortLabel || '').trim()
+    locationDisplay: String(matchingPlace?.display || '').trim(),
+    locationShortLabel: String(matchingPlace?.shortLabel || '').trim()
   };
 }
 
@@ -526,8 +528,15 @@ async function getWeatherSnapshotForLocation(lat, lon, { force = false, ocean = 
   return { ...state };
 }
 
+function isCurrentWeatherLocation(location) {
+  if (appCtx.onMoon || appCtx.travelingToMoon || !(appCtx.isEnv?.(appCtx.ENV?.EARTH) || appCtx.oceanMode?.active)) return false;
+  const observed = resolveObservedEarthLocation();
+  return haversineKm(location.lat, location.lon, observed.lat, observed.lon) < WEATHER_MOVE_THRESHOLD_KM;
+}
+
 async function refreshLiveWeather(force = false) {
   if (appCtx.onMoon || appCtx.travelingToMoon || !(appCtx.isEnv?.(appCtx.ENV?.EARTH) || appCtx.oceanMode?.active)) {
+    _pendingWeatherRequest = null;
     updateWeatherUi();
     return appCtx.liveWeatherState;
   }
@@ -538,6 +547,7 @@ async function refreshLiveWeather(force = false) {
     return appCtx.liveWeatherState;
   }
 
+  if (_pendingWeatherRequest && !isCurrentWeatherLocation(_pendingWeatherRequest.location)) _pendingWeatherRequest = null;
   const lastLive = appCtx.liveWeatherState || null;
   const now = Date.now();
   const movedKm = lastLive ? haversineKm(lastLive.lat, lastLive.lon, location.lat, location.lon) : Infinity;
@@ -550,6 +560,10 @@ async function refreshLiveWeather(force = false) {
 
   const stale = !lastLive || (now - Number(lastLive.fetchedAtMs || 0)) >= WEATHER_REFRESH_INTERVAL_MS;
   const movedFar = movedKm >= WEATHER_MOVE_THRESHOLD_KM;
+  if (lastLive && movedFar) {
+    weatherStateService.setLiveState(null);
+    syncActiveWeatherState();
+  }
   if (!force && !stale && !movedFar) {
     if ((appCtx.weatherMode || 'live') === 'live') syncActiveWeatherState();
     return appCtx.liveWeatherState;
@@ -558,8 +572,10 @@ async function refreshLiveWeather(force = false) {
   const cacheKey = weatherCacheKey(location.lat, location.lon);
   const cached = weatherStateService.getCachedWeather(cacheKey);
   if (!force && cached && (now - Number(cached.fetchedAtMs || 0)) < WEATHER_REFRESH_INTERVAL_MS) {
+    _pendingWeatherRequest = null;
     weatherStateService.setLiveState(cached);
     void refreshLivePlace(location, false).then(() => {
+      if (!isCurrentWeatherLocation(location)) return;
       weatherStateService.updatePlaceLabels();
       updateWeatherUi();
     });
@@ -569,7 +585,7 @@ async function refreshLiveWeather(force = false) {
   }
 
   const requestKey = `${cacheKey}:${Math.floor(now / WEATHER_REFRESH_INTERVAL_MS)}`;
-  if (_pendingWeatherRequest?.key === requestKey) {
+  if (_pendingWeatherRequest?.key === requestKey && !force) {
     try {
       await _pendingWeatherRequest.promise;
     } catch {
@@ -580,25 +596,28 @@ async function refreshLiveWeather(force = false) {
 
   const ocean = !!appCtx.oceanMode?.active;
   void refreshLivePlace(location, force).then(() => {
+    if (!isCurrentWeatherLocation(location)) return;
     weatherStateService.updatePlaceLabels();
     updateWeatherUi();
   });
+  const request = { key: requestKey, location, promise: null };
   const promise = fetchWeatherForLocation(location.lat, location.lon, { ocean, force }).then((payload) => {
     const state = buildLiveWeatherState(location, payload);
-    state.locationDisplay = String(appCtx.livePlaceState?.display || state.locationDisplay || '').trim();
-    state.locationShortLabel = String(appCtx.livePlaceState?.shortLabel || state.locationShortLabel || '').trim();
-    weatherStateService.setLiveState(state);
-    weatherStateService.setCachedWeather(cacheKey, state);
+    if (_pendingWeatherRequest === request || !weatherStateService.getCachedWeather(cacheKey)) weatherStateService.setCachedWeather(cacheKey, state);
+    if (_pendingWeatherRequest === request && isCurrentWeatherLocation(location)) weatherStateService.setLiveState(state);
     return state;
   }).catch((err) => {
     console.warn('[weather] live weather fetch failed:', err?.message || err);
     return appCtx.liveWeatherState;
   }).finally(() => {
-    if (_pendingWeatherRequest?.key === requestKey) _pendingWeatherRequest = null;
+    if (_pendingWeatherRequest !== request) return;
+    _pendingWeatherRequest = null;
+    if (!isCurrentWeatherLocation(location)) return;
     if ((appCtx.weatherMode || 'live') === 'live') syncActiveWeatherState();
     else updateWeatherUi();
   });
-  _pendingWeatherRequest = { key: requestKey, promise };
+  request.promise = promise;
+  _pendingWeatherRequest = request;
   await promise;
   return appCtx.liveWeatherState;
 }

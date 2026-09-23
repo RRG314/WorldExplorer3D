@@ -5,6 +5,7 @@ import process from 'node:process';
 // tests. Every file corresponds to a retained System Inventory capability or
 // an Architecture Map ownership boundary.
 const tests = [
+  'tests/weather-location-lifecycle-current.test.mjs',
   'tests/release-interruption-evidence-current.test.mjs',
   'tests/perf-active-play-quality-current.test.mjs',
   'tests/hosting-api-routes-current.test.mjs',
@@ -257,7 +258,7 @@ const tests = [
   'tests/weapon-reticle-current.test.mjs'
 ];
 
-const result = spawnSync(process.execPath, ['--test', '--test-concurrency=1', ...tests], {
+const result = spawnSync(process.execPath, ['--experimental-vm-modules', '--test', '--test-concurrency=1', ...tests], {
   cwd: process.cwd(),
   env: process.env,
   stdio: 'inherit'
