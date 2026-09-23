@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 
 const baseUrl = String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4192').replace(/\/$/, '');
 const evidenceDir = path.resolve('output/release-evidence/current/terrain-boundary');
@@ -10,6 +11,7 @@ await fs.mkdir(evidenceDir, { recursive: true });
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 const failures = [];
+collectBrowserGraphicsErrors(page, failures);
 const report = { ok: false, samples: [], surfaceChain: null, failures };
 const optionalExternalFailures = [];
 const cancelledProviderRequests = [];
