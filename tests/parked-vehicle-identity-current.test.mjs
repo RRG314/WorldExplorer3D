@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parkedVehicleAnchors } from '../app/js/urban-sandbox/vehicle-model.js';
+import { VEHICLE_CATALOG } from '../app/js/engine/vehicle-catalog.js';
 
 const edge = (name, x, z = 0) => ({
   id: `traffic:${name}:0:forward:0`, sourceFeatureId: name,
@@ -39,4 +40,26 @@ test('opposite lanes and separate source spans have distinct parked-car identiti
   const otherSpan = { ...first, p1: { ...first.p1, z: 30 }, p2: { ...first.p2, z: 46 }, sourceTStart: .4, sourceTEnd: .8 };
   const ids = [first, reverse, otherSpan].map(e => anchors([e])[0].id);
   assert.equal(new Set(ids).size, 3);
+});
+
+test('parking never overlaps a passing vehicle even when it clears the lane centerline', () => {
+  // Actual London/Baltimore diagnostic geometry: the old check accepted a
+  // compact whose inner edge was only 2 cm beyond the traffic centerline.
+  const narrow = { ...edge('narrow-road', 20), roadWidth: 7.117117117117117, laneOffset: 1.708108108108108 };
+  for (let seed = 0; seed < 32; seed++) {
+    assert.equal(anchors([narrow], { worldIdentity: `world-${seed}` }).length, 0);
+  }
+});
+
+test('parking chooses a fitting car and reserves the full traffic envelope plus clearance', () => {
+  const limited = { ...edge('limited-curb', 20), roadWidth: 11.3, laneOffset: 2.25 };
+  const trafficHalfWidth = Math.max(...VEHICLE_CATALOG.map(variant => variant.width)) / 2;
+  for (let seed = 0; seed < 32; seed++) {
+    const result = anchors([limited], { worldIdentity: `world-${seed}` });
+    assert.equal(result.length, 1, 'A fitting compact must not disappear because a wider car was randomly chosen first');
+    const car = result[0];
+    assert.equal(car.variant.id, 'compact');
+    assert.ok(car.curbOffset - car.variant.width / 2 >= car.laneOffset + trafficHalfWidth + .25 - 1e-9);
+    assert.ok(car.curbOffset + car.variant.width / 2 <= car.roadHalfWidth - .18 + 1e-9);
+  }
 });

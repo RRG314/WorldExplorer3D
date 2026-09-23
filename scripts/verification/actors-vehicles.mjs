@@ -404,10 +404,10 @@ assert.equal(supportSpanConflictsWithDriveableRoad(connectedBridgeFeature, {
 
 const fixtureFeature = {
   id: 'verification-road',
-  width: 10,
+  width: 12,
   type: 'residential',
   transportRecord: {
-    crossSection: { widthMeters: 10, lanes: 2, lanesSource: 'mapped' },
+    crossSection: { widthMeters: 12, lanes: 2, lanesSource: 'mapped' },
     speed: { metersPerSecond: 10 },
     completeness: 'lossless'
   }
@@ -433,7 +433,7 @@ const fixtureAnchors = parkedVehicleAnchors(fixtureGraph, { x: -30, z: 0 }, {
 assert.equal(fixtureGraph.schemaVersion, 2, 'Traffic graph must publish the curb-vector schema.');
 assert.ok(fixtureGraph.edges.every((edge) => Math.abs(Math.hypot(edge.curbNormalX, edge.curbNormalZ) - 1) < 1e-6), 'Every traffic lane must publish a normalized outward curb vector.');
 assert.ok(fixtureAnchors.length > 0, 'A road with enough curb space must produce a parked vehicle.');
-assert.ok(fixtureAnchors.every((anchor) => anchor.curbOffset - anchor.variant.width * .5 >= anchor.laneOffset - .001), 'Parked vehicle bodies must remain outside the moving lane center.');
+assert.ok(fixtureAnchors.every((anchor) => anchor.curbOffset - anchor.variant.width * .5 >= anchor.trafficOuterEdge + anchor.trafficClearance - .001), 'Parked vehicle bodies must clear the full moving fleet envelope.');
 
 const slopedFixtureGraph = compileTrafficGraph({
   traversal: {

@@ -15,8 +15,8 @@ import { createUrbanNpcVisual } from './npc-visuals.js?v=9';
 import { nearestMappedFacility } from './facility-model.js?v=3';
 import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=6';
 import { reconcilePublishedRoomVehicles } from './room-vehicle-reconciliation.js?v=1';
-import { createUrbanResponderRuntime } from './responder-runtime.js?v=31';
-import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=9';
+import { createUrbanResponderRuntime } from './responder-runtime.js?v=32';
+import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=10';
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=12';
 import {
   attachCuratedTrafficVehicle,
@@ -2571,10 +2571,12 @@ function snapshot(state) {
         parking: vehicle.source === 'deterministic-parked-vehicle' ? Object.freeze({
           roadHalfWidth: Number(vehicle.roadHalfWidth || 0),
           laneOffset: Number(vehicle.laneOffset || 0),
+          trafficOuterEdge: Number(vehicle.trafficOuterEdge || 0),
+          trafficClearance: Number(vehicle.trafficClearance || 0),
           curbOffset: Number(vehicle.curbOffset || 0),
           curbNormalX: Number(vehicle.curbNormalX || 0),
           curbNormalZ: Number(vehicle.curbNormalZ || 0),
-          fullyOutsideTravelLane: Number(vehicle.curbOffset || 0) - Number(vehicle.variant?.width || 0) * .5 >= Number(vehicle.laneOffset || 0) - .001
+          fullyOutsideTravelLane: Number(vehicle.curbOffset || 0) - Number(vehicle.variant?.width || 0) * .5 >= Number(vehicle.trafficOuterEdge || 0) + Number(vehicle.trafficClearance || 0) - .001
         }) : null
       });
     })),

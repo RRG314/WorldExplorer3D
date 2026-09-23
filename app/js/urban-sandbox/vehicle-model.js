@@ -1,8 +1,13 @@
-import { PARKED_VEHICLE_CATALOG, VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=6';
+import { PARKED_VEHICLE_CATALOG, VEHICLE_CATALOG, VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=6';
 import { directedSurfacePitch, resolveVehicleRoadContactPose } from '../engine/vehicle-road-attitude.js?v=3';
 
 // Compatibility export only. Parked and traffic vehicles now share one data owner.
 const URBAN_VEHICLE_CATALOG = PARKED_VEHICLE_CATALOG;
+// Reserve the actual fleet envelope, including buses, rather than treating a
+// zero-width lane centerline as the outer edge of moving traffic.
+const TRAFFIC_HALF_WIDTH = Math.max(...VEHICLE_CATALOG.map(variant => variant.width)) * .5;
+const PARKING_TRAFFIC_CLEARANCE = .25;
+const PARKING_CURB_MARGIN = .18;
 
 function hashText(value = '') {
   let hash = 2166136261;
@@ -14,9 +19,10 @@ function hashText(value = '') {
   return hash >>> 0;
 }
 
-function stableVehicleDefinition(worldIdentity, anchorKey, slot = 0) {
+function stableVehicleDefinition(worldIdentity, anchorKey, slot = 0, catalog = URBAN_VEHICLE_CATALOG) {
+  if (!catalog.length) return null;
   const seed = hashText(`${worldIdentity}:${anchorKey}:${slot}`);
-  const variant = URBAN_VEHICLE_CATALOG[seed % URBAN_VEHICLE_CATALOG.length];
+  const variant = catalog[seed % catalog.length];
   const palette = [variant.color, 0x2f3d4a, 0x9b9a8d, 0x6f3e39, 0x426255, 0x6b587b];
   return Object.freeze({
     id: `urban-vehicle:${hashText(`${worldIdentity}:${anchorKey}:${slot}:vehicle`).toString(16)}`,
@@ -73,19 +79,18 @@ function parkedVehicleAnchors(graph, reference = {}, options = {}) {
   for (const candidate of candidates) {
     if (selected.length >= count) break;
     const yaw = edgeYaw(candidate.edge);
-    const definition = stableVehicleDefinition(worldIdentity, candidate.anchorKey);
     // Traffic graph positions are lane centers, not road centerlines. Move to
     // the curb on the lane's outside only; choosing a random side can put a
     // parked vehicle back in the opposing or through lane.
     const roadHalfWidth = Math.max(2.4, Number(candidate.edge?.roadWidth || 5.4) * .5);
     const laneOffset = Math.max(0, Number(candidate.edge?.laneOffset || 0));
-    const vehicleHalfWidth = Number(definition.variant.width || 1.8) * .5;
-    const curbMargin = .18;
-    const curbSpace = roadHalfWidth - laneOffset;
-    // A road without a full vehicle-width curb zone is not a valid parking
-    // source. Skipping it is preferable to fabricating a car in a travel lane.
-    if (curbSpace < vehicleHalfWidth * 2 + curbMargin) continue;
-    const lateralOffset = Math.max(0, roadHalfWidth - vehicleHalfWidth - curbMargin - laneOffset);
+    const trafficOuterEdge = laneOffset + TRAFFIC_HALF_WIDTH;
+    const availableWidth = roadHalfWidth - trafficOuterEdge - PARKING_TRAFFIC_CLEARANCE - PARKING_CURB_MARGIN;
+    const fittingCatalog = URBAN_VEHICLE_CATALOG.filter(variant => variant.width <= availableWidth);
+    const definition = stableVehicleDefinition(worldIdentity, candidate.anchorKey, 0, fittingCatalog);
+    if (!definition) continue;
+    const vehicleHalfWidth = definition.variant.width * .5;
+    const lateralOffset = roadHalfWidth - vehicleHalfWidth - PARKING_CURB_MARGIN - laneOffset;
     const curbNormalX = Number(candidate.edge?.curbNormalX);
     const curbNormalZ = Number(candidate.edge?.curbNormalZ);
     if (![curbNormalX, curbNormalZ].every(Number.isFinite) || Math.hypot(curbNormalX, curbNormalZ) < .9) continue;
@@ -124,6 +129,8 @@ function parkedVehicleAnchors(graph, reference = {}, options = {}) {
       }),
       roadHalfWidth,
       laneOffset,
+      trafficOuterEdge,
+      trafficClearance: PARKING_TRAFFIC_CLEARANCE,
       curbOffset: laneOffset + lateralOffset,
       curbNormalX,
       curbNormalZ,
