@@ -77,9 +77,12 @@ try {
     const sdk = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js');
     return (await sdk.getDocFromServer(sdk.doc(WorldExplorerFirebase.initFirebase().db, 'rooms', code, 'players', uid))).data().pose;
   }, { code, uid: member.uid });
-  const readLocalPose = () => member.page.evaluate(async () => {
-    const { readPoseSnapshot } = await import('/app/js/multiplayer/ui-room-pose.js?v=4');
-    return readPoseSnapshot().pose;
+  const readLocalPose = () => member.page.evaluate(() => {
+    const actor = globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor;
+    if (!Number.isFinite(actor?.position?.x) || !Number.isFinite(actor?.position?.z)) {
+      throw new Error('Loaded player pose is unavailable');
+    }
+    return actor.position;
   });
   const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
   const localBefore = await readLocalPose();

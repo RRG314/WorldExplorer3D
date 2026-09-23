@@ -18,7 +18,6 @@ const page = await context.newPage();
 const browserErrors = [];
 const failedLocalResources = [];
 collectBrowserGraphicsErrors(page, browserErrors);
-await configureStagingAppCheck(page, baseUrl);
 
 page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
 page.on('response', (response) => {
@@ -98,6 +97,7 @@ async function approachNearbyAction() {
 }
 
 try {
+  await configureStagingAppCheck(page, baseUrl);
   await mkdir(evidenceDir, { recursive: true });
   await page.goto(`${baseUrl}/app/`, { waitUntil: 'load', timeout: 120_000 });
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });

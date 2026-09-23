@@ -17,13 +17,7 @@ const report = { ok: false, samples: [], surfaceChain: null, failures };
 // Retain request initiators to distinguish a stale-world request from an
 // external tile failure. This is observer-only and does not route requests.
 report.mapRequests = [];
-const network = await page.context().newCDPSession(page);
-await network.send('Network.enable');
-network.on('Network.requestWillBeSent', event => {
-  if (!event.request.url.startsWith('https://tile.openstreetmap.org/') || report.mapRequests.length >= 96) return;
-  report.mapRequests.push({ url: event.request.url, timestamp: event.timestamp,
-    initiator: event.initiator, documentURL: event.documentURL });
-});
+
 const optionalExternalFailures = [];
 const cancelledProviderRequests = [];
 const isOptionalExternalUrl = (url) => /(?:overpass-api\.de|overpass\.private\.coffee|google-analytics\.com)\//i.test(String(url || ''));
@@ -54,6 +48,13 @@ page.on('requestfailed', (request) => {
 });
 
 try {
+  const network = await page.context().newCDPSession(page);
+  await network.send('Network.enable');
+  network.on('Network.requestWillBeSent', event => {
+    if (!event.request.url.startsWith('https://tile.openstreetmap.org/') || report.mapRequests.length >= 96) return;
+    report.mapRequests.push({ url: event.request.url, timestamp: event.timestamp,
+      initiator: event.initiator, documentURL: event.documentURL });
+  });
   report.attestation = await configureStagingAppCheck(page, baseUrl);
   const params = new URLSearchParams({
     loc: 'custom', lat: '39.6612', lon: '-76.8847', lname: 'Manchester Maryland',
