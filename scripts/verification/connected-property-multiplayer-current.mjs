@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 
 const root = process.cwd();
 const require = createRequire(import.meta.url);
@@ -23,6 +24,7 @@ const firebaseConfig = JSON.parse(await fs.readFile(path.join(root, 'config/fire
 const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=768'] });
 const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const browserFailures = [];
+const clients = [];
 const useRealWorld = process.env.WE3D_PROPERTY_REAL_WORLD === '1';
 
 async function createPlayer(label, viewport) {
@@ -48,12 +50,31 @@ async function createPlayer(label, viewport) {
     await route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":{"message":"Controlled parcel outage"}}' }).catch(() => {});
   });
   const page = await context.newPage();
+  // Register before startup: a rejected createPlayer must retain its own page
+  // and dependency/boot evidence, not just the previously successful client.
+  const diagnostics = { label, stage: 'navigation', console: [], failedRequests: [], failedResponses: [] };
+  clients.push({ label, context, page, diagnostics });
+  const safeUrl = value => { try { const url = new URL(value); return `${url.origin}${url.pathname}`; } catch { return ''; } };
+  collectBrowserGraphicsErrors(page, browserFailures);
+  page.on('console', message => {
+    if ((['warning', 'error'].includes(message.type()) || message.text().startsWith('[boot]')) && diagnostics.console.length < 80) {
+      diagnostics.console.push({ type: message.type(), text: message.text().slice(0, 2000) });
+    }
+  });
+  page.on('requestfailed', request => {
+    if (diagnostics.failedRequests.length < 40) diagnostics.failedRequests.push({ url: safeUrl(request.url()), error: request.failure()?.errorText || '' });
+  });
+  page.on('response', response => {
+    if (response.status() >= 400 && diagnostics.failedResponses.length < 40) diagnostics.failedResponses.push({ url: safeUrl(response.url()), status: response.status() });
+  });
   page.on('pageerror', (error) => browserFailures.push(`${label}: ${error.stack || error}`));
   // The globe's optional imagery tiles must not gate the application shell.
   // Waiting for the browser load event makes this verifier measure third-party
   // image completion twice instead of the Property UI it is meant to exercise.
   await page.goto(`${baseUrl}/app/?diagnostics=1`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
+  diagnostics.stage = 'runtime-ready';
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
+  diagnostics.stage = 'authentication';
   const identity = await page.evaluate(async ({ label, email }) => {
     const services = globalThis.WorldExplorerFirebase?.initFirebase?.();
     const auth = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js');
@@ -88,6 +109,7 @@ async function createPlayer(label, viewport) {
       return diagnostics?.gameStarted === true && diagnostics.worldLoading === false;
     }, null, { timeout: 360_000 });
   }
+  diagnostics.stage = 'ready';
   return { context, page, identity,
     holdParcelRefresh: () => { holdParcelRefresh = true; },
     pendingParcelCount: () => pendingParcelRoutes.size,
@@ -297,14 +319,14 @@ try {
   console.log(JSON.stringify(report, null, 2));
   assert.equal(report.ok, true);
 } catch (error) {
-  await fs.writeFile(path.join(outputDir, 'report.json'), JSON.stringify({ ok: false, failure: String(error.stack || error), browserFailures }, null, 2) + '\n');
-  for (const [label, player] of [['owner', owner], ['buyer', buyer]]) {
-    if (player?.page && !player.page.isClosed()) await player.page.screenshot({ path: path.join(outputDir, `${label}-failure.png`), timeout: 5000 }).catch(() => {});
+  await fs.writeFile(path.join(outputDir, 'report.json'), JSON.stringify({ ok: false, failure: String(error.stack || error), browserFailures, startup: clients.map(client => client.diagnostics) }, null, 2) + '\n');
+  for (const client of clients) {
+    if (!client.page.isClosed()) await client.page.screenshot({ path: path.join(outputDir, `${client.label.toLowerCase().replaceAll(' ', '-')}-failure.png`), timeout: 5000 }).catch(() => {});
   }
   throw error;
 } finally {
   owner?.releaseParcelRefresh(); buyer?.releaseParcelRefresh();
-  await Promise.allSettled([owner?.context?.close(), buyer?.context?.close()]);
+  await Promise.allSettled(clients.map(client => client.context.close()));
   await browser.close();
   await server.close();
 }
