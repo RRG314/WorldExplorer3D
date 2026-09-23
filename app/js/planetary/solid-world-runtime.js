@@ -11,6 +11,7 @@ import { playSurfacePodLaunch } from './surface-pod-launch.js?v=11';
 import { samplePhysicalEnvironment } from './runtime/physical-environment.js?v=2';
 import { clearActivePlanetaryObstacles, setActivePlanetaryObstacles } from './runtime/obstacle-authority.js?v=1';
 import { SOLID_SURFACE_TRAVEL_CAPABILITIES } from './traversal-capabilities.js?v=1';
+import { createOwnedPlanetaryWorldCache, disposeOwnedPlanetaryWorld } from './owned-world-cache.js?v=1';
 import {
   CALORIS_PLANITIA_SURFACE_REGION,
   CERES_OCCATOR_SURFACE_REGION,
@@ -24,7 +25,7 @@ import {
   TITAN_SHANGRI_LA_SURFACE_REGION,
   TRITON_CANTALOUPE_SURFACE_REGION,
   VESTA_RHEASILVIA_SURFACE_REGION
-} from './runtime/surface-authority.js?v=4';
+} from './runtime/surface-authority.js?v=5';
 
 function worldPack(input) {
   return Object.freeze({
@@ -167,7 +168,10 @@ const SOLID_WORLD_PACKS = Object.freeze({
   })
 });
 
-const worldCache = new Map();
+const worldCache = createOwnedPlanetaryWorldCache({
+  capacity: 2,
+  releasePublication: regionId => ensurePlanetarySurfaceAuthority(appCtx).release(regionId)
+});
 const runtimeWorldPacks = new Map();
 let activePack = null;
 let transitionId = 0;
@@ -811,15 +815,21 @@ async function createSolidWorld(pack) {
     };
   });
   if (publication.status !== 'accepted' || !surface) {
+    if (surface) disposeOwnedPlanetaryWorld({ surface });
     throw new Error(`${pack.title} surface publication failed: ${publication.reason || publication.status}`);
   }
   const world = { pack, surface, objects: [] };
-  worldCache.set(pack.bodyId, world);
   appCtx.scene.add(surface);
   addVisualSurfaceHorizon(pack, world);
   addGeneratedSurfaceDetail(pack, world);
   await addParentBodyView(pack, world);
+  if (authority.snapshot().generation !== publication.generation) {
+    disposeOwnedPlanetaryWorld(world);
+    if (authority.snapshot().active?.regionId !== pack.manifest.regionId) authority.release(pack.manifest.regionId);
+    throw new Error(`${pack.title} surface request was superseded.`);
+  }
   addExpeditionReturnPod(pack, world);
+  worldCache.set(pack.bodyId, world);
   return world;
 }
 
@@ -1299,6 +1309,7 @@ registerEnvironmentLifecycle(ENV.PLANETARY, {
 
 Object.assign(appCtx, {
   arriveAtSolidWorld,
+  getPlanetaryWorldCacheSnapshot: () => worldCache.snapshot(),
   getActivePlanetaryReturnPod,
   renderActiveExpeditionOutpost,
   registerExpeditionSolidWorld,

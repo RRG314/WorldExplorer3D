@@ -789,10 +789,21 @@ function createPlanetarySurfaceAuthority(options = {}) {
     return publishState({ status: SURFACE_PUBLICATION_STATUS.IDLE, reason });
   };
 
+  const release = (regionId) => {
+    if (active?.manifest.regionId === regionId) throw new Error('Cannot release the active planetary surface');
+    const removed = acceptedPublications.delete(regionId);
+    if (rollback?.manifest.regionId === regionId) {
+      rollback = null;
+      publishState({ status: state.status, reason: state.reason, candidate: state.candidate });
+    }
+    return removed;
+  };
+
   return Object.freeze({
     activate,
     clear,
     prepare,
+    release,
     rollback: rollbackPublication,
     sampleAtLocalXZ,
     snapshot: () => state

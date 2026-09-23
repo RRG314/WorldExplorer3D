@@ -15,7 +15,8 @@ test('browser-hosted HTTP functions explicitly preserve public invocation at dep
 });
 
 test('background capture worker does not acquire the browser invocation policy', () => {
-  assert.notDeepEqual(endpoints.realityCaptureWorker.__endpoint.httpsTrigger.invoker, ['public']);
+  assert.deepEqual(endpoints.realityCaptureWorker.__endpoint.httpsTrigger.invoker,
+    [`capture-worker@${process.env.GCLOUD_PROJECT}.iam.gserviceaccount.com`]);
   assert.equal(hosted.includes('realityCaptureWorker'), false);
 });
 

@@ -26,9 +26,10 @@ function createTransportControllerRegistry(options = {}) {
   let transitions = 0;
   let conflicts = 0;
   let lastConflictSignature = '';
+  let ordered = null;
 
   function orderedControllers() {
-    return [...controllers.values()].sort((left, right) => (
+    return ordered ||= [...controllers.values()].sort((left, right) => (
       left.priority - right.priority || left.registrationOrder - right.registrationOrder
     ));
   }
@@ -53,7 +54,12 @@ function createTransportControllerRegistry(options = {}) {
       lastError: ''
     };
     controllers.set(id, record);
-    return () => controllers.delete(id);
+    ordered = null;
+    return () => {
+      const removed = controllers.delete(id);
+      if (removed) ordered = null;
+      return removed;
+    };
   }
 
   function activeCandidates(context) {
@@ -116,7 +122,9 @@ function createTransportControllerRegistry(options = {}) {
     };
   }
 
-  return Object.freeze({ registerController, snapshot, update });
+  // Simulation needs the selected owner, not percentile histories. Keep the
+  // allocating diagnostic snapshot out of the fixed-step movement loop.
+  return Object.freeze({ registerController, snapshot, update, getActiveId: () => activeId });
 }
 
 export { createTransportControllerRegistry };

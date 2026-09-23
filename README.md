@@ -1,5 +1,7 @@
 # World Explorer 3D
 
+[Current integration state and verification entrypoints](CURRENT-STATE.md). Dated reports below describe their own snapshots; they are not current deployment receipts.
+
 [Full project description](docs/PROJECT_DESCRIPTION.md) · [System inventory](docs/SYSTEM_INVENTORY.md) · [Architecture map](docs/ARCHITECTURE_MAP.md) · [Source reference](docs/SYSTEM_INVENTORY_REFERENCE.md)
 
 [![Runtime Verify](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml/badge.svg?branch=stable)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml)
