@@ -39,7 +39,9 @@ if(i===0){
  const before=await readFrames();await page.waitForTimeout(750);const paused=await readFrames();
  if(!Number.isFinite(before)||paused!==before)throw new Error('Manual pause continued drawing the city');
  await page.screenshot({path:path.join(args.screenshotDir,'paused.png')});
- await page.locator('#resumeBtn').click();await page.locator('body > canvas:not(#minimap)').click();
+ await page.locator('#resumeBtn').focus();await page.keyboard.press('Escape');
+ await page.locator('#pauseScreen.show').waitFor({state:'hidden'});
+ await page.locator('body > canvas:not(#minimap)').click();
  await page.waitForTimeout(500);const resumed=await readFrames();
  if(!(resumed>paused))throw new Error('Rendering did not resume after the pause dialog');
  fs.writeFileSync(path.join(args.screenshotDir,'pause.json'),JSON.stringify({ok:true,before,paused,resumed},null,2));
