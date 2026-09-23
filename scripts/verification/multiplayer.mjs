@@ -44,7 +44,9 @@ const roomStateWait = { timeout: process.env.CI ? 120_000 : 20_000, polling: 250
 // parked cars. Both parked and ambient traffic are player-enterable vehicles.
 // Exercise a vehicle actually present in this full world, retaining normal
 // walking, entry and server authority; never fabricate a car or widen a road.
-const worldLocation = { name: 'Logan Main Street', lat: 41.7355, lon: -111.8344 };
+// Select the lane position recorded in the actual 979dea loaded world, not
+// the earlier OSM-only preflight point 40 world units east of the street.
+const worldLocation = { name: 'Logan Main Street', lat: 41.735329, lon: -111.834912 };
 const browserBudget = {
   maxOldSpaceMiB: 1024, worldInitialization: 'sequential', simultaneouslyLoadedWorlds: 2,
   foregroundGameplayWorlds: 1, waitingClient: 'normal manual-pause UI; network listeners remain active',
@@ -232,7 +234,7 @@ async function launchRoomWorld(player) {
 
 async function walkToVehicle(player, vehicleId, maxSteps = 1_200) {
   await player.page.bringToFront();
-  let previousDistance = Infinity;
+  let previousPosition = null;
   let stagnant = 0;
   let recoveries = 0;
   let lastState = null;
@@ -254,7 +256,7 @@ async function walkToVehicle(player, vehicleId, maxSteps = 1_200) {
     }, vehicleId);
     lastState = state;
     if (step % 25 === 0) console.log(JSON.stringify({ stage: 'walk-to-shared-vehicle', vehicleId, step, recoveries, state }));
-    if (state.missing) throw new Error(`Room vehicle ${vehicleId} is unavailable to this client.`);
+    if (state.missing) return { reached: false, reason: 'vehicle-left-detail-range', step, recoveries, state, recoveryTrace };
     if (state.interaction?.action === 'enter_vehicle' && state.nearbyVehicleId === vehicleId) {
       return { reached: true, step, recoveries, state, recoveryTrace };
     }
@@ -265,8 +267,10 @@ async function walkToVehicle(player, vehicleId, maxSteps = 1_200) {
       continue; // Only translation can establish a blocked route.
     }
     await inputStep(player.page, 'ArrowUp', state.distance > 18 ? 140 : 90);
-    stagnant = state.distance >= previousDistance - 0.008 ? stagnant + 1 : 0;
-    previousDistance = state.distance;
+    // A moving car can approach a player who is blocked by a wall. Measure
+    // the player's translation, not the changing distance to that car.
+    stagnant = previousPosition && Math.hypot(state.x - previousPosition.x, state.z - previousPosition.z) < .008 ? stagnant + 1 : 0;
+    previousPosition = { x: state.x, z: state.z };
     if (stagnant > 32) {
       if (recoveries >= 6) {
         return { reached: false, reason: 'stagnant', step, recoveries, state, recoveryTrace };
@@ -277,7 +281,7 @@ async function walkToVehicle(player, vehicleId, maxSteps = 1_200) {
       await inputStep(player.page, 'ArrowUp', 1_200);
       recoveries += 1;
       stagnant = 0;
-      previousDistance = Infinity;
+      previousPosition = null;
     }
   }
   return { reached: false, reason: 'step-limit', step: maxSteps, recoveries, state: lastState, recoveryTrace };
@@ -414,6 +418,7 @@ try {
   await pauseWaitingPlayer(member);
   await resumePlayer(owner);
   await recordStage('both worlds ready; verifying shared vehicle and movement');
+  await owner.page.screenshot({ path: path.join(path.dirname(reportPath), 'owner-before-vehicle.png'), timeout: 15000 });
   const memberInitialVehicleIds = await member.page.evaluate(() =>
     (globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.vehicles || []).map(vehicle => vehicle.id));
   const parkingSource = await owner.page.evaluate(async () => {

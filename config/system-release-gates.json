@@ -6,6 +6,7 @@
     "docs/ARCHITECTURE_MAP.md": ["Application overview", "Earth world flow", "Player movement and cameras", "Character, companions, and urban play", "Field exploration and progression", "Planetary and space environments", "Quick Build and persistent Blocks", "Multiplayer and backend", "Data classification", "Release shape"]
   },
   "gates": {
+    "multiplayer-diagnostic": { "scope": "diagnostic", "command": ["node", "scripts/verification/backend-isolated.mjs", "--stages=multiplayer"], "artifactRequired": true, "timeoutMs": 1020000 },
     "weather-location-ui": { "scope": "candidate", "command": ["node", "scripts/verification/weather-location-ui.mjs"], "artifactRequired": false, "timeoutMs": 45000 },
     "regional-london-diagnostic": { "scope": "diagnostic", "command": ["node", "scripts/verification/regional-world-richness.mjs", "--journey=london"], "artifactRequired": true, "timeoutMs": 600000 },
     "regional-dubai-diagnostic": { "scope": "diagnostic", "command": ["node", "scripts/verification/regional-world-richness.mjs", "--journey=dubai"], "artifactRequired": true, "timeoutMs": 600000 },

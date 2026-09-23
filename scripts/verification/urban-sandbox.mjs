@@ -144,8 +144,10 @@ async function walkTo(page, target, options = {}) {
   let stagnant = 0;
   let start = null;
   let detourCount = 0;
+  let completedSteps = 0;
   for (let step = 0; step < maxSteps; step += 1) {
     if (Date.now() >= (options.deadline || Infinity)) break;
+    completedSteps = step + 1;
     if (options.resolveTarget) {
       target = await options.resolveTarget();
       if (!target) return { reached: false, blocked: false, targetMissing: true, start, steps: step };
@@ -197,7 +199,7 @@ async function walkTo(page, target, options = {}) {
       return { reached: false, blocked: true, start, final: state, steps: step };
     }
   }
-  return { reached: false, blocked: false, start, final: await actorState(page, target), steps: maxSteps };
+  return { reached: false, blocked: false, start, final: await actorState(page, target), steps: completedSteps, stepBudget: maxSteps };
 }
 
 async function launchBaltimore(page) {
@@ -227,7 +229,7 @@ async function reachableVehicleCandidates(page) {
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     const actor = state.activeActor?.position || {};
     return (state.urbanSandbox?.vehicles || [])
-      .filter((vehicle) => vehicle.source === 'deterministic-parked-vehicle' &&
+      .filter((vehicle) => ['deterministic-parked-vehicle', 'living-world-detailed-traffic'].includes(vehicle.source) &&
         !vehicle.attachedToPlayer && !vehicle.occupied && vehicle.driverDoor)
       .map((vehicle) => ({ ...vehicle, distance: Math.hypot(vehicle.driverDoor.x - actor.x, vehicle.driverDoor.z - actor.z) }))
       .sort((left, right) => left.distance - right.distance);
@@ -530,6 +532,8 @@ async function runVehicleEquipmentJourney() {
     for (const candidate of candidates) {
       const result = await walkTo(page, candidate.driverDoor, {
         interactionVehicleId: candidate.id,
+        // Traffic keeps moving until the normal player interaction claims it.
+        resolveTarget: async () => (await diagnostics(page)).urbanSandbox?.vehicles?.find(entry => entry.id === candidate.id)?.driverDoor || null,
         maxSteps: 420,
         stagnantLimit: 24,
         detour: true

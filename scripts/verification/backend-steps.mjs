@@ -26,3 +26,19 @@ export function backendGroupTimeoutMs(group, environment = process.env) {
   const stageMs = Math.max(...group.map(step => backendStageTimeoutMs(step, environment)));
   return stageMs > 600_000 ? stageMs + 60_000 : 600_000;
 }
+
+
+// Explicit diagnostic subsets preserve group isolation and never masquerade
+// as the complete backend gate. Default release execution still selects all.
+export function selectBackendGroups(stageList = null) {
+  if (stageList === null) return { groups: backendGroups, completeGate: true, selectedStages: null };
+  const ids = String(stageList).split(',');
+  if (!ids.length || new Set(ids).size !== ids.length || ids.some(id => !backendSteps.some(step => step.id === id))) {
+    throw new Error('Invalid backend diagnostic stage selection');
+  }
+  return {
+    groups: backendGroups.map(group => group.filter(step => ids.includes(step.id))).filter(group => group.length),
+    completeGate: false,
+    selectedStages: ids
+  };
+}

@@ -1,8 +1,11 @@
 import { prepareBackendEmulatorParameters } from './backend-emulator-parameters.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { backendGroups, backendSteps, backendGroupTimeoutMs } from './backend-steps.mjs';
+import { selectBackendGroups, backendGroupTimeoutMs } from './backend-steps.mjs';
 import { runLoggedStep } from './run-logged-step.mjs';
+
+const stageArgument = process.argv.slice(2).find(value => value.startsWith('--stages='));
+const selection = selectBackendGroups(stageArgument ? stageArgument.slice('--stages='.length) : null);
 
 // Functions emulators retain a worker for each invoked function. Release those
 // workers before each independent browser journey; preserve concurrency within
@@ -15,7 +18,7 @@ const cleanupParameters = prepareBackendEmulatorParameters();
 const onTermination = () => { cleanupParameters(); process.exit(143); };
 process.once('SIGTERM', onTermination);
 try {
-for (const group of backendGroups) {
+for (const group of selection.groups) {
   const ids = group.map(step => step.id);
   console.log(`[backend-isolated] START ${ids.join(', ')}`);
   const timeoutMs = backendGroupTimeoutMs(group);
@@ -33,10 +36,11 @@ for (const group of backendGroups) {
   cleanupParameters();
 }
 const report = {
-  ok: results.length === backendGroups.length && results.every(result => result.ok),
-  completeGate: true,
+  ok: results.length === selection.groups.length && results.every(result => result.ok),
+  completeGate: selection.completeGate,
+  selectedStages: selection.selectedStages,
   contract: 'world-explorer-backend-release-v2',
-  stageCount: backendSteps.length, outputDir, results
+  stageCount: selection.groups.flat().length, outputDir, results
 };
 writeFileSync(path.join(outputDir, 'report.json'), JSON.stringify(report, null, 2));
 console.log(JSON.stringify(report, null, 2));

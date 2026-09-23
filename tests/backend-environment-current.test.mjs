@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { backendVerificationCommand } from '../scripts/verification/backend-environment.mjs';
-import { backendGroups, backendSteps, backendStageTimeoutMs, backendGroupTimeoutMs } from '../scripts/verification/backend-steps.mjs';
+import { selectBackendGroups, backendGroups, backendSteps, backendStageTimeoutMs, backendGroupTimeoutMs } from '../scripts/verification/backend-steps.mjs';
 import {readFileSync} from 'node:fs';
 test('nested backend deadlines leave CI multiplayer time for both worlds and emulator cleanup',()=>{
  const group=backendGroups.find(group=>group.some(step=>step.id==='multiplayer'));
@@ -26,4 +26,18 @@ test('an existing complete emulator lifecycle runs backend assertions without ne
 });
 test('a partial emulator environment fails closed',()=>{
  assert.throws(()=>backendVerificationCommand({FIRESTORE_EMULATOR_HOST:'127.0.0.1:8080'}),/partial environment/);
+});
+
+test('backend diagnostics preserve default coverage and label every explicit subset incomplete', () => {
+  assert.equal(selectBackendGroups().completeGate, true);
+  assert.deepEqual(selectBackendGroups().groups, backendGroups);
+  const subset = selectBackendGroups('room-chat-gameplay,multiplayer');
+  assert.equal(subset.completeGate, false);
+  assert.deepEqual(subset.groups.map(group => group.map(step => step.id)), [['room-chat-gameplay'], ['multiplayer']]);
+  assert.equal(selectBackendGroups(backendSteps.map(step => step.id).join(',')).completeGate, false);
+});
+test('invalid diagnostic selections fail before starting any emulator', () => {
+  for (const value of ['', 'unknown', 'multiplayer,multiplayer', 'multiplayer,', 'multiplayer; echo unsafe']) {
+    assert.throws(() => selectBackendGroups(value), /Invalid backend diagnostic/);
+  }
 });
