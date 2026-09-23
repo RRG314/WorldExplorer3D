@@ -1,0 +1,41 @@
+<!doctype html>
+<meta charset="utf-8"><title>Terrain shader lifecycle</title>
+<link rel="icon" href="/favicon.svg">
+<style>body{margin:0;background:#083344;color:white;font:16px system-ui}canvas{display:block}p{margin:12px}</style>
+<script src="/node_modules/three/build/three.min.js"></script>
+<p id="caption">Tunnel openings and pavement: press Right to advance a lifecycle step.</p>
+<script type="module">
+import {applyTerrainPortalMasksForContext} from '/app/js/terrain/structure-terrain-portals.js';
+import {createPavementTerrainMask} from '/app/js/world/pavement-terrain-mask.js';
+const renderer=new THREE.WebGLRenderer({antialias:false,preserveDrawingBuffer:true});
+renderer.setSize(384,384);document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x083344);scene.add(new THREE.AmbientLight(0xffffff,1));
+const camera=new THREE.OrthographicCamera(-16,16,16,-16,.1,100);
+camera.position.set(16,40,16);camera.up.set(0,0,-1);camera.lookAt(16,0,16);
+const geometry=new THREE.PlaneGeometry(32,32).rotateX(-Math.PI/2).translate(16,1,16);
+const material=new THREE.MeshStandardMaterial({color:0x227722,roughness:1});
+const terrain=new THREE.Mesh(geometry,material);terrain.userData.isTerrainMesh=true;
+const terrainGroup=new THREE.Group();terrainGroup.add(terrain);scene.add(terrainGroup);
+const ctx={terrainGroup,renderer};
+const portal=x=>({x,z:16,tangentX:1,tangentZ:0,roadY:0,halfWidth:4,halfDepth:3,cutHeight:5});
+const phases=[{name:'initial',masks:[portal(16)],holes:[16]},
+ {name:'refresh',masks:[portal(24)],holes:[24]},
+ {name:'clear',masks:[],holes:[]},
+ {name:'two-openings',masks:[portal(8),portal(24)],holes:[8,24]},
+ {name:'reuse-one-opening-program',masks:[portal(8)],holes:[8]}];
+let phase=0,pavement;
+function render(){renderer.render(scene,camera);}
+function pixel(x,z){const p=new THREE.Vector3(x,1,z).project(camera),rgba=new Uint8Array(4),gl=renderer.getContext();gl.readPixels(Math.floor((p.x+1)*192),Math.floor((p.y+1)*192),1,1,gl.RGBA,gl.UNSIGNED_BYTE,rgba);return [...rgba];}
+terrain.visible=false;render();const background=pixel(4,4);terrain.visible=true;
+applyTerrainPortalMasksForContext(ctx,phases[0].masks);
+pavement=createPavementTerrainMask(ctx,['0:0']);pavement.syncMaterials();
+pavement.publish('0:0',new Uint8Array(pavement.layout.resolution**2).fill(255));
+render();const pavedReference=pixel(4,4);
+function advance(){phase=Math.min(phase+1,phases.length-1);applyTerrainPortalMasksForContext(ctx,phases[phase].masks);pavement.syncMaterials();render();document.getElementById('caption').textContent=phases[phase].name+' · gray pavement must remain while dark openings move';}
+addEventListener('keydown',event=>{if(event.code==='ArrowRight')advance();});
+window.advanceTime=async()=>render();
+window.render_game_to_text=()=>JSON.stringify({phase:phases[phase].name,phaseIndex:phase,coordinateSystem:'world x/z 0..32, terrain y=1, top view',background,pavedReference,
+ probes:[4,8,16,24].map(x=>({x,z:x===4?4:16,expected:phases[phase].holes.includes(x)?'opening':'pavement',rgba:pixel(x,x===4?4:16)})),
+ glError:renderer.getContext().getError(),contextLost:renderer.getContext().isContextLost(),calls:renderer.info.render.calls});
+window.ready=true;
+</script>

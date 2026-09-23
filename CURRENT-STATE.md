@@ -62,6 +62,15 @@ outcomes, artifact identities, failures, and temporary credential cleanup.
 Earlier regional/city/planetary results retain their own source/artifact scope;
 never relabel them as a current complete matrix or device performance proof.
 
+A subsequent source audit reproduced a separate terrain shader lifecycle bug:
+refreshing/clearing tunnel openings replaced the pavement hook installed afterward.
+The repair installs the portal hook once, updates a stable uniform, reuses same-size
+textures, and disposes replaced textures. Two runtime component cases and a five-step
+GPU pixel fixture cover refresh, clear, grow, and cached-program reuse. The original
+shader visibly loses pavement in the same fixture; the repaired version preserves it.
+The new `terrain-shaders` candidate gate retains this check. This product change is
+not yet hosted and is not yet established as the cause of the remote GPU failures.
+
 ## Release path and remaining acceptance
 
 Release preparation requires complete current staging evidence before converting

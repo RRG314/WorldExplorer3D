@@ -5,7 +5,7 @@ import {
   sampleFeatureSurfaceY
 } from "../structure-semantics.js?v=63";
 import { roadWidthAtProjection } from '../world/road-cross-section-profile.js?v=1';
-import { terrainHeightWithPortalCuts } from './structure-terrain-portals.js?v=1';
+import { terrainHeightWithPortalCuts } from './structure-terrain-portals.js?v=2';
 
 const MAX_HEIGHT_CACHE_ENTRIES = 65536;
 

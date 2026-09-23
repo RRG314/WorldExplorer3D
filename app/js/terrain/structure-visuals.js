@@ -18,7 +18,7 @@ import {
   elevatedSegmentSafety,
   supportPointConflictsWithDriveableRoad
 } from "../world/bridge-safety.js?v=14";
-import { applyTerrainPortalMasksForContext } from './structure-terrain-portals.js?v=1';
+import { applyTerrainPortalMasksForContext } from './structure-terrain-portals.js?v=2';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
 import { sampleStructureAssemblyThicknessAt } from '../world/compiler/transport-structure-assembly.js?v=15';
 
