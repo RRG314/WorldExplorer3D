@@ -22,11 +22,11 @@ function sha256(buffer) {
   return crypto.createHash('sha256').update(buffer).digest('hex');
 }
 
-run('scripts/verification/source.mjs');
-run('scripts/hosting-artifact.mjs', ['verify']);
-run('scripts/verification/world.mjs', [], { WE3D_VERIFY_ROOT: 'dist' });
-
 const build = JSON.parse(await fs.readFile(path.join(root, 'dist', 'build-manifest.json'), 'utf8'));
+const productionConfig = JSON.parse(await fs.readFile(path.join(root, 'config', 'firebase.production.json'), 'utf8'));
+if (build.firebaseEnvironment !== 'production' || build.firebaseProjectId !== productionConfig.projectId) {
+  throw new Error('Finalization requires the production-configured artifact for the production Firebase project.');
+}
 const approval = JSON.parse(await fs.readFile(path.resolve(root, approvalPath), 'utf8'));
 if (build.sourceDirty !== false) throw new Error('Finalization requires an artifact built from clean source.');
 if (approval.approved !== true) throw new Error('The current evidence manifest is not approved.');
@@ -41,6 +41,14 @@ for (const image of approval.images) {
   const bytes = await fs.readFile(path.join(root, relative));
   if (sha256(bytes) !== String(image.sha256 || '')) throw new Error(`Evidence hash mismatch: ${relative}`);
 }
+
+run('scripts/verification/source.mjs');
+run('scripts/hosting-artifact.mjs', ['verify']);
+// A reviewed screenshot is not a substitute for complete, current candidate
+// and backend execution evidence. Fail before launching another world check.
+run('scripts/verification/release-scope.mjs', ['--require-ready']);
+run('scripts/verification/public-feature-claims.mjs', ['--require-ready']);
+run('scripts/verification/world.mjs', [], { WE3D_VERIFY_ROOT: 'dist' });
 
 console.log(JSON.stringify({
   ok: true,
