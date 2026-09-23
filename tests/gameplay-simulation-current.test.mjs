@@ -188,3 +188,22 @@ test('networked input delegates timer yields to the real kernel without releasin
   assert.equal(receipt.timing, 'dom-keyboard-fixed-step-with-network-yields');
   kernel.dispose();
 });
+
+
+test('GPS field waiting supplies fresh fixes until the selected target reveals and remains bounded', async () => {
+ const { waitForGpsFieldReveal } = await import('../scripts/verification/gps-fix-stream.mjs');
+ for (const succeeds of [true, false]) {
+  let time = 0, fixes = 0;
+  const cdp = { send: async (method, fix) => {
+   assert.equal(method, 'Emulation.setGeolocationOverride');
+   assert.deepEqual(fix, { latitude: 39, longitude: -76, accuracy: 6, speed: 0, heading: 0 }); fixes++;
+  } };
+  const page = { waitForTimeout: async ms => { time += ms; }, evaluate: async () => ({
+   targetId: fixes === 1 ? 'previous-stop' : 'selected-stop',
+   phase: succeeds ? 'revealed' : 'observing', pauseReason: null, lastFixAgeMs: 620
+  }) };
+  const run = waitForGpsFieldReveal(page, cdp, { latitude: 39, longitude: -76 }, 'selected-stop', { timeoutMs: 1500, now: () => time });
+  if (succeeds) { assert.equal((await run).lastState.targetId, 'selected-stop'); assert.equal(fixes, 2); }
+  else { await assert.rejects(run, /did not reveal/); assert.equal(fixes, 3); }
+ }
+});

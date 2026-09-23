@@ -1,3 +1,4 @@
+import { waitForGpsFieldReveal } from './gps-fix-stream.mjs';
 import { selectLowRenderQuality } from './render-quality-ui.mjs';
 import { installBrowserGraphicsProbe } from './browser-graphics-probe.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
@@ -142,17 +143,7 @@ try {
     (Number(firstObjective.targetWorld.x) - Number(gpsWorld.x)) /
       (metersPerDegree * Math.cos(latitudeBeforeObjective * Math.PI / 180));
   await page.locator('#discoveryExpeditionList [data-field-objective]').first().click();
-  for (let index = 0; index < 9; index += 1) {
-    await cdp.send('Emulation.setGeolocationOverride', {
-      latitude: targetLatitude,
-      longitude: targetLongitude,
-      accuracy: 6,
-      speed: 1.4,
-      heading: 0
-    });
-    await page.waitForTimeout(620);
-  }
-  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery?.interaction?.phase === 'revealed', null, { timeout: 30_000 });
+  await waitForGpsFieldReveal(page, cdp, { latitude: targetLatitude, longitude: targetLongitude }, firstObjective.slotId);
   await page.locator('#liveGpsFieldBtn').click();
   await page.waitForSelector('#discoveryPanel.show', { timeout: 30_000 });
   await page.locator('#discoveryPrimaryBtn').click();
@@ -193,7 +184,7 @@ try {
       await page.waitForTimeout(620);
     }
     try {
-      await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery?.interaction?.phase === 'revealed', null, { timeout: 30_000 });
+      await waitForGpsFieldReveal(page, cdp, { latitude: stopLatitude, longitude: stopLongitude }, objective.slotId);
     } catch (error) {
       const failedStop = await snapshot();
       console.error(JSON.stringify({ expectedCompleted, objective, liveGps: failedStop.liveGps, interaction: failedStop.worldDiscovery?.interaction }, null, 2));

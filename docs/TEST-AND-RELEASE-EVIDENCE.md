@@ -104,3 +104,17 @@ The former script-local 38/40-second limits conflicted with the declared 60-seco
 M1 budget and were applied on virtual runners without matching hardware authority.
 Historical failures under those limits remain failures in their original receipts.
 The physical budget is unchanged, and no cloud pass replaces it or phone acceptance.
+
+
+## GPS input and complete mobile journeys
+
+CDP geolocation overrides emit individual fixes; they do not simulate an ongoing
+phone GPS watch. The field-observation verifier supplies fresh fixes until the
+selected target actually reveals, retaining the same bounded 30-second wait.
+It never assigns field progress or bypasses the application's stale-signal rules.
+
+The full mobile-controls functional gate has a 15-minute overall deadline. The
+instrumented Linux run reached walking, driving, drone, plane, reload and restored
+walking before the old 10-minute wrapper killed its final settings-reset check.
+Individual action deadlines remain unchanged. This wrapper allowance is not a
+startup, FPS or phone-performance budget; the physical M1 limits remain unchanged.

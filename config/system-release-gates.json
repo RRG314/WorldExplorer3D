@@ -29,7 +29,7 @@
     "player-blockers": { "scope": "candidate", "command": ["npm", "run", "verify:player-reported-blockers"], "artifactRequired": true },
     "title-header-layout": { "scope": "candidate", "command": ["node", "scripts/verification/title-header-layout-current.mjs"], "artifactRequired": true, "timeoutMs": 60000 },
     "mobile-action-layout": { "scope": "candidate", "command": ["node", "scripts/verification/mobile-action-layout-current.mjs"], "artifactRequired": true, "timeoutMs": 60000 },
-    "mobile-controls": { "scope": "candidate", "command": ["npm", "run", "verify:mobile-controls"], "artifactRequired": true },
+    "mobile-controls": { "scope": "candidate", "command": ["npm", "run", "verify:mobile-controls"], "artifactRequired": true, "timeoutMs": 900000 },
     "assembled-worlds": { "scope": "candidate", "command": ["npm", "run", "verify:assembled-locations"], "artifactRequired": true, "timeoutMs": 1200000 },
     "assembled-fallback": { "scope": "candidate", "command": ["npm", "run", "verify:assembled-locations-fallback"], "artifactRequired": true, "timeoutMs": 1200000 },
     "provider-release": { "scope": "candidate", "command": ["npm", "run", "verify:provider-release"], "artifactRequired": false },
