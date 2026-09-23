@@ -1,3 +1,4 @@
+import { installBrowserGraphicsProbe } from './browser-graphics-probe.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -548,6 +549,7 @@ try {
       context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
       page = await context.newPage();
       await configureStagingAppCheck(page, baseUrl);
+      await installBrowserGraphicsProbe(page, path.join(evidenceDir, `${location.id}-graphics-failure.json`));
     } catch (error) {
       await closeOwnedBrowser(browser, browserServer);
       throw error;
@@ -738,7 +740,7 @@ try {
       });
     } catch (error) {
       results.push({ id: location.id, ok: false, error: String(error?.stack || error), browserErrors, localFailures });
-      if (capture) await page.screenshot({ path: path.join(captureDir, `${location.id}-error.png`), timeout: 5000 }).catch(() => {});
+      await page.screenshot({ path: path.join(evidenceDir, `${location.id}-error.png`), timeout: 5000 }).catch(() => {});
     } finally {
       try { await saveReport(); }
       finally {

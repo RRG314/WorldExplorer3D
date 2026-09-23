@@ -160,3 +160,12 @@ Raw provider timestamps and attribution are retained in tests/fixtures/multiplay
 No world/actor/vehicle state is assigned by this fixture. Live-provider and fallback
 acceptance still belong to their separate candidate gates. The earlier run with
 zero nearby vehicles and failed Overpass remains failed evidence.
+
+
+The player-reported controls gate now uses the same explicit Linux software-CI
+profile as mobile-controls: the shipped Low setting selected through Settings,
+with DPR 1. Input/HUD/camera thresholds and the ten-minute total deadline remain
+unchanged. Each completed action records simulated and wall time before the
+next action; this is controls/layout evidence, not default-quality or phone FPS.
+Actor/vehicle visual checks retain their original rendering profile and now
+capture failed screenshots and graphics diagnostics even without --capture.

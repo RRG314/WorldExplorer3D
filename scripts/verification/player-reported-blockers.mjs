@@ -1,7 +1,8 @@
+import { selectLowRenderQuality } from './render-quality-ui.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
@@ -14,6 +15,9 @@ const outputDir = path.join('/tmp', 'worldexplorer3d-verification', 'player-repo
 const server = await startStaticServer({ rootDir: servedRoot, ports: [4411, 4412, 4413] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const softwareCi = !!process.env.CI && process.platform === 'linux';
+const verificationProfile = { scope: 'functional-controls-and-layout', quality: softwareCi ? 'low via Settings' : 'default', deviceScaleFactor: softwareCi ? 1 : 3, physicalPerformanceAccepted: false };
+const touchTimings = [];
 const browserErrors = [];
 const localFailures = [];
 
@@ -117,6 +121,7 @@ async function touchHold(page, cdp, selector, deltaX, deltaY, holdMs = 1_050) {
   await page.waitForTimeout(70);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [point(end)] });
   // Ocean owns a separate RAF loop; the earth kernel is deliberately suspended.
+  const simulationStartedAt = Date.now();
   const simulation = before?.activeActor?.mode === 'ocean'
     ? await (async () => {
       const started = Date.now();
@@ -127,6 +132,8 @@ async function touchHold(page, cdp, selector, deltaX, deltaY, holdMs = 1_050) {
       return { timing: 'dedicated-ocean-wall-clock', elapsedMs: Date.now() - started };
     })()
     : await advanceGameplay(page, holdMs);
+  touchTimings.push({ selector, mode: before?.activeActor?.mode, holdMs, wallElapsedMs: Date.now() - simulationStartedAt, simulation });
+  await writeFile(path.join(outputDir, 'input-timing.json'), JSON.stringify({ verificationProfile, touchTimings }, null, 2));
   const held = await page.evaluate(() => ({
     diagnostics: globalThis.getWorldExplorerRuntimeDiagnostics?.(),
     hud: {
@@ -178,7 +185,8 @@ try {
 
   mobileContext = await browser.newContext({
     ...devices['iPhone 13'],
-    viewport: { width: 390, height: 844 }
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: verificationProfile.deviceScaleFactor
   });
   const mobile = await mobileContext.newPage();
   await configureStagingAppCheck(mobile, baseUrl);
@@ -187,6 +195,7 @@ try {
   await mobile.goto(`${baseUrl}/app/`, { waitUntil: 'load', timeout: 120_000 });
   await waitForRuntime(mobile);
   await selectBaltimore(mobile);
+  if (softwareCi) await selectLowRenderQuality(mobile);
 
   await mobile.locator('#globeSelectorStartBtn').click();
   await mobile.waitForSelector('#loading.show', { timeout: 30_000 });
@@ -263,7 +272,8 @@ try {
   await mobileContext.close();
   mobileContext = await browser.newContext({
     ...devices['iPhone 13'],
-    viewport: { width: 390, height: 844 }
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: verificationProfile.deviceScaleFactor
   });
   const oceanMobile = await mobileContext.newPage();
   await configureStagingAppCheck(oceanMobile, baseUrl);
@@ -272,6 +282,7 @@ try {
   await oceanMobile.goto(`${baseUrl}/app/`, { waitUntil: 'load', timeout: 120_000 });
   await waitForRuntime(oceanMobile);
   await selectBaltimore(oceanMobile);
+  if (softwareCi) await selectLowRenderQuality(oceanMobile);
   await oceanMobile.locator('#globeSelectorOceanBtn').click();
   await oceanMobile.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.mode === 'ocean', null, { timeout: 120_000 });
   await waitForInteractiveWorld(oceanMobile);
@@ -339,6 +350,7 @@ try {
     noFailedLocalResources: localFailures.length === 0
   };
   const report = {
+    verificationProfile, touchTimings,
     timing: 'earth-fixed-step-and-ocean-live-raf',
     simulationReceipts: [rightMove, leftMove, forwardMove, driveMove, droneMove, planeMove, oceanMove].map(move => move.simulation),
     ok: Object.values(checks).every(Boolean),
@@ -363,6 +375,7 @@ try {
     browserErrors,
     localFailures
   };
+  await writeFile(path.join(outputDir, 'report.json'), JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
   assert.equal(report.ok, true, 'One or more player-reported release blockers remain.');
 } finally {

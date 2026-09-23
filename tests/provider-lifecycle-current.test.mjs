@@ -93,3 +93,78 @@ test('server camera fallback is serial and does not launch duplicate endpoint pr
   assert.equal(maxActive, 1); assert.equal(calls.length, 2);
   assert.equal(result.endpoint, endpoints[1]);
 });
+
+
+test('unavailable vector provider stops request storms, retains cached tiles and probes recovery once', async t => {
+  releaseShortbreadRuntimeCache({ includeRaw: true });
+  const previousConfig = globalThis.WORLD_EXPLORER_CONFIG;
+  globalThis.WORLD_EXPLORER_CONFIG = { osmVectorTileUrl: 'https://cooldown-test.invalid/{z}/{x}/{y}' };
+  t.after(() => { globalThis.WORLD_EXPLORER_CONFIG = previousConfig; releaseShortbreadRuntimeCache({ includeRaw: true }); });
+  let now = 100_000, calls = 0, unavailable = false, releaseProbe;
+  t.mock.method(Date, 'now', () => now);
+  const loadVectorTileLib = async () => ({ Pbf: class {}, VectorTile: class {} });
+  t.mock.method(globalThis, 'fetch', async () => {
+    calls++;
+    if (unavailable) throw new TypeError('Failed to fetch');
+    if (releaseProbe === null) await new Promise(resolve => { releaseProbe = resolve; });
+    return { ok: true, arrayBuffer: async () => new Uint8Array([2]).buffer };
+  });
+  const get = x => fetchShortbreadTile(14, x, 1, { loadVectorTileLib });
+  const cached = await get(0);
+  unavailable = true;
+  for (let x = 1; x <= 20; x++) await assert.rejects(get(x));
+  assert.equal(calls, 4, 'Three failed requests must pause the provider, not drain the entire tile queue');
+  assert.equal(await get(0), cached, 'Provider pause must retain usable cached coverage');
+  now += 60_001; unavailable = false; releaseProbe = null;
+  const recovering = get(21);
+  await new Promise(resolve => setImmediate(resolve));
+  await assert.rejects(get(22), /recovery|cooldown|paused/i);
+  assert.equal(calls, 5, 'Only one tile may probe a provider after its cooldown');
+  releaseProbe(); await recovering;
+  await get(22);
+  assert.equal(calls, 6, 'A successful probe must reopen normal fetching');
+});
+
+test('vector rate limits honor Retry-After without treating a missing tile as a provider outage', async t => {
+  releaseShortbreadRuntimeCache({ includeRaw: true });
+  const previousConfig = globalThis.WORLD_EXPLORER_CONFIG;
+  globalThis.WORLD_EXPLORER_CONFIG = { osmVectorTileUrl: 'https://rate-test.invalid/{z}/{x}/{y}' };
+  t.after(() => { globalThis.WORLD_EXPLORER_CONFIG = previousConfig; releaseShortbreadRuntimeCache({ includeRaw: true }); });
+  let now = 100_000, status = 404, calls = 0;
+  t.mock.method(Date, 'now', () => now);
+  const loadVectorTileLib = async () => ({ Pbf: class {}, VectorTile: class {} });
+  t.mock.method(globalThis, 'fetch', async () => {
+    calls++; return { ok: status === 200, status, headers: { get: () => '120' }, arrayBuffer: async () => new ArrayBuffer(0) };
+  });
+  const get = x => fetchShortbreadTile(14, x, 1, { loadVectorTileLib });
+  for (let x = 0; x < 4; x++) await assert.rejects(get(x));
+  assert.equal(calls, 4, 'Missing individual tiles must not disable other coverage');
+  status = 429; await assert.rejects(get(4));
+  now += 60_001; status = 200; await assert.rejects(get(5));
+  assert.equal(calls, 5, 'Retry-After must prevent an early retry');
+  now += 60_001; await get(5);
+  assert.equal(calls, 6);
+});
+
+
+test('late concurrent success cannot reopen a paused vector provider', async t => {
+  releaseShortbreadRuntimeCache({ includeRaw: true });
+  const previousConfig = globalThis.WORLD_EXPLORER_CONFIG;
+  globalThis.WORLD_EXPLORER_CONFIG = { osmVectorTileUrl: 'https://generation-test.invalid/{z}/{x}/{y}' };
+  t.after(() => { globalThis.WORLD_EXPLORER_CONFIG = previousConfig; releaseShortbreadRuntimeCache({ includeRaw: true }); });
+  let finishOld, startedOld, calls = 0;
+  const started = new Promise(resolve => { startedOld = resolve; });
+  t.mock.method(globalThis, 'fetch', async () => {
+    calls++;
+    if (calls === 1) { startedOld(); await new Promise(resolve => { finishOld = resolve; });
+      return { ok: true, arrayBuffer: async () => new ArrayBuffer(0) }; }
+    return { ok: false, status: 429 };
+  });
+  const loadVectorTileLib = async () => ({ Pbf: class {}, VectorTile: class {} });
+  const get = x => fetchShortbreadTile(14, x, 1, { loadVectorTileLib });
+  const old = get(0); await started;
+  await assert.rejects(get(1)); finishOld(); await old;
+  await assert.rejects(get(2), /paused/);
+  assert.equal(calls, 2);
+  assert.ok(await get(0), 'The late successful tile remains useful cached coverage');
+});
