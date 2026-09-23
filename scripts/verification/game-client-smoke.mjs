@@ -8,8 +8,12 @@ import path from 'node:path';
 // pretending to establish Earth coverage or physical-device performance.
 const root = path.resolve(process.env.WE3D_VERIFY_ROOT || 'dist');
 const out = 'output/verification/game-client-smoke';
-await fs.mkdir(out, { recursive: true });
 const manifest = JSON.parse(await fs.readFile(path.join(root, 'build-manifest.json')));
+// Failed runs must not leave an earlier candidate's successful receipt or
+// screenshots in the current evidence directory.
+await fs.rm(out, { recursive: true, force: true });
+await fs.mkdir(out, { recursive: true });
+await fs.writeFile(`${out}/report.json`, JSON.stringify({ ok: false, complete: false, buildId: manifest.buildId, stage: 'started' }, null, 2));
 const server = await startStaticServer({ rootDir: root, ports: [4491, 4492] });
 try {
   const child = spawn(process.execPath, [
@@ -32,6 +36,9 @@ try {
   const report = { ok: true, buildId: manifest.buildId, evidenceScope: 'packaged Moon gameplay and keyboard pause/resume; not Earth coverage or performance', pause, modes: runtime.modes };
   await fs.writeFile(`${out}/report.json`, JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report));
+} catch (error) {
+  await fs.writeFile(`${out}/report.json`, JSON.stringify({ ok: false, complete: true, buildId: manifest.buildId, error: String(error.stack || error) }, null, 2));
+  throw error;
 } finally {
   await server.close();
 }
