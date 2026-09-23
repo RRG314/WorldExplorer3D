@@ -49,6 +49,19 @@ page.on('response', (response) => {
 });
 
 const snapshot = () => page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.() || {});
+const checkpoints = [];
+async function recordCheckpoint(phase, state) {
+  checkpoints.push({ phase, at: new Date().toISOString(),
+    completedStops: state.worldDiscovery?.fieldExpedition?.completedCount ?? 0,
+    observation: state.worldDiscovery?.interaction?.phase ?? null,
+    gpsActive: state.liveGps?.active === true,
+    pauseReason: state.liveGps?.fieldSession?.pauseReason ?? null,
+    lastFixAgeMs: state.liveGps?.lastFixAgeMs ?? null,
+    runtimeErrorCount: state.runtimeErrors?.length ?? 0,
+    watch: gpsFixStream.snapshot() });
+  await mkdir('output/verification/live-gps-field', { recursive: true });
+  await writeFile('output/verification/live-gps-field/checkpoints.json', JSON.stringify(checkpoints, null, 2));
+}
 const distance2d = (left, right) => Math.hypot(
   Number(right?.x || 0) - Number(left?.x || 0),
   Number(right?.z || 0) - Number(left?.z || 0)
@@ -99,6 +112,7 @@ try {
   });
   await page.waitForTimeout(2_200);
   const walking = await snapshot();
+  await recordCheckpoint('walking', walking);
 
   await page.locator('#liveGpsFieldBtn').click();
   await page.waitForSelector('#discoveryPanel.show', { timeout: 30_000 });
@@ -149,6 +163,7 @@ try {
   await page.locator('#discoveryPrimaryBtn').click();
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery?.fieldExpedition?.completedCount === 1, null, { timeout: 30_000 });
   const firstStopRecorded = await snapshot();
+  await recordCheckpoint('first-stop-recorded', firstStopRecorded);
   await page.screenshot({ path: 'output/verification/live-gps-field/first-stop-recorded-mobile.png', fullPage: false });
   await page.locator('#discoveryCloseBtn').click();
 
@@ -199,6 +214,7 @@ try {
     if (expectedCompleted < 3) await page.locator('#discoveryCloseBtn').click();
   }
   const expeditionComplete = await snapshot();
+  await recordCheckpoint('expedition-complete', expeditionComplete);
   await page.screenshot({ path: 'output/verification/live-gps-field/expedition-complete-mobile.png', fullPage: false });
   await page.locator('#discoveryCloseBtn').click();
 
@@ -211,6 +227,7 @@ try {
   });
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().liveGps?.fieldSession?.pauseReason === 'accuracy-hold', null, { timeout: 30_000 });
   const accuracyHeld = await snapshot();
+  await recordCheckpoint('accuracy-held', accuracyHeld);
 
   await gpsFixStream.send('Emulation.setGeolocationOverride', {
     latitude: currentLatitude + 0.00004,
@@ -238,6 +255,7 @@ try {
   }, null, { timeout: 30_000 });
   await page.waitForTimeout(1_200);
   const driving = await snapshot();
+  await recordCheckpoint('driving', driving);
 
   gpsFixStream.assertHealthy();
   const checks = {
@@ -315,7 +333,8 @@ try {
     driving: { actor: driving.activeActor, gps: driving.liveGps, cameraFollow: driving.cameraFollow },
     browserErrors,
     localFailures,
-    gpsFixStream: gpsFixStream.snapshot()
+    gpsFixStream: gpsFixStream.snapshot(),
+    checkpoints
   };
   await writeFile('output/verification/live-gps-field/report.json', JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));

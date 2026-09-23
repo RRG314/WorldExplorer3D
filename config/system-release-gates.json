@@ -48,7 +48,7 @@
     "analytics-lifecycle": { "scope": "candidate", "command": ["npm", "run", "verify:analytics-lifecycle"], "artifactRequired": true },
     "explorer-browser": { "scope": "candidate", "command": ["npm", "run", "verify:explorer-coherence-browser"], "artifactRequired": true },
     "regional-world": { "scope": "candidate", "command": ["npm", "run", "verify:regional-world-richness"], "artifactRequired": true, "timeoutMs": 1800000 },
-    "live-gps": { "scope": "candidate", "command": ["npm", "run", "verify:live-gps"], "artifactRequired": true },
+    "live-gps": { "scope": "candidate", "command": ["npm", "run", "verify:live-gps"], "artifactRequired": true, "timeoutMs": 1200000 },
     "walking-field": { "scope": "candidate", "command": ["npm", "run", "verify:walking-encounters"], "artifactRequired": true },
     "fishing": { "scope": "candidate", "command": ["npm", "run", "verify:unified-fishing"], "artifactRequired": true },
     "fishing-recovery": { "scope": "candidate", "command": ["npm", "run", "verify:fishing-loss-recovery"], "artifactRequired": true },

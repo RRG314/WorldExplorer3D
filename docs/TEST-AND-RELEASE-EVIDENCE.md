@@ -122,3 +122,10 @@ take much longer in wall time on this runner. Each touch action now retains its
 simulation receipt and elapsed wall time, even if a later stage times out.
 Movement thresholds and per-action deadlines are unchanged. This overall allowance
 is not a mobile latency/FPS budget or a physical-performance acceptance result.
+
+The complete Live GPS functional journey has a 20-minute overall deadline. The
+continuous-watch software-renderer run completed all three field stops but hit
+the former 10-minute wrapper while capturing the completion screenshot, before
+accuracy and speed assertions. Checkpoints are written before screenshots so a
+later timeout cannot erase earlier execution evidence. Completed checkpoints do
+not mark the full gate passed; all remaining assertions and error checks must pass.
