@@ -1,0 +1,224 @@
+{
+  "source": "https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2025_Gazetteer/2025_gaz_place_24.txt",
+  "retrievedAt": "2026-09-23T17:53:52.034Z",
+  "sampleType": "Census populated-place internal points in all 24 jurisdictions; actual live parcel jurisdiction and usable geometry must match. Samples do not establish statewide completeness.",
+  "samples": [
+    {
+      "code": "ALLE",
+      "geoid": "24001",
+      "name": "Allegany County",
+      "lat": 39.651739,
+      "lon": -78.757948,
+      "place": "Cumberland city",
+      "placeGeoid": "2421325"
+    },
+    {
+      "code": "ANNE",
+      "geoid": "24003",
+      "name": "Anne Arundel County",
+      "lat": 38.972152,
+      "lon": -76.505332,
+      "place": "Annapolis city",
+      "placeGeoid": "2401600"
+    },
+    {
+      "code": "BACO",
+      "geoid": "24005",
+      "name": "Baltimore County",
+      "lat": 39.39421,
+      "lon": -76.617751,
+      "place": "Towson CDP",
+      "placeGeoid": "2478425"
+    },
+    {
+      "code": "CALV",
+      "geoid": "24009",
+      "name": "Calvert County",
+      "lat": 38.543791,
+      "lon": -76.587906,
+      "place": "Prince Frederick CDP",
+      "placeGeoid": "2463950"
+    },
+    {
+      "code": "CARO",
+      "geoid": "24011",
+      "name": "Caroline County",
+      "lat": 38.879421,
+      "lon": -75.824452,
+      "place": "Denton town",
+      "placeGeoid": "2422725"
+    },
+    {
+      "code": "CARR",
+      "geoid": "24013",
+      "name": "Carroll County",
+      "lat": 39.579154,
+      "lon": -77.006691,
+      "place": "Westminster city",
+      "placeGeoid": "2483100"
+    },
+    {
+      "code": "CECI",
+      "geoid": "24015",
+      "name": "Cecil County",
+      "lat": 39.605776,
+      "lon": -75.821686,
+      "place": "Elkton town",
+      "placeGeoid": "2425800"
+    },
+    {
+      "code": "CHAR",
+      "geoid": "24017",
+      "name": "Charles County",
+      "lat": 38.543467,
+      "lon": -76.96979,
+      "place": "La Plata town",
+      "placeGeoid": "2445750"
+    },
+    {
+      "code": "DORC",
+      "geoid": "24019",
+      "name": "Dorchester County",
+      "lat": 38.554063,
+      "lon": -76.077116,
+      "place": "Cambridge city",
+      "placeGeoid": "2412400"
+    },
+    {
+      "code": "FRED",
+      "geoid": "24021",
+      "name": "Frederick County",
+      "lat": 39.436891,
+      "lon": -77.411952,
+      "place": "Frederick city",
+      "placeGeoid": "2430325"
+    },
+    {
+      "code": "GARR",
+      "geoid": "24023",
+      "name": "Garrett County",
+      "lat": 39.417143,
+      "lon": -79.402352,
+      "place": "Oakland town",
+      "placeGeoid": "2457650"
+    },
+    {
+      "code": "HARF",
+      "geoid": "24025",
+      "name": "Harford County",
+      "lat": 39.534942,
+      "lon": -76.346323,
+      "place": "Bel Air town",
+      "placeGeoid": "2405550"
+    },
+    {
+      "code": "HOWA",
+      "geoid": "24027",
+      "name": "Howard County",
+      "lat": 39.276691,
+      "lon": -76.833952,
+      "place": "Ellicott City CDP",
+      "placeGeoid": "2426000"
+    },
+    {
+      "code": "KENT",
+      "geoid": "24029",
+      "name": "Kent County",
+      "lat": 39.218383,
+      "lon": -76.074022,
+      "place": "Chestertown town",
+      "placeGeoid": "2416225"
+    },
+    {
+      "code": "MONT",
+      "geoid": "24031",
+      "name": "Montgomery County",
+      "lat": 39.083666,
+      "lon": -77.155585,
+      "place": "Rockville city",
+      "placeGeoid": "2467675"
+    },
+    {
+      "code": "PRIN",
+      "geoid": "24033",
+      "name": "Prince George's County",
+      "lat": 38.816495,
+      "lon": -76.75367,
+      "place": "Upper Marlboro town",
+      "placeGeoid": "2479875"
+    },
+    {
+      "code": "QUEE",
+      "geoid": "24035",
+      "name": "Queen Anne's County",
+      "lat": 39.042265,
+      "lon": -76.062538,
+      "place": "Centreville town",
+      "placeGeoid": "2414950"
+    },
+    {
+      "code": "STMA",
+      "geoid": "24037",
+      "name": "St. Mary's County",
+      "lat": 38.303891,
+      "lon": -76.639653,
+      "place": "Leonardtown town",
+      "placeGeoid": "2446475"
+    },
+    {
+      "code": "SOME",
+      "geoid": "24039",
+      "name": "Somerset County",
+      "lat": 38.205137,
+      "lon": -75.696384,
+      "place": "Princess Anne town",
+      "placeGeoid": "2464000"
+    },
+    {
+      "code": "TALB",
+      "geoid": "24041",
+      "name": "Talbot County",
+      "lat": 38.776262,
+      "lon": -76.070478,
+      "place": "Easton town",
+      "placeGeoid": "2424475"
+    },
+    {
+      "code": "WASH",
+      "geoid": "24043",
+      "name": "Washington County",
+      "lat": 39.637986,
+      "lon": -77.723252,
+      "place": "Hagerstown city",
+      "placeGeoid": "2436075"
+    },
+    {
+      "code": "WICO",
+      "geoid": "24045",
+      "name": "Wicomico County",
+      "lat": 38.375198,
+      "lon": -75.586555,
+      "place": "Salisbury city",
+      "placeGeoid": "2469925"
+    },
+    {
+      "code": "WORC",
+      "geoid": "24047",
+      "name": "Worcester County",
+      "lat": 38.172519,
+      "lon": -75.390403,
+      "place": "Snow Hill town",
+      "placeGeoid": "2473075"
+    },
+    {
+      "code": "BACI",
+      "geoid": "24510",
+      "name": "Baltimore city",
+      "lat": 39.300032,
+      "lon": -76.610476,
+      "place": "Baltimore city",
+      "placeGeoid": "2404000"
+    }
+  ],
+  "jurisdictionSource": "https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2025_Gazetteer/2025_gaz_counties_24.txt"
+}

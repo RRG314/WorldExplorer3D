@@ -14,7 +14,9 @@ const cache = new Map();
 const inFlight = new Map();
 
 function cacheKey(lat, lon, radiusM) {
-  return `${Math.round(Number(lat) * 200) / 200}:${Math.round(Number(lon) * 200) / 200}:${Math.round(Number(radiusM) / 100) * 100}`;
+  // Reuse only identical spatial envelopes. Coarse location buckets can serve
+  // another area's parcels after a short walk or a change of query radius.
+  return buildMarylandParcelQueryUrl({ lat, lon, radiusM, offset: 0, limit: PAGE_SIZE });
 }
 
 function trimCache() {
@@ -74,13 +76,17 @@ async function loadMarylandParcels(request = {}, options = {}) {
         warnings: Object.freeze(truncated ? ['Parcel results were capped for this dense area. Move closer to narrow the search.'] : []),
         fetchedAt: new Date().toISOString(), fromCache: false, query: Object.freeze({ lat, lon, radiusM })
       });
-      cache.set(key, { expiresAt: now + CACHE_TTL_MS, value });
-      trimCache();
+      // A forced refresh may now own this key. Older work still resolves for
+      // its original caller, but cannot publish over or untrack that refresh.
+      if (inFlight.get(key) === task) {
+        cache.set(key, { expiresAt: now + CACHE_TTL_MS, value });
+        trimCache();
+      }
       return value;
     } finally {
       clearTimeout(timeout);
       options.signal?.removeEventListener?.('abort', abort);
-      inFlight.delete(key);
+      if (inFlight.get(key) === task) inFlight.delete(key);
     }
   })();
   inFlight.set(key, task);

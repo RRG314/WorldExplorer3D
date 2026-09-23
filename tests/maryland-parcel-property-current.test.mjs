@@ -10,7 +10,7 @@ import {
   parcelGameValue,
   pointInGeometry
 } from '../app/js/gis/maryland-parcel-core.js';
-import { clearMarylandParcelCache, loadMarylandParcels } from '../app/js/gis/maryland-parcel-provider.js';
+import { clearMarylandParcelCache, loadMarylandParcels, marylandParcelProviderSnapshot } from '../app/js/gis/maryland-parcel-provider.js';
 import { makeParcelPropertyCandidates, parcelBuildPermissionAt } from '../app/js/real-estate/parcel-property-model.js';
 
 const require = createRequire(import.meta.url);
@@ -121,7 +121,7 @@ test('parcel valuation is deterministic and matches the transaction authority', 
   assert.equal(parcelGameValue(parcel, buildings), clientValue);
 });
 
-test('the connected authority accepts verified parcel identity and rejects forged parcel identity', () => {
+test('the property normalizer accepts consistent provider identifiers and rejects mismatched identifiers', () => {
   const parcel = normalizeMarylandParcelFeature(feature());
   const input = {
     propertyId: parcel.worldPropertyId, parcelId: parcel.parcelId,
@@ -158,4 +158,66 @@ test('provider failure returns no fabricated parcel and does not poison the boun
   });
   assert.equal(response.status, 'ready');
   assert.equal(response.parcels.length, 1);
+});
+
+
+const providerResponse = () => ({ ok: true, json: async () => ({ type: 'FeatureCollection', features: [feature()] }) });
+
+test('nearby but different parcel bounds never reuse another location response', async () => {
+  clearMarylandParcelCache();
+  const calls = [];
+  const fetchImpl = async url => { calls.push(url); return providerResponse(); };
+  const first = { lat: 39.2904, lon: -76.6122, radiusM: 450 };
+  const second = { ...first, lat: 39.2914 };
+  await loadMarylandParcels(first, { fetchImpl });
+  const result = await loadMarylandParcels(second, { fetchImpl });
+  assert.equal(calls.length, 2);
+  assert.equal(result.query.lat, second.lat);
+  assert.notEqual(new URL(calls[0]).searchParams.get('geometry'), new URL(calls[1]).searchParams.get('geometry'));
+});
+
+test('identical parcel requests share an active fetch and reuse its completed cache', async () => {
+  clearMarylandParcelCache();
+  let resolve, calls = 0;
+  const fetchImpl = () => { calls++; return new Promise(done => { resolve = done; }); };
+  const request = { lat: 39.2904, lon: -76.6122 };
+  const first = loadMarylandParcels(request, { fetchImpl });
+  const second = loadMarylandParcels(request, { fetchImpl });
+  assert.equal(calls, 1);
+  resolve(providerResponse());
+  await Promise.all([first, second]);
+  const cached = await loadMarylandParcels(request, { fetchImpl });
+  assert.equal(cached.fromCache, true);
+  assert.equal(calls, 1);
+  assert.equal(marylandParcelProviderSnapshot().activeRequests, 0);
+});
+
+test('an older parcel request cannot erase the active forced refresh', async () => {
+  clearMarylandParcelCache();
+  const pending = [];
+  const fetchImpl = () => new Promise(resolve => pending.push(resolve));
+  const request = { lat: 39.2904, lon: -76.6122 };
+  const old = loadMarylandParcels(request, { fetchImpl });
+  const fresh = loadMarylandParcels(request, { fetchImpl, force: true });
+  pending[0](providerResponse());
+  await old;
+  const activeDuringRefresh = marylandParcelProviderSnapshot().activeRequests;
+  pending[1](providerResponse());
+  await fresh;
+  assert.equal(activeDuringRefresh, 1);
+});
+
+test('a late older parcel response cannot replace newer refreshed data', async () => {
+  clearMarylandParcelCache();
+  const pending = [];
+  const fetchImpl = () => new Promise(resolve => pending.push(resolve));
+  const request = { lat: 39.2904, lon: -76.6122 };
+  const old = loadMarylandParcels(request, { fetchImpl });
+  const fresh = loadMarylandParcels(request, { fetchImpl, force: true });
+  pending[1]({ ok: true, json: async () => ({ type: 'FeatureCollection', features: [feature({ POLYID: 'newer' })] }) });
+  const latest = await fresh;
+  pending[0](providerResponse());
+  await old;
+  const cached = await loadMarylandParcels(request, { fetchImpl });
+  assert.equal(cached.parcels[0].parcelId, latest.parcels[0].parcelId);
 });
