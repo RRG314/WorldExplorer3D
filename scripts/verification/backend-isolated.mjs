@@ -26,7 +26,7 @@ for (const group of backendGroups) {
   ], { cwd: process.cwd(), env: process.env,
     logPath: path.join(outputDir, `${ids[0]}.log`), timeoutMs });
   results.push({ stages: ids, timeoutMs, ...result });
-  if (!result.ok) break;
+  // Groups own isolated emulators; retain later independent evidence on failure.
 }
 } finally {
   process.removeListener('SIGTERM', onTermination);

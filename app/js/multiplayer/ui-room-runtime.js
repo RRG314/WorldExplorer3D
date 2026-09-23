@@ -1,7 +1,7 @@
 import { ensureEntitlements } from "../../../js/entitlements.js?v=71";
 import { createGhostManager } from "./ghosts.js?v=58";
 import { listenExplorerLeaderboard } from "./loop.js?v=56";
-import { stopPresence } from "./presence.js?v=62";
+import { stopPresence } from "./presence.js?v=63";
 import {
   deriveRoomDeterministicSeed,
   findFeaturedPublicRooms,

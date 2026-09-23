@@ -7,7 +7,7 @@ import {
   upsertSharedBlock
 } from "./blocks.js?v=69";
 import { listenChat } from "./chat.js?v=56";
-import { listenPlayers, startPresence } from "./presence.js?v=62";
+import { listenPlayers, startPresence } from "./presence.js?v=63";
 import {
   deriveRoomDeterministicSeed,
   listenHomeBase,

@@ -14,7 +14,7 @@ import {
   createUiRoomEventsApi
 } from './ui-room-events.js?v=4';
 import { createUiRoomRenderers } from './ui-room-renderers.js?v=3';
-import { createUiRoomActions } from './ui-room-actions.js?v=9';
+import { createUiRoomActions } from './ui-room-actions.js?v=10';
 import {
   emitTutorialEvent,
   finiteNumber,

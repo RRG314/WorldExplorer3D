@@ -32,6 +32,9 @@ let activeRoomId = null;
 let getPose = null;
 let heartbeatTimer = null;
 let lastWriteAt = 0;
+// Throttling begins at acknowledgement; the stored expiry begins when the
+// payload is constructed. Slow responses must not extend that server lease.
+let lastLeaseWriteAt = 0;
 let lastSentPose = null;
 let lastSamplePose = null;
 let lastSampleAt = 0;
@@ -230,13 +233,16 @@ async function writePresence(force = false) {
   inFlightWrite = true;
   try {
     const { db } = getServices();
-    if (now - lastWriteAt >= PRESENCE_TTL_MS) {
+    if (now - lastLeaseWriteAt >= PRESENCE_TTL_MS) {
       if (now - lastAdmissionAttemptAt < 15_000) return;
       lastAdmissionAttemptAt = now;
       await postProtectedFunction('/joinRoom', {
         roomCode: writingRoomId, displayName: getDisplayName(user)
       }, { label: 'Room reconnection' });
-      if (isCurrent()) lastWriteAt = Date.now();
+      if (isCurrent()) {
+        lastWriteAt = Date.now();
+        lastLeaseWriteAt = now;
+      }
       return; // The server wrote presence; respect the normal heartbeat throttle.
     }
     const playerRef = doc(db, ROOM_COLLECTION, writingRoomId, PLAYER_COLLECTION, user.uid);
@@ -253,6 +259,7 @@ async function writePresence(force = false) {
 
     if (isCurrent()) {
       lastWriteAt = Date.now();
+      lastLeaseWriteAt = now;
       lastSentPose = normalized;
     }
   } catch (err) {
@@ -284,6 +291,7 @@ async function stopPresence({ releaseLease = true } = {}) {
   lastSamplePose = null;
   lastSampleAt = 0;
   lastWriteAt = 0;
+  lastLeaseWriteAt = 0;
 
   if (!releaseLease || !roomId || !user || !user.uid) return;
 
@@ -340,6 +348,7 @@ function startPresence(roomId, getPoseFn) {
   // The room create/join flow already writes presence. Waiting for the first heartbeat
   // avoids immediate server-side throttle denials on lastSeenAt.
   lastWriteAt = Date.now();
+  lastLeaseWriteAt = lastWriteAt;
 }
 
 function listenPlayers(roomId, callback, options = {}) {

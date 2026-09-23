@@ -9,6 +9,7 @@ export const backendSteps = [
   { id: 'urban-civic-backend', command: [process.execPath, 'scripts/verification/urban-civic-backend-current.mjs'] },
   { id: 'shared-expedition', command: [process.execPath, 'scripts/verification/interstellar-shared.mjs'] },
   { id: 'connected-property-multiplayer', command: [process.execPath, 'scripts/verification/connected-property-multiplayer-current.mjs'] },
+  { id: 'room-chat-gameplay', command: [process.execPath, 'scripts/verification/room-chat-gameplay.mjs'] },
   { id: 'multiplayer', command: [process.execPath, 'scripts/verification/multiplayer.mjs'] },
   { id: 'account-backend', command: [process.execPath, 'scripts/verification/account-backend-current.mjs'] },
 ];

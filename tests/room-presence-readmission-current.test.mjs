@@ -15,8 +15,8 @@ function harness({ rejected = false, writeImpl = async () => {} } = {}) {
     setDoc: async (...args) => { calls.push(['write', ...args]); await writeImpl(); },
     postProtectedFunction: async (...args) => { calls.push(['admit', ...args]); if (rejected) throw new Error('Room full'); }
   });
-  vm.runInContext(source + "\nactiveRoomId='ROOM01';getPose=()=>({});lastWriteAt=Date.now();", context);
-  return { calls, switchRoom: () => vm.runInContext("void stopPresence({releaseLease:false});activeRoomId='ROOM02';getPose=()=>({});lastWriteAt=Date.now();", context), advance: ms => { now += ms; }, write: (force = false) => context.writePresence(force) };
+  vm.runInContext(source + "\nactiveRoomId='ROOM01';getPose=()=>({});lastWriteAt=Date.now();lastLeaseWriteAt=Date.now();", context);
+  return { calls, switchRoom: () => vm.runInContext("void stopPresence({releaseLease:false});activeRoomId='ROOM02';getPose=()=>({});lastWriteAt=Date.now();lastLeaseWriteAt=Date.now();", context), advance: ms => { now += ms; }, write: (force = false) => context.writePresence(force) };
 }
 test('expired presence requests server admission instead of reviving its document', async () => {
   const h = harness(); h.advance(91_000); await h.write();
@@ -51,4 +51,17 @@ test('completion of an old room heartbeat cannot release the new room write lock
   assert.equal(pending.length,2);pending[0]();await old;
   h.advance(2500);await h.write();assert.equal(pending.length,2);
   pending[1]();await current;
+});
+
+test('a delayed acknowledgement does not extend the stored presence expiry', async () => {
+  const pending=[];
+  const h=harness({writeImpl:()=>new Promise(resolve=>pending.push(resolve))});
+  h.advance(2500);const write=h.write();
+  h.advance(85_000);pending[0]();await write;
+  h.advance(6000);
+  // Do not await a second direct write: the old implementation incorrectly
+  // starts one, and its unresolved promise would obscure this assertion.
+  const recovery=h.write();
+  assert.deepEqual(h.calls.map(c=>c[0]),['write','admit']);
+  await recovery;
 });
