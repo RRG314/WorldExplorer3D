@@ -3,7 +3,7 @@ import './capture-theme.js';
 import {wallDirections} from './orientation.js';
 import {mountCaptureMap} from './map-context.js';
 import {loadClassicScript} from '../modules/script-loader.js?v=56';
-import {vendorScriptsCritical} from '../modules/manifest.js?v=605';
+import {vendorScriptsCritical} from '../modules/manifest.js?v=606';
 import {createCaptureViewer} from './result-viewer.js?v=2';
 import {wallFootprint,validateQuad,rectifyPhoto,buildHybridShell,buildWallPatch} from './hybrid-geometry.js?v=1';
 import {loadLocalCaptureDraft,saveLocalCaptureDraft,deleteLocalCaptureDraft} from './local-draft-store.js?v=1';

@@ -40,6 +40,10 @@ export function createOwnedPlanetaryWorldCache({ capacity = 2, releasePublicatio
       }
       return world;
     },
-    snapshot: () => ({ capacity, size: entries.size, bodyIds: [...entries.keys()] })
+    snapshot: () => ({ capacity, size: entries.size, bodyIds: [...entries.keys()],
+      attachedBodyIds: [...entries].filter(([, world]) =>
+        [world.surface, ...(world.objects || [])].some(root => root?.parent)
+      ).map(([id]) => id)
+    })
   });
 }

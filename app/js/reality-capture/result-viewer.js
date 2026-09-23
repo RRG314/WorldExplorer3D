@@ -1,6 +1,6 @@
 import {prepareHomePhotoSurfaces} from './home-photo-surfaces.js';
 import { loadClassicScript } from '../modules/script-loader.js?v=56';
-import { vendorScriptsCritical } from '../modules/manifest.js?v=605';
+import { vendorScriptsCritical } from '../modules/manifest.js?v=606';
 import { applyCaptureAlignment } from './alignment.js?v=1';
 
 export async function createCaptureViewer(host, bytes, signal, options = {}) {

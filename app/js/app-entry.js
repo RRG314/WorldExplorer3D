@@ -38,7 +38,7 @@ import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.j
 import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=1';
 import { installOnDemandLiveEarth } from './runtime/on-demand-live-earth.js?v=7';
 import { installOnDemandMars } from './runtime/on-demand-mars.js?v=1';
-import './planetary/solid-world-runtime.js?v=21';
+import './planetary/solid-world-runtime.js?v=22';
 import './planetary/vehicles.js?v=3';
 import './planetary/astronaut.js?v=4';
 import './planetary/sky-orientation.js?v=15';

@@ -11,7 +11,7 @@ import { playSurfacePodLaunch } from './surface-pod-launch.js?v=11';
 import { samplePhysicalEnvironment } from './runtime/physical-environment.js?v=2';
 import { clearActivePlanetaryObstacles, setActivePlanetaryObstacles } from './runtime/obstacle-authority.js?v=1';
 import { SOLID_SURFACE_TRAVEL_CAPABILITIES } from './traversal-capabilities.js?v=1';
-import { createOwnedPlanetaryWorldCache, disposeOwnedPlanetaryWorld } from './owned-world-cache.js?v=1';
+import { createOwnedPlanetaryWorldCache, disposeOwnedPlanetaryWorld } from './owned-world-cache.js?v=2';
 import {
   CALORIS_PLANITIA_SURFACE_REGION,
   CERES_OCCATOR_SURFACE_REGION,
@@ -1046,6 +1046,9 @@ async function arriveAtSolidWorld(bodyInput) {
   });
   try {
   suspendEarthModesForPlanetaryEntry(ENV.PLANETARY);
+  // The coordinator only exits when the environment enum changes. Two solid
+  // bodies both use PLANETARY, but their scene ownership must still change.
+  if (activePack) hideActiveWorld();
   appCtx.setPauseReason?.('planetary_transition', true);
   const world = await createSolidWorld(pack);
   if (requestId !== transitionId) return false;

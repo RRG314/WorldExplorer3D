@@ -53,6 +53,7 @@ try {
     assert.ok(state.surfaceVertices > 1000);
     assert.equal(state.cache.size, Math.min(2, index + 1));
     assert.ok(state.cache.bodyIds.includes(bodyId));
+    assert.deepEqual(state.cache.attachedBodyIds, [bodyId], 'cached planets must not remain attached to the active scene');
     if (index === 2) assert.equal(state.cache.bodyIds.includes('mercury'), false);
     await page.screenshot({ path: `${output}/${index}-${bodyId}.png` });
     worlds.push(state);
