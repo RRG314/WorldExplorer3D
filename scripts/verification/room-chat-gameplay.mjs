@@ -41,7 +41,7 @@ async function boot(label, mobile) {
   return { page, uid };
 }
 async function ready(page) {
-  await page.waitForFunction(() => { const s = window.getWorldExplorerRuntimeDiagnostics?.(); return s?.gameStarted && !s.worldLoading; }, null, { timeout: 90000 });
+  await page.waitForFunction(() => { const s = window.getWorldExplorerRuntimeDiagnostics?.(); return s?.gameStarted && !s.worldLoading && s.environment === 'MOON' && !s.planetary?.traveling; }, null, { timeout: 90000 });
 }
 try {
   const owner = await boot('owner', false);

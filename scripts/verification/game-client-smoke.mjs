@@ -16,8 +16,8 @@ try {
     'scripts/verification/web-game-ready-current.mjs',
     '--url', `http://127.0.0.1:${server.port}/app/?launch=moon&gm=free`,
     '--actions-json', JSON.stringify({ steps: [{ buttons: ['up'], frames: 24 }, { buttons: [], frames: 6 }] }),
-    '--click-selector', '#globeSelectorStartBtn', '--iterations', '2', '--pause-ms', '500', '--screenshot-dir', out
-  ], { stdio: 'inherit', env: { ...process.env, WE3D_REAL_GPU: '1', WE3D_TEST_MOBILE: '1', WE3D_TEST_PAUSE: '1' } });
+    '--click-selector', '#globeSelectorMoonBtn', '--iterations', '2', '--pause-ms', '500', '--screenshot-dir', out
+  ], { stdio: 'inherit', env: { ...process.env, WE3D_REAL_GPU: '1', WE3D_TEST_MOBILE: '1', WE3D_TEST_PAUSE: '1', WE3D_EXPECT_ENVIRONMENT: 'MOON' } });
   const code = await new Promise((resolve, reject) => {
     child.once('error', reject);
     child.once('exit', value => resolve(value ?? 1));
@@ -26,6 +26,7 @@ try {
   const runtime = JSON.parse(await fs.readFile(`${out}/runtime.json`));
   assert.equal(runtime.worldLoading, false);
   assert.equal(runtime.gameStarted, true);
+  assert.equal(runtime.environment, 'MOON');
   const pause = JSON.parse(await fs.readFile(`${out}/pause.json`));
   assert.equal(pause.ok, true);
   const report = { ok: true, buildId: manifest.buildId, evidenceScope: 'packaged Moon gameplay and keyboard pause/resume; not Earth coverage or performance', pause, modes: runtime.modes };

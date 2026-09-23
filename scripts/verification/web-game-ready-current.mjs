@@ -22,6 +22,11 @@ for(const [before,after] of patches){
  if(!source.includes(before)) throw new Error('Prescribed client changed; review readiness adapter before running.');
  source=source.replace(before,after);
 }
+if(process.env.WE3D_EXPECT_ENVIRONMENT) source=source.replace('await doChoreography(page, canvas, steps);', `await page.waitForFunction(expected => {
+ const s=window.getWorldExplorerRuntimeDiagnostics?.();
+ return s?.environment===expected && s.gameStarted && !s.worldLoading && !s.planetary?.traveling && !document.getElementById('loading')?.classList.contains('show');
+}, ${JSON.stringify(process.env.WE3D_EXPECT_ENVIRONMENT)}, {timeout:90000});
+await doChoreography(page, canvas, steps);`);
 // A failed start is a failed test, not a successful menu screenshot.
 source=source.replace('console.warn("Failed to click selector", args.clickSelector, err);','throw err;');
 // The generic client captures console errors but exits successfully. A release
@@ -32,6 +37,11 @@ source=source.replace('if (freshErrors.length) {', 'if (freshErrors.length) { pr
 source=source.replace('await captureScreenshot(page, canvas, shotPath);', 'await page.screenshot({path:shotPath, type:"png"});\nfs.writeFileSync(path.join(args.screenshotDir,"runtime.json"),JSON.stringify(await page.evaluate(()=>window.getWorldExplorerRuntimeDiagnostics?.()),null,2));');
 if(process.env.WE3D_TEST_PAUSE==='1') source=source.replace('await doChoreography(page, canvas, steps);', `await doChoreography(page, canvas, steps);
 if(i===0){
+ await page.screenshot({path:path.join(args.screenshotDir,'before-pause.png')});
+ fs.writeFileSync(path.join(args.screenshotDir,'before-pause.json'),JSON.stringify(await page.evaluate(()=>({
+  runtime:window.getWorldExplorerRuntimeDiagnostics?.(),
+  canvases:[...document.querySelectorAll('canvas')].map(e=>({id:e.id,style:e.getAttribute('style'),display:getComputedStyle(e).display,visibility:getComputedStyle(e).visibility,rect:e.getBoundingClientRect().toJSON()}))
+ })),null,2));
  await page.locator('body > canvas:not(#minimap)').click();
  await page.keyboard.press('Escape');
  await page.locator('#pauseScreen.show').waitFor({state:'visible'});
