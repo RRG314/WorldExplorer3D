@@ -80,7 +80,7 @@ async function createPlayer(label, viewport) {
     const auth = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js');
     const credential = await auth.createUserWithEmailAndPassword(services.auth, email, 'WorldExplorer3D-Test-Only-93!');
     await auth.updateProfile(credential.user, { displayName: label });
-    const authUi = await import('/js/auth-ui.js?v=55');
+    const authUi = await import('/js/auth-ui.js?v=56');
     const deadline = Date.now() + 12_000;
     while (authUi.getCurrentUser()?.uid !== credential.user.uid && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 50));

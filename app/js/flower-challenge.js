@@ -4,8 +4,8 @@ import { createFlowerLeaderboardView } from "./flower-challenge/leaderboard-view
 import { createFlowerMarkerRuntime } from "./flower-challenge/marker-runtime.js?v=1";
 import { normalizeLeaderboardId } from "./leaderboards/catalog.js?v=2";
 import { emitProductTelemetry } from "./platform/product-telemetry.js?v=1";
-import { getCurrentUser } from "../../js/auth-ui.js?v=55";
-import { initFirebase } from "../../js/firebase-init.js?v=57";
+import { getCurrentUser } from "../../js/auth-ui.js?v=56";
+import { initFirebase } from "../../js/firebase-init.js?v=58";
 
 const LOCAL_LEADERBOARD_KEY = 'worldExplorer3D.flowerChallenge.localLeaderboard.v1';
 const LOCAL_PAINT_LEADERBOARD_KEY = 'worldExplorer3D.paintTown.localLeaderboard.v1';

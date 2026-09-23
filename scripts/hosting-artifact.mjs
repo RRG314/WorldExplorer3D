@@ -46,8 +46,8 @@ const GAME_RUNTIME_ENTRYPOINTS = Object.freeze({
 const ROOT_SHARED_MODULE_DIR = path.join(ROOT, 'js');
 const GAME_SHARED_CONTEXT_MODULE = 'app/js/shared-context.js';
 const REQUIRED_EXTERNAL_ROOT_MODULES = Object.freeze([
-  '/js/firebase-init.js?v=57',
-  '/js/auth-ui.js?v=55',
+  '/js/firebase-init.js?v=58',
+  '/js/auth-ui.js?v=56',
   '/app/js/shared-context.js?v=55'
 ]);
 const INDIRECT_RUNTIME_ENTRYPOINTS = new Set([

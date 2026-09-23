@@ -1,5 +1,5 @@
-import { getCurrentUserToken } from './auth-ui.js?v=55';
-import { getFirebaseAppCheckToken, readFirebaseConfig } from './firebase-init.js?v=57';
+import { getCurrentUserToken } from './auth-ui.js?v=56';
+import { getFirebaseAppCheckToken, readFirebaseConfig } from './firebase-init.js?v=58';
 import { assertFunctionsOrigin } from './firebase-environment-policy.js';
 
 const DEFAULT_FUNCTIONS_REGION = 'us-central1';

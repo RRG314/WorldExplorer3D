@@ -26,7 +26,7 @@ async function newAccount(admin=false){
 async function call(page,path,body){return page.evaluate(async({path,body})=>(await import('/js/function-api.js?v=1')).postProtectedFunction(path,body),{path,body});}
 async function deleteTestAccount(account){
  // Recent reauthentication is required by the real account deletion endpoint.
- await account.page.evaluate(async({email,password})=>(await import('/js/auth-ui.js?v=55')).signInWithEmailPassword(email,password),{email:account.email,password:account.password});
+ await account.page.evaluate(async({email,password})=>(await import('/js/auth-ui.js?v=56')).signInWithEmailPassword(email,password),{email:account.email,password:account.password});
  await call(account.page,'/deleteAccount',{confirmation:'DELETE'});account.deleted=true;
  const result=await storage.get(`/storage/v1/b/${bucket}/o`,{queryParams:{prefix:`reality-captures/${account.localId}/`,versions:true}});assert.equal((result.body.items||[]).length,0);
 }

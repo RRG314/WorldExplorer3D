@@ -1,4 +1,5 @@
 import {
+  browserPopupRedirectResolver,
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
   getRedirectResult,
@@ -11,7 +12,7 @@ import {
   signOut,
   updateProfile
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
-import { initFirebase } from './firebase-init.js?v=57';
+import { initFirebase, setAuthRedirectPending } from './firebase-init.js?v=58';
 
 const provider = new GoogleAuthProvider();
 provider.setCustomParameters({ prompt: 'select_account' });
@@ -52,7 +53,7 @@ export async function resolveRedirectSignIn() {
   const auth = getFirebaseAuth();
   if (!auth) return null;
   try {
-    const result = await getRedirectResult(auth);
+    const result = await getRedirectResult(auth, browserPopupRedirectResolver);
     return result && result.user ? result.user : auth.currentUser;
   } catch (err) {
     console.warn('[auth] Redirect sign-in result failed:', err);
@@ -83,12 +84,18 @@ export async function signInWithGoogle() {
   if (auth.currentUser) return auth.currentUser;
 
   try {
-    const result = await signInWithPopup(auth, provider);
+    const result = await signInWithPopup(auth, provider, browserPopupRedirectResolver);
     return result.user;
   } catch (err) {
     const code = String(err && err.code ? err.code : '');
     if (code.includes('popup-blocked') || code.includes('popup-closed-by-user') || code.includes('cancelled-popup-request')) {
-      await signInWithRedirect(auth, provider);
+      setAuthRedirectPending(true);
+      try {
+        await signInWithRedirect(auth, provider, browserPopupRedirectResolver);
+      } catch (redirectError) {
+        setAuthRedirectPending(false);
+        throw new Error(friendlyAuthMessage(redirectError));
+      }
       return null;
     }
     throw new Error(friendlyAuthMessage(err));

@@ -1422,8 +1422,16 @@ const htmlFailures = [
   ...await htmlResourceFailures(path.join(root, 'app', 'index.html'))
 ];
 
-const moduleFiles = (await filesUnder(path.join(root, 'app', 'js')))
-  .filter((filePath) => filePath.endsWith('.js') || filePath.endsWith('.mjs'));
+// Include public/account entry points and their shared modules. Checking only
+// app/js misses duplicate service owners introduced by an inline page import.
+const moduleFiles = [
+  ...await filesUnder(path.join(root, 'app')),
+  ...await filesUnder(path.join(root, 'js')),
+  ...await filesUnder(path.join(root, 'account')),
+  ...await filesUnder(path.join(root, 'about')),
+  ...await filesUnder(path.join(root, 'legal')),
+  path.join(root, 'index.html'), path.join(root, 'about.html')
+].filter((filePath) => /\.(?:m?js|html)$/.test(filePath));
 const missingModuleTargets = [];
 const identitiesByTarget = new Map();
 for (const importer of moduleFiles) {

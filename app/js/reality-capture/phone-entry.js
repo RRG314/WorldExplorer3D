@@ -1,4 +1,4 @@
-import { observeAuth, getCurrentUser, signInWithGoogle, signInWithEmailPassword, signOutUser, resolveRedirectSignIn } from '../../../js/auth-ui.js?v=55';
+import { observeAuth, getCurrentUser, signInWithGoogle, signInWithEmailPassword, signOutUser, resolveRedirectSignIn } from '../../../js/auth-ui.js?v=56';
 import { listMyRealityCaptures } from '../../../js/community-reality-capture-api.js?v=4';
 import { openRealityCaptureSession, closeRealityCapture } from './ui.js?v=2';
 import {groupCaptureBuildings,captureLabel} from './workflow-presentation.js';

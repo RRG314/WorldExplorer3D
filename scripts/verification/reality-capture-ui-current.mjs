@@ -27,11 +27,11 @@ async function makePage(viewport, mobile = false) {
     const url = new URL(route.request().url());
     const module = body => route.fulfill({ contentType: 'text/javascript', body });
     if (url.pathname.endsWith('/auth-ui.js')) return module(authModule);
-    if (url.pathname.endsWith('/firebase-init.js')) return module(`import {getCurrentUser} from '/js/auth-ui.js?v=55';export const initFirebase=()=>({db:{},storage:{},auth:{get currentUser(){return getCurrentUser()}}});`);
+    if (url.pathname.endsWith('/firebase-init.js')) return module(`import {getCurrentUser} from '/js/auth-ui.js?v=56';export const initFirebase=()=>({db:{},storage:{},auth:{get currentUser(){return getCurrentUser()}}});`);
     // This component fixture has no notification events. Real Firestore receipt
     // delivery is exercised by the staging acceptance, not this transport double.
     if(url.pathname.endsWith('firebase-firestore.js'))return module(`export const collection=(...args)=>args;export const query=(...args)=>args;export const orderBy=(...args)=>args;export const limit=n=>n;export const onSnapshot=(_,next)=>{queueMicrotask(()=>next({docs:[]}));return()=>{}};`);
-    if (url.pathname.endsWith('/function-api.js')) return module(`import {getCurrentUser} from '/js/auth-ui.js?v=55';export async function postProtectedFunction(name,body={}){const r=await fetch('/__test'+name,{method:'POST',body:JSON.stringify({uid:getCurrentUser()?.uid,...body})});const data=await r.json();if(!r.ok){const e=new Error(data.error);e.status=r.status;throw e;}return data;}export const postAppCheckedFunction=postProtectedFunction;`);
+    if (url.pathname.endsWith('/function-api.js')) return module(`import {getCurrentUser} from '/js/auth-ui.js?v=56';export async function postProtectedFunction(name,body={}){const r=await fetch('/__test'+name,{method:'POST',body:JSON.stringify({uid:getCurrentUser()?.uid,...body})});const data=await r.json();if(!r.ok){const e=new Error(data.error);e.status=r.status;throw e;}return data;}export const postAppCheckedFunction=postProtectedFunction;`);
     if (url.pathname.startsWith('/__test/')) {
       const action = url.pathname.slice(8), input=action==='upload'?{path:url.searchParams.get('path'),sector:url.searchParams.get('sector')}:route.request().postDataJSON();
       const json = (body, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
@@ -347,7 +347,7 @@ try {
   if(await phone.locator('#googleSignIn').isVisible())await phone.click('#googleSignIn');
   await phone.locator('#realityCapturePanel.show').waitFor();
   assert.equal(await phone.locator('[data-capture-count]').textContent(),videoCount);
-  await phone.evaluate(async () => (await import('/js/auth-ui.js?v=55')).setUser('other'));
+  await phone.evaluate(async () => (await import('/js/auth-ui.js?v=56')).setUser('other'));
   assert.equal(await phone.locator('#realityCapturePanel.show').count(), 0);
   await phone.waitForFunction(() => document.getElementById('phoneStatus').textContent.includes('unavailable for this account'));
   // Exercise the actual shared Three.js review renderer. This deliberately

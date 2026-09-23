@@ -1,5 +1,5 @@
 import './capture-theme.js';
-import {observeAuth} from '../../../js/auth-ui.js?v=55';
+import {observeAuth} from '../../../js/auth-ui.js?v=56';
 import {normalizeCapturePhoto} from '../../../js/community-reality-capture-api.js?v=4';
 import {saveLocalCapturePhoto} from './local-draft-store.js?v=1';
 import {loadSurvey,saveSurvey,surveyOwner,surveyBuildingKey,localSurveyEnabled} from './survey-store.js';

@@ -41,6 +41,11 @@ const cdp = await context.newCDPSession(page);
 const browserErrors = [];
   collectBrowserGraphicsErrors(page, browserErrors);
 const localFailures = [];
+const authIframeRequests = [];
+page.on('request', request => {
+  if (/\/(__\/auth\/iframe)(?:[?.]|$)/.test(new URL(request.url()).pathname)) authIframeRequests.push(request.url());
+});
+const touchTimingReceipts = [];
 page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
 page.on('response', (response) => {
   if (response.url().startsWith(baseUrl) && response.status() >= 400) localFailures.push({ url: response.url(), status: response.status() });
@@ -78,8 +83,12 @@ async function touchDrag(selector, deltaX, deltaY, holdMs = 900) {
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point(start)] });
   await page.waitForTimeout(80);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [point(end)] });
-  await page.waitForTimeout(holdMs);
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  try {
+    if (selector === '#largeMapCanvas') await page.waitForTimeout(holdMs);
+    else touchTimingReceipts.push({ selector, holdMs, receipt: await advanceGameplay(page, holdMs) });
+  } finally {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  }
   await page.waitForTimeout(90);
 }
 
@@ -416,6 +425,7 @@ try {
       reloadedWalkState.mobileControls?.move?.active !== true && reloadedWalkState.mobileControls?.look?.active !== true &&
       resetWalkState.activeActor?.mode === 'walk',
     savedSettingsPresent: await page.evaluate(() => !!localStorage.getItem('world-explorer-mobile-controls-v1')),
+    noUnrequestedAuthIframe: authIframeRequests.length === 0,
     noBrowserErrors: browserErrors.length === 0,
     noFailedLocalResources: localFailures.length === 0
   };
@@ -438,7 +448,7 @@ try {
       planeBefore: planeBefore.activeActor?.orientation,
       planeAfter: planeControlled.activeActor?.orientation
     },
-    browserErrors, localFailures, memorySnapshots
+    browserErrors, localFailures, memorySnapshots, authIframeRequests, touchTimingReceipts
   };
   await writeFile('output/verification/mobile-controls/report.json', JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));

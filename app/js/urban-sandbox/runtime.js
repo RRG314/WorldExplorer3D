@@ -32,7 +32,7 @@ import { createConnectedExplorerWallet } from '../economy/connected-wallet-autho
 import { ensurePlayerConditionAuthority } from '../player/condition-model.js?v=1';
 import { createConnectedPlayerState } from '../player/connected-player-state.js?v=1';
 import { ensureVehicleUpgradeStore, parseUpgradeServiceId, stableVehicleIdentity } from '../transport/vehicle-upgrades.js?v=1';
-import { getCurrentUser } from '../../../js/auth-ui.js?v=55';
+import { getCurrentUser } from '../../../js/auth-ui.js?v=56';
 import { emitProductTelemetry } from '../platform/product-telemetry.js?v=1';
 import { claimLootPickup, createLootPickup } from './loot-pickup-model.js?v=1';
 import { NPC_COMBAT_STATES, resolveNpcCombatState } from './npc-combat-policy.js?v=2';

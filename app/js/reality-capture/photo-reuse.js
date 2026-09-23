@@ -2,7 +2,7 @@ import './capture-theme.js';
 import {sameCaptureBuilding} from '../../../functions/capture-target.mjs';
 import {listMyRealityCaptures,getMyRealityCapture,getRealityCaptureAssetAccess} from '../../../js/community-reality-capture-api.js?v=4';
 import {listLocalCaptureDrafts,loadLocalCaptureDraft} from './local-draft-store.js?v=1';
-import {getCurrentUser} from '../../../js/auth-ui.js?v=55';
+import {getCurrentUser} from '../../../js/auth-ui.js?v=56';
 import {mountCaptureStep} from './workspace-navigation.js';
 
 export async function chooseReusablePhotos({uid,building,captureId,kind,signal}) {

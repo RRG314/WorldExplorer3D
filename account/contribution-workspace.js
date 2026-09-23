@@ -1,4 +1,4 @@
-import {observeAuth,getCurrentUser} from '../js/auth-ui.js?v=55';
+import {observeAuth,getCurrentUser} from '../js/auth-ui.js?v=56';
 import {mountReviewWorkspace,mountContributionWorkspace} from '../app/js/reality-capture/review-workspace.js';
 let dispose=()=>{},mounted='';
 function update(){

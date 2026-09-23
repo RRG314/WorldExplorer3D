@@ -1,5 +1,5 @@
-import {initFirebase} from './firebase-init.js?v=57';
-import {observeAuth} from './auth-ui.js?v=55';
+import {initFirebase} from './firebase-init.js?v=58';
+import {observeAuth} from './auth-ui.js?v=56';
 import {collection,query,orderBy,limit,onSnapshot} from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 
 // Reuses the existing owner-only account notification collection. No photos,

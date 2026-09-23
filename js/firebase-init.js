@@ -1,5 +1,5 @@
 import { getApp, getApps, initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
-import { connectAuthEmulator, getAuth } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
+import { connectAuthEmulator, initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence, browserPopupRedirectResolver, getRedirectResult } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
 import { connectFirestoreEmulator, getFirestore } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { connectStorageEmulator, getStorage } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-storage.js';
 import {
@@ -14,6 +14,20 @@ import { FIREBASE_CONFIG_STORAGE_KEY, normalizeConfig, readFirebaseConfig, hasFi
 
 let cachedServices = null;
 let cachedAppCheck = null;
+const AUTH_REDIRECT_PENDING_KEY = 'world-explorer-auth-redirect-pending';
+
+export function setAuthRedirectPending(pending) {
+  try {
+    if (pending) sessionStorage.setItem(AUTH_REDIRECT_PENDING_KEY, '1');
+    else sessionStorage.removeItem(AUTH_REDIRECT_PENDING_KEY);
+  } catch {
+    if (pending) throw new Error('Browser session storage is unavailable. Enable it before redirect sign-in.');
+  }
+}
+function hasPendingAuthRedirect() {
+  try { return sessionStorage.getItem(AUTH_REDIRECT_PENDING_KEY) === '1'; }
+  catch { return false; }
+}
 
 function readEmulatorConfig() {
   const raw = globalThis.WORLD_EXPLORER_FIREBASE_EMULATORS;
@@ -33,7 +47,11 @@ export function initFirebase() {
   const app = getApps().length > 0 ? getApp() : initializeApp(config);
   assertFirebaseEnvironment(app.options);
   if (app.options.projectId !== config.projectId) throw new Error('Firebase environment changed. Reload before continuing.');
-  const auth = getAuth(app);
+  // Keep persistent sessions, but do not pre-open Google's OAuth iframe on
+  // mobile gameplay. Popup/redirect callers supply the resolver explicitly.
+  const auth = initializeAuth(app, {
+    persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence]
+  });
   const db = getFirestore(app);
   const storage = getStorage(app);
   const emulator = readEmulatorConfig();
@@ -56,6 +74,12 @@ export function initFirebase() {
   }
 
   cachedServices = { app, auth, db, storage, appCheck: cachedAppCheck, config, emulator };
+  if (hasPendingAuthRedirect()) {
+    // A real redirect return must recover without requiring a second click.
+    void getRedirectResult(auth, browserPopupRedirectResolver)
+      .catch(error => console.warn('[auth] Redirect recovery failed:', error))
+      .finally(() => setAuthRedirectPending(false));
+  }
   return cachedServices;
 }
 

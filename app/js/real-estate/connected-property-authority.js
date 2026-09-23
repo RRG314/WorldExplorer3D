@@ -6,8 +6,8 @@ import {
   query,
   where
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
-import { getCurrentUser } from '../../../js/auth-ui.js?v=55';
-import { initFirebase } from '../../../js/firebase-init.js?v=57';
+import { getCurrentUser } from '../../../js/auth-ui.js?v=56';
+import { initFirebase } from '../../../js/firebase-init.js?v=58';
 import { commitWorldPropertyAction, commitWorldPropertyTradeAction } from '../../../js/property-api.js?v=3';
 
 const LOCATION_PROPERTY_LIMIT = 320;

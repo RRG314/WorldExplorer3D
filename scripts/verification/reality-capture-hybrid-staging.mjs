@@ -25,7 +25,7 @@ try{
   }
   await page.goto(origin+'/app/capture.html');await page.locator('#googleSignIn').waitFor({state:'visible'});
   config=await page.evaluate(()=>globalThis.WORLD_EXPLORER_FIREBASE);assert.equal(config.projectId,production?'worldexplorer3d-d9b83':'we3d-staging-20260712');
-  assert.equal(await page.evaluate(async()=>!!(await(await import('/js/firebase-init.js?v=57')).getFirebaseAppCheckToken())),true,'Registered staging automation identity must obtain an App Check token before creating test records');
+  assert.equal(await page.evaluate(async()=>!!(await(await import('/js/firebase-init.js?v=58')).getFirebaseAppCheckToken())),true,'Registered staging automation identity must obtain an App Check token before creating test records');
   const email=`hybrid-smoke-${Date.now()}@example.test`,password=randomBytes(24).toString('base64url');
   const response=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${config.apiKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password,returnSecureToken:true})});account=await response.json();assert.ok(response.ok,account.error?.message);
   await page.locator('[name=email]').fill(email);await page.locator('[name=password]').fill(password);await page.locator('#emailSignIn button').click();await page.locator('#phoneCaptures').waitFor({state:'visible'});

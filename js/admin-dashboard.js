@@ -1,7 +1,7 @@
 // Building review lives in the account workspace; preserve old review links.
 if(new URL(location.href).searchParams.get('view')==='moderation'&&(!new URL(location.href).searchParams.get('queue')||new URL(location.href).searchParams.get('queue')==='reality')){const target=new URL('./',location.href);target.searchParams.set('section','review');const capture=new URL(location.href).searchParams.get('capture');if(capture)target.searchParams.set('capture',capture);location.replace(target.href);}
-import { hasFirebaseConfig } from './firebase-init.js?v=57';
-import { ensureSignedIn, observeAuth, signOutUser } from './auth-ui.js?v=55';
+import { hasFirebaseConfig } from './firebase-init.js?v=58';
+import { ensureSignedIn, observeAuth, signOutUser } from './auth-ui.js?v=56';
 import { enableAdminTester, getAccountOverview } from './billing.js?v=58';
 import {
   getAdminDashboardOverview,
@@ -828,7 +828,7 @@ async function mountRealityModelPreview(url, capture) {
   const approve = document.getElementById('captureApproveBtn');
   if (approve) approve.disabled = true;
   try {
-    const { createCaptureViewer } = await import('../app/js/reality-capture/result-viewer.js?v=1');
+    const { createCaptureViewer } = await import('../app/js/reality-capture/result-viewer.js?v=2');
     const response = await fetch(url, { signal: controller.signal, cache: 'no-store', credentials: 'omit' });
     if (!response.ok) throw Error('protected_model_unavailable');
     viewer = await createCaptureViewer(host, await response.arrayBuffer(), controller.signal, {

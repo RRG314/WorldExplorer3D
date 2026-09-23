@@ -1,5 +1,5 @@
 import { postAppCheckedFunction, postProtectedFunction } from './function-api.js?v=3';
-import { initFirebase } from './firebase-init.js?v=57';
+import { initFirebase } from './firebase-init.js?v=58';
 
 
 const CLIENT_LIMITS = Object.freeze({

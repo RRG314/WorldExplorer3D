@@ -18,7 +18,7 @@ import {
   normalizeCapturePhoto,
   uploadRealityCapturePhoto
 } from '../../../js/community-reality-capture-api.js?v=4';
-import { getCurrentUser, observeAuth, signInWithGoogle, signInWithEmailPassword, signOutUser } from '../../../js/auth-ui.js?v=55';
+import { getCurrentUser, observeAuth, signInWithGoogle, signInWithEmailPassword, signOutUser } from '../../../js/auth-ui.js?v=56';
 import { captureDraftKey, capturePhoneUrl, mergedCapturePhotos, captureIsEditable } from './capture-session.js?v=1';
 import {
   deleteLocalCaptureDraft,

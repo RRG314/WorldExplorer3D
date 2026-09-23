@@ -1,4 +1,4 @@
-import {getCurrentUser} from '../../../js/auth-ui.js?v=55';
+import {getCurrentUser} from '../../../js/auth-ui.js?v=56';
 import {loadLocalCaptureDraft,saveLocalCaptureDraftIfVersion} from './local-draft-store.js?v=1';
 export const localSurveyEnabled=()=>['localhost','127.0.0.1','[::1]'].includes(location.hostname);
 export const surveyOwner=()=>{const u=getCurrentUser();return u&&!u.isAnonymous?u.uid:'local-device';};

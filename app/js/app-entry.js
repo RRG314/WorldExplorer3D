@@ -1,6 +1,6 @@
 // ES module entrypoint with explicit application boot contract.
 // Import order mirrors legacy runtime dependencies.
-import { getCurrentUser, observeAuth } from '../../js/auth-ui.js?v=55';
+import { getCurrentUser, observeAuth } from '../../js/auth-ui.js?v=56';
 import { setupAnalyticsConsentUi } from '../../js/analytics-consent.js?v=3';
 import './procedural-random.js?v=1';
 import './config.js?v=63';

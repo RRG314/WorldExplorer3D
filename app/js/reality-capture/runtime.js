@@ -146,7 +146,7 @@ export async function refreshCommunityRealityCapturePresentation(appCtx) {
   const worldId = worldModificationIdentityForLocation(appCtx.LOC || {});
   if (!worldId || !appCtx.initialEarthWorldReady) return null;
   const intent=readCaptureIntent();
-  if(intent&&!appCtx._captureSignInResume){appCtx._captureSignInResume=true;void import('../../../js/auth-ui.js?v=55').then(async({getCurrentUser})=>{const user=getCurrentUser();if(!user||user.isAnonymous)return;const ui=await import('./ui.js?v=2');clearCaptureIntent();const target=intent.target,building=target&&(appCtx.buildings||[]).find(b=>b.sourceBuildingId===target.sourceBuildingId);if(building)await ui.openRealityCaptureForBuilding(appCtx,{id:building.sourceBuildingId,label:target.label,position:{x:buildingCenter(building).x,z:buildingCenter(building).z}});else await ui.openRealityCaptureLibrary(appCtx,target);}).catch(()=>{}).finally(()=>appCtx._captureSignInResume=false);}
+  if(intent&&!appCtx._captureSignInResume){appCtx._captureSignInResume=true;void import('../../../js/auth-ui.js?v=56').then(async({getCurrentUser})=>{const user=getCurrentUser();if(!user||user.isAnonymous)return;const ui=await import('./ui.js?v=2');clearCaptureIntent();const target=intent.target,building=target&&(appCtx.buildings||[]).find(b=>b.sourceBuildingId===target.sourceBuildingId);if(building)await ui.openRealityCaptureForBuilding(appCtx,{id:building.sourceBuildingId,label:target.label,position:{x:buildingCenter(building).x,z:buildingCenter(building).z}});else await ui.openRealityCaptureLibrary(appCtx,target);}).catch(()=>{}).finally(()=>appCtx._captureSignInResume=false);}
 
   const serial = ++refreshSerial;
   try {
@@ -214,7 +214,7 @@ export function installCommunityRealityCaptureRuntime(appCtx) {
   }
   if(isLocal){
     window.addEventListener('we3d-local-survey-changed',()=>{void refreshCommunityRealityCapturePresentation(appCtx);});
-    void import('../../../js/auth-ui.js?v=55').then(({observeAuth})=>observeAuth(()=>{
+    void import('../../../js/auth-ui.js?v=56').then(({observeAuth})=>observeAuth(()=>{
       for(const id of instances.keys())if(id.startsWith('local-survey:'))removeInstance(appCtx,id);
       if(appCtx.initialEarthWorldReady)void refreshCommunityRealityCapturePresentation(appCtx);
     }));

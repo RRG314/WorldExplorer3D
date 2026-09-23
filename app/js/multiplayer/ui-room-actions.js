@@ -1,4 +1,4 @@
-import { getCurrentUser } from "../../../js/auth-ui.js?v=55";
+import { getCurrentUser } from "../../../js/auth-ui.js?v=56";
 import { emitProductTelemetry } from "../platform/product-telemetry.js?v=1";
 import { createArtifact, removeArtifact } from "./artifacts.js?v=57";
 import { sendMessage } from "./chat.js?v=56";
