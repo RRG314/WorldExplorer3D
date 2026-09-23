@@ -152,3 +152,11 @@ suspended/incomplete simulation and exhausted recovery budgets. The earlier
 software-rendered wall-clock observations (drive 31.63 degrees after 2.5s and
 plane 9.42 degrees after 6s) remain failed responsiveness evidence; this functional
 check does not turn them into physical-phone latency acceptance.
+
+The two-client vehicle journey uses hash-verified recorded public map responses
+for its exact desktop/mobile primary queries. This isolates room/lease behavior
+from an unavailable public map provider; remaining providers use normal loading.
+Raw provider timestamps and attribution are retained in tests/fixtures/multiplayer.
+No world/actor/vehicle state is assigned by this fixture. Live-provider and fallback
+acceptance still belong to their separate candidate gates. The earlier run with
+zero nearby vehicles and failed Overpass remains failed evidence.

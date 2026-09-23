@@ -14,3 +14,21 @@ test('non-Overpass bodies, hosts and byte ranges remain distinct',()=>{
  assert.notDeepEqual(key({...base,method:'POST',body:'[timeout:8]'}),key({...base,method:'POST',body:'[timeout:20]'}));
  assert.equal(key(base).semanticOverpass,false);
 });
+
+
+test('backend map replay verifies captured bytes and only fulfills the exact query', async () => {
+ const {installRecordedOverpassFixture}=await import('../scripts/verification/recorded-overpass-fixture.mjs');
+ const {readFile}=await import('node:fs/promises');
+ for(const profile of ['desktop','mobile']){
+  const meta=JSON.parse(await readFile(new URL(`./fixtures/multiplayer/logan-primary-${profile}.meta.json`,import.meta.url),'utf8'));
+  let handler;const context={route:async(_pattern,fn)=>{handler=fn;}};
+  const receipt=await installRecordedOverpassFixture(context,profile);
+  let fulfilled=0,continued=0;
+  for(const exact of [false,true]){
+   const query=exact?meta.query.replace('[timeout:30]','[timeout:8]'):meta.query.replace('41.7','42.7');
+   await handler({request:()=>({method:()=> 'POST',url:()=> 'https://overpass.private.coffee/api/interpreter',postData:()=>new URLSearchParams({data:query}).toString()}),
+    continue:async()=>{continued++;},fulfill:async result=>{fulfilled++;assert.equal(result.status,200);assert.equal(JSON.parse(result.body).elements.length,meta.elements);}});
+  }
+  assert.equal(fulfilled,1);assert.equal(continued,1);assert.equal(receipt.hits,1);
+ }
+});

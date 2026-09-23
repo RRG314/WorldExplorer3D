@@ -4,6 +4,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 import { advanceGameplay, stepGameplayKeys } from './gameplay-simulation.mjs';
+import { installRecordedOverpassFixture } from './recorded-overpass-fixture.mjs';
 import { pauseWaitingPlayer as pauseWaitingPage } from './pause-waiting-player.mjs';
 import { selectLowRenderQuality } from './render-quality-ui.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
@@ -52,7 +53,8 @@ const browserBudget = {
   foregroundGameplayWorlds: 1, waitingClient: 'normal manual-pause UI; network listeners remain active',
   viewport: { width: 1280, height: 800 }, deviceScaleFactor, roomStateWait,
   memberViewport: { width: 390, height: 844 },
-  navigationTiming: 'dom-keyboard-fixed-step-with-network-yields',
+  navigationTiming: 'bounded fixed-step walking; network-yielding driving',
+  mapEvidence: 'exact recorded public Overpass queries; remaining providers use normal loading',
   evidenceScope: 'multiplayer-functional', worldLocation
 };
 browserBudget.renderQuality = process.env.CI ? 'low (selected through Settings)' : 'default';
@@ -72,6 +74,7 @@ async function createPlayer(label) {
     viewport: mobile ? browserBudget.memberViewport : browserBudget.viewport,
     deviceScaleFactor, isMobile: mobile, hasTouch: mobile
   });
+  const providerFixture = await installRecordedOverpassFixture(context, mobile ? 'mobile' : 'desktop');
   await context.addInitScript(({ functionsBase, firebaseConfig }) => {
     // Firestore emulator data is namespaced by the Firebase app project ID.
     // Match the Functions emulator project so browser writes and Admin SDK
@@ -173,7 +176,7 @@ async function createPlayer(label) {
     email: `${label}-${runId}@example.test`,
     displayName: label === 'owner' ? 'Room Owner' : 'Room Member'
   });
-  return { context, page, identity, browserErrors, interactionTrace };
+  return { context, page, identity, browserErrors, interactionTrace, providerFixture };
 }
 
 function wrapYaw(value) {
@@ -223,6 +226,7 @@ async function launchRoomWorld(player) {
     return state.gameStarted === true && state.worldLoading === false && state.activeActor?.mode === 'walk' &&
       state.urbanSandbox?.active === true && Number(state.urbanSandbox?.vehicleCount || 0) > 0;
   }, null, { timeout: 360_000, polling: 500 });
+  assert.ok(player.providerFixture.hits > 0, 'Expected exact recorded map query was not consumed');
   const origin = await player.page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().earthOrigin);
   assert.ok(Math.abs(origin?.lat-worldLocation.lat)<1e-6 && Math.abs(origin?.lon-worldLocation.lon)<1e-6,
     `Loaded room world differs from selected city: ${JSON.stringify({expected:worldLocation,actual:origin})}`);
@@ -618,6 +622,7 @@ try {
   await member.page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.phase === 'walking', null, roomStateWait);
 
   const checks = {
+    recordedMapQueriesConsumed: owner.providerFixture.hits > 0 && member.providerFixture.hits > 0,
     distinctAuthenticatedPlayers: owner.identity.uid !== member.identity.uid,
     ownerCreatedBoundedPrivateRoom:
       room.visibility === 'private' && Number(room.maxPlayers) >= 2 && Number(room.maxPlayers) <= 32,
@@ -642,6 +647,7 @@ try {
     ok: true,
     complete: true,
     browserBudget,
+    providerFixtures: {owner: owner.providerFixture, member: member.providerFixture},
     pauseReceipts,
     contract: 'two-authenticated-clients-bounded-room-convergence',
     generatedAt: new Date().toISOString(),
@@ -682,6 +688,7 @@ try {
       vehiclePrompt: document.getElementById('urbanVehiclePrompt')?.textContent || '',
       inputTrace: globalThis.__multiplayerInputTrace || []
     })).catch(failure => ({ captureError: String(failure) }));
+    clients[label].providerFixture = player.providerFixture;
     clients[label].interactionTrace = player.interactionTrace;
     clients[label].browserErrors = player.browserErrors;
     await player.page.screenshot({ path: path.join(path.dirname(reportPath), `${label}-failure.png`), timeout: 5000 }).catch(() => {});
