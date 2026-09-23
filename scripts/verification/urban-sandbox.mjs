@@ -4,6 +4,8 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 import { advanceGameplay, stepGameplayKeys } from './gameplay-simulation.mjs';
+import { selectLowRenderQuality } from './render-quality-ui.mjs';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 
 const root = process.cwd();
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
@@ -42,6 +44,7 @@ async function saveJourneyFailure(page, journey, error) {
 }
 
 function bindEvidence(page) {
+  collectBrowserGraphicsErrors(page, browserErrors);
   page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   page.on('response', (response) => {
     if (response.url().startsWith(baseUrl) && response.status() >= 400) {
@@ -204,6 +207,7 @@ async function launchBaltimore(page) {
   });
   await page.goto(`${baseUrl}/app/?${params}`, { waitUntil: 'load', timeout: 120_000 });
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
+  if (process.env.CI) await selectLowRenderQuality(page);
   await page.getByRole('button', { name: 'Explore', exact: true }).click();
   await page.waitForFunction(() => {
     if (document.getElementById('loading')?.classList.contains('show')) return false;
@@ -546,10 +550,11 @@ async function runVehicleEquipmentJourney() {
       return urban?.phase === 'enter' && Math.abs(Number(current?.driverDoor?.openRadians || 0)) > 0.05;
     }, vehicle.id, { timeout: 5_000 });
     const entering = await diagnostics(page);
+    const entryTiming = await advanceGameplay(page, 650);
     await page.waitForFunction((vehicleId) => {
       const urban = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox;
       return urban?.phase === 'driving' && urban.activeVehicleId === vehicleId;
-    }, vehicle.id, { timeout: 8_000 });
+    }, vehicle.id, { timeout: 8_000, polling: 100 });
     const entered = await diagnostics(page);
     // Preserve trusted keyboard input while measuring actual simulation time.
     // A slow cloud renderer can consume the entire wall wait in one frame.
@@ -576,11 +581,12 @@ async function runVehicleEquipmentJourney() {
       return urban?.phase === 'exit' && Math.abs(Number(current?.driverDoor?.openRadians || 0)) > 0.05;
     }, vehicle.id, { timeout: 5_000 });
     const exiting = await diagnostics(page);
+    const exitTiming = await advanceGameplay(page, 650);
     await page.waitForFunction((vehicleId) => {
       const urban = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox;
       const current = urban?.vehicles?.find((entry) => entry.id === vehicleId);
       return urban?.phase === 'walking' && !urban.activeVehicleId && current?.attachedToPlayer === false;
-    }, vehicle.id, { timeout: 8_000 });
+    }, vehicle.id, { timeout: 8_000, polling: 100 });
     const exited = await diagnostics(page);
     const retainedVehicle = exited.urbanSandbox.vehicles.find((entry) => entry.id === vehicle.id);
 
@@ -641,6 +647,7 @@ async function runVehicleEquipmentJourney() {
       approach,
       entering,
       entered,
+      transitionTiming: { mode: 'runtime-fixed-step', entry: entryTiming, exit: exitTiming },
       driven,
       drivenMeters,
       driveTiming: { mode: 'trusted-keyboard-runtime-fixed-step', receipts: driveReceipts },
@@ -747,9 +754,14 @@ async function runMedicalRecoveryJourney() {
 }
 
 let report;
+const verificationMode = {
+  evidenceScope: 'urban functional input; deterministic DOM keyboard navigation and transitions; not rendering performance',
+  deviceScaleFactor: process.env.CI ? .5 : 1,
+  renderQuality: process.env.CI ? 'low (selected through Settings)' : 'default'
+};
+console.log(JSON.stringify(verificationMode));
 try {
   if (requestedScope === 'arrest') {
-    console.log(JSON.stringify({evidenceScope:'urban functional input; deterministic DOM keyboard navigation; not rendering performance',deviceScaleFactor:process.env.CI ? .5 : 1}));
   console.log('[urban-sandbox] START arrest recovery');
     const arrest = await runArrestRecoveryJourney();
     const facility = arrest.custody.urbanSandbox.custody?.facility || {};
@@ -821,10 +833,9 @@ try {
       noBrowserErrors: browserErrors.length === 0,
       noFailedLocalResources: localFailures.length === 0
     };
-    report = { ok: Object.values(checks).every(Boolean), contract: 'urban-sandbox-vehicle-scope-v1', servedRoot, checks, browserErrors, localFailures };
+    report = { ok: Object.values(checks).every(Boolean), contract: 'urban-sandbox-vehicle-scope-v1', servedRoot, checks, evidence: { transitionTiming: primary.transitionTiming }, browserErrors, localFailures };
     console.log('[urban-sandbox] PASS vehicle and equipment');
   } else {
-  console.log(JSON.stringify({evidenceScope:'urban functional input; deterministic DOM keyboard navigation; not rendering performance',deviceScaleFactor:process.env.CI ? .5 : 1}));
   console.log('[urban-sandbox] START arrest recovery');
   const arrest = await runArrestRecoveryJourney();
   console.log('[urban-sandbox] PASS arrest recovery');
@@ -885,6 +896,7 @@ try {
     evidence: {
       vehicleId: primary.vehicle.id,
       drivenMeters: primary.drivenMeters,
+      transitionTiming: primary.transitionTiming,
       collisionStopDistance: primary.collisionProbe.final.distance,
       civicLevel: arrest.witnessedResponse.state.urbanSandbox.civicResponse?.level,
       responderCount: arrest.responderArrived.urbanSandbox.responders?.activeCount,
@@ -897,6 +909,7 @@ try {
   }
   await mkdir(path.dirname(reportPath), { recursive: true });
   report.scope = requestedScope;
+  report.verificationMode = verificationMode;
   report.complete = requestedScope === 'all';
   report.browserBudget = { maxOldSpaceMiB: 1024, freshBrowserPerJourney: true };
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');

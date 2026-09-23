@@ -4,6 +4,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 import { stepGameplayKeys } from './gameplay-simulation.mjs';
+import { selectLowRenderQuality } from './render-quality-ui.mjs';
 
 const root = process.cwd();
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
@@ -80,7 +81,10 @@ async function createPlayer(label) {
     if (['warning', 'error'].includes(message.type())) interactionTrace.push({ type: message.type(), text: message.text() });
   });
   page.on('request', request => {
-    if (/UrbanVehicle/.test(request.url())) interactionTrace.push({ type: 'vehicle-request', method: request.method(), url: request.url() });
+    if (/UrbanVehicle/.test(request.url())) interactionTrace.push({ type: 'vehicle-request', at: new Date().toISOString(), method: request.method(), url: request.url() });
+  });
+  page.on('response', response => {
+    if (/UrbanVehicle/.test(response.url())) interactionTrace.push({ type: 'vehicle-response', at: new Date().toISOString(), status: response.status(), url: response.url() });
   });
   await page.addInitScript(() => {
     globalThis.__multiplayerInputTrace = [];
@@ -102,10 +106,7 @@ async function createPlayer(label) {
   if (process.env.CI) {
     // Exercise the shipped low-render-quality path on the shared virtual GPU.
     // City data, physics, room authority and server lease deadlines are unchanged.
-    await page.locator('[data-globe-destination="settings"]').click();
-    await page.locator('#renderQualitySelect').selectOption('low');
-    await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().quality === 'low');
-    await page.locator('#globeHubOverlayCloseBtn').click();
+    await selectLowRenderQuality(page);
   }
   const identity = await page.evaluate(async ({ email, displayName }) => {
     const services = globalThis.WorldExplorerFirebase?.initFirebase?.();

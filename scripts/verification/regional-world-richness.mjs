@@ -5,6 +5,7 @@ import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
+import { closeOwnedBrowser, withinDeadline } from './owned-browser.mjs';
 
 const externalUrl = String(process.env.WE3D_VERIFY_BASE_URL || '').replace(/\/$/, '');
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
@@ -107,13 +108,14 @@ async function startRegionalFieldLead(page, journey) {
 }
 
 async function inspectJourney(journey) {
-  const browser = await chromium.launch({
+  const browserServer = await chromium.launchServer({
     headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280']
   });
   try {
+    const browser = await chromium.connect(browserServer.wsEndpoint());
     return await inspectJourneyInBrowser(browser, journey);
   } finally {
-    await browser.close();
+    await closeOwnedBrowser(browserServer);
   }
 }
 
@@ -199,14 +201,18 @@ async function inspectJourneyInBrowser(browser, journey) {
       pageErrors, providerWarnings, localFailures, ok: Object.values(checks).every(Boolean)
     };
   } catch (error) {
-    const state = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.() || null).catch(() => null);
+    const state = await withinDeadline(
+      () => page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.() || null),
+      10_000, 'Failed regional world diagnostics'
+    ).catch(() => null);
     await writeFile(path.join(outputDir, `${journey.id}-failure.json`), JSON.stringify({
       error: String(error?.stack || error), state, pageErrors, providerWarnings, localFailures
     }, null, 2));
     await page.screenshot({ path: path.join(outputDir, `${journey.id}-failure.png`), timeout: 10000 }).catch(() => {});
     throw error;
   } finally {
-    await context.close();
+    // BrowserServer owns final cleanup, including an unresponsive renderer.
+    await withinDeadline(() => context.close(), 8000, 'Regional context close').catch(() => {});
   }
 }
 
