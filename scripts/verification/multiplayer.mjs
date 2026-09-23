@@ -39,10 +39,10 @@ const deviceScaleFactor = process.env.CI ? 0.5 : 1;
 // on requestAnimationFrame being scheduled by the software GPU while that world
 // compiles. Match the CI action allowance; retain the normal local deadline.
 const roomStateWait = { timeout: process.env.CI ? 120_000 : 20_000, polling: 250 };
-// Exercise two complete, real city worlds without making network authority
-// depend on the largest city mesh in the geography matrix. Baltimore remains
-// covered by the separate assembled-world, actor, urban and performance gates.
-const worldLocation = { name: 'Monaco', lat: 43.7384, lon: 7.4246 };
+// The shared-car journey needs a real parked-car location. The actor fixture
+// records valid curb parking here; central Monaco has no eligible nearby curb
+// space. Never bypass the placement guards or fabricate vehicles for this test.
+const worldLocation = { name: 'London', lat: 51.5074, lon: -0.1278 };
 const browserBudget = {
   maxOldSpaceMiB: 1024, worldInitialization: 'sequential', simultaneouslyLoadedWorlds: 2,
   foregroundGameplayWorlds: 1, waitingClient: 'normal manual-pause UI; network listeners remain active',
@@ -444,6 +444,8 @@ try {
       .sort((left, right) => left.distance - right.distance);
   });
   let sharedVehicle = null;
+  assert.ok(sharedVehicleCandidates.length > 0,
+    `No eligible persistent parked vehicles at ${worldLocation.name}; shared-car fixture cannot run.`);
   for (const candidate of sharedVehicleCandidates) {
     const ownerReach = await walkToVehicle(owner, candidate.id);
     if (ownerReach.reached) {

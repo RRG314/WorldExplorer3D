@@ -27,6 +27,18 @@ const journeyFilter = String(process.env.WE3D_VERIFY_JOURNEY || '').trim();
 const journeys = journeyFilter ? allJourneys.filter((entry) => entry.id === journeyFilter) : allJourneys;
 assert.ok(journeys.length > 0, `Unknown regional journey filter: ${journeyFilter}`);
 
+// Gameplay panels suspend world drawing. Observe their DOM state with timers,
+// rather than waiting for a rendering frame on a paused/software-GPU world.
+async function waitForVisible(page, selector, timeout) {
+  await page.waitForFunction(selector => {
+    const element = document.querySelector(selector);
+    if (!element) return false;
+    const box = element.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    return box.width > 0 && box.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
+  }, selector, { timeout, polling: 250 });
+}
+
 async function waitForWorld(page) {
   await page.waitForFunction(() => {
     if (document.getElementById('loading')?.classList.contains('show')) return false;
@@ -49,20 +61,20 @@ async function openRegionalGuide(page) {
   const analytics = page.locator('#analyticsConsentBanner');
   if (await analytics.isVisible()) await page.locator('#analyticsConsentDenyBtn').click();
   await page.locator('#travelBtn').click();
-  await page.waitForSelector('#travelMenu.open', { timeout: 10_000 });
+  await waitForVisible(page, '#travelMenu.open', 10_000);
   await page.locator('#fWalk').click();
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.mode === 'walk', null, { timeout: 20_000 });
   await page.locator('#exploreBtn').click();
-  await page.waitForSelector('#exploreMenu.open', { timeout: 10_000 });
+  await waitForVisible(page, '#exploreMenu.open', 10_000);
   await page.locator('#fWorldDiscovery').click();
-  await page.waitForSelector('#discoveryPanel.show', { timeout: 20_000 });
+  await waitForVisible(page, '#discoveryPanel.show', 20_000);
   const workspaceTutorial = page.locator('#discoverySectionTutorial:not([hidden])');
   if (await workspaceTutorial.isVisible()) await page.locator('#discoverySectionTutorialDoneBtn').click();
   await page.locator('[data-discovery-tab="guide"]').click();
-  await page.waitForSelector('[data-discovery-pane="guide"].active', { timeout: 10_000 });
+  await waitForVisible(page, '[data-discovery-pane="guide"].active', 10_000);
   const guideTutorial = page.locator('#discoverySectionTutorial:not([hidden])');
   if (await guideTutorial.isVisible()) await page.locator('#discoverySectionTutorialDoneBtn').click();
-  await page.waitForFunction(() => /REGIONAL LIFE LIST/.test(document.getElementById('discoveryLifeList')?.textContent || ''), null, { timeout: 20_000 });
+  await page.waitForFunction(() => /REGIONAL LIFE LIST/.test(document.getElementById('discoveryLifeList')?.textContent || ''), null, { timeout: 20_000, polling: 250 });
   const regionalLifeDetails = page.locator('.discoveryGuideLifeDetails');
   if (!await regionalLifeDetails.evaluate((element) => element.open)) {
     await regionalLifeDetails.locator('summary').click();
@@ -72,7 +84,7 @@ async function openRegionalGuide(page) {
 
 async function startRegionalFieldLead(page, journey) {
   await page.locator('[data-discovery-tab="today"]').click();
-  await page.waitForSelector('[data-discovery-pane="today"].active', { timeout: 10_000 });
+  await waitForVisible(page, '[data-discovery-pane="today"].active', 10_000);
   const regionalActivityIds = [
     'nature-observe', 'photograph', 'community-survey', 'wildlife-track',
     'insect-macro', 'habitat-survey', 'sonar-survey'
@@ -235,10 +247,14 @@ try {
   await writeFile(reportPath, JSON.stringify(report, null, 2));
   for (const journey of journeys) {
     console.log(`[regional-world] START ${journey.id}`);
-    const result = await inspectJourney(journey);
+    // Each journey owns and closes its browser. A failed city must remain red,
+    // but should not erase independent coverage of all later regions.
+    const result = await inspectJourney(journey).catch(error => ({
+      id: journey.id, ok: false, error: String(error?.stack || error)
+    }));
     report.results.push(result);
     await writeFile(reportPath, JSON.stringify(report, null, 2));
-    console.log(JSON.stringify({ id: result.id, ok: result.ok, packId: result.snapshot.packId, fieldLead: result.fieldLead, checks: result.checks }, null, 2));
+    console.log(JSON.stringify({ id: result.id, ok: result.ok, packId: result.snapshot?.packId, fieldLead: result.fieldLead, checks: result.checks, error: result.error }, null, 2));
   }
   report.ok = report.results.every((entry) => entry.ok);
   report.complete = journeyFilter === '' && report.results.length === allJourneys.length;
