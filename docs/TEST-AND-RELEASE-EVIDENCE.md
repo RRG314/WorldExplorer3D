@@ -89,3 +89,18 @@ stale application artwork. Generated evidence is outside the Hosting source
 allowlist; source references, module identities, and immutable packaged assets
 remain checked. Failed-run screenshots must be preserved, not deleted to make
 source verification pass.
+
+## Mobile loading measurement authority
+
+`mobile-load` proves mapped-world publication, the mobile resource profile, and
+GPS watch activation in touch emulation. It records raw startup times and provider
+failures, but its functional cloud receipt explicitly does not accept performance.
+The required `performance` gate runs the sustained retention check, then the same
+normal/GPS mobile journeys with `--measure-load-time`. That mode rejects CI and
+non-M1 hardware before browser startup, checks the actual gameplay renderer, and
+enforces the single mobile load budget in `config/performance-budgets.json`.
+
+The former script-local 38/40-second limits conflicted with the declared 60-second
+M1 budget and were applied on virtual runners without matching hardware authority.
+Historical failures under those limits remain failures in their original receipts.
+The physical budget is unchanged, and no cloud pass replaces it or phone acceptance.

@@ -81,7 +81,7 @@
     "verify:mission-lifecycle": "node scripts/verification/mission-lifecycle.mjs",
     "verify:retention-release": "node scripts/verification/retention-release.mjs",
     "verify:retention-ui": "node scripts/verification/retention-ui.mjs",
-    "verify:performance-retention": "node scripts/verification/performance-retention.mjs",
+    "verify:performance-retention": "node scripts/verification/performance-retention.mjs && node scripts/verification/mobile-load.mjs --measure-load-time",
     "verify:space-memory-lifecycle": "node scripts/verification/space-memory-lifecycle-current.mjs",
     "verify:analytics-lifecycle": "node scripts/verification/analytics-lifecycle-current.mjs",
     "verify:landing-user-count": "node scripts/verification/landing-user-count-current.mjs",

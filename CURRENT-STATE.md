@@ -12,9 +12,9 @@ older Documents checkout. Do not merge or promote production frontend yet.
 
 Latest checked production Hosting:
 `5.2.0+db62593ba377.6342cddaba06fc68.production`.
-Latest checked hosted staging:
-`5.3.0+a54d03456814.6fcbfc0f54adbfef.staging`.
-The local 45bbf1f8 staging package is newer: asset digest a120b7ab5ef75a5a.
+Hosted staging verified at 16:20 UTC:
+`5.3.0+44ad9368fd9e.a120b7ab5ef75a5a.staging`.
+Its asset digest matches the local package; production Hosting is unchanged.
 Re-read hosted manifests; a browser query parameter is not build identity.
 
 Current detailed ledger (ignored generated evidence, updated independently of
@@ -85,8 +85,11 @@ Confirmed test-harness issues include third-party-frame storage seeding, expired
 brief tutorial hints, stale moving-vehicle observations and missing staging-only
 App Check setup. Fixes preserve real input/state assertions and graphics errors.
 Mobile load now records provider failures and final-world state before cleanup;
-its mapped-world and timing assertions remain. It is touch/mobile Chrome emulation,
-not a physical iPhone performance result.
+its mapped-world assertions remain. Functional runs retain raw timings without
+claiming performance. The required physical performance gate additionally runs
+normal/GPS journeys against the unchanged, single declared M1 load budget.
+Conflicting script-local38/40-second cloud thresholds are retired, not relabeled
+as historical passes. Touch emulation is not physical iPhone performance.
 
 Virtual-Mac graphics failures include allocation errors/context loss and shader
 errors with empty compiler logs. Linux Manhattan and seven-city fallback passes

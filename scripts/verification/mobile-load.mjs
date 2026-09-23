@@ -4,6 +4,14 @@ import { configureStagingAppCheck } from './staging-app-check.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { readPerformanceHost, requirePerformanceHost, requireHardwareGraphics } from './performance-host.mjs';
+
+const measureLoadTime = process.argv.includes('--measure-load-time');
+// Functional cloud journeys never establish hardware load-time acceptance.
+// The required physical performance gate runs this mode sequentially.
+const hostAuthority = measureLoadTime ? requirePerformanceHost() : {host: readPerformanceHost()};
+const performanceBudgets = JSON.parse(await fs.readFile(new URL('../../config/performance-budgets.json', import.meta.url), 'utf8'));
+const loadTimeBudgetMs = performanceBudgets.mobileRegressionTier.budgets.firstPlayableMs;
 
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
 const externalUrl = String(process.env.WE3D_VERIFY_BASE_URL || '').replace(/\/$/, '');
@@ -100,6 +108,15 @@ async function waitForPlayable(page, requireLiveGps = false) {
     throw new Error(`Mobile world did not become playable: ${JSON.stringify(last)}`);
   }
   await page.waitForTimeout(1_000);
+  if (measureLoadTime) {
+    const renderer = await page.evaluate(async () => {
+      const {ctx} = await import('/app/js/shared-context.js?v=55');
+      const gl = ctx.renderer?.getContext?.();
+      const info = gl?.getExtension('WEBGL_debug_renderer_info');
+      return gl ? gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER) : null;
+    });
+    requireHardwareGraphics(renderer);
+  }
 }
 
 async function openTitle(page) {
@@ -130,6 +147,7 @@ async function runStandardJourney() {
       titleReadyMs,
       firstPlayableMs,
       worldCounts: diagnostics.worldCounts,
+      transportCompilation: diagnostics.transportCompilation,
       loadProfile: diagnostics.worldLoad?.loadMetrics?.loadProfile || diagnostics.worldLoad?.loadProfile || null,
       phases: diagnostics.worldLoad?.phaseTotals || diagnostics.worldLoad?.loadMetrics?.phases || null,
       regionalTransportSelection: diagnostics.worldLoad?.regionalTransportSelection ||
@@ -171,6 +189,7 @@ async function runLiveGpsJourney() {
       permissionToPlayableMs,
       liveGps: diagnostics.liveGps,
       worldCounts: diagnostics.worldCounts,
+      transportCompilation: diagnostics.transportCompilation,
       phases: diagnostics.worldLoad?.phaseTotals || diagnostics.worldLoad?.loadMetrics?.phases || null,
       browserErrors: client.browserErrors,
       localFailures: client.localFailures,
@@ -239,8 +258,10 @@ try {
   console.error(JSON.stringify({ mobileStandardCompleted: standard }));
   const liveGps = await runLiveGpsJourney();
   const checks = {
-    standardFirstPlayUnder38Seconds: standard.firstPlayableMs <= 38_000,
-    liveGpsPermissionToPlayUnder40Seconds: liveGps.permissionToPlayableMs <= 40_000,
+    ...(measureLoadTime ? {
+      standardFirstPlayWithinHardwareBudget: standard.firstPlayableMs <= loadTimeBudgetMs,
+      liveGpsPermissionToPlayWithinHardwareBudget: liveGps.permissionToPlayableMs <= loadTimeBudgetMs
+    } : {}),
     mobileProfileActuallyActive:
       standard.loadProfile?.dynamicBudgetScale <= 0.28 &&
       standard.loadProfile?.regionalContextRadiusMeters === 6_000 &&
@@ -266,15 +287,18 @@ try {
   };
   const report = {
     ok: Object.values(checks).every(Boolean),
-    contract: 'mobile-cold-start-and-live-gps-current-v2',
+    contract: 'mobile-cold-start-and-live-gps-current-v3',
     measurementAuthority: 'installed Chrome, 390x844 touch/mobile emulation; owner device proof remains required',
+    evidenceScope: measureLoadTime ? 'physical M1 mobile-emulation load-time regression' : 'functional mobile-emulation journey; observed timings are not performance acceptance',
+    timingAcceptance: {enforced: measureLoadTime, budgetSource: 'config/performance-budgets.json:mobileRegressionTier',
+      budgetMs: loadTimeBudgetMs, requiredGate: 'performance', hostAuthority},
     checks,
     standard,
     liveGps
   };
   await fs.writeFile(`${evidenceDir}/report.json`, JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
-  assert.equal(report.ok, true, 'Mobile cold-start and Live GPS timing journey failed.');
+  assert.equal(report.ok, true, 'Mobile cold-start and Live GPS journey failed; see the scoped report.');
 } catch (error) {
   verificationError = error;
   console.error(error?.stack || error);
