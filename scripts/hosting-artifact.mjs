@@ -2,6 +2,7 @@
 
 import { firebaseProjectScript, firebaseInitJson, generatedFirebaseFiles } from './lib/firebase-artifact-config.mjs';
 import crypto from 'node:crypto';
+import { canonicalBundledModule, rewritePackagedModuleReference } from './lib/runtime-module-identity.mjs';
 import { readReleaseSourceIdentity, assertReleaseSourceIdentity } from './lib/release-source-identity.mjs';
 import { build as buildJavaScript } from 'esbuild';
 import fs from 'node:fs/promises';
@@ -168,7 +169,10 @@ async function buildGameRuntime() {
           return { path: externalPath, external: true };
         }
         const relative = path.relative(ROOT_SHARED_MODULE_DIR, resolved);
-        if (relative.startsWith('..') || path.isAbsolute(relative)) return null;
+        if (relative.startsWith('..') || path.isAbsolute(relative)) {
+          const canonical = canonicalBundledModule(args.path, args.resolveDir);
+          return canonical ? { path: canonical } : null;
+        }
         const externalPath = `/js/${normalizePath(relative)}${query}`;
         externalRootModules.add(externalPath);
         return { path: externalPath, external: true };
@@ -337,7 +341,7 @@ async function buildArtifact(environment) {
   await fs.writeFile(captureHtmlPath, captureHtml.replace('js/reality-capture/phone-entry.js?v=1', runtimePackaging.entries['capture-phone']));
   const adminModulePath = path.join(OUTPUT_DIR, 'js', 'admin-dashboard.js');
   const adminModule = await fs.readFile(adminModulePath, 'utf8');
-  await fs.writeFile(adminModulePath, adminModule.replace('../app/js/reality-capture/result-viewer.js?v=1', `../app/${runtimePackaging.entries['capture-review']}`));
+  await fs.writeFile(adminModulePath, rewritePackagedModuleReference(adminModule, '../app/js/reality-capture/result-viewer.js', `../app/${runtimePackaging.entries['capture-review']}`));
   await writeGeneratedFirebaseFiles(environment, config);
 
   const files = await hashOutputFiles();
@@ -418,7 +422,7 @@ async function verifyArtifact() {
       : relative;
     const outputHash = expectedFiles[outputRelative];
     const sourceHash = relative === 'js/admin-dashboard.js'
-      ? sha256((await fs.readFile(source, 'utf8')).replace('../app/js/reality-capture/result-viewer.js?v=1', `../app/${buildManifest.runtimePackaging?.entries?.['capture-review']}`))
+      ? sha256(rewritePackagedModuleReference(await fs.readFile(source, 'utf8'), '../app/js/reality-capture/result-viewer.js', `../app/${buildManifest.runtimePackaging?.entries?.['capture-review']}`))
       : await hashFile(source);
     if (!outputHash || outputHash !== sourceHash) {
       throw new Error(`Hosting artifact differs from canonical source: ${relative} -> ${outputRelative}`);
