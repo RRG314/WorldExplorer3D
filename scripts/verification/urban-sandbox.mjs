@@ -602,7 +602,9 @@ async function runVehicleEquipmentJourney() {
 
     await equip(page, 'flashlight');
     await page.keyboard.press('KeyV');
-    await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.equipment?.flashlightEnabled === true, null, { timeout: 3_000 });
+    // This observes equipment state, not render responsiveness. A virtual GPU
+    // can starve RAF polling after the real action has already toggled the light.
+    await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.equipment?.flashlightEnabled === true, null, { timeout: process.env.CI ? 20_000 : 3_000, polling: 100 });
     equipmentResults.flashlight = await equipmentItem(page, 'flashlight');
 
     await equip(page, 'baton');

@@ -44,6 +44,7 @@ const browserBudget = {
   navigationTiming: 'dom-keyboard-runtime-fixed-step',
   evidenceScope: 'multiplayer-functional'
 };
+browserBudget.renderQuality = process.env.CI ? 'low (selected through Settings)' : 'default';
 async function recordStage(stage) {
   console.log(`[multiplayer] ${stage}`);
   await fs.mkdir(path.dirname(reportPath), { recursive: true });
@@ -85,7 +86,7 @@ async function createPlayer(label) {
     globalThis.__multiplayerInputTrace = [];
     globalThis.addEventListener('keydown', event => {
       if (!['KeyE', 'Escape'].includes(event.code)) return;
-      globalThis.__multiplayerInputTrace.push({ type: 'keydown', repeat: event.repeat, target: event.target?.tagName, prompt: document.getElementById('urbanVehiclePrompt')?.textContent, urban: globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox });
+      globalThis.__multiplayerInputTrace.push({ type: 'keydown', code: event.code, repeat: event.repeat, target: event.target?.tagName, prompt: document.getElementById('urbanVehiclePrompt')?.textContent, urban: globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox });
     }, true);
     globalThis.addEventListener('we3d:context-interaction-completed', event => {
       globalThis.__multiplayerInputTrace.push({ type: 'completed', detail: event.detail });
@@ -98,6 +99,14 @@ async function createPlayer(label) {
   });
   await page.goto(`${baseUrl}/app/?${params}`, { waitUntil: 'load', timeout: 120000 });
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120000 });
+  if (process.env.CI) {
+    // Exercise the shipped low-render-quality path on the shared virtual GPU.
+    // City data, physics, room authority and server lease deadlines are unchanged.
+    await page.locator('[data-globe-destination="settings"]').click();
+    await page.locator('#renderQualitySelect').selectOption('low');
+    await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().quality === 'low');
+    await page.locator('#globeHubOverlayCloseBtn').click();
+  }
   const identity = await page.evaluate(async ({ email, displayName }) => {
     const services = globalThis.WorldExplorerFirebase?.initFirebase?.();
     if (!services?.auth || !services?.db) throw new Error('Firebase emulator services did not initialize.');
@@ -463,6 +472,7 @@ try {
     throw new Error(`Claimed room vehicle did not enter driving mode: ${JSON.stringify({ claimResult, vehicleEntryState })}`, { cause: error });
   }
   const ownerClaimed = await owner.page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox);
+  await pauseWaitingPlayer(owner);
   await member.page.waitForFunction((vehicleId) => {
     const urban = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox;
     const vehicle = urban?.vehicles?.find((entry) => entry.id === vehicleId);
@@ -476,7 +486,6 @@ try {
 
   // Cross the server's 15-second lease interval before testing release. This
   // proves liveness, rather than a claim observed only before its first expiry.
-  await pauseWaitingPlayer(owner);
   await owner.page.waitForTimeout(16_000);
   const retainedLease = await owner.page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox);
   assert.equal(retainedLease?.phase, 'driving', 'The room vehicle lease expired while its driver remained active.');
@@ -601,7 +610,7 @@ try {
     await player.page.screenshot({ path: path.join(path.dirname(reportPath), `${label}-failure.png`), timeout: 5000 }).catch(() => {});
   }
   await fs.mkdir(path.dirname(reportPath), { recursive: true });
-  await fs.writeFile(reportPath, `${JSON.stringify({ ok: false, complete: false, error: String(error?.stack || error), browserBudget, clients }, null, 2)}\n`);
+  await fs.writeFile(reportPath, `${JSON.stringify({ ok: false, complete: false, error: String(error?.stack || error), browserBudget, pauseReceipts, clients }, null, 2)}\n`);
   throw error;
 } finally {
   // Firebase keeps streaming connections open in both player contexts. Closing
