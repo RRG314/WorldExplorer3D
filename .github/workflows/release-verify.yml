@@ -22,7 +22,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.scope }}-${{ (inputs.scope == 'candidate' || inputs.scope == 'diagnostic') && inputs.gates || 'all' }}-${{ inputs.runner || 'ubuntu-latest' }}
+  # Manual verification runs own isolated runners and emulator data. Do not
+  # embed the potentially long gate list or silently supersede a queued run.
+  group: release-verification-${{ github.repository_id }}-${{ github.run_id }}
   cancel-in-progress: false
 
 jobs:

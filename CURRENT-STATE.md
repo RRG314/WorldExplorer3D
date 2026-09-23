@@ -61,6 +61,15 @@ the existing mobile-action-layout release gate. The unchanged complete backend
 journey and packaged gameplay checks must verify the new artifact before this
 fix is promoted to staging. Production Hosting remains unchanged.
 
+The packaged prompt/layout checks pass on 7c7716bd, and packaged gameplay passes
+in run 35869188628 after supplying the required temporary staging App Check test
+credential. The initial smoke failure was an attestation setup failure and is
+retained. A requested 49-gate functional run exposed an overlong GitHub concurrency
+name before any test started; the workflow now uses bounded numeric run identity.
+Follow `output/release-integration/test-confidence-2026-09-23/AUDIT.md` for the
+latest execution receipts and pending acceptance. These are still separate from
+physical-device performance and owner phone approval.
+
 ## Evidence and commands
 
 - Latest [packaged game check](https://github.com/RRG314/WorldExplorer3D/actions/runs/35858596632),
