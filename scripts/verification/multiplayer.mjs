@@ -567,6 +567,12 @@ try {
     const urban = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox;
     return { authority: urban.authority, vehicle: urban.vehicles.find((entry) => entry.id === vehicleId) };
   }, sharedVehicle.id);
+  await recordStage('shared-car claim, lease renewal, release and member handoff accepted; waiting for member exit');
+  // Driving starts before the normal exit stability interval is complete.
+  // Wait for the same visible action used by the owner's exit above.
+  await member.page.waitForFunction(() =>
+    globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.interaction?.action === 'exit_vehicle',
+  null, { timeout: 12_000, polling: 250 });
   await member.page.keyboard.press('KeyE');
   await member.page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.phase === 'walking', null, roomStateWait);
 
