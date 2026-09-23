@@ -4,6 +4,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
+import { selectLowRenderQuality } from './render-quality-ui.mjs';
 
 for (const key of ['FIREBASE_AUTH_EMULATOR_HOST', 'FIRESTORE_EMULATOR_HOST']) {
   assert.ok(process.env[key], `Refusing non-emulator account creation: ${key}`);
@@ -12,12 +13,13 @@ const root = path.resolve(process.env.WE3D_VERIFY_ROOT || 'dist');
 const config = JSON.parse(await fs.readFile('config/firebase.staging.json'));
 const out = 'output/verification/room-chat-gameplay';
 await fs.mkdir(out, { recursive: true });
-const report = { ok: false, checks: [], errors: [], buildId: JSON.parse(await fs.readFile(path.join(root, 'build-manifest.json'))).buildId };
+const report = { ok: false, checks: [], errors: [], buildId: JSON.parse(await fs.readFile(path.join(root, 'build-manifest.json'))).buildId,
+  browserBudget: { renderQuality: process.env.CI ? 'low (normal Settings UI)' : 'default', deviceScaleFactor: process.env.CI ? .5 : 1, evidenceScope: 'two full clients; functional chat/movement, not performance or default-quality graphics acceptance' } };
 const server = await startStaticServer({ rootDir: root, ports: [4491, 4492] });
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const pages = [];
 async function boot(label, mobile) {
-  const context = await browser.newContext({ viewport: mobile ? { width: 412, height: 915 } : { width: 1100, height: 760 }, isMobile: mobile, hasTouch: mobile });
+  const context = await browser.newContext({ viewport: mobile ? { width: 412, height: 915 } : { width: 1100, height: 760 }, isMobile: mobile, hasTouch: mobile, deviceScaleFactor: report.browserBudget.deviceScaleFactor });
   await context.addInitScript(config => {
     globalThis.WORLD_EXPLORER_FIREBASE = config;
     globalThis.WORLD_EXPLORER_FIREBASE_ENV = 'staging';
@@ -30,6 +32,7 @@ async function boot(label, mobile) {
   await page.goto(`http://127.0.0.1:${server.port}/app/?launch=moon&gm=free`);
   await page.waitForFunction(() => window.__WE3D_RUNTIME_READY__, null, { timeout: 60000 });
   if (await page.locator('#analyticsConsentDenyBtn').isVisible()) await page.locator('#analyticsConsentDenyBtn').click();
+  if (process.env.CI) await selectLowRenderQuality(page);
   assert.equal(await page.locator('#roomChatDrawer').evaluate(e => e.inert && e.getAttribute('aria-hidden') === 'true'), true);
   const uid = await page.evaluate(async label => {
     const { auth } = WorldExplorerFirebase.initFirebase();

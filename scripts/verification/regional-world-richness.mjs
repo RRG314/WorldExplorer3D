@@ -13,8 +13,6 @@ const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
 const servedRoot = requestedRoot ? path.resolve(process.cwd(), requestedRoot) : process.cwd();
 const server = externalUrl ? null : await startStaticServer({ rootDir: servedRoot, ports: [4497, 4498, 4499] });
 const baseUrl = externalUrl || `http://127.0.0.1:${server.port}`;
-const outputDir = 'output/verification/regional-world-richness';
-const reportPath = path.join(outputDir, 'report.json');
 const allJourneys = [
   { id: 'tokyo', lat: 35.6762, lon: 139.6503, packId: 'jp-kanto-urban-nature', width: 1365, height: 900 },
   { id: 'london', lat: 51.5074, lon: -0.1278, packId: 'eu-atlantic-urban-nature', width: 1365, height: 900 },
@@ -23,9 +21,11 @@ const allJourneys = [
   { id: 'miami', lat: 25.7617, lon: -80.1918, packId: 'us-fl-south-florida-coast', width: 390, height: 844, mobile: true },
   { id: 'dubai', lat: 25.2048, lon: 55.2708, packId: 'ae-dubai-desert-gulf', width: 390, height: 844, mobile: true }
 ];
-const journeyFilter = String(process.env.WE3D_VERIFY_JOURNEY || '').trim();
+const journeyFilter = String(process.argv.find(arg => arg.startsWith('--journey='))?.slice('--journey='.length) || process.env.WE3D_VERIFY_JOURNEY || '').trim();
 const journeys = journeyFilter ? allJourneys.filter((entry) => entry.id === journeyFilter) : allJourneys;
 assert.ok(journeys.length > 0, `Unknown regional journey filter: ${journeyFilter}`);
+const outputDir = path.join('output/verification/regional-world-richness', journeyFilter || '');
+const reportPath = path.join(outputDir, 'report.json');
 
 // Gameplay panels suspend world drawing. Observe their DOM state with timers,
 // rather than waiting for a rendering frame on a paused/software-GPU world.
@@ -233,6 +233,7 @@ async function inspectJourneyInBrowser(browser, journey) {
 
 const report = {
   contract: 'regional-world-richness-v1', ok: false, complete: false, servedRoot,
+  scope: journeyFilter ? 'diagnostic-subset' : 'full',
   requestedJourneys: journeys.map(journey => journey.id), results: [],
   browserBudget: {
     maxOldSpaceMiB: 1280, freshBrowserPerJourney: true,

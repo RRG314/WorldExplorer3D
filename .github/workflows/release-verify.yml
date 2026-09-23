@@ -6,7 +6,7 @@ on:
       scope:
         description: Verification scope (never deploys)
         type: choice
-        options: [full, backend, functional, candidate]
+        options: [full, backend, functional, candidate, diagnostic]
         default: full
       runner:
         description: Standard runner for targeted verification (never a physical-Mac performance receipt)
@@ -14,7 +14,7 @@ on:
         options: [ubuntu-latest, macos-14]
         default: ubuntu-latest
       gates:
-        description: Candidate gate IDs, comma separated (candidate scope only; no performance gate)
+        description: Candidate or diagnostic gate IDs, comma separated (no performance gate)
         type: string
         default: artifact-world
 
@@ -22,7 +22,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.scope }}-${{ inputs.scope == 'candidate' && inputs.gates || 'all' }}-${{ inputs.runner || 'ubuntu-latest' }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.scope }}-${{ (inputs.scope == 'candidate' || inputs.scope == 'diagnostic') && inputs.gates || 'all' }}-${{ inputs.runner || 'ubuntu-latest' }}
   cancel-in-progress: false
 
 jobs:
@@ -97,7 +97,7 @@ jobs:
         run: npm run release:verify
 
       - name: Build immutable staging artifact
-        if: inputs.scope == 'backend' || inputs.scope == 'candidate'
+        if: inputs.scope == 'backend' || inputs.scope == 'candidate' || inputs.scope == 'diagnostic'
         run: node scripts/hosting-artifact.mjs build --firebase-env staging
 
       - name: Verify all backend stages against isolated emulators
@@ -107,10 +107,11 @@ jobs:
           WE3D_VERIFY_ROOT: dist
 
       - name: Verify selected candidate gates
-        if: inputs.scope == 'candidate'
+        if: inputs.scope == 'candidate' || inputs.scope == 'diagnostic'
         env:
           WE3D_VERIFY_ROOT: dist
           WE3D_CANDIDATE_GATES: ${{ inputs.gates }}
+          WE3D_GATE_SCOPE: ${{ inputs.scope }}
           WE3D_STAGING_APP_CHECK_CREDENTIAL: ${{ secrets.WE3D_STAGING_APP_CHECK_CREDENTIAL }}
         run: |
           node --input-type=module - <<'JS'
@@ -131,11 +132,11 @@ jobs:
           import fs from 'node:fs';
           const config=JSON.parse(fs.readFileSync('config/system-release-gates.json','utf8'));
           const ids=String(process.env.WE3D_CANDIDATE_GATES||'').split(',');
-          if(ids.some(id=>!id||config.gates[id]?.scope!=='candidate'||id==='performance')) {
+          if(ids.some(id=>!id||config.gates[id]?.scope!==process.env.WE3D_GATE_SCOPE||id==='performance')) {
             throw new Error('Select explicit candidate gate IDs. Physical-Mac performance cannot run here.');
           }
           JS
-          node scripts/verification/system-release.mjs --run --scope=candidate --continue-on-failure "--gate=$WE3D_CANDIDATE_GATES"
+          node scripts/verification/system-release.mjs --run "--scope=$WE3D_GATE_SCOPE" --continue-on-failure "--gate=$WE3D_CANDIDATE_GATES"
 
       - name: Remove temporary staging credential file
         if: always()

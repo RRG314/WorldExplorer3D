@@ -6,6 +6,8 @@
     "docs/ARCHITECTURE_MAP.md": ["Application overview", "Earth world flow", "Player movement and cameras", "Character, companions, and urban play", "Field exploration and progression", "Planetary and space environments", "Quick Build and persistent Blocks", "Multiplayer and backend", "Data classification", "Release shape"]
   },
   "gates": {
+    "regional-london-diagnostic": { "scope": "diagnostic", "command": ["node", "scripts/verification/regional-world-richness.mjs", "--journey=london"], "artifactRequired": true, "timeoutMs": 600000 },
+    "regional-dubai-diagnostic": { "scope": "diagnostic", "command": ["node", "scripts/verification/regional-world-richness.mjs", "--journey=dubai"], "artifactRequired": true, "timeoutMs": 600000 },
     "source-graph": { "scope": "candidate", "command": ["npm", "run", "verify:source"], "artifactRequired": false },
     "release-contracts": { "scope": "candidate", "command": ["npm", "run", "verify:release-scope"], "artifactRequired": false },
     "public-claims": { "scope": "candidate", "command": ["npm", "run", "audit:release-claims"], "artifactRequired": false },

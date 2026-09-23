@@ -39,10 +39,12 @@ const deviceScaleFactor = process.env.CI ? 0.5 : 1;
 // on requestAnimationFrame being scheduled by the software GPU while that world
 // compiles. Match the CI action allowance; retain the normal local deadline.
 const roomStateWait = { timeout: process.env.CI ? 120_000 : 20_000, polling: 250 };
-// The shared-car journey needs a real parked-car location. The actor fixture
-// records valid curb parking here; central Monaco has no eligible nearby curb
-// space. Never bypass the placement guards or fabricate vehicles for this test.
-const worldLocation = { name: 'London', lat: 51.5074, lon: -0.1278 };
+// Current OSM Main Street geometry (way 954776975) was run through the actual
+// graph/parking compiler before selecting this location: three eligible cars
+// within 44 world units, each clearing the passing fleet by over 2.5 units.
+// The complete live world must still pass collision/placement guards. Never
+// fabricate a car or bypass those guards to make the handoff test pass.
+const worldLocation = { name: 'Logan Main Street', lat: 41.7355, lon: -111.8344 };
 const browserBudget = {
   maxOldSpaceMiB: 1024, worldInitialization: 'sequential', simultaneouslyLoadedWorlds: 2,
   foregroundGameplayWorlds: 1, waitingClient: 'normal manual-pause UI; network listeners remain active',
