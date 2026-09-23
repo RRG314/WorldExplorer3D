@@ -52,7 +52,36 @@ try {
   await page.goto(`${baseUrl}/app/?${params}`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   await page.waitForFunction(() => document.getElementById('globeSelectorStartBtn')?.disabled === false, null, { timeout: 120_000 });
+  // Hold the real runtime loader at its import boundary. A title launch must
+  // not tick/render the default Baltimore world while Manchester is pending.
+  await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const original = ctx.ensureEarthRuntimeReady;
+    const gate = new Promise(resolve => { window.__releaseTitleImport = resolve; });
+    ctx.ensureEarthRuntimeReady = async (...args) => {
+      window.__titleImportHeld = true;
+      await gate;
+      ctx.ensureEarthRuntimeReady = original;
+      return original?.(...args);
+    };
+  });
   await page.locator('#globeSelectorStartBtn').click();
+  await page.waitForFunction(() => window.__titleImportHeld === true);
+  const launchSnapshot = () => page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const phases = window.getWorldExplorerRuntimeDiagnostics().runtimeKernel.phases;
+    return { pending: ctx.titleLaunchPending, worldLoading: !!ctx.worldLoading,
+      presentation: phases.presentation.find(row => row.id === 'core.presentation').updates,
+      renderer: phases.render.find(row => row.id === 'core.renderer').updates };
+  });
+  const heldBefore = await launchSnapshot();
+  await page.waitForTimeout(750);
+  const heldAfter = await launchSnapshot();
+  report.titleImportTransition = { heldBefore, heldAfter };
+  assert.equal(heldBefore.pending, true);
+  assert.equal(heldBefore.worldLoading, false, 'probe must exercise the gap before the world loader');
+  assert.deepEqual(heldAfter, heldBefore, 'stale world work continued during runtime import');
+  await page.evaluate(() => window.__releaseTitleImport());
   await page.waitForFunction(() => {
     if (document.getElementById('loading')?.classList.contains('show')) return false;
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};

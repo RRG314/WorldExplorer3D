@@ -26,7 +26,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       id: 'core.input',
       owner: 'engine',
       phase: 'input',
-      enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading,
+      enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading && !appCtx.titleLaunchPending,
       update() {
         appCtx.updateControlInput?.();
       }
@@ -35,7 +35,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       id: 'core.simulation',
       owner: 'engine',
       phase: 'simulation',
-      enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading,
+      enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading && !appCtx.titleLaunchPending,
       update(frame) {
         appCtx.update(frame.dt);
       }
@@ -44,7 +44,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       id: 'core.world',
       owner: 'world',
       phase: 'world',
-      enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading,
+      enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading && !appCtx.titleLaunchPending,
       update(frame) {
         // Ship interiors are a bounded activity nested inside Space Flight.
         // Earth weather, astronomical-sky refresh, boat availability, and
@@ -77,7 +77,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       id: 'core.camera',
       owner: 'camera',
       phase: 'camera',
-      enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading,
+      enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading && !appCtx.titleLaunchPending,
       update(frame) {
         appCtx.updateCamera(frame.dt);
         appCtx.updatePlanetarySky?.();
@@ -88,7 +88,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       owner: 'platform',
       phase: 'camera',
       priority: 20,
-      enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading,
+      enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading && !appCtx.titleLaunchPending,
       update(frame) {
         appCtx.updateActivityCreator?.(frame.dt, frame.timestamp);
         appCtx.updateActivityDiscovery?.(frame.dt, frame.timestamp);
@@ -105,7 +105,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       id: 'core.presentation',
       owner: 'presentation',
       phase: 'presentation',
-      enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading,
+      enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading && !appCtx.titleLaunchPending,
       update(frame) {
         weatherUiTimer += frame.dt;
         if (weatherUiTimer >= 1) {
@@ -178,7 +178,7 @@ function createCoreRenderSystem(appCtx, shouldUseComposer) {
     // partial city batches competes with compilation and uploads them early.
     // Manual pause retains the last frame beneath its dimmed dialog. Network
     // listeners and lease heartbeats remain alive without redrawing the city.
-    enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading && !appCtx.hasPauseReason?.('manual_pause'),
+    enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading && !appCtx.titleLaunchPending && !appCtx.hasPauseReason?.('manual_pause'),
     update() {
       draw();
     }

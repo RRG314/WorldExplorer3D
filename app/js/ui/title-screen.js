@@ -634,6 +634,9 @@ function initTitleScreenUi({
     document.getElementById('memoryFlowerFloatBtn')?.classList.add('show');
     gameShareFloatBtn?.classList.add('show');
     closeGameShareMenu?.();
+    // Loading optional runtime modules is part of launch, before loadRoads
+    // takes ownership of worldLoading. Do not tick the retained/default world.
+    appCtx.titleLaunchPending = true;
     appCtx.gameStarted = true;
     if (requestedLaunchMode !== 'ocean' && requestedLaunchMode !== 'earth') {
       void appCtx.ensureStarCatalogLoaded?.();
@@ -786,6 +789,7 @@ function initTitleScreenUi({
         throw error;
       })
       .finally(() => {
+        appCtx.titleLaunchPending = false;
         if (titleStartPromise === tracked) titleStartPromise = null;
       });
     titleStartPromise = tracked;

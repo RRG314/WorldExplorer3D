@@ -18,6 +18,7 @@ export const currentContractTests = [
   'tests/planetary-world-cache-current.test.mjs',
   'tests/weather-location-lifecycle-current.test.mjs',
   'tests/release-interruption-evidence-current.test.mjs',
+  'tests/run-logged-step-current.test.mjs',
   'tests/perf-active-play-quality-current.test.mjs',
   'tests/hosting-api-routes-current.test.mjs',
   'tests/browser-function-invokers-current.test.cjs',

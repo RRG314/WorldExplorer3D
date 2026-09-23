@@ -104,3 +104,24 @@ test('overview advances between LOD ticks without adding a timer or background l
  app._streetPavementUpdating=false;app.gameStarted=false;kernel.runFrame(192);assert.equal(advances,10);
  kernel.dispose();
 });
+
+for (const composer of [false, true]) test(`title runtime imports suppress stale-world work until launch finishes (${composer})`, () => {
+  let updates = 0, draws = 0, maps = 0;
+  const app = { gameStarted: true, worldLoading: false, titleLaunchPending: true,
+    renderer: { render: () => draws++ }, composer: { render: () => draws++ },
+    update: () => updates++, updateControlInput: () => updates++, updateCamera: () => updates++,
+    drawMinimap: () => maps++, updateHUD() {}, refreshLiveWeather: () => updates++ };
+  const kernel = createRuntimeKernel();
+  for (const system of createCoreFrameSystems(app)) kernel.registerSystem(system);
+  kernel.registerSystem(createCoreRenderSystem(app, () => composer));
+  for (let i = 0; i < 200; i++) kernel.runFrame(i * 16);
+  assert.deepEqual({ updates, draws, maps }, { updates: 0, draws: 0, maps: 0 });
+  // The world loader can explicitly prepare a completed frame while the title
+  // still owns the loading cover; regular simulation must remain suspended.
+  app.prepareFirstWorldRender();
+  assert.equal(draws, 1);
+  app.titleLaunchPending = false;
+  for (let i = 200; i < 220; i++) kernel.runFrame(i * 16);
+  assert.ok(updates > 1); assert.ok(maps > 0); assert.ok(draws > 1);
+  kernel.dispose();
+});
