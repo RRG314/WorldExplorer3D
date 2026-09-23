@@ -1,4 +1,4 @@
-import { waitForGpsFieldReveal } from './gps-fix-stream.mjs';
+import { waitForGpsFieldReveal, createGpsFixStream } from './gps-fix-stream.mjs';
 import { selectLowRenderQuality } from './render-quality-ui.mjs';
 import { installBrowserGraphicsProbe } from './browser-graphics-probe.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
@@ -36,6 +36,7 @@ await context.grantPermissions(['geolocation'], { origin });
 const page = await context.newPage();
 await configureStagingAppCheck(page, baseUrl);
 const cdp = await context.newCDPSession(page);
+const gpsFixStream = createGpsFixStream(cdp);
 const browserErrors = [];
 const localFailures = [];
 collectBrowserGraphicsErrors(page, browserErrors);
@@ -54,6 +55,7 @@ const distance2d = (left, right) => Math.hypot(
 );
 
 try {
+  await gpsFixStream.send('Emulation.setGeolocationOverride', { latitude: 39.2904, longitude: -76.6122, accuracy: 6, speed: 0, heading: 0 });
   const url = `${baseUrl}/app/`;
   await page.goto(url, { waitUntil: 'load', timeout: 120_000 });
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
@@ -88,7 +90,7 @@ try {
   await page.mouse.up();
 
   await page.waitForTimeout(2_200);
-  await cdp.send('Emulation.setGeolocationOverride', {
+  await gpsFixStream.send('Emulation.setGeolocationOverride', {
     latitude: 39.290445,
     longitude: -76.6122,
     accuracy: 6,
@@ -109,11 +111,9 @@ try {
   }
   await page.locator('.discoveryTodayRoute > summary').click();
   await page.waitForSelector('.discoveryTodayRoute[open] #discoveryExpeditionList [data-field-objective]', { timeout: 30_000 });
-  // A CDP override sends one fix; unlike a phone GPS watch it does not keep
-  // publishing while the user reads tutorials. Refresh the same stationary
-  // position after opening the route rather than accepting a stale Signal Lost
-  // label as a distance, or changing the application's signal-loss policy.
-  await cdp.send('Emulation.setGeolocationOverride', {
+  // The owned GPS stream keeps this stationary fix fresh through every UI
+  // step. Signal-loss policy and recording eligibility remain unchanged.
+  await gpsFixStream.send('Emulation.setGeolocationOverride', {
     latitude: 39.290445, longitude: -76.6122, accuracy: 6, speed: 0, heading: 0
   });
   await page.waitForFunction(() => {
@@ -143,7 +143,7 @@ try {
     (Number(firstObjective.targetWorld.x) - Number(gpsWorld.x)) /
       (metersPerDegree * Math.cos(latitudeBeforeObjective * Math.PI / 180));
   await page.locator('#discoveryExpeditionList [data-field-objective]').first().click();
-  await waitForGpsFieldReveal(page, cdp, { latitude: targetLatitude, longitude: targetLongitude }, firstObjective.slotId);
+  await waitForGpsFieldReveal(page, gpsFixStream, { latitude: targetLatitude, longitude: targetLongitude }, firstObjective.slotId);
   await page.locator('#liveGpsFieldBtn').click();
   await page.waitForSelector('#discoveryPanel.show', { timeout: 30_000 });
   await page.locator('#discoveryPrimaryBtn').click();
@@ -174,7 +174,7 @@ try {
     const routeSteps = Math.max(1, Math.ceil(Math.hypot(deltaX, deltaZ) / 12));
     for (let step = 1; step <= routeSteps + 10; step += 1) {
       const amount = Math.min(1, step / routeSteps);
-      await cdp.send('Emulation.setGeolocationOverride', {
+      await gpsFixStream.send('Emulation.setGeolocationOverride', {
         latitude: currentLatitude + (stopLatitude - currentLatitude) * amount,
         longitude: currentLongitude + (stopLongitude - currentLongitude) * amount,
         accuracy: 6,
@@ -184,7 +184,7 @@ try {
       await page.waitForTimeout(620);
     }
     try {
-      await waitForGpsFieldReveal(page, cdp, { latitude: stopLatitude, longitude: stopLongitude }, objective.slotId);
+      await waitForGpsFieldReveal(page, gpsFixStream, { latitude: stopLatitude, longitude: stopLongitude }, objective.slotId);
     } catch (error) {
       const failedStop = await snapshot();
       console.error(JSON.stringify({ expectedCompleted, objective, liveGps: failedStop.liveGps, interaction: failedStop.worldDiscovery?.interaction }, null, 2));
@@ -202,7 +202,7 @@ try {
   await page.screenshot({ path: 'output/verification/live-gps-field/expedition-complete-mobile.png', fullPage: false });
   await page.locator('#discoveryCloseBtn').click();
 
-  await cdp.send('Emulation.setGeolocationOverride', {
+  await gpsFixStream.send('Emulation.setGeolocationOverride', {
     latitude: currentLatitude + 0.00002,
     longitude: currentLongitude,
     accuracy: 60,
@@ -212,7 +212,7 @@ try {
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().liveGps?.fieldSession?.pauseReason === 'accuracy-hold', null, { timeout: 30_000 });
   const accuracyHeld = await snapshot();
 
-  await cdp.send('Emulation.setGeolocationOverride', {
+  await gpsFixStream.send('Emulation.setGeolocationOverride', {
     latitude: currentLatitude + 0.00004,
     longitude: currentLongitude,
     accuracy: 6,
@@ -223,7 +223,7 @@ try {
 
   const fastFixes = [0.00014, 0.00028, 0.00042, 0.00056, 0.00070, 0.00084].map((offset) => currentLatitude + offset);
   for (const latitude of fastFixes) {
-    await cdp.send('Emulation.setGeolocationOverride', {
+    await gpsFixStream.send('Emulation.setGeolocationOverride', {
       latitude,
       longitude: currentLongitude,
       accuracy: 6,
@@ -239,6 +239,7 @@ try {
   await page.waitForTimeout(1_200);
   const driving = await snapshot();
 
+  gpsFixStream.assertHealthy();
   const checks = {
     mobileEntryVisible: true,
     consentCancelHoldsStart: deniedSnapshot.liveGps?.active !== true,
@@ -313,7 +314,8 @@ try {
     accuracyHeld: { gps: accuracyHeld.liveGps },
     driving: { actor: driving.activeActor, gps: driving.liveGps, cameraFollow: driving.cameraFollow },
     browserErrors,
-    localFailures
+    localFailures,
+    gpsFixStream: gpsFixStream.snapshot()
   };
   await writeFile('output/verification/live-gps-field/report.json', JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
@@ -329,7 +331,9 @@ try {
   }, null, 2));
   throw error;
 } finally {
-  await context.close();
-  await browser.close();
-  await server?.close();
+  let streamError;
+  try { await gpsFixStream.stop(); } catch (error) { streamError = error; }
+  try { await context.close(); }
+  finally { try { await browser.close(); } finally { await server?.close(); } }
+  if (streamError) throw streamError;
 }

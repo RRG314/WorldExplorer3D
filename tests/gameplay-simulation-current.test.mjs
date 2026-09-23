@@ -207,3 +207,31 @@ test('GPS field waiting supplies fresh fixes until the selected target reveals a
   else { await assert.rejects(run, /did not reveal/); assert.equal(fixes, 3); }
  }
 });
+
+test('the GPS watch stays fresh through UI work, preserves bad accuracy, and stops its owned timer', async () => {
+ const { createGpsFixStream } = await import('../scripts/verification/gps-fix-stream.mjs');
+ const timers=new Map(),fixes=[];let next=0,inFlight=0;
+ const stream=createGpsFixStream({send:async(method,fix)=>{
+  assert.equal(method,'Emulation.setGeolocationOverride');assert.equal(++inFlight,1);
+  await Promise.resolve();fixes.push(fix);inFlight--;
+ }},{setTimer:fn=>{timers.set(++next,fn);return next;},clearTimer:id=>timers.delete(id)});
+ const tick=async()=>{const [id,fn]=timers.entries().next().value;timers.delete(id);await fn();};
+ await stream.send('Emulation.setGeolocationOverride',{latitude:39,longitude:-76,accuracy:6,speed:0});
+ await tick();await tick();
+ assert.equal(fixes.length,3);assert.equal(timers.size,1);
+ await stream.send('Emulation.setGeolocationOverride',{latitude:39,longitude:-76,accuracy:60,speed:0});
+ await tick();assert.equal(fixes.at(-1).accuracy,60);
+ await stream.stop();assert.equal(timers.size,0);assert.equal(stream.snapshot().active,false);
+ await assert.rejects(stream.send('Emulation.setGeolocationOverride',{latitude:39,longitude:-76}),/assertion|false/i);
+});
+
+test('GPS heartbeat failures surface and cannot leave an orphan timer', async () => {
+ const { createGpsFixStream } = await import('../scripts/verification/gps-fix-stream.mjs');
+ let tick,attempt=0;
+ const stream=createGpsFixStream({send:async()=>{if(++attempt===2)throw new Error('GPS protocol failed');}},
+  {setTimer:fn=>{tick=fn;return 1;},clearTimer:()=>{tick=null;}});
+ await stream.send('Emulation.setGeolocationOverride',{latitude:39,longitude:-76});
+ const next=tick;tick=null;await next();
+ assert.equal(tick,null);assert.throws(()=>stream.assertHealthy(),/GPS protocol failed/);
+ await assert.rejects(stream.stop(),/GPS protocol failed/);
+});
