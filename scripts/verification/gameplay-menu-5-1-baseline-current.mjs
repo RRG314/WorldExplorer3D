@@ -1,3 +1,4 @@
+import { installBrowserGraphicsProbe } from './browser-graphics-probe.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
@@ -49,6 +50,7 @@ async function verify(viewport, name) {
   const runtimeRequests = [];
   page.on('request', (request) => runtimeRequests.push(request.url()));
   collectBrowserGraphicsErrors(page, browserErrors);
+  await installBrowserGraphicsProbe(page, path.join(outputDir, `${name}-graphics-failure.json`), () => phase);
   page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   await startEarth(page);
 

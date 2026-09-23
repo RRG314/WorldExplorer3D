@@ -1,3 +1,4 @@
+import { installBrowserGraphicsProbe } from './browser-graphics-probe.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
@@ -31,6 +32,7 @@ const cdp = await context.newCDPSession(page);
 const browserErrors = [];
 const localFailures = [];
 collectBrowserGraphicsErrors(page, browserErrors);
+await installBrowserGraphicsProbe(page, 'output/verification/live-gps-field/graphics-failure.json');
 page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
 page.on('response', (response) => {
   if (response.url().startsWith(baseUrl) && response.status() >= 400) {
