@@ -6,6 +6,7 @@ import { startStaticServer } from './static-server.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { closeOwnedBrowser, withinDeadline } from './owned-browser.mjs';
+import { selectLowRenderQuality } from './render-quality-ui.mjs';
 
 const externalUrl = String(process.env.WE3D_VERIFY_BASE_URL || '').replace(/\/$/, '');
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
@@ -125,6 +126,7 @@ async function inspectJourneyInBrowser(browser, journey) {
   const localFailures = [];
   const context = await browser.newContext({
     viewport: { width: journey.width, height: journey.height },
+    deviceScaleFactor: process.env.CI ? .5 : 1,
     hasTouch: journey.mobile === true,
     isMobile: journey.mobile === true
   });
@@ -144,6 +146,7 @@ async function inspectJourneyInBrowser(browser, journey) {
     await page.goto(`${baseUrl}/app/`, { waitUntil: 'load', timeout: 120_000 });
     await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
     await page.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
+    if (process.env.CI) await selectLowRenderQuality(page);
     await enterCoordinates(page, journey);
     await page.locator('#globeSelectorStartBtn').click();
     await waitForWorld(page);
@@ -219,7 +222,12 @@ async function inspectJourneyInBrowser(browser, journey) {
 const report = {
   contract: 'regional-world-richness-v1', ok: false, complete: false, servedRoot,
   requestedJourneys: journeys.map(journey => journey.id), results: [],
-  browserBudget: { maxOldSpaceMiB: 1280, freshBrowserPerJourney: true }
+  browserBudget: {
+    maxOldSpaceMiB: 1280, freshBrowserPerJourney: true,
+    deviceScaleFactor: process.env.CI ? .5 : 1,
+    renderQuality: process.env.CI ? 'low (selected through Settings)' : 'default',
+    evidenceScope: 'regional ecology and responsive UI; not rendering performance or default-quality visual acceptance'
+  }
 };
 try {
   await mkdir('output/release-evidence/current', { recursive: true });
