@@ -50,6 +50,7 @@ function createRuntimeKernel(options = {}) {
   let running = false;
   let disposed = false;
   let frameHandle = null;
+  let manualSession = false;
   let previousTimestamp = null;
   let accumulator = 0;
   let frameNumber = 0;
@@ -206,6 +207,11 @@ function createRuntimeKernel(options = {}) {
   }
 
   function advanceBy(milliseconds = 0, suppliedContext = {}) {
+    if (manualSession) throw new Error('Manual simulation is already active.');
+    return advanceFrames(milliseconds, suppliedContext);
+  }
+
+  function advanceFrames(milliseconds = 0, suppliedContext = {}) {
     if (disposed) throw new Error('Runtime kernel is disposed.');
     const requestedMs = Math.max(0, finiteNumber(milliseconds, 0));
     if (requestedMs === 0) {
@@ -246,8 +252,34 @@ function createRuntimeKernel(options = {}) {
     });
   }
 
+  // Keep one clock owner across asynchronous network yields. The heartbeat
+  // uses real timers, but RAF must not add extra driving time while keys are held.
+  async function advanceWithNetworkYields(milliseconds = 0, suppliedContext = {}) {
+    if (disposed) throw new Error('Runtime kernel is disposed.');
+    if (manualSession) throw new Error('Manual simulation is already active.');
+    const requestedMs = Math.max(0, finiteNumber(milliseconds, 0));
+    const total = { requestedMs, simulatedMs: 0, frames: 0, suspendedFrames: 0 };
+    manualSession = true;
+    if (frameHandle !== null && typeof cancelFrame === 'function') cancelFrame(frameHandle);
+    frameHandle = null;
+    try {
+      while (total.simulatedMs < requestedMs - 1e-7) {
+        const receipt = advanceFrames(Math.min(16, requestedMs - total.simulatedMs), suppliedContext);
+        total.simulatedMs += receipt.simulatedMs;
+        total.frames += receipt.frames;
+        total.suspendedFrames += receipt.suspendedFrames;
+        await (options.yieldToNetwork?.() ?? new Promise(resolve => globalThis.setTimeout(resolve, 0)));
+      }
+      return Object.freeze(total);
+    } finally {
+      manualSession = false;
+      previousTimestamp = now();
+      scheduleNextFrame();
+    }
+  }
+
   function scheduleNextFrame() {
-    if (!running || typeof requestFrame !== 'function') return;
+    if (manualSession || !running || typeof requestFrame !== 'function') return;
     frameHandle = requestFrame((timestamp) => {
       frameHandle = null;
       try {
@@ -316,6 +348,7 @@ function createRuntimeKernel(options = {}) {
 
   return Object.freeze({
     advanceBy,
+    advanceWithNetworkYields,
     dispose,
     registerSystem,
     runFrame,

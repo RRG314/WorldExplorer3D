@@ -32,12 +32,11 @@ export async function stepGameplayKeys(page, keys, milliseconds, { yieldToNetwor
       for (const code of codes) dispatch('keydown', code);
       const result = [];
       for (let remaining = milliseconds; remaining > 0;) {
-        // Networked journeys use real server leases. A synchronous batch of
-        // rendered frames can starve their heartbeat timers on a slow GPU.
-        const duration = Math.min(yieldToNetwork ? 16 : 2000, remaining);
-        result.push({ duration, receipt: await globalThis.advanceTime?.(duration) });
+        // The kernel owns RAF suspension through every heartbeat/network yield.
+        // Yielding here would resume live animation while these keys remain held.
+        const duration = Math.min(2000, remaining);
+        result.push({ duration, receipt: await globalThis.advanceTime?.(duration, { yieldToNetwork }) });
         remaining -= duration;
-        if (yieldToNetwork) await new Promise(resolve => setTimeout(resolve, 0));
       }
       return result;
     } finally {

@@ -152,23 +152,39 @@ test('vehicle input rechecks the actual nearby identity and releases E on failed
 });
 
 
-test('networked input yields timer tasks between frames while preserving held keys', async () => {
-  const pressed = new Set(), durations = [];
-  let yields = 0;
+test('networked input delegates timer yields to the real kernel without releasing clock ownership', async () => {
+  const { createRuntimeKernel } = await import('../app/js/runtime/kernel.js');
+  const pressed = new Set(), pending = new Map();
+  let time = 0, nextId = 0, movementMs = 0, yields = 0;
   const target = { tagName: 'BODY', dispatchEvent(event) {
     if (event.type === 'keydown') pressed.add(event.code);
     else pressed.delete(event.code);
   } };
+  const kernel = createRuntimeKernel({
+    now: () => time,
+    requestFrame: fn => { pending.set(++nextId, fn); return nextId; },
+    cancelFrame: id => pending.delete(id),
+    yieldToNetwork: async () => {
+      assert.ok(pressed.has('ArrowUp')); yields++; time += 2000;
+      for (const [id, callback] of [...pending]) { pending.delete(id); callback(time); }
+    }
+  });
+  kernel.registerSystem({id: 'movement', update(frame) { if (pressed.has('ArrowUp')) movementMs += frame.dt * 1000; }});
+  kernel.start();
   const page = { evaluate: async (fn, args) => vm.runInNewContext(`(${fn.toString()})(args)`, {
     args, document: { activeElement: target },
     KeyboardEvent: class { constructor(type, options) { Object.assign(this, options, { type }); } },
-    setTimeout(callback) { assert.ok(pressed.has('ArrowUp')); yields++; callback(); },
-    advanceTime(duration) {
-      assert.ok(pressed.has('ArrowUp')); durations.push(duration);
-      return { simulatedMs: duration, frames: 1, suspendedFrames: 0 };
-    }
+    setTimeout(callback) {
+      time += 2000;
+      for (const [id, frame] of [...pending]) { pending.delete(id); frame(time); }
+      callback();
+    },
+    advanceTime: (duration, options) => options?.yieldToNetwork
+      ? kernel.advanceWithNetworkYields(duration) : kernel.advanceBy(duration)
   }) };
   const receipt = await stepGameplayKeys(page, 'ArrowUp', 50, { yieldToNetwork: true });
-  assert.deepEqual(durations, [16, 16, 16, 2]); assert.equal(yields, durations.length);
-  assert.equal(pressed.size, 0); assert.equal(receipt.timing, 'dom-keyboard-fixed-step-with-network-yields');
+  assert.ok(Math.abs(movementMs - 50) < 1e-8, `Extra live movement: ${movementMs}`);
+  assert.equal(yields, 4); assert.equal(pressed.size, 0);
+  assert.equal(receipt.timing, 'dom-keyboard-fixed-step-with-network-yields');
+  kernel.dispose();
 });

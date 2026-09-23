@@ -1,7 +1,7 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
 import { createCoreFrameSystems, createCoreRenderSystem } from './runtime/core-frame-systems.js?v=11';
 import { createDebugPresentationSystem } from './runtime/debug-presentation.js?v=3';
-import { createRuntimeKernel } from './runtime/kernel.js?v=2';
+import { createRuntimeKernel } from './runtime/kernel.js?v=3';
 
 let perfPanelTimer = 0;
 let runtimeSystemsRegistered = false;
@@ -148,9 +148,11 @@ function registerRuntimeSystem(definition) {
   return runtimeKernel.registerSystem(definition);
 }
 
-function advanceRuntimeTime(milliseconds = 0) {
+function advanceRuntimeTime(milliseconds = 0, options = {}) {
   registerRuntimeSystems();
-  return runtimeKernel.advanceBy(milliseconds, { source: 'automation' });
+  return options.yieldToNetwork === true
+    ? runtimeKernel.advanceWithNetworkYields(milliseconds, { source: 'automation' })
+    : runtimeKernel.advanceBy(milliseconds, { source: 'automation' });
 }
 
 function showLoad(text, options = {}) {
