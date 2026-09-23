@@ -3,6 +3,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 
 const root = process.cwd();
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
@@ -103,6 +105,8 @@ try {
     const browserErrors = [];
     const browserConsole = [];
     const localFailures = [];
+    collectBrowserGraphicsErrors(page, browserErrors);
+    await configureStagingAppCheck(page, baseUrl);
     page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
     page.on('crash', () => {
       browserErrors.push('Browser renderer crashed during assembled-world verification');
@@ -404,6 +408,8 @@ try {
         const suffix = forceTransportFallback ? '-transport-fallback' : '';
         await page.screenshot({ path: path.join(evidenceDir, `${location.id}${suffix}.png`) });
       }
+      checks.noBrowserErrors = browserErrors.length === 0;
+      checks.noFailedLocalResources = localFailures.length === 0;
       results.push({
         ...location,
         ok: Object.values(checks).every(Boolean),

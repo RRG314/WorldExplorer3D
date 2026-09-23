@@ -222,6 +222,7 @@ const tests = [
   'tests/environment-context-loading-current.test.mjs',
   'tests/deferred-workload-current.test.mjs',
   'tests/core-render-lifecycle-current.test.mjs',
+  'tests/browser-graphics-errors-current.test.mjs',
   'tests/road-interior-terrain-current.test.mjs',
   'tests/road-terrain-conformance-current.test.mjs',
   'tests/road-terrain-reconciliation-current.test.mjs',

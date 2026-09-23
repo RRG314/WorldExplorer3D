@@ -3,6 +3,8 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 
 const externalUrl = String(process.env.WE3D_VERIFY_BASE_URL || '').replace(/\/$/, '');
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
@@ -125,6 +127,8 @@ async function inspectJourneyInBrowser(browser, journey) {
     isMobile: journey.mobile === true
   });
   const page = await context.newPage();
+  collectBrowserGraphicsErrors(page, pageErrors);
+  await configureStagingAppCheck(page, baseUrl);
   page.on('pageerror', (error) => pageErrors.push(String(error?.stack || error)));
   page.on('console', (message) => {
     if (message.type() === 'error') providerWarnings.push(`console: ${message.text()}`);

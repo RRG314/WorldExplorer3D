@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { VEHICLE_CATALOG, PARKED_VEHICLE_CATALOG } from '../../app/js/engine/vehicle-catalog.js?v=6';
 import { resolveVehicleRoadContactPose } from '../../app/js/engine/vehicle-road-attitude.js?v=2';
 import {
@@ -550,6 +551,7 @@ try {
       throw error;
     }
     const browserErrors = [];
+    collectBrowserGraphicsErrors(page, browserErrors);
     const localFailures = [];
     page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
     page.on('response', (response) => {
@@ -695,6 +697,8 @@ try {
       if (capture) {
         await page.screenshot({ path: path.join(captureDir, `${location.id}.png`) });
       }
+      checks.noBrowserErrors = browserErrors.length === 0;
+      checks.noFailedLocalResources = localFailures.length === 0;
       results.push({
         id: location.id,
         ok: Object.values(checks).every(Boolean),
