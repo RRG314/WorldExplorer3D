@@ -2,7 +2,7 @@
 // readiness contract. Its generic 500ms menu delay is insufficient here.
 import {readFile} from 'node:fs/promises';
 import {spawn} from 'node:child_process';
-const client=process.env.WE3D_GAME_CLIENT || '/Users/stevenreid/.codex/skills/develop-web-game/scripts/web_game_playwright_client.js';
+const client=process.env.WE3D_GAME_CLIENT || new URL('./vendor/web-game-playwright-client.js', import.meta.url);
 let source=await readFile(client,'utf8');
 if (process.env.WE3D_STAGING_APP_CHECK_FILE) {
  const {token} = JSON.parse(await readFile(process.env.WE3D_STAGING_APP_CHECK_FILE, 'utf8'));

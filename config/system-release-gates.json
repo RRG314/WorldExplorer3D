@@ -11,6 +11,7 @@
     "public-claims": { "scope": "candidate", "command": ["npm", "run", "audit:release-claims"], "artifactRequired": false },
     "current-contracts": { "scope": "candidate", "command": ["npm", "run", "verify:current-contracts"], "artifactRequired": false },
     "artifact-world": { "scope": "candidate", "command": ["npm", "run", "verify:artifact-runtime"], "artifactRequired": true, "timeoutMs": 360000 },
+    "game-client-smoke": { "scope": "candidate", "command": ["node", "scripts/verification/game-client-smoke.mjs"], "artifactRequired": true, "timeoutMs": 180000 },
     "facade-shaders": { "scope": "candidate", "command": ["node", "scripts/verification/building-facade-shaders-current.mjs"], "artifactRequired": false, "timeoutMs": 60000 },
     "street-geometry": { "scope": "candidate", "command": ["npm", "run", "verify:streets"], "artifactRequired": false },
     "street-workers": { "scope": "candidate", "command": ["node", "scripts/verification/street-worker-artifact.mjs"], "artifactRequired": true },
