@@ -3,7 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
-import { advanceGameplay } from './gameplay-simulation.mjs';
+import { advanceGameplay, stepGameplayKeys } from './gameplay-simulation.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 
@@ -66,7 +66,7 @@ async function approachNearbyAction() {
   const deadline = Date.now() + (process.env.CI ? 180_000 : 90_000);
   let last;
   while (Date.now() < deadline) {
-    last = await page.evaluate(() => {
+    last = await page.evaluate(async () => {
       const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
       const actor = state.activeActor;
       const targets = [
@@ -77,20 +77,65 @@ async function approachNearbyAction() {
       ];
       const distance = target => Math.hypot(target.x - actor.position.x, target.z - actor.position.z);
       const target = targets.sort((a, b) => distance(a) - distance(b))[0];
+      // A person on the opposite pavement may be close in Euclidean distance
+      // but behind a solid building. Read the real collider to plan a bounded
+      // walking route; all movement still goes through the DOM input handlers.
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const origin = actor?.position;
+      let waypoint = target;
+      if (origin && target && typeof ctx.checkBuildingCollision === 'function') {
+        const spacing = 2;
+        const nearby = targets.filter(candidate => distance(candidate) < 90);
+        const key = (x, z) => `${x},${z}`;
+        const point = node => ({ x: origin.x + node.x * spacing, z: origin.z + node.z * spacing });
+        const clear = (x, z) => !ctx.checkBuildingCollision(x, z, .4, {
+          actorBaseY: origin.y - 1.7, actorHeight: 1.7
+        })?.collision;
+        const queue = [{ x: 0, z: 0, parent: null }];
+        const seen = new Set(['0,0']);
+        let reached = null;
+        for (let index = 0; index < queue.length && index < 6400; index += 1) {
+          const node = queue[index];
+          const at = point(node);
+          if (nearby.some(candidate => Math.hypot(candidate.x - at.x, candidate.z - at.z) < 2)) { reached = node; break; }
+          for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+            const next = { x: node.x + dx, z: node.z + dz, parent: node };
+            const id = key(next.x, next.z);
+            if (Math.abs(next.x) > 45 || Math.abs(next.z) > 45 || seen.has(id)) continue;
+            seen.add(id);
+            const to = point(next);
+            if (clear(to.x, to.z) && clear((at.x + to.x) / 2, (at.z + to.z) / 2)) queue.push(next);
+          }
+        }
+        if (reached?.parent) {
+          const route = [];
+          for (let node = reached; node.parent; node = node.parent) route.unshift(node);
+          // Keep straight sections together so the verifier doesn't stop and
+          // turn at every grid cell. Replan against the actor's actual position.
+          let last = route[0];
+          const direction = { x: last.x, z: last.z };
+          for (const node of route.slice(1)) {
+            if (node.x - last.x !== direction.x || node.z - last.z !== direction.z) break;
+            last = node;
+          }
+          waypoint = point(last);
+        } else if (!reached) waypoint = null;
+      }
       const prompt = document.getElementById('urbanVehiclePrompt');
-      return {actor, target, action:state.urbanSandbox?.interaction,
+      return {actor, target, waypoint, action:state.urbanSandbox?.interaction,
         visible:!!prompt?.classList.contains('show') && getComputedStyle(prompt).display !== 'none'};
     });
     if (last.visible && last.action) return last;
     assert.ok(last.target && last.actor?.mode === 'walk', `No walking approach: ${JSON.stringify(last)}`);
-    const dx = last.target.x - last.actor.position.x;
-    const dz = last.target.z - last.actor.position.z;
+    assert.ok(last.waypoint, `No collision-free approach to a nearby action: ${JSON.stringify(last)}`);
+    const dx = last.waypoint.x - last.actor.position.x;
+    const dz = last.waypoint.z - last.actor.position.z;
     const angle = Math.atan2(dx, dz) - last.actor.orientation.yaw;
     const delta = Math.atan2(Math.sin(angle), Math.cos(angle));
     if (Math.abs(delta) > 0.12) {
-      await hold(delta > 0 ? 'ArrowLeft' : 'ArrowRight', Math.abs(delta) > 0.5 ? 140 : 24);
+      await stepGameplayKeys(page, [delta > 0 ? 'ArrowLeft' : 'ArrowRight'], Math.min(500, Math.max(20, Math.abs(delta) / 2.6 * 1000)));
     } else {
-      await hold('KeyZ', Math.hypot(dx, dz) > 4 ? 400 : 100);
+      await stepGameplayKeys(page, ['ArrowUp'], Math.hypot(dx, dz) > 4 ? 600 : 150);
     }
   }
   throw new Error(`Could not reach a nearby action using normal input: ${JSON.stringify(last)}`);
