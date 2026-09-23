@@ -1,0 +1,4 @@
+# Historical browser test actor-state property, not an authentication secret:
+# actorKey: '__WE3D_COMPARISON_ACTOR__'. This exact line was later removed.
+# Limit the exception to this commit/path/rule/line; do not allow general keys.
+49a2b632cf4a825eb4e5ef8cb3533079911a1c94:scripts/verification/performance-comparison.mjs:generic-api-key:67
