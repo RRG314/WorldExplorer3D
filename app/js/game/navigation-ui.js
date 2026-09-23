@@ -1,6 +1,20 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { escapeHtml, escapeJsString, formatPrice, toFiniteNumber } from "./ui-utils.js?v=1";
 
+import { disposeThreeObjectTree } from '../engine/webgl-lifecycle.js?v=2';
+
+let navigationFrame = null;
+function clearNavigationVisuals() {
+  if (navigationFrame !== null) cancelAnimationFrame(navigationFrame);
+  navigationFrame = null;
+  for (const key of ['navigationRoute', 'navigationMarker']) {
+    const object = appCtx[key];
+    object?.parent?.remove(object);
+    disposeThreeObjectTree(object);
+    appCtx[key] = null;
+  }
+}
+
 export function updateNearbyPOI() {
   const poiInfo = document.getElementById('poiInfo');
   if (!appCtx.poiMode) {
@@ -243,14 +257,7 @@ export function clearNavigation() {
   appCtx.navigationRouteDistance = 0;
   appCtx._navigationRouteState = null;
 
-  if (appCtx.navigationRoute) {
-    appCtx.scene.remove(appCtx.navigationRoute);
-    appCtx.navigationRoute = null;
-  }
-  if (appCtx.navigationMarker) {
-    appCtx.scene.remove(appCtx.navigationMarker);
-    appCtx.navigationMarker = null;
-  }
+  clearNavigationVisuals();
 
   document.getElementById('navigationHud').style.display = 'none';
 }
@@ -308,16 +315,13 @@ export function createNavigationRoute(fromX, fromZ, toX, toZ, forceRebuild = fal
   const worldPoints = routePointsToWorldVectors(routeData.points, navMode);
   if (worldPoints.length < 2) return;
 
-  if (appCtx.navigationRoute) appCtx.scene.remove(appCtx.navigationRoute);
-  if (appCtx.navigationMarker) appCtx.scene.remove(appCtx.navigationMarker);
+  clearNavigationVisuals();
 
   const curve = new THREE.CatmullRomCurve3(worldPoints);
   const tubularSegments = Math.max(24, (worldPoints.length - 1) * 10);
   const tubeGeometry = new THREE.TubeGeometry(curve, tubularSegments, 0.3, 8, false);
   const tubeMaterial = new THREE.MeshBasicMaterial({
     color: 0x00ff88,
-    emissive: 0x00ff88,
-    emissiveIntensity: 1,
     transparent: true,
     opacity: 0.8
   });
@@ -328,8 +332,6 @@ export function createNavigationRoute(fromX, fromZ, toX, toZ, forceRebuild = fal
   const sphereGeometry = new THREE.SphereGeometry(2, 16, 16);
   const sphereMaterial = new THREE.MeshBasicMaterial({
     color: 0x00ff88,
-    emissive: 0x00ff88,
-    emissiveIntensity: 2,
     transparent: true,
     opacity: 0.7
   });
@@ -340,8 +342,6 @@ export function createNavigationRoute(fromX, fromZ, toX, toZ, forceRebuild = fal
   const beamGeometry = new THREE.CylinderGeometry(0.2, 0.2, 20, 8);
   const beamMaterial = new THREE.MeshBasicMaterial({
     color: 0x00ff88,
-    emissive: 0x00ff88,
-    emissiveIntensity: 1,
     transparent: true,
     opacity: 0.5
   });
@@ -354,12 +354,13 @@ export function createNavigationRoute(fromX, fromZ, toX, toZ, forceRebuild = fal
   appCtx.scene.add(appCtx.navigationMarker);
 
   const animateMarker = () => {
-    if (appCtx.navigationMarker && appCtx.navigationMarker.parent) {
-      const time = Date.now() * 0.003;
-      sphere.scale.setScalar(1 + Math.sin(time) * 0.2);
-      sphere.material.opacity = 0.5 + Math.sin(time) * 0.2;
-      requestAnimationFrame(animateMarker);
-    }
+    // A route rebuild must not let an old closure follow the new global marker.
+    if (appCtx.navigationMarker !== markerGroup || !markerGroup.parent) return;
+    navigationFrame = null;
+    const time = Date.now() * 0.003;
+    sphere.scale.setScalar(1 + Math.sin(time) * 0.2);
+    sphere.material.opacity = 0.5 + Math.sin(time) * 0.2;
+    navigationFrame = requestAnimationFrame(animateMarker);
   };
   animateMarker();
 }

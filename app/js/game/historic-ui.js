@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { clearNavigation, createNavigationRoute, describeDestinationEntrySupport, getNavigationTargetForDestination } from "./navigation-ui.js?v=1";
+import { clearNavigation, createNavigationRoute, describeDestinationEntrySupport, getNavigationTargetForDestination } from "./navigation-ui.js?v=2";
 import { escapeHtml, escapeJsString, toFiniteNumber } from "./ui-utils.js?v=1";
 import { closeModal, updatePropertyPanel } from "./property-ui.js?v=9";
 

@@ -163,6 +163,7 @@ export function resetWorldForReload(options = {}) {
   disposeSceneMeshes(appCtx.urbanSurfaceMeshes, { skipSharedUrbanSurfaceMaterial: true });
   appCtx.replaceWorldCollection('urbanSurfaceMeshes');
   invalidateTraversalNetworks('world_reload_reset');
+  appCtx.clearNavigation?.();
   appCtx.navigationRoutePoints = [];
   appCtx.navigationRouteDistance = 0;
 

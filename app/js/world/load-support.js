@@ -241,6 +241,7 @@ export function createSyntheticFallbackWorld(options = {}) {
     'waterWaveVisuals'
   ]);
   invalidateTraversalNetworks('fallback_world_reset');
+  appCtx.clearNavigation?.();
   appCtx.navigationRoutePoints = [];
   appCtx.navigationRouteDistance = 0;
   appCtx.clearWorldCollections([

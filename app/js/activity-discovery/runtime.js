@@ -290,6 +290,10 @@ function applySpawnForActivity(activity = {}) {
 }
 
 function clearRuntimeNavigation() {
+  if (typeof appCtx.clearNavigation === 'function') {
+    appCtx.clearNavigation();
+    return;
+  }
   appCtx.showNavigation = false;
   appCtx.navigationRoute = null;
   appCtx.navigationRoutePoints = [];

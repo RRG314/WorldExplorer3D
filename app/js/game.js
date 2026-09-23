@@ -43,7 +43,7 @@ import {
   updateMapLayers,
   updateNavigationRoute,
   updateNearbyPOI
-} from "./game/navigation-ui.js?v=1";
+} from "./game/navigation-ui.js?v=2";
 import {
   clearPropertyMarkers,
   closeModal,

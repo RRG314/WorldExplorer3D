@@ -57,12 +57,12 @@ import {
   finalizeLoadedWorld,
   recordWorldLoadWarning,
   safeWorldLoadCall
-} from "./world/load-support.js?v=44";
+} from "./world/load-support.js?v=45";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
   resetWorldForReload
-} from "./world/load-reset.js?v=21";
+} from "./world/load-reset.js?v=22";
 import {
   prepareWorldFeatureSelections
 } from "./world/load-budgeting.js?v=20";

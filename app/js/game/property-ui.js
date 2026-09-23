@@ -7,7 +7,7 @@ import { createConnectedExplorerWallet } from '../economy/connected-wallet-autho
 import { getCurrentUser } from '../../../js/auth-ui.js?v=55';
 import { getCurrentRoom } from '../multiplayer/rooms.js?v=67';
 import { postActivity } from '../multiplayer/loop.js?v=56';
-import { createNavigationRoute, describeDestinationEntrySupport, getNavigationTargetForDestination } from './navigation-ui.js?v=1';
+import { createNavigationRoute, describeDestinationEntrySupport, getNavigationTargetForDestination } from './navigation-ui.js?v=2';
 import { escapeHtml, sanitizeHttpUrl } from './ui-utils.js?v=1';
 import { isLikelyMarylandCoordinate } from '../gis/maryland-parcel-core.js?v=1';
 import { loadMarylandParcels, marylandParcelProviderSnapshot } from '../gis/maryland-parcel-provider.js?v=2';

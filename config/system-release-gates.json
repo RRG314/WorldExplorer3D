@@ -20,6 +20,7 @@
     "current-contracts": { "scope": "candidate", "command": ["npm", "run", "verify:current-contracts"], "artifactRequired": false },
     "artifact-world": { "scope": "candidate", "command": ["npm", "run", "verify:artifact-runtime"], "artifactRequired": true, "timeoutMs": 360000 },
     "game-client-smoke": { "scope": "candidate", "command": ["node", "scripts/verification/game-client-smoke.mjs"], "artifactRequired": true, "timeoutMs": 180000 },
+    "navigation-lifecycle": { "scope": "candidate", "command": ["node", "scripts/verification/navigation-lifecycle-current.mjs"], "artifactRequired": false, "timeoutMs": 60000 },
     "facade-shaders": { "scope": "candidate", "command": ["node", "scripts/verification/building-facade-shaders-current.mjs"], "artifactRequired": false, "timeoutMs": 60000 },
     "terrain-shaders": { "scope": "candidate", "command": ["node", "scripts/verification/terrain-shaders-current.mjs"], "artifactRequired": false, "timeoutMs": 60000 },
     "street-geometry": { "scope": "candidate", "command": ["npm", "run", "verify:streets"], "artifactRequired": false },

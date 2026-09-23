@@ -13,7 +13,7 @@ import {
   startActivity,
   stopActivity,
   updateActivityRuntime
-} from './runtime.js?v=7';
+} from './runtime.js?v=8';
 import {
   discoveryActionLabel,
   discoveryBadgeForActivity,
