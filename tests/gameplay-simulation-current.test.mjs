@@ -14,10 +14,12 @@ test('functional timing rejects idle, fallback, suspended and incomplete simulat
 });
 
 test('instrumented navigation bounds simulation and releases every key after success or failure', async () => {
+  for (const keys of [['ShiftLeft', 'ArrowUp'], ['Space']]) {
   for (const failure of [false, true]) {
     const pressed = new Set();
     const durations = [];
     const target = { tagName: 'BODY', dispatchEvent(event) {
+      if (event.code === 'Space') assert.equal(event.key, ' ');
       if (event.type === 'keydown') pressed.add(event.code);
       else pressed.delete(event.code);
     } };
@@ -25,18 +27,19 @@ test('instrumented navigation bounds simulation and releases every key after suc
       args, document: { activeElement: target },
       KeyboardEvent: class { constructor(type, options) { Object.assign(this, options, { type }); } },
       async advanceTime(duration) {
-        assert.deepEqual([...pressed], ['ShiftLeft', 'ArrowUp']);
+        assert.deepEqual([...pressed], keys);
         durations.push(duration);
         if (failure) throw new Error('simulation failed');
         return { simulatedMs: duration, frames: 1, suspendedFrames: 0 };
       }
     }) };
-    if (failure) await assert.rejects(stepGameplayKeys(page, ['ShiftLeft', 'ArrowUp'], 5200), /simulation failed/);
+    if (failure) await assert.rejects(stepGameplayKeys(page, keys, 5200), /simulation failed/);
     else {
-      await stepGameplayKeys(page, ['ShiftLeft', 'ArrowUp'], 5200);
+      await stepGameplayKeys(page, keys, 5200);
       assert.deepEqual(durations, [2000, 2000, 1200]);
     }
     assert.equal(pressed.size, 0);
+  }
   }
 });
 

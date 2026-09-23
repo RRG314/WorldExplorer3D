@@ -303,6 +303,23 @@ let owner;
 let member;
 const pauseReceipts = [];
 const vehicleApproaches = [];
+const vehicleExitWaits = [];
+async function brakeUntilExitAvailable(player) {
+  const started = Date.now();
+  for (let simulatedMs = 0; simulatedMs <= 12_000; simulatedMs += 100) {
+    const state = await player.page.evaluate(() => {
+      const urban = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox;
+      return { phase: urban?.phase, interaction: urban?.interaction, vehicle: urban?.playerVehicle };
+    });
+    assert.equal(state.phase, 'driving', 'Vehicle authority ended before normal exit');
+    if (state.interaction?.action === 'exit_vehicle') {
+      vehicleExitWaits.push({ simulatedMs, wallMs: Date.now() - started, state });
+      return;
+    }
+    assert.ok(simulatedMs < 12_000, `Braking did not enable exit: ${JSON.stringify(state)}`);
+    await stepGameplayKeys(player.page, 'Space', 100);
+  }
+}
 async function pauseWaitingPlayer(player) {
   pauseReceipts.push(await pauseWaitingPage(player.page));
 }
@@ -535,17 +552,11 @@ try {
   }, sharedVehicle.id, roomStateWait);
 
   await resumePlayer(owner);
-  await owner.page.keyboard.down('ArrowUp');
-  await owner.page.waitForTimeout(1_100);
-  await owner.page.keyboard.up('ArrowUp');
-  await owner.page.keyboard.down('Space');
-  try {
-    // The visible exit action requires low speed plus a stability interval.
-    // Fixed-duration braking can press E before that action becomes available.
-    await owner.page.waitForFunction(() =>
-      globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.interaction?.action === 'exit_vehicle',
-    null, { timeout: 12_000, polling: 250 });
-  } finally { await owner.page.keyboard.up('Space'); }
+  // Use the same normal DOM-input/fixed-step contract as walking. Wall-clock
+  // sleeps on a software GPU do not establish a known physics interval.
+  // The server lease test above deliberately remains real wall-clock time.
+  await stepGameplayKeys(owner.page, 'ArrowUp', 1_100);
+  await brakeUntilExitAvailable(owner);
   await owner.page.keyboard.press('KeyE');
   await owner.page.waitForFunction((vehicleId) => {
     const urban = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox;
@@ -583,9 +594,7 @@ try {
   await recordStage('shared-car claim, lease renewal, release and member handoff accepted; waiting for member exit');
   // Driving starts before the normal exit stability interval is complete.
   // Wait for the same visible action used by the owner's exit above.
-  await member.page.waitForFunction(() =>
-    globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.interaction?.action === 'exit_vehicle',
-  null, { timeout: 12_000, polling: 250 });
+  await brakeUntilExitAvailable(member);
   await member.page.keyboard.press('KeyE');
   await member.page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.phase === 'walking', null, roomStateWait);
 
@@ -618,6 +627,7 @@ try {
     contract: 'two-authenticated-clients-bounded-room-convergence',
     generatedAt: new Date().toISOString(),
     checks,
+    vehicleExitWaits,
     interactionTrace: {
       owner: await owner.page.evaluate(() => globalThis.__multiplayerInputTrace || []),
       member: await member.page.evaluate(() => globalThis.__multiplayerInputTrace || [])
@@ -658,7 +668,7 @@ try {
     await player.page.screenshot({ path: path.join(path.dirname(reportPath), `${label}-failure.png`), timeout: 5000 }).catch(() => {});
   }
   await fs.mkdir(path.dirname(reportPath), { recursive: true });
-  await fs.writeFile(reportPath, `${JSON.stringify({ ok: false, complete: false, error: String(error?.stack || error), browserBudget, pauseReceipts, vehicleApproaches, clients }, null, 2)}\n`);
+  await fs.writeFile(reportPath, `${JSON.stringify({ ok: false, complete: false, error: String(error?.stack || error), browserBudget, pauseReceipts, vehicleApproaches, vehicleExitWaits, clients }, null, 2)}\n`);
   throw error;
 } finally {
   // Firebase keeps streaming connections open in both player contexts. Closing

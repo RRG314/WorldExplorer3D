@@ -18,14 +18,14 @@ export async function advanceGameplay(page, milliseconds) {
 export async function stepGameplayKeys(page, keys, milliseconds) {
   assert.ok(Number.isFinite(milliseconds) && milliseconds > 0 && milliseconds <= 6000);
   const codes = Array.isArray(keys) ? keys : [keys];
-  assert.ok(codes.length > 0 && codes.every(code => /^(Arrow(Up|Down|Left|Right)|ShiftLeft)$/.test(code)));
+  assert.ok(codes.length > 0 && codes.every(code => /^(Arrow(Up|Down|Left|Right)|ShiftLeft|Space)$/.test(code)));
   const receipts = await page.evaluate(async ({ codes, milliseconds }) => {
     const target = document.activeElement || document.body;
     if (target?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target?.tagName)) {
       throw new Error('Gameplay navigation is blocked by a focused UI control.');
     }
     const dispatch = (type, code) => target.dispatchEvent(new KeyboardEvent(type, {
-      code, key: code === 'ShiftLeft' ? 'Shift' : code,
+      code, key: code === 'ShiftLeft' ? 'Shift' : code === 'Space' ? ' ' : code,
       shiftKey: codes.includes('ShiftLeft') && type === 'keydown', bubbles: true, cancelable: true
     }));
     try {
