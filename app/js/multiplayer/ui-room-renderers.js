@@ -400,10 +400,12 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
     if (refs.floatChat) {
       refs.floatChat.hidden = !hasRoom;
       refs.floatChat.classList.toggle("on", state.chatOpen);
+      refs.floatChat.setAttribute("aria-expanded", String(state.chatOpen));
       refs.floatChat.classList.toggle("disabled", !hasRoom);
     }
     if (refs.chatToggleBtn) {
       refs.chatToggleBtn.classList.toggle("on", state.chatOpen);
+      refs.chatToggleBtn.setAttribute("aria-expanded", String(state.chatOpen));
       refs.chatToggleBtn.disabled = !hasRoom;
     }
     if (refs.chatSendBtn) refs.chatSendBtn.disabled = !hasRoom;
@@ -525,7 +527,16 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
 
   function setChatOpen(open) {
     state.chatOpen = !!open;
-    if (refs.chatDrawer) refs.chatDrawer.classList.toggle("open", state.chatOpen);
+    if (refs.chatDrawer) {
+      const focused = refs.chatDrawer.ownerDocument?.activeElement;
+      // Opacity/translation alone leave invisible controls in keyboard and
+      // accessibility navigation. Release chat's focus before hiding it so
+      // the gameplay input guard does not keep treating movement as typing.
+      if (!state.chatOpen && focused && refs.chatDrawer.contains(focused)) focused.blur();
+      refs.chatDrawer.inert = !state.chatOpen;
+      refs.chatDrawer.setAttribute("aria-hidden", String(!state.chatOpen));
+      refs.chatDrawer.classList.toggle("open", state.chatOpen);
+    }
     updateToggleStates();
   }
 

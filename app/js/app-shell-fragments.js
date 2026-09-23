@@ -150,7 +150,7 @@ const APP_SHELL_FRAGMENT_HTML = `
     </div>
   </section>
 </div>
-<aside id="roomChatDrawer" class="room-chat-drawer" aria-label="Room chat">
+<aside id="roomChatDrawer" class="room-chat-drawer" aria-label="Room chat" inert aria-hidden="true">
   <div class="room-chat-head">
     <span>Room Chat</span>
     <button id="roomChatCloseBtn" type="button">Close</button>
