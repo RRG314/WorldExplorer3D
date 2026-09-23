@@ -14,6 +14,16 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 const failures = [];
 collectBrowserGraphicsErrors(page, failures);
 const report = { ok: false, samples: [], surfaceChain: null, failures };
+// Retain request initiators to distinguish a stale-world request from an
+// external tile failure. This is observer-only and does not route requests.
+report.mapRequests = [];
+const network = await page.context().newCDPSession(page);
+await network.send('Network.enable');
+network.on('Network.requestWillBeSent', event => {
+  if (!event.request.url.startsWith('https://tile.openstreetmap.org/') || report.mapRequests.length >= 96) return;
+  report.mapRequests.push({ url: event.request.url, timestamp: event.timestamp,
+    initiator: event.initiator, documentURL: event.documentURL });
+});
 const optionalExternalFailures = [];
 const cancelledProviderRequests = [];
 const isOptionalExternalUrl = (url) => /(?:overpass-api\.de|overpass\.private\.coffee|google-analytics\.com)\//i.test(String(url || ''));
@@ -143,7 +153,7 @@ try {
   assert.ok(Math.abs(
     Number(state.surfaceChain?.renderedTerrainY) - Number(state.surfaceChain?.surfaces?.drive?.y)
   ) <= 0.02, JSON.stringify(state.surfaceChain));
-  assert.deepEqual(failures, []);
+  assert.equal(failures.length, 0, `Browser/network/graphics failures; full details: ${path.join(evidenceDir, 'report.json')}`);
   await page.screenshot({ path: path.join(evidenceDir, 'manchester-car-over-boundary.png'), fullPage: false });
   report.ok = true;
   console.log(JSON.stringify(report, null, 2));

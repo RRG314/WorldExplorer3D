@@ -4,6 +4,8 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 import { advanceGameplay } from './gameplay-simulation.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 
 const servedRoot = path.resolve(process.cwd(), String(process.env.WE3D_VERIFY_ROOT || '.'));
 const externalUrl = String(process.env.WE3D_VERIFY_BASE_URL || '').replace(/\/$/, '');
@@ -15,6 +17,8 @@ const context = await browser.newContext({ viewport: { width: 1440, height: 900 
 const page = await context.newPage();
 const browserErrors = [];
 const failedLocalResources = [];
+collectBrowserGraphicsErrors(page, browserErrors);
+await configureStagingAppCheck(page, baseUrl);
 
 page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
 page.on('response', (response) => {
@@ -58,24 +62,30 @@ async function moveWithRemappedForwardKey() {
 
 async function approachNearbyAction() {
   // Completing the movement lesson does not imply an interaction is in reach.
-  // Read a published parked-car approach and walk there through normal input.
+  // Read a published person or parked-car approach and walk there through
+  // normal input. A city need not have a parked car near its arrival point.
   const deadline = Date.now() + (process.env.CI ? 180_000 : 90_000);
   let last;
   while (Date.now() < deadline) {
     last = await page.evaluate(() => {
       const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
       const actor = state.activeActor;
-      const vehicles = (state.urbanSandbox?.vehicles || []).filter(v => !v.occupied && !v.ambientTraffic);
-      const distance = v => Math.hypot(v.driverDoor.x - actor.position.x, v.driverDoor.z - actor.position.z);
-      const target = vehicles.filter(v => v.driverDoor).sort((a, b) => distance(a) - distance(b))[0];
+      const targets = [
+        ...(state.urbanSandbox?.vehicles || []).filter(v => !v.occupied && !v.ambientTraffic && v.driverDoor)
+          .map(v => ({ id: v.id, kind: 'parked-vehicle', ...v.driverDoor })),
+        ...(state.urbanSandbox?.interactiveNpcs || []).filter(npc => !npc.knockedDown)
+          .map(npc => ({ id: npc.id, kind: 'person', x: npc.x, z: npc.z }))
+      ];
+      const distance = target => Math.hypot(target.x - actor.position.x, target.z - actor.position.z);
+      const target = targets.sort((a, b) => distance(a) - distance(b))[0];
       const prompt = document.getElementById('urbanVehiclePrompt');
       return {actor, target, action:state.urbanSandbox?.interaction,
         visible:!!prompt?.classList.contains('show') && getComputedStyle(prompt).display !== 'none'};
     });
     if (last.visible && last.action) return last;
     assert.ok(last.target && last.actor?.mode === 'walk', `No walking approach: ${JSON.stringify(last)}`);
-    const dx = last.target.driverDoor.x - last.actor.position.x;
-    const dz = last.target.driverDoor.z - last.actor.position.z;
+    const dx = last.target.x - last.actor.position.x;
+    const dz = last.target.z - last.actor.position.z;
     const angle = Math.atan2(dx, dz) - last.actor.orientation.yaw;
     const delta = Math.atan2(Math.sin(angle), Math.cos(angle));
     if (Math.abs(delta) > 0.12) {
@@ -230,7 +240,7 @@ try {
     openMenus:[...document.querySelectorAll('.floatMenu.open')].map(e=>e.id),
     runtime:globalThis.getWorldExplorerRuntimeDiagnostics?.()
   }); }).catch(error=>({captureError:String(error?.stack||error)}));
-  await writeFile(`${evidenceDir}/failure.json`,JSON.stringify({ok:false,error:String(error?.stack||error),state},null,2)+'\n');
+  await writeFile(`${evidenceDir}/failure.json`,JSON.stringify({ok:false,error:String(error?.stack||error),state,browserErrors,failedLocalResources},null,2)+'\n');
   await page.screenshot({path:`${evidenceDir}/failure.png`}).catch(()=>{});
   throw error;
 } finally {
