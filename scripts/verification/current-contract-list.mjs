@@ -72,6 +72,7 @@ export const currentContractTests = [
   'tests/osm-airport-source-current.test.mjs',
   'tests/pavement-mask-current.test.mjs',
   'tests/terrain-shader-composition-current.test.mjs',
+  'tests/terrain-provider-cancellation-current.test.mjs',
   'tests/pavement-sliver-grade-current.test.mjs',
   'tests/pavement-storage-current.test.mjs',
   'tests/perf-window-precision-current.test.mjs',

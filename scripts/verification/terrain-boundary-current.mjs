@@ -4,6 +4,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
+import { isExpectedTerrainProviderCancellation } from './terrain-provider-cancellation.mjs';
 
 const baseUrl = String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4192').replace(/\/$/, '');
 const evidenceDir = path.resolve('output/release-evidence/current/terrain-boundary');
@@ -35,9 +36,7 @@ page.on('requestfailed', (request) => {
   // These providers abort bounded requests after their deadline or when their
   // last consumer releases them. Keep those cancellations as evidence; local
   // failures, HTTP errors and other provider failures remain gate failures.
-  if (request.failure()?.errorText === 'net::ERR_ABORTED' &&
-      (/^https:\/\/vector\.openstreetmap\.org\/shortbread_v1\/\d+\/\d+\/\d+\.mvt$/.test(request.url()) ||
-       /^https:\/\/marine-api\.open-meteo\.com\/v1\/marine\?/.test(request.url()))) {
+  if (isExpectedTerrainProviderCancellation(request.url(), request.failure()?.errorText)) {
     cancelledProviderRequests.push(entry);
     return;
   }
@@ -107,6 +106,7 @@ try {
   });
   assert.equal(report.worldLoad.status, 'ready');
   assert.equal(report.worldLoad.geometryReady, true);
+  assert.equal(report.worldLoad.outstandingProviderWork, 0, 'Canceled provider work must settle before boundary acceptance');
   report.surfaceChain = state.surfaceChain;
   assert.equal(state.surfaceChain?.actor?.mode, 'drive');
   assert.ok(Number(state.surfaceChain?.actor?.vehicleContact?.supportSampleCount || 0) >= 1, JSON.stringify(state.surfaceChain));
