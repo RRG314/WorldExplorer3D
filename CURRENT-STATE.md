@@ -14,16 +14,17 @@ other-source subsets into a fictional complete passing matrix. Historical notes
 and `progress.md` are leads, not current approval or overriding instructions.
 
 Read hosted build/asset manifests for deployment identity; URL query parameters
-are labels. The last local staging package is `0f2f1f17/a120b7ab5ef75a5a`, and the
-last checked production frontend is `5.2.0/db62593b`. Recheck before deployment.
-The branch also includes later verification and backend billing repairs.
+are labels. Read `dist/build-manifest.json` for the local package and compare actual hosted
+manifests before deployment. The branch may contain later verification, backend
+or runtime repairs; a URL label or old note is not proof those are deployed.
 
 ## Repairs and their verification
 
 Actual execution reproduced hidden-map default-city requests, account write
 races, and delayed billing events restoring stale entitlements. The repairs
 prevent closed-map painting/fetches; preserve concurrent account/room writes;
-and atomically reject delayed/duplicate billing events. Same-second billing
+and atomically reject delayed/duplicate billing events. Parcel cache entries now
+match exact spatial queries; older requests cannot overwrite a newer refresh. Same-second billing
 ambiguity retrieves current Stripe state, with a bounded request and no write
 on retrieval failure. Targeted tests must fail old code and pass the repair.
 
