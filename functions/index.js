@@ -1102,16 +1102,36 @@ async function resolveUidFromCustomer(customerId) {
   return snap.docs[0].id;
 }
 
-async function upsertPlanFromSubscription({ uid, customerId, subscriptionId, status, priceId }) {
+async function upsertPlanFromSubscription({ uid, customerId, subscriptionId, status, priceId, eventCreated = null, eventId = null }) {
   if (!uid) return;
 
   const cfg = stripeConfig();
-  const paidPlan = planFromPriceId(priceId, cfg);
-  const active = hasActiveSubscription(status);
   const userRef = db.collection('users').doc(uid);
   await db.runTransaction(async transaction => {
     const userSnap = await transaction.get(userRef);
     const userData = userSnap.exists ? userSnap.data() || {} : {};
+    // Signed Stripe events can be duplicated or delivered out of order. The
+    // cursor and entitlement write share the account transaction, so concurrent
+    // deliveries cannot roll back a newer committed subscription state.
+    const incomingCreated = Number(eventCreated) || 0;
+    const committedCreated = Number(userData.stripeEventCreated) || 0;
+    if (eventId && userData.stripeEventId === eventId) return;
+    if (incomingCreated > 0 && incomingCreated < committedCreated) return;
+    let currentStatus = status;
+    let currentPriceId = priceId;
+    if (incomingCreated > 0 && incomingCreated === committedCreated && subscriptionId) {
+      // Event timestamps have second precision; IDs are not sortable. Resolve
+      // a tie from Stripe while the transaction owns the account version. A
+      // failed lookup aborts the write and returns 500 for Stripe to retry.
+      const current = await getStripeClient().subscriptions.retrieve(subscriptionId, {}, { timeout: 10000, maxNetworkRetries: 0 });
+      currentStatus = current.status || 'none';
+      currentPriceId = current.items?.data?.[0]?.price?.id || null;
+    }
+    const active = hasActiveSubscription(currentStatus);
+    if (subscriptionId && userData.stripeSubscriptionId &&
+        subscriptionId !== userData.stripeSubscriptionId && !active &&
+        hasActiveSubscription(userData.subscriptionStatus)) return;
+    const paidPlan = planFromPriceId(currentPriceId, cfg);
     const trialEndsAtMs = timestampToMillis(userData.trialEndsAt) || timestampToMillis(userData.trialEndsAtMs);
     const fallbackPlan = trialEndsAtMs > Date.now() ? 'trial' : 'free';
     const plan = active ? normalizePlan(paidPlan) : fallbackPlan;
@@ -1128,7 +1148,8 @@ async function upsertPlanFromSubscription({ uid, customerId, subscriptionId, sta
       {
         stripeCustomerId: customerId || null,
         stripeSubscriptionId: subscriptionId || null,
-        subscriptionStatus: status || 'none',
+        subscriptionStatus: currentStatus || 'none',
+        ...(incomingCreated > 0 && eventId ? { stripeEventCreated: incomingCreated, stripeEventId: eventId } : {}),
         plan,
         entitlements: planEntitlements(plan),
         roomCreateCount,
@@ -2672,7 +2693,9 @@ exports.stripeWebhook = functions.region('us-central1').runWith({ invoker: 'publ
             customerId,
             subscriptionId,
             status,
-            priceId
+            priceId,
+            eventCreated: event.created,
+            eventId: event.id
           });
         }
 
@@ -2705,7 +2728,9 @@ exports.stripeWebhook = functions.region('us-central1').runWith({ invoker: 'publ
             customerId,
             subscriptionId,
             status,
-            priceId
+            priceId,
+            eventCreated: event.created,
+            eventId: event.id
           });
         }
 

@@ -83,3 +83,43 @@ test('subscription fallback reads trial expiry from the committed account snapsh
   await f.scope.upsertPlanFromSubscription({ uid: 'test-user', status: 'canceled', priceId: 'pro' });
   assert.equal(f.state().plan, 'free'); assert.equal(f.state().roomCreateCount, 2);
 });
+
+test('delayed subscription event cannot restore canceled paid access', async () => {
+  const f = fixture({ plan: 'free', subscriptionStatus: 'canceled', stripeSubscriptionId: 'sub_current', stripeEventCreated: 200, stripeEventId: 'evt_cancel', roomCreateCount: 2 });
+  await f.scope.upsertPlanFromSubscription({ uid: 'test-user', subscriptionId: 'sub_current', status: 'active', priceId: 'pro', eventCreated: 100, eventId: 'evt_old' });
+  assert.equal(f.state().plan, 'free'); assert.equal(f.state().subscriptionStatus, 'canceled');
+  assert.equal(f.state().stripeEventId, 'evt_cancel');
+});
+test('duplicate signed event does not rewrite the committed account', async () => {
+  const f = fixture({ plan: 'supporter', subscriptionStatus: 'active', stripeSubscriptionId: 'sub_current', stripeEventCreated: 200, stripeEventId: 'evt_same', updatedAt: 'original' });
+  await f.scope.upsertPlanFromSubscription({ uid: 'test-user', subscriptionId: 'sub_current', status: 'active', priceId: 'supporter', eventCreated: 200, eventId: 'evt_same' });
+  assert.equal(f.state().updatedAt, 'original');
+});
+test('same-second subscription changes reconcile current Stripe state inside the transaction', async () => {
+  const f = fixture({ plan: 'supporter', stripeSubscriptionId: 'sub_current', stripeEventCreated: 200, stripeEventId: 'evt_newer' });
+  let lookups = 0;
+  f.scope.getStripeClient = () => ({ subscriptions: { retrieve: async id => {
+    assert.equal(id, 'sub_current'); lookups++;
+    return { status: 'active', items: { data: [{ price: { id: 'supporter' } }] } };
+  } } });
+  await f.scope.upsertPlanFromSubscription({ uid: 'test-user', subscriptionId: 'sub_current', status: 'active', priceId: 'pro', eventCreated: 200, eventId: 'evt_delayed_same_second' });
+  assert.equal(f.state().plan, 'supporter'); assert.equal(lookups, 1);
+});
+test('ending an older subscription cannot cancel the current active subscription', async () => {
+  const f = fixture({ plan: 'pro', subscriptionStatus: 'active', stripeSubscriptionId: 'sub_current', stripeEventCreated: 200, stripeEventId: 'evt_current' });
+  await f.scope.upsertPlanFromSubscription({ uid: 'test-user', subscriptionId: 'sub_old', status: 'canceled', priceId: 'pro', eventCreated: 201, eventId: 'evt_old_cancel' });
+  assert.equal(f.state().plan, 'pro'); assert.equal(f.state().stripeSubscriptionId, 'sub_current');
+});
+test('same-second reconciliation fetches again after a concurrent account change', async () => {
+  const f = fixture({ plan: 'pro', stripeSubscriptionId: 'sub_current', stripeEventCreated: 200, stripeEventId: 'evt_previous' }, write => write({ plan: 'free', subscriptionStatus: 'canceled' }));
+  let lookups = 0;
+  f.scope.getStripeClient = () => ({ subscriptions: { retrieve: async () => ({ status: ++lookups === 1 ? 'active' : 'canceled', items: { data: [{ price: { id: 'pro' } }] } }) } });
+  await f.scope.upsertPlanFromSubscription({ uid: 'test-user', subscriptionId: 'sub_current', status: 'active', priceId: 'pro', eventCreated: 200, eventId: 'evt_incoming' });
+  assert.equal(lookups, 2); assert.equal(f.state().plan, 'free');
+});
+test('failed same-second reconciliation cannot commit an unverified entitlement', async () => {
+  const f = fixture({ plan: 'supporter', stripeSubscriptionId: 'sub_current', stripeEventCreated: 200, stripeEventId: 'evt_previous' });
+  f.scope.getStripeClient = () => ({ subscriptions: { retrieve: async () => { throw new Error('Stripe unavailable'); } } });
+  await assert.rejects(f.scope.upsertPlanFromSubscription({ uid: 'test-user', subscriptionId: 'sub_current', status: 'active', priceId: 'pro', eventCreated: 200, eventId: 'evt_incoming' }), /Stripe unavailable/);
+  assert.equal(f.state().plan, 'supporter'); assert.equal(f.state().stripeEventId, 'evt_previous');
+});

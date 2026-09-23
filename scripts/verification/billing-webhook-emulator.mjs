@@ -18,9 +18,10 @@ export async function verifyBillingWebhook({ projectId, functionsOrigin, uid }) 
   const stripe = new Stripe('local-emulator-unused');
   const checks = [];
   let sequence = 0;
-  async function send(status, price, validSignature = true) {
-    const payload = JSON.stringify({ id: `evt_emulator_${Date.now()}_${sequence++}`, type: 'customer.subscription.updated',
-      object: 'event', created: Math.floor(Date.now() / 1000), livemode: false,
+  const eventEpoch = Math.floor(Date.now() / 1000) - 60;
+  async function send(status, price, validSignature = true, event = {}) {
+    const payload = JSON.stringify({ id: event.id || `evt_emulator_${Date.now()}_${sequence++}`, type: 'customer.subscription.updated',
+      object: 'event', created: event.created || eventEpoch + sequence, livemode: false,
       data: { object: { id: 'sub_emulator_billing', object: 'subscription', customer: 'cus_emulator_billing', status,
         metadata: { uid }, items: { data: [{ price: { id: price } }] } } } });
     const signature = stripe.webhooks.generateTestHeaderString({ payload, secret: validSignature ? 'local-emulator-unused' : 'wrong-emulator-secret' });
@@ -49,6 +50,15 @@ export async function verifyBillingWebhook({ projectId, functionsOrigin, uid }) 
     assert.equal(state.plan, 'trial'); assert.equal(state.subscriptionStatus, 'canceled');
     assert.equal(state.roomCreateCount, 2);
     checks.push('ended subscription restores the still-valid trial');
+    const committedEvent = { id: state.stripeEventId, created: state.stripeEventCreated };
+    const committedUpdatedAt = state.updatedAt.toMillis();
+    state = await send('canceled', 'price_emulator_supporter', true, committedEvent);
+    assert.equal(state.updatedAt.toMillis(), committedUpdatedAt);
+    checks.push('exact duplicate event returns success without a second write');
+    state = await send('active', 'price_emulator_pro', true, { id: 'evt_emulator_delayed', created: eventEpoch });
+    assert.equal(state.plan, 'trial'); assert.equal(state.subscriptionStatus, 'canceled');
+    assert.equal(state.stripeEventId, committedEvent.id);
+    checks.push('delayed signed paid event cannot restore canceled access');
     return { ok: true, scope: 'signed HTTP webhook and emulator persistence; no Stripe payment or external API request', checks };
   } finally {
     // Restore this fixture before the separate account deletion test. Fake
