@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { startStaticServer } from './static-server.mjs';
 
 const root = process.cwd();
@@ -26,6 +27,7 @@ if (process.env.WE3D_STAGING_APP_CHECK_FILE) {
 }
 const page = await context.newPage();
 const browserErrors = [];
+collectBrowserGraphicsErrors(page, browserErrors);
 const localFailures = [];
 const visualEvidence = [];
 
@@ -156,7 +158,7 @@ try {
   await page.waitForFunction(() => {
     const sandbox = globalThis.getWorldExplorerRuntimeDiagnostics?.()?.urbanSandbox;
     return sandbox?.equipment?.equippedId === 'laser-gun';
-  }, null, { timeout: 5000 });
+  }, null, { timeout: 5000, polling: 100 });
   await page.waitForTimeout(4000);
   const laserEquipped = await snapshot();
   if (captureRequested) {
@@ -177,21 +179,21 @@ try {
     const laser = sandbox?.equipment?.items?.find((entry) => entry.id === 'laser-gun');
     return Number(laser?.magazine) === before - 1 &&
       sandbox?.projectileRuntime?.lastProjectileAction?.equipmentId === 'laser-gun';
-  }, laserMagazineBefore, { timeout: 5000 });
+  }, laserMagazineBefore, { timeout: 5000, polling: 100 });
   const laserUsed = await snapshot();
 
   await page.keyboard.press('Digit2');
   await page.waitForFunction(() => {
     return globalThis.getWorldExplorerRuntimeDiagnostics?.()?.urbanSandbox?.equipment?.equippedId === 'flashlight';
-  }, null, { timeout: 5000 });
+  }, null, { timeout: 5000, polling: 100 });
   await page.keyboard.press('KeyV');
   await page.waitForFunction(() => {
     return globalThis.getWorldExplorerRuntimeDiagnostics?.()?.urbanSandbox?.equipment?.flashlightEnabled === true;
-  }, null, { timeout: 5000 });
+  }, null, { timeout: 5000, polling: 100 });
   const flashlightUsed = await snapshot();
 
   await page.keyboard.press('Escape');
-  await page.waitForFunction(() => document.querySelector('#urbanEquipment')?.classList.contains('show') !== true, null, { timeout: 5000 });
+  await page.waitForFunction(() => document.querySelector('#urbanEquipment')?.classList.contains('show') !== true, null, { timeout: 5000, polling: 100 });
   const closed = await snapshot();
 
   const finalItems = closed.equipment?.items || [];

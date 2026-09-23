@@ -3,6 +3,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 
 const root = process.cwd();
 const servedRoot = path.resolve(root, process.env.WE3D_VERIFY_ROOT || '.');
@@ -10,11 +12,23 @@ const server = await startStaticServer({ rootDir: servedRoot, ports: [4392, 4393
 const baseUrl = `http://127.0.0.1:${server.port}`;
 const outputDir = path.join(root, 'output', 'verification', 'analytics-lifecycle');
 const stagingConfig = JSON.parse(await fs.readFile(path.join(root, 'config', 'firebase.staging.json'), 'utf8'));
-const safeConfig = Object.freeze({ ...stagingConfig, measurementId: 'G-WE3DLOCAL', appCheckSiteKey: '' });
-const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
+const safeConfig = Object.freeze({ ...stagingConfig, measurementId: 'G-WE3DLOCAL' });
+let browser = null;
+const allBrowserErrors = [];
 
 async function createContext(options) {
+  // These are independent cold-start consent cases, not a retained-world test.
+  // Release the previous process as well as its context between cases.
+  await browser?.close();
+  browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
   const context = await browser.newContext(options);
+  await configureStagingAppCheck(context, baseUrl);
+  context.on('page', page => {
+    page.verificationErrors = [];
+    collectBrowserGraphicsErrors(page, page.verificationErrors);
+    collectBrowserGraphicsErrors(page, allBrowserErrors);
+    page.on('pageerror', error => { const message = String(error.stack || error); page.verificationErrors.push(message); allBrowserErrors.push(message); });
+  });
   // Exercise the real SDK against an explicit local collection fixture. The
   // shipped project-config script otherwise replaces addInitScript overrides.
   await context.route('**/js/firebase-project-config.js*', route => route.fulfill({
@@ -57,7 +71,7 @@ async function saveFailure(page, name, error) {
     url: location.href
   })).catch(() => null);
   await fs.writeFile(path.join(outputDir, `${name}-failure.json`), JSON.stringify({
-    error: String(error?.stack || error), evidence
+    error: String(error?.stack || error), evidence, browserErrors: page.verificationErrors || []
   }, null, 2));
 }
 
@@ -309,7 +323,8 @@ try {
   result.storageBlocked = await verifyStorageBlockedConsent();
   result.defaultStorage = await verifyDefaultStoredFirstEntry();
   for (const destination of destinations) result.destinations.push(await verifyGrantedDestination(destination));
-  result.ok = result.storageBlocked.ok && result.defaultStorage.ok && result.destinations.every((entry) => entry.ok);
+  result.browserErrors = allBrowserErrors;
+  result.ok = allBrowserErrors.length === 0 && result.storageBlocked.ok && result.defaultStorage.ok && result.destinations.every((entry) => entry.ok);
   await fs.writeFile(path.join(outputDir, 'report.json'), `${JSON.stringify(result, null, 2)}\n`, 'utf8');
   console.log(JSON.stringify(result, null, 2));
   assert.equal(result.ok, true);
@@ -318,6 +333,6 @@ try {
   await fs.writeFile(path.join(outputDir, 'report.json'), `${JSON.stringify(result, null, 2)}\n`);
   throw error;
 } finally {
-  await browser.close().catch(() => {});
+  await browser?.close().catch(() => {});
   await server.close().catch(() => {});
 }

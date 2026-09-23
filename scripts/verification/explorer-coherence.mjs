@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 
 const baseUrl = String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4192').replace(/\/$/, '');
 const evidenceDir = 'output/verification/explorer-coherence';
@@ -8,6 +10,7 @@ const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, acceptDownloads: true });
 const page = await context.newPage();
 const browserErrors = [];
+collectBrowserGraphicsErrors(page, browserErrors);
 const failedLocalResources = [];
 
 page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
@@ -49,6 +52,7 @@ async function chooseProfile() {
 
 try {
   await mkdir(evidenceDir, { recursive: true });
+  await configureStagingAppCheck(page, baseUrl);
   await page.goto(`${baseUrl}/app/`, { waitUntil: 'load', timeout: 120_000 });
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   await page.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
@@ -175,6 +179,10 @@ try {
   report.ok = report.ok && Object.values(report.checks).every(Boolean);
   console.log(JSON.stringify(report, null, 2));
   assert.equal(report.ok, true);
+} catch (error) {
+  const state = await page.evaluate(() => ({ ready: globalThis.__WE3D_RUNTIME_READY__, runtime: globalThis.getWorldExplorerRuntimeDiagnostics?.(), loading: document.querySelector('#loading')?.textContent })).catch(() => null);
+  await writeFile(`${evidenceDir}/failure.json`, JSON.stringify({ ok: false, error: String(error.stack || error), state, browserErrors, failedLocalResources }, null, 2));
+  throw error;
 } finally {
   await context.close();
   await browser.close();

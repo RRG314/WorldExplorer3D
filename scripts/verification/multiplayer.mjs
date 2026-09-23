@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
-import { stepGameplayKeys } from './gameplay-simulation.mjs';
+import { advanceGameplay, stepGameplayKeys } from './gameplay-simulation.mjs';
 import { pauseWaitingPlayer as pauseWaitingPage } from './pause-waiting-player.mjs';
 import { selectLowRenderQuality } from './render-quality-ui.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
@@ -240,6 +240,8 @@ async function launchRoomWorld(player) {
 async function walkToVehicle(player, vehicleId, maxSteps = 1_200) {
   await player.page.bringToFront();
   let previousPosition = null;
+  let previousDistance = null;
+  let recedingSteps = 0;
   let stagnant = 0;
   let recoveries = 0;
   let lastState = null;
@@ -265,6 +267,11 @@ async function walkToVehicle(player, vehicleId, maxSteps = 1_200) {
     if (state.interaction?.action === 'enter_vehicle' && state.nearbyVehicleId === vehicleId) {
       return { reached: true, step, recoveries, state, recoveryTrace };
     }
+    // Walking cannot catch a car already driving away. Re-observe the live
+    // roster instead of exhausting a stale list while every other car leaves.
+    recedingSteps = previousDistance !== null && state.distance > previousDistance + .5 ? recedingSteps + 1 : 0;
+    previousDistance = state.distance;
+    if (recedingSteps >= 4) return { reached: false, reason: 'vehicle-moving-away', step, recoveries, state, recoveryTrace };
     const desired = Math.atan2(state.targetX - state.x, state.targetZ - state.z);
     const delta = wrapYaw(desired - state.yaw);
     if (Math.abs(delta) > 0.13) {
@@ -295,6 +302,7 @@ async function walkToVehicle(player, vehicleId, maxSteps = 1_200) {
 let owner;
 let member;
 const pauseReceipts = [];
+const vehicleApproaches = [];
 async function pauseWaitingPlayer(player) {
   pauseReceipts.push(await pauseWaitingPage(player.page));
 }
@@ -434,7 +442,7 @@ try {
       .slice(0, 80).map(edge => ({ sourceFeatureId: edge.sourceFeatureId, roadWidth: edge.roadWidth, laneOffset: edge.laneOffset, roadClass: edge.roadClass, laneProvenance: edge.laneProvenance }));
   });
   console.log(JSON.stringify({ stage: 'published-parking-source', edges: parkingSource }));
-  const sharedVehicleCandidates = await owner.page.evaluate(() => {
+  const readVehicleCandidates = () => owner.page.evaluate(() => {
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     const actor = state.activeActor?.position || {};
     return (state.urbanSandbox?.vehicles || [])
@@ -443,18 +451,23 @@ try {
       .map((vehicle) => ({ id: vehicle.id, source: vehicle.source, distance: Math.hypot(vehicle.driverDoor.x - actor.x, vehicle.driverDoor.z - actor.z) }))
       .sort((left, right) => left.distance - right.distance);
   });
-  // Prefer parked cars when the source supports them, then proximity. The
-  // report records whether the phone initially seeded the chosen car.
-  sharedVehicleCandidates.sort((a, b) => Number(a.source !== 'deterministic-parked-vehicle') - Number(b.source !== 'deterministic-parked-vehicle') || a.distance - b.distance);
   let sharedVehicle = null;
-  assert.ok(sharedVehicleCandidates.length > 0,
-    `No eligible mapped vehicles at ${worldLocation.name}; shared-car fixture cannot run.`);
-  for (const candidate of sharedVehicleCandidates) {
-    const ownerReach = await walkToVehicle(owner, candidate.id);
-    if (ownerReach.reached) {
-      sharedVehicle = candidate;
-      break;
+  const attempted = new Set();
+  // Retain normal walking and server claims. Each observation is fresh; never
+  // teleport an actor, immobilize traffic, or manufacture an enterable car.
+  for (let attempt = 0; attempt < 30 && !sharedVehicle; attempt++) {
+    const candidates = await readVehicleCandidates();
+    candidates.sort((a, b) => Number(a.source !== 'deterministic-parked-vehicle') - Number(b.source !== 'deterministic-parked-vehicle') || a.distance - b.distance);
+    const candidate = candidates.find(row => !attempted.has(row.id));
+    if (!candidate) {
+      await advanceGameplay(owner.page, 1000);
+      attempted.clear();
+      continue;
     }
+    attempted.add(candidate.id);
+    const ownerReach = await walkToVehicle(owner, candidate.id);
+    vehicleApproaches.push({ candidate, ownerReach });
+    if (ownerReach.reached) sharedVehicle = candidate;
   }
   assert.ok(sharedVehicle?.id, 'Room owner could not reach any published vehicle with normal walking input.');
 
@@ -597,6 +610,7 @@ try {
   };
   assert.ok(Object.values(checks).every(Boolean), 'Two-client multiplayer verification failed.');
   const report = {
+    vehicleApproaches,
     ok: true,
     complete: true,
     browserBudget,
@@ -644,7 +658,7 @@ try {
     await player.page.screenshot({ path: path.join(path.dirname(reportPath), `${label}-failure.png`), timeout: 5000 }).catch(() => {});
   }
   await fs.mkdir(path.dirname(reportPath), { recursive: true });
-  await fs.writeFile(reportPath, `${JSON.stringify({ ok: false, complete: false, error: String(error?.stack || error), browserBudget, pauseReceipts, clients }, null, 2)}\n`);
+  await fs.writeFile(reportPath, `${JSON.stringify({ ok: false, complete: false, error: String(error?.stack || error), browserBudget, pauseReceipts, vehicleApproaches, clients }, null, 2)}\n`);
   throw error;
 } finally {
   // Firebase keeps streaming connections open in both player contexts. Closing
