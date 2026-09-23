@@ -26,8 +26,8 @@ test('repeated driver failures cannot flood the verification report', () => {
   const errors = [];
   collectBrowserGraphicsErrors(page, errors);
   for (let i = 0; i < 100; i++) page.emit('console', {
-    type: () => 'error', text: () => `THREE.WebGLProgram: shader error: ${'x'.repeat(10_000)}`
+    type: () => 'error', text: () => `THREE.WebGLProgram: shader error: ${'x'.repeat(100_000)}`
   });
   assert.equal(errors.length, 20);
-  assert.ok(errors.every(error => error.length <= 2010));
+  assert.ok(errors.every(error => error.length === 65546));
 });

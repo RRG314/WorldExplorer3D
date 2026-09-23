@@ -98,8 +98,13 @@ async function createPlayer(label) {
   page.on('request', request => {
     if (/UrbanVehicle/.test(request.url())) interactionTrace.push({ type: 'vehicle-request', at: new Date().toISOString(), method: request.method(), url: request.url() });
   });
-  page.on('response', response => {
-    if (/UrbanVehicle/.test(response.url())) interactionTrace.push({ type: 'vehicle-response', at: new Date().toISOString(), status: response.status(), url: response.url() });
+  page.on('response', async response => {
+    if (!/UrbanVehicle/.test(response.url())) return;
+    const event = { type: 'vehicle-response', at: new Date().toISOString(), status: response.status(), url: response.url() };
+    interactionTrace.push(event);
+    if (response.request().method() !== 'POST') return;
+    const result = await response.json().catch(() => null);
+    if (result) Object.assign(event, { accepted: result.accepted, reason: result.reason || result.error || '', leaseExpiresMs: result.state?.leaseExpiresMs });
   });
   await page.addInitScript(() => {
     globalThis.__multiplayerInputTrace = [];
@@ -491,8 +496,9 @@ try {
     }, sharedVehicle.id);
     throw new Error(`Claimed room vehicle did not enter driving mode: ${JSON.stringify({ claimResult, vehicleEntryState })}`, { cause: error });
   }
-  const ownerClaimed = await owner.page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox);
   await pauseWaitingPlayer(owner);
+  const ownerClaimed = await owner.page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox);
+  assert.equal(ownerClaimed.phase, 'driving', 'Vehicle ownership ended before the owner could pause.');
   await member.page.waitForFunction((vehicleId) => {
     const urban = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox;
     const vehicle = urban?.vehicles?.find((entry) => entry.id === vehicleId);

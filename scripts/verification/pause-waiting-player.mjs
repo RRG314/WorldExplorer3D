@@ -2,7 +2,14 @@ import assert from 'node:assert/strict';
 
 export async function pauseWaitingPlayer(page) {
   await page.bringToFront();
-  await page.locator('body > canvas:not(#minimap)').click();
+  // Normal keyboard gameplay already owns focus. A redundant canvas click
+  // waits for rendered stability and can consume a short server lease on a
+  // slow GPU before Escape is even sent. Refocus only actual form controls.
+  const focusedControl = await page.evaluate(() => {
+    const element = document.activeElement;
+    return element?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(element?.tagName);
+  });
+  if (focusedControl) await page.locator('body > canvas:not(#minimap)').click();
   const attempts = [];
   // Escape first dismisses an open gameplay panel. Observe that normal UI
   // transition before using Escape again to request the actual pause dialog.

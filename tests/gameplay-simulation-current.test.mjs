@@ -61,3 +61,60 @@ test('fishing stage observation terminates on actual target, loss, or simulation
   await assert.rejects(advanceUntilFishingStage(page, 'bite', 200), /did not reach bite/);
   await assert.rejects(advanceUntilFishingStage({ evaluate: async () => ({ stage: 'lost' }) }, 'bite'), /did not reach bite/);
 });
+
+// Execute the actual urban navigation function without starting its browser.
+// The target can move independently of the actor, as live traffic/NPCs do.
+async function urbanApproachHarness(moves) {
+  const { readFile } = await import('node:fs/promises');
+  const source = await readFile(new URL('../scripts/verification/urban-sandbox.mjs', import.meta.url), 'utf8');
+  const body = source.slice(source.indexOf('async function walkTo('), source.indexOf('\nasync function launchBaltimore('));
+  let step = 0;
+  const walkTo = vm.runInNewContext(`(${body})`, {
+    actorState: async () => ({ x: 0, z: moves ? step : 0, yaw: 0, distance: moves ? 100 + step * 9 : 100 - step * 10 }),
+    inputStep: async () => { step++; }, wrapYaw: value => value,
+    diagnostics: async () => ({}), console, Date
+  });
+  return walkTo({}, { x: 0, z: 100 }, {
+    maxSteps: 5, stagnantLimit: 1, stopDistance: .1,
+    resolveTarget: async () => ({ x: 0, z: moves ? 100 + step * 10 : 100 - step * 10 })
+  });
+}
+
+test('urban navigation detects a blocked player even while a target approaches', async () => {
+  assert.equal((await urbanApproachHarness(false)).blocked, true);
+});
+
+test('urban navigation does not call a moving player blocked when a target moves away', async () => {
+  const result = await urbanApproachHarness(true);
+  assert.equal(result.blocked, false);
+  assert.equal(result.steps, 5);
+});
+
+// Pausing an already focused world must not wait for another canvas click;
+// a slow renderer could consume the backend lease during actionability waits.
+test('waiting-player pause only refocuses the canvas when a form owns input', async () => {
+  const { pauseWaitingPlayer } = await import('../scripts/verification/pause-waiting-player.mjs');
+  for (const focused of [false, true]) {
+    let canvasClicks = 0, paused = false;
+    const page = {
+      bringToFront: async () => {},
+      evaluate: async fn => {
+        const source = fn.toString();
+        if (source.includes('isContentEditable')) return focused;
+        if (source.includes('focusedElement')) return { focusedElement: 'BODY', visiblePanels: [], paused };
+        return 42;
+      },
+      locator: selector => ({
+        click: async () => { assert.ok(selector.includes('canvas')); canvasClicks++; },
+        isVisible: async () => paused
+      }),
+      keyboard: { press: async key => { assert.equal(key, 'Escape'); paused = true; } },
+      waitForFunction: async () => { assert.equal(paused, true); },
+      waitForTimeout: async () => {}
+    };
+    const receipt = await pauseWaitingPlayer(page);
+    assert.equal(canvasClicks, focused ? 1 : 0);
+    assert.equal(receipt.before, receipt.after);
+    assert.equal(paused, true);
+  }
+});

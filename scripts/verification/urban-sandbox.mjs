@@ -140,7 +140,7 @@ async function walkTo(page, target, options = {}) {
   const stopDistance = Number(options.stopDistance ?? 0.75);
   const maxSteps = Number(options.maxSteps ?? 1_200);
   const interactionVehicleId = String(options.interactionVehicleId || '');
-  let previousDistance = Infinity;
+  let previousPosition = null;
   let stagnant = 0;
   let start = null;
   let detourCount = 0;
@@ -175,8 +175,10 @@ async function walkTo(page, target, options = {}) {
       const movementPulseMs = state.distance > 20 ? 520 : state.distance > 8 ? 260 : state.distance > 3 ? 140 : 80;
       await inputStep(page, state.distance > 20 ? ['ShiftLeft', 'ArrowUp'] : 'ArrowUp', movementPulseMs);
     }
-    stagnant = state.distance >= previousDistance - 0.008 ? stagnant + 1 : 0;
-    previousDistance = state.distance;
+    // A moving target must not hide a blocked player or falsely block one
+    // who is walking. Only actor translation establishes navigation progress.
+    stagnant = previousPosition && Math.hypot(state.x - previousPosition.x, state.z - previousPosition.z) < .008 ? stagnant + 1 : 0;
+    previousPosition = { x: state.x, z: state.z };
     if (stagnant > Number(options.stagnantLimit ?? 85) && options.detour === true && detourCount < 8) {
       const side = detourCount % 2 === 0 ? 1 : -1;
       detourCount += 1;
@@ -187,12 +189,12 @@ async function walkTo(page, target, options = {}) {
       const turned = await turnToward(page, tangent, .16, 160, { deadline: options.deadline }).then(() => true, () => false);
       if (!turned) {
         stagnant = 0;
-        previousDistance = Infinity;
+        previousPosition = null;
         continue;
       }
       await inputStep(page, state.distance > 20 ? ['ShiftLeft', 'ArrowUp'] : 'ArrowUp', Math.max(900, Math.min(5_200, state.distance * 125)));
       stagnant = 0;
-      previousDistance = Infinity;
+      previousPosition = null;
       continue;
     }
     if (stagnant > Number(options.stagnantLimit ?? 85)) {
