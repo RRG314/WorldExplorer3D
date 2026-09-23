@@ -143,6 +143,11 @@ async function createPlayer(label) {
     const authApi = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js');
     const credential = await authApi.createUserWithEmailAndPassword(services.auth, email, 'WorldExplorer3D-Test-Only-93!');
     await authApi.updateProfile(credential.user, { displayName });
+    // Firebase Auth Emulator 15.22 can set validSince in the second after
+    // signup's auth_time. Establish a normal authenticated session after setup;
+    // token refresh alone retains auth_time and cannot repair that boundary.
+    const signedIn = await authApi.signInWithEmailAndPassword(services.auth, email, 'WorldExplorer3D-Test-Only-93!');
+    if (signedIn.user.uid !== credential.user.uid) throw new Error('Emulator sign-in changed the fixture account.');
     const authUi = await import('/js/auth-ui.js?v=56');
     const deadline = Date.now() + 10000;
     while (authUi.getCurrentUser()?.uid !== credential.user.uid && Date.now() < deadline) {
@@ -178,8 +183,21 @@ function wrapYaw(value) {
   return result;
 }
 
-async function inputStep(page, key, milliseconds) {
-  return stepGameplayKeys(page, key, milliseconds, { yieldToNetwork: true });
+async function inputStep(page, key, milliseconds, { yieldToNetwork = true } = {}) {
+  const started = Date.now();
+  const receipt = await stepGameplayKeys(page, key, milliseconds, { yieldToNetwork });
+  const timing = { key, milliseconds, wallMs: Date.now() - started, receipt };
+  inputTimings.push(timing);
+  await fs.writeFile(path.join(path.dirname(reportPath), 'input-timing.json'), JSON.stringify(inputTimings, null, 2));
+  return timing;
+}
+
+// No vehicle lease is held while approaching on foot. Use the same fixed-step
+// keyboard path as other walking journeys and yield between bounded bursts,
+// instead of forcing a software-GPU presentation after every 16ms of physics.
+// Driving/braking retain per-frame network yields for real lease heartbeats.
+function walkingStep(page, key, milliseconds) {
+  return inputStep(page, key, milliseconds, { yieldToNetwork: false });
 }
 
 async function launchRoomWorld(player) {
@@ -262,7 +280,7 @@ async function walkToVehicle(player, vehicleId, maxSteps = 1_200) {
       };
     }, vehicleId);
     lastState = state;
-    if (step % 25 === 0) console.log(JSON.stringify({ stage: 'walk-to-shared-vehicle', vehicleId, step, recoveries, state }));
+    if (step % 5 === 0) console.log(JSON.stringify({ stage: 'walk-to-shared-vehicle', vehicleId, step, recoveries, state }));
     if (state.missing) return { reached: false, reason: 'vehicle-left-detail-range', step, recoveries, state, recoveryTrace };
     if (state.interaction?.action === 'enter_vehicle' && state.nearbyVehicleId === vehicleId) {
       return { reached: true, step, recoveries, state, recoveryTrace };
@@ -275,10 +293,10 @@ async function walkToVehicle(player, vehicleId, maxSteps = 1_200) {
     const desired = Math.atan2(state.targetX - state.x, state.targetZ - state.z);
     const delta = wrapYaw(desired - state.yaw);
     if (Math.abs(delta) > 0.13) {
-      await inputStep(player.page, delta > 0 ? 'ArrowLeft' : 'ArrowRight', Math.abs(delta) > 0.7 ? 55 : 16);
+      await walkingStep(player.page, delta > 0 ? 'ArrowLeft' : 'ArrowRight', Math.abs(delta) > 0.7 ? 55 : 16);
       continue; // Only translation can establish a blocked route.
     }
-    await inputStep(player.page, 'ArrowUp', state.distance > 18 ? 140 : 90);
+    await walkingStep(player.page, 'ArrowUp', state.distance > 18 ? 140 : 90);
     // A moving car can approach a player who is blocked by a wall. Measure
     // the player's translation, not the changing distance to that car.
     stagnant = previousPosition && Math.hypot(state.x - previousPosition.x, state.z - previousPosition.z) < .008 ? stagnant + 1 : 0;
@@ -288,9 +306,9 @@ async function walkToVehicle(player, vehicleId, maxSteps = 1_200) {
         return { reached: false, reason: 'stagnant', step, recoveries, state, recoveryTrace };
       }
       recoveryTrace.push({ x: state.x, z: state.z, distance: state.distance });
-      await inputStep(player.page, 'ArrowDown', 260);
-      await inputStep(player.page, recoveries % 2 === 0 ? 'ArrowLeft' : 'ArrowRight', 640);
-      await inputStep(player.page, 'ArrowUp', 1_200);
+      await walkingStep(player.page, 'ArrowDown', 260);
+      await walkingStep(player.page, recoveries % 2 === 0 ? 'ArrowLeft' : 'ArrowRight', 640);
+      await walkingStep(player.page, 'ArrowUp', 1_200);
       recoveries += 1;
       stagnant = 0;
       previousPosition = null;
@@ -301,6 +319,7 @@ async function walkToVehicle(player, vehicleId, maxSteps = 1_200) {
 
 let owner;
 let member;
+const inputTimings = [];
 const pauseReceipts = [];
 const vehicleApproaches = [];
 const vehicleExitWaits = [];

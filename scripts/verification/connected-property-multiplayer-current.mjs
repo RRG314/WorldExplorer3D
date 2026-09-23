@@ -80,6 +80,11 @@ async function createPlayer(label, viewport) {
     const auth = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js');
     const credential = await auth.createUserWithEmailAndPassword(services.auth, email, 'WorldExplorer3D-Test-Only-93!');
     await auth.updateProfile(credential.user, { displayName: label });
+    // Firebase Auth Emulator 15.22 can set validSince in the second after
+    // signup's auth_time. Establish a normal authenticated session after setup;
+    // token refresh alone retains auth_time and cannot repair that boundary.
+    const signedIn = await auth.signInWithEmailAndPassword(services.auth, email, 'WorldExplorer3D-Test-Only-93!');
+    if (signedIn.user.uid !== credential.user.uid) throw new Error('Emulator sign-in changed the fixture account.');
     const authUi = await import('/js/auth-ui.js?v=56');
     const deadline = Date.now() + 12_000;
     while (authUi.getCurrentUser()?.uid !== credential.user.uid && Date.now() < deadline) {

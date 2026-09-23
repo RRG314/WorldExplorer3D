@@ -129,3 +129,17 @@ the former 10-minute wrapper while capturing the completion screenshot, before
 accuracy and speed assertions. Checkpoints are written before screenshots so a
 later timeout cannot erase earlier execution evidence. Completed checkpoints do
 not mark the full gate passed; all remaining assertions and error checks must pass.
+
+## Emulator session and walking timing
+
+The two-client property/vehicle fixtures sign in normally after account creation
+and profile setup. An in-process reproduction against Auth Emulator 15.22.0
+showed signup `auth_time` can precede `validSince` at a second boundary. Refreshing
+a token retains that authentication time. Server revocation checking stays enabled;
+this fixture correction is not evidence that a hosted account journey passed.
+
+The vehicle verifier records every input's simulated duration, wall duration and
+runtime receipt. Walking uses short synchronous fixed-step bursts, with network
+work between bursts. Driving and braking retain network yields inside each burst
+so real server leases can renew. Vehicle proximity, motion, claim and release
+assertions remain unchanged, as does the 900-second total deadline.
