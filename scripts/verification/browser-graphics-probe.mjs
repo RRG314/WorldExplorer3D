@@ -1,5 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import os from 'node:os';
+import { execFileSync } from 'node:child_process';
 
 // Opt-in investigation evidence, not a change to rendering, shaders or errors.
 // The normal acceptance collector still rejects every graphics failure.
@@ -16,9 +18,14 @@ export async function installBrowserGraphicsProbe(page, outputPath, phase = () =
   let captured = false;
   page.on('console', message => {
     if (captured || !['error', 'warning'].includes(message.type()) ||
-        !/shader error|WebGL:.*INVALID_OPERATION|context (?:was )?lost/i.test(message.text())) return;
+        !/shader error|WebGL:.*INVALID_OPERATION|GL_OUT_OF_MEMORY|CONTEXT_LOST_WEBGL|context (?:was )?lost/i.test(message.text())) return;
     captured = true;
     const report = { at: new Date().toISOString(), phase: phase(), firstMessage: message.text() };
+    if (process.env.CI) {
+      report.hostMemory = { total: os.totalmem(), free: os.freemem() };
+      try { report.hostProcesses = execFileSync('ps', ['-axo', 'pid=,ppid=,rss=,comm='], { encoding: 'utf8', timeout: 2000 }); }
+      catch (error) { report.hostProcessError = error.message; }
+    }
     // Capture promptly, while the failing context still exists. Do not call
     // getError(), clear errors, restore contexts, or alter shader compilation.
     page.evaluate(async () => {

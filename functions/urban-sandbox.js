@@ -219,13 +219,19 @@ async function claimUrbanVehicleLease(options = {}) {
   if (typeof runTransaction !== 'function' || !entityRef || !uid || !input) throw new TypeError('Vehicle claim transaction inputs are required.');
   const entityId = normalizeUrbanEntityId(input.entityId);
   if (!entityId) throw new Error('invalid_entity');
-  const pose = normalizePose(input.pose);
   return runTransaction(async (transaction) => {
     const snapshot = await transaction.get(entityRef);
     const current = snapshotData(snapshot);
     const leaseExpiresMs = timestampMillis(current?.leaseExpiresAt, 0);
     if (current && current.kind !== 'vehicle') throw new Error('entity_kind_conflict');
     if (current && current.worldSeed !== input.worldSeed) throw new Error('world_conflict');
+    // Once published, the server pose remains authoritative across handoff.
+    // A claimant's stale local car must not move the shared car or let a player
+    // claim a distant car by submitting a fabricated nearby pose.
+    const pose = normalizePose(current?.pose || input.pose);
+    if (input.actorPose && poseDistance(normalizePose(input.actorPose), pose) > 30) {
+      return Object.freeze({ accepted: false, reason: 'too_far' });
+    }
     if (current?.leaseOwnerUid && current.leaseOwnerUid !== uid && leaseExpiresMs > nowMs) {
       return Object.freeze({ accepted: false, reason: 'occupied', ownerUid: current.leaseOwnerUid, leaseExpiresMs });
     }

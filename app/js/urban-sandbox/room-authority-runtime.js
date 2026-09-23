@@ -66,6 +66,7 @@ function createUrbanRoomAuthorityRuntime(options = {}) {
   let pendingVehicleId = '';
   let impactPending = false;
   let leaseSweepElapsed = 0;
+  const revokedVehicles = new Set();
 
   const active = () => !disposed && options.isActive();
   const currentRoom = () => appCtx.getCurrentMultiplayerRoom?.() || null;
@@ -84,6 +85,7 @@ function createUrbanRoomAuthorityRuntime(options = {}) {
       ? { authority: state.authority, vehicle: leasedVehicle() } : null,
     vehiclePose: options.vehiclePose,
     onRejected(vehicle) {
+      revokedVehicles.add(vehicle);
       revokeVehicleControl(vehicle);
       options.setStatus('This room vehicle lease ended. Control was released safely.', 2600);
     },
@@ -133,6 +135,7 @@ function createUrbanRoomAuthorityRuntime(options = {}) {
     if (nextKey === roomKey && (state.authority || !room)) return state.authority;
     const generation = ++syncGeneration;
     heartbeat.stop();
+    revokedVehicles.clear();
     pendingVehicleId = '';
     const previousVehicle = leasedVehicle();
     if (previousVehicle && state.authority) {
@@ -186,6 +189,8 @@ function createUrbanRoomAuthorityRuntime(options = {}) {
       }
       vehicle.roomLeaseOwnerUid = authority.actorUid;
       vehicle.roomOccupiedByOther = false;
+      revokedVehicles.delete(vehicle);
+      if (result.state?.pose) options.syncVehiclePose(vehicle, result.state.pose);
       if (options.enterVehicle(vehicle) === false) {
         authority.releaseVehicle(vehicle, options.vehiclePose(vehicle)).catch(() => {});
         return;
@@ -203,6 +208,9 @@ function createUrbanRoomAuthorityRuntime(options = {}) {
     leaseSweepElapsed += Math.max(0, Number(dt) || 0);
     if (leaseSweepElapsed >= .5) {
       leaseSweepElapsed = 0;
+      for (const vehicle of revokedVehicles) {
+        if (!state.vehicles.includes(vehicle)) revokedVehicles.delete(vehicle);
+      }
       options.reconcileVehicles?.();
       const currentTime = Date.now();
       for (const vehicle of state.vehicles) {
@@ -217,6 +225,14 @@ function createUrbanRoomAuthorityRuntime(options = {}) {
         vehicle.roomOccupiedByOther = lease.occupiedByOther;
         vehicle.roomLeaseOwnerUid = lease.leaseOwnerUid;
         vehicle.visual.root.visible = !lease.occupiedByOther || vehicle.attachedToPlayer;
+        // The last snapshot can arrive while this car is still attached and
+        // therefore cannot be applied then. A rejected release produces no new
+        // snapshot: reconcile once the exit completes using retained authority.
+        if (revokedVehicles.has(vehicle) && !vehicle.attachedToPlayer &&
+            state.activeVehicle !== vehicle && state.transition?.vehicle !== vehicle) {
+          options.syncVehiclePose(vehicle, remote.pose);
+          revokedVehicles.delete(vehicle);
+        }
       }
     }
     impactPending = state.authorityImpactPending === true;
@@ -260,6 +276,7 @@ function createUrbanRoomAuthorityRuntime(options = {}) {
   function dispose() {
     if (disposed) return false;
     heartbeat.stop();
+    revokedVehicles.clear();
     const vehicle = leasedVehicle();
     if (vehicle && state.authority) {
       state.authority.releaseVehicle(vehicle, options.vehiclePose(vehicle)).catch(() => {});
@@ -276,7 +293,8 @@ function createUrbanRoomAuthorityRuntime(options = {}) {
 
   globalThis.addEventListener('we3d-room-changed', sync);
   sync();
-  return Object.freeze({ civicSnapshot, dispose, reportCivicEvent, requestVehicleEntry, resolveCivicOutcome, snapshot, sync, update });
+  return Object.freeze({ civicSnapshot, dispose, reportCivicEvent, requestVehicleEntry, resolveCivicOutcome, snapshot, sync, update,
+    hasRevokedLease: vehicle => revokedVehicles.has(vehicle) });
 }
 
 export { createUrbanRoomAuthorityRuntime, createVehicleLeaseHeartbeat, resolveRoomVehicleLease };

@@ -65,6 +65,26 @@ async function setPresence(user, x = 0, z = 0) {
 await Promise.all([setPresence(owner), setPresence(observer)]);
 
 const common = { roomCode, worldSeed };
+const vehicle = { ...common, entityId: 'traffic:sedan:authority-check', label: 'Sedan', style: 'sedan', color: 0x556677,
+  pose: { x: 4, y: 0, z: 3, yaw: .5, pitch: .2, roll: -.1 } };
+const firstClaim = await post('/claimUrbanVehicle', owner, vehicle);
+assert.equal(firstClaim.body.accepted, true, JSON.stringify(firstClaim));
+const firstRelease = await post('/releaseUrbanVehicle', owner, vehicle);
+assert.equal(firstRelease.body.accepted, true, JSON.stringify(firstRelease));
+const handoff = await post('/claimUrbanVehicle', observer, { ...vehicle, pose: { x: 8, y: 0, z: 3, yaw: 0 } });
+assert.equal(handoff.body.accepted, true, JSON.stringify(handoff));
+assert.deepEqual(handoff.body.state.pose, vehicle.pose, 'New claimant must inherit the server pose');
+const secondRelease = await post('/releaseUrbanVehicle', observer, vehicle);
+assert.equal(secondRelease.body.accepted, true, JSON.stringify(secondRelease));
+await setPresence(observer, 1000, 1000);
+const distantClaim = await post('/claimUrbanVehicle', observer, { ...vehicle, pose: { x: 1001, y: 0, z: 1000, yaw: 0 } });
+assert.equal(distantClaim.status, 200, JSON.stringify(distantClaim));
+assert.equal(distantClaim.body.accepted, false);
+assert.equal(distantClaim.body.reason, 'too_far');
+const vehicleDoc = (await roomRef.collection('urbanEntities').where('entityId', '==', vehicle.entityId).get()).docs[0].data();
+assert.deepEqual(vehicleDoc.pose, vehicle.pose);
+assert.equal(vehicleDoc.leaseOwnerUid, '');
+await setPresence(observer);
 const unauthenticated = await post('/commitUrbanCivicEvent', null, {
   ...common, kind: 'collision', severity: 1, witnessCount: 1, position: { x: 0, z: 0 }
 });
@@ -120,6 +140,8 @@ console.log(JSON.stringify({
   ok: true,
   roomCode,
   checks: {
+    vehicleHandoffPreservesServerPose: true,
+    fabricatedClaimPoseCannotMoveDistantVehicle: true,
     authenticationRequired: true,
     currentRoomPresenceRequired: true,
     eventRangeEnforced: true,

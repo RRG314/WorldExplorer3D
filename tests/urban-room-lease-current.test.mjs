@@ -125,3 +125,25 @@ test('shared vehicle claims and release preserve bounded road pitch and bank', a
   assert.equal(urbanBackend.normalizePose({ pitch: 10, roll: -10 }).roll, -.55);
   assert.equal(urbanBackend.normalizePose({}).pitch, 0, 'Existing records and older clients remain compatible.');
 });
+
+test('a later claimant cannot replace the server vehicle pose with a stale local pose', async () => {
+  let stored = { kind: 'vehicle', worldSeed: 'earth:test', pose: { x: 10, y: 2, z: 0, yaw: .5, pitch: .2, roll: -.1 }, condition: .8, leaseOwnerUid: '', revision: 3 };
+  const result = await urbanBackend.claimUrbanVehicleLease({
+    runTransaction: fn => fn({ get: async () => ({ exists: true, data: () => stored }), set: (_, value) => { stored = value; } }),
+    entityRef: {}, uid: 'new-driver', nowMs: 1000, timestampFromMs: value => ({ toMillis: () => value }),
+    input: { entityId: 'car', worldSeed: 'earth:test', actorPose: { x: 10 }, pose: { x: 15, y: 0, z: 0, yaw: 0 } }
+  });
+  assert.equal(result.accepted, true);
+  assert.equal(stored.pose.x, 10); assert.equal(stored.pose.pitch, .2); assert.equal(stored.pose.roll, -.1);
+});
+
+test('claim proximity is checked against the existing vehicle inside the transaction', async () => {
+  const stored = { kind: 'vehicle', worldSeed: 'earth:test', pose: { x: 10, y: 0, z: 0, yaw: 0 }, leaseOwnerUid: '', revision: 3 };
+  let writes = 0;
+  const result = await urbanBackend.claimUrbanVehicleLease({
+    runTransaction: fn => fn({ get: async () => ({ exists: true, data: () => stored }), set: () => { writes++; } }),
+    entityRef: {}, uid: 'far-driver', nowMs: 1000, timestampFromMs: value => ({ toMillis: () => value }),
+    input: { entityId: 'car', worldSeed: 'earth:test', actorPose: { x: 1000 }, pose: { x: 1001, y: 0, z: 0, yaw: 0 } }
+  });
+  assert.equal(result.accepted, false); assert.equal(result.reason, 'too_far'); assert.equal(writes, 0);
+});

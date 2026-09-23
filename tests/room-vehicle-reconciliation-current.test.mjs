@@ -100,3 +100,47 @@ test('the real room update reconciles unseeded cars and applies their occupied l
   assert.equal(h.state.vehicles[0].visual.root.visible, false, 'The player proxy owns the other driver appearance');
   runtime.dispose();
 });
+
+test('rejected lease restores the last server pose after exit without needing another snapshot', async () => {
+  const h = harness(); h.reconcile();
+  const vehicle = h.state.vehicles[0]; vehicle.x = 100;
+  let room = null;
+  const source = fs.readFileSync(new URL('../app/js/urban-sandbox/room-authority-runtime.js', import.meta.url), 'utf8')
+    .replace(/^import .*;\n/m, '').replace(/^export \{.*\};?$/m, '');
+  const context = { appCtx: { car: {}, getCurrentMultiplayerRoom: () => room }, Date, Map, Set, Object, Math,
+    addEventListener() {}, removeEventListener() {}, setInterval: () => 1, clearInterval() {} };
+  vm.createContext(context); vm.runInContext(source, context);
+  const runtime = context.createUrbanRoomAuthorityRuntime({
+    state: h.state, isActive: () => true, vehiclePose: car => ({ x: car.x }),
+    syncVehiclePose: (car, pose) => Object.assign(car, pose), setStatus() {},
+    enterVehicle: car => { h.state.activeVehicle = car; car.attachedToPlayer = true; return true; },
+    beginExit: () => { h.state.transition = { kind: 'exit', vehicle }; }
+  });
+  room = { code: 'TESTROOM' };
+  h.state.authority = { actorUid: 'me', claimVehicle: async () => ({ accepted: true }),
+    updateVehicle: async () => ({ accepted: false, reason: 'not_owner' }), releaseVehicle: async () => ({}), dispose() {} };
+  try {
+    runtime.requestVehicleEntry(vehicle);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(h.state.transition?.kind, 'exit');
+    runtime.update(.5); assert.equal(vehicle.x, 100, 'Do not snap an attached car during its exit animation');
+    vehicle.attachedToPlayer = false; h.state.activeVehicle = null;
+    runtime.update(.5); assert.equal(vehicle.x, 100, 'Wait until the exit transition completes');
+    h.state.transition = null; runtime.update(.5);
+    assert.equal(vehicle.x, 10); assert.equal(vehicle.pitch, .1); assert.equal(vehicle.roll, -.1);
+  } finally { runtime.dispose(); }
+});
+
+test('an exit after rejected ownership does not publish another release', () => {
+  const source = fs.readFileSync(new URL('../app/js/urban-sandbox/runtime.js', import.meta.url), 'utf8');
+  const fn = source.slice(source.indexOf('function updateTransition('), source.indexOf('function beginEnter('));
+  let releases = 0;
+  const context = { setDoorProgress() {}, vehiclePose: () => ({}), now: () => 0, emitProductTelemetry() {},
+    activeWorldMatches: () => true, setStatus() {} };
+  vm.createContext(context); vm.runInContext(fn, context);
+  const state = { transition: { kind: 'exit', elapsed: 1, duration: .56, handoffComplete: true, vehicle: { id: 'shared' } },
+    roomAuthorityRuntime: { hasRevokedLease: () => true },
+    authority: { releaseVehicle: async () => { releases++; return { accepted: false }; } } };
+  context.updateTransition(state, .016);
+  assert.equal(releases, 0); assert.equal(state.transition, null);
+});

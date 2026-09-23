@@ -1933,6 +1933,7 @@ exports.claimUrbanVehicle = functions.region('us-central1').runWith({ invoker: '
       input: {
         entityId,
         worldSeed: context.worldSeed,
+        actorPose: context.player.pose,
         pose,
         label: sanitizeText(req.body && req.body.label, 80),
         style: sanitizeText(req.body && req.body.style, 40),

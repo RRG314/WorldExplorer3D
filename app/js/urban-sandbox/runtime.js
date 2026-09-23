@@ -13,7 +13,7 @@ import {
 } from './curated-equipment-visual.js?v=2';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=9';
 import { nearestMappedFacility } from './facility-model.js?v=3';
-import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=6';
+import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=7';
 import { reconcilePublishedRoomVehicles } from './room-vehicle-reconciliation.js?v=1';
 import { createUrbanResponderRuntime } from './responder-runtime.js?v=32';
 import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=10';
@@ -1804,7 +1804,8 @@ function updateTransition(state, dt) {
   }
   if (t >= 1) {
     setDoorProgress(transition.vehicle, 0);
-    if (transition.kind === 'exit' && state.authority) {
+    if (transition.kind === 'exit' && state.authority &&
+        !state.roomAuthorityRuntime?.hasRevokedLease?.(transition.vehicle)) {
       state.authority.releaseVehicle(transition.vehicle, vehiclePose(transition.vehicle)).then((result) => {
         if (!result?.accepted && activeWorldMatches(state)) setStatus(state, 'Vehicle release is still synchronizing with the room.', 1800);
       }).catch(() => {

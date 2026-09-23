@@ -1,7 +1,8 @@
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
+import { installBrowserGraphicsProbe } from './browser-graphics-probe.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
@@ -15,6 +16,21 @@ const baseUrl = `http://127.0.0.1:${server.port}`;
 const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
 const context = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height: 844 } });
 const page = await context.newPage();
+let graphicsPhase = 'startup';
+const memorySnapshots = [];
+await installBrowserGraphicsProbe(page, 'output/verification/mobile-controls/graphics-failure.json', () => graphicsPhase);
+async function recordGraphicsPhase(phase) {
+  graphicsPhase = phase;
+  const snapshot = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return { memory: ctx.renderer?.info?.memory, programs: ctx.renderer?.info?.programs?.length,
+      contextLost: ctx.renderer?.getContext?.()?.isContextLost?.(),
+      heap: performance.memory?.usedJSHeapSize, canvasCount: document.querySelectorAll('canvas').length };
+  });
+  memorySnapshots.push({ phase, at: new Date().toISOString(), ...snapshot });
+  await mkdir('output/verification/mobile-controls', { recursive: true });
+  await writeFile('output/verification/mobile-controls/memory-phases.json', JSON.stringify(memorySnapshots, null, 2));
+}
 await configureStagingAppCheck(page, baseUrl);
 const cdp = await context.newCDPSession(page);
 const browserErrors = [];
@@ -117,6 +133,7 @@ async function touchStraightnessProbe(selector) {
 }
 
 async function mode(mode, selector) {
+  await recordGraphicsPhase(`before-${mode}`);
   const item = page.locator(selector);
   const owningMenu = item.locator('xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " floatMenu ")]').first();
   const owningButton = owningMenu.locator(':scope > .floatBtn');
@@ -153,6 +170,7 @@ async function mode(mode, selector) {
   });
   if (visibility.display === 'none') console.log(JSON.stringify({ mobileControlsHiddenAfterMode: mode, ...visibility }));
   await page.waitForSelector(`#mobileTouchControls.show.mode-${mode === 'walk' ? 'walking' : mode === 'drive' ? 'driving' : mode}`, { timeout: 10_000 });
+  await recordGraphicsPhase(`${mode}-ready`);
 }
 
 async function layoutSnapshot() {
@@ -189,6 +207,7 @@ try {
   await page.waitForSelector('#loading.show', { timeout: 30_000 });
   await page.waitForFunction(() => !document.getElementById('loading')?.classList.contains('show'), null, { timeout: 240_000 });
   await waitForInteractiveWorld();
+  await recordGraphicsPhase('initial-world-ready');
 
   await mode('walk', '#fWalk');
   const standardLayout = await layoutSnapshot();
@@ -325,6 +344,8 @@ try {
   await page.screenshot({ path: 'output/verification/mobile-controls/plane-standard-mobile.png', fullPage: false });
 
   await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+  await recordGraphicsPhase('before-reload-after-all-modes');
+  graphicsPhase = 'reload';
   await page.reload({ waitUntil: 'load', timeout: 120_000 });
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   await page.waitForFunction(() => navigator.maxTouchPoints > 0 && matchMedia('(hover: none) and (pointer: coarse)').matches, null, { timeout: 10_000 });
@@ -410,8 +431,9 @@ try {
       planeBefore: planeBefore.activeActor?.orientation,
       planeAfter: planeControlled.activeActor?.orientation
     },
-    browserErrors, localFailures
+    browserErrors, localFailures, memorySnapshots
   };
+  await writeFile('output/verification/mobile-controls/report.json', JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
   assert.equal(report.ok, true, 'Mobile control and camera journey failed.');
 } finally {
