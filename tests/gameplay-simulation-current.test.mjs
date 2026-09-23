@@ -118,3 +118,32 @@ test('waiting-player pause only refocuses the canvas when a form owns input', as
     assert.equal(paused, true);
   }
 });
+
+test('vehicle input rechecks the actual nearby identity and releases E on failed simulation', async () => {
+  const { enterNearbyVehicle } = await import('../scripts/verification/gameplay-simulation.mjs');
+  for (const scenario of ['moved', 'focused', 'failure', 'success']) {
+    const events = [];
+    let entered = false;
+    const target = { tagName: scenario === 'focused' ? 'BUTTON' : 'BODY', dispatchEvent: e => events.push(e.type) };
+    const page = { evaluate: async (fn, id) => vm.runInNewContext(`(${fn.toString()})(id)`, {
+      id, document: { activeElement: target },
+      KeyboardEvent: class { constructor(type, options) { Object.assign(this, options, { type }); } },
+      getWorldExplorerRuntimeDiagnostics: () => ({ urbanSandbox: {
+        phase: entered ? 'enter' : 'walking', nearbyVehicleId: scenario === 'moved' ? 'other' : 'car',
+        interaction: { action: 'enter_vehicle' }, vehicles: [{ id: 'car', driverDoor: { openRadians: entered ? .2 : 0 } }]
+      } }),
+      advanceTime: async duration => {
+        assert.equal(duration, 150); assert.deepEqual(events, ['keydown']);
+        if (scenario === 'failure') throw Error('simulation failed');
+        entered = true; return { simulatedMs: duration, frames: 9, suspendedFrames: 0 };
+      }
+    }) };
+    if (scenario === 'moved') { assert.equal(await enterNearbyVehicle(page, 'car'), null); assert.deepEqual(events, []); }
+    else if (scenario === 'focused') { await assert.rejects(enterNearbyVehicle(page, 'car'), /focused UI control/); assert.deepEqual(events, []); }
+    else {
+      if (scenario === 'failure') await assert.rejects(enterNearbyVehicle(page, 'car'), /simulation failed/);
+      else assert.equal((await enterNearbyVehicle(page, 'car')).state.urbanSandbox.phase, 'enter');
+      assert.deepEqual(events, ['keydown', 'keyup']);
+    }
+  }
+});

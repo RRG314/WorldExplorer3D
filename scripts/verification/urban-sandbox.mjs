@@ -3,7 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
-import { advanceGameplay, stepGameplayKeys } from './gameplay-simulation.mjs';
+import { advanceGameplay, stepGameplayKeys, enterNearbyVehicle } from './gameplay-simulation.mjs';
 import { selectLowRenderQuality } from './render-quality-ui.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 
@@ -159,10 +159,11 @@ async function walkTo(page, target, options = {}) {
     if (interactionVehicleId && state.interaction?.action === 'enter_vehicle') {
       const current = await diagnostics(page);
       if (current.urbanSandbox?.nearbyVehicleId === interactionVehicleId) {
-        return { reached: true, byInteraction: true, start, final: state, steps: step };
+        const arrival = options.onVehicleArrival ? await options.onVehicleArrival() : true;
+        if (arrival) return { reached: true, byInteraction: true, arrival, start, final: state, steps: step };
       }
     }
-    if (state.distance <= stopDistance) return { reached: true, byInteraction: false, start, final: state, steps: step };
+    if (!interactionVehicleId && state.distance <= stopDistance) return { reached: true, byInteraction: false, start, final: state, steps: step };
     const desired = Math.atan2(Number(target.x) - state.x, Number(target.z) - state.z);
     const delta = wrapYaw(desired - state.yaw);
     if (Math.abs(delta) > 0.13) {
@@ -546,6 +547,7 @@ async function runVehicleEquipmentJourney() {
       attempted.add(candidate.id);
       const result = await walkTo(page, candidate.driverDoor, {
         interactionVehicleId: candidate.id,
+        onVehicleArrival: () => enterNearbyVehicle(page, candidate.id),
         // Traffic keeps moving until the normal player interaction claims it.
         resolveTarget: async () => (await diagnostics(page)).urbanSandbox?.vehicles?.find(entry => entry.id === candidate.id)?.driverDoor || null,
         maxSteps: 420,
@@ -562,13 +564,7 @@ async function runVehicleEquipmentJourney() {
     }
     if (!vehicle) console.error('CP5 vehicle approach evidence', JSON.stringify(approachEvidence, null, 2));
     assert.equal(approach?.reached, true, 'Normal walking input could not reach the vehicle door prompt.');
-    await page.keyboard.press('KeyE');
-    await page.waitForFunction((vehicleId) => {
-      const urban = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox;
-      const current = urban?.vehicles?.find((entry) => entry.id === vehicleId);
-      return urban?.phase === 'enter' && Math.abs(Number(current?.driverDoor?.openRadians || 0)) > 0.05;
-    }, vehicle.id, { timeout: 5_000 });
-    const entering = await diagnostics(page);
+    const entering = approach.arrival.state;
     const entryTiming = await advanceGameplay(page, 650);
     await page.waitForFunction((vehicleId) => {
       const urban = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox;

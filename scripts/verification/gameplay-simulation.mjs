@@ -60,3 +60,33 @@ export async function advanceUntilFishingStage(page, stage, maximumMs = 10000) {
     simulatedMs += receipt.simulatedMs;
   }
 }
+
+// A live traffic target can move between separate automation protocol calls.
+// Check the visible interaction and send its normal DOM key in one browser
+// task; no pose, ownership, or gameplay state is assigned by the verifier.
+export async function enterNearbyVehicle(page, vehicleId) {
+  const result = await page.evaluate(async id => {
+    const before = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
+    const urban = before.urbanSandbox || {};
+    if (urban.interaction?.action !== 'enter_vehicle' || urban.nearbyVehicleId !== id) return null;
+    const target = document.activeElement || document.body;
+    if (target?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target?.tagName)) {
+      throw new Error('Vehicle input is blocked by a focused UI control.');
+    }
+    try {
+      target.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE', key: 'e', bubbles: true, cancelable: true }));
+      const receipt = await globalThis.advanceTime?.(150);
+      return { receipt, state: globalThis.getWorldExplorerRuntimeDiagnostics?.() };
+    } finally {
+      target.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE', key: 'e', bubbles: true, cancelable: true }));
+    }
+  }, vehicleId);
+  if (!result) return null;
+  assert.ok(result.receipt?.simulatedMs === 150 && result.receipt?.frames > 0 && result.receipt?.suspendedFrames === 0,
+    `Vehicle entry did not advance: ${JSON.stringify(result.receipt)}`);
+  const urban = result.state?.urbanSandbox;
+  const vehicle = urban?.vehicles?.find(entry => entry.id === vehicleId);
+  assert.ok(urban?.phase === 'enter' && Math.abs(Number(vehicle?.driverDoor?.openRadians || 0)) > .05,
+    `Normal vehicle interaction did not open the selected door: ${JSON.stringify({ phase: urban?.phase, vehicle })}`);
+  return { ...result, timing: 'dom-keyboard-runtime-fixed-step' };
+}
