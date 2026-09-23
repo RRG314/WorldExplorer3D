@@ -15,11 +15,11 @@ export async function advanceGameplay(page, milliseconds) {
 // simulation in one browser task. Separate protocol down/step/up calls allow
 // live RAF turns between commands, so runner latency changes the steering.
 // This proves functional navigation, not trusted hardware input or frame rate.
-export async function stepGameplayKeys(page, keys, milliseconds) {
+export async function stepGameplayKeys(page, keys, milliseconds, { yieldToNetwork = false } = {}) {
   assert.ok(Number.isFinite(milliseconds) && milliseconds > 0 && milliseconds <= 6000);
   const codes = Array.isArray(keys) ? keys : [keys];
   assert.ok(codes.length > 0 && codes.every(code => /^(Arrow(Up|Down|Left|Right)|ShiftLeft|Space)$/.test(code)));
-  const receipts = await page.evaluate(async ({ codes, milliseconds }) => {
+  const receipts = await page.evaluate(async ({ codes, milliseconds, yieldToNetwork }) => {
     const target = document.activeElement || document.body;
     if (target?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target?.tagName)) {
       throw new Error('Gameplay navigation is blocked by a focused UI control.');
@@ -32,21 +32,24 @@ export async function stepGameplayKeys(page, keys, milliseconds) {
       for (const code of codes) dispatch('keydown', code);
       const result = [];
       for (let remaining = milliseconds; remaining > 0;) {
-        const duration = Math.min(2000, remaining);
+        // Networked journeys use real server leases. A synchronous batch of
+        // rendered frames can starve their heartbeat timers on a slow GPU.
+        const duration = Math.min(yieldToNetwork ? 16 : 2000, remaining);
         result.push({ duration, receipt: await globalThis.advanceTime?.(duration) });
         remaining -= duration;
+        if (yieldToNetwork) await new Promise(resolve => setTimeout(resolve, 0));
       }
       return result;
     } finally {
       for (const code of [...codes].reverse()) dispatch('keyup', code);
     }
-  }, { codes, milliseconds });
+  }, { codes, milliseconds, yieldToNetwork });
   for (const { duration, receipt } of receipts) {
     assert.ok(receipt && Math.abs(receipt.simulatedMs - duration) < 0.001 &&
       receipt.frames > 0 && receipt.suspendedFrames === 0,
     `Navigation simulation did not advance: ${JSON.stringify(receipt)}`);
   }
-  return { timing: 'dom-keyboard-runtime-fixed-step', receipts };
+  return { timing: yieldToNetwork ? 'dom-keyboard-fixed-step-with-network-yields' : 'dom-keyboard-runtime-fixed-step', receipts };
 }
 
 export async function advanceUntilFishingStage(page, stage, maximumMs = 10000) {

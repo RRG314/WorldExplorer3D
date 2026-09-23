@@ -150,3 +150,25 @@ test('vehicle input rechecks the actual nearby identity and releases E on failed
     }
   }
 });
+
+
+test('networked input yields timer tasks between frames while preserving held keys', async () => {
+  const pressed = new Set(), durations = [];
+  let yields = 0;
+  const target = { tagName: 'BODY', dispatchEvent(event) {
+    if (event.type === 'keydown') pressed.add(event.code);
+    else pressed.delete(event.code);
+  } };
+  const page = { evaluate: async (fn, args) => vm.runInNewContext(`(${fn.toString()})(args)`, {
+    args, document: { activeElement: target },
+    KeyboardEvent: class { constructor(type, options) { Object.assign(this, options, { type }); } },
+    setTimeout(callback) { assert.ok(pressed.has('ArrowUp')); yields++; callback(); },
+    advanceTime(duration) {
+      assert.ok(pressed.has('ArrowUp')); durations.push(duration);
+      return { simulatedMs: duration, frames: 1, suspendedFrames: 0 };
+    }
+  }) };
+  const receipt = await stepGameplayKeys(page, 'ArrowUp', 50, { yieldToNetwork: true });
+  assert.deepEqual(durations, [16, 16, 16, 2]); assert.equal(yields, durations.length);
+  assert.equal(pressed.size, 0); assert.equal(receipt.timing, 'dom-keyboard-fixed-step-with-network-yields');
+});

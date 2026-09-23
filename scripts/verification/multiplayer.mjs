@@ -52,7 +52,7 @@ const browserBudget = {
   foregroundGameplayWorlds: 1, waitingClient: 'normal manual-pause UI; network listeners remain active',
   viewport: { width: 1280, height: 800 }, deviceScaleFactor, roomStateWait,
   memberViewport: { width: 390, height: 844 },
-  navigationTiming: 'dom-keyboard-runtime-fixed-step',
+  navigationTiming: 'dom-keyboard-fixed-step-with-network-yields',
   evidenceScope: 'multiplayer-functional', worldLocation
 };
 browserBudget.renderQuality = process.env.CI ? 'low (selected through Settings)' : 'default';
@@ -179,7 +179,7 @@ function wrapYaw(value) {
 }
 
 async function inputStep(page, key, milliseconds) {
-  return stepGameplayKeys(page, key, milliseconds);
+  return stepGameplayKeys(page, key, milliseconds, { yieldToNetwork: true });
 }
 
 async function launchRoomWorld(player) {
@@ -317,7 +317,7 @@ async function brakeUntilExitAvailable(player) {
       return;
     }
     assert.ok(simulatedMs < 12_000, `Braking did not enable exit: ${JSON.stringify(state)}`);
-    await stepGameplayKeys(player.page, 'Space', 100);
+    await inputStep(player.page, 'Space', 100);
   }
 }
 async function pauseWaitingPlayer(player) {
@@ -555,7 +555,7 @@ try {
   // Use the same normal DOM-input/fixed-step contract as walking. Wall-clock
   // sleeps on a software GPU do not establish a known physics interval.
   // The server lease test above deliberately remains real wall-clock time.
-  await stepGameplayKeys(owner.page, 'ArrowUp', 1_100);
+  await inputStep(owner.page, 'ArrowUp', 1_100);
   await brakeUntilExitAvailable(owner);
   await owner.page.keyboard.press('KeyE');
   await owner.page.waitForFunction((vehicleId) => {
