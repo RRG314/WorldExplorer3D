@@ -46,6 +46,21 @@ and live services before making release claims.
   fail instead of silently skipping requested work. Runtime and release-tooling
   syntax are both checked. See `docs/TEST-AND-RELEASE-EVIDENCE.md`.
 
+## Latest mobile blocker follow-up
+
+Fresh backend run [35865910900](https://github.com/RRG314/WorldExplorer3D/actions/runs/35865910900)
+on bdea3b11 passed 12/13 stages, including room-profile concurrency. Multiplayer
+reached shared-vehicle handoff, then failed because the phone vehicle prompt's
+non-interactive shell intercepted a canvas tap after resume. The failure and
+screenshots are retained; it is not relabeled as a pass.
+
+The CSS now lets pointer input pass through the prompt shell and explicitly
+retains pointer input on its buttons. Four actual-markup/CSS pointer cases and
+35 existing mobile-control/layout cases pass locally. The new check is part of
+the existing mobile-action-layout release gate. The unchanged complete backend
+journey and packaged gameplay checks must verify the new artifact before this
+fix is promoted to staging. Production Hosting remains unchanged.
+
 ## Evidence and commands
 
 - Latest [packaged game check](https://github.com/RRG314/WorldExplorer3D/actions/runs/35858596632),

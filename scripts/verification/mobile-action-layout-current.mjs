@@ -1,3 +1,4 @@
+import './urban-prompt-layout-current.mjs';
 import assert from 'node:assert/strict';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';

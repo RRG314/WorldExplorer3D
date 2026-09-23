@@ -1,10 +1,10 @@
 @layer legacy {
 #controlsTab{position:fixed;bottom:20px;left:200px;transform:none;width:220px;background:rgba(255,255,255,0.95);border:none;border-radius:12px;z-index:104;display:none;font-size:12px;color:#475569;max-width:220px;max-height:60vh;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
-#urbanVehiclePrompt{position:fixed;left:50%;bottom:26px;z-index:138;display:none;align-items:center;gap:10px;max-width:min(430px,calc(100vw - 28px));padding:9px 10px 9px 13px;color:#f4f7f9;background:rgba(5,12,18,.92);border:1px solid rgba(157,174,186,.45);box-shadow:0 12px 34px rgba(0,0,0,.42);backdrop-filter:blur(12px);transform:translateX(-50%);font:600 12px/1.25 Inter,sans-serif;pointer-events:auto}
+#urbanVehiclePrompt{position:fixed;left:50%;bottom:26px;z-index:138;display:none;align-items:center;gap:10px;max-width:min(430px,calc(100vw - 28px));padding:9px 10px 9px 13px;color:#f4f7f9;background:rgba(5,12,18,.92);border:1px solid rgba(157,174,186,.45);box-shadow:0 12px 34px rgba(0,0,0,.42);backdrop-filter:blur(12px);transform:translateX(-50%);font:600 12px/1.25 Inter,sans-serif;pointer-events:none}
 #urbanVehiclePrompt.show{display:flex}
 .urbanVehiclePromptCopy{min-width:0}.urbanVehiclePromptCopy>div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#urbanVehiclePromptTitle{color:#fff}#urbanVehiclePromptMeta{margin-top:2px;color:#9aa8b2;font-size:10px;font-weight:500}
 #urbanVehiclePrompt kbd{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:28px;padding:0 7px;color:#dbeafe;background:#10243b;border:1px solid #2d7dff;border-radius:2px;font:700 11px Orbitron,sans-serif;box-shadow:none}
-#urbanVehiclePrompt button{display:none;min-height:36px;padding:0 13px;color:#fff;background:#2d7dff;border:1px solid #65a1ff;border-radius:2px;font:700 11px Orbitron,sans-serif}
+#urbanVehiclePrompt button{pointer-events:auto;display:none;min-height:36px;padding:0 13px;color:#fff;background:#2d7dff;border:1px solid #65a1ff;border-radius:2px;font:700 11px Orbitron,sans-serif}
 #urbanVehiclePrompt button:disabled{opacity:.5}
 #urbanVehiclePrompt kbd[hidden],#urbanVehiclePrompt button[hidden]{display:none!important}
 #urbanVehiclePrompt.familiar{padding-top:7px;padding-bottom:7px;background:rgba(5,12,18,.84)}
