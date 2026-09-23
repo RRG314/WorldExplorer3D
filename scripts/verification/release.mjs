@@ -19,8 +19,8 @@ const steps = [
     cwd: 'functions'
   },
   {
-    name: 'Build the production hosting artifact',
-    command: [process.execPath, 'scripts/hosting-artifact.mjs', 'build', '--firebase-env', 'production']
+    name: 'Build the staging-configured verification artifact',
+    command: [process.execPath, 'scripts/hosting-artifact.mjs', 'build', '--firebase-env', 'staging']
   },
   {
     name: 'Run the complete candidate system matrix against the artifact',
@@ -39,7 +39,9 @@ const steps = [
   {
     name: 'Require current execution-backed public claims',
     command: [process.execPath, 'scripts/verification/public-feature-claims.mjs', '--require-ready']
-  }
+  },
+  { name: 'Prepare production configuration from the completely verified artifact',
+    command: [process.execPath, 'scripts/prepare-production-artifact.mjs'] }
 ];
 
 for (const step of steps) {
@@ -54,4 +56,4 @@ for (const step of steps) {
   }
 }
 
-console.log('\n[release] Automated release boundaries passed on the production artifact. Desktop and phone owner approval are still required before deployment.');
+console.log('\n[release] Automated release boundaries passed on staging; production packaging is linked by an exact configuration-only promotion receipt. Desktop and phone owner approval are still required before deployment.');

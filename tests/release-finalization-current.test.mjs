@@ -50,6 +50,6 @@ for (const failing of ['release-scope', 'public-feature-claims']) test(`finaliza
   const result = execute();
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, new RegExp(`Finalization prerequisite failed: scripts/verification/${failing}`));
-  assert.deepEqual(JSON.parse(readFileSync(path.join(root, `${failing}-args`), 'utf8')), ['--require-ready']);
+  assert.deepEqual(JSON.parse(readFileSync(path.join(root, `${failing}-args`), 'utf8')), ['--require-ready', '--promoted-production']);
   assert.equal(existsSync(path.join(root, 'world-started')), false);
 }));

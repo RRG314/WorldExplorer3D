@@ -38,6 +38,15 @@ jobs:
       - name: Bounded pull-request verification
         run: npm run verify:pr
 
+      - name: Preserve component test inventory and sensitivity evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: component-test-evidence
+          path: output/verification/current-contracts/
+          if-no-files-found: warn
+          retention-days: 14
+
   stable-runtime:
     if: github.event_name == 'push' && github.ref == 'refs/heads/stable'
     timeout-minutes: 45

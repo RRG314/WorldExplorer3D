@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import fs from 'node:fs';
 import {
   firstPositional,
   parseFlag,
@@ -27,6 +28,9 @@ if (!channelId) {
 }
 
 try {
+  if (configEnv === 'production' && !useExistingArtifact) {
+    throw new Error('Production preview requires --use-existing-artifact after preparing and reviewing the verified production package.');
+  }
   if (!useExistingArtifact) {
     console.log(`[preview:deploy] Building immutable hosting artifact for Firebase environment "${configEnv}"`);
     runNodeScript('scripts/hosting-artifact.mjs', ['build', '--firebase-env', configEnv], cwd);
@@ -34,7 +38,16 @@ try {
     console.log('[preview:deploy] Reusing the existing immutable hosting artifact without rebuilding');
   }
 
-  if (!skipChecks) {
+  const build = JSON.parse(fs.readFileSync('dist/build-manifest.json', 'utf8'));
+  if (build.firebaseProjectId !== projectId || build.firebaseEnvironment !== configEnv) {
+    throw new Error('Preview target/environment does not match the packaged Firebase configuration.');
+  }
+  if (build.firebaseEnvironment === 'production') {
+    // The same reviewed package will be cloned to live. Production Firebase is
+    // forbidden on localhost; use its linked staging evidence and never skip
+    // finalization, including when --skip-checks was supplied.
+    runNodeScript('scripts/release-finalize.mjs', [], cwd);
+  } else if (!skipChecks) {
     console.log('[preview:deploy] Verifying hosting artifact identity and source parity');
     runNodeScript('scripts/hosting-artifact.mjs', ['verify'], cwd);
     console.log('[preview:deploy] Running the current complete-world verification against the bundled artifact');

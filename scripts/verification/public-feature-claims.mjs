@@ -1,3 +1,4 @@
+import { promotedEvidenceIdentity } from './production-promotion.mjs';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import {
@@ -8,6 +9,7 @@ import {
 
 const root = process.cwd();
 const requireReady = process.argv.includes('--require-ready');
+const promotedIdentity = process.argv.includes('--promoted-production') ? promotedEvidenceIdentity() : undefined;
 const packageJson = await readFile(`${root}/package.json`, 'utf8').then(JSON.parse);
 const manifestPath = `${root}/config/public-feature-claims.json`;
 const manifest = await readFile(manifestPath, 'utf8').then(JSON.parse);
@@ -23,8 +25,8 @@ const current = currentBaseline(root);
 const candidateEvidence = readExecutionEvidence(root, 'candidate');
 const backendEvidence = readExecutionEvidence(root, 'backend');
 const executionEvidenceFailures = {
-  candidate: compareEvidenceToBaseline(candidateEvidence, current, 'candidate'),
-  backend: compareEvidenceToBaseline(backendEvidence, current, 'backend')
+  candidate: compareEvidenceToBaseline(candidateEvidence, current, 'candidate', promotedIdentity),
+  backend: compareEvidenceToBaseline(backendEvidence, current, 'backend', promotedIdentity)
 };
 
 if (manifest.schemaVersion !== 1) failures.push('schemaVersion must be 1');

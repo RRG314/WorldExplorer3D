@@ -6,6 +6,26 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
 
+test('a requested gate in another scope fails instead of silently running a subset', t => {
+  const root = mkdtempSync(path.join(tmpdir(), 'we3d-scope-selection-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(path.join(root, 'config'));
+  writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '5.3.0' }));
+  writeFileSync(path.join(root, 'config/system-release-gates.json'), JSON.stringify({
+    schemaVersion: 1, targetVersion: '5.3.0', documents: {}, systems: [], gates: {
+      local: { scope: 'candidate', artifactRequired: false, command: [process.execPath, '-e', 'process.exit(0)'] },
+      service: { scope: 'backend', artifactRequired: false, command: [process.execPath, '-e', 'process.exit(0)'] }
+    }
+  }));
+  const result = spawnSync(process.execPath, [
+    fileURLToPath(new URL('../scripts/verification/system-release.mjs', import.meta.url)),
+    '--run', '--scope=candidate', '--gate=local,service'
+  ], { cwd: root, encoding: 'utf8', timeout: 10000 });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout + result.stderr, /service belongs to backend, not candidate/);
+  assert.doesNotMatch(result.stdout, /START local/);
+});
+
 test('interrupting a fresh gate cannot leave an earlier success as current evidence', t => {
   const root = mkdtempSync(path.join(tmpdir(), 'we3d-interrupted-evidence-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));

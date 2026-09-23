@@ -2,7 +2,7 @@ export const backendSteps = [
   { id: 'room-admission-http', command: [process.execPath, '--test', 'tests/room-admission-http-emulator.test.mjs'] },
   { id: 'room-admission', command: [process.execPath, '--test', '--test-concurrency=1', 'tests/room-admission-emulator.test.mjs'] },
   { id: 'storage-rules', command: [process.execPath, '--test', '--test-concurrency=1', 'tests/storage.rules.reality-capture.test.mjs'] },
-  { id: 'firestore-rules', command: [process.execPath, '--test', 'tests/firestore.rules.security.test.mjs'] },
+  { id: 'firestore-rules', command: [process.execPath, '--test', '--test-concurrency=1', 'tests/firestore.rules.security.test.mjs', 'tests/room-profile-emulator.test.mjs'] },
   { id: 'discovery-receipts', command: [process.execPath, '--test', 'tests/discovery-receipt-endpoint-current.test.mjs'] },
   { id: 'public-user-count', command: [process.execPath, 'scripts/verification/public-user-count-backend-current.mjs'] },
   { id: 'connected-property-backend', command: [process.execPath, 'scripts/verification/connected-property-backend-current.mjs'] },

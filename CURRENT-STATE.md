@@ -15,7 +15,7 @@ and live services before making release claims.
   missing capture-email retry Hosting route; reconciled backend configuration.
   Added 5 composite indexes and 12 collection-group field indexes, preserving
   existing indexes. All required indexes were verified READY.
-- Current artifact evidence: source coherence and 1,222 contracts pass on 9b3d35b5;
+- Current artifact evidence: source coherence and 1,222 Node component/source cases pass on 9b3d35b5; this count does not certify browser journeys or production readiness.
   its packaged Moon gameplay/pause check passes and screenshots were inspected.
   Planetary cache integration and the complete 15-assertion city-gameplay check
   pass on db5705d9. Asset comparison proves the only change between those builds
@@ -32,6 +32,19 @@ and live services before making release claims.
 - September 23 work: production backend/index reconciliation and runtime cost audit.
   Follow `output/release-integration/audit-2026-09-23/` for local evidence; private
   parameter files there must never enter Git or public reports.
+- Subsequent test-confidence audit: 1,288 cases from 265 unique files passed
+  locally, with no skips, TODOs, or duplicate names. A deliberately disabled
+  facade cleanup passed four source-text checks but failed the new runtime
+  lifecycle check. An additional production-preview guard test passed separately;
+  CI records the final suite totals. Twelve omitted component files and the
+  room-profile emulator tests are now included in their regular gates. Future
+  unassigned test files fail inventory verification. No game runtime code changed
+  in this follow-up.
+- Release tooling now tests staging configuration before a strictly checked
+  production configuration conversion. Direct preview promotion enforces
+  finalization and pins the reviewed Hosting version. Wrong-scope gate requests
+  fail instead of silently skipping requested work. Runtime and release-tooling
+  syntax are both checked. See `docs/TEST-AND-RELEASE-EVIDENCE.md`.
 
 ## Evidence and commands
 
@@ -39,7 +52,8 @@ and live services before making release claims.
   [planetary integration](https://github.com/RRG314/WorldExplorer3D/actions/runs/35857130505),
   and [complete city gameplay](https://github.com/RRG314/WorldExplorer3D/actions/runs/35857989509).
 - `npm run verify:source`: syntax, source coherence and module identities.
-- `npm run verify:current-contracts`: explicitly selected current regression tests.
+- `npm run verify:current-contracts`: explicitly selected Node component/source checks, with an executed-case report. This command is not production certification.
+- `npm run audit:tests` and `npm run verify:test-sensitivity`: inspect the test inventory and reproduce the isolated cleanup-defect experiment.
 - `node scripts/audit-runtime-startup.mjs`: resolved eager/deferred module graph;
   this reports source bytes, not measured runtime memory or frame performance.
 - `scripts/verification/`: separate test programs. They are not game entrypoints.

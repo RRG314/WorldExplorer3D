@@ -46,9 +46,10 @@ run('scripts/verification/source.mjs');
 run('scripts/hosting-artifact.mjs', ['verify']);
 // A reviewed screenshot is not a substitute for complete, current candidate
 // and backend execution evidence. Fail before launching another world check.
-run('scripts/verification/release-scope.mjs', ['--require-ready']);
-run('scripts/verification/public-feature-claims.mjs', ['--require-ready']);
-run('scripts/verification/world.mjs', [], { WE3D_VERIFY_ROOT: 'dist' });
+run('scripts/verification/release-scope.mjs', ['--require-ready', '--promoted-production']);
+run('scripts/verification/public-feature-claims.mjs', ['--require-ready', '--promoted-production']);
+// Browser journeys ran against the linked staging package. Local production
+// Firebase is deliberately forbidden; do not bypass that isolation policy.
 
 console.log(JSON.stringify({
   ok: true,

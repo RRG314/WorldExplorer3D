@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { firebaseProjectScript, firebaseInitJson, generatedFirebaseFiles } from './lib/firebase-artifact-config.mjs';
 import crypto from 'node:crypto';
 import { readReleaseSourceIdentity, assertReleaseSourceIdentity } from './lib/release-source-identity.mjs';
 import { build as buildJavaScript } from 'esbuild';
@@ -264,30 +265,8 @@ function firebaseConfigPath(environment) {
   return path.join(ROOT, 'config', `firebase.${environment}.json`);
 }
 
-function firebaseProjectScript(environment, config) {
-  return `window.WORLD_EXPLORER_FIREBASE_ENV = ${JSON.stringify(environment)};\n` +
-    `window.WORLD_EXPLORER_FIREBASE = window.WORLD_EXPLORER_FIREBASE || ${JSON.stringify(config, null, 2)};\n`;
-}
-
-function firebaseInitJson(config) {
-  const payload = {
-    apiKey: String(config.apiKey || ''),
-    appId: String(config.appId || ''),
-    authDomain: String(config.authDomain || ''),
-    measurementId: String(config.measurementId || ''),
-    messagingSenderId: String(config.messagingSenderId || ''),
-    projectId: String(config.projectId || ''),
-    storageBucket: String(config.storageBucket || '')
-  };
-  return canonicalJson(payload);
-}
-
 async function writeGeneratedFirebaseFiles(environment, config) {
-  const files = {
-    'js/firebase-project-config.js': firebaseProjectScript(environment, config),
-    '__/firebase/init.json': firebaseInitJson(config),
-    '__/firebase/init.js': `self.__FIREBASE_DEFAULTS__ = ${firebaseInitJson(config).trim()};\n`
-  };
+  const files = generatedFirebaseFiles(environment, config);
   for (const [relative, content] of Object.entries(files)) {
     const target = path.join(OUTPUT_DIR, relative);
     await fs.mkdir(path.dirname(target), { recursive: true });

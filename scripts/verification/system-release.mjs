@@ -50,7 +50,10 @@ const selected = Object.entries(config.gates || {}).filter(([id, gate]) =>
   gate.scope === requestedScope && (requestedGates.size === 0 || requestedGates.has(id))
 );
 if (requestedGates.size > 0) {
-  for (const id of requestedGates) if (!config.gates?.[id]) failures.push(`unknown requested gate: ${id}`);
+  for (const id of requestedGates) {
+    if (!config.gates?.[id]) failures.push(`unknown requested gate: ${id}`);
+    else if (config.gates[id].scope !== requestedScope) failures.push(`gate ${id} belongs to ${config.gates[id].scope}, not ${requestedScope}`);
+  }
 }
 if (selected.length === 0) failures.push(`no gates selected for scope ${requestedScope}`);
 
