@@ -66,3 +66,24 @@ past a gate. A subset of passing gates does not replace a complete matrix.
 Requesting a backend gate under candidate scope is now an error, not a silently
 omitted check. Human phone acceptance and sustained device performance remain
 separate from component and remote browser evidence.
+
+## Performance authority and remote execution
+
+`verify:performance-retention` checks the actual host before opening a browser:
+macOS, native ARM, Macmini9,1, Apple M1, 8 GiB, and no CI runner. It also requires
+an M1 hardware WebGL renderer and records the host, renderer, and browser version
+with the measurements. Passing host eligibility alone is not a performance pass.
+`release:verify` performs the same host preflight before starting its full matrix.
+
+The remote workflow offers explicit candidate/diagnostic gate selections and the
+complete backend gate. It rejects the physical performance gate. The old separate
+functional matrix was removed because it duplicated the gate registry and had
+omitted new gates; cloud runs no longer offer a misleading full physical-release
+mode. Select remote gates from `config/system-release-gates.json` and retain their
+individual scope and artifact identities.
+
+The source gate no longer treats screenshots in ignored audit directories as
+stale application artwork. Generated evidence is outside the Hosting source
+allowlist; source references, module identities, and immutable packaged assets
+remain checked. Failed-run screenshots must be preserved, not deleted to make
+source verification pass.

@@ -4,7 +4,10 @@ import { sampleFrameWindow } from './frame-window.mjs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { requirePerformanceHost, requireHardwareGraphics } from './performance-host.mjs';
 
+// Reject cloud/other hardware before opening a browser or loading a world.
+const hostAuthority = requirePerformanceHost();
 const root = process.cwd();
 const verifyRoot = process.env.WE3D_VERIFY_ROOT || root;
 const budgets = JSON.parse(await readFile(`${root}/config/performance-budgets.json`, 'utf8'));
@@ -13,6 +16,7 @@ const baseUrl = `http://127.0.0.1:${server.port}`;
 // Keep GC within this 8 GiB host's test-process envelope; acceptance budgets stay unchanged.
 const browserOptions = { headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280'] };
 let browser = await chromium.launch(browserOptions);
+let graphicsAuthority = null;
 const requestedProfile = String(process.env.WE3D_VERIFY_PROFILE || 'all').trim().toLowerCase();
 const auditOnly = process.env.WE3D_VERIFY_AUDIT_ONLY === '1';
 assert.ok(['all', 'desktop', 'mobile'].includes(requestedProfile), `Unsupported WE3D_VERIFY_PROFILE: ${requestedProfile}`);
@@ -348,6 +352,18 @@ async function runMobileRegression() {
 
 try {
   await mkdir('output/verification/performance-retention', { recursive: true });
+  const graphicsPage = await browser.newPage();
+  try {
+    graphicsAuthority = await graphicsPage.evaluate(() => {
+      const gl = document.createElement('canvas').getContext('webgl2');
+      if (!gl) return null;
+      const info = gl.getExtension('WEBGL_debug_renderer_info');
+      const renderer = info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+      gl.getExtension('WEBGL_lose_context')?.loseContext();
+      return { renderer };
+    });
+    requireHardwareGraphics(graphicsAuthority?.renderer);
+  } finally { await graphicsPage.close(); }
   let desktop = null;
   let mobileRegression = null;
   if (requestedProfile !== 'mobile') {
@@ -383,6 +399,9 @@ try {
       reason: 'Stationary and controlled moving samples are separate. A live-versus-candidate comparison with matched data, routes, quality, hardware, and repeated cold/warm trials is required to establish improvement.'
     },
     budgets,
+    hostAuthority,
+    graphicsAuthority,
+    browserVersion: browser.version(),
     desktop,
     mobileRegression,
     physicalPhoneEvidence: {

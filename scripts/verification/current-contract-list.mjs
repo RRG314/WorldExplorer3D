@@ -13,6 +13,7 @@ export const currentContractTests = [
   'tests/capture-review-notice.test.cjs',
   'tests/capture-building-lookup.test.cjs',
   'tests/production-promotion-current.test.mjs',
+  'tests/performance-host-current.test.mjs',
   'tests/transport-hot-path-current.test.mjs',
   'tests/planetary-world-cache-current.test.mjs',
   'tests/weather-location-lifecycle-current.test.mjs',

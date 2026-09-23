@@ -1447,23 +1447,10 @@ const duplicateModuleIdentities = [...identitiesByTarget.entries()]
 
 const diagnosticsSource = await fs.readFile(path.join(root, 'app', 'js', 'runtime-diagnostics.js'), 'utf8');
 const productionDebugDefaultOff = diagnosticsSource.includes("diagnosticsParams.get('diagnostics') === '1'");
-const outputFiles = await filesUnder(path.join(root, 'output')).catch(() => []);
-// Gameplay journeys create their candidate evidence before the closing source
-// gate. Those captures are expected verification output, not stale source-tree
-// artwork. Playwright skill captures have the same evidence role; their
-// existence does not make current application source stale.
-const staleGeneratedImages = outputFiles
-  .map((filePath) => path.relative(root, filePath).split(path.sep).join('/'))
-  .filter((relative) => /\.(?:png|jpe?g|webp)$/i.test(relative) &&
-    !relative.startsWith('output/verification/') &&
-    !relative.startsWith('output/playwright/') &&
-    // Dated release audits retain original failed and corrected browser captures.
-    !/^output\/release-integration\/audit-\d{4}-\d{2}-\d{2}\//.test(relative) &&
-    // Private research-document renders are not release artwork and output/
-    // is excluded by the hosting source allowlist. Preserve research evidence
-    // rather than fail application health because a PDF was rendered locally.
-    !relative.startsWith('output/research/') &&
-    !relative.startsWith('output/release-evidence/current/'));
+// Ignored audit/browser captures are not shipped source. Their age or folder
+// name cannot establish source health. Hosting uses an explicit source allowlist
+// and verifies delivered assets; source references and entry graphs are checked
+// above. Preserve failure evidence instead of requiring its deletion here.
 
 const report = {
   ok: false,
@@ -1490,7 +1477,6 @@ const report = {
     roadSurfaceFootprintFailures,
     structureFallbackAuthorityFailures,
     groundAuthorityFailures,
-    staleGeneratedImages,
     productionDebugDefaultOff: productionDebugDefaultOff ? [] : ['runtime diagnostics are not opt-in']
   }
 };

@@ -2,6 +2,10 @@ import { spawnSync } from 'node:child_process';
 
 const steps = [
   {
+    name: 'Require the declared physical performance host before the full release matrix',
+    command: [process.execPath, 'scripts/verification/performance-host.mjs']
+  },
+  {
     name: 'Validate release scope structure',
     command: [process.execPath, 'scripts/verification/release-scope.mjs']
   },
