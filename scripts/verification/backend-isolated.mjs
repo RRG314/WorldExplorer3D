@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { selectBackendGroups, backendGroupTimeoutMs } from './backend-steps.mjs';
 import { runLoggedStep } from './run-logged-step.mjs';
+import { prepareBillingEmulatorFixture } from './billing-emulator-fixture.mjs';
 
 const stageArgument = process.argv.slice(2).find(value => value.startsWith('--stages='));
 const selection = selectBackendGroups(stageArgument ? stageArgument.slice('--stages='.length) : null);
@@ -15,23 +16,28 @@ const outputDir = path.join('/tmp', 'worldexplorer3d-verification', 'backend-iso
 mkdirSync(outputDir, { recursive: true });
 const results = [];
 const cleanupParameters = prepareBackendEmulatorParameters();
-const onTermination = () => { cleanupParameters(); process.exit(143); };
+let billingFixture;
+const onTermination = () => { billingFixture?.cleanup(); cleanupParameters(); process.exit(143); };
 process.once('SIGTERM', onTermination);
 try {
 for (const group of selection.groups) {
   const ids = group.map(step => step.id);
   console.log(`[backend-isolated] START ${ids.join(', ')}`);
   const timeoutMs = backendGroupTimeoutMs(group);
+  billingFixture = ids.includes('account-backend') ? prepareBillingEmulatorFixture() : null;
   const result = await runLoggedStep([
     'firebase', 'emulators:exec', '--non-interactive',
     '--only', 'auth,firestore,storage,functions', '--project', 'we3d-staging-20260712',
     `node scripts/verification/backend-release.mjs --stages=${ids.join(',')}`
-  ], { cwd: process.cwd(), env: process.env,
+  ], { cwd: process.cwd(), env: { ...process.env, ...billingFixture?.env },
     logPath: path.join(outputDir, `${ids[0]}.log`), timeoutMs });
+  billingFixture?.cleanup();
+  billingFixture = null;
   results.push({ stages: ids, timeoutMs, ...result });
   // Groups own isolated emulators; retain later independent evidence on failure.
 }
 } finally {
+  billingFixture?.cleanup();
   process.removeListener('SIGTERM', onTermination);
   cleanupParameters();
 }

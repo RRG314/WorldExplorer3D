@@ -86,9 +86,10 @@ test('subscription fallback reads trial expiry from the committed account snapsh
 
 test('delayed subscription event cannot restore canceled paid access', async () => {
   const f = fixture({ plan: 'free', subscriptionStatus: 'canceled', stripeSubscriptionId: 'sub_current', stripeEventCreated: 200, stripeEventId: 'evt_cancel', roomCreateCount: 2 });
+  f.scope.getStripeClient = () => ({ subscriptions: { retrieve: async () => ({ status: 'canceled', items: { data: [{ price: { id: 'pro' } }] } }) } });
   await f.scope.upsertPlanFromSubscription({ uid: 'test-user', subscriptionId: 'sub_current', status: 'active', priceId: 'pro', eventCreated: 100, eventId: 'evt_old' });
   assert.equal(f.state().plan, 'free'); assert.equal(f.state().subscriptionStatus, 'canceled');
-  assert.equal(f.state().stripeEventId, 'evt_cancel');
+  assert.equal(f.state().stripeEventId, 'evt_old');
 });
 test('duplicate signed event does not rewrite the committed account', async () => {
   const f = fixture({ plan: 'supporter', subscriptionStatus: 'active', stripeSubscriptionId: 'sub_current', stripeEventCreated: 200, stripeEventId: 'evt_same', updatedAt: 'original' });
@@ -107,6 +108,7 @@ test('same-second subscription changes reconcile current Stripe state inside the
 });
 test('ending an older subscription cannot cancel the current active subscription', async () => {
   const f = fixture({ plan: 'pro', subscriptionStatus: 'active', stripeSubscriptionId: 'sub_current', stripeEventCreated: 200, stripeEventId: 'evt_current' });
+  f.scope.getStripeClient = () => ({ subscriptions: { retrieve: async () => ({ status: 'canceled', items: { data: [{ price: { id: 'pro' } }] } }) } });
   await f.scope.upsertPlanFromSubscription({ uid: 'test-user', subscriptionId: 'sub_old', status: 'canceled', priceId: 'pro', eventCreated: 201, eventId: 'evt_old_cancel' });
   assert.equal(f.state().plan, 'pro'); assert.equal(f.state().stripeSubscriptionId, 'sub_current');
 });
@@ -122,4 +124,41 @@ test('failed same-second reconciliation cannot commit an unverified entitlement'
   f.scope.getStripeClient = () => ({ subscriptions: { retrieve: async () => { throw new Error('Stripe unavailable'); } } });
   await assert.rejects(f.scope.upsertPlanFromSubscription({ uid: 'test-user', subscriptionId: 'sub_current', status: 'active', priceId: 'pro', eventCreated: 200, eventId: 'evt_incoming' }), /Stripe unavailable/);
   assert.equal(f.state().plan, 'supporter'); assert.equal(f.state().stripeEventId, 'evt_previous');
+});
+
+
+test('existing subscription without an event cursor reconciles before accepting delayed paid access', async () => {
+  const f = fixture({ plan: 'free', subscriptionStatus: 'canceled', stripeSubscriptionId: 'sub_legacy', roomCreateCount: 2 });
+  let lookups = 0;
+  f.scope.getStripeClient = () => ({ subscriptions: { retrieve: async id => {
+    assert.equal(id, 'sub_legacy'); lookups++;
+    return { status: 'canceled', items: { data: [{ price: { id: 'pro' } }] } };
+  } } });
+  await f.scope.upsertPlanFromSubscription({ uid: 'test-user', subscriptionId: 'sub_legacy', status: 'active', priceId: 'pro', eventCreated: 100, eventId: 'evt_legacy_delayed' });
+  assert.equal(f.state().plan, 'free'); assert.equal(f.state().subscriptionStatus, 'canceled');
+  assert.equal(f.state().roomCreateCount, 2); assert.equal(lookups, 1);
+  assert.equal(f.state().stripeEventCreated, 100);
+});
+
+test('failed legacy subscription reconciliation preserves the account and leaves the cursor unset', async () => {
+  const f = fixture({ plan: 'free', subscriptionStatus: 'canceled', stripeSubscriptionId: 'sub_legacy', updatedAt: 'original' });
+  f.scope.getStripeClient = () => ({ subscriptions: { retrieve: async () => { throw new Error('Stripe unavailable'); } } });
+  await assert.rejects(f.scope.upsertPlanFromSubscription({ uid: 'test-user', subscriptionId: 'sub_legacy', status: 'active', priceId: 'pro', eventCreated: 100, eventId: 'evt_legacy_delayed' }), /Stripe unavailable/);
+  assert.equal(f.state().plan, 'free'); assert.equal(f.state().updatedAt, 'original');
+  assert.equal(f.state().stripeEventId, undefined);
+});
+
+
+test('a later event timestamp still uses current subscription state, not its payload', async () => {
+  const f = fixture({ plan: 'free', subscriptionStatus: 'canceled', stripeSubscriptionId: 'sub_current', stripeEventCreated: 100, stripeEventId: 'evt_previous' });
+  f.scope.getStripeClient = () => ({ subscriptions: { retrieve: async () => ({ status: 'canceled', items: { data: [{ price: { id: 'pro' } }] } }) } });
+  await f.scope.upsertPlanFromSubscription({ uid: 'test-user', subscriptionId: 'sub_current', status: 'active', priceId: 'pro', eventCreated: 200, eventId: 'evt_later_timestamp' });
+  assert.equal(f.state().plan, 'free'); assert.equal(f.state().subscriptionStatus, 'canceled');
+});
+
+test('first signed subscription event uses canonical state before granting paid access', async () => {
+  const f = fixture({ plan: 'free', subscriptionStatus: 'none' });
+  f.scope.getStripeClient = () => ({ subscriptions: { retrieve: async () => ({ status: 'canceled', items: { data: [{ price: { id: 'pro' } }] } }) } });
+  await f.scope.upsertPlanFromSubscription({ uid: 'test-user', subscriptionId: 'sub_first', status: 'active', priceId: 'pro', eventCreated: 200, eventId: 'evt_first' });
+  assert.equal(f.state().plan, 'free'); assert.equal(f.state().subscriptionStatus, 'canceled');
 });
