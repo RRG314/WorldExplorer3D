@@ -5,6 +5,7 @@ import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 import { stepGameplayKeys } from './gameplay-simulation.mjs';
 import { selectLowRenderQuality } from './render-quality-ui.mjs';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 
 const root = process.cwd();
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
@@ -38,12 +39,16 @@ const deviceScaleFactor = process.env.CI ? 0.5 : 1;
 // on requestAnimationFrame being scheduled by the software GPU while that world
 // compiles. Match the CI action allowance; retain the normal local deadline.
 const roomStateWait = { timeout: process.env.CI ? 120_000 : 20_000, polling: 250 };
+// Exercise two complete, real city worlds without making network authority
+// depend on the largest city mesh in the geography matrix. Baltimore remains
+// covered by the separate assembled-world, actor, urban and performance gates.
+const worldLocation = { name: 'Monaco', lat: 43.7384, lon: 7.4246 };
 const browserBudget = {
   maxOldSpaceMiB: 1024, worldInitialization: 'sequential', simultaneouslyLoadedWorlds: 2,
   foregroundGameplayWorlds: 1, waitingClient: 'normal manual-pause UI; network listeners remain active',
   viewport: { width: 1280, height: 800 }, deviceScaleFactor, roomStateWait,
   navigationTiming: 'dom-keyboard-runtime-fixed-step',
-  evidenceScope: 'multiplayer-functional'
+  evidenceScope: 'multiplayer-functional', worldLocation
 };
 browserBudget.renderQuality = process.env.CI ? 'low (selected through Settings)' : 'default';
 async function recordStage(stage) {
@@ -76,6 +81,7 @@ async function createPlayer(label) {
   // Two stable frames on a software GPU can exceed Playwright's 30s default.
   if (process.env.CI) page.setDefaultTimeout(120_000);
   const browserErrors = [];
+  collectBrowserGraphicsErrors(page, browserErrors);
   const interactionTrace = [];
   page.on('console', message => {
     if (['warning', 'error'].includes(message.type())) interactionTrace.push({ type: message.type(), text: message.text() });
@@ -98,7 +104,7 @@ async function createPlayer(label) {
   });
   page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   const params = new URLSearchParams({
-    loc: 'custom', lat: '39.2904', lon: '-76.6122', lname: 'Baltimore',
+    loc: 'custom', lat: String(worldLocation.lat), lon: String(worldLocation.lon), lname: worldLocation.name,
     launch: 'earth', gm: 'free', mode: 'walk'
   });
   await page.goto(`${baseUrl}/app/?${params}`, { waitUntil: 'load', timeout: 120000 });
@@ -228,6 +234,7 @@ async function walkToVehicle(player, vehicleId, maxSteps = 1_200) {
       };
     }, vehicleId);
     lastState = state;
+    if (step % 25 === 0) console.log(JSON.stringify({ stage: 'walk-to-shared-vehicle', vehicleId, step, recoveries, state }));
     if (state.missing) throw new Error(`Room vehicle ${vehicleId} is unavailable to this client.`);
     if (state.interaction?.action === 'enter_vehicle' && state.nearbyVehicleId === vehicleId) {
       return { reached: true, step, recoveries, state, recoveryTrace };
@@ -313,7 +320,7 @@ try {
   await openMultiplayerTitleControls(owner);
   await owner.page.locator('#mpCreateRoomDetails > summary').click();
   await owner.page.locator('#mpTitleRoomNameInput').fill('Release multiplayer verification');
-  await owner.page.locator('#mpTitleLocationTagInput').fill('Baltimore');
+  await owner.page.locator('#mpTitleLocationTagInput').fill(worldLocation.name);
   await owner.page.locator('#mpTitleCreateBtn').click();
   try {
     await owner.page.waitForFunction(() =>
@@ -379,16 +386,16 @@ try {
     });
   }, { roomCode: room.code, artifactsModuleUrl: moduleUrls.artifacts });
 
-  await owner.page.evaluate(async ({ roomCode, title, artifactsModuleUrl }) => {
+  await owner.page.evaluate(async ({ roomCode, title, artifactsModuleUrl, worldLocation }) => {
     const artifacts = await import(artifactsModuleUrl);
     await artifacts.createArtifact(roomCode, {
       type: 'pin',
       title,
       text: 'Two-client production contract',
       visibility: 'room',
-      anchor: { kind: 'earth', lat: 39.2904, lon: -76.6122, x: 0, y: 0, z: 0 }
+      anchor: { kind: 'earth', lat: worldLocation.lat, lon: worldLocation.lon, x: 0, y: 0, z: 0 }
     });
-  }, { roomCode: room.code, title: artifactTitle, artifactsModuleUrl: moduleUrls.artifacts });
+  }, { roomCode: room.code, title: artifactTitle, artifactsModuleUrl: moduleUrls.artifacts, worldLocation });
 
   await member.page.waitForFunction((title) => {
     const verification = globalThis.__WE3D_MULTIPLAYER_VERIFY__;
