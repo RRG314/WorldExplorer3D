@@ -4,6 +4,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
+import { installBrowserGraphicsProbe } from './browser-graphics-probe.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 
 const root = process.cwd();
@@ -100,12 +101,20 @@ try {
       args: [`--js-flags=--max-old-space-size=${maxOldSpaceMiB}`]
     });
     browser = await chromium.connect(browserServer.wsEndpoint());
+    const browserProcess = { pid: browserServer.process()?.pid, stderrTail: '', exit: null };
+    browserServer.process()?.stderr?.on('data', chunk => {
+      browserProcess.stderrTail = (browserProcess.stderrTail + String(chunk)).slice(-16000);
+    });
+    browserServer.process()?.once('exit', (code, signal) => {
+      browserProcess.exit = { code, signal, at: new Date().toISOString() };
+    });
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     const page = await context.newPage();
     const browserErrors = [];
     const browserConsole = [];
     const localFailures = [];
     collectBrowserGraphicsErrors(page, browserErrors);
+    await installBrowserGraphicsProbe(page, `output/verification/assembled-locations/${location.id}-graphics-failure.json`);
     await configureStagingAppCheck(page, baseUrl);
     page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
     page.on('crash', () => {
@@ -420,6 +429,7 @@ try {
           atGradeTerrainOutcomeObserved
         },
         snapshot,
+        browserProcess,
         browserErrors,
         browserConsole,
         localFailures
@@ -430,6 +440,7 @@ try {
         ok: false,
         durationMs: Math.round(performance.now() - locationStartedAt),
         error: String(error?.stack || error),
+        browserProcess,
         browserErrors,
         browserConsole,
         localFailures

@@ -101,7 +101,19 @@ try {
   }
   await page.locator('.discoveryTodayRoute > summary').click();
   await page.waitForSelector('.discoveryTodayRoute[open] #discoveryExpeditionList [data-field-objective]', { timeout: 30_000 });
-  await page.waitForTimeout(300);
+  // A CDP override sends one fix; unlike a phone GPS watch it does not keep
+  // publishing while the user reads tutorials. Refresh the same stationary
+  // position after opening the route rather than accepting a stale Signal Lost
+  // label as a distance, or changing the application's signal-loss policy.
+  await cdp.send('Emulation.setGeolocationOverride', {
+    latitude: 39.290445, longitude: -76.6122, accuracy: 6, speed: 0, heading: 0
+  });
+  await page.waitForFunction(() => {
+    const gps = globalThis.getWorldExplorerRuntimeDiagnostics?.().liveGps;
+    const stops = [...document.querySelectorAll('#discoveryExpeditionList [data-field-objective]')];
+    return gps?.fieldSession?.pauseReason === null && stops.length === 3 &&
+      stops.every(entry => /\d+ m/.test(entry.textContent || ''));
+  }, null, { timeout: 10_000 });
   const fieldToday = await page.evaluate(() => ({
     sessionText: document.getElementById('discoveryFieldSession')?.textContent?.replace(/\s+/g, ' ').trim() || '',
     objectiveCount: document.querySelectorAll('#discoveryExpeditionList [data-field-objective]').length,

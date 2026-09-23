@@ -1,5 +1,6 @@
 import { spawn, execFileSync } from 'node:child_process';
 import { createWriteStream } from 'node:fs';
+import os from 'node:os';
 
 function processSnapshot() {
   if (process.platform === 'win32') return [];
@@ -8,6 +9,15 @@ function processSnapshot() {
       const [pid, parent, ...started] = line.trim().split(/\s+/);
       return { pid: Number(pid), parent: Number(parent), started: started.join(' ') };
     });
+}
+
+function recordHostResources(log, phase) {
+  if (!process.env.CI) return;
+  try {
+    const processes = execFileSync('ps', ['-axo', 'pid=,ppid=,rss=,comm='], { encoding: 'utf8', timeout: 2000 });
+    // No arguments/environment: neither application tokens nor CI secrets.
+    log.write(`\n[runner-resources] ${JSON.stringify({ phase, at: new Date().toISOString(), totalMemory: os.totalmem(), freeMemory: os.freemem(), processes })}\n`);
+  } catch (error) { log.write(`[runner-resources] ${phase}: ${error.message}\n`); }
 }
 
 function descendants(snapshot, parent) {
@@ -27,6 +37,7 @@ export function runLoggedStep(command, options = {}) {
   const [executable, ...args] = command;
   const log = createWriteStream(options.logPath, { encoding: 'utf8' });
   const startedAt = Date.now();
+  recordHostResources(log, 'before-step');
   const timeoutMs = Math.max(1_000, Number(options.timeoutMs) || 10 * 60_000);
 
   return new Promise((resolve) => {
@@ -51,6 +62,7 @@ export function runLoggedStep(command, options = {}) {
       child.stdout?.destroy();
       child.stderr?.destroy();
       child.unref();
+      recordHostResources(log, 'after-step');
       log.end(() => resolve({
         durationMs: Date.now() - startedAt,
         error: spawnError ? String(spawnError.stack || spawnError) : (timedOut ? `timed out after ${timeoutMs} ms` : ''),
