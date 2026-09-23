@@ -1,3 +1,4 @@
+import { closeOwnedBrowser } from './owned-browser.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -66,25 +67,10 @@ async function closeWithin(label, close, timeoutMs = 8_000) {
   return ok;
 }
 
-async function terminateOwnedBrowserProcess(timeoutMs = 4_000) {
-  const child = browserServer?.process?.();
-  if (!child || child.exitCode !== null || child.signalCode) return true;
-  const waitForExit = (durationMs) => new Promise((resolve) => {
-    let timer = null;
-    const done = () => {
-      clearTimeout(timer);
-      resolve(true);
-    };
-    child.once('exit', done);
-    timer = setTimeout(() => {
-      child.off('exit', done);
-      resolve(false);
-    }, durationMs);
-  });
-  child.kill('SIGTERM');
-  if (await waitForExit(timeoutMs)) return true;
-  child.kill('SIGKILL');
-  return waitForExit(2_000);
+async function terminateOwnedBrowserProcess() {
+  if (!browserServer) return true;
+  try { await closeOwnedBrowser(browserServer); return true; }
+  catch (error) { console.error('[assembled-locations] owned cleanup failed:', error); return false; }
 }
 
 let cleanupError = null;
