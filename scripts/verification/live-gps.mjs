@@ -1,8 +1,9 @@
+import { selectLowRenderQuality } from './render-quality-ui.mjs';
 import { installBrowserGraphicsProbe } from './browser-graphics-probe.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
@@ -17,9 +18,14 @@ const server = externalUrl ? null : await startStaticServer({
 });
 const baseUrl = externalUrl || `http://127.0.0.1:${server.port}`;
 const origin = new URL(baseUrl).origin;
+// This software-renderer profile is functional evidence only. Physical mobile
+// performance and default-quality acceptance remain separate release gates.
+const softwareCi = !!process.env.CI && process.platform === 'linux';
+const verificationProfile = { scope: 'functional', softwareCi, quality: softwareCi ? 'low via Settings' : 'default', deviceScaleFactor: softwareCi ? 1 : 1 };
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const context = await browser.newContext({
   viewport: { width: 390, height: 844 },
+  deviceScaleFactor: verificationProfile.deviceScaleFactor,
   hasTouch: true,
   isMobile: true,
   geolocation: { latitude: 39.2904, longitude: -76.6122, accuracy: 6 },
@@ -51,6 +57,7 @@ try {
   await page.goto(url, { waitUntil: 'load', timeout: 120_000 });
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   await page.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
+  if (softwareCi) await selectLowRenderQuality(page);
   const consent = page.locator('#analyticsConsentDenyBtn');
   if (await consent.isVisible()) await consent.click();
   const liveGpsEntry = page.locator('#globeSelectorLiveGpsBtn');
@@ -294,6 +301,7 @@ try {
     noFailedLocalResources: localFailures.length === 0
   };
   const report = {
+    verificationProfile,
     ok: Object.values(checks).every(Boolean),
     contract: 'live-gps-field-v2-visible-three-stop-journey',
     checks,
@@ -316,8 +324,19 @@ try {
     browserErrors,
     localFailures
   };
+  await writeFile('output/verification/live-gps-field/report.json', JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
   assert.equal(report.ok, true, 'Live GPS visible journey failed.');
+} catch (error) {
+  const state = await Promise.race([
+    snapshot().catch(captureError => ({ captureError: String(captureError) })),
+    new Promise(resolve => { const timer = setTimeout(() => resolve({ captureError: 'diagnostic capture exceeded 5s' }), 5000); timer.unref(); })
+  ]);
+  await mkdir('output/verification/live-gps-field', { recursive: true });
+  await writeFile('output/verification/live-gps-field/failure.json', JSON.stringify({
+    ok: false, error: String(error?.stack || error), verificationProfile, state, browserErrors, localFailures
+  }, null, 2));
+  throw error;
 } finally {
   await context.close();
   await browser.close();

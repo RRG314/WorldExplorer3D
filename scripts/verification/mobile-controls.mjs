@@ -1,3 +1,4 @@
+import { selectLowRenderQuality } from './render-quality-ui.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { installBrowserGraphicsProbe } from './browser-graphics-probe.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
@@ -13,8 +14,12 @@ const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
 const servedRoot = requestedRoot ? path.resolve(root, requestedRoot) : root;
 const server = await startStaticServer({ rootDir: servedRoot, ports: [4391, 4392, 4393] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
+// This software-renderer profile is functional evidence only. Physical mobile
+// performance and default-quality acceptance remain separate release gates.
+const softwareCi = !!process.env.CI && process.platform === 'linux';
+const verificationProfile = { scope: 'functional', softwareCi, quality: softwareCi ? 'low via Settings' : 'default', deviceScaleFactor: softwareCi ? 1 : 3 };
 const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
-const context = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height: 844 } });
+const context = await browser.newContext({ ...devices['iPhone 13'], deviceScaleFactor: verificationProfile.deviceScaleFactor, viewport: { width: 390, height: 844 } });
 const page = await context.newPage();
 let graphicsPhase = 'startup';
 const memorySnapshots = [];
@@ -203,6 +208,7 @@ try {
   await page.goto(`${baseUrl}/app/`, { waitUntil: 'load', timeout: 120_000 });
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   await page.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
+  if (softwareCi) await selectLowRenderQuality(page);
   await page.locator('#globeSelectorStartBtn').click();
   await page.waitForSelector('#loading.show', { timeout: 30_000 });
   await page.waitForFunction(() => !document.getElementById('loading')?.classList.contains('show'), null, { timeout: 240_000 });
@@ -414,6 +420,7 @@ try {
     noFailedLocalResources: localFailures.length === 0
   };
   const report = {
+    verificationProfile,
     ok: Object.values(checks).every(Boolean), contract: 'semantic-mobile-controls-v2', checks,
     layouts: { standardLayout, southpawLayout, reloadedSouthpawLayout, resetLayout, onboardingLayout, settingsLayout, packUi, openPackUi },
     map: { mapFollowState, mapBrowseState, mapZoomed, mapRecentered, mapReturnedToPlay, blockedMovementDistance: distance(mapActorBefore.activeActor?.position, mapActorAfterBlockedInput.activeActor?.position) },
@@ -436,6 +443,16 @@ try {
   await writeFile('output/verification/mobile-controls/report.json', JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
   assert.equal(report.ok, true, 'Mobile control and camera journey failed.');
+} catch (error) {
+  const state = await Promise.race([
+    diagnostics().catch(captureError => ({ captureError: String(captureError) })),
+    new Promise(resolve => { const timer = setTimeout(() => resolve({ captureError: 'diagnostic capture exceeded 5s' }), 5000); timer.unref(); })
+  ]);
+  await mkdir('output/verification/mobile-controls', { recursive: true });
+  await writeFile('output/verification/mobile-controls/failure.json', JSON.stringify({
+    ok: false, error: String(error?.stack || error), verificationProfile, state, browserErrors, localFailures
+  }, null, 2));
+  throw error;
 } finally {
   await context.close();
   await browser.close();
