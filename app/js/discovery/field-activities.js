@@ -141,6 +141,37 @@ function createFieldActivitySession(options = {}) {
   const observedCatalogIds = options.observedCatalogIds instanceof Set ? options.observedCatalogIds : new Set(options.observedCatalogIds || []);
   let progress = options.progress || fieldProgress({ collectionCount: options.collectionCount || 0 });
   let recording = false;
+  let observationClock = null;
+  function resetObservationClock(authority) {
+    const clock = authority?.observationClock;
+    observationClock = clock && Number.isFinite(clock.receivedAt) ? {
+      ...clock, sampledAt: clock.receivedAt, receivedAt: Math.max(clock.receivedAt, clock.evaluatedAt ?? clock.receivedAt)
+    } : null;
+  }
+  function observationSeconds(dt, authority) {
+    if (authority?.authority !== 'live-gps-field-v2') {
+      if (observationClock) state.elapsed = 0;
+      observationClock = null;
+      return Math.max(0, Number(dt) || 0);
+    }
+    const clock = authority.observationClock;
+    if (!clock || !Number.isFinite(clock.receivedAt)) {
+      state.elapsed = 0;
+      observationClock = null;
+      return 0;
+    }
+    const previous = observationClock;
+    if (!previous || clock.continuityId !== previous.continuityId ||
+        clock.receivedAt - previous.receivedAt > clock.maximumGapMs ||
+        clock.receivedAt < previous.sampledAt) {
+      state.elapsed = 0;
+      resetObservationClock(authority);
+      return 0;
+    }
+    if (clock.receivedAt === previous.sampledAt) return 0;
+    observationClock = { ...clock, sampledAt: clock.receivedAt };
+    return Math.max(0, clock.receivedAt - previous.receivedAt) / 1000;
+  }
   let state = { phase: 'idle', activityId: null, slot: null, elapsed: 0, message: 'Choose an available field activity.', error: '', result: null, authority: null, characterTuning: null };
 
   const distanceToSlot = (position, slot) => slot ? Math.hypot(Number(position?.x || 0) - slot.position.x, Number(position?.z || 0) - slot.position.z) : null;
@@ -162,6 +193,7 @@ function createFieldActivitySession(options = {}) {
     const message = authority?.message || (phase === 'observing'
       ? `Hold position to ${actionPhrase}…`
       : `A plausible survey point is ${Math.ceil(distance)} m away. Follow the bearing while the panel is minimized.`);
+    resetObservationClock(authority);
     state = { phase, activityId, slot, elapsed: 0, message, error: '', result: null, authority, characterTuning };
     return true;
   }
@@ -203,6 +235,7 @@ function createFieldActivitySession(options = {}) {
       if (authority ? authority.eligible : distance <= observationRadius) {
         state.phase = 'observing';
         state.elapsed = 0;
+        resetObservationClock(authority);
         state.message = `Survey point reached. Hold position to ${state.slot.evidenceContract?.actionPhrase || state.slot.activityLabel.toLowerCase()}…`;
       } else if (authority?.message) {
         state.message = authority.message;
@@ -212,10 +245,12 @@ function createFieldActivitySession(options = {}) {
     if (authority ? !authority.eligible : distance > breakRadius) {
       state.phase = 'seeking';
       state.elapsed = 0;
+      observationClock = null;
       state.message = authority?.message || 'The survey point moved outside observation range. Follow the bearing to resume.';
       return snapshot(position);
     }
-    state.elapsed += Math.max(0, Number(dt) || 0);
+    const elapsedSeconds = observationSeconds(dt, authority);
+    state.elapsed += elapsedSeconds;
     if (state.elapsed >= Number(state.slot.evidenceContract?.holdSeconds || 1.8)) {
       const discovery = FIELD_DISCOVERY_CATALOG.find((entry) => entry.id === state.slot.catalogId);
       state.phase = 'revealed';
@@ -313,6 +348,7 @@ function createFieldActivitySession(options = {}) {
   }
 
   function reset() {
+    observationClock = null;
     state = { phase: 'idle', activityId: null, slot: null, elapsed: 0, message: 'Choose an available field activity.', error: '', result: null, authority: null, characterTuning: null };
   }
 
@@ -321,6 +357,7 @@ function createFieldActivitySession(options = {}) {
     const distance = state.authority?.distanceMeters ?? distanceToSlot(position, state.slot);
     const bearing = bearingToSlot(position, state.slot);
     return Object.freeze({
+      observationSeconds: Number(state.elapsed.toFixed(3)),
       active: state.phase !== 'idle', phase: state.phase, activityId: state.activityId,
       activityLabel: ACTIVITY_CATALOG.find((entry) => entry.id === state.activityId)?.label || '',
       message: state.message, error: state.error,

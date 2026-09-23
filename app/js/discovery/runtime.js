@@ -7,7 +7,7 @@ import { createWalkingEncounterDirector } from './encounter-director.js?v=1';
 import { resolveRegionalEcologyPack } from './ecology/regional-packs.js?v=2';
 import { compileEnvironmentContext } from './environment-context.js?v=2';
 import { createFieldRetentionSnapshot } from './field-retention.js?v=2';
-import { compileFieldActivityPlan, createFieldActivitySession } from './field-activities.js?v=4';
+import { compileFieldActivityPlan, createFieldActivitySession } from './field-activities.js?v=5';
 import { createFieldExpedition } from './field-expedition.js?v=1';
 import { ACTIVITY_TOOL, createFieldEquipmentPresentation } from './field-equipment.js?v=4';
 import { explorerProgressSnapshot } from './explorer-events.js?v=3';
@@ -1393,6 +1393,11 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     const liveGps = appCtx.getLiveGpsSnapshot?.() || { active: false };
     return liveGps.active ? appCtx.getLiveGpsFieldEligibility?.(target, evidence || approachEvidenceAt(target)) || null : null;
   };
+  listenForExplorerEvent('we3d-live-gps-field-fix', () => {
+    if (state.disposed || appCtx.worldPublication?.requestId !== publication.requestId ||
+        appCtx.worldPublication?.sequence !== publication.sequence || state.activeActivityId === 'metal-detect') return;
+    state.fieldSession.update(0, playerPosition(appCtx), { evaluateFieldTarget: state.evaluateFieldTarget });
+  });
   state.fieldExpedition = createFieldExpedition({
     plan: fieldActivities,
     claimedIds,

@@ -97,3 +97,47 @@ test('recording a field mechanic persists its typed evidence payload', async () 
     slot.evidenceContract.requiredFields.forEach((field) => assert.ok(Object.hasOwn(record.evidencePayload, field)));
   }
 });
+
+function gpsObservationFixture() {
+  const { environment, eligibility } = publications();
+  const plan = compileFieldActivityPlan(environment, eligibility, { slotsPerCell: 3 });
+  const slot = plan.slots.find((entry) => entry.activityId === 'community-survey');
+  const session = createFieldActivitySession({ plan });
+  let authority = { authority: 'live-gps-field-v2', eligible: true, distanceMeters: 1,
+    observationClock: { receivedAt: 1000, evaluatedAt: 1000, continuityId: 0, maximumGapMs: 20000 } };
+  const context = { evaluateFieldTarget: () => authority };
+  session.beginSlot(slot.id, slot.position, context);
+  return { session, step(receivedAt, overrides = {}, dt = 0.001) {
+    authority = { ...authority, eligible: true, ...overrides,
+      observationClock: { ...authority.observationClock, receivedAt, evaluatedAt: receivedAt, ...overrides.observationClock } };
+    return session.update(dt, slot.position, context);
+  } };
+}
+
+test('GPS observation uses qualified fix time even when rendering is slow', () => {
+  const { step } = gpsObservationFixture();
+  assert.equal(step(3000).phase, 'observing');
+  assert.equal(step(5000).phase, 'revealed');
+});
+
+test('repeated GPS fixes and large simulation steps cannot manufacture observation time', () => {
+  const { step } = gpsObservationFixture();
+  assert.equal(step(1000, {}, 100).phase, 'observing');
+  assert.equal(step(1000, {}, 100).phase, 'observing');
+});
+
+test('GPS observation restarts after eligibility or fix continuity breaks', () => {
+  for (const interruption of ['ineligible', 'epoch', 'gap', 'backwards']) {
+    const { step } = gpsObservationFixture();
+    step(3000);
+    if (interruption === 'ineligible') {
+      assert.equal(step(3500, { eligible: false }).phase, 'seeking');
+      assert.equal(step(4000).phase, 'observing');
+    } else if (interruption === 'epoch') step(4000, { observationClock: { continuityId: 1 } });
+    else if (interruption === 'gap') step(30000);
+    else step(500);
+    const start = interruption === 'gap' ? 30000 : interruption === 'backwards' ? 500 : 4000;
+    assert.equal(step(start + 2000).phase, 'observing', interruption);
+    assert.equal(step(start + 4000).phase, 'revealed', interruption);
+  }
+});

@@ -49,6 +49,7 @@ function createLiveGpsFieldSession(options = {}) {
     }),
     movementSource: 'live-gps',
     currentQuality: null,
+    observationContinuityId: 0,
     proximityTargetId: null,
     proximityState: 'distant',
     lastQualifiedFix: null,
@@ -59,6 +60,12 @@ function createLiveGpsFieldSession(options = {}) {
     inaccurateFixes: 0,
     unsafeSpeedFixes: 0
   };
+}
+
+function interruptLiveGpsFieldObservation(session) {
+  if (!session) return;
+  session.observationContinuityId += 1;
+  session.lastQualifiedFix = null;
 }
 
 function ingestLiveGpsFieldFix(session, fix, context = {}) {
@@ -74,6 +81,10 @@ function ingestLiveGpsFieldFix(session, fix, context = {}) {
   if (speedMps > LIVE_GPS_FIELD_POLICY.maximumEligibleSpeedMps) session.unsafeSpeedFixes += 1;
   session.currentQuality = Object.freeze({ accuracyMeters: accuracy, speedMps, receivedAt });
 
+  const gap = session.lastQualifiedFix ? receivedAt - session.lastQualifiedFix.receivedAt : 0;
+  if (!qualified || gap < 0 || gap > LIVE_GPS_FIELD_POLICY.maximumFixGapMs) {
+    interruptLiveGpsFieldObservation(session);
+  }
   const previous = session.lastQualifiedFix;
   let creditedMeters = 0;
   if (qualified && previous) {
@@ -168,6 +179,12 @@ function evaluateLiveGpsFieldProximity(session, distanceMeters, runtime = {}, ta
   }
   return Object.freeze({
     authority: 'live-gps-field-v2',
+    observationClock: Object.freeze({
+      receivedAt: session?.lastQualifiedFix?.receivedAt ?? null,
+      evaluatedAt: Date.now(),
+      continuityId: session?.observationContinuityId ?? 0,
+      maximumGapMs: LIVE_GPS_FIELD_POLICY.maximumFixGapMs
+    }),
     movementClass: eligible || !pauseReason ? 'gps_walk' : pauseReason === 'unsafe-speed' ? 'gps_fast' : 'gps_walk',
     state,
     eligible,
@@ -228,5 +245,6 @@ export {
   createLiveGpsFieldSession,
   evaluateLiveGpsFieldProximity,
   ingestLiveGpsFieldFix,
+  interruptLiveGpsFieldObservation,
   liveGpsFieldSessionSnapshot
 };
