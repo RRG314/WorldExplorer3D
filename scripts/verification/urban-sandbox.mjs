@@ -425,6 +425,19 @@ async function chaseOfficerUntilCustody(page, timeoutMs = 35_000) {
   return diagnostics(page);
 }
 
+async function waitForResponderDispatch(page) {
+  const receipts = [];
+  for (let simulatedMs = 0; simulatedMs <= 8000; simulatedMs += 500) {
+    const state = await diagnostics(page);
+    if (Number(state.urbanSandbox?.responders?.activeCount || 0) > 0) {
+      return { simulatedMs, receipts, state };
+    }
+    assert.ok(simulatedMs < 8000,
+      `Witnessed incident did not dispatch within 8 simulated seconds: ${JSON.stringify(state.urbanSandbox?.civicResponse)}`);
+    receipts.push(await advanceGameplay(page, 500));
+  }
+}
+
 async function meetResponderUntilOfficer(page, timeoutMs = 45_000) {
   const deadline = Date.now() + timeoutMs;
   const trace = [];
@@ -445,7 +458,7 @@ async function meetResponderUntilOfficer(page, timeoutMs = 45_000) {
     // The response vehicle owns this approach. Moving toward it continually
     // changes its destination and does not represent a player holding at the
     // reported incident while a dispatched unit arrives.
-    await page.evaluate(() => globalThis.advanceTime?.(240));
+    await advanceGameplay(page, 240);
     await page.waitForTimeout(60);
   }
   const final = await diagnostics(page);
@@ -495,7 +508,7 @@ async function evadeOfficerUntilHospital(page, timeoutMs = 45_000) {
     } else {
       // Hold briefly in the officer's real firing lane so the projectile path
       // can resolve, then retreat before contact can become an arrest.
-      await page.evaluate(() => globalThis.advanceTime?.(420));
+      await advanceGameplay(page, 420);
       await inputStep(page, 'ArrowUp', 80);
     }
     await page.waitForTimeout(45);
@@ -519,7 +532,7 @@ async function verifyCustodyIncidentEnded(page) {
   const before = await diagnostics(page);
   const start = before.activeActor?.position || {};
   for (let index = 0; index < 4; index += 1) {
-    await page.evaluate(() => globalThis.advanceTime?.(1600));
+    await advanceGameplay(page, 1600);
     await inputStep(page, 'ArrowUp', 180);
   }
   await page.waitForTimeout(300);
@@ -693,7 +706,7 @@ async function runArrestRecoveryJourney() {
   try {
     await launchEarth(page);
     const witnessedResponse = await triggerWitnessedAssaultResponse(page);
-    await page.waitForFunction(() => Number(globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.responders?.activeCount || 0) > 0, null, { timeout: 45_000 });
+    const dispatchTiming = await waitForResponderDispatch(page);
     const responderArrived = await meetResponderUntilOfficer(page);
     if (!responderArrived.urbanSandbox?.responders?.responders?.some((entry) => !!entry.officer)) {
       console.error('CP5 arrest responder arrival evidence', JSON.stringify({
@@ -724,7 +737,7 @@ async function runArrestRecoveryJourney() {
     assert.equal(ended.after.urbanSandbox?.civicResponse?.phase, 'clear', 'Civic attention remained active after custody release.');
     assert.equal(Number(ended.after.urbanSandbox?.responders?.activeCount || 0), 0, 'Responders from the completed custody incident remained active.');
     assert.ok(ended.moved > .2, 'Normal walking control did not recover after custody release.');
-    return { witnessedResponse, responderArrived, custody, recovered, ended };
+    return { witnessedResponse, dispatchTiming, responderArrived, custody, recovered, ended };
   } catch (error) {
     await saveJourneyFailure(page, 'arrest', error);
     throw error;
@@ -739,7 +752,7 @@ async function runMedicalRecoveryJourney() {
   try {
     await launchEarth(page);
     const witnessedResponse = await triggerWitnessedWeaponResponse(page);
-    await page.waitForFunction(() => Number(globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.responders?.activeCount || 0) > 0, null, { timeout: 45_000 });
+    const dispatchTiming = await waitForResponderDispatch(page);
     const before = await meetResponderUntilOfficer(page, 50_000);
     if (!before.urbanSandbox?.responders?.responders?.some((entry) => !!entry.officer)) {
       console.error('CP5 responder arrival evidence', JSON.stringify({
@@ -764,7 +777,7 @@ async function runMedicalRecoveryJourney() {
     }
     assert.equal(custody.urbanSandbox?.custody?.type, 'hospital', 'Normal movement and responder impacts did not resolve to mapped hospital recovery.');
     const recovered = await continueFromCustody(page);
-    return { witnessedResponse, before, custody, recovered };
+    return { witnessedResponse, dispatchTiming, before, custody, recovered };
   } catch (error) {
     await saveJourneyFailure(page, 'medical', error);
     throw error;
