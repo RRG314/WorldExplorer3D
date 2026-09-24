@@ -315,7 +315,7 @@ async function walkToPoint(target, options = {}) {
       continue;
     }
     if (stagnantMs > 7000) {
-      if (allowBlocked) return { reached: false, blocked: true, steps: step, start, final: state, path };
+      if (allowBlocked) return { reached: false, blocked: true, stagnantMs, steps: step, start, final: state, path };
       break;
     }
   }
@@ -328,7 +328,7 @@ async function walkToPoint(target, options = {}) {
       distance: Math.hypot(Number(x) - Number(actor.position?.x), Number(z) - Number(actor.position?.z))
     };
   }, target);
-  return { reached: false, blocked: allowBlocked, steps: maxSteps, start, final, path };
+  return { reached: false, blocked: false, budgetExhausted: true, stagnantMs, steps: maxSteps, start, final, path };
 }
 
 async function interiorOwnershipSnapshot(targetKey) {
