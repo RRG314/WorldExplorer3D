@@ -35,7 +35,7 @@
     "provider-release": { "scope": "candidate", "command": ["npm", "run", "verify:provider-release"], "artifactRequired": false },
     "actors-vehicles": { "scope": "candidate", "command": ["npm", "run", "verify:actors-vehicles"], "artifactRequired": true, "timeoutMs": 1800000 },
     "terrain-boundary": { "scope": "candidate", "command": ["npm", "run", "verify:terrain-boundary"], "artifactRequired": true },
-    "interiors": { "scope": "candidate", "command": ["npm", "run", "verify:interiors"], "artifactRequired": true },
+    "interiors": { "scope": "candidate", "command": ["npm", "run", "verify:interiors"], "artifactRequired": true, "timeoutMs": 1800000 },
     "poi-lifecycle": { "scope": "candidate", "command": ["npm", "run", "verify:poi-lifecycle"], "artifactRequired": false },
     "urban-sandbox": { "scope": "candidate", "command": ["npm", "run", "verify:urban-sandbox"], "artifactRequired": true, "timeoutMs": 1200000 },
     "urban-equipment": { "scope": "candidate", "command": ["npm", "run", "verify:urban-equipment"], "artifactRequired": true },

@@ -251,7 +251,8 @@ async function walkToPoint(target, options = {}) {
   const allowBlocked = options.allowBlocked === true;
   const allowDetour = options.detour === true;
   const path = [];
-  let stagnant = 0;
+  let stagnantMs = 0;
+  let previousMoveMs = 0;
   let previousDistance = Infinity;
   let start = null;
   let detourCount = 0;
@@ -285,12 +286,14 @@ async function walkToPoint(target, options = {}) {
       await stepGameplayKeys(page, turnKey, turnBurstMs(yawDelta));
       continue; // Turning cannot demonstrate blocked translation.
     } else {
-      await stepGameplayKeys(page, 'ArrowUp', walkBurstMs(state.distance, stopDistance));
+      const duration = walkBurstMs(state.distance, stopDistance);
+      await stepGameplayKeys(page, 'ArrowUp', duration);
+      if (state.distance >= previousDistance - 0.008) stagnantMs += previousMoveMs;
+      else stagnantMs = 0;
+      previousMoveMs = duration;
     }
-    if (state.distance >= previousDistance - 0.008) stagnant += 1;
-    else stagnant = 0;
     previousDistance = state.distance;
-    if (allowDetour && stagnant > 20 && detourCount < 8) {
+    if (allowDetour && stagnantMs > 2000 && detourCount < 8) {
       const side = detourCount % 2 === 0 ? 1 : -1;
       detourCount += 1;
       const tangentYaw = wrapYaw(desiredYaw + side * Math.PI / 2);
@@ -306,11 +309,12 @@ async function walkToPoint(target, options = {}) {
       const detourDurationMs = Math.max(700, Math.min(2_500, state.distance * 160));
       await stepGameplayKeys(page, 'ArrowUp', detourDurationMs);
       path.push({ ...state, detour: detourCount });
-      stagnant = 0;
+      stagnantMs = 0;
+      previousMoveMs = 0;
       previousDistance = Infinity;
       continue;
     }
-    if (stagnant > 70) {
+    if (stagnantMs > 7000) {
       if (allowBlocked) return { reached: false, blocked: true, steps: step, start, final: state, path };
       break;
     }
@@ -564,6 +568,7 @@ try {
     true,
     `Published stairs were not traversable through normal walking input: ${JSON.stringify(stairTraversal)}`
   );
+  markStage('desktop-stairs-complete', { stairTraversal });
   await page.screenshot({ path: 'output/release-evidence/current/interior-stairs-desktop.png', fullPage: false });
 
   const elevatorPrepared = await prepareInteriorInteraction('elevator');
@@ -589,6 +594,7 @@ try {
   await page.keyboard.press('KeyE');
   await chooseElevatorFloor(0);
 
+  markStage('desktop-elevator-complete', { elevatorArrival, elevatorUpperArrival });
   const wallContact = await pushAgainstInteriorWall();
   const wallRecovery = await backAwayFromWall();
 
