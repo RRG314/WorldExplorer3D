@@ -113,10 +113,9 @@ async function turnToward(page, target, tolerance = 0.16, maxSteps = 160, option
     const desired = Math.atan2(Number(target.x) - state.x, Number(target.z) - state.z);
     const delta = wrapYaw(desired - state.yaw);
     if (Math.abs(delta) <= tolerance) return state;
-    // Use coarse real-input turns while far away, then shorten the input burst
-    // near the target. A fixed 55 ms burst can straddle the tolerance forever
-    // on a busy renderer even though the interaction is already available.
-    const turnDurationMs = Math.abs(delta) > 0.7 ? 55 : Math.abs(delta) > 0.3 ? 32 : 16;
+    // Bound turns by the remaining angle. Every fixed physics step runs;
+    // fewer final-frame readbacks keep software CI navigation practical.
+    const turnDurationMs = Math.max(16, Math.min(600, Math.abs(delta) / 2.6 * 800));
     const turnKey = delta > 0 ? 'ArrowLeft' : 'ArrowRight';
     await inputStep(page, options.keepMoving === true ? ['ArrowUp', turnKey] : turnKey, turnDurationMs);
   }
@@ -134,7 +133,7 @@ async function turnCameraToward(page, target, tolerance = 0.16, maxSteps = 160) 
     // A/D are conventional strafing bindings on foot. Arrow keys are the
     // supported keyboard-only turn control and rotate the camera with the
     // explorer when no independent mouse-look offset is active.
-    const turnDurationMs = Math.abs(delta) > 0.7 ? 55 : Math.abs(delta) > 0.3 ? 32 : 16;
+    const turnDurationMs = Math.max(16, Math.min(600, Math.abs(delta) / 2.6 * 800));
     await inputStep(page, delta > 0 ? 'ArrowLeft' : 'ArrowRight', turnDurationMs);
   }
   const final = await actorState(page, target);
@@ -173,13 +172,13 @@ async function walkTo(page, target, options = {}) {
     const desired = Math.atan2(Number(target.x) - state.x, Number(target.z) - state.z);
     const delta = wrapYaw(desired - state.yaw);
     if (Math.abs(delta) > 0.13) {
-      const pulseMs = Math.abs(delta) > 0.7 ? 55 : Math.abs(delta) > 0.3 ? 32 : 16;
+      const pulseMs = Math.max(16, Math.min(600, Math.abs(delta) / 2.6 * 800));
       await inputStep(page, delta > 0 ? 'ArrowLeft' : 'ArrowRight', pulseMs);
       // Facing a target cannot reduce its distance. Counting these turns as
       // blocked movement sent the verifier on a detour before it even walked.
       continue;
     } else {
-      const movementPulseMs = state.distance > 20 ? 520 : state.distance > 8 ? 260 : state.distance > 3 ? 140 : 80;
+      const movementPulseMs = Math.max(40, Math.min(600, Math.max(0, state.distance - (interactionVehicleId ? 1 : stopDistance)) / (state.distance > 20 ? 5.6 : 2.8) * 800));
       await inputStep(page, state.distance > 20 ? ['ShiftLeft', 'ArrowUp'] : 'ArrowUp', movementPulseMs);
     }
     // A moving target must not hide a blocked player or falsely block one
