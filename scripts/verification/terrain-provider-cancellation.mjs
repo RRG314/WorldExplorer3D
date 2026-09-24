@@ -1,3 +1,12 @@
+// The elevation loader retires in-flight tiles when a far-terrain generation
+// is replaced. Limit recognition to the exact public Terrarium object path.
+export function isTerrainElevationTileUrl(url) {
+  let parsed;
+  try { parsed = new URL(url); } catch { return false; }
+  return parsed.origin === 'https://s3.amazonaws.com' &&
+    /^\/elevation-tiles-prod\/terrarium\/\d+\/\d+\/\d+\.png$/.test(parsed.pathname);
+}
+
 // These application-owned requests have bounded timeouts or are canceled when
 // their last terrain consumer is released. This classification applies only to
 // browser cancellation, never HTTP failures, failed decoding, or GPU errors.
@@ -6,6 +15,7 @@ export function isExpectedTerrainProviderCancellation(url, reason) {
   let parsed;
   try { parsed = new URL(url); } catch { return false; }
   if (parsed.protocol !== 'https:') return false;
+  if (isTerrainElevationTileUrl(url)) return true;
   if (parsed.origin === 'https://vector.openstreetmap.org') {
     return /^\/shortbread_v1\/\d+\/\d+\/\d+\.mvt$/.test(parsed.pathname);
   }

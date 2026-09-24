@@ -4,7 +4,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
-import { isExpectedTerrainProviderCancellation } from './terrain-provider-cancellation.mjs';
+import { isExpectedTerrainProviderCancellation, isTerrainElevationTileUrl } from './terrain-provider-cancellation.mjs';
 
 const baseUrl = String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4192').replace(/\/$/, '');
 const evidenceDir = path.resolve('output/release-evidence/current/terrain-boundary');
@@ -24,7 +24,7 @@ const isOptionalExternalUrl = (url) => /(?:overpass-api\.de|overpass\.private\.c
 page.on('pageerror', (error) => failures.push(`pageerror: ${error.stack || error}`));
 page.on('response', (response) => {
   if (response.status() >= 400 && (response.url().startsWith(`${baseUrl}/`) ||
-      response.url().startsWith('https://vector.openstreetmap.org/shortbread_v1/'))) {
+      response.url().startsWith('https://vector.openstreetmap.org/shortbread_v1/') || isTerrainElevationTileUrl(response.url()))) {
     failures.push(`HTTP ${response.status()}: ${response.url()}`);
   }
 });
