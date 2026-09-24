@@ -525,9 +525,12 @@ async function meetResponderUntilOfficer(page, simulationBudgetMs = 45_000) {
 }
 
 async function evadeOfficerUntilHospital(page, timeoutMs = 45_000) {
-  const deadline = Date.now() + timeoutMs;
+  // The captured software-CI run delivered only seven movement bursts before
+  // 45 wall seconds elapsed (health had fallen to .28). Keep real responder
+  // impacts and custody outcomes, with bounded input attempts and a CI cap.
+  const deadline = Date.now() + (process.env.CI ? 180_000 : timeoutMs);
   const trace = [];
-  while (Date.now() < deadline) {
+  while (Date.now() < deadline && trace.length < 90) {
     const state = await diagnostics(page);
     const custodyType = state.urbanSandbox?.custody?.type || '';
     if (custodyType === 'hospital') return state;
@@ -885,6 +888,38 @@ async function runMedicalRecoveryJourney() {
   }
 }
 
+function vehicleEquipmentChecks(primary) {
+    const vehicleAfterExit = primary.exited.urbanSandbox.vehicles.filter((entry) => entry.id === primary.vehicle.id);
+    return {
+      oneVehicleIdentityAcrossDoorDriveExit:
+        primary.entered.urbanSandbox.activeVehicleId === primary.vehicle.id &&
+        primary.entered.urbanSandbox.vehicles.filter((entry) => entry.id === primary.vehicle.id).length === 1 &&
+        vehicleAfterExit.length === 1 && vehicleAfterExit[0].attachedToPlayer === false,
+      visualDoorAndActorTransition:
+        Math.abs(primary.entering.urbanSandbox.vehicles.find((entry) => entry.id === primary.vehicle.id)?.driverDoor?.openRadians || 0) > 0.05 &&
+        Math.abs(primary.exiting.urbanSandbox.vehicles.find((entry) => entry.id === primary.vehicle.id)?.driverDoor?.openRadians || 0) > 0.05 &&
+        primary.entered.activeActor?.mode === 'drive' && primary.exited.activeActor?.mode === 'walk',
+      realDrivingMovesClaimedVehicle: primary.drivenMeters > 1,
+      segmentCollisionContainsPlayer: primary.collisionProbe.reached === false && primary.collisionProbe.blocked === true,
+      handsAndStaffAffectSameVehicle:
+        primary.equipmentResults.hands.vehicleId === primary.equipmentResults.baton.vehicleId &&
+        primary.equipmentResults.hands.after < primary.equipmentResults.hands.before &&
+        primary.equipmentResults.baton.after < primary.equipmentResults.baton.before,
+      ammunitionAndQuantitiesChangeExactlyOnce:
+        ['pulse-sidearm', 'laser-gun', 'paintball-gun'].every((id) => {
+          const result = primary.equipmentResults[id];
+          return Number(result.after?.magazine) === Number(result.before?.magazine) - 1 && Number(result.after?.reserve) === Number(result.before?.reserve);
+        }) && Number(primary.equipmentResults['concussion-charge'].after?.quantity) === Number(primary.equipmentResults['concussion-charge'].before?.quantity) - 1,
+      flashlightUsesSharedBackpack: primary.equipmentResults.flashlight && primary.parachuteBefore.deployed === false,
+      projectilesResolveThroughOneRuntime:
+        ['pulse-sidearm', 'laser-gun', 'paintball-gun'].every((id) => primary.equipmentResults[id].state.urbanSandbox.projectileRuntime?.lastProjectileAction?.equipmentId === id),
+      groundParachuteFailsSafely:
+        primary.parachuteBefore.deployed === false && primary.parachuteGroundRecovery.deployed === false,
+      noBrowserErrors: browserErrors.length === 0,
+      noFailedLocalResources: localFailures.length === 0
+    };
+}
+
 let report;
 const verificationMode = {
   evidenceScope: 'urban functional input; deterministic DOM keyboard navigation and transitions; not rendering performance',
@@ -938,41 +973,20 @@ try {
   } else if (requestedScope === 'vehicle') {
     console.log('[urban-sandbox] START vehicle and equipment');
     const primary = await withIndependentEquipmentJourneys(await runVehicleEquipmentJourney());
-    const vehicleAfterExit = primary.exited.urbanSandbox.vehicles.filter((entry) => entry.id === primary.vehicle.id);
-    const checks = {
-      oneVehicleIdentityAcrossDoorDriveExit:
-        primary.entered.urbanSandbox.activeVehicleId === primary.vehicle.id &&
-        primary.entered.urbanSandbox.vehicles.filter((entry) => entry.id === primary.vehicle.id).length === 1 &&
-        vehicleAfterExit.length === 1 && vehicleAfterExit[0].attachedToPlayer === false,
-      visualDoorAndActorTransition:
-        Math.abs(primary.entering.urbanSandbox.vehicles.find((entry) => entry.id === primary.vehicle.id)?.driverDoor?.openRadians || 0) > 0.05 &&
-        Math.abs(primary.exiting.urbanSandbox.vehicles.find((entry) => entry.id === primary.vehicle.id)?.driverDoor?.openRadians || 0) > 0.05 &&
-        primary.entered.activeActor?.mode === 'drive' && primary.exited.activeActor?.mode === 'walk',
-      realDrivingMovesClaimedVehicle: primary.drivenMeters > 1,
-      segmentCollisionContainsPlayer: primary.collisionProbe.reached === false && primary.collisionProbe.blocked === true,
-      handsAndStaffAffectSameVehicle:
-        primary.equipmentResults.hands.vehicleId === primary.equipmentResults.baton.vehicleId &&
-        primary.equipmentResults.hands.after < primary.equipmentResults.hands.before &&
-        primary.equipmentResults.baton.after < primary.equipmentResults.baton.before,
-      ammunitionAndQuantitiesChangeExactlyOnce:
-        ['pulse-sidearm', 'laser-gun', 'paintball-gun'].every((id) => {
-          const result = primary.equipmentResults[id];
-          return Number(result.after?.magazine) === Number(result.before?.magazine) - 1 && Number(result.after?.reserve) === Number(result.before?.reserve);
-        }) && Number(primary.equipmentResults['concussion-charge'].after?.quantity) === Number(primary.equipmentResults['concussion-charge'].before?.quantity) - 1,
-      flashlightUsesSharedBackpack: primary.equipmentResults.flashlight && primary.parachuteBefore.deployed === false,
-      projectilesResolveThroughOneRuntime:
-        ['pulse-sidearm', 'laser-gun', 'paintball-gun'].every((id) => primary.equipmentResults[id].state.urbanSandbox.projectileRuntime?.lastProjectileAction?.equipmentId === id),
-      groundParachuteFailsSafely:
-        primary.parachuteBefore.deployed === false && primary.parachuteGroundRecovery.deployed === false,
-      noBrowserErrors: browserErrors.length === 0,
-      noFailedLocalResources: localFailures.length === 0
-    };
+    const checks = vehicleEquipmentChecks(primary);
     report = { ok: Object.values(checks).every(Boolean), contract: 'urban-sandbox-vehicle-scope-v1', servedRoot, checks, evidence: { transitionTiming: primary.transitionTiming, collisionProbe: primary.collisionProbe, providerFixture: primary.providerFixture, equipmentJourneys: primary.equipmentJourneys }, browserErrors, localFailures };
     console.log('[urban-sandbox] CAPTURED vehicle and equipment');
   } else {
   console.log('[urban-sandbox] START vehicle and equipment');
   const primary = await withIndependentEquipmentJourneys(await runVehicleEquipmentJourney());
   await mkdir(path.dirname(reportPath), { recursive: true });
+  const vehicleChecks = vehicleEquipmentChecks(primary);
+  await writeFile(path.join(path.dirname(reportPath), 'vehicle-equipment-checks.json'), JSON.stringify({
+    scope: 'vehicle-and-equipment', complete: true, completeCandidate: false,
+    ok: Object.values(vehicleChecks).every(Boolean), checks: vehicleChecks,
+    providerFixture: primary.providerFixture, browserErrors: [...browserErrors], localFailures: [...localFailures]
+  }, null, 2));
+  assert.ok(Object.values(vehicleChecks).every(Boolean), `Vehicle/equipment checks failed: ${JSON.stringify(vehicleChecks)}`);
   await writeFile(path.join(path.dirname(reportPath), 'progress.json'), JSON.stringify({ complete: false, aggregateAssertionsRun: false, completedJourneys: ['vehicle'], evidence: { vehicleId: primary.vehicle.id, drivenMeters: primary.drivenMeters, providerFixture: primary.providerFixture } }, null, 2));
   console.log('[urban-sandbox] CAPTURED vehicle and equipment');
   console.log('[urban-sandbox] START arrest recovery');

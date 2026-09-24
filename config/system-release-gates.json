@@ -46,7 +46,7 @@
     "commerce-coherence": { "scope": "candidate", "command": ["npm", "run", "verify:commerce-coherence"], "artifactRequired": false },
     "gameplay-menu": { "scope": "candidate", "command": ["npm", "run", "verify:gameplay-menu"], "artifactRequired": true, "timeoutMs": 1200000 },
     "hotbar-actions": { "scope": "candidate", "command": ["npm", "run", "verify:hotbar-actions"], "artifactRequired": true,
-      "timeoutMs": 1200000 },
+      "timeoutMs": 2400000 },
     "landing-user-count": { "scope": "candidate", "command": ["npm", "run", "verify:landing-user-count"], "artifactRequired": true },
     "analytics-lifecycle": { "scope": "candidate", "command": ["npm", "run", "verify:analytics-lifecycle"], "artifactRequired": true },
     "explorer-browser": { "scope": "candidate", "command": ["npm", "run", "verify:explorer-coherence-browser"], "artifactRequired": true },
