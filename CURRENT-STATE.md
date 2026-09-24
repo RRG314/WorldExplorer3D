@@ -26,6 +26,17 @@ Diagnostic process/memory capture must preserve those errors as failures.
 Functional CI quality settings and simulation timing are recorded explicitly;
 they cannot establish default-quality visuals, physical load time or FPS.
 
+## Mobile verification correction (September 24)
+
+Several browser journeys used a touch viewport with Chromium's desktop user
+agent. A bounded browser probe confirmed one touch point and desktop app
+classification. Their old results establish touch-layout behavior, not mobile
+world-loading coverage. Mobile contexts now supply the Playwright iPhone user
+agent without changing viewport sizes, pixel ratios, assertions or deadlines.
+The recorded multiplayer maps also have a contract against the shipped query
+generator. Recheck affected journeys; do not carry their old passes forward as
+mobile acceptance. The receipt is `mobile-profile-probe.json` in the ledger.
+
 ## Repairs and deployment scope
 
 Repair receipts cover hidden-map requests; exact parcel-query cache ownership;

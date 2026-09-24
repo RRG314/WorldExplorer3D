@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 
 const root = process.cwd();
@@ -14,7 +14,7 @@ const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const context = await browser.newContext({
   viewport: { width: 390, height: 844 },
   hasTouch: true,
-  isMobile: true,
+  isMobile: true, userAgent: devices['iPhone 13'].userAgent,
   geolocation: { ...startGeo, accuracy: 6 },
   permissions: ['geolocation']
 });

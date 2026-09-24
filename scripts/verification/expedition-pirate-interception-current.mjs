@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 
 const servedRoot = path.resolve(process.cwd(), String(process.env.WE3D_VERIFY_ROOT || '.'));
@@ -171,7 +171,7 @@ async function desktopJourney() {
 }
 
 async function mobilePresentation() {
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, userAgent: devices['iPhone 13'].userAgent });
   const page = await context.newPage();
   page.on('pageerror', (error) => browserErrors.push(`mobile: ${error.stack || error}`));
   await openSpace(page);

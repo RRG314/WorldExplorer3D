@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 
 const root = process.cwd();
@@ -351,7 +351,7 @@ try {
     console.log(JSON.stringify(report, null, 2));
     assert.equal(report.ok, true, 'Companion persistence stage failed.');
   } else if (stage === 'mobile') {
-    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, userAgent: devices['iPhone 13'].userAgent, hasTouch: true });
     const page = await context.newPage();
     bindEvidence(page, 'mobile');
     const result = await exercise(page, 'mobile');
@@ -391,7 +391,7 @@ try {
     assert.equal(report.ok, true, 'Domestic companion encounter stage failed.');
   } else {
 
-    const mobileContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    const mobileContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, userAgent: devices['iPhone 13'].userAgent, hasTouch: true });
     const mobilePage = await mobileContext.newPage();
     bindEvidence(mobilePage, 'mobile');
     const mobile = await exercise(mobilePage, 'mobile');

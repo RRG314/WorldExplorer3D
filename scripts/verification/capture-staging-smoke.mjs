@@ -1,4 +1,4 @@
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 import { randomBytes } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -9,7 +9,7 @@ const origin = 'https://we3d-staging-20260712.web.app';
 const output = 'output/verification/capture-staging-live';
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
-const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, userAgent: devices['iPhone 13'].userAgent, hasTouch: true });
 page.setDefaultTimeout(20000);
 const errors = [];
 let lastResponse = '';

@@ -6,7 +6,7 @@ import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 
 const root = process.cwd();
@@ -28,7 +28,7 @@ const context = await browser.newContext({
   viewport: { width: 390, height: 844 },
   deviceScaleFactor: verificationProfile.deviceScaleFactor,
   hasTouch: true,
-  isMobile: true,
+  isMobile: true, userAgent: devices['iPhone 13'].userAgent,
   geolocation: { latitude: 39.2904, longitude: -76.6122, accuracy: 6 },
   permissions: ['geolocation']
 });

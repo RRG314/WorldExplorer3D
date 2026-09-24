@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
@@ -179,7 +179,7 @@ async function verifyGrantedDestination(destination) {
 }
 
 async function verifyDefaultStoredFirstEntry() {
-  const context = await createContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const context = await createContext({ viewport: { width: 390, height: 844 }, isMobile: true, userAgent: devices['iPhone 13'].userAgent, hasTouch: true });
   await context.addInitScript((config) => {
     globalThis.WORLD_EXPLORER_FIREBASE = config;
   }, safeConfig);

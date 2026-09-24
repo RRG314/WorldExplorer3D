@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 
 const baseUrl = String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4192').replace(/\/$/, '');
 const outputDir = path.resolve('output/verification/expedition-pod-journey');
@@ -514,7 +514,7 @@ async function run() {
 }
 
 async function verifyMobileLaunchBay() {
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, userAgent: devices['iPhone 13'].userAgent, hasTouch: true });
   const page = await context.newPage();
   page.on('pageerror', (error) => failures.push(`mobile pageerror: ${error.stack || error}`));
   page.on('requestfailed', (request) => {

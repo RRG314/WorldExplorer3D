@@ -2,7 +2,7 @@ import './urban-prompt-layout-current.mjs';
 import assert from 'node:assert/strict';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 import { showWorldSelectionNotice } from '../../app/js/interaction/world-click-router.js';
 const root = path.resolve(process.env.WE3D_VERIFY_ROOT || '.');
@@ -12,7 +12,7 @@ const html = (await readFile(path.join(root, 'app/index.html'), 'utf8')).replace
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const results = [];
 try {
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, userAgent: devices['iPhone 13'].userAgent });
   const page = await context.newPage();
   await page.setContent(html.replace('<head>', `<head><base href="${base}">`), { waitUntil: 'load' });
   await page.evaluate(async () => {

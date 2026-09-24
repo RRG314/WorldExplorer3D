@@ -2,7 +2,7 @@ import { createGpsFixStream } from './gps-fix-stream.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 
@@ -282,7 +282,7 @@ async function acceptLead(page, lead) {
 try {
   await mkdir('output/release-evidence/current', { recursive: true });
 
-  const freeContext = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const freeContext = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, userAgent: devices['iPhone 13'].userAgent });
   const freePage = await freeContext.newPage();
   const freeCdp = await freeContext.newCDPSession(freePage);
   await instrument(freePage);
@@ -306,7 +306,7 @@ try {
   await freeContext.close();
 
   const gpsContext = await browser.newContext({
-    viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true,
+    viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, userAgent: devices['iPhone 13'].userAgent,
     geolocation: { latitude: 39.2904, longitude: -76.6122, accuracy: 6 }, permissions: ['geolocation']
   });
   await gpsContext.grantPermissions(['geolocation'], { origin });
