@@ -1,3 +1,4 @@
+import { softwareCompositorArgs } from './software-compositor.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -14,7 +15,7 @@ const server = await startStaticServer({ rootDir: servedRoot, ports: [4389, 4390
 const baseUrl = `http://127.0.0.1:${server.port}`;
 const reportPath = path.join(root, 'output', 'verification', 'interiors', 'report.json');
 const launchBrowser = () => chromium.launch({
-  headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024']
+  headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024', ...softwareCompositorArgs()]
 });
 let browser = await launchBrowser();
 let context = await browser.newContext({ viewport: { width: 1280, height: 720 } });

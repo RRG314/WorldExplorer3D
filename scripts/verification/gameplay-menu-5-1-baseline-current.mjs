@@ -1,3 +1,4 @@
+import { softwareCompositorArgs } from './software-compositor.mjs';
 import { installBrowserGraphicsProbe } from './browser-graphics-probe.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
@@ -10,7 +11,7 @@ const baseUrl = String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:419
 const outputDir = path.resolve('output/verification/player-navigation-current');
 await fs.mkdir(outputDir, { recursive: true });
 
-const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024', ...softwareCompositorArgs()] });
 const failures = [];
 const browserErrors = [];
 let activePage = null;

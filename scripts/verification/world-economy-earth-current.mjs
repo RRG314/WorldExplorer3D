@@ -1,3 +1,4 @@
+import { softwareCompositorArgs } from './software-compositor.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { installBrowserGraphicsProbe } from './browser-graphics-probe.mjs';
 import assert from 'node:assert/strict';
@@ -15,7 +16,7 @@ const baseUrl = staticServer
 const outputDir = path.resolve('output/verification/world-economy-earth');
 await fs.mkdir(outputDir, { recursive: true });
 // Bound functional gameplay verification; performance budgets use their own harness.
-const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024', ...softwareCompositorArgs()] });
 const failures = [];
 
 async function run() {

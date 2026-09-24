@@ -1,3 +1,4 @@
+import { softwareCompositorArgs } from './software-compositor.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -12,7 +13,7 @@ const baseUrl = externalUrl || `http://127.0.0.1:${server.port}`;
 const evidenceDir = path.resolve('output/verification/maryland-parcel-property');
 await mkdir(evidenceDir, { recursive: true });
 
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: softwareCompositorArgs() });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await context.newPage();
 await configureStagingAppCheck(page, baseUrl);

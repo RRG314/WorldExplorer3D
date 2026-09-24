@@ -1,3 +1,4 @@
+import { softwareCompositorArgs } from './software-compositor.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { installBrowserGraphicsProbe } from './browser-graphics-probe.mjs';
 import assert from 'node:assert/strict';
@@ -16,7 +17,7 @@ const outputDir = path.resolve('output/verification/world-economy-cargo');
 await fs.mkdir(outputDir, { recursive: true });
 // Bound this multi-page gameplay verifier on the owner's 8 GiB Mac.
 // This is functional custody evidence, not a performance-budget measurement.
-const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024', ...softwareCompositorArgs()] });
 const failures = [];
 
 async function state(page) {

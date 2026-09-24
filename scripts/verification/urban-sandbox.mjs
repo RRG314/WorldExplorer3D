@@ -1,3 +1,4 @@
+import { softwareCompositorArgs } from './software-compositor.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -23,7 +24,7 @@ const localFailures = [];
 
 async function createJourneyBrowser() {
   const browser = await chromium.launch({
-    headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024']
+    headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024', ...softwareCompositorArgs()]
   });
   try {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: process.env.CI ? 0.5 : 1 });

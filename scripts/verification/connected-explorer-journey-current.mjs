@@ -1,3 +1,4 @@
+import { softwareCompositorArgs } from './software-compositor.mjs';
 import { installBrowserGraphicsProbe } from './browser-graphics-probe.mjs';
 import { selectLowRenderQuality } from './render-quality-ui.mjs';
 import assert from 'node:assert/strict';
@@ -14,7 +15,7 @@ const externalUrl = String(process.env.WE3D_VERIFY_BASE_URL || '').replace(/\/$/
 const server = externalUrl ? null : await startStaticServer({ rootDir: servedRoot, ports: [4437, 4438, 4439] });
 const baseUrl = externalUrl || `http://127.0.0.1:${server.port}`;
 const evidenceDir = 'output/verification/connected-explorer-journey';
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: softwareCompositorArgs() });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await context.newPage();
 const browserErrors = [];

@@ -1,3 +1,4 @@
+import { softwareCompositorArgs } from './software-compositor.mjs';
 import { installBrowserGraphicsProbe } from './browser-graphics-probe.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -123,7 +124,7 @@ async function startRegionalFieldLead(page, journey) {
 
 async function inspectJourney(journey) {
   const browserServer = await chromium.launchServer({
-    headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280']
+    headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280', ...softwareCompositorArgs()]
   });
   try {
     const browser = await chromium.connect(browserServer.wsEndpoint());

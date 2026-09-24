@@ -1,3 +1,4 @@
+import { softwareCompositorArgs } from './software-compositor.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
@@ -18,7 +19,7 @@ const pageErrors = [];
 
 async function withJourney(name, mobile, run) {
   const browser = await chromium.launch({
-    headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280']
+    headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280', ...softwareCompositorArgs()]
   });
   let page;
   let crashed = false;

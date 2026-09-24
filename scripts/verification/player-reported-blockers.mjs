@@ -1,3 +1,4 @@
+import { softwareCompositorArgs } from './software-compositor.mjs';
 import { selectLowRenderQuality } from './render-quality-ui.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
@@ -14,7 +15,7 @@ const servedRoot = requestedRoot ? path.resolve(root, requestedRoot) : root;
 const outputDir = path.join('/tmp', 'worldexplorer3d-verification', 'player-reported-blockers');
 const server = await startStaticServer({ rootDir: servedRoot, ports: [4411, 4412, 4413] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: softwareCompositorArgs() });
 const softwareCi = !!process.env.CI && process.platform === 'linux';
 const verificationProfile = { scope: 'functional-controls-and-layout', quality: softwareCi ? 'low via Settings' : 'default', deviceScaleFactor: softwareCi ? 1 : 3, physicalPerformanceAccepted: false };
 const touchTimings = [];
