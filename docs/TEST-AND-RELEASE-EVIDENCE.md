@@ -108,17 +108,24 @@ The physical budget is unchanged, and no cloud pass replaces it or phone accepta
 
 ## GPS input and complete mobile journeys
 
-CDP geolocation overrides emit individual fixes; they do not simulate an ongoing
-phone GPS watch. The field-observation verifier supplies fresh fixes until the
-selected target actually reveals, retaining the same bounded 30-second wait.
-It never assigns field progress or bypasses the application's stale-signal rules.
+Repeated CDP geolocation overrides emit a position-unavailable error before the
+next fix in the tested Chrome version. An empty-browser probe reproduced this;
+the application's interruption rules correctly reset continuous observation.
+The Live GPS journey therefore declares an explicit simulated browser sensor API
+instead of treating repeated overrides as a continuous phone watch. It delivers
+fresh fixes with real timestamps, preserves deliberate errors and poor accuracy,
+and clears owned watches. Consent UI, proximity, freshness and field progress run
+through the shipped application. The bounded 30-second observation wait remains.
+This fixture does not establish native permission behavior or actual device GPS.
 
 The full mobile-controls functional gate has a 30-minute overall deadline on the
 verification runner. Once touch holds advanced the complete requested simulation
 duration, the Linux software-renderer run reached drone mode without context loss
 in captured snapshots but exhausted the 15-minute overall deadline. Every simulated
-frame still executes the real rendering path; a short simulated hold can therefore
-take much longer in wall time on this runner. Each touch action now retains its
+step executes the gameplay systems. Functional helpers can explicitly request a
+single final render per burst; default manual stepping and normal animation keep
+their existing render behavior. This reduces software-GPU work without skipping
+physics/input updates and cannot establish physical frame rate. Each touch action now retains its
 simulation receipt and elapsed wall time, even if a later stage times out.
 Movement thresholds and per-action deadlines are unchanged. This overall allowance
 is not a mobile latency/FPS budget or a physical-performance acceptance result.
@@ -142,7 +149,11 @@ The vehicle verifier records every input's simulated duration, wall duration and
 runtime receipt. Walking uses short synchronous fixed-step bursts, with network
 work between bursts. Driving and braking retain network yields inside each burst
 so real server leases can renew. Vehicle proximity, motion, claim and release
-assertions remain unchanged, as does the 900-second total deadline.
+assertions remain unchanged. The current CI total allowance is 1,800 seconds:
+the recorded 900-second run reached owner claim, lease retention, driving and
+release, then was interrupted before the second-player handoff. The surrounding
+emulator and suite deadlines leave room for cleanup and other stages. This is a
+functional execution allowance, not a player responsiveness budget.
 
 The mobile-controls functional camera check waits the real idle delay, then
 records bounded simulation steps to the original heading/trailing thresholds.
@@ -177,3 +188,16 @@ controls and keyboard focus, room rules disable unavailable tools, and hint text
 cannot create HTML elements. The old module failed five of nine assertions. The
 fixture is registered in the existing painttown gate; it does not replace the
 full painting/weapon journey. Inventory accepts this explicit sequential command.
+
+## Browser graphics and responsive dialogs
+
+Linux functional journeys use the shared software-compositor helper after native
+traces identified long default-compositor readbacks. It is inactive outside Linux
+CI, so local hardware and the shipped player renderer are unchanged. Neither a
+software compositor nor fixed-step input can provide physical performance proof.
+
+The PaintTown gate also checks the actual hub markup, CSS and panel controller at
+phone, wide-touch and desktop sizes. A legacy coarse-pointer flex layout had
+collapsed the newer grid-placed dialog and allowed its footer to cover choices.
+The regression checks hit testing of all sampled game choices; it does not replace
+the full painting/weapon journey.

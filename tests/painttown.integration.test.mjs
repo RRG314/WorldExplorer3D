@@ -126,10 +126,18 @@ async function runTouchPaintCheck(page) {
   };
 }
 
-async function runGunPhysicsCheck(page) {
+async function runGunPhysicsCheck(page, report) {
   const snapshot = () => page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().paintTown || {});
   await page.locator('#paintTownHud button[data-paint-tool="gun"]').click();
   const before = await snapshot();
+  report.gunProgress = { before, input: await page.evaluate(() => {
+    const d = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
+    return { gameStarted: d.gameStarted, paused: d.paused, gameMode: d.gameMode,
+      focused: document.activeElement?.outerHTML?.slice(0, 500),
+      resultVisible: document.getElementById('resultScreen')?.classList.contains('show'),
+      hudText: document.getElementById('paintTownHud')?.innerText };
+  }) };
+  fs.writeFileSync(REPORT_PATH, JSON.stringify(report, null, 2));
   let launched;
   await page.keyboard.down('ControlLeft');
   try {
@@ -137,6 +145,10 @@ async function runGunPhysicsCheck(page) {
       Number(globalThis.getWorldExplorerRuntimeDiagnostics?.().paintTown?.lastShotAtMs || 0) > Number(previousShotAt || 0),
     Number(before.lastShotAtMs || 0), { timeout: 2_000 });
     launched = await snapshot();
+  } catch (error) {
+    report.gunProgress.after = await snapshot();
+    report.gunProgress.error = String(error);
+    throw error;
   } finally {
     await page.keyboard.up('ControlLeft');
   }
@@ -202,7 +214,7 @@ async function run() {
 
     report.seedCheck = await checkDeterministicSeed();
     report.touchCheck = await runTouchPaintCheck(page);
-    report.gunCheck = await runGunPhysicsCheck(page);
+    report.gunCheck = await runGunPhysicsCheck(page, report);
     await page.screenshot({ path: SCREEN_HUD_PATH, fullPage: true });
 
     const seedPass = report.seedCheck.deterministic && report.seedCheck.differentiatesByRoom;
