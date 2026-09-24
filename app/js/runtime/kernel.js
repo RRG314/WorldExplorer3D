@@ -215,7 +215,8 @@ function createRuntimeKernel(options = {}) {
     if (disposed) throw new Error('Runtime kernel is disposed.');
     const requestedMs = Math.max(0, finiteNumber(milliseconds, 0));
     if (requestedMs === 0) {
-      return Object.freeze({ requestedMs, simulatedMs: 0, frames: 0, suspendedFrames: 0 });
+      return Object.freeze({ requestedMs, simulatedMs: 0, frames: 0, suspendedFrames: 0,
+        renderMode: suppliedContext.renderIntermediateFrames === false ? 'last-step' : 'each-step' });
     }
 
     const wasRunning = running;
@@ -234,7 +235,9 @@ function createRuntimeKernel(options = {}) {
       const ran = executeFrame(
         startTimestamp + simulatedMs,
         stepMs / 1000,
-        { ...suppliedContext, manualAdvance: true }
+        { ...suppliedContext, manualAdvance: true,
+          manualRender: suppliedContext.renderIntermediateFrames !== false ||
+            (simulatedMs >= requestedMs - 1e-7 && suppliedContext.renderFinalFrame !== false) }
       );
       frames += 1;
       if (!ran) manualSuspendedFrames += 1;
@@ -248,7 +251,8 @@ function createRuntimeKernel(options = {}) {
       requestedMs,
       simulatedMs: Number(simulatedMs.toFixed(6)),
       frames,
-      suspendedFrames: manualSuspendedFrames
+      suspendedFrames: manualSuspendedFrames,
+      renderMode: suppliedContext.renderIntermediateFrames === false ? 'last-step' : 'each-step'
     });
   }
 
@@ -258,13 +262,16 @@ function createRuntimeKernel(options = {}) {
     if (disposed) throw new Error('Runtime kernel is disposed.');
     if (manualSession) throw new Error('Manual simulation is already active.');
     const requestedMs = Math.max(0, finiteNumber(milliseconds, 0));
-    const total = { requestedMs, simulatedMs: 0, frames: 0, suspendedFrames: 0 };
+    const total = { requestedMs, simulatedMs: 0, frames: 0, suspendedFrames: 0,
+      renderMode: suppliedContext.renderIntermediateFrames === false ? 'last-step' : 'each-step' };
     manualSession = true;
     if (frameHandle !== null && typeof cancelFrame === 'function') cancelFrame(frameHandle);
     frameHandle = null;
     try {
       while (total.simulatedMs < requestedMs - 1e-7) {
-        const receipt = advanceFrames(Math.min(16, requestedMs - total.simulatedMs), suppliedContext);
+        const receipt = advanceFrames(Math.min(16, requestedMs - total.simulatedMs), {
+          ...suppliedContext, renderFinalFrame: total.simulatedMs + 16 >= requestedMs - 1e-7
+        });
         total.simulatedMs += receipt.simulatedMs;
         total.frames += receipt.frames;
         total.suspendedFrames += receipt.suspendedFrames;

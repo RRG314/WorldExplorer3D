@@ -125,3 +125,22 @@ for (const composer of [false, true]) test(`title runtime imports suppress stale
   assert.ok(updates > 1); assert.ok(maps > 0); assert.ok(draws > 1);
   kernel.dispose();
 });
+
+
+for (const composer of [false,true]) for (const network of [false,true]) {
+ test(`functional stepping renders its final state once without dropping simulation (${composer}, ${network})`,async()=>{
+  let draws=0, simulatedMs=0, yields=0;
+  const app={gameStarted:true,renderer:{render:()=>draws++},composer:{render:()=>draws++}};
+  const kernel=createRuntimeKernel({yieldToNetwork:async()=>{yields++;}});
+  kernel.registerSystem({id:'simulation',phase:'simulation',update:frame=>{simulatedMs+=frame.dt*1000;}});
+  kernel.registerSystem(createCoreRenderSystem(app,()=>composer));
+  const context={renderIntermediateFrames:false};
+  const receipt=network?await kernel.advanceWithNetworkYields(1000,context):kernel.advanceBy(1000,context);
+  assert.equal(receipt.renderMode,'last-step');assert.equal(receipt.simulatedMs,1000);assert.ok(Math.abs(simulatedMs-1000)<1e-7);
+  assert.equal(draws,1,'only the final simulated state should submit a full world draw');
+  if(network)assert.ok(yields>1,'network heartbeats still receive every yield');
+  const before=draws;kernel.runFrame(performance.now());assert.equal(draws,before+1,'ordinary animation still renders');
+  const beforeDefault=draws;kernel.advanceBy(50);assert.equal(draws,beforeDefault+3,'default stepping retains every render');
+  kernel.dispose();
+ });
+}

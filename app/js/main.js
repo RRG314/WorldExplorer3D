@@ -150,9 +150,12 @@ function registerRuntimeSystem(definition) {
 
 function advanceRuntimeTime(milliseconds = 0, options = {}) {
   registerRuntimeSystems();
+  // Functional automation can coalesce draws while retaining every input,
+  // simulation, world and UI update. Normal play/default stepping is unchanged.
+  const context = { source: 'automation', renderIntermediateFrames: options.renderIntermediateFrames !== false };
   return options.yieldToNetwork === true
-    ? runtimeKernel.advanceWithNetworkYields(milliseconds, { source: 'automation' })
-    : runtimeKernel.advanceBy(milliseconds, { source: 'automation' });
+    ? runtimeKernel.advanceWithNetworkYields(milliseconds, context)
+    : runtimeKernel.advanceBy(milliseconds, context);
 }
 
 function showLoad(text, options = {}) {

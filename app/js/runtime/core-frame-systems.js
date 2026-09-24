@@ -178,7 +178,7 @@ function createCoreRenderSystem(appCtx, shouldUseComposer) {
     // partial city batches competes with compilation and uploads them early.
     // Manual pause retains the last frame beneath its dimmed dialog. Network
     // listeners and lease heartbeats remain alive without redrawing the city.
-    enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading && !appCtx.titleLaunchPending && !appCtx.hasPauseReason?.('manual_pause'),
+    enabled: (frame) => frame?.manualRender !== false && !!appCtx.gameStarted && !appCtx.worldLoading && !appCtx.titleLaunchPending && !appCtx.hasPauseReason?.('manual_pause'),
     update() {
       draw();
     }

@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 
 // Functional input checks use the actual runtime kernel's fixed-step hook.
+// Every simulation step runs, but only the final frame is drawn per burst.
 // These receipts do not measure wall-clock responsiveness or rendering speed.
 export async function advanceGameplay(page, milliseconds) {
   assert.ok(Number.isFinite(milliseconds) && milliseconds > 0 && milliseconds <= 2000);
-  const receipt = await page.evaluate((duration) => globalThis.advanceTime?.(duration), milliseconds);
+  const receipt = await page.evaluate((duration) => globalThis.advanceTime?.(duration, { renderIntermediateFrames: false }), milliseconds);
   assert.ok(receipt && Math.abs(receipt.simulatedMs - milliseconds) < 0.001 &&
     receipt.frames > 0 && receipt.suspendedFrames === 0,
   `Gameplay did not advance: ${JSON.stringify(receipt)}`);
@@ -35,7 +36,7 @@ export async function stepGameplayKeys(page, keys, milliseconds, { yieldToNetwor
         // The kernel owns RAF suspension through every heartbeat/network yield.
         // Yielding here would resume live animation while these keys remain held.
         const duration = Math.min(2000, remaining);
-        result.push({ duration, receipt: await globalThis.advanceTime?.(duration, { yieldToNetwork }) });
+        result.push({ duration, receipt: await globalThis.advanceTime?.(duration, { yieldToNetwork, renderIntermediateFrames: false }) });
         remaining -= duration;
       }
       return result;
