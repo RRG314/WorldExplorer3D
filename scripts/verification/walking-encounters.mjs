@@ -274,6 +274,7 @@ async function acceptLead(page, lead) {
       activeActivityId: discovery.activeActivityId,
       interaction: discovery.interaction,
       quickVisible: !!quick && getComputedStyle(quick).display !== 'none',
+      duplicateJourneyHidden: document.getElementById('currentJourneyCard')?.hidden === true,
       quickClearsMobileControls: controls.every((box) => !overlaps(quickBox, box)),
       journalOpen: document.getElementById('discoveryPanel')?.classList.contains('show') || false
     };
@@ -342,6 +343,7 @@ try {
   await gpsContext.close();
 
   const checks = {
+    oneFieldPromptOwner: freeAccepted.duplicateJourneyHidden && gpsAccepted.duplicateJourneyHidden,
     freeRoamLeadVisible: freeLead.lead.available && freeLead.promptMode === 'free-roam' && freeLead.promptText.includes(freeLead.lead.leadLabel) && /field lead/i.test(freeLead.promptText),
     freeRoamLeadClearsControls: freeLead.promptClearsMobileControls === true,
     freeRoamLeadButtonUsable: freeLead.promptButtonUsable === true,

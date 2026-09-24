@@ -66,3 +66,13 @@ test('mobile tracking leaves unsolicited suggestions in Today but shows a starte
     ui.update(1);assert.equal(nodes.get('currentJourneyCard').hidden,false);assert.equal(nodes.get('currentJourneyTitle').textContent,'Survey');
   } finally {if(previous===undefined)delete globalThis.document;else globalThis.document=previous;}
 });
+
+
+test('discovery owns one field prompt for active results and nearby leads', () => {
+ for (const phase of ['idle','seeking','observing','revealed']) {
+  assert.equal(deriveFieldJourney(context({active:true,promptOwner:'discovery',
+   interaction:{phase,targetName:'Rock pigeon'},activeActivityId:'survey',
+   actions:[{id:'survey',label:'Community survey'}],
+   fieldExpedition:{objectives:[{targetLabel:'Survey stop',distanceMeters:12}]}})),null);
+ }
+});

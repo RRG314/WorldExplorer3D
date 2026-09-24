@@ -88,7 +88,7 @@
     "verify:public-user-count-backend": "firebase emulators:exec --only auth,functions --project we3d-staging-20260712 \"node scripts/verification/public-user-count-backend-current.mjs\"",
     "verify:deflock": "node --test tests/deflock-data-contract.test.mjs",
     "verify:deflock-live-ui": "node scripts/verification/deflock-live-ui.mjs",
-    "verify:walking-encounters": "node scripts/verification/walking-encounters.mjs",
+    "verify:walking-encounters": "node scripts/verification/field-prompt-layout-current.mjs && node scripts/verification/walking-encounters.mjs",
     "verify:ar": "node scripts/verification/ar.mjs",
     "verify:regional-ecology": "node --test tests/baltimore-regional-ecology.test.mjs tests/regional-ecology-expansion.test.mjs",
     "verify:regional-world-richness": "node scripts/verification/regional-world-richness.mjs",

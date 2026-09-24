@@ -32,7 +32,9 @@ function safeSnapshot(fn) {
 
 function deriveFieldJourney(appCtx) {
   const field = safeSnapshot(appCtx.worldDiscoveryRuntimeSnapshot);
-  if (!field?.active) return null;
+  // Discovery owns its compact activity action and Today panel. Do not publish
+  // a second tracking card for the same activity or ambient field lead.
+  if (!field?.active || field.promptOwner === 'discovery') return null;
   const activity = field.actions?.find?.((entry) => entry.id === field.activeActivityId);
   const phase = text(field.interaction?.phase, 'idle');
   if (ACTIVE_FIELD_PHASES.has(phase)) {

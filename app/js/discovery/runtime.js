@@ -833,7 +833,9 @@ function createDiscoveryUi(state) {
     const arEligibility = state.getArChallengeEligibility?.();
     if (elements.arChallenge) elements.arChallenge.hidden = !arEligibility?.allowed;
     if (elements.title && activeTab === 'today') elements.title.textContent = 'Today';
-    if (elements.quickLabel) elements.quickLabel.textContent = `Resume ${activeAction?.label || 'Field Activity'}`;
+    if (elements.quickLabel) elements.quickLabel.textContent = snapshot?.phase === 'revealed'
+      ? `Record ${snapshot.targetName || activeAction?.label || 'your finding'}`
+      : `Resume ${activeAction?.label || 'Field Activity'}`;
     if (!snapshot) return;
     if (elements.inspection) {
       const catalog = BUILTIN_DISCOVERY_CATALOGS.fieldDiscoveries.find((entry) => entry.id === snapshot.targetCatalogId);
@@ -902,6 +904,7 @@ function createDiscoveryUi(state) {
 
   return Object.freeze({
     get activeTab() { return activeTab; }, get open() { return open; },
+    ownsFieldPrompt: !!elements.quick,
     dispose() { listeners.splice(0).forEach((remove) => remove()); setOpen(false); elements.quick?.classList.remove('show'); elements.prompt?.classList.remove('show'); },
     refreshData, render, setOpen, setTab, showResult, showSectionTutorial, showTutorial
   });
@@ -2376,6 +2379,7 @@ function worldDiscoveryRuntimeSnapshot(appCtx) {
   const actorPosition = playerPosition(appCtx);
   return Object.freeze({
     active: !state.disposed,
+    promptOwner: state.ui?.ownsFieldPrompt ? 'discovery' : null,
     requestId: state.publication.requestId,
     sequence: state.publication.sequence,
     worldIdentity: state.publication.worldIdentity.id,
