@@ -542,12 +542,27 @@ async function saveReport(complete = false) {
 try {
   for (const location of selectedLocations) {
     console.error(`[actors-vehicles] START ${location.id}`);
-    const browserServer = await chromium.launchServer({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280'] });
+    // Remote CPU-only graphics must composite through the same ANGLE driver,
+    // rather than synchronously reading every WebGL frame into software layers.
+    // This remains software functional evidence, never physical GPU acceptance.
+    const graphicsArgs = process.env.CI ? ['--use-gl=angle', '--use-angle=swiftshader'] : [];
+    const browserServer = await chromium.launchServer({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280', ...graphicsArgs] });
     let browser, context, page, cpuProfiler;
     const traceDurations = new Map();
     let traceStarted = false;
     try {
       browser = await chromium.connect(browserServer.wsEndpoint());
+      if (process.env.CI) {
+        const session = await browser.newBrowserCDPSession();
+        const info = await session.send('SystemInfo.getInfo');
+        await fs.writeFile(path.join(evidenceDir, `${location.id}-graphics-backend.json`), JSON.stringify({
+          scope: 'remote software graphics configuration; not physical performance', graphicsArgs,
+          featureStatus: info.gpu.featureStatus,
+          renderer: info.gpu.auxAttributes?.glRenderer,
+          implementation: info.gpu.auxAttributes?.glImplementationParts
+        }, null, 2));
+        await session.detach();
+      }
       context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
       page = await context.newPage();
       await configureStagingAppCheck(page, baseUrl);
