@@ -201,3 +201,16 @@ phone, wide-touch and desktop sizes. A legacy coarse-pointer flex layout had
 collapsed the newer grid-placed dialog and allowed its footer to cover choices.
 The regression checks hit testing of all sampled game choices; it does not replace
 the full painting/weapon journey.
+
+## Menu and map-search verification
+
+The menu journey covers both desktop and mobile worlds. Its combined functional
+allowance is 20 minutes: the recorded 10-minute run completed desktop checks
+and reached the mobile profile panel before the wrapper terminated it. Individual
+UI and loading deadlines are unchanged. The mobile context supplies the iPhone
+user agent as well as a touch viewport; neither establishes phone performance.
+
+Map-search readiness polls only the published world sequence and loading flag.
+Previously each half-second poll rebuilt the full diagnostic inventories,
+including traversal graphs and nearby interiors. Full before/after diagnostics
+remain recorded, and the 180-second search deadline remains unchanged.

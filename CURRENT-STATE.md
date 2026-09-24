@@ -20,7 +20,9 @@ Browser journeys, signed emulator HTTP, live services, visual review, phone
 acceptance, and physical performance are separate evidence levels.
 
 Current nonphysical results and rechecks are recorded in
-`latest-product-results.json` in the ledger. Do not combine differing runtime
+`vehicle-footprint-matrix-results.json` and
+`vehicle-footprint-backend-results.json` in the ledger.
+`latest-product-results.json` describes the older staging32 runtime. Do not combine differing runtime
 assets into a complete release. For verifier-only commits, check both the runtime
 source diff and every gate's asset-manifest hash against the staged package.
 Historical virtual-GPU allocation/context failures remain failed receipts;
@@ -39,6 +41,10 @@ generator. Recheck affected journeys; do not carry their old passes forward as
 mobile acceptance. The receipt is `mobile-profile-probe.json` in the ledger.
 
 ## Repairs and deployment scope
+
+The latest vehicle repair replaces width-only circular collision with full
+swept oriented footprints, covering the visible front and rear body. Its runtime
+assets require their own acceptance; older staging32 results are historical.
 
 Recent runtime repairs address idle touch controls cancelling hardware walking
 turns, painting also opening unrelated building selection cards, and slow parcel
