@@ -825,7 +825,7 @@ try {
       noFailedLocalResources: localFailures.length === 0
     };
     report = { ok: Object.values(checks).every(Boolean), contract: 'urban-sandbox-arrest-scope-v1', servedRoot, checks, browserErrors, localFailures };
-    console.log('[urban-sandbox] PASS arrest recovery');
+    console.log('[urban-sandbox] CAPTURED arrest recovery');
   } else if (requestedScope === 'medical') {
     console.log('[urban-sandbox] START medical recovery');
     const medical = await runMedicalRecoveryJourney();
@@ -843,7 +843,7 @@ try {
       noFailedLocalResources: localFailures.length === 0
     };
     report = { ok: Object.values(checks).every(Boolean), contract: 'urban-sandbox-medical-scope-v1', servedRoot, checks, browserErrors, localFailures };
-    console.log('[urban-sandbox] PASS medical recovery');
+    console.log('[urban-sandbox] CAPTURED medical recovery');
   } else if (requestedScope === 'vehicle') {
     console.log('[urban-sandbox] START vehicle and equipment');
     const primary = await runVehicleEquipmentJourney();
@@ -876,17 +876,20 @@ try {
       noFailedLocalResources: localFailures.length === 0
     };
     report = { ok: Object.values(checks).every(Boolean), contract: 'urban-sandbox-vehicle-scope-v1', servedRoot, checks, evidence: { transitionTiming: primary.transitionTiming }, browserErrors, localFailures };
-    console.log('[urban-sandbox] PASS vehicle and equipment');
+    console.log('[urban-sandbox] CAPTURED vehicle and equipment');
   } else {
   console.log('[urban-sandbox] START vehicle and equipment');
   const primary = await runVehicleEquipmentJourney();
-  console.log('[urban-sandbox] PASS vehicle and equipment');
+  await mkdir(path.dirname(reportPath), { recursive: true });
+  await writeFile(path.join(path.dirname(reportPath), 'progress.json'), JSON.stringify({ complete: false, aggregateAssertionsRun: false, completedJourneys: ['vehicle'], evidence: { vehicleId: primary.vehicle.id, drivenMeters: primary.drivenMeters, providerFixture: primary.providerFixture } }, null, 2));
+  console.log('[urban-sandbox] CAPTURED vehicle and equipment');
   console.log('[urban-sandbox] START arrest recovery');
   const arrest = await runArrestRecoveryJourney();
-  console.log('[urban-sandbox] PASS arrest recovery');
+  await writeFile(path.join(path.dirname(reportPath), 'progress.json'), JSON.stringify({ complete: false, aggregateAssertionsRun: false, completedJourneys: ['vehicle', 'arrest'], evidence: { vehicleId: primary.vehicle.id, drivenMeters: primary.drivenMeters, policeFacility: arrest.custody.urbanSandbox.custody?.facility } }, null, 2));
+  console.log('[urban-sandbox] CAPTURED arrest recovery');
   console.log('[urban-sandbox] START medical recovery');
   const medical = await runMedicalRecoveryJourney();
-  console.log('[urban-sandbox] PASS medical recovery');
+  console.log('[urban-sandbox] CAPTURED medical recovery');
   const vehicleAfterExit = primary.exited.urbanSandbox.vehicles.filter((entry) => entry.id === primary.vehicle.id);
   const custodyFacility = arrest.custody.urbanSandbox.custody?.facility || {};
   const medicalFacility = medical.custody.urbanSandbox.custody?.facility || {};
@@ -936,6 +939,9 @@ try {
     servedRoot,
     checks,
     evidence: {
+      providerFixture: primary.providerFixture,
+      braking: primary.braking,
+      driveTiming: primary.driveTiming,
       vehicleLocation: primary.ready.earthOrigin,
       vehicleId: primary.vehicle.id,
       drivenMeters: primary.drivenMeters,
