@@ -647,15 +647,22 @@ try {
       // Releasing the accelerator still leaves the car coasting, and terrain
       // suspension can legitimately be settling at that instant. Preserve the
       // moving snapshot, then test settled contact after normal braking.
+      await fs.writeFile(path.join(evidenceDir, `${location.id}-drive-progress.json`), JSON.stringify({
+        first: {actor:first.activeActor,surface:first.surfaceChain},
+        moving: {actor:second.activeActor,surface:second.surfaceChain}, inputSteps
+      }, null, 2));
       await page.keyboard.down('Space');
       try {
-        inputSteps.push(await advanceGameplay(page, 1500));
-        await page.waitForFunction(() => {
-          const actor = globalThis.getWorldExplorerRuntimeDiagnostics?.()?.activeActor;
-          return actor?.mode === 'drive' && actor.contact?.grounded === true &&
-            Math.hypot(Number(actor.velocity?.x || 0), Number(actor.velocity?.z || 0)) < 0.1;
-        }, null, { timeout: 15_000, polling: 250 });
-        await page.waitForTimeout(500);
+        let brakeSimulationMs = 0;
+        while (true) {
+          const actor = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.()?.activeActor);
+          if (actor?.mode === 'drive' && actor.contact?.grounded === true &&
+              Math.hypot(Number(actor.velocity?.x || 0), Number(actor.velocity?.z || 0)) < .1) break;
+          assert.ok(brakeSimulationMs < 6000,
+            `Vehicle did not settle under braking: ${JSON.stringify({brakeSimulationMs,actor})}`);
+          inputSteps.push(await advanceGameplay(page, 250));
+          brakeSimulationMs += 250;
+        }
       } finally { await page.keyboard.up('Space'); }
       const settled = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.());
       const vehicles = second?.urbanSandbox?.vehicles || [];
