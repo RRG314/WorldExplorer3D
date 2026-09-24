@@ -195,6 +195,12 @@ function mergeGamepad(actions, gamepad) {
 function mergeMobileTouch(actions) {
   if (!mobileTouchState.enabled) return actions;
   const mobile = resolveMobileSemanticActions(actions.mode, mobileTouchState);
+  // A touch-capable screen does not own a hardware walking gesture. Keeping
+  // mobile camera recentering active here pulls a keyboard/gamepad turn back
+  // toward the previous actor heading and can prevent a complete turn.
+  const hardwareNavigation = ['move', 'turn', 'strafe', 'lookYaw', 'lookPitch']
+    .some((axis) => Math.abs(Number(actions[axis]) || 0) > 0);
+  if (actions.mode === 'walk' && hardwareNavigation && !mobile.moveActive && !mobile.lookActive) return actions;
   actions.move = Math.abs(mobile.move) > Math.abs(actions.move) ? mobile.move : actions.move;
   actions.turn = Math.abs(mobile.turn) > Math.abs(actions.turn) ? mobile.turn : actions.turn;
   actions.steer = actions.turn;

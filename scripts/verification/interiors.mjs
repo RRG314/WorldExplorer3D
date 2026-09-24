@@ -1,3 +1,4 @@
+import { selectLowRenderQuality } from './render-quality-ui.mjs';
 import { softwareCompositorArgs } from './software-compositor.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import assert from 'node:assert/strict';
@@ -18,12 +19,12 @@ const launchBrowser = () => chromium.launch({
   headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024', ...softwareCompositorArgs()]
 });
 let browser = await launchBrowser();
-let context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+let context = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: process.env.CI ? 0.5 : 1 });
 let page = await context.newPage();
 const browserErrors = [];
 const browserConsole = [];
 const localFailures = [];
-const progress = { stage: 'desktop-load', navigationTiming: 'dom-keyboard-runtime-fixed-step' };
+const progress = { stage: 'desktop-load', navigationTiming: 'dom-keyboard-runtime-fixed-step', renderProfile: process.env.CI ? 'low quality via Settings; DPR 0.5; functional traversal only' : 'default quality' };
 function markStage(stage, evidence = {}) {
   Object.assign(progress, evidence, { stage });
   console.log(`[interiors] ${stage}`);
@@ -51,6 +52,7 @@ async function waitForWorld() {
   const consentButton = page.locator('#analyticsConsentDenyBtn');
   if (await consentButton.isVisible()) await consentButton.click();
   if (await page.locator('#globeSelectorStartBtn').isVisible().catch(() => false)) {
+    if (process.env.CI) await selectLowRenderQuality(page);
     await page.locator('#globeSelectorStartBtn').click();
   }
   await page.waitForFunction(() => {
@@ -256,7 +258,11 @@ async function walkToPoint(target, options = {}) {
       };
     }, target);
     if (!start) start = state;
-    if (step % 20 === 0) path.push(state);
+    if (step % 20 === 0) {
+      path.push(state);
+      progress.navigation = { step, target, state, detourCount };
+      console.log('[interior-navigation]', JSON.stringify(progress.navigation));
+    }
     if (state.distance <= stopDistance) {
       return { reached: true, blocked: false, steps: step, start, final: state, path };
     }
@@ -593,7 +599,7 @@ try {
   await context.close();
   await browser.close();
   browser = await launchBrowser();
-  context = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height: 844 } });
+  context = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height: 844 }, deviceScaleFactor: process.env.CI ? 0.5 : devices['iPhone 13'].deviceScaleFactor });
   page = await context.newPage();
   bindPageEvidence(page);
   await configureStagingAppCheck(page, baseUrl);
