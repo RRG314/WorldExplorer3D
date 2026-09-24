@@ -1,3 +1,4 @@
+import { advanceGameplay } from './gameplay-simulation.mjs';
 import { softwareCompositorArgs } from './software-compositor.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
@@ -122,8 +123,9 @@ async function runDesktop() {
 
     const beforeWalk = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.position || null);
     await page.keyboard.down('ArrowUp');
-    await page.waitForTimeout(900);
-    await page.keyboard.up('ArrowUp');
+    let keyboardSimulation;
+    try { keyboardSimulation = await advanceGameplay(page, 900); }
+    finally { await page.keyboard.up('ArrowUp'); }
     const afterWalk = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.position || null);
     const walkedMeters = Math.hypot(Number(afterWalk?.x) - Number(beforeWalk?.x), Number(afterWalk?.z) - Number(beforeWalk?.z));
 
@@ -168,7 +170,9 @@ async function runDesktop() {
       noBrowserErrors: browserErrors.length === 0,
       noFailedLocalResources: localFailures.length === 0
     };
-    return { ok: Object.values(checks).every(Boolean), checks, titleAudit, worldAudit, settingsApplied, walkedMeters, backpack, trappedIds, browserErrors, localFailures };
+    return { ok: Object.values(checks).every(Boolean), checks, titleAudit, worldAudit, settingsApplied, walkedMeters, keyboardSimulation,
+      movementEvidence: 'real keyboard input with fixed-step simulation; not wall-clock responsiveness',
+      backpack, trappedIds, browserErrors, localFailures };
   } finally {
     await context.close();
   }
