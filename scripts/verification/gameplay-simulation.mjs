@@ -121,3 +121,32 @@ export async function settleReleasedCamera(page, { maximumHeadingDegrees, minimu
     state = await read();
   }
 }
+
+// Capture the intermediate exit animation in the same task as normal DOM
+// interaction input. Slow software frames can starve injected wall-clock polls.
+export async function exitActiveVehicle(page, vehicleId) {
+  const result = await page.evaluate(async id => {
+    const before = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox;
+    if (before?.activeVehicleId !== id || before?.interaction?.action !== 'exit_vehicle') {
+      throw new Error('Selected vehicle is not eligible for normal exit.');
+    }
+    const target = document.activeElement || document.body;
+    if (target?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target?.tagName)) {
+      throw new Error('Vehicle input is blocked by a focused UI control.');
+    }
+    try {
+      target.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE', key: 'e', bubbles: true, cancelable: true }));
+      const receipt = await globalThis.advanceTime?.(150, { renderIntermediateFrames: false });
+      return { receipt, state: globalThis.getWorldExplorerRuntimeDiagnostics?.() };
+    } finally {
+      target.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE', key: 'e', bubbles: true, cancelable: true }));
+    }
+  }, vehicleId);
+  assert.ok(result.receipt?.simulatedMs === 150 && result.receipt?.frames > 0 && result.receipt?.suspendedFrames === 0,
+    `Vehicle exit did not advance: ${JSON.stringify(result.receipt)}`);
+  const urban = result.state?.urbanSandbox;
+  const vehicle = urban?.vehicles?.find(entry => entry.id === vehicleId);
+  assert.ok(urban?.phase === 'exit' && Math.abs(Number(vehicle?.driverDoor?.openRadians || 0)) > .05,
+    `Normal vehicle interaction did not open its exit door: ${JSON.stringify({ phase: urban?.phase, vehicle })}`);
+  return result;
+}

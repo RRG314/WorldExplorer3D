@@ -6,7 +6,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
-import { advanceGameplay, stepGameplayKeys, enterNearbyVehicle } from './gameplay-simulation.mjs';
+import { advanceGameplay, stepGameplayKeys, enterNearbyVehicle, exitActiveVehicle } from './gameplay-simulation.mjs';
 import { selectLowRenderQuality } from './render-quality-ui.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 
@@ -620,20 +620,13 @@ async function runVehicleEquipmentJourney() {
       finally { await page.keyboard.up('Space'); }
       braking.simulatedMs += 250;
     }
-    await page.keyboard.press('KeyE');
-    await page.waitForFunction((vehicleId) => {
-      const urban = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox;
-      const current = urban?.vehicles?.find((entry) => entry.id === vehicleId);
-      return urban?.phase === 'exit' && Math.abs(Number(current?.driverDoor?.openRadians || 0)) > 0.05;
-    }, vehicle.id, { timeout: 5_000 });
-    const exiting = await diagnostics(page);
+    const exitInteraction = await exitActiveVehicle(page, vehicle.id);
+    const exiting = exitInteraction.state;
     const exitTiming = await advanceGameplay(page, 650);
-    await page.waitForFunction((vehicleId) => {
-      const urban = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox;
-      const current = urban?.vehicles?.find((entry) => entry.id === vehicleId);
-      return urban?.phase === 'walking' && !urban.activeVehicleId && current?.attachedToPlayer === false;
-    }, vehicle.id, { timeout: 8_000, polling: 100 });
     const exited = await diagnostics(page);
+    const released = exited.urbanSandbox?.vehicles?.find(entry => entry.id === vehicle.id);
+    assert.ok(exited.urbanSandbox?.phase === 'walking' && !exited.urbanSandbox?.activeVehicleId && released?.attachedToPlayer === false,
+      'Exit transition did not release the vehicle after 800ms of simulation.');
     const retainedVehicle = exited.urbanSandbox.vehicles.find((entry) => entry.id === vehicle.id);
 
     const collisionProbe = await walkTo(page, { x: retainedVehicle.x, z: retainedVehicle.z }, {
