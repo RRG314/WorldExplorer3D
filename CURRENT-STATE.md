@@ -19,12 +19,13 @@ source-text assertions can pass while the actual runtime behavior is broken.
 Browser journeys, signed emulator HTTP, live services, visual review, phone
 acceptance, and physical performance are separate evidence levels.
 
-Do not combine passing subsets from different commits into a complete release.
-The full candidate matrix has unresolved failures, including virtual-GPU memory
-allocation/context loss. Fresh-run passes do not establish a graphics repair.
-Diagnostic process/memory capture must preserve those errors as failures.
-Functional CI quality settings and simulation timing are recorded explicitly;
-they cannot establish default-quality visuals, physical load time or FPS.
+Current nonphysical results and rechecks are recorded in
+`latest-product-results.json` in the ledger. Do not combine differing runtime
+assets into a complete release. For verifier-only commits, check both the runtime
+source diff and every gate's asset-manifest hash against the staged package.
+Historical virtual-GPU allocation/context failures remain failed receipts;
+a fresh-run pass alone does not establish a graphics repair. Functional CI quality
+settings and simulation timing cannot establish physical load time or FPS.
 
 ## Mobile verification correction (September 24)
 
@@ -38,6 +39,12 @@ generator. Recheck affected journeys; do not carry their old passes forward as
 mobile acceptance. The receipt is `mobile-profile-probe.json` in the ledger.
 
 ## Repairs and deployment scope
+
+Recent runtime repairs address idle touch controls cancelling hardware walking
+turns, painting also opening unrelated building selection cards, and slow parcel
+queries. Parcel loading now resolves spatial IDs before bounded geometry batches.
+Before/after regressions, browser journeys, provider readbacks and deployment
+identities are linked from the maintained ledger; use those executed receipts.
 
 Repair receipts cover hidden-map requests; exact parcel-query cache ownership;
 account concurrency; canonical Stripe subscription reconciliation; and vehicle
