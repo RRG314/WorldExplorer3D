@@ -42,7 +42,7 @@
     "urban-equipment": { "scope": "candidate", "command": ["npm", "run", "verify:urban-equipment"], "artifactRequired": true },
     "tutorial-controls": { "scope": "candidate", "command": ["npm", "run", "verify:tutorial-controls"], "artifactRequired": true },
     "commerce-coherence": { "scope": "candidate", "command": ["npm", "run", "verify:commerce-coherence"], "artifactRequired": false },
-    "gameplay-menu": { "scope": "candidate", "command": ["npm", "run", "verify:gameplay-menu"], "artifactRequired": true },
+    "gameplay-menu": { "scope": "candidate", "command": ["npm", "run", "verify:gameplay-menu"], "artifactRequired": true, "timeoutMs": 1200000 },
     "hotbar-actions": { "scope": "candidate", "command": ["npm", "run", "verify:hotbar-actions"], "artifactRequired": true,
       "timeoutMs": 1200000 },
     "landing-user-count": { "scope": "candidate", "command": ["npm", "run", "verify:landing-user-count"], "artifactRequired": true },

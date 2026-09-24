@@ -206,11 +206,13 @@ async function verifyEarthActions(page) {
   await page.locator('#mapSearchBtn').click();
   await page.locator('#largeMap').waitFor({ state: 'hidden', timeout: 20_000 });
   try {
-  await page.waitForFunction((priorSequence) => {
+  await page.waitForFunction(async (priorSequence) => {
     if (document.getElementById('loading')?.classList.contains('show')) return false;
-    const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
-    return diagnostics.worldLoading === false
-      && Number(diagnostics.livingWorld?.sequence || 0) > priorSequence;
+    // Read only publication ownership. Full diagnostics rebuild several world
+    // inventories and must not run every half second during world loading.
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return ctx.worldLoading === false
+      && Number(ctx.livingWorldRuntime?.publication?.sequence || 0) > priorSequence;
   }, worldSequenceBeforeSearch, { timeout: 180_000, polling: 500 });
   } finally {
     searchObservation.after = await observeSearchWorld();

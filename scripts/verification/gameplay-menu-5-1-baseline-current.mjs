@@ -6,7 +6,7 @@ import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 
 const baseUrl = String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4192').replace(/\/$/, '');
 const outputDir = path.resolve('output/verification/player-navigation-current');
@@ -44,7 +44,7 @@ async function openMenu(page, buttonId, menuId) {
 
 async function verify(viewport, name) {
   const touch = viewport.width <= 760;
-  const context = await browser.newContext({ viewport, deviceScaleFactor: process.env.CI ? 0.5 : 1, hasTouch: touch, isMobile: touch });
+  const context = await browser.newContext({ ...(touch ? { userAgent: devices['iPhone 13'].userAgent } : {}), viewport, deviceScaleFactor: process.env.CI ? 0.5 : 1, hasTouch: touch, isMobile: touch });
   const page = await context.newPage();
   await configureStagingAppCheck(page, baseUrl);
   activePage = page;
