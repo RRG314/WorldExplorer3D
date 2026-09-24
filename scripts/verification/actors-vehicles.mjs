@@ -1,5 +1,6 @@
 import { installBrowserGraphicsProbe } from './browser-graphics-probe.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
+import { advanceGameplay } from './gameplay-simulation.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -500,7 +501,7 @@ const selectedLocations = requested.size ? locations.filter((location) => reques
 assert.ok(selectedLocations.length > 0, 'No actor/vehicle verification locations selected.');
 
 const results = [];
-const browserBudget = { engine: 'installed-chrome', maxOldSpaceMiB: 1280 };
+const browserBudget = { engine: 'installed-chrome', maxOldSpaceMiB: 1280, inputTiming: 'Playwright keyboard with validated runtime fixed steps; not wall-clock responsiveness' };
 async function boundedClose(close, timeoutMs = 8000) {
   let timer;
   try {
@@ -635,16 +636,19 @@ try {
       await page.locator('body > canvas:not(#minimap)').click();
       assert.equal(await page.evaluate(() => document.activeElement?.matches('button,input,textarea,select,[contenteditable="true"]')), false);
       const first = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.());
+      const inputSteps = [];
       await page.keyboard.down('ArrowUp');
-      await page.waitForTimeout(1250);
-      await page.keyboard.up('ArrowUp');
-      await page.waitForTimeout(2750);
+      try { inputSteps.push(await advanceGameplay(page, 1250)); }
+      finally { await page.keyboard.up('ArrowUp'); }
+      inputSteps.push(await advanceGameplay(page, 2000));
+      inputSteps.push(await advanceGameplay(page, 750));
       const second = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.());
       // Releasing the accelerator still leaves the car coasting, and terrain
       // suspension can legitimately be settling at that instant. Preserve the
       // moving snapshot, then test settled contact after normal braking.
       await page.keyboard.down('Space');
       try {
+        inputSteps.push(await advanceGameplay(page, 1500));
         await page.waitForFunction(() => {
           const actor = globalThis.getWorldExplorerRuntimeDiagnostics?.()?.activeActor;
           return actor?.mode === 'drive' && actor.contact?.grounded === true &&
@@ -762,6 +766,7 @@ try {
         trafficContactAnomalies: activePopulation.contactAnomalies || [],
         previousMaximumWheelPenetration: Number(activePopulation.previousMaximumWheelPenetration || 0),
         playerDriveMeters,
+        inputSteps,
         playerStartSurfaceKind: first?.surfaceChain?.surfaces?.drive?.kind || null,
         playerStartVehicleContact: first?.surfaceChain?.actor?.vehicleContact || null,
         playerStartGrounded: first?.surfaceChain?.actor?.grounded ?? null,

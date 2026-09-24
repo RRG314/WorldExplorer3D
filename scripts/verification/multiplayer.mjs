@@ -32,7 +32,7 @@ const moduleUrls = requestedRoot
   : sourceModuleUrls;
 // Correctness coverage retains both complete worlds; performance is measured
 // separately. Bound old-space allocation on the small-memory verification host.
-const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024', ...(process.env.CI ? ['--use-gl=angle', '--use-angle=swiftshader'] : [])] });
 // The Linux runner uses software rasterization. Reduce only its backing-store
 // pixels, retaining the desktop CSS viewport, complete city data and two live
 // clients. This is functional backend evidence, never FPS/visual acceptance.
