@@ -1,3 +1,4 @@
+import { installGpsSensorFixture } from './gps-sensor-fixture.mjs';
 import { softwareCompositorArgs } from './software-compositor.mjs';
 import { waitForGpsFieldReveal, createGpsFixStream } from './gps-fix-stream.mjs';
 import { selectLowRenderQuality } from './render-quality-ui.mjs';
@@ -23,7 +24,7 @@ const origin = new URL(baseUrl).origin;
 // This software-renderer profile is functional evidence only. Physical mobile
 // performance and default-quality acceptance remain separate release gates.
 const softwareCi = !!process.env.CI && process.platform === 'linux';
-const verificationProfile = { scope: 'functional', softwareCi, quality: softwareCi ? 'low via Settings' : 'default', deviceScaleFactor: softwareCi ? 1 : 1 };
+const verificationProfile = { scope: 'functional', sensorInput: 'simulated-browser-geolocation; not real-device GPS or native permission acceptance', softwareCi, quality: softwareCi ? 'low via Settings' : 'default', deviceScaleFactor: softwareCi ? 1 : 1 };
 const browser = await chromium.launch({ headless: true, channel: 'chrome', args: softwareCompositorArgs() });
 const context = await browser.newContext({
   viewport: { width: 390, height: 844 },
@@ -36,8 +37,8 @@ const context = await browser.newContext({
 await context.grantPermissions(['geolocation'], { origin });
 const page = await context.newPage();
 await configureStagingAppCheck(page, baseUrl);
-const cdp = await context.newCDPSession(page);
-const gpsFixStream = createGpsFixStream(cdp);
+const sensor = await installGpsSensorFixture(page, { latitude: 39.2904, longitude: -76.6122, accuracy: 6, speed: 0, heading: 0 });
+const gpsFixStream = createGpsFixStream(sensor);
 const browserErrors = [];
 const localFailures = [];
 collectBrowserGraphicsErrors(page, browserErrors);
@@ -69,9 +70,9 @@ const distance2d = (left, right) => Math.hypot(
 );
 
 try {
-  await gpsFixStream.send('Emulation.setGeolocationOverride', { latitude: 39.2904, longitude: -76.6122, accuracy: 6, speed: 0, heading: 0 });
   const url = `${baseUrl}/app/`;
   await page.goto(url, { waitUntil: 'load', timeout: 120_000 });
+  await gpsFixStream.send('Emulation.setGeolocationOverride', { latitude: 39.2904, longitude: -76.6122, accuracy: 6, speed: 0, heading: 0 });
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   await page.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
   if (softwareCi) await selectLowRenderQuality(page);

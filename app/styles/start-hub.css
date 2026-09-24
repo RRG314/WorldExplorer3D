@@ -747,12 +747,6 @@ body.start-hub-open #flowerChallengePanel {
     display: none;
   }
   .globe-app-rail { grid-column: 1; grid-row: 5; position: fixed; }
-  .globe-hub-overlay {
-    position: fixed;
-    z-index: 30;
-    inset: 62px 0 68px;
-    grid-template-rows: 60px minmax(0, 1fr) auto;
-  }
   .globe-hub-panel-host { padding: 14px; }
   .globe-hub-panel-host .loc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .globe-hub-footer-host .title-footer { grid-template-columns: 1fr; }
@@ -773,4 +767,15 @@ body.start-hub-open #flowerChallengePanel {
   .globe-destination-bar button { gap: 0; font-size: 0; }
   .globe-destination-bar button .destination-thumb { width: 34px; height: 34px; flex-basis: 34px; }
   .globe-hub-panel-host .loc-grid { grid-template-columns: 1fr; }
+}
+
+/* The earlier shell switches to flex for every coarse pointer, including
+   wide tablets. Its dialog must not depend on grid placement at those sizes. */
+@media (max-width: 900px), (pointer: coarse) {
+  .globe-hub-overlay {
+    position: fixed;
+    z-index: 30;
+    inset: 62px 0 68px;
+    grid-template-rows: 60px minmax(0, 1fr) auto;
+  }
 }

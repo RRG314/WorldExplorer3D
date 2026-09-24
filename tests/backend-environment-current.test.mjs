@@ -7,7 +7,7 @@ test('nested backend deadlines leave CI multiplayer time for both worlds and emu
  const group=backendGroups.find(group=>group.some(step=>step.id==='multiplayer'));
  assert.equal(backendStageTimeoutMs(group[0],{}),600_000);
  assert.equal(backendGroupTimeoutMs(group,{}),600_000);
- assert.equal(backendStageTimeoutMs(group[0],{CI:'true'}),900_000);
+ assert.equal(backendStageTimeoutMs(group[0],{CI:'true'}),1_800_000);
  assert.ok(backendGroupTimeoutMs(group,{CI:'true'})>=backendStageTimeoutMs(group[0],{CI:'true'})+60_000);
  const gate=JSON.parse(readFileSync(new URL('../config/system-release-gates.json',import.meta.url))).gates.backend;
  assert.ok(gate.timeoutMs>=backendGroupTimeoutMs(group,{CI:'true'})+600_000,'whole-suite deadline must also leave room for the other backend groups');

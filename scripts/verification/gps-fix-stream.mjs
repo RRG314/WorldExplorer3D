@@ -16,7 +16,7 @@ export async function waitForGpsFieldReveal(page, cdp, fix, targetId, { timeoutM
         pauseReason: state.liveGps?.fieldSession?.pauseReason, lastFixAgeMs: state.liveGps?.lastFixAgeMs };
     });
     if (lastState.targetId === targetId && lastState.phase === 'revealed') {
-      return { scope: 'real GPS fixes and field runtime; no simulation-clock override', elapsedMs: now() - started, lastState };
+      return { scope: 'simulated sensor fixes and real field runtime; real timestamps, no simulation-clock override', elapsedMs: now() - started, lastState };
     }
   } while (now() - started < timeoutMs);
   throw new Error(`GPS field observation did not reveal the selected stop: ${JSON.stringify({ targetId, lastState })}`);
