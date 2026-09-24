@@ -1,3 +1,4 @@
+import { vehicleApproachWaypoints } from './vehicle-approach-waypoints.mjs';
 import { installRecordedOverpassFixture } from './recorded-overpass-fixture.mjs';
 import { softwareCompositorArgs } from './software-compositor.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
@@ -724,10 +725,16 @@ async function runEquipmentJourney(ids) {
     assert.ok(providerFixture.hits > 0, 'Equipment journey must consume recorded map input.');
     const vehicle = (await reachableVehicleCandidates(page)).find(entry => entry.source === 'deterministic-parked-vehicle');
     assert.ok(vehicle, 'Equipment journey needs a published parked vehicle.');
-    const approach = await walkTo(page, vehicle.driverDoor, {
-      stopDistance: .4, maxSteps: 420, detour: true, deadline: Date.now() + 180000
-    });
-    assert.equal(approach.reached, true, 'Equipment journey could not approach a parked vehicle normally.');
+    const approach = [];
+    for (const target of vehicleApproachWaypoints(await actorState(page), vehicle)) {
+      const leg = await walkTo(page, target, {
+        stopDistance: .25, maxSteps: 420, detour: true, stagnantLimit: 24, deadline: Date.now() + 180000
+      });
+      approach.push({ target, ...leg });
+      await mkdir(path.dirname(reportPath), { recursive: true });
+      await writeFile(path.join(path.dirname(reportPath), `equipment-${ids[0]}-approach.json`), JSON.stringify({ vehicle, approach }, null, 2));
+      assert.equal(leg.reached, true, 'Equipment journey could not walk around the parked vehicle normally.');
+    }
     await turnToward(page, vehicle);
     const equipmentResults = {};
     let parachuteBefore, parachuteGroundRecovery;

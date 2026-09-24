@@ -83,3 +83,22 @@ test('vehicle collision permits overlap escape and tangent sliding but rejects d
   assert.equal(sweptVehicleFootprintContact({ x: -1.31, z: 0 }, { x: -1.31, z: 1 }, target), null);
   assert.equal(sweptVehicleFootprintContact({ x: -3, z: 0 }, { x: 3, z: 0 }, { ...target, kind: 'npc' }), undefined);
 });
+
+
+test('equipment approach routes stay outside the actual full vehicle collision footprint', async () => {
+  const { vehicleApproachWaypoints } = await import('../scripts/verification/vehicle-approach-waypoints.mjs');
+  for (const yaw of [0, .45, Math.PI / 2, -2.8]) {
+    const c = Math.cos(yaw), s = Math.sin(yaw);
+    const world = (x, z) => ({ x: 10 + x * c + z * s, z: 20 - x * s + z * c });
+    const vehicle = { x: 10, z: 20, yaw, dimensionsMeters: { width: 1.78, length: 4.45 }, driverDoor: world(-.97, .16) };
+    const target = { ...vehicle, kind: 'vehicle', ref: { variant: vehicle.dimensionsMeters } };
+    for (const initial of [world(-.75, 3), world(2, 0), world(0, -4)]) {
+      let from = initial;
+      for (const to of vehicleApproachWaypoints(initial, vehicle)) {
+        assert.equal(sweptVehicleFootprintContact(from, to, target, .35), null);
+        from = to;
+      }
+      assert.ok(Math.hypot(from.x - vehicle.x, from.z - vehicle.z) < 2.4);
+    }
+  }
+});
