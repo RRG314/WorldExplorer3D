@@ -1,3 +1,4 @@
+import { installRecordedOverpassFixture } from './recorded-overpass-fixture.mjs';
 import { softwareCompositorArgs } from './software-compositor.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
@@ -22,15 +23,16 @@ const reportPath = path.join(root, 'output', 'verification', 'urban-sandbox',
 const browserErrors = [];
 const localFailures = [];
 
-async function createJourneyBrowser() {
+async function createJourneyBrowser({ recordedVehicles = false } = {}) {
   const browser = await chromium.launch({
     headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024', ...softwareCompositorArgs()]
   });
   try {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: process.env.CI ? 0.5 : 1 });
+    const providerFixture = recordedVehicles ? await installRecordedOverpassFixture(context, 'desktop') : null;
     const page = await context.newPage();
     await configureStagingAppCheck(page, baseUrl);
-    return { browser, context, page };
+    return { browser, context, page, providerFixture };
   } catch (error) {
     await browser.close();
     throw error;
@@ -245,7 +247,7 @@ async function reachableVehicleCandidates(page) {
       .filter((vehicle) => ['deterministic-parked-vehicle', 'living-world-detailed-traffic'].includes(vehicle.source) &&
         !vehicle.attachedToPlayer && !vehicle.occupied && vehicle.driverDoor)
       .map((vehicle) => ({ ...vehicle, distance: Math.hypot(vehicle.driverDoor.x - actor.x, vehicle.driverDoor.z - actor.z) }))
-      .sort((left, right) => left.distance - right.distance);
+      .sort((left, right) => Number(right.source === 'deterministic-parked-vehicle') - Number(left.source === 'deterministic-parked-vehicle') || left.distance - right.distance);
   });
 }
 
@@ -546,12 +548,13 @@ async function verifyCustodyIncidentEnded(page) {
 }
 
 async function runVehicleEquipmentJourney() {
-  const { browser, context, page } = await createJourneyBrowser();
+  const { browser, context, page, providerFixture } = await createJourneyBrowser({ recordedVehicles: true });
   bindEvidence(page);
   try {
     // This actual road point has demonstrated normal entry and two-client
     // handoff. Baltimore's selected point can supply only one departing car.
     const ready = await launchEarth(page, { lat: 41.735329, lon: -111.834912, name: 'Logan Main Street' });
+    assert.ok(providerFixture.hits > 0, 'Vehicle journey must consume the exact recorded road query.');
     const vehicleDeadline = Date.now() + (process.env.CI ? 180_000 : 70_000);
     const attempted = new Set();
     let vehicle = null;
