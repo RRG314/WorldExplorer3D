@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs/promises';
 import { currentContractTests } from './current-contract-list.mjs';
 import { backendSteps } from './backend-steps.mjs';
@@ -18,9 +19,16 @@ if (String(packageJson.scripts['verify:painttown'] || '').split(/\s*&&\s*/).incl
 }
 const unselectedFiles = all.filter(file => !currentContractTests.includes(file)).sort();
 const unownedFiles = unselectedFiles.filter(file => !externalOwners.has(file));
+// PR checks do not execute emulator/browser journeys, but their entry points
+// must still parse. Ownership alone previously let a broken shebang pass.
+const separateGateSyntaxChecks = unselectedFiles.filter(file => externalOwners.has(file)).map(file => {
+  const result = spawnSync(process.execPath, ['--check', file], {encoding:'utf8',timeout:10000});
+  if (result.status !== 0) console.error(result.stderr || result.error?.message || `Syntax check failed: ${file}`);
+  return {file,ok:result.status === 0};
+});
 const report = { schemaVersion: 1, evidenceScope: 'Static inventory signals, not exclusive test classifications or coverage percentages',
   selectedFiles: rows.length, uniqueFiles: new Set(currentContractTests).size,
-  unselectedFiles, separateGateFiles: unselectedFiles.map(file => ({ file, gate: externalOwners.get(file) || null })), unownedFiles,
+  unselectedFiles, separateGateFiles: unselectedFiles.map(file => ({ file, gate: externalOwners.get(file) || null })), unownedFiles, separateGateSyntaxChecks,
   filesReadingSourceOrFixtures: rows.filter(row => row.sourceReading).length,
   filesWithMatchingAssertions: rows.filter(row => row.sourceMatchingAssertions).length,
   filesUsingVm: rows.filter(row => row.vmExecution).length,
@@ -32,3 +40,5 @@ if (unownedFiles.length) {
   console.error('Test files are missing from both the component suite and separate release gates. Assign their execution scope explicitly.');
   process.exitCode = 1;
 }
+
+if (separateGateSyntaxChecks.some(result => !result.ok)) process.exitCode = 1;

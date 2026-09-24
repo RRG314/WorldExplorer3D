@@ -1,5 +1,5 @@
-import { softwareCompositorArgs } from '../scripts/verification/software-compositor.mjs';
 #!/usr/bin/env node
+import { softwareCompositorArgs } from '../scripts/verification/software-compositor.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
