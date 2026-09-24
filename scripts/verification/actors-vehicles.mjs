@@ -1,3 +1,4 @@
+import { softwareCompositorArgs } from './software-compositor.mjs';
 import { installBrowserGraphicsProbe } from './browser-graphics-probe.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import { advanceGameplay } from './gameplay-simulation.mjs';
@@ -546,7 +547,7 @@ try {
     // Remote CPU-only graphics must composite through the same ANGLE driver,
     // rather than synchronously reading every WebGL frame into software layers.
     // This remains software functional evidence, never physical GPU acceptance.
-    const graphicsArgs = process.env.CI ? ['--use-gl=angle', '--use-angle=swiftshader'] : [];
+    const graphicsArgs = softwareCompositorArgs();
     const browserServer = await chromium.launchServer({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280', ...graphicsArgs] });
     let browser, context, page, cpuProfiler;
     const traceDurations = new Map();

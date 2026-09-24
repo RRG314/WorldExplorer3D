@@ -1,3 +1,4 @@
+import { softwareCompositorArgs } from './software-compositor.mjs';
 import { waitForGpsFieldReveal, createGpsFixStream } from './gps-fix-stream.mjs';
 import { selectLowRenderQuality } from './render-quality-ui.mjs';
 import { installBrowserGraphicsProbe } from './browser-graphics-probe.mjs';
@@ -23,7 +24,7 @@ const origin = new URL(baseUrl).origin;
 // performance and default-quality acceptance remain separate release gates.
 const softwareCi = !!process.env.CI && process.platform === 'linux';
 const verificationProfile = { scope: 'functional', softwareCi, quality: softwareCi ? 'low via Settings' : 'default', deviceScaleFactor: softwareCi ? 1 : 1 };
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: softwareCompositorArgs() });
 const context = await browser.newContext({
   viewport: { width: 390, height: 844 },
   deviceScaleFactor: verificationProfile.deviceScaleFactor,

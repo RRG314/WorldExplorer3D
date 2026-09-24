@@ -1,3 +1,4 @@
+import { softwareCompositorArgs } from '../scripts/verification/software-compositor.mjs';
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
@@ -174,7 +175,7 @@ async function run() {
     APP_URL = `http://127.0.0.1:${server.port}/app/`;
     report.appUrl = APP_URL;
 
-    browser = await chromium.launch({ headless: true, channel: 'chrome' });
+    browser = await chromium.launch({ headless: true, channel: 'chrome', args: softwareCompositorArgs() });
     const context = await browser.newContext({
       ...devices['iPhone 13'],
       viewport: { width: 1280, height: 800 },
