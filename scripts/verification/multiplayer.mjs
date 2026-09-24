@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 import { advanceGameplay, stepGameplayKeys } from './gameplay-simulation.mjs';
 import { installRecordedOverpassFixture } from './recorded-overpass-fixture.mjs';
@@ -71,6 +71,9 @@ const emulatorFirebaseConfig = JSON.parse(await fs.readFile(path.join(root, 'con
 async function createPlayer(label) {
   const mobile = label === 'member';
   const context = await browser.newContext({
+    // A touch viewport alone keeps Chromium's desktop user agent and reports
+    // one touch point; the app then correctly selects desktop map coverage.
+    ...(mobile ? { userAgent: devices['iPhone 13'].userAgent } : {}),
     viewport: mobile ? browserBudget.memberViewport : browserBudget.viewport,
     deviceScaleFactor, isMobile: mobile, hasTouch: mobile
   });
