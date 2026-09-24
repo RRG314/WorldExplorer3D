@@ -192,16 +192,31 @@ async function verifyEarthActions(page) {
   await clickMenuItem(page, 'travelBtn', 'travelMenu', 'fWorldMap');
   await page.locator('#largeMap').waitFor({ state: 'visible', timeout: 10_000 });
   assert.equal(await page.locator('#mapSearchInput').isVisible().catch(() => false), true);
-  const worldSequenceBeforeSearch = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().livingWorld?.sequence || 0);
+  const observeSearchWorld = () => page.evaluate(() => {
+    const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
+    return { worldLoading: state.worldLoading, worldLoad: state.worldLoad,
+      sequence: state.livingWorld?.sequence, requestId: state.livingWorld?.requestId,
+      worldIdentity: state.livingWorld?.worldIdentity,
+      loadingVisible: document.getElementById('loading')?.classList.contains('show') === true };
+  });
+  const searchObservation = { before: await observeSearchWorld(), startedAt: new Date().toISOString() };
+  const worldSequenceBeforeSearch = Number(searchObservation.before.sequence || 0);
+  await fs.writeFile(path.join(outputDir, 'map-search-observation.json'), JSON.stringify(searchObservation, null, 2));
   await page.locator('#mapSearchInput').fill('39.2904, -76.6122');
   await page.locator('#mapSearchBtn').click();
   await page.locator('#largeMap').waitFor({ state: 'hidden', timeout: 20_000 });
+  try {
   await page.waitForFunction((priorSequence) => {
     if (document.getElementById('loading')?.classList.contains('show')) return false;
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return diagnostics.worldLoading === false
       && Number(diagnostics.livingWorld?.sequence || 0) > priorSequence;
   }, worldSequenceBeforeSearch, { timeout: 180_000, polling: 500 });
+  } finally {
+    searchObservation.after = await observeSearchWorld();
+    searchObservation.finishedAt = new Date().toISOString();
+    await fs.writeFile(path.join(outputDir, 'map-search-observation.json'), JSON.stringify(searchObservation, null, 2));
+  }
   await page.locator('#loading.show').waitFor({ state: 'hidden', timeout: 180_000 });
   const searchedLocation = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');

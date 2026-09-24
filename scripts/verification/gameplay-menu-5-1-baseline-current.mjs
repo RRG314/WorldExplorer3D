@@ -1,3 +1,4 @@
+import { selectLowRenderQuality } from './render-quality-ui.mjs';
 import { softwareCompositorArgs } from './software-compositor.mjs';
 import { installBrowserGraphicsProbe } from './browser-graphics-probe.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
@@ -22,6 +23,7 @@ async function startEarth(page) {
   await page.goto(`${baseUrl}/app/?navigation=${Date.now()}`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
   await page.waitForFunction(() => document.getElementById('startBtn')?.disabled === false, null, { timeout: 120_000 });
   if (await page.locator('#analyticsConsentDenyBtn').isVisible().catch(() => false)) await page.locator('#analyticsConsentDenyBtn').click();
+  if (process.env.CI) await selectLowRenderQuality(page);
   if (await page.locator('#globeSelectorStartBtn').isVisible().catch(() => false)) await page.locator('#globeSelectorStartBtn').click();
   else await page.locator('#startBtn').click();
   await page.locator('#loading.show').waitFor({ state: 'visible', timeout: 30_000 });
@@ -155,7 +157,7 @@ try {
 }
 
 failures.push(...browserErrors);
-const report = { phase, evidenceScope: 'functional navigation; not rendering performance', deviceScaleFactor: process.env.CI ? 0.5 : 1, ok: failures.length === 0, baseUrl, result, failures };
+const report = { phase, renderProfile: process.env.CI ? 'low quality selected through Settings; DPR 0.5' : 'default quality', evidenceScope: 'functional navigation; not rendering performance', deviceScaleFactor: process.env.CI ? 0.5 : 1, ok: failures.length === 0, baseUrl, result, failures };
 await fs.writeFile(path.join(outputDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
 console.log(JSON.stringify(report, null, 2));
 assert.deepEqual(failures, []);
