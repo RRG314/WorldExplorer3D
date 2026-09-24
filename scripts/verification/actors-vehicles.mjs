@@ -544,6 +544,8 @@ try {
     console.error(`[actors-vehicles] START ${location.id}`);
     const browserServer = await chromium.launchServer({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280'] });
     let browser, context, page, cpuProfiler;
+    const traceDurations = new Map();
+    let traceStarted = false;
     try {
       browser = await chromium.connect(browserServer.wsEndpoint());
       context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
@@ -586,6 +588,25 @@ try {
         await cpuProfiler.send('Profiler.enable');
         await cpuProfiler.send('Profiler.setSamplingInterval', { interval: 2000 });
         await cpuProfiler.send('Profiler.start');
+        // CPU sampling cannot attribute native/compositor stalls. Retain only
+        // event names and timing aggregates, never request/header/event args.
+        cpuProfiler.on('Tracing.dataCollected', ({ value }) => {
+          for (const event of value) {
+            if (event.ph !== 'X' || !(event.dur > 0)) continue;
+            const key = `${event.pid}:${event.tid}:${event.cat}:${event.name}`;
+            if (!traceDurations.has(key) && traceDurations.size >= 2000) continue;
+            const row = traceDurations.get(key) || { name: event.name, category: event.cat,
+              pid: event.pid, tid: event.tid, count: 0, totalMs: 0, maxMs: 0 };
+            row.count++; row.totalMs += event.dur / 1000;
+            row.maxMs = Math.max(row.maxMs, event.dur / 1000);
+            traceDurations.set(key, row);
+          }
+        });
+        await cpuProfiler.send('Tracing.start', {
+          categories: 'toplevel,gpu,cc,devtools.timeline',
+          transferMode: 'ReportEvents', options: 'record-until-full'
+        });
+        traceStarted = true;
       }
       const timeControl = page.locator('#quickTimeOfDay');
       await timeControl.waitFor({ state: 'visible' });
@@ -749,6 +770,23 @@ try {
       await page.screenshot({ path: path.join(evidenceDir, `${location.id}-error.png`), timeout: 5000 }).catch(() => {});
     } finally {
       if (cpuProfiler) {
+        if (traceStarted) {
+          try {
+            let traceTimer;
+            const completed = new Promise((resolve, reject) => {
+              traceTimer = setTimeout(() => reject(new Error('Trace collection timed out')), 10000);
+              cpuProfiler.once('Tracing.tracingComplete', resolve);
+            });
+            // Attach rejection handling before CDP can block.
+            completed.catch(() => {});
+            try { await cpuProfiler.send('Tracing.end'); await completed; }
+            finally { clearTimeout(traceTimer); }
+            await fs.writeFile(path.join(evidenceDir, `${location.id}-native-trace-summary.json`), JSON.stringify({
+              scope: 'remote interaction diagnosis; overlapping inclusive durations, not FPS or exclusive CPU time',
+              events: [...traceDurations.values()].sort((a,b) => b.maxMs - a.maxMs).slice(0,100)
+            }, null, 2));
+          } catch (error) { console.error('Native trace capture failed:', error.message); }
+        }
         try {
           const { profile } = await cpuProfiler.send('Profiler.stop');
           await fs.writeFile(path.join(evidenceDir, `${location.id}-interaction.cpuprofile`), JSON.stringify(profile));
