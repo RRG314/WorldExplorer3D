@@ -1,10 +1,11 @@
+import { selectLowRenderQuality } from './render-quality-ui.mjs';
 import { softwareCompositorArgs } from './software-compositor.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 
 const baseUrl = String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4192').replace(/\/$/, '');
 const outputDir = path.resolve('output/verification/hotbar-actions-current');
@@ -12,6 +13,7 @@ await fs.mkdir(outputDir, { recursive: true });
 
 const resumeStage = Number(process.env.WE3D_HOTBAR_RESUME_STAGE || 0);
 const onlyAction = String(process.env.WE3D_HOTBAR_ONLY_ACTION || '');
+console.log(JSON.stringify({ evidenceScope: 'functional hotbar journeys; not frame rate or default-quality acceptance', renderProfile: process.env.CI ? 'low quality selected through Settings; DPR 0.5' : 'default quality', mobileIdentity: 'iPhone user agent with touch viewport' }));
 const failures = [];
 const completed = [];
 const localRequestFailures = [];
@@ -25,6 +27,8 @@ async function withJourney(name, mobile, run) {
   let crashed = false;
   try {
     const context = await browser.newContext({
+      ...(mobile ? { userAgent: devices['iPhone 13'].userAgent } : {}),
+      deviceScaleFactor: process.env.CI ? 0.5 : 1,
       viewport: mobile ? { width: 390, height: 844 } : { width: 1440, height: 900 },
       hasTouch: mobile, isMobile: mobile
     });
@@ -84,6 +88,7 @@ async function startEarth(page, suffix) {
     await page.locator('#analyticsConsentDenyBtn').click();
   }
   if (await page.locator('#globeSelectorStartBtn').isVisible().catch(() => false)) {
+    if (process.env.CI) await selectLowRenderQuality(page);
     await page.locator('#globeSelectorStartBtn').click();
   } else {
     await page.locator('#startBtn').click();
