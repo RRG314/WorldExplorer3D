@@ -12,7 +12,7 @@ import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 
 const root = process.cwd();
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
-const requestedScope = String(process.env.WE3D_URBAN_SCOPE || 'all').trim().toLowerCase();
+const requestedScope = String(process.argv.find(arg => arg.startsWith('--scope='))?.slice(8) || process.env.WE3D_URBAN_SCOPE || 'all').trim().toLowerCase();
 assert.ok(['all', 'arrest', 'medical', 'vehicle'].includes(requestedScope),
   `Unsupported WE3D_URBAN_SCOPE: ${requestedScope}`);
 const servedRoot = requestedRoot ? path.resolve(root, requestedRoot) : root;
@@ -634,6 +634,7 @@ async function runVehicleEquipmentJourney() {
     });
     const minimumVehicleRadius = Math.max(0.8, Number(retainedVehicle.dimensionsMeters?.width || 1.8) * 0.42);
     assert.equal(collisionProbe.reached, false, 'Walking collision allowed the player into the parked vehicle center.');
+    assert.equal(collisionProbe.blocked, true, 'Vehicle collision must be demonstrated by blocked translation, not navigation budget exhaustion.');
     assert.ok(collisionProbe.final.distance >= minimumVehicleRadius, 'Parked vehicle collision stopped inside the visual body.');
     await turnToward(page, retainedVehicle);
 
@@ -858,7 +859,7 @@ try {
         Math.abs(primary.exiting.urbanSandbox.vehicles.find((entry) => entry.id === primary.vehicle.id)?.driverDoor?.openRadians || 0) > 0.05 &&
         primary.entered.activeActor?.mode === 'drive' && primary.exited.activeActor?.mode === 'walk',
       realDrivingMovesClaimedVehicle: primary.drivenMeters > 1,
-      segmentCollisionContainsPlayer: primary.collisionProbe.reached === false,
+      segmentCollisionContainsPlayer: primary.collisionProbe.reached === false && primary.collisionProbe.blocked === true,
       handsAndStaffAffectSameVehicle:
         primary.equipmentResults.hands.after < primary.equipmentResults.hands.before &&
         primary.equipmentResults.baton.after < primary.equipmentResults.baton.before,
@@ -875,7 +876,7 @@ try {
       noBrowserErrors: browserErrors.length === 0,
       noFailedLocalResources: localFailures.length === 0
     };
-    report = { ok: Object.values(checks).every(Boolean), contract: 'urban-sandbox-vehicle-scope-v1', servedRoot, checks, evidence: { transitionTiming: primary.transitionTiming }, browserErrors, localFailures };
+    report = { ok: Object.values(checks).every(Boolean), contract: 'urban-sandbox-vehicle-scope-v1', servedRoot, checks, evidence: { transitionTiming: primary.transitionTiming, collisionProbe: primary.collisionProbe, providerFixture: primary.providerFixture }, browserErrors, localFailures };
     console.log('[urban-sandbox] CAPTURED vehicle and equipment');
   } else {
   console.log('[urban-sandbox] START vehicle and equipment');
@@ -903,7 +904,7 @@ try {
       Math.abs(primary.exiting.urbanSandbox.vehicles.find((entry) => entry.id === primary.vehicle.id)?.driverDoor?.openRadians || 0) > 0.05 &&
       primary.entered.activeActor?.mode === 'drive' && primary.exited.activeActor?.mode === 'walk',
     realDrivingMovesClaimedVehicle: primary.drivenMeters > 1,
-    segmentCollisionContainsPlayer: primary.collisionProbe.reached === false,
+    segmentCollisionContainsPlayer: primary.collisionProbe.reached === false && primary.collisionProbe.blocked === true,
     handsAndStaffAffectSameVehicle:
       primary.equipmentResults.hands.after < primary.equipmentResults.hands.before &&
       primary.equipmentResults.baton.after < primary.equipmentResults.baton.before,
@@ -947,6 +948,7 @@ try {
       drivenMeters: primary.drivenMeters,
       transitionTiming: primary.transitionTiming,
       collisionStopDistance: primary.collisionProbe.final.distance,
+      collisionProbe: primary.collisionProbe,
       civicLevel: arrest.witnessedResponse.state.urbanSandbox.civicResponse?.level,
       responderCount: arrest.responderArrived.urbanSandbox.responders?.activeCount,
       policeFacility: custodyFacility,

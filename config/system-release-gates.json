@@ -37,6 +37,7 @@
     "terrain-boundary": { "scope": "candidate", "command": ["npm", "run", "verify:terrain-boundary"], "artifactRequired": true },
     "interiors": { "scope": "candidate", "command": ["npm", "run", "verify:interiors"], "artifactRequired": true, "timeoutMs": 1800000 },
     "poi-lifecycle": { "scope": "candidate", "command": ["npm", "run", "verify:poi-lifecycle"], "artifactRequired": false },
+    "urban-vehicle-diagnostic": { "scope": "diagnostic", "command": ["node", "scripts/verification/urban-sandbox.mjs", "--scope=vehicle"], "artifactRequired": true, "timeoutMs": 1500000 },
     "urban-sandbox": { "scope": "candidate", "command": ["npm", "run", "verify:urban-sandbox"], "artifactRequired": true, "timeoutMs": 2400000 },
     "urban-equipment": { "scope": "candidate", "command": ["npm", "run", "verify:urban-equipment"], "artifactRequired": true },
     "tutorial-controls": { "scope": "candidate", "command": ["npm", "run", "verify:tutorial-controls"], "artifactRequired": true },
