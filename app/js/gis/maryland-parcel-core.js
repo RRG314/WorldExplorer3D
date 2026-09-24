@@ -222,6 +222,26 @@ function buildMarylandParcelQueryUrl({ lat, lon, radiusM = 450, offset = 0, limi
   return `${MARYLAND_PARCEL_SOURCE.layerUrl}/query?${params}`;
 }
 
+// Resolve the spatial set first, then fetch bounded primary-key batches. A
+// spatial query with sorted offset pagination can be much slower on iMAP.
+function buildMarylandParcelIdsQueryUrl(request) {
+  const url = new URL(buildMarylandParcelQueryUrl(request));
+  url.searchParams.set('f', 'json');
+  url.searchParams.set('returnIdsOnly', 'true');
+  url.searchParams.set('returnGeometry', 'false');
+  for (const key of ['orderByFields', 'resultOffset', 'resultRecordCount', 'outFields', 'geometryPrecision', 'maxAllowableOffset']) url.searchParams.delete(key);
+  return url.href;
+}
+
+function buildMarylandParcelFeaturesQueryUrl(request, objectIds) {
+  if (!Array.isArray(objectIds) || objectIds.length < 1 || objectIds.length > 250 ||
+      objectIds.some(id => !Number.isSafeInteger(id) || id < 0)) throw new RangeError('Expected 1–250 valid parcel object IDs.');
+  const url = new URL(buildMarylandParcelQueryUrl(request));
+  url.searchParams.set('objectIds', objectIds.join(','));
+  for (const key of ['geometry', 'geometryType', 'inSR', 'spatialRel', 'orderByFields', 'resultOffset', 'resultRecordCount']) url.searchParams.delete(key);
+  return url.href;
+}
+
 function parcelGameValue(parcel = {}, buildings = []) {
   const parcelArea = Math.max(0, finite(parcel.parcelAreaSqM, 0));
   const structuredFloorArea = buildings.reduce((sum, building) => sum + Math.max(16, finite(building.area, 16)) * Math.max(1, finite(building.levels, 1)), 0);
@@ -242,6 +262,8 @@ export {
   MARYLAND_PARCEL_SOURCE,
   QUERY_FIELDS,
   buildMarylandParcelQueryUrl,
+  buildMarylandParcelIdsQueryUrl,
+  buildMarylandParcelFeaturesQueryUrl,
   geometryCentroid,
   isLikelyMarylandCoordinate,
   normalizeMarylandParcelFeature,

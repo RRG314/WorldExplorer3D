@@ -30,7 +30,7 @@ for (const sample of fixture.samples) {
   const name = MARYLAND_JURISDICTIONS[sample.code];
   const startedAt = Date.now();
   try {
-    // Use the real provider, including its 250-record pages, two-page cap,
+    // Use the real provider, including its spatial ID lookup, two 250-ID batches,
     // timeout, request headers and normalization. A smaller TOP-N query can
     // behave differently and does not establish the app's availability.
     const response = await loadMarylandParcels({ lat: sample.lat, lon: sample.lon, radiusM: 450 });
