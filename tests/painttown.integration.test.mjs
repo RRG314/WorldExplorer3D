@@ -247,6 +247,8 @@ async function run() {
 
     report.seedCheck = await checkDeterministicSeed();
     report.touchCheck = await runTouchPaintCheck(page);
+    report.touchCheck.noWorldSelection = await page.locator('#worldSelectionNotice:visible').count() === 0;
+    if (!report.touchCheck.noWorldSelection) throw new Error('Painting also opened an unrelated world selection card.');
     report.gunCheck = await runGunPhysicsCheck(page, report);
     await page.screenshot({ path: SCREEN_HUD_PATH, fullPage: true });
 
