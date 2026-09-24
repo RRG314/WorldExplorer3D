@@ -679,6 +679,7 @@ async function runVehicleEquipmentJourney() {
 
     return {
       ready,
+      providerFixture,
       vehicle,
       approach,
       entering,
@@ -792,6 +793,7 @@ async function runMedicalRecoveryJourney() {
 let report;
 const verificationMode = {
   evidenceScope: 'urban functional input; deterministic DOM keyboard navigation and transitions; not rendering performance',
+  vehicleMapInput: 'exact recorded Logan road query; not live map-provider availability',
   deviceScaleFactor: process.env.CI ? .5 : 1,
   renderQuality: process.env.CI ? 'low (selected through Settings)' : 'default'
 };
