@@ -141,19 +141,31 @@ async function turnCameraToward(page, target, tolerance = 0.16, maxSteps = 160) 
   throw new Error(`Could not aim the camera reticle at ${JSON.stringify(target)} with normal look input: ${JSON.stringify({ final, desired, delta: wrapYaw(desired - final.cameraYaw) })}`);
 }
 
-// Collision evidence is a straight attempted translation into the parked body.
-// Navigation turning/sliding and step-budget exhaustion are not blockage.
+// Collision evidence is attempted inward translation at the parked side.
+// The shipped resolver permits tangential sliding; only its inward component
+// must stay blocked. Step-budget exhaustion can never establish contact.
 async function probeVehicleCollision(page, target) {
   await turnToward(page, target, .04);
   const start = await actorState(page, target);
   let previous = start, stagnantMs = 0;
+  const width = Number(target.dimensionsMeters?.width || 1.8);
+  const length = Number(target.dimensionsMeters?.length || 4.5);
+  const yaw = Number(target.yaw || 0);
+  const local = actor => ({
+    side: (actor.x - target.x) * Math.cos(yaw) - (actor.z - target.z) * Math.sin(yaw),
+    along: (actor.x - target.x) * Math.sin(yaw) + (actor.z - target.z) * Math.cos(yaw)
+  });
   const trace = [];
   for (let step = 0; step < 12; step += 1) {
     const timing = await inputStep(page, 'ArrowUp', 1000);
     const current = await actorState(page, target);
     const translated = Math.hypot(current.x - previous.x, current.z - previous.z);
-    stagnantMs = translated < .008 ? stagnantMs + 1000 : 0;
-    trace.push({ step, translated, stagnantMs, actor: current, timing });
+    const currentLocal = local(current), previousLocal = local(previous);
+    const normalTranslation = Math.abs(currentLocal.side - previousLocal.side);
+    const atVehicleSide = Math.abs(currentLocal.side) >= width * .42 &&
+      Math.abs(currentLocal.side) <= width / 2 + .5 && Math.abs(currentLocal.along) <= length / 2;
+    stagnantMs = normalTranslation < .008 && atVehicleSide ? stagnantMs + 1000 : 0;
+    trace.push({ step, translated, normalTranslation, atVehicleSide, local: currentLocal, stagnantMs, actor: current, timing });
     if (current.distance <= .15) return { reached: true, blocked: false, start, final: current, trace };
     if (stagnantMs >= 7000) return { reached: false, blocked: true, stagnantMs, start, final: current, trace };
     previous = current;

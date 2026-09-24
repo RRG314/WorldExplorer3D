@@ -1,7 +1,7 @@
 import { setDomText, setDomAttribute, setDomHidden, setDomClass } from '../ui/dom-state.js?v=1';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { carSpeedToMph, mphToCarSpeed } from '../physics/vehicle-speed-units.js?v=2';
-import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleMassKg } from '../engine/vehicle-catalog.js?v=6';
+import { VEHICLE_CATALOG, VEHICLE_ROOT_TO_GROUND_METERS, vehicleMassKg } from '../engine/vehicle-catalog.js?v=6';
 import { applyTransportDamage } from '../transport/damage-model.js?v=1';
 import { createCivicResponseModel } from './civic-response-model.js?v=3';
 import { ensurePlayerBackpackInventory } from './equipment-model.js?v=10';
@@ -16,7 +16,7 @@ import { nearestMappedFacility } from './facility-model.js?v=3';
 import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=7';
 import { reconcilePublishedRoomVehicles } from './room-vehicle-reconciliation.js?v=1';
 import { createUrbanResponderRuntime } from './responder-runtime.js?v=32';
-import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=10';
+import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates, sweptVehicleFootprintContact } from './vehicle-model.js?v=10';
 import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=12';
 import {
   attachCuratedTrafficVehicle,
@@ -45,6 +45,8 @@ import {
 } from '../walking/curated-explorer-character.js?v=8';
 
 const ENTER_DISTANCE = 2.8;
+const VEHICLE_COLLISION_FLEET_RADIUS = Math.max(...VEHICLE_CATALOG.map(vehicle => Math.hypot(vehicle.width, vehicle.length) / 2));
+
 // Room clients can assemble slightly different collision envelopes when a live
 // map-provider request succeeds for one player and falls back for another. A
 // released authoritative vehicle keeps its shared pose, but the receiving
@@ -551,12 +553,14 @@ function resolveUrbanActorCollision(from = {}, to = {}, options = {}) {
   const source = { x: Number(from.x) || 0, z: Number(from.z) || 0 };
   const destination = { x: Number(to.x) || 0, z: Number(to.z) || 0 };
   const travelDistance = Math.hypot(destination.x - source.x, destination.z - source.z);
-  const targets = urbanCollisionTargets(state, destination, Math.max(mode === 'drive' ? 12 : 5, travelDistance + 3));
+  const targets = urbanCollisionTargets(state, destination, Math.max(mode === 'drive' ? 12 : 5, travelDistance + VEHICLE_COLLISION_FLEET_RADIUS + actorRadius));
   const blockerAlong = (start, end) => {
     const dx = end.x - start.x;
     const dz = end.z - start.z;
     const lengthSquared = dx * dx + dz * dz;
     return targets.map((target) => {
+      const footprint = sweptVehicleFootprintContact(start, end, target, actorRadius);
+      if (footprint !== undefined) return footprint;
       const targetX = Number(target.x || 0);
       const targetZ = Number(target.z || 0);
       const t = lengthSquared > .000001
@@ -572,6 +576,8 @@ function resolveUrbanActorCollision(from = {}, to = {}, options = {}) {
         endDistance: Math.hypot(end.x - targetX, end.z - targetZ)
       };
     }).filter((entry) => {
+      if (!entry) return false;
+      if (entry.footprint) return true;
       const combinedRadius = actorRadius + entry.target.radius;
       if (entry.distance >= combinedRadius) return false;
       // If a prior frame left the actor overlapping, permit motion that

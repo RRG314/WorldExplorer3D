@@ -265,7 +265,7 @@ test('functional camera recovery respects idle delay, simulation cap and release
 });
 
 
-test('vehicle collision probe requires sustained translation blockage and rejects budget exhaustion', async () => {
+test('vehicle collision probe allows tangential sliding but requires sustained inward blockage', async () => {
   const { readFile } = await import('node:fs/promises');
   const source = await readFile(new URL('../scripts/verification/urban-sandbox.mjs', import.meta.url), 'utf8');
   const body = source.slice(source.indexOf('async function probeVehicleCollision('), source.indexOf('\nasync function useEquipmentSimulation('));
@@ -273,10 +273,10 @@ test('vehicle collision probe requires sustained translation blockage and reject
     let step = 0;
     const probe = vm.runInNewContext(`(${body})`, {
       turnToward: async () => {},
-      actorState: async () => ({ x: moves ? step : 0, z: 0, distance: 2 }),
+      actorState: async () => ({ x: moves ? -1.2 - step : -1.2, z: step * .01, distance: 1.2 }),
       inputStep: async (_page, key, duration) => { assert.equal(key, 'ArrowUp'); assert.equal(duration, 1000); step++; }
     });
-    const result = await probe({}, { x: 2, z: 0 });
+    const result = await probe({}, { x: 0, z: 0, yaw: 0 });
     assert.equal(result.blocked, !moves);
     if (moves) assert.equal(result.budgetExhausted, true);
     else assert.equal(result.stagnantMs, 7000);

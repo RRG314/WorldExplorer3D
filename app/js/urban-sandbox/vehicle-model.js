@@ -169,3 +169,38 @@ export {
   vehicleDoorPosition,
   vehicleExitCandidates
 };
+
+
+// Sweep the actor against the vehicle's full oriented footprint. Expanding
+// the box by the actor radius is conservative at corners and prevents both
+// tunnelling and walking through the front/rear overhangs of long vehicles.
+export function sweptVehicleFootprintContact(from, to, target, actorRadius = .3) {
+  const variant = target?.ref?.variant;
+  if (!['vehicle', 'ambient_vehicle'].includes(target?.kind) ||
+      !(Number(variant?.width) > 0 && Number(variant?.length) > 0)) return undefined;
+  const yaw = Number(target.yaw || 0), c = Math.cos(yaw), s = Math.sin(yaw);
+  const local = point => ({ x: (point.x - target.x) * c - (point.z - target.z) * s,
+    z: (point.x - target.x) * s + (point.z - target.z) * c });
+  const start = local(from), end = local(to);
+  const half = { x: Number(variant.width) / 2 + actorRadius, z: Number(variant.length) / 2 + actorRadius };
+  const signedDistance = point => {
+    const x = Math.abs(point.x) - half.x, z = Math.abs(point.z) - half.z;
+    return Math.hypot(Math.max(x, 0), Math.max(z, 0)) + Math.min(Math.max(x, z), 0);
+  };
+  const sourceDistance = signedDistance(start), endDistance = signedDistance(end);
+  // Preserve escape from an existing overlap, but reject deeper penetration.
+  if (sourceDistance < 0 && endDistance >= sourceDistance - .005) return null;
+  let enter = 0, leave = 1;
+  for (const axis of ['x', 'z']) {
+    const delta = end[axis] - start[axis];
+    if (Math.abs(delta) < 1e-9) {
+      if (Math.abs(start[axis]) >= half[axis]) return null;
+      continue;
+    }
+    const a = (-half[axis] - start[axis]) / delta, b = (half[axis] - start[axis]) / delta;
+    enter = Math.max(enter, Math.min(a, b));
+    leave = Math.min(leave, Math.max(a, b));
+    if (enter >= leave) return null;
+  }
+  return { target, t: enter, distance: 0, sourceDistance, endDistance, footprint: 'oriented-vehicle-box' };
+}

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parkedVehicleAnchors } from '../app/js/urban-sandbox/vehicle-model.js';
+import { parkedVehicleAnchors, sweptVehicleFootprintContact } from '../app/js/urban-sandbox/vehicle-model.js';
 import { VEHICLE_CATALOG } from '../app/js/engine/vehicle-catalog.js';
 
 const edge = (name, x, z = 0) => ({
@@ -62,4 +62,24 @@ test('parking chooses a fitting car and reserves the full traffic envelope plus 
     assert.ok(car.curbOffset - car.variant.width / 2 >= car.laneOffset + trafficHalfWidth + .25 - 1e-9);
     assert.ok(car.curbOffset + car.variant.width / 2 <= car.roadHalfWidth - .18 + 1e-9);
   }
+});
+
+
+test('vehicle collision covers the overhang, rotated sides and high-speed sweeps', () => {
+  const target = { kind: 'vehicle', x: 0, z: 0, yaw: 0, ref: { variant: { width: 1.78, length: 4.45 } } };
+  // This path misses the old width-only circle but intersects the visible body.
+  assert.ok(sweptVehicleFootprintContact({ x: -3, z: 1.8 }, { x: 3, z: 1.8 }, target));
+  assert.ok(sweptVehicleFootprintContact({ x: 0, z: -20 }, { x: 0, z: 20 }, target));
+  assert.equal(sweptVehicleFootprintContact({ x: -3, z: 3 }, { x: 3, z: 3 }, target), null);
+  target.yaw = Math.PI / 2;
+  assert.ok(sweptVehicleFootprintContact({ x: 1.8, z: -3 }, { x: 1.8, z: 3 }, target));
+  assert.equal(sweptVehicleFootprintContact({ x: 3, z: -3 }, { x: 3, z: 3 }, target), null);
+});
+
+test('vehicle collision permits overlap escape and tangent sliding but rejects deeper entry', () => {
+  const target = { kind: 'vehicle', x: 0, z: 0, yaw: 0, ref: { variant: { width: 2, length: 5 } } };
+  assert.equal(sweptVehicleFootprintContact({ x: -1.2, z: 0 }, { x: -1.4, z: 0 }, target), null);
+  assert.ok(sweptVehicleFootprintContact({ x: -1.2, z: 0 }, { x: -.8, z: 0 }, target));
+  assert.equal(sweptVehicleFootprintContact({ x: -1.31, z: 0 }, { x: -1.31, z: 1 }, target), null);
+  assert.equal(sweptVehicleFootprintContact({ x: -3, z: 0 }, { x: 3, z: 0 }, { ...target, kind: 'npc' }), undefined);
 });
