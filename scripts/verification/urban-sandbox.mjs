@@ -604,11 +604,22 @@ async function runVehicleEquipmentJourney() {
     const enteredVehicle = entered.urbanSandbox.vehicles.find((entry) => entry.id === vehicle.id);
     const drivenVehicle = driven.urbanSandbox.vehicles.find((entry) => entry.id === vehicle.id);
     const drivenMeters = Math.hypot(drivenVehicle.x - enteredVehicle.x, drivenVehicle.z - enteredVehicle.z);
-    await page.waitForFunction(() => {
-      const urban = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox;
-      return urban?.interaction?.action === 'exit_vehicle' &&
-        Number.isFinite(urban.playerVehicle?.worldVelocityMps) && urban.playerVehicle.worldVelocityMps <= 1.4;
-    }, null, { timeout: process.env.CI ? 30_000 : 6_000, polling: 100 });
+    const braking = { simulatedMs: 0, receipts: [] };
+    // Keep the brake held through fixed simulation, as in the passing two-player
+    // handoff journey. Waiting on RAF after releasing it did not finish braking
+    // on the software renderer. The normal exit eligibility rule remains intact.
+    for (;;) {
+      const state = await diagnostics(page);
+      assert.equal(state.urbanSandbox?.phase, 'driving', 'Vehicle authority ended before normal exit.');
+      const urban = state.urbanSandbox;
+      if (urban?.interaction?.action === 'exit_vehicle' &&
+          Number.isFinite(urban.playerVehicle?.worldVelocityMps) && urban.playerVehicle.worldVelocityMps <= 1.4) break;
+      assert.ok(braking.simulatedMs < 12000, `Braking did not enable exit: ${JSON.stringify(urban?.playerVehicle)}`);
+      await page.keyboard.down('Space');
+      try { braking.receipts.push(await advanceGameplay(page, 250)); }
+      finally { await page.keyboard.up('Space'); }
+      braking.simulatedMs += 250;
+    }
     await page.keyboard.press('KeyE');
     await page.waitForFunction((vehicleId) => {
       const urban = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox;
@@ -686,6 +697,7 @@ async function runVehicleEquipmentJourney() {
       transitionTiming: { mode: 'runtime-fixed-step', entry: entryTiming, exit: exitTiming },
       driven,
       drivenMeters,
+      braking,
       driveTiming: { mode: 'trusted-keyboard-runtime-fixed-step', receipts: driveReceipts },
       exiting,
       exited,
