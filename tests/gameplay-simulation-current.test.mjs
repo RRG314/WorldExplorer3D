@@ -263,3 +263,22 @@ test('functional camera recovery respects idle delay, simulation cap and release
     assert.ok(simulated <= 1500);
   }
 });
+
+
+test('vehicle collision probe requires sustained translation blockage and rejects budget exhaustion', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const source = await readFile(new URL('../scripts/verification/urban-sandbox.mjs', import.meta.url), 'utf8');
+  const body = source.slice(source.indexOf('async function probeVehicleCollision('), source.indexOf('\nasync function useEquipmentSimulation('));
+  for (const moves of [false, true]) {
+    let step = 0;
+    const probe = vm.runInNewContext(`(${body})`, {
+      turnToward: async () => {},
+      actorState: async () => ({ x: moves ? step : 0, z: 0, distance: 2 }),
+      inputStep: async (_page, key, duration) => { assert.equal(key, 'ArrowUp'); assert.equal(duration, 1000); step++; }
+    });
+    const result = await probe({}, { x: 2, z: 0 });
+    assert.equal(result.blocked, !moves);
+    if (moves) assert.equal(result.budgetExhausted, true);
+    else assert.equal(result.stagnantMs, 7000);
+  }
+});

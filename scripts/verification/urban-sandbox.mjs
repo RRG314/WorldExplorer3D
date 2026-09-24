@@ -141,6 +141,45 @@ async function turnCameraToward(page, target, tolerance = 0.16, maxSteps = 160) 
   throw new Error(`Could not aim the camera reticle at ${JSON.stringify(target)} with normal look input: ${JSON.stringify({ final, desired, delta: wrapYaw(desired - final.cameraYaw) })}`);
 }
 
+// Collision evidence is a straight attempted translation into the parked body.
+// Navigation turning/sliding and step-budget exhaustion are not blockage.
+async function probeVehicleCollision(page, target) {
+  await turnToward(page, target, .04);
+  const start = await actorState(page, target);
+  let previous = start, stagnantMs = 0;
+  const trace = [];
+  for (let step = 0; step < 12; step += 1) {
+    const timing = await inputStep(page, 'ArrowUp', 1000);
+    const current = await actorState(page, target);
+    const translated = Math.hypot(current.x - previous.x, current.z - previous.z);
+    stagnantMs = translated < .008 ? stagnantMs + 1000 : 0;
+    trace.push({ step, translated, stagnantMs, actor: current, timing });
+    if (current.distance <= .15) return { reached: true, blocked: false, start, final: current, trace };
+    if (stagnantMs >= 7000) return { reached: false, blocked: true, stagnantMs, start, final: current, trace };
+    previous = current;
+  }
+  return { reached: false, blocked: false, budgetExhausted: true, start, final: previous, trace };
+}
+
+async function useEquipmentSimulation(page, milliseconds) {
+  const result = await page.evaluate(async duration => {
+    const target = document.activeElement || document.body;
+    if (target?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target?.tagName)) {
+      throw new Error('Equipment input is blocked by a focused UI control.');
+    }
+    try {
+      target.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true, cancelable: true }));
+      const receipt = await globalThis.advanceTime?.(duration, { renderIntermediateFrames: false });
+      return { receipt, state: globalThis.getWorldExplorerRuntimeDiagnostics?.() };
+    } finally {
+      target.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyV', key: 'v', bubbles: true, cancelable: true }));
+    }
+  }, milliseconds);
+  assert.ok(result.receipt?.simulatedMs === milliseconds && result.receipt.frames > 0 && result.receipt.suspendedFrames === 0,
+    `Equipment simulation did not advance: ${JSON.stringify(result.receipt)}`);
+  return result;
+}
+
 async function walkTo(page, target, options = {}) {
   const stopDistance = Number(options.stopDistance ?? 0.75);
   const maxSteps = Number(options.maxSteps ?? 1_200);
@@ -629,9 +668,9 @@ async function runVehicleEquipmentJourney() {
       'Exit transition did not release the vehicle after 800ms of simulation.');
     const retainedVehicle = exited.urbanSandbox.vehicles.find((entry) => entry.id === vehicle.id);
 
-    const collisionProbe = await walkTo(page, { x: retainedVehicle.x, z: retainedVehicle.z }, {
-      stopDistance: 0.15, maxSteps: 260, stagnantLimit: 55
-    });
+    const collisionProbe = await probeVehicleCollision(page, retainedVehicle);
+    await mkdir(path.dirname(reportPath), { recursive: true });
+    await writeFile(path.join(path.dirname(reportPath), 'vehicle-collision-probe.json'), JSON.stringify(collisionProbe, null, 2));
     const minimumVehicleRadius = Math.max(0.8, Number(retainedVehicle.dimensionsMeters?.width || 1.8) * 0.42);
     assert.equal(collisionProbe.reached, false, 'Walking collision allowed the player into the parked vehicle center.');
     assert.equal(collisionProbe.blocked, true, 'Vehicle collision must be demonstrated by blocked translation, not navigation budget exhaustion.');
@@ -670,10 +709,12 @@ async function runVehicleEquipmentJourney() {
 
     await equip(page, 'concussion-charge');
     const chargeBefore = await equipmentItem(page, 'concussion-charge');
-    await page.keyboard.press('KeyV');
-    await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.projectileRuntime?.lastProjectileAction?.equipmentId === 'concussion-charge' && globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.projectileRuntime?.lastProjectileAction?.phase === 'impact', null, { timeout: 8_000 });
+    const chargeTiming = await useEquipmentSimulation(page, 4000);
+    const chargeAction = chargeTiming.state.urbanSandbox?.projectileRuntime?.lastPlayerProjectileAction;
+    assert.ok(chargeAction?.equipmentId === 'concussion-charge' && chargeAction?.phase === 'impact',
+      `Thrown charge did not impact within four simulated seconds: ${JSON.stringify(chargeAction)}`);
     const chargeAfter = await equipmentItem(page, 'concussion-charge');
-    equipmentResults['concussion-charge'] = { before: chargeBefore, after: chargeAfter };
+    equipmentResults['concussion-charge'] = { before: chargeBefore, after: chargeAfter, timing: chargeTiming.receipt };
 
     await equip(page, 'parachute');
     const parachuteBefore = await diagnostics(page);
