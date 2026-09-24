@@ -144,6 +144,16 @@ async function chooseTarget() {
   });
 }
 
+// Use bounded input bursts proportional to the remaining turn/distance. The
+// old 16–90ms bursts incurred a complete software-renderer readback for each
+// few centimetres. Physics still executes every fixed step and owns collisions.
+function turnBurstMs(delta) {
+  return Math.max(16, Math.min(600, Math.abs(delta) / 2.6 * 800));
+}
+function walkBurstMs(distance, stopDistance = 0) {
+  return Math.max(40, Math.min(600, Math.max(0, distance - stopDistance) / 2.8 * 800));
+}
+
 function wrapYaw(value) {
   let result = Number(value) || 0;
   while (result > Math.PI) result -= Math.PI * 2;
@@ -169,7 +179,7 @@ async function walkToInteriorPrompt(target, maxSteps = 1_400) {
       );
       const delta = wrapYaw(targetYaw - yaw);
       if (Math.abs(delta) <= 0.11) return true;
-      await stepGameplayKeys(page, delta > 0 ? 'ArrowLeft' : 'ArrowRight', Math.abs(delta) > 0.7 ? 55 : 16);
+      await stepGameplayKeys(page, delta > 0 ? 'ArrowLeft' : 'ArrowRight', turnBurstMs(delta));
     }
     return false;
   };
@@ -212,11 +222,11 @@ async function walkToInteriorPrompt(target, maxSteps = 1_400) {
     const yawDelta = wrapYaw(desiredYaw - state.yaw);
     if (Math.abs(yawDelta) > 0.14) {
       const turnKey = yawDelta > 0 ? 'ArrowLeft' : 'ArrowRight';
-      await stepGameplayKeys(page, turnKey, Math.abs(yawDelta) > 0.7 ? 55 : 16);
+      await stepGameplayKeys(page, turnKey, turnBurstMs(yawDelta));
       continue; // Turning cannot demonstrate blocked translation.
     } else {
       const running = state.distance > 24;
-      await stepGameplayKeys(page, running ? ['ShiftLeft', 'ArrowUp'] : 'ArrowUp', 140);
+      await stepGameplayKeys(page, running ? ['ShiftLeft', 'ArrowUp'] : 'ArrowUp', walkBurstMs(state.distance) / (running ? 2 : 1));
     }
     if (state.distance >= previousDistance - 0.015) stagnant += 1;
     else stagnant = 0;
@@ -272,10 +282,10 @@ async function walkToPoint(target, options = {}) {
     const yawDelta = wrapYaw(desiredYaw - state.yaw);
     if (Math.abs(yawDelta) > 0.12) {
       const turnKey = yawDelta > 0 ? 'ArrowLeft' : 'ArrowRight';
-      await stepGameplayKeys(page, turnKey, Math.abs(yawDelta) > 0.7 ? 55 : 16);
+      await stepGameplayKeys(page, turnKey, turnBurstMs(yawDelta));
       continue; // Turning cannot demonstrate blocked translation.
     } else {
-      await stepGameplayKeys(page, 'ArrowUp', 90);
+      await stepGameplayKeys(page, 'ArrowUp', walkBurstMs(state.distance, stopDistance));
     }
     if (state.distance >= previousDistance - 0.008) stagnant += 1;
     else stagnant = 0;
@@ -291,7 +301,7 @@ async function walkToPoint(target, options = {}) {
         const delta = wrapYaw(tangentYaw - yaw);
         if (Math.abs(delta) <= 0.11) break;
         const turnKey = delta > 0 ? 'ArrowLeft' : 'ArrowRight';
-        await stepGameplayKeys(page, turnKey, Math.abs(delta) > 0.7 ? 55 : 16);
+        await stepGameplayKeys(page, turnKey, turnBurstMs(delta));
       }
       const detourDurationMs = Math.max(700, Math.min(2_500, state.distance * 160));
       await stepGameplayKeys(page, 'ArrowUp', detourDurationMs);
