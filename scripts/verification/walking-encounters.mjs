@@ -325,10 +325,10 @@ try {
   const gpsPage = await gpsContext.newPage();
   const gpsSensor = await installGpsSensorFixture(gpsPage, { latitude: 39.2904, longitude: -76.6122, accuracy: 6, speed: 0, heading: 0 });
   gpsFixStream = createGpsFixStream(gpsSensor);
-  await gpsFixStream.send('Emulation.setGeolocationOverride', { latitude: 39.2904, longitude: -76.6122, accuracy: 6, speed: 0, heading: 0 });
   await instrument(gpsPage);
   await gpsPage.goto(`${baseUrl}/app/`, { waitUntil: 'load', timeout: 120_000 });
   await gpsPage.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
+  await gpsFixStream.send('Emulation.setGeolocationOverride', { latitude: 39.2904, longitude: -76.6122, accuracy: 6, speed: 0, heading: 0 });
   await gpsPage.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
   await gpsPage.locator('#globeSelectorLiveGpsBtn').click();
   await gpsPage.waitForSelector('#liveGpsPermissionPanel.show', { timeout: 30_000 });
