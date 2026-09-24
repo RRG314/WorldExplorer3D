@@ -1,3 +1,5 @@
+import { advanceGameplay } from './gameplay-simulation.mjs';
+import { installGpsSensorFixture } from './gps-sensor-fixture.mjs';
 import { softwareCompositorArgs } from './software-compositor.mjs';
 import { createGpsFixStream } from './gps-fix-stream.mjs';
 import assert from 'node:assert/strict';
@@ -143,11 +145,19 @@ async function moveAwayFromDirectInteraction(page, cdp) {
 }
 
 async function waitForLead(page, expectedMode, movePastDirectInteraction) {
-  await page.waitForFunction((mode) => {
-    const state = globalThis.getWorldExplorerRuntimeDiagnostics?.();
-    return state?.worldDiscovery?.encounterLead?.available === true &&
-      state.worldDiscovery.encounterLead.mode === mode;
-  }, expectedMode, { timeout: process.env.CI ? 120_000 : 30_000, polling:500 });
+  // The invitation cadence is simulation time. A slow software renderer can
+  // consume two wall-clock minutes before its ten-second cadence has elapsed.
+  const cadenceReceipts = [];
+  let lead;
+  for (let simulatedMs = 0; simulatedMs <= 12000; simulatedMs += 1000) {
+    lead = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery?.encounterLead);
+    if (lead?.available === true && lead.mode === expectedMode) break;
+    assert.ok(simulatedMs < 12000, `No ${expectedMode} encounter lead after twelve simulated seconds: ${JSON.stringify(lead)}`);
+    cadenceReceipts.push(await advanceGameplay(page, 1000));
+  }
+  await writeFile(`output/release-evidence/current/walking-${expectedMode}-cadence.json`, JSON.stringify({
+    evidenceScope: 'functional simulation cadence; not physical responsiveness', cadenceReceipts, lead
+  }, null, 2));
   const directInteraction = await page.evaluate(() => {
     const direct = document.getElementById('urbanVehiclePrompt');
     const lead = document.getElementById('discoveryContextPrompt');
@@ -313,7 +323,8 @@ try {
   });
   await gpsContext.grantPermissions(['geolocation'], { origin });
   const gpsPage = await gpsContext.newPage();
-  gpsFixStream = createGpsFixStream(await gpsContext.newCDPSession(gpsPage));
+  const gpsSensor = await installGpsSensorFixture(gpsPage, { latitude: 39.2904, longitude: -76.6122, accuracy: 6, speed: 0, heading: 0 });
+  gpsFixStream = createGpsFixStream(gpsSensor);
   await gpsFixStream.send('Emulation.setGeolocationOverride', { latitude: 39.2904, longitude: -76.6122, accuracy: 6, speed: 0, heading: 0 });
   await instrument(gpsPage);
   await gpsPage.goto(`${baseUrl}/app/`, { waitUntil: 'load', timeout: 120_000 });
@@ -390,7 +401,7 @@ try {
     noBrowserErrors: browserErrors.length === 0,
     noFailedLocalResources: localFailures.length === 0
   };
-  const report = { ok: Object.values(checks).every(Boolean), contract: 'walking-encounters-v2', checks, freeDirectPromptPlacement, freeLead, freeAccepted, gpsDirectPromptPlacement, gpsLead, gpsAccepted, browserErrors, localFailures };
+  const report = { ok: Object.values(checks).every(Boolean), contract: 'walking-encounters-v2', gpsInput: 'simulated browser sensor with fresh fixes; not native device GPS acceptance', cadence: 'validated fixed-step simulation; not physical responsiveness', checks, freeDirectPromptPlacement, freeLead, freeAccepted, gpsDirectPromptPlacement, gpsLead, gpsAccepted, browserErrors, localFailures };
   const output = process.env.WE3D_VERIFY_VERBOSE === '1' ? report : {
     ok: report.ok,
     contract: report.contract,
