@@ -570,11 +570,12 @@ async function runVehicleEquipmentJourney() {
     assert.equal(approach?.reached, true, 'Normal walking input could not reach the vehicle door prompt.');
     const entering = approach.arrival.state;
     const entryTiming = await advanceGameplay(page, 650);
-    await page.waitForFunction((vehicleId) => {
-      const urban = globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox;
-      return urban?.phase === 'driving' && urban.activeVehicleId === vehicleId;
-    }, vehicle.id, { timeout: 8_000, polling: 100 });
+    // The fixed-step burst exceeds the 560ms door transition. Read its result
+    // directly: an injected polling task can miss its wall deadline while the
+    // software compositor is busy even though entry has already completed.
     const entered = await diagnostics(page);
+    assert.equal(entered.urbanSandbox?.phase, 'driving', 'Entry transition did not finish after 800ms of simulation.');
+    assert.equal(entered.urbanSandbox?.activeVehicleId, vehicle.id, 'Entry selected the wrong vehicle.');
     // Preserve trusted keyboard input while measuring actual simulation time.
     // A slow cloud renderer can consume the entire wall wait in one frame.
     const driveReceipts = [];

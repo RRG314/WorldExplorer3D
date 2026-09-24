@@ -28,8 +28,9 @@ async function selectPaintTownAndStart(page) {
   await page.waitForSelector('#globeHubOverlay:not([hidden]) #tab-games.active', { timeout: 10_000 });
   const paintTownMode = page.locator('.mode[data-mode="painttown"]');
   await paintTownMode.evaluate((element) => element.scrollIntoView({ block: 'center', inline: 'nearest' }));
-  await paintTownMode.focus();
-  await paintTownMode.press('Enter');
+  // Exercise the touch user's visible choice; wide-touch hit testing is also
+  // covered by the actual DOM/CSS fixture that precedes this journey.
+  await paintTownMode.tap();
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().gameMode === 'painttown', null, { timeout: 10_000 });
   await page.screenshot({ path: SCREEN_TITLE_PATH, fullPage: true });
   await page.click('#globeHubOverlayCloseBtn');
@@ -228,7 +229,18 @@ async function run() {
     });
 
     await page.goto(APP_URL, { waitUntil: 'load', timeout: 120_000 });
-    await selectPaintTownAndStart(page);
+    try {
+      await selectPaintTownAndStart(page);
+    } catch (error) {
+      report.selectionFailure = await page.evaluate(() => ({
+        mode: globalThis.getWorldExplorerRuntimeDiagnostics?.().gameMode,
+        focus: document.activeElement?.outerHTML?.slice(0, 500),
+        selected: [...document.querySelectorAll('.mode.sel')].map(element => element.dataset.mode),
+        overlayHidden: document.getElementById('globeHubOverlay')?.hidden
+      })).catch(() => null);
+      await page.screenshot({ path: SCREEN_TITLE_PATH, timeout: 10000 }).catch(() => {});
+      throw error;
+    }
     await waitForPaintTownRuntime(page);
     report.runtime = await capturePaintTownRuntime(page);
     await page.screenshot({ path: SCREEN_GAME_PATH, fullPage: true });
