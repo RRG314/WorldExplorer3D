@@ -490,13 +490,17 @@ async function waitForResponderDispatch(page) {
   }
 }
 
-async function meetResponderUntilOfficer(page, timeoutMs = 45_000) {
-  const deadline = Date.now() + timeoutMs;
+async function meetResponderUntilOfficer(page, simulationBudgetMs = 45_000) {
+  const deadline = Date.now() + (process.env.CI ? 300_000 : simulationBudgetMs);
   const trace = [];
-  while (Date.now() < deadline) {
+  let simulatedMs = 0;
+  while (Date.now() < deadline && simulatedMs < simulationBudgetMs) {
     const state = await diagnostics(page);
     const responders = state.urbanSandbox?.responders?.responders || [];
-    if (responders.some((entry) => !!entry.officer)) return state;
+    if (responders.some((entry) => !!entry.officer)) {
+      state.__responderMeetTrace = trace;
+      return state;
+    }
     const responder = responders.slice().sort((left, right) =>
       Number(left.distanceToActor ?? Infinity) - Number(right.distanceToActor ?? Infinity))[0] || null;
     trace.push({
@@ -510,8 +514,10 @@ async function meetResponderUntilOfficer(page, timeoutMs = 45_000) {
     // The response vehicle owns this approach. Moving toward it continually
     // changes its destination and does not represent a player holding at the
     // reported incident while a dispatched unit arrives.
-    await advanceGameplay(page, 240);
-    await page.waitForTimeout(60);
+    const timing = await advanceGameplay(page, Math.min(1000, simulationBudgetMs - simulatedMs));
+    simulatedMs += timing.simulatedMs;
+    trace[trace.length - 1].timing = timing;
+    trace[trace.length - 1].simulatedMs = simulatedMs;
   }
   const final = await diagnostics(page);
   final.__responderMeetTrace = trace.slice(-20);
