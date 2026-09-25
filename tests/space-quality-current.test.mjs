@@ -85,3 +85,15 @@ test('a stalled Pathfinder model cannot hang boarding or attach after its deadli
     assert.equal(host.children.length,1,'late model must not replace a resolved fallback');
   } finally {console.warn=originalWarn;}
 });
+
+
+test('unresolved planet textures join at longitude and poles without painted seams',async()=>{
+  const {fillPlanetSurface}=await import('../app/js/universe/planet-surface.js');
+  const width=33,height=17,profile={seed:17,kind:'arid-rocky',palette:[0x886644,0xccaa88,0x554433]};
+  const pixels=fillPlanetSurface(profile,width,height,new Uint8ClampedArray(width*height*4));
+  const pixel=(x,y)=>[...pixels.slice((y*width+x)*4,(y*width+x)*4+4)];
+  for(let y=0;y<height;y++)assert.deepEqual(pixel(0,y),pixel(width-1,y));
+  for(const y of [0,height-1])for(let x=1;x<width;x++)assert.deepEqual(pixel(0,y),pixel(x,y));
+  assert.deepEqual(pixels,fillPlanetSurface(profile,width,height,new Uint8ClampedArray(pixels.length)));
+  assert.notDeepEqual(pixels,fillPlanetSurface({...profile,seed:18},width,height,new Uint8ClampedArray(pixels.length)));
+});

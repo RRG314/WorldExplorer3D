@@ -1,3 +1,4 @@
+import { fillPlanetSurface } from './planet-surface.js?v=1';
 import { createNebulaVolume } from './nebula-volume.js?v=1';
 import { createBlackHoleVisual } from './black-hole.js?v=4';
 import { createRoundStarMaterial } from '../sky/star-point-material.js?v=4';
@@ -105,57 +106,9 @@ function createPlanetTexture(profile, mobile) {
   canvas.width = size;
   canvas.height = size / 2;
   const context = canvas.getContext('2d');
-  const random = seededRandom(profile.seed);
-  const colors = profile.palette.map((color) => `#${new THREE.Color(color).getHexString()}`);
-  const gas = ['gas-giant', 'ice-giant', 'mini-neptune'].includes(profile.kind);
-  const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
-  for (let stop = 0; stop <= 8; stop += 1) {
-    const jitter = gas ? random() * 0.08 : random() * 0.22;
-    gradient.addColorStop(Math.min(1, stop / 8), colors[(stop + Math.floor(jitter * 10)) % colors.length]);
-  }
-  context.fillStyle = gradient;
-  context.fillRect(0, 0, canvas.width, canvas.height);
-
-  if (gas) {
-    for (let band = 0; band < 34; band += 1) {
-      const y = random() * canvas.height;
-      const thickness = 1 + random() * (mobile ? 4 : 7);
-      context.globalAlpha = 0.08 + random() * 0.23;
-      context.fillStyle = colors[(band + 1) % colors.length];
-      context.fillRect(0, y, canvas.width, thickness);
-    }
-    if (profile.kind === 'gas-giant') {
-      context.globalAlpha = 0.48;
-      context.fillStyle = colors[2];
-      context.beginPath();
-      context.ellipse(canvas.width * (0.25 + random() * 0.5), canvas.height * (0.48 + random() * 0.18), canvas.width * 0.075, canvas.height * 0.045, 0, 0, Math.PI * 2);
-      context.fill();
-    }
-  } else {
-    for (let feature = 0; feature < (mobile ? 65 : 130); feature += 1) {
-      const x = random() * canvas.width;
-      const y = random() * canvas.height;
-      const width = 5 + random() * canvas.width * 0.12;
-      const height = 2 + random() * canvas.height * 0.1;
-      context.globalAlpha = 0.08 + random() * 0.34;
-      context.fillStyle = colors[feature % colors.length];
-      context.beginPath();
-      context.ellipse(x, y, width, height, random() * Math.PI, 0, Math.PI * 2);
-      context.fill();
-    }
-    if (profile.kind === 'lava-world') {
-      context.globalAlpha = 0.7;
-      context.strokeStyle = colors[1];
-      context.lineWidth = mobile ? 2 : 3;
-      for (let flow = 0; flow < 16; flow += 1) {
-        context.beginPath();
-        context.moveTo(random() * canvas.width, random() * canvas.height);
-        context.bezierCurveTo(random() * canvas.width, random() * canvas.height, random() * canvas.width, random() * canvas.height, random() * canvas.width, random() * canvas.height);
-        context.stroke();
-      }
-    }
-  }
-  context.globalAlpha = 1;
+  const pixels = context.createImageData(canvas.width, canvas.height);
+  fillPlanetSurface(profile, canvas.width, canvas.height, pixels.data);
+  context.putImageData(pixels, 0, 0);
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = THREE.RepeatWrapping;
   if (typeof THREE.SRGBColorSpace !== 'undefined') texture.colorSpace = THREE.SRGBColorSpace;

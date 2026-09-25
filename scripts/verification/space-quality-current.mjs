@@ -19,7 +19,8 @@ try {
  await page.waitForFunction(()=>document.getElementById('startBtn')?.disabled===false,null,{timeout:120000});
  await page.evaluate(()=>{document.getElementById('spaceLaunchToggle')?.click();document.getElementById('startBtn')?.click();});
  await page.waitForFunction(()=>JSON.parse(window.render_game_to_text?.()||'{}').modes?.space===true,null,{timeout:180000});
- await page.waitForFunction(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return ctx.spaceFlight?.celestialCatalog?.starEntries?.length>=700;});
+ await page.evaluate(async()=>{window.__spaceQualityContext=(await import('/app/js/shared-context.js?v=55')).ctx;});
+ await page.waitForFunction(()=>window.__spaceQualityContext.spaceFlight?.celestialCatalog?.starEntries?.length>=700);
  // Explicit scene fixtures isolate selection and geometry; they are not a full travel journey.
  const selected=await page.evaluate(async()=>{
   const {ctx}=await import('/app/js/shared-context.js?v=55');
@@ -54,16 +55,16 @@ try {
   if(!action)throw Error('Missing ship boarding action');
   action.click();
  });
- await page.waitForFunction(async()=>{
-  const {ctx}=await import('/app/js/shared-context.js?v=55');let count=0;
+ await page.waitForFunction(()=>{
+  const ctx=window.__spaceQualityContext;let count=0;
   ctx.activeInterior?.group?.traverse(o=>{if(o.userData.curatedCharacterAssetId)count++;});return count===7;
  },null,{timeout:60000});
  const interior=await page.evaluate(async()=>{
   const {ctx}=await import('/app/js/shared-context.js?v=55');const pending=[];
   ctx.activeInterior.group.traverse(o=>{if(o.userData.furnishingReady)pending.push(o.userData.furnishingReady);});
-  const loaded=await Promise.all(pending);return {furnishings:loaded.length,loaded:loaded.filter(Boolean).length,near:ctx.camera.near};
+  const loaded=await Promise.all(pending);let crew=0;ctx.activeInterior.group.traverse(o=>{if(o.userData.curatedCharacterAssetId)crew++;});return {crew,furnishings:loaded.length,loaded:loaded.filter(Boolean).length,near:ctx.camera.near};
  });
- assert.equal(interior.loaded,interior.furnishings);assert.ok(interior.loaded>20);assert.equal(interior.near,.05);checks.push({name:'free-exploration-crew-furnishings',...interior});
+ assert.equal(interior.crew,7);assert.equal(interior.loaded,interior.furnishings);assert.ok(interior.loaded>20);assert.equal(interior.near,.05);checks.push({name:'free-exploration-crew-furnishings',...interior});
  for(const [deck,x,z,yaw,label] of [['command',0,27,0,'bridge'],['habitat',-6,0,-Math.PI/2,'quarters'],['habitat',-5,15,-Math.PI/2,'medical'],['engineering',4,0,Math.PI/2,'cargo']]) {
   await page.evaluate(async({deck,x,z,yaw})=>{
    const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.switchSolisReachDeck(deck);
@@ -74,7 +75,7 @@ try {
  const exited=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.exitExpeditionShipInterior();return {near:ctx.camera.near,active:ctx.spaceFlight.active};});
  assert.equal(exited.near,.5);assert.equal(exited.active,true);checks.push({name:'interior-exit-restores-camera',...exited});
  await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.travelToUniverseDestination('orion-nebula');});
- await page.waitForFunction(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return ctx.universeRuntime.current.id==='orion-nebula'&&!ctx.universeRuntime.transition;},null,{timeout:30000});
+ await page.waitForFunction(()=>{const ctx=window.__spaceQualityContext;return ctx.universeRuntime.current.id==='orion-nebula'&&!ctx.universeRuntime.transition;},null,{timeout:30000});
  for(const [label,x,z] of [['outside',0,13000],['edge',0,6500],['inside',1400,0]]) {
   const state=await page.evaluate(async({x,z})=>{
    const {ctx}=await import('/app/js/shared-context.js?v=55');cancelAnimationFrame(ctx.spaceFlight.animationId);
