@@ -17,7 +17,7 @@ function projectPhysicalBody(id) {
     physicalRadiusKm: body.physical.meanRadiusM / 1000,
     meanDistanceAU: body.physical.meanSolarDistanceM / METERS_PER_AU,
     meanDistanceKM: body.physical.meanSolarDistanceM / 1000,
-    texture: body.presentation.globalTexturePath,
+    texture: body.presentation.orbitalTexturePath || body.presentation.globalTexturePath,
     landingMode: body.exploration.landingMode,
     bodyCatalogVersion: body.catalogVersion
   };

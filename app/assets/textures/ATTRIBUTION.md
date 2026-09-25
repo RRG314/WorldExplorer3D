@@ -101,3 +101,5 @@ Nebula `*-nebula-density.jpg` derivatives retain the credits of their correspond
 
 ## Ice-giant maps and Saturn ring profile (September 25, 2026)
 NASA Visualization Technology Applications and Development (VTAD), base-color images extracted from the NASA glTF downloads: https://science.nasa.gov/resource/uranus-3d-model/, https://science.nasa.gov/resource/neptune-3d-model/, and https://science.nasa.gov/resource/saturn-3d-model/. Uranus/Neptune maps are 1024×512 visualization products, not current weather; Saturn rings preserve the source alpha profile. NASA media usage guidelines apply. Saturn globe atlas is cube-projected; scripts/bake-saturn-atlas.mjs resamples the model’s declared mesh UVs to a 2048×1024 cylindrical runtime map. Only rasterization gaps near poles are filled from neighboring samples.
+
+Venus orbital clouds: NASA VTAD base-color texture from https://science.nasa.gov/resource/venus-3d-model/ (Venus_1_12103.glb). This visualization texture is used only for the cloudy orbital appearance; Magellan radar context is retained for the surface.

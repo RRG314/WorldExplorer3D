@@ -68,3 +68,20 @@ test('Earth environment refresh cannot relight a ship interior or solid world', 
  ensureHdrEnvironment(engine);assert.equal(scene.environment,null);
  appCtx.activePlanetaryBodyId=null;ensureHdrEnvironment(engine);assert.equal(scene.environment,map);
 });
+
+test('Pluto and Ceres retain round geometry and catalog imagery in the named-body renderer', async()=>{
+ const {createNamedAsteroids}=await import('../app/js/solar-system/minor-bodies.js');
+ const {NAMED_ASTEROIDS}=await import('../app/js/solar-system/catalog.js');
+ const previous=globalThis.THREE;
+ globalThis.THREE={...THREE,TextureLoader:class{load(path){const t=new THREE.Texture();t.userData={path};return t;}}};
+ try{
+  const state={solarSystem:{group:new THREE.Group()},NAMED_ASTEROIDS:NAMED_ASTEROIDS.filter(b=>['Pluto','Ceres'].includes(b.name)),getEarthHelioPos:()=>({}),createLabel:()=>{},normalizeAngle:a=>a,computeOrbitalPosition:()=>({}),ASTEROID_BELT:{visualScale:1},AU_TO_SCENE:1,helioToScene:()=>({x:0,y:0,z:0}),distanceAU:()=>0};
+  createNamedAsteroids(state);
+  assert.equal(state.solarSystem.asteroidMeshes.length,2);
+  for(const {mesh,asteroid} of state.solarSystem.asteroidMeshes){
+   const p=mesh.geometry.attributes.position;
+   for(let i=0;i<p.count;i++)assert.ok(Math.abs(Math.hypot(p.getX(i),p.getY(i),p.getZ(i))-asteroid.radiusScaled)<1e-4);
+   assert.ok(mesh.material.map.userData.path.endsWith('.jpg'));assert.equal(mesh.material.flatShading,false);
+  }
+ }finally{globalThis.THREE=previous;}
+});

@@ -206,7 +206,7 @@ const bodyRows = [
     atmosphere: { class: ATMOSPHERE_CLASS.DENSE, referencePressurePa: 9_200_000, composition: ['carbon_dioxide', 'nitrogen'] },
     exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'venus', requiresProtectedSurfaceCapability: true },
     frames: { inertial: 'J2000', bodyFixed: 'IAU_VENUS' },
-    presentation: { environmentId: 'VENUS', globalTexturePath: '/app/assets/textures/venus_magellan.jpg', surfaceLabel: 'Venus surface' },
+    presentation: { environmentId: 'VENUS', orbitalTexturePath: '/app/assets/textures/venus-nasa-vtad-clouds.jpg', globalTexturePath: '/app/assets/textures/venus_magellan.jpg', surfaceLabel: 'Venus surface' },
     provenanceSources: sharedPlanetSources
   }),
   makeBody({
