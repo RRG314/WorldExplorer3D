@@ -56,7 +56,9 @@ function createAtmosphericSky(body, style) {
         float c = altitude * (2.0 + altitude);
         float discriminant = b*b-c;
         float elevation = dot(normalize(radial), ray);
-        vec3 color = mix(hazeColor, skyColor, smoothstep(-0.02, 0.55, elevation));
+        float aboveHaze=smoothstep(35000.0,180000.0,altitude*radiusM);
+        vec3 overhead=mix(skyColor,vec3(.001),aboveHaze);
+        vec3 color = mix(hazeColor, overhead, smoothstep(-0.02, 0.55, elevation));
         if (discriminant > 0.0 && b < 0.0) {
           float distance = c / (-b + sqrt(discriminant));
           vec3 point = normalize(origin + ray * distance);
@@ -74,16 +76,19 @@ function createAtmosphericSky(body, style) {
           float stepLength=segment/12.0;
           vec3 cloudLight=vec3(0.0);
           float transmission=1.0;
+          // Per-ray sample offset removes coherent slice bands at grazing angles.
+          float sampleOffset=cloudHash(vec3(gl_FragCoord.xy,17.0));
           for(int step=0;step<12;step++) {
-            vec3 samplePoint=origin+ray*(entry+(float(step)+.5)*stepLength);
+            vec3 samplePoint=origin+ray*(entry+(float(step)+sampleOffset)*stepLength);
             float height=(length(samplePoint)-1.0)/top;
             vec3 q=samplePoint*(radiusM/11000.0);
             float broad=cloudNoise(q);
             float detail=cloudNoise(q*3.1+vec3(broad*2.0));
-            float density=smoothstep(.34,.72,broad*.75+detail*.25);
-            density*=1.0-smoothstep(.45,1.0,height);
+            float cloudTop=.25+.75*broad;
+            float density=smoothstep(.28,.65,broad*.62+detail*.38);
+            density*=1.0-smoothstep(cloudTop-.2,cloudTop,height);
             float alpha=1.0-exp(-density*stepLength*radiusM/1800.0);
-            float shade=.5+.5*smoothstep(0.0,.8,height);
+            float shade=.42+.78*smoothstep(0.0,cloudTop,height);
             vec3 lit=mix(observed,hazeColor*.8,.32)*shade;
             cloudLight+=transmission*alpha*lit;
             transmission*=1.0-alpha;
@@ -170,7 +175,7 @@ function updateAtmosphericFlightPresentation(bodyId, options = {}) {
   uniforms.radial.value.normalize();
   const altitudeM = Number.isFinite(options.altitudeM) ? options.altitudeM : 20000;
   uniforms.relativeAltitude.value = altitudeM / (presentation.body.physical.meanRadiusM);
-  uniforms.immersion.value = Math.min(0.96, Math.max(0, -altitudeM / 25000));
+  uniforms.immersion.value = Math.min(0.995, 1 - Math.exp(-Math.max(0, -altitudeM) / 1600));
   return true;
 }
 

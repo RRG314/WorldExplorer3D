@@ -150,7 +150,7 @@ try {
     if(!presentation)throw Error('Atmospheric journey did not create its renderer');
     presentation.dome.material.uniforms.radial.value.set(radial.x,radial.y,radial.z).normalize();
     presentation.dome.material.uniforms.relativeAltitude.value=altitudeM/presentation.body.physical.meanRadiusM;
-    presentation.dome.material.uniforms.immersion.value=Math.min(.96,Math.max(0,-altitudeM/25000));
+    presentation.dome.material.uniforms.immersion.value=Math.min(.995,1-Math.exp(-Math.max(0,-altitudeM)/1600));
     flight.camera.position.copy(flight.rocket.position).add(new THREE.Vector3(0,2,0));
     flight.camera.up.set(radial.x,radial.y,radial.z).normalize();flight.camera.lookAt(flight.rocket.position.clone().add(new THREE.Vector3(-180,-65,-300)));flight.camera.updateMatrixWorld(true);
    },{bodyId,altitudeM});
