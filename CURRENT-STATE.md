@@ -4,45 +4,43 @@ Work only in `/Users/stevenreid/Developer/WorldExplorer3D-release-integration`,
 branch `steven/post-5.2-release-integration`, draft PR #87 into `stable`.
 Do not edit the older Documents checkout. Verify Git status and HEAD first.
 
-## Active space-quality work (September 25)
+## Final space candidate (September 25)
 
-Runtime fixes are committed through `c1396f13` and pushed to the integration
-branch. Evidence: `output/release-integration/ship-overhaul-2026-09-25/LEDGER.md`.
-User expanded scope to actual visual quality for planets, flyovers and nebulae.
-Implemented legacy-avatar removal and r128 resource ownership fixes, isolated
-Earth lighting/environment, regional map UVs, sourced replacement NASA maps,
-rounded/textured dwarf planets, Saturn ring imagery, Venus orbital clouds,
-body-fixed giant cloud volumes, nebula filaments and surface material relief.
+Runtime frozen at fef3e82a; the following commit corrects only an outdated Venus
+catalog test and this handoff. No game assets changed after final browser checks.
+Evidence: output/release-integration/ship-overhaul-2026-09-25/LEDGER.md and
+RELEASE-CANDIDATE.md. Read the hosted identity receipt there for the deployed
+staging candidate; URL query labels are not deployment proof.
 
-Latest verification:
-- `36145930173` (87383f2d): space-quality passed, including actual camera toggles
-  around one curated player, seven crew, 39 furnishings, star selection/travel,
-  orbital gallery, three nebula viewpoints and four giant-atmosphere fixtures.
-- `36145793381` (f691e47b): space-release passed, including 55 component cases,
-  local physics, Jupiter entry/return continuity, resource lifecycle and journey.
-- `36146107547` (c1396f13): ten-world cache/render check passed after correcting
-  a Three r128 shader macro collision. Earlier run36145720979 failed and stays
-  recorded as failed. Ground/aerial screenshots reviewed; no GPU errors in rerun.
-- Prescribed game-client-smoke passed in run36143533121 (439ee461); later
-  changes have focused scene/transition evidence, not renewed input-smoke evidence.
-All consuming runs completed; temporary App Check registrations/files/GitHub
-secret have been revoked/removed. No local test browser/server left running.
+Final runtime additions: owned indoor PMREM reflections for metallic licensed
+furniture and metre-scaled bulkhead/deck panels. Reflections are released on exit;
+Earth environment ownership is restored. Reviewed bridge, quarters, medical and
+cargo screenshots. Rooms and some fittings remain stylized; a complete new art
+kit or measured reconstruction of local extraterrestrial terrain is not claimed.
 
-**Not globally visually accepted or production-ready.** Orbital assets and
-nebula structure visibly improved; gas flyover is a modeled cloud volume with
-observed global color and no repeated floor tiles, still limited close-up detail.
-Local landing terrain remains sparse/generic; primitive rover art remains.
-Solis Reach architecture/art overhaul is not complete; some rooms remain
-boxy and furnishings dark. Free modular Sketchfab kit download was blocked by
-Chrome; owner help requested once, still pending. Existing licensed assets are
-available. Pluto source has unobserved polar gaps; do not call its coverage complete.
-Full physical-device responsiveness/phone acceptance remains unverified.
+- Remote 36191268666: space-quality, prescribed game-client-smoke and space-release
+  all passed. Includes rendered galleries, camera modes, crew/furnishings,
+  atmospheric entry/return, space resource lifecycle and player journeys.
+- Remote 36191360361: source-graph, artifact-world, artifact-integrity and
+  release-identity passed. current-contracts failed one stale expectation that
+  Venus orbit use the surface radar image instead of its new cloud image.
+- Corrected that expectation while retaining physical facts and adding a separate
+  orbital/surface imagery assertion. Final sequential local component run passed
+  all 1377 cases; no skipped/TODO cases. This is not 1377 player journeys.
+- Latest ten-solid-world render/cache check remains passed at c1396f13; subsequent
+  runtime changes are ship-only. Do not rerun that check without relevant changes.
+- Live production inventory: 78 Functions ACTIVE, 11 indexes READY, no pagination.
+  This is deployment-state evidence, not execution of every live Function.
 
-Staging remains `5.3.0+d56a763ee585.60de62d12b1bd025.staging`; production remains
-`5.2.0+db62593ba377.6342cddaba06fc68.production`. No deployment this session.
-The owner authorized production only after reported issues are fixed.
-Ordinary Chrome remains open. Approximately 3.9 GiB disk free; heavy browser
-checks used authorized GitHub runners, not concurrent local WebGL workloads.
+Production remains 5.2.0+db62593ba377.6342cddaba06fc68.production. Full production
+promotion remains blocked by incomplete/stale release-wide execution manifests
+and unverified physical-device/owner phone acceptance. Do not manufacture approval
+or reinterpret focused passes as the complete release matrix. Backend, billing
+and performance evidence limits below still apply. The owner deferred phone testing.
+
+Keep ordinary Chrome open. Approximately 7 GiB free; no local WebGL tests used.
+Temporary staging App Check consumers are runs 36191268666 and 36191360361; see
+output/release-integration/live-checks/ship-final-appcheck.json for cleanup state.
 
 ## Historical space-quality checkpoint (September 24)
 

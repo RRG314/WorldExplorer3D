@@ -128,12 +128,20 @@ test('solar-system render projection no longer owns physical body facts', () => 
     assert.equal(projected.name, canonical.name);
     assert.equal(projected.massKg, canonical.physical.massKg);
     assert.equal(projected.physicalRadiusKm, canonical.physical.meanRadiusM / 1000);
-    assert.equal(projected.texture, canonical.presentation.globalTexturePath);
+    assert.equal(projected.texture, canonical.presentation.orbitalTexturePath || canonical.presentation.globalTexturePath);
     assert.equal(projected.landingMode, canonical.exploration.landingMode);
     assert.equal(projected.bodyCatalogVersion, BODY_CATALOG_VERSION);
     assert.ok(projected.radiusScaled > 0, `${canonical.id} needs an explicit visual radius`);
     assert.ok(Number.isFinite(projected.a0), `${canonical.id} needs its orbit approximation`);
   });
+});
+
+test('Venus orbital clouds remain separate from its radar surface imagery', () => {
+  const venus = getAstronomicalBody('venus');
+  const orbital = SOLAR_SYSTEM_PLANETS.find(body => body.bodyId === 'venus');
+  assert.equal(orbital.texture, venus.presentation.orbitalTexturePath);
+  assert.notEqual(orbital.texture, venus.presentation.globalTexturePath);
+  assert.equal(venus.presentation.globalTexturePath, '/app/assets/textures/venus_magellan.jpg');
 });
 
 test('current Earth Moon Mars compatibility values remain unchanged', () => {
