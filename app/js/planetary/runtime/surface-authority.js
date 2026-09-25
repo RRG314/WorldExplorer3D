@@ -321,7 +321,7 @@ const IO_TVASHTAR_SURFACE_REGION = createModeledMissionSurface({
   verticalDatum: 'Modeled regional relief informed by Voyager and Galileo morphology; not local elevation data',
   source: {
     title: 'Io global color mosaic from Voyager and Galileo imagery',
-    url: 'https://science.nasa.gov/resource/io-the-volcanic-moon/',
+    url: 'https://science.nasa.gov/3d-resources/jupiter-io-b/',
     provider: 'NASA/JPL/USGS',
     attribution: 'NASA/JPL/USGS',
     rights: 'NASA and USGS source imagery is used with mission credit retained.',
@@ -330,8 +330,8 @@ const IO_TVASHTAR_SURFACE_REGION = createModeledMissionSurface({
   asset: {
     id: 'io-voyager-galileo-context',
     role: 'albedo',
-    url: '/app/assets/textures/io-voyager-galileo.jpg',
-    sourceProduct: 'Voyager/Galileo Io global color mosaic PIA09257'
+    url: '/app/assets/textures/io-jpl-galileo-map.jpg',
+    sourceProduct: 'NASA 3D Resources USGS Voyager map with Galileo color'
   },
   rollbackId: 'io-tvashtar-modeled-runtime-v1'
 });
@@ -346,7 +346,7 @@ const EUROPA_CONAMARA_SURFACE_REGION = createModeledMissionSurface({
   verticalDatum: 'Modeled regional relief informed by Voyager and Galileo imaging; not local elevation data',
   source: {
     title: 'Europa global views from Voyager and Galileo imagery',
-    url: 'https://science.nasa.gov/resource/europa-in-true-color/',
+    url: 'https://science.nasa.gov/3d-resources/jupiter-europa/',
     provider: 'NASA/JPL-Caltech/SETI Institute',
     attribution: 'NASA/JPL-Caltech/SETI Institute',
     rights: 'NASA mission imagery is used with mission credit retained.',
@@ -355,8 +355,8 @@ const EUROPA_CONAMARA_SURFACE_REGION = createModeledMissionSurface({
   asset: {
     id: 'europa-voyager-galileo-context',
     role: 'albedo',
-    url: '/app/assets/textures/europa-voyager-galileo.jpg',
-    sourceProduct: 'Voyager/Galileo Europa global views PIA01295'
+    url: '/app/assets/textures/europa-usgs-voyager-map.jpg',
+    sourceProduct: 'NASA 3D Resources USGS Voyager cylindrical map'
   },
   rollbackId: 'europa-conamara-modeled-runtime-v1'
 });
@@ -380,7 +380,7 @@ const TITAN_SHANGRI_LA_SURFACE_REGION = createModeledMissionSurface({
   asset: {
     id: 'titan-cassini-iss-context',
     role: 'near-infrared-albedo',
-    url: '/app/assets/textures/titan-cassini-iss.jpg',
+    url: '/app/assets/textures/titan-cassini-map-unlabelled.jpg',
     resolutionM: 4000,
     sourceProduct: 'Cassini ISS Titan global map PIA19658'
   },
@@ -396,19 +396,18 @@ const ENCELADUS_SOUTH_POLAR_SURFACE_REGION = createModeledMissionSurface({
   coordinateSystem: 'IAU Enceladus planetocentric latitude / positive-east longitude',
   verticalDatum: 'Modeled regional relief informed by Cassini imaging; not local elevation data',
   source: {
-    title: 'Cassini global infrared and visible Enceladus mosaic',
-    url: 'https://science.nasa.gov/resource/enceladus-global-color-mosaic/',
+    title: 'NASA VTAD Enceladus surface map',
+    url: 'https://science.nasa.gov/resource/enceladus-3d-model/',
     provider: 'NASA/JPL-Caltech/University of Arizona/LPG-CNRS-University of Nantes/Space Science Institute',
     attribution: 'NASA/JPL-Caltech/University of Arizona/LPG-CNRS/University of Nantes/Space Science Institute',
     rights: 'NASA mission imagery is used with mission credit retained.',
-    processing: 'Observed infrared/visible context is projected onto modeled fracture terrain; plume activity is presented as scientific context, not a guaranteed event.'
+    processing: 'NASA visualization map with source mosaic seams and coverage fill retained; mapped regional color is combined with modeled local relief, not measured elevation.'
   },
   asset: {
     id: 'enceladus-cassini-context',
     role: 'enhanced-color-albedo',
-    url: '/app/assets/textures/enceladus-cassini.jpg',
-    resolutionM: 200,
-    sourceProduct: 'Cassini VIMS/ISS Enceladus mosaic PIA24027'
+    url: '/app/assets/textures/enceladus-nasa-vtad-map.jpg',
+    sourceProduct: 'NASA VTAD Enceladus glTF base-color map'
   },
   rollbackId: 'enceladus-south-polar-modeled-runtime-v1'
 });
@@ -422,19 +421,18 @@ const TRITON_CANTALOUPE_SURFACE_REGION = createModeledMissionSurface({
   coordinateSystem: 'IAU Triton planetocentric latitude / positive-east longitude',
   verticalDatum: 'Modeled regional relief informed by Voyager 2 imagery; coverage is limited to the observed hemisphere',
   source: {
-    title: 'Voyager 2 enhanced-color global Triton map',
-    url: 'https://science.nasa.gov/resource/global-color-map-of-triton/',
+    title: 'NASA VTAD Triton surface map',
+    url: 'https://science.nasa.gov/resource/triton-3d-model/',
     provider: 'NASA/JPL-Caltech/Lunar & Planetary Institute',
     attribution: 'NASA/JPL-Caltech/Lunar & Planetary Institute',
     rights: 'NASA mission imagery is used with mission credit retained.',
-    processing: 'Observed color context is projected onto modeled cellular terrain; unobserved regions are not presented as mapped.'
+    processing: 'NASA visualization map with source mosaic seams and coverage fill retained; mapped regional color is combined with modeled local relief, not measured elevation.'
   },
   asset: {
     id: 'triton-voyager-context',
     role: 'enhanced-color-albedo',
-    url: '/app/assets/textures/triton-voyager.jpg',
-    resolutionM: 600,
-    sourceProduct: 'Voyager 2 Triton global map PIA18668'
+    url: '/app/assets/textures/triton-nasa-vtad-map.jpg',
+    sourceProduct: 'NASA VTAD Triton glTF base-color map'
   },
   rollbackId: 'triton-voyager-modeled-runtime-v1'
 });
@@ -448,19 +446,18 @@ const CERES_OCCATOR_SURFACE_REGION = createModeledMissionSurface({
   coordinateSystem: 'IAU Ceres planetocentric latitude / positive-east longitude',
   verticalDatum: 'Modeled regional relief informed by Dawn imaging; not local elevation data',
   source: {
-    title: 'Dawn enhanced-color Ceres map',
-    url: 'https://science.nasa.gov/resource/colorful-ceres/',
+    title: 'NASA VTAD Ceres surface map',
+    url: 'https://science.nasa.gov/resource/ceres-3d-model/',
     provider: 'NASA/JPL-Caltech/UCLA/MPS/DLR/IDA',
     attribution: 'NASA/JPL-Caltech/UCLA/MPS/DLR/IDA',
     rights: 'NASA mission imagery is used with mission credit retained.',
-    processing: 'Enhanced-color observed context is projected onto modeled crater terrain; colors emphasize compositional differences.'
+    processing: 'NASA visualization map with source mosaic seams and coverage fill retained; mapped regional color is combined with modeled local relief, not measured elevation.'
   },
   asset: {
     id: 'ceres-dawn-context',
     role: 'enhanced-color-albedo',
-    url: '/app/assets/textures/ceres-dawn-enhanced.jpg',
-    resolutionM: 140,
-    sourceProduct: 'Dawn Ceres enhanced-color map PIA20351'
+    url: '/app/assets/textures/ceres-nasa-vtad-map.jpg',
+    sourceProduct: 'NASA VTAD Ceres glTF base-color map'
   },
   rollbackId: 'ceres-occator-modeled-runtime-v1'
 });
@@ -474,18 +471,18 @@ const VESTA_RHEASILVIA_SURFACE_REGION = createModeledMissionSurface({
   coordinateSystem: 'IAU Vesta planetocentric latitude / positive-east longitude',
   verticalDatum: 'Modeled regional relief informed by Dawn imaging; not local elevation data',
   source: {
-    title: "Dawn false-color view of Vesta's southern hemisphere",
-    url: 'https://photojournal.jpl.nasa.gov/catalog/PIA15141',
+    title: 'NASA VTAD Vesta surface map',
+    url: 'https://science.nasa.gov/resource/vesta-3d-model/',
     provider: 'NASA/JPL-Caltech/UCLA/MPS/DLR/IDA',
     attribution: 'NASA/JPL-Caltech/UCLA/MPS/DLR/IDA',
     rights: 'NASA mission imagery is used with mission credit retained.',
-    processing: 'A clean observed-image window is projected onto modeled basin relief; false colors emphasize compositional differences and the local playable relief is not a measured DTM.'
+    processing: 'NASA visualization map with source mosaic seams and coverage fill retained; mapped regional color is combined with modeled local relief, not measured elevation.'
   },
   asset: {
     id: 'vesta-dawn-context',
     role: 'albedo',
-    url: '/app/assets/textures/vesta-dawn-false-color.jpg',
-    sourceProduct: 'Dawn Vesta southern hemisphere false-color view PIA15141'
+    url: '/app/assets/textures/vesta-nasa-vtad-map.jpg',
+    sourceProduct: 'NASA VTAD Vesta glTF base-color map'
   },
   rollbackId: 'vesta-rheasilvia-modeled-runtime-v1'
 });

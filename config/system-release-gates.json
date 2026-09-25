@@ -9,7 +9,7 @@
     "assembled-manhattan-diagnostic": { "scope": "diagnostic", "command": ["env", "WE3D_VERIFY_LOCATIONS=manhattan", "node", "scripts/verification/assembled-locations.mjs"], "artifactRequired": true, "timeoutMs": 600000 },
     "property-multiplayer-diagnostic": { "scope": "diagnostic", "command": ["node", "scripts/verification/backend-isolated.mjs", "--stages=connected-property-multiplayer"], "artifactRequired": true, "timeoutMs": 660000 },
     "chat-billing-diagnostic": { "scope": "diagnostic", "command": ["node", "scripts/verification/backend-isolated.mjs", "--stages=room-chat-gameplay,account-backend"], "artifactRequired": true, "timeoutMs": 1200000 },
-    "planetary-cache": { "scope": "diagnostic", "command": ["node", "scripts/verification/planetary-cache-current.mjs"], "artifactRequired": true, "timeoutMs": 240000 },
+    "planetary-cache": { "scope": "diagnostic", "command": ["node", "scripts/verification/planetary-cache-current.mjs"], "artifactRequired": true, "timeoutMs": 600000 },
     "multiplayer-diagnostic": { "scope": "diagnostic", "command": ["node", "scripts/verification/backend-isolated.mjs", "--stages=multiplayer"], "artifactRequired": true, "timeoutMs": 1020000 },
     "weather-location-ui": { "scope": "candidate", "command": ["node", "scripts/verification/weather-location-ui.mjs"], "artifactRequired": false, "timeoutMs": 45000 },
     "regional-london-diagnostic": { "scope": "diagnostic", "command": ["node", "scripts/verification/regional-world-richness.mjs", "--journey=london"], "artifactRequired": true, "timeoutMs": 600000 },

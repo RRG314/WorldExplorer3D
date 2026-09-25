@@ -95,7 +95,7 @@ function abortError(assetId) {
 }
 
 function disposeModelInstance(root, policy = {}) {
-  root?.removeFromParent?.();
+  root?.parent?.remove(root);
   const skeletons = new Set();
   root?.traverse?.((object) => {
     if (!object?.isMesh) return;

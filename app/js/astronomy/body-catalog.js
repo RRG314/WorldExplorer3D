@@ -296,7 +296,7 @@ const bodyRows = [
     atmosphere: { class: ATMOSPHERE_CLASS.EXOSPHERE, referencePressurePa: 0, composition: ['sulfur_dioxide'] },
     exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'io', experienceTier: 'featured' },
     frames: { inertial: 'J2000', bodyFixed: 'IAU_IO' },
-    presentation: { environmentId: 'IO', globalTexturePath: '/app/assets/textures/io-voyager-galileo.jpg', surfaceLabel: 'Tvashtar volcanic region' },
+    presentation: { environmentId: 'IO', globalTexturePath: '/app/assets/textures/io-jpl-galileo-map.jpg', surfaceLabel: 'Tvashtar volcanic region' },
     provenanceSources: sharedMoonSources
   }),
   makeBody({
@@ -305,7 +305,7 @@ const bodyRows = [
     atmosphere: { class: ATMOSPHERE_CLASS.EXOSPHERE, referencePressurePa: 0, composition: ['oxygen'] },
     exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'europa', experienceTier: 'featured' },
     frames: { inertial: 'J2000', bodyFixed: 'IAU_EUROPA' },
-    presentation: { environmentId: 'EUROPA', globalTexturePath: '/app/assets/textures/europa-voyager-galileo.jpg', surfaceLabel: 'Conamara Chaos region' },
+    presentation: { environmentId: 'EUROPA', globalTexturePath: '/app/assets/textures/europa-usgs-voyager-map.jpg', surfaceLabel: 'Conamara Chaos region' },
     provenanceSources: sharedMoonSources
   }),
   makeBody({
@@ -332,7 +332,7 @@ const bodyRows = [
     atmosphere: { class: ATMOSPHERE_CLASS.DENSE, referencePressurePa: 146_700, composition: ['nitrogen', 'methane', 'hydrogen'] },
     exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'titan', experienceTier: 'featured', requiresProtectedSurfaceCapability: true },
     frames: { inertial: 'J2000', bodyFixed: 'IAU_TITAN' },
-    presentation: { environmentId: 'TITAN', globalTexturePath: '/app/assets/textures/titan-cassini-iss.jpg', surfaceLabel: 'Shangri-La dunes' },
+    presentation: { environmentId: 'TITAN', globalTexturePath: '/app/assets/textures/titan-cassini-map-unlabelled.jpg', surfaceLabel: 'Shangri-La dunes' },
     provenanceSources: sharedMoonSources
   }),
   makeBody({
@@ -341,7 +341,7 @@ const bodyRows = [
     atmosphere: { class: ATMOSPHERE_CLASS.EXOSPHERE, referencePressurePa: 0, composition: ['water_vapor', 'carbon_dioxide'] },
     exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'enceladus', experienceTier: 'featured' },
     frames: { inertial: 'J2000', bodyFixed: 'IAU_ENCELADUS' },
-    presentation: { environmentId: 'ENCELADUS', globalTexturePath: '/app/assets/textures/enceladus-cassini.jpg', surfaceLabel: 'South polar terrain' },
+    presentation: { environmentId: 'ENCELADUS', globalTexturePath: '/app/assets/textures/enceladus-nasa-vtad-map.jpg', surfaceLabel: 'South polar terrain' },
     provenanceSources: sharedMoonSources
   }),
   makeBody({
@@ -350,7 +350,7 @@ const bodyRows = [
     atmosphere: { class: ATMOSPHERE_CLASS.THIN, referencePressurePa: 1.4, composition: ['nitrogen', 'methane'] },
     exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'triton', experienceTier: 'featured' },
     frames: { inertial: 'J2000', bodyFixed: 'IAU_TRITON' },
-    presentation: { environmentId: 'TRITON', globalTexturePath: '/app/assets/textures/triton-voyager.jpg', surfaceLabel: 'Voyager imaged hemisphere' },
+    presentation: { environmentId: 'TRITON', globalTexturePath: '/app/assets/textures/triton-nasa-vtad-map.jpg', surfaceLabel: 'Voyager imaged hemisphere' },
     provenanceSources: sharedMoonSources
   }),
   makeBody({
@@ -359,7 +359,7 @@ const bodyRows = [
     atmosphere: { class: ATMOSPHERE_CLASS.EXOSPHERE, referencePressurePa: 0, composition: ['water_vapor'] },
     exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'ceres', experienceTier: 'featured' },
     frames: { inertial: 'J2000', bodyFixed: 'IAU_CERES' },
-    presentation: { environmentId: 'CERES', globalTexturePath: '/app/assets/textures/ceres-dawn-enhanced.jpg', surfaceLabel: 'Occator crater region' },
+    presentation: { environmentId: 'CERES', globalTexturePath: '/app/assets/textures/ceres-nasa-vtad-map.jpg', surfaceLabel: 'Occator crater region' },
     provenanceSources: sharedSmallBodySources
   }),
   makeBody({
@@ -368,7 +368,7 @@ const bodyRows = [
     atmosphere: { class: ATMOSPHERE_CLASS.NONE, referencePressurePa: 0, composition: [] },
     exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'vesta', experienceTier: 'featured' },
     frames: { inertial: 'J2000', bodyFixed: 'IAU_VESTA' },
-    presentation: { environmentId: 'VESTA', globalTexturePath: '/app/assets/textures/vesta-dawn.jpg', surfaceLabel: 'Rheasilvia basin' },
+    presentation: { environmentId: 'VESTA', globalTexturePath: '/app/assets/textures/vesta-nasa-vtad-map.jpg', surfaceLabel: 'Rheasilvia basin' },
     provenanceSources: sharedSmallBodySources
   }),
   makeBody({

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {placeHand} from '../app/js/walking/held-equipment-pose.js';
 import {createEquipmentVisuals} from '../app/js/urban-sandbox/equipment-visuals.js';
-import {createFieldNavigatorMesh} from '../app/js/walking/field-navigator-mesh.js';
+import {createPlayerCharacterHost} from '../app/js/walking/player-character-host.js';
 import {updateCuratedCharacterAnimation} from '../app/js/walking/curated-explorer-character.js';
 
 test('two-bone hand placement reaches its target under a rotated parent without changing arm length',()=>{
@@ -21,7 +21,7 @@ test('two-bone hand placement reaches its target under a rotated parent without 
 test('equipping a firearm selects armed animation and hands restores ordinary locomotion',async()=>{
   // No loader in this small unit test: verify the controller-animation contract,
   // while the real GLBs and attachment are covered by the browser scene.
-  const character=createFieldNavigatorMesh(THREE),scene=new THREE.Scene();scene.add(character);
+  const character=createPlayerCharacterHost(THREE),scene=new THREE.Scene();scene.add(character);
   const actions=Object.fromEntries(['idle','walk','armedIdle','armedRun'].map(k=>[k,{setEffectiveWeight(w){this.weight=w;}}]));
   character.userData.characterMixer={update(){}};character.userData.characterActions=actions;
   const oldWarn=console.warn;console.warn=()=>{};

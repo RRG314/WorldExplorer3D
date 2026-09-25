@@ -47,9 +47,10 @@ function setPlanetaryCharacter(body = 'earth') {
   if (character.userData.curatedCharacterAssetId === desired.assetId) return true;
 
   disposeCuratedCharacter(character);
-  void attachCuratedExplorerCharacter(THREE, character, {
+  return attachCuratedExplorerCharacter(THREE, character, {
     assetId: desired.assetId,
     role: desired.role,
+    failClosed: true,
     // Environment transitions temporarily detach the character host while the
     // Earth scene is restored. The request remains valid as long as this is
     // still the authoritative player host and desired asset.
@@ -59,7 +60,6 @@ function setPlanetaryCharacter(body = 'earth') {
       assetId: desired.assetId
     })
   });
-  return true;
 }
 
 Object.assign(appCtx, { setPlanetaryCharacter });

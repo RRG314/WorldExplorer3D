@@ -73,3 +73,20 @@ Each source is a two-dimensional material surface with no triangle count. Runtim
 - Street imagery: Panoramax and KartaView community observations, CC BY-SA 4.0.
 - Global marine model guidance: Open-Meteo Marine Weather API under provider terms. Source: https://open-meteo.com/en/docs/marine-weather-api
 - United States water-level observations and tide predictions: NOAA Center for Operational Oceanographic Products and Services. Source: https://tidesandcurrents.noaa.gov/
+
+## September 25 space image correction
+- `europa-usgs-voyager-map.jpg`: USGS Voyager cylindrical Europa map, from NASA/JPL/Caltech's 3D resource. Replaces the unsuitable side-by-side globe illustration in runtime materials. Source: https://science.nasa.gov/3d-resources/jupiter-europa/ . USGS, JPL and Caltech credit retained. Native 1440×720 resolution; JPEG optimized locally.
+- `io-jpl-galileo-map.jpg`: Caltech/JPL/USGS map with Galileo global-mosaic color. Replaces a map illustration containing grid lines. Source: https://science.nasa.gov/3d-resources/jupiter-io-b/ . Native 1440×720; coverage/resolution vary.
+- `jupiter-hubble-opal-2015.jpg`: NASA/ESA/Goddard Hubble OPAL 2015, rotation 1, 3600×1800. Source: https://svs.gsfc.nasa.gov/12021/ . TIFF converted to JPEG. Observed coverage stops near ±80° latitude; the atmospheric view extends edge colors at the poles rather than claiming polar measurements. This is a historical map, not live cloud/weather data.
+
+## Surface maps corrected September 25
+
+- `triton-nasa-vtad-map.jpg`: base-color texture extracted from [NASA VTAD Triton glTF](https://science.nasa.gov/resource/triton-3d-model/), NASA mission imagery, NASA Visualization Technology Applications and Development. Conversion script records the exact public glTF URL and image name. Optimized JPEG, maximum 4096 pixels wide; coverage fill and mission mosaic seams are retained. These are visualization products, not measured local elevation or complete uniform-resolution surveys.
+
+- `ceres-nasa-vtad-map.jpg`: base-color texture extracted from [NASA VTAD Ceres glTF](https://science.nasa.gov/resource/ceres-3d-model/), NASA mission imagery, NASA Visualization Technology Applications and Development. Conversion script records the exact public glTF URL and image name. Optimized JPEG, maximum 4096 pixels wide; coverage fill and mission mosaic seams are retained. These are visualization products, not measured local elevation or complete uniform-resolution surveys.
+
+- `vesta-nasa-vtad-map.jpg`: base-color texture extracted from [NASA VTAD Vesta glTF](https://science.nasa.gov/resource/vesta-3d-model/), NASA mission imagery, NASA Visualization Technology Applications and Development. Conversion script records the exact public glTF URL and image name. Optimized JPEG, maximum 4096 pixels wide; coverage fill and mission mosaic seams are retained. These are visualization products, not measured local elevation or complete uniform-resolution surveys.
+
+- `enceladus-nasa-vtad-map.jpg`: base-color texture extracted from [NASA VTAD Enceladus glTF](https://science.nasa.gov/resource/enceladus-3d-model/), NASA mission imagery, NASA Visualization Technology Applications and Development. Conversion script records the exact public glTF URL and image name. Optimized JPEG, maximum 4096 pixels wide; coverage fill and mission mosaic seams are retained. These are visualization products, not measured local elevation or complete uniform-resolution surveys.
+
+- `titan-cassini-map-unlabelled.jpg`: NASA/JPL-Caltech/Space Science Institute, Cassini ISS PIA19658. Original local `titan-cassini-iss.jpg` preserved. Extracted map rectangle x=72,y=81,width=1478,height=738, removing title, border, axes and scale; resized to 2048x1024. Near-infrared mosaic, not visible-light color. 360→0 west longitude corresponds to 0→360 east longitude.

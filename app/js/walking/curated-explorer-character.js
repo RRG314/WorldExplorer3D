@@ -135,9 +135,15 @@ function updateCuratedCharacterAnimation(host, isMoving, deltaTime, isRunning = 
 
 function disposeCuratedCharacter(host) {
   const attachment = host?.userData?.curatedCharacterAttachment;
+  // Cancel even an in-flight request without an attached visual.
+  if (host?.userData) {
+    delete host.userData.curatedCharacterLoadToken;
+    delete host.userData.curatedCharacterLoadStarted;
+    delete host.userData.curatedCharacterLoadingAssetId;
+  }
   if (!attachment) return false;
   attachment.mixer.stopAllAction();
-  attachment.visual.removeFromParent?.();
+  attachment.visual.parent?.remove(attachment.visual);
   attachment.instance.dispose();
   delete host.userData.curatedCharacterAttachment;
   host.userData.characterMixer = null;
@@ -160,7 +166,7 @@ async function attachCuratedExplorerCharacter(THREE, host, options = {}) {
   host.userData.curatedCharacterLoadingAssetId = assetId;
   try {
     const instance = await loadModelAsset(THREE, assetId, { signal: options.signal });
-    if (options.isCurrent && !options.isCurrent()) {
+    if (host.userData.curatedCharacterLoadToken !== loadToken || (options.isCurrent && !options.isCurrent())) {
       instance.dispose();
       if (host.userData.curatedCharacterLoadToken === loadToken) {
         host.userData.curatedCharacterLoadStarted = false;

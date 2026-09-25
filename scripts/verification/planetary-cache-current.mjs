@@ -34,8 +34,8 @@ try {
   await page.waitForFunction(() => {
     const state = window.getWorldExplorerRuntimeDiagnostics?.();
     return state?.gameStarted && !state.worldLoading && state.environment === 'MOON';
-  }, null, { timeout: 120000 });
-  for (const [index, bodyId] of ['mercury', 'venus', 'io', 'mercury'].entries()) {
+  }, null, { timeout: 180000 });
+  for (const [index, bodyId] of ['mercury', 'venus', 'io', 'europa', 'titan', 'enceladus', 'triton', 'ceres', 'vesta', 'pluto', 'mercury'].entries()) {
     const state = await page.evaluate(async bodyId => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
       const arrived = await ctx.arriveAtSolidWorld(bodyId);
@@ -56,6 +56,20 @@ try {
     assert.deepEqual(state.cache.attachedBodyIds, [bodyId], 'cached planets must not remain attached to the active scene');
     if (index === 2) assert.equal(state.cache.bodyIds.includes('mercury'), false);
     await page.screenshot({ path: `${output}/${index}-${bodyId}.png` });
+    // Additional aerial fixture is explicitly separate from player-input evidence.
+    const aerial = await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const camera = ctx.camera;
+      const prior = { position: camera.position.clone(), quaternion: camera.quaternion.clone() };
+      const center = ctx.activeSolidWorldSurface.position;
+      camera.position.set(center.x + 2200, center.y + 2000, center.z + 2500);
+      camera.lookAt(center.x, center.y, center.z); camera.updateMatrixWorld(true);
+      ctx.renderer.render(ctx.scene, camera);
+      const image = ctx.renderer.domElement.toDataURL('image/png');
+      camera.position.copy(prior.position); camera.quaternion.copy(prior.quaternion);
+      return image;
+    });
+    await fs.writeFile(`${output}/${index}-${bodyId}-aerial.png`, Buffer.from(aerial.split(',')[1], 'base64'));
     worlds.push(state);
   }
   assert.deepEqual(errors, []);

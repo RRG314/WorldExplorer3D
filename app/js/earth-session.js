@@ -74,7 +74,7 @@ async function restoreEarthActorOwnership() {
   markEarthResumePhase('restore_vehicle');
   await appCtx.setPlanetaryVehicle?.('earth');
   markEarthResumePhase('restore_character');
-  appCtx.setPlanetaryCharacter?.('earth');
+  await appCtx.setPlanetaryCharacter?.('earth');
 }
 
 function captureCurrentPose() {
@@ -219,6 +219,7 @@ async function finalizeEarthResume(resolved, isCurrent = () => true, options = {
   }
   appCtx.earthResumeRenderReady = true;
   markEarthResumePhase('render_frames');
+  await appCtx.prepareFirstWorldRender?.();
   await waitForRenderedFrames();
   if (!isCurrent()) return false;
   appCtx.lastTime = performance.now();

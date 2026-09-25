@@ -544,6 +544,7 @@ export function updateSpaceFlightPhysics() {
       if (appCtx.spaceJourney?.phase === 'atmospheric_exploration' && giantAtmosphere) {
         updateAtmosphericFlightPresentation(environment.bodyId, {
           radial: appCtx.spaceFlight.atmosphericRadialScene,
+          altitudeM: appCtx.spaceAtmosphereExploration?.altitudeM,
           horizontalSpeedMps: appCtx.spaceAtmosphereExploration?.horizontalSpeedMps
         });
       } else {

@@ -527,6 +527,7 @@ export function refreshAstronomicalSky(force = false, deps = {}) {
   if (typeof deps.alignStarFieldToLocation === "function") {
     deps.alignStarFieldToLocation(loc.lat, loc.lon);
   }
+  if (force) invalidateSkyVisualCache();
   applySkyVisualState(state.visual, state);
   if (typeof appCtx.applyOceanSkyState === "function" && appCtx.oceanMode?.active) {
     appCtx.applyOceanSkyState(state);

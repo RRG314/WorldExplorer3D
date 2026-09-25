@@ -384,7 +384,7 @@ async function arriveAtEarth(expectedSessionId = null) {
     appCtx.earthResumePending = false;
     return false;
   }
-  appCtx.setPlanetaryCharacter?.('earth');
+  // resumeEarthWorldSession restores and awaits the authoritative character.
   emitTutorialEvent('returned_to_earth', { source: 'earth_arrival' });
   const weatherPanel = document.getElementById('weatherPanel');
   if (weatherPanel) weatherPanel.style.display = '';
@@ -392,18 +392,6 @@ async function arriveAtEarth(expectedSessionId = null) {
   // The Travel menu has one renderer. Publishing Earth is enough for it to
   // expose the Earth-only actions without a second DOM writer.
   appCtx.syncTravelModeButtons?.();
-
-  // Restore Earth lighting
-  if (appCtx.sun) {
-    appCtx.sun.intensity = 1.2; // Normal Earth sun intensity
-    appCtx.sun.position.set(100, 150, 50); // Normal Earth sun position
-  }
-  if (appCtx.ambientLight) {
-    appCtx.ambientLight.intensity = 0.3; // Normal ambient light
-  }
-  if (appCtx.fillLight) {
-    appCtx.fillLight.intensity = 0.3; // Normal fill light
-  }
 
   if (appCtx.car) {
     appCtx.car.vx = 0;

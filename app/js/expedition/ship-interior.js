@@ -1,3 +1,4 @@
+import { configureColorTexture } from '../planetary/catalog.js?v=1';
 import { attachShipFurnishing } from './ship-furnishings.js?v=1';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { getPrimaryWorldCanvas } from '../engine/webgl-lifecycle.js?v=2';
@@ -93,7 +94,7 @@ function createShipDisplayTexture(label, accentColor) {
   context.font = '16px monospace';
   context.fillText(`${STARSHIP_NAME.toUpperCase()} // ACTIVE`, 302, 220);
   const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
+  configureColorTexture(texture, appCtx.renderer);
   texture.anisotropy = Math.min(8, appCtx.renderer?.capabilities?.getMaxAnisotropy?.() || 1);
   texture.needsUpdate = true;
   return texture;
@@ -131,7 +132,7 @@ function createIncidentStepTexture(index, label, accentColor) {
   context.fillRect(284, 66, 44, 8);
   context.fillRect(284, 90, 58, 8);
   const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
+  configureColorTexture(texture, appCtx.renderer);
   texture.anisotropy = Math.min(8, appCtx.renderer?.capabilities?.getMaxAnisotropy?.() || 1);
   texture.needsUpdate = true;
   return texture;
@@ -210,7 +211,7 @@ function createShipPanelTexture(kind, accentColor) {
   }
 
   const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
+  configureColorTexture(texture, appCtx.renderer);
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
   const repeat = kind === 'corridor' ? [2, 18] : kind === 'wall' ? [3, 10] : kind === 'ceiling' ? [5, 16] : [7, 18];
@@ -367,17 +368,6 @@ function addConsole(group, x, z, yaw, accent, label) {
   }
   const seat = new THREE.Group();
   seat.name = `${label}:articulated-seat`;
-  const fabric = material(0x26394c, { roughness: 0.82, metalness: 0.04 });
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.28, 0.42, 12), frame);
-  base.position.set(0, 0.21, 1.3);
-  seat.add(base);
-  box(seat, { x: 0.78, y: 0.18, z: 0.68 }, { x: 0, y: 0.58, z: 1.3 }, fabric, `${label}:seat-cushion`);
-  const back = box(seat, { x: 0.78, y: 0.92, z: 0.18 }, { x: 0, y: 1.05, z: 1.58 }, fabric, `${label}:seat-back`);
-  back.rotation.x = -0.12;
-  [-0.48, 0.48].forEach((side) => {
-    box(seat, { x: 0.1, y: 0.5, z: 0.1 }, { x: side, y: 0.65, z: 1.3 }, frame, `${label}:seat-arm`);
-    box(seat, { x: 0.2, y: 0.08, z: 0.5 }, { x: side, y: 0.9, z: 1.12 }, frame, `${label}:seat-armrest`);
-  });
   consoleGroup.add(seat);
   void furnish(seat, 'bridge-chair', { fit: { x: 0.95, y: 1.3, z: 0.85 }, z: 1.3 });
   consoleGroup.position.set(x, 0, z);
@@ -493,28 +483,16 @@ function addMedicalBed(group, x, z, yaw, accent, label) {
 function addBunkModule(group, x, z, yaw, accent, label) {
   const root = new THREE.Group();
   root.name = `crew-bunk:${label}`;
-  const frame = material(0x4c6070, { metalness: 0.5, roughness: 0.42 });
-  const fabric = material(0x8ea8b8, { metalness: 0.02, roughness: 0.88 });
-  const bunkShell = material(0x1b2a37, { metalness: 0.34, roughness: 0.56 });
-  box(root, { x: 2.45, y: 2.75, z: 0.12 }, { x: 0, y: 1.38, z: -1.71 }, bunkShell, `${label}:bunk-back`);
-  box(root, { x: 2.45, y: 0.12, z: 3.55 }, { x: 0, y: 2.75, z: 0 }, bunkShell, `${label}:bunk-roof`);
-  [0.64, 1.93].forEach((y, index) => {
-    box(root, { x: 2.1, y: 0.18, z: 3.02 }, { x: 0, y, z: 0.05 }, fabric, `${label}:mattress-${index}`);
-    box(root, { x: 1.7, y: 0.16, z: 0.62 }, { x: 0, y: y + 0.16, z: -1.02 }, material(0xc0cbd1, { roughness: 0.9, metalness: 0 }), `${label}:pillow-${index}`);
-    box(root, { x: 0.12, y: 0.1, z: 0.55 }, { x: 0.82, y: y + 0.54, z: -1.3 }, material(accent, { emissive: accent, emissiveIntensity: 0.72 }), `${label}:reading-light-${index}`);
-  });
-  [-1.12, 1.12].forEach((side) => box(root, { x: 0.14, y: 2.75, z: 3.4 }, { x: side, y: 1.38, z: 0 }, frame, `${label}:bunk-frame`));
-  box(root, { x: 2.1, y: 0.48, z: 3.02 }, { x: 0, y: 0.25, z: 0.05 }, frame, `${label}:personal-stowage`);
   root.position.set(x, 0, z);
   root.rotation.y = yaw;
   group.add(root);
-  [0.48, 1.78].forEach((height, index) => {
-    const bed = new THREE.Group(); root.add(bed);
-    void furnish(bed, 'crew-bed', { sourceYaw: Math.PI / 2, y: height, fit: { x: 1.9, y: 0.5, z: 2.9 } }).then((ready) => {
-      if (!ready) return;
-      for (const part of ['mattress','pillow']) { const mesh = root.getObjectByName(`${label}:${part}-${index}`); if (mesh) mesh.visible = false; }
-    });
-  });
+  // A real single berth with a reading lamp, locker and personal display.
+  // Avoid scaled-down stacked beds and their hidden procedural duplicates.
+  void furnish(root, 'crew-bed', { replace: false, sourceYaw: Math.PI / 2, fit: { x: 2.1, y: 1.25, z: 3.2 } });
+  const locker = new THREE.Group(); root.add(locker);
+  void furnish(locker, 'cargo-locker', { x: 2.3, z: -0.8, fit: {x:1.1,y:2.1,z:1.2} });
+  const lamp = new THREE.Group(); root.add(lamp);
+  void furnish(lamp, 'crew-lamp', { x: -1.35, y: 1.0, z: -1.25, fit: {x:0.45,y:0.5,z:0.45} });
   return root;
 }
 
@@ -552,35 +530,14 @@ function addGalleyModule(group, x, z, yaw, accent) {
 function addWardroomTable(group, x, z, accent) {
   const root = new THREE.Group();
   root.name = 'wardroom-furniture';
-  const frame = material(0x596c79, { metalness: 0.56, roughness: 0.36 });
-  const top = material(0x3a302d, { metalness: 0.12, roughness: 0.62 });
-  const fabric = material(0x29495b, { metalness: 0.02, roughness: 0.82 });
-  const ceramic = material(0xd7e2e4, { metalness: 0.02, roughness: 0.52 });
-  box(root, { x: 7.2, y: 0.18, z: 2.6 }, { x: 0, y: 0.92, z: 0 }, top, 'wardroom-tabletop');
-  box(root, { x: 5.9, y: 0.025, z: 0.22 }, { x: 0, y: 1.02, z: 0 }, material(accent, { emissive: accent, emissiveIntensity: 0.38, metalness: 0.06, roughness: 0.28 }), 'wardroom-table-status-strip');
-  [-2.7, 2.7].forEach((leg) => {
-    box(root, { x: 0.28, y: 0.86, z: 1.8 }, { x: leg, y: 0.43, z: 0 }, frame, 'wardroom-table-leg');
-    box(root, { x: 1.15, y: 0.14, z: 1.55 }, { x: leg, y: 0.12, z: 0 }, frame, 'wardroom-table-foot');
-  });
-  [-2.45, -0.85, 0.85, 2.45].forEach((placeX, index) => {
-    const placeZ = index % 2 ? -0.68 : 0.68;
-    const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.035, 24), ceramic);
-    plate.position.set(placeX, 1.04, placeZ);
-    plate.name = `wardroom-place-setting:${index}`;
-    root.add(plate);
-    cylinder(root, 0.09, 0.08, 0.24, { x: placeX + 0.45, y: 1.15, z: placeZ }, material(index % 2 ? 0x6faab9 : 0xc79b5a, { metalness: 0.04, roughness: 0.46 }), `wardroom-cup:${index}`, null, 14);
-    box(root, { x: 0.06, y: 0.025, z: 0.52 }, { x: placeX - 0.48, y: 1.05, z: placeZ }, frame, `wardroom-utensil:${index}`);
-  });
-  [-4.1, -1.35, 1.35, 4.1].forEach((seatX, index) => {
-    const chair = new THREE.Group(); root.add(chair);
-    const seatZ = index % 2 ? -1.85 : 1.85;
-    box(chair, { x: 1.05, y: 0.18, z: 0.78 }, { x: seatX, y: 0.55, z: seatZ }, fabric, 'wardroom-seat');
-    box(chair, { x: 1.05, y: 0.7, z: 0.14 }, { x: seatX, y: 0.9, z: seatZ + (seatZ < 0 ? -0.38 : 0.38) }, fabric, 'wardroom-seat-back');
-    cylinder(chair, 0.12, 0.2, 0.42, { x: seatX, y: 0.25, z: seatZ }, frame, 'wardroom-seat-pedestal', null, 12);
-    void furnish(chair, 'wardroom-chair', { x: seatX, z: seatZ, yaw: seatZ < 0 ? Math.PI : 0, fit: {x:1.05,y:1.3,z:0.95} });
-  });
   root.position.set(x, 0, z);
   group.add(root);
+  const table = new THREE.Group(); root.add(table);
+  void furnish(table, 'wardroom-table', { fit: {x:6.8,y:1.1,z:2.6} });
+  [-2.1, 0, 2.1].forEach((seatX) => [-1.9,1.9].forEach((seatZ) => {
+    const chair = new THREE.Group(); root.add(chair);
+    void furnish(chair, 'wardroom-chair', {x:seatX,z:seatZ,yaw:seatZ<0?Math.PI:0,fit:{x:1.05,y:1.3,z:0.95}});
+  }));
   return root;
 }
 
@@ -671,11 +628,6 @@ function addThermalAssembly(group, x, z, yaw, accent, label) {
 function addCargoModule(group, x, z, yaw, accent, label) {
   const root = new THREE.Group();
   root.name = `cargo-module:${label}`;
-  const shell = material(0x6c6252, { metalness: 0.2, roughness: 0.74 });
-  const frame = material(0x4d5e69, { metalness: 0.58, roughness: 0.36 });
-  box(root, { x: 2.25, y: 1.65, z: 2.3 }, { x: 0, y: 0.83, z: 0 }, shell, `${label}:cargo-case`);
-  [-1.08, 1.08].forEach((side) => box(root, { x: 0.14, y: 1.84, z: 2.48 }, { x: side, y: 0.92, z: 0 }, frame, `${label}:cargo-frame`));
-  [-0.72, 0, 0.72].forEach((height) => box(root, { x: 1.65, y: 0.1, z: 0.08 }, { x: 0, y: 0.88 + height, z: -1.19 }, material(height === 0 ? accent : 0xc5a35c, { emissive: height === 0 ? accent : 0x000000, emissiveIntensity: height === 0 ? 0.5 : 0 }), `${label}:cargo-mark`));
   root.position.set(x, 0, z);
   root.rotation.y = yaw;
   group.add(root);
@@ -1118,47 +1070,7 @@ function addDeckDetails(group, deckId) {
     const shuttle = new THREE.Group();
     shuttle.name = 'expedition-landing-pod';
     shuttle.userData.curatedPodTargetForwardAxis = 'z';
-    const hull = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.65, 7.2, 22), steel);
-    hull.rotation.x = Math.PI / 2;
-    shuttle.add(hull);
-    const nose = new THREE.Mesh(new THREE.ConeGeometry(1.2, 2.2, 22), steel);
-    nose.rotation.x = Math.PI / 2;
-    nose.position.z = 4.7;
-    shuttle.add(nose);
-    const canopy = new THREE.Mesh(new THREE.SphereGeometry(1.05, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), material(0x284e62, { emissive: 0x102b38, emissiveIntensity: 0.34, metalness: 0.12, roughness: 0.18 }));
-    canopy.scale.set(0.88, 0.7, 1.45);
-    canopy.position.set(0, 1.05, 1.1);
-    shuttle.add(canopy);
-    box(shuttle, { x: 7.4, y: 0.16, z: 2.15 }, { x: 0, y: -0.15, z: -0.4 }, steel, 'survey-craft-wing');
-    box(shuttle, { x: 0.18, y: 1.45, z: 2.35 }, { x: 0, y: 0.62, z: -3.15 }, steel, 'survey-craft-tail-fin');
-    [-2.3, 2.3].forEach((side) => box(shuttle, { x: 2.3, y: 0.12, z: 1.25 }, { x: side, y: 0.16, z: -2.8 }, steel, 'survey-craft-tailplane'));
-    [-3.2, 3.2].forEach((side) => cylinder(shuttle, 0.44, 0.62, 2.8, { x: side, y: -0.12, z: -0.4 }, dark, 'survey-craft-thruster', { x: Math.PI / 2, y: 0, z: 0 }, 16));
-    [-3.2, 3.2].forEach((side) => {
-      const engineRing = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.09, 10, 22), material(0x607685, { metalness: 0.74, roughness: 0.26 }));
-      engineRing.position.set(side, -0.12, -1.8);
-      engineRing.name = 'survey-craft-engine-ring';
-      shuttle.add(engineRing);
-      const exhaust = cylinder(shuttle, 0.34, 0.34, 0.08, { x: side, y: -0.12, z: -1.86 }, material(0x61c9e4, { emissive: 0x2e9fc2, emissiveIntensity: 0.72, metalness: 0.06, roughness: 0.24 }), 'survey-craft-engine-glow', { x: Math.PI / 2, y: 0, z: 0 }, 18);
-      exhaust.userData.shipAnimated = 'screen';
-      exhaust.userData.baseEmissiveIntensity = 0.66;
-    });
-    [-0.56, 0.56].forEach((side) => box(shuttle, { x: 0.08, y: 0.75, z: 1.42 }, { x: side, y: 1.1, z: 0.92 }, material(0x7895a3, { metalness: 0.56, roughness: 0.3 }), 'survey-craft-canopy-frame'));
-    [-2.45, 0, 2.45].forEach((side, index) => {
-      box(shuttle, { x: 0.18, y: 1.1, z: 0.18 }, { x: side, y: -0.68, z: index === 1 ? 1.9 : -0.55 }, dark, 'survey-craft-landing-strut');
-      cylinder(shuttle, 0.27, 0.27, 0.18, { x: side, y: -1.24, z: index === 1 ? 1.9 : -0.55 }, material(0x17212b, { metalness: 0.25, roughness: 0.72 }), 'survey-craft-landing-pad', null, 16);
-    });
-    [-0.56, 0.56].forEach((side) => box(shuttle, { x: 0.12, y: 0.12, z: 2.1 }, { x: side, y: 0.55, z: -3.5 }, material(0xdfa14a, { emissive: 0xdfa14a, emissiveIntensity: 0.62 }), 'survey-craft-marker'));
-    const hatchSurface = material(0x203746, { metalness: 0.58, roughness: 0.3 });
-    box(shuttle, { x: 0.09, y: 1.35, z: 1.18 }, { x: 1.62, y: 0.62, z: 1.12 }, hatchSurface, 'survey-craft-boarding-hatch');
-    [-0.62, 0.62].forEach((offset) => box(shuttle, { x: 0.12, y: 1.55, z: 0.12 }, { x: 1.7, y: 0.62, z: 1.12 + offset }, steel, 'survey-craft-hatch-frame'));
-    box(shuttle, { x: 0.12, y: 0.12, z: 1.42 }, { x: 1.7, y: 1.38, z: 1.12 }, steel, 'survey-craft-hatch-header');
-    box(shuttle, { x: 0.12, y: 0.16, z: 0.42 }, { x: 1.74, y: 0.72, z: 1.12 }, material(0x67d8e8, { emissive: 0x2a9eb5, emissiveIntensity: 0.72, metalness: 0.12, roughness: 0.24 }), 'survey-craft-hatch-control');
-    const boardingRamp = box(shuttle, { x: 2.75, y: 0.12, z: 1.22 }, { x: 2.9, y: -0.58, z: 1.12 }, material(0x566a77, { metalness: 0.62, roughness: 0.32 }), 'survey-craft-boarding-ramp');
-    boardingRamp.rotation.z = -0.16;
     shuttle.position.set(0, 1.45, -29.5);
-    shuttle.traverse((object) => {
-      if (object?.isMesh) object.userData.defaultPodFallback = true;
-    });
     group.add(shuttle);
     void attachCuratedExpeditionPod(THREE, shuttle);
     [-3.35, 3.35].forEach((side) => {
@@ -1190,6 +1102,7 @@ function addDeckPropColliders(colliders, deckId) {
     add(6.8, 15.5, 2.1, 5.1, 1.5, 'treadmill');
     add(10.2, 18, 3, 1.2, 2.7, 'resistance-frame');
     [[-8.5, -3.15], [-8.5, 3.15], [8.5, -3.15], [8.5, 3.15]].forEach(([x, z], index) => add(x, z, 2.7, 3.8, 3, `bunk-${index}`));
+    [[-6.2,-3.95],[-10.8,3.95],[10.8,-3.95],[6.2,3.95]].forEach(([x,z],index)=>add(x,z,1.1,1.2,2.1,`berth-locker-${index}`));
     [[-8.2, -11.2], [-8.2, -17.7], [8.2, -11.2], [8.2, -17.7]].forEach(([x, z], index) => add(x, z, 3.9, 1.5, 3, `life-support-${index}`));
     [-33, -29, -25].forEach((z, index) => add(-8.2, z, 3.8, 1.75, 3, `hydroponics-${index}`));
     [-32.2, -28, -24.8].forEach((z, index) => add(8.3, z, 2.5, 2.55, 2, `shelter-stores-${index}`));
@@ -1212,7 +1125,7 @@ function addBridgeView(group) {
   const sourceCanvas = appCtx.spaceFlight?.canvas;
   const texture = sourceCanvas ? new THREE.CanvasTexture(sourceCanvas) : null;
   if (texture) {
-    texture.colorSpace = THREE.SRGBColorSpace;
+    configureColorTexture(texture, appCtx.renderer);
     texture.minFilter = THREE.LinearFilter;
     texture.magFilter = THREE.LinearFilter;
     texture.generateMipmaps = false;
@@ -1275,7 +1188,7 @@ function roomLabelTexture(label, accentColor) {
   const visible = lines.slice(0, 2);
   visible.forEach((text, index) => context.fillText(text, 270, visible.length === 1 ? 64 : 45 + index * 40));
   const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
+  configureColorTexture(texture, appCtx.renderer);
   texture.needsUpdate = true;
   return texture;
 }
@@ -1468,6 +1381,8 @@ function buildSolisReachScene(expedition) {
   const root = new THREE.Group();
   root.name = 'expedition-ship:solis-reach';
   root.userData.environmentOwner = 'SPACE_FLIGHT:SHIP_INTERIOR';
+  root.add(new THREE.HemisphereLight(0xf3f5f7, 0x343038, 0.85));
+  root.add(new THREE.AmbientLight(0xffffff, 0.3));
   const deckStates = new Map();
   SHIP_DECKS.forEach((deckDefinition, index) => {
     const state = buildDeckScene(deckDefinition);
@@ -2278,6 +2193,9 @@ function enterSolisReachInterior(options = {}) {
     walking: snapshotWalkingState(),
     dynamicBuildingColliders: [...(appCtx.dynamicBuildingColliders || [])],
     sceneBackground: appCtx.scene.background,
+    sceneFog: appCtx.scene.fog,
+    toneMappingExposure: appCtx.renderer.toneMappingExposure,
+    earthLightVisibility: Object.fromEntries(['sun', 'hemiLight', 'fillLight', 'ambientLight'].map((key) => [key, appCtx[key]?.visible !== false])),
     shadowMapEnabled: appCtx.renderer?.shadowMap?.enabled === true,
     cameraNear: appCtx.camera.near,
     interiorPromptDisplay: document.getElementById('interiorPrompt')?.style.display || '',
@@ -2359,6 +2277,11 @@ function enterSolisReachInterior(options = {}) {
   appCtx.camera.near = 0.05;
   appCtx.camera.updateProjectionMatrix();
   appCtx.scene.background = new THREE.Color(0x02050b);
+  appCtx.scene.fog = null;
+  appCtx.renderer.toneMappingExposure = 1;
+  ['sun', 'hemiLight', 'fillLight', 'ambientLight'].forEach((key) => {
+    if (appCtx[key]) appCtx[key].visible = false;
+  });
   appCtx.renderer.shadowMap.enabled = true;
   const interiorPrompt = document.getElementById('interiorPrompt');
   if (interiorPrompt) interiorPrompt.style.display = '';
@@ -2424,6 +2347,23 @@ function exitSolisReachInterior() {
   appCtx.replaceWorldCollection('dynamicBuildingColliders', session.dynamicBuildingColliders);
   session.sceneState.root.parent?.remove?.(session.sceneState.root);
   session.sceneState.crewMeshes.forEach((mesh) => mesh.userData.disposeCuratedCharacter?.());
+  // Detach asset instances before releasing scene-owned primitives. Their
+  // textures are shared by the model cache and must survive another boarding.
+  const furnishingHosts = [];
+  const podHosts = [];
+  session.sceneState.root.traverse((child) => {
+    if (child.userData.curatedPodLoadPromise || child.userData.curatedPodAttachment) podHosts.push(child);
+  });
+  podHosts.forEach((host) => {
+    host.userData.curatedPodDisposed = true;
+    host.userData.curatedPodAttachment?.instance.dispose();
+    const visual = host.userData.curatedPodAttachment?.visual;
+    visual?.parent?.remove(visual);
+  });
+  session.sceneState.root.traverse((child) => {
+    if (child.userData.disposeShipFurnishing) furnishingHosts.push(child);
+  });
+  furnishingHosts.forEach((host) => host.userData.disposeShipFurnishing());
   session.sceneState.root.traverse((child) => {
     child.geometry?.dispose?.();
     if (Array.isArray(child.material)) child.material.forEach((entry) => { entry?.map?.dispose?.(); entry?.dispose?.(); });
@@ -2435,6 +2375,11 @@ function exitSolisReachInterior() {
   appCtx.camera.near = session.cameraNear;
   appCtx.camera.updateProjectionMatrix();
   appCtx.scene.background = session.sceneBackground;
+  appCtx.scene.fog = session.sceneFog;
+  appCtx.renderer.toneMappingExposure = session.toneMappingExposure;
+  Object.entries(session.earthLightVisibility).forEach(([key, visible]) => {
+    if (appCtx[key]) appCtx[key].visible = visible;
+  });
   if (appCtx.renderer?.shadowMap) appCtx.renderer.shadowMap.enabled = session.shadowMapEnabled;
   const interiorPrompt = document.getElementById('interiorPrompt');
   if (interiorPrompt) interiorPrompt.style.display = session.interiorPromptDisplay;

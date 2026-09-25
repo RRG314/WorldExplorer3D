@@ -99,16 +99,38 @@ try {
  }
  const exited=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.exitExpeditionShipInterior();return {near:ctx.camera.near,active:ctx.spaceFlight.active};});
  assert.equal(exited.near,.5);assert.equal(exited.active,true);checks.push({name:'interior-exit-restores-camera',...exited});
- await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.travelToUniverseDestination('orion-nebula');});
- await page.waitForFunction(()=>{const ctx=window.__spaceQualityContext;return ctx.universeRuntime.current.id==='orion-nebula'&&!ctx.universeRuntime.transition;},null,{timeout:30000});
- for(const [label,x,z] of [['outside',0,13000],['edge',0,6500],['inside',1400,0]]) {
-  const state=await page.evaluate(async({x,z})=>{
-   const {ctx}=await import('/app/js/shared-context.js?v=55');cancelAnimationFrame(ctx.spaceFlight.animationId);
-   const flight=ctx.spaceFlight;flight.camera.position.set(x,0,z);flight.camera.lookAt(0,0,-6000);flight.camera.updateMatrixWorld(true);
-   flight.renderer.render(flight.scene,flight.camera);
-   return {glError:flight.renderer.getContext().getError(),reconstruction:ctx.universeRuntime.frameGroup.userData.observationalImage,drawCalls:flight.renderer.info.render.calls};
-  },{x,z});
-  assert.equal(state.glError,0);checks.push({name:`nebula-${label}`,...state});await page.screenshot({path:`${out}/nebula-${label}.png`});
+ for (const nebulaId of ['orion-nebula','carina-nebula','crab-nebula']) {
+  await page.evaluate(async id=>{const ctx=window.__spaceQualityContext;ctx.animateSpaceFlight();ctx.travelToUniverseDestination(id);},nebulaId);
+  await page.waitForFunction(id=>{const ctx=window.__spaceQualityContext;return ctx.universeRuntime.current.id===id&&!ctx.universeRuntime.transition;},nebulaId,{timeout:30000});
+  for(const [label,x,z] of [['outside',0,13000],['edge',0,6500],['inside',1400,0]]) {
+   const state=await page.evaluate(({x,z})=>{
+    const ctx=window.__spaceQualityContext;cancelAnimationFrame(ctx.spaceFlight.animationId);
+    const flight=ctx.spaceFlight;flight.camera.position.set(x,0,z);flight.camera.lookAt(0,0,-6000);flight.camera.updateMatrixWorld(true);
+    flight.renderer.render(flight.scene,flight.camera);
+    return {glError:flight.renderer.getContext().getError(),reconstruction:ctx.universeRuntime.frameGroup.userData.observationalImage,drawCalls:flight.renderer.info.render.calls};
+   },{x,z});
+   assert.equal(state.glError,0);checks.push({name:`${nebulaId}-${label}`,...state});await page.screenshot({path:`${out}/${nebulaId}-${label}.png`});
+  }
+ }
+ await page.evaluate(async()=>{
+  const ctx=window.__spaceQualityContext;ctx.returnUniverseToSolImmediate();cancelAnimationFrame(ctx.spaceFlight.animationId);
+  window.__atmosphereFixture=await import('/app/js/space/atmospheric-flight-presentation.js');
+ });
+ for(const bodyId of ['jupiter','saturn','uranus','neptune']) {
+  for(const altitudeM of [200000,20000,-5000]) {
+   await page.evaluate(({bodyId,altitudeM})=>{
+    const ctx=window.__spaceQualityContext, flight=ctx.spaceFlight;
+    const radial={x:0.94,y:0.342,z:0};
+    window.__atmosphereFixture.updateAtmosphericFlightPresentation(bodyId,{radial,altitudeM});
+    flight.camera.position.copy(flight.rocket.position).add(new THREE.Vector3(0,2,0));
+    flight.camera.up.set(0,1,0);flight.camera.lookAt(flight.rocket.position.clone().add(new THREE.Vector3(-180,-65,-300)));flight.camera.updateMatrixWorld(true);
+   },{bodyId,altitudeM});
+   await page.waitForFunction(()=>window.__spaceQualityContext.spaceFlight.atmosphericPresentation.cloudTexture.image?.width>0);
+   const state=await page.evaluate(()=>{const f=window.__spaceQualityContext.spaceFlight;f.renderer.render(f.scene,f.camera);return {glError:f.renderer.getContext().getError(),imagery:f.atmosphericPresentation.dome.userData.imagery};});
+   assert.equal(state.glError,0);checks.push({name:'atmospheric-render-fixture',bodyId,altitudeM,...state});
+   await page.screenshot({path:`${out}/${bodyId}-${altitudeM}.png`});
+  }
+  await page.evaluate(()=>window.__atmosphereFixture.releaseAtmosphericFlightPresentation());
  }
  assert.deepEqual(errors,[]);
  await fs.writeFile(`${out}/report.json`,JSON.stringify({ok:true,complete:true,evidenceScope:'Desktop software-rendered scene fixtures; not real-device performance or full surface launch acceptance',checks,errors},null,2));

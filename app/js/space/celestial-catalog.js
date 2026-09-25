@@ -35,6 +35,7 @@ function createConstellations(group, catalog) {
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(segments.length * 6), 3));
     const line = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: 0x628bb8, transparent: true, opacity: 0.10, depthWrite: false }));
+    line.renderOrder = -1000;
     line.userData = { isSpaceConstellation: true, constellationName: name };
     line.visible = appCtx.constellationsVisible === true;
     line.frustumCulled = false;

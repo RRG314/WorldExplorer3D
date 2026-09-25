@@ -25,6 +25,12 @@ export function attachShipFurnishing(THREE, host, assetId, options = {}) {
       host.add(visual);
       fallback.forEach((object) => { object.visible = false; });
       host.userData.curatedFurnishing = assetId;
+      host.userData.disposeShipFurnishing = () => {
+        instance.dispose();
+        visual.parent?.remove(visual);
+        delete host.userData.disposeShipFurnishing;
+        delete host.userData.curatedFurnishing;
+      };
       return true;
     } catch (error) {
       instance?.dispose();

@@ -556,11 +556,9 @@ function rebaseActiveFrame() {
   _rebase.copy(rocket.position);
   rocket.position.sub(_rebase);
   appCtx.spaceFlight.camera?.position.sub(_rebase);
-  if (universeRuntime.current.objectClass === 'nebula' || universeRuntime.current.objectClass === 'stellar_region') {
-    universeRuntime.frameGroup?.position.set(0, 0, 0);
-  } else {
-    universeRuntime.frameGroup?.position.sub(_rebase);
-  }
+  // Gas/dust fields are world anchored too; recentering them changes the
+  // visible density around the pilot whenever the floating origin shifts.
+  universeRuntime.frameGroup?.position.sub(_rebase);
   universeRuntime.transitGroup?.position.sub(_rebase);
   universeRuntime.canonicalFrameOffset.add(_rebase);
 }

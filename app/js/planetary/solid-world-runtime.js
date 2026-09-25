@@ -1,3 +1,4 @@
+import { regionalMapUv } from './regional-map-uv.js';
 import { getAstronomicalBody, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=3';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { ENV, getEnv } from '../env.js?v=58';
@@ -150,7 +151,6 @@ const SOLID_WORLD_PACKS = Object.freeze({
     bodyId: 'vesta', manifest: VESTA_RHEASILVIA_SURFACE_REGION, reliefKind: 'vesta-basin', detailSeed: 83,
     rockColor: 0x615b54, rockScale: 4.8, spawn: { x: 940, z: -460, angle: 0.5 },
     material: { color: 0x837b70, roughness: 0.97, bumpScale: 7 },
-    textureWindow: { u: 0.59, v: 0.31, width: 0.28, height: 0.39 },
     skyColor: 0x000000, sunColor: 0xfff6e3, sunIntensity: 0.18, ambientIntensity: 0.08,
     title: 'Rheasilvia Basin, Vesta',
     context: 'Irregular small world · giant impact basin · 0.025g',
@@ -366,6 +366,7 @@ function loadSurfaceTexture(pack) {
       asset.url,
       (texture) => {
         const configured = configureColorTexture(texture, appCtx.renderer);
+        configured.wrapS = THREE.RepeatWrapping;
         if (pack.textureWindow) {
           configured.offset.set(pack.textureWindow.u, pack.textureWindow.v);
           configured.repeat.set(pack.textureWindow.width, pack.textureWindow.height);
@@ -494,6 +495,16 @@ function addVisualSurfaceHorizon(pack, world) {
       );
     }
     positions.needsUpdate = true;
+    // Use the named site's body-fixed coordinates, not the entire globe on a 16 km tile.
+    if (!pack.runtimeModeled) {
+      const address = { ...pack.manifest.address, radiusM: getAstronomicalBody(pack.bodyId).physical.meanRadiusM };
+      const uv = geometry.attributes.uv;
+      for (let index = 0; index < positions.count; index++) {
+        const mapped = regionalMapUv(address, positions.getX(index), positions.getZ(index));
+        uv.setXY(index, mapped.u, mapped.v);
+      }
+      uv.needsUpdate = true;
+    }
     geometry.computeVertexNormals();
     const material = world.surface.material.clone();
     material.polygonOffset = true;
@@ -778,14 +789,23 @@ async function createSolidWorld(pack) {
       positions.setY(index, sampleModeledRelief(pack, positions.getX(index), positions.getZ(index)));
     }
     positions.needsUpdate = true;
+    // Use the named site's body-fixed coordinates, not the entire globe on a 16 km tile.
+    if (!pack.runtimeModeled) {
+      const address = { ...pack.manifest.address, radiusM: getAstronomicalBody(pack.bodyId).physical.meanRadiusM };
+      const uv = geometry.attributes.uv;
+      for (let index = 0; index < positions.count; index++) {
+        const mapped = regionalMapUv(address, positions.getX(index), positions.getZ(index));
+        uv.setXY(index, mapped.u, mapped.v);
+      }
+      uv.needsUpdate = true;
+    }
     geometry.computeVertexNormals();
     const material = new THREE.MeshStandardMaterial({
       map: texture,
       color: pack.material.color,
       roughness: pack.material.roughness,
       metalness: 0,
-      bumpMap: texture,
-      bumpScale: pack.material.bumpScale,
+      // Albedo/radar brightness is not an elevation measurement. Relief comes from geometry.
       transparent: false,
       opacity: 1,
       depthTest: true,

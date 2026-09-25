@@ -3,9 +3,11 @@
 // not measured tomography or a naked-eye claim. No animated density or billboard planes.
 export function createNebulaVolume(THREE, entity, mobile = false) {
   const radius = Number(entity.visualProfile?.navigationRadiusScene) || 9000;
+  const image = new THREE.TextureLoader().load(entity.visualProfile.image);
   const material = new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, depthTest: false, side: THREE.BackSide,
     uniforms: {
+      observation: { value: image },
       observer: { value: new THREE.Vector3() },
       tint: { value: new THREE.Color(entity.visualProfile?.tint || 0x9bbcff) },
       seed: { value: Number(entity.visualProfile?.seed || 1) % 997 },
@@ -15,6 +17,7 @@ export function createNebulaVolume(THREE, entity, mobile = false) {
       void main() { localPosition = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
     fragmentShader: `precision highp float;
       varying vec3 localPosition;
+      uniform sampler2D observation;
       uniform vec3 observer; uniform vec3 tint; uniform float seed; uniform float shell;
       float hash(vec3 p) { return fract(sin(dot(p, vec3(127.1,311.7,74.7))+seed)*43758.5453); }
       float noise3(vec3 p) {
@@ -37,11 +40,17 @@ export function createNebulaVolume(THREE, entity, mobile = false) {
           float radial=length(p*vec3(1.0,1.45,1.0));
           float envelope=1.0-smoothstep(0.60,1.0,radial);
           float structure=noise3(p*5.0+seed)*0.68+noise3(p*13.0)*0.32;
-          float density=smoothstep(0.34,0.75,structure)*envelope;
+          // Observed morphology and colors constrain this depth reconstruction.
+          // Depth itself is uncertain; broad filaments vary continuously in 3D.
+          vec2 imageUv=clamp(p.xy*0.48+0.5+vec2(p.z*0.035,0.0),0.001,0.999);
+          vec3 observed=pow(texture2D(observation,imageUv).rgb,vec3(2.2));
+          float luminance=dot(observed,vec3(0.2126,0.7152,0.0722));
+          float filament=0.45+0.55*smoothstep(0.25,0.78,structure);
+          float density=smoothstep(0.008,0.38,luminance)*filament*envelope;
           if(shell>0.5) density*=smoothstep(0.22,0.48,radial);
           else density*=0.25+0.75*smoothstep(0.08,0.42,length(p-vec3(0.12,0.0,0.08)));
           float absorbed=1.0-exp(-density*stepSize*2.8);
-          vec3 color=mix(tint*0.12,tint*0.80,smoothstep(0.35,0.75,structure));
+          vec3 color=mix(tint*0.035,observed*1.8,0.9);
           emission+=transmission*absorbed*color;
           transmission*=1.0-absorbed;
           if(transmission<0.02) break;
@@ -51,6 +60,8 @@ export function createNebulaVolume(THREE, entity, mobile = false) {
         gl_FragColor=vec4(emission/max(alpha,0.001),alpha);
       }`
   });
+  // Scene disposal owns this image, unlike shared model-template textures.
+  material.map = image;
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), material);
   mesh.name = `${entity.name} reconstructed gas and dust volume`;
   mesh.scale.setScalar(radius);

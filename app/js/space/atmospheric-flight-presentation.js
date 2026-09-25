@@ -1,4 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
+import { getAstronomicalBody } from '../astronomy/body-catalog.js?v=3';
 import { disposeThreeObjectTree } from '../engine/webgl-lifecycle.js?v=2';
 
 const BODY_STYLE = Object.freeze({
@@ -9,41 +10,64 @@ const BODY_STYLE = Object.freeze({
 });
 
 let active = null;
-let localUp = null;
-let deckQuaternion = null;
-let deckNormal = null;
-
-function createCloudTexture(style) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 256;
-  const context = canvas.getContext('2d');
-  const base = `#${style.deck.toString(16).padStart(6, '0')}`;
-  const cloud = `#${style.cloud.toString(16).padStart(6, '0')}`;
-  context.fillStyle = base;
-  context.fillRect(0, 0, 256, 256);
-  const random = (() => {
-    let seed = 0x51a7c3;
-    return () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 0xffffffff);
-  })();
-  for (let index = 0; index < 90; index += 1) {
-    const x = random() * 256;
-    const y = random() * 256;
-    const radius = 8 + random() * 34;
-    const gradient = context.createRadialGradient(x, y, 0, x, y, radius);
-    gradient.addColorStop(0, `${cloud}bb`);
-    gradient.addColorStop(1, `${cloud}00`);
-    context.fillStyle = gradient;
-    context.beginPath();
-    context.arc(x, y, radius, 0, Math.PI * 2);
-    context.fill();
-  }
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(5, 5);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
+// Sample the catalog cloud map on a sphere, using the flight's actual
+// radial direction and altitude. No repeated tiles or camera-following floor.
+function createAtmosphericSky(body, style) {
+  const map = new THREE.TextureLoader().load(body.id === 'jupiter' ? '/app/assets/textures/jupiter-hubble-opal-2015.jpg' : body.presentation.globalTexturePath);
+  map.wrapS = THREE.RepeatWrapping;
+  map.wrapT = THREE.ClampToEdgeWrapping;
+  const material = new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms: {
+      cloudMap: { value: map },
+      radial: { value: new THREE.Vector3(0, 1, 0) },
+      relativeAltitude: { value: 20000 / (body.physical.meanRadiusM) },
+      skyColor: { value: new THREE.Color(style.sky) },
+      hazeColor: { value: new THREE.Color(style.haze) },
+      immersion: { value: 0 }
+    },
+    vertexShader: `varying vec3 sight;
+      void main() {
+        vec4 world = modelMatrix * vec4(position, 1.0);
+        sight = world.xyz - cameraPosition;
+        gl_Position = projectionMatrix * viewMatrix * world;
+      }`,
+    fragmentShader: `precision highp float;
+      varying vec3 sight;
+      uniform sampler2D cloudMap;
+      uniform vec3 radial, skyColor, hazeColor;
+      uniform float relativeAltitude, immersion;
+      void main() {
+        vec3 ray = normalize(sight);
+        float altitude = max(relativeAltitude, 0.000005);
+        vec3 origin = normalize(radial) * (1.0 + altitude);
+        float b = dot(origin, ray);
+        // Factored subtraction retains precision close to the cloud tops.
+        float c = altitude * (2.0 + altitude);
+        float discriminant = b*b-c;
+        float elevation = dot(normalize(radial), ray);
+        vec3 color = mix(hazeColor, skyColor, smoothstep(-0.02, 0.55, elevation));
+        if (discriminant > 0.0 && b < 0.0) {
+          float distance = c / (-b + sqrt(discriminant));
+          vec3 point = normalize(origin + ray * distance);
+          vec2 uv = vec2(fract(atan(point.z, -point.x) / 6.28318530718),
+                         clamp(0.5 + asin(clamp(point.y, -1.0, 1.0)) / 3.14159265359, 0.059, 0.941));
+          vec3 observed = pow(texture2D(cloudMap, uv).rgb, vec3(2.2));
+          float aerial = 1.0-exp(-distance*8.0);
+          color = mix(observed, hazeColor, aerial*0.8);
+        }
+        color = mix(color, hazeColor, immersion);
+        gl_FragColor = vec4(color, 1.0);
+        #include <tonemapping_fragment>
+        #include <encodings_fragment>
+      }`
+  });
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(850, 32, 20), material);
+  dome.name = 'spherical cloud atmosphere';
+  dome.userData.imagery = body.id === 'jupiter' ? 'Hubble OPAL 2015; observed to 80 degrees; polar color extended' : 'NASA/JPL synthesized map; not current observed weather';
+  dome.renderOrder = -900;
+  dome.frustumCulled = false;
+  return { dome, map };
 }
 
 function hideOrbitalPresentation() {
@@ -57,6 +81,7 @@ function hideOrbitalPresentation() {
     appCtx.universeRuntime?.frameGroup,
     ...spaceBodies.map((body) => body?.mesh)
   ].filter(Boolean);
+  const solarFrameWasVisible = solarBodyGroup?.visible !== false;
   const hidden = [...new Set(objects)].map((object) => {
     const visible = object.visible;
     object.visible = false;
@@ -69,9 +94,8 @@ function hideOrbitalPresentation() {
     element.style.display = 'none';
   });
   if (typeof appCtx.setSolarSystemFrameVisibility === 'function') {
-    const restoreVisible = solarBodyGroup?.visible !== false;
     appCtx.setSolarSystemFrameVisibility(false);
-    hidden.push({ restore: () => appCtx.setSolarSystemFrameVisibility(restoreVisible) });
+    hidden.push({ restore: () => appCtx.setSolarSystemFrameVisibility(solarFrameWasVisible) });
   }
   return hidden;
 }
@@ -86,44 +110,11 @@ function ensureAtmosphericFlightPresentation(bodyId) {
 
   const group = new THREE.Group();
   group.name = `${bodyId} atmospheric flight volume`;
-  const dome = new THREE.Mesh(
-    new THREE.SphereGeometry(850, 32, 20),
-    new THREE.MeshBasicMaterial({ color: style.sky, side: THREE.BackSide, depthWrite: false, fog: false })
-  );
-  dome.name = 'atmospheric sky enclosure';
+  const body = getAstronomicalBody(bodyId);
+  const { dome, map } = createAtmosphericSky(body, style);
   group.add(dome);
-
-  const cloudTexture = createCloudTexture(style);
-  const deck = new THREE.Mesh(
-    new THREE.PlaneGeometry(2600, 2600, 1, 1),
-    new THREE.MeshPhongMaterial({
-      color: style.deck,
-      emissive: style.sky,
-      emissiveIntensity: 0.18,
-      map: cloudTexture,
-      side: THREE.DoubleSide,
-      depthWrite: true,
-      fog: true
-    })
-  );
-  deck.name = 'atmospheric cloud deck';
-  group.add(deck);
-
-  const haze = new THREE.Mesh(
-    new THREE.PlaneGeometry(3000, 560),
-    new THREE.MeshBasicMaterial({
-      color: style.haze,
-      transparent: true,
-      opacity: 0.38,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-      fog: true
-    })
-  );
-  haze.name = 'atmospheric horizon haze';
-  group.add(haze);
   scene.add(group);
-  active = { bodyId, group, deck, haze, cloudTexture, hidden: hideOrbitalPresentation() };
+  active = { bodyId, group, dome, cloudTexture: map, body, hidden: hideOrbitalPresentation() };
   appCtx.spaceFlight.atmosphericPresentation = active;
   return active;
 }
@@ -133,20 +124,14 @@ function updateAtmosphericFlightPresentation(bodyId, options = {}) {
   const rocket = appCtx.spaceFlight?.rocket;
   if (!presentation || !rocket) return false;
   presentation.group.position.copy(rocket.position);
-  localUp ||= new THREE.Vector3(0, 1, 0);
-  deckQuaternion ||= new THREE.Quaternion();
-  deckNormal ||= new THREE.Vector3(0, 0, 1);
-  localUp.set(
-    Number(options.radial?.x) || 0,
-    Number(options.radial?.y) || 1,
-    Number(options.radial?.z) || 0
-  ).normalize();
-  presentation.deck.position.copy(localUp).multiplyScalar(-180);
-  deckQuaternion.setFromUnitVectors(deckNormal, localUp);
-  presentation.deck.quaternion.copy(deckQuaternion);
-  presentation.haze.position.copy(localUp).multiplyScalar(-120);
-  presentation.haze.quaternion.copy(appCtx.spaceFlight.camera?.quaternion || rocket.quaternion);
-  presentation.cloudTexture.offset.x = (presentation.cloudTexture.offset.x + (Number(options.horizontalSpeedMps) || 0) * 0.0000008) % 1;
+  const uniforms = presentation.dome.material.uniforms;
+  const radial = options.radial || { x: 0, y: 1, z: 0 };
+  uniforms.radial.value.set(Number(radial.x) || 0, Number(radial.y) || 0, Number(radial.z) || 0);
+  if (uniforms.radial.value.lengthSq() < 1e-12) uniforms.radial.value.set(0, 1, 0);
+  uniforms.radial.value.normalize();
+  const altitudeM = Number.isFinite(options.altitudeM) ? options.altitudeM : 20000;
+  uniforms.relativeAltitude.value = altitudeM / (presentation.body.physical.meanRadiusM);
+  uniforms.immersion.value = Math.min(0.96, Math.max(0, -altitudeM / 25000));
   return true;
 }
 
@@ -162,6 +147,7 @@ function releaseAtmosphericFlightPresentation() {
     else object.visible = visible;
   });
   active.group?.parent?.remove?.(active.group);
+  active.cloudTexture?.dispose();
   if (active.group) disposeThreeObjectTree(active.group);
   if (appCtx.spaceFlight) appCtx.spaceFlight.atmosphericPresentation = null;
   active = null;
