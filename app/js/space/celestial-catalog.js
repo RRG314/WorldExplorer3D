@@ -21,7 +21,7 @@ function createCatalogStars(group, catalog) {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(catalog.starEntries.length * 3), 3));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(catalog.starEntries.length * 3), 3));
-  catalog.points = new THREE.Points(geometry, createRoundStarMaterial({ size: 3.5, sizeAttenuation: false, vertexColors: true, transparent: true, depthWrite: false, fog: false }));
+  catalog.points = new THREE.Points(geometry, createRoundStarMaterial({ skyBackground: true, size: 3.5, sizeAttenuation: false, vertexColors: true, transparent: true, depthWrite: false, fog: false }));
   catalog.points.userData.isCatalogStar = true;
   catalog.points.frustumCulled = false;
   catalog.points.renderOrder = -1000;
@@ -36,6 +36,7 @@ function createConstellations(group, catalog) {
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(segments.length * 6), 3));
     const line = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: 0x628bb8, transparent: true, opacity: 0.10, depthWrite: false }));
     line.userData = { isSpaceConstellation: true, constellationName: name };
+    line.visible = appCtx.constellationsVisible === true;
     line.frustumCulled = false;
     group.add(line);
     catalog.constellationEntries.push({ line, name, segments: segments.map((pair) => pair.map((id) => stars.get(id))) });
@@ -73,9 +74,20 @@ function highlightSpaceConstellation(name = '') {
   const entries = appCtx.spaceFlight?.celestialCatalog?.constellationEntries || [];
   entries.forEach((entry) => {
     const selected = entry.name === name;
+    entry.line.visible = selected || appCtx.constellationsVisible === true;
     entry.line.material.color.setHex(selected ? 0x65e6ff : 0x628bb8);
     entry.line.material.opacity = selected ? 0.88 : 0.18;
   });
+}
+
+function setSpaceConstellationsVisible(visible) {
+  appCtx.constellationsVisible = visible === true;
+  highlightSpaceConstellation('');
+  const button = document.getElementById('spaceConstellationToggle');
+  if (button) {
+    button.textContent = `CONSTELLATIONS: ${visible ? 'ON' : 'OFF'}`;
+    button.setAttribute('aria-pressed', String(visible === true));
+  }
 }
 
 function showSpaceConstellationInfo(name) {
@@ -120,7 +132,7 @@ function createSpaceCelestialCatalog(scene) {
   return catalog;
 }
 
-Object.assign(appCtx, { highlightSpaceConstellation, showSpaceConstellationInfo, updateSpaceCatalogObserver });
+Object.assign(appCtx, { highlightSpaceConstellation, showSpaceConstellationInfo, updateSpaceCatalogObserver, setSpaceConstellationsVisible });
 
 export {
   createSpaceCelestialCatalog,

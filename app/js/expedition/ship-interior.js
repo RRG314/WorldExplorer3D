@@ -496,7 +496,7 @@ function addBunkModule(group, x, z, yaw, accent, label) {
   const frame = material(0x4c6070, { metalness: 0.5, roughness: 0.42 });
   const fabric = material(0x8ea8b8, { metalness: 0.02, roughness: 0.88 });
   const bunkShell = material(0x1b2a37, { metalness: 0.34, roughness: 0.56 });
-  box(root, { x: 2.45, y: 2.75, z: 0.12 }, { x: 0, y: 1.38, z: 1.71 }, bunkShell, `${label}:bunk-back`);
+  box(root, { x: 2.45, y: 2.75, z: 0.12 }, { x: 0, y: 1.38, z: -1.71 }, bunkShell, `${label}:bunk-back`);
   box(root, { x: 2.45, y: 0.12, z: 3.55 }, { x: 0, y: 2.75, z: 0 }, bunkShell, `${label}:bunk-roof`);
   [0.64, 1.93].forEach((y, index) => {
     box(root, { x: 2.1, y: 0.18, z: 3.02 }, { x: 0, y, z: 0.05 }, fabric, `${label}:mattress-${index}`);
@@ -1232,7 +1232,7 @@ function addBridgeView(group) {
   const portalCamera = appCtx.spaceFlight?.camera?.clone?.() || null;
   if (portalCamera) {
     portalCamera.fov = 64;
-    portalCamera.aspect = 18 / 7;
+    portalCamera.aspect = 18 / 2.2;
     portalCamera.near = 0.5;
     portalCamera.far = appCtx.spaceFlight.camera.far;
     portalCamera.updateProjectionMatrix();

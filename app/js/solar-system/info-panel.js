@@ -36,6 +36,7 @@ function formatLightYears(ly) {
 }
 
 function hidePlanetInfo(ctx) {
+  ctx.appCtx.highlightSpaceConstellation?.('');
   if (ctx.solarSystem.infoPanel) {
     ctx.solarSystem.infoPanel.style.display = 'none';
   }

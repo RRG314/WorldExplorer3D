@@ -21,6 +21,11 @@ try {
  await page.waitForFunction(()=>JSON.parse(window.render_game_to_text?.()||'{}').modes?.space===true,null,{timeout:180000});
  await page.evaluate(async()=>{window.__spaceQualityContext=(await import('/app/js/shared-context.js?v=55')).ctx;});
  await page.waitForFunction(()=>window.__spaceQualityContext.spaceFlight?.celestialCatalog?.starEntries?.length>=700);
+ await page.locator('#spaceConstellationToggle').click();
+ assert.equal(await page.evaluate(()=>window.__spaceQualityContext.spaceFlight.celestialCatalog.constellationEntries.filter(e=>e.line.visible).length),88);
+ await page.locator('#spaceConstellationToggle').click();
+ assert.equal(await page.evaluate(()=>window.__spaceQualityContext.spaceFlight.celestialCatalog.constellationEntries.filter(e=>e.line.visible).length),0);
+ checks.push({name:'constellation-overlay-toggle',figures:88});
  // Explicit scene fixtures isolate selection and geometry; they are not a full travel journey.
  const selected=await page.evaluate(async()=>{
   const {ctx}=await import('/app/js/shared-context.js?v=55');
@@ -85,7 +90,7 @@ try {
   const loaded=await Promise.all(pending);const crew=ctx.getShipInteriorSnapshot().crewPresentation.length;return {crew,furnishings:loaded.length,loaded:loaded.filter(Boolean).length,near:ctx.camera.near};
  });
  assert.equal(interior.crew,7);assert.equal(interior.loaded,interior.furnishings);assert.ok(interior.loaded>20);assert.equal(interior.near,.05);checks.push({name:'free-exploration-crew-furnishings',...interior});
- for(const [deck,x,z,yaw,label] of [['command',0,27,0,'bridge'],['habitat',-6,0,-Math.PI/2,'quarters'],['habitat',-5,15,-Math.PI/2,'medical'],['engineering',4,0,Math.PI/2,'cargo']]) {
+ for(const [deck,x,z,yaw,label] of [['command',0,27,0,'bridge'],['habitat',-8.5,0,Math.PI,'quarters'],['habitat',-5,15,-Math.PI/2,'medical'],['engineering',4,0,Math.PI/2,'cargo']]) {
   await page.evaluate(async({deck,x,z,yaw})=>{
    const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.switchSolisReachDeck(deck);
    Object.assign(ctx.Walk.state.walker,{x,z,y:1.74,yaw,angle:yaw,pitch:0});ctx.Walk.state.view='first';ctx.presentationPose=null;

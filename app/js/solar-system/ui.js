@@ -207,6 +207,14 @@ export function createToggleButton(ctx) {
   });
   container.appendChild(destinationSelect);
 
+  const constellationToggle = document.createElement('button');
+  constellationToggle.id = 'spaceConstellationToggle';
+  constellationToggle.className = 'ssToggleBtn';
+  constellationToggle.type = 'button';
+  constellationToggle.textContent = `CONSTELLATIONS: ${ctx.appCtx.constellationsVisible ? 'ON' : 'OFF'}`;
+  constellationToggle.setAttribute('aria-pressed', String(ctx.appCtx.constellationsVisible === true));
+  constellationToggle.addEventListener('click', () => ctx.appCtx.setSpaceConstellationsVisible?.(!ctx.appCtx.constellationsVisible));
+  container.appendChild(constellationToggle);
   document.body.appendChild(container);
   createSolarSystemScale(ctx);
 }
