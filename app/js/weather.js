@@ -306,7 +306,7 @@ function updateWeatherUi() {
 }
 
 function applyWeatherPresentation() {
-  if (appCtx.activeShipInterior || appCtx.onMoon || appCtx.onMars) {
+  if (appCtx.activeShipInterior || appCtx.activePlanetaryBodyId || appCtx.onMoon || appCtx.onMars) {
     updateWeatherUi();
     return;
   }

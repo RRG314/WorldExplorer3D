@@ -1,3 +1,5 @@
+import { getAstronomicalBody } from '../astronomy/body-catalog.js?v=3';
+import { configureColorTexture } from '../planetary/catalog.js?v=1';
 export function createMoonSystems(ctx) {
   ctx.solarSystem.moonMeshes = [];
 
@@ -6,11 +8,16 @@ export function createMoonSystems(ctx) {
     if (!moonConfig) return;
 
     moonConfig.forEach((moon, index) => {
-      const moonGeo = new THREE.SphereGeometry(moon.radiusScaled, 14, 14);
+      const moonGeo = new THREE.SphereGeometry(moon.radiusScaled, 40, 28);
+      const body = getAstronomicalBody(moon.name.toLowerCase());
+      // These two small-body atlas entries do not yet supply cylindrical maps.
+      const mapped = body && !['phobos', 'deimos'].includes(body.id) && body.presentation.globalTexturePath;
+      const map = mapped ? configureColorTexture(new THREE.TextureLoader().load(mapped), ctx.spaceFlight?.renderer) : null;
       const moonMat = new THREE.MeshPhongMaterial({
-        color: moon.color,
+        color: map ? 0xffffff : moon.color,
+        map,
         emissive: 0x101010,
-        shininess: 18
+        shininess: 2
       });
       const moonMesh = new THREE.Mesh(moonGeo, moonMat);
       moonMesh.name = moon.name;

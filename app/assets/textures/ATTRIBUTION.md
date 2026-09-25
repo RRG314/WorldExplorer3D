@@ -92,3 +92,9 @@ Each source is a two-dimensional material surface with no triangle count. Runtim
 - `titan-cassini-map-unlabelled.jpg`: NASA/JPL-Caltech/Space Science Institute, Cassini ISS PIA19658. Original local `titan-cassini-iss.jpg` preserved. Extracted map rectangle x=72,y=81,width=1478,height=738, removing title, border, axes and scale; resized to 2048x1024. Near-infrared mosaic, not visible-light color. 360→0 west longitude corresponds to 0→360 east longitude.
 
 Nebula `*-nebula-density.jpg` derivatives retain the credits of their corresponding original NASA/ESA/Webb images in `universe/`. They are reduced to width 512, median filtered 5 px and blurred 3 px to remove point-source stars before reconstructing gas density. Stars must not become luminous columns inside the volume. Original observations remain unchanged.
+
+- `ganymede-nasa-vtad-map.jpg`: NASA VTAD base-color map extracted from [NASA Ganymede 3D model](https://science.nasa.gov/resource/ganymede-3d-model/), NASA/JPL/USGS mission imagery. 2048x1024 JPEG; original mosaic seams and filled coverage retained.
+
+- `callisto-nasa-vtad-map.jpg`: NASA VTAD base-color map extracted from [NASA Callisto 3D model](https://science.nasa.gov/resource/callisto-3d-model/), NASA/JPL/USGS mission imagery. 2048x1024 JPEG; original mosaic seams and filled coverage retained.
+
+- `jupiter-hubble-opal-2015-complete.jpg`: derivative of the credited OPAL 2015 map above. Unobserved polar rows outside y=107..1692 extended from the nearest observed latitude to avoid black polar holes. Polar fill is visualization, not an observation.

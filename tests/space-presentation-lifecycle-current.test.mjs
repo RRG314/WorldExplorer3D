@@ -57,3 +57,14 @@ test('all giant atmospheres use finite spherical map coordinates and restore orb
   }
  } finally {globalThis.THREE=oldThree;globalThis.document=oldDocument;}
 });
+
+test('Earth environment refresh cannot relight a ship interior or solid world', async()=>{
+ const {ensureHdrEnvironment}=await import('../app/js/engine/quality.js');
+ const map={name:'Earth sky'},scene={environment:null};
+ const appCtx={scene,activeShipInterior:true};
+ const engine={state:{fallbackEnvMap:map},appCtx};
+ ensureHdrEnvironment(engine);assert.equal(scene.environment,null);assert.equal(appCtx.earthEnvironmentMap,map);
+ appCtx.activeShipInterior=false;appCtx.activePlanetaryBodyId='ceres';
+ ensureHdrEnvironment(engine);assert.equal(scene.environment,null);
+ appCtx.activePlanetaryBodyId=null;ensureHdrEnvironment(engine);assert.equal(scene.environment,map);
+});

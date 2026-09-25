@@ -557,7 +557,7 @@ function getAllSpaceBodies() {
         massKg: body?.physical?.massKg,
         physicalRadiusKm: body?.physical?.meanRadiusM ? body.physical.meanRadiusM / 1000 : null,
         mesh: entry.mesh,
-        landable: body?.exploration?.landingMode === 'solid_surface'
+        landable: body?.exploration?.landingMode === 'solid_surface' && appCtx.canLandSolidWorld?.(body.id) === true
       });
     });
 
@@ -571,7 +571,7 @@ function getAllSpaceBodies() {
         massKg: body?.physical?.massKg,
         physicalRadiusKm: body?.physical?.meanRadiusM ? body.physical.meanRadiusM / 1000 : null,
         mesh: entry.mesh,
-        landable: body?.exploration?.landingMode === 'solid_surface'
+        landable: body?.exploration?.landingMode === 'solid_surface' && appCtx.canLandSolidWorld?.(body.id) === true
       });
     });
   }

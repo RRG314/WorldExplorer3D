@@ -2194,6 +2194,7 @@ function enterSolisReachInterior(options = {}) {
     dynamicBuildingColliders: [...(appCtx.dynamicBuildingColliders || [])],
     sceneBackground: appCtx.scene.background,
     sceneFog: appCtx.scene.fog,
+    sceneEnvironment: appCtx.scene.environment,
     toneMappingExposure: appCtx.renderer.toneMappingExposure,
     earthLightVisibility: Object.fromEntries(['sun', 'hemiLight', 'fillLight', 'ambientLight'].map((key) => [key, appCtx[key]?.visible !== false])),
     shadowMapEnabled: appCtx.renderer?.shadowMap?.enabled === true,
@@ -2278,6 +2279,7 @@ function enterSolisReachInterior(options = {}) {
   appCtx.camera.updateProjectionMatrix();
   appCtx.scene.background = new THREE.Color(0x02050b);
   appCtx.scene.fog = null;
+  appCtx.scene.environment = null;
   appCtx.renderer.toneMappingExposure = 1;
   ['sun', 'hemiLight', 'fillLight', 'ambientLight'].forEach((key) => {
     if (appCtx[key]) appCtx[key].visible = false;
@@ -2376,6 +2378,7 @@ function exitSolisReachInterior() {
   appCtx.camera.updateProjectionMatrix();
   appCtx.scene.background = session.sceneBackground;
   appCtx.scene.fog = session.sceneFog;
+  appCtx.scene.environment = appCtx.earthEnvironmentMap || session.sceneEnvironment;
   appCtx.renderer.toneMappingExposure = session.toneMappingExposure;
   Object.entries(session.earthLightVisibility).forEach(([key, visible]) => {
     if (appCtx[key]) appCtx[key].visible = visible;

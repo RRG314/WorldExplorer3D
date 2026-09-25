@@ -17,7 +17,7 @@ for (const [file,url] of maps) {
 
 // NASA VTAD publishes surface maps inside its downloadable glTF models.
 // Extract the declared base-color image, never the normal map or a preview.
-for (const [id,model] of Object.entries({triton:'t/Triton_1_2707',ceres:'c/Ceres_1_1000',vesta:'v/Vesta_1_100',enceladus:'e/Enceladus_1_504'})) {
+for (const [id,model] of Object.entries({triton:'t/Triton_1_2707',ceres:'c/Ceres_1_1000',vesta:'v/Vesta_1_100',enceladus:'e/Enceladus_1_504',ganymede:'g/Ganymede_1_5268',callisto:'c/Callisto_1_4821'})) {
  const url=`https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/09/${model}.glb`;
  const response=await fetch(url,{signal:AbortSignal.timeout(45000)});
  if(!response.ok)throw Error(`${id}: HTTP ${response.status}`);
@@ -43,4 +43,13 @@ for (const [id,source] of [['orion','nasa'],['carina','webb'],['crab','webb']]) 
  await sharp(`app/assets/textures/universe/${id}-nebula-${source}.jpg`)
   .resize({width:512}).median(5).blur(3).jpeg({quality:90})
   .toFile(`app/assets/textures/universe/${id}-nebula-density.jpg`);
+}
+
+// OPAL lacks polar coverage. Preserve map latitudes; fill only absent polar rows.
+{
+ const {data,info}=await sharp('app/assets/textures/jupiter-hubble-opal-2015.jpg').removeAlpha().raw().toBuffer({resolveWithObject:true});
+ const stride=info.width*info.channels,north=107,south=info.height-108;
+ for(let y=0;y<north;y++)data.copy(data,y*stride,north*stride,(north+1)*stride);
+ for(let y=south+1;y<info.height;y++)data.copy(data,y*stride,south*stride,(south+1)*stride);
+ await sharp(data,{raw:info}).jpeg({quality:90}).toFile('app/assets/textures/jupiter-hubble-opal-2015-complete.jpg');
 }

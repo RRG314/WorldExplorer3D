@@ -1037,6 +1037,7 @@ function hideActiveWorld() {
     if (appCtx.scene) {
       appCtx.scene.background = priorWorldPresentation.background;
       appCtx.scene.fog = priorWorldPresentation.fog;
+      appCtx.scene.environment = appCtx.earthEnvironmentMap || priorWorldPresentation.environmentMap;
     }
     if (appCtx.sun) {
       if (priorWorldPresentation.sunColor != null) appCtx.sun.color?.setHex?.(priorWorldPresentation.sunColor);
@@ -1100,6 +1101,7 @@ async function arriveAtSolidWorld(bodyInput) {
       cameraFar: Number(appCtx.camera?.far),
       background: appCtx.scene?.background || null,
       fog: appCtx.scene?.fog || null,
+      environmentMap: appCtx.scene?.environment || null,
       sunColor: appCtx.sun?.color?.getHex?.(),
       sunIntensity: Number(appCtx.sun?.intensity),
       ambientIntensity: Number(appCtx.ambientLight?.intensity),
@@ -1110,6 +1112,7 @@ async function arriveAtSolidWorld(bodyInput) {
       sunPosition: appCtx.sun?.position?.clone?.()
     };
   }
+  appCtx.scene.environment = null;
   appCtx.scene.background = new THREE.Color(pack.skyColor);
   appCtx.scene.fog = pack.fogColor == null ? null : new THREE.FogExp2(pack.fogColor, pack.fogDensity);
   if (appCtx.renderer) appCtx.renderer.toneMappingExposure = pack.exposure;
@@ -1347,6 +1350,7 @@ registerEnvironmentLifecycle(ENV.PLANETARY, {
 Object.assign(appCtx, {
   arriveAtSolidWorld,
   getPlanetaryWorldCacheSnapshot: () => worldCache.snapshot(),
+  canLandSolidWorld: bodyId => !!(SOLID_WORLD_PACKS[normalizeAstronomicalBodyId(bodyId)] || runtimeWorldPacks.get(bodyId)),
   getActivePlanetaryReturnPod,
   renderActiveExpeditionOutpost,
   registerExpeditionSolidWorld,

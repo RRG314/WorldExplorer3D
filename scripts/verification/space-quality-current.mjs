@@ -74,6 +74,19 @@ try {
  await page.waitForFunction(()=>window.__spaceQualityContext.universeRuntime.current.id==='tau-ceti'&&!window.__spaceQualityContext.universeRuntime.transition,null,{timeout:30000});
  checks.push({name:'selected-star-travel-completed',destination:'tau-ceti'});
 
+ // Orbital artwork gallery uses the actual scene meshes, including moons.
+ await page.evaluate(()=>{const ctx=window.__spaceQualityContext;ctx.returnUniverseToSolImmediate();cancelAnimationFrame(ctx.spaceFlight.animationId);});
+ const orbitalNames=await page.evaluate(()=>window.__spaceQualityContext.getAllSpaceBodies().filter(b=>b.name!=='Sun'&&b.mesh.visible).map(b=>b.name));
+ for(const name of orbitalNames) {
+  await page.evaluate(name=>{
+   const ctx=window.__spaceQualityContext,f=ctx.spaceFlight;
+   const b=ctx.getAllSpaceBodies().find(b=>b.name===name&&b.mesh.visible),point=new THREE.Vector3();b.mesh.getWorldPosition(point);
+   f.camera.position.copy(point).add(new THREE.Vector3(0,b.radius*0.6,b.radius*3.8));f.camera.lookAt(point);f.camera.updateMatrixWorld(true);
+   f.renderer.render(f.scene,f.camera);
+  },name);
+  await page.screenshot({path:`${out}/orbital-${name.toLowerCase().replaceAll(' ','-')}.png`});
+ }
+ checks.push({name:'orbital-artwork-gallery',bodies:orbitalNames,evidenceScope:'scene-camera fixtures for visual review'});
  await page.evaluate(async()=>{
   const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.returnUniverseToSolImmediate();
   const action=document.getElementById('fBoardSolisReach');
@@ -125,6 +138,7 @@ try {
    for(let frame=0;frame<500&&ctx.spaceJourney.phase!=='approach';frame++)ctx.updateRenderedSpaceJourney({realDtS:.1});
    const entered=ctx.requestRenderedAtmosphericEntry(bodyId);
    ctx.updateSpaceFlightPhysics();
+   ctx.spaceFlight.rocket.visible=false; // Pure atmosphere fixture, camera at the craft origin.
    return entered;
   },bodyId);
   assert.equal(entry.accepted,true,JSON.stringify(entry));
@@ -142,7 +156,7 @@ try {
    },{bodyId,altitudeM});
    await page.waitForFunction(()=>window.__spaceQualityContext.spaceFlight.atmosphericPresentation.cloudTexture.image?.width>0);
    const state=await page.evaluate(()=>{const f=window.__spaceQualityContext.spaceFlight;f.renderer.render(f.scene,f.camera);return {glError:f.renderer.getContext().getError(),imagery:f.atmosphericPresentation.dome.userData.imagery};});
-   assert.equal(state.glError,0);checks.push({name:'atmospheric-render-fixture',bodyId,altitudeM,...state});
+   assert.equal(state.glError,0);checks.push({name:'atmospheric-render-fixture',craftHiddenForView:true,bodyId,altitudeM,...state});
    await page.screenshot({path:`${out}/${bodyId}-${altitudeM}.png`});
   }
 

@@ -242,7 +242,7 @@ const bodyRows = [
     atmosphere: { class: ATMOSPHERE_CLASS.GIANT, referencePressurePa: 100_000, composition: ['hydrogen', 'helium', 'methane', 'ammonia'] },
     exploration: { landingMode: LANDING_MODE.ATMOSPHERIC_DESCENT, surfaceRegionEligible: false, environmentProfileId: 'jupiter' },
     frames: { inertial: 'J2000', bodyFixed: 'IAU_JUPITER' },
-    presentation: { environmentId: 'JUPITER', globalTexturePath: '/app/assets/textures/jupiter_voyager.jpg', surfaceLabel: null },
+    presentation: { environmentId: 'JUPITER', globalTexturePath: '/app/assets/textures/jupiter-hubble-opal-2015-complete.jpg', surfaceLabel: null },
     provenanceSources: sharedPlanetSources
   }),
   makeBody({
@@ -314,7 +314,7 @@ const bodyRows = [
     atmosphere: { class: ATMOSPHERE_CLASS.EXOSPHERE, referencePressurePa: 0, composition: ['oxygen'] },
     exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'ganymede', experienceTier: 'regional' },
     frames: { inertial: 'J2000', bodyFixed: 'IAU_GANYMEDE' },
-    presentation: { environmentId: 'GANYMEDE', globalTexturePath: '/app/assets/textures/ganymede-voyager-galileo.jpg', surfaceLabel: 'Galileo Regio' },
+    presentation: { environmentId: 'GANYMEDE', globalTexturePath: '/app/assets/textures/ganymede-nasa-vtad-map.jpg', surfaceLabel: 'Galileo Regio' },
     provenanceSources: sharedMoonSources
   }),
   makeBody({
@@ -323,7 +323,7 @@ const bodyRows = [
     atmosphere: { class: ATMOSPHERE_CLASS.EXOSPHERE, referencePressurePa: 0, composition: ['carbon_dioxide', 'oxygen'] },
     exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'callisto', experienceTier: 'regional' },
     frames: { inertial: 'J2000', bodyFixed: 'IAU_CALLISTO' },
-    presentation: { environmentId: 'CALLISTO', globalTexturePath: '/app/assets/textures/callisto-voyager-galileo.jpg', surfaceLabel: 'Valhalla basin' },
+    presentation: { environmentId: 'CALLISTO', globalTexturePath: '/app/assets/textures/callisto-nasa-vtad-map.jpg', surfaceLabel: 'Valhalla basin' },
     provenanceSources: sharedMoonSources
   }),
   makeBody({
