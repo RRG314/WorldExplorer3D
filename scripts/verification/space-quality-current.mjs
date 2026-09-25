@@ -49,6 +49,26 @@ try {
   return {stars:catalog.starEntries.length,segments:catalog.constellationEntries.length,changed:after.some((v,i)=>Math.abs(v-before[i])>1),finite:[...after].every(Number.isFinite)};
  });
  assert.equal(sky.changed,true);assert.equal(sky.finite,true);checks.push({name:'observer-parallax',...sky});
+ const starTarget=await page.evaluate(()=>{
+  const ctx=window.__spaceQualityContext,flight=ctx.spaceFlight,catalog=flight.celestialCatalog;
+  flight.camera.position.set(0,0,5000);
+  ctx.updateSpaceCatalogObserver({x:0,y:0,z:0},flight.camera.position);
+  const index=catalog.starEntries.findIndex(entry=>entry.star.hip===8102);
+  if(index<0)throw Error('Tau Ceti catalog identity missing');
+  const target=new THREE.Vector3().fromBufferAttribute(catalog.points.geometry.attributes.position,index).add(catalog.group.position);
+  flight.camera.lookAt(target);flight.camera.updateMatrixWorld(true);flight.renderer.render(flight.scene,flight.camera);
+  return {x:innerWidth/2,y:innerHeight/2};
+ });
+ await page.mouse.click(starTarget.x,starTarget.y);
+ await page.waitForFunction(()=>window.__spaceQualityContext.solarSystem.selectedUniverseId==='tau-ceti');
+ assert.equal(await page.locator('#ssInfoSetCourse').isVisible(),true);
+ checks.push({name:'catalog-star-click-and-travel-action',destination:'tau-ceti',title:await page.locator('#ssInfoTitle').textContent()});
+ await page.screenshot({path:`${out}/02-star-selection.png`});
+ await page.evaluate(()=>window.__spaceQualityContext.animateSpaceFlight());
+ await page.locator('#ssInfoSetCourse').click();
+ await page.waitForFunction(()=>window.__spaceQualityContext.universeRuntime.current.id==='tau-ceti'&&!window.__spaceQualityContext.universeRuntime.transition,null,{timeout:30000});
+ checks.push({name:'selected-star-travel-completed',destination:'tau-ceti'});
+
  await page.evaluate(async()=>{
   const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.returnUniverseToSolImmediate();
   const action=document.getElementById('fBoardSolisReach');
@@ -56,13 +76,13 @@ try {
   action.click();
  });
  await page.waitForFunction(()=>{
-  const ctx=window.__spaceQualityContext;let count=0;
-  ctx.activeInterior?.group?.traverse(o=>{if(o.userData.curatedCharacterAssetId)count++;});return count===7;
+  const crew=window.__spaceQualityContext.getShipInteriorSnapshot?.()?.crewPresentation;
+  return crew?.length===7 && crew.every(member=>member.curatedAssetId && member.visibleFallbackMeshCount===0);
  },null,{timeout:60000});
  const interior=await page.evaluate(async()=>{
   const {ctx}=await import('/app/js/shared-context.js?v=55');const pending=[];
   ctx.activeInterior.group.traverse(o=>{if(o.userData.furnishingReady)pending.push(o.userData.furnishingReady);});
-  const loaded=await Promise.all(pending);let crew=0;ctx.activeInterior.group.traverse(o=>{if(o.userData.curatedCharacterAssetId)crew++;});return {crew,furnishings:loaded.length,loaded:loaded.filter(Boolean).length,near:ctx.camera.near};
+  const loaded=await Promise.all(pending);const crew=ctx.getShipInteriorSnapshot().crewPresentation.length;return {crew,furnishings:loaded.length,loaded:loaded.filter(Boolean).length,near:ctx.camera.near};
  });
  assert.equal(interior.crew,7);assert.equal(interior.loaded,interior.furnishings);assert.ok(interior.loaded>20);assert.equal(interior.near,.05);checks.push({name:'free-exploration-crew-furnishings',...interior});
  for(const [deck,x,z,yaw,label] of [['command',0,27,0,'bridge'],['habitat',-6,0,-Math.PI/2,'quarters'],['habitat',-5,15,-Math.PI/2,'medical'],['engineering',4,0,Math.PI/2,'cargo']]) {
@@ -88,6 +108,7 @@ try {
  assert.deepEqual(errors,[]);
  await fs.writeFile(`${out}/report.json`,JSON.stringify({ok:true,complete:true,evidenceScope:'Desktop software-rendered scene fixtures; not real-device performance or full surface launch acceptance',checks,errors},null,2));
 } catch(error) {
+ checks.push({name:'failure-state',state:await page.evaluate(()=>({ship:window.__spaceQualityContext?.getShipInteriorSnapshot?.(),interior:!!window.__spaceQualityContext?.activeInterior})).catch(()=>null)});
  await page.screenshot({path:`${out}/failure.png`}).catch(()=>{});
  await fs.writeFile(`${out}/report.json`,JSON.stringify({ok:false,complete:true,checks,errors,error:String(error.stack||error)},null,2));throw error;
 } finally {await browser.close();await server.close();}
