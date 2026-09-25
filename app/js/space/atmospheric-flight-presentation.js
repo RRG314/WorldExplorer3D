@@ -20,6 +20,7 @@ function createAtmosphericSky(body, style) {
     side: THREE.BackSide, depthWrite: false, fog: false,
     uniforms: {
       cloudMap: { value: map },
+      viewToWorld: { value: new THREE.Matrix3() },
       radial: { value: new THREE.Vector3(0, 1, 0) },
       relativeAltitude: { value: 20000 / (body.physical.meanRadiusM) },
       skyColor: { value: new THREE.Color(style.sky) },
@@ -28,17 +29,20 @@ function createAtmosphericSky(body, style) {
     },
     vertexShader: `varying vec3 sight;
       void main() {
-        vec4 world = modelMatrix * vec4(position, 1.0);
-        sight = world.xyz - cameraPosition;
-        gl_Position = projectionMatrix * viewMatrix * world;
+        // Model-view is calculated at JS double precision before reaching the
+        // GPU. Subtracting two huge world positions in float loses the ray.
+        vec4 view = modelViewMatrix * vec4(position, 1.0);
+        sight = view.xyz;
+        gl_Position = projectionMatrix * view;
       }`,
     fragmentShader: `precision highp float;
       varying vec3 sight;
       uniform sampler2D cloudMap;
+      uniform mat3 viewToWorld;
       uniform vec3 radial, skyColor, hazeColor;
       uniform float relativeAltitude, immersion;
       void main() {
-        vec3 ray = normalize(sight);
+        vec3 ray = normalize(viewToWorld * sight);
         float altitude = max(relativeAltitude, 0.000005);
         vec3 origin = normalize(radial) * (1.0 + altitude);
         float b = dot(origin, ray);
@@ -67,6 +71,9 @@ function createAtmosphericSky(body, style) {
   dome.userData.imagery = body.id === 'jupiter' ? 'Hubble OPAL 2015; observed to 80 degrees; polar color extended' : 'NASA/JPL synthesized map; not current observed weather';
   dome.renderOrder = -900;
   dome.frustumCulled = false;
+  dome.onBeforeRender = (_renderer, _scene, camera) => {
+    material.uniforms.viewToWorld.value.setFromMatrix4(camera.matrixWorld);
+  };
   return { dome, map };
 }
 

@@ -17,7 +17,7 @@ for (const [file,url] of maps) {
 
 // NASA VTAD publishes surface maps inside its downloadable glTF models.
 // Extract the declared base-color image, never the normal map or a preview.
-for (const [id,model] of Object.entries({triton:'t/Triton_1_2707',ceres:'c/Ceres_1_1000',vesta:'v/Vesta_1_100',enceladus:'e/Enceladus_1_504',ganymede:'g/Ganymede_1_5268',callisto:'c/Callisto_1_4821'})) {
+for (const [id,model] of Object.entries({triton:'t/Triton_1_2707',ceres:'c/Ceres_1_1000',vesta:'v/Vesta_1_100',enceladus:'e/Enceladus_1_504',ganymede:'g/Ganymede_1_5268',callisto:'c/Callisto_1_4821',uranus:'u/Uranus_1_51118',neptune:'n/Neptune_1_49528'})) {
  const url=`https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/09/${model}.glb`;
  const response=await fetch(url,{signal:AbortSignal.timeout(45000)});
  if(!response.ok)throw Error(`${id}: HTTP ${response.status}`);
@@ -30,7 +30,7 @@ for (const [id,model] of Object.entries({triton:'t/Triton_1_2707',ceres:'c/Ceres
  const start=28+jsonLength+(view.byteOffset||0);
  const image=buffer.subarray(start,start+view.byteLength);
  const file=`app/assets/textures/${id}-nasa-vtad-map.jpg`;
- await sharp(image).resize({width:4096,withoutEnlargement:true}).jpeg({quality:90}).toFile(file);
+ await sharp(image).resize({width:['ganymede','callisto','uranus','neptune'].includes(id)?2048:4096,withoutEnlargement:true}).jpeg({quality:90}).toFile(file);
  console.log(JSON.stringify({file,source:url,image:source.name,bytes:(await fs.stat(file)).size}));
 }
 

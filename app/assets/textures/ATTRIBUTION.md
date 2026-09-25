@@ -98,3 +98,6 @@ Nebula `*-nebula-density.jpg` derivatives retain the credits of their correspond
 - `callisto-nasa-vtad-map.jpg`: NASA VTAD base-color map extracted from [NASA Callisto 3D model](https://science.nasa.gov/resource/callisto-3d-model/), NASA/JPL/USGS mission imagery. 2048x1024 JPEG; original mosaic seams and filled coverage retained.
 
 - `jupiter-hubble-opal-2015-complete.jpg`: derivative of the credited OPAL 2015 map above. Unobserved polar rows outside y=107..1692 extended from the nearest observed latitude to avoid black polar holes. Polar fill is visualization, not an observation.
+
+## Ice-giant maps and Saturn ring profile (September 25, 2026)
+NASA Visualization Technology Applications and Development (VTAD), base-color images extracted from the NASA glTF downloads: https://science.nasa.gov/resource/uranus-3d-model/, https://science.nasa.gov/resource/neptune-3d-model/, and https://science.nasa.gov/resource/saturn-3d-model/. Uranus/Neptune maps are 1024×512 visualization products, not current weather; Saturn rings preserve the source alpha profile. NASA media usage guidelines apply. Saturn globe atlas is cube-projected and was deliberately not applied as an equirectangular map.

@@ -260,7 +260,7 @@ const bodyRows = [
     atmosphere: { class: ATMOSPHERE_CLASS.GIANT, referencePressurePa: 100_000, composition: ['hydrogen', 'helium', 'methane'] },
     exploration: { landingMode: LANDING_MODE.ATMOSPHERIC_DESCENT, surfaceRegionEligible: false, environmentProfileId: 'uranus' },
     frames: { inertial: 'J2000', bodyFixed: 'IAU_URANUS' },
-    presentation: { environmentId: 'URANUS', globalTexturePath: '/app/assets/textures/uranus_jpl.jpg', surfaceLabel: null },
+    presentation: { environmentId: 'URANUS', globalTexturePath: '/app/assets/textures/uranus-nasa-vtad-map.jpg', surfaceLabel: null },
     provenanceSources: sharedPlanetSources
   }),
   makeBody({
@@ -269,7 +269,7 @@ const bodyRows = [
     atmosphere: { class: ATMOSPHERE_CLASS.GIANT, referencePressurePa: 100_000, composition: ['hydrogen', 'helium', 'methane'] },
     exploration: { landingMode: LANDING_MODE.ATMOSPHERIC_DESCENT, surfaceRegionEligible: false, environmentProfileId: 'neptune' },
     frames: { inertial: 'J2000', bodyFixed: 'IAU_NEPTUNE' },
-    presentation: { environmentId: 'NEPTUNE', globalTexturePath: '/app/assets/textures/neptune_jpl.jpg', surfaceLabel: null },
+    presentation: { environmentId: 'NEPTUNE', globalTexturePath: '/app/assets/textures/neptune-nasa-vtad-map.jpg', surfaceLabel: null },
     provenanceSources: sharedPlanetSources
   }),
   makeBody({

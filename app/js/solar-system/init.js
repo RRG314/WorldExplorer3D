@@ -95,31 +95,31 @@ function initSolarSystemModel(context, spaceScene) {
     }
     const mat = new THREE.MeshPhongMaterial({
       map: texture,
-      color: planet.color,
-      emissive: planet.emissive,
-      shininess: 30
+      color: texture ? 0xffffff : planet.color,
+      emissive: 0x050505,
+      shininess: 2
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.name = planet.name;
     mesh.userData = { isPlanet: true, planetIndex: i };
 
-    const glowGeo = new THREE.SphereGeometry(planet.radiusScaled * 1.4, 20, 20);
-    const glowMat = new THREE.MeshBasicMaterial({
-      color: planet.glowColor || planet.color,
-      transparent: true,
-      opacity: 0.15,
-      side: THREE.BackSide
-    });
-    mesh.add(new THREE.Mesh(glowGeo, glowMat));
-
     if (planet.name === 'Saturn') {
       const ringGeo = new THREE.RingGeometry(
         planet.radiusScaled * 1.3,
         planet.radiusScaled * 2.2,
-        48
+        128
       );
+      const ringMap = new THREE.TextureLoader().load('/app/assets/textures/saturn-nasa-vtad-rings.png');
+      if (typeof THREE.SRGBColorSpace !== 'undefined') ringMap.colorSpace = THREE.SRGBColorSpace;
+      else ringMap.encoding = THREE.sRGBEncoding;
+      const position = ringGeo.attributes.position, uv = ringGeo.attributes.uv;
+      for (let j = 0; j < position.count; j++) {
+        const radius = Math.hypot(position.getX(j), position.getY(j));
+        uv.setXY(j, (radius / planet.radiusScaled - 1.3) / .9, .5);
+      }
       const ringMat = new THREE.MeshBasicMaterial({
-        color: 0xccbb88, transparent: true, opacity: 0.6, side: THREE.DoubleSide
+        map: ringMap, color: 0xffffff, transparent: true, opacity: 1,
+        depthWrite: false, side: THREE.DoubleSide
       });
       const ring = new THREE.Mesh(ringGeo, ringMat);
       ring.rotation.x = Math.PI * 0.4;
