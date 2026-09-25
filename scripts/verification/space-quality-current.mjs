@@ -50,8 +50,7 @@ try {
  assert.equal(sky.changed,true);assert.equal(sky.finite,true);checks.push({name:'observer-parallax',...sky});
  await page.evaluate(async()=>{
   const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.returnUniverseToSolImmediate();
-  const ship=await import('/app/js/expedition/ship-interior.js?v=27');
-  if(!ship.enterSolisReachInterior())throw Error('Free exploration ship entry failed');
+  if(!await ctx.boardSolisReachDirect(ctx))throw Error('Free exploration ship entry failed');
  });
  await page.waitForFunction(async()=>{
   const {ctx}=await import('/app/js/shared-context.js?v=55');let count=0;
@@ -65,12 +64,12 @@ try {
  assert.equal(interior.loaded,interior.furnishings);assert.ok(interior.loaded>20);assert.equal(interior.near,.05);checks.push({name:'free-exploration-crew-furnishings',...interior});
  for(const [deck,x,z,yaw,label] of [['command',0,27,0,'bridge'],['habitat',-6,0,-Math.PI/2,'quarters'],['habitat',-5,15,-Math.PI/2,'medical'],['engineering',4,0,Math.PI/2,'cargo']]) {
   await page.evaluate(async({deck,x,z,yaw})=>{
-   const {ctx}=await import('/app/js/shared-context.js?v=55');const ship=await import('/app/js/expedition/ship-interior.js?v=27');ship.switchSolisReachDeck(deck);
+   const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.switchSolisReachDeck(deck);
    Object.assign(ctx.Walk.state.walker,{x,z,y:1.74,yaw,angle:yaw,pitch:0});ctx.Walk.state.view='first';ctx.presentationPose=null;
   },{deck,x,z,yaw});
   await page.waitForTimeout(600);await page.screenshot({path:`${out}/ship-${label}.png`});
  }
- const exited=await page.evaluate(async()=>{const ship=await import('/app/js/expedition/ship-interior.js?v=27');ship.exitSolisReachInterior();const {ctx}=await import('/app/js/shared-context.js?v=55');return {near:ctx.camera.near,active:ctx.spaceFlight.active};});
+ const exited=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.exitExpeditionShipInterior();return {near:ctx.camera.near,active:ctx.spaceFlight.active};});
  assert.equal(exited.near,.5);assert.equal(exited.active,true);checks.push({name:'interior-exit-restores-camera',...exited});
  await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.travelToUniverseDestination('orion-nebula');});
  await page.waitForFunction(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');return ctx.universeRuntime.current.id==='orion-nebula'&&!ctx.universeRuntime.transition;},null,{timeout:30000});
