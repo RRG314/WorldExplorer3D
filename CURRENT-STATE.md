@@ -4,7 +4,47 @@ Work only in `/Users/stevenreid/Developer/WorldExplorer3D-release-integration`,
 branch `steven/post-5.2-release-integration`, draft PR #87 into `stable`.
 Do not edit the older Documents checkout. Verify Git status and HEAD first.
 
-## Active space-quality work (September 24)
+## Active space-quality work (September 25)
+
+Runtime fixes are committed through `c1396f13` and pushed to the integration
+branch. Evidence: `output/release-integration/ship-overhaul-2026-09-25/LEDGER.md`.
+User expanded scope to actual visual quality for planets, flyovers and nebulae.
+Implemented legacy-avatar removal and r128 resource ownership fixes, isolated
+Earth lighting/environment, regional map UVs, sourced replacement NASA maps,
+rounded/textured dwarf planets, Saturn ring imagery, Venus orbital clouds,
+body-fixed giant cloud volumes, nebula filaments and surface material relief.
+
+Latest verification:
+- `36145930173` (87383f2d): space-quality passed, including actual camera toggles
+  around one curated player, seven crew, 39 furnishings, star selection/travel,
+  orbital gallery, three nebula viewpoints and four giant-atmosphere fixtures.
+- `36145793381` (f691e47b): space-release passed, including 55 component cases,
+  local physics, Jupiter entry/return continuity, resource lifecycle and journey.
+- `36146107547` (c1396f13): ten-world cache/render check passed after correcting
+  a Three r128 shader macro collision. Earlier run36145720979 failed and stays
+  recorded as failed. Ground/aerial screenshots reviewed; no GPU errors in rerun.
+- Prescribed game-client-smoke passed in run36143533121 (439ee461); later
+  changes have focused scene/transition evidence, not renewed input-smoke evidence.
+All consuming runs completed; temporary App Check registrations/files/GitHub
+secret have been revoked/removed. No local test browser/server left running.
+
+**Not globally visually accepted or production-ready.** Orbital assets and
+nebula structure visibly improved; gas flyover is a modeled cloud volume with
+observed global color and no repeated floor tiles, still limited close-up detail.
+Local landing terrain remains sparse/generic; primitive rover art remains.
+Solis Reach architecture/art overhaul is not complete; some rooms remain
+boxy and furnishings dark. Free modular Sketchfab kit download was blocked by
+Chrome; owner help requested once, still pending. Existing licensed assets are
+available. Pluto source has unobserved polar gaps; do not call its coverage complete.
+Full physical-device responsiveness/phone acceptance remains unverified.
+
+Staging remains `5.3.0+d56a763ee585.60de62d12b1bd025.staging`; production remains
+`5.2.0+db62593ba377.6342cddaba06fc68.production`. No deployment this session.
+The owner authorized production only after reported issues are fixed.
+Ordinary Chrome remains open. Approximately 3.9 GiB disk free; heavy browser
+checks used authorized GitHub runners, not concurrent local WebGL workloads.
+
+## Historical space-quality checkpoint (September 24)
 
 The current task is the owner's space/interior refinement request. Its evidence
 ledger is `output/release-integration/space-quality-2026-09-24/LEDGER.md`.
