@@ -1,3 +1,4 @@
+import { waitForAsyncCondition } from './async-browser-condition.mjs';
 import { selectLowRenderQuality } from './render-quality-ui.mjs';
 import { softwareCompositorArgs } from './software-compositor.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
@@ -94,7 +95,7 @@ async function startEarth(page, suffix) {
     await page.locator('#startBtn').click();
   }
   await page.locator('#loading.show').waitFor({ state: 'hidden', timeout: 180_000 });
-  await page.waitForFunction(async () => {
+  await waitForAsyncCondition(page, async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     return !!(ctx.gameStarted && ctx.initialEarthWorldReady && !ctx.worldLoading && ctx.worldDiscoveryRuntime && ctx.urbanSandboxRuntime);
   }, null, { timeout: 180_000 });
@@ -144,7 +145,7 @@ async function verifyEarthActions(page) {
   mark('Explore · DeFlock Hunt', 'gameplay authority active');
 
   await clickMenuItem(page, 'exploreBtn', 'exploreMenu', 'fFlowerChallenge');
-  await page.waitForFunction(async () => {
+  await waitForAsyncCondition(page, async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     return ctx.getFlowerChallengeBackendStatus?.().challengeActive === true;
   }, null, { timeout: 20_000 });
@@ -206,7 +207,7 @@ async function verifyEarthActions(page) {
   await page.locator('#mapSearchBtn').click();
   await page.locator('#largeMap').waitFor({ state: 'hidden', timeout: 20_000 });
   try {
-  await page.waitForFunction(async (priorSequence) => {
+  await waitForAsyncCondition(page, async (priorSequence) => {
     if (document.getElementById('loading')?.classList.contains('show')) return false;
     // Read only publication ownership. Full diagnostics rebuild several world
     // inventories and must not run every half second during world loading.
@@ -272,7 +273,7 @@ async function verifyEarthActions(page) {
     if (walker) { walker.y = -500; walker.vy = -10; walker.onGround = false; }
   });
   await clickMenuItem(page, 'travelBtn', 'travelMenu', 'fRespawn');
-  await page.waitForFunction(async () => {
+  await waitForAsyncCondition(page, async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     return Number(ctx.Walk?.state?.walker?.y) > -100 && ctx.Walk?.state?.walker?.onGround === true;
   }, null, { timeout: 20_000 });
@@ -379,7 +380,7 @@ async function verifyEnvironmentAndSpaceActions(page) {
     return state.environment === 'EARTH' && state.worldLoading === false && state.modes?.ocean === false;
   }, null, { timeout: 120_000 });
   await page.locator('#loading.show').waitFor({ state: 'hidden', timeout: 120_000 });
-  await page.waitForFunction(async () => {
+  await waitForAsyncCondition(page, async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     return ctx.initialEarthWorldReady && !ctx.worldLoading;
   }, null, { timeout: 120_000 });

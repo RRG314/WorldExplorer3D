@@ -1,3 +1,4 @@
+import { waitForAsyncCondition } from './async-browser-condition.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -304,7 +305,7 @@ async function run() {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
       return ctx.starField?.userData?.planetarySurfaceOcclusion === false;
     }), true);
-    await page.waitForFunction(async () => {
+    await waitForAsyncCondition(page, async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
       return ctx.getExpeditionPodDockingTarget?.()?.position != null;
     });

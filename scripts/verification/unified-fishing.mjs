@@ -1,3 +1,4 @@
+import { waitForAsyncCondition } from './async-browser-condition.mjs';
 import { softwareCompositorArgs } from './software-compositor.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
@@ -129,7 +130,7 @@ try {
 
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().fishing?.stage === 'landed', null, { timeout: 20_000 });
   const fishing = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().fishing || {});
-  await page.waitForFunction(async () => {
+  await waitForAsyncCondition(page, async () => {
     const request = indexedDB.open('world-explorer-discovery');
     return new Promise((resolve) => {
       request.onerror = () => resolve(false);

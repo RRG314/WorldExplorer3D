@@ -1,3 +1,4 @@
+import { waitForAsyncCondition } from './async-browser-condition.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -113,7 +114,7 @@ try {
   const firstDistance = Number(samples[0].distanceToActor);
   const minimumDistance = Math.min(...samples.map((sample) => Number(sample.distanceToActor)));
   assert.ok(minimumDistance < firstDistance - 2, JSON.stringify({ firstDistance, minimumDistance, candidate, trace: samples.slice(-8) }));
-  await page.waitForFunction(async () => {
+  await waitForAsyncCondition(page, async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     const root = ctx.urbanSandboxRuntime?.responders?.targets?.().find((entry) => entry.kind === 'responder_officer')?.ref?.visual?.root;
     const equipment = root?.children?.find((child) => child?.userData?.equipmentPresentation);

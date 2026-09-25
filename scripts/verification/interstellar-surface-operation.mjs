@@ -1,3 +1,4 @@
+import { waitForAsyncCondition } from './async-browser-condition.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -112,7 +113,7 @@ async function run(viewport, name) {
     await page.screenshot({ path: path.join(outputDir, `${name}-survey-approach.png`), fullPage: true });
 
     await page.locator('#sfLandBtn').click();
-    await page.waitForFunction(async (bodyId) => {
+    await waitForAsyncCondition(page, async (bodyId) => {
       const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
       const { ctx } = await import('/app/js/shared-context.js?v=55');
       return snapshot.environment === 'PLANETARY' && ctx.activePlanetaryBodyId === bodyId;

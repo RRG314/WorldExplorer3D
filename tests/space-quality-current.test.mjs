@@ -97,3 +97,14 @@ test('unresolved planet textures join at longitude and poles without painted sea
   assert.deepEqual(pixels,fillPlanetSurface(profile,width,height,new Uint8ClampedArray(pixels.length)));
   assert.notDeepEqual(pixels,fillPlanetSurface({...profile,seed:18},width,height,new Uint8ClampedArray(pixels.length)));
 });
+
+
+test('browser readiness waits for resolved truth, and false promises reach their deadline',async()=>{
+ const {waitForAsyncCondition}=await import('../scripts/verification/async-browser-condition.mjs');
+ let calls=0;
+ const page={evaluate:async(predicate,arg)=>{calls++;return predicate(arg);}};
+ await waitForAsyncCondition(page,async()=>calls>=3,null,{timeout:200,polling:1});
+ assert.equal(calls,3);
+ await assert.rejects(waitForAsyncCondition(page,async()=>false,null,{timeout:10,polling:1}),/timed out/);
+ await assert.rejects(waitForAsyncCondition({evaluate:()=>new Promise(()=>{})},()=>true,null,{timeout:10}),/timed out/);
+});

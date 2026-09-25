@@ -1,3 +1,4 @@
+import { waitForAsyncCondition } from './async-browser-condition.mjs';
 import { vehicleApproachWaypoints } from './vehicle-approach-waypoints.mjs';
 import { installRecordedOverpassFixture } from './recorded-overpass-fixture.mjs';
 import { softwareCompositorArgs } from './software-compositor.mjs';
@@ -318,7 +319,7 @@ async function equip(page, id) {
   );
   await equipAction.waitFor({ state: 'visible', timeout: 5_000 });
   await equipAction.click();
-  await page.waitForFunction(async (catalogId) => {
+  await waitForAsyncCondition(page, async (catalogId) => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     return ctx.urbanSandboxRuntimeSnapshot?.().equipment?.equippedId === catalogId;
   }, id, { timeout: process.env.CI ? 20_000 : 5_000, polling: 250 });

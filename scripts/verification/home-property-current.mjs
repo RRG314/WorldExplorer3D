@@ -1,3 +1,4 @@
+import { waitForAsyncCondition } from './async-browser-condition.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -35,7 +36,7 @@ try {
   await page.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
   await page.locator('#globeSelectorStartBtn').click();
   await page.waitForTimeout(800);
-  await page.waitForFunction(async () => {
+  await waitForAsyncCondition(page, async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     return Array.isArray(ctx.buildings) && ctx.buildings.length > 0;
   }, null, { timeout: 180_000 });
@@ -80,7 +81,7 @@ try {
   assert.match(String(routeTarget), /^home:/);
 
   await page.locator('.propertyHomeCard.candidate [data-property-action="navigate"]').first().click();
-  await page.waitForFunction(async () => {
+  await waitForAsyncCondition(page, async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     return ctx.showNavigation === true && !!ctx.selectedProperty;
   }, null, { timeout: 20_000 });

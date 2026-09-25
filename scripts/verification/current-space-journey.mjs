@@ -1,3 +1,4 @@
+import { waitForAsyncCondition } from './async-browser-condition.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
@@ -105,7 +106,7 @@ try {
   assert.equal(solarDirection.offscreenCueVisible || solarDirection.visibleBodyLabelCount > 0, true, JSON.stringify(solarDirection));
   await page.screenshot({ path: path.join(evidenceDir, '02-solar-course-set.png') });
   await page.locator('#sfAssistBtn').click();
-  await page.waitForFunction(async () => {
+  await waitForAsyncCondition(page, async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     return ctx.spaceJourneyAssistState?.active === true;
   });

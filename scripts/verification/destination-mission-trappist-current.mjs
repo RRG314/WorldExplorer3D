@@ -1,3 +1,4 @@
+import { waitForAsyncCondition } from './async-browser-condition.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -101,7 +102,7 @@ async function completeAnalysisAndExit(page) {
   assert.equal(completed.destinationMission.outcomeId, 'priority-follow-up');
   assert.equal(completed.destinationMission.crewLeadId, 'crew-science');
   assert.match(completed.destinationMission.returnConsequence, /higher-value return survey/i);
-  await page.waitForFunction(async (destinationId) => {
+  await waitForAsyncCondition(page, async (destinationId) => {
     const { createIndexedDbDiscoveryProfileStore } = await import('/app/js/discovery/profile-store.js?v=4');
     const events = await createIndexedDbDiscoveryProfileStore().listEvents(500);
     return events.some((entry) => entry.eventId === `event:destination-mission:${destinationId}`);
@@ -279,7 +280,7 @@ async function runSurfaceMission(page, destinationId, expectedEvidence, screensh
       && state.universeNavigation?.currentFrameId === frameId
       && state.universeNavigation?.transitionDestinationId == null;
   }, destinationId.split('-').slice(0, 2).join('-'), { timeout: 35_000 });
-  await page.waitForFunction(async () => {
+  await waitForAsyncCondition(page, async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     return ctx.getExpeditionPodDockingTarget?.()?.position != null;
   });
