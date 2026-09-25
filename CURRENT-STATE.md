@@ -12,8 +12,15 @@ Free CC-BY Sketchfab furnishings were acquired through the signed-in browser,
 converted to bounded local GLBs, and integrated across Solis Reach rooms.
 Space changes include Pathfinder readiness, aircraft pitch, ship wall/camera
 repairs, crew fallback, observed-star projection/selection, volumetric nebulae,
-and seamless modeled planet surfaces. These changes are not yet deployed.
-Do not use the older production matrix below as acceptance of these changes.
+and seamless modeled planet surfaces. Staging now serves runtime `d56a763e`
+(build `5.3.0+d56a763ee585.60de62d12b1bd025.staging`). Hosted manifests
+matched the verified local/remote assets. Production Hosting is unchanged.
+Remote run `36088114408` passed the focused space visual/functional fixture
+and gameplay smoke; screenshots were inspected. The fixture verifies seven
+curated crew, 32 furnishings, three decks, star selection/travel, constellation
+controls, and nebula viewpoints. It does not prove the full Earth-to-Pathfinder
+launch journey, physical performance, or phone acceptance. Do not use the older
+production matrix below as acceptance of these changes.
 
 A new audit found 19 asynchronous `waitForFunction` predicates in 12 older
 browser verifiers. This installed Playwright treats their Promise as truthy;
