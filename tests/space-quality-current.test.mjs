@@ -44,3 +44,44 @@ test('every corridor room wall meets its transverse bulkheads with no open corne
     }
   }
 });
+
+
+test('Gaia observer updates reuse GPU geometry and exclude inactive capacity from picking', async()=>{
+  const THREE=await import('three');globalThis.THREE=THREE;
+  const {rebuildGaiaSkyLayers}=await import('../app/js/sky/gaia-catalog.js');
+  const state={radius:100,brightMagnitude:5.2,stars:[
+    {sourceId:'1',raDeg:0,decDeg:0,parallaxMas:1000,magnitude:5,bpRp:1},
+    {sourceId:'2',raDeg:90,decDeg:0,parallaxMas:1000,magnitude:7,bpRp:1}
+  ],brightPoints:new THREE.Points(),faintPoints:new THREE.Points()};
+  rebuildGaiaSkyLayers(state,new THREE.Vector3());
+  const geometry=state.brightPoints.geometry,position=geometry.getAttribute('position');
+  assert.equal(geometry.drawRange.count,1);
+  rebuildGaiaSkyLayers(state,new THREE.Vector3(-10,0,0));
+  assert.equal(state.brightPoints.geometry,geometry);
+  assert.equal(geometry.getAttribute('position'),position);
+  assert.equal(geometry.drawRange.count,0);
+  assert.equal(state.brightPoints.userData.catalogEntries.length,0);
+  assert.equal(state.faintPoints.geometry.drawRange.count,2);
+  state.brightPoints.geometry.dispose();state.faintPoints.geometry.dispose();
+});
+
+
+test('a stalled Pathfinder model cannot hang boarding or attach after its deadline', async()=>{
+  const THREE=await import('three');
+  const {attachCuratedExpeditionPod}=await import('../app/js/space/curated-expedition-pod.js');
+  let finish;
+  const api={...THREE,GLTFLoader:class {load(url,success){finish=success;}}};
+  const scene=new THREE.Group(),host=new THREE.Group(),fallback=new THREE.Group();
+  fallback.userData.defaultPodFallback=true;host.add(fallback);scene.add(host);
+  const originalWarn=console.warn;console.warn=()=>{};
+  try {
+    const pending=attachCuratedExpeditionPod(api,host,{timeoutMs:10});
+    assert.equal(fallback.visible,false);
+    assert.equal(await pending,false);
+    assert.equal(fallback.visible,true);
+    assert.equal(host.userData.curatedPodStatus,'fallback');
+    finish({scene:new THREE.Group()});
+    await new Promise(resolve=>setTimeout(resolve,0));
+    assert.equal(host.children.length,1,'late model must not replace a resolved fallback');
+  } finally {console.warn=originalWarn;}
+});

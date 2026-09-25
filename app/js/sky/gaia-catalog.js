@@ -150,11 +150,20 @@ function rebuildGaiaSkyLayers(state, observer = null) {
     layer.colors.push(color.r, color.g, color.b);
   });
   [['bright', state.brightPoints], ['faint', state.faintPoints]].forEach(([key, points]) => {
-    points.geometry.dispose();
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(layers[key].positions, 3));
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(layers[key].colors, 3));
-    points.geometry = geometry;
+    // Reserve catalog capacity once: parallax must not churn GPU buffers in flight.
+    const geometry = points.geometry;
+    const capacity = state.stars.length * 3;
+    for (const [name, values] of [['position', layers[key].positions], ['color', layers[key].colors]]) {
+      let attribute = geometry.getAttribute(name);
+      if (!attribute || attribute.array.length < capacity) {
+        attribute = new THREE.Float32BufferAttribute(new Float32Array(capacity), 3);
+        geometry.setAttribute(name, attribute);
+      }
+      attribute.array.set(values);
+      attribute.needsUpdate = true;
+    }
+    geometry.setDrawRange(0, layers[key].entries.length);
+    geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), state.radius);
     points.userData.catalogCount = layers[key].positions.length / 3;
     points.userData.isCatalogStar = true;
     points.userData.catalogEntries = layers[key].entries;

@@ -50,7 +50,9 @@ try {
  assert.equal(sky.changed,true);assert.equal(sky.finite,true);checks.push({name:'observer-parallax',...sky});
  await page.evaluate(async()=>{
   const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.returnUniverseToSolImmediate();
-  if(!await ctx.boardSolisReachDirect(ctx))throw Error('Free exploration ship entry failed');
+  const action=document.getElementById('fBoardSolisReach');
+  if(!action)throw Error('Missing ship boarding action');
+  action.click();
  });
  await page.waitForFunction(async()=>{
   const {ctx}=await import('/app/js/shared-context.js?v=55');let count=0;

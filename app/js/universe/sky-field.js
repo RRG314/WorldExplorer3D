@@ -44,14 +44,17 @@ function createUniverseSky(scene) {
 function setUniverseSkyFrame(state, entity, visible) {
   if (!state) return;
   state.currentEntity = entity || null;
+  state.lastObserver = null;
+  state.lastObserverUpdate = null;
   state.group.visible = Boolean(visible);
   if (state.group.visible) rebuildGaiaGeometry(state);
 }
 
-function updateUniverseSky(state, rocket, observer = null) {
+function updateUniverseSky(state, rocket, observer = null, now = performance.now()) {
   if (!state?.group?.visible || !rocket) return;
   state.group.position.copy(rocket.position);
-  if (observer && (!state.lastObserver || Math.hypot(observer.x-state.lastObserver.x, observer.y-state.lastObserver.y, observer.z-state.lastObserver.z) > 0.001)) {
+  if (observer && (!state.lastObserverUpdate || now - state.lastObserverUpdate >= 250) && (!state.lastObserver || Math.hypot(observer.x-state.lastObserver.x, observer.y-state.lastObserver.y, observer.z-state.lastObserver.z) > 0.001)) {
+    state.lastObserverUpdate = now;
     state.lastObserver = { ...observer };
     rebuildGaiaSkyLayers(state.gaiaSky, new THREE.Vector3(observer.x, observer.y, observer.z));
   }
