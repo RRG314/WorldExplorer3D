@@ -13,7 +13,7 @@ let active = null;
 // Sample the catalog cloud map on a sphere, using the flight's actual
 // radial direction and altitude. No repeated tiles or camera-following floor.
 function createAtmosphericSky(body, style) {
-  const map = new THREE.TextureLoader().load(body.id === 'jupiter' ? '/app/assets/textures/jupiter-hubble-opal-2015.jpg' : body.presentation.globalTexturePath);
+  const map = new THREE.TextureLoader().load(body.presentation.globalTexturePath);
   map.wrapS = THREE.RepeatWrapping;
   map.wrapT = THREE.ClampToEdgeWrapping;
   const material = new THREE.ShaderMaterial({
@@ -22,6 +22,7 @@ function createAtmosphericSky(body, style) {
       cloudMap: { value: map },
       viewToWorld: { value: new THREE.Matrix3() },
       radial: { value: new THREE.Vector3(0, 1, 0) },
+      radiusM: { value: body.physical.meanRadiusM },
       relativeAltitude: { value: 20000 / (body.physical.meanRadiusM) },
       skyColor: { value: new THREE.Color(style.sky) },
       hazeColor: { value: new THREE.Color(style.haze) },
@@ -40,7 +41,12 @@ function createAtmosphericSky(body, style) {
       uniform sampler2D cloudMap;
       uniform mat3 viewToWorld;
       uniform vec3 radial, skyColor, hazeColor;
-      uniform float relativeAltitude, immersion;
+      uniform float relativeAltitude, immersion, radiusM;
+      float cloudHash(vec3 p) { return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453); }
+      float cloudNoise(vec3 p) {
+        vec3 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
+        return mix(mix(mix(cloudHash(i),cloudHash(i+vec3(1,0,0)),f.x),mix(cloudHash(i+vec3(0,1,0)),cloudHash(i+vec3(1,1,0)),f.x),f.y),mix(mix(cloudHash(i+vec3(0,0,1)),cloudHash(i+vec3(1,0,1)),f.x),mix(cloudHash(i+vec3(0,1,1)),cloudHash(i+vec3(1,1,1)),f.x),f.y),f.z);
+      }
       void main() {
         vec3 ray = normalize(viewToWorld * sight);
         float altitude = max(relativeAltitude, 0.000005);
@@ -55,8 +61,17 @@ function createAtmosphericSky(body, style) {
           float distance = c / (-b + sqrt(discriminant));
           vec3 point = normalize(origin + ray * distance);
           vec2 uv = vec2(fract(atan(point.z, -point.x) / 6.28318530718),
-                         clamp(0.5 + asin(clamp(point.y, -1.0, 1.0)) / 3.14159265359, 0.059, 0.941));
+                         clamp(0.5 + asin(clamp(point.y, -1.0, 1.0)) / 3.14159265359, 0.001, 0.999));
           vec3 observed = pow(texture2D(cloudMap, uv).rgb, vec3(2.2));
+          // Mission maps resolve global weather, not kilometre-scale cloud tops.
+          // Add explicitly modeled, body-fixed turbulence below that resolution.
+          vec3 cloudPoint=point*(radiusM/18000.0);
+          float warp=cloudNoise(cloudPoint*.22);
+          float billow=cloudNoise(cloudPoint+vec3(warp*3.0));
+          float fine=cloudNoise(cloudPoint*3.2+vec3(warp));
+          float detail=(billow-.5)*.65+(fine-.5)*.2;
+          float resolved=1.0-smoothstep(.015,.06,altitude);
+          observed*=1.0+detail*resolved;
           float aerial = 1.0-exp(-distance*8.0);
           color = mix(observed, hazeColor, aerial*0.8);
         }
@@ -68,7 +83,7 @@ function createAtmosphericSky(body, style) {
   });
   const dome = new THREE.Mesh(new THREE.SphereGeometry(850, 32, 20), material);
   dome.name = 'spherical cloud atmosphere';
-  dome.userData.imagery = body.id === 'jupiter' ? 'Hubble OPAL 2015; observed to 80 degrees; polar color extended' : 'NASA/JPL synthesized map; not current observed weather';
+  dome.userData.imagery = body.id === 'jupiter' ? 'Hubble OPAL 2015; observed to 80 degrees; polar fill and local cloud detail modeled' : 'NASA/JPL synthesized map; not current observed weather';
   dome.renderOrder = -900;
   dome.frustumCulled = false;
   dome.onBeforeRender = (_renderer, _scene, camera) => {
