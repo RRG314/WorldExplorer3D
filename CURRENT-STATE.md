@@ -4,6 +4,23 @@ Work only in `/Users/stevenreid/Developer/WorldExplorer3D-release-integration`,
 branch `steven/post-5.2-release-integration`, draft PR #87 into `stable`.
 Do not edit the older Documents checkout. Verify Git status and HEAD first.
 
+## Active space-quality work (September 24)
+
+The current task is the owner's space/interior refinement request. Its evidence
+ledger is `output/release-integration/space-quality-2026-09-24/LEDGER.md`.
+Free CC-BY Sketchfab furnishings were acquired through the signed-in browser,
+converted to bounded local GLBs, and integrated across Solis Reach rooms.
+Space changes include Pathfinder readiness, aircraft pitch, ship wall/camera
+repairs, crew fallback, observed-star projection/selection, volumetric nebulae,
+and seamless modeled planet surfaces. These changes are not yet deployed.
+Do not use the older production matrix below as acceptance of these changes.
+
+A new audit found 19 asynchronous `waitForFunction` predicates in 12 older
+browser verifiers. This installed Playwright treats their Promise as truthy;
+those predicates did not reliably wait for readiness. They now use an explicitly
+awaited polling helper. Re-evaluate affected evidence when those gates are needed;
+do not infer complete production acceptance from their historical receipts.
+
 ## Current evidence
 
 The maintained ledger is `output/release-integration/test-confidence-2026-09-23/`.

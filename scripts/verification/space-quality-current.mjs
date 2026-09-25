@@ -60,7 +60,7 @@ try {
   return {x:innerWidth/2,y:innerHeight/2};
  });
  await page.mouse.click(starTarget.x,starTarget.y);
- await page.waitForFunction(()=>window.__spaceQualityContext.solarSystem.selectedUniverseId==='tau-ceti');
+ await page.waitForFunction(()=>document.getElementById('ssInfoSetCourse')?.textContent==='TRAVEL TO TAU CETI');
  assert.equal(await page.locator('#ssInfoSetCourse').isVisible(),true);
  checks.push({name:'catalog-star-click-and-travel-action',destination:'tau-ceti',title:await page.locator('#ssInfoTitle').textContent()});
  await page.screenshot({path:`${out}/02-star-selection.png`});
