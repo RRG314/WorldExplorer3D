@@ -84,7 +84,7 @@ function setPlanetarySky(body, date = new Date(), options = {}) {
   appCtx.starField.traverse((child) => {
     if (!child.material || child.userData?.skyHitbox) return;
     const baseOpacity = Number(child.userData?.baseOpacity ?? child.material.opacity ?? 1);
-    child.material.transparent = true;
+    child.material.transparent = false;
     child.material.opacity = Math.min(baseOpacity, starOpacity);
     child.material.needsUpdate = true;
   });

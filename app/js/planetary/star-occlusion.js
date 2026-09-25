@@ -35,9 +35,9 @@ function setPlanetaryStarOcclusion(starField, active) {
             clipShadows: material.clipShadows
           });
         }
-        material.depthTest = true;
+        material.depthTest = false;
         material.depthWrite = false;
-        material.transparent = true;
+        material.transparent = false;
         material.clippingPlanes = [ensurePlanetaryHorizonPlane()];
         material.clipIntersection = false;
         material.clipShadows = false;
@@ -60,9 +60,9 @@ function setPlanetaryStarOcclusion(starField, active) {
       if (!object.userData[OBJECT_STATE_KEY]) {
         object.userData[OBJECT_STATE_KEY] = Object.freeze({ renderOrder: object.renderOrder });
       }
-      // Transparent stars must render after opaque planetary terrain so the
-      // terrain depth buffer can hide the lower celestial hemisphere.
-      object.renderOrder = 1000;
+      // The star sphere is camera-relative and smaller than the terrain horizon.
+      // Treat it as background: opaque terrain then overwrites it at any distance.
+      object.renderOrder = -1000;
     } else if (object.userData[OBJECT_STATE_KEY]) {
       object.renderOrder = object.userData[OBJECT_STATE_KEY].renderOrder;
       delete object.userData[OBJECT_STATE_KEY];

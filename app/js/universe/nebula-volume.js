@@ -3,7 +3,7 @@
 // not measured tomography or a naked-eye claim. No animated density or billboard planes.
 export function createNebulaVolume(THREE, entity, mobile = false) {
   const radius = Number(entity.visualProfile?.navigationRadiusScene) || 9000;
-  const image = new THREE.TextureLoader().load(entity.visualProfile.image);
+  const image = new THREE.TextureLoader().load(entity.visualProfile.densityImage || entity.visualProfile.image);
   const material = new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, depthTest: false, side: THREE.BackSide,
     uniforms: {
@@ -58,6 +58,8 @@ export function createNebulaVolume(THREE, entity, mobile = false) {
         float alpha=1.0-transmission;
         if(alpha<0.002) discard;
         gl_FragColor=vec4(emission/max(alpha,0.001),alpha);
+        #include <tonemapping_fragment>
+        #include <encodings_fragment>
       }`
   });
   // Scene disposal owns this image, unlike shared model-template textures.

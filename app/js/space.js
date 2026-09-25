@@ -1,3 +1,4 @@
+import { releaseAtmosphericFlightPresentation } from './space/atmospheric-flight-presentation.js?v=1';
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { getPrimaryWorldCanvas } from "./engine/webgl-lifecycle.js?v=2";
 import { captureEarthWorldSession } from "./earth-session.js?v=17";
@@ -681,6 +682,10 @@ function completeLanding(sessionId = appCtx.spaceFlight._sessionId) {
 
 function exitSpaceFlight(source = 'runtime') {
   console.log('Exiting space flight...', String(source || 'runtime'));
+  // Interior mode pauses flight, but still belongs to the space lifecycle.
+  // Restore shared Earth scene state before disposing the parent space session.
+  if (appCtx.activeShipInterior) appCtx.exitExpeditionShipInterior?.();
+  releaseAtmosphericFlightPresentation();
 
   pirateInterceptionRuntime?.stop?.('space-flight-exit');
 
@@ -726,7 +731,7 @@ function exitSpaceFlight(source = 'runtime') {
 
 registerEnvironmentLifecycle(appCtx.ENV.SPACE_FLIGHT, {
   exitSync: ({ source } = {}) => {
-    if (appCtx.spaceFlight.active) exitSpaceFlight(source || 'environment_transition');
+    if (appCtx.spaceFlight.active || appCtx.activeShipInterior) exitSpaceFlight(source || 'environment_transition');
   },
   snapshot: () => ({
     active: !!appCtx.spaceFlight.active,

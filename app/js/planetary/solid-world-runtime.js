@@ -1,3 +1,4 @@
+import { addSurfaceMaterialDetail } from './surface-material-detail.js';
 import { regionalMapUv } from './regional-map-uv.js';
 import { getAstronomicalBody, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=3';
 import { ctx as appCtx } from '../shared-context.js?v=55';
@@ -500,13 +501,13 @@ function addVisualSurfaceHorizon(pack, world) {
       const address = { ...pack.manifest.address, radiusM: getAstronomicalBody(pack.bodyId).physical.meanRadiusM };
       const uv = geometry.attributes.uv;
       for (let index = 0; index < positions.count; index++) {
-        const mapped = regionalMapUv(address, positions.getX(index), positions.getZ(index));
+        const mapped = regionalMapUv(address, positions.getX(index) + centerX, positions.getZ(index) + centerZ);
         uv.setXY(index, mapped.u, mapped.v);
       }
       uv.needsUpdate = true;
     }
     geometry.computeVertexNormals();
-    const material = world.surface.material.clone();
+    const material = addSurfaceMaterialDetail(world.surface.material.clone());
     material.polygonOffset = true;
     material.polygonOffsetFactor = 1;
     material.polygonOffsetUnits = 1;
@@ -811,6 +812,7 @@ async function createSolidWorld(pack) {
       depthTest: true,
       depthWrite: true
     });
+    addSurfaceMaterialDetail(material);
     surface = new THREE.Mesh(geometry, material);
     surface.name = `${pack.title} modeled surface`;
     surface.position.set(
@@ -1046,6 +1048,10 @@ function hideActiveWorld() {
     if (appCtx.fillLight && Number.isFinite(priorWorldPresentation.fillIntensity)) {
       appCtx.fillLight.intensity = priorWorldPresentation.fillIntensity;
     }
+    if (appCtx.hemiLight) appCtx.hemiLight.visible = priorWorldPresentation.hemiVisible;
+    if (priorWorldPresentation.fillColor != null) appCtx.fillLight?.color?.setHex(priorWorldPresentation.fillColor);
+    if (priorWorldPresentation.ambientColor != null) appCtx.ambientLight?.color?.setHex(priorWorldPresentation.ambientColor);
+    if (priorWorldPresentation.sunPosition) appCtx.sun?.position?.copy(priorWorldPresentation.sunPosition);
     priorWorldPresentation = null;
   }
   activePack = null;
@@ -1097,7 +1103,11 @@ async function arriveAtSolidWorld(bodyInput) {
       sunColor: appCtx.sun?.color?.getHex?.(),
       sunIntensity: Number(appCtx.sun?.intensity),
       ambientIntensity: Number(appCtx.ambientLight?.intensity),
-      fillIntensity: Number(appCtx.fillLight?.intensity)
+      fillIntensity: Number(appCtx.fillLight?.intensity),
+      fillColor: appCtx.fillLight?.color?.getHex?.(),
+      ambientColor: appCtx.ambientLight?.color?.getHex?.(),
+      hemiVisible: appCtx.hemiLight?.visible,
+      sunPosition: appCtx.sun?.position?.clone?.()
     };
   }
   appCtx.scene.background = new THREE.Color(pack.skyColor);
@@ -1112,6 +1122,10 @@ async function arriveAtSolidWorld(bodyInput) {
     appCtx.sun.intensity = pack.sunIntensity;
     appCtx.sun.position.set(-160, 220, 70);
   }
+  // Earth's blue hemisphere is not illumination for an airless world.
+  if (appCtx.hemiLight) appCtx.hemiLight.visible = false;
+  appCtx.fillLight?.color?.setHex(0xffffff);
+  appCtx.ambientLight?.color?.setHex(0xffffff);
   if (appCtx.ambientLight) appCtx.ambientLight.intensity = pack.ambientIntensity;
   if (appCtx.fillLight) appCtx.fillLight.intensity = pack.fillIntensity;
   appCtx.setTravelMode?.(pack.arrivalMode || 'drive', { source: `${bodyId}_arrival`, emitTutorial: false });

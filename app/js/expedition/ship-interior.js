@@ -153,10 +153,10 @@ function createShipPanelTexture(kind, accentColor) {
   const context = canvas.getContext('2d');
   const accent = hexColor(accentColor);
   const palettes = {
-    floor: ['#1f2a36', '#283542', '#111a24'],
-    corridor: ['#243847', '#2d4658', '#101b25'],
-    wall: ['#46545f', '#60707b', '#26323c'],
-    ceiling: ['#2b3743', '#374654', '#17212b']
+    floor: ['#353738', '#434546', '#252729'],
+    corridor: ['#414344', '#505253', '#252829'],
+    wall: ['#858583', '#a4a49e', '#4c5050'],
+    ceiling: ['#626563', '#787b77', '#393e3d']
   };
   const [base, panel, seam] = palettes[kind] || palettes.floor;
   context.fillStyle = base;
@@ -225,10 +225,10 @@ function shipSurfaceMaterial(kind, deckId) {
   const accentColor = deckAccent(deckId);
   const texture = createShipPanelTexture(kind, accentColor);
   const colors = {
-    floor: 0x71808c,
-    corridor: 0x6b8596,
-    wall: 0xb3bec4,
-    ceiling: 0x7b8993
+    floor: 0xffffff,
+    corridor: 0xffffff,
+    wall: 0xffffff,
+    ceiling: 0xffffff
   };
   return material(colors[kind] || colors.floor, {
     roughness: kind === 'wall' ? 0.58 : 0.46,
@@ -1098,6 +1098,7 @@ function addDeckPropColliders(colliders, deckId) {
   } else if (deckId === 'habitat') {
     add(-7.6, 26.1, 7.9, 2.05, 2.2, 'galley');
     add(1.5, 30.2, 7.4, 2.9, 1.2, 'wardroom-table');
+    for (const x of [-0.6, 1.5, 3.6]) for (const z of [28.3, 32.1]) add(x, z, 1.05, 0.95, 1.3, 'wardroom-chair');
     [11.2, 15.4, 19.6].forEach((z, index) => add(-8.2, z, 2.5, 3.7, 1.9, `medical-bed-${index}`));
     add(6.8, 15.5, 2.1, 5.1, 1.5, 'treadmill');
     add(10.2, 18, 3, 1.2, 2.7, 'resistance-frame');
@@ -1361,8 +1362,7 @@ function buildDeckScene(deckDefinition) {
   addDeckDetails(group, deckDefinition.id);
   const spaceView = deckDefinition.id === 'command' ? addBridgeView(group) : null;
   addDeckPropColliders(colliders, deckDefinition.id);
-  group.add(new THREE.HemisphereLight(0xcde7ff, 0x101923, 0.5));
-  const fill = new THREE.DirectionalLight(0xdceaf3, 0.68);
+  const fill = new THREE.DirectionalLight(0xfff4e5, 0.5);
   fill.position.set(8, 18, 8);
   group.add(fill);
   [-30, -20, -10, 0, 10, 20, 30].forEach((z, index) => {
@@ -1381,7 +1381,7 @@ function buildSolisReachScene(expedition) {
   const root = new THREE.Group();
   root.name = 'expedition-ship:solis-reach';
   root.userData.environmentOwner = 'SPACE_FLIGHT:SHIP_INTERIOR';
-  root.add(new THREE.HemisphereLight(0xf3f5f7, 0x343038, 0.85));
+  root.add(new THREE.HemisphereLight(0xf3f5f7, 0x343038, 0.65));
   root.add(new THREE.AmbientLight(0xffffff, 0.3));
   const deckStates = new Map();
   SHIP_DECKS.forEach((deckDefinition, index) => {

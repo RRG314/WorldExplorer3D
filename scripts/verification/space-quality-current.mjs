@@ -114,14 +114,29 @@ try {
  }
  await page.evaluate(async()=>{
   const ctx=window.__spaceQualityContext;ctx.returnUniverseToSolImmediate();cancelAnimationFrame(ctx.spaceFlight.animationId);
-  window.__atmosphereFixture=await import('/app/js/space/atmospheric-flight-presentation.js');
+
  });
  for(const bodyId of ['jupiter','saturn','uranus','neptune']) {
+  const entry=await page.evaluate(bodyId=>{
+   const ctx=window.__spaceQualityContext;
+   ctx.clearRenderedSpaceJourney();
+   if(!ctx.beginRenderedSpaceJourney({sourceBodyId:'earth',destinationBodyId:bodyId,mode:'assisted'}))throw Error('Journey initialization failed');
+   ctx.engageRenderedJourneyAssist();
+   for(let frame=0;frame<500&&ctx.spaceJourney.phase!=='approach';frame++)ctx.updateRenderedSpaceJourney({realDtS:.1});
+   const entered=ctx.requestRenderedAtmosphericEntry(bodyId);
+   ctx.updateSpaceFlightPhysics();
+   return entered;
+  },bodyId);
+  assert.equal(entry.accepted,true,JSON.stringify(entry));
   for(const altitudeM of [200000,20000,-5000]) {
    await page.evaluate(({bodyId,altitudeM})=>{
     const ctx=window.__spaceQualityContext, flight=ctx.spaceFlight;
     const radial={x:0.94,y:0.342,z:0};
-    window.__atmosphereFixture.updateAtmosphericFlightPresentation(bodyId,{radial,altitudeM});
+    const presentation=flight.atmosphericPresentation;
+    if(!presentation)throw Error('Atmospheric journey did not create its renderer');
+    presentation.dome.material.uniforms.radial.value.set(radial.x,radial.y,radial.z).normalize();
+    presentation.dome.material.uniforms.relativeAltitude.value=altitudeM/presentation.body.physical.meanRadiusM;
+    presentation.dome.material.uniforms.immersion.value=Math.min(.96,Math.max(0,-altitudeM/25000));
     flight.camera.position.copy(flight.rocket.position).add(new THREE.Vector3(0,2,0));
     flight.camera.up.set(0,1,0);flight.camera.lookAt(flight.rocket.position.clone().add(new THREE.Vector3(-180,-65,-300)));flight.camera.updateMatrixWorld(true);
    },{bodyId,altitudeM});
@@ -130,7 +145,7 @@ try {
    assert.equal(state.glError,0);checks.push({name:'atmospheric-render-fixture',bodyId,altitudeM,...state});
    await page.screenshot({path:`${out}/${bodyId}-${altitudeM}.png`});
   }
-  await page.evaluate(()=>window.__atmosphereFixture.releaseAtmosphericFlightPresentation());
+
  }
  assert.deepEqual(errors,[]);
  await fs.writeFile(`${out}/report.json`,JSON.stringify({ok:true,complete:true,evidenceScope:'Desktop software-rendered scene fixtures; not real-device performance or full surface launch acceptance',checks,errors},null,2));

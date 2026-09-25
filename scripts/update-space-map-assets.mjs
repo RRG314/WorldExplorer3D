@@ -33,3 +33,14 @@ for (const [id,model] of Object.entries({triton:'t/Triton_1_2707',ceres:'c/Ceres
  await sharp(image).resize({width:4096,withoutEnlargement:true}).jpeg({quality:90}).toFile(file);
  console.log(JSON.stringify({file,source:url,image:source.name,bytes:(await fs.stat(file)).size}));
 }
+
+// Remove labels from the preserved Cassini cylindrical map, not its imagery.
+await sharp('app/assets/textures/titan-cassini-iss.jpg')
+ .extract({left:72,top:81,width:1478,height:738}).resize(2048,1024)
+ .jpeg({quality:92}).toFile('app/assets/textures/titan-cassini-map-unlabelled.jpg');
+// Point-source stars belong to the star catalog, not an extruded gas density.
+for (const [id,source] of [['orion','nasa'],['carina','webb'],['crab','webb']]) {
+ await sharp(`app/assets/textures/universe/${id}-nebula-${source}.jpg`)
+  .resize({width:512}).median(5).blur(3).jpeg({quality:90})
+  .toFile(`app/assets/textures/universe/${id}-nebula-density.jpg`);
+}
