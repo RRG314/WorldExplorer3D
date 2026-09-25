@@ -251,7 +251,7 @@ const bodyRows = [
     atmosphere: { class: ATMOSPHERE_CLASS.GIANT, referencePressurePa: 100_000, composition: ['hydrogen', 'helium', 'methane', 'ammonia'] },
     exploration: { landingMode: LANDING_MODE.ATMOSPHERIC_DESCENT, surfaceRegionEligible: false, environmentProfileId: 'saturn' },
     frames: { inertial: 'J2000', bodyFixed: 'IAU_SATURN' },
-    presentation: { environmentId: 'SATURN', globalTexturePath: '/app/assets/textures/saturn_jpl.jpg', surfaceLabel: null },
+    presentation: { environmentId: 'SATURN', globalTexturePath: '/app/assets/textures/saturn-nasa-vtad-map.jpg', surfaceLabel: null },
     provenanceSources: sharedPlanetSources
   }),
   makeBody({
