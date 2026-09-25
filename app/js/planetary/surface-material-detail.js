@@ -1,6 +1,7 @@
 // Procedural metre-scale regolith/ice variation below the resolution of the
 // mission map. This changes shading only; collision height remains authoritative.
 export function addSurfaceMaterialDetail(material, strength = 0.22) {
+  material.extensions = { ...material.extensions, derivatives: true };
   material.onBeforeCompile = shader => {
     shader.uniforms.surfaceDetailStrength = { value: strength };
     shader.vertexShader = 'varying vec3 surfaceDetailPosition;\n' + shader.vertexShader;
@@ -20,7 +21,19 @@ export function addSurfaceMaterialDetail(material, strength = 0.22) {
       float detail=(broad-0.5)*0.65+(granular-0.5)*fineVisibility;
       diffuseColor.rgb *= 1.0 + detail*surfaceDetailStrength;
     `);
+    shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+      // Derivative bump mapping adds sub-grid regolith/ice relief without
+      // treating a mission color map as an elevation measurement.
+      float localRange=1.0-smoothstep(60.0,450.0,length(cameraPosition-surfaceDetailPosition));
+      float grainHeight=terrainNoise(surfaceDetailPosition.xz*.7)*.045
+                      +terrainNoise(surfaceDetailPosition.xz*.13)*.12;
+      vec3 sigmaX=dFdx(-vViewPosition), sigmaY=dFdy(-vViewPosition);
+      vec3 r1=cross(sigmaY,normal), r2=cross(normal,sigmaX);
+      float determinant=dot(sigmaX,r1);
+      vec3 gradient=sign(determinant)*(dFdx(grainHeight)*r1+dFdy(grainHeight)*r2);
+      normal=normalize(abs(determinant)*normal-gradient*localRange);
+    `);
   };
-  material.customProgramCacheKey = () => 'planetary-metre-detail-v1';
+  material.customProgramCacheKey = () => 'planetary-metre-detail-v2';
   return material;
 }
