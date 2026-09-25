@@ -48,9 +48,13 @@ function setUniverseSkyFrame(state, entity, visible) {
   if (state.group.visible) rebuildGaiaGeometry(state);
 }
 
-function updateUniverseSky(state, rocket) {
+function updateUniverseSky(state, rocket, observer = null) {
   if (!state?.group?.visible || !rocket) return;
   state.group.position.copy(rocket.position);
+  if (observer && (!state.lastObserver || Math.hypot(observer.x-state.lastObserver.x, observer.y-state.lastObserver.y, observer.z-state.lastObserver.z) > 0.001)) {
+    state.lastObserver = { ...observer };
+    rebuildGaiaSkyLayers(state.gaiaSky, new THREE.Vector3(observer.x, observer.y, observer.z));
+  }
 }
 
 export { createUniverseSky, setUniverseSkyFrame, updateUniverseSky };

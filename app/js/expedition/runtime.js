@@ -325,7 +325,7 @@ async function launchEarthPathfinderToSolisReach(options = {}) {
   return true;
 }
 
-function stageEarthPathfinder(appContext) {
+async function stageEarthPathfinder(appContext) {
   bindRuntimeContext(appContext);
   if (!activeContext || activeContext.getEnv?.() !== activeContext.ENV?.EARTH) {
     activeContext?.showToast?.('Pathfinder can be deployed from an active Earth location.');
@@ -354,6 +354,8 @@ function stageEarthPathfinder(appContext) {
     return false;
   }
   closeExpeditionPlanner();
+  await pod.userData.curatedPodLoadPromise;
+  if (!pod.parent || pod.userData.curatedPodDisposed) return false;
   activeContext.showToast?.('Pathfinder is ready nearby. Approach the hatch and press E to board.');
   return true;
 }

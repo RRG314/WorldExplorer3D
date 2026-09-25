@@ -42,6 +42,7 @@ function hidePlanetInfo(ctx) {
   document.body?.classList.remove('space-destination-details-open');
   ctx.solarSystem.selectedPlanet = null;
   ctx.solarSystem.selectedBodyId = null;
+  ctx.solarSystem.selectedUniverseId = null;
 }
 
 function openPlanetInfo(ctx) {
@@ -50,6 +51,7 @@ function openPlanetInfo(ctx) {
 }
 
 function configureSetCourse(ctx, bodyId, label) {
+  ctx.solarSystem.selectedUniverseId = null;
   const setCourse = document.getElementById('ssInfoSetCourse');
   if (!setCourse) return;
   const selectable = SOLAR_SYSTEM_EXPLORATION_DESTINATION_IDS.includes(bodyId);

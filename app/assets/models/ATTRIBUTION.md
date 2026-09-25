@@ -236,3 +236,11 @@ Pirate Interception Raider
 - Bundled SHA-256: `42aae3c61667d05024d3636649592b40f963ef08133f2329271a876962c0b7ba`
 - Processing: repacked from self-contained glTF to extension-free GLB with glTF-Transform 4.5.0; the embedded texture was reduced from 2048 px to 512 px. The 8,292-triangle source geometry and original orange hull presentation were retained.
 - Notes: One shared model family presents the bounded interceptor, attacker, and boarding-craft roles. Role, health, collision, movement, weapons, boarding progress, damage, and cleanup remain owned by the pirate-interception runtime; this file is presentation only.
+
+## Solis Reach quarters furniture
+Selected bed, display and lamp meshes from [Sci-Fi Interior Room](https://sketchfab.com/3d-models/sci-fi-interior-room-ec3e1efe815743439322bd1536a886e3) by [Van_Twinkle](https://sketchfab.com/Van_Twinkle), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Extracted from the owner-downloaded glTF and scaled/oriented to authored ship furniture. Original license: interiors/solis/LICENSE-room.txt.
+
+## Astronomical catalog data
+HYG v4.0 by David Nash / Astronexus and Western constellation figures by Stellarium contributors, CC BY-SA 4.0. Subsetting/conversion and source hashes: `../data/universe/observed-sky-sources.json`. No constellation artwork used.
+
+Additional Solis Reach furniture: [Sci-fi furniture/props pack](https://sketchfab.com/3d-models/free-sci-fi-furnitureprops-pack-b521def33f21422e9be8b4d237f7ca63) by [NinKorr3D](https://sketchfab.com/NinKorr3D), and [Medical Console](https://sketchfab.com/3d-models/medical-console-89065e109790417191467cfececf2c7c) by [Oliver Triplett](https://sketchfab.com/OliverTriplett), both CC BY 4.0. Meshes separated, textures resized to 512px, and furniture fitted to authored rooms. Original license notices retained under interiors/solis/.

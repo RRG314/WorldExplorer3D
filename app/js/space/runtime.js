@@ -228,9 +228,10 @@ function getActiveSpaceBodies() {
 
 export function resolveSpaceControlInput(keys = {}, sharedActions = {}) {
   const legacyYaw = keys.arrowleft ? -1 : keys.arrowright ? 1 : 0;
-  const legacyPitch = keys.arrowup ? 1 : keys.arrowdown ? -1 : 0;
+  const legacyPitch = keys.arrowup ? -1 : keys.arrowdown ? 1 : 0;
   const yaw = legacyYaw || -(Number(sharedActions.turn) || 0);
-  const pitch = legacyPitch || (Number(sharedActions.move) || 0);
+  // Aircraft convention: pushing forward lowers the nose, pulling back raises it.
+  const pitch = legacyPitch || -(Number(sharedActions.move) || 0);
   const thrust = !!keys[' '] || Number(sharedActions.jump) > 0.05;
   const brake = !!keys.shift || Number(sharedActions.sprint) > 0.05;
   return Object.freeze({ yaw, pitch, thrust, brake });

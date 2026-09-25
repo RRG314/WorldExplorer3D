@@ -1,7 +1,7 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { getAstronomicalBody, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=3';
 import { disposeThreeObjectTree } from '../engine/webgl-lifecycle.js?v=2';
-import { getGalaxyEntryDestination, getUniverseFrame, resolveUniverseAddress } from './catalog.js?v=11';
+import { getGalaxyEntryDestination, getUniverseFrame, resolveUniverseAddress, icrsToCartesian } from './catalog.js?v=11';
 import { updateBlackHoleEncounter, updateBlackHoleVisual } from './black-hole.js?v=4';
 import { createDeepSkyLayer, setDeepSkyFrame, updateDeepSkyLayer } from './deep-sky.js?v=3';
 import { createRegionEncounter, fireEncounterPulse, updateRegionEncounter } from './encounters.js?v=1';
@@ -105,7 +105,10 @@ function setSolVisibility(visible) {
   appCtx.setSolarSystemFrameVisibility?.(visible);
   if (appCtx.spaceFlight?.earth) appCtx.spaceFlight.earth.visible = visible;
   if (appCtx.spaceFlight?.moon) appCtx.spaceFlight.moon.visible = visible;
-  if (appCtx.spaceFlight?.celestialCatalog?.group) appCtx.spaceFlight.celestialCatalog.group.visible = visible;
+  if (appCtx.spaceFlight?.celestialCatalog?.group) {
+    appCtx.spaceFlight.celestialCatalog.group.visible = true;
+    appCtx.spaceFlight.celestialCatalog.gaiaSky.group.visible = visible;
+  }
   const moonButton = document.getElementById('orbitsToggle');
   const marsButton = document.getElementById('marsLandingToggle');
   if (moonButton) moonButton.style.display = visible ? '' : 'none';
@@ -880,7 +883,15 @@ function updateUniverseRuntime(frameSeconds = 1 / 60) {
   updateMissionScanEffects();
   updateDestinationMissionRuntime();
   rebaseActiveFrame();
-  updateUniverseSky(universeRuntime.sky, appCtx.spaceFlight.rocket);
+  const observer = universeRuntime.current.canonicalPosition?.frame === 'ICRS'
+    ? icrsToCartesian(universeRuntime.current) : { x: 0, y: 0, z: 0 };
+  if (universeRuntime.current.id !== 'sol' && universeRuntime.current.canonicalPosition?.frame === 'ICRS') {
+    const metrics = getUniverseNavigationMetrics(universeRuntime.current, appCtx.spaceFlight.rocket, universeRuntime.canonicalFrameOffset);
+    const scale = metrics.frameRadiusLy / metrics.sceneRadius;
+    for (const axis of ['x', 'y', 'z']) observer[axis] += (universeRuntime.canonicalFrameOffset[axis] + appCtx.spaceFlight.rocket.position[axis]) * scale;
+  }
+  appCtx.updateSpaceCatalogObserver?.(observer, appCtx.spaceFlight.camera?.position || appCtx.spaceFlight.rocket.position);
+  updateUniverseSky(universeRuntime.sky, appCtx.spaceFlight.rocket, observer);
   updateDeepSkyLayer(
     universeRuntime.deepSky,
     appCtx.spaceFlight.rocket,

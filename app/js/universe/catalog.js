@@ -324,7 +324,7 @@ const CATALOG = [
       tint: 0x89a7ff,
       navigationRadiusScene: 9000
     },
-    generatedFlags: ['observational-image-projection'],
+    generatedFlags: ['procedural-volumetric-reconstruction', 'enhanced-emission-display'],
     uncertainty: { distance: 'Published estimates vary by method and sub-region.' },
     provenance: [SOURCES.nasaOrion]
   }),
@@ -348,7 +348,7 @@ const CATALOG = [
       tint: 0xff9a73,
       navigationRadiusScene: 9000
     },
-    generatedFlags: ['observational-image-projection'],
+    generatedFlags: ['procedural-volumetric-reconstruction', 'enhanced-emission-display'],
     uncertainty: { distance: 'Representative distance to the Carina star-forming complex.' },
     provenance: [SOURCES.nasaCarina]
   }),
@@ -372,7 +372,7 @@ const CATALOG = [
       tint: 0x7ee0b7,
       navigationRadiusScene: 9000
     },
-    generatedFlags: ['observational-image-projection'],
+    generatedFlags: ['procedural-volumetric-reconstruction', 'enhanced-emission-display'],
     provenance: [SOURCES.nasaCrab]
   }),
   entity({

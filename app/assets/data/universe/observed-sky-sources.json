@@ -1,0 +1,22 @@
+{
+  "license": "CC-BY-SA-4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+  "sources": [
+    {
+      "author": "David Nash / Astronexus",
+      "url": "https://github.com/astronexus/HYG-Database",
+      "version": "HYG v4.0",
+      "sha256": "8e3ff9e67445e558a759b117910850cff1b1d4d492f45f715c2ee2db3d869bac"
+    },
+    {
+      "author": "Stellarium contributors",
+      "url": "https://github.com/Stellarium/stellarium-skycultures/tree/master/western",
+      "sha256": "a6bb12b5fdc605a3fa76c0ebde77aca2465d26966d385e544e371d661d4d84e2"
+    }
+  ],
+  "modifications": "Subset of bright and constellation member stars; parsecs converted to light years; HIP line graphs converted to coordinate pairs. No illustrations included.",
+  "epoch": "J2000 catalog positions; proper motion not applied",
+  "starCount": 700,
+  "constellationCount": 88,
+  "limitations": "Traditional Western line figures, not IAU boundaries. Unknown-distance stars cannot be reprojected for a distant observer."
+}

@@ -99,9 +99,9 @@ test('saved remaps change live control actions and swap collisions', () => {
 
 test('space flight consumes the same configurable actions while keeping arrow and touch fallbacks', () => {
   const configured = resolveSpaceControlInput({}, { move: 1, turn: 1, jump: 1, sprint: 0 });
-  assert.deepEqual(configured, { yaw: -1, pitch: 1, thrust: true, brake: false });
+  assert.deepEqual(configured, { yaw: -1, pitch: -1, thrust: true, brake: false });
   const legacyTouch = resolveSpaceControlInput({ arrowright: true, arrowdown: true, shift: true }, {});
-  assert.deepEqual(legacyTouch, { yaw: 1, pitch: -1, thrust: false, brake: true });
+  assert.deepEqual(legacyTouch, { yaw: 1, pitch: 1, thrust: false, brake: true });
 });
 
 test('building entry prompts require a published door and door-range approach', () => {

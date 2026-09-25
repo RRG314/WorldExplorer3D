@@ -127,3 +127,13 @@ function validateShipLayout() {
 }
 
 export { getShipDeck, getShipDeckForRoom, getShipRoom, SHIP_CREW_POSTS, SHIP_DECK_BOUNDS, SHIP_DECKS, SHIP_DOORS, SHIP_ROOMS, SHIP_STATIONS, validateShipLayout };
+
+// Room bounds describe usable floor space, not bulkhead endpoints. Extend each
+// corridor wall to its enclosing transverse bulkheads so corners meet exactly.
+export function roomBulkheadSpan(room) {
+  const boundaries = [-36, -22, -7, 8, 24, 36];
+  const center = (room.minZ + room.maxZ) / 2;
+  const upper = boundaries.findIndex((z) => z > center);
+  if (upper < 1) throw new RangeError(`Room outside hull: ${room.id}`);
+  return { minZ: boundaries[upper - 1], maxZ: boundaries[upper] };
+}

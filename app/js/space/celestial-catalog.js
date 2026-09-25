@@ -1,4 +1,7 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
+import { BRIGHT_STARS, CONSTELLATION_STAR_IDS } from '../sky/catalog.js?v=1';
+import { projectCatalogStar } from './observer-sky.js?v=1';
+import { createRoundStarMaterial } from '../sky/star-point-material.js?v=4';
 import { createGaiaSkyLayers } from '../sky/gaia-catalog.js?v=4';
 
 const CATALOG_RADIUS = 300000;
@@ -14,51 +17,55 @@ function raDecToPosition(raHours, decDeg, radius = CATALOG_RADIUS) {
 }
 
 function createCatalogStars(group, catalog) {
-  catalog.starEntries = [];
-  (appCtx.BRIGHT_STARS || []).filter((star) => !star.isPlanet).forEach((star, index) => {
-    const position = raDecToPosition(star.ra, star.dec);
-    const radius = Math.max(260, Math.min(720, 570 - Number(star.mag || 0) * 58));
-    const mesh = new THREE.Mesh(
-      new THREE.SphereGeometry(radius, 8, 8),
-      new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false })
-    );
-    mesh.position.copy(position);
-    mesh.userData = { isCatalogStar: true, starIndex: index, star };
-    group.add(mesh);
-
-    const hitbox = new THREE.Mesh(
-      new THREE.SphereGeometry(Math.max(1500, radius * 3.4), 6, 6),
-      new THREE.MeshBasicMaterial({ visible: false })
-    );
-    hitbox.position.copy(position);
-    hitbox.userData = { isCatalogStar: true, starIndex: index, star };
-    group.add(hitbox);
-    catalog.starEntries.push({ mesh, hitbox, star });
-  });
+  catalog.starEntries = BRIGHT_STARS.filter((star) => !star.isPlanet).map((star) => ({ star }));
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(catalog.starEntries.length * 3), 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(catalog.starEntries.length * 3), 3));
+  catalog.points = new THREE.Points(geometry, createRoundStarMaterial({ size: 3.5, sizeAttenuation: false, vertexColors: true, transparent: true, depthWrite: false, fog: false }));
+  catalog.points.userData.isCatalogStar = true;
+  catalog.points.frustumCulled = false;
+  catalog.points.renderOrder = -1000;
+  group.add(catalog.points);
 }
 
 function createConstellations(group, catalog) {
   catalog.constellationEntries = [];
-  const material = new THREE.LineBasicMaterial({
-    color: 0x628bb8,
-    transparent: true,
-    opacity: 0.12,
-    depthWrite: false
+  const stars = new Map(BRIGHT_STARS.map((star) => [star.hip, star]));
+  Object.entries(CONSTELLATION_STAR_IDS).forEach(([name, segments]) => {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(segments.length * 6), 3));
+    const line = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: 0x628bb8, transparent: true, opacity: 0.10, depthWrite: false }));
+    line.userData = { isSpaceConstellation: true, constellationName: name };
+    line.frustumCulled = false;
+    group.add(line);
+    catalog.constellationEntries.push({ line, name, segments: segments.map((pair) => pair.map((id) => stars.get(id))) });
   });
-  Object.entries(appCtx.CONSTELLATION_LINES || {}).forEach(([name, segments]) => {
-    const constellation = new THREE.Group();
-    constellation.name = name + ' constellation';
-    segments.forEach((segment) => {
-      const geometry = new THREE.BufferGeometry().setFromPoints([
-        raDecToPosition(segment[0][0], segment[0][1], CATALOG_RADIUS - 1200),
-        raDecToPosition(segment[1][0], segment[1][1], CATALOG_RADIUS - 1200)
-      ]);
-      const line = new THREE.Line(geometry, material.clone());
-      line.userData = { isSpaceConstellation: true, constellationName: name };
-      constellation.add(line);
-      catalog.constellationEntries.push({ line, name });
+}
+
+function updateSpaceCatalogObserver(observer = { x: 0, y: 0, z: 0 }, position = null) {
+  const catalog = appCtx.spaceFlight?.celestialCatalog;
+  if (!catalog) return;
+  if (position) catalog.group.position.copy(position);
+  const last = catalog.observer;
+  if (last && Math.hypot(observer.x-last.x, observer.y-last.y, observer.z-last.z) < 0.00001) return;
+  catalog.observer = { ...observer };
+  const positions = catalog.points.geometry.attributes.position;
+  const colors = catalog.points.geometry.attributes.color;
+  catalog.starEntries.forEach((entry, index) => {
+    const projected = projectCatalogStar(entry.star, observer, CATALOG_RADIUS);
+    entry.projected = projected;
+    positions.setXYZ(index, projected?.x || 0, projected?.y || 0, projected?.z || 0);
+    const brightness = projected ? Math.max(0.08, Math.min(1, Math.pow(10, -0.16 * projected.magnitude))) : 0;
+    colors.setXYZ(index, brightness, brightness, brightness);
+  });
+  positions.needsUpdate = colors.needsUpdate = true;
+  catalog.constellationEntries.forEach((entry) => {
+    const attribute = entry.line.geometry.attributes.position;
+    entry.segments.forEach((pair, i) => {
+      const points = pair.map((star) => projectCatalogStar(star, observer, CATALOG_RADIUS - 1200));
+      points.forEach((point, j) => attribute.setXYZ(i * 2 + j, points.every(Boolean) ? point.x : 0, points.every(Boolean) ? point.y : 0, points.every(Boolean) ? point.z : 0));
     });
-    group.add(constellation);
+    attribute.needsUpdate = true;
   });
 }
 
@@ -79,13 +86,15 @@ function showSpaceConstellationInfo(name) {
     if (element) element.textContent = value;
   };
   set('ssInfoTitle', name);
-  set('ssInfoType', 'IAU Constellation');
-  set('ssInfoDesc', 'Official sky-region pattern shown from catalog right ascension and declination coordinates.');
+  set('ssInfoType', 'Traditional Western constellation figure');
+  set('ssInfoDesc', 'Stellarium line figure joining HYG catalog stars. Its shape changes with your viewpoint; IAU sky boundaries are defined from Earth.');
   set('ssInfoMetaLabel', 'CELESTIAL COORDINATES');
   set('ssInfoMetric1Label', 'Reference frame');
   set('ssInfoDistAU', 'Equatorial J2000');
   set('ssInfoMetric2Label', 'Pattern source');
-  set('ssInfoDistKM', 'IAU sky regions');
+  set('ssInfoDistKM', 'Stellarium / HYG v4.0');
+  const courseButton = document.getElementById('ssInfoSetCourse');
+  if (courseButton) courseButton.style.display = 'none';
   set('ssInfoMetric3Label', 'Catalog stars');
   set('ssInfoDistEarth', String((appCtx.BRIGHT_STARS || []).filter((star) => star.constellation === name).length));
   panel.style.display = 'block';
@@ -107,10 +116,11 @@ function createSpaceCelestialCatalog(scene) {
   createConstellations(group, catalog);
   scene.add(group);
   appCtx.spaceFlight.celestialCatalog = catalog;
+  updateSpaceCatalogObserver();
   return catalog;
 }
 
-Object.assign(appCtx, { highlightSpaceConstellation, showSpaceConstellationInfo });
+Object.assign(appCtx, { highlightSpaceConstellation, showSpaceConstellationInfo, updateSpaceCatalogObserver });
 
 export {
   createSpaceCelestialCatalog,

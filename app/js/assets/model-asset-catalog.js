@@ -1,6 +1,27 @@
 const MODEL_ASSET_SCHEMA_VERSION = 1;
 
 const MODEL_ASSET_CATALOG = Object.freeze([
+  ...['cargo-case','cargo-tank','cargo-locker','storage-case','bridge-chair','wardroom-chair','lab-stool','wardroom-table','medical-console'].map((name) => Object.freeze({
+    schemaVersion: MODEL_ASSET_SCHEMA_VERSION, id: `solis-${name}`,
+    label: `Solis Reach ${name.replaceAll('-', ' ')}`, url: `/app/assets/models/interiors/solis/${name}.glb`,
+    roles: Object.freeze(['ship-interior-furnishing']), license: 'CC-BY-4.0',
+    sourceUrl: name === 'medical-console' ? 'https://sketchfab.com/3d-models/medical-console-89065e109790417191467cfececf2c7c' : 'https://sketchfab.com/3d-models/free-sci-fi-furnitureprops-pack-b521def33f21422e9be8b4d237f7ca63',
+    attribution: name === 'medical-console' ? 'Medical Console by Oliver Triplett' : 'Sci-fi furniture/props pack by NinKorr3D',
+    collisionPolicy: 'authored-ship-prop-colliders', sourceUpAxis: 'y',
+    instancePolicy: Object.freeze({geometry:'clone',materials:'clone'}),
+    budgets: Object.freeze({bytes:2000000,triangles:8500,textureEdgePixels:512})
+  })),
+  ...['crew-bed', 'crew-display', 'crew-lamp'].map((name) => Object.freeze({
+    schemaVersion: MODEL_ASSET_SCHEMA_VERSION,
+    id: `solis-${name}`, label: `Solis Reach ${name.replaceAll('-', ' ')}`,
+    url: `/app/assets/models/interiors/solis/${name}.glb`,
+    roles: Object.freeze(['ship-interior-furnishing']), license: 'CC-BY-4.0',
+    sourceUrl: 'https://sketchfab.com/3d-models/sci-fi-interior-room-ec3e1efe815743439322bd1536a886e3',
+    attribution: 'Sci-Fi Interior Room by Van_Twinkle; selected furniture extracted and fitted to Solis Reach.',
+    collisionPolicy: 'authored-ship-prop-colliders', sourceUpAxis: 'y',
+    instancePolicy: Object.freeze({ geometry: 'clone', materials: 'clone' }),
+    budgets: Object.freeze({ bytes: 900000, triangles: 18000, textureEdgePixels: 1024 })
+  })),
   ...['pine', 'broadleaf', 'shrub', 'fern', 'grass'].flatMap((kind) => (['pine','broadleaf'].includes(kind) ? ['', '-lod'] : ['']).map((suffix) => Object.freeze({
     schemaVersion: MODEL_ASSET_SCHEMA_VERSION,
     id: `nature-${kind}${suffix}`,

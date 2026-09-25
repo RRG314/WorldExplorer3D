@@ -1,3 +1,4 @@
+import { createNebulaVolume } from './nebula-volume.js?v=1';
 import { createBlackHoleVisual } from './black-hole.js?v=4';
 import { createRoundStarMaterial } from '../sky/star-point-material.js?v=4';
 import { derivePlanetVisualProfile, deriveStarVisualProfile } from './body-visual-profile.js?v=1';
@@ -324,78 +325,13 @@ function createNebulaCloudTexture(seed) {
   return new THREE.CanvasTexture(canvas);
 }
 
-function createNebulaCloudVolume(entity) {
-  const group = new THREE.Group();
-  const random = seededRandom(entity.visualProfile.seed + 104729);
-  const cloudMap = createNebulaCloudTexture(entity.visualProfile.seed);
-  const tint = new THREE.Color(entity.visualProfile.tint || 0x9bbcff);
-  for (let i = 0; i < 42; i++) {
-    const material = new THREE.SpriteMaterial({
-      map: cloudMap,
-      color: tint.clone().offsetHSL((random() - 0.5) * 0.08, -0.08, (random() - 0.5) * 0.12),
-      transparent: true,
-      opacity: 0.09 + random() * 0.09,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      fog: false
-    });
-    const cloud = new THREE.Sprite(material);
-    const radial = Math.pow(random(), 0.62) * 7200;
-    const azimuth = random() * Math.PI * 2;
-    const elevation = (random() - 0.5) * 5200;
-    cloud.position.set(Math.cos(azimuth) * radial, elevation, Math.sin(azimuth) * radial);
-    const size = 850 + random() * 2600;
-    cloud.scale.set(size * (0.75 + random() * 0.7), size, 1);
-    cloud.userData = { baseOpacity: material.opacity, phase: random() * Math.PI * 2 };
-    group.add(cloud);
-  }
-  group.userData.cloudMap = cloudMap;
-  return group;
-}
-
 function createNebula(entity) {
   const group = new THREE.Group();
-  const texture = new THREE.TextureLoader().load(entity.visualProfile.image);
-  if (typeof THREE.SRGBColorSpace !== 'undefined') texture.colorSpace = THREE.SRGBColorSpace;
-  const tint = entity.visualProfile.tint || 0xffffff;
-  const layers = [];
-  [
-    { z: 0, width: 9000, opacity: 0.38 },
-    { z: -4200, width: 11500, opacity: 0.16 },
-    { z: 3200, width: 7800, opacity: 0.1 }
-  ].forEach((definition, index) => {
-    const material = new THREE.SpriteMaterial({
-      map: texture,
-      alphaMap: createFeatheredAlphaMap(),
-      color: tint,
-      transparent: true,
-      opacity: definition.opacity,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      fog: false
-    });
-    const sprite = new THREE.Sprite(material);
-    sprite.position.z = definition.z;
-    sprite.scale.set(
-      definition.width,
-      definition.width / Number(entity.visualProfile.imageAspect || 1.39),
-      1
-    );
-    sprite.userData = { baseOpacity: definition.opacity, phase: index * 1.7 };
-    group.add(sprite);
-    layers.push(sprite);
-  });
-  const cloudVolume = createNebulaCloudVolume(entity);
-  group.add(cloudVolume);
-  const label = createLabel(entity.name, 420);
-  label.position.y = 4700;
-  group.add(label);
-  group.userData.nebulaLayers = layers;
-  group.userData.nebulaClouds = cloudVolume.children;
+  group.add(createNebulaVolume(THREE, entity, globalThis.matchMedia?.('(max-width: 768px)').matches === true));
   group.userData.observationalImage = {
     credit: entity.visualProfile.imageCredit,
     accuracy: entity.accuracy,
-    generatedDepth: 'layered image projection'
+    generatedDepth: 'procedural emission/absorption reconstruction; not measured 3D data'
   };
   return group;
 }
@@ -644,18 +580,7 @@ function updateUniverseFrameVisual(group, elapsedSeconds, frameScale = 1) {
   (group.userData.starMaterials || []).forEach((material) => {
     if (material.uniforms?.time) material.uniforms.time.value = elapsedSeconds;
   });
-  if (group.userData.universeEntity?.objectClass === 'galaxy') group.rotation.y += 0.00012 * frameScale;
-  if (group.userData.stellarRegionField) group.userData.stellarRegionField.rotation.y += 0.00022 * frameScale;
-  (group.userData.nebulaLayers || []).forEach((layer) => {
-    layer.material.opacity = layer.userData.baseOpacity * (
-      0.92 + Math.sin(elapsedSeconds * 0.2 + layer.userData.phase) * 0.08
-    );
-  });
-  (group.userData.nebulaClouds || []).forEach((cloud) => {
-    cloud.material.opacity = cloud.userData.baseOpacity * (
-      0.88 + Math.sin(elapsedSeconds * 0.08 + cloud.userData.phase) * 0.12
-    );
-  });
+
 }
 
 export {

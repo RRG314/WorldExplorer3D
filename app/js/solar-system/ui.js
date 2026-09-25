@@ -1,3 +1,4 @@
+import { showCelestialSelection } from '../space/celestial-selection.js?v=1';
 import {
   handleMoonLandingAction,
   handleSpaceReturnAction,
@@ -22,13 +23,15 @@ function formatKilometers(km) {
 }
 
 export function onSolarSystemClick(ctx, event) {
-  if (!ctx.appCtx.spaceFlight.active || !ctx.solarSystem.visible || !ctx.solarSystem.group) return;
+  if (!ctx.appCtx.spaceFlight.active || !ctx.solarSystem.group) return;
 
   ctx.solarSystem.mouse.x = event.clientX / window.innerWidth * 2 - 1;
   ctx.solarSystem.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
   ctx.solarSystem.raycaster.setFromCamera(ctx.solarSystem.mouse, ctx.appCtx.spaceFlight.camera);
 
   const clickables = [];
+  const outsideSol = ctx.appCtx.universeRuntime?.current?.id && ctx.appCtx.universeRuntime.current.id !== 'sol';
+  if (!outsideSol) {
   ctx.solarSystem.planetMeshes.forEach((entry) => {
     clickables.push(entry.mesh, entry.hitbox);
   });
@@ -42,13 +45,26 @@ export function onSolarSystemClick(ctx, event) {
   ctx.solarSystem.galaxyMeshes.forEach((entry) => {
     clickables.push(entry.mesh, entry.hitbox);
   });
-  const celestialCatalog = ctx.appCtx.spaceFlight?.celestialCatalog;
-  celestialCatalog?.starEntries?.forEach((entry) => clickables.push(entry.mesh, entry.hitbox));
-  celestialCatalog?.constellationEntries?.forEach((entry) => clickables.push(entry.line));
   clickables.push(ctx.solarSystem.sunMesh);
+  } else {
+    const meshes = ctx.appCtx.universeRuntime?.frameGroup?.userData?.destinationMeshes;
+    meshes?.forEach((mesh) => clickables.push(mesh));
+  }
+  const celestialCatalog = ctx.appCtx.spaceFlight?.celestialCatalog;
+  if (celestialCatalog?.points) clickables.push(celestialCatalog.points);
+  const gaia = outsideSol ? ctx.appCtx.universeRuntime?.sky?.gaiaSky : celestialCatalog?.gaiaSky;
+  if (gaia?.group?.visible !== false) clickables.push(gaia?.brightPoints, gaia?.faintPoints);
+  celestialCatalog?.constellationEntries?.forEach((entry) => clickables.push(entry.line));
 
-  ctx.solarSystem.raycaster.params.Line.threshold = 1400;
-  const intersects = ctx.solarSystem.raycaster.intersectObjects(clickables, true);
+  ctx.solarSystem.raycaster.params.Line.threshold = 650;
+  ctx.solarSystem.raycaster.params.Points.threshold = 1500;
+  const intersects = ctx.solarSystem.raycaster.intersectObjects(clickables.filter(Boolean), true);
+  // A star at a line endpoint wins over its constellation line. Solid bodies
+  // still occlude distant catalog points; never let a sky marker select through a planet.
+  intersects.sort((a, b) => {
+    const rank = (hit) => hit.object.userData.isSpaceConstellation ? 2 : hit.object.userData.isCatalogStar ? 1 : 0;
+    return rank(a) - rank(b) || a.distance - b.distance;
+  });
   if (intersects.length === 0) {
     hidePlanetInfo(ctx);
     return;
@@ -58,6 +74,7 @@ export function onSolarSystemClick(ctx, event) {
   let target = hit;
   while (
     target &&
+    !target.userData.universeEntityId &&
     !target.userData.isPlanet &&
     !target.userData.isMoon &&
     !target.userData.isAsteroid &&
@@ -70,7 +87,9 @@ export function onSolarSystemClick(ctx, event) {
     target = target.parent;
   }
 
-  if (target && target.userData.isPlanet) {
+  if (target?.userData.universeEntityId) {
+    showCelestialSelection(ctx, { entityId: target.userData.universeEntityId });
+  } else if (target && target.userData.isPlanet) {
     const idx = target.userData.planetIndex;
     const entry = ctx.solarSystem.planetMeshes.find((item) => item.planet === ctx.SOLAR_SYSTEM_PLANETS[idx]);
     if (entry) showPlanetInfo(ctx, entry);
@@ -90,9 +109,10 @@ export function onSolarSystemClick(ctx, event) {
     const entry = ctx.solarSystem.galaxyMeshes.find((item) => item.galaxy === ctx.GALAXIES[idx]);
     if (entry) showGalaxyInfo(ctx, entry);
   } else if (target && target.userData.isCatalogStar) {
-    const star = target.userData.star;
+    const entry = (target.userData.catalogEntries || celestialCatalog.starEntries)[intersects[0].index];
+    const star = entry?.star || target.userData.star;
     if (star) {
-      ctx.appCtx.showStarInfo?.(star);
+      showCelestialSelection(ctx, { star, projected: entry?.projected });
       ctx.appCtx.highlightSpaceConstellation?.(star.constellation);
     }
   } else if (target && target.userData.isSpaceConstellation) {
@@ -125,6 +145,11 @@ export function createInfoPanel(ctx) {
   ctx.solarSystem.infoPanel = panel;
   document.getElementById('ssInfoClose').addEventListener('click', () => hidePlanetInfo(ctx));
   document.getElementById('ssInfoSetCourse').addEventListener('click', () => {
+    if (ctx.solarSystem.selectedUniverseId) {
+      const accepted = ctx.appCtx.travelToUniverseDestination?.(ctx.solarSystem.selectedUniverseId);
+      if (accepted) hidePlanetInfo(ctx);
+      return;
+    }
     const bodyId = ctx.solarSystem.selectedBodyId;
     const result = ctx.appCtx.setSolarSystemCourse?.(bodyId);
     if (result?.accepted) hidePlanetInfo(ctx);

@@ -312,7 +312,7 @@ async function startExpeditionPirateInterception(encounter, hooks = {}) {
   return pirateInterceptionRuntime.begin(encounter, hooks);
 }
 
-function startSpaceFlightToSolisReach(options = {}) {
+async function startSpaceFlightToSolisReach(options = {}) {
   if (appCtx.spaceFlight.active) return false;
   const usePathfinder = options.pathfinder !== false;
   const sessionId = beginSpaceFlightSession({
@@ -343,13 +343,13 @@ function startSpaceFlightToSolisReach(options = {}) {
   if (!commitEnvironment(appCtx.ENV.SPACE_FLIGHT, { token: transition })) return false;
   emitTutorialEvent('entered_space', { destination: SPACE_CRAFT_IDENTITY.starship.id, source: usePathfinder ? 'pathfinder_pod' : 'direct_starship' });
 
-  appCtx.spaceFlight.canvas.style.display = 'block';
+  appCtx.spaceFlight.canvas.style.display = 'none';
   appCtx.spaceFlight.hud.style.display = 'block';
   prepareSpaceFlightHudForEntry();
   document.getElementById('sfDestination').textContent = SPACE_CRAFT_IDENTITY.starship.name;
   document.getElementById('sfLandBtn').textContent = `APPROACH ${SPACE_CRAFT_IDENTITY.starship.name.toUpperCase()}`;
   const worldCanvas = getPrimaryWorldCanvas(appCtx);
-  if (worldCanvas) worldCanvas.style.display = 'none';
+  // Keep the last surface launch frame until the space camera and craft are ready.
   hideGameUI();
 
   createSpaceFlightScene({ includeExtendedSpace: true });
@@ -365,7 +365,12 @@ function startSpaceFlightToSolisReach(options = {}) {
   setExpeditionPodFlightPresentation(usePathfinder);
 
   appCtx.stopRuntimeKernel?.('space-flight-active');
+  await appCtx.spaceFlight.rocket?.userData?.curatedPodLoadPromise;
+  if (!isCurrentSpaceFlightSession(sessionId, SPACE_CRAFT_IDENTITY.starship.id)) return false;
+  // Render the destination before exposing its canvas; never publish a stale frame.
   animateSpaceFlight();
+  if (worldCanvas) worldCanvas.style.display = 'none';
+  appCtx.spaceFlight.canvas.style.display = 'block';
   appCtx.showSolarSystemUI?.();
   appCtx.showUniverseUI?.();
   spaceSessionScope.timeout(() => {
