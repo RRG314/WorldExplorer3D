@@ -110,6 +110,21 @@ try {
   },{deck,x,z,yaw});
   await page.waitForTimeout(600);await page.screenshot({path:`${out}/ship-${label}.png`});
  }
+ // Exercise the real camera-mode toggle around the same player host.
+ await page.evaluate(()=>{window.__spaceQualityContext.Walk.state.view='third';});
+ for(const expected of ['first','overhead','third']) {
+  await page.evaluate(()=>window.__spaceQualityContext.Walk.toggleView());
+  await page.waitForTimeout(120);
+  const avatar=await page.evaluate(()=>{
+   const w=window.__spaceQualityContext.Walk.state,host=w.characterMesh;
+   return {view:w.view,visible:host.visible,asset:host.userData.curatedCharacterAssetId,
+    curatedInstances:host.children.filter(o=>o.userData.curatedCharacterAssetId).length};
+  });
+  assert.equal(avatar.view,expected);assert.equal(avatar.visible,expected!=='first');
+  assert.ok(avatar.asset);assert.equal(avatar.curatedInstances,1);
+  checks.push({name:'ship-player-camera-cycle',...avatar});
+  await page.screenshot({path:`${out}/ship-player-${expected}.png`});
+ }
  const exited=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.exitExpeditionShipInterior();return {near:ctx.camera.near,active:ctx.spaceFlight.active};});
  assert.equal(exited.near,.5);assert.equal(exited.active,true);checks.push({name:'interior-exit-restores-camera',...exited});
  for (const nebulaId of ['orion-nebula','carina-nebula','crab-nebula']) {
