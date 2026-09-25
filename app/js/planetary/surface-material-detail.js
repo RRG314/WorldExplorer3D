@@ -28,9 +28,9 @@ export function addSurfaceMaterialDetail(material, strength = 0.22) {
       float grainHeight=terrainNoise(surfaceDetailPosition.xz*.7)*.045
                       +terrainNoise(surfaceDetailPosition.xz*.13)*.12;
       vec3 sigmaX=dFdx(-vViewPosition), sigmaY=dFdy(-vViewPosition);
-      vec3 r1=cross(sigmaY,normal), r2=cross(normal,sigmaX);
-      float determinant=dot(sigmaX,r1);
-      vec3 gradient=sign(determinant)*(dFdx(grainHeight)*r1+dFdy(grainHeight)*r2);
+      vec3 terrainCrossX=cross(sigmaY,normal), terrainCrossY=cross(normal,sigmaX);
+      float determinant=dot(sigmaX,terrainCrossX);
+      vec3 gradient=sign(determinant)*(dFdx(grainHeight)*terrainCrossX+dFdy(grainHeight)*terrainCrossY);
       normal=normalize(abs(determinant)*normal-gradient*localRange);
     `);
   };
