@@ -35,7 +35,11 @@ function worldPack(input) {
     segments: 192,
     fogColor: null,
     fogDensity: 0,
-    exposure: 1.04,
+    // Camera adaptation preserves readable terrain under weaker sunlight.
+    // It changes display exposure, never the physical environment or gravity.
+    exposure: Math.min(4.5, Math.max(1.04, 1.4 / Math.sqrt(
+      Math.max(0.08, input.sunIntensity + input.ambientIntensity + (input.fillIntensity ?? 0.2))
+    ))),
     fillIntensity: 0.2,
     rockCount: 520,
     rockScale: 4,
@@ -803,7 +807,9 @@ async function createSolidWorld(pack) {
     geometry.computeVertexNormals();
     const material = new THREE.MeshStandardMaterial({
       map: texture,
-      color: pack.material.color,
+      // Observed albedo already carries its color. A second pigment tint
+      // turned ice grey and multiplied volcanic maps into near-black brown.
+      color: pack.runtimeModeled ? pack.material.color : 0xffffff,
       roughness: pack.material.roughness,
       metalness: 0,
       // Albedo/radar brightness is not an elevation measurement. Relief comes from geometry.
