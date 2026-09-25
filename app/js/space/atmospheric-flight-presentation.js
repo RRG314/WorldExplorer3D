@@ -63,15 +63,32 @@ function createAtmosphericSky(body, style) {
           vec2 uv = vec2(fract(atan(point.z, -point.x) / 6.28318530718),
                          clamp(0.5 + asin(clamp(point.y, -1.0, 1.0)) / 3.14159265359, 0.001, 0.999));
           vec3 observed = pow(texture2D(cloudMap, uv).rgb, vec3(2.2));
-          // Mission maps resolve global weather, not kilometre-scale cloud tops.
-          // Add explicitly modeled, body-fixed turbulence below that resolution.
-          vec3 cloudPoint=point*(radiusM/18000.0);
-          float warp=cloudNoise(cloudPoint*.22);
-          float billow=cloudNoise(cloudPoint+vec3(warp*3.0));
-          float fine=cloudNoise(cloudPoint*3.2+vec3(warp));
-          float detail=(billow-.5)*.65+(fine-.5)*.2;
-          float resolved=1.0-smoothstep(.015,.06,altitude);
-          observed*=1.0+detail*resolved;
+          // A bounded cloud layer above the reference pressure surface.
+          // Density is reconstructed below the map's resolution, not claimed
+          // as measured weather. All samples remain fixed to body coordinates.
+          float top=7000.0/radiusM;
+          float outerC=(altitude-top)*(2.0+altitude+top);
+          float outerDiscriminant=max(0.0,b*b-outerC);
+          float entry=max(0.0,outerC/(-b+sqrt(outerDiscriminant)));
+          float segment=max(0.0,distance-entry);
+          float stepLength=segment/12.0;
+          vec3 cloudLight=vec3(0.0);
+          float transmission=1.0;
+          for(int step=0;step<12;step++) {
+            vec3 samplePoint=origin+ray*(entry+(float(step)+.5)*stepLength);
+            float height=(length(samplePoint)-1.0)/top;
+            vec3 q=samplePoint*(radiusM/11000.0);
+            float broad=cloudNoise(q);
+            float detail=cloudNoise(q*3.1+vec3(broad*2.0));
+            float density=smoothstep(.34,.72,broad*.75+detail*.25);
+            density*=1.0-smoothstep(.45,1.0,height);
+            float alpha=1.0-exp(-density*stepLength*radiusM/1800.0);
+            float shade=.5+.5*smoothstep(0.0,.8,height);
+            vec3 lit=mix(observed,hazeColor*.8,.32)*shade;
+            cloudLight+=transmission*alpha*lit;
+            transmission*=1.0-alpha;
+          }
+          observed=cloudLight+transmission*observed*.6;
           float aerial = 1.0-exp(-distance*8.0);
           color = mix(observed, hazeColor, aerial*0.8);
         }
