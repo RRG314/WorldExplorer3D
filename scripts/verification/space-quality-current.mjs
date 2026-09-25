@@ -103,6 +103,8 @@ try {
   const loaded=await Promise.all(pending);const crew=ctx.getShipInteriorSnapshot().crewPresentation.length;return {crew,furnishings:loaded.length,loaded:loaded.filter(Boolean).length,near:ctx.camera.near};
  });
  assert.equal(interior.crew,7);assert.equal(interior.loaded,interior.furnishings);assert.ok(interior.loaded>20);assert.equal(interior.near,.05);checks.push({name:'free-exploration-crew-furnishings',...interior});
+ assert.equal(await page.evaluate(()=>window.__spaceQualityContext.scene.environment?.name),'solis-reach-indoor-reflections');
+ checks.push({name:'owned-indoor-reflections'});
  for(const [deck,x,z,yaw,label] of [['command',0,27,0,'bridge'],['habitat',-8.5,0,Math.PI,'quarters'],['habitat',-5,15,-Math.PI/2,'medical'],['engineering',4,0,Math.PI/2,'cargo']]) {
   await page.evaluate(async({deck,x,z,yaw})=>{
    const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.switchSolisReachDeck(deck);

@@ -1,5 +1,6 @@
 import { configureColorTexture } from '../planetary/catalog.js?v=1';
 import { attachShipFurnishing } from './ship-furnishings.js?v=1';
+import { createShipEnvironment, applyShipSurfaceUV } from './ship-environment.js?v=1';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { getPrimaryWorldCanvas } from '../engine/webgl-lifecycle.js?v=2';
 import {
@@ -214,8 +215,7 @@ function createShipPanelTexture(kind, accentColor) {
   configureColorTexture(texture, appCtx.renderer);
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
-  const repeat = kind === 'corridor' ? [2, 18] : kind === 'wall' ? [3, 10] : kind === 'ceiling' ? [5, 16] : [7, 18];
-  texture.repeat.set(...repeat);
+  texture.repeat.set(1, 1);
   texture.anisotropy = Math.min(8, appCtx.renderer?.capabilities?.getMaxAnisotropy?.() || 1);
   texture.needsUpdate = true;
   return texture;
@@ -230,13 +230,15 @@ function shipSurfaceMaterial(kind, deckId) {
     wall: 0xffffff,
     ceiling: 0xffffff
   };
-  return material(colors[kind] || colors.floor, {
+  const surface = material(colors[kind] || colors.floor, {
     roughness: kind === 'wall' ? 0.58 : 0.46,
     metalness: kind === 'wall' ? 0.2 : 0.42,
     map: texture,
     bumpMap: texture,
     bumpScale: kind === 'wall' ? 0.012 : 0.022
   });
+  surface.userData.shipTileSize = kind === 'wall' ? 6.84 : kind === 'ceiling' ? 8 : 4;
+  return surface;
 }
 
 function shipDisplayMaterial(label, accent, intensity = 0.72) {
@@ -253,6 +255,7 @@ function shipDisplayMaterial(label, accent, intensity = 0.72) {
 
 function box(group, size, position, surface, name = '') {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(size.x, size.y, size.z), surface);
+  if (surface.userData.shipTileSize) applyShipSurfaceUV(mesh.geometry, size, position, surface.userData.shipTileSize);
   mesh.position.set(position.x, position.y, position.z);
   mesh.name = name;
   mesh.castShadow = true;
@@ -2279,7 +2282,8 @@ function enterSolisReachInterior(options = {}) {
   appCtx.camera.updateProjectionMatrix();
   appCtx.scene.background = new THREE.Color(0x02050b);
   appCtx.scene.fog = null;
-  appCtx.scene.environment = null;
+  session.indoorEnvironment = createShipEnvironment(THREE, appCtx.pmremGenerator);
+  appCtx.scene.environment = session.indoorEnvironment?.texture || null;
   appCtx.renderer.toneMappingExposure = 1;
   ['sun', 'hemiLight', 'fillLight', 'ambientLight'].forEach((key) => {
     if (appCtx[key]) appCtx[key].visible = false;
@@ -2379,6 +2383,7 @@ function exitSolisReachInterior() {
   appCtx.scene.background = session.sceneBackground;
   appCtx.scene.fog = session.sceneFog;
   appCtx.scene.environment = appCtx.earthEnvironmentMap || session.sceneEnvironment;
+  session.indoorEnvironment?.dispose();
   appCtx.renderer.toneMappingExposure = session.toneMappingExposure;
   Object.entries(session.earthLightVisibility).forEach(([key, visible]) => {
     if (appCtx[key]) appCtx[key].visible = visible;

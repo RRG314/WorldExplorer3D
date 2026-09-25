@@ -6,6 +6,32 @@ import {attachCuratedExplorerCharacter, disposeCuratedCharacter, EXPLORER_ASSET_
 import {attachShipFurnishing} from '../app/js/expedition/ship-furnishings.js';
 import {ctx} from '../app/js/shared-context.js?v=55';
 import {ensureAtmosphericFlightPresentation, updateAtmosphericFlightPresentation, releaseAtmosphericFlightPresentation} from '../app/js/space/atmospheric-flight-presentation.js';
+import {createShipEnvironment, applyShipSurfaceUV} from '../app/js/expedition/ship-environment.js';
+
+test('ship reflection bake releases temporary geometry but retains the owned target',()=>{
+ let releasedGeometry=0,releasedMaterials=0,targetReleased=0;
+ const target={texture:{},dispose(){targetReleased++;}};
+ const generator={fromScene(scene){
+  assert.equal(scene.children.length,5);
+  scene.children[0].geometry.addEventListener('dispose',()=>releasedGeometry++);
+  scene.children.forEach(mesh=>mesh.material.addEventListener('dispose',()=>releasedMaterials++));
+  return target;
+ }};
+ assert.equal(createShipEnvironment(THREE,generator),target);
+ assert.equal(releasedGeometry,1);assert.equal(releasedMaterials,5);assert.equal(targetReleased,0);
+ target.dispose();assert.equal(targetReleased,1);
+});
+
+test('ship bulkheads keep one panel scale across long and short faces',()=>{
+ for(const length of [2,13,72]){
+  const geometry=new THREE.BoxGeometry(.28,3.42,length);
+  applyShipSurfaceUV(geometry,{x:.28,y:3.42,z:length},{x:0,y:1.71,z:0},6.84);
+  const uv=geometry.attributes.uv;
+  assert.ok(Math.abs(Math.abs(uv.getX(0)-uv.getX(1))-length/6.84)<1e-5);
+  assert.ok(Math.abs(Math.abs(uv.getY(0)-uv.getY(2))-.5)<1e-5);
+  geometry.dispose();
+ }
+});
 
 const pending = new Map();
 const api = {...THREE, GLTFLoader: class { load(url, resolve) {pending.set(url,resolve);} }};
