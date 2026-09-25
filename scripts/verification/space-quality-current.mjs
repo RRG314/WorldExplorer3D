@@ -155,9 +155,20 @@ try {
     flight.camera.up.set(0,1,0);flight.camera.lookAt(flight.rocket.position.clone().add(new THREE.Vector3(-180,-65,-300)));flight.camera.updateMatrixWorld(true);
    },{bodyId,altitudeM});
    await page.waitForFunction(()=>window.__spaceQualityContext.spaceFlight.atmosphericPresentation.cloudTexture.image?.width>0);
-   const state=await page.evaluate(()=>{const f=window.__spaceQualityContext.spaceFlight;f.renderer.render(f.scene,f.camera);return {glError:f.renderer.getContext().getError(),imagery:f.atmosphericPresentation.dome.userData.imagery};});
+   const capture=await page.evaluate(()=>{
+    const f=window.__spaceQualityContext.spaceFlight;
+    cancelAnimationFrame(f.animationId);f.rocket.visible=false;
+    f.scene.updateMatrixWorld(true);
+    const ray=new THREE.Raycaster();ray.setFromCamera(new THREE.Vector2(0,0),f.camera);
+    const visible=[];f.scene.traverseVisible(o=>{if(o.isMesh)visible.push(o);});
+    const hits=ray.intersectObjects(visible,false).slice(0,12).map(h=>({name:h.object.name,parent:h.object.parent?.name,type:h.object.material?.type,distance:h.distance}));
+    f.renderer.render(f.scene,f.camera);
+    return {png:f.renderer.domElement.toDataURL('image/png'),state:{glError:f.renderer.getContext().getError(),imagery:f.atmosphericPresentation.dome.userData.imagery,hits}};
+   });
+   const state=capture.state;
+   await fs.writeFile(`${out}/${bodyId}-${altitudeM}.png`,Buffer.from(capture.png.split(',')[1],'base64'));
    assert.equal(state.glError,0);checks.push({name:'atmospheric-render-fixture',craftHiddenForView:true,bodyId,altitudeM,...state});
-   await page.screenshot({path:`${out}/${bodyId}-${altitudeM}.png`});
+
   }
 
  }
