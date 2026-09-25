@@ -318,7 +318,10 @@ async function equip(page, id) {
   );
   await equipAction.waitFor({ state: 'visible', timeout: 5_000 });
   await equipAction.click();
-  await page.waitForFunction((catalogId) => globalThis.getWorldExplorerRuntimeDiagnostics?.().urbanSandbox?.equipment?.equippedId === catalogId, id, { timeout: 5_000 });
+  await page.waitForFunction(async (catalogId) => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return ctx.urbanSandboxRuntimeSnapshot?.().equipment?.equippedId === catalogId;
+  }, id, { timeout: process.env.CI ? 20_000 : 5_000, polling: 250 });
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.getElementById('urbanEquipment')?.classList.contains('show'), null, { timeout: 5_000 });
 }
