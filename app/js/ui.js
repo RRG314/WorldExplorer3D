@@ -547,12 +547,7 @@ function setupUI() {
     }
     closeAllFloatMenus();
   });
-  document.getElementById('fRespawn').addEventListener('click', () => {
-    // Release aircraft/drone/boat control before relocating the ground actor.
-    appCtx.setTravelMode('walk', { source: 'safe_ground_recovery', force: true });
-    appCtx.spawnOnRoad();
-    closeAllFloatMenus();
-  });
+  document.getElementById('fRespawn').addEventListener('click', () => {appCtx.spawnOnRoad();closeAllFloatMenus();});
   document.getElementById('fRespawnRand').addEventListener('click', () => {
     if (typeof appCtx.spawnOnRoad === 'function') appCtx.spawnOnRoad({ random: true });
     closeAllFloatMenus();
