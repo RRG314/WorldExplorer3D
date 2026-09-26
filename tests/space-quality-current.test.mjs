@@ -1,9 +1,10 @@
+import {ring,ringRoute,pointInRoom} from '../app/js/expedition/ship-ring-plan.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Vector3,Quaternion} from 'three';
 import {projectCatalogStar} from '../app/js/space/observer-sky.js';
 import {BRIGHT_STARS,CONSTELLATION_STAR_IDS} from '../app/js/sky/catalog.js';
-import {roomBulkheadSpan,SHIP_DECKS} from '../app/js/expedition/ship-layout.js';
+import {SHIP_DECKS} from '../app/js/expedition/ship-layout.js';
 import {resolveSpaceControlInput} from '../app/js/space/runtime.js';
 
 test('aircraft controls rotate the nose down for forward input and up for back input',()=>{
@@ -32,19 +33,18 @@ test('all 88 line figures reference measured HIP stars with a single identity pe
   const elnath=BRIGHT_STARS.find(s=>s.name==='Elnath');
   assert.ok(elnath.ra>5.4&&elnath.ra<5.5);assert.ok(elnath.dec>28&&elnath.dec<29);
 });
-test('every corridor room wall meets its transverse bulkheads with no open corner seams',()=>{
-  for(const deck of SHIP_DECKS) for(const side of ['port','starboard']) {
-    const rooms=deck.rooms.filter(r=>r.side===side).sort((a,b)=>a.minZ-b.minZ);
-    let previous;
-    for(const room of rooms) {
-      const span=roomBulkheadSpan(room);
-      assert.ok(span.minZ<=room.minZ&&span.maxZ>=room.maxZ);
-      if(previous) assert.equal(previous.maxZ,span.minZ,`${deck.id}/${side}/${room.id}`);
-      previous=span;
-    }
+test('circular layout keeps every station inside its room and routes around the ring',()=>{
+ for(const deck of SHIP_DECKS){
+  for(const room of deck.rooms){
+   assert.ok(pointInRoom(room.center,room));
+   for(const station of deck.stations.filter(s=>s.roomId===room.id))assert.ok(pointInRoom(station,room),station.id);
   }
+  const a=deck.rooms[0],b=deck.rooms[4];
+  const route=ringRoute(a.center,b.center,a,b);
+  for(const point of route.slice(2,-2))assert.ok(Math.abs(Math.hypot(point.x,point.z)-21.8)<1e-7);
+ }
+ assert.ok(Math.abs(ring.corridorOuter-ring.corridorInner-3.6)<1e-9);
 });
-
 
 test('Gaia observer updates reuse GPU geometry and exclude inactive capacity from picking', async()=>{
   const THREE=await import('three');globalThis.THREE=THREE;

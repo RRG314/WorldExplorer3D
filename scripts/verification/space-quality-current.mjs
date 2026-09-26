@@ -1,3 +1,4 @@
+import {SHIP_DECKS} from '../../app/js/expedition/ship-layout.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import { chromium } from 'playwright';
@@ -105,13 +106,16 @@ try {
  assert.equal(interior.crew,7);assert.equal(interior.loaded,interior.furnishings);assert.ok(interior.loaded>20);assert.equal(interior.near,.05);checks.push({name:'free-exploration-crew-furnishings',...interior});
  assert.equal(await page.evaluate(()=>window.__spaceQualityContext.scene.environment?.name),'solis-reach-indoor-reflections');
  checks.push({name:'owned-indoor-reflections'});
- for(const [deck,x,z,yaw,label] of [['command',0,27,0,'bridge'],['habitat',-8.5,0,Math.PI,'quarters'],['habitat',-5,15,-Math.PI/2,'medical'],['engineering',4,0,Math.PI/2,'cargo']]) {
+ for(const deck of SHIP_DECKS)for(const room of deck.rooms) {
+  const radius=room.id==='storm-shelter'?16:26.5;
+  const view={deck:deck.id,x:Math.sin(room.angle)*radius,z:Math.cos(room.angle)*radius,yaw:room.angle+(room.id==='storm-shelter'?0:Math.PI)};
   await page.evaluate(async({deck,x,z,yaw})=>{
-   const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.switchSolisReachDeck(deck);
+   const ctx=window.__spaceQualityContext;ctx.switchSolisReachDeck(deck);
    Object.assign(ctx.Walk.state.walker,{x,z,y:1.74,yaw,angle:yaw,pitch:0});ctx.Walk.state.view='first';ctx.presentationPose=null;
-  },{deck,x,z,yaw});
-  await page.waitForTimeout(600);await page.screenshot({path:`${out}/ship-${label}.png`});
+  },view);
+  await page.waitForTimeout(600);await page.screenshot({path:`${out}/ship-${room.id}.png`});
  }
+ checks.push({name:'all-room-gallery',rooms:SHIP_DECKS.flatMap(d=>d.rooms.map(r=>r.id)),evidenceScope:'actual room renders; separate from walking journeys'});
  // Exercise the real camera-mode toggle around the same player host.
  await page.evaluate(()=>{window.__spaceQualityContext.Walk.state.view='third';});
  for(const expected of ['first','overhead','third']) {

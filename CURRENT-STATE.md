@@ -4,6 +4,34 @@ Work only in `/Users/stevenreid/Developer/WorldExplorer3D-release-integration`,
 branch `steven/post-5.2-release-integration`, draft PR #87 into `stable`.
 Do not edit the older Documents checkout. Verify Git status and HEAD first.
 
+## Active owner request: ship and exploration redesign
+
+The owner superseded release finishing with a substantial research/design-first
+request: circular hallways, an exterior-facing pod bay and launch door, functionally
+furnished original exploration-ship rooms, physical specimen placement and research/
+fabrication using existing conserved collections, richer all-space destinations,
+and line-artifact repairs without changing the nebula appearance they like.
+
+Research/design work is saved in docs/design/SOLIS-REACH-EXPLORATION-REDESIGN.md.
+Scaled three-deck study: docs/design/solis-reach-deck-plan.html; editable geometry:
+docs/design/solis-reach-ring-plan.mjs. All25 existing room IDs are retained;
+3.6m circular corridor; four radial shortcuts. The geometry-only design validation
+passed; this is NOT implemented/runtime-tested ship collision or gameplay.
+
+Redesign runtime work is in progress: shared ring geometry, polygon collision,
+map/crew/station transforms, exterior views and launch sequencing are implemented
+but NOT visually accepted. Targeted topology tests pass for all room-to-room
+architectural paths. Furnishing clearance, physical research and space enrichment
+remain in progress. No redesign deployment yet. Do not substitute another parallel inventory.
+Galaxy image Sprites currently dim 3D stars, and region encounters own36 nearby
+rocks; scene richness must be separate from encounters. Inventory has61 public
+space destinations. Diagnose line ownership under movement and constellation
+selection; do not modify nebula-volume.js based only on a hypothesis.
+
+Current source base d5801002; live staging readback matches d5801002; production
+still db62593. Design files are new working changes. Ordinary Chrome remains open.
+Disk readback at design start approximately34GiB free (later readback takes priority).
+
 ## Final space candidate (September 25)
 
 Runtime frozen at fef3e82a; the following commit corrects only an outdated Venus

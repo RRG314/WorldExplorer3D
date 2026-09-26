@@ -682,9 +682,14 @@ function beginLocalContact(contactId, options = {}) {
   return false;
 }
 
-function launchPodToContact(contactId) {
+function launchPodToContact(contactId, released = false) {
   const contact = activeExpedition?.routeContacts?.find((entry) => entry.id === contactId);
   if (!contact || !['available', 'returned'].includes(contact.localOperationState)) return false;
+  if (!released) {
+    const started=activeContext?.beginExpeditionPodLaunch?.(()=>launchPodToContact(contactId,true))===true;
+    if(started)closeShipStationPanel();
+    return started;
+  }
   const returnFrameId = activeContext?.universeRuntime?.current?.id || activeExpedition.originId || 'sol';
   setPodJourney(createPodJourney({
     expeditionId: activeExpedition.id,
@@ -708,9 +713,14 @@ function launchPodToContact(contactId) {
   return true;
 }
 
-function launchDestinationMissionPod() {
+function launchDestinationMissionPod(released = false) {
   const mission = activeContext?.getDestinationMissionSnapshot?.();
   if (!activeExpedition || !mission?.surfaceRequired || mission.phase !== 'fieldwork' || !mission.atDestination) return false;
+  if (!released) {
+    const started=activeContext?.beginExpeditionPodLaunch?.(()=>launchDestinationMissionPod(true))===true;
+    if(started)closeShipStationPanel();
+    return started;
+  }
   if (!activeContext?.prepareDestinationMissionSurface?.(mission.destinationId)) return false;
   const returnFrameId = activeContext?.universeRuntime?.current?.id || activeExpedition.originId || 'sol';
   setPodJourney(createPodJourney({
@@ -735,8 +745,13 @@ function launchDestinationMissionPod() {
   return true;
 }
 
-function launchPodToEarth() {
+function launchPodToEarth(released = false) {
   if (!activeExpedition || activeContext?.universeRuntime?.current?.id !== 'sol' || activeContext?.universeRuntime?.transition) return false;
+  if (!released) {
+    const started=activeContext?.beginExpeditionPodLaunch?.(()=>launchPodToEarth(true))===true;
+    if(started)closeShipStationPanel();
+    return started;
+  }
   setPodJourney(createPodJourney({
     expeditionId: activeExpedition.id,
     contactId: currentEarthAnchorId(),
