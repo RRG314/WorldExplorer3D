@@ -6,6 +6,19 @@ test files. Some execute application logic or Three.js geometry; some inspect
 source wiring; others use controlled service fixtures. Browser and emulator
 journeys have separate gates.
 
+## GitHub checks
+
+Pull requests run source, component, inventory and sensitivity checks. Stable
+pushes run those checks and verify the immutable staging package. Browser and
+backend release checks run through Remote Release Verification with explicit
+scope and, where required, a temporary staging App Check credential.
+
+The previous stable job also launched the live world without that credential.
+That duplicated the artifact-world gate with an incomplete environment. World
+verification remains in the release matrix; it is not counted as passed by the
+code/package badge. The separate release-check badge reports the selected run,
+not full production acceptance.
+
 ## Inspect the evidence
 
 - `npm run verify:pr`: source and release-script syntax/coherence, component
