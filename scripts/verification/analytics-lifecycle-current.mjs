@@ -1,16 +1,51 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 
 const root = process.cwd();
-const server = await startStaticServer({ rootDir: root, ports: [4392, 4393, 4394, 4395] });
+const servedRoot = path.resolve(root, process.env.WE3D_VERIFY_ROOT || '.');
+const server = await startStaticServer({ rootDir: servedRoot, ports: [4392, 4393, 4394, 4395] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
 const outputDir = path.join(root, 'output', 'verification', 'analytics-lifecycle');
-const productionConfig = JSON.parse(await fs.readFile(path.join(root, 'config', 'firebase.production.json'), 'utf8'));
-const safeConfig = Object.freeze({ ...productionConfig });
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const stagingConfig = JSON.parse(await fs.readFile(path.join(root, 'config', 'firebase.staging.json'), 'utf8'));
+const safeConfig = Object.freeze({ ...stagingConfig, measurementId: 'G-WE3DLOCAL' });
+let browser = null;
+const allBrowserErrors = [];
+
+async function createContext(options) {
+  // These are independent cold-start consent cases, not a retained-world test.
+  // Release the previous process as well as its context between cases.
+  await browser?.close();
+  browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
+  const context = await browser.newContext(options);
+  await configureStagingAppCheck(context, baseUrl);
+  context.on('page', page => {
+    page.verificationErrors = [];
+    collectBrowserGraphicsErrors(page, page.verificationErrors);
+    collectBrowserGraphicsErrors(page, allBrowserErrors);
+    page.on('pageerror', error => { const message = String(error.stack || error); page.verificationErrors.push(message); allBrowserErrors.push(message); });
+  });
+  // Exercise the real SDK against an explicit local collection fixture. The
+  // shipped project-config script otherwise replaces addInitScript overrides.
+  await context.route('**/js/firebase-project-config.js*', route => route.fulfill({
+    contentType: 'text/javascript',
+    body: `window.WORLD_EXPLORER_FIREBASE_ENV = 'staging'; window.WORLD_EXPLORER_FIREBASE = ${JSON.stringify(safeConfig)};`
+  }));
+  await context.route('https://firebase.googleapis.com/v1alpha/projects/-/apps/*/webConfig*', route => route.fulfill({
+    json: { appId: safeConfig.appId, projectId: safeConfig.projectId, measurementId: safeConfig.measurementId }
+  }));
+  // A Firebase installation is not required to verify local event formation.
+  await context.route('https://firebaseinstallations.googleapis.com/**', route => route.fulfill({ status: 503, json: { error: 'local analytics fixture' } }));
+  // Page-level collectors below capture requests first; this also blocks any
+  // collection formed before those handlers or after a page transition.
+  await context.route(/https:\/\/(?:[^/]+\.)?(?:google-analytics\.com|analytics\.google\.com|app-measurement\.com)\//i,
+    route => route.fulfill({ status: 204, body: '' }));
+  return context;
+}
 
 const allDestinations = Object.freeze([
   Object.freeze({ id: 'earth', selector: '#globeSelectorStartBtn', environment: 'earth' }),
@@ -28,6 +63,18 @@ async function analyticsSnapshot(page) {
   return page.evaluate(() => globalThis.getWorldExplorerAnalyticsSnapshot?.() || null);
 }
 
+async function saveFailure(page, name, error) {
+  const evidence = await page.evaluate(() => ({
+    analytics: globalThis.getWorldExplorerAnalyticsSnapshot?.() || null,
+    firebaseProjectId: globalThis.WORLD_EXPLORER_FIREBASE?.projectId || null,
+    measurementId: globalThis.WORLD_EXPLORER_FIREBASE?.measurementId || null,
+    url: location.href
+  })).catch(() => null);
+  await fs.writeFile(path.join(outputDir, `${name}-failure.json`), JSON.stringify({
+    error: String(error?.stack || error), evidence, browserErrors: page.verificationErrors || []
+  }, null, 2));
+}
+
 async function openStartHub(page) {
   await page.goto(`${baseUrl}/`, { waitUntil: 'load', timeout: 120_000 });
   await page.locator('#landingPrimaryCta').click();
@@ -36,11 +83,14 @@ async function openStartHub(page) {
 }
 
 async function verifyGrantedDestination(destination) {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-  await context.addInitScript((config) => {
+  const context = await createContext({ viewport: { width: 1440, height: 900 } });
+  await context.addInitScript(({config, origin}) => {
+    // Playwright runs this in third-party/sandboxed frames too. Seed only our
+    // owned page; a provider iframe is not an app storage-failure fixture.
+    if (location.origin !== origin) return;
     globalThis.WORLD_EXPLORER_FIREBASE = config;
     localStorage.setItem('worldExplorer3D.analyticsConsent.v1', 'granted');
-  }, safeConfig);
+  }, {config: safeConfig, origin: new URL(baseUrl).origin});
   const page = await context.newPage();
   const browserErrors = [];
   const failedLocalResources = [];
@@ -62,6 +112,7 @@ async function verifyGrantedDestination(destination) {
 
     await page.locator(destination.selector).click();
     await page.waitForFunction((expectedEnvironment) => {
+      if (document.getElementById('loading')?.classList.contains('show')) return false;
       const runtime = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
       if (runtime.gameStarted !== true || runtime.titleVisible === true) return false;
       if (expectedEnvironment === 'earth') return runtime.environment === 'EARTH';
@@ -69,7 +120,7 @@ async function verifyGrantedDestination(destination) {
       if (expectedEnvironment === 'mars') return runtime.environment === 'MARS';
       if (expectedEnvironment === 'space') return runtime.environment === 'SPACE_FLIGHT';
       return runtime.environment === 'OCEAN';
-    }, destination.environment, { timeout: 240_000 });
+    }, destination.environment, { timeout: 240_000, polling: 500 });
     try {
       await page.waitForFunction((expectedEnvironment) => {
         const analytics = globalThis.getWorldExplorerAnalyticsSnapshot?.();
@@ -101,7 +152,7 @@ async function verifyGrantedDestination(destination) {
       await page.waitForTimeout(250);
     }
     const collectionEvidence = collectionRequests.join('\n');
-    await page.screenshot({ path: path.join(outputDir, `${destination.id}-analytics-ready.png`), fullPage: true });
+    await page.screenshot({ path: path.join(outputDir, `${destination.id}-analytics-ready.png`), fullPage: false });
     assert.equal(snapshot.consent, 'granted', `${destination.id}: ${JSON.stringify({ consentEvidence, snapshot })}`);
     assert.equal(snapshot.deliveryState, 'ready_explicit');
     assert.equal(snapshot.worldSessionCount, 1);
@@ -119,13 +170,16 @@ async function verifyGrantedDestination(destination) {
       eventLoggedCount: snapshot.eventLoggedCount,
       collectionRequestCount: collectionRequests.length
     };
+  } catch (error) {
+    await saveFailure(page, destination.id, error);
+    throw error;
   } finally {
     await context.close();
   }
 }
 
 async function verifyDefaultStoredFirstEntry() {
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const context = await createContext({ viewport: { width: 390, height: 844 }, isMobile: true, userAgent: devices['iPhone 13'].userAgent, hasTouch: true });
   await context.addInitScript((config) => {
     globalThis.WORLD_EXPLORER_FIREBASE = config;
   }, safeConfig);
@@ -214,13 +268,16 @@ async function verifyDefaultStoredFirstEntry() {
       grantedDeliveryState: grantedSnapshot.deliveryState,
       grantedSessionCount: grantedSnapshot.worldSessionCount
     };
+  } catch (error) {
+    await saveFailure(page, 'default-entry', error);
+    throw error;
   } finally {
     await context.close();
   }
 }
 
 async function verifyStorageBlockedConsent() {
-  const context = await browser.newContext({ viewport: { width: 900, height: 700 } });
+  const context = await createContext({ viewport: { width: 900, height: 700 } });
   await context.addInitScript((config) => {
     globalThis.WORLD_EXPLORER_FIREBASE = config;
     const key = 'worldExplorer3D.analyticsConsent.v1';
@@ -258,16 +315,27 @@ async function verifyStorageBlockedConsent() {
 }
 
 await fs.mkdir(outputDir, { recursive: true });
-const result = { ok: false, contract: 'default-standard-analytics-with-explicit-limited-mode', storageBlocked: null, defaultStorage: null, destinations: [] };
+const result = {
+  ok: false, contract: 'default-standard-analytics-with-explicit-limited-mode',
+  servedRoot, complete: requestedDestinations.size === 0,
+  evidenceMode: 'real-sdk-local-collection-fixture', productionDeliveryVerified: false,
+  measurementId: safeConfig.measurementId,
+  storageBlocked: null, defaultStorage: null, destinations: []
+};
 try {
   result.storageBlocked = await verifyStorageBlockedConsent();
   result.defaultStorage = await verifyDefaultStoredFirstEntry();
   for (const destination of destinations) result.destinations.push(await verifyGrantedDestination(destination));
-  result.ok = result.storageBlocked.ok && result.defaultStorage.ok && result.destinations.every((entry) => entry.ok);
+  result.browserErrors = allBrowserErrors;
+  result.ok = allBrowserErrors.length === 0 && result.storageBlocked.ok && result.defaultStorage.ok && result.destinations.every((entry) => entry.ok);
   await fs.writeFile(path.join(outputDir, 'report.json'), `${JSON.stringify(result, null, 2)}\n`, 'utf8');
   console.log(JSON.stringify(result, null, 2));
   assert.equal(result.ok, true);
+} catch (error) {
+  result.error = String(error?.stack || error);
+  await fs.writeFile(path.join(outputDir, 'report.json'), `${JSON.stringify(result, null, 2)}\n`);
+  throw error;
 } finally {
-  await browser.close().catch(() => {});
+  await browser?.close().catch(() => {});
   await server.close().catch(() => {});
 }

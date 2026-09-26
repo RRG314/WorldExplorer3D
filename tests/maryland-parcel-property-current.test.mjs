@@ -6,11 +6,13 @@ import {
   MARYLAND_JURISDICTIONS,
   QUERY_FIELDS,
   buildMarylandParcelQueryUrl,
+  buildMarylandParcelIdsQueryUrl,
+  buildMarylandParcelFeaturesQueryUrl,
   normalizeMarylandParcelFeature,
   parcelGameValue,
   pointInGeometry
 } from '../app/js/gis/maryland-parcel-core.js';
-import { clearMarylandParcelCache, loadMarylandParcels } from '../app/js/gis/maryland-parcel-provider.js';
+import { clearMarylandParcelCache, loadMarylandParcels, marylandParcelProviderSnapshot } from '../app/js/gis/maryland-parcel-provider.js';
 import { makeParcelPropertyCandidates, parcelBuildPermissionAt } from '../app/js/real-estate/parcel-property-model.js';
 
 const require = createRequire(import.meta.url);
@@ -121,7 +123,7 @@ test('parcel valuation is deterministic and matches the transaction authority', 
   assert.equal(parcelGameValue(parcel, buildings), clientValue);
 });
 
-test('the connected authority accepts verified parcel identity and rejects forged parcel identity', () => {
+test('the property normalizer accepts consistent provider identifiers and rejects mismatched identifiers', () => {
   const parcel = normalizeMarylandParcelFeature(feature());
   const input = {
     propertyId: parcel.worldPropertyId, parcelId: parcel.parcelId,
@@ -148,14 +150,124 @@ test('Quick Build uses parcel ownership only when parcel evidence is ready', () 
   assert.equal(parcelBuildPermissionAt({ status: 'ready', candidates: [property], homes: [{ parcelId: parcel.parcelId }], lat: 39.2904, lon: -76.6122 }).allowed, true);
 });
 
+function withSpatialIndex(fetchFeatures) {
+  return async (url, options) => new URL(url).searchParams.get('returnIdsOnly') === 'true'
+    ? { ok: true, json: async () => ({ objectIds: [1] }) }
+    : fetchFeatures(url, options);
+}
+
 test('provider failure returns no fabricated parcel and does not poison the bounded cache', async () => {
   clearMarylandParcelCache();
   await assert.rejects(() => loadMarylandParcels({ lat: 39.2904, lon: -76.6122 }, {
     fetchImpl: async () => { throw new Error('offline'); }, force: true
   }), /offline/);
   const response = await loadMarylandParcels({ lat: 39.2904, lon: -76.6122 }, {
-    fetchImpl: async () => ({ ok: true, json: async () => ({ type: 'FeatureCollection', features: [feature()] }) }), force: true
+    fetchImpl: withSpatialIndex(async () => ({ ok: true, json: async () => ({ type: 'FeatureCollection', features: [feature()] }) })), force: true
   });
   assert.equal(response.status, 'ready');
   assert.equal(response.parcels.length, 1);
+});
+
+
+const providerResponse = () => ({ ok: true, json: async () => ({ type: 'FeatureCollection', features: [feature()] }) });
+
+test('nearby but different parcel bounds never reuse another location response', async () => {
+  clearMarylandParcelCache();
+  const calls = [];
+  const fetchImpl = async url => { calls.push(url); return withSpatialIndex(async () => providerResponse())(url); };
+  const first = { lat: 39.2904, lon: -76.6122, radiusM: 450 };
+  const second = { ...first, lat: 39.2914 };
+  await loadMarylandParcels(first, { fetchImpl });
+  const result = await loadMarylandParcels(second, { fetchImpl });
+  assert.equal(calls.length, 4);
+  assert.equal(result.query.lat, second.lat);
+  assert.notEqual(new URL(calls[0]).searchParams.get('geometry'), new URL(calls[2]).searchParams.get('geometry'));
+});
+
+test('identical parcel requests share an active fetch and reuse its completed cache', async () => {
+  clearMarylandParcelCache();
+  let resolve, calls = 0;
+  const fetchImpl = withSpatialIndex(() => { calls++; return new Promise(done => { resolve = done; }); });
+  const request = { lat: 39.2904, lon: -76.6122 };
+  const first = loadMarylandParcels(request, { fetchImpl });
+  const second = loadMarylandParcels(request, { fetchImpl });
+  await new Promise(setImmediate);
+  assert.equal(calls, 1);
+  resolve(providerResponse());
+  await Promise.all([first, second]);
+  const cached = await loadMarylandParcels(request, { fetchImpl });
+  assert.equal(cached.fromCache, true);
+  assert.equal(calls, 1);
+  assert.equal(marylandParcelProviderSnapshot().activeRequests, 0);
+});
+
+test('an older parcel request cannot erase the active forced refresh', async () => {
+  clearMarylandParcelCache();
+  const pending = [];
+  const fetchImpl = withSpatialIndex(() => new Promise(resolve => pending.push(resolve)));
+  const request = { lat: 39.2904, lon: -76.6122 };
+  const old = loadMarylandParcels(request, { fetchImpl });
+  const fresh = loadMarylandParcels(request, { fetchImpl, force: true });
+  await new Promise(setImmediate);
+  pending[0](providerResponse());
+  await old;
+  const activeDuringRefresh = marylandParcelProviderSnapshot().activeRequests;
+  pending[1](providerResponse());
+  await fresh;
+  assert.equal(activeDuringRefresh, 1);
+});
+
+test('a late older parcel response cannot replace newer refreshed data', async () => {
+  clearMarylandParcelCache();
+  const pending = [];
+  const fetchImpl = withSpatialIndex(() => new Promise(resolve => pending.push(resolve)));
+  const request = { lat: 39.2904, lon: -76.6122 };
+  const old = loadMarylandParcels(request, { fetchImpl });
+  const fresh = loadMarylandParcels(request, { fetchImpl, force: true });
+  await new Promise(setImmediate);
+  pending[1]({ ok: true, json: async () => ({ type: 'FeatureCollection', features: [feature({ POLYID: 'newer' })] }) });
+  const latest = await fresh;
+  pending[0](providerResponse());
+  await old;
+  const cached = await loadMarylandParcels(request, { fetchImpl });
+  assert.equal(cached.parcels[0].parcelId, latest.parcels[0].parcelId);
+});
+
+
+test('spatial ID batches avoid sorted spatial pagination while retaining filters and privacy', async () => {
+  clearMarylandParcelCache();
+  const requests = [];
+  const response = await loadMarylandParcels({ lat: 39.2904, lon: -76.6122 }, { fetchImpl: async url => {
+    const params = new URL(url).searchParams;
+    requests.push(params);
+    assert.equal(params.has('orderByFields'), false);
+    assert.equal(params.has('resultOffset'), false);
+    assert.match(params.get('where'), /ACCTID <> 'ROW'/);
+    if (params.get('returnIdsOnly') === 'true') {
+      assert.ok(params.get('geometry'));
+      assert.equal(params.has('outFields'), false);
+      return { ok: true, json: async () => ({ objectIds: [...Array.from({ length: 501 }, (_, i) => 501 - i), 1, -1, null] }) };
+    }
+    assert.equal(params.has('geometry'), false);
+    assert.deepEqual(params.get('outFields').split(','), [...QUERY_FIELDS]);
+    const ids = params.get('objectIds').split(',').map(Number);
+    assert.equal(ids.length, 250);
+    return { ok: true, json: async () => ({ features: ids.map(id => feature({ OBJECTID: id, POLYID: String(id) })) }) };
+  } });
+  assert.equal(requests.length, 3);
+  assert.equal(response.parcels.length, 500);
+  assert.equal(response.warnings.length, 1);
+  assert.equal(requests[1].get('objectIds').split(',')[0], '1');
+  assert.equal(requests[2].get('objectIds').split(',').at(-1), '500');
+});
+
+test('empty spatial index skips geometry requests and invalid batches fail closed', async () => {
+  let calls = 0;
+  const result = await loadMarylandParcels({ lat: 39.291, lon: -76.612 }, { force: true,
+    fetchImpl: async () => { calls++; return { ok: true, json: async () => ({ objectIds: [] }) }; } });
+  assert.equal(calls, 1);
+  assert.equal(result.status, 'no-coverage-at-point');
+  assert.throws(() => buildMarylandParcelFeaturesQueryUrl({ lat: 39.29, lon: -76.61 }, [NaN]), /valid parcel/);
+  await assert.rejects(loadMarylandParcels({ lat: 39.291, lon: -76.612 }, { force: true,
+    fetchImpl: async () => ({ ok: true, json: async () => ({}) }) }), /spatial object-ID index/);
 });

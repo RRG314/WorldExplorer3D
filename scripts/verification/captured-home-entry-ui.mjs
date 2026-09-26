@@ -1,0 +1,41 @@
+import assert from 'node:assert/strict';
+import {readFile,mkdir} from 'node:fs/promises';
+import {chromium} from 'playwright';
+import {startStaticServer} from './static-server.mjs';
+import {makeStarterLayout,layoutEntrance} from '../../functions/interior-layout.mjs';
+const saved=process.env.WE3D_ENTRY_FIXTURE?JSON.parse(await readFile(process.env.WE3D_ENTRY_FIXTURE,'utf8')):null;
+const envelope=saved?.building?.spatialContext||{footprint:[{x:-15,z:-6},{x:15,z:-6},{x:15,z:6},{x:-15,z:6}],wallHeightMeters:6};
+const layout=saved?.hybridSubmission?.layout||makeStarterLayout({footprint:envelope.footprint,heightMeters:6},{bedrooms:1,bathrooms:0,floorCount:1});
+const building={sourceBuildingId:'overture:entry-fixture',buildingType:'house',geometrySource:'overture',pts:envelope.footprint,centerX:0,centerZ:0,bodyHeightMeters:envelope.wallHeightMeters||6,baseY:0,minY:0,maxY:envelope.wallHeightMeters||6,height:envelope.wallHeightMeters||6};
+const server=await startStaticServer({rootDir:process.cwd(),ports:[4498]});const browser=await chromium.launch({channel:'chrome',headless:true});await mkdir('output/verification/captured-home-entry',{recursive:true});
+try{const page=await browser.newPage({viewport:{width:1100,height:800}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ const api=await readFile('js/community-reality-capture-api.js','utf8');
+ await page.route('**/js/community-reality-capture-api.js*',r=>r.fulfill({contentType:'text/javascript',body:api.replace("return endpoint('/resolveBuildingInteriorRepresentation', { sourceBuildingId, worldId, roomId,spaceId });","return Promise.resolve(window.entryFixtureResponse);")}));
+ await page.route('**/entry-fixture',r=>r.fulfill({contentType:'text/html',body:'<body><button id="interiorPrompt"></button></body>'}));
+ if(process.env.WE3D_ENTRY_MODEL)await page.route('**/fixture-home.glb',r=>r.fulfill({contentType:'model/gltf-binary',path:process.env.WE3D_ENTRY_MODEL}));
+ await page.goto(`http://127.0.0.1:${server.port}/entry-fixture`);await page.addScriptTag({url:'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'});await page.addScriptTag({url:'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js'});
+ await page.evaluate(async({building,layout,model})=>{
+ const {ctx}=await import('/app/js/shared-context.js?v=55');window.testCtx=ctx;
+ const a=building.pts[0],b=building.pts[1],x=(a.x+b.x)/2,z=(a.z+b.z)/2;window.outside={x,z,y:1.7};
+ Object.assign(ctx,{buildings:[building],gameStarted:true,LOC:{lat:39.6573,lon:-76.8876},scene:new THREE.Scene(),camera:new THREE.PerspectiveCamera(65,1100/700,.1,1000),Walk:{CFG:{eyeHeight:1.7},state:{mode:'walk',view:'third',walker:{...outside,yaw:0,angle:0}}},buildingEntranceByBuilding:new Map([[building.sourceBuildingId,{x:x+40,z:z+40,approachX:x+40,approachZ:z+40}]]),communityRealityCaptureEntryBuildings:new Set(),replaceWorldCollection:(key,values=[])=>ctx[key]=values,elevationWorldYAtWorldXZ:()=>0,sampleFeatureSurfaceY:()=>0});
+ window.entryFixtureResponse={available:true,authorized:true,representationKind:'home-layout',layout,revision:2,model:model?{url:"/fixture-home.glb"}:null};
+ const interiors=await import('/app/js/interiors.js');window.testInteriors=interiors;const {onKey}=await import('/app/js/input.js');document.addEventListener('keydown',e=>onKey(e.code,e));
+ interiors.updateInteriorInteraction();setInterval(()=>interiors.updateInteriorInteraction(),100);
+ },{building,layout,model:!!process.env.WE3D_ENTRY_MODEL});
+ assert.equal(await page.locator('#interiorPrompt').textContent(),'','Hidden generated door reproduces missing prompt');
+ await page.evaluate(()=>{testCtx.communityRealityCaptureEntryBuildings.add(testCtx.buildings[0].sourceBuildingId);testInteriors.updateInteriorInteraction();});
+ await page.waitForFunction(()=>document.querySelector('#interiorPrompt').textContent.includes('Enter'));
+ await page.keyboard.press('e');
+ await page.waitForFunction(()=>!!testCtx.activeInterior,null,{timeout:15000}).catch(async e=>{console.log(await page.locator('#interiorPrompt').textContent(),errors);throw e;});
+ if(process.env.WE3D_ENTRY_MODEL)await page.waitForFunction(()=>!!testCtx.activeInterior?.communityRealityCaptureRoot);
+ const entrance=layoutEntrance(layout);const arrival=await page.evaluate(()=>testCtx.Walk.state.walker);assert.ok(Math.hypot(arrival.x-building.centerX-entrance.point.x,arrival.z-building.centerZ-entrance.point.z)<1.6,'Arrive beside the marked entrance');assert.ok(Math.abs(arrival.yaw-Math.atan2(entrance.inward.x,entrance.inward.z))<.0001,'Face inward from the marked door');
+ const inside=await page.evaluate(()=>{testInteriors.updateInteriorInteraction();return {kind:testCtx.activeInterior.layoutKind,rooms:testCtx.activeInterior.definition.communityRealityCapture.layout.floors[0].rooms.length,colliders:testCtx.dynamicBuildingColliders.length,view:testCtx.Walk.state.view};});
+ assert.equal(inside.kind,'authored-home');assert.equal(inside.rooms,layout.floors[0].rooms.length);assert.ok(inside.colliders>0);assert.equal(inside.view,'first');
+ await page.evaluate(()=>{const c=testCtx.camera,p=testCtx.Walk.state.walker;c.position.set(p.x,p.y,p.z);c.lookAt(testCtx.activeInterior.center.x,p.y,testCtx.activeInterior.center.z);const r=new THREE.WebGLRenderer({preserveDrawingBuffer:true,logarithmicDepthBuffer:true});r.setSize(1100,700);testCtx.scene.background=new THREE.Color('#23343f');document.body.append(r.domElement);r.render(testCtx.scene,c);window.testRenderer=r;});await page.screenshot({path:'output/verification/captured-home-entry/inside.png'});
+ if(process.env.WE3D_ENTRY_MODEL){await page.evaluate(()=>{const c=testCtx.camera,p=testCtx.Walk.state.walker;c.lookAt(p.x+.2,p.y-3,p.z+.2);testRenderer.render(testCtx.scene,c);});await page.screenshot({path:'output/verification/captured-home-entry/floor-photo.png'});assert.equal(await page.evaluate(()=>{let found=false;testCtx.activeInterior.communityRealityCaptureRoot.traverse(o=>{if(o.isMesh&&o.userData.kind==='floor'&&o.material.map&&o.position.y>0)found=true;});return found;}),true);}
+ await page.keyboard.press('e');await page.waitForFunction(()=>!testCtx.activeInterior);
+ assert.deepEqual(await page.evaluate(()=>({x:testCtx.Walk.state.walker.x,z:testCtx.Walk.state.walker.z,y:testCtx.Walk.state.walker.y})),await page.evaluate(()=>outside));
+ await page.evaluate(()=>{window.entryFixtureResponse={available:true,authorized:false,label:'Private Residence',requestable:false};testInteriors.updateInteriorInteraction();});await page.keyboard.press('e');await page.waitForFunction(()=>document.querySelector('#interiorPrompt').textContent.includes('Private'),null,{timeout:5000}).catch(()=>{});
+ assert.equal(await page.evaluate(()=>!!testCtx.activeInterior),false,'Private-access denial never enters a generated fallback');
+ assert.deepEqual(errors,[]);console.log(JSON.stringify({passed:true,fixture:saved?'read-only submitted home':'synthetic home',checks:['missing prompt reproduced','near captured facade prompt','real E handler','authored geometry and colliders','first-person spawn','E exit restores outside','private access denied']}));
+}finally{await browser.close();await server.close();}

@@ -1,3 +1,4 @@
+import { worldPresentationReady } from './visibility-contract.js?v=1';
 const ACTIVE_FIELD_PHASES = new Set([
   'sweeping', 'signal', 'classified', 'excavating', 'seeking', 'observing', 'revealed'
 ]);
@@ -31,7 +32,9 @@ function safeSnapshot(fn) {
 
 function deriveFieldJourney(appCtx) {
   const field = safeSnapshot(appCtx.worldDiscoveryRuntimeSnapshot);
-  if (!field?.active) return null;
+  // Discovery owns its compact activity action and Today panel. Do not publish
+  // a second tracking card for the same activity or ambient field lead.
+  if (!field?.active || field.promptOwner === 'discovery') return null;
   const activity = field.actions?.find?.((entry) => entry.id === field.activeActivityId);
   const phase = text(field.interaction?.phase, 'idle');
   if (ACTIVE_FIELD_PHASES.has(phase)) {
@@ -192,12 +195,14 @@ function createCurrentJourneyUi(appCtx, options = {}) {
     elapsed = 0;
     const tutorial = options.getTutorialSnapshot?.() || null;
     const hiddenForFirstJourney = tutorial?.enabled && !tutorial.completed && !tutorial.skipped;
-    if (!appCtx.gameStarted || hiddenForFirstJourney) {
+    if (!worldPresentationReady(appCtx) || hiddenForFirstJourney) {
       if (card) card.hidden = true;
       return;
     }
     const journey = deriveSpaceJourney(appCtx) || deriveFieldJourney(appCtx);
-    if (!journey) {
+    // Nearby suggestions remain discoverable in Today. On a phone only an
+    // activity the player actually started earns an in-game tracking card.
+    if (!journey || (journey.transient && appCtx.isLikelyMobileDevice?.())) {
       if (card) card.hidden = true;
       return;
     }

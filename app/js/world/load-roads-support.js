@@ -29,6 +29,7 @@ export function createWorldRoadLoaderSupport({
     const baseY = Number.isFinite(options.baseY) ? options.baseY : null;
     const building = {
       pts: detail === 'full' ? pts : null,
+      surfaceFootprint: pts,
       minX,
       maxX,
       minZ,

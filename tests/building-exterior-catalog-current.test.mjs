@@ -50,6 +50,15 @@ test('the same stable building identity produces the same exterior', () => {
   assert.deepEqual(profile(), profile());
 });
 
+test('moving the world origin does not change a mapped facade', () => {
+  const geographicCenter = {lat:39.6573,lon:-76.8875};
+  assert.deepEqual(
+    profile({geographicCenter,centerX:12,centerZ:20}),
+    profile({geographicCenter,centerX:801,centerZ:-900})
+  );
+  assert.deepEqual(profile({centerX:12,centerZ:20}),profile({centerX:801,centerZ:-900}));
+});
+
 test('signed hash combinations never produce an undefined family', () => {
   for (const buildingSeed of [-2147483648, -998877665, -1, 0x7fffffff, 0xffffffff]) {
     const selected = profile({ buildingSeed, buildingIdentity: `signed:${buildingSeed}` });

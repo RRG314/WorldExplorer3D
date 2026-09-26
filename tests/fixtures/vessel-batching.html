@@ -1,0 +1,18 @@
+<!doctype html><meta charset="utf-8"><title>Vessel batching verification</title><link rel="icon" href="data:,"><style>body{margin:0;background:#cddbe2}canvas{display:block}</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script type="module">
+import {getMaritimeCatalogEntry} from '/app/js/transport/maritime-catalog.js';
+const before=new URLSearchParams(location.search).has('before');
+const {createVesselVisual,updateVesselVisual}=await import(before?'/output/release-integration/audit-2026-09-21/vessel-before.mjs':'/app/js/transport/vessel-visual-recipe.js');
+const entry=getMaritimeCatalogEntry(new URLSearchParams(location.search).get('vessel')||'container-cargo-ship');
+const visual=createVesselVisual(THREE,entry),scene=new THREE.Scene();scene.background=new THREE.Color('#cddbe2');scene.add(visual.root,new THREE.HemisphereLight(0xffffff,0x536976,1));
+const sun=new THREE.DirectionalLight(0xffffff,1.5);sun.position.set(40,80,50);scene.add(sun);
+const size=entry.dimensions.length,camera=new THREE.PerspectiveCamera(38,1100/650,.1,size*10);camera.position.set(size*.92,size*.52,size*.75);camera.lookAt(0,entry.dimensions.height*.2,0);
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(1100,650);renderer.setPixelRatio(1);renderer.outputEncoding=THREE.sRGBEncoding;document.body.append(renderer.domElement);
+const draw=()=>renderer.render(scene,camera);draw();
+window.advanceTime=()=>draw();
+window.render_game_to_text=()=>JSON.stringify({vessel:entry.id,before,drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,batching:visual.root.userData.staticPartBatching});
+window.setDamage=value=>{updateVesselVisual(visual,value);draw();};
+window.fixturePixels=()=>{const c=document.createElement('canvas');c.width=1100;c.height=650;const ctx=c.getContext('2d');ctx.drawImage(renderer.domElement,0,0);return Array.from(ctx.getImageData(0,0,1100,650).data);};
+window.fixtureReady=true;
+</script>

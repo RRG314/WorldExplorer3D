@@ -47,6 +47,8 @@ export function appendGeometryWithTransform(batch, geometry, matrix) {
   const normAttr = geometry.attributes.normal;
   const uvAttr = geometry.attributes.uv;
   const facadeEntranceAttr = geometry.attributes.facadeEntrance;
+  const facadeAttributes = [['facadeLayouts','facadeLayout'],['facadeOpenings','facadeOpening']];
+  const facadeStarts = facadeAttributes.map(([key]) => batch[key]?.length || 0);
   const baseVertex = batch.positions.length / 3;
   const startPos = batch.positions.length;
   const startNormals = batch.normals.length;
@@ -71,6 +73,7 @@ export function appendGeometryWithTransform(batch, geometry, matrix) {
     if (Array.isArray(batch.facadeParams)) batch.facadeParams.length = startFacadeParams;
     if (Array.isArray(batch.roofAParams)) batch.roofAParams.length = startRoofAParams;
     if (Array.isArray(batch.roofColorsB)) batch.roofColorsB.length = startRoofColorsB;
+    facadeAttributes.forEach(([key], i) => { if (batch[key]) batch[key].length = facadeStarts[i]; });
     batch.indices.length = startIdx;
   };
 
@@ -99,6 +102,12 @@ export function appendGeometryWithTransform(batch, geometry, matrix) {
       batch.uvs.push(Number.isFinite(u) ? u : 0, Number.isFinite(vUv) ? vUv : 0);
     } else {
       batch.uvs.push(0, 0);
+    }
+
+    for (const [key, attributeName] of facadeAttributes) {
+      if (!Array.isArray(batch[key])) continue;
+      const attribute = geometry.attributes[attributeName];
+      batch[key].push(attribute?.getX(i) ?? -1, attribute?.getY(i) ?? -1, attribute?.getZ(i) ?? 0, attribute?.getW(i) ?? 0);
     }
 
     if (Array.isArray(batch.facadeEntrances)) {
@@ -154,6 +163,9 @@ export function buildMergedGeometry(batch) {
   for (let i = 0; i < batch.uvs.length; i++) {
     if (!Number.isFinite(batch.uvs[i])) return null;
   }
+  for (const key of ['facadeLayouts','facadeOpenings']) {
+    if (Array.isArray(batch[key]) && (batch[key].length !== batch.positions.length / 3 * 4 || batch[key].some(value => !Number.isFinite(value)))) return null;
+  }
   const vertexCount = batch.positions.length / 3;
   for (let i = 0; i < batch.indices.length; i++) {
     const idx = batch.indices[i];
@@ -164,6 +176,9 @@ export function buildMergedGeometry(batch) {
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(batch.positions, 3));
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(batch.normals, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(batch.uvs, 2));
+  for (const [key,name] of [['facadeLayouts','facadeLayout'],['facadeOpenings','facadeOpening']]) {
+    if (Array.isArray(batch[key])) geometry.setAttribute(name,new THREE.Float32BufferAttribute(batch[key],4));
+  }
   if (Array.isArray(batch.facadeEntrances)) {
     geometry.setAttribute('facadeEntrance', new THREE.Float32BufferAttribute(batch.facadeEntrances, 4));
   }

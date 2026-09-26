@@ -1,8 +1,13 @@
-import { PARKED_VEHICLE_CATALOG, VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=6';
-import { directedSurfacePitch, resolveVehicleRoadContactPose } from '../engine/vehicle-road-attitude.js?v=2';
+import { PARKED_VEHICLE_CATALOG, VEHICLE_CATALOG, VEHICLE_ROOT_TO_GROUND_METERS } from '../engine/vehicle-catalog.js?v=6';
+import { directedSurfacePitch, resolveVehicleRoadContactPose } from '../engine/vehicle-road-attitude.js?v=3';
 
 // Compatibility export only. Parked and traffic vehicles now share one data owner.
 const URBAN_VEHICLE_CATALOG = PARKED_VEHICLE_CATALOG;
+// Reserve the actual fleet envelope, including buses, rather than treating a
+// zero-width lane centerline as the outer edge of moving traffic.
+const TRAFFIC_HALF_WIDTH = Math.max(...VEHICLE_CATALOG.map(variant => variant.width)) * .5;
+const PARKING_TRAFFIC_CLEARANCE = .25;
+const PARKING_CURB_MARGIN = .18;
 
 function hashText(value = '') {
   let hash = 2166136261;
@@ -14,12 +19,13 @@ function hashText(value = '') {
   return hash >>> 0;
 }
 
-function stableVehicleDefinition(worldIdentity, edgeIndex, slot = 0) {
-  const seed = hashText(`${worldIdentity}:${edgeIndex}:${slot}`);
-  const variant = URBAN_VEHICLE_CATALOG[seed % URBAN_VEHICLE_CATALOG.length];
+function stableVehicleDefinition(worldIdentity, anchorKey, slot = 0, catalog = URBAN_VEHICLE_CATALOG) {
+  if (!catalog.length) return null;
+  const seed = hashText(`${worldIdentity}:${anchorKey}:${slot}`);
+  const variant = catalog[seed % catalog.length];
   const palette = [variant.color, 0x2f3d4a, 0x9b9a8d, 0x6f3e39, 0x426255, 0x6b587b];
   return Object.freeze({
-    id: `urban-vehicle:${hashText(`${worldIdentity}:${edgeIndex}:${slot}:vehicle`).toString(16)}`,
+    id: `urban-vehicle:${hashText(`${worldIdentity}:${anchorKey}:${slot}:vehicle`).toString(16)}`,
     variant,
     color: palette[(seed >>> 5) % palette.length],
     condition: 1,
@@ -33,6 +39,17 @@ function stableVehicleDefinition(worldIdentity, edgeIndex, slot = 0) {
 
 function edgeYaw(edge) {
   return Math.atan2(Number(edge?.p2?.x || 0) - Number(edge?.p1?.x || 0), Number(edge?.p2?.z || 0) - Number(edge?.p1?.z || 0));
+}
+
+function parkingAnchorKey(edge) {
+  // Graph array indices and selection slots vary with provider order, nearby
+  // obstacles and client budgets. Bind the car to its actual directed segment.
+  // Millimetre planar coordinates ignore irrelevant floating-point/ground-Y
+  // differences while keeping adjacent spans and opposite lanes distinct.
+  return JSON.stringify([
+    'parking-v2', String(edge.sourceFeatureId || ''), String(edge.direction || ''),
+    ...[edge.p1.x, edge.p1.z, edge.p2.x, edge.p2.z].map(value => Number(value).toFixed(3))
+  ]);
 }
 
 function parkedVehicleAnchors(graph, reference = {}, options = {}) {
@@ -53,28 +70,27 @@ function parkedVehicleAnchors(graph, reference = {}, options = {}) {
     distance >= minDistance && distance <= maxDistance &&
     Number(edge?.length || 0) >= 12 &&
     !/motorway|trunk/i.test(String(edge?.roadClass || ''))
-  )).sort((a, b) => {
+  )).map(candidate => ({ ...candidate, anchorKey: parkingAnchorKey(candidate.edge) })).sort((a, b) => {
     const parkingPriority = (entry) => /residential|living_street|service|unclassified/i.test(String(entry.edge?.roadClass || '')) ? 0 : 1;
-    return parkingPriority(a) - parkingPriority(b) || a.distance - b.distance || a.edgeIndex - b.edgeIndex;
+    return parkingPriority(a) - parkingPriority(b) || a.distance - b.distance || (a.anchorKey < b.anchorKey ? -1 : a.anchorKey > b.anchorKey ? 1 : 0);
   });
 
   const selected = [];
   for (const candidate of candidates) {
     if (selected.length >= count) break;
     const yaw = edgeYaw(candidate.edge);
-    const definition = stableVehicleDefinition(worldIdentity, candidate.edgeIndex, selected.length);
     // Traffic graph positions are lane centers, not road centerlines. Move to
     // the curb on the lane's outside only; choosing a random side can put a
     // parked vehicle back in the opposing or through lane.
     const roadHalfWidth = Math.max(2.4, Number(candidate.edge?.roadWidth || 5.4) * .5);
     const laneOffset = Math.max(0, Number(candidate.edge?.laneOffset || 0));
-    const vehicleHalfWidth = Number(definition.variant.width || 1.8) * .5;
-    const curbMargin = .18;
-    const curbSpace = roadHalfWidth - laneOffset;
-    // A road without a full vehicle-width curb zone is not a valid parking
-    // source. Skipping it is preferable to fabricating a car in a travel lane.
-    if (curbSpace < vehicleHalfWidth * 2 + curbMargin) continue;
-    const lateralOffset = Math.max(0, roadHalfWidth - vehicleHalfWidth - curbMargin - laneOffset);
+    const trafficOuterEdge = laneOffset + TRAFFIC_HALF_WIDTH;
+    const availableWidth = roadHalfWidth - trafficOuterEdge - PARKING_TRAFFIC_CLEARANCE - PARKING_CURB_MARGIN;
+    const fittingCatalog = URBAN_VEHICLE_CATALOG.filter(variant => variant.width <= availableWidth);
+    const definition = stableVehicleDefinition(worldIdentity, candidate.anchorKey, 0, fittingCatalog);
+    if (!definition) continue;
+    const vehicleHalfWidth = definition.variant.width * .5;
+    const lateralOffset = roadHalfWidth - vehicleHalfWidth - PARKING_CURB_MARGIN - laneOffset;
     const curbNormalX = Number(candidate.edge?.curbNormalX);
     const curbNormalZ = Number(candidate.edge?.curbNormalZ);
     if (![curbNormalX, curbNormalZ].every(Number.isFinite) || Math.hypot(curbNormalX, curbNormalZ) < .9) continue;
@@ -113,6 +129,8 @@ function parkedVehicleAnchors(graph, reference = {}, options = {}) {
       }),
       roadHalfWidth,
       laneOffset,
+      trafficOuterEdge,
+      trafficClearance: PARKING_TRAFFIC_CLEARANCE,
       curbOffset: laneOffset + lateralOffset,
       curbNormalX,
       curbNormalZ,
@@ -151,3 +169,38 @@ export {
   vehicleDoorPosition,
   vehicleExitCandidates
 };
+
+
+// Sweep the actor against the vehicle's full oriented footprint. Expanding
+// the box by the actor radius is conservative at corners and prevents both
+// tunnelling and walking through the front/rear overhangs of long vehicles.
+export function sweptVehicleFootprintContact(from, to, target, actorRadius = .3) {
+  const variant = target?.ref?.variant;
+  if (!['vehicle', 'ambient_vehicle'].includes(target?.kind) ||
+      !(Number(variant?.width) > 0 && Number(variant?.length) > 0)) return undefined;
+  const yaw = Number(target.yaw || 0), c = Math.cos(yaw), s = Math.sin(yaw);
+  const local = point => ({ x: (point.x - target.x) * c - (point.z - target.z) * s,
+    z: (point.x - target.x) * s + (point.z - target.z) * c });
+  const start = local(from), end = local(to);
+  const half = { x: Number(variant.width) / 2 + actorRadius, z: Number(variant.length) / 2 + actorRadius };
+  const signedDistance = point => {
+    const x = Math.abs(point.x) - half.x, z = Math.abs(point.z) - half.z;
+    return Math.hypot(Math.max(x, 0), Math.max(z, 0)) + Math.min(Math.max(x, z), 0);
+  };
+  const sourceDistance = signedDistance(start), endDistance = signedDistance(end);
+  // Preserve escape from an existing overlap, but reject deeper penetration.
+  if (sourceDistance < 0 && endDistance >= sourceDistance - .005) return null;
+  let enter = 0, leave = 1;
+  for (const axis of ['x', 'z']) {
+    const delta = end[axis] - start[axis];
+    if (Math.abs(delta) < 1e-9) {
+      if (Math.abs(start[axis]) >= half[axis]) return null;
+      continue;
+    }
+    const a = (-half[axis] - start[axis]) / delta, b = (half[axis] - start[axis]) / delta;
+    enter = Math.max(enter, Math.min(a, b));
+    leave = Math.min(leave, Math.max(a, b));
+    if (enter >= leave) return null;
+  }
+  return { target, t: enter, distance: 0, sourceDistance, endDistance, footprint: 'oriented-vehicle-box' };
+}

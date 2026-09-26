@@ -13,8 +13,8 @@ import {
 import {
   createUiRoomEventsApi
 } from './ui-room-events.js?v=4';
-import { createUiRoomRenderers } from './ui-room-renderers.js?v=2';
-import { createUiRoomActions } from './ui-room-actions.js?v=9';
+import { createUiRoomRenderers } from './ui-room-renderers.js?v=3';
+import { createUiRoomActions } from './ui-room-actions.js?v=10';
 import {
   emitTutorialEvent,
   finiteNumber,
@@ -42,7 +42,7 @@ import {
   isWalkModeActive,
   isDroneModeActive
 } from './ui-room-support.js?v=2';
-import { readPoseSnapshot, readWorldContext } from './ui-room-pose.js?v=3';
+import { readPoseSnapshot, readWorldContext } from './ui-room-pose.js?v=4';
 
 let singleton = null;
 function initMultiplayerPlatform() {
@@ -144,6 +144,8 @@ function initMultiplayerPlatform() {
     chatOpen: false,
     browseCityKey: '',
     browseRooms: [],
+    browsePhase: 'idle',
+    browseRequestId: 0,
     featuredRooms: [],
     friends: [],
     recentPlayers: [],
@@ -437,7 +439,7 @@ function initMultiplayerPlatform() {
     applyEntitlementCopy();
     attemptPendingRoomJoin();
     updateToggleStates();
-    renderBrowseRooms();
+    handleBrowseRooms();
     renderFeaturedRooms();
     renderFriends();
     renderRecentPlayers();
@@ -469,7 +471,7 @@ function initMultiplayerPlatform() {
     renderArtifacts();
     renderRoomActivities();
     renderHomeBase();
-    renderBrowseRooms();
+    handleBrowseRooms();
     renderFeaturedRooms();
     renderFriends();
     renderRecentPlayers();

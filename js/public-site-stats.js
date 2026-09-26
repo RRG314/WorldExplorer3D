@@ -1,4 +1,4 @@
-import { readFirebaseConfig } from './firebase-init.js?v=57';
+import { readFirebaseConfig } from './firebase-config.js';
 
 function publicStatsCandidates() {
   const config = readFirebaseConfig();

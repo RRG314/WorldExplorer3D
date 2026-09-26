@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { buildingExteriorMaterialPoolSnapshot } from './engine/building-facade-materials.js?v=16';
+import { buildingExteriorMaterialPoolSnapshot } from './engine/building-facade-materials.js?v=19';
 
 const diagnosticsParams = new URLSearchParams(globalThis.location?.search || '');
 // Production-like local runs must behave exactly like the deployed build.
@@ -1397,7 +1397,7 @@ globalThis.render_game_to_text = () => JSON.stringify({
     terrainTiles: appCtx.terrainTileCache?.size ?? null
   }
 });
-globalThis.advanceTime = async (milliseconds = 0) => {
+globalThis.advanceTime = async (milliseconds = 0, options = {}) => {
   const duration = Math.max(0, Number(milliseconds) || 0);
   if (!appCtx.gameStarted) {
     if (duration === 0) return { requestedMs: 0, simulatedMs: 0, frames: 0, mode: 'title-idle' };
@@ -1412,7 +1412,7 @@ globalThis.advanceTime = async (milliseconds = 0) => {
     return { requestedMs: duration, simulatedMs: 0, frames: 0, mode: 'title-idle' };
   }
   if (typeof appCtx.advanceRuntimeTime === 'function') {
-    return appCtx.advanceRuntimeTime(duration);
+    return appCtx.advanceRuntimeTime(duration, options);
   }
   if (duration === 0) return { requestedMs: 0, simulatedMs: 0, frames: 0 };
   await new Promise((resolve) => globalThis.setTimeout(resolve, duration));

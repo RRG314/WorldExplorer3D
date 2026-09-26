@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 
 const baseUrl = String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4250').replace(/\/$/, '');
 const outputDir = 'output/verification/airport-mobile-and-projectile-current';
 await fs.mkdir(outputDir, { recursive: true });
 
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
-const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, userAgent: devices['iPhone 13'].userAgent });
 const page = await context.newPage();
 const pageErrors = [];
 const failedLocalResources = [];

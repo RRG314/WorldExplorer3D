@@ -48,7 +48,7 @@ function createUrbanNpcVisual(THREE, definition = {}) {
     if (!heldEquipment) return false;
     const wrist = curatedRightWrist(root);
     const loaded = !!heldEquipment.userData.curatedEquipmentAssetId;
-    if (!wrist || !loaded) {
+    if (!wrist || !loaded || !['defending', 'armed'].includes(root.userData.reaction)) {
       heldEquipment.visible = false;
       return false;
     }
@@ -68,7 +68,8 @@ function createUrbanNpcVisual(THREE, definition = {}) {
 
   const setReaction = (reaction = '') => {
     root.userData.reaction = String(reaction || '');
-    root.userData.weaponPose = heldEquipment ? 'curated-forward-ready' : 'unarmed';
+    root.userData.weaponPose = !heldEquipment ? 'unarmed' : ['defending', 'armed'].includes(root.userData.reaction) ? 'curated-forward-ready' : 'holstered';
+    if (heldEquipment && root.userData.weaponPose === 'holstered') heldEquipment.visible = false;
   };
   setReaction(definition.reaction);
   root.userData.performanceProfile = Object.freeze({

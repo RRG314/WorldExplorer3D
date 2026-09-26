@@ -1,6 +1,8 @@
 (() => {
   const SECTION_META = Object.freeze({
-    overview: ['Overview', 'Account status, access, and the actions you use most.'],
+    overview: ['Overview', 'Your account and saved world improvements.'],
+    contributions: ['My contributions', 'Edit, submit and track your building improvements.'],
+    review: ['Review improvements', 'Inspect a submitted version, make a decision, then test it in the world.'],
     profile: ['Profile', 'Private identity and the public creator card are kept clearly separated.'],
     social: ['Friends & Rooms', 'Manage friends and room invitations without mixing them into account security.'],
     support: ['Support & Receipts', 'Optional donations, billing controls, and receipt history.'],
@@ -28,8 +30,9 @@
       const url = new URL(window.location.href);
       if (next === 'overview') url.searchParams.delete('section');
       else url.searchParams.set('section', next);
-      window.history.replaceState({ accountSection: next }, '', url);
+      window.history.pushState({ accountSection: next }, '', url);
     }
+    window.dispatchEvent(new CustomEvent('we3d:account-section',{detail:{section:next}}));
     document.querySelector('.wrap')?.scrollTo?.({ top: 0, behavior: options.instant ? 'auto' : 'smooth' });
   }
 

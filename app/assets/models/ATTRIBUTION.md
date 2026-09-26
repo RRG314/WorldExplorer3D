@@ -236,3 +236,25 @@ Pirate Interception Raider
 - Bundled SHA-256: `42aae3c61667d05024d3636649592b40f963ef08133f2329271a876962c0b7ba`
 - Processing: repacked from self-contained glTF to extension-free GLB with glTF-Transform 4.5.0; the embedded texture was reduced from 2048 px to 512 px. The 8,292-triangle source geometry and original orange hull presentation were retained.
 - Notes: One shared model family presents the bounded interceptor, attacker, and boarding-craft roles. Role, health, collision, movement, weapons, boarding progress, damage, and cleanup remain owned by the pirate-interception runtime; this file is presentation only.
+
+## Solis Reach quarters furniture
+Selected bed, display and lamp meshes from [Sci-Fi Interior Room](https://sketchfab.com/3d-models/sci-fi-interior-room-ec3e1efe815743439322bd1536a886e3) by [Van_Twinkle](https://sketchfab.com/Van_Twinkle), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Extracted from the owner-downloaded glTF and scaled/oriented to authored ship furniture. Original license: interiors/solis/LICENSE-room.txt.
+
+## Astronomical catalog data
+HYG v4.0 by David Nash / Astronexus and Western constellation figures by Stellarium contributors, CC BY-SA 4.0. Subsetting/conversion and source hashes: `../data/universe/observed-sky-sources.json`. No constellation artwork used.
+
+Additional Solis Reach furniture: [Sci-fi furniture/props pack](https://sketchfab.com/3d-models/free-sci-fi-furnitureprops-pack-b521def33f21422e9be8b4d237f7ca63) by [NinKorr3D](https://sketchfab.com/NinKorr3D), and [Medical Console](https://sketchfab.com/3d-models/medical-console-89065e109790417191467cfececf2c7c) by [Oliver Triplett](https://sketchfab.com/OliverTriplett), both CC BY 4.0. Meshes separated, textures resized to 512px, and furniture fitted to authored rooms. Original license notices retained under interiors/solis/.
+
+### Solis Reach wall equipment
+
+- `interiors/solis/wall-navigation.glb`: [Large Wall-Mounted Computer Console](https://sketchfab.com/3d-models/large-wall-mounted-computer-console-298b7d9b68064618a3819d1a8fae4baf) by [Inditrion Dradnon](https://sketchfab.com/dradnon), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+- `interiors/solis/wall-instruments.glb`: [Wall Console](https://sketchfab.com/3d-models/wall-console-98724ee49fba42a2b0ccbe79a36f246e) by [LuddePudde](https://sketchfab.com/luddepubde), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+
+Downloaded September 25, 2026 through the signed-in Sketchfab download controls. Converted textures to bounded 1024px WebP, deduplicated unused data, retained base PBR maps for the existing renderer, and positioned/scaled the models for ship bulkheads. No AI-generated replacement artwork.
+
+### Solis Reach artist-made equipment (September 2026)
+All following sources are Creative Commons Attribution 4.0: https://creativecommons.org/licenses/by/4.0/ . Textures resized to at most 1024px and encoded as WebP; original PBR materials retained. Geometry/materials are shared across instances.
+- `interiors/solis/reactor-core.glb`: **SciFi Reactor Core**, iedalton — https://sketchfab.com/3d-models/scifi-reactor-core-b3fe00d6b73841a0b6b3a288efc03668
+- `interiors/solis/medical-table.glb`: **Sci-Fi Laboratory Op Table**, Michael V (@bossdeff) — https://sketchfab.com/3d-models/sci-fi-laboratory-op-table-ae314a5ea3614a5caf52f0d7e7d61665
+- `interiors/solis/command-console.glb` and `laboratory-desk.glb`: **Sci-Fi Computer Room**, Michael V (@bossdeff) — https://sketchfab.com/3d-models/sci-fi-computer-room-a149d5bfcef6496c9a0606b5ce5ebf27 . Selected desk, keyboard, speakers and monitor extracted; room architecture and posters excluded.
+- `interiors/solis/equipment-server.glb`: **Sci-Fi Servers**, Michael V (@bossdeff) — https://sketchfab.com/3d-models/sci-fi-servers-37fd7c8ef38d4e5290cf6597394909c8 . Used as a game asset, not for generative model training.

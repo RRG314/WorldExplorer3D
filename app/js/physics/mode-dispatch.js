@@ -1,4 +1,4 @@
-import { createTransportControllerRegistry } from '../transport/controller-registry.js?v=1';
+import { createTransportControllerRegistry } from '../transport/controller-registry.js?v=2';
 
 let controllerRegistry = null;
 let controllerContext = null;
@@ -96,7 +96,7 @@ function updateAlternateTravelMode(appCtx, dt, options = {}) {
   const registry = ensureControllerRegistry(appCtx, options);
   const updated = registry.update(dt, { appCtx });
   if (!updated) return false;
-  const activeId = registry.snapshot({ appCtx }).activeId;
+  const activeId = registry.getActiveId();
   if (activeId === 'walk') {
     updateWalkAuxiliaries(appCtx, dt);
   } else if (activeId === 'boat') {

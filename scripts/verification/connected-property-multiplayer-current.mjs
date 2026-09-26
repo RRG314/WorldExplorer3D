@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 
 const root = process.cwd();
 const require = createRequire(import.meta.url);
@@ -11,6 +12,7 @@ const admin = require('../../functions/node_modules/firebase-admin');
 const { STARTING_CREDITS } = require('../../functions/property-authority.js');
 const outputDir = path.join(root, 'output', 'verification', 'connected-property-multiplayer');
 await fs.mkdir(outputDir, { recursive: true });
+await fs.rm(path.join(outputDir, 'report.json'), { force: true });
 const artifactRoot = path.resolve(process.env.WE3D_VERIFY_ROOT || root);
 const server = await startStaticServer({ rootDir: artifactRoot, ports: [4433, 4434, 4435] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
@@ -19,9 +21,10 @@ if (!admin.apps.length) admin.initializeApp({ projectId });
 const adminDb = admin.firestore();
 const functionsOrigin = `http://127.0.0.1:5001/${projectId}/us-central1`;
 const firebaseConfig = JSON.parse(await fs.readFile(path.join(root, 'config/firebase.staging.json'), 'utf8'));
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=768'] });
 const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const browserFailures = [];
+const clients = [];
 const useRealWorld = process.env.WE3D_PROPERTY_REAL_WORLD === '1';
 
 async function createPlayer(label, viewport) {
@@ -40,19 +43,49 @@ async function createPlayer(label, viewport) {
     });
     globalThis.WORLD_EXPLORER_FUNCTIONS_ORIGIN = functionsOrigin;
   }, { functionsOrigin, firebaseConfig });
+  const pendingParcelRoutes = new Set();
+  let holdParcelRefresh = false;
+  if (!useRealWorld) await context.route('https://mdgeodata.md.gov/imap/**', async route => {
+    if (holdParcelRefresh) await new Promise(resolve => pendingParcelRoutes.add(resolve));
+    await route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":{"message":"Controlled parcel outage"}}' }).catch(() => {});
+  });
   const page = await context.newPage();
+  // Register before startup: a rejected createPlayer must retain its own page
+  // and dependency/boot evidence, not just the previously successful client.
+  const diagnostics = { label, stage: 'navigation', console: [], failedRequests: [], failedResponses: [] };
+  clients.push({ label, context, page, diagnostics });
+  const safeUrl = value => { try { const url = new URL(value); return `${url.origin}${url.pathname}`; } catch { return ''; } };
+  collectBrowserGraphicsErrors(page, browserFailures);
+  page.on('console', message => {
+    if ((['warning', 'error'].includes(message.type()) || message.text().startsWith('[boot]')) && diagnostics.console.length < 80) {
+      diagnostics.console.push({ type: message.type(), text: message.text().slice(0, 2000) });
+    }
+  });
+  page.on('requestfailed', request => {
+    if (diagnostics.failedRequests.length < 40) diagnostics.failedRequests.push({ url: safeUrl(request.url()), error: request.failure()?.errorText || '' });
+  });
+  page.on('response', response => {
+    if (response.status() >= 400 && diagnostics.failedResponses.length < 40) diagnostics.failedResponses.push({ url: safeUrl(response.url()), status: response.status() });
+  });
   page.on('pageerror', (error) => browserFailures.push(`${label}: ${error.stack || error}`));
   // The globe's optional imagery tiles must not gate the application shell.
   // Waiting for the browser load event makes this verifier measure third-party
   // image completion twice instead of the Property UI it is meant to exercise.
   await page.goto(`${baseUrl}/app/?diagnostics=1`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
+  diagnostics.stage = 'runtime-ready';
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
+  diagnostics.stage = 'authentication';
   const identity = await page.evaluate(async ({ label, email }) => {
     const services = globalThis.WorldExplorerFirebase?.initFirebase?.();
     const auth = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js');
     const credential = await auth.createUserWithEmailAndPassword(services.auth, email, 'WorldExplorer3D-Test-Only-93!');
     await auth.updateProfile(credential.user, { displayName: label });
-    const authUi = await import('/js/auth-ui.js?v=55');
+    // Firebase Auth Emulator 15.22 can set validSince in the second after
+    // signup's auth_time. Establish a normal authenticated session after setup;
+    // token refresh alone retains auth_time and cannot repair that boundary.
+    const signedIn = await auth.signInWithEmailAndPassword(services.auth, email, 'WorldExplorer3D-Test-Only-93!');
+    if (signedIn.user.uid !== credential.user.uid) throw new Error('Emulator sign-in changed the fixture account.');
+    const authUi = await import('/js/auth-ui.js?v=56');
     const deadline = Date.now() + 12_000;
     while (authUi.getCurrentUser()?.uid !== credential.user.uid && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -81,7 +114,12 @@ async function createPlayer(label, viewport) {
       return diagnostics?.gameStarted === true && diagnostics.worldLoading === false;
     }, null, { timeout: 360_000 });
   }
-  return { context, page, identity };
+  diagnostics.stage = 'ready';
+  return { context, page, identity,
+    holdParcelRefresh: () => { holdParcelRefresh = true; },
+    pendingParcelCount: () => pendingParcelRoutes.size,
+    releaseParcelRefresh: () => { holdParcelRefresh = false; for (const resolve of pendingParcelRoutes) resolve(); pendingParcelRoutes.clear(); }
+  };
 }
 
 async function createSharedRoom(owner) {
@@ -134,10 +172,12 @@ async function stageAtSameMappedProperty(player, roomCode, sourceBuildingId = ''
 }
 
 async function waitForStatus(page, pattern) {
-  await page.waitForTimeout(1_500);
+  await page.waitForFunction(({ source, flags }) =>
+    new RegExp(source, flags).test(document.getElementById('propertyHubStatus')?.textContent || ''),
+  { source: pattern.source, flags: pattern.flags }, { timeout: 30_000 });
   const state = await page.evaluate(() => ({
     status: String(document.getElementById('propertyHubStatus')?.textContent || '').trim(),
-    panel: String(document.getElementById('propertyHubList')?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 800),
+    panel: String(document.getElementById('propertyList')?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 800),
     currentUser: globalThis.WorldExplorerFirebase?.initFirebase?.().auth?.currentUser?.uid || ''
   }));
   assert.match(state.status, pattern, `Unexpected Property state: ${JSON.stringify(state)}; browser failures: ${JSON.stringify(browserFailures)}`);
@@ -148,10 +188,10 @@ async function waitForStatus(page, pattern) {
 let owner;
 let buyer;
 try {
-  [owner, buyer] = await Promise.all([
-    createPlayer('Owner Rowan', { width: 1440, height: 900 }),
-    createPlayer('Buyer Vale', { width: 390, height: 844 })
-  ]);
+  // Keep both authenticated clients for the transaction/listener assertions,
+  // but do not compile two application shells concurrently on small hosts.
+  owner = await createPlayer('Owner Rowan', { width: 1440, height: 900 });
+  buyer = await createPlayer('Buyer Vale', { width: 390, height: 844 });
   const room = await createSharedRoom(owner);
   await joinSharedRoom(buyer, room.code);
 
@@ -160,8 +200,36 @@ try {
   assert.equal(buyerProperty.worldPropertyId, property.worldPropertyId);
 
   const ownerBuy = owner.page.locator(`[data-property-action="buy"][data-property-id="${property.id}"]`);
-  await ownerBuy.click();
+  let releasePurchase;
+  let observedPurchase;
+  const purchaseHeld = new Promise(resolve => { releasePurchase = resolve; });
+  const purchaseObserved = new Promise(resolve => { observedPurchase = resolve; });
+  let purchaseRequests = 0;
+  await owner.page.route(`${functionsOrigin}/commitWorldPropertyAction`, async route => {
+    purchaseRequests += 1;
+    observedPurchase();
+    await purchaseHeld;
+    await route.continue();
+  });
+  owner.holdParcelRefresh();
+  try {
+    await ownerBuy.click();
+    let requestTimer;
+    try { await Promise.race([purchaseObserved, new Promise((_, reject) => { requestTimer = setTimeout(() => reject(new Error('Purchase request not observed')), 10000); })]); }
+    finally { clearTimeout(requestTimer); }
+    assert.equal(await ownerBuy.isDisabled(), true, 'Pending purchase cannot be submitted twice');
+    assert.match(await owner.page.locator('#propertyHubStatus').innerText(), /Saving property/);
+    await owner.page.keyboard.press('Enter');
+    assert.equal(purchaseRequests, 1);
+    await owner.page.screenshot({ path: path.join(outputDir, 'desktop-purchase-pending.png') });
+  } finally { releasePurchase(); }
   await waitForStatus(owner.page, /now yours/);
+  if (!useRealWorld) {
+    await owner.page.waitForFunction(() => document.getElementById('propertyPanel')?.getAttribute('aria-busy') === 'false');
+    assert.ok(owner.pendingParcelCount() > 0, 'Confirmation is visible while optional parcel refresh remains blocked');
+    owner.releaseParcelRefresh();
+  }
+  await owner.page.unroute(`${functionsOrigin}/commitWorldPropertyAction`);
   await owner.page.locator('[data-property-view="home"]').first().click();
   await owner.page.waitForFunction((id) => document.querySelector(`[data-property-action="list-sale"][data-property-id="${CSS.escape(id)}"]`), property.id, { timeout: 30_000 });
   await owner.page.locator(`[data-property-action="list-sale"][data-property-id="${property.id}"]`).click();
@@ -189,7 +257,16 @@ try {
     const button = document.querySelector(`[data-property-action="buy"][data-property-id="${CSS.escape(id)}"]`);
     return !!button && /buy/i.test(button.textContent || '');
   }, buyerProperty.id, { timeout: 30_000 });
-  await buyer.page.locator(`[data-property-action="buy"][data-property-id="${buyerProperty.id}"]`).click();
+  const buyerBuy = buyer.page.locator(`[data-property-action="buy"][data-property-id="${buyerProperty.id}"]`);
+  await buyer.page.route(`${functionsOrigin}/commitWorldPropertyAction`, route => route.abort('failed'));
+  await buyerBuy.click();
+  await waitForStatus(buyer.page, /Could not confirm the property change/);
+  assert.equal(await buyerBuy.isDisabled(), false, 'A failed request releases the pending UI');
+  const afterFailure = await listedPropertySnapshot.docs[0].ref.get();
+  assert.equal(afterFailure.data().ownerUid, owner.identity.uid, 'The controlled failed request did not transfer ownership');
+  await buyer.page.screenshot({ path: path.join(outputDir, 'mobile-purchase-network-error.png') });
+  await buyer.page.unroute(`${functionsOrigin}/commitWorldPropertyAction`);
+  await buyerBuy.click();
   await waitForStatus(buyer.page, /now yours/);
 
   const persisted = await buyer.page.evaluate(async (propertyId) => {
@@ -213,10 +290,8 @@ try {
   assert.ok(Number(persisted.wallet.credits) > 0 && Number(persisted.wallet.credits) < STARTING_CREDITS);
   assert.equal(Number(persisted.wallet.currencyVersion), 2);
 
-  await Promise.all([
-    owner.page.screenshot({ path: path.join(outputDir, 'desktop-owner-after-sale.png'), fullPage: true }),
-    buyer.page.screenshot({ path: path.join(outputDir, 'mobile-buyer-owned.png'), fullPage: true })
-  ]);
+  await owner.page.screenshot({ path: path.join(outputDir, 'desktop-owner-after-sale.png'), fullPage: true });
+  await buyer.page.screenshot({ path: path.join(outputDir, 'mobile-buyer-owned.png'), fullPage: true });
   const report = {
     ok: browserFailures.length === 0,
     roomCode: room.code,
@@ -230,6 +305,9 @@ try {
       sameCanonicalRoomModule: true,
       sameMappedPropertyForBothPlayers: true,
       nearbyFreeClaimThroughUi: true,
+      pendingPurchaseFeedbackAndDuplicateGuard: true,
+      confirmationIndependentOfParcelProvider: !useRealWorld,
+      networkFailureVisibleAndRetryRecovers: true,
       saleListingThroughUi: true,
       secondPlayerPurchaseThroughUi: true,
       atomicOwnershipAndWalletPersistence: true,
@@ -239,14 +317,21 @@ try {
     },
     worldEvidence: useRealWorld
       ? 'full Earth world load'
-      : 'controlled mapped-building fixture after the full concurrent Earth load exceeded seven minutes',
+      : 'controlled mapped-building fixture with unavailable/delayed parcel provider; real emulator transactions and two browser clients',
     browserFailures
   };
   await fs.writeFile(path.join(outputDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify(report, null, 2));
   assert.equal(report.ok, true);
+} catch (error) {
+  await fs.writeFile(path.join(outputDir, 'report.json'), JSON.stringify({ ok: false, failure: String(error.stack || error), browserFailures, startup: clients.map(client => client.diagnostics) }, null, 2) + '\n');
+  for (const client of clients) {
+    if (!client.page.isClosed()) await client.page.screenshot({ path: path.join(outputDir, `${client.label.toLowerCase().replaceAll(' ', '-')}-failure.png`), timeout: 5000 }).catch(() => {});
+  }
+  throw error;
 } finally {
-  await Promise.allSettled([owner?.context?.close(), buyer?.context?.close()]);
+  owner?.releaseParcelRefresh(); buyer?.releaseParcelRefresh();
+  await Promise.allSettled(clients.map(client => client.context.close()));
   await browser.close();
   await server.close();
 }

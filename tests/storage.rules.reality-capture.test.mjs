@@ -45,10 +45,10 @@ function photoMetadata(ownerUid = OWNER, captureId = CAPTURE_ID) {
   };
 }
 
-test('capture owner can create one normalized quarantine photo but cannot read or overwrite it', async () => {
+test('even the owner cannot use Firebase uploads that issue permanent tokens; media requires short-lived server authorization', async () => {
   const ownerStorage = environment.authenticatedContext(OWNER).storage();
   const object = ref(ownerStorage, `reality-captures/${OWNER}/${CAPTURE_ID}/originals/${FILE_NAME}`);
-  await uploadBytes(object, new Uint8Array([0xff, 0xd8, 0xff, 0xe0]), photoMetadata());
+  await assert.rejects(() => uploadBytes(object, new Uint8Array([0xff, 0xd8, 0xff, 0xe0]), photoMetadata()), denied);
   await assert.rejects(() => getBytes(object), denied);
   await assert.rejects(() => uploadBytes(object, new Uint8Array([0xff, 0xd8, 0xff, 0xe0]), photoMetadata()), denied);
 });

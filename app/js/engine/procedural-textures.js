@@ -6,7 +6,7 @@ export function createAsphaltTexture() {
   canvas.height = 256;
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#2a2a2a';ctx.fillRect(0, 0, 256, 256);
-  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xA5FA17) : Math.random.bind(Math);
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.worldSeed ^ 0xA5FA17) : Math.random.bind(Math);
   for (let i = 0; i < 2000; i++) {
     const x = rng() * 256,y = rng() * 256;
     const brightness = 20 + rng() * 40;
@@ -25,7 +25,7 @@ export function createAsphaltNormal() {
   canvas.height = 128;
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#8080ff';ctx.fillRect(0, 0, 128, 128);
-  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xB0B041) : Math.random.bind(Math);
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.worldSeed ^ 0xB0B041) : Math.random.bind(Math);
   for (let i = 0; i < 500; i++) {
     const x = rng() * 128,y = rng() * 128;
     ctx.fillStyle = `rgb(${120 + rng() * 20}, ${120 + rng() * 20}, ${230 + rng() * 25})`;
@@ -44,7 +44,7 @@ export function createRoughnessMap() {
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#e0e0e0';
   ctx.fillRect(0, 0, 128, 128);
-  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xC0FFEE) : Math.random.bind(Math);
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.worldSeed ^ 0xC0FFEE) : Math.random.bind(Math);
   for (let i = 0; i < 800; i++) {
     const x = rng() * 128;
     const y = rng() * 128;
@@ -123,7 +123,7 @@ export function createProceduralGrassNormal() {
   ctx.fillStyle = '#8080ff';
   ctx.fillRect(0, 0, size, size);
 
-  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xB14DE5) : Math.random.bind(Math);
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.worldSeed ^ 0xB14DE5) : Math.random.bind(Math);
   for (let i = 0; i < 5000; i++) {
     const x = rng() * size,y = rng() * size;
     const nx = 120 + rng() * 16;
@@ -161,7 +161,7 @@ export function createProceduralGrassRoughness() {
   ctx.fillStyle = '#d8d8d8';
   ctx.fillRect(0, 0, size, size);
 
-  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xD1B7) : Math.random.bind(Math);
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.worldSeed ^ 0xD1B7) : Math.random.bind(Math);
   for (let i = 0; i < 2000; i++) {
     const x = rng() * size,y = rng() * size;
     const brightness = 170 + rng() * 85;
@@ -190,7 +190,7 @@ export function createConcreteFacadeTexture() {
   ctx.fillStyle = '#9a9590';
   ctx.fillRect(0, 0, size, size);
 
-  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xC0C0) : Math.random.bind(Math);
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.worldSeed ^ 0xC0C0) : Math.random.bind(Math);
   for (let i = 0; i < 8000; i++) {
     const x = rng() * size,y = rng() * size;
     const brightness = 130 + rng() * 50;
@@ -224,7 +224,7 @@ export function createConcreteNormalMap() {
   ctx.fillStyle = '#8080ff';
   ctx.fillRect(0, 0, size, size);
 
-  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xC1C1) : Math.random.bind(Math);
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.worldSeed ^ 0xC1C1) : Math.random.bind(Math);
   for (let y = 0; y < size; y += 64) {
     ctx.fillStyle = '#7070f0';
     ctx.fillRect(0, y, size, 2);
@@ -250,7 +250,7 @@ export function createConcreteRoughnessMap() {
   ctx.fillStyle = '#cccccc';
   ctx.fillRect(0, 0, size, size);
 
-  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xC2C2) : Math.random.bind(Math);
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.worldSeed ^ 0xC2C2) : Math.random.bind(Math);
   for (let i = 0; i < 2000; i++) {
     const x = rng() * size,y = rng() * size;
     const b = 170 + rng() * 70;
@@ -268,7 +268,7 @@ export function createBrickFacadeTexture() {
   const canvas = document.createElement('canvas');
   canvas.width = size;canvas.height = size;
   const ctx = canvas.getContext('2d');
-  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xB41C) : Math.random.bind(Math);
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.worldSeed ^ 0xB41C) : Math.random.bind(Math);
 
   ctx.fillStyle = '#b0a89a';
   ctx.fillRect(0, 0, size, size);
@@ -308,7 +308,7 @@ export function createBrickNormalMap() {
   ctx.fillRect(0, 0, size, size);
 
   const brickH = 16,brickW = 36,mortarW = 3;
-  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xB41D) : Math.random.bind(Math);
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.worldSeed ^ 0xB41D) : Math.random.bind(Math);
 
   for (let row = 0; row < size / (brickH + mortarW); row++) {
     const y = row * (brickH + mortarW);
@@ -345,7 +345,7 @@ export function createBrickRoughnessMap() {
   ctx.fillRect(0, 0, size, size);
 
   const brickH = 8,mortarW = 2;
-  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xB41E) : Math.random.bind(Math);
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.worldSeed ^ 0xB41E) : Math.random.bind(Math);
   for (let row = 0; row < size / (brickH + mortarW); row++) {
     const y = row * (brickH + mortarW);
     ctx.fillStyle = '#e0e0e0';

@@ -199,9 +199,9 @@ function classifyWorldSurfaceProfile({
 
   const polar = absLat >= DEEP_POLAR_LAT_THRESHOLD ||
     absLat >= POLAR_SNOW_LAT_THRESHOLD && (norm.explicitCryo > 0 || norm.water >= 0.08);
-  const frozenWater = polar ||
-    absLat >= POLAR_ICE_LAT_THRESHOLD ||
-    absLat >= 60 && norm.explicitCryo >= 0.05;
+  // A glacier on land is not evidence that every surrounding ocean inlet is
+  // frozen. Water-body geometry/weather owns local ice, not a latitude switch.
+  const frozenWater = false;
 
   const latitudeDry = absLat >= ARID_LAT_MIN && absLat <= ARID_LAT_MAX;
   const sparseVegetation = norm.vegetated <= 0.28;
@@ -250,9 +250,9 @@ function classifyWorldSurfaceProfile({
   return {
     absLat,
     centerLat: lat,
-    terrainModeHint: polar ? 'snow' : aridTerrain ? 'sand' : 'grass',
+    terrainModeHint: polar ? 'snow' : lat <= -60 ? (norm.barren >= .1 ? 'rock' : 'snowRock') : aridTerrain ? 'sand' : 'grass',
     waterModeHint: frozenWater ? 'ice' : 'water',
-    reason: polar ? 'polar_latitude' : aridTerrain ? 'arid_surface' : 'temperate',
+    reason: polar ? 'polar_latitude' : lat <= -60 ? 'antarctic_surface' : aridTerrain ? 'arid_surface' : 'temperate',
     biome,
     signals
   };
@@ -282,7 +282,7 @@ function classifyTerrainSurfaceProfile({
   const localSignals = summarizeLocalGroundSignals(bounds);
   const norm = localSignals.normalized;
   const weatherSnow = shouldApplySnowOverlay(absLat, maxMeters);
-  const useSnow = polar || alpine || subpolarSnow || weatherSnow;
+  const useSnow = polar || alpine || subpolarSnow || weatherSnow || worldProfile?.terrainModeHint === 'snowRock';
   const waterNearby = localSignals.waterAdjacent || norm.water >= 0.08;
   const steepTerrain = maxMeters - minMeters >= 210 || (Number.isFinite(p90Meters) && Number.isFinite(p75Meters) && (p90Meters - p75Meters) >= 85);
   const explicitBeachSand = norm.sand >= 0.08 && waterNearby && (
@@ -291,7 +291,7 @@ function classifyTerrainSurfaceProfile({
   );
   const aridFallback = shouldUseAridFallback(absLat, worldProfile, norm, localSignals);
   const useSand = !useSnow && (explicitBeachSand || aridFallback);
-  const useRock = !useSnow && !useSand && (norm.rock >= 0.18 || (steepTerrain && norm.rock >= 0.06));
+  const useRock = !useSnow && !useSand && (worldProfile?.terrainModeHint === 'rock' || norm.rock >= 0.18 || (steepTerrain && norm.rock >= 0.06));
   const mappedUrbanGround =
     norm.urban >= 0.52 &&
     norm.urban >= norm.grass * 1.6 &&
@@ -310,7 +310,7 @@ function classifyTerrainSurfaceProfile({
     (mappedUrbanGround || denseUrbanFallback);
   const useSoil = !useSnow && !useSand && !useRock && !useBuilt && (norm.soil >= 0.2 || (norm.soil >= 0.1 && norm.grass < 0.24));
   const mode = useSnow ?
-    ((useRock || steepTerrain) ? 'snowRock' : 'snow') :
+    ((useRock || steepTerrain || worldProfile?.terrainModeHint === 'snowRock') ? 'snowRock' : 'snow') :
     useSand ? 'sand' :
     useRock ? 'rock' :
     useBuilt ? 'built' :
@@ -341,7 +341,8 @@ function classifyWaterSurfaceProfile({
   const latMid = midpointLatitude(bounds);
   const absLat = Math.abs(latMid);
   const worldProfile = worldSurfaceProfile || appCtx.worldSurfaceProfile || null;
-  const frozen = worldProfile?.waterModeHint === 'ice' || absLat >= POLAR_ICE_LAT_THRESHOLD;
+  // Latitude alone cannot establish present sea/lake ice coverage.
+  const frozen = worldProfile?.waterModeHint === 'ice';
   return {
     mode: frozen ? 'ice' : 'water',
     reason: frozen ? 'frozen_surface' : 'liquid_surface',

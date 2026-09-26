@@ -1,0 +1,14 @@
+[
+  {
+    "level": "warn",
+    "message": "[WorldLoad] lossless OpenStreetMap transport data failed: Error: All Overpass endpoints failed: [https://lz4.overpass-api.de/api/interpreter] timeout after 7499ms | [https://overpass.private.coffee/api/interpreter] timeout after 749ms | [https://overpass-api.de/api/interpreter] timeout after 500ms\n    at _e (https://worldexplorer3d.io/app/js/bundles/chunk-OYYENYEL.js:65:2861)\n    at async j (https://worldexplorer3d.io/app/js/bundles/chunk-HCATPEPN.js:103:173209)\n    at async pt (https://worldexplorer3d.io/app/js/bundles/chunk-HCATPEPN.js:111:48981)\n    at async Object.uM [as loadRoads] (https://worldexplorer3d.io/app/js/bundles/chunk-HCATPEPN.js:111:113684)\n    at async Mt (https://worldexplorer3d.io/app/js/bundles/app-entry-PC7FTFRY.js:326:131541)",
+    "timestamp": "2026-09-15T23:59:27.046Z",
+    "url": "https://worldexplorer3d.io/app/js/bundles/chunk-HCATPEPN.js"
+  },
+  {
+    "level": "warn",
+    "message": "[WorldLoad] Applied adaptive limits (roads 17158/36134, buildings 0/0, landuse 0/0, pois 5657/6662).",
+    "timestamp": "2026-09-15T23:59:33.174Z",
+    "url": "https://worldexplorer3d.io/app/js/bundles/chunk-HCATPEPN.js"
+  }
+]

@@ -99,9 +99,9 @@ test('saved remaps change live control actions and swap collisions', () => {
 
 test('space flight consumes the same configurable actions while keeping arrow and touch fallbacks', () => {
   const configured = resolveSpaceControlInput({}, { move: 1, turn: 1, jump: 1, sprint: 0 });
-  assert.deepEqual(configured, { yaw: -1, pitch: 1, thrust: true, brake: false });
+  assert.deepEqual(configured, { yaw: -1, pitch: -1, thrust: true, brake: false });
   const legacyTouch = resolveSpaceControlInput({ arrowright: true, arrowdown: true, shift: true }, {});
-  assert.deepEqual(legacyTouch, { yaw: 1, pitch: -1, thrust: false, brake: true });
+  assert.deepEqual(legacyTouch, { yaw: 1, pitch: 1, thrust: false, brake: true });
 });
 
 test('building entry prompts require a published door and door-range approach', () => {
@@ -150,4 +150,41 @@ test('interaction familiarity groups repeated prompts by real-world action famil
   assert.equal(interactionFamily('enter_vehicle'), 'vehicle');
   assert.equal(interactionFamily('aircraft_options'), 'vehicle');
   assert.equal(interactionFamily('talk_npc'), 'person');
+});
+
+test('idle touch controls do not pull keyboard walking back to the old heading', async () => {
+  const { readControlActions, setMobileTouchEnabled, setMobileTouchPad, clearMobileTouchInput } = await import('../app/js/controls/action-input.js?v=12');
+  const { createWalkingPhysicsHelpers } = await import('../app/js/walking/physics.js');
+  const priorPerformance = Object.getOwnPropertyDescriptor(globalThis, 'performance');
+  Object.defineProperty(globalThis, 'performance', { configurable: true, value: { now: () => 5000 } });
+  const priorKeys = appCtx.keys;
+  const priorRead = appCtx.readControlActions;
+  const state = { walker: { x: 0, z: 0, y: 1.7, angle: 0, yaw: 0, lookYawOffset: 0, pitch: 0,
+    vy: 0, onGround: true, wallJumpTimer: 0 }, characterMesh: null };
+  const physics = createWalkingPhysicsHelpers({
+    CFG: { eyeHeight: 1.7, runSpeed: 5.6, walkSpeed: 2.8, turnSpeed: 2.6, blockStepHeight: .65 },
+    animateCharacterWalk() {}, getBuildingsArray: () => [], getNearbyBuildings: () => [],
+    getWalkGroundY: () => 0, isPointInPolygon: () => false, keys: {}, state
+  });
+  const advance = () => physics.updateWalkPhysics(1 / 60, (value, fallback) => Number.isFinite(value) ? value : fallback);
+  try {
+    appCtx.readControlActions = readControlActions;
+    clearMobileTouchInput('test');
+    setMobileTouchEnabled(true);
+    appCtx.keys = { ArrowRight: true };
+    for (let i = 0; i < 60; i++) advance();
+    assert.ok(Math.abs(state.walker.yaw + 2.6) < .001, `Keyboard turn was cancelled by idle touch camera: ${state.walker.yaw}`);
+    appCtx.keys = {};
+    for (let i = 0; i < 60; i++) advance();
+    assert.ok(Math.abs(state.walker.yaw + 2.6) < .001, 'Releasing the key must preserve the new actor heading.');
+    setMobileTouchPad('move', 0, -1, true);
+    assert.equal(readControlActions('walk').mobileTouch, true, 'A new touch gesture retains mobile movement semantics.');
+    assert.equal(readControlActions('walk').mobileMoveActive, true);
+  } finally {
+    Object.defineProperty(globalThis, 'performance', priorPerformance);
+    clearMobileTouchInput('test-cleanup');
+    setMobileTouchEnabled(false);
+    appCtx.keys = priorKeys;
+    appCtx.readControlActions = priorRead;
+  }
 });

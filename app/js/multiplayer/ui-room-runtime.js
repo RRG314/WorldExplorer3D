@@ -1,7 +1,7 @@
 import { ensureEntitlements } from "../../../js/entitlements.js?v=71";
 import { createGhostManager } from "./ghosts.js?v=58";
 import { listenExplorerLeaderboard } from "./loop.js?v=56";
-import { stopPresence } from "./presence.js?v=62";
+import { stopPresence } from "./presence.js?v=63";
 import {
   deriveRoomDeterministicSeed,
   findFeaturedPublicRooms,
@@ -45,6 +45,7 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
   } = renderers;
 
   function clearSubscriptions() {
+    state.roomSessionGeneration = (Number(state.roomSessionGeneration) || 0) + 1;
     if (typeof state.unsubRoom === "function") state.unsubRoom();
     if (typeof state.unsubPlayers === "function") state.unsubPlayers();
     if (typeof state.unsubChat === "function") state.unsubChat();
@@ -220,7 +221,9 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
   }
 
   async function syncRoomWorldContext(room, force = false, respawn = false) {
-    if (!room || !room.world) return;
+    if (!room || !room.world || state.currentRoom?.id !== room.id) return;
+    const generation = state.roomSessionGeneration;
+    const isCurrent = () => state.roomSessionGeneration === generation && state.currentRoom?.id === room.id;
 
     const signature = roomWorldSignature(room);
     if (!force && signature && state.activeRoomWorldSignature === signature) return;
@@ -259,6 +262,7 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     }
 
     const environmentReady = await ensureRoomEnvironment(kind, room, respawn);
+    if (!isCurrent()) return;
     if (!environmentReady) {
       scheduleRoomWorldRetry(room, respawn, 700);
       return;
@@ -274,6 +278,7 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     setStatus(`Syncing room world ${room.code} (seed ${roomSeed})...`);
     try {
       await appCtx.loadRoads();
+      if (!isCurrent()) return;
       if (respawn && typeof appCtx.spawnOnRoad === "function") {
         appCtx.spawnOnRoad();
       }
@@ -293,10 +298,10 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
       appCtx.setSharedBuildEntries([]);
     }
     appCtx.configureSharedEditableWorld?.({ enabled: false });
-    await stopPresence();
-    if (!localOnly) {
-      await leaveRoom();
-    }
+    // Capture and detach both owners before yielding. Waiting here used to let
+    // a completed join replace currentRoom, then leaveRoom deleted the new room.
+    const stoppingPresence = stopPresence();
+    const leavingRoom = localOnly ? Promise.resolve() : leaveRoom();
 
     state.currentRoom = null;
     state.activeRoomWorldSignature = "";
@@ -322,6 +327,7 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     renderHomeBase();
     updateToggleStates();
     publishMapRoomsToContext();
+    await Promise.all([stoppingPresence, leavingRoom]);
   }
 
   function ensureGhostManager() {
@@ -330,6 +336,8 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     if (!appCtx.scene) return;
 
     state.ghostManager = createGhostManager(appCtx.scene, {
+      getCamera: () => appCtx.camera,
+      getViewportHeight: () => appCtx.renderer?.domElement?.clientHeight || globalThis.innerHeight,
       getSelfUid: () => state.authUser?.uid || state.entitlement.uid || "",
       getLocalFrame: () => helpers.readPoseSnapshot?.()?.frame || null
     });
@@ -387,6 +395,11 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
   }
 
   function ensureGlobalSubscriptions() {
+    const uid = state.authUser?.uid || '';
+    if (state.globalSubscriptionUid !== uid) {
+      clearGlobalSubscriptions();
+      state.globalSubscriptionUid = uid;
+    }
     if (!state.authUser) {
       clearGlobalSubscriptions();
       state.friends = [];
@@ -404,27 +417,31 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
 
     if (!state.unsubFriends) {
       state.unsubFriends = listenFriends((rows) => {
+        if (state.authUser?.uid !== uid) return;
         state.friends = rows;
         renderFriends();
       });
     }
     if (!state.unsubRecentPlayers) {
       state.unsubRecentPlayers = listenRecentPlayers((rows) => {
+        if (state.authUser?.uid !== uid) return;
         state.recentPlayers = rows;
         renderRecentPlayers();
       });
     }
     if (!state.unsubInvites) {
       state.unsubInvites = listenIncomingInvites((rows) => {
+        if (state.authUser?.uid !== uid) return;
         state.invites = rows;
         renderInvites();
       });
     }
     if (!state.unsubOwnedRooms) {
       state.unsubOwnedRooms = listenMyRooms((rows) => {
+        if (state.authUser?.uid !== uid) return;
         state.ownedRooms = rows;
         renderOwnedRooms();
-      });
+      }, { onError: () => setStatus('Saved rooms could not be refreshed. Reload the app to reconnect.', true) });
     }
     ensureLeaderboardSubscription();
   }
@@ -443,6 +460,9 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     renderers.refreshPlanLabel();
 
     const allowed = canUseMultiplayer(state.entitlement);
+    // Account refresh is background state, not the result of the player's
+    // create/join action. Keep its pending/error outcome until their next action.
+    if (state.authUser && (state.roomCreateBusy || state.roomJoinBusy || state.lastActionStatusWarn)) return;
     if (!state.authUser) {
       if (state.pendingRoomCode) {
         setStatus(`Invite detected for room ${state.pendingRoomCode}. Sign in to continue.`);

@@ -1,5 +1,6 @@
+import {prepareHomePhotoSurfaces} from './home-photo-surfaces.js';
 import { loadClassicScript } from '../modules/script-loader.js?v=56';
-import { vendorScriptsCritical } from '../modules/manifest.js?v=597';
+import { vendorScriptsCritical } from '../modules/manifest.js?v=606';
 import { applyCaptureAlignment } from './alignment.js?v=1';
 
 export async function createCaptureViewer(host, bytes, signal, options = {}) {
@@ -8,7 +9,10 @@ export async function createCaptureViewer(host, bytes, signal, options = {}) {
   if (!globalThis.THREE.OrbitControls) await loadClassicScript('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js');
   if (signal.aborted) return null;
   const T = globalThis.THREE;
-  const model = options.model || (await new Promise((resolve, reject) => new T.GLTFLoader().parse(bytes, '', resolve, reject))).scene;
+  let model = options.model || (await new Promise((resolve, reject) => new T.GLTFLoader().parse(bytes, '', resolve, reject))).scene;
+  if(options.exteriorBuilding){const {buildHybridShell}=await import('./hybrid-geometry.js?v=1');const shell=buildHybridShell(T,options.exteriorBuilding,options.patchHeightMeters,{});shell.add(model);model=shell;}
+  if(options.homeLayout){prepareHomePhotoSurfaces(model,options.homeLayout);const {buildAuthoredInterior}=await import('../interiors/authored-geometry.js');const home=buildAuthoredInterior(T,options.homeLayout);home.group.add(model);home.group.traverse(o=>{if(o.userData.kind==='ceiling')o.visible=false;});model=home.group;}
+  if(model.name==='authored-home')options={...options,interiorLighting:true};
   const disposeModel = () => model.traverse(object => {
     object.geometry?.dispose();
     for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
@@ -28,8 +32,8 @@ export async function createCaptureViewer(host, bytes, signal, options = {}) {
   if (!Number.isFinite(radius) || radius <= 0) { disposeModel(); throw Error('Invalid reconstruction bounds.'); }
   const placementReview = options.alignment !== undefined;
   if (placementReview) applyCaptureAlignment(model, options.alignment);
-  else model.position.sub(center);
-  scene.add(model, new T.HemisphereLight(0xffffff, 0x4b6970, 1.4));
+  else if(!options.preserveCoordinates) model.position.sub(center);
+  scene.add(model, new T.HemisphereLight(0xffffff, 0x4b6970, options.interiorLighting ? .55 : 1.4));
   const reference = new T.Group();
   const footprint = options.spatialContext?.footprint || [];
   if (placementReview && footprint.length >= 3) {
@@ -44,13 +48,19 @@ export async function createCaptureViewer(host, bytes, signal, options = {}) {
       new T.Vector3(entrance.x, 0, entrance.z), new T.Vector3(entrance.x, 2, entrance.z)
     ]), new T.LineBasicMaterial({ color: 0xffcc55, depthTest: false })));
     scene.add(reference);
+    const front=options.streetFacingWall;
+    if(Number.isInteger(front)&&footprint[front]){
+      const a=footprint[front],b=footprint[(front+1)%footprint.length];
+      reference.add(new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(a.x,.1,a.z),new T.Vector3(b.x,.1,b.z)]),new T.LineBasicMaterial({color:0xffcc55,depthTest:false})));
+    }
   }
-  const light = new T.DirectionalLight(0xffffff, 0.8);
+  const light = new T.DirectionalLight(0xffffff, options.interiorLighting ? .45 : .8);
   light.position.set(1, 2, 3); scene.add(light);
   const camera = new T.PerspectiveCamera(50, 1, radius / 1000, radius * 100);
   const renderer = new T.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
   renderer.outputEncoding = T.sRGBEncoding;
+  if(options.interiorLighting){renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=.8;}
   const canvas = renderer.domElement;
   canvas.tabIndex = 0;
   canvas.setAttribute('aria-label', options.label || 'Your reconstructed model. Drag to rotate, pinch or scroll to zoom. Use the buttons below for keyboard control.');
@@ -85,6 +95,9 @@ export async function createCaptureViewer(host, bytes, signal, options = {}) {
   canvas.addEventListener('pointercancel', e=>{pointers.delete(e.pointerId);press=null;}, {signal:events.signal});
   const draw = () => { if (!disposed && !document.hidden) renderer.render(scene, camera); };
   const reset = () => {
+    controls.enableZoom=true;controls.enablePan=true;
+    camera.fov=50;
+    if(options.homeLayout)model.traverse(o=>{if(o.userData.kind==='ceiling')o.visible=false;});
     const box = new T.Box3().setFromObject(model);
     if (reference.children.length) box.union(new T.Box3().setFromObject(reference));
     const target = box.getCenter(new T.Vector3());
@@ -109,6 +122,22 @@ export async function createCaptureViewer(host, bytes, signal, options = {}) {
   };
   signal.addEventListener('abort', dispose, { once: true });
   return { dispose, reset,
+    faceDirection: normal => {
+      if(disposed)return;
+      const box=new T.Box3().setFromObject(model),target=box.getCenter(new T.Vector3());
+      const distance=Math.max(...box.getSize(new T.Vector3()).toArray(),1)*1.6;
+      controls.target.copy(target);camera.position.copy(target).add(new T.Vector3(normal.x,0,normal.z).multiplyScalar(distance));
+      controls.update();draw();
+    },
+    setInside: (position,direction={x:0,y:0,z:-1}) => {
+      if(disposed)return;
+      if(options.homeLayout)model.traverse(o=>{if(o.userData.kind==='ceiling')o.visible=true;});
+      camera.position.set(position.x,position.y,position.z);
+      camera.near=.03;camera.fov=70;camera.updateProjectionMatrix();
+      controls.target.copy(camera.position).add(new T.Vector3(direction.x||0,direction.y||0,direction.z||0).normalize().multiplyScalar(.01));
+      controls.minDistance=.01;controls.maxDistance=.01;controls.enableZoom=false;controls.enablePan=false;
+      controls.update();draw();
+    },
     redraw: draw,
     getView: () => ({position:camera.position.toArray(),target:controls.target.toArray()}),
     updateAlignment: alignment => { if (!placementReview || disposed) return; applyCaptureAlignment(model, alignment); draw(); },

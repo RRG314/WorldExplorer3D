@@ -32,6 +32,7 @@ import {
 } from "./terrain/surface-profiles.js?v=54";
 import {
   applyHeightsToTerrainMesh,
+  applyHeightsToTerrainMeshCooperatively,
   buildTerrainTileMesh,
   clearTerrainTileCache,
   clearTerrainMeshes,
@@ -58,7 +59,7 @@ import {
   buildRoadSkirts,
   detectRoadIntersections,
   publishCompiledTransportMeshes
-} from "./terrain/rebuild.js?v=54";
+} from "./terrain/rebuild.js?v=57";
 import {
   disableRoadDebugMode as disableRoadDebugModeInternal,
   toggleRoadDebugMode as toggleRoadDebugModeInternal,
@@ -299,28 +300,41 @@ function applyWaterTerrainMask(options = {}) {
   return stats;
 }
 
-function applyTransportTerrainCorridors(options = {}) {
+async function applyTransportTerrainCorridors(options = {}) {
   const meshes = (appCtx.terrainGroup?.children || []).filter(
-    (mesh) => mesh?.userData?.isTerrainMesh
+    (mesh) => mesh?.userData?.isTerrainMesh && mesh.userData.terrainTile &&
+      mesh.visible!==false && !mesh.userData.pendingTerrainTile
   );
   let adjustedVertices = 0;
   let waterMaskedVertices = 0;
   for (const mesh of meshes) {
-    applyHeightsToTerrainMesh(mesh, terrainTileDeps, {
+    if(options.isCurrent?.()===false)return null;
+    const completed=await applyHeightsToTerrainMeshCooperatively(mesh, terrainTileDeps, {
       reuseBaseElevations: true,
-      refreshVisualProfile: options.deferVisualProfile !== true
+      refreshVisualProfile: options.deferVisualProfile !== true,
+      isCurrent: options.isCurrent,
+      yieldControl: options.yieldBetweenTiles
     });
+    if(!completed){
+      if(options.isCurrent?.()===false)return null;
+      throw new Error(`Published terrain ${mesh.userData.terrainTileKey || 'tile'} could not be graded: ${mesh.userData.groundUnavailableReason || 'height publication failed'}`);
+    }
     adjustedVertices += Number(mesh.userData?.transportCorridorAdjustedVertices || 0);
     waterMaskedVertices += Number(mesh.userData?.waterMaskedVertices || 0);
+    await options.yieldBetweenTiles?.();
   }
+  if(options.isCurrent?.()===false)return null;
   const terrainSeams = stitchTerrainGroupEdges(appCtx);
   refreshFarTerrainBoundaryHeights();
   clearTerrainHeightCache();
   const stats = Object.freeze({
     authority: 'compiled_transport_surface',
     heightSamplingAuthority: 'rendered-triangle-barycentric',
+    frontageQueries:appCtx.streetFrontageGrading?.stats?.(),
     terrainMeshes: meshes.length,
     corridorCount: Number(appCtx.transportTerrainCorridorPublication?.corridorCount || 0),
+    heightCompilationYields: meshes.reduce((sum,mesh)=>sum+(mesh.userData.heightCompilationScheduling?.yields || 0),0),
+    maximumHeightCompilationChunkMs: Math.max(0,...meshes.map(mesh=>mesh.userData.heightCompilationScheduling?.maximumChunkMs || 0)),
     adjustedVertices,
     terrainSeams
   });
@@ -341,6 +355,7 @@ const {
   cachedBaseTerrainHeight,
   cachedTerrainHeight,
   clearTerrainHeightCache,
+  heightSamplingCacheStats,
   pointAlongPolyline,
   polylineCurvatureMetric,
   subdivideRoadPoints,
@@ -408,6 +423,7 @@ const {
 
 const {
   publishLocationTerrain,
+  waitForLocationTerrainPublication,
   resetLocationTerrainPublication
 } = createLocationTerrainApi({
   appCtx,
@@ -435,6 +451,8 @@ function resetEarthStreaming(reason = 'earth_streaming_reset') {
   appCtx.structureTerrainCuts = [];
   appCtx.structureTerrainCutByFeature = null;
   appCtx.structureTerrainCutIndex = null;
+  appCtx.structureTerrainProjectionIndex?.dispose?.();
+  appCtx.structureTerrainProjectionIndex=null;
   appCtx.transportTerrainCorridorPublication = null;
   appCtx.transportTerrainCorridorStats = null;
   clearTerrainHeightCache();
@@ -576,6 +594,7 @@ Object.assign(appCtx, {
   applyHeightsToTerrainMesh,
   applyWaterTerrainMask,
   baseTerrainHeightAt: cachedBaseTerrainHeight,
+  heightSamplingCacheStats,
   buildRoadSkirts,
   clearStructureVisualMeshes,
   buildTerrainTileMesh,
@@ -634,6 +653,7 @@ Object.assign(appCtx, {
   tileXYToLatLonBounds,
   toggleRoadDebugMode,
   publishLocationTerrain,
+  waitForLocationTerrainPublication,
   validateRoadTerrainConformance,
   verifyAcceptedGroundCoverage,
   waitForTerrainCoverageAt,
@@ -692,6 +712,7 @@ export {
   tileXYToLatLonBounds,
   toggleRoadDebugMode,
   publishLocationTerrain,
+  waitForLocationTerrainPublication,
   validateRoadTerrainConformance,
   verifyAcceptedGroundCoverage,
   waitForFarTerrainClipmap,

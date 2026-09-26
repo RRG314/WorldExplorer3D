@@ -1,3 +1,4 @@
+import { ambientNotices } from '../ui/ambient-notices.js';
 export function createBoatPromptUi({ appCtx, getSeaStateConfig, getWaveIntensity, waterKindLabel }) {
   let prompt = null;
   let boatButton = null;
@@ -7,6 +8,7 @@ export function createBoatPromptUi({ appCtx, getSeaStateConfig, getWaveIntensity
   let waveLabel = null;
   let waveValue = null;
   let hideTimer = null;
+  let ambientKey = null;
 
   function ensureBoatPromptRefs() {
     if (!prompt) prompt = document.getElementById('boatPrompt');
@@ -25,6 +27,7 @@ export function createBoatPromptUi({ appCtx, getSeaStateConfig, getWaveIntensity
 
   function updateBoatMenuUi() {
     ensureBoatPromptRefs();
+    if (ambientKey && !ambientNotices.request('boat', ambientKey, { blocked: ambientBlocked(), durationMs: 6000 })) hideBoatPrompt();
     if (boatButton) {
       boatButton.textContent = appCtx.boatMode?.active ? '⛴ Exit Vessel' : appCtx.oceanMode?.active ? '🚤 Surface Boat' : '🚤 Boat Mode';
     }
@@ -47,7 +50,22 @@ export function createBoatPromptUi({ appCtx, getSeaStateConfig, getWaveIntensity
     }
   }
 
+  function ambientBlocked() {
+    return !!(appCtx.paused || appCtx.showLargeMap || appCtx.activeInterior || appCtx.resolvePrimaryContextInteraction?.() || document.getElementById('interiorPrompt')?.classList.contains('show'));
+  }
+
+  function showBoatHint(message, key) {
+    const locationKey = `${appCtx.LOC?.lat}:${appCtx.LOC?.lon}:${key}`;
+    if (!ambientNotices.request('boat', locationKey, { blocked: ambientBlocked(), durationMs: 6000 })) return false;
+    if (ambientKey === locationKey) return true;
+    showBoatPrompt(message, 'supported', 6000);
+    ambientKey = locationKey;
+    return true;
+  }
+
   function hideBoatPrompt() {
+    ambientKey = null;
+    ambientNotices.release('boat');
     ensureBoatPromptRefs();
     if (hideTimer) clearTimeout(hideTimer);
     hideTimer = null;
@@ -60,6 +78,7 @@ export function createBoatPromptUi({ appCtx, getSeaStateConfig, getWaveIntensity
   function showBoatPrompt(message, variant = 'supported', durationMs = 0) {
     ensureBoatPromptRefs();
     if (!prompt) return;
+    if (ambientKey) { ambientNotices.release('boat'); ambientKey = null; }
     if (hideTimer) clearTimeout(hideTimer);
     hideTimer = null;
     prompt.textContent = message;
@@ -75,5 +94,5 @@ export function createBoatPromptUi({ appCtx, getSeaStateConfig, getWaveIntensity
     return waveSlider;
   }
 
-  return { boatHudLabel, ensureBoatPromptRefs, getWaveSlider, hideBoatPrompt, showBoatPrompt, updateBoatMenuUi };
+  return { boatHudLabel, ensureBoatPromptRefs, getWaveSlider, hideBoatPrompt, showBoatHint, showBoatPrompt, updateBoatMenuUi };
 }

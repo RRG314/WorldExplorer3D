@@ -1,19 +1,25 @@
+import { softwareCompositorArgs } from './software-compositor.mjs';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { advanceGameplay, advanceUntilFishingStage } from './gameplay-simulation.mjs';
 
 const root = process.cwd();
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
 const servedRoot = requestedRoot ? path.resolve(root, requestedRoot) : root;
 const server = await startStaticServer({ rootDir: servedRoot, ports: [4386, 4387, 4388] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
-const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024', ...softwareCompositorArgs()] });
+const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: process.env.CI ? 0.5 : 1, hasTouch: true, isMobile: true, userAgent: devices['iPhone 13'].userAgent });
 const page = await context.newPage();
+await configureStagingAppCheck(page, baseUrl);
 const browserErrors = [];
 const localFailures = [];
+collectBrowserGraphicsErrors(page, browserErrors);
 page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
 page.on('response', (response) => {
   if (response.url().startsWith(baseUrl) && response.status() >= 400) localFailures.push({ url: response.url(), status: response.status() });
@@ -74,7 +80,7 @@ try {
   const catchesBefore = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().fishing?.catches || 0);
 
   await page.locator('#fishingActionBtn').click();
-  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().fishing?.stage === 'bite', null, { timeout: 20_000 });
+  await advanceUntilFishingStage(page, 'bite');
   await page.locator('#fishingActionBtn').click();
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().fishing?.stage === 'fighting', null, { timeout: 10_000 });
   const firstAttemptId = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().fishing?.attempt?.attemptId || null);
@@ -90,7 +96,7 @@ try {
     const wrongDirection = Number(fishing.fishDirection) < 0 ? 'ArrowLeft' : 'ArrowRight';
     await page.keyboard.press(wrongDirection);
     await page.keyboard.down('Space');
-    await page.evaluate(() => globalThis.advanceTime?.(180));
+    await advanceGameplay(page, 180);
     await page.keyboard.up('Space');
   }
 
@@ -102,11 +108,11 @@ try {
     gesture: document.querySelector('#fishingGestureLabel')?.textContent || ''
   }));
   await mkdir('output/release-evidence/current', { recursive: true });
-  await page.screenshot({ path: 'output/release-evidence/current/fishing-line-loss-mobile.png', fullPage: true });
+  await page.screenshot({ path: 'output/release-evidence/current/fishing-line-loss-mobile.png', fullPage: false });
 
   const recordsAfterLoss = await catchRecordCount();
   await page.locator('#fishingActionBtn').click();
-  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().fishing?.stage === 'bite', null, { timeout: 20_000 });
+  await advanceUntilFishingStage(page, 'bite');
   await page.locator('#fishingActionBtn').click();
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().fishing?.stage === 'fighting', null, { timeout: 10_000 });
   const retry = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().fishing || {});
@@ -127,7 +133,7 @@ try {
       modesButtonOwnsHit: !!button && (hit === button || button.contains(hit))
     };
   });
-  await page.screenshot({ path: 'output/release-evidence/current/fishing-teardown-recovery-mobile.png', fullPage: true });
+  await page.screenshot({ path: 'output/release-evidence/current/fishing-teardown-recovery-mobile.png', fullPage: false });
   const recordsAfterClose = await catchRecordCount();
 
   await page.locator('#exploreBtn').click();
@@ -159,6 +165,9 @@ try {
     noFailedLocalResources: localFailures.length === 0
   };
   const report = {
+    timing: 'runtime-fixed-step',
+    evidenceScope: 'functional; not rendering performance',
+    deviceScaleFactor: process.env.CI ? 0.5 : 1,
     ok: Object.values(checks).every(Boolean),
     contract: 'fishing-line-loss-retry-close-teardown-v1',
     checks,

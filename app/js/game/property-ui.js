@@ -4,13 +4,13 @@ import { createLocalCommerceModel } from '../urban-sandbox/commerce-model.js?v=5
 import { createHousingModel, makeHomeCandidates } from '../real-estate/housing-model.js?v=2';
 import { createConnectedPropertyAuthority } from '../real-estate/connected-property-authority.js?v=3';
 import { createConnectedExplorerWallet } from '../economy/connected-wallet-authority.js?v=2';
-import { getCurrentUser } from '../../../js/auth-ui.js?v=55';
+import { getCurrentUser } from '../../../js/auth-ui.js?v=56';
 import { getCurrentRoom } from '../multiplayer/rooms.js?v=67';
 import { postActivity } from '../multiplayer/loop.js?v=56';
-import { createNavigationRoute, describeDestinationEntrySupport, getNavigationTargetForDestination } from './navigation-ui.js?v=1';
+import { createNavigationRoute, describeDestinationEntrySupport, getNavigationTargetForDestination } from './navigation-ui.js?v=2';
 import { escapeHtml, sanitizeHttpUrl } from './ui-utils.js?v=1';
 import { isLikelyMarylandCoordinate } from '../gis/maryland-parcel-core.js?v=1';
-import { loadMarylandParcels, marylandParcelProviderSnapshot } from '../gis/maryland-parcel-provider.js?v=1';
+import { loadMarylandParcels, marylandParcelProviderSnapshot } from '../gis/maryland-parcel-provider.js?v=2';
 import { makeParcelPropertyCandidates, parcelBuildPermissionAt } from '../real-estate/parcel-property-model.js?v=1';
 
 let activeView = 'home';
@@ -21,6 +21,23 @@ let marketProperties = [];
 let marketLoaded = false;
 let marketLoading = false;
 let propertyEventsBound = false;
+let propertyActionPending = false;
+const PROPERTY_MUTATION_ACTIONS = new Set(['buy', 'sell', 'sell-world', 'list-sale', 'list-rent', 'rent', 'cancel-listing', 'primary', 'store', 'withdraw', 'propose-trade', 'accept-trade', 'decline-trade', 'cancel-trade']);
+
+function updatePropertyActionPending() {
+  appCtx.PropertyUI.panel?.setAttribute('aria-busy', String(propertyActionPending));
+  for (const button of document.querySelectorAll('[data-property-action]')) {
+    if (!PROPERTY_MUTATION_ACTIONS.has(button.dataset.propertyAction)) continue;
+    if (propertyActionPending && !button.disabled) {
+      button.disabled = true;
+      button.dataset.propertyPendingDisabled = 'true';
+    } else if (!propertyActionPending && button.dataset.propertyPendingDisabled === 'true') {
+      button.disabled = false;
+      delete button.dataset.propertyPendingDisabled;
+    }
+  }
+}
+
 let nearbyVisibleLimit = 24;
 const PROPERTY_INTERACTION_RADIUS = 55;
 let parcelBoundaryGroup = null;
@@ -379,6 +396,7 @@ export function updatePropertyPanel() {
   else if (activeView === 'market') appCtx.PropertyUI.list.innerHTML = renderMarket();
   else appCtx.PropertyUI.list.innerHTML = renderHome(view);
   appCtx.PropertyUI.panel?.classList.toggle('show', appCtx.realEstateMode === true);
+  updatePropertyActionPending();
 }
 
 function propertyById(id) {
@@ -653,7 +671,7 @@ async function handlePropertyAction(button) {
     setTimeout(() => document.getElementById('appSignInBtn')?.click?.(), 180);
     return true;
   }
-  if (!getCurrentUser() && ['buy', 'sell', 'sell-world', 'list-sale', 'list-rent', 'rent', 'cancel-listing', 'primary', 'store', 'withdraw', 'propose-trade', 'accept-trade', 'decline-trade', 'cancel-trade'].includes(action)) {
+  if (!getCurrentUser() && PROPERTY_MUTATION_ACTIONS.has(action)) {
     setStatus('Sign in to save property, your Explorer wallet, storage, and shared play to your account.', 'error');
     return false;
   }
@@ -661,55 +679,73 @@ async function handlePropertyAction(button) {
   const shared = model === connectedAuthority;
   const selectedProperty = propertyId ? propertyById(propertyId) : null;
   if (shared && !requirePropertyVisit(selectedProperty, action)) return false;
-  let result = null;
-  if (action === 'buy') result = await model.buy(selectedProperty);
-  else if (action === 'sell') result = model.sell(propertyId);
-  else if (action === 'sell-world') result = await model.sellWorld(selectedProperty);
-  else if (action === 'list-sale') {
-    const property = selectedProperty;
-    result = await model.listSale(property, property.baseValue || property.price);
-  } else if (action === 'list-rent') {
-    const property = selectedProperty;
-    result = await model.listRent(property, Math.max(1, Math.ceil((property.baseValue || property.price) * .05)), 7);
-  } else if (action === 'rent') result = await model.rent(selectedProperty);
-  else if (action === 'cancel-listing') result = await model.cancelListing(selectedProperty);
-  else if (action === 'propose-trade') {
-    const offeredId = button.closest('.propertyHomeCard')?.querySelector('[data-trade-offer-for]')?.value || '';
-    result = await model.proposeTrade(propertyById(offeredId), propertyById(propertyId), 0);
-  } else if (action === 'accept-trade') result = await model.acceptTrade(offerId);
-  else if (action === 'decline-trade') result = await model.declineTrade(offerId);
-  else if (action === 'cancel-trade') result = await model.cancelTrade(offerId);
-  else if (action === 'primary') result = model.setPrimary(propertyId);
-  else if (action === 'store') result = model.storeItem(propertyId, itemId, 1);
-  else if (action === 'withdraw') result = model.withdrawItem(propertyId, itemId, 1);
-  if (!result) return false;
-  if (!(shared ? result.accepted : result.ok)) { setStatus(reasonMessage(result.reason), 'error'); return false; }
-  if (action === 'buy') await recordPropertyProgress(result, 'bought', selectedProperty);
-  else if (!shared && action === 'sell') await recordPropertyProgress(result, 'sold', selectedProperty);
-  if (action === 'primary') await appCtx.assignCompanionPrimaryHome?.(result.home?.id || propertyId);
-  if (['sell', 'sell-world'].includes(action)) {
-    const nextPrimaryHomeId = model.snapshot(appCtx.properties || []).primaryHomeId || '';
-    await appCtx.assignCompanionPrimaryHome?.(nextPrimaryHomeId);
+  if (!PROPERTY_MUTATION_ACTIONS.has(action) || propertyActionPending) return false;
+  propertyActionPending = true;
+  updatePropertyActionPending();
+  setStatus('Saving property…');
+  let committed = false;
+  try {
+    let result = null;
+    if (action === 'buy') result = await model.buy(selectedProperty);
+    else if (action === 'sell') result = model.sell(propertyId);
+    else if (action === 'sell-world') result = await model.sellWorld(selectedProperty);
+    else if (action === 'list-sale') {
+      const property = selectedProperty;
+      result = await model.listSale(property, property.baseValue || property.price);
+    } else if (action === 'list-rent') {
+      const property = selectedProperty;
+      result = await model.listRent(property, Math.max(1, Math.ceil((property.baseValue || property.price) * .05)), 7);
+    } else if (action === 'rent') result = await model.rent(selectedProperty);
+    else if (action === 'cancel-listing') result = await model.cancelListing(selectedProperty);
+    else if (action === 'propose-trade') {
+      const offeredId = button.closest('.propertyHomeCard')?.querySelector('[data-trade-offer-for]')?.value || '';
+      result = await model.proposeTrade(propertyById(offeredId), propertyById(propertyId), 0);
+    } else if (action === 'accept-trade') result = await model.acceptTrade(offerId);
+    else if (action === 'decline-trade') result = await model.declineTrade(offerId);
+    else if (action === 'cancel-trade') result = await model.cancelTrade(offerId);
+    else if (action === 'primary') result = model.setPrimary(propertyId);
+    else if (action === 'store') result = model.storeItem(propertyId, itemId, 1);
+    else if (action === 'withdraw') result = model.withdrawItem(propertyId, itemId, 1);
+    if (!result || !(shared ? result.accepted : result.ok)) { setStatus(reasonMessage(result?.reason), 'error'); return false; }
+    committed = true;
+    const label = propertyById(propertyId)?.label || 'Property';
+    let success = 'Saved.';
+    if (action === 'buy') success = `${label} is now yours.`;
+    else if (action === 'sell') success = `${result.home?.label || label} sold for ${credits(result.salePrice)}.`;
+    else if (action === 'sell-world') success = `${label} was sold back to the world.`;
+    else if (action === 'list-sale') success = `${label} is listed for sale.`;
+    else if (action === 'list-rent') success = `${label} is available for a 7-day rental.`;
+    else if (action === 'rent') success = `${label} is rented to you.`;
+    else if (action === 'cancel-listing') success = `${label} is no longer listed.`;
+    else if (action === 'propose-trade') success = 'Your property trade offer was sent.';
+    else if (action === 'accept-trade') success = 'The property trade is complete.';
+    else if (action === 'decline-trade') success = 'The property trade offer was declined.';
+    else if (action === 'cancel-trade') success = 'Your property trade offer was cancelled.';
+    else if (action === 'primary') success = `${result.home?.label || label} is now your primary home.`;
+    else if (action === 'store') success = `${result.item?.label || 'Item'} moved into home storage.`;
+    else if (action === 'withdraw') success = `${result.item?.label || 'Item'} moved back to your Backpack.`;
+    // The authoritative transaction is complete. Parcel providers and progress
+    // projections must not delay its confirmation or turn it into a failed sale.
+    updatePropertyPanel();
+    setStatus(success, 'ok');
+    if (action === 'buy') await recordPropertyProgress(result, 'bought', selectedProperty);
+    else if (!shared && action === 'sell') await recordPropertyProgress(result, 'sold', selectedProperty);
+    if (action === 'primary') await appCtx.assignCompanionPrimaryHome?.(result.home?.id || propertyId);
+    if (['sell', 'sell-world'].includes(action)) {
+      const nextPrimaryHomeId = model.snapshot(appCtx.properties || []).primaryHomeId || '';
+      await appCtx.assignCompanionPrimaryHome?.(nextPrimaryHomeId);
+    }
+    void loadPropertiesAtCurrentLocation().catch(() => {});
+    return true;
+  } catch (_) {
+    setStatus(committed
+      ? 'Property saved. Some home details could not refresh; reopen Real Estate to refresh them.'
+      : 'Could not confirm the property change. Refresh your properties before trying again.', 'error');
+    return false;
+  } finally {
+    propertyActionPending = false;
+    updatePropertyActionPending();
   }
-  const label = propertyById(propertyId)?.label || 'Property';
-  let success = 'Saved.';
-  if (action === 'buy') success = `${label} is now yours. Your furnished home and companion home base are ready.`;
-  else if (action === 'sell') success = `${result.home?.label || label} sold for ${credits(result.salePrice)}.`;
-  else if (action === 'sell-world') success = `${label} was sold back to the world.`;
-  else if (action === 'list-sale') success = `${label} is listed for sale.`;
-  else if (action === 'list-rent') success = `${label} is available for a 7-day rental.`;
-  else if (action === 'rent') success = `${label} is rented to you.`;
-  else if (action === 'cancel-listing') success = `${label} is no longer listed.`;
-  else if (action === 'propose-trade') success = 'Your property trade offer was sent.';
-  else if (action === 'accept-trade') success = 'The property trade is complete.';
-  else if (action === 'decline-trade') success = 'The property trade offer was declined.';
-  else if (action === 'cancel-trade') success = 'Your property trade offer was cancelled.';
-  else if (action === 'primary') success = `${result.home?.label || label} is now your primary home.`;
-  else if (action === 'store') success = `${result.item?.label || 'Item'} moved into home storage.`;
-  else if (action === 'withdraw') success = `${result.item?.label || 'Item'} moved back to your Backpack.`;
-  await loadPropertiesAtCurrentLocation();
-  setStatus(success, 'ok');
-  return true;
 }
 
 function bindPropertyEvents() {

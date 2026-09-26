@@ -10,10 +10,11 @@ import {
   pointInMappedLandArea,
   pointInMappedWaterArea
 } from './far-field-mapped-context.js?v=20';
+import { buildFarBuildingInstanceBatches } from './far-building-instance-batches.js?v=1';
 import { resolveFarBuildingMassing } from './far-building-massing.js?v=2';
 import { applyFarBuildingFacadeDetail } from './far-building-facade-material.js?v=4';
 import { loadFarTerrainElevationWithParentFallback } from './far-field-elevation-loader.js?v=2';
-import { applyTerrainPortalMasksForContext, terrainHeightWithPortalCuts } from './structure-terrain-portals.js?v=1';
+import { applyTerrainPortalMasksForContext, terrainHeightWithPortalCuts } from './structure-terrain-portals.js?v=2';
 import {
   cellInsideDetailedCoverage,
   cellInsideHole
@@ -234,7 +235,7 @@ function createFarFieldTerrainApi(deps = {}) {
       return detailedMode;
     }
     const worldHint = String(appCtx.worldSurfaceProfile?.terrainModeHint || '');
-    if (worldHint === 'snow' || worldHint === 'sand') return worldHint;
+    if (['snow', 'snowRock', 'rock', 'sand'].includes(worldHint)) return worldHint;
     const semantic = classifyWorldCoverSurface(worldCoverResult, Number(appCtx.LOC?.lat || 0));
     return resolveWorldCoverDetailMode(semantic, worldCoverResult);
   }
@@ -248,10 +249,9 @@ function createFarFieldTerrainApi(deps = {}) {
       Number(spec?.outer?.maxX || 0) - Number(spec?.outer?.minX || 0),
       Number(spec?.outer?.maxZ || 0) - Number(spec?.outer?.minZ || 0)
     ) / unitsPerMeter;
-    // Detailed z15 tiles use roughly one repeat per 80 m. The location LOD
-    // keeps that physical scale instead of stretching one texture across the
-    // entire 44 km background square.
-    const repeats = Math.max(12, spanMeters / 80);
+    // Match the detailed terrain's six-world-unit grass scale. Mip filtering
+    // handles the aerial LOD; changing texel scale at the seam does not.
+    const repeats = Math.max(1, spanMeters * unitsPerMeter / 6);
     const detailTextures = ensureTerrainTextureSet(mesh, repeats, 'grass');
     material.map = detailTextures?.map || null;
     material.normalMap = detailTextures?.normalMap || null;
@@ -338,7 +338,7 @@ function createFarFieldTerrainApi(deps = {}) {
           { x: center.x - widthWorld * 0.5, z: center.z + depthWorld * 0.5 }
         ];
         const massing = resolveFarBuildingMassing(building, footprint, areaWorld, unitsPerMeter, {
-          worldSeed: appCtx.rdtSeed
+          worldSeed: appCtx.worldSeed
         });
         if (!massing) continue;
         if (massing.heightSource === 'explicit_height' || massing.heightSource === 'levels') {
@@ -396,7 +396,7 @@ function createFarFieldTerrainApi(deps = {}) {
       if (!Number.isFinite(groundMeters)) continue;
       const baseY = groundMeters * unitsPerMeter * yExaggeration + 0.25;
       const massing = resolveFarBuildingMassing(building, footprint, area, unitsPerMeter, {
-        worldSeed: appCtx.rdtSeed
+        worldSeed: appCtx.worldSeed
       });
       if (!massing) continue;
       if (massing.heightSource === 'explicit_height' || massing.heightSource === 'levels') {
@@ -506,6 +506,11 @@ function createFarFieldTerrainApi(deps = {}) {
       }).catch(() => null))
     ]);
     if (requestGeneration !== generation) return;
+    // The detailed mesh queue must settle before the far mesh chooses its
+    // holes. Otherwise late near tiles cover a far surface that was compiled
+    // through their still-empty slots, leaving two terrain owners.
+    await appCtx.waitForLocationTerrainPublication?.();
+    if(requestGeneration!==generation || signal.aborted)return;
     appCtx.fixedLocationMappedSurfaceContext = mappedContext;
     let detailedMappedSurfaceTintVertices = 0;
     for (const detailedMesh of appCtx.terrainGroup?.children || []) {
@@ -560,12 +565,12 @@ function createFarFieldTerrainApi(deps = {}) {
     const builtBuildings = await buildFarBuildingGeometry(spec, loadedTiles, offsetMeters, mappedContext);
     const buildingGeometryBuildMs = performance.now() - buildingBuildStartedAt;
     const waterBuildStartedAt = performance.now();
-    const builtWater = buildFarWaterGeometry(appCtx, mappedContext);
-    const publishedWaterAreaIdentities = builtWater?.publishedAreaIdentities;
+    const builtWater = buildFarWaterGeometry(appCtx, mappedContext, spec.inner);
+    const publishedWaterAreaIdentities = builtWater?.publishedAreaIdentities || new Set();
     const fixedRegionalStructureWaterAreas = (mappedContext?.waterAreas || [])
       .filter((area) =>
         Number.isFinite(Number(area?.surfaceMeters)) &&
-        (!publishedWaterAreaIdentities || publishedWaterAreaIdentities.has(String(area?.identity || '')))
+        publishedWaterAreaIdentities.has(String(area?.identity || ''))
       )
       .map((area) => {
         const pts = (area.outer || []).map((coordinate) => {
@@ -587,7 +592,7 @@ function createFarFieldTerrainApi(deps = {}) {
       appCtx,
       mappedContext,
       spec,
-      builtWater?.publishedAreaIdentities
+      publishedWaterAreaIdentities
     );
     const waterTerrainMaskBuildMs = performance.now() - waterMaskBuildStartedAt;
     if (requestGeneration !== generation) {
@@ -623,7 +628,8 @@ function createFarFieldTerrainApi(deps = {}) {
     const mesh = new THREE.Mesh(built.geometry, material);
     mesh.name = 'FixedLocationTerrainLod';
     mesh.renderOrder = 0;
-    mesh.frustumCulled = false;
+    // The geometry planner computes bounds and refreshes them after seam edits.
+    mesh.frustumCulled = true;
     mesh.receiveShadow = true;
     mesh.castShadow = false;
     mesh.userData.isFarTerrainClipmap = true;
@@ -643,25 +649,27 @@ function createFarFieldTerrainApi(deps = {}) {
       appCtx.LOC.lat,
       appCtx.LOC.lon
     );
+    const hasPolarSurface = !acceptedRegionalGround && !elevationFallbackMode &&
+      [...loadedTiles.values()].some(tile => Number(tile?.polarSampleCount || 0) > 0);
     mesh.userData.renderProvenance = {
       version: 1,
       profile: 'fixed-location-terrain-lod',
       provider: acceptedRegionalGround
         ? centerAcceptedGround?.providerId
-        : elevationFallbackMode ? 'accepted-ground-flat-datum' : 'mapzen-terrarium',
+        : elevationFallbackMode ? 'accepted-ground-flat-datum' : hasPolarSurface ? 'rema-mapzen-surface-composite' : 'mapzen-terrarium',
       dataset: acceptedRegionalGround
         ? centerAcceptedGround?.artifactId
         : elevationFallbackMode
         ? 'Degraded fixed-location flat datum with mapped surface semantics'
-        : 'Mapzen Terrarium elevation-derived landscape',
-      verticalDatum: centerAcceptedGround?.verticalDatum || null,
+        : hasPolarSurface ? 'REMA orthometric surface with Mapzen void fallback' : 'Mapzen Terrarium elevation-derived landscape',
+      verticalDatum: centerAcceptedGround?.verticalDatum || (hasPolarSurface ? 'EGM2008 for REMA samples; mixed-source datum for fallback cells' : null),
       normalizationOffsetMeters: offsetMeters,
       layer: 'terrain',
       role: 'fixed-location-terrain-lod',
       sources: [
         ...(acceptedRegionalGround
           ? [centerAcceptedGround?.artifactId].filter(Boolean)
-          : elevationFallbackMode ? ['accepted-ground-flat-datum'] : ['mapzen-terrarium']),
+          : elevationFallbackMode ? ['accepted-ground-flat-datum'] : hasPolarSurface ? ['pgc-rema-orthometric', 'mapzen-terrarium'] : ['mapzen-terrarium']),
         'openstreetmap-shortbread',
         ...(worldCoverContext ? ['esa-worldcover-2021'] : [])
       ],
@@ -678,23 +686,23 @@ function createFarFieldTerrainApi(deps = {}) {
       applyTerrainPortalMasksForContext(appCtx, appCtx.structureTerrainPortalDescriptors);
     }
     if (builtBuildings) {
-      const buildingMaterial = applyFarBuildingFacadeDetail(new THREE.MeshStandardMaterial({
+      const buildingMaterial = builtBuildings.geometry ? applyFarBuildingFacadeDetail(new THREE.MeshStandardMaterial({
         color: 0xffffff,
         vertexColors: true,
         roughness: 0.92,
         metalness: 0,
         side: THREE.DoubleSide,
         fog: true
-      }));
-      farContextMesh = builtBuildings.geometry
+      })) : null;
+      const buildingContext = builtBuildings.geometry
         ? new THREE.Mesh(builtBuildings.geometry, buildingMaterial)
         : new THREE.Group();
-      farContextMesh.name = 'FarMappedBuildingContext';
-      farContextMesh.renderOrder = 1;
-      farContextMesh.castShadow = false;
-      farContextMesh.receiveShadow = false;
-      farContextMesh.userData.isFarMappedContext = true;
-      farContextMesh.userData.renderProvenance = {
+      buildingContext.name = 'FarMappedBuildingContext';
+      buildingContext.renderOrder = 1;
+      buildingContext.castShadow = false;
+      buildingContext.receiveShadow = false;
+      buildingContext.userData.isFarMappedContext = true;
+      buildingContext.userData.renderProvenance = {
         version: 1,
         profile: 'far-mapped-building-massing',
         provider: 'openstreetmap',
@@ -705,8 +713,6 @@ function createFarFieldTerrainApi(deps = {}) {
         fallback: false
       };
       if (builtBuildings.instances.length > 0) {
-        const instanceGeometry = new THREE.BoxGeometry(1, 1, 1);
-        instanceGeometry.translate(0, 0.5, 0);
         const instanceMaterial = applyFarBuildingFacadeDetail(new THREE.MeshStandardMaterial({
           color: 0xffffff,
           roughness: 0.94,
@@ -714,38 +720,22 @@ function createFarFieldTerrainApi(deps = {}) {
           side: THREE.FrontSide,
           fog: true
         }));
-        const instanceMesh = new THREE.InstancedMesh(
-          instanceGeometry,
-          instanceMaterial,
-          builtBuildings.instances.length
-        );
-        const matrix = new THREE.Matrix4();
-        const position = new THREE.Vector3();
-        const rotation = new THREE.Quaternion();
-        const scale = new THREE.Vector3();
-        const color = new THREE.Color();
-        const up = new THREE.Vector3(0, 1, 0);
-        for (let index = 0; index < builtBuildings.instances.length; index += 1) {
-          const building = builtBuildings.instances[index];
-          position.set(building.x, building.baseY, building.z);
-          rotation.setFromAxisAngle(up, building.rotationY);
-          scale.set(building.width, building.height, building.depth);
-          matrix.compose(position, rotation, scale);
-          instanceMesh.setMatrixAt(index, matrix);
-          color.setRGB(building.color[0], building.color[1], building.color[2]);
-          instanceMesh.setColorAt(index, color);
-          if ((index + 1) % 12000 === 0) await yieldToMainThread();
+        try {
+          const batches = await buildFarBuildingInstanceBatches(
+            THREE, builtBuildings.instances, instanceMaterial, { yieldControl: yieldToMainThread }
+          );
+          for (const batch of batches) buildingContext.add(batch);
+        } catch (error) {
+          disposeFarFieldMesh(buildingContext);
+          instanceMaterial.dispose();
+          throw error;
         }
-        instanceMesh.instanceMatrix.needsUpdate = true;
-        if (instanceMesh.instanceColor) instanceMesh.instanceColor.needsUpdate = true;
-        instanceMesh.name = 'FarMappedBuildingInstances';
-        instanceMesh.renderOrder = 1;
-        instanceMesh.castShadow = false;
-        instanceMesh.receiveShadow = false;
-        instanceMesh.frustumCulled = false;
-        instanceMesh.userData.isFarMappedBuildingInstances = true;
-        farContextMesh.add(instanceMesh);
       }
+      if (requestGeneration !== generation) {
+        disposeFarFieldMesh(buildingContext);
+        return;
+      }
+      farContextMesh = buildingContext;
       appCtx.terrainGroup.add(farContextMesh);
     }
     farWaterMesh = createFarWaterMesh(builtWater, FAR_CONTEXT_HALF_EXTENT_METERS);
@@ -769,7 +759,7 @@ function createFarFieldTerrainApi(deps = {}) {
       elevationFallbackMode,
       groundAuthority: acceptedRegionalGround
         ? 'accepted-ground-stack'
-        : elevationFallbackMode || 'mapzen-terrarium-offset',
+        : elevationFallbackMode || (hasPolarSurface ? 'rema-mapzen-surface-composite' : 'mapzen-terrarium-offset'),
       fallbackElevationMeters,
       offsetMeters,
       columns: built.columns,
@@ -836,6 +826,7 @@ function createFarFieldTerrainApi(deps = {}) {
       contextZoom: mappedContext.contextZoom,
       landAreas: Number(mappedContext.landAreas || 0),
       landAreasByTile: mappedContext.landAreasByTile,
+      landAreaSpatialByTile: mappedContext.landAreaSpatialByTile,
       surfaceFallbackByTile: mappedContext.surfaceFallbackByTile
     });
   }

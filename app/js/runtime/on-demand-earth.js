@@ -1,3 +1,4 @@
+import {emitLocalLoadTrace} from '../world/load-trace.js';
 let modulePromise = null;
 
 function captureEarthLoadIntent(appCtx) {
@@ -33,7 +34,14 @@ function installOnDemandEarth(appCtx) {
 
   async function ensureEarthRuntimeReady() {
     if (!modulePromise) {
-      modulePromise = import('./earth-runtime.js?v=198').catch((error) => {
+      const started=performance.now();
+      emitLocalLoadTrace('startup','earth-module:start');
+      modulePromise = import('./earth-runtime.js?v=201').then(module=>{
+        emitLocalLoadTrace('startup','earth-module:end',{durationMs:performance.now()-started});
+        return module;
+      }).catch((error) => {
+        emitLocalLoadTrace('startup','earth-module:failed',{durationMs:performance.now()-started});
+        console.error('[EarthRuntime] Initialization failed:',error);
         modulePromise = null;
         throw error;
       });

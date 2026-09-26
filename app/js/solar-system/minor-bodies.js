@@ -1,3 +1,5 @@
+import { getAstronomicalBody } from '../astronomy/body-catalog.js?v=3';
+import { configureColorTexture } from '../planetary/catalog.js?v=1';
 export function createMoonSystems(ctx) {
   ctx.solarSystem.moonMeshes = [];
 
@@ -6,11 +8,16 @@ export function createMoonSystems(ctx) {
     if (!moonConfig) return;
 
     moonConfig.forEach((moon, index) => {
-      const moonGeo = new THREE.SphereGeometry(moon.radiusScaled, 14, 14);
+      const moonGeo = new THREE.SphereGeometry(moon.radiusScaled, 40, 28);
+      const body = getAstronomicalBody(moon.name.toLowerCase());
+      // These two small-body atlas entries do not yet supply cylindrical maps.
+      const mapped = body && !['phobos', 'deimos'].includes(body.id) && body.presentation.globalTexturePath;
+      const map = mapped ? configureColorTexture(new THREE.TextureLoader().load(mapped), ctx.spaceFlight?.renderer) : null;
       const moonMat = new THREE.MeshPhongMaterial({
-        color: moon.color,
+        color: map ? 0xffffff : moon.color,
+        map,
         emissive: 0x101010,
-        shininess: 18
+        shininess: 2
       });
       const moonMesh = new THREE.Mesh(moonGeo, moonMat);
       moonMesh.name = moon.name;
@@ -243,34 +250,28 @@ export function createNamedAsteroids(ctx) {
   const earthPos = ctx.getEarthHelioPos(now);
 
   ctx.NAMED_ASTEROIDS.forEach((asteroid, i) => {
-    const geo = new THREE.SphereGeometry(asteroid.radiusScaled, 10, 8);
-    const posArr = geo.attributes.position.array;
-    for (let v = 0; v < posArr.length; v += 3) {
-      const deform = 0.8 + Math.sin(v * 3.7) * 0.15 + Math.cos(v * 2.3) * 0.1;
-      posArr[v] *= deform;
-      posArr[v + 1] *= deform;
-      posArr[v + 2] *= deform;
+    const body = getAstronomicalBody(asteroid.name.toLowerCase());
+    const mapped = body?.presentation?.globalTexturePath;
+    const map = mapped ? configureColorTexture(new THREE.TextureLoader().load(mapped), ctx.spaceFlight?.renderer) : null;
+    // Dwarf planets are rounded worlds, not randomly deformed asteroid shards.
+    const geo = new THREE.SphereGeometry(asteroid.radiusScaled, 40, 28);
+    if (asteroid.type !== 'Dwarf Planet') {
+      const position = geo.attributes.position;
+      for (let v = 0; v < position.count; v++) {
+        const x = position.getX(v), y = position.getY(v), z = position.getZ(v);
+        // Direction-based displacement preserves shared seam/pole vertices.
+        const scale = 1 + .035 * Math.sin(x / asteroid.radiusScaled * 4) * Math.cos(z / asteroid.radiusScaled * 3);
+        position.setXYZ(v, x * scale, y * scale * .88, z * scale);
+      }
+      geo.computeVertexNormals();
     }
-    geo.computeVertexNormals();
-
     const mat = new THREE.MeshPhongMaterial({
-      color: asteroid.color,
-      emissive: asteroid.emissive,
-      shininess: 10,
-      flatShading: true
+      map, color: map ? 0xffffff : asteroid.color,
+      emissive: 0x050505, shininess: 2
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.name = asteroid.name;
     mesh.userData = { isAsteroid: true, asteroidIndex: i };
-
-    const glowGeo = new THREE.SphereGeometry(asteroid.radiusScaled * 1.3, 12, 12);
-    const glowMat = new THREE.MeshBasicMaterial({
-      color: asteroid.glowColor,
-      transparent: true,
-      opacity: 0.1,
-      side: THREE.BackSide
-    });
-    mesh.add(new THREE.Mesh(glowGeo, glowMat));
 
     const hitRadius = Math.max(asteroid.radiusScaled * 4, 40);
     const hitGeo = new THREE.SphereGeometry(hitRadius, 6, 6);

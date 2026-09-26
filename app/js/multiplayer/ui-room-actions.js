@@ -1,4 +1,4 @@
-import { getCurrentUser } from "../../../js/auth-ui.js?v=55";
+import { getCurrentUser } from "../../../js/auth-ui.js?v=56";
 import { emitProductTelemetry } from "../platform/product-telemetry.js?v=1";
 import { createArtifact, removeArtifact } from "./artifacts.js?v=57";
 import { sendMessage } from "./chat.js?v=56";
@@ -23,8 +23,8 @@ import {
   sendInviteToFriend
 } from "./social.js?v=55";
 import { createUiRoomRoomActionsApi } from "./ui-room-room-actions.js?v=2";
-import { createUiRoomRuntime } from "./ui-room-runtime.js?v=4";
-import { createUiRoomSession } from "./ui-room-session.js?v=8";
+import { createUiRoomRuntime } from "./ui-room-runtime.js?v=5";
+import { createUiRoomSession } from "./ui-room-session.js?v=9";
 
 export function createUiRoomActions({ appCtx, refs, state, renderers, helpers, callbacks }) {
   const {

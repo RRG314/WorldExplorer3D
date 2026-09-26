@@ -1,4 +1,4 @@
-import { createFieldNavigatorMesh } from './field-navigator-mesh.js?v=2';
+import { createPlayerCharacterHost } from './player-character-host.js';
 import {
   attachCuratedExplorerCharacter,
   disposeCuratedCharacter,
@@ -20,13 +20,14 @@ function createWalkingCharacterHelpers({ THREE, scene }) {
     void attachCuratedExplorerCharacter(THREE, character, {
       assetId,
       role: 'player-character',
+      failClosed: true,
       isCurrent: () => character.parent === scene && character.userData.requestedCuratedCharacterAssetId === assetId
     });
     return gender;
   }
 
   function createCharacterMesh() {
-    const character = createFieldNavigatorMesh(THREE);
+    const character = createPlayerCharacterHost(THREE);
     scene.add(character);
     attachSelectedCharacter(character);
     return character;
@@ -44,32 +45,7 @@ function createWalkingCharacterHelpers({ THREE, scene }) {
   }
 
   function animateCharacterWalk(characterMesh, isMoving, deltaTime, isRunning = false) {
-    if (!characterMesh || !characterMesh.userData.limbs) return;
-
-    if (updateCuratedCharacterAnimation(characterMesh, isMoving, deltaTime, isRunning)) return;
-
-    const limbs = characterMesh.userData.limbs;
-    const scale = limbs.scale;
-
-    if (isMoving) {
-      characterMesh.userData.walkTime += deltaTime * 8;
-      const t = characterMesh.userData.walkTime;
-      const legSwing = Math.sin(t) * 0.5;
-      const armSwing = Math.sin(t) * 0.4;
-
-      limbs.leg1.rotation.x = legSwing;
-      limbs.leg2.rotation.x = -legSwing;
-      limbs.arm1.rotation.x = -armSwing;
-      limbs.arm2.rotation.x = armSwing;
-      limbs.body.position.y = 1.0 * scale + Math.abs(Math.sin(t * 2)) * 0.05 * scale;
-    } else {
-      const resetSpeed = deltaTime * 5;
-      limbs.leg1.rotation.x *= 1 - resetSpeed;
-      limbs.leg2.rotation.x *= 1 - resetSpeed;
-      limbs.arm1.rotation.x *= 1 - resetSpeed;
-      limbs.arm2.rotation.x *= 1 - resetSpeed;
-      limbs.body.position.y = 1.0 * scale;
-    }
+    if (characterMesh) updateCuratedCharacterAnimation(characterMesh, isMoving, deltaTime, isRunning);
   }
 
   return {

@@ -1,8 +1,13 @@
+import { advanceGameplay } from './gameplay-simulation.mjs';
+import { installGpsSensorFixture } from './gps-sensor-fixture.mjs';
+import { softwareCompositorArgs } from './software-compositor.mjs';
+import { createGpsFixStream } from './gps-fix-stream.mjs';
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 
 const root = process.cwd();
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
@@ -11,11 +16,45 @@ const externalUrl = String(process.env.WE3D_VERIFY_BASE_URL || '').replace(/\/$/
 const server = externalUrl ? null : await startStaticServer({ rootDir: servedRoot, ports: [4394, 4395, 4396] });
 const baseUrl = externalUrl || `http://127.0.0.1:${server.port}`;
 const origin = new URL(baseUrl).origin;
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024', ...softwareCompositorArgs()] });
 const browserErrors = [];
 const localFailures = [];
+let gpsFixStream = null;
 
 async function instrument(page) {
+  await configureStagingAppCheck(page, baseUrl);
+  // A seven-second invitation may expire while a remote runner completes the
+  // preceding click. Observe its actual visible layout when it is presented;
+  // the journey below still accepts the same lead through its persistent UI.
+  await page.addInitScript(() => {
+    addEventListener('DOMContentLoaded', () => {
+      const prompt = document.getElementById('discoveryContextPrompt');
+      if (!prompt) return;
+      const observer = new MutationObserver(() => {
+        if (globalThis.__WE3D_WALKING_NOTICE_EVIDENCE__ || !prompt.classList.contains('show') ||
+            getComputedStyle(prompt).display === 'none') return;
+        const lead = globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery?.encounterLead;
+        if (!lead?.available) return;
+        const rect = element => {
+          const box = element?.getBoundingClientRect();
+          return box ? {left:box.left,right:box.right,top:box.top,bottom:box.bottom,width:box.width,height:box.height} : null;
+        };
+        const box = rect(prompt), button = rect(document.getElementById('discoveryContextOpenBtn'));
+        const overlaps = other => !!box && !!other && box.left < other.right && box.right > other.left && box.top < other.bottom && box.bottom > other.top;
+        globalThis.__WE3D_WALKING_NOTICE_EVIDENCE__ = {
+          slotId: lead.slotId, mode: lead.mode,
+          covered: document.getElementById('loading')?.classList.contains('show') === true,
+          promptText: document.getElementById('discoveryContextText')?.textContent || '',
+          promptButton: document.getElementById('discoveryContextOpenBtn')?.textContent || '',
+          promptMode: prompt.dataset.mode,
+          promptClearsMobileControls: ['mobileMovePad','mobileLookPad'].every(id => !overlaps(rect(document.getElementById(id)))),
+          promptButtonUsable: !!button && button.width >= 44 && button.height >= 44 && button.left >= 0 && button.right <= innerWidth && button.left >= box.left && button.right <= box.right
+        };
+        observer.disconnect();
+      });
+      observer.observe(prompt, {attributes:true, childList:true, subtree:true});
+    });
+  });
   page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   page.on('response', (response) => {
     if (response.url().startsWith(baseUrl) && response.status() >= 400) localFailures.push({ url: response.url(), status: response.status() });
@@ -24,9 +63,10 @@ async function instrument(page) {
 
 async function waitForWorld(page) {
   await page.waitForFunction(() => {
+    if (document.getElementById('loading')?.classList.contains('show')) return false;
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.();
     return state?.gameStarted === true && state.worldLoading === false && state.worldDiscovery?.active === true;
-  }, null, { timeout: 240_000 });
+  }, null, { timeout: 240_000, polling: 500 });
 }
 
 async function inspectDirectPromptPlacement(page) {
@@ -105,11 +145,19 @@ async function moveAwayFromDirectInteraction(page, cdp) {
 }
 
 async function waitForLead(page, expectedMode, movePastDirectInteraction) {
-  await page.waitForFunction((mode) => {
-    const state = globalThis.getWorldExplorerRuntimeDiagnostics?.();
-    return state?.worldDiscovery?.encounterLead?.available === true &&
-      state.worldDiscovery.encounterLead.mode === mode;
-  }, expectedMode, { timeout: 30_000 });
+  // The invitation cadence is simulation time. A slow software renderer can
+  // consume two wall-clock minutes before its ten-second cadence has elapsed.
+  const cadenceReceipts = [];
+  let lead;
+  for (let simulatedMs = 0; simulatedMs <= 12000; simulatedMs += 1000) {
+    lead = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery?.encounterLead);
+    if (lead?.available === true && lead.mode === expectedMode) break;
+    assert.ok(simulatedMs < 12000, `No ${expectedMode} encounter lead after twelve simulated seconds: ${JSON.stringify(lead)}`);
+    cadenceReceipts.push(await advanceGameplay(page, 1000));
+  }
+  await writeFile(`output/release-evidence/current/walking-${expectedMode}-cadence.json`, JSON.stringify({
+    evidenceScope: 'functional simulation cadence; not physical responsiveness', cadenceReceipts, lead
+  }, null, 2));
   const directInteraction = await page.evaluate(() => {
     const direct = document.getElementById('urbanVehiclePrompt');
     const lead = document.getElementById('discoveryContextPrompt');
@@ -123,8 +171,8 @@ async function waitForLead(page, expectedMode, movePastDirectInteraction) {
   }
   await page.waitForFunction(() => {
     const prompt = document.getElementById('discoveryContextPrompt');
-    return prompt?.classList.contains('show') && getComputedStyle(prompt).display !== 'none';
-  }, null, { timeout: 20_000 });
+    return globalThis.__WE3D_WALKING_NOTICE_EVIDENCE__ || (prompt?.classList.contains('show') && getComputedStyle(prompt).display !== 'none');
+  }, null, { timeout: process.env.CI ? 120_000 : 20_000, polling: 250 });
   const tutorialClose = page.locator('#tutorialHintCard .tutorial-icon-btn');
   if (await tutorialClose.isVisible()) await tutorialClose.click();
   const snapshotHandle = await page.waitForFunction((mode) => {
@@ -138,6 +186,14 @@ async function waitForLead(page, expectedMode, movePastDirectInteraction) {
     const moveBox = document.getElementById('mobileMovePad')?.getBoundingClientRect();
     const lookBox = document.getElementById('mobileLookPad')?.getBoundingClientRect();
     const promptText = document.getElementById('discoveryContextText')?.textContent || '';
+    const observed = globalThis.__WE3D_WALKING_NOTICE_EVIDENCE__;
+    if (observed?.mode === mode && observed.slotId === state?.worldDiscovery?.encounterLead?.slotId) {
+      if (observed.covered) throw new Error('Walking invitation was consumed behind the loading cover.');
+      if (!observed.promptText.includes(state.worldDiscovery.encounterLead.leadLabel)) return null;
+      return {...observed, lead:state.worldDiscovery.encounterLead,
+        regionalEcology:state.worldDiscovery.regionalEcology, creatureQuality:state.worldDiscovery.creatureQuality,
+        wildlife:state.worldDiscovery.wildlife, noticeEvidence:'observed-visible-layout-before-expiry'};
+    }
     if (!state?.worldDiscovery?.encounterLead?.available ||
       state.worldDiscovery.encounterLead.mode !== mode ||
       !prompt?.classList.contains('show') || getComputedStyle(prompt).display === 'none' ||
@@ -174,20 +230,38 @@ async function waitForLead(page, expectedMode, movePastDirectInteraction) {
       wildlife: state.worldDiscovery.wildlife,
       visiblePromptLayers
     };
-  }, expectedMode, { timeout: 20_000 });
+  }, expectedMode, { timeout: process.env.CI ? 120_000 : 20_000, polling: 250 });
   const result = await snapshotHandle.jsonValue();
   await snapshotHandle.dispose();
   return { ...result, directInteraction };
 }
 
 async function acceptLead(page, lead) {
-  await page.locator('#discoveryContextOpenBtn').click();
+  // A short notice can expire or yield to a closer world action before a
+  // person taps it. Verify the persistent normal-input route after expiry.
+  await page.waitForTimeout(8000);
+  assert.equal(await page.locator('#discoveryContextPrompt.show').isVisible(), false,
+    'The transient field lead should expire while the underlying lead remains available.');
+  await page.locator('#exploreBtn').click();
+  await page.locator('#fWorldDiscovery').click();
+  await page.locator('#discoveryPanel.show').waitFor({ state: 'visible' });
+  await page.locator('[data-discovery-tab="today"]').click();
+  const persistentLead = page.locator('#discoveryEncounterLeadBtn');
+  await persistentLead.waitFor({ state: 'visible', timeout: 10000 });
+  await persistentLead.scrollIntoViewIfNeeded();
+  const leadBox = await persistentLead.boundingBox();
+  assert.ok(leadBox && leadBox.height >= 44 && leadBox.x >= 0 && leadBox.x + leadBox.width <= 390,
+    'Persistent Track Lead must provide a usable phone-sized target without horizontal overflow.');
+  const currentLead = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery?.encounterLead);
+  assert.equal(currentLead?.slotId, lead.slotId, 'Today must retain the same offered lead.');
+  await page.screenshot({ path: `output/release-evidence/current/baltimore-ecology-${lead.mode}-persistent-lead-mobile.png` });
+  await persistentLead.click();
   try {
     await page.waitForFunction((slotId) => {
       const discovery = globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery;
       return discovery?.interaction?.active === true && discovery.interaction.targetId === slotId &&
         discovery.encounterLead?.available === false;
-    }, lead.slotId, { timeout: 20_000 });
+    }, lead.slotId, { timeout: process.env.CI ? 120_000 : 20_000, polling: 250 });
   } catch (error) {
     const diagnostics = await page.evaluate(() => {
       const discovery = globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery;
@@ -195,6 +269,8 @@ async function acceptLead(page, lead) {
     });
     throw new Error(`Encounter lead did not start: ${JSON.stringify({ requested: lead, diagnostics })}`, { cause: error });
   }
+  assert.equal(await page.locator('#discoveryEncounterLeadBtn').evaluate(button => button.hidden), true,
+    'The persistent invitation must hide after its lead is accepted.');
   return page.evaluate(() => {
     const discovery = globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery;
     const quick = document.getElementById('discoveryQuickToolBtn');
@@ -208,6 +284,7 @@ async function acceptLead(page, lead) {
       activeActivityId: discovery.activeActivityId,
       interaction: discovery.interaction,
       quickVisible: !!quick && getComputedStyle(quick).display !== 'none',
+      duplicateJourneyHidden: document.getElementById('currentJourneyCard')?.hidden === true,
       quickClearsMobileControls: controls.every((box) => !overlaps(quickBox, box)),
       journalOpen: document.getElementById('discoveryPanel')?.classList.contains('show') || false
     };
@@ -217,7 +294,7 @@ async function acceptLead(page, lead) {
 try {
   await mkdir('output/release-evidence/current', { recursive: true });
 
-  const freeContext = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const freeContext = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, userAgent: devices['iPhone 13'].userAgent });
   const freePage = await freeContext.newPage();
   const freeCdp = await freeContext.newCDPSession(freePage);
   await instrument(freePage);
@@ -230,25 +307,28 @@ try {
   await freePage.locator('#travelBtn').click();
   await freePage.waitForSelector('#travelMenu.open', { timeout: 10_000 });
   await freePage.locator('#fWalk').click();
-  await freePage.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.mode === 'walk', null, { timeout: 20_000 });
+  await freePage.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.mode === 'walk', null, { timeout: process.env.CI ? 120_000 : 20_000, polling: 250 });
   const freeLead = await waitForLead(freePage, 'free-roam', async () => {
     assert.equal(await moveAwayFromDirectInteraction(freePage, freeCdp), true,
       'Normal mobile walking must clear the nearby direct interaction before the field lead appears.');
   });
-  await freePage.screenshot({ path: 'output/release-evidence/current/baltimore-ecology-free-roam-lead-mobile.png', fullPage: true });
+  await freePage.screenshot({ path: 'output/release-evidence/current/baltimore-ecology-free-roam-lead-mobile.png', fullPage: false });
   const freeAccepted = await acceptLead(freePage, freeLead.lead);
-  await freePage.screenshot({ path: 'output/release-evidence/current/baltimore-ecology-free-roam-tracking-mobile.png', fullPage: true });
+  await freePage.screenshot({ path: 'output/release-evidence/current/baltimore-ecology-free-roam-tracking-mobile.png', fullPage: false });
   await freeContext.close();
 
   const gpsContext = await browser.newContext({
-    viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true,
+    viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, userAgent: devices['iPhone 13'].userAgent,
     geolocation: { latitude: 39.2904, longitude: -76.6122, accuracy: 6 }, permissions: ['geolocation']
   });
   await gpsContext.grantPermissions(['geolocation'], { origin });
   const gpsPage = await gpsContext.newPage();
+  const gpsSensor = await installGpsSensorFixture(gpsPage, { latitude: 39.2904, longitude: -76.6122, accuracy: 6, speed: 0, heading: 0 });
+  gpsFixStream = createGpsFixStream(gpsSensor);
   await instrument(gpsPage);
   await gpsPage.goto(`${baseUrl}/app/`, { waitUntil: 'load', timeout: 120_000 });
   await gpsPage.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
+  await gpsFixStream.send('Emulation.setGeolocationOverride', { latitude: 39.2904, longitude: -76.6122, accuracy: 6, speed: 0, heading: 0 });
   await gpsPage.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
   await gpsPage.locator('#globeSelectorLiveGpsBtn').click();
   await gpsPage.waitForSelector('#liveGpsPermissionPanel.show', { timeout: 30_000 });
@@ -264,14 +344,17 @@ try {
   await gpsPage.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().liveGps?.active === true, null, { timeout: 60_000 });
   const gpsDirectPromptPlacement = await inspectDirectPromptPlacement(gpsPage);
   const gpsLead = await waitForLead(gpsPage, 'live-gps', async () => {
-    await gpsContext.setGeolocation({ latitude: 39.2907, longitude: -76.6122, accuracy: 6 });
+    await gpsFixStream.send('Emulation.setGeolocationOverride', { latitude: 39.2907, longitude: -76.6122, accuracy: 6, speed: 0, heading: 0 });
   });
-  await gpsPage.screenshot({ path: 'output/release-evidence/current/baltimore-ecology-live-gps-lead-mobile.png', fullPage: true });
+  await gpsPage.screenshot({ path: 'output/release-evidence/current/baltimore-ecology-live-gps-lead-mobile.png', fullPage: false });
   const gpsAccepted = await acceptLead(gpsPage, gpsLead.lead);
-  await gpsPage.screenshot({ path: 'output/release-evidence/current/baltimore-ecology-live-gps-tracking-mobile.png', fullPage: true });
+  await gpsPage.screenshot({ path: 'output/release-evidence/current/baltimore-ecology-live-gps-tracking-mobile.png', fullPage: false });
+  await gpsFixStream.stop();
+  gpsFixStream = null;
   await gpsContext.close();
 
   const checks = {
+    oneFieldPromptOwner: freeAccepted.duplicateJourneyHidden && gpsAccepted.duplicateJourneyHidden,
     freeRoamLeadVisible: freeLead.lead.available && freeLead.promptMode === 'free-roam' && freeLead.promptText.includes(freeLead.lead.leadLabel) && /field lead/i.test(freeLead.promptText),
     freeRoamLeadClearsControls: freeLead.promptClearsMobileControls === true,
     freeRoamLeadButtonUsable: freeLead.promptButtonUsable === true,
@@ -318,7 +401,7 @@ try {
     noBrowserErrors: browserErrors.length === 0,
     noFailedLocalResources: localFailures.length === 0
   };
-  const report = { ok: Object.values(checks).every(Boolean), contract: 'walking-encounters-v2', checks, freeDirectPromptPlacement, freeLead, freeAccepted, gpsDirectPromptPlacement, gpsLead, gpsAccepted, browserErrors, localFailures };
+  const report = { ok: Object.values(checks).every(Boolean), contract: 'walking-encounters-v2', gpsInput: 'simulated browser sensor with fresh fixes; not native device GPS acceptance', cadence: 'validated fixed-step simulation; not physical responsiveness', checks, freeDirectPromptPlacement, freeLead, freeAccepted, gpsDirectPromptPlacement, gpsLead, gpsAccepted, browserErrors, localFailures };
   const output = process.env.WE3D_VERIFY_VERBOSE === '1' ? report : {
     ok: report.ok,
     contract: report.contract,
@@ -344,7 +427,24 @@ try {
   };
   console.log(JSON.stringify(output, null, 2));
   assert.equal(report.ok, true, 'Walking encounter journey failed.');
+} catch (error) {
+  const pages = browser.contexts().flatMap(context => context.pages());
+  const states = [];
+  for (const page of pages) {
+    states.push(await page.evaluate(() => ({
+      ...globalThis.getWorldExplorerRuntimeDiagnostics?.(),
+      noticeEvidence:globalThis.__WE3D_WALKING_NOTICE_EVIDENCE__ || null,
+      promptState:['loading','discoveryContextPrompt','urbanVehiclePrompt','interiorPrompt'].map(id => {
+        const element=document.getElementById(id);
+        return {id,classes:element?.className,hidden:element?.hidden,display:element?getComputedStyle(element).display:null};
+      })
+    })).catch(() => null));
+  }
+  await writeFile('output/release-evidence/current/walking-field-failure.json', JSON.stringify({
+    error: String(error?.stack || error), states, browserErrors, localFailures
+  }, null, 2));
+  throw error;
 } finally {
-  await browser.close();
-  await server?.close();
+  try { await gpsFixStream?.stop(); }
+  finally { await browser.close(); await server?.close(); }
 }

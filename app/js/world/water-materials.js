@@ -161,6 +161,7 @@ float weSunGlitter = pow(weSunAlignment, mix(170.0, 54.0, weWaterOvercast)) * we
 float weWaveGlint = clamp(0.36 + weWaveHeight * 0.16 + weWaveCrestValue * 0.12 + weFresnel * 0.42, 0.0, 1.0);
 float weFoamBands = smoothstep(0.42, 0.94, weWaveCrestValue) * clamp(weWaveFoamStrength, 0.0, 1.8);
 float weWhitecapBands = smoothstep(0.72, 1.28, weWaveCrestValue) * clamp(weWaveFoamStrength * 0.62, 0.0, 1.4);
+// WE_WATER_FOAM_EXTENSION
 float weSurfaceGrain = 0.5 + 0.5 * sin(vWeWaveWorldXZ.x * 0.085 + weWaveTime * 1.24) * sin(vWeWaveWorldXZ.y * 0.073 - weWaveTime * 1.08);
 float weSkyResponse = clamp((0.06 + weFresnel * 0.34) * (1.0 - weWaterOvercast * 0.18), 0.0, 0.4);
 diffuseColor.rgb *= mix(0.58, 0.9, smoothstep(0.02, 0.82, weFresnel));
@@ -169,6 +170,7 @@ diffuseColor.rgb *= mix(vec3(0.92), vec3(1.025), weSurfaceGrain * clamp(weWaveVi
 diffuseColor.rgb += weWaterSunColor * weSunGlitter * 0.28;
 diffuseColor.rgb += vec3(0.045, 0.062, 0.078) * (weFoamBands * 0.4 + weWhitecapBands * 0.46);
 diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.88, 0.93, 0.98), clamp(weWhitecapBands * 0.18, 0.0, 0.22));
+// WE_WATER_COLOR_EXTENSION
 diffuseColor.rgb *= mix(1.0, 0.58, clamp(weWaterNight, 0.0, 1.0));
 if (weWaveEdgeFade > 0.0) {
   float weEdge = min(min(vWePatchUv.x, 1.0 - vWePatchUv.x), min(vWePatchUv.y, 1.0 - vWePatchUv.y));
@@ -179,7 +181,8 @@ if (weWaveEdgeFade > 0.0) {
       .replace(
         '#include <emissivemap_fragment>',
         `#include <emissivemap_fragment>
-totalEmissiveRadiance += vec3(0.018, 0.026, 0.034) * (weFoamBands * 0.22 + weWhitecapBands * 0.16) * weWaterDaylight;`
+totalEmissiveRadiance += vec3(0.018, 0.026, 0.034) * (weFoamBands * 0.22 + weWhitecapBands * 0.16) * weWaterDaylight;
+// WE_WATER_EMISSIVE_EXTENSION`
       );
     if (shaderHook) shaderHook(shader, { material, waterKind });
   };

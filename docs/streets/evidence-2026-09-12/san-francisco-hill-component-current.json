@@ -1,0 +1,21 @@
+{
+  "name": "san-francisco",
+  "pass": true,
+  "failures": [],
+  "tiles": 16,
+  "roads": 29,
+  "buildings": 264,
+  "triangles": 8088,
+  "area": 12158.294276000051,
+  "refinements": 2946,
+  "frontages": 7241,
+  "minClearance": 0.07198310810809971,
+  "maxClearance": 0.1629619831081044,
+  "elevationRangeMeters": 30.35295,
+  "durationMs": 2310,
+  "rendered": {
+    "geometries": 242,
+    "textures": 0,
+    "drawCalls": 242
+  }
+}

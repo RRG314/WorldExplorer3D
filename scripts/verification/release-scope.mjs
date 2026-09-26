@@ -1,3 +1,4 @@
+import { promotedEvidenceIdentity } from './production-promotion.mjs';
 import assert from 'node:assert/strict';
 import { access, readFile } from 'node:fs/promises';
 import {
@@ -13,6 +14,7 @@ const [program, packageJson] = await Promise.all([
 ]);
 
 const requireReady = process.argv.includes('--require-ready');
+const promotedIdentity = process.argv.includes('--promoted-production') ? promotedEvidenceIdentity() : undefined;
 const failures = [];
 const expectedIds = Array.from({ length: 12 }, (_, index) => `CP${index}`);
 const checkpointIds = Object.keys(program.checkpoints || {});
@@ -52,7 +54,7 @@ const current = currentBaseline(root);
 const evidenceByScope = Object.fromEntries(scopes.map((scope) => [scope, readExecutionEvidence(root, scope)]));
 const evidenceFailures = Object.fromEntries(scopes.map((scope) => [
   scope,
-  compareEvidenceToBaseline(evidenceByScope[scope], current, scope)
+  compareEvidenceToBaseline(evidenceByScope[scope], current, scope, promotedIdentity)
 ]));
 const passedGateIds = new Set(scopes.flatMap((scope) =>
   (evidenceByScope[scope]?.results || []).filter((result) => result.ok).map((result) => result.id)

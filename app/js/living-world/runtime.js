@@ -7,7 +7,7 @@ import {
 } from './model.js?v=1';
 import { compileEntranceCatalog } from './entrance-catalog.js?v=6';
 import { compilePedestrianGraph, compileTrafficGraph, resolveDrivingSide } from './navigation-graphs.js?v=12';
-import { createLivingWorldPopulation } from './population.js?v=22';
+import { createLivingWorldPopulation } from './population.js?v=24';
 
 function livingWorldTier(appCtx) {
   const requested = String(appCtx?.getDynamicBudgetState?.().tier || 'balanced').toLowerCase();
@@ -156,7 +156,12 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
   const pedestrianCompilation = compilePedestrianGraph({
     traversal: traversal.walk,
     entrances: catalog.entrances,
-    sampleSurface: appCtx.sampleFeatureSurfaceY,
+    metersPerWorldUnit: appCtx.METERS_PER_WORLD_UNIT || 1.11,
+    isPedestrianSurface: (x,z) => {
+      const p=appCtx.streetPavement, b=p?.coverageBounds;
+      return !b || x<b.minX || x>b.maxX || z<b.minZ || z>b.maxZ || Number.isFinite(p.sampleAt(x,z));
+    },
+    sampleSurface: (feature, x, z, projection) => appCtx.streetPavement?.sampleAt(x, z) ?? appCtx.sampleFeatureSurfaceY(feature, x, z, projection),
     isBlockedPoint: (x, z) => pedestrianPointBlocked(appCtx, x, z),
     activityAnchors,
     tier
@@ -171,6 +176,7 @@ export function startLivingWorldRuntime(appCtx, options = {}) {
   });
   const sampleVehicleSurface = createTrafficVehicleSurfaceSampler(appCtx, trafficCompilation);
   const population = createLivingWorldPopulation({
+    latitude: appCtx.LOC?.lat,
     pedestrianGraph: pedestrianCompilation.publication,
     trafficGraph: trafficCompilation.publication,
     random: createWorldRandom(worldIdentity, 0x4c495645),

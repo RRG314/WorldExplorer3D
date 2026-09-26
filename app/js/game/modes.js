@@ -11,7 +11,7 @@ import {
   stopLiveGpsMode,
   updateDeFlockMode,
   updateLiveGpsMode
-} from "../runtime/on-demand-location-games.js?v=2";
+} from "../runtime/on-demand-location-games.js?v=3";
 
 const gameplayRegistry = createGameplayPluginRegistry({
   onError(error, id, phase) {

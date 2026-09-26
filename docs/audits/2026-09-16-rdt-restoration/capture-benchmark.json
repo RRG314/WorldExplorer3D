@@ -1,0 +1,45 @@
+{
+  "scope": "synthetic CPU component benchmark, not whole-app evidence",
+  "buildings": 23000,
+  "samples": 30,
+  "warmups": 5,
+  "includesMutationValidation": true,
+  "cases": [
+    {
+      "kind": "dense",
+      "buildAndFirstQueryMs": 16.768791,
+      "baselineMedianMs": 1.3572089999999974,
+      "rdtMedianMs": 0.21479200000000276,
+      "last": {
+        "algorithm": "rdt-spatial",
+        "rebuilt": false,
+        "nodes": 4161,
+        "candidates": 133
+      }
+    },
+    {
+      "kind": "clustered",
+      "buildAndFirstQueryMs": 13.898624999999981,
+      "baselineMedianMs": 1.228749999999991,
+      "rdtMedianMs": 0.6551249999999982,
+      "last": {
+        "algorithm": "rdt-spatial",
+        "rebuilt": false,
+        "nodes": 361,
+        "candidates": 2775
+      }
+    },
+    {
+      "kind": "coincident",
+      "buildAndFirstQueryMs": 11.268541999999997,
+      "baselineMedianMs": 0.9463749999999891,
+      "rdtMedianMs": 1.0794579999999883,
+      "last": {
+        "algorithm": "rdt-spatial",
+        "rebuilt": false,
+        "nodes": 1,
+        "candidates": 23000
+      }
+    }
+  ]
+}

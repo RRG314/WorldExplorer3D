@@ -1,4 +1,8 @@
+const { admitRoomPlayer } = require('./room-admission');
 const functions = require('firebase-functions/v1');
+// Browser HTTP routes use Firebase ID tokens inside verifyAuth/requireModerator.
+// Declare public transport invocation explicitly: updates otherwise preserve
+// stale IAM denials before those handlers run. Background workers stay separate.
 const admin = require('firebase-admin');
 const crypto = require('node:crypto');
 const { FieldValue, Timestamp: AdminTimestamp } = require('firebase-admin/firestore');
@@ -807,12 +811,6 @@ function parsePositiveInt(value, fallback = 20, min = 1, max = 50) {
   return Math.max(min, Math.min(max, Math.floor(n)));
 }
 
-function isFailedPreconditionError(err) {
-  const code = err && err.code;
-  if (Number(code) === 9) return true;
-  return String(code || '').toLowerCase() === 'failed-precondition';
-}
-
 async function deleteDocsByQuery(query, batchSize = 200, label = '') {
   const limit = Math.max(10, Math.min(500, Number(batchSize) || 200));
   for (;;) {
@@ -820,11 +818,9 @@ async function deleteDocsByQuery(query, batchSize = 200, label = '') {
     try {
       snap = await query.limit(limit).get();
     } catch (err) {
-      if (isFailedPreconditionError(err)) {
-        const tag = label ? ` (${label})` : '';
-        console.warn(`[deleteAccount] Skipping query cleanup${tag}: Firestore failed precondition.`, err && err.message ? err.message : err);
-        return;
-      }
+      // A missing index or failed query is unfinished cleanup, never success.
+      // Preserve the login so the owner can retry after the cause is repaired.
+      console.error('[deleteAccount] Unfinished cleanup:', label, err.code || 'unknown');
       throw err;
     }
     if (snap.empty) return;
@@ -842,11 +838,9 @@ async function updateDocsByQuery(query, updateForDoc, batchSize = 200, label = '
     try {
       snap = await query.limit(limit).get();
     } catch (err) {
-      if (isFailedPreconditionError(err)) {
-        const tag = label ? ` (${label})` : '';
-        console.warn(`[deleteAccount] Skipping query update${tag}: Firestore failed precondition.`, err && err.message ? err.message : err);
-        return;
-      }
+      // A missing index or failed query is unfinished cleanup, never success.
+      // Preserve the login so the owner can retry after the cause is repaired.
+      console.error('[deleteAccount] Unfinished cleanup:', label, err.code || 'unknown');
       throw err;
     }
     if (snap.empty) return;
@@ -895,6 +889,7 @@ async function deleteRoomTree(roomRef) {
   // explicit path is still used by emulators and older runtimes.
   const subcollections = [
     'players',
+    'admission',
     'chat',
     'chatState',
     'artifacts',
@@ -952,6 +947,7 @@ async function deleteDiscoveryTradesForUser(uid) {
 
 async function deleteUserData(uid) {
   if (!uid) return;
+  await require('./capture-account-cleanup').cleanupCaptureAccount({db,bucket:admin.storage().bucket(),uid,FieldValue});
 
   const userRef = db.collection('users').doc(uid);
   const creatorProfileRef = db.collection(CREATOR_PROFILES_COLLECTION).doc(uid);
@@ -977,9 +973,9 @@ async function deleteUserData(uid) {
   await deleteDocsByQuery(db.collection('fishingLeaderboard').where('uid', '==', uid), 200, 'fishingLeaderboard(uid)');
   await deleteDocsByQuery(db.collection('deflockLeaderboard').where('uid', '==', uid), 200, 'deflockLeaderboard(uid)');
   await deleteDocsByQuery(db.collection('activityFeed').where('uid', '==', uid), 200, 'activityFeed(uid)');
-  await db.collection('explorerLeaderboard').doc(uid).delete().catch(() => {});
+  await db.collection('explorerLeaderboard').doc(uid).delete();
   await releaseWorldPropertiesForUser(uid);
-  await db.collection('propertyLeaderboard').doc(uid).delete().catch(() => {});
+  await db.collection('propertyLeaderboard').doc(uid).delete();
   await deleteDiscoveryTradesForUser(uid);
 
   if (db && typeof db.recursiveDelete === 'function') {
@@ -995,15 +991,15 @@ async function deleteUserData(uid) {
     await deleteDocsByQuery(userRef.collection('commerceStock'), 200, 'users/{uid}/commerceStock');
     await deleteDocsByQuery(userRef.collection('gameplay'), 200, 'users/{uid}/gameplay');
     await deleteDocsByQuery(userRef.collection('propertyEntitlements'), 200, 'users/{uid}/propertyEntitlements');
-    await userRef.delete().catch(() => {});
+    await userRef.delete();
   }
-  await creatorProfileRef.delete().catch(() => {});
+  await creatorProfileRef.delete();
   if (db && typeof db.recursiveDelete === 'function') {
-    await db.recursiveDelete(explorerProfileRef).catch(() => {});
+    await db.recursiveDelete(explorerProfileRef);
   } else {
     await deleteDocsByQuery(explorerProfileRef.collection('items'), 200, 'explorerProfiles/{uid}/items');
     await deleteDocsByQuery(explorerProfileRef.collection('claims'), 200, 'explorerProfiles/{uid}/claims');
-    await explorerProfileRef.delete().catch(() => {});
+    await explorerProfileRef.delete();
   }
 }
 
@@ -1045,60 +1041,58 @@ async function assertStripeCustomerOwnership(stripe, customerId, uid, expectedEm
 
 async function ensureUserDoc(uid, email, displayName) {
   const ref = db.collection('users').doc(uid);
-  const snap = await ref.get();
   const normalizedDisplayName = normalizeDisplayName(displayName);
+  const result = await db.runTransaction(async transaction => {
+    const snap = await transaction.get(ref);
 
-  if (snap.exists) {
-    const existing = snap.data() || {};
-    const plan = normalizePlan(existing.plan);
-    const roomCreateCount = normalizeRoomCreateCount(existing.roomCreateCount);
-    const existingLimit = Number.isFinite(Number(existing.roomCreateLimit))
-      ? Math.max(0, Math.min(10000, Math.floor(Number(existing.roomCreateLimit))))
-      : null;
-    const isAdminOverride = String(existing.subscriptionStatus || '').toLowerCase() === 'admin';
-    const roomCreateLimit = isAdminOverride
-      ? Math.max(existingLimit || 0, ADMIN_TEST_ROOM_CREATE_LIMIT)
-      : roomCreateLimitForPlan(plan);
-    await ref.set(
-      {
-        email: email || existing.email || '',
-        displayName: normalizedDisplayName || existing.displayName || 'Explorer',
+    if (snap.exists) {
+      const existing = snap.data() || {};
+      const plan = normalizePlan(existing.plan);
+      const roomCreateCount = normalizeRoomCreateCount(existing.roomCreateCount);
+      const existingLimit = Number.isFinite(Number(existing.roomCreateLimit))
+        ? Math.max(0, Math.min(10000, Math.floor(Number(existing.roomCreateLimit))))
+        : null;
+      const isAdminOverride = String(existing.subscriptionStatus || '').toLowerCase() === 'admin';
+      const roomCreateLimit = isAdminOverride
+        ? Math.max(existingLimit || 0, ADMIN_TEST_ROOM_CREATE_LIMIT)
+        : roomCreateLimitForPlan(plan);
+      transaction.set(ref,
+        {
+          email: email || existing.email || '',
+          displayName: normalizedDisplayName || existing.displayName || 'Explorer',
+          roomCreateCount,
+          roomCreateLimit,
+          updatedAt: FieldValue.serverTimestamp()
+        },
+        { merge: true }
+      );
+      return {
+        ...existing,
         roomCreateCount,
-        roomCreateLimit,
-        updatedAt: FieldValue.serverTimestamp()
-      },
-      { merge: true }
-    );
-    await ensureCreatorProfileDoc(db, uid, {
-      username: normalizedDisplayName || existing.displayName || 'Explorer'
-    });
-    return {
-      ...existing,
-      roomCreateCount,
-      roomCreateLimit
+        roomCreateLimit
+      };
+    }
+
+    const plan = 'free';
+    const created = {
+      uid,
+      email: email || '',
+      displayName: normalizedDisplayName || 'Explorer',
+      plan,
+      trialEndsAt: null,
+      subscriptionStatus: 'none',
+      entitlements: planEntitlements(plan),
+      roomCreateCount: 0,
+      roomCreateLimit: roomCreateLimitForPlan(plan),
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp()
     };
-  }
 
-  const plan = 'free';
-  const created = {
-    uid,
-    email: email || '',
-    displayName: normalizedDisplayName || 'Explorer',
-    plan,
-    trialEndsAt: null,
-    subscriptionStatus: 'none',
-    entitlements: planEntitlements(plan),
-    roomCreateCount: 0,
-    roomCreateLimit: roomCreateLimitForPlan(plan),
-    createdAt: FieldValue.serverTimestamp(),
-    updatedAt: FieldValue.serverTimestamp()
-  };
-
-  await ref.set(created, { merge: true });
-  await ensureCreatorProfileDoc(db, uid, {
-    username: normalizedDisplayName || 'Explorer'
+    transaction.set(ref, created, { merge: true });
+    return created;
   });
-  return created;
+  await ensureCreatorProfileDoc(db, uid, { username: normalizedDisplayName || result.displayName || 'Explorer' });
+  return result;
 }
 
 async function resolveUidFromCustomer(customerId) {
@@ -1108,54 +1102,64 @@ async function resolveUidFromCustomer(customerId) {
   return snap.docs[0].id;
 }
 
-async function resolveFallbackPlan(uid) {
-  const snap = await db.collection('users').doc(uid).get();
-  const data = snap.exists ? snap.data() || {} : {};
-  const trialEndsAt = data.trialEndsAt && typeof data.trialEndsAt.toMillis === 'function' ? data.trialEndsAt.toMillis() : null;
-
-  if (trialEndsAt && trialEndsAt > Date.now()) {
-    return 'trial';
-  }
-
-  return 'free';
-}
-
-async function upsertPlanFromSubscription({ uid, customerId, subscriptionId, status, priceId }) {
+async function upsertPlanFromSubscription({ uid, customerId, subscriptionId, status, priceId, eventCreated = null, eventId = null }) {
   if (!uid) return;
 
   const cfg = stripeConfig();
-  const paidPlan = planFromPriceId(priceId, cfg);
-  const active = hasActiveSubscription(status);
-  const fallbackPlan = active ? 'free' : await resolveFallbackPlan(uid);
-  const plan = active ? normalizePlan(paidPlan) : fallbackPlan;
   const userRef = db.collection('users').doc(uid);
-  const userSnap = await userRef.get();
-  const userData = userSnap.exists ? userSnap.data() || {} : {};
-  const roomCreateCount = normalizeRoomCreateCount(userData.roomCreateCount);
-  const isAdminOverride = String(userData.subscriptionStatus || '').toLowerCase() === 'admin';
-  const existingLimit = Number.isFinite(Number(userData.roomCreateLimit))
-    ? Math.max(0, Math.min(10000, Math.floor(Number(userData.roomCreateLimit))))
-    : 0;
-  const roomCreateLimit = isAdminOverride
-    ? Math.max(existingLimit, ADMIN_TEST_ROOM_CREATE_LIMIT)
-    : roomCreateLimitForPlan(plan);
+  await db.runTransaction(async transaction => {
+    const userSnap = await transaction.get(userRef);
+    const userData = userSnap.exists ? userSnap.data() || {} : {};
+    // Signed events are notifications, not an ordered subscription snapshot.
+    // Retrieve canonical state inside the account transaction so a retry after
+    // a concurrent account write also refreshes the subscription state.
+    const incomingCreated = Number(eventCreated) || 0;
+    if (eventId && userData.stripeEventId === eventId) return;
+    let currentStatus = status;
+    let currentPriceId = priceId;
+    if (eventId && subscriptionId) {
+      // Event timestamps have second precision and are not a state version.
+      // This also covers the first delivery and pre-cursor existing accounts.
+      // A failed lookup aborts the write and returns 500 for Stripe to retry.
+      const current = await getStripeClient().subscriptions.retrieve(subscriptionId, {}, { timeout: 10000, maxNetworkRetries: 0 });
+      currentStatus = current.status || 'none';
+      currentPriceId = current.items?.data?.[0]?.price?.id || null;
+    }
+    const active = hasActiveSubscription(currentStatus);
+    if (subscriptionId && userData.stripeSubscriptionId &&
+        subscriptionId !== userData.stripeSubscriptionId && !active &&
+        hasActiveSubscription(userData.subscriptionStatus)) return;
+    const paidPlan = planFromPriceId(currentPriceId, cfg);
+    const trialEndsAtMs = timestampToMillis(userData.trialEndsAt) || timestampToMillis(userData.trialEndsAtMs);
+    const fallbackPlan = trialEndsAtMs > Date.now() ? 'trial' : 'free';
+    const plan = active ? normalizePlan(paidPlan) : fallbackPlan;
+    const roomCreateCount = normalizeRoomCreateCount(userData.roomCreateCount);
+    const isAdminOverride = String(userData.subscriptionStatus || '').toLowerCase() === 'admin';
+    const existingLimit = Number.isFinite(Number(userData.roomCreateLimit))
+      ? Math.max(0, Math.min(10000, Math.floor(Number(userData.roomCreateLimit))))
+      : 0;
+    const roomCreateLimit = isAdminOverride
+      ? Math.max(existingLimit, ADMIN_TEST_ROOM_CREATE_LIMIT)
+      : roomCreateLimitForPlan(plan);
 
-  await userRef.set(
-    {
-      stripeCustomerId: customerId || null,
-      stripeSubscriptionId: subscriptionId || null,
-      subscriptionStatus: status || 'none',
-      plan,
-      entitlements: planEntitlements(plan),
-      roomCreateCount,
-      roomCreateLimit,
-      updatedAt: FieldValue.serverTimestamp()
-    },
-    { merge: true }
-  );
+    transaction.set(userRef,
+      {
+        stripeCustomerId: customerId || null,
+        stripeSubscriptionId: subscriptionId || null,
+        subscriptionStatus: currentStatus || 'none',
+        ...(incomingCreated > 0 && eventId ? { stripeEventCreated: incomingCreated, stripeEventId: eventId } : {}),
+        plan,
+        entitlements: planEntitlements(plan),
+        roomCreateCount,
+        roomCreateLimit,
+        updatedAt: FieldValue.serverTimestamp()
+      },
+      { merge: true }
+    );
+  });
 }
 
-exports.getPublicSiteStats = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.getPublicSiteStats = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed.' });
   try {
@@ -1168,7 +1172,7 @@ exports.getPublicSiteStats = functions.region('us-central1').https.onRequest(asy
   }
 });
 
-exports.createCheckoutSession = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.createCheckoutSession = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
@@ -1253,7 +1257,7 @@ exports.createCheckoutSession = functions.region('us-central1').https.onRequest(
   }
 });
 
-exports.createPortalSession = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.createPortalSession = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
@@ -1300,7 +1304,7 @@ exports.createPortalSession = functions.region('us-central1').https.onRequest(as
   }
 });
 
-exports.startTrial = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.startTrial = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
@@ -1312,107 +1316,110 @@ exports.startTrial = functions.region('us-central1').https.onRequest(async (req,
 
   try {
     const authUser = await admin.auth().getUser(auth.uid);
-    const existing = await ensureUserDoc(auth.uid, authUser.email || '', authUser.displayName || '');
-    const nowMs = Date.now();
+    await ensureUserDoc(auth.uid, authUser.email || '', authUser.displayName || '');
+    const userRef = db.collection('users').doc(auth.uid);
+    const outcome = await db.runTransaction(async transaction => {
+      const snapshot = await transaction.get(userRef);
+      const existing = snapshot.data() || {};
+      const nowMs = Date.now();
 
-    const existingPlan = normalizePlan(existing.plan);
-    const subscriptionStatus = String(existing.subscriptionStatus || 'none');
-    const trialEndsAtMs = timestampToMillis(existing.trialEndsAt) || timestampToMillis(existing.trialEndsAtMs);
-    const trialConsumedAtMs = timestampToMillis(existing.trialConsumedAt) || timestampToMillis(existing.trialConsumedAtMs);
+      const existingPlan = normalizePlan(existing.plan);
+      const subscriptionStatus = String(existing.subscriptionStatus || 'none');
+      const trialEndsAtMs = timestampToMillis(existing.trialEndsAt) || timestampToMillis(existing.trialEndsAtMs);
+      const trialConsumedAtMs = timestampToMillis(existing.trialConsumedAt) || timestampToMillis(existing.trialConsumedAtMs);
 
-    if (existingPlan === 'supporter' || existingPlan === 'pro' || hasActiveSubscription(subscriptionStatus)) {
-      res.status(200).json({
-        status: 'already-paid',
-        plan: existingPlan,
-        trialEndsAtMs: trialEndsAtMs || null
-      });
-      return;
-    }
-
-    if (existingPlan === 'trial' && trialEndsAtMs && trialEndsAtMs > nowMs) {
-      const trialEndsAtIsTimestamp = existing.trialEndsAt && typeof existing.trialEndsAt.toMillis === 'function';
-      const trialStartsAtIsTimestamp = existing.trialStartsAt && typeof existing.trialStartsAt.toMillis === 'function';
-      const trialConsumedAtIsTimestamp = existing.trialConsumedAt && typeof existing.trialConsumedAt.toMillis === 'function';
-
-      if (!trialEndsAtIsTimestamp || !trialStartsAtIsTimestamp || !trialConsumedAtIsTimestamp) {
-        const normalizedTrialEndsAt = AdminTimestamp.fromMillis(trialEndsAtMs);
-        const normalizedTrialStartMs = trialStartsAtIsTimestamp
-          ? existing.trialStartsAt.toMillis()
-          : Math.max(nowMs - TRIAL_DURATION_MS, trialEndsAtMs - TRIAL_DURATION_MS);
-        const normalizedTrialStartsAt = AdminTimestamp.fromMillis(normalizedTrialStartMs);
-        const normalizedTrialConsumedAt = trialConsumedAtIsTimestamp
-          ? existing.trialConsumedAt
-          : normalizedTrialStartsAt;
-        const roomCreateCount = normalizeRoomCreateCount(existing.roomCreateCount);
-        const roomCreateLimit = Math.max(
-          roomCreateLimitForPlan('trial'),
-          normalizeRoomCreateLimit(existing.roomCreateLimit)
-        );
-
-        await db.collection('users').doc(auth.uid).set(
-          {
-            plan: 'trial',
-            trialStartsAt: normalizedTrialStartsAt,
-            trialEndsAt: normalizedTrialEndsAt,
-            trialConsumedAt: normalizedTrialConsumedAt,
-            entitlements: planEntitlements('trial'),
-            roomCreateCount,
-            roomCreateLimit,
-            updatedAt: FieldValue.serverTimestamp()
-          },
-          { merge: true }
-        );
+      if (existingPlan === 'supporter' || existingPlan === 'pro' || hasActiveSubscription(subscriptionStatus)) {
+        return { status: 200, body: {
+          status: 'already-paid',
+          plan: existingPlan,
+          trialEndsAtMs: trialEndsAtMs || null
+        } };
       }
 
-      res.status(200).json({
-        status: 'already-active',
+      if (existingPlan === 'trial' && trialEndsAtMs && trialEndsAtMs > nowMs) {
+        const trialEndsAtIsTimestamp = existing.trialEndsAt && typeof existing.trialEndsAt.toMillis === 'function';
+        const trialStartsAtIsTimestamp = existing.trialStartsAt && typeof existing.trialStartsAt.toMillis === 'function';
+        const trialConsumedAtIsTimestamp = existing.trialConsumedAt && typeof existing.trialConsumedAt.toMillis === 'function';
+
+        if (!trialEndsAtIsTimestamp || !trialStartsAtIsTimestamp || !trialConsumedAtIsTimestamp) {
+          const normalizedTrialEndsAt = AdminTimestamp.fromMillis(trialEndsAtMs);
+          const normalizedTrialStartMs = trialStartsAtIsTimestamp
+            ? existing.trialStartsAt.toMillis()
+            : Math.max(nowMs - TRIAL_DURATION_MS, trialEndsAtMs - TRIAL_DURATION_MS);
+          const normalizedTrialStartsAt = AdminTimestamp.fromMillis(normalizedTrialStartMs);
+          const normalizedTrialConsumedAt = trialConsumedAtIsTimestamp
+            ? existing.trialConsumedAt
+            : normalizedTrialStartsAt;
+          const roomCreateCount = normalizeRoomCreateCount(existing.roomCreateCount);
+          const roomCreateLimit = Math.max(
+            roomCreateLimitForPlan('trial'),
+            normalizeRoomCreateLimit(existing.roomCreateLimit)
+          );
+
+          transaction.set(userRef,
+            {
+              plan: 'trial',
+              trialStartsAt: normalizedTrialStartsAt,
+              trialEndsAt: normalizedTrialEndsAt,
+              trialConsumedAt: normalizedTrialConsumedAt,
+              entitlements: planEntitlements('trial'),
+              roomCreateCount,
+              roomCreateLimit,
+              updatedAt: FieldValue.serverTimestamp()
+            },
+            { merge: true }
+          );
+        }
+
+        return { status: 200, body: {
+          status: 'already-active',
+          plan: 'trial',
+          trialEndsAtMs
+        } };
+      }
+
+      if (trialConsumedAtMs || (trialEndsAtMs && trialEndsAtMs <= nowMs)) {
+        return { status: 403, body: {
+          error: 'Trial already used. Upgrade to Supporter or Pro for multiplayer access.'
+        } };
+      }
+
+      const trialStartsAt = AdminTimestamp.fromMillis(nowMs);
+      const trialEndsAt = AdminTimestamp.fromMillis(nowMs + TRIAL_DURATION_MS);
+      const roomCreateCount = normalizeRoomCreateCount(existing.roomCreateCount);
+      const roomCreateLimit = roomCreateLimitForPlan('trial');
+      transaction.set(userRef,
+        {
+          uid: auth.uid,
+          email: authUser.email || existing.email || '',
+          displayName: authUser.displayName || existing.displayName || '',
+          plan: 'trial',
+          subscriptionStatus,
+          trialStartsAt,
+          trialEndsAt,
+          trialConsumedAt: trialStartsAt,
+          entitlements: planEntitlements('trial'),
+          roomCreateCount,
+          roomCreateLimit,
+          updatedAt: FieldValue.serverTimestamp()
+        },
+        { merge: true }
+      );
+
+      return { status: 200, body: {
+        status: 'activated',
         plan: 'trial',
-        trialEndsAtMs
-      });
-      return;
-    }
-
-    if (trialConsumedAtMs || (trialEndsAtMs && trialEndsAtMs <= nowMs)) {
-      res.status(403).json({
-        error: 'Trial already used. Upgrade to Supporter or Pro for multiplayer access.'
-      });
-      return;
-    }
-
-    const trialStartsAt = AdminTimestamp.fromMillis(nowMs);
-    const trialEndsAt = AdminTimestamp.fromMillis(nowMs + TRIAL_DURATION_MS);
-    const roomCreateCount = normalizeRoomCreateCount(existing.roomCreateCount);
-    const roomCreateLimit = roomCreateLimitForPlan('trial');
-    await db.collection('users').doc(auth.uid).set(
-      {
-        uid: auth.uid,
-        email: authUser.email || existing.email || '',
-        displayName: authUser.displayName || existing.displayName || '',
-        plan: 'trial',
-        subscriptionStatus,
-        trialStartsAt,
-        trialEndsAt,
-        trialConsumedAt: trialStartsAt,
-        entitlements: planEntitlements('trial'),
-        roomCreateCount,
-        roomCreateLimit,
-        updatedAt: FieldValue.serverTimestamp()
-      },
-      { merge: true }
-    );
-
-    res.status(200).json({
-      status: 'activated',
-      plan: 'trial',
-      trialEndsAtMs: nowMs + TRIAL_DURATION_MS
+        trialEndsAtMs: nowMs + TRIAL_DURATION_MS
+      } };
     });
+    res.status(outcome.status).json(outcome.body);
   } catch (err) {
     console.error('[startTrial] failed:', err);
     res.status(500).json({ error: 'Unable to start trial right now.' });
   }
 });
 
-exports.enableAdminTester = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.enableAdminTester = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
@@ -1448,7 +1455,6 @@ exports.enableAdminTester = functions.region('us-central1').https.onRequest(asyn
       authUser.email || '',
       authUser.displayName || ''
     );
-    const roomCreateCount = normalizeRoomCreateCount(existingDoc.roomCreateCount);
     const roomCreateLimit = ADMIN_TEST_ROOM_CREATE_LIMIT;
 
     await db.collection('users').doc(auth.uid).set(
@@ -1459,7 +1465,6 @@ exports.enableAdminTester = functions.region('us-central1').https.onRequest(asyn
         plan: 'pro',
         subscriptionStatus: 'admin',
         entitlements: planEntitlements('pro'),
-        roomCreateCount,
         roomCreateLimit,
         updatedAt: FieldValue.serverTimestamp()
       },
@@ -1480,7 +1485,7 @@ exports.enableAdminTester = functions.region('us-central1').https.onRequest(asyn
   }
 });
 
-exports.getAccountOverview = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.getAccountOverview = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
@@ -1571,7 +1576,7 @@ exports.getAccountOverview = functions.region('us-central1').https.onRequest(asy
   }
 });
 
-exports.listBillingReceipts = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.listBillingReceipts = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
@@ -1643,7 +1648,7 @@ exports.listBillingReceipts = functions.region('us-central1').https.onRequest(as
   }
 });
 
-exports.updateAccountProfile = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.updateAccountProfile = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
@@ -1683,7 +1688,7 @@ exports.updateAccountProfile = functions.region('us-central1').https.onRequest(a
   }
 });
 
-exports.deleteAccount = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.deleteAccount = functions.runWith({timeoutSeconds:540,memory:'512MB',invoker:'public'}).region('us-central1').https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
@@ -1753,7 +1758,23 @@ exports.deleteAccount = functions.region('us-central1').https.onRequest(async (r
   }
 });
 
-exports.claimDeFlockVirtualDisable = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.joinRoom = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed.' }); return; }
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+  try {
+    const result = await admitRoomPlayer({ db, uid: auth.uid,
+      roomCode: String(req.body?.roomCode || '').trim().toUpperCase(),
+      displayName: req.body?.displayName || auth.name || 'Explorer' });
+    res.status(200).json(result);
+  } catch (error) {
+    if (!error.status) console.error('[joinRoom] failed:', error);
+    res.status(error.status || 500).json({ error: error.status ? error.message : 'Unable to join this room right now.' });
+  }
+});
+
+exports.claimDeFlockVirtualDisable = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
@@ -1888,7 +1909,7 @@ function urbanCivicAgencyForRoom(room = {}) {
   return 'Local civic response';
 }
 
-exports.claimUrbanVehicle = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.claimUrbanVehicle = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
   const auth = await verifyAuth(req, res);
@@ -1912,6 +1933,7 @@ exports.claimUrbanVehicle = functions.region('us-central1').https.onRequest(asyn
       input: {
         entityId,
         worldSeed: context.worldSeed,
+        actorPose: context.player.pose,
         pose,
         label: sanitizeText(req.body && req.body.label, 80),
         style: sanitizeText(req.body && req.body.style, 40),
@@ -1952,10 +1974,10 @@ async function handleUrbanVehicleLeaseUpdate(req, res, release = false) {
   }
 }
 
-exports.updateUrbanVehicle = functions.region('us-central1').https.onRequest((req, res) => handleUrbanVehicleLeaseUpdate(req, res, false));
-exports.releaseUrbanVehicle = functions.region('us-central1').https.onRequest((req, res) => handleUrbanVehicleLeaseUpdate(req, res, true));
+exports.updateUrbanVehicle = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest((req, res) => handleUrbanVehicleLeaseUpdate(req, res, false));
+exports.releaseUrbanVehicle = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest((req, res) => handleUrbanVehicleLeaseUpdate(req, res, true));
 
-exports.commitWorldPropertyAction = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.commitWorldPropertyAction = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
   const auth = await verifyAuth(req, res);
@@ -2064,7 +2086,7 @@ exports.commitWorldPropertyAction = functions.region('us-central1').https.onRequ
   }
 });
 
-exports.commitExplorerCommerceAction = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.commitExplorerCommerceAction = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
   const auth = await verifyAuth(req, res);
@@ -2100,7 +2122,7 @@ exports.commitExplorerCommerceAction = functions.region('us-central1').https.onR
   }
 });
 
-exports.settleExplorerCommerceOutcome = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.settleExplorerCommerceOutcome = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
   const auth = await verifyAuth(req, res);
@@ -2131,7 +2153,7 @@ exports.settleExplorerCommerceOutcome = functions.region('us-central1').https.on
   }
 });
 
-exports.saveExplorerPlayerCondition = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.saveExplorerPlayerCondition = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
   const auth = await verifyAuth(req, res);
@@ -2152,7 +2174,7 @@ exports.saveExplorerPlayerCondition = functions.region('us-central1').https.onRe
   }
 });
 
-exports.commitUrbanImpacts = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.commitUrbanImpacts = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
   const auth = await verifyAuth(req, res);
@@ -2202,7 +2224,7 @@ exports.commitUrbanImpacts = functions.region('us-central1').https.onRequest(asy
   }
 });
 
-exports.commitUrbanCivicEvent = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.commitUrbanCivicEvent = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
   const auth = await verifyAuth(req, res);
@@ -2239,7 +2261,7 @@ exports.commitUrbanCivicEvent = functions.region('us-central1').https.onRequest(
   }
 });
 
-exports.resolveUrbanCivicOutcome = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.resolveUrbanCivicOutcome = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
   const auth = await verifyAuth(req, res);
@@ -2297,7 +2319,7 @@ async function requireExpeditionRoomContext(req, res, auth) {
   return { roomCode, roomRef, room, player };
 }
 
-exports.mutateSharedExpedition = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.mutateSharedExpedition = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
   const auth = await verifyAuth(req, res);
@@ -2372,7 +2394,7 @@ exports.mutateSharedExpedition = functions.region('us-central1').https.onRequest
   }
 });
 
-exports.submitContribution = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.submitContribution = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
@@ -2415,20 +2437,15 @@ exports.submitContribution = functions.region('us-central1').https.onRequest(asy
       return;
     }
 
-    const createdAt = FieldValue.serverTimestamp();
-    const ref = await db.collection('editorSubmissions').add({
-      editType,
-      status: 'pending',
-      worldKind,
-      areaKey,
-      target,
-      payload,
-      userId: auth.uid,
-      userDisplayName,
-      source,
-      createdAt,
-      updatedAt: createdAt
+    const { ref, replayed, status } = await require('./contribution-idempotency').saveContributionOnce({
+      db, uid: auth.uid, requestId: req.body?.requestId,
+      record: { editType, worldKind, areaKey, target, payload, userId: auth.uid, userDisplayName, source },
+      timestamp: FieldValue.serverTimestamp()
     });
+    if (replayed) {
+      res.status(200).json({ id: ref.id, status, replayed: true, notification: { sent: false, reason: 'already-submitted' } });
+      return;
+    }
 
     const savedSnap = await ref.get();
     const saved = serializeContributionDoc(savedSnap, { reviewerOnly: true });
@@ -2447,11 +2464,12 @@ exports.submitContribution = functions.region('us-central1').https.onRequest(asy
     });
   } catch (err) {
     console.error('[submitContribution] failed:', err);
-    res.status(500).json({ error: 'Could not save this contribution right now.' });
+    const publicError = err.status === 400 || err.status === 409;
+    res.status(publicError ? err.status : 500).json({ error: publicError ? err.message : 'Could not save this contribution right now.' });
   }
 });
 
-exports.getContributionModerationOverview = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.getContributionModerationOverview = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
@@ -2483,7 +2501,7 @@ exports.getContributionModerationOverview = functions.region('us-central1').http
   }
 });
 
-exports.listContributionSubmissions = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.listContributionSubmissions = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
@@ -2551,7 +2569,7 @@ exports.listContributionSubmissions = functions.region('us-central1').https.onRe
   }
 });
 
-exports.moderateContributionSubmission = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.moderateContributionSubmission = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed.' });
@@ -2617,7 +2635,7 @@ exports.moderateContributionSubmission = functions.region('us-central1').https.o
   }
 });
 
-exports.stripeWebhook = functions.region('us-central1').https.onRequest(async (req, res) => {
+exports.stripeWebhook = functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
   if (req.method !== 'POST') {
     res.status(405).send('Method not allowed');
     return;
@@ -2653,28 +2671,14 @@ exports.stripeWebhook = functions.region('us-central1').https.onRequest(async (r
         }
 
         if (uid) {
-          const stripe = getStripeClient();
-          let status = 'active';
-          let priceId = null;
-
-          if (subscriptionId) {
-            const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-            status = subscription.status || status;
-            priceId =
-              subscription.items &&
-              subscription.items.data &&
-              subscription.items.data[0] &&
-              subscription.items.data[0].price
-                ? subscription.items.data[0].price.id
-                : null;
-          }
-
           await upsertPlanFromSubscription({
             uid,
             customerId,
             subscriptionId,
-            status,
-            priceId
+            status: 'none',
+            priceId: null,
+            eventCreated: event.created,
+            eventId: event.id
           });
         }
 
@@ -2707,7 +2711,9 @@ exports.stripeWebhook = functions.region('us-central1').https.onRequest(async (r
             customerId,
             subscriptionId,
             status,
-            priceId
+            priceId,
+            eventCreated: event.created,
+            eventId: event.id
           });
         }
 
@@ -2757,6 +2763,8 @@ Object.assign(exports, buildDiscoveryExports({
 
 Object.assign(exports, buildCommunityRealityCaptureExports({
   db,
+  captureAccountIsDeleting:async uid=>(await db.collection('captureAccountDeletions').doc(uid).get()).exists,
+  contributionNotificationConfig,
   setCors,
   verifyAuth,
   verifyAppCheck,
@@ -2767,3 +2775,27 @@ Object.assign(exports, buildCommunityRealityCaptureExports({
 Object.assign(exports, require('./reality-capture-processing').buildCaptureProcessingExports({
   db, bucket: admin.storage().bucket()
 }));
+
+// Submission survives browser closure; retry delivery without resubmitting photos.
+exports.notifyCaptureReview = functions.region('us-central1').runWith({ failurePolicy: true })
+  .firestore.document('realityCaptures/{captureId}').onWrite(async (change, context) => {
+    const { reviewNotice, deliverReviewNotice, contributorNotice } = require('./capture-review-notice');
+    const before=change.before.exists?change.before.data():null,after=change.after.exists?change.after.data():null;
+    const activity=contributorNotice(before,after,context.params.captureId);
+    if(activity){const id=crypto.createHash('sha256').update(`${activity.captureId}/${activity.revision}/${activity.status}`).digest('hex');await db.runTransaction(async tx=>{const live=await tx.get(change.after.ref),current=live.data();if(!live.exists||current.ownerUid!==activity.ownerUid||current.status!==activity.status||String(current.hybridSubmission?.revision||current.processingAttemptId||'initial')!==activity.revision)return;tx.set(db.collection('users').doc(activity.ownerUid).collection('notifications').doc(id),{...activity,createdAtMs:Date.parse(context.timestamp)});});}
+    const notice = reviewNotice(before,after,context.params.captureId);
+    if (!notice) return;
+    notice.eventTimeMs = Date.parse(context.timestamp);
+    await deliverReviewNotice({ ref: change.after.ref, notice, config: contributionNotificationConfig() });
+  });
+
+// Reconcile uploads that finish after capture/account deletion. This trigger
+// never publishes media and also seals legacy SDK-uploaded originals.
+exports.sealRealityCaptureOriginal=functions.storage.object().onFinalize(async object=>{
+  const match=/^reality-captures\/([^/]+)\/([^/]+)\/originals\/([a-f0-9]{32})\.jpg$/.exec(object.name||'');
+  if(!match)return;
+  const [,uid,captureId]=match,file=admin.storage().bucket(object.bucket).file(object.name,{generation:object.generation});
+  const [capture,tombstone]=await Promise.all([db.collection('realityCaptures').doc(captureId).get(),db.collection('captureAccountDeletions').doc(uid).get()]);
+  if(tombstone.exists||!capture.exists||capture.data().ownerUid!==uid||capture.data().status==='deleting'){await file.delete({ignoreNotFound:true});return;}
+  const [metadata]=await file.getMetadata();await require('./reality-capture-storage-privacy').sealCapturePhoto(file,metadata);
+});

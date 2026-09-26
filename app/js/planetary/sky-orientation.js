@@ -84,7 +84,7 @@ function setPlanetarySky(body, date = new Date(), options = {}) {
   appCtx.starField.traverse((child) => {
     if (!child.material || child.userData?.skyHitbox) return;
     const baseOpacity = Number(child.userData?.baseOpacity ?? child.material.opacity ?? 1);
-    child.material.transparent = true;
+    child.material.transparent = false;
     child.material.opacity = Math.min(baseOpacity, starOpacity);
     child.material.needsUpdate = true;
   });
@@ -119,10 +119,11 @@ function clearPlanetarySky() {
 function updatePlanetarySky() {
   const env = appCtx.getEnv?.();
   if (!appCtx.starField || !appCtx.camera) return;
-  if (env === appCtx.ENV?.MOON || env === appCtx.ENV?.MARS || env === appCtx.ENV?.PLANETARY) {
-    appCtx.starField.position.copy(appCtx.camera.position);
-    updatePlanetaryStarHorizon(appCtx.starField, appCtx.camera.position.y);
-  }
+  // Earth can contain tens of thousands of scene nodes. An inactive Mars
+  // atmosphere must not trigger a complete name search on every Earth frame.
+  if (env == null || !(env === appCtx.ENV?.MOON || env === appCtx.ENV?.MARS || env === appCtx.ENV?.PLANETARY)) return;
+  appCtx.starField.position.copy(appCtx.camera.position);
+  updatePlanetaryStarHorizon(appCtx.starField, appCtx.camera.position.y);
   const marsAtmosphere = appCtx.scene?.getObjectByName('Planetary atmosphere: mars');
   updatePlanetaryAtmosphere(marsAtmosphere, appCtx.camera, appCtx.sun?.position);
 }

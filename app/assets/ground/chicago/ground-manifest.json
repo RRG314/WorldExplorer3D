@@ -3,7 +3,7 @@
   "artifactId": "chicago-ground",
   "providerId": "copernicus-dem-classified-ground-v1",
   "sourceRelease": "COP-DEM-2021:GLO-30",
-  "contentSha256": "b4296772e49fbb551e36ad20cb7753de9facb4d5bb81a72099840b0f94edf65a",
+  "contentSha256": "67da8efeb9ac5950aa58fc44bb6c2dafb509c0fb53b8f015d844bdfe58faeaba",
   "spacingMeters": 90,
   "coverage": {
     "south": 41.85370305267472,
@@ -18,7 +18,7 @@
   "correctionAttested": true,
   "sourceEvidence": {
     "sourceClassification": "digital-surface-model",
-    "correctionMethod": "worldexplorer-pmf-grid-v1",
+    "correctionMethod": "worldexplorer-pmf-boundary-reconstruction-v3",
     "sourceTiles": [
       {
         "tileId": "Copernicus_DSM_COG_10_N41_00_W088_00_DEM",
@@ -29,7 +29,14 @@
         "etag": "d4e2218539afcfae09de0ae064c381d9",
         "lastModified": "Mon, 09 May 2022 14:22:27 GMT"
       }
-    ]
+    ],
+    "classificationMethod": "worldexplorer-pmf-grid-v1",
+    "reconstruction": {
+      "method": "harmonic-ground-boundary",
+      "toleranceMeters": 0.00001,
+      "exteriorPolicy": "retain-source-observation",
+      "sourceArtifactSha256": "b4296772e49fbb551e36ad20cb7753de9facb4d5bb81a72099840b0f94edf65a"
+    }
   },
   "attribution": {
     "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",

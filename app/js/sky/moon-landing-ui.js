@@ -183,21 +183,12 @@ function createMoonLandingUiApi(context) {
     if (!btn) {
       btn = document.createElement('button');
       btn.id = 'returnToEarthBtn';
-      btn.className = 'game-btn';
+      btn.className = 'floatItem';
       btn.textContent = 'Launch Pathfinder to Solis Reach';
-      btn.style.position = 'fixed';
-      btn.style.top = '82px';
-      btn.style.right = '20px';
-      btn.style.zIndex = '1000';
-      btn.style.padding = '10px 20px';
-      btn.style.fontSize = '16px';
-      btn.style.backgroundColor = '#4CAF50';
-      btn.style.color = 'white';
-      btn.style.border = 'none';
-      btn.style.borderRadius = '5px';
-      btn.style.cursor = 'pointer';
-      btn.addEventListener('click', onReturnToEarth);
-      document.body.appendChild(btn);
+      btn.addEventListener('click', () => { document.getElementById('travelMenu')?.classList.remove('open'); onReturnToEarth(); });
+      const menu = document.querySelector('#travelMenu .floatItems');
+      if (!menu) return;
+      menu.appendChild(btn);
     }
     btn.style.display = 'block';
   }

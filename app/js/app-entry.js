@@ -1,14 +1,14 @@
 // ES module entrypoint with explicit application boot contract.
 // Import order mirrors legacy runtime dependencies.
-import { getCurrentUser, observeAuth } from '../../js/auth-ui.js?v=55';
+import { getCurrentUser, observeAuth } from '../../js/auth-ui.js?v=56';
 import { setupAnalyticsConsentUi } from '../../js/analytics-consent.js?v=3';
-import './rdt.js?v=55';
+import './procedural-random.js?v=1';
 import './config.js?v=63';
 import { ctx as appCtx } from './shared-context.js?v=55';
 import { createAccountService } from './platform/account-service.js?v=1';
 import { createPlatformServiceRegistry } from './platform/service-registry.js?v=1';
 import { scheduleAfterFirstPlay } from './runtime/workload-policy.js?v=1';
-import './runtime-diagnostics.js?v=82';
+import './runtime-diagnostics.js?v=83';
 import './ui/legal-attribution.js?v=1';
 import './state.js?v=65';
 import './camera-mode.js?v=1';
@@ -26,30 +26,30 @@ import './session-coordinator.js?v=2';
 import './planetary/scene-ownership.js?v=9';
 import './real-estate.js?v=55';
 import { init, tryEnablePostProcessing } from './engine.js?v=105';
-import './physics.js?v=128';
+import './physics.js?v=129';
 import './walking.js?v=98';
 import './travel-mode.js?v=29';
 import { initBoatMode } from './boat-mode.js?v=58';
 import './sky.js?v=89';
-import './weather.js?v=11';
+import './weather.js?v=12';
 import './runtime/on-demand-modes.js?v=52';
-import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=190';
+import { installOnDemandEarth } from './runtime/on-demand-earth.js?v=193';
 import { installOnDemandBlockBuilder } from './runtime/on-demand-block-builder.js?v=10';
 import { installOnDemandFlowerChallenge } from './runtime/on-demand-flower-challenge.js?v=1';
-import { installOnDemandLiveEarth } from './runtime/on-demand-live-earth.js?v=6';
+import { installOnDemandLiveEarth } from './runtime/on-demand-live-earth.js?v=7';
 import { installOnDemandMars } from './runtime/on-demand-mars.js?v=1';
-import './planetary/solid-world-runtime.js?v=20';
+import './planetary/solid-world-runtime.js?v=22';
 import './planetary/vehicles.js?v=3';
 import './planetary/astronaut.js?v=4';
 import './planetary/sky-orientation.js?v=15';
 import './planetary/moon-sky.js?v=1';
 import './planetary/tracks.js?v=2';
 import './planetary/field-activities.js?v=11';
-import './game.js?v=70';
+import './game.js?v=71';
 import './input.js?v=79';
 import './hud.js?v=105';
 import './map.js?v=61';
-import { renderLoop } from './main.js?v=76';
+import { renderLoop } from './main.js?v=77';
 import './memory.js?v=55';
 import { setupUI } from './ui.js?v=172';
 import { initAccessibility } from './ui/accessibility.js?v=2';
@@ -131,7 +131,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'multiplayer', category: 'social',
         load: async () => {
-            const { initMultiplayerPlatform } = await import('./multiplayer/ui-room.js?v=83');
+            const { initMultiplayerPlatform } = await import('./multiplayer/ui-room.js?v=86');
             const api = initMultiplayerPlatform({ getScene: () => appCtx.scene });
             api?.setAuthUser?.(_lastObservedAuthUser || getCurrentUser() || null);
             return api;
@@ -458,9 +458,8 @@ function bootApp() {
         globalThis.dispatchEvent?.(new CustomEvent('we3d:runtime-ready'));
     });
     runBootStep('scheduleAnalyticsWarmup', () => scheduleAnalyticsWarmup(2800));
-    runBootStep('schedulePlaneVisualWarmup', () => {
-        scheduleAfterFirstPlay('plane-visual', () => appCtx.preparePlaneModeVisual?.(), { timeout: 9000 });
-    });
+    // Plane mode constructs its visual when selected; walking and driving do
+    // not need to allocate an unused aircraft after every application start.
     _booted = true;
     return { tryEnablePostProcessing };
 }

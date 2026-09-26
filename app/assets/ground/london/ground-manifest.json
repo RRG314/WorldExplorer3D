@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "artifactId": "london-ground",
-  "providerId": "copernicus-dem-classified-ground-v1",
-  "sourceRelease": "COP-DEM-2021:GLO-30",
-  "contentSha256": "a8b00430c605ba3f098779afd280badee098124308dddfd299f867e6511a7da0",
+  "providerId": "ea-lidar-composite-dtm-2022",
+  "sourceRelease": "EA-LIDAR-COMPOSITE-2022:DTM-2m",
+  "contentSha256": "cefaa225bda05b99ad17cb1f17a6de7c740438bde6d8cea18f6a33acbc5cd5bd",
   "spacingMeters": 90,
   "coverage": {
     "south": 51.486917632326914,
@@ -15,26 +15,164 @@
   "complete": true,
   "missingSampleCount": 0,
   "licenseAttested": true,
-  "correctionAttested": true,
   "sourceEvidence": {
-    "sourceClassification": "digital-surface-model",
-    "correctionMethod": "worldexplorer-pmf-grid-v1",
+    "sourceClassification": "bare-earth-dtm",
+    "sourceCrs": "EPSG:7405",
+    "targetCrs": "EPSG:9056+3855",
+    "resampling": "mean of all valid 2 m pixel centres inside each projected source-grid cell; no missing pixels or interpolation fill",
+    "sourceConfigurationSha256": "e7082ac57340384003c7ef6dfa88a7bcfdd4b0af33e1615510541b8c1412b972",
     "sourceTiles": [
       {
-        "tileId": "Copernicus_DSM_COG_10_N51_00_W001_00_DEM",
-        "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N51_00_W001_00_DEM/Copernicus_DSM_COG_10_N51_00_W001_00_DEM.tif",
-        "resolutionMeters": 30,
-        "contentLength": 32682214,
-        "contentSha256": "bdd0e7522e84cb434450d6f6f5b7c1889eefb0f8c28abaeddbaad77048c3961e",
-        "etag": "6a9f702479b4d415478d0c63fc78d605",
-        "lastModified": "Mon, 09 May 2022 14:30:24 GMT"
+        "product": {
+          "id": "lidar_composite_dtm",
+          "label": "LIDAR Composite DTM"
+        },
+        "year": {
+          "id": "2022",
+          "label": "2022"
+        },
+        "resolution": {
+          "id": "2",
+          "label": "2m"
+        },
+        "tile": {
+          "id": "TQ2575",
+          "label": "TQ27ne"
+        },
+        "label": "lidar_composite_dtm-2022-2m-TQ27ne",
+        "uri": "https://environment.data.gov.uk/tiles/collections/survey/lidar_composite_dtm/2022/2/TQ2575",
+        "bytes": 18101066,
+        "sha256": "20ed1b50ac9443d0825cd154daa19f1a9ba78cef6bd7cb55b94c1114e51b8ba0",
+        "rasters": [
+          {
+            "filename": "TQ27ne_DTM_2m.tif",
+            "bytes": 18364916,
+            "sha256": "4cbac9ca675c58f0e229a4b7b0ab6bbcd6ec634029387ece20ced4d914df8c8e"
+          }
+        ]
+      },
+      {
+        "product": {
+          "id": "lidar_composite_dtm",
+          "label": "LIDAR Composite DTM"
+        },
+        "year": {
+          "id": "2022",
+          "label": "2022"
+        },
+        "resolution": {
+          "id": "2",
+          "label": "2m"
+        },
+        "tile": {
+          "id": "TQ2580",
+          "label": "TQ28se"
+        },
+        "label": "lidar_composite_dtm-2022-2m-TQ28se",
+        "uri": "https://environment.data.gov.uk/tiles/collections/survey/lidar_composite_dtm/2022/2/TQ2580",
+        "bytes": 20472493,
+        "sha256": "4f6757661857f243c6877eda5c904620dc037f5bb679224f5fa2b6bb298bdf02",
+        "rasters": [
+          {
+            "filename": "TQ28se_DTM_2m.tif",
+            "bytes": 20943278,
+            "sha256": "302d61275f1674533a417596e70a7fed3ca082adabd30458489d1db1e54f4ebe"
+          }
+        ]
+      },
+      {
+        "product": {
+          "id": "lidar_composite_dtm",
+          "label": "LIDAR Composite DTM"
+        },
+        "year": {
+          "id": "2022",
+          "label": "2022"
+        },
+        "resolution": {
+          "id": "2",
+          "label": "2m"
+        },
+        "tile": {
+          "id": "TQ3075",
+          "label": "TQ37nw"
+        },
+        "label": "lidar_composite_dtm-2022-2m-TQ37nw",
+        "uri": "https://environment.data.gov.uk/tiles/collections/survey/lidar_composite_dtm/2022/2/TQ3075",
+        "bytes": 18538235,
+        "sha256": "e06db8defcbd97c49b8a6b6eed6ccf1d1c0ed73dfb773ae52f8b907cf3c4590d",
+        "rasters": [
+          {
+            "filename": "TQ37nw_DTM_2m.tif",
+            "bytes": 18820566,
+            "sha256": "2d12cf04530a411835a9770adf7f1e20945387adb4c5c65eb63cae746fb4660d"
+          }
+        ]
+      },
+      {
+        "product": {
+          "id": "lidar_composite_dtm",
+          "label": "LIDAR Composite DTM"
+        },
+        "year": {
+          "id": "2022",
+          "label": "2022"
+        },
+        "resolution": {
+          "id": "2",
+          "label": "2m"
+        },
+        "tile": {
+          "id": "TQ3080",
+          "label": "TQ38sw"
+        },
+        "label": "lidar_composite_dtm-2022-2m-TQ38sw",
+        "uri": "https://environment.data.gov.uk/tiles/collections/survey/lidar_composite_dtm/2022/2/TQ3080",
+        "bytes": 19317156,
+        "sha256": "80f7c2c4ba6443fad5e9f7b1b2389c6c156517239829377de70b2b6267e1c913",
+        "rasters": [
+          {
+            "filename": "TQ38sw_DTM_2m.tif",
+            "bytes": 19704068,
+            "sha256": "125296ac5b98ea2cba426166628157637c78700fa698a3195fec7054fd9f9c48"
+          }
+        ]
       }
-    ]
+    ],
+    "normalization": {
+      "source": "EPSG:9056+3855",
+      "target": "EPSG:7405",
+      "definition": "proj=pipeline step proj=unitconvert xy_in=deg xy_out=rad step proj=vgridshift grids=us_nga_egm08_25.tif multiplier=1 step inv proj=vgridshift grids=uk_os_OSGM15_GB.tif multiplier=1 step inv proj=hgridshift grids=uk_os_OSTN15_NTv2_OSGBtoETRS.tif step proj=tmerc lat_0=49 lon_0=-2 k=0.9996012717 x_0=400000 y_0=-100000 ellps=airy",
+      "description": "axis order change (2D) + Inverse of WGS 84 to EGM2008 height (1) using WGS 84 to WGS 84 (G1674) + Inverse of WGS 84 to WGS 84 (G1674) + Inverse of ETRS89 to WGS 84 (1) + ETRS89 to ODN height (2) + Inverse of OSGB36 to ETRS89 (2) + British National Grid",
+      "accuracyMeters": 8.038,
+      "pyprojVersion": "3.7.2",
+      "projVersion": "9.5.1",
+      "grids": [
+        {
+          "url": "https://cdn.proj.org/uk_os_OSGM15_GB.tif",
+          "filename": "uk_os_OSGM15_GB.tif",
+          "bytes": 1540925,
+          "sha256": "bf0ac81f1c0c33332693d7d606f335b793c3c2995b8e69eeb1350bd94adcde3b"
+        },
+        {
+          "url": "https://cdn.proj.org/uk_os_OSTN15_NTv2_OSGBtoETRS.tif",
+          "filename": "uk_os_OSTN15_NTv2_OSGBtoETRS.tif",
+          "bytes": 3035814,
+          "sha256": "5d6ed64d2119952c4c559fa1fccbc594b6520fc3ec3ef2fc10be13202c4384fa"
+        },
+        {
+          "url": "https://cdn.proj.org/us_nga_egm08_25.tif",
+          "filename": "us_nga_egm08_25.tif",
+          "bytes": 80585622,
+          "sha256": "4191d471eefebf24091b56dbc604353cb3b8cf8cc70e448bb9ae56a272bef17a"
+        }
+      ]
+    },
+    "sourceVerticalRmseMeters": 0.15
   },
   "attribution": {
-    "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
-    "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
-    "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+    "notice": "Environment Agency copyright and/or database right 2022. All rights reserved.",
+    "licenseDocument": "https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/",
     "modified": true
   }
 }

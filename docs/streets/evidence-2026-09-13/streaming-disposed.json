@@ -1,0 +1,82 @@
+{
+  "busy": false,
+  "near": {
+    "tiles": 53,
+    "triangles": 9809,
+    "curbTriangles": 14408,
+    "markingTriangles": 0,
+    "ramps": 0,
+    "workerMs": 0,
+    "inferredFrontages": 11289,
+    "managedPaths": 44,
+    "residentRoads": 30,
+    "residentBuildings": 264,
+    "roads": 116,
+    "roadMeshes": 116,
+    "buildings": 1056,
+    "worldLoadSequence": 1,
+    "plannedTiles": 75,
+    "reusedCells": 75,
+    "terrainRefinementTriangles": 534,
+    "drawCalls": 36,
+    "compilerCacheBytes": 4957928,
+    "coverageBounds": {
+      "minX": -384,
+      "maxX": 384,
+      "minZ": -384,
+      "maxZ": 384
+    },
+    "positionBytes": 871812,
+    "durationMs": 638
+  },
+  "overview": {
+    "status": "disposed",
+    "completedCells": 384,
+    "totalCells": 384,
+    "triangles": 18224,
+    "positionBytes": 0,
+    "drawCalls": 18,
+    "sourceScope": "complete loaded location",
+    "error": null,
+    "coverageBounds": {
+      "minX": -704,
+      "maxX": 1536,
+      "minZ": -320,
+      "maxZ": 1280
+    }
+  },
+  "renderer": {
+    "geometries": 1174,
+    "textures": 0
+  },
+  "heapBytes": 32109009,
+  "history": [
+    {
+      "position": {
+        "x": 0,
+        "z": 0
+      },
+      "durationMs": 10401,
+      "reusedCells": 0,
+      "cacheBytes": 2483158
+    },
+    {
+      "position": {
+        "x": 1024,
+        "z": 1024
+      },
+      "durationMs": 10444,
+      "reusedCells": 0,
+      "cacheBytes": 4957928
+    },
+    {
+      "position": {
+        "x": 0,
+        "z": 0
+      },
+      "durationMs": 638,
+      "reusedCells": 75,
+      "cacheBytes": 4957928
+    }
+  ]
+}

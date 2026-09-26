@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 
 const baseUrl = process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4195';
 const out = 'output/playwright/ar-lifecycle-current';
 await fs.mkdir(out, { recursive: true });
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
-const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, userAgent: devices['iPhone 13'].userAgent, hasTouch: true });
 const errors = [];
 page.on('pageerror', (error) => errors.push(String(error)));
 try {

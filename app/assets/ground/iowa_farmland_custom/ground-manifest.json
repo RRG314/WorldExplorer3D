@@ -3,7 +3,7 @@
   "artifactId": "iowa_farmland_custom-ground",
   "providerId": "copernicus-dem-classified-ground-v1",
   "sourceRelease": "COP-DEM-2021:GLO-30",
-  "contentSha256": "7625420477d2092b0664b5f3d7d69c6944c197d16df1c18c349b9e7045bf9817",
+  "contentSha256": "eae865440850f80d6574de4c7545cd9e1e8c1e1c70a0fcbe4932e351c28e44d0",
   "spacingMeters": 90,
   "coverage": {
     "south": 42.05572208383063,
@@ -18,7 +18,7 @@
   "correctionAttested": true,
   "sourceEvidence": {
     "sourceClassification": "digital-surface-model",
-    "correctionMethod": "worldexplorer-pmf-grid-v1",
+    "correctionMethod": "worldexplorer-pmf-boundary-reconstruction-v3",
     "sourceTiles": [
       {
         "tileId": "Copernicus_DSM_COG_10_N42_00_W094_00_DEM",
@@ -29,7 +29,14 @@
         "etag": "c96d97ab3b67940670368f10f0c7200b",
         "lastModified": "Mon, 09 May 2022 14:23:13 GMT"
       }
-    ]
+    ],
+    "classificationMethod": "worldexplorer-pmf-grid-v1",
+    "reconstruction": {
+      "method": "harmonic-ground-boundary",
+      "toleranceMeters": 0.00001,
+      "exteriorPolicy": "retain-source-observation",
+      "sourceArtifactSha256": "7625420477d2092b0664b5f3d7d69c6944c197d16df1c18c349b9e7045bf9817"
+    }
   },
   "attribution": {
     "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",

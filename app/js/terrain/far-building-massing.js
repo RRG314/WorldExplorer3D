@@ -33,7 +33,7 @@ function resolveFarBuildingMassing(building, footprint, areaWorld, unitsPerMeter
   const footprintWidth = (maxX - minX) / unitsPerMeter;
   const footprintDepth = (maxZ - minZ) / unitsPerMeter;
   const footprintArea = areaWorld / (unitsPerMeter * unitsPerMeter);
-  const seed = buildingSeedFromIdentity(building?.identity, options.worldSeed);
+  const seed = buildingSeedFromIdentity(building?.identity);
   const random = (seed >>> 0) / 4294967295;
   const fallbackHeight = inferFallbackBuildingHeightMeters(
     kind,

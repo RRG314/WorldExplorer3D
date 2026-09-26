@@ -1,5 +1,5 @@
 import { getApp, getApps, initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
-import { connectAuthEmulator, getAuth } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
+import { connectAuthEmulator, initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence, browserPopupRedirectResolver, getRedirectResult } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
 import { connectFirestoreEmulator, getFirestore } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { connectStorageEmulator, getStorage } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-storage.js';
 import {
@@ -8,11 +8,26 @@ import {
   initializeAppCheck
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app-check.js';
 import { getAnalyticsTools } from './analytics-service.js?v=1';
+import { assertFirebaseEnvironment } from './firebase-environment-policy.js';
 
-const FIREBASE_CONFIG_STORAGE_KEY = 'worldExplorer3D.firebaseConfig';
+import { FIREBASE_CONFIG_STORAGE_KEY, normalizeConfig, readFirebaseConfig, hasFirebaseConfig } from './firebase-config.js';
 
 let cachedServices = null;
 let cachedAppCheck = null;
+const AUTH_REDIRECT_PENDING_KEY = 'world-explorer-auth-redirect-pending';
+
+export function setAuthRedirectPending(pending) {
+  try {
+    if (pending) sessionStorage.setItem(AUTH_REDIRECT_PENDING_KEY, '1');
+    else sessionStorage.removeItem(AUTH_REDIRECT_PENDING_KEY);
+  } catch {
+    if (pending) throw new Error('Browser session storage is unavailable. Enable it before redirect sign-in.');
+  }
+}
+function hasPendingAuthRedirect() {
+  try { return sessionStorage.getItem(AUTH_REDIRECT_PENDING_KEY) === '1'; }
+  catch { return false; }
+}
 
 function readEmulatorConfig() {
   const raw = globalThis.WORLD_EXPLORER_FIREBASE_EMULATORS;
@@ -24,63 +39,34 @@ function readEmulatorConfig() {
   return { host, authPort, firestorePort, storagePort };
 }
 
-function normalizeConfig(raw) {
-  if (!raw || typeof raw !== 'object') return null;
-
-  const cfg = {
-    apiKey: String(raw.apiKey || '').trim(),
-    authDomain: String(raw.authDomain || '').trim(),
-    projectId: String(raw.projectId || '').trim(),
-    storageBucket: String(raw.storageBucket || '').trim(),
-    messagingSenderId: String(raw.messagingSenderId || '').trim(),
-    appId: String(raw.appId || '').trim(),
-    measurementId: String(raw.measurementId || '').trim(),
-    appCheckSiteKey: String(raw.appCheckSiteKey || '').trim()
-  };
-
-  if (!cfg.apiKey || !cfg.projectId || !cfg.appId) return null;
-  return cfg;
-}
-
-function readWindowConfig() {
-  const raw = globalThis.WORLD_EXPLORER_FIREBASE;
-  return normalizeConfig(raw);
-}
-
-function readStoredConfig() {
-  try {
-    const raw = localStorage.getItem(FIREBASE_CONFIG_STORAGE_KEY);
-    if (!raw) return null;
-    return normalizeConfig(JSON.parse(raw));
-  } catch (_) {
-    return null;
-  }
-}
-
-export function readFirebaseConfig() {
-  return readWindowConfig() || readStoredConfig();
-}
-
-export function hasFirebaseConfig() {
-  return !!readFirebaseConfig();
-}
-
 export function initFirebase() {
   if (cachedServices) return cachedServices;
   const config = readFirebaseConfig();
   if (!config) return null;
 
   const app = getApps().length > 0 ? getApp() : initializeApp(config);
-  const auth = getAuth(app);
+  assertFirebaseEnvironment(app.options);
+  if (app.options.projectId !== config.projectId) throw new Error('Firebase environment changed. Reload before continuing.');
+  // Keep persistent sessions, but do not pre-open Google's OAuth iframe on
+  // mobile gameplay. Popup/redirect callers supply the resolver explicitly.
+  const auth = initializeAuth(app, {
+    persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence]
+  });
   const db = getFirestore(app);
   const storage = getStorage(app);
-  if (!cachedAppCheck && config.appCheckSiteKey) {
+  const emulator = readEmulatorConfig();
+  const loopbackHosts = ['localhost', '127.0.0.1', '[::1]'];
+  const localEmulator = emulator && loopbackHosts.includes(emulator.host) &&
+    loopbackHosts.includes(globalThis.location?.hostname) &&
+    ['http:', 'https:'].includes(globalThis.location?.protocol);
+  // Local emulators do not validate App Check. Avoid starting remote CAPTCHA
+  // frames for them; hosted staging/production retain ordinary attestation.
+  if (!localEmulator && !cachedAppCheck && config.appCheckSiteKey) {
     cachedAppCheck = initializeAppCheck(app, {
       provider: new ReCaptchaEnterpriseProvider(config.appCheckSiteKey),
       isTokenAutoRefreshEnabled: true
     });
   }
-  const emulator = readEmulatorConfig();
   if (emulator) {
     connectAuthEmulator(auth, `http://${emulator.host}:${emulator.authPort}`, { disableWarnings: true });
     connectFirestoreEmulator(db, emulator.host, emulator.firestorePort);
@@ -88,6 +74,12 @@ export function initFirebase() {
   }
 
   cachedServices = { app, auth, db, storage, appCheck: cachedAppCheck, config, emulator };
+  if (hasPendingAuthRedirect()) {
+    // A real redirect return must recover without requiring a second click.
+    void getRedirectResult(auth, browserPopupRedirectResolver)
+      .catch(error => console.warn('[auth] Redirect recovery failed:', error))
+      .finally(() => setAuthRedirectPending(false));
+  }
   return cachedServices;
 }
 
@@ -113,12 +105,13 @@ export function setFirebaseConfig(config) {
     throw new Error('Invalid Firebase config. Expected apiKey, projectId, and appId.');
   }
 
+  assertFirebaseEnvironment(normalized);
   localStorage.setItem(FIREBASE_CONFIG_STORAGE_KEY, JSON.stringify(normalized));
   cachedServices = null;
   return normalized;
 }
 
-export { FIREBASE_CONFIG_STORAGE_KEY };
+export { FIREBASE_CONFIG_STORAGE_KEY, readFirebaseConfig, hasFirebaseConfig };
 
 globalThis.WorldExplorerFirebase = {
   initFirebase,

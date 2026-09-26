@@ -5,11 +5,6 @@ const PANORAMAX_API = 'https://panoramax.openstreetmap.fr/api';
 const KARTAVIEW_API = 'https://api.openstreetcam.org/2.0/photo/';
 const OPENSKY_API = 'https://opensky-network.org/api/states/all';
 const ADSB_LOL_API = 'https://api.adsb.lol/v2/point';
-const DEFLOCK_OVERPASS_ENDPOINTS = Object.freeze([
-  'https://lz4.overpass-api.de/api/interpreter',
-  'https://overpass.private.coffee/api/interpreter',
-  'https://overpass-api.de/api/interpreter'
-]);
 const MEMORY_CACHE = new Map();
 const AIRCRAFT_CACHE = new Map();
 const DEFLOCK_CACHE = new Map();
@@ -194,6 +189,7 @@ async function fetchDeFlockOverpass(endpoint, overpassQuery, options, controller
     const payload = typeof response.json === 'function'
       ? await response.json()
       : JSON.parse(await response.text());
+    if (controller.signal.aborted) throw new DOMException('Mapped camera provider timed out', 'AbortError');
     if (!Array.isArray(payload?.elements)) throw new Error('Upstream returned an invalid Overpass payload.');
     return { endpoint, payload };
   } finally {
@@ -210,15 +206,29 @@ async function queryDeFlockCameras(input = {}, options = {}) {
     return { ...cached.value, cache: 'memory', cacheAgeMs: now - cached.savedAt };
   }
 
+  const { OVERPASS_ENDPOINTS, overpassAttemptBudget } = await import('./overpass-provider-policy.mjs');
   const endpoints = Array.isArray(options.endpoints) && options.endpoints.length
     ? options.endpoints
-    : DEFLOCK_OVERPASS_ENDPOINTS;
+    : OVERPASS_ENDPOINTS;
   const controllers = [];
   const overpassQuery = buildDeFlockOverpassQuery(query);
   try {
-    const winner = await Promise.any(endpoints.map((endpoint) => (
-      fetchDeFlockOverpass(String(endpoint), overpassQuery, options, controllers)
-    )));
+    const uniqueEndpoints = [...new Set(endpoints)];
+    const deadline = performance.now() + (Number(options.timeoutMs) || 14000);
+    let winner = null;
+    let lastError = null;
+    for (let index = 0; index < uniqueEndpoints.length; index += 1) {
+      const remainingMs = deadline - performance.now();
+      if (remainingMs <= 0) break;
+      try {
+        winner = await fetchDeFlockOverpass(String(uniqueEndpoints[index]), overpassQuery, {
+          ...options,
+          timeoutMs: overpassAttemptBudget(remainingMs, uniqueEndpoints.length - index)
+        }, controllers);
+        break;
+      } catch (error) { lastError = error; }
+    }
+    if (!winner) throw lastError || new Error('Mapped camera provider deadline expired');
     controllers.forEach((controller) => controller.abort());
     const value = {
       schemaVersion: 1,
@@ -521,7 +531,7 @@ async function queryStreetImagery(input = {}, options = {}) {
 
 function buildGeospatialExports({ functions, setCors }) {
   return {
-    getDeFlockCameras: functions.region('us-central1').https.onRequest(async (req, res) => {
+    getDeFlockCameras: functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
       if (setCors(req, res)) return;
       if (req.method !== 'GET') {
         res.status(405).json({ error: 'Method not allowed.' });
@@ -537,7 +547,7 @@ function buildGeospatialExports({ functions, setCors }) {
         res.status(status).json({ error: error?.message || 'Mapped camera data is unavailable.' });
       }
     }),
-    getStreetImagery: functions.region('us-central1').https.onRequest(async (req, res) => {
+    getStreetImagery: functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
       if (setCors(req, res)) return;
       if (req.method !== 'GET') {
         res.status(405).json({ error: 'Method not allowed.' });
@@ -553,7 +563,7 @@ function buildGeospatialExports({ functions, setCors }) {
         res.status(status).json({ error: status === 504 ? 'Street imagery provider timed out.' : (error?.message || 'Street imagery unavailable.') });
       }
     }),
-    getAircraftStates: functions.region('us-central1').https.onRequest(async (req, res) => {
+    getAircraftStates: functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
       if (setCors(req, res)) return;
       if (req.method !== 'GET') {
         res.status(405).json({ error: 'Method not allowed.' });

@@ -1,8 +1,9 @@
-import { getCurrentUserToken } from './auth-ui.js?v=55';
-import { getFirebaseAppCheckToken, readFirebaseConfig } from './firebase-init.js?v=57';
+import { getCurrentUserToken } from './auth-ui.js?v=56';
+import { getFirebaseAppCheckToken, readFirebaseConfig } from './firebase-init.js?v=58';
+import { assertFunctionsOrigin } from './firebase-environment-policy.js';
 
 const DEFAULT_FUNCTIONS_REGION = 'us-central1';
-const RETRYABLE_STATUS_CODES = new Set([404, 405, 406, 501, 502, 503, 504]);
+const ROUTING_MISS_STATUS_CODES = new Set([404, 405, 501]);
 
 function normalizeBasePath(pathname = '/') {
   const path = String(pathname || '/');
@@ -27,9 +28,8 @@ export function getReturnUrlBase() {
 
 function getDirectFunctionsOrigin() {
   const override = String(globalThis.WORLD_EXPLORER_FUNCTIONS_ORIGIN || '').trim();
-  if (override) return override.replace(/\/$/, '');
-
   const cfg = readFirebaseConfig();
+  if (override) return assertFunctionsOrigin(override, cfg, globalThis.location, globalThis.WORLD_EXPLORER_FIREBASE_EMULATORS);
   const projectId = cfg && cfg.projectId ? String(cfg.projectId).trim() : '';
   if (!projectId) return '';
 
@@ -52,10 +52,6 @@ function buildFunctionCandidates(path) {
   candidates.push(normalizedPath);
   if (directOrigin && !preferDirectOrigin) candidates.push(`${directOrigin}${normalizedPath}`);
   return [...new Set(candidates)];
-}
-
-function isRetryableFunctionStatus(status) {
-  return RETRYABLE_STATUS_CODES.has(Number(status));
 }
 
 function isJsonResponse(res, rawText = '') {
@@ -83,115 +79,96 @@ function unavailableFunctionError(path, attempts = [], label = 'API') {
   );
 }
 
-export async function postAppCheckedFunction(path, body = {}, options = {}) {
-  const appCheckToken = await getFirebaseAppCheckToken();
-  const candidates = buildFunctionCandidates(path);
-  const attempts = [];
-  const label = String(options.label || 'API');
-  for (let i = 0; i < candidates.length; i += 1) {
-    const url = candidates[i];
-    const isLast = i === candidates.length - 1;
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(appCheckToken ? { 'X-Firebase-AppCheck': appCheckToken } : {}),
-          ...(options.headers || {})
-        },
-        body: JSON.stringify(body)
-      });
-      const rawText = await res.text();
-      let payload = null;
-      if (rawText) {
-        try { payload = JSON.parse(rawText); } catch { payload = null; }
-      }
-      attempts.push({ url, status: res.status });
-      if (!isJsonResponse(res, rawText)) {
-        if (!isLast) continue;
-        throw unavailableFunctionError(path, attempts, label);
-      }
-      if (isRetryableFunctionStatus(res.status) && !isLast) continue;
-      if (!res.ok) {
-        if (isRetryableFunctionStatus(res.status)) throw unavailableFunctionError(path, attempts, label);
-        const error = new Error(payload?.error || `Request failed (${res.status})`);
-        error.status = res.status;
-        error.payload = payload;
-        throw error;
-      }
-      return payload || {};
-    } catch (error) {
-      if (!isLast && !error?.status) continue;
-      throw error;
-    }
-  }
-  throw unavailableFunctionError(path, attempts, label);
+function interruptedError(code, message) {
+  return Object.assign(new Error(message), { code, outcomeUnknown: false });
 }
 
-export async function postProtectedFunction(path, body = {}, options = {}) {
-  const token = await getCurrentUserToken(options.forceRefreshToken !== false);
-  const appCheckToken = await getFirebaseAppCheckToken();
-  const candidates = buildFunctionCandidates(path);
-  let lastError = null;
-  const attempts = [];
-  const label = String(options.label || 'API');
-
-  for (let i = 0; i < candidates.length; i += 1) {
-    const url = candidates[i];
-    const isLast = i === candidates.length - 1;
-    let responseRecorded = false;
-
-    try {
-      const res = await fetch(url, {
-        method: options.method || 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-          ...(appCheckToken ? { 'X-Firebase-AppCheck': appCheckToken } : {}),
-          ...(options.headers || {})
-        },
-        body: JSON.stringify(body)
-      });
-
-      const rawText = await res.text();
-      let payload = null;
-      if (rawText) {
-        try {
-          payload = JSON.parse(rawText);
-        } catch {
-          payload = null;
-        }
-      }
-
-      attempts.push({ url, status: res.status });
-      responseRecorded = true;
-
-      if (!isJsonResponse(res, rawText)) {
-        if (!isLast) continue;
-        throw unavailableFunctionError(path, attempts, label);
-      }
-
-      if (isRetryableFunctionStatus(res.status) && !isLast) continue;
-
-      if (!res.ok) {
-        if (isRetryableFunctionStatus(res.status)) {
-          throw unavailableFunctionError(path, attempts, label);
-        }
-        const error = new Error(payload?.error || `Request failed (${res.status})`);
-        error.status = res.status;
-        error.payload = payload;
-        throw error;
-      }
-
-      return payload || {};
-    } catch (err) {
-      lastError = err;
-      if (!responseRecorded) attempts.push({ url, status: null });
-      if (!isLast && !responseRecorded) continue;
-      throw err;
-    }
+// A deadline includes authentication, response headers and response-body delivery.
+// Racing the operation also settles callers when a mocked or stuck provider ignores abort.
+async function withRequestDeadline(options, operation) {
+  const controller = new AbortController();
+  const timeoutMs = Number.isFinite(options.timeoutMs) && options.timeoutMs > 0 ? options.timeoutMs : 60000;
+  let timer;
+  let rejectInterrupted;
+  const interrupted = new Promise((_, reject) => { rejectInterrupted = reject; });
+  const cancel = (error) => { controller.abort(error); rejectInterrupted(error); };
+  const onAbort = () => cancel(interruptedError('request-cancelled', 'Request cancelled.'));
+  try {
+    if (options.signal?.aborted) throw interruptedError('request-cancelled', 'Request cancelled.');
+    options.signal?.addEventListener('abort', onAbort, { once: true });
+    timer = setTimeout(() => cancel(interruptedError('request-timeout', 'The request timed out.')), timeoutMs);
+    return await Promise.race([operation(controller.signal), interrupted]);
+  } finally {
+    clearTimeout(timer);
+    options.signal?.removeEventListener('abort', onAbort);
   }
+}
 
-  if (lastError) throw lastError;
-  throw unavailableFunctionError(path, attempts, label);
+async function requestFunction(path, body, options, authenticated) {
+  let dispatched = false;
+  try {
+    return await withRequestDeadline(options, async signal => {
+      const token = authenticated ? await getCurrentUserToken(options.forceRefreshToken !== false) : null;
+      const appCheckToken = await getFirebaseAppCheckToken();
+      if (signal.aborted) throw signal.reason;
+      const serializedBody = JSON.stringify(body);
+      const candidates = buildFunctionCandidates(path);
+      const attempts = [];
+      for (let i = 0; i < candidates.length; i += 1) {
+        if (signal.aborted) throw signal.reason;
+        const url = candidates[i];
+        dispatched = true;
+        const res = await fetch(url, {
+          method: options.method || 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(authenticated ? { Authorization: `Bearer ${token}` } : {}),
+            ...(appCheckToken ? { 'X-Firebase-AppCheck': appCheckToken } : {}),
+            ...(options.headers || {})
+          },
+          body: serializedBody,
+          signal
+        });
+        const rawText = await res.text();
+        attempts.push({ url, status: res.status });
+        let payload;
+        try { payload = JSON.parse(rawText); } catch { payload = null; }
+        const json = isJsonResponse(res, rawText);
+        // Only a non-JSON routing rejection may select a different endpoint.
+        // Network errors, gateway failures and malformed successful responses may
+        // follow a committed write and must never trigger an automatic replay.
+        if (!json && ROUTING_MISS_STATUS_CODES.has(res.status) && i < candidates.length - 1) {
+          dispatched = false;
+          continue;
+        }
+        if (!json || (res.ok && (!payload || typeof payload !== 'object'))) {
+          const error = unavailableFunctionError(path, attempts, String(options.label || 'API'));
+          error.status = res.status;
+          error.outcomeUnknown = res.ok || res.status >= 500;
+          throw error;
+        }
+        if (!res.ok) {
+          throw Object.assign(new Error(payload?.error || `Request failed (${res.status})`), {
+            status: res.status, payload, outcomeUnknown: res.status >= 500
+          });
+        }
+        return payload;
+      }
+      throw unavailableFunctionError(path, attempts, String(options.label || 'API'));
+    });
+  } catch (error) {
+    if (dispatched && (!error.status || error.status >= 500 || error.outcomeUnknown)) {
+      error.outcomeUnknown = true;
+      error.message = `${error.message} The operation may have completed. Check its status before submitting again.`;
+    }
+    throw error;
+  }
+}
+
+export function postAppCheckedFunction(path, body = {}, options = {}) {
+  return requestFunction(path, body, options, false);
+}
+
+export function postProtectedFunction(path, body = {}, options = {}) {
+  return requestFunction(path, body, options, true);
 }

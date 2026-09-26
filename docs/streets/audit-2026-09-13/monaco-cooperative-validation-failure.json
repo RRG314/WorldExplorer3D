@@ -1,0 +1,8 @@
+[
+  {
+    "level": "warn",
+    "message": "[WorldLoad] publishStreetPavement failed: Error: Pavement has incomplete or overlapping terrain support: {\"sourceArea\":28.159898499999986,\"coveredArea\":28.16000953484705,\"difference\":0.00011103484706254108}\n    at conformPavementMesh (http://127.0.0.1:4192/app/js/world/pavement-terrain-conformance.js:7:27)\n    at conformPavementMeshCooperatively (http://127.0.0.1:4192/app/js/world/pavement-terrain-conformance.js:43:5)\n    at async publishStreetPavement (http://127.0.0.1:4192/app/js/world/street-pavement-runtime.js:265:30)\n    at async finalizeLoadedWorld (http://127.0.0.1:4192/app/js/world/load-support.js?v=44:130:34)\n    at async markLoaded (http://127.0.0.1:4192/app/js/world/load-roads.js?v=226:287:7)\n    at async loadRoadsInternal (http://127.0.0.1:4192/app/js/world/load-roads.js?v=226:1037:11)\n    at async Object.loadRoads (http://127.0.0.1:4192/app/js/world.js?v=473:292:20)\n    at async runTitleStart (http://127.0.0.1:4192/app/js/ui/title-screen.js?v=118:707:5)",
+    "timestamp": "2026-09-15T11:56:59.372Z",
+    "url": "http://127.0.0.1:4192/app/js/world/load-support.js?v=44"
+  }
+]

@@ -44,6 +44,8 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
   }
 
   function setStatus(message, warn = false) {
+    state.lastActionStatus = String(message || '');
+    state.lastActionStatusWarn = warn === true;
     if (refs.titleStatus) {
       refs.titleStatus.textContent = message || "";
       refs.titleStatus.style.color = warn ? "#ef4444" : "#64748b";
@@ -64,12 +66,11 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
     if (!refs.titleBrowseList) return;
 
     if (!state.browseRooms.length) {
-      if (state.browseCityKey) {
-        refs.titleBrowseList.innerHTML = '<li class="mpRoomEmpty">No public rooms found for that city tag.</li>';
-      } else {
-        refs.titleBrowseList.innerHTML =
-          '<li class="mpRoomEmpty">Search a city to find public rooms (view-only if signed out).</li>';
-      }
+      const message = state.browsePhase === 'loading' ? 'Loading public rooms…' :
+        state.browsePhase === 'error' ? 'Room directory unavailable. Try Browse again.' :
+        state.browseCityKey ? 'No public rooms with this city tag. Clear the filter to browse all rooms.' :
+        state.browsePhase === 'ready' ? 'No public rooms yet. Create one or use an invite code.' : 'Browse public rooms; city filter is optional.';
+      refs.titleBrowseList.innerHTML = `<li class="mpRoomEmpty">${message}</li>`;
       publishMapRoomsToContext();
       return;
     }
@@ -82,7 +83,7 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
         const locationLabel = safeHtml(room.locationTag?.label || room.locationTag?.city || "Unknown location", 80);
         const joinButton = state.authUser
           ? `<button class="mp-btn secondary mpRoomJoinBtn" data-room-code="${escapeHtml(code)}" type="button">Join</button>`
-          : '<button class="mp-btn secondary mpRoomJoinBtn" type="button" disabled title="Sign in to join">View</button>';
+          : `<button class="mp-btn secondary mpRoomJoinBtn" data-room-code="${escapeHtml(code)}" type="button">Sign in to join</button>`;
         return `<li class="mpRoomItem"><div class="mpRoomInfo"><div class="mpRoomName">${roomName}</div><div class="mpRoomMeta">${locationLabel} • ${escapeHtml(worldKind)} • ${escapeHtml(code)}</div></div>${joinButton}</li>`;
       })
       .join("");
@@ -124,7 +125,7 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
         const locationLabel = safeHtml(room.locationTag?.label || room.locationTag?.city || "Unknown location", 80);
         const joinButton = state.authUser
           ? `<button class="mp-btn secondary mpRoomJoinBtn" data-room-code="${escapeHtml(code)}" type="button">Join</button>`
-          : '<button class="mp-btn secondary mpRoomJoinBtn" type="button" disabled title="Sign in to join">View</button>';
+          : `<button class="mp-btn secondary mpRoomJoinBtn" data-room-code="${escapeHtml(code)}" type="button">Sign in to join</button>`;
         return `<li class="mpRoomItem"><div class="mpRoomInfo"><div class="mpRoomName">${roomName}</div><div class="mpRoomMeta">${locationLabel} • ${escapeHtml(code)}</div></div>${joinButton}</li>`;
       })
       .join("");
@@ -397,11 +398,14 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
       refs.floatGhosts.classList.toggle("disabled", !hasRoom);
     }
     if (refs.floatChat) {
+      refs.floatChat.hidden = !hasRoom;
       refs.floatChat.classList.toggle("on", state.chatOpen);
+      refs.floatChat.setAttribute("aria-expanded", String(state.chatOpen));
       refs.floatChat.classList.toggle("disabled", !hasRoom);
     }
     if (refs.chatToggleBtn) {
       refs.chatToggleBtn.classList.toggle("on", state.chatOpen);
+      refs.chatToggleBtn.setAttribute("aria-expanded", String(state.chatOpen));
       refs.chatToggleBtn.disabled = !hasRoom;
     }
     if (refs.chatSendBtn) refs.chatSendBtn.disabled = !hasRoom;
@@ -523,7 +527,16 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
 
   function setChatOpen(open) {
     state.chatOpen = !!open;
-    if (refs.chatDrawer) refs.chatDrawer.classList.toggle("open", state.chatOpen);
+    if (refs.chatDrawer) {
+      const focused = refs.chatDrawer.ownerDocument?.activeElement;
+      // Opacity/translation alone leave invisible controls in keyboard and
+      // accessibility navigation. Release chat's focus before hiding it so
+      // the gameplay input guard does not keep treating movement as typing.
+      if (!state.chatOpen && focused && refs.chatDrawer.contains(focused)) focused.blur();
+      refs.chatDrawer.inert = !state.chatOpen;
+      refs.chatDrawer.setAttribute("aria-hidden", String(!state.chatOpen));
+      refs.chatDrawer.classList.toggle("open", state.chatOpen);
+    }
     updateToggleStates();
   }
 

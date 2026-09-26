@@ -1,3 +1,5 @@
+import {prepareHomePhotoSurfaces} from './home-photo-surfaces.js';
+import './capture-theme.js';
 import {
   requestPrivateSpaceAccess,
   resolveBuildingInteriorRepresentation
@@ -25,7 +27,16 @@ export async function resolveCommunityInteriorDefinition(appCtx, support, resolv
   if (!sourceBuildingId || !worldId) return resolveFallback(support);
   try {
     const roomId = canonicalRoomId(appCtx);
-    const response = await resolveBuildingInteriorRepresentation(sourceBuildingId, worldId, roomId);
+    let response = await resolveBuildingInteriorRepresentation(sourceBuildingId, worldId, roomId);
+    if(response?.selectionRequired){
+      const dialog=document.createElement('dialog');dialog.className='realityCaptureDialog';dialog.setAttribute('aria-label','Choose an interior');
+      const title=document.createElement('h2');title.textContent='Choose an interior';dialog.append(title);
+      for(const [index,space] of response.spaces.entries()){const b=document.createElement('button');b.textContent=`${space.label} · ${index+1}`;b.onclick=()=>dialog.close(space.spaceId);dialog.append(b);}
+      const cancel=document.createElement('button');cancel.textContent='Back outside';cancel.onclick=()=>dialog.close();dialog.append(cancel);document.body.append(dialog);dialog.showModal();
+      const id=await new Promise(resolve=>dialog.addEventListener('close',()=>resolve(dialog.returnValue),{once:true}));dialog.remove();
+      if(!id)return {accessDenied:true,label:'Interior selection cancelled',reason:'cancelled',requestable:false};
+      response=await resolveBuildingInteriorRepresentation(sourceBuildingId,worldId,roomId,id);
+    }
     if (!response?.available) return resolveFallback(support);
     if (!response.authorized) {
       return {
@@ -111,20 +122,25 @@ export async function attachCommunityInteriorRepresentation(appCtx, active) {
       return false;
     }
     const alignment = representation.alignment || {};
-    applyCaptureAlignment(root, alignment, { x: finite(active.center?.x), y: finite(active.floorBaseY), z: finite(active.center?.z) });
+    if(representation.representationKind==='home-layout')applyCaptureAlignment(root,{},{});
+    else applyCaptureAlignment(root, alignment, { x: finite(active.center?.x), y: finite(active.floorBaseY), z: finite(active.center?.z) });
     root.userData.communityRealityCapture = Object.freeze({
       captureId: String(representation.captureId || ''),
       spaceId: String(representation.spaceId || ''),
       presentationOnly: true,
-      collisionAuthority: 'generated-interior-proxy'
+      collisionAuthority: representation.representationKind==='home-layout'?'authored-layout':'generated-interior-proxy'
     });
+    if(representation.representationKind==='home-layout')prepareHomePhotoSurfaces(root,representation.layout);
     root.traverse((object) => {
       if (!object?.isMesh) return;
       object.castShadow = true;
       object.receiveShadow = true;
       object.frustumCulled = true;
+      if(representation.representationKind==='home-layout'){
+        for(const material of Array.isArray(object.material)?object.material:[object.material]){material.polygonOffset=true;material.polygonOffsetFactor=-2;material.polygonOffsetUnits=-2;}
+      }
     });
-    active.group.traverse((object) => {
+    if(representation.representationKind!=='home-layout')active.group.traverse((object) => {
       if (object?.isMesh && !isInteractionVisual(object)) object.visible = false;
     });
     active.group.add(root);

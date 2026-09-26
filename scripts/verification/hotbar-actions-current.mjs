@@ -1,20 +1,57 @@
+import { waitForAsyncCondition } from './async-browser-condition.mjs';
+import { selectLowRenderQuality } from './render-quality-ui.mjs';
+import { softwareCompositorArgs } from './software-compositor.mjs';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 
 const baseUrl = String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4192').replace(/\/$/, '');
 const outputDir = path.resolve('output/verification/hotbar-actions-current');
 await fs.mkdir(outputDir, { recursive: true });
 
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
-const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const resumeStage = Number(process.env.WE3D_HOTBAR_RESUME_STAGE || 0);
 const onlyAction = String(process.env.WE3D_HOTBAR_ONLY_ACTION || '');
+console.log(JSON.stringify({ evidenceScope: 'functional hotbar journeys; not frame rate or default-quality acceptance', renderProfile: process.env.CI ? 'low quality selected through Settings; DPR 0.5' : 'default quality', mobileIdentity: 'iPhone user agent with touch viewport' }));
 const failures = [];
 const completed = [];
 const localRequestFailures = [];
 const pageErrors = [];
+
+async function withJourney(name, mobile, run) {
+  const browser = await chromium.launch({
+    headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280', ...softwareCompositorArgs()]
+  });
+  let page;
+  let crashed = false;
+  try {
+    const context = await browser.newContext({
+      ...(mobile ? { userAgent: devices['iPhone 13'].userAgent } : {}),
+      deviceScaleFactor: process.env.CI ? 0.5 : 1,
+      viewport: mobile ? { width: 390, height: 844 } : { width: 1440, height: 900 },
+      hasTouch: mobile, isMobile: mobile
+    });
+    page = await context.newPage();
+    await configureStagingAppCheck(page, baseUrl);
+    watchPage(page);
+    const crash = new Promise((_, reject) => page.once('crash', () => {
+      crashed = true;
+      reject(new Error(`Gameplay renderer crashed during ${name}.`));
+    }));
+    return await Promise.race([run(page), crash]);
+  } catch (error) {
+    const state = page && !crashed ? await snapshot(page).catch(() => null) : null;
+    await fs.writeFile(path.join(outputDir, `${name}-failure.json`), JSON.stringify({
+      error: String(error?.stack || error), completed, state, pageErrors, localRequestFailures
+    }, null, 2));
+    if (!crashed) await page?.screenshot({ path: path.join(outputDir, `${name}-failure.png`), timeout: 10000 }).catch(() => {});
+    throw error;
+  } finally {
+    await browser.close();
+  }
+}
 
 function mark(label, details = '') {
   completed.push({ label, details });
@@ -22,6 +59,7 @@ function mark(label, details = '') {
 }
 
 function watchPage(page) {
+  collectBrowserGraphicsErrors(page, pageErrors);
   page.on('pageerror', (error) => pageErrors.push(String(error?.stack || error)));
   page.on('requestfailed', (request) => {
     const reason = request.failure()?.errorText || '';
@@ -51,12 +89,13 @@ async function startEarth(page, suffix) {
     await page.locator('#analyticsConsentDenyBtn').click();
   }
   if (await page.locator('#globeSelectorStartBtn').isVisible().catch(() => false)) {
+    if (process.env.CI) await selectLowRenderQuality(page);
     await page.locator('#globeSelectorStartBtn').click();
   } else {
     await page.locator('#startBtn').click();
   }
   await page.locator('#loading.show').waitFor({ state: 'hidden', timeout: 180_000 });
-  await page.waitForFunction(async () => {
+  await waitForAsyncCondition(page, async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     return !!(ctx.gameStarted && ctx.initialEarthWorldReady && !ctx.worldLoading && ctx.worldDiscoveryRuntime && ctx.urbanSandboxRuntime);
   }, null, { timeout: 180_000 });
@@ -106,7 +145,7 @@ async function verifyEarthActions(page) {
   mark('Explore · DeFlock Hunt', 'gameplay authority active');
 
   await clickMenuItem(page, 'exploreBtn', 'exploreMenu', 'fFlowerChallenge');
-  await page.waitForFunction(async () => {
+  await waitForAsyncCondition(page, async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     return ctx.getFlowerChallengeBackendStatus?.().challengeActive === true;
   }, null, { timeout: 20_000 });
@@ -154,15 +193,33 @@ async function verifyEarthActions(page) {
   await clickMenuItem(page, 'travelBtn', 'travelMenu', 'fWorldMap');
   await page.locator('#largeMap').waitFor({ state: 'visible', timeout: 10_000 });
   assert.equal(await page.locator('#mapSearchInput').isVisible().catch(() => false), true);
-  const worldSequenceBeforeSearch = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().livingWorld?.sequence || 0);
+  const observeSearchWorld = () => page.evaluate(() => {
+    const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
+    return { worldLoading: state.worldLoading, worldLoad: state.worldLoad,
+      sequence: state.livingWorld?.sequence, requestId: state.livingWorld?.requestId,
+      worldIdentity: state.livingWorld?.worldIdentity,
+      loadingVisible: document.getElementById('loading')?.classList.contains('show') === true };
+  });
+  const searchObservation = { before: await observeSearchWorld(), startedAt: new Date().toISOString() };
+  const worldSequenceBeforeSearch = Number(searchObservation.before.sequence || 0);
+  await fs.writeFile(path.join(outputDir, 'map-search-observation.json'), JSON.stringify(searchObservation, null, 2));
   await page.locator('#mapSearchInput').fill('39.2904, -76.6122');
   await page.locator('#mapSearchBtn').click();
   await page.locator('#largeMap').waitFor({ state: 'hidden', timeout: 20_000 });
-  await page.waitForFunction((priorSequence) => {
-    const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
-    return diagnostics.worldLoading === false
-      && Number(diagnostics.livingWorld?.sequence || 0) > priorSequence;
-  }, worldSequenceBeforeSearch, { timeout: 180_000 });
+  try {
+  await waitForAsyncCondition(page, async (priorSequence) => {
+    if (document.getElementById('loading')?.classList.contains('show')) return false;
+    // Read only publication ownership. Full diagnostics rebuild several world
+    // inventories and must not run every half second during world loading.
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return ctx.worldLoading === false
+      && Number(ctx.livingWorldRuntime?.publication?.sequence || 0) > priorSequence;
+  }, worldSequenceBeforeSearch, { timeout: 180_000, polling: 500 });
+  } finally {
+    searchObservation.after = await observeSearchWorld();
+    searchObservation.finishedAt = new Date().toISOString();
+    await fs.writeFile(path.join(outputDir, 'map-search-observation.json'), JSON.stringify(searchObservation, null, 2));
+  }
   await page.locator('#loading.show').waitFor({ state: 'hidden', timeout: 180_000 });
   const searchedLocation = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
@@ -216,7 +273,7 @@ async function verifyEarthActions(page) {
     if (walker) { walker.y = -500; walker.vy = -10; walker.onGround = false; }
   });
   await clickMenuItem(page, 'travelBtn', 'travelMenu', 'fRespawn');
-  await page.waitForFunction(async () => {
+  await waitForAsyncCondition(page, async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     return Number(ctx.Walk?.state?.walker?.y) > -100 && ctx.Walk?.state?.walker?.onGround === true;
   }, null, { timeout: 20_000 });
@@ -310,7 +367,7 @@ async function verifyEarthActions(page) {
   mark('Context · Current Controls');
   }
 
-  await page.screenshot({ path: path.join(outputDir, 'desktop-earth-actions.png'), fullPage: true });
+  await page.screenshot({ path: path.join(outputDir, 'desktop-earth-actions.png'), fullPage: false });
 }
 
 async function verifyEnvironmentAndSpaceActions(page) {
@@ -323,7 +380,7 @@ async function verifyEnvironmentAndSpaceActions(page) {
     return state.environment === 'EARTH' && state.worldLoading === false && state.modes?.ocean === false;
   }, null, { timeout: 120_000 });
   await page.locator('#loading.show').waitFor({ state: 'hidden', timeout: 120_000 });
-  await page.waitForFunction(async () => {
+  await waitForAsyncCondition(page, async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     return ctx.initialEarthWorldReady && !ctx.worldLoading;
   }, null, { timeout: 120_000 });
@@ -340,12 +397,10 @@ async function verifyEnvironmentAndSpaceActions(page) {
   const interior = (await snapshot(page)).expeditionShipInterior;
   assert.ok(interior?.crewActors?.length >= 1, JSON.stringify(interior));
   mark('Travel · Board Solis Reach', 'playable ship interior reached');
-  await page.screenshot({ path: path.join(outputDir, 'desktop-solis-reach.png'), fullPage: true });
+  await page.screenshot({ path: path.join(outputDir, 'desktop-solis-reach.png'), fullPage: false });
 }
 
-async function verifyIsolatedSpaceAction(actionId, label, predicate) {
-  const page = await context.newPage();
-  watchPage(page);
+async function verifyIsolatedSpaceAction(page, actionId, label, predicate) {
   await startEarth(page, actionId);
   await clickMenuItem(page, 'travelBtn', 'travelMenu', actionId);
   try {
@@ -355,13 +410,9 @@ async function verifyIsolatedSpaceAction(actionId, label, predicate) {
     throw new Error(`${label} did not reach its end state. Current state: ${JSON.stringify(state)}\n${error?.stack || error}`);
   }
   mark(label);
-  await page.close();
 }
 
-async function verifyMobileAccess() {
-  const mobileContext = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
-  const page = await mobileContext.newPage();
-  watchPage(page);
+async function verifyMobileAccess(page) {
   await startEarth(page, 'mobile');
   await clickMenuItem(page, 'exploreBtn', 'exploreMenu', 'fWorldDiscovery');
   await page.locator('#discoveryPanel[aria-hidden="false"]').waitFor({ state: 'visible', timeout: 20_000 });
@@ -385,39 +436,38 @@ async function verifyMobileAccess() {
   await page.locator('#controlsBarBtn').click();
   assert.notEqual(await page.locator('#controlsTab').evaluate((el) => getComputedStyle(el).display), 'none');
   assert.equal(await page.locator('#ctrlContent').evaluate((el) => el.classList.contains('hidden')), false);
-  await page.screenshot({ path: path.join(outputDir, 'mobile-hotbar-access.png'), fullPage: true });
+  await page.screenshot({ path: path.join(outputDir, 'mobile-hotbar-access.png'), fullPage: false });
   mark('Mobile 390×844 access', 'all five roots and Controls accept one touch without double-toggle');
-  await mobileContext.close();
 }
 
 try {
   if (!onlyAction) {
-    const page = await context.newPage();
-    watchPage(page);
-    await startEarth(page, 'main');
-    await verifyEarthActions(page);
-    await verifyEnvironmentAndSpaceActions(page);
-    await page.close();
+    await withJourney('main', false, async (page) => {
+      await startEarth(page, 'main');
+      await verifyEarthActions(page);
+      await verifyEnvironmentAndSpaceActions(page);
+    });
   }
 
-  if (!onlyAction || onlyAction === 'fSpaceRocket') await verifyIsolatedSpaceAction('fSpaceRocket', 'Travel · Free Space Flight', () => {
+  if (!onlyAction || onlyAction === 'fSpaceRocket') await withJourney('space-flight', false, (page) => verifyIsolatedSpaceAction(page, 'fSpaceRocket', 'Travel · Free Space Flight', () => {
     const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
     return state.modes?.space === true && state.spaceFlight?.controlMode === 'flying';
-  });
-  if (!onlyAction || onlyAction === 'fSpaceDirect') await verifyIsolatedSpaceAction('fSpaceDirect', 'Travel · Direct to Moon', () => {
+  }));
+  if (!onlyAction || onlyAction === 'fSpaceDirect') await withJourney('moon', false, (page) => verifyIsolatedSpaceAction(page, 'fSpaceDirect', 'Travel · Direct to Moon', () => {
     const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
     return state.environment === 'MOON' && state.worldLoading === false;
-  });
-  if (!onlyAction || onlyAction === 'mobile') await verifyMobileAccess();
+  }));
+  if (!onlyAction || onlyAction === 'mobile') await withJourney('mobile', true, verifyMobileAccess);
 } catch (error) {
   failures.push(String(error?.stack || error));
-} finally {
-  await context.close();
-  await browser.close();
 }
 
 failures.push(...pageErrors, ...localRequestFailures);
-const report = { ok: failures.length === 0, baseUrl, completed, failures };
+const report = {
+  ok: failures.length === 0, baseUrl, completed, failures,
+  complete: !onlyAction && resumeStage === 0,
+  browserBudget: { maxOldSpaceMiB: 1280, freshBrowserPerJourney: true }
+};
 await fs.writeFile(path.join(outputDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
 console.log(JSON.stringify(report, null, 2));
 assert.deepEqual(failures, []);

@@ -1,8 +1,13 @@
+import { selectLowRenderQuality } from './render-quality-ui.mjs';
+import { softwareCompositorArgs } from './software-compositor.mjs';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { stepGameplayKeys } from './gameplay-simulation.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 
 const root = process.cwd();
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
@@ -10,13 +15,22 @@ const servedRoot = requestedRoot ? path.resolve(root, requestedRoot) : root;
 const server = await startStaticServer({ rootDir: servedRoot, ports: [4389, 4390, 4391] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
 const reportPath = path.join(root, 'output', 'verification', 'interiors', 'report.json');
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
-let context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+const launchBrowser = () => chromium.launch({
+  headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024', ...softwareCompositorArgs()]
+});
+let browser = await launchBrowser();
+let context = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: process.env.CI ? 0.5 : 1 });
 let page = await context.newPage();
 const browserErrors = [];
 const browserConsole = [];
 const localFailures = [];
+const progress = { stage: 'desktop-load', navigationTiming: 'dom-keyboard-runtime-fixed-step', renderProfile: process.env.CI ? 'low quality via Settings; DPR 0.5; functional traversal only' : 'default quality' };
+function markStage(stage, evidence = {}) {
+  Object.assign(progress, evidence, { stage });
+  console.log(`[interiors] ${stage}`);
+}
 function bindPageEvidence(targetPage) {
+  collectBrowserGraphicsErrors(targetPage, browserErrors);
   targetPage.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   targetPage.on('console', (message) => {
     if (['warning', 'error'].includes(message.type())) browserConsole.push(`${message.type()}: ${message.text()}`);
@@ -26,10 +40,11 @@ function bindPageEvidence(targetPage) {
   });
 }
 bindPageEvidence(page);
+await configureStagingAppCheck(page, baseUrl);
 
 const params = new URLSearchParams({
   loc: 'custom', lat: '39.28378', lon: '-76.61244', lname: 'Baltimore Visitor Center',
-  launch: 'earth', gm: 'free', mode: 'walk'
+  launch: 'earth', gm: 'free', mode: 'walking'
 });
 
 async function waitForWorld() {
@@ -37,13 +52,15 @@ async function waitForWorld() {
   const consentButton = page.locator('#analyticsConsentDenyBtn');
   if (await consentButton.isVisible()) await consentButton.click();
   if (await page.locator('#globeSelectorStartBtn').isVisible().catch(() => false)) {
+    if (process.env.CI) await selectLowRenderQuality(page);
     await page.locator('#globeSelectorStartBtn').click();
   }
   await page.waitForFunction(() => {
+    if (document.getElementById('loading')?.classList.contains('show')) return false;
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return diagnostics.gameStarted === true && diagnostics.worldLoading === false && diagnostics.modes?.walking === true &&
       Number(diagnostics.worldCounts?.buildings || 0) > 0;
-  }, null, { timeout: 300_000 });
+  }, null, { timeout: 300_000, polling: 500 });
   await page.waitForTimeout(2_500);
 }
 
@@ -127,6 +144,16 @@ async function chooseTarget() {
   });
 }
 
+// Use bounded input bursts proportional to the remaining turn/distance. The
+// old 16–90ms bursts incurred a complete software-renderer readback for each
+// few centimetres. Physics still executes every fixed step and owns collisions.
+function turnBurstMs(delta) {
+  return Math.max(16, Math.min(600, Math.abs(delta) / 2.6 * 800));
+}
+function walkBurstMs(distance, stopDistance = 0) {
+  return Math.max(40, Math.min(600, Math.max(0, distance - stopDistance) / 2.8 * 800));
+}
+
 function wrapYaw(value) {
   let result = Number(value) || 0;
   while (result > Math.PI) result -= Math.PI * 2;
@@ -152,9 +179,7 @@ async function walkToInteriorPrompt(target, maxSteps = 1_400) {
       );
       const delta = wrapYaw(targetYaw - yaw);
       if (Math.abs(delta) <= 0.11) return true;
-      await page.keyboard.down(delta > 0 ? 'ArrowLeft' : 'ArrowRight');
-      await page.evaluate(() => globalThis.advanceTime?.(70));
-      await page.keyboard.up(delta > 0 ? 'ArrowLeft' : 'ArrowRight');
+      await stepGameplayKeys(page, delta > 0 ? 'ArrowLeft' : 'ArrowRight', turnBurstMs(delta));
     }
     return false;
   };
@@ -166,11 +191,7 @@ async function walkToInteriorPrompt(target, maxSteps = 1_400) {
     const turned = await turnTowardYaw(tangentYaw);
     if (!turned) return false;
     const detourDurationMs = Math.max(900, Math.min(5_200, Number(remainingDistance || 0) * 125));
-    await page.keyboard.down('ShiftLeft');
-    await page.keyboard.down('ArrowUp');
-    await page.evaluate((durationMs) => globalThis.advanceTime?.(durationMs), detourDurationMs);
-    await page.keyboard.up('ArrowUp');
-    await page.keyboard.up('ShiftLeft');
+    await stepGameplayKeys(page, ['ShiftLeft', 'ArrowUp'], detourDurationMs);
     return true;
   };
 
@@ -192,7 +213,7 @@ async function walkToInteriorPrompt(target, maxSteps = 1_400) {
       };
     }, target.approachTarget);
     if (step % 20 === 0) path.push(state);
-    if (state.promptVisible && /enter/i.test(state.promptText) && state.promptTargetKey === target.key) {
+    if (state.promptVisible && state.promptTargetKey === target.key) {
       return { reached: true, steps: step, path, final: state };
     }
     assert.equal(Number.isFinite(state.x) && Number.isFinite(state.z) && Number.isFinite(state.yaw), true, 'Walking actor state became unavailable.');
@@ -201,16 +222,11 @@ async function walkToInteriorPrompt(target, maxSteps = 1_400) {
     const yawDelta = wrapYaw(desiredYaw - state.yaw);
     if (Math.abs(yawDelta) > 0.14) {
       const turnKey = yawDelta > 0 ? 'ArrowLeft' : 'ArrowRight';
-      await page.keyboard.down(turnKey);
-      await page.evaluate(() => globalThis.advanceTime?.(70));
-      await page.keyboard.up(turnKey);
+      await stepGameplayKeys(page, turnKey, turnBurstMs(yawDelta));
+      continue; // Turning cannot demonstrate blocked translation.
     } else {
       const running = state.distance > 24;
-      if (running) await page.keyboard.down('ShiftLeft');
-      await page.keyboard.down('ArrowUp');
-      await page.evaluate(() => globalThis.advanceTime?.(140));
-      await page.keyboard.up('ArrowUp');
-      if (running) await page.keyboard.up('ShiftLeft');
+      await stepGameplayKeys(page, running ? ['ShiftLeft', 'ArrowUp'] : 'ArrowUp', walkBurstMs(state.distance) / (running ? 2 : 1));
     }
     if (state.distance >= previousDistance - 0.015) stagnant += 1;
     else stagnant = 0;
@@ -235,7 +251,8 @@ async function walkToPoint(target, options = {}) {
   const allowBlocked = options.allowBlocked === true;
   const allowDetour = options.detour === true;
   const path = [];
-  let stagnant = 0;
+  let stagnantMs = 0;
+  let previousMoveMs = 0;
   let previousDistance = Infinity;
   let start = null;
   let detourCount = 0;
@@ -252,7 +269,11 @@ async function walkToPoint(target, options = {}) {
       };
     }, target);
     if (!start) start = state;
-    if (step % 20 === 0) path.push(state);
+    if (step % 20 === 0) {
+      path.push(state);
+      progress.navigation = { step, target, state, detourCount };
+      console.log('[interior-navigation]', JSON.stringify(progress.navigation));
+    }
     if (state.distance <= stopDistance) {
       return { reached: true, blocked: false, steps: step, start, final: state, path };
     }
@@ -262,18 +283,17 @@ async function walkToPoint(target, options = {}) {
     const yawDelta = wrapYaw(desiredYaw - state.yaw);
     if (Math.abs(yawDelta) > 0.12) {
       const turnKey = yawDelta > 0 ? 'ArrowLeft' : 'ArrowRight';
-      await page.keyboard.down(turnKey);
-      await page.evaluate(() => globalThis.advanceTime?.(55));
-      await page.keyboard.up(turnKey);
+      await stepGameplayKeys(page, turnKey, turnBurstMs(yawDelta));
+      continue; // Turning cannot demonstrate blocked translation.
     } else {
-      await page.keyboard.down('ArrowUp');
-      await page.evaluate(() => globalThis.advanceTime?.(90));
-      await page.keyboard.up('ArrowUp');
+      const duration = walkBurstMs(state.distance, stopDistance);
+      await stepGameplayKeys(page, 'ArrowUp', duration);
+      if (state.distance >= previousDistance - 0.008) stagnantMs += previousMoveMs;
+      else stagnantMs = 0;
+      previousMoveMs = duration;
     }
-    if (state.distance >= previousDistance - 0.008) stagnant += 1;
-    else stagnant = 0;
     previousDistance = state.distance;
-    if (allowDetour && stagnant > 20 && detourCount < 8) {
+    if (allowDetour && stagnantMs > 2000 && detourCount < 8) {
       const side = detourCount % 2 === 0 ? 1 : -1;
       detourCount += 1;
       const tangentYaw = wrapYaw(desiredYaw + side * Math.PI / 2);
@@ -284,21 +304,18 @@ async function walkToPoint(target, options = {}) {
         const delta = wrapYaw(tangentYaw - yaw);
         if (Math.abs(delta) <= 0.11) break;
         const turnKey = delta > 0 ? 'ArrowLeft' : 'ArrowRight';
-        await page.keyboard.down(turnKey);
-        await page.evaluate(() => globalThis.advanceTime?.(65));
-        await page.keyboard.up(turnKey);
+        await stepGameplayKeys(page, turnKey, turnBurstMs(delta));
       }
       const detourDurationMs = Math.max(700, Math.min(2_500, state.distance * 160));
-      await page.keyboard.down('ArrowUp');
-      await page.evaluate((durationMs) => globalThis.advanceTime?.(durationMs), detourDurationMs);
-      await page.keyboard.up('ArrowUp');
+      await stepGameplayKeys(page, 'ArrowUp', detourDurationMs);
       path.push({ ...state, detour: detourCount });
-      stagnant = 0;
+      stagnantMs = 0;
+      previousMoveMs = 0;
       previousDistance = Infinity;
       continue;
     }
-    if (stagnant > 70) {
-      if (allowBlocked) return { reached: false, blocked: true, steps: step, start, final: state, path };
+    if (stagnantMs > 7000) {
+      if (allowBlocked) return { reached: false, blocked: true, stagnantMs, steps: step, start, final: state, path };
       break;
     }
   }
@@ -311,7 +328,7 @@ async function walkToPoint(target, options = {}) {
       distance: Math.hypot(Number(x) - Number(actor.position?.x), Number(z) - Number(actor.position?.z))
     };
   }, target);
-  return { reached: false, blocked: allowBlocked, steps: maxSteps, start, final, path };
+  return { reached: false, blocked: false, budgetExhausted: true, stagnantMs, steps: maxSteps, start, final, path };
 }
 
 async function interiorOwnershipSnapshot(targetKey) {
@@ -417,9 +434,7 @@ async function climbPublishedStairs() {
 
 async function backAwayFromWall() {
   const before = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.position || null);
-  await page.keyboard.down('ArrowDown');
-  await page.evaluate(() => globalThis.advanceTime?.(1_200));
-  await page.keyboard.up('ArrowDown');
+  await stepGameplayKeys(page, 'ArrowDown', 1_200);
   const after = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.position || null);
   return {
     before,
@@ -463,6 +478,22 @@ async function tapVisibleInteriorPrompt() {
   return bounds;
 }
 
+async function mobileInteriorPromptLayout() {
+  return page.evaluate(() => {
+    const prompt = document.getElementById('interiorPrompt');
+    const rect = prompt.getBoundingClientRect();
+    const controls = ['mobileMovePad', 'mobileLookPad', 'mobileActionPrimary', 'mobileActionSecondary']
+      .map(id => {
+        const node = document.getElementById(id), r = node.getBoundingClientRect();
+        const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+        return { id, hit: node === hit || node.contains(hit),
+          overlapsPrompt: r.x < rect.right && r.right > rect.left && r.y < rect.bottom && r.bottom > rect.top };
+      });
+    return { prompt: rect.toJSON(), controls,
+      ok: controls.every(control => control.hit && !control.overlapsPrompt) };
+  });
+}
+
 async function chooseElevatorFloor(level) {
   await page.waitForSelector('#interiorElevatorFloorPicker', { timeout: 10_000 });
   const choices = await page.locator('#interiorElevatorFloorPicker [data-elevator-level]').evaluateAll((buttons) =>
@@ -494,6 +525,7 @@ try {
   assert.ok(target, 'No published enterable building support was available within 650 meters.');
 
   const approach = await walkToInteriorPrompt(target);
+  markStage('desktop-approach', { target, approach });
   assert.equal(
     approach.reached,
     true,
@@ -523,8 +555,9 @@ try {
   }
   await page.waitForTimeout(1_000);
   const inside = await interiorOwnershipSnapshot(target.sourceBuildingId);
+  markStage('desktop-entered', { exteriorBefore, inside });
   await mkdir('output/release-evidence/current', { recursive: true });
-  await page.screenshot({ path: 'output/release-evidence/current/interior-entered-desktop.png', fullPage: true });
+  await page.screenshot({ path: 'output/release-evidence/current/interior-entered-desktop.png', fullPage: false });
 
   const stairTraversal = await climbPublishedStairs();
   assert.equal(
@@ -535,7 +568,8 @@ try {
     true,
     `Published stairs were not traversable through normal walking input: ${JSON.stringify(stairTraversal)}`
   );
-  await page.screenshot({ path: 'output/release-evidence/current/interior-stairs-desktop.png', fullPage: true });
+  markStage('desktop-stairs-complete', { stairTraversal });
+  await page.screenshot({ path: 'output/release-evidence/current/interior-stairs-desktop.png', fullPage: false });
 
   const elevatorPrepared = await prepareInteriorInteraction('elevator');
   assert.equal(
@@ -547,7 +581,7 @@ try {
   await page.keyboard.press('KeyE');
   const elevatorPickerDown = await chooseElevatorFloor(0);
   const elevatorArrival = await interiorOwnershipSnapshot(target.sourceBuildingId);
-  await page.screenshot({ path: 'output/release-evidence/current/interior-elevator-desktop.png', fullPage: true });
+  await page.screenshot({ path: 'output/release-evidence/current/interior-elevator-desktop.png', fullPage: false });
 
   const elevatorUpPrepared = await prepareInteriorInteraction('elevator');
   assert.equal(elevatorUpPrepared?.promptVisible, true, 'Lobby did not retain its elevator interaction.');
@@ -560,6 +594,7 @@ try {
   await page.keyboard.press('KeyE');
   await chooseElevatorFloor(0);
 
+  markStage('desktop-elevator-complete', { elevatorArrival, elevatorUpperArrival });
   const wallContact = await pushAgainstInteriorWall();
   const wallRecovery = await backAwayFromWall();
 
@@ -569,7 +604,8 @@ try {
   await page.keyboard.press('KeyE');
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().interior?.active === false, null, { timeout: 10_000 });
   const afterExit = await interiorOwnershipSnapshot(target.sourceBuildingId);
-  await page.screenshot({ path: 'output/release-evidence/current/interior-exited-desktop.png', fullPage: true });
+  markStage('desktop-complete', { stairTraversal, elevatorArrival, elevatorUpperArrival, wallContact, wallRecovery, afterExit });
+  await page.screenshot({ path: 'output/release-evidence/current/interior-exited-desktop.png', fullPage: false });
 
   const mobileParams = new URLSearchParams(params);
   mobileParams.set('rx', String(afterExit.walker.x));
@@ -577,19 +613,42 @@ try {
   mobileParams.set('rz', String(afterExit.walker.z));
   mobileParams.set('yaw', '0');
   await context.close();
-  context = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height: 844 } });
+  await browser.close();
+  browser = await launchBrowser();
+  context = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height: 844 }, deviceScaleFactor: process.env.CI ? 0.5 : devices['iPhone 13'].deviceScaleFactor });
   page = await context.newPage();
   bindPageEvidence(page);
+  await configureStagingAppCheck(page, baseUrl);
   await page.goto(`${baseUrl}/app/?${mobileParams}`, { waitUntil: 'load', timeout: 120_000 });
   await waitForWorld();
-  await page.waitForFunction(() => {
+  const mobileRestored = await interiorOwnershipSnapshot(target.sourceBuildingId);
+  markStage('mobile-loaded', { mobileRestored });
+  assert.ok(Math.hypot(mobileRestored.walker.x - afterExit.walker.x, mobileRestored.walker.z - afterExit.walker.z) < 0.6,
+    `Walking share link did not restore the exterior pose: ${JSON.stringify({ expected: afterExit.walker, actual: mobileRestored.walker })}`);
+  // A fresh phone profile starts with movement guidance, which deliberately
+  // owns prompt visibility. Dismiss it through the same control a player uses.
+  const tutorialLater = page.getByRole('button', { name: 'Show this tutorial step later', exact: true });
+  if (await tutorialLater.isVisible()) await tutorialLater.tap();
+  // Fresh provider data can move an inferred doorway slightly. Verify the saved
+  // pose first, then approach this load's published entrance for the same building.
+  await openNearbyInteriorDirectory();
+  const mobileTarget = await page.evaluate((key) =>
+    globalThis.getWorldExplorerRuntimeDiagnostics?.().interior?.candidates?.find((candidate) => candidate.key === key), target.key);
+  assert.ok(mobileTarget, 'The same building is absent from the mobile world.');
+  const mobileApproach = await walkToInteriorPrompt(mobileTarget);
+  markStage('mobile-approached', { mobileTarget, mobileApproach });
+  assert.equal(mobileApproach.reached, true, 'Mobile walker could not reach the published entrance.');
+  await page.waitForFunction((key) => {
     const prompt = document.querySelector('#interiorPrompt');
-    return prompt?.classList.contains('show') === true && /enter/i.test(prompt.textContent || '');
-  }, null, { timeout: 10_000 });
+    return prompt?.classList.contains('show') === true &&
+      globalThis.getWorldExplorerRuntimeDiagnostics?.().interior?.promptTargetKey === key;
+  }, target.key, { timeout: 10_000 });
+  await page.locator('#interiorPrompt.show').waitFor({ state: 'visible', timeout: 10_000 });
   const mobileEnterBounds = await page.locator('#interiorPrompt.show').evaluate((element) => {
     const bounds = element.getBoundingClientRect();
     return { left: bounds.left, right: bounds.right, top: bounds.top, bottom: bounds.bottom };
   });
+  const mobileEntryLayout = await mobileInteriorPromptLayout();
   await tapVisibleInteriorPrompt();
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().interior?.active === true, null, { timeout: 30_000 });
   const mobileEntered = await interiorOwnershipSnapshot(target.sourceBuildingId);
@@ -598,14 +657,18 @@ try {
   await tapVisibleInteriorPrompt();
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().interior?.active === false, null, { timeout: 10_000 });
   const mobileExited = await interiorOwnershipSnapshot(target.sourceBuildingId);
-  await page.waitForFunction(() => {
+  await page.waitForFunction((key) => {
     const prompt = document.querySelector('#interiorPrompt');
-    return prompt?.classList.contains('show') === true && /enter/i.test(prompt.textContent || '');
-  }, null, { timeout: 10_000 });
+    return prompt?.classList.contains('show') === true &&
+      globalThis.getWorldExplorerRuntimeDiagnostics?.().interior?.promptTargetKey === key;
+  }, target.key, { timeout: 10_000 });
   await tapVisibleInteriorPrompt();
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().interior?.active === true, null, { timeout: 30_000 });
   const mobileReentered = await interiorOwnershipSnapshot(target.sourceBuildingId);
-  await page.screenshot({ path: 'output/release-evidence/current/interior-mobile.png', fullPage: true });
+  const mobileInsideLayout = await mobileInteriorPromptLayout();
+  // Full-page capture with even a four-pixel overflow changes Chrome's mobile
+  // media layout. Capture the game viewport and verify its real touch targets.
+  await page.screenshot({ path: 'output/release-evidence/current/interior-mobile.png', fullPage: false });
 
   await page.reload({ waitUntil: 'load', timeout: 120_000 });
   await waitForWorld();
@@ -647,6 +710,7 @@ try {
     exteriorOwnershipRestored: afterExit.colliderCount === 0 && afterExit.buildingCollisionDisabled === false,
     mobilePromptFitsViewport: mobileEnterBounds.left >= 0 && mobileEnterBounds.right <= 390 &&
       mobileEnterBounds.top >= 0 && mobileEnterBounds.bottom <= 844,
+    mobilePromptKeepsControlsClear: mobileEntryLayout.ok && mobileInsideLayout.ok,
     contextualTouchEntryExitRecovery: mobileEntered.active === true && mobileExited.active === false &&
       mobileExited.colliderCount === 0 && mobileReentered.active === true && mobileReentered.key === target.key,
     reloadTearsDownInterior: afterReload.diagnostics.active === false,
@@ -656,6 +720,7 @@ try {
   const report = {
     ok: Object.values(checks).every(Boolean),
     contract: 'published-multifloor-building-keyboard-touch-lifecycle-v2',
+    browserBudget: { maxOldSpaceMiB: 1024, freshBrowserPerDevice: true },
     checks,
     target,
     approach,
@@ -672,6 +737,10 @@ try {
     wallRecovery,
     afterExit,
     mobileEnterBounds,
+    mobileEntryLayout,
+    mobileInsideLayout,
+    mobileTarget,
+    mobileApproach,
     mobileEntered,
     mobileExited,
     mobileReentered,
@@ -691,6 +760,7 @@ try {
     contract: 'published-multifloor-building-keyboard-touch-lifecycle-v2',
     failedAt: new Date().toISOString(),
     error: String(error?.stack || error),
+    progress,
     diagnostics: await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.() || null).catch(() => null),
     browserErrors,
     browserConsole,

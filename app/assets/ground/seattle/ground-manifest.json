@@ -3,7 +3,7 @@
   "artifactId": "seattle-ground",
   "providerId": "copernicus-dem-classified-ground-v1",
   "sourceRelease": "COP-DEM-2021:GLO-30",
-  "contentSha256": "b0a902c2f7b0537c35acbdc9a62eb69b9ee9202914087f444e7e7bb6b446b662",
+  "contentSha256": "3f20b26d9c70188c7a2fb29c39780a7cc41f6f077d9b86acc0b58b855d6731fd",
   "spacingMeters": 90,
   "coverage": {
     "south": 47.58397456077559,
@@ -18,7 +18,7 @@
   "correctionAttested": true,
   "sourceEvidence": {
     "sourceClassification": "digital-surface-model",
-    "correctionMethod": "worldexplorer-pmf-grid-v1",
+    "correctionMethod": "worldexplorer-pmf-boundary-reconstruction-v3",
     "sourceTiles": [
       {
         "tileId": "Copernicus_DSM_COG_10_N47_00_W123_00_DEM",
@@ -29,7 +29,14 @@
         "etag": "1fc6b8ff9866072475dc8703a201d1fd",
         "lastModified": "Mon, 09 May 2022 14:27:25 GMT"
       }
-    ]
+    ],
+    "classificationMethod": "worldexplorer-pmf-grid-v1",
+    "reconstruction": {
+      "method": "harmonic-ground-boundary",
+      "toleranceMeters": 0.00001,
+      "exteriorPolicy": "retain-source-observation",
+      "sourceArtifactSha256": "b0a902c2f7b0537c35acbdc9a62eb69b9ee9202914087f444e7e7bb6b446b662"
+    }
   },
   "attribution": {
     "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",

@@ -1,5 +1,7 @@
-import { hasFirebaseConfig } from './firebase-init.js?v=57';
-import { ensureSignedIn, observeAuth, signOutUser } from './auth-ui.js?v=55';
+// Building review lives in the account workspace; preserve old review links.
+if(new URL(location.href).searchParams.get('view')==='moderation'&&(!new URL(location.href).searchParams.get('queue')||new URL(location.href).searchParams.get('queue')==='reality')){const target=new URL('./',location.href);target.searchParams.set('section','review');const capture=new URL(location.href).searchParams.get('capture');if(capture)target.searchParams.set('capture',capture);location.replace(target.href);}
+import { hasFirebaseConfig } from './firebase-init.js?v=58';
+import { ensureSignedIn, observeAuth, signOutUser } from './auth-ui.js?v=56';
 import { enableAdminTester, getAccountOverview } from './billing.js?v=58';
 import {
   getAdminDashboardOverview,
@@ -21,6 +23,7 @@ import {
   getRealityCaptureModerationDetail,
   listRealityCaptureModeration,
   moderateRealityCapture
+  ,retryRealityCaptureReviewEmail
 } from './community-reality-capture-api.js?v=4';
 import {
   LANDING_PAGE_ENTRY_ID,
@@ -34,8 +37,8 @@ const VIEW_META = {
     subtitle: 'Platform health, pending review workload, active rooms, and recent admin actions in one place.'
   },
   moderation: {
-    title: 'Editor Moderation',
-    subtitle: 'Review overlay submissions and legacy contributions without mixing them into the rest of the admin system.'
+    title: 'Contribution approvals',
+    subtitle: 'Inspect building exteriors and interiors, then approve or return them with a decision. Interior access stays private unless explicitly shared.'
   },
   users: {
     title: 'User Management',
@@ -97,7 +100,7 @@ const state = {
   dashboardOverview: null,
   operations: null,
   currentView: 'overview',
-  currentModerationMode: 'overlay',
+  currentModerationMode: ['overlay', 'legacy', 'reality'].includes(new URL(location.href).searchParams.get('queue')) ? new URL(location.href).searchParams.get('queue') : 'reality',
   busy: false,
   overlayFilters: {
     reviewState: 'submitted',
@@ -126,7 +129,7 @@ const state = {
   legacySelectedId: '',
   realityFilters: { status: 'review_required' },
   realityItems: [],
-  realitySelectedId: '',
+  realitySelectedId: new URL(location.href).searchParams.get('capture') || '',
   realityDetails: new Map(),
   userFilters: {
     search: '',
@@ -391,6 +394,7 @@ function renderOverview() {
   const activity = Array.isArray(state.dashboardOverview?.recentActivity) ? state.dashboardOverview.recentActivity : [];
   const rooms = Array.isArray(state.dashboardOverview?.recentRooms) ? state.dashboardOverview.recentRooms : [];
   const statCards = [
+    { label: 'Building Improvements Awaiting Review', value: summary.pendingReality ?? 'Unavailable', tone: 'warning' },
     { label: 'Pending Overlay', value: summary.pendingOverlay || 0, tone: 'warning' },
     { label: 'Pending Legacy', value: summary.pendingLegacy || 0, tone: 'warning' },
     { label: 'Published Overlays', value: summary.publishedOverlay || 0, tone: 'ok' },
@@ -824,10 +828,14 @@ async function mountRealityModelPreview(url, capture) {
   const approve = document.getElementById('captureApproveBtn');
   if (approve) approve.disabled = true;
   try {
-    const { createCaptureViewer } = await import('../app/js/reality-capture/result-viewer.js?v=1');
+    const { createCaptureViewer } = await import('../app/js/reality-capture/result-viewer.js?v=2');
     const response = await fetch(url, { signal: controller.signal, cache: 'no-store', credentials: 'omit' });
     if (!response.ok) throw Error('protected_model_unavailable');
     viewer = await createCaptureViewer(host, await response.arrayBuffer(), controller.signal, {
+      homeLayout:capture.hybridSubmission?.kind==='home-layout'?capture.hybridSubmission.layout:null,
+      exteriorBuilding:capture.hybridSubmission?.kind==='facade-patches'?capture.building:null,
+      patchHeightMeters:capture.hybridSubmission?.heightMeters,
+      streetFacingWall:capture.hybridSubmission?.streetFacingWall,
       alignment: capture.review?.alignment || {},
       spatialContext: capture.captureKind === 'exterior' ? capture.building?.spatialContext : null
     });
@@ -878,9 +886,13 @@ function renderRealityDetail() {
   const capture = detail.capture || item;
   const alignment = capture.review?.alignment || { positionOffset: { x: 0, y: 0, z: 0 }, rotationYDegrees: 0, scale: 1 };
   const canModerate = capture.status === 'review_required' && !!detail.model?.url;
+  const emailStatus = ({accepted:'Accepted by email provider (delivery not confirmed)',not_configured:'Email sender is not configured',failed:'Email failed; retry pending',needs_attention:'Email needs attention; automatic retries stopped'})[capture.reviewEmail?.status] || 'No email send recorded';
+  const front=capture.hybridSubmission?.streetFacingWall;
   refs.moderationDetail.innerHTML = `
     <div class="detail-header"><div><h3>${escapeHtml(capture.building?.label || 'Reality capture')}</h3><p>${escapeHtml(capture.captureKind === 'interior_room' ? capture.room?.label || 'Interior room' : 'Building exterior')} • ${escapeHtml(capture.building?.sourceBuildingId || '')}</p></div><span class="status-pill" data-status="${escapeHtml(capture.status)}">${escapeHtml(capture.status)}</span></div>
     <div class="detail-grid">
+      <article class="detail-card"><span class="detail-label">Approval notice</span><strong>${escapeHtml(emailStatus)}</strong><p>This submission is available here regardless of email delivery.</p>${capture.status==='review_required'?'<button id="captureRetryEmail" type="button">Retry approval email</button>':''}</article>
+      <article class="detail-card"><span class="detail-label">Submitted street-facing reference</span><strong>${Number.isInteger(front)?`Wall ${front+1}`:'Not identified'}</strong><p>Contributor-declared reference from this submitted revision, not verified road data.</p></article>
       <article class="detail-card"><span class="detail-label">Contributor</span><strong>${escapeHtml(capture.ownerDisplayName || 'Explorer')}</strong><p>Originals remain private</p></article>
       <article class="detail-card"><span class="detail-label">Photos</span><strong>${escapeHtml(String(capture.uploadSummary?.photoCount || detail.thumbnails?.length || 0))}</strong><p>${escapeHtml(String(capture.uploadSummary?.totalBytes || 0))} bytes</p></article>
       <article class="detail-card"><span class="detail-label">Pipeline</span><strong>${escapeHtml(capture.processingPipelineVersion || 'Pending')}</strong><p>Schema ${escapeHtml(String(capture.captureSchemaVersion || 1))}</p></article>
@@ -903,7 +915,8 @@ function renderRealityDetail() {
     const revision=capture.hybridSubmission.revision;
     refs.moderationDetail.querySelectorAll('.capture-alignment-grid input').forEach(input=>{input.disabled=true;});
     const label=document.createElement('p');
-    label.className='detail-note';label.textContent=`Saved photo walls · revision ${revision} · ${capture.hybridSubmission.patches?.length||0} patches. Placement is fixed to the submitted mapped walls; uncovered geometry remains unchanged.`;
+    const submission=capture.hybridSubmission,isHome=submission.kind==='home-layout',count=isHome?(submission.roomPhotos||[]).reduce((sum,room)=>sum+(room.patches?.length||0),0):(submission.patches?.length||0);
+    label.className='detail-note';label.textContent=`${isHome?'Photo-supported interior':'Saved exterior photos'} · revision ${revision} · ${count} placed photos. ${isHome?'Check room boundaries, doorways and private access.':'Check the selected building and each photographed side.'} Uncovered surfaces remain procedural.`;
     refs.moderationDetail.prepend(label);
   }
   if (detail.model?.url) void mountRealityModelPreview(detail.model.url, capture);
@@ -1860,6 +1873,13 @@ document.addEventListener('click', async (event) => {
   const target = event.target instanceof HTMLElement ? event.target : null;
   if (!target) return;
 
+  if(target.id==='captureRetryEmail'){
+    const item=selectedRealityItem();if(!item)return;
+    setBusy(true);
+    try{const result=await retryRealityCaptureReviewEmail(item.captureId);state.realityDetails.delete(item.captureId);await ensureRealityDetail(item.captureId);renderRealityDetail();setStatus(result.status==='accepted'?'Email accepted by the sending provider.':`Email not sent: ${result.status}. Your contribution remains in this queue.`,result.status==='accepted'?'ok':'warn');}
+    catch(error){setStatus(error.message||'Email retry failed.','warn');}finally{setBusy(false);}return;
+  }
+
   const goTo = target.closest('[data-goto-view]');
   if (goTo) {
     setView(goTo.getAttribute('data-goto-view') || 'overview');
@@ -1869,6 +1889,7 @@ document.addEventListener('click', async (event) => {
   const modeBtn = target.closest('[data-moderation-mode]');
   if (modeBtn) {
     state.currentModerationMode = modeBtn.getAttribute('data-moderation-mode') || 'overlay';
+    if(state.currentModerationMode==='reality'){location.assign('./?section=review');return;}
     renderModeration();
     try {
       setBusy(true);

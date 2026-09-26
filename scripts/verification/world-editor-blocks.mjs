@@ -137,7 +137,7 @@ async function createExplorer(label, viewport = { width: 1280, height: 720 }, in
     const authApi = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js');
     const credential = await authApi.createUserWithEmailAndPassword(services.auth, email, accountPassword);
     await authApi.updateProfile(credential.user, { displayName });
-    const authUi = await import('/js/auth-ui.js?v=55');
+    const authUi = await import('/js/auth-ui.js?v=56');
     const deadline = Date.now() + 15_000;
     while (authUi.getCurrentUser()?.uid !== credential.user.uid && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -668,6 +668,7 @@ async function waitForCurrentRoom(page, expectedCode = '') {
 async function createRoomThroughVisibleTitleUi(page) {
   await openVisibleMultiplayerTab(page);
   await page.locator('#mpTitleVisibilitySelect').selectOption('private');
+  await page.locator('#mpCreateRoomDetails > summary').click();
   await page.locator('#mpTitleRoomNameInput').fill(`Blocks acceptance ${runId}`);
   await page.locator('#mpTitleLocationTagInput').fill('Baltimore Inner Harbor');
   await page.locator('#mpTitleCreateBtn').click();
@@ -699,7 +700,7 @@ async function readRenderedBlocks(page) {
 
 async function readRoomBlockDocumentCount(page, roomCode) {
   return page.evaluate(async (code) => {
-    const { initFirebase } = await import('/js/firebase-init.js?v=57');
+    const { initFirebase } = await import('/js/firebase-init.js?v=58');
     const firestore = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js');
     const { db } = initFirebase();
     const snapshot = await firestore.getDocs(firestore.collection(db, 'rooms', code, 'blocks'));

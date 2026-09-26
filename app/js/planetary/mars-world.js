@@ -11,7 +11,7 @@ import { suspendEarthModesForPlanetaryEntry } from './entry.js?v=9';
 import {
   ensurePlanetarySurfaceAuthority,
   OLYMPUS_MONS_SURFACE_REGION
-} from './runtime/surface-authority.js?v=4';
+} from './runtime/surface-authority.js?v=5';
 
 const MARS_SIZE = 24000;
 const MARS_SEGMENTS = 256;
@@ -367,11 +367,12 @@ function showMarsReturnButton() {
   if (!button) {
     button = document.createElement('button');
     button.id = 'marsReturnEarthBtn';
-    button.className = 'game-btn';
+    button.className = 'floatItem';
     button.textContent = 'Launch Pathfinder to Solis Reach';
-    button.style.cssText = 'position:fixed;top:82px;right:20px;z-index:1000;padding:10px 20px;font-size:16px;background:#b4532a;color:#fff;border:1px solid #efb08c;border-radius:5px;cursor:pointer;';
-    button.addEventListener('click', () => void returnFromMars());
-    document.body.appendChild(button);
+    button.addEventListener('click', () => { document.getElementById('travelMenu')?.classList.remove('open'); void returnFromMars(); });
+    const menu = document.querySelector('#travelMenu .floatItems');
+    if (!menu) return;
+    menu.appendChild(button);
   }
   button.style.display = 'block';
 }

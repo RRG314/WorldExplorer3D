@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 const rootDir = process.cwd();
-const envName = String(process.argv[2] || process.env.WE3D_FIREBASE_ENV || 'production').trim().toLowerCase();
+const envName = String(process.argv[2] || process.env.WE3D_FIREBASE_ENV || 'staging').trim().toLowerCase();
 const configMap = {
   production: 'config/firebase.production.json',
   staging: 'config/firebase.staging.json'
@@ -28,6 +28,7 @@ async function writeFile(targetPath, content) {
 
 async function main() {
   assertKnownEnv(envName);
+  if (envName === 'production') throw new Error('Source checkouts must not use production. Build an explicit production hosting artifact instead.');
   const configPath = path.join(rootDir, configMap[envName]);
   const raw = await fs.readFile(configPath, 'utf8');
   const config = JSON.parse(raw);

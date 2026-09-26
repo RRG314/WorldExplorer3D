@@ -1,3 +1,4 @@
+import { attachBuildingFacadeLayout } from './building-facade-layout.js?v=2';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { classifyStructureSemantics } from "../structure-semantics.js?v=63";
 import {
@@ -6,7 +7,7 @@ import {
   interpretBuildingSemantics
 } from "../building-semantics.js?v=5";
 import { createMidLodBuildingMesh } from "./load-geometry.js?v=28";
-import { geometryHasFinitePositions } from "./geometry-batching.js?v=6";
+import { geometryHasFinitePositions } from "./geometry-batching.js?v=7";
 import { createRoofDetailMesh } from "./roof-details.js?v=2";
 import {
   createMappedRoofMesh,
@@ -15,7 +16,7 @@ import {
 import {
   batchMidLodBuildingMeshes,
   batchNearLodBuildingMeshes
-} from "./building-batching.js?v=12";
+} from "./building-batching.js?v=15";
 import { curatedLandmarksNear } from "./landmark-catalog.js?v=9";
 import { compileBuildingProvenance } from './building-provenance-model.js?v=1';
 import { createBuildingRoadFootprintGuards } from './building-road-footprint.js?v=8';
@@ -26,9 +27,9 @@ import {
 } from './water-adjacent-structures.js?v=4';
 import { yieldToMainThread as defaultYieldToMainThread } from './cooperative-scheduling.js?v=1';
 import { isImplausibleTallBuildingFootprint } from './building-geometry-quality.js?v=1';
-import { publishBuildingFacadeEntrances } from './building-facade-entrances.js?v=3';
-import { publishBuildingExteriorDetails } from './building-exterior-details.js?v=1';
-import { resolveBuildingExteriorPresentation } from '../engine/building-facade-materials.js?v=16';
+import { publishBuildingFacadeEntrances } from './building-facade-entrances.js?v=4';
+import { publishBuildingExteriorDetails } from './building-exterior-details.js?v=2';
+import { resolveBuildingExteriorPresentation } from '../engine/building-facade-materials.js?v=19';
 import { mappedBuildingAddress } from '../real-estate/public-address.js?v=1';
 
 export function requiresLoadedRoadCoverageForBuilding(tags = {}) {
@@ -105,8 +106,6 @@ export async function buildBuildingGeometryPass(options = {}) {
       .map((record) => record?.identity?.featureId)
       .filter(Boolean)
   );
-  const useRdtBudgeting = options.useRdtBudgeting === true;
-  const rdtLoadComplexity = Number(options.rdtLoadComplexity || 0);
   const featureMinPolygonArea = Number.isFinite(options.featureMinPolygonArea) ? options.featureMinPolygonArea : 8;
   const startLoadPhase = typeof options.startLoadPhase === 'function' ? options.startLoadPhase : () => {};
   const endLoadPhase = typeof options.endLoadPhase === 'function' ? options.endLoadPhase : () => {};
@@ -144,8 +143,6 @@ export async function buildBuildingGeometryPass(options = {}) {
     sampleFootprintCoverage
   } = await createBuildingRoadFootprintGuards({
     roads: appCtx.roads,
-    useRdtBudgeting,
-    rdtLoadComplexity,
     yieldToMainThread
   });
   endLoadPhase('buildBuildingRoadGuards');
@@ -268,7 +265,9 @@ export async function buildBuildingGeometryPass(options = {}) {
       continue;
     }
 
-    const bSeed = buildingSeedFromIdentity(way.tags?._sourceFeatureId || way.id, appCtx.rdtSeed);
+    // A mapped building is shared Earth content, not a session-seeded prop.
+    // Starting nearby or joining another mode must not change its massing.
+    const bSeed = buildingSeedFromIdentity(way.tags?._sourceFeatureId || way.id);
     const br1 = appCtx.rand01FromInt(bSeed);
     const br2 = appCtx.rand01FromInt(bSeed ^ 0x9e3779b9);
     const bt = way.tags.building || way.tags['building:part'] || 'yes';
@@ -400,7 +399,7 @@ export async function buildBuildingGeometryPass(options = {}) {
     const suppressGroundApron =
       structureSemantics.terrainMode === 'elevated' ||
       roadCoreConflict;
-    const colliderDetail = useRdtBudgeting && lodTier !== 'near' && !roadCoreConflict ? 'bbox' : 'full';
+    const colliderDetail = 'full';
 
     const sampleTerrainY = (x, z) => {
       const meshHeight = typeof appCtx.terrainMeshHeightAt === 'function'
@@ -616,6 +615,13 @@ export async function buildBuildingGeometryPass(options = {}) {
     mesh.userData.exteriorProfile = resolvedExteriorPresentation?.exteriorProfile || mesh.userData?.exteriorPresentation?.exteriorProfile || mesh.material?.userData?.exteriorProfile || null;
     mesh.userData.exteriorFamilyId = mesh.material?.userData?.exteriorFamilyId || null;
     mesh.userData.exteriorGeneratorVersion = mesh.material?.userData?.exteriorGeneratorVersion || null;
+    attachBuildingFacadeLayout(mesh.geometry, { ...mesh.userData.exteriorProfile, levels: Math.max(1, resolvedLevels - (Number(buildingSemantics.buildingMinLevel) || 0)), foundation: terrainFoundationRise });
+    if (lodTier === 'mid' && mesh.material?.userData?.buildingExterior) {
+      const color = new THREE.Color(mesh.userData.exteriorPresentation?.wallColor ?? baseColor);
+      const colors = new Float32Array(mesh.geometry.attributes.position.count * 3);
+      for(let i=0;i<colors.length;i+=3) colors.set([color.r,color.g,color.b],i);
+      mesh.geometry.setAttribute('color',new THREE.BufferAttribute(colors,3));
+    }
 
     // The rendered body owns the downhill foundation segment. Publish that
     // same vertical extent to collision so a visible wall cannot be traversed

@@ -1,12 +1,13 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { carSpeedToMph } from '../physics/vehicle-speed-units.js?v=2';
 import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleDefinitionById } from '../engine/vehicle-catalog.js?v=6';
-import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=11';
+import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=12';
 import {
   attachCuratedTrafficVehicle,
+  syncCuratedVehicleGroundPivot,
   CURATED_RESPONDER_ASSET_ID,
   disposeCuratedTrafficVehicle
-} from './curated-traffic-vehicle.js?v=4';
+} from './curated-traffic-vehicle.js?v=5';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=9';
 import {
   attachCuratedExplorerCharacter,
@@ -15,10 +16,10 @@ import {
   updateCuratedCharacterAnimation
 } from '../walking/curated-explorer-character.js?v=8';
 import { createResponderResponseModel, responderAgencyProfile, responderApproachSpeed } from './responder-model.js?v=4';
-import { vehicleDoorPosition } from './vehicle-model.js?v=7';
+import { vehicleDoorPosition } from './vehicle-model.js?v=10';
 import { applyConditionImpact } from './impact-model.js?v=1';
 import { applyTransportDamage } from '../transport/damage-model.js?v=1';
-import { resolveVehicleRoadContactPose } from '../engine/vehicle-road-attitude.js?v=2';
+import { resolveVehicleRoadContactPose } from '../engine/vehicle-road-attitude.js?v=3';
 import { dampCrashMotion } from './crash-physics.js?v=1';
 import { ENTITY_LIFECYCLE_MS, lifecycleExpired, markLifecycleStart } from '../runtime/entity-lifecycle-policy.js?v=1';
 
@@ -218,6 +219,7 @@ function createUrbanResponderRuntime(options = {}) {
     visual.root.position.set(responder.x, responder.y, responder.z);
     visual.root.rotation.order = 'YXZ';
     visual.root.rotation.set(responder.pitch, responder.yaw, responder.roll);
+    syncCuratedVehicleGroundPivot(visual.root);
     group.add(visual.root);
     responders.push(responder);
     visual.root.userData.disposeCuratedTrafficVehicle = () => disposeCuratedTrafficVehicle(visual.root);
@@ -539,6 +541,7 @@ function createUrbanResponderRuntime(options = {}) {
     responder.visual.root.position.set(responder.x, responder.y, responder.z);
     responder.visual.root.rotation.order = 'YXZ';
     responder.visual.root.rotation.set(responder.pitch, responder.yaw, responder.roll);
+    syncCuratedVehicleGroundPivot(responder.visual.root);
     responder.visual.wheels.forEach((wheel) => { wheel.rotation.x += responder.speed * dt / .38; });
     responder.visual.setServiceLights(elapsed, !returning);
     if (returning) responder.returnElapsed += dt;

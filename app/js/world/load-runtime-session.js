@@ -1,3 +1,5 @@
+import {rdtDepth} from '../rdt.js';
+import {emitLocalLoadTrace} from './load-trace.js';
 import { createBuildingProvenanceSnapshot } from './building-provenance-model.js?v=1';
 import {
   markFirstPlayReady,
@@ -35,8 +37,7 @@ export function createWorldLoadRuntimeSession(options = {}) {
   const nextLoadSequence = Number(appCtx._worldLoadSequence || 0) + 1;
   const loadRequest = createWorldLoadRequest(locationSelection, nextLoadSequence);
   const locName = loadRequest?.name || 'Unknown location';
-  const perfModeNow = getPerfModeValue();
-  const useRdtBudgeting = perfModeNow === 'rdt';
+  const perfModeNow = 'baseline';
   const loadMetrics = {
     mode: perfModeNow,
     location: locName,
@@ -69,6 +70,7 @@ export function createWorldLoadRuntimeSession(options = {}) {
   const traceLoadPhase = (event, name, details = {}) => {
     if (!traceWorldLoad) return;
     console.warn(`[WorldLoadTrace] ${event} ${name}`, JSON.stringify(details));
+    emitLocalLoadTrace('world',`${event}:${name}`,details);
   };
 
   appCtx._lastBuildingBatchStats = null;
@@ -241,7 +243,7 @@ export function createWorldLoadRuntimeSession(options = {}) {
     appCtx.Walk.state.walker.vy = 0;
   }
 
-  appCtx.rdtSeed = appCtx.hashGeoToInt(
+  appCtx.worldSeed = appCtx.hashGeoToInt(
     appCtx.LOC.lat,
     appCtx.LOC.lon,
     appCtx.gameMode === 'trial' ? 1 :
@@ -251,12 +253,15 @@ export function createWorldLoadRuntimeSession(options = {}) {
   );
   const sharedSeedOverrideRaw = Number(appCtx.sharedSeedOverride);
   if (Number.isFinite(sharedSeedOverrideRaw)) {
-    appCtx.rdtSeed = (Math.floor(sharedSeedOverrideRaw) | 0) >>> 0;
+    appCtx.worldSeed = (Math.floor(sharedSeedOverrideRaw) | 0) >>> 0;
   }
-  const rawRdtComplexity = appCtx.rdtDepth(appCtx.rdtSeed, 1.5);
-  const rdtLoadComplexity = appCtx.rdtDepth(appCtx.rdtSeed % 1000000 + 2, 1.5);
-  appCtx.rdtComplexity = useRdtBudgeting ? rawRdtComplexity : 0;
 
+  // Restore RDT's location identity without using a geographic hash to discard
+  // mapped features. Spatial partitioning is driven by actual resident data.
+  appCtx.rdtComplexity = rdtDepth(appCtx.worldSeed, 1.5);
+  appCtx.rdtLoadComplexity = rdtDepth(appCtx.worldSeed % 1000000 + 2, 1.5);
+  loadMetrics.rdtLoadComplexity = appCtx.rdtLoadComplexity;
+  loadMetrics.rdtComplexity = appCtx.rdtComplexity;
   const dynamicBudgetState = getRuntimeDynamicBudget(perfModeNow);
   // Automatic presentation quality may change after a demanding first load.
   // That must not change which mapped roads/buildings exist when the same
@@ -266,12 +271,12 @@ export function createWorldLoadRuntimeSession(options = {}) {
     ? dynamicBudgetState.budgetScale
     : 1;
   const loadProfile = getAdaptiveLoadProfile(
-    rdtLoadComplexity,
+    0,
     perfModeNow,
     authorityBudgetScale,
     dynamicBudgetState.deviceClass
   );
-  const lodThresholds = getWorldLodThresholds(rdtLoadComplexity, perfModeNow, dynamicBudgetState.lodScale);
+  const lodThresholds = getWorldLodThresholds(0, perfModeNow, dynamicBudgetState.lodScale);
   const plannedDetailRadiusDeg = Number(loadProfile.radii?.[0]);
   appCtx.plannedEarthDetailRadiusWorld = Number.isFinite(plannedDetailRadiusDeg)
     ? Math.max(800, Math.round(plannedDetailRadiusDeg * (appCtx.SCALE || 100000) * 0.92))
@@ -279,9 +284,6 @@ export function createWorldLoadRuntimeSession(options = {}) {
   appCtx.dynamicBudgetScale = authorityBudgetScale;
   appCtx.dynamicLodScale = dynamicBudgetState.lodScale;
 
-  loadMetrics.rdtLoadComplexity = rdtLoadComplexity;
-  appCtx.rdtLoadComplexity = rdtLoadComplexity;
-  loadMetrics.rdtComplexity = rawRdtComplexity;
   loadMetrics.radii = loadProfile.radii.slice();
   loadMetrics.lodThresholds = lodThresholds;
   loadMetrics.loadProfile = {
@@ -319,14 +321,13 @@ export function createWorldLoadRuntimeSession(options = {}) {
     lodThresholds,
     perfModeNow,
     phaseTotals,
-    rdtLoadComplexity,
     runtimeState,
     restoreRequestedSelection,
+    abortProviderWork: reason=>providerAbortController.abort(reason),
     releaseWorldLoadCancellation,
     runProviderWork,
     startLoadPhase,
     syncWorldSessionState,
-    useRdtBudgeting,
     useSyntheticFallbackRoads:
       appCtx.gameMode === 'trial' ||
       appCtx.gameMode === 'checkpoint' ||
@@ -486,12 +487,20 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
   let maritime = null;
   let worldDiscovery = null;
   const gameplayStartupDurationsMs = Object.create(null);
+  const traceStartup = (phase, name, durationMs) => {
+    emitLocalLoadTrace('gameplay',`${phase}:${name}`,{durationMs});
+    if (new URLSearchParams(globalThis.location?.search || '').get('worldLoadTrace') === '1') {
+      console.warn(`[WorldLoadTrace] ${phase} gameplay:${name}`, JSON.stringify({durationMs}));
+    }
+  };
   const measureGameplayStartup = async (name, task) => {
     const startedAt = performance.now();
+    traceStartup('start', name);
     try {
       return await task();
     } finally {
       gameplayStartupDurationsMs[name] = Math.round(performance.now() - startedAt);
+      traceStartup('end', name, gameplayStartupDurationsMs[name]);
     }
   };
   const startupIsCurrent = () => !!(
@@ -512,11 +521,11 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
       maritimeModule,
       worldDiscoveryModule
     ] = await Promise.all([
-      import('../living-world/runtime.js?v=34'),
-      import('../urban-sandbox/runtime.js?v=89'),
+      import('../living-world/runtime.js?v=35'),
+      import('../urban-sandbox/runtime.js?v=92'),
       import('../transport/aviation-runtime.js?v=20'),
       import('../transport/maritime-runtime.js?v=16'),
-      import('../discovery/runtime.js?v=37')
+      import('../discovery/runtime.js?v=38')
     ]);
     gameplayStartupDurationsMs.moduleLoad = Math.round(performance.now() - moduleLoadStartedAt);
     if (!startupIsCurrent()) {
@@ -603,8 +612,30 @@ export async function finishWorldLoadRuntimeSession(session = {}) {
   }
   appCtx.worldLoading = false;
   appCtx.enforceEnvironmentSceneOwnership?.();
+  try {
+    const firstRender=appCtx.prepareFirstWorldRender?.();
+    if(runtimeState)runtimeState.firstRender=firstRender || null;
+  } catch(error) {
+    disposeGameplayRuntimesForPublication(appCtx,publication,'first-render-failed');
+    worldSession?.fail?.('first-render-failed');
+    syncWorldSessionState?.();
+    if(runtimeState){
+      runtimeState.status='failed';runtimeState.geometryReady=false;runtimeState.gameplayRuntimesReady=false;
+      runtimeState.firstRenderError=String(error?.message || error);
+      runtimeState.finishedAt=runtimeState.updatedAt=performance.now();
+    }
+    appCtx.gameStarted=false;
+    appCtx.initialEarthWorldReady=false;
+    try {appCtx.releaseEarthWorldForTitle?.();}
+    catch(cleanupError){console.error('[World] First-render failure cleanup failed',cleanupError);}
+    appCtx.hideLoad?.();
+    appCtx.showToast?.('This location could not draw its first frame. Return to the menu and try again.');
+    finalizePerfLoad(false,{reason:'first-render-failed'});
+    releaseWorldLoadCancellation?.();
+    return worldSession?.snapshot?.() || null;
+  }
   appCtx.hideLoad?.();
-  void appCtx.refreshCommunityRealityCapturePresentation?.();
+  void appCtx.refreshNearbyCapturePresentation?.();
   scheduleAfterFirstPlay(`earth-ambient-state-${publication.sequence}`, () => {
     appCtx.refreshAstronomicalSky?.(true);
     return appCtx.refreshLiveWeather?.(true);

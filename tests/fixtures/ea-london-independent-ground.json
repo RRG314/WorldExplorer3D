@@ -1,0 +1,63 @@
+{
+  "source": "Environment Agency independent 1 m WMS point checks, retrieved September 17 2026",
+  "sourceDatum": "ODN",
+  "comparison": "2 m raster points agree within 0.05 m; published coarse-cell means may differ with local relief",
+  "samples": [
+    {
+      "column": -158,
+      "row": 74574,
+      "eaDtmOdnMeters": 9.72700023651123,
+      "productionEgm2008Meters": 10.897388007928956,
+      "candidateEgm2008Meters": 10.897388007928956,
+      "queryUrl": "https://environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m/wms?service=WMS&version=1.3.0&request=GetFeatureInfo&layers=Lidar_Composite_Elevation_DTM_1m&query_layers=Lidar_Composite_Elevation_DTM_1m&styles=&crs=EPSG%3A3857&bbox=-14225%2C6711655%2C-14215%2C6711665&width=11&height=11&i=5&j=5&format=image%2Fpng&info_format=application%2Fjson&feature_count=1"
+    },
+    {
+      "column": -157,
+      "row": 74574,
+      "eaDtmOdnMeters": 10.319000244140625,
+      "productionEgm2008Meters": 10.632460343062945,
+      "candidateEgm2008Meters": 10.632460343062945,
+      "queryUrl": "https://environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m/wms?service=WMS&version=1.3.0&request=GetFeatureInfo&layers=Lidar_Composite_Elevation_DTM_1m&query_layers=Lidar_Composite_Elevation_DTM_1m&styles=&crs=EPSG%3A3857&bbox=-14135%2C6711655%2C-14125%2C6711665&width=11&height=11&i=5&j=5&format=image%2Fpng&info_format=application%2Fjson&feature_count=1"
+    },
+    {
+      "column": -156,
+      "row": 74574,
+      "eaDtmOdnMeters": 10.517999649047852,
+      "productionEgm2008Meters": 15.418279886317109,
+      "candidateEgm2008Meters": 15.418279886317109,
+      "queryUrl": "https://environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m/wms?service=WMS&version=1.3.0&request=GetFeatureInfo&layers=Lidar_Composite_Elevation_DTM_1m&query_layers=Lidar_Composite_Elevation_DTM_1m&styles=&crs=EPSG%3A3857&bbox=-14045%2C6711655%2C-14035%2C6711665&width=11&height=11&i=5&j=5&format=image%2Fpng&info_format=application%2Fjson&feature_count=1"
+    },
+    {
+      "column": -158,
+      "row": 74573,
+      "eaDtmOdnMeters": 8.655000686645508,
+      "productionEgm2008Meters": 6.950607962296081,
+      "candidateEgm2008Meters": 6.950607962296081,
+      "queryUrl": "https://environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m/wms?service=WMS&version=1.3.0&request=GetFeatureInfo&layers=Lidar_Composite_Elevation_DTM_1m&query_layers=Lidar_Composite_Elevation_DTM_1m&styles=&crs=EPSG%3A3857&bbox=-14225%2C6711565%2C-14215%2C6711575&width=11&height=11&i=5&j=5&format=image%2Fpng&info_format=application%2Fjson&feature_count=1"
+    },
+    {
+      "column": -157,
+      "row": 74573,
+      "eaDtmOdnMeters": 8.521000862121582,
+      "productionEgm2008Meters": 9.137612415109487,
+      "candidateEgm2008Meters": 9.137612415109487,
+      "queryUrl": "https://environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m/wms?service=WMS&version=1.3.0&request=GetFeatureInfo&layers=Lidar_Composite_Elevation_DTM_1m&query_layers=Lidar_Composite_Elevation_DTM_1m&styles=&crs=EPSG%3A3857&bbox=-14135%2C6711565%2C-14125%2C6711575&width=11&height=11&i=5&j=5&format=image%2Fpng&info_format=application%2Fjson&feature_count=1"
+    },
+    {
+      "column": -156,
+      "row": 74573,
+      "eaDtmOdnMeters": 7.078000068664551,
+      "productionEgm2008Meters": 19.492323145658688,
+      "candidateEgm2008Meters": 19.492323145658688,
+      "queryUrl": "https://environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m/wms?service=WMS&version=1.3.0&request=GetFeatureInfo&layers=Lidar_Composite_Elevation_DTM_1m&query_layers=Lidar_Composite_Elevation_DTM_1m&styles=&crs=EPSG%3A3857&bbox=-14045%2C6711565%2C-14035%2C6711575&width=11&height=11&i=5&j=5&format=image%2Fpng&info_format=application%2Fjson&feature_count=1"
+    },
+    {
+      "column": -156,
+      "row": 74572,
+      "eaDtmOdnMeters": 6.445000171661377,
+      "productionEgm2008Meters": 11.244010255159282,
+      "candidateEgm2008Meters": 18.019772871332464,
+      "queryUrl": "https://environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m/wms?service=WMS&version=1.3.0&request=GetFeatureInfo&layers=Lidar_Composite_Elevation_DTM_1m&query_layers=Lidar_Composite_Elevation_DTM_1m&styles=&crs=EPSG%3A3857&bbox=-14045%2C6711475%2C-14035%2C6711485&width=11&height=11&i=5&j=5&format=image%2Fpng&info_format=application%2Fjson&feature_count=1"
+    }
+  ]
+}

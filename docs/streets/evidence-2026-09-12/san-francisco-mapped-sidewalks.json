@@ -1,0 +1,67 @@
+{
+  "buildings": 21025,
+  "contact": {
+    "source": "sidewalk",
+    "y": 78.66455042868844
+  },
+  "coverageBounds": {
+    "maxX": 384,
+    "maxZ": 384,
+    "minX": -384,
+    "minZ": -384
+  },
+  "curbTriangles": 59324,
+  "drawCalls": 72,
+  "durationMs": 7181,
+  "indexedRoad": null,
+  "inferredFrontages": 9551,
+  "managedPaths": 1915,
+  "mappedAreaRendered": null,
+  "pavement": 78.66455042868844,
+  "plannedTiles": 144,
+  "position": {
+    "x": 30.593750084808494,
+    "y": 80.36455042868845,
+    "z": -27.185000000073956
+  },
+  "road": {
+    "name": "Clay Street",
+    "section": {
+      "inferredLanes": false,
+      "inferredWidth": true,
+      "lanes": 1,
+      "lanesSource": "source:lanes",
+      "placement": {
+        "centerlineOffsetMeters": 0,
+        "raw": "",
+        "status": "absent"
+      },
+      "widthMeters": 3.05,
+      "widthSource": "derived:lanes"
+    },
+    "tags": {
+      "highway": "tertiary",
+      "lanes": "1",
+      "lanes:psv": "1",
+      "lit": "yes",
+      "name": "Clay Street",
+      "oneway": "yes",
+      "sidewalk:left": "separate",
+      "surface": "asphalt",
+      "tiger:cfcc": "A41",
+      "tiger:county": "San Francisco, CA",
+      "tiger:name_base": "Clay",
+      "tiger:name_type": "St",
+      "trolley_wire": "yes"
+    },
+    "type": "tertiary",
+    "width": 3.05
+  },
+  "roadMeshes": 40,
+  "roadRendered": null,
+  "roads": 15898,
+  "terrain": 78.31373505274638,
+  "tiles": 141,
+  "triangles": 35105,
+  "worldLoadSequence": 1
+}

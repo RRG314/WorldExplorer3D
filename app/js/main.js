@@ -1,7 +1,7 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
-import { createCoreFrameSystems } from './runtime/core-frame-systems.js?v=9';
+import { createCoreFrameSystems, createCoreRenderSystem } from './runtime/core-frame-systems.js?v=11';
 import { createDebugPresentationSystem } from './runtime/debug-presentation.js?v=3';
-import { createRuntimeKernel } from './runtime/kernel.js?v=2';
+import { createRuntimeKernel } from './runtime/kernel.js?v=3';
 
 let perfPanelTimer = 0;
 let runtimeSystemsRegistered = false;
@@ -48,6 +48,11 @@ function positionOverlayBetween(overlay, leftRect, rightRect) {
 
 function positionTopOverlays() {
   if (!appCtx.gameStarted) return;
+  const debugOverlay = document.getElementById('debugOverlay');
+  const perfPanel = document.getElementById('perfPanel');
+  const debugVisible = !!debugOverlay && debugOverlay.style.display !== 'none';
+  const perfVisible = !!perfPanel && perfPanel.style.display !== 'none';
+  if (!debugVisible && !perfVisible) return;
   const hudRect = isVisibleRect(document.getElementById('hud'));
   const menuRect = isVisibleRect(document.getElementById('mainMenuBtn'));
   if (!hudRect || !menuRect) return;
@@ -60,12 +65,10 @@ function positionTopOverlays() {
     width: 1,
     height: 1
   };
-  const debugOverlay = document.getElementById('debugOverlay');
-  if (debugOverlay && debugOverlay.style.display !== 'none') {
+  if (debugVisible) {
     positionOverlayBetween(debugOverlay, hudRect, centerRect);
   }
-  const perfPanel = document.getElementById('perfPanel');
-  if (perfPanel && perfPanel.style.display !== 'none') {
+  if (perfVisible) {
     positionOverlayBetween(perfPanel, centerRect, menuRect);
   }
 }
@@ -116,17 +119,7 @@ function registerRuntimeSystems() {
   const systems = createCoreFrameSystems(appCtx, { positionTopOverlays });
   systems.forEach((system) => runtimeKernel.registerSystem(system));
   runtimeKernel.registerSystem(createDebugPresentationSystem(appCtx));
-  runtimeKernel.registerSystem({
-    id: 'core.renderer',
-    owner: 'renderer',
-    phase: 'render',
-    priority: 0,
-    update() {
-      if (shouldUseComposer()) appCtx.composer.render();
-      else appCtx.renderer.render(appCtx.scene, appCtx.camera);
-      appCtx.recordPerfRendererInfo?.(appCtx.renderer);
-    }
-  });
+  runtimeKernel.registerSystem(createCoreRenderSystem(appCtx, shouldUseComposer));
   runtimeKernel.registerSystem({
     id: 'core.performance-panel',
     owner: 'diagnostics',
@@ -155,9 +148,14 @@ function registerRuntimeSystem(definition) {
   return runtimeKernel.registerSystem(definition);
 }
 
-function advanceRuntimeTime(milliseconds = 0) {
+function advanceRuntimeTime(milliseconds = 0, options = {}) {
   registerRuntimeSystems();
-  return runtimeKernel.advanceBy(milliseconds, { source: 'automation' });
+  // Functional automation can coalesce draws while retaining every input,
+  // simulation, world and UI update. Normal play/default stepping is unchanged.
+  const context = { source: 'automation', renderIntermediateFrames: options.renderIntermediateFrames !== false };
+  return options.yieldToNetwork === true
+    ? runtimeKernel.advanceWithNetworkYields(milliseconds, context)
+    : runtimeKernel.advanceBy(milliseconds, context);
 }
 
 function showLoad(text, options = {}) {

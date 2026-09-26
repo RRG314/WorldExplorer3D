@@ -43,7 +43,7 @@ import {
   updateMapLayers,
   updateNavigationRoute,
   updateNearbyPOI
-} from "./game/navigation-ui.js?v=1";
+} from "./game/navigation-ui.js?v=2";
 import {
   clearPropertyMarkers,
   closeModal,
@@ -56,7 +56,7 @@ import {
   togglePropertyFilters,
   toggleRealEstate,
   updatePropertyPanel
-} from "./game/property-ui.js?v=8";
+} from "./game/property-ui.js?v=9";
 import {
   closeHistoricPanel,
   createHistoricCard,

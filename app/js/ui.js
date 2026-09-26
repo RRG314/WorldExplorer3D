@@ -8,7 +8,7 @@ import { initMobileControls } from "./ui/mobile-controls.js?v=86";
 import { initShareUi } from "./ui/share-links.js?v=64";
 import { setupSettingsUi } from "./ui/settings.js?v=2";
 import { bindSpaceActions } from "./ui/space-actions.js?v=17";
-import { initTitleScreenUi } from "./ui/title-screen.js?v=118";
+import { initTitleScreenUi } from "./ui/title-screen.js?v=119";
 import { commitEnvironment, exitCurrentEnvironmentSync } from './session-coordinator.js?v=2';
 
 function emitTutorialEvent(eventName, payload = {}) {
@@ -138,6 +138,7 @@ function setupUI() {
     perfSettingsStatus,
     gameShareFloatBtn,
     closeGameShareMenu: () => shareUi?.closeGameShareMenu?.(),
+    closeAllFloatMenus,
     applySharedRuntimeState: () => shareUi?.applySharedRuntimeState?.(),
     updateControlsModeUI,
     isTouchPreferredClient

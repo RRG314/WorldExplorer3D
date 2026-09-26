@@ -1,0 +1,13 @@
+- strong: Controlled street geometry test
+- paragraph: Real pavement worker and renderer. Synthetic source geometry, not a real location.
+- text: Terrain
+- combobox "Terrain":
+  - option "Flat"
+  - option "Uphill"
+  - option "Downhill"
+  - option "Cross slope"
+  - option "Rolling terrain" [selected]
+  - option "High elevation"
+- button "Overview" [active]
+- button "Curb ramp"
+- generic: "{ \"terrain\": \"rolling\", \"positionBytes\": 96948, \"terrainRefinementTriangles\": 624, \"ramps\": 16, \"markingTriangles\": 32, \"curbSurface\": 0.18000000715255737, \"backOfRamp\": 0.26625001430511475, \"roadSurface\": 0.18000000715255737 }"

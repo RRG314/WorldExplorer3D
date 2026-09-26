@@ -1,4 +1,4 @@
-import { hasFirebaseConfig } from '../../js/firebase-init.js?v=57';
+import { hasFirebaseConfig } from '../../js/firebase-init.js?v=58';
 import {
   observeAuth,
   requestPasswordReset,
@@ -6,7 +6,7 @@ import {
   signInWithGoogle,
   signOutUser,
   signUpWithEmailPassword
-} from '../../js/auth-ui.js?v=55';
+} from '../../js/auth-ui.js?v=56';
 import {
   ensureEntitlements,
   getFreeEntitlementsState,

@@ -47,7 +47,7 @@ import {
 } from './boat-mode/surface-layer-visibility.js?v=2';
 import { getMaritimeCatalogEntry } from './transport/maritime-catalog.js?v=1';
 import { applyTransportDamage, transportDamagePresentation } from './transport/damage-model.js?v=1';
-import { updateVesselVisual } from './transport/vessel-visual-recipe.js?v=7';
+import { updateVesselVisual } from './transport/vessel-visual-recipe.js?v=8';
 
 const BOAT_PROMPT_DISTANCE = 18;
 const BOAT_ENTRY_OFFSET = 9;
@@ -135,6 +135,7 @@ const {
   ensureBoatPromptRefs,
   getWaveSlider,
   hideBoatPrompt,
+  showBoatHint,
   showBoatPrompt,
   updateBoatMenuUi
 } = createBoatPromptUi({ appCtx, getSeaStateConfig, getWaveIntensity, waterKindLabel });
@@ -290,23 +291,14 @@ function syncBoatPromptState(force = false) {
     const promptSignature = 'ocean_surface_transfer';
     if (force || _boatPromptSignature !== promptSignature) {
       _boatPromptSignature = promptSignature;
-      showBoatPrompt('Surface Boat Available • Press G or choose Surface Boat', 'supported', BOAT_PROMPT_DURATION_MS);
+      showBoatHint('Surface boat available in Travel', 'surface');
     }
     return null;
   }
 
   if (appCtx.boatMode?.active) {
     updateBoatMenuUi();
-    const shoreline = Number.isFinite(appCtx.boatMode.shorelineDistance) ? Math.round(appCtx.boatMode.shorelineDistance) : null;
-    const message =
-      shoreline && shoreline < 90 ?
-        `${appCtx.boatMode.vesselLabel || 'Vessel'} underway • Press G or choose Exit Vessel • ${shoreline}m to shore` :
-        `${appCtx.boatMode.vesselLabel || 'Vessel'} underway • Press G or choose Exit Vessel near shore`;
-    const promptSignature = `active:${message}`;
-    if (force || _boatPromptSignature !== promptSignature) {
-      _boatPromptSignature = promptSignature;
-      showBoatPrompt(message, 'active', BOAT_PROMPT_DURATION_MS);
-    }
+    showBoatHint('Vessel controls are in Travel', 'underway');
     return appCtx.boatMode.currentWater || null;
   }
 
@@ -334,12 +326,8 @@ function syncBoatPromptState(force = false) {
   appCtx.boatMode.available = !!candidate;
   if (candidate) {
     appCtx.boatMode.promptLabel = candidate.label;
-    appCtx.boatMode.promptMessage = `Boat Travel Available • ${candidate.label} • Press G or choose Boat Mode`;
-    const promptSignature = `candidate:${candidate.type}:${candidate.label}:${Math.round(candidate.spawnX * 2)}:${Math.round(candidate.spawnZ * 2)}`;
-    if (force || _boatPromptSignature !== promptSignature) {
-      _boatPromptSignature = promptSignature;
-      showBoatPrompt(appCtx.boatMode.promptMessage, 'supported', BOAT_PROMPT_DURATION_MS);
-    }
+    appCtx.boatMode.promptMessage = 'Boat available in Travel';
+    showBoatHint(appCtx.boatMode.promptMessage, `available:${candidate.type}:${candidate.label}`);
   } else {
     _boatPromptSignature = '';
     hideBoatPrompt();

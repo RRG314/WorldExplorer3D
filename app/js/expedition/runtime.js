@@ -1,3 +1,5 @@
+import {RESEARCH_BENCHES,applyResearchCommand,availableResearchSample,sampleIsMounted} from './research-workbench.js';
+import { publishMissionMarkup } from './mission-dom.js';
 import { DEFAULT_CREW, getPropulsionProfile, getShipProfile, PROPULSION_PROFILES, SHIP_PROFILES } from './catalog.js?v=2';
 import { assessExpeditionReadiness, createExpeditionPlan, totalCargoMass, withExpeditionChanges } from './model.js?v=12';
 import {
@@ -324,7 +326,7 @@ async function launchEarthPathfinderToSolisReach(options = {}) {
   return true;
 }
 
-function stageEarthPathfinder(appContext) {
+async function stageEarthPathfinder(appContext) {
   bindRuntimeContext(appContext);
   if (!activeContext || activeContext.getEnv?.() !== activeContext.ENV?.EARTH) {
     activeContext?.showToast?.('Pathfinder can be deployed from an active Earth location.');
@@ -353,6 +355,8 @@ function stageEarthPathfinder(appContext) {
     return false;
   }
   closeExpeditionPlanner();
+  await pod.userData.curatedPodLoadPromise;
+  if (!pod.parent || pod.userData.curatedPodDisposed) return false;
   activeContext.showToast?.('Pathfinder is ready nearby. Approach the hatch and press E to board.');
   return true;
 }
@@ -679,9 +683,14 @@ function beginLocalContact(contactId, options = {}) {
   return false;
 }
 
-function launchPodToContact(contactId) {
+function launchPodToContact(contactId, released = false) {
   const contact = activeExpedition?.routeContacts?.find((entry) => entry.id === contactId);
   if (!contact || !['available', 'returned'].includes(contact.localOperationState)) return false;
+  if (!released) {
+    const started=activeContext?.beginExpeditionPodLaunch?.(()=>launchPodToContact(contactId,true))===true;
+    if(started)closeShipStationPanel();
+    return started;
+  }
   const returnFrameId = activeContext?.universeRuntime?.current?.id || activeExpedition.originId || 'sol';
   setPodJourney(createPodJourney({
     expeditionId: activeExpedition.id,
@@ -705,9 +714,14 @@ function launchPodToContact(contactId) {
   return true;
 }
 
-function launchDestinationMissionPod() {
+function launchDestinationMissionPod(released = false) {
   const mission = activeContext?.getDestinationMissionSnapshot?.();
   if (!activeExpedition || !mission?.surfaceRequired || mission.phase !== 'fieldwork' || !mission.atDestination) return false;
+  if (!released) {
+    const started=activeContext?.beginExpeditionPodLaunch?.(()=>launchDestinationMissionPod(true))===true;
+    if(started)closeShipStationPanel();
+    return started;
+  }
   if (!activeContext?.prepareDestinationMissionSurface?.(mission.destinationId)) return false;
   const returnFrameId = activeContext?.universeRuntime?.current?.id || activeExpedition.originId || 'sol';
   setPodJourney(createPodJourney({
@@ -732,8 +746,13 @@ function launchDestinationMissionPod() {
   return true;
 }
 
-function launchPodToEarth() {
+function launchPodToEarth(released = false) {
   if (!activeExpedition || activeContext?.universeRuntime?.current?.id !== 'sol' || activeContext?.universeRuntime?.transition) return false;
+  if (!released) {
+    const started=activeContext?.beginExpeditionPodLaunch?.(()=>launchPodToEarth(true))===true;
+    if(started)closeShipStationPanel();
+    return started;
+  }
   setPodJourney(createPodJourney({
     expeditionId: activeExpedition.id,
     contactId: currentEarthAnchorId(),
@@ -1192,7 +1211,7 @@ function renderMission() {
       ? `<div class="expeditionShipAction"><button id="expeditionEarthPod" class="expeditionPrimary" type="button">${earthPodReady ? `Return to ${STARSHIP_NAME} in Pathfinder` : `Launch Pathfinder to ${STARSHIP_NAME}`}</button><small>Depart from the currently loaded Earth location, fly manually to ${STARSHIP_NAME}, and dock with the same saved Expedition.</small></div>`
       : `<div class="expeditionShipAction"><button id="expeditionEnterShip" class="expeditionPrimary" type="button">${expedition.pendingEvent ? `Respond aboard ${STARSHIP_NAME}` : `Enter ${STARSHIP_NAME}`}</button><small>${expedition.pendingEvent ? `Follow the highlighted route to ${String(expedition.pendingEvent.roomId || 'the affected station').replaceAll('-', ' ')} and interact with the equipment there.` : 'Walk the ship, meet the crew, inspect systems, and return to the same flight.'}</small></div>`
     : '';
-  host.innerHTML = `
+  const missionMarkup = `
     ${readinessMarkup(expedition)}
     ${sharedMissionMarkup()}
     <section class="expeditionCampaignStatus"><span>${String(phase).replaceAll('-', ' ')}</span><h3>Current objective</h3><p>${objective}</p><small>WIN CONDITION · Complete the Proxima b survey, return its evidence to ${STARSHIP_NAME}, and publish the analysis.</small></section>
@@ -1203,6 +1222,7 @@ function renderMission() {
     ${contacts.length ? `<section class="expeditionContacts"><h3>Route Contacts</h3>${contacts.map((contact) => `<p><strong>${contact.designation}</strong><span>${contact.spectralClass} · ${contact.worldClass} · ${String(contact.status).replaceAll('-', ' ')}</span>${!expedition.activeLocalContactId && ['available', 'returned'].includes(contact.localOperationState) ? `<button type="button" data-enter-contact="${contact.id}">Enter local Space</button>` : ''}</p>`).join('')}</section>` : ''}
     ${outpostMarkup(expedition)}
     <section class="expeditionLog"><h3>Captain's Log</h3>${log.map((entry) => `<p><span>${entry.kind}</span>${entry.message}</p>`).join('')}</section>`;
+  if (!publishMissionMarkup(host, missionMarkup)) return;
 
   document.getElementById('expeditionShareCreate')?.addEventListener('click', async () => {
     try {
@@ -1476,7 +1496,7 @@ async function transferApprovedSampleToBackpack() {
   if (!activeExpedition) return Object.freeze({ changed: false, message: 'No Expedition cargo is active.' });
   if (sharedState) return Object.freeze({ changed: false, message: 'Room sample export stays locked until ship cargo and player inventory can commit in one server transaction.' });
   const sample = (activeExpedition.scienceSamples || []).find((entry) =>
-    entry.processed === true && entry.analysisApproved === true && !entry.recoveryRequirement && entry.exported !== true
+    entry.processed === true && entry.analysisApproved === true && !entry.recoveryRequirement && entry.exported !== true && !entry.consumed && !sampleIsMounted(activeExpedition,entry.id)
   );
   if (!sample) return Object.freeze({ changed: false, message: 'Process and approve a science sample before moving it to the Backpack.' });
   const massKg = Math.max(0, Number(sample.massKg || 0));
@@ -1548,6 +1568,51 @@ async function transferApprovedSampleToBackpack() {
     return Object.freeze({ changed: false, message: String(error?.message || 'The approved sample transfer could not be committed.') });
   }
   return Object.freeze({ changed: true, message: `${definition.label} moved to the Backpack. Eligible research buyers offer ${value} Explorer Credits.` });
+}
+
+function renderResearchBench(interaction) {
+  if(!activeExpedition||!RESEARCH_BENCHES[interaction.id])return false;
+  const bench=RESEARCH_BENCHES[interaction.id];
+  let panel=document.getElementById('shipStationPanel');
+  if(!panel){panel=document.createElement('section');panel.id='shipStationPanel';document.body.appendChild(panel);}
+  panel.replaceChildren();
+  const card=document.createElement('div');card.className='ship-station-card';card.setAttribute('role','dialog');card.setAttribute('aria-label',bench.label);panel.appendChild(card);
+  const heading=document.createElement('h2');heading.textContent=bench.label;card.appendChild(heading);
+  const text=value=>{const p=document.createElement('p');p.textContent=value;card.appendChild(p);};
+  const button=(label,action)=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.addEventListener('click',action);card.appendChild(b);return b;};
+  button('Close',closeShipStationPanel);
+  text(bench.instrument==='fabricate'?'Combine two characterized specimens with 2 kg binder and 0.1 MWh to make repair stock. This game recipe conserves all input mass.':'Place a sealed specimen on the bench. Measurements cost 0.025 MWh per sample and remain attached to its source record.');
+  let busy=false;
+  const perform=async(researchAction,sampleId='')=>{
+    if(busy)return;busy=true;
+    card.querySelectorAll('button,select').forEach(el=>el.disabled=true);
+    const command={type:'research',benchId:interaction.id,researchAction,sampleId};
+    const result=applyResearchCommand(activeExpedition,command);
+    try{
+      if(!result.changed){activeContext?.showToast?.(result.message);return;}
+      await applyExpeditionMutation(result.expedition,'operation',command);
+      activeContext?.playExpeditionShipAction?.({interaction,message:result.message});
+    }catch(error){reportSharedMutationError(error);}
+    finally{if(panel.classList.contains('show'))renderResearchBench(interaction);}
+  };
+  const slots=activeExpedition.research?.benches?.[interaction.id]||[null,null];
+  slots.forEach((id,index)=>{
+    const sample=activeExpedition.scienceSamples?.find(s=>s.id===id);
+    text(`Cradle ${index+1}: ${sample?`${sample.label} · ${sample.massKg} kg · ${sample.bodyId||'recorded source'}`:'empty'}`);
+    if(sample){
+      const studies=activeExpedition.research?.studies?.[id];
+      text(`Measurements: ${['spectrum','thermal'].filter(key=>studies?.[key]).join(', ')||'none yet'}.`);
+      button(`Return cradle ${index+1} to cargo`,()=>perform('return',id));
+    }
+  });
+  const choices=(activeExpedition.scienceSamples||[]).filter(s=>availableResearchSample(s)&&!sampleIsMounted(activeExpedition,s.id));
+  if(slots.includes(null)&&choices.length){
+    const select=document.createElement('select');select.setAttribute('aria-label','Sample from cargo');
+    for(const sample of choices){const option=document.createElement('option');option.value=sample.id;option.textContent=`${sample.label} · ${sample.massKg} kg`;select.appendChild(option);}card.appendChild(select);
+    button('Place selected specimen',()=>perform('place',select.value));
+  }else if(!choices.length&&!slots.some(Boolean))text('No specimens aboard. Collect a sample during a destination field operation, then return to the ship.');
+  button(bench.instrument==='fabricate'?'Fabricate composite repair stock':'Run measurement',()=>perform(bench.instrument==='fabricate'?'fabricate':'measure')).disabled=!slots.some(Boolean);
+  panel.classList.add('show');return true;
 }
 
 function renderShipStationPanel(interaction) {
@@ -1709,6 +1774,7 @@ function markExpeditionPodSurfaceLaunch(bodyId) {
 }
 
 async function handleShipInteraction(interaction) {
+  if (interaction?.kind === 'ship-research') return renderResearchBench(interaction);
   if (interaction?.kind === 'ship-crew') return renderCrewInteractionPanel(interaction);
   if (interaction?.id === 'bridge-flight') {
     if (activeExpedition?.pendingEvent?.roomId === 'bridge') return renderShipStationPanel(interaction);

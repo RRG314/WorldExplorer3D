@@ -52,7 +52,7 @@ function entranceTouchesFacadeMesh(mesh, entrance) {
   return bestDistance <= 0.11 && verticalDelta <= 1.2;
 }
 
-function attachEntranceAttribute(mesh, entrance) {
+export function attachEntranceAttribute(mesh, entrance) {
   const geometry = mesh?.geometry;
   const positions = geometry?.attributes?.position;
   const normals = geometry?.attributes?.normal;
@@ -106,7 +106,12 @@ function attachEntranceAttribute(mesh, entrance) {
         (z - finite(entrance?.z)) * finite(entrance?.tangentZ);
       const offset = vertexIndex * 4;
       values[offset] = tangentOffset;
-      values[offset + 1] = 1;
+      // The door keeps its outward-facing atlas orientation. Encode whether
+      // its tangent agrees with the facade's canonical increasing X/Z axis,
+      // so reserving a whole window bay also works on reversed wall edges.
+      const tangentX = finite(entrance?.tangentX);
+      const reversed = tangentX < -1e-7 || (Math.abs(tangentX) <= 1e-7 && finite(entrance?.tangentZ) < 0);
+      values[offset + 1] = reversed ? 1 : 2;
       values[offset + 2] = bottomLocalY;
       values[offset + 3] = encodedStyle;
       attributed.add(vertexIndex);

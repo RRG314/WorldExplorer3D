@@ -1,0 +1,259 @@
+{
+  "scope": "Complete saved layout extent; horizontal pavement partition invariance only. Does not certify heights, movement or missing source data.",
+  "coverageBounds": {
+    "minX": -384,
+    "maxX": 384,
+    "minZ": -384,
+    "maxZ": 384
+  },
+  "sourceCounts": {
+    "roads": 328,
+    "buildings": 1056,
+    "landuses": 203,
+    "linearFeatures": 208
+  },
+  "reports": [
+    {
+      "chunkSize": 64,
+      "tiles": 140,
+      "area": 72638.09054500007,
+      "milliseconds": 3167.85725,
+      "differenceArea": 0,
+      "differences": []
+    },
+    {
+      "chunkSize": 32,
+      "tiles": 554,
+      "area": 72640.0429315001,
+      "milliseconds": 3481.9468749999996,
+      "differenceArea": 3.7884834999988164,
+      "differences": [
+        {
+          "bounds": {
+            "minX": 128,
+            "maxX": 192,
+            "minZ": -192,
+            "maxZ": -128
+          },
+          "differenceArea": 1.419160999999941
+        },
+        {
+          "bounds": {
+            "minX": -384,
+            "maxX": -320,
+            "minZ": -64,
+            "maxZ": 0
+          },
+          "differenceArea": 0.7450290000000008
+        },
+        {
+          "bounds": {
+            "minX": 64,
+            "maxX": 128,
+            "minZ": -128,
+            "maxZ": -64
+          },
+          "differenceArea": 0.3681930000000156
+        },
+        {
+          "bounds": {
+            "minX": -320,
+            "maxX": -256,
+            "minZ": -64,
+            "maxZ": 0
+          },
+          "differenceArea": 0.20640350000004734
+        },
+        {
+          "bounds": {
+            "minX": 192,
+            "maxX": 256,
+            "minZ": -256,
+            "maxZ": -192
+          },
+          "differenceArea": 0.10638200000006068
+        },
+        {
+          "bounds": {
+            "minX": -320,
+            "maxX": -256,
+            "minZ": 64,
+            "maxZ": 128
+          },
+          "differenceArea": 0.07939100000006807
+        },
+        {
+          "bounds": {
+            "minX": -128,
+            "maxX": -64,
+            "minZ": 192,
+            "maxZ": 256
+          },
+          "differenceArea": 0.056252000000452496
+        },
+        {
+          "bounds": {
+            "minX": 192,
+            "maxX": 256,
+            "minZ": 128,
+            "maxZ": 192
+          },
+          "differenceArea": 0.05400049999996774
+        },
+        {
+          "bounds": {
+            "minX": -256,
+            "maxX": -192,
+            "minZ": -256,
+            "maxZ": -192
+          },
+          "differenceArea": 0.05273000000003639
+        },
+        {
+          "bounds": {
+            "minX": -128,
+            "maxX": -64,
+            "minZ": -320,
+            "maxZ": -256
+          },
+          "differenceArea": 0.0477085000000051
+        },
+        {
+          "bounds": {
+            "minX": 192,
+            "maxX": 256,
+            "minZ": -320,
+            "maxZ": -256
+          },
+          "differenceArea": 0.044004500000029825
+        },
+        {
+          "bounds": {
+            "minX": 192,
+            "maxX": 256,
+            "minZ": -384,
+            "maxZ": -320
+          },
+          "differenceArea": 0.042450499999946295
+        }
+      ]
+    },
+    {
+      "chunkSize": 128,
+      "tiles": 36,
+      "area": 72637.86801800001,
+      "milliseconds": 4287.570749999999,
+      "differenceArea": 0.7601035000001853,
+      "differences": [
+        {
+          "bounds": {
+            "minX": 128,
+            "maxX": 192,
+            "minZ": -384,
+            "maxZ": -320
+          },
+          "differenceArea": 0.1191605000001416
+        },
+        {
+          "bounds": {
+            "minX": -320,
+            "maxX": -256,
+            "minZ": -128,
+            "maxZ": -64
+          },
+          "differenceArea": 0.04170300000011179
+        },
+        {
+          "bounds": {
+            "minX": -128,
+            "maxX": -64,
+            "minZ": -384,
+            "maxZ": -320
+          },
+          "differenceArea": 0.025473999999953735
+        },
+        {
+          "bounds": {
+            "minX": -64,
+            "maxX": 0,
+            "minZ": -192,
+            "maxZ": -128
+          },
+          "differenceArea": 0.025148500000004594
+        },
+        {
+          "bounds": {
+            "minX": 192,
+            "maxX": 256,
+            "minZ": -256,
+            "maxZ": -192
+          },
+          "differenceArea": 0.021511499999937497
+        },
+        {
+          "bounds": {
+            "minX": 128,
+            "maxX": 192,
+            "minZ": -320,
+            "maxZ": -256
+          },
+          "differenceArea": 0.0209934999999912
+        },
+        {
+          "bounds": {
+            "minX": -64,
+            "maxX": 0,
+            "minZ": 256,
+            "maxZ": 320
+          },
+          "differenceArea": 0.019987999999581788
+        },
+        {
+          "bounds": {
+            "minX": 128,
+            "maxX": 192,
+            "minZ": -256,
+            "maxZ": -192
+          },
+          "differenceArea": 0.01980150000000034
+        },
+        {
+          "bounds": {
+            "minX": 0,
+            "maxX": 64,
+            "minZ": 0,
+            "maxZ": 64
+          },
+          "differenceArea": 0.018877000000009705
+        },
+        {
+          "bounds": {
+            "minX": -320,
+            "maxX": -256,
+            "minZ": 0,
+            "maxZ": 64
+          },
+          "differenceArea": 0.017317999999987434
+        },
+        {
+          "bounds": {
+            "minX": -384,
+            "maxX": -320,
+            "minZ": -64,
+            "maxZ": 0
+          },
+          "differenceArea": 0.017234000000050893
+        },
+        {
+          "bounds": {
+            "minX": -384,
+            "maxX": -320,
+            "minZ": -128,
+            "maxZ": -64
+          },
+          "differenceArea": 0.014616999999895845
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+Model Information:
+* title:	Sci-Fi Interior Room
+* source:	https://sketchfab.com/3d-models/sci-fi-interior-room-ec3e1efe815743439322bd1536a886e3
+* author:	Van_Twinkle (https://sketchfab.com/Van_Twinkle)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Sci-Fi Interior Room" (https://sketchfab.com/3d-models/sci-fi-interior-room-ec3e1efe815743439322bd1536a886e3) by Van_Twinkle (https://sketchfab.com/Van_Twinkle) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

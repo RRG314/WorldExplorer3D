@@ -4,6 +4,7 @@ const GAIA_CSV_URL = new URL('../../assets/data/universe/gaia-dr3-nearby-bright.
 let catalogPromise = null;
 
 function parseNumber(value) {
+  if (value == null || String(value).trim() === '') return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }
@@ -132,25 +133,40 @@ function rebuildGaiaSkyLayers(state, observer = null) {
   if (state?.disposed || !state?.stars?.length) return 0;
   const origin = observer?.isVector3 ? observer : new THREE.Vector3();
   const layers = {
-    bright: { positions: [], colors: [] },
-    faint: { positions: [], colors: [] }
+    bright: { positions: [], colors: [], entries: [] },
+    faint: { positions: [], colors: [], entries: [] }
   };
   state.stars.forEach((star) => {
     const direction = starCartesian(star).sub(origin);
     if (direction.lengthSq() < 1e-12) return;
+    const distanceLy = direction.length();
+    const sourceDistanceLy = 1000 / star.parallaxMas * 3.26156;
+    const magnitude = star.magnitude + 5 * Math.log10(distanceLy / sourceDistanceLy);
     direction.normalize().multiplyScalar(state.radius);
-    const layer = star.magnitude <= state.brightMagnitude ? layers.bright : layers.faint;
+    const layer = magnitude <= state.brightMagnitude ? layers.bright : layers.faint;
+    layer.entries.push({ star: { name: `Gaia DR3 ${star.sourceId}`, proper: star.sourceId, source: 'ESA Gaia DR3 (J2016.0)', ra: star.raDeg / 15, dec: star.decDeg, dist: sourceDistanceLy, mag: star.magnitude, constellation: 'Catalog star' }, projected: { distanceLy, magnitude } });
     const color = colorFromBpRp(star.bpRp);
     layer.positions.push(direction.x, direction.y, direction.z);
     layer.colors.push(color.r, color.g, color.b);
   });
   [['bright', state.brightPoints], ['faint', state.faintPoints]].forEach(([key, points]) => {
-    points.geometry.dispose();
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(layers[key].positions, 3));
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(layers[key].colors, 3));
-    points.geometry = geometry;
+    // Reserve catalog capacity once: parallax must not churn GPU buffers in flight.
+    const geometry = points.geometry;
+    const capacity = state.stars.length * 3;
+    for (const [name, values] of [['position', layers[key].positions], ['color', layers[key].colors]]) {
+      let attribute = geometry.getAttribute(name);
+      if (!attribute || attribute.array.length < capacity) {
+        attribute = new THREE.Float32BufferAttribute(new Float32Array(capacity), 3);
+        geometry.setAttribute(name, attribute);
+      }
+      attribute.array.set(values);
+      attribute.needsUpdate = true;
+    }
+    geometry.setDrawRange(0, layers[key].entries.length);
+    geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), state.radius);
     points.userData.catalogCount = layers[key].positions.length / 3;
+    points.userData.isCatalogStar = true;
+    points.userData.catalogEntries = layers[key].entries;
   });
   return state.stars.length;
 }

@@ -19,19 +19,6 @@ export function createPerfRendererInfoApi({ appCtx, perfStats }) {
       poiMeshes: typeof appCtx.poiMeshes !== 'undefined' && Array.isArray(appCtx.poiMeshes) ? appCtx.poiMeshes.length : 0,
       landuseMeshes: typeof appCtx.landuseMeshes !== 'undefined' && Array.isArray(appCtx.landuseMeshes) ? appCtx.landuseMeshes.length : 0
     };
-    const rdtNoiseConfig = typeof appCtx.getRdtNoiseConfig === 'function'
-      ? appCtx.getRdtNoiseConfig()
-      : {
-          enabled: !!appCtx.rdtNoiseEnabled,
-          variant: appCtx.rdtNoiseVariant || 'standard',
-          chaos: Number.isFinite(Number(appCtx.rdtNoiseChaos)) ? Number(appCtx.rdtNoiseChaos) : 0
-        };
-    perfStats.live.rdtNoise = {
-      ...(perfStats.live.rdtNoise || {}),
-      enabled: !!rdtNoiseConfig?.enabled,
-      variant: String(rdtNoiseConfig?.variant || 'standard'),
-      chaos: Number.isFinite(Number(rdtNoiseConfig?.chaos)) ? Number(rdtNoiseConfig.chaos) : 0
-    };
     perfStats.updatedAt = Date.now();
   }
 

@@ -7,7 +7,7 @@
   },
   "scripts": {
     "serve": "firebase emulators:start --only functions",
-    "deploy": "firebase deploy --only functions",
+    "deploy": "firebase deploy --only functions --project we3d-staging-20260712",
     "logs": "firebase functions:log"
   },
   "dependencies": {

@@ -31,10 +31,10 @@ service firebase.storage {
     // Reads, replacements, metadata changes, and deletes go through the trusted
     // backend so a leaked object path is never sufficient to retrieve a photo.
     match /reality-captures/{uid}/{captureId}/originals/{fileName} {
-      allow create: if ownsWritableCapture(uid, captureId) &&
-        capture(captureId).uploadSlots.get(fileName, false) == true &&
-        validNormalizedPhoto(uid, captureId, fileName) &&
-        resource == null;
+      // Uploads now use owner/App-Check-authorized, size-bounded, write-once
+      // GCS tickets. Firebase SDK creates long-lived download tokens even for
+      // abandoned uploads; deny that path before those tokens can exist.
+      allow create: if false;
       allow get, list, update, delete: if false;
     }
 

@@ -1,3 +1,5 @@
+import { ensureRoomUserProfile } from './rooms-profile.js';
+import { postProtectedFunction } from '../../../js/function-api.js?v=3';
 import {
   collection,
   Timestamp,
@@ -6,6 +8,7 @@ import {
   doc,
   getDoc,
   getDocFromServer,
+  runTransaction,
   getDocs,
   limit,
   onSnapshot,
@@ -16,8 +19,8 @@ import {
   writeBatch,
   where
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
-import { ensureGuestSession, getCurrentUser } from '../../../js/auth-ui.js?v=55';
-import { initFirebase } from '../../../js/firebase-init.js?v=57';
+import { ensureGuestSession, getCurrentUser } from '../../../js/auth-ui.js?v=56';
+import { initFirebase } from '../../../js/firebase-init.js?v=58';
 import {
   CITY_KEY_MAX_LEN,
   DEFAULT_MAX_PLAYERS,
@@ -39,18 +42,15 @@ import {
   ROOM_CREATE_RETRY_BASE_MS,
   ROOM_CREATE_RETRY_STEP_MS,
   ROOM_PRESENCE_LEAVE_TTL_MS,
-  ROOM_PRESENCE_TTL_MS,
   ROOM_STATE_COLLECTION,
   USERS_COLLECTION,
   VALID_PAINT_TOUCH_MODES,
   buildDefaultPose,
-  buildPlayerPresencePayload,
   cloneObject,
   deriveRoomDeterministicSeed,
   firestoreRuleIntOrNull,
   formatRoomCreateDeniedMessage,
   hashStringToUint32,
-  isPlayerPresenceActive,
   modeForWorldKind,
   normalizeCityKey,
   normalizeCode,
@@ -78,6 +78,12 @@ import {
 import { createMultiplayerRoomsDirectoryApi } from './rooms-directory.js?v=2';
 
 let currentRoom = null;
+let roomRequestGeneration = 0;
+function assertCurrentRoomRequest(generation, uid = null) {
+  if (generation !== roomRequestGeneration || (uid && getCurrentUser()?.uid !== uid)) {
+    throw new DOMException('Room request superseded by another session', 'AbortError');
+  }
+}
 
 function getServices() {
   const services = initFirebase();
@@ -93,22 +99,6 @@ function requireSignedInUser() {
     throw new Error('Sign in is required to use multiplayer.');
   }
   return user;
-}
-
-async function countActivePlayers(roomCode, maxPlayers) {
-  const { db } = getServices();
-  const code = normalizeCode(roomCode);
-  if (!code) return 0;
-  const limitSize = Math.max(4, Math.min(96, Math.floor(Number(maxPlayers) || DEFAULT_MAX_PLAYERS) + 12));
-  const playersRef = collection(db, ROOM_COLLECTION, code, PLAYER_COLLECTION);
-  const playersSnap = await getDocs(query(playersRef, limit(limitSize)));
-  const nowMs = Date.now();
-  let active = 0;
-  playersSnap.forEach((playerSnap) => {
-    const data = playerSnap.data() || {};
-    if (isPlayerPresenceActive(data, nowMs)) active += 1;
-  });
-  return active;
 }
 
 function myRoomsCollection(db, uid) {
@@ -201,6 +191,7 @@ function setCurrentRoom(nextRoom) {
 }
 
 async function createRoom(options = {}) {
+  const generation = ++roomRequestGeneration;
   const { db } = getServices();
   const user = requireSignedInUser();
   const displayName = resolveDisplayName(user, options.displayName);
@@ -229,20 +220,10 @@ async function createRoom(options = {}) {
     }
   }
 
-  async function ensureUserProfile() {
-    let snap = await getDoc(userRef);
-    if (snap.exists()) return snap;
-
-    await setDoc(userRef, {
-      uid: user.uid,
-      email: String(user.email || '').trim().slice(0, 320),
-      displayName: displayName.slice(0, 60),
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    }, { merge: true });
-    snap = await getDoc(userRef);
-    return snap;
-  }
+  const ensureUserProfile = () => ensureRoomUserProfile({
+    db, userRef, runTransaction, serverTimestamp, getDocFromServer,
+    profile: { uid: user.uid, email: String(user.email || '').trim().slice(0, 320), displayName: displayName.slice(0, 60) }
+  });
 
   let profileSnap = await ensureUserProfile();
   let didServerProfileRefresh = false;
@@ -366,37 +347,8 @@ async function createRoom(options = {}) {
     throw new Error('Unable to reserve a room code. Please retry.');
   }
 
-  const ownerPlayerRef = doc(db, ROOM_COLLECTION, createdCode, PLAYER_COLLECTION, user.uid);
-  let ownerJoinedAt = null;
-  let ownerRole = 'owner';
-  try {
-    const existingOwnerSnap = await getDoc(ownerPlayerRef);
-    if (existingOwnerSnap.exists()) {
-      const existingOwner = existingOwnerSnap.data() || {};
-      if (existingOwner.joinedAt && typeof existingOwner.joinedAt.toMillis === 'function') {
-        ownerJoinedAt = existingOwner.joinedAt;
-      }
-      ownerRole = normalizePlayerRole(existingOwner.role, 'owner');
-    }
-  } catch (err) {
-    if (String(err?.code || '') !== 'permission-denied') throw err;
-  }
-
-  try {
-    await setDoc(ownerPlayerRef, buildPlayerPresencePayload({
-      uid: user.uid,
-      displayName,
-      joinedAt: ownerJoinedAt || serverTimestamp(),
-      role: ownerRole,
-      joinCode: createdCode,
-      world
-    }), { merge: true });
-  } catch (err) {
-    if (String(err?.code || '') === 'permission-denied') {
-      throw new Error('Room created, but owner presence could not be written. Check sign-in state and Firestore rules.');
-    }
-    throw err;
-  }
+  assertCurrentRoomRequest(generation, user.uid);
+  await postProtectedFunction('/joinRoom', { roomCode: createdCode, displayName }, { label: 'Room admission' });
 
   const roomSnap = await getDoc(doc(db, ROOM_COLLECTION, createdCode));
   const room = toRoomObject(roomSnap);
@@ -404,16 +356,20 @@ async function createRoom(options = {}) {
     throw new Error('Room creation succeeded but room could not be loaded.');
   }
 
+  assertCurrentRoomRequest(generation, user.uid);
   setCurrentRoom(room);
   try {
     await upsertMyRoomRecord(room, 'owner');
   } catch (err) {
     console.warn('[multiplayer][rooms] Failed to persist room in myRooms after create:', err);
   }
+  assertCurrentRoomRequest(generation, user.uid);
   return room;
 }
 
 async function joinRoomByCode(codeInput, options = {}) {
+  const generation = ++roomRequestGeneration;
+  const startingUid = getCurrentUser()?.uid;
   const { db } = getServices();
   const code = normalizeCode(codeInput);
   if (code.length !== ROOM_CODE_LENGTH) {
@@ -431,6 +387,7 @@ async function joinRoomByCode(codeInput, options = {}) {
     throw new Error('Could not read room details.');
   }
 
+  assertCurrentRoomRequest(generation, startingUid);
   let user = getCurrentUser();
   if (!user || !user.uid) {
     if (room.visibility !== 'public') {
@@ -443,49 +400,9 @@ async function joinRoomByCode(codeInput, options = {}) {
   }
 
   const displayName = resolveDisplayName(user, options.displayName);
-  const playerRef = doc(db, ROOM_COLLECTION, code, PLAYER_COLLECTION, user.uid);
-  let preservedJoinedAt = null;
-  let preservedRole = 'member';
-  let hasExistingMembership = false;
-
-  try {
-    const existingPlayerSnap = await getDoc(playerRef);
-    if (existingPlayerSnap.exists()) {
-      hasExistingMembership = true;
-      const existingPlayer = existingPlayerSnap.data() || {};
-      if (existingPlayer.joinedAt && typeof existingPlayer.joinedAt.toMillis === 'function') {
-        preservedJoinedAt = existingPlayer.joinedAt;
-      }
-      preservedRole = normalizePlayerRole(existingPlayer.role, 'member');
-    }
-  } catch (err) {
-    // If we cannot read an existing player doc yet, proceed with a create-style payload.
-    if (String(err?.code || '') !== 'permission-denied') throw err;
-  }
-
-  if (!hasExistingMembership) {
-    const cap = normalizeMaxPlayers(room.maxPlayers);
-    const activePlayers = await countActivePlayers(code, cap);
-    if (activePlayers >= cap) {
-      throw new Error(`Room is full (${cap} players max for stable performance). Try another room or retry shortly.`);
-    }
-  }
-
-  try {
-    await setDoc(playerRef, buildPlayerPresencePayload({
-      uid: user.uid,
-      displayName,
-      joinedAt: preservedJoinedAt || serverTimestamp(),
-      role: preservedRole,
-      joinCode: code,
-      world: room.world
-    }), { merge: true });
-  } catch (err) {
-    if (String(err?.code || '') === 'permission-denied') {
-      throw new Error('Room join denied. Check room code and ensure your plan includes multiplayer.');
-    }
-    throw err;
-  }
+  assertCurrentRoomRequest(generation, user.uid);
+  await postProtectedFunction('/joinRoom', { roomCode: code, displayName }, { label: 'Room admission' });
+  assertCurrentRoomRequest(generation, user.uid);
   setCurrentRoom(room);
   try {
     const role = room && room.ownerUid === user.uid ? 'owner' : 'member';
@@ -493,10 +410,12 @@ async function joinRoomByCode(codeInput, options = {}) {
   } catch (err) {
     console.warn('[multiplayer][rooms] Failed to persist room in myRooms after join:', err);
   }
+  assertCurrentRoomRequest(generation, user.uid);
   return room;
 }
 
 async function leaveRoom() {
+  roomRequestGeneration += 1;
   const user = getCurrentUser();
   const room = currentRoom ? cloneObject(currentRoom) : null;
 
@@ -506,9 +425,7 @@ async function leaveRoom() {
   try {
     const { db } = getServices();
     const playerRef = doc(db, ROOM_COLLECTION, room.id, PLAYER_COLLECTION, user.uid);
-    await setDoc(playerRef, {
-      expiresAt: Timestamp.fromMillis(Date.now() + ROOM_PRESENCE_LEAVE_TTL_MS)
-    }, { merge: true });
+    await deleteDoc(playerRef);
   } catch (_) {
     // Keep local state clean even if network write fails.
   }

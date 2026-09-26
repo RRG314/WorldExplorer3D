@@ -1,6 +1,17 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { readPerformanceHost, requirePerformanceHost, requireHardwareGraphics } from './performance-host.mjs';
+
+const measureLoadTime = process.argv.includes('--measure-load-time');
+// Functional cloud journeys never establish hardware load-time acceptance.
+// The required physical performance gate runs this mode sequentially.
+const hostAuthority = measureLoadTime ? requirePerformanceHost() : {host: readPerformanceHost()};
+const performanceBudgets = JSON.parse(await fs.readFile(new URL('../../config/performance-budgets.json', import.meta.url), 'utf8'));
+const loadTimeBudgetMs = performanceBudgets.mobileRegressionTier.budgets.firstPlayableMs;
 
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
 const externalUrl = String(process.env.WE3D_VERIFY_BASE_URL || '').replace(/\/$/, '');
@@ -9,14 +20,20 @@ const server = externalUrl ? null : await startStaticServer({
   ports: [4397, 4398, 4399]
 });
 const baseUrl = externalUrl || `http://127.0.0.1:${server.port}`;
+const evidenceDir = 'output/verification/mobile-load';
+await fs.mkdir(evidenceDir, {recursive: true});
 // Own the browser process explicitly. Installed Chrome can occasionally stop
 // answering the graceful close command after consecutive WebGL contexts even
 // though those contexts have closed. BrowserServer gives this bounded verifier
 // a supported kill fallback instead of leaving an orphaned process behind.
-const browserServer = await chromium.launchServer({ headless: true, channel: 'chrome' });
-const browser = await chromium.connect(browserServer.wsEndpoint());
+const ownedBrowserServers = new Set();
 
 async function createMobilePage() {
+  // A closed context can leave GPU allocations in the shared browser process.
+  // Give each cold-start journey its own process and reclaim it before the next.
+  const browserServer = await chromium.launchServer({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
+  ownedBrowserServers.add(browserServer);
+  const browser = await chromium.connect(browserServer.wsEndpoint());
   const context = await browser.newContext({
     ...devices['iPhone 13'],
     viewport: { width: 390, height: 844 },
@@ -27,13 +44,23 @@ async function createMobilePage() {
   const page = await context.newPage();
   const browserErrors = [];
   const localFailures = [];
+  const providerFailures = [];
+  collectBrowserGraphicsErrors(page, browserErrors);
+  const attestation = await configureStagingAppCheck(page, baseUrl);
   page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   page.on('response', (response) => {
+    if (!response.url().startsWith(baseUrl) && response.status() >= 400) {
+      providerFailures.push({url: response.url(), status: response.status()});
+    }
     if (response.url().startsWith(baseUrl) && response.status() >= 400) {
       localFailures.push({ url: response.url(), status: response.status() });
     }
   });
-  return { context, page, browserErrors, localFailures };
+  page.on('requestfailed', request => {
+    const failure = {url: request.url(), reason: request.failure()?.errorText};
+    (request.url().startsWith(baseUrl) ? localFailures : providerFailures).push(failure);
+  });
+  return { context, page, browserServer, browserErrors, localFailures, providerFailures, attestation };
 }
 
 async function waitForPlayable(page, requireLiveGps = false) {
@@ -41,8 +68,9 @@ async function waitForPlayable(page, requireLiveGps = false) {
   let last = null;
   while (performance.now() - startedAt < 180_000) {
     last = await page.evaluate((liveGps) => {
-      const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
       const loadingVisible = document.getElementById('loading')?.classList.contains('show') === true;
+      if (loadingVisible) return { ready: false, loadingVisible };
+      const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
       return {
         ready: state.gameStarted === true && state.worldLoading === false && !loadingVisible &&
           Number(state.worldCounts?.roads || 0) > 0 &&
@@ -65,6 +93,11 @@ async function waitForPlayable(page, requireLiveGps = false) {
       };
     }, requireLiveGps);
     if (last.ready) break;
+    if (last.gameStarted && !last.worldLoading && !last.loadingVisible &&
+        last.worldLoad?.status === 'ready' &&
+        (!last.worldCounts?.roads || !last.worldCounts?.buildings)) {
+      throw new Error(`Mobile load finished without mapped city geometry: ${JSON.stringify(last)}`);
+    }
     const elapsedMs = Math.round(performance.now() - startedAt);
     if (elapsedMs % 20_000 < 1_200) {
       console.error(JSON.stringify({ mobileLoadProgressMs: elapsedMs, ...last }));
@@ -75,6 +108,15 @@ async function waitForPlayable(page, requireLiveGps = false) {
     throw new Error(`Mobile world did not become playable: ${JSON.stringify(last)}`);
   }
   await page.waitForTimeout(1_000);
+  if (measureLoadTime) {
+    const renderer = await page.evaluate(async () => {
+      const {ctx} = await import('/app/js/shared-context.js?v=55');
+      const gl = ctx.renderer?.getContext?.();
+      const info = gl?.getExtension('WEBGL_debug_renderer_info');
+      return gl ? gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER) : null;
+    });
+    requireHardwareGraphics(renderer);
+  }
 }
 
 async function openTitle(page) {
@@ -100,21 +142,30 @@ async function runStandardJourney() {
     await waitForPlayable(client.page, false);
     const firstPlayableMs = Math.round(performance.now() - startedAt);
     const diagnostics = await client.page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.() || {});
-    await client.page.screenshot({ path: '/tmp/worldexplorer-mobile-load-standard.png', fullPage: true });
+    await client.page.screenshot({ path: `${evidenceDir}/standard.png`, fullPage: false });
     return {
       titleReadyMs,
       firstPlayableMs,
       worldCounts: diagnostics.worldCounts,
+      transportCompilation: diagnostics.transportCompilation,
       loadProfile: diagnostics.worldLoad?.loadMetrics?.loadProfile || diagnostics.worldLoad?.loadProfile || null,
       phases: diagnostics.worldLoad?.phaseTotals || diagnostics.worldLoad?.loadMetrics?.phases || null,
       regionalTransportSelection: diagnostics.worldLoad?.regionalTransportSelection ||
         diagnostics.worldLoad?.loadMetrics?.regionalTransportSelection || null,
       farTerrain: diagnostics.farTerrain || diagnostics.terrain?.farField || null,
       browserErrors: client.browserErrors,
-      localFailures: client.localFailures
+      localFailures: client.localFailures,
+      providerFailures: client.providerFailures,
+      attestation: client.attestation
     };
+  } catch (error) {
+    await saveFailure(client, error);
+    throw error;
   } finally {
-    await client.context.close();
+    if (!await terminateOwnedBrowserProcess(client.browserServer)) {
+      throw new Error('Mobile journey browser failed to release its process.');
+    }
+    ownedBrowserServers.delete(client.browserServer);
   }
 }
 
@@ -131,20 +182,38 @@ async function runLiveGpsJourney() {
     const permissionToPlayableMs = Math.round(performance.now() - permissionStartedAt);
     const entryToPlayableMs = Math.round(performance.now() - startedAt);
     const diagnostics = await client.page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.() || {});
-    await client.page.screenshot({ path: '/tmp/worldexplorer-mobile-load-live-gps.png', fullPage: true });
+    await client.page.screenshot({ path: `${evidenceDir}/live-gps.png`, fullPage: false });
     return {
       titleReadyMs,
       entryToPlayableMs,
       permissionToPlayableMs,
       liveGps: diagnostics.liveGps,
       worldCounts: diagnostics.worldCounts,
+      transportCompilation: diagnostics.transportCompilation,
       phases: diagnostics.worldLoad?.phaseTotals || diagnostics.worldLoad?.loadMetrics?.phases || null,
       browserErrors: client.browserErrors,
-      localFailures: client.localFailures
+      localFailures: client.localFailures,
+      providerFailures: client.providerFailures,
+      attestation: client.attestation
     };
+  } catch (error) {
+    await saveFailure(client, error);
+    throw error;
   } finally {
-    await client.context.close();
+    if (!await terminateOwnedBrowserProcess(client.browserServer)) {
+      throw new Error('Mobile journey browser failed to release its process.');
+    }
+    ownedBrowserServers.delete(client.browserServer);
   }
+}
+
+async function saveFailure(client, error) {
+  const state = await client.page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.()).catch(() => null);
+  await fs.writeFile(`${evidenceDir}/failure.json`, JSON.stringify({
+    ok: false, error: String(error?.stack || error), state, attestation: client.attestation,
+    browserErrors: client.browserErrors, localFailures: client.localFailures, providerFailures: client.providerFailures
+  }, null, 2));
+  await client.page.screenshot({path: `${evidenceDir}/failure.png`, timeout: 10000}).catch(() => {});
 }
 
 async function closeWithin(label, close, timeoutMs = 8_000) {
@@ -186,10 +255,13 @@ async function terminateOwnedBrowserProcess(browserServer, timeoutMs = 4_000) {
 let verificationError = null;
 try {
   const standard = await runStandardJourney();
+  console.error(JSON.stringify({ mobileStandardCompleted: standard }));
   const liveGps = await runLiveGpsJourney();
   const checks = {
-    standardFirstPlayUnder38Seconds: standard.firstPlayableMs <= 38_000,
-    liveGpsPermissionToPlayUnder40Seconds: liveGps.permissionToPlayableMs <= 40_000,
+    ...(measureLoadTime ? {
+      standardFirstPlayWithinHardwareBudget: standard.firstPlayableMs <= loadTimeBudgetMs,
+      liveGpsPermissionToPlayWithinHardwareBudget: liveGps.permissionToPlayableMs <= loadTimeBudgetMs
+    } : {}),
     mobileProfileActuallyActive:
       standard.loadProfile?.dynamicBudgetScale <= 0.28 &&
       standard.loadProfile?.regionalContextRadiusMeters === 6_000 &&
@@ -215,19 +287,26 @@ try {
   };
   const report = {
     ok: Object.values(checks).every(Boolean),
-    contract: 'mobile-cold-start-and-live-gps-current-v2',
+    contract: 'mobile-cold-start-and-live-gps-current-v3',
     measurementAuthority: 'installed Chrome, 390x844 touch/mobile emulation; owner device proof remains required',
+    evidenceScope: measureLoadTime ? 'physical M1 mobile-emulation load-time regression' : 'functional mobile-emulation journey; observed timings are not performance acceptance',
+    timingAcceptance: {enforced: measureLoadTime, budgetSource: 'config/performance-budgets.json:mobileRegressionTier',
+      budgetMs: loadTimeBudgetMs, requiredGate: 'performance', hostAuthority},
     checks,
     standard,
     liveGps
   };
+  await fs.writeFile(`${evidenceDir}/report.json`, JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
-  assert.equal(report.ok, true, 'Mobile cold-start and Live GPS timing journey failed.');
+  assert.equal(report.ok, true, 'Mobile cold-start and Live GPS journey failed; see the scoped report.');
 } catch (error) {
   verificationError = error;
   console.error(error?.stack || error);
 } finally {
-  const browserProcessClosed = await terminateOwnedBrowserProcess(browserServer);
+  let browserProcessClosed = true;
+  for (const browserServer of ownedBrowserServers) {
+    browserProcessClosed = await terminateOwnedBrowserProcess(browserServer) && browserProcessClosed;
+  }
   const serverClosed = !server || await closeWithin('server', () => server.close(), 3_000);
   if ((!browserProcessClosed || !serverClosed) && !verificationError) {
     verificationError = new Error('Mobile verification passed its gameplay assertions but did not release its runtime resources.');

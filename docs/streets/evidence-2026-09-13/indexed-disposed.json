@@ -1,0 +1,37 @@
+{
+  "busy": false,
+  "renderer": {
+    "geometries": 1173,
+    "textures": 0
+  },
+  "heapBytes": 45987170,
+  "history": [
+    {
+      "position": {
+        "x": 0,
+        "z": 0
+      },
+      "durationMs": 5624,
+      "reusedCells": 0,
+      "cacheBytes": 2483808
+    },
+    {
+      "position": {
+        "x": 1024,
+        "z": 1024
+      },
+      "durationMs": 6734,
+      "reusedCells": 0,
+      "cacheBytes": 4959246
+    },
+    {
+      "position": {
+        "x": 0,
+        "z": 0
+      },
+      "durationMs": 826,
+      "reusedCells": 75,
+      "cacheBytes": 4959246
+    }
+  ]
+}

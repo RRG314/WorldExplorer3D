@@ -22,7 +22,9 @@ const CAPTURE_STATES = Object.freeze([
 const STATE_TRANSITIONS = Object.freeze({
   draft: Object.freeze(['uploading']),
   uploading: Object.freeze(['draft', 'uploaded', 'processing_failed']),
-  uploaded: Object.freeze(['queued']),
+  // Reopening is additionally restricted by the reservation endpoint to manual
+  // sets without a review submission, processed result or queued attempt.
+  uploaded: Object.freeze(['queued', 'uploading']),
   queued: Object.freeze(['processing', 'processing_failed']),
   processing: Object.freeze(['review_required', 'processing_failed']),
   processing_failed: Object.freeze(['queued', 'rejected']),
@@ -164,7 +166,9 @@ function createCaptureDraft(input = {}, actor = {}, nowMs = Date.now()) {
     throw new Error('interior_permission_confirmation_required');
   }
   const captureId = stableId('capture', ownerUid, building.worldId, building.sourceBuildingId, captureKind, nowMs, crypto.randomBytes(8).toString('hex'));
-  const spaceId = spaceIdForCapture(ownerUid, building, captureKind, room?.label || '');
+  // A new unit has an opaque identity. Renaming rooms cannot create a different
+  // home; continuations explicitly retain their source spaceId.
+  const spaceId = captureKind==='interior_room'?stableId('space',ownerUid,captureId):'';
   return Object.freeze({
     captureId,
     captureSchemaVersion: CAPTURE_SCHEMA_VERSION,
@@ -227,7 +231,7 @@ function validateUploadedPhotoSet(capture = {}, files = [], options = {}) {
   const kind = normalizeCaptureKind(capture.captureKind);
   const limits = CAPTURE_LIMITS[kind];
   const rows = Array.isArray(files) ? files : [];
-  const minimum = options.manual === true && kind === 'exterior' ? 1 : limits.minPhotos;
+  const minimum = options.manual === true ? 1 : limits.minPhotos;
   if (rows.length < minimum) throw new Error('too_few_photos');
   if (rows.length > limits.maxPhotos) throw new Error('too_many_photos');
   let totalBytes = 0;
@@ -275,7 +279,10 @@ function resolveSpaceAccess(input = {}) {
   if (mode === 'PUBLIC') {
     // Sharing preference is not publication authority. A reviewed interior
     // must be the exact capture currently installed in this private space.
-    const reviewed = !!space.captureId && space.publicApproval?.captureId === space.captureId;
+    const installed=space.installedRepresentation,approval=space.publicApproval;
+    const reviewed = !!space.captureId && approval?.captureId === space.captureId && (!installed || (
+      installed.modelPath===approval.modelPath && installed.modelGeneration===approval.modelGeneration && installed.revision===approval.revision
+    ));
     return Object.freeze(reviewed
       ? { allowed: true, reason: 'public', scope: 'public' }
       : { allowed: false, reason: 'public_review_required', requestable: false });

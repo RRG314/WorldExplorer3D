@@ -1,5 +1,7 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 
+import { haversineKm } from '../earth-location.js?v=2';
+
 function createWeatherStateService(context = appCtx) {
   let mode = 'live';
   let liveState = null;
@@ -43,7 +45,8 @@ function createWeatherStateService(context = appCtx) {
     const display = String(place?.display || '').trim();
     const shortLabel = String(place?.shortLabel || '').trim();
     const apply = (state) => {
-      if (!state) return;
+      // A geocoder reply may arrive after the observer has changed locations.
+      if (!state || !place || haversineKm(state.lat, state.lon, place.lat, place.lon) >= 12) return;
       state.locationDisplay = display || String(state.locationDisplay || '').trim();
       state.locationShortLabel = shortLabel || String(state.locationShortLabel || '').trim();
     };

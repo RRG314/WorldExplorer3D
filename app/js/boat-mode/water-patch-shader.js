@@ -1,5 +1,8 @@
 export function customizeBoatWaterPatchShader(shader) {
   if (!shader?.uniforms || typeof THREE === 'undefined') return;
+  for (const marker of ['// WE_WATER_FOAM_EXTENSION', '// WE_WATER_COLOR_EXTENSION', '// WE_WATER_EMISSIVE_EXTENSION']) {
+    if (!shader.fragmentShader.includes(marker)) throw new Error(`Boat water shader is missing its shared hook: ${marker}`);
+  }
   shader.uniforms.weBoatPos = { value: new THREE.Vector2(0, 0) };
   shader.uniforms.weBoatForward = { value: new THREE.Vector2(0, 1) };
   shader.uniforms.weBoatWakeStrength = { value: 0 };
@@ -107,20 +110,20 @@ float weBoatBowFoamMask(vec2 worldXZ) {
 }`
     )
     .replace(
-      'float weFoamBands = smoothstep(0.46, 0.96, weWaveCrestValue) * clamp(weWaveFoamStrength, 0.0, 1.5);',
-      `float weFoamBands = smoothstep(0.44, 0.98, weWaveCrestValue) * clamp(weWaveFoamStrength, 0.0, 1.8);
+      '// WE_WATER_FOAM_EXTENSION',
+      `weFoamBands = smoothstep(0.44, 0.98, weWaveCrestValue) * clamp(weWaveFoamStrength, 0.0, 1.8);
 float weWhitecaps = smoothstep(0.74, 1.36, weWaveCrestValue + weBoatWaveSeverity * 0.18) * clamp(weWaveFoamStrength * 0.72 + weBoatWaveSeverity * 0.66, 0.0, 2.2);
 float weBoatWakeFoam = weBoatWakeFoamMask(vWeWaveWorldXZ) * (0.28 + weBoatWakeStrength * 1.24 + weBoatSternFoam * 0.46);
 float weBoatBowFoam = weBoatBowFoamMask(vWeWaveWorldXZ) * (0.22 + weBoatBowWave * 0.92 + weBoatBowSplash * 0.76);
 float weBoatFoam = clamp(weBoatWakeFoam + weBoatBowFoam, 0.0, 2.8);`
     )
     .replace(
-      'diffuseColor.rgb += vec3(0.08, 0.11, 0.13) * weFoamBands * 0.58;',
+      '// WE_WATER_COLOR_EXTENSION',
       `diffuseColor.rgb += vec3(0.04, 0.06, 0.08) * (weFoamBands * 0.32 + weWhitecaps * 0.38 + weBoatFoam * 0.42);
 diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.78, 0.84, 0.9), clamp(weWhitecaps * 0.1 + weBoatFoam * 0.12, 0.0, 0.24));`
     )
     .replace(
-      'totalEmissiveRadiance += vec3(0.048, 0.074, 0.098) * weFoamBands * (weWaveVisualStrength * 0.74);',
+      '// WE_WATER_EMISSIVE_EXTENSION',
       `totalEmissiveRadiance += vec3(0.048, 0.074, 0.098) * (weFoamBands * (weWaveVisualStrength * 0.74) + weWhitecaps * 0.22 + weBoatFoam * 0.28);`
     )
     .replace(

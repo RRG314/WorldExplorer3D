@@ -1,18 +1,20 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import {createRequire} from 'node:module';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 
 const root = process.cwd();
 const outputDir = path.join(root, 'output', 'verification', 'interstellar-shared');
 await fs.mkdir(outputDir, { recursive: true });
-const server = await startStaticServer({ rootDir: root, ports: [4390, 4391, 4392] });
+const servedRoot = path.resolve(process.env.WE3D_VERIFY_ROOT || root);
+const server = await startStaticServer({ rootDir: servedRoot, ports: [4390, 4391, 4392] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
 const projectId = String(process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || 'we3d-staging-20260712');
 const functionsOrigin = `http://127.0.0.1:5001/${projectId}/us-central1`;
 const firebaseConfig = JSON.parse(await fs.readFile(path.join(root, 'config/firebase.staging.json'), 'utf8'));
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=768'] });
 const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const failures = [];
 
@@ -35,7 +37,7 @@ async function createPlayer(label, viewport) {
     const auth = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js');
     const credential = await auth.createUserWithEmailAndPassword(services.auth, email, 'WorldExplorer3D-Test-Only-93!');
     await auth.updateProfile(credential.user, { displayName: label });
-    const authUi = await import('/js/auth-ui.js?v=55');
+    const authUi = await import('/js/auth-ui.js?v=56');
     const deadline = Date.now() + 12_000;
     while (authUi.getCurrentUser()?.uid !== credential.user.uid && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -65,23 +67,17 @@ async function openMultiplayer(player) {
 }
 
 async function openSharedPlanner(player) {
-  await player.page.evaluate(async () => {
-    const [runtime, rooms] = await Promise.all([
-      import('/app/js/expedition/runtime.js?v=13'), import('/app/js/multiplayer/rooms.js?v=67')
-    ]);
-    runtime.openExpeditionPlanner({
-      getCurrentMultiplayerRoom: () => rooms.getCurrentRoom(),
-      showToast: () => {},
-      updateExpeditionShipRecord: () => {}
-    });
-  });
+  await player.page.waitForFunction(() =>
+    JSON.parse(globalThis.render_game_to_text?.() || '{}').modes?.space === true,
+  null, { timeout: 120_000 });
+  if (await player.page.locator('#roomPanelCloseBtn').isVisible()) {
+    await player.page.locator('#roomPanelCloseBtn').click();
+  }
+  if (!await player.page.locator('#sfExpeditionBtn').isVisible()) {
+    await player.page.locator('#sfHudToggle').click();
+  }
+  await player.page.locator('#sfExpeditionBtn').click();
   await player.page.locator('#expeditionOverlay').waitFor({ state: 'visible' });
-  await player.page.locator('#expeditionOverlay').evaluate((element) => {
-    // This focused verifier opens the room panel before an Earth world is
-    // needed. Keep unrelated background map loading from obscuring the panel
-    // being inspected; gameplay verifiers exercise the normal world boundary.
-    element.style.zIndex = '2147483647';
-  });
 }
 
 let owner;
@@ -90,6 +86,10 @@ try {
   owner = await createPlayer('Captain Rowan', { width: 1440, height: 900 });
   member = await createPlayer('Engineer Vale', { width: 390, height: 844 });
   await openMultiplayer(owner);
+  // Opening the globe's multiplayer destination selects its Earth context.
+  // Explicitly choose Space before creating this interstellar room.
+  await owner.page.locator('#spaceLaunchToggle').evaluate(button => button.click());
+  await owner.page.locator('#mpCreateRoomDetails > summary').click();
   await owner.page.locator('#mpTitleRoomNameInput').fill('Shared Interstellar Crew');
   await owner.page.locator('#mpTitleLocationTagInput').fill('Solar System');
   await owner.page.locator('#mpTitleCreateBtn').click();
@@ -105,6 +105,14 @@ try {
   }
   const roomCode = String(await owner.page.locator('#roomPanelRoomCode').textContent()).match(/\b[A-Z2-9]{6}\b/)?.[0] || '';
   assert.match(roomCode, /^[A-Z2-9]{6}$/);
+  const roomWorld = await owner.page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return { world: ctx.getCurrentMultiplayerRoom?.()?.world,
+      selected: ctx.loadingScreenMode, gameStarted: ctx.gameStarted,
+      spaceActive: ctx.spaceFlight?.active, worldLoading: ctx.worldLoading };
+  });
+  console.log('[interstellar-shared] created room world', JSON.stringify(roomWorld));
+  assert.equal(roomWorld.world?.kind, 'space', JSON.stringify(roomWorld));
 
   await openMultiplayer(member);
   await member.page.locator('#mpTitleCodeInput').fill(roomCode);
@@ -218,7 +226,39 @@ try {
     return (await firestore.getDoc(firestore.doc(services.db, 'rooms', code, 'expeditions', 'active'))).data();
   }, roomCode);
 
+  // Seed material only through the isolated emulator, then exercise the same
+  // authenticated command endpoint used by mounted workbenches.
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST||'',/^(127\.0\.0\.1|localhost):\d+$/);
+  const require=createRequire(path.join(root,'functions/package.json'));
+  const admin=require('firebase-admin');
+  const fixtureAdmin=admin.initializeApp({projectId},`research-${runId}`);
+  try {
+    await fixtureAdmin.firestore().doc(`rooms/${roomCode}/expeditions/active`).update({
+      'expedition.scienceSamples':[{id:'research-a',label:'Basalt',bodyId:'mars',massKg:3},{id:'research-b',label:'Regolith',bodyId:'moon',massKg:2}],
+      'expedition.resources.scienceCargoKg':5
+    });
+  } finally {await fixtureAdmin.delete();}
+  let researchState=finalShared;
+  const researchCommand=async(player,benchId,researchAction,sampleId,revision=researchState.revision)=>player.page.evaluate(async args=>{
+    const api=await import('/js/expedition-api.js?v=2');
+    return api.mutateSharedExpedition(args);
+  },{roomCode,action:'commit',expectedRevision:revision,command:{type:'research',benchId,researchAction,sampleId}});
+  for(const bench of ['science-bench','analysis-bench','fabrication-bench']){
+    const prior=researchState.revision;
+    researchState=(await researchCommand(owner,bench,'place','research-a')).state;
+    await assert.rejects(()=>researchCommand(member,bench,'place','research-b',prior),/stale|revision|conflict/i);
+    researchState=(await researchCommand(member,bench,'place','research-b')).state;
+    if(bench==='fabrication-bench')researchState=(await researchCommand(member,bench,'fabricate')).state;
+    else{
+      researchState=(await researchCommand(owner,bench,'measure')).state;
+      for(const id of ['research-a','research-b'])researchState=(await researchCommand(member,bench,'return',id)).state;
+    }
+  }
+  assert.equal(researchState.expedition.resources.scienceCargoKg,0);
+  assert.equal(researchState.expedition.resources.maintenanceKg,finalShared.expedition.resources.maintenanceKg+7);
+  assert.equal(researchState.expedition.resources.feedstockKg,finalShared.expedition.resources.feedstockKg-2);
   const report = {
+    sharedResearch:{seededMaterials:true,revision:researchState.revision,conservedOutputKg:7,staleRevisionsRejected:true},
     ok: failures.length === 0,
     roomCode,
     revision: finalShared.revision,

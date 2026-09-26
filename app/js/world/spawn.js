@@ -76,7 +76,9 @@ function evaluateWalkSpawnCandidate(x, z, options = {}) {
     if (!standingOnRoof) return { valid: false, reason: "inside_building", terrainY };
   }
   const buildingCheck = !standingOnRoof && typeof appCtx.checkBuildingCollision === "function" ?
-    appCtx.checkBuildingCollision(x, z, 1.5, {
+    // A saved walking pose may validly stand close to a doorway. Validate the
+    // full player radius instead of moving it to satisfy fresh-arrival padding.
+    appCtx.checkBuildingCollision(x, z, options.restorePose === true ? 0.35 : 1.5, {
       actorBaseY: collisionBaseY,
       actorHeight: 1.9
     }) :
@@ -260,7 +262,8 @@ function searchNearestSafeRoadSpawn(targetX, targetZ, options = {}) {
   const traversableFeatures = worldSpawnDeps.traversableFeaturesForMode(requestedMode);
   if (!Array.isArray(traversableFeatures) || traversableFeatures.length === 0) return null;
   const maxDistance = Number.isFinite(options.maxDistance) ? Math.max(32, options.maxDistance) : 220;
-  const limits = [maxDistance, Infinity];
+  // An explicit bound is a destination contract, not a first-pass hint.
+  const limits = Number.isFinite(options.maxDistance) || requestedMode === "walk" ? [maxDistance] : [maxDistance, Infinity];
   const shortlistLimit = requestedMode === "drive" ? 18 : 12;
 
   const sampleSegmentCandidates = (p1, p2) => {
@@ -483,6 +486,7 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
   if (mode === "walk") {
     const direct = evaluateWalkSpawnCandidate(x, z, {
       angle,
+      restorePose: options.restorePose === true,
       feetY: options.feetY,
       preserveElevatedSurface: options.preserveElevatedSurface,
       preferredRoad: options.preferredRoad || null,
@@ -491,18 +495,19 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
     });
     if (direct.valid && (!isSubgradeArrival(direct) || preservesOccupiedTunnel(direct, options))) return direct;
 
+    // Explore the selected terrain before moving a walking arrival to a road.
+    const groundFallback = searchNearestSafeGroundSpawn(x, z, {
+      angle,
+      maxRadius: options.maxGroundRadius
+    });
+    if (groundFallback) return groundFallback;
+
     const surfaceFallback = searchNearestSafeRoadSpawn(x, z, {
       mode: "walk",
       angle,
       maxDistance: options.maxRoadDistance
     });
     if (surfaceFallback) return surfaceFallback;
-
-    const groundFallback = searchNearestSafeGroundSpawn(x, z, {
-      angle,
-      maxRadius: options.maxGroundRadius
-    });
-    if (groundFallback) return groundFallback;
 
     return fallbackResolvedSpawn("walk", { x, z, angle, source: "walk_fallback" });
   }

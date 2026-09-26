@@ -1,3 +1,4 @@
+import { markRoadsAtMissingTiles } from './shortbread-missing-coverage.js';
 import { createRoadNameResolver } from './shortbread-road-labels.js?v=1';
 import { yieldToMainThread } from './cooperative-scheduling.js?v=1';
 import { runBoundedProviderBatch } from '../earth-core/bounded-provider-batch.js?v=1';
@@ -19,6 +20,46 @@ const decodedTileCache = new Map();
 const rawTileCache = new Map();
 const pendingTileRequests = new Map();
 let rawTileCacheBytes = 0;
+
+// A failed origin must not consume every queued tile (roads and buildings share
+// this owner). Cached data remains usable; one request probes after the pause.
+const providerHealth = new Map();
+const PROVIDER_COOLDOWN_MS = 60_000;
+function healthFor(template) {
+  let health = providerHealth.get(template);
+  if (!health) {
+    health = { failures: 0, blockedUntil: 0, probing: false, generation: 0 };
+    providerHealth.set(template, health);
+    if (providerHealth.size > 8) providerHealth.delete(providerHealth.keys().next().value);
+  }
+  return health;
+}
+function beginProviderRequest(health) {
+  if (health.blockedUntil > Date.now() || health.probing) {
+    throw new Error('Shortbread provider paused for cooldown or recovery probe');
+  }
+  const probing = health.blockedUntil > 0;
+  if (probing) health.probing = true;
+  return { generation: health.generation, probing };
+}
+function recordProviderFailure(health, attempt, status = 0, retryAfter = '') {
+  if (attempt.generation !== health.generation) return;
+  const providerWide = !status || status >= 500 || status === 403 || status === 429;
+  if (!providerWide) {
+    // A missing individual tile still proves the origin is responding.
+    health.failures = 0; health.blockedUntil = 0;
+    return;
+  }
+  health.failures++;
+  if (health.failures < 3 && status !== 403 && status !== 429 && !attempt.probing) return;
+  const seconds = Number(retryAfter);
+  const headerDelay = String(retryAfter).trim() && Number.isFinite(seconds)
+    ? seconds * 1000 : Date.parse(retryAfter) - Date.now();
+  const delay = Math.max(PROVIDER_COOLDOWN_MS, Number.isFinite(headerDelay) ? Math.min(headerDelay, 86_400_000) : 0);
+  health.blockedUntil = Date.now() + delay;
+  health.generation++;
+}
+
 
 function cacheRawTile(cacheKey, bytes) {
   const previous = rawTileCache.get(cacheKey);
@@ -148,7 +189,11 @@ function waitForSharedTileRequest(entry, signal, z, x, y) {
 }
 
 export async function fetchShortbreadTile(z, x, y, options = {}) {
-  const cacheKey = `${tileTemplate()}:${z}/${x}/${y}`;
+  const externalSignal = options.signal || null;
+  if (externalSignal?.aborted) throw shortbreadAbortError(z, x, y);
+  const loadVectorTileLib = options.loadVectorTileLib || getVectorTileLib;
+  const template = tileTemplate();
+  const cacheKey = `${template}:${z}/${x}/${y}`;
   const cached = decodedTileCache.get(cacheKey);
   if (cached) {
     decodedTileCache.delete(cacheKey);
@@ -159,7 +204,8 @@ export async function fetchShortbreadTile(z, x, y, options = {}) {
   if (rawCached) {
     rawTileCache.delete(cacheKey);
     rawTileCache.set(cacheKey, rawCached);
-    const { Pbf, VectorTile } = await getVectorTileLib();
+    const { Pbf, VectorTile } = await loadVectorTileLib();
+    if (externalSignal?.aborted) throw shortbreadAbortError(z, x, y);
     const record = { tile: new VectorTile(new Pbf(rawCached.bytes)), z, x, y };
     decodedTileCache.set(cacheKey, record);
     while (decodedTileCache.size > SHORTBREAD_DECODED_TILE_CACHE_LIMIT) {
@@ -167,23 +213,36 @@ export async function fetchShortbreadTile(z, x, y, options = {}) {
     }
     return record;
   }
-  const externalSignal = options.signal || null;
-  if (externalSignal?.aborted) throw shortbreadAbortError(z, x, y);
   let entry = pendingTileRequests.get(cacheKey);
-  if (!entry) {
+  if (!entry || entry.controller.signal.aborted) {
+    const health = healthFor(template);
+    const attempt = beginProviderRequest(health);
     const controller = new AbortController();
+    let timedOut = false;
     entry = { controller, consumers: new Set(), promise: null, settled: false };
-    const timeoutId = setTimeout(() => controller.abort(), SHORTBREAD_FETCH_TIMEOUT_MS);
+    const timeoutId = setTimeout(() => { timedOut = true; controller.abort(); }, SHORTBREAD_FETCH_TIMEOUT_MS);
     entry.promise = (async () => {
-      const { Pbf, VectorTile } = await getVectorTileLib();
-      const response = await fetch(tileUrl(z, x, y), {
-        signal: controller.signal,
-        cache: 'default'
-      });
-      if (!response.ok) throw new Error(`Shortbread tile ${z}/${x}/${y}: HTTP ${response.status}`);
-      const bytes = new Uint8Array(await response.arrayBuffer());
+      const { Pbf, VectorTile } = await loadVectorTileLib();
+      if (controller.signal.aborted) throw shortbreadAbortError(z, x, y);
+      let response, bytes;
+      try {
+        response = await fetch(tileUrl(z, x, y), { signal: controller.signal, cache: 'default' });
+        if (!response.ok) throw new Error(`Shortbread tile ${z}/${x}/${y}: HTTP ${response.status}`);
+        bytes = new Uint8Array(await response.arrayBuffer());
+      } catch (error) {
+        // Last-consumer/world cancellation is normal ownership cleanup, not an outage.
+        if (!controller.signal.aborted || timedOut) {
+          recordProviderFailure(health, attempt, response?.ok ? 0 : response?.status,
+            response?.headers?.get?.('retry-after') || '');
+        }
+        throw error;
+      }
+      if (controller.signal.aborted) throw shortbreadAbortError(z, x, y);
       cacheRawTile(cacheKey, bytes);
       const record = { tile: new VectorTile(new Pbf(bytes)), z, x, y };
+      if (attempt.generation === health.generation) {
+        health.failures = 0; health.blockedUntil = 0;
+      }
       decodedTileCache.set(cacheKey, record);
       while (decodedTileCache.size > SHORTBREAD_DECODED_TILE_CACHE_LIMIT) {
         decodedTileCache.delete(decodedTileCache.keys().next().value);
@@ -191,6 +250,7 @@ export async function fetchShortbreadTile(z, x, y, options = {}) {
       return record;
     })().finally(() => {
       clearTimeout(timeoutId);
+      if (attempt.probing) health.probing = false;
       entry.settled = true;
       if (pendingTileRequests.get(cacheKey) === entry) pendingTileRequests.delete(cacheKey);
     });
@@ -258,6 +318,8 @@ function roadTags(properties = {}) {
     junction: raw('junction'),
     footway: raw('footway'),
     sidewalk: raw('sidewalk'),
+    foot: raw('foot'),
+    ...Object.fromEntries(['crossing','crossing:markings','kerb','tactile_paving','sidewalk:left','sidewalk:right','sidewalk:both','sidewalk:width','sidewalk:left:width','sidewalk:right:width','sidewalk:both:width','width:carriageway',...['left','right','both'].flatMap(side=>[`parking:${side}`,`parking:${side}:orientation`,`parking:${side}:width`,`parking:lane:${side}`,`parking:lane:${side}:parallel`,`parking:lane:${side}:diagonal`,`parking:lane:${side}:perpendicular`])].map(key=>[key,raw(key)])),
     tracktype: raw('tracktype'),
     bicycle: raw('bicycle'),
     horse: raw('horse'),
@@ -389,12 +451,12 @@ function geometryParts(geometry) {
     return geometry.coordinates.map((coords) => ({ coords, polygon: false }));
   }
   if (geometry.type === 'Polygon') {
-    return geometry.coordinates.length > 0 ? [{ coords: geometry.coordinates[0], polygon: true }] : [];
+    return geometry.coordinates.length > 0 ? [{ coords: geometry.coordinates[0], holes: geometry.coordinates.slice(1), polygon: true }] : [];
   }
   if (geometry.type === 'MultiPolygon') {
     return geometry.coordinates
       .filter((polygon) => polygon.length > 0)
-      .map((polygon) => ({ coords: polygon[0], polygon: true }));
+      .map((polygon) => ({ coords: polygon[0], holes: polygon.slice(1), polygon: true }));
   }
   return [];
 }
@@ -509,6 +571,9 @@ async function convertTilesToElements(tiles, layerNames, bounds = null) {
             if (!partIntersectsBounds(part, bounds)) continue;
           const resolvedTags = {
             ...tags,
+            ...(['land', 'sites', 'street_polygons'].includes(layerName) &&
+                typeof geojson.properties?.surface === 'string'
+              ? { surface: geojson.properties.surface } : {}),
             ...(layerName === 'buildings' ? { _geometrySource: 'shortbread-vector' } : {})
           };
           if (layerName === 'streets' && resolveRoadName) {
@@ -533,6 +598,8 @@ async function convertTilesToElements(tiles, layerNames, bounds = null) {
             type: 'way',
             id: nextWayId--,
             nodes: nodeIds,
+            ...(['land', 'sites', 'street_polygons'].includes(layerName)
+              ? { surfaceHoles: part.holes || [] } : {}),
             tags: { ...resolvedTags, _sourceFeatureId: sourceFeatureId }
           });
         }
@@ -623,13 +690,15 @@ async function fetchTileCoverage(lat, lon, radius, zoom, options = {}) {
   const tiles = settled
     .filter((entry) => entry.status === 'fulfilled' && entry.value)
     .map((entry) => entry.value);
+  const missingTiles = coordinates.filter((_coordinate, index) => settled[index]?.status === 'rejected')
+    .map(({ x, y }) => ({ x, y, z: zoom }));
   const successfulTiles = settled.filter((entry) => entry.status === 'fulfilled').length;
   if (tiles.length === 0) {
-    if (successfulTiles > 0) return { tiles, requestedTiles: coordinates.length, bounds, metrics };
+    if (successfulTiles > 0) return { tiles, requestedTiles: coordinates.length, bounds, metrics, missingTiles };
     const reason = settled.find((entry) => entry.status === 'rejected')?.reason;
     throw new Error(`Shortbread coverage unavailable: ${reason?.message || reason || 'no tiles'}`);
   }
-  return { tiles, requestedTiles: coordinates.length, bounds, metrics };
+  return { tiles, requestedTiles: coordinates.length, bounds, metrics, missingTiles };
 }
 
 export async function fetchShortbreadWorldData(options = {}) {
@@ -643,7 +712,7 @@ export async function fetchShortbreadWorldData(options = {}) {
     : coverageBounds
       ? selectShortbreadZoomForBounds(coverageBounds, options)
       : SHORTBREAD_ZOOM;
-  const { tiles, requestedTiles, bounds, metrics } = await fetchTileCoverage(
+  const { tiles, requestedTiles, bounds, metrics, missingTiles } = await fetchTileCoverage(
     lat,
     lon,
     options.radius,
@@ -655,13 +724,7 @@ export async function fetchShortbreadWorldData(options = {}) {
     : ['streets', 'land', 'sites', 'pois', 'street_polygons'];
   if (includeBuildings && !layerNames.includes('buildings')) layerNames.push('buildings');
   const elements = await convertTilesToElements(tiles, layerNames, bounds);
-  if (metrics.rejected > 0) {
-    for (const element of elements) {
-      if (element?.type === 'way' && element?.tags?.highway) {
-        element.tags._sourceTruncated = 'yes';
-      }
-    }
-  }
+  const affectedRoads = markRoadsAtMissingTiles(elements, missingTiles);
   return {
     elements,
     _overpassSource: 'shortbread-vector',
@@ -671,7 +734,10 @@ export async function fetchShortbreadWorldData(options = {}) {
       loaded: metrics.fulfilled,
       decoded: tiles.length,
       requested: requestedTiles,
-      failed: metrics.rejected,
+      failed: missingTiles.length,
+      missingTiles,
+      affectedRoads,
+      coverageComplete: missingTiles.length === 0,
       maxInFlight: metrics.maxInFlight,
       zoom,
       bounds,

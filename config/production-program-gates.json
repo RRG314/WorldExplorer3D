@@ -1,34 +1,34 @@
 {
   "schemaVersion": 4,
-  "programId": "world-explorer-5.2-release-2026-09-03",
-  "targetVersion": "5.2.0",
+  "programId": "world-explorer-5.3-release-2026-09-21",
+  "targetVersion": "5.3.0",
   "productionBaseline": {
     "version": "5.2.0",
-    "releaseCommit": "a5f7d7372731d7b5697821437d2ebec307f8ecf8"
+    "releaseCommit": "db62593ba377e276e5079c78238fa3a83e501c93"
   },
   "roadmap": "ROADMAP.md",
-  "acceptanceContract": "RELEASE_NOTES_5.2.0.md",
+  "acceptanceContract": "RELEASE_NOTES_5.3.0.md",
   "deploymentRequiresExplicitUserApproval": true,
   "statusAuthority": "current-execution-evidence",
   "requiredExecutionScopes": ["candidate", "backend"],
   "executionGateRequirements": {
     "CP0": ["source-graph", "artifact-world", "explorer-browser"],
     "CP1": ["assembled-worlds", "assembled-fallback", "provider-release"],
-    "CP2": ["assembled-worlds", "actors-vehicles", "terrain-boundary"],
+    "CP2": ["street-geometry", "street-workers", "assembled-worlds", "actors-vehicles", "terrain-boundary"],
     "CP3": ["interiors", "poi-lifecycle"],
-    "CP4": ["tutorial-controls", "mobile-controls", "commerce-coherence"],
+    "CP4": ["tutorial-controls", "mobile-action-layout", "mobile-controls", "commerce-coherence"],
     "CP5": ["urban-sandbox", "urban-equipment", "actors-vehicles"],
     "CP6": ["commerce-coherence", "world-economy", "maryland-parcels"],
     "CP7": ["live-gps", "walking-field", "regional-world"],
     "CP8": ["fishing", "fishing-recovery", "environments"],
     "CP9": ["gameplay-menu", "hotbar-actions", "backend"],
     "CP10": ["mobile-load", "performance", "space-release"],
-    "CP11": ["accessibility", "mobile-controls", "space-release", "artifact-integrity", "release-identity", "backend"]
+    "CP11": ["accessibility", "mobile-action-layout", "mobile-controls", "space-release", "artifact-integrity", "release-identity", "backend"]
   },
   "checkpoints": {
     "CP0": {
       "name": "Current feature evidence",
-      "minimumDecision": "Retain only public feature claims backed by current source evidence and fresh normal-input journeys on the immutable 5.2 candidate.",
+      "minimumDecision": "Retain only public feature claims backed by current source evidence and fresh normal-input journeys on the immutable target-version candidate.",
       "requiredCommands": ["verify:source", "verify:world", "verify:artifact-runtime", "verify:release-claims", "verify:explorer-coherence-browser", "verify:regional-guide-new-york"],
       "openItems": []
     },
@@ -94,7 +94,7 @@
     },
     "CP11": {
       "name": "UI, accessibility, presentation, and release identity",
-      "minimumDecision": "Require keyboard and 390x844 touch completion of every retained primary flow, honest public claims, inspected runtime captures, and one immutable 5.2 identity.",
+      "minimumDecision": "Require keyboard and 390x844 touch completion of every retained primary flow, honest public claims, inspected runtime captures, and one immutable target-version identity.",
       "requiredCommands": ["verify:accessibility-release", "verify:mobile-controls", "verify:player-reported-blockers", "verify:connected-explorer-journey", "verify:current-space-journey", "verify:landing-user-count", "verify:analytics-lifecycle", "verify:release-claims", "verify:source", "verify:hosting", "verify:release-identity", "release:verify"],
       "openItems": []
     }

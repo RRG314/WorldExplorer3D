@@ -1,0 +1,7 @@
+{
+  "baseline": "db62593ba377",
+  "comparisons": 2200,
+  "identical": true,
+  "scope": "Procedural hash and seeded random parity; not an RDT performance benchmark",
+  "decision": "Do not restore coordinate-hash-based content budgets. Live defaults to baseline; seeded identity helpers are retained."
+}

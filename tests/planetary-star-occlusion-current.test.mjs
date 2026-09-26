@@ -26,14 +26,14 @@ function skyObject({ nested = false } = {}) {
   return { root, points, material };
 }
 
-test('planetary star rendering is depth-tested after terrain, including nested catalog layers', () => {
+test('planetary stars render as background before terrain, including nested catalog layers', () => {
   const { root, points, material } = skyObject({ nested: true });
   assert.equal(setPlanetaryStarOcclusion(root, true), 1);
-  assert.equal(material.depthTest, true);
+  assert.equal(material.depthTest, false);
   assert.equal(material.depthWrite, false);
-  assert.equal(material.transparent, true);
+  assert.equal(material.transparent, false);
   assert.equal(material.clippingPlanes.length, 1);
-  assert.equal(points.renderOrder, 1000);
+  assert.equal(points.renderOrder, -1000);
   assert.equal(root.userData.planetarySurfaceOcclusion, true);
 });
 

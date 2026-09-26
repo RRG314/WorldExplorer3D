@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {readFile,mkdir} from 'node:fs/promises';
+import {chromium} from 'playwright';
+import {startStaticServer} from './static-server.mjs';
+import {createRequire} from 'node:module';
+import {makeStarterLayout,layoutRoomDescriptor} from '../../functions/interior-layout.mjs';
+const require=createRequire(import.meta.url),sharp=require('../../functions/node_modules/sharp');
+const {createPatchGlb}=require('../../functions/reality-capture-patch-derivative');
+const {normalizeHybridPreview,footprintSignature}=require('../../functions/reality-capture-hybrid');
+const layout=makeStarterLayout({footprint:[{x:0,z:0},{x:10,z:0},{x:10,z:12},{x:0,z:12}],heightMeters:6},{bedrooms:0,bathrooms:0,floorCount:1});
+const photoId='b'.repeat(32),photo=await sharp({create:{width:128,height:128,channels:3,background:'#268a83'}}).jpeg().toBuffer();
+const capture={captureId:'review-fixture',ownerUid:'fixture',status:'review_required',captureKind:'interior_room',room:{widthMeters:10,lengthMeters:12,heightMeters:2.7},consent:{propertyPermissionConfirmed:true},publicContributionRequested:false,building:{sourceAuthority:'osm',sourceBuildingId:'fixture',label:'Test home',lat:0,lon:0,spatialContext:{footprint:[{x:0,z:0},{x:10,z:0},{x:10,z:12},{x:0,z:12}],height:{meters:6}}},inputManifest:[{name:`reality-captures/fixture/review-fixture/originals/${photoId}.jpg`,generation:'1',size:photo.length,sha256:createHash('sha256').update(photo).digest('hex')}]};
+const descriptor=layoutRoomDescriptor(layout,layout.floors[0].rooms[0].id);
+capture.hybridSubmission=normalizeHybridPreview(capture,{baseRevision:0,footprintSignature:footprintSignature(capture.building,capture.room),layout,roomPhotos:[{roomId:layout.floors[0].rooms[0].id,patches:[0,4,5].map(w=>({id:`patch${w}`,photoId,surfaceId:descriptor.surfaceIds[w],region:[0,0,1,1],quad:[[0,0],[1,0],[1,1],[0,1]]}))}]});
+capture.hybridSubmission.status='review_required';const glb=await createPatchGlb(capture,capture.hybridSubmission,async()=>photo);
+const server=await startStaticServer({rootDir:process.cwd(),ports:[4499]});const browser=await chromium.launch({channel:'chrome',headless:true});const output='output/verification/capture-review';await mkdir(output,{recursive:true});
+try{for(const width of [1100,412]){
+ const page=await browser.newPage({viewport:{width,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.route('**/review-fixture',r=>r.fulfill({contentType:'text/html',body:'<meta name="viewport" content="width=device-width,initial-scale=1"><body style="background:#071018;color:white"><h1>Review improvements</h1><main></main></body>'}));
+ await page.route('**/review.glb',r=>r.fulfill({contentType:'model/gltf-binary',body:glb}));
+ await page.goto(`http://127.0.0.1:${server.port}/review-fixture`);
+ await page.evaluate(async capture=>{const {mountReviewWorkspace}=await import('/app/js/reality-capture/review-workspace.js');window.decisions=[];window.fixture=structuredClone(capture);window.failModel=false;window.failAccess=false;window.mount=()=>{window.dispose?.();window.dispose=mountReviewWorkspace(document.querySelector('main'),{onOpenWorld:c=>window.opened=c.captureId,api:{listRealityCaptureModeration:async()=>{if(window.failAccess)throw Error('Permission denied');return {items:[window.fixture]};},getRealityCaptureModerationDetail:async()=>({capture:structuredClone(window.fixture),model:{url:window.failModel?'/missing-model.glb':'/review.glb'}}),moderateRealityCapture:async(...args)=>{window.decisions.push(args);window.fixture.status=args[1];window.fixture.hybridSubmission.status=args[1];}}});};window.mount();},capture);
+ const approve=page.getByRole('button',{name:'Approve improvement',exact:true});await approve.waitFor();await page.waitForFunction(()=>!Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Approve improvement')?.disabled);
+ await page.getByRole('button',{name:'Inside · walls and ceiling',exact:true}).click();await page.screenshot({path:`${output}/${width}-inside.png`,fullPage:true});await page.getByRole('button',{name:'Look at ceiling',exact:true}).click();await page.screenshot({path:`${output}/${width}-ceiling.png`,fullPage:true});await page.getByRole('button',{name:'Overview',exact:true}).click();
+ await page.getByRole('button',{name:'Request changes',exact:true}).click();assert.equal(await page.evaluate(()=>decisions.length),0);await page.getByRole('status').filter({hasText:/Explain/}).waitFor();
+ await approve.click();await page.getByRole('status').filter({hasText:/Approved. Open/}).waitFor();
+ const decisions=await page.evaluate(()=>decisions);assert.deepEqual(decisions,[[capture.captureId,'approved','',{},1]]);assert.equal(await approve.isDisabled(),true);assert.match(await page.locator('.reviewVersionStatus').textContent(),/Approved interior/);assert.match(await page.locator('[data-review-detail]').textContent(),/Private interior/);
+ await page.getByRole('button',{name:'Open this building in the world',exact:true}).click();assert.equal(await page.evaluate(()=>opened),capture.captureId);
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.screenshot({path:`${output}/${width}-approved.png`,fullPage:true});
+ await page.evaluate(()=>{fixture.status=fixture.hybridSubmission.status='review_required';failModel=true;mount();});await page.getByRole('status').filter({hasText:/Unable to open review/}).waitFor();assert.equal(await approve.isDisabled(),true);
+ await page.evaluate(()=>{failAccess=true;mount();});await page.getByRole('status').filter({hasText:/Permission denied/}).waitFor();assert.equal(await approve.count(),0);
+ assert.deepEqual(errors,[]);await page.close();console.log(`${width}: real generated wall/floor/ceiling GLB reviewed, exact revision approved, privacy preserved, failed preview blocked, access denial handled.`);
+}}finally{await browser.close();await server.close();}

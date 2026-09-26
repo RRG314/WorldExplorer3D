@@ -1,7 +1,9 @@
 # World Explorer 3D
 
-Updated September 8, 2026. For rollout status and remaining limitations, see
-the [release status](RELEASE_AUDIT_2026_09_08.md).
+Updated September 10, 2026 for source baseline `53452516` (version 5.2.0).
+This describes the implemented product and its boundaries, not a fresh production
+acceptance certificate. See the [current inventory](SYSTEM_INVENTORY.md),
+[architecture](ARCHITECTURE_MAP.md) and [audit evidence](audits/2026-09-10/tests-and-evidence.md).
 
 World Explorer 3D is a browser-based sandbox that turns mapped places into
 playable worlds. You can explore a neighborhood on foot, drive its streets,
@@ -169,10 +171,20 @@ saves. Paid generation is retained for development rather than offered as the
 ordinary public workflow. The release status distinguishes tested behavior from
 production availability.
 
-Interior captures start private. Broader sharing must be an explicit choice
-and still pass review. A stretchable, photo-textured playable room is planned;
-an uploaded room model does not by itself establish correct walls, doors and
-collision. Private in-world draft previews also remain unfinished.
+Interior captures start private. The implemented home editor now supports a
+floorplan grid, adding and reshaping rooms, layout openings, photo placement on
+walls, floors and ceilings, and selecting the entrance used to enter the home.
+Saved revisions, submission and approval connect that work to the mapped building.
+Recent staging fixes addressed floor-photo visibility and entrance placement;
+the owner confirmed the updated flow worked. This is scoped feedback, not proof
+that every room shape, device or production deployment is accepted.
+
+Contributions and reviewer actions reuse the Account Center and shared review
+workspace, including an in-world review dialog. Saving a draft, submitting it and
+publishing an approved revision remain different actions. The overall account,
+admin and review experience still needs a complete usability pass. Public
+contributor-preview worlds and automatic capture rewards are not established as
+finished features.
 
 Meshroom/TRELLIS-based reconstruction is retained for development and future
 options, including individual objects. Real jobs have run, but complete
@@ -214,8 +226,26 @@ building, community and contributions. Its next work is making those connections
 reliable and understandable, not introducing a second wallet, building database
 or capture pipeline for each new interface.
 
-Worldwide visual completeness, flawless bridge/tunnel coverage, a finished
-manual interior editor, public contributor-preview worlds and automatic capture
+Worldwide visual completeness, flawless bridge/tunnel coverage, broad interior
+editor acceptance, public contributor-preview worlds and automatic capture
 rewards are not complete. Staging success does not certify production. See the
 [system inventory](SYSTEM_INVENTORY.md), [architecture map](ARCHITECTURE_MAP.md)
 and [manual capture plan](MANUAL_CAPTURE_PRODUCT_PLAN.md) for precise boundaries.
+
+
+## Project structure and current priorities
+
+The browser assembles and simulates the active world. Firebase Authentication
+identifies the player, Firestore stores shared structured records, Storage holds
+media, and Cloud Functions authorize protected changes. Browser storage holds
+some preferences and drafts, so “saved on this device” and “saved to your account”
+are different promises. The [architecture map](ARCHITECTURE_MAP.md) explains these
+boundaries without requiring familiarity with the code.
+
+The immediate priority is reliability: make critical journeys mandatory release
+checks, prevent duplicate writes after uncertain network responses, make account
+deletion complete and recoverable, and make editing/review/publication easy to
+follow. Keep the existing working world and improve its shared foundations. The
+[repair plan](audits/2026-09-10/repair-plan.md) states the evidence required before
+each repair can be called complete. No whole-app readiness claim follows merely
+from the number of systems or tests in the repository.

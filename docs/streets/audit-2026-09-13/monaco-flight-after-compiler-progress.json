@@ -1,0 +1,30 @@
+{
+  "tiles": 109,
+  "triangles": 128168,
+  "curbTriangles": 79128,
+  "markingTriangles": 12265,
+  "ramps": 0,
+  "workerMs": 10650,
+  "inferredFrontages": 34146,
+  "managedPaths": 165,
+  "residentRoads": 307,
+  "residentBuildings": 1273,
+  "roads": 12793,
+  "roadMeshes": 19,
+  "buildings": 9417,
+  "worldLoadSequence": 1,
+  "plannedTiles": 144,
+  "highestRefinement": {
+    "cell": "-5:0",
+    "bounds": {
+      "minX": -320,
+      "maxX": -256,
+      "minZ": 0,
+      "maxZ": 64
+    },
+    "addedTriangles": 1750,
+    "baseTriangles": 638
+  },
+  "terrainRefinementTriangles": 90419,
+  "completedTiles": 124
+}

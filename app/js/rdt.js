@@ -386,6 +386,7 @@ function getRdtNoiseConfig() {
 // Returns a stable "complexity level" integer for any positive input.
 // alpha controls the divisor growth rate (default 1.5).
 function rdtDepth(n, alpha = 1.5) {
+  if (!Number.isFinite(alpha) || alpha <= 0) throw new RangeError("RDT alpha must be finite and positive");
   n = Math.floor(Math.abs(n));
   if (!Number.isFinite(n) || n < 2) return 0;
   let x = n,k = 0;

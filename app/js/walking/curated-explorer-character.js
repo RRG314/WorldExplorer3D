@@ -1,4 +1,4 @@
-import { loadModelAsset } from '../assets/model-asset-runtime.js?v=15';
+import { loadModelAsset } from '../assets/model-asset-runtime.js?v=16';
 
 const EXPLORER_ASSET_ID = 'character-field-explorer-v1';
 const EXPLORER_WOMAN_ASSET_ID = 'character-field-explorer-woman-v1';
@@ -122,7 +122,7 @@ function updateCuratedCharacterAnimation(host, isMoving, deltaTime, isRunning = 
   if (!mixer) return false;
   mixer.update(Math.max(0, Number(deltaTime) || 0));
   const actions = host.userData.characterActions || {};
-  const armed = !!host?.userData?.heldEquipmentId;
+  const armed = !!host?.userData?.heldEquipmentId && host.userData.weaponPose !== 'holstered';
   const target = armed
     ? isMoving && actions.armedRun ? 'armedRun' : actions.armedIdle ? 'armedIdle' : 'idle'
     : isRunning && actions.run ? 'run' : isMoving && actions.walk ? 'walk' : 'idle';
@@ -135,9 +135,15 @@ function updateCuratedCharacterAnimation(host, isMoving, deltaTime, isRunning = 
 
 function disposeCuratedCharacter(host) {
   const attachment = host?.userData?.curatedCharacterAttachment;
+  // Cancel even an in-flight request without an attached visual.
+  if (host?.userData) {
+    delete host.userData.curatedCharacterLoadToken;
+    delete host.userData.curatedCharacterLoadStarted;
+    delete host.userData.curatedCharacterLoadingAssetId;
+  }
   if (!attachment) return false;
   attachment.mixer.stopAllAction();
-  attachment.visual.removeFromParent?.();
+  attachment.visual.parent?.remove(attachment.visual);
   attachment.instance.dispose();
   delete host.userData.curatedCharacterAttachment;
   host.userData.characterMixer = null;
@@ -160,7 +166,7 @@ async function attachCuratedExplorerCharacter(THREE, host, options = {}) {
   host.userData.curatedCharacterLoadingAssetId = assetId;
   try {
     const instance = await loadModelAsset(THREE, assetId, { signal: options.signal });
-    if (options.isCurrent && !options.isCurrent()) {
+    if (host.userData.curatedCharacterLoadToken !== loadToken || (options.isCurrent && !options.isCurrent())) {
       instance.dispose();
       if (host.userData.curatedCharacterLoadToken === loadToken) {
         host.userData.curatedCharacterLoadStarted = false;

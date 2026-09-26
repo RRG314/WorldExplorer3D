@@ -1,4 +1,4 @@
-import { searchPlaces } from '../places/place-search.js?v=3';
+import { searchPlaces } from '../places/place-search.js?v=4';
 
 function escapeHtml(value = '') {
   return String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[character]);

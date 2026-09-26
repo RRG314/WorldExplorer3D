@@ -103,6 +103,10 @@
     ],
     "rewrites": [
       {
+        "source": "/joinRoom",
+        "function": "joinRoom"
+      },
+      {
         "source": "/getPublicSiteStats",
         "function": "getPublicSiteStats"
       },
@@ -167,6 +171,42 @@
         "function": "commitUrbanImpacts"
       },
       {
+        "source": "/claimExplorerDiscovery",
+        "function": "claimExplorerDiscovery"
+      },
+      {
+        "source": "/listExplorerDiscoveries",
+        "function": "listExplorerDiscoveries"
+      },
+      {
+        "source": "/createDiscoveryTrade",
+        "function": "createDiscoveryTrade"
+      },
+      {
+        "source": "/acceptDiscoveryTrade",
+        "function": "acceptDiscoveryTrade"
+      },
+      {
+        "source": "/cancelDiscoveryTrade",
+        "function": "cancelDiscoveryTrade"
+      },
+      {
+        "source": "/commitExplorerCommerceAction",
+        "function": "commitExplorerCommerceAction"
+      },
+      {
+        "source": "/settleExplorerCommerceOutcome",
+        "function": "settleExplorerCommerceOutcome"
+      },
+      {
+        "source": "/saveExplorerPlayerCondition",
+        "function": "saveExplorerPlayerCondition"
+      },
+      {
+        "source": "/claimDeFlockVirtualDisable",
+        "function": "claimDeFlockVirtualDisable"
+      },
+      {
         "source": "/commitWorldPropertyAction",
         "function": "commitWorldPropertyAction"
       },
@@ -213,6 +253,10 @@
       {
         "source": "/submitRealityCaptureHybrid",
         "function": "submitRealityCaptureHybrid"
+      },
+      {
+        "source": "/createRealityCaptureUploadUrl",
+        "function": "createRealityCaptureUploadUrl"
       },
       {
         "source": "/reserveRealityCapturePhoto",
@@ -265,6 +309,10 @@
     {
       "source": "/moderateRealityCapture",
       "function": "moderateRealityCapture"
+    },
+    {
+      "source": "/retryRealityCaptureReviewEmail",
+      "function": "retryRealityCaptureReviewEmail"
     },
     {
       "source": "/listRealityCaptureModeration",

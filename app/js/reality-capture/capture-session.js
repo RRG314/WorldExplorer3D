@@ -20,5 +20,7 @@ export function mergedCapturePhotos(local = [], remote = []) {
 }
 
 export function captureIsEditable(capture) {
-  return !capture || ['draft', 'uploading'].includes(capture.status);
+  if(capture?.continuationReady===false)return false;
+  return !capture || ['draft', 'uploading'].includes(capture.status) ||
+    (capture.status === 'uploaded' && !capture.hybridSubmission && !capture.processed && !capture.queuedAt);
 }

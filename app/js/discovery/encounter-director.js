@@ -94,17 +94,20 @@ function createWalkingEncounterDirector(options = {}) {
       elapsed = 0;
       walkedMeters = 0;
     }
-    if (!cadenceEligible) {
+    if (!walkingEarth || input.operationActive === true) {
       clear('walking-ineligible');
       return snapshot(position, input.liveGpsActive === true);
     }
-    if (cooldown > 0) return snapshot(position, input.liveGpsActive === true);
 
     if (current) {
       const stillAvailable = !claimedIds.has(current.slot.claimId) && canUseSlot(current.slot) === true;
       const distance = distanceBetween(position, current.slot.position);
       if (!stillAvailable || distance > maxLeadDistance * 1.25) clear('lead-stale');
     }
+    // Menus pause discovery cadence, but must not discard the invitation the
+    // player opened Today to inspect. Validate it before retaining it so GPS
+    // movement, claims and capability changes can still invalidate stale leads.
+    if (input.blocked === true || cooldown > 0) return snapshot(position, input.liveGpsActive === true);
     const cadenceReady = elapsed >= fallbackDelaySeconds || (elapsed >= initialDelaySeconds && walkedMeters >= requiredWalkMeters);
     if (!current && cadenceReady) {
       const candidate = availableSlots(position)[0];

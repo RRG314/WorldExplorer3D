@@ -1,9 +1,12 @@
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { completeWorldReady } from './complete-world-readiness.mjs';
 
 const root = process.cwd();
 const externalUrl = String(process.env.WE3D_VERIFY_BASE_URL || '').replace(/\/$/, '');
@@ -39,6 +42,7 @@ const baseUrl = externalUrl || `http://127.0.0.1:${server.port}`;
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await context.newPage();
+await configureStagingAppCheck(page, baseUrl);
 const browserErrors = [];
 const localFailures = [];
 const expectedStaticBackendMisses = [];
@@ -49,6 +53,7 @@ function isExpectedStaticBackendMiss(resourceUrl) {
 }
 
 function attachDiagnostics(targetPage) {
+  collectBrowserGraphicsErrors(targetPage, browserErrors);
   targetPage.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   targetPage.on('response', (response) => {
     if (response.url().startsWith(baseUrl) && response.status() >= 400) {
@@ -79,6 +84,7 @@ attachDiagnostics(page);
 
 async function verifyPlatformSurfaces() {
   const platformPage = await context.newPage();
+  await configureStagingAppCheck(platformPage, baseUrl);
   attachDiagnostics(platformPage);
   try {
     await platformPage.goto(`${baseUrl}/account/`, { waitUntil: 'load', timeout: 120000 });
@@ -212,20 +218,7 @@ async function waitForCompleteWorld() {
   while (Date.now() < deadline) {
     const intervalTimeout = Math.max(1, Math.min(60_000, deadline - Date.now()));
     try {
-      await page.waitForFunction(() => {
-        const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
-        const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
-        return state.gameStarted === true && state.worldLoading === false &&
-          diagnostics.surfaceChain?.surfaces?.terrain?.kind === 'terrain' &&
-          Number.isFinite(Number(diagnostics.surfaceChain?.surfaces?.terrain?.y)) &&
-          Number(diagnostics.worldCounts?.roads || 0) > 0 &&
-          Number(diagnostics.worldCounts?.buildingMeshes || 0) > 0 &&
-          Number(diagnostics.transportStructures?.publishedBodies || 0) > 0 &&
-          Number(diagnostics.visualOwners?.water?.surfaceCount || 0) > 0 &&
-          diagnostics.livingWorld?.active === true &&
-          diagnostics.urbanSandbox?.active === true &&
-          diagnostics.worldDiscovery?.active === true;
-      }, null, { timeout: intervalTimeout });
+      await page.waitForFunction(completeWorldReady, null, { timeout: intervalTimeout, polling: 500 });
       return;
     } catch (error) {
       latest = await worldReadinessSnapshot().catch(() => null);
@@ -458,12 +451,13 @@ try {
     localFailures
   };
 
-  if (report.ok && captureRequested) {
+  if (captureRequested) {
     const manifest = JSON.parse(await fs.readFile(path.join(servedRoot, 'build-manifest.json'), 'utf8'));
     assert.equal(manifest.sourceDirty, false, 'release evidence requires a clean immutable artifact');
-    await fs.rm(evidenceDir, { recursive: true, force: true });
+    // This directory also holds other gates' receipts. A screenshot must not
+    // erase the evidence already collected by the release matrix.
     await fs.mkdir(evidenceDir, { recursive: true });
-    const worldImage = path.join(evidenceDir, 'complete-baltimore-world.png');
+    const worldImage = path.join(evidenceDir, report.ok ? 'complete-baltimore-world.png' : 'baltimore-world-failed.png');
     await page.screenshot({ path: worldImage, fullPage: false, timeout: 120000 });
     report.screenshotsWritten.push(path.relative(root, worldImage));
   }

@@ -1,0 +1,18 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Street layer visibility check</title>
+<style>body{margin:0;background:#202830;color:white;font:14px system-ui}#report{position:absolute;left:8px;top:8px;background:#101921dd;padding:12px;max-width:410px;max-height:90vh;overflow:auto;white-space:pre-wrap}button{padding:8px}</style>
+<div id="report"><button id="run">Run camera sweep</button><pre id="result">Ready</pre></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script><script type="module">
+import {hardscapeMaterialOptions} from '../../app/js/world/load-landuse-pass.js';
+import {surfaceComposition} from '../../app/js/world/surface-contract.js?v=16';
+const renderer=new THREE.WebGLRenderer({antialias:false,preserveDrawingBuffer:true});renderer.setSize(800,600);document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x182028);scene.add(new THREE.AmbientLight(0xffffff,1));
+const camera=new THREE.PerspectiveCamera(70,800/600,.5,12000);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(240,240),new THREE.MeshStandardMaterial(hardscapeMaterialOptions({LANDUSE_STYLES:{paved:{color:0xff0000}}},'paved',surfaceComposition('paved')).material));
+ground.geometry.rotateX(-Math.PI/2);ground.renderOrder=3;scene.add(ground);
+const sidewalk=new THREE.Mesh(new THREE.PlaneGeometry(80,80),new THREE.MeshStandardMaterial({color:0xffffff,roughness:.96}));sidewalk.geometry.rotateX(-Math.PI/2);scene.add(sidewalk);
+const target=new THREE.WebGLRenderTarget(800,600);const pixel=new Uint8Array(4);const results=[];
+function setSlope(slope){for(const [mesh,bias] of [[ground,.046],[sidewalk,.16]]){const p=mesh.geometry.attributes.position;for(let i=0;i<p.count;i++)p.setY(i,p.getZ(i)*slope+bias);p.needsUpdate=true;mesh.geometry.computeVertexNormals();mesh.geometry.computeBoundingSphere();}}
+function check(slope,distance){setSlope(slope);camera.position.set(0,slope*distance+2,distance);camera.lookAt(0,.16,0);camera.updateMatrixWorld();scene.updateMatrixWorld(true);const ray=new THREE.Raycaster();ray.setFromCamera(new THREE.Vector2(0,0),camera);const nearest=ray.intersectObjects([ground,sidewalk])[0];renderer.setRenderTarget(target);renderer.render(scene,camera);renderer.readRenderTargetPixels(target,400,300,1,1,pixel);renderer.setRenderTarget(null);renderer.render(scene,camera);return {slope,distance,nearest:nearest?.object===sidewalk?'sidewalk':'hardscape',pixel:Array.from(pixel),pass:nearest?.object===sidewalk&&pixel[1]>pixel[0]*.8};}
+function run(){results.length=0;for(const slope of [-.6,-.25,0,.25,.6])for(const distance of [5,30,100])results.push(check(slope,distance));document.querySelector('#result').textContent=JSON.stringify({pass:results.every(r=>r.pass),failures:results.filter(r=>!r.pass),samples:results.length},null,2);}
+document.querySelector('#run').onclick=run;run();
+</script></html>

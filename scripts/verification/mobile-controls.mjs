@@ -1,34 +1,58 @@
+import { selectLowRenderQuality } from './render-quality-ui.mjs';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
+import { installBrowserGraphicsProbe } from './browser-graphics-probe.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { advanceGameplay, settleReleasedCamera } from './gameplay-simulation.mjs';
 
 const root = process.cwd();
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
 const servedRoot = requestedRoot ? path.resolve(root, requestedRoot) : root;
 const server = await startStaticServer({ rootDir: servedRoot, ports: [4391, 4392, 4393] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
-const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+// This software-renderer profile is functional evidence only. Physical mobile
+// performance and default-quality acceptance remain separate release gates.
+const softwareCi = !!process.env.CI && process.platform === 'linux';
+const verificationProfile = { scope: 'functional', softwareCi, quality: softwareCi ? 'low via Settings' : 'default', deviceScaleFactor: softwareCi ? 1 : 3 };
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024'] });
+const context = await browser.newContext({ ...devices['iPhone 13'], deviceScaleFactor: verificationProfile.deviceScaleFactor, viewport: { width: 390, height: 844 } });
 const page = await context.newPage();
+let graphicsPhase = 'startup';
+const memorySnapshots = [];
+await installBrowserGraphicsProbe(page, 'output/verification/mobile-controls/graphics-failure.json', () => graphicsPhase);
+async function recordGraphicsPhase(phase) {
+  graphicsPhase = phase;
+  const snapshot = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return { memory: ctx.renderer?.info?.memory, programs: ctx.renderer?.info?.programs?.length,
+      contextLost: ctx.renderer?.getContext?.()?.isContextLost?.(),
+      heap: performance.memory?.usedJSHeapSize, canvasCount: document.querySelectorAll('canvas').length };
+  });
+  memorySnapshots.push({ phase, at: new Date().toISOString(), ...snapshot });
+  await mkdir('output/verification/mobile-controls', { recursive: true });
+  await writeFile('output/verification/mobile-controls/memory-phases.json', JSON.stringify(memorySnapshots, null, 2));
+}
+await configureStagingAppCheck(page, baseUrl);
 const cdp = await context.newCDPSession(page);
 const browserErrors = [];
+  collectBrowserGraphicsErrors(page, browserErrors);
 const localFailures = [];
+const authIframeRequests = [];
+page.on('request', request => {
+  if (/\/(__\/auth\/iframe)(?:[?.]|$)/.test(new URL(request.url()).pathname)) authIframeRequests.push(request.url());
+});
+const touchTimingReceipts = [];
 page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
 page.on('response', (response) => {
   if (response.url().startsWith(baseUrl) && response.status() >= 400) localFailures.push({ url: response.url(), status: response.status() });
 });
 
 const diagnostics = () => page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.() || {});
-async function waitForCameraRecenter(maximumHeadingDegrees, timeoutMs) {
-  await page.waitForFunction((maximumHeading) => {
-    const camera = globalThis.getWorldExplorerRuntimeDiagnostics?.().cameraFollow;
-    return Number(camera?.headingAlignmentDegrees) < maximumHeading &&
-      Number(camera?.trailingDistance) > 2;
-  }, maximumHeadingDegrees, { timeout: timeoutMs }).catch(() => {});
-  return diagnostics();
-}
+
 const distance = (a, b) => Math.hypot(Number(a?.x) - Number(b?.x), Number(a?.z) - Number(b?.z));
 // Walking is calibrated near a normal human pace. These journeys must prove
 // sustained directional movement without assuming vehicle-like displacement.
@@ -52,8 +76,17 @@ async function touchDrag(selector, deltaX, deltaY, holdMs = 900) {
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point(start)] });
   await page.waitForTimeout(80);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [point(end)] });
-  await page.waitForTimeout(holdMs);
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  try {
+    if (selector === '#largeMapCanvas') await page.waitForTimeout(holdMs);
+    else {
+      const startedAt = Date.now();
+      const receipt = await advanceGameplay(page, holdMs);
+      touchTimingReceipts.push({ selector, holdMs, receipt, wallElapsedMs: Date.now() - startedAt });
+    }
+  } finally {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  }
+  await writeFile('output/verification/mobile-controls/touch-timing.json', JSON.stringify(touchTimingReceipts, null, 2));
   await page.waitForTimeout(90);
 }
 
@@ -84,11 +117,18 @@ async function touchStraightnessProbe(selector) {
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point(start)] });
   await page.waitForTimeout(80);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [point(end)] });
-  await page.waitForTimeout(450);
-  const middle = await diagnostics();
-  await page.waitForTimeout(650);
-  const after = await diagnostics();
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  let middle, after;
+  const timingReceipts = [];
+  try {
+    // This checks trajectory under a held real touch, not runner frame rate.
+    // A busy cloud renderer can simulate too little in a 450ms wall-clock wait.
+    timingReceipts.push(await advanceGameplay(page, 450));
+    middle = await diagnostics();
+    timingReceipts.push(await advanceGameplay(page, 650));
+    after = await diagnostics();
+  } finally {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  }
   await page.waitForTimeout(150);
   const positions = {
     before: before.activeActor?.position,
@@ -96,6 +136,7 @@ async function touchStraightnessProbe(selector) {
     after: after.activeActor?.position
   };
   return {
+    timing: 'trusted-touch-runtime-fixed-step', timingReceipts,
     ...positions,
     firstDistance: distance(positions.before, positions.middle),
     secondDistance: distance(positions.middle, positions.after),
@@ -104,6 +145,7 @@ async function touchStraightnessProbe(selector) {
 }
 
 async function mode(mode, selector) {
+  await recordGraphicsPhase(`before-${mode}`);
   const item = page.locator(selector);
   const owningMenu = item.locator('xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " floatMenu ")]').first();
   const owningButton = owningMenu.locator(':scope > .floatBtn');
@@ -140,6 +182,7 @@ async function mode(mode, selector) {
   });
   if (visibility.display === 'none') console.log(JSON.stringify({ mobileControlsHiddenAfterMode: mode, ...visibility }));
   await page.waitForSelector(`#mobileTouchControls.show.mode-${mode === 'walk' ? 'walking' : mode === 'drive' ? 'driving' : mode}`, { timeout: 10_000 });
+  await recordGraphicsPhase(`${mode}-ready`);
 }
 
 async function layoutSnapshot() {
@@ -153,8 +196,9 @@ async function layoutSnapshot() {
 
 async function waitForInteractiveWorld() {
   await page.waitForFunction(() => {
-    const state = globalThis.getWorldExplorerRuntimeDiagnostics?.();
     const loadingVisible = document.getElementById('loading')?.classList.contains('show') === true;
+    if (loadingVisible) { globalThis.__WE3D_VERIFY_INTERACTIVE_SINCE__ = 0; return false; }
+    const state = globalThis.getWorldExplorerRuntimeDiagnostics?.();
     const titleVisible = !document.getElementById('titleScreen')?.classList.contains('hidden');
     const ready = state?.gameStarted === true && state.worldLoading === false && !loadingVisible && !titleVisible;
     if (!ready) {
@@ -163,7 +207,7 @@ async function waitForInteractiveWorld() {
     }
     globalThis.__WE3D_VERIFY_INTERACTIVE_SINCE__ ||= performance.now();
     return performance.now() - globalThis.__WE3D_VERIFY_INTERACTIVE_SINCE__ >= 2_500;
-  }, null, { timeout: 300_000 });
+  }, null, { timeout: 300_000, polling: 500 });
 }
 
 try {
@@ -171,10 +215,12 @@ try {
   await page.goto(`${baseUrl}/app/`, { waitUntil: 'load', timeout: 120_000 });
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   await page.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
+  if (softwareCi) await selectLowRenderQuality(page);
   await page.locator('#globeSelectorStartBtn').click();
   await page.waitForSelector('#loading.show', { timeout: 30_000 });
   await page.waitForFunction(() => !document.getElementById('loading')?.classList.contains('show'), null, { timeout: 240_000 });
   await waitForInteractiveWorld();
+  await recordGraphicsPhase('initial-world-ready');
 
   await mode('walk', '#fWalk');
   const standardLayout = await layoutSnapshot();
@@ -185,9 +231,14 @@ try {
     const rect = (element) => element ? element.getBoundingClientRect().toJSON() : null;
     const lookRect = look?.getBoundingClientRect();
     const lookHit = lookRect ? document.elementFromPoint(lookRect.left + lookRect.width / 2, lookRect.top + lookRect.height / 2) : null;
-    return { tutorial: rect(tutorial), look: rect(look), pack: rect(pack), lookHit: lookHit?.closest?.('#mobileLookPad')?.id || lookHit?.id || '' };
+    const actionTargets = ['mobileActionPrimary','mobileActionSecondary','mobileEquipmentUse','urbanEquipmentToggle'].map(id => document.getElementById(id)).filter(element => element && !element.hidden && getComputedStyle(element).display !== 'none').map(element => {
+      const box = element.getBoundingClientRect();
+      const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+      return { id: element.id, hit: element === hit || element.contains(hit) };
+    });
+    return { tutorial: rect(tutorial), look: rect(look), pack: rect(pack), actionTargets, lookHit: lookHit?.closest?.('#mobileLookPad')?.id || lookHit?.id || '' };
   });
-  await page.screenshot({ path: 'output/verification/mobile-controls/walk-onboarding-mobile.png', fullPage: true });
+  await page.screenshot({ path: 'output/verification/mobile-controls/walk-onboarding-mobile.png', fullPage: false });
   const packUi = await page.evaluate(() => {
     const pack = document.getElementById('urbanEquipmentToggle');
     return {
@@ -214,7 +265,7 @@ try {
       closeHitId: closeHit?.closest?.('#urbanEquipmentCloseBtn')?.id || closeHit?.id || ''
     };
   });
-  await page.screenshot({ path: 'output/verification/mobile-controls/backpack-mobile.png', fullPage: true });
+  await page.screenshot({ path: 'output/verification/mobile-controls/backpack-mobile.png', fullPage: false });
   await page.locator('#urbanEquipmentCloseBtn').click();
   await page.waitForFunction(() => !document.getElementById('urbanEquipment')?.classList.contains('show'), null, { timeout: 10_000 });
   await page.locator('#minimap').click();
@@ -237,7 +288,7 @@ try {
   }));
   await page.locator('#mapZoomIn').click();
   const mapZoomed = await page.locator('#zoomLevel').textContent();
-  await page.screenshot({ path: 'output/verification/mobile-controls/map-explorer-mobile.png', fullPage: true });
+  await page.screenshot({ path: 'output/verification/mobile-controls/map-explorer-mobile.png', fullPage: false });
   await page.locator('#mapRecenter').click();
   const mapRecentered = await page.evaluate(() => !document.getElementById('largeMap')?.classList.contains('browsing'));
   await page.locator('#mapClose').click();
@@ -251,9 +302,9 @@ try {
   const walkMoved = await diagnostics();
   await touchDrag('#mobileLookPad', 43, 0, 950);
   const walkLooked = await diagnostics();
-  await page.waitForTimeout(2_300);
-  const walkRecentered = await diagnostics();
-  await page.screenshot({ path: 'output/verification/mobile-controls/walk-standard-mobile.png', fullPage: true });
+  const walkRecovery = await settleReleasedCamera(page, { maximumHeadingDegrees: 5, minimumTrailingDistance: 1, maximumSimulationMs: 1300 });
+  const walkRecentered = walkRecovery.state;
+  await page.screenshot({ path: 'output/verification/mobile-controls/walk-standard-mobile.png', fullPage: false });
 
   await page.locator('#controlsBarBtn').click();
   await page.waitForSelector('#controlsTab.bar-open #mobileControlSettings', { timeout: 10_000 });
@@ -274,7 +325,7 @@ try {
     desktopInstructionsVisible: ['drivingControls', 'boatControls', 'walkingControls', 'droneControls', 'planeControls', 'rocketControls', 'oceanControls']
       .some((id) => getComputedStyle(document.getElementById(id)).display !== 'none')
   }));
-  await page.screenshot({ path: 'output/verification/mobile-controls/settings-mobile.png', fullPage: true });
+  await page.screenshot({ path: 'output/verification/mobile-controls/settings-mobile.png', fullPage: false });
   await page.locator('#ctrlHeader').click();
   const southpawLayout = await layoutSnapshot();
   const savedSouthpawSettings = await page.evaluate(() => JSON.parse(localStorage.getItem('world-explorer-mobile-controls-v1') || 'null'));
@@ -286,15 +337,15 @@ try {
   const driveMoved = await diagnostics();
   await touchDrag('#mobileLookPad', 43, 0, 900);
   const driveLooked = await diagnostics();
-  await page.waitForTimeout(2_500);
-  const driveRecentered = await diagnostics();
-  await page.screenshot({ path: 'output/verification/mobile-controls/drive-standard-mobile.png', fullPage: true });
+  const driveRecovery = await settleReleasedCamera(page, { maximumHeadingDegrees: 6, minimumTrailingDistance: 2, maximumSimulationMs: 1500 });
+  const driveRecentered = driveRecovery.state;
+  await page.screenshot({ path: 'output/verification/mobile-controls/drive-standard-mobile.png', fullPage: false });
 
   await mode('drone', '#fDrone');
   const droneBefore = await diagnostics();
   await touchDrag('#mobileMovePad', 30, -46, 1_250);
   const droneControlled = await diagnostics();
-  await page.screenshot({ path: 'output/verification/mobile-controls/drone-southpaw-mobile.png', fullPage: true });
+  await page.screenshot({ path: 'output/verification/mobile-controls/drone-southpaw-mobile.png', fullPage: false });
 
   await mode('plane', '#fPlane');
   const planeBefore = await diagnostics();
@@ -302,10 +353,13 @@ try {
   const planeControlled = await diagnostics();
   await touchDrag('#mobileLookPad', 42, 0, 900);
   const planeLooked = await diagnostics();
-  const planeRecentered = await waitForCameraRecenter(7, 6_000);
-  await page.screenshot({ path: 'output/verification/mobile-controls/plane-standard-mobile.png', fullPage: true });
+  const planeRecovery = await settleReleasedCamera(page, { maximumHeadingDegrees: 7, minimumTrailingDistance: 2, maximumSimulationMs: 5000 });
+  const planeRecentered = planeRecovery.state;
+  await page.screenshot({ path: 'output/verification/mobile-controls/plane-standard-mobile.png', fullPage: false });
 
   await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+  await recordGraphicsPhase('before-reload-after-all-modes');
+  graphicsPhase = 'reload';
   await page.reload({ waitUntil: 'load', timeout: 120_000 });
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   await page.waitForFunction(() => navigator.maxTouchPoints > 0 && matchMedia('(hover: none) and (pointer: coarse)').matches, null, { timeout: 10_000 });
@@ -322,12 +376,14 @@ try {
   const resetWalkState = await diagnostics();
 
   const checks = {
+    mobileWorldBudgetActive: Number(walkBefore.worldLoad?.loadMetrics?.loadProfile?.dynamicBudgetScale ?? walkBefore.worldLoad?.loadProfile?.dynamicBudgetScale ?? Infinity) <= 0.28,
     standardMoveLeft: standardLayout.move.x + standardLayout.move.width / 2 < standardLayout.width / 2,
     standardLookAndActionRight: standardLayout.look.x > standardLayout.width / 2 && standardLayout.primary.x > standardLayout.width / 2,
     southpawActuallySwaps: southpawLayout.move.x > southpawLayout.width / 2 && southpawLayout.look.x < southpawLayout.width / 2,
     southpawSurvivesReload: savedSouthpawSettings?.handedness === 'southpaw' &&
       reloadedSouthpawLayout.move.x > reloadedSouthpawLayout.width / 2 && reloadedSouthpawLayout.look.x < reloadedSouthpawLayout.width / 2,
     resetRestoresStandard: resetLayout.move.x < resetLayout.width / 2 && resetLayout.look.x > resetLayout.width / 2,
+    actionButtonsReceiveTouches: onboardingLayout.actionTargets.length >= 2 && onboardingLayout.actionTargets.every(target => target.hit),
     onboardingClearOfLookControl: onboardingLayout.lookHit === 'mobileLookPad',
     walkingPackClearOfLookControl: !onboardingLayout.pack || onboardingLayout.pack.x + onboardingLayout.pack.width < onboardingLayout.look.x,
     packIsIntegratedWithActionDock: packUi.parent === 'mobileActionStack' && packUi.integrated && packUi.position === 'static',
@@ -368,10 +424,12 @@ try {
       reloadedWalkState.mobileControls?.move?.active !== true && reloadedWalkState.mobileControls?.look?.active !== true &&
       resetWalkState.activeActor?.mode === 'walk',
     savedSettingsPresent: await page.evaluate(() => !!localStorage.getItem('world-explorer-mobile-controls-v1')),
+    noUnrequestedAuthIframe: authIframeRequests.length === 0,
     noBrowserErrors: browserErrors.length === 0,
     noFailedLocalResources: localFailures.length === 0
   };
   const report = {
+    verificationProfile,
     ok: Object.values(checks).every(Boolean), contract: 'semantic-mobile-controls-v2', checks,
     layouts: { standardLayout, southpawLayout, reloadedSouthpawLayout, resetLayout, onboardingLayout, settingsLayout, packUi, openPackUi },
     map: { mapFollowState, mapBrowseState, mapZoomed, mapRecentered, mapReturnedToPlay, blockedMovementDistance: distance(mapActorBefore.activeActor?.position, mapActorAfterBlockedInput.activeActor?.position) },
@@ -389,10 +447,22 @@ try {
       planeBefore: planeBefore.activeActor?.orientation,
       planeAfter: planeControlled.activeActor?.orientation
     },
-    browserErrors, localFailures
+    cameraRecoveryTiming: [walkRecovery, driveRecovery, planeRecovery].map(({ state, ...timing }) => timing),
+    browserErrors, localFailures, memorySnapshots, authIframeRequests, touchTimingReceipts
   };
+  await writeFile('output/verification/mobile-controls/report.json', JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
   assert.equal(report.ok, true, 'Mobile control and camera journey failed.');
+} catch (error) {
+  const state = await Promise.race([
+    diagnostics().catch(captureError => ({ captureError: String(captureError) })),
+    new Promise(resolve => { const timer = setTimeout(() => resolve({ captureError: 'diagnostic capture exceeded 5s' }), 5000); timer.unref(); })
+  ]);
+  await mkdir('output/verification/mobile-controls', { recursive: true });
+  await writeFile('output/verification/mobile-controls/failure.json', JSON.stringify({
+    ok: false, error: String(error?.stack || error), verificationProfile, state, browserErrors, localFailures
+  }, null, 2));
+  throw error;
 } finally {
   await context.close();
   await browser.close();

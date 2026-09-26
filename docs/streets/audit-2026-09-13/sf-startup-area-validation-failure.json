@@ -1,0 +1,38 @@
+[
+  {
+    "level": "error",
+    "message": "[2026-09-15T14:08:51.974Z]  @firebase/app-check: FirebaseError: AppCheck: ReCAPTCHA error. (appCheck/recaptcha-error).\n    at ReCaptchaEnterpriseProvider.getToken (https://www.gstatic.com/firebasejs/10.12.5/firebase-app-check.js:1:20480)\n    at async getToken$2 (https://www.gstatic.com/firebasejs/10.12.5/firebase-app-check.js:1:14780)\n    at async Refresher.operation (https://www.gstatic.com/firebasejs/10.12.5/firebase-app-check.js:1:16197)\n    at async Refresher.process (https://www.gstatic.com/firebasejs/10.12.5/firebase-app-check.js:1:6570)",
+    "timestamp": "2026-09-15T14:08:51.982Z",
+    "url": "https://www.gstatic.com/firebasejs/10.12.5/firebase-app-check.js"
+  },
+  {
+    "level": "error",
+    "message": "[2026-09-15T14:09:21.983Z]  @firebase/app-check: FirebaseError: AppCheck: ReCAPTCHA error. (appCheck/recaptcha-error).\n    at ReCaptchaEnterpriseProvider.getToken (https://www.gstatic.com/firebasejs/10.12.5/firebase-app-check.js:1:20480)\n    at async getToken$2 (https://www.gstatic.com/firebasejs/10.12.5/firebase-app-check.js:1:14780)\n    at async Refresher.operation (https://www.gstatic.com/firebasejs/10.12.5/firebase-app-check.js:1:16197)\n    at async Refresher.process (https://www.gstatic.com/firebasejs/10.12.5/firebase-app-check.js:1:6570)",
+    "timestamp": "2026-09-15T14:09:21.986Z",
+    "url": "https://www.gstatic.com/firebasejs/10.12.5/firebase-app-check.js"
+  },
+  {
+    "level": "warn",
+    "message": "[WorldLoad] Applied adaptive limits (roads 16730/39653, buildings 126/138, landuse 1798/2250, pois 5657/6662).",
+    "timestamp": "2026-09-15T14:09:53.260Z",
+    "url": "http://127.0.0.1:4192/app/js/world/load-roads.js?v=226"
+  },
+  {
+    "level": "error",
+    "message": "[2026-09-15T14:11:41.552Z]  @firebase/app-check: FirebaseError: AppCheck: ReCAPTCHA error. (appCheck/recaptcha-error).\n    at ReCaptchaEnterpriseProvider.getToken (https://www.gstatic.com/firebasejs/10.12.5/firebase-app-check.js:1:20480)\n    at async getToken$2 (https://www.gstatic.com/firebasejs/10.12.5/firebase-app-check.js:1:14780)\n    at async Refresher.operation (https://www.gstatic.com/firebasejs/10.12.5/firebase-app-check.js:1:16197)\n    at async Refresher.process (https://www.gstatic.com/firebasejs/10.12.5/firebase-app-check.js:1:6570)",
+    "timestamp": "2026-09-15T14:11:41.565Z",
+    "url": "https://www.gstatic.com/firebasejs/10.12.5/firebase-app-check.js"
+  },
+  {
+    "level": "warn",
+    "message": "[WorldLoad] publishStreetPavement failed: Error: Pavement has incomplete or overlapping terrain support: {\"sourceArea\":891.6927220000003,\"coveredArea\":891.694006608371,\"difference\":0.0012846083706108402}\n    at conformPavementMeshCooperatively (http://127.0.0.1:4192/app/js/world/pavement-terrain-conformance.js:49:24)\n    at async publishStreetPavement (http://127.0.0.1:4192/app/js/world/street-pavement-runtime.js:280:30)\n    at async finalizeLoadedWorld (http://127.0.0.1:4192/app/js/world/load-support.js?v=44:130:34)\n    at async markLoaded (http://127.0.0.1:4192/app/js/world/load-roads.js?v=226:287:7)\n    at async loadRoadsInternal (http://127.0.0.1:4192/app/js/world/load-roads.js?v=226:1037:11)\n    at async Object.loadRoads (http://127.0.0.1:4192/app/js/world.js?v=473:292:20)\n    at async runTitleStart (http://127.0.0.1:4192/app/js/ui/title-screen.js?v=118:707:5)",
+    "timestamp": "2026-09-15T14:12:49.485Z",
+    "url": "http://127.0.0.1:4192/app/js/world/load-support.js?v=44"
+  },
+  {
+    "level": "error",
+    "message": "[2026-09-15T14:13:41.611Z]  @firebase/app-check: FirebaseError: AppCheck: ReCAPTCHA error. (appCheck/recaptcha-error).\n    at ReCaptchaEnterpriseProvider.getToken (https://www.gstatic.com/firebasejs/10.12.5/firebase-app-check.js:1:20480)\n    at async getToken$2 (https://www.gstatic.com/firebasejs/10.12.5/firebase-app-check.js:1:14780)\n    at async Refresher.operation (https://www.gstatic.com/firebasejs/10.12.5/firebase-app-check.js:1:16197)\n    at async Refresher.process (https://www.gstatic.com/firebasejs/10.12.5/firebase-app-check.js:1:6570)",
+    "timestamp": "2026-09-15T14:13:41.614Z",
+    "url": "https://www.gstatic.com/firebasejs/10.12.5/firebase-app-check.js"
+  }
+]

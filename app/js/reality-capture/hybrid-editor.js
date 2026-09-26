@@ -1,18 +1,25 @@
+import {mountCaptureStep} from './workspace-navigation.js';
+import './capture-theme.js';
+import {wallDirections} from './orientation.js';
+import {mountCaptureMap} from './map-context.js';
 import {loadClassicScript} from '../modules/script-loader.js?v=56';
-import {vendorScriptsCritical} from '../modules/manifest.js?v=597';
-import {createCaptureViewer} from './result-viewer.js?v=1';
+import {vendorScriptsCritical} from '../modules/manifest.js?v=606';
+import {createCaptureViewer} from './result-viewer.js?v=2';
 import {wallFootprint,validateQuad,rectifyPhoto,buildHybridShell,buildWallPatch} from './hybrid-geometry.js?v=1';
 import {loadLocalCaptureDraft,saveLocalCaptureDraft,deleteLocalCaptureDraft} from './local-draft-store.js?v=1';
+import {normalizeManualRoom,manualRoomFootprint,manualRoomSurfaceSize,ROOM_SURFACE_NAMES} from '../../../functions/capture-room-geometry.mjs';
 
 // The host supplies the existing authenticated asset/save APIs. No public URLs,
 // alternate uploader, reconstruction queue, or world-geometry authority here.
-export async function openHybridEditor({capture,photos,loadPhoto,save,submit,signal}) {
-  const pts=wallFootprint(capture.building);
+export async function openHybridEditor({capture,photos,loadPhoto,save,submit,signal,onClose,initialWall=0,saveScope='account',inWorld=false,notice=''}) {
+  const isRoom=capture.captureKind==='interior_room';
+  let pts=isRoom?manualRoomFootprint(capture.hybridPreview?.room||capture.room):wallFootprint(capture.building);
   if(!photos.length)throw Error('No saved photographs are available for this capture.');
   if(!globalThis.THREE)await loadClassicScript(vendorScriptsCritical[0]);
   signal.throwIfAborted();
   const T=globalThis.THREE, abort=new AbortController();
   const dialog=document.createElement('dialog'); dialog.className='captureHybridEditor';
+  if(inWorld)dialog.classList.add('captureInWorld');
   dialog.setAttribute('aria-label','Build a photo-supported building preview');
   dialog.innerHTML=`<style>
     .captureHybridEditor{box-sizing:border-box;color-scheme:dark;background:#09222d;color:#e3f5fa;border:1px solid #68c4d0;border-radius:12px;width:min(1000px,96vw);max-height:94dvh;padding:18px;overflow:auto;overscroll-behavior:contain;font:14px/1.5 'Poppins',sans-serif}
@@ -43,6 +50,12 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
   <div class="hybridColumns"><section class="hybridBuilding" aria-label="Building side"><h3>1. Choose a building side</h3>
     <div data-viewer></div><div class="hybridActions"><button data-rotate>Rotate view</button><button data-closer>Zoom in</button><button data-farther>Zoom out</button><button data-reset>Reset view</button></div>
     <div data-wall-buttons aria-label="Choose a building side"></div><p data-side-label></p>
+    <canvas data-plan aria-label="Building footprint, north up; highlighted wall matches the 3D selection" style="width:100%;height:auto"></canvas>
+    <p data-orientation-help>North is up on this plan. Directions describe where each outside wall faces, not the camera direction. Match this outline to the map before placing photos.</p>
+    <a data-map-context target="_blank" rel="noopener noreferrer">Check this building on the map</a>
+    <button data-face-wall>Look straight at selected wall</button>
+    <button data-mark-front>Mark selected wall as street-facing</button><p data-front-reference></p>
+    <details data-map-panel><summary>See surrounding streets and match a wall</summary><div data-map-preview></div></details>
     </section><section class="hybridPlacement" aria-label="Wall placement"><h3>3. Place the photo on this side</h3><p>Start with the whole wall, or choose a grid section. Drag the yellow box to move it; drag its lower-right handle to resize.</p>
     <div class="hybridActions"><button data-whole>Whole wall</button><button data-tile>Grid section</button><label>Grid<select data-grid><option value="2">2 × 2</option><option value="4" selected>4 × 4</option><option value="8">8 × 8</option></select></label></div>
     <div class="hybridWall" data-wall-board aria-label="Wall placement. Drag the selected region or use arrow keys; Shift plus arrows resizes."><div data-existing></div><div data-placement tabindex="0" role="group" aria-label="Selected photo region"><img data-placement-image alt="Cropped photo preview" hidden><span data-resize aria-hidden="true">↘</span></div></div>
@@ -57,7 +70,6 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
     <label>Saved photo<select data-photo-choice></select></label>
     <div class="hybridFields"><label>Selected corner<select data-corner><option value="0">1 · Top-left</option><option value="1">2 · Top-right</option><option value="2">3 · Bottom-right</option><option value="3">4 · Bottom-left</option></select></label>
     <label>Photo X (%)<input data-x type="number" min="0" max="100" step="0.1"></label><label>Photo Y (%)<input data-y type="number" min="0" max="100" step="0.1"></label></div>
-    <canvas data-plan aria-label="Mapped footprint, north up; wall numbers match the selector"></canvas>
     <label>Mapped wall<select data-wall></select></label><p>Wall percentages run from its numbered start corner to the next corner; height runs from ground to eaves. A close-up must cover only its actual portion, not the whole wall.</p>
     <div class="hybridFields"><label>Left (%)<input data-region="0" type="number" min="0" max="100" value="0"></label><label>Bottom (%)<input data-region="1" type="number" min="0" max="100" value="0"></label><label>Right (%)<input data-region="2" type="number" min="0" max="100" value="100"></label><label>Top (%)<input data-region="3" type="number" min="0" max="100" value="100"></label></div>
     <label>Preview wall / eaves height (metres)<input data-height type="number" min="1" max="1200" step="0.1"></label><p data-height-evidence></p>
@@ -73,14 +85,40 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
     <button data-submit>Submit saved walls for approval</button><p data-submission role="status"></p></section>
   `;
   const $=s=>dialog.querySelector(s), cache=new Map(), snapshots=[], thumbs=new Map(),patchThumbs=new Map();
+  if(inWorld){$('[data-close]').textContent='Back to photos';$('[data-close]').setAttribute('aria-label',capture.authoredLayout?'Back to interior':'Back to photos');}
+  const deviceOnly=saveScope==='device',savedWhere=deviceOnly?'on this device':'to account';
+  if(deviceOnly)$('[data-save]').textContent='Save preview in my local world';
+  if(capture.authoredLayout)$('[data-save]').textContent='Save room photos and home layout';
   let preview=structuredClone(capture.hybridPreview||{revision:0,footprintSignature:capture.footprintSignature,heightMeters:capture.building?.spatialContext?.wallHeightMeters||capture.buildingDetails?.heightMeters||capture.building?.spatialContext?.height?.meters||6,roofShape:['flat','gabled','hipped'].includes(capture.buildingDetails?.roofShape)?capture.buildingDetails.roofShape:'unknown',roofRiseMeters:2,patches:[]});
+  if(isRoom){preview.room=normalizeManualRoom(preview.room||capture.room);preview.heightMeters=preview.room.heightMeters;preview.roofShape='flat';}
+  const presentationBuilding=()=>isRoom?{...capture.building,manualRoom:preview.room}:capture.building;
+  if(isRoom){
+    dialog.setAttribute('aria-label','Edit private room photos');
+    dialog.querySelector('h2').textContent='Your private room';
+    dialog.querySelector('header + p').textContent='Choose a wall, floor or ceiling, then place a cropped photo. This room stays private; public sharing requires your choice and approval.';
+    $('[data-advanced] summary').textContent='Advanced · room dimensions and exact placement';
+    $('[data-height]').min='1.8';$('[data-height]').max='12';
+    $('[data-roof]').closest('.hybridFields').hidden=true;
+    const dimensions=document.createElement('div');dimensions.className='hybridFields';
+    dimensions.innerHTML='<label>Room width (m)<input data-room-edit-width type="number" min="1.5" max="80" step="0.1"></label><label>Room length (m)<input data-room-edit-length type="number" min="1.5" max="80" step="0.1"></label>';
+    $('[data-rebuild]').before(dimensions);
+    $('[data-room-edit-width]').value=preview.room.widthMeters;$('[data-room-edit-length]').value=preview.room.lengthMeters;
+    $('[data-publication] h3').textContent='Review this room';
+    $('[data-publication] p').textContent='Cropped images remain protected. Submitting for review does not make your room public.';
+    $('[data-submit]').textContent='Submit private room for review';
+    dialog.querySelector('.hybridBuilding h3').textContent='1. Choose a room surface';
+    if(capture.authoredLayout){$('[data-rebuild]').hidden=true;dimensions.hidden=true;$('[data-height]').closest('label').hidden=true;$('[data-height-evidence]').hidden=true;}
+  }
   let quad=[],selected=0,bitmap=null,viewer=null,busy=false,closed=false,editId=null,drag=false,dirty=false,highlight=null,photoPage=0,thumbnailBusy=false;
-  const localKey=JSON.stringify(['capture-wall-edit-v1',capture.ownerUid,capture.captureId]);
+  let showPhotos=true,photoMeshes=[];
+  const compare=document.createElement('button');compare.textContent='Show without photos';compare.setAttribute('aria-pressed','false');$('[data-reset]').after(compare);
+  compare.onclick=()=>{showPhotos=!showPhotos;for(const mesh of photoMeshes)mesh.visible=showPhotos;compare.textContent=showPhotos?'Show without photos':'Show photo placements';compare.setAttribute('aria-pressed',String(!showPhotos));};
+  const localKey=JSON.stringify(['capture-wall-edit-v1',capture.ownerUid,capture.captureId,...(capture.authoredRoomId?[capture.authoredRoomId]:[])]);
   let recovery=null;
   try { recovery=(await loadLocalCaptureDraft(localKey)).draft; } catch { /* Account Save still works when device storage is unavailable. */ }
   const status=t=>{$('[data-status]').textContent=t;};
   $('[data-publication]').hidden=typeof submit!=='function';
-  if(preview.revision)$('[data-saved]').textContent=`Saved to account · revision ${preview.revision} · ${preview.patches.length} photo patches.`;
+  if(preview.revision)$('[data-saved]').textContent=`Saved ${savedWhere} · revision ${preview.revision} · ${preview.patches.length} photo patches.`;
   const active=()=>{abort.signal.throwIfAborted();signal.throwIfAborted();};
   function setBusy(value){busy=value;dialog.querySelectorAll('button:not([data-close]),input,select').forEach(e=>e.disabled=value);pageButtons();}
   function pageButtons(){$('[data-prev-photos]').disabled=busy||thumbnailBusy||photoPage===0;$('[data-next-photos]').disabled=busy||thumbnailBusy||(photoPage+1)*6>=photos.length;}
@@ -91,21 +129,37 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
     }
     if(!closed)setBusy(false);
   }}
-  function close(){if(closed)return;closed=true;abort.abort();viewer?.dispose();for(const b of cache.values())b.close?.();cache.clear();thumbs.clear();signal.removeEventListener('abort',close);dialog.close();dialog.remove();}
+  function close(){if(closed)return;closed=true;abort.abort();viewer?.dispose();for(const b of cache.values())b.close?.();cache.clear();thumbs.clear();signal.removeEventListener('abort',close);dialog.captureStepDispose?.();dialog.close();dialog.remove();onClose?.();}
   signal.addEventListener('abort',close,{once:true});
   if(recovery?.preview){
     $('[data-recovery]').hidden=false;
     const same=recovery.baseRevision===preview.revision&&recovery.preview.footprintSignature===preview.footprintSignature;
-    $('[data-recover]').hidden=!same;
-    $('[data-recovery-copy]').textContent=same?'This device has unsaved photo placements from your last visit. Restore them or keep the account version.':'A newer account revision exists. The older device draft will not overwrite it.';
+    $('[data-recover]').hidden=false;
+    $('[data-recovery-copy]').textContent=same?'This device has unsaved photo placements from your last visit. Inspect them or keep the account version.':`Device edits were based on version ${recovery.baseRevision}; your account is version ${preview.revision}. Inspect them before explicitly saving. Nothing is overwritten automatically.`;
   }
-  $('[data-recover]').onclick=()=>run(async()=>{if(recovery?.baseRevision!==preview.revision||recovery.preview.footprintSignature!==preview.footprintSignature)throw Error('The account version changed. Reopen this editor.');preview=structuredClone(recovery.preview);dirty=true;$('[data-height]').value=preview.heightMeters;$('[data-roof]').value=preview.roofShape;$('[data-rise]').value=preview.roofRiseMeters;$('[data-recovery]').hidden=true;await rebuild();status('Recovered placements. Save to account when ready.');});
+  $('[data-recover]').onclick=()=>run(async()=>{if(recovery.preview.footprintSignature!==preview.footprintSignature)throw Error('The mapped outline changed. Keep this device draft; its photos must be aligned with the updated building before saving.');const currentRevision=preview.revision;remember();preview={...structuredClone(recovery.preview),revision:currentRevision};dirty=true;$('[data-height]').value=preview.heightMeters;$('[data-roof]').value=preview.roofShape;$('[data-rise]').value=preview.roofRiseMeters;$('[data-recovery]').hidden=true;await rebuild();status('Inspecting device placements. Save explicitly to replace the account placements with this draft, or Undo to return to the account version.');});
   $('[data-discard-recovery]').onclick=()=>run(async()=>{await deleteLocalCaptureDraft(localKey);recovery=null;$('[data-recovery]').hidden=true;});
-  $('[data-close]').onclick=close;dialog.addEventListener('cancel',e=>{e.preventDefault();close();});
+  const requestClose=()=>{if(busy){status('Wait for the current operation to finish before closing.');return;}if(dirty&&!confirm('These edits have not been saved to your account. Close the editor and keep only the device recovery draft?'))return;close();};
+  mountCaptureStep(dialog,{building:capture.building,section:capture.authoredLayout?'Interior · room photos':'Exterior · photo placement',requestClose,parentLabel:capture.authoredLayout?'Back to floor plan':'Back to building'});
+  $('[data-close]').onclick=requestClose;dialog.addEventListener('cancel',e=>{e.preventDefault();requestClose();});
   const photoSelect=$('[data-photo-choice]');
-  photos.forEach((p,i)=>photoSelect.add(new Option(`Photo ${i+1}`,p.id)));
-  pts.forEach((p,i)=>$('[data-wall]').add(new Option(`Wall ${i+1} · ${Math.hypot(p.x-pts[(i+1)%pts.length].x,p.z-pts[(i+1)%pts.length].z).toFixed(1)} m`,String(i))));
-  pts.forEach((p,i)=>{const b=document.createElement('button');b.textContent=`Side ${i+1}`;b.dataset.side=i;b.onclick=()=>selectWall(i);$('[data-wall-buttons]').append(b);});
+  const photoName=document.createElement('label');photoName.textContent='Photo label (optional)';const nameInput=document.createElement('input');nameInput.maxLength=60;nameInput.dataset.photoName='';photoName.append(nameInput);$('[data-photo]').before(photoName);
+  const photoTitle=(id,index)=>preview.photoLabels?.[id]||`Photo ${index+1}`;
+  nameInput.onchange=()=>run(async()=>{remember();preview.photoLabels={...preview.photoLabels,[photoSelect.value]:nameInput.value.trim()};for(const [i,p] of photos.entries())photoSelect.options[i].textContent=photoTitle(p.id,i);await loadThumbnails();status('Photo label updated in this draft. Save to keep it across devices.');});
+  const rotateCrop=document.createElement('button');rotateCrop.textContent='Rotate photo 90°';rotateCrop.dataset.rotatePhoto='';$('[data-clear]').after(rotateCrop);
+  rotateCrop.onclick=()=>{if(busy||quad.length!==4)return;quad=[quad[3],quad[0],quad[1],quad[2]];drawPhoto();cropPreview();status('Photo orientation adjusted. Choose Place photo to apply this crop.');};
+  photos.forEach((p,i)=>photoSelect.add(new Option(photoTitle(p.id,i),p.id)));
+  const directions=wallDirections(pts);
+  let mapContext=null;
+  $('[data-map-panel]').hidden=isRoom;
+  $('[data-map-panel]').addEventListener('toggle',()=>{if($('[data-map-panel]').open&&!mapContext){mapContext=mountCaptureMap($('[data-map-preview]'),capture.building,pts,selectWall,abort.signal);mapContext.select(Number($('[data-wall]').value));}});
+  const surfaceNames=isRoom?[...pts.map((_,i)=>`Wall ${i+1}`),'Floor','Ceiling']:directions.map(d=>`Wall ${d.wall+1} · faces ${d.compass} · ${d.length.toFixed(1)} m`);
+  const geo=capture.building;
+  $('[data-map-context]').hidden=isRoom||!Number.isFinite(geo?.lat)||!Number.isFinite(geo?.lon);
+  if(!$('[data-map-context]').hidden)$('[data-map-context]').href=`https://www.openstreetmap.org/?mlat=${geo.lat}&mlon=${geo.lon}#map=19/${geo.lat}/${geo.lon}`;
+  if(isRoom){$('[data-orientation-help]').textContent='Room plan: wall numbers match this room’s saved layout. This local room view does not imply a street-facing side.';$('[data-face-wall]').hidden=true;$('[data-mark-front]').hidden=true;}
+  surfaceNames.forEach((label,i)=>$('[data-wall]').add(new Option(label,String(i))));
+  surfaceNames.forEach((label,i)=>{const b=document.createElement('button');b.textContent=isRoom?label:`${i+1} · ${directions[i].compass}`;b.dataset.side=i;b.onclick=()=>selectWall(i);$('[data-wall-buttons]').append(b);});
   $('[data-height]').value=preview.heightMeters;
   $('[data-roof]').value=preview.roofShape||'unknown';$('[data-rise]').value=preview.roofRiseMeters||2;
   $('[data-height-evidence]').textContent=capture.buildingDetails?.heightMeters?'Starting height: your unverified measurement.':capture.building?.spatialContext?.height?.meters?`Starting height: ${capture.building.spatialContext.height.evidence} map snapshot. Check this against the actual eaves; it may include the roof or be inaccurate.`:'No mapped height; 6 m is only a provisional preview value.';
@@ -135,12 +189,16 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
   function selectWall(wall,internal=false){
     if((busy&&!internal)||closed)return;
     $('[data-wall]').value=wall;editId=null;drawPlan();drawPlacement();
+    mapContext?.select(wall);
     dialog.querySelectorAll('[data-side]').forEach(b=>b.setAttribute('aria-pressed',String(Number(b.dataset.side)===wall)));
-    $('[data-side-label]').textContent=`Selected: ${$('[data-wall]').selectedOptions[0].textContent}. Yellow shows the selected wall.`;
-    if(highlight){const mesh=buildWallPatch(T,capture.building,preview.heightMeters,{wall,region:[0,0,1,1]},null);highlight.geometry.dispose();highlight.geometry=mesh.geometry;mesh.material.dispose();viewer?.redraw();}
+    $('[data-side-label]').textContent=`Selected: ${$('[data-wall]').selectedOptions[0].textContent}. Yellow shows the selected surface.`;
+    if(highlight){const mesh=buildWallPatch(T,presentationBuilding(),preview.heightMeters,{wall,region:[0,0,1,1]},null);highlight.geometry.dispose();highlight.geometry=mesh.geometry;mesh.material.dispose();viewer?.redraw();}
   }
   function pickWall({point}){
     if(busy||point.y<0||point.y>preview.heightMeters+.02)return;
+    if(isRoom&&(point.y<.02||Math.abs(point.y-preview.heightMeters)<.02)){
+      selectWall(point.y<.02?pts.length:pts.length+1);return;
+    }
     let best=-1,distance=Infinity;
     pts.forEach((a,i)=>{const b=pts[(i+1)%pts.length],dx=b.x-a.x,dz=b.z-a.z,u=Math.max(0,Math.min(1,((point.x-a.x)*dx+(point.z-a.z)*dz)/(dx*dx+dz*dz))),d=Math.hypot(point.x-a.x-u*dx,point.z-a.z-u*dz);if(d<distance){distance=d;best=i;}});
     if(best>=0&&distance<.1){selectWall(best);status(`Side ${best+1} selected. Choose a photo, crop it, then place it on this wall.`);}
@@ -156,7 +214,7 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
       b.onclick=()=>run(async()=>{photoSelect.value=p.id;await selectPhoto();status('Photo selected. Adjust the yellow crop corners, then choose Place photo on wall.');});
       try{
         if(!thumbs.has(p.id)){const blob=await loadPhoto(p.id,abort.signal);active();if(!(blob instanceof Blob)||blob.size>32*1024*1024)throw Error('Photo exceeds preview limit');const image=await createImageBitmap(blob,{imageOrientation:'from-image',resizeWidth:160});try{active();const c=document.createElement('canvas');c.width=160;c.height=Math.max(1,Math.round(image.height/image.width*160));c.getContext('2d').drawImage(image,0,0,c.width,c.height);thumbs.set(p.id,c.toDataURL('image/jpeg',.75));c.width=c.height=0;}finally{image.close();}}
-        const img=document.createElement('img');img.src=thumbs.get(p.id);img.alt=`Saved photo ${start+offset+1}`;b.replaceChildren(img,document.createTextNode(`Photo ${start+offset+1}`));
+        const img=document.createElement('img');img.src=thumbs.get(p.id);img.alt=`Saved photo ${start+offset+1}`;const uses=[...new Set(preview.patches.filter(patch=>patch.photoId===p.id).map(patch=>surfaceNames[patch.wall]))];b.replaceChildren(img,document.createTextNode(`${photoTitle(p.id,start+offset)} · ${uses.length?uses.join(', '):'Not placed'}`));
       }catch(e){active();b.textContent=`Photo ${start+offset+1} · tap to retry`;}
     }
     }finally{thumbnailBusy=false;if(!closed)pageButtons();}
@@ -168,32 +226,46 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
     ctx.strokeStyle='#ffcb55';ctx.lineWidth=c.width/220;ctx.beginPath();quad.forEach((p,i)=>i?ctx.lineTo(p[0]*c.width,p[1]*c.height):ctx.moveTo(p[0]*c.width,p[1]*c.height));if(quad.length===4)ctx.closePath();ctx.stroke();
     quad.forEach((p,i)=>{ctx.fillStyle=i===selected?'#fff':'#ffcb55';ctx.beginPath();ctx.arc(p[0]*c.width,p[1]*c.height,c.width/65,0,Math.PI*2);ctx.fill();ctx.fillStyle='#05202b';ctx.font=`bold ${c.width/48}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(String(i+1),p[0]*c.width,p[1]*c.height);});if(updateFields)coordinates();
   }
-  async function selectPhoto(){bitmap=await photo(photoSelect.value);active();quad=[[.08,.08],[.92,.08],[.92,.92],[.08,.92]];selected=0;editId=null;drawPhoto();cropPreview();drawPlacement();dialog.querySelectorAll('[data-photo-id]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.photoId===photoSelect.value)));}
+  async function selectPhoto(){nameInput.value=preview.photoLabels?.[photoSelect.value]||'';bitmap=await photo(photoSelect.value);active();quad=[[.08,.08],[.92,.08],[.92,.92],[.08,.92]];selected=0;editId=null;drawPhoto();cropPreview();drawPlacement();dialog.querySelectorAll('[data-photo-id]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.photoId===photoSelect.value)));}
   function drawPlan(){
+    $('[data-front-reference]').textContent=Number.isInteger(preview.streetFacingWall)?`Your street-facing reference: wall ${preview.streetFacingWall+1}. User supplied—not verified map data.`:isRoom?'':'Street-facing side not identified. Check the map, then mark the correct wall.';
     const c=$('[data-plan]');c.width=640;c.height=320;const ctx=c.getContext('2d');ctx.clearRect(0,0,640,320);
     const xs=pts.map(p=>p.x),zs=pts.map(p=>p.z),minx=Math.min(...xs),minz=Math.min(...zs),dx=Math.max(...xs)-minx,dz=Math.max(...zs)-minz,scale=Math.min(500/dx,220/dz);
     const xy=p=>[70+(p.x-minx)*scale,50+(p.z-minz)*scale];ctx.fillStyle='#cdebf1';ctx.font='20px system-ui';ctx.fillText('N ↑',560,32);
     pts.forEach((p,i)=>{const a=xy(p),b=xy(pts[(i+1)%pts.length]);ctx.strokeStyle=i===Number($('[data-wall]').value)?'#ffcb55':'#7fb1bc';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke();ctx.fillStyle='#fff';ctx.fillText(String(i+1),(a[0]+b[0])/2,(a[1]+b[1])/2-8);ctx.fillStyle='#ffcb55';ctx.fillRect(a[0]-3,a[1]-3,6,6);});
+    const entrance=!isRoom&&capture.building?.spatialContext?.entrance;
+    if(entrance){const [x,y]=xy(entrance);ctx.fillStyle='#4edb97';ctx.beginPath();ctx.arc(x,y,7,0,Math.PI*2);ctx.fill();ctx.fillText('Entrance reference',20,310);}
+    if(isRoom){ctx.clearRect(550,0,90,40);ctx.fillStyle='#cdebf1';ctx.fillText('Room',550,32);}
   }
   function remember(){snapshots.push(structuredClone(preview));if(snapshots.length>10)snapshots.shift();dirty=true;$('[data-saved]').textContent='Unsaved preview changes.';}
   function patchList(){
     const ul=$('[data-patches]');ul.replaceChildren();
-    preview.patches.forEach(p=>{const li=document.createElement('li');li.append(`Wall ${p.wall+1} · Photo ${photos.findIndex(x=>x.id===p.photoId)+1} `);
+    preview.patches.forEach(p=>{const li=document.createElement('li');li.append(`${surfaceNames[p.wall]} · ${photoTitle(p.photoId,photos.findIndex(x=>x.id===p.photoId))} `);
+      const replace=document.createElement('button');replace.textContent='Replace with selected photo';replace.onclick=()=>run(async()=>{validateQuad(quad);remember();p.photoId=photoSelect.value;p.quad=structuredClone(quad);await rebuild();status('The selected photo and crop replaced this placement. Its surface and region are unchanged. Save to keep it.');});li.append(replace);
+      const destination=document.createElement('select');destination.setAttribute('aria-label',`Move photo patch ${p.id} to surface`);
+      surfaceNames.forEach((name,i)=>destination.add(new Option(name,String(i))));destination.value=String(p.wall);
+      const relocate=document.createElement('button');relocate.textContent='Move to this surface';
+      relocate.onclick=()=>run(async()=>{const wall=Number(destination.value);if(wall===p.wall)return;if(preview.patches.some(q=>q.id!==p.id&&q.wall===wall&&Math.min(q.region[2],p.region[2])-Math.max(q.region[0],p.region[0])>.001&&Math.min(q.region[3],p.region[3])-Math.max(q.region[1],p.region[1])>.001))throw Error('That surface already has a photo here. Choose an empty surface or adjust its existing photo first.');remember();p.wall=wall;if(!isRoom)p.orientationVersion=2;selectWall(wall,true);await rebuild();status('Photo moved in this draft. Check crop and proportions on the new surface, then save and submit for review. The live building is unchanged.');});
+      if(!isRoom&&p.orientationVersion!==2)li.append('Older image orientation retained. Adjusting or moving uses the corrected outside-facing orientation. ');
+      li.append(destination,relocate);
       const edit=document.createElement('button');edit.textContent='Adjust';edit.onclick=()=>run(async()=>{photoSelect.value=p.photoId;bitmap=await photo(p.photoId);quad=structuredClone(p.quad);selected=0;selectWall(p.wall,true);editId=p.id;setRegion(p.region);drawPhoto();cropPreview();status('Adjust this patch, then choose Place photo on wall to update it.');});
       const remove=document.createElement('button');remove.textContent='Remove';remove.onclick=()=>run(async()=>{remember();preview.patches=preview.patches.filter(x=>x.id!==p.id);await rebuild();});li.append(edit,remove);ul.append(li);
     });
   }
   async function rebuild(){
-    active();patchThumbs.clear();const group=buildHybridShell(T,capture.building,preview.heightMeters,preview);
+    photoMeshes=[];
+    active();patchThumbs.clear();if(isRoom)pts=manualRoomFootprint(preview.room);const group=buildHybridShell(T,presentationBuilding(),preview.heightMeters,preview);
     try{
-      highlight=buildWallPatch(T,capture.building,preview.heightMeters,{wall:Number($('[data-wall]').value),region:[0,0,1,1]},null);
+      highlight=buildWallPatch(T,presentationBuilding(),preview.heightMeters,{wall:Number($('[data-wall]').value),region:[0,0,1,1]},null);
       highlight.material.color.set('#ffcc55');highlight.material.transparent=true;highlight.material.opacity=.22;highlight.material.depthWrite=false;highlight.material.polygonOffsetFactor=-1;highlight.material.polygonOffsetUnits=-1;group.add(highlight);
-      for(const p of preview.patches){const b=await photo(p.photoId);active();const a=pts[p.wall],end=pts[(p.wall+1)%pts.length];const aspect=Math.hypot(end.x-a.x,end.z-a.z)*(p.region[2]-p.region[0])/(preview.heightMeters*(p.region[3]-p.region[1]));const canvas=rectifyPhoto(b,p.quad,aspect),texture=new T.CanvasTexture(canvas);texture.encoding=T.sRGBEncoding;group.add(buildWallPatch(T,capture.building,preview.heightMeters,p,texture));const thumb=document.createElement('canvas');thumb.width=192;thumb.height=192;thumb.getContext('2d').drawImage(canvas,0,0,192,192);patchThumbs.set(p.id,thumb.toDataURL('image/jpeg',.75));thumb.width=thumb.height=0;}
+      for(const p of preview.patches){const b=await photo(p.photoId);active();const a=pts[p.wall],end=pts[(p.wall+1)%pts.length];const size=isRoom?manualRoomSurfaceSize(preview.room,p.wall):[Math.hypot(end.x-a.x,end.z-a.z),preview.heightMeters];const aspect=size[0]*(p.region[2]-p.region[0])/(size[1]*(p.region[3]-p.region[1]));const canvas=rectifyPhoto(b,p.quad,aspect),texture=new T.CanvasTexture(canvas);texture.encoding=T.sRGBEncoding;const mesh=buildWallPatch(T,presentationBuilding(),preview.heightMeters,p,texture);mesh.visible=showPhotos;photoMeshes.push(mesh);group.add(mesh);const thumb=document.createElement('canvas');thumb.width=192;thumb.height=192;thumb.getContext('2d').drawImage(canvas,0,0,192,192);patchThumbs.set(p.id,thumb.toDataURL('image/jpeg',.75));thumb.width=thumb.height=0;}
       active();const view=viewer?.getView();viewer?.dispose();viewer=await createCaptureViewer($('[data-viewer]'),null,abort.signal,{model:group,alignment:{},fitScale:.65,view,onPick:pickWall,label:'Tap a wall to select it. Drag to rotate; pinch or scroll to zoom. Side buttons also select walls.'});
-      active();bitmap=await photo(photoSelect.value);drawPhoto();cropPreview();patchList();drawPlacement();
+      active();bitmap=await photo(photoSelect.value);drawPhoto();cropPreview();patchList();drawPlacement();await thumbnailPage();
     }catch(e){group.traverse(o=>{o.geometry?.dispose();o.material?.map?.dispose();o.material?.dispose();});throw e;}
   }
   photoSelect.onchange=()=>run(selectPhoto);$('[data-wall]').onchange=()=>selectWall(Number($('[data-wall]').value));
+  $('[data-face-wall]').onclick=()=>{const d=directions[Number($('[data-wall]').value)];if(!d||!viewer)return;viewer.faceDirection(d.normal);};
+  $('[data-mark-front]').onclick=()=>{if(busy)return;remember();preview.streetFacingWall=Number($('[data-wall]').value);drawPlan();status('Street-facing reference marked. Save to account to keep it; existing photos have not been moved.');};
   const loadThumbnails=()=>thumbnailPage().catch(e=>{if(!closed)status(e.message);});
   $('[data-prev-photos]').onclick=()=>{photoPage=Math.max(0,photoPage-1);void loadThumbnails();};
   $('[data-next-photos]').onclick=()=>{photoPage=Math.min(Math.ceil(photos.length/6)-1,photoPage+1);void loadThumbnails();};
@@ -226,22 +298,23 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
   $('[data-new]').onclick=()=>run(async()=>{await selectPhoto();setRegion([0,0,1,1]);status('Choose a photo and wall. For a smaller patch, choose Grid section or tap the wall grid.');});
   $('[data-add]').onclick=()=>run(async()=>{
     validateQuad(quad);const region=[...dialog.querySelectorAll('[data-region]')].map(e=>Number(e.value)/100),wall=Number($('[data-wall]').value);
-    const patch={id:editId||crypto.randomUUID(),photoId:photoSelect.value,quad:structuredClone(quad),wall,region};
-    const check=buildWallPatch(T,capture.building,preview.heightMeters,patch,null);check.geometry.dispose();check.material.dispose();
+    const patch={id:editId||crypto.randomUUID(),photoId:photoSelect.value,quad:structuredClone(quad),wall,region,...(!isRoom?{orientationVersion:2}:{})};
+    const check=buildWallPatch(T,presentationBuilding(),preview.heightMeters,patch,null);check.geometry.dispose();check.material.dispose();
     if(preview.patches.some(p=>p.id!==editId&&p.wall===wall&&Math.min(p.region[2],region[2])-Math.max(p.region[0],region[0])>.001&&Math.min(p.region[3],region[3])-Math.max(p.region[1],region[1])>.001))throw Error('This overlaps an existing patch. Adjust that patch or choose a separate wall region.');
     if(!editId&&preview.patches.length>=16)throw Error('This preview supports 16 patches. Adjust an existing patch to improve it.');
     remember();preview.patches=preview.patches.filter(p=>p.id!==editId);preview.patches.push(patch);editId=patch.id;await rebuild();status('Photo patch applied. Rotate the building and check alignment before saving.');
   });
-  $('[data-rebuild]').onclick=()=>run(async()=>{const height=Number($('[data-height]').value),rise=Number($('[data-rise]').value);if(!Number.isFinite(height)||height<1||height>1200||!Number.isFinite(rise)||rise<.3||rise>20)throw Error('Enter valid wall and roof dimensions.');remember();preview.heightMeters=height;preview.roofShape=$('[data-roof]').value;preview.roofRiseMeters=rise;await rebuild();status('Preview dimensions updated; mapped geometry is unchanged.');});
+  $('[data-rebuild]').onclick=()=>run(async()=>{const height=Number($('[data-height]').value),rise=Number($('[data-rise]').value);if(!Number.isFinite(height)||height<1||height>1200||!Number.isFinite(rise)||rise<.3||rise>20)throw Error('Enter valid wall and roof dimensions.');const room=isRoom?normalizeManualRoom({widthMeters:Number($('[data-room-edit-width]').value),lengthMeters:Number($('[data-room-edit-length]').value),heightMeters:height}):null;remember();if(room)preview.room=room;preview.heightMeters=height;preview.roofShape=$('[data-roof]').value;preview.roofRiseMeters=rise;await rebuild();status('Preview dimensions updated; mapped geometry is unchanged.');});
   $('[data-undo]').onclick=()=>run(async()=>{if(!snapshots.length)return;const revision=preview.revision;preview=snapshots.pop();preview.revision=revision;dirty=true;$('[data-height]').value=preview.heightMeters;editId=null;await rebuild();status('Last preview edit undone. Save to keep this version.');});
   $('[data-save]').onclick=()=>run(async()=>{
     $('[data-saved]').textContent='Saving your photo placements…';
-    try {const result=await save({...preview,baseRevision:preview.revision});active();preview=structuredClone(result.preview);dirty=false;await deleteLocalCaptureDraft(localKey).catch(()=>{});$('[data-recovery]').hidden=true;$('[data-saved]').textContent=`Saved to account · revision ${preview.revision} · ${preview.patches.length} photo patches.`;status('Saved. Submit these walls when you are ready for approval.');}
+    try {const result=await save({...preview,baseRevision:preview.revision});active();preview=structuredClone(result.preview);dirty=false;await deleteLocalCaptureDraft(localKey).catch(()=>{});$('[data-recovery]').hidden=true;$('[data-saved]').textContent=`Saved ${savedWhere} · revision ${preview.revision} · ${preview.patches.length} photo patches.`;status(deviceOnly?'Saved to your local world preview. Close the editor to see this building. Nothing was uploaded or published.':'Saved. Submit these walls when you are ready for approval.');}
     catch(error){$('[data-saved]').textContent=`Not saved: ${error.message}. Keep this editor open and retry.`;throw error;}
   });
   $('[data-submit]').onclick=()=>run(async()=>{
     if(dirty||!preview.revision)throw Error('Save your latest photo placements before submitting.');
     if(!preview.patches.length)throw Error('Place at least one photo on a wall first.');
+    if(!confirm(`Submit revision ${preview.revision} with ${preview.patches.length} photo placements on ${new Set(preview.patches.map(p=>p.wall)).size} surfaces? Original photos stay private. ${isRoom?'Interior access stays private unless separately requested and approved.':'The exterior changes for everyone only after approval.'}`))return;
     $('[data-submission]').textContent='Preparing your cropped wall images for review…';
     try {const result=await submit(preview.revision);active();$('[data-submission]').textContent=`Revision ${result.revision} · ${result.status==='approved'?'Approved':'Submitted for approval'}. Your saved edits remain available.`;status('Submission recorded. The building changes after approval, not merely after saving.');}
     catch(error){$('[data-submission]').textContent=`Not submitted: ${error.message}. Your saved edits are safe.`;throw error;}
@@ -249,7 +322,8 @@ export async function openHybridEditor({capture,photos,loadPhoto,save,submit,sig
   $('[data-rotate]').onclick=()=>viewer?.rotate();$('[data-reset]').onclick=()=>viewer?.reset();
   $('[data-closer]').onclick=()=>viewer?.zoom(.8);$('[data-farther]').onclick=()=>viewer?.zoom(1.25);
   document.body.append(dialog);dialog.showModal();
-  await run(async()=>{await selectPhoto();selectWall(0,true);await rebuild();});
+  await run(async()=>{await selectPhoto();selectWall(Number.isInteger(initialWall)&&initialWall>=0&&initialWall<$('[data-wall]').options.length?initialWall:0,true);await rebuild();});
   void loadThumbnails();
+  if(notice)status(notice);
   return {close,getState:()=>({revision:preview.revision,patches:preview.patches.length,dirty,closed,selectedWall:Number($('[data-wall]').value),selectedPhoto:photoSelect.value,region:getRegion(),quad,buildingId:capture.building.sourceBuildingId})};
 }

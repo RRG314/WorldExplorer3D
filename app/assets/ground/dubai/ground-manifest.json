@@ -3,7 +3,7 @@
   "artifactId": "dubai-ground",
   "providerId": "copernicus-dem-classified-ground-v1",
   "sourceRelease": "COP-DEM-2021:GLO-30",
-  "contentSha256": "abed3037fed7cc2f11460f359699040ab3f15ac640d1901b2c79987719679b95",
+  "contentSha256": "1fe4679ee150e62ad5c92249fa9cc141ee4b85dc67c4efec12f236ec868d2be2",
   "spacingMeters": 90,
   "coverage": {
     "south": 25.175204983480818,
@@ -18,7 +18,7 @@
   "correctionAttested": true,
   "sourceEvidence": {
     "sourceClassification": "digital-surface-model",
-    "correctionMethod": "worldexplorer-pmf-grid-v1",
+    "correctionMethod": "worldexplorer-pmf-boundary-reconstruction-v3",
     "sourceTiles": [
       {
         "tileId": "Copernicus_DSM_COG_10_N25_00_E055_00_DEM",
@@ -29,7 +29,14 @@
         "etag": "79b97efc5d013554f652d9b195afc2bd",
         "lastModified": "Mon, 09 May 2022 14:11:00 GMT"
       }
-    ]
+    ],
+    "classificationMethod": "worldexplorer-pmf-grid-v1",
+    "reconstruction": {
+      "method": "harmonic-ground-boundary",
+      "toleranceMeters": 0.00001,
+      "exteriorPolicy": "retain-source-observation",
+      "sourceArtifactSha256": "abed3037fed7cc2f11460f359699040ab3f15ac640d1901b2c79987719679b95"
+    }
   },
   "attribution": {
     "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",

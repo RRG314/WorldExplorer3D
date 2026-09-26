@@ -1,10 +1,10 @@
-window.WORLD_EXPLORER_FIREBASE_ENV = "production";
-window.WORLD_EXPLORER_FIREBASE = window.WORLD_EXPLORER_FIREBASE || {
-  "projectId": "worldexplorer3d-d9b83",
-  "appId": "1:469573887496:web:abf6ee1eda1f733f42d3bd",
-  "storageBucket": "worldexplorer3d-d9b83.firebasestorage.app",
-  "apiKey": "AIzaSyDu-IXMWLU5UExjtPWfJ3BEHXg4xxvE3UU",
-  "authDomain": "worldexplorer3d-d9b83.firebaseapp.com",
-  "messagingSenderId": "469573887496",
-  "measurementId": "G-H9H6H1EWY6"
+window.WORLD_EXPLORER_FIREBASE_ENV = "staging";
+window.WORLD_EXPLORER_FIREBASE = {
+  "projectId": "we3d-staging-20260712",
+  "appId": "1:524178734996:web:f59acbc9014f0e26f51981",
+  "storageBucket": "we3d-staging-20260712.firebasestorage.app",
+  "apiKey": "AIzaSyCJHCzRq6xwV1NbZ5NIRXfYA8XuL0Jvbz4",
+  "authDomain": "we3d-staging-20260712.firebaseapp.com",
+  "messagingSenderId": "524178734996",
+  "appCheckSiteKey": "6LepRq4tAAAAAHyE_MVJfWdAKZ9HJs9qFkKHAMM0"
 };

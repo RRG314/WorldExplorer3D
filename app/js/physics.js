@@ -1,8 +1,9 @@
+import { shouldRefreshRoadQuery } from './physics/road-query-policy.js';
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { constrainTunnelActorCeiling } from './world/compiler/tunnel-space-query.js';
 import { isRoadSurfaceReachable } from "./structure-semantics.js?v=63";
 import { updateDrone } from "./physics/drone-flight.js?v=11";
-import { updatePlane } from "./plane-mode.js?v=36";
+import { updatePlane } from "./plane-mode.js?v=37";
 import {
   createEarthVehicleGroundContactSampler,
   stabilizeEarthVehicleSurfaceY,
@@ -10,7 +11,7 @@ import {
 } from "./physics/vehicle-surface.js?v=6";
 import { createBuildingCollisionQuery } from "./physics/building-collision.js?v=4";
 import { resolveVehicleBuildingCollision } from "./physics/building-collision-response.js?v=8";
-import { getEarthTransportControllerSnapshot, updateAlternateTravelMode } from "./physics/mode-dispatch.js?v=4";
+import { getEarthTransportControllerSnapshot, updateAlternateTravelMode } from "./physics/mode-dispatch.js?v=5";
 import { updatePlanetaryVehicleHeight } from "./physics/planetary-vehicle.js?v=3";
 import {
   arcadeSteeringYawTarget,
@@ -28,20 +29,13 @@ import { updateRoadVehicleVerticalState } from './physics/road-vehicle-airborne.
 import { ensureVehicleUpgradeStore, vehicleUpgradeDynamics } from './transport/vehicle-upgrades.js?v=1';
 import { samplePhysicalEnvironment } from './planetary/runtime/physical-environment.js?v=2';
 import { groundVehicleTuning } from './character/vehicle-assistance.js?v=1';
-// RDT-based adaptive throttling state
-// At high complexity, skip findNearestRoad on some frames (reuse cached result)
-let _rdtPhysFrame = 0;
-let _rdtRoadSkipInterval = 2; // 2 = every other rendered frame, etc.
 let _cachedNearRoad = null;
-let _rdtLastFrameToken;
 
 const earthVehicleGroundContactSampler = createEarthVehicleGroundContactSampler(appCtx);
 
 // Invalidate road cache - must be called on road reload, mode change, teleport
 function invalidateRoadCache() {
   _cachedNearRoad = null;
-  _rdtPhysFrame = 0;
-  _rdtLastFrameToken = undefined;
   earthVehicleGroundContactSampler.reset();
 }
 
@@ -83,26 +77,12 @@ function getNearestRoadThrottled(x, z, forceCheck = false, currentY = NaN) {
     return { road: null, dist: Infinity, pt: { x, z } };
   }
 
-  const frameToken = Number.isFinite(appCtx.lastTime) ? appCtx.lastTime : undefined;
-  const sameRenderedFrame = frameToken !== undefined && frameToken === _rdtLastFrameToken;
-  if (!sameRenderedFrame) {
-    _rdtPhysFrame++;
-    _rdtLastFrameToken = frameToken;
-  }
-  _rdtRoadSkipInterval = typeof appCtx.rdtComplexity === 'number' ?
-  appCtx.rdtComplexity >= 6 ? 3 : 2 :
-  2;
-
+  const queryTime = performance.now();
+  const queryRevision = appCtx._groundSurfaceRevision || 0;
+  const shouldCheck = shouldRefreshRoadQuery(_cachedNearRoad, {
+    x, z, y: currentY, now: queryTime, revision: queryRevision, force: forceCheck
+  });
   let nr;
-  const movedBeyondCache = Number.isFinite(_cachedNearRoad?.queryX) &&
-    Math.hypot(x - _cachedNearRoad.queryX, z - _cachedNearRoad.queryZ) > 4;
-  const shouldCheck = !_cachedNearRoad || (!sameRenderedFrame && (
-    forceCheck ||
-    _rdtPhysFrame % _rdtRoadSkipInterval === 0 ||
-    movedBeyondCache ||
-    (Number.isFinite(currentY) && Number.isFinite(_cachedNearRoad?.y) && Math.abs(_cachedNearRoad.y - currentY) > 6)
-  ));
-
   if (shouldCheck) {
     nr = appCtx.findNearestRoad(x, z, {
       y: Number.isFinite(currentY) ? currentY : NaN,
@@ -120,7 +100,10 @@ function getNearestRoadThrottled(x, z, forceCheck = false, currentY = NaN) {
       distanceToEndpoint: Number.isFinite(nr?.distanceToEndpoint) ? nr.distanceToEndpoint : Infinity,
       distanceToTransitionZone: Number.isFinite(nr?.distanceToTransitionZone) ? nr.distanceToTransitionZone : Infinity,
       queryX: x,
-      queryZ: z
+      queryZ: z,
+      queryY: currentY,
+      queryTime,
+      queryRevision
     };
   } else {
     nr = _cachedNearRoad;

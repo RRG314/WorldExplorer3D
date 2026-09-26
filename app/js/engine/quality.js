@@ -3,6 +3,13 @@ import {
   createAtmosphereMaterial
 } from '../sky/earth-atmosphere.js?v=1';
 
+function publishEarthEnvironment(ctx, texture) {
+  ctx.appCtx.earthEnvironmentMap = texture || null;
+  if (!ctx.appCtx.activeShipInterior && !ctx.appCtx.activePlanetaryBodyId) {
+    ctx.appCtx.scene.environment = texture || null;
+  }
+}
+
 function buildProceduralEnvironmentTarget(ctx, profile) {
   const pmremGenerator = ctx.appCtx.pmremGenerator;
   if (!pmremGenerator || typeof THREE === 'undefined') return null;
@@ -48,7 +55,7 @@ export function refreshProceduralEnvironment(ctx, profile = null, options = {}) 
   ctx.state.fallbackEnvMap = nextTarget.texture;
   ctx.state.fallbackEnvSignature = nextProfile.signature;
   if (!ctx.state.hdrEnvMap || ctx.state.renderQualityLevel === ctx.RENDER_QUALITY_LOW || ctx.appCtx.scene.environment === previousMap) {
-    ctx.appCtx.scene.environment = ctx.state.fallbackEnvMap;
+    publishEarthEnvironment(ctx, ctx.state.fallbackEnvMap);
   }
   if (previousTarget && previousTarget !== nextTarget) previousTarget.dispose?.();
   return ctx.state.fallbackEnvMap;
@@ -84,11 +91,11 @@ export function applyRenderQuality(ctx, level, options = {}) {
     });
   }
   if (normalized === ctx.RENDER_QUALITY_LOW) {
-    ctx.appCtx.scene.environment = ctx.state.fallbackEnvMap || null;
+    publishEarthEnvironment(ctx, ctx.state.fallbackEnvMap);
   } else if (ctx.state.hdrEnvMap) {
-    ctx.appCtx.scene.environment = ctx.state.hdrEnvMap;
+    publishEarthEnvironment(ctx, ctx.state.hdrEnvMap);
   } else if (ctx.state.fallbackEnvMap) {
-    ctx.appCtx.scene.environment = ctx.state.fallbackEnvMap;
+    publishEarthEnvironment(ctx, ctx.state.fallbackEnvMap);
   }
 
   if (ctx.state.carPaintMaterial) {
@@ -120,7 +127,7 @@ export function applyRenderQuality(ctx, level, options = {}) {
 export function ensureHdrEnvironment(ctx) {
   ctx.state.hdrLoadRequested = true;
   if (ctx.state.fallbackEnvMap) {
-    ctx.appCtx.scene.environment = ctx.state.fallbackEnvMap;
+    publishEarthEnvironment(ctx, ctx.state.fallbackEnvMap);
   }
   if (typeof ctx.appCtx.updatePerfPanel === 'function') ctx.appCtx.updatePerfPanel(true);
 }

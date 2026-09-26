@@ -1,8 +1,12 @@
+import { softwareCompositorArgs } from './software-compositor.mjs';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
+import { installBrowserGraphicsProbe } from './browser-graphics-probe.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 
 const verifyRoot = process.env.WE3D_VERIFY_ROOT || '';
 const staticServer = verifyRoot ? await startStaticServer({ rootDir: verifyRoot, ports: [4441, 4442, 4443] }) : null;
@@ -11,12 +15,16 @@ const baseUrl = staticServer
   : String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4192').replace(/\/$/, '');
 const outputDir = path.resolve('output/verification/world-economy-earth');
 await fs.mkdir(outputDir, { recursive: true });
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+// Bound functional gameplay verification; performance budgets use their own harness.
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024', ...softwareCompositorArgs()] });
 const failures = [];
 
 async function run() {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
+  await configureStagingAppCheck(page, baseUrl);
+  collectBrowserGraphicsErrors(page, failures);
+  await installBrowserGraphicsProbe(page, path.join(outputDir, 'graphics-failure.json'));
   page.on('pageerror', (error) => failures.push(`pageerror: ${error.stack || error}`));
   page.on('requestfailed', (request) => { if (request.url().startsWith(baseUrl)) failures.push(`request failed: ${request.url()}`); });
   try {
@@ -30,9 +38,10 @@ async function run() {
     await searchResult.click();
     await page.locator('#globeSelectorStartBtn').click();
     await page.waitForFunction(() => {
+      if (document.getElementById('loading')?.classList.contains('show')) return false;
       const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
       return state.gameStarted && !state.worldLoading && state.urbanSandbox?.active;
-    }, null, { timeout: 120_000 });
+    }, null, { timeout: process.env.CI ? 360_000 : 120_000, polling: 500 });
     const places = await page.evaluate(() => {
       const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
       return snapshot.urbanSandbox?.commerce?.stores || [];
@@ -62,7 +71,7 @@ async function run() {
     assert.match(ui.source, /game stock/i);
     assert.match(ui.source, /OpenStreetMap/i);
     assert.ok(ui.buyCount > 0);
-    await page.screenshot({ path: path.join(outputDir, 'mapped-business-open.png'), fullPage: true });
+    await page.screenshot({ path: path.join(outputDir, 'mapped-business-open.png'), fullPage: false });
     const beforeCredits = Number(ui.credits.replace(/[^\d]/g, '') || 0);
     const buy = page.locator('#urbanStoreStock [data-store-action="buy"]:not([disabled])').first();
     const itemLabel = String(await buy.locator('xpath=..').locator('strong').textContent());
@@ -77,6 +86,13 @@ async function run() {
     assert.ok(after.credits < beforeCredits, JSON.stringify({ beforeCredits, after }));
     assert.ok(after.backpackLabels.includes(itemLabel), JSON.stringify({ itemLabel, after }));
     return { placeCount: places.length, kinds: [...new Set(places.map((place) => place.kind))], target, ui, itemLabel, afterCredits: after.credits };
+  } catch (error) {
+    const state = await page.evaluate(() => {
+      const d = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
+      return {gameStarted:d.gameStarted,worldLoading:d.worldLoading,worldCounts:d.worldCounts,worldLoad:d.worldLoad,errors:d.runtimeErrors};
+    }).catch(() => null);
+    await fs.writeFile(path.join(outputDir, 'failure.json'), JSON.stringify({error:String(error),state},null,2));
+    throw error;
   } finally {
     await context.close();
   }

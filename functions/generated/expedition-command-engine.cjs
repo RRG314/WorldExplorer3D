@@ -28,203 +28,6 @@ __export(command_authority_exports, {
 });
 module.exports = __toCommonJS(command_authority_exports);
 
-// app/js/expedition/outpost.js?v=1
-var OUTPOST_CONSTRUCTION_COST = Object.freeze({
-  maintenanceKg: 90,
-  feedstockKg: 120,
-  powerMWh: 4,
-  foodKg: 30,
-  waterKg: 20
-});
-function clone(value) {
-  return globalThis.structuredClone ? globalThis.structuredClone(value) : JSON.parse(JSON.stringify(value));
-}
-function surfaceAddressKey(contactId) {
-  const systemId = String(contactId || "").trim().toLowerCase();
-  const bodyId = `${systemId}-i`;
-  const regionId = `${bodyId}-survey-site`;
-  return ["we3d-world", "v1", systemId, bodyId, `${bodyId}-fixed`, regionId, "expedition"].join(":");
-}
-function buildOutpostBlueprint() {
-  const blocks = [];
-  const add = (gx, gy, gz, shape, materialIndex, rotation = 0, moduleId = "habitat") => {
-    blocks.push(Object.freeze({ gx, gy, gz, shape, materialIndex, rotation, moduleId }));
-  };
-  for (let x = -5; x <= 5; x += 1) for (let z = -3; z <= 3; z += 1) {
-    if (Math.abs(x) <= 1 && z === 3) continue;
-    add(x, 0, z, "floor", 7, 0, "foundation");
-    if ((Math.abs(x) === 5 || Math.abs(z) === 3) && !(z === 3 && Math.abs(x) <= 1)) {
-      const shape = z === -3 && x === 0 ? "door" : (x + z) % 3 === 0 ? "window" : "wall";
-      add(x, 1, z, shape, shape === "window" ? 2 : 6, Math.abs(x) === 5 ? 1 : 0, "habitat");
-      add(x, 2, z, shape === "door" ? "wall" : shape, shape === "window" ? 2 : 6, Math.abs(x) === 5 ? 1 : 0, "habitat");
-    }
-    add(x, 3, z, "roof", 7, 0, "habitat");
-  }
-  for (let x = 8; x <= 11; x += 1) for (let z = -2; z <= 1; z += 1) {
-    add(x, 0, z, "floor", 7, 0, "power");
-    if ((x + z) % 2 === 0) add(x, 0.5, z, "slab", 1, 0, "power");
-  }
-  for (let x = -10; x <= -7; x += 1) for (let z = -2; z <= 1; z += 1) {
-    add(x, 0, z, "floor", 7, 0, "storage");
-    if (x === -10 || x === -7 || z === -2 || z === 1) add(x, 1, z, "wall", 4, Math.abs(x) >= 7 ? 1 : 0, "storage");
-  }
-  for (let x = -2; x <= 2; x += 1) for (let z = 6; z <= 10; z += 1) add(x, 0, z, "floor", 6, 0, "landing-pad");
-  add(0, 0.5, 8, "sign", 1, 0, "landing-pad");
-  return Object.freeze(blocks);
-}
-var OUTPOST_BLUEPRINT = buildOutpostBlueprint();
-function createOutpostSite(expedition, contactId, nowMs = Date.now()) {
-  const contact = (expedition?.routeContacts || []).find((entry) => entry.id === contactId);
-  if (!contact || !["returned", "surveyed"].includes(contact.localOperationState) && contact.status !== "surveyed") {
-    return Object.freeze({ expedition, changed: false, message: "Complete and return from the local survey before establishing an outpost." });
-  }
-  if ((expedition.outposts || []).some((entry) => entry.contactId === contactId)) {
-    return Object.freeze({ expedition, changed: false, message: "This survey site already has an outpost record." });
-  }
-  const outpost = Object.freeze({
-    type: "ExpeditionOutpost",
-    schemaVersion: 1,
-    id: `${expedition.id}:outpost:${contactId}`,
-    contactId,
-    bodyId: `${contactId}-i`,
-    worldAddressKey: surfaceAddressKey(contactId),
-    name: `${contact.designation} Field Station`,
-    state: "planned",
-    operationsStatus: "planned",
-    revision: 1,
-    ownerAuthority: "interstellar-expedition",
-    structureAuthority: "block-builder-shape-catalog",
-    blueprint: OUTPOST_BLUEPRINT,
-    installedMaterialKg: 0,
-    power: Object.freeze({ storedMWh: 0, capacityMWh: 12, generationMW: 0.18, condition: 1 }),
-    lifeSupport: Object.freeze({ condition: 1, crewCapacity: 4, occupied: 0 }),
-    stores: Object.freeze({ foodKg: 0, waterKg: 0, maintenanceKg: 0 }),
-    assignedCrewIds: Object.freeze([]),
-    condition: 1,
-    createdAtMs: nowMs,
-    updatedAtMs: nowMs,
-    lastAdvancedMissionS: Number(expedition.strategicElapsedS || 0),
-    log: Object.freeze([{ atMissionS: Number(expedition.strategicElapsedS || 0), message: "The returned survey site was reserved for a field station." }])
-  });
-  return Object.freeze({
-    expedition: Object.freeze({ ...expedition, outposts: Object.freeze([...expedition.outposts || [], outpost]) }),
-    outpost,
-    changed: true,
-    message: `${outpost.name} site recorded at the existing survey-world address.`
-  });
-}
-function constructionAvailability(expedition, outpost) {
-  if (!outpost || outpost.state !== "planned") return Object.freeze({ enabled: false, reason: "The outpost is not awaiting construction." });
-  for (const [key, cost] of Object.entries(OUTPOST_CONSTRUCTION_COST)) {
-    if (Number(expedition?.resources?.[key] || 0) < cost) return Object.freeze({ enabled: false, reason: `Requires ${cost} ${key.replaceAll(/([A-Z])/g, " $1").toLowerCase()}.` });
-  }
-  const crew = (expedition.crew || []).filter((member) => member.status !== "dead");
-  if (crew.length < 2) return Object.freeze({ enabled: false, reason: "Two active crew members are required." });
-  return Object.freeze({ enabled: true, reason: "" });
-}
-function constructOutpost(expedition, outpostId, nowMs = Date.now()) {
-  const index = (expedition?.outposts || []).findIndex((entry) => entry.id === outpostId);
-  const outpost = expedition?.outposts?.[index];
-  const availability = constructionAvailability(expedition, outpost);
-  if (!availability.enabled) return Object.freeze({ expedition, changed: false, message: availability.reason });
-  const resources = clone(expedition.resources);
-  for (const [key, cost] of Object.entries(OUTPOST_CONSTRUCTION_COST)) resources[key] -= cost;
-  const assignedCrew = (expedition.crew || []).filter((member) => member.status !== "dead").slice(0, 2).map((member) => member.id);
-  const nextOutpost = Object.freeze({
-    ...outpost,
-    state: "operational",
-    operationsStatus: "operational",
-    revision: outpost.revision + 1,
-    installedMaterialKg: OUTPOST_CONSTRUCTION_COST.maintenanceKg + OUTPOST_CONSTRUCTION_COST.feedstockKg,
-    power: Object.freeze({ ...outpost.power, storedMWh: OUTPOST_CONSTRUCTION_COST.powerMWh }),
-    lifeSupport: Object.freeze({ ...outpost.lifeSupport, occupied: assignedCrew.length }),
-    stores: Object.freeze({ foodKg: OUTPOST_CONSTRUCTION_COST.foodKg, waterKg: OUTPOST_CONSTRUCTION_COST.waterKg, maintenanceKg: 0 }),
-    assignedCrewIds: Object.freeze(assignedCrew),
-    updatedAtMs: nowMs,
-    lastAdvancedMissionS: Number(expedition.strategicElapsedS || 0),
-    log: Object.freeze([...outpost.log || [], { atMissionS: Number(expedition.strategicElapsedS || 0), message: "Habitat, power, life support, storage, workshop, airlock, and landing pad commissioned." }])
-  });
-  const outposts = expedition.outposts.map((entry, outpostIndex) => outpostIndex === index ? nextOutpost : entry);
-  return Object.freeze({
-    expedition: Object.freeze({ ...expedition, resources: Object.freeze(resources), outposts: Object.freeze(outposts) }),
-    outpost: nextOutpost,
-    changed: true,
-    message: `${nextOutpost.name} is operational. Two crew and all transferred stores remain on its ledger.`
-  });
-}
-function serviceOutpost(expedition, outpostId, nowMs = Date.now()) {
-  const index = (expedition?.outposts || []).findIndex((entry) => entry.id === outpostId);
-  const outpost = expedition?.outposts?.[index];
-  if (!outpost || outpost.state !== "operational") return Object.freeze({ expedition, changed: false, message: "No operational outpost is selected." });
-  if (Number(expedition.resources?.maintenanceKg || 0) < 8 || Number(expedition.resources?.powerMWh || 0) < 0.4) {
-    return Object.freeze({ expedition, changed: false, message: "Servicing requires 8 kg maintenance material and 0.4 MWh." });
-  }
-  const resources = clone(expedition.resources);
-  resources.maintenanceKg -= 8;
-  resources.powerMWh -= 0.4;
-  const nextOutpost = Object.freeze({
-    ...outpost,
-    revision: outpost.revision + 1,
-    installedMaterialKg: Number(outpost.installedMaterialKg || 0) + 8,
-    condition: Math.min(1, Number(outpost.condition || 0) + 0.12),
-    power: Object.freeze({ ...outpost.power, condition: Math.min(1, Number(outpost.power?.condition || 0) + 0.08) }),
-    lifeSupport: Object.freeze({ ...outpost.lifeSupport, condition: Math.min(1, Number(outpost.lifeSupport?.condition || 0) + 0.08) }),
-    operationsStatus: Number(outpost.stores?.foodKg || 0) > 0 && Number(outpost.stores?.waterKg || 0) > 0 ? "operational" : "emergency",
-    updatedAtMs: nowMs,
-    log: Object.freeze([...outpost.log || [], { atMissionS: Number(expedition.strategicElapsedS || 0), message: "Crew serviced power, seals, and environmental controls." }])
-  });
-  return Object.freeze({
-    expedition: Object.freeze({
-      ...expedition,
-      resources: Object.freeze(resources),
-      outposts: Object.freeze(expedition.outposts.map((entry, outpostIndex) => outpostIndex === index ? nextOutpost : entry))
-    }),
-    outpost: nextOutpost,
-    changed: true,
-    message: `${nextOutpost.name} servicing completed and 8 kg is recorded as installed material.`
-  });
-}
-function advanceOutpostState(outpost, missionS) {
-  if (outpost?.state !== "operational") return outpost;
-  const fromS = Math.max(0, Number(outpost.lastAdvancedMissionS || 0));
-  const toS = Math.max(fromS, Number(missionS || 0));
-  const days = (toS - fromS) / 86400;
-  if (days < 0.01) return outpost;
-  const occupied = Math.max(0, Number(outpost.lifeSupport?.occupied || outpost.assignedCrewIds?.length || 0));
-  const powerCondition = Math.max(0, Math.min(1, Number(outpost.power?.condition ?? 1)));
-  const lifeSupportCondition = Math.max(0, Math.min(1, Number(outpost.lifeSupport?.condition ?? 1)));
-  const generatedMWh = Number(outpost.power?.generationMW || 0) * 24 * days * powerCondition;
-  const requiredMWh = occupied * 0.04 * days;
-  const storedMWh = Math.max(0, Math.min(Number(outpost.power?.capacityMWh || 0), Number(outpost.power?.storedMWh || 0) + generatedMWh - requiredMWh));
-  const foodKg = Math.max(0, Number(outpost.stores?.foodKg || 0) - occupied * 0.02 * days);
-  const waterKg = Math.max(0, Number(outpost.stores?.waterKg || 0) - occupied * 6e-3 * days);
-  const condition = Math.max(0.12, Number(outpost.condition || 0) - days * (3e-5 + occupied * 2e-6));
-  const nextPowerCondition = Math.max(0.12, powerCondition - days * 18e-6);
-  const nextLifeSupportCondition = Math.max(0.12, lifeSupportCondition - days * 24e-6);
-  const operationsStatus = foodKg <= 0.01 || waterKg <= 0.01 || storedMWh <= 0.1 || condition < 0.3 || nextLifeSupportCondition < 0.3 ? "emergency" : condition < 0.55 || nextLifeSupportCondition < 0.55 ? "maintenance" : "operational";
-  const statusChanged = operationsStatus !== outpost.operationsStatus;
-  const log = statusChanged ? Object.freeze([...outpost.log || [], Object.freeze({
-    atMissionS: toS,
-    message: operationsStatus === "emergency" ? "The field station entered emergency conservation after its stores or systems fell below a safe operating margin." : operationsStatus === "maintenance" ? "The field station reported a maintenance watch as systems aged." : "The field station returned to normal operations."
-  })]) : outpost.log;
-  return Object.freeze({
-    ...outpost,
-    revision: Number(outpost.revision || 0) + 1,
-    operationsStatus,
-    condition,
-    power: Object.freeze({ ...outpost.power, storedMWh, condition: nextPowerCondition }),
-    lifeSupport: Object.freeze({ ...outpost.lifeSupport, condition: nextLifeSupportCondition }),
-    stores: Object.freeze({ ...outpost.stores, foodKg, waterKg }),
-    lastAdvancedMissionS: toS,
-    log
-  });
-}
-function advanceOutposts(expedition, missionS) {
-  const outposts = (expedition?.outposts || []).map((outpost) => advanceOutpostState(outpost, missionS));
-  if (!outposts.some((outpost, index) => outpost !== expedition.outposts[index])) return expedition?.outposts || Object.freeze([]);
-  return Object.freeze(outposts);
-}
-
 // app/js/expedition/catalog.js?v=2
 var PROPULSION_CLASS = Object.freeze({
   DEMONSTRATED: "demonstrated",
@@ -674,6 +477,7 @@ var CATALOG = [
     visualProfile: {
       kind: "observational-nebula",
       image: "assets/textures/universe/orion-nebula-nasa.jpg?v=3",
+      densityImage: "assets/textures/universe/orion-nebula-density.jpg",
       imageAspect: 2.0833,
       displayWidth: 24e3,
       imageCredit: "NASA, ESA, M. Robberto (STScI/ESA), Hubble Orion Treasury Project Team",
@@ -681,7 +485,7 @@ var CATALOG = [
       tint: 9021439,
       navigationRadiusScene: 9e3
     },
-    generatedFlags: ["observational-image-projection"],
+    generatedFlags: ["procedural-volumetric-reconstruction", "enhanced-emission-display"],
     uncertainty: { distance: "Published estimates vary by method and sub-region." },
     provenance: [SOURCES.nasaOrion]
   }),
@@ -698,6 +502,7 @@ var CATALOG = [
     visualProfile: {
       kind: "observational-nebula",
       image: "assets/textures/universe/carina-nebula-webb.jpg?v=1",
+      densityImage: "assets/textures/universe/carina-nebula-density.jpg",
       imageAspect: 2.8902,
       displayWidth: 32e3,
       imageCredit: "NASA, ESA, CSA, STScI",
@@ -705,7 +510,7 @@ var CATALOG = [
       tint: 16751219,
       navigationRadiusScene: 9e3
     },
-    generatedFlags: ["observational-image-projection"],
+    generatedFlags: ["procedural-volumetric-reconstruction", "enhanced-emission-display"],
     uncertainty: { distance: "Representative distance to the Carina star-forming complex." },
     provenance: [SOURCES.nasaCarina]
   }),
@@ -722,6 +527,7 @@ var CATALOG = [
     visualProfile: {
       kind: "observational-nebula",
       image: "assets/textures/universe/crab-nebula-webb.jpg?v=1",
+      densityImage: "assets/textures/universe/crab-nebula-density.jpg",
       imageAspect: 1.1488,
       displayWidth: 2e4,
       imageCredit: "NASA, ESA, CSA, STScI, Tea Temim (Princeton University); Image Processing: Joseph DePasquale (STScI)",
@@ -729,7 +535,7 @@ var CATALOG = [
       tint: 8315063,
       navigationRadiusScene: 9e3
     },
-    generatedFlags: ["observational-image-projection"],
+    generatedFlags: ["procedural-volumetric-reconstruction", "enhanced-emission-display"],
     provenance: [SOURCES.nasaCrab]
   }),
   entity({
@@ -1222,7 +1028,7 @@ var EVENT_ONSET = Object.freeze({
   "charged-interference": Object.freeze({ sensors: -0.08, navigation: -0.04 }),
   "close-star-thermal-stress": Object.freeze({ thermal: -0.12, hull: -0.04 })
 });
-function clone2(value) {
+function clone(value) {
   return globalThis.structuredClone ? globalThis.structuredClone(value) : JSON.parse(JSON.stringify(value));
 }
 function hashText(text) {
@@ -1339,7 +1145,7 @@ function createDirectedEvent(expedition, slot) {
   const definition = selectVoyageEvent(expedition, slot);
   if (!definition) return null;
   const director = normalizeVoyageDirector(expedition);
-  const systems = clone2(expedition.systems || {});
+  const systems = clone(expedition.systems || {});
   for (const [systemId, delta] of Object.entries(EVENT_ONSET[definition.id] || {})) {
     if (!systems[systemId]) continue;
     systems[systemId].condition = Math.max(0, Math.min(1, Number(systems[systemId].condition || 0) + Number(delta)));
@@ -1399,7 +1205,7 @@ function applyContactEffect(expedition, contacts, definition, effect) {
   if (!effect) return;
   let contact = [...contacts].reverse().find((entry) => entry.localOperationState !== "completed");
   if (!contact) {
-    contact = clone2(stableContact(expedition, definition.id));
+    contact = clone(stableContact(expedition, definition.id));
     contacts.push(contact);
   }
   if (effect === "survey") {
@@ -1424,10 +1230,10 @@ function resolveDirectedEvent(expedition, choiceId) {
   if (!availability.enabled) return null;
   const band = resolveBand(expedition, definition, option);
   const effects = option.effects || {};
-  const resources = clone2(expedition.resources || {});
-  const systems = clone2(expedition.systems || {});
-  const crew = clone2(expedition.crew || []);
-  const contacts = clone2(expedition.routeContacts || []);
+  const resources = clone(expedition.resources || {});
+  const systems = clone(expedition.systems || {});
+  const crew = clone(expedition.crew || []);
+  const contacts = clone(expedition.routeContacts || []);
   const director = normalizeVoyageDirector(expedition);
   const tags = { ...director.tags };
   const factor = band === "success" ? 1 : band === "partial" ? 0.55 : 0.2;
@@ -1489,9 +1295,9 @@ function applyDueConsequences(expedition) {
   const director = normalizeVoyageDirector(expedition);
   const due = director.deferredConsequences.filter((entry) => Number(entry.dueStep) <= director.step && (!entry.unlessTag || !director.tags[entry.unlessTag]));
   if (!due.length) return null;
-  const resources = clone2(expedition.resources || {});
-  const systems = clone2(expedition.systems || {});
-  const crew = clone2(expedition.crew || []);
+  const resources = clone(expedition.resources || {});
+  const systems = clone(expedition.systems || {});
+  const crew = clone(expedition.crew || []);
   for (const entry of due) {
     if (entry.systemId && systems[entry.systemId]) {
       systems[entry.systemId].condition = Math.max(0, Math.min(1, Number(systems[entry.systemId].condition || 0) + Number(entry.delta || 0)));
@@ -1521,7 +1327,7 @@ var CRYOGENIC_RESERVE = Object.freeze([
   Object.freeze({ id: "reserve-medical", name: "Leon Ibarra", ageYears: 40, experienceYears: 15, health: 0.98, fatigue: 0, assignment: "cryogenic-reserve", roles: Object.freeze(["medical", "life-support"]), status: "cryogenic" }),
   Object.freeze({ id: "reserve-navigation", name: "Rin Okoye", ageYears: 35, experienceYears: 10, health: 0.99, fatigue: 0, assignment: "cryogenic-reserve", roles: Object.freeze(["navigation", "command"]), status: "cryogenic" })
 ]);
-function clone3(value) {
+function clone2(value) {
   return globalThis.structuredClone ? globalThis.structuredClone(value) : JSON.parse(JSON.stringify(value));
 }
 function createLongDurationState(shipProfileId) {
@@ -1578,14 +1384,14 @@ function advanceLongDurationState(expedition, deltaS) {
     logEntries: Object.freeze([])
   });
   const years = Math.max(0, Number(deltaS) || 0) / JULIAN_YEAR_S;
-  const resources = clone3(expedition.resources || {});
+  const resources = clone2(expedition.resources || {});
   const logEntries = [];
   if (state.kind === "cryogenic") {
-    const next2 = clone3(state);
+    const next2 = clone2(state);
     next2.reserveCrew = next2.reserveCrew.map((member) => member.status === "cryogenic" ? { ...member, ageYears: Number(member.ageYears || 0) + years * 0.04 } : member);
     return Object.freeze({ longDuration: Object.freeze(next2), crew: expedition.crew, resources: Object.freeze(resources), logEntries: Object.freeze(logEntries) });
   }
-  const next = clone3(state);
+  const next = clone2(state);
   const totalYears = Math.max(0, Number(expedition.strategicElapsedS || 0));
   const generationIndex = Math.floor(totalYears / JULIAN_YEAR_S / next.cohortYears);
   const educationCondition = Math.max(0, Math.min(1, Number(expedition.systems?.education?.condition ?? 1)));
@@ -1613,7 +1419,7 @@ function advanceLongDurationState(expedition, deltaS) {
 function wakeReserveSpecialist(expedition, reserveId = null) {
   const state = expedition?.longDuration;
   if (state?.kind !== "cryogenic") return Object.freeze({ expedition, changed: false, message: "This ship has no cryogenic reserve crew." });
-  const resources = clone3(expedition.resources || {});
+  const resources = clone2(expedition.resources || {});
   const cryogenicCondition = Number(expedition.systems?.cryogenic?.condition ?? 0);
   if (cryogenicCondition < 0.25) return Object.freeze({ expedition, changed: false, message: "Cryogenic support is not stable enough for a controlled wake cycle." });
   if (Number(resources.medicalUnits || 0) < state.wakeCost.medicalUnits || Number(resources.powerMWh || 0) < state.wakeCost.powerMWh) {
@@ -1689,7 +1495,7 @@ var RESOURCE_KEYS = Object.freeze([
   "scienceCargoKg",
   "processingResidueKg"
 ]);
-function clone4(value) {
+function clone3(value) {
   return globalThis.structuredClone ? globalThis.structuredClone(value) : JSON.parse(JSON.stringify(value));
 }
 function crewRoleCoverage(crew = []) {
@@ -1755,7 +1561,7 @@ function createExpeditionPlan({
   const crewPopulation = crewPopulationForShip(shipId, crew.length);
   const calculation = calculateExpeditionTravel({ destinationId, ship, propulsion, crewCount: crewPopulation });
   const selectedReserveMargin = Math.max(0, Math.min(0.4, reserveMargin != null && Number.isFinite(Number(reserveMargin)) ? Number(reserveMargin) : survival === "severe" ? 0.08 : 0.15));
-  const provisioned = resources ? clone4(resources) : recommendedResources(calculation.expectedResources, selectedReserveMargin);
+  const provisioned = resources ? clone3(resources) : recommendedResources(calculation.expectedResources, selectedReserveMargin);
   if (!resources && ship) {
     provisioned.propellantKg = Math.min(Number(provisioned.propellantKg || 0), Number(ship.propellantCapacityKg || 0));
   }
@@ -1781,7 +1587,7 @@ function createExpeditionPlan({
     }),
     propulsionId,
     crewPopulation,
-    crew: Object.freeze(clone4(crew)),
+    crew: Object.freeze(clone3(crew)),
     longDuration: createLongDurationState(shipId),
     resources: Object.freeze(provisioned),
     systems: Object.freeze(systems),
@@ -1811,6 +1617,278 @@ function createExpeditionPlan({
 }
 function withExpeditionChanges(expedition, changes) {
   return Object.freeze({ ...expedition, ...changes, updatedAtMs: Number(changes.updatedAtMs) || Date.now() });
+}
+
+// app/js/expedition/research-workbench.js
+var RESEARCH_BENCHES = Object.freeze({
+  "science-bench": { roomId: "science", deckId: "command", label: "Spectrometry bench", template: { x: -8.1, z: -3.3 }, instrument: "spectrum" },
+  "analysis-bench": { roomId: "analysis-data", deckId: "command", label: "Thermal analysis bench", template: { x: -8.1, z: -18.2 }, instrument: "thermal" },
+  "fabrication-bench": { roomId: "cargo-fabrication", deckId: "engineering", label: "Composite workbench", template: { x: -8.2, z: -3.7 }, instrument: "fabricate" }
+});
+function sampleIsMounted(expedition, id) {
+  return Object.values(expedition.research?.benches || {}).some((slots) => slots.includes(id));
+}
+function availableResearchSample(sample) {
+  return sample && !sample.exported && !sample.consumed && !sample.outputs && Number.isFinite(sample.massKg) && sample.massKg > 0;
+}
+function applyResearchCommand(expedition, command) {
+  const bench = RESEARCH_BENCHES[command.benchId];
+  const reject = (message2) => ({ expedition, changed: false, message: message2 });
+  if (!bench) return reject("Unknown research workbench.");
+  const research = structuredClone(expedition.research || { benches: {}, studies: {} });
+  research.benches ||= {};
+  research.studies ||= {};
+  const slots = research.benches[command.benchId] || [null, null];
+  research.benches[command.benchId] = slots;
+  const samples = (expedition.scienceSamples || []).map((s) => ({ ...s }));
+  const resources = { ...expedition.resources };
+  let message;
+  if (command.researchAction === "place") {
+    const sample = samples.find((s) => s.id === command.sampleId);
+    if (!availableResearchSample(sample) || sampleIsMounted(expedition, sample.id)) return reject("That sample is unavailable or already on a bench.");
+    const index = slots.indexOf(null);
+    if (index < 0) return reject("Both cradles are occupied. Return a sample to cargo first.");
+    slots[index] = sample.id;
+    message = `Placed ${sample.label} in cradle ${index + 1}.`;
+  } else if (command.researchAction === "return") {
+    const index = slots.indexOf(command.sampleId);
+    if (index < 0) return reject("That sample is not on this bench.");
+    slots[index] = null;
+    message = "Sample returned to its sealed cargo container.";
+  } else if (command.researchAction === "measure") {
+    if (bench.instrument === "fabricate") return reject("Use the laboratory instruments to characterize these samples.");
+    const mounted = slots.map((id) => samples.find((s) => s.id === id)).filter(availableResearchSample);
+    if (!mounted.length) return reject("Place a sample in an instrument cradle first.");
+    const pending = mounted.filter((s) => !research.studies[s.id]?.[bench.instrument]);
+    if (!pending.length) return reject("These measurements are already recorded.");
+    const cost = 0.025 * pending.length;
+    if (!(Number(resources.powerMWh) >= cost)) return reject(`This measurement requires ${cost} MWh.`);
+    resources.powerMWh -= cost;
+    for (const sample of pending) {
+      research.studies[sample.id] ||= {};
+      research.studies[sample.id][bench.instrument] = { bodyId: sample.bodyId || null, massKg: sample.massKg, atMissionS: Number(expedition.strategicElapsedS) || 0, truthClass: sample.truthClass || "modeled-game-sample", result: bench.instrument === "spectrum" ? "Spectral fingerprint recorded; source provenance retained." : "Thermal response recorded; composite fabrication eligibility established." };
+    }
+    message = `${bench.instrument === "spectrum" ? "Spectral" : "Thermal"} measurements recorded for ${pending.length} sample${pending.length === 1 ? "" : "s"}.`;
+  } else if (command.researchAction === "fabricate") {
+    if (bench.instrument !== "fabricate") return reject("Use the fabrication workbench.");
+    const mounted = slots.map((id) => samples.find((s) => s.id === id));
+    if (mounted.length !== 2 || !mounted.every(availableResearchSample) || mounted[0].id === mounted[1].id) return reject("Place two distinct characterized samples in the cradles.");
+    if (!mounted.every((s) => research.studies[s.id]?.spectrum && research.studies[s.id]?.thermal)) return reject("Both samples need spectral and thermal measurements first.");
+    if (mounted.some((s) => s.recoveryRequirement)) return reject("Mission recovery material must use its specified recovery process.");
+    const mass = mounted.reduce((sum, s) => sum + s.massKg, 0);
+    if (!(resources.scienceCargoKg >= mass && resources.feedstockKg >= 2 && resources.powerMWh >= 0.1)) return reject("Requires the mounted cargo lots, 2 kg binder feedstock and 0.1 MWh.");
+    resources.scienceCargoKg -= mass;
+    resources.feedstockKg -= 2;
+    resources.powerMWh -= 0.1;
+    resources.maintenanceKg = Number(resources.maintenanceKg || 0) + mass + 2;
+    for (const sample of mounted) {
+      sample.consumed = true;
+      sample.processed = true;
+      sample.outputs = { maintenanceKg: sample.massKg };
+    }
+    research.benches[command.benchId] = [null, null];
+    research.lastFabrication = { sampleIds: mounted.map((s) => s.id), outputKg: mass + 2, atMissionS: Number(expedition.strategicElapsedS) || 0 };
+    message = `Fabricated ${mass + 2} kg of composite repair stock from two characterized samples and 2 kg binder. Available to Engineering repairs.`;
+  } else return reject("Unknown workbench action.");
+  const next = withExpeditionChanges(expedition, { research, scienceSamples: samples, resources, log: [...expedition.log || [], { kind: "research", atMissionS: Number(expedition.strategicElapsedS) || 0, message }] });
+  return { expedition: next, changed: true, message };
+}
+
+// app/js/expedition/outpost.js?v=1
+var OUTPOST_CONSTRUCTION_COST = Object.freeze({
+  maintenanceKg: 90,
+  feedstockKg: 120,
+  powerMWh: 4,
+  foodKg: 30,
+  waterKg: 20
+});
+function clone4(value) {
+  return globalThis.structuredClone ? globalThis.structuredClone(value) : JSON.parse(JSON.stringify(value));
+}
+function surfaceAddressKey(contactId) {
+  const systemId = String(contactId || "").trim().toLowerCase();
+  const bodyId = `${systemId}-i`;
+  const regionId = `${bodyId}-survey-site`;
+  return ["we3d-world", "v1", systemId, bodyId, `${bodyId}-fixed`, regionId, "expedition"].join(":");
+}
+function buildOutpostBlueprint() {
+  const blocks = [];
+  const add = (gx, gy, gz, shape, materialIndex, rotation = 0, moduleId = "habitat") => {
+    blocks.push(Object.freeze({ gx, gy, gz, shape, materialIndex, rotation, moduleId }));
+  };
+  for (let x = -5; x <= 5; x += 1) for (let z = -3; z <= 3; z += 1) {
+    if (Math.abs(x) <= 1 && z === 3) continue;
+    add(x, 0, z, "floor", 7, 0, "foundation");
+    if ((Math.abs(x) === 5 || Math.abs(z) === 3) && !(z === 3 && Math.abs(x) <= 1)) {
+      const shape = z === -3 && x === 0 ? "door" : (x + z) % 3 === 0 ? "window" : "wall";
+      add(x, 1, z, shape, shape === "window" ? 2 : 6, Math.abs(x) === 5 ? 1 : 0, "habitat");
+      add(x, 2, z, shape === "door" ? "wall" : shape, shape === "window" ? 2 : 6, Math.abs(x) === 5 ? 1 : 0, "habitat");
+    }
+    add(x, 3, z, "roof", 7, 0, "habitat");
+  }
+  for (let x = 8; x <= 11; x += 1) for (let z = -2; z <= 1; z += 1) {
+    add(x, 0, z, "floor", 7, 0, "power");
+    if ((x + z) % 2 === 0) add(x, 0.5, z, "slab", 1, 0, "power");
+  }
+  for (let x = -10; x <= -7; x += 1) for (let z = -2; z <= 1; z += 1) {
+    add(x, 0, z, "floor", 7, 0, "storage");
+    if (x === -10 || x === -7 || z === -2 || z === 1) add(x, 1, z, "wall", 4, Math.abs(x) >= 7 ? 1 : 0, "storage");
+  }
+  for (let x = -2; x <= 2; x += 1) for (let z = 6; z <= 10; z += 1) add(x, 0, z, "floor", 6, 0, "landing-pad");
+  add(0, 0.5, 8, "sign", 1, 0, "landing-pad");
+  return Object.freeze(blocks);
+}
+var OUTPOST_BLUEPRINT = buildOutpostBlueprint();
+function createOutpostSite(expedition, contactId, nowMs = Date.now()) {
+  const contact = (expedition?.routeContacts || []).find((entry) => entry.id === contactId);
+  if (!contact || !["returned", "surveyed"].includes(contact.localOperationState) && contact.status !== "surveyed") {
+    return Object.freeze({ expedition, changed: false, message: "Complete and return from the local survey before establishing an outpost." });
+  }
+  if ((expedition.outposts || []).some((entry) => entry.contactId === contactId)) {
+    return Object.freeze({ expedition, changed: false, message: "This survey site already has an outpost record." });
+  }
+  const outpost = Object.freeze({
+    type: "ExpeditionOutpost",
+    schemaVersion: 1,
+    id: `${expedition.id}:outpost:${contactId}`,
+    contactId,
+    bodyId: `${contactId}-i`,
+    worldAddressKey: surfaceAddressKey(contactId),
+    name: `${contact.designation} Field Station`,
+    state: "planned",
+    operationsStatus: "planned",
+    revision: 1,
+    ownerAuthority: "interstellar-expedition",
+    structureAuthority: "block-builder-shape-catalog",
+    blueprint: OUTPOST_BLUEPRINT,
+    installedMaterialKg: 0,
+    power: Object.freeze({ storedMWh: 0, capacityMWh: 12, generationMW: 0.18, condition: 1 }),
+    lifeSupport: Object.freeze({ condition: 1, crewCapacity: 4, occupied: 0 }),
+    stores: Object.freeze({ foodKg: 0, waterKg: 0, maintenanceKg: 0 }),
+    assignedCrewIds: Object.freeze([]),
+    condition: 1,
+    createdAtMs: nowMs,
+    updatedAtMs: nowMs,
+    lastAdvancedMissionS: Number(expedition.strategicElapsedS || 0),
+    log: Object.freeze([{ atMissionS: Number(expedition.strategicElapsedS || 0), message: "The returned survey site was reserved for a field station." }])
+  });
+  return Object.freeze({
+    expedition: Object.freeze({ ...expedition, outposts: Object.freeze([...expedition.outposts || [], outpost]) }),
+    outpost,
+    changed: true,
+    message: `${outpost.name} site recorded at the existing survey-world address.`
+  });
+}
+function constructionAvailability(expedition, outpost) {
+  if (!outpost || outpost.state !== "planned") return Object.freeze({ enabled: false, reason: "The outpost is not awaiting construction." });
+  for (const [key, cost] of Object.entries(OUTPOST_CONSTRUCTION_COST)) {
+    if (Number(expedition?.resources?.[key] || 0) < cost) return Object.freeze({ enabled: false, reason: `Requires ${cost} ${key.replaceAll(/([A-Z])/g, " $1").toLowerCase()}.` });
+  }
+  const crew = (expedition.crew || []).filter((member) => member.status !== "dead");
+  if (crew.length < 2) return Object.freeze({ enabled: false, reason: "Two active crew members are required." });
+  return Object.freeze({ enabled: true, reason: "" });
+}
+function constructOutpost(expedition, outpostId, nowMs = Date.now()) {
+  const index = (expedition?.outposts || []).findIndex((entry) => entry.id === outpostId);
+  const outpost = expedition?.outposts?.[index];
+  const availability = constructionAvailability(expedition, outpost);
+  if (!availability.enabled) return Object.freeze({ expedition, changed: false, message: availability.reason });
+  const resources = clone4(expedition.resources);
+  for (const [key, cost] of Object.entries(OUTPOST_CONSTRUCTION_COST)) resources[key] -= cost;
+  const assignedCrew = (expedition.crew || []).filter((member) => member.status !== "dead").slice(0, 2).map((member) => member.id);
+  const nextOutpost = Object.freeze({
+    ...outpost,
+    state: "operational",
+    operationsStatus: "operational",
+    revision: outpost.revision + 1,
+    installedMaterialKg: OUTPOST_CONSTRUCTION_COST.maintenanceKg + OUTPOST_CONSTRUCTION_COST.feedstockKg,
+    power: Object.freeze({ ...outpost.power, storedMWh: OUTPOST_CONSTRUCTION_COST.powerMWh }),
+    lifeSupport: Object.freeze({ ...outpost.lifeSupport, occupied: assignedCrew.length }),
+    stores: Object.freeze({ foodKg: OUTPOST_CONSTRUCTION_COST.foodKg, waterKg: OUTPOST_CONSTRUCTION_COST.waterKg, maintenanceKg: 0 }),
+    assignedCrewIds: Object.freeze(assignedCrew),
+    updatedAtMs: nowMs,
+    lastAdvancedMissionS: Number(expedition.strategicElapsedS || 0),
+    log: Object.freeze([...outpost.log || [], { atMissionS: Number(expedition.strategicElapsedS || 0), message: "Habitat, power, life support, storage, workshop, airlock, and landing pad commissioned." }])
+  });
+  const outposts = expedition.outposts.map((entry, outpostIndex) => outpostIndex === index ? nextOutpost : entry);
+  return Object.freeze({
+    expedition: Object.freeze({ ...expedition, resources: Object.freeze(resources), outposts: Object.freeze(outposts) }),
+    outpost: nextOutpost,
+    changed: true,
+    message: `${nextOutpost.name} is operational. Two crew and all transferred stores remain on its ledger.`
+  });
+}
+function serviceOutpost(expedition, outpostId, nowMs = Date.now()) {
+  const index = (expedition?.outposts || []).findIndex((entry) => entry.id === outpostId);
+  const outpost = expedition?.outposts?.[index];
+  if (!outpost || outpost.state !== "operational") return Object.freeze({ expedition, changed: false, message: "No operational outpost is selected." });
+  if (Number(expedition.resources?.maintenanceKg || 0) < 8 || Number(expedition.resources?.powerMWh || 0) < 0.4) {
+    return Object.freeze({ expedition, changed: false, message: "Servicing requires 8 kg maintenance material and 0.4 MWh." });
+  }
+  const resources = clone4(expedition.resources);
+  resources.maintenanceKg -= 8;
+  resources.powerMWh -= 0.4;
+  const nextOutpost = Object.freeze({
+    ...outpost,
+    revision: outpost.revision + 1,
+    installedMaterialKg: Number(outpost.installedMaterialKg || 0) + 8,
+    condition: Math.min(1, Number(outpost.condition || 0) + 0.12),
+    power: Object.freeze({ ...outpost.power, condition: Math.min(1, Number(outpost.power?.condition || 0) + 0.08) }),
+    lifeSupport: Object.freeze({ ...outpost.lifeSupport, condition: Math.min(1, Number(outpost.lifeSupport?.condition || 0) + 0.08) }),
+    operationsStatus: Number(outpost.stores?.foodKg || 0) > 0 && Number(outpost.stores?.waterKg || 0) > 0 ? "operational" : "emergency",
+    updatedAtMs: nowMs,
+    log: Object.freeze([...outpost.log || [], { atMissionS: Number(expedition.strategicElapsedS || 0), message: "Crew serviced power, seals, and environmental controls." }])
+  });
+  return Object.freeze({
+    expedition: Object.freeze({
+      ...expedition,
+      resources: Object.freeze(resources),
+      outposts: Object.freeze(expedition.outposts.map((entry, outpostIndex) => outpostIndex === index ? nextOutpost : entry))
+    }),
+    outpost: nextOutpost,
+    changed: true,
+    message: `${nextOutpost.name} servicing completed and 8 kg is recorded as installed material.`
+  });
+}
+function advanceOutpostState(outpost, missionS) {
+  if (outpost?.state !== "operational") return outpost;
+  const fromS = Math.max(0, Number(outpost.lastAdvancedMissionS || 0));
+  const toS = Math.max(fromS, Number(missionS || 0));
+  const days = (toS - fromS) / 86400;
+  if (days < 0.01) return outpost;
+  const occupied = Math.max(0, Number(outpost.lifeSupport?.occupied || outpost.assignedCrewIds?.length || 0));
+  const powerCondition = Math.max(0, Math.min(1, Number(outpost.power?.condition ?? 1)));
+  const lifeSupportCondition = Math.max(0, Math.min(1, Number(outpost.lifeSupport?.condition ?? 1)));
+  const generatedMWh = Number(outpost.power?.generationMW || 0) * 24 * days * powerCondition;
+  const requiredMWh = occupied * 0.04 * days;
+  const storedMWh = Math.max(0, Math.min(Number(outpost.power?.capacityMWh || 0), Number(outpost.power?.storedMWh || 0) + generatedMWh - requiredMWh));
+  const foodKg = Math.max(0, Number(outpost.stores?.foodKg || 0) - occupied * 0.02 * days);
+  const waterKg = Math.max(0, Number(outpost.stores?.waterKg || 0) - occupied * 6e-3 * days);
+  const condition = Math.max(0.12, Number(outpost.condition || 0) - days * (3e-5 + occupied * 2e-6));
+  const nextPowerCondition = Math.max(0.12, powerCondition - days * 18e-6);
+  const nextLifeSupportCondition = Math.max(0.12, lifeSupportCondition - days * 24e-6);
+  const operationsStatus = foodKg <= 0.01 || waterKg <= 0.01 || storedMWh <= 0.1 || condition < 0.3 || nextLifeSupportCondition < 0.3 ? "emergency" : condition < 0.55 || nextLifeSupportCondition < 0.55 ? "maintenance" : "operational";
+  const statusChanged = operationsStatus !== outpost.operationsStatus;
+  const log = statusChanged ? Object.freeze([...outpost.log || [], Object.freeze({
+    atMissionS: toS,
+    message: operationsStatus === "emergency" ? "The field station entered emergency conservation after its stores or systems fell below a safe operating margin." : operationsStatus === "maintenance" ? "The field station reported a maintenance watch as systems aged." : "The field station returned to normal operations."
+  })]) : outpost.log;
+  return Object.freeze({
+    ...outpost,
+    revision: Number(outpost.revision || 0) + 1,
+    operationsStatus,
+    condition,
+    power: Object.freeze({ ...outpost.power, storedMWh, condition: nextPowerCondition }),
+    lifeSupport: Object.freeze({ ...outpost.lifeSupport, condition: nextLifeSupportCondition }),
+    stores: Object.freeze({ ...outpost.stores, foodKg, waterKg }),
+    lastAdvancedMissionS: toS,
+    log
+  });
+}
+function advanceOutposts(expedition, missionS) {
+  const outposts = (expedition?.outposts || []).map((outpost) => advanceOutpostState(outpost, missionS));
+  if (!outposts.some((outpost, index) => outpost !== expedition.outposts[index])) return expedition?.outposts || Object.freeze([]);
+  return Object.freeze(outposts);
 }
 
 // app/js/expedition/failure-authority.js?v=3
@@ -1951,11 +2029,11 @@ function operationCycle(expedition) {
 }
 function operationKey(expedition, actionId) {
   if (actionId === "process-resource-sample") {
-    const sample = (expedition?.scienceSamples || []).find((entry) => entry.processed !== true);
+    const sample = (expedition?.scienceSamples || []).find((entry) => entry.processed !== true && !entry.consumed && !entry.exported && !sampleIsMounted(expedition, entry.id));
     return `${actionId}:${sample?.id || "none"}`;
   }
   if (actionId === "approve-processed-sample") {
-    const sample = (expedition?.scienceSamples || []).find((entry) => entry.processed === true && !entry.recoveryRequirement && entry.analysisApproved !== true && entry.exported !== true);
+    const sample = (expedition?.scienceSamples || []).find((entry) => entry.processed === true && !entry.recoveryRequirement && entry.analysisApproved !== true && entry.exported !== true && !entry.consumed && !sampleIsMounted(expedition, entry.id));
     return `${actionId}:${sample?.id || "none"}`;
   }
   return `${actionId}:${operationCycle(expedition)}`;
@@ -1974,7 +2052,7 @@ function actionAvailability(expedition, actionId) {
   const used = expedition?.operationFlags?.[operationKey(expedition, actionId)] === true;
   if (actionId === "load-backpack-materials") return Object.freeze({ enabled: true, reason: "Compatible material bundles transfer from the shared Backpack with exact mass." });
   if (actionId === "transfer-approved-sample") {
-    const sample = (expedition?.scienceSamples || []).find((entry) => entry.processed === true && entry.analysisApproved === true && !entry.recoveryRequirement && entry.exported !== true);
+    const sample = (expedition?.scienceSamples || []).find((entry) => entry.processed === true && entry.analysisApproved === true && !entry.recoveryRequirement && entry.exported !== true && !entry.consumed && !sampleIsMounted(expedition, entry.id));
     return Object.freeze({ enabled: !!sample, reason: sample ? "Transfers one conserved approved lot to the shared Backpack." : "Process and approve a science sample first." });
   }
   if (used) return Object.freeze({ enabled: false, reason: "Completed during this voyage segment." });
@@ -1994,11 +2072,11 @@ function actionAvailability(expedition, actionId) {
     "service-thermal-loop": 8
   }[actionId];
   if (maintenanceCost && Number(resources.maintenanceKg) < maintenanceCost) return Object.freeze({ enabled: false, reason: `Requires ${maintenanceCost} kg of maintenance parts.` });
-  if (actionId === "process-resource-sample" && !(expedition?.scienceSamples || []).some((sample) => sample.processed !== true)) {
+  if (actionId === "process-resource-sample" && !(expedition?.scienceSamples || []).some((sample) => sample.processed !== true && !sample.consumed && !sample.exported && !sampleIsMounted(expedition, sample.id))) {
     return Object.freeze({ enabled: false, reason: "Acquire and transfer a sample from a supported local operation first." });
   }
-  if (actionId === "approve-processed-sample" && !(expedition?.scienceSamples || []).some((sample) => sample.processed === true && !sample.recoveryRequirement && sample.analysisApproved !== true && sample.exported !== true)) {
-    const approved = (expedition?.scienceSamples || []).some((sample) => sample.processed === true && sample.analysisApproved === true && !sample.recoveryRequirement && sample.exported !== true);
+  if (actionId === "approve-processed-sample" && !(expedition?.scienceSamples || []).some((sample) => sample.processed === true && !sample.recoveryRequirement && sample.analysisApproved !== true && sample.exported !== true && !sample.consumed && !sampleIsMounted(expedition, sample.id))) {
+    const approved = (expedition?.scienceSamples || []).some((sample) => sample.processed === true && sample.analysisApproved === true && !sample.recoveryRequirement && sample.exported !== true && !sample.consumed && !sampleIsMounted(expedition, sample.id));
     return Object.freeze({
       enabled: false,
       reason: approved ? "The sealed sample is approved and ready for transfer from the Cargo Hold." : "No processed science sample is awaiting review."
@@ -2102,7 +2180,7 @@ function applyShipOperation(expedition, actionId) {
     kind = "science";
   } else if (actionId === "process-resource-sample") {
     const samples = clone5(expedition.scienceSamples || []);
-    const sample = samples.find((entry) => entry.processed !== true);
+    const sample = samples.find((entry) => entry.processed !== true && !entry.consumed && !entry.exported && !sampleIsMounted(expedition, entry.id));
     sample.processed = true;
     sample.processedAtMissionS = Number(expedition.strategicElapsedS) || 0;
     const recovery = sample.recoveryRequirement;
@@ -2136,7 +2214,7 @@ function applyShipOperation(expedition, actionId) {
     return Object.freeze({ expedition: next2, changed: true, message });
   } else if (actionId === "approve-processed-sample") {
     const samples = clone5(expedition.scienceSamples || []);
-    const sample = samples.find((entry) => entry.processed === true && !entry.recoveryRequirement && entry.analysisApproved !== true && entry.exported !== true);
+    const sample = samples.find((entry) => entry.processed === true && !entry.recoveryRequirement && entry.analysisApproved !== true && entry.exported !== true && !entry.consumed && !sampleIsMounted(expedition, entry.id));
     sample.analysisApproved = true;
     sample.analysisApprovedAtMissionS = Number(expedition.strategicElapsedS) || 0;
     sample.tradeClassification = "approved-game-world-research-sample";
@@ -2581,6 +2659,7 @@ var COMMAND_TYPES = Object.freeze([
   "advance",
   "event-response",
   "ship-operation",
+  "research",
   "outpost-plan",
   "outpost-build",
   "outpost-service",
@@ -2596,6 +2675,9 @@ function normalizeExpeditionCommand(input = {}) {
   if (!COMMAND_TYPES.includes(type)) throw new Error("invalid_expedition_command");
   return Object.freeze({
     type,
+    benchId: cleanText(input.benchId, 80),
+    researchAction: cleanText(input.researchAction, 40),
+    sampleId: cleanText(input.sampleId, 220),
     choiceId: cleanText(input.choiceId, 120),
     operationId: cleanText(input.operationId, 120),
     contactId: cleanText(input.contactId, 180),
@@ -2641,6 +2723,8 @@ function executeExpeditionCommand(expedition, input = {}, options = {}) {
     result = { expedition: advanceToNextMilestone(expedition), message: "The next voyage chapter is ready." };
   } else if (command.type === "event-response") {
     result = { expedition: resolveExpeditionEvent(expedition, command.choiceId), message: "The crew completed the response." };
+  } else if (command.type === "research") {
+    result = applyResearchCommand(expedition, command);
   } else if (command.type === "ship-operation") {
     result = applyShipOperation(expedition, command.operationId);
   } else if (command.type === "outpost-plan") {

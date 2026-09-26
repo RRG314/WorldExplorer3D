@@ -58,11 +58,11 @@ function contextSetForCell(cell, options) {
   const contexts = new Set();
   const point = cell.center;
   const radiusSq = Math.pow(options.cellSize * 0.8, 2);
-  const nearbyBuildings = options.buildings.filter((feature) => distanceSquared(featureCenter(feature), point) <= radiusSq);
-  const nearbyRoads = options.roads.filter((feature) => distanceSquared(featureCenter(feature), point) <= radiusSq);
+  const nearbyBuildings = options.buildings.filter((feature) => distanceSquared(options.centerOf(feature), point) <= radiusSq);
+  const nearbyRoads = options.roads.filter((feature) => distanceSquared(options.centerOf(feature), point) <= radiusSq);
   const containingLand = options.landuses.filter((feature) => containsPoint(feature, point, options.pointInPolygon));
   const containingWater = options.waterAreas.filter((feature) => containsPoint(feature, point, options.pointInPolygon));
-  const nearbyWaterways = options.waterways.filter((feature) => distanceSquared(featureCenter(feature), point) <= radiusSq);
+  const nearbyWaterways = options.waterways.filter((feature) => distanceSquared(options.centerOf(feature), point) <= radiusSq);
   const tags = containingLand.map(textTags).join(' ');
   const waterTags = [...containingWater, ...nearbyWaterways].map(textTags).join(' ');
 
@@ -99,7 +99,16 @@ function compileEnvironmentContext(options = {}) {
   if (worldIdentity?.type !== 'WorldIdentity') throw new TypeError('Environment context requires a WorldIdentity.');
   const cellSize = Math.max(80, Number(options.cellSize) || 160);
   const gridRadius = Math.max(1, Math.min(4, Math.floor(Number(options.gridRadius) || 2)));
+  // A compile visits many cells over the same immutable source features.
+  // Reuse each centre within this compile instead of walking every polygon
+  // again for every cell. The cache dies with the compilation.
+  const centers = new WeakMap();
+  const centerOf = feature => {
+    if (!centers.has(feature)) centers.set(feature, featureCenter(feature));
+    return centers.get(feature);
+  };
   const runtime = {
+    centerOf,
     cellSize,
     latitude: Number(worldIdentity.location?.lat || 0),
     buildings: Array.isArray(options.buildings) ? options.buildings : [],

@@ -1,3 +1,4 @@
+import {batchStaticVesselParts} from './batch-static-vessel-parts.js';
 import { transportDamagePresentation } from './damage-model.js?v=1';
 
 const COLORS = Object.freeze({
@@ -385,6 +386,7 @@ function createVesselVisual(THREE, entry, options = {}) {
     smoke.userData.smokeIndex = index;
     root.add(smoke);
   }
+  root.userData.staticPartBatching = batchStaticVesselParts(THREE, root);
   root.name = entry.label;
   root.userData.transportCatalogId = entry.id;
   root.userData.transportDomain = 'maritime';

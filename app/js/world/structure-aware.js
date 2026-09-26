@@ -1,3 +1,8 @@
+import {createFeatureProjectionIndex} from '../terrain/feature-projection-index.js';
+import {assignOrdinaryStreetJunctions} from './compiler/ordinary-street-profile.js';
+import {roadMetersPerWorldUnit} from './road-units.js';
+import { streetScaleForWorld } from './compiler/street-frontage-policy.js';
+import { createStreetFrontageGrading } from '../terrain/street-frontage-grading.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   assignFeatureConnections,
@@ -78,10 +83,20 @@ function publishAtGradeTerrainCorridors(roads = []) {
   // Retain only references to the canonical road objects. Per-road wrapper
   // records and a second feature map duplicated an entire metropolitan road
   // set without adding authority or query value.
+  appCtx.streetFrontageGrading?.dispose?.();
+  appCtx.streetFrontageGrading = createStreetFrontageGrading(appCtx.buildings || [], streetScaleForWorld(appCtx), roads);
+  appCtx.structureTerrainProjectionIndex?.dispose?.();
+  appCtx.structureTerrainProjectionIndex=createFeatureProjectionIndex();
   appCtx.structureTerrainCuts = indexedFeatures;
   appCtx.structureTerrainCutByFeature = null;
   appCtx.structureTerrainCutIndex = createDriveableRoadConflictIndex(indexedFeatures, {
-    cellSize: 72
+    cellSize: 72,
+    // Grading includes the shoulder outside the collision footprint. Omitting
+    // it from a spatial bucket made a continuous shoulder stop at cell edges.
+    paddingForRoad: road => {
+      const width = Math.max(Number(road.width) || 5, Number(road.resolvedCrossSection?.sourceWidthMeters)/roadMetersPerWorldUnit(road) || 0);
+      return width * .5 + 44 / streetScaleForWorld(appCtx) + Math.max(3.5, Math.min(8, width * .65));
+    }
   });
   appCtx.transportTerrainCorridorPublication = Object.freeze({
     authority: 'compiled_transport_surface',
@@ -378,6 +393,7 @@ function* compileStructureAwareFeatureProfileSteps() {
   // Connection anchors must read surfaces compiled from the current graph and
   // stack ranks. Reusing the pre-refresh models makes a merge target sample a
   // stale deck height and leaves visible steps or open-air ramp ends.
+  measure('ordinaryStreetJunctions',()=>assignOrdinaryStreetJunctions(transportFeatures,appCtx.transportNetworkModel,worldBaseTerrainY));
   measure('buildInitialProfiles', () => {
     for (let i = 0; i < transportFeatures.length; i++) {
       const feature = transportFeatures[i];

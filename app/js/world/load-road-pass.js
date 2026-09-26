@@ -1,3 +1,6 @@
+import {publishedRoadSourceTopology} from './road-source-topology.js';
+import {roadDimensionsFromSource} from './road-units.js';
+import {streetScaleForWorld} from './compiler/street-frontage-policy.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { updateFeatureSurfaceProfile } from "../structure-semantics.js?v=63";
 // Installs the final-publication guardrail owner. Guardrails are compiled once
@@ -17,18 +20,15 @@ export async function buildRoadGeometryPass(options = {}) {
   const geometryGuards = options.geometryGuards || {};
   const tileBudgetCfg = options.tileBudgetCfg || {};
   const loadMetrics = options.loadMetrics || {};
-  const perfModeNow = options.perfModeNow || 'rdt';
-  const useRdtBudgeting = options.useRdtBudgeting === true;
+  const perfModeNow = 'baseline';
   const startLoadPhase = typeof options.startLoadPhase === 'function' ? options.startLoadPhase : () => {};
   const endLoadPhase = typeof options.endLoadPhase === 'function' ? options.endLoadPhase : () => {};
   const showLoad = typeof options.showLoad === 'function' ? options.showLoad : () => {};
   const classifyStructureSemantics = options.classifyStructureSemantics;
   const cloneStructureSemantics = options.cloneStructureSemantics;
   const sanitizeWorldPathPoints = options.sanitizeWorldPathPoints;
-  const decimateRoadCenterlineByDepth = options.decimateRoadCenterlineByDepth;
   const wayCenterLatLon = options.wayCenterLatLon;
   const featureTileKeyForLatLon = options.featureTileKeyForLatLon;
-  const rdtDepthForFeatureTile = options.rdtDepthForFeatureTile;
   const getRoadSubdivisionStep = options.getRoadSubdivisionStep;
   const polylineBounds = options.polylineBounds;
   const worldBaseTerrainY = options.worldBaseTerrainY;
@@ -98,12 +98,13 @@ export async function buildRoadGeometryPass(options = {}) {
         ? 'shortbread-v1'
         : 'osm-overpass'
     }, way.tags || {});
-    const width = transportRecord.crossSection.widthMeters;
+    const dimensions = roadDimensionsFromSource(transportRecord,streetScaleForWorld(appCtx));
+    const {width} = dimensions;
     const limit = type.includes('motorway') ? 65 : type.includes('trunk') ? 55 : type.includes('primary') ? 40 : type.includes('secondary') ? 35 : 25;
     const name = way.tags?.name || type.charAt(0).toUpperCase() + type.slice(1);
     const centerLatLon = wayCenterLatLon(way, nodes);
     const roadTileKey = centerLatLon ? featureTileKeyForLatLon(centerLatLon.lat, centerLatLon.lon, tileBudgetCfg.tileDegrees) : null;
-    const roadTileDepth = useRdtBudgeting && roadTileKey ? rdtDepthForFeatureTile(roadTileKey, tileBudgetCfg.tileDegrees) : 0;
+    const roadTileDepth = 0;
     const fixedRegionalRoad = way.tags?._regionalContext === 'fixed-location';
     const roadSubdivideStepBase = fixedRegionalRoad
       ? Math.max(20, getRoadSubdivisionStep(type, roadTileDepth, perfModeNow))
@@ -118,23 +119,20 @@ export async function buildRoadGeometryPass(options = {}) {
         : structureSemantics?.rampCandidate
           ? Math.min(roadSubdivideStepBase, regionalRampStep)
           : roadSubdivideStepBase;
-    const decimatedRoadPts = decimateRoadCenterlineByDepth(pts, type, roadTileDepth, perfModeNow);
-    if (decimatedRoadPts.length < 2) continue;
+    // Source topology is retained; rendering may subdivide without deleting graph nodes.
+    const sourceRoadPts = pts;
+    if (sourceRoadPts.length < 2) continue;
 
+    const sourceTopologyNodes = publishedRoadSourceTopology(rawNodeRecords, rawPts, sourceRoadPts);
     const roadFeature = {
-      pts: decimatedRoadPts,
-      width,
+      pts: sourceRoadPts,
+      ...dimensions,
       limit,
       name,
       sourceFeatureId: transportRecord.identity,
-      sourceNodeIds: Object.freeze((way.nodes || []).map(String)),
-      sourceTopologyNodes: Object.freeze(rawNodeRecords.map((entry, index) =>
-        Object.freeze({
-          id: entry.id,
-          x: rawPts[index].x,
-          z: rawPts[index].z
-        })
-      )),
+      originalSourceNodeIds: Object.freeze((way.nodes || []).map(String)),
+      sourceNodeIds: Object.freeze(sourceTopologyNodes.map(node => node.id)),
+      sourceTopologyNodes,
       transportRecord,
       type,
       surfaceTag: String(way.tags?.surface || '').toLowerCase(),
@@ -150,12 +148,12 @@ export async function buildRoadGeometryPass(options = {}) {
       surfaceBias: ROAD_SURFACE_BIAS,
       lodDepth: roadTileDepth,
       subdivideMaxDist: roadSubdivideStep,
-      bounds: polylineBounds(decimatedRoadPts, width * 0.5 + 18)
+      bounds: polylineBounds(sourceRoadPts, width * 0.5 + 18)
     };
     appCtx.roads.push(roadFeature);
     updateFeatureSurfaceProfile(roadFeature, worldBaseTerrainY, { surfaceBias: ROAD_SURFACE_BIAS });
     loadMetrics.roads.sourcePoints += pts.length;
-    loadMetrics.roads.decimatedPoints += decimatedRoadPts.length;
+    loadMetrics.roads.decimatedPoints += sourceRoadPts.length;
     } finally {
       if ((roadIndex + 1) % yieldEveryRoads === 0 && roadIndex + 1 < roadWays.length) {
         yieldCount += 1;

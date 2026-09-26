@@ -1,8 +1,13 @@
+import { softwareCompositorArgs } from './software-compositor.mjs';
+import { selectLowRenderQuality } from './render-quality-ui.mjs';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { advanceGameplay } from './gameplay-simulation.mjs';
 
 const root = process.cwd();
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
@@ -10,11 +15,15 @@ const servedRoot = requestedRoot ? path.resolve(root, requestedRoot) : root;
 const outputDir = path.join('/tmp', 'worldexplorer3d-verification', 'player-reported-blockers');
 const server = await startStaticServer({ rootDir: servedRoot, ports: [4411, 4412, 4413] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: softwareCompositorArgs() });
+const softwareCi = !!process.env.CI && process.platform === 'linux';
+const verificationProfile = { scope: 'functional-controls-and-layout', quality: softwareCi ? 'low via Settings' : 'default', deviceScaleFactor: softwareCi ? 1 : 3, physicalPerformanceAccepted: false };
+const touchTimings = [];
 const browserErrors = [];
 const localFailures = [];
 
 function observe(page) {
+  collectBrowserGraphicsErrors(page, browserErrors);
   page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   page.on('response', (response) => {
     if (response.url().startsWith(baseUrl) && response.status() >= 400) {
@@ -112,7 +121,20 @@ async function touchHold(page, cdp, selector, deltaX, deltaY, holdMs = 1_050) {
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point(start)] });
   await page.waitForTimeout(70);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [point(end)] });
-  await page.waitForTimeout(holdMs);
+  // Ocean owns a separate RAF loop; the earth kernel is deliberately suspended.
+  const simulationStartedAt = Date.now();
+  const simulation = before?.activeActor?.mode === 'ocean'
+    ? await (async () => {
+      const started = Date.now();
+      await page.waitForFunction((position) => {
+        const actor = globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor;
+        return actor?.mode === 'ocean' && Math.hypot(actor.position.x - position.x, actor.position.z - position.z) > 0.8;
+      }, before.activeActor.position, { timeout: 15000, polling: 100 });
+      return { timing: 'dedicated-ocean-wall-clock', elapsedMs: Date.now() - started };
+    })()
+    : await advanceGameplay(page, holdMs);
+  touchTimings.push({ selector, mode: before?.activeActor?.mode, holdMs, wallElapsedMs: Date.now() - simulationStartedAt, simulation });
+  await writeFile(path.join(outputDir, 'input-timing.json'), JSON.stringify({ verificationProfile, touchTimings }, null, 2));
   const held = await page.evaluate(() => ({
     diagnostics: globalThis.getWorldExplorerRuntimeDiagnostics?.(),
     hud: {
@@ -125,7 +147,7 @@ async function touchHold(page, cdp, selector, deltaX, deltaY, holdMs = 1_050) {
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await page.waitForTimeout(120);
   const after = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.());
-  return { before, held, after, holdMs };
+  return { before, held, after, holdMs, simulation };
 }
 
 let desktopContext;
@@ -135,6 +157,7 @@ try {
 
   desktopContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const desktop = await desktopContext.newPage();
+  await configureStagingAppCheck(desktop, baseUrl);
   observe(desktop);
   await desktop.goto(`${baseUrl}/app/`, { waitUntil: 'load', timeout: 120_000 });
   await waitForRuntime(desktop);
@@ -163,14 +186,17 @@ try {
 
   mobileContext = await browser.newContext({
     ...devices['iPhone 13'],
-    viewport: { width: 390, height: 844 }
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: verificationProfile.deviceScaleFactor
   });
   const mobile = await mobileContext.newPage();
+  await configureStagingAppCheck(mobile, baseUrl);
   const cdp = await mobileContext.newCDPSession(mobile);
   observe(mobile);
   await mobile.goto(`${baseUrl}/app/`, { waitUntil: 'load', timeout: 120_000 });
   await waitForRuntime(mobile);
   await selectBaltimore(mobile);
+  if (softwareCi) await selectLowRenderQuality(mobile);
 
   await mobile.locator('#globeSelectorStartBtn').click();
   await mobile.waitForSelector('#loading.show', { timeout: 30_000 });
@@ -199,7 +225,7 @@ try {
   const rightMove = await touchHold(mobile, cdp, '#mobileMovePad', 48, 0, 1_050);
   const leftMove = await touchHold(mobile, cdp, '#mobileMovePad', -48, 0, 1_050);
   const forwardMove = await touchHold(mobile, cdp, '#mobileMovePad', 0, -52, 1_050);
-  await mobile.screenshot({ path: path.join(outputDir, 'walking-controls-mobile.png'), fullPage: true });
+  await mobile.screenshot({ path: path.join(outputDir, 'walking-controls-mobile.png'), fullPage: false });
 
   const promptSelector = '#urbanVehiclePrompt.show, #discoveryContextPrompt.show, #interiorPrompt.show, #boatPrompt.show';
   let promptAppeared = false;
@@ -234,7 +260,7 @@ try {
       prompts
     };
   }, promptAppeared);
-  await mobile.screenshot({ path: path.join(outputDir, 'bottom-menu-mobile.png'), fullPage: true });
+  await mobile.screenshot({ path: path.join(outputDir, 'bottom-menu-mobile.png'), fullPage: false });
 
   await switchTravelMode(mobile, '#fDriving', 'drive', 'mode-driving');
   const driveMove = await touchHold(mobile, cdp, '#mobileMovePad', 0, -52, 1_350);
@@ -242,19 +268,22 @@ try {
   const droneMove = await touchHold(mobile, cdp, '#mobileMovePad', 0, -52, 1_200);
   await switchTravelMode(mobile, '#fPlane', 'plane', 'mode-plane');
   const planeMove = await touchHold(mobile, cdp, '#mobileMovePad', 0, -52, 1_200);
-  await mobile.screenshot({ path: path.join(outputDir, 'plane-speed-mobile.png'), fullPage: true });
+  await mobile.screenshot({ path: path.join(outputDir, 'plane-speed-mobile.png'), fullPage: false });
 
   await mobileContext.close();
   mobileContext = await browser.newContext({
     ...devices['iPhone 13'],
-    viewport: { width: 390, height: 844 }
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: verificationProfile.deviceScaleFactor
   });
   const oceanMobile = await mobileContext.newPage();
+  await configureStagingAppCheck(oceanMobile, baseUrl);
   const oceanCdp = await mobileContext.newCDPSession(oceanMobile);
   observe(oceanMobile);
   await oceanMobile.goto(`${baseUrl}/app/`, { waitUntil: 'load', timeout: 120_000 });
   await waitForRuntime(oceanMobile);
   await selectBaltimore(oceanMobile);
+  if (softwareCi) await selectLowRenderQuality(oceanMobile);
   await oceanMobile.locator('#globeSelectorOceanBtn').click();
   await oceanMobile.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.mode === 'ocean', null, { timeout: 120_000 });
   await waitForInteractiveWorld(oceanMobile);
@@ -287,7 +316,7 @@ try {
     throw new Error(`Ocean mobile controls did not become visible: ${JSON.stringify(oceanUiState)}`, { cause: error });
   }
   const oceanMove = await touchHold(oceanMobile, oceanCdp, '#mobileMovePad', 0, -52, 1_250);
-  await oceanMobile.screenshot({ path: path.join(outputDir, 'ocean-speed-mobile.png'), fullPage: true });
+  await oceanMobile.screenshot({ path: path.join(outputDir, 'ocean-speed-mobile.png'), fullPage: false });
 
   const rightProjection = screenRightProjection(rightMove.before, rightMove.held.diagnostics);
   const leftProjection = screenRightProjection(leftMove.before, leftMove.held.diagnostics);
@@ -313,7 +342,8 @@ try {
     planeSpeedUsesKnots: planeMove.held.hud.unit === 'KTS' && planeMove.held.hud.secondaryLabel === 'ALT' &&
       planeMove.held.hud.speed > 0 && planeMove.held.hud.speed < 500,
     oceanSpeedUsesKnots: oceanMove.held.hud.unit === 'KTS' && oceanMove.held.hud.secondaryLabel === 'DEPTH' &&
-      /m$/.test(oceanMove.held.hud.secondary) && oceanMove.held.hud.speed > 0 && oceanMove.held.hud.speed < 100,
+      /m$/.test(oceanMove.held.hud.secondary) && oceanMove.held.hud.speed > 0 && oceanMove.held.hud.speed < 100 &&
+      horizontalDistance(oceanMove.before.activeActor?.position, oceanMove.held.diagnostics?.activeActor?.position) > 0.8,
     bottomMenuOwnsHudArea: menuOwnership.menuOpen && menuOwnership.prompts.every((prompt) =>
       prompt.display === 'none' && prompt.overlap === false
     ),
@@ -321,6 +351,9 @@ try {
     noFailedLocalResources: localFailures.length === 0
   };
   const report = {
+    verificationProfile, touchTimings,
+    timing: 'earth-fixed-step-and-ocean-live-raf',
+    simulationReceipts: [rightMove, leftMove, forwardMove, driveMove, droneMove, planeMove, oceanMove].map(move => move.simulation),
     ok: Object.values(checks).every(Boolean),
     contract: 'player-reported-release-blockers-v1',
     checks,
@@ -343,6 +376,7 @@ try {
     browserErrors,
     localFailures
   };
+  await writeFile(path.join(outputDir, 'report.json'), JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
   assert.equal(report.ok, true, 'One or more player-reported release blockers remain.');
 } finally {

@@ -1,3 +1,6 @@
+import { fetchPolarElevationTile, isPolarElevationTile, mergePolarElevation, polarSourceAt } from './polar-elevation-source.js';
+import {setTerrainWorldGrid} from './world-grid.js';
+import { markGroundSurfaceChanged } from './surface-revision.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   decodeTerrariumRGB,
@@ -63,6 +66,7 @@ function touchTerrainTile(tile) {
 
 function failTerrainTileAttempt(tile, reason) {
   if (!tile || tile.evicted || tile.failed) return;
+  tile.polarAbort?.abort();
   tile.loaded = false;
   tile.loading = false;
   tile.failed = true;
@@ -92,8 +96,16 @@ function startTerrainTileAttempt(tile, z, x, y, deps) {
   tile.failed = false;
   tile.lastError = "";
   img.crossOrigin = "anonymous";
+  tile.polarAbort?.abort();
+  tile.polarAbort = new AbortController();
+  const selectedTile = latLonToTileXY(Number(appCtx.LOC?.lat || 0), Number(appCtx.LOC?.lon || 0), z);
+  const polarRequest = fetchPolarElevationTile(z, x, y, {
+    signal: tile.polarAbort.signal,
+    priority: Math.hypot(x - selectedTile.x, y - selectedTile.y) + Math.max(0, 15 - z) * 100,
+    onError: error => { tile.polarError = error; }
+  });
 
-  img.onload = () => {
+  img.onload = async () => {
     if (tile.evicted || tile.attempts !== attempt) {
       resolveReady(false);
       return;
@@ -111,6 +123,11 @@ function startTerrainTileAttempt(tile, z, x, y, deps) {
         elev[i] = decodeTerrariumRGB(data[p], data[p + 1], data[p + 2]);
       }
 
+      const polar = await polarRequest;
+      if (tile.evicted || tile.failed || tile.attempts !== attempt) { resolveReady(false); return; }
+      const merged = mergePolarElevation(elev, polar);
+      tile.polarMask = merged?.mask || null;
+      tile.polarSampleCount = merged?.count || 0;
       tile.loaded = true;
       tile.loading = false;
       tile.failed = false;
@@ -251,6 +268,7 @@ function releaseTerrainTile(tile) {
     tile.img.onerror = null;
     tile.img.src = '';
   }
+  tile.polarAbort?.abort();
   tile.img = null;
   tile.elev = null;
   tile.ready = null;
@@ -299,7 +317,7 @@ function waitForTerrainTileReady(z, x, y, deadline, deps, options = {}) {
     getOrLoadTerrainTile, failTerrainTileAttempt, terrainNow,
     cancelTile: (tileZ, tileX, tileY) => cancelTileRequest(appCtx.terrainTileCache, tileZ, tileX, tileY),
     maxAttempts: TERRAIN_TILE_MAX_ATTEMPTS,
-    attemptTimeoutMs: TERRAIN_TILE_ATTEMPT_TIMEOUT_MS
+    attemptTimeoutMs: isPolarElevationTile(z, x, y) ? 11000 : TERRAIN_TILE_ATTEMPT_TIMEOUT_MS
   });
 }
 
@@ -423,6 +441,7 @@ export function terrainSourceSampleAtLatLon(lat, lon, deps = {}) {
     longitude: lon,
     zoom: appCtx.TERRAIN_ZOOM,
     tile,
+    sourceFacts: polarSourceAt(tile, tilePoint.xf - tilePoint.x, tilePoint.yf - tilePoint.y) || undefined,
     clampElevationMeters: deps.clampElevationMeters
   });
 }
@@ -441,6 +460,7 @@ export function peekTerrainSourceSampleAtLatLon(lat, lon, deps = {}) {
     longitude: lon,
     zoom: appCtx.TERRAIN_ZOOM,
     tile: peekTerrainTile(appCtx.TERRAIN_ZOOM, tilePoint.x, tilePoint.y),
+    sourceFacts: polarSourceAt(peekTerrainTile(appCtx.TERRAIN_ZOOM, tilePoint.x, tilePoint.y), tilePoint.xf - tilePoint.x, tilePoint.yf - tilePoint.y) || undefined,
     clampElevationMeters: deps.clampElevationMeters
   });
 }
@@ -468,18 +488,17 @@ export function buildTerrainTileMesh(z, tx, ty, deps = {}) {
   const pNW = appCtx.geoToWorld(bounds.latN, bounds.lonW);
   const pNE = appCtx.geoToWorld(bounds.latN, bounds.lonE);
   const pSW = appCtx.geoToWorld(bounds.latS, bounds.lonW);
-  const pCenter = appCtx.geoToWorld((bounds.latN + bounds.latS) * 0.5, (bounds.lonW + bounds.lonE) * 0.5);
 
   const width = Math.hypot(pNE.x - pNW.x, pNE.z - pNW.z);
   const depth = Math.hypot(pSW.x - pNW.x, pSW.z - pNW.z);
 
-  const cx = pCenter.x;
-  const cz = pCenter.z;
-
   const geo = new THREE.PlaneGeometry(width, depth, appCtx.TERRAIN_SEGMENTS, appCtx.TERRAIN_SEGMENTS);
   geo.rotateX(-Math.PI / 2);
+  setTerrainWorldGrid(geo.attributes.position, appCtx.TERRAIN_SEGMENTS, pNW, pNE, pSW);
 
-  const repeats = Math.max(10, Math.round(width / 25));
+  // Keep blades/soil detail at pedestrian scale, not a 25-unit carpet.
+  // The same UV transform feeds diffuse, normal and roughness maps.
+  const repeats = Math.max(1, width / 6);
   const mat = new THREE.MeshStandardMaterial({
     color: typeof appCtx.grassDiffuse !== "undefined" && appCtx.grassDiffuse ? 0xffffff : TERRAIN_GRASS_COLOR_HEX,
     roughness: 0.95,
@@ -496,10 +515,12 @@ export function buildTerrainTileMesh(z, tx, ty, deps = {}) {
 
   const mesh = new THREE.Mesh(geo, mat);
   mesh.renderOrder = 0;
-  mesh.position.set(cx, 0, cz);
+  mesh.position.set(0, 0, 0);
   mesh.receiveShadow = true;
   mesh.castShadow = false;
-  mesh.frustumCulled = false;
+  // Height publication, seam stitching and reprojection invalidate the bounds;
+  // Three rebuilds the sphere from the current vertices before culling.
+  mesh.frustumCulled = true;
   mesh.userData = { terrainTile: { z, tx, ty, bounds } };
   mesh.userData.terrainTileKey = terrainTileMeshKey(z, tx, ty);
   mesh.userData.isTerrainMesh = true;
@@ -524,6 +545,31 @@ export function buildTerrainTileMesh(z, tx, ty, deps = {}) {
 }
 
 export function applyHeightsToTerrainMesh(mesh, deps = {}, options = {}) {
+  // Initial tile construction remains synchronous. Both drivers consume the
+  // same calculation and publication code, so scheduling cannot change heights.
+  for (const _ of terrainHeightSteps(mesh, deps, options)) void _;
+}
+
+export async function applyHeightsToTerrainMeshCooperatively(mesh, deps = {}, options = {}) {
+  const steps=terrainHeightSteps(mesh,deps,options);
+  const yieldControl=options.yieldControl || (()=>new Promise(resolve=>setTimeout(resolve,0)));
+  const budget=Math.max(0,Number(options.sliceBudgetMs ?? 8));
+  let started=performance.now(),maximumChunkMs=0,yields=0;
+  try {
+    for (;;) {
+      if(options.isCurrent?.()===false)return false;
+      const next=steps.next();
+      const elapsed=performance.now()-started;maximumChunkMs=Math.max(maximumChunkMs,elapsed);
+      if(next.done){
+        if(next.value===true)mesh.userData.heightCompilationScheduling={yields,maximumChunkMs,sliceBudgetMs:budget};
+        return next.value===true;
+      }
+      if(elapsed>=budget){yields++;await yieldControl();started=performance.now();}
+    }
+  } finally {steps.return();}
+}
+
+function* terrainHeightSteps(mesh, deps = {}, options = {}) {
   const info = mesh.userData?.terrainTile;
   if (!info) return;
 
@@ -611,8 +657,8 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}, options = {}) {
         mesh.userData.renderProvenance = {
           version: 1,
           profile: 'worldwide-terrain-fallback',
-          provider: 'mapzen-terrarium',
-          dataset: 'Mapzen Terrain Tiles',
+          provider: tile.polarSampleCount ? 'pgc-rema-orthometric-with-mapzen-voids' : 'mapzen-terrarium',
+          dataset: tile.polarSampleCount ? 'REMA orthometric surface with Mapzen void fallback' : 'Mapzen Terrain Tiles',
           release: '',
           verticalDatum: 'mixed-source',
           tileKey: mesh.userData.terrainTileKey,
@@ -670,6 +716,9 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}, options = {}) {
     elevations.push(y);
     minElevation = Math.min(minElevation, y);
     maxElevation = Math.max(maxElevation, y);
+    // Heights are staged in elevations; yielding does not expose a partly
+    // rewritten tile or move its origin underneath existing contact queries.
+    if((i+1)%128===0)yield;
   }
 
   mesh.position.y = minElevation - 10;
@@ -679,6 +728,8 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}, options = {}) {
 
   pos.needsUpdate = true;
   mesh.geometry.computeVertexNormals();
+  mesh.geometry.boundingBox = null;
+  mesh.geometry.boundingSphere = null;
   stitchTerrainMeshEdges(appCtx, mesh);
   mesh.userData.pendingTerrainTile = false;
   mesh.userData.baseTerrainWorldY = nextBaseElevations;
@@ -686,6 +737,7 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}, options = {}) {
   mesh.userData.transportCorridorAdjustedVertices = transportCorridorAdjustedVertices;
   mesh.userData.groundUnavailableReason = null;
   mesh.visible = true;
+  markGroundSurfaceChanged(appCtx);
 
   const unitsPerMeter = (appCtx.WORLD_UNITS_PER_METER || 1) * (appCtx.TERRAIN_Y_EXAGGERATION || 1);
   const minMeters = Number.isFinite(minElevation) && unitsPerMeter > 0 ? minElevation / unitsPerMeter : 0;
@@ -706,6 +758,7 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}, options = {}) {
   if (options.refreshVisualProfile !== false) {
     applyTerrainVisualProfile(mesh, classifyTerrainVisualProfile(bounds, minMeters, maxMeters, elevationStats));
   }
+  return true;
 }
 
 export {

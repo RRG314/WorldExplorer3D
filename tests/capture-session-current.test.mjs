@@ -16,5 +16,8 @@ test('phone links identify only the capture and reject localhost, insecure and m
 test('uploaded and local photo IDs merge without duplicate counts; submitted captures are read-only', () => {
   assert.deepEqual(mergedCapturePhotos([{ id: 'a', sector: 1 }], [{ id: 'a', sector: 1 }, { id: 'b', sector: 2 }]), [{ id: 'a', sector: 1 }, { id: 'b', sector: 2 }]);
   assert.equal(captureIsEditable({ status: 'draft' }), true);
+  assert.equal(captureIsEditable({ status: 'uploaded' }), true);
+  assert.equal(captureIsEditable({ status: 'uploaded',hybridSubmission:{revision:1} }), false);
+  assert.equal(captureIsEditable({ status: 'uploaded',queuedAt:1 }), false);
   for (const status of ['queued', 'approved', 'processing', 'processing_failed']) assert.equal(captureIsEditable({ status }), false);
 });

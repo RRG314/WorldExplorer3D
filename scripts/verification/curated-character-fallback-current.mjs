@@ -1,3 +1,4 @@
+import { waitForAsyncCondition } from './async-browser-condition.mjs';
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 
@@ -116,7 +117,7 @@ try {
   await page.waitForFunction(() => document.querySelector('.expeditionSummary .is-ready')?.textContent?.includes('READY'));
   await page.locator('#expeditionEnterShip').click();
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').expeditionShipInterior?.active === true);
-  await page.waitForFunction(async () => {
+  await waitForAsyncCondition(page, async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     const layer = ctx.scene?.getObjectByName?.('solis-reach-crew-layer');
     return layer?.children?.length === 7 && layer.children.every((root) => root.userData.curatedCharacterLoadStarted === false);

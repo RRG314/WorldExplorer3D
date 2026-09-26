@@ -25,6 +25,9 @@ function systemSnapshot(record) {
     fixedUpdates: record.fixedUpdates,
     failures: record.failures,
     lastDurationMs: Number(record.lastDurationMs.toFixed(3)),
+    maxDurationMs: Number(record.maxDurationMs.toFixed(3)),
+    slowUpdates: record.slowUpdates,
+    lastSlowFrame: record.lastSlowFrame,
     lastError: record.lastError
   };
 }
@@ -47,6 +50,7 @@ function createRuntimeKernel(options = {}) {
   let running = false;
   let disposed = false;
   let frameHandle = null;
+  let manualSession = false;
   let previousTimestamp = null;
   let accumulator = 0;
   let frameNumber = 0;
@@ -88,6 +92,9 @@ function createRuntimeKernel(options = {}) {
       fixedUpdates: 0,
       failures: 0,
       lastDurationMs: 0,
+      maxDurationMs: 0,
+      slowUpdates: 0,
+      lastSlowFrame: null,
       lastError: ''
     };
     systems.set(id, record);
@@ -130,6 +137,8 @@ function createRuntimeKernel(options = {}) {
       if (method === 'fixedUpdate') record.fixedUpdates++;
       else record.updates++;
       record.lastDurationMs = Math.max(0, now() - startedAt);
+      record.maxDurationMs = Math.max(record.maxDurationMs,record.lastDurationMs);
+      if(record.lastDurationMs>16.7){record.slowUpdates++;record.lastSlowFrame=frameNumber;}
     } catch (error) {
       record.failures++;
       record.lastError = error instanceof Error ? error.message : String(error);
@@ -171,6 +180,7 @@ function createRuntimeKernel(options = {}) {
       ...sharedContext,
       timestamp: currentTimestamp,
       dt,
+      rawDelta,
       fixedDelta,
       frameNumber,
       flags: Object.create(null),
@@ -197,10 +207,16 @@ function createRuntimeKernel(options = {}) {
   }
 
   function advanceBy(milliseconds = 0, suppliedContext = {}) {
+    if (manualSession) throw new Error('Manual simulation is already active.');
+    return advanceFrames(milliseconds, suppliedContext);
+  }
+
+  function advanceFrames(milliseconds = 0, suppliedContext = {}) {
     if (disposed) throw new Error('Runtime kernel is disposed.');
     const requestedMs = Math.max(0, finiteNumber(milliseconds, 0));
     if (requestedMs === 0) {
-      return Object.freeze({ requestedMs, simulatedMs: 0, frames: 0, suspendedFrames: 0 });
+      return Object.freeze({ requestedMs, simulatedMs: 0, frames: 0, suspendedFrames: 0,
+        renderMode: suppliedContext.renderIntermediateFrames === false ? 'last-step' : 'each-step' });
     }
 
     const wasRunning = running;
@@ -219,7 +235,9 @@ function createRuntimeKernel(options = {}) {
       const ran = executeFrame(
         startTimestamp + simulatedMs,
         stepMs / 1000,
-        { ...suppliedContext, manualAdvance: true }
+        { ...suppliedContext, manualAdvance: true,
+          manualRender: suppliedContext.renderIntermediateFrames !== false ||
+            (simulatedMs >= requestedMs - 1e-7 && suppliedContext.renderFinalFrame !== false) }
       );
       frames += 1;
       if (!ran) manualSuspendedFrames += 1;
@@ -227,18 +245,48 @@ function createRuntimeKernel(options = {}) {
 
     // Manual stepping ends at the current real clock so the next browser frame
     // cannot count the simulated duration a second time.
-    previousTimestamp = endTimestamp;
+    previousTimestamp = now();
     if (wasRunning) scheduleNextFrame();
     return Object.freeze({
       requestedMs,
       simulatedMs: Number(simulatedMs.toFixed(6)),
       frames,
-      suspendedFrames: manualSuspendedFrames
+      suspendedFrames: manualSuspendedFrames,
+      renderMode: suppliedContext.renderIntermediateFrames === false ? 'last-step' : 'each-step'
     });
   }
 
+  // Keep one clock owner across asynchronous network yields. The heartbeat
+  // uses real timers, but RAF must not add extra driving time while keys are held.
+  async function advanceWithNetworkYields(milliseconds = 0, suppliedContext = {}) {
+    if (disposed) throw new Error('Runtime kernel is disposed.');
+    if (manualSession) throw new Error('Manual simulation is already active.');
+    const requestedMs = Math.max(0, finiteNumber(milliseconds, 0));
+    const total = { requestedMs, simulatedMs: 0, frames: 0, suspendedFrames: 0,
+      renderMode: suppliedContext.renderIntermediateFrames === false ? 'last-step' : 'each-step' };
+    manualSession = true;
+    if (frameHandle !== null && typeof cancelFrame === 'function') cancelFrame(frameHandle);
+    frameHandle = null;
+    try {
+      while (total.simulatedMs < requestedMs - 1e-7) {
+        const receipt = advanceFrames(Math.min(16, requestedMs - total.simulatedMs), {
+          ...suppliedContext, renderFinalFrame: total.simulatedMs + 16 >= requestedMs - 1e-7
+        });
+        total.simulatedMs += receipt.simulatedMs;
+        total.frames += receipt.frames;
+        total.suspendedFrames += receipt.suspendedFrames;
+        await (options.yieldToNetwork?.() ?? new Promise(resolve => globalThis.setTimeout(resolve, 0)));
+      }
+      return Object.freeze(total);
+    } finally {
+      manualSession = false;
+      previousTimestamp = now();
+      scheduleNextFrame();
+    }
+  }
+
   function scheduleNextFrame() {
-    if (!running || typeof requestFrame !== 'function') return;
+    if (manualSession || !running || typeof requestFrame !== 'function') return;
     frameHandle = requestFrame((timestamp) => {
       frameHandle = null;
       try {
@@ -307,6 +355,7 @@ function createRuntimeKernel(options = {}) {
 
   return Object.freeze({
     advanceBy,
+    advanceWithNetworkYields,
     dispose,
     registerSystem,
     runFrame,

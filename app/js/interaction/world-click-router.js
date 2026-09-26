@@ -133,6 +133,9 @@ function handleWorldCanvasClick(appCtx, event) {
   if (!globalThis.THREE || event?.button !== 0 || event?.target !== appCtx.renderer?.domElement) return false;
   if (!appCtx.gameStarted || appCtx.paused || appCtx.blockBuildMode || appCtx.fishingGame?.open) return false;
   if (appCtx.worldDiscoveryRuntime?.ui?.open || appCtx.urbanSandboxRuntime?.equipmentOpen) return false;
+  // PaintTown handles pointerdown; the subsequent click must not also open
+  // a selection card over the painting controls.
+  if (appCtx.gameMode === 'painttown' && appCtx.paintTown?.active === true) return true;
   const onFoot = appCtx.Walk?.state?.mode === 'walk';
   const equipmentCategory = appCtx.urbanSandboxRuntime?.equipment?.equipped?.()?.category;
   if (equipmentCategory === 'sidearm' || equipmentCategory === 'explosive') return false;

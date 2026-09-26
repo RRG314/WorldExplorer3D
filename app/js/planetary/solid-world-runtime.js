@@ -1,3 +1,5 @@
+import { addSurfaceMaterialDetail } from './surface-material-detail.js';
+import { regionalMapUv } from './regional-map-uv.js';
 import { getAstronomicalBody, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=3';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { ENV, getEnv } from '../env.js?v=58';
@@ -11,6 +13,7 @@ import { playSurfacePodLaunch } from './surface-pod-launch.js?v=11';
 import { samplePhysicalEnvironment } from './runtime/physical-environment.js?v=2';
 import { clearActivePlanetaryObstacles, setActivePlanetaryObstacles } from './runtime/obstacle-authority.js?v=1';
 import { SOLID_SURFACE_TRAVEL_CAPABILITIES } from './traversal-capabilities.js?v=1';
+import { createOwnedPlanetaryWorldCache, disposeOwnedPlanetaryWorld } from './owned-world-cache.js?v=2';
 import {
   CALORIS_PLANITIA_SURFACE_REGION,
   CERES_OCCATOR_SURFACE_REGION,
@@ -24,7 +27,7 @@ import {
   TITAN_SHANGRI_LA_SURFACE_REGION,
   TRITON_CANTALOUPE_SURFACE_REGION,
   VESTA_RHEASILVIA_SURFACE_REGION
-} from './runtime/surface-authority.js?v=4';
+} from './runtime/surface-authority.js?v=5';
 
 function worldPack(input) {
   return Object.freeze({
@@ -32,7 +35,11 @@ function worldPack(input) {
     segments: 192,
     fogColor: null,
     fogDensity: 0,
-    exposure: 1.04,
+    // Camera adaptation preserves readable terrain under weaker sunlight.
+    // It changes display exposure, never the physical environment or gravity.
+    exposure: Math.min(4.5, Math.max(1.04, 1.4 / Math.sqrt(
+      Math.max(0.08, input.sunIntensity + input.ambientIntensity + (input.fillIntensity ?? 0.2))
+    ))),
     fillIntensity: 0.2,
     rockCount: 520,
     rockScale: 4,
@@ -149,7 +156,6 @@ const SOLID_WORLD_PACKS = Object.freeze({
     bodyId: 'vesta', manifest: VESTA_RHEASILVIA_SURFACE_REGION, reliefKind: 'vesta-basin', detailSeed: 83,
     rockColor: 0x615b54, rockScale: 4.8, spawn: { x: 940, z: -460, angle: 0.5 },
     material: { color: 0x837b70, roughness: 0.97, bumpScale: 7 },
-    textureWindow: { u: 0.59, v: 0.31, width: 0.28, height: 0.39 },
     skyColor: 0x000000, sunColor: 0xfff6e3, sunIntensity: 0.18, ambientIntensity: 0.08,
     title: 'Rheasilvia Basin, Vesta',
     context: 'Irregular small world · giant impact basin · 0.025g',
@@ -167,7 +173,10 @@ const SOLID_WORLD_PACKS = Object.freeze({
   })
 });
 
-const worldCache = new Map();
+const worldCache = createOwnedPlanetaryWorldCache({
+  capacity: 2,
+  releasePublication: regionId => ensurePlanetarySurfaceAuthority(appCtx).release(regionId)
+});
 const runtimeWorldPacks = new Map();
 let activePack = null;
 let transitionId = 0;
@@ -362,6 +371,7 @@ function loadSurfaceTexture(pack) {
       asset.url,
       (texture) => {
         const configured = configureColorTexture(texture, appCtx.renderer);
+        configured.wrapS = THREE.RepeatWrapping;
         if (pack.textureWindow) {
           configured.offset.set(pack.textureWindow.u, pack.textureWindow.v);
           configured.repeat.set(pack.textureWindow.width, pack.textureWindow.height);
@@ -490,8 +500,18 @@ function addVisualSurfaceHorizon(pack, world) {
       );
     }
     positions.needsUpdate = true;
+    // Use the named site's body-fixed coordinates, not the entire globe on a 16 km tile.
+    if (!pack.runtimeModeled) {
+      const address = { ...pack.manifest.address, radiusM: getAstronomicalBody(pack.bodyId).physical.meanRadiusM };
+      const uv = geometry.attributes.uv;
+      for (let index = 0; index < positions.count; index++) {
+        const mapped = regionalMapUv(address, positions.getX(index) + centerX, positions.getZ(index) + centerZ);
+        uv.setXY(index, mapped.u, mapped.v);
+      }
+      uv.needsUpdate = true;
+    }
     geometry.computeVertexNormals();
-    const material = world.surface.material.clone();
+    const material = addSurfaceMaterialDetail(world.surface.material.clone());
     material.polygonOffset = true;
     material.polygonOffsetFactor = 1;
     material.polygonOffsetUnits = 1;
@@ -774,19 +794,31 @@ async function createSolidWorld(pack) {
       positions.setY(index, sampleModeledRelief(pack, positions.getX(index), positions.getZ(index)));
     }
     positions.needsUpdate = true;
+    // Use the named site's body-fixed coordinates, not the entire globe on a 16 km tile.
+    if (!pack.runtimeModeled) {
+      const address = { ...pack.manifest.address, radiusM: getAstronomicalBody(pack.bodyId).physical.meanRadiusM };
+      const uv = geometry.attributes.uv;
+      for (let index = 0; index < positions.count; index++) {
+        const mapped = regionalMapUv(address, positions.getX(index), positions.getZ(index));
+        uv.setXY(index, mapped.u, mapped.v);
+      }
+      uv.needsUpdate = true;
+    }
     geometry.computeVertexNormals();
     const material = new THREE.MeshStandardMaterial({
       map: texture,
-      color: pack.material.color,
+      // Observed albedo already carries its color. A second pigment tint
+      // turned ice grey and multiplied volcanic maps into near-black brown.
+      color: pack.runtimeModeled ? pack.material.color : 0xffffff,
       roughness: pack.material.roughness,
       metalness: 0,
-      bumpMap: texture,
-      bumpScale: pack.material.bumpScale,
+      // Albedo/radar brightness is not an elevation measurement. Relief comes from geometry.
       transparent: false,
       opacity: 1,
       depthTest: true,
       depthWrite: true
     });
+    addSurfaceMaterialDetail(material);
     surface = new THREE.Mesh(geometry, material);
     surface.name = `${pack.title} modeled surface`;
     surface.position.set(
@@ -811,15 +843,21 @@ async function createSolidWorld(pack) {
     };
   });
   if (publication.status !== 'accepted' || !surface) {
+    if (surface) disposeOwnedPlanetaryWorld({ surface });
     throw new Error(`${pack.title} surface publication failed: ${publication.reason || publication.status}`);
   }
   const world = { pack, surface, objects: [] };
-  worldCache.set(pack.bodyId, world);
   appCtx.scene.add(surface);
   addVisualSurfaceHorizon(pack, world);
   addGeneratedSurfaceDetail(pack, world);
   await addParentBodyView(pack, world);
+  if (authority.snapshot().generation !== publication.generation) {
+    disposeOwnedPlanetaryWorld(world);
+    if (authority.snapshot().active?.regionId !== pack.manifest.regionId) authority.release(pack.manifest.regionId);
+    throw new Error(`${pack.title} surface request was superseded.`);
+  }
   addExpeditionReturnPod(pack, world);
+  worldCache.set(pack.bodyId, world);
   return world;
 }
 
@@ -1005,6 +1043,7 @@ function hideActiveWorld() {
     if (appCtx.scene) {
       appCtx.scene.background = priorWorldPresentation.background;
       appCtx.scene.fog = priorWorldPresentation.fog;
+      appCtx.scene.environment = appCtx.earthEnvironmentMap || priorWorldPresentation.environmentMap;
     }
     if (appCtx.sun) {
       if (priorWorldPresentation.sunColor != null) appCtx.sun.color?.setHex?.(priorWorldPresentation.sunColor);
@@ -1016,6 +1055,10 @@ function hideActiveWorld() {
     if (appCtx.fillLight && Number.isFinite(priorWorldPresentation.fillIntensity)) {
       appCtx.fillLight.intensity = priorWorldPresentation.fillIntensity;
     }
+    if (appCtx.hemiLight) appCtx.hemiLight.visible = priorWorldPresentation.hemiVisible;
+    if (priorWorldPresentation.fillColor != null) appCtx.fillLight?.color?.setHex(priorWorldPresentation.fillColor);
+    if (priorWorldPresentation.ambientColor != null) appCtx.ambientLight?.color?.setHex(priorWorldPresentation.ambientColor);
+    if (priorWorldPresentation.sunPosition) appCtx.sun?.position?.copy(priorWorldPresentation.sunPosition);
     priorWorldPresentation = null;
   }
   activePack = null;
@@ -1036,6 +1079,9 @@ async function arriveAtSolidWorld(bodyInput) {
   });
   try {
   suspendEarthModesForPlanetaryEntry(ENV.PLANETARY);
+  // The coordinator only exits when the environment enum changes. Two solid
+  // bodies both use PLANETARY, but their scene ownership must still change.
+  if (activePack) hideActiveWorld();
   appCtx.setPauseReason?.('planetary_transition', true);
   const world = await createSolidWorld(pack);
   if (requestId !== transitionId) return false;
@@ -1061,12 +1107,18 @@ async function arriveAtSolidWorld(bodyInput) {
       cameraFar: Number(appCtx.camera?.far),
       background: appCtx.scene?.background || null,
       fog: appCtx.scene?.fog || null,
+      environmentMap: appCtx.scene?.environment || null,
       sunColor: appCtx.sun?.color?.getHex?.(),
       sunIntensity: Number(appCtx.sun?.intensity),
       ambientIntensity: Number(appCtx.ambientLight?.intensity),
-      fillIntensity: Number(appCtx.fillLight?.intensity)
+      fillIntensity: Number(appCtx.fillLight?.intensity),
+      fillColor: appCtx.fillLight?.color?.getHex?.(),
+      ambientColor: appCtx.ambientLight?.color?.getHex?.(),
+      hemiVisible: appCtx.hemiLight?.visible,
+      sunPosition: appCtx.sun?.position?.clone?.()
     };
   }
+  appCtx.scene.environment = null;
   appCtx.scene.background = new THREE.Color(pack.skyColor);
   appCtx.scene.fog = pack.fogColor == null ? null : new THREE.FogExp2(pack.fogColor, pack.fogDensity);
   if (appCtx.renderer) appCtx.renderer.toneMappingExposure = pack.exposure;
@@ -1079,6 +1131,10 @@ async function arriveAtSolidWorld(bodyInput) {
     appCtx.sun.intensity = pack.sunIntensity;
     appCtx.sun.position.set(-160, 220, 70);
   }
+  // Earth's blue hemisphere is not illumination for an airless world.
+  if (appCtx.hemiLight) appCtx.hemiLight.visible = false;
+  appCtx.fillLight?.color?.setHex(0xffffff);
+  appCtx.ambientLight?.color?.setHex(0xffffff);
   if (appCtx.ambientLight) appCtx.ambientLight.intensity = pack.ambientIntensity;
   if (appCtx.fillLight) appCtx.fillLight.intensity = pack.fillIntensity;
   appCtx.setTravelMode?.(pack.arrivalMode || 'drive', { source: `${bodyId}_arrival`, emitTutorial: false });
@@ -1299,6 +1355,8 @@ registerEnvironmentLifecycle(ENV.PLANETARY, {
 
 Object.assign(appCtx, {
   arriveAtSolidWorld,
+  getPlanetaryWorldCacheSnapshot: () => worldCache.snapshot(),
+  canLandSolidWorld: bodyId => !!(SOLID_WORLD_PACKS[normalizeAstronomicalBodyId(bodyId)] || runtimeWorldPacks.get(bodyId)),
   getActivePlanetaryReturnPod,
   renderActiveExpeditionOutpost,
   registerExpeditionSolidWorld,

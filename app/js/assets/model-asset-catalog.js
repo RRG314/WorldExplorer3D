@@ -1,6 +1,51 @@
 const MODEL_ASSET_SCHEMA_VERSION = 1;
 
 const MODEL_ASSET_CATALOG = Object.freeze([
+  ...[
+    ['reactor-core','scifi-reactor-core-b3fe00d6b73841a0b6b3a288efc03668','SciFi Reactor Core by iedalton',5000000,62000],
+    ['medical-table','sci-fi-laboratory-op-table-ae314a5ea3614a5caf52f0d7e7d61665','Sci-Fi Laboratory Op Table by Michael V',1500000,16500],
+    ['command-console','sci-fi-computer-room-a149d5bfcef6496c9a0606b5ce5ebf27','Sci-Fi Computer Room by Michael V; extracted desk and instruments',1500000,16000],
+    ['laboratory-desk','sci-fi-computer-room-a149d5bfcef6496c9a0606b5ce5ebf27','Sci-Fi Computer Room by Michael V; extracted desk',200000,1500],
+    ['equipment-server','sci-fi-servers-37fd7c8ef38d4e5290cf6597394909c8','Sci-Fi Servers by Michael V',600000,6500]
+  ].map(([name,slug,attribution,bytes,triangles])=>Object.freeze({
+    schemaVersion:MODEL_ASSET_SCHEMA_VERSION,id:`solis-${name}`,label:attribution,
+    url:`/app/assets/models/interiors/solis/${name}.glb`,roles:Object.freeze(['ship-interior-furnishing']),
+    sourceUrl:`https://sketchfab.com/3d-models/${slug}`,attribution,license:'CC-BY-4.0',
+    collisionPolicy:'authored-ship-prop-colliders',sourceUpAxis:'y',
+    instancePolicy:Object.freeze({geometry:'shared',materials:'shared'}),
+    budgets:Object.freeze({bytes,triangles,textureEdgePixels:1024})
+  })),
+  ...[
+    ['wall-navigation','https://sketchfab.com/3d-models/large-wall-mounted-computer-console-298b7d9b68064618a3819d1a8fae4baf','Large Wall-Mounted Computer Console by Inditrion Dradnon'],
+    ['wall-instruments','https://sketchfab.com/3d-models/wall-console-98724ee49fba42a2b0ccbe79a36f246e','Wall Console by LuddePudde']
+  ].map(([name,sourceUrl,attribution])=>Object.freeze({
+    schemaVersion:MODEL_ASSET_SCHEMA_VERSION,id:`solis-${name}`,label:attribution,
+    url:`/app/assets/models/interiors/solis/${name}.glb`,roles:Object.freeze(['ship-interior-furnishing']),
+    sourceUrl,attribution,license:'CC-BY-4.0',collisionPolicy:'authored-ship-prop-colliders',sourceUpAxis:'y',
+    instancePolicy:Object.freeze({geometry:'shared',materials:'shared'}),
+    budgets:Object.freeze({bytes:2500000,triangles:13000,textureEdgePixels:1024})
+  })),
+  ...['cargo-case','cargo-tank','cargo-locker','storage-case','bridge-chair','wardroom-chair','lab-stool','wardroom-table','medical-console'].map((name) => Object.freeze({
+    schemaVersion: MODEL_ASSET_SCHEMA_VERSION, id: `solis-${name}`,
+    label: `Solis Reach ${name.replaceAll('-', ' ')}`, url: `/app/assets/models/interiors/solis/${name}.glb`,
+    roles: Object.freeze(['ship-interior-furnishing']), license: 'CC-BY-4.0',
+    sourceUrl: name === 'medical-console' ? 'https://sketchfab.com/3d-models/medical-console-89065e109790417191467cfececf2c7c' : 'https://sketchfab.com/3d-models/free-sci-fi-furnitureprops-pack-b521def33f21422e9be8b4d237f7ca63',
+    attribution: name === 'medical-console' ? 'Medical Console by Oliver Triplett' : 'Sci-fi furniture/props pack by NinKorr3D',
+    collisionPolicy: 'authored-ship-prop-colliders', sourceUpAxis: 'y',
+    instancePolicy: Object.freeze({geometry:'clone',materials:'clone'}),
+    budgets: Object.freeze({bytes:2000000,triangles:8500,textureEdgePixels:512})
+  })),
+  ...['crew-bed', 'crew-display', 'crew-lamp'].map((name) => Object.freeze({
+    schemaVersion: MODEL_ASSET_SCHEMA_VERSION,
+    id: `solis-${name}`, label: `Solis Reach ${name.replaceAll('-', ' ')}`,
+    url: `/app/assets/models/interiors/solis/${name}.glb`,
+    roles: Object.freeze(['ship-interior-furnishing']), license: 'CC-BY-4.0',
+    sourceUrl: 'https://sketchfab.com/3d-models/sci-fi-interior-room-ec3e1efe815743439322bd1536a886e3',
+    attribution: 'Sci-Fi Interior Room by Van_Twinkle; selected furniture extracted and fitted to Solis Reach.',
+    collisionPolicy: 'authored-ship-prop-colliders', sourceUpAxis: 'y',
+    instancePolicy: Object.freeze({ geometry: 'clone', materials: 'clone' }),
+    budgets: Object.freeze({ bytes: 900000, triangles: 18000, textureEdgePixels: 1024 })
+  })),
   ...['pine', 'broadleaf', 'shrub', 'fern', 'grass'].flatMap((kind) => (['pine','broadleaf'].includes(kind) ? ['', '-lod'] : ['']).map((suffix) => Object.freeze({
     schemaVersion: MODEL_ASSET_SCHEMA_VERSION,
     id: `nature-${kind}${suffix}`,
@@ -111,7 +156,8 @@ const MODEL_ASSET_CATALOG = Object.freeze([
     sourceUrl: 'https://quaternius.com/packs/scifimodularguns.html',
     attribution: 'Sci-Fi Modular Gun Pack — Pistol 2 by Quaternius',
     sourceUpAxis: 'z',
-    targetLengthMeters: .58,
+    targetLengthMeters: .32,
+    gripOffsetMeters: Object.freeze({ x: 0, y: -.045, z: .08 }),
     collisionPolicy: 'existing-equipment-and-projectile-authority',
     instancePolicy: Object.freeze({ geometry: 'shared', materials: 'clone' }),
     budgets: Object.freeze({ bytes: 54_000, triangles: 1_700, maxInstances: 24, textureEdgePixels: 0 })
@@ -128,6 +174,7 @@ const MODEL_ASSET_CATALOG = Object.freeze([
     attribution: 'Sci-Fi Modular Gun Pack — AR 3 by Quaternius',
     sourceUpAxis: 'z',
     targetLengthMeters: .84,
+    gripOffsetMeters: Object.freeze({ x: 0, y: -.11, z: .25 }),
     collisionPolicy: 'existing-equipment-and-projectile-authority',
     instancePolicy: Object.freeze({ geometry: 'shared', materials: 'clone' }),
     budgets: Object.freeze({ bytes: 102_000, triangles: 3_200, maxInstances: 16, textureEdgePixels: 0 })

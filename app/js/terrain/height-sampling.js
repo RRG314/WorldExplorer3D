@@ -1,9 +1,28 @@
+import {terrainGridInterval} from './world-grid.js';
+import { streetSideEdge } from '../world/compiler/street-frontage-policy.js';
 import {
   projectPointToFeature,
   sampleFeatureSurfaceY
 } from "../structure-semantics.js?v=63";
 import { roadWidthAtProjection } from '../world/road-cross-section-profile.js?v=1';
-import { terrainHeightWithPortalCuts } from './structure-terrain-portals.js?v=1';
+import { terrainHeightWithPortalCuts } from './structure-terrain-portals.js?v=2';
+
+const MAX_HEIGHT_CACHE_ENTRIES = 65536;
+
+function rememberHeight(cache, key, height) {
+  if (!Number.isFinite(height)) return height;
+  if (cache.size >= MAX_HEIGHT_CACHE_ENTRIES) {
+    // Batched FIFO eviction bounds metropolitan builds without maintaining a
+    // second index or doing a linked-list update on every terrain sample.
+    let remaining = MAX_HEIGHT_CACHE_ENTRIES / 2;
+    for (const oldest of cache.keys()) {
+      cache.delete(oldest);
+      if (--remaining === 0) break;
+    }
+  }
+  cache.set(key, height);
+  return height;
+}
 
 // THREE.PlaneGeometry splits each grid cell along the bottom-left to
 // top-right diagonal. Runtime ground queries must use those same two planes;
@@ -60,12 +79,10 @@ function createTerrainHeightSamplingApi(deps = {}) {
 
       if (lx < x0 || lx > x1 || lz < z0 || lz > z1) continue;
 
-      const fx = (lx - x0) / (x1 - x0) * segs;
-      const fz = (lz - z0) / (z1 - z0) * segs;
-      const col = Math.max(0, Math.min(segs - 1, Math.floor(fx)));
-      const row = Math.max(0, Math.min(segs - 1, Math.floor(fz)));
-      const sx = fx - col;
-      const sz = fz - row;
+      const col = terrainGridInterval(pos.array,segs,3,0,lx);
+      const row = terrainGridInterval(pos.array,segs,vps*3,2,lz);
+      const sx = (lx-pos.getX(col))/(pos.getX(col+1)-pos.getX(col));
+      const sz = (lz-pos.getZ(row*vps))/(pos.getZ((row+1)*vps)-pos.getZ(row*vps));
 
       const baseY = mesh.position.y;
       const y00 = pos.getY(row * vps + col) + baseY;
@@ -96,11 +113,9 @@ function createTerrainHeightSamplingApi(deps = {}) {
   }
 
   function cachedBaseTerrainHeight(x, z) {
-    const key = `${Math.round(x * 10)},${Math.round(z * 10)}`;
+    const key = `${x},${z}`;
     if (baseTerrainHeightCache.has(key)) return baseTerrainHeightCache.get(key);
-    const h = baseTerrainHeightAt(x, z);
-    baseTerrainHeightCache.set(key, h);
-    return h;
+    return rememberHeight(baseTerrainHeightCache,key,baseTerrainHeightAt(x,z));
   }
 
   function applyStructureTerrainCuts(worldX, worldZ, terrainY) {
@@ -114,7 +129,9 @@ function createTerrainHeightSamplingApi(deps = {}) {
       ? indexedFeatures
       : appCtx.structureTerrainCuts;
     let strongestAtGradeWeight = 0;
-    let strongestAtGradeY = terrainY;
+    let atGradeWeightedY = 0;
+    let atGradeWeightSum = 0;
+    const atGradeSamples = [];
     for (let i = 0; i < candidates.length; i++) {
       const cut = candidates[i];
       const feature = cut?.feature || cut;
@@ -125,28 +142,37 @@ function createTerrainHeightSamplingApi(deps = {}) {
         worldZ < bounds.minZ || worldZ > bounds.maxZ
       )) continue;
 
-      const projected = projectPointToFeature(feature, worldX, worldZ);
+      const projected = appCtx.structureTerrainProjectionIndex
+        ? appCtx.structureTerrainProjectionIndex.project(feature,worldX,worldZ)
+        : projectPointToFeature(feature,worldX,worldZ);
       if (!projected) continue;
 
       if (feature?.structureSemantics?.terrainMode === 'at_grade') {
         const width = roadWidthAtProjection(feature, projected);
         const halfWidth = width * 0.5;
         const shoulderBlend = Math.max(3.5, Math.min(8, width * 0.65));
-        const influenceRadius = halfWidth + shoulderBlend;
+        const p1=feature.pts[projected.segIndex],p2=feature.pts[projected.segIndex+1];
+        const dx=p2.x-p1.x,dz=p2.z-p1.z;
+        const sign=((worldX-projected.x)*dz-(worldZ-projected.z)*dx)>=0 ? 1 : -1;
+        const edge=streetSideEdge(feature,halfWidth,sign);
+        const frontage=appCtx.streetFrontageGrading;
+        const gradedEdge=frontage && projected.dist<=edge ? edge : frontage?.influenceOuterDistance
+          ? frontage.influenceOuterDistance(feature,projected,worldX,worldZ,halfWidth,shoulderBlend)
+          : frontage?.outerDistance(feature,projected,worldX,worldZ,halfWidth) ?? halfWidth;
+        if(gradedEdge===null)continue;
+        const influenceRadius = gradedEdge + shoulderBlend;
         if (!Number.isFinite(projected.dist) || projected.dist > influenceRadius) continue;
         const surfaceY = sampleFeatureSurfaceY(feature, worldX, worldZ, projected);
         if (!Number.isFinite(surfaceY)) continue;
         const targetTerrainY = surfaceY - Math.max(0, Number(feature.surfaceBias) || 0.08);
         const shoulderT = Math.max(0, Math.min(1,
-          (projected.dist - halfWidth) / shoulderBlend
+          (projected.dist - gradedEdge) / shoulderBlend
         ));
-        const weight = projected.dist <= halfWidth
+        const weight = projected.dist <= gradedEdge
           ? 1
           : 1 - (shoulderT * shoulderT * (3 - 2 * shoulderT));
-        if (weight > strongestAtGradeWeight) {
-          strongestAtGradeWeight = weight;
-          strongestAtGradeY = terrainY + (targetTerrainY - terrainY) * weight;
-        }
+        const edgeDistance=Math.max(0,projected.dist-edge);
+        atGradeSamples.push({targetTerrainY,weight,edgeDistance,penetration:Math.max(0,edge-projected.dist)});
         continue;
       }
       const width = Math.max(4.5, Number(cut.width) || Number(feature.width) || 6);
@@ -181,7 +207,21 @@ function createTerrainHeightSamplingApi(deps = {}) {
       adjustedY = Math.min(adjustedY, adjustedY + (targetY - adjustedY) * fade);
     }
 
-    if (strongestAtGradeWeight > 0) adjustedY = strongestAtGradeY;
+    // Carriageways own their elevation. A neighboring frontage/shoulder may
+    // shape unowned ground but cannot vote on an occupied carriageway. Outside
+    // the footprint inverse-distance weights approach that boundary value
+    // continuously, rather than switching abruptly to the closest road.
+    const owned=atGradeSamples.filter(s=>s.edgeDistance===0);
+    for(const sample of owned.length ? owned : atGradeSamples){
+      const gradeWeight=owned.length ? Math.max(1e-12,sample.penetration**2) : sample.weight**4 / sample.edgeDistance**2;
+      atGradeWeightedY+=sample.targetTerrainY*gradeWeight;
+      atGradeWeightSum+=gradeWeight;
+      strongestAtGradeWeight=Math.max(strongestAtGradeWeight,sample.weight);
+    }
+
+    if (atGradeWeightSum > 0) {
+      adjustedY = terrainY + (atGradeWeightedY / atGradeWeightSum - terrainY) * strongestAtGradeWeight;
+    }
 
     return adjustedY;
   }
@@ -245,11 +285,9 @@ function createTerrainHeightSamplingApi(deps = {}) {
 
   function cachedTerrainHeight(x, z) {
     if (!terrainHeightCacheEnabled) return terrainMeshHeightAt(x, z);
-    const key = `${Math.round(x * 10)},${Math.round(z * 10)}`;
+    const key = `${x},${z}`;
     if (terrainHeightCache.has(key)) return terrainHeightCache.get(key);
-    const h = terrainMeshHeightAt(x, z);
-    terrainHeightCache.set(key, h);
-    return h;
+    return rememberHeight(terrainHeightCache,key,terrainMeshHeightAt(x,z));
   }
 
   function clearTerrainHeightCache() {
@@ -314,6 +352,7 @@ function createTerrainHeightSamplingApi(deps = {}) {
     cachedBaseTerrainHeight,
     cachedTerrainHeight,
     clearTerrainHeightCache,
+    heightSamplingCacheStats: () => ({terrainEntries:terrainHeightCache.size,baseEntries:baseTerrainHeightCache.size,maximumEntriesPerCache:MAX_HEIGHT_CACHE_ENTRIES}),
     pointAlongPolyline,
     polylineCurvatureMetric,
     subdivideRoadPoints,

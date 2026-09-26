@@ -1,0 +1,402 @@
+{
+  "ok": true,
+  "contract": "world-explorer-system-release-v1",
+  "targetVersion": "5.2.0",
+  "scope": "candidate",
+  "systemCount": 16,
+  "gateCount": 44,
+  "gates": [
+    {
+      "id": "source-graph",
+      "artifactRequired": false,
+      "command": [
+        "npm",
+        "run",
+        "verify:source"
+      ]
+    },
+    {
+      "id": "release-contracts",
+      "artifactRequired": false,
+      "command": [
+        "npm",
+        "run",
+        "verify:release-scope"
+      ]
+    },
+    {
+      "id": "public-claims",
+      "artifactRequired": false,
+      "command": [
+        "npm",
+        "run",
+        "audit:release-claims"
+      ]
+    },
+    {
+      "id": "current-contracts",
+      "artifactRequired": false,
+      "command": [
+        "npm",
+        "run",
+        "verify:current-contracts"
+      ]
+    },
+    {
+      "id": "artifact-world",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:artifact-runtime"
+      ]
+    },
+    {
+      "id": "street-workers",
+      "artifactRequired": true,
+      "command": [
+        "node",
+        "scripts/verification/street-worker-artifact.mjs"
+      ]
+    },
+    {
+      "id": "mobile-load",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:mobile-load"
+      ]
+    },
+    {
+      "id": "player-blockers",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:player-reported-blockers"
+      ]
+    },
+    {
+      "id": "mobile-controls",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:mobile-controls"
+      ]
+    },
+    {
+      "id": "assembled-worlds",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:assembled-locations"
+      ]
+    },
+    {
+      "id": "assembled-fallback",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:assembled-locations-fallback"
+      ]
+    },
+    {
+      "id": "provider-release",
+      "artifactRequired": false,
+      "command": [
+        "npm",
+        "run",
+        "verify:provider-release"
+      ]
+    },
+    {
+      "id": "actors-vehicles",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:actors-vehicles"
+      ]
+    },
+    {
+      "id": "terrain-boundary",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:terrain-boundary"
+      ]
+    },
+    {
+      "id": "interiors",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:interiors"
+      ]
+    },
+    {
+      "id": "poi-lifecycle",
+      "artifactRequired": false,
+      "command": [
+        "npm",
+        "run",
+        "verify:poi-lifecycle"
+      ]
+    },
+    {
+      "id": "urban-sandbox",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:urban-sandbox"
+      ]
+    },
+    {
+      "id": "urban-equipment",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:urban-equipment"
+      ]
+    },
+    {
+      "id": "tutorial-controls",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:tutorial-controls"
+      ]
+    },
+    {
+      "id": "commerce-coherence",
+      "artifactRequired": false,
+      "command": [
+        "npm",
+        "run",
+        "verify:commerce-coherence"
+      ]
+    },
+    {
+      "id": "gameplay-menu",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:gameplay-menu"
+      ]
+    },
+    {
+      "id": "hotbar-actions",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:hotbar-actions"
+      ]
+    },
+    {
+      "id": "landing-user-count",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:landing-user-count"
+      ]
+    },
+    {
+      "id": "analytics-lifecycle",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:analytics-lifecycle"
+      ]
+    },
+    {
+      "id": "explorer-browser",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:explorer-coherence-browser"
+      ]
+    },
+    {
+      "id": "regional-world",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:regional-world-richness"
+      ]
+    },
+    {
+      "id": "live-gps",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:live-gps"
+      ]
+    },
+    {
+      "id": "walking-field",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:walking-encounters"
+      ]
+    },
+    {
+      "id": "fishing",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:unified-fishing"
+      ]
+    },
+    {
+      "id": "fishing-recovery",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:fishing-loss-recovery"
+      ]
+    },
+    {
+      "id": "environments",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:environments"
+      ]
+    },
+    {
+      "id": "painttown",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:painttown"
+      ]
+    },
+    {
+      "id": "accessibility",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:accessibility-release"
+      ]
+    },
+    {
+      "id": "performance",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:performance-retention"
+      ]
+    },
+    {
+      "id": "space-release",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:space-release"
+      ]
+    },
+    {
+      "id": "connected-journey",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:connected-explorer-journey"
+      ]
+    },
+    {
+      "id": "world-economy",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:world-economy"
+      ]
+    },
+    {
+      "id": "maryland-parcels",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:maryland-parcels"
+      ]
+    },
+    {
+      "id": "artifact-integrity",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:hosting"
+      ]
+    },
+    {
+      "id": "release-identity",
+      "artifactRequired": true,
+      "command": [
+        "npm",
+        "run",
+        "verify:release-identity"
+      ]
+    },
+    {
+      "id": "capture-local",
+      "artifactRequired": false,
+      "command": [
+        "npm",
+        "run",
+        "verify:reality-capture:local"
+      ]
+    },
+    {
+      "id": "capture-editor-fixture",
+      "artifactRequired": false,
+      "command": [
+        "node",
+        "scripts/verification/interior-reshape-ui.mjs"
+      ]
+    },
+    {
+      "id": "capture-review-fixture",
+      "artifactRequired": false,
+      "command": [
+        "node",
+        "scripts/verification/capture-review-workspace-ui.mjs"
+      ]
+    },
+    {
+      "id": "capture-entry-fixture",
+      "artifactRequired": false,
+      "command": [
+        "node",
+        "scripts/verification/captured-home-entry-ui.mjs"
+      ]
+    }
+  ]
+}

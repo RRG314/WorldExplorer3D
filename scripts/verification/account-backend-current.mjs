@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { verifyBillingWebhook } from './billing-webhook-emulator.mjs';
 
 const projectId = String(process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || 'we3d-staging-20260712');
 const authOrigin = `http://${String(process.env.FIREBASE_AUTH_EMULATOR_HOST || '127.0.0.1:9099')}`;
@@ -43,7 +44,10 @@ assert.equal(updated.status, 200, JSON.stringify(updated.body));
 assert.equal(updated.body.displayName, 'Release Explorer');
 assert.equal(updated.body.creatorProfile.bio, 'Exploring Earth and beyond.');
 
-const activated = await post('/startTrial');
+const concurrentTrials = await Promise.all([post('/startTrial'), post('/startTrial')]);
+assert.deepEqual(concurrentTrials.map(result => result.body.status).sort(), ['activated', 'already-active']);
+assert.equal(concurrentTrials[0].body.trialEndsAtMs, concurrentTrials[1].body.trialEndsAtMs);
+const activated = concurrentTrials.find(result => result.body.status === 'activated');
 assert.equal(activated.status, 200, JSON.stringify(activated.body));
 assert.equal(activated.body.status, 'activated');
 assert.equal(activated.body.plan, 'trial');
@@ -63,6 +67,8 @@ assert.equal(refreshed.body.overview.displayName, 'Release Explorer');
 assert.equal(refreshed.body.overview.plan, 'trial');
 assert.equal(refreshed.body.overview.subscriptionStatus, 'none');
 
+const billingWebhook = await verifyBillingWebhook({ projectId, functionsOrigin, uid: user.uid });
+
 const rejectedDelete = await post('/deleteAccount', { confirmation: 'delete' });
 assert.equal(rejectedDelete.status, 400, JSON.stringify(rejectedDelete.body));
 
@@ -79,11 +85,13 @@ assert.equal(lookupDeleted.ok, false, 'Deleted authentication identity remained 
 
 console.log(JSON.stringify({
   ok: true,
+  billingWebhook,
   checks: {
     authenticationRequired: true,
     overviewLoaded: true,
     profilePersisted: true,
     trialActivatedOnce: true,
+    concurrentTrialAdmission: true,
     emptyBillingHistoryHandled: true,
     refreshedOverviewMatches: true,
     deletionRequiresExactConfirmation: true,

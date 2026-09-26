@@ -9,7 +9,8 @@ import {
 } from '../app/js/plane/flight-dynamics.js';
 import { ctx as appCtx } from '../app/js/shared-context.js?v=55';
 import { updateDrone } from '../app/js/physics/drone-flight.js';
-import { shouldRenderRoadCenterMarkings } from '../app/js/terrain/rebuild.js';
+import { shouldRenderRoadCenterMarkings, appendRoadCenterMarkings } from '../app/js/terrain/rebuild.js';
+import { createRoadContactIndex } from '../app/js/terrain/road-contact-index.js';
 import { compileElevatedAssembly } from '../app/js/world/compiler/transport-structure-assembly.js';
 import { integrateSkydivingDynamics } from '../app/js/urban-sandbox/parachute-model.js';
 
@@ -127,7 +128,7 @@ test('a generalized urban bridge searches beyond parallel roads for visible supp
   ));
 });
 
-test('detached road-marking quads are not published at any elevation', () => {
+test('elevated markings stay disabled while terrain-conforming ground markings remain available', () => {
   const generalizedBridge = {
     type: 'primary',
     transportRecord: { completeness: 'generalized' },
@@ -137,9 +138,36 @@ test('detached road-marking quads are not published at any elevation', () => {
   assert.equal(shouldRenderRoadCenterMarkings({
     ...generalizedBridge,
     structureSemantics: { terrainMode: 'at_grade' }
-  }), false);
+  }), true);
   assert.equal(shouldRenderRoadCenterMarkings({
     ...generalizedBridge,
     transportRecord: { completeness: 'lossless' }
   }), false);
+});
+
+test('published ground markings are clipped to their folded surface and cannot attach to an elevated deck', () => {
+  const mesh = (terrainMode, y) => ({
+    geometry: { attributes: { position: { array: new Float32Array([
+      0,y,-2, 0,y,2, 3,y,-2, 3,y,2, 6,y+2,-2, 6,y+2,2
+    ]) } }, getIndex: () => ({ array: new Uint16Array([0,1,2,2,1,3,2,3,4,4,3,5]) }) },
+    userData: { terrainMode }
+  });
+  const road = { type:'primary', width:10, structureSemantics:{terrainMode:'at_grade'} };
+  const points = [{x:-2,z:0},{x:20,z:0}];
+  const ground = createRoadContactIndex([mesh('at_grade',0)]);
+  const elevated = createRoadContactIndex([mesh('elevated',10)]);
+  try {
+    const vertices=[], indices=[];
+    appendRoadCenterMarkings(road,points,vertices,indices,null,()=>999,ground);
+    assert.ok(indices.length>0);
+    for(let i=0;i<indices.length;i+=3){
+      const ids=indices.slice(i,i+3), x=ids.reduce((n,j)=>n+vertices[j*3],0)/3,
+        z=ids.reduce((n,j)=>n+vertices[j*3+2],0)/3, y=ids.reduce((n,j)=>n+vertices[j*3+1],0)/3;
+      assert.ok(x>=0&&x<=6,'no unsupported marking outside the published road');
+      assert.ok(Math.abs(y-ground.sampleAt(x,z)-.012)<1e-5,'marking follows the folded mesh, not stale profile');
+    }
+    const unsupported=[], unsupportedIndices=[];
+    appendRoadCenterMarkings(road,points,unsupported,unsupportedIndices,null,()=>10,elevated);
+    assert.equal(unsupported.length,0,'a nearby raised road cannot support ground markings');
+  } finally { ground.dispose(); elevated.dispose(); }
 });

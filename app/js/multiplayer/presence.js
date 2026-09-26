@@ -1,6 +1,8 @@
+import { postProtectedFunction } from '../../../js/function-api.js?v=3';
 import {
   collection,
   doc,
+  deleteDoc,
   limit,
   onSnapshot,
   orderBy,
@@ -9,31 +11,35 @@ import {
   setDoc,
   Timestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
-import { getCurrentUser } from '../../../js/auth-ui.js?v=55';
-import { initFirebase } from '../../../js/firebase-init.js?v=57';
+import { getCurrentUser } from '../../../js/auth-ui.js?v=56';
+import { initFirebase } from '../../../js/firebase-init.js?v=58';
 import { normalizeCode } from './rooms.js?v=67';
 
 const ROOM_COLLECTION = 'rooms';
 const PLAYER_COLLECTION = 'players';
 const PRESENCE_TTL_MS = 90 * 1000;
-const HEARTBEAT_INTERVAL_MS = 2000;
-const MIN_WRITE_INTERVAL_MS = 2000;
+const HEARTBEAT_INTERVAL_MS = 2500;
+// Rules require strictly more than two server seconds; include jitter headroom.
+const MIN_WRITE_INTERVAL_MS = 2250;
 const MOVE_THRESHOLD_METERS = 0.5;
 const ROTATE_THRESHOLD_RAD = 0.05;
 const STALE_LAST_SEEN_MS = 45 * 1000;
 const STALE_CLOCK_SKEW_TOLERANCE_MS = 2 * 60 * 1000;
 const MAX_PLAYER_DOCS_READ = 32;
-const LEAVE_TTL_MS = 1000;
 const ALLOWED_MODES = new Set(['drive', 'walk', 'drone', 'space', 'moon']);
 
 let activeRoomId = null;
 let getPose = null;
 let heartbeatTimer = null;
 let lastWriteAt = 0;
+// Throttling begins at acknowledgement; the stored expiry begins when the
+// payload is constructed. Slow responses must not extend that server lease.
+let lastLeaseWriteAt = 0;
 let lastSentPose = null;
 let lastSamplePose = null;
 let lastSampleAt = 0;
 let inFlightWrite = false;
+let presenceGeneration = 0;
 let releaseVisibilityListener = null;
 
 function getServices() {
@@ -202,6 +208,8 @@ function movedBeyondThreshold(prevPose, nextPose) {
   return yawDelta >= ROTATE_THRESHOLD_RAD || pitchDelta >= ROTATE_THRESHOLD_RAD;
 }
 
+let lastAdmissionAttemptAt = 0;
+
 async function writePresence(force = false) {
   if (!activeRoomId || typeof getPose !== 'function' || inFlightWrite) return;
 
@@ -209,7 +217,7 @@ async function writePresence(force = false) {
   if (!user || !user.uid) return;
 
   const now = Date.now();
-  if (!force && now - lastWriteAt < MIN_WRITE_INTERVAL_MS) return;
+  if (now - lastWriteAt < MIN_WRITE_INTERVAL_MS) return;
 
   const normalized = enrichPoseVelocity(
     normalizePosePayload(getPose() || {}),
@@ -219,10 +227,25 @@ async function writePresence(force = false) {
   const movementReached = movedBeyondThreshold(lastSentPose?.pose, normalized.pose);
   if (!force && !intervalReached && !movementReached) return;
 
+  const writingRoomId = activeRoomId;
+  const writingGeneration = presenceGeneration;
+  const isCurrent = () => presenceGeneration === writingGeneration && activeRoomId === writingRoomId;
   inFlightWrite = true;
   try {
     const { db } = getServices();
-    const playerRef = doc(db, ROOM_COLLECTION, activeRoomId, PLAYER_COLLECTION, user.uid);
+    if (now - lastLeaseWriteAt >= PRESENCE_TTL_MS) {
+      if (now - lastAdmissionAttemptAt < 15_000) return;
+      lastAdmissionAttemptAt = now;
+      await postProtectedFunction('/joinRoom', {
+        roomCode: writingRoomId, displayName: getDisplayName(user)
+      }, { label: 'Room reconnection' });
+      if (isCurrent()) {
+        lastWriteAt = Date.now();
+        lastLeaseWriteAt = now;
+      }
+      return; // The server wrote presence; respect the normal heartbeat throttle.
+    }
+    const playerRef = doc(db, ROOM_COLLECTION, writingRoomId, PLAYER_COLLECTION, user.uid);
     await setDoc(playerRef, {
       uid: user.uid,
       displayName: getDisplayName(user),
@@ -231,19 +254,24 @@ async function writePresence(force = false) {
       mode: normalized.mode,
       frame: normalized.frame,
       pose: normalized.pose,
-      joinCode: activeRoomId
+      joinCode: writingRoomId
     }, { merge: true });
 
-    lastWriteAt = now;
-    lastSentPose = normalized;
+    if (isCurrent()) {
+      lastWriteAt = Date.now();
+      lastLeaseWriteAt = now;
+      lastSentPose = normalized;
+    }
   } catch (err) {
     console.warn('[multiplayer][presence] write failed:', err);
   } finally {
-    inFlightWrite = false;
+    if (isCurrent()) inFlightWrite = false;
   }
 }
 
-async function stopPresence() {
+async function stopPresence({ releaseLease = true } = {}) {
+  presenceGeneration += 1;
+  inFlightWrite = false;
   if (heartbeatTimer) {
     clearInterval(heartbeatTimer);
     heartbeatTimer = null;
@@ -263,15 +291,14 @@ async function stopPresence() {
   lastSamplePose = null;
   lastSampleAt = 0;
   lastWriteAt = 0;
+  lastLeaseWriteAt = 0;
 
-  if (!roomId || !user || !user.uid) return;
+  if (!releaseLease || !roomId || !user || !user.uid) return;
 
   try {
     const { db } = getServices();
     const playerRef = doc(db, ROOM_COLLECTION, roomId, PLAYER_COLLECTION, user.uid);
-    await setDoc(playerRef, {
-      expiresAt: Timestamp.fromMillis(Date.now() + LEAVE_TTL_MS)
-    }, { merge: true });
+    await deleteDoc(playerRef);
   } catch (_) {
     // Best effort only.
   }
@@ -305,9 +332,11 @@ function startPresence(roomId, getPoseFn) {
     throw new Error('startPresence requires a pose provider function.');
   }
 
-  stopPresence();
+  // Rebinding the same admitted room must not expire its new membership.
+  void stopPresence({ releaseLease: activeRoomId !== normalizedRoomId });
 
   activeRoomId = normalizedRoomId;
+  lastAdmissionAttemptAt = 0;
   getPose = getPoseFn;
   lastSamplePose = null;
   lastSampleAt = 0;
@@ -319,6 +348,7 @@ function startPresence(roomId, getPoseFn) {
   // The room create/join flow already writes presence. Waiting for the first heartbeat
   // avoids immediate server-side throttle denials on lastSeenAt.
   lastWriteAt = Date.now();
+  lastLeaseWriteAt = lastWriteAt;
 }
 
 function listenPlayers(roomId, callback, options = {}) {

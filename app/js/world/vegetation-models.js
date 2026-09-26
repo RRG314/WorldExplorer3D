@@ -1,4 +1,5 @@
-import {loadModelAsset} from '../assets/model-asset-runtime.js?v=15';
+import {drainCooperatively} from './cooperative-scheduling.js?v=1';
+import {loadModelAsset} from '../assets/model-asset-runtime.js?v=16';
 import {vegetationIdentitySeed} from './vegetation-spatial.js';
 
 const models = new Map();
@@ -62,11 +63,12 @@ function requestModel(ctx, kind) {
   return state;
 }
 
-export function renderVegetationModels(ctx, placements) {
+function* vegetationModelSteps(ctx, placements) {
   const groups = new Map();
   const biome = ctx.worldSurfaceProfile?.biome?.id || '';
   const accepted=[];
   for(const placement of placements) {
+    yield;
     const kind=vegetationModelKind(placement,biome,Number(ctx.LOC?.lat ?? 45)), model=requestModel(ctx,kind);
     if(!model.parts) continue;
     const baseY=ctx.terrainMeshHeightAt?.(placement.x,placement.z) ?? ctx.elevationWorldYAtWorldXZ?.(placement.x,placement.z);
@@ -81,40 +83,54 @@ export function renderVegetationModels(ctx, placements) {
     groups.get(key).placements.push(placement);accepted.push(placement);
   }
   for(const group of groups.values()) {
+    yield;
     const lod=new THREE.LOD();
+    ctx.vegetationMeshes.push(lod);
     const centerX=(group.cx+.5)*CELL_METERS, centerZ=(group.cz+.5)*CELL_METERS;
     const centerY=group.placements.reduce((sum,p)=>sum+p.baseY,0)/group.placements.length;
     lod.position.set(centerX,centerY,centerZ);
     for(let level=0;level<group.model.parts.length;level++) {
       const root=new THREE.Group();
+      lod.addLevel(root,level===0 ? 0 : 300);
       for(const part of group.model.parts[level]) {
         const geometry=part.geometry.clone(), material=part.material.clone();
         const mesh=new THREE.InstancedMesh(geometry,material,group.placements.length);
+        root.add(mesh);
         const bound=new THREE.Box3(), localBox=new THREE.Box3().setFromBufferAttribute(geometry.attributes.position);
         const matrix=new THREE.Matrix4(), quaternion=new THREE.Quaternion(), scale=new THREE.Vector3();
-        group.placements.forEach((p,index)=>{
+        for(let index=0;index<group.placements.length;index++){
+          if(index%64===0)yield;
+          const p=group.placements[index];
           const size=Math.max(.65,Number(p.scale)||1);
           quaternion.setFromAxisAngle(new THREE.Vector3(0,1,0),Number(p.rotation)||0);
           scale.set(size,size,size);
           matrix.compose(new THREE.Vector3(p.x-centerX,p.baseY-centerY,p.z-centerZ),quaternion,scale);
           mesh.setMatrixAt(index,matrix);bound.union(localBox.clone().applyMatrix4(matrix));
-        });
+        }
         // Three r128 culls instances using geometry bounds, not instance bounds.
         geometry.boundingSphere=bound.getBoundingSphere(new THREE.Sphere());
         geometry.boundingBox=bound;
         mesh.frustumCulled=true;mesh.castShadow=false;mesh.receiveShadow=true;
-        mesh.instanceMatrix.needsUpdate=true;root.add(mesh);
+        mesh.instanceMatrix.needsUpdate=true;
       }
-      lod.addLevel(root,level===0 ? 0 : 300);
     }
     lod.addLevel(new THREE.Group(),['fern','grass'].includes(group.kind) ? 240 : 1600);
     lod.userData.isVegetationBatch=true;
     lod.userData.vegetationAuthority='curated-model-cell-lod';
-    ctx.addEarthWorldObject(lod);ctx.vegetationMeshes.push(lod);
+    ctx.addEarthWorldObject(lod);
   }
   ctx.replaceWorldCollection('vegetationFeatures',accepted);
   ctx.vegetationModelStatus=Object.fromEntries([...models].map(([kind,state])=>[kind,state.error || (state.parts ? 'ready' : 'loading')]));
   return accepted.length;
+}
+
+export function renderVegetationModels(ctx, placements) {
+  const steps=vegetationModelSteps(ctx,placements);
+  for (;;) {const result=steps.next();if(result.done)return result.value;}
+}
+
+export function renderVegetationModelsCooperatively(ctx,placements,schedule) {
+  return drainCooperatively(vegetationModelSteps(ctx,placements),schedule);
 }
 
 export function disposeVegetationBatch(root) {

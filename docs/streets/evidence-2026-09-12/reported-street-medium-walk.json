@@ -1,0 +1,165 @@
+{
+  "tiles": 123,
+  "triangles": 27747,
+  "curbTriangles": 41354,
+  "markingTriangles": 3110,
+  "ramps": 0,
+  "workerMs": 6161,
+  "inferredFrontages": 23029,
+  "managedPaths": 369,
+  "residentRoads": 395,
+  "residentBuildings": 1242,
+  "roads": 17118,
+  "roadMeshes": 40,
+  "buildings": 27829,
+  "worldLoadSequence": 1,
+  "plannedTiles": 144,
+  "drawCalls": 94,
+  "coverageBounds": {
+    "minX": -384,
+    "maxX": 384,
+    "minZ": -384,
+    "maxZ": 384
+  },
+  "durationMs": 7846,
+  "position": {
+    "x": 3.7617779396167443,
+    "y": 27.077615808241166,
+    "z": 10.957785498348196
+  },
+  "roadRendered": null,
+  "mappedAreaRendered": null,
+  "contact": {
+    "source": "sidewalk",
+    "y": 25.377615808241167
+  },
+  "indexedRoad": null,
+  "terrain": 25.04808375498031,
+  "pavement": 25.377615808241167,
+  "nearbyBuildings": [
+    {
+      "name": "",
+      "pts": [
+        {
+          "x": -14.048284609458214,
+          "z": 12.39159014758684
+        },
+        {
+          "x": -22.349526927094665,
+          "z": 12.806653010244418
+        },
+        {
+          "x": -22.349526927094665,
+          "z": 8.656025486430963
+        },
+        {
+          "x": 1.3090136781692219,
+          "z": 7.410837708476947
+        },
+        {
+          "x": 1.7240757940510445,
+          "z": 12.806653010244418
+        },
+        {
+          "x": -14.048284609458214,
+          "z": 13.636778809456018
+        }
+      ],
+      "distance": 2.7514616316765865
+    },
+    {
+      "name": "",
+      "pts": [
+        {
+          "x": -11.557911914167278,
+          "z": 15.712093739495003
+        },
+        {
+          "x": -13.63322249357639,
+          "z": 16.127156801104547
+        },
+        {
+          "x": -14.048284609458214,
+          "z": 13.636778809456018
+        },
+        {
+          "x": 1.7240757940510445,
+          "z": 12.806653010244418
+        },
+        {
+          "x": 1.7240757940510445,
+          "z": 17.372346128041727
+        },
+        {
+          "x": -11.142849798285456,
+          "z": 17.787409289127254
+        }
+      ],
+      "distance": 2.7514616316765865
+    },
+    {
+      "name": "",
+      "pts": [
+        {
+          "x": -22.76458904297649,
+          "z": 5.335525239757999
+        },
+        {
+          "x": 1.3090136781692219,
+          "z": 3.675275707593073
+        },
+        {
+          "x": 1.3090136781692219,
+          "z": 7.410837708476947
+        },
+        {
+          "x": -22.349526927094665,
+          "z": 8.656025486430963
+        }
+      ],
+      "distance": 4.3124112914130475
+    }
+  ],
+  "road": {
+    "name": "Saint Paul Street",
+    "type": "primary",
+    "width": 10.1,
+    "tags": {
+      "cycleway:right": "lane",
+      "cycleway:right:buffer": "no",
+      "highway": "primary",
+      "lanes": "2",
+      "lit": "yes",
+      "maxspeed": "30 mph",
+      "name": "Saint Paul Street",
+      "oneway": "yes",
+      "parking:both": "lane",
+      "parking:both:orientation": "parallel",
+      "ref": "MD 2",
+      "surface": "asphalt"
+    },
+    "section": {
+      "lanes": 2,
+      "lanesSource": "source:lanes",
+      "widthMeters": 10.1,
+      "widthSource": "derived:lanes+mapped-parking",
+      "inferredLanes": false,
+      "inferredWidth": true,
+      "parking": {
+        "left": {
+          "widthMeters": 2,
+          "source": "inferred:parking-orientation"
+        },
+        "right": {
+          "widthMeters": 2,
+          "source": "inferred:parking-orientation"
+        }
+      },
+      "placement": {
+        "raw": "",
+        "centerlineOffsetMeters": 0,
+        "status": "absent"
+      }
+    }
+  }
+}

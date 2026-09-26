@@ -1,4 +1,5 @@
 import { analyticsStorageAllowed } from './analytics-consent.js?v=3';
+import { assertFirebaseEnvironment } from './firebase-environment-policy.js';
 
 let tools;
 let pending;
@@ -18,6 +19,7 @@ export function analyticsPageContext(location = globalThis.location, referrer = 
 }
 
 export async function getAnalyticsTools(config = globalThis.WORLD_EXPLORER_FIREBASE) {
+  assertFirebaseEnvironment(config);
   if (tools) return tools;
   if (pending) return pending;
   if (!config?.measurementId || Date.now() < retryAfter) return null;
@@ -28,6 +30,7 @@ export async function getAnalyticsTools(config = globalThis.WORLD_EXPLORER_FIREB
     ]);
     if (!await mod.isSupported()) return null;
     const app = apps.getApps().length ? apps.getApp() : apps.initializeApp(config);
+    assertFirebaseEnvironment(app.options);
     mod.setConsent({ analytics_storage: analyticsStorageAllowed() ? 'granted' : 'denied', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });
     const analytics = mod.initializeAnalytics(app, { config: { ...analyticsPageContext(), send_page_view: false, allow_google_signals: false, allow_ad_personalization_signals: false } });
     tools = { analytics, ...mod };

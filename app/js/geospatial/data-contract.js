@@ -10,6 +10,17 @@ const TRUTH_TYPES = Object.freeze([
 ]);
 
 const DATA_SOURCES = Object.freeze({
+  'usgs-cngm-surface': Object.freeze({
+    id:'usgs-cngm-surface',label:'USGS Cooperative National Geologic Map · surface units',
+    operator:'USGS and contributing geological surveys',truthType:'reference',
+    licenseId:'source-map-attribution',homepage:'https://ngmdb.usgs.gov/nationalgeology/',
+    description:'Published geological units with original map citations; not proof of surface exposure or collecting access.'
+  }),
+  macrostrat: Object.freeze({
+    id:'macrostrat',label:'Macrostrat geological map sources',operator:'Macrostrat',truthType:'reference',
+    licenseId:'CC-BY-4.0',licenseUrl:'https://creativecommons.org/licenses/by/4.0/',homepage:'https://macrostrat.org/',
+    description:'Regional geological map alternatives retaining original sources, not exact specimen locations.'
+  }),
   celestrak: Object.freeze({
     id: 'celestrak',
     label: 'CelesTrak',

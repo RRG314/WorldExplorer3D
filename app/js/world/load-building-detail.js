@@ -8,10 +8,6 @@ import {
 import { reviewedMappedVesselDataNear } from './reviewed-mapped-vessels.js?v=1';
 import { completeBuildingPublicationGroups } from './building-publication-groups.js';
 
-const COMPLETE_BUILDING_TILE_CAP = 1200;
-const BUILDING_COVERAGE_TARGET = 0.85;
-const EXPANDED_COVERAGE_FLOOR = 9001;
-
 function mappedBuildingHeightMeters(tags = {}) {
   const explicitHeight = Number.parseFloat(tags.height);
   if (Number.isFinite(explicitHeight)) return explicitHeight;
@@ -82,35 +78,18 @@ export function resolveBuildingPublicationSelection(options = {}) {
     0,
     Math.floor(Number(options.requestedBuildingWays) || 0)
   );
-  // Retain approximately 85% of mapped footprints. The one-feature floor
-  // above the retired 9,000 cap ensures a dense source cannot silently fall
-  // back to the exact coverage level the user rejected.
-  const coverageTargetCap = requestedBuildingWays > 0
-    ? Math.min(
-        requestedBuildingWays,
-        Math.max(
-          requestedBuildingWays > 9000 ? EXPANDED_COVERAGE_FLOOR : 1,
-          Math.ceil(requestedBuildingWays * BUILDING_COVERAGE_TARGET)
-        )
-      )
+  // Available mapped buildings must not be deliberately thinned when they
+  // fit the client budget. Density in one source tile is not missing data.
+  const configuredGlobalCap = requestedBuildingWays > 0
+    ? Math.min(configuredSafetyCap, requestedBuildingWays)
     : configuredSafetyCap;
-  const configuredGlobalCap = Math.min(configuredSafetyCap, coverageTargetCap);
-  const configuredPerTile = Math.max(
-    1,
-    Math.floor(Number(options.tileBudgetCfg?.buildingsPerTile) || 1),
-    Math.floor(Number(options.tileBudgetCfg?.buildingsMinPerTile) || 1)
-  );
   return Object.freeze({
     globalCap: configuredGlobalCap,
-    // Building geometry is already spatially batched and runtime-culled. Do
-    // not apply the recursive-depth tile thinning used for roads and props:
-    // that policy intentionally retained as little as 62% of dense tiles and
-    // left visible holes between otherwise authoritative footprints.
-    basePerTile: Math.max(configuredPerTile, COMPLETE_BUILDING_TILE_CAP),
-    minPerTile: configuredPerTile,
+    basePerTile: configuredGlobalCap,
+    minPerTile: configuredGlobalCap,
     useRdt: false,
     spreadAcrossArea: true,
-    coverageTarget: BUILDING_COVERAGE_TARGET,
+    coverageTarget: 1,
     requestedBuildingWays,
     // Preserve the broad mapped district when a global cap is reached instead
     // of concentrating nearly every retained footprint in the center.
@@ -351,14 +330,12 @@ export async function loadBuildingDetailForPublication(options = {}) {
         lodThresholds: options.lodThresholds,
         nodes,
         pickBuildingBaseColor: options.pickBuildingBaseColor,
-        rdtLoadComplexity: options.rdtLoadComplexity,
         registerBuildingCollision: options.registerBuildingCollision,
         sanitizeWorldFootprintPoints: options.sanitizeWorldFootprintPoints,
         showLoad: () => {},
         signedPolygonAreaXZ: options.signedPolygonAreaXZ,
         startLoadPhase: options.startLoadPhase,
         endLoadPhase: options.endLoadPhase,
-        useRdtBudgeting: options.useRdtBudgeting
       });
       options.loadMetrics.buildings.geometryPublication = buildingPublication;
       if (!isActiveLoadContext()) return;

@@ -1,0 +1,174 @@
+{
+  "tiles": 132,
+  "triangles": 26018,
+  "curbTriangles": 45202,
+  "inferredFrontages": 2451,
+  "managedPaths": 0,
+  "roads": 19219,
+  "roadMeshes": 36,
+  "buildings": 25518,
+  "worldLoadSequence": 1,
+  "plannedTiles": 144,
+  "durationMs": 11510,
+  "position": {
+    "x": 27.693449487884177,
+    "y": 51.070844413303035,
+    "z": -187.48864005335292
+  },
+  "contact": "terrain",
+  "terrain": 1.6682176434059173,
+  "pavement": null,
+  "nearbyBuildings": [
+    {
+      "name": "Hollywood Diner",
+      "pts": [
+        {
+          "x": 53.79582748992474,
+          "z": -190.7690362294545
+        },
+        {
+          "x": 54.62617610082811,
+          "z": -192.01452509847172
+        },
+        {
+          "x": 57.94757054444158,
+          "z": -189.10838405261643
+        },
+        {
+          "x": 57.11722193353822,
+          "z": -187.86289466348194
+        },
+        {
+          "x": 61.26896498805506,
+          "z": -184.54158853913327
+        },
+        {
+          "x": 55.456524711731475,
+          "z": -177.48380779849526
+        },
+        {
+          "x": 50.88960735176295,
+          "z": -180.80511726807913
+        },
+        {
+          "x": 49.64408443540789,
+          "z": -179.55962640101575
+        },
+        {
+          "x": 47.56821290814947,
+          "z": -181.6354443896273
+        },
+        {
+          "x": 48.39856151905284,
+          "z": -182.4657714116995
+        },
+        {
+          "x": 45.07716707543936,
+          "z": -185.7870785222815
+        },
+        {
+          "x": 50.88960735176295,
+          "z": -192.84485089272607
+        }
+      ],
+      "distance": 17.46679560789264
+    },
+    {
+      "name": "",
+      "pts": [
+        {
+          "x": 7.711479584787758,
+          "z": -135.1369739559516
+        },
+        {
+          "x": 6.881130973884389,
+          "z": -151.74360598635417
+        },
+        {
+          "x": 20.997057359241662,
+          "z": -152.5739365554557
+        },
+        {
+          "x": 22.242580275596715,
+          "z": -127.66397669352614
+        },
+        {
+          "x": 8.126653890239442,
+          "z": -126.833643171409
+        }
+      ],
+      "distance": 35.55106451130011
+    },
+    {
+      "name": "",
+      "pts": [
+        {
+          "x": 40.09507541001915,
+          "z": -153.40426702508125
+        },
+        {
+          "x": 66.66623095892696,
+          "z": -155.0649276659044
+        },
+        {
+          "x": 67.91175387528202,
+          "z": -135.1369739559516
+        },
+        {
+          "x": 41.340598326374206,
+          "z": -133.47630858859816
+        }
+      ],
+      "distance": 36.2704398959117
+    }
+  ],
+  "road": {
+    "name": "Fallsway",
+    "type": "secondary",
+    "width": 6.9,
+    "tags": {
+      "_nameProvenance": "spatial-label-association",
+      "_sourceCompleteness": "generalized",
+      "_sourceFeatureId": "shortbread:streets:13:2352:3122:437:0",
+      "access": "",
+      "bicycle": "",
+      "bridge": "",
+      "covered": "",
+      "cutting": "",
+      "destination": "",
+      "embankment": "",
+      "footway": "",
+      "highway": "secondary",
+      "horse": "",
+      "incline": "",
+      "junction": "",
+      "lanes": "",
+      "layer": "",
+      "level": "",
+      "location": "",
+      "maxheight": "",
+      "name": "Fallsway",
+      "oneway": "",
+      "placement": "",
+      "service": "",
+      "sidewalk": "",
+      "surface": "",
+      "tracktype": "yes",
+      "tunnel": "",
+      "width": ""
+    },
+    "section": {
+      "lanes": 2,
+      "lanesSource": "fallback:road-class",
+      "widthMeters": 6.9,
+      "widthSource": "fallback:road-class",
+      "inferredLanes": true,
+      "inferredWidth": true,
+      "placement": {
+        "raw": "",
+        "centerlineOffsetMeters": 0,
+        "status": "absent"
+      }
+    }
+  }
+}

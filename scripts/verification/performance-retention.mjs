@@ -1,14 +1,23 @@
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
+import { sampleFrameWindow } from './frame-window.mjs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { requirePerformanceHost, requireHardwareGraphics } from './performance-host.mjs';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 
+// Reject cloud/other hardware before opening a browser or loading a world.
+const hostAuthority = requirePerformanceHost();
 const root = process.cwd();
 const verifyRoot = process.env.WE3D_VERIFY_ROOT || root;
 const budgets = JSON.parse(await readFile(`${root}/config/performance-budgets.json`, 'utf8'));
 const server = await startStaticServer({ rootDir: verifyRoot, ports: [4421, 4422, 4423] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+// Keep GC within this 8 GiB host's test-process envelope; acceptance budgets stay unchanged.
+const browserOptions = { headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280'] };
+let browser = await chromium.launch(browserOptions);
+let graphicsAuthority = null;
 const requestedProfile = String(process.env.WE3D_VERIFY_PROFILE || 'all').trim().toLowerCase();
 const auditOnly = process.env.WE3D_VERIFY_AUDIT_ONLY === '1';
 assert.ok(['all', 'desktop', 'mobile'].includes(requestedProfile), `Unsupported WE3D_VERIFY_PROFILE: ${requestedProfile}`);
@@ -25,6 +34,7 @@ function metricValue(metrics, name) {
 async function createMeasuredClient(contextOptions) {
   const context = await browser.newContext(contextOptions);
   const page = await context.newPage();
+  await configureStagingAppCheck(page, baseUrl);
   const cdp = await context.newCDPSession(page);
   await cdp.send('Network.enable');
   await cdp.send('Performance.enable');
@@ -32,6 +42,7 @@ async function createMeasuredClient(contextOptions) {
   const transfers = new Map();
   const browserErrors = [];
   const localFailures = [];
+  collectBrowserGraphicsErrors(page, browserErrors);
   page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   page.on('response', (response) => {
     if (response.url().startsWith(baseUrl) && response.status() >= 400) {
@@ -112,7 +123,7 @@ async function waitForPlayable(page) {
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.();
     return state?.gameStarted === true && state.worldLoading === false &&
       Number(state.worldCounts?.buildings || 0) > 0 && Number(state.worldCounts?.roads || 0) > 0;
-  }, null, { timeout: 300_000 });
+  }, null, { timeout: 300_000, polling: 500 });
   await page.waitForTimeout(2_500);
 }
 
@@ -151,47 +162,38 @@ async function selectMode(page, expected, selector) {
   assert.equal(await page.locator(selector).isVisible(), true, `${selector} is not a visible Travel action.`);
   const startedAt = performance.now();
   await page.locator(selector).click();
-  await page.waitForFunction((mode) => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.mode === mode, expected, { timeout: 20_000 });
+  await page.waitForFunction((mode) => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.mode === mode, expected, { timeout: 20_000, polling: 500 });
   const activationMs = Math.round(performance.now() - startedAt);
   await page.waitForTimeout(1_200);
   return activationMs;
 }
 
-async function measureMode(client, id, sampleMs = 5_000) {
-  const raw = await client.page.evaluate(async (durationMs) => {
-    return new Promise((resolve) => {
-    const deltas = [];
-    const startedAt = performance.now();
-    let previous = startedAt;
-    const frame = (now) => {
-      if (now > previous) deltas.push(now - previous);
-      previous = now;
-      if (now - startedAt < durationMs) requestAnimationFrame(frame);
-      else {
-        const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
-        resolve({
-          deltas,
-          diagnostics: {
-            renderer: diagnostics.renderer || {},
-            worldCounts: diagnostics.worldCounts || null,
-            // Production artifacts bundle the module graph, so source-only module
-            // URLs are intentionally absent. Keep the release measurement on the
-            // public diagnostics contract instead of importing private source.
-            drawCallBreakdown: diagnostics.performance?.drawCallBreakdown || []
-          }
-        });
-      }
-    };
-    requestAnimationFrame(frame);
-    });
-  }, sampleMs);
+async function measureMode(client, id, sampleMs = 5_000, movementKey = null) {
+  if (movementKey) {
+    // Focus the world through a real pointer action, then hold the actual control.
+    await client.page.mouse.click(720, 400);
+    await client.page.keyboard.down(movementKey);
+  }
+  let raw;
+  try { raw = await client.page.evaluate(sampleFrameWindow, sampleMs); }
+  finally { if (movementKey) await client.page.keyboard.up(movementKey); }
+  assert.ok(raw.deltas.length > 0, 'Frame sample must contain intervals');
+  assert.ok(raw.elapsedMs >= sampleMs, 'Frame sample must cover the requested duration');
+  assert.ok(raw.deltas.every((value) => Number.isFinite(value) && value > 0), 'Frame intervals must be positive');
+  assert.ok(Math.abs(raw.deltas.reduce((sum, value) => sum + value, 0) - raw.elapsedMs) < 0.001,
+    'Frame intervals must sum to the measured window');
   const deltas = raw.deltas.filter((value) => Number.isFinite(value) && value > 0);
   const averageFrameMs = deltas.reduce((sum, value) => sum + value, 0) / Math.max(1, deltas.length);
   const rawJsHeapUsedBytes = await heapUsedBytes(client.cdp);
   const jsHeapUsedBytes = await heapUsedBytes(client.cdp, true);
   return {
     id,
+    scenario: movementKey ? 'controlled-moving-route' : id === 'plane' ? 'autonomous-flight' : 'stationary-mode',
+    inputDuringSample: movementKey ? { key: movementKey, heldForMs: sampleMs } : 'none',
     sampleMs,
+    elapsedMs: raw.elapsedMs,
+    distanceWorldUnits: raw.startPosition && raw.endPosition
+      ? Math.hypot(raw.endPosition.x-raw.startPosition.x,raw.endPosition.z-raw.startPosition.z) : null,
     frames: deltas.length,
     averageFps: 1000 / averageFrameMs,
     averageFrameMs,
@@ -244,11 +246,29 @@ async function runDesktop() {
     const launch = await launchWorld(client);
     const walkActivationMs = await selectMode(client.page, 'walk', '#fWalk');
     const walk = { ...(await measureMode(client, 'walk', auditOnly ? 1_500 : 5_000)), activationMs: walkActivationMs };
+    console.log('[performance-retention] desktop walk', JSON.stringify({ fps: walk.averageFps, withinBudgets: modesWithinBudgets([walk], budgets.desktopTier) }));
+    const walkMoving = await measureMode(client, 'walk-moving', 5_000, 'w');
     const driveActivationMs = await selectMode(client.page, 'drive', '#fDriving');
     const drive = { ...(await measureMode(client, 'drive', auditOnly ? 1_500 : 5_000)), activationMs: driveActivationMs };
+    console.log('[performance-retention] desktop drive', JSON.stringify({ fps: drive.averageFps, withinBudgets: modesWithinBudgets([drive], budgets.desktopTier) }));
+    const driveMoving = await measureMode(client, 'drive-moving', 5_000, 'w');
     const planeActivationMs = await selectMode(client.page, 'plane', '#fPlane');
-    const plane = { ...(await measureMode(client, 'plane', auditOnly ? 1_500 : 5_000)), activationMs: planeActivationMs };
-    const modes = [walk, drive, plane];
+    // Exercise the actual throttle and climb controls. An idle aircraft spawned
+    // from a city street can hit the next block; that is not sustained-flight
+    // performance evidence. Do not teleport, disable collisions, or inject speed.
+    await client.page.mouse.click(720, 400);
+    const flightBefore = await client.page.evaluate(async () => (await import('/app/js/shared-context.js?v=55')).ctx.getPlaneSnapshot());
+    await client.page.keyboard.down('Space');
+    await client.page.keyboard.down('s');
+    try { await client.page.waitForTimeout(2_000); }
+    finally { await client.page.keyboard.up('s'); await client.page.keyboard.up('Space'); }
+    const flightAfter = await client.page.evaluate(async () => (await import('/app/js/shared-context.js?v=55')).ctx.getPlaneSnapshot());
+    assert.ok(flightAfter.pitch > .05 && flightAfter.y > flightBefore.y && flightAfter.throttle > flightBefore.throttle,
+      'Real pitch/throttle input must establish a climb before sustained flight');
+    const plane = { ...(await measureMode(client, 'plane', auditOnly ? 1_500 : 90_000, 'Space')), activationMs: planeActivationMs,
+      preparation: { keys: ['s', 'Space'], heldForMs: 2_000, before: flightBefore, after: flightAfter } };
+    console.log('[performance-retention] desktop plane', JSON.stringify({ fps: plane.averageFps, withinBudgets: modesWithinBudgets([plane], budgets.desktopTier) }));
+    const modes = [walk, walkMoving, drive, driveMoving, plane];
     const baselineCounts = walk.worldCounts;
     const releases = [];
     const reloadCounts = [];
@@ -280,9 +300,11 @@ async function runDesktop() {
     const releaseTextures = releases.map((entry) => Number(entry?.after?.rendererTextures || 0));
     const checks = {
       firstPlayableWithinBudget: launch.firstPlayableMs <= limit.firstPlayableMs,
-      modeActivationResponsive: modes.every((mode) => mode.activationMs <= limit.maximumModeActivationMs),
+      modeActivationResponsive: modes.filter((mode) => mode.activationMs !== undefined).every((mode) => mode.activationMs <= limit.maximumModeActivationMs),
       completeWorld: modes.every((mode) => Number(mode.worldCounts?.buildings) > 0 && Number(mode.worldCounts?.roads) > 0 && Number(mode.worldCounts?.terrainTiles) > 0),
       modesWithinBudgets: modesWithinBudgets(modes, budgets.desktopTier),
+      movingGroundRoutesObserved: walkMoving.distanceWorldUnits >= 2 && driveMoving.distanceWorldUnits >= 5,
+      sustainedFlightObserved: !auditOnly && plane.elapsedMs >= 90_000 && plane.distanceWorldUnits >= 1_000,
       teardownClearsWorldOwners: releases.every((entry) =>
         Number(entry?.after?.roads || 0) <= budgets.retention.maximumRetainedRoads &&
         Number(entry?.after?.buildings || 0) <= budgets.retention.maximumRetainedBuildings &&
@@ -316,7 +338,7 @@ async function runMobileRegression() {
     const checks = {
       viewportIs390x844: await client.page.evaluate(() => innerWidth === 390 && innerHeight === 844),
       firstPlayableWithinBudget: launch.firstPlayableMs <= limit.firstPlayableMs,
-      modeActivationResponsive: modes.every((mode) => mode.activationMs <= limit.maximumModeActivationMs),
+      modeActivationResponsive: modes.filter((mode) => mode.activationMs !== undefined).every((mode) => mode.activationMs <= limit.maximumModeActivationMs),
       completeWorld: modes.every((mode) => Number(mode.worldCounts?.buildings) > 0 && Number(mode.worldCounts?.roads) > 0 && Number(mode.worldCounts?.terrainTiles) > 0),
       modesWithinBudgets: modesWithinBudgets(modes, budgets.mobileRegressionTier),
       transferWithinBudget: transferWithinBudget(transfer, limit),
@@ -332,6 +354,18 @@ async function runMobileRegression() {
 
 try {
   await mkdir('output/verification/performance-retention', { recursive: true });
+  const graphicsPage = await browser.newPage();
+  try {
+    graphicsAuthority = await graphicsPage.evaluate(() => {
+      const gl = document.createElement('canvas').getContext('webgl2');
+      if (!gl) return null;
+      const info = gl.getExtension('WEBGL_debug_renderer_info');
+      const renderer = info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+      gl.getExtension('WEBGL_lose_context')?.loseContext();
+      return { renderer };
+    });
+    requireHardwareGraphics(graphicsAuthority?.renderer);
+  } finally { await graphicsPage.close(); }
   let desktop = null;
   let mobileRegression = null;
   if (requestedProfile !== 'mobile') {
@@ -341,6 +375,13 @@ try {
     console.log('[performance-retention] desktop complete');
   }
   if (requestedProfile !== 'desktop') {
+    // Retention is measured within the desktop journey. Use a fresh process
+    // for the independent mobile profile so desktop GPU/native caches cannot
+    // inflate its cold-start memory or affect its measurement.
+    if (desktop) {
+      await browser.close();
+      browser = await chromium.launch(browserOptions);
+    }
     console.log('[performance-retention] starting mobile');
     mobileRegression = await runMobileRegression();
     await writeFile('output/verification/performance-retention/report-mobile.json', `${JSON.stringify(mobileRegression, null, 2)}\n`);
@@ -353,7 +394,16 @@ try {
     generatedAt: new Date().toISOString(),
     baseUrl,
     writesProduction: false,
+    evidenceScope: {
+      kind: 'single-artifact-budget-and-retention',
+      comparativeImprovementEstablished: false,
+      movingWalkAndDriveMeasured: desktop?.checks?.movingGroundRoutesObserved === true,
+      reason: 'Stationary and controlled moving samples are separate. A live-versus-candidate comparison with matched data, routes, quality, hardware, and repeated cold/warm trials is required to establish improvement.'
+    },
     budgets,
+    hostAuthority,
+    graphicsAuthority,
+    browserVersion: browser.version(),
     desktop,
     mobileRegression,
     physicalPhoneEvidence: {

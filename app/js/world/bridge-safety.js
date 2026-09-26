@@ -33,21 +33,22 @@ export function createDriveableRoadConflictIndex(roads = [], options = {}) {
       maxZ = Math.max(maxZ, point.z);
     }
     if (![minX, maxX, minZ, maxZ].every(Number.isFinite)) continue;
-    const padding = Math.max(2, (Number(road.width) || 5) * 0.5 + 0.8);
-    const minCellX = Math.floor((minX - padding) / cellSize);
-    const maxCellX = Math.floor((maxX + padding) / cellSize);
-    const minCellZ = Math.floor((minZ - padding) / cellSize);
-    const maxCellZ = Math.floor((maxZ + padding) / cellSize);
-    for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
-      for (let cellZ = minCellZ; cellZ <= maxCellZ; cellZ += 1) {
-        const key = `${cellX},${cellZ}`;
-        let bucket = buckets.get(key);
-        if (!bucket) {
-          bucket = [];
-          buckets.set(key, bucket);
-        }
-        bucket.push(road);
-      }
+    const requestedPadding = typeof options.paddingForRoad === 'function' ? options.paddingForRoad(road) : NaN;
+    const padding = Number.isFinite(requestedPadding) ? Math.max(0, requestedPadding) : Math.max(2, (Number(road.width) || 5) * 0.5 + 0.8);
+    // Index occupied segment corridors, not the entire bounding rectangle of
+    // a long bent road. The rectangle admitted distant roads into every ground
+    // query across its empty interior, multiplying frontage and profile work.
+    const keys=new Set();
+    for(let i=1;i<road.pts.length;i++) {
+      const a=road.pts[i-1],b=road.pts[i];
+      if(![a.x,a.z,b.x,b.z].every(Number.isFinite))continue;
+      const minCellX=Math.floor((Math.min(a.x,b.x)-padding)/cellSize),maxCellX=Math.floor((Math.max(a.x,b.x)+padding)/cellSize);
+      const minCellZ=Math.floor((Math.min(a.z,b.z)-padding)/cellSize),maxCellZ=Math.floor((Math.max(a.z,b.z)+padding)/cellSize);
+      for(let x=minCellX;x<=maxCellX;x++)for(let z=minCellZ;z<=maxCellZ;z++)keys.add(`${x},${z}`);
+    }
+    for(const key of keys) {
+      let bucket=buckets.get(key);if(!bucket)buckets.set(key,bucket=[]);
+      bucket.push(road);
     }
     indexedRoads += 1;
   }

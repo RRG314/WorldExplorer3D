@@ -1,3 +1,5 @@
+import {fitOrdinaryStreetProfile} from './ordinary-street-profile.js';
+import {roadPlacementOffsetWorld} from '../road-units.js';
 import {
   polylineDistances,
   sampleProfileAtDistance
@@ -147,7 +149,7 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
   const sampleDistances = createSampleDistances(
     total,
     options.sampleStep,
-    exactGraphNodeDistances
+    exactGraphNodeDistances.concat((feature.ordinaryStreetAnchors||[]).map(a=>a.distance))
   );
   const surfaceBias = Number.isFinite(options.surfaceBias)
     ? Number(options.surfaceBias)
@@ -164,7 +166,7 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
   const approachMaximumGrade = engineeredApproach
     ? engineeredMaximumGrade(feature, semantics)
     : null;
-  const maximumGrade = Number.isFinite(options.maximumGrade)
+  let maximumGrade = Number.isFinite(options.maximumGrade)
     ? Number(options.maximumGrade)
     : semantics?.terrainMode !== 'at_grade'
       ? engineeredMaximumGrade(feature, semantics)
@@ -178,9 +180,7 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
   const groundProbeHalfWidth = semantics.terrainMode === 'subgrade' && semantics.isTunnel
     ? Math.max(3.4, compiledWidth) * 0.5 + 0.95
     : halfWidth;
-  const corridorCenterOffset = finiteNumber(
-    feature?.transportRecord?.crossSection?.placement?.centerlineOffsetMeters
-  );
+  const corridorCenterOffset = roadPlacementOffsetWorld(feature);
   const anchors = normalizeAnchors(feature, semantics, total);
   const groundHeights = new Float32Array(sampleDistances.length);
   const offsets = new Float32Array(sampleDistances.length);
@@ -339,6 +339,15 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
         sampleDistances,
         maximumGrade
       );
+  if(mode==='at_grade'&&!engineeredApproach){
+    const ordinaryFit=fitOrdinaryStreetProfile(sampleDistances,centerHeights,[
+      {distance:0,targetSurfaceY:endpointGroundStart+surfaceBias},
+      {distance:total,targetSurfaceY:endpointGroundEnd+surfaceBias},
+      ...(feature.ordinaryStreetAnchors||[])
+    ],maximumGrade);
+    centerHeights=ordinaryFit.heights;
+    maximumGrade=ordinaryFit.maximumGrade;
+  }
   if (engineeredApproach) {
     // Graph identity and the complete grade cone are solved together below.
     // A separate pre-pass that pinned anchor samples could survive an

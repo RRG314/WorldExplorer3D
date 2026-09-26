@@ -1,0 +1,7921 @@
+{
+  "schemaVersion": 1,
+  "baseline": "f88af9db3473e9339ae776dcb4320ddf3297353d",
+  "method": "All app/js JavaScript files scanned; entries retain lexical contract mentions and imports, including comments. Not a call graph or proof of live reachability.",
+  "scannedFiles": 696,
+  "contracts": [
+    "roads",
+    "roadMeshes",
+    "linearFeatures",
+    "linearFeatureMeshes",
+    "landuses",
+    "surfaceFeatureHints",
+    "urbanSurfaceMeshes",
+    "buildings",
+    "buildingMeshes",
+    "dynamicBuildingColliders",
+    "transportNetworkModel",
+    "transportSurfacePublication",
+    "GroundHeight",
+    "SurfaceQuery",
+    "applyTransportTerrainCorridors",
+    "sampleFeatureSurfaceY",
+    "repositionBuildingsWithTerrain",
+    "buildTraversalNetworks",
+    "invalidateTraversalNetworks",
+    "vegetationMeshes",
+    "streetFurnitureMeshes",
+    "worldTraversalRadiusWorld",
+    "_worldLoadSequence"
+  ],
+  "entries": [
+    {
+      "file": "app/js/activity-discovery/catalog.js",
+      "sha256": "d12393b2758cbe8175b63ce43ad4d33965ecc70c1312c0f1a6a2d5783265e2e1",
+      "imports": [
+        "../shared-context.js?v=55",
+        "./schema-core.js?v=1",
+        "./library.js?v=3",
+        "./schema.js?v=2"
+      ],
+      "mentions": [
+        {
+          "line": 222,
+          "contracts": [
+            "GroundHeight"
+          ]
+        },
+        {
+          "line": 231,
+          "contracts": [
+            "GroundHeight"
+          ]
+        },
+        {
+          "line": 291,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 302,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 304,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 317,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 318,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 319,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/app-entry.js",
+      "sha256": "9097d38f19c9c8587ef329d8e08e17fa1b322b0f143a05614a4d2c54790648c5",
+      "imports": [
+        "../../js/auth-ui.js?v=55",
+        "../../js/analytics-consent.js?v=3",
+        "./rdt.js?v=55",
+        "./config.js?v=63",
+        "./shared-context.js?v=55",
+        "./platform/account-service.js?v=1",
+        "./platform/service-registry.js?v=1",
+        "./runtime/workload-policy.js?v=1",
+        "./runtime-diagnostics.js?v=82",
+        "./ui/legal-attribution.js?v=1",
+        "./state.js?v=65",
+        "./camera-mode.js?v=1",
+        "./pause-state.js?v=1",
+        "./location-session.js?v=7",
+        "./controls/action-input.js?v=13",
+        "./controls/keyboard-binding-ui.js?v=2",
+        "./interaction/context-router.js?v=5",
+        "./transport/actor-contract.js?v=6",
+        "./world/collection-registry.js?v=1",
+        "./world/water-environment.js?v=2",
+        "./perf.js?v=57",
+        "./env.js?v=58",
+        "./session-coordinator.js?v=2",
+        "./planetary/scene-ownership.js?v=9",
+        "./real-estate.js?v=55",
+        "./engine.js?v=105",
+        "./physics.js?v=128",
+        "./walking.js?v=98",
+        "./travel-mode.js?v=29",
+        "./boat-mode.js?v=58",
+        "./sky.js?v=89",
+        "./weather.js?v=11",
+        "./runtime/on-demand-modes.js?v=52",
+        "./runtime/on-demand-earth.js?v=190",
+        "./runtime/on-demand-block-builder.js?v=10",
+        "./runtime/on-demand-flower-challenge.js?v=1",
+        "./runtime/on-demand-live-earth.js?v=6",
+        "./runtime/on-demand-mars.js?v=1",
+        "./planetary/solid-world-runtime.js?v=20",
+        "./planetary/vehicles.js?v=3",
+        "./planetary/astronaut.js?v=4",
+        "./planetary/sky-orientation.js?v=15",
+        "./planetary/moon-sky.js?v=1",
+        "./planetary/tracks.js?v=2",
+        "./planetary/field-activities.js?v=11",
+        "./game.js?v=70",
+        "./input.js?v=79",
+        "./hud.js?v=105",
+        "./map.js?v=61",
+        "./main.js?v=76",
+        "./memory.js?v=55",
+        "./ui.js?v=172",
+        "./ui/accessibility.js?v=2"
+      ],
+      "mentions": [
+        {
+          "line": 281,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 282,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/block-builder/interaction.js",
+      "sha256": "0c72b9d6fac0450506a66392d1fce61bad5c53373b4975a346d5e5a6b327b86b",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 93,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 94,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/block-builder/ui.js",
+      "sha256": "c47b0ed0fa1b8c2c1a5643b1c1789b79bff905de3d53fb62bb5a049db11a594e",
+      "imports": [
+        "../shared-context.js?v=55",
+        "./catalog.js?v=2"
+      ],
+      "mentions": [
+        {
+          "line": 95,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 98,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/blocks.js",
+      "sha256": "0ef1144600f702308c11a60768d405f1c74ee2b9c87fc15a2fb59e53b447937c",
+      "imports": [
+        "./shared-context.js?v=55",
+        "./block-builder/interaction.js?v=4",
+        "./block-builder/catalog.js?v=2",
+        "./block-builder/collision.js?v=1",
+        "./block-builder/local-store.js?v=3",
+        "./block-builder/shared-sync.js?v=3",
+        "./planetary/runtime/surface-authority.js?v=4",
+        "./planetary/runtime/surface-query.js?v=3",
+        "./block-builder/world-coordinates.js?v=1",
+        "./character/construction-assistance.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 470,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 478,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/boat-mode.js",
+      "sha256": "4b50b5a4c71edfad0bf1e593fcf6917bae8fe14d4a732800283e9a0cae2b3dab",
+      "imports": [
+        "./shared-context.js?v=55",
+        "./earth-session.js?v=17",
+        "./water-dynamics.js?v=9",
+        "./boat-mode/water-query.js?v=21",
+        "./boat-mode/surface-effects.js?v=18",
+        "./boat-mode/boat-model.js?v=7",
+        "./boat-mode/prompt-ui.js?v=3",
+        "./boat-mode/dynamics.js?v=1",
+        "./boat-mode/runtime-dynamics.js?v=16",
+        "./boat-mode/ocean-transfer.js?v=3",
+        "./boat-mode/policy.js?v=3",
+        "./boat-mode/surface-layer-visibility.js?v=2",
+        "./transport/maritime-catalog.js?v=1",
+        "./transport/damage-model.js?v=1",
+        "./transport/vessel-visual-recipe.js?v=7"
+      ],
+      "mentions": [
+        {
+          "line": 71,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 72,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 74,
+          "contracts": [
+            "vegetationMeshes"
+          ]
+        },
+        {
+          "line": 75,
+          "contracts": [
+            "streetFurnitureMeshes"
+          ]
+        },
+        {
+          "line": 626,
+          "contracts": [
+            "GroundHeight"
+          ]
+        },
+        {
+          "line": 643,
+          "contracts": [
+            "GroundHeight"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/boat-mode/water-query.js",
+      "sha256": "9e4dc562154dfb3e697ebcc704edaa84a3d83a62e6152aecc5f0875b76283615",
+      "imports": [
+        "../shared-context.js?v=55",
+        "../water-dynamics.js?v=9",
+        "./water-geometry.js?v=4",
+        "../world/water-body-contract.js?v=4",
+        "../world/water-surface-registry.js?v=3"
+      ],
+      "mentions": [
+        {
+          "line": 295,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/building-entry.js",
+      "sha256": "5c73c714eca7037164fb37c221181aac43e4bf2d7e30d5c20d05b521bf062da2",
+      "imports": [
+        "./shared-context.js?v=55"
+      ],
+      "mentions": [
+        {
+          "line": 361,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 383,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 391,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 448,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 508,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/deflock/runtime.js",
+      "sha256": "ee0511bd2510f9a59b05d9a74e80268fdd80ead3895c462f8a4e1b53fd55f5a0",
+      "imports": [
+        "../shared-context.js?v=55",
+        "./source.js?v=7",
+        "./placement.js?v=2",
+        "./state.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 264,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 269,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/discovery/environment-context.js",
+      "sha256": "31530e6cf42fb4ddab0272057365af232d667b5bd485d3ff0888acac4aa5c6cc",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 61,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 62,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 63,
+          "contracts": [
+            "landuses"
+          ]
+        },
+        {
+          "line": 105,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 106,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 107,
+          "contracts": [
+            "landuses"
+          ]
+        },
+        {
+          "line": 167,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 168,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 169,
+          "contracts": [
+            "landuses"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/discovery/runtime.js",
+      "sha256": "a787270d03b0bd9a365c3d81f613dd0ef0e15d0c0f1ad0b30dcf08a943251c98",
+      "imports": [
+        "./catalog.js?v=4",
+        "./companion-runtime.js?v=10",
+        "./creature-quality.js?v=1",
+        "./detector-session.js?v=3",
+        "./encounter-director.js?v=1",
+        "./ecology/regional-packs.js?v=2",
+        "./environment-context.js?v=2",
+        "./field-retention.js?v=2",
+        "./field-activities.js?v=4",
+        "./field-expedition.js?v=1",
+        "./field-equipment.js?v=4",
+        "./explorer-events.js?v=3",
+        "./explorer-goals.js?v=2",
+        "./model.js?v=1",
+        "./profile-store.js?v=5",
+        "./pacing.js?v=2",
+        "./telemetry.js?v=2",
+        "./surface.js?v=1",
+        "./tools.js?v=1",
+        "./tutorials.js?v=1",
+        "./visual-content.js?v=1",
+        "./wildlife-runtime.js?v=6",
+        "../living-world/model.js?v=1",
+        "../ar/eligibility.js?v=2",
+        "../ui/screen-layout.js?v=2",
+        "../character/catalog.js?v=1",
+        "../character/capability-resolver.js?v=2",
+        "../character/wildlife-assistance.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 1090,
+          "contracts": [
+            "roads",
+            "landuses",
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/discovery/surface.js",
+      "sha256": "e074b59b4f65b84c0bdbec1972fa1245e70730e65f1d13a18dadcba16b237374",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 2,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/earth-core/world-snapshot.js",
+      "sha256": "755ee4d7aa04d0543313a8888151bb2ae098650ab589bd76a16a0affc90bf37d",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 5,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/earth-session.js",
+      "sha256": "071a6401ce983fc59a5019ce32163eddb7109ae9e43be51895b86232e6dc9f25",
+      "imports": [
+        "./shared-context.js?v=55",
+        "./earth-location.js?v=2",
+        "./session-coordinator.js?v=2"
+      ],
+      "mentions": [
+        {
+          "line": 332,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 334,
+          "contracts": [
+            "roads"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/editable-world/runtime.js",
+      "sha256": "70677f1f2c758d7ad767525b71cf002be1973d0df7aab0bceb58048640dd0292",
+      "imports": [
+        "./local-store.js?v=1",
+        "./model.js?v=1",
+        "./presentation.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 40,
+          "contracts": [
+            "invalidateTraversalNetworks"
+          ]
+        },
+        {
+          "line": 91,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 116,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 139,
+          "contracts": [
+            "invalidateTraversalNetworks"
+          ]
+        },
+        {
+          "line": 144,
+          "contracts": [
+            "_worldLoadSequence"
+          ]
+        },
+        {
+          "line": 178,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 180,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 182,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 222,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 386,
+          "contracts": [
+            "invalidateTraversalNetworks"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/engine/building-facade-materials.js",
+      "sha256": "3f6c358ccf41538313e539d30fd525d6d5fa8e8185607957d5eadaa8e5071349",
+      "imports": [
+        "../world/building-exterior-catalog.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 243,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 297,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/engine/scene-bootstrap.js",
+      "sha256": "5f5a5eb5f0a78d47126db8458375cf807c9cfb52b5ccfcd396a2903acfc29389",
+      "imports": [
+        "./input-handlers.js?v=15",
+        "./night-lighting.js?v=8",
+        "./curated-player-car.js?v=7",
+        "./shadow-policy.js?v=2",
+        "../sky/earth-atmosphere.js?v=1",
+        "../startup-diagnostics.js?v=2"
+      ],
+      "mentions": [
+        {
+          "line": 400,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 404,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/expedition/ship-interior.js",
+      "sha256": "c4c80720c4608e732d67cf939892d1ad89c2691da6cbd86eebd7b88fb73aa5b3",
+      "imports": [
+        "../shared-context.js?v=55",
+        "../engine/webgl-lifecycle.js?v=2",
+        "./ship-layout.js?v=5",
+        "./crew-operations.js?v=1",
+        "./failure-authority.js?v=3",
+        "../space/craft-identity.js?v=1",
+        "../space/curated-expedition-pod.js?v=4",
+        "../walking/curated-explorer-character.js?v=8"
+      ],
+      "mentions": [
+        {
+          "line": 1922,
+          "contracts": [
+            "dynamicBuildingColliders"
+          ]
+        },
+        {
+          "line": 2249,
+          "contracts": [
+            "dynamicBuildingColliders"
+          ]
+        },
+        {
+          "line": 2299,
+          "contracts": [
+            "dynamicBuildingColliders"
+          ]
+        },
+        {
+          "line": 2390,
+          "contracts": [
+            "dynamicBuildingColliders"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/fishing/shore-authority.js",
+      "sha256": "e407225ccf1357dca5aaa95a02b7adf514ed4e749a2f3fbbc6b349755f267f9f",
+      "imports": [
+        "./population-authority.js?v=2"
+      ],
+      "mentions": [
+        {
+          "line": 32,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 58,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/flower-challenge/leaderboard.js",
+      "sha256": "5a6893b4e8c154fc14e064114480966dd25b6fa98c9c7d896d620ebeb032dc39",
+      "imports": [
+        "../leaderboards/catalog.js?v=2",
+        "../discovery/explorer-events.js?v=3",
+        "../platform/product-telemetry.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 430,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/flower-challenge/marker-runtime.js",
+      "sha256": "3f52aff4c5a23fa829b5869849d399511701ed3b0e4cb2b14f5d51ab872f5560",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 21,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 25,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 29,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 66,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 67,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 69,
+          "contracts": [
+            "roads"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/game/modes.js",
+      "sha256": "151fd9630fe2575f19790061ef6d6afff917fb66609060dff454711b777ae6a2",
+      "imports": [
+        "../shared-context.js?v=55",
+        "../gameplay/plugin-registry.js?v=1",
+        "./police.js?v=2",
+        "./paint-town.js?v=2",
+        "../runtime/on-demand-location-games.js?v=2"
+      ],
+      "mentions": [
+        {
+          "line": 42,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 43,
+          "contracts": [
+            "roads"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/game/navigation-ui.js",
+      "sha256": "b8d0957e92f36800078aa67f14b32a691a60bd8e77949cff2644b81fc9e7ec20",
+      "imports": [
+        "../shared-context.js?v=55",
+        "./ui-utils.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 88,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 92,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 94,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 98,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 210,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 275,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 277,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/game/paint-town/claims.js",
+      "sha256": "33a791f5cfda4b2da9d7d92dc64db5292616e2112d0185068f3ff947be13c96c",
+      "imports": [
+        "../../shared-context.js?v=55",
+        "./constants.js?v=1",
+        "./core.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 35,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 36,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 37,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 61,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 116,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 119,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 123,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 125,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 126,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 159,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/game/paint-town/projectiles.js",
+      "sha256": "e30dfe028ef5e5db3a660f118926c97ba9e5e413e52a54ff3abb51d9aede6927",
+      "imports": [
+        "../../shared-context.js?v=55",
+        "./constants.js?v=1",
+        "./core.js?v=1",
+        "./claims.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 131,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 132,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 412,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/game/paint-town/runtime.js",
+      "sha256": "fc9952d7fa0348e9c58079f38681126e9387431539a304ed59139315b7f37d7d",
+      "imports": [
+        "../../shared-context.js?v=55",
+        "./constants.js?v=1",
+        "./core.js?v=1",
+        "./claims.js?v=1",
+        "./projectiles.js?v=2"
+      ],
+      "mentions": [
+        {
+          "line": 63,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 64,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 65,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 89,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 95,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 128,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/game/police.js",
+      "sha256": "ff8ccf3b9b1a36f3b3ba8f34137232040794452cffea6882fe0e67ce37197685",
+      "imports": [
+        "../shared-context.js?v=55",
+        "../physics/vehicle-speed-units.js?v=2"
+      ],
+      "mentions": [
+        {
+          "line": 57,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 61,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 130,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 134,
+          "contracts": [
+            "roadMeshes"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/game/property-ui.js",
+      "sha256": "c8fbcb90c147fb7d22af8197a22eb426e38059a158be0c9707994a5b54ca1530",
+      "imports": [
+        "../shared-context.js?v=55",
+        "../urban-sandbox/equipment-model.js?v=10",
+        "../urban-sandbox/commerce-model.js?v=5",
+        "../real-estate/housing-model.js?v=2",
+        "../real-estate/connected-property-authority.js?v=3",
+        "../economy/connected-wallet-authority.js?v=2",
+        "../../../js/auth-ui.js?v=55",
+        "../multiplayer/rooms.js?v=67",
+        "../multiplayer/loop.js?v=56",
+        "./navigation-ui.js?v=1",
+        "./ui-utils.js?v=1",
+        "../gis/maryland-parcel-core.js?v=1",
+        "../gis/maryland-parcel-provider.js?v=1",
+        "../real-estate/parcel-property-model.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 80,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 137,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 260,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 295,
+          "contracts": [
+            "roads",
+            "buildings"
+          ]
+        },
+        {
+          "line": 297,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 304,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 368,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 477,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/geospatial/data-contract.js",
+      "sha256": "df773a79435c7b276b2cd8211cebd264a9463214f48bee732158ed20646f02c5",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 135,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/gis/maryland-parcel-core.js",
+      "sha256": "88837be88af28b5b566c6fe66bb419ddd2a1742a4859c4600d4cec49f5e9a601",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 225,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 227,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/ground.js",
+      "sha256": "1b0c5797ed8781653d84a76b07d9bee25101c33a325f4a7783633720c7a3ebd4",
+      "imports": [
+        "./shared-context.js?v=55",
+        "./structure-semantics.js?v=63",
+        "./world/surface-contract.js?v=16",
+        "./world/road-cross-section-profile.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 4,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 9,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 40,
+          "contracts": [
+            "GroundHeight"
+          ]
+        },
+        {
+          "line": 137,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 198,
+          "contracts": [
+            "linearFeatureMeshes"
+          ]
+        },
+        {
+          "line": 202,
+          "contracts": [
+            "urbanSurfaceMeshes"
+          ]
+        },
+        {
+          "line": 233,
+          "contracts": [
+            "linearFeatures"
+          ]
+        },
+        {
+          "line": 286,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 288,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 338,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 353,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 424,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 567,
+          "contracts": [
+            "GroundHeight",
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 568,
+          "contracts": [
+            "GroundHeight",
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 570,
+          "contracts": [
+            "GroundHeight",
+            "SurfaceQuery"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/hud.js",
+      "sha256": "0e9d4473cf032f0e6756bd5de9ba5a0cb087479ee3c56249ec3a191421b362ab",
+      "imports": [
+        "./shared-context.js?v=55",
+        "./engine/night-lighting.js?v=8",
+        "./engine/shadow-policy.js?v=2",
+        "./hud/boat-camera.js?v=5",
+        "./physics/vehicle-speed-units.js?v=2",
+        "./hud/chase-camera-terrain.js?v=1",
+        "./hud/tunnel-camera-controller.js?v=6",
+        "./hud/tunnel-camera-boom.js",
+        "./hud/vehicle-camera-body.js",
+        "./hud/driving-cabin-camera.js",
+        "./controls/traversal-control-policy.js?v=8",
+        "./planetary/runtime/surface-query.js?v=3"
+      ],
+      "mentions": [
+        {
+          "line": 478,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 527,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 568,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 598,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 656,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 682,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 717,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 724,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/interaction/world-click-router.js",
+      "sha256": "e9dbc531fb2bc2c65ba9c615b90ebe1b921d74f9ad27f4ab8621c764d70dc0b4",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 143,
+          "contracts": [
+            "streetFurnitureMeshes"
+          ]
+        },
+        {
+          "line": 144,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/interiors/core.js",
+      "sha256": "44fbe2e15d0727b5be8eec8dcfc01cf2e141940a13f7f72c9a6f163be0b69a2b",
+      "imports": [
+        "../shared-context.js?v=55",
+        "../building-entry.js?v=9",
+        "./constants.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 143,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/interiors/runtime-ui.js",
+      "sha256": "3f556d1a241ca426d9980309735123540ed0e917d33a0acb84e94ebe99b9b0bd",
+      "imports": [
+        "../shared-context.js?v=55",
+        "../building-entry.js?v=9"
+      ],
+      "mentions": [
+        {
+          "line": 85,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 86,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 87,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 166,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 168,
+          "contracts": [
+            "vegetationMeshes"
+          ]
+        },
+        {
+          "line": 170,
+          "contracts": [
+            "streetFurnitureMeshes"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/interiors/runtime.js",
+      "sha256": "d2cfbbadc20c8ce79732b48adcba9b063465bcff6d5554f224db17bd3ec4aeee",
+      "imports": [
+        "../shared-context.js?v=55",
+        "../building-entry.js?v=9",
+        "./runtime-ui.js?v=4",
+        "./elevator-authority.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 160,
+          "contracts": [
+            "dynamicBuildingColliders"
+          ]
+        },
+        {
+          "line": 324,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 336,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 347,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 392,
+          "contracts": [
+            "dynamicBuildingColliders"
+          ]
+        },
+        {
+          "line": 495,
+          "contracts": [
+            "dynamicBuildingColliders"
+          ]
+        },
+        {
+          "line": 530,
+          "contracts": [
+            "dynamicBuildingColliders"
+          ]
+        },
+        {
+          "line": 612,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/leaderboards/catalog.js",
+      "sha256": "d4f0b9cac7e775a05827edbc4a069417677828d26b6402a31796a180add29467",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 15,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/living-world/entrance-catalog.js",
+      "sha256": "f36755b26a4886f1c9d15bb5f71819546d6c8ec54e03c4bbd2419e580d182cf0",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 317,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/living-world/runtime.js",
+      "sha256": "df58f175f9d8181023be6fad23daae1137249890ec3872231e7fc25804ce61cc",
+      "imports": [
+        "./model.js?v=1",
+        "./entrance-catalog.js?v=6",
+        "./navigation-graphs.js?v=12",
+        "./population.js?v=22"
+      ],
+      "mentions": [
+        {
+          "line": 86,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 134,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 137,
+          "contracts": [
+            "GroundHeight"
+          ]
+        },
+        {
+          "line": 154,
+          "contracts": [
+            "buildTraversalNetworks"
+          ]
+        },
+        {
+          "line": 159,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 167,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 185,
+          "contracts": [
+            "streetFurnitureMeshes"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/map/earth-base.js",
+      "sha256": "d269de1909d25bce80b684d8399be1bb166813936cdb4988692bd03273d67423",
+      "imports": [
+        "../shared-context.js?v=55",
+        "./tiles.js?v=5"
+      ],
+      "mentions": [
+        {
+          "line": 7,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 8,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 9,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 10,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 11,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 14,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 17,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 49,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 50,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 51,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 52,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 59,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 60,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 63,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 71,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 73,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 203,
+          "contracts": [
+            "linearFeatures"
+          ]
+        },
+        {
+          "line": 209,
+          "contracts": [
+            "linearFeatures"
+          ]
+        },
+        {
+          "line": 252,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 254,
+          "contracts": [
+            "roads"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/memory.js",
+      "sha256": "b2173971e73f4b20b762549c498d139c4a588251e327b89f3ab66159960d4953",
+      "imports": [
+        "./shared-context.js?v=55",
+        "./memory-markers.js?v=1",
+        "./memory-ui.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 113,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 132,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 134,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/perf-panel.js",
+      "sha256": "e9fce4519f3a6cb5a7a58741d32301d381d0042c797596262901788feeea7bdb",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 98,
+          "contracts": [
+            "roads",
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/perf-renderer.js",
+      "sha256": "628e7f5b1dae543facf24def3c4b43f332a0dbf402f3f3262052ecd69d6c56c0",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 17,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 18,
+          "contracts": [
+            "buildings",
+            "buildingMeshes"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/perf.js",
+      "sha256": "aff2555e57cc87096774305e3828dc1537a06178c27adc339b03d49bdc55b4f7",
+      "imports": [
+        "./shared-context.js?v=55",
+        "./perf-panel.js?v=1",
+        "./perf-renderer.js?v=1",
+        "./perf-settings.js?v=1",
+        "./physics/vehicle-speed-units.js?v=2"
+      ],
+      "mentions": [
+        {
+          "line": 102,
+          "contracts": [
+            "roads",
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/physics.js",
+      "sha256": "363cf512686d8a7433354c463fdfd41d2593a7acb57d60c85cfbadece3bd37a4",
+      "imports": [
+        "./shared-context.js?v=55",
+        "./world/compiler/tunnel-space-query.js",
+        "./structure-semantics.js?v=63",
+        "./physics/drone-flight.js?v=11",
+        "./plane-mode.js?v=36",
+        "./physics/vehicle-surface.js?v=6",
+        "./physics/building-collision.js?v=4",
+        "./physics/building-collision-response.js?v=8",
+        "./physics/mode-dispatch.js?v=4",
+        "./physics/planetary-vehicle.js?v=3",
+        "./controls/traversal-control-policy.js?v=8",
+        "./physics/vehicle-speed-units.js?v=2",
+        "./engine/vehicle-catalog.js?v=6",
+        "./transport/damage-model.js?v=1",
+        "./physics/road-vehicle-airborne.js?v=1",
+        "./transport/vehicle-upgrades.js?v=1",
+        "./planetary/runtime/physical-environment.js?v=2",
+        "./character/vehicle-assistance.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 81,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 82,
+          "contracts": [
+            "roads"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/physics/building-collision.js",
+      "sha256": "262f22c9aff559ce47d7d20ca8249bc463c30dc231cc91183ac68a014c34f6dd",
+      "imports": [
+        "../world/vegetation-obstacle-index.js"
+      ],
+      "mentions": [
+        {
+          "line": 14,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 15,
+          "contracts": [
+            "dynamicBuildingColliders"
+          ]
+        },
+        {
+          "line": 26,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 31,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 38,
+          "contracts": [
+            "dynamicBuildingColliders"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/physics/drone-flight.js",
+      "sha256": "3807ca24a8d5a414c8879e5729ba33ef25a1570fc7f386b98d77b0aa182475f0",
+      "imports": [
+        "../shared-context.js?v=55",
+        "../planetary/runtime/surface-query.js?v=3",
+        "../planetary/traversal-capabilities.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 54,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/physics/vehicle-surface.js",
+      "sha256": "fa4bf04d0b826a93506add543cbaa67c899b86fe02f9e8d967d87d82b4d66d79",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 53,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/plane-mode.js",
+      "sha256": "81bc7615d19d8608d65a5e0f3081613e47f455962c8fdfa7b0ff302ca2438423",
+      "imports": [
+        "./shared-context.js?v=55",
+        "./controls/traversal-control-policy.js?v=8",
+        "./plane/roof-contact.js?v=2",
+        "./plane/flight-dynamics.js?v=4",
+        "./physics/swept-contact.js?v=1",
+        "./transport/aviation-catalog.js?v=5",
+        "./transport/aircraft-visual-recipe.js?v=11",
+        "./transport/damage-model.js?v=1",
+        "./controls/mobile-touch-authority.js?v=5"
+      ],
+      "mentions": [
+        {
+          "line": 161,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 191,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 205,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 208,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/planetary/scene-ownership.js",
+      "sha256": "cd6ca5dab6bea4b1214dbf9a077767d00e27dbdfaea9796e201e21a2b4891362",
+      "imports": [
+        "../shared-context.js?v=55"
+      ],
+      "mentions": [
+        {
+          "line": 4,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 5,
+          "contracts": [
+            "urbanSurfaceMeshes"
+          ]
+        },
+        {
+          "line": 7,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 9,
+          "contracts": [
+            "linearFeatureMeshes"
+          ]
+        },
+        {
+          "line": 12,
+          "contracts": [
+            "streetFurnitureMeshes"
+          ]
+        },
+        {
+          "line": 13,
+          "contracts": [
+            "vegetationMeshes"
+          ]
+        },
+        {
+          "line": 202,
+          "contracts": [
+            "_worldLoadSequence"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/poi/building-association.js",
+      "sha256": "d6675e0c9941b83188bae5730091848881524d05576505072df8682846d51172",
+      "imports": [
+        "../building-entry.js?v=9"
+      ],
+      "mentions": [
+        {
+          "line": 11,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 17,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 47,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 50,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/poi/lifecycle.js",
+      "sha256": "591abbd155713dfce2872e6bff932fd3bb967350301524a1e5a18cde9a997592",
+      "imports": [
+        "./semantic-authority.js?v=3",
+        "./building-association.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 4,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 6,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/real-estate/housing-model.js",
+      "sha256": "4c849c6536045b32988ed7330f72704f56f056ffbd3a10c59df8f2740ff70c31",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 9,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 157,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 158,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/real-estate/parcel-property-model.js",
+      "sha256": "bc3bfee378b1392aa7728a9be4fb1561a8f0ccb37832854231673ef932f96519",
+      "imports": [
+        "../gis/maryland-parcel-core.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 38,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 39,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 40,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 51,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 71,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 75,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 78,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 79,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 80,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/reality-capture/runtime-contract.js",
+      "sha256": "af840b7b0c8addd5153874e0db617580c5e73581fc63cfb50c31d29e50eba8f1",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 49,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/reality-capture/runtime.js",
+      "sha256": "708e52f36920ffddaa7feb07e022ddb5877d7ad8bfcf6471e79f2fe177384add",
+      "imports": [
+        "./capture-intent.js",
+        "../../../js/community-reality-capture-api.js?v=4",
+        "../editable-world/model.js?v=1",
+        "../editable-world/runtime.js?v=4",
+        "./runtime-contract.js?v=2",
+        "./alignment.js?v=1",
+        "./nearby-refresh.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 101,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 111,
+          "contracts": [
+            "_worldLoadSequence"
+          ]
+        },
+        {
+          "line": 117,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 156,
+          "contracts": [
+            "_worldLoadSequence"
+          ]
+        },
+        {
+          "line": 160,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 175,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 231,
+          "contracts": [
+            "_worldLoadSequence"
+          ]
+        },
+        {
+          "line": 238,
+          "contracts": [
+            "_worldLoadSequence"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/reality-capture/survey-association.js",
+      "sha256": "77d5d46dea1e9844f98b1aba01767c97be1035ba9233260c8800a814e54697c1",
+      "imports": [
+        "./orientation.js"
+      ],
+      "mentions": [
+        {
+          "line": 3,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 9,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/reality-capture/survey-presentation.js",
+      "sha256": "5161d8e19e3fba7b4d0555b2faad1b850fff785413d2361a7ace751d4def876f",
+      "imports": [
+        "./survey-store.js",
+        "./local-draft-store.js?v=1",
+        "./hybrid-geometry.js?v=1",
+        "../editable-world/model.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 14,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/reality-capture/survey-ui.js",
+      "sha256": "ecd582bf577a3fce4805586da150f2d59813bc6be440908094e491f00794b14d",
+      "imports": [
+        "./capture-theme.js",
+        "../../../js/auth-ui.js?v=55",
+        "../../../js/community-reality-capture-api.js?v=4",
+        "./local-draft-store.js?v=1",
+        "./survey-store.js",
+        "./survey-metadata.js",
+        "./survey-association.js",
+        "./orientation.js",
+        "./runtime-contract.js?v=2"
+      ],
+      "mentions": [
+        {
+          "line": 31,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 47,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 58,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/reality-capture/ui.js",
+      "sha256": "11ef55943034a49f678e9135467400fba5d65fd9572dd9f9d6e0062e6fd3cee3",
+      "imports": [
+        "./capture-intent.js",
+        "./workspace-navigation.js",
+        "../../../functions/capture-target.mjs",
+        "./capture-theme.js",
+        "./workflow-presentation.js",
+        "../../../js/capture-activity.js",
+        "../editable-world/model.js?v=1",
+        "../../../js/community-reality-capture-api.js?v=4",
+        "../../../js/auth-ui.js?v=55",
+        "./capture-session.js?v=1",
+        "./local-draft-store.js?v=1",
+        "./runtime-contract.js?v=2",
+        "./alignment.js?v=1",
+        "./photo-guide.js?v=1",
+        "../ui/screen-layout.js?v=2"
+      ],
+      "mentions": [
+        {
+          "line": 1025,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 1028,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 1029,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/runtime-diagnostics.js",
+      "sha256": "c723a1f1f82e4c6d5176586f39abd2729fdc7d6d863410d4ee4d9ceb237e46d4",
+      "imports": [
+        "./shared-context.js?v=55",
+        "./engine/building-facade-materials.js?v=16"
+      ],
+      "mentions": [
+        {
+          "line": 273,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 495,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 496,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 497,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 674,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 676,
+          "contracts": [
+            "worldTraversalRadiusWorld"
+          ]
+        },
+        {
+          "line": 677,
+          "contracts": [
+            "worldTraversalRadiusWorld"
+          ]
+        },
+        {
+          "line": 678,
+          "contracts": [
+            "worldTraversalRadiusWorld"
+          ]
+        },
+        {
+          "line": 680,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 765,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 785,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 789,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 836,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 860,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 893,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 895,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 897,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 899,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 901,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 916,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 918,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 920,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 943,
+          "contracts": [
+            "transportSurfacePublication"
+          ]
+        },
+        {
+          "line": 944,
+          "contracts": [
+            "transportSurfacePublication"
+          ]
+        },
+        {
+          "line": 973,
+          "contracts": [
+            "vegetationMeshes"
+          ]
+        },
+        {
+          "line": 992,
+          "contracts": [
+            "dynamicBuildingColliders"
+          ]
+        },
+        {
+          "line": 1046,
+          "contracts": [
+            "dynamicBuildingColliders"
+          ]
+        },
+        {
+          "line": 1070,
+          "contracts": [
+            "dynamicBuildingColliders"
+          ]
+        },
+        {
+          "line": 1119,
+          "contracts": [
+            "transportSurfacePublication"
+          ]
+        },
+        {
+          "line": 1120,
+          "contracts": [
+            "transportSurfacePublication"
+          ]
+        },
+        {
+          "line": 1121,
+          "contracts": [
+            "transportSurfacePublication"
+          ]
+        },
+        {
+          "line": 1122,
+          "contracts": [
+            "transportSurfacePublication"
+          ]
+        },
+        {
+          "line": 1220,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 1221,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 1223,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 1224,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 1226,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 1227,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 1229,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 1230,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 1235,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 1236,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 1240,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 1241,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 1243,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 1244,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 1267,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 1395,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 1396,
+          "contracts": [
+            "roads"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/sky/star-point-material.js",
+      "sha256": "a11bb3caac92d81ec05f94405d8a623a8b5ca81956e9da0e730a9c198244b6f8",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 7,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/state.js",
+      "sha256": "a0e61514bbe83f9dd871b7b73840c40b887edf2b92a1a783a83be30d7df236fa",
+      "imports": [
+        "./shared-context.js?v=55",
+        "./sky/catalog.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 57,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 146,
+          "contracts": [
+            "roads",
+            "roadMeshes",
+            "linearFeatures",
+            "linearFeatureMeshes",
+            "landuses",
+            "surfaceFeatureHints",
+            "urbanSurfaceMeshes",
+            "buildings",
+            "buildingMeshes",
+            "dynamicBuildingColliders"
+          ]
+        },
+        {
+          "line": 154,
+          "contracts": [
+            "streetFurnitureMeshes"
+          ]
+        },
+        {
+          "line": 155,
+          "contracts": [
+            "vegetationMeshes"
+          ]
+        },
+        {
+          "line": 228,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 229,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 230,
+          "contracts": [
+            "dynamicBuildingColliders"
+          ]
+        },
+        {
+          "line": 266,
+          "contracts": [
+            "landuses"
+          ]
+        },
+        {
+          "line": 267,
+          "contracts": [
+            "linearFeatureMeshes"
+          ]
+        },
+        {
+          "line": 268,
+          "contracts": [
+            "linearFeatures"
+          ]
+        },
+        {
+          "line": 303,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 304,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 305,
+          "contracts": [
+            "urbanSurfaceMeshes"
+          ]
+        },
+        {
+          "line": 324,
+          "contracts": [
+            "streetFurnitureMeshes"
+          ]
+        },
+        {
+          "line": 325,
+          "contracts": [
+            "surfaceFeatureHints"
+          ]
+        },
+        {
+          "line": 327,
+          "contracts": [
+            "vegetationMeshes"
+          ]
+        },
+        {
+          "line": 346,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 347,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 348,
+          "contracts": [
+            "dynamicBuildingColliders"
+          ]
+        },
+        {
+          "line": 384,
+          "contracts": [
+            "landuses"
+          ]
+        },
+        {
+          "line": 385,
+          "contracts": [
+            "linearFeatureMeshes"
+          ]
+        },
+        {
+          "line": 386,
+          "contracts": [
+            "linearFeatures"
+          ]
+        },
+        {
+          "line": 421,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 422,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 423,
+          "contracts": [
+            "urbanSurfaceMeshes"
+          ]
+        },
+        {
+          "line": 442,
+          "contracts": [
+            "streetFurnitureMeshes"
+          ]
+        },
+        {
+          "line": 443,
+          "contracts": [
+            "surfaceFeatureHints"
+          ]
+        },
+        {
+          "line": 445,
+          "contracts": [
+            "vegetationMeshes"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/structure-semantics.js",
+      "sha256": "29975ecbff3b094ddbadff76548b768ccc49af7465ba53bed61854c37116ccd4",
+      "imports": [
+        "./world/compiler/transport-surface-model.js?v=25",
+        "./structure-semantics/classification.js?v=2",
+        "./structure-semantics/stacking.js?v=10",
+        "./structure-semantics/geometry.js?v=2",
+        "./world/road-cross-section-profile.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 739,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 744,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 980,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/surface-rules-local.js",
+      "sha256": "7098349803f7143fe0f81765dc2274a582d9e713e98d308f24feee0bce86c532",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 2,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 3,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 9,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 10,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 214,
+          "contracts": [
+            "landuses",
+            "buildings"
+          ]
+        },
+        {
+          "line": 218,
+          "contracts": [
+            "landuses"
+          ]
+        },
+        {
+          "line": 223,
+          "contracts": [
+            "surfaceFeatureHints"
+          ]
+        },
+        {
+          "line": 233,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 237,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 357,
+          "contracts": [
+            "landuses"
+          ]
+        },
+        {
+          "line": 359,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 360,
+          "contracts": [
+            "roads"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/surface-rules.js",
+      "sha256": "bbcf847a77c2277e023db8970620b3732cf0100d9446ee35436e62c04ffec6ff",
+      "imports": [
+        "./shared-context.js?v=55",
+        "./surface-rules-local.js?v=4",
+        "./earth-core/biome-profile.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 299,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 300,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 302,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 303,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 426,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 434,
+          "contracts": [
+            "landuses",
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/terrain.js",
+      "sha256": "2fb5c318f00e9162c31f9320067ee462f603e2511c30beaa8995625a5e91b1a7",
+      "imports": [
+        "./shared-context.js?v=55",
+        "./terrain/structure-visuals.js?v=59",
+        "./terrain/height-sampling.js?v=15",
+        "./terrain/material-cache.js?v=3",
+        "./terrain/seams.js?v=2",
+        "./terrain/reprojection.js?v=22",
+        "./terrain/ground-provider-registry.js?v=3",
+        "./terrain/ground-artifact.js?v=4",
+        "./terrain/accepted-ground-runtime.js?v=2",
+        "./terrain/accepted-ground-catalog.js?v=1",
+        "./terrain/surface-profiles.js?v=54",
+        "./terrain/tiles.js?v=49",
+        "./terrain/rebuild.js?v=54",
+        "./terrain/debug-tools.js?v=17",
+        "./terrain/location-world.js?v=4",
+        "./terrain/polar-cryosphere-surface.js?v=1",
+        "./terrain/far-field.js?v=74",
+        "./terrain/actor-reprojection.js?v=2",
+        "./terrain/water-terrain-mask.js?v=1",
+        "./water-dynamics.js?v=9",
+        "./world/water-surface-registry.js?v=3"
+      ],
+      "mentions": [
+        {
+          "line": 302,
+          "contracts": [
+            "applyTransportTerrainCorridors"
+          ]
+        },
+        {
+          "line": 359,
+          "contracts": [
+            "repositionBuildingsWithTerrain"
+          ]
+        },
+        {
+          "line": 372,
+          "contracts": [
+            "applyTransportTerrainCorridors"
+          ]
+        },
+        {
+          "line": 373,
+          "contracts": [
+            "repositionBuildingsWithTerrain"
+          ]
+        },
+        {
+          "line": 433,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 575,
+          "contracts": [
+            "applyTransportTerrainCorridors"
+          ]
+        },
+        {
+          "line": 611,
+          "contracts": [
+            "repositionBuildingsWithTerrain"
+          ]
+        },
+        {
+          "line": 677,
+          "contracts": [
+            "repositionBuildingsWithTerrain"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/terrain/actor-reprojection.js",
+      "sha256": "c0f2f6b7d704dc63b3d8c116cbbfcda205c0358ca59d123a17e9b372a93923fb",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 41,
+          "contracts": [
+            "GroundHeight"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/terrain/debug-tools.js",
+      "sha256": "49be1dc27e7a824d114d40f0690903c8409ac0ac1bbff602ccc9ed89fa0fb305",
+      "imports": [
+        "../shared-context.js?v=55"
+      ],
+      "mentions": [
+        {
+          "line": 18,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 44,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 56,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 88,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 114,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 125,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 133,
+          "contracts": [
+            "roadMeshes"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/terrain/far-field-mapped-context.js",
+      "sha256": "8a2d76e982f12362503c4b714147461280f1f285eaec5be040986a901af33581",
+      "imports": [
+        "../world/shortbread-source.js?v=20",
+        "../earth-core/bounded-provider-batch.js?v=1",
+        "../world/cooperative-scheduling.js?v=1",
+        "../surface-rules-local.js?v=4",
+        "./mapped-ground-evidence.js"
+      ],
+      "mentions": [
+        {
+          "line": 12,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 284,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 285,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 286,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 472,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 534,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 539,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 542,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/terrain/far-field.js",
+      "sha256": "09e8e25c754cf6d1577694cfdb5e420e635e41db92744228b944244159e9ab2a",
+      "imports": [
+        "./far-field-mapped-context.js?v=20",
+        "./far-building-massing.js?v=2",
+        "./far-building-facade-material.js?v=4",
+        "./far-field-elevation-loader.js?v=2",
+        "./structure-terrain-portals.js?v=1",
+        "./far-field-coverage.js?v=2",
+        "./far-field-geometry.js?v=18",
+        "./worldcover-baseline.js?v=17",
+        "./surface-profiles.js?v=54",
+        "./surface-material-blend.js?v=2",
+        "./worldcover-detail-mode.js?v=1",
+        "./far-field-water.js?v=7",
+        "../world/fixed-regional-context.js?v=9",
+        "../world/cooperative-scheduling.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 320,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 454,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 700,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 701,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 818,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 826,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/terrain/height-sampling.js",
+      "sha256": "bde0ca2e2007f894c04802c0b9189e13e52b6b2322ca606a37a8c418384df1b7",
+      "imports": [
+        "../structure-semantics.js?v=63",
+        "../world/road-cross-section-profile.js?v=1",
+        "./structure-terrain-portals.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 3,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 137,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 156,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/terrain/intersections.js",
+      "sha256": "90a0a8812e68e11495346d8c4042c29650d5b59dd62d82c1427db3c9834a7e24",
+      "imports": [
+        "../world/road-cross-section-profile.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 91,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 234,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 253,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 260,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 273,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 279,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 416,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 420,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 421,
+          "contracts": [
+            "roads"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/terrain/rebuild.js",
+      "sha256": "f311c37db5ebe68bf992bd15f6dec0e7d8e2a27cb27b0aa50f67581106984183",
+      "imports": [
+        "../shared-context.js?v=55",
+        "../road-render.js?v=4",
+        "./intersections.js?v=5",
+        "./context-utils.js?v=1",
+        "../structure-semantics.js?v=63",
+        "../world/cooperative-scheduling.js?v=1",
+        "./road-junctions.js?v=11",
+        "./road-surface-geometry.js?v=2",
+        "../world/road-cross-section-profile.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 8,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 139,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 140,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 219,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 356,
+          "contracts": [
+            "applyTransportTerrainCorridors"
+          ]
+        },
+        {
+          "line": 357,
+          "contracts": [
+            "repositionBuildingsWithTerrain"
+          ]
+        },
+        {
+          "line": 366,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 367,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 403,
+          "contracts": [
+            "applyTransportTerrainCorridors"
+          ]
+        },
+        {
+          "line": 404,
+          "contracts": [
+            "applyTransportTerrainCorridors"
+          ]
+        },
+        {
+          "line": 409,
+          "contracts": [
+            "repositionBuildingsWithTerrain"
+          ]
+        },
+        {
+          "line": 410,
+          "contracts": [
+            "repositionBuildingsWithTerrain"
+          ]
+        },
+        {
+          "line": 427,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 440,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 442,
+          "contracts": [
+            "urbanSurfaceMeshes"
+          ]
+        },
+        {
+          "line": 449,
+          "contracts": [
+            "urbanSurfaceMeshes"
+          ]
+        },
+        {
+          "line": 628,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 645,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 654,
+          "contracts": [
+            "_worldLoadSequence"
+          ]
+        },
+        {
+          "line": 660,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 665,
+          "contracts": [
+            "_worldLoadSequence"
+          ]
+        },
+        {
+          "line": 669,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 675,
+          "contracts": [
+            "_worldLoadSequence"
+          ]
+        },
+        {
+          "line": 692,
+          "contracts": [
+            "transportSurfacePublication"
+          ]
+        },
+        {
+          "line": 694,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 696,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 717,
+          "contracts": [
+            "_worldLoadSequence"
+          ]
+        },
+        {
+          "line": 719,
+          "contracts": [
+            "transportSurfacePublication"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/terrain/reprojection.js",
+      "sha256": "c0ed382c33e3155fd3a713f25ecf35b277c9fb04255f18d2e1fcaeac4e400985",
+      "imports": [
+        "../structure-semantics.js?v=63",
+        "../world/load-geometry.js?v=28",
+        "../world/water-body-contract.js?v=4"
+      ],
+      "mentions": [
+        {
+          "line": 121,
+          "contracts": [
+            "GroundHeight"
+          ]
+        },
+        {
+          "line": 122,
+          "contracts": [
+            "GroundHeight"
+          ]
+        },
+        {
+          "line": 125,
+          "contracts": [
+            "GroundHeight"
+          ]
+        },
+        {
+          "line": 126,
+          "contracts": [
+            "GroundHeight"
+          ]
+        },
+        {
+          "line": 168,
+          "contracts": [
+            "repositionBuildingsWithTerrain"
+          ]
+        },
+        {
+          "line": 172,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 173,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 174,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 183,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 192,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 299,
+          "contracts": [
+            "linearFeatureMeshes"
+          ]
+        },
+        {
+          "line": 312,
+          "contracts": [
+            "streetFurnitureMeshes"
+          ]
+        },
+        {
+          "line": 321,
+          "contracts": [
+            "repositionBuildingsWithTerrain"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/terrain/road-junctions.js",
+      "sha256": "1bcc1a75747f9d7e9c3af39d72cbe297f7d8bc6b40a3424e6b7f410e8a829abf",
+      "imports": [
+        "../structure-semantics.js?v=63"
+      ],
+      "mentions": [
+        {
+          "line": 1,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 7,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 9,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 10,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 22,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 23,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 27,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 30,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 31,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 34,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 42,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 45,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 53,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 64,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 69,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 70,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 75,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 83,
+          "contracts": [
+            "roads"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/terrain/structure-tunnel-visuals.js",
+      "sha256": "67b994583859432361446dfabf5ba4c2f1d7f094b8c0d6dda206cbc012d842db",
+      "imports": [
+        "../structure-semantics.js?v=63",
+        "../world/compiler/tunnel-envelope.js"
+      ],
+      "mentions": [
+        {
+          "line": 1,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 49,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 79,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 142,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/terrain/structure-visuals.js",
+      "sha256": "d010edae18e67f5d00f6e626baf131346f72c28b5c695b23be6ae3f03471b88d",
+      "imports": [
+        "../shared-context.js?v=55",
+        "../structure-semantics.js?v=63",
+        "./structure-visual-meshes.js?v=26",
+        "./structure-tunnel-visuals.js?v=24",
+        "../world/bridge-safety.js?v=14",
+        "./structure-terrain-portals.js?v=1",
+        "../world/cooperative-scheduling.js?v=1",
+        "../world/compiler/transport-structure-assembly.js?v=15"
+      ],
+      "mentions": [
+        {
+          "line": 4,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 64,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 65,
+          "contracts": [
+            "linearFeatures"
+          ]
+        },
+        {
+          "line": 69,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 121,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 166,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 221,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 625,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 626,
+          "contracts": [
+            "linearFeatures"
+          ]
+        },
+        {
+          "line": 627,
+          "contracts": [
+            "linearFeatures"
+          ]
+        },
+        {
+          "line": 629,
+          "contracts": [
+            "roads"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/terrain/surface-profiles.js",
+      "sha256": "144cd40d2f21e534e0a4d8d37a51435acfaa6c11409e8a5c64efaf2a997b68f9",
+      "imports": [
+        "../shared-context.js?v=55",
+        "../surface-rules.js?v=18",
+        "./worldcover-baseline.js?v=17",
+        "./worldcover-detail-mode.js?v=1",
+        "./tile-coordinates.js?v=1",
+        "./far-field-mapped-context.js?v=20",
+        "./worldcover-biome-state.js?v=1",
+        "./surface-material-blend.js?v=2",
+        "../world/cooperative-scheduling.js?v=1",
+        "./worldcover-recovery.js",
+        "./mapped-ground-evidence.js"
+      ],
+      "mentions": [
+        {
+          "line": 33,
+          "contracts": [
+            "landuses"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/terrain/worldcover-baseline.js",
+      "sha256": "5a206c0cd36de4902871819be77723144d01ba82deb4c47112633acb48448049",
+      "imports": [
+        "../earth-core/provider-outage-circuit.js?v=1",
+        "./surface-material-blend.js?v=2",
+        "./worldcover-categorical.js"
+      ],
+      "mentions": [
+        {
+          "line": 29,
+          "contracts": [
+            "roads"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/transport/airport-hub.js",
+      "sha256": "4cc43a24945712c05348e5b06ad8e188ffb9a2ee47cd79971cbe45686a997116",
+      "imports": [
+        "../places/place-search.js?v=3"
+      ],
+      "mentions": [
+        {
+          "line": 143,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/transport/aviation-runtime.js",
+      "sha256": "575217a47afc0d647c41da696815bfee9b0d06039dabdb35913568050ecba0cc",
+      "imports": [
+        "../shared-context.js?v=55",
+        "./aviation-catalog.js?v=5",
+        "./aircraft-visual-recipe.js?v=11",
+        "./damage-model.js?v=1",
+        "../runtime/entity-lifecycle-policy.js?v=1",
+        "../urban-sandbox/parachute-model.js?v=7",
+        "./ambient-route-motion.js?v=1",
+        "./airport-layout.js?v=6",
+        "./airport-hub.js?v=4"
+      ],
+      "mentions": [
+        {
+          "line": 16,
+          "contracts": [
+            "dynamicBuildingColliders"
+          ]
+        },
+        {
+          "line": 17,
+          "contracts": [
+            "dynamicBuildingColliders"
+          ]
+        },
+        {
+          "line": 80,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 213,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 645,
+          "contracts": [
+            "dynamicBuildingColliders"
+          ]
+        },
+        {
+          "line": 646,
+          "contracts": [
+            "dynamicBuildingColliders"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/transport/maritime-runtime.js",
+      "sha256": "179cda9ee15bb2fd01a49915d7c4f0d9266f63ad0647eb34d51f94d38c3ec94a",
+      "imports": [
+        "../shared-context.js?v=55",
+        "./maritime-catalog.js?v=1",
+        "./vessel-visual-recipe.js?v=7",
+        "../runtime/entity-lifecycle-policy.js?v=1",
+        "./ambient-route-motion.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 37,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 374,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 636,
+          "contracts": [
+            "GroundHeight"
+          ]
+        },
+        {
+          "line": 650,
+          "contracts": [
+            "GroundHeight"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/travel-mode.js",
+      "sha256": "38dbb7260a048cda3fedaef55eb59d2d36dd81a71887fbbc7437ee9d3410ab24",
+      "imports": [
+        "./shared-context.js?v=55",
+        "./controls/traversal-control-policy.js?v=8",
+        "./planetary/runtime/surface-query.js?v=3",
+        "./planetary/traversal-capabilities.js?v=1",
+        "./travel/menu-state.js?v=2"
+      ],
+      "mentions": [
+        {
+          "line": 135,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 162,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/ui/share-links.js",
+      "sha256": "dc4d910d333ed7e6a23237b8b01fe8b06386f131e7510920cdbfadaa9f3d0aad",
+      "imports": [
+        "../shared-context.js?v=55"
+      ],
+      "mentions": [
+        {
+          "line": 103,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 255,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 269,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/ui/title-screen.js",
+      "sha256": "1aa8e36f359817516547087bd4b88a9b7bc20f18fd0a47474e321152ca14d24c",
+      "imports": [
+        "../shared-context.js?v=55",
+        "../env.js?v=58",
+        "../session-coordinator.js?v=2",
+        "./globe-selector.js?v=93",
+        "./share-links.js?v=64",
+        "../planetary/entry.js?v=9",
+        "../runtime/workload-policy.js?v=1",
+        "./title-screen/globe-hub.js?v=5",
+        "./title-screen/geolocation.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 93,
+          "contracts": [
+            "roads",
+            "roadMeshes",
+            "buildings",
+            "buildingMeshes"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/urban-sandbox/commerce-model.js",
+      "sha256": "682473b95df57e0ab2a56de455534a429115b03a907f9a99eeba12277203aba4",
+      "imports": [
+        "../resources/material-catalog.js?v=2",
+        "../poi/semantic-authority.js?v=3",
+        "../poi/building-association.js?v=1",
+        "../transport/vehicle-upgrades.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 123,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/urban-sandbox/equipment-runtime.js",
+      "sha256": "33bab102c83b49842531e3a5084586098526180de5b3443a488d976d5d228a91",
+      "imports": [
+        "../shared-context.js?v=55",
+        "./impact-model.js?v=1",
+        "../transport/damage-model.js?v=1",
+        "../physics/swept-contact.js?v=1",
+        "./parachute-model.js?v=7",
+        "../ui/screen-layout.js?v=2",
+        "./npc-combat-policy.js?v=2",
+        "./weapon-reticle-authority.js?v=1",
+        "./projectile-ballistics.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 254,
+          "contracts": [
+            "streetFurnitureMeshes"
+          ]
+        },
+        {
+          "line": 378,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 898,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/urban-sandbox/responder-runtime.js",
+      "sha256": "fec2a2864929f3f79987810238b604fb204f758950e76c621b35b6f79635c6ce",
+      "imports": [
+        "../shared-context.js?v=55",
+        "../physics/vehicle-speed-units.js?v=2",
+        "../engine/vehicle-catalog.js?v=6",
+        "./vehicle-visuals.js?v=11",
+        "./curated-traffic-vehicle.js?v=4",
+        "./npc-visuals.js?v=9",
+        "../walking/curated-explorer-character.js?v=8",
+        "./responder-model.js?v=4",
+        "./vehicle-model.js?v=7",
+        "./impact-model.js?v=1",
+        "../transport/damage-model.js?v=1",
+        "../engine/vehicle-road-attitude.js?v=2",
+        "./crash-physics.js?v=1",
+        "../runtime/entity-lifecycle-policy.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 84,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 106,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 108,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/urban-sandbox/room-authority-runtime.js",
+      "sha256": "107d98bfeb95249c5a868d0183b5daf6b2bf3904cdce4f14dd5447c8903d34a8",
+      "imports": [
+        "../shared-context.js?v=55"
+      ],
+      "mentions": [
+        {
+          "line": 56,
+          "contracts": [
+            "streetFurnitureMeshes"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/urban-sandbox/runtime.js",
+      "sha256": "23b1b38c8a8591c7a6012a73661d60600df6ad09cb6f9bd2ef2692a7ded0b868",
+      "imports": [
+        "../shared-context.js?v=55",
+        "../physics/vehicle-speed-units.js?v=2",
+        "../engine/vehicle-catalog.js?v=6",
+        "../transport/damage-model.js?v=1",
+        "./civic-response-model.js?v=3",
+        "./equipment-model.js?v=10",
+        "./equipment-runtime.js?v=24",
+        "./equipment-visuals.js?v=10",
+        "./curated-equipment-visual.js?v=2",
+        "./npc-visuals.js?v=9",
+        "./facility-model.js?v=3",
+        "./room-authority-runtime.js?v=4",
+        "./responder-runtime.js?v=29",
+        "./vehicle-model.js?v=7",
+        "./vehicle-visuals.js?v=11",
+        "./curated-traffic-vehicle.js?v=4",
+        "./impact-model.js?v=1",
+        "./crash-physics.js?v=1",
+        "../physics/swept-contact.js?v=1",
+        "./commerce-model.js?v=5",
+        "../economy/connected-wallet-authority.js?v=2",
+        "../player/condition-model.js?v=1",
+        "../player/connected-player-state.js?v=1",
+        "../transport/vehicle-upgrades.js?v=1",
+        "../../../js/auth-ui.js?v=55",
+        "../platform/product-telemetry.js?v=1",
+        "./loot-pickup-model.js?v=1",
+        "./npc-combat-policy.js?v=2",
+        "../runtime/entity-lifecycle-policy.js?v=1",
+        "../walking/curated-explorer-character.js?v=8"
+      ],
+      "mentions": [
+        {
+          "line": 463,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 507,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 663,
+          "contracts": [
+            "streetFurnitureMeshes"
+          ]
+        },
+        {
+          "line": 2127,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 2384,
+          "contracts": [
+            "streetFurnitureMeshes"
+          ]
+        },
+        {
+          "line": 2676,
+          "contracts": [
+            "_worldLoadSequence"
+          ]
+        },
+        {
+          "line": 2867,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 3050,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/walking.js",
+      "sha256": "2457ea92ec559f991bbd2255e5adfd8a97aa52cc48c64936640a6fee9c85ba17",
+      "imports": [
+        "./shared-context.js?v=55",
+        "./walking/character.js?v=7",
+        "./walking/geometry.js?v=1",
+        "./walking/physics.js?v=31",
+        "./walking/runtime.js?v=5",
+        "./walking/terrain.js?v=5"
+      ],
+      "mentions": [
+        {
+          "line": 18,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 19,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/walking/physics.js",
+      "sha256": "b67691cb3478bba806ee36a43b4f5a6dd20133c452090faead27717c186b898d",
+      "imports": [
+        "../shared-context.js?v=55",
+        "../controls/mobile-touch-authority.js?v=5",
+        "../physics/vehicle-speed-units.js?v=2",
+        "../urban-sandbox/parachute-model.js?v=7",
+        "../planetary/runtime/surface-query.js?v=3",
+        "../planetary/runtime/physical-environment.js?v=2",
+        "../planetary/runtime/surface-authority.js?v=4",
+        "../planetary/runtime/surface-boundary.js?v=1",
+        "../planetary/runtime/obstacle-authority.js?v=1",
+        "../interiors/vertical-boundary.js?v=1",
+        "../world/compiler/tunnel-space-query.js"
+      ],
+      "mentions": [
+        {
+          "line": 95,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/walking/runtime.js",
+      "sha256": "f709e26f60a699955614f47546a8370931afe5c0ff1d2a67e498bae221133a55",
+      "imports": [
+        "../shared-context.js?v=55",
+        "../hud/tunnel-camera-envelope.js?v=6",
+        "../hud/tunnel-camera-boom.js",
+        "../hud/chase-camera-terrain.js?v=1",
+        "./camera-collision.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 164,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 234,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/walking/terrain.js",
+      "sha256": "3af10e5ed8866d7c0f7db8752c1cdbd6745a990c37d12ff450743e125a55e1a9",
+      "imports": [
+        "../shared-context.js?v=55",
+        "../planetary/runtime/surface-query.js?v=3"
+      ],
+      "mentions": [
+        {
+          "line": 36,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 38,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 51,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 53,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world.js",
+      "sha256": "1ec683654d1bb2627091537676f89cbd911fedde6fad44c08248cdf49ea36149",
+      "imports": [
+        "./shared-context.js?v=55",
+        "./surface-rules.js?v=18",
+        "./water-dynamics.js?v=9",
+        "./structure-semantics.js?v=63",
+        "./world/spawn.js?v=41",
+        "./world/osm-loader.js?v=29",
+        "./world/budgets.js?v=16",
+        "./world/publication.js?v=2",
+        "./world/load-support.js?v=44",
+        "./world/load-reset.js?v=21",
+        "./world/load-budgeting.js?v=20",
+        "./world/load-geometry.js?v=28",
+        "./world/load-style.js?v=5",
+        "./world/load-selection.js?v=1",
+        "./world/load-road-pass.js?v=40",
+        "./world/load-building-pass.js?v=56",
+        "./world/render-support.js?v=15",
+        "./world/navigation.js?v=6",
+        "./world/traversal.js?v=4",
+        "./world/vegetation.js?v=10",
+        "./world/world-geometry.js?v=3",
+        "./world/waterway-ribbon.js?v=32",
+        "./world/furniture.js?v=22",
+        "./world/building-spatial-index.js?v=7",
+        "./world/structure-aware.js?v=51",
+        "./world/load-roads.js?v=226",
+        "./world/shortbread-source.js?v=20",
+        "./world/overture-building-source.js?v=14",
+        "./world/preset-building-metadata.js?v=2",
+        "./world/landmark-detail.js?v=36",
+        "./world/load-runtime-session.js?v=122"
+      ],
+      "mentions": [
+        {
+          "line": 17,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 122,
+          "contracts": [
+            "buildTraversalNetworks"
+          ]
+        },
+        {
+          "line": 126,
+          "contracts": [
+            "invalidateTraversalNetworks"
+          ]
+        },
+        {
+          "line": 167,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 177,
+          "contracts": [
+            "roads",
+            "buildings"
+          ]
+        },
+        {
+          "line": 229,
+          "contracts": [
+            "buildTraversalNetworks"
+          ]
+        },
+        {
+          "line": 258,
+          "contracts": [
+            "invalidateTraversalNetworks"
+          ]
+        },
+        {
+          "line": 304,
+          "contracts": [
+            "roads",
+            "buildings"
+          ]
+        },
+        {
+          "line": 317,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 324,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 325,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 332,
+          "contracts": [
+            "invalidateTraversalNetworks"
+          ]
+        },
+        {
+          "line": 355,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 356,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 376,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 386,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 449,
+          "contracts": [
+            "buildTraversalNetworks"
+          ]
+        },
+        {
+          "line": 455,
+          "contracts": [
+            "invalidateTraversalNetworks"
+          ]
+        },
+        {
+          "line": 469,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 484,
+          "contracts": [
+            "buildTraversalNetworks"
+          ]
+        },
+        {
+          "line": 490,
+          "contracts": [
+            "invalidateTraversalNetworks"
+          ]
+        },
+        {
+          "line": 503,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/bridge-guardrails.js",
+      "sha256": "f8a0f2ea7e78e6a500370a2acdca0395f345751ee4d8819b4fc97dccb0d1f6af",
+      "imports": [
+        "../shared-context.js?v=55",
+        "../structure-semantics.js?v=63",
+        "./building-spatial-index.js?v=7",
+        "./bridge-safety.js?v=14"
+      ],
+      "mentions": [
+        {
+          "line": 2,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 79,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 101,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 123,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 132,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 134,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 144,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 148,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 155,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 156,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 157,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 159,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 172,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 174,
+          "contracts": [
+            "roads"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/bridge-landmark.js",
+      "sha256": "10f1d03812fd9b304f43023e277858fe3627ecfd77005d852fe5d7ba4823d6f1",
+      "imports": [
+        "../shared-context.js?v=55",
+        "../structure-semantics.js?v=63",
+        "./bridge-landmark-structure.js?v=1",
+        "./transport-surface-controls.js?v=3"
+      ],
+      "mentions": [
+        {
+          "line": 2,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 169,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 182,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 394,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 409,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 434,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 448,
+          "contracts": [
+            "roads"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/bridge-safety.js",
+      "sha256": "280ebc433b645aba4e541901dc2224a3a6b51668c18c522e099e9dccba3dbe4c",
+      "imports": [
+        "../structure-semantics.js?v=63"
+      ],
+      "mentions": [
+        {
+          "line": 1,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 18,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 22,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 75,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 84,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 105,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 113,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 146,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 151,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 165,
+          "contracts": [
+            "roads"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/building-batching.js",
+      "sha256": "3d6a2e2444cf332e53a88902292a00fd4a60520ff71ebdd98e8e7a0ccc8ad893",
+      "imports": [
+        "../shared-context.js?v=55",
+        "./geometry-batching.js?v=6",
+        "./cooperative-scheduling.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 154,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 165,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 166,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 211,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 366,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/building-exterior-details.js",
+      "sha256": "e1aca6b6cb499682c6203b0b6b3165d08609f6bff5db9222c38283464fc25457",
+      "imports": [
+        "./geometry-batching.js?v=6",
+        "./building-exterior-catalog.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 284,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/building-facade-entrances.js",
+      "sha256": "5c5d09f2b1a34fbba8c788dd3af040014daa8469edb9e8d4a8a4bb683a2ab675",
+      "imports": [
+        "../living-world/entrance-catalog.js?v=6"
+      ],
+      "mentions": [
+        {
+          "line": 127,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 136,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 141,
+          "contracts": [
+            "GroundHeight"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/building-road-footprint.js",
+      "sha256": "0fac97b94567377c81b2f1ffb5d3fd98f2ceee9c0ce6f08604ac178af4e290ae",
+      "imports": [
+        "./cooperative-scheduling.js?v=1",
+        "./road-cross-section-profile.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 11,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 75,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 76,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 99,
+          "contracts": [
+            "roads"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/building-spatial-index.js",
+      "sha256": "d209d22f304cbe730eecc85ced7f55a14572ac7f305999e8e5539cc841ad142d",
+      "imports": [
+        "../shared-context.js?v=55"
+      ],
+      "mentions": [
+        {
+          "line": 41,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 42,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 43,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 45,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 46,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 72,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 73,
+          "contracts": [
+            "dynamicBuildingColliders"
+          ]
+        },
+        {
+          "line": 107,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 108,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 109,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/collection-registry.js",
+      "sha256": "d2124fa4c9185d02f36da7622b5e70cb9edf5f51ecbbdd4b3c1877ad27ea36ea",
+      "imports": [
+        "../shared-context.js?v=55"
+      ],
+      "mentions": [
+        {
+          "line": 4,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 5,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 6,
+          "contracts": [
+            "urbanSurfaceMeshes"
+          ]
+        },
+        {
+          "line": 7,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 8,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 9,
+          "contracts": [
+            "dynamicBuildingColliders"
+          ]
+        },
+        {
+          "line": 10,
+          "contracts": [
+            "landuses"
+          ]
+        },
+        {
+          "line": 11,
+          "contracts": [
+            "surfaceFeatureHints"
+          ]
+        },
+        {
+          "line": 16,
+          "contracts": [
+            "linearFeatures"
+          ]
+        },
+        {
+          "line": 17,
+          "contracts": [
+            "linearFeatureMeshes"
+          ]
+        },
+        {
+          "line": 23,
+          "contracts": [
+            "streetFurnitureMeshes"
+          ]
+        },
+        {
+          "line": 25,
+          "contracts": [
+            "vegetationMeshes"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/compiler/accepted-ground-selection.js",
+      "sha256": "d8fd465eaf55e2f2c2d68e9eae66e0ad8ebb33143c061a0fffb7b77e63263c3e",
+      "imports": [
+        "../fixed-regional-structures.js?v=16"
+      ],
+      "mentions": [
+        {
+          "line": 86,
+          "contracts": [
+            "roads"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/compiler/district-source.js",
+      "sha256": "d1025c469ce0c44352458eb858ce1fa0d5ebb14ee5d3499aad586f299134a4e7",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 6,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 7,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 210,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 211,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/compiler/selected-location-source-adapter.js",
+      "sha256": "ce31cc31b738520f8e281220aedf998fb8b76dc61595c6b44c479d70583e2bf8",
+      "imports": [
+        "./district-source.js?v=1",
+        "./district-ground-model.js?v=2",
+        "./accepted-ground-selection.js?v=13"
+      ],
+      "mentions": [
+        {
+          "line": 15,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 16,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 24,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 25,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 136,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 137,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 151,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 152,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 164,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 165,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/compiler/transport-junction-profile.js",
+      "sha256": "d4343d256178356fc8aea6f309663aa99f57a162b8773d4817ec027815c6c072",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 112,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 126,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 146,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 238,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 242,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 251,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 292,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 494,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 505,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 638,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 644,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 664,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 733,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 739,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 751,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 826,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 876,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 882,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 900,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 968,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 973,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 985,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/compiler/transport-network-model.js",
+      "sha256": "051a2d57ffd7c5f5f9bb02a124ea96cff6598f640999d23609d69cbe22782fac",
+      "imports": [
+        "../../structure-semantics/geometry.js?v=2"
+      ],
+      "mentions": [
+        {
+          "line": 206,
+          "contracts": [
+            "roads"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/compiler/transport-source-normalizer.js",
+      "sha256": "d4863d02a186eae7712b7495167fd7ea2c69e4c76e32424573d2fdf489ff3699",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 130,
+          "contracts": [
+            "roads"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/compiler/world-layer-products.js",
+      "sha256": "e6de1b0f48e8a1078f6f332230bd2735e83d1e38eddce8154b6bfa83e2a3e0ea",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 4,
+          "contracts": [
+            "roads",
+            "roadMeshes",
+            "linearFeatures",
+            "linearFeatureMeshes",
+            "urbanSurfaceMeshes"
+          ]
+        },
+        {
+          "line": 5,
+          "contracts": [
+            "buildings",
+            "buildingMeshes",
+            "dynamicBuildingColliders"
+          ]
+        },
+        {
+          "line": 6,
+          "contracts": [
+            "landuses",
+            "surfaceFeatureHints",
+            "vegetationMeshes"
+          ]
+        },
+        {
+          "line": 7,
+          "contracts": [
+            "streetFurnitureMeshes"
+          ]
+        },
+        {
+          "line": 87,
+          "contracts": [
+            "transportSurfacePublication"
+          ]
+        },
+        {
+          "line": 92,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 144,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 146,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 157,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 168,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/fixed-regional-context.js",
+      "sha256": "51d45dd395987a1b800c900eb8ba6c4ec8b773d3126d9261c66fd0d8ea4423ae",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 234,
+          "contracts": [
+            "worldTraversalRadiusWorld"
+          ]
+        },
+        {
+          "line": 235,
+          "contracts": [
+            "worldTraversalRadiusWorld"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/fixed-regional-structures.js",
+      "sha256": "4e86006c1a7b7444dee9f80d379637c304eda6ef7d726746f10437651b54eba7",
+      "imports": [
+        "./fixed-regional-context.js?v=9",
+        "./landmark-source.js?v=3"
+      ],
+      "mentions": [
+        {
+          "line": 637,
+          "contracts": [
+            "roads"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/furniture.js",
+      "sha256": "bb2a9b18ae3bfa6dd9e6a731111c25366850a841152b3da23a61fb6e4c3324f3",
+      "imports": [
+        "../shared-context.js?v=55",
+        "./vegetation-models.js",
+        "./vegetation.js?v=10",
+        "../engine/night-lighting.js?v=8",
+        "./road-cross-section-profile.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 189,
+          "contracts": [
+            "streetFurnitureMeshes"
+          ]
+        },
+        {
+          "line": 202,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 245,
+          "contracts": [
+            "streetFurnitureMeshes"
+          ]
+        },
+        {
+          "line": 312,
+          "contracts": [
+            "streetFurnitureMeshes"
+          ]
+        },
+        {
+          "line": 333,
+          "contracts": [
+            "streetFurnitureMeshes"
+          ]
+        },
+        {
+          "line": 375,
+          "contracts": [
+            "streetFurnitureMeshes"
+          ]
+        },
+        {
+          "line": 393,
+          "contracts": [
+            "streetFurnitureMeshes"
+          ]
+        },
+        {
+          "line": 407,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 439,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 463,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 467,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 468,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 472,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 473,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 474,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 550,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 590,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 640,
+          "contracts": [
+            "vegetationMeshes"
+          ]
+        },
+        {
+          "line": 641,
+          "contracts": [
+            "vegetationMeshes"
+          ]
+        },
+        {
+          "line": 657,
+          "contracts": [
+            "_worldLoadSequence"
+          ]
+        },
+        {
+          "line": 660,
+          "contracts": [
+            "_worldLoadSequence"
+          ]
+        },
+        {
+          "line": 662,
+          "contracts": [
+            "roads",
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/inferred-building-footprints.js",
+      "sha256": "5bed460f7ef601fd455a2cbe3fcd344fe69ad29442a3dadb063d3098ea5e500b",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 140,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 142,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 174,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 175,
+          "contracts": [
+            "landuses"
+          ]
+        },
+        {
+          "line": 180,
+          "contracts": [
+            "landuses"
+          ]
+        },
+        {
+          "line": 183,
+          "contracts": [
+            "landuses"
+          ]
+        },
+        {
+          "line": 187,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 247,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 248,
+          "contracts": [
+            "landuses"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/landmark-models.js",
+      "sha256": "2a12842eb1ef07e92f4608037c41df4c40e192f148620254e73bf031b4d51037",
+      "imports": [
+        "../shared-context.js?v=55",
+        "./landmark-catalog.js?v=9",
+        "./eiffel-structure.js?v=1",
+        "./elizabeth-tower-structure.js?v=1",
+        "./giza-pyramid-structure.js?v=3",
+        "./ten-light-street-structure.js?v=1",
+        "./commerce-place-structure.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 71,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/linear-feature-presentation.js",
+      "sha256": "d25db7bd3341bfa29f5cd2e7bf156f9d3ce17741884a8ea3c23c3e8f890ec7ab",
+      "imports": [
+        "../road-render.js?v=4"
+      ],
+      "mentions": [
+        {
+          "line": 97,
+          "contracts": [
+            "linearFeatureMeshes"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/load-budgeting.js",
+      "sha256": "f3f9a3ee81f1b6fcde05e7fb9056217410c51ac6d6ab9eed7390cf0c66939cd7",
+      "imports": [
+        "../shared-context.js?v=55"
+      ],
+      "mentions": [
+        {
+          "line": 158,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 439,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 440,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 441,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 449,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 450,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 453,
+          "contracts": [
+            "linearFeatures"
+          ]
+        },
+        {
+          "line": 454,
+          "contracts": [
+            "linearFeatures"
+          ]
+        },
+        {
+          "line": 455,
+          "contracts": [
+            "linearFeatures"
+          ]
+        },
+        {
+          "line": 456,
+          "contracts": [
+            "linearFeatures"
+          ]
+        },
+        {
+          "line": 457,
+          "contracts": [
+            "linearFeatures"
+          ]
+        },
+        {
+          "line": 458,
+          "contracts": [
+            "linearFeatures"
+          ]
+        },
+        {
+          "line": 500,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 501,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/load-building-detail.js",
+      "sha256": "bfce002809b4296d16db94c035f927ad33deeaef3a69454416d62838e4a5baa4",
+      "imports": [
+        "../shared-context.js?v=55",
+        "./building-metadata.js?v=2",
+        "./inferred-building-footprints.js?v=2",
+        "./water-structure-source.js?v=3",
+        "./reviewed-mapped-vessels.js?v=1",
+        "./building-publication-groups.js"
+      ],
+      "mentions": [
+        {
+          "line": 106,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 165,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 179,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 187,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 212,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 282,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 329,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 334,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 335,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 336,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 337,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 344,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 345,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 363,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 375,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 380,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 385,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 408,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/load-building-pass.js",
+      "sha256": "2d1c3cce71225aa8785738e0815ee37e524c3042180537898a4144ae927812f4",
+      "imports": [
+        "../shared-context.js?v=55",
+        "../structure-semantics.js?v=63",
+        "../building-semantics.js?v=5",
+        "./load-geometry.js?v=28",
+        "./geometry-batching.js?v=6",
+        "./roof-details.js?v=2",
+        "./mapped-roof-geometry.js?v=6",
+        "./building-batching.js?v=12",
+        "./landmark-catalog.js?v=9",
+        "./building-provenance-model.js?v=1",
+        "./building-road-footprint.js?v=8",
+        "./water-adjacent-structures.js?v=4",
+        "./cooperative-scheduling.js?v=1",
+        "./building-geometry-quality.js?v=1",
+        "./building-facade-entrances.js?v=3",
+        "./building-exterior-details.js?v=1",
+        "../engine/building-facade-materials.js?v=16",
+        "../real-estate/public-address.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 133,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 146,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 213,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 671,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 690,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 709,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 788,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 789,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 790,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 791,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 792,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 793,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 796,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/load-landuse-pass.js",
+      "sha256": "bc1ebbe1854fd1a4f6e674b02bee2a80b2004f1c6ce584792bfdd1bf0bb1df10",
+      "imports": [
+        "./terrain-conforming-polygon.js?v=2",
+        "./surface-contract.js?v=16",
+        "./water-body-contract.js?v=4",
+        "./water-surface-registry.js?v=3",
+        "../earth-core/bounded-provider-batch.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 119,
+          "contracts": [
+            "landuses"
+          ]
+        },
+        {
+          "line": 120,
+          "contracts": [
+            "landuses"
+          ]
+        },
+        {
+          "line": 156,
+          "contracts": [
+            "landuses"
+          ]
+        },
+        {
+          "line": 334,
+          "contracts": [
+            "landuses"
+          ]
+        },
+        {
+          "line": 378,
+          "contracts": [
+            "surfaceFeatureHints"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/load-linear-runtime.js",
+      "sha256": "a1f67fba81e3b509c5c7309aa402dca843f017465925176f505576515ca0ef35",
+      "imports": [
+        "./linear-feature-presentation.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 99,
+          "contracts": [
+            "linearFeatures"
+          ]
+        },
+        {
+          "line": 125,
+          "contracts": [
+            "linearFeatures"
+          ]
+        },
+        {
+          "line": 154,
+          "contracts": [
+            "linearFeatures"
+          ]
+        },
+        {
+          "line": 162,
+          "contracts": [
+            "linearFeatures"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/load-reset.js",
+      "sha256": "20808f1d1295c1aa275ae7a6158d7f69d0270e07fa2bd1f436a216cbe31f80cb",
+      "imports": [
+        "../shared-context.js?v=55",
+        "../engine/building-facade-materials.js?v=16",
+        "./building-exterior-details.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 60,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 61,
+          "contracts": [
+            "urbanSurfaceMeshes"
+          ]
+        },
+        {
+          "line": 64,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 68,
+          "contracts": [
+            "streetFurnitureMeshes"
+          ]
+        },
+        {
+          "line": 69,
+          "contracts": [
+            "vegetationMeshes"
+          ]
+        },
+        {
+          "line": 74,
+          "contracts": [
+            "invalidateTraversalNetworks"
+          ]
+        },
+        {
+          "line": 123,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 124,
+          "contracts": [
+            "roads",
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 128,
+          "contracts": [
+            "transportSurfacePublication"
+          ]
+        },
+        {
+          "line": 141,
+          "contracts": [
+            "urbanSurfaceMeshes"
+          ]
+        },
+        {
+          "line": 142,
+          "contracts": [
+            "urbanSurfaceMeshes"
+          ]
+        },
+        {
+          "line": 143,
+          "contracts": [
+            "invalidateTraversalNetworks"
+          ]
+        },
+        {
+          "line": 147,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 148,
+          "contracts": [
+            "buildings",
+            "buildingMeshes",
+            "dynamicBuildingColliders"
+          ]
+        },
+        {
+          "line": 158,
+          "contracts": [
+            "landuses"
+          ]
+        },
+        {
+          "line": 159,
+          "contracts": [
+            "surfaceFeatureHints"
+          ]
+        },
+        {
+          "line": 169,
+          "contracts": [
+            "worldTraversalRadiusWorld"
+          ]
+        },
+        {
+          "line": 171,
+          "contracts": [
+            "linearFeatureMeshes"
+          ]
+        },
+        {
+          "line": 172,
+          "contracts": [
+            "linearFeatures",
+            "linearFeatureMeshes"
+          ]
+        },
+        {
+          "line": 185,
+          "contracts": [
+            "streetFurnitureMeshes"
+          ]
+        },
+        {
+          "line": 186,
+          "contracts": [
+            "streetFurnitureMeshes"
+          ]
+        },
+        {
+          "line": 188,
+          "contracts": [
+            "vegetationMeshes"
+          ]
+        },
+        {
+          "line": 189,
+          "contracts": [
+            "vegetationMeshes"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/load-road-pass.js",
+      "sha256": "c37f672e09d3000ab0f28b76594d330fddf35203d217f8d2944c6281c7380a67",
+      "imports": [
+        "../shared-context.js?v=55",
+        "../structure-semantics.js?v=63",
+        "./bridge-guardrails.js?v=20",
+        "./compiler/transport-source-normalizer.js?v=4",
+        "./cooperative-scheduling.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 40,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 155,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 157,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 158,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 167,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 168,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 169,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 170,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 173,
+          "contracts": [
+            "roads"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/load-roads-support.js",
+      "sha256": "2905acf45c8d6973279d1e4bc173d61907205205d7cd7d71207d165797d83a0b",
+      "imports": [
+        "../boat-mode/water-query.js?v=21"
+      ],
+      "mentions": [
+        {
+          "line": 66,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/load-roads.js",
+      "sha256": "e1f8e8795857489d0617ac661b5eb469b599f002994e67d091ac438cd8db9a80",
+      "imports": [
+        "./load-linear-runtime.js?v=11",
+        "./load-landuse-pass.js?v=40",
+        "./load-roads-support.js?v=9",
+        "../boat-mode/water-query.js?v=21",
+        "./load-runtime-session.js?v=122",
+        "./load-building-detail.js?v=27",
+        "./accepted-ground-activation.js?v=7",
+        "../earth-core/world-load-plan.js?v=1",
+        "./compiler/selected-location-source-adapter.js?v=16",
+        "./settlement-density-policy.js?v=1",
+        "./load-terrain-readiness.js?v=2",
+        "./world-load-coordinator.js?v=2",
+        "./fixed-regional-context.js?v=9",
+        "./fixed-regional-structures.js?v=16",
+        "./regional-civic-facilities.js?v=2",
+        "../transport/facility-compiler.js?v=4",
+        "../transport/facility-visuals.js?v=7",
+        "./osm-airport-source.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 3,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 90,
+          "contracts": [
+            "buildTraversalNetworks"
+          ]
+        },
+        {
+          "line": 119,
+          "contracts": [
+            "invalidateTraversalNetworks"
+          ]
+        },
+        {
+          "line": 212,
+          "contracts": [
+            "invalidateTraversalNetworks"
+          ]
+        },
+        {
+          "line": 282,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 286,
+          "contracts": [
+            "buildTraversalNetworks"
+          ]
+        },
+        {
+          "line": 324,
+          "contracts": [
+            "invalidateTraversalNetworks"
+          ]
+        },
+        {
+          "line": 358,
+          "contracts": [
+            "worldTraversalRadiusWorld"
+          ]
+        },
+        {
+          "line": 401,
+          "contracts": [
+            "worldTraversalRadiusWorld"
+          ]
+        },
+        {
+          "line": 800,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 877,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 885,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 886,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 911,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 931,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 1023,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 1043,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 1060,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 1061,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 1075,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 1088,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 1096,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 1097,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 1100,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 1119,
+          "contracts": [
+            "roads"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/load-runtime-session.js",
+      "sha256": "dfefb42ddcebea6c58abb51fd4b8b125dd2c7a7336fd4fa4da3b3f698dda056a",
+      "imports": [
+        "./building-provenance-model.js?v=1",
+        "../runtime/workload-policy.js?v=1",
+        "../earth-core/world-load-request.js?v=1",
+        "../earth-core/world-load-session.js?v=1",
+        "./collection-registry.js?v=1",
+        "./compiler/world-layer-products.js?v=4",
+        "./world-snapshot-adapter.js?v=4",
+        "../poi/lifecycle.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 26,
+          "contracts": [
+            "invalidateTraversalNetworks"
+          ]
+        },
+        {
+          "line": 35,
+          "contracts": [
+            "_worldLoadSequence"
+          ]
+        },
+        {
+          "line": 46,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 47,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 50,
+          "contracts": [
+            "linearFeatures"
+          ]
+        },
+        {
+          "line": 96,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 97,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 121,
+          "contracts": [
+            "invalidateTraversalNetworks"
+          ]
+        },
+        {
+          "line": 169,
+          "contracts": [
+            "_worldLoadSequence"
+          ]
+        },
+        {
+          "line": 190,
+          "contracts": [
+            "_worldLoadSequence"
+          ]
+        },
+        {
+          "line": 262,
+          "contracts": [
+            "roads",
+            "buildings"
+          ]
+        },
+        {
+          "line": 414,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 415,
+          "contracts": [
+            "buildings",
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 433,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 459,
+          "contracts": [
+            "transportSurfacePublication"
+          ]
+        },
+        {
+          "line": 631,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 632,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 633,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 634,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 637,
+          "contracts": [
+            "linearFeatures"
+          ]
+        },
+        {
+          "line": 638,
+          "contracts": [
+            "linearFeatureMeshes"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/load-support.js",
+      "sha256": "6966cc7484c6a86631abadb6a6477661a505c53217582ed7519417da8beb6afc",
+      "imports": [
+        "../shared-context.js?v=55",
+        "../road-render.js?v=4",
+        "./furniture.js?v=22",
+        "./cooperative-scheduling.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 28,
+          "contracts": [
+            "buildTraversalNetworks"
+          ]
+        },
+        {
+          "line": 64,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 85,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 86,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 87,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 88,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 89,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 124,
+          "contracts": [
+            "buildTraversalNetworks"
+          ]
+        },
+        {
+          "line": 157,
+          "contracts": [
+            "invalidateTraversalNetworks"
+          ]
+        },
+        {
+          "line": 160,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 189,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 190,
+          "contracts": [
+            "urbanSurfaceMeshes"
+          ]
+        },
+        {
+          "line": 192,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 194,
+          "contracts": [
+            "linearFeatureMeshes"
+          ]
+        },
+        {
+          "line": 196,
+          "contracts": [
+            "streetFurnitureMeshes"
+          ]
+        },
+        {
+          "line": 197,
+          "contracts": [
+            "vegetationMeshes"
+          ]
+        },
+        {
+          "line": 200,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 201,
+          "contracts": [
+            "urbanSurfaceMeshes"
+          ]
+        },
+        {
+          "line": 203,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 206,
+          "contracts": [
+            "streetFurnitureMeshes"
+          ]
+        },
+        {
+          "line": 207,
+          "contracts": [
+            "vegetationMeshes"
+          ]
+        },
+        {
+          "line": 210,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 211,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 212,
+          "contracts": [
+            "landuses"
+          ]
+        },
+        {
+          "line": 213,
+          "contracts": [
+            "surfaceFeatureHints"
+          ]
+        },
+        {
+          "line": 218,
+          "contracts": [
+            "invalidateTraversalNetworks"
+          ]
+        },
+        {
+          "line": 222,
+          "contracts": [
+            "linearFeatures"
+          ]
+        },
+        {
+          "line": 223,
+          "contracts": [
+            "linearFeatureMeshes"
+          ]
+        },
+        {
+          "line": 224,
+          "contracts": [
+            "dynamicBuildingColliders"
+          ]
+        },
+        {
+          "line": 238,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 289,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 361,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 536,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 537,
+          "contracts": [
+            "buildings",
+            "buildingMeshes"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/navigation.js",
+      "sha256": "30700550c6ef4651698c9ebf316d3df9c302b379bcd08e4c9809a1b833b7795d",
+      "imports": [
+        "../shared-context.js?v=55",
+        "./road-cross-section-profile.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 8,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 33,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 60,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 61,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 62,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 71,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 76,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 86,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 87,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 88,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 89,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 154,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 320,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 483,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 484,
+          "contracts": [
+            "roads"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/osm-loader.js",
+      "sha256": "3c58bc02d92e19890ba6c83d7fc826dfb24cc05b3c7398714465232623b097e0",
+      "imports": [
+        "../shared-context.js?v=55",
+        "./osm-cache.js?v=3"
+      ],
+      "mentions": [
+        {
+          "line": 226,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 321,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/overture-building-source.js",
+      "sha256": "b2b8ab3de35e8a014ccc3a804b2a20265c20ec14204dd9fd96d4e06c722687b0",
+      "imports": [
+        "./shortbread-source.js?v=20",
+        "./overture-tile-source.js?v=6",
+        "./building-provenance-model.js?v=1",
+        "../earth-core/bounded-provider-batch.js?v=1",
+        "../earth-core/request-cancellation.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 249,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 349,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 350,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 371,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/overture-tile-source.js",
+      "sha256": "aa33032cba1e4ed92880f334b1fb998786f8d0d17359fe18e469bc16b08c9276",
+      "imports": [
+        "./shortbread-source.js?v=20"
+      ],
+      "mentions": [
+        {
+          "line": 16,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 35,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/preset-building-metadata.js",
+      "sha256": "9a9c7044c0840bbd48e9f70ba4f8e736d344bb3b40010800c3a607dd61b2a6de",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 1,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/publication.js",
+      "sha256": "460c8201a9dc13f8473af06eb6eecec4587a04b7c7aeebf66670bcae75a8d77b",
+      "imports": [
+        "../shared-context.js?v=55"
+      ],
+      "mentions": [
+        {
+          "line": 26,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 27,
+          "contracts": [
+            "urbanSurfaceMeshes"
+          ]
+        },
+        {
+          "line": 28,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 31,
+          "contracts": [
+            "streetFurnitureMeshes"
+          ]
+        },
+        {
+          "line": 34,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 37,
+          "contracts": [
+            "roadMeshes"
+          ]
+        },
+        {
+          "line": 38,
+          "contracts": [
+            "urbanSurfaceMeshes"
+          ]
+        },
+        {
+          "line": 39,
+          "contracts": [
+            "buildings",
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 45,
+          "contracts": [
+            "streetFurnitureMeshes"
+          ]
+        },
+        {
+          "line": 48,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 51,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 54,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 55,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 56,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 57,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 58,
+          "contracts": [
+            "buildingMeshes"
+          ]
+        },
+        {
+          "line": 60,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/settlement-density-policy.js",
+      "sha256": "7bbb69ef44f046a7616f01f9461bfa4a54fe771cea3e65c077cfdbbff2ae9608",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 16,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 24,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 53,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/shortbread-source.js",
+      "sha256": "b2dc9283936aa4c31697b5e9f9df6f8e1068a93a61b3389fe142c6ebdd2eac0e",
+      "imports": [
+        "./shortbread-road-labels.js?v=1",
+        "./cooperative-scheduling.js?v=1",
+        "../earth-core/bounded-provider-batch.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 8,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 359,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 515,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 661,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 688,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 700,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 709,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 721,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/spawn-location-arrival.js",
+      "sha256": "6109390f593b15fec59bd2afe77886a4097e1e1d698986f2de03ed4ee551ba41",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 81,
+          "contracts": [
+            "roads"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/spawn-structure-search.js",
+      "sha256": "205a1eca64a017d6f271d1fa943e7a38cbd4d5a0466f1931a0ae601ab291e1a5",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 1,
+          "contracts": [
+            "roads",
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 4,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 18,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/spawn-surface.js",
+      "sha256": "257b1b4ba9952761546e673dd941aa3dadc873eb3ace0caebe1484157bc54efc",
+      "imports": [
+        "../shared-context.js?v=55",
+        "../structure-semantics.js?v=63",
+        "./road-cross-section-profile.js?v=1",
+        "../planetary/runtime/surface-query.js?v=3"
+      ],
+      "mentions": [
+        {
+          "line": 35,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 41,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 48,
+          "contracts": [
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 279,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 281,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 282,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 284,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 300,
+          "contracts": [
+            "buildings"
+          ]
+        },
+        {
+          "line": 301,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/spawn.js",
+      "sha256": "01a304fa35104255f6375867b2bd250b7b51d50a12842b50ace623aef76f6e2b",
+      "imports": [
+        "../shared-context.js?v=55",
+        "./featured-arrivals.js?v=3",
+        "../structure-semantics.js?v=63",
+        "./spawn-surface.js?v=14",
+        "./spawn-structure-search.js?v=2",
+        "./spawn-location-arrival.js?v=6",
+        "./compiler/tunnel-space-query.js"
+      ],
+      "mentions": [
+        {
+          "line": 14,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 221,
+          "contracts": [
+            "roads",
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 473,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 588,
+          "contracts": [
+            "GroundHeight"
+          ]
+        },
+        {
+          "line": 595,
+          "contracts": [
+            "GroundHeight"
+          ]
+        },
+        {
+          "line": 672,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 680,
+          "contracts": [
+            "roads"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/structure-aware.js",
+      "sha256": "5968a2945e6847182af13349fc2a9d805bc5111e558b1f791c689d66d72fb0bf",
+      "imports": [
+        "../shared-context.js?v=55",
+        "../structure-semantics.js?v=63",
+        "./compiler/tunnel-system-model.js?v=15",
+        "./compiler/tunnel-solid-publication.js",
+        "./compiler/transport-structure-model.js?v=1",
+        "./compiler/transport-structure-assembly.js?v=15",
+        "./compiler/transport-junction-profile.js?v=21",
+        "./bridge-safety.js?v=14",
+        "./structure-colliders.js?v=13",
+        "./cooperative-scheduling.js?v=1",
+        "./transport-surface-controls.js?v=3"
+      ],
+      "mentions": [
+        {
+          "line": 9,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 58,
+          "contracts": [
+            "linearFeatures"
+          ]
+        },
+        {
+          "line": 59,
+          "contracts": [
+            "linearFeatures"
+          ]
+        },
+        {
+          "line": 65,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 67,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 311,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 323,
+          "contracts": [
+            "linearFeatureMeshes"
+          ]
+        },
+        {
+          "line": 324,
+          "contracts": [
+            "linearFeatureMeshes"
+          ]
+        },
+        {
+          "line": 325,
+          "contracts": [
+            "linearFeatureMeshes"
+          ]
+        },
+        {
+          "line": 345,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 347,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 351,
+          "contracts": [
+            "transportSurfacePublication"
+          ]
+        },
+        {
+          "line": 352,
+          "contracts": [
+            "transportSurfacePublication"
+          ]
+        },
+        {
+          "line": 353,
+          "contracts": [
+            "transportSurfacePublication"
+          ]
+        },
+        {
+          "line": 354,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 430,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 435,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 452,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 454,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 475,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 476,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 499,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 500,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 522,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 523,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 548,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 549,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 578,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 579,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 630,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 689,
+          "contracts": [
+            "_worldLoadSequence"
+          ]
+        },
+        {
+          "line": 690,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 696,
+          "contracts": [
+            "roads",
+            "_worldLoadSequence"
+          ]
+        },
+        {
+          "line": 706,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 748,
+          "contracts": [
+            "linearFeatureMeshes"
+          ]
+        },
+        {
+          "line": 749,
+          "contracts": [
+            "linearFeatureMeshes"
+          ]
+        },
+        {
+          "line": 750,
+          "contracts": [
+            "linearFeatureMeshes"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/structure-colliders.js",
+      "sha256": "25e6df83a06c02713c29632c74f66d35f179dedf700720d35bbee1030d45e1cf",
+      "imports": [
+        "../structure-semantics.js?v=63",
+        "./building-spatial-index.js?v=7",
+        "./compiler/tunnel-envelope.js",
+        "./compiler/tunnel-junction-openings.js"
+      ],
+      "mentions": [
+        {
+          "line": 3,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 173,
+          "contracts": [
+            "sampleFeatureSurfaceY"
+          ]
+        },
+        {
+          "line": 220,
+          "contracts": [
+            "buildings"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/surface-contract.js",
+      "sha256": "823de7f3bd09af1f6649677fce411629998201456bf7d7c408abef926dd335e7",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 99,
+          "contracts": [
+            "worldTraversalRadiusWorld"
+          ]
+        },
+        {
+          "line": 275,
+          "contracts": [
+            "GroundHeight"
+          ]
+        },
+        {
+          "line": 276,
+          "contracts": [
+            "GroundHeight",
+            "SurfaceQuery"
+          ]
+        },
+        {
+          "line": 299,
+          "contracts": [
+            "GroundHeight"
+          ]
+        },
+        {
+          "line": 309,
+          "contracts": [
+            "GroundHeight"
+          ]
+        },
+        {
+          "line": 336,
+          "contracts": [
+            "GroundHeight"
+          ]
+        },
+        {
+          "line": 348,
+          "contracts": [
+            "GroundHeight"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/transport-surface-controls.js",
+      "sha256": "cc235f0e91e440624412601a45a19cd30ef8df35b5aaf958d376f73aa17d315b",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 45,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 46,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 47,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 48,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 191,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 200,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 223,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 224,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 233,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 249,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 252,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 256,
+          "contracts": [
+            "roads"
+          ]
+        },
+        {
+          "line": 263,
+          "contracts": [
+            "roads"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/traversal.js",
+      "sha256": "aafdc8982514cb4b96cc553b557e68a69101559703fe0a247e3e153efe906244",
+      "imports": [
+        "../shared-context.js?v=55",
+        "./road-cross-section-profile.js?v=1"
+      ],
+      "mentions": [
+        {
+          "line": 82,
+          "contracts": [
+            "linearFeatures"
+          ]
+        },
+        {
+          "line": 83,
+          "contracts": [
+            "linearFeatures"
+          ]
+        },
+        {
+          "line": 84,
+          "contracts": [
+            "linearFeatures"
+          ]
+        },
+        {
+          "line": 94,
+          "contracts": [
+            "invalidateTraversalNetworks"
+          ]
+        },
+        {
+          "line": 266,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 267,
+          "contracts": [
+            "transportNetworkModel"
+          ]
+        },
+        {
+          "line": 278,
+          "contracts": [
+            "buildTraversalNetworks"
+          ]
+        },
+        {
+          "line": 306,
+          "contracts": [
+            "buildTraversalNetworks"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/vegetation-models.js",
+      "sha256": "66599f031938a20843fe24571c13d0aab3e82fd3dcd8348226bca554e3804c5a",
+      "imports": [
+        "../assets/model-asset-runtime.js?v=15",
+        "./vegetation-spatial.js"
+      ],
+      "mentions": [
+        {
+          "line": 21,
+          "contracts": [
+            "_worldLoadSequence"
+          ]
+        },
+        {
+          "line": 22,
+          "contracts": [
+            "_worldLoadSequence"
+          ]
+        },
+        {
+          "line": 25,
+          "contracts": [
+            "_worldLoadSequence"
+          ]
+        },
+        {
+          "line": 60,
+          "contracts": [
+            "_worldLoadSequence"
+          ]
+        },
+        {
+          "line": 113,
+          "contracts": [
+            "vegetationMeshes"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/vegetation.js",
+      "sha256": "05371a56f9851590d810fdf301f086d778c53798c0f93fe840ac59fe98b64f26",
+      "imports": [
+        "../shared-context.js?v=55",
+        "../boat-mode/water-query.js?v=21",
+        "./vegetation-spatial.js",
+        "./vegetation-models.js"
+      ],
+      "mentions": [
+        {
+          "line": 201,
+          "contracts": [
+            "landuses"
+          ]
+        },
+        {
+          "line": 202,
+          "contracts": [
+            "landuses"
+          ]
+        },
+        {
+          "line": 203,
+          "contracts": [
+            "landuses"
+          ]
+        },
+        {
+          "line": 284,
+          "contracts": [
+            "landuses"
+          ]
+        },
+        {
+          "line": 455,
+          "contracts": [
+            "landuses"
+          ]
+        },
+        {
+          "line": 456,
+          "contracts": [
+            "landuses"
+          ]
+        },
+        {
+          "line": 457,
+          "contracts": [
+            "landuses"
+          ]
+        },
+        {
+          "line": 476,
+          "contracts": [
+            "roads"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "app/js/world/world-load-coordinator.js",
+      "sha256": "41b82ed2b8efab6091428297fb22a8822fc34b241c5120fd5136c7fccd1081a9",
+      "imports": [],
+      "mentions": [
+        {
+          "line": 20,
+          "contracts": [
+            "_worldLoadSequence"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -10,9 +10,14 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   pull-request:
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    timeout-minutes: 45
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -27,14 +32,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Playwright (runtime tests)
-        run: npx playwright install --with-deps chromium
+      - name: Install backend dependencies
+        run: npm ci --prefix functions
 
       - name: Bounded pull-request verification
         run: npm run verify:pr
 
+      - name: Preserve component test inventory and sensitivity evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: component-test-evidence
+          path: output/verification/current-contracts/
+          if-no-files-found: warn
+          retention-days: 14
+
   stable-runtime:
     if: github.event_name == 'push' && github.ref == 'refs/heads/stable'
+    timeout-minutes: 45
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -54,11 +69,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install backend dependencies
+        run: npm ci --prefix functions
+
       - name: Install datum normalizer
         run: python -m pip install -r scripts/ground-datum-requirements.txt
 
       - name: Install Playwright (runtime tests)
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium chrome
 
       - name: Extended stable runtime verification
         run: npm run runtime:verify

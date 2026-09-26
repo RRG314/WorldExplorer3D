@@ -76,7 +76,9 @@ function buildCaptureProcessingExports({ db, bucket }) {
     return finishCaptureAttempt(db, captureId, attemptId, patch);
   }
 
-  const realityCaptureWorker = functions.region('us-central1').runWith({ timeoutSeconds: 120, memory: '512MB', maxInstances: 2 }).https.onRequest(async (req, res) => {
+  // OIDC verification below remains required. Explicit IAM prevents a new
+  // deployment from inheriting the CLI's public HTTP-function default.
+  const realityCaptureWorker = functions.region('us-central1').runWith({ invoker: workerEmail, timeoutSeconds: 120, memory: '512MB', maxInstances: 2 }).https.onRequest(async (req, res) => {
     res.set('Cache-Control', 'private, no-store');
     if (req.method !== 'POST') return res.status(405).end();
     try {

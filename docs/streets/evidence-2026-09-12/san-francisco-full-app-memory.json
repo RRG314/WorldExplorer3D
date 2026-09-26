@@ -1,0 +1,64 @@
+{
+  "note": "Heap is browser-reported JavaScript only; geometry bytes exclude textures, GPU allocations and other tabs. Inspect twice to see runtime activity.",
+  "javascriptHeapBytes": 1418204342,
+  "sceneGeometryBytes": 412042699,
+  "rendererResources": {
+    "geometries": 1805,
+    "textures": 554
+  },
+  "gameStarted": true,
+  "worldLoading": false,
+  "pavementBuildActive": false,
+  "deferredWork": {
+    "budgets": {
+      "firstPlayTargetMs": 25000,
+      "frameTargetMs": 16.7,
+      "cooperativeChunkTargetMs": 8,
+      "backgroundIdleTimeoutMs": 1800,
+      "inactiveAuxiliaryRenderers": 0
+    },
+    "firstPlayReady": true,
+    "activeTask": "earth-ambient-state-1",
+    "firstPlayDetail": {
+      "environment": "earth",
+      "loadDurationMs": 182068,
+      "publicationSequence": 1
+    },
+    "queued": [
+      "earth-star-catalog"
+    ],
+    "completed": [
+      "tutorial-runtime",
+      "analytics-runtime",
+      "plane-visual"
+    ]
+  },
+  "street": {
+    "tiles": 144,
+    "triangles": 303896,
+    "curbTriangles": 87944,
+    "markingTriangles": 9759,
+    "ramps": 0,
+    "workerMs": 25265,
+    "inferredFrontages": 82047,
+    "managedPaths": 585,
+    "residentRoads": 289,
+    "residentBuildings": 1885,
+    "roads": 15562,
+    "roadMeshes": 40,
+    "buildings": 22202,
+    "worldLoadSequence": 1,
+    "plannedTiles": 144,
+    "terrainRefinementTriangles": 259779,
+    "drawCalls": 104,
+    "coverageBounds": {
+      "minX": -384,
+      "maxX": 384,
+      "minZ": -384,
+      "maxZ": 384
+    },
+    "positionBytes": 14457564,
+    "durationMs": 28540
+  },
+  "workSinceLastInspection": null
+}

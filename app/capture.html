@@ -12,10 +12,10 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Orbitron:wght@500;700&display=swap">
   <link rel="stylesheet" href="styles/reality-capture.css?v=2">
   <style>
-    :root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#071723;color:#e9fbff;font:16px/1.5 Poppins,system-ui,sans-serif}
+    :root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#05090d;color:#f4f7f9;font:16px/1.5 Inter,system-ui,sans-serif}
     main{max-width:600px;margin:auto;padding:28px 20px}h1,h2{font-family:Orbitron,Poppins,system-ui,sans-serif}h1{font-size:26px;line-height:1.35;overflow-wrap:anywhere}h2{font-size:20px}a{color:#82eef1}
     :focus-visible{outline:2px solid #82eef1;outline-offset:3px}
-    main button,main input{font:inherit;min-height:48px;border:1px solid #4d8c9b;border-radius:7px;padding:10px;background:#123443;color:inherit}
+    main button,main input{font:inherit;min-height:48px;border:1px solid #53606a;border-radius:4px;padding:10px;background:#101921;color:inherit}
     button{cursor:pointer}form,form label{display:grid;gap:8px}form{margin:20px 0}main input{width:100%}
     [hidden]{display:none!important}#captureList{display:grid;gap:12px}#captureList button{text-align:left}
     #phoneStatus{color:#acdee4;overflow-wrap:anywhere}.realityCapturePanel{width:min(600px,100vw);inset:0;margin:auto;background:#081b25}
@@ -26,10 +26,10 @@
   <main>
     <a href="../account/">World Explorer account</a>
     <h1>Bring your place into the world</h1>
-    <p>Start on your computer, take photos on your phone, and return to the same capture on either device.</p>
+    <p>Choose a building in the world, take or upload photos, and edit your improvement here. Everything works on this device; switching between phone and computer is optional.</p>
     <p id="phoneAccount"></p>
     <section id="phoneSignIn" hidden>
-      <p>Sign in with the same account you used on your computer. You do not need a second account.</p>
+      <p>Sign in to save your work and return to it on any device. You only need one World Explorer account.</p>
       <button id="googleSignIn" type="button">Sign in with Google</button>
       <form id="emailSignIn">
         <label>Email<input name="email" type="email" autocomplete="username" required></label>

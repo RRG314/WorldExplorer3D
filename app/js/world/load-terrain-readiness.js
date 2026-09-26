@@ -1,3 +1,9 @@
+export function selectedPolarSurfaceReady(appCtx) {
+  if (appCtx.worldLoadRuntimeState?.groundMode !== 'polar-cryosphere-local' || Number(appCtx.LOC?.lat) > -75) return true;
+  const sample = appCtx.terrainSourceSampleAtWorldXZ?.(0, 0);
+  return sample?.available === true && sample?.provenance?.dataset === 'Reference Elevation Model of Antarctica';
+}
+
 export async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
   if (!appCtx.terrainEnabled || appCtx.onMoon) return false;
   const waitForCoverage = appCtx.waitForTerrainCoverageAt;
@@ -6,9 +12,12 @@ export async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase
   startLoadPhase('waitForTerrainCoverage');
   try {
     const startedAt = performance.now();
-    const centerReady = typeof waitForCenter === 'function' ? await waitForCenter(0, 0, 3000) : false;
+    // The Antarctic source has a bounded request queue of its own. Do not
+    // cancel its selected tile using the shorter Terrarium-only deadline.
+    const polar = Number(appCtx.LOC?.lat) <= -60;
+    const centerReady = typeof waitForCenter === 'function' ? await waitForCenter(0, 0, polar ? 12000 : 3000) : false;
     const coverage = typeof waitForCoverage === 'function'
-      ? await waitForCoverage(0, 0, Math.max(800, 5000 - (performance.now() - startedAt)), 0.72)
+      ? await waitForCoverage(0, 0, Math.max(polar ? 11000 : 800, (polar ? 23000 : 5000) - (performance.now() - startedAt)), 0.72)
       : null;
     const nearReady = centerReady || coverage?.ready === true;
     if (appCtx.worldLoadRuntimeState?.groundMode === 'polar-cryosphere-local') {

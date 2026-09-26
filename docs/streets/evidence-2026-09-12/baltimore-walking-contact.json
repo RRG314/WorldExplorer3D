@@ -1,0 +1,146 @@
+{
+  "tiles": 134,
+  "triangles": 25059,
+  "curbTriangles": 43456,
+  "inferredFrontages": 2252,
+  "managedPaths": 0,
+  "roads": 19219,
+  "roadMeshes": 36,
+  "buildings": 25518,
+  "worldLoadSequence": 1,
+  "plannedTiles": 144,
+  "durationMs": 6080,
+  "position": {
+    "x": 35.1033952509255,
+    "y": 6.591074818712205,
+    "z": -9.64994698351283
+  },
+  "contact": "sidewalk",
+  "terrain": 4.62597964694843,
+  "pavement": 4.891074818712204,
+  "nearbyBuildings": [
+    {
+      "name": "",
+      "pts": [
+        {
+          "x": 19.75153444288661,
+          "z": -8.510109623927065
+        },
+        {
+          "x": 22.6577545810484,
+          "z": -8.925283413674379
+        },
+        {
+          "x": 23.48810319195177,
+          "z": 6.436163157985675
+        },
+        {
+          "x": 20.581883053789976,
+          "z": 6.851337857227691
+        }
+      ],
+      "distance": 12.466720056741066
+    },
+    {
+      "name": "",
+      "pts": [
+        {
+          "x": 12.278396944756288,
+          "z": -21.38048562372319
+        },
+        {
+          "x": 11.448048333852919,
+          "z": -33.83566568189167
+        },
+        {
+          "x": 24.31845180285514,
+          "z": -34.6660102287899
+        },
+        {
+          "x": 25.148800413758508,
+          "z": -20.134966397478138
+        },
+        {
+          "x": 19.336360137434923,
+          "z": -19.719793275640995
+        },
+        {
+          "x": 19.336360137434923,
+          "z": -21.79565865176869
+        }
+      ],
+      "distance": 14.457855666847044
+    },
+    {
+      "name": "Baltimore City Hall",
+      "pts": [
+        {
+          "x": 20.581883053789976,
+          "z": 6.851337857227691
+        },
+        {
+          "x": -15.12310721505489,
+          "z": 8.512036904306797
+        },
+        {
+          "x": -15.953455825958258,
+          "z": -6.849414223353278
+        },
+        {
+          "x": 19.75153444288661,
+          "z": -8.510109623927065
+        }
+      ],
+      "distance": 15.394117690719012
+    }
+  ],
+  "road": {
+    "name": "East Fayette Street",
+    "type": "unclassified",
+    "width": 5,
+    "tags": {
+      "_nameProvenance": "spatial-label-association",
+      "_sourceCompleteness": "generalized",
+      "_sourceFeatureId": "shortbread:streets:13:2352:3122:1042:0",
+      "access": "",
+      "bicycle": "yes",
+      "bridge": "",
+      "covered": "",
+      "cutting": "",
+      "destination": "",
+      "embankment": "",
+      "footway": "",
+      "highway": "unclassified",
+      "horse": "no",
+      "incline": "",
+      "junction": "",
+      "lanes": "",
+      "layer": "",
+      "level": "",
+      "location": "",
+      "maxheight": "",
+      "name": "East Fayette Street",
+      "oneway": "",
+      "placement": "",
+      "service": "",
+      "sidewalk": "",
+      "surface": "",
+      "tracktype": "",
+      "tunnel": "",
+      "width": ""
+    },
+    "section": {
+      "lanes": 2,
+      "lanesSource": "fallback:road-class",
+      "widthMeters": 5,
+      "widthSource": "fallback:road-class",
+      "inferredLanes": true,
+      "inferredWidth": true,
+      "placement": {
+        "raw": "",
+        "centerlineOffsetMeters": 0,
+        "status": "absent"
+      }
+    }
+  }
+}

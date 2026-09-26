@@ -1,0 +1,15 @@
+- strong: Controlled street geometry test
+- paragraph: Real pavement worker and renderer. Synthetic source geometry, not a real location.
+- text: Terrain
+- combobox "Terrain":
+  - option "Flat"
+  - option "Uphill"
+  - option "Downhill"
+  - option "Cross slope"
+  - option "Rolling terrain"
+  - option "Overpass beside ground street" [selected]
+  - option "High elevation"
+- button "Overview"
+- button "Curb ramp"
+- button "Rebuild paving five times"
+- generic: "{ \"terrain\": \"overpass\", \"pavementBesideBridge\": 0.20875000953674316, \"positionBytes\": 74340, \"terrainRefinementTriangles\": 12, \"ramps\": 16, \"markingTriangles\": 16, \"curbSurface\": 0.18000000715255737, \"backOfRamp\": 0.26625001430511475, \"roadSurface\": 12 }"

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 
 const root = process.cwd();
@@ -12,7 +12,7 @@ const server = externalUrl ? null : await startStaticServer({ rootDir: servedRoo
 const baseUrl = externalUrl || `http://127.0.0.1:${server.port}`;
 const reportPath = path.join(root, 'output', 'verification', 'ar', 'report.json');
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
-const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, userAgent: devices['iPhone 13'].userAgent });
 const page = await context.newPage();
 const browserErrors = [];
 const localFailures = [];

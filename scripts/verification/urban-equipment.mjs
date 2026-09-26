@@ -1,7 +1,10 @@
+import { softwareCompositorArgs } from './software-compositor.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { startStaticServer } from './static-server.mjs';
 
 const root = process.cwd();
@@ -9,6 +12,7 @@ const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
 const servedRoot = requestedRoot ? path.resolve(root, requestedRoot) : root;
 const externalUrl = String(process.env.WE3D_VERIFY_BASE_URL || '').replace(/\/$/, '');
 const captureRequested = process.env.WE3D_CAPTURE_RELEASE_EVIDENCE === '1';
+const equipmentTimeout = process.env.CI ? 30_000 : 5_000;
 const policy = JSON.parse(await fs.readFile(path.join(root, 'config', 'verification-policy.json'), 'utf8'));
 const reportPath = path.join(root, 'output', 'verification', 'urban-equipment', 'report.json');
 const evidenceDir = path.join(root, policy.visualEvidence.outputDirectory);
@@ -17,10 +21,12 @@ const server = externalUrl ? null : await startStaticServer({
   ports: [4400, 4401, 4402, 4403]
 });
 const baseUrl = externalUrl || `http://127.0.0.1:${server.port}`;
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024', ...softwareCompositorArgs()] });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await context.newPage();
+await configureStagingAppCheck(page, baseUrl);
 const browserErrors = [];
+collectBrowserGraphicsErrors(page, browserErrors);
 const localFailures = [];
 const visualEvidence = [];
 
@@ -109,6 +115,7 @@ try {
   await page.getByRole('button', { name: 'Explore', exact: true }).click();
 
   await page.waitForFunction(() => {
+    if (document.getElementById('loading')?.classList.contains('show')) return false;
     const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return diagnostics.gameStarted === true && diagnostics.worldLoading === false &&
       diagnostics.environment === 'EARTH' &&
@@ -135,7 +142,7 @@ try {
   ];
 
   await page.keyboard.press('KeyI');
-  await page.waitForSelector('#urbanEquipment.show', { timeout: 5000 });
+  await page.waitForSelector('#urbanEquipment.show', { timeout: equipmentTimeout });
   const opened = await snapshot();
 
   const laserItem = page.locator('#urbanBackpackContents [data-equipment-id]').filter({ hasText: 'Laser gun' });
@@ -150,7 +157,7 @@ try {
   await page.waitForFunction(() => {
     const sandbox = globalThis.getWorldExplorerRuntimeDiagnostics?.()?.urbanSandbox;
     return sandbox?.equipment?.equippedId === 'laser-gun';
-  }, null, { timeout: 5000 });
+  }, null, { timeout: equipmentTimeout, polling: 100 });
   await page.waitForTimeout(4000);
   const laserEquipped = await snapshot();
   if (captureRequested) {
@@ -161,7 +168,7 @@ try {
     await page.screenshot({ path: laserImage, fullPage: false, timeout: 120000 });
     visualEvidence.push(path.relative(root, laserImage));
     await page.keyboard.press('KeyI');
-    await page.waitForSelector('#urbanEquipment.show', { timeout: 5000 });
+    await page.waitForSelector('#urbanEquipment.show', { timeout: equipmentTimeout });
   }
   const laserMagazineBefore = Number(item(laserEquipped, 'laser-gun')?.magazine);
 
@@ -171,21 +178,21 @@ try {
     const laser = sandbox?.equipment?.items?.find((entry) => entry.id === 'laser-gun');
     return Number(laser?.magazine) === before - 1 &&
       sandbox?.projectileRuntime?.lastProjectileAction?.equipmentId === 'laser-gun';
-  }, laserMagazineBefore, { timeout: 5000 });
+  }, laserMagazineBefore, { timeout: equipmentTimeout, polling: 100 });
   const laserUsed = await snapshot();
 
   await page.keyboard.press('Digit2');
   await page.waitForFunction(() => {
     return globalThis.getWorldExplorerRuntimeDiagnostics?.()?.urbanSandbox?.equipment?.equippedId === 'flashlight';
-  }, null, { timeout: 5000 });
+  }, null, { timeout: equipmentTimeout, polling: 100 });
   await page.keyboard.press('KeyV');
   await page.waitForFunction(() => {
     return globalThis.getWorldExplorerRuntimeDiagnostics?.()?.urbanSandbox?.equipment?.flashlightEnabled === true;
-  }, null, { timeout: 5000 });
+  }, null, { timeout: equipmentTimeout, polling: 100 });
   const flashlightUsed = await snapshot();
 
   await page.keyboard.press('Escape');
-  await page.waitForFunction(() => document.querySelector('#urbanEquipment')?.classList.contains('show') !== true, null, { timeout: 5000 });
+  await page.waitForFunction(() => document.querySelector('#urbanEquipment')?.classList.contains('show') !== true, null, { timeout: equipmentTimeout, polling: 100 });
   const closed = await snapshot();
 
   const finalItems = closed.equipment?.items || [];
@@ -307,6 +314,18 @@ try {
       captureRequested,
       screenshotsWritten: [],
       error: String(error?.stack || error),
+      state: await snapshot().catch(() => null),
+      inputOwner: await page.evaluate(() => ({
+        activeElement: {tag: document.activeElement?.tagName, id: document.activeElement?.id, classes: document.activeElement?.className},
+        equipment: (() => {
+          const element = document.getElementById('urbanEquipment');
+          const style = element && getComputedStyle(element);
+          const rect = element?.getBoundingClientRect();
+          return {display:style?.display, visibility:style?.visibility, width:rect?.width, height:rect?.height};
+        })(),
+        loading: document.getElementById('loading')?.className,
+        globe: document.getElementById('globeSelectorScreen')?.className
+      })).catch(() => null),
       browserErrors,
       localFailures
     };

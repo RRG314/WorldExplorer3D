@@ -32,6 +32,8 @@ export function stitchTerrainMeshEdges(appCtx, mesh) {
     normal.setXYZ(indexA, nx / length, ny / length, nz / length);
     otherNormal.setXYZ(indexB, nx / length, ny / length, nz / length);
     otherPosition.needsUpdate = true;
+    other.geometry.boundingBox = null;
+    other.geometry.boundingSphere = null;
     otherNormal.needsUpdate = true;
   };
 
@@ -46,6 +48,8 @@ export function stitchTerrainMeshEdges(appCtx, mesh) {
     if (south) averagePair(south, segments * verticesPerSide + edgeIndex, edgeIndex);
   }
   position.needsUpdate = true;
+  mesh.geometry.boundingBox = null;
+  mesh.geometry.boundingSphere = null;
   normal.needsUpdate = true;
 }
 
@@ -98,7 +102,11 @@ export function stitchTerrainGroupEdges(appCtx) {
     }
     sharedVertices += 1;
   }
-  for (const mesh of modifiedMeshes) mesh.geometry.computeVertexNormals?.();
+  for (const mesh of modifiedMeshes) {
+    mesh.geometry.computeVertexNormals?.();
+    mesh.geometry.boundingBox = null;
+    mesh.geometry.boundingSphere = null;
+  }
 
   // Positions now have one exact owner value. Average the freshly computed
   // edge normals as presentation data without changing physical height.

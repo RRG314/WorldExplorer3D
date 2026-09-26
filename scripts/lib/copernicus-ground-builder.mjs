@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { fromArrayBuffer } from 'geotiff';
+import {reconstructClassifiedGround} from './ground-reconstruction.mjs';
 import {
   WEB_MERCATOR_RADIUS_METERS,
   normalizeLongitude
@@ -28,7 +29,7 @@ export const COPERNICUS_DEM_90_LIABILITY_NOTICE =
 
 const NODATA = -32767;
 const FILTER_RADII = Object.freeze([1, 2, 3, 4, 5, 6]);
-const FILTER_VERSION = 'worldexplorer-pmf-grid-v2';
+const FILTER_VERSION = 'worldexplorer-pmf-boundary-reconstruction-v3';
 
 function sha256(bytes) {
   return crypto.createHash('sha256').update(bytes).digest('hex');
@@ -245,9 +246,10 @@ export function classifyCopernicusSurface({
       }
     }
   }
+  const reconstructed=reconstructClassifiedGround(raw,removed,width,height);
   return Object.freeze({
     method: FILTER_VERSION,
-    ground,
+    ground: reconstructed.ground,
     removed,
     removedCount: removed.reduce((total, value) => total + value, 0)
   });
@@ -329,7 +331,7 @@ export async function buildCopernicusGroundSamples({
       groundElevationMeters,
       confidence: Math.max(0.75, 1 - uncertaintyMeters / 120),
       correctionReason: classified.removed[index]
-        ? 'progressive-morphological-surface-classification'
+        ? 'progressive-morphological-classification-ground-boundary-reconstruction'
         : 'surface-consistent-with-local-ground-envelope',
       provenance:
         `${sourceTile.tileId}:${sourceTile.contentSha256.slice(0, 16)}:` +

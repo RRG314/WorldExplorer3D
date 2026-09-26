@@ -317,6 +317,7 @@ const CATALOG = [
     visualProfile: {
       kind: 'observational-nebula',
       image: 'assets/textures/universe/orion-nebula-nasa.jpg?v=3',
+      densityImage: 'assets/textures/universe/orion-nebula-density.jpg',
       imageAspect: 2.0833,
       displayWidth: 24000,
       imageCredit: 'NASA, ESA, M. Robberto (STScI/ESA), Hubble Orion Treasury Project Team',
@@ -324,7 +325,7 @@ const CATALOG = [
       tint: 0x89a7ff,
       navigationRadiusScene: 9000
     },
-    generatedFlags: ['observational-image-projection'],
+    generatedFlags: ['procedural-volumetric-reconstruction', 'enhanced-emission-display'],
     uncertainty: { distance: 'Published estimates vary by method and sub-region.' },
     provenance: [SOURCES.nasaOrion]
   }),
@@ -341,6 +342,7 @@ const CATALOG = [
     visualProfile: {
       kind: 'observational-nebula',
       image: 'assets/textures/universe/carina-nebula-webb.jpg?v=1',
+      densityImage: 'assets/textures/universe/carina-nebula-density.jpg',
       imageAspect: 2.8902,
       displayWidth: 32000,
       imageCredit: 'NASA, ESA, CSA, STScI',
@@ -348,7 +350,7 @@ const CATALOG = [
       tint: 0xff9a73,
       navigationRadiusScene: 9000
     },
-    generatedFlags: ['observational-image-projection'],
+    generatedFlags: ['procedural-volumetric-reconstruction', 'enhanced-emission-display'],
     uncertainty: { distance: 'Representative distance to the Carina star-forming complex.' },
     provenance: [SOURCES.nasaCarina]
   }),
@@ -365,6 +367,7 @@ const CATALOG = [
     visualProfile: {
       kind: 'observational-nebula',
       image: 'assets/textures/universe/crab-nebula-webb.jpg?v=1',
+      densityImage: 'assets/textures/universe/crab-nebula-density.jpg',
       imageAspect: 1.1488,
       displayWidth: 20000,
       imageCredit: 'NASA, ESA, CSA, STScI, Tea Temim (Princeton University); Image Processing: Joseph DePasquale (STScI)',
@@ -372,7 +375,7 @@ const CATALOG = [
       tint: 0x7ee0b7,
       navigationRadiusScene: 9000
     },
-    generatedFlags: ['observational-image-projection'],
+    generatedFlags: ['procedural-volumetric-reconstruction', 'enhanced-emission-display'],
     provenance: [SOURCES.nasaCrab]
   }),
   entity({

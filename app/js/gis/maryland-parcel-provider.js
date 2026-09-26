@@ -1,6 +1,8 @@
 import {
   MARYLAND_PARCEL_SOURCE,
   buildMarylandParcelQueryUrl,
+  buildMarylandParcelIdsQueryUrl,
+  buildMarylandParcelFeaturesQueryUrl,
   isLikelyMarylandCoordinate,
   normalizeMarylandParcelFeature
 } from './maryland-parcel-core.js?v=1';
@@ -14,15 +16,17 @@ const cache = new Map();
 const inFlight = new Map();
 
 function cacheKey(lat, lon, radiusM) {
-  return `${Math.round(Number(lat) * 200) / 200}:${Math.round(Number(lon) * 200) / 200}:${Math.round(Number(radiusM) / 100) * 100}`;
+  // Reuse only identical spatial envelopes. Coarse location buckets can serve
+  // another area's parcels after a short walk or a change of query radius.
+  return buildMarylandParcelQueryUrl({ lat, lon, radiusM, offset: 0, limit: PAGE_SIZE });
 }
 
 function trimCache() {
   while (cache.size > MAX_CACHE_ENTRIES) cache.delete(cache.keys().next().value);
 }
 
-async function fetchPage(fetchImpl, request, offset, signal) {
-  const response = await fetchImpl(buildMarylandParcelQueryUrl({ ...request, offset, limit: PAGE_SIZE }), {
+async function fetchPayload(fetchImpl, url, signal) {
+  const response = await fetchImpl(url, {
     signal, headers: { Accept: 'application/geo+json,application/json' }, credentials: 'omit'
   });
   if (!response.ok) throw new Error(`Maryland parcel service returned ${response.status}.`);
@@ -54,9 +58,15 @@ async function loadMarylandParcels(request = {}, options = {}) {
     try {
       const parcels = [];
       const seen = new Set();
-      let truncated = false;
-      for (let page = 0; page < MAX_PAGES; page += 1) {
-        const payload = await fetchPage(fetchImpl, { lat, lon, radiusM }, page * PAGE_SIZE, controller.signal);
+      const request = { lat, lon, radiusM };
+      const index = await fetchPayload(fetchImpl, buildMarylandParcelIdsQueryUrl(request), controller.signal);
+      if (index?.objectIds !== null && !Array.isArray(index?.objectIds)) throw new Error('Maryland parcel service returned no spatial object-ID index.');
+      const objectIds = [...new Set((index.objectIds || []).filter(id => Number.isSafeInteger(id) && id >= 0))].sort((a, b) => a - b);
+      const truncated = objectIds.length > MAX_PAGES * PAGE_SIZE;
+      const boundedIds = objectIds.slice(0, MAX_PAGES * PAGE_SIZE);
+      for (let offset = 0; offset < boundedIds.length; offset += PAGE_SIZE) {
+        const payload = await fetchPayload(fetchImpl,
+          buildMarylandParcelFeaturesQueryUrl(request, boundedIds.slice(offset, offset + PAGE_SIZE)), controller.signal);
         const features = Array.isArray(payload?.features) ? payload.features : [];
         features.forEach((feature) => {
           const parcel = normalizeMarylandParcelFeature(feature);
@@ -64,8 +74,7 @@ async function loadMarylandParcels(request = {}, options = {}) {
           seen.add(parcel.parcelId);
           parcels.push(parcel);
         });
-        if (features.length < PAGE_SIZE && payload?.exceededTransferLimit !== true) break;
-        if (page === MAX_PAGES - 1) truncated = true;
+        if (payload?.exceededTransferLimit === true) throw new Error('Maryland parcel service truncated a bounded ID batch.');
       }
       const value = Object.freeze({
         status: parcels.length ? 'ready' : 'no-coverage-at-point',
@@ -74,13 +83,17 @@ async function loadMarylandParcels(request = {}, options = {}) {
         warnings: Object.freeze(truncated ? ['Parcel results were capped for this dense area. Move closer to narrow the search.'] : []),
         fetchedAt: new Date().toISOString(), fromCache: false, query: Object.freeze({ lat, lon, radiusM })
       });
-      cache.set(key, { expiresAt: now + CACHE_TTL_MS, value });
-      trimCache();
+      // A forced refresh may now own this key. Older work still resolves for
+      // its original caller, but cannot publish over or untrack that refresh.
+      if (inFlight.get(key) === task) {
+        cache.set(key, { expiresAt: now + CACHE_TTL_MS, value });
+        trimCache();
+      }
       return value;
     } finally {
       clearTimeout(timeout);
       options.signal?.removeEventListener?.('abort', abort);
-      inFlight.delete(key);
+      if (inFlight.get(key) === task) inFlight.delete(key);
     }
   })();
   inFlight.set(key, task);

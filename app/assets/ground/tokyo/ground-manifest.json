@@ -3,7 +3,7 @@
   "artifactId": "tokyo-ground",
   "providerId": "copernicus-dem-classified-ground-v1",
   "sourceRelease": "COP-DEM-2021:GLO-30",
-  "contentSha256": "d3802b73f17c6ebc7cc12063a36502bfb8cf660b78e04353d6a8bbc219b414e8",
+  "contentSha256": "d738052a7d19df68fcd7737ebb996cfd325875f74e77826f30a100754452c13b",
   "spacingMeters": 90,
   "coverage": {
     "south": 35.64950238673167,
@@ -18,7 +18,7 @@
   "correctionAttested": true,
   "sourceEvidence": {
     "sourceClassification": "digital-surface-model",
-    "correctionMethod": "worldexplorer-pmf-grid-v1",
+    "correctionMethod": "worldexplorer-pmf-boundary-reconstruction-v3",
     "sourceTiles": [
       {
         "tileId": "Copernicus_DSM_COG_10_N35_00_E139_00_DEM",
@@ -29,7 +29,14 @@
         "etag": "1e0020384f857e90e0ecf3ecc806f28c",
         "lastModified": "Mon, 09 May 2022 14:18:06 GMT"
       }
-    ]
+    ],
+    "classificationMethod": "worldexplorer-pmf-grid-v1",
+    "reconstruction": {
+      "method": "harmonic-ground-boundary",
+      "toleranceMeters": 0.00001,
+      "exteriorPolicy": "retain-source-observation",
+      "sourceArtifactSha256": "d3802b73f17c6ebc7cc12063a36502bfb8cf660b78e04353d6a8bbc219b414e8"
+    }
   },
   "attribution": {
     "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",

@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Baseline defect reproduction; not release acceptance",
+  "findings": [
+    {
+      "id": "width-units",
+      "observation": {
+        "input": "6 ft",
+        "returnedWidth": 6,
+        "expectedMeters": 1.8288000000000002
+      },
+      "defectObserved": true,
+      "explanation": "Linear feature styling uses parseFloat and discards the explicit feet unit."
+    },
+    {
+      "id": "left-right",
+      "observation": {
+        "sourceDirection": "east (+x), north is -z",
+        "firstLeftPoint": {
+          "x": 0,
+          "y": 0.08,
+          "z": 6.2
+        }
+      },
+      "defectObserved": true,
+      "explanation": "The left sidewalk is placed south of an eastbound way."
+    },
+    {
+      "id": "offset-height",
+      "observation": {
+        "returnedY": 0.08,
+        "heightAtShiftedPointPlusBias": 6.28
+      },
+      "defectObserved": true,
+      "explanation": "Route elevation samples the road centerline before shifting sideways. This synthetic slope demonstrates the mismatch, not the slope of a real site."
+    },
+    {
+      "id": "per-side-separate",
+      "observation": {
+        "input": {
+          "sidewalk:both": "separate"
+        },
+        "inferredDirectedEdges": 4
+      },
+      "defectObserved": true,
+      "explanation": "Per-side separate mapping is ignored by pedestrian inference, creating additional inferred sidewalks."
+    },
+    {
+      "id": "area-classification",
+      "observation": {
+        "road": "paved",
+        "sidewalk": "paved"
+      },
+      "defectObserved": true,
+      "explanation": "Both enter the same paved presentation category. This is semantic flattening, not proof that the original provider omitted their geometry."
+    }
+  ]
+}

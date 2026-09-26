@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 
 const baseUrl = String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4202').replace(/\/$/, '');
 const evidenceDir = 'output/verification/explorer-pack-actions';
@@ -9,7 +9,7 @@ const context = await browser.newContext({
   viewport: { width: 390, height: 844 },
   deviceScaleFactor: 1,
   hasTouch: true,
-  isMobile: true
+  isMobile: true, userAgent: devices['iPhone 13'].userAgent
 });
 const page = await context.newPage();
 const pageErrors = [];

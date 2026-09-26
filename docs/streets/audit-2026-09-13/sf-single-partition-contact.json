@@ -1,0 +1,369 @@
+{
+  "tiles": 144,
+  "triangles": 170326,
+  "curbTriangles": 82322,
+  "markingTriangles": 48250,
+  "ramps": 0,
+  "workerMs": 8695,
+  "inferredFrontages": 99084,
+  "managedPaths": 583,
+  "residentRoads": 292,
+  "residentBuildings": 1869,
+  "roads": 15554,
+  "roadMeshes": 25,
+  "buildings": 20486,
+  "worldLoadSequence": 1,
+  "plannedTiles": 144,
+  "highestRefinement": {
+    "cell": "-2:1",
+    "bounds": {
+      "minX": -128,
+      "maxX": -64,
+      "minZ": 64,
+      "maxZ": 128
+    },
+    "addedTriangles": 1695,
+    "baseTriangles": 724
+  },
+  "terrainRefinementTriangles": 119745,
+  "drawCalls": 103,
+  "compilerCacheBytes": 16715894,
+  "coverageBounds": {
+    "minX": -384,
+    "maxX": 384,
+    "minZ": -384,
+    "maxZ": 384
+  },
+  "indexBytes": 1801242,
+  "positionBytes": 2822364,
+  "durationMs": 14253,
+  "sourceCoverage": {
+    "scope": "Loaded source network requiring inferred or mapped sidewalks; length within the compilation window, not proof of rendered pavement. Separately tagged sidewalks need mapped path data.",
+    "requiredSidewalkMeters": 464326.8261327449,
+    "withinCompilationWindowMeters": 25191.480966613162,
+    "outsideCompilationWindowMeters": 439135.34516613174,
+    "compilationCoveragePercent": 5.425377029457103,
+    "requiredSegments": 8980,
+    "uncoveredSegments": 8413,
+    "examples": [
+      {
+        "kind": "road-side",
+        "name": "Lincoln Way",
+        "a": {
+          "x": -7549.90183816687,
+          "z": 2831.9326104224274
+        },
+        "b": {
+          "x": -6481.632606661886,
+          "z": 2774.2581197458094
+        },
+        "uncoveredMeters": 2375.011465999452
+      },
+      {
+        "kind": "road-side",
+        "name": "Lincoln Way",
+        "a": {
+          "x": -6417.19731968222,
+          "z": 2770.865516654908
+        },
+        "b": {
+          "x": -5058.969296768739,
+          "z": 2694.532358498236
+        },
+        "uncoveredMeters": 3020.0243181469
+      },
+      {
+        "kind": "road-side",
+        "name": "37th Avenue",
+        "a": {
+          "x": -6491.806599342885,
+          "z": 2774.2581197458094
+        },
+        "b": {
+          "x": -6490.110933896052,
+          "z": 2818.362101565697
+        },
+        "uncoveredMeters": 97.9831774103875
+      },
+      {
+        "kind": "road-side",
+        "name": "36th Avenue",
+        "a": {
+          "x": -6401.93633066072,
+          "z": 2869.2516381610744
+        },
+        "b": {
+          "x": -6408.7189924480535,
+          "z": 2769.169215692102
+        },
+        "uncoveredMeters": 222.692622784102
+      },
+      {
+        "kind": "road-side",
+        "name": "Laguna Street",
+        "a": {
+          "x": -1369.2012844594572,
+          "z": -1119.425529360285
+        },
+        "b": {
+          "x": -1370.8969499062903,
+          "z": -1109.2530713042947
+        },
+        "uncoveredMeters": 22.894452634928935
+      },
+      {
+        "kind": "road-side",
+        "name": "Laguna Street",
+        "a": {
+          "x": -1370.8969499062903,
+          "z": -1109.2530713042947
+        },
+        "b": {
+          "x": -1367.5056190126238,
+          "z": -1097.3851858651074
+        },
+        "uncoveredMeters": 27.40129642024362
+      },
+      {
+        "kind": "road-side",
+        "name": "Girard Road",
+        "a": {
+          "x": -2983.4747898447677,
+          "z": -1046.522603697042
+        },
+        "b": {
+          "x": -2951.257146354935,
+          "z": -1078.7356130734338
+        },
+        "uncoveredMeters": 101.14176072033086
+      },
+      {
+        "kind": "road-side",
+        "name": "Girard Road",
+        "a": {
+          "x": -2951.257146354935,
+          "z": -1078.7356130734338
+        },
+        "b": {
+          "x": -2907.1698447372687,
+          "z": -1114.3393020859094
+        },
+        "uncoveredMeters": 125.80395135733468
+      }
+    ],
+    "status": "incomplete"
+  },
+  "position": {
+    "x": 6.725535372830481,
+    "y": 104.74337070303498,
+    "z": -4.745967516320662
+  },
+  "roadRendered": 103.04337070303495,
+  "mappedAreaRendered": null,
+  "contact": {
+    "source": "road",
+    "y": 103.04337070303498
+  },
+  "indexedRoad": 103.04337070303498,
+  "terrain": 102.86337248995258,
+  "pavement": null,
+  "nearbyBuildings": [
+    {
+      "name": "",
+      "pts": [
+        {
+          "x": -20.299421503559287,
+          "z": -21.143022343039775
+        },
+        {
+          "x": -19.875505141850958,
+          "z": -17.751700373480617
+        },
+        {
+          "x": -13.940676077934375,
+          "z": -18.599531013308024
+        },
+        {
+          "x": -14.364592439642703,
+          "z": -21.99085259064759
+        },
+        {
+          "x": -6.310181567184482,
+          "z": -23.262597780160377
+        },
+        {
+          "x": -6.310181567184482,
+          "z": -24.534342752247085
+        },
+        {
+          "x": -4.190599758642845,
+          "z": -24.958257692730967
+        },
+        {
+          "x": -1.6471015883928806,
+          "z": -8.849472804683955
+        },
+        {
+          "x": -28.353832376017507,
+          "z": -4.610313048658554
+        },
+        {
+          "x": -30.897330546267472,
+          "z": -19.447361553659448
+        }
+      ],
+      "distance": 9.324151722064002
+    },
+    {
+      "name": "Nob Hill Place Apartments",
+      "pts": [
+        {
+          "x": -18.603756056725977,
+          "z": 5.563680291231776
+        },
+        {
+          "x": -16.48417424818434,
+          "z": 5.98759698249296
+        },
+        {
+          "x": -2.9188506735178628,
+          "z": 3.0201806410445897
+        },
+        {
+          "x": -0.7992688649762258,
+          "z": 3.0201806410445897
+        },
+        {
+          "x": 0.048563858440428986,
+          "z": 5.563680291231776
+        },
+        {
+          "x": -0.37535250326789843,
+          "z": 6.411513699333682
+        },
+        {
+          "x": 3.439894752107048,
+          "z": 28.8791345283812
+        },
+        {
+          "x": -14.364592439642703,
+          "z": 31.846561252280026
+        },
+        {
+          "x": -15.636341524767685,
+          "z": 22.09644934083599
+        },
+        {
+          "x": -12.668926992809393,
+          "z": 21.672531723027078
+        },
+        {
+          "x": -13.09284335451772,
+          "z": 19.129026532027638
+        },
+        {
+          "x": -17.755923333309322,
+          "z": 19.97686150048139
+        },
+        {
+          "x": -19.875505141850958,
+          "z": 6.411513699333682
+        }
+      ],
+      "distance": 10.813682814816675
+    },
+    {
+      "name": "",
+      "pts": [
+        {
+          "x": 53.46202543368968,
+          "z": -2.06681602747949
+        },
+        {
+          "x": 55.15769088052299,
+          "z": -2.06681602747949
+        },
+        {
+          "x": 56.00552360393964,
+          "z": 3.444097190197226
+        },
+        {
+          "x": 51.34244362514804,
+          "z": 4.291930356714602
+        },
+        {
+          "x": 52.1902763485647,
+          "z": 8.955014514810955
+        },
+        {
+          "x": 57.277272689064624,
+          "z": 8.107180813965442
+        },
+        {
+          "x": 58.972938135897934,
+          "z": 17.857274262667033
+        },
+        {
+          "x": 20.820465582148472,
+          "z": 23.792120053656163
+        },
+        {
+          "x": 17.005218326773523,
+          "z": 0.05276549046584478
+        },
+        {
+          "x": 53.03810907198135,
+          "z": -5.458145194836561
+        }
+      ],
+      "distance": 11.344589904620149
+    }
+  ],
+  "road": {
+    "name": "Sacramento Street",
+    "type": "tertiary",
+    "width": 5.495495495495494,
+    "tags": {
+      "foot": "yes",
+      "highway": "tertiary",
+      "lanes": "2",
+      "lanes:psv": "1",
+      "lit": "yes",
+      "name": "Sacramento Street",
+      "name:en": "Sacramento Street",
+      "name:zh": "唐人街",
+      "oneway": "yes",
+      "shoulder": "no",
+      "sidewalk": "both",
+      "surface": "asphalt",
+      "tiger:cfcc": "A41",
+      "tiger:county": "San Francisco, CA",
+      "tiger:name_base": "Sacramento",
+      "tiger:name_type": "St",
+      "trolley_wire": "yes"
+    },
+    "section": {
+      "lanes": 2,
+      "lanesSource": "source:lanes",
+      "widthMeters": 6.1,
+      "widthSource": "derived:lanes",
+      "inferredLanes": false,
+      "inferredWidth": true,
+      "parking": {
+        "left": {
+          "widthMeters": 0,
+          "source": "not-on-carriageway"
+        },
+        "right": {
+          "widthMeters": 0,
+          "source": "not-on-carriageway"
+        }
+      },
+      "placement": {
+        "raw": "",
+        "centerlineOffsetMeters": 0,
+        "status": "absent"
+      }
+    }
+  }
+}

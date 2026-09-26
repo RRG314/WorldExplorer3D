@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 
 const externalUrl = String(process.env.WE3D_VERIFY_BASE_URL || '').replace(/\/$/, '');
@@ -246,7 +246,7 @@ try {
   const desktop = await browser.newContext({ viewport: { width: 1200, height: 500 } });
   const desktopResult = await openDeFlock(desktop, 'desktop-camera-selected.png');
   await desktop.close();
-  const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, userAgent: devices['iPhone 13'].userAgent });
   const mobileResult = await openDeFlock(mobile, 'mobile-camera-selected.png', true);
   await mobile.close();
   const report = {

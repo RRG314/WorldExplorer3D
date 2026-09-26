@@ -1,0 +1,19 @@
+{
+  "ok": true,
+  "buildId": "5.2.0+1519f0618e08.d67c7d366fca56e3.staging",
+  "evidence": "packaged worker protocol in Node adapter",
+  "results": [
+    {
+      "entry": "street-pavement-worker",
+      "tiles": 6,
+      "nonempty": 1,
+      "ok": true
+    },
+    {
+      "entry": "street-overview-worker",
+      "tiles": 6,
+      "nonempty": 1,
+      "ok": true
+    }
+  ]
+}

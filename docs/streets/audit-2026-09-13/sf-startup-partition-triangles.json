@@ -1,0 +1,14 @@
+[
+  {
+    "level": "warn",
+    "message": "[WorldLoad] Applied adaptive limits (roads 16730/39653, buildings 126/138, landuse 1798/2250, pois 5657/6662).",
+    "timestamp": "2026-09-15T14:16:16.301Z",
+    "url": "http://127.0.0.1:4192/app/js/world/load-roads.js?v=226"
+  },
+  {
+    "level": "warn",
+    "message": "[WorldLoad] publishStreetPavement failed: Error: Pavement has incomplete or overlapping terrain support: {\"sourceArea\":891.6927220000003,\"coveredArea\":891.694006608371,\"difference\":0.0012846083706108402,\"worstTriangle\":{\"source\":[{\"x\":376,\"z\":-164},{\"x\":372.701,\"z\":-168},{\"x\":373.201,\"z\":-164}],\"area\":5.597999999999956,\"difference\":0.00007612115246047324,\"contributions\":[{\"kind\":\"near\",\"vertices\":[373.1587662500036,59.28817934107513,-167.44496362533667,372.701,59.2396792349852,-168,372.8135334523721,59.35773150576501,-167.0997323810236,373.94281005859375,59.33352797614215,-166.49431941971056,373.1587662500036,59.28817934107512,-167.44496362533667,372.8135334523721,59.357731505765,-167.0997323810236,373.94281005859375,59.33352797614215,-166.49431941971056,372.8135334523721,59.357731505765,-167.0997323810236,373.201,59.688371522471726,-164,373.94281005859375,59.33352797614215,-166.49431941971056,373.201,59.688371522471726,-164,373.94281005859375,59.62586312342623,-164]},{\"kind\":\"near\",\"vertices\":[376,59.47978443114364,-164,373.9427795410156,59.333527454166116,-166.4943564219271,373.9427795410156,59.625866938123494,-164]},{\"kind\":\"far\",\"vertices\":[]}]}}\n    at conformPavementMeshCooperatively (http://127.0.0.1:4192/app/js/world/pavement-terrain-conformance.js:49:24)\n    at async publishStreetPavement (http://127.0.0.1:4192/app/js/world/street-pavement-runtime.js:280:30)\n    at async finalizeLoadedWorld (http://127.0.0.1:4192/app/js/world/load-support.js?v=44:130:34)\n    at async markLoaded (http://127.0.0.1:4192/app/js/world/load-roads.js?v=226:287:7)\n    at async loadRoadsInternal (http://127.0.0.1:4192/app/js/world/load-roads.js?v=226:1037:11)\n    at async Object.loadRoads (http://127.0.0.1:4192/app/js/world.js?v=473:292:20)\n    at async runTitleStart (http://127.0.0.1:4192/app/js/ui/title-screen.js?v=118:707:5)",
+    "timestamp": "2026-09-15T14:19:36.969Z",
+    "url": "http://127.0.0.1:4192/app/js/world/load-support.js?v=44"
+  }
+]

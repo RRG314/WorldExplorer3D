@@ -1,3 +1,4 @@
+import { FACADE_OPENINGS_GLSL } from '../world/building-facade-layout.js?v=2';
 import {
   MATERIAL_VARIANTS,
   buildingExteriorCatalogSnapshot,
@@ -252,7 +253,7 @@ function facadeTextureRepeat(facadeStyle) {
 }
 
 function surfaceTextureRepeat(textureId, facadeStyle, lodTier) {
-  if (lodTier === 'mid') return facadeTextureRepeat(facadeStyle);
+  // Architectural layout is independent of LOD; surface grain retains metre scale.
   if (textureId === 'glass_curtain') return { x: 0.18, y: 0.18 };
   if (textureId === 'stone_civic') return { x: 0.13, y: 0.13 };
   if (textureId === 'brick_wall_001') return { x: 0.34, y: 0.34 };
@@ -265,14 +266,18 @@ function surfaceTextureRepeat(textureId, facadeStyle, lodTier) {
   return facadeTextureRepeat(facadeStyle);
 }
 
-function facadeTexture(appCtx, textureId, facadeStyle, variant = 0, lodTier = 'near') {
-  const variantIndex = Math.max(0, Math.min(3, Number(variant) | 0));
-  const projectionKey = lodTier === 'mid' ? facadeStyle : 'surface';
-  const poolKey = `${lodTier}:${textureId}:${projectionKey}:v${variantIndex}`;
+export function facadeTextureProjection(textureId, facadeStyle, variant = 0, lodTier = 'near') {
+  const index=Math.max(0,Math.min(3,Number(variant)|0));
+  const repeat=surfaceTextureRepeat(textureId,facadeStyle,lodTier);
+  return [repeat.x*[0.94,1,1.08,0.98][index],repeat.y*[1,0.98,1.04,0.96][index],
+    [0.04,0.223,0.447,0.691][index],lodTier==='mid'?0:[0.03,0.29,0.57,0.81][index]];
+}
+
+function facadeTexture(appCtx, textureId) {
+  const url = FACADE_TEXTURES[textureId] || FACADE_TEXTURES.neutral;
+  const poolKey = url;
   const cached = facadeTexturePool.get(poolKey);
   if (cached) return cached;
-  const url = FACADE_TEXTURES[textureId] || FACADE_TEXTURES.neutral;
-  const repeat = surfaceTextureRepeat(textureId, facadeStyle, lodTier);
   const texture = new THREE.TextureLoader().load(
     url,
     () => {
@@ -286,18 +291,11 @@ function facadeTexture(appCtx, textureId, facadeStyle, variant = 0, lodTier = 'n
       texture.userData.loadStatus = 'failed';
     }
   );
-  texture.name = `building-facade-surface:${textureId}:${facadeStyle}:v${variantIndex}`;
+  texture.name = `building-facade-image:${url}`;
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
-  const repeatScaleX = [0.94, 1, 1.08, 0.98][variantIndex];
-  const repeatScaleY = [1, 0.98, 1.04, 0.96][variantIndex];
-  texture.repeat.set(repeat.x * repeatScaleX, repeat.y * repeatScaleY);
-  // Preserve the proven deterministic facade phasing from the Phase 4
-  // renderer without recreating a texture per building.
-  // V stays aligned across buildings so a wall begins with a complete
-  // storey instead of a random horizontal slice. U phasing is enough to
-  // prevent identical neighboring window columns.
-  texture.offset.set([0.04, 0.223, 0.447, 0.691][variantIndex], lodTier === 'mid' ? 0 : [0.03, 0.29, 0.57, 0.81][variantIndex]);
+  // Projection belongs to the material/vertex attributes, not the shared
+  // image. One GPU image serves every deterministic facade variation.
   texture.minFilter = THREE.LinearMipmapLinearFilter;
   texture.magFilter = THREE.LinearFilter;
   texture.generateMipmaps = true;
@@ -307,9 +305,7 @@ function facadeTexture(appCtx, textureId, facadeStyle, variant = 0, lodTier = 'n
   texture.anisotropy = Math.max(1, Math.min(8, maximumAnisotropy));
   texture.userData = {
     owner: 'engine/building-facade-materials',
-    facadeStyle,
     facadeTextureId: textureId,
-    facadeVariant: variantIndex,
     source: url.includes('/polyhaven-') ? 'poly-haven-cc0-surface' : 'project-authored-static-atlas',
     assetUrl: url,
     loadStatus: 'loading',
@@ -353,49 +349,27 @@ function facadeEntranceAtlas(appCtx) {
 }
 
 function applyWallOnlyFacadeMap(material, roof, entranceAtlas, exteriorProfile) {
-  const facadeProjection = new THREE.Vector4(
-    Number(material.map?.repeat?.x || 0.08),
-    Number(material.map?.repeat?.y || (1 / 16)),
-    Number(material.map?.offset?.x || 0),
-    Number(material.map?.offset?.y || 0)
-  );
+  const facadeProjection = new THREE.Vector4(...material.userData.facadeProjection);
   const roofA = new THREE.Color(roof.colorA);
   const roofB = new THREE.Color(roof.colorB);
   const grainScale = Number(roof.grainScale || 0.6);
-  const window = exteriorProfile?.window || {};
-  const storefront = exteriorProfile?.storefront || {};
-  const windowParams = new THREE.Vector4(
-    Number(window.bayWidth || 3.4),
-    Number(window.floorHeight || 3.2),
-    Number(window.width || 0.55),
-    Number(window.height || 0.56)
-  );
-  const storefrontParams = new THREE.Vector4(
-    Number(storefront.code || 0),
-    Number(storefront.glazing || 0),
-    Number(material.userData?.facadeVariant || 0) * 0.173,
-    exteriorProfile?.material?.surfacePattern === 'glass' ? 2 : exteriorProfile?.material?.surfacePattern === 'horizontal_siding' ? 1 : 0
-  );
-  const windowGlass = new THREE.Color(exteriorProfile?.material?.surfacePattern === 'glass' ? 0x9db6c2 : 0x243640);
-  const windowFrame = new THREE.Color(exteriorProfile?.category === 'residential' ? 0x302f2c : 0x69757a);
-  const windowFrameWidth = Number(window.frame || 0.05);
   material.onBeforeCompile = (shader) => {
+    // Facades use wall-local coordinates; remove the unused standard map UV
+    // varying so merged buildings stay within eight vertex attribute slots.
+    shader.vertexShader = shader.vertexShader.replace('#include <uv_vertex>', '');
+
     shader.uniforms.facadeEntranceAtlas = { value: entranceAtlas };
     shader.uniforms.facadeProjection = { value: facadeProjection };
     shader.uniforms.facadeRoofA = { value: roofA };
     shader.uniforms.facadeRoofB = { value: roofB };
     shader.uniforms.facadeRoofGrainScale = { value: grainScale };
-    shader.uniforms.facadeWindowParams = { value: windowParams };
-    shader.uniforms.facadeStorefrontParams = { value: storefrontParams };
-    shader.uniforms.facadeWindowGlass = { value: windowGlass };
-    shader.uniforms.facadeWindowFrame = { value: windowFrame };
-    shader.uniforms.facadeWindowFrameWidth = { value: windowFrameWidth };
-    shader.vertexShader = `attribute vec4 facadeEntrance;\nvarying float vFacadeWallMask;\nvarying vec2 vFacadeRoofPosition;\nvarying vec2 vFacadeWallPosition;\nvarying vec4 vFacadeEntrance;\n${shader.vertexShader}`;
+    shader.vertexShader = `attribute vec4 facadeLayout; attribute vec4 facadeOpening;\nvarying vec4 vFacadeLayout; varying vec4 vFacadeOpening;\nattribute vec4 facadeEntrance;\nvarying float vFacadeWallMask;\nvarying vec2 vFacadeRoofPosition;\nvarying vec2 vFacadeWallPosition;\nvarying vec4 vFacadeEntrance;\n${shader.vertexShader}`;
     shader.vertexShader = shader.vertexShader.replace(
       '#include <beginnormal_vertex>',
       [
         '#include <beginnormal_vertex>',
         'vFacadeEntrance = facadeEntrance;',
+        'vFacadeLayout = facadeLayout; vFacadeOpening = facadeOpening;',
         'vFacadeWallMask = smoothstep(0.18, 0.72, 1.0 - abs(objectNormal.y));',
         'vFacadeRoofPosition = position.xz;',
         'float facadeHorizontal = abs(objectNormal.x) > abs(objectNormal.z) ? position.z : position.x;',
@@ -407,16 +381,13 @@ function applyWallOnlyFacadeMap(material, roof, entranceAtlas, exteriorProfile) 
       'varying vec2 vFacadeRoofPosition;',
       'varying vec2 vFacadeWallPosition;',
       'varying vec4 vFacadeEntrance;',
+      'varying vec4 vFacadeLayout; varying vec4 vFacadeOpening;',
+      FACADE_OPENINGS_GLSL,
       'uniform sampler2D facadeEntranceAtlas;',
       'uniform vec4 facadeProjection;',
       'uniform vec3 facadeRoofA;',
       'uniform vec3 facadeRoofB;',
       'uniform float facadeRoofGrainScale;',
-      'uniform vec4 facadeWindowParams;',
-      'uniform vec4 facadeStorefrontParams;',
-      'uniform vec3 facadeWindowGlass;',
-      'uniform vec3 facadeWindowFrame;',
-      'uniform float facadeWindowFrameWidth;',
       'float facadeRoofHash(vec2 p) {',
       '  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);',
       '}',
@@ -440,48 +411,22 @@ function applyWallOnlyFacadeMap(material, roof, entranceAtlas, exteriorProfile) 
         '#include <map_fragment>',
         [
         '#ifdef USE_MAP',
-        '  vec2 facadeUv = vFacadeWallPosition * facadeProjection.xy + facadeProjection.zw;',
+        '  vec2 facadeUv = vFacadeLayout.zw * facadeProjection.xy + facadeProjection.zw;',
         '  vec4 facadeTexel = mapTexelToLinear(texture2D(map, facadeUv));',
         '  float roofGrain = facadeRoofNoise(vFacadeRoofPosition * facadeRoofGrainScale);',
         '  vec3 roofSurface = mix(facadeRoofA, facadeRoofB, 0.18 + roofGrain * 0.64);',
-        '  diffuseColor.rgb = mix(roofSurface, diffuseColor.rgb * facadeTexel.rgb, vFacadeWallMask);',
+        '  vec3 facadeBase = diffuseColor.rgb;',
+        '#ifdef USE_COLOR',
+        '  facadeBase *= vColor.rgb;',
+        '#endif',
+        '  diffuseColor.rgb = mix(roofSurface, facadeWallSurface(facadeBase, facadeTexel.rgb), vFacadeWallMask);',
         '  diffuseColor.a *= facadeTexel.a;',
-        '  float facadeSurfacePattern = facadeStorefrontParams.w;',
-        '  if (vFacadeWallMask > 0.5 && facadeSurfacePattern < 1.5) {',
-        '    float bayWidth = max(1.8, facadeWindowParams.x);',
-        '    float floorHeight = max(2.65, facadeWindowParams.y);',
-        '    float bayCoord = fract(vFacadeWallPosition.x / bayWidth + facadeStorefrontParams.z) - 0.5;',
-        '    float floorCoord = fract(max(0.0, vFacadeWallPosition.y - 0.18) / floorHeight);',
-        '    vec2 windowPoint = vec2(bayCoord, floorCoord - 0.58);',
-        '    vec2 outerHalf = vec2(facadeWindowParams.z, facadeWindowParams.w) * 0.5;',
-        '    vec2 revealHalf = outerHalf + vec2(0.035, 0.028);',
-        '    float windowReveal = facadeEntranceRect(windowPoint, revealHalf, 0.012);',
-        '    float windowOuter = facadeEntranceRect(windowPoint, outerHalf, 0.012);',
-        '    vec2 innerHalf = max(vec2(0.02), outerHalf - vec2(facadeWindowFrameWidth));',
-        '    float windowInner = facadeEntranceRect(windowPoint, innerHalf, 0.012);',
-        '    float upperFloor = step(3.05, vFacadeWallPosition.y);',
-        '    float revealRing = max(0.0, windowReveal - windowOuter) * upperFloor;',
-        '    diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.58, revealRing * 0.82);',
-        '    diffuseColor.rgb = mix(diffuseColor.rgb, facadeWindowFrame, windowOuter * upperFloor);',
-        '    diffuseColor.rgb = mix(diffuseColor.rgb, facadeWindowGlass, windowInner * upperFloor * 0.94);',
-        '    float lintelBand = facadeEntranceRect(windowPoint - vec2(0.0, outerHalf.y + 0.026), vec2(outerHalf.x + 0.045, 0.022), 0.008) * upperFloor;',
-        '    float sillBand = facadeEntranceRect(windowPoint + vec2(0.0, outerHalf.y + 0.036), vec2(outerHalf.x + 0.055, 0.024), 0.008) * upperFloor;',
-        '    diffuseColor.rgb = mix(diffuseColor.rgb, facadeWindowFrame * 1.16, max(lintelBand * 0.52, sillBand * 0.8));',
-        '    float verticalMullion = (1.0 - smoothstep(0.0, 0.014, abs(windowPoint.x))) * step(0.52, facadeWindowParams.z);',
-        '    float horizontalMullion = (1.0 - smoothstep(0.0, 0.012, abs(windowPoint.y))) * step(0.58, facadeWindowParams.w);',
-        '    float mullion = max(verticalMullion, horizontalMullion) * windowInner * upperFloor;',
-        '    diffuseColor.rgb = mix(diffuseColor.rgb, facadeWindowFrame, mullion * 0.86);',
-        '    float sidingGroove = (1.0 - smoothstep(0.0, 0.055, abs(fract(vFacadeWallPosition.y * 2.8) - 0.5))) * step(0.5, facadeSurfacePattern);',
-        '    diffuseColor.rgb *= 1.0 - sidingGroove * 0.1;',
-        '    float storefrontActive = step(0.5, facadeStorefrontParams.x) * step(0.35, vFacadeWallPosition.y) * (1.0 - step(3.25, vFacadeWallPosition.y));',
-        '    float storeCoord = fract(vFacadeWallPosition.x / 3.3 + facadeStorefrontParams.z) - 0.5;',
-        '    float storeOuter = facadeEntranceRect(vec2(storeCoord, (vFacadeWallPosition.y - 1.78) / 3.0), vec2(0.47, 0.46), 0.01);',
-        '    float storeInner = facadeEntranceRect(vec2(storeCoord, (vFacadeWallPosition.y - 1.78) / 3.0), vec2(max(0.12, facadeStorefrontParams.y * 0.47), 0.41), 0.01);',
-        '    diffuseColor.rgb = mix(diffuseColor.rgb, facadeWindowFrame * 0.72, storeOuter * storefrontActive);',
-        '    diffuseColor.rgb = mix(diffuseColor.rgb, facadeWindowGlass * 1.08, storeInner * storefrontActive * 0.96);',
-        '    float storeTransom = (1.0 - smoothstep(0.0, 0.035, abs(vFacadeWallPosition.y - 2.68))) * storefrontActive;',
-        '    diffuseColor.rgb = mix(diffuseColor.rgb, facadeWindowFrame, storeTransom * 0.9);',
-        '  }',
+        '  vec4 openingLayout = vFacadeLayout;',
+        '  float fittedBayWidth = vFacadeLayout.z / max(vFacadeLayout.x, 0.0001);',
+        '  float entranceTangentSign = mix(-1.0, 1.0, step(1.5, vFacadeEntrance.y));',
+        '  float bayCenterFromDoor = vFacadeEntrance.x - entranceTangentSign * (fract(vFacadeLayout.x) - 0.5) * fittedBayWidth;',
+        '  if (vFacadeEntrance.y > 0.5 && vFacadeLayout.y >= 0.0 && vFacadeLayout.y < 1.0 && abs(bayCenterFromDoor) < fittedBayWidth * vFacadeOpening.x * 0.5 + 1.2) openingLayout.x = -1.0;',
+        '  if (vFacadeWallMask > 0.5) diffuseColor.rgb = facadeOpenings(diffuseColor.rgb, openingLayout, vFacadeOpening);',
         '  float entranceActive = step(0.5, vFacadeEntrance.y) * vFacadeWallMask;',
         '  if (entranceActive > 0.0) {',
         '    float entranceAtlasStyle = floor(fract(vFacadeEntrance.w) * 16.0 + 0.1);',
@@ -508,7 +453,7 @@ function applyWallOnlyFacadeMap(material, roof, entranceAtlas, exteriorProfile) 
       ].join('\n')
     );
   };
-  material.customProgramCacheKey = () => 'building-facade-world-projection-v7-window-depth-catalog-storefronts-entrances';
+  material.customProgramCacheKey = () => 'building-facade-local-layout-v10-catalog-albedo';
 }
 
 export function resolveBuildingExteriorPresentation(engineContext, buildingType, buildingSeed, baseColorHex, options = {}) {
@@ -519,6 +464,7 @@ export function resolveBuildingExteriorPresentation(engineContext, buildingType,
     buildingType,
     buildingSeed,
     buildingIdentity: options.buildingIdentity,
+    geographicCenter: options.geographicCenter || appCtx?.worldToLatLon?.(options.centerX, options.centerZ),
     location: options.location || appCtx?.LOC || {},
     qualityTier: options.qualityTier || appCtx?.getDynamicBudgetState?.().tier || 'balanced'
   });
@@ -552,11 +498,11 @@ export function resolveBuildingExteriorPresentation(engineContext, buildingType,
   const facadeStyle = exteriorProfile.familyId;
   const facadeAtlasStyle = exteriorProfile.category;
   const facadeVariant = ((Number(buildingSeed) || 0) >>> 0) % 4;
-  const lodTextureId = lodTier === 'mid' ? presentation.atlasStyle : catalogMaterial.texture;
+  const lodTextureId = catalogMaterial.surfacePattern === 'glass' ? 'concrete' : catalogMaterial.texture;
   const textureProjectionStyle = lodTier === 'mid' ? presentation.facadeStyle : facadeStyle;
   const tint = color.clone().lerp(
     new THREE.Color(0xffffff),
-    mappedColor ? 0.5 : mappedFamily ? 0.34 : 0.7
+    mappedColor ? 0 : 0.10
   );
   return Object.freeze({
     mappedFamily,
@@ -626,21 +572,23 @@ export function getBuildingMaterial(engineContext, buildingType, buildingSeed, b
   if (cached) return cached;
 
   const entranceAtlas = facadeEntranceAtlas(appCtx);
-  const midSurface = lodTextureId === 'glass'
-    ? { roughness: 0.38, metalness: 0.14 }
-    : lodTextureId === 'neutral'
-      ? { roughness: 0.92, metalness: 0.02 }
-      : { roughness: 0.9, metalness: 0 };
+  // Mid-distance colors, roof surfaces and openings are per-vertex. Keep
+  // equivalent masonry/glass response shared so small catalog roughness
+  // differences do not split each spatial batch into extra draw calls.
+  const midGlass = catalogMaterial.surfacePattern === 'glass';
   const material = new THREE.MeshStandardMaterial({
     color: lodTier === 'mid' ? 0xffffff : tint,
-    map: facadeTexture(appCtx, lodTextureId, textureProjectionStyle, facadeVariant, lodTier),
-    roughness: lodTier === 'mid' ? midSurface.roughness : profile.roughness,
-    metalness: lodTier === 'mid' ? midSurface.metalness : Math.max(profile.metalness, roof.metalness * 0.08)
+    map: facadeTexture(appCtx, lodTextureId),
+    roughness: lodTier === 'mid' ? (midGlass ? 0.32 : 0.9) : profile.roughness,
+    metalness: lodTier === 'mid' ? (midGlass ? 0.16 : 0) : Math.max(profile.metalness, roof.metalness * 0.08),
+    vertexColors: lodTier === 'mid'
   });
-  material.userData = { facadeVariant };
+  const projection=facadeTextureProjection(lodTextureId,textureProjectionStyle,facadeVariant,lodTier);
+  material.userData = { facadeVariant,facadeProjection:projection };
   applyWallOnlyFacadeMap(material, roof, entranceAtlas, exteriorProfile);
   material.name = `building-exterior:${key}`;
   material.userData = {
+    facadeProjection: projection,
     buildingBatchKey: `building-exterior:${key}`,
     buildingExterior: true,
     facadeAtlas: true,

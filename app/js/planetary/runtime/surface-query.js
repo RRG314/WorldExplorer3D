@@ -1,5 +1,5 @@
 import { normalizeAstronomicalBodyId } from '../../astronomy/body-catalog.js?v=3';
-import { getPlanetarySurfaceRegion } from './surface-authority.js?v=4';
+import { getPlanetarySurfaceRegion } from './surface-authority.js?v=5';
 
 function activePlanetaryBodyId(appContext) {
   if (appContext?.onMoon) return 'moon';

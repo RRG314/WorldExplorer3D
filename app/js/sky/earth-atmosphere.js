@@ -81,7 +81,9 @@ function buildEarthAtmosphereProfile(skyState = null, weatherState = null, optio
   const nightZenith = 0x071126;
   const nightHorizon = 0x172545;
   const daylightZenith = mixHex(baseSky, 0x397fc2, 0.32 * daylight);
-  const daylightHorizon = mixHex(fog, 0xe8f2f7, 0.34 * daylight);
+  // A clear horizon retains atmospheric blue. Cloud/fog optics below own the
+  // whitening; baking white into every day profile erased snow/sky contrast.
+  const daylightHorizon = mixHex(fog, 0x82b3db, 0.5 * daylight);
   const zenithColor = mixHex(
     mixHex(daylightZenith, nightZenith, night),
     overcastColor,
@@ -147,10 +149,12 @@ function createAtmosphereMaterial(profile, options = {}) {
     fog: false,
     toneMapped: true,
     uniforms: {
-      weSkyZenith: { value: new THREE.Color(profile.zenithColor) },
-      weSkyHorizon: { value: new THREE.Color(profile.horizonColor) },
-      weSkyLower: { value: new THREE.Color(profile.lowerColor) },
-      weSkySunColor: { value: new THREE.Color(profile.sunColor) },
+      // r128 does not automatically linearize CSS/hex colours. This shader
+      // encodes its output once; treating sRGB input as linear washed out skies.
+      weSkyZenith: { value: new THREE.Color(profile.zenithColor).convertSRGBToLinear() },
+      weSkyHorizon: { value: new THREE.Color(profile.horizonColor).convertSRGBToLinear() },
+      weSkyLower: { value: new THREE.Color(profile.lowerColor).convertSRGBToLinear() },
+      weSkySunColor: { value: new THREE.Color(profile.sunColor).convertSRGBToLinear() },
       weSkySunDirection: { value: new THREE.Vector3(profile.sunDirection.x, profile.sunDirection.y, profile.sunDirection.z) },
       weSkyDaylight: { value: profile.daylight },
       weSkyTwilight: { value: profile.twilight },
@@ -182,7 +186,7 @@ void main() {
   float elevation = clamp(direction.y, -0.22, 1.0);
   float upperBlend = smoothstep(-0.04, 0.78, elevation);
   vec3 skyColor = mix(weSkyHorizon, weSkyZenith, pow(upperBlend, 0.72));
-  float belowHorizon = smoothstep(0.02, -0.2, elevation);
+  float belowHorizon = 1.0 - smoothstep(-0.2, 0.02, elevation);
   skyColor = mix(skyColor, weSkyLower, belowHorizon);
 
   float horizonBand = exp(-pow(abs(elevation) * mix(4.2, 2.4, weSkyHaze), 1.35));
@@ -210,10 +214,10 @@ function applyEarthAtmosphereProfile(target, profile) {
   const material = target?.material?.userData?.earthAtmosphereMaterial ? target.material : target;
   const uniforms = material?.uniforms;
   if (!uniforms || !profile) return false;
-  uniforms.weSkyZenith.value.setHex(profile.zenithColor);
-  uniforms.weSkyHorizon.value.setHex(profile.horizonColor);
-  uniforms.weSkyLower.value.setHex(profile.lowerColor);
-  uniforms.weSkySunColor.value.setHex(profile.sunColor);
+  uniforms.weSkyZenith.value.setHex(profile.zenithColor).convertSRGBToLinear();
+  uniforms.weSkyHorizon.value.setHex(profile.horizonColor).convertSRGBToLinear();
+  uniforms.weSkyLower.value.setHex(profile.lowerColor).convertSRGBToLinear();
+  uniforms.weSkySunColor.value.setHex(profile.sunColor).convertSRGBToLinear();
   uniforms.weSkySunDirection.value.set(profile.sunDirection.x, profile.sunDirection.y, profile.sunDirection.z);
   uniforms.weSkyDaylight.value = profile.daylight;
   uniforms.weSkyTwilight.value = profile.twilight;

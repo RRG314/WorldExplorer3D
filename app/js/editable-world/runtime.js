@@ -36,6 +36,7 @@ function distanceToBuilding(position, building) {
 }
 
 function emitChange(appCtx, detail) {
+  appCtx._streetPavementDirty = true;
   globalThis.dispatchEvent?.(new CustomEvent('we3d:editable-world-change', { detail }));
   appCtx?.invalidateTraversalNetworks?.('editable_world_change');
 }

@@ -1,8 +1,12 @@
+import { closeOwnedBrowser } from './owned-browser.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
+import { installBrowserGraphicsProbe } from './browser-graphics-probe.mjs';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 
 const root = process.cwd();
 const requestedRoot = String(process.env.WE3D_VERIFY_ROOT || '').trim();
@@ -44,8 +48,8 @@ if (capture) await fs.mkdir(evidenceDir, { recursive: true });
 // contexts can occasionally stop answering Playwright's graceful close even
 // after every context has closed. BrowserServer gives this verifier a bounded
 // process fallback instead of leaking Chrome into later performance gates.
-const browserServer = await chromium.launchServer({ headless: true, channel: 'chrome' });
-const browser = await chromium.connect(browserServer.wsEndpoint());
+let browserServer = null;
+let browser = null;
 const results = [];
 
 async function closeWithin(label, close, timeoutMs = 8_000) {
@@ -63,25 +67,10 @@ async function closeWithin(label, close, timeoutMs = 8_000) {
   return ok;
 }
 
-async function terminateOwnedBrowserProcess(timeoutMs = 4_000) {
-  const child = browserServer?.process?.();
-  if (!child || child.exitCode !== null || child.signalCode) return true;
-  const waitForExit = (durationMs) => new Promise((resolve) => {
-    let timer = null;
-    const done = () => {
-      clearTimeout(timer);
-      resolve(true);
-    };
-    child.once('exit', done);
-    timer = setTimeout(() => {
-      child.off('exit', done);
-      resolve(false);
-    }, durationMs);
-  });
-  child.kill('SIGTERM');
-  if (await waitForExit(timeoutMs)) return true;
-  child.kill('SIGKILL');
-  return waitForExit(2_000);
+async function terminateOwnedBrowserProcess() {
+  if (!browserServer) return true;
+  try { await closeOwnedBrowser(browserServer); return true; }
+  catch (error) { console.error('[assembled-locations] owned cleanup failed:', error); return false; }
 }
 
 let cleanupError = null;
@@ -89,13 +78,37 @@ let cleanupError = null;
 try {
   for (const location of locations) {
     const locationStartedAt = performance.now();
-    console.error(`[assembled-locations] START ${location.id}`);
+    const maxOldSpaceMiB = location.id === 'london' || location.class === 'dense-urban' ? 1280 : 1024;
+    console.error(`[assembled-locations] START ${location.id} (heap ${maxOldSpaceMiB} MiB)`);
+    browserServer = await chromium.launchServer({
+      headless: true, channel: 'chrome',
+      // Bound correctness-test allocation on the 8 GiB workstation. This does
+      // not change world budgets or stand in for the separate performance gate.
+      args: [`--js-flags=--max-old-space-size=${maxOldSpaceMiB}`]
+    });
+    browser = await chromium.connect(browserServer.wsEndpoint());
+    const browserProcess = { pid: browserServer.process()?.pid, stderrTail: '', exit: null };
+    browserServer.process()?.stderr?.on('data', chunk => {
+      browserProcess.stderrTail = (browserProcess.stderrTail + String(chunk)).slice(-16000);
+    });
+    browserServer.process()?.once('exit', (code, signal) => {
+      browserProcess.exit = { code, signal, at: new Date().toISOString() };
+    });
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     const page = await context.newPage();
     const browserErrors = [];
     const browserConsole = [];
     const localFailures = [];
+    collectBrowserGraphicsErrors(page, browserErrors);
+    await installBrowserGraphicsProbe(page, `output/verification/assembled-locations/${location.id}-graphics-failure.json`);
+    await configureStagingAppCheck(page, baseUrl);
     page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
+    page.on('crash', () => {
+      browserErrors.push('Browser renderer crashed during assembled-world verification');
+      // Chromium can leave a polling request pending after renderer OOM.
+      // Closing this owned page makes the failed case finish immediately.
+      void page.close().catch(() => {});
+    });
     page.on('console', (message) => {
       if (!['warning', 'error'].includes(message.type())) return;
       if (browserConsole.length < 120) {
@@ -128,14 +141,16 @@ try {
       if (await consent.isVisible()) await consent.click();
       await page.getByRole('button', { name: 'Explore', exact: true }).click();
       await page.waitForFunction(() => {
+        if (document.querySelector('#loading.show')) return false;
         const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
+        if (state.gameStarted !== true || state.worldLoading !== false) return false;
         const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
         return state.gameStarted === true && state.worldLoading === false &&
           diagnostics.surfaceChain?.surfaces?.terrain?.kind === 'terrain' &&
           Number.isFinite(Number(diagnostics.surfaceChain?.surfaces?.terrain?.y)) &&
           Number(diagnostics.worldCounts?.roads || 0) > 0 &&
           diagnostics.livingWorld?.active === true && diagnostics.urbanSandbox?.active === true;
-      }, null, { timeout: 360000 });
+      }, null, { timeout: 360000, polling: 500 });
       await page.waitForTimeout(3000);
 
       const snapshot = await page.evaluate(() => {
@@ -253,12 +268,16 @@ try {
           Number(snapshot.surfaceChain?.surfaces?.walk?.feature?.structureVisual?.visibleMeshCount || 0) > 0
         ),
         mappedRuralArrival: location.id !== 'iowa-rural' || (
-          snapshot.surfaceChain?.surfaces?.walk?.kind === 'road' &&
-          !!snapshot.surfaceChain?.surfaces?.walk?.feature?.transportSource?.identity &&
+          // Walking arrivals preserve the selected farmland coordinates;
+          // snapping to a road kilometres away would violate destination truth.
+          ['terrain', 'road'].includes(snapshot.surfaceChain?.surfaces?.walk?.kind) &&
+          snapshot.surfaceChain?.actor?.grounded === true &&
+          snapshot.surfaceChain?.buildingCollision?.collision === false &&
+          Math.abs(Number(snapshot.surfaceChain?.deltas?.feetMinusWalkSurface)) <= 0.35 &&
           Math.hypot(
-            Number(snapshot.surfaceChain?.world?.x || 0),
-            Number(snapshot.surfaceChain?.world?.z || 0)
-          ) <= 2700
+            Number(snapshot.surfaceChain?.world?.x),
+            Number(snapshot.surfaceChain?.world?.z)
+          ) <= 96
         ),
         exactStructureConnectionsContinuous: Number(snapshot.transportContinuity?.discontinuityCount || 0) === 0,
         generalizedStructureEndpointsSupported:
@@ -268,14 +287,19 @@ try {
         compiledRoadGradesWithinDesignBounds: Number(snapshot.transportGradeProfile?.violationCount || 0) === 0,
         solidRoadSurfaceFootprints:
           snapshot.roadSurfaceIntegrity?.authority ===
-            'solid-at-grade-segments-and-bounded-turn-joins' &&
+            'unioned-carriageway-regions' &&
           snapshot.roadSurfaceIntegrity?.surfaceHeightAuthority ===
-            'compiled_transport_surface_profile' &&
-          Number(snapshot.roadSurfaceIntegrity?.segmentQuads || 0) > 0 &&
-          Number(snapshot.roadSurfaceIntegrity?.foldedTriangles || 0) === 0 &&
-          Number(snapshot.roadSurfaceIntegrity?.degenerateTriangles || 0) === 0 &&
-          Number(snapshot.roadSurfaceIntegrity?.junctionCoverageGaps || 0) === 0 &&
-          Number(snapshot.roadSurfaceIntegrity?.compiledSurfaceFallbacks || 0) === 0,
+            'partitioned-published-terrain'
+          && snapshot.roadSurfaceIntegrity?.geometryMeasurementAuthority === 'published-buffer-geometry-triangles'
+          && snapshot.roadSurfaceIntegrity?.junctionMeasurementAuthority === 'published-at-grade-contact-index'
+          && snapshot.roadSurfaceIntegrity?.junctionPrecisionAuthority === 'compiler-grid-and-float32-rounding-bound' &&
+          Number(snapshot.roadSurfaceIntegrity?.junctionSamples || 0) > 0 &&
+          Number(snapshot.roadSurfaceIntegrity?.carriagewayRegions || 0) > 0 &&
+          Number(snapshot.roadSurfaceIntegrity?.surfaceTriangles || 0) > 0 &&
+          snapshot.roadSurfaceIntegrity?.invalidTriangles === 0 &&
+          snapshot.roadSurfaceIntegrity?.downwardFacingTriangles === 0 &&
+          snapshot.roadSurfaceIntegrity?.zeroFootprintTriangles === 0 &&
+          snapshot.roadSurfaceIntegrity?.junctionCoverageGaps === 0,
         oneAtGradeTransportTerrainAuthority:
           snapshot.atGradeTerrainAuthority?.authority === 'compiled_transport_surface' &&
           Number(snapshot.atGradeTerrainAuthority?.roadCount || 0) > 0 &&
@@ -379,6 +403,8 @@ try {
         const suffix = forceTransportFallback ? '-transport-fallback' : '';
         await page.screenshot({ path: path.join(evidenceDir, `${location.id}${suffix}.png`) });
       }
+      checks.noBrowserErrors = browserErrors.length === 0;
+      checks.noFailedLocalResources = localFailures.length === 0;
       results.push({
         ...location,
         ok: Object.values(checks).every(Boolean),
@@ -389,6 +415,7 @@ try {
           atGradeTerrainOutcomeObserved
         },
         snapshot,
+        browserProcess,
         browserErrors,
         browserConsole,
         localFailures
@@ -399,18 +426,27 @@ try {
         ok: false,
         durationMs: Math.round(performance.now() - locationStartedAt),
         error: String(error?.stack || error),
+        browserProcess,
         browserErrors,
         browserConsole,
         localFailures
       });
     } finally {
-      await context.close().catch(() => {});
+      // Persist the completed case before potentially slow browser cleanup.
+      await fs.writeFile(reportPath, `${JSON.stringify({ ok: false, complete: false,
+        generatedAt: new Date().toISOString(), requestedLocations: locations.map(x => x.id),
+        contract: 'complete-assembled-gameplay-representative-location-matrix',
+        forceTransportFallback, results }, null, 2)}\n`);
+      await closeWithin('context', () => context.close());
+      if (!await terminateOwnedBrowserProcess()) cleanupError = 'Location browser did not exit';
       const latest = results.at(-1);
+      console.error(JSON.stringify({ event: 'assembled-location-result', id: location.id, ok: latest?.ok, checks: latest?.checks, error: latest?.error }));
       console.error(
         `[assembled-locations] ${latest?.ok ? 'PASS' : 'FAIL'} ${location.id} ` +
         `(${Math.round(performance.now() - locationStartedAt)} ms)`
       );
     }
+    if (!results.at(-1)?.ok || cleanupError) break;
   }
 } finally {
   const browserProcessClosed = await terminateOwnedBrowserProcess();
@@ -421,10 +457,14 @@ try {
 }
 
 const report = {
-  ok: results.every((result) => result.ok) && cleanupError === null,
+  ok: results.length === locations.length && results.every((result) => result.ok) && cleanupError === null,
+  complete: results.length === locations.length,
+  scope: requestedLocations.size > 0 ? 'diagnostic-subset' : 'full',
+  requestedLocations: locations.map(location => location.id),
   generatedAt: new Date().toISOString(),
   contract: 'complete-assembled-gameplay-representative-location-matrix',
   captureEnabled: capture,
+  browserBudget: { engine: 'installed-chrome', maxOldSpaceMiB: 1280, standardWorldHeapMiB: 1024, denseWorldHeapMiB: 1280 },
   forceTransportFallback,
   cleanupError,
   results

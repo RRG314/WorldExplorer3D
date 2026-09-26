@@ -46,7 +46,6 @@ import {
   initWorldBudgets,
   limitNodesByTileBudget,
   limitWaysByTileBudget,
-  rdtDepthForFeatureTile,
   wayCenterLatLon
 } from "./world/budgets.js?v=16";
 import { publishLocationWorld } from "./world/publication.js?v=2";
@@ -58,12 +57,12 @@ import {
   finalizeLoadedWorld,
   recordWorldLoadWarning,
   safeWorldLoadCall
-} from "./world/load-support.js?v=44";
+} from "./world/load-support.js?v=45";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
   resetWorldForReload
-} from "./world/load-reset.js?v=21";
+} from "./world/load-reset.js?v=22";
 import {
   prepareWorldFeatureSelections
 } from "./world/load-budgeting.js?v=20";
@@ -84,7 +83,6 @@ import {
   worldLinePointsFromLonLat
 } from "./world/load-geometry.js?v=28";
 import {
-  decimateRoadCenterlineByDepth,
   getPerfModeValue,
   isDriveableHighwayTag,
   linearFeaturePriority,
@@ -101,7 +99,7 @@ import {
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
 import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=40";
-import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=56";
+import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=57";
 import {
   batchLanduseMeshes,
   initWorldRenderSupport,
@@ -164,7 +162,7 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=51";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=226";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=229";
 import {
   fetchShortbreadBuildingData,
   fetchShortbreadWorldData,
@@ -173,17 +171,16 @@ import {
 import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=14";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=2";
 import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=36";
-import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=122";
+import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=125";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
 
 const FEATURE_MIN_POLYGON_AREA = 8;
 const FEATURE_MIN_HOLE_AREA = 6;
-// Publish only drivable transport surfaces. Mapped pedestrian, rail, and cycle
-// data remain available from OSM for future validated systems, but they do not
-// become visible world geometry or competing traversal surfaces.
+// Mapped pedestrian data feeds the pavement area compiler and walking graph.
+// Keeping this disabled discards separately mapped sidewalks before compilation.
 const LINEAR_FEATURE_POLICY = Object.freeze({
-  footway: false,
+  footway: true,
   cycleway: false,
   railway: false
 });
@@ -237,7 +234,6 @@ const { loadRoads: loadOsmRoads, isVehicleRoad, isInsideWaterArea } = createWorl
   cloneStructureSemantics,
   createSyntheticFallbackWorld,
   decimatePoints,
-  decimateRoadCenterlineByDepth,
   earthSceneSuppressed,
   fetchOverpassJSON,
   fetchGlobalBuildingData,
@@ -267,7 +263,6 @@ const { loadRoads: loadOsmRoads, isVehicleRoad, isInsideWaterArea } = createWorl
   pointInPolygon,
   polylineBounds,
   prepareWorldFeatureSelections,
-  rdtDepthForFeatureTile,
   recordWorldLoadWarning,
   refreshStructureAwareFeatureProfiles,
   refreshStructureAwareFeatureProfilesCooperatively,
@@ -314,7 +309,7 @@ async function refreshAuthoritativeMapData() {
   if (appCtx.onMoon || appCtx.onMars || appCtx.spaceFlight?.active) {
     throw new Error('OpenStreetMap refresh is available on Earth.');
   }
-  await invalidateOverpassCaches(appCtx.LOC, ['core', 'buildings', 'building-metadata']);
+  await invalidateOverpassCaches(appCtx.LOC, ['core', 'core-pedestrian-v2', 'buildings', 'building-metadata']);
   releaseShortbreadRuntimeCache({ includeRaw: true });
   return loadRoads();
 }

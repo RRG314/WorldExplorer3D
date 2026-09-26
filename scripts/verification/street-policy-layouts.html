@@ -1,0 +1,23 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Shared street rule verification</title>
+<style>body{background:#17212b;color:#eef3f6;font:16px system-ui;margin:24px}main{display:grid;grid-template-columns:repeat(2,480px);gap:16px}section{background:#26323c;padding:12px}canvas{background:#526257;width:456px;height:210px}h2{font-size:16px}p{max-width:960px}</style>
+<h1>Shared street rules — footprint inspection</h1><p>Actual pavement compiler output. White: sidewalks. Gray: buildings. Dark: road. These views verify horizontal geometry; they do not certify terrain heights or city loading.</p><main></main><p id="result">Running</p>
+<script type="module">
+import {prepareStreetPavement,compilePavementTile} from '../../app/js/world/compiler/street-pavement.js';
+const boxes=[{pts:[{x:0,z:-15},{x:10,z:-15},{x:10,z:-10},{x:0,z:-10}]},{pts:[{x:10,z:-15},{x:20,z:-15},{x:20,z:-10},{x:10,z:-10}]}];
+const cases=[['Original layout',1,0,{}],['Rotated and rescaled',1.11,Math.PI/3,{}],['Explicitly no sidewalks',1,0,{sidewalk:'no'}],['Only the frontage side',1,0,{sidewalk:'left'}]];
+for(const [name,scale,angle,tags] of cases){
+ const transform=p=>({x:10000+(p.x*Math.cos(angle)-p.z*Math.sin(angle))/scale,z:-8000+(p.x*Math.sin(angle)+p.z*Math.cos(angle))/scale});
+ const road={pts:[{x:0,z:0},{x:20,z:0}].map(transform),width:8/scale,type:'residential',tags};
+ const buildings=boxes.map(b=>({pts:b.pts.map(transform)}));
+ const plan=prepareStreetPavement({roads:[road],buildings,metersPerWorldUnit:scale});
+ const polygons=plan.tiles.flatMap(t=>compilePavementTile(t,scale).polygons);
+ const section=document.createElement('section'),heading=document.createElement('h2'),canvas=document.createElement('canvas');heading.textContent=name;canvas.width=456;canvas.height=210;section.append(heading,canvas);document.querySelector('main').append(section);
+ const ctx=canvas.getContext('2d'),pts=buildings.flatMap(b=>b.pts).concat(road.pts),cx=(Math.min(...pts.map(p=>p.x))+Math.max(...pts.map(p=>p.x)))/2,cz=(Math.min(...pts.map(p=>p.z))+Math.max(...pts.map(p=>p.z)))/2;
+ const screen=([x,z])=>[228+(x-cx)*6*scale,105+(z-cz)*6*scale];
+ function draw(poly,color){ctx.beginPath();for(const ring of poly){ring.forEach((p,i)=>ctx[i?'lineTo':'moveTo'](...screen(p)));ctx.closePath();}ctx.fillStyle=color;ctx.fill('evenodd');}
+ draw([[{x:0,z:-4},{x:20,z:-4},{x:20,z:4},{x:0,z:4}].map(transform).map(p=>[p.x,p.z])],'#10171e');
+ for(const poly of polygons)draw(poly,'#edf0ed');
+ for(const b of buildings)draw([b.pts.map(p=>[p.x,p.z])],'#9da6b0');
+}
+document.querySelector('#result').textContent='Four compiler layouts rendered. Numerical invariants are checked by npm run verify:streets.';
+</script></html>

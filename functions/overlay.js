@@ -457,7 +457,7 @@ function buildOverlayExports(helpers = {}) {
       : async () => null;
 
   return {
-    saveOverlayFeatureDraft: functions.region('us-central1').https.onRequest(async (req, res) => {
+    saveOverlayFeatureDraft: functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
       if (setCors(req, res)) return;
       if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method not allowed.' });
@@ -521,7 +521,7 @@ function buildOverlayExports(helpers = {}) {
       }
     }),
 
-    submitOverlayFeature: functions.region('us-central1').https.onRequest(async (req, res) => {
+    submitOverlayFeature: functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
       if (setCors(req, res)) return;
       if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method not allowed.' });
@@ -565,7 +565,7 @@ function buildOverlayExports(helpers = {}) {
       }
     }),
 
-    deleteOverlayFeatureDraft: functions.region('us-central1').https.onRequest(async (req, res) => {
+    deleteOverlayFeatureDraft: functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
       if (setCors(req, res)) return;
       if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method not allowed.' });
@@ -595,7 +595,7 @@ function buildOverlayExports(helpers = {}) {
       }
     }),
 
-    moderateOverlayFeature: functions.region('us-central1').https.onRequest(async (req, res) => {
+    moderateOverlayFeature: functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
       if (setCors(req, res)) return;
       if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method not allowed.' });

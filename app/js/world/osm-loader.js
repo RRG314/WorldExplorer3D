@@ -6,11 +6,7 @@ import {
   writePersistentOverpassCache
 } from "./osm-cache.js?v=3";
 
-const OVERPASS_ENDPOINTS = [
-  'https://lz4.overpass-api.de/api/interpreter',
-  'https://overpass.private.coffee/api/interpreter',
-  'https://overpass-api.de/api/interpreter'
-];
+import { OVERPASS_ENDPOINTS, overpassAttemptBudget } from '../../../functions/overpass-provider-policy.mjs';
 
 export const OVERPASS_MIN_TIMEOUT_MS = 5000;
 const OVERPASS_STAGGER_MS = 2000;
@@ -106,7 +102,7 @@ function pruneOverpassMemoryCache(nowMs = Date.now()) {
   }
 }
 
-function findOverpassMemoryCache(meta) {
+function findOverpassMemoryCache(meta, queryKey) {
   if (!meta) return null;
   const nowMs = Date.now();
   pruneOverpassMemoryCache(nowMs);
@@ -114,7 +110,7 @@ function findOverpassMemoryCache(meta) {
   let best = null;
   for (let i = 0; i < overpassMemoryCache.length; i++) {
     const entry = overpassMemoryCache[i];
-    if (!sameLocation(entry.meta, meta)) continue;
+    if (entry.queryKey !== queryKey || !sameLocation(entry.meta, meta)) continue;
     if (entry.meta?.kind && meta?.kind && entry.meta.kind !== meta.kind) continue;
     if (entry.meta.roadsRadius + 1e-9 < meta.roadsRadius) continue;
     if (entry.meta.featureRadius + 1e-9 < meta.featureRadius) continue;
@@ -128,14 +124,14 @@ function findOverpassMemoryCache(meta) {
   return best;
 }
 
-function storeOverpassMemoryCache(meta, data, endpoint) {
+function storeOverpassMemoryCache(meta, data, endpoint, queryKey) {
   if (!meta || !data || !Array.isArray(data.elements)) return;
 
   const nowMs = Date.now();
   pruneOverpassMemoryCache(nowMs);
 
   const existingIdx = overpassMemoryCache.findIndex((entry) =>
-    sameLocation(entry.meta, meta) &&
+    entry.queryKey === queryKey && sameLocation(entry.meta, meta) &&
     String(entry.meta?.kind || '') === String(meta?.kind || '') &&
     Math.abs(entry.meta.roadsRadius - meta.roadsRadius) < 1e-9 &&
     Math.abs(entry.meta.featureRadius - meta.featureRadius) < 1e-9 &&
@@ -143,6 +139,7 @@ function storeOverpassMemoryCache(meta, data, endpoint) {
   );
 
   const record = {
+    queryKey,
     meta: {
       lat: meta.lat,
       lon: meta.lon,
@@ -307,7 +304,7 @@ export function buildWorldOverpassPlan({
       roadsRadius,
       featureRadius,
       poiRadius,
-      kind: 'core'
+      kind: 'core-pedestrian-v2'
     },
     buildingPublicationCacheMeta: {
       lat: location.lat,
@@ -395,12 +392,7 @@ export function buildWorldOverpassPlan({
             );out body;>;out skel qt;`,
     primaryQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
                 way["highway"~"^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|unclassified|living_street|service)$"]${roadsBounds};
-                way["highway"~"^(footway|pedestrian|path|corridor|steps)$"]["bridge"]${featureBounds};
-                way["highway"~"^(footway|pedestrian|path|corridor|steps)$"]["layer"]${featureBounds};
-                way["highway"~"^(footway|pedestrian|path|corridor|steps)$"]["level"]${featureBounds};
-                way["highway"~"^(footway|pedestrian|path|corridor|steps)$"]["covered"]${featureBounds};
-                way["highway"~"^(footway|pedestrian|path|corridor|steps)$"]["indoor"]${featureBounds};
-                way["highway"~"^(footway|pedestrian|path|corridor|steps)$"]["min_height"]${featureBounds};
+                way["highway"~"^(footway|pedestrian|path|corridor|steps|cycleway)$"]${featureBounds};
                 way["landuse"]${featureBounds};
                 way["area:highway"]${featureBounds};
                 way["amenity"="parking"]${featureBounds};
@@ -445,7 +437,8 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
   const requestStartedAt = Date.now();
   const externalSignal = options.signal || null;
   if (externalSignal?.aborted) throw externalAbortError(externalSignal);
-  const cached = findOverpassMemoryCache(cacheMeta);
+  const persistentCacheKey = overpassCacheKey(cacheMeta, query);
+  const cached = findOverpassMemoryCache(cacheMeta, persistentCacheKey);
   if (cached?.data?.elements) {
     cached.data._overpassEndpoint = cached.endpoint ? `${cached.endpoint} (memory-cache)` : 'memory-cache';
     cached.data._overpassSource = 'memory-cache';
@@ -453,13 +446,13 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
     return cached.data;
   }
 
-  const persistentCacheKey = overpassCacheKey(cacheMeta, query);
   const persistent = await readPersistentOverpassCache(persistentCacheKey);
+  if (externalSignal?.aborted) throw externalAbortError(externalSignal);
   if (persistent?.data?.elements) {
     persistent.data._overpassEndpoint = persistent.endpoint ? `${persistent.endpoint} (persistent-cache)` : 'persistent-cache';
     persistent.data._overpassSource = 'persistent-cache';
     persistent.data._overpassCacheAgeMs = Math.max(0, Date.now() - Number(persistent.savedAt || 0));
-    storeOverpassMemoryCache(cacheMeta, persistent.data, persistent.endpoint);
+    storeOverpassMemoryCache(cacheMeta, persistent.data, persistent.endpoint, persistentCacheKey);
     return persistent.data;
   }
 
@@ -475,7 +468,7 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
   const configuredEndpoints = Array.isArray(options.endpoints)
     ? options.endpoints.map((endpoint) => String(endpoint || '').trim()).filter(Boolean)
     : [];
-  const endpoints = configuredEndpoints.length > 0 ? configuredEndpoints : orderedOverpassEndpoints();
+  const endpoints = [...new Set(configuredEndpoints.length > 0 ? configuredEndpoints : orderedOverpassEndpoints())];
   const fetchImpl = typeof options.fetchImpl === 'function' ? options.fetchImpl : globalThis.fetch;
   if (typeof fetchImpl !== 'function') throw new TypeError('Overpass fetch implementation is unavailable');
   const retryDelayMs = Math.max(0, Number.isFinite(Number(options.staggerMs))
@@ -506,12 +499,9 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
       if (requestController.signal.aborted) throw externalAbortError(requestController.signal);
       const now = performance.now();
       if (now >= requestDeadlineMs - 300) break;
-      const endpointsAfterThis = endpoints.length - idx - 1;
-      const timeLeftMs = requestDeadlineMs - now;
-      const timeoutForEndpointMs = Math.max(500, Math.min(
-        timeLeftMs - 250,
-        timeLeftMs - endpointsAfterThis * 750
-      ));
+      const timeoutForEndpointMs = overpassAttemptBudget(
+        requestDeadlineMs - now, endpoints.length - idx
+      );
       const controller = new AbortController();
       const relayAbort = () => controller.abort(externalAbortError(externalSignal));
       const relayRequestAbort = () => controller.abort(externalAbortError(requestController.signal));
@@ -542,12 +532,16 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
         throw new Error('invalid payload');
       }
 
+      // Fetch implementations and cached responses may resolve after cancellation.
+      // Never publish or cache a completed response for an abandoned world load.
+      if (externalSignal?.aborted) throw externalAbortError(externalSignal);
+      if (controller.signal.aborted) throw externalAbortError(controller.signal);
       data._overpassEndpoint = endpoint;
       data._overpassSource = 'network';
       data._overpassCacheAgeMs = 0;
       lastOverpassEndpoint = endpoint;
       if (usesDefaultProvider) markOverpassProviderAvailable();
-      storeOverpassMemoryCache(cacheMeta, data, endpoint);
+      storeOverpassMemoryCache(cacheMeta, data, endpoint, persistentCacheKey);
       void writePersistentOverpassCache(persistentCacheKey, data, endpoint, cacheMeta);
       return data;
       } catch (err) {
@@ -565,12 +559,13 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
     throw new Error(`All Overpass endpoints failed: ${errors.join(' | ')}`);
   } catch (error) {
     if (externalSignal?.aborted) throw externalAbortError(externalSignal);
-    const fallback = await readPersistentOverpassFallback(cacheMeta);
+    const fallback = await readPersistentOverpassFallback(cacheMeta, persistentCacheKey);
+    if (externalSignal?.aborted) throw externalAbortError(externalSignal);
     if (fallback?.data?.elements) {
       fallback.data._overpassEndpoint = fallback.endpoint ? `${fallback.endpoint} (persistent-fallback)` : 'persistent-fallback';
       fallback.data._overpassSource = 'persistent-fallback';
       fallback.data._overpassCacheAgeMs = Math.max(0, Date.now() - Number(fallback.savedAt || 0));
-      storeOverpassMemoryCache(cacheMeta, fallback.data, fallback.endpoint);
+      storeOverpassMemoryCache(cacheMeta, fallback.data, fallback.endpoint, persistentCacheKey);
       return fallback.data;
     }
     if (usesDefaultProvider) markOverpassProviderUnavailable(requestStartedAt);

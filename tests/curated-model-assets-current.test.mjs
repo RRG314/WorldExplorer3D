@@ -169,9 +169,9 @@ test('locally bundled skinned Explorer families serve player choices, nearby NPC
   }
 });
 
-test('player retains recovery while every NPC role is curated-only', () => {
+test('player and every NPC role are curated-only', () => {
   const walking = fs.readFileSync(path.join(root, 'app/js/walking/character.js'), 'utf8');
-  const playerFallback = fs.readFileSync(path.join(root, 'app/js/walking/field-navigator-mesh.js'), 'utf8');
+  const playerHost = fs.readFileSync(path.join(root, 'app/js/walking/player-character-host.js'), 'utf8');
   const walkingPhysics = fs.readFileSync(path.join(root, 'app/js/walking/physics.js'), 'utf8');
   const npcVisuals = fs.readFileSync(path.join(root, 'app/js/urban-sandbox/npc-visuals.js'), 'utf8');
   const population = fs.readFileSync(path.join(root, 'app/js/living-world/population.js'), 'utf8');
@@ -181,7 +181,7 @@ test('player retains recovery while every NPC role is curated-only', () => {
   const loader = fs.readFileSync(path.join(root, 'app/js/assets/model-asset-runtime.js'), 'utf8');
   assert.match(walking, /attachCuratedExplorerCharacter\(THREE, character/);
   assert.match(walkingPhysics, /Number\(actions\.sprint\)\s*>\s*0\.05/);
-  assert.match(playerFallback, /defaultCharacterFallback\s*=\s*true/);
+  assert.doesNotMatch(playerHost, /new THREE\.(?:Mesh|.*Geometry|.*Material)/);
   assert.match(npcVisuals, /characterStyle\s*=\s*'curated-only-local-model'/);
   assert.match(npcVisuals, /proceduralCharacterMeshCount\s*=\s*0/);
   assert.match(npcVisuals, /proceduralEquipmentMeshCount\s*=\s*0/);
@@ -195,9 +195,9 @@ test('player retains recovery while every NPC role is curated-only', () => {
   assert.match(shipInterior, /proceduralCharacterMeshCount\s*=\s*0/);
   assert.match(shipInterior, /failClosed:\s*true/);
   assert.match(shipInterior, /crewMeshes\.forEach\(\(mesh\) => mesh\.userData\.disposeCuratedCharacter/);
-  assert.match(loader, /object\.skeleton\s*=\s*sourceMesh\.skeleton\.clone\(\)/);
+  assert.match(loader, /skeleton\.bones = sourceSkeleton\.bones\.map/);
   assert.match(loader, /instancePolicy/);
-  assert.match(loader, /removeFromParent/);
+  assert.match(loader, /parent\?\.remove\(root\)/);
 });
 
 test('six bundled animal models provide cohesive companion and wildlife upgrades', () => {
@@ -326,4 +326,15 @@ test('the bundled E34 retains its source and CC BY license evidence within its G
   assert.equal(json.asset?.extras?.license, 'CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)');
   assert.equal(json.asset?.extras?.source, asset.sourceUrl);
   assert.match(json.asset?.extras?.author || '', /Uralvagonzavod/);
+});
+
+test('ship furnishings have local bounded GLBs and attributable sources', () => {
+  for (const asset of modelAssetsForRole('ship-interior-furnishing')) {
+    const {bytes,json}=readGlbAssetMetadata(path.join(root,asset.url.replace(/^\//,'')));
+    assert.ok(bytes.length<=asset.budgets.bytes,`${asset.id} download budget`);
+    assert.ok(triangleCount(json)<=asset.budgets.triangles,`${asset.id} geometry budget`);
+    assert.ok(asset.sourceUrl.startsWith('https://sketchfab.com/3d-models/'));
+    assert.equal(asset.license,'CC-BY-4.0');
+    assert.ok((json.images||[]).every(image=>Number.isInteger(image.bufferView)),`${asset.id} must not fetch external textures`);
+  }
 });

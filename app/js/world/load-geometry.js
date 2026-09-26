@@ -3,8 +3,8 @@ import {
   classifyWaterSurfaceProfile,
   normalizeLanduseSurfaceType
 } from "../surface-rules.js?v=18";
-import { geometryHasFinitePositions } from "./geometry-batching.js?v=6";
-import { resolveBuildingExteriorPresentation } from '../engine/building-facade-materials.js?v=16';
+import { geometryHasFinitePositions } from "./geometry-batching.js?v=7";
+import { resolveBuildingExteriorPresentation } from '../engine/building-facade-materials.js?v=19';
 import {
   fetchShortbreadTile,
   vectorTileRangeForBounds

@@ -1,9 +1,12 @@
 #!/usr/bin/env node
+import { advanceGameplay } from '../scripts/verification/gameplay-simulation.mjs';
+import { softwareCompositorArgs } from '../scripts/verification/software-compositor.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { chromium, devices } from 'playwright';
 import { startStaticServer } from '../scripts/verification/static-server.mjs';
+import { configureStagingAppCheck } from '../scripts/verification/staging-app-check.mjs';
 import { deriveRoomDeterministicSeed } from '../app/js/multiplayer/rooms-seed-model.js';
 
 const VERIFY_ROOT = process.env.WE3D_VERIFY_ROOT || process.cwd();
@@ -25,8 +28,9 @@ async function selectPaintTownAndStart(page) {
   await page.waitForSelector('#globeHubOverlay:not([hidden]) #tab-games.active', { timeout: 10_000 });
   const paintTownMode = page.locator('.mode[data-mode="painttown"]');
   await paintTownMode.evaluate((element) => element.scrollIntoView({ block: 'center', inline: 'nearest' }));
-  await paintTownMode.focus();
-  await paintTownMode.press('Enter');
+  // Exercise the touch user's visible choice; wide-touch hit testing is also
+  // covered by the actual DOM/CSS fixture that precedes this journey.
+  await paintTownMode.tap();
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().gameMode === 'painttown', null, { timeout: 10_000 });
   await page.screenshot({ path: SCREEN_TITLE_PATH, fullPage: true });
   await page.click('#globeHubOverlayCloseBtn');
@@ -124,22 +128,43 @@ async function runTouchPaintCheck(page) {
   };
 }
 
-async function runGunPhysicsCheck(page) {
+async function runGunPhysicsCheck(page, report) {
   const snapshot = () => page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().paintTown || {});
   await page.locator('#paintTownHud button[data-paint-tool="gun"]').click();
   const before = await snapshot();
+  report.gunProgress = { before, input: await page.evaluate(() => {
+    const d = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
+    return { gameStarted: d.gameStarted, paused: d.paused, gameMode: d.gameMode,
+      focused: document.activeElement?.outerHTML?.slice(0, 500),
+      resultVisible: document.getElementById('resultScreen')?.classList.contains('show'),
+      hudText: document.getElementById('paintTownHud')?.innerText };
+  }) };
+  fs.writeFileSync(REPORT_PATH, JSON.stringify(report, null, 2));
   let launched;
   await page.keyboard.down('ControlLeft');
   try {
-    await page.waitForFunction((previousShotAt) =>
-      Number(globalThis.getWorldExplorerRuntimeDiagnostics?.().paintTown?.lastShotAtMs || 0) > Number(previousShotAt || 0),
-    Number(before.lastShotAtMs || 0), { timeout: 2_000 });
+    // The DOM key handler fires synchronously. RAF polling can itself exceed
+    // two seconds on the software GPU even though lastShotAt already changed.
     launched = await snapshot();
+    if (!(Number(launched.lastShotAtMs || 0) > Number(before.lastShotAtMs || 0))) {
+      throw new Error(`Firing input did not launch a paintball: ${JSON.stringify(launched)}`);
+    }
+  } catch (error) {
+    report.gunProgress.after = await snapshot();
+    report.gunProgress.error = String(error);
+    throw error;
   } finally {
     await page.keyboard.up('ControlLeft');
   }
-  await page.waitForFunction(() => Number(globalThis.getWorldExplorerRuntimeDiagnostics?.().paintTown?.paintballs || 0) === 0, null, { timeout: 8_000 });
-  const after = await snapshot();
+  let after = await snapshot(), simulatedMs = 0;
+  report.gunProgress.expirySteps = [];
+  while (Number(after.paintballs || 0) > 0 && simulatedMs < 6000) {
+    const receipt = await advanceGameplay(page, 500);
+    report.gunProgress.expirySteps.push(receipt);
+    simulatedMs += receipt.simulatedMs;
+    after = await snapshot();
+  }
+  report.gunProgress.expiryEvidence = 'real keyboard input and simulation; not wall-clock latency';
   return {
     fired: Number(launched.lastShotAtMs || 0) > Number(before.lastShotAtMs || 0),
     lastShotAtBefore: Number(before.lastShotAtMs || 0),
@@ -173,33 +198,58 @@ async function run() {
     APP_URL = `http://127.0.0.1:${server.port}/app/`;
     report.appUrl = APP_URL;
 
-    browser = await chromium.launch({ headless: true, channel: 'chrome' });
+    browser = await chromium.launch({ headless: true, channel: 'chrome', args: softwareCompositorArgs() });
     const context = await browser.newContext({
       ...devices['iPhone 13'],
       viewport: { width: 1280, height: 800 },
       screen: { width: 1280, height: 800 }
     });
     const page = await context.newPage();
+    report.appCheck = await configureStagingAppCheck(page, APP_URL);
     page.on('console', (msg) => {
       if (msg.type() === 'error') {
         const message = `console.error: ${msg.text()}`;
         report.consoleErrors.push(message);
-        if (!isExpectedLocalNetworkConsoleError(message)) report.errors.push(message);
+        // Optional reverse place naming has a shipped secondary provider and
+        // selected-location fallback. Preserve its outage as a warning; local
+        // asset failures and unhandled application errors still fail below.
+        const optionalPlaceOutage = message.includes("Access to fetch at 'https://nominatim.openstreetmap.org/reverse?") && message.includes('blocked by CORS policy');
+        if (optionalPlaceOutage) (report.providerWarnings ||= []).push(message);
+        else if (!isExpectedLocalNetworkConsoleError(message)) report.errors.push(message);
       }
+    });
+    page.on('requestfailed', request => {
+      if (request.url().startsWith(new URL(APP_URL).origin)) report.errors.push(`local request failed: ${request.url()}`);
+    });
+    page.on('response', response => {
+      if (response.url().startsWith(new URL(APP_URL).origin) && response.status() >= 400) report.errors.push(`local HTTP ${response.status()}: ${response.url()}`);
     });
     page.on('pageerror', (err) => {
       report.errors.push(`pageerror: ${String(err)}`);
     });
 
     await page.goto(APP_URL, { waitUntil: 'load', timeout: 120_000 });
-    await selectPaintTownAndStart(page);
+    try {
+      await selectPaintTownAndStart(page);
+    } catch (error) {
+      report.selectionFailure = await page.evaluate(() => ({
+        mode: globalThis.getWorldExplorerRuntimeDiagnostics?.().gameMode,
+        focus: document.activeElement?.outerHTML?.slice(0, 500),
+        selected: [...document.querySelectorAll('.mode.sel')].map(element => element.dataset.mode),
+        overlayHidden: document.getElementById('globeHubOverlay')?.hidden
+      })).catch(() => null);
+      await page.screenshot({ path: SCREEN_TITLE_PATH, timeout: 10000 }).catch(() => {});
+      throw error;
+    }
     await waitForPaintTownRuntime(page);
     report.runtime = await capturePaintTownRuntime(page);
     await page.screenshot({ path: SCREEN_GAME_PATH, fullPage: true });
 
     report.seedCheck = await checkDeterministicSeed();
     report.touchCheck = await runTouchPaintCheck(page);
-    report.gunCheck = await runGunPhysicsCheck(page);
+    report.touchCheck.noWorldSelection = await page.locator('#worldSelectionNotice:visible').count() === 0;
+    if (!report.touchCheck.noWorldSelection) throw new Error('Painting also opened an unrelated world selection card.');
+    report.gunCheck = await runGunPhysicsCheck(page, report);
     await page.screenshot({ path: SCREEN_HUD_PATH, fullPage: true });
 
     const seedPass = report.seedCheck.deterministic && report.seedCheck.differentiatesByRoom;

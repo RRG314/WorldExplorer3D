@@ -1,8 +1,13 @@
+import { softwareCompositorArgs } from './software-compositor.mjs';
+import { installBrowserGraphicsProbe } from './browser-graphics-probe.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
+import { advanceGameplay } from './gameplay-simulation.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { VEHICLE_CATALOG, PARKED_VEHICLE_CATALOG } from '../../app/js/engine/vehicle-catalog.js?v=6';
 import { resolveVehicleRoadContactPose } from '../../app/js/engine/vehicle-road-attitude.js?v=2';
 import {
@@ -403,10 +408,10 @@ assert.equal(supportSpanConflictsWithDriveableRoad(connectedBridgeFeature, {
 
 const fixtureFeature = {
   id: 'verification-road',
-  width: 10,
+  width: 12,
   type: 'residential',
   transportRecord: {
-    crossSection: { widthMeters: 10, lanes: 2, lanesSource: 'mapped' },
+    crossSection: { widthMeters: 12, lanes: 2, lanesSource: 'mapped' },
     speed: { metersPerSecond: 10 },
     completeness: 'lossless'
   }
@@ -432,7 +437,7 @@ const fixtureAnchors = parkedVehicleAnchors(fixtureGraph, { x: -30, z: 0 }, {
 assert.equal(fixtureGraph.schemaVersion, 2, 'Traffic graph must publish the curb-vector schema.');
 assert.ok(fixtureGraph.edges.every((edge) => Math.abs(Math.hypot(edge.curbNormalX, edge.curbNormalZ) - 1) < 1e-6), 'Every traffic lane must publish a normalized outward curb vector.');
 assert.ok(fixtureAnchors.length > 0, 'A road with enough curb space must produce a parked vehicle.');
-assert.ok(fixtureAnchors.every((anchor) => anchor.curbOffset - anchor.variant.width * .5 >= anchor.laneOffset - .001), 'Parked vehicle bodies must remain outside the moving lane center.');
+assert.ok(fixtureAnchors.every((anchor) => anchor.curbOffset - anchor.variant.width * .5 >= anchor.trafficOuterEdge + anchor.trafficClearance - .001), 'Parked vehicle bodies must clear the full moving fleet envelope.');
 
 const slopedFixtureGraph = compileTrafficGraph({
   traversal: {
@@ -496,13 +501,80 @@ const requested = new Set(String(process.env.WE3D_ACTOR_VEHICLE_LOCATIONS || '')
 const selectedLocations = requested.size ? locations.filter((location) => requested.has(location.id)) : locations;
 assert.ok(selectedLocations.length > 0, 'No actor/vehicle verification locations selected.');
 
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const results = [];
+const browserBudget = { engine: 'installed-chrome', maxOldSpaceMiB: 1280, inputTiming: 'Playwright keyboard with validated runtime fixed steps; not wall-clock responsiveness' };
+async function boundedClose(close, timeoutMs = 8000) {
+  let timer;
+  try {
+    return await Promise.race([
+      Promise.resolve().then(close).then(() => true, () => false),
+      new Promise(resolve => { timer = setTimeout(() => resolve(false), timeoutMs); })
+    ]);
+  } finally { clearTimeout(timer); }
+}
+async function closeOwnedBrowser(browser, browserServer) {
+  // A remotely connected Browser.close() disconnects its client; the launch
+  // server owns the actual Chrome process and must close it.
+  if (await boundedClose(() => browserServer.close())) return;
+  const child = browserServer.process();
+  if (!child || child.exitCode !== null || child.signalCode) return;
+  console.error('[actors-vehicles] Graceful browser close stalled; stopping its owned process.');
+  const waitForExit = () => new Promise(resolve => {
+    if (child.exitCode !== null || child.signalCode) return resolve();
+    child.once('exit', resolve);
+  });
+  child.kill('SIGTERM');
+  if (await boundedClose(waitForExit, 4000)) return;
+  child.kill('SIGKILL');
+  assert.ok(await boundedClose(waitForExit, 2000), 'Owned actor-test browser did not exit.');
+}
+async function saveReport(complete = false) {
+  const report = {
+    ok: complete && results.length === selectedLocations.length && results.every(result => result.ok),
+    complete,
+    scope: requested.size ? 'diagnostic-subset' : 'full',
+    requestedLocations: selectedLocations.map(location => location.id),
+    generatedAt: new Date().toISOString(),
+    contract: 'current-rendered-actors-and-vehicles',
+    captureEnabled: capture, browserBudget, results
+  };
+  await fs.writeFile(path.join(evidenceDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
+  return report;
+}
 try {
   for (const location of selectedLocations) {
-    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-    const page = await context.newPage();
+    console.error(`[actors-vehicles] START ${location.id}`);
+    // Remote CPU-only graphics must composite through the same ANGLE driver,
+    // rather than synchronously reading every WebGL frame into software layers.
+    // This remains software functional evidence, never physical GPU acceptance.
+    const graphicsArgs = softwareCompositorArgs();
+    const browserServer = await chromium.launchServer({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280', ...graphicsArgs] });
+    let browser, context, page, cpuProfiler;
+    const traceDurations = new Map();
+    let traceStarted = false;
+    try {
+      browser = await chromium.connect(browserServer.wsEndpoint());
+      if (process.env.CI) {
+        const session = await browser.newBrowserCDPSession();
+        const info = await session.send('SystemInfo.getInfo');
+        await fs.writeFile(path.join(evidenceDir, `${location.id}-graphics-backend.json`), JSON.stringify({
+          scope: 'remote software graphics configuration; not physical performance', graphicsArgs,
+          featureStatus: info.gpu.featureStatus,
+          renderer: info.gpu.auxAttributes?.glRenderer,
+          implementation: info.gpu.auxAttributes?.glImplementationParts
+        }, null, 2));
+        await session.detach();
+      }
+      context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      page = await context.newPage();
+      await configureStagingAppCheck(page, baseUrl);
+      await installBrowserGraphicsProbe(page, path.join(evidenceDir, `${location.id}-graphics-failure.json`));
+    } catch (error) {
+      await closeOwnedBrowser(browser, browserServer);
+      throw error;
+    }
     const browserErrors = [];
+    collectBrowserGraphicsErrors(page, browserErrors);
     const localFailures = [];
     page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
     page.on('response', (response) => {
@@ -522,23 +594,77 @@ try {
       await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120000 });
       await page.getByRole('button', { name: 'Explore', exact: true }).click();
       await page.waitForFunction(() => {
+        if (document.getElementById('loading')?.classList.contains('show')) return false;
         const diagnostics = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
         return diagnostics.gameStarted === true && diagnostics.worldLoading === false &&
           diagnostics.livingWorld?.active === true && diagnostics.urbanSandbox?.active === true;
-      }, null, { timeout: 360000 });
+      }, null, { timeout: 360000, polling: 500 });
       await page.waitForTimeout(5000);
-      const environmentButton = page.getByRole('button', { name: 'Environment controls' });
-      if (await environmentButton.isVisible().catch(() => false)) {
-        await environmentButton.click();
-        await page.locator('#fTimeOfDay').click();
-        await page.waitForTimeout(1000);
+      if (process.env.CI) {
+        cpuProfiler = await context.newCDPSession(page);
+        await cpuProfiler.send('Profiler.enable');
+        await cpuProfiler.send('Profiler.setSamplingInterval', { interval: 2000 });
+        await cpuProfiler.send('Profiler.start');
+        // CPU sampling cannot attribute native/compositor stalls. Retain only
+        // event names and timing aggregates, never request/header/event args.
+        cpuProfiler.on('Tracing.dataCollected', ({ value }) => {
+          for (const event of value) {
+            if (event.ph !== 'X' || !(event.dur > 0)) continue;
+            const key = `${event.pid}:${event.tid}:${event.cat}:${event.name}`;
+            if (!traceDurations.has(key) && traceDurations.size >= 2000) continue;
+            const row = traceDurations.get(key) || { name: event.name, category: event.cat,
+              pid: event.pid, tid: event.tid, count: 0, totalMs: 0, maxMs: 0 };
+            row.count++; row.totalMs += event.dur / 1000;
+            row.maxMs = Math.max(row.maxMs, event.dur / 1000);
+            traceDurations.set(key, row);
+          }
+        });
+        await cpuProfiler.send('Tracing.start', {
+          categories: 'toplevel,gpu,cc,devtools.timeline',
+          transferMode: 'ReportEvents', options: 'record-until-full'
+        });
+        traceStarted = true;
       }
+      const timeControl = page.locator('#quickTimeOfDay');
+      await timeControl.waitFor({ state: 'visible' });
+      for (let attempt = 0; attempt < 5 && await timeControl.getAttribute('data-mode') !== 'day'; attempt += 1) {
+        await timeControl.click();
+      }
+      assert.equal(await timeControl.getAttribute('data-mode'), 'day', 'Actor screenshots require the visible Day setting.');
+      await page.waitForTimeout(1000);
+      // Focused buttons deliberately retain keyboard input for accessibility.
+      // Return to the visible world before testing the driving controls.
+      await page.locator('body > canvas:not(#minimap)').click();
+      assert.equal(await page.evaluate(() => document.activeElement?.matches('button,input,textarea,select,[contenteditable="true"]')), false);
       const first = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.());
+      const inputSteps = [];
       await page.keyboard.down('ArrowUp');
-      await page.waitForTimeout(1250);
-      await page.keyboard.up('ArrowUp');
-      await page.waitForTimeout(2750);
+      try { inputSteps.push(await advanceGameplay(page, 1250)); }
+      finally { await page.keyboard.up('ArrowUp'); }
+      inputSteps.push(await advanceGameplay(page, 2000));
+      inputSteps.push(await advanceGameplay(page, 750));
       const second = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.());
+      // Releasing the accelerator still leaves the car coasting, and terrain
+      // suspension can legitimately be settling at that instant. Preserve the
+      // moving snapshot, then test settled contact after normal braking.
+      await fs.writeFile(path.join(evidenceDir, `${location.id}-drive-progress.json`), JSON.stringify({
+        first: {actor:first.activeActor,surface:first.surfaceChain},
+        moving: {actor:second.activeActor,surface:second.surfaceChain}, inputSteps
+      }, null, 2));
+      await page.keyboard.down('Space');
+      try {
+        let brakeSimulationMs = 0;
+        while (true) {
+          const actor = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.()?.activeActor);
+          if (actor?.mode === 'drive' && actor.contact?.grounded === true &&
+              Math.hypot(Number(actor.velocity?.x || 0), Number(actor.velocity?.z || 0)) < .1) break;
+          assert.ok(brakeSimulationMs < 6000,
+            `Vehicle did not settle under braking: ${JSON.stringify({brakeSimulationMs,actor})}`);
+          inputSteps.push(await advanceGameplay(page, 250));
+          brakeSimulationMs += 250;
+        }
+      } finally { await page.keyboard.up('Space'); }
+      const settled = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.());
       const vehicles = second?.urbanSandbox?.vehicles || [];
       const envelopes = vehicles.map((vehicle) => ({
         id: vehicle.id,
@@ -564,13 +690,17 @@ try {
           second?.surfaceChain?.actor?.mode === 'drive' &&
           playerDriveMeters >= 0.25,
         playerVehicleRetainsPublishedSurfaceContact:
-          first?.surfaceChain?.surfaces?.drive?.kind === 'road' &&
-          ['road', 'terrain'].includes(String(second?.surfaceChain?.surfaces?.drive?.kind || '')) &&
-          Number(second?.surfaceChain?.actor?.vehicleContact?.sampleCount || 0) >= 1 &&
-          Number(second?.surfaceChain?.actor?.vehicleContact?.supportSampleCount || 0) >= 1 &&
-          Number.isFinite(Number(second?.surfaceChain?.actor?.vehicleContact?.chassisClearance)) &&
-          Number(second?.surfaceChain?.actor?.vehicleContact?.chassisClearance) >= -0.002 &&
-          Number(second?.surfaceChain?.actor?.vehicleContact?.chassisClearance) <= 0.12,
+          // Custom coordinates preserve their published arrival, which may be
+          // terrain. Verify real support at both ends, without teleporting to a road.
+          ['road', 'terrain'].includes(String(first?.surfaceChain?.surfaces?.drive?.kind || '')) &&
+          first?.surfaceChain?.actor?.grounded === true &&
+          Number(first?.surfaceChain?.actor?.vehicleContact?.supportSampleCount || 0) >= 1 &&
+          ['road', 'terrain'].includes(String(settled?.surfaceChain?.surfaces?.drive?.kind || '')) &&
+          Number(settled?.surfaceChain?.actor?.vehicleContact?.sampleCount || 0) >= 1 &&
+          Number(settled?.surfaceChain?.actor?.vehicleContact?.supportSampleCount || 0) >= 1 &&
+          Number.isFinite(Number(settled?.surfaceChain?.actor?.vehicleContact?.chassisClearance)) &&
+          Number(settled?.surfaceChain?.actor?.vehicleContact?.chassisClearance) >= -0.002 &&
+          Number(settled?.surfaceChain?.actor?.vehicleContact?.chassisClearance) <= 0.12,
         canonicalFarNpc: Number(population.pedestrians || 0) === 0 ||
           population.pedestrianRepresentation === 'curated-only-local-models' &&
           Number(population.proceduralPedestrianMeshes || 0) === 0,
@@ -622,9 +752,11 @@ try {
         noBrowserErrors: browserErrors.length === 0,
         noFailedLocalResources: localFailures.length === 0
       };
-      if (capture && Object.values(checks).every(Boolean)) {
+      if (capture) {
         await page.screenshot({ path: path.join(captureDir, `${location.id}.png`) });
       }
+      checks.noBrowserErrors = browserErrors.length === 0;
+      checks.noFailedLocalResources = localFailures.length === 0;
       results.push({
         id: location.id,
         ok: Object.values(checks).every(Boolean),
@@ -639,36 +771,79 @@ try {
         fourWheelContactVehicles: Number(activePopulation.fourWheelContactVehicles || 0),
         maximumWheelPenetration: Number(activePopulation.maximumWheelPenetration || 0),
         maximumWheelGap: Number(activePopulation.maximumWheelGap || 0),
+        trafficContactAnomalies: activePopulation.contactAnomalies || [],
         previousMaximumWheelPenetration: Number(activePopulation.previousMaximumWheelPenetration || 0),
         playerDriveMeters,
+        inputSteps,
         playerStartSurfaceKind: first?.surfaceChain?.surfaces?.drive?.kind || null,
+        playerStartVehicleContact: first?.surfaceChain?.actor?.vehicleContact || null,
+        playerStartGrounded: first?.surfaceChain?.actor?.grounded ?? null,
         playerStartSurfaceId: first?.surfaceChain?.surfaces?.drive?.feature?.id || null,
         playerEndSurfaceKind: second?.surfaceChain?.surfaces?.drive?.kind || null,
         playerDriveSurfaceId: second?.surfaceChain?.surfaces?.drive?.feature?.id || null,
         playerFeetMinusDriveSurface: Number(second?.surfaceChain?.deltas?.feetMinusDriveSurface),
-        playerVehicleContact: second?.surfaceChain?.actor?.vehicleContact || null,
+        movingVehicleContact: second?.surfaceChain?.actor?.vehicleContact || null,
+        movingVehicleGrounded: second?.surfaceChain?.actor?.grounded ?? null,
+        movingVehicleVelocity: second?.activeActor?.velocity || null,
+        settledVehicleGrounded: settled?.surfaceChain?.actor?.grounded ?? null,
+        settledVehicleVelocity: settled?.activeActor?.velocity || null,
+        playerVehicleContact: settled?.surfaceChain?.actor?.vehicleContact || null,
         envelopes,
+        runtimeErrors: second?.runtimeErrors || [],
         browserErrors,
         localFailures
       });
     } catch (error) {
       results.push({ id: location.id, ok: false, error: String(error?.stack || error), browserErrors, localFailures });
+      await page.screenshot({ path: path.join(evidenceDir, `${location.id}-error.png`), timeout: 5000 }).catch(() => {});
     } finally {
-      await context.close().catch(() => {});
+      if (cpuProfiler) {
+        if (traceStarted) {
+          try {
+            let traceTimer;
+            const completed = new Promise((resolve, reject) => {
+              traceTimer = setTimeout(() => reject(new Error('Trace collection timed out')), 10000);
+              cpuProfiler.once('Tracing.tracingComplete', resolve);
+            });
+            // Attach rejection handling before CDP can block.
+            completed.catch(() => {});
+            try { await cpuProfiler.send('Tracing.end'); await completed; }
+            finally { clearTimeout(traceTimer); }
+            await fs.writeFile(path.join(evidenceDir, `${location.id}-native-trace-summary.json`), JSON.stringify({
+              scope: 'remote interaction diagnosis; overlapping inclusive durations, not FPS or exclusive CPU time',
+              events: [...traceDurations.values()].sort((a,b) => b.maxMs - a.maxMs).slice(0,100)
+            }, null, 2));
+          } catch (error) { console.error('Native trace capture failed:', error.message); }
+        }
+        try {
+          const { profile } = await cpuProfiler.send('Profiler.stop');
+          await fs.writeFile(path.join(evidenceDir, `${location.id}-interaction.cpuprofile`), JSON.stringify(profile));
+          const frames = new Map(profile.nodes.map(node => [node.id, node.callFrame]));
+          const totals = new Map();
+          for (let index = 0; index < (profile.samples || []).length; index++) {
+            const id = profile.samples[index]; totals.set(id, (totals.get(id) || 0) + (profile.timeDeltas[index] || 0));
+          }
+          await fs.writeFile(path.join(evidenceDir, `${location.id}-cpu-summary.json`), JSON.stringify({
+            scope: 'remote interaction diagnosis; not physical performance acceptance',
+            durationMs: (profile.endTime - profile.startTime) / 1000,
+            topSamples: [...totals].sort((a,b) => b[1] - a[1]).slice(0, 40).map(([id, us]) => ({ milliseconds: us / 1000, ...frames.get(id) }))
+          }, null, 2));
+        } catch (error) { console.error('CPU diagnostic capture failed:', error.message); }
+      }
+      try { await saveReport(); }
+      finally {
+        await boundedClose(() => context.close());
+        await closeOwnedBrowser(browser, browserServer);
+      }
     }
+    const latest = results.at(-1);
+    console.error(`[actors-vehicles] ${latest.ok ? 'PASS' : 'FAIL'} ${location.id}`, Object.entries(latest.checks || {}).filter(([, value]) => !value).map(([name]) => name));
+    if (!latest.ok) break;
   }
 } finally {
-  await browser.close().catch(() => {});
   await server.close().catch(() => {});
 }
 
-const report = {
-  ok: results.every((result) => result.ok),
-  generatedAt: new Date().toISOString(),
-  contract: 'current-rendered-actors-and-vehicles',
-  captureEnabled: capture,
-  results
-};
-await fs.writeFile(path.join(evidenceDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
+const report = await saveReport(results.length === selectedLocations.length);
 console.log(JSON.stringify(report, null, 2));
 assert.equal(report.ok, true, `Actor/vehicle verification failed; see ${path.relative(root, path.join(evidenceDir, 'report.json'))}`);

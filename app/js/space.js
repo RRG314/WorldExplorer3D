@@ -1,3 +1,4 @@
+import { releaseAtmosphericFlightPresentation } from './space/atmospheric-flight-presentation.js?v=1';
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { getPrimaryWorldCanvas } from "./engine/webgl-lifecycle.js?v=2";
 import { captureEarthWorldSession } from "./earth-session.js?v=17";
@@ -312,7 +313,7 @@ async function startExpeditionPirateInterception(encounter, hooks = {}) {
   return pirateInterceptionRuntime.begin(encounter, hooks);
 }
 
-function startSpaceFlightToSolisReach(options = {}) {
+async function startSpaceFlightToSolisReach(options = {}) {
   if (appCtx.spaceFlight.active) return false;
   const usePathfinder = options.pathfinder !== false;
   const sessionId = beginSpaceFlightSession({
@@ -343,13 +344,13 @@ function startSpaceFlightToSolisReach(options = {}) {
   if (!commitEnvironment(appCtx.ENV.SPACE_FLIGHT, { token: transition })) return false;
   emitTutorialEvent('entered_space', { destination: SPACE_CRAFT_IDENTITY.starship.id, source: usePathfinder ? 'pathfinder_pod' : 'direct_starship' });
 
-  appCtx.spaceFlight.canvas.style.display = 'block';
+  appCtx.spaceFlight.canvas.style.display = 'none';
   appCtx.spaceFlight.hud.style.display = 'block';
   prepareSpaceFlightHudForEntry();
   document.getElementById('sfDestination').textContent = SPACE_CRAFT_IDENTITY.starship.name;
   document.getElementById('sfLandBtn').textContent = `APPROACH ${SPACE_CRAFT_IDENTITY.starship.name.toUpperCase()}`;
   const worldCanvas = getPrimaryWorldCanvas(appCtx);
-  if (worldCanvas) worldCanvas.style.display = 'none';
+  // Keep the last surface launch frame until the space camera and craft are ready.
   hideGameUI();
 
   createSpaceFlightScene({ includeExtendedSpace: true });
@@ -365,7 +366,12 @@ function startSpaceFlightToSolisReach(options = {}) {
   setExpeditionPodFlightPresentation(usePathfinder);
 
   appCtx.stopRuntimeKernel?.('space-flight-active');
+  await appCtx.spaceFlight.rocket?.userData?.curatedPodLoadPromise;
+  if (!isCurrentSpaceFlightSession(sessionId, SPACE_CRAFT_IDENTITY.starship.id)) return false;
+  // Render the destination before exposing its canvas; never publish a stale frame.
   animateSpaceFlight();
+  if (worldCanvas) worldCanvas.style.display = 'none';
+  appCtx.spaceFlight.canvas.style.display = 'block';
   appCtx.showSolarSystemUI?.();
   appCtx.showUniverseUI?.();
   spaceSessionScope.timeout(() => {
@@ -676,6 +682,10 @@ function completeLanding(sessionId = appCtx.spaceFlight._sessionId) {
 
 function exitSpaceFlight(source = 'runtime') {
   console.log('Exiting space flight...', String(source || 'runtime'));
+  // Interior mode pauses flight, but still belongs to the space lifecycle.
+  // Restore shared Earth scene state before disposing the parent space session.
+  if (appCtx.activeShipInterior) appCtx.exitExpeditionShipInterior?.();
+  releaseAtmosphericFlightPresentation();
 
   pirateInterceptionRuntime?.stop?.('space-flight-exit');
 
@@ -721,7 +731,7 @@ function exitSpaceFlight(source = 'runtime') {
 
 registerEnvironmentLifecycle(appCtx.ENV.SPACE_FLIGHT, {
   exitSync: ({ source } = {}) => {
-    if (appCtx.spaceFlight.active) exitSpaceFlight(source || 'environment_transition');
+    if (appCtx.spaceFlight.active || appCtx.activeShipInterior) exitSpaceFlight(source || 'environment_transition');
   },
   snapshot: () => ({
     active: !!appCtx.spaceFlight.active,

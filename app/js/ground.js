@@ -20,7 +20,7 @@ function isWalkFeatureSurfaceReachable(feature, options = {}) {
   // connected to terrain. Metadata alone cannot authorize a large vertical
   // jump; stale or pre-terrain feature heights must fall back to terrain.
   if (!semantics?.gradeSeparated) {
-    return Math.abs(surfaceY - terrainY) <= 1.25;
+    return surfaceY >= terrainY-.08 && surfaceY-terrainY <= 1.25;
   }
 
   // A new walk session starts on the rendered terrain unless a structure
@@ -117,6 +117,9 @@ const GroundHeight = {
     if (!Number.isFinite(profileY)) return true;
     const delta = Math.abs(meshY - profileY);
     const semantics = road?.structureSemantics || null;
+    // Ground-level transport follows the published graded mesh. The profile
+    // is a grading input and may differ after intersecting corridors blend.
+    if (semantics?.terrainMode === 'at_grade') return true;
     if (semantics?.terrainMode === 'subgrade' && meshY > profileY + 1.2) return false;
     if (delta <= 2.6) return true;
     const hasTransitionAnchors = Array.isArray(road?.structureTransitionAnchors) && road.structureTransitionAnchors.length > 0;
@@ -128,6 +131,7 @@ const GroundHeight = {
 
   _resolveRoadSurfaceY(road, meshY, profileY) {
     if (road?.structureSemantics?.terrainMode === 'subgrade' && Number.isFinite(profileY)) return profileY;
+    if (road?.structureSemantics?.terrainMode === 'at_grade' && Number.isFinite(meshY)) return meshY;
     if (Number.isFinite(meshY) && Number.isFinite(profileY)) return Math.max(profileY, meshY);
     if (Number.isFinite(meshY)) return meshY;
     return profileY;
@@ -139,7 +143,7 @@ const GroundHeight = {
     if (this._roadSurfaceMeshSource !== source || this._roadSurfaceMeshCount !== source.length) {
       this._roadSurfaceMeshSource = source;
       this._roadSurfaceMeshCount = source.length;
-      this._roadSurfaceMeshes = source.filter((mesh) => mesh && mesh.userData?.isRoadSkirt !== true);
+      this._roadSurfaceMeshes = source.filter((mesh) => mesh && mesh.userData?.isRoadSkirt !== true && mesh.userData?.isRoadMarking !== true);
     }
     return this._roadSurfaceMeshes;
   },
@@ -199,7 +203,11 @@ const GroundHeight = {
   },
 
   urbanSurfaceMeshY(x, z) {
-    return this._raycastMeshY(appCtx.urbanSurfaceMeshes, x, z, 1500, Infinity);
+    // Resident pavement has already been queried through its triangle index.
+    // Raycasting it again here scans the neighborhood for every off-sidewalk
+    // walking/spawn query and also treats paint and curb faces as support.
+    const legacySurfaces = (appCtx.urbanSurfaceMeshes || []).filter(mesh => !mesh.userData?.streetPavement);
+    return this._raycastMeshY(legacySurfaces, x, z, 1500, Infinity);
   },
 
   _projectPointToFeature(feature, x, z) {
@@ -312,10 +320,16 @@ const GroundHeight = {
       };
     }
 
+    const pavementY = appCtx.streetPavement?.sampleAt(x, z);
+    if (Number.isFinite(pavementY) && (!Number.isFinite(currentY) || Math.abs(currentY - pavementY) < 2)) {
+      return { y: pavementY, source: 'sidewalk', feature: null, dist: 0, pt: { x, z } };
+    }
+
     const terrainY = this.terrainY(x, z);
     const nr = this._nearestWalkRoad(x, z, currentY);
+    const indexedRoadY = appCtx.roadContactIndex?.sampleAt(x, z, nr?.y);
     const elevatedWalkSurface = nr?.road?.structureSemantics?.terrainMode === 'elevated';
-    const roadOnSurface = isRoadSurfaceReachable(nr, {
+    const roadOnSurface = (!appCtx.roadContactIndex || Number.isFinite(indexedRoadY)) && isRoadSurfaceReachable(nr, {
       currentRoad: appCtx.car?.road || null,
       // A bridge deck stops supporting a walking actor at its authored edge.
       // The general road query carries generous vehicle/transition padding;
@@ -329,32 +343,26 @@ const GroundHeight = {
       Number.isFinite(linear.dist) &&
       linear.dist <= Math.max(0.9, featureWidth * 0.5 + 0.8)
     );
+    const publishedLinearY=onLinear?appCtx.linearWalkContactIndex?.sampleAt(x,z,currentY):null;
     const preferLinear = !!(
       onLinear &&
+      !(roadOnSurface && linear.feature?.subtype === 'crossing' && !linear.feature?.structureSemantics?.gradeSeparated) &&
       isWalkFeatureSurfaceReachable(linear?.feature, {
         currentY,
         terrainY,
-        surfaceY: Number.isFinite(linear?.pt?.x) && Number.isFinite(linear?.pt?.z)
-          ? sampleFeatureSurfaceY(linear.feature, linear.pt.x, linear.pt.z, linear)
-          : NaN
+        surfaceY: Number.isFinite(publishedLinearY)?publishedLinearY:
+          linear.feature?.structureSemantics?.gradeSeparated
+            ? sampleFeatureSurfaceY(linear.feature,x,z,linear) : NaN
       }) &&
       (!roadOnSurface || linear.dist <= (Number.isFinite(nr?.dist) ? nr.dist + 0.15 : Infinity))
     );
 
     if (preferLinear) {
       const feature = linear.feature;
-      const sampleX = Number.isFinite(linear?.pt?.x) ? linear.pt.x : x;
-      const sampleZ = Number.isFinite(linear?.pt?.z) ? linear.pt.z : z;
-      const featureBias = Number.isFinite(feature?.surfaceBias) ?
-        feature.surfaceBias :
-        Number.isFinite(feature?.bias) ?
-          feature.bias :
-          0.05;
-      const sampledY = sampleFeatureSurfaceY(feature, sampleX, sampleZ, linear);
-      const meshY = Number.isFinite(sampledY) ? sampledY : this.linearFeatureMeshY(sampleX, sampleZ);
-      const baseY = this.terrainY(sampleX, sampleZ);
+      const meshY = Number.isFinite(publishedLinearY)?publishedLinearY:
+        sampleFeatureSurfaceY(feature,x,z,linear);
       return {
-        y: Number.isFinite(meshY) ? meshY : baseY + featureBias + 0.02,
+        y: feature?.structureSemantics?.gradeSeparated ? meshY : Math.max(terrainY,meshY,roadOnSurface&&Number.isFinite(indexedRoadY)?indexedRoadY:-Infinity),
         source: String(feature?.kind || feature?.networkKind || 'path'),
         feature,
         dist: linear.dist,
@@ -363,9 +371,10 @@ const GroundHeight = {
     }
 
     if (roadOnSurface) {
-      const sampleX = Number.isFinite(nr?.pt?.x) ? nr.pt.x : x;
-      const sampleZ = Number.isFinite(nr?.pt?.z) ? nr.pt.z : z;
-      const meshY = options.sampleRenderedMesh === false
+      // The centerline can differ from the surface under the actor on cross slopes.
+      const sampleX = x;
+      const sampleZ = z;
+      const meshY = Number.isFinite(indexedRoadY) ? indexedRoadY : options.sampleRenderedMesh === false
         ? Number(nr?.y)
         : this.roadMeshY(sampleX, sampleZ, currentY, nr);
       const roadY =
@@ -439,13 +448,14 @@ const GroundHeight = {
           preferredRoad: appCtx.car?.road || null
         }) : null;
       }
-      if (isRoadSurfaceReachable(nearestRoad, {
+      const indexedRoadY = appCtx.roadContactIndex?.sampleAt(x, z, nearestRoad?.y);
+      if ((!appCtx.roadContactIndex || Number.isFinite(indexedRoadY)) && isRoadSurfaceReachable(nearestRoad, {
         currentRoad: appCtx.car?.road || null,
         extraVerticalAllowance: 0.5
       })) {
-        const sampleX = Number.isFinite(nearestRoad?.pt?.x) ? nearestRoad.pt.x : x;
-        const sampleZ = Number.isFinite(nearestRoad?.pt?.z) ? nearestRoad.pt.z : z;
-        const meshY = options.sampleRenderedMesh === false
+        const sampleX = x;
+        const sampleZ = z;
+        const meshY = Number.isFinite(indexedRoadY) ? indexedRoadY : options.sampleRenderedMesh === false
           ? Number(nearestRoad?.y)
           : this.roadMeshY(sampleX, sampleZ, currentY, nearestRoad);
         if (this._shouldUseRoadMeshHeight(nearestRoad?.road, meshY, nearestRoad?.y)) {

@@ -344,11 +344,11 @@ export function chooseInteriorSpawnPoint(desiredPoint, walkSurfaces, fallbackPoi
   return fallbackPoint || desiredPoint || null;
 }
 
-export function createWallCollider(p1, p2, baseY, height = INTERIOR_WALL_HEIGHT, thickness = INTERIOR_WALL_THICKNESS) {
+export function createWallCollider(p1, p2, baseY, height = INTERIOR_WALL_HEIGHT, thickness = INTERIOR_WALL_THICKNESS, minimumLength = .2) {
   const dx = p2.x - p1.x;
   const dz = p2.z - p1.z;
   const len = Math.hypot(dx, dz);
-  if (!(len > 0.2)) return null;
+  if (!(len > minimumLength)) return null;
   const nx = -dz / len;
   const nz = dx / len;
   const hw = thickness * 0.5;

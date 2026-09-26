@@ -1,3 +1,5 @@
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -26,7 +28,9 @@ const destinations = Object.freeze([
 async function verifyDestination(destination) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
+  await configureStagingAppCheck(page, baseUrl);
   const browserErrors = [];
+  collectBrowserGraphicsErrors(page, browserErrors);
   const localFailures = [];
   page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   page.on('response', (response) => {
@@ -89,6 +93,8 @@ async function verifyDestination(destination) {
       noBrowserErrors: browserErrors.length === 0,
       noFailedLocalResources: localFailures.length === 0
     };
+    await fs.mkdir(path.dirname(reportPath), { recursive: true });
+    await fs.writeFile(path.join(path.dirname(reportPath), `${destination.id}.json`), JSON.stringify({ id: destination.id, checks, snapshot, browserErrors, localFailures }, null, 2));
     assert.ok(Object.values(checks).every(Boolean), `${destination.id} destination verification failed`);
     return { id: destination.id, ok: true, checks, snapshot, browserErrors, localFailures };
   } finally {

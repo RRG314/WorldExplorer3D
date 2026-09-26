@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "execution": "One city at a time on this 8 GiB Mac. Close owned component tabs before loading a full city. Record provider and graphics setting. Abort an unresponsive run; never mark it passed.",
+  "cities": [
+    {"name":"Baltimore","stops":[{"name":"East Biddle","lat":39.3035,"lon":-76.6118},{"name":"East Chase","lat":39.3025,"lon":-76.6125},{"name":"Eutaw / Preston","lat":39.3018,"lon":-76.6231}]},
+    {"name":"Monaco","stops":[{"name":"Monte Carlo hill district","lat":43.7384,"lon":7.4246}]},
+    {"name":"San Francisco","stops":[{"name":"Nob Hill district","lat":37.7924,"lon":-122.4147}]}
+  ],
+  "steps": ["Start from a fresh menu and record time to first controllable frame.","Use daylight. Save an overview and a walking-height view.","Walk forward, return, turn around, then inspect the same curb and frontage again.","Check an intersection corner, a sloping frontage, a missing-building gap, and a grade-separated crossing where present; record absent cases as not applicable.","Capture terrain, sidewalk and road heights plus rendered layer ownership at any defect.","Inspect memory before and after the route, with worker/queue status. Stop the world before the next city."],
+  "acceptance": {"geometry":"No non-finite or downward triangles; sampled pavement stays above terrain; protected areas remain excluded; render/contact agree.","visibility":"Raised pavement remains visible across camera positions; no depth-biased hardscape overlays.","visual":"No unaccounted frontage gaps, spikes or discontinuous corners in the route screenshots.","performance":"No UI timeouts. Record load time, JS heap and geometry bytes separately; any unresponsive run is a failure, not a skipped success."}
+}

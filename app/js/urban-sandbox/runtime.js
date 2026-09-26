@@ -1,6 +1,7 @@
+import { setDomText, setDomAttribute, setDomHidden, setDomClass } from '../ui/dom-state.js?v=1';
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { carSpeedToMph, mphToCarSpeed } from '../physics/vehicle-speed-units.js?v=2';
-import { VEHICLE_ROOT_TO_GROUND_METERS, vehicleMassKg } from '../engine/vehicle-catalog.js?v=6';
+import { VEHICLE_CATALOG, VEHICLE_ROOT_TO_GROUND_METERS, vehicleMassKg } from '../engine/vehicle-catalog.js?v=6';
 import { applyTransportDamage } from '../transport/damage-model.js?v=1';
 import { createCivicResponseModel } from './civic-response-model.js?v=3';
 import { ensurePlayerBackpackInventory } from './equipment-model.js?v=10';
@@ -12,15 +13,17 @@ import {
 } from './curated-equipment-visual.js?v=2';
 import { createUrbanNpcVisual } from './npc-visuals.js?v=9';
 import { nearestMappedFacility } from './facility-model.js?v=3';
-import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=4';
-import { createUrbanResponderRuntime } from './responder-runtime.js?v=29';
-import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates } from './vehicle-model.js?v=7';
-import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=11';
+import { createUrbanRoomAuthorityRuntime } from './room-authority-runtime.js?v=7';
+import { reconcilePublishedRoomVehicles } from './room-vehicle-reconciliation.js?v=1';
+import { createUrbanResponderRuntime } from './responder-runtime.js?v=32';
+import { parkedVehicleAnchors, vehicleDoorPosition, vehicleExitCandidates, sweptVehicleFootprintContact } from './vehicle-model.js?v=10';
+import { createUrbanVehicleVisual } from './vehicle-visuals.js?v=12';
 import {
   attachCuratedTrafficVehicle,
+  syncCuratedVehicleGroundPivot,
   CURATED_TRAFFIC_ASSET_BY_VARIANT,
   disposeCuratedTrafficVehicle
-} from './curated-traffic-vehicle.js?v=4';
+} from './curated-traffic-vehicle.js?v=5';
 import { applyConditionImpact } from './impact-model.js?v=1';
 import { dampCrashMotion, resolveCrashImpact } from './crash-physics.js?v=1';
 import { sampleSweptContact } from '../physics/swept-contact.js?v=1';
@@ -29,7 +32,7 @@ import { createConnectedExplorerWallet } from '../economy/connected-wallet-autho
 import { ensurePlayerConditionAuthority } from '../player/condition-model.js?v=1';
 import { createConnectedPlayerState } from '../player/connected-player-state.js?v=1';
 import { ensureVehicleUpgradeStore, parseUpgradeServiceId, stableVehicleIdentity } from '../transport/vehicle-upgrades.js?v=1';
-import { getCurrentUser } from '../../../js/auth-ui.js?v=55';
+import { getCurrentUser } from '../../../js/auth-ui.js?v=56';
 import { emitProductTelemetry } from '../platform/product-telemetry.js?v=1';
 import { claimLootPickup, createLootPickup } from './loot-pickup-model.js?v=1';
 import { NPC_COMBAT_STATES, resolveNpcCombatState } from './npc-combat-policy.js?v=2';
@@ -42,6 +45,8 @@ import {
 } from '../walking/curated-explorer-character.js?v=8';
 
 const ENTER_DISTANCE = 2.8;
+const VEHICLE_COLLISION_FLEET_RADIUS = Math.max(...VEHICLE_CATALOG.map(vehicle => Math.hypot(vehicle.width, vehicle.length) / 2));
+
 // Room clients can assemble slightly different collision envelopes when a live
 // map-provider request succeeds for one player and falls back for another. A
 // released authoritative vehicle keeps its shared pose, but the receiving
@@ -133,6 +138,7 @@ function syncVehiclePose(vehicle, pose) {
     vehicle.visual.root.position.set(vehicle.x, vehicle.y, vehicle.z);
     vehicle.visual.root.rotation.order = 'YXZ';
     vehicle.visual.root.rotation.set(vehicle.pitch, vehicle.yaw, vehicle.roll);
+    syncCuratedVehicleGroundPivot(vehicle.visual.root);
     vehicle.visual.root.updateMatrixWorld(true);
   }
 }
@@ -547,12 +553,14 @@ function resolveUrbanActorCollision(from = {}, to = {}, options = {}) {
   const source = { x: Number(from.x) || 0, z: Number(from.z) || 0 };
   const destination = { x: Number(to.x) || 0, z: Number(to.z) || 0 };
   const travelDistance = Math.hypot(destination.x - source.x, destination.z - source.z);
-  const targets = urbanCollisionTargets(state, destination, Math.max(mode === 'drive' ? 12 : 5, travelDistance + 3));
+  const targets = urbanCollisionTargets(state, destination, Math.max(mode === 'drive' ? 12 : 5, travelDistance + VEHICLE_COLLISION_FLEET_RADIUS + actorRadius));
   const blockerAlong = (start, end) => {
     const dx = end.x - start.x;
     const dz = end.z - start.z;
     const lengthSquared = dx * dx + dz * dz;
     return targets.map((target) => {
+      const footprint = sweptVehicleFootprintContact(start, end, target, actorRadius);
+      if (footprint !== undefined) return footprint;
       const targetX = Number(target.x || 0);
       const targetZ = Number(target.z || 0);
       const t = lengthSquared > .000001
@@ -568,6 +576,8 @@ function resolveUrbanActorCollision(from = {}, to = {}, options = {}) {
         endDistance: Math.hypot(end.x - targetX, end.z - targetZ)
       };
     }).filter((entry) => {
+      if (!entry) return false;
+      if (entry.footprint) return true;
       const combinedRadius = actorRadius + entry.target.radius;
       if (entry.distance >= combinedRadius) return false;
       // If a prior frame left the actor overlapping, permit motion that
@@ -1132,9 +1142,9 @@ function promotePedestrian(state, source) {
   if (!promoted) return null;
   const promotedId = `urban-npc:${state.worldIdentity}:${promoted.id}`;
   const possessionSeed = [...promotedId].reduce((sum, char) => (sum * 33 + char.charCodeAt(0)) >>> 0, 5381);
-  const heldEquipment = possessionSeed % 13 === 0
-    ? 'compact-sidearm'
-    : possessionSeed % 17 === 0 ? 'laser-gun' : possessionSeed % 11 === 0 ? 'paintball-gun' : '';
+  // Ambient population supplies civilians. Equipment belongs to an explicit
+  // encounter/responder role, never a random hash of a passerby's identity.
+  const heldEquipment = promoted.combatRole === 'armed-local' ? String(promoted.heldEquipment || '') : '';
   const definition = {
     ...promoted,
     id: promotedId,
@@ -1718,6 +1728,7 @@ function mountVehicleForDriving(state, vehicle) {
   vehicle.visual.root.removeFromParent?.();
   vehicle.visual.root.position.set(0, 0, 0);
   vehicle.visual.root.rotation.set(0, 0, 0);
+  syncCuratedVehicleGroundPivot(vehicle.visual.root);
   appCtx.carMesh.add(vehicle.visual.root);
   vehicle.attachedToPlayer = true;
   vehicle.occupied = true;
@@ -1799,7 +1810,8 @@ function updateTransition(state, dt) {
   }
   if (t >= 1) {
     setDoorProgress(transition.vehicle, 0);
-    if (transition.kind === 'exit' && state.authority) {
+    if (transition.kind === 'exit' && state.authority &&
+        !state.roomAuthorityRuntime?.hasRevokedLease?.(transition.vehicle)) {
       state.authority.releaseVehicle(transition.vehicle, vehiclePose(transition.vehicle)).then((result) => {
         if (!result?.accepted && activeWorldMatches(state)) setStatus(state, 'Vehicle release is still synchronizing with the room.', 1800);
       }).catch(() => {
@@ -2421,54 +2433,53 @@ function performInteraction(state, candidate) {
   return state.roomAuthorityRuntime?.requestVehicleEntry(vehicle) === true;
 }
 
+const PROMPT_ACTION_LABELS = Object.freeze({
+  talk_npc: 'Talk', loot_npc: 'Search', loot_responder: 'Collect gear',
+  collect_loot: 'Collect', inspect_object: 'Inspect', visit_store: 'Visit'
+});
+
 function updatePrompt(state) {
   const prompt = state.prompt;
   if (!prompt?.root) return;
   if (appCtx.getEnv?.() !== 'EARTH' || appCtx.oceanMode?.active || appCtx.spaceFlight?.active || appCtx.activePlanetaryBodyId) {
-    prompt.secondaryKey.hidden = true;
-    prompt.secondaryButton.hidden = true;
-    prompt.takeKey.hidden = true;
-    prompt.takeButton.hidden = true;
-    prompt.root.classList.remove('show');
-    prompt.root.setAttribute('aria-hidden', 'true');
+    setDomHidden(prompt.secondaryKey, true);
+    setDomHidden(prompt.secondaryButton, true);
+    setDomHidden(prompt.takeKey, true);
+    setDomHidden(prompt.takeButton, true);
+    setDomClass(prompt.root, 'show', false);
+    setDomAttribute(prompt.root, 'aria-hidden', 'true');
     return;
   }
   const candidate = appCtx.resolvePrimaryContextInteraction?.() || interactionCandidate(state);
   const transientStatus = state.statusUntil > now() ? state.statusMessage : '';
   if (!candidate && !transientStatus) {
-    prompt.root.classList.remove('familiar');
-    prompt.secondaryKey.hidden = true;
-    prompt.secondaryButton.hidden = true;
-    prompt.takeKey.hidden = true;
-    prompt.takeButton.hidden = true;
-    prompt.root.classList.remove('show');
-    prompt.root.setAttribute('aria-hidden', 'true');
+    setDomClass(prompt.root, 'familiar', false);
+    setDomHidden(prompt.secondaryKey, true);
+    setDomHidden(prompt.secondaryButton, true);
+    setDomHidden(prompt.takeKey, true);
+    setDomHidden(prompt.takeButton, true);
+    setDomClass(prompt.root, 'show', false);
+    setDomAttribute(prompt.root, 'aria-hidden', 'true');
     return;
   }
-  prompt.root.classList.add('show');
-  prompt.root.classList.toggle('familiar', !transientStatus && candidate?.familiar === true);
-  prompt.root.setAttribute('aria-hidden', 'false');
-  prompt.title.textContent = transientStatus || candidate.label;
-  prompt.meta.textContent = transientStatus || candidate?.familiar === true
+  setDomClass(prompt.root, 'show', true);
+  setDomClass(prompt.root, 'familiar', !transientStatus && candidate?.familiar === true);
+  setDomAttribute(prompt.root, 'aria-hidden', 'false');
+  setDomText(prompt.title, transientStatus || candidate.label);
+  setDomText(prompt.meta, transientStatus || candidate?.familiar === true
     ? ''
-    : `${candidate.detail}${candidate.distance ? ` • ${candidate.distance.toFixed(1)} m` : ''}`;
-  prompt.key.textContent = appCtx.getControlPromptLabel?.('interact') || appCtx.getControlBindingLabel?.('interact') || 'E';
-  prompt.button.textContent = candidate?.label || (candidate?.action === 'exit_vehicle' ? 'Exit' : 'Enter');
-  if (candidate?.action === 'talk_npc') prompt.button.textContent = 'Talk';
-  if (candidate?.action === 'loot_npc') prompt.button.textContent = 'Search';
-  if (candidate?.action === 'loot_responder') prompt.button.textContent = 'Collect gear';
-  if (candidate?.action === 'collect_loot') prompt.button.textContent = 'Collect';
-  if (candidate?.action === 'inspect_object') prompt.button.textContent = 'Inspect';
-  if (candidate?.action === 'visit_store') prompt.button.textContent = 'Visit';
-  prompt.button.disabled = !candidate?.available;
-  prompt.button.hidden = !!transientStatus;
+    : `${candidate.detail}${candidate.distance ? ` • ${candidate.distance.toFixed(1)} m` : ''}`);
+  setDomText(prompt.key, appCtx.getControlPromptLabel?.('interact') || appCtx.getControlBindingLabel?.('interact') || 'E');
+  setDomText(prompt.button, PROMPT_ACTION_LABELS[candidate?.action] || candidate?.label || (candidate?.action === 'exit_vehicle' ? 'Exit' : 'Enter'));
+  if (prompt.button.disabled !== !candidate?.available) prompt.button.disabled = !candidate?.available;
+  setDomHidden(prompt.button, !!transientStatus);
   const showSecondary = !transientStatus && !!candidate?.secondaryLabel && appCtx.Walk?.state?.mode === 'walk';
-  prompt.secondaryKey.hidden = !showSecondary;
-  prompt.secondaryButton.hidden = !showSecondary;
-  prompt.secondaryButton.textContent = candidate?.secondaryLabel || 'Use';
+  setDomHidden(prompt.secondaryKey, !showSecondary);
+  setDomHidden(prompt.secondaryButton, !showSecondary);
+  setDomText(prompt.secondaryButton, candidate?.secondaryLabel || 'Use');
   const showTake = !transientStatus && (candidate?.action === 'talk_npc' || candidate?.action === 'loot_npc' || candidate?.action === 'loot_responder');
-  prompt.takeKey.hidden = !showTake;
-  prompt.takeButton.hidden = !showTake;
+  setDomHidden(prompt.takeKey, !showTake);
+  setDomHidden(prompt.takeButton, !showTake);
 }
 
 function snapshot(state) {
@@ -2567,10 +2578,12 @@ function snapshot(state) {
         parking: vehicle.source === 'deterministic-parked-vehicle' ? Object.freeze({
           roadHalfWidth: Number(vehicle.roadHalfWidth || 0),
           laneOffset: Number(vehicle.laneOffset || 0),
+          trafficOuterEdge: Number(vehicle.trafficOuterEdge || 0),
+          trafficClearance: Number(vehicle.trafficClearance || 0),
           curbOffset: Number(vehicle.curbOffset || 0),
           curbNormalX: Number(vehicle.curbNormalX || 0),
           curbNormalZ: Number(vehicle.curbNormalZ || 0),
-          fullyOutsideTravelLane: Number(vehicle.curbOffset || 0) - Number(vehicle.variant?.width || 0) * .5 >= Number(vehicle.laneOffset || 0) - .001
+          fullyOutsideTravelLane: Number(vehicle.curbOffset || 0) - Number(vehicle.variant?.width || 0) * .5 >= Number(vehicle.trafficOuterEdge || 0) + Number(vehicle.trafficClearance || 0) - .001
         }) : null
       });
     })),
@@ -3137,8 +3150,35 @@ function startUrbanSandboxRuntime(options = {}) {
     isActive: () => activeWorldMatches(state),
     vehiclePose,
     syncVehiclePose,
+    reconcileVehicles: () => reconcilePublishedRoomVehicles(state, {
+      reference: civicActorPosition(state),
+      claimTrafficAgent: (entityId) => {
+        const prefix = `traffic:${state.worldIdentity}:`;
+        if (!entityId.startsWith(prefix)) return null;
+        const agentId = entityId.slice(prefix.length);
+        return state.population?.promoteVehicle?.(agentId) ? agentId : null;
+      },
+      releaseTrafficAgent: agentId => state.population?.restoreRoomVehicle?.(agentId),
+      createVehicle: (definition) => {
+        const visual = createUrbanVehicleVisual(THREE, definition);
+        const vehicle = { ...definition, visual, attachedToPlayer: false, occupied: false, driver: '' };
+        syncVehiclePose(vehicle, definition);
+        state.group.add(visual.root);
+        // Attach after publication so asynchronous asset ownership can be checked.
+        queueMicrotask(() => {
+          if (activeWorldMatches(state) && state.vehicles.includes(vehicle)) attachCuratedTrafficDetail(state, vehicle);
+        });
+        return vehicle;
+      },
+      disposeVehicle: vehicle => vehicle.visual.dispose()
+    }),
     setStatus: (message, duration) => setStatus(state, message, duration),
     enterVehicle: (vehicle) => enterVehicleAfterClaim(state, vehicle),
+    cancelVehicleEntry: (vehicle) => {
+      if (state.transition?.kind !== 'enter' || state.transition.vehicle !== vehicle) return;
+      setDoorProgress(vehicle, 0);
+      state.transition = null;
+    },
     beginExit: () => beginExit(state)
   });
   state.reportCivicEvent = (event) => reportCivicEvent(state, event);

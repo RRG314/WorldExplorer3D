@@ -448,6 +448,11 @@ async function computeRoomOccupancy(roomId, maxPlayers = 10) {
 
 function buildAlerts(summary = {}) {
   const alerts = [];
+  if (Number(summary.pendingReality) > 0) alerts.push({
+    severity: 'warning',
+    title: `${summary.pendingReality} building improvement${summary.pendingReality === 1 ? '' : 's'} awaiting approval`,
+    detail: 'Open Moderation → Reality Captures to inspect and approve exterior and private interior submissions.'
+  });
   const pendingTotal = Number(summary.pendingOverlay || 0) + Number(summary.pendingLegacy || 0);
   if (pendingTotal > 0) {
     alerts.push({
@@ -515,7 +520,7 @@ function buildAdminDashboardExports(helpers = {}) {
       : async () => {};
 
   return {
-    getAdminDashboardOverview: functions.region('us-central1').https.onRequest(async (req, res) => {
+    getAdminDashboardOverview: functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
       if (setCors(req, res)) return;
       if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method not allowed.' });
@@ -557,7 +562,9 @@ function buildAdminDashboardExports(helpers = {}) {
         }
 
         const publishedAtMs = publishedLandingSnap.exists ? timestampToMillis(publishedLandingSnap.data()?.publishedAt) : 0;
+        const pendingReality = await safeCount(db.collection('realityCaptures').where('status', '==', 'review_required'));
         const summary = {
+          pendingReality,
           pendingOverlay,
           needsChangesOverlay,
           publishedOverlay,
@@ -592,7 +599,7 @@ function buildAdminDashboardExports(helpers = {}) {
       }
     }),
 
-    listAdminOverlayFeatures: functions.region('us-central1').https.onRequest(async (req, res) => {
+    listAdminOverlayFeatures: functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
       if (setCors(req, res)) return;
       if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method not allowed.' });
@@ -648,7 +655,7 @@ function buildAdminDashboardExports(helpers = {}) {
       }
     }),
 
-    getAdminOverlayFeatureDetail: functions.region('us-central1').https.onRequest(async (req, res) => {
+    getAdminOverlayFeatureDetail: functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
       if (setCors(req, res)) return;
       if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method not allowed.' });
@@ -704,7 +711,7 @@ function buildAdminDashboardExports(helpers = {}) {
       }
     }),
 
-    listAdminUsers: functions.region('us-central1').https.onRequest(async (req, res) => {
+    listAdminUsers: functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
       if (setCors(req, res)) return;
       if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method not allowed.' });
@@ -737,7 +744,7 @@ function buildAdminDashboardExports(helpers = {}) {
       }
     }),
 
-    getAdminUserDetail: functions.region('us-central1').https.onRequest(async (req, res) => {
+    getAdminUserDetail: functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
       if (setCors(req, res)) return;
       if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method not allowed.' });
@@ -805,7 +812,7 @@ function buildAdminDashboardExports(helpers = {}) {
       }
     }),
 
-    listAdminRooms: functions.region('us-central1').https.onRequest(async (req, res) => {
+    listAdminRooms: functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
       if (setCors(req, res)) return;
       if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method not allowed.' });
@@ -840,7 +847,7 @@ function buildAdminDashboardExports(helpers = {}) {
       }
     }),
 
-    updateAdminRoomFlags: functions.region('us-central1').https.onRequest(async (req, res) => {
+    updateAdminRoomFlags: functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
       if (setCors(req, res)) return;
       if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method not allowed.' });
@@ -883,7 +890,7 @@ function buildAdminDashboardExports(helpers = {}) {
       }
     }),
 
-    getAdminSiteContent: functions.region('us-central1').https.onRequest(async (req, res) => {
+    getAdminSiteContent: functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
       if (setCors(req, res)) return;
       if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method not allowed.' });
@@ -917,7 +924,7 @@ function buildAdminDashboardExports(helpers = {}) {
       }
     }),
 
-    saveAdminSiteContentDraft: functions.region('us-central1').https.onRequest(async (req, res) => {
+    saveAdminSiteContentDraft: functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
       if (setCors(req, res)) return;
       if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method not allowed.' });
@@ -951,7 +958,7 @@ function buildAdminDashboardExports(helpers = {}) {
       }
     }),
 
-    publishAdminSiteContent: functions.region('us-central1').https.onRequest(async (req, res) => {
+    publishAdminSiteContent: functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
       if (setCors(req, res)) return;
       if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method not allowed.' });
@@ -997,7 +1004,7 @@ function buildAdminDashboardExports(helpers = {}) {
       }
     }),
 
-    listAdminActivity: functions.region('us-central1').https.onRequest(async (req, res) => {
+    listAdminActivity: functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
       if (setCors(req, res)) return;
       if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method not allowed.' });
@@ -1019,7 +1026,7 @@ function buildAdminDashboardExports(helpers = {}) {
       }
     }),
 
-    getAdminOperationsSnapshot: functions.region('us-central1').https.onRequest(async (req, res) => {
+    getAdminOperationsSnapshot: functions.region('us-central1').runWith({ invoker: 'public' }).https.onRequest(async (req, res) => {
       if (setCors(req, res)) return;
       if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method not allowed.' });

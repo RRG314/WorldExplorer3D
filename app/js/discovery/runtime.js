@@ -1,3 +1,4 @@
+import { ambientNotices } from '../ui/ambient-notices.js';
 import { BUILTIN_DISCOVERY_CATALOGS, COMPANION_CATALOG, TOOL_CATALOG, validateDiscoveryCatalogs } from './catalog.js?v=4';
 import { createCompanionRuntime } from './companion-runtime.js?v=10';
 import { auditRegionalCreatureQuality } from './creature-quality.js?v=1';
@@ -6,7 +7,7 @@ import { createWalkingEncounterDirector } from './encounter-director.js?v=1';
 import { resolveRegionalEcologyPack } from './ecology/regional-packs.js?v=2';
 import { compileEnvironmentContext } from './environment-context.js?v=2';
 import { createFieldRetentionSnapshot } from './field-retention.js?v=2';
-import { compileFieldActivityPlan, createFieldActivitySession } from './field-activities.js?v=4';
+import { compileFieldActivityPlan, createFieldActivitySession } from './field-activities.js?v=5';
 import { createFieldExpedition } from './field-expedition.js?v=1';
 import { ACTIVITY_TOOL, createFieldEquipmentPresentation } from './field-equipment.js?v=4';
 import { explorerProgressSnapshot } from './explorer-events.js?v=3';
@@ -236,7 +237,7 @@ function guideCategoryFor(record = {}) {
   if (/wildlife|animal|bird|fish|marine/.test(family)) return family.includes('marine') || family === 'fish' ? 'ocean' : 'wildlife';
   if (/botany|plant|fung/.test(family)) return 'plants';
   if (/fossil/.test(family)) return 'fossils';
-  if (/rock|mineral|sediment|gem|ore|metal/.test(family)) return 'geology';
+  if (/geology|rock|mineral|sediment|gem|ore|metal/.test(family)) return 'geology';
   if (/water-survey|ocean/.test(family)) return 'ocean';
   return 'places';
 }
@@ -246,6 +247,7 @@ function createDiscoveryUi(state) {
   const elements = {
     panel: byId('discoveryPanel'), close: byId('discoveryCloseBtn'), help: byId('discoveryHelpBtn'), quick: byId('discoveryQuickToolBtn'), menu: byId('fWorldDiscovery'),
     todayBackpack: byId('discoveryOpenBackpackTodayBtn'),
+    encounterLead: byId('discoveryEncounterLeadBtn'), encounterLeadDetail: byId('discoveryEncounterLeadDetail'),
     title: byId('discoveryPanelTitle'), actions: byId('discoveryActionList'), quickLabel: byId('discoveryQuickToolBtn')?.querySelector('strong'),
     quickSignal: byId('discoveryQuickSignal'), prompt: byId('discoveryContextPrompt'), promptText: byId('discoveryContextText'),
     promptOpen: byId('discoveryContextOpenBtn'), phase: byId('discoveryPhase'), bearing: byId('discoveryBearing'),
@@ -274,8 +276,6 @@ function createDiscoveryUi(state) {
   let guideRecords = [];
   let journalRecords = [];
   let expeditionSignature = '';
-  let encounterPromptRevision = -1;
-  let encounterPromptShownAt = 0;
 
   function listen(element, type, handler) {
     if (!element) return;
@@ -309,7 +309,7 @@ function createDiscoveryUi(state) {
       : worldCatalog;
     const companionCatalogIds = new Set(COMPANION_CATALOG.map((entry) => entry.id));
     const scopedGuide = requestedScope === 'current' && regionalPack
-      ? guideRecords.filter((entry) => (currentRegionIds.has(entry.catalogId) || companionCatalogIds.has(entry.catalogId)) && entry.regions?.includes(state.worldIdentityId))
+      ? guideRecords.filter((entry) => (currentRegionIds.has(entry.catalogId) || companionCatalogIds.has(entry.catalogId) || entry.catalogId === 'mapped-geology-study') && entry.regions?.includes(state.worldIdentityId))
       : guideRecords;
     const knownIds = new Set(scopedGuide.map((entry) => entry.catalogId));
     const known = scopedGuide.filter((entry) => {
@@ -363,6 +363,11 @@ function createDiscoveryUi(state) {
     }
   }
 
+  function geologyDetails(evidence) {
+    if(!evidence?.units?.length)return '';
+    return '<details class="discoveryGeologyEvidence"><summary>Mapped geology and sources</summary>'+evidence.units.map(unit=>'<p><strong>'+escapeHtml(unit.name)+'</strong><br>'+escapeHtml(unit.material)+'<br>Age: '+escapeHtml(unit.age||'Unspecified')+'<br>'+escapeHtml(unit.citation)+'<br>'+escapeHtml(unit.provider+' · '+unit.license)+'</p>').join('')+'<small>Regional mapped evidence; exposure and collecting permission are not established. '+escapeHtml((evidence.warnings||[]).join(' '))+'</small></details>';
+  }
+
   function renderJournal() {
     if (!elements.journal) return;
     const path = String(elements.journalCategory?.value || 'all');
@@ -382,7 +387,7 @@ function createDiscoveryUi(state) {
       const returnButton = canReturn ? `<button class="discoveryJournalReturn" data-journal-return="${escapeHtml(event.eventId)}" type="button">Return to location</button>` : '';
       const activity = displayDiscoveryLabel(event.activityId || event.eventType || event.pathId, 'Explorer memory');
       const eventPath = event.pathId || 'field';
-      return `<article class="discoveryItem discoveryJournalEvent"><span class="discoveryJournalTime">${escapeHtml(when)}</span><span class="discoveryJournalPath">${escapeHtml(pathLabels[eventPath] || 'Explorer')}</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><small>${escapeHtml(`${event.regionLabel || 'Current region'} · ${activity}${connections ? ` · ${connections}` : ''}`)}</small>${event.detail ? `<small>${escapeHtml(event.detail)}</small>` : ''}<span class="discoveryJournalProgress">${event.progress?.points > 0 ? `+${event.progress.points} Explorer points` : 'Saved to your Journal'}</span>${returnButton}</article>`;
+      return `<article class="discoveryItem discoveryJournalEvent"><span class="discoveryJournalTime">${escapeHtml(when)}</span><span class="discoveryJournalPath">${escapeHtml(pathLabels[eventPath] || 'Explorer')}</span><strong>${escapeHtml(event.name || 'Explorer record')}</strong><small>${escapeHtml(`${event.regionLabel || 'Current region'} · ${activity}${connections ? ` · ${connections}` : ''}`)}</small>${event.detail ? `<small>${escapeHtml(event.detail)}</small>` : ''}<span class="discoveryJournalProgress">${event.progress?.points > 0 ? `+${event.progress.points} Explorer points` : 'Saved to your Journal'}</span>${geologyDetails(event.evidencePayload?.geologyEvidence)}${returnButton}</article>`;
     }).join('') : '<div class="discoveryEmpty">No Journal records match these filters.</div>';
   }
 
@@ -566,6 +571,7 @@ function createDiscoveryUi(state) {
     const visual = visualForCatalogId(record.catalogId);
     const name = record.name || catalog?.names?.common || record.catalogId;
     const details = meta || `${displayDiscoveryLabel(record.family || catalog?.family)} · ${displayDiscoveryLabel(record.evidenceClass, 'Field reference')}`;
+    if(record.geologyEvidence)return `<article class="discoveryItem"><strong>${escapeHtml(name)}</strong><small>${escapeHtml(details)}</small>${geologyDetails(record.geologyEvidence)}</article>`;
     if (!visual) return `<article class="discoveryItem"><strong>${escapeHtml(name)}</strong><small>${escapeHtml(details)}</small></article>`;
     return `<article class="discoveryItem discoveryItemVisual"><img src="${escapeHtml(visual.image)}" alt="${escapeHtml(visual.alt)}" loading="lazy"><div><strong>${escapeHtml(name)}</strong><div class="discoveryScientific">${escapeHtml(catalog?.names?.scientific || visual.scientificName)}</div><small>${escapeHtml(details)}</small><span class="discoveryEvidence">Reference image</span><a class="discoveryCredit" href="${escapeHtml(visual.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(`${visual.author} · ${visual.license}`)}</a><div class="discoveryCompanionActions"><button class="discoveryArLaunch" data-ar-record="${escapeHtml(record.instanceId || record.catalogId)}" data-ar-source="${escapeHtml(source)}" type="button">Place in AR</button></div></div></article>`;
   }
@@ -649,6 +655,9 @@ function createDiscoveryUi(state) {
   listen(elements.promptOpen, 'click', () => {
     if (state.encounterLead?.available) void state.startEncounterLead?.();
     else setOpen(true);
+  });
+  listen(elements.encounterLead, 'click', () => {
+    if (state.encounterLead?.available) void state.startEncounterLead?.();
   });
   listen(elements.close, 'click', () => setOpen(false));
   listen(elements.help, 'click', () => void state.showSectionTutorial?.(activeTab === 'today' ? 'workspace' : activeTab, true));
@@ -777,25 +786,28 @@ function createDiscoveryUi(state) {
     const operationActive = !!snapshot?.active && !['complete', 'collected', 'recorded', 'left'].includes(snapshot?.phase);
     elements.quick?.classList.toggle('show', state.active && !open && operationActive && (detectorAvailable || activityId !== 'metal-detect'));
     const encounterLead = state.encounterLead || null;
+    // Keep the same lead reachable in Today after its transient notice expires
+    // or yields to a nearby world interaction. Do not replace an active task.
+    if (elements.encounterLead) {
+      const available = encounterLead?.available === true && !operationActive;
+      elements.encounterLead.hidden = !available;
+      elements.encounterLead.disabled = !available;
+      if (elements.encounterLeadDetail) elements.encounterLeadDetail.textContent = available
+        ? `${encounterLead.leadLabel} · ${Math.ceil(Number(encounterLead.distanceMeters || 0))} m ${compactCompassDirection(encounterLead.bearingDegrees)} · field lead`
+        : '';
+    }
     // A world-space action within reach (observe wildlife, enter a vehicle,
     // inspect an object) is more urgent than a broader walking lead. The lead
     // remains available and returns as soon as the direct interaction clears.
     const directInteraction = state.appCtx.resolvePrimaryContextInteraction?.() || null;
     const interiorInteraction = document.getElementById('interiorPrompt')?.classList.contains('show') === true;
-    const encounterPromptEligible = !open && !operationActive && !directInteraction && !interiorInteraction && encounterLead?.available === true;
-    const encounterRevision = Number(encounterLead?.revision);
-    const promptNow = typeof performance !== 'undefined' ? performance.now() : Date.now();
-    if (!encounterLead?.available) {
-      encounterPromptRevision = -1;
-      encounterPromptShownAt = 0;
-    } else if (encounterPromptEligible && encounterRevision !== encounterPromptRevision) {
-      encounterPromptRevision = encounterRevision;
-      encounterPromptShownAt = promptNow;
-    }
-    // A field lead is an invitation, not a permanent HUD layer. Keep the
-    // underlying lead available in Explorer after this short notice expires.
+    const ambientBlocked = state.appCtx.paused || state.appCtx.showLargeMap || state.appCtx.getFishingSnapshot?.().open === true;
+    const encounterPromptEligible = !open && !ambientBlocked && !operationActive && !directInteraction && !interiorInteraction && encounterLead?.available === true;
     const preferredNoticeMs = globalThis.getWorldExplorerAccessibilityNoticeMs?.(7000) ?? 7000;
-    const showEncounterLead = encounterPromptEligible && (!Number.isFinite(preferredNoticeMs) || promptNow - encounterPromptShownAt < preferredNoticeMs);
+    const showEncounterLead = ambientNotices.request('discovery', `${state.worldIdentityId || ''}:${encounterLead?.revision}`, {
+      durationMs: preferredNoticeMs,
+      blocked: !encounterPromptEligible
+    });
     elements.prompt?.classList.toggle('show', showEncounterLead);
     if (elements.prompt) {
       elements.prompt.dataset.tone = encounterLead?.tone || 'field';
@@ -814,11 +826,16 @@ function createDiscoveryUi(state) {
         `<button class="discoveryActionChip${action.id === activityId ? ' active' : ''}" data-discovery-action="${escapeHtml(action.id)}" type="button"><span>${escapeHtml(action.label)}</span><small>${action.id === 'fish' ? 'Full game' : index === 0 ? 'Recommended nearby lead' : 'Alternative lead'}</small></button>`
       ).join('');
     }
+    if(elements.actions && actions.length>3 && !elements.actions.querySelector('.discoveryMoreActivities')) {
+      elements.actions.insertAdjacentHTML('beforeend', `<details class="discoveryMoreActivities"><summary>More field activities</summary>${actions.slice(3).map(action=>`<button class="discoveryActionChip" data-discovery-action="${escapeHtml(action.id)}" type="button"><span>${escapeHtml(action.label)}</span></button>`).join('')}</details>`);
+    }
     const activeAction = actions.find((action) => action.id === activityId);
     const arEligibility = state.getArChallengeEligibility?.();
     if (elements.arChallenge) elements.arChallenge.hidden = !arEligibility?.allowed;
     if (elements.title && activeTab === 'today') elements.title.textContent = 'Today';
-    if (elements.quickLabel) elements.quickLabel.textContent = `Resume ${activeAction?.label || 'Field Activity'}`;
+    if (elements.quickLabel) elements.quickLabel.textContent = snapshot?.phase === 'revealed'
+      ? `Record ${snapshot.targetName || activeAction?.label || 'your finding'}`
+      : `Resume ${activeAction?.label || 'Field Activity'}`;
     if (!snapshot) return;
     if (elements.inspection) {
       const catalog = BUILTIN_DISCOVERY_CATALOGS.fieldDiscoveries.find((entry) => entry.id === snapshot.targetCatalogId);
@@ -887,6 +904,7 @@ function createDiscoveryUi(state) {
 
   return Object.freeze({
     get activeTab() { return activeTab; }, get open() { return open; },
+    ownsFieldPrompt: !!elements.quick,
     dispose() { listeners.splice(0).forEach((remove) => remove()); setOpen(false); elements.quick?.classList.remove('show'); elements.prompt?.classList.remove('show'); },
     refreshData, render, setOpen, setTab, showResult, showSectionTutorial, showTutorial
   });
@@ -1378,6 +1396,11 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
     const liveGps = appCtx.getLiveGpsSnapshot?.() || { active: false };
     return liveGps.active ? appCtx.getLiveGpsFieldEligibility?.(target, evidence || approachEvidenceAt(target)) || null : null;
   };
+  listenForExplorerEvent('we3d-live-gps-field-fix', () => {
+    if (state.disposed || appCtx.worldPublication?.requestId !== publication.requestId ||
+        appCtx.worldPublication?.sequence !== publication.sequence || state.activeActivityId === 'metal-detect') return;
+    state.fieldSession.update(0, playerPosition(appCtx), { evaluateFieldTarget: state.evaluateFieldTarget });
+  });
   state.fieldExpedition = createFieldExpedition({
     plan: fieldActivities,
     claimedIds,
@@ -2084,6 +2107,12 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
       } else if (fieldPhase === 'revealed') {
         const completedSlot = fieldActivities.slots.find((entry) => entry.id === state.fieldSession.snapshot(position).targetId);
         const recorded = await state.fieldSession.record(profileStore, {
+          isCurrent: () => appCtx.worldDiscoveryRuntime === state,
+          resolveGeology: async (point) => {
+            const location = appCtx.worldToLatLon(point.x, point.z);
+            const {lookupGeology,geologyRecord} = await import('../geospatial/geology.js');
+            return geologyRecord(await lookupGeology(location));
+          },
           toolId: ACTIVITY_TOOL[state.activeActivityId] || '',
           regionLabel,
           locationKey: state.locationKey,
@@ -2292,8 +2321,7 @@ async function startWorldDiscoveryRuntime(appCtx, options = {}) {
             .filter((action) => {
               const toolId = ACTIVITY_TOOL[action.id];
               return !toolId || state.entitlements.canUseTool(toolId).allowed;
-            })
-            .slice(0, 3);
+            });
         }
         state.currentCellId = state.actions[0]?.cellId || null;
       }
@@ -2351,6 +2379,7 @@ function worldDiscoveryRuntimeSnapshot(appCtx) {
   const actorPosition = playerPosition(appCtx);
   return Object.freeze({
     active: !state.disposed,
+    promptOwner: state.ui?.ownsFieldPrompt ? 'discovery' : null,
     requestId: state.publication.requestId,
     sequence: state.publication.sequence,
     worldIdentity: state.publication.worldIdentity.id,

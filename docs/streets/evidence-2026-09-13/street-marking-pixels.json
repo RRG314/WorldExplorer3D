@@ -1,0 +1,35 @@
+{
+  "status": "pass",
+  "checks": [
+    {
+      "cameraHeight": 0.2,
+      "paintedPixels": 3,
+      "pass": true
+    },
+    {
+      "cameraHeight": 0.5,
+      "paintedPixels": 6,
+      "pass": true
+    },
+    {
+      "cameraHeight": 1,
+      "paintedPixels": 9,
+      "pass": true
+    },
+    {
+      "cameraHeight": 3,
+      "paintedPixels": 9,
+      "pass": true
+    },
+    {
+      "cameraHeight": 8,
+      "paintedPixels": 9,
+      "pass": true
+    },
+    {
+      "cameraHeight": 20,
+      "paintedPixels": 9,
+      "pass": true
+    }
+  ]
+}

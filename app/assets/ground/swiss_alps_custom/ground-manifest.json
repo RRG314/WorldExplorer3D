@@ -3,7 +3,7 @@
   "artifactId": "swiss_alps_custom-ground",
   "providerId": "copernicus-dem-classified-ground-v1",
   "sourceRelease": "COP-DEM-2021:GLO-30",
-  "contentSha256": "0ec81068f59ac5287c4f21580048dd1ef6cbc4261a555b13efe3213de9d64652",
+  "contentSha256": "78fdc21154141ab024c468d839424c78fd86015a9fe3afaa8d2368bd39b5ff66",
   "spacingMeters": 90,
   "coverage": {
     "south": 46.51422145821381,
@@ -18,7 +18,7 @@
   "correctionAttested": true,
   "sourceEvidence": {
     "sourceClassification": "digital-surface-model",
-    "correctionMethod": "worldexplorer-pmf-grid-v1",
+    "correctionMethod": "worldexplorer-pmf-boundary-reconstruction-v3",
     "sourceTiles": [
       {
         "tileId": "Copernicus_DSM_COG_10_N46_00_E007_00_DEM",
@@ -29,7 +29,14 @@
         "etag": "d75ca33280e101b7e83b2fbef81e853b",
         "lastModified": "Mon, 09 May 2022 14:25:45 GMT"
       }
-    ]
+    ],
+    "classificationMethod": "worldexplorer-pmf-grid-v1",
+    "reconstruction": {
+      "method": "harmonic-ground-boundary",
+      "toleranceMeters": 0.00001,
+      "exteriorPolicy": "retain-source-observation",
+      "sourceArtifactSha256": "0ec81068f59ac5287c4f21580048dd1ef6cbc4261a555b13efe3213de9d64652"
+    }
   },
   "attribution": {
     "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",

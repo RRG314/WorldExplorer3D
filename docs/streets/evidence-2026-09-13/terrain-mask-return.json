@@ -1,0 +1,104 @@
+{
+  "busy": false,
+  "near": {
+    "tiles": 53,
+    "triangles": 9750,
+    "curbTriangles": 14414,
+    "markingTriangles": 0,
+    "ramps": 0,
+    "workerMs": 0,
+    "inferredFrontages": 11289,
+    "managedPaths": 44,
+    "residentRoads": 30,
+    "residentBuildings": 264,
+    "roads": 116,
+    "roadMeshes": 116,
+    "buildings": 1056,
+    "worldLoadSequence": 1,
+    "plannedTiles": 75,
+    "reusedCells": 75,
+    "terrainRefinementTriangles": 474,
+    "highestRefinement": {
+      "cell": "-2:1",
+      "bounds": {
+        "minX": -128,
+        "maxX": -64,
+        "minZ": 64,
+        "maxZ": 128
+      },
+      "addedTriangles": 274,
+      "baseTriangles": 462
+    },
+    "drawCalls": 36,
+    "compilerCacheBytes": 4959238,
+    "coverageBounds": {
+      "minX": -384,
+      "maxX": 384,
+      "minZ": -384,
+      "maxZ": 384
+    },
+    "indexBytes": 144984,
+    "positionBytes": 278664,
+    "durationMs": 709
+  },
+  "overview": {
+    "status": "complete",
+    "representation": "terrain material coverage",
+    "completedCells": 340,
+    "totalCells": 340,
+    "nonemptyCells": 236,
+    "coveredSquareWorldUnits": 83920.69019607846,
+    "positionBytes": 0,
+    "retainedBytes": 1404192,
+    "drawCalls": 0,
+    "workerActive": false,
+    "sourceScope": "complete loaded location",
+    "error": null,
+    "sourceCells": 384,
+    "excludedCells": 44,
+    "maskResolution": 64,
+    "worldUnitsPerTexel": 1,
+    "materials": 1,
+    "coverageBounds": {
+      "minX": -704,
+      "maxX": 1536,
+      "minZ": -256,
+      "maxZ": 1280
+    },
+    "durationMs": 17946
+  },
+  "renderer": {
+    "geometries": 1210,
+    "textures": 3
+  },
+  "heapBytes": 32093431,
+  "history": [
+    {
+      "position": {
+        "x": 0,
+        "z": 0
+      },
+      "durationMs": 4719,
+      "reusedCells": 0,
+      "cacheBytes": 2483804
+    },
+    {
+      "position": {
+        "x": 1024,
+        "z": 1024
+      },
+      "durationMs": 5433,
+      "reusedCells": 0,
+      "cacheBytes": 4959238
+    },
+    {
+      "position": {
+        "x": 0,
+        "z": 0
+      },
+      "durationMs": 709,
+      "reusedCells": 75,
+      "cacheBytes": 4959238
+    }
+  ]
+}

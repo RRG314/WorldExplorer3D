@@ -28,7 +28,10 @@ export function setupEngineInputHandlers(appCtx) {
   });
 
   inputScope.listen(globalThis, 'keydown', (e) => {
-    if (isFormControl(e.target)) return;
+    // The pause dialog intentionally focuses Resume for accessibility. Escape
+    // must still resume from that button; ordinary form typing stays isolated.
+    const pauseEscape = e.code === 'Escape' && appCtx.hasPauseReason?.('manual_pause');
+    if (isFormControl(e.target) && !pauseEscape) return;
     if (appCtx.hasPauseReason?.('reality_capture')) return;
     if (appCtx.showLargeMap && gameplayKeys.has(e.code)) {
       e.preventDefault();

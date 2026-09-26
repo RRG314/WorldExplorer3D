@@ -1,0 +1,34 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Pavement terrain pixel verification</title>
+<style>body{background:#15202b;color:#fff;font:14px system-ui}pre{white-space:pre-wrap}canvas{width:384px;height:384px;image-rendering:pixelated}</style>
+<h1>Pavement terrain pixel verification</h1><p>Checks rendered footprint edges, a courtyard hole, detail-window masking, terrain movement and material cleanup.</p><pre id="result">Running</pre>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script><script type="module">
+import {createPavementTerrainMask} from '../../app/js/world/pavement-terrain-mask.js';
+import {rasterizePavementMask} from '../../app/js/world/compiler/pavement-mask.js';
+const renderer=new THREE.WebGLRenderer({antialias:false});renderer.setSize(64,64);renderer.setPixelRatio(1);renderer.outputEncoding=THREE.LinearEncoding;document.body.append(renderer.domElement);
+const scene=new THREE.Scene(),geometry=new THREE.PlaneGeometry(64,64,1,1);geometry.rotateX(-Math.PI/2);geometry.translate(32,0,32);
+const material=new THREE.MeshBasicMaterial({color:0xff0000}),mesh=new THREE.Mesh(geometry,material);mesh.userData.isTerrainMesh=true;scene.add(mesh);
+const camera=new THREE.OrthographicCamera(0,64,32,-32,.1,300);camera.position.set(0,100,32);camera.up.set(0,0,-1);camera.lookAt(0,0,32);
+const target=new THREE.WebGLRenderTarget(64,64,{depthBuffer:true}),ctx={renderer,terrainGroup:{children:[mesh]},landuseMeshes:[]};
+const rect=(x,z,w,h)=>[[x,z],[x+w,z],[x+w,z+h],[x,z+h],[x,z]];
+const polygons=[[rect(8,8,32,32),rect(16,16,8,8)]],mask=rasterizePavementMask(polygons,{minX:0,maxX:64,minZ:0,maxZ:64});
+const checks=[];
+function render(){renderer.setRenderTarget(target);renderer.render(scene,camera);renderer.setRenderTarget(null);renderer.render(scene,camera);}
+function check(name,x,z,paved){
+ const projected=new THREE.Vector3(x,mesh.position.y,z).project(camera),pixel=new Uint8Array(4);
+ renderer.readRenderTargetPixels(target,Math.floor((projected.x+1)*32),Math.floor((projected.y+1)*32),1,1,pixel);
+ const expected=paved?124:0,pass=Math.abs(pixel[1]-expected)<=5;
+ checks.push({name,point:{x,z},expected:paved?'pavement':'base terrain',pixel:Array.from(pixel),pass});
+}
+try{
+ const originalCompile=material.onBeforeCompile,originalKey=material.customProgramCacheKey;
+ const coverage=createPavementTerrainMask(ctx,['0:0']);coverage.publish('0:0',mask);coverage.syncMaterials();render();
+ check('outside left edge at texel center',7.5,12.5,false);check('inside left edge',8.5,12.5,true);
+ check('courtyard hole',20.5,20.5,false);check('outside footprint',44.5,32.5,false);check('paved area',32.5,32.5,true);
+ coverage.setDetailBounds({minX:24,minZ:24,maxX:40,maxZ:40});render();check('near detail masks the terrain layer',32.5,32.5,false);
+ coverage.setDetailBounds(null);mesh.position.y=15;render();check('terrain movement retains coverage',32.5,32.5,true);
+ coverage.dispose();render();check('disposal restores base material',32.5,32.5,false);
+ checks.push({name:'material hooks restored',pass:material.onBeforeCompile===originalCompile&&material.customProgramCacheKey===originalKey});
+ target.dispose();renderer.render(scene,camera);
+ document.querySelector('#result').textContent=JSON.stringify({status:checks.every(c=>c.pass)?'pass':'fail',checks,renderer:renderer.info.memory},null,2);
+}catch(error){document.querySelector('#result').textContent=JSON.stringify({status:'fail',error:String(error.stack),checks},null,2);}
+</script></html>

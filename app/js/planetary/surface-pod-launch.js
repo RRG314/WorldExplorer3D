@@ -133,6 +133,7 @@ function releaseStagedEarthPod({ remove = true } = {}) {
   stagedEarthPod = null;
   stagedEarthContext = null;
   stagedEarthBoard = null;
+  if (remove && pod) pod.userData.curatedPodDisposed = true;
   if (remove && pod?.parent) pod.parent.remove(pod);
   if (remove) pod?.traverse?.((child) => {
     child.geometry?.dispose?.();
@@ -159,6 +160,7 @@ function stageEarthPod(appCtx, options = {}) {
         const distance = stagedEarthPodDistance();
         if (
           !stagedEarthPod ||
+          stagedEarthPod.userData.curatedPodStatus === 'loading' ||
           stagedEarthContext?.getEnv?.() !== stagedEarthContext?.ENV?.EARTH ||
           stagedEarthPod.parent !== stagedEarthContext?.earthSceneRoot ||
           !Number.isFinite(distance) ||
@@ -380,6 +382,7 @@ function clearLaunch(appCtx, launch, { restore = false } = {}) {
     child.geometry?.dispose?.();
     child.material?.dispose?.();
   });
+  if (launch.temporary && launch.pod) launch.pod.userData.curatedPodDisposed = true;
   if (launch.temporary && launch.pod?.parent) launch.pod.parent.remove(launch.pod);
   if (launch.temporary) launch.pod?.traverse?.((child) => {
     child.geometry?.dispose?.();

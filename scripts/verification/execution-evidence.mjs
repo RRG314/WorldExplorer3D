@@ -56,7 +56,26 @@ function readExecutionEvidence(root = process.cwd(), scope = 'candidate') {
   }
 }
 
-function compareEvidenceToBaseline(evidence, baseline, scope = 'candidate') {
+function currentArtifactIdentity(root = process.cwd(), artifactRoot = process.env.WE3D_VERIFY_ROOT || 'dist') {
+  try {
+    const directory = path.resolve(root, artifactRoot);
+    return {
+      buildManifestSha256: createHash('sha256').update(readFileSync(path.join(directory, 'build-manifest.json'))).digest('hex'),
+      assetManifestSha256: createHash('sha256').update(readFileSync(path.join(directory, 'asset-manifest.json'))).digest('hex')
+    };
+  } catch {
+    return null;
+  }
+}
+
+function sameArtifactIdentity(left, right) {
+  return !!left && !!right && typeof left.buildManifestSha256 === 'string' &&
+    typeof left.assetManifestSha256 === 'string' &&
+    left.buildManifestSha256 === right.buildManifestSha256 &&
+    left.assetManifestSha256 === right.assetManifestSha256;
+}
+
+function compareEvidenceToBaseline(evidence, baseline, scope = 'candidate', artifact = currentArtifactIdentity()) {
   if (!evidence) return ['current execution evidence is missing'];
   const failures = [];
   if (evidence.contract !== 'world-explorer-execution-evidence-v1') failures.push('execution evidence contract is invalid');
@@ -64,13 +83,16 @@ function compareEvidenceToBaseline(evidence, baseline, scope = 'candidate') {
   if (evidence.baseline?.workspaceFingerprint !== baseline.workspaceFingerprint) failures.push('execution evidence does not match the current working tree');
   if (evidence.ok !== true) failures.push('the current execution matrix did not pass');
   if (evidence.scope !== scope) failures.push(`the current execution evidence is not the complete ${scope} scope`);
+  if (!sameArtifactIdentity(evidence.artifactIdentity, artifact)) failures.push('execution evidence does not match the current artifact manifests');
   return failures;
 }
 
 export {
   EVIDENCE_RELATIVE_PATH,
   compareEvidenceToBaseline,
+  currentArtifactIdentity,
   currentBaseline,
   evidencePath,
-  readExecutionEvidence
+  readExecutionEvidence,
+  sameArtifactIdentity
 };

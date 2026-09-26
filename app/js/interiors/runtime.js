@@ -81,6 +81,7 @@ export function sampleInteriorWalkSurface(x, z, currentY, deps) {
     if (surface.kind === "polygon") {
       if (!Array.isArray(surface.pts) || surface.pts.length < 3) continue;
       if (!deps.pointInPolygonSafe(x, z, surface.pts)) continue;
+      if(surface.holes?.some(r=>deps.pointInPolygonSafe(x,z,r)))continue;
       consider({
         y: surface.y,
         source: "interior",
@@ -129,6 +130,7 @@ function applyInteriorSceneState(active, sceneState) {
   active.partitionCount = sceneState.partitionCount;
   active.layoutKind = sceneState.layoutKind;
   active.floorPlan = sceneState.floorPlan;
+  active.authoredCeilings = sceneState.authoredCeilings;
   active.floorId = sceneState.floorId;
   active.floorLabel = sceneState.floorLabel;
   active.floorBaseY = sceneState.floorBaseY;
@@ -253,6 +255,11 @@ function openElevatorFloorPicker(active, deps) {
 function refreshActiveFloorFromHeight(active, walker, deps) {
   if (!active?.floorPlan || active.floorPlan.floorCount <= 1 || active.floorTransitionPending) return;
   const feetY = walker.y - (appCtx.Walk?.CFG?.eyeHeight || 1.7);
+  if(active.floorPlan.authored){
+    const nearest=active.floorPlan.floors.reduce((best,f,i)=>Math.abs(active.floorBaseY+f.elevation-feetY)<Math.abs(active.floorBaseY+active.floorPlan.floors[best].elevation-feetY)?i:best,0);
+    if(Math.abs(active.floorBaseY+active.floorPlan.floors[nearest].elevation-feetY)<.45){active.activeLevel=nearest;active.floorId=active.floorPlan.floors[nearest].id;active.floorLabel=active.floorPlan.floors[nearest].label;}
+    return;
+  }
   const relative = (feetY - active.floorBaseY) / active.floorPlan.storyHeight;
   const nearestLevel = Math.max(0, Math.min(active.floorPlan.floorCount - 1, Math.round(relative)));
   const targetFloorY = active.floorBaseY + nearestLevel * active.floorPlan.storyHeight;
@@ -378,7 +385,9 @@ export async function enterInteriorForSupport(support, deps) {
   }
 
   const ownedHome = deps.findOwnedHomeForInteriorSupport?.(support) || null;
-  const sceneState = deps.buildInteriorScene(definition, { curatedHome: !!ownedHome });
+  let sceneState;
+  try{sceneState=deps.buildInteriorScene(definition,{curatedHome:!!ownedHome});}
+  catch(error){setTransientHint(`Interior not ready: ${error.message}`,deps.INTERIOR_NOTICE_MS,deps);return false;}
   appCtx.scene.add(sceneState.group);
   appCtx.replaceWorldCollection('dynamicBuildingColliders', sceneState.dynamicColliders.slice());
 
@@ -395,6 +404,7 @@ export async function enterInteriorForSupport(support, deps) {
 
   const walker = appCtx.Walk.state.walker;
   const outsideState = {
+    ...(sceneState.mode==='authored'?{cameraNear:appCtx.camera?.near}:{}),
     x: deps.finiteNumber(walker.x, 0),
     z: deps.finiteNumber(walker.z, 0),
     y: deps.finiteNumber(walker.y, 0),
@@ -407,7 +417,7 @@ export async function enterInteriorForSupport(support, deps) {
   walker.x = sceneState.entryPoint.x;
   walker.z = sceneState.entryPoint.z;
   walker.y = sceneState.entryPoint.y;
-  const entryYaw = Math.atan2(sceneState.center.x - walker.x, sceneState.center.z - walker.z);
+  const entryYaw = Number.isFinite(sceneState.entryYaw) ? sceneState.entryYaw : Math.atan2(sceneState.center.x - walker.x, sceneState.center.z - walker.z);
   walker.angle = entryYaw;
   walker.yaw = entryYaw;
   walker.pitch = 0;
@@ -426,6 +436,7 @@ export async function enterInteriorForSupport(support, deps) {
   }
 
   const entryHeight = sceneState.entryPoint.y;
+  if(sceneState.mode==='authored'&&appCtx.camera){appCtx.camera.near=.04;appCtx.camera.updateProjectionMatrix();}
   appCtx.activeInterior = {
     key,
     label: definition.label,
@@ -475,6 +486,7 @@ export async function enterInteriorForSupport(support, deps) {
 
 export function clearActiveInterior(options = {}, deps) {
   const active = appCtx.activeInterior;
+  if(Number.isFinite(active?.outsideState?.cameraNear)&&appCtx.camera){appCtx.camera.near=active.outsideState.cameraNear;appCtx.camera.updateProjectionMatrix();}
   if (active?.environmentKind === 'expedition-ship' && options.shipInternal !== true) {
     return appCtx.exitExpeditionShipInterior?.() === true;
   }
@@ -597,9 +609,8 @@ function pickNearbyBuildingCandidate(force = false, deps) {
   const candidate = pickNearbyEnterableBuildingSupport(walker.x, walker.z, {
     radius: deps.INTERIOR_ENTRY_RADIUS,
     allowSynthetic: true,
-    // World entry is a door interaction, not a building-footprint proximity
-    // test. Buildings without a published exterior entrance remain available
-    // through property/place planning, but do not shout an ambient E prompt.
+    // Generated buildings use their visible door. Loaded reviewed facades also
+    // allow a nearby-building action because photos can hide that generated door.
     requireExteriorEntrance: true,
     actorBaseY: Number.isFinite(walker.y) ?
       walker.y - (appCtx.Walk?.CFG?.eyeHeight || 1.7) :
@@ -618,8 +629,7 @@ function pickNearbyBuildingCandidate(force = false, deps) {
 async function enterNearbyBuilding(deps, resolvedCandidate = null) {
   const candidate = resolvedCandidate || pickNearbyBuildingCandidate(true, deps);
   if (!candidate?.support?.enterable) return false;
-  await enterInteriorForSupport(candidate.support, deps);
-  return true;
+  return await enterInteriorForSupport(candidate.support, deps);
 }
 
 function ensureExteriorContextInteraction(deps) {

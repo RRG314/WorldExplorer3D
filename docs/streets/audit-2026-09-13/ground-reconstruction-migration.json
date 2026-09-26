@@ -1,0 +1,310 @@
+{
+  "mode": "write",
+  "method": "worldexplorer-pmf-boundary-reconstruction-v3",
+  "artifacts": [
+    {
+      "artifactId": "amazon_custom-ground",
+      "samples": 6724,
+      "changed": 228,
+      "maximumChangeMeters": 15.611993924466276,
+      "iterations": 30,
+      "residualMeters": 0.00000865829419893771
+    },
+    {
+      "artifactId": "antarctica-ground",
+      "samples": 6400,
+      "changed": 53,
+      "maximumChangeMeters": 27.77221107774642,
+      "iterations": 32,
+      "residualMeters": 0.000006762990636843824
+    },
+    {
+      "artifactId": "chapel_hill_custom-ground",
+      "samples": 6724,
+      "changed": 337,
+      "maximumChangeMeters": 26.62543085700051,
+      "iterations": 22,
+      "residualMeters": 0.000009556340444305533
+    },
+    {
+      "artifactId": "chicago-ground",
+      "samples": 6724,
+      "changed": 244,
+      "maximumChangeMeters": 60.12449750335966,
+      "iterations": 26,
+      "residualMeters": 0.000008697121472778235
+    },
+    {
+      "artifactId": "dead-sea-ground",
+      "samples": 6400,
+      "changed": 0,
+      "maximumChangeMeters": 0,
+      "iterations": 1,
+      "residualMeters": 0
+    },
+    {
+      "artifactId": "dubai-ground",
+      "samples": 6724,
+      "changed": 51,
+      "maximumChangeMeters": 12.957015287107009,
+      "iterations": 21,
+      "residualMeters": 0.000009628343118350813
+    },
+    {
+      "artifactId": "dubai-desert-ground",
+      "samples": 6320,
+      "changed": 0,
+      "maximumChangeMeters": 0,
+      "iterations": 1,
+      "residualMeters": 0
+    },
+    {
+      "artifactId": "everglades_custom-ground",
+      "samples": 6724,
+      "changed": 3,
+      "maximumChangeMeters": 3.98076217337821,
+      "iterations": 11,
+      "residualMeters": 0.000005962120255276204
+    },
+    {
+      "artifactId": "four-tile-corner-ground",
+      "samples": 6241,
+      "changed": 316,
+      "maximumChangeMeters": 77.18038055125407,
+      "iterations": 38,
+      "residualMeters": 0.0000068448384809016716
+    },
+    {
+      "artifactId": "golden-gate-ground",
+      "samples": 6400,
+      "changed": 228,
+      "maximumChangeMeters": 69.32704063471209,
+      "iterations": 34,
+      "residualMeters": 0.000006652468130141642
+    },
+    {
+      "artifactId": "great_pyramids_custom-ground",
+      "samples": 6724,
+      "changed": 212,
+      "maximumChangeMeters": 23.156569273295815,
+      "iterations": 43,
+      "residualMeters": 0.00000799618786118117
+    },
+    {
+      "artifactId": "great_wall_custom-ground",
+      "samples": 6724,
+      "changed": 750,
+      "maximumChangeMeters": 73.1341115928567,
+      "iterations": 31,
+      "residualMeters": 0.000008427640636909928
+    },
+    {
+      "artifactId": "hollywood-ground",
+      "samples": 6724,
+      "changed": 237,
+      "maximumChangeMeters": 61.93453174812123,
+      "iterations": 27,
+      "residualMeters": 0.000007696420993852371
+    },
+    {
+      "artifactId": "iowa_farmland_custom-ground",
+      "samples": 6724,
+      "changed": 16,
+      "maximumChangeMeters": 9.381652882401738,
+      "iterations": 16,
+      "residualMeters": 0.000007328639469506015
+    },
+    {
+      "artifactId": "lake_tahoe_custom-ground",
+      "samples": 6724,
+      "changed": 0,
+      "maximumChangeMeters": 0,
+      "iterations": 1,
+      "residualMeters": 0
+    },
+    {
+      "artifactId": "lasvegas-ground",
+      "samples": 6724,
+      "changed": 19,
+      "maximumChangeMeters": 7.334569109506447,
+      "iterations": 12,
+      "residualMeters": 0.000003902079015460913
+    },
+    {
+      "artifactId": "lhasa-plateau-ground",
+      "samples": 6400,
+      "changed": 137,
+      "maximumChangeMeters": 72.79733632358284,
+      "iterations": 25,
+      "residualMeters": 0.000007216190169856418
+    },
+    {
+      "artifactId": "london-ground",
+      "samples": 6724,
+      "changed": 191,
+      "maximumChangeMeters": 16.743777640841717,
+      "iterations": 26,
+      "residualMeters": 0.000006766482139042296
+    },
+    {
+      "artifactId": "losangeles-ground",
+      "samples": 6724,
+      "changed": 268,
+      "maximumChangeMeters": 29.471119779766383,
+      "iterations": 45,
+      "residualMeters": 0.000008022668083640383
+    },
+    {
+      "artifactId": "miami-ground",
+      "samples": 6724,
+      "changed": 46,
+      "maximumChangeMeters": 13.107362168108462,
+      "iterations": 16,
+      "residualMeters": 0.000007274572798365853
+    },
+    {
+      "artifactId": "miami-beach-ground",
+      "samples": 6724,
+      "changed": 14,
+      "maximumChangeMeters": 6.309971848339941,
+      "iterations": 17,
+      "residualMeters": 0.000008253358220855489
+    },
+    {
+      "artifactId": "monaco-ground",
+      "samples": 6400,
+      "changed": 232,
+      "maximumChangeMeters": 60.6717756505808,
+      "iterations": 54,
+      "residualMeters": 0.000007822121347089706
+    },
+    {
+      "artifactId": "nairobi_custom-ground",
+      "samples": 6724,
+      "changed": 141,
+      "maximumChangeMeters": 24.44773845399618,
+      "iterations": 21,
+      "residualMeters": 0.000009341557188236038
+    },
+    {
+      "artifactId": "nurburgring-ground",
+      "samples": 6724,
+      "changed": 440,
+      "maximumChangeMeters": 49.41606949728197,
+      "iterations": 38,
+      "residualMeters": 0.00000764226967930881
+    },
+    {
+      "artifactId": "panama_canal_custom-ground",
+      "samples": 6724,
+      "changed": 390,
+      "maximumChangeMeters": 51.574821303672735,
+      "iterations": 31,
+      "residualMeters": 0.000009015206686058264
+    },
+    {
+      "artifactId": "paris-ground",
+      "samples": 6724,
+      "changed": 323,
+      "maximumChangeMeters": 21.1498410142138,
+      "iterations": 25,
+      "residualMeters": 0.000009718901971211835
+    },
+    {
+      "artifactId": "pregerson-interchange-ground",
+      "samples": 6400,
+      "changed": 25,
+      "maximumChangeMeters": 10.937702357167453,
+      "iterations": 22,
+      "residualMeters": 0.000007042095127474113
+    },
+    {
+      "artifactId": "sahara_custom-ground",
+      "samples": 6724,
+      "changed": 75,
+      "maximumChangeMeters": 25.91238243404382,
+      "iterations": 19,
+      "residualMeters": 0.000005300054453982739
+    },
+    {
+      "artifactId": "sanfrancisco-ground",
+      "samples": 6724,
+      "changed": 304,
+      "maximumChangeMeters": 39.06699803216864,
+      "iterations": 30,
+      "residualMeters": 0.000007405542447713742
+    },
+    {
+      "artifactId": "saopaulo_custom-ground",
+      "samples": 6724,
+      "changed": 248,
+      "maximumChangeMeters": 25.59328283648165,
+      "iterations": 33,
+      "residualMeters": 0.000008709698249731446
+    },
+    {
+      "artifactId": "seattle-ground",
+      "samples": 6724,
+      "changed": 135,
+      "maximumChangeMeters": 27.204372011202103,
+      "iterations": 56,
+      "residualMeters": 0.000009345534579097148
+    },
+    {
+      "artifactId": "shenandoah_custom-ground",
+      "samples": 6724,
+      "changed": 520,
+      "maximumChangeMeters": 32.227943115065045,
+      "iterations": 38,
+      "residualMeters": 0.00000764226967930881
+    },
+    {
+      "artifactId": "svalbard-ground",
+      "samples": 6400,
+      "changed": 0,
+      "maximumChangeMeters": 0,
+      "iterations": 1,
+      "residualMeters": 0
+    },
+    {
+      "artifactId": "swiss_alps_custom-ground",
+      "samples": 6724,
+      "changed": 260,
+      "maximumChangeMeters": 79.76240284451796,
+      "iterations": 28,
+      "residualMeters": 0.000006086552275519352
+    },
+    {
+      "artifactId": "swiss-alps-ground",
+      "samples": 6320,
+      "changed": 363,
+      "maximumChangeMeters": 79.2244432342934,
+      "iterations": 49,
+      "residualMeters": 0.000009105880735660321
+    },
+    {
+      "artifactId": "sydney_custom-ground",
+      "samples": 6724,
+      "changed": 577,
+      "maximumChangeMeters": 48.04510738152335,
+      "iterations": 38,
+      "residualMeters": 0.000008606941847233429
+    },
+    {
+      "artifactId": "tokyo-ground",
+      "samples": 6724,
+      "changed": 37,
+      "maximumChangeMeters": 10.800085413817243,
+      "iterations": 15,
+      "residualMeters": 0.00000450021565256975
+    },
+    {
+      "artifactId": "tokyo_shinjuku_custom-ground",
+      "samples": 6724,
+      "changed": 170,
+      "maximumChangeMeters": 25.02617885282516,
+      "iterations": 25,
+      "residualMeters": 0.00000818907864186258
+    }
+  ]
+}

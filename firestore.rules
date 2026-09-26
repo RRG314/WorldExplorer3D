@@ -647,12 +647,6 @@ service cloud.firestore {
           (request.resource.data.joinCode is string && request.resource.data.joinCode == roomData(roomId).code));
     }
 
-    function canJoinByCode(roomId) {
-      return roomExists(roomId) &&
-        request.resource.data.joinCode is string &&
-        request.resource.data.joinCode == roomData(roomId).code;
-    }
-
     function respectsPresenceWriteThrottle() {
       return resource == null ||
         !(resource.data.lastSeenAt is timestamp) ||
@@ -791,14 +785,12 @@ service cloud.firestore {
         (!('roomCreateCount' in request.resource.data) ||
           (
             request.resource.data.roomCreateCount is int &&
-            request.resource.data.roomCreateCount >= 0 &&
-            request.resource.data.roomCreateCount <= 10000
+            request.resource.data.roomCreateCount == 0
           )) &&
         (!('roomCreateLimit' in request.resource.data) ||
           (
             request.resource.data.roomCreateLimit is int &&
-            request.resource.data.roomCreateLimit >= 0 &&
-            request.resource.data.roomCreateLimit <= 10000
+            request.resource.data.roomCreateLimit == planRoomCreateLimit('free')
           )) &&
         request.resource.data.createdAt is timestamp &&
         request.resource.data.updatedAt is timestamp;
@@ -2085,22 +2077,16 @@ service cloud.firestore {
       allow delete: if isSignedIn() && isRoomOwner(roomId);
 
       match /players/{uid} {
-        // A signed-in invite holder must be able to count room occupants before
-        // creating membership. The unlisted room code remains the discovery key.
-        allow read: if isMultiplayerEntitled() && roomExists(roomId);
-        allow create: if isMultiplayerEntitled() &&
-          isSelf(uid) &&
-          roomExists(roomId) &&
-          validPlayerDoc(roomId, uid) &&
-          (
-            isRoomOwner(roomId) ||
-            roomData(roomId).visibility == 'public' ||
-            canJoinByCode(roomId)
-          );
+        // Capacity is checked by the server; private rosters stay member-only.
+        allow read: if isMultiplayerEntitled() && canReadRoom(roomId);
+        // Admission and expired-lease renewal are server transactions.
+        allow create: if false;
         allow update: if isMultiplayerEntitled() &&
           isSelf(uid) &&
           isRoomMember(roomId) &&
           validPlayerDoc(roomId, uid) &&
+          resource.data.expiresAt > request.time &&
+          request.resource.data.expiresAt <= request.time + duration.value(120, 's') &&
           request.resource.data.role == resource.data.role &&
           request.resource.data.joinedAt == resource.data.joinedAt &&
           respectsPresenceWriteThrottle();

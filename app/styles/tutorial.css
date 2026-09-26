@@ -53,10 +53,16 @@ body.game-panel-layer-open #currentJourneyCard,
 body.game-activity-layer-open #currentJourneyCard,
 body:has(#largeMap.show) #currentJourneyCard{display:none!important}
 body:has(#universeNavigator:not([hidden])) #currentJourneyCard{display:none!important}
-body:has(#urbanVehiclePrompt.show) #tutorialHintCard,
-body:has(#interiorPrompt.show) #tutorialHintCard,
-body:has(#boatPrompt.show) #tutorialHintCard,
-body:has(#discoveryContextPrompt.show) #tutorialHintCard{display:none!important}
+body:has(#urbanVehiclePrompt.show) #tutorialHintCard:not([data-tutorial-stage="move"]),
+body:has(#interiorPrompt.show) #tutorialHintCard:not([data-tutorial-stage="move"]),
+body:has(#boatPrompt.show) #tutorialHintCard:not([data-tutorial-stage="move"]),
+body:has(#discoveryContextPrompt.show) #tutorialHintCard:not([data-tutorial-stage="move"]){display:none!important}
+/* A new player must see how to move before nearby ambient actions take over.
+   Dismissing guidance or advancing to interaction restores normal priority. */
+body:has(#tutorialHintCard[data-tutorial-stage="move"]:not([hidden])) #urbanVehiclePrompt,
+body:has(#tutorialHintCard[data-tutorial-stage="move"]:not([hidden])) #interiorPrompt,
+body:has(#tutorialHintCard[data-tutorial-stage="move"]:not([hidden])) #boatPrompt,
+body:has(#tutorialHintCard[data-tutorial-stage="move"]:not([hidden])) #discoveryContextPrompt{display:none!important}
 body:has(#controlsTab.bar-open) #tutorialHintCard{display:none!important}
 @media(max-width:700px){
   .tutorial-card{top:auto;right:max(9px,env(safe-area-inset-right));bottom:max(330px,calc(env(safe-area-inset-bottom) + 322px));width:min(330px,calc(100vw - 18px));max-height:calc(100dvh - 360px);overflow:auto;padding:11px}

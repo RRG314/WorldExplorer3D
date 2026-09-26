@@ -1,4 +1,5 @@
-const SHIP_DECK_BOUNDS = Object.freeze({ minX: -13, maxX: 13, minZ: -36, maxZ: 36 });
+import {compileRingDecks, templatePoint, ring} from './ship-ring-plan.js';
+const SHIP_DECK_BOUNDS = Object.freeze({ minX: -39, maxX: 39, minZ: -39, maxZ: 39 });
 
 function freezeRoom(room) { return Object.freeze({ ...room }); }
 function freezeStation(station) { return Object.freeze({ radius: 2.15, ...station }); }
@@ -10,7 +11,7 @@ function deck(id, label, shortLabel, rooms, stations) {
   });
 }
 
-const SHIP_DECKS = Object.freeze([
+const ROOM_KIT_TEMPLATES = Object.freeze([
   deck('command', 'Deck 1 · Command & Science', 'Command', [
     { id: 'bridge', label: 'Bridge', side: 'full', minX: -12.4, maxX: 12.4, minZ: 24, maxZ: 35, systemId: 'navigation' },
     { id: 'navigation-cartography', label: 'Navigation & Cartography', side: 'port', minX: -12.4, maxX: -2.7, minZ: 9, maxZ: 22, systemId: 'navigation' },
@@ -76,22 +77,17 @@ const SHIP_DECKS = Object.freeze([
   ])
 ]);
 
+const SHIP_DECKS = Object.freeze(compileRingDecks(ROOM_KIT_TEMPLATES));
+
 const SHIP_ROOMS = Object.freeze(SHIP_DECKS.flatMap((entry) => entry.rooms));
 const SHIP_STATIONS = Object.freeze(SHIP_DECKS.flatMap((entry) => [
   ...entry.stations,
   freezeStation({ id: `deck-lift:${entry.id}`, roomId: null, deckId: entry.id, label: 'Use deck lift', x: 0, z: 0, radius: 2 })
 ]));
-const SHIP_DOORS = Object.freeze(SHIP_ROOMS.map((room) => {
-  const sideDoor = room.side === 'port' || room.side === 'starboard';
-  const fore = room.side === 'full' && room.minZ >= 23;
-  return Object.freeze({
-    id: `door:${room.id}`, deckId: room.deckId, roomId: room.id,
-    label: `${room.label} pressure door`,
-    x: sideDoor ? (room.side === 'port' ? -2.7 : 2.7) : 0,
-    z: sideDoor ? (room.minZ + room.maxZ) * 0.5 : fore ? room.minZ : room.maxZ,
-    orientation: sideDoor ? 'side' : 'cross', radius: 1.8
-  });
-}));
+const SHIP_DOORS = Object.freeze(SHIP_ROOMS.map(room=>Object.freeze({
+ id:`door:${room.id}`,deckId:room.deckId,roomId:room.id,label:`${room.label} pressure door`,
+ ...room.door,yaw:room.angle,orientation:'radial',radius:2
+})));
 const SHIP_CREW_POSTS = Object.freeze([
   Object.freeze({ crewId: 'crew-nav', deckId: 'command', roomId: 'bridge', x: -4.5, z: 29.5, yaw: Math.PI }),
   Object.freeze({ crewId: 'crew-flight', deckId: 'command', roomId: 'bridge', x: 4.5, z: 29.5, yaw: Math.PI }),
@@ -100,7 +96,7 @@ const SHIP_CREW_POSTS = Object.freeze([
   Object.freeze({ crewId: 'crew-life', deckId: 'habitat', roomId: 'life-support', x: 8.5, z: -12, yaw: -Math.PI / 2 }),
   Object.freeze({ crewId: 'crew-systems', deckId: 'engineering', roomId: 'cargo-fabrication', x: -8.5, z: 3, yaw: Math.PI / 2 }),
   Object.freeze({ crewId: 'crew-eng', deckId: 'engineering', roomId: 'engineering', x: -4.2, z: 30, yaw: 0 })
-]);
+].map(post=>{const room=SHIP_ROOMS.find(r=>r.id===post.roomId);return Object.freeze({...post,...templatePoint(room,post),yaw:post.yaw+room.kitYaw});}));
 
 function getShipDeck(deckId) { return SHIP_DECKS.find((entry) => entry.id === deckId) || null; }
 function getShipRoom(roomId) { return SHIP_ROOMS.find((room) => room.id === roomId) || null; }
@@ -127,3 +123,13 @@ function validateShipLayout() {
 }
 
 export { getShipDeck, getShipDeckForRoom, getShipRoom, SHIP_CREW_POSTS, SHIP_DECK_BOUNDS, SHIP_DECKS, SHIP_DOORS, SHIP_ROOMS, SHIP_STATIONS, validateShipLayout };
+
+// Room bounds describe usable floor space, not bulkhead endpoints. Extend each
+// corridor wall to its enclosing transverse bulkheads so corners meet exactly.
+export function roomBulkheadSpan(room) {
+  const boundaries = [-36, -22, -7, 8, 24, 36];
+  const center = (room.minZ + room.maxZ) / 2;
+  const upper = boundaries.findIndex((z) => z > center);
+  if (upper < 1) throw new RangeError(`Room outside hull: ${room.id}`);
+  return { minZ: boundaries[upper - 1], maxZ: boundaries[upper] };
+}

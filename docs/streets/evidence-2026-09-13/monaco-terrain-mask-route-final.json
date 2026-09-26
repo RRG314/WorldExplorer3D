@@ -1,0 +1,273 @@
+{
+  "tiles": 103,
+  "triangles": 362011,
+  "curbTriangles": 83430,
+  "markingTriangles": 2419,
+  "ramps": 0,
+  "workerMs": 1763,
+  "inferredFrontages": 18951,
+  "managedPaths": 190,
+  "residentRoads": 353,
+  "residentBuildings": 724,
+  "roads": 12818,
+  "roadMeshes": 50,
+  "buildings": 8106,
+  "worldLoadSequence": 1,
+  "plannedTiles": 134,
+  "highestRefinement": {
+    "cell": "-6:2",
+    "bounds": {
+      "minX": -384,
+      "maxX": -320,
+      "minZ": 128,
+      "maxZ": 192
+    },
+    "addedTriangles": 11843,
+    "baseTriangles": 562
+  },
+  "terrainRefinementTriangles": 330125,
+  "reusedCells": 73,
+  "drawCalls": 87,
+  "compilerCacheBytes": 14327418,
+  "coverageBounds": {
+    "minX": -448,
+    "maxX": 320,
+    "minZ": -256,
+    "maxZ": 512
+  },
+  "indexBytes": 2687160,
+  "positionBytes": 3552012,
+  "durationMs": 15102,
+  "sourceCoverage": {
+    "scope": "Loaded source network requiring inferred or mapped sidewalks; length within the compilation window, not proof of rendered pavement. Separately tagged sidewalks need mapped path data.",
+    "requiredSidewalkMeters": 185576.0909476838,
+    "withinCompilationWindowMeters": 24403.940473572555,
+    "outsideCompilationWindowMeters": 161172.15047411126,
+    "compilationCoveragePercent": 13.150368858913149,
+    "requiredSegments": 8607,
+    "uncoveredSegments": 7210,
+    "examples": [
+      {
+        "kind": "road-side",
+        "name": "D 2204",
+        "a": {
+          "x": -6828.31260724724,
+          "z": -2812.268145088126
+        },
+        "b": {
+          "x": -6879.473341679509,
+          "z": -2722.3908472606695
+        },
+        "uncoveredMeters": 229.58867577505555
+      },
+      {
+        "kind": "road-side",
+        "name": "D 2204",
+        "a": {
+          "x": -6739.944065955137,
+          "z": -2967.2258321156164
+        },
+        "b": {
+          "x": -6770.950571671664,
+          "z": -2912.9910982831575
+        },
+        "uncoveredMeters": 138.68888771270912
+      },
+      {
+        "kind": "road-side",
+        "name": "Route de Laghet",
+        "a": {
+          "x": -7293.410192995143,
+          "z": -237.83387503470976
+        },
+        "b": {
+          "x": -7276.356614851053,
+          "z": -185.12467707552105
+        },
+        "uncoveredMeters": 122.98647879004118
+      },
+      {
+        "kind": "road-side",
+        "name": "Route de Laghet",
+        "a": {
+          "x": -7276.356614851053,
+          "z": -185.12467707552105
+        },
+        "b": {
+          "x": -7265.504337850269,
+          "z": -123.11326185994176
+        },
+        "uncoveredMeters": 139.75755234809583
+      },
+      {
+        "kind": "road-side",
+        "name": "Route de Laghet",
+        "a": {
+          "x": -7265.504337850269,
+          "z": -123.11326185994176
+        },
+        "b": {
+          "x": -7260.853361992789,
+          "z": -106.06001007857913
+        },
+        "uncoveredMeters": 39.240970982870024
+      },
+      {
+        "kind": "road-side",
+        "name": "Route de Laghet",
+        "a": {
+          "x": -7260.853361992789,
+          "z": -106.06001007857913
+        },
+        "b": {
+          "x": -7237.598482705394,
+          "z": -70.40305394383495
+        },
+        "uncoveredMeters": 94.50547904454488
+      },
+      {
+        "kind": "road-side",
+        "name": "La Provençale",
+        "a": {
+          "x": -7263.954012564443,
+          "z": -120.01267423755735
+        },
+        "b": {
+          "x": -7260.853361992789,
+          "z": -106.06001007857913
+        },
+        "uncoveredMeters": 31.730539376645204
+      },
+      {
+        "kind": "road-side",
+        "name": "La Provençale",
+        "a": {
+          "x": -7260.853361992789,
+          "z": -106.06001007857913
+        },
+        "b": {
+          "x": -7236.048157419568,
+          "z": -67.3024390252408
+        },
+        "uncoveredMeters": 102.15492254041317
+      }
+    ],
+    "status": "incomplete"
+  },
+  "position": {
+    "x": -295.56177682445923,
+    "y": 113.29214892702072,
+    "z": 424.19690790303656
+  },
+  "roadRendered": null,
+  "mappedAreaRendered": null,
+  "contact": {
+    "source": "terrain",
+    "y": 13.11976186345148
+  },
+  "indexedRoad": null,
+  "terrain": 13.11976186345148,
+  "pavement": 13.384388736737472,
+  "nearbyBuildings": [
+    {
+      "name": "villa Medecin",
+      "pts": [
+        {
+          "x": -287.8778076673436,
+          "z": 404.78491376489956
+        },
+        {
+          "x": -285.55231973860407,
+          "z": 422.22727767438073
+        },
+        {
+          "x": -300.66799127541094,
+          "z": 424.16532124747164
+        },
+        {
+          "x": -302.99347920415045,
+          "z": 406.7229516905968
+        }
+      ],
+      "distance": 5.106312146345722
+    },
+    {
+      "name": "",
+      "pts": [
+        {
+          "x": -303.76864184706363,
+          "z": 409.82381367626886
+        },
+        {
+          "x": -302.60589788269385,
+          "z": 421.06445183236474
+        },
+        {
+          "x": -315.0085001693046,
+          "z": 422.22727767438073
+        },
+        {
+          "x": -316.17124413367435,
+          "z": 411.37424527022404
+        }
+      ],
+      "distance": 7.7092102395610675
+    },
+    {
+      "name": "",
+      "pts": [
+        {
+          "x": -278.9634372738421,
+          "z": 446.64667249918466
+        },
+        {
+          "x": -280.1261812382118,
+          "z": 438.1192534694378
+        },
+        {
+          "x": -273.1497174519933,
+          "z": 436.9564245408242
+        },
+        {
+          "x": -271.9869734876235,
+          "z": 445.48384191358537
+        }
+      ],
+      "distance": 20.78675821701097
+    }
+  ],
+  "road": {
+    "name": "Rue des Princes",
+    "type": "residential",
+    "width": 5,
+    "tags": {
+      "highway": "residential",
+      "name": "Rue des Princes",
+      "oneway": "yes",
+      "surface": "paving_stones"
+    },
+    "section": {
+      "lanes": 1,
+      "lanesSource": "fallback:road-class",
+      "widthMeters": 5,
+      "widthSource": "fallback:road-class",
+      "inferredLanes": true,
+      "inferredWidth": true,
+      "parking": {
+        "left": {
+          "widthMeters": 0,
+          "source": "not-on-carriageway"
+        },
+        "right": {
+          "widthMeters": 0,
+          "source": "not-on-carriageway"
+        }
+      },
+      "placement": {
+        "raw": "",
+        "centerlineOffsetMeters": 0,
+        "status": "absent"
+      }
+    }
+  }
+}

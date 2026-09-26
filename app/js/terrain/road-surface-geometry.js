@@ -109,107 +109,16 @@ function appendTurnJoin({
   };
 }
 
-function appendSolidAtGradeRoadGeometry({
-  feature,
-  points,
-  halfWidth,
-  widthSamplesMeters = null,
-  sampleTerrainY,
-  surfaceBias = 0.18,
-  targetVerts = [],
-  targetIndices = []
-} = {}) {
-  if (
-    !feature ||
-    !Array.isArray(points) ||
-    points.length < 2 ||
-    !(Number(halfWidth) > 0) ||
-    typeof sampleTerrainY !== 'function'
-  ) {
-    return Object.freeze({
-      segmentQuads: 0,
-      turnJoins: 0,
-      surfaceTriangles: 0,
-      foldedTriangles: 0,
-      degenerateTriangles: 0
-    });
+export function roadTurnFootprint({ previous, point, next, leftDistance, rightDistance }) {
+  const incoming = segmentFrame(previous, point), outgoing = segmentFrame(point, next);
+  if (!incoming || !outgoing) return [];
+  const targetVerts = [], targetIndices = [], geometryPoints = [];
+  appendTurnJoin({ point, incoming, outgoing, leftDistance, rightDistance,
+    sampleTerrainY: () => 0, surfaceBias: 0, targetVerts, targetIndices, geometryPoints });
+  const polygons = [];
+  for (let i=0;i<targetIndices.length;i+=3) {
+    const ring = targetIndices.slice(i,i+3).map(j=>[targetVerts[j*3],targetVerts[j*3+2]]);
+    polygons.push([ring.concat([ring[0]])]);
   }
-
-  const offset = Number(
-    feature?.transportRecord?.crossSection?.placement?.centerlineOffsetMeters
-  ) || 0;
-  const widthAt = (index) => {
-    const sampledWidth = Number(widthSamplesMeters?.[index]);
-    return Number.isFinite(sampledWidth) && sampledWidth > 0
-      ? sampledWidth
-      : Number(halfWidth) * 2;
-  };
-  const geometryPoints = [];
-  const frames = [];
-  let segmentQuads = 0;
-  let surfaceTriangles = 0;
-  let foldedTriangles = 0;
-  let degenerateTriangles = 0;
-  let turnJoins = 0;
-
-  for (let index = 0; index < points.length - 1; index += 1) {
-    const start = points[index];
-    const end = points[index + 1];
-    const frame = segmentFrame(start, end);
-    frames[index] = frame;
-    if (!frame) continue;
-    const startHalfWidth = widthAt(index) * 0.5;
-    const endHalfWidth = widthAt(index + 1) * 0.5;
-    const startLeftDistance = Math.max(0.3, startHalfWidth + offset);
-    const startRightDistance = Math.max(0.3, startHalfWidth - offset);
-    const endLeftDistance = Math.max(0.3, endHalfWidth + offset);
-    const endRightDistance = Math.max(0.3, endHalfWidth - offset);
-    const indices = [
-      appendPoint(targetVerts, geometryPoints, surfacePoint(start, frame.normalX * startLeftDistance, frame.normalZ * startLeftDistance, sampleTerrainY, surfaceBias)),
-      appendPoint(targetVerts, geometryPoints, surfacePoint(start, -frame.normalX * startRightDistance, -frame.normalZ * startRightDistance, sampleTerrainY, surfaceBias)),
-      appendPoint(targetVerts, geometryPoints, surfacePoint(end, frame.normalX * endLeftDistance, frame.normalZ * endLeftDistance, sampleTerrainY, surfaceBias)),
-      appendPoint(targetVerts, geometryPoints, surfacePoint(end, -frame.normalX * endRightDistance, -frame.normalZ * endRightDistance, sampleTerrainY, surfaceBias))
-    ];
-    const firstArea = upwardTriangle(targetIndices, indices[0], indices[2], indices[1], geometryPoints);
-    const secondArea = upwardTriangle(targetIndices, indices[1], indices[2], indices[3], geometryPoints);
-    if (firstArea <= 1e-7) degenerateTriangles += 1;
-    if (secondArea <= 1e-7) degenerateTriangles += 1;
-    // Independent segment rectangles cannot geometrically fold. Keep this
-    // explicit diagnostic so a future index/order rewrite cannot hide one.
-    if (firstArea < 0 || secondArea < 0) foldedTriangles += 1;
-    segmentQuads += 1;
-    surfaceTriangles += 2;
-  }
-
-  for (let index = 1; index < points.length - 1; index += 1) {
-    const incoming = frames[index - 1];
-    const outgoing = frames[index];
-    if (!incoming || !outgoing) continue;
-    const pointHalfWidth = widthAt(index) * 0.5;
-    const join = appendTurnJoin({
-      point: points[index],
-      incoming,
-      outgoing,
-      leftDistance: Math.max(0.3, pointHalfWidth + offset),
-      rightDistance: Math.max(0.3, pointHalfWidth - offset),
-      sampleTerrainY,
-      surfaceBias,
-      targetVerts,
-      targetIndices,
-      geometryPoints
-    });
-    turnJoins += join.joins;
-    surfaceTriangles += join.triangles;
-    degenerateTriangles += join.degenerateTriangles;
-  }
-
-  return Object.freeze({
-    segmentQuads,
-    turnJoins,
-    surfaceTriangles,
-    foldedTriangles,
-    degenerateTriangles
-  });
+  return polygons;
 }
-
-export { appendSolidAtGradeRoadGeometry };

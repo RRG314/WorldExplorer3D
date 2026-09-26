@@ -1,0 +1,57 @@
+{
+  "bounds": {
+    "minX": -2.7678492586880132,
+    "maxX": 60.09756854443244,
+    "minZ": -29.72000000000105,
+    "maxZ": 33.17042937358905
+  },
+  "method": "Triangle centroids in common capture bounds; projected area >= 0.01 world units squared; slope is rise/run magnitude, not signed grade. Width normalization changes road area, so compare shape defects rather than coverage.",
+  "before": {
+    "road": {
+      "triangles": 1198,
+      "worst": {
+        "x": 2.0193461179733276,
+        "z": 5.8303937911987305,
+        "area": 0.07309263607041316,
+        "slope": 0.5756661041755662
+      },
+      "areaAbove50": 0.2192779082112395,
+      "areaAbove30": 132.58324905302263
+    },
+    "sidewalk": {
+      "triangles": 1201,
+      "worst": {
+        "x": 13.96130625406901,
+        "z": 7.268138408660889,
+        "area": 0.028514297912579423,
+        "slope": 0.4957920115920709
+      },
+      "areaAbove50": 0,
+      "areaAbove30": 69.71027187470497
+    }
+  },
+  "after": {
+    "road": {
+      "triangles": 686,
+      "worst": {
+        "x": 40.75214385986328,
+        "z": 30.29057502746582,
+        "area": 1.465698717154737,
+        "slope": 0.33526912356332855
+      },
+      "areaAbove50": 0,
+      "areaAbove30": 9.234936904504536
+    },
+    "sidewalk": {
+      "triangles": 1237,
+      "worst": {
+        "x": 55.039302825927734,
+        "z": 14.115535736083984,
+        "area": 0.012470224093704019,
+        "slope": 0.5819405445976498
+      },
+      "areaAbove50": 0.012470224093704019,
+      "areaAbove30": 13.556790956617078
+    }
+  }
+}

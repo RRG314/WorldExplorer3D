@@ -1,0 +1,346 @@
+{
+  "note": "Heap is browser-reported JavaScript only; geometry bytes exclude textures, GPU allocations and other tabs. Inspect twice to see runtime activity.",
+  "javascriptHeapBytes": 1262758952,
+  "sceneGeometryBytes": 259247053,
+  "rendererResources": {
+    "geometries": 1270,
+    "textures": 780
+  },
+  "gameStarted": true,
+  "worldLoading": false,
+  "pavementBuildActive": false,
+  "deferredWork": {
+    "budgets": {
+      "firstPlayTargetMs": 25000,
+      "frameTargetMs": 16.7,
+      "cooperativeChunkTargetMs": 8,
+      "backgroundIdleTimeoutMs": 1800,
+      "inactiveAuxiliaryRenderers": 0
+    },
+    "firstPlayReady": true,
+    "activeTask": null,
+    "firstPlayDetail": {
+      "environment": "earth",
+      "loadDurationMs": 92817,
+      "publicationSequence": 1
+    },
+    "queued": [],
+    "completed": [
+      "tutorial-runtime",
+      "analytics-runtime",
+      "plane-visual",
+      "earth-ambient-state-1",
+      "earth-star-catalog"
+    ]
+  },
+  "street": {
+    "tiles": 110,
+    "triangles": 381378,
+    "curbTriangles": 89424,
+    "markingTriangles": 2486,
+    "ramps": 0,
+    "workerMs": 2868,
+    "inferredFrontages": 19728,
+    "managedPaths": 199,
+    "residentRoads": 328,
+    "residentBuildings": 803,
+    "roads": 12818,
+    "roadMeshes": 50,
+    "buildings": 8106,
+    "worldLoadSequence": 1,
+    "plannedTiles": 133,
+    "highestRefinement": {
+      "cell": "5:-4",
+      "bounds": {
+        "minX": 320,
+        "maxX": 384,
+        "minZ": -256,
+        "maxZ": -192
+      },
+      "addedTriangles": 16292,
+      "baseTriangles": 1059
+    },
+    "terrainRefinementTriangles": 347851,
+    "drawCalls": 83,
+    "compilerCacheBytes": 11892318,
+    "coverageBounds": {
+      "minX": -384,
+      "maxX": 384,
+      "minZ": -384,
+      "maxZ": 384
+    },
+    "indexBytes": 2839728,
+    "positionBytes": 3762516,
+    "durationMs": 19184,
+    "sourceCoverage": {
+      "scope": "Loaded source network requiring inferred or mapped sidewalks; length within the compilation window, not proof of rendered pavement. Separately tagged sidewalks need mapped path data.",
+      "requiredSidewalkMeters": 185576.0909476838,
+      "withinCompilationWindowMeters": 25615.36105232016,
+      "outsideCompilationWindowMeters": 159960.72989536365,
+      "compilationCoveragePercent": 13.803158004627573,
+      "requiredSegments": 8607,
+      "uncoveredSegments": 6976,
+      "examples": [
+        {
+          "kind": "road-side",
+          "name": "D 2204",
+          "a": {
+            "x": -6828.31260724724,
+            "z": -2812.268145088126
+          },
+          "b": {
+            "x": -6879.473341679509,
+            "z": -2722.3908472606695
+          },
+          "uncoveredMeters": 229.58867577505555
+        },
+        {
+          "kind": "road-side",
+          "name": "D 2204",
+          "a": {
+            "x": -6739.944065955137,
+            "z": -2967.2258321156164
+          },
+          "b": {
+            "x": -6770.950571671664,
+            "z": -2912.9910982831575
+          },
+          "uncoveredMeters": 138.68888771270912
+        },
+        {
+          "kind": "road-side",
+          "name": "Route de Laghet",
+          "a": {
+            "x": -7293.410192995143,
+            "z": -237.83387503470976
+          },
+          "b": {
+            "x": -7276.356614851053,
+            "z": -185.12467707552105
+          },
+          "uncoveredMeters": 122.98647879004118
+        },
+        {
+          "kind": "road-side",
+          "name": "Route de Laghet",
+          "a": {
+            "x": -7276.356614851053,
+            "z": -185.12467707552105
+          },
+          "b": {
+            "x": -7265.504337850269,
+            "z": -123.11326185994176
+          },
+          "uncoveredMeters": 139.75755234809583
+        },
+        {
+          "kind": "road-side",
+          "name": "Route de Laghet",
+          "a": {
+            "x": -7265.504337850269,
+            "z": -123.11326185994176
+          },
+          "b": {
+            "x": -7260.853361992789,
+            "z": -106.06001007857913
+          },
+          "uncoveredMeters": 39.240970982870024
+        },
+        {
+          "kind": "road-side",
+          "name": "Route de Laghet",
+          "a": {
+            "x": -7260.853361992789,
+            "z": -106.06001007857913
+          },
+          "b": {
+            "x": -7237.598482705394,
+            "z": -70.40305394383495
+          },
+          "uncoveredMeters": 94.50547904454488
+        },
+        {
+          "kind": "road-side",
+          "name": "La Provençale",
+          "a": {
+            "x": -7263.954012564443,
+            "z": -120.01267423755735
+          },
+          "b": {
+            "x": -7260.853361992789,
+            "z": -106.06001007857913
+          },
+          "uncoveredMeters": 31.730539376645204
+        },
+        {
+          "kind": "road-side",
+          "name": "La Provençale",
+          "a": {
+            "x": -7260.853361992789,
+            "z": -106.06001007857913
+          },
+          "b": {
+            "x": -7236.048157419568,
+            "z": -67.3024390252408
+          },
+          "uncoveredMeters": 102.15492254041317
+        }
+      ],
+      "status": "incomplete"
+    }
+  },
+  "workSinceLastInspection": [
+    {
+      "id": "core.frame-metrics",
+      "updates": 4947,
+      "lastDurationMs": 0.5
+    },
+    {
+      "id": "core.input",
+      "updates": 4947,
+      "lastDurationMs": 0
+    },
+    {
+      "id": "core.simulation",
+      "updates": 4947,
+      "lastDurationMs": 0.2
+    },
+    {
+      "id": "aviation-runtime:1",
+      "updates": 4947,
+      "lastDurationMs": 0
+    },
+    {
+      "id": "maritime-runtime:1",
+      "updates": 4947,
+      "lastDurationMs": 0.1
+    },
+    {
+      "id": "urban-sandbox:1:interaction",
+      "updates": 4947,
+      "lastDurationMs": 1
+    },
+    {
+      "id": "core.world",
+      "updates": 4947,
+      "lastDurationMs": 0.1
+    },
+    {
+      "id": "reality-capture.nearby",
+      "updates": 4947,
+      "lastDurationMs": 0
+    },
+    {
+      "id": "core.camera",
+      "updates": 4947,
+      "lastDurationMs": 1.8
+    },
+    {
+      "id": "platform.activities",
+      "updates": 4947,
+      "lastDurationMs": 0
+    },
+    {
+      "id": "core.presentation",
+      "updates": 4947,
+      "lastDurationMs": 1.3
+    },
+    {
+      "id": "world-discovery:1:runtime",
+      "updates": 4947,
+      "lastDurationMs": 0.4
+    },
+    {
+      "id": "debug.presentation",
+      "updates": 1595,
+      "lastDurationMs": 0
+    },
+    {
+      "id": "core.renderer",
+      "updates": 4947,
+      "lastDurationMs": 7.4
+    }
+  ],
+  "streetOverview": {
+    "status": "complete",
+    "representation": "terrain material coverage",
+    "completedCells": 1662,
+    "totalCells": 1662,
+    "nonemptyCells": 1211,
+    "coveredSquareWorldUnits": 365513.8980392159,
+    "positionBytes": 0,
+    "retainedBytes": 7018528,
+    "drawCalls": 0,
+    "workerActive": false,
+    "sourceScope": "complete loaded location",
+    "error": null,
+    "sourceCells": 32478,
+    "excludedCells": 30816,
+    "maskResolution": 64,
+    "worldUnitsPerTexel": 1,
+    "materials": 93,
+    "coverageBounds": {
+      "minX": -7360,
+      "maxX": 6656,
+      "minZ": -5952,
+      "maxZ": 3776
+    },
+    "durationMs": 115562
+  },
+  "loadPhases": {
+    "prepareAcceptedGround": 37,
+    "fetchOverpass": 124,
+    "fetchFixedRegionalContext": 1451,
+    "fetchFixedRegionalStructures": 1493,
+    "waitForFixedRegionalGround": 2183,
+    "featureBudgeting": 931,
+    "waitForTransportGround": 0,
+    "buildRoadGeometry": 1332,
+    "buildLanduseGeometry": 99,
+    "batchLanduseGeometry": 5,
+    "buildLinearFeatureData": 418,
+    "buildPoiGeometry": 15,
+    "buildStreetFurniture": 550,
+    "buildBuildingRoadGuards": 3181,
+    "buildBuildingGeometry": 4047,
+    "publishBuildingFacadeEntrances": 452,
+    "publishBuildingExteriorDetails": 31,
+    "batchBuildingGeometry": 906,
+    "publishLocationTerrain": 0,
+    "publishCompiledTransportMeshes": 41101,
+    "refreshTerrainSurfaceProfiles": 1094,
+    "retireGroundFallbackPlaceholder": 0,
+    "buildTraversalNetworks": 327,
+    "spawnPlayer": 1041,
+    "refreshMemoryMarkersForCurrentLocation": 0,
+    "refreshBlockBuilderForCurrentLocation": 0,
+    "refreshEditableWorldPresentation": 0,
+    "publishLocationWorld": 1,
+    "refreshEditableBuildingVisibility": 77,
+    "waitForTerrainSurfaceMaterials": 0
+  },
+  "geometryByLayer": {
+    "roadMeshes": 109832806,
+    "buildingMeshes": 41819568,
+    "landuseMeshes": 576832,
+    "urbanSurfaceMeshes": 12873104,
+    "linearFeatureMeshes": 536076,
+    "vegetationMeshes": 19846608
+  },
+  "quality": {
+    "status": "fail",
+    "failures": [
+      "JavaScript heap exceeds 768 MiB",
+      "first play exceeds 25000 ms",
+      "terrain refinement multiplies pavement triangles by more than 8"
+    ],
+    "pending": [],
+    "refinementMultiplier": 11.37524979866973,
+    "budgets": {
+      "javascriptHeapBytes": 805306368,
+      "pavementPositionBytes": 16777216,
+      "refinementMultiplier": 8
+    },
+    "visualStatus": "Requires camera sweep and recorded city route; performance checks cannot certify appearance."
+  }
+}

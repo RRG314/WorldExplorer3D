@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "targetVersion": "5.2.0",
+  "targetVersion": "5.3.0",
   "publicFiles": ["index.html", "about/index.html", "README.md", "github-pages/index.html", "app/index.html"],
   "allowedStatuses": ["review-required", "source-verified", "candidate-verified", "excluded"],
   "forbiddenPublicPatterns": [
@@ -15,7 +15,7 @@
     {
       "id": "fixed-location-earth",
       "status": "candidate-verified",
-      "source": { "file": "README.md", "pattern": "Choose a location, step into the world" },
+      "source": { "file": "README.md", "pattern": "Choose a location, step into a bounded playable world" },
       "evidenceCommands": ["verify:world", "verify:assembled-locations", "verify:artifact-runtime"]
     },
     {

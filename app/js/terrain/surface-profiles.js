@@ -1,3 +1,4 @@
+import { attachRegionalImagery } from './regional-imagery.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   classifyTerrainSurfaceProfile as classifySharedTerrainSurfaceProfile
@@ -23,6 +24,23 @@ import {
 } from './surface-material-blend.js?v=2';
 import { yieldToMainThread } from '../world/cooperative-scheduling.js?v=1';
 import { scheduleWorldCoverRecovery } from './worldcover-recovery.js';
+import { indexMappedGround } from './mapped-ground-evidence.js';
+
+let detailedGroundCollection = null;
+let detailedGroundCount = -1;
+let detailedGroundOrigin = '';
+let detailedGroundIndex = null;
+function currentDetailedGroundIndex() {
+  const collection = appCtx.landuses || [];
+  const origin = `${appCtx.LOC?.lat}/${appCtx.LOC?.lon}`;
+  if (collection !== detailedGroundCollection || collection.length !== detailedGroundCount || origin !== detailedGroundOrigin) {
+    detailedGroundOrigin = origin;
+    detailedGroundCollection = collection;
+    detailedGroundCount = collection.length;
+    detailedGroundIndex = indexMappedGround(collection);
+  }
+  return detailedGroundIndex;
+}
 
 const SNOW_COLOR_HEX = 0xffffff; const ALPINE_SNOW_COLOR_HEX = 0xe5ebf2;
 const SAND_COLOR_HEX = 0xd7c08a;
@@ -326,7 +344,9 @@ function ensureTerrainSemanticTextureSets(mesh, repeats) {
 
 export function applyTerrainSemanticMaterialBlend(mesh, repeats = 12) {
   const textureSets = ensureTerrainSemanticTextureSets(mesh, repeats);
-  return configureTerrainSurfaceMaterialBlend(mesh, textureSets);
+  const configured = configureTerrainSurfaceMaterialBlend(mesh, textureSets);
+  if (configured) attachRegionalImagery(mesh, appCtx, mesh.material.userData.terrainSurfaceMaterialBlend.uniforms);
+  return configured;
 }
 
 let cachedGroundFallbackMesh = null;
@@ -467,9 +487,13 @@ export function applyMappedSemanticVertexTints(
   const contextZoom = Number(mappedContext?.contextZoom || 0);
   const buckets = mappedContext?.landAreasByTile;
   const spatialBuckets = mappedContext?.landAreaSpatialByTile;
-  if (!geometry || !positions || !buckets?.get || contextZoom <= 0 ||
+  const detailed = currentDetailedGroundIndex();
+  if (!geometry || !positions ||
       typeof appCtx.worldToLatLon !== 'function') return 0;
-  if (options.force !== true && mesh.userData?.mappedSemanticTintContext === mappedContext) {
+  if (options.force !== true && mesh.userData?.mappedSemanticTintContext === mappedContext &&
+      mesh.userData?.mappedDetailedGroundIndex === detailed &&
+      mesh.userData?.mappedSemanticAttributeVersions === [geometry.attributes.color?.version,
+        geometry.attributes.terrainSurfaceMixA?.version, geometry.attributes.terrainSurfaceMixB?.version].join('/')) {
     return Number(mesh.userData?.mappedSemanticTintVertices || 0);
   }
 
@@ -488,6 +512,14 @@ export function applyMappedSemanticVertexTints(
   for (let index = 0; index < positions.count; index += 1) {
     const worldX = positions.getX(index) + Number(mesh.position?.x || 0);
     const worldZ = positions.getZ(index) + Number(mesh.position?.z || 0);
+    const localOwner = detailed.sample(worldX, worldZ);
+    if (localOwner) {
+      setNormalizedTerrainAttribute(colors, index, localOwner.tint);
+      setTerrainSurfaceMaterialMixAt(materialMix, index, localOwner.mode);
+      tintedVertices += 1;
+      continue;
+    }
+    if (!buckets?.get || contextZoom <= 0) continue;
     let geographic;
     let tile;
     if (separableLocalProjection) {
@@ -554,6 +586,9 @@ export function applyMappedSemanticVertexTints(
   }
   mesh.userData.mappedSemanticTintVertices = tintedVertices;
   mesh.userData.mappedSemanticTintContext = mappedContext;
+  mesh.userData.mappedDetailedGroundIndex = detailed;
+  mesh.userData.mappedSemanticAttributeVersions = [geometry.attributes.color?.version,
+    geometry.attributes.terrainSurfaceMixA?.version, geometry.attributes.terrainSurfaceMixB?.version].join('/');
   return tintedVertices;
 }
 
@@ -855,7 +890,9 @@ export function applyTerrainVisualProfile(mesh, profile, repeats = null, options
   const worldCoverOwnsFinalMix = options.queueWorldCover !== false && !!mesh.userData.worldCoverResult;
   if (options.deferSurfaceMaterialMix !== true && !worldCoverOwnsFinalMix) {
     measure('profileMaterialMix', () => applyTerrainProfileSurfaceMaterialMix(mesh, nextMode));
-    measure('mappedSemanticTints', () => applyMappedSemanticVertexTints(mesh));
+    // Profile publication resets the material weights above. A cached polygon
+    // index is reusable, but its previous vertex writes are not.
+    measure('mappedSemanticTints', () => applyMappedSemanticVertexTints(mesh, appCtx.fixedLocationMappedSurfaceContext, { force: true }));
     measure('reliefMaterialMix', () => applyTerrainReliefMaterialMix(mesh));
     measure('semanticMaterialBlend', () => applyTerrainSemanticMaterialBlend(mesh, textureRepeats));
   }

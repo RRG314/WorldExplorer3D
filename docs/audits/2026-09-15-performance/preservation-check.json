@@ -1,0 +1,5 @@
+{
+  "checkedSourceFiles": 1224,
+  "changedSinceAuditStart": [],
+  "scope": "Source/config/test/script files, excludes asset payloads and private configuration outside these tracked source roots. Audit-only additions listed separately by Git."
+}

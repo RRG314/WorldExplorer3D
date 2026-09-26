@@ -2,8 +2,9 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { runLoggedStep } from './run-logged-step.mjs';
-import { currentBaseline, evidencePath } from './execution-evidence.mjs';
+import { currentBaseline, evidencePath, currentArtifactIdentity, sameArtifactIdentity } from './execution-evidence.mjs';
 import { startStaticServer } from './static-server.mjs';
+import { completeReleaseEnvironment } from './release-environment.mjs';
 
 const root = process.cwd();
 const config = JSON.parse(readFileSync(path.join(root, 'config/system-release-gates.json'), 'utf8'));
@@ -14,6 +15,7 @@ const requestedScope = scopeArg ? scopeArg.slice('--scope='.length) : 'candidate
 const gateArg = process.argv.find((arg) => arg.startsWith('--gate='));
 const requestedGates = new Set(gateArg ? gateArg.slice('--gate='.length).split(',').filter(Boolean) : []);
 const freshExecution = process.argv.includes('--fresh');
+const continueOnFailure = process.argv.includes('--continue-on-failure');
 const failures = [];
 
 if (config.schemaVersion !== 1) failures.push('schemaVersion must be 1');
@@ -48,7 +50,10 @@ const selected = Object.entries(config.gates || {}).filter(([id, gate]) =>
   gate.scope === requestedScope && (requestedGates.size === 0 || requestedGates.has(id))
 );
 if (requestedGates.size > 0) {
-  for (const id of requestedGates) if (!config.gates?.[id]) failures.push(`unknown requested gate: ${id}`);
+  for (const id of requestedGates) {
+    if (!config.gates?.[id]) failures.push(`unknown requested gate: ${id}`);
+    else if (config.gates[id].scope !== requestedScope) failures.push(`gate ${id} belongs to ${config.gates[id].scope}, not ${requestedScope}`);
+  }
 }
 if (selected.length === 0) failures.push(`no gates selected for scope ${requestedScope}`);
 
@@ -83,11 +88,12 @@ mkdirSync(outputDir, { recursive: true });
 const results = [];
 const startedAt = new Date().toISOString();
 const baseline = currentBaseline(root);
+const artifactIdentity = currentArtifactIdentity(root, artifactRoot);
 const artifactServer = shouldRun && selected.some(([, gate]) => gate.artifactRequired)
   ? await startStaticServer({ rootDir: path.resolve(root, artifactRoot), ports: [4481, 4482, 4483] })
   : null;
 const verificationEnvironment = {
-  ...process.env,
+  ...completeReleaseEnvironment(process.env),
   WE3D_VERIFY_ROOT: artifactRoot,
   ...(artifactServer ? { WE3D_VERIFY_BASE_URL: `http://127.0.0.1:${artifactServer.port}` } : {})
 };
@@ -97,7 +103,9 @@ function gateEvidencePath(id) {
 }
 
 function reusableGateEvidence(id, gate) {
-  if (freshExecution) return null;
+  // Files can change without updating their manifests. Always re-hash the
+  // delivered artifact instead of trusting a cached integrity receipt.
+  if (freshExecution || id === 'artifact-integrity') return null;
   const target = gateEvidencePath(id);
   if (!existsSync(target)) return null;
   try {
@@ -106,6 +114,7 @@ function reusableGateEvidence(id, gate) {
     if (prior.baseline?.headCommit !== baseline.headCommit ||
       prior.baseline?.workspaceFingerprint !== baseline.workspaceFingerprint) return null;
     if (JSON.stringify(prior.command) !== JSON.stringify(gate.command)) return null;
+    if (gate.artifactRequired && !sameArtifactIdentity(prior.artifactIdentity, artifactIdentity)) return null;
     return prior;
   } catch {
     return null;
@@ -123,9 +132,31 @@ function writeGateEvidence(id, gate, record) {
     id,
     command: gate.command,
     baseline,
+    artifactIdentity,
     completedAt: new Date().toISOString(),
     ...record,
     reused: false
+  }, null, 2)}\n`, 'utf8');
+}
+
+let executionStarted = false;
+function markGateStarted(id, gate) {
+  // Persist before spawning. A resource guard, cancelled CI job or crash can
+  // terminate this process before the normal completion writer is reached.
+  // An older green result must not survive that interruption as current proof.
+  writeGateEvidence(id, gate, {
+    ok: false, state: 'running', startedAt: new Date().toISOString(), completedAt: null
+  });
+  if (executionStarted) return;
+  executionStarted = true;
+  const target = evidencePath(root, requestedScope);
+  mkdirSync(path.dirname(target), { recursive: true });
+  writeFileSync(target, `${JSON.stringify({
+    schemaVersion: 1, contract: 'world-explorer-execution-evidence-v1',
+    targetVersion: config.targetVersion, scope: requestedScope,
+    ok: false, state: 'running', baseline, artifactIdentity, artifactRoot,
+    startedAt, completedAt: null, outputDir, results: [],
+    failures: ['Verification started; the complete scope has not finished.']
   }, null, 2)}\n`, 'utf8');
 }
 
@@ -148,6 +179,7 @@ try {
       continue;
     }
     console.log(`[system-release] START ${id} (${results.length + 1}/${selected.length})`);
+    markGateStarted(id, gate);
     const result = await runLoggedStep(gate.command, {
       cwd: root,
       env: verificationEnvironment,
@@ -156,6 +188,7 @@ try {
     });
     const record = {
       id,
+      state: 'completed',
       ok: result.ok,
       durationMs: result.durationMs,
       status: result.status,
@@ -167,7 +200,7 @@ try {
     results.push(record);
     writeGateEvidence(id, gate, record);
     console.log(`[system-release] ${record.ok ? 'PASS' : 'FAIL'} ${id} (${record.durationMs} ms)`);
-    if (!record.ok) break;
+    if (!record.ok && !continueOnFailure) break;
   }
 } finally {
   await artifactServer?.close?.();
@@ -176,6 +209,7 @@ try {
 const report = {
   ok: results.length === selected.length && results.every((entry) => entry.ok),
   contract: 'world-explorer-system-release-v1',
+  continueOnFailure,
   targetVersion: config.targetVersion,
   scope: requestedScope,
   artifactRoot,
@@ -184,6 +218,7 @@ const report = {
   startedAt,
   completedAt: new Date().toISOString(),
   baseline,
+  artifactIdentity,
   results
 };
 const isCompleteScope = requestedGates.size === 0;
@@ -191,25 +226,31 @@ if (isCompleteScope) {
   const completedBaseline = currentBaseline(root);
   const stableBaseline = completedBaseline.headCommit === baseline.headCommit &&
     completedBaseline.workspaceFingerprint === baseline.workspaceFingerprint;
+  const stableArtifact = sameArtifactIdentity(artifactIdentity, currentArtifactIdentity(root, artifactRoot));
   const executionEvidence = {
     schemaVersion: 1,
     contract: 'world-explorer-execution-evidence-v1',
     targetVersion: config.targetVersion,
     scope: requestedScope,
-    ok: report.ok && stableBaseline,
+    state: 'completed',
+    ok: report.ok && stableBaseline && stableArtifact,
     baseline,
     completedBaseline,
+    artifactIdentity,
     artifactRoot,
     startedAt,
     completedAt: report.completedAt,
     outputDir,
     results,
-    failures: stableBaseline ? [] : ['the source working tree changed while the matrix was running']
+    failures: [
+      ...(!stableBaseline ? ['the source working tree changed while the matrix was running'] : []),
+      ...(!stableArtifact ? ['artifact manifests missing or changed while the matrix was running'] : [])
+    ]
   };
   const currentEvidencePath = evidencePath(root, requestedScope);
   mkdirSync(path.dirname(currentEvidencePath), { recursive: true });
   writeFileSync(currentEvidencePath, `${JSON.stringify(executionEvidence, null, 2)}\n`, 'utf8');
-  if (!stableBaseline) report.ok = false;
+  if (!stableBaseline || !stableArtifact) report.ok = false;
 }
 // Write the human-readable run report after the baseline stability decision.
 // Previously a tree mutation could correctly fail execution evidence while the

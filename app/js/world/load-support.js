@@ -1,3 +1,6 @@
+import {SurfacePublicationError} from './surface-publication-error.js';
+import {selectedPolarSurfaceReady} from './load-terrain-readiness.js?v=2';
+import { publishStreetPavement } from './street-pavement-runtime.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { appendUpwardRibbonGeometry } from "../road-render.js?v=4";
 import { generateStreetFurniture } from "./furniture.js?v=22";
@@ -59,6 +62,17 @@ export async function finalizeLoadedWorld(options = {}) {
   if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.publishLocationTerrain === 'function') {
     runFinalStep('publishLocationTerrain', () => appCtx.publishLocationTerrain());
     await yieldToMainThread();
+    // Roadless locations need the same physical-surface publication barrier
+    // that the transport compiler enforces in cities, before player spawn.
+    if (!appCtx.roads?.length && typeof appCtx.waitForLocationTerrainPublication === 'function') {
+      startLoadPhase('waitForLocationTerrainPublication');
+      try { await appCtx.waitForLocationTerrainPublication(); }
+      catch (error) { throw new SurfacePublicationError('terrain', error); }
+      finally { endLoadPhase('waitForLocationTerrainPublication'); }
+    }
+    if (!selectedPolarSurfaceReady(appCtx)) {
+      throw new SurfacePublicationError('terrain', new Error('Antarctic surface elevation is unavailable. Please retry this location.'));
+    }
   }
   const transportWillRebuildTerrain = appCtx.terrainEnabled && !appCtx.onMoon &&
     Array.isArray(appCtx.roads) && appCtx.roads.length > 0 &&
@@ -79,6 +93,8 @@ export async function finalizeLoadedWorld(options = {}) {
       transportPublication = await appCtx.publishCompiledTransportMeshes();
     } catch (error) {
       recordWorldLoadWarning(loadMetrics, 'publishCompiledTransportMeshes', error);
+      if(error?.name==='AbortError')throw error;
+      throw new SurfacePublicationError('roads',error);
     } finally {
       endLoadPhase('publishCompiledTransportMeshes');
     }
@@ -121,6 +137,15 @@ export async function finalizeLoadedWorld(options = {}) {
   if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.retireGroundFallbackPlaceholder === 'function') {
     runFinalStep('retireGroundFallbackPlaceholder', () => appCtx.retireGroundFallbackPlaceholder());
   }
+  try {
+    appCtx.showLoad?.('Building connected sidewalks and street surfaces...');
+    loadMetrics.streetPavement = await publishStreetPavement(appCtx);
+  } catch (error) {
+    recordWorldLoadWarning(loadMetrics, 'publishStreetPavement', error);
+    appCtx.streetPavementError = String(error?.message || error);
+    if(error?.name==='AbortError')throw error;
+    throw new SurfacePublicationError('pavement',error);
+  }
   runFinalStep('buildTraversalNetworks', () => buildTraversalNetworks());
   await yieldToMainThread();
   // World publication owns the one final arrival. Calling a generic road spawn
@@ -150,7 +175,7 @@ export async function finalizeLoadedWorld(options = {}) {
 }
 
 export function createSyntheticFallbackWorld(options = {}) {
-  const perfModeNow = options.perfModeNow || 'rdt';
+  const perfModeNow = 'baseline';
   const registerBuildingCollision = typeof options.registerBuildingCollision === 'function' ? options.registerBuildingCollision : () => null;
   const getRoadSubdivisionStep = typeof options.getRoadSubdivisionStep === 'function' ? options.getRoadSubdivisionStep : () => 3;
   const polylineBounds = typeof options.polylineBounds === 'function' ? options.polylineBounds : () => null;
@@ -216,6 +241,7 @@ export function createSyntheticFallbackWorld(options = {}) {
     'waterWaveVisuals'
   ]);
   invalidateTraversalNetworks('fallback_world_reset');
+  appCtx.clearNavigation?.();
   appCtx.navigationRoutePoints = [];
   appCtx.navigationRouteDistance = 0;
   appCtx.clearWorldCollections([

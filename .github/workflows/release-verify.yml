@@ -1,14 +1,39 @@
-name: Full Release Verify
+name: Remote Release Verification
+run-name: "Verify ${{ inputs.scope }}: ${{ inputs.scope == 'backend' && 'all backend stages' || inputs.gates }}"
 
 on:
   workflow_dispatch:
+    inputs:
+      scope:
+        description: Verification scope (never deploys)
+        type: choice
+        options: [backend, candidate, diagnostic]
+        default: candidate
+      runner:
+        description: Standard runner for targeted verification (never a physical-Mac performance receipt)
+        type: choice
+        options: [ubuntu-latest, macos-14]
+        default: ubuntu-latest
+      gates:
+        description: Candidate or diagnostic gate IDs, comma separated (no performance gate)
+        type: string
+        default: artifact-world
 
 permissions:
   contents: read
 
+concurrency:
+  # Manual verification runs own isolated runners and emulator data. Do not
+  # embed the potentially long gate list or silently supersede a queued run.
+  group: release-verification-${{ github.repository_id }}-${{ github.run_id }}
+  cancel-in-progress: false
+
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    env:
+      JAVA_TOOL_OPTIONS: -Xmx512m
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -20,6 +45,7 @@ jobs:
           cache: npm
 
       - name: Setup Python
+        if: inputs.scope != 'backend'
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
@@ -33,14 +59,95 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install backend dependencies
+        run: npm ci --prefix functions
+
       - name: Install Firebase release tooling
         run: npm install --global firebase-tools@15.22.0
 
       - name: Install datum normalizer
+        if: inputs.scope != 'backend'
         run: python -m pip install -r scripts/ground-datum-requirements.txt
 
       - name: Install Playwright
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium chrome
 
-      - name: Full release verification
-        run: npm run release:verify
+      - name: Record actual browser graphics backend
+        run: |
+          node --input-type=module - <<'JS'
+          import { chromium } from 'playwright';
+          import fs from 'node:fs/promises';
+          import os from 'node:os';
+          const browser = await chromium.launch({headless:true,channel:'chrome'});
+          try {
+            const page = await browser.newPage();
+            const graphics = await page.evaluate(() => {
+              const gl = document.createElement('canvas').getContext('webgl2');
+              if (!gl) throw new Error('WebGL2 is unavailable on this verification runner');
+              const info = gl.getExtension('WEBGL_debug_renderer_info');
+              return {renderer:info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER),version:gl.getParameter(gl.VERSION)};
+            });
+            const report = {platform:process.platform,architecture:process.arch,cpuCount:os.cpus().length,totalMemory:os.totalmem(),browser:browser.version(),graphics,evidenceScope:'remote functional verification only'};
+            await fs.mkdir('output/verification',{recursive:true});
+            await fs.writeFile('output/verification/runner-graphics.json',JSON.stringify(report,null,2));
+            console.log(JSON.stringify(report));
+          } finally {await browser.close();}
+          JS
+
+      - name: Build immutable staging artifact
+        if: inputs.scope == 'backend' || inputs.scope == 'candidate' || inputs.scope == 'diagnostic'
+        run: node scripts/hosting-artifact.mjs build --firebase-env staging
+
+      - name: Verify all backend stages against isolated emulators
+        if: inputs.scope == 'backend'
+        run: node scripts/verification/system-release.mjs --run --scope=backend
+        env:
+          WE3D_VERIFY_ROOT: dist
+
+      - name: Verify selected candidate gates
+        if: inputs.scope == 'candidate' || inputs.scope == 'diagnostic'
+        env:
+          WE3D_VERIFY_ROOT: dist
+          WE3D_CANDIDATE_GATES: ${{ inputs.gates }}
+          WE3D_GATE_SCOPE: ${{ inputs.scope }}
+          WE3D_STAGING_APP_CHECK_CREDENTIAL: ${{ secrets.WE3D_STAGING_APP_CHECK_CREDENTIAL }}
+        run: |
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          const credential = process.env.WE3D_STAGING_APP_CHECK_CREDENTIAL;
+          if (credential) {
+            console.log(`::add-mask::${JSON.parse(credential).token}`);
+            const file = path.join(process.env.RUNNER_TEMP, 'we3d-staging-appcheck.private.json');
+            fs.writeFileSync(file, credential, {mode:0o600});
+          }
+          JS
+          unset WE3D_STAGING_APP_CHECK_CREDENTIAL
+          if [ -f "$RUNNER_TEMP/we3d-staging-appcheck.private.json" ]; then
+            export WE3D_STAGING_APP_CHECK_FILE="$RUNNER_TEMP/we3d-staging-appcheck.private.json"
+          fi
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs';
+          const config=JSON.parse(fs.readFileSync('config/system-release-gates.json','utf8'));
+          const ids=String(process.env.WE3D_CANDIDATE_GATES||'').split(',');
+          if(ids.some(id=>!id||config.gates[id]?.scope!==process.env.WE3D_GATE_SCOPE||id==='performance')) {
+            throw new Error('Select explicit candidate gate IDs. Physical-Mac performance cannot run here.');
+          }
+          JS
+          node scripts/verification/system-release.mjs --run "--scope=$WE3D_GATE_SCOPE" --continue-on-failure "--gate=$WE3D_CANDIDATE_GATES"
+
+      - name: Remove temporary staging credential file
+        if: always()
+        run: rm -f "$RUNNER_TEMP/we3d-staging-appcheck.private.json"
+
+      - name: Preserve verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-evidence-${{ github.sha }}
+          path: |
+            output/release-evidence/
+            output/verification/
+            /tmp/worldexplorer3d-verification/
+          if-no-files-found: warn
+          retention-days: 14

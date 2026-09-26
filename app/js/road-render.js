@@ -1,3 +1,11 @@
+import { normalizePublishedRoadIndices } from './terrain/published-road-integrity.js';
+
+export function createRoadMarkingMaterial({color=0xffffee,emissive=0x444444,emissiveIntensity=.3,roughness=.8}={}) {
+  // Roads use -2. Paint must stay ahead of their depth bias at grazing angles.
+  return new THREE.MeshStandardMaterial({color,emissive,emissiveIntensity,roughness,
+    polygonOffset:true,polygonOffsetFactor:-6,polygonOffsetUnits:-6});
+}
+
 function appendUpwardRibbonGeometry(leftEdge = [], rightEdge = [], vertices = [], indices = []) {
   const count = Math.min(leftEdge.length, rightEdge.length);
   if (count < 2) return false;
@@ -50,15 +58,7 @@ function createRoadSurfaceMaterials({
   };
 
   if (includeMarkings) {
-    materials.roadMarkMaterial = new THREE.MeshStandardMaterial({
-      color: 0xffffee,
-      emissive: 0x444444,
-      emissiveIntensity: 0.3,
-      roughness: 0.8,
-      polygonOffset: true,
-      polygonOffsetFactor: -6,
-      polygonOffsetUnits: -6
-    });
+    materials.roadMarkMaterial = createRoadMarkingMaterial();
   }
 
   if (includeSidewalk) {
@@ -132,9 +132,20 @@ function buildIndexedBatchMesh({
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  const uv = [];
+  for (let i = 0; i < verts.length; i += 3) uv.push(verts[i] * 1.11 / 4, verts[i + 2] * 1.11 / 4);
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   const vertexCount = verts.length / 3;
   const indexArray = vertexCount > 65535 ? new Uint32Array(indices) : new Uint16Array(indices);
-  geometry.setIndex(new THREE.BufferAttribute(indexArray, 1));
+  let publishedIndices = indexArray;
+  if (userData?.isRoadBatch && !userData.isRoadSkirt && !userData.isRoadMarking) {
+    const normalized = normalizePublishedRoadIndices(geometry.attributes.position.array, indexArray, userData.surfaceRanges);
+    publishedIndices = normalized.indices;
+    userData = { ...userData, surfaceRanges: normalized.surfaceRanges,
+      removedZeroFootprintTriangles: normalized.removedZeroFootprintTriangles,
+      correctedDownwardTriangles: normalized.correctedDownwardTriangles };
+  }
+  geometry.setIndex(new THREE.BufferAttribute(publishedIndices, 1));
   geometry.computeVertexNormals();
   const mesh = new THREE.Mesh(geometry, material);
   mesh.renderOrder = renderOrder;

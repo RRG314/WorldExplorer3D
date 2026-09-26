@@ -1,14 +1,18 @@
+import { advanceGameplay } from './gameplay-simulation.mjs';
+import { softwareCompositorArgs } from './software-compositor.mjs';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 
 const root = process.cwd();
 const servedRoot = path.resolve(root, process.env.WE3D_VERIFY_ROOT || root);
 const server = await startStaticServer({ rootDir: servedRoot, ports: [4434, 4435, 4436] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024', ...softwareCompositorArgs()] });
 const outputRoot = path.join(root, 'output', 'verification', 'accessibility-release');
 const requestedProfile = String(process.env.WE3D_VERIFY_PROFILE || 'all').trim().toLowerCase();
 assert.ok(['all', 'desktop', 'mobile'].includes(requestedProfile), `Unsupported WE3D_VERIFY_PROFILE: ${requestedProfile}`);
@@ -56,7 +60,9 @@ async function semanticAudit(page) {
 async function runDesktop() {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
   const page = await context.newPage();
+  await configureStagingAppCheck(page, baseUrl);
   const browserErrors = [];
+  collectBrowserGraphicsErrors(page, browserErrors);
   const localFailures = [];
   page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   page.on('response', (response) => {
@@ -117,8 +123,9 @@ async function runDesktop() {
 
     const beforeWalk = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.position || null);
     await page.keyboard.down('ArrowUp');
-    await page.waitForTimeout(900);
-    await page.keyboard.up('ArrowUp');
+    let keyboardSimulation;
+    try { keyboardSimulation = await advanceGameplay(page, 900); }
+    finally { await page.keyboard.up('ArrowUp'); }
     const afterWalk = await page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().activeActor?.position || null);
     const walkedMeters = Math.hypot(Number(afterWalk?.x) - Number(beforeWalk?.x), Number(afterWalk?.z) - Number(beforeWalk?.z));
 
@@ -163,16 +170,20 @@ async function runDesktop() {
       noBrowserErrors: browserErrors.length === 0,
       noFailedLocalResources: localFailures.length === 0
     };
-    return { ok: Object.values(checks).every(Boolean), checks, titleAudit, worldAudit, settingsApplied, walkedMeters, backpack, trappedIds, browserErrors, localFailures };
+    return { ok: Object.values(checks).every(Boolean), checks, titleAudit, worldAudit, settingsApplied, walkedMeters, keyboardSimulation,
+      movementEvidence: 'real keyboard input with fixed-step simulation; not wall-clock responsiveness',
+      backpack, trappedIds, browserErrors, localFailures };
   } finally {
     await context.close();
   }
 }
 
 async function runMobile() {
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 });
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, userAgent: devices['iPhone 13'].userAgent, hasTouch: true, deviceScaleFactor: 1 });
   const page = await context.newPage();
+  await configureStagingAppCheck(page, baseUrl);
   const browserErrors = [];
+  collectBrowserGraphicsErrors(page, browserErrors);
   const localFailures = [];
   page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
   page.on('response', (response) => {

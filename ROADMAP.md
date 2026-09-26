@@ -1,6 +1,6 @@
 # World Explorer 3D Roadmap
 
-Last updated: 2026-09-07.
+Last updated: 2026-09-25.
 
 World Explorer 3D is growing toward a connected world sandbox: choose a real
 place, build an Explorer, travel by land, water, air, or space, and make a
@@ -12,11 +12,10 @@ feature.
 
 ### Improve real places with photos
 
-Manual photo placement is the first contribution path: match pictures to the
-actual building sides, save the work, and submit it for review. The exterior
-pilot is being refined in staging. Private single-room editing, playable
-personal previews, shared contribution rooms, attribution and featured places
-are the next connected milestones—not released capabilities yet.
+Manual exterior photo contributions are released. The 5.3 candidate connects
+building-aligned room editing, wall/floor/ceiling photos, saved revisions, phone
+handoff, account review and entry into approved interiors. Broader device review
+and clearer editing guidance remain priorities.
 
 Interiors start private. An owner must deliberately request public sharing,
 and the submitted interior must be approved before others can access it
@@ -46,28 +45,36 @@ Real-world context makes the sandbox recognizable, but it does not turn the
 game into a navigation, appraisal, ownership, wildlife-presence, or safety
 service. Unknown source data remains unknown.
 
-## Current release candidate: 5.2
+## Current release candidate: 5.3
 
-Version 5.2 preserves the established 5.1 world and traversal experience while
-adding a connected Interstellar Expeditions Alpha, virtual property and Credits,
-a clearer gameplay menu, and stronger transition, backend, and memory ownership.
+The public release remains 5.2. [5.3 release notes](RELEASE_NOTES_5.3.0.md)
+describe the changes being prepared for production.
 
-| Area | 5.2 capability | Continuing work |
+| Area | In the 5.3 candidate | Next work |
 | --- | --- | --- |
-| Explorer | One Profile, Journal, Field Guide, Backpack, quick-slot loadout, Field Today, Expeditions, specialties, and seasonal surveys | Cross-device progression and more ways to use specialties |
-| Regional field play | Eleven regional packs with 180 attainable entries across every built-in Earth destination | Independent scientific review, more regions, and more promoted creature models |
-| Character and companions | Attributes, skills, condition, equipment, companion care, trust, levels, livestock, and vehicle travel | Player-selectable Explorer identities, richer appearance, training, and ability growth |
-| Earth travel | Walking, distinct road vehicles, responder vehicles, drone, personal aircraft, airport aircraft, boats, ships, and skydiving | More vehicle classes, facilities, damage presentation, and physical-device tuning |
-| Water | Shore visibility, mapped vessel identity, marinas, ports, playable boat and ship classes, shore/boat/underwater fishing | Wider port coverage, water traffic, maritime activities, and reviewed bathymetry |
-| Space | Manual and assisted flight, selectable courses, celestial collision, planetary entry, accepted surfaces, landing, and return; Interstellar Expeditions Alpha adds Solis Reach, crew work, voyage events, Pathfinder surface travel, sample return, long-duration journeys, and shared state | Expand Alpha mission and destination variety, room and crew presentation, planetary activities, spacecraft, audio, and visual review |
-| Property and economy | One Credits record, mapped-business exchange, conserved planetary samples, one free first virtual property claim, listings, purchases, public-address display, and server-authorized shared ownership | Rentals, direct player offers, decoration, home services, broader account sync, valuation licensing, and economic tuning |
-| World construction | Quick Build with persistent local and room Blocks | Terrain shaping, building materials, interiors, decoration, and a future creator workspace built on the same Block authority |
-| Community | Bounded rooms, presence, chat, activities, shared Blocks, persistent room vehicles, and public game leaderboards | Larger-room review, moderation depth, clubs, events, and shared settlements |
-| Access and performance | Keyboard, touch, mobile layouts, accessibility settings, bounded loading, and lifecycle cleanup | Broader phone, browser, assistive-technology, battery, and thermal review |
+| Solis Reach | Circular corridors, 25 functional rooms, licensed furnishings, exterior views and a controlled Pathfinder launch | Finish the utility-equipment art pass; deepen room activities and crew interaction |
+| Research | Physical specimen placement, measurements and fabrication using conserved cargo, including shared expeditions | More experiments, recipes and consequences for expedition planning |
+| Space | Selectable stars and planets, observer-dependent sky, improved planet imagery, spatial galaxies and repaired nebula overlays | Broader scientific review, destination variety and measured device budgets |
+| Earth | Complete facade bays, connected pavement, roadside placement and water-surface repairs | Complex bridge/tunnel approaches, regional coverage and material consistency |
+| Photo contributions | Floor plans, room photos, saved revisions, phone handoff and approved interior entry | Editing usability, contribution discovery and wider device acceptance |
+| Shared play | Room admission, presence, vehicle ownership and shared research repairs | More multiplayer activities and broader network-condition testing |
+| Rendering and controls | Shared resources, static batching, bounded interface updates, camera and mobile-overlay repairs | Physical-phone responsiveness, sustained-session memory and thermal testing |
 
-The 5.2 release is complete when the exact release build passes owner review on
-desktop and phone, its account and public leaderboard paths are available, and
-that approved build is published without being rebuilt.
+### Before production promotion
+
+- Complete the remaining physical-phone walkthrough and record any blocking issue.
+- Keep the verified shared-research backend and required indexes aligned with
+  the final frontend package.
+- Verify the final production package, retain rollback information and publish
+  the release only after the deployment is confirmed.
+
+### Following this release
+
+Prioritize consistent ship art and more useful research activities over adding
+unconnected rooms or menus. Improve recognizable Earth locations and space
+landscapes using available observations, with procedural reconstruction clearly
+distinguished from measured data. Automatic 3D reconstruction remains a separate
+development track; it is not a promised public feature of 5.3.
 
 ## Next foundation: persistent player life
 

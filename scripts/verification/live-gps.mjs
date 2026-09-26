@@ -1,7 +1,14 @@
+import { installGpsSensorFixture } from './gps-sensor-fixture.mjs';
+import { softwareCompositorArgs } from './software-compositor.mjs';
+import { waitForGpsFieldReveal, createGpsFixStream } from './gps-fix-stream.mjs';
+import { selectLowRenderQuality } from './render-quality-ui.mjs';
+import { installBrowserGraphicsProbe } from './browser-graphics-probe.mjs';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 
 const root = process.cwd();
@@ -14,19 +21,28 @@ const server = externalUrl ? null : await startStaticServer({
 });
 const baseUrl = externalUrl || `http://127.0.0.1:${server.port}`;
 const origin = new URL(baseUrl).origin;
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+// This software-renderer profile is functional evidence only. Physical mobile
+// performance and default-quality acceptance remain separate release gates.
+const softwareCi = !!process.env.CI && process.platform === 'linux';
+const verificationProfile = { scope: 'functional', sensorInput: 'simulated-browser-geolocation; not real-device GPS or native permission acceptance', softwareCi, quality: softwareCi ? 'low via Settings' : 'default', deviceScaleFactor: softwareCi ? 1 : 1 };
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: softwareCompositorArgs() });
 const context = await browser.newContext({
   viewport: { width: 390, height: 844 },
+  deviceScaleFactor: verificationProfile.deviceScaleFactor,
   hasTouch: true,
-  isMobile: true,
+  isMobile: true, userAgent: devices['iPhone 13'].userAgent,
   geolocation: { latitude: 39.2904, longitude: -76.6122, accuracy: 6 },
   permissions: ['geolocation']
 });
 await context.grantPermissions(['geolocation'], { origin });
 const page = await context.newPage();
-const cdp = await context.newCDPSession(page);
+await configureStagingAppCheck(page, baseUrl);
+const sensor = await installGpsSensorFixture(page, { latitude: 39.2904, longitude: -76.6122, accuracy: 6, speed: 0, heading: 0 });
+const gpsFixStream = createGpsFixStream(sensor);
 const browserErrors = [];
 const localFailures = [];
+collectBrowserGraphicsErrors(page, browserErrors);
+await installBrowserGraphicsProbe(page, 'output/verification/live-gps-field/graphics-failure.json');
 page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
 page.on('response', (response) => {
   if (response.url().startsWith(baseUrl) && response.status() >= 400) {
@@ -35,6 +51,19 @@ page.on('response', (response) => {
 });
 
 const snapshot = () => page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.() || {});
+const checkpoints = [];
+async function recordCheckpoint(phase, state) {
+  checkpoints.push({ phase, at: new Date().toISOString(),
+    completedStops: state.worldDiscovery?.fieldExpedition?.completedCount ?? 0,
+    observation: state.worldDiscovery?.interaction?.phase ?? null,
+    gpsActive: state.liveGps?.active === true,
+    pauseReason: state.liveGps?.fieldSession?.pauseReason ?? null,
+    lastFixAgeMs: state.liveGps?.lastFixAgeMs ?? null,
+    runtimeErrorCount: state.runtimeErrors?.length ?? 0,
+    watch: gpsFixStream.snapshot() });
+  await mkdir('output/verification/live-gps-field', { recursive: true });
+  await writeFile('output/verification/live-gps-field/checkpoints.json', JSON.stringify(checkpoints, null, 2));
+}
 const distance2d = (left, right) => Math.hypot(
   Number(right?.x || 0) - Number(left?.x || 0),
   Number(right?.z || 0) - Number(left?.z || 0)
@@ -43,8 +72,10 @@ const distance2d = (left, right) => Math.hypot(
 try {
   const url = `${baseUrl}/app/`;
   await page.goto(url, { waitUntil: 'load', timeout: 120_000 });
+  await gpsFixStream.send('Emulation.setGeolocationOverride', { latitude: 39.2904, longitude: -76.6122, accuracy: 6, speed: 0, heading: 0 });
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   await page.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
+  if (softwareCi) await selectLowRenderQuality(page);
   const consent = page.locator('#analyticsConsentDenyBtn');
   if (await consent.isVisible()) await consent.click();
   const liveGpsEntry = page.locator('#globeSelectorLiveGpsBtn');
@@ -74,7 +105,7 @@ try {
   await page.mouse.up();
 
   await page.waitForTimeout(2_200);
-  await cdp.send('Emulation.setGeolocationOverride', {
+  await gpsFixStream.send('Emulation.setGeolocationOverride', {
     latitude: 39.290445,
     longitude: -76.6122,
     accuracy: 6,
@@ -83,6 +114,7 @@ try {
   });
   await page.waitForTimeout(2_200);
   const walking = await snapshot();
+  await recordCheckpoint('walking', walking);
 
   await page.locator('#liveGpsFieldBtn').click();
   await page.waitForSelector('#discoveryPanel.show', { timeout: 30_000 });
@@ -95,7 +127,17 @@ try {
   }
   await page.locator('.discoveryTodayRoute > summary').click();
   await page.waitForSelector('.discoveryTodayRoute[open] #discoveryExpeditionList [data-field-objective]', { timeout: 30_000 });
-  await page.waitForTimeout(300);
+  // The owned GPS stream keeps this stationary fix fresh through every UI
+  // step. Signal-loss policy and recording eligibility remain unchanged.
+  await gpsFixStream.send('Emulation.setGeolocationOverride', {
+    latitude: 39.290445, longitude: -76.6122, accuracy: 6, speed: 0, heading: 0
+  });
+  await page.waitForFunction(() => {
+    const gps = globalThis.getWorldExplorerRuntimeDiagnostics?.().liveGps;
+    const stops = [...document.querySelectorAll('#discoveryExpeditionList [data-field-objective]')];
+    return gps?.fieldSession?.pauseReason === null && stops.length === 3 &&
+      stops.every(entry => /\d+ m/.test(entry.textContent || ''));
+  }, null, { timeout: 10_000 });
   const fieldToday = await page.evaluate(() => ({
     sessionText: document.getElementById('discoveryFieldSession')?.textContent?.replace(/\s+/g, ' ').trim() || '',
     objectiveCount: document.querySelectorAll('#discoveryExpeditionList [data-field-objective]').length,
@@ -103,7 +145,7 @@ try {
       .map((entry) => entry.textContent?.replace(/\s+/g, ' ').trim() || '')
   }));
   await mkdir('output/verification/live-gps-field', { recursive: true });
-  await page.screenshot({ path: 'output/verification/live-gps-field/field-today-mobile.png', fullPage: true });
+  await page.screenshot({ path: 'output/verification/live-gps-field/field-today-mobile.png', fullPage: false });
   const fieldBefore = await snapshot();
   const firstObjective = fieldBefore.worldDiscovery?.fieldExpedition?.objectives?.[0];
   assert.ok(firstObjective?.targetWorld, 'Field Today must expose a deterministic first objective to diagnostics.');
@@ -117,23 +159,14 @@ try {
     (Number(firstObjective.targetWorld.x) - Number(gpsWorld.x)) /
       (metersPerDegree * Math.cos(latitudeBeforeObjective * Math.PI / 180));
   await page.locator('#discoveryExpeditionList [data-field-objective]').first().click();
-  for (let index = 0; index < 9; index += 1) {
-    await cdp.send('Emulation.setGeolocationOverride', {
-      latitude: targetLatitude,
-      longitude: targetLongitude,
-      accuracy: 6,
-      speed: 1.4,
-      heading: 0
-    });
-    await page.waitForTimeout(620);
-  }
-  await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery?.interaction?.phase === 'revealed', null, { timeout: 30_000 });
+  await waitForGpsFieldReveal(page, gpsFixStream, { latitude: targetLatitude, longitude: targetLongitude }, firstObjective.slotId);
   await page.locator('#liveGpsFieldBtn').click();
   await page.waitForSelector('#discoveryPanel.show', { timeout: 30_000 });
   await page.locator('#discoveryPrimaryBtn').click();
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery?.fieldExpedition?.completedCount === 1, null, { timeout: 30_000 });
   const firstStopRecorded = await snapshot();
-  await page.screenshot({ path: 'output/verification/live-gps-field/first-stop-recorded-mobile.png', fullPage: true });
+  await recordCheckpoint('first-stop-recorded', firstStopRecorded);
+  await page.screenshot({ path: 'output/verification/live-gps-field/first-stop-recorded-mobile.png', fullPage: false });
   await page.locator('#discoveryCloseBtn').click();
 
   let currentLatitude = targetLatitude;
@@ -158,7 +191,7 @@ try {
     const routeSteps = Math.max(1, Math.ceil(Math.hypot(deltaX, deltaZ) / 12));
     for (let step = 1; step <= routeSteps + 10; step += 1) {
       const amount = Math.min(1, step / routeSteps);
-      await cdp.send('Emulation.setGeolocationOverride', {
+      await gpsFixStream.send('Emulation.setGeolocationOverride', {
         latitude: currentLatitude + (stopLatitude - currentLatitude) * amount,
         longitude: currentLongitude + (stopLongitude - currentLongitude) * amount,
         accuracy: 6,
@@ -168,7 +201,7 @@ try {
       await page.waitForTimeout(620);
     }
     try {
-      await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery?.interaction?.phase === 'revealed', null, { timeout: 30_000 });
+      await waitForGpsFieldReveal(page, gpsFixStream, { latitude: stopLatitude, longitude: stopLongitude }, objective.slotId);
     } catch (error) {
       const failedStop = await snapshot();
       console.error(JSON.stringify({ expectedCompleted, objective, liveGps: failedStop.liveGps, interaction: failedStop.worldDiscovery?.interaction }, null, 2));
@@ -183,10 +216,11 @@ try {
     if (expectedCompleted < 3) await page.locator('#discoveryCloseBtn').click();
   }
   const expeditionComplete = await snapshot();
-  await page.screenshot({ path: 'output/verification/live-gps-field/expedition-complete-mobile.png', fullPage: true });
+  await recordCheckpoint('expedition-complete', expeditionComplete);
+  await page.screenshot({ path: 'output/verification/live-gps-field/expedition-complete-mobile.png', fullPage: false });
   await page.locator('#discoveryCloseBtn').click();
 
-  await cdp.send('Emulation.setGeolocationOverride', {
+  await gpsFixStream.send('Emulation.setGeolocationOverride', {
     latitude: currentLatitude + 0.00002,
     longitude: currentLongitude,
     accuracy: 60,
@@ -195,8 +229,9 @@ try {
   });
   await page.waitForFunction(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().liveGps?.fieldSession?.pauseReason === 'accuracy-hold', null, { timeout: 30_000 });
   const accuracyHeld = await snapshot();
+  await recordCheckpoint('accuracy-held', accuracyHeld);
 
-  await cdp.send('Emulation.setGeolocationOverride', {
+  await gpsFixStream.send('Emulation.setGeolocationOverride', {
     latitude: currentLatitude + 0.00004,
     longitude: currentLongitude,
     accuracy: 6,
@@ -207,7 +242,7 @@ try {
 
   const fastFixes = [0.00014, 0.00028, 0.00042, 0.00056, 0.00070, 0.00084].map((offset) => currentLatitude + offset);
   for (const latitude of fastFixes) {
-    await cdp.send('Emulation.setGeolocationOverride', {
+    await gpsFixStream.send('Emulation.setGeolocationOverride', {
       latitude,
       longitude: currentLongitude,
       accuracy: 6,
@@ -222,7 +257,9 @@ try {
   }, null, { timeout: 30_000 });
   await page.waitForTimeout(1_200);
   const driving = await snapshot();
+  await recordCheckpoint('driving', driving);
 
+  gpsFixStream.assertHealthy();
   const checks = {
     mobileEntryVisible: true,
     consentCancelHoldsStart: deniedSnapshot.liveGps?.active !== true,
@@ -276,6 +313,7 @@ try {
     noFailedLocalResources: localFailures.length === 0
   };
   const report = {
+    verificationProfile,
     ok: Object.values(checks).every(Boolean),
     contract: 'live-gps-field-v2-visible-three-stop-journey',
     checks,
@@ -296,12 +334,27 @@ try {
     accuracyHeld: { gps: accuracyHeld.liveGps },
     driving: { actor: driving.activeActor, gps: driving.liveGps, cameraFollow: driving.cameraFollow },
     browserErrors,
-    localFailures
+    localFailures,
+    gpsFixStream: gpsFixStream.snapshot(),
+    checkpoints
   };
+  await writeFile('output/verification/live-gps-field/report.json', JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
   assert.equal(report.ok, true, 'Live GPS visible journey failed.');
+} catch (error) {
+  const state = await Promise.race([
+    snapshot().catch(captureError => ({ captureError: String(captureError) })),
+    new Promise(resolve => { const timer = setTimeout(() => resolve({ captureError: 'diagnostic capture exceeded 5s' }), 5000); timer.unref(); })
+  ]);
+  await mkdir('output/verification/live-gps-field', { recursive: true });
+  await writeFile('output/verification/live-gps-field/failure.json', JSON.stringify({
+    ok: false, error: String(error?.stack || error), verificationProfile, state, browserErrors, localFailures
+  }, null, 2));
+  throw error;
 } finally {
-  await context.close();
-  await browser.close();
-  await server?.close();
+  let streamError;
+  try { await gpsFixStream.stop(); } catch (error) { streamError = error; }
+  try { await context.close(); }
+  finally { try { await browser.close(); } finally { await server?.close(); } }
+  if (streamError) throw streamError;
 }

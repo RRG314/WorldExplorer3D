@@ -1,3 +1,4 @@
+import {roadPlacementOffsetWorld} from './world/road-units.js';
 import {
   attachCompiledTransportSurface,
   compileTransportSurfaceModel,
@@ -615,9 +616,7 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
 
   const { distances: pointDistances, total } = polylineDistances(points);
   const profileTotal = feature.surfaceDistances?.length ? feature.surfaceDistances[feature.surfaceDistances.length - 1] : total;
-  const corridorCenterOffset = Number(
-    feature?.transportRecord?.crossSection?.placement?.centerlineOffsetMeters
-  ) || 0;
+  const corridorCenterOffset = roadPlacementOffsetWorld(feature);
   const leftEdge = [];
   const rightEdge = [];
   const centerlineHeights = [];
@@ -770,39 +769,10 @@ function sampleFeatureSurfaceY(feature, x, z, projected = null) {
     ? Math.max(0, Math.min(1, Number(projection.t)))
     : 0;
   const segLen = Math.hypot(p2.x - p1.x, p2.z - p1.z);
-  const pathDistances = model?.pathDistances instanceof Float32Array
+  const pathDistances = isNumericProfileArray(model?.pathDistances)
     ? model.pathDistances
     : distances;
   const distance = pathDistances[segIndex] + segLen * projectionT;
-  if (
-    feature.structureSemantics?.terrainMode === 'at_grade' &&
-    typeof feature.surfaceTerrainSampler === 'function'
-  ) {
-    const sampleX = Number.isFinite(Number(projection.x))
-      ? Number(projection.x)
-      : Number.isFinite(Number(projection.pt?.x))
-        ? Number(projection.pt.x)
-        : p1.x + (p2.x - p1.x) * projectionT;
-    const sampleZ = Number.isFinite(Number(projection.z))
-      ? Number(projection.z)
-      : Number.isFinite(Number(projection.pt?.z))
-        ? Number(projection.pt.z)
-        : p1.z + (p2.z - p1.z) * projectionT;
-    const terrainY = Number(feature.surfaceTerrainSampler(sampleX, sampleZ));
-    if (Number.isFinite(terrainY)) {
-      const offsets = feature.surfaceOffsets instanceof Float32Array ? feature.surfaceOffsets : null;
-      const structureOffset = offsets
-        ? Number(sampleProfileAtDistance(distances, offsets, distance)) || 0
-        : 0;
-      const surfaceBias = Number.isFinite(feature.surfaceBias) ? Number(feature.surfaceBias) : 0.08;
-      return applyJunctionTransitionY(
-        feature,
-        sampleX,
-        sampleZ,
-        terrainY + structureOffset + surfaceBias
-      );
-    }
-  }
   if (model) {
     const sampleX = Number.isFinite(Number(projection.x))
       ? Number(projection.x)

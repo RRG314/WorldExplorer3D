@@ -1,7 +1,7 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { getAstronomicalBody, normalizeAstronomicalBodyId } from '../astronomy/body-catalog.js?v=3';
 import { disposeThreeObjectTree } from '../engine/webgl-lifecycle.js?v=2';
-import { getGalaxyEntryDestination, getUniverseFrame, resolveUniverseAddress } from './catalog.js?v=11';
+import { getGalaxyEntryDestination, getUniverseFrame, resolveUniverseAddress, icrsToCartesian } from './catalog.js?v=11';
 import { updateBlackHoleEncounter, updateBlackHoleVisual } from './black-hole.js?v=4';
 import { createDeepSkyLayer, setDeepSkyFrame, updateDeepSkyLayer } from './deep-sky.js?v=3';
 import { createRegionEncounter, fireEncounterPulse, updateRegionEncounter } from './encounters.js?v=1';
@@ -19,7 +19,7 @@ import { releaseGaiaSkyLayers } from '../sky/gaia-catalog.js?v=4';
 import {
   createUniverseFrameVisual,
   getUniverseDestinationMesh,
-  setUniverseCourseMarker,
+  setUniverseCourseTarget,
   updateUniverseFrameVisual
 } from './visuals.js?v=19';
 import {
@@ -105,7 +105,10 @@ function setSolVisibility(visible) {
   appCtx.setSolarSystemFrameVisibility?.(visible);
   if (appCtx.spaceFlight?.earth) appCtx.spaceFlight.earth.visible = visible;
   if (appCtx.spaceFlight?.moon) appCtx.spaceFlight.moon.visible = visible;
-  if (appCtx.spaceFlight?.celestialCatalog?.group) appCtx.spaceFlight.celestialCatalog.group.visible = visible;
+  if (appCtx.spaceFlight?.celestialCatalog?.group) {
+    appCtx.spaceFlight.celestialCatalog.group.visible = true;
+    appCtx.spaceFlight.celestialCatalog.gaiaSky.group.visible = visible;
+  }
   const moonButton = document.getElementById('orbitsToggle');
   const marsButton = document.getElementById('marsLandingToggle');
   if (moonButton) moonButton.style.display = visible ? '' : 'none';
@@ -269,6 +272,7 @@ function positionRocketForFrame(entity) {
 function installFrame(entity) {
   disposeActiveFrame();
   universeRuntime.current = entity;
+  appCtx.highlightSpaceConstellation?.('');
   universeRuntime.galaxyEntry = getGalaxyEntryDestination(entity.id);
   universeRuntime.canonicalFrameOffset.set(0, 0, 0);
   setSolVisibility(entity.id === 'sol');
@@ -280,7 +284,7 @@ function installFrame(entity) {
     universeRuntime.encounter = createRegionEncounter(universeRuntime.frameGroup, entity);
     const courseDestination = universeRuntime.course?.destination;
     if (courseDestination?.objectClass === 'exoplanet' && courseDestination.parentFrameId === entity.id) {
-      setUniverseCourseMarker(universeRuntime.frameGroup, courseDestination.id, true);
+      setUniverseCourseTarget(universeRuntime.frameGroup, courseDestination.id, true);
     }
   }
   positionRocketForFrame(entity);
@@ -367,7 +371,7 @@ function travelToUniverseDestination(addressOrId, options = {}) {
     reason: 'wayfinder-interstellar-course-set'
   });
   if (destination.objectClass === 'exoplanet' && destinationFrame.id === universeRuntime.current.id) {
-    setUniverseCourseMarker(universeRuntime.frameGroup, destination.id, true);
+    setUniverseCourseTarget(universeRuntime.frameGroup, destination.id, true);
     showMessage(`COURSE SET · ${destination.name.toUpperCase()}`, '#6fe8ff');
     updateUniverseNavigator(universeRuntime);
     return true;
@@ -553,11 +557,9 @@ function rebaseActiveFrame() {
   _rebase.copy(rocket.position);
   rocket.position.sub(_rebase);
   appCtx.spaceFlight.camera?.position.sub(_rebase);
-  if (universeRuntime.current.objectClass === 'nebula' || universeRuntime.current.objectClass === 'stellar_region') {
-    universeRuntime.frameGroup?.position.set(0, 0, 0);
-  } else {
-    universeRuntime.frameGroup?.position.sub(_rebase);
-  }
+  // Gas/dust fields are world anchored too; recentering them changes the
+  // visible density around the pilot whenever the floating origin shifts.
+  universeRuntime.frameGroup?.position.sub(_rebase);
   universeRuntime.transitGroup?.position.sub(_rebase);
   universeRuntime.canonicalFrameOffset.add(_rebase);
 }
@@ -808,9 +810,6 @@ function getUniverseCourseSnapshot() {
   const body = destination?.objectClass === 'exoplanet'
     ? getUniverseDestinationMesh(universeRuntime.frameGroup, destination.id)
     : null;
-  const entry = body
-    ? (universeRuntime.frameGroup?.userData?.orbitingPlanets || []).find((candidate) => candidate.body === body)
-    : null;
   let targetVisual = null;
   const directionCue = updateLocalCourseCue();
   if (body && appCtx.spaceFlight?.camera && appCtx.spaceFlight?.rocket) {
@@ -824,7 +823,7 @@ function getUniverseCourseSnapshot() {
     appCtx.spaceFlight.camera.getWorldDirection(cameraDirection);
     targetDirection.copy(targetWorld).sub(appCtx.spaceFlight.camera.position).normalize();
     targetVisual = Object.freeze({
-      markerVisible: entry?.marker?.visible === true,
+      cueVisible: directionCue?.visible === true,
       ndcX: Number(projected.x),
       ndcY: Number(projected.y),
       cameraTargetDot: Number(cameraDirection.dot(targetDirection)),
@@ -880,7 +879,15 @@ function updateUniverseRuntime(frameSeconds = 1 / 60) {
   updateMissionScanEffects();
   updateDestinationMissionRuntime();
   rebaseActiveFrame();
-  updateUniverseSky(universeRuntime.sky, appCtx.spaceFlight.rocket);
+  const observer = universeRuntime.current.canonicalPosition?.frame === 'ICRS'
+    ? icrsToCartesian(universeRuntime.current) : { x: 0, y: 0, z: 0 };
+  if (universeRuntime.current.id !== 'sol' && universeRuntime.current.canonicalPosition?.frame === 'ICRS') {
+    const metrics = getUniverseNavigationMetrics(universeRuntime.current, appCtx.spaceFlight.rocket, universeRuntime.canonicalFrameOffset);
+    const scale = metrics.frameRadiusLy / metrics.sceneRadius;
+    for (const axis of ['x', 'y', 'z']) observer[axis] += (universeRuntime.canonicalFrameOffset[axis] + appCtx.spaceFlight.rocket.position[axis]) * scale;
+  }
+  appCtx.updateSpaceCatalogObserver?.(observer, appCtx.spaceFlight.camera?.position || appCtx.spaceFlight.rocket.position);
+  updateUniverseSky(universeRuntime.sky, appCtx.spaceFlight.rocket, observer);
   updateDeepSkyLayer(
     universeRuntime.deepSky,
     appCtx.spaceFlight.rocket,

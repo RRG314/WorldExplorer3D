@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
+import { firebaseProjectScript, firebaseInitJson, generatedFirebaseFiles } from './lib/firebase-artifact-config.mjs';
 import crypto from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import { canonicalBundledModule, rewritePackagedModuleReference } from './lib/runtime-module-identity.mjs';
+import { readReleaseSourceIdentity, assertReleaseSourceIdentity } from './lib/release-source-identity.mjs';
 import { build as buildJavaScript } from 'esbuild';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -33,17 +35,20 @@ const GAME_RUNTIME_ENTRYPOINTS = Object.freeze({
   bootstrap: 'app/js/bootstrap.js',
   'app-entry': 'app/js/app-entry.js',
   'account-social': 'app/js/multiplayer/social.js',
+  'account-contributions': 'account/contribution-workspace.js',
   'capture-phone': 'app/js/reality-capture/phone-entry.js',
   'capture-review': 'app/js/reality-capture/result-viewer.js',
   'multiplayer-rooms': 'app/js/multiplayer/rooms.js',
   'multiplayer-artifacts': 'app/js/multiplayer/artifacts.js',
-  'tunnel-solid-worker': 'app/js/world/compiler/tunnel-solid-worker.js'
+  'tunnel-solid-worker': 'app/js/world/compiler/tunnel-solid-worker.js',
+  'street-pavement-worker': 'app/js/world/compiler/street-pavement-worker.js',
+  'street-overview-worker': 'app/js/world/compiler/street-overview-worker.js'
 });
 const ROOT_SHARED_MODULE_DIR = path.join(ROOT, 'js');
 const GAME_SHARED_CONTEXT_MODULE = 'app/js/shared-context.js';
 const REQUIRED_EXTERNAL_ROOT_MODULES = Object.freeze([
-  '/js/firebase-init.js?v=57',
-  '/js/auth-ui.js?v=55',
+  '/js/firebase-init.js?v=58',
+  '/js/auth-ui.js?v=56',
   '/app/js/shared-context.js?v=55'
 ]);
 const INDIRECT_RUNTIME_ENTRYPOINTS = new Set([
@@ -69,14 +74,6 @@ function readFlag(name, fallback = '') {
   if (exact) return exact.slice(name.length + 1);
   const index = process.argv.indexOf(name);
   return index >= 0 && index + 1 < process.argv.length ? process.argv[index + 1] : fallback;
-}
-
-function git(args, fallback = '') {
-  try {
-    return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim();
-  } catch {
-    return fallback;
-  }
 }
 
 async function listFiles(directory, base = '') {
@@ -172,7 +169,10 @@ async function buildGameRuntime() {
           return { path: externalPath, external: true };
         }
         const relative = path.relative(ROOT_SHARED_MODULE_DIR, resolved);
-        if (relative.startsWith('..') || path.isAbsolute(relative)) return null;
+        if (relative.startsWith('..') || path.isAbsolute(relative)) {
+          const canonical = canonicalBundledModule(args.path, args.resolveDir);
+          return canonical ? { path: canonical } : null;
+        }
         const externalPath = `/js/${normalizePath(relative)}${query}`;
         externalRootModules.add(externalPath);
         return { path: externalPath, external: true };
@@ -229,6 +229,8 @@ async function rewriteGameHtml(runtime, groundData) {
   const productionConfig = canonicalJson({
     appEntrypoint: `./${runtime.entries['app-entry'].replace(/^js\/bundles\//, '')}`,
     tunnelSolidWorkerUrl: `/app/${runtime.entries['tunnel-solid-worker']}`,
+    streetPavementWorkerUrl: `/app/${runtime.entries['street-pavement-worker']}`,
+    streetOverviewWorkerUrl: `/app/${runtime.entries['street-overview-worker']}`,
     groundCatalogUrl: groundData.catalogUrl,
     groundReleaseId: groundData.releaseId
   }).trim();
@@ -255,6 +257,8 @@ async function rewriteAccountHtml(runtime) {
     throw new Error('Account HTML no longer contains the expected social source import.');
   }
   html = html.replace(sourceImport, bundledImport);
+  if(!html.includes('./contribution-workspace.js'))throw new Error('Account contributions entry is missing.');
+  html = html.replace('./contribution-workspace.js',`../app/${runtime.entries['account-contributions']}`);
   await fs.writeFile(htmlPath, html, 'utf8');
 }
 
@@ -265,30 +269,8 @@ function firebaseConfigPath(environment) {
   return path.join(ROOT, 'config', `firebase.${environment}.json`);
 }
 
-function firebaseProjectScript(environment, config) {
-  return `window.WORLD_EXPLORER_FIREBASE_ENV = ${JSON.stringify(environment)};\n` +
-    `window.WORLD_EXPLORER_FIREBASE = window.WORLD_EXPLORER_FIREBASE || ${JSON.stringify(config, null, 2)};\n`;
-}
-
-function firebaseInitJson(config) {
-  const payload = {
-    apiKey: String(config.apiKey || ''),
-    appId: String(config.appId || ''),
-    authDomain: String(config.authDomain || ''),
-    measurementId: String(config.measurementId || ''),
-    messagingSenderId: String(config.messagingSenderId || ''),
-    projectId: String(config.projectId || ''),
-    storageBucket: String(config.storageBucket || '')
-  };
-  return canonicalJson(payload);
-}
-
 async function writeGeneratedFirebaseFiles(environment, config) {
-  const files = {
-    'js/firebase-project-config.js': firebaseProjectScript(environment, config),
-    '__/firebase/init.json': firebaseInitJson(config),
-    '__/firebase/init.js': `self.__FIREBASE_DEFAULTS__ = ${firebaseInitJson(config).trim()};\n`
-  };
+  const files = generatedFirebaseFiles(environment, config);
   for (const [relative, content] of Object.entries(files)) {
     const target = path.join(OUTPUT_DIR, relative);
     await fs.mkdir(path.dirname(target), { recursive: true });
@@ -343,6 +325,8 @@ async function packageLockSha256() {
 }
 
 async function buildArtifact(environment) {
+  // Check provenance before replacing any generated artifact.
+  const sourceIdentity = readReleaseSourceIdentity(ROOT);
   const sourceFiles = await collectSourceFiles();
   const config = JSON.parse(await fs.readFile(firebaseConfigPath(environment), 'utf8'));
   const sourceReleases = await sourceReleaseFingerprint(sourceFiles);
@@ -357,17 +341,15 @@ async function buildArtifact(environment) {
   await fs.writeFile(captureHtmlPath, captureHtml.replace('js/reality-capture/phone-entry.js?v=1', runtimePackaging.entries['capture-phone']));
   const adminModulePath = path.join(OUTPUT_DIR, 'js', 'admin-dashboard.js');
   const adminModule = await fs.readFile(adminModulePath, 'utf8');
-  await fs.writeFile(adminModulePath, adminModule.replace('../app/js/reality-capture/result-viewer.js?v=1', `../app/${runtimePackaging.entries['capture-review']}`));
+  await fs.writeFile(adminModulePath, rewritePackagedModuleReference(adminModule, '../app/js/reality-capture/result-viewer.js', `../app/${runtimePackaging.entries['capture-review']}`));
   await writeGeneratedFirebaseFiles(environment, config);
 
   const files = await hashOutputFiles();
   const packageJson = await readPackage();
-  const commit = git(['rev-parse', 'HEAD'], 'unknown');
+  const { commit, commitTime, sourceDirty: dirty } = sourceIdentity;
   const shortCommit = commit.slice(0, 12);
   const contentHash = sha256(canonicalJson(files));
   const fingerprint = await sourceFingerprint(sourceFiles, environment, config);
-  const dirty = git(['status', '--porcelain'], '').length > 0;
-  const commitTime = git(['show', '-s', '--format=%cI', 'HEAD'], 'unknown');
   const dependencyLockSha256 = await packageLockSha256();
   const buildId = `${packageJson.version}+${shortCommit}.${contentHash.slice(0, 16)}.${environment}`;
   const assetManifest = { schemaVersion: 1, files };
@@ -440,7 +422,7 @@ async function verifyArtifact() {
       : relative;
     const outputHash = expectedFiles[outputRelative];
     const sourceHash = relative === 'js/admin-dashboard.js'
-      ? sha256((await fs.readFile(source, 'utf8')).replace('../app/js/reality-capture/result-viewer.js?v=1', `../app/${buildManifest.runtimePackaging?.entries?.['capture-review']}`))
+      ? sha256(rewritePackagedModuleReference(await fs.readFile(source, 'utf8'), '../app/js/reality-capture/result-viewer.js', `../app/${buildManifest.runtimePackaging?.entries?.['capture-review']}`))
       : await hashFile(source);
     if (!outputHash || outputHash !== sourceHash) {
       throw new Error(`Hosting artifact differs from canonical source: ${relative} -> ${outputRelative}`);
@@ -480,12 +462,18 @@ async function verifyArtifact() {
   const captureHtml = await fs.readFile(path.join(OUTPUT_DIR, 'app', 'capture.html'), 'utf8');
   const adminModule = await fs.readFile(path.join(OUTPUT_DIR, 'js', 'admin-dashboard.js'), 'utf8');
   for (const [name, entry] of Object.entries(runtimePackaging.entries || {})) {
-    const referenced = name === 'account-social' ? accountHtml.includes(`../app/${entry}`)
+    if (!expectedFiles[`app/${entry}`]) {
+      throw new Error(`Packaged runtime entry is missing: ${name} -> ${entry}`);
+    }
+    const referenced = (name === 'account-social'||name === 'account-contributions') ? accountHtml.includes(`../app/${entry}`)
       : name === 'capture-phone' ? captureHtml.includes(entry)
       : name === 'capture-review' ? adminModule.includes(`../app/${entry}`) : gameHtml.includes(entry);
     if (!referenced && !INDIRECT_RUNTIME_ENTRYPOINTS.has(name)) {
       throw new Error(`Game HTML does not reference bundled entry: ${entry}`);
     }
+  }
+  for (const name of Object.keys(GAME_RUNTIME_ENTRYPOINTS)) {
+    if (!runtimePackaging.entries?.[name]) throw new Error(`Missing runtime entry: ${name}`);
   }
   const configuredAppEntrypoint = `./${path.basename(runtimePackaging.entries?.['app-entry'] || '')}`;
   if (
@@ -503,7 +491,9 @@ async function verifyArtifact() {
   const contentHash = sha256(canonicalJson(expectedFiles));
   const fingerprint = await sourceFingerprint(sourceFiles, environment, config);
   const dependencyLockSha256 = await packageLockSha256();
-  const commit = git(['rev-parse', 'HEAD'], 'unknown');
+  const sourceIdentity = readReleaseSourceIdentity(ROOT);
+  assertReleaseSourceIdentity(buildManifest, sourceIdentity);
+  const { commit } = sourceIdentity;
   const buildId = `${packageJson.version}+${commit.slice(0, 12)}.${contentHash.slice(0, 16)}.${environment}`;
   const assetManifestSha256 = sha256(canonicalJson(assetManifest));
   if (

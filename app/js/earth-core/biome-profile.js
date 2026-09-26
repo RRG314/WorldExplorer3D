@@ -19,12 +19,12 @@ export function classifyBiomeProfile(options = {}) {
 
   let id = 'temperate-mosaic';
   if (absLatitude >= 86 || (absLatitude >= 60 && cryo >= 0.5)) id = 'polar-cryosphere';
-  else if (absLatitude >= 66) id = vegetated >= 0.12 ? 'tundra' : 'polar-desert';
+  else if (latitude <= -60 || absLatitude >= 66) id = vegetated >= 0.12 ? 'tundra' : 'polar-desert';
   else if ((Number.isFinite(elevationMeters) && elevationMeters >= 3200) || cryo >= 0.5) id = 'alpine';
   else if (boundedRatio(signals.wetland)>=0.2 && woody<0.25) id = 'wetland';
   else if (absLatitude <= 24 && woody >= 0.2 && water >= 0.015) id = 'tropical-rainforest';
   else if (absLatitude <= 24 && woody >= 0.28) id = 'tropical-seasonal-forest';
-  else if (arid >= 0.16 || (absLatitude >= 12 && absLatitude <= 35 && vegetated < 0.12)) id = 'hot-desert';
+  else if ((arid >= 0.16 && absLatitude < 60) || (absLatitude >= 12 && absLatitude <= 35 && vegetated < 0.12)) id = 'hot-desert';
   else if (scrub >= 0.12 && vegetated < 0.34) id = 'shrubland';
   else if (woody >= 0.42) id = 'temperate-forest';
   else if (reliefMeters >= 700) id = 'montane-mosaic';

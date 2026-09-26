@@ -7,6 +7,7 @@ import {
   attachCuratedParachuteVisual,
   disposeCuratedParachuteVisual
 } from './curated-parachute-visual.js?v=1';
+import { applyRifleHandPose } from '../walking/held-equipment-pose.js?v=1';
 
 function createEquipmentVisuals(THREE, characterMesh) {
   const hand = characterMesh?.userData?.limbs?.arm2;
@@ -178,12 +179,22 @@ function createEquipmentVisuals(THREE, characterMesh) {
     if (curatedEquipmentAssetForId(id)) void attachCuratedEquipmentVisual(THREE, items.get(visualId), id);
     parachutePack.visible = parachuteReady || parachuteCanopy.visible;
     root.userData.equippedId = String(id || 'hands');
+    characterMesh.userData.heldEquipmentId = curatedEquipmentAssetForId(id) ? String(id) : '';
+    characterMesh.userData.weaponPose = characterMesh.userData.heldEquipmentId ? 'ready' : 'unarmed';
     resetRootPose();
   };
   setEquipped('hands');
   return Object.freeze({
     root,
     setEquipped,
+    muzzleWorldPosition() {
+      const host = items.get(visualIdFor(root.userData.equippedId));
+      const point = host?.userData?.curatedEquipmentAttachment?.visual?.userData?.muzzleInHost;
+      if (!point || !host.visible) return null;
+      root.updateWorldMatrix?.(true, true);
+      const world = host.localToWorld(new THREE.Vector3(point.x, point.y, point.z));
+      return { x: world.x, y: world.y, z: world.z };
+    },
     setAimDirection(direction, active = true) {
       aiming = active === true && direction && [direction.x, direction.y, direction.z].every(Number.isFinite);
       const horizontal = aiming ? Math.hypot(direction.x, direction.z) : 0;
@@ -209,12 +220,21 @@ function createEquipmentVisuals(THREE, characterMesh) {
       return true;
     },
     update(dt = 0) {
+      const rifle = root.userData.equippedId === 'laser-gun';
+      if (rifle) applyRifleHandPose(THREE, characterMesh, 'r', new THREE.Vector3(-.17, 1.36 - Math.sin(aimPitch) * .25, .27));
       const curatedGrip = resetRootPose();
       if (aiming) root.rotation.x += aimPitch;
+      if (rifle && curatedGrip) {
+        root.updateWorldMatrix(true, true);
+        const support = root.localToWorld(new THREE.Vector3(0, -.02, .20));
+        applyRifleHandPose(THREE, characterMesh, 'l', characterMesh.worldToLocal(support));
+      }
       if (!useAction) return;
       useAction.elapsed += Math.max(0, Number(dt) || 0);
       const progress = Math.min(1, useAction.elapsed / useAction.duration);
-      const motion = Math.sin(progress * Math.PI);
+      const motion = useAction.category === 'sidearm'
+        ? (1 - Math.exp(-progress * 55)) * Math.exp(-progress * 7)
+        : Math.sin(progress * Math.PI);
       if (useAction.category === 'unarmed') {
         if (!curatedGrip) {
           hand.rotation.x = -1.35 * motion;
@@ -253,7 +273,7 @@ function createEquipmentVisuals(THREE, characterMesh) {
         }
         root.position.y += motion * .06;
       }
-      root.scale.setScalar(1 + motion * .06);
+      root.scale.setScalar(1);
       if (progress >= 1) {
         useAction = null;
         resetRootPose();
@@ -286,6 +306,8 @@ function createEquipmentVisuals(THREE, characterMesh) {
     dispose() {
       root.userData.disposed = true;
       items.forEach((group) => disposeCuratedEquipmentVisual(group));
+      characterMesh.userData.heldEquipmentId = '';
+      characterMesh.userData.weaponPose = 'unarmed';
       root.removeFromParent?.();
       parachutePack.removeFromParent?.();
       disposeCuratedParachuteVisual(parachuteCanopy);

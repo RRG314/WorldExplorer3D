@@ -60,6 +60,8 @@ export function createLinearFeatureRuntime(options = {}) {
     const feature = {
       kind: classification.kind,
       subtype: classification.subtype,
+      sourceTags: { ...(tags || {}) },
+      crossingNodes: runtimeOptions.crossingNodes || [],
       networkKind: classification.kind,
       name: String(tags?.name || '').trim(),
       sourceFeatureId: tags?.sourceFeatureId ? String(tags.sourceFeatureId) : '',
@@ -98,9 +100,8 @@ export function createLinearFeatureRuntime(options = {}) {
     updateFeatureSurfaceProfile(feature, worldBaseTerrainY, { surfaceBias: spec.bias });
     appCtx.linearFeatures.push(feature);
 
-    // Navigation and physical surface semantics are data. The legacy ribbons
-    // exposed raw mapped walking paths as competing world geometry. That
-    // presentation owner has been deleted; this module publishes data only.
+    // This record feeds navigation and the resident pavement area compiler.
+    // The publication pass below provides coarse paths outside that coverage.
     return true;
   }
 
@@ -142,6 +143,7 @@ export function createLinearFeatureRuntime(options = {}) {
         const pts = sanitizeWorldPathPoints(rawPts, geometryGuards);
         if (pts.length < 2) return;
         addLinearFeatureRecord(pts, { ...(way.tags || {}), sourceFeatureId: way.id ? String(way.id) : '' }, {
+          crossingNodes: way.nodes.map(id => nodes[id]).filter(n => n?.tags?.kerb || n?.tags?.highway === 'crossing').map(n => ({ ...appCtx.geoToWorld(n.lat,n.lon), kerb:n.tags.kerb, tags:{...n.tags} })),
           force: group.force === true,
           alwaysVisible: group.alwaysVisible === true
         });

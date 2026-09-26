@@ -1,0 +1,44 @@
+{
+  "purpose": "Architecture counterexample, not a city reproduction",
+  "fixture": "Two disjoint, parallel 4-unit carriageways 6 units apart, flat profiles at heights 2 and 6, attached facades ten units beyond the first centerline",
+  "samples": [
+    {
+      "x": 10,
+      "z": -2,
+      "engineeredRoadY": 2,
+      "renderedRoadY": 4,
+      "departure": 2
+    },
+    {
+      "x": 10,
+      "z": 0,
+      "engineeredRoadY": 2,
+      "renderedRoadY": 4,
+      "departure": 2
+    },
+    {
+      "x": 10,
+      "z": 1,
+      "engineeredRoadY": 2,
+      "renderedRoadY": 4,
+      "departure": 2
+    },
+    {
+      "x": 10,
+      "z": 2,
+      "engineeredRoadY": 2,
+      "renderedRoadY": 4,
+      "departure": 2
+    }
+  ],
+  "existingConformanceAudit": {
+    "authority": "published-at-grade-road-geometry-versus-rendered-terrain",
+    "totalSamples": 4,
+    "issuesFound": 0,
+    "minimumDelta": 0.18,
+    "maximumDelta": 0.18,
+    "buriedSamples": 0,
+    "floatingSamples": 0,
+    "worstDeltas": []
+  }
+}

@@ -1,0 +1,1226 @@
+[
+  {
+    "scope": "world",
+    "phase": "start:prepareAcceptedGround",
+    "javascriptHeapBytes": 43590080,
+    "roads": 0,
+    "roadMeshes": 0
+  },
+  {
+    "scope": "world",
+    "phase": "end:prepareAcceptedGround",
+    "javascriptHeapBytes": 43590080,
+    "durationMs": 34
+  },
+  {
+    "scope": "world",
+    "phase": "start:fetchFixedRegionalContext",
+    "javascriptHeapBytes": 43590080,
+    "roads": 0,
+    "roadMeshes": 0
+  },
+  {
+    "scope": "world",
+    "phase": "start:fetchOverpass",
+    "javascriptHeapBytes": 43590080,
+    "roads": 0,
+    "roadMeshes": 0
+  },
+  {
+    "scope": "world",
+    "phase": "end:fetchOverpass",
+    "javascriptHeapBytes": 68350837,
+    "durationMs": 237
+  },
+  {
+    "scope": "world",
+    "phase": "start:fetchFixedRegionalStructures",
+    "javascriptHeapBytes": 68350837,
+    "roads": 0,
+    "roadMeshes": 0
+  },
+  {
+    "scope": "world",
+    "phase": "end:fetchFixedRegionalContext",
+    "javascriptHeapBytes": 276088950,
+    "durationMs": 2045
+  },
+  {
+    "scope": "world",
+    "phase": "end:fetchFixedRegionalStructures",
+    "javascriptHeapBytes": 270850928,
+    "durationMs": 2130
+  },
+  {
+    "scope": "world",
+    "phase": "start:waitForFixedRegionalGround",
+    "javascriptHeapBytes": 335065496,
+    "roads": 0,
+    "roadMeshes": 0
+  },
+  {
+    "scope": "world",
+    "phase": "end:waitForFixedRegionalGround",
+    "javascriptHeapBytes": 437443790,
+    "durationMs": 3423
+  },
+  {
+    "scope": "world",
+    "phase": "start:featureBudgeting",
+    "javascriptHeapBytes": 476471252,
+    "roads": 0,
+    "roadMeshes": 0
+  },
+  {
+    "scope": "world",
+    "phase": "end:featureBudgeting",
+    "javascriptHeapBytes": 630805904,
+    "durationMs": 1663
+  },
+  {
+    "scope": "world",
+    "phase": "start:waitForTransportGround",
+    "javascriptHeapBytes": 622819088,
+    "roads": 0,
+    "roadMeshes": 0
+  },
+  {
+    "scope": "world",
+    "phase": "end:waitForTransportGround",
+    "javascriptHeapBytes": 622819088,
+    "durationMs": 0
+  },
+  {
+    "scope": "world",
+    "phase": "start:buildRoadGeometry",
+    "javascriptHeapBytes": 622819088,
+    "roads": 0,
+    "roadMeshes": 0
+  },
+  {
+    "scope": "world",
+    "phase": "end:buildRoadGeometry",
+    "javascriptHeapBytes": 880970959,
+    "durationMs": 1578
+  },
+  {
+    "scope": "world",
+    "phase": "start:buildLanduseGeometry",
+    "javascriptHeapBytes": 880970959,
+    "roads": 15554,
+    "roadMeshes": 0
+  },
+  {
+    "scope": "world",
+    "phase": "end:buildLanduseGeometry",
+    "javascriptHeapBytes": 863621173,
+    "durationMs": 140
+  },
+  {
+    "scope": "world",
+    "phase": "start:batchLanduseGeometry",
+    "javascriptHeapBytes": 863621173,
+    "roads": 15554,
+    "roadMeshes": 0
+  },
+  {
+    "scope": "world",
+    "phase": "end:batchLanduseGeometry",
+    "javascriptHeapBytes": 863621173,
+    "durationMs": 11
+  },
+  {
+    "scope": "world",
+    "phase": "start:buildLinearFeatureData",
+    "javascriptHeapBytes": 863621173,
+    "roads": 15554,
+    "roadMeshes": 0
+  },
+  {
+    "scope": "world",
+    "phase": "end:buildLinearFeatureData",
+    "javascriptHeapBytes": 926677621,
+    "durationMs": 401
+  },
+  {
+    "scope": "world",
+    "phase": "start:buildPoiGeometry",
+    "javascriptHeapBytes": 946580713,
+    "roads": 15554,
+    "roadMeshes": 0
+  },
+  {
+    "scope": "world",
+    "phase": "end:buildPoiGeometry",
+    "javascriptHeapBytes": 946580713,
+    "durationMs": 43
+  },
+  {
+    "scope": "world",
+    "phase": "start:buildStreetFurniture",
+    "javascriptHeapBytes": 946580713,
+    "roads": 15554,
+    "roadMeshes": 0
+  },
+  {
+    "scope": "world",
+    "phase": "end:buildStreetFurniture",
+    "javascriptHeapBytes": 977099503,
+    "durationMs": 379
+  },
+  {
+    "scope": "world",
+    "phase": "start:buildBuildingGeometry",
+    "javascriptHeapBytes": 718737346,
+    "roads": 15554,
+    "roadMeshes": 0
+  },
+  {
+    "scope": "world",
+    "phase": "start:buildBuildingRoadGuards",
+    "javascriptHeapBytes": 718737346,
+    "roads": 15554,
+    "roadMeshes": 0
+  },
+  {
+    "scope": "world",
+    "phase": "end:buildBuildingRoadGuards",
+    "javascriptHeapBytes": 917337418,
+    "durationMs": 3890
+  },
+  {
+    "scope": "world",
+    "phase": "end:buildBuildingGeometry",
+    "javascriptHeapBytes": 1091024410,
+    "durationMs": 6215
+  },
+  {
+    "scope": "world",
+    "phase": "start:publishBuildingFacadeEntrances",
+    "javascriptHeapBytes": 1091024410,
+    "roads": 15554,
+    "roadMeshes": 0
+  },
+  {
+    "scope": "world",
+    "phase": "end:publishBuildingFacadeEntrances",
+    "javascriptHeapBytes": 1130315842,
+    "durationMs": 326
+  },
+  {
+    "scope": "world",
+    "phase": "start:publishBuildingExteriorDetails",
+    "javascriptHeapBytes": 1130315842,
+    "roads": 15554,
+    "roadMeshes": 0
+  },
+  {
+    "scope": "world",
+    "phase": "end:publishBuildingExteriorDetails",
+    "javascriptHeapBytes": 1130315842,
+    "durationMs": 38
+  },
+  {
+    "scope": "world",
+    "phase": "start:batchBuildingGeometry",
+    "javascriptHeapBytes": 1130315842,
+    "roads": 15554,
+    "roadMeshes": 0
+  },
+  {
+    "scope": "world",
+    "phase": "end:batchBuildingGeometry",
+    "javascriptHeapBytes": 1448002912,
+    "durationMs": 809
+  },
+  {
+    "scope": "world",
+    "phase": "start:publishLocationTerrain",
+    "javascriptHeapBytes": 1448002912,
+    "roads": 15554,
+    "roadMeshes": 0
+  },
+  {
+    "scope": "world",
+    "phase": "end:publishLocationTerrain",
+    "javascriptHeapBytes": 1448002912,
+    "durationMs": 0
+  },
+  {
+    "scope": "world",
+    "phase": "start:publishCompiledTransportMeshes",
+    "javascriptHeapBytes": 1448002912,
+    "roads": 15554,
+    "roadMeshes": 0
+  },
+  {
+    "scope": "transport",
+    "phase": "refreshStructureProfiles:start",
+    "javascriptHeapBytes": 1448002912
+  },
+  {
+    "scope": "transport",
+    "phase": "refreshStructureProfiles:end",
+    "javascriptHeapBytes": 1880878981,
+    "milliseconds": 4534.9
+  },
+  {
+    "scope": "transport",
+    "phase": "applyTransportTerrainCorridors:start",
+    "javascriptHeapBytes": 1880878981
+  },
+  {
+    "scope": "transport",
+    "phase": "applyTransportTerrainCorridors:end",
+    "javascriptHeapBytes": 1991602413,
+    "milliseconds": 47231.7
+  },
+  {
+    "scope": "transport",
+    "phase": "reprojectGroundAttachedWorld:start",
+    "javascriptHeapBytes": 1991602413
+  },
+  {
+    "scope": "transport",
+    "phase": "reprojectGroundAttachedWorld:end",
+    "javascriptHeapBytes": 1973114153,
+    "milliseconds": 84.6
+  },
+  {
+    "scope": "transport",
+    "phase": "refreshPublishedTerrainStructureAssemblies:start",
+    "javascriptHeapBytes": 1973114153
+  },
+  {
+    "scope": "transport",
+    "phase": "refreshPublishedTerrainStructureAssemblies:end",
+    "javascriptHeapBytes": 2000008965,
+    "milliseconds": 881
+  },
+  {
+    "scope": "transport",
+    "phase": "detectIntersections:start",
+    "javascriptHeapBytes": 2000008965
+  },
+  {
+    "scope": "transport",
+    "phase": "detectIntersections:end",
+    "javascriptHeapBytes": 2085699909,
+    "milliseconds": 1282.9
+  },
+  {
+    "scope": "transport",
+    "phase": "buildStructureRibbons:start",
+    "javascriptHeapBytes": 2085699909
+  },
+  {
+    "scope": "transport",
+    "phase": "buildStructureRibbons:end",
+    "javascriptHeapBytes": 2209505125,
+    "milliseconds": 1872.1
+  },
+  {
+    "scope": "transport",
+    "phase": "buildCarriagewayRegions:start",
+    "javascriptHeapBytes": 2209505125
+  },
+  {
+    "scope": "transport",
+    "phase": "indexCarriageways:start",
+    "javascriptHeapBytes": 2238280605,
+    "roads": 14973
+  },
+  {
+    "scope": "transport",
+    "phase": "indexCarriageways:end",
+    "javascriptHeapBytes": 954604289,
+    "tiles": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 954604289,
+    "completed": 0,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 973535767,
+    "completed": 128,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 968038885,
+    "completed": 256,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 986642007,
+    "completed": 384,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 974268929,
+    "completed": 512,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 989868691,
+    "completed": 640,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 992588493,
+    "completed": 768,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 986824495,
+    "completed": 896,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1009642247,
+    "completed": 1024,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 996128535,
+    "completed": 1152,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1003423015,
+    "completed": 1280,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1018428513,
+    "completed": 1408,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1012397891,
+    "completed": 1536,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1007225729,
+    "completed": 1664,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1014073889,
+    "completed": 1792,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1027841263,
+    "completed": 1920,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1023646313,
+    "completed": 2048,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1029723887,
+    "completed": 2176,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1021331755,
+    "completed": 2304,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1032087307,
+    "completed": 2432,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1041318133,
+    "completed": 2560,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1047009593,
+    "completed": 2688,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1041627121,
+    "completed": 2816,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1039530959,
+    "completed": 2944,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1055196635,
+    "completed": 3072,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1072090043,
+    "completed": 3200,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1065330615,
+    "completed": 3328,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1074059749,
+    "completed": 3456,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1061990071,
+    "completed": 3584,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1070170029,
+    "completed": 3712,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1067480781,
+    "completed": 3840,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1077701001,
+    "completed": 3968,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1100531023,
+    "completed": 4096,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1078872119,
+    "completed": 4224,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1109665073,
+    "completed": 4352,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1088782213,
+    "completed": 4480,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1116387211,
+    "completed": 4608,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1095359907,
+    "completed": 4736,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1118158989,
+    "completed": 4864,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1109589763,
+    "completed": 4992,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1135987761,
+    "completed": 5120,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1119248961,
+    "completed": 5248,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1146436061,
+    "completed": 5376,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1152983099,
+    "completed": 5504,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1179124869,
+    "completed": 5632,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1184839227,
+    "completed": 5760,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1205774851,
+    "completed": 5888,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1215032889,
+    "completed": 6016,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1235299593,
+    "completed": 6144,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1270898143,
+    "completed": 6272,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1266675041,
+    "completed": 6400,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1293692827,
+    "completed": 6528,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1323920487,
+    "completed": 6656,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1348474191,
+    "completed": 6784,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1347195569,
+    "completed": 6912,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1358246937,
+    "completed": 7040,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1388994093,
+    "completed": 7168,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1422949313,
+    "completed": 7296,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1434166539,
+    "completed": 7424,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1459879727,
+    "completed": 7552,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1438442263,
+    "completed": 7680,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1464351237,
+    "completed": 7808,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1472877319,
+    "completed": 7936,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1481068219,
+    "completed": 8064,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1487782369,
+    "completed": 8192,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1483979437,
+    "completed": 8320,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1487757919,
+    "completed": 8448,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1466313663,
+    "completed": 8576,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1494104727,
+    "completed": 8704,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1490182703,
+    "completed": 8832,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1502783845,
+    "completed": 8960,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1487964763,
+    "completed": 9088,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1495533827,
+    "completed": 9216,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1490083693,
+    "completed": 9344,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1487746925,
+    "completed": 9472,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1513376767,
+    "completed": 9600,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1506731891,
+    "completed": 9728,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1524860479,
+    "completed": 9856,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1520716293,
+    "completed": 9984,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1513114651,
+    "completed": 10112,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1541836115,
+    "completed": 10240,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1520492357,
+    "completed": 10368,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1532598007,
+    "completed": 10496,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1527947591,
+    "completed": 10624,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1555915181,
+    "completed": 10752,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1541075559,
+    "completed": 10880,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1554854737,
+    "completed": 11008,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1550827059,
+    "completed": 11136,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1558413251,
+    "completed": 11264,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1558695321,
+    "completed": 11392,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1567799641,
+    "completed": 11520,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "meshCarriageway:progress",
+    "javascriptHeapBytes": 1558570401,
+    "completed": 11648,
+    "total": 11721
+  },
+  {
+    "scope": "transport",
+    "phase": "buildCarriagewayRegions:end",
+    "javascriptHeapBytes": 1558570401,
+    "milliseconds": 15214.1
+  },
+  {
+    "scope": "transport",
+    "phase": "projectGroundRoadMarkings:start",
+    "javascriptHeapBytes": 1558570401
+  },
+  {
+    "scope": "transport",
+    "phase": "projectGroundRoadMarkings:end",
+    "javascriptHeapBytes": 1735561217,
+    "milliseconds": 702
+  },
+  {
+    "scope": "transport",
+    "phase": "uploadRoadMeshes:start",
+    "javascriptHeapBytes": 1735561217
+  },
+  {
+    "scope": "transport",
+    "phase": "uploadRoadMeshes:end",
+    "javascriptHeapBytes": 1815039397,
+    "milliseconds": 216.8
+  },
+  {
+    "scope": "transport",
+    "phase": "rebuildStructureVisuals:start",
+    "javascriptHeapBytes": 1948301185
+  },
+  {
+    "scope": "transport",
+    "phase": "rebuildStructureVisuals:end",
+    "javascriptHeapBytes": 1980093136,
+    "milliseconds": 270.6
+  },
+  {
+    "scope": "world",
+    "phase": "end:publishCompiledTransportMeshes",
+    "javascriptHeapBytes": 1980093136,
+    "durationMs": 72730
+  },
+  {
+    "scope": "world",
+    "phase": "start:refreshTerrainSurfaceProfiles",
+    "javascriptHeapBytes": 1980093136,
+    "roads": 15554,
+    "roadMeshes": 26
+  },
+  {
+    "scope": "world",
+    "phase": "end:refreshTerrainSurfaceProfiles",
+    "javascriptHeapBytes": 1973198009,
+    "durationMs": 613
+  },
+  {
+    "scope": "world",
+    "phase": "start:publishDeferredTransportLandmark",
+    "javascriptHeapBytes": 1973198009,
+    "roads": 15554,
+    "roadMeshes": 26
+  },
+  {
+    "scope": "world",
+    "phase": "end:publishDeferredTransportLandmark",
+    "javascriptHeapBytes": 1967590441,
+    "durationMs": 229
+  },
+  {
+    "scope": "world",
+    "phase": "start:retireGroundFallbackPlaceholder",
+    "javascriptHeapBytes": 1967590441,
+    "roads": 15554,
+    "roadMeshes": 26
+  },
+  {
+    "scope": "world",
+    "phase": "end:retireGroundFallbackPlaceholder",
+    "javascriptHeapBytes": 1967590441,
+    "durationMs": 0
+  },
+  {
+    "scope": "world",
+    "phase": "start:buildTraversalNetworks",
+    "javascriptHeapBytes": 2161126059,
+    "roads": 15554,
+    "roadMeshes": 26
+  },
+  {
+    "scope": "world",
+    "phase": "end:buildTraversalNetworks",
+    "javascriptHeapBytes": 2215979459,
+    "durationMs": 331
+  },
+  {
+    "scope": "world",
+    "phase": "start:spawnPlayer",
+    "javascriptHeapBytes": 2215979459,
+    "roads": 15554,
+    "roadMeshes": 26
+  },
+  {
+    "scope": "world",
+    "phase": "end:spawnPlayer",
+    "javascriptHeapBytes": 2195074719,
+    "durationMs": 685
+  },
+  {
+    "scope": "world",
+    "phase": "start:refreshMemoryMarkersForCurrentLocation",
+    "javascriptHeapBytes": 2195074719,
+    "roads": 15554,
+    "roadMeshes": 26
+  },
+  {
+    "scope": "world",
+    "phase": "end:refreshMemoryMarkersForCurrentLocation",
+    "javascriptHeapBytes": 2195074719,
+    "durationMs": 0
+  },
+  {
+    "scope": "world",
+    "phase": "start:refreshBlockBuilderForCurrentLocation",
+    "javascriptHeapBytes": 2195074719,
+    "roads": 15554,
+    "roadMeshes": 26
+  },
+  {
+    "scope": "world",
+    "phase": "end:refreshBlockBuilderForCurrentLocation",
+    "javascriptHeapBytes": 2195074719,
+    "durationMs": 0
+  },
+  {
+    "scope": "world",
+    "phase": "start:refreshEditableWorldPresentation",
+    "javascriptHeapBytes": 2195074719,
+    "roads": 15554,
+    "roadMeshes": 26
+  },
+  {
+    "scope": "world",
+    "phase": "end:refreshEditableWorldPresentation",
+    "javascriptHeapBytes": 2195074719,
+    "durationMs": 0
+  },
+  {
+    "scope": "world",
+    "phase": "start:publishLocationWorld",
+    "javascriptHeapBytes": 2195074719,
+    "roads": 15554,
+    "roadMeshes": 26
+  },
+  {
+    "scope": "world",
+    "phase": "end:publishLocationWorld",
+    "javascriptHeapBytes": 2195074719,
+    "durationMs": 2
+  },
+  {
+    "scope": "world",
+    "phase": "start:refreshEditableBuildingVisibility",
+    "javascriptHeapBytes": 2195074719,
+    "roads": 15554,
+    "roadMeshes": 26
+  },
+  {
+    "scope": "world",
+    "phase": "end:refreshEditableBuildingVisibility",
+    "javascriptHeapBytes": 2200215439,
+    "durationMs": 291
+  },
+  {
+    "scope": "world",
+    "phase": "start:waitForTerrainSurfaceMaterials",
+    "javascriptHeapBytes": 2200215439,
+    "roads": 15554,
+    "roadMeshes": 26
+  },
+  {
+    "scope": "world",
+    "phase": "end:waitForTerrainSurfaceMaterials",
+    "javascriptHeapBytes": 2200215439,
+    "durationMs": 0
+  },
+  {
+    "scope": "gameplay",
+    "phase": "start:livingWorld",
+    "javascriptHeapBytes": 2276802055
+  },
+  {
+    "scope": "gameplay",
+    "phase": "end:livingWorld",
+    "javascriptHeapBytes": 2353275665,
+    "durationMs": 1046
+  },
+  {
+    "scope": "gameplay",
+    "phase": "start:urbanSandbox",
+    "javascriptHeapBytes": 2353275665
+  },
+  {
+    "scope": "gameplay",
+    "phase": "end:urbanSandbox",
+    "javascriptHeapBytes": 2329224650,
+    "durationMs": 264
+  },
+  {
+    "scope": "gameplay",
+    "phase": "start:aviation",
+    "javascriptHeapBytes": 2329224650
+  },
+  {
+    "scope": "gameplay",
+    "phase": "end:aviation",
+    "javascriptHeapBytes": 2329224650,
+    "durationMs": 5
+  },
+  {
+    "scope": "gameplay",
+    "phase": "start:maritime",
+    "javascriptHeapBytes": 2329224650
+  },
+  {
+    "scope": "gameplay",
+    "phase": "end:maritime",
+    "javascriptHeapBytes": 2329224650,
+    "durationMs": 43
+  },
+  {
+    "scope": "gameplay",
+    "phase": "start:worldDiscovery",
+    "javascriptHeapBytes": 2329224650
+  },
+  {
+    "scope": "gameplay",
+    "phase": "end:worldDiscovery",
+    "javascriptHeapBytes": 2375408113,
+    "durationMs": 6803
+  }
+]

@@ -107,14 +107,25 @@ export function createUiRoomRoomActionsApi({
       return null;
     }
 
+    if (!state.authUser) {
+      state.pendingRoomCode = code;
+      state.pendingRoomPrompted = false;
+      setInputCode(refs, code);
+      setStatus('Sign in to join this room. Your selection is saved.');
+      document.getElementById('appSignInBtn')?.click();
+      return null;
+    }
+    if (state.roomJoinBusy) return null;
+    state.roomJoinBusy = true;
+    emitProductTelemetry('room_join_attempt', { source: options.source || 'code' });
     try {
       const room = await joinRoomByCode(code);
       if (!state.authUser) {
         const authed = getCurrentUser();
         if (authed) callbacks.setAuthUser?.(authed);
       }
-      await activateRoom(room, "joined room");
-      await bumpExplorerLeaderboard({ roomsJoined: 1 });
+      if (!await activateRoom(room, "joined room")) return null;
+      await bumpExplorerLeaderboard({ roomsJoined: 1 }).catch(() => {});
       emitProductTelemetry('room_join', {
         source: 'code',
         visibility: room.visibility || 'private',
@@ -126,10 +137,13 @@ export function createUiRoomRoomActionsApi({
       closeRoomPanel();
       return room;
     } catch (err) {
+      emitProductTelemetry('room_join_failed', { error_code: err?.code || 'unknown' });
       console.error("[multiplayer][ui] join failed:", err);
       if (!suppressStatus) setStatus(err?.message || "Could not join that room.", true);
       if (throwOnError) throw err;
       return null;
+    } finally {
+      state.roomJoinBusy = false;
     }
   }
 
@@ -198,9 +212,13 @@ export function createUiRoomRoomActionsApi({
   }
 
   async function handleCreateRoom() {
-    if (!(await ensureAccessOrWarn("creating a room"))) return;
-
+    if (state.roomCreateBusy) return;
+    state.roomCreateBusy = true;
+    setStatus('Checking room access…');
+    emitProductTelemetry('room_create_attempt', { visibility: readVisibilitySelection() });
     try {
+      if (!(await ensureAccessOrWarn('creating a room'))) return;
+      setStatus('Creating room…');
       const world = readWorldContext();
       const roomName = sanitizeText(readRoomNameInput(), 80);
       const visibility = readVisibilitySelection();
@@ -219,8 +237,8 @@ export function createUiRoomRoomActionsApi({
         locationTag: effectiveLocationTag ? { label: effectiveLocationTag, city: effectiveLocationTag, kind: world.kind } : null
       });
 
-      await activateRoom(room, "created room");
-      await bumpExplorerLeaderboard({ roomsJoined: 1 });
+      if (!await activateRoom(room, "created room")) return null;
+      await bumpExplorerLeaderboard({ roomsJoined: 1 }).catch(() => {});
       emitProductTelemetry('room_create', {
         visibility: room.visibility || visibility,
         world_kind: room.world?.kind || world.kind,
@@ -238,8 +256,11 @@ export function createUiRoomRoomActionsApi({
         }
       }
     } catch (err) {
+      emitProductTelemetry('room_create_failed', { error_code: err?.code || 'unknown' });
       console.error("[multiplayer][ui] create room failed:", err);
       setStatus(err?.message || "Could not create room.", true);
+    } finally {
+      state.roomCreateBusy = false;
     }
   }
 
@@ -254,27 +275,29 @@ export function createUiRoomRoomActionsApi({
   async function handleBrowseRooms() {
     const cityInput = sanitizeText(refs.titleBrowseCityInput?.value || "", 48);
     const cityKey = helpers.normalizeCityKey(cityInput);
-    if (!cityKey) {
-      setBrowseStatus("Enter a city name to browse public rooms.", true);
-      state.browseRooms = [];
-      renderBrowseRooms();
-      return;
-    }
-
+    const requestId = (state.browseRequestId || 0) + 1;
+    state.browseRequestId = requestId;
     state.browseCityKey = cityKey;
-    setBrowseStatus(`Searching public rooms near ${cityInput}...`);
+    state.browsePhase = 'loading';
+    state.browseRooms = [];
+    renderBrowseRooms();
+    setBrowseStatus(cityKey ? `Searching rooms tagged ${cityInput}…` : 'Loading public rooms…');
+    emitProductTelemetry('room_browse_attempt', { filtered: !!cityKey });
     try {
       const rooms = await findPublicRoomsByCity(cityInput, { resultLimit: 20 });
+      if (requestId !== state.browseRequestId) return;
       state.browseRooms = rooms;
+      state.browsePhase = 'ready';
       renderBrowseRooms();
-      if (!rooms.length) {
-        setBrowseStatus(`No public rooms near ${cityInput} right now.`);
-        return;
-      }
-      setBrowseStatus(`Found ${rooms.length} public room${rooms.length === 1 ? "" : "s"} near ${cityInput}.`);
+      setBrowseStatus(rooms.length ? `${rooms.length} public room${rooms.length === 1 ? '' : 's'}${cityKey ? ` tagged ${cityInput}` : ''}. Join a room to see who is there.` :
+        cityKey ? `No rooms tagged ${cityInput}. Clear the city filter to see all public rooms, or create one.` : 'No public rooms yet. Create a public room to let others find you, or join with an invite code.');
+      emitProductTelemetry('room_browse_result', { filtered: !!cityKey, result_count: rooms.length });
     } catch (err) {
-      console.error("[multiplayer][ui] browse rooms failed:", err);
-      setBrowseStatus(err?.message || "Could not browse public rooms right now.", true);
+      if (requestId !== state.browseRequestId) return;
+      state.browsePhase = 'error';
+      renderBrowseRooms();
+      emitProductTelemetry('room_browse_failed', { error_code: err?.code || 'unknown' });
+      setBrowseStatus('Rooms could not be loaded. Check your connection and try Browse again.', true);
     }
   }
 
@@ -285,8 +308,8 @@ export function createUiRoomRoomActionsApi({
     const roomName = `Weekly City • ${weekly.city} (Week ${weekly.week})`;
 
     async function finalizeJoin(room, originLabel) {
-      await activateRoom(room, originLabel);
-      await bumpExplorerLeaderboard({ roomsJoined: 1 });
+      if (!await activateRoom(room, originLabel)) return null;
+      await bumpExplorerLeaderboard({ roomsJoined: 1 }).catch(() => {});
       emitProductTelemetry('room_join', {
         source: 'weekly_city',
         visibility: room.visibility || 'public',

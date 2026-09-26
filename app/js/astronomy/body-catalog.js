@@ -206,7 +206,7 @@ const bodyRows = [
     atmosphere: { class: ATMOSPHERE_CLASS.DENSE, referencePressurePa: 9_200_000, composition: ['carbon_dioxide', 'nitrogen'] },
     exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'venus', requiresProtectedSurfaceCapability: true },
     frames: { inertial: 'J2000', bodyFixed: 'IAU_VENUS' },
-    presentation: { environmentId: 'VENUS', globalTexturePath: '/app/assets/textures/venus_magellan.jpg', surfaceLabel: 'Venus surface' },
+    presentation: { environmentId: 'VENUS', orbitalTexturePath: '/app/assets/textures/venus-nasa-vtad-clouds.jpg', globalTexturePath: '/app/assets/textures/venus_magellan.jpg', surfaceLabel: 'Venus surface' },
     provenanceSources: sharedPlanetSources
   }),
   makeBody({
@@ -242,7 +242,7 @@ const bodyRows = [
     atmosphere: { class: ATMOSPHERE_CLASS.GIANT, referencePressurePa: 100_000, composition: ['hydrogen', 'helium', 'methane', 'ammonia'] },
     exploration: { landingMode: LANDING_MODE.ATMOSPHERIC_DESCENT, surfaceRegionEligible: false, environmentProfileId: 'jupiter' },
     frames: { inertial: 'J2000', bodyFixed: 'IAU_JUPITER' },
-    presentation: { environmentId: 'JUPITER', globalTexturePath: '/app/assets/textures/jupiter_voyager.jpg', surfaceLabel: null },
+    presentation: { environmentId: 'JUPITER', globalTexturePath: '/app/assets/textures/jupiter-hubble-opal-2015-complete.jpg', surfaceLabel: null },
     provenanceSources: sharedPlanetSources
   }),
   makeBody({
@@ -251,7 +251,7 @@ const bodyRows = [
     atmosphere: { class: ATMOSPHERE_CLASS.GIANT, referencePressurePa: 100_000, composition: ['hydrogen', 'helium', 'methane', 'ammonia'] },
     exploration: { landingMode: LANDING_MODE.ATMOSPHERIC_DESCENT, surfaceRegionEligible: false, environmentProfileId: 'saturn' },
     frames: { inertial: 'J2000', bodyFixed: 'IAU_SATURN' },
-    presentation: { environmentId: 'SATURN', globalTexturePath: '/app/assets/textures/saturn_jpl.jpg', surfaceLabel: null },
+    presentation: { environmentId: 'SATURN', globalTexturePath: '/app/assets/textures/saturn-nasa-vtad-map.jpg', surfaceLabel: null },
     provenanceSources: sharedPlanetSources
   }),
   makeBody({
@@ -260,7 +260,7 @@ const bodyRows = [
     atmosphere: { class: ATMOSPHERE_CLASS.GIANT, referencePressurePa: 100_000, composition: ['hydrogen', 'helium', 'methane'] },
     exploration: { landingMode: LANDING_MODE.ATMOSPHERIC_DESCENT, surfaceRegionEligible: false, environmentProfileId: 'uranus' },
     frames: { inertial: 'J2000', bodyFixed: 'IAU_URANUS' },
-    presentation: { environmentId: 'URANUS', globalTexturePath: '/app/assets/textures/uranus_jpl.jpg', surfaceLabel: null },
+    presentation: { environmentId: 'URANUS', globalTexturePath: '/app/assets/textures/uranus-nasa-vtad-map.jpg', surfaceLabel: null },
     provenanceSources: sharedPlanetSources
   }),
   makeBody({
@@ -269,7 +269,7 @@ const bodyRows = [
     atmosphere: { class: ATMOSPHERE_CLASS.GIANT, referencePressurePa: 100_000, composition: ['hydrogen', 'helium', 'methane'] },
     exploration: { landingMode: LANDING_MODE.ATMOSPHERIC_DESCENT, surfaceRegionEligible: false, environmentProfileId: 'neptune' },
     frames: { inertial: 'J2000', bodyFixed: 'IAU_NEPTUNE' },
-    presentation: { environmentId: 'NEPTUNE', globalTexturePath: '/app/assets/textures/neptune_jpl.jpg', surfaceLabel: null },
+    presentation: { environmentId: 'NEPTUNE', globalTexturePath: '/app/assets/textures/neptune-nasa-vtad-map.jpg', surfaceLabel: null },
     provenanceSources: sharedPlanetSources
   }),
   makeBody({
@@ -296,7 +296,7 @@ const bodyRows = [
     atmosphere: { class: ATMOSPHERE_CLASS.EXOSPHERE, referencePressurePa: 0, composition: ['sulfur_dioxide'] },
     exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'io', experienceTier: 'featured' },
     frames: { inertial: 'J2000', bodyFixed: 'IAU_IO' },
-    presentation: { environmentId: 'IO', globalTexturePath: '/app/assets/textures/io-voyager-galileo.jpg', surfaceLabel: 'Tvashtar volcanic region' },
+    presentation: { environmentId: 'IO', globalTexturePath: '/app/assets/textures/io-jpl-galileo-map.jpg', surfaceLabel: 'Tvashtar volcanic region' },
     provenanceSources: sharedMoonSources
   }),
   makeBody({
@@ -305,7 +305,7 @@ const bodyRows = [
     atmosphere: { class: ATMOSPHERE_CLASS.EXOSPHERE, referencePressurePa: 0, composition: ['oxygen'] },
     exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'europa', experienceTier: 'featured' },
     frames: { inertial: 'J2000', bodyFixed: 'IAU_EUROPA' },
-    presentation: { environmentId: 'EUROPA', globalTexturePath: '/app/assets/textures/europa-voyager-galileo.jpg', surfaceLabel: 'Conamara Chaos region' },
+    presentation: { environmentId: 'EUROPA', globalTexturePath: '/app/assets/textures/europa-usgs-voyager-map.jpg', surfaceLabel: 'Conamara Chaos region' },
     provenanceSources: sharedMoonSources
   }),
   makeBody({
@@ -314,7 +314,7 @@ const bodyRows = [
     atmosphere: { class: ATMOSPHERE_CLASS.EXOSPHERE, referencePressurePa: 0, composition: ['oxygen'] },
     exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'ganymede', experienceTier: 'regional' },
     frames: { inertial: 'J2000', bodyFixed: 'IAU_GANYMEDE' },
-    presentation: { environmentId: 'GANYMEDE', globalTexturePath: '/app/assets/textures/ganymede-voyager-galileo.jpg', surfaceLabel: 'Galileo Regio' },
+    presentation: { environmentId: 'GANYMEDE', globalTexturePath: '/app/assets/textures/ganymede-nasa-vtad-map.jpg', surfaceLabel: 'Galileo Regio' },
     provenanceSources: sharedMoonSources
   }),
   makeBody({
@@ -323,7 +323,7 @@ const bodyRows = [
     atmosphere: { class: ATMOSPHERE_CLASS.EXOSPHERE, referencePressurePa: 0, composition: ['carbon_dioxide', 'oxygen'] },
     exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'callisto', experienceTier: 'regional' },
     frames: { inertial: 'J2000', bodyFixed: 'IAU_CALLISTO' },
-    presentation: { environmentId: 'CALLISTO', globalTexturePath: '/app/assets/textures/callisto-voyager-galileo.jpg', surfaceLabel: 'Valhalla basin' },
+    presentation: { environmentId: 'CALLISTO', globalTexturePath: '/app/assets/textures/callisto-nasa-vtad-map.jpg', surfaceLabel: 'Valhalla basin' },
     provenanceSources: sharedMoonSources
   }),
   makeBody({
@@ -332,7 +332,7 @@ const bodyRows = [
     atmosphere: { class: ATMOSPHERE_CLASS.DENSE, referencePressurePa: 146_700, composition: ['nitrogen', 'methane', 'hydrogen'] },
     exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'titan', experienceTier: 'featured', requiresProtectedSurfaceCapability: true },
     frames: { inertial: 'J2000', bodyFixed: 'IAU_TITAN' },
-    presentation: { environmentId: 'TITAN', globalTexturePath: '/app/assets/textures/titan-cassini-iss.jpg', surfaceLabel: 'Shangri-La dunes' },
+    presentation: { environmentId: 'TITAN', globalTexturePath: '/app/assets/textures/titan-cassini-map-unlabelled.jpg', surfaceLabel: 'Shangri-La dunes' },
     provenanceSources: sharedMoonSources
   }),
   makeBody({
@@ -341,7 +341,7 @@ const bodyRows = [
     atmosphere: { class: ATMOSPHERE_CLASS.EXOSPHERE, referencePressurePa: 0, composition: ['water_vapor', 'carbon_dioxide'] },
     exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'enceladus', experienceTier: 'featured' },
     frames: { inertial: 'J2000', bodyFixed: 'IAU_ENCELADUS' },
-    presentation: { environmentId: 'ENCELADUS', globalTexturePath: '/app/assets/textures/enceladus-cassini.jpg', surfaceLabel: 'South polar terrain' },
+    presentation: { environmentId: 'ENCELADUS', globalTexturePath: '/app/assets/textures/enceladus-nasa-vtad-map.jpg', surfaceLabel: 'South polar terrain' },
     provenanceSources: sharedMoonSources
   }),
   makeBody({
@@ -350,7 +350,7 @@ const bodyRows = [
     atmosphere: { class: ATMOSPHERE_CLASS.THIN, referencePressurePa: 1.4, composition: ['nitrogen', 'methane'] },
     exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'triton', experienceTier: 'featured' },
     frames: { inertial: 'J2000', bodyFixed: 'IAU_TRITON' },
-    presentation: { environmentId: 'TRITON', globalTexturePath: '/app/assets/textures/triton-voyager.jpg', surfaceLabel: 'Voyager imaged hemisphere' },
+    presentation: { environmentId: 'TRITON', globalTexturePath: '/app/assets/textures/triton-nasa-vtad-map.jpg', surfaceLabel: 'Voyager imaged hemisphere' },
     provenanceSources: sharedMoonSources
   }),
   makeBody({
@@ -359,7 +359,7 @@ const bodyRows = [
     atmosphere: { class: ATMOSPHERE_CLASS.EXOSPHERE, referencePressurePa: 0, composition: ['water_vapor'] },
     exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'ceres', experienceTier: 'featured' },
     frames: { inertial: 'J2000', bodyFixed: 'IAU_CERES' },
-    presentation: { environmentId: 'CERES', globalTexturePath: '/app/assets/textures/ceres-dawn-enhanced.jpg', surfaceLabel: 'Occator crater region' },
+    presentation: { environmentId: 'CERES', globalTexturePath: '/app/assets/textures/ceres-nasa-vtad-map.jpg', surfaceLabel: 'Occator crater region' },
     provenanceSources: sharedSmallBodySources
   }),
   makeBody({
@@ -368,7 +368,7 @@ const bodyRows = [
     atmosphere: { class: ATMOSPHERE_CLASS.NONE, referencePressurePa: 0, composition: [] },
     exploration: { landingMode: LANDING_MODE.SOLID_SURFACE, surfaceRegionEligible: true, environmentProfileId: 'vesta', experienceTier: 'featured' },
     frames: { inertial: 'J2000', bodyFixed: 'IAU_VESTA' },
-    presentation: { environmentId: 'VESTA', globalTexturePath: '/app/assets/textures/vesta-dawn.jpg', surfaceLabel: 'Rheasilvia basin' },
+    presentation: { environmentId: 'VESTA', globalTexturePath: '/app/assets/textures/vesta-nasa-vtad-map.jpg', surfaceLabel: 'Rheasilvia basin' },
     provenanceSources: sharedSmallBodySources
   }),
   makeBody({

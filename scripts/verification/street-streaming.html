@@ -1,0 +1,40 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Street coverage and movement verification</title>
+<style>body{margin:0;background:#a8bac7;color:white;font:13px system-ui}aside{position:fixed;left:8px;top:8px;padding:12px;background:#101921ee;width:305px;max-height:92vh;overflow:auto}button{padding:7px;margin:3px}pre{white-space:pre-wrap}</style>
+<aside><strong>Location-wide pavement verification</strong><p>Four captured San Francisco street districts across 1.5 km, on a continuous sloping test terrain. Real pavement workers and publication code; illustrative buildings. This is a streaming integration test, not a full city load.</p><button id="run">Build full coverage</button><button id="move">Move detail to far district</button><button id="return">Return detail to start</button><button id="reset">Dispose surfaces</button><button id="wide">Whole layout view</button><button id="closeStart">Inspect start district</button><button id="closeFar">Inspect far district</button><pre id="result">Ready</pre></aside>
+<footer style="position:fixed;right:8px;bottom:8px;background:#101921dd;padding:6px"><a style="color:white" href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a></footer>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script><script type="module">
+import {publishStreetPavement} from '../../app/js/world/street-pavement-runtime.js';
+import {createStreetOverview} from '../../app/js/world/street-overview.js';
+import {terrainSampler,shiftedCase} from './street-quality-core.js';
+import {appendSolidAtGradeRoadGeometry} from '../../app/js/terrain/road-surface-geometry.js?v=2';
+const fixture=await fetch('../../tests/fixtures/streets/san-francisco-hill-quality.json').then(r=>r.json());
+const input={roads:[],buildings:[],landuses:[],linearFeatures:[]};
+for(const [x,z] of [[0,0],[1024,0],[0,1024],[1024,1024]]){const part=shiftedCase(fixture,x,z).input;for(const key of Object.keys(input))input[key].push(...part[key]);}
+const grid={minX:-256,minZ:-256,step:16,size:101,heights:[]};
+for(let row=0;row<grid.size;row++)for(let col=0;col<grid.size;col++){const x=grid.minX+col*grid.step,z=grid.minZ+row*grid.step;grid.heights.push(.1*x+.05*z+5*Math.sin(x/120)*Math.cos(z/160));}
+const ground=terrainSampler(grid),scene=new THREE.Scene();scene.background=new THREE.Color('#a8bac7');scene.add(new THREE.HemisphereLight(0xffffff,0x7b8271,1));
+const sun=new THREE.DirectionalLight(0xffffff,.8);sun.position.set(100,300,60);scene.add(sun);
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(1);renderer.outputEncoding=THREE.sRGBEncoding;document.body.append(renderer.domElement);
+const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,.5,5000);camera.position.set(1450,1250,1550);camera.lookAt(450,60,500);
+function add(vertices,indices,material){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));if(indices)g.setIndex(indices);g.computeVertexNormals();g.computeBoundingSphere();const mesh=new THREE.Mesh(g,material);scene.add(mesh);return mesh;}
+const tv=[],ti=[],n=grid.size;for(let row=0;row<n;row++)for(let col=0;col<n;col++){const x=grid.minX+col*grid.step,z=grid.minZ+row*grid.step;tv.push(x,ground(x,z),z);if(row<n-1&&col<n-1){const a=row*n+col;ti.push(a,a+n,a+1,a+1,a+n,a+n+1);}}
+const terrainMesh=add(tv,ti,new THREE.MeshStandardMaterial({color:0x74765e,roughness:1}));terrainMesh.userData.isTerrainMesh=true;
+const roadMeshes=[];for(const road of input.roads){if(road.structureSemantics?.terrainMode!=='at_grade')continue;const v=[],i=[];appendSolidAtGradeRoadGeometry({feature:road,points:road.pts,halfWidth:road.width/2,sampleTerrainY:ground,surfaceBias:.08,targetVerts:v,targetIndices:i});if(v.length)roadMeshes.push(add(v,i,new THREE.MeshStandardMaterial({color:0x34383c,roughness:1})));}
+const buildingsMaterial=new THREE.MeshStandardMaterial({color:0xbda88d,roughness:1});
+for(const building of input.buildings){const shape=new THREE.Shape();building.pts.forEach((p,i)=>i?shape.lineTo(p.x,-p.z):shape.moveTo(p.x,-p.z));shape.closePath();const g=new THREE.ExtrudeGeometry(shape,{depth:7,bevelEnabled:false});g.rotateX(-Math.PI/2);const mesh=new THREE.Mesh(g,buildingsMaterial);mesh.position.y=Math.max(...building.pts.map(p=>ground(p.x,p.z)));scene.add(mesh);}
+const ctx={...input,_worldLoadSequence:1,_groundSurfaceRevision:0,scene,renderer,terrainGroup:{children:[terrainMesh]},landuseMeshes:[],roadMeshes,urbanSurfaceMeshes:[],linearFeatureMeshes:[],terrainEnabled:true,METERS_PER_WORLD_UNIT:1.11,car:{x:0,z:0},terrainMeshHeightAt:ground,elevationWorldYAtWorldXZ:ground,addEarthWorldObject:mesh=>scene.add(mesh)};
+let busy=false,history=[];
+const report=()=>{renderer.render(scene,camera);document.querySelector('#result').textContent=JSON.stringify({busy,near:ctx.streetPavement?.stats,overview:ctx.streetOverview?.stats,renderer:renderer.info.memory,heapBytes:performance.memory?.usedJSHeapSize,history},null,2);};
+async function detail(x,z){ctx.car={x,z};await publishStreetPavement(ctx);history.push({position:{x,z},durationMs:ctx.streetPavement.stats.durationMs,reusedCells:ctx.streetPavement.stats.reusedCells||0,cacheBytes:ctx.streetPavement.stats.compilerCacheBytes});report();}
+async function action(work){if(busy)return;busy=true;report();try{await work();}catch(error){history.push({error:String(error.stack)});}finally{busy=false;report();}}
+document.querySelector('#run').onclick=()=>action(async()=>{await detail(0,0);ctx.streetOverview ||= createStreetOverview(ctx);for(let i=0;i<5000;i++){ctx.streetOverview.step(ctx.car);await ctx.streetOverview.pause();report();if(['complete','failed'].includes(ctx.streetOverview.stats.status))break;await new Promise(r=>setTimeout(r,0));}});
+document.querySelector('#move').onclick=()=>action(()=>detail(1024,1024));document.querySelector('#return').onclick=()=>action(()=>detail(0,0));
+document.querySelector('#reset').onclick=()=>action(async()=>{
+ ctx.streetOverview?.dispose();ctx.streetOverview=null;ctx.streetPavement?.dispose();ctx.streetPavement=null;ctx._streetPavementCache?.clear();
+ for(const mesh of ctx.linearFeatureMeshes){mesh.parent?.remove(mesh);mesh.geometry.dispose();mesh.material.dispose();}
+ ctx.linearFeatureMeshes.length=0;ctx.urbanSurfaceMeshes.length=0;
+});
+document.querySelector('#wide').onclick=()=>{camera.position.set(1450,1250,1550);camera.lookAt(450,60,500);report();};
+for(const [id,x,z] of [['closeStart',0,0],['closeFar',1024,1024]])document.querySelector('#'+id).onclick=()=>{camera.position.set(x+70,ground(x+70,z+90)+50,z+90);camera.lookAt(x,ground(x,z),z);report();};
+report();
+</script></html>

@@ -1,3 +1,5 @@
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
@@ -18,8 +20,10 @@ const context = await browser.newContext({
   hasTouch: mobile
 });
 const page = await context.newPage();
+await configureStagingAppCheck(page, baseUrl);
 const browserErrors = [];
 const failedLocalResources = [];
+collectBrowserGraphicsErrors(page, browserErrors);
 page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
 page.on('response', (response) => {
   if (response.url().startsWith(baseUrl) && response.status() >= 400) failedLocalResources.push({ status: response.status(), url: response.url() });
@@ -39,9 +43,11 @@ try {
 
   await page.selectOption('#spaceDestinationSelect', destinationBodyId);
   await page.waitForFunction((bodyId) => JSON.parse(globalThis.render_game_to_text?.() || '{}').spaceFlight?.destinationBodyId === bodyId, destinationBodyId);
-  if (!await page.locator('#sfAssistBtn').isVisible() && await page.locator('#sfHudToggle').isVisible()) {
-    await page.locator('#sfHudToggle').click();
-  }
+  // Visibility can change between separate checks while the HUD initializes.
+  // Wait for its control, then use the explicit state so opening never closes it.
+  const hudToggle = page.locator('#sfHudToggle');
+  await hudToggle.waitFor({ state: 'visible' });
+  if (await hudToggle.getAttribute('aria-expanded') === 'false') await hudToggle.click();
   await page.locator('#sfAssistBtn').click();
   await page.waitForFunction(() => JSON.parse(globalThis.render_game_to_text?.() || '{}').spaceFlight?.assist?.active === true);
 
@@ -67,6 +73,13 @@ try {
   });
   assert.equal(advanced.phase, 'approach', `Assisted ${destinationLabel} course stopped: ${JSON.stringify(advanced)}.`);
   assert.ok(advanced.minimumForwardDot > 0.98, `Assisted flight moved backward relative to the craft: ${JSON.stringify(advanced)}.`);
+  // Advancing the journey above does not run the frame-owned HUD update.
+  // Observe the real entry control once that update has consumed the new state.
+  await page.waitForFunction((label) => {
+    const button = document.getElementById('sfLandBtn');
+    return button?.disabled === false &&
+      button.textContent?.trim().toUpperCase() === `ENTER ${label.toUpperCase()} ATMOSPHERE`;
+  }, destinationLabel, { timeout: 10_000 });
   const before = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     return {

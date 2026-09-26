@@ -1,6 +1,6 @@
+import {refreshLinearWalkContactIndex} from './road-contact-index.js?v=1';
 import {
-  buildFeatureRibbonEdges,
-  isRoadSurfaceReachable
+  buildFeatureRibbonEdges
 } from "../structure-semantics.js?v=63";
 import { waterSurfaceBaseElevation } from "../world/load-geometry.js?v=28";
 import { reconcileWaterBodySurface } from '../world/water-body-contract.js?v=4';
@@ -70,6 +70,8 @@ function createTerrainReprojectionApi(deps = {}) {
 
     positions.needsUpdate = true;
     mesh.geometry.computeVertexNormals();
+    mesh.geometry.boundingBox = null;
+    mesh.geometry.boundingSphere = null;
     return true;
   }
 
@@ -96,38 +98,16 @@ function createTerrainReprojectionApi(deps = {}) {
         }
         positions.needsUpdate = true;
         mesh.geometry.computeVertexNormals();
+        mesh.geometry.boundingBox = null;
+        mesh.geometry.boundingSphere = null;
         return true;
       }
     }
 
-    const resolveBaseY = (x, z, kind) => {
-      const terrainY = terrainMeshHeightAt(x, z);
-      const fallbackTerrain = Number.isFinite(terrainY) ? terrainY : 0;
-      const nearestRoad = typeof appCtx.findNearestRoad === "function" ? appCtx.findNearestRoad(x, z, {
-        y: fallbackTerrain + 0.4,
-        maxVerticalDelta: 6
-      }) : null;
-      const snapPadding =
-        kind === "footway" ? 2.4 :
-        kind === "cycleway" ? 2.0 :
-        1.0;
-      const shouldSnapToRoad = isRoadSurfaceReachable(nearestRoad, {
-        extraLateralPadding: snapPadding - 1.35
-      });
-      if (shouldSnapToRoad) {
-        const roadSampleX = Number.isFinite(nearestRoad?.pt?.x) ? nearestRoad.pt.x : x;
-        const roadSampleZ = Number.isFinite(nearestRoad?.pt?.z) ? nearestRoad.pt.z : z;
-        const roadY =
-          appCtx.GroundHeight && typeof appCtx.GroundHeight.roadMeshY === "function" ?
-            appCtx.GroundHeight.roadMeshY(roadSampleX, roadSampleZ) :
-            null;
-        if (Number.isFinite(roadY)) return roadY;
-        if (appCtx.GroundHeight && typeof appCtx.GroundHeight.roadSurfaceY === "function") {
-          return appCtx.GroundHeight.roadSurfaceY(roadSampleX, roadSampleZ);
-        }
-        return fallbackTerrain + 0.08;
-      }
-      return fallbackTerrain;
+    const resolveBaseY = (x, z) => {
+      const terrainY=terrainMeshHeightAt(x,z);
+      const roadY=appCtx.roadContactIndex?.sampleAt(x,z,terrainY,'at_grade');
+      return Number.isFinite(roadY)?Math.max(terrainY,roadY):terrainY;
     };
 
     const kind = String(mesh.userData?.linearFeatureKind || "").toLowerCase();
@@ -162,6 +142,8 @@ function createTerrainReprojectionApi(deps = {}) {
 
     positions.needsUpdate = true;
     mesh.geometry.computeVertexNormals();
+    mesh.geometry.boundingBox = null;
+    mesh.geometry.boundingSphere = null;
     return true;
   }
 
@@ -284,6 +266,8 @@ function createTerrainReprojectionApi(deps = {}) {
       }
       positions.needsUpdate = true;
       mesh.geometry.computeVertexNormals();
+      mesh.geometry.boundingBox = null;
+      mesh.geometry.boundingSphere = null;
       if (isWaterPolygon) {
         mesh.userData.waterSurfaceBase = avgElevation;
         const waterAreaSurface = mesh.userData.waterAreaRef?.surfaceY;
@@ -299,6 +283,7 @@ function createTerrainReprojectionApi(deps = {}) {
     appCtx.linearFeatureMeshes.forEach((mesh) => {
       reprojectLinearFeatureMeshToTerrain(mesh);
     });
+    refreshLinearWalkContactIndex(appCtx);
 
     appCtx.poiMeshes.forEach((mesh) => {
       const pos = mesh.userData.poiPosition;

@@ -1,8 +1,10 @@
+import { softwareCompositorArgs } from './software-compositor.mjs';
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 
 const servedRoot = path.resolve(process.cwd(), String(process.env.WE3D_VERIFY_ROOT || '.'));
 const externalUrl = String(process.env.WE3D_VERIFY_BASE_URL || '').replace(/\/$/, '');
@@ -11,9 +13,10 @@ const baseUrl = externalUrl || `http://127.0.0.1:${server.port}`;
 const evidenceDir = path.resolve('output/verification/maryland-parcel-property');
 await mkdir(evidenceDir, { recursive: true });
 
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: softwareCompositorArgs() });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await context.newPage();
+await configureStagingAppCheck(page, baseUrl);
 const browserErrors = [];
 const failedLocalResources = [];
 const parcelRequests = [];
@@ -36,9 +39,10 @@ async function launchBaltimore() {
   await page.locator('#globeCustomLon').fill('-76.6122');
   await page.locator('#globeSelectorStartBtn').click();
   await page.waitForFunction(() => {
+    if (document.getElementById('loading')?.classList.contains('show')) return false;
     const state = JSON.parse(globalThis.render_game_to_text?.() || '{}');
     return state.gameStarted === true && state.worldLoading === false && state.worldCounts?.buildings > 0;
-  }, null, { timeout: 180_000 });
+  }, null, { timeout: process.env.CI ? 360_000 : 180_000, polling:500 });
 }
 
 async function openPropertyHub() {
@@ -70,7 +74,7 @@ try {
     const rect = element.getBoundingClientRect();
     return rect.right <= window.innerWidth && rect.bottom <= window.innerHeight && rect.width > 300;
   }), true);
-  await page.screenshot({ path: path.join(evidenceDir, '01-desktop-parcel-property-hub.png'), fullPage: true });
+  await page.screenshot({ path: path.join(evidenceDir, '01-desktop-parcel-property-hub.png'), fullPage: false });
 
   const firstParcelCard = page.locator('.propertyHomeCard.candidate[data-parcel-property="true"]').first();
   await firstParcelCard.locator('[data-property-action="details"]').click();
@@ -79,7 +83,7 @@ try {
   const parcelShape = page.locator('.propertyParcelShape svg polygon');
   await parcelShape.waitFor({ state: 'visible' });
   assert.ok((await parcelShape.getAttribute('points') || '').split(' ').length >= 3);
-  await page.screenshot({ path: path.join(evidenceDir, '02-desktop-parcel-details.png'), fullPage: true });
+  await page.screenshot({ path: path.join(evidenceDir, '02-desktop-parcel-details.png'), fullPage: false });
   await page.locator('[data-property-action="boundary"]').click();
   const boundary = await page.evaluate(() => import('/app/js/shared-context.js?v=55').then(({ ctx }) => ({
     present: ctx.scene?.children?.some((child) => String(child.name || '').startsWith('parcel-boundary:')) === true,
@@ -89,7 +93,7 @@ try {
   assert.equal(typeof boundary.permission?.allowed, 'boolean');
   await page.locator('#closeModalBtn').click();
   await page.locator('#closePropertyPanelBtn').click();
-  await page.screenshot({ path: path.join(evidenceDir, '03-desktop-terrain-boundary.png'), fullPage: true });
+  await page.screenshot({ path: path.join(evidenceDir, '03-desktop-terrain-boundary.png'), fullPage: false });
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => import('/app/js/shared-context.js?v=55').then(({ ctx }) => ctx.toggleRealEstate?.(true)));
@@ -100,7 +104,7 @@ try {
     return rect.left >= 0 && rect.right <= window.innerWidth && rect.bottom <= window.innerHeight;
   }), true);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
-  await page.screenshot({ path: path.join(evidenceDir, '04-mobile-parcel-property-hub.png'), fullPage: true });
+  await page.screenshot({ path: path.join(evidenceDir, '04-mobile-parcel-property-hub.png'), fullPage: false });
 
   assert.deepEqual(browserErrors, []);
   assert.deepEqual(failedLocalResources, []);
@@ -116,6 +120,9 @@ try {
     desktopAndMobileFit: true,
     evidenceDir
   }, null, 2));
+} catch (error) {
+  await writeFile(path.join(evidenceDir, 'failure.json'), JSON.stringify({error:String(error),state:await diagnostics().catch(()=>null),browserErrors,failedLocalResources},null,2));
+  throw error;
 } finally {
   await context.close();
   await browser.close();

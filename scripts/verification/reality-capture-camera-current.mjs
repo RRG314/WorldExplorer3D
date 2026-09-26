@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
-import { chromium } from 'playwright';
+import { chromium, devices } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 
 // Chromium's synthetic camera exercises real getUserMedia/video/canvas/dialog
@@ -8,7 +8,7 @@ import { startStaticServer } from './static-server.mjs';
 const server = await startStaticServer({ rootDir: process.cwd(), ports: [4490, 4491] });
 const browser = await chromium.launch({ channel: 'chrome', headless: true,
   args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
-const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, userAgent: devices['iPhone 13'].userAgent, hasTouch: true });
 const errors = []; page.on('pageerror', error => errors.push(error.message));
 await mkdir('output/verification/reality-capture-camera', { recursive: true });
 try {

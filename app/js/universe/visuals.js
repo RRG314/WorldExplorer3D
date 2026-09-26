@@ -1,3 +1,6 @@
+import {createGalacticVolume} from './galactic-volume.js';
+import { fillPlanetSurface } from './planet-surface.js?v=1';
+import { createNebulaVolume } from './nebula-volume.js?v=1';
 import { createBlackHoleVisual } from './black-hole.js?v=4';
 import { createRoundStarMaterial } from '../sky/star-point-material.js?v=4';
 import { derivePlanetVisualProfile, deriveStarVisualProfile } from './body-visual-profile.js?v=1';
@@ -104,84 +107,13 @@ function createPlanetTexture(profile, mobile) {
   canvas.width = size;
   canvas.height = size / 2;
   const context = canvas.getContext('2d');
-  const random = seededRandom(profile.seed);
-  const colors = profile.palette.map((color) => `#${new THREE.Color(color).getHexString()}`);
-  const gas = ['gas-giant', 'ice-giant', 'mini-neptune'].includes(profile.kind);
-  const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
-  for (let stop = 0; stop <= 8; stop += 1) {
-    const jitter = gas ? random() * 0.08 : random() * 0.22;
-    gradient.addColorStop(Math.min(1, stop / 8), colors[(stop + Math.floor(jitter * 10)) % colors.length]);
-  }
-  context.fillStyle = gradient;
-  context.fillRect(0, 0, canvas.width, canvas.height);
-
-  if (gas) {
-    for (let band = 0; band < 34; band += 1) {
-      const y = random() * canvas.height;
-      const thickness = 1 + random() * (mobile ? 4 : 7);
-      context.globalAlpha = 0.08 + random() * 0.23;
-      context.fillStyle = colors[(band + 1) % colors.length];
-      context.fillRect(0, y, canvas.width, thickness);
-    }
-    if (profile.kind === 'gas-giant') {
-      context.globalAlpha = 0.48;
-      context.fillStyle = colors[2];
-      context.beginPath();
-      context.ellipse(canvas.width * (0.25 + random() * 0.5), canvas.height * (0.48 + random() * 0.18), canvas.width * 0.075, canvas.height * 0.045, 0, 0, Math.PI * 2);
-      context.fill();
-    }
-  } else {
-    for (let feature = 0; feature < (mobile ? 65 : 130); feature += 1) {
-      const x = random() * canvas.width;
-      const y = random() * canvas.height;
-      const width = 5 + random() * canvas.width * 0.12;
-      const height = 2 + random() * canvas.height * 0.1;
-      context.globalAlpha = 0.08 + random() * 0.34;
-      context.fillStyle = colors[feature % colors.length];
-      context.beginPath();
-      context.ellipse(x, y, width, height, random() * Math.PI, 0, Math.PI * 2);
-      context.fill();
-    }
-    if (profile.kind === 'lava-world') {
-      context.globalAlpha = 0.7;
-      context.strokeStyle = colors[1];
-      context.lineWidth = mobile ? 2 : 3;
-      for (let flow = 0; flow < 16; flow += 1) {
-        context.beginPath();
-        context.moveTo(random() * canvas.width, random() * canvas.height);
-        context.bezierCurveTo(random() * canvas.width, random() * canvas.height, random() * canvas.width, random() * canvas.height, random() * canvas.width, random() * canvas.height);
-        context.stroke();
-      }
-    }
-  }
-  context.globalAlpha = 1;
+  const pixels = context.createImageData(canvas.width, canvas.height);
+  fillPlanetSurface(profile, canvas.width, canvas.height, pixels.data);
+  context.putImageData(pixels, 0, 0);
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = THREE.RepeatWrapping;
   if (typeof THREE.SRGBColorSpace !== 'undefined') texture.colorSpace = THREE.SRGBColorSpace;
   return texture;
-}
-
-function createCourseMarker(radius, destinationName) {
-  const marker = new THREE.Group();
-  marker.name = 'Active destination marker';
-  const material = new THREE.MeshBasicMaterial({
-    color: 0x6fe8ff,
-    transparent: true,
-    opacity: 0.86,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending
-  });
-  const outer = new THREE.Mesh(new THREE.TorusGeometry(radius * 2.8, Math.max(0.14, radius * 0.055), 8, 64), material);
-  outer.rotation.x = Math.PI / 2;
-  const cross = new THREE.Mesh(new THREE.TorusGeometry(radius * 2.15, Math.max(0.12, radius * 0.045), 8, 48), material.clone());
-  cross.rotation.y = Math.PI / 2;
-  const label = createLabel(`${destinationName} · COURSE`, 460);
-  label.position.y = radius * 3.7;
-  label.scale.set(44, 9, 1);
-  marker.add(outer, cross, label);
-  marker.userData.baseScale = 1;
-  marker.visible = false;
-  return marker;
 }
 
 function createPlanetarySystem(entity) {
@@ -270,11 +202,9 @@ function createPlanetarySystem(entity) {
       rings.name = `${planet.name} model-derived ring system`;
       body.add(rings);
     }
-    const marker = createCourseMarker(radius, planet.name);
-    body.add(marker);
     group.userData.destinationMeshes.set(planet.id, body);
     group.userData.gravityBodies.push(body);
-    group.userData.orbitingPlanets.push({ body, marker, orbitRadius, phase, orbitDays: Number(planet.orbitDays || 365) });
+    group.userData.orbitingPlanets.push({ body, orbitRadius, phase, orbitDays: Number(planet.orbitDays || 365) });
   });
   return group;
 }
@@ -324,78 +254,13 @@ function createNebulaCloudTexture(seed) {
   return new THREE.CanvasTexture(canvas);
 }
 
-function createNebulaCloudVolume(entity) {
-  const group = new THREE.Group();
-  const random = seededRandom(entity.visualProfile.seed + 104729);
-  const cloudMap = createNebulaCloudTexture(entity.visualProfile.seed);
-  const tint = new THREE.Color(entity.visualProfile.tint || 0x9bbcff);
-  for (let i = 0; i < 42; i++) {
-    const material = new THREE.SpriteMaterial({
-      map: cloudMap,
-      color: tint.clone().offsetHSL((random() - 0.5) * 0.08, -0.08, (random() - 0.5) * 0.12),
-      transparent: true,
-      opacity: 0.09 + random() * 0.09,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      fog: false
-    });
-    const cloud = new THREE.Sprite(material);
-    const radial = Math.pow(random(), 0.62) * 7200;
-    const azimuth = random() * Math.PI * 2;
-    const elevation = (random() - 0.5) * 5200;
-    cloud.position.set(Math.cos(azimuth) * radial, elevation, Math.sin(azimuth) * radial);
-    const size = 850 + random() * 2600;
-    cloud.scale.set(size * (0.75 + random() * 0.7), size, 1);
-    cloud.userData = { baseOpacity: material.opacity, phase: random() * Math.PI * 2 };
-    group.add(cloud);
-  }
-  group.userData.cloudMap = cloudMap;
-  return group;
-}
-
 function createNebula(entity) {
   const group = new THREE.Group();
-  const texture = new THREE.TextureLoader().load(entity.visualProfile.image);
-  if (typeof THREE.SRGBColorSpace !== 'undefined') texture.colorSpace = THREE.SRGBColorSpace;
-  const tint = entity.visualProfile.tint || 0xffffff;
-  const layers = [];
-  [
-    { z: 0, width: 9000, opacity: 0.38 },
-    { z: -4200, width: 11500, opacity: 0.16 },
-    { z: 3200, width: 7800, opacity: 0.1 }
-  ].forEach((definition, index) => {
-    const material = new THREE.SpriteMaterial({
-      map: texture,
-      alphaMap: createFeatheredAlphaMap(),
-      color: tint,
-      transparent: true,
-      opacity: definition.opacity,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      fog: false
-    });
-    const sprite = new THREE.Sprite(material);
-    sprite.position.z = definition.z;
-    sprite.scale.set(
-      definition.width,
-      definition.width / Number(entity.visualProfile.imageAspect || 1.39),
-      1
-    );
-    sprite.userData = { baseOpacity: definition.opacity, phase: index * 1.7 };
-    group.add(sprite);
-    layers.push(sprite);
-  });
-  const cloudVolume = createNebulaCloudVolume(entity);
-  group.add(cloudVolume);
-  const label = createLabel(entity.name, 420);
-  label.position.y = 4700;
-  group.add(label);
-  group.userData.nebulaLayers = layers;
-  group.userData.nebulaClouds = cloudVolume.children;
+  group.add(createNebulaVolume(THREE, entity, globalThis.matchMedia?.('(max-width: 768px)').matches === true));
   group.userData.observationalImage = {
     credit: entity.visualProfile.imageCredit,
     accuracy: entity.accuracy,
-    generatedDepth: 'layered image projection'
+    generatedDepth: 'procedural emission/absorption reconstruction; not measured 3D data'
   };
   return group;
 }
@@ -409,23 +274,20 @@ function createStellarRegion(entity) {
     entity.visualProfile.tint || 0xa9c9ff,
     1.45
   );
+  group.add(createGalacticVolume(THREE,entity,{region:true,mobile:globalThis.matchMedia?.('(max-width: 768px)').matches===true}));
   field.name = 'Model-derived stellar region';
   group.add(field);
   const random = seededRandom(entity.visualProfile.seed + 71);
-  for (let i = 0; i < 48; i++) {
-    const color = i % 5 === 0 ? 0xffcf94 : i % 3 === 0 ? 0xbad7ff : 0xf5f7ff;
-    const radius = 2.5 + random() * 6;
-    const star = new THREE.Mesh(
-      new THREE.SphereGeometry(radius, 12, 8),
-      new THREE.MeshBasicMaterial({ color })
-    );
-    star.position.set(
-      (random() - 0.5) * 27000,
-      (random() - 0.5) * 6200,
-      (random() - 0.5) * 27000
-    );
-    group.add(star);
+  const positions=[],colors=[];
+  for(let i=0;i<600;i++){
+    const cluster=i%6,angle=cluster*Math.PI/3;
+    const spread=700+random()*1800;
+    positions.push(Math.cos(angle)*6500+(random()-.5)*spread,(random()-.5)*1500,Math.sin(angle)*6500+(random()-.5)*spread);
+    const color=new THREE.Color(i%5===0?0xffcf94:0xbad7ff);colors.push(color.r,color.g,color.b);
   }
+  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
+  const clusters=new THREE.Points(geometry,createRoundStarMaterial({size:3.2,sizeAttenuation:false,vertexColors:true,transparent:true,depthWrite:false,opacity:.85}));
+  clusters.name='Modeled stellar associations';group.add(clusters);
   const label = createLabel(entity.name, 440);
   label.position.y = 8600;
   group.add(label);
@@ -516,53 +378,10 @@ function createGalaxyBulge(entity) {
 function createGalaxy(entity) {
   const group = new THREE.Group();
   const starField = createGalaxyPoints(entity);
-  if (entity.visualProfile?.image) {
-    const texture = new THREE.TextureLoader().load(entity.visualProfile.image);
-    if (typeof THREE.SRGBColorSpace !== 'undefined') texture.colorSpace = THREE.SRGBColorSpace;
-    const image = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: texture,
-      alphaMap: createFeatheredAlphaMap(),
-      transparent: true,
-      opacity: 0.88,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      fog: false
-    }));
-    const width = 1680;
-    image.scale.set(width, width / Number(entity.visualProfile.imageAspect || 2.5), 1);
-    image.userData = {
-      accuracy: 'observational multiwavelength image',
-      imageCredit: entity.visualProfile.imageCredit,
-      source: entity.visualProfile.imageSourceUrl
-    };
-    group.add(image);
-    starField.material.opacity = 0.24;
-    starField.material.size = 2.25;
-  }
   group.add(starField);
-  if (!entity.visualProfile?.image) group.add(createGalaxyBulge(entity));
-  if (!entity.visualProfile?.image) {
-    const haloTexture = createNebulaCloudTexture((entity.visualProfile?.seed || 1) + 9001);
-    const halo = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: haloTexture,
-      color: entity.visualProfile?.tint || 0x7298d0,
-      transparent: true,
-      opacity: 0.16,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending
-    }));
-    halo.scale.set(1900, 720, 1);
-    halo.name = 'Model-derived galactic halo';
-    group.add(halo);
-    const dustLane = new THREE.Mesh(
-      new THREE.RingGeometry(120, 850, 160),
-      new THREE.MeshBasicMaterial({ color: 0x080b14, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false })
-    );
-    dustLane.rotation.x = Math.PI / 2;
-    dustLane.scale.y = 0.13;
-    dustLane.name = 'Model-derived dust lane';
-    group.add(dustLane);
-  }
+  group.add(createGalaxyBulge(entity));
+  group.add(createGalacticVolume(THREE,entity,{mobile:globalThis.matchMedia?.('(max-width: 768px)').matches===true}));
+  group.userData.observationalReference={image:entity.visualProfile?.image||null,credit:entity.visualProfile?.imageCredit||null,accuracy:'Morphology-informed 3D reconstruction; individual unresolved stars and dust are procedural.'};
   const label = createLabel(entity.name, 420);
   label.position.y = 170;
   group.add(label);
@@ -611,11 +430,10 @@ function getUniverseDestinationMesh(group, destinationId) {
   return group?.userData?.destinationMeshes?.get?.(destinationId) || null;
 }
 
-function setUniverseCourseMarker(group, destinationId, active = true) {
+function setUniverseCourseTarget(group, destinationId, active = true) {
   let selected = null;
   (group?.userData?.orbitingPlanets || []).forEach((entry) => {
     const matches = entry.body?.userData?.universeEntityId === destinationId;
-    if (entry.marker) entry.marker.visible = Boolean(active && matches);
     if (matches) selected = entry.body;
   });
   group.userData.activeDestinationId = active ? destinationId : null;
@@ -635,32 +453,17 @@ function updateUniverseFrameVisual(group, elapsedSeconds, frameScale = 1) {
     entry.body.position.x = Math.cos(angle) * entry.orbitRadius;
     entry.body.position.z = Math.sin(angle) * entry.orbitRadius;
     entry.body.rotation.y += 0.006 * frameScale;
-    if (entry.marker?.visible) {
-      const pulse = 1 + Math.sin(elapsedSeconds * 3.2) * 0.08;
-      entry.marker.scale.setScalar(pulse);
-      entry.marker.rotation.z += 0.012 * frameScale;
-    }
+
   });
   (group.userData.starMaterials || []).forEach((material) => {
     if (material.uniforms?.time) material.uniforms.time.value = elapsedSeconds;
   });
-  if (group.userData.universeEntity?.objectClass === 'galaxy') group.rotation.y += 0.00012 * frameScale;
-  if (group.userData.stellarRegionField) group.userData.stellarRegionField.rotation.y += 0.00022 * frameScale;
-  (group.userData.nebulaLayers || []).forEach((layer) => {
-    layer.material.opacity = layer.userData.baseOpacity * (
-      0.92 + Math.sin(elapsedSeconds * 0.2 + layer.userData.phase) * 0.08
-    );
-  });
-  (group.userData.nebulaClouds || []).forEach((cloud) => {
-    cloud.material.opacity = cloud.userData.baseOpacity * (
-      0.88 + Math.sin(elapsedSeconds * 0.08 + cloud.userData.phase) * 0.12
-    );
-  });
+
 }
 
 export {
   createUniverseFrameVisual,
   getUniverseDestinationMesh,
-  setUniverseCourseMarker,
+  setUniverseCourseTarget,
   updateUniverseFrameVisual
 };

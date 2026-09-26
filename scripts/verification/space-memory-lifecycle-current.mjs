@@ -1,3 +1,5 @@
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -10,9 +12,11 @@ await mkdir(outputDir, { recursive: true });
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await context.newPage();
+await configureStagingAppCheck(page, baseUrl);
 const cdp = await context.newCDPSession(page);
 await cdp.send('Performance.enable');
 const browserErrors = [];
+collectBrowserGraphicsErrors(page, browserErrors);
 page.on('pageerror', (error) => browserErrors.push(String(error?.stack || error)));
 
 async function heapAfterCollection() {

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { readReleaseSourceIdentity } from '../lib/release-source-identity.mjs';
 
 const root = process.cwd();
 const artifactRoot = path.resolve(root, process.env.WE3D_VERIFY_ROOT || 'dist');
@@ -15,7 +16,8 @@ const [packageJson, packageLock, gates, buildManifest, landing, game, appShellSo
   readFile(path.join(root, 'app/js/app-shell-fragments.js'), 'utf8')
 ]);
 
-const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+const sourceIdentity = readReleaseSourceIdentity(root);
+const { commit } = sourceIdentity;
 const expectedVersion = gates.targetVersion;
 const expectedPrefix = `${expectedVersion}+${commit.slice(0, 12)}.`;
 const expectedBuildId = String(process.env.WE3D_EXPECT_BUILD_ID || '').trim();
@@ -28,7 +30,9 @@ const checks = {
   manifestVersion: buildManifest.version === expectedVersion,
   manifestCommit: buildManifest.commit === commit,
   immutableCandidateIdentity: buildManifest.buildId === buildManifest.candidateId && buildManifest.buildId.startsWith(expectedPrefix),
-  cleanCandidateSource: buildManifest.sourceDirty === false,
+  cleanCandidateSource: buildManifest.sourceDirty === false && sourceIdentity.sourceDirty === false,
+  sourceCommitTime: buildManifest.commitTime === sourceIdentity.commitTime &&
+    buildManifest.buildTimestamp === sourceIdentity.commitTime,
   displayedLandingIdentity: landing.includes('id="landingBuildIdentity"') && landing.includes('build-manifest.json'),
   displayedGameIdentity: appShellSource.includes("fetch('/build-manifest.json'") &&
     appShellSource.includes('hudBox.dataset.buildLabel') &&

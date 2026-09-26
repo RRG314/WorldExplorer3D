@@ -1,0 +1,56 @@
+{
+  "terrain": "rolling",
+  "stableResources": true,
+  "samples": [
+    {
+      "iteration": 1,
+      "geometries": 16,
+      "textures": 1,
+      "pavementMeshes": 12,
+      "sceneChildren": 18,
+      "positionBytes": 31968,
+      "workerActive": false,
+      "javascriptHeapBytes": 20467273
+    },
+    {
+      "iteration": 2,
+      "geometries": 16,
+      "textures": 1,
+      "pavementMeshes": 12,
+      "sceneChildren": 18,
+      "positionBytes": 31968,
+      "workerActive": false,
+      "javascriptHeapBytes": 20467273
+    },
+    {
+      "iteration": 3,
+      "geometries": 16,
+      "textures": 1,
+      "pavementMeshes": 12,
+      "sceneChildren": 18,
+      "positionBytes": 31968,
+      "workerActive": false,
+      "javascriptHeapBytes": 27378797
+    },
+    {
+      "iteration": 4,
+      "geometries": 16,
+      "textures": 1,
+      "pavementMeshes": 12,
+      "sceneChildren": 18,
+      "positionBytes": 31968,
+      "workerActive": false,
+      "javascriptHeapBytes": 27378797
+    },
+    {
+      "iteration": 5,
+      "geometries": 16,
+      "textures": 1,
+      "pavementMeshes": 12,
+      "sceneChildren": 18,
+      "positionBytes": 31968,
+      "workerActive": false,
+      "javascriptHeapBytes": 29502909
+    }
+  ]
+}

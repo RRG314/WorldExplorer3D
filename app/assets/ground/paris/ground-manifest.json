@@ -3,7 +3,7 @@
   "artifactId": "paris-ground",
   "providerId": "copernicus-dem-classified-ground-v1",
   "sourceRelease": "COP-DEM-2021:GLO-30",
-  "contentSha256": "cebd0a41f8a3625a81e0293d7f180198018f3db25ca26794680e2e328961e79e",
+  "contentSha256": "8349fabd6416916658ab3b8b9d157ae4d1f82175277657e2bb10fe2f7883cd06",
   "spacingMeters": 90,
   "coverage": {
     "south": 48.83493743972565,
@@ -18,7 +18,7 @@
   "correctionAttested": true,
   "sourceEvidence": {
     "sourceClassification": "digital-surface-model",
-    "correctionMethod": "worldexplorer-pmf-grid-v1",
+    "correctionMethod": "worldexplorer-pmf-boundary-reconstruction-v3",
     "sourceTiles": [
       {
         "tileId": "Copernicus_DSM_COG_10_N48_00_E002_00_DEM",
@@ -29,7 +29,14 @@
         "etag": "207f962b7e9228481b87cd422df840f1",
         "lastModified": "Mon, 09 May 2022 14:27:26 GMT"
       }
-    ]
+    ],
+    "classificationMethod": "worldexplorer-pmf-grid-v1",
+    "reconstruction": {
+      "method": "harmonic-ground-boundary",
+      "toleranceMeters": 0.00001,
+      "exteriorPolicy": "retain-source-observation",
+      "sourceArtifactSha256": "cebd0a41f8a3625a81e0293d7f180198018f3db25ca26794680e2e328961e79e"
+    }
   },
   "attribution": {
     "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",

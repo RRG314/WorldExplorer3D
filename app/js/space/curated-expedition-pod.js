@@ -1,4 +1,4 @@
-import { loadModelAsset } from '../assets/model-asset-runtime.js?v=15';
+import { loadModelAsset } from '../assets/model-asset-runtime.js?v=16';
 
 const EXPEDITION_POD_ASSET_ID = 'space-pathfinder-transfer-pod-v2';
 
@@ -46,13 +46,23 @@ function prepareCuratedExpeditionPod(THREE, instance) {
   return visual;
 }
 
-async function attachCuratedExpeditionPod(THREE, host) {
+async function attachCuratedExpeditionPod(THREE, host, { timeoutMs = 15000 } = {}) {
   if (!host) return false;
   if (host.userData.curatedPodAssetId === EXPEDITION_POD_ASSET_ID) return true;
   if (host.userData.curatedPodLoadPromise) return host.userData.curatedPodLoadPromise;
+  setPodFallbackVisible(host, false);
+  host.userData.curatedPodStatus = 'loading';
   const loadPromise = (async () => {
+    let timer;
+    const controller = new AbortController();
     try {
-      const instance = await loadModelAsset(THREE, EXPEDITION_POD_ASSET_ID);
+      const instance = await Promise.race([
+        loadModelAsset(THREE, EXPEDITION_POD_ASSET_ID, { signal: controller.signal }),
+        new Promise((_, reject) => { timer = setTimeout(() => {
+          controller.abort();
+          reject(new Error('Pathfinder presentation timed out.'));
+        }, timeoutMs); })
+      ]);
       if (!host.parent || host.userData.curatedPodDisposed === true) {
         instance.dispose();
         return false;
@@ -63,12 +73,15 @@ async function attachCuratedExpeditionPod(THREE, host) {
       host.userData.curatedPodAssetId = EXPEDITION_POD_ASSET_ID;
       host.userData.curatedPodAttachment = Object.freeze({ instance, visual });
       setPodFallbackVisible(host, false);
+      host.userData.curatedPodStatus = 'ready';
       return true;
     } catch (error) {
-      setPodFallbackVisible(host, true);
+      if (host.userData.curatedPodDisposed !== true) setPodFallbackVisible(host, true);
+      host.userData.curatedPodStatus = 'fallback';
       console.warn('Curated transfer pod unavailable; keeping the built-in pod.', error);
       return false;
     } finally {
+      clearTimeout(timer);
       delete host.userData.curatedPodLoadPromise;
     }
   })();

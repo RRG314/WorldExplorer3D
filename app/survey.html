@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Photo Survey · World Explorer</title>
+<style>body{margin:0;background:#071018;color:#f4f7f9;font:16px/1.6 system-ui,sans-serif}main{max-width:700px;margin:8vh auto;padding:24px}a{color:#9ae0ee}button{min-height:44px;background:#2d7dff;color:white;border:1px solid #53606a;border-radius:4px;padding:12px 20px;font:inherit}</style></head>
+<body><main><p>Opening Photo Survey in your world…</p><a href="./?survey=1&mode=walking">Continue to World Explorer</a></main>
+<script type="module">
+// Compatibility for saved links: editing belongs to the running world.
+const destination=new URL('./',location.href);
+destination.search=location.search;
+destination.searchParams.set('survey','1');
+if(!destination.searchParams.has('mode'))destination.searchParams.set('mode','walking');
+location.replace(destination.href);
+</script></body></html>

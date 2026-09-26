@@ -152,12 +152,20 @@ function pointToBuildingFootprintDistance(x, z, building) {
   return best;
 }
 
-function safePlaneLaunchAboveUrbanGeometry(x, z, groundY, groundOffset = .72) {
+export function safePlaneLaunchAboveUrbanGeometry(x, z, groundY, groundOffset = .72, yaw = 0) {
   const aircraftAndCameraRadius = 18;
+  // Direct urban flight needs time to respond to the first obstacle, not just
+  // clearance under the initial pose. Cover four seconds at 60 world units/s.
+  // Sampling with a half-step margin conservatively encloses the whole corridor,
+  // including thin obstacles between samples. Explicit runway/altitude spawns
+  // bypass this helper and keep their authored ground/takeoff behavior.
+  const lookAhead = 240;
+  const step = 12;
+  const forward = aircraftForwardVector(yaw);
   const candidates = appCtx.getNearbyBuildings?.(
-    x,
-    z,
-    aircraftAndCameraRadius + 12
+    x + forward.x * lookAhead / 2,
+    z + forward.z * lookAhead / 2,
+    lookAhead / 2 + aircraftAndCameraRadius + step / 2 + 12
   ) || appCtx.buildings || [];
   let highestRoofY = -Infinity;
   let nearbyBuildingCount = 0;
@@ -169,7 +177,14 @@ function safePlaneLaunchAboveUrbanGeometry(x, z, groundY, groundOffset = .72) {
       building.allowsPassageBelow === true ||
       building.collisionKind === 'barrier'
     ) continue;
-    if (pointToBuildingFootprintDistance(x, z, building) > aircraftAndCameraRadius) continue;
+    let intersectsLaunchCorridor = false;
+    for (let distance = 0; distance <= lookAhead; distance += step) {
+      if (pointToBuildingFootprintDistance(x + forward.x * distance, z + forward.z * distance, building) <= aircraftAndCameraRadius + step / 2) {
+        intersectsLaunchCorridor = true;
+        break;
+      }
+    }
+    if (!intersectsLaunchCorridor) continue;
     const roofY = buildingTopY(building);
     if (!Number.isFinite(roofY) || roofY <= groundY + 2) continue;
     highestRoofY = Math.max(highestRoofY, roofY);
@@ -294,7 +309,7 @@ function startPlaneMode(options = {}) {
   const groundOffset = planeGroundOffset(catalog);
   const safeLaunch = hasExplicitY
     ? { required: false, y: Math.max(groundY + groundOffset, options.y) }
-    : safePlaneLaunchAboveUrbanGeometry(state.x, state.z, groundY, groundOffset);
+    : safePlaneLaunchAboveUrbanGeometry(state.x, state.z, groundY, groundOffset, state.yaw);
   state.y = safeLaunch.y;
   state.passengerAltitude = state.y;
   state.pitch = clamp(Number(options.pitch) || 0, catalog.aircraftKind === 'rotorcraft' ? -0.28 : -0.35, catalog.aircraftKind === 'rotorcraft' ? 0.28 : 0.35);

@@ -21,7 +21,10 @@ export function resolveChaseCameraTerrainCollision(origin, target, sampleTerrain
     const y = origin.y + dy * t;
     const z = origin.z + dz * t;
     const terrainY = Number(sampleTerrainY(x, z));
-    if (!Number.isFinite(terrainY) || y >= terrainY + clearance) continue;
+    // The clearance belongs to the camera end, not the low look-at anchor.
+    // Taper the view volume toward that anchor: a full-radius sphere there
+    // intersects even a flat road and retracts every frame toward the roof.
+    if (!Number.isFinite(terrainY) || y >= terrainY + clearance * t) continue;
 
     // Stop before the first terrain crossing instead of lifting the camera
     // through the hillside, which would change the intended chase framing.

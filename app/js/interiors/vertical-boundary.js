@@ -1,3 +1,4 @@
+import {pointInRoom} from '../../../functions/interior-layout.mjs';
 function pointToSegmentDistance(x, z, start, end) {
   const dx = Number(end?.x) - Number(start?.x);
   const dz = Number(end?.z) - Number(start?.z);
@@ -22,6 +23,12 @@ function resolveInteriorCeiling(input = {}) {
   const verticalVelocity = Number(input.verticalVelocity) || 0;
   if (!activeInterior?.floorPlan || !Number.isFinite(eyeY)) {
     return Object.freeze({ eyeY, verticalVelocity, collided: false, ceilingY: null });
+  }
+  if(activeInterior.floorPlan.authored){
+    const floor=activeInterior.floorPlan.floors[activeInterior.activeLevel||0],base=activeInterior.floorBaseY+floor.elevation;
+    const candidates=(activeInterior.authoredCeilings||[]).filter(s=>s.y>base+.1&&s.polygons.some(p=>pointInRoom({x:input.x,z:input.z},p[0])&&!p.slice(1).some(h=>pointInRoom({x:input.x,z:input.z},h)))).sort((a,b)=>a.y-b.y);
+    const ceilingY=candidates[0]?.y??null,maximumEyeY=ceilingY===null?Infinity:ceilingY-.18;
+    return {eyeY:Math.min(eyeY,maximumEyeY),verticalVelocity:eyeY>maximumEyeY?Math.min(0,verticalVelocity):verticalVelocity,collided:eyeY>maximumEyeY,ceilingY};
   }
   if (insideInteriorStairOpening(activeInterior, input.x, input.z)) {
     return Object.freeze({ eyeY, verticalVelocity, collided: false, ceilingY: null, opening: 'stairs' });

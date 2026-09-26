@@ -2,13 +2,21 @@ import { ctx as appCtx } from '../shared-context.js?v=55';
 import { finiteNumber, isDroneModeActive, isWalkModeActive, sanitizeText } from './ui-room-support.js?v=2';
 
 function readWorldContext() {
-  const lat = finiteNumber(appCtx.LOC?.lat, finiteNumber(appCtx.customLoc?.lat, 0));
-  const lon = finiteNumber(appCtx.LOC?.lon, finiteNumber(appCtx.customLoc?.lon, 0));
-  const locName = appCtx.selLoc === 'custom'
-    ? sanitizeText(appCtx.customLoc?.name || 'Custom', 80)
-    : sanitizeText(appCtx.LOCS?.[appCtx.selLoc]?.name || appCtx.selLoc || 'Custom', 80);
+  // LOC belongs to the loaded world and can still be the previous city while
+  // the title is showing a new selection. Use the same selection authority as
+  // Explore until play begins; room pose frames then stay on the loaded world.
+  const selected = appCtx.gameStarted ? null : (appCtx.resolveLocationSelection?.() ||
+    (appCtx.selLoc === 'custom' ? appCtx.customLoc : appCtx.LOCS?.[appCtx.selLoc]));
+  const location = (appCtx.gameStarted ? appCtx.LOC : selected) || appCtx.LOC || appCtx.customLoc;
+  const lat = finiteNumber(location?.lat, 0);
+  const lon = finiteNumber(location?.lon, 0);
+  const locName = sanitizeText(location?.name || appCtx.selLoc || 'Custom', 80);
 
-  const kind = appCtx.spaceFlight?.active ? 'space' : appCtx.onMoon ? 'moon' : 'earth';
+  // Before play begins, no environment runtime is active yet. Room creation
+  // must honor the selected title destination instead of starting Earth.
+  const selectedKind = !appCtx.gameStarted && ['space', 'moon'].includes(appCtx.loadingScreenMode)
+    ? appCtx.loadingScreenMode : 'earth';
+  const kind = appCtx.spaceFlight?.active ? 'space' : appCtx.onMoon ? 'moon' : selectedKind;
   return {
     kind,
     lat,

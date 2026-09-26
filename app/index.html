@@ -23,16 +23,16 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <script type="module" src="../js/site-analytics.js?v=1"></script>
 <style>@layer legacy, interface;</style>
 <link rel="stylesheet" href="styles/title-shell.css?v=95">
-<link rel="stylesheet" href="styles/runtime-shell.css?v=124">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=127">
 <link rel="stylesheet" href="styles/block-builder.css?v=8">
 <link rel="stylesheet" href="styles/universe.css?v=9">
 <link rel="stylesheet" href="styles/fishing-game.css?v=6">
-<link rel="stylesheet" href="styles/interface-v4.css?v=30">
-<link rel="stylesheet" href="styles/start-hub.css?v=18">
+<link rel="stylesheet" href="styles/interface-v4.css?v=32">
+<link rel="stylesheet" href="styles/start-hub.css?v=20">
 <link rel="stylesheet" href="styles/discovery.css?v=17">
 <link rel="stylesheet" href="styles/tutorial.css?v=15">
 <link rel="stylesheet" href="styles/ar.css?v=1">
-<link rel="stylesheet" href="styles/mobile-controls.css?v=2">
+<link rel="stylesheet" href="styles/mobile-controls.css?v=3">
 <link rel="stylesheet" href="styles/map-explorer.css?v=4">
 <link rel="stylesheet" href="styles/accessibility.css?v=3">
 <link rel="stylesheet" href="styles/reality-capture.css?v=2">
@@ -41,7 +41,6 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <a class="we3d-skip-link" href="#globeSelectorStartBtn">Skip to world controls</a>
 <div id="accessibilityAnnouncements" class="we3d-visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="fileLaunchError" role="alert"><div><strong>World Explorer needs a local web server.</strong><code>npm run dev</code></div></div>
-<button id="appSignInBtn" class="auth-float-toggle" type="button" aria-expanded="false" aria-controls="authFloatPanel">Sign In / Sign Up</button>
 <aside id="authFloatPanel" class="auth-float-panel" hidden>
   <div id="authFormBlock" class="auth-form-block">
     <div class="auth-tabs">
@@ -78,7 +77,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
     </div>
   </div>
   <div id="authPanelStatus"></div>
-  <p class="auth-hint">If login is disabled, enable Google and/or Email/Password in Firebase Console -> Authentication -> Sign-in method.</p>
+  <p class="auth-hint">Use your email or Google account to sign in.</p>
 </aside>
 <aside id="proAccessPanel" class="pro-access-panel" hidden>
   <div class="pro-access-head">
@@ -192,14 +191,24 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <div class="mp-card">
 <div class="mp-title">🌐 Explore Together</div>
 <div id="mpPlanState" class="mp-plan-state">Sign in to access multiplayer rooms.</div>
+<div class="mp-subtitle">Public Rooms</div>
+<div class="mp-row">
+<input id="mpBrowseCityInput" class="mp-input" type="text" maxlength="48" placeholder="Filter by city (optional)">
+<button id="mpBrowseBtn" class="mp-btn secondary" type="button">Browse</button>
+</div>
+<div id="mpBrowseStatus" class="mp-status">Browse room metadata only (no live presence stream).</div>
+<ul id="mpBrowseList" class="mp-room-list">
+<li class="mpRoomEmpty">Loading public rooms…</li>
+</ul>
+
 <div class="mp-subtitle">Join With A Room Code</div>
 <div class="mp-row">
 <input id="mpTitleCodeInput" class="mp-input" type="text" maxlength="8" placeholder="Room code (AB12CD)">
 <button id="mpTitleJoinBtn" class="mp-btn primary" type="button">Join Room</button>
 </div>
-<div class="mp-status">Private rooms use an invite code. Public rooms can also be found by city below.</div>
+<div class="mp-status">Private rooms use an invite code. Public rooms appear above, with an optional city filter.</div>
 
-<div class="mp-subtitle">Create A Room At Your Selected Location</div>
+<details id="mpCreateRoomDetails"><summary class="mp-subtitle">Create a room at this location</summary>
 <div class="mp-row">
 <select id="mpTitleVisibilitySelect" class="mp-select" aria-label="Room visibility">
 <option value="private" selected>Private Room</option>
@@ -217,22 +226,13 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <div class="mp-row">
 <button id="mpTitleTrialBtn" class="mp-btn warn" type="button">Account / Sign In</button>
 </div>
+</details>
 <div id="mpTitleStatus" class="mp-status"></div>
 
 <div class="mp-subtitle">My Rooms</div>
 <div id="mpOwnedRoomsStatus" class="mp-status">Rooms you create or join appear here so you can return any time. You can delete rooms you own.</div>
 <ul id="mpOwnedRoomsList" class="mp-room-list">
 <li class="mpRoomEmpty">Sign in to load your rooms.</li>
-</ul>
-
-<div class="mp-subtitle">Public Rooms Near A City</div>
-<div class="mp-row">
-<input id="mpBrowseCityInput" class="mp-input" type="text" maxlength="48" placeholder="City (e.g. Tokyo)">
-<button id="mpBrowseBtn" class="mp-btn secondary" type="button">Find Rooms</button>
-</div>
-<div id="mpBrowseStatus" class="mp-status">Browse room metadata only (no live presence stream).</div>
-<ul id="mpBrowseList" class="mp-room-list">
-<li class="mpRoomEmpty">Search a city to find public rooms.</li>
 </ul>
 
 <div class="mp-subtitle">Featured City</div>
@@ -495,8 +495,9 @@ How Connected Data Is Used
     <section>
       <h3>Maps &amp; Earth</h3>
       <p><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap contributors</a> — ODbL 1.0. Includes mapped roads, buildings, water, places, and surveillance nodes.</p>
-      <p><a href="https://www.esri.com/en-us/legal/terms/full-master-agreement" target="_blank" rel="noopener noreferrer">Esri World Imagery</a> — interactive satellite basemap imagery with provider attribution shown in the globe selector.</p>
+      <p><a href="https://www.esri.com/en-us/legal/terms/full-master-agreement" target="_blank" rel="noopener noreferrer">Esri World Imagery</a> — satellite basemap and regional terrain colour. Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community. Imagery is dated; it does not represent live weather.</p>
       <p>ESA WorldCover 2021 / modified Copernicus Sentinel data — CC BY 4.0. GEBCO bathymetry — CC BY 4.0. Copernicus and USGS terrain artifacts retain source-specific notices.</p>
+      <p>Antarctic elevation: <a href="https://doi.org/10.7910/DVN/EBW8UC" target="_blank" rel="noopener noreferrer">Howat et al. (2022), Reference Elevation Model of Antarctica, Mosaics v2</a>. Antarctic DEMs: Byrd Polar and Climate Research Center / Polar Geospatial Center; NSF-OPP awards 1043681, 1542736, 1543501, 1559691, 1810976, 2129685. Esri orthometric EGM2008 service; surface elevations may include structures. <a href="https://www.pgc.umn.edu/guides/user-services/acknowledgement-policy/" target="_blank" rel="noopener noreferrer">Source acknowledgements</a>.</p>
     </section>
     <section>
       <h3>Live &amp; community feeds</h3>
@@ -551,6 +552,7 @@ How Connected Data Is Used
 <button id="globeLocationSearchBtn" type="button">Search</button>
 </div>
 <div class="globe-hub-tools" aria-label="Account and application tools">
+<button id="appSignInBtn" class="auth-float-toggle" type="button" aria-expanded="false" aria-controls="authFloatPanel">Sign In / Sign Up</button>
 <button id="globeHubShareBtn" type="button" title="Share World Explorer" aria-label="Share World Explorer">↗</button>
 <button id="globeHubThemeBtn" type="button" title="Switch to light appearance" aria-label="Switch to light appearance" aria-pressed="false">☼</button>
 <button type="button" data-globe-destination="settings" title="Settings" aria-label="Open settings">⚙</button>
@@ -573,6 +575,10 @@ How Connected Data Is Used
   <input id="globeMobileLocationSearch" type="text" placeholder="Search city or place" aria-label="Search city or place">
   <button id="globeMobileLocationSearchBtn" type="button">Search</button>
 </div>
+<div class="globe-search-feedback">
+<div id="globeLocationSearchStatus" role="status" aria-live="polite" style="font-size:12px;min-height:16px;color:#64748b">Search for a place or choose one from the globe.</div>
+<div id="globeLocationSearchResults" class="globe-location-search-results" role="listbox" aria-label="Place search results" hidden></div>
+</div>
 <div class="globe-selector-stat">
 <div class="globe-selector-stat-label">Selected Coordinates</div>
 <div id="globeSelectorLatLon" class="globe-selector-stat-value">No point selected</div>
@@ -588,8 +594,6 @@ How Connected Data Is Used
 <button id="globeSelectorLiveEarthModeBtn" class="globe-selector-mode-tab" type="button">Live Earth</button>
 </div>
 <div id="globeSelectorExplorePanel" class="globe-selector-mode-panel active">
-<div id="globeLocationSearchStatus" style="font-size:11px;min-height:14px;color:#64748b">Search for a place or choose one from the globe.</div>
-<div id="globeLocationSearchResults" class="globe-location-search-results" role="listbox" aria-label="Place search results" hidden></div>
 <div class="globe-selector-field-label">Manual Coordinates</div>
 <div class="globe-selector-row globe-selector-coordinate-row">
 <input id="globeCustomLat" type="number" step="0.0001" placeholder="Latitude">
@@ -686,7 +690,7 @@ How Connected Data Is Used
 <div class="indicators"><span class="ind" id="indBrake">BRK</span><span class="ind" id="indBoost">BOOST</span><span class="ind" id="indDrift">DRIFT</span></div>
 </div>
 </div></div>
-<div id="coords"><span id="coordsText">--</span><a id="coordsOsmLink" data-osm-location-link href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" title="Edit this location in OpenStreetMap">OSM</a></div>
+<div id="coords"><span id="coordsText">--</span><a id="coordsOsmLink" data-osm-location-link href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" title="Edit this location in OpenStreetMap">OSM</a><a id="terrainImageryCredit" hidden href="https://www.esri.com/en-us/legal/terms/full-master-agreement" target="_blank" rel="noopener noreferrer" title="Imagery: Esri, Vantor, Earthstar Geographics, and the GIS User Community">© Esri</a></div>
 <div id="interiorPrompt" aria-live="polite"></div>
 <div id="boatPrompt" aria-live="polite"></div>
 <div id="discoveryContextPrompt" aria-live="polite"><span id="discoveryContextText">Explore what is possible here.</span><button id="discoveryContextOpenBtn" type="button">Explore</button></div>
@@ -714,6 +718,7 @@ How Connected Data Is Used
       <section class="discoveryPane active" data-discovery-pane="today">
         <div class="discoveryModeNote"><b>YOUR NEXT STEP</b><span>Choose one activity, then return to the world. The active tool and nearby cues will guide you.</span></div>
         <button id="discoveryOpenBackpackTodayBtn" class="discoveryBackpackEntry" type="button"><span>▣</span><strong>Open Backpack</strong><small>Tools · quick slots · finds</small></button>
+        <button id="discoveryEncounterLeadBtn" class="discoveryBackpackEntry discoveryEncounterLead" type="button" hidden><span>⌖</span><strong>Track Lead</strong><small id="discoveryEncounterLeadDetail"></small></button>
         <div id="discoveryFieldSession" class="discoveryFieldSession" hidden aria-live="polite"></div>
         <div id="discoveryResultCard" class="discoveryResultCard" hidden aria-live="polite"></div>
         <div class="discoverySectionHead"><span>CHOOSE AN ACTIVITY</span><small>BEST LOCAL FIT FIRST</small></div>
@@ -1592,7 +1597,7 @@ Explore the area
 </div>
 
 <!-- Real Estate System -->
-<script type="module" src="js/app-shell-fragments.js?v=86"></script>
+<script type="module" src="js/app-shell-fragments.js?v=87"></script>
 <script type="module" src="js/app-auth-shell.js?v=87"></script>
-<script type="module" src="js/bootstrap.js?v=601"></script>
+<script type="module" src="js/bootstrap.js?v=610"></script>
 </body></html>

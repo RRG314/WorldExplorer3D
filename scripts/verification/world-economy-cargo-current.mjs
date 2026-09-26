@@ -1,8 +1,12 @@
+import { softwareCompositorArgs } from './software-compositor.mjs';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
+import { installBrowserGraphicsProbe } from './browser-graphics-probe.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
 
 const verifyRoot = process.env.WE3D_VERIFY_ROOT || '';
 const staticServer = verifyRoot ? await startStaticServer({ rootDir: verifyRoot, ports: [4444, 4445, 4446] }) : null;
@@ -11,14 +15,21 @@ const baseUrl = staticServer
   : String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4192').replace(/\/$/, '');
 const outputDir = path.resolve('output/verification/world-economy-cargo');
 await fs.mkdir(outputDir, { recursive: true });
-const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+// Bound this multi-page gameplay verifier on the owner's 8 GiB Mac.
+// This is functional custody evidence, not a performance-budget measurement.
+const browser = await chromium.launch({ headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1024', ...softwareCompositorArgs()] });
 const failures = [];
 
 async function state(page) {
   return page.evaluate(() => JSON.parse(globalThis.render_game_to_text?.() || '{}'));
 }
 
-function observePage(page) {
+let observedPages = 0;
+async function observePage(page) {
+  collectBrowserGraphicsErrors(page, failures);
+  await installBrowserGraphicsProbe(page, path.join(outputDir, `graphics-failure-${++observedPages}.json`));
+  await configureStagingAppCheck(page, baseUrl);
+  if (process.env.CI) page.setDefaultTimeout(120_000);
   page.on('pageerror', (error) => failures.push(`pageerror: ${error.stack || error}`));
   page.on('requestfailed', (request) => {
     if (request.url().startsWith(baseUrl)) failures.push(`request failed: ${request.url()}`);
@@ -27,21 +38,23 @@ function observePage(page) {
 
 async function buyEarthMaterial(context) {
   const page = await context.newPage();
-  observePage(page);
+  await observePage(page);
   try {
     await page.goto(`${baseUrl}/app/?diagnostics=1`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
     await page.waitForFunction(() => document.getElementById('startBtn')?.disabled === false, null, { timeout: 120_000 });
     if (await page.locator('#analyticsConsentDenyBtn').isVisible()) await page.locator('#analyticsConsentDenyBtn').click();
-    await page.locator('#globeLocationSearch').fill('Baltimore, Maryland');
+    // Use the supported coordinate search to isolate cargo custody from geocoder availability.
+    await page.locator('#globeLocationSearch').fill('39.2904, -76.6122');
     await page.locator('#globeLocationSearchBtn').click();
     const searchResult = page.locator('#globeLocationSearchResults [role="option"]').first();
     await searchResult.waitFor({ state: 'visible', timeout: 30_000 });
     await searchResult.click();
     await page.locator('#globeSelectorStartBtn').click();
     await page.waitForFunction(() => {
+      if (document.getElementById('loading')?.classList.contains('show')) return false;
       const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
       return snapshot.gameStarted && !snapshot.worldLoading && snapshot.urbanSandbox?.active;
-    }, null, { timeout: 120_000 });
+    }, null, { timeout: process.env.CI ? 360_000 : 120_000, polling: 500 });
 
     const places = await page.evaluate(() => {
       const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
@@ -80,8 +93,12 @@ async function buyEarthMaterial(context) {
     const item = after.backpack.items.find((entry) => entry.catalogId === materialCatalogId);
     assert.ok(item, JSON.stringify(after.backpack));
     assert.ok(after.urbanSandbox.commerce.current.credits < before.urbanSandbox.commerce.current.credits);
-    await page.screenshot({ path: path.join(outputDir, 'earth-material-purchased.png'), fullPage: true });
+    await page.screenshot({ path: path.join(outputDir, 'earth-material-purchased.png'), fullPage: false });
     return { store: opened, item, credits: after.urbanSandbox.commerce.current.credits };
+  } catch (error) {
+    const snapshot = await state(page).catch(() => null);
+    await fs.writeFile(path.join(outputDir, 'failure-state.json'), JSON.stringify({ error: String(error?.stack || error), snapshot }, null, 2));
+    throw error;
   } finally {
     await page.close();
   }
@@ -89,7 +106,7 @@ async function buyEarthMaterial(context) {
 
 async function loadMaterialAboard(context, purchase) {
   const page = await context.newPage();
-  observePage(page);
+  await observePage(page);
   try {
     await page.goto(`${baseUrl}/app/?launch=space&diagnostics=1`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
     await page.waitForFunction(() => document.getElementById('startBtn')?.disabled === false, null, { timeout: 120_000 });
@@ -110,7 +127,7 @@ async function loadMaterialAboard(context, purchase) {
     const transfer = page.locator('#shipStationPanel [data-ship-action="load-backpack-materials"]');
     await transfer.waitFor({ state: 'visible' });
     const before = await state(page);
-    await page.screenshot({ path: path.join(outputDir, 'cargo-transfer-ready.png'), fullPage: true });
+    await page.screenshot({ path: path.join(outputDir, 'cargo-transfer-ready.png'), fullPage: false });
     await transfer.click();
     await page.waitForFunction((feedstock) => {
       const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
@@ -127,8 +144,12 @@ async function loadMaterialAboard(context, purchase) {
     assert.equal(result.materialStillCarried, false, JSON.stringify(result));
     assert.equal(result.feedstockKg - result.beforeFeedstockKg, result.earthLoadedKg, JSON.stringify(result));
     assert.equal(result.stationTitle, 'Cargo Hold');
-    await page.screenshot({ path: path.join(outputDir, 'cargo-transfer-complete.png'), fullPage: true });
+    await page.screenshot({ path: path.join(outputDir, 'cargo-transfer-complete.png'), fullPage: false });
     return result;
+  } catch (error) {
+    const snapshot = await state(page).catch(() => null);
+    await fs.writeFile(path.join(outputDir, 'failure-state.json'), JSON.stringify({ error: String(error?.stack || error), snapshot }, null, 2));
+    throw error;
   } finally {
     await page.close();
   }

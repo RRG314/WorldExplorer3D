@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
+import { configureStagingAppCheck } from './staging-app-check.mjs';
+import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
+import { isExpectedTerrainProviderCancellation, isTerrainElevationTileUrl } from './terrain-provider-cancellation.mjs';
 
 const baseUrl = String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4192').replace(/\/$/, '');
 const evidenceDir = path.resolve('output/release-evidence/current/terrain-boundary');
@@ -9,9 +12,22 @@ await fs.mkdir(evidenceDir, { recursive: true });
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 const failures = [];
+collectBrowserGraphicsErrors(page, failures);
+const report = { ok: false, samples: [], surfaceChain: null, failures };
+// Retain request initiators to distinguish a stale-world request from an
+// external tile failure. This is observer-only and does not route requests.
+report.mapRequests = [];
+
 const optionalExternalFailures = [];
+const cancelledProviderRequests = [];
 const isOptionalExternalUrl = (url) => /(?:overpass-api\.de|overpass\.private\.coffee|google-analytics\.com)\//i.test(String(url || ''));
 page.on('pageerror', (error) => failures.push(`pageerror: ${error.stack || error}`));
+page.on('response', (response) => {
+  if (response.status() >= 400 && (response.url().startsWith(`${baseUrl}/`) ||
+      response.url().startsWith('https://vector.openstreetmap.org/shortbread_v1/') || isTerrainElevationTileUrl(response.url()))) {
+    failures.push(`HTTP ${response.status()}: ${response.url()}`);
+  }
+});
 page.on('console', (message) => {
   if (message.type() !== 'error') return;
   const location = message.location();
@@ -21,10 +37,25 @@ page.on('console', (message) => {
 });
 page.on('requestfailed', (request) => {
   const entry = `requestfailed: ${request.failure()?.errorText || 'unknown'} ${request.url()}`;
+  // These providers abort bounded requests after their deadline or when their
+  // last consumer releases them. Keep those cancellations as evidence; local
+  // failures, HTTP errors and other provider failures remain gate failures.
+  if (isExpectedTerrainProviderCancellation(request.url(), request.failure()?.errorText)) {
+    cancelledProviderRequests.push(entry);
+    return;
+  }
   (isOptionalExternalUrl(request.url()) ? optionalExternalFailures : failures).push(entry);
 });
 
 try {
+  const network = await page.context().newCDPSession(page);
+  await network.send('Network.enable');
+  network.on('Network.requestWillBeSent', event => {
+    if (!event.request.url.startsWith('https://tile.openstreetmap.org/') || report.mapRequests.length >= 96) return;
+    report.mapRequests.push({ url: event.request.url, timestamp: event.timestamp,
+      initiator: event.initiator, documentURL: event.documentURL });
+  });
+  report.attestation = await configureStagingAppCheck(page, baseUrl);
   const params = new URLSearchParams({
     loc: 'custom', lat: '39.6612', lon: '-76.8847', lname: 'Manchester Maryland',
     launch: 'earth', gm: 'free', mode: 'walk', terrainBoundary: String(Date.now())
@@ -32,11 +63,43 @@ try {
   await page.goto(`${baseUrl}/app/?${params}`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
   await page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   await page.waitForFunction(() => document.getElementById('globeSelectorStartBtn')?.disabled === false, null, { timeout: 120_000 });
+  // Hold the real runtime loader at its import boundary. A title launch must
+  // not tick/render the default Baltimore world while Manchester is pending.
+  await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const original = ctx.ensureEarthRuntimeReady;
+    const gate = new Promise(resolve => { window.__releaseTitleImport = resolve; });
+    ctx.ensureEarthRuntimeReady = async (...args) => {
+      window.__titleImportHeld = true;
+      await gate;
+      ctx.ensureEarthRuntimeReady = original;
+      return original?.(...args);
+    };
+  });
   await page.locator('#globeSelectorStartBtn').click();
+  await page.waitForFunction(() => window.__titleImportHeld === true);
+  const launchSnapshot = () => page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const phases = window.getWorldExplorerRuntimeDiagnostics().runtimeKernel.phases;
+    return { pending: ctx.titleLaunchPending, worldLoading: !!ctx.worldLoading,
+      presentation: phases.presentation.find(row => row.id === 'core.presentation').updates,
+      renderer: phases.render.find(row => row.id === 'core.renderer').updates };
+  });
+  report.mapRequestsBeforeLaunch = report.mapRequests.slice();
+  assert.equal(report.mapRequestsBeforeLaunch.length, 0, 'Closed title map must not request tiles for the default city');
+  const heldBefore = await launchSnapshot();
+  await page.waitForTimeout(750);
+  const heldAfter = await launchSnapshot();
+  report.titleImportTransition = { heldBefore, heldAfter };
+  assert.equal(heldBefore.pending, true);
+  assert.equal(heldBefore.worldLoading, false, 'probe must exercise the gap before the world loader');
+  assert.deepEqual(heldAfter, heldBefore, 'stale world work continued during runtime import');
+  await page.evaluate(() => window.__releaseTitleImport());
   await page.waitForFunction(() => {
+    if (document.getElementById('loading')?.classList.contains('show')) return false;
     const state = globalThis.getWorldExplorerRuntimeDiagnostics?.() || {};
     return state.gameStarted === true && state.worldLoading === false && state.livingWorld?.active === true;
-  }, null, { timeout: 360_000 });
+  }, null, { timeout: 360_000, polling: 500 });
 
   const samples = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
@@ -53,6 +116,7 @@ try {
       };
     });
   });
+  report.samples = samples;
   const farOwned = samples.filter((sample) => Number.isFinite(sample.far));
   assert.ok(farOwned.length >= 3, JSON.stringify(samples));
   assert.ok(farOwned.every((sample) => Math.abs(sample.renderedMinusFar) <= 0.01), JSON.stringify(samples));
@@ -77,17 +141,35 @@ try {
   await page.waitForTimeout(500);
 
   const state = await page.evaluate(() => JSON.parse(globalThis.render_game_to_text?.() || '{}'));
+  report.worldLoad = await page.evaluate(() => {
+    const load = globalThis.getWorldExplorerRuntimeDiagnostics?.().worldLoad;
+    return { status: load?.status, geometryReady: load?.geometryReady,
+      providers: load?.session?.providers, outstandingProviderWork: load?.session?.outstandingProviderWork };
+  });
+  assert.equal(report.worldLoad.status, 'ready');
+  assert.equal(report.worldLoad.geometryReady, true);
+  assert.equal(report.worldLoad.outstandingProviderWork, 0, 'Canceled provider work must settle before boundary acceptance');
+  report.surfaceChain = state.surfaceChain;
   assert.equal(state.surfaceChain?.actor?.mode, 'drive');
   assert.ok(Number(state.surfaceChain?.actor?.vehicleContact?.supportSampleCount || 0) >= 1, JSON.stringify(state.surfaceChain));
   assert.ok(Number(state.surfaceChain?.actor?.vehicleContact?.chassisClearance) >= -0.002, JSON.stringify(state.surfaceChain));
   assert.ok(Math.abs(
     Number(state.surfaceChain?.renderedTerrainY) - Number(state.surfaceChain?.surfaces?.drive?.y)
   ) <= 0.02, JSON.stringify(state.surfaceChain));
-  assert.deepEqual(failures, []);
+  assert.equal(failures.length, 0, `Browser/network/graphics failures; full details: ${path.join(evidenceDir, 'report.json')}`);
   await page.screenshot({ path: path.join(evidenceDir, 'manchester-car-over-boundary.png'), fullPage: false });
-  const report = { ok: true, samples, surfaceChain: state.surfaceChain, failures, optionalExternalFailures };
-  await fs.writeFile(path.join(evidenceDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
+  report.ok = true;
   console.log(JSON.stringify(report, null, 2));
+} catch (error) {
+  report.error = String(error?.stack || error);
+  await page.screenshot({ path: path.join(evidenceDir, 'failure.png'), timeout: 10_000 }).catch(() => {});
+  throw error;
 } finally {
-  await browser.close();
+  report.optionalExternalFailures = optionalExternalFailures;
+  report.cancelledProviderRequests = cancelledProviderRequests;
+  try {
+    await fs.writeFile(path.join(evidenceDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
+  } finally {
+    await browser.close();
+  }
 }

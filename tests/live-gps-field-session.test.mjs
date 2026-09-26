@@ -4,6 +4,7 @@ import {
   createLiveGpsFieldSession,
   evaluateLiveGpsFieldProximity,
   ingestLiveGpsFieldFix,
+  interruptLiveGpsFieldObservation,
   liveGpsFieldSessionSnapshot
 } from '../app/js/live-gps/field-session-authority.js';
 
@@ -105,4 +106,29 @@ test('uses interaction hysteresis and never grants a competitive or location rew
   assert.equal(snapshot.privacy.rawRouteStored, false);
   assert.equal(snapshot.rewardPolicy.competitive, false);
   assert.equal(snapshot.rewardPolicy.locationReward, false);
+});
+
+
+test('GPS observation continuity resets on rejected quality, long gaps, backwards time and lifecycle pause', () => {
+  const session = consentedSession();
+  const fix = (receivedAt, accuracy = 6, speedMps = 0) => ingestLiveGpsFieldFix(session,
+    { latitude: 39.2904, longitude: -76.6122, receivedAt, accuracy }, { speedMps });
+  fix(1000);
+  const clock = () => evaluateLiveGpsFieldProximity(session, 1, readyRuntime, safeApproach).observationClock;
+  assert.equal(clock().receivedAt, 1000);
+  assert.equal(clock().continuityId, 0);
+  fix(2000, 100);
+  assert.equal(clock().receivedAt, null);
+  assert.equal(clock().continuityId, 1);
+  fix(3000);
+  fix(4000, 6, 10);
+  assert.equal(clock().continuityId, 2);
+  fix(5000);
+  fix(30000);
+  assert.equal(clock().continuityId, 3);
+  fix(29000);
+  assert.equal(clock().continuityId, 4);
+  interruptLiveGpsFieldObservation(session);
+  assert.equal(clock().receivedAt, null);
+  assert.equal(clock().continuityId, 5);
 });

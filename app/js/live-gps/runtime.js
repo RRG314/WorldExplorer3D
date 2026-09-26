@@ -11,8 +11,9 @@ import {
   createLiveGpsFieldSession,
   evaluateLiveGpsFieldProximity,
   ingestLiveGpsFieldFix,
+  interruptLiveGpsFieldObservation,
   liveGpsFieldSessionSnapshot
-} from './field-session-authority.js?v=2';
+} from './field-session-authority.js?v=3';
 
 const LIVE_GPS_WATCH_OPTIONS = Object.freeze({
   enableHighAccuracy: true,
@@ -196,6 +197,10 @@ function ingestSessionPosition(session, position, source = 'watch') {
   } else if (result.reason === 'jump-quarantined') {
     session.notice = 'Large GPS jump held while waiting for a confirming fix.';
   }
+  if (!result.accepted) interruptLiveGpsFieldObservation(session.fieldSession);
+  // Observe every fix, including departures between rendered frames. The
+  // listener belongs to the current world and retains no GPS route history.
+  globalThis.dispatchEvent?.(new Event('we3d-live-gps-field-fix'));
   updateLiveGpsHud(true);
   return result;
 }
@@ -214,6 +219,7 @@ function startWatch(session = activeSession) {
     },
     (error) => {
       if (session !== activeSession || generation !== session.watchGeneration) return;
+      interruptLiveGpsFieldObservation(session.fieldSession);
       session.notice = geolocationErrorMessage(error);
       if (Number(error?.code) === 1) {
         stopWatch(session);
@@ -249,6 +255,7 @@ function handleVisibilityChange() {
   const session = activeSession;
   if (!session) return;
   if (document.visibilityState === 'hidden') {
+    interruptLiveGpsFieldObservation(session.fieldSession);
     session.visibilityPaused = true;
     session.notice = 'GPS movement paused while World Explorer is not visible.';
     stopWatch(session);
@@ -461,6 +468,7 @@ function resolveLiveGpsWalkerTarget(dt, current = {}) {
 function pauseOrResumeLiveGps() {
   const session = activeSession;
   if (!session || session.recentering) return false;
+  interruptLiveGpsFieldObservation(session.fieldSession);
   if (!session.following) {
     if (session.model.boundaryState === 'hard-pause') {
       session.notice = 'Recenter the world before resuming GPS-follow.';
@@ -481,6 +489,7 @@ async function recenterLiveGpsWorld() {
   const session = activeSession;
   const fix = session?.model?.filtered;
   if (!session || session.recentering || !fix || typeof appCtx.loadRoads !== 'function') return false;
+  interruptLiveGpsFieldObservation(session.fieldSession);
   session.recentering = true;
   session.following = false;
   session.notice = 'Recentering the fixed world. This is the only world reload.';

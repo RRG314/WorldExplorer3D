@@ -1,4 +1,4 @@
-import { loadModelAsset } from '../assets/model-asset-runtime.js?v=15';
+import { loadModelAsset } from '../assets/model-asset-runtime.js?v=16';
 
 const PARACHUTE_ASSET_ID = 'equipment-explorer-parachute-v1';
 

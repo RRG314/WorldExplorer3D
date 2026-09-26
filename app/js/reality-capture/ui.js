@@ -1,7 +1,14 @@
+import {rememberCaptureIntent,clearCaptureIntent} from './capture-intent.js';
+import {mountCaptureStep} from './workspace-navigation.js';
+import {captureWorldScope,sameCaptureBuilding,captureBuildingKey} from '../../../functions/capture-target.mjs';
+import './capture-theme.js';
+import {captureWorkflow,captureLabel} from './workflow-presentation.js';
+import {mountCaptureActivity} from '../../../js/capture-activity.js';
 import { worldModificationIdentityForLocation } from '../editable-world/model.js?v=1';
 import {
   createRealityCaptureDraft,
   getMyRealityCapture,
+  listMyRealityCaptures,
   getRealityCaptureAssetAccess,
   saveRealityCaptureHybridPreview,
   submitRealityCaptureHybrid,
@@ -11,7 +18,7 @@ import {
   normalizeCapturePhoto,
   uploadRealityCapturePhoto
 } from '../../../js/community-reality-capture-api.js?v=4';
-import { getCurrentUser, observeAuth } from '../../../js/auth-ui.js?v=55';
+import { getCurrentUser, observeAuth, signInWithGoogle, signInWithEmailPassword, signOutUser } from '../../../js/auth-ui.js?v=56';
 import { captureDraftKey, capturePhoneUrl, mergedCapturePhotos, captureIsEditable } from './capture-session.js?v=1';
 import {
   deleteLocalCaptureDraft,
@@ -58,6 +65,7 @@ function allPhotos() {
 }
 
 function processingDescription(capture) {
+  if(capture?.hybridSubmission||capture?.status==='rejected'){const flow=captureWorkflow(capture);return `${flow.title}. ${flow.note?`Reviewer: ${flow.note} `:''}${flow.next}`;}
   if (capture?.hybridSubmission?.status === 'approved') return 'Your submitted photo walls were approved.';
   if (capture?.hybridSubmission?.status === 'review_required') return 'Your saved photo walls are awaiting approval.';
   if (capture?.status === 'uploaded') return 'Ready to match photos to walls. No reconstruction was started.';
@@ -87,17 +95,19 @@ function renderProgress(session) {
   panel.querySelector('[data-capture-refresh]').disabled = session.busy || checking;
   panel.querySelector('[data-capture-progress-title]').textContent = checking ? 'Checking your capture…'
     : session.progressError ? 'Could not check right now'
+    : session.serverCapture.hybridSubmission ? captureWorkflow(session.serverCapture).title
     : ready ? 'Preview ready · coverage needs review'
     : status === 'processing' ? 'Reconstruction in progress'
     : status === 'queued' ? 'Waiting to start'
-    : status === 'processing_failed' ? 'Processing needs attention' : 'Photos saved';
+    : status === 'processing_failed' ? 'Needs attention' : captureWorkflow(session.serverCapture).title;
   panel.querySelector('[data-capture-server-status]').textContent = session.progressError
     ? 'The status could not be refreshed. This does not mean your upload was lost. Check again when your connection returns.'
     : session.serverCapture.reconstructionSourceCaptureId ? 'This reconstruction test reused your earlier photo set. Choose Open my original photos below to view them or take more.'
     : `${session.remotePhotos.length} photos uploaded · ${processingDescription(session.serverCapture)}`;
   const stamp = session.lastCheckedAt ? new Date(session.lastCheckedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) : '';
   panel.querySelector('[data-capture-checked]').textContent = stamp ? `Last successful check: ${stamp}` : '';
-  panel.querySelector('[data-capture-progress-help]').textContent = ready ? 'Choose View my 3D result below to inspect it.'
+  panel.querySelector('[data-capture-progress-help]').textContent = session.serverCapture.hybridSubmission ? captureWorkflow(session.serverCapture).next
+    : ready ? 'Choose View my 3D result below to inspect it.'
     : active ? 'This page checks every 15 seconds while visible. You can close it and return later. No reliable percentage or finish time is available yet.'
     : status === 'processing_failed' ? 'Use Match photos to building sides below. Public reconstruction is not available.'
     : 'Choose Save and place photos to match your pictures to this building. No 3D reconstruction is started.';
@@ -119,9 +129,12 @@ function ensurePanel() {
       <section class="realityCaptureTarget"><span>SELECTED MAPPED BUILDING</span><strong data-capture-label></strong><small data-capture-id></small></section>
       <section class="realityCaptureHandoff">
         <strong data-capture-account></strong>
-        <p>Use this same account on your phone. Your building, room and uploaded photos stay together.</p>
-        <button type="button" data-capture-phone>Continue on phone</button>
+        <p>Take or choose photos, place them, then submit your saved improvement for review—all on this device. Saving alone does not submit it.</p>
+        <details><summary>Use another device (optional)</summary>
+        <p>Your saved photos stay with this account. You do not need a computer.</p>
+        <button type="button" data-capture-phone>Create a phone link</button>
         <div data-capture-link-box hidden><canvas data-capture-qr aria-label="Scan to continue this capture on your phone"></canvas><a data-capture-link></a><button type="button" data-capture-copy>Copy phone link</button></div>
+        </details>
         <button type="button" data-capture-refresh hidden>Check uploaded photos and progress</button>
         <section data-capture-processing-status class="realityCaptureProcessingStatus" role="status" aria-live="polite" aria-atomic="true" hidden>
           <strong data-capture-progress-title></strong>
@@ -132,7 +145,7 @@ function ensurePanel() {
         </section>
         <button type="button" data-capture-retry hidden>Retry reconstruction with my saved photos</button>
         <button type="button" class="captureGuidedCameraButton" data-capture-source hidden>Open my original photos</button>
-        <section data-capture-additional hidden><p>This submitted photo set is preserved. To take more photos or video for this building, start another photo set. Nothing is processed until you choose to upload for processing.</p><button type="button" class="captureGuidedCameraButton" data-capture-new-set>Take more photos for this building</button></section>
+      <section data-capture-additional hidden><p>Your submitted version stays unchanged. Continue editing a new version with your saved photos and placements.</p><button type="button" class="captureGuidedCameraButton" data-capture-new-set>Continue improving this building</button></section>
       </section>
       <section data-capture-result hidden aria-label="Your reconstruction">
         <h2>Reconstruction preview</h2>
@@ -150,7 +163,7 @@ function ensurePanel() {
       <button type="button" data-capture-hybrid hidden>Match photos to building sides</button>
       <div class="realityCaptureKinds" role="tablist" aria-label="Capture type">
         <button type="button" data-capture-kind="exterior" role="tab">Exterior</button>
-        <button type="button" data-capture-kind="interior_room" role="tab" hidden>One room</button>
+        <button type="button" data-capture-kind="interior_room" role="tab">Home interior</button>
       </div>
       <label class="realityCaptureConsent" data-facade-choice hidden><input data-exterior-facade type="checkbox" checked> <span>Photograph only the sides you can safely access.</span></label>
       <details data-building-details class="captureVisualGuide"><summary>Advanced · building details and measurements (optional)</summary>
@@ -171,18 +184,19 @@ function ensurePanel() {
         <p data-capture-safety-copy>Stay on safe public access, do not photograph people, license plates, screens, documents, or security details. Photos are normalized on this device to remove EXIF and GPS metadata before upload.</p>
       </section>
       <section class="realityCaptureRoom" hidden>
-        <div class="realityCaptureGrid">
+        <p>Design the floor plan on a grid, then enter each room and choose photos for its walls and floor.</p>
+        <details><summary>Advanced · starting room measurements</summary><div class="realityCaptureGrid">
           <label>Room name<input data-room-label maxlength="100" value="Living room"></label>
           <label>Room type<select data-room-type><option value="living_room">Living room</option><option value="bedroom">Bedroom</option><option value="kitchen">Kitchen</option><option value="office">Office</option><option value="other">Other</option></select></label>
           <label>Width (m)<input data-room-width type="number" min="1.5" max="80" step="0.1" value="4"></label>
           <label>Length (m)<input data-room-length type="number" min="1.5" max="80" step="0.1" value="6"></label>
           <label>Height (m)<input data-room-height type="number" min="1.8" max="12" step="0.1" value="2.7"></label>
           <label>Door direction<input data-room-direction type="number" min="0" max="359" step="1" value="0"></label>
-        </div>
+        </div></details>
         <label class="realityCaptureConsent"><input data-room-permission type="checkbox"> <span>I have permission to capture and upload this interior.</span></label>
       </section>
       <section class="realityCaptureGuide">
-        <div><span>GUIDED COVERAGE</span><strong data-capture-count>0 photos</strong></div>
+        <div><span>PHOTOS</span><strong data-capture-count>0 photos</strong></div>
         <p data-capture-instruction></p>
         <details class="captureVisualGuide" open><summary>Where to stand and how to frame photos</summary><div data-capture-photo-guide></div></details>
         <div class="realityCaptureSectors" data-capture-sectors></div>
@@ -193,6 +207,7 @@ function ensurePanel() {
           <input data-capture-input type="file" accept="image/*" multiple>
           <span>Add photos from your library</span>
         </label>
+        <button type="button" data-capture-reuse>Reuse saved or device photos</button>
         <p class="realityCaptureQuality" data-capture-quality>No photos leave this device until you save or upload them.</p>
         <details data-capture-gallery><summary>View saved and new photos</summary><div data-capture-photo-grid></div><button type="button" class="captureGuidedCameraButton" data-photo-prev>Previous photos</button><span data-photo-page></span><button type="button" class="captureGuidedCameraButton" data-photo-next>Next photos</button></details>
       </section>
@@ -206,12 +221,25 @@ function ensurePanel() {
       <p class="realityCaptureStatus" data-capture-status role="status" aria-live="polite"></p>
     </div>`;
   document.body.appendChild(panel);
+  // Keep the mode, its primary action and any permission/error together.
+  // Reuse the existing controls and authority; do not create a second launcher.
+  const workspace=document.createElement('section');workspace.dataset.captureWorkspace='';workspace.className='realityCaptureHandoff';
+  const help=document.createElement('p');help.dataset.captureWorkspaceHelp='';
+  const permission=panel.querySelector('[data-room-permission]').closest('label');permission.dataset.captureWorkspacePermission='';
+  const launch=panel.querySelector('[data-capture-hybrid]');launch.classList.add('captureGuidedCameraButton');launch.style.width='100%';launch.style.minHeight='48px';
+  workspace.append(panel.querySelector('.realityCaptureKinds'),help,permission,launch,panel.querySelector('[data-capture-status]'));
+  panel.querySelector('.realityCaptureTarget').after(workspace);
+  if(['localhost','127.0.0.1'].includes(location.hostname)){const diagnostic=document.createElement('p');diagnostic.textContent='Local preview · account operations require browser verification. Use the staging app to test saving across devices. ';const staging=document.createElement('a');staging.href='https://we3d-staging-20260712.web.app/app/capture.html';staging.textContent='Open staging contributions';diagnostic.append(staging);workspace.append(diagnostic);}
+  const library=document.createElement('button');library.type='button';library.textContent='My contributions';library.dataset.captureLibrary='';
+  panel.querySelector('.realityCaptureScroll').prepend(library);
+  library.onclick=()=>{if(current&&!current.busy)void openRealityCaptureLibrary(current.appCtx);};
   panel.addEventListener('cancel', event => { event.preventDefault(); closeRealityCapture(); });
   panel.querySelector('[data-capture-close]').addEventListener('click', closeRealityCapture);
   panel.querySelector('[data-capture-cancel]').addEventListener('click', clearDraft);
-  panel.querySelector('[data-capture-upload]').addEventListener('click', () => uploadDraft(current?.kind !== 'interior_room'));
+  panel.querySelector('[data-capture-upload]').addEventListener('click', () => uploadDraft(true));
   panel.querySelector('[data-capture-save]').addEventListener('click', () => uploadDraft(false));
   panel.querySelector('[data-capture-input]').addEventListener('change', addPhotos);
+  panel.querySelector('[data-capture-reuse]').onclick=async()=>{const session=current;if(!session||session.busy)return;if(!captureIsEditable(session.serverCapture)){panel.querySelector('[data-capture-status]').textContent='Choose Continue improving this building before adding photos to a submitted version.';return;}try{const {chooseReusablePhotos}=await import('./photo-reuse.js');const files=await chooseReusablePhotos({uid:session.uid,building:session.target,captureId:session.serverCapture?.captureId,kind:session.kind,signal:session.abort.signal});assertCurrent(session);if(files.length)await addPhotos({target:{files,value:''}});}catch(e){if(isCurrent(session))panel.querySelector('[data-capture-status]').textContent=e.message;}};
   panel.querySelector('[data-capture-video]').addEventListener('change', importVideo);
   panel.querySelector('[data-exterior-facade]').addEventListener('change', () => {
     if (!current || current.serverCapture) return;
@@ -246,18 +274,18 @@ function ensurePanel() {
   panel.querySelector('[data-capture-source]').addEventListener('click', () => {
     const id=current?.serverCapture?.reconstructionSourceCaptureId;
     if(id)void openRealityCaptureSession(id).then(()=>{
-      if(location.pathname.endsWith('/capture.html'))history.replaceState(null,'',`#capture=${encodeURIComponent(id)}`);
+      if(location.pathname.endsWith('/capture.html'))history.replaceState(history.state,'',`#capture=${encodeURIComponent(id)}`);
     }).catch(error=>{panel.querySelector('[data-capture-status]').textContent=error.message;});
   });
   panel.querySelector('[data-capture-new-set]').addEventListener('click', async () => {
     const session=current;if(!session||session.busy)return;
     setBusy(session,true);
     try {
-      const response=await createRealityCaptureDraft({...draftInput(session),publicContributionRequested:false});
+      const response=await createRealityCaptureDraft({...draftInput(session),sourceCaptureId:session.serverCapture.continuationReady===false?session.serverCapture.sourceCaptureId:session.serverCapture.captureId,publicContributionRequested:false});
       assertCurrent(session);
       await openRealityCaptureSession(response.capture.captureId);
-      if(location.pathname.endsWith('/capture.html'))history.replaceState(null,'',`#capture=${encodeURIComponent(response.capture.captureId)}`);
-      ensurePanel().querySelector('[data-capture-status]').textContent='New photo set ready. Your previous photos and result are unchanged. Open the camera, choose a video, or add photos below.';
+      if(location.pathname.endsWith('/capture.html'))history.replaceState(history.state,'',`#capture=${encodeURIComponent(response.capture.captureId)}`);
+      ensurePanel().querySelector('[data-capture-status]').textContent='Your editable version is ready with your saved photos and placements. The submitted version is unchanged. Add photos or continue editing.';
     }catch(error){if(isCurrent(session))panel.querySelector('[data-capture-status]').textContent=error.message;}
     finally{setBusy(session,false);}
   });
@@ -317,7 +345,7 @@ function ensurePanel() {
   return panel;
 }
 
-function buildTarget(appCtx, target) {
+export function buildTarget(appCtx, target) {
   const position = target.position || target.object?.position || { x: 0, z: 0 };
   const geo = appCtx.worldToLatLon?.(finite(position.x), finite(position.z)) || appCtx.worldToGeo?.(finite(position.x), finite(position.z)) || appCtx.LOC || {};
   const building = resolveCanonicalMappedBuilding(appCtx, target);
@@ -331,7 +359,7 @@ function buildTarget(appCtx, target) {
     sourceAuthority: String(building?.geometrySource || target.object?.userData?.geometrySource || 'mapped'),
     label: String(target.label || target.object?.userData?.buildingName || 'Mapped building'),
     locationLabel: String(appCtx.LOC?.name || appCtx.LOC?.label || ''),
-    worldId: worldModificationIdentityForLocation(appCtx.LOC || {}),
+    worldId: captureWorldScope(worldModificationIdentityForLocation(appCtx.LOC || {})),
     lat: finite(geo.lat, finite(appCtx.LOC?.lat)),
     lon: finite(geo.lon, finite(appCtx.LOC?.lon)),
     footprintGeo,
@@ -446,26 +474,35 @@ function render() {
   const bySector = new Map(sectorList.map((_, index) => [index, photos.filter((photo) => photo.sector === index).length]));
   panel.querySelector('[data-capture-label]').textContent = current.target.label;
   panel.querySelector('[data-capture-id]').textContent = current.target.sourceBuildingId;
-  panel.querySelector('[data-capture-count]').textContent = `${photos.length} / ${minimumPhotos()} minimum`;
+  panel.querySelector('[data-public-contribution]').closest('label').hidden=current.kind==='interior_room';
+  panel.querySelector('[data-capture-count]').textContent = `${photos.length} photos · ${current.remotePhotos.length} saved to account`;
   panel.querySelector('[data-capture-upload]').textContent = current.kind === 'interior_room' ? 'Save room photos' : 'Save and place photos';
   panel.querySelector('[data-capture-account]').textContent = `Account: ${getCurrentUser()?.email || getCurrentUser()?.displayName || 'Signed-in explorer'}`;
   panel.querySelector('[data-capture-refresh]').hidden = !current.serverCapture;
   panel.querySelector('[data-capture-retry]').hidden = true;
   const locked = !captureIsEditable(current.serverCapture);
+  panel.querySelector('[data-capture-cancel]').hidden=current.serverCapture?.status==='approved'||!!current.serverCapture?.supersededBy;
   panel.querySelector('[data-capture-live-camera]').style.display=locked?'none':'';
   for(const selector of ['[data-capture-input]','[data-capture-video]'])panel.querySelector(selector).closest('label').style.display=locked?'none':'';
   panel.querySelector('[data-capture-source]').hidden=!current.serverCapture?.reconstructionSourceCaptureId;
   panel.querySelector('[data-capture-additional]').hidden=!locked||!!current.serverCapture?.reconstructionSourceCaptureId;
   panel.querySelectorAll('button:not([data-capture-close]), input, select').forEach((element) => {
-    element.disabled = current.busy || (locked && !element.matches('[data-capture-refresh], [data-capture-copy], [data-capture-phone], [data-capture-preview], [data-capture-hybrid], [data-viewer-action], [data-capture-cancel], [data-capture-retry], [data-capture-source], [data-capture-new-set], [data-photo-prev], [data-photo-next]'));
+    element.disabled = current.busy || (locked && !element.matches('[data-capture-kind], [data-capture-refresh], [data-capture-copy], [data-capture-phone], [data-capture-preview], [data-capture-hybrid], [data-viewer-action], [data-capture-cancel], [data-capture-retry], [data-capture-source], [data-capture-new-set], [data-photo-prev], [data-photo-next]'));
   });
   panel.querySelector('[data-photo-prev]').disabled=current.busy||current.photoPage===0;
+  panel.querySelector('[data-capture-library]').disabled=current.busy;
   panel.querySelector('[data-photo-next]').disabled=current.busy||(current.photoPage+1)*6>=galleryPhotos.length;
   panel.querySelector('[data-photo-page]').textContent=galleryPhotos.length?` ${current.photoPage*6+1}–${Math.min((current.photoPage+1)*6,galleryPhotos.length)} of ${galleryPhotos.length} `:'No photos in this set.';
-  panel.querySelector('[data-capture-hybrid]').hidden = current.kind !== 'exterior' || !current.remotePhotos.length || !current.serverCapture?.building?.spatialContext?.footprint?.length;
-  panel.querySelector('[data-capture-result]').hidden = !current.serverCapture?.processed?.optimizedModelPath;
+  panel.querySelector('[data-capture-hybrid]').hidden = current.kind === 'exterior' && (!current.remotePhotos.length || !current.serverCapture?.building?.spatialContext?.footprint?.length);
+  panel.querySelector('[data-capture-hybrid]').textContent = current.kind === 'interior_room' ? 'Open floor-plan grid' : 'Match photos to building sides';
+  panel.querySelector('[data-capture-workspace-help]').textContent=current.kind==='interior_room'?'Draw a known room, then select its walls or floor to add photos. Your interior stays private.':'Choose Home interior to draw your floor plan. For the outside, add photos below, then match them to building sides.';
+  panel.querySelector('[data-capture-workspace-permission]').hidden=current.kind!=='interior_room';
+  panel.querySelector('[data-capture-result]').hidden = !(current.serverCapture?.hybridSubmission?.modelPath||current.serverCapture?.processed?.optimizedModelPath);
+  const manualHome=current.serverCapture?.hybridSubmission?.kind==='home-layout';
+  panel.querySelector('[data-capture-result] h2').textContent=manualHome?'Your interior preview':'Your exterior preview';
+  panel.querySelector('[data-capture-result] h2 + p').textContent=`${captureWorkflow(current.serverCapture||{}).title}. ${captureWorkflow(current.serverCapture||{}).privacy}. Only the saved version is shown here.`;
   const registration = current.serverCapture?.processed?.registration;
-  panel.querySelector('[data-capture-registration]').textContent = registration?.status === 'available'
+  panel.querySelector('[data-capture-registration]').textContent = current.serverCapture?.hybridSubmission?'Manual photo placement · no paid reconstruction was started.':registration?.status === 'available'
     ? `${registration.registeredCount} of ${registration.submittedCount} photos positioned in 3D. ${registration.registeredCount < registration.submittedCount
       ? 'Some photos could not be positioned; this preview may be incomplete.' : 'Photo matching alone does not confirm that every wall and the roof were reconstructed.'}`
     : 'Coverage unverified: this result has no retained photo-matching report. A finished processing job does not mean a complete building.';
@@ -475,12 +512,15 @@ function render() {
   panel.querySelector('[data-exterior-facade]').checked = current.exteriorScope === 'facade';
   panel.querySelector('[data-exterior-facade]').disabled = current.busy || !!current.serverCapture;
   panel.querySelectorAll('[data-capture-kind], .realityCaptureRoom input:not([data-room-permission]), .realityCaptureRoom select, [data-public-contribution]').forEach((element) => {
-    element.disabled = current.busy || (element.matches('[data-capture-kind]') ? !!current.resumed : !!current.serverCapture);
+    element.disabled = current.busy || (element.matches('[data-capture-kind]') ? false : !!current.serverCapture);
   });
   panel.querySelector('[data-capture-instruction]').textContent = current.kind === 'interior_room'
-    ? `Stand near ${sectorList[current.activeSector]}. Keep each wall in several neighboring photos and include floor-to-wall and wall-to-ceiling edges.`
+    ? 'Add photos of your rooms in any order. Open Design your home, choose a room, then click the wall or floor where each photo belongs. Uploading never assigns a photo to a door.'
     : `Photograph the ${sectorList[current.activeSector].toLowerCase()} side. Include the wall edges where possible. One clear photo is enough to start; add other sides later.`;
-  panel.querySelector('[data-capture-photo-guide]').innerHTML = photoGuideMarkup(current.kind, current.activeSector, current.exteriorScope);
+  panel.querySelector('[data-capture-photo-guide]').innerHTML = '<p>Choose a clear view of the surface you want to improve. One photo is enough to start. Select its actual side in the editor; unassigned photos can be used later.</p>';
+  panel.querySelector('[data-capture-photo-guide]').hidden = current.kind === 'interior_room';
+  panel.querySelector('.captureVisualGuide').hidden = current.kind === 'interior_room';
+  panel.querySelector('[data-capture-sectors]').hidden = true;
   panel.querySelector('[data-capture-sectors]').innerHTML = sectorList.map((label, index) => `
     <button type="button" data-sector-index="${index}" class="${index === current.activeSector ? 'active' : ''} ${bySector.get(index) >= 2 ? 'covered' : ''}">
       <span>${escapeHtml(label)}</span><b>${bySector.get(index)}</b>
@@ -495,7 +535,7 @@ function render() {
   const exposure = current.photos.filter((photo) => photo.quality?.exposure !== 'usable').length;
   panel.querySelector('[data-capture-quality]').textContent = current.photos.length
     ? `${current.photos.length} normalized photos saved privately on this device · ${blurry} soft/blurry · ${exposure} exposure warnings`
-    : 'No photos leave this device until you choose Upload for processing.';
+    : 'New photos stay on this device until you save them to your account.';
   renderProgress(current);
 }
 
@@ -516,15 +556,39 @@ async function persist(session = current) {
 }
 
 async function switchKind(kind) {
-  // Existing private room records remain reopenable, but new room editing is
-  // not part of the public manual-exterior release.
-  if (kind !== 'exterior') return;
+  if (!['exterior','interior_room'].includes(kind)) return;
   const session = current;
-  if (!session || session.busy || session.resumed || kind === session.kind) return;
+  if (!session || session.busy || kind === session.kind) return;
   setBusy(session, true);
-  try { await persist(session); assertCurrent(session); await restore(kind, session); }
+  try {
+    await persist(session); assertCurrent(session);
+    const result = await listMyRealityCaptures({worldId:session.target.worldId,sourceBuildingId:session.target.sourceBuildingId});
+    assertCurrent(session);
+    // Older services return the complete owner list when fewer than their
+    // documented 60-record cap exists. Filter it below; never infer completeness
+    // from a full capped page or silently start a duplicate from that page.
+    if(result.buildingScoped!==true&&(!Array.isArray(result.captures)||result.captures.length>=60))throw Error('This account needs the updated capture lookup to safely find this building’s saved work. Your captures are unchanged.');
+    if(result.truncated) throw Error('This building has many saved contributions. Open the specific interior from My captures to avoid starting a duplicate.');
+    const matches=(result.captures||[]).filter(c=>c.captureKind===kind&&sameCaptureBuilding(c.building,session.target));
+    if(matches.length>1) {
+      const chooser=document.createElement('dialog');chooser.className='realityCaptureDialog';
+      chooser.setAttribute('aria-label','Choose saved work for this building');
+      const heading=document.createElement('h2');heading.textContent='Choose your saved work for this building';chooser.append(heading);
+      for(const capture of matches){const button=document.createElement('button');button.textContent=captureLabel(capture);button.onclick=()=>{chooser.close(capture.captureId);};chooser.append(button);}
+      const cancel=document.createElement('button');cancel.textContent='Cancel';cancel.onclick=()=>chooser.close();chooser.append(cancel);document.body.append(chooser);chooser.showModal();
+      const abortChoice=()=>chooser.close();session.abort.signal.addEventListener('abort',abortChoice,{once:true});
+      const id=await new Promise(resolve=>chooser.addEventListener('close',()=>resolve(chooser.returnValue),{once:true}));session.abort.signal.removeEventListener('abort',abortChoice);chooser.remove();assertCurrent(session);
+      if(id)await openRealityCaptureSession(id,session.appCtx);
+    } else if(matches.length) await openRealityCaptureSession(matches[0].captureId,session.appCtx);
+    else {
+      session.resumed=false;
+      await restore(kind,session);
+      if(session.serverCapture)await fetchProgress(session);
+      ensurePanel().querySelector('[data-capture-status]').textContent=kind==='interior_room'?'Add your interior to this same building. Your exterior is unchanged. Interior access stays private.':'Your interior is unchanged. Add exterior photos for this same building.';
+    }
+  }
   catch (error) { if (isCurrent(session)) ensurePanel().querySelector('[data-capture-status]').textContent = error.message; }
-  finally { setBusy(session, false); }
+  finally { setBusy(session, false); if(current?.kind===kind){const panel=ensurePanel();panel.querySelector('.realityCaptureScroll').scrollTop=0;panel.querySelector('[data-capture-hybrid]').focus({preventScroll:true});} }
 }
 
 async function addPhotos(event) {
@@ -668,22 +732,42 @@ function scheduleProgress(session) {
 }
 
 async function previewHybrid() {
-  const session=current;if(!session||session.busy||!session.serverCapture)return;
+  const session=current;if(!session||session.busy)return;
   setBusy(session,true);
   try {
-    const {openHybridEditor}=await import('./hybrid-editor.js?v=1');assertCurrent(session);
+    await ensureServerCapture(session);assertCurrent(session);
+    const {openHybridEditor}=await import('./hybrid-editor.js?v=1');
+    const {openHomeLayoutEditor}=session.kind==='interior_room'?await import('./home-layout-editor.js'):{};assertCurrent(session);
     session.hybridEditor?.close();
-    session.hybridEditor=await openHybridEditor({capture:session.serverCapture,photos:session.remotePhotos,signal:session.abort.signal,
+    session.hybridEditor=await (openHomeLayoutEditor||openHybridEditor)({capture:session.serverCapture,photos:session.remotePhotos,signal:session.abort.signal,inWorld:!!session.appCtx,onClose:()=>{if(isCurrent(session)){render();ensurePanel().querySelector('[data-capture-hybrid]').focus();}},
+      refreshPhotos:async()=>{
+        assertCurrent(session);await fetchProgress(session);assertCurrent(session);
+        if(session.remotePhotos.length&&['draft','uploading'].includes(session.serverCapture.status)){
+          await finalizeRealityCaptureUpload(session.serverCapture.captureId,'manual');await fetchProgress(session);assertCurrent(session);
+        }
+        return {photos:session.remotePhotos};
+      },
+      importPhotos:async files=>{
+        assertCurrent(session);
+        if(!captureIsEditable(session.serverCapture))throw Error('This submitted photo set is preserved. Existing photos can still be placed here. To add new uploads, close this editor and choose Continue improving this building.');
+        const accepted=await addPhotos({target:{files,value:''}});assertCurrent(session);
+        if(!accepted)throw Error(ensurePanel().querySelector('[data-capture-status]').textContent||'No photos were accepted.');
+        await uploadDraft(false);assertCurrent(session);
+        if(session.photos.some(photo=>!session.uploadedPhotoIds.has(photo.id)))throw Error(ensurePanel().querySelector('[data-capture-status]').textContent||'Upload incomplete. Photos remain saved on this device.');
+        if(['draft','uploading'].includes(session.serverCapture.status))await finalizeRealityCaptureUpload(session.serverCapture.captureId,'manual');
+        await fetchProgress(session);assertCurrent(session);
+        return {photos:session.remotePhotos};
+      },
       loadPhoto:async(id,signal)=>{
         assertCurrent(session);const item=session.remotePhotos.find(p=>p.id===id);if(!item)throw Error('Unknown capture photo.');
         const path=item.path||`reality-captures/${session.uid}/${session.serverCapture.captureId}/originals/${id}.jpg`;
         const access=await getRealityCaptureAssetAccess(session.serverCapture.captureId,'original',path);assertCurrent(session);
         const response=await fetch(access.url,{cache:'no-store',signal});if(!response.ok)throw Error('Unable to open this saved photo.');
         const blob=await response.blob();assertCurrent(session);return blob;
-      },submit:async revision=>{
+      },submit:async (revision,publicSharing=false)=>{
         assertCurrent(session);
-        const result=await submitRealityCaptureHybrid(session.serverCapture.captureId,revision,true);
-        assertCurrent(session);return result;
+        const result=await submitRealityCaptureHybrid(session.serverCapture.captureId,revision,true,session.kind==='interior_room'?publicSharing===true:true);
+        assertCurrent(session);await fetchProgress(session);return result;
       },save:async preview=>{
         assertCurrent(session);const result=await saveRealityCaptureHybridPreview(session.serverCapture.captureId,preview);assertCurrent(session);
         session.serverCapture.hybridPreview=result.preview;await persist(session);return result;
@@ -694,10 +778,10 @@ async function previewHybrid() {
 
 async function previewResult() {
   const session = current;
-  if (!session || session.busy || !session.serverCapture?.processed?.optimizedModelPath) return;
+  if (!session || session.busy || !(session.serverCapture?.hybridSubmission?.modelPath||session.serverCapture?.processed?.optimizedModelPath)) return;
   setBusy(session, true);
   const panel = ensurePanel();
-  panel.querySelector('[data-capture-status]').textContent = 'Opening your private reconstruction…';
+  panel.querySelector('[data-capture-status]').textContent = 'Opening your saved preview…';
   try {
     const access = await getRealityCaptureAssetAccess(session.serverCapture.captureId);
     assertCurrent(session);
@@ -706,10 +790,16 @@ async function previewResult() {
     const bytes = await response.arrayBuffer();
     assertCurrent(session);
     if (bytes.byteLength > 20 * 1024 * 1024) throw Error('This model exceeds the preview limit.');
-    const { createCaptureViewer } = await import('./result-viewer.js?v=1');
+    const { createCaptureViewer } = await import('./result-viewer.js?v=2');
     assertCurrent(session);
     session.viewer?.dispose();
-    session.viewer = await createCaptureViewer(panel.querySelector('[data-capture-viewer]'), bytes, session.abort.signal);
+    const submitted=session.serverCapture.hybridSubmission;
+    session.viewer = await createCaptureViewer(panel.querySelector('[data-capture-viewer]'), bytes, session.abort.signal,{
+      homeLayout:submitted?.kind==='home-layout'?submitted.layout:null,
+      exteriorBuilding:submitted?.kind==='facade-patches'?session.serverCapture.building:null,
+      patchHeightMeters:submitted?.heightMeters,
+      ...(submitted?.kind==='facade-patches'?{alignment:{},spatialContext:session.serverCapture.building?.spatialContext,streetFacingWall:submitted.streetFacingWall}:{})
+    });
     assertCurrent(session);
     panel.querySelector('[data-capture-viewer-controls]').hidden = false;
     panel.querySelector('[data-capture-status]').textContent = 'Drag to rotate. Pinch or scroll to zoom. This preview does not change the public world.';
@@ -800,7 +890,7 @@ async function uploadDraft(submit = true) {
     }
     status.textContent = 'Checking your photos for manual placement…';
     assertCurrent(session);
-    const result = await finalizeRealityCaptureUpload(session.serverCapture.captureId, 'manual');
+    const result = session.serverCapture.status==='uploaded'?{status:'uploaded'}:await finalizeRealityCaptureUpload(session.serverCapture.captureId, 'manual');
     assertCurrent(session);
     status.textContent = `Upload complete. Status: ${result.status}. Originals remain private.`;
     await deleteLocalCaptureDraft(session.draftId);
@@ -814,7 +904,7 @@ async function uploadDraft(submit = true) {
   } finally {
     setBusy(session, false);
   }
-  if (submit && isCurrent(session) && session.serverCapture?.status === 'uploaded' && session.kind === 'exterior') await previewHybrid();
+  if (submit && isCurrent(session) && session.serverCapture?.status === 'uploaded') await previewHybrid();
 }
 
 async function clearDraft() {
@@ -841,14 +931,31 @@ async function clearDraft() {
 function startSession(appCtx, target) {
   const user = getCurrentUser();
   if (!user || user.isAnonymous) throw new Error('Sign in to your World Explorer account before capturing. Use that same account on your phone.');
-  if (current) closeRealityCapture();
+  if (current) closeRealityCapture({force:true});
   const session = { appCtx, uid: user.uid, target, kind: 'exterior', draftId: '', activeSector: 0,
     photos: [], remotePhotos: [], serverCapture: null, uploadedPhotoIds: new Set(), abort: new AbortController(), busy: false };
   current = session;
+  ensurePanel().classList.toggle('captureInWorld',!!appCtx);
   session.unsubscribe = observeAuth((next) => {
-    if (current === session && next?.uid !== session.uid) closeRealityCapture();
+    if (current === session && next?.uid !== session.uid) closeRealityCapture({force:true});
   });
   return session;
+}
+
+async function requireContributor(appCtx,target=null){
+  if(getCurrentUser()&&!getCurrentUser().isAnonymous)return true;
+  rememberCaptureIntent(target);
+  const dialog=document.createElement('dialog');dialog.className='realityCaptureDialog';dialog.setAttribute('aria-label','Sign in to contribute');
+  dialog.innerHTML='<header><h2>Save your contribution</h2></header><p>Sign in to continue with this building on any device.</p><button data-google>Sign in with Google</button><form><label>Email<input name="email" type="email" autocomplete="username" required></label><label>Password<input name="password" type="password" autocomplete="current-password" required></label><button>Sign in</button></form><p role="status"></p><button data-cancel>Back to world</button>';
+  document.body.append(dialog);dialog.showModal();appCtx?.setPauseReason?.('capture-sign-in',true);
+  return await new Promise(resolve=>{
+    let done=false;const finish=value=>{if(done)return;done=true;clearCaptureIntent();unsubscribe();dialog.close();dialog.remove();appCtx?.setPauseReason?.('capture-sign-in',false);resolve(value);};
+    const unsubscribe=observeAuth(user=>{if(user&&!user.isAnonymous)queueMicrotask(()=>finish(true));});
+    const login=async action=>{try{dialog.querySelector('[role=status]').textContent='Signing in…';if(getCurrentUser()?.isAnonymous)await signOutUser();await action();}catch(e){dialog.querySelector('[role=status]').textContent=e.message;}};
+    dialog.querySelector('[data-google]').onclick=()=>login(signInWithGoogle);
+    dialog.querySelector('form').onsubmit=e=>{e.preventDefault();const f=e.currentTarget;void login(()=>signInWithEmailPassword(f.email.value,f.password.value));};
+    dialog.querySelector('[data-cancel]').onclick=()=>finish(false);dialog.oncancel=e=>{e.preventDefault();finish(false);};
+  });
 }
 
 export async function openRealityCaptureForBuilding(appCtx, buildingTarget) {
@@ -860,14 +967,24 @@ export async function openRealityCaptureForBuilding(appCtx, buildingTarget) {
   }
   let session;
   try {
+    const user=getCurrentUser();
+    if(!user||user.isAnonymous){if(!await requireContributor(appCtx,target))return false;return openRealityCaptureForBuilding(appCtx,buildingTarget);}
+    const result=await listMyRealityCaptures({worldId:target.worldId,sourceBuildingId:target.sourceBuildingId});
+    if(getCurrentUser()?.uid!==user.uid)throw Error('Account changed. Please open this building again.');
+    if(result.truncated||(result.buildingScoped!==true&&(!Array.isArray(result.captures)||result.captures.length>=60)))throw Error('Saved work could not be fully checked. Open My contributions before starting another capture.');
+    const saved=(result.captures||[]).filter(c=>sameCaptureBuilding(c.building,target));
+    const exteriors=saved.filter(c=>c.captureKind==='exterior');
+    if(exteriors.length===1)return openRealityCaptureSession(exteriors[0].captureId,appCtx);
+    if(saved.length)return openRealityCaptureLibrary(appCtx,target);
     session = startSession(appCtx, target);
     await restore('exterior', session);
   } catch (error) {
-    appCtx.showWorldSelectionNotice?.('Sign in to capture', error.message);
+    appCtx.showWorldSelectionNotice?.('Could not open contribution', error.message);
     return false;
   }
   panel.classList.add('show');
   panel.showModal();
+  mountCaptureStep(panel,{building:session.target,section:session.kind==='interior_room'?'Interior':'Exterior',requestClose:closeRealityCapture});
   panel.setAttribute('aria-hidden', 'false');
   panel.setAttribute('aria-modal', 'true');
   appCtx.setPauseReason?.('reality_capture', true);
@@ -882,14 +999,59 @@ export async function openRealityCaptureForBuilding(appCtx, buildingTarget) {
   return true;
 }
 
+// One account library, used in the world without replacing it with device-only drafts.
+export async function openRealityCaptureLibrary(appCtx=null,target=null) {
+  const user=getCurrentUser();
+  if(!user||user.isAnonymous){if(!await requireContributor(appCtx,target))return false;return openRealityCaptureLibrary(appCtx,target);}
+  if(current){await persist(current);closeRealityCapture({force:true});}
+  document.getElementById('realityCaptureLibrary')?.close();
+  const dialog=document.createElement('dialog');dialog.id='realityCaptureLibrary';dialog.className=`realityCaptureDialog${appCtx?' captureInWorld':''}`;
+  dialog.innerHTML='<header><h2>Reality Capture · My contributions</h2><button type="button" data-close>Back to world</button></header><p>Exterior contributions are reviewed before appearing publicly. Interiors stay private unless you explicitly choose sharing and they are approved.</p><p data-state role="status">Loading your saved contributions…</p><div data-list></div><button type="button" data-refresh>Refresh saved work</button>';
+  document.body.append(dialog);dialog.showModal();
+  const stopActivity=mountCaptureActivity(dialog,{open:async id=>{try{await openRealityCaptureSession(id,appCtx);dialog.close();}catch(error){dialog.querySelector('[data-state]').textContent=error.message;}}});
+  const environment=document.createElement('p');environment.textContent=`Account: ${user.email||user.displayName||'Explorer'} · ${globalThis.WORLD_EXPLORER_FIREBASE_ENV||'configured'} environment. Saved uploads are shared across devices in this environment.`;dialog.querySelector('[data-state]').before(environment);
+  appCtx?.setPauseReason?.('reality_capture_library',true);appCtx?.clearControlInputState?.('capture-library-open');document.exitPointerLock?.();
+  let disposed=false,request=0;
+  const unsubscribe=observeAuth(next=>{if(next?.uid!==user.uid)dialog.close();});
+  dialog.addEventListener('close',()=>{disposed=true;request++;unsubscribe();stopActivity();dialog.remove();appCtx?.setPauseReason?.('reality_capture_library',false);appCtx?.clearControlInputState?.('capture-library-close');},{once:true});
+  dialog.querySelector('[data-close]').onclick=()=>dialog.close();
+  async function refresh(){
+    const token=++request,list=dialog.querySelector('[data-list]'),status=dialog.querySelector('[data-state]');status.textContent='Checking your account…';list.replaceChildren();
+    try{
+      const result=await listMyRealityCaptures(target?{worldId:target.worldId,sourceBuildingId:target.sourceBuildingId}:undefined);
+      if(disposed||token!==request||getCurrentUser()?.uid!==user.uid)return;
+      const records=(result.captures||[]).filter(c=>!target||(sameCaptureBuilding(c.building,target)));
+      status.textContent=records.length?`${records.length} saved contributions${result.truncated?' · more records exist; this list is incomplete':''}`:'No saved contributions found for this account'+(target?' at this building.':'. Device-only photo batches are separate from uploaded contributions.');
+      const buildings=new Map();
+      for(const capture of records){
+        const building=capture.building||{},key=captureBuildingKey(building);
+        let group=buildings.get(key);
+        if(!group){group=document.createElement('section');const title=document.createElement('h3');title.textContent=building.label||'Mapped building';const identity=document.createElement('p');identity.textContent=`Building ${building.sourceBuildingId||'unknown'} · ${building.worldId||'world'}`;group.append(title,identity);buildings.set(key,group);list.append(group);}
+        const button=document.createElement('button');button.type='button';button.style.cssText='display:block;width:100%;min-height:48px;margin:8px 0;text-align:left';button.textContent=captureLabel(capture);button.onclick=async()=>{button.disabled=true;try{await openRealityCaptureSession(capture.captureId,appCtx);dialog.close();}catch(error){status.textContent=error.message;button.disabled=false;}};group.append(button);
+      }
+    }catch(error){if(!disposed&&token===request)status.textContent=`Could not load saved contributions: ${error.message}. Your uploads have not been removed.`;}
+  }
+  dialog.querySelector('[data-refresh]').onclick=refresh;
+  if(['localhost','127.0.0.1','[::1]'].includes(location.hostname)&&appCtx){
+    const advanced=document.createElement('details');advanced.innerHTML='<summary>Advanced · device photo batches</summary><p>Recover or organize a local photo batch. These previews have not been uploaded or submitted for approval.</p><button type="button">Open device photo organizer</button>';advanced.querySelector('button').onclick=async()=>{dialog.close();const {openPhotoSurvey}=await import('./survey-ui.js');await openPhotoSurvey({appCtx,building:target});};dialog.append(advanced);
+  }
+  void import('../../../js/billing.js?v=58').then(m=>m.getAccountOverview()).then(overview=>{
+    if(disposed||getCurrentUser()?.uid!==user.uid||!(overview.isAdmin||overview.adminTesterEligible))return;
+    const review=document.createElement('button');review.textContent='Review improvements';review.onclick=async()=>{const {openCaptureReview}=await import('./review-dialog.js');await openCaptureReview({appCtx});};dialog.querySelector('header').after(review);
+  }).catch(()=>{});
+  await refresh();return true;
+}
+
 // Server-resolved identity is used on the phone; do not instantiate the Earth renderer.
-export async function openRealityCaptureSession(captureId) {
+export async function openRealityCaptureSession(captureId, appCtx = current?.appCtx || null) {
   const generation = ++openGeneration;
   const user = getCurrentUser();
   if (!user || user.isAnonymous) throw new Error('Sign in with the account that started this capture.');
   const result = await getMyRealityCapture(captureId);
   if (generation !== openGeneration || getCurrentUser()?.uid !== user.uid) throw new Error('Account changed. Open the capture again.');
-  const session = startSession(null, result.capture.building);
+  const session = startSession(appCtx, result.capture.building);
+  appCtx?.setPauseReason?.('reality_capture',true);
+  appCtx?.screenLayout?.setPanelLayer('reality-capture',true);
   session.resumed = true;
   await restore(result.capture.captureKind, session, result.capture);
   assertCurrent(session);
@@ -899,17 +1061,21 @@ export async function openRealityCaptureSession(captureId) {
   const panel = ensurePanel();
   panel.classList.add('show');
   panel.showModal();
+  mountCaptureStep(panel,{building:session.target,section:session.kind==='interior_room'?'Interior':'Exterior',requestClose:closeRealityCapture});
   panel.setAttribute('aria-hidden', 'false');
   panel.setAttribute('aria-modal', 'true');
   panel.querySelector('[data-capture-server-status]').textContent = `${session.remotePhotos.length} photos uploaded · ${processingDescription(result.capture)}`;
   render();
   scheduleProgress(session);
+  if(location.pathname.endsWith('/capture.html'))history.replaceState(history.state,'',`#capture=${encodeURIComponent(captureId)}`);
   return true;
 }
 
-export function closeRealityCapture() {
-  openGeneration++;
+export function closeRealityCapture(options={}) {
   const panel = ensurePanel();
+  if(current?.busy&&!options.force){panel.querySelector('[data-capture-status]').textContent='Wait for the current operation to finish before closing.';return;}
+  openGeneration++;
+  if(options.force)for(const dialog of [...document.querySelectorAll('dialog[open][data-capture-step]')].reverse())dialog.captureStepDispose?.({skipHistory:true});
   if (current) {
     const session = current;
     void persist(session).catch(() => {});
@@ -925,7 +1091,7 @@ export function closeRealityCapture() {
     current = null;
   }
   panel.classList.remove('show');
-  panel.close();
+  panel.captureStepDispose?.();panel.close();
   panel.removeAttribute('aria-modal');
   panel.setAttribute('aria-hidden', 'true');
   panel.querySelector('[data-capture-link]').removeAttribute('href');

@@ -55,6 +55,7 @@ function projectFieldGuideEntry(existingGuide, record, now, regionId) {
       ? record.evidencePayload.livePresenceClaim
       : existingGuide?.livePresenceClaim === true,
     sourceRefs: clone(record.sourceRefs || existingGuide?.sourceRefs || []),
+    geologyEvidence: clone(record.evidencePayload?.geologyEvidence || existingGuide?.geologyEvidence || null),
     regions: [...new Set([...existingRegions, regionId])],
     regionLabels: [...new Set([...(existingGuide?.regionLabels || []), String(record.regionLabel || 'Current region')])]
   };

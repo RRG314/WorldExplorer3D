@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "release": "5.2.0",
+  "release": "5.3.0",
   "desktopTier": {
     "id": "apple-m1-8gb-mac-mini-chrome",
     "hardware": "Apple M1 Mac mini, 8 GB unified memory",

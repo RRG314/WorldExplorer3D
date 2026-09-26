@@ -67,7 +67,7 @@ function compiledSurfaceAtDistance(feature, distance) {
     (finite(heights[right], NaN) - finite(heights[left], NaN)) * t;
 }
 
-function connectedSideGroups(connections = []) {
+export function connectedSideGroups(connections = []) {
   const parent = new Map();
   const sides = new Map();
   const ensure = (side) => {

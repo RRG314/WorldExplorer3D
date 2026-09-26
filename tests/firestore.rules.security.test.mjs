@@ -392,6 +392,16 @@ async function runCheck(name, fn) {
   }
 }
 
+await runCheck('new profiles cannot mint their own room quota or counterfeit an initial count', async () => {
+  const uid = 'quota_bootstrap_user';
+  const db = testEnv.authenticatedContext(uid).firestore();
+  const ref = doc(db, 'users', uid);
+  const base = { uid, email: 'quota@example.test', displayName: 'Quota check', createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
+  await assertFails(setDoc(ref, { ...base, roomCreateLimit: 10000 }));
+  await assertFails(setDoc(ref, { ...base, roomCreateCount: 1 }));
+  await assertSucceeds(setDoc(ref, { ...base, roomCreateCount: 0, roomCreateLimit: 3 }));
+});
+
 await runCheck('explorer can read their trusted discovery inventory', async () => {
   await assertSucceeds(getDoc(doc(ownerDb, 'explorerProfiles', OWNER_UID, 'items', 'trusted_item')));
 });
@@ -668,16 +678,16 @@ await runCheck('signed-in invite-code joiner can read private room metadata', as
   await assertSucceeds(getDoc(doc(joinerDb, 'rooms', ROOM_ID)));
 });
 
-await runCheck('signed-in invite-code joiner can count players before membership', async () => {
-  await assertSucceeds(getDocs(collection(joinerDb, 'rooms', ROOM_ID, 'players')));
+await runCheck('private roster is hidden until server admission', async () => {
+  await assertFails(getDocs(collection(joinerDb, 'rooms', ROOM_ID, 'players')));
 });
 
 await runCheck('signed-in user cannot enumerate all private rooms', async () => {
   await assertFails(getDocs(collection(joinerDb, 'rooms')));
 });
 
-await runCheck('signed-in invite-code joiner can create own membership', async () => {
-  await assertSucceeds(setDoc(
+await runCheck('invite holder cannot bypass server admission with a direct membership write', async () => {
+  await assertFails(setDoc(
     doc(joinerDb, 'rooms', ROOM_ID, 'players', JOINER_UID),
     playerDoc(JOINER_UID, 'Private Room Joiner', 'member')
   ));
