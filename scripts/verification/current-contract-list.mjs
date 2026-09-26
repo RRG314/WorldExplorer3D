@@ -106,6 +106,8 @@ export const currentContractTests = [
   'tests/shadow-policy-current.test.mjs',
   'tests/space-travel-session-current.test.mjs',
   'tests/space-quality-current.test.mjs',
+  'tests/ship-ring-current.test.mjs',
+  'tests/research-workbench-current.test.mjs',
   'tests/starter-companion-current.test.mjs',
   'tests/street-captured-overlap-current.test.mjs',
   'tests/street-carriageway-ownership-current.test.mjs',

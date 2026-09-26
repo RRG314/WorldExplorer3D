@@ -1,3 +1,4 @@
+import {sampleIsMounted} from './research-workbench.js';
 import { withExpeditionChanges } from './model.js?v=12';
 import { resolveSystemFailure } from './failure-authority.js?v=3';
 import { reinforceGenerationTraining, wakeReserveSpecialist } from './long-duration.js?v=1';
@@ -69,11 +70,11 @@ function operationCycle(expedition) {
 
 function operationKey(expedition, actionId) {
   if (actionId === 'process-resource-sample') {
-    const sample = (expedition?.scienceSamples || []).find((entry) => entry.processed !== true);
+    const sample = (expedition?.scienceSamples || []).find((entry) => entry.processed !== true && !entry.consumed && !entry.exported && !sampleIsMounted(expedition,entry.id));
     return `${actionId}:${sample?.id || 'none'}`;
   }
   if (actionId === 'approve-processed-sample') {
-    const sample = (expedition?.scienceSamples || []).find((entry) => entry.processed === true && !entry.recoveryRequirement && entry.analysisApproved !== true && entry.exported !== true);
+    const sample = (expedition?.scienceSamples || []).find((entry) => entry.processed === true && !entry.recoveryRequirement && entry.analysisApproved !== true && entry.exported !== true && !entry.consumed && !sampleIsMounted(expedition,entry.id));
     return `${actionId}:${sample?.id || 'none'}`;
   }
   return `${actionId}:${operationCycle(expedition)}`;
@@ -108,7 +109,7 @@ function actionAvailability(expedition, actionId) {
   const used = expedition?.operationFlags?.[operationKey(expedition, actionId)] === true;
   if (actionId === 'load-backpack-materials') return Object.freeze({ enabled: true, reason: 'Compatible material bundles transfer from the shared Backpack with exact mass.' });
   if (actionId === 'transfer-approved-sample') {
-    const sample = (expedition?.scienceSamples || []).find((entry) => entry.processed === true && entry.analysisApproved === true && !entry.recoveryRequirement && entry.exported !== true);
+    const sample = (expedition?.scienceSamples || []).find((entry) => entry.processed === true && entry.analysisApproved === true && !entry.recoveryRequirement && entry.exported !== true && !entry.consumed && !sampleIsMounted(expedition,entry.id));
     return Object.freeze({ enabled: !!sample, reason: sample ? 'Transfers one conserved approved lot to the shared Backpack.' : 'Process and approve a science sample first.' });
   }
   if (used) return Object.freeze({ enabled: false, reason: 'Completed during this voyage segment.' });
@@ -128,11 +129,11 @@ function actionAvailability(expedition, actionId) {
     'service-thermal-loop': 8
   }[actionId];
   if (maintenanceCost && Number(resources.maintenanceKg) < maintenanceCost) return Object.freeze({ enabled: false, reason: `Requires ${maintenanceCost} kg of maintenance parts.` });
-  if (actionId === 'process-resource-sample' && !(expedition?.scienceSamples || []).some((sample) => sample.processed !== true)) {
+  if (actionId === 'process-resource-sample' && !(expedition?.scienceSamples || []).some((sample) => sample.processed !== true && !sample.consumed && !sample.exported && !sampleIsMounted(expedition,sample.id))) {
     return Object.freeze({ enabled: false, reason: 'Acquire and transfer a sample from a supported local operation first.' });
   }
-  if (actionId === 'approve-processed-sample' && !(expedition?.scienceSamples || []).some((sample) => sample.processed === true && !sample.recoveryRequirement && sample.analysisApproved !== true && sample.exported !== true)) {
-    const approved = (expedition?.scienceSamples || []).some((sample) => sample.processed === true && sample.analysisApproved === true && !sample.recoveryRequirement && sample.exported !== true);
+  if (actionId === 'approve-processed-sample' && !(expedition?.scienceSamples || []).some((sample) => sample.processed === true && !sample.recoveryRequirement && sample.analysisApproved !== true && sample.exported !== true && !sample.consumed && !sampleIsMounted(expedition,sample.id))) {
+    const approved = (expedition?.scienceSamples || []).some((sample) => sample.processed === true && sample.analysisApproved === true && !sample.recoveryRequirement && sample.exported !== true && !sample.consumed && !sampleIsMounted(expedition,sample.id));
     return Object.freeze({
       enabled: false,
       reason: approved ? 'The sealed sample is approved and ready for transfer from the Cargo Hold.' : 'No processed science sample is awaiting review.'
@@ -241,7 +242,7 @@ function applyShipOperation(expedition, actionId) {
     kind = 'science';
   } else if (actionId === 'process-resource-sample') {
     const samples = clone(expedition.scienceSamples || []);
-    const sample = samples.find((entry) => entry.processed !== true);
+    const sample = samples.find((entry) => entry.processed !== true && !entry.consumed && !entry.exported && !sampleIsMounted(expedition,entry.id));
     sample.processed = true;
     sample.processedAtMissionS = Number(expedition.strategicElapsedS) || 0;
     const recovery = sample.recoveryRequirement;
@@ -275,7 +276,7 @@ function applyShipOperation(expedition, actionId) {
     return Object.freeze({ expedition: next, changed: true, message });
   } else if (actionId === 'approve-processed-sample') {
     const samples = clone(expedition.scienceSamples || []);
-    const sample = samples.find((entry) => entry.processed === true && !entry.recoveryRequirement && entry.analysisApproved !== true && entry.exported !== true);
+    const sample = samples.find((entry) => entry.processed === true && !entry.recoveryRequirement && entry.analysisApproved !== true && entry.exported !== true && !entry.consumed && !sampleIsMounted(expedition,entry.id));
     sample.analysisApproved = true;
     sample.analysisApprovedAtMissionS = Number(expedition.strategicElapsedS) || 0;
     sample.tradeClassification = 'approved-game-world-research-sample';

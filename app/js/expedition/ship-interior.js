@@ -1,3 +1,4 @@
+import {RESEARCH_BENCHES} from './research-workbench.js';
 import {podBayCycle} from './pod-bay-cycle.js';
 import {buildRingDeck} from './ship-ring-scene.js';
 import {ring, polar, templatePoint, pointInRoom, ringRoute} from './ship-ring-plan.js';
@@ -416,23 +417,10 @@ function addScienceBench(group, x, z, yaw, accent, label) {
   return root;
 }
 
-function addWallServicePanel(group, x, z, yaw, accent, label) {
-  const root = new THREE.Group();
-  root.name = `service-panel:${label}`;
-  const frame = material(0x374b5b, { metalness: 0.58, roughness: 0.36 });
-  const recess = material(0x0f1d28, { metalness: 0.5, roughness: 0.44 });
-  box(root, { x: 1.5, y: 2.2, z: 0.14 }, { x: 0, y: 1.35, z: 0 }, frame, `${label}:service-frame`);
-  box(root, { x: 1.24, y: 1.88, z: 0.08 }, { x: 0, y: 1.35, z: -0.09 }, recess, `${label}:service-recess`);
-  [-0.42, 0, 0.42].forEach((offset, index) => {
-    const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.25, 10), material(index === 1 ? accent : 0x7b8790, { emissive: index === 1 ? accent : 0x000000, emissiveIntensity: index === 1 ? 0.35 : 0, metalness: 0.42, roughness: 0.38 }));
-    tube.position.set(offset, 1.38, -0.18);
-    root.add(tube);
-  });
-  for (let index = 0; index < 4; index += 1) box(root, { x: 0.16, y: 0.08, z: 0.05 }, { x: -0.46 + index * 0.31, y: 2.28, z: -0.18 }, material(index === 0 ? 0xe8a54a : accent, { emissive: index === 0 ? 0xe8a54a : accent, emissiveIntensity: 0.65 }), `${label}:service-status`);
-  root.position.set(x, 0, z);
-  root.rotation.y = yaw;
-  group.add(root);
-  return root;
+function addWallServicePanel(group,x,z,yaw,accent,label){
+ const root=new THREE.Group();root.name=`service-panel:${label}`;root.position.set(x,.5,z);root.rotation.y=yaw;group.add(root);
+ void furnish(root,'wall-instruments',{fit:{x:1.5,y:1.8,z:.5},sourceYaw:Math.PI});
+ return root;
 }
 
 function cylinder(group, radiusTop, radiusBottom, height, position, surface, name = '', rotation = null, segments = 12) {
@@ -1149,8 +1137,25 @@ function createShipExteriorView() {
  return {source:'live-local-space-renderer',texture,camera,surfaces:[],elapsed:0,frameCount:0};
 }
 
+function addWallEquipment(group,deck){
+ for(const room of deck.rooms){
+  const inner=room.id==='storm-shelter',radius=inner?17.5:38.4;
+  for(const [index,offset] of [-.24,.24].entries()){
+   const angle=room.angle+offset,p=polar(radius,angle),host=new THREE.Group();
+   host.name=`wall-equipment:${room.id}:${index}`;host.position.set(p.x,.7,p.z);host.rotation.y=angle+Math.PI;host.userData.shipRoomId=room.id;group.add(host);
+   const asset=index===0?(deck.id==='habitat'?'crew-display':'wall-navigation'):'wall-instruments';
+   void furnish(host,asset,{fit:{x:index===0?3:2,y:1.8,z:index===0?1.15:.65}});
+   const station=SHIP_STATIONS.find(entry=>entry.roomId===room.id);
+   if(station){
+    group.userData.wallInteractions||=[];
+    group.userData.wallInteractions.push({...station,id:`wall:${room.id}:${index}`,stationId:station.id,x:p.x,z:p.z,kind:'ship-wall-station',radius:2.8,level:0});
+   }
+  }
+ }
+}
+
 function buildDeckScene(deckDefinition) {
- return buildRingDeck(THREE,deckDefinition,{surface:shipSurfaceMaterial,material,box,accent:deckAccent,label:roomLabelTexture,details:addDeckDetails,propColliders:addDeckPropColliders,spaceView:createShipExteriorView});
+ return buildRingDeck(THREE,deckDefinition,{surface:shipSurfaceMaterial,material,box,accent:deckAccent,label:roomLabelTexture,details:addDeckDetails,propColliders:addDeckPropColliders,spaceView:createShipExteriorView,wallEquipment:addWallEquipment});
 }
 
 function buildSolisReachScene(expedition) {
@@ -1584,6 +1589,33 @@ function activeDeckColliders(session = activeSession) {
   return [...state.colliders, ...state.doorStates.filter((door) => !door.open).map((door) => door.collider)];
 }
 
+function researchBenchInteractions(deckId){
+ return Object.entries(RESEARCH_BENCHES).filter(([,b])=>b.deckId===deckId).map(([id,b])=>{
+  const room=SHIP_ROOMS.find(r=>r.id===b.roomId),p=templatePoint(room,b.template);
+  return {id,...b,...p,kind:'ship-research',radius:2.5,level:0};
+ });
+}
+function syncResearchBenches(session){
+ if(!session)return;
+ for(const [id,bench] of Object.entries(RESEARCH_BENCHES)){
+  const deck=session.sceneState.deckStates.get(bench.deckId);
+  let group=deck.group.getObjectByName(`research-cradles:${id}`);
+  if(!group){
+   group=new THREE.Group();group.name=`research-cradles:${id}`;
+   const room=SHIP_ROOMS.find(r=>r.id===bench.roomId),p=templatePoint(room,bench.template);
+   group.position.set(p.x,1.12,p.z);group.rotation.y=room.kitYaw+(id==='fabrication-bench'?0:Math.PI/2);deck.group.add(group);
+   for(let i=0;i<2;i++){
+    const cradle=new THREE.Mesh(new THREE.CylinderGeometry(.32,.35,.08,24),material(0x51646b,{metalness:.65}));cradle.position.x=(i-.5)*1.1;group.add(cradle);
+    const specimen=new THREE.Mesh(new THREE.IcosahedronGeometry(.2,1),material(i?0x97826b:0x807566,{roughness:.9}));specimen.name=`specimen:${i}`;specimen.position.set((i-.5)*1.1,.26,0);group.add(specimen);
+    const glass=material(0xbbe9e4,{transparent:true,opacity:.14,roughness:.1,depthWrite:false});
+    const jar=new THREE.Mesh(new THREE.CylinderGeometry(.28,.28,.55,20),glass);jar.position.set((i-.5)*1.1,.31,0);group.add(jar);
+   }
+  }
+  const slots=session.expedition?.research?.benches?.[id]||[];
+  for(let i=0;i<2;i++){const specimen=group.getObjectByName(`specimen:${i}`);specimen.visible=!!slots[i];specimen.userData.sampleId=slots[i]||null;}
+ }
+}
+
 function activeDeckInteractions(session = activeSession) {
   if (!session) return [];
   const profileId = session.expedition?.ship?.profileId;
@@ -1595,6 +1627,7 @@ function activeDeckInteractions(session = activeSession) {
     kind: station.id.startsWith('deck-lift:') ? 'ship-lift' : 'ship-station',
     level: 0
   }));
+  stations.push(...researchBenchInteractions(session.activeDeckId),...(activeDeckState(session)?.group.userData.wallInteractions||[]));
   const doors = SHIP_DOORS.filter((door) => door.deckId === session.activeDeckId).map((door) => ({
     ...door,
     kind: 'ship-door',
@@ -1924,6 +1957,7 @@ function toggleShipMap(show) {
 function updateExpeditionShipRecord(expedition) {
   if (!activeSession || !expedition || expedition.id !== activeSession.expedition?.id) return false;
   activeSession.expedition = expedition;
+  syncResearchBenches(activeSession);
   syncCrewMeshes(activeSession, expedition);
   refreshCrewOperations(activeSession, true);
   syncIncidentPresentation(activeSession);
@@ -2058,6 +2092,7 @@ function enterSolisReachInterior(options = {}) {
   const interiorPrompt = document.getElementById('interiorPrompt');
   if (interiorPrompt) interiorPrompt.style.display = '';
   appCtx.renderLoop?.();
+  syncResearchBenches(session);
   syncIncidentPresentation(session);
   syncShipGuidance(session);
   ensureShipMaps(session);
@@ -2189,6 +2224,7 @@ function handleShipInteriorInteraction(interaction) {
     void advanceIncidentProcedure(interaction);
     return true;
   }
+  if(interaction.kind==='ship-wall-station')interaction={...interaction,id:interaction.stationId,kind:'ship-station'};
   const result = activeSession.onInteraction?.(interaction, activeSession.expedition);
   return result !== false;
 }
@@ -2239,7 +2275,7 @@ function beginExpeditionPodLaunch(onRelease) {
   session.podLaunch={elapsed:0,onRelease,walkEnabled:appCtx.Walk.state.enabled,stage:''};
   appCtx.Walk.state.enabled=false;
   const cabin=polar(32.4,bay.angle);
-  Object.assign(walker,{x:cabin.x,z:cabin.z,y:2.1,yaw:bay.angle+Math.PI,angle:bay.angle+Math.PI,pitch:0,vy:0});
+  Object.assign(walker,{x:cabin.x,z:cabin.z,y:2.1,yaw:bay.angle,angle:bay.angle,pitch:0,vy:0});
   door.open=false;door.targetY=1.36;
   updateActiveDeckContract(session);
   return true;
@@ -2328,6 +2364,7 @@ function getShipInteriorSnapshot() {
   return {
     active: true,
     shipId: 'solis-reach',
+    research: activeSession.expedition?.research || {benches:{},studies:{}},
     podLaunch: activeSession.podLaunch ? podBayCycle(activeSession.podLaunch.elapsed) : null,
     deckId: activeSession.activeDeckId,
     deckCount: SHIP_DECKS.length,

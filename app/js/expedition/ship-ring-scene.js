@@ -1,18 +1,22 @@
+import {batchStaticModelTemplate} from '../assets/static-model-batching.js';
 import {ring, polar, bounds, templatePoint} from './ship-ring-plan.js';
 
 // Polygon colliders are derived from the same wall endpoints as their meshes.
 export function buildRingDeck(THREE,deck,api) {
  const group=new THREE.Group();group.name=`solis-reach-deck:${deck.id}`;
+ const architecture=new THREE.Group();architecture.name=`ring-architecture:${deck.id}`;group.add(architecture);
  const colliders=[],doorStates=[];
  const deckHeight=deck.id==='engineering'?6:3.6;
  const wallMaterial=api.surface('wall',deck.id),floorMaterial=api.surface('floor',deck.id),ceilingMaterial=api.surface('ceiling',deck.id);
  const trim=api.material(0x4d6268,{metalness:.45,roughness:.5});
  const light=api.material(api.accent(deck.id),{emissive:api.accent(deck.id),emissiveIntensity:.8,metalness:.05});
- const disc=(y,material)=>{const mesh=new THREE.Mesh(new THREE.CylinderGeometry(ring.hullRadius,ring.hullRadius,.16,128),material);mesh.position.y=y;mesh.receiveShadow=true;group.add(mesh);return mesh;};
+ const disc=(y,material)=>{const mesh=new THREE.Mesh(new THREE.CylinderGeometry(ring.hullRadius,ring.hullRadius,.16,128),material);const positions=mesh.geometry.attributes.position,uv=mesh.geometry.attributes.uv;
+  for(let i=0;i<positions.count;i++)uv.setXY(i,positions.getX(i)/4,positions.getZ(i)/4);
+  mesh.position.y=y;mesh.receiveShadow=true;architecture.add(mesh);return mesh;};
  disc(-.08,floorMaterial);disc(deckHeight+.08,ceilingMaterial);
  function wall(a,b,name,{height=deckHeight,base=0,material=wallMaterial,solid=true,width=.24}={}){
   const dx=b.x-a.x,dz=b.z-a.z,length=Math.hypot(dx,dz),nx=dz/length*width/2,nz=-dx/length*width/2;
-  const mesh=api.box(group,{x:width,y:height,z:length+.035},{x:(a.x+b.x)/2,y:base+height/2,z:(a.z+b.z)/2},material,name);
+  const mesh=api.box(name.startsWith('door:')?group:architecture,{x:width,y:height,z:length+.035},{x:(a.x+b.x)/2,y:base+height/2,z:(a.z+b.z)/2},material,name);
   mesh.rotation.y=Math.atan2(dx,dz);
   if(solid){const pts=[{x:a.x+nx,z:a.z+nz},{x:b.x+nx,z:b.z+nz},{x:b.x-nx,z:b.z-nz},{x:a.x-nx,z:a.z-nz}];colliders.push({...bounds(pts),pts,baseY:base,height,isInteriorCollider:true,sourceBuildingId:name});}
   return mesh;
@@ -70,6 +74,7 @@ export function buildRingDeck(THREE,deck,api) {
   placard.position.set(d.x*.987,3.12,d.z*.987);placard.rotation.y=room.angle+Math.PI;group.add(placard);
   const taskLight=new THREE.PointLight(0xfff5e8,.75,18,2);taskLight.position.set(room.center.x,3.2,room.center.z);group.add(taskLight);
  }
+ group.userData.architectureBatching=batchStaticModelTemplate(THREE,architecture);
  // Existing functional room kits are positioned through their room's transform.
  const kit=new THREE.Group();api.details(kit,deck.id);
  for(const child of [...kit.children]){
@@ -78,6 +83,7 @@ export function buildRingDeck(THREE,deck,api) {
    ||deck.rooms.reduce((a,r)=>Math.hypot(child.position.x-(r.template.minX+r.template.maxX)/2,child.position.z-(r.template.minZ+r.template.maxZ)/2)<Math.hypot(child.position.x-(a.template.minX+a.template.maxX)/2,child.position.z-(a.template.minZ+a.template.maxZ)/2)?r:a);
   const point=templatePoint(room,child.position);child.position.x=point.x;child.position.z=point.z;child.rotation.y+=room.kitYaw;child.scale.multiplyScalar(room.fitScale);child.userData.shipRoomId=room.id;group.add(child);
  }
+ api.wallEquipment?.(group,deck);
  const oldColliders=[];api.propColliders(oldColliders,deck.id);
  for(const c of oldColliders){const room=deck.rooms.find(r=>c.centerX>=r.template.minX&&c.centerX<=r.template.maxX&&c.centerZ>=r.template.minZ&&c.centerZ<=r.template.maxZ);if(!room)continue;
   const pts=[{x:c.minX,z:c.minZ},{x:c.maxX,z:c.minZ},{x:c.maxX,z:c.maxZ},{x:c.minX,z:c.maxZ}].map(p=>templatePoint(room,p));colliders.push({...c,...bounds(pts),pts});

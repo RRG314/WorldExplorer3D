@@ -13,7 +13,7 @@ for(const deck of SHIP_DECKS)test(`${deck.id}: real rendered walls admit room-to
   surface:()=>surface,material:()=>surface,accent:()=>0xffffff,label:()=>null,details:()=>{},propColliders:()=>{},
   box(group,size,p,material,name){const mesh=new THREE.Mesh(new THREE.BoxGeometry(size.x,size.y,size.z),material);mesh.position.set(p.x,p.y,p.z);mesh.name=name;group.add(mesh);return mesh;}
  });
- const ctx={dynamicBuildingColliders:state.colliders,pointInPolygon:(x,z,pts)=>pointInRoom({x,z},{polygon:pts})};
+ const ctx={dynamicBuildingColliders:state.colliders};
  const collision=createBuildingCollisionQuery(ctx);
  const blocked=p=>collision(p.x,p.z,.32,{actorBaseY:0,actorHeight:1.8}).collision;
  for(const a of deck.rooms)for(const b of deck.rooms){

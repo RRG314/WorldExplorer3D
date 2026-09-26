@@ -108,7 +108,7 @@ try {
  checks.push({name:'owned-indoor-reflections'});
  for(const deck of SHIP_DECKS)for(const room of deck.rooms) {
   const radius=room.id==='storm-shelter'?16:26.5;
-  const view={deck:deck.id,x:Math.sin(room.angle)*radius,z:Math.cos(room.angle)*radius,yaw:room.angle+(room.id==='storm-shelter'?0:Math.PI)};
+  const view={deck:deck.id,x:Math.sin(room.angle)*radius,z:Math.cos(room.angle)*radius,yaw:room.angle+(room.id==='storm-shelter'?Math.PI:0)};
   await page.evaluate(async({deck,x,z,yaw})=>{
    const ctx=window.__spaceQualityContext;ctx.switchSolisReachDeck(deck);
    Object.assign(ctx.Walk.state.walker,{x,z,y:1.74,yaw,angle:yaw,pitch:0});ctx.Walk.state.view='first';ctx.presentationPose=null;

@@ -1,3 +1,4 @@
+import {applyResearchCommand} from './research-workbench.js';
 import { constructOutpost, createOutpostSite, serviceOutpost } from './outpost.js?v=1';
 import { DEFAULT_CREW, getPropulsionProfile, getShipProfile } from './catalog.js?v=2';
 import { createExpeditionPlan } from './model.js?v=12';
@@ -10,6 +11,7 @@ const COMMAND_TYPES = Object.freeze([
   'advance',
   'event-response',
   'ship-operation',
+  'research',
   'outpost-plan',
   'outpost-build',
   'outpost-service',
@@ -27,6 +29,9 @@ function normalizeExpeditionCommand(input = {}) {
   if (!COMMAND_TYPES.includes(type)) throw new Error('invalid_expedition_command');
   return Object.freeze({
     type,
+    benchId: cleanText(input.benchId,80),
+    researchAction: cleanText(input.researchAction,40),
+    sampleId: cleanText(input.sampleId,220),
     choiceId: cleanText(input.choiceId, 120),
     operationId: cleanText(input.operationId, 120),
     contactId: cleanText(input.contactId, 180),
@@ -76,6 +81,8 @@ function executeExpeditionCommand(expedition, input = {}, options = {}) {
     result = { expedition: advanceToNextMilestone(expedition), message: 'The next voyage chapter is ready.' };
   } else if (command.type === 'event-response') {
     result = { expedition: resolveExpeditionEvent(expedition, command.choiceId), message: 'The crew completed the response.' };
+  } else if (command.type === 'research') {
+    result=applyResearchCommand(expedition,command);
   } else if (command.type === 'ship-operation') {
     result = applyShipOperation(expedition, command.operationId);
   } else if (command.type === 'outpost-plan') {

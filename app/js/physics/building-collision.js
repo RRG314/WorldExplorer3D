@@ -1,3 +1,4 @@
+import {pointInPolygonXZ} from '../structure-semantics/geometry.js';
 import { nearbyVegetationObstacles } from '../world/vegetation-obstacle-index.js';
 
 function buildingVerticalRangeOverlap(building, actorBaseY, actorHeight, tolerance = 0.45) {
@@ -52,7 +53,7 @@ function createBuildingCollisionQuery(appCtx) {
 
       const hasPolygon = Array.isArray(building.pts) && building.pts.length >= 3;
       const isInside = hasPolygon
-        ? appCtx.pointInPolygon(x, z, building.pts)
+        ? pointInPolygonXZ(x, z, building.pts)
         : x >= building.minX && x <= building.maxX && z >= building.minZ && z <= building.maxZ;
       let nearestEdgeDist = Infinity;
       let nearestEdgeInfo = null;

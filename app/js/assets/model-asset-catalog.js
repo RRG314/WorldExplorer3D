@@ -1,6 +1,16 @@
 const MODEL_ASSET_SCHEMA_VERSION = 1;
 
 const MODEL_ASSET_CATALOG = Object.freeze([
+  ...[
+    ['wall-navigation','https://sketchfab.com/3d-models/large-wall-mounted-computer-console-298b7d9b68064618a3819d1a8fae4baf','Large Wall-Mounted Computer Console by Inditrion Dradnon'],
+    ['wall-instruments','https://sketchfab.com/3d-models/wall-console-98724ee49fba42a2b0ccbe79a36f246e','Wall Console by LuddePudde']
+  ].map(([name,sourceUrl,attribution])=>Object.freeze({
+    schemaVersion:MODEL_ASSET_SCHEMA_VERSION,id:`solis-${name}`,label:attribution,
+    url:`/app/assets/models/interiors/solis/${name}.glb`,roles:Object.freeze(['ship-interior-furnishing']),
+    sourceUrl,attribution,license:'CC-BY-4.0',collisionPolicy:'authored-ship-prop-colliders',sourceUpAxis:'y',
+    instancePolicy:Object.freeze({geometry:'shared',materials:'shared'}),
+    budgets:Object.freeze({bytes:2500000,triangles:13000,textureEdgePixels:1024})
+  })),
   ...['cargo-case','cargo-tank','cargo-locker','storage-case','bridge-chair','wardroom-chair','lab-stool','wardroom-table','medical-console'].map((name) => Object.freeze({
     schemaVersion: MODEL_ASSET_SCHEMA_VERSION, id: `solis-${name}`,
     label: `Solis Reach ${name.replaceAll('-', ' ')}`, url: `/app/assets/models/interiors/solis/${name}.glb`,

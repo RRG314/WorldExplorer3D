@@ -244,3 +244,10 @@ Selected bed, display and lamp meshes from [Sci-Fi Interior Room](https://sketch
 HYG v4.0 by David Nash / Astronexus and Western constellation figures by Stellarium contributors, CC BY-SA 4.0. Subsetting/conversion and source hashes: `../data/universe/observed-sky-sources.json`. No constellation artwork used.
 
 Additional Solis Reach furniture: [Sci-fi furniture/props pack](https://sketchfab.com/3d-models/free-sci-fi-furnitureprops-pack-b521def33f21422e9be8b4d237f7ca63) by [NinKorr3D](https://sketchfab.com/NinKorr3D), and [Medical Console](https://sketchfab.com/3d-models/medical-console-89065e109790417191467cfececf2c7c) by [Oliver Triplett](https://sketchfab.com/OliverTriplett), both CC BY 4.0. Meshes separated, textures resized to 512px, and furniture fitted to authored rooms. Original license notices retained under interiors/solis/.
+
+### Solis Reach wall equipment
+
+- `interiors/solis/wall-navigation.glb`: [Large Wall-Mounted Computer Console](https://sketchfab.com/3d-models/large-wall-mounted-computer-console-298b7d9b68064618a3819d1a8fae4baf) by [Inditrion Dradnon](https://sketchfab.com/dradnon), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+- `interiors/solis/wall-instruments.glb`: [Wall Console](https://sketchfab.com/3d-models/wall-console-98724ee49fba42a2b0ccbe79a36f246e) by [LuddePudde](https://sketchfab.com/luddepubde), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+
+Downloaded September 25, 2026 through the signed-in Sketchfab download controls. Converted textures to bounded 1024px WebP, deduplicated unused data, retained base PBR maps for the existing renderer, and positioned/scaled the models for ship bulkheads. No AI-generated replacement artwork.
