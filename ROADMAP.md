@@ -63,7 +63,8 @@ describe the changes being prepared for production.
 ### Before production promotion
 
 - Complete the remaining physical-phone walkthrough and record any blocking issue.
-- Deploy the compatible shared-research backend and confirm required indexes.
+- Keep the verified shared-research backend and required indexes aligned with
+  the final frontend package.
 - Verify the final production package, retain rollback information and publish
   the release only after the deployment is confirmed.
 

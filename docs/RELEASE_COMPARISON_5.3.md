@@ -14,7 +14,7 @@ difference; changed-file and test counts are not feature counts.
 | --- | --- | --- | --- |
 | Ship layout | Three-deck Solis Reach with fixed room arrangements | Circular circulation, shared room/door/collision layout, 25 rooms and controlled pod departure | Some utility fittings still use simpler custom geometry |
 | Research | Sample collection, cargo and analysis actions | Physical bench placement, spectral/thermal measurements and fabrication through the existing inventory | Experiment and recipe variety is limited |
-| Shared expeditions | Shared voyage state | Authoritative research mutations, conserved materials and rejection of stale revisions | Latest research handler must accompany frontend promotion |
+| Shared expeditions | Shared voyage state | Authoritative research mutations, conserved materials and rejection of stale revisions | Compatible research handler is deployed; frontend promotion remains pending |
 | Space information | Solar-System inspection and destination travel | Selection and information beyond the Solar System, supported star travel and observer-dependent sky | Catalog coverage is bounded; distant surfaces are reconstructions |
 | Space rendering | Existing planetary and destination scenes | Revised planet/moon imagery, gas-giant atmosphere detail, spatial galaxies and nebula line repairs | No claim of measured terrain on poorly observed worlds |
 | Buildings | Mapped footprints and varied facades | Whole window bays, consistent floor margins and aligned near-distance detail | Incomplete mapped geometry still limits accuracy |

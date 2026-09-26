@@ -15,6 +15,8 @@ The GitHub release is being prepared as a draft, not a publication announcement.
 - All 25 ship-room views were inspected after the furniture and corridor fixes.
 - Two-player backend verification covered research custody, fabrication and
   rejection of stale updates.
+- Production shared research is updated. All 11 declared composite indexes and
+  12 field-index configurations match ready production indexes.
 - The staging package identity and newly added model URLs were verified after
   deployment. Asset authors and licenses are recorded with the models.
 
@@ -22,11 +24,9 @@ The GitHub release is being prepared as a draft, not a publication announcement.
 
 1. Finish the physical-phone walkthrough: location search, walking/driving,
    water, Main Menu, multiplayer controls and ship/space transitions.
-2. Deploy the compatible shared-research handler and confirm the production
-   function/index inventory. Keep existing configuration and user data.
-3. Prepare and verify the production-configured package against the tested
+2. Prepare and verify the production-configured package against the tested
    candidate, retain rollback information, and complete release finalization.
-4. Confirm the deployed build before publishing the draft release.
+3. Confirm the deployed build before publishing the draft release.
 
 Passing software-rendered browser checks does not establish phone responsiveness.
 Some utility equipment remains simpler than the licensed ship furnishings;
