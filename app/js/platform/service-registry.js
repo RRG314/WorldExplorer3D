@@ -38,6 +38,7 @@ function createPlatformServiceRegistry(options = {}) {
       status: 'idle',
       value: null,
       promise: null,
+      generation: 0,
       attempts: 0,
       readyAt: 0,
       lastDurationMs: 0,
@@ -57,11 +58,21 @@ function createPlatformServiceRegistry(options = {}) {
     record.status = 'loading';
     record.attempts++;
     record.lastError = '';
+    const generation = record.generation;
+    const isCurrent = () => services.get(record.id) === record && record.generation === generation;
     const startedAt = now();
     emit('loading', record);
     record.promise = Promise.resolve()
       .then(() => record.load({ context, id: record.id, registry: api }))
       .then((value) => {
+        if (!isCurrent()) {
+          // A reset owns the lifetime even if the import cannot be cancelled.
+          // Do not tear down a singleton already adopted by a newer load.
+          if (value != null && value !== record.value) disposeValue(record, value, 'stale-load');
+          const error = new Error(`Service ${record.id} load was invalidated.`);
+          error.name = 'AbortError';
+          throw error;
+        }
         record.value = value ?? null;
         record.status = 'ready';
         record.readyAt = now();
@@ -71,6 +82,7 @@ function createPlatformServiceRegistry(options = {}) {
         return record.value;
       })
       .catch((error) => {
+        if (!isCurrent()) throw error;
         record.status = 'failed';
         record.lastDurationMs = Math.max(0, now() - startedAt);
         record.lastError = safeError(error);
@@ -88,16 +100,20 @@ function createPlatformServiceRegistry(options = {}) {
     return handler(...args);
   }
 
-  function resetService(id, reason = 'reset', remove = false) {
-    const record = services.get(String(id));
-    if (!record) return false;
-    const value = record.value;
+  function disposeValue(record, value, reason) {
     try {
       if (typeof record.dispose === 'function') record.dispose(value, reason);
       else value?.dispose?.(reason);
     } catch (error) {
       console.warn(`[platform] Service disposal failed: ${record.id}`, error);
     }
+  }
+
+  function resetService(id, reason = 'reset', remove = false) {
+    const record = services.get(String(id));
+    if (!record) return false;
+    record.generation++;
+    disposeValue(record, record.value, reason);
     record.status = 'idle';
     record.value = null;
     record.promise = null;
