@@ -10,10 +10,18 @@ export function buildRingDeck(THREE,deck,api) {
  const wallMaterial=api.surface('wall',deck.id),floorMaterial=api.surface('floor',deck.id),ceilingMaterial=api.surface('ceiling',deck.id);
  const trim=api.material(0x4d6268,{metalness:.45,roughness:.5});
  const light=api.material(api.accent(deck.id),{emissive:api.accent(deck.id),emissiveIntensity:.8,metalness:.05});
- const disc=(y,material)=>{const mesh=new THREE.Mesh(new THREE.CylinderGeometry(ring.hullRadius,ring.hullRadius,.16,128),material);const positions=mesh.geometry.attributes.position,uv=mesh.geometry.attributes.uv;
+ // Subdivide the circular walking surfaces into short radial bands. A single
+ // 32m cap fan produces unstable texture derivatives at corridor grazing angles
+ // on the software renderer used by the browser checks.
+ const disc=(y,material,ceiling=false)=>{
+  const geometry=new THREE.RingGeometry(0,ring.hullRadius,128,16);
+  geometry.rotateX(ceiling?Math.PI/2:-Math.PI/2);
+  const positions=geometry.attributes.position,uv=geometry.attributes.uv;
   for(let i=0;i<positions.count;i++)uv.setXY(i,positions.getX(i)/4,positions.getZ(i)/4);
-  mesh.position.y=y;mesh.receiveShadow=true;architecture.add(mesh);return mesh;};
- disc(-.08,floorMaterial);disc(deckHeight+.08,ceilingMaterial);
+  const mesh=new THREE.Mesh(geometry,material);mesh.name=ceiling?'ring-ceiling':'ring-floor';
+  mesh.position.y=y;mesh.receiveShadow=true;architecture.add(mesh);return mesh;
+ };
+ disc(0,floorMaterial);disc(deckHeight,ceilingMaterial,true);
  function wall(a,b,name,{height=deckHeight,base=0,material=wallMaterial,solid=true,width=.24}={}){
   const dx=b.x-a.x,dz=b.z-a.z,length=Math.hypot(dx,dz),nx=dz/length*width/2,nz=-dx/length*width/2;
   const mesh=api.box(name.startsWith('door:')?group:architecture,{x:width,y:height,z:length+.035},{x:(a.x+b.x)/2,y:base+height/2,z:(a.z+b.z)/2},material,name);

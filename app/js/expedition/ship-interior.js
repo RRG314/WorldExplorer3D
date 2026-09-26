@@ -870,19 +870,12 @@ function addDeckDetails(group, deckId) {
     addScienceBench(group, -8.1, -18.2, Math.PI / 2, 0xb887e8, 'data-instruments');
     addWallServicePanel(group, 12.62, 17.9, -Math.PI / 2, 0x7399e8, 'communications-service');
     addWallServicePanel(group, 12.62, 3.7, -Math.PI / 2, 0x3aa8d8, 'sensor-service');
-    const briefing = new THREE.Group();
-    briefing.name = 'briefing-furniture';
-    box(briefing, { x: 5.6, y: 0.18, z: 2.3 }, { x: 0, y: 0.92, z: 0 }, dark, 'briefing-tabletop');
-    [-2.2, 2.2].forEach((x) => box(briefing, { x: 0.24, y: 0.86, z: 1.6 }, { x, y: 0.43, z: 0 }, steel, 'briefing-table-leg'));
-    [-2.05, -0.7, 0.7, 2.05].forEach((x, index) => {
-      box(briefing, { x: 0.82, y: 0.15, z: 0.65 }, { x, y: 0.55, z: index % 2 ? -1.65 : 1.65 }, soft, 'briefing-seat');
-      box(briefing, { x: 0.82, y: 0.72, z: 0.14 }, { x, y: 0.91, z: index % 2 ? -1.96 : 1.96 }, soft, 'briefing-seat-back');
-    });
-    briefing.position.set(7.8, 0, -14.5);
-    group.add(briefing);
-    [-3.6, -1.2, 1.2, 3.6].forEach((x) => {
-      box(group, { x: 2.05, y: 0.2, z: 0.82 }, { x, y: 0.48, z: -31 }, soft, 'observation-seat');
-      box(group, { x: 2.05, y: 0.72, z: 0.16 }, { x, y: 0.86, z: -31.35 }, soft, 'observation-seat-back');
+    const briefing=addWardroomTable(group,7.8,-14.5,0x7399e8);
+    briefing.name='briefing-furniture';
+    [-3.6,-1.2,1.2,3.6].forEach(x=>{
+      const seat=new THREE.Group();seat.name='observation-seat';
+      seat.position.set(x,0,-31);group.add(seat);
+      void furnish(seat,'wardroom-chair',{fit:{x:1.05,y:1.3,z:.95},sourceYaw:Math.PI});
     });
   } else if (deckId === 'habitat') {
     addRoomTaskLight(group, 1.5, 30, 0xffd5a4, 'wardroom', 0.74, 12);
@@ -963,7 +956,8 @@ function addDeckPropColliders(colliders, deckId) {
     [[-8.2, 15.5], [8.2, 15.5], [-8.2, 0.5], [8.2, 0.5], [-8.2, -14.5]].forEach(([x, z], index) => add(x, z, 2.35, 2.7, 1.85, `science-console-${index}`));
     add(-8.1, -3.3, 1.7, 4.6, 1.9, 'sample-analysis-bench');
     add(-8.1, -18.2, 1.7, 4.6, 1.9, 'data-instrument-bench');
-    add(7.8, -14.5, 6.2, 4.6, 1.2, 'briefing-table');
+    add(7.8, -14.5, 7.4, 4.8, 1.3, 'briefing-table');
+    [-3.6,-1.2,1.2,3.6].forEach((x,index)=>add(x,-31,1.05,.95,1.3,`observation-chair-${index}`));
   } else if (deckId === 'habitat') {
     add(-7.6, 26.1, 7.9, 2.05, 2.2, 'galley');
     add(1.5, 30.2, 7.4, 2.9, 1.2, 'wardroom-table');
