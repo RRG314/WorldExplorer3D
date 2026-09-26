@@ -327,3 +327,14 @@ test('the bundled E34 retains its source and CC BY license evidence within its G
   assert.equal(json.asset?.extras?.source, asset.sourceUrl);
   assert.match(json.asset?.extras?.author || '', /Uralvagonzavod/);
 });
+
+test('ship furnishings have local bounded GLBs and attributable sources', () => {
+  for (const asset of modelAssetsForRole('ship-interior-furnishing')) {
+    const {bytes,json}=readGlbAssetMetadata(path.join(root,asset.url.replace(/^\//,'')));
+    assert.ok(bytes.length<=asset.budgets.bytes,`${asset.id} download budget`);
+    assert.ok(triangleCount(json)<=asset.budgets.triangles,`${asset.id} geometry budget`);
+    assert.ok(asset.sourceUrl.startsWith('https://sketchfab.com/3d-models/'));
+    assert.equal(asset.license,'CC-BY-4.0');
+    assert.ok((json.images||[]).every(image=>Number.isInteger(image.bufferView)),`${asset.id} must not fetch external textures`);
+  }
+});

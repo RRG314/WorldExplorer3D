@@ -13,24 +13,33 @@ fabrication using existing conserved collections, richer all-space destinations,
 and line-artifact repairs without changing the nebula appearance they like.
 
 Research/design work is saved in docs/design/SOLIS-REACH-EXPLORATION-REDESIGN.md.
-Scaled three-deck study: docs/design/solis-reach-deck-plan.html; editable geometry:
-docs/design/solis-reach-ring-plan.mjs. All25 existing room IDs are retained;
-3.6m circular corridor; four radial shortcuts. The geometry-only design validation
-passed; this is NOT implemented/runtime-tested ship collision or gameplay.
+The runtime now uses the shared 32m-radius ring plan for three decks, 25 rooms,
+room/crew/station placement, doors, maps and architectural collision. All-pairs
+room-route topology tests pass. Physical research uses the existing specimen
+records and expedition mutation authority; no parallel inventory was introduced.
+Galaxy/stellar-region scenes now have a navigable reconstructed volume. The
+nebula artwork is unchanged; selected constellation highlights respect the toggle,
+and constellation paths stay on the observer sky shell.
 
-Redesign runtime work is in progress: shared ring geometry, polygon collision,
-map/crew/station transforms, exterior views and launch sequencing are implemented
-but NOT visually accepted. Targeted topology tests pass for all room-to-room
-architectural paths. Furnishing clearance, physical research and space enrichment
-remain in progress. No redesign deployment yet. Do not substitute another parallel inventory.
-Galaxy image Sprites currently dim 3D stars, and region encounters own36 nearby
-rocks; scene richness must be separate from encounters. Inventory has61 public
-space destinations. Diagnose line ownership under movement and constellation
-selection; do not modify nebula-volume.js based only on a hypothesis.
+Current pushed candidate20a4bea4 adds licensed Sketchfab reactor, consoles,
+laboratory desks, medical tables and equipment servers, removing their old
+procedural counterparts. Original authors and source licenses are in the asset
+catalog and app/assets/models/ATTRIBUTION.md. Prominent assets are still awaiting
+visual acceptance; remaining procedural room equipment is not claimed replaced.
 
-Current source base d5801002; live staging readback matches d5801002; production
-still db62593. Design files are new working changes. Ordinary Chrome remains open.
-Disk readback at design start approximately34GiB free (later readback takes priority).
+Remote104912 passed current-contracts, source-graph, artifact-world,
+artifact-integrity and release-identity. Two browser fixtures failed: hidden Earth
+boarding action in space, and an avatar visibility assumption incompatible with
+camera collision. Corrected fixtures and new assets are running remotely in
+36207329569 (ship-research, space-quality, game-client-smoke). Review actual
+screenshots and errors before accepting. Backend research command engine source
+is generated but has not been deployed. No redesign deployment has occurred.
+
+Last independently checked staging wasd5801002 and productiondb62593; query
+strings are not deployment identities. Ordinary Chrome remains open. About34GiB
+free at the latest local readback. Temporary staging AppCheck registration for
+these remote jobs must be revoked with the existing cleanup script once all
+consumers finish; receipt output/release-integration/live-checks/ring-design-appcheck.json.
 
 ## Final space candidate (September 25)
 

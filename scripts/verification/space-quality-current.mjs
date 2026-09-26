@@ -6,7 +6,8 @@ import { chromium } from 'playwright';
 import { startStaticServer } from './static-server.mjs';
 import { collectBrowserGraphicsErrors } from './browser-graphics-errors.mjs';
 import { configureStagingAppCheck } from './staging-app-check.mjs';
-const out='output/verification/space-quality';
+const shipOnly=process.argv.includes('--ship-only');
+const out=shipOnly?'output/verification/ship-gallery':'output/verification/space-quality';
 await fs.rm(out,{recursive:true,force:true}); await fs.mkdir(out,{recursive:true});
 await fs.writeFile(`${out}/report.json`,JSON.stringify({ok:false,complete:false}));
 const server=await startStaticServer({rootDir:process.env.WE3D_VERIFY_ROOT||'dist',ports:[4495,4496]});
@@ -22,6 +23,7 @@ try {
  await page.evaluate(()=>{document.getElementById('spaceLaunchToggle')?.click();document.getElementById('startBtn')?.click();});
  await page.waitForFunction(()=>JSON.parse(window.render_game_to_text?.()||'{}').modes?.space===true,null,{timeout:180000});
  await page.evaluate(async()=>{window.__spaceQualityContext=(await import('/app/js/shared-context.js?v=55')).ctx;});
+ if(!shipOnly){
  await page.waitForFunction(()=>window.__spaceQualityContext.spaceFlight?.celestialCatalog?.starEntries?.length>=700);
  await page.locator('#spaceConstellationToggle').click();
  assert.equal(await page.evaluate(()=>window.__spaceQualityContext.spaceFlight.celestialCatalog.constellationEntries.filter(e=>e.line.visible).length),88);
@@ -90,6 +92,7 @@ try {
   await page.screenshot({path:`${out}/orbital-${name.toLowerCase().replaceAll(' ','-')}.png`});
  }
  checks.push({name:'orbital-artwork-gallery',bodies:orbitalNames,evidenceScope:'scene-camera fixtures for visual review'});
+ }
  await page.evaluate(async()=>{
   const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.returnUniverseToSolImmediate();
   const action=document.getElementById('fBoardSolisReach');
@@ -135,6 +138,7 @@ try {
  }
  const exited=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.exitExpeditionShipInterior();return {near:ctx.camera.near,active:ctx.spaceFlight.active};});
  assert.equal(exited.near,.5);assert.equal(exited.active,true);checks.push({name:'interior-exit-restores-camera',...exited});
+ if(!shipOnly){
  for (const nebulaId of ['orion-nebula','carina-nebula','crab-nebula']) {
   await page.evaluate(async id=>{const ctx=window.__spaceQualityContext;ctx.animateSpaceFlight();ctx.travelToUniverseDestination(id);},nebulaId);
   await page.waitForFunction(id=>{const ctx=window.__spaceQualityContext;return ctx.universeRuntime.current.id===id&&!ctx.universeRuntime.transition;},nebulaId,{timeout:30000});
@@ -225,8 +229,9 @@ try {
   }
   checks.push({name:'public-destination-render',...info});
  }
+ }
  assert.deepEqual(errors,[]);
- await fs.writeFile(`${out}/report.json`,JSON.stringify({ok:true,complete:true,evidenceScope:'Desktop software-rendered scene fixtures; not real-device performance or full surface launch acceptance',checks,errors},null,2));
+ await fs.writeFile(`${out}/report.json`,JSON.stringify({ok:true,complete:true,scope:shipOnly?'ship-gallery':'space-quality',evidenceScope:'Desktop software-rendered scene fixtures; not real-device performance or full surface launch acceptance',checks,errors},null,2));
 } catch(error) {
  checks.push({name:'failure-state',state:await page.evaluate(()=>({ship:window.__spaceQualityContext?.getShipInteriorSnapshot?.(),interior:!!window.__spaceQualityContext?.activeInterior})).catch(()=>null)});
  await page.screenshot({path:`${out}/failure.png`}).catch(()=>{});

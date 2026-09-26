@@ -9,8 +9,8 @@
 #shipObjectiveCue strong{grid-column:1;font:700 12px/1.25 Orbitron,sans-serif}
 #shipObjectiveCue small{grid-column:1;color:#d9c4ab;font-size:10px}
 #shipObjectiveCue button{grid-column:2;grid-row:1/4;min-height:38px;padding:7px 9px;border:1px solid rgba(255,187,104,.64);border-radius:7px;background:#5d3b1e;color:#fff;font:700 8px Orbitron,sans-serif}
-.ship-map-deck{position:relative;width:min(720px,92vw);aspect-ratio:72/26;margin:12px auto;border:1px solid rgba(123,189,221,.6);border-radius:14px;background:linear-gradient(180deg,rgba(34,56,74,.94) 0 40%,rgba(23,52,69,.96) 40% 60%,rgba(34,56,74,.94) 60%);overflow:hidden}
-.ship-map-deck.compact{width:100%;margin:0;aspect-ratio:72/30;border-radius:7px}
+.ship-map-deck{position:relative;width:min(480px,72vh,92vw);aspect-ratio:1;margin:12px auto;border:1px solid rgba(123,189,221,.6);border-radius:50%;background:radial-gradient(circle,rgba(23,52,69,.96) 0 11%,rgba(34,56,74,.94) 12% 43%,rgba(23,52,69,.96) 44% 53%,rgba(34,56,74,.94) 54%);overflow:hidden}
+.ship-map-deck.compact{width:100%;margin:0;aspect-ratio:1;border-radius:50%}
 .ship-map-room{position:absolute;z-index:2;display:grid;place-items:center;padding:2px;border:1px solid rgba(139,190,215,.5);border-radius:3px;background:rgba(34,76,99,.7);color:#e9f8ff;font:600 8px/1.15 Inter,sans-serif;text-align:center;overflow:hidden}
 .ship-map-room.status-degraded,.ship-map-room.status-operational{border-color:#f0b45c;background:rgba(119,73,25,.72)}
 .ship-map-room.status-critical{border-color:#ff6b6b;background:rgba(121,35,43,.78)}

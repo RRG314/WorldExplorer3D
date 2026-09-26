@@ -33,3 +33,20 @@ test('insufficient power and uncharacterized or missing samples never mutate the
  const before=JSON.stringify(e);assert.equal(applyResearchCommand(e,{benchId:'science-bench',researchAction:'measure'}).changed,false);assert.equal(JSON.stringify(e),before);
  assert.throws(()=>command(e,'unknown','place','a'),/not_available/);
 });
+test('browser and deployed-engine module apply the same conserved research commands',async()=>{
+ const {default:server}=await import('../functions/generated/expedition-command-engine.cjs');
+ let browser=plan(),backend=plan();
+ const send=(benchId,researchAction,sampleId)=>{
+  const cmd={type:'research',benchId,researchAction,sampleId},options={nowMs:123};
+  browser=executeExpeditionCommand(browser,cmd,options).expedition;
+  backend=server.executeExpeditionCommand(backend,cmd,options).expedition;
+  // Commit timestamps belong to each execution clock; gameplay records must agree.
+  assert.deepEqual({...backend,updatedAtMs:0},{...browser,updatedAtMs:0});
+ };
+ for(const bench of ['science-bench','analysis-bench','fabrication-bench']){
+  for(const id of ['a','b'])send(bench,'place',id);
+  if(bench==='fabrication-bench')send(bench,'fabricate');
+  else{send(bench,'measure');for(const id of ['a','b'])send(bench,'return',id);}
+ }
+ assert.equal(backend.resources.maintenanceKg,7);
+});

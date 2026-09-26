@@ -401,7 +401,7 @@ function addRoomTaskLight(group, x, z, color, label, intensity = 0.7, distance =
 function addMedicalBed(group, x, z, yaw, accent, label) {
   const root=new THREE.Group();root.name=`medical-bed:${label}`;
   root.position.set(x,0,z);root.rotation.y=yaw;group.add(root);
-  void furnish(root,'medical-table',{fit:{x:2.25,y:2.3,z:3.6}});
+  void furnish(root,'medical-table',{sourceYaw:Math.PI/2,fit:{x:2.25,y:2.3,z:3.6}});
   return root;
 }
 
