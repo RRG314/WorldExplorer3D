@@ -7,6 +7,7 @@
   },
   "gates": {
     "assembled-manhattan-diagnostic": { "scope": "diagnostic", "command": ["env", "WE3D_VERIFY_LOCATIONS=manhattan", "node", "scripts/verification/assembled-locations.mjs"], "artifactRequired": true, "timeoutMs": 600000 },
+    "shared-research-diagnostic": { "scope": "diagnostic", "command": ["node", "scripts/verification/backend-isolated.mjs", "--stages=shared-expedition"], "artifactRequired": true, "timeoutMs": 660000 },
     "property-multiplayer-diagnostic": { "scope": "diagnostic", "command": ["node", "scripts/verification/backend-isolated.mjs", "--stages=connected-property-multiplayer"], "artifactRequired": true, "timeoutMs": 660000 },
     "chat-billing-diagnostic": { "scope": "diagnostic", "command": ["node", "scripts/verification/backend-isolated.mjs", "--stages=room-chat-gameplay,account-backend"], "artifactRequired": true, "timeoutMs": 1200000 },
     "planetary-cache": { "scope": "diagnostic", "command": ["node", "scripts/verification/planetary-cache-current.mjs"], "artifactRequired": true, "timeoutMs": 600000 },
