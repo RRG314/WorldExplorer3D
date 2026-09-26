@@ -2,6 +2,20 @@ const MODEL_ASSET_SCHEMA_VERSION = 1;
 
 const MODEL_ASSET_CATALOG = Object.freeze([
   ...[
+    ['reactor-core','scifi-reactor-core-b3fe00d6b73841a0b6b3a288efc03668','SciFi Reactor Core by iedalton',5000000,62000],
+    ['medical-table','sci-fi-laboratory-op-table-ae314a5ea3614a5caf52f0d7e7d61665','Sci-Fi Laboratory Op Table by Michael V',1500000,16500],
+    ['command-console','sci-fi-computer-room-a149d5bfcef6496c9a0606b5ce5ebf27','Sci-Fi Computer Room by Michael V; extracted desk and instruments',1500000,16000],
+    ['laboratory-desk','sci-fi-computer-room-a149d5bfcef6496c9a0606b5ce5ebf27','Sci-Fi Computer Room by Michael V; extracted desk',200000,1500],
+    ['equipment-server','sci-fi-servers-37fd7c8ef38d4e5290cf6597394909c8','Sci-Fi Servers by Michael V',600000,6500]
+  ].map(([name,slug,attribution,bytes,triangles])=>Object.freeze({
+    schemaVersion:MODEL_ASSET_SCHEMA_VERSION,id:`solis-${name}`,label:attribution,
+    url:`/app/assets/models/interiors/solis/${name}.glb`,roles:Object.freeze(['ship-interior-furnishing']),
+    sourceUrl:`https://sketchfab.com/3d-models/${slug}`,attribution,license:'CC-BY-4.0',
+    collisionPolicy:'authored-ship-prop-colliders',sourceUpAxis:'y',
+    instancePolicy:Object.freeze({geometry:'shared',materials:'shared'}),
+    budgets:Object.freeze({bytes,triangles,textureEdgePixels:1024})
+  })),
+  ...[
     ['wall-navigation','https://sketchfab.com/3d-models/large-wall-mounted-computer-console-298b7d9b68064618a3819d1a8fae4baf','Large Wall-Mounted Computer Console by Inditrion Dradnon'],
     ['wall-instruments','https://sketchfab.com/3d-models/wall-console-98724ee49fba42a2b0ccbe79a36f246e','Wall Console by LuddePudde']
   ].map(([name,sourceUrl,attribution])=>Object.freeze({

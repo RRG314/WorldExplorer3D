@@ -44,6 +44,12 @@ export function buildRingDeck(THREE,deck,api) {
    group.userData.launchDoor=door;group.userData.launchDoorClosedY=2.55;
    // Glazed upper observation strip remains visible with the launch door sealed.
    door.scale.y=.86;door.position.y=2.55;
+   // The outer pressure boundary stays solid to walking; launch transfers the
+   // player through the controlled flight handoff, never by walking into space.
+   const tangent={x:Math.cos(room.angle)*5.4,z:-Math.sin(room.angle)*5.4};
+   const normal=polar(.15,room.angle);
+   const pts=[[-1,-1],[1,-1],[1,1],[-1,1]].map(([u,v])=>({x:p.x+u*tangent.x+v*normal.x,z:p.z+u*tangent.z+v*normal.z}));
+   colliders.push({...bounds(pts),pts,baseY:0,height:deckHeight,isInteriorCollider:true,sourceBuildingId:'pod-bay-pressure-boundary'});
   }
  }
 
@@ -84,7 +90,7 @@ export function buildRingDeck(THREE,deck,api) {
    ||deck.rooms.reduce((a,r)=>Math.hypot(child.position.x-(r.template.minX+r.template.maxX)/2,child.position.z-(r.template.minZ+r.template.maxZ)/2)<Math.hypot(child.position.x-(a.template.minX+a.template.maxX)/2,child.position.z-(a.template.minZ+a.template.maxZ)/2)?r:a);
   const point=templatePoint(room,child.position);child.position.x=point.x;child.position.z=point.z;child.position.y=(child.isLight||child.name.includes('task-light'))?deckHeight-.35:child.position.y*room.fitScale;child.rotation.y+=room.kitYaw;child.scale.multiplyScalar(room.fitScale);child.userData.shipRoomId=room.id;group.add(child);
  }
- api.wallEquipment?.(group,deck);
+ api.wallEquipment?.(group,deck,colliders);
  const oldColliders=[];api.propColliders(oldColliders,deck.id);
  for(const c of oldColliders){const room=deck.rooms.find(r=>c.centerX>=r.template.minX&&c.centerX<=r.template.maxX&&c.centerZ>=r.template.minZ&&c.centerZ<=r.template.maxZ);if(!room)continue;
   const pts=[{x:c.minX,z:c.minZ},{x:c.maxX,z:c.minZ},{x:c.maxX,z:c.maxZ},{x:c.minX,z:c.maxZ}].map(p=>templatePoint(room,p));colliders.push({...c,...bounds(pts),pts,height:c.height*room.fitScale,baseY:c.baseY*room.fitScale});

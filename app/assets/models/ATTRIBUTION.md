@@ -251,3 +251,10 @@ Additional Solis Reach furniture: [Sci-fi furniture/props pack](https://sketchfa
 - `interiors/solis/wall-instruments.glb`: [Wall Console](https://sketchfab.com/3d-models/wall-console-98724ee49fba42a2b0ccbe79a36f246e) by [LuddePudde](https://sketchfab.com/luddepubde), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 Downloaded September 25, 2026 through the signed-in Sketchfab download controls. Converted textures to bounded 1024px WebP, deduplicated unused data, retained base PBR maps for the existing renderer, and positioned/scaled the models for ship bulkheads. No AI-generated replacement artwork.
+
+### Solis Reach artist-made equipment (September 2026)
+All following sources are Creative Commons Attribution 4.0: https://creativecommons.org/licenses/by/4.0/ . Textures resized to at most 1024px and encoded as WebP; original PBR materials retained. Geometry/materials are shared across instances.
+- `interiors/solis/reactor-core.glb`: **SciFi Reactor Core**, iedalton — https://sketchfab.com/3d-models/scifi-reactor-core-b3fe00d6b73841a0b6b3a288efc03668
+- `interiors/solis/medical-table.glb`: **Sci-Fi Laboratory Op Table**, Michael V (@bossdeff) — https://sketchfab.com/3d-models/sci-fi-laboratory-op-table-ae314a5ea3614a5caf52f0d7e7d61665
+- `interiors/solis/command-console.glb` and `laboratory-desk.glb`: **Sci-Fi Computer Room**, Michael V (@bossdeff) — https://sketchfab.com/3d-models/sci-fi-computer-room-a149d5bfcef6496c9a0606b5ce5ebf27 . Selected desk, keyboard, speakers and monitor extracted; room architecture and posters excluded.
+- `interiors/solis/equipment-server.glb`: **Sci-Fi Servers**, Michael V (@bossdeff) — https://sketchfab.com/3d-models/sci-fi-servers-37fd7c8ef38d4e5290cf6597394909c8 . Used as a game asset, not for generative model training.

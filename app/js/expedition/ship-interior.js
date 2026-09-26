@@ -348,74 +348,26 @@ function furnish(host, asset, options = {}) {
 
 function addConsole(group, x, z, yaw, accent, label) {
   if(Math.abs(x)>5&&Math.abs(z)<23)yaw+=Math.PI;
-  const consoleGroup = new THREE.Group();
-  consoleGroup.name = `ship-console:${label}`;
-  const dark = material(0x111b28, { metalness: 0.62, roughness: 0.34 });
-  const frame = material(0x566675, { metalness: 0.58, roughness: 0.38 });
-  const screen = shipDisplayMaterial(label, accent);
-  box(consoleGroup, { x: 2.55, y: 0.16, z: 0.92 }, { x: 0, y: 0.08, z: 0 }, frame, `${label}:console-plinth`);
-  box(consoleGroup, { x: 2.3, y: 0.66, z: 0.72 }, { x: 0, y: 0.45, z: 0 }, dark, `${label}:console-body`);
-  [-1.08, 1.08].forEach((side) => box(consoleGroup, { x: 0.18, y: 0.82, z: 0.82 }, { x: side, y: 0.48, z: 0 }, frame, `${label}:console-edge`));
-  const bezel = box(consoleGroup, { x: 2.28, y: 0.72, z: 0.12 }, { x: 0, y: 1.01, z: -0.3 }, frame, `${label}:display-bezel`);
-  bezel.rotation.x = -0.32;
-  const display = box(consoleGroup, { x: 2.04, y: 0.54, z: 0.035 }, { x: 0, y: 1.02, z: -0.372 }, screen, `${label}:display`);
-  display.rotation.x = -0.32;
-  display.userData.shipAnimated = 'screen';
-  display.userData.baseEmissiveIntensity = 0.68 + (accent % 7) * 0.018;
-  box(consoleGroup, { x: 1.74, y: 0.28, z: 0.035 }, { x: 0, y: 0.43, z: -0.375 }, material(0x273847, { metalness: 0.52, roughness: 0.4 }), `${label}:service-access`);
-  [-0.62, -0.31, 0, 0.31, 0.62].forEach((offset) => box(consoleGroup, { x: 0.18, y: 0.04, z: 0.025 }, { x: offset, y: 0.43, z: -0.4 }, material(0x7c8d98, { metalness: 0.66, roughness: 0.32 }), `${label}:service-vent`));
-  box(consoleGroup, { x: 1.8, y: 0.035, z: 0.06 }, { x: 0, y: 0.15, z: -0.42 }, material(accent, { emissive: accent, emissiveIntensity: 0.42, metalness: 0.08, roughness: 0.3 }), `${label}:console-underglow`);
-  for (let index = 0; index < 10; index += 1) {
-    const buttonColor = index % 4 === 0 ? 0xe9a447 : index % 3 === 0 ? 0x72d6a2 : accent;
-    box(consoleGroup, { x: 0.14, y: 0.035, z: 0.11 }, {
-      x: -0.92 + (index % 5) * 0.46,
-      y: 0.81,
-      z: 0.02 + Math.floor(index / 5) * 0.2
-    }, material(buttonColor, { emissive: buttonColor, emissiveIntensity: 0.55, metalness: 0.06, roughness: 0.36 }), `${label}:control`);
-  }
-  const seat = new THREE.Group();
-  seat.name = `${label}:articulated-seat`;
-  consoleGroup.add(seat);
-  void furnish(seat, 'bridge-chair', { fit: { x: 0.95, y: 1.3, z: 0.85 }, z: -1.3, sourceYaw:Math.PI });
-  consoleGroup.position.set(x, 0, z);
-  consoleGroup.rotation.y = yaw;
-  group.add(consoleGroup);
-  return consoleGroup;
+  const root = new THREE.Group();
+  root.name = `ship-console:${label}`;
+  root.position.set(x,0,z);root.rotation.y=yaw;group.add(root);
+  // Source furniture faces +Z; the authored console interaction faces -Z.
+  void furnish(root,'command-console',{replace:false,sourceYaw:Math.PI,fit:{x:2.55,y:1.9,z:1.1}});
+  const seat=new THREE.Group();root.add(seat);
+  void furnish(seat,'bridge-chair',{fit:{x:.95,y:1.3,z:.85},z:-1.3,sourceYaw:Math.PI});
+  return root;
 }
 
 function addScienceBench(group, x, z, yaw, accent, label) {
-  yaw+=Math.PI;
-  const root = new THREE.Group();
-  root.name = `science-bench:${label}`;
-  const frame = material(0x566675, { metalness: 0.56, roughness: 0.4 });
-  const worktop = material(0xbac4ca, { metalness: 0.14, roughness: 0.58 });
-  const dark = material(0x162433, { metalness: 0.42, roughness: 0.48 });
-  box(root, { x: 4.4, y: 0.18, z: 1.25 }, { x: 0, y: 1.02, z: 0 }, worktop, `${label}:worktop`);
-  [-1.85, 0, 1.85].forEach((leg) => box(root, { x: 0.18, y: 1.02, z: 1.05 }, { x: leg, y: 0.51, z: 0 }, frame, `${label}:bench-frame`));
-  box(root, { x: 4.25, y: 0.7, z: 0.32 }, { x: 0, y: 1.55, z: 0.45 }, dark, `${label}:instrument-shelf`);
-  [-1.5, -0.75, 0, 0.75, 1.5].forEach((offset, index) => {
-    const vessel = new THREE.Mesh(new THREE.CylinderGeometry(0.09 + (index % 2) * 0.025, 0.1, 0.32 + (index % 3) * 0.06, 10), material(index % 2 ? 0x79c7d9 : 0xd9b06f, { emissive: index % 2 ? 0x245b68 : 0x604a22, emissiveIntensity: 0.25, metalness: 0.08, roughness: 0.32 }));
-    vessel.position.set(offset, 1.2, 0.05);
-    root.add(vessel);
-  });
-  const display = box(root, { x: 1.42, y: 0.7, z: 0.05 }, { x: -1.28, y: 1.56, z: 0.25 }, shipDisplayMaterial(label, accent, 0.76), `${label}:instrument-display`);
-  display.userData.shipAnimated = 'screen';
-  display.userData.baseEmissiveIntensity = 0.78;
-  const scannerBed = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.58, 0.1, 24), material(0x263845, { metalness: 0.62, roughness: 0.32 }));
-  scannerBed.rotation.x = Math.PI / 2;
-  scannerBed.position.set(0.65, 1.18, -0.04);
-  scannerBed.name = `${label}:sample-scanner-bed`;
-  root.add(scannerBed);
-  const scannerRing = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.07, 10, 28), material(accent, { emissive: accent, emissiveIntensity: 0.48, metalness: 0.32, roughness: 0.28 }));
-  scannerRing.rotation.x = Math.PI / 2;
-  scannerRing.position.set(0.65, 1.38, -0.04);
-  scannerRing.name = `${label}:sample-scanner-ring`;
-  root.add(scannerRing);
-  box(root, { x: 0.1, y: 0.88, z: 0.1 }, { x: 1.28, y: 1.48, z: -0.02 }, frame, `${label}:scanner-arm`);
-  box(root, { x: 0.72, y: 0.1, z: 0.1 }, { x: 0.96, y: 1.9, z: -0.02 }, frame, `${label}:scanner-boom`);
-  root.position.set(x, 0, z);
-  root.rotation.y = yaw;
-  group.add(root);
+  const root=new THREE.Group();root.name=`science-bench:${label}`;
+  root.position.set(x,0,z);root.rotation.y=yaw+Math.PI;group.add(root);
+  // Two normal-sized artist desks make a continuous specimen work surface.
+  for(const offset of [-1.12,1.12]){
+    const desk=new THREE.Group();root.add(desk);
+    void furnish(desk,'laboratory-desk',{x:offset,sourceYaw:Math.PI,fit:{x:2.3,y:1.02,z:1.05}});
+  }
+  const instrument=new THREE.Group();root.add(instrument);
+  void furnish(instrument,'medical-console',{x:-1.5,y:1.02,z:.22,fit:{x:.75,y:.52,z:.5}});
   return root;
 }
 
@@ -447,31 +399,9 @@ function addRoomTaskLight(group, x, z, color, label, intensity = 0.7, distance =
 }
 
 function addMedicalBed(group, x, z, yaw, accent, label) {
-  const root = new THREE.Group();
-  root.name = `medical-bed:${label}`;
-  const frame = material(0x667989, { metalness: 0.48, roughness: 0.38 });
-  const cushion = material(0xd5e0e4, { metalness: 0.03, roughness: 0.86 });
-  const screenSurface = shipDisplayMaterial(`${label}-vitals`, accent, 0.78);
-  box(root, { x: 2, y: 0.22, z: 3.35 }, { x: 0, y: 0.68, z: 0 }, frame, `${label}:bed-frame`);
-  box(root, { x: 1.76, y: 0.22, z: 2.88 }, { x: 0, y: 0.87, z: 0.1 }, cushion, `${label}:mattress`);
-  box(root, { x: 1.5, y: 0.2, z: 0.68 }, { x: 0, y: 1.02, z: -1.05 }, material(0xb8cbd4, { roughness: 0.9, metalness: 0 }), `${label}:pillow`);
-  [-1.04, 1.04].forEach((side) => {
-    box(root, { x: 0.08, y: 0.55, z: 2.6 }, { x: side, y: 1.1, z: 0.2 }, frame, `${label}:rail`);
-    [-0.92, 0.92].forEach((end) => box(root, { x: 0.08, y: 0.56, z: 0.08 }, { x: side, y: 0.9, z: end }, frame, `${label}:rail-post`));
-  });
-  const display = box(root, { x: 0.82, y: 0.56, z: 0.08 }, { x: 1.32, y: 1.58, z: -0.95 }, screenSurface, `${label}:diagnostic-display`);
-  display.userData.shipAnimated = 'screen';
-  display.userData.baseEmissiveIntensity = 0.82;
-  box(root, { x: 0.1, y: 1.1, z: 0.1 }, { x: 1.32, y: 1.12, z: -0.95 }, frame, `${label}:display-arm`);
-  box(root, { x: 1.35, y: 0.1, z: 0.1 }, { x: 0.7, y: 2.1, z: 0.82 }, frame, `${label}:diagnostic-boom`);
-  const diagnosticLamp = cylinder(root, 0.32, 0.24, 0.12, { x: 0.08, y: 2.04, z: 0.82 }, material(0xccecf0, { emissive: 0xa9e4ea, emissiveIntensity: 0.8, metalness: 0.12, roughness: 0.24 }), `${label}:diagnostic-lamp`, { x: Math.PI / 2, y: 0, z: 0 }, 18);
-  diagnosticLamp.userData.shipAnimated = 'screen';
-  diagnosticLamp.userData.baseEmissiveIntensity = 0.74;
-  root.position.set(x, 0, z);
-  root.rotation.y = yaw;
-  group.add(root);
-  const diagnostic = new THREE.Group(); root.add(diagnostic);
-  void furnish(diagnostic, 'medical-console', { x: 0, y: 1.0, z: 1.45, fit: { x: 1.05, y: 0.55, z: 0.6 } });
+  const root=new THREE.Group();root.name=`medical-bed:${label}`;
+  root.position.set(x,0,z);root.rotation.y=yaw;group.add(root);
+  void furnish(root,'medical-table',{fit:{x:2.25,y:2.3,z:3.6}});
   return root;
 }
 
@@ -587,20 +517,9 @@ function addHydroponicsRack(group, x, z, yaw, accent, label) {
 }
 
 function addPowerCabinet(group, x, z, yaw, accent, label) {
-  yaw+=Math.PI;
-  const root = new THREE.Group();
-  root.name = `power-cabinet:${label}`;
-  const frame = material(0x4a5966, { metalness: 0.66, roughness: 0.32 });
-  const dark = material(0x111b24, { metalness: 0.54, roughness: 0.4 });
-  box(root, { x: 2.2, y: 2.9, z: 1.2 }, { x: 0, y: 1.45, z: 0 }, frame, `${label}:cabinet`);
-  box(root, { x: 1.86, y: 2.52, z: 0.14 }, { x: 0, y: 1.45, z: -0.63 }, dark, `${label}:cabinet-face`);
-  [0.58, 1.16, 1.74, 2.32].forEach((height, row) => {
-    box(root, { x: 1.55, y: 0.14, z: 0.08 }, { x: 0, y: height, z: -0.74 }, material(row === 2 ? 0xe1a247 : accent, { emissive: row === 2 ? 0xe1a247 : accent, emissiveIntensity: 0.64 }), `${label}:power-bus`);
-    [-0.58, 0, 0.58].forEach((offset) => box(root, { x: 0.11, y: 0.1, z: 0.05 }, { x: offset, y: height + 0.22, z: -0.75 }, material(accent, { emissive: accent, emissiveIntensity: 0.7 }), `${label}:breaker-status`));
-  });
-  root.position.set(x, 0, z);
-  root.rotation.y = yaw;
-  group.add(root);
+  const root=new THREE.Group();root.name=`power-cabinet:${label}`;
+  root.position.set(x,0,z);root.rotation.y=yaw+Math.PI;group.add(root);
+  void furnish(root,'equipment-server',{fit:{x:2.2,y:2.9,z:1.2}});
   return root;
 }
 
@@ -992,37 +911,9 @@ function addDeckDetails(group, deckId) {
     addRoomTaskLight(group, 0, 30, 0xffbd82, 'main-engineering', 0.76, 12);
     addRoomTaskLight(group, -8.2, -2.4, 0xffc58f, 'fabrication', 0.66, 9);
     addRoomTaskLight(group, 0, -29, 0x8ecfe8, 'local-craft-bay', 0.7, 12);
-    const coreRoot = new THREE.Group();
-    coreRoot.name = 'propulsion-core';
-    const coreShell = cylinder(coreRoot, 1.18, 1.42, 5.6, { x: 0, y: 0, z: 0 }, material(0x573a34, { emissive: 0x33150d, emissiveIntensity: 0.42, metalness: 0.7, roughness: 0.26 }), 'propulsion-core-shell', { x: Math.PI / 2, y: 0, z: 0 }, 24);
-    const coreEmitter = cylinder(coreRoot, 0.68, 0.68, 5.92, { x: 0, y: 0, z: 0 }, material(0xff9a59, { emissive: 0xff6d34, emissiveIntensity: 1.18, metalness: 0.12, roughness: 0.22 }), 'propulsion-core-emitter', { x: Math.PI / 2, y: 0, z: 0 }, 20);
-    coreEmitter.userData.shipAnimated = 'screen';
-    coreEmitter.userData.baseEmissiveIntensity = 1.12;
-    [-2.25, 0, 2.25].forEach((z, index) => {
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(1.48, 0.16, 10, 28), material(index === 1 ? 0xe8b16a : 0x7f8d94, { emissive: index === 1 ? 0x8a451c : 0x1a2327, emissiveIntensity: index === 1 ? 0.72 : 0.18, metalness: 0.72, roughness: 0.26 }));
-      ring.position.z = z;
-      ring.name = `propulsion-core-field-ring:${index}`;
-      coreRoot.add(ring);
-    });
-    [-1.85, 1.85].forEach((x) => {
-      [-2.2, 2.2].forEach((z) => box(coreRoot, { x: 0.28, y: 2.5, z: 0.34 }, { x, y: -0.55, z }, steel, 'propulsion-core-support'));
-    });
-    [-2.2, 2.2].forEach((z) => box(coreRoot, { x: 3.95, y: 0.22, z: 0.34 }, { x: 0, y: -1.75, z }, steel, 'propulsion-core-crossbrace'));
-    [-1.35, -0.45, 0.45, 1.35].forEach((x, index) => {
-      const node = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 8), material(index % 2 ? 0xffb272 : 0x76d8ea, { emissive: index % 2 ? 0xff7d3b : 0x3fb4cf, emissiveIntensity: 0.9, metalness: 0.12, roughness: 0.24 }));
-      node.position.set(x, 0, -2.93);
-      node.name = `propulsion-core-field-node:${index}`;
-      node.userData.shipAnimated = 'screen';
-      node.userData.baseEmissiveIntensity = 0.82;
-      coreRoot.add(node);
-    });
-    [-1.65, 1.65].forEach((x) => {
-      cylinder(coreRoot, 0.085, 0.085, 5.1, { x, y: -1.25, z: 0 }, material(0xa66a45, { metalness: 0.66, roughness: 0.3 }), 'propulsion-core-service-conduit', { x: Math.PI / 2, y: 0, z: 0 }, 10);
-      [-2.45, 2.45].forEach((z) => cylinder(coreRoot, 0.18, 0.18, 0.26, { x, y: -1.25, z }, material(0x314652, { metalness: 0.7, roughness: 0.28 }), 'propulsion-core-conduit-coupling', { x: Math.PI / 2, y: 0, z: 0 }, 12));
-    });
-    coreRoot.position.set(0, 1.82, 30.5);
-    coreRoot.rotation.y=Math.PI/2;
-    group.add(coreRoot);
+    const coreRoot=new THREE.Group();coreRoot.name='propulsion-core';
+    coreRoot.position.set(0,0,30.5);group.add(coreRoot);
+    void furnish(coreRoot,'reactor-core',{fit:{x:4.1,y:5.8,z:6.2}});
     addConsole(group, -4.5, 31.2, Math.PI, 0xe28d4c, 'propulsion-control');
     addConsole(group, 4.5, 31.2, Math.PI, 0xe2b34c, 'engineering-watch');
     [-9.7, -6.9].forEach((x, index) => addPowerCabinet(group, x, 15.5, Math.PI / 2, 0xe2b34c, `power-${index + 1}`));
@@ -1139,7 +1030,7 @@ function createShipExteriorView() {
  return {source:'live-local-space-renderer',texture,camera,surfaces:[],elapsed:0,frameCount:0};
 }
 
-function addWallEquipment(group,deck){
+function addWallEquipment(group,deck,colliders){
  for(const room of deck.rooms){
   const inner=room.id==='storm-shelter',radius=inner?17.5:ring.hullRadius-.6;
   for(const [index,offset] of [-.24,.24].entries()){
@@ -1147,6 +1038,9 @@ function addWallEquipment(group,deck){
    host.name=`wall-equipment:${room.id}:${index}`;host.position.set(p.x,.7,p.z);host.rotation.y=angle+Math.PI;host.userData.shipRoomId=room.id;group.add(host);
    const asset=index===0?(deck.id==='habitat'?'crew-display':'wall-navigation'):'wall-instruments';
    void furnish(host,asset,{sourceYaw:index===1?Math.PI:0,fit:{x:index===0?3:2,y:1.8,z:index===0?1.15:.65}});
+   const halfWidth=index===0?1.5:1,halfDepth=index===0?.575:.325;
+   const pts=[[-1,-1],[1,-1],[1,1],[-1,1]].map(([u,v])=>({x:p.x+u*halfWidth*Math.cos(angle)+v*halfDepth*Math.sin(angle),z:p.z-u*halfWidth*Math.sin(angle)+v*halfDepth*Math.cos(angle)}));
+   colliders.push({pts,minX:Math.min(...pts.map(v=>v.x)),maxX:Math.max(...pts.map(v=>v.x)),minZ:Math.min(...pts.map(v=>v.z)),maxZ:Math.max(...pts.map(v=>v.z)),baseY:.7,height:1.8,isInteriorCollider:true,sourceBuildingId:host.name});
    const station=SHIP_STATIONS.find(entry=>entry.roomId===room.id);
    if(station){
     group.userData.wallInteractions||=[];
@@ -1605,7 +1499,7 @@ function syncResearchBenches(session){
   if(!group){
    group=new THREE.Group();group.name=`research-cradles:${id}`;
    const room=SHIP_ROOMS.find(r=>r.id===bench.roomId),p=templatePoint(room,bench.template);
-   group.position.set(p.x,1.12,p.z);group.rotation.y=room.kitYaw+(id==='fabrication-bench'?0:-Math.PI/2);deck.group.add(group);
+   group.position.set(p.x,(id==='fabrication-bench'?1.07:1.06)*room.fitScale,p.z);group.rotation.y=room.kitYaw+(id==='fabrication-bench'?0:-Math.PI/2);deck.group.add(group);
    for(let i=0;i<2;i++){
     const cradle=new THREE.Mesh(new THREE.CylinderGeometry(.32,.35,.08,24),material(0x51646b,{metalness:.65}));cradle.position.x=(i-.5)*1.1;group.add(cradle);
     const specimen=new THREE.Mesh(new THREE.IcosahedronGeometry(.2,1),material(i?0x97826b:0x807566,{roughness:.9}));specimen.name=`specimen:${i}`;specimen.position.set((i-.5)*1.1,.26,0);group.add(specimen);
@@ -2274,8 +2168,10 @@ function beginExpeditionPodLaunch(onRelease) {
   if(occupied){appCtx.showToast?.('Wait for the crew to clear the launch bay.');return false;}
   const state=activeDeckState(session),door=state.doorStates.find(entry=>entry.roomId===bay.id);
   if(!state.group.userData.launchDoor||!door)return false;
-  session.podLaunch={elapsed:0,onRelease,walkEnabled:appCtx.Walk.state.enabled,stage:''};
+  session.podLaunch={elapsed:0,onRelease,walkEnabled:appCtx.Walk.state.enabled,view:appCtx.Walk.state.view,stage:''};
   appCtx.Walk.state.enabled=false;
+  appCtx.Walk.state.view='first';
+  if(appCtx.Walk.state.characterMesh)appCtx.Walk.state.characterMesh.visible=false;
   const cabin=polar(29.2,bay.angle);
   Object.assign(walker,{x:cabin.x,z:cabin.z,y:2.1,yaw:bay.angle,angle:bay.angle,pitch:0,vy:0});
   door.open=false;door.targetY=1.36;
@@ -2293,6 +2189,7 @@ function updatePodLaunch(session,dt){
   if(!phase.complete)return false;
   session.podLaunch=null;
   appCtx.Walk.state.enabled=launch.walkEnabled;
+  appCtx.Walk.state.view=launch.view;
   if(launch.onRelease()!==true&&activeSession===session){
     door.position.y=state.group.userData.launchDoorClosedY;
     appCtx.showToast?.('Launch cancelled. Bay atmosphere restored.');

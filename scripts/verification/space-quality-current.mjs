@@ -119,7 +119,7 @@ try {
  }
  checks.push({name:'all-room-gallery',rooms:SHIP_DECKS.flatMap(d=>d.rooms.map(r=>r.id)),evidenceScope:'actual room renders; separate from walking journeys'});
  // Exercise the real camera-mode toggle around the same player host.
- await page.evaluate(()=>{window.__spaceQualityContext.Walk.state.view='third';});
+ await page.evaluate(()=>{const ctx=window.__spaceQualityContext;ctx.switchSolisReachDeck('command');Object.assign(ctx.Walk.state.walker,{x:0,z:21.8,y:1.74,yaw:Math.PI/2,angle:Math.PI/2,pitch:0});ctx.Walk.state.view='third';});
  for(const expected of ['first','overhead','third']) {
   await page.evaluate(()=>window.__spaceQualityContext.Walk.toggleView());
   await page.waitForTimeout(120);
