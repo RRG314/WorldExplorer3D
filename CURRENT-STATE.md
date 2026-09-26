@@ -21,25 +21,30 @@ Galaxy/stellar-region scenes now have a navigable reconstructed volume. The
 nebula artwork is unchanged; selected constellation highlights respect the toggle,
 and constellation paths stay on the observer sky shell.
 
-Current pushed candidate20a4bea4 adds licensed Sketchfab reactor, consoles,
-laboratory desks, medical tables and equipment servers, removing their old
-procedural counterparts. Original authors and source licenses are in the asset
-catalog and app/assets/models/ATTRIBUTION.md. Prominent assets are still awaiting
-visual acceptance; remaining procedural room equipment is not claimed replaced.
+Current pushed candidate78f2cc30 continues the licensed asset replacement. Actual
+Sketchfab reactor, consoles, laboratory desks, medical tables and equipment servers
+replace their old primitive builders. Source authors/licenses and bounded budgets
+are in the catalog and app/assets/models/ATTRIBUTION.md. Remaining procedural room
+equipment is not claimed replaced. Artist placement is not yet visually accepted.
 
-Remote104912 passed current-contracts, source-graph, artifact-world,
-artifact-integrity and release-identity. Two browser fixtures failed: hidden Earth
-boarding action in space, and an avatar visibility assumption incompatible with
-camera collision. Corrected fixtures and new assets are running remotely in
-36207329569 (ship-research, space-quality, game-client-smoke). Review actual
-screenshots and errors before accepting. Backend research command engine source
-is generated but has not been deployed. No redesign deployment has occurred.
+Completed remote evidence: 36207329569 space-quality (61 destinations/25 rooms,
+9 nebula views) and game-client-smoke; 36207818083 ship-gallery and physical
+ship-research journey; 36207910233 two-player shared-research diagnostic;
+36208510386 universe-wayfinder desktop/mobile, ship-gallery and game-client-smoke.
+Reviewed screenshots reveal two issues despite passing assertions: wrong navigation
+panel face and flat/occluded walking floor/ceiling. Candidate10ac56f7 confirmed both wall-panel faces visually. Raycasts show the
+correct textured floor and ceiling, no duplicate surface. Candidate78f2cc30
+subdivides deck surfaces and replaces primitive briefing/observation furniture
+with existing licensed models. Remote36209521137 is checking those visuals now.
+Do not call the candidate visually accepted or production ready yet.
 
-Last independently checked staging wasd5801002 and productiondb62593; query
-strings are not deployment identities. Ordinary Chrome remains open. About34GiB
-free at the latest local readback. Temporary staging AppCheck registration for
-these remote jobs must be revoked with the existing cleanup script once all
-consumers finish; receipt output/release-integration/live-checks/ring-design-appcheck.json.
+Staging mutateSharedExpedition is ACTIVE version3, updated2026-09-26T01:32:54Z;
+existing deployed parameters were preserved and temporary local env removed.
+Production research function is not updated by this iteration. Frontend staging
+last checked d5801002; production db62593. No redesign frontend deployment yet.
+Ordinary Chrome remains open.33GiB free. Temporary AppCheck receipt:
+output/release-integration/live-checks/ring-design-appcheck.json; revoke after all
+remote consumers complete. Evidence ledger: output/release-integration/ship-systems-redesign/LEDGER.md.
 
 ## Final space candidate (September 25)
 
