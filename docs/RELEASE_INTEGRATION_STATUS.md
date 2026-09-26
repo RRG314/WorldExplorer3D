@@ -1,10 +1,10 @@
 # 5.3 release status
 
-Updated September 25, 2026. **Release candidate; not deployed to production.**
+Updated September 26, 2026. **5.3 is deployed to production.**
 
-The public game remains on 5.2. The 5.3 staging preview includes the redesigned
-ship, research workbenches, licensed furnishings and space-rendering changes.
-The GitHub release is being prepared as a draft, not a publication announcement.
+The public game now includes the redesigned ship, research workbenches, licensed
+furnishings and space-rendering changes from the approved 5.3 candidate.
+The GitHub release remains a draft.
 
 ## Completed checks
 
@@ -20,13 +20,18 @@ The GitHub release is being prepared as a draft, not a publication announcement.
 - The staging package identity and newly added model URLs were verified after
   deployment. Asset authors and licenses are recorded with the models.
 
-## Before production
+## Deployment
 
-1. Finish the physical-phone walkthrough: location search, walking/driving,
-   water, Main Menu, multiplayer controls and ship/space transitions.
-2. Prepare and verify the production-configured package against the tested
-   candidate, retain rollback information, and complete release finalization.
-3. Confirm the deployed build before publishing the draft release.
+The live build is `5.3.0+bbe6502228e3.8044052b36c00b4a.production`.
+Its game files match the preserved staging candidate; only Firebase configuration
+changed for production. Hosted build and asset manifests were verified after
+release, and the deployed Firestore and Storage rules match the package.
+
+Additional recovery and lighting changes are deferred to the refactor work.
+Desktop driving and flight missed the configured performance budgets in the
+later diagnostic build. The owner chose to deploy the previously approved
+candidate and investigate further changes separately. This is not a claim that
+all performance targets or physical-phone checks passed.
 
 Passing software-rendered browser checks does not establish phone responsiveness.
 Some utility equipment remains simpler than the licensed ship furnishings;
