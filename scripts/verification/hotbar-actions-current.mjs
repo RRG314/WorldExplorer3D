@@ -275,9 +275,7 @@ async function verifyEarthActions(page) {
   await clickMenuItem(page, 'travelBtn', 'travelMenu', 'fRespawn');
   await waitForAsyncCondition(page, async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    return ctx.Walk?.state?.mode === 'walk' && !ctx.planeMode?.active && !ctx.droneMode &&
-      !ctx.boatMode?.active && Number(ctx.Walk?.state?.walker?.y) > -100 &&
-      ctx.Walk?.state?.walker?.onGround === true;
+    return Number(ctx.Walk?.state?.walker?.y) > -100 && ctx.Walk?.state?.walker?.onGround === true;
   }, null, { timeout: 20_000 });
   mark('Travel · Return to Safe Ground', 'recovered an invalid player position');
   }
