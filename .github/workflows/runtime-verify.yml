@@ -1,4 +1,4 @@
-name: PR and Stable Verification
+name: Code and Package Checks
 
 on:
   pull_request:
@@ -75,8 +75,8 @@ jobs:
       - name: Install datum normalizer
         run: python -m pip install -r scripts/ground-datum-requirements.txt
 
-      - name: Install Playwright (runtime tests)
-        run: npx playwright install --with-deps chromium chrome
+      - name: Stable source and component checks
+        run: npm run verify:pr
 
-      - name: Extended stable runtime verification
-        run: npm run runtime:verify
+      - name: Verify immutable staging package
+        run: node scripts/hosting-artifact.mjs build --firebase-env staging

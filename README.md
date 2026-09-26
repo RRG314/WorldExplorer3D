@@ -4,7 +4,7 @@
 
 [Full project description](docs/PROJECT_DESCRIPTION.md) · [System inventory](docs/SYSTEM_INVENTORY.md) · [Architecture map](docs/ARCHITECTURE_MAP.md) · [Source reference](docs/SYSTEM_INVENTORY_REFERENCE.md)
 
-[![Code and runtime checks](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml/badge.svg?branch=stable)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml)
+[![Code and package checks](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml/badge.svg?branch=stable)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml)
 [![Secret Scan](https://github.com/RRG314/WorldExplorer3D/actions/workflows/secret-scan.yml/badge.svg?branch=stable)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/secret-scan.yml)
 [![Release checks](https://github.com/RRG314/WorldExplorer3D/actions/workflows/release-verify.yml/badge.svg?branch=stable)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/release-verify.yml)
 [![GitHub Pages](https://github.com/RRG314/WorldExplorer3D/actions/workflows/deploy-pages-public.yml/badge.svg?branch=stable)](https://rrg314.github.io/WorldExplorer3D/)
@@ -100,7 +100,7 @@ active world.*
   Explorer Credits, and connect planetary samples to the same Backpack, cargo,
   and mapped-business exchange loop.
 
-## Version 5.2
+## The released 5.2 foundation
 
 Version 5.2 makes the sandbox feel more alive and more connected. The current
 Explorer and companion travel together, roads carry denser traffic and
@@ -175,7 +175,7 @@ environment. Secrets are not included in the repository.
 
 - [Active release repair program](docs/RELEASE_REPAIR_PROGRAM.md)
 
-- [Release notes](RELEASE_NOTES_5.2.0.md)
+- [5.3 candidate release notes](RELEASE_NOTES_5.3.0.md)
 - [Changelog](CHANGELOG.md)
 - [Roadmap](ROADMAP.md)
 - [System inventory](docs/SYSTEM_INVENTORY.md)

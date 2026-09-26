@@ -65,7 +65,7 @@ async function measure(page, mode) {
   await page.waitForTimeout(1500);
   await page.keyboard.down('w');
   let raw;
-  try { raw = await page.evaluate(sampleFrameWindow, {durationMs:20000,targetDistance:mode==='walk'?12:75,actorKey:'__WE3D_COMPARISON_ACTOR__'}); }
+  try { raw = await page.evaluate(sampleFrameWindow, {durationMs:20000,targetDistance:mode==='walk'?12:75,actorKey:'__WE3D_COMPARISON_ACTOR__'}); } // gitleaks:allow -- browser fixture property, not a credential
   finally { await page.keyboard.up('w'); }
   const distance = Math.hypot(raw.endPosition.x-raw.startPosition.x, raw.endPosition.z-raw.startPosition.z);
   assert.equal(raw.routeComplete,true, `${mode}: input did not complete the fixed route`);

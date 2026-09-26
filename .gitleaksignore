@@ -3,3 +3,6 @@
 49a2b632cf4a825eb4e5ef8cb3533079911a1c94:scripts/verification/performance-comparison.mjs:generic-api-key:67
 # The explanatory comment originally repeated that same non-secret literal.
 57c880d84922e29e330e5f6e7a67e524d414ce82:.gitleaksignore:generic-api-key:2
+
+# Same reviewed browser fixture property after the 5.3 squash merge.
+bceee233716a37a42ee163a2584da3c9abf8a1f0:scripts/verification/performance-comparison.mjs:generic-api-key:68
