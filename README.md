@@ -100,7 +100,7 @@ active world.*
   Explorer Credits, and connect planetary samples to the same Backpack, cargo,
   and mapped-business exchange loop.
 
-## Version 5.2
+## The released 5.2 foundation
 
 Version 5.2 makes the sandbox feel more alive and more connected. The current
 Explorer and companion travel together, roads carry denser traffic and
@@ -175,7 +175,7 @@ environment. Secrets are not included in the repository.
 
 - [Active release repair program](docs/RELEASE_REPAIR_PROGRAM.md)
 
-- [Release notes](RELEASE_NOTES_5.2.0.md)
+- [5.3 candidate release notes](RELEASE_NOTES_5.3.0.md)
 - [Changelog](CHANGELOG.md)
 - [Roadmap](ROADMAP.md)
 - [System inventory](docs/SYSTEM_INVENTORY.md)

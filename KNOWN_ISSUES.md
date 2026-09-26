@@ -1,6 +1,23 @@
 # Known Issues and Limitations
 
-Last reviewed: 2026-09-03 for World Explorer 3D 5.2.0.
+Last reviewed: 2026-09-25 for the World Explorer 3D 5.3 candidate.
+The public game remains on 5.2 until production promotion.
+
+## 5.3 candidate acceptance
+
+- Physical-phone responsiveness has not yet been accepted for this candidate.
+  Emulated touch layouts and software-rendered browser journeys are functional
+  evidence, not hardware frame-rate, battery or thermal measurements.
+- The production research handler and required indexes are updated. Final
+  production-package verification and frontend promotion are still pending.
+- Licensed ship furnishings replace major placeholders, but galley appliances,
+  hydroponics, thermal/life-support equipment, exercise/EVA fittings and parts
+  of fabrication still use simpler custom geometry. Art detail is not uniform.
+- Distant planets and stellar environments combine available observations with
+  procedural reconstruction. Gas giants offer atmospheric flight rather than
+  a solid surface to land on. Scientific completeness is not claimed.
+- Research currently offers a limited set of measurements and fabrication
+  outcomes; broader experiments and expedition consequences remain planned.
 
 ## Location and map coverage
 
@@ -45,8 +62,8 @@ Last reviewed: 2026-09-03 for World Explorer 3D 5.2.0.
   source.
 - WebXR, camera-overlay AR, geolocation and some graphics features depend on
   browser support, device hardware and explicit user permission.
-- Performance varies by browser, graphics hardware, and device. Final staging
-  review covers desktop and a 390×844 mobile layout, but does not guarantee a
+- Performance varies by browser, graphics hardware, and device. Browser
+  review includes desktop and mobile layouts, but does not establish a
   particular battery, thermal, or frame-rate result on every physical phone.
 
 ## External services

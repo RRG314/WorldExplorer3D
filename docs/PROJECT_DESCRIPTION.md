@@ -1,9 +1,16 @@
 # World Explorer 3D
 
-Updated September 10, 2026 for source baseline `53452516` (version 5.2.0).
-This describes the implemented product and its boundaries, not a fresh production
-acceptance certificate. See the [current inventory](SYSTEM_INVENTORY.md),
-[architecture](ARCHITECTURE_MAP.md) and [audit evidence](audits/2026-09-10/tests-and-evidence.md).
+Updated September 25, 2026 for the 5.3 candidate. The public game remains on 5.2.
+See [release status](RELEASE_INTEGRATION_STATUS.md) for deployment and acceptance,
+[the release comparison](RELEASE_COMPARISON_5.3.md) for changes from the last release,
+and [known limitations](../KNOWN_ISSUES.md).
+
+The candidate expands Solis Reach with circular corridors, function-specific
+rooms, licensed furnishings, physical specimen research and a controlled pod
+launch. Space gains selectable bodies beyond the Solar System, improved imagery
+and spatial galactic environments. Earth work includes facade, pavement, water,
+mobile-control and shared-room repairs. Photo contributions connect room plans,
+interior surfaces, saved revisions and approved in-game entry.
 
 World Explorer 3D is a browser-based sandbox that turns mapped places into
 playable worlds. You can explore a neighborhood on foot, drive its streets,

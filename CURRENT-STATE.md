@@ -23,8 +23,8 @@ indexes. Existing environment parameters were preserved; temporary env removed.
 PR source/component/inventory/sensitivity and secret scans passed. Final ship
 visuals and smoke passed36209521137; research and two-player backend checks passed
 36207818083 and36207910233; destination gallery passed36207329569; wayfinder
-passed36208510386. All25 room views and camera modes were reviewed. Latest stable
-artifact checks run36210611726 and runtime run36210599010 are pending readback.
+passed36208510386. All25 room views and camera modes were reviewed. Stable artifact checks are run36210611726 and runtime checks run36210599010;
+read their current GitHub results before starting another run.
 Stable squash secret scan flagged the already-reviewed browser actor property,
 not a credential; a scoped historical fingerprint and inline explanation repair
 that false positive without disabling secret detection.
