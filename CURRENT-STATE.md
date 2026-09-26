@@ -21,30 +21,39 @@ Galaxy/stellar-region scenes now have a navigable reconstructed volume. The
 nebula artwork is unchanged; selected constellation highlights respect the toggle,
 and constellation paths stay on the observer sky shell.
 
-Current pushed candidate78f2cc30 continues the licensed asset replacement. Actual
-Sketchfab reactor, consoles, laboratory desks, medical tables and equipment servers
-replace their old primitive builders. Source authors/licenses and bounded budgets
-are in the catalog and app/assets/models/ATTRIBUTION.md. Remaining procedural room
-equipment is not claimed replaced. Artist placement is not yet visually accepted.
+Staging now serves 5.3.0+56fcf94d400b.e1ad84e8534bf3fc.staging, verified by
+hosted build-manifest/content hash and all seven new GLB responses. Runtime source
+is78f2cc30;56fcf94d adds only handoff documentation. No production deployment.
 
-Completed remote evidence: 36207329569 space-quality (61 destinations/25 rooms,
-9 nebula views) and game-client-smoke; 36207818083 ship-gallery and physical
-ship-research journey; 36207910233 two-player shared-research diagnostic;
-36208510386 universe-wayfinder desktop/mobile, ship-gallery and game-client-smoke.
-Reviewed screenshots reveal two issues despite passing assertions: wrong navigation
-panel face and flat/occluded walking floor/ceiling. Candidate10ac56f7 confirmed both wall-panel faces visually. Raycasts show the
-correct textured floor and ceiling, no duplicate surface. Candidate78f2cc30
-subdivides deck surfaces and replaces primitive briefing/observation furniture
-with existing licensed models. Remote36209521137 is checking those visuals now.
-Do not call the candidate visually accepted or production ready yet.
+Real Sketchfab reactor, consoles, laboratory desks, medical tables, equipment
+servers, wall instruments and social-room furniture replace their old primitive
+builders. Authors, source URLs and licenses are in the asset catalog and
+app/assets/models/ATTRIBUTION.md. Remaining custom utility geometry includes
+galley appliances, life-support/thermal equipment, hydroponics, exercise/EVA,
+resource processing and the fabrication gantry. Do not claim all props replaced
+or uniform high-end art quality; these are explicit remaining art limitations.
+
+Completed remote evidence:36207329569 space-quality (61 destinations/25 rooms,
+9 nebula views) and game-client-smoke;36207818083 physical ship-research journey;
+36207910233 authenticated two-player shared-research diagnostic;36208510386
+universe-wayfinder desktop/mobile. Latest36209521137 at78f2cc30 PASS ship-gallery
+and game-client-smoke. Opened every final room contact sheet and camera view.
+Corrected wall-navigation orientation; both panel faces now visible. Replaced
+large cylinder caps with subdivided circular surfaces: actual first-person
+screenshots confirm floor/ceiling texture and occlusion issue resolved. Overhead
+camera remains beneath ceiling; briefing/observation use licensed furniture.
 
 Staging mutateSharedExpedition is ACTIVE version3, updated2026-09-26T01:32:54Z;
-existing deployed parameters were preserved and temporary local env removed.
-Production research function is not updated by this iteration. Frontend staging
-last checked d5801002; production db62593. No redesign frontend deployment yet.
-Ordinary Chrome remains open.33GiB free. Temporary AppCheck receipt:
-output/release-integration/live-checks/ring-design-appcheck.json; revoke after all
-remote consumers complete. Evidence ledger: output/release-integration/ship-systems-redesign/LEDGER.md.
+existing deployed parameters preserved and temporary local env removed.
+Production research function is not updated by this iteration. Production last
+verifieddb62593. Hardware/phone responsiveness remains unverified; remote browser
+screenshots use software rendering. Do not equate these results with a completed
+production release review for the expanded redesign.
+
+Ordinary Chrome remains open.33GiB free at last check. Temporary AppCheck
+registration, private credential and GitHub test secret were removed after all
+remote runs completed. Evidence:output/release-integration/ship-systems-redesign/
+LEDGER.md,artist-hosted-identity.json,staging-research-readback.json.
 
 ## Final space candidate (September 25)
 
