@@ -1,4 +1,4 @@
-import {pointInPolygonXZ} from '../structure-semantics/geometry.js';
+import {pointInPolygonXZ} from '../structure-semantics/geometry.js?v=2';
 import { nearbyVegetationObstacles } from '../world/vegetation-obstacle-index.js';
 
 function buildingVerticalRangeOverlap(building, actorBaseY, actorHeight, tolerance = 0.45) {

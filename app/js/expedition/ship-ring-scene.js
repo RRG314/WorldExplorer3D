@@ -1,4 +1,4 @@
-import {batchStaticModelTemplate} from '../assets/static-model-batching.js';
+import {batchStaticModelTemplate} from '../assets/static-model-batching.js?v=1';
 import {ring, polar, bounds, templatePoint} from './ship-ring-plan.js';
 
 // Polygon colliders are derived from the same wall endpoints as their meshes.
