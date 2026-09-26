@@ -2,7 +2,7 @@ import {ring,ringRoute,pointInRoom} from '../app/js/expedition/ship-ring-plan.js
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Vector3,Quaternion} from 'three';
-import {projectCatalogStar} from '../app/js/space/observer-sky.js';
+import {projectCatalogStar,skyArcPoints} from '../app/js/space/observer-sky.js';
 import {BRIGHT_STARS,CONSTELLATION_STAR_IDS} from '../app/js/sky/catalog.js';
 import {SHIP_DECKS} from '../app/js/expedition/ship-layout.js';
 import {resolveSpaceControlInput} from '../app/js/space/runtime.js';
@@ -107,4 +107,11 @@ test('browser readiness waits for resolved truth, and false promises reach their
  assert.equal(calls,3);
  await assert.rejects(waitForAsyncCondition(page,async()=>false,null,{timeout:10,polling:1}),/timed out/);
  await assert.rejects(waitForAsyncCondition({evaluate:()=>new Promise(()=>{})},()=>true,null,{timeout:10}),/timed out/);
+});
+
+test('constellation annotation vertices remain on the sky shell from every viewing direction',()=>{
+ const arc=skyArcPoints({x:1,y:0,z:0},{x:0,y:1,z:0},300000);
+ assert.equal(arc.length,13);
+ for(const point of arc)assert.ok(Math.abs(Math.hypot(point.x,point.y,point.z)-300000)<1e-6);
+ assert.equal(skyArcPoints(null,{x:1,y:0,z:0},1).every(p=>p.x===0&&p.y===0&&p.z===0),true);
 });

@@ -272,6 +272,7 @@ function positionRocketForFrame(entity) {
 function installFrame(entity) {
   disposeActiveFrame();
   universeRuntime.current = entity;
+  appCtx.highlightSpaceConstellation?.('');
   universeRuntime.galaxyEntry = getGalaxyEntryDestination(entity.id);
   universeRuntime.canonicalFrameOffset.set(0, 0, 0);
   setSolVisibility(entity.id === 'sol');

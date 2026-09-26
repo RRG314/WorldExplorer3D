@@ -1,5 +1,5 @@
 // Shared spatial definition: render surfaces, collision, maps and routes use these polygons.
-export const ring = Object.freeze({hullRadius:39, corridorInner:20, corridorOuter:23.6, coreRadius:5, deckHeight:3.6});
+export const ring = Object.freeze({hullRadius:32, corridorInner:20, corridorOuter:23.6, coreRadius:5, deckHeight:3.6});
 const definitions = {
  command:['bridge','communications','sensor-control','briefing','observation-gallery','analysis-data','science','navigation-cartography'],
  habitat:['galley-wardroom','exercise-bay','quarters-starboard','life-support','hydroponics','hygiene-waste','quarters','medical'],
@@ -15,7 +15,7 @@ export function sector(inner,outer,start,end,steps=16){
 export const decks=Object.freeze(Object.entries(definitions).map(([id,ids])=>({
  id,rooms:ids.map((id,index)=>{
   const angle=index*Math.PI/4, half=Math.PI/8;
-  return {id,angle,polygon:sector(ring.corridorOuter,ring.hullRadius,angle-half+.006,angle+half-.006),door:polar(ring.corridorOuter,angle),center:polar(31,angle),exterior:id==='local-craft-bay'||id==='bridge'||id==='observation-gallery'};
+  return {id,angle,polygon:sector(ring.corridorOuter,ring.hullRadius,angle-half+.006,angle+half-.006),door:polar(ring.corridorOuter,angle),center:polar(27.8,angle),exterior:id==='local-craft-bay'||id==='bridge'||id==='observation-gallery'};
  }),
  spokes:[0,Math.PI/2,Math.PI,3*Math.PI/2].map(angle=>({from:polar(ring.coreRadius,angle),to:polar(21.8,angle)})),
  innerRooms:id==='habitat'?[{id:'storm-shelter',polygon:sector(6,18,Math.PI+.18,Math.PI*1.5-.18),center:polar(12,Math.PI*1.25)}]:[]
@@ -54,7 +54,7 @@ export function compileRingDecks(templates) {
    const layout=[...plan.rooms,...plan.innerRooms].find(r=>r.id===template.id);
    const inner=plan.innerRooms.includes(layout);
    const angle=layout.angle??Math.PI*1.25;
-   const room={...template,...layout,angle,template,fitScale:inner?.65:template.side==='full'?.72:1,...bounds(layout.polygon)};
+   const room={...template,...layout,angle,template,fitScale:inner?.65:template.side==='full'?.72:.78,...bounds(layout.polygon)};
    room.kitYaw=angle+(template.side==='port'?Math.PI/2:template.side==='starboard'?-Math.PI/2:template.maxZ<0?Math.PI:0)+(inner?Math.PI:0);
    room.door=layout.door||polar(18,angle);return Object.freeze(room);
   });

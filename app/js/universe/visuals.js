@@ -1,3 +1,4 @@
+import {createGalacticVolume} from './galactic-volume.js';
 import { fillPlanetSurface } from './planet-surface.js?v=1';
 import { createNebulaVolume } from './nebula-volume.js?v=1';
 import { createBlackHoleVisual } from './black-hole.js?v=4';
@@ -298,23 +299,20 @@ function createStellarRegion(entity) {
     entity.visualProfile.tint || 0xa9c9ff,
     1.45
   );
+  group.add(createGalacticVolume(THREE,entity,{region:true,mobile:globalThis.matchMedia?.('(max-width: 768px)').matches===true}));
   field.name = 'Model-derived stellar region';
   group.add(field);
   const random = seededRandom(entity.visualProfile.seed + 71);
-  for (let i = 0; i < 48; i++) {
-    const color = i % 5 === 0 ? 0xffcf94 : i % 3 === 0 ? 0xbad7ff : 0xf5f7ff;
-    const radius = 2.5 + random() * 6;
-    const star = new THREE.Mesh(
-      new THREE.SphereGeometry(radius, 12, 8),
-      new THREE.MeshBasicMaterial({ color })
-    );
-    star.position.set(
-      (random() - 0.5) * 27000,
-      (random() - 0.5) * 6200,
-      (random() - 0.5) * 27000
-    );
-    group.add(star);
+  const positions=[],colors=[];
+  for(let i=0;i<600;i++){
+    const cluster=i%6,angle=cluster*Math.PI/3;
+    const spread=700+random()*1800;
+    positions.push(Math.cos(angle)*6500+(random()-.5)*spread,(random()-.5)*1500,Math.sin(angle)*6500+(random()-.5)*spread);
+    const color=new THREE.Color(i%5===0?0xffcf94:0xbad7ff);colors.push(color.r,color.g,color.b);
   }
+  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
+  const clusters=new THREE.Points(geometry,createRoundStarMaterial({size:3.2,sizeAttenuation:false,vertexColors:true,transparent:true,depthWrite:false,opacity:.85}));
+  clusters.name='Modeled stellar associations';group.add(clusters);
   const label = createLabel(entity.name, 440);
   label.position.y = 8600;
   group.add(label);
@@ -405,53 +403,10 @@ function createGalaxyBulge(entity) {
 function createGalaxy(entity) {
   const group = new THREE.Group();
   const starField = createGalaxyPoints(entity);
-  if (entity.visualProfile?.image) {
-    const texture = new THREE.TextureLoader().load(entity.visualProfile.image);
-    if (typeof THREE.SRGBColorSpace !== 'undefined') texture.colorSpace = THREE.SRGBColorSpace;
-    const image = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: texture,
-      alphaMap: createFeatheredAlphaMap(),
-      transparent: true,
-      opacity: 0.88,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      fog: false
-    }));
-    const width = 1680;
-    image.scale.set(width, width / Number(entity.visualProfile.imageAspect || 2.5), 1);
-    image.userData = {
-      accuracy: 'observational multiwavelength image',
-      imageCredit: entity.visualProfile.imageCredit,
-      source: entity.visualProfile.imageSourceUrl
-    };
-    group.add(image);
-    starField.material.opacity = 0.24;
-    starField.material.size = 2.25;
-  }
   group.add(starField);
-  if (!entity.visualProfile?.image) group.add(createGalaxyBulge(entity));
-  if (!entity.visualProfile?.image) {
-    const haloTexture = createNebulaCloudTexture((entity.visualProfile?.seed || 1) + 9001);
-    const halo = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: haloTexture,
-      color: entity.visualProfile?.tint || 0x7298d0,
-      transparent: true,
-      opacity: 0.16,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending
-    }));
-    halo.scale.set(1900, 720, 1);
-    halo.name = 'Model-derived galactic halo';
-    group.add(halo);
-    const dustLane = new THREE.Mesh(
-      new THREE.RingGeometry(120, 850, 160),
-      new THREE.MeshBasicMaterial({ color: 0x080b14, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false })
-    );
-    dustLane.rotation.x = Math.PI / 2;
-    dustLane.scale.y = 0.13;
-    dustLane.name = 'Model-derived dust lane';
-    group.add(dustLane);
-  }
+  group.add(createGalaxyBulge(entity));
+  group.add(createGalacticVolume(THREE,entity,{mobile:globalThis.matchMedia?.('(max-width: 768px)').matches===true}));
+  group.userData.observationalReference={image:entity.visualProfile?.image||null,credit:entity.visualProfile?.imageCredit||null,accuracy:'Morphology-informed 3D reconstruction; individual unresolved stars and dust are procedural.'};
   const label = createLabel(entity.name, 420);
   label.position.y = 170;
   group.add(label);

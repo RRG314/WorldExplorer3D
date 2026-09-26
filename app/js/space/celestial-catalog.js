@@ -1,6 +1,6 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { BRIGHT_STARS, CONSTELLATION_STAR_IDS } from '../sky/catalog.js?v=1';
-import { projectCatalogStar } from './observer-sky.js?v=1';
+import { projectCatalogStar, skyArcPoints } from './observer-sky.js?v=1';
 import { createRoundStarMaterial } from '../sky/star-point-material.js?v=4';
 import { createGaiaSkyLayers } from '../sky/gaia-catalog.js?v=4';
 
@@ -33,7 +33,7 @@ function createConstellations(group, catalog) {
   const stars = new Map(BRIGHT_STARS.map((star) => [star.hip, star]));
   Object.entries(CONSTELLATION_STAR_IDS).forEach(([name, segments]) => {
     const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(segments.length * 6), 3));
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(segments.length * 6 * 12), 3));
     const line = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: 0x628bb8, transparent: true, opacity: 0.10, depthWrite: false }));
     line.renderOrder = -1000;
     line.userData = { isSpaceConstellation: true, constellationName: name };
@@ -65,7 +65,10 @@ function updateSpaceCatalogObserver(observer = { x: 0, y: 0, z: 0 }, position = 
     const attribute = entry.line.geometry.attributes.position;
     entry.segments.forEach((pair, i) => {
       const points = pair.map((star) => projectCatalogStar(star, observer, CATALOG_RADIUS - 1200));
-      points.forEach((point, j) => attribute.setXYZ(i * 2 + j, points.every(Boolean) ? point.x : 0, points.every(Boolean) ? point.y : 0, points.every(Boolean) ? point.z : 0));
+      const arc=skyArcPoints(points[0],points[1],CATALOG_RADIUS-1200);
+      for(let step=0;step<12;step++)for(let end=0;end<2;end++){
+        const point=arc[step+end];attribute.setXYZ(i*24+step*2+end,point.x,point.y,point.z);
+      }
     });
     attribute.needsUpdate = true;
   });
@@ -75,7 +78,7 @@ function highlightSpaceConstellation(name = '') {
   const entries = appCtx.spaceFlight?.celestialCatalog?.constellationEntries || [];
   entries.forEach((entry) => {
     const selected = entry.name === name;
-    entry.line.visible = selected || appCtx.constellationsVisible === true;
+    entry.line.visible = appCtx.constellationsVisible === true;
     entry.line.material.color.setHex(selected ? 0x65e6ff : 0x628bb8);
     entry.line.material.opacity = selected ? 0.88 : 0.18;
   });

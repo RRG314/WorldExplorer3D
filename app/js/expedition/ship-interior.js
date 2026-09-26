@@ -347,6 +347,7 @@ function furnish(host, asset, options = {}) {
 }
 
 function addConsole(group, x, z, yaw, accent, label) {
+  if(Math.abs(x)>5&&Math.abs(z)<23)yaw+=Math.PI;
   const consoleGroup = new THREE.Group();
   consoleGroup.name = `ship-console:${label}`;
   const dark = material(0x111b28, { metalness: 0.62, roughness: 0.34 });
@@ -375,7 +376,7 @@ function addConsole(group, x, z, yaw, accent, label) {
   const seat = new THREE.Group();
   seat.name = `${label}:articulated-seat`;
   consoleGroup.add(seat);
-  void furnish(seat, 'bridge-chair', { fit: { x: 0.95, y: 1.3, z: 0.85 }, z: 1.3 });
+  void furnish(seat, 'bridge-chair', { fit: { x: 0.95, y: 1.3, z: 0.85 }, z: -1.3, sourceYaw:Math.PI });
   consoleGroup.position.set(x, 0, z);
   consoleGroup.rotation.y = yaw;
   group.add(consoleGroup);
@@ -383,6 +384,7 @@ function addConsole(group, x, z, yaw, accent, label) {
 }
 
 function addScienceBench(group, x, z, yaw, accent, label) {
+  yaw+=Math.PI;
   const root = new THREE.Group();
   root.name = `science-bench:${label}`;
   const frame = material(0x566675, { metalness: 0.56, roughness: 0.4 });
@@ -585,6 +587,7 @@ function addHydroponicsRack(group, x, z, yaw, accent, label) {
 }
 
 function addPowerCabinet(group, x, z, yaw, accent, label) {
+  yaw+=Math.PI;
   const root = new THREE.Group();
   root.name = `power-cabinet:${label}`;
   const frame = material(0x4a5966, { metalness: 0.66, roughness: 0.32 });
@@ -1018,6 +1021,7 @@ function addDeckDetails(group, deckId) {
       [-2.45, 2.45].forEach((z) => cylinder(coreRoot, 0.18, 0.18, 0.26, { x, y: -1.25, z }, material(0x314652, { metalness: 0.7, roughness: 0.28 }), 'propulsion-core-conduit-coupling', { x: Math.PI / 2, y: 0, z: 0 }, 12));
     });
     coreRoot.position.set(0, 1.82, 30.5);
+    coreRoot.rotation.y=Math.PI/2;
     group.add(coreRoot);
     addConsole(group, -4.5, 31.2, Math.PI, 0xe28d4c, 'propulsion-control');
     addConsole(group, 4.5, 31.2, Math.PI, 0xe2b34c, 'engineering-watch');
@@ -1052,8 +1056,6 @@ function addDeckDetails(group, deckId) {
       [-33.2, -25.8].forEach((z) => box(group, { x: 0.62, y: 0.72, z: 0.5 }, { x: side, y: 0.38, z }, steel, 'pod-magnetic-clamp'));
     });
     box(group, { x: 9.6, y: 0.1, z: 0.4 }, { x: 0, y: 0.08, z: -34.15 }, material(0x64c9e4, { emissive: 0x2e9fc2, emissiveIntensity: 0.54, metalness: 0.08, roughness: 0.28 }), 'pod-launch-threshold');
-    [-4.8, 4.8].forEach((side) => box(group, { x: 0.28, y: 3.1, z: 0.3 }, { x: side, y: 1.55, z: -34.45 }, steel, 'pod-bay-door-frame'));
-    box(group, { x: 9.9, y: 0.28, z: 0.3 }, { x: 0, y: 3.02, z: -34.45 }, steel, 'pod-bay-door-header');
     const podStatus = box(group, { x: 1.4, y: 0.7, z: 0.045 }, { x: 5.35, y: 1.55, z: -29 }, shipDisplayMaterial('pod-launch-ready', 0xdfa14a, 0.74), 'pod-launch-status-display');
     podStatus.rotation.y = -Math.PI / 2;
     podStatus.userData.shipAnimated = 'screen';
@@ -1133,18 +1135,18 @@ function createShipExteriorView() {
  const flight=appCtx.spaceFlight;
  if(!flight?.canvas||!flight.camera)return null;
  const texture=new THREE.CanvasTexture(flight.canvas);configureColorTexture(texture,appCtx.renderer);texture.generateMipmaps=false;texture.minFilter=THREE.LinearFilter;
- const camera=flight.camera.clone();camera.aspect=14/3.6;camera.updateProjectionMatrix();
+ const camera=flight.camera.clone();camera.aspect=12/3.6;camera.updateProjectionMatrix();
  return {source:'live-local-space-renderer',texture,camera,surfaces:[],elapsed:0,frameCount:0};
 }
 
 function addWallEquipment(group,deck){
  for(const room of deck.rooms){
-  const inner=room.id==='storm-shelter',radius=inner?17.5:38.4;
+  const inner=room.id==='storm-shelter',radius=inner?17.5:ring.hullRadius-.6;
   for(const [index,offset] of [-.24,.24].entries()){
    const angle=room.angle+offset,p=polar(radius,angle),host=new THREE.Group();
    host.name=`wall-equipment:${room.id}:${index}`;host.position.set(p.x,.7,p.z);host.rotation.y=angle+Math.PI;host.userData.shipRoomId=room.id;group.add(host);
    const asset=index===0?(deck.id==='habitat'?'crew-display':'wall-navigation'):'wall-instruments';
-   void furnish(host,asset,{fit:{x:index===0?3:2,y:1.8,z:index===0?1.15:.65}});
+   void furnish(host,asset,{sourceYaw:index===1?Math.PI:0,fit:{x:index===0?3:2,y:1.8,z:index===0?1.15:.65}});
    const station=SHIP_STATIONS.find(entry=>entry.roomId===room.id);
    if(station){
     group.userData.wallInteractions||=[];
@@ -1603,7 +1605,7 @@ function syncResearchBenches(session){
   if(!group){
    group=new THREE.Group();group.name=`research-cradles:${id}`;
    const room=SHIP_ROOMS.find(r=>r.id===bench.roomId),p=templatePoint(room,bench.template);
-   group.position.set(p.x,1.12,p.z);group.rotation.y=room.kitYaw+(id==='fabrication-bench'?0:Math.PI/2);deck.group.add(group);
+   group.position.set(p.x,1.12,p.z);group.rotation.y=room.kitYaw+(id==='fabrication-bench'?0:-Math.PI/2);deck.group.add(group);
    for(let i=0;i<2;i++){
     const cradle=new THREE.Mesh(new THREE.CylinderGeometry(.32,.35,.08,24),material(0x51646b,{metalness:.65}));cradle.position.x=(i-.5)*1.1;group.add(cradle);
     const specimen=new THREE.Mesh(new THREE.IcosahedronGeometry(.2,1),material(i?0x97826b:0x807566,{roughness:.9}));specimen.name=`specimen:${i}`;specimen.position.set((i-.5)*1.1,.26,0);group.add(specimen);
@@ -2274,7 +2276,7 @@ function beginExpeditionPodLaunch(onRelease) {
   if(!state.group.userData.launchDoor||!door)return false;
   session.podLaunch={elapsed:0,onRelease,walkEnabled:appCtx.Walk.state.enabled,stage:''};
   appCtx.Walk.state.enabled=false;
-  const cabin=polar(32.4,bay.angle);
+  const cabin=polar(29.2,bay.angle);
   Object.assign(walker,{x:cabin.x,z:cabin.z,y:2.1,yaw:bay.angle,angle:bay.angle,pitch:0,vy:0});
   door.open=false;door.targetY=1.36;
   updateActiveDeckContract(session);

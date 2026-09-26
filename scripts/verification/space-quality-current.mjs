@@ -1,3 +1,4 @@
+import {getUniverseDestinations} from '../../app/js/universe/catalog.js';
 import {SHIP_DECKS} from '../../app/js/expedition/ship-layout.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -68,6 +69,7 @@ try {
  await page.mouse.click(starTarget.x,starTarget.y);
  await page.waitForFunction(()=>document.getElementById('ssInfoSetCourse')?.textContent==='TRAVEL TO TAU CETI');
  assert.equal(await page.locator('#ssInfoSetCourse').isVisible(),true);
+ assert.equal(await page.evaluate(()=>window.__spaceQualityContext.spaceFlight.celestialCatalog.constellationEntries.filter(e=>e.line.visible).length),0,'Picking a star must not override the OFF overlay setting');
  checks.push({name:'catalog-star-click-and-travel-action',destination:'tau-ceti',title:await page.locator('#ssInfoTitle').textContent()});
  await page.screenshot({path:`${out}/02-star-selection.png`});
  await page.evaluate(()=>window.__spaceQualityContext.animateSpaceFlight());
@@ -107,7 +109,7 @@ try {
  assert.equal(await page.evaluate(()=>window.__spaceQualityContext.scene.environment?.name),'solis-reach-indoor-reflections');
  checks.push({name:'owned-indoor-reflections'});
  for(const deck of SHIP_DECKS)for(const room of deck.rooms) {
-  const radius=room.id==='storm-shelter'?16:26.5;
+  const radius=room.id==='storm-shelter'?16:25.2;
   const view={deck:deck.id,x:Math.sin(room.angle)*radius,z:Math.cos(room.angle)*radius,yaw:room.angle+(room.id==='storm-shelter'?Math.PI:0)};
   await page.evaluate(async({deck,x,z,yaw})=>{
    const ctx=window.__spaceQualityContext;ctx.switchSolisReachDeck(deck);
@@ -141,9 +143,9 @@ try {
     const ctx=window.__spaceQualityContext;cancelAnimationFrame(ctx.spaceFlight.animationId);
     const flight=ctx.spaceFlight;flight.camera.position.set(x,0,z);flight.camera.lookAt(0,0,-6000);flight.camera.updateMatrixWorld(true);
     flight.renderer.render(flight.scene,flight.camera);
-    return {glError:flight.renderer.getContext().getError(),reconstruction:ctx.universeRuntime.frameGroup.userData.observationalImage,drawCalls:flight.renderer.info.render.calls};
+    return {glError:flight.renderer.getContext().getError(),visibleLines:(()=>{const lines=[];flight.scene.traverseVisible(o=>{if(o.isLine&&o.material.opacity>0)lines.push({name:o.name,constellation:o.userData.constellationName||null});});return lines;})(),reconstruction:ctx.universeRuntime.frameGroup.userData.observationalImage,drawCalls:flight.renderer.info.render.calls};
    },{x,z});
-   assert.equal(state.glError,0);checks.push({name:`${nebulaId}-${label}`,...state});await page.screenshot({path:`${out}/${nebulaId}-${label}.png`});
+   assert.equal(state.glError,0);assert.deepEqual(state.visibleLines,[],'No transit or constellation lines with overlays off');checks.push({name:`${nebulaId}-${label}`,...state});await page.screenshot({path:`${out}/${nebulaId}-${label}.png`});
   }
  }
  await page.evaluate(async()=>{
@@ -192,6 +194,36 @@ try {
 
   }
 
+ }
+ // Visit each public destination. Exoplanet cameras isolate the selected body;
+ // frame destinations retain the playable arrival view and an interior view.
+ await page.evaluate(()=>{const ctx=window.__spaceQualityContext;ctx.clearRenderedSpaceJourney();ctx.animateSpaceFlight();});
+ for(const destination of getUniverseDestinations()){
+  const info={id:destination.id,frame:destination.parentFrameId||destination.id,kind:destination.objectClass};
+  if(['exoplanet','planetary_system'].includes(info.kind)){
+   await page.evaluate(info=>{const ctx=window.__spaceQualityContext;if(!ctx.restoreUniverseLocalFrame(info.frame,info.kind==='exoplanet'?info.id:''))throw Error(`Cannot restore ${info.id}`);},info);
+  }else{
+   await page.evaluate(id=>{const ctx=window.__spaceQualityContext;ctx.animateSpaceFlight();if(!ctx.travelToUniverseDestination(id))throw Error(`Cannot travel to ${id}`);},info.id);
+   await page.waitForFunction(id=>{const c=window.__spaceQualityContext;return c.universeRuntime.current.id===id&&!c.universeRuntime.transition;},info.id,{timeout:30000});
+  }
+  await page.evaluate(info=>{
+   const ctx=window.__spaceQualityContext,f=ctx.spaceFlight;cancelAnimationFrame(f.animationId);
+   if(info.kind==='exoplanet'){
+    const body=ctx.universeRuntime.frameGroup.userData.destinationMeshes.get(info.id);if(!body)throw Error(`Missing body ${info.id}`);
+    const point=new THREE.Vector3();body.getWorldPosition(point);const radius=body.geometry?.parameters.radius||12;
+    f.camera.position.copy(point).add(new THREE.Vector3(radius*.7,radius*.6,radius*3.4));f.camera.lookAt(point);
+   }else if(info.kind==='galaxy'){
+    f.camera.position.set(200,650,1250);f.camera.lookAt(0,0,0);
+   }
+   f.camera.updateMatrixWorld(true);ctx.updateUniverseRuntime(1/60);f.renderer.render(f.scene,f.camera);
+  },info);
+  await page.waitForTimeout(200);
+  await page.screenshot({path:`${out}/destination-${info.id}.png`});
+  if(['galaxy','stellar_region'].includes(info.kind)){
+   await page.evaluate(info=>{const ctx=window.__spaceQualityContext,f=ctx.spaceFlight;const p=info.kind==='galaxy'?new THREE.Vector3(320,12,180):new THREE.Vector3(500,100,900);ctx.universeRuntime.frameGroup.localToWorld(p);f.camera.position.copy(p);f.camera.lookAt(ctx.universeRuntime.frameGroup.position);f.camera.updateMatrixWorld(true);ctx.updateUniverseRuntime(1/60);f.renderer.render(f.scene,f.camera);},info);
+   await page.screenshot({path:`${out}/destination-${info.id}-inside.png`});
+  }
+  checks.push({name:'public-destination-render',...info});
  }
  assert.deepEqual(errors,[]);
  await fs.writeFile(`${out}/report.json`,JSON.stringify({ok:true,complete:true,evidenceScope:'Desktop software-rendered scene fixtures; not real-device performance or full surface launch acceptance',checks,errors},null,2));

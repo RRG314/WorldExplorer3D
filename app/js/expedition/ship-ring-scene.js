@@ -36,11 +36,11 @@ export function buildRingDeck(THREE,deck,api) {
  }
  const spaceView=api.spaceView?.();
  if(spaceView)for(const room of windows){
-  const p=polar(38.3,room.angle),bay=room.id==='local-craft-bay';
-  const view=new THREE.Mesh(new THREE.PlaneGeometry(14,deckHeight-1),new THREE.MeshBasicMaterial({map:spaceView.texture,side:THREE.DoubleSide,toneMapped:false}));
+  const p=polar(ring.hullRadius-.65,room.angle),bay=room.id==='local-craft-bay';
+  const view=new THREE.Mesh(new THREE.PlaneGeometry(12,deckHeight-1),new THREE.MeshBasicMaterial({map:spaceView.texture,side:THREE.DoubleSide,toneMapped:false}));
   view.position.set(p.x,deckHeight/2,p.z);view.rotation.y=room.angle;view.name=`exterior-view:${room.id}`;group.add(view);spaceView.surfaces.push(view);
   if(bay){
-   const door=api.box(group,{x:12.8,y:5.15,z:.3},{x:p.x,y:2.9,z:p.z},trim,'pod-bay-launch-door');door.rotation.y=room.angle;
+   const door=api.box(group,{x:10.8,y:5.15,z:.3},{x:p.x,y:2.9,z:p.z},trim,'pod-bay-launch-door');door.rotation.y=room.angle;
    group.userData.launchDoor=door;group.userData.launchDoorClosedY=2.55;
    // Glazed upper observation strip remains visible with the launch door sealed.
    door.scale.y=.86;door.position.y=2.55;
@@ -54,6 +54,7 @@ export function buildRingDeck(THREE,deck,api) {
  for(let i=0;i<portals.length;i++)arc(ring.corridorInner,portals[i]+.105,(portals[(i+1)%portals.length]||full)-.105,'inner-corridor-bulkhead');
  for(let i=0;i<4;i++){
   const angle=i*Math.PI/2;
+  for(const side of [-1,1]){const start=polar(5,angle),end=polar(19.9,angle),offset=polar(2.05*side,angle+Math.PI/2);wall({x:start.x+offset.x,z:start.z+offset.z},{x:end.x+offset.x,z:end.z+offset.z},'radial-service-bulkhead');}
   const p=polar(12,angle);const fixture=api.box(group,{x:2.4,y:.04,z:9},{x:p.x,y:3.55,z:p.z},light,'radial-passage-light');fixture.rotation.y=angle;
  }
  for(const room of deck.rooms){
@@ -81,12 +82,12 @@ export function buildRingDeck(THREE,deck,api) {
   if(child.name.startsWith('deck-lift:')){group.add(child);continue;}
   const room=deck.rooms.find(r=>child.position.x>=r.template.minX-.5&&child.position.x<=r.template.maxX+.5&&child.position.z>=r.template.minZ-.5&&child.position.z<=r.template.maxZ+.5)
    ||deck.rooms.reduce((a,r)=>Math.hypot(child.position.x-(r.template.minX+r.template.maxX)/2,child.position.z-(r.template.minZ+r.template.maxZ)/2)<Math.hypot(child.position.x-(a.template.minX+a.template.maxX)/2,child.position.z-(a.template.minZ+a.template.maxZ)/2)?r:a);
-  const point=templatePoint(room,child.position);child.position.x=point.x;child.position.z=point.z;child.rotation.y+=room.kitYaw;child.scale.multiplyScalar(room.fitScale);child.userData.shipRoomId=room.id;group.add(child);
+  const point=templatePoint(room,child.position);child.position.x=point.x;child.position.z=point.z;child.position.y=(child.isLight||child.name.includes('task-light'))?deckHeight-.35:child.position.y*room.fitScale;child.rotation.y+=room.kitYaw;child.scale.multiplyScalar(room.fitScale);child.userData.shipRoomId=room.id;group.add(child);
  }
  api.wallEquipment?.(group,deck);
  const oldColliders=[];api.propColliders(oldColliders,deck.id);
  for(const c of oldColliders){const room=deck.rooms.find(r=>c.centerX>=r.template.minX&&c.centerX<=r.template.maxX&&c.centerZ>=r.template.minZ&&c.centerZ<=r.template.maxZ);if(!room)continue;
-  const pts=[{x:c.minX,z:c.minZ},{x:c.maxX,z:c.minZ},{x:c.maxX,z:c.maxZ},{x:c.minX,z:c.maxZ}].map(p=>templatePoint(room,p));colliders.push({...c,...bounds(pts),pts});
+  const pts=[{x:c.minX,z:c.minZ},{x:c.maxX,z:c.minZ},{x:c.maxX,z:c.maxZ},{x:c.minX,z:c.maxZ}].map(p=>templatePoint(room,p));colliders.push({...c,...bounds(pts),pts,height:c.height*room.fitScale,baseY:c.baseY*room.fitScale});
  }
  group.add(new THREE.HemisphereLight(0xfff7ec,0x424d50,.75));
  const alertLight=new THREE.PointLight(0xff6b45,0,80,2);alertLight.position.y=3.2;group.add(alertLight);

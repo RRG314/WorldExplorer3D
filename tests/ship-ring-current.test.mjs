@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {SHIP_DECKS} from '../app/js/expedition/ship-layout.js';
-import {ringRoute,pointInRoom,polar} from '../app/js/expedition/ship-ring-plan.js';
+import {ring,ringRoute,pointInRoom,polar} from '../app/js/expedition/ship-ring-plan.js';
 import {buildRingDeck} from '../app/js/expedition/ship-ring-scene.js';
 import {createBuildingCollisionQuery} from '../app/js/physics/building-collision.js';
 import {podBayCycle} from '../app/js/expedition/pod-bay-cycle.js';
@@ -31,7 +31,7 @@ for(const deck of SHIP_DECKS)test(`${deck.id}: real rendered walls admit room-to
   assert.equal(blocked(door),true,door.id);
  }
  ctx.dynamicBuildingColliders=state.colliders;
- assert.equal(blocked(polar(39,Math.PI/8)),true,'pressure hull');
+ assert.equal(blocked(polar(ring.hullRadius,Math.PI/8)),true,'pressure hull');
  state.group.traverse(o=>o.geometry?.dispose());surface.dispose();
 });
 test('launch interlock opens the exterior door only after sealing and atmosphere recovery',()=>{
