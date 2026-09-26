@@ -2,8 +2,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
+import {startStaticServer} from './static-server.mjs';
+import {configureStagingAppCheck} from './staging-app-check.mjs';
 
-const baseUrl = String(process.env.WE3D_VERIFY_BASE_URL || 'http://127.0.0.1:4213').replace(/\/$/, '');
+const server=process.env.WE3D_VERIFY_BASE_URL?null:await startStaticServer({rootDir:process.env.WE3D_VERIFY_ROOT||'dist',ports:[4493,4494]});
+const baseUrl=String(process.env.WE3D_VERIFY_BASE_URL||`http://127.0.0.1:${server.port}`).replace(/\/$/,'');
 const outputDir = path.resolve('output/verification/universe-wayfinder');
 await fs.mkdir(outputDir, { recursive: true });
 
@@ -16,6 +19,7 @@ async function diagnostics(page) {
 }
 
 async function openSpace(page) {
+  await configureStagingAppCheck(page,baseUrl);
   await page.goto(`${baseUrl}/app/?launch=space`, { waitUntil: 'domcontentloaded', timeout: 120000 });
   await page.waitForFunction(() => document.getElementById('startBtn')?.disabled === false, null, { timeout: 120000 });
   await page.evaluate(() => {
@@ -73,7 +77,7 @@ async function verifyViewport(viewport, name) {
     }, null, { timeout: 15000 });
     const arrivalState = await diagnostics(page);
     const targetVisual = arrivalState.universeNavigation?.targetVisual;
-    assert.equal(targetVisual.markerVisible, true);
+    assert.equal(targetVisual.cueVisible, true);
     assert.ok(
       Math.abs(targetVisual.ndcX) < 0.92 && Math.abs(targetVisual.ndcY) < 0.92,
       `course planet must remain visible after arrival: ${JSON.stringify(targetVisual)}`
@@ -202,6 +206,7 @@ try {
   await verifyViewport({ width: 390, height: 844 }, 'mobile');
 } finally {
   await browser.close();
+  await server?.close();
 }
 
 const report = { ok: failures.length === 0, baseUrl, results, failures };

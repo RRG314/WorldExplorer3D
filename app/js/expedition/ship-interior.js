@@ -237,8 +237,10 @@ function shipSurfaceMaterial(kind, deckId) {
     roughness: kind === 'wall' ? 0.58 : 0.46,
     metalness: kind === 'wall' ? 0.2 : 0.42,
     map: texture,
-    bumpMap: texture,
-    bumpScale: kind === 'wall' ? 0.012 : 0.022
+    // Albedo panel markings are not a height map. Keep grazing deck/ceiling
+    // shading stable instead of differentiating every painted screw and stripe.
+    bumpMap: kind === 'wall' ? texture : null,
+    bumpScale: kind === 'wall' ? 0.012 : 0
   });
   surface.userData.shipTileSize = kind === 'wall' ? 6.84 : kind === 'ceiling' ? 8 : 4;
   return surface;
@@ -373,7 +375,7 @@ function addScienceBench(group, x, z, yaw, accent, label) {
 
 function addWallServicePanel(group,x,z,yaw,accent,label){
  const root=new THREE.Group();root.name=`service-panel:${label}`;root.position.set(x,.5,z);root.rotation.y=yaw;group.add(root);
- void furnish(root,'wall-instruments',{fit:{x:1.5,y:1.8,z:.5},sourceYaw:Math.PI});
+ void furnish(root,'wall-instruments',{fit:{x:1.5,y:1.8,z:.5}});
  return root;
 }
 
@@ -1033,11 +1035,12 @@ function createShipExteriorView() {
 function addWallEquipment(group,deck,colliders){
  for(const room of deck.rooms){
   const inner=room.id==='storm-shelter',radius=inner?17.5:ring.hullRadius-.6;
-  for(const [index,offset] of [-.24,.24].entries()){
+  const offsets=['bridge','observation-gallery','local-craft-bay'].includes(room.id)?[-.24,.24]:[-.12,.12];
+  for(const [index,offset] of offsets.entries()){
    const angle=room.angle+offset,p=polar(radius,angle),host=new THREE.Group();
    host.name=`wall-equipment:${room.id}:${index}`;host.position.set(p.x,.7,p.z);host.rotation.y=angle+Math.PI;host.userData.shipRoomId=room.id;group.add(host);
    const asset=index===0?(deck.id==='habitat'?'crew-display':'wall-navigation'):'wall-instruments';
-   void furnish(host,asset,{sourceYaw:index===1?Math.PI:0,fit:{x:index===0?3:2,y:1.8,z:index===0?1.15:.65}});
+   void furnish(host,asset,{sourceYaw:0,fit:{x:index===0?3:2,y:1.8,z:index===0?1.15:.65}});
    const halfWidth=index===0?1.5:1,halfDepth=index===0?.575:.325;
    const pts=[[-1,-1],[1,-1],[1,1],[-1,1]].map(([u,v])=>({x:p.x+u*halfWidth*Math.cos(angle)+v*halfDepth*Math.sin(angle),z:p.z-u*halfWidth*Math.sin(angle)+v*halfDepth*Math.cos(angle)}));
    colliders.push({pts,minX:Math.min(...pts.map(v=>v.x)),maxX:Math.max(...pts.map(v=>v.x)),minZ:Math.min(...pts.map(v=>v.z)),maxZ:Math.max(...pts.map(v=>v.z)),baseY:.7,height:1.8,isInteriorCollider:true,sourceBuildingId:host.name});
@@ -1572,6 +1575,7 @@ function updateActiveDeckContract(session = activeSession) {
   appCtx.activeInterior.interactions = activeDeckInteractions(session);
   appCtx.activeInterior.floorId = `solis-reach-${session.activeDeckId}`;
   appCtx.activeInterior.floorLabel = deck?.label || session.activeDeckId;
+  appCtx.activeInterior.ceilingY = session.activeDeckId === 'engineering' ? 6 : 3.6;
   // Ship decks are swapped into one local scene plane by the ship runtime;
   // they are not vertically stacked floors owned by the building-interior
   // elevator runtime.
@@ -1952,6 +1956,7 @@ function enterSolisReachInterior(options = {}) {
     label: options.expedition?.ship?.name || STARSHIP_NAME,
     mode: 'authored-ship',
     environmentKind: 'expedition-ship',
+    ceilingY: 3.6,
     group: sceneState.root,
     walkSurfaces: [sceneState.walkSurface],
     placementTargets: [],

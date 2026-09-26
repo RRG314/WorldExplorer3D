@@ -116,29 +116,6 @@ function createPlanetTexture(profile, mobile) {
   return texture;
 }
 
-function createCourseMarker(radius, destinationName) {
-  const marker = new THREE.Group();
-  marker.name = 'Active destination marker';
-  const material = new THREE.MeshBasicMaterial({
-    color: 0x6fe8ff,
-    transparent: true,
-    opacity: 0.86,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending
-  });
-  const outer = new THREE.Mesh(new THREE.TorusGeometry(radius * 2.8, Math.max(0.14, radius * 0.055), 8, 64), material);
-  outer.rotation.x = Math.PI / 2;
-  const cross = new THREE.Mesh(new THREE.TorusGeometry(radius * 2.15, Math.max(0.12, radius * 0.045), 8, 48), material.clone());
-  cross.rotation.y = Math.PI / 2;
-  const label = createLabel(`${destinationName} · COURSE`, 460);
-  label.position.y = radius * 3.7;
-  label.scale.set(44, 9, 1);
-  marker.add(outer, cross, label);
-  marker.userData.baseScale = 1;
-  marker.visible = false;
-  return marker;
-}
-
 function createPlanetarySystem(entity) {
   if (entity.id === 'sol') {
     throw new Error('Sol visuals are owned by the authoritative solar-system runtime.');
@@ -225,11 +202,9 @@ function createPlanetarySystem(entity) {
       rings.name = `${planet.name} model-derived ring system`;
       body.add(rings);
     }
-    const marker = createCourseMarker(radius, planet.name);
-    body.add(marker);
     group.userData.destinationMeshes.set(planet.id, body);
     group.userData.gravityBodies.push(body);
-    group.userData.orbitingPlanets.push({ body, marker, orbitRadius, phase, orbitDays: Number(planet.orbitDays || 365) });
+    group.userData.orbitingPlanets.push({ body, orbitRadius, phase, orbitDays: Number(planet.orbitDays || 365) });
   });
   return group;
 }
@@ -455,11 +430,10 @@ function getUniverseDestinationMesh(group, destinationId) {
   return group?.userData?.destinationMeshes?.get?.(destinationId) || null;
 }
 
-function setUniverseCourseMarker(group, destinationId, active = true) {
+function setUniverseCourseTarget(group, destinationId, active = true) {
   let selected = null;
   (group?.userData?.orbitingPlanets || []).forEach((entry) => {
     const matches = entry.body?.userData?.universeEntityId === destinationId;
-    if (entry.marker) entry.marker.visible = Boolean(active && matches);
     if (matches) selected = entry.body;
   });
   group.userData.activeDestinationId = active ? destinationId : null;
@@ -479,11 +453,7 @@ function updateUniverseFrameVisual(group, elapsedSeconds, frameScale = 1) {
     entry.body.position.x = Math.cos(angle) * entry.orbitRadius;
     entry.body.position.z = Math.sin(angle) * entry.orbitRadius;
     entry.body.rotation.y += 0.006 * frameScale;
-    if (entry.marker?.visible) {
-      const pulse = 1 + Math.sin(elapsedSeconds * 3.2) * 0.08;
-      entry.marker.scale.setScalar(pulse);
-      entry.marker.rotation.z += 0.012 * frameScale;
-    }
+
   });
   (group.userData.starMaterials || []).forEach((material) => {
     if (material.uniforms?.time) material.uniforms.time.value = elapsedSeconds;
@@ -494,6 +464,6 @@ function updateUniverseFrameVisual(group, elapsedSeconds, frameScale = 1) {
 export {
   createUniverseFrameVisual,
   getUniverseDestinationMesh,
-  setUniverseCourseMarker,
+  setUniverseCourseTarget,
   updateUniverseFrameVisual
 };

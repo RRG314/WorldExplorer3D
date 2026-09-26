@@ -180,8 +180,9 @@ function createWalkingRuntimeHelpers({
 
     if (state.view === "overhead" && !tunnelEnvelope.inside) {
       const terrainY = getWalkGroundY(walker.x, walker.z, 0);
-      const height = 45;
-      const offsetBack = 8;
+      const ship = appCtx.activeInterior?.environmentKind === 'expedition-ship';
+      const height = ship ? Math.max(2.8,Number(appCtx.activeInterior.ceilingY || 3.6)-terrainY-.24) : 45;
+      const offsetBack = ship ? 0 : 8;
 
       camera.position.set(
         walker.x - Math.sin(cameraYaw) * offsetBack,
@@ -189,7 +190,7 @@ function createWalkingRuntimeHelpers({
         walker.z - Math.cos(cameraYaw) * offsetBack
       );
 
-      const lookAhead = 15;
+      const lookAhead = ship ? .35 : 15;
       camera.lookAt(
         walker.x + Math.sin(cameraYaw) * lookAhead,
         terrainY,

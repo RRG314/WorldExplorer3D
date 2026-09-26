@@ -111,3 +111,19 @@ test('Pluto and Ceres retain round geometry and catalog imagery in the named-bod
   }
  }finally{globalThis.THREE=previous;}
 });
+
+test('ship overhead camera stays below each deck ceiling and over the player',async()=>{
+ const {createWalkingRuntimeHelpers}=await import('../app/js/walking/runtime.js');
+ const previous=ctx.activeInterior,pose=ctx.presentationPose;
+ const camera=new THREE.PerspectiveCamera(),state={mode:'walk',view:'overhead',walker:{x:0,y:1.74,z:21.8,yaw:Math.PI/2,pitch:0}};
+ const helpers=createWalkingRuntimeHelpers({CFG:{eyeHeight:1.7},camera,state,getWalkGroundY:()=>0});
+ try{
+  ctx.presentationPose=null;
+  for(const ceilingY of [3.6,6]){
+   ctx.activeInterior={environmentKind:'expedition-ship',ceilingY};
+   assert.equal(helpers.updateWalkCamera(),true);
+   assert.ok(camera.position.y<ceilingY&&camera.position.y>state.walker.y);
+   assert.equal(camera.position.x,state.walker.x);assert.equal(camera.position.z,state.walker.z);
+  }
+ }finally{ctx.activeInterior=previous;ctx.presentationPose=pose;}
+});

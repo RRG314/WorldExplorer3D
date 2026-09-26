@@ -19,7 +19,7 @@ import { releaseGaiaSkyLayers } from '../sky/gaia-catalog.js?v=4';
 import {
   createUniverseFrameVisual,
   getUniverseDestinationMesh,
-  setUniverseCourseMarker,
+  setUniverseCourseTarget,
   updateUniverseFrameVisual
 } from './visuals.js?v=19';
 import {
@@ -284,7 +284,7 @@ function installFrame(entity) {
     universeRuntime.encounter = createRegionEncounter(universeRuntime.frameGroup, entity);
     const courseDestination = universeRuntime.course?.destination;
     if (courseDestination?.objectClass === 'exoplanet' && courseDestination.parentFrameId === entity.id) {
-      setUniverseCourseMarker(universeRuntime.frameGroup, courseDestination.id, true);
+      setUniverseCourseTarget(universeRuntime.frameGroup, courseDestination.id, true);
     }
   }
   positionRocketForFrame(entity);
@@ -371,7 +371,7 @@ function travelToUniverseDestination(addressOrId, options = {}) {
     reason: 'wayfinder-interstellar-course-set'
   });
   if (destination.objectClass === 'exoplanet' && destinationFrame.id === universeRuntime.current.id) {
-    setUniverseCourseMarker(universeRuntime.frameGroup, destination.id, true);
+    setUniverseCourseTarget(universeRuntime.frameGroup, destination.id, true);
     showMessage(`COURSE SET · ${destination.name.toUpperCase()}`, '#6fe8ff');
     updateUniverseNavigator(universeRuntime);
     return true;
@@ -810,9 +810,6 @@ function getUniverseCourseSnapshot() {
   const body = destination?.objectClass === 'exoplanet'
     ? getUniverseDestinationMesh(universeRuntime.frameGroup, destination.id)
     : null;
-  const entry = body
-    ? (universeRuntime.frameGroup?.userData?.orbitingPlanets || []).find((candidate) => candidate.body === body)
-    : null;
   let targetVisual = null;
   const directionCue = updateLocalCourseCue();
   if (body && appCtx.spaceFlight?.camera && appCtx.spaceFlight?.rocket) {
@@ -826,7 +823,7 @@ function getUniverseCourseSnapshot() {
     appCtx.spaceFlight.camera.getWorldDirection(cameraDirection);
     targetDirection.copy(targetWorld).sub(appCtx.spaceFlight.camera.position).normalize();
     targetVisual = Object.freeze({
-      markerVisible: entry?.marker?.visible === true,
+      cueVisible: directionCue?.visible === true,
       ndcX: Number(projected.x),
       ndcY: Number(projected.y),
       cameraTargetDot: Number(cameraDirection.dot(targetDirection)),
