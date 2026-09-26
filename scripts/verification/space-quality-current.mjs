@@ -134,6 +134,11 @@ try {
   assert.equal(avatar.view,expected);assert.equal(avatar.visible,expected!=='first');
   assert.ok(avatar.asset);assert.equal(avatar.curatedInstances,1);
   checks.push({name:'ship-player-camera-cycle',...avatar});
+  if(expected==='first')checks.push({name:'walking-surface-diagnostics',surfaces:await page.evaluate(()=>{
+   const ctx=window.__spaceQualityContext,ray=new THREE.Raycaster();
+   return [-.65,.65].map(y=>{ray.setFromCamera(new THREE.Vector2(0,y),ctx.camera);return ray.intersectObjects(ctx.scene.children,true).filter(h=>{let o=h.object;while(o){if(!o.visible)return false;o=o.parent;}return true;}).slice(0,3).map(h=>({name:h.object.name,parent:h.object.parent?.name,distance:h.distance,point:h.point.toArray(),uv:h.uv?.toArray(),map:!!h.object.material.map,type:h.object.geometry.type}));});
+  })});
+
   await page.screenshot({path:`${out}/ship-player-${expected}.png`});
  }
  const exited=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.exitExpeditionShipInterior();return {near:ctx.camera.near,active:ctx.spaceFlight.active};});

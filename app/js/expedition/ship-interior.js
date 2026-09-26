@@ -1040,7 +1040,7 @@ function addWallEquipment(group,deck,colliders){
    const angle=room.angle+offset,p=polar(radius,angle),host=new THREE.Group();
    host.name=`wall-equipment:${room.id}:${index}`;host.position.set(p.x,.7,p.z);host.rotation.y=angle+Math.PI;host.userData.shipRoomId=room.id;group.add(host);
    const asset=index===0?(deck.id==='habitat'?'crew-display':'wall-navigation'):'wall-instruments';
-   void furnish(host,asset,{sourceYaw:0,fit:{x:index===0?3:2,y:1.8,z:index===0?1.15:.65}});
+   void furnish(host,asset,{sourceYaw:asset==='wall-navigation'?Math.PI:0,fit:{x:index===0?3:2,y:1.8,z:index===0?1.15:.65}});
    const halfWidth=index===0?1.5:1,halfDepth=index===0?.575:.325;
    const pts=[[-1,-1],[1,-1],[1,1],[-1,1]].map(([u,v])=>({x:p.x+u*halfWidth*Math.cos(angle)+v*halfDepth*Math.sin(angle),z:p.z-u*halfWidth*Math.sin(angle)+v*halfDepth*Math.cos(angle)}));
    colliders.push({pts,minX:Math.min(...pts.map(v=>v.x)),maxX:Math.max(...pts.map(v=>v.x)),minZ:Math.min(...pts.map(v=>v.z)),maxZ:Math.max(...pts.map(v=>v.z)),baseY:.7,height:1.8,isInteriorCollider:true,sourceBuildingId:host.name});
