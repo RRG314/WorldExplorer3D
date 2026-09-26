@@ -2,6 +2,38 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
+## [5.3.0] - Unreleased
+
+### Added
+
+- Circular Solis Reach corridors, licensed room equipment and wall instruments,
+  exterior views and a staged Pathfinder launch sequence.
+- Physical specimen placement, measurements and fabrication connected to local
+  and shared expedition cargo.
+- Star and planet information and supported travel actions outside the Solar
+  System, observer-dependent star positions and spatial galactic environments.
+- Building-aligned interior photo editing, saved revisions, phone handoff,
+  account review and entry into approved interiors.
+
+### Changed
+
+- Improved planetary imagery, atmospheric rendering, land-cover treatment,
+  facade layout, pavement continuity and roadside placement.
+- Shared reusable textures and skeleton data, batched static models, culled
+  off-screen geometry and reduced repeated interface updates.
+- Separated component, browser, backend and performance evidence in release checks.
+
+### Fixed
+
+- Overlapping regional and detailed water surfaces; stale world resources.
+- Retired character flashes, ship camera clipping, backward wall consoles and
+  corridor floor/ceiling texture loss.
+- Unwanted nebula line overlays and duplicate space course markers.
+- Room admission races, presence expiry and shared-vehicle ownership recovery.
+- Mobile prompt overlap, dialog focus and incomplete account-cleanup reporting.
+
+See [5.3 release notes](RELEASE_NOTES_5.3.0.md) for scope and known limitations.
+
 ## [5.2.0] - 2026-09-03
 
 ### Added
