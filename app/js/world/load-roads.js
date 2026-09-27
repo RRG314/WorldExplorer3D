@@ -803,6 +803,22 @@ export function createWorldRoadLoader(deps = {}) {
         });
         loadMetrics.buildings.loadPolicy = buildingLoadPolicy;
         const normalizedSelection = normalized.selection;
+        // Start the independent building download while terrain and road geometry
+        // are prepared. Publication, metadata merging and fallback selection stay
+        // in loadBuildingDetailForPublication. Capture rejection immediately so a
+        // superseded load cannot leave an unobserved prefetch rejection.
+        const preferredBuildingRequest = buildingLoadPolicy.shouldLoad && normalizedSelection.roadWays.length > 0
+          ? runProviderWork('overture', 'building-detail', (signal) =>
+              fetchGlobalBuildingData({
+                lat: appCtx.LOC.lat,
+                lon: appCtx.LOC.lon,
+                radius: buildingPublicationCacheMeta.featureRadius,
+                bounds: buildingPublicationCacheMeta.bounds,
+                visibilityRadiusWorld: buildingPublicationCacheMeta.visibleRadiusWorld,
+                signal
+              })
+            ).then(data => ({ data }), error => ({ error }))
+          : null;
         appCtx._worldLoadNodes = normalizedSelection.nodes;
         if (runtimeState) {
           Object.assign(runtimeState, normalized.diagnostics);
@@ -952,17 +968,12 @@ export function createWorldRoadLoader(deps = {}) {
                 signal
               })
             ),
-            fetchPreferredData: buildingLoadPolicy.shouldLoad
-              ? () => runProviderWork('overture', 'building-detail', (signal) =>
-                  fetchGlobalBuildingData({
-                    lat: appCtx.LOC.lat,
-                    lon: appCtx.LOC.lon,
-                    radius: buildingPublicationCacheMeta.featureRadius,
-                    bounds: buildingPublicationCacheMeta.bounds,
-                    visibilityRadiusWorld: buildingPublicationCacheMeta.visibleRadiusWorld,
-                    signal
-                  })
-                )
+            fetchPreferredData: preferredBuildingRequest
+              ? async () => {
+                  const result = await preferredBuildingRequest;
+                  if ('error' in result) throw result.error;
+                  return result.data;
+                }
               : null,
             fetchFallbackData: buildingLoadPolicy.shouldLoad
               ? () => runProviderWork('openstreetmap-shortbread', 'building-detail-fallback', async (signal) => {
