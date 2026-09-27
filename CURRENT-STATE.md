@@ -1,40 +1,26 @@
-# Release work entry point
+# Current local verification state
 
-Work in `/Users/stevenreid/Developer/WorldExplorer3D-release-integration` on
-`steven/post-5.2-release-integration`. Keep ordinary Chrome open; run heavy
-verification remotely. Follow AGENTS.md resource and credential rules.
+Worktree: `/Users/stevenreid/.codex/worktrees/architecture-evaluation/WorldExplorer3D-live-deployed-20260320`
+Branch: `steven/architecture-evaluation`. This work remains local; do not push or deploy automatically. Keep ordinary Chrome open. Run heavyweight checks sequentially and preserve source/history.
 
-## 5.3 preparation — September 25, 2026
+## Production identity verified September 27, 2026 UTC
 
-PR #87 is merged into stable. The integration branch retains its detailed history
-and incorporates stable ancestry. The v5.3.0 GitHub release is a draft:
-**World Explorer 3D 5.3 — Further into the World**. Do not publish it or claim the
-frontend deployed. Public documentation is in RELEASE_NOTES_5.3.0.md, ROADMAP.md,
-CHANGELOG.md and docs/RELEASE_INTEGRATION_STATUS.md. The comparison against both
-published and live 5.2 baselines is docs/RELEASE_COMPARISON_5.3.md.
+The public build manifest at `https://worldexplorer3d.io/build-manifest.json` reports
+`5.3.0+bbe6502228e3.8044052b36c00b4a.production`, clean source commit
+`bbe6502228e369fe2a15dc6a177f5d83948584c3`. Earlier notes describing production as 5.2 are historical and no longer current.
 
-Production remains5.2.0+db62593ba377.6342cddaba06fc68.production. Last verified
-staging is5.3.0+56fcf94d400b.e1ad84e8534bf3fc.staging. Later candidate source fixes
-two module URL identities; do not confuse it with that deployed staging artifact.
-Production mutateSharedExpedition is now ACTIVE version4 (2026-09-26T02:01Z).
-All11 declared composite indexes and12 field overrides match ready production
-indexes. Existing environment parameters were preserved; temporary env removed.
+## Local scope
 
-PR source/component/inventory/sensitivity and secret scans passed. Final ship
-visuals and smoke passed36209521137; research and two-player backend checks passed
-36207818083 and36207910233; destination gallery passed36207329569; wayfinder
-passed36208510386. All25 room views and camera modes were reviewed. Stable artifact checks are run36210611726 and runtime checks run36210599010;
-read their current GitHub results before starting another run.
-Stable squash secret scan flagged the already-reviewed browser actor property,
-not a credential; a scoped historical fingerprint and inline explanation repair
-that false positive without disabling secret detection.
+The measured refactor changes location-selection boundaries, service lifecycle, frontage/profile/decal calculations, renderer diagnostics and Earth presentation cleanup. Later local changes add shared layered character animation, equipment presentation, presence wrap/frame fixes and a server action cooldown repair.
 
-No physical-phone responsiveness acceptance or production artifact finalization
-is claimed. Utility-equipment art remains simpler than licensed furnishings.
-Do not repeat completed unchanged tests without a failure or a relevant change.
-Evidence: output/release-integration/release-preparation and
-output/release-integration/ship-systems-redesign. Temporary AppCheck registration,
-GitHub test credential and private file were removed after the visual runs.
+The new action resolver and receipt ledger are contained R&D components. They do not establish a deployed action gateway, server movement, PvP, durable shared pickups or a complete new multiplayer game mode. They must not be presented as shipping capability. Details: `docs/action-game-rnd/ACCEPTANCE_MATRIX.md`.
 
-The user's “other branch” was interpreted as the integration branch; an optional
-question about main was unanswered. Main has not been modified.
+## Current verification
+
+- Current component suite: passed all executed checks, no skipped cases. The first attempt lacked backend dependencies in this worktree; matching existing dependencies were linked and the complete run passed.
+- Strict portable-boundary type check: passed.
+- Emulator admission HTTP, transactional admission/capacity, Firestore rules and shared urban/civic backend: passed.
+- Source-browser public directory join, both mapped worlds, shared artifact and vehicle claim/renewal/release/handoff reached completion. The final harness assertion still expected a private room; corrected to match the public scenario. A built-candidate run is still required before this gate can be marked passed.
+- Earlier character lab screenshots were inspected. Physical-phone acceptance for the new changes remains unverified.
+
+Check actual new execution reports before updating this file. Test counts are coverage inventory, not a production-readiness score. No final production readiness or new deployment is claimed here.
