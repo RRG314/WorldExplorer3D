@@ -1,0 +1,461 @@
+{
+  "source": "ee1bca65bef2ccd00c740536343e9fc64f20400d",
+  "runtimeDiffSha256": "c880341ac7917076aafdde4d30b9eebdcea5a1a1b0974de3aea1c24d2aee0e0f",
+  "host": {
+    "ok": true,
+    "host": {
+      "platform": "darwin",
+      "architecture": "arm64",
+      "model": "Macmini9,1",
+      "cpu": "Apple M1",
+      "memoryBytes": 8589934592,
+      "ci": false
+    },
+    "checks": {
+      "physicalRun": true,
+      "macOS": true,
+      "nativeArm": true,
+      "declaredMacMini": true,
+      "declaredChip": true,
+      "declaredMemory": true
+    },
+    "evidenceScope": "Host eligibility only; this is not a performance measurement."
+  },
+  "quality": "med fixed; auto-quality disabled",
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "location": {
+    "lat": 39.2904,
+    "lon": -76.6122,
+    "name": "Baltimore"
+  },
+  "complete": true,
+  "errors": [],
+  "firstPlayableMs": 74200,
+  "firstPlayableTimingScope": "sampled allocation profiler includes collected objects; do not compare with uninstrumented latency",
+  "manualSkyMode": "day",
+  "flightPreparation": {
+    "before": {
+      "active": true,
+      "x": 0,
+      "y": 103.15165297545269,
+      "z": 3.969804798280056,
+      "yaw": 0,
+      "pitch": 0,
+      "roll": 0,
+      "pitchRate": 0,
+      "rollRate": 0,
+      "speed": 26.348004064638758,
+      "vx": 0,
+      "vy": 0,
+      "vz": 26.34800406463876,
+      "throttle": 0.48,
+      "climbRate": 0,
+      "horizontalSpeed": 26.348004064638758,
+      "flightPathAngle": 0,
+      "angleOfAttack": 0,
+      "liftLoad": 1,
+      "turnRate": 0,
+      "stalled": false,
+      "airborne": true,
+      "contactKind": "terrain",
+      "contactBuildingId": "",
+      "launchKind": "urban_airborne",
+      "launchClearanceY": 103.15165297545269,
+      "lastImpactAt": 0,
+      "lastImpactSpeed": 0,
+      "transportEntityId": "direct-flight:personal-prop",
+      "transportCatalogId": "personal-prop",
+      "condition": 1,
+      "durabilityPolicy": "exploration_unlimited",
+      "operable": true,
+      "passengerMode": false
+    },
+    "after": {
+      "active": true,
+      "x": 0,
+      "y": 200.85825777035132,
+      "z": 43.139953629944586,
+      "yaw": 0,
+      "pitch": 2.323645450953367,
+      "roll": 0,
+      "pitchRate": 1.216855512190893,
+      "rollRate": 0,
+      "speed": 97.77012740203914,
+      "vx": 0,
+      "vy": 77.11325967501215,
+      "vz": -60.10443406692281,
+      "throttle": 1,
+      "climbRate": 77.11325967501237,
+      "horizontalSpeed": -60.10443406692283,
+      "flightPathAngle": 2.2328685049175387,
+      "angleOfAttack": 0.12745477593589974,
+      "liftLoad": 3.6145419455514127,
+      "turnRate": 0,
+      "stalled": false,
+      "airborne": true,
+      "contactKind": "terrain",
+      "contactBuildingId": "",
+      "launchKind": "urban_airborne",
+      "launchClearanceY": 103.15165297545269,
+      "lastImpactAt": 0,
+      "lastImpactSpeed": 0,
+      "transportEntityId": "direct-flight:personal-prop",
+      "transportCatalogId": "personal-prop",
+      "condition": 1,
+      "durabilityPolicy": "exploration_unlimited",
+      "operable": true,
+      "passengerMode": false
+    }
+  },
+  "samples": [
+    {
+      "id": "plane-sustained",
+      "elapsedMs": 90000.80000000002,
+      "frames": 5137,
+      "meanMs": 17.520109013042635,
+      "p95Ms": 18.69999999999709,
+      "p99Ms": 33.40000000000873,
+      "start": {
+        "x": 0,
+        "z": 43.139953629944586
+      },
+      "end": {
+        "x": 0,
+        "z": 12627.296848810785
+      },
+      "distance": 12584.15689518084,
+      "renderer": {
+        "contextLost": false,
+        "glError": 0,
+        "pixelRatio": 1,
+        "width": 1280,
+        "height": 800,
+        "calls": 91,
+        "triangles": 516168,
+        "programs": 60,
+        "geometries": 1331,
+        "textures": 178
+      },
+      "worldCounts": {
+        "buildings": 25507,
+        "buildingMeshes": 540,
+        "landuseMeshes": 111,
+        "roadMeshes": 779,
+        "roads": 18758,
+        "terrainTiles": 49,
+        "visibleBuildingMeshes": 540,
+        "pitchedRoofMeshes": 35,
+        "inferredPitchedRoofMeshes": 0,
+        "guardedRoads": 0,
+        "guardrailColliders": 0,
+        "guardrailVisualInstances": 0
+      },
+      "jsHeapUsedBytes": 536915744,
+      "scriptSeconds": 46.216390000000004,
+      "taskSeconds": 53.76451300000001,
+      "dom": {
+        "documents": 2,
+        "nodes": 106212,
+        "jsEventListeners": 933
+      }
+    }
+  ],
+  "longTasks": {
+    "entries": [
+      {
+        "startTime": 1632,
+        "duration": 105
+      },
+      {
+        "startTime": 1737.2999999970198,
+        "duration": 138
+      },
+      {
+        "startTime": 6765.199999988079,
+        "duration": 118
+      },
+      {
+        "startTime": 6979.199999988079,
+        "duration": 105
+      },
+      {
+        "startTime": 7085.0999999940395,
+        "duration": 77
+      },
+      {
+        "startTime": 7292.29999999702,
+        "duration": 59
+      },
+      {
+        "startTime": 7351.5999999940395,
+        "duration": 55
+      },
+      {
+        "startTime": 7406.79999999702,
+        "duration": 53
+      },
+      {
+        "startTime": 7460.899999991059,
+        "duration": 54
+      },
+      {
+        "startTime": 7514.899999991059,
+        "duration": 52
+      },
+      {
+        "startTime": 7568,
+        "duration": 53
+      },
+      {
+        "startTime": 7621.199999988079,
+        "duration": 53
+      },
+      {
+        "startTime": 7675.0999999940395,
+        "duration": 66
+      },
+      {
+        "startTime": 7741.0999999940395,
+        "duration": 76
+      },
+      {
+        "startTime": 7817.699999988079,
+        "duration": 74
+      },
+      {
+        "startTime": 7892.0999999940395,
+        "duration": 77
+      },
+      {
+        "startTime": 7970.0999999940395,
+        "duration": 78
+      },
+      {
+        "startTime": 8048.79999999702,
+        "duration": 88
+      },
+      {
+        "startTime": 8137.399999991059,
+        "duration": 94
+      },
+      {
+        "startTime": 8231.59999999404,
+        "duration": 84
+      },
+      {
+        "startTime": 8316.09999999404,
+        "duration": 81
+      },
+      {
+        "startTime": 8397.09999999404,
+        "duration": 76
+      },
+      {
+        "startTime": 8474,
+        "duration": 63
+      },
+      {
+        "startTime": 8561.29999999702,
+        "duration": 233
+      },
+      {
+        "startTime": 8976.79999999702,
+        "duration": 193
+      },
+      {
+        "startTime": 9170.5,
+        "duration": 75
+      },
+      {
+        "startTime": 9273.29999999702,
+        "duration": 78
+      },
+      {
+        "startTime": 11383.29999999702,
+        "duration": 305
+      },
+      {
+        "startTime": 11698.5,
+        "duration": 2876
+      },
+      {
+        "startTime": 14709.199999988079,
+        "duration": 57
+      },
+      {
+        "startTime": 16814.09999999404,
+        "duration": 235
+      },
+      {
+        "startTime": 17280.69999998808,
+        "duration": 3571
+      },
+      {
+        "startTime": 22718.39999999106,
+        "duration": 637
+      },
+      {
+        "startTime": 23361.79999999702,
+        "duration": 987
+      },
+      {
+        "startTime": 26821.29999999702,
+        "duration": 331
+      },
+      {
+        "startTime": 27979,
+        "duration": 252
+      },
+      {
+        "startTime": 28272.89999999106,
+        "duration": 650
+      },
+      {
+        "startTime": 28974.69999998808,
+        "duration": 2660
+      },
+      {
+        "startTime": 31636.19999998808,
+        "duration": 245
+      },
+      {
+        "startTime": 31881.5,
+        "duration": 234
+      },
+      {
+        "startTime": 32116.5,
+        "duration": 234
+      },
+      {
+        "startTime": 32351.5,
+        "duration": 457
+      },
+      {
+        "startTime": 32809.39999999106,
+        "duration": 857
+      },
+      {
+        "startTime": 33668,
+        "duration": 72
+      },
+      {
+        "startTime": 33752.59999999404,
+        "duration": 530
+      },
+      {
+        "startTime": 40655.19999998808,
+        "duration": 149
+      },
+      {
+        "startTime": 40804.5,
+        "duration": 995
+      },
+      {
+        "startTime": 41849.69999998808,
+        "duration": 82
+      },
+      {
+        "startTime": 41932.59999999404,
+        "duration": 246
+      },
+      {
+        "startTime": 44685.69999998808,
+        "duration": 347
+      },
+      {
+        "startTime": 47129.79999999702,
+        "duration": 235
+      },
+      {
+        "startTime": 50949.39999999106,
+        "duration": 256
+      },
+      {
+        "startTime": 51211.89999999106,
+        "duration": 345
+      },
+      {
+        "startTime": 52027.79999999702,
+        "duration": 71
+      },
+      {
+        "startTime": 55620.79999999702,
+        "duration": 125
+      },
+      {
+        "startTime": 61703,
+        "duration": 55
+      },
+      {
+        "startTime": 64324.19999998808,
+        "duration": 1922
+      },
+      {
+        "startTime": 66824.69999998808,
+        "duration": 448
+      },
+      {
+        "startTime": 69197.59999999404,
+        "duration": 67
+      },
+      {
+        "startTime": 72156.29999999702,
+        "duration": 312
+      },
+      {
+        "startTime": 72469.29999999702,
+        "duration": 551
+      },
+      {
+        "startTime": 73084.39999999106,
+        "duration": 1471
+      },
+      {
+        "startTime": 74693.79999999702,
+        "duration": 1179
+      },
+      {
+        "startTime": 75874,
+        "duration": 96
+      },
+      {
+        "startTime": 76239.19999998808,
+        "duration": 212
+      },
+      {
+        "startTime": 78279.59999999404,
+        "duration": 62
+      },
+      {
+        "startTime": 78413.19999998808,
+        "duration": 55
+      },
+      {
+        "startTime": 81584.09999999404,
+        "duration": 88
+      },
+      {
+        "startTime": 81973.19999998808,
+        "duration": 191
+      },
+      {
+        "startTime": 93639,
+        "duration": 85
+      },
+      {
+        "startTime": 174009.29999999702,
+        "duration": 174
+      },
+      {
+        "startTime": 174520.39999999106,
+        "duration": 107
+      }
+    ],
+    "dropped": 0,
+    "scope": "Observer long tasks above 50 ms; renderer/GPU and asynchronous waits are not measured as blocking."
+  },
+  "visualReview": "Flight screenshot inspected: aircraft airborne, daytime, coarse regional terrain outside detailed city coverage. This is not an art-fidelity approval."
+}

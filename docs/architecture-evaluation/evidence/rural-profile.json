@@ -1,0 +1,241 @@
+{
+  "source": "ee1bca65bef2ccd00c740536343e9fc64f20400d",
+  "runtimeDiffSha256": "c880341ac7917076aafdde4d30b9eebdcea5a1a1b0974de3aea1c24d2aee0e0f",
+  "host": {
+    "ok": true,
+    "host": {
+      "platform": "darwin",
+      "architecture": "arm64",
+      "model": "Macmini9,1",
+      "cpu": "Apple M1",
+      "memoryBytes": 8589934592,
+      "ci": false
+    },
+    "checks": {
+      "physicalRun": true,
+      "macOS": true,
+      "nativeArm": true,
+      "declaredMacMini": true,
+      "declaredChip": true,
+      "declaredMemory": true
+    },
+    "evidenceScope": "Host eligibility only; this is not a performance measurement."
+  },
+  "quality": "med fixed; auto-quality disabled",
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "clock": "normal RAF; no advanceTime",
+  "location": {
+    "lat": 35.611,
+    "lon": -83.489,
+    "name": "Smoky-Mountains"
+  },
+  "firstPlayableMs": 22742,
+  "samples": [
+    {
+      "id": "walking-stationary",
+      "elapsedMs": 15000.3,
+      "frames": 900,
+      "meanMs": 16.666999999999998,
+      "p95Ms": 17,
+      "p99Ms": 18.599999999998545,
+      "start": {
+        "x": 0,
+        "z": 0
+      },
+      "end": {
+        "x": 0,
+        "z": 0
+      },
+      "distance": 0,
+      "renderer": {
+        "contextLost": false,
+        "glError": 0,
+        "pixelRatio": 1,
+        "width": 1280,
+        "height": 800,
+        "calls": 219,
+        "triangles": 1693841,
+        "programs": 34,
+        "geometries": 277,
+        "textures": 121
+      },
+      "worldCounts": {
+        "buildings": 4,
+        "buildingMeshes": 4,
+        "landuseMeshes": 34,
+        "roadMeshes": 152,
+        "roads": 1960,
+        "terrainTiles": 262,
+        "visibleBuildingMeshes": 4,
+        "pitchedRoofMeshes": 0,
+        "inferredPitchedRoofMeshes": 0,
+        "guardedRoads": 0,
+        "guardrailColliders": 0,
+        "guardrailVisualInstances": 0
+      },
+      "jsHeapUsedBytes": 138918400,
+      "scriptSeconds": 3.6703819999999996,
+      "taskSeconds": 4.712219000000001,
+      "dom": {
+        "documents": 2,
+        "nodes": 26199,
+        "jsEventListeners": 1184
+      }
+    },
+    {
+      "id": "walking-moving",
+      "elapsedMs": 15014.900000000001,
+      "frames": 901,
+      "meanMs": 16.664705882352944,
+      "p95Ms": 18.69999999999709,
+      "p99Ms": 18.700000000004366,
+      "start": {
+        "x": 0,
+        "z": 0
+      },
+      "end": {
+        "x": 0,
+        "z": 42.13496000000006
+      },
+      "distance": 42.13496000000006,
+      "renderer": {
+        "contextLost": false,
+        "glError": 0,
+        "pixelRatio": 1,
+        "width": 1280,
+        "height": 800,
+        "calls": 226,
+        "triangles": 1664185,
+        "programs": 36,
+        "geometries": 298,
+        "textures": 124
+      },
+      "worldCounts": {
+        "buildings": 4,
+        "buildingMeshes": 4,
+        "landuseMeshes": 34,
+        "roadMeshes": 152,
+        "roads": 1960,
+        "terrainTiles": 262,
+        "visibleBuildingMeshes": 4,
+        "pitchedRoofMeshes": 0,
+        "inferredPitchedRoofMeshes": 0,
+        "guardedRoads": 0,
+        "guardrailColliders": 0,
+        "guardrailVisualInstances": 0
+      },
+      "jsHeapUsedBytes": 118698944,
+      "scriptSeconds": 3.6617310000000005,
+      "taskSeconds": 4.683435000000003,
+      "dom": {
+        "documents": 2,
+        "nodes": 44405,
+        "jsEventListeners": 1222
+      }
+    },
+    {
+      "id": "driving-moving",
+      "elapsedMs": 15000.300000000003,
+      "frames": 876,
+      "meanMs": 17.123630136986304,
+      "p95Ms": 18.59999999999127,
+      "p99Ms": 18.69999999999709,
+      "start": {
+        "x": 0,
+        "z": 42.13496000000006
+      },
+      "end": {
+        "x": 0,
+        "z": 588.9248455866534
+      },
+      "distance": 546.7898855866533,
+      "renderer": {
+        "contextLost": false,
+        "glError": 0,
+        "pixelRatio": 1,
+        "width": 1280,
+        "height": 800,
+        "calls": 156,
+        "triangles": 1181422,
+        "programs": 49,
+        "geometries": 269,
+        "textures": 127
+      },
+      "worldCounts": {
+        "buildings": 4,
+        "buildingMeshes": 4,
+        "landuseMeshes": 34,
+        "roadMeshes": 152,
+        "roads": 1960,
+        "terrainTiles": 262,
+        "visibleBuildingMeshes": 4,
+        "pitchedRoofMeshes": 0,
+        "inferredPitchedRoofMeshes": 0,
+        "guardedRoads": 0,
+        "guardrailColliders": 0,
+        "guardrailVisualInstances": 0
+      },
+      "jsHeapUsedBytes": 112645904,
+      "scriptSeconds": 3.663144000000001,
+      "taskSeconds": 5.015876000000002,
+      "dom": {
+        "documents": 2,
+        "nodes": 7897,
+        "jsEventListeners": 1023
+      }
+    }
+  ],
+  "complete": true,
+  "errors": [],
+  "initial": {
+    "worldCounts": {
+      "buildings": 4,
+      "buildingMeshes": 4,
+      "landuseMeshes": 34,
+      "roadMeshes": 152,
+      "roads": 1960,
+      "terrainTiles": 262,
+      "visibleBuildingMeshes": 4,
+      "pitchedRoofMeshes": 0,
+      "inferredPitchedRoofMeshes": 0,
+      "guardedRoads": 0,
+      "guardrailColliders": 0,
+      "guardrailVisualInstances": 0
+    },
+    "renderer": {
+      "contextLost": false,
+      "glError": 0,
+      "pixelRatio": 1,
+      "width": 1280,
+      "height": 800,
+      "calls": 219,
+      "triangles": 1693841,
+      "programs": 34,
+      "geometries": 277,
+      "textures": 121
+    },
+    "transportCompilation": {
+      "roadCount": 1960,
+      "meshCount": 152,
+      "phaseDurationsMs": {
+        "refreshStructureProfiles": 376.9,
+        "applyTransportTerrainCorridors": 699.8,
+        "reprojectGroundAttachedWorld": 4.8,
+        "refreshPublishedTerrainStructureAssemblies": 15.8,
+        "detectIntersections": 36.7,
+        "buildStructureRibbons": 276.4,
+        "buildCarriagewayRegions": 2188.1,
+        "projectGroundRoadMarkings": 125.8,
+        "uploadRoadMeshes": 31.4,
+        "buildRoadContacts": 129,
+        "measurePublishedRoadIntegrity": 5.1,
+        "rebuildStructureVisuals": 21.2,
+        "total": 3915.3
+      }
+    }
+  },
+  "visualReview": "Walking and driving screenshots inspected. Nighttime limits vegetation appearance assessment; not a daytime art review."
+}

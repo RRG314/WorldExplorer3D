@@ -1,0 +1,15 @@
+<!doctype html><meta charset="utf-8"><title>Selection card and menu interaction</title>
+<link rel="stylesheet" href="/app/styles/interface-v4.css">
+<style>body{font:16px system-ui;background:#182634;color:white;margin:24px}.floatMenu{position:fixed;right:18px;bottom:86px;width:340px;background:#34536b;padding:20px;box-sizing:border-box}#target{min-height:70px;width:100%;font:inherit}.world-selection-notice{min-height:155px}#reopen{font:inherit;padding:10px}</style>
+<h1>Selection card / Travel menu</h1><p id="status"></p><button id="reopen">Reopen Travel</button>
+<div class="floatMenu open"><button id="target">Enter Free Space Flight</button></div>
+<aside class="world-selection-notice" id="worldSelectionNotice"><strong>Selected building</strong><span>Selection persists after the Travel menu closes.</span><div class="worldSelectionActions"><button data-world-selection-action>Improve this place</button><button data-world-selection-dismiss>×</button></div></aside>
+<script>
+const menu=document.querySelector('.floatMenu'),card=document.querySelector('aside');
+const state={clicked:0,hiddenWhileOpen:false,restoredAfterClose:false};
+function read(){state.hiddenWhileOpen=getComputedStyle(card).display==='none';document.querySelector('#status').textContent=JSON.stringify(state);}
+window.render_game_to_text=()=>JSON.stringify(state);window.advanceTime=async()=>{};
+requestAnimationFrame(read);
+document.querySelector('#target').onclick=()=>{read();state.clicked++;menu.classList.remove('open');state.restoredAfterClose=getComputedStyle(card).display!=='none';document.querySelector('#status').textContent=JSON.stringify(state);};
+document.querySelector('#reopen').onclick=()=>{menu.classList.add('open');read();};
+</script>

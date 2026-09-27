@@ -1,9 +1,15 @@
-# Architecture investigation — September 26, 2026
+# World Explorer architecture evaluation
 
-Baseline: `bbe6502228e369fe2a15dc6a177f5d83948584c3` (5.3 release candidate). Work is isolated on `steven/architecture-evaluation`; the release checkout and production are unchanged.
+Production is already live at `bbe6502228e369fe2a15dc6a177f5d83948584c3`. This isolated branch is not deployed. The latest request is browser-first architecture evaluation with future engine portability.
 
-**Status: investigation in progress.** Source inspection and a reproduced lifecycle repair are available. Required normal-player A–T hardware profiling is not complete. Do not interpret the recommendation as a completed performance certification.
+**Investigation in progress.** Start with [the current decision](FINAL_ARCHITECTURE_DECISION.md), which states both measured conclusions and remaining work. It is not an exhaustive-audit completion certificate.
 
-Read [Executive decision](EXECUTIVE_DECISION.md), [runtime evidence](CURRENT_RUNTIME_PROFILE.md), [ownership and runtime audit](PRODUCTION_RUNTIME_AUDIT.md), [problems](ARCHITECTURAL_PROBLEMS.md), [research](TECHNOLOGY_RESEARCH.md), [comparison](ARCHITECTURE_COMPARISON.md), [rewrite impact](REWRITE_IMPACT_MATRIX.md), [feature parity](FEATURE_PARITY_MATRIX.md), [target architecture](TARGET_ARCHITECTURE.md), [migration](MIGRATION_PLAN.md), [repairs](REPAIRS_COMPLETED.md), and [open risks](OPEN_RISKS.md).
+- [Measured hotspots and coverage](HOTSPOT_PROFILE.md)
+- [All context/Three source-access classifications](COUPLING_CLASSIFICATION.md)
+- [Portable core map](PORTABLE_CORE_MAP.md) and [real-location proof](PORTABLE_WORLD_SCHEMA.md)
+- [Rust evaluation](RUST_WASM_EVALUATION.md) and [actual benchmarks](RUST_WASM_BENCHMARKS.md)
+- [TypeScript pilot](TYPESCRIPT_EVALUATION.md), [Workers](WORKER_EVALUATION.md), [WebGPU](WEBGPU_EVALUATION.md)
+- [Godot/Unity reuse](GODOT_UNITY_PORTABILITY.md), [system matrix](ARCHITECTURE_DECISION_MATRIX.md), [implementation priorities](IMPLEMENTATION_PRIORITY.md)
+- [Repairs](REPAIRS_COMPLETED.md), [primary-source research](TECHNOLOGY_RESEARCH.md), [measurement method](CURRENT_RUNTIME_PROFILE.md)
 
-Evidence levels are kept separate: source findings, deterministic component tests, browser behavior, controlled performance samples, and live-service acceptance. Source size is not heap usage. Remote software-rendered verification is not mobile or Mac GPU performance evidence.
+Earlier architecture/comparison/migration reports remain background. Current measured results supersede earlier memory-pressure deferrals. Ordinary Chrome remains open and local heavyweight work is serialized. Component tests, source evidence, normal-clock hardware samples and live deployment acceptance remain distinct evidence levels.

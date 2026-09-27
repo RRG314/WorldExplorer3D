@@ -1,0 +1,296 @@
+{
+  "label": "transport-input-capture",
+  "source": "ee1bca65bef2ccd00c740536343e9fc64f20400d",
+  "host": {
+    "ok": true,
+    "host": {
+      "platform": "darwin",
+      "architecture": "arm64",
+      "model": "Macmini9,1",
+      "cpu": "Apple M1",
+      "memoryBytes": 8589934592,
+      "ci": false
+    },
+    "checks": {
+      "physicalRun": true,
+      "macOS": true,
+      "nativeArm": true,
+      "declaredMacMini": true,
+      "declaredChip": true,
+      "declaredMemory": true
+    },
+    "evidenceScope": "Host eligibility only; this is not a performance measurement."
+  },
+  "quality": "med fixed; auto-quality disabled",
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "clock": "normal RAF; no advanceTime",
+  "location": {
+    "lat": 39.2904,
+    "lon": -76.6122,
+    "name": "Baltimore"
+  },
+  "complete": true,
+  "errors": [],
+  "failure": null,
+  "titleReadyMs": 1127,
+  "firstPlayableMs": 88306,
+  "graphics": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1, Unspecified Version)",
+  "capturedTransportModels": 18758,
+  "samples": [
+    {
+      "id": "walking-stationary",
+      "elapsedMs": 15000.599999999991,
+      "frames": 695,
+      "meanMs": 21.583597122302145,
+      "p95Ms": 34.19999999999709,
+      "p99Ms": 34.30000000000291,
+      "start": {
+        "x": 0,
+        "z": 0
+      },
+      "end": {
+        "x": 0,
+        "z": 0
+      },
+      "distance": 0,
+      "renderer": {
+        "contextLost": false,
+        "glError": 0,
+        "pixelRatio": 1,
+        "width": 1280,
+        "height": 800,
+        "calls": 1007,
+        "triangles": 3072403,
+        "programs": 60,
+        "geometries": 1301,
+        "textures": 136
+      },
+      "worldCounts": {
+        "buildings": 25507,
+        "buildingMeshes": 540,
+        "landuseMeshes": 111,
+        "roadMeshes": 779,
+        "roads": 18758,
+        "terrainTiles": 49,
+        "visibleBuildingMeshes": 540,
+        "pitchedRoofMeshes": 35,
+        "inferredPitchedRoofMeshes": 0,
+        "guardedRoads": 0,
+        "guardrailColliders": 0,
+        "guardrailVisualInstances": 0
+      },
+      "jsHeapUsedBytes": 2091561744,
+      "scriptSeconds": 10.880871999999998,
+      "taskSeconds": 12.019494000000009,
+      "dom": {
+        "documents": 2,
+        "nodes": 28840,
+        "jsEventListeners": 1120
+      }
+    },
+    {
+      "id": "walking-moving",
+      "elapsedMs": 15000.200000000012,
+      "frames": 708,
+      "meanMs": 21.186723163841826,
+      "p95Ms": 34.19999999999709,
+      "p99Ms": 34.30000000000291,
+      "start": {
+        "x": 0,
+        "z": 0.1397199999999837
+      },
+      "end": {
+        "x": 0,
+        "z": 9.006760000000034
+      },
+      "distance": 8.867040000000049,
+      "renderer": {
+        "contextLost": false,
+        "glError": 0,
+        "pixelRatio": 1,
+        "width": 1280,
+        "height": 800,
+        "calls": 1462,
+        "triangles": 3156065,
+        "programs": 60,
+        "geometries": 1301,
+        "textures": 136
+      },
+      "worldCounts": {
+        "buildings": 25507,
+        "buildingMeshes": 540,
+        "landuseMeshes": 111,
+        "roadMeshes": 779,
+        "roads": 18758,
+        "terrainTiles": 49,
+        "visibleBuildingMeshes": 540,
+        "pitchedRoofMeshes": 35,
+        "inferredPitchedRoofMeshes": 0,
+        "guardedRoads": 0,
+        "guardrailColliders": 0,
+        "guardrailVisualInstances": 0
+      },
+      "jsHeapUsedBytes": 2114204272,
+      "scriptSeconds": 11.945925000000003,
+      "taskSeconds": 13.026392000000001,
+      "dom": {
+        "documents": 2,
+        "nodes": 42945,
+        "jsEventListeners": 1162
+      }
+    },
+    {
+      "id": "driving-moving",
+      "elapsedMs": 15001.100000000006,
+      "frames": 643,
+      "meanMs": 23.329860031104207,
+      "p95Ms": 34.29999999998836,
+      "p99Ms": 67.30000000001746,
+      "start": {
+        "x": 0.9623120803520324,
+        "z": -0.6163616662909868
+      },
+      "end": {
+        "x": -153.17632938936526,
+        "z": -20.077776511238273
+      },
+      "distance": 155.36237466612434,
+      "renderer": {
+        "contextLost": false,
+        "glError": 0,
+        "pixelRatio": 1,
+        "width": 1280,
+        "height": 800,
+        "calls": 713,
+        "triangles": 3309017,
+        "programs": 88,
+        "geometries": 1811,
+        "textures": 166
+      },
+      "worldCounts": {
+        "buildings": 25507,
+        "buildingMeshes": 540,
+        "landuseMeshes": 111,
+        "roadMeshes": 779,
+        "roads": 18758,
+        "terrainTiles": 49,
+        "visibleBuildingMeshes": 540,
+        "pitchedRoofMeshes": 35,
+        "inferredPitchedRoofMeshes": 0,
+        "guardedRoads": 0,
+        "guardrailColliders": 0,
+        "guardrailVisualInstances": 0
+      },
+      "jsHeapUsedBytes": 2197242704,
+      "scriptSeconds": 9.401131999999997,
+      "taskSeconds": 12.194721000000001,
+      "dom": {
+        "documents": 2,
+        "nodes": 69935,
+        "jsEventListeners": 1528
+      }
+    }
+  ],
+  "menuMetrics": {
+    "Timestamp": 89571.785818,
+    "AudioHandlers": 0,
+    "AudioWorkletProcessors": 0,
+    "Documents": 2,
+    "Frames": 4,
+    "JSEventListeners": 696,
+    "LayoutObjects": 223,
+    "MediaKeySessions": 0,
+    "MediaKeys": 0,
+    "Nodes": 6466,
+    "Resources": 778,
+    "ContextLifecycleStateObservers": 80,
+    "V8PerContextDatas": 4,
+    "WorkerGlobalScopes": 0,
+    "UACSSResources": 0,
+    "RTCPeerConnections": 0,
+    "ResourceFetchers": 2,
+    "AdSubframes": 0,
+    "DetachedScriptStates": 0,
+    "ArrayBufferContents": 75630,
+    "LayoutCount": 515,
+    "RecalcStyleCount": 5118,
+    "LayoutDuration": 0.267488,
+    "RecalcStyleDuration": 3.401149,
+    "DevToolsCommandDuration": 3.731097,
+    "ScriptDuration": 52.670532,
+    "V8CompileDuration": 0.000208,
+    "TaskDuration": 138.158302,
+    "TaskOtherDuration": 78.087828,
+    "ThreadTime": 132.893558,
+    "ProcessTime": 200.641583,
+    "JSHeapUsedSize": 192343292,
+    "JSHeapTotalSize": 1228472320,
+    "FirstMeaningfulPaint": 89402.786173,
+    "DomContentLoaded": 89401.948874,
+    "NavigationStart": 89401.456051
+  },
+  "menuDiagnostics": {
+    "gameStarted": false,
+    "worldCounts": {
+      "buildings": 0,
+      "buildingMeshes": 0,
+      "landuseMeshes": 0,
+      "roadMeshes": 0,
+      "roads": 0,
+      "terrainTiles": 0,
+      "visibleBuildingMeshes": 0,
+      "pitchedRoofMeshes": 0,
+      "inferredPitchedRoofMeshes": 0,
+      "guardedRoads": 0,
+      "guardrailColliders": 0,
+      "guardrailVisualInstances": 0
+    },
+    "renderer": {
+      "contextLost": false,
+      "glError": 0,
+      "pixelRatio": 1,
+      "width": 1280,
+      "height": 800,
+      "calls": 0,
+      "triangles": 0,
+      "programs": 27,
+      "geometries": 107,
+      "textures": 46
+    },
+    "lastEarthWorldRelease": {
+      "released": true,
+      "reason": "title_screen_release",
+      "before": {
+        "roads": 18758,
+        "buildings": 25507,
+        "rendererGeometries": 1811,
+        "rendererTextures": 166
+      },
+      "after": {
+        "roads": 0,
+        "buildings": 0,
+        "terrainTiles": 0,
+        "rendererGeometries": 107,
+        "rendererTextures": 46
+      },
+      "releasedAt": 165167.10000000894
+    }
+  },
+  "initialWorldCounts": {
+    "buildings": 25507,
+    "buildingMeshes": 540,
+    "landuseMeshes": 111,
+    "roadMeshes": 779,
+    "roads": 18758,
+    "terrainTiles": 49,
+    "visibleBuildingMeshes": 540,
+    "pitchedRoofMeshes": 35,
+    "inferredPitchedRoofMeshes": 0,
+    "guardedRoads": 0,
+    "guardrailColliders": 0,
+    "guardrailVisualInstances": 0
+  }
+}

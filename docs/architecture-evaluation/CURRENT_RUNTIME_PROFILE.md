@@ -4,39 +4,15 @@ Baseline `bbe6502228e369fe2a15dc6a177f5d83948584c3`; September 26, 2026. **Norma
 
 ## Measurements obtained
 
-- Local machine: 8 GiB Apple Silicon Mac; `kern.memorystatus_vm_pressure_level` repeatedly returned `2` (warning). Disk check: 32 GiB available. A full world workload was not launched under that pressure.
-- Static browser-source scan: 803 JS files, 8,618,396 bytes after the small registry repair. Estimated literal static entry closure: 232 modules / 2,200,091 source bytes. Includes neither network compression nor all computed imports/vendor scripts. See `evidence/source-inventory.json` and the reproducible script.
-- Diagnostics source: 68,414 bytes / 1,436 lines, statically imported at entry. Inspection found large snapshots are invoked on request; no automatic caller elsewhere in app/js was found. This is download/parse surface, not evidence that snapshots run every frame.
-- Component reproduction: a pending service reset left one stale ready value and zero disposal calls. After repair: zero stale publication and one disposal. Five lifecycle tests pass, including retry and late failure. This is a deterministic resource-ownership result, not a GPU or gameplay benchmark. A bounded browser-component fixture also passed and its screenshot was inspected; it uses no world or backend.
+The owner authorized physical hardware profiling. Earlier resource-pressure deferral is historical and no longer a prerequisite. Chrome remains open; owned test browsers run one at a time and close afterward.
 
-## Required scenario ledger
+Two headed Chrome/M1 urban pilots completed on normal RAF at fixed medium quality, 1280×800/DPR1. First playable was approximately 88 seconds. The captured world contains 18,758 road profiles and 25,507 building collider records. Captured road inputs now support the isolated JS/Worker/Rust comparison. Screenshots confirm actual walking/driving scenes; short walking displacement terminates near a building, so these are not sustained traversal benchmarks.
 
-All rows below require a normal, unmodified simulation clock, a visible foreground tab, no repeated large diagnostic snapshots, fixed quality for matched comparisons, recorded viewport/DPR/driver/browser/build, and no overlapping workload.
+[Hotspot profile](HOTSPOT_PROFILE.md) records actual load phases, sampled CPU, coverage gaps and interpretation limits. [Rust/Wasm benchmark](RUST_WASM_BENCHMARKS.md) records component timing and exact output comparisons. [Evidence summaries](evidence/transport-input-capture-summary.json) retain per-window frame times, counters and provenance.
 
-| Scenario | Intended observation | Current evidence |
-| --- | --- | --- |
-| A title/startup | Cold/warm transfer, parse/init, globe GPU, idle tasks | Source inspected; normal-player metrics pending |
-| B first Earth load | Provider wait vs compiler vs uploads; first usable frame | Pending |
-| C walking | Actual displacement; frame distribution | Pending |
-| D sustained walking | At least 120 s; GC and streaming/resource growth | Pending |
-| E driving | Actual driven distance; collision and camera | Pending |
-| F sustained driving | At least 120 s; sustained allocations | Pending |
-| G flight | Aircraft load, physics, large visible area | Pending |
-| H dense city | Same coordinates and source hashes before/after | Pending |
-| I rural | Distinguish low object count from provider delay | Pending |
-| J vegetation-heavy | Instancing, draw calls, retained vegetation | Pending |
-| K building-heavy | Facade materials, batches, shader compilation | Pending |
-| L Ocean | Separate renderer/frame ownership, teardown | Pending |
-| M planetary | Terrain assets/track state and return | Pending |
-| N Space | Destination and ship renderer ownership | Pending |
-| O interior | Entry/exit, imported assets, collision state | Pending |
-| P Reality Capture | Local empty draft/editor only; no private photos | Pending |
-| Q return menu | Immediate and settled resource deltas | Pending |
-| R Earth → other → Earth | Correct state and retained resources | Pending |
-| S repeated locations | Three bounded switches, steady-state vs growth | Pending |
-| T repeated environments | Three cycles, settled heap/GPU/listeners | Pending |
+The Ocean/return session reached both environments, then encountered a real selected-place card that intercepted the Space menu click. The original failed journey remains recorded; a bounded CSS correction subsequently passed the same full-world normal pointer path and both screenshots were inspected. Legacy `renderer` diagnostics refer to the Earth renderer even in auxiliary environments; those counters are not Ocean rendering evidence. Dedicated environment profiling reads each actual renderer owner.
 
-Previous backend and software-rendered CI journeys establish functional coverage only. They cannot fill these hardware-performance rows.
+The service reset fix still has no proven normal-player FPS benefit. Likewise, no before/after whole-world performance improvement is yet established by the numeric prototype. Rural night profiling, full Capture selector replay, three equal urban cycles and a sampled live-allocation window are now captured, along with compile allocation traffic, journey long tasks and a 90-second daylight flight. Sustained routes, alternating locations, daytime vegetation and matched compile-stage improvements remain outstanding; see the scenario ledger in HOTSPOT_PROFILE.md.
 
 ## Measurement design
 
@@ -58,4 +34,4 @@ Collect cheap renderer.info counters and CDP Performance/Memory domain summaries
 
 After each teardown sample immediately, after 5 seconds, and after 30 seconds idle. Determine which references intentionally remain (ES modules, shared GLB templates, bounded caches) and which should be released (world buffers, renderer context, subscriptions). A retained module namespace is not by itself a leak. Require growth across repeated equal cycles before claiming a leak.
 
-Do not change acceptance thresholds to complete a run. Abort under resource guard and preserve partial data with its termination reason. The next measurement session must start with normal memory pressure; leave the user's ordinary Chrome session open.
+Do not change acceptance thresholds to complete a run. Abort under resource guard and preserve partial data with its termination reason. Leave the user's ordinary Chrome session open. Record host conditions, run one owned workload at a time and avoid attributing OS/browser contention to application heap.

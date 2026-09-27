@@ -1,0 +1,128 @@
+{
+  "windowMs": 10000,
+  "samplingIntervalBytes": 32768,
+  "scope": "Default sampling profiler: sampled allocations still live at stop, not total allocation traffic, retained-after-GC proof, or leak diagnosis. Separate from frame timings.",
+  "sampledLiveBytes": 2467484,
+  "largest": [
+    {
+      "function": "",
+      "url": "/app/js/sky/gaia-catalog.js?v=4",
+      "line": 139,
+      "sampledSelfBytes": 986532
+    },
+    {
+      "function": "",
+      "url": "/app/js/sky/gaia-catalog.js?v=4",
+      "line": 15,
+      "sampledSelfBytes": 525088
+    },
+    {
+      "function": "split",
+      "url": "",
+      "line": 0,
+      "sampledSelfBytes": 131120
+    },
+    {
+      "function": "Number",
+      "url": "",
+      "line": 0,
+      "sampledSelfBytes": 131100
+    },
+    {
+      "function": "At",
+      "url": "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js",
+      "line": 6,
+      "sampledSelfBytes": 78268
+    },
+    {
+      "function": "Yi",
+      "url": "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js",
+      "line": 6,
+      "sampledSelfBytes": 71680
+    },
+    {
+      "function": "multiplyMatrices",
+      "url": "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js",
+      "line": 6,
+      "sampledSelfBytes": 70032
+    },
+    {
+      "function": "",
+      "url": "/app/js/runtime/kernel.js?v=3",
+      "line": 290,
+      "sampledSelfBytes": 66936
+    },
+    {
+      "function": "slice",
+      "url": "",
+      "line": 0,
+      "sampledSelfBytes": 42112
+    },
+    {
+      "function": "get",
+      "url": "",
+      "line": 0,
+      "sampledSelfBytes": 34992
+    },
+    {
+      "function": "push",
+      "url": "",
+      "line": 0,
+      "sampledSelfBytes": 33960
+    },
+    {
+      "function": "updateWeatherUi",
+      "url": "/app/js/weather.js?v=12",
+      "line": 199,
+      "sampledSelfBytes": 33240
+    },
+    {
+      "function": "(BYTECODE_COMPILER)",
+      "url": "",
+      "line": 0,
+      "sampledSelfBytes": 32916
+    },
+    {
+      "function": "multiplyMatrices",
+      "url": "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js",
+      "line": 6,
+      "sampledSelfBytes": 32832
+    },
+    {
+      "function": "ensureStarCatalogLoaded",
+      "url": "/app/js/sky/starfield-ui.js?v=16",
+      "line": 149,
+      "sampledSelfBytes": 32784
+    },
+    {
+      "function": "isFinite",
+      "url": "",
+      "line": 0,
+      "sampledSelfBytes": 32784
+    },
+    {
+      "function": "updateMatrixWorld",
+      "url": "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js",
+      "line": 6,
+      "sampledSelfBytes": 32784
+    },
+    {
+      "function": "has",
+      "url": "",
+      "line": 0,
+      "sampledSelfBytes": 32780
+    },
+    {
+      "function": "applyWaveUniformsToMaterial",
+      "url": "/app/js/boat-mode/surface-effects.js?v=18",
+      "line": 140,
+      "sampledSelfBytes": 32772
+    },
+    {
+      "function": "refreshMaterialUniforms",
+      "url": "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js",
+      "line": 6,
+      "sampledSelfBytes": 32772
+    }
+  ]
+}

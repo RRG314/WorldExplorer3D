@@ -1,3 +1,5 @@
+> Current status: see [the updated decision](FINAL_ARCHITECTURE_DECISION.md) and [measured hotspots](HOTSPOT_PROFILE.md). Hardware profiling and isolated prototypes now exist; earlier deferrals below are historical.
+
 # Engineering decision
 
 **Primary path: REFACTOR IN PLACE.** This is the current architecture decision, conditional on completing the normal-player performance study. The evidence does not justify a full engine rewrite, immediate Rust conversion, or a production WebGPU migration.

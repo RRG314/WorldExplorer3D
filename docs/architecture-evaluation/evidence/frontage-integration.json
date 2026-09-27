@@ -1,0 +1,9 @@
+{
+  "source": "ee1bca65bef2ccd00c740536343e9fc64f20400d",
+  "runtimeDiffSha256": "c880341ac7917076aafdde4d30b9eebdcea5a1a1b0974de3aea1c24d2aee0e0f",
+  "firstPlayableMs": 72908,
+  "complete": true,
+  "errors": [],
+  "noticeSpaceTransitionPassed": true,
+  "limitation": "Live providers, single unpaired run. Not evidence of a measured first-load reduction."
+}

@@ -1,0 +1,12 @@
+{
+  "command": "cargo test --manifest-path scripts/architecture-evaluation/rust-profile/Cargo.toml",
+  "toolchain": "1.98.1",
+  "target": "native Apple Silicon test harness; browser Wasm replay recorded separately",
+  "passed": 3,
+  "failed": 0,
+  "tests": [
+    "clamps_and_interpolates",
+    "duplicate_knots_and_nonfinite_heights",
+    "batch_uses_offsets_and_releases_owned_allocations"
+  ]
+}

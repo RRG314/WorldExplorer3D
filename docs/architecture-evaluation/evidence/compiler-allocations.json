@@ -1,0 +1,308 @@
+{
+  "samplingIntervalBytes": 131072,
+  "includeCollectedObjects": true,
+  "estimatedAllocationBytes": 64990826604,
+  "scope": "Sampled estimated cumulative allocation traffic during initial compile, including garbage-collected objects. NOT peak/resident heap, literal counted bytes, total browser memory, or leak evidence. Inlining may attribute callee allocations to caller frames.",
+  "largest": [
+    {
+      "function": "projectDecalPolygon",
+      "url": "/app/js/terrain/surface-decal-projection.js",
+      "line": 3,
+      "estimatedBytes": 5058862780
+    },
+    {
+      "function": "mappedWaterBedMetersAt",
+      "url": "/app/js/terrain/far-field-geometry.js?v=18",
+      "line": 67,
+      "estimatedBytes": 3562438036
+    },
+    {
+      "function": "add",
+      "url": "",
+      "line": 0,
+      "estimatedBytes": 3399286548
+    },
+    {
+      "function": "partitionSteps",
+      "url": "/app/js/world/pavement-terrain-partition.js",
+      "line": 26,
+      "estimatedBytes": 3219118700
+    },
+    {
+      "function": "indexPavementPositionSteps",
+      "url": "/app/js/world/pavement-indexed-mesh.js",
+      "line": 4,
+      "estimatedBytes": 2290513224
+    },
+    {
+      "function": "sampleDistrictGroundMeters",
+      "url": "/app/js/world/compiler/district-ground-model.js?v=2",
+      "line": 280,
+      "estimatedBytes": 2273351016
+    },
+    {
+      "function": "hypot",
+      "url": "",
+      "line": 0,
+      "estimatedBytes": 2006417924
+    },
+    {
+      "function": "next",
+      "url": "",
+      "line": 0,
+      "estimatedBytes": 1677590396
+    },
+    {
+      "function": "roadWidthAtSegmentMeters",
+      "url": "/app/js/world/road-cross-section-profile.js?v=1",
+      "line": 47,
+      "estimatedBytes": 1620795584
+    },
+    {
+      "function": "safe",
+      "url": "/app/js/world/roadside-placement.js",
+      "line": 49,
+      "estimatedBytes": 1578704232
+    },
+    {
+      "function": "roadContactIndexSteps",
+      "url": "/app/js/terrain/road-contact-index.js?v=1",
+      "line": 21,
+      "estimatedBytes": 1539149028
+    },
+    {
+      "function": "supports",
+      "url": "/app/js/terrain/road-contact-index.js?v=1",
+      "line": 112,
+      "estimatedBytes": 1402810712
+    },
+    {
+      "function": "sampleAtLatLon",
+      "url": "/app/js/terrain/accepted-ground-runtime.js?v=2",
+      "line": 88,
+      "estimatedBytes": 1328545812
+    },
+    {
+      "function": "polygonResult",
+      "url": "/app/js/world/compiler/street-polygon-kernel.js",
+      "line": 32,
+      "estimatedBytes": 1246462148
+    },
+    {
+      "function": "query",
+      "url": "/app/js/world/compiler/street-frontage-policy.js",
+      "line": 64,
+      "estimatedBytes": 1088223540
+    },
+    {
+      "function": "set",
+      "url": "",
+      "line": 0,
+      "estimatedBytes": 998765732
+    },
+    {
+      "function": "ClipperLib.ClipperBase.AddPath",
+      "url": "/app/vendor/clipper/index.js",
+      "line": 2877,
+      "estimatedBytes": 990474880
+    },
+    {
+      "function": "outerDistance",
+      "url": "/app/js/terrain/street-frontage-grading.js",
+      "line": 14,
+      "estimatedBytes": 950626656
+    },
+    {
+      "function": "push",
+      "url": "",
+      "line": 0,
+      "estimatedBytes": 932879116
+    },
+    {
+      "function": "visit",
+      "url": "/app/js/terrain/feature-projection-index.js",
+      "line": 31,
+      "estimatedBytes": 888077076
+    },
+    {
+      "function": "ClipperLib.Clipper.BuildIntersectList",
+      "url": "/app/vendor/clipper/index.js",
+      "line": 5172,
+      "estimatedBytes": 850024792
+    },
+    {
+      "function": "",
+      "url": "/app/js/world/roadside-placement.js",
+      "line": 52,
+      "estimatedBytes": 782142432
+    },
+    {
+      "function": "compileTransportSurfaceModel",
+      "url": "/app/js/world/compiler/transport-surface-model.js?v=25",
+      "line": 128,
+      "estimatedBytes": 712735380
+    },
+    {
+      "function": "applyStructureTerrainCuts",
+      "url": "/app/js/terrain/height-sampling.js?v=15",
+      "line": 121,
+      "estimatedBytes": 691910744
+    },
+    {
+      "function": "appendMidFacadeAttributes",
+      "url": "/app/js/world/building-batching.js?v=15",
+      "line": 23,
+      "estimatedBytes": 588712388
+    },
+    {
+      "function": "projectPolygon",
+      "url": "/app/js/terrain/road-contact-index.js?v=1",
+      "line": 100,
+      "estimatedBytes": 578767072
+    },
+    {
+      "function": "weightedMixForWorldCover",
+      "url": "/app/js/terrain/surface-material-blend.js?v=2",
+      "line": 107,
+      "estimatedBytes": 569733652
+    },
+    {
+      "function": "sampleFeatureSurfaceY",
+      "url": "/app/js/structure-semantics.js?v=63",
+      "line": 743,
+      "estimatedBytes": 511653648
+    },
+    {
+      "function": "paths",
+      "url": "/app/js/world/compiler/street-polygon-kernel.js",
+      "line": 9,
+      "estimatedBytes": 474830516
+    },
+    {
+      "function": "applyMappedSemanticVertexTints",
+      "url": "/app/js/terrain/surface-profiles.js?v=54",
+      "line": 480,
+      "estimatedBytes": 463130148
+    },
+    {
+      "function": "roadTags",
+      "url": "/app/js/world/shortbread-source.js?v=20",
+      "line": 262,
+      "estimatedBytes": 392804600
+    },
+    {
+      "function": "img.onload",
+      "url": "/app/js/terrain/tiles.js?v=49",
+      "line": 108,
+      "estimatedBytes": 357198124
+    },
+    {
+      "function": "distanceToFootprint",
+      "url": "/app/js/building-entry.js?v=9",
+      "line": 99,
+      "estimatedBytes": 356770536
+    },
+    {
+      "function": "append",
+      "url": "/app/js/terrain/spatial-road-batches.js",
+      "line": 7,
+      "estimatedBytes": 356518480
+    },
+    {
+      "function": "meshPavementTile",
+      "url": "/app/js/world/compiler/street-pavement.js",
+      "line": 317,
+      "estimatedBytes": 315402188
+    },
+    {
+      "function": "appendGeometryWithTransform",
+      "url": "/app/js/world/geometry-batching.js?v=7",
+      "line": 43,
+      "estimatedBytes": 310830052
+    },
+    {
+      "function": "isEnterableBuildingCandidate",
+      "url": "/app/js/building-entry.js?v=9",
+      "line": 187,
+      "estimatedBytes": 290523880
+    },
+    {
+      "function": "unavailable",
+      "url": "/app/js/terrain/accepted-ground-runtime.js?v=2",
+      "line": 47,
+      "estimatedBytes": 283003588
+    },
+    {
+      "function": "fromEntries",
+      "url": "",
+      "line": 0,
+      "estimatedBytes": 279444716
+    },
+    {
+      "function": "I.f.toGeoJSON",
+      "url": "https://cdn.jsdelivr.net/npm/@mapbox/vector-tile@1.3.1/+esm",
+      "line": 7,
+      "estimatedBytes": 275754416
+    },
+    {
+      "function": "segmentToSegmentDistance",
+      "url": "/app/js/world/building-road-footprint.js?v=8",
+      "line": 203,
+      "estimatedBytes": 267792360
+    },
+    {
+      "function": "sampleTerrainOrThrow",
+      "url": "/app/js/world/compiler/transport-surface-profile.js?v=12",
+      "line": 654,
+      "estimatedBytes": 263758548
+    },
+    {
+      "function": "flatMap",
+      "url": "",
+      "line": 0,
+      "estimatedBytes": 262791712
+    },
+    {
+      "function": "buildTraversalGraph",
+      "url": "/app/js/world/traversal.js?v=4",
+      "line": 107,
+      "estimatedBytes": 259787636
+    },
+    {
+      "function": "streetRoadSegments",
+      "url": "/app/js/world/compiler/street-carriageway.js",
+      "line": 10,
+      "estimatedBytes": 256986328
+    },
+    {
+      "function": "ClipperLib.Clipper.AddOutPt",
+      "url": "/app/vendor/clipper/index.js",
+      "line": 4233,
+      "estimatedBytes": 250939516
+    },
+    {
+      "function": "",
+      "url": "/app/js/terrain/rebuild.js?v=57",
+      "line": 508,
+      "estimatedBytes": 247255316
+    },
+    {
+      "function": "_",
+      "url": "https://cdn.jsdelivr.net/npm/@mapbox/vector-tile@1.3.1/+esm",
+      "line": 7,
+      "estimatedBytes": 240553840
+    },
+    {
+      "function": "filter",
+      "url": "",
+      "line": 0,
+      "estimatedBytes": 221616352
+    },
+    {
+      "function": "ci",
+      "url": "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js",
+      "line": 6,
+      "estimatedBytes": 209475908
+    }
+  ]
+}

@@ -1,3 +1,5 @@
+> Current status: see [the updated decision](FINAL_ARCHITECTURE_DECISION.md) and [measured hotspots](HOTSPOT_PROFILE.md). Hardware profiling and isolated prototypes now exist; earlier deferrals below are historical.
+
 # Open risks and completion conditions
 
 **The investigation is not complete.** The architecture recommendation is deliberately narrower than the requested performance certification.

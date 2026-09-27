@@ -1,0 +1,23 @@
+{
+  "source": "2c8e94991622 (earlier measured release test; safe-ground UI change was subsequently excluded from production)",
+  "scope": "Same transport compiler code; different quality/viewport/live inputs. Historical corroboration, not matched before/after. Extracted from completed performance-retention run; not rerun.",
+  "transportCompilation": {
+    "roadCount": 18758,
+    "meshCount": 779,
+    "phaseDurationsMs": {
+      "refreshStructureProfiles": 5607.9,
+      "applyTransportTerrainCorridors": 8030.5,
+      "reprojectGroundAttachedWorld": 25.6,
+      "refreshPublishedTerrainStructureAssemblies": 1139.6,
+      "detectIntersections": 286.3,
+      "buildStructureRibbons": 2493,
+      "buildCarriagewayRegions": 18849.7,
+      "projectGroundRoadMarkings": 2226.3,
+      "uploadRoadMeshes": 371.7,
+      "buildRoadContacts": 1612.8,
+      "measurePublishedRoadIntegrity": 54.7,
+      "rebuildStructureVisuals": 133.8,
+      "total": 40847.3
+    }
+  }
+}
