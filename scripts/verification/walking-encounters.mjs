@@ -271,21 +271,39 @@ async function acceptLead(page, lead) {
   }
   assert.equal(await page.locator('#discoveryEncounterLeadBtn').evaluate(button => button.hidden), true,
     'The persistent invitation must hide after its lead is accepted.');
-  return page.evaluate(() => {
+  return page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
     const discovery = globalThis.getWorldExplorerRuntimeDiagnostics?.().worldDiscovery;
     const quick = document.getElementById('discoveryQuickToolBtn');
+    const direct = document.getElementById('urbanVehiclePrompt');
+    const directButton = document.getElementById('urbanVehiclePromptButton');
+    const visible = element => !!element && !element.hidden &&
+      getComputedStyle(element).display !== 'none' && getComputedStyle(element).visibility !== 'hidden';
+    const quickVisible = visible(quick);
+    const directVisible = visible(direct);
+    const candidate = ctx.resolvePrimaryContextInteraction?.();
+    const directUsable = directVisible && visible(directButton) && !directButton.disabled &&
+      candidate?.available === true &&
+      document.getElementById('urbanVehiclePromptTitle')?.textContent === candidate.label;
+    const trackingPrompt = quickVisible ? quick : directUsable ? direct : null;
+    const trackingButton = quickVisible ? quick : directUsable ? directButton : null;
+    const buttonBox = trackingButton?.getBoundingClientRect();
     const overlaps = (left, right) => !!left && !!right &&
       left.left < right.right && left.right > right.left && left.top < right.bottom && left.bottom > right.top;
-    const quickBox = quick?.getBoundingClientRect();
+    const trackingBox = trackingPrompt?.getBoundingClientRect();
     const controls = ['exploreBtn', 'mobileMovePad', 'mobileLookPad', 'urbanEquipmentToggle']
       .map((id) => document.getElementById(id)?.getBoundingClientRect())
       .filter(Boolean);
     return {
       activeActivityId: discovery.activeActivityId,
       interaction: discovery.interaction,
-      quickVisible: !!quick && getComputedStyle(quick).display !== 'none',
+      trackingPromptVisible: !!trackingPrompt,
+      trackingPromptUsable: !!buttonBox && buttonBox.width >= 44 && buttonBox.height >= 44 &&
+        buttonBox.left >= 0 && buttonBox.right <= innerWidth,
+      oneTrackingPrompt: Number(quickVisible) + Number(directVisible) === 1,
+      trackingPromptOwner: quickVisible ? 'discovery' : directUsable ? candidate.id : null,
       duplicateJourneyHidden: document.getElementById('currentJourneyCard')?.hidden === true,
-      quickClearsMobileControls: controls.every((box) => !overlaps(quickBox, box)),
+      trackingClearsMobileControls: !!trackingBox && controls.every((box) => !overlaps(trackingBox, box)),
       journalOpen: document.getElementById('discoveryPanel')?.classList.contains('show') || false
     };
   });
@@ -359,14 +377,16 @@ try {
     freeRoamLeadClearsControls: freeLead.promptClearsMobileControls === true,
     freeRoamLeadButtonUsable: freeLead.promptButtonUsable === true,
     freeRoamStartsExistingFieldSession: freeAccepted.activeActivityId === freeLead.lead.activityId && freeAccepted.interaction.targetId === freeLead.lead.slotId,
-    freeRoamKeepsJournalOutOfTheWay: freeAccepted.quickVisible === true && freeAccepted.journalOpen === false,
-    freeRoamTrackingClearsControls: freeAccepted.quickClearsMobileControls === true,
+    freeRoamKeepsJournalOutOfTheWay: freeAccepted.trackingPromptVisible === true && freeAccepted.journalOpen === false,
+    freeRoamTrackingClearsControls: freeAccepted.trackingClearsMobileControls === true,
+    freeRoamHasOneUsableTrackingPrompt: freeAccepted.oneTrackingPrompt && freeAccepted.trackingPromptUsable,
     liveGpsLeadVisible: gpsLead.lead.available && gpsLead.promptMode === 'live-gps' && gpsLead.promptText.includes(gpsLead.lead.leadLabel) && /field lead/i.test(gpsLead.promptText),
     liveGpsLeadClearsControls: gpsLead.promptClearsMobileControls === true,
     liveGpsLeadButtonUsable: gpsLead.promptButtonUsable === true,
     liveGpsUsesSameEncounterContract: gpsAccepted.activeActivityId === gpsLead.lead.activityId && gpsAccepted.interaction.targetId === gpsLead.lead.slotId,
-    liveGpsKeepsJournalOutOfTheWay: gpsAccepted.quickVisible === true && gpsAccepted.journalOpen === false,
-    liveGpsTrackingClearsControls: gpsAccepted.quickClearsMobileControls === true,
+    liveGpsKeepsJournalOutOfTheWay: gpsAccepted.trackingPromptVisible === true && gpsAccepted.journalOpen === false,
+    liveGpsTrackingClearsControls: gpsAccepted.trackingClearsMobileControls === true,
+    liveGpsHasOneUsableTrackingPrompt: gpsAccepted.oneTrackingPrompt && gpsAccepted.trackingPromptUsable,
     gpsConsentOwnsAnalyticsLayer: consentOwnsAnalyticsLayer === true,
     directInteractionDefersBroadLead: [freeLead, gpsLead]
       .filter((entry) => entry.directInteraction)

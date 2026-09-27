@@ -33,7 +33,9 @@ function ensureStreetLightPool() {
     const target = new THREE.Object3D();
     const light = new THREE.SpotLight(STREET_LIGHT_COLOR, 0, STREET_LIGHT_DISTANCE, 0.78, 0.62, 1.5);
     light.target = target;
-    light.visible = false;
+    // Keep the shader's light count stable as nearby fixtures enter/leave range.
+    // An unused slot contributes no light through its zero intensity.
+    light.visible = true;
     light.castShadow = false;
     light.userData.worldStreetLight = true;
     appCtx.scene?.add(light);
@@ -51,7 +53,7 @@ export function createVehicleHeadlightRig(carMesh) {
     const light = new THREE.SpotLight(HEADLIGHT_COLOR, 0, 76, 0.34, 0.68, 1.35);
     light.target = target;
     light.castShadow = false;
-    light.visible = false;
+    light.visible = true;
     target.visible = false;
     appCtx.scene?.add(light);
     appCtx.scene?.add(target);
@@ -75,7 +77,6 @@ function updateHeadlights(factor) {
   const rig = appCtx.carMesh?.userData?.headlightRig || [];
   const active = factor > 0.02 && appCtx.carMesh?.visible !== false && !appCtx.boatMode?.active;
   for (const entry of rig) {
-    entry.light.visible = active;
     entry.light.intensity = active ? HEADLIGHT_INTENSITY * factor : 0;
     if (active) {
       headlightLocalPosition.set(entry.x, -0.48, 1.65);
@@ -124,7 +125,6 @@ function updateStreetLights(factor, now) {
     const light = entry.light;
     const fixture = fixtures[index]?.fixture;
     if (!fixture) {
-      light.visible = false;
       light.intensity = 0;
       continue;
     }
