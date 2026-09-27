@@ -9,12 +9,13 @@ const runtimeSource = await read('ui-room-runtime');
 const noop = () => {};
 const pending = () => { let resolve; const promise = new Promise(r => resolve = r); return { promise, resolve }; };
 function harness() {
-  const callbacks = [], events = [];
+  const callbacks = [], events = [], timers = new Map();
+  let nextTimer = 0;
   const state = { authUser: { uid: 'one' }, roomSessionGeneration: 0 };
   const renderers = new Proxy({}, { get: () => noop });
   const helpers = new Proxy({ readPoseSnapshot: () => ({}), buildInviteLink: () => null }, { get: (target, key) => target[key] || (v => v) });
   const appCtx = { ensureEditableWorldRuntime: async () => {} };
-  const context = vm.createContext({ console, Promise, URL, state, appCtx, refs: {}, renderers, helpers,
+  const context = vm.createContext({ console, Promise, URL, window: {setInterval: callback => {const id=++nextTimer;timers.set(id,callback);return id;},clearInterval:id=>timers.delete(id)}, state, appCtx, refs: {}, renderers, helpers,
     editableModule: { resolveEditableRoomRole: () => 'member', editableRoomPermissions: () => ({}), roomWorldModificationIdentity: room => room.id,
       listenRoomWorldModifications: () => noop },
     startPresence: id => events.push(['presence', id]), recordRecentPlayers: async () => {},
@@ -30,7 +31,7 @@ function harness() {
   const sessionRuntime = { ...runtime, syncRoomWorldContext: async () => {}, applyRoomPaintMultiplayerConfig: noop, installPaintClaimPublisher: noop };
   vm.runInContext(sessionSource, context);
   const session = context.createUiRoomSession({ appCtx, refs: {}, state, renderers, helpers, runtime: sessionRuntime });
-  return { context, state, appCtx, callbacks, events, runtime, ...session };
+  return { context, state, appCtx, callbacks, events, timers, runtime, ...session };
 }
 
 test('a delayed activation cannot replace a newer room or install duplicate subscriptions', async () => {
@@ -117,4 +118,13 @@ test('the newest room request owns publication even if an older server admission
   await new Promise(resolve => setImmediate(resolve)); h.admissions[1].resolve(); await next;
   h.admissions[0].resolve(); await assert.rejects(old, { name: 'AbortError' });
   assert.equal(h.context.getCurrentRoom().id, 'BBBBBB');
+});
+
+test('remote-player updates exist only during an active room and restart once on rejoin', async () => {
+ const h=harness();h.runtime.ensureGhostTicker();assert.equal(h.timers.size,0);
+ await h.activateRoom({id:'AAAAAA',code:'AAAAAA'});assert.equal(h.timers.size,1);
+ h.runtime.ensureGhostTicker();assert.equal(h.timers.size,1);
+ await h.runtime.deactivateRoom();assert.equal(h.timers.size,0);
+ await h.activateRoom({id:'BBBBBB',code:'BBBBBB'});assert.equal(h.timers.size,1);
+ h.runtime.clearSubscriptions();assert.equal(h.timers.size,0);
 });

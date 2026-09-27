@@ -45,6 +45,8 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
   } = renderers;
 
   function clearSubscriptions() {
+    if (state.ghostRenderTimer) window.clearInterval(state.ghostRenderTimer);
+    state.ghostRenderTimer = null;
     state.roomSessionGeneration = (Number(state.roomSessionGeneration) || 0) + 1;
     if (typeof state.unsubRoom === "function") state.unsubRoom();
     if (typeof state.unsubPlayers === "function") state.unsubPlayers();
@@ -345,7 +347,7 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
   }
 
   function ensureGhostTicker() {
-    if (state.ghostRenderTimer) return;
+    if (!state.currentRoom || state.ghostRenderTimer) return;
     state.ghostRenderTimer = window.setInterval(() => {
       if (!state.currentRoom) return;
       ensureGhostManager();
