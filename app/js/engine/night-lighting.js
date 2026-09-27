@@ -63,6 +63,11 @@ export function createVehicleHeadlightRig(carMesh) {
 
 export function resetStreetLampFixtures() {
   appCtx.streetLampFixtures = [];
+  lastStreetUpdateAt = -Infinity;
+  for (const entry of appCtx.streetLightPool || []) {
+    entry.light.visible = false;
+    entry.light.intensity = 0;
+  }
 }
 
 export function registerStreetLamp(group, head, target = null) {
@@ -118,7 +123,7 @@ function updateStreetLights(factor, now) {
   const enabled = factor > 0.02 && !appCtx.onMoon && !appCtx.onMars;
   if (enabled && now - lastStreetUpdateAt < UPDATE_INTERVAL_MS) return;
   lastStreetUpdateAt = now;
-  const fixtures = enabled ? nearestFixtures(pool.length) : [];
+  const fixtures = enabled ? nearestFixtures(streetLightBudget()) : [];
   for (let index = 0; index < pool.length; index++) {
     const entry = pool[index];
     const light = entry.light;

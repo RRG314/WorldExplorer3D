@@ -95,6 +95,16 @@ export function applyDirectionalShadowPolicy(appCtx, options = {}) {
   renderer.shadowMap.needsUpdate = enabled;
   renderer.shadowMap.type = quality === 'high' ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
   sun.castShadow = enabled;
+  // This Three.js version allocates only when map is null; changing mapSize
+  // alone leaves the old GPU target and an incompatible viewport alive.
+  if (!enabled || (sun.shadow.map && (
+    sun.shadow.map.width !== resolution || sun.shadow.map.height !== resolution
+  ))) {
+    sun.shadow.map?.dispose();
+    sun.shadow.mapPass?.dispose();
+    sun.shadow.map = null;
+    sun.shadow.mapPass = null;
+  }
   sun.shadow.mapSize.set(Math.max(1, resolution), Math.max(1, resolution));
   sun.shadow.camera.left = -SHADOW_RADIUS_WORLD_UNITS;
   sun.shadow.camera.right = SHADOW_RADIUS_WORLD_UNITS;

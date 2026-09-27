@@ -180,6 +180,7 @@ export const currentContractTests = [
   'tests/provider-fixture-key-current.test.mjs',
   'tests/vessel-batching-current.test.mjs',
   'tests/static-model-batching-current.test.mjs',
+  'tests/night-lighting-lifecycle-current.test.mjs',
   'tests/building-facade-layout-current.test.mjs',
   'tests/building-exterior-catalog-current.test.mjs',
   'tests/building-exterior-integration-current.test.mjs',
