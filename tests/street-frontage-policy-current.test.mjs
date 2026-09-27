@@ -87,3 +87,15 @@ test('translated diagonal and degenerate frontage queries retain exact contacts'
     assert.deepEqual(policy.query(p(16,-1),p(16,33),0),[policy.edges[0],policy.edges[1]]);
   }
 });
+
+
+test('repeated bucket candidates never cache exact hits or survive disposal',()=>{
+  const policy=createStreetFrontagePolicy([rect(10,0,8,8)],1);
+  const near={x:9,z:4},far={x:2,z:4};
+  assert.deepEqual(policy.query(near,near,2),[policy.edges[3]]);
+  assert.deepEqual(policy.query(far,far,2),[],'different points in the same buckets require a fresh exact distance');
+  assert.deepEqual(policy.query(near,near,2),[policy.edges[3]]);
+  for(let i=0;i<300;i++)policy.query({x:i*128,z:i*128},undefined,2);
+  assert.deepEqual(policy.query(near,near,2),[policy.edges[3]],'eviction cannot alter accepted edge order');
+  policy.dispose();assert.deepEqual(policy.query(near,near,2),[]);
+});
