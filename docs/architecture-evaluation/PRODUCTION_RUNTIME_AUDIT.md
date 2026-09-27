@@ -1,6 +1,6 @@
 # Runtime and ownership audit
 
-Source baseline: candidate `bbe6502`; production remains 5.2 and was not changed. This document describes the candidate's public runtime, not a claim that these files are deployed. The candidate and stable `59b27fb` have identical tracked file content. Compared with live-source `db62593`, Git reports 1,222 changed files, 107,718 insertions and 8,138 deletions; these include assets/docs/tests and are not feature counts.
+Historical audit baseline: `bbe6502` (5.3). Production identity is recorded in `CURRENT-STATE.md`. This document describes that baseline; subsequent local changes are not implied to be deployed. At the time of the baseline comparison, candidate and stable `59b27fb` had identical tracked file content. Compared with live-source `db62593`, Git reports 1,222 changed files, 107,718 insertions and 8,138 deletions; these include assets/docs/tests and are not feature counts.
 
 ## Boot and lifetime
 
