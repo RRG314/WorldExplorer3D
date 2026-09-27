@@ -24,3 +24,7 @@ Read-only production checks confirmed public room queries (unfiltered and city-f
 The full release gate is still pending. Use the machine-written evidence in `output/release-evidence/current/` and the final `verify:release-ready` result; do not substitute this note, test counts or focused diagnostics for a completed matrix. The current regression reports are under `output/verification/refactor-release/` and each named verification directory.
 
 No new authoritative PvP capability or automatic deployment is approved by these results. The R&D program and physical-phone acceptance remain separately incomplete.
+
+## Loading investigation — September 27
+
+See `docs/architecture-evaluation/LOADING_AUDIT.md` for measured loading bottlenecks, local repairs, rejected experiments and remaining publication architecture work. Local loading improvements do not close the full release gate. Production was not changed.
