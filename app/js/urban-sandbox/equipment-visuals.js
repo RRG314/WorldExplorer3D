@@ -174,6 +174,10 @@ function createEquipmentVisuals(THREE, characterMesh) {
     return false;
   };
   const setEquipped = (id) => {
+    if (root.userData.equippedId !== String(id || 'hands')) {
+      characterMesh.userData.characterAnimation?.cancelEquipmentAction?.();
+      useAction = null;
+    }
     const visualId = visualIdFor(id);
     items.forEach((group, itemId) => { group.visible = itemId === visualId; });
     if (curatedEquipmentAssetForId(id)) void attachCuratedEquipmentVisual(THREE, items.get(visualId), id);
@@ -212,6 +216,7 @@ function createEquipmentVisuals(THREE, characterMesh) {
     playUse(definition = {}) {
       const category = String(definition.category || 'utility');
       useAction = {
+        authored: characterMesh.userData.characterAnimation?.playEquipmentAction?.(definition) === true,
         id: String(definition.id || root.userData.equippedId || 'hands'),
         category,
         elapsed: 0,
@@ -232,6 +237,12 @@ function createEquipmentVisuals(THREE, characterMesh) {
       if (!useAction) return;
       useAction.elapsed += Math.max(0, Number(dt) || 0);
       const progress = Math.min(1, useAction.elapsed / useAction.duration);
+      if (useAction.authored && useAction.category !== 'sidearm') {
+        // The authored hand motion owns the attached tool. Applying the old
+        // procedural swing again would rotate it twice relative to the wrist.
+        if (progress >= 1) useAction = null;
+        return;
+      }
       const motion = useAction.category === 'sidearm'
         ? (1 - Math.exp(-progress * 55)) * Math.exp(-progress * 7)
         : Math.sin(progress * Math.PI);

@@ -1,3 +1,4 @@
+import { createCharacterAnimationController } from '../character/animation/controller.js';
 import { loadModelAsset } from '../assets/model-asset-runtime.js?v=16';
 
 const EXPLORER_ASSET_ID = 'character-field-explorer-v1';
@@ -103,34 +104,15 @@ function prepareExplorerVisual(THREE, instance, options = {}) {
 }
 
 function createAnimationState(THREE, visual, clips, record) {
-  const mixer = new THREE.AnimationMixer(visual);
-  const actions = {};
-  for (const [role, clipName] of Object.entries(record.animationClips || {})) {
-    const clip = clips.find((entry) => entry.name === clipName);
-    if (!clip) continue;
-    const action = mixer.clipAction(clip);
-    action.enabled = true;
-    action.setEffectiveWeight(role === 'idle' ? 1 : 0);
-    action.play();
-    actions[role] = action;
-  }
-  return { mixer, actions };
+  const controller = createCharacterAnimationController(THREE, visual, clips, record.animationClips);
+  return { mixer: controller.mixer, actions: controller.actions, controller };
 }
 
 function updateCuratedCharacterAnimation(host, isMoving, deltaTime, isRunning = false) {
-  const mixer = host?.userData?.characterMixer;
-  if (!mixer) return false;
-  mixer.update(Math.max(0, Number(deltaTime) || 0));
-  const actions = host.userData.characterActions || {};
-  const armed = !!host?.userData?.heldEquipmentId && host.userData.weaponPose !== 'holstered';
-  const target = armed
-    ? isMoving && actions.armedRun ? 'armedRun' : actions.armedIdle ? 'armedIdle' : 'idle'
-    : isRunning && actions.run ? 'run' : isMoving && actions.walk ? 'walk' : 'idle';
-  for (const [name, action] of Object.entries(actions)) {
-    action.enabled = true;
-    action.setEffectiveWeight(name === target ? 1 : 0);
-  }
-  return true;
+  const controller = host?.userData?.characterAnimation;
+  if (!controller) return false;
+  const armed = !!host.userData.heldEquipmentId && host.userData.weaponPose !== 'holstered';
+  return controller.update({ moving: isMoving, running: isRunning, aiming: armed }, deltaTime);
 }
 
 function disposeCuratedCharacter(host) {
@@ -142,12 +124,13 @@ function disposeCuratedCharacter(host) {
     delete host.userData.curatedCharacterLoadingAssetId;
   }
   if (!attachment) return false;
-  attachment.mixer.stopAllAction();
+  attachment.controller.dispose();
   attachment.visual.parent?.remove(attachment.visual);
   attachment.instance.dispose();
   delete host.userData.curatedCharacterAttachment;
   host.userData.characterMixer = null;
   host.userData.characterActions = null;
+  host.userData.characterAnimation = null;
   delete host.userData.curatedCharacterAssetId;
   delete host.userData.curatedCharacterLoadStarted;
   delete host.userData.curatedCharacterLoadToken;
@@ -181,6 +164,7 @@ async function attachCuratedExplorerCharacter(THREE, host, options = {}) {
     host.add(visual);
     host.userData.curatedCharacterAssetId = instance.record.id;
     host.userData.characterMixer = animation.mixer;
+    host.userData.characterAnimation = animation.controller;
     host.userData.characterActions = animation.actions;
     host.userData.curatedCharacterAttachment = Object.freeze({ instance, visual, ...animation });
     if (host.userData.curatedCharacterLoadToken === loadToken) {

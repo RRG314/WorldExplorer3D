@@ -65,3 +65,20 @@ test('a delayed acknowledgement does not extend the stored presence expiry', asy
   assert.deepEqual(h.calls.map(c=>c[0]),['write','admit']);
   await recovery;
 });
+
+test('yaw wrap reports rotation in both directions without treating a full turn as movement', () => {
+  const context = vm.createContext({}); vm.runInContext(source, context);
+  const pose = yaw => ({x:0,y:0,z:0,yaw,pitch:0});
+  assert.equal(context.movedBeyondThreshold(pose(3.1),pose(-3.1)),true);
+  assert.equal(context.movedBeyondThreshold(pose(-3.1),pose(3.1)),true);
+  assert.equal(context.movedBeyondThreshold(pose(0),pose(2*Math.PI)),false);
+});
+
+test('velocity inference never turns a location or interior change into motion', () => {
+  const context = vm.createContext({}); vm.runInContext(source, context);
+  const sample=(x,time,frame={kind:'earth',locLat:39,locLon:-76})=>context.enrichPoseVelocity(context.normalizePosePayload({pose:{x,y:0,z:0},frame}),time).pose;
+  assert.equal(sample(0,1000).vx,0);
+  assert.equal(sample(2,2000).vx,2);
+  assert.equal(sample(90,3000,{kind:'earth',locLat:40,locLon:-76}).vx,0);
+  assert.equal(sample(0,4000,{kind:'earth',locLat:40,locLon:-76,interiorKey:'building:1'}).vx,0);
+});
