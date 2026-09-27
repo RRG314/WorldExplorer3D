@@ -65,7 +65,15 @@ export function createStreetFrontagePolicy(buildings = [], metersPerWorldUnit = 
     const box=bounds(a,b),seen=new Set();
     for(let x=Math.floor((box.minX-pad)/cell);x<=Math.floor((box.maxX+pad)/cell);x++)for(let z=Math.floor((box.minZ-pad)/cell);z<=Math.floor((box.maxZ+pad)/cell);z++)for(const edge of buckets.get(`${x}:${z}`)||[])seen.add(edge);
     const result=[];
-    for(const edge of seen)if(segmentDistance(a,b,edge.a,edge.b)<=pad+1e-8)result.push(edge);
+    // Bucket overlap is only a coarse candidate test. Reject disjoint edge
+    // bounds before the exact projections, retaining a conservative roundoff
+    // margin for translated coordinates and the existing distance tolerance.
+    const reach=pad+1e-8+8*Number.EPSILON*Math.max(1,Math.abs(box.minX),Math.abs(box.maxX),Math.abs(box.minZ),Math.abs(box.maxZ),Math.abs(pad));
+    for(const edge of seen){
+      const eb=edge.bounds;
+      if(eb.maxX<box.minX-reach || eb.minX>box.maxX+reach || eb.maxZ<box.minZ-reach || eb.minZ>box.maxZ+reach)continue;
+      if(segmentDistance(a,b,edge.a,edge.b)<=pad+1e-8)result.push(edge);
+    }
     return result;
   }
   return { edges, query,

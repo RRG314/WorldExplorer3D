@@ -70,3 +70,20 @@ test('semantic grade separation excludes frontage even with missing source tags'
     assert.equal(createStreetFrontageGrading([],1).outerDistance(road,{segIndex:0,t:.5},10,-5,4),4);
   }
 });
+test('frontage broad phase preserves near-contact tolerance and source edge order',()=>{
+  const policy=createStreetFrontagePolicy([rect(10,0,32,32)],1);
+  const p={x:10-0.5e-8,z:16};
+  assert.deepEqual(policy.query(p,p,0),[policy.edges[3]]);
+  const outside={x:10-2e-8,z:16};
+  assert.deepEqual(policy.query(outside,outside,0),[]);
+  const a={x:0,z:16},b={x:50,z:16};
+  assert.deepEqual(policy.query(a,b,0),[policy.edges[1],policy.edges[3]]);
+});
+test('translated diagonal and degenerate frontage queries retain exact contacts',()=>{
+  for(const shift of [-1e9,0,1e9]){
+    const p=(x,z)=>({x:x+shift,z:z+shift});
+    const policy=createStreetFrontagePolicy([{pts:[p(0,0),p(32,32),p(0,32)]}],1);
+    assert.deepEqual(policy.query(p(16,16),p(16,16),0),[policy.edges[0]]);
+    assert.deepEqual(policy.query(p(16,-1),p(16,33),0),[policy.edges[0],policy.edges[1]]);
+  }
+});
