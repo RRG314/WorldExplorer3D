@@ -22,7 +22,7 @@ export function triangleMayOverlapCell(points, minX, maxX, minZ, maxZ) {
 // without recursively multiplying skinny pavement triangles near a grid edge.
 export function createPavementTerrainPartition(meshes = [], {includeFarTerrain = false,farSupportIndex} = {}) {
   const farMeshes=includeFarTerrain ? meshes.filter(m=>m.visible!==false && m.userData?.isFarTerrainClipmap) : [];
-  const farIndex=farSupportIndex ?? (farMeshes.length ? createRoadContactIndex(farMeshes,320) : null);
+  const farIndex=farSupportIndex ?? (farMeshes.length ? createRoadContactIndex(farMeshes,64) : null);
   const grids=[];
   for(const mesh of meshes){
     if(!mesh.userData?.isTerrainMesh || mesh.visible===false || mesh.userData.pendingTerrainTile)continue;
@@ -97,7 +97,7 @@ export function createPavementTerrainPartition(meshes = [], {includeFarTerrain =
 
 export async function createPavementTerrainPartitionCooperatively(meshes=[],options={}) {
   const far=options.includeFarTerrain ? meshes.filter(m=>m.visible!==false && m.userData?.isFarTerrainClipmap) : [];
-  const farSupportIndex=far.length ? await createRoadContactIndexCooperatively(far,320,options) : null;
+  const farSupportIndex=far.length ? await createRoadContactIndexCooperatively(far,64,options) : null;
   try {
     if(options.current?.()===false)throw new Error('Terrain support construction superseded');
     return createPavementTerrainPartition(meshes,{...options,farSupportIndex});

@@ -124,3 +124,19 @@ test('removing the intermediate road grid retains a sharp terrain crest and cont
     }
   }
 });
+
+
+test('tile height reuse preserves exact coordinates and expires before the next build',()=>{
+  const tile=prepareCarriagewayTiles([road([[8,64],[120,64]])])[0];
+  let epoch=0,calls=0;const seen=new Set();
+  const sample=(x,z)=>{const key=`${x}:${z}`;assert.ok(!seen.has(key),'duplicate height query within tile');seen.add(key);calls++;return x*.12345+z*.98765+epoch;};
+  const partition=(vertices,sampleTop)=>{
+    for(let i=0;i<vertices.length;i+=3){assert.equal(sampleTop(vertices[i],vertices[i+2]),vertices[i+1]);}
+    return vertices;
+  };
+  const first=meshCarriagewayTile(tile,sample,partition);assert.ok(calls>0);assert.ok(calls<first.indices.length);
+  seen.clear();epoch=7;
+  const next=meshCarriagewayTile(tile,sample,partition);
+  assert.deepEqual(next.indices,first.indices);
+  for(let i=0;i<first.positions.length;i+=3){assert.equal(next.positions[i],first.positions[i]);assert.equal(next.positions[i+2],first.positions[i+2]);assert.ok(Math.abs(next.positions[i+1]-first.positions[i+1]-7)<1e-5);}
+});
