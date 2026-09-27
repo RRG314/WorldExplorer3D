@@ -1,5 +1,6 @@
 // Component and source-contract checks; browser and emulator journeys run separately.
 export const currentContractTests = [
+  'tests/local-refactor-boundaries-current.test.mjs',
   'tests/platform-service-lifecycle-current.test.mjs',
   'tests/regional-map-uv-current.test.mjs',
   'tests/space-presentation-lifecycle-current.test.mjs',

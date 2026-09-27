@@ -43,7 +43,7 @@ let deadline;try{
  if(process.env.WE3D_PROFILE_DAY==='1'){for(let i=0;i<6&&await page.locator('#quickTimeOfDay').getAttribute('data-mode')!=='day';i++)await page.locator('#quickTimeOfDay').click();report.manualSkyMode=await page.locator('#quickTimeOfDay').getAttribute('data-mode');if(report.manualSkyMode!=='day')throw Error('Day preset did not activate');}
  if(process.env.WE3D_PROFILE_COMPILER==='1'){const {profile}=await cdp.send('Profiler.stop');await writeFile(`${out}/compilation.cpuprofile`,JSON.stringify(profile));report.firstPlayableTimingScope='sampled profiler enabled; do not compare as uninstrumented load latency';}
  await page.waitForTimeout(2500);
- report.initial=await page.evaluate(()=>{const d=getWorldExplorerRuntimeDiagnostics();return {worldCounts:d.worldCounts,worldLoad:d.worldLoad,renderer:d.renderer,runtimeKernel:d.runtimeKernel,transportCompilation:d.transportCompilation};});await save();
+ report.initial=await page.evaluate(()=>{const d=getWorldExplorerRuntimeDiagnostics();return {worldCounts:d.worldCounts,worldLoad:d.worldLoad,renderer:d.renderer,rendererOwners:d.rendererOwners,runtimeKernel:d.runtimeKernel,transportCompilation:d.transportCompilation};});await save();
  if(process.env.WE3D_CAPTURE_WORLD==='1'){
   const projection=await page.evaluate(async()=>{
    const {ctx}=await import('/app/js/shared-context.js?v=55');
@@ -78,7 +78,7 @@ let deadline;try{
   await cdp.send('HeapProfiler.startSampling',{samplingInterval:32768});await page.waitForTimeout(10000);
   const allocation=await cdp.send('HeapProfiler.stopSampling');await writeFile(`${out}/walking-allocations.json`,JSON.stringify(allocation));
  }
- async function sample(id,key=null,duration=15000){console.log(`profile: ${id}`);const before=await metrics();if(key){await page.mouse.click(640,400);await page.keyboard.down(key);}let raw;try{raw=await page.evaluate(sampleFrameWindow,duration);}finally{if(key)await page.keyboard.up(key);}const after=await metrics(),s=[...raw.deltas].sort((a,b)=>a-b);report.samples.push({id,elapsedMs:raw.elapsedMs,frames:s.length,meanMs:raw.elapsedMs/s.length,p95Ms:s[Math.ceil(s.length*.95)-1],p99Ms:s[Math.ceil(s.length*.99)-1],start:raw.startPosition,end:raw.endPosition,distance:raw.startPosition&&raw.endPosition?Math.hypot(raw.endPosition.x-raw.startPosition.x,raw.endPosition.z-raw.startPosition.z):null,renderer:raw.diagnostics.renderer,worldCounts:raw.diagnostics.worldCounts,jsHeapUsedBytes:after.JSHeapUsedSize,scriptSeconds:after.ScriptDuration-before.ScriptDuration,taskSeconds:after.TaskDuration-before.TaskDuration,dom:await cdp.send('Memory.getDOMCounters')});await save();}
+ async function sample(id,key=null,duration=15000){console.log(`profile: ${id}`);const before=await metrics();if(key){await page.mouse.click(640,400);await page.keyboard.down(key);}let raw;try{raw=await page.evaluate(sampleFrameWindow,duration);}finally{if(key)await page.keyboard.up(key);}const after=await metrics(),s=[...raw.deltas].sort((a,b)=>a-b);report.samples.push({id,elapsedMs:raw.elapsedMs,frames:s.length,meanMs:raw.elapsedMs/s.length,p95Ms:s[Math.ceil(s.length*.95)-1],p99Ms:s[Math.ceil(s.length*.99)-1],start:raw.startPosition,end:raw.endPosition,distance:raw.startPosition&&raw.endPosition?Math.hypot(raw.endPosition.x-raw.startPosition.x,raw.endPosition.z-raw.startPosition.z):null,renderer:raw.diagnostics.renderer,rendererOwners:await page.evaluate(()=>getWorldExplorerRuntimeDiagnostics().rendererOwners),worldCounts:raw.diagnostics.worldCounts,jsHeapUsedBytes:after.JSHeapUsedSize,scriptSeconds:after.ScriptDuration-before.ScriptDuration,taskSeconds:after.TaskDuration-before.TaskDuration,dom:await cdp.send('Memory.getDOMCounters')});await save();}
  if(process.env.WE3D_PROFILE_SKIP_EARTH_WINDOWS!=='1'){
  await sample('walking-stationary');await sample('walking-moving','w');
  console.log('profile: sampled CPU (separate from frame measurements)');await cdp.send('Profiler.enable');await cdp.send('Profiler.start');await page.waitForTimeout(10000);const {profile}=await cdp.send('Profiler.stop');await writeFile(`${out}/walking.cpuprofile`,JSON.stringify(profile));
@@ -112,10 +112,17 @@ let deadline;try{
   ]){
    console.log(`profile: enter ${id}`);await page.locator('#travelBtn').click();await page.locator(`#${action}`).click();
    await page.waitForFunction(ready,null,{timeout:120000});await page.waitForTimeout(3000);
+   const expectedOwner=id==='earth-return'?'main':id;
+   const actualOwner=await page.evaluate(()=>getWorldExplorerRuntimeDiagnostics().rendererOwners);
+   if(actualOwner.activeOwner!==expectedOwner||!actualOwner.active)throw Error(`Wrong renderer owner for ${id}`);
+   if(id!=='earth-return'){
+    const stale=await page.evaluate(()=>({selection:!!document.querySelector('#worldSelectionNotice:not([hidden])'),civic:!!document.querySelector('#urbanCivicStatus.show')}));
+    if(stale.selection||stale.civic)throw Error(`Earth UI remained active in ${id}`);
+   }
    await sample(`${id}-stationary`);await page.screenshot({path:`${out}/${id}.png`});
   }
  }
- await page.locator('#mainMenuBtn').click();await page.waitForTimeout(5000);report.menuMetrics=await metrics();report.menuDiagnostics=await page.evaluate(()=>{const d=getWorldExplorerRuntimeDiagnostics();return {gameStarted:d.gameStarted,worldCounts:d.worldCounts,renderer:d.renderer,lastEarthWorldRelease:d.lastEarthWorldRelease};});
+ await page.locator('#mainMenuBtn').click();await page.waitForTimeout(5000);report.menuMetrics=await metrics();report.menuDiagnostics=await page.evaluate(()=>{const d=getWorldExplorerRuntimeDiagnostics();return {gameStarted:d.gameStarted,worldCounts:d.worldCounts,renderer:d.renderer,rendererOwners:d.rendererOwners,lastEarthWorldRelease:d.lastEarthWorldRelease};});
  if(retentionCycles){
   report.retention=[];
   for(let cycle=0;cycle<retentionCycles;cycle++){
@@ -128,7 +135,7 @@ let deadline;try{
    const phases=[];
    for(const delay of [0,5000,25000]){
     if(delay)await page.waitForTimeout(delay);
-    phases.push({idleSinceFirstSnapshotMs:phases.length?phases.length===1?5000:30000:0,metrics:await metrics(),dom:await cdp.send('Memory.getDOMCounters'),diagnostics:await page.evaluate(()=>{const d=getWorldExplorerRuntimeDiagnostics();return{gameStarted:d.gameStarted,worldCounts:d.worldCounts,renderer:d.renderer,lastEarthWorldRelease:d.lastEarthWorldRelease};})});
+    phases.push({idleSinceFirstSnapshotMs:phases.length?phases.length===1?5000:30000:0,metrics:await metrics(),dom:await cdp.send('Memory.getDOMCounters'),diagnostics:await page.evaluate(()=>{const d=getWorldExplorerRuntimeDiagnostics();return{gameStarted:d.gameStarted,worldCounts:d.worldCounts,renderer:d.renderer,rendererOwners:d.rendererOwners,lastEarthWorldRelease:d.lastEarthWorldRelease};})});
    }
    await cdp.send('HeapProfiler.collectGarbage');
    report.retention.push({cycle:cycle+1,phases,postGc:await metrics(),note:cycle===0?'Initial first snapshot follows existing five-second menu settle':'Subsequent first snapshot immediately after Main Menu click; timing records actual observation, not release completion'});await save();

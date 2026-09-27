@@ -1,8 +1,8 @@
 # World Explorer architecture evaluation
 
-Production is already live at `bbe6502228e369fe2a15dc6a177f5d83948584c3`. This isolated branch is not deployed. The latest request is browser-first architecture evaluation with future engine portability.
+Production is already live at `bbe6502228e369fe2a15dc6a177f5d83948584c3`. This isolated branch is not deployed. The latest request is local implementation of the evidence-backed refactor, with future engine portability. Nothing from this branch is published to GitHub or deployed.
 
-**Investigation in progress.** Start with [the current decision](FINAL_ARCHITECTURE_DECISION.md), which states both measured conclusions and remaining work. It is not an exhaustive-audit completion certificate.
+**Local implementation:** start with [the implementation plan and checks](LOCAL_REFACTOR_PLAN.md). For the broader investigation, see [the current decision](FINAL_ARCHITECTURE_DECISION.md), which states both measured conclusions and remaining work. It is not an exhaustive-audit completion certificate.
 
 - [Measured hotspots and coverage](HOTSPOT_PROFILE.md)
 - [All context/Three source-access classifications](COUPLING_CLASSIFICATION.md)

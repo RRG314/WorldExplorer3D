@@ -12,6 +12,7 @@
     "candidate:create-and-serve": "node scripts/local-candidate.mjs create-and-serve",
     "capture:5.0-gallery": "node scripts/capture-release-gallery.mjs",
     "verify:source": "node scripts/verification/source.mjs",
+    "verify:boundary-types": "node scripts/verification/check-boundary-types.mjs",
     "verify:current-contracts": "node scripts/verification/current-contracts.mjs",
     "audit:tests": "node scripts/verification/contract-inventory.mjs",
     "verify:test-sensitivity": "node scripts/verification/contract-sensitivity.mjs",

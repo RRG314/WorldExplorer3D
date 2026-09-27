@@ -1,3 +1,4 @@
+import { clearEarthInteractionPresentation } from './interaction/earth-presentation.js';
 import { ctx as appCtx } from './shared-context.js?v=55';
 import { ENV, getEnv, switchEnv } from './env.js?v=58';
 import { createLifecycleScope, getLifecycleRegistrySnapshot } from './runtime/lifecycle-scope.js?v=2';
@@ -69,10 +70,14 @@ function commitEnvironment(target, options = {}) {
       : beginEnvironmentTransition(target, { source: options.source });
   }
 
-  const committed = getEnv() === target || switchEnv(target);
+  const previousEnvironment = getEnv();
+  const committed = previousEnvironment === target || switchEnv(target);
   if (!committed) {
     cancelEnvironmentTransition(token, 'commit-rejected');
     return false;
+  }
+  if (previousEnvironment === ENV.EARTH && target !== ENV.EARTH) {
+    clearEarthInteractionPresentation();
   }
   token.committedAt = performance.now();
   if (options.finish !== false) finishEnvironmentTransition(token);

@@ -2,6 +2,10 @@
 
 **Current decision: refactor in place. Do not rewrite World Explorer or move it out of the browser.** Keep Three.js and Firebase while strengthening the existing data/domain boundaries. This is the decision supported by the work so far; the exhaustive investigation is **not complete**. Remaining coverage is listed below so this document cannot be mistaken for full certification.
 
+## Local implementation update
+
+The owner subsequently authorized local implementation. The [implementation ledger](LOCAL_REFACTOR_PLAN.md) is now the current source for promoted changes: compiler-owned sorted profile sampling, allocation-reduced decal clipping, explicit geographic selection, strict boundary checks and renderer ownership diagnostics. Visual testing also exposed and repaired stale Earth overlays on environment departure. These changes remain local. The broader investigation limits below still apply; neither a complete rewrite nor a general FPS gain is claimed.
+
 ## What the measurements say
 
 A physical Apple M1 run loaded Baltimore in roughly 88 seconds. Compiled transport publication consumed about 45 seconds elapsed. An earlier same-compiler run already identifies carriageway integration (~18.85 s), terrain corridors (~8.03 s) and structure profiles (~5.61 s) as its largest nested phases. These include cooperative scheduling; CPU/allocation attribution still matters. A follow-up collected-allocation sample and long-task observer corroborate heavy temporary work and multi-second main-thread tasks during the larger journey. A renderer rewrite does not follow from these timings.

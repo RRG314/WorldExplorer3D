@@ -1,3 +1,4 @@
+import { sampleSortedProfileAtDistance } from '../../structure-semantics/profile-sampling.js';
 import {fitOrdinaryStreetProfile} from './ordinary-street-profile.js';
 import {roadPlacementOffsetWorld} from '../road-units.js';
 import {
@@ -29,6 +30,9 @@ import {
 } from './transport-surface-profile.js?v=12';
 
 const TRANSPORT_SURFACE_SCHEMA_VERSION = 1;
+// Weak ownership, not a cache of external/mutable profiles. Compilation creates
+// sorted station distances; later reconciliation updates heights, not stations.
+const compiledModels = new WeakSet();
 
 function featureRoadType(feature) {
   return String(
@@ -435,7 +439,7 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     mode === 'at_grade' ? [groundHeights, leftGround, rightGround] : null,
     surfaceBias
   );
-  return Object.freeze({
+  const model = Object.freeze({
     schemaVersion: TRANSPORT_SURFACE_SCHEMA_VERSION,
     authority: 'compiled_transport_surface',
     sourceFeatureId: String(feature.sourceFeatureId || feature.id || ''),
@@ -472,20 +476,23 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     rightHeights,
     stats
   });
+  compiledModels.add(model);
+  return model;
 }
 
 function sampleTransportSurfaceAtDistance(model, distance, lateralOffset = 0) {
   if (!model?.distances?.length || !model?.centerHeights?.length) return NaN;
-  const centerY = sampleProfileAtDistance(model.distances, model.centerHeights, distance);
+  const sample = compiledModels.has(model) ? sampleSortedProfileAtDistance : sampleProfileAtDistance;
+  const centerY = sample(model.distances, model.centerHeights, distance);
   if (!Number.isFinite(centerY)) return NaN;
   const halfWidth = Math.max(0.01, finiteNumber(model.width, 2) * 0.5);
   const lateral = clamp(finiteNumber(lateralOffset) / halfWidth, -1, 1);
   if (lateral > 0) {
-    const leftY = sampleProfileAtDistance(model.distances, model.leftHeights, distance);
+    const leftY = sample(model.distances, model.leftHeights, distance);
     return centerY + (leftY - centerY) * lateral;
   }
   if (lateral < 0) {
-    const rightY = sampleProfileAtDistance(model.distances, model.rightHeights, distance);
+    const rightY = sample(model.distances, model.rightHeights, distance);
     return centerY + (rightY - centerY) * -lateral;
   }
   return centerY;
