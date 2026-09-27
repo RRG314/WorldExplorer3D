@@ -111,3 +111,16 @@ test('removing the intermediate road grid retains a sharp terrain crest and cont
   assert.ok(Math.abs(contact.sampleAt(0,0)-2.18)<1e-5);
   contact.dispose();partition.dispose();
 });
+
+ test('multi-triangle turn fans have one owner per intersecting tile',()=>{
+  for(const points of [[[10,10],[30,10],[30,30]],[[10,10],[30,10],[10,11]]]) {
+    const tiles=prepareCarriagewayTiles([road(points)],16);
+    assert.ok(tiles.some(tile=>tile.joins.length));
+    for(const tile of tiles) {
+      assert.equal(tile.joins.length,new Set(tile.joins).size);
+      const ordinary=unionCarriageway(tile);
+      const repeated=unionCarriageway({...tile,joins:tile.joins.flatMap(join=>[join,join,join])});
+      assert.ok(Math.abs(area(ordinary)-area(repeated))<1e-8);
+    }
+  }
+});

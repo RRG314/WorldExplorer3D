@@ -2,6 +2,22 @@ import {terrainGridInterval} from '../terrain/world-grid.js';
 import {createRoadContactIndex,createRoadContactIndexCooperatively} from '../terrain/road-contact-index.js?v=1';
 import {projectDecalTriangle} from '../terrain/surface-decal-projection.js';
 
+// Conservative separating-axis rejection before allocating support triangles.
+// A thin diagonal road can have a large grid-cell bounding box; most cells in
+// that box lie wholly outside the triangle. Keep the clipper's edge tolerance.
+export function triangleMayOverlapCell(points, minX, maxX, minZ, maxZ) {
+  const sign = Math.sign((points[1].x-points[0].x)*(points[2].z-points[0].z) -
+    (points[1].z-points[0].z)*(points[2].x-points[0].x));
+  if (!sign) return true;
+  for (let i=0;i<3;i++) {
+    const a=points[i],b=points[(i+1)%3],dx=b.x-a.x,dz=b.z-a.z;
+    const x=-sign*dz>=0 ? maxX : minX;
+    const z=sign*dx>=0 ? maxZ : minZ;
+    if (sign*(dx*(z-a.z)-dz*(x-a.x)) < -1e-9) return false;
+  }
+  return true;
+}
+
 // Split against the rendered terrain planes. This preserves creases exactly
 // without recursively multiplying skinny pavement triangles near a grid edge.
 export function createPavementTerrainPartition(meshes = [], {includeFarTerrain = false,farSupportIndex} = {}) {
@@ -38,6 +54,7 @@ export function createPavementTerrainPartition(meshes = [], {includeFarTerrain =
         const row0=terrainGridInterval(g.p.array,g.segments,g.stride*3,2,minZ-g.oz),row1=terrainGridInterval(g.p.array,g.segments,g.stride*3,2,maxZ-g.oz);
         for(let row=row0;row<=row1;row++)for(let col=col0;col<=col1;col++){
           const a=row*g.stride+col,b=a+1,c=a+g.stride,d=c+1;
+          if (!triangleMayOverlapCell(points,g.p.array[a*3],g.p.array[b*3],g.p.array[a*3+2],g.p.array[c*3+2])) continue;
           for(const ids of [[a,c,b],[b,c,d]]){
             const [ia,ib,ic]=ids.map(n=>n*3),p=g.p.array;
             const denominator=(p[ib+2]-p[ic+2])*(p[ia]-p[ic])+(p[ic]-p[ib])*(p[ia+2]-p[ic+2]);

@@ -251,6 +251,7 @@ export const currentContractTests = [
   'tests/street-prefetch-current.test.mjs',
   'tests/street-streaming-current.test.mjs',
   'tests/pavement-terrain-current.test.mjs',
+  'tests/terrain-partition-broadphase-current.test.mjs',
   'tests/environment-context-loading-current.test.mjs',
   'tests/deferred-workload-current.test.mjs',
   'tests/core-render-lifecycle-current.test.mjs',

@@ -56,13 +56,22 @@ export function unionCarriageway(tile, {clipToBounds = true} = {}) {
 // Ground roads have a single horizontal owner. Elevated and underground roads
 // retain independent structure surfaces and never enter this planar union.
 export function prepareCarriagewayTiles(roads, chunkSize = 128) {
-  const tiles=new Map();
+  const tiles=new Map(),joinOwners=new Map();
   const insert=(kind,item,polygon)=> {
     const b=boundsOf(polygon.flat().map(([x,z])=>({x,z})));
     for(let ix=Math.floor(b.minX/chunkSize);ix<=Math.floor(b.maxX/chunkSize);ix++)
       for(let iz=Math.floor(b.minZ/chunkSize);iz<=Math.floor(b.maxZ/chunkSize);iz++) {
         const key=`${ix}:${iz}`;
         if(!tiles.has(key))tiles.set(key,{key,segments:[],joins:[],bounds:{minX:ix*chunkSize,maxX:(ix+1)*chunkSize,minZ:iz*chunkSize,maxZ:(iz+1)*chunkSize}});
+        // A turn is a fan of polygons. Index the owner once per tile; union
+        // expands that whole fan, so inserting it for every fan triangle made
+        // a k-triangle turn contribute k² duplicate polygons.
+        if (kind === 'joins') {
+          let seen=joinOwners.get(key);
+          if (!seen) joinOwners.set(key,seen=new Set());
+          if (seen.has(item)) continue;
+          seen.add(item);
+        }
         tiles.get(key)[kind].push(item);
       }
   };
