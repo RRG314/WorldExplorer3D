@@ -9,11 +9,22 @@ const boundsOf = points => ({minX:Math.min(...points.map(p=>p.x)),maxX:Math.max(
 // placement samples. Cell boundaries never replace source width constraints.
 export function* streetRoadSegments(road) {
   const offset=roadPlacementOffsetWorld(road);
+  const section=road.resolvedCrossSection;
+  const widths=section?.segmentWidthsMeters;
+  const sampledWidths=widths instanceof Float32Array || Array.isArray(widths);
+  const varyingWidths=sampledWidths && widths.length>0 &&
+    !widths.every(width=>Number.isFinite(width) && width>0 && width===widths[0]);
+  const hasProfiles=section?.intervalProfiles?.length>0 ||
+    (Array.isArray(section?.segmentProfiles) && section.segmentProfiles.some(profiles=>profiles?.length>0));
+  // Source points already describe the road curve. A straight, constant-width
+  // source segment is one exact quad; uniform 32-unit cuts add no shape or
+  // terrain information (the terrain partition supplies those creases later).
+  const needsWidthSampling=varyingWidths || hasProfiles;
   for(let index=0;index<(road.pts?.length || 0)-1;index++) {
     const a=road.pts[index],b=road.pts[index+1],length=Math.hypot(b.x-a.x,b.z-a.z);
     if(length<.01)continue;
     const breaks=new Set([0,1]);
-    const count=Math.ceil(length/(Number(road.resolvedCrossSection?.constrainedSegmentCount)>0 ? 6 : 32));
+    const count=needsWidthSampling ? Math.ceil(length/(Number(section?.constrainedSegmentCount)>0 ? 6 : 32)) : 1;
     for(let j=1;j<count;j++)breaks.add(j/count);
     for(const profile of road.resolvedCrossSection?.segmentProfiles?.[index] || []) {
       breaks.add(Math.max(0,Math.min(1,profile.startT)));breaks.add(Math.max(0,Math.min(1,profile.endT)));
