@@ -17,10 +17,10 @@ The new action resolver and receipt ledger are contained R&D components. They do
 
 ## Current verification
 
-- Current component suite: passed all executed checks, no skipped cases. The first attempt lacked backend dependencies in this worktree; matching existing dependencies were linked and the complete run passed.
-- Strict portable-boundary type check: passed.
-- Emulator admission HTTP, transactional admission/capacity, Firestore rules and shared urban/civic backend: passed.
-- Source-browser public directory join, both mapped worlds, shared artifact and vehicle claim/renewal/release/handoff reached completion. The final harness assertion still expected a private room; corrected to match the public scenario. A built-candidate run is still required before this gate can be marked passed.
-- Earlier character lab screenshots were inspected. Physical-phone acceptance for the new changes remains unverified.
+Focused verification passed: current component suite without skips, portable-boundary types, backend admission/capacity/privacy and urban/civic authority, built public-room discovery and two-player vehicle handoff, packaged Moon controls/pause, Moon/Mars/Space/Ocean entry, equipment use, ship research, shared expeditions, chat and short transport reconnect. Screenshots exposed a planetary ground/star hitbox mismatch; it was fixed and visually rechecked in candidate `b7d62ba1`.
 
-Check actual new execution reports before updating this file. Test counts are coverage inventory, not a production-readiness score. No final production readiness or new deployment is claimed here.
+Read-only production checks confirmed public room queries (unfiltered and city-filtered), three READY directory indexes and ACTIVE join/vehicle/impact Functions. No production data was modified. Production's old server cooldown implementation remains unchanged until an authorized backend release.
+
+The full release gate is still pending. Use the machine-written evidence in `output/release-evidence/current/` and the final `verify:release-ready` result; do not substitute this note, test counts or focused diagnostics for a completed matrix. The current regression reports are under `output/verification/refactor-release/` and each named verification directory.
+
+No new authoritative PvP capability or automatic deployment is approved by these results. The R&D program and physical-phone acceptance remain separately incomplete.
