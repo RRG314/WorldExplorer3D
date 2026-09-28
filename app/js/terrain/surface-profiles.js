@@ -30,6 +30,14 @@ let detailedGroundCollection = null;
 let detailedGroundCount = -1;
 let detailedGroundOrigin = '';
 let detailedGroundIndex = null;
+export function resetTerrainSurfaceProfileCache() {
+  detailedGroundCollection = null;
+  detailedGroundCount = -1;
+  detailedGroundOrigin = '';
+  detailedGroundIndex = null;
+  cachedGroundFallbackMesh = null;
+}
+
 function currentDetailedGroundIndex() {
   const collection = appCtx.landuses || [];
   const origin = `${appCtx.LOC?.lat}/${appCtx.LOC?.lon}`;

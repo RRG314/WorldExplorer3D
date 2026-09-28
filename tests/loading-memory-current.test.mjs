@@ -61,7 +61,7 @@ test('world reset releases derived transport models as well as scene objects',as
  const appCtx={resetEarthStreaming(){},replaceWorldCollection(k){this[k]=[];},clearWorldCollections(keys){for(const k of keys)this[k]=[];}};
  let groundInvalidations=0;appCtx.GroundHeight={invalidate(){groundInvalidations++;}};
  for(const key of keys)appCtx[key]={oldWorldFeature:{}};
- const context=vm.createContext({appCtx,releaseLocationModels(){},clearBuildingExteriorMaterialPool(){},clearBuildingExteriorDetails(){}});
+ const context=vm.createContext({appCtx,resetRoadSearchIndex(){},releaseLocationModels(){},clearBuildingExteriorMaterialPool(){},clearBuildingExteriorDetails(){}});
  vm.runInContext(source,context);context.resetWorldForReload({showLoading:false});
  for(const key of keys)assert.equal(appCtx[key],null,key);
  assert.equal(groundInvalidations,1);
@@ -85,4 +85,20 @@ test('shared vegetation cells cull independently, re-enter view and keep LOD dis
  for(const l of a.levels)l.object.addEventListener('dispose',()=>instanceDisposals++);
  context.disposeVegetationBatch(a);assert.equal(geometryDisposals,0);assert.equal(instanceDisposals,2);
  b.update(camera);assert.equal(b.levels[0].object.visible,true);
+});
+
+
+test('road search reset drops old source roots and rebuilds for the next city',async()=>{
+ const source=(await readFile(new URL('../app/js/world/navigation.js',import.meta.url),'utf8')).replace(/^import[^;]+;\s*/gm,'').replaceAll('export function','function');
+ const roads=[{pts:[{x:0,z:0},{x:50,z:0}],width:10}], appCtx={roads};
+ const context=vm.createContext({appCtx});vm.runInContext(source,context);
+ vm.runInContext('rebuildRoadSearchIndexIfNeeded(); nearRoadResult.road=appCtx.roads[0]',context);
+ assert.ok(vm.runInContext('roadSearchIndex.size',context)>0);
+ context.resetRoadSearchIndex();
+ for(const expression of ['roadSearchIndex.size','roadSearchFeatureSet.size'])assert.equal(vm.runInContext(expression,context),0);
+ for(const expression of ['roadSearchBaseRef','nearRoadResult.road'])assert.equal(vm.runInContext(expression,context),null);
+ appCtx.roads=[{pts:[{x:500,z:0},{x:550,z:0}],width:10}];
+ vm.runInContext('rebuildRoadSearchIndexIfNeeded()',context);
+ assert.equal(vm.runInContext('roadSearchFeatureSet.has(appCtx.roads[0])',context),true);
+ assert.equal(vm.runInContext('roadSearchBaseRef',context),appCtx.roads);
 });

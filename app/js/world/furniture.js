@@ -727,6 +727,8 @@ export function flushWorldCoverVegetationRefresh() {
 }
 
 export function resetWorldFurnitureCaches() {
+  resetStreetLampFixtures();
+  appCtx.trafficControlPlacements = [];
   roadsideResolver = null;
   vegetationRefreshRevision++;
   vegetationFocus = null;

@@ -1,3 +1,4 @@
+import { resetRoadSearchIndex } from './navigation.js';
 import { releaseLocationModels } from './release-location-models.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { clearBuildingExteriorMaterialPool } from "../engine/building-facade-materials.js?v=19";
@@ -235,6 +236,7 @@ export function resetWorldForReload(options = {}) {
   // previously batched world objects that are no longer reachable from a list.
   appCtx.clearEarthWorldSceneObjects?.();
 
+  resetRoadSearchIndex();
   appCtx.GroundHeight?.invalidate?.();
   resetWorldFurnitureCaches();
   if (typeof appCtx.invalidateRoadCache === 'function') appCtx.invalidateRoadCache();

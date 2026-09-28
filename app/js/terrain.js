@@ -28,7 +28,8 @@ import {
   computeElevationStatsMeters,
   refreshTerrainSurfaceProfiles,
   refreshTerrainSurfaceProfilesCooperatively,
-  setWorldSurfaceProfile
+  setWorldSurfaceProfile,
+  resetTerrainSurfaceProfileCache
 } from "./terrain/surface-profiles.js?v=54";
 import {
   applyHeightsToTerrainMesh,
@@ -445,6 +446,7 @@ const {
 });
 
 function resetEarthStreaming(reason = 'earth_streaming_reset') {
+  resetTerrainSurfaceProfileCache();
   earthStreamingReleaseGeneration += 1;
   // Cut/fill profiles use location-relative coordinates. They must be released
   // before any new tile samples terrain, including destinations with no roads
