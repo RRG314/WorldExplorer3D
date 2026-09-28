@@ -167,6 +167,7 @@ export function resetWorldForReload(options = {}) {
   appCtx.sharedTransportSurfacePresentation = null;
   appCtx.tunnelSolidCompilation = null;
   appCtx.structureProfileCompilation = null;
+  if (appCtx.Walk?.state?.walker) appCtx.Walk.state.walker._walkSupportFeature = null;
   if (appCtx.car) {
     appCtx.car.road = null;
     appCtx.car.onRoad = false;
