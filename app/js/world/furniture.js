@@ -497,6 +497,11 @@ function trafficControlPlacements(mappedFurnitureNodes = [], roads = appCtx.road
 }
 
 export function generateStreetFurniture(options = {}) {
+  try { return publishStreetFurniture(options); }
+  finally { roadsideResolver = null; }
+}
+
+function publishStreetFurniture(options = {}) {
   initFurnitureMaterials();
   initFurnitureGeometries();
   resetStreetLampFixtures();
@@ -722,6 +727,7 @@ export function flushWorldCoverVegetationRefresh() {
 }
 
 export function resetWorldFurnitureCaches() {
+  roadsideResolver = null;
   vegetationRefreshRevision++;
   vegetationFocus = null;
   if (worldCoverVegetationTimer) globalThis.clearTimeout(worldCoverVegetationTimer);

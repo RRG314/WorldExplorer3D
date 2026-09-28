@@ -155,6 +155,15 @@ export function resetWorldForReload(options = {}) {
   appCtx._streetPavementRetryAt = 0;
   appCtx._streetMotion = null;
   appCtx.transportSurfacePublication = null;
+  // These derived graphs belong to this world, including closures over their
+  // canonical features. An empty scene must not keep the previous city alive.
+  appCtx.transportNetworkModel = null;
+  appCtx.transportStructureModel = null;
+  appCtx.transportStructureAssembly = null;
+  appCtx.transportJunctionProfile = null;
+  appCtx.sharedTransportSurfacePresentation = null;
+  appCtx.tunnelSolidCompilation = null;
+  appCtx.structureProfileCompilation = null;
   if (appCtx.car) {
     appCtx.car.road = null;
     appCtx.car.onRoad = false;
