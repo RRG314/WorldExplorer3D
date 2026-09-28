@@ -131,7 +131,10 @@ function createTerrainHeightSamplingApi(deps = {}) {
     let strongestAtGradeWeight = 0;
     let atGradeWeightedY = 0;
     let atGradeWeightSum = 0;
-    const atGradeSamples = [];
+    // Accumulate the two ownership classes separately. Terrain compilation
+    // visits every grid vertex; allocating a sample object per nearby road
+    // and filtering another array added garbage without changing the grade.
+    let ownedWeight = 0, ownedY = 0, ownedStrongest = 0, ownedCount = 0;
     for (let i = 0; i < candidates.length; i++) {
       const cut = candidates[i];
       const feature = cut?.feature || cut;
@@ -172,7 +175,18 @@ function createTerrainHeightSamplingApi(deps = {}) {
           ? 1
           : 1 - (shoulderT * shoulderT * (3 - 2 * shoulderT));
         const edgeDistance=Math.max(0,projected.dist-edge);
-        atGradeSamples.push({targetTerrainY,weight,edgeDistance,penetration:Math.max(0,edge-projected.dist)});
+        if (edgeDistance === 0) {
+          const gradeWeight = Math.max(1e-12, Math.max(0, edge-projected.dist)**2);
+          ownedY += targetTerrainY * gradeWeight;
+          ownedWeight += gradeWeight;
+          ownedStrongest = Math.max(ownedStrongest, weight);
+          ownedCount++;
+        } else {
+          const gradeWeight = weight**4 / edgeDistance**2;
+          atGradeWeightedY += targetTerrainY * gradeWeight;
+          atGradeWeightSum += gradeWeight;
+          strongestAtGradeWeight = Math.max(strongestAtGradeWeight, weight);
+        }
         continue;
       }
       const width = Math.max(4.5, Number(cut.width) || Number(feature.width) || 6);
@@ -211,12 +225,10 @@ function createTerrainHeightSamplingApi(deps = {}) {
     // shape unowned ground but cannot vote on an occupied carriageway. Outside
     // the footprint inverse-distance weights approach that boundary value
     // continuously, rather than switching abruptly to the closest road.
-    const owned=atGradeSamples.filter(s=>s.edgeDistance===0);
-    for(const sample of owned.length ? owned : atGradeSamples){
-      const gradeWeight=owned.length ? Math.max(1e-12,sample.penetration**2) : sample.weight**4 / sample.edgeDistance**2;
-      atGradeWeightedY+=sample.targetTerrainY*gradeWeight;
-      atGradeWeightSum+=gradeWeight;
-      strongestAtGradeWeight=Math.max(strongestAtGradeWeight,sample.weight);
+    if (ownedCount) {
+      atGradeWeightedY = ownedY;
+      atGradeWeightSum = ownedWeight;
+      strongestAtGradeWeight = ownedStrongest;
     }
 
     if (atGradeWeightSum > 0) {

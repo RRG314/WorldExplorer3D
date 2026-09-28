@@ -49,19 +49,26 @@ export function createPavementTerrainPartition(meshes = [], {includeFarTerrain =
       const minX=Math.min(...world.map(p=>p.x)),maxX=Math.max(...world.map(p=>p.x)),minZ=Math.min(...world.map(p=>p.z)),maxZ=Math.max(...world.map(p=>p.z));
       for(const g of grids){
         if(maxX<=g.minX+g.ox||minX>=g.maxX+g.ox||maxZ<=g.minZ+g.oz||minZ>=g.maxZ+g.oz)continue;
-        const points=world.map(p=>({x:p.x-g.ox,z:p.z-g.oz})),supports=[];
+        const points=world.map(p=>({x:p.x-g.ox,z:p.z-g.oz}));
         const col0=terrainGridInterval(g.p.array,g.segments,3,0,minX-g.ox),col1=terrainGridInterval(g.p.array,g.segments,3,0,maxX-g.ox);
         const row0=terrainGridInterval(g.p.array,g.segments,g.stride*3,2,minZ-g.oz),row1=terrainGridInterval(g.p.array,g.segments,g.stride*3,2,maxZ-g.oz);
-        for(let row=row0;row<=row1;row++)for(let col=col0;col<=col1;col++){
-          const a=row*g.stride+col,b=a+1,c=a+g.stride,d=c+1;
-          if (!triangleMayOverlapCell(points,g.p.array[a*3],g.p.array[b*3],g.p.array[a*3+2],g.p.array[c*3+2])) continue;
-          for(const ids of [[a,c,b],[b,c,d]]){
-            const [ia,ib,ic]=ids.map(n=>n*3),p=g.p.array;
-            const denominator=(p[ib+2]-p[ic+2])*(p[ia]-p[ic])+(p[ic]-p[ib])*(p[ia+2]-p[ic+2]);
-            supports.push({positions:p,a:ia,b:ib,c:ic,denominator});
+        // Clipping consumes each support synchronously. Reuse one descriptor
+        // instead of materializing two objects plus index arrays for every
+        // terrain cell touched by every road triangle.
+        function* supports(){
+          const p=g.p.array,support={positions:p,a:0,b:0,c:0,denominator:0};
+          for(let row=row0;row<=row1;row++)for(let col=col0;col<=col1;col++){
+            const a=(row*g.stride+col)*3,b=a+3,c=a+g.stride*3,d=c+3;
+            if(!triangleMayOverlapCell(points,p[a],p[b],p[a+2],p[c+2]))continue;
+            support.a=a;support.b=c;support.c=b;
+            support.denominator=(p[c+2]-p[b+2])*(p[a]-p[b])+(p[b]-p[c])*(p[a+2]-p[b+2]);
+            yield support;
+            support.a=b;support.b=c;support.c=d;
+            support.denominator=(p[c+2]-p[d+2])*(p[b]-p[d])+(p[d]-p[c])*(p[b+2]-p[d+2]);
+            yield support;
           }
         }
-        const clipped=projectDecalTriangle(points,supports,0);
+        const clipped=projectDecalTriangle(points,supports(),0);
         contributions.push({kind:"near",vertices:clipped});
         for(let j=0;j<clipped.length;j+=9){
           coveredArea+=Math.abs((clipped[j+3]-clipped[j])*(clipped[j+8]-clipped[j+2])-(clipped[j+5]-clipped[j+2])*(clipped[j+6]-clipped[j]))/2;

@@ -1,6 +1,6 @@
-import {createTerrainHeightSamplingApi} from './height-sampling.js';
-import {sampleFarFieldGridWorldY} from './far-field-geometry.js';
-import {terrainHeightWithPortalCuts} from './structure-terrain-portals.js';
+import {createTerrainHeightSamplingApi} from './height-sampling.js?v=15';
+import {sampleFarFieldGridWorldY} from './far-field-geometry.js?v=18';
+import {terrainHeightWithPortalCuts} from './structure-terrain-portals.js?v=2';
 
 // This snapshot contains geometry and source coordinates only. No scene,
 // renderer, cache or mutable world object crosses the worker boundary.
