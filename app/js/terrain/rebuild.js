@@ -854,7 +854,7 @@ export async function publishCompiledTransportMeshes(deps = {}) {
       try {
         for(const batch of packet.batches)buildIndexedBatchMesh({scene:group,targetList:meshes,
           verts:batch.positions,indices:batch.indices,material:roadMat,renderOrder:2,frustumCulled:true,
-          userData:{isRoadBatch:true,terrainMode:'at_grade',roadSpatialKey:packet.key,sharedRoadMaterial:true,worldLoadSequence:sequence}});
+          userData:{isRoadBatch:true,terrainMode:'at_grade',surfaceRanges:[{start:0,count:batch.indices.length,terrainMode:'at_grade'}],roadSpatialKey:packet.key,sharedRoadMaterial:true,worldLoadSequence:sequence}});
         contact=await createRoadContactIndexCooperatively(meshes,16,schedule);
         // Clip dashes to this region's exact road tops. Neighboring regions own
         // the other pieces; no marking changes physical collision coverage.
@@ -879,10 +879,18 @@ export async function publishCompiledTransportMeshes(deps = {}) {
           const measured=measurePublishedRoadTriangles(mesh.geometry.attributes.position.array,mesh.geometry.getIndex()?.array);
           for(const [key,value] of Object.entries(measured))measurements[key]=(measurements[key]||0)+value;
         }
+        const junctionStats={junctionSamples:0,junctionExactContactMisses:0,junctionPrecisionContacts:0,
+          maximumJunctionCoordinateTolerance:0,maximumJunctionContactDistance:0};
         for(const junction of junctionsByRegion.get(packet.key)||[]){
+          junctionStats.junctionSamples++;
           if(Number.isFinite(contact.sampleAt(junction.x,junction.z,NaN,'at_grade')))continue;
+          junctionStats.junctionExactContactMisses++;
           const tolerance=roadSourceCoordinateTolerance(junction.x,junction.z,STREET_POLYGON_GRID_WORLD);
-          if(!contact.nearestSurfaceAt(junction.x,junction.z,tolerance,'at_grade'))throw new Error(`Missing road contact in region ${packet.key}`);
+          junctionStats.maximumJunctionCoordinateTolerance=Math.max(junctionStats.maximumJunctionCoordinateTolerance,tolerance);
+          const nearest=contact.nearestSurfaceAt(junction.x,junction.z,tolerance,'at_grade');
+          if(!nearest)throw new Error(`Missing road contact in region ${packet.key}`);
+          junctionStats.junctionPrecisionContacts++;
+          junctionStats.maximumJunctionContactDistance=Math.max(junctionStats.maximumJunctionContactDistance,nearest.distance);
         }
         if(!isCurrent())throw new DOMException('Transport region superseded','AbortError');
         // No await between render/contact publication and retirement of the
@@ -892,7 +900,8 @@ export async function publishCompiledTransportMeshes(deps = {}) {
         appCtx.replaceWorldCollection('roadMeshes',[...appCtx.roadMeshes,...meshes]);
         committed=true;
         roadSurfaceIntegrity.carriagewayRegions+=packet.keys.length;
-        roadSurfaceIntegrity.junctionSamples+=(junctionsByRegion.get(packet.key)||[]).length;
+        for(const [key,value] of Object.entries(junctionStats))roadSurfaceIntegrity[key]=key.startsWith('maximum')
+          ?Math.max(roadSurfaceIntegrity[key],value):roadSurfaceIntegrity[key]+value;
         for(const [key,value] of Object.entries(measurements))roadSurfaceIntegrity[key]+=value;
         updateSummary(false);
       } finally {

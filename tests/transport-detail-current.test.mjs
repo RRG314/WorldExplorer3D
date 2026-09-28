@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {planTransportRegions,nearestTransportRegion} from '../app/js/terrain/transport-detail-plan.js';
+import {planTransportRegions,nearestTransportRegion,actorNeedsRoadDetail} from '../app/js/terrain/transport-detail-plan.js';
 import {createTransportDetailCompiler} from '../app/js/terrain/transport-detail-compiler.js';
 import {restoreTransportTerrain} from '../app/js/terrain/transport-terrain-snapshot.js';
 import {createRegionalRoadContact} from '../app/js/terrain/regional-road-contact.js';
@@ -87,4 +87,24 @@ test('regional readiness changes only after the publication callback commits and
  assert.equal(detail.readyAt({x:2500,z:300},0),true);
  detail.dispose();assert.equal(worker.terminated,true);assert.equal(detail.stats.status,'disposed');
  detail.step({x:2500,z:300});assert.equal(detail.stats.status,'disposed');
+});
+
+test('render publication accepts transferred typed buffers and retains terrain mode for contacts',async t=>{
+ const previous=globalThis.THREE;const THREE=await import('three');globalThis.THREE=THREE;t.after(()=>globalThis.THREE=previous);
+ const {buildIndexedBatchMesh}=await import('../app/js/road-render.js');
+ const scene=new THREE.Group(),list=[],material=new THREE.MeshStandardMaterial();
+ buildIndexedBatchMesh({scene,targetList:list,material,verts:new Float32Array([0,2,0,10,2,0,0,2,10]),indices:new Uint32Array([0,2,1]),
+  userData:{isRoadBatch:true,surfaceRanges:[{start:0,count:3,terrainMode:'at_grade'}]}});
+ assert.equal(list.length,1,'a transferred region must not silently disappear at the renderer boundary');
+ const contact=createRoadContactIndex(list);assert.equal(contact.sampleAt(1,1,NaN,'at_grade'),2);
+ contact.dispose();list[0].geometry.dispose();material.dispose();
+});
+
+
+test('ground readiness protects landing and driving without pausing water or high-altitude flight',()=>{
+ assert.equal(actorNeedsRoadDetail({source:'boat',y:0},0),false);
+ assert.equal(actorNeedsRoadDetail({source:'plane',y:300},0),false);
+ assert.equal(actorNeedsRoadDetail({source:'plane',y:100},0),true);
+ assert.equal(actorNeedsRoadDetail({source:'drone',y:300},NaN),true);
+ assert.equal(actorNeedsRoadDetail({source:'drive',y:300},0),true);
 });

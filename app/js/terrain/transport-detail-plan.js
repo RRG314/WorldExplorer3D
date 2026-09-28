@@ -34,3 +34,9 @@ export function nearestTransportRegion(regions,focus) {
   }
   return selected;
 }
+
+export function actorNeedsRoadDetail(point,terrainY) {
+  if(point?.source==='boat')return false;
+  if(['plane','drone'].includes(point?.source)&&Number.isFinite(point.y)&&Number.isFinite(terrainY)&&point.y-terrainY>128)return false;
+  return true;
+}

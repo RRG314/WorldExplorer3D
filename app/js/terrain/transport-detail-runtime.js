@@ -1,6 +1,6 @@
 import {captureTransportTerrain} from './transport-terrain-snapshot.js';
 import {createPavementTerrainMask} from '../world/pavement-terrain-mask.js';
-import {TRANSPORT_REGION_SIZE} from './transport-detail-plan.js';
+import {TRANSPORT_REGION_SIZE,actorNeedsRoadDetail} from './transport-detail-plan.js';
 
 export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,z:0}}) {
   const url=globalThis.__WORLD_EXPLORER_PRODUCTION__?.transportDetailWorkerUrl||new URL('./transport-detail-worker.js',import.meta.url);
@@ -56,8 +56,12 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
     // commits retire only four-byte lookup entries, not the whole atlas.
     stats.heightParity=initial.heightParity;stats.completedRegions=initial.regions.length;stats.pendingRegions=remaining.size;stats.status='near-ready';
     initial.masks=null;
-    const controller={stats,initial,dispose,
+    const controller={stats,initial,dispose,refreshMaterials:()=>mask?.syncMaterials(),
       attach(callback,onComplete=()=>{}){publish=callback;complete=onComplete;},
+      readyForActor(point,terrainY){
+        if(!actorNeedsRoadDetail(point,terrainY)){updateNotice(false);return true;}
+        return controller.readyAt(point);
+      },
       readyAt(point,margin=384){
         if(disposed)return true;
         const x=Number(point?.x)||0,z=Number(point?.z)||0;
