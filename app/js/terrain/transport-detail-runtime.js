@@ -2,7 +2,7 @@ import {captureTransportTerrain} from './transport-terrain-snapshot.js';
 import {createPavementTerrainMask} from '../world/pavement-terrain-mask.js';
 import {TRANSPORT_REGION_SIZE,actorNeedsRoadDetail} from './transport-detail-plan.js';
 
-export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,z:0}}) {
+export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,z:0},terrainReady=null}) {
   const url=globalThis.__WORLD_EXPLORER_PRODUCTION__?.transportDetailWorkerUrl||new URL('./transport-detail-worker.js',import.meta.url);
   const worker=new Worker(url,{type:'module'});
   let pending=null,disposed=false,active=null,publish=null,complete=null,mask=null,notice=null,lastSync=0;
@@ -34,6 +34,15 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
   appCtx._cancelTransportPreparation?.();
   appCtx._cancelTransportPreparation=dispose;
   try {
+    const sourceRoads=roads.map((road,auditIndex)=>({auditIndex,
+      pts:road.pts,width:road.width,metersPerWorldUnit:road.metersPerWorldUnit,resolvedCrossSection:road.resolvedCrossSection,
+      structureSemantics:road.structureSemantics,transportRecord:{crossSection:road.transportRecord?.crossSection}
+    }));
+    const planInput={roads:sourceRoads,focus,maxTextureSize:Math.min(4096,appCtx.renderer.capabilities.maxTextureSize)};
+    if(terrainReady){
+      await Promise.all([request({type:'plan',input:planInput}),terrainReady]);
+      if(disposed||!isCurrent())throw new DOMException('Transport detail superseded','AbortError');
+    }
     const heightProbes=[];
     const stride=Math.max(1,Math.floor(roads.length/256));
     for(let i=0;i<roads.length;i+=stride){
@@ -41,10 +50,9 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
       const y=appCtx.terrainMeshHeightAt(point.x,point.z)+.18;
       heightProbes.push({x:point.x,z:point.z,y});
     }
-    const initial=await request({type:'prepare',input:{roads:roads.map((road,auditIndex)=>({auditIndex,
-      pts:road.pts,width:road.width,metersPerWorldUnit:road.metersPerWorldUnit,resolvedCrossSection:road.resolvedCrossSection,
-      structureSemantics:road.structureSemantics,transportRecord:{crossSection:road.transportRecord?.crossSection}
-    })),terrain:captureTransportTerrain(appCtx),heightProbes,focus,maxTextureSize:Math.min(4096,appCtx.renderer.capabilities.maxTextureSize)}});
+    const initial=await request({type:'prepare',input:{...(terrainReady?{}:planInput),
+      terrain:captureTransportTerrain(appCtx),heightProbes}});
+
     if(!isCurrent())throw new DOMException('Transport detail superseded','AbortError');
     mask=createPavementTerrainMask(appCtx,initial.keys,{kind:'road',cellSize:128,color:[.075,.078,.082],deferUpload:true});
     const size=initial.layout.resolution**2;

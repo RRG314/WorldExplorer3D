@@ -48,12 +48,20 @@ export function nodeDistanceSq(node, location) {
 export function limitWaysByDistance(ways, nodeMap, limit, compareFn, options = {}, location) {
   if (ways.length <= limit) return ways;
 
+  // Selection is synchronous within one immutable location frame. Compute a
+  // source centroid once, rather than once for each sort comparison.
+  const distances = new Map();
+  /** @param {T} way */
+  const distance = (way) => {
+    if (!distances.has(way)) distances.set(way, wayCenterDistanceSq(way, nodeMap, location));
+    return distances.get(way);
+  };
   const sorted = ways
     .slice()
     .sort((a, b) => {
       const cmp = compareFn ? compareFn(a, b) : 0;
       if (cmp !== 0) return cmp;
-      return wayCenterDistanceSq(a, nodeMap, location) - wayCenterDistanceSq(b, nodeMap, location);
+      return distance(a) - distance(b);
     });
 
   if (options?.spreadAcrossArea) {

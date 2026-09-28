@@ -6,15 +6,9 @@ import {restoreTransportTerrain} from './transport-terrain-snapshot.js';
 import {planTransportRegions,nearestTransportRegion} from './transport-detail-plan.js';
 import {createSpatialRoadBatches} from './spatial-road-batches.js';
 
-export function createTransportDetailCompiler({roads,terrain,focus={x:0,z:0},radius,maxTextureSize=4096,heightProbes=[]}) {
-  const restored=restoreTransportTerrain(terrain);
-  const heightParity={samples:heightProbes.length,maximumDifference:0};
-  for(const point of heightProbes){
-    const actual=restored.sampleTop(point.x,point.z),difference=Math.abs(actual-point.y);
-    if(!Number.isFinite(actual)||!Number.isFinite(point.y)||difference>1e-4)throw new Error('Transport terrain snapshot differs from the published height authority');
-    heightParity.maximumDifference=Math.max(heightParity.maximumDifference,difference);
-  }
-  const partition=createPavementTerrainPartition(restored.meshes,{includeFarTerrain:true});
+// The planar footprint is independent of terrain elevation. It can compile
+// while the main thread publishes the final cut/fill surface.
+export function prepareTransportDetailPlan({roads,focus={x:0,z:0},radius,maxTextureSize=4096}) {
   const tiles=prepareCarriagewayTiles(roads);
   const keys=tiles.map(tile=>tile.key),layout=pavementMaskLayout(keys,maxTextureSize);
   const masks=new Uint8Array(keys.length*layout.resolution**2);
@@ -23,6 +17,19 @@ export function createTransportDetailCompiler({roads,terrain,focus={x:0,z:0},rad
     masks.set(rasterizePavementMask(tile.polygons,tile.bounds,layout.resolution),i*layout.resolution**2);
   }
   const plan=planTransportRegions(tiles,focus,radius);
+  return {tiles,keys,layout,masks,plan};
+}
+
+export function createTransportDetailCompiler({roads,terrain,focus={x:0,z:0},radius,maxTextureSize=4096,heightProbes=[],preparedPlan=null}) {
+  const restored=restoreTransportTerrain(terrain);
+  const heightParity={samples:heightProbes.length,maximumDifference:0};
+  for(const point of heightProbes){
+    const actual=restored.sampleTop(point.x,point.z),difference=Math.abs(actual-point.y);
+    if(!Number.isFinite(actual)||!Number.isFinite(point.y)||difference>1e-4)throw new Error('Transport terrain snapshot differs from the published height authority');
+    heightParity.maximumDifference=Math.max(heightParity.maximumDifference,difference);
+  }
+  const partition=createPavementTerrainPartition(restored.meshes,{includeFarTerrain:true});
+  const {tiles,keys,layout,masks,plan}=preparedPlan || prepareTransportDetailPlan({roads,focus,radius,maxTextureSize});
   function compile(region){
     const builder=createSpatialRoadBatches();
     for(const tile of region.tiles){

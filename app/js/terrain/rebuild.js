@@ -423,6 +423,8 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     }
   };
 
+  let preparingDetail=null,cancelPreparation=null,releaseTerrain=()=>{},detailAdopted=false;
+  try {
   if (typeof disableRoadDebugMode === "function") {
     disableRoadDebugMode();
   }
@@ -436,6 +438,22 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   } else if (typeof appCtx.refreshStructureAwareFeatureProfiles === "function") {
     measure('refreshStructureProfiles', () => appCtx.refreshStructureAwareFeatureProfiles());
     await yieldToMainThread();
+  }
+  if(typeof Worker==='function') {
+    const seen=new Set(),planRoads=[];
+    for(const road of baseRoads){
+      if(!road||!Array.isArray(road.pts)||road.pts.length<2)continue;
+      const shared=road.transportSurfacePresentation?.status==='compiled'?road.transportSurfacePresentation:null;
+      if(shared){if(seen.has(shared.id))continue;seen.add(shared.id);}
+      const renderRoad=shared||road;
+      if(renderRoad.structureSemantics?.terrainMode==='at_grade'&&renderRoad.pts?.length>=2)planRoads.push(renderRoad);
+    }
+    const terrainReady=new Promise(resolve=>releaseTerrain=resolve);
+    preparingDetail=prepareTransportDetail(appCtx,planRoads,{isCurrent,terrainReady});
+    // The final publication awaits this same promise. Handle early rejection
+    // while terrain is still compiling, so cancellation never leaks a worker.
+    preparingDetail.catch(()=>{});
+    cancelPreparation=appCtx._cancelTransportPreparation;
   }
   if (typeof applyTransportTerrainCorridors === 'function') {
     await measureAsync('applyTransportTerrainCorridors', () => applyTransportTerrainCorridors({
@@ -616,7 +634,9 @@ export async function publishCompiledTransportMeshes(deps = {}) {
   if(!isCurrent())return;
   await measureAsync('buildCarriagewayRegions',async()=>{
     if(typeof Worker==='function') {
-      detail=await prepareTransportDetail(appCtx,atGradeRoads.map(entry=>entry.road),{isCurrent});
+      releaseTerrain();
+      detail=await preparingDetail;
+      detailAdopted=true;
       appCtx.transportDetail=detail;
       for(const region of detail.initial.regions){
         initialRegionKeys.add(region.key);
@@ -910,4 +930,8 @@ export async function publishCompiledTransportMeshes(deps = {}) {
     },()=>updateSummary(true));
   }
   return appCtx.transportSurfacePublication;
+  } finally {
+    releaseTerrain();
+    if(preparingDetail&&!detailAdopted)cancelPreparation?.();
+  }
 }

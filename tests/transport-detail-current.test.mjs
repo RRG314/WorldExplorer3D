@@ -1,8 +1,9 @@
 import test from 'node:test';
+import {Worker as NodeWorker} from 'node:worker_threads';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {planTransportRegions,nearestTransportRegion,actorNeedsRoadDetail} from '../app/js/terrain/transport-detail-plan.js';
-import {createTransportDetailCompiler} from '../app/js/terrain/transport-detail-compiler.js';
+import {createTransportDetailCompiler,prepareTransportDetailPlan} from '../app/js/terrain/transport-detail-compiler.js';
 import {restoreTransportTerrain} from '../app/js/terrain/transport-terrain-snapshot.js';
 import {createRegionalRoadContact} from '../app/js/terrain/regional-road-contact.js';
 import {createRoadContactIndex} from '../app/js/terrain/road-contact-index.js';
@@ -115,4 +116,55 @@ test('ground readiness protects landing and driving without pausing water or hig
  assert.equal(actorNeedsRoadDetail({source:'plane',y:100},0),true);
  assert.equal(actorNeedsRoadDetail({source:'drone',y:300},NaN),true);
  assert.equal(actorNeedsRoadDetail({source:'drive',y:300},0),true);
+});
+
+
+test('plan-ahead transport produces byte-identical masks and complete geometry from the final terrain',()=>{
+ const serial=createTransportDetailCompiler({roads,terrain:terrain(),radius:1024});
+ const preplanned=prepareTransportDetailPlan({roads,radius:1024});
+ const overlapped=createTransportDetailCompiler({terrain:terrain(),preparedPlan:preplanned});
+ assert.deepEqual(overlapped.initial.masks,serial.initial.masks);
+ assert.deepEqual(overlapped.initial.keys,serial.initial.keys);
+ const serialBatches=serial.initial.regions.flatMap(r=>r.batches),overlapBatches=overlapped.initial.regions.flatMap(r=>r.batches);
+ let packet;while((packet=serial.next()))serialBatches.push(...packet.batches);
+ while((packet=overlapped.next()))overlapBatches.push(...packet.batches);
+ assert.equal(triangles(overlapBatches),triangles(serialBatches));
+ serial.dispose();overlapped.dispose();
+});
+
+test('plan-ahead preparation cannot capture provisional terrain and cancels while waiting for the final surface',async t=>{
+ const previous=globalThis.Worker;const messages=[];let worker;
+ globalThis.Worker=class {
+  constructor(){worker=this;this.terminated=false;}
+  postMessage(message){messages.push(message.type);if(message.type==='plan')queueMicrotask(()=>this.onmessage({data:{type:'planned'}}));}
+  terminate(){this.terminated=true;}
+ };
+ t.after(()=>globalThis.Worker=previous);
+ const {prepareTransportDetail}=await import('../app/js/terrain/transport-detail-runtime.js');
+ let release;const terrainReady=new Promise(resolve=>release=resolve);
+ const ctx={renderer:{capabilities:{maxTextureSize:4096}},get terrainGroup(){throw new Error('Provisional terrain sampled');}};
+ const pending=prepareTransportDetail(ctx,[],{isCurrent:()=>true,terrainReady});
+ const rejected=assert.rejects(pending,{name:'AbortError'});
+ await new Promise(resolve=>setTimeout(resolve,0));assert.deepEqual(messages,['plan']);
+ ctx._cancelTransportPreparation();release();await rejected;assert.equal(worker.terminated,true);assert.deepEqual(messages,['plan']);
+});
+
+
+test('actual transport worker accepts an early planar plan and transfers final terrain geometry',{timeout:30000},async t=>{
+ const url=new URL('../app/js/terrain/transport-detail-worker.js',import.meta.url).href;
+ const code=`const {parentPort}=require('node:worker_threads');globalThis.self={postMessage:(m,transfer)=>parentPort.postMessage(m,transfer)};import(${JSON.stringify(url)}).then(()=>parentPort.on('message',data=>self.onmessage({data})));`;
+ const worker=new NodeWorker(code,{eval:true});t.after(()=>worker.terminate());
+ const request=data=>new Promise((resolve,reject)=>{worker.once('message',resolve);worker.once('error',reject);worker.postMessage(data);}).finally(()=>worker.removeAllListeners('error'));
+ assert.equal((await request({type:'plan',input:{roads,radius:1024}})).type,'planned');
+ const result=await request({type:'prepare',input:{terrain:terrain(),heightProbes:[{x:0,z:0,y:.18}]}});
+ assert.equal(result.type,'prepared');assert.equal(result.heightParity.maximumDifference,0);
+ const batches=result.regions.flatMap(r=>r.batches);
+ for(;;){const next=await request({type:'next',focus:{x:1000,z:0}});if(next.type==='complete')break;assert.equal(next.type,'region');batches.push(...next.batches);}
+ const serial=createTransportDetailCompiler({roads,terrain:terrain(),radius:1024});const expected=serial.initial.regions.flatMap(r=>r.batches);
+ let next;while((next=serial.next({x:1000,z:0})))expected.push(...next.batches);
+ assert.equal(triangles(batches),triangles(expected));serial.dispose();
+ // Reusing the worker must discard the previous plan and geometry.
+ await request({type:'plan',input:{roads:[],radius:1024}});
+ const empty=await request({type:'prepare',input:{terrain:terrain()}});assert.equal(empty.totalCells,0);
+ assert.equal((await request({type:'next',focus:{x:0,z:0}})).type,'complete');
 });
