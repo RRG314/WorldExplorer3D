@@ -69,3 +69,55 @@ The full component/source-contract suite passed 1,447 cases before the sparse-ov
 Local receipts are under `output/architecture-evaluation/native-memory/`. `baseline`, `categories`, and `workers` inspect the old `5e88a56b` candidate; `optimized` and `optimized-journey` inspect geometry/terrain changes; `sparse-journey` inspects sparse preparation. Their `settled` label means **road-detail complete**, not complete pavement overview. It must not be reported as fully idle gameplay. `final-complete` attempted a separate completed-overview milestone but failed its readiness assertion; it is not passing evidence. The follow-up `completed-world/completion-receipt.json` records monotonically increasing cell progress, stable source identities, successful completion and worker shutdown. It does not reproduce a restart. After those measurements, its optional daylight screenshot setup attempted to import an unshipped source module and failed. This is a harness error; that run did not execute its later movement/menu checks and is not labeled a complete journey. The error is preserved in `failure.json`. Earlier `sparse-journey` supplies actual walking, driving, flight and Main Menu evidence. The final packaged Moon smoke passed on `8910f7d5`; its screenshot and the final Earth road-ready screenshot were inspected.
 
 The diagnostic journey applies GC and a browser memory-pressure notification only after the natural measurements and Main Menu return. These are diagnostic probes, not application behavior or evidence of a user-visible fix. Even that probe does not release all native allocation charges. The remaining native allocation ownership is unresolved.
+
+
+## September 28: scalar ground queries and overlapped publication
+
+The latest runtime is `e6641af4`. Height-only queries now bypass diagnostic sample
+objects while preserving the rich provenance API. Exact Float64 coordinates use a
+bounded typed cache. Mapped-water sampling first selects conservative geographic
+buckets and then applies the original containment/bed calculation. No elevations,
+water holes or detail settings are approximated.
+
+Planar road compilation now begins while final terrain is being published. A
+readiness barrier prevents elevation snapshots or height probes from observing
+provisional terrain. Worker cancellation, serial/preplanned complete geometry
+parity and actual worker reuse are covered by the targeted tests. Initial region
+publication still waits for the final terrain and contact geometry.
+
+| Baltimore measurement | Previous `8910f7d5` | Latest `e6641af4` |
+|---|---:|---:|
+| First playable, individual unprofiled run | 59.25 s | 49.99 s |
+| Transport publication | Earlier 22–26 s range | 16.96 s |
+| Completed background, primary renderer footprint | 3,119 MiB | About 2,684 MiB |
+| Completed background, browser-owned footprint sum | 4,311 MiB | About 3,979 MiB |
+| Natural completed main heap / backing storage | 429.7 / 497.8 MiB | 403.5 / 503.2 MiB |
+
+The latest run preserved 25,507 buildings, 18,759 roads, 49 terrain tiles and all
+4,358 overview cells. All 555 refined road regions completed; 260 height probes
+had zero difference. It exercised walking, driving, flight and Main Menu without
+browser errors. These are individual runs, not a percentile or a guarantee for
+other locations. A separate fresh repeat entered in 49.36 seconds.
+
+Detailed Chromium allocator tracing after background completion attributed about
+745 MiB to V8, 795 MiB to PartitionAlloc and 295 MiB to malloc in the main renderer.
+After a diagnostic collection on Main Menu, V8 was about 56 MiB, PartitionAlloc
+333 MiB and malloc 213 MiB, while the native footprint remained about 1.65 GiB.
+The trace includes allocation ownership edges: parent/child and shared categories
+must not be added together indiscriminately. See Chromium's
+[memory-infra documentation](https://chromium.googlesource.com/chromium/src/+/main/docs/memory-infra/README.md).
+This rules out equating the entire process footprint with retained JavaScript
+objects; it does not establish that the unexplained remainder is a browser bug.
+
+The earlier performance harness imposed a 1,280 MiB V8 limit and collected garbage
+between mode measurements. The harness now uses ordinary allocation behavior for
+loading and active-play budgets, with post-GC values explicitly reserved for
+retained-object diagnosis. It still does not turn a JavaScript budget into a
+whole-process budget.
+
+Evidence: `native-memory/numeric-ground`, `native-memory/overlapped-ground` and
+`native-memory/cycles-ground` under the local architecture output directory.
+The last directory remains in progress until its report is complete. Short flight
+samples in the first two runs were approximately 28 FPS with long-frame spikes;
+these do not pass the inherited desktop frame-time gate. Sustained-flight
+profiling and repeated natural-memory cycles are the next acceptance checks.

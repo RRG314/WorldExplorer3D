@@ -14,8 +14,9 @@ const verifyRoot = process.env.WE3D_VERIFY_ROOT || root;
 const budgets = JSON.parse(await readFile(`${root}/config/performance-budgets.json`, 'utf8'));
 const server = await startStaticServer({ rootDir: verifyRoot, ports: [4421, 4422, 4423] });
 const baseUrl = `http://127.0.0.1:${server.port}`;
-// Keep GC within this 8 GiB host's test-process envelope; acceptance budgets stay unchanged.
-const browserOptions = { headless: true, channel: 'chrome', args: ['--js-flags=--max-old-space-size=1280'] };
+// Match ordinary browser allocation behavior. A test-only heap cap changes GC
+// frequency and can disguise the allocation footprint users experience.
+const browserOptions = { headless: true, channel: 'chrome', args: [] };
 let browser = await chromium.launch(browserOptions);
 let graphicsAuthority = null;
 const requestedProfile = String(process.env.WE3D_VERIFY_PROFILE || 'all').trim().toLowerCase();
@@ -136,7 +137,7 @@ async function launchWorld(client) {
   milestones.documentLoadedMs = Date.now() - startedAt;
   await client.page.waitForFunction(() => globalThis.__WE3D_RUNTIME_READY__ === true, null, { timeout: 120_000 });
   milestones.runtimeReadyMs = Date.now() - startedAt;
-  const titleHeapBytes = await heapUsedBytes(client.cdp, true);
+  const titleHeapBytes = await heapUsedBytes(client.cdp);
   await client.page.waitForSelector('#globeSelectorScreen.show', { timeout: 60_000 });
   if (await client.page.locator('#analyticsConsentDenyBtn').isVisible().catch(() => false)) {
     await client.page.locator('#analyticsConsentDenyBtn').click();
@@ -185,7 +186,7 @@ async function measureMode(client, id, sampleMs = 5_000, movementKey = null) {
   const deltas = raw.deltas.filter((value) => Number.isFinite(value) && value > 0);
   const averageFrameMs = deltas.reduce((sum, value) => sum + value, 0) / Math.max(1, deltas.length);
   const rawJsHeapUsedBytes = await heapUsedBytes(client.cdp);
-  const jsHeapUsedBytes = await heapUsedBytes(client.cdp, true);
+  const jsHeapUsedBytes = rawJsHeapUsedBytes;
   return {
     id,
     scenario: movementKey ? 'controlled-moving-route' : id === 'plane' ? 'autonomous-flight' : 'stationary-mode',
@@ -286,7 +287,11 @@ async function runDesktop() {
         return state.gameStarted === false && state.titleVisible === true && state.lastEarthWorldRelease?.released === true;
       }, null, { timeout: 30_000 });
       const release = await client.page.evaluate(() => globalThis.getWorldExplorerRuntimeDiagnostics?.().lastEarthWorldRelease || null);
+      // Record natural behavior before collecting solely to diagnose retained
+      // ownership. Never use the collected value as an active-play budget.
+      release.naturalJsHeapUsedBytes = await heapUsedBytes(client.cdp);
       release.jsHeapUsedBytes = await heapUsedBytes(client.cdp, true);
+      release.heapEvidenceScope = 'post-GC retained objects; not process memory';
       releases.push(release);
       await client.page.locator('#globeSelectorStartBtn').click();
       await waitForPlayable(client.page);
