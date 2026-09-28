@@ -1,4 +1,5 @@
-import { resetRoadSearchIndex } from './navigation.js';
+import { resetRoadMapIndex } from '../map/earth-base.js?v=4';
+import { resetRoadSearchIndex } from './navigation.js?v=6';
 import { releaseLocationModels } from './release-location-models.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { clearBuildingExteriorMaterialPool } from "../engine/building-facade-materials.js?v=19";
@@ -237,6 +238,7 @@ export function resetWorldForReload(options = {}) {
   appCtx.clearEarthWorldSceneObjects?.();
 
   resetRoadSearchIndex();
+  resetRoadMapIndex();
   appCtx.GroundHeight?.invalidate?.();
   resetWorldFurnitureCaches();
   if (typeof appCtx.invalidateRoadCache === 'function') appCtx.invalidateRoadCache();

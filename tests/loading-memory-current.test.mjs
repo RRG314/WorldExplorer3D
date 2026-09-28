@@ -61,7 +61,7 @@ test('world reset releases derived transport models as well as scene objects',as
  const appCtx={resetEarthStreaming(){},replaceWorldCollection(k){this[k]=[];},clearWorldCollections(keys){for(const k of keys)this[k]=[];}};
  let groundInvalidations=0;appCtx.GroundHeight={invalidate(){groundInvalidations++;}};
  for(const key of keys)appCtx[key]={oldWorldFeature:{}};
- const context=vm.createContext({appCtx,resetRoadSearchIndex(){},releaseLocationModels(){},clearBuildingExteriorMaterialPool(){},clearBuildingExteriorDetails(){}});
+ const context=vm.createContext({appCtx,resetRoadMapIndex(){},resetRoadSearchIndex(){},releaseLocationModels(){},clearBuildingExteriorMaterialPool(){},clearBuildingExteriorDetails(){}});
  vm.runInContext(source,context);context.resetWorldForReload({showLoading:false});
  for(const key of keys)assert.equal(appCtx[key],null,key);
  assert.equal(groundInvalidations,1);
@@ -101,4 +101,13 @@ test('road search reset drops old source roots and rebuilds for the next city',a
  vm.runInContext('rebuildRoadSearchIndexIfNeeded()',context);
  assert.equal(vm.runInContext('roadSearchFeatureSet.has(appCtx.roads[0])',context),true);
  assert.equal(vm.runInContext('roadSearchBaseRef',context),appCtx.roads);
+});
+
+
+test('minimap reset releases the entire previous road index before the next view',async()=>{
+ const source=(await readFile(new URL('../app/js/map/earth-base.js',import.meta.url),'utf8')).replace(/export \{[^}]+\};/g,'').replace(/^import[^;]+;\s*/gm,'').replaceAll('export function','function');
+ const context=vm.createContext({appCtx:{},roads:[{pts:[{x:0,z:0},{x:100,z:0}]}]});vm.runInContext(source,context);
+ vm.runInContext('rebuildRoadMapIndex(roads)',context);assert.equal(vm.runInContext('roadMapIndex.source===roads',context),true);
+ context.resetRoadMapIndex();assert.equal(vm.runInContext('roadMapIndex',context),null);
+ vm.runInContext('rebuildRoadMapIndex(roads)',context);assert.equal(vm.runInContext('roadMapIndexIsCurrent(roads)',context),true);
 });

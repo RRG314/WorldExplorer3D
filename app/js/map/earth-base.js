@@ -4,6 +4,8 @@ import { loadTile } from "./tiles.js?v=5";
 const ROAD_MAP_INDEX_CELL_SIZE = 256;
 let roadMapIndex = null;
 
+export function resetRoadMapIndex() { roadMapIndex = null; }
+
 function roadMapIndexIsCurrent(roads) {
   return roadMapIndex?.source === roads &&
     roadMapIndex.length === roads.length &&
