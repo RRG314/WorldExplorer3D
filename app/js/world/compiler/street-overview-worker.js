@@ -16,6 +16,9 @@ self.onmessage=({data})=>{
    const tile=plan.tiles[selected];pending.delete(selected);
    const result=compilePavementTile(tile,plan.metersPerWorldUnit,{includeMarkings:false});
    const resolution=data.resolution||64,mask=rasterizePavementMask(result.polygons,tile.bounds,resolution);
+   // This cell will never compile again in this plan. Drop its source/context
+   // arrays as soon as its mask exists, rather than retaining every finished cell.
+   plan.tiles[selected]=null;
    const coveredSquareWorldUnits=mask.reduce((sum,n)=>sum+n/255,0)*(64/resolution)**2;
    self.postMessage({type:'tile',key:tile.key,bounds:tile.bounds,mask,coveredSquareWorldUnits,remaining:pending.size},[mask.buffer]);
   }
