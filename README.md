@@ -6,10 +6,12 @@
 
 [![Code and package checks](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml/badge.svg?branch=stable)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml)
 [![Secret Scan](https://github.com/RRG314/WorldExplorer3D/actions/workflows/secret-scan.yml/badge.svg?branch=stable)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/secret-scan.yml)
-[![Release checks](https://github.com/RRG314/WorldExplorer3D/actions/workflows/release-verify.yml/badge.svg?branch=stable)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/release-verify.yml)
 [![GitHub Pages](https://github.com/RRG314/WorldExplorer3D/actions/workflows/deploy-pages-public.yml/badge.svg?branch=stable)](https://rrg314.github.io/WorldExplorer3D/)
 [![Release](https://img.shields.io/github/v/release/RRG314/WorldExplorer3D?sort=date)](https://github.com/RRG314/WorldExplorer3D/releases/latest)
 [![License: Source Available](https://img.shields.io/badge/license-source--available-lightgrey)](LICENSE)
+
+[Manual browser/backend verification](https://github.com/RRG314/WorldExplorer3D/actions/workflows/release-verify.yml)
+reports selected checks; it is not an overall release or performance badge.
 
 World Explorer 3D is a browser-based world sandbox built around real places.
 Choose a location, step into a bounded playable world, and explore by land,
