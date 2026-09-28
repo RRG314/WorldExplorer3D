@@ -496,6 +496,7 @@ function applyManualTimePreset(time) {
   applySkyVisualState({ ...config, phase: time }, {
     source: "manual",
     phase: time,
+    visual: { ...config, phase: time },
     sun: {
       visible: time !== "night",
       daylightFactor: time === "day" ? 1 : 0.45,

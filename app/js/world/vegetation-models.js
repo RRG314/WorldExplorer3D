@@ -34,17 +34,28 @@ function requestModel(ctx, kind) {
         throw failure.reason;
       }
       const instances=results.map(result=>result.value);
-      state.parts = instances.map(instance=>{
+      instances[0].root.updateMatrixWorld(true);
+      const primaryBounds = new THREE.Box3().setFromObject(instances[0].root);
+      const height = primaryBounds.max.y-primaryBounds.min.y;
+      const normalizedScale = (kind === 'grass' ? 1.2 : kind === 'fern' ? 0.7 : kind === 'shrub' ? 1.8 : 9) / Math.max(height,0.1);
+      // Tree LODs are derived from the same material set (verified by the asset
+      // contract). Reuse near textures so switching LOD does not upload a second
+      // identical set of maps to the GPU. Geometry remains independent.
+      const sharedMaps = new Map();
+      state.parts = instances.map((instance,level)=>{
         instance.root.updateMatrixWorld(true);
-        const bounds = new THREE.Box3().setFromObject(instance.root);
-        const height = bounds.max.y-bounds.min.y;
-        const normalizedScale = (kind === 'grass' ? 1.2 : kind === 'fern' ? 0.7 : kind === 'shrub' ? 1.8 : 9) / Math.max(height,0.1);
         const parts=[];
         instance.root.traverse(mesh=>{
           if(!mesh.isMesh) return;
           const geometry=mesh.geometry.clone();geometry.applyMatrix4(mesh.matrixWorld);
-          geometry.translate(0,-bounds.min.y,0);geometry.scale(normalizedScale,normalizedScale,normalizedScale);
-          const material=mesh.material.clone();material.roughness=0.93;
+          geometry.translate(0,-primaryBounds.min.y,0);geometry.scale(normalizedScale,normalizedScale,normalizedScale);
+          const material=mesh.material.clone();
+          for(const slot of ['map','normalMap','roughnessMap','metalnessMap','aoMap','emissiveMap']) {
+            const key=`${material.name}:${slot}`;
+            if(level===0 && material[slot])sharedMaps.set(key,material[slot]);
+            else if(material[slot] && sharedMaps.has(key))material[slot]=sharedMaps.get(key);
+          }
+          if(material.alphaTest>0)material.alphaToCoverage=true;
           // Templates own geometry and textures across reloads; cells own materials and instance buffers.
           geometry.userData.sharedRuntimeGeometry=true;
           for(const value of Object.values(material)) if(value?.isTexture) {

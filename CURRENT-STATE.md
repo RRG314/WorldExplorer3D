@@ -5,7 +5,11 @@ Updated September 28, 2026.
 ## Workspace and authority
 
 Worktree: `/Users/stevenreid/.codex/worktrees/architecture-evaluation/WorldExplorer3D-live-deployed-20260320`.
-Branch: `steven/architecture-evaluation`.
+Branch: `steven/visual-quality`.
+
+Visual-quality implementation is in progress locally. See
+`docs/visual-quality/PLAN.md` and `docs/visual-quality/EVIDENCE.md`.
+The local rendering and asset changes are not the deployed build.
 
 The owner authorized production deployment and GitHub updates on September 28,
 superseding earlier local-only instructions. Keep ordinary Chrome open. Run

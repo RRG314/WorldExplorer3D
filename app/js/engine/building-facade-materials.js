@@ -1,4 +1,4 @@
-import { FACADE_OPENINGS_GLSL } from '../world/building-facade-layout.js?v=2';
+import { FACADE_OPENINGS_GLSL } from '../world/building-facade-layout.js?v=3';
 import {
   MATERIAL_VARIANTS,
   buildingExteriorCatalogSnapshot,
@@ -349,6 +349,7 @@ function facadeEntranceAtlas(appCtx) {
 }
 
 function applyWallOnlyFacadeMap(material, roof, entranceAtlas, exteriorProfile) {
+  material.extensions = { ...material.extensions, derivatives: true };
   const facadeProjection = new THREE.Vector4(...material.userData.facadeProjection);
   const roofA = new THREE.Color(roof.colorA);
   const roofB = new THREE.Color(roof.colorB);
@@ -453,7 +454,7 @@ function applyWallOnlyFacadeMap(material, roof, entranceAtlas, exteriorProfile) 
       ].join('\n')
     );
   };
-  material.customProgramCacheKey = () => 'building-facade-local-layout-v10-catalog-albedo';
+  material.customProgramCacheKey = () => 'building-facade-local-layout-v11-filtered-openings';
 }
 
 export function resolveBuildingExteriorPresentation(engineContext, buildingType, buildingSeed, baseColorHex, options = {}) {

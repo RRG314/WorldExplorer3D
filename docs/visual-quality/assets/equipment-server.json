@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "assetId": "solis-equipment-server",
+  "sourceUrl": "https://sketchfab.com/3d-models/sci-fi-servers-37fd7c8ef38d4e5290cf6597394909c8",
+  "attribution": "Sci-Fi Servers by Michael V",
+  "license": "CC-BY-4.0",
+  "sourceSha256": "9d8edd01d012b52f727c6fc9eacca1180935c81b27fc35987aa0bb06986527f6",
+  "outputSha256": "460e316eac58d6b4afba9807061c4a2d43a01e9bf2d8400a3674f54e10dc05d7",
+  "recipe": {
+    "nodes": null,
+    "textureEdge": 1024,
+    "format": "webp",
+    "quality": 90,
+    "consoleEnvelope": null
+  },
+  "bytes": 473288,
+  "triangles": 5899,
+  "primitives": 2,
+  "bounds": {
+    "min": [
+      -0.37509744521012633,
+      -0.00008780747739828287,
+      -0.7209145510498758
+    ],
+    "max": [
+      0.3675537921289995,
+      0.7388323356200637,
+      0.11676129659227495
+    ]
+  },
+  "textures": [
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    }
+  ],
+  "extensions": [
+    "KHR_materials_emissive_strength",
+    "KHR_materials_transmission"
+  ],
+  "materialCompatibility": {
+    "emissiveStrength": "r128 runtime adapter",
+    "specular": "standard PBR fallback; optional source extension retained"
+  }
+}

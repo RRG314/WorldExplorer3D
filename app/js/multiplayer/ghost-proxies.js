@@ -1,3 +1,5 @@
+import { attachCuratedExplorerCharacter } from '../walking/curated-explorer-character.js?v=8';
+
 function drawRoundedRect(ctx, x, y, width, height, radius) {
   if (typeof ctx.roundRect === 'function') {
     ctx.beginPath();
@@ -59,59 +61,15 @@ function createNameTag(THREE, labelText) {
 
 function createWalkerProxy(THREE) {
   const group = new THREE.Group();
-  const scale = 1.35;
-  const bodyMat = new THREE.MeshBasicMaterial({ color: 0x7eb6f2 });
-  const headMat = new THREE.MeshBasicMaterial({ color: 0xf3dcc2 });
-  const legMat = new THREE.MeshBasicMaterial({ color: 0x6b7280 });
-
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.42 * scale, 0.62 * scale, 0.28 * scale), bodyMat);
-  body.position.y = 1.0 * scale;
-  group.add(body);
-
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.22 * scale, 16, 14), headMat);
-  head.position.y = 1.55 * scale;
-  group.add(head);
-
-  const legLeftPivot = new THREE.Group();
-  const legLeft = new THREE.Mesh(new THREE.BoxGeometry(0.16 * scale, 0.62 * scale, 0.16 * scale), legMat);
-  legLeft.position.y = -0.31 * scale;
-  legLeftPivot.position.set(-0.11 * scale, 0.71 * scale, 0);
-  legLeftPivot.add(legLeft);
-  group.add(legLeftPivot);
-
-  const legRightPivot = new THREE.Group();
-  const legRight = new THREE.Mesh(new THREE.BoxGeometry(0.16 * scale, 0.62 * scale, 0.16 * scale), legMat);
-  legRight.position.y = -0.31 * scale;
-  legRightPivot.position.set(0.11 * scale, 0.71 * scale, 0);
-  legRightPivot.add(legRight);
-  group.add(legRightPivot);
-
-  const armMat = bodyMat.clone();
-  armMat.color.setHex(0x6ea8ec);
-
-  const armLeftPivot = new THREE.Group();
-  const armLeft = new THREE.Mesh(new THREE.BoxGeometry(0.10 * scale, 0.52 * scale, 0.10 * scale), armMat);
-  armLeft.position.y = -0.26 * scale;
-  armLeftPivot.position.set(-0.26 * scale, 1.21 * scale, 0);
-  armLeftPivot.add(armLeft);
-  group.add(armLeftPivot);
-
-  const armRightPivot = new THREE.Group();
-  const armRight = new THREE.Mesh(new THREE.BoxGeometry(0.10 * scale, 0.52 * scale, 0.10 * scale), armMat);
-  armRight.position.y = -0.26 * scale;
-  armRightPivot.position.set(0.26 * scale, 1.21 * scale, 0);
-  armRightPivot.add(armRight);
-  group.add(armRightPivot);
-
-  group.userData.limbs = {
-    scale,
-    body,
-    legLeftPivot,
-    legRightPivot,
-    armLeftPivot,
-    armRightPivot
-  };
-
+  group.name = 'remote-explorer';
+  // Use the same normalized asset and animation as the local player. The
+  // character loader cancels attachment if the proxy leaves during loading.
+  group.userData.characterReady = attachCuratedExplorerCharacter(THREE, group, {
+    role: 'player-character',
+    failClosed: true,
+    hideAuthoredWeapons: true,
+    isCurrent: () => !!group.parent
+  });
   return group;
 }
 
@@ -228,7 +186,7 @@ function nameTagHeightForProxy(proxyType) {
   if (proxyType === 'car') return 2.55;
   if (proxyType === 'drone') return 2.25;
   if (proxyType === 'space') return 3.0;
-  return 3.3;
+  return 2.3;
 }
 
 function yOffsetForProxy(proxyType) {

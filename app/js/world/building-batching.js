@@ -1,6 +1,6 @@
 import {GeometryBatchStorage, batchStorageView} from './geometry-batch-storage.js';
 import {compactBuildingVertices} from './building-vertex-storage.js';
-import { FACADE_OPENINGS_GLSL } from './building-facade-layout.js?v=2';
+import { FACADE_OPENINGS_GLSL } from './building-facade-layout.js?v=3';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   boundingSphereCenter,
@@ -48,6 +48,7 @@ export function appendMidFacadeAttributes(batch, material, exteriorPresentation,
 
 export function createMidFacadeBatchMaterial(sourceMaterial, batchKey) {
   const material = sourceMaterial.clone();
+  material.extensions = { ...material.extensions, derivatives: true };
   material.color.setHex(0xffffff);
   material.vertexColors = true;
   material.onBeforeCompile = (shader) => {
@@ -119,7 +120,7 @@ export function createMidFacadeBatchMaterial(sourceMaterial, batchKey) {
       ].join('\n')
     );
   };
-  material.customProgramCacheKey = () => 'building-mid-facade-batch-v6-catalog-albedo';
+  material.customProgramCacheKey = () => 'building-mid-facade-batch-v7-filtered-openings';
   material.userData = {
     ...(material.userData || {}),
     buildingMidFacadeBatch: true,

@@ -81,9 +81,8 @@ export function applyRenderQuality(ctx, level, options = {}) {
   ctx.appCtx.renderQualityLevel = normalized;
   if (options.persist !== false) ctx.writeStorage(ctx.RENDER_QUALITY_STORAGE_KEY, normalized);
 
-  if (ctx.appCtx.renderer) {
-    ctx.appCtx.renderer.toneMappingExposure = normalized === ctx.RENDER_QUALITY_HIGH ? 0.95 : normalized === ctx.RENDER_QUALITY_MED ? 0.9 : 0.85;
-  }
+  // Weather and the active world own exposure. A cost/detail change must not
+  // recolour the same place, especially while inside a ship or on another body.
   if (ctx.appCtx.sun) {
     applyDirectionalShadowPolicy(ctx.appCtx, {
       gpuTier: ctx.state.currentGpuTier,
@@ -96,25 +95,6 @@ export function applyRenderQuality(ctx, level, options = {}) {
     publishEarthEnvironment(ctx, ctx.state.hdrEnvMap);
   } else if (ctx.state.fallbackEnvMap) {
     publishEarthEnvironment(ctx, ctx.state.fallbackEnvMap);
-  }
-
-  if (ctx.state.carPaintMaterial) {
-    const high = normalized === ctx.RENDER_QUALITY_HIGH;
-    const utilityMatte = ctx.state.carPaintMaterial.userData?.vehiclePaintFinish === 'utility-matte';
-    ctx.state.carPaintMaterial.envMapIntensity = utilityMatte
-      ? (high ? 0.9 : normalized === ctx.RENDER_QUALITY_MED ? 0.7 : 0.4)
-      : (high ? 1.5 : normalized === ctx.RENDER_QUALITY_MED ? 1.2 : 0.65);
-    ctx.state.carPaintMaterial.roughness = utilityMatte
-      ? (high ? 0.44 : normalized === ctx.RENDER_QUALITY_MED ? 0.52 : 0.6)
-      : (high ? 0.14 : 0.2);
-    ctx.state.carPaintMaterial.metalness = utilityMatte
-      ? (high ? 0.3 : normalized === ctx.RENDER_QUALITY_MED ? 0.24 : 0.18)
-      : (high ? 0.95 : 0.88);
-    if ('clearcoat' in ctx.state.carPaintMaterial) {
-      ctx.state.carPaintMaterial.clearcoat = 0.0;
-      ctx.state.carPaintMaterial.clearcoatRoughness = 1.0;
-    }
-    ctx.state.carPaintMaterial.needsUpdate = true;
   }
 
   if (ctx.appCtx.ssaoPass) ctx.appCtx.ssaoPass.enabled = ctx.state.ssaoEnabled && normalized === ctx.RENDER_QUALITY_HIGH;

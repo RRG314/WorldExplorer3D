@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 1,
+  "assetId": "solis-command-console",
+  "sourceUrl": "https://sketchfab.com/3d-models/sci-fi-computer-room-a149d5bfcef6496c9a0606b5ce5ebf27",
+  "attribution": "Sci-Fi Computer Room by Michael V; extracted desk and instruments",
+  "license": "CC-BY-4.0",
+  "sourceSha256": "2d418181f7b106f980232b034640116ea4f0713857a15c9d0986f71eb341249e",
+  "outputSha256": "03c965a151e99d5bc4bf3fbd7d49a9363b32ccf74d35ae71d279671e74134aec",
+  "recipe": {
+    "nodes": [
+      "Object_2",
+      "Object_4",
+      "Object_5",
+      "Object_9",
+      "Object_13"
+    ],
+    "textureEdge": 1024,
+    "format": "webp",
+    "quality": 90,
+    "consoleEnvelope": {
+      "min": [
+        -1.49,
+        -0.3,
+        -0.161
+      ],
+      "max": [
+        0.34,
+        0.33,
+        0.556
+      ],
+      "simplification": {
+        "ratio": 0.75,
+        "error": 0.0005,
+        "lockBorder": true
+      }
+    }
+  },
+  "bytes": 1210696,
+  "triangles": 15245,
+  "primitives": 7,
+  "bounds": {
+    "min": [
+      -1.4829688116398998,
+      -1.0624105792947347,
+      -0.16015278395405738
+    ],
+    "max": [
+      0.33735088675561187,
+      0.3224422578465446,
+      0.5552265211001737
+    ]
+  },
+  "textures": [
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    }
+  ],
+  "extensions": [
+    "KHR_materials_emissive_strength"
+  ],
+  "materialCompatibility": {
+    "emissiveStrength": "r128 runtime adapter",
+    "specular": "standard PBR fallback; optional source extension retained"
+  }
+}

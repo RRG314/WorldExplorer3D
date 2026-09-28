@@ -7,7 +7,8 @@ export const TERRAIN_SURFACE_CLASS = Object.freeze({
   rock: 5,
   snow: 6,
   moss: 7,
-  wetland:8
+  wetland:8,
+  bare:9
 });
 
 const MATERIAL_ATTRIBUTE_A = 'terrainSurfaceMixA';
@@ -50,12 +51,10 @@ export function terrainSurfaceClassForWorldCover(name = '', latitude = 0) {
     return TERRAIN_SURFACE_CLASS.forest;
   }
   if (normalized === 'crop') return TERRAIN_SURFACE_CLASS.soil;
-  if (normalized === 'bare') {
-    const absoluteLatitude = Math.abs(Number(latitude) || 0);
-    return absoluteLatitude >= 12 && absoluteLatitude <= 35
-      ? TERRAIN_SURFACE_CLASS.sand
-      : TERRAIN_SURFACE_CLASS.rock;
-  }
+  // WorldCover's bare class includes exposed soil, rock and sand. Latitude
+  // alone cannot identify dunes; keep it a neutral mineral mixture and let
+  // mapped surfaces, imagery and slope supply the more specific evidence.
+  if (normalized === 'bare') return TERRAIN_SURFACE_CLASS.bare;
   if (normalized === 'snow') return TERRAIN_SURFACE_CLASS.snow;
   if (normalized === 'moss') return TERRAIN_SURFACE_CLASS.moss;
   if (normalized === 'wetland') return TERRAIN_SURFACE_CLASS.wetland;
@@ -85,6 +84,7 @@ export function terrainSurfaceMixForClass(surfaceClass = TERRAIN_SURFACE_CLASS.g
   else if (surfaceClass === TERRAIN_SURFACE_CLASS.snow) mixB[1] = 1;
   else if (surfaceClass === TERRAIN_SURFACE_CLASS.moss) { mixA[3] = 0.45; mixB[0] = 0.55; }
   else if (surfaceClass === TERRAIN_SURFACE_CLASS.wetland) mixA[3]=0.55;
+  else if (surfaceClass === TERRAIN_SURFACE_CLASS.bare) { mixA[3]=0.45; mixB[0]=0.55; }
   return { mixA, mixB };
 }
 
@@ -216,13 +216,16 @@ export function applyTerrainReliefMaterialMix(mesh) {
     const sand = Math.max(0, terrainAttributeComponent(attributes.mixA, index, 1));
     const snow = Math.max(0, terrainAttributeComponent(attributes.mixB, index, 1));
     const protectedWeight = Math.min(1, urban + sand + snow);
-    const rock = Math.max(
-      Math.max(0, terrainAttributeComponent(attributes.mixB, index, 0)),
-      slopeRock * (1 - protectedWeight)
-    );
-    if (rock <= 0.001) continue;
+    const available = 1 - protectedWeight;
+    const previousRock = Math.min(available, Math.max(0, terrainAttributeComponent(attributes.mixB, index, 0)));
+    const rock = Math.max(previousRock, slopeRock * available);
+    if (rock <= previousRock + 0.001) continue;
 
-    const naturalScale = Math.max(0, 1 - rock);
+    // Redistribute only the remaining natural cover. Scaling by (1-rock)
+    // repeatedly darkened forest tiles on refresh, and could make mixed urban
+    // and rock weights exceed one. Existing rock and mapped cover stay fixed.
+    const naturalScale = available > previousRock
+      ? Math.max(0, (available - rock) / (available - previousRock)) : 0;
     setNormalizedTerrainAttribute(attributes.mixA, index, [
       urban,
       sand,
@@ -323,9 +326,12 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
             '  vec3 rockAxes = pow(abs(normalize(vTerrainDetailNormal)), vec3(4.0));',
             '  rockAxes /= max(dot(rockAxes, vec3(1.0)), 0.0001);',
             '  vec3 rockPoint = vTerrainDetailPosition * 0.125;',
-            '  terrainRockColor = mapTexelToLinear(texture2D(terrainRockMap, rockPoint.yz)) * rockAxes.x;',
-            '  terrainRockColor += mapTexelToLinear(texture2D(terrainRockMap, rockPoint.xz)) * rockAxes.y;',
-            '  terrainRockColor += mapTexelToLinear(texture2D(terrainRockMap, rockPoint.xy)) * rockAxes.z;',
+            // Metre-scale pebbles must not become a repeated cliff pattern at distance.
+            // A positive mip bias filters the same physical material, without extra samplers.
+            '  float rockMipBias = 1.5 * smoothstep(40.0, 300.0, length(vViewPosition));',
+            '  terrainRockColor = mapTexelToLinear(texture2D(terrainRockMap, rockPoint.yz, rockMipBias)) * rockAxes.x;',
+            '  terrainRockColor += mapTexelToLinear(texture2D(terrainRockMap, rockPoint.xz, rockMipBias)) * rockAxes.y;',
+            '  terrainRockColor += mapTexelToLinear(texture2D(terrainRockMap, rockPoint.xy, rockMipBias)) * rockAxes.z;',
             '  #ifdef WE3D_TERRAIN_SNOW_MAP',
             '    vec2 snowPoint = vTerrainDetailPosition.xz * terrainSnowUvScale;',
             '    terrainSnowColor = mapTexelToLinear(texture2D(terrainSnowMap, snowPoint));',
@@ -364,6 +370,9 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
             '  regionalColor = mix(regionalColor, mapTexelToLinear(texture2D(terrainLocalMap, clamp(localUv, 0.0, 1.0))).rgb, localWeight);',
             '  regionalWeight = max(regionalWeight, localWeight * (1.0 - clamp(vTerrainSurfaceMixA.x + terrainSnowWeight, 0.0, 1.0)));',
             '  float regionalLuminance = dot(regionalColor, vec3(0.2126, 0.7152, 0.0722));',
+            // Deep photographic shadows contain little usable reflectance evidence.
+            // Keep semantic rock/soil visible there instead of relighting black pixels.
+            '  regionalWeight *= smoothstep(0.015, 0.08, regionalLuminance);',
             // Compress baked illumination before applying the scene lighting a second time.
             // This is approximate delighting, not a claim of measured reflectance.
             '  regionalColor *= (0.015 + 0.35 * sqrt(max(regionalLuminance, 0.0))) / max(regionalLuminance, 0.015);',
@@ -377,7 +386,7 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
         )
         .replace(
           '#include <color_fragment>',
-          '#ifdef WE3D_TERRAIN_REGIONAL_IMAGE\n#ifdef USE_COLOR\ndiffuseColor.rgb *= mix(vColor, vec3(1.0), regionalWeight);\n#endif\n#else\n#include <color_fragment>\n#endif'
+          '#ifdef USE_COLOR\nfloat mineralTintAuthority = clamp(vTerrainSurfaceMixA.y + vTerrainSurfaceMixA.w + vTerrainSurfaceMixB.x + vTerrainSurfaceMixB.y, 0.0, 1.0);\n#ifdef WE3D_TERRAIN_REGIONAL_IMAGE\nmineralTintAuthority = max(mineralTintAuthority, regionalWeight);\n#endif\ndiffuseColor.rgb *= mix(vColor, vec3(1.0), mineralTintAuthority);\n#endif'
         )
         .replace(
           '#include <normal_fragment_maps>',
@@ -390,7 +399,7 @@ export function configureTerrainSurfaceMaterialBlend(mesh, textureSets = {}) {
     };
     material.customProgramCacheKey = () => [
       previousProgramCacheKey?.() || '',
-      'terrain-semantic-pbr-material-mix-v13'
+      'terrain-semantic-pbr-material-mix-v14'
     ].join(':');
   }
   if (!state.uniforms.terrainRegionalMap.value) state.uniforms.terrainRegionalMap.value = material.map;

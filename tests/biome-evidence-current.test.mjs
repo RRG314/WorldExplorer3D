@@ -2,6 +2,21 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {classifyBiomeProfile} from '../app/js/earth-core/biome-profile.js';
 import {worldCoverStatsForLocation,refreshWorldBiomeFromWorldCoverStats} from '../app/js/terrain/worldcover-biome-state.js';
+import {terrainSurfaceClassForWorldCover,terrainSurfaceMixForClass,TERRAIN_SURFACE_CLASS} from '../app/js/terrain/surface-material-blend.js';
+
+test('missing vegetation data and bare terrain do not invent hot sandy deserts',()=>{
+ for(const latitude of [-33,-20,18,30,45]) {
+  assert.notEqual(classifyBiomeProfile({latitude}).id,'hot-desert');
+  const cover=terrainSurfaceClassForWorldCover('bare',latitude);
+  assert.equal(cover,TERRAIN_SURFACE_CLASS.bare);
+  const mixture=terrainSurfaceMixForClass(cover);
+  assert.equal(mixture.mixA[1],0,'unobserved dunes');
+  assert.equal(mixture.mixA[3]+mixture.mixB[0],1);
+ }
+ assert.equal(classifyBiomeProfile({latitude:43,signals:{arid:.8,vegetated:.05}}).id,'arid-mosaic');
+ assert.equal(classifyBiomeProfile({latitude:23,elevationMeters:120,signals:{arid:.8,vegetated:.05}}).id,'hot-desert');
+ assert.equal(classifyBiomeProfile({latitude:28,reliefMeters:900,signals:{arid:.5,vegetated:.1}}).id,'montane-mosaic');
+});
 
 test('mapped herbaceous wetlands remain distinct from open water and woodland',()=>{
  const biome=classifyBiomeProfile({latitude:25.45,elevationMeters:1,signals:{woody:0,vegetated:1,wetland:.9,water:0}});
@@ -38,5 +53,14 @@ test('same accepted tiles give same local biome in either completion order',()=>
   assert.notEqual(ctx.worldSurfaceProfile.biome.id,'temperate-forest');
   ctx.LOC={lat:10,lon:10};
   assert.equal(refreshWorldBiomeFromWorldCoverStats(ctx,stats,far),null);
+ }
+});
+
+test('unmapped subtropical locations do not acquire sand from latitude alone',async()=>{
+ const {classifyWorldSurfaceProfile}=await import('../app/js/surface-rules.js');
+ for(const lat of [-30,-18,18,23,30,34]){
+  assert.notEqual(classifyWorldSurfaceProfile({centerLat:lat}).terrainModeHint,'sand');
+  assert.equal(classifyWorldSurfaceProfile({centerLat:lat,landuseWays:[{tags:{natural:'bare_rock'}}]}).terrainModeHint,'rock');
+  assert.equal(classifyWorldSurfaceProfile({centerLat:lat,landuseWays:[{tags:{natural:'sand'}}]}).terrainModeHint,'sand');
  }
 });

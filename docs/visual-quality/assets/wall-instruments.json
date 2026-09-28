@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "assetId": "solis-wall-instruments",
+  "sourceUrl": "https://sketchfab.com/3d-models/wall-console-98724ee49fba42a2b0ccbe79a36f246e",
+  "attribution": "Wall Console by LuddePudde",
+  "license": "CC-BY-4.0",
+  "sourceSha256": "ee185953a320ee2f24067b9edfde1d89384e7a9ea2d0f4f6559a9167265c31ff",
+  "outputSha256": "e720ea8d940be6cd56058d8106baf5885e76d2d5a5ad4431c299c3b79149a64c",
+  "recipe": {
+    "textureEdge": 1024,
+    "format": "webp",
+    "quality": 90
+  },
+  "bytes": 1341872,
+  "triangles": 11780,
+  "primitives": 2,
+  "bounds": {
+    "min": [
+      -1.0000003485077844,
+      -0.6263050211352292,
+      -0.21040992441595574
+    ],
+    "max": [
+      0.9999996929077941,
+      0.6263050211352292,
+      0.21040807661592006
+    ]
+  },
+  "textures": [
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    }
+  ],
+  "extensions": [],
+  "materialCompatibility": {
+    "emissiveStrength": "r128 runtime adapter",
+    "specular": "standard PBR fallback; optional source extension retained"
+  }
+}

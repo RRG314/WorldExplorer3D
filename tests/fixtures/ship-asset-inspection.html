@@ -1,0 +1,30 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,">
+<style>body{margin:0;background:#202831;color:#eee;font:16px system-ui}canvas{display:block}#status{position:absolute;top:12px;left:16px}</style>
+<div id="status">Loading licensed asset…</div>
+<script src="/node_modules/three/build/three.min.js"></script>
+<script src="/node_modules/three/examples/js/loaders/GLTFLoader.js"></script>
+<script type="module">
+import { createShipEnvironment } from '/app/js/expedition/ship-environment.js';
+import { registerMaterialCompatibility } from '/app/js/assets/gltf-material-compatibility.js';
+const params=new URLSearchParams(location.search), asset=params.get('asset')||'reactor-core';
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+renderer.setSize(1000,700);renderer.outputEncoding=THREE.sRGBEncoding;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1;
+renderer.physicallyCorrectLights=true;document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color('#202831');
+const target=createShipEnvironment(THREE,new THREE.PMREMGenerator(renderer));scene.environment=target.texture;
+scene.add(new THREE.HemisphereLight(0xfff7ec,0x424d50,.75));
+const camera=new THREE.PerspectiveCamera(40,1000/700,.01,100);
+const url=params.get('original')?`/output/visual-quality/originals/${asset}.glb`:`/app/assets/models/interiors/solis/${asset}.glb`;
+const gltf=await registerMaterialCompatibility(new THREE.GLTFLoader()).loadAsync(url), root=gltf.scene;
+scene.add(root);root.updateMatrixWorld(true);
+const bounds=new THREE.Box3().setFromObject(root),size=bounds.getSize(new THREE.Vector3()),center=bounds.getCenter(new THREE.Vector3());
+root.position.sub(center);const span=Math.max(size.x,size.y,size.z);
+camera.position.set(span*.9,span*.55,span*1.7);camera.lookAt(0,0,0);
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(span*8,span*8),new THREE.MeshStandardMaterial({color:0x69727a,roughness:.85}));
+floor.rotation.x=-Math.PI/2;floor.position.y=-size.y/2-.002;scene.add(floor);
+let yaw=Number(params.get('yaw')||0);document.addEventListener('keydown',e=>{if(e.key==='ArrowRight')yaw+=Math.PI/4;if(e.key==='ArrowLeft')yaw-=Math.PI/4;draw();});
+function draw(){camera.position.set(Math.sin(yaw+.48)*span*2,span*.55,Math.cos(yaw+.48)*span*2);camera.lookAt(0,0,0);renderer.render(scene,camera);}
+window.advanceTime=draw;window.render_game_to_text=()=>JSON.stringify({asset,original:params.has('original'),size:size.toArray(),yaw,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,textures:renderer.info.memory.textures,glError:renderer.getContext().getError()});
+document.getElementById('status').textContent=asset+(params.has('original')?' — original':' — runtime');window.ready=true;draw();
+</script>

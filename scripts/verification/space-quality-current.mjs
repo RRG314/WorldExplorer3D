@@ -143,6 +143,24 @@ try {
  }
  const exited=await page.evaluate(async()=>{const {ctx}=await import('/app/js/shared-context.js?v=55');ctx.exitExpeditionShipInterior();return {near:ctx.camera.near,active:ctx.spaceFlight.active};});
  assert.equal(exited.near,.5);assert.equal(exited.active,true);checks.push({name:'interior-exit-restores-camera',...exited});
+ const retention=[];
+ for(let cycle=0;cycle<2;cycle++) {
+  await page.evaluate(()=>document.getElementById('fBoardSolisReach').click());
+  await page.waitForFunction(()=>window.__spaceQualityContext.getShipInteriorSnapshot?.()?.crewPresentation?.length===7);
+  const sample=await page.evaluate(async()=>{
+   const ctx=window.__spaceQualityContext,root=ctx.activeInterior.group,pending=[];
+   root.traverse(o=>{if(o.userData.furnishingReady)pending.push(o.userData.furnishingReady);});
+   if(!(await Promise.all(pending)).every(Boolean))throw Error('Reboarding assets failed');
+   ctx.renderer.render(ctx.scene,ctx.camera);
+   const active={...ctx.renderer.info.memory};
+   ctx.exitExpeditionShipInterior();ctx.renderer.render(ctx.scene,ctx.camera);
+   return {active,released:{...ctx.renderer.info.memory},interior:!!ctx.activeInterior,exposure:ctx.renderer.toneMappingExposure};
+  });
+  assert.equal(sample.interior,false);retention.push(sample);
+ }
+ assert.ok(retention[1].released.textures<=retention[0].released.textures+1,'Ship textures accumulate across boarding');
+ assert.ok(retention[1].released.geometries<=retention[0].released.geometries+1,'Ship geometries accumulate across boarding');
+ checks.push({name:'reboarding-resource-retention',cycles:retention});
  if(!shipOnly){
  for (const nebulaId of ['orion-nebula','carina-nebula','crab-nebula']) {
   await page.evaluate(async id=>{const ctx=window.__spaceQualityContext;ctx.animateSpaceFlight();ctx.travelToUniverseDestination(id);},nebulaId);

@@ -1,5 +1,7 @@
+import {modelAssetRequestUrl} from './model-asset-url.js';
 import {batchStaticModelTemplate} from './static-model-batching.js?v=1';
 import { getModelAsset } from './model-asset-catalog.js?v=16';
+import { registerMaterialCompatibility } from './gltf-material-compatibility.js';
 
 const templateLoads = new Map();
 
@@ -8,14 +10,14 @@ function loaderFor(THREE) {
   // Curated runtime assets are stored as self-contained, non-Draco GLBs.
   // Keeping decoding local prevents a vehicle or character from disappearing
   // because a third-party CDN is slow, blocked, or offline.
-  return new THREE.GLTFLoader();
+  return registerMaterialCompatibility(new THREE.GLTFLoader());
 }
 
 function loadTemplate(THREE, record) {
   if (templateLoads.has(record.id)) return templateLoads.get(record.id);
   const pending = new Promise((resolve, reject) => {
     loaderFor(THREE).load(
-      record.url,
+      modelAssetRequestUrl(record),
       (gltf) => {
         const root = gltf?.scene || gltf?.scenes?.[0];
         if (!root) {

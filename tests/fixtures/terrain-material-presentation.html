@@ -1,0 +1,30 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,">
+<style>body{margin:0;background:#263039;color:white;font:15px system-ui}canvas{display:block}p{margin:8px}</style>
+<p>Terrain materials: bare mineral, sand, forest, snow. Right toggles dark satellite imagery.</p>
+<script src="/node_modules/three/build/three.min.js"></script>
+<script type="module">
+import {configureTerrainSurfaceMaterialBlend,applyTerrainProfileSurfaceMaterialMix} from '/app/js/terrain/surface-material-blend.js';
+const renderer=new THREE.WebGLRenderer({preserveDrawingBuffer:true,antialias:false});renderer.setSize(800,400);renderer.outputEncoding=THREE.sRGBEncoding;document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color('#263039');scene.add(new THREE.AmbientLight(0xffffff,1));
+const camera=new THREE.OrthographicCamera(-8,8,4,-4,.1,100);camera.position.set(0,0,10);camera.lookAt(0,0,0);
+const texture=(rgb)=>{const t=new THREE.DataTexture(new Uint8Array([...rgb,255]),1,1,THREE.RGBAFormat);t.encoding=THREE.sRGBEncoding;t.needsUpdate=true;return t;};
+const maps={urban:{map:texture([100,100,100])},sand:{map:texture([200,163,100])},forest:{map:texture([60,90,45])},soil:{map:texture([105,75,45])},rock:{map:texture([120,113,100])},snow:{map:texture([235,240,245])},snowTextureSupported:true};
+const dark=texture([0,0,0]);let imagery=false;
+const meshes=['rock','sand','forest','snow'].map((mode,i)=>{
+ const geometry=new THREE.PlaneGeometry(3.5,5,2,2);geometry.setAttribute('terrainGeographicUv',geometry.getAttribute('uv').clone());
+ geometry.setAttribute('color',new THREE.Float32BufferAttribute(Array.from({length:geometry.attributes.position.count},()=>[.5,1,.5]).flat(),3));
+ const material=new THREE.MeshStandardMaterial({map:maps.rock.map,roughness:1,vertexColors:true});material.defines={WE3D_TERRAIN_REGIONAL_IMAGE:1};
+ const mesh=new THREE.Mesh(geometry,material);mesh.position.x=-6+i*4;scene.add(mesh);configureTerrainSurfaceMaterialBlend(mesh,maps);applyTerrainProfileSurfaceMaterialMix(mesh,mode);
+ const uniforms=material.userData.terrainSurfaceMaterialBlend.uniforms;uniforms.terrainRegionalMap.value=dark;return mesh;
+});
+function draw(){for(const mesh of meshes)mesh.material.userData.terrainSurfaceMaterialBlend.uniforms.terrainRegionalReady.value=imagery?1:0;renderer.render(scene,camera);}
+function pixels(){const gl=renderer.getContext();return meshes.map((_,i)=>{const p=new Uint8Array(4);gl.readPixels(100+i*200,200,1,1,gl.RGBA,gl.UNSIGNED_BYTE,p);return [...p];});}
+draw();const reference=pixels();
+addEventListener('keydown',event=>{if(event.code==='ArrowRight'){imagery=!imagery;draw();}});
+if(Math.max(...reference[3].slice(0,3))-Math.min(...reference[3].slice(0,3))>20)throw Error('Legacy tint contaminated snow');
+if(reference[0][0]<reference[0][1] || reference[1][0]<reference[1][1])throw Error('Legacy green tint contaminated mineral surfaces');
+const testedPixels=(()=>{imagery=true;draw();const result=pixels();imagery=false;draw();return result;})();
+if(JSON.stringify(reference)!==JSON.stringify(testedPixels))throw Error('Baked black imagery erased the terrain surface');
+if(reference.some(pixel=>pixel[0]+pixel[1]+pixel[2]<100))throw Error('Terrain reference did not render');
+window.advanceTime=draw;window.render_game_to_text=()=>JSON.stringify({imagery,reference,pixels:pixels(),glError:renderer.getContext().getError(),programs:renderer.info.programs.length});window.ready=true;
+</script>

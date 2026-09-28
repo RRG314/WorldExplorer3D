@@ -12,7 +12,7 @@ try{const page=await browser.newPage({viewport:{width:1100,height:800}});const e
  const api=await readFile('js/community-reality-capture-api.js','utf8');
  await page.route('**/js/community-reality-capture-api.js*',r=>r.fulfill({contentType:'text/javascript',body:api.replace("return endpoint('/resolveBuildingInteriorRepresentation', { sourceBuildingId, worldId, roomId,spaceId });","return Promise.resolve(window.entryFixtureResponse);")}));
  await page.route('**/entry-fixture',r=>r.fulfill({contentType:'text/html',body:'<body><button id="interiorPrompt"></button></body>'}));
- if(process.env.WE3D_ENTRY_MODEL)await page.route('**/fixture-home.glb',r=>r.fulfill({contentType:'model/gltf-binary',path:process.env.WE3D_ENTRY_MODEL}));
+ if(process.env.WE3D_ENTRY_MODEL)await page.route('**/fixture-home.glb*',r=>r.fulfill({contentType:'model/gltf-binary',path:process.env.WE3D_ENTRY_MODEL}));
  await page.goto(`http://127.0.0.1:${server.port}/entry-fixture`);await page.addScriptTag({url:'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'});await page.addScriptTag({url:'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js'});
  await page.evaluate(async({building,layout,model})=>{
  const {ctx}=await import('/app/js/shared-context.js?v=55');window.testCtx=ctx;

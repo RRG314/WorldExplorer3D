@@ -254,7 +254,7 @@ async function activeJourney(viewport, label) {
 async function fallbackJourney() {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true });
   let blockedRequests = 0;
-  await context.route('**/app/assets/models/vehicles/traffic/*.glb', (route) => {
+  await context.route('**/app/assets/models/vehicles/traffic/*.glb*', (route) => {
     blockedRequests += 1;
     return route.abort('failed');
   });

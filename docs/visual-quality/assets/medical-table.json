@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "assetId": "solis-medical-table",
+  "sourceUrl": "https://sketchfab.com/3d-models/sci-fi-laboratory-op-table-ae314a5ea3614a5caf52f0d7e7d61665",
+  "attribution": "Sci-Fi Laboratory Op Table by Michael V",
+  "license": "CC-BY-4.0",
+  "sourceSha256": "23f5b7e7cc64d5110778e6d39a581cbb538c5b65dbe094831e235bb64689117b",
+  "outputSha256": "0be7c0a147a46e32b7bfa4e8b1d2a378a043ae129e920acdbf8da39237bb623d",
+  "recipe": {
+    "nodes": null,
+    "textureEdge": 1024,
+    "format": "webp",
+    "quality": 90,
+    "consoleEnvelope": null
+  },
+  "bytes": 1144892,
+  "triangles": 15974,
+  "primitives": 7,
+  "bounds": {
+    "min": [
+      -1.3799723078316672,
+      -0.004880259814695961,
+      -1.6022798689606206
+    ],
+    "max": [
+      2.816328462593365,
+      3.2880165056708393,
+      1.157327265749825
+    ]
+  },
+  "textures": [
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    }
+  ],
+  "extensions": [
+    "KHR_materials_emissive_strength"
+  ],
+  "materialCompatibility": {
+    "emissiveStrength": "r128 runtime adapter",
+    "specular": "standard PBR fallback; optional source extension retained"
+  }
+}

@@ -247,7 +247,6 @@ Additional Solis Reach furniture: [Sci-fi furniture/props pack](https://sketchfa
 
 ### Solis Reach wall equipment
 
-- `interiors/solis/wall-navigation.glb`: [Large Wall-Mounted Computer Console](https://sketchfab.com/3d-models/large-wall-mounted-computer-console-298b7d9b68064618a3819d1a8fae4baf) by [Inditrion Dradnon](https://sketchfab.com/dradnon), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 - `interiors/solis/wall-instruments.glb`: [Wall Console](https://sketchfab.com/3d-models/wall-console-98724ee49fba42a2b0ccbe79a36f246e) by [LuddePudde](https://sketchfab.com/luddepubde), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 Downloaded September 25, 2026 through the signed-in Sketchfab download controls. Converted textures to bounded 1024px WebP, deduplicated unused data, retained base PBR maps for the existing renderer, and positioned/scaled the models for ship bulkheads. No AI-generated replacement artwork.
@@ -258,3 +257,9 @@ All following sources are Creative Commons Attribution 4.0: https://creativecomm
 - `interiors/solis/medical-table.glb`: **Sci-Fi Laboratory Op Table**, Michael V (@bossdeff) — https://sketchfab.com/3d-models/sci-fi-laboratory-op-table-ae314a5ea3614a5caf52f0d7e7d61665
 - `interiors/solis/command-console.glb` and `laboratory-desk.glb`: **Sci-Fi Computer Room**, Michael V (@bossdeff) — https://sketchfab.com/3d-models/sci-fi-computer-room-a149d5bfcef6496c9a0606b5ce5ebf27 . Selected desk, keyboard, speakers and monitor extracted; room architecture and posters excluded.
 - `interiors/solis/equipment-server.glb`: **Sci-Fi Servers**, Michael V (@bossdeff) — https://sketchfab.com/3d-models/sci-fi-servers-37fd7c8ef38d4e5290cf6597394909c8 . Used as a game asset, not for generative model training.
+
+## Vegetation
+
+`nature/pine*.glb`, `nature/broadleaf*.glb`, `nature/fern.glb`, `nature/grass.glb`: [Low poly vegetation for games](https://sketchfab.com/3d-models/low-poly-vegetation-for-games-cdac82eb61ab4d83bf162b4c44b44d6d) by **denoises**, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Downloaded September 28, 2026. Selected conifer, broadleaf, fern and grass plants; normalized placement origins, resized textures to 512px and created distant tree variants. Source and derivative checksums are recorded in `nature/asset-manifest.json`. Conversion: `scripts/build-sketchfab-vegetation-assets.mjs`.
+
+`nature/shrub.glb`: [Bush](https://sketchfab.com/3d-models/bush-844e6a315757431da97efb5f17383bb5) by **lev26**, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Downloaded September 28, 2026. Base aligned, resized map, alpha-tested leaves. Checksums and conversion details: `nature/asset-manifest.json`.

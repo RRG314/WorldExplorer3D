@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "assetId": "solis-wall-navigation",
+  "sourceUrl": "https://sketchfab.com/3d-models/large-wall-mounted-computer-console-298b7d9b68064618a3819d1a8fae4baf",
+  "attribution": "Large Wall-Mounted Computer Console by Inditrion Dradnon",
+  "license": "CC-BY-4.0",
+  "sourceSha256": "313050d6e0cafff1a915f2ef0feeed6323e16b6f28c7bea195a6595ad2323b42",
+  "outputSha256": "3edf0587311cca110c2195e1d662eccd3d1ab731e85733fed7bcf669931351fd",
+  "recipe": {
+    "textureEdge": 1024,
+    "format": "webp",
+    "quality": 90
+  },
+  "bytes": 445660,
+  "triangles": 1092,
+  "primitives": 4,
+  "bounds": {
+    "min": [
+      -154.10797895947266,
+      -8.24498854693428,
+      26.27433583678437
+    ],
+    "max": [
+      -127.62938704052735,
+      8.512711434453086,
+      35.88695887252804
+    ]
+  },
+  "textures": [
+    {
+      "name": "",
+      "width": 1024,
+      "height": 1024,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 5592406
+    },
+    {
+      "name": "",
+      "width": 1024,
+      "height": 512,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 2796203
+    },
+    {
+      "name": "",
+      "width": 512,
+      "height": 512,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 1398102
+    },
+    {
+      "name": "",
+      "width": 512,
+      "height": 512,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 1398102
+    },
+    {
+      "name": "",
+      "width": 512,
+      "height": 512,
+      "mimeType": "image/webp",
+      "estimatedRgbaMipBytes": 1398102
+    }
+  ],
+  "extensions": [
+    "KHR_materials_emissive_strength",
+    "KHR_materials_specular",
+    "KHR_texture_transform"
+  ],
+  "materialCompatibility": {
+    "emissiveStrength": "r128 runtime adapter",
+    "specular": "standard PBR fallback; optional source extension retained"
+  },
+  "status": "rejected-source-geometry",
+  "reason": "Distorted shell is present in the original download and converted mesh. Removed from runtime; stations use the licensed wall-instruments module."
+}
