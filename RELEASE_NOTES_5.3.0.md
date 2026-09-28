@@ -1,8 +1,8 @@
 # Further into the world
 
 World Explorer 3D 5.3 brings more detail to familiar places and more to do aboard
-Solis Reach. This is a release candidate; the public game remains on 5.2 until
-production promotion is complete.
+Solis Reach. Version 5.3 is live, including the September 28 loading and
+memory update.
 
 ## A ship you can explore and work in
 
@@ -60,15 +60,42 @@ unchanged interface updates and releases replaced scene resources. These changes
 reduce avoidable work; they are not a promise of a particular frame rate on every
 device.
 
-## Still ahead
+## Faster world loading, less repeated work
 
-Some ship utility equipment remains custom-built and less detailed than the
-licensed furnishings. Planetary terrain and distant environments mix observations
-with procedural reconstruction; unknown landscapes are not presented as measured
-surface data. Complex bridges, tunnels and incomplete map coverage still need
-location-specific refinement.
+Terrain sampling now avoids repeated temporary allocations. Mapped-water
+lookups use a spatial index, road compilation overlaps terrain preparation with
+a readiness barrier, and building buffers are sized before compilation.
+Pavement workers retain less intermediate data. Nearby lighting reuses a fixed
+spotlight pool instead of continually adding shader variants.
 
-Physical-phone responsiveness for this candidate remains to be checked.
-Production promotion also requires compatible backend deployment and the final
-production package checks. See [release status](docs/RELEASE_INTEGRATION_STATUS.md)
-for those requirements and [the roadmap](ROADMAP.md) for continuing work.
+In individual dense-city runs on an M1 Mac, first play improved from about
+59 seconds to 48–50 seconds. A matched road-ready measurement reduced the primary
+renderer footprint from about 3.8 GiB to 3.1 GiB while retaining the same
+25,507 buildings, 18,759 roads and 49 terrain tiles. These are specific test
+results, not guarantees for every location, network or device.
+
+Multiplayer action cooldowns now use server time consistently. A fresh
+weekly-city check loaded Chicago through the normal join controls on two
+authenticated clients and verified that both players shared the public room.
+That session used isolated backend services; live deployment checks separately
+verified the production package and service authentication boundaries.
+
+## Known limitations
+
+Dense-city memory remains substantial, especially after repeated world entry.
+The final desktop performance run missed the configured ground-mode FPS,
+transient heap and aircraft-activation targets: approximately 41–42 FPS,
+1.11 GiB peak sampled heap, and a two-second aircraft activation. The performance
+gate remains failed; its limits were not lowered. Mobile browser emulation
+passed, but physical-phone responsiveness is still unverified.
+
+Some ship utility equipment remains simpler than the licensed furnishings.
+Planetary terrain and distant environments mix observations with procedural
+reconstruction; unknown landscapes are not measured surface data. Complex
+bridges, tunnels and incomplete map coverage still need location-specific work.
+
+The portable-core, Rust/Wasm, TypeScript and action-system investigations include
+prototypes and benchmarks. They are not a replacement game engine, a new
+server-authoritative movement system, or a promise of complete PvP support.
+See [release status](docs/RELEASE_INTEGRATION_STATUS.md) and
+[the roadmap](ROADMAP.md) for validation and continuing work.

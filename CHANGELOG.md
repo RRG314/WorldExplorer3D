@@ -2,7 +2,7 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
-## [5.3.0] - Unreleased
+## [5.3.0] - 2026-09-28
 
 ### Added
 
@@ -17,6 +17,10 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
 
 ### Changed
 
+- Reduced terrain sampling allocations, bounded building buffers, indexed water
+  lookups and overlapped road compilation without reducing mapped-world coverage.
+- Reduced pavement-worker memory and bounded nearby-light shader variants.
+
 - Improved planetary imagery, atmospheric rendering, land-cover treatment,
   facade layout, pavement continuity and roadside placement.
 - Shared reusable textures and skeleton data, batched static models, culled
@@ -24,6 +28,9 @@ Notable user-facing changes are recorded here. Git history and GitHub releases c
 - Separated component, browser, backend and performance evidence in release checks.
 
 ### Fixed
+
+- Server action cooldowns no longer subtract a client-clock tolerance.
+- Safe-ground recovery releases the active travel controller before relocation.
 
 - Overlapping regional and detailed water surfaces; stale world resources.
 - Retired character flashes, ship camera clipping, backward wall consoles and

@@ -1,6 +1,11 @@
 # World Explorer architecture evaluation
 
-Production is already live at `bbe6502228e369fe2a15dc6a177f5d83948584c3`. This isolated branch is not deployed. The latest request is local implementation of the evidence-backed refactor, with future engine portability. Nothing from this branch is published to GitHub or deployed.
+The measured runtime improvements from this investigation shipped September 28,
+2026, at source commit `2839df5d6bbed9f8dfa4b89e379ba2e026cab438`.
+Earlier documents describe the local investigation at their stated dates;
+their no-deployment notes are historical. See the current
+[release status](../RELEASE_INTEGRATION_STATUS.md) for shipped scope and limits.
+
 
 **Local implementation:** start with [the implementation plan and checks](LOCAL_REFACTOR_PLAN.md). For the broader investigation, see [the current decision](FINAL_ARCHITECTURE_DECISION.md), which states both measured conclusions and remaining work. It is not an exhaustive-audit completion certificate.
 

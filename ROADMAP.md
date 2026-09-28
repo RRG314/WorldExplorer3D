@@ -1,6 +1,6 @@
 # World Explorer 3D Roadmap
 
-Last updated: 2026-09-25.
+Last updated: 2026-09-28.
 
 World Explorer 3D is growing toward a connected world sandbox: choose a real
 place, build an Explorer, travel by land, water, air, or space, and make a
@@ -12,7 +12,7 @@ feature.
 
 ### Improve real places with photos
 
-Manual exterior photo contributions are released. The 5.3 candidate connects
+Manual exterior photo contributions are released. Version 5.3 connects
 building-aligned room editing, wall/floor/ceiling photos, saved revisions, phone
 handoff, account review and entry into approved interiors. Broader device review
 and clearer editing guidance remain priorities.
@@ -45,12 +45,12 @@ Real-world context makes the sandbox recognizable, but it does not turn the
 game into a navigation, appraisal, ownership, wildlife-presence, or safety
 service. Unknown source data remains unknown.
 
-## Current release candidate: 5.3
+## Current release: 5.3
 
-The public release remains 5.2. [5.3 release notes](RELEASE_NOTES_5.3.0.md)
-describe the changes being prepared for production.
+Version 5.3 is live. [Release notes](RELEASE_NOTES_5.3.0.md) describe the shipped
+features, loading improvements and remaining limits.
 
-| Area | In the 5.3 candidate | Next work |
+| Area | In 5.3 | Next work |
 | --- | --- | --- |
 | Solis Reach | Circular corridors, 25 functional rooms, licensed furnishings, exterior views and a controlled Pathfinder launch | Finish the utility-equipment art pass; deepen room activities and crew interaction |
 | Research | Physical specimen placement, measurements and fabrication using conserved cargo, including shared expeditions | More experiments, recipes and consequences for expedition planning |
@@ -60,13 +60,18 @@ describe the changes being prepared for production.
 | Shared play | Room admission, presence, vehicle ownership and shared research repairs | More multiplayer activities and broader network-condition testing |
 | Rendering and controls | Shared resources, static batching, bounded interface updates, camera and mobile-overlay repairs | Physical-phone responsiveness, sustained-session memory and thermal testing |
 
-### Before production promotion
+### Immediate follow-up
 
-- Complete the remaining physical-phone walkthrough and record any blocking issue.
-- Keep the verified shared-research backend and required indexes aligned with
-  the final frontend package.
-- Verify the final production package, retain rollback information and publish
-  the release only after the deployment is confirmed.
+- Validate responsiveness and sustained memory use on physical phones.
+- Reduce repeated-session renderer memory and dense-city loading without
+  removing mapped roads, buildings or terrain coverage.
+- Improve ground-mode frame rate and aircraft activation; the desktop
+  performance gate still misses those targets and transient heap limits.
+- Broaden authenticated live-network multiplayer checks beyond isolated
+  two-client tests, including reconnects and varied network conditions.
+- Continue extracting portable computation only where measured improvements
+  justify it. Rust/Wasm, WebGPU and engine migration remain evaluated options,
+  not automatic replacements for the current browser renderer.
 
 ### Following this release
 
