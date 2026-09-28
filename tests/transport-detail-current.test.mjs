@@ -87,6 +87,14 @@ test('regional readiness changes only after the publication callback commits and
  assert.equal(detail.readyAt({x:2500,z:300},0),true);
  detail.dispose();assert.equal(worker.terminated,true);assert.equal(detail.stats.status,'disposed');
  detail.step({x:2500,z:300});assert.equal(detail.stats.status,'disposed');
+ // Reset while asynchronous main-thread publication is still outstanding.
+ const cancelled=await prepareTransportDetail(ctx,[],{isCurrent:()=>true});
+ let release;cancelled.attach(()=>new Promise(resolve=>release=resolve));
+ cancelled.step({x:2500,z:300});await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(typeof release,'function');
+ cancelled.dispose();release();await new Promise(resolve=>setTimeout(resolve,0));
+ assert.equal(worker.terminated,true);assert.equal(cancelled.stats.status,'disposed');
+ assert.equal(cancelled.stats.completedRegions,0);assert.equal(cancelled.stats.pendingRegions,0);
 });
 
 test('render publication accepts transferred typed buffers and retains terrain mode for contacts',async t=>{

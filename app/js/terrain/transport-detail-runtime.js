@@ -71,7 +71,7 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
         updateNotice(false);return true;
       },
       step(point={x:0,z:0}){
-        if(disposed||!publish)return;
+        if(disposed||!publish||stats.status==='complete')return;
         if(!isCurrent()){dispose();return;}
         const now=performance.now();if(now-lastSync>500){mask?.syncMaterials();lastSync=now;}
         if(active||stats.error||stats.status==='complete')return;
@@ -81,7 +81,7 @@ export async function prepareTransportDetail(appCtx,roads,{isCurrent,focus={x:0,
           const packet=await request({type:'next',focus:{x:Number(point.x)||0,z:Number(point.z)||0}});
           if(disposed||!isCurrent())return;
           if(packet.type==='complete'){
-            stats.status='complete';stats.completedAt=performance.now();worker.terminate();updateNotice(false);complete?.();publish=null;complete=null;return;
+            stats.status='complete';stats.completedAt=performance.now();mask?.setEnabled(false);worker.terminate();updateNotice(false);complete?.();publish=null;complete=null;return;
           }
           await publish(packet);
           if(disposed||!isCurrent())return;

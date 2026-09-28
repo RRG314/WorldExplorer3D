@@ -76,6 +76,8 @@ test('road overview and pavement retain separate shader uniforms and retirement 
  assert.match(shader.fragmentShader,/pavementCoverage\(\)/);
  assert.ok(shader.uniforms.roadCoverageMaskLookup.value.image.data[0]>0);
  road.retire('0:0');assert.equal(shader.uniforms.roadCoverageMaskLookup.value.image.data[0],0);
+ road.setEnabled(false);assert.equal(shader.uniforms.roadCoverageMaskEnabled.value,0);
+ assert.equal(shader.uniforms.pavementMaskEnabled.value,1);
  road.dispose();assert.equal(shader.uniforms.roadCoverageMaskEnabled.value,0);
  pavement.dispose();
 });

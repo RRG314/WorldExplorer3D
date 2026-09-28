@@ -63,6 +63,7 @@ export function createPavementTerrainMask(appCtx,keys,{kind="pavement",cellSize=
     return materials.size;
   }
   return {layout,uploadStats,bytes:bytes.byteLength+addresses.byteLength,syncMaterials,
+    setEnabled(enabled){uniforms.pavementMaskEnabled.value=enabled?1:0;},
     setDetailBounds(b){uniforms.nearPavementBounds.value.set(...(b?[b.minX,b.minZ,b.maxX,b.maxZ]:[1,1,-1,-1]));},
     publish(key,mask){
       const slot=slots.get(key);if(slot===undefined||mask.length!==layout.resolution**2)throw new Error('Invalid pavement mask cell');
