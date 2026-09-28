@@ -99,3 +99,24 @@ test('repeated bucket candidates never cache exact hits or survive disposal',()=
   assert.deepEqual(policy.query(near,near,2),[policy.edges[3]],'eviction cannot alter accepted edge order');
   policy.dispose();assert.deepEqual(policy.query(near,near,2),[]);
 });
+
+test('squared broad comparison agrees with hypot at random and rounding-boundary reaches',()=>{
+  function pointDistance(p,a,b){const dx=b.x-a.x,dz=b.z-a.z,l=dx*dx+dz*dz,t=l?Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.z-a.z)*dz)/l)):0;return Math.hypot(p.x-a.x-dx*t,p.z-a.z-dz*t);}
+  const cross=(p,q,r)=>(q.x-p.x)*(r.z-p.z)-(q.z-p.z)*(r.x-p.x);
+  const distance=(a,b,c,d)=>cross(a,b,c)*cross(a,b,d)<0&&cross(c,d,a)*cross(c,d,b)<0?0:Math.min(pointDistance(a,c,d),pointDistance(b,c,d),pointDistance(c,a,b),pointDistance(d,a,b));
+  let seed=7139;const random=()=>((seed=Math.imul(seed,1664525)+1013904223>>>0)/2**32);
+  for(const shift of [0,1e9,-1e9]){
+    const point=()=>({x:shift+random()*140,z:shift+random()*140});
+    const policy=createStreetFrontagePolicy(Array.from({length:12},()=>({pts:[point(),point(),point()]})),1);
+    for(let i=0;i<200;i++){
+      const a=point(),b=i%2?a:point(),target=policy.edges[i%policy.edges.length];
+      const threshold=distance(a,b,target.a,target.b);
+      for(const pad of [random()*30,Math.max(0,threshold-1e-8),Math.max(0,threshold-1e-8+1e-13)]){
+        const expected=policy.edges.filter(e=>distance(a,b,e.a,e.b)<=pad+1e-8).map(e=>policy.edges.indexOf(e));
+        const actual=policy.query(a,b,pad).map(e=>policy.edges.indexOf(e)).sort((x,y)=>x-y);
+        assert.deepEqual(actual,expected);
+      }
+    }
+    policy.dispose();
+  }
+});

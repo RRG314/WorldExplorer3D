@@ -40,6 +40,25 @@ function segmentDistance(a,b,c,d) {
   if(cross(a,b,c)*cross(a,b,d)<0 && cross(c,d,a)*cross(c,d,b)<0)return 0;
   return Math.min(pointSegment(a,c,d),pointSegment(b,c,d),pointSegment(c,a,b),pointSegment(d,a,b));
 }
+function pointSegmentSquared(p,a,b) {
+  const dx=b.x-a.x,dz=b.z-a.z,length=dx*dx+dz*dz;
+  const t=length ? Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.z-a.z)*dz)/length)) : 0;
+  const x=p.x-a.x-dx*t,z=p.z-a.z-dz*t;
+  return x*x+z*z;
+}
+function segmentWithinReach(a,b,c,d,reach) {
+  if(a.x!==b.x || a.z!==b.z) {
+    if(cross(a,b,c)*cross(a,b,d)<0 && cross(c,d,a)*cross(c,d,b)<0)return true;
+  }
+  const squared=a.x===b.x && a.z===b.z ? pointSegmentSquared(a,c,d) :
+    Math.min(pointSegmentSquared(a,c,d),pointSegmentSquared(b,c,d),pointSegmentSquared(c,a,b),pointSegmentSquared(d,a,b));
+  const limit=reach*reach;
+  // Near the decision boundary, retain the original hypot calculation and
+  // its rounding. Squared comparisons only reject/accept well-separated cases.
+  if(reach<0 || !Number.isFinite(squared) || !Number.isFinite(limit) ||
+    Math.abs(squared-limit)<=32*Number.EPSILON*Math.max(1,squared,limit))return segmentDistance(a,b,c,d)<=reach;
+  return squared<limit;
+}
 export function createStreetFrontagePolicy(buildings = [], metersPerWorldUnit = 1.11) {
   const scale=streetScale(metersPerWorldUnit), edges=[], corners=new Map(), buckets=new Map(), sections=new WeakMap();
   const candidateRegions=new Map();
@@ -88,7 +107,7 @@ export function createStreetFrontagePolicy(buildings = [], metersPerWorldUnit = 
     for(const edge of candidates){
       const eb=edge.bounds;
       if(eb.maxX<box.minX-reach || eb.minX>box.maxX+reach || eb.maxZ<box.minZ-reach || eb.minZ>box.maxZ+reach)continue;
-      if(segmentDistance(a,b,edge.a,edge.b)<=pad+1e-8)result.push(edge);
+      if(segmentWithinReach(a,b,edge.a,edge.b,pad+1e-8))result.push(edge);
     }
     return result;
   }

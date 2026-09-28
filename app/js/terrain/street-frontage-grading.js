@@ -19,7 +19,7 @@ export function createStreetFrontageGrading(buildings = [], metersPerWorldUnit =
       const nx=(b.z-a.z)/length,nz=-(b.x-a.x)/length,sign=(x-px)*nx+(z-pz)*nz>=0?1:-1;
       // Exact coordinates avoid quantization steps on a continuous grade.
       let roadCache=cache.get(road);if(!roadCache&&sampleCount<20000){roadCache=new Map();cache.set(road,roadCache);}
-      const cacheKey=`${px}:${pz}:${halfWidth}:${sign}`;
+      const cacheKey=roadCache ? `${px}:${pz}:${halfWidth}:${sign}` : null;
       if(roadCache?.has(cacheKey))return roadCache.get(cacheKey);
       const section=policy.section(road,projection.segIndex)[sign>0?'left':'right'];
       const edge=streetSideEdge(road,halfWidth,sign);

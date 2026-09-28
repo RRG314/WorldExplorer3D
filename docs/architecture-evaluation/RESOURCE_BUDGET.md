@@ -121,3 +121,48 @@ The last directory remains in progress until its report is complete. Short fligh
 samples in the first two runs were approximately 28 FPS with long-frame spikes;
 these do not pass the inherited desktop frame-time gate. Sustained-flight
 profiling and repeated natural-memory cycles are the next acceptance checks.
+
+
+### Completed repeated-entry check
+
+Runtime `2c1b1eac` replaces growing building-batch JavaScript arrays with buffers
+sized from the source geometry. Intermediate normals remain Float64 so facade
+mask calculations keep their previous precision. A transformed-building replay
+compares every published attribute and index byte; rollback after invalid input
+is covered. Frontage searches additionally use squared distances away from the
+rounding boundary and retain the original hypot calculation at that boundary.
+Roads without a usable cache no longer construct unused coordinate-string keys.
+
+The bounded-buffer run entered Baltimore in 48.714 seconds. Natural completed
+heap/backing storage was 398.0/503.0 MiB; renderer footprint was 2,894 MiB and the
+browser-owned sum 4,079 MiB. The two repeated entries completed all road regions
+in 57.077 and 63.615 seconds (different milestone from first playable). Roads and
+terrain coverage were preserved. Both exits cleared published world owners.
+Natural menu heap after those reloads was 1,582/1,671 MiB, versus 1,670/1,797 MiB
+in the preceding repeated-entry run. This is reduced transient allocation, not a
+claim that the browser immediately releases all memory.
+
+After the final diagnostic collection, retained JavaScript heap was 45.5 MiB and
+backing storage 80.1 MiB; renderer footprint remained 2,678 MiB. Natural menu
+renderer footprints were 3,897 and 4,088 MiB before that diagnostic collection.
+Thus the reload path remains expensive in whole-process memory even though the
+old world is no longer retained by the main JavaScript object graph. A two-cycle
+check is not a long-run plateau guarantee. No test-only collection is used by
+the application.
+
+Sustained 90-second actual flight covered approximately 12 km at 47.44 FPS with
+33.4 ms p99. The short driving sample was 41.46 FPS, still below the inherited
+43.65 FPS desktop gate, and comparable to earlier runs around 40.5–42.9 FPS.
+Do not call that gate passing. Packaged mobile city/GPS entry, Manchester terrain
+boundary checks, Moon controls/pause and artifact integrity passed on `2c1b1eac`.
+Their screenshots were inspected. The mobile functional harness reported a
+20.338-second entry but still imposes a test heap cap; this is not a natural-memory
+or physical-phone performance certification.
+
+The current allocation profile still estimates about 28 GiB of allocation churn
+during a profiled city compilation. That cumulative estimate includes collected
+objects and sampling overhead; it is not retained RAM. It points to frontage,
+terrain and geometry calculations, not a reason to assign a 28 GiB memory budget.
+The profile is under `output/architecture-evaluation/current-allocation-audit/`.
+The full production execution matrix remains required; these focused results do
+not establish whole-product release readiness.
