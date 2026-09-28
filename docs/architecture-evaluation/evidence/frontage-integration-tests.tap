@@ -1,0 +1,244 @@
+TAP version 13
+# Subtest: shared street rules survive scale 0.5, rotation 0
+ok 1 - shared street rules survive scale 0.5, rotation 0
+  ---
+  duration_ms: 16.202917
+  type: 'test'
+  ...
+# Subtest: shared street rules survive scale 0.5, rotation 1.0471975511965976
+ok 2 - shared street rules survive scale 0.5, rotation 1.0471975511965976
+  ---
+  duration_ms: 4.791333
+  type: 'test'
+  ...
+# Subtest: shared street rules survive scale 0.5, rotation 1.5707963267948966
+ok 3 - shared street rules survive scale 0.5, rotation 1.5707963267948966
+  ---
+  duration_ms: 3.447875
+  type: 'test'
+  ...
+# Subtest: shared street rules survive scale 1, rotation 0
+ok 4 - shared street rules survive scale 1, rotation 0
+  ---
+  duration_ms: 1.554917
+  type: 'test'
+  ...
+# Subtest: shared street rules survive scale 1, rotation 1.0471975511965976
+ok 5 - shared street rules survive scale 1, rotation 1.0471975511965976
+  ---
+  duration_ms: 1.899417
+  type: 'test'
+  ...
+# Subtest: shared street rules survive scale 1, rotation 1.5707963267948966
+ok 6 - shared street rules survive scale 1, rotation 1.5707963267948966
+  ---
+  duration_ms: 1.053417
+  type: 'test'
+  ...
+# Subtest: shared street rules survive scale 1.11, rotation 0
+ok 7 - shared street rules survive scale 1.11, rotation 0
+  ---
+  duration_ms: 1.635875
+  type: 'test'
+  ...
+# Subtest: shared street rules survive scale 1.11, rotation 1.0471975511965976
+ok 8 - shared street rules survive scale 1.11, rotation 1.0471975511965976
+  ---
+  duration_ms: 1.29525
+  type: 'test'
+  ...
+# Subtest: shared street rules survive scale 1.11, rotation 1.5707963267948966
+ok 9 - shared street rules survive scale 1.11, rotation 1.5707963267948966
+  ---
+  duration_ms: 2.553542
+  type: 'test'
+  ...
+# Subtest: shared street rules survive scale 2, rotation 0
+ok 10 - shared street rules survive scale 2, rotation 0
+  ---
+  duration_ms: 1.490209
+  type: 'test'
+  ...
+# Subtest: shared street rules survive scale 2, rotation 1.0471975511965976
+ok 11 - shared street rules survive scale 2, rotation 1.0471975511965976
+  ---
+  duration_ms: 1.751792
+  type: 'test'
+  ...
+# Subtest: shared street rules survive scale 2, rotation 1.5707963267948966
+ok 12 - shared street rules survive scale 2, rotation 1.5707963267948966
+  ---
+  duration_ms: 0.83025
+  type: 'test'
+  ...
+# Subtest: same source segment resolves consistently beyond the local facade and across tiles
+ok 13 - same source segment resolves consistently beyond the local facade and across tiles
+  ---
+  duration_ms: 0.379583
+  type: 'test'
+  ...
+# Subtest: explicit absence, separate mapping and structures override nearby buildings
+ok 14 - explicit absence, separate mapping and structures override nearby buildings
+  ---
+  duration_ms: 0.146958
+  type: 'test'
+  ...
+# Subtest: reversal swaps left and right without changing physical frontage
+ok 15 - reversal swaps left and right without changing physical frontage
+  ---
+  duration_ms: 0.100209
+  type: 'test'
+  ...
+# Subtest: invalid and passage footprints cannot create frontage evidence
+ok 16 - invalid and passage footprints cannot create frontage evidence
+  ---
+  duration_ms: 0.231083
+  type: 'test'
+  ...
+# Subtest: world scale has one authority and rejects unusable values
+ok 17 - world scale has one authority and rejects unusable values
+  ---
+  duration_ms: 0.238833
+  type: 'test'
+  ...
+# Subtest: placement offsets move both grading edges with the pavement
+ok 18 - placement offsets move both grading edges with the pavement
+  ---
+  duration_ms: 0.069333
+  type: 'test'
+  ...
+# Subtest: semantic grade separation excludes frontage even with missing source tags
+ok 19 - semantic grade separation excludes frontage even with missing source tags
+  ---
+  duration_ms: 0.095708
+  type: 'test'
+  ...
+# Subtest: frontage broad phase preserves near-contact tolerance and source edge order
+ok 20 - frontage broad phase preserves near-contact tolerance and source edge order
+  ---
+  duration_ms: 0.06675
+  type: 'test'
+  ...
+# Subtest: translated diagonal and degenerate frontage queries retain exact contacts
+ok 21 - translated diagonal and degenerate frontage queries retain exact contacts
+  ---
+  duration_ms: 0.095166
+  type: 'test'
+  ...
+# Subtest: visible angled facade is measured geometrically
+ok 22 - visible angled facade is measured geometrically
+  ---
+  duration_ms: 0.579209
+  type: 'test'
+  ...
+# Subtest: near wall occludes rear wall regardless of angle or facade eligibility
+ok 23 - near wall occludes rear wall regardless of angle or facade eligibility
+  ---
+  duration_ms: 0.155375
+  type: 'test'
+  ...
+# Subtest: frontage reach crossing partitions eligible portion instead of dropping interval
+ok 24 - frontage reach crossing partitions eligible portion instead of dropping interval
+  ---
+  duration_ms: 0.30925
+  type: 'test'
+  ...
+# Subtest: overlapping footprint visibility changes produce exact source intervals
+ok 25 - overlapping footprint visibility changes produce exact source intervals
+  ---
+  duration_ms: 0.112333
+  type: 'test'
+  ...
+# Subtest: pavement and grading agree for angled frontage, tile 16, rotation 0
+ok 26 - pavement and grading agree for angled frontage, tile 16, rotation 0
+  ---
+  duration_ms: 11.292125
+  type: 'test'
+  ...
+# Subtest: pavement and grading agree for angled frontage, tile 16, rotation 0.6
+ok 27 - pavement and grading agree for angled frontage, tile 16, rotation 0.6
+  ---
+  duration_ms: 3.012
+  type: 'test'
+  ...
+# Subtest: pavement and grading agree for angled frontage, tile 16, rotation 1.57
+ok 28 - pavement and grading agree for angled frontage, tile 16, rotation 1.57
+  ---
+  duration_ms: 2.77975
+  type: 'test'
+  ...
+# Subtest: pavement and grading agree for angled frontage, tile 32, rotation 0
+ok 29 - pavement and grading agree for angled frontage, tile 32, rotation 0
+  ---
+  duration_ms: 1.542333
+  type: 'test'
+  ...
+# Subtest: pavement and grading agree for angled frontage, tile 32, rotation 0.6
+ok 30 - pavement and grading agree for angled frontage, tile 32, rotation 0.6
+  ---
+  duration_ms: 1.474958
+  type: 'test'
+  ...
+# Subtest: pavement and grading agree for angled frontage, tile 32, rotation 1.57
+ok 31 - pavement and grading agree for angled frontage, tile 32, rotation 1.57
+  ---
+  duration_ms: 1.854041
+  type: 'test'
+  ...
+# Subtest: pavement and grading agree for angled frontage, tile 64, rotation 0
+ok 32 - pavement and grading agree for angled frontage, tile 64, rotation 0
+  ---
+  duration_ms: 1.651667
+  type: 'test'
+  ...
+# Subtest: pavement and grading agree for angled frontage, tile 64, rotation 0.6
+ok 33 - pavement and grading agree for angled frontage, tile 64, rotation 0.6
+  ---
+  duration_ms: 1.088417
+  type: 'test'
+  ...
+# Subtest: pavement and grading agree for angled frontage, tile 64, rotation 1.57
+ok 34 - pavement and grading agree for angled frontage, tile 64, rotation 1.57
+  ---
+  duration_ms: 0.964958
+  type: 'test'
+  ...
+# Subtest: small walls remain occluders but do not by themselves imply an urban sidewalk
+ok 35 - small walls remain occluders but do not by themselves imply an urban sidewalk
+  ---
+  duration_ms: 0.296834
+  type: 'test'
+  ...
+# Subtest: visibility barriers use exactly the rendered curved and tapered road footprint
+ok 36 - visibility barriers use exactly the rendered curved and tapered road footprint
+  ---
+  duration_ms: 9.938708
+  type: 'test'
+  ...
+# Subtest: packed barrier queries preserve exact footprints across buffer chunks and disposal
+ok 37 - packed barrier queries preserve exact footprints across buffer chunks and disposal
+  ---
+  duration_ms: 27.869792
+  type: 'test'
+  ...
+# Subtest: mapped water and land preserve islands, bounds and malformed-edge handling
+ok 38 - mapped water and land preserve islands, bounds and malformed-edge handling
+  ---
+  duration_ms: 0.547
+  type: 'test'
+  ...
+# Subtest: frontage point and segment queries preserve exact distance and crossing cases
+ok 39 - frontage point and segment queries preserve exact distance and crossing cases
+  ---
+  duration_ms: 0.413958
+  type: 'test'
+  ...
+1..39
+# tests 39
+# suites 0
+# pass 39
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 289.109875

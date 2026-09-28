@@ -622,20 +622,20 @@ function* terrainHeightSteps(mesh, deps = {}, options = {}) {
       meters = nextBaseElevations[i] / unitsPerMeter;
     } else if (acceptedSampler) {
       const { lat, lon } = worldToLatLon(wx, wz);
-      acceptedSample = acceptedSampler(lat, lon);
-      if (
-        acceptedSample?.status !== 'available' ||
-        !Number.isFinite(Number(acceptedSample.groundElevationMeters))
-      ) {
+      const scalarSampler = deps.sampleAcceptedGroundElevationAtLatLon;
+      if (i === 0 || typeof scalarSampler !== 'function') acceptedSample = acceptedSampler(lat, lon);
+      const acceptedMeters = acceptedSample
+        ? (acceptedSample.status === 'available' ? Number(acceptedSample.groundElevationMeters) : NaN)
+        : scalarSampler(lat, lon);
+      if (!Number.isFinite(acceptedMeters)) {
+        acceptedSample ||= acceptedSampler(lat, lon);
         mesh.userData.pendingTerrainTile = true;
         mesh.userData.groundUnavailableReason =
           acceptedSample?.reason || 'accepted-ground-sample-unavailable';
         mesh.visible = false;
         return;
       }
-      meters = deps.clampElevationMeters(
-        Number(acceptedSample.groundElevationMeters)
-      );
+      meters = deps.clampElevationMeters(acceptedMeters);
       if (i === 0) {
         mesh.userData.renderProvenance = {
           version: 1,

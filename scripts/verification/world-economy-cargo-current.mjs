@@ -71,15 +71,20 @@ async function buyEarthMaterial(context) {
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
         const candidate = globalThis.__WE3D_STORE_SUPPORT__?.context?.()?.active;
         if (candidate?.action !== 'visit_store' || candidate?.data?.storeId !== place.id) continue;
-        if (await globalThis.__WE3D_STORE_SUPPORT__?.perform?.() === true) return place;
+        if (await globalThis.__WE3D_STORE_SUPPORT__?.perform?.() === true) {
+          const stock = JSON.parse(globalThis.render_game_to_text?.() || '{}').urbanSandbox?.commerce?.current?.standard || [];
+          if (stock.some(item => item.remaining > 0 && item.expeditionTransfer?.kgPerUnit > 0)) return place;
+          document.getElementById('urbanStoreCloseBtn')?.click();
+        }
       }
       return null;
     }, materialStores);
     assert.ok(opened, 'No mapped material seller opened through its published player interaction.');
     await page.locator('#urbanStore.show').waitFor({ state: 'visible' });
     const openStoreState = await state(page);
-    const materialCatalogId = openStoreState.urbanSandbox?.commerce?.current?.standard
-      ?.find((item) => item.category === 'material')?.id || '';
+    const material = openStoreState.urbanSandbox?.commerce?.current?.standard
+      ?.find((item) => item.remaining > 0 && item.expeditionTransfer?.kgPerUnit > 0);
+    const materialCatalogId = material?.id || '';
     assert.ok(materialCatalogId, `Mapped material seller ${opened.name} did not publish a transferable material in today's stock.`);
     const buy = page.locator(`#urbanStoreStock [data-store-action="buy"][data-store-item="${materialCatalogId}"]`);
     await buy.waitFor({ state: 'visible' });
@@ -94,7 +99,7 @@ async function buyEarthMaterial(context) {
     assert.ok(item, JSON.stringify(after.backpack));
     assert.ok(after.urbanSandbox.commerce.current.credits < before.urbanSandbox.commerce.current.credits);
     await page.screenshot({ path: path.join(outputDir, 'earth-material-purchased.png'), fullPage: false });
-    return { store: opened, item, credits: after.urbanSandbox.commerce.current.credits };
+    return { store: opened, item, transfer: material.expeditionTransfer, credits: after.urbanSandbox.commerce.current.credits };
   } catch (error) {
     const snapshot = await state(page).catch(() => null);
     await fs.writeFile(path.join(outputDir, 'failure-state.json'), JSON.stringify({ error: String(error?.stack || error), snapshot }, null, 2));
@@ -129,20 +134,26 @@ async function loadMaterialAboard(context, purchase) {
     const before = await state(page);
     await page.screenshot({ path: path.join(outputDir, 'cargo-transfer-ready.png'), fullPage: false });
     await transfer.click();
-    await page.waitForFunction((feedstock) => {
+    const resourceKey = purchase.transfer.resourceKey;
+    const beforeKg = before.interstellarExpedition.resources[resourceKey];
+    await page.waitForFunction(({resourceKey, beforeKg}) => {
       const snapshot = JSON.parse(globalThis.render_game_to_text?.() || '{}');
-      return snapshot.interstellarExpedition?.resources?.feedstockKg > feedstock;
-    }, before.interstellarExpedition.resources.feedstockKg);
+      return snapshot.interstellarExpedition?.resources?.[resourceKey] > beforeKg;
+    }, {resourceKey, beforeKg});
     const after = await state(page);
     const result = {
-      feedstockKg: after.interstellarExpedition.resources.feedstockKg,
-      beforeFeedstockKg: before.interstellarExpedition.resources.feedstockKg,
+      resourceKey,
+      resourceKg: after.interstellarExpedition.resources[resourceKey],
+      beforeKg,
+      expectedMassKg: purchase.transfer.kgPerUnit * purchase.item.quantity,
       earthLoadedKg: after.interstellarExpedition.materialLedger?.earthLoadedKg,
+      beforeEarthLoadedKg: before.interstellarExpedition.materialLedger?.earthLoadedKg || 0,
       materialStillCarried: after.backpack?.items?.some((item) => item.catalogId === purchase.item.catalogId) === true,
       stationTitle: await page.locator('#shipStationTitle').textContent()
     };
     assert.equal(result.materialStillCarried, false, JSON.stringify(result));
-    assert.equal(result.feedstockKg - result.beforeFeedstockKg, result.earthLoadedKg, JSON.stringify(result));
+    assert.equal(result.resourceKg - result.beforeKg, result.expectedMassKg, JSON.stringify(result));
+    assert.equal(result.earthLoadedKg - result.beforeEarthLoadedKg, result.expectedMassKg, JSON.stringify(result));
     assert.equal(result.stationTitle, 'Cargo Hold');
     await page.screenshot({ path: path.join(outputDir, 'cargo-transfer-complete.png'), fullPage: false });
     return result;

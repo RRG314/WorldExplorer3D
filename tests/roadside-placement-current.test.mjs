@@ -30,3 +30,26 @@ test('grade-separated roads do not create ground fixtures; road coordinate scale
  const scaled=createRoadsidePlacementResolver([road({x:-100,z:0},{x:100,z:0},5,{metersPerWorldUnit:2,resolvedCrossSection:{sourceWidthMeters:10}})]);
  const p=scaled.resolve({x:0,z:0});assert.ok(Math.abs(p.z)>3.5&&Math.abs(p.z)<5);
 });
+
+test('structure lookup retains boundary, distant and broad structure exclusions',()=>{
+ for(const z of [-64,-.01,0,64,128]) {
+  const bridge=road({x:-100,z},{x:100,z},10,{bridge:'yes'});
+  const r=createRoadsidePlacementResolver([bridge]);
+  assert.equal(r.resolve({x:0,z:z+7.9},{preferOriginal:true}),null);
+  assert.ok(r.resolve({x:0,z:z+8.1},{preferOriginal:true}));
+ }
+ const broad=road({x:-100000,z:-100000},{x:100000,z:100000},10,{tunnel:'yes'});
+ assert.equal(createRoadsidePlacementResolver([broad]).resolve({x:5000,z:5000},{preferOriginal:true}),null);
+ const distant=road({x:10000,z:10000},{x:10100,z:10000},10,{bridge:'yes'});
+ assert.ok(createRoadsidePlacementResolver([eastWest,distant]).resolve({x:20,z:0}));
+});
+
+test('index bounds cover profile widths between endpoint and midpoint samples',()=>{
+ const r=road({x:0,z:50},{x:120,z:50},40,{metersPerWorldUnit:1,resolvedCrossSection:{
+  sourceWidthMeters:40,segmentWidthsMeters:new Float32Array([4]),
+  segmentProfiles:[[{startT:0,endT:.1,widthMeters:4},{startT:.45,endT:.55,widthMeters:4},{startT:.9,endT:1,widthMeters:4}]]
+ }});
+ assert.equal(createRoadsidePlacementResolver([r]).roadBlocked({x:30,z:68}),true);
+ const bridge=createRoadsidePlacementResolver([{...r,bridge:'yes'}]);
+ assert.equal(bridge.resolve({x:30,z:71},{preferOriginal:true}),null);
+});

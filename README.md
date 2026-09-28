@@ -1,31 +1,35 @@
 # World Explorer 3D
 
-[Release status](docs/RELEASE_INTEGRATION_STATUS.md) · [5.3 release candidate](RELEASE_NOTES_5.3.0.md) · [Roadmap](ROADMAP.md)
+[Release status](docs/RELEASE_INTEGRATION_STATUS.md) · [5.3 release notes](RELEASE_NOTES_5.3.0.md) · [Roadmap](ROADMAP.md)
 
 [Full project description](docs/PROJECT_DESCRIPTION.md) · [System inventory](docs/SYSTEM_INVENTORY.md) · [Architecture map](docs/ARCHITECTURE_MAP.md) · [Source reference](docs/SYSTEM_INVENTORY_REFERENCE.md)
 
 [![Code and package checks](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml/badge.svg?branch=stable)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml)
 [![Secret Scan](https://github.com/RRG314/WorldExplorer3D/actions/workflows/secret-scan.yml/badge.svg?branch=stable)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/secret-scan.yml)
-[![Release checks](https://github.com/RRG314/WorldExplorer3D/actions/workflows/release-verify.yml/badge.svg?branch=stable)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/release-verify.yml)
 [![GitHub Pages](https://github.com/RRG314/WorldExplorer3D/actions/workflows/deploy-pages-public.yml/badge.svg?branch=stable)](https://rrg314.github.io/WorldExplorer3D/)
 [![Release](https://img.shields.io/github/v/release/RRG314/WorldExplorer3D?sort=date)](https://github.com/RRG314/WorldExplorer3D/releases/latest)
 [![License: Source Available](https://img.shields.io/badge/license-source--available-lightgrey)](LICENSE)
+
+[Manual browser/backend verification](https://github.com/RRG314/WorldExplorer3D/actions/workflows/release-verify.yml)
+reports selected checks; it is not an overall release or performance badge.
 
 World Explorer 3D is a browser-based world sandbox built around real places.
 Choose a location, step into a bounded playable world, and explore by land,
 water, air, or space. Discovery, vehicles, virtual property, persistent building,
 photo-based home improvements and shared rooms connect the experience.
 
-The public game remains on 5.2. The 5.3 candidate adds a redesigned Solis Reach,
-physical specimen research, richer space environments, building-photo interiors
-and world-rendering repairs. [Release status](docs/RELEASE_INTEGRATION_STATUS.md)
-distinguishes the candidate from the deployed game. Workflow badges report their
-named checks; they do not certify phone performance or production approval.
+The live game is on 5.3, with a redesigned Solis Reach, physical specimen
+research, richer space environments, building-photo interiors and faster world
+loading. The September 28 update reduces terrain and building allocation,
+worker memory and shader growth while preserving mapped-world coverage.
+[Release status](docs/RELEASE_INTEGRATION_STATUS.md) records the shipped build
+and remaining performance limits. Workflow badges report their named checks;
+they do not certify phone performance or a fully passing performance gate.
 
 <p align="center">
   <a href="https://worldexplorer3d.io/app/"><strong>Play World Explorer 3D</strong></a>
   · <a href="CONTROLS_REFERENCE.md">Controls</a>
-  · <a href="RELEASE_NOTES_5.3.0.md">5.3 preview</a>
+  · <a href="RELEASE_NOTES_5.3.0.md">5.3 release notes</a>
   · <a href="ROADMAP.md">Roadmap</a>
 </p>
 
@@ -35,7 +39,7 @@ named checks; they do not certify phone performance or production approval.
 manual building-photo contributions, richer ground and building detail, and
 restored BMW chase and driver-seat views.*
 
-Read [Further into the world](RELEASE_NOTES_5.3.0.md) for the 5.3 candidate,
+Read [Further into the world](RELEASE_NOTES_5.3.0.md) for the 5.3 release,
 [the last published update](RELEASE_NOTES_2026_09_08.md), or the
 [full project description](docs/PROJECT_DESCRIPTION.md) for how
 travel, discovery, property, building, community and space fit together.

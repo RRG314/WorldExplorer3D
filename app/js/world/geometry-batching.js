@@ -1,3 +1,4 @@
+import {isBatchStorage, batchStorageView} from './geometry-batch-storage.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 
 export function geometryHasFinitePositions(geometry) {
@@ -53,11 +54,11 @@ export function appendGeometryWithTransform(batch, geometry, matrix) {
   const startPos = batch.positions.length;
   const startNormals = batch.normals.length;
   const startUvs = batch.uvs.length;
-  const startFacadeEntrances = Array.isArray(batch.facadeEntrances) ? batch.facadeEntrances.length : 0;
-  const startColors = Array.isArray(batch.colors) ? batch.colors.length : 0;
-  const startFacadeParams = Array.isArray(batch.facadeParams) ? batch.facadeParams.length : 0;
-  const startRoofAParams = Array.isArray(batch.roofAParams) ? batch.roofAParams.length : 0;
-  const startRoofColorsB = Array.isArray(batch.roofColorsB) ? batch.roofColorsB.length : 0;
+  const startFacadeEntrances = isBatchStorage(batch.facadeEntrances) ? batch.facadeEntrances.length : 0;
+  const startColors = isBatchStorage(batch.colors) ? batch.colors.length : 0;
+  const startFacadeParams = isBatchStorage(batch.facadeParams) ? batch.facadeParams.length : 0;
+  const startRoofAParams = isBatchStorage(batch.roofAParams) ? batch.roofAParams.length : 0;
+  const startRoofColorsB = isBatchStorage(batch.roofColorsB) ? batch.roofColorsB.length : 0;
   const startIdx = batch.indices.length;
 
   const normalMatrix = new THREE.Matrix3().getNormalMatrix(matrix);
@@ -68,11 +69,11 @@ export function appendGeometryWithTransform(batch, geometry, matrix) {
     batch.positions.length = startPos;
     batch.normals.length = startNormals;
     batch.uvs.length = startUvs;
-    if (Array.isArray(batch.facadeEntrances)) batch.facadeEntrances.length = startFacadeEntrances;
-    if (Array.isArray(batch.colors)) batch.colors.length = startColors;
-    if (Array.isArray(batch.facadeParams)) batch.facadeParams.length = startFacadeParams;
-    if (Array.isArray(batch.roofAParams)) batch.roofAParams.length = startRoofAParams;
-    if (Array.isArray(batch.roofColorsB)) batch.roofColorsB.length = startRoofColorsB;
+    if (isBatchStorage(batch.facadeEntrances)) batch.facadeEntrances.length = startFacadeEntrances;
+    if (isBatchStorage(batch.colors)) batch.colors.length = startColors;
+    if (isBatchStorage(batch.facadeParams)) batch.facadeParams.length = startFacadeParams;
+    if (isBatchStorage(batch.roofAParams)) batch.roofAParams.length = startRoofAParams;
+    if (isBatchStorage(batch.roofColorsB)) batch.roofColorsB.length = startRoofColorsB;
     facadeAttributes.forEach(([key], i) => { if (batch[key]) batch[key].length = facadeStarts[i]; });
     batch.indices.length = startIdx;
   };
@@ -105,12 +106,12 @@ export function appendGeometryWithTransform(batch, geometry, matrix) {
     }
 
     for (const [key, attributeName] of facadeAttributes) {
-      if (!Array.isArray(batch[key])) continue;
+      if (!isBatchStorage(batch[key])) continue;
       const attribute = geometry.attributes[attributeName];
       batch[key].push(attribute?.getX(i) ?? -1, attribute?.getY(i) ?? -1, attribute?.getZ(i) ?? 0, attribute?.getW(i) ?? 0);
     }
 
-    if (Array.isArray(batch.facadeEntrances)) {
+    if (isBatchStorage(batch.facadeEntrances)) {
       if (facadeEntranceAttr?.itemSize === 4) {
         batch.facadeEntrances.push(
           facadeEntranceAttr.getX(i),
@@ -144,15 +145,18 @@ export function appendGeometryWithTransform(batch, geometry, matrix) {
 }
 
 export function buildMergedGeometry(batch) {
+  const isMergedArray = value => Array.isArray(value) || ArrayBuffer.isView(value);
+  // Consume the valid prefix only; failed source meshes may have rolled back.
+  batch = Object.fromEntries(Object.entries(batch).map(([key, value]) => [key, batchStorageView(value)]));
   if (!batch.positions.length || !batch.indices.length) return null;
   if (batch.positions.length % 3 !== 0 || batch.normals.length % 3 !== 0 || batch.uvs.length % 2 !== 0) return null;
   if (batch.normals.length !== batch.positions.length) return null;
   if (batch.uvs.length !== batch.positions.length / 3 * 2) return null;
-  if (Array.isArray(batch.facadeEntrances) && batch.facadeEntrances.length !== batch.positions.length / 3 * 4) return null;
-  if (Array.isArray(batch.colors) && batch.colors.length !== batch.positions.length) return null;
-  if (Array.isArray(batch.facadeParams) && batch.facadeParams.length !== batch.positions.length / 3 * 4) return null;
-  if (Array.isArray(batch.roofAParams) && batch.roofAParams.length !== batch.positions.length / 3 * 4) return null;
-  if (Array.isArray(batch.roofColorsB) && batch.roofColorsB.length !== batch.positions.length / 3 * 4) return null;
+  if (isMergedArray(batch.facadeEntrances) && batch.facadeEntrances.length !== batch.positions.length / 3 * 4) return null;
+  if (isMergedArray(batch.colors) && batch.colors.length !== batch.positions.length) return null;
+  if (isMergedArray(batch.facadeParams) && batch.facadeParams.length !== batch.positions.length / 3 * 4) return null;
+  if (isMergedArray(batch.roofAParams) && batch.roofAParams.length !== batch.positions.length / 3 * 4) return null;
+  if (isMergedArray(batch.roofColorsB) && batch.roofColorsB.length !== batch.positions.length / 3 * 4) return null;
 
   for (let i = 0; i < batch.positions.length; i++) {
     if (!Number.isFinite(batch.positions[i])) return null;
@@ -164,7 +168,7 @@ export function buildMergedGeometry(batch) {
     if (!Number.isFinite(batch.uvs[i])) return null;
   }
   for (const key of ['facadeLayouts','facadeOpenings']) {
-    if (Array.isArray(batch[key]) && (batch[key].length !== batch.positions.length / 3 * 4 || batch[key].some(value => !Number.isFinite(value)))) return null;
+    if (isMergedArray(batch[key]) && (batch[key].length !== batch.positions.length / 3 * 4 || batch[key].some(value => !Number.isFinite(value)))) return null;
   }
   const vertexCount = batch.positions.length / 3;
   for (let i = 0; i < batch.indices.length; i++) {
@@ -177,21 +181,21 @@ export function buildMergedGeometry(batch) {
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(batch.normals, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(batch.uvs, 2));
   for (const [key,name] of [['facadeLayouts','facadeLayout'],['facadeOpenings','facadeOpening']]) {
-    if (Array.isArray(batch[key])) geometry.setAttribute(name,new THREE.Float32BufferAttribute(batch[key],4));
+    if (isMergedArray(batch[key])) geometry.setAttribute(name,new THREE.Float32BufferAttribute(batch[key],4));
   }
-  if (Array.isArray(batch.facadeEntrances)) {
+  if (isMergedArray(batch.facadeEntrances)) {
     geometry.setAttribute('facadeEntrance', new THREE.Float32BufferAttribute(batch.facadeEntrances, 4));
   }
-  if (Array.isArray(batch.colors)) {
+  if (isMergedArray(batch.colors)) {
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(batch.colors, 3));
   }
-  if (Array.isArray(batch.facadeParams)) {
+  if (isMergedArray(batch.facadeParams)) {
     geometry.setAttribute('buildingFacadeParams', new THREE.Float32BufferAttribute(batch.facadeParams, 4));
   }
-  if (Array.isArray(batch.roofAParams)) {
+  if (isMergedArray(batch.roofAParams)) {
     geometry.setAttribute('buildingRoofAParams', new THREE.Float32BufferAttribute(batch.roofAParams, 4));
   }
-  if (Array.isArray(batch.roofColorsB)) {
+  if (isMergedArray(batch.roofColorsB)) {
     geometry.setAttribute('buildingRoofColorB', new THREE.Float32BufferAttribute(batch.roofColorsB, 4));
   }
 

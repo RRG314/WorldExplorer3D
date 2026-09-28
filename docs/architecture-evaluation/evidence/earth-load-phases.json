@@ -1,0 +1,123 @@
+{
+  "source": "ee1bca65bef2ccd00c740536343e9fc64f20400d",
+  "location": {
+    "lat": 39.2904,
+    "lon": -76.6122,
+    "name": "Baltimore"
+  },
+  "firstPlayableMs": 88306,
+  "phaseTotalsElapsedMs": {
+    "prepareAcceptedGround": 68,
+    "fetchOverpass": 9009,
+    "fetchFixedRegionalContext": 9304,
+    "fetchFixedRegionalStructures": 302,
+    "waitForFixedRegionalGround": 8801,
+    "featureBudgeting": 2228,
+    "waitForTransportGround": 0,
+    "buildRoadGeometry": 2588,
+    "buildLanduseGeometry": 128,
+    "batchLanduseGeometry": 12,
+    "buildLinearFeatureData": 37,
+    "buildPoiGeometry": 16,
+    "buildStreetFurniture": 3261,
+    "buildBuildingRoadGuards": 516,
+    "buildBuildingGeometry": 2454,
+    "publishBuildingFacadeEntrances": 701,
+    "publishBuildingExteriorDetails": 59,
+    "batchBuildingGeometry": 1123,
+    "publishLocationTerrain": 0,
+    "publishCompiledTransportMeshes": 45302,
+    "refreshTerrainSurfaceProfiles": 541,
+    "retireGroundFallbackPlaceholder": 0,
+    "buildTraversalNetworks": 316,
+    "spawnPlayer": 49,
+    "refreshMemoryMarkersForCurrentLocation": 0,
+    "refreshBlockBuilderForCurrentLocation": 0,
+    "refreshEditableWorldPresentation": 0,
+    "publishLocationWorld": 3,
+    "refreshEditableBuildingVisibility": 253,
+    "waitForTerrainSurfaceMaterials": 0
+  },
+  "firstRender": {
+    "durationMs": 1188.0999999940395,
+    "programs": 47
+  },
+  "providers": {
+    "accepted-ground": {
+      "started": 1,
+      "completed": 1,
+      "failed": 0,
+      "aborted": 0,
+      "discarded": 0,
+      "inFlight": 0
+    },
+    "openstreetmap-shortbread": {
+      "started": 4,
+      "completed": 4,
+      "failed": 0,
+      "aborted": 0,
+      "discarded": 0,
+      "inFlight": 0
+    },
+    "osm-overpass": {
+      "started": 2,
+      "completed": 0,
+      "failed": 2,
+      "aborted": 0,
+      "discarded": 0,
+      "inFlight": 0
+    },
+    "overture": {
+      "started": 1,
+      "completed": 1,
+      "failed": 0,
+      "aborted": 0,
+      "discarded": 0,
+      "inFlight": 0
+    },
+    "bundled-building-pack": {
+      "started": 1,
+      "completed": 1,
+      "failed": 0,
+      "aborted": 0,
+      "discarded": 0,
+      "inFlight": 0
+    },
+    "bundled-landmarks": {
+      "started": 1,
+      "completed": 1,
+      "failed": 0,
+      "aborted": 0,
+      "discarded": 0,
+      "inFlight": 0
+    }
+  },
+  "roadCompilation": {
+    "roadCount": 18758,
+    "meshCount": 0,
+    "authority": "transport_feature_compiler",
+    "yieldCount": 593
+  },
+  "acceptedGround": {
+    "generation": 2,
+    "status": "accepted",
+    "reason": null,
+    "location": {
+      "latitude": 39.2904,
+      "longitude": -76.61220000000003
+    },
+    "artifactId": "baltimore-ground",
+    "providerId": "usgs-3dep-best-available",
+    "sourceRelease": "USGS-3DEP:20260511",
+    "verticalDatum": "EGM2008",
+    "contentSha256": "a3b3c9372f4873e77336c4c25e0b4ba28d24fddded59e50cd1b9d9f7100140f0",
+    "artifactCount": 1,
+    "artifactIds": [
+      "baltimore-ground"
+    ],
+    "contentSha256s": [
+      "a3b3c9372f4873e77336c4c25e0b4ba28d24fddded59e50cd1b9d9f7100140f0"
+    ]
+  },
+  "scope": "Single live-provider load. Phases may overlap or contain yields/waits. Do not sum as exclusive CPU time."
+}

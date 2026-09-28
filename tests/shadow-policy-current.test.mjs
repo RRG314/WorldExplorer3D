@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import * as THREE from 'three';
+import { applyDirectionalShadowPolicy } from '../app/js/engine/shadow-policy.js';
 
 import {
   computeDirectionalShadowPlacement,
@@ -60,4 +62,25 @@ test('tiny astronomical direction changes do not churn the runtime shadow map', 
   assert.equal(updateStableDirectionalShadow(appCtx, { x: .5201, y: .8199, z: .2201 }, observer, { nowMs: 110 }), false);
   assert.equal(appCtx.renderer.shadowMap.needsUpdate, false);
   assert.equal(assigned.length, 2);
+});
+
+ test('shadow quality changes retire mismatched GPU targets and preserve matching targets', () => {
+  globalThis.THREE = THREE;
+  try {
+    const sun = new THREE.DirectionalLight();
+    const appCtx = {sun, renderer:{shadowMap:{}}};
+    const target = new THREE.WebGLRenderTarget(2048,2048);
+    let disposed = 0; target.addEventListener('dispose',()=>disposed++);
+    sun.shadow.map = target;
+    applyDirectionalShadowPolicy(appCtx,{quality:'high',gpuTier:'high'});
+    assert.equal(sun.shadow.map,target); assert.equal(disposed,0);
+    applyDirectionalShadowPolicy(appCtx,{quality:'med',gpuTier:'high'});
+    assert.equal(sun.shadow.map,null); assert.equal(disposed,1);
+    assert.equal(sun.shadow.mapSize.x,1024);
+    const smaller = new THREE.WebGLRenderTarget(1024,1024);
+    smaller.addEventListener('dispose',()=>disposed++); sun.shadow.map=smaller;
+    applyDirectionalShadowPolicy(appCtx,{quality:'low',gpuTier:'high'});
+    assert.equal(sun.shadow.map,null); assert.equal(disposed,2);
+    assert.equal(appCtx.renderer.shadowMap.enabled,false);
+  } finally { delete globalThis.THREE; }
 });

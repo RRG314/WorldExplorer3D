@@ -1,3 +1,5 @@
+import { resetRoadMapIndex } from '../map/earth-base.js?v=4';
+import { resetRoadSearchIndex } from './navigation.js?v=6';
 import { releaseLocationModels } from './release-location-models.js';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { clearBuildingExteriorMaterialPool } from "../engine/building-facade-materials.js?v=19";
@@ -25,7 +27,8 @@ function disposeSceneMeshes(meshes, options = {}) {
     if (typeof mesh.removeFromParent === 'function') mesh.removeFromParent();
     else mesh.parent?.remove?.(mesh);
     mesh.traverse?.((object) => {
-      object.geometry?.dispose?.();
+      if (!object.geometry?.userData?.sharedRuntimeGeometry) object.geometry?.dispose?.();
+      if (object.isInstancedMesh) object.dispose?.();
       if (!object.material) return;
       if (skipSharedUrbanSurfaceMaterial && object.userData?.sharedUrbanSurfaceMaterial) return;
       if (Array.isArray(object.material)) {
@@ -76,6 +79,11 @@ export function resetWorldForReload(options = {}) {
   const clearBuildingSpatialIndex = typeof options.clearBuildingSpatialIndex === 'function' ? options.clearBuildingSpatialIndex : () => {};
   const resetWorldFurnitureCaches = typeof options.resetWorldFurnitureCaches === 'function' ? options.resetWorldFurnitureCaches : () => {};
 
+  appCtx._roadMeshGeneration=(appCtx._roadMeshGeneration||0)+1;
+  appCtx._cancelTransportPreparation?.();
+  appCtx._cancelTransportPreparation=null;
+  appCtx.transportDetail?.dispose();
+  appCtx.transportDetail=null;
   appCtx.disposeLivingWorldRuntime?.('world_reload');
   appCtx.clearCommunityRealityCapturePresentation?.();
   appCtx.buildingEntranceCatalog = null;
@@ -122,6 +130,8 @@ export function resetWorldForReload(options = {}) {
     appCtx.clearActiveInterior({ restorePlayer: false, preserveCache: true });
   }
 
+  appCtx.transportDetail?.dispose();
+  appCtx.transportDetail=null;
   disposeSceneMeshes(appCtx.roadMeshes);
   appCtx.clearWorldCollections(['roadMeshes', 'roads']);
   // A publication belongs to exactly one world-load sequence. Clearing it here
@@ -148,6 +158,16 @@ export function resetWorldForReload(options = {}) {
   appCtx._streetPavementRetryAt = 0;
   appCtx._streetMotion = null;
   appCtx.transportSurfacePublication = null;
+  // These derived graphs belong to this world, including closures over their
+  // canonical features. An empty scene must not keep the previous city alive.
+  appCtx.transportNetworkModel = null;
+  appCtx.transportStructureModel = null;
+  appCtx.transportStructureAssembly = null;
+  appCtx.transportJunctionProfile = null;
+  appCtx.sharedTransportSurfacePresentation = null;
+  appCtx.tunnelSolidCompilation = null;
+  appCtx.structureProfileCompilation = null;
+  if (appCtx.Walk?.state?.walker) appCtx.Walk.state.walker._walkSupportFeature = null;
   if (appCtx.car) {
     appCtx.car.road = null;
     appCtx.car.onRoad = false;
@@ -218,6 +238,9 @@ export function resetWorldForReload(options = {}) {
   // previously batched world objects that are no longer reachable from a list.
   appCtx.clearEarthWorldSceneObjects?.();
 
+  resetRoadSearchIndex();
+  resetRoadMapIndex();
+  appCtx.GroundHeight?.invalidate?.();
   resetWorldFurnitureCaches();
   if (typeof appCtx.invalidateRoadCache === 'function') appCtx.invalidateRoadCache();
   appCtx.renderer?.renderLists?.dispose?.();

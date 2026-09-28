@@ -4,7 +4,6 @@ const crypto = require('node:crypto');
 
 const VEHICLE_LEASE_MS = 15_000;
 const VEHICLE_MOVE_MAX_METERS_PER_SECOND = 90;
-const ACTION_CLOCK_SKEW_MS = 250;
 const DIRECT_HIT_TOLERANCE_METERS = 3.5;
 const CIVIC_EVENT_COOLDOWN_MS = 1_500;
 const CIVIC_OBSERVED_MS = 2_400;
@@ -296,7 +295,9 @@ async function commitUrbanImpacts(options = {}) {
     const actorSnapshot = await transaction.get(actorRef);
     const actorState = snapshotData(actorSnapshot) || {};
     const lastActionMs = timestampMillis(actorState.lastActionAt, 0);
-    if (lastActionMs && nowMs + ACTION_CLOCK_SKEW_MS - lastActionMs < equipment.cooldownMs) {
+    // Both values are server timestamps. Client clock tolerance here would
+    // shorten every cooldown (310 ms became 60 ms for the pulse sidearm).
+    if (actorState.lastActionAt != null && nowMs - lastActionMs < equipment.cooldownMs) {
       return Object.freeze({ accepted: false, reason: 'cooldown' });
     }
     const snapshots = [];

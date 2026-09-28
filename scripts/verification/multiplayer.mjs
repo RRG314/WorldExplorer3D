@@ -372,6 +372,7 @@ try {
 
   await openMultiplayerTitleControls(owner);
   await owner.page.locator('#mpCreateRoomDetails > summary').click();
+  await owner.page.locator('#mpTitleVisibilitySelect').selectOption('public');
   await owner.page.locator('#mpTitleRoomNameInput').fill('Release multiplayer verification');
   await owner.page.locator('#mpTitleLocationTagInput').fill(worldLocation.name);
   await owner.page.locator('#mpTitleCreateBtn').click();
@@ -398,13 +399,20 @@ try {
     return { code, world: data.world, visibility: String(data.visibility || ''), maxPlayers: Number(data.maxPlayers || 0) };
   }, roomCode);
 
+  assert.equal(room.visibility, 'public', 'The discovery journey requires a public room.');
   assert.ok(Math.abs(room.world?.lat-worldLocation.lat)<1e-6 && Math.abs(room.world?.lon-worldLocation.lon)<1e-6,
     `Created room differs from selected city: ${JSON.stringify(room.world)}`);
 
   async function joinThroughNormalControls(player, roomCode) {
     await openMultiplayerTitleControls(player);
-    await player.page.locator('#mpTitleCodeInput').fill(roomCode);
-    await player.page.locator('#mpTitleJoinBtn').click();
+    // Exercise discovery and admission through the actual public directory.
+    // Knowing the code in the harness must not bypass the discoverability gate.
+    await player.page.locator('#mpBrowseCityInput').fill('');
+    await player.page.locator('#mpBrowseBtn').click();
+    const publicJoin = player.page.locator(`#mpBrowseList button[data-room-code="${roomCode}"]`);
+    await publicJoin.waitFor({state:'visible', timeout:20000});
+    await player.page.screenshot({path:path.join(path.dirname(reportPath),'public-room-directory.png')});
+    await publicJoin.click();
     try {
       await player.page.waitForFunction((code) => {
         const roomCodeText = document.getElementById('roomPanelRoomCode')?.textContent || '';
@@ -628,10 +636,11 @@ try {
   const checks = {
     recordedMapQueriesConsumed: owner.providerFixture.hits > 0 && member.providerFixture.hits > 0,
     distinctAuthenticatedPlayers: owner.identity.uid !== member.identity.uid,
-    ownerCreatedBoundedPrivateRoom:
-      room.visibility === 'private' && Number(room.maxPlayers) >= 2 && Number(room.maxPlayers) <= 32,
+    ownerCreatedBoundedPublicRoom:
+      room.visibility === 'public' && Number(room.maxPlayers) >= 2 && Number(room.maxPlayers) <= 32,
     secondClientJoinedSameRoom: memberJoinedRoomCode === room.code,
     bothPresenceRecordsVisible: playerCount === 2,
+    publicDirectoryJoin: room.visibility === 'public' && memberJoinedRoomCode === room.code,
     sharedArtifactConverged: sharedArtifact.title === artifactTitle && sharedArtifact.text === 'Two-client production contract',
     roomVehicleLeaseVisibleToSecondClient:
       ownerClaimed.activeVehicleId === sharedVehicle.id &&
@@ -645,7 +654,7 @@ try {
       memberClaimedAfterRelease.vehicle?.roomLeaseOwnerUid === member.identity.uid,
     noBrowserErrors: owner.browserErrors.length === 0 && member.browserErrors.length === 0
   };
-  assert.ok(Object.values(checks).every(Boolean), 'Two-client multiplayer verification failed.');
+  assert.ok(Object.values(checks).every(Boolean), `Two-client multiplayer verification failed: ${JSON.stringify(checks)}`);
   const report = {
     vehicleApproaches,
     ok: true,

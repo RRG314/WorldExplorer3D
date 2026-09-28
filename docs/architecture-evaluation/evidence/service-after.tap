@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: reset invalidates pending publication and disposes the late resource
+ok 1 - reset invalidates pending publication and disposes the late resource
+  ---
+  duration_ms: 2.429
+  type: 'test'
+  ...
+# Subtest: late completion cannot replace a newer generation
+ok 2 - late completion cannot replace a newer generation
+  ---
+  duration_ms: 0.199708
+  type: 'test'
+  ...
+# Subtest: late failure cannot mark a replacement failed
+ok 3 - late failure cannot mark a replacement failed
+  ---
+  duration_ms: 0.12525
+  type: 'test'
+  ...
+# Subtest: unregistered pending service cannot publish; custom disposer receives result
+ok 4 - unregistered pending service cannot publish; custom disposer receives result
+  ---
+  duration_ms: 0.306125
+  type: 'test'
+  ...
+# Subtest: normal concurrent requests load once; failures can retry
+ok 5 - normal concurrent requests load once; failures can retry
+  ---
+  duration_ms: 0.24125
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 48.061333

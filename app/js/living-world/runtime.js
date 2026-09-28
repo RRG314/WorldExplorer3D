@@ -111,9 +111,15 @@ export function disposeLivingWorldRuntime(appCtx, reason = 'world-reload') {
   return disposed;
 }
 
-export function startLivingWorldRuntime(appCtx, options = {}) {
+// Keep permanent accessors outside the per-world scope. Sibling closures in
+// that scope can retain the disposed simulation and its complete road graph.
+function installLivingWorldAccessors(appCtx) {
   appCtx.disposeLivingWorldRuntime = (reason = 'disposed') => disposeLivingWorldRuntime(appCtx, reason);
   appCtx.livingWorldRuntimeSnapshot = () => livingWorldRuntimeSnapshot(appCtx);
+}
+
+export function startLivingWorldRuntime(appCtx, options = {}) {
+  installLivingWorldAccessors(appCtx);
   if (!globalThis.THREE) return null;
   const snapshot = options.snapshot;
   const request = options.request;

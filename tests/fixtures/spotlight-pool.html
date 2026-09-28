@@ -1,0 +1,32 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Spotlight pool parity</title><link rel="icon" href="/favicon.svg"></head><body style="margin:0"><script src="/node_modules/three/build/three.min.js"></script><script type="module">
+const original=THREE.ShaderChunk.lights_fragment_begin;
+const {installInactiveSpotLightShortcut}=await import('/app/js/engine/night-lighting.js');
+const results=[];
+function render(active,fixed){
+ THREE.ShaderChunk.lights_fragment_begin=original;
+ if(fixed)installInactiveSpotLightShortcut(THREE);
+ const renderer=new THREE.WebGLRenderer({antialias:false,preserveDrawingBuffer:true});renderer.setSize(240,180);renderer.physicallyCorrectLights=true;
+ const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(45,240/180,.1,100);camera.position.set(0,5,9);camera.lookAt(0,0,0);
+ scene.background=new THREE.Color(0x162030);scene.add(new THREE.HemisphereLight(0xffffff,0x202020,.25));
+ const floor=new THREE.Mesh(new THREE.PlaneGeometry(16,16),new THREE.MeshStandardMaterial({color:0x8094aa,roughness:.65}));floor.rotation.x=-Math.PI/2;floor.position.y=-1;scene.add(floor);
+ for(let i=0;i<3;i++){
+  const mesh=new THREE.Mesh(new THREE.SphereGeometry(.8,32,24),new THREE.MeshStandardMaterial({color:[0xc08866,0x6688bb,0x888888][i],metalness:i*.3,roughness:.2+i*.25}));mesh.position.x=(i-1)*2;scene.add(mesh);
+ }
+ for(let i=0;i<10;i++){
+  const light=new THREE.SpotLight(new THREE.Color().setHSL(i/10,.45,.7),i<active?4:0,20,.8,.5,1.5);
+  light.position.set(Math.cos(i)*4,5,Math.sin(i)*4);light.visible=fixed||i<active;scene.add(light);scene.add(light.target);
+ }
+ renderer.render(scene,camera);
+ const gl=renderer.getContext(),pixels=new Uint8Array(240*180*4);gl.readPixels(0,0,240,180,gl.RGBA,gl.UNSIGNED_BYTE,pixels);
+ const error=gl.getError();
+ if(fixed&&active===3){const image=new Image();image.src=renderer.domElement.toDataURL();document.body.append(image);}
+ scene.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});renderer.dispose();renderer.forceContextLoss();
+ return {pixels,error};
+}
+for(const active of [0,1,3,8]){
+ const before=render(active,false),after=render(active,true);let maxDifference=0,changedChannels=0;
+ for(let i=0;i<before.pixels.length;i++){const d=Math.abs(before.pixels[i]-after.pixels[i]);maxDifference=Math.max(maxDifference,d);if(d)changedChannels++;}
+ results.push({active,maxDifference,changedChannels,brightness:before.pixels.reduce((sum,value,index)=>sum+(index%4<3?value:0),0),errors:[before.error,after.error]});
+}
+window.results=results;window.ready=true;
+</script></body></html>

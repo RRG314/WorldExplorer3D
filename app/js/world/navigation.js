@@ -26,6 +26,14 @@ let roadSearchFeatureSet = new Set();
 let roadSearchBaseRef = null;
 let roadSearchBaseCount = -1;
 
+export function resetRoadSearchIndex() {
+  roadSearchIndex.clear();
+  roadSearchFeatureSet.clear();
+  roadSearchBaseRef = null;
+  roadSearchBaseCount = -1;
+  nearRoadResult.road = null;
+}
+
 export function initWorldNavigation(deps = {}) {
   if (typeof deps.applySpawnTarget === 'function') runtime.applySpawnTarget = deps.applySpawnTarget;
   if (typeof deps.areRoadsConnected === 'function') runtime.areRoadsConnected = deps.areRoadsConnected;

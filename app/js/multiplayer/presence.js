@@ -37,6 +37,7 @@ let lastWriteAt = 0;
 let lastLeaseWriteAt = 0;
 let lastSentPose = null;
 let lastSamplePose = null;
+let lastSampleFrame = null;
 let lastSampleAt = 0;
 let inFlightWrite = false;
 let presenceGeneration = 0;
@@ -123,7 +124,10 @@ function enrichPoseVelocity(normalizedPose, nowMs) {
     finiteNumber(pose.vz, 0)
   );
 
-  if (incomingSpeed < 0.01 && lastSamplePose && nowMs > lastSampleAt) {
+  const frame = normalizedPose.frame;
+  const sameFrame = frame && lastSampleFrame && ['kind', 'locLat', 'locLon', 'interiorKey', 'interiorFloorId', 'interiorFloorLevel']
+    .every(key => frame[key] === lastSampleFrame[key]);
+  if (incomingSpeed < 0.01 && lastSamplePose && sameFrame && nowMs > lastSampleAt) {
     const dt = (nowMs - lastSampleAt) / 1000;
     if (dt > 0.016) {
       pose.vx = clampVelocity((finiteNumber(pose.x, 0) - finiteNumber(lastSamplePose.x, 0)) / dt);
@@ -138,13 +142,14 @@ function enrichPoseVelocity(normalizedPose, nowMs) {
     z: finiteNumber(pose.z, 0)
   };
   lastSampleAt = nowMs;
+  lastSampleFrame = frame ? { ...frame } : null;
   return normalizedPose;
 }
 
 function angularDistance(a, b) {
   const delta = (finiteNumber(a, 0) - finiteNumber(b, 0)) % (Math.PI * 2);
-  if (delta > Math.PI) return delta - Math.PI * 2;
-  if (delta < -Math.PI) return delta + Math.PI * 2;
+  if (delta > Math.PI) return Math.abs(delta - Math.PI * 2);
+  if (delta < -Math.PI) return Math.abs(delta + Math.PI * 2);
   return Math.abs(delta);
 }
 

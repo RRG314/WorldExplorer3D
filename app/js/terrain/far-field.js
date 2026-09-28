@@ -74,6 +74,7 @@ function createFarFieldTerrainApi(deps = {}) {
     getOrLoadTerrainTile,
     latLonToTileXY,
     sampleAcceptedGroundAtLatLon,
+    sampleAcceptedGroundElevationAtLatLon,
     sampleDetailedTerrainMetersAtLatLon,
     sampleTileElevationMeters,
     terrainTileDeps,
@@ -179,6 +180,7 @@ function createFarFieldTerrainApi(deps = {}) {
     farFieldSeamBlendMeters: FAR_FIELD_SEAM_BLEND_METERS,
     latLonToTileXY,
     sampleAcceptedGroundAtLatLon,
+    sampleAcceptedGroundElevationAtLatLon,
     sampleDetailedTerrainMetersAtLatLon,
     sampleTileElevationMeters,
     terrainTileDeps,
@@ -977,6 +979,7 @@ function createFarFieldTerrainApi(deps = {}) {
     refreshFarTerrainBoundaryHeights,
     resetFarTerrainClipmap,
     sampleFarTerrainWorldYAt,
+    getFarTerrainSurfaceSnapshot: () => farFieldSurfaceState ? {grid:farFieldSurfaceState.surfaceGrid,portals:farFieldMesh?.userData?.structureTerrainPortalDescriptors || []} : null,
     scheduleFarTerrainSurfaceRefresh,
     updateFarTerrainClipmap,
     waitForFarTerrainClipmap

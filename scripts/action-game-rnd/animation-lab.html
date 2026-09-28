@@ -1,0 +1,32 @@
+<!doctype html><meta charset="utf-8"><title>Character animation laboratory</title>
+<style>body{margin:0;background:#152637;color:white;font:16px system-ui}aside{position:absolute;padding:18px;background:#122332dd;max-width:430px}button{padding:10px;margin:4px}canvas{display:block}</style>
+<aside><h1>Shared character animation</h1><p>Existing licensed rigs · common locomotion and upper-body actions</p><button id="action" disabled>Walk + wave</button><button id="aim" disabled>Walk + aim</button><button id="fire" disabled>Walk + ranged action</button><button id="punch" disabled>Walk + punch</button><button id="idle" disabled>Idle</button><p id="status">Loading two independent skeletons…</p></aside>
+<script src="/node_modules/three/build/three.min.js"></script>
+<script src="/node_modules/three/examples/js/loaders/GLTFLoader.js"></script>
+<script type="module">
+import {createEquipmentVisuals} from '/app/js/urban-sandbox/equipment-visuals.js';
+import {createPlayerCharacterHost} from '/app/js/walking/player-character-host.js';
+import {attachCuratedExplorerCharacter,disposeCuratedCharacter} from '/app/js/walking/curated-explorer-character.js?v=8';
+const state={ready:false,mode:'idle',errors:[]};let seq=0;
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x254258);
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(1100,720);renderer.setPixelRatio(1);document.body.append(renderer.domElement);
+const camera=new THREE.PerspectiveCamera(42,1100/720,.1,60);camera.position.set(5,3.2,7);camera.lookAt(0,.9,0);
+scene.add(new THREE.HemisphereLight(0xffffff,0x526276,1.3));const light=new THREE.DirectionalLight(0xffffff,1);light.position.set(3,6,4);scene.add(light);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(30,30),new THREE.MeshStandardMaterial({color:0x536471}));ground.rotation.x=-Math.PI/2;scene.add(ground);
+const hosts=[createPlayerCharacterHost(THREE),createPlayerCharacterHost(THREE)];hosts.forEach((h,i)=>{scene.add(h);h.position.x=i?1.3:-1.3;});
+const loaded=await Promise.all(hosts.map((h,i)=>attachCuratedExplorerCharacter(THREE,h,{assetId:i?'character-field-explorer-woman-v1':'character-field-explorer-v1',isCurrent:()=>h.parent===scene})));
+hosts.forEach(h=>h.visible=true);
+const equipment=hosts.map(h=>createEquipmentVisuals(THREE,h));
+state.ready=loaded.every(Boolean);state.rigs=hosts.map(h=>h.userData.curatedCharacterAssetId);
+for(const button of document.querySelectorAll('button'))button.disabled=!state.ready;
+document.querySelector('#status').textContent=state.ready?'Both licensed models loaded.':'Loading failed';
+document.querySelector('#action').onclick=()=>{state.mode='wave';hosts.forEach(h=>h.userData.characterAnimation.play('wave',++seq));};
+document.querySelector('#punch').onclick=()=>{state.mode='punch';equipment.forEach(e=>{e.setEquipped('hands');e.playUse({id:'hands',category:'unarmed'});});};
+document.querySelector('#fire').onclick=()=>{state.mode='fire';equipment.forEach(e=>{e.setEquipped('pulse-sidearm');e.playUse({id:'pulse-sidearm',category:'sidearm'});});};
+document.querySelector('#aim').onclick=()=>{state.mode='aim';};document.querySelector('#idle').onclick=()=>{state.mode='idle';};
+function step(dt){for(const h of hosts)h.userData.characterAnimation?.update({moving:state.mode!=='idle',aiming:state.mode==='aim'||state.mode==='fire'},dt);for(const e of equipment)e.update(dt);renderer.render(scene,camera);}
+window.advanceTime=async ms=>{for(let i=0;i<Math.ceil(ms/16.67);i++)step(1/60);};
+window.render_game_to_text=()=>JSON.stringify({...state,animation:hosts.map(h=>h.userData.characterAnimation?.snapshot()),equipment:equipment.map(e=>e.root.userData.equippedId),drawCalls:renderer.info.render.calls});
+let previous=performance.now();function frame(now){step(Math.min(.05,(now-previous)/1000));previous=now;requestAnimationFrame(frame);}requestAnimationFrame(frame);
+window.addEventListener('pagehide',()=>{equipment.forEach(e=>e.dispose());hosts.forEach(disposeCuratedCharacter);renderer.dispose();});
+</script>

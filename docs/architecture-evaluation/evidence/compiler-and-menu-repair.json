@@ -1,0 +1,392 @@
+{
+  "source": "ee1bca65bef2ccd00c740536343e9fc64f20400d",
+  "runtimeDiffSha256": "b8660c6fb71f4494c14caadf2d5c064a1dcdf1bb957488e72ed0d62c9c394799",
+  "firstPlayableMs": 80390,
+  "firstPlayableTimingScope": "sampled profiler enabled; do not compare as uninstrumented load latency",
+  "noticeSuppressedWhileMenuOpen": true,
+  "noticeSpaceTransitionPassed": true,
+  "complete": true,
+  "errors": [],
+  "transportCompilation": {
+    "roadCount": 18758,
+    "meshCount": 779,
+    "phaseDurationsMs": {
+      "refreshStructureProfiles": 5827.8,
+      "applyTransportTerrainCorridors": 7845.6,
+      "reprojectGroundAttachedWorld": 29.9,
+      "refreshPublishedTerrainStructureAssemblies": 1186.7,
+      "detectIntersections": 306.5,
+      "buildStructureRibbons": 2642.8,
+      "buildCarriagewayRegions": 20308.6,
+      "projectGroundRoadMarkings": 2342.7,
+      "uploadRoadMeshes": 411.4,
+      "buildRoadContacts": 1824.4,
+      "measurePublishedRoadIntegrity": 66.1,
+      "rebuildStructureVisuals": 153.5,
+      "total": 42967.4
+    }
+  },
+  "cpuSelfSamples": [
+    {
+      "function": "(idle)",
+      "url": "",
+      "line": 0,
+      "sampledSelfMs": 9271.172
+    },
+    {
+      "function": "(garbage collector)",
+      "url": "",
+      "line": 0,
+      "sampledSelfMs": 4124.975
+    },
+    {
+      "function": "projectDecalPolygon",
+      "url": "/app/js/terrain/surface-decal-projection.js",
+      "line": 3,
+      "sampledSelfMs": 3979.477
+    },
+    {
+      "function": "cachedTerrainHeight",
+      "url": "/app/js/terrain/height-sampling.js?v=15",
+      "line": 286,
+      "sampledSelfMs": 3533.779
+    },
+    {
+      "function": "roadContactIndexSteps",
+      "url": "/app/js/terrain/road-contact-index.js?v=1",
+      "line": 21,
+      "sampledSelfMs": 3215.829
+    },
+    {
+      "function": "query",
+      "url": "/app/js/world/compiler/street-frontage-policy.js",
+      "line": 64,
+      "sampledSelfMs": 2660.42
+    },
+    {
+      "function": "terrainMeshHeightAt",
+      "url": "/app/js/terrain/height-sampling.js?v=15",
+      "line": 50,
+      "sampledSelfMs": 1955.434
+    },
+    {
+      "function": "polygonResult",
+      "url": "/app/js/world/compiler/street-polygon-kernel.js",
+      "line": 32,
+      "sampledSelfMs": 1935.453
+    },
+    {
+      "function": "(program)",
+      "url": "",
+      "line": 0,
+      "sampledSelfMs": 1914.108
+    },
+    {
+      "function": "indexPavementPositionSteps",
+      "url": "/app/js/world/pavement-indexed-mesh.js",
+      "line": 4,
+      "sampledSelfMs": 1913.232
+    },
+    {
+      "function": "cachedBaseTerrainHeight",
+      "url": "/app/js/terrain/height-sampling.js?v=15",
+      "line": 115,
+      "sampledSelfMs": 1711.917
+    },
+    {
+      "function": "pointSegment",
+      "url": "/app/js/world/compiler/street-frontage-policy.js",
+      "line": 30,
+      "sampledSelfMs": 1508.52
+    },
+    {
+      "function": "projection",
+      "url": "/app/js/world/roadside-placement.js",
+      "line": 36,
+      "sampledSelfMs": 924.683
+    },
+    {
+      "function": "crossingShellRanges",
+      "url": "/app/js/world/compiler/tunnel-system-model.js?v=15",
+      "line": 150,
+      "sampledSelfMs": 886.475
+    },
+    {
+      "function": "projectPolygon",
+      "url": "/app/js/terrain/road-contact-index.js?v=1",
+      "line": 100,
+      "sampledSelfMs": 801.623
+    },
+    {
+      "function": "roadWidthAtSegment",
+      "url": "/app/js/world/road-cross-section-profile.js?v=1",
+      "line": 122,
+      "sampledSelfMs": 785.484
+    },
+    {
+      "function": "pointInLonLatRing",
+      "url": "/app/js/terrain/far-field-mapped-context.js?v=20",
+      "line": 154,
+      "sampledSelfMs": 721.679
+    },
+    {
+      "function": "segmentIntersection2D",
+      "url": "/app/js/structure-semantics/geometry.js?v=2",
+      "line": 47,
+      "sampledSelfMs": 689.264
+    },
+    {
+      "function": "getProgramInfoLog",
+      "url": "",
+      "line": 0,
+      "sampledSelfMs": 668.33
+    },
+    {
+      "function": "rememberHeight",
+      "url": "/app/js/terrain/height-sampling.js?v=15",
+      "line": 12,
+      "sampledSelfMs": 583.53
+    },
+    {
+      "function": "partitionSteps",
+      "url": "/app/js/world/pavement-terrain-partition.js",
+      "line": 26,
+      "sampledSelfMs": 555.629
+    },
+    {
+      "function": "sampleAtLatLon",
+      "url": "/app/js/terrain/accepted-ground-runtime.js?v=2",
+      "line": 88,
+      "sampledSelfMs": 555.418
+    },
+    {
+      "function": "outerDistance",
+      "url": "/app/js/terrain/street-frontage-grading.js",
+      "line": 14,
+      "sampledSelfMs": 523.125
+    },
+    {
+      "function": "supports",
+      "url": "/app/js/terrain/road-contact-index.js?v=1",
+      "line": 112,
+      "sampledSelfMs": 517.074
+    },
+    {
+      "function": "segmentDistance",
+      "url": "/app/js/world/compiler/street-frontage-policy.js",
+      "line": 36,
+      "sampledSelfMs": 481.822
+    },
+    {
+      "function": "sampleProfileAtDistance",
+      "url": "/app/js/structure-semantics/geometry.js?v=2",
+      "line": 16,
+      "sampledSelfMs": 460.908
+    },
+    {
+      "function": "wayCenterDistanceSq",
+      "url": "/app/js/world/load-selection.js?v=1",
+      "line": 3,
+      "sampledSelfMs": 452.349
+    },
+    {
+      "function": "sampleDistrictGroundMeters",
+      "url": "/app/js/world/compiler/district-ground-model.js?v=2",
+      "line": 280,
+      "sampledSelfMs": 435.423
+    },
+    {
+      "function": "setBatchedBuildingSuppressed",
+      "url": "/app/js/editable-world/runtime.js?v=4",
+      "line": 44,
+      "sampledSelfMs": 431.285
+    },
+    {
+      "function": "execute",
+      "url": "/app/js/world/compiler/street-polygon-kernel.js",
+      "line": 77,
+      "sampledSelfMs": 428.919
+    },
+    {
+      "function": "roadTags",
+      "url": "/app/js/world/shortbread-source.js?v=20",
+      "line": 262,
+      "sampledSelfMs": 419.655
+    },
+    {
+      "function": "addSquare",
+      "url": "/app/js/world/cell-coverage.js",
+      "line": 8,
+      "sampledSelfMs": 407.169
+    },
+    {
+      "function": "sourceRoadWidthMeters",
+      "url": "/app/js/world/road-cross-section-profile.js?v=1",
+      "line": 13,
+      "sampledSelfMs": 385.054
+    },
+    {
+      "function": "visit",
+      "url": "/app/js/terrain/feature-projection-index.js",
+      "line": 31,
+      "sampledSelfMs": 370.021
+    },
+    {
+      "function": "intervalIndex",
+      "url": "/app/js/terrain/far-field-geometry.js?v=18",
+      "line": 129,
+      "sampledSelfMs": 349.105
+    },
+    {
+      "function": "encodedSample",
+      "url": "/app/js/world/compiler/district-ground-model.js?v=2",
+      "line": 318,
+      "sampledSelfMs": 347.652
+    },
+    {
+      "function": "mappedWaterBedMetersAt",
+      "url": "/app/js/terrain/far-field-geometry.js?v=18",
+      "line": 67,
+      "sampledSelfMs": 323.735
+    },
+    {
+      "function": "applyStructureTerrainCuts",
+      "url": "/app/js/terrain/height-sampling.js?v=15",
+      "line": 121,
+      "sampledSelfMs": 308.076
+    },
+    {
+      "function": "",
+      "url": "/app/js/world/pavement-height-sampler.js",
+      "line": 36,
+      "sampledSelfMs": 307.403
+    },
+    {
+      "function": "loadRoadsInternal",
+      "url": "/app/js/world/load-roads.js?v=229",
+      "line": 202,
+      "sampledSelfMs": 297.884
+    },
+    {
+      "function": "getX",
+      "url": "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js",
+      "line": 6,
+      "sampledSelfMs": 294.737
+    },
+    {
+      "function": "roadWidthAtSegmentMeters",
+      "url": "/app/js/world/road-cross-section-profile.js?v=1",
+      "line": 47,
+      "sampledSelfMs": 284.525
+    },
+    {
+      "function": "locationRecord",
+      "url": "/app/js/terrain/accepted-ground-runtime.js?v=2",
+      "line": 35,
+      "sampledSelfMs": 279.243
+    },
+    {
+      "function": "smoothSignedCutFillProfile",
+      "url": "/app/js/world/compiler/transport-surface-profile.js?v=12",
+      "line": 559,
+      "sampledSelfMs": 277.204
+    },
+    {
+      "function": "upsertNode",
+      "url": "/app/js/world/traversal.js?v=4",
+      "line": 115,
+      "sampledSelfMs": 276.63
+    },
+    {
+      "function": "texImage2D",
+      "url": "",
+      "line": 0,
+      "sampledSelfMs": 273.737
+    },
+    {
+      "function": "compileTunnelSystemModel",
+      "url": "/app/js/world/compiler/tunnel-system-model.js?v=15",
+      "line": 252,
+      "sampledSelfMs": 265.728
+    },
+    {
+      "function": "nodeIdFor",
+      "url": "/app/js/world/shortbread-source.js?v=20",
+      "line": 509,
+      "sampledSelfMs": 262.154
+    },
+    {
+      "function": "compileTransportNetworkModel",
+      "url": "/app/js/world/compiler/transport-network-model.js?v=9",
+      "line": 331,
+      "sampledSelfMs": 246.461
+    },
+    {
+      "function": "sampleFarFieldSurfaceMeters",
+      "url": "/app/js/terrain/far-field-geometry.js?v=18",
+      "line": 385,
+      "sampledSelfMs": 239.533
+    },
+    {
+      "function": "roadMetersPerWorldUnit",
+      "url": "/app/js/world/road-units.js",
+      "line": 3,
+      "sampledSelfMs": 235.048
+    },
+    {
+      "function": "",
+      "url": "/app/js/world/budgets.js?v=16",
+      "line": 89,
+      "sampledSelfMs": 233.622
+    },
+    {
+      "function": "frontageHit",
+      "url": "/app/js/world/compiler/street-frontage-geometry.js",
+      "line": 3,
+      "sampledSelfMs": 232.813
+    },
+    {
+      "function": "convertTilesToElements",
+      "url": "/app/js/world/shortbread-source.js?v=20",
+      "line": 496,
+      "sampledSelfMs": 230.994
+    },
+    {
+      "function": "terrainGridInterval",
+      "url": "/app/js/terrain/world-grid.js",
+      "line": 17,
+      "sampledSelfMs": 228.822
+    },
+    {
+      "function": "sampleAt",
+      "url": "/app/js/terrain/road-contact-index.js?v=1",
+      "line": 148,
+      "sampledSelfMs": 227.513
+    },
+    {
+      "function": "structureNodeMapFromLookup",
+      "url": "/app/js/world/fixed-regional-structures.js?v=16",
+      "line": 44,
+      "sampledSelfMs": 226.765
+    },
+    {
+      "function": "meshPavementTile",
+      "url": "/app/js/world/compiler/street-pavement.js",
+      "line": 317,
+      "sampledSelfMs": 226.049
+    },
+    {
+      "function": "partition",
+      "url": "/app/js/world/pavement-terrain-partition.js",
+      "line": 71,
+      "sampledSelfMs": 223.906
+    },
+    {
+      "function": "wayCenterLatLon",
+      "url": "/app/js/world/budgets.js?v=16",
+      "line": 60,
+      "sampledSelfMs": 218.898
+    }
+  ],
+  "limitations": "Single live-provider initial load with sampling profiler. Self samples are not calls. No paired first-playable improvement claim."
+}

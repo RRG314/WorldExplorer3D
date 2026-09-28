@@ -1,0 +1,25 @@
+<!doctype html><meta charset="utf-8"><title>Frontage query comparison</title>
+<style>body{margin:24px;background:#101a23;color:#e8f2f5;font:16px system-ui}canvas{display:block;background:#182632;border:1px solid #607487}button{margin:12px 0;padding:10px}p{max-width:760px}</style>
+<h1>Frontage query comparison</h1><p>Captured Baltimore building footprints. Green edges pass the exact frontage query; gray edges do not. Click the map to move the query.</p>
+<button id="target">Check next location</button><canvas width="760" height="650"></canvas><p id="status">Loading captured data…</p>
+<script type="module">
+import {createStreetFrontagePolicy} from '/app/js/world/compiler/street-frontage-policy.js';
+import {createStreetFrontagePolicy as baseline} from '/output/architecture-evaluation/frontage-query/baseline.js';
+const data=await(await fetch('/output/architecture-evaluation/world-boundary-and-environments/world-projection.json')).json();
+const buildings=data.buildings.flatMap(b=>b.components.map(c=>({pts:c.footprint})));
+const current=createStreetFrontagePolicy(buildings),old=baseline(buildings);
+const canvas=document.querySelector('canvas'),g=canvas.getContext('2d');let point={x:0,z:0},checks=0,state;
+const screen=p=>({x:p.x*1.6+380,y:p.z*1.6+325});
+function draw(){
+ const hits=current.query(point,point,30),before=old.query(point,point,30);
+ const ids=hits.map(e=>current.edges.indexOf(e)),expected=before.map(e=>old.edges.indexOf(e));
+ state={checks,query:point,hitCount:ids.length,orderedResultsMatch:JSON.stringify(ids)===JSON.stringify(expected),axes:'X right/east, Z down/south'};
+ g.clearRect(0,0,760,650);
+ for(const edge of current.edges){const a=screen(edge.a),b=screen(edge.b);g.strokeStyle=hits.includes(edge)?'#7dffbd':'#566675';g.lineWidth=hits.includes(edge)?3:1;g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke();}
+ const p=screen(point);g.strokeStyle='#ffc976';g.lineWidth=2;g.beginPath();g.arc(p.x,p.y,48,0,Math.PI*2);g.stroke();g.fillStyle='#ffc976';g.fillRect(p.x-3,p.y-3,6,6);
+ document.querySelector('#status').textContent=`${hits.length} accepted edges · ordered results ${state.orderedResultsMatch?'match':'DIFFER'} · ${checks} interactions`;
+}
+document.querySelector('#target').onclick=()=>{point={x:point.x+20,z:point.z+10};checks++;draw();};
+canvas.onclick=e=>{const r=canvas.getBoundingClientRect();point={x:(e.clientX-r.left-380)/1.6,z:(e.clientY-r.top-325)/1.6};checks++;draw();};
+window.render_game_to_text=()=>JSON.stringify(state);window.advanceTime=()=>draw();draw();
+</script>

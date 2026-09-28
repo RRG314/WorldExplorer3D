@@ -1,5 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { roadSegmentIsDriveable } from './road-cross-section-profile.js?v=1';
+import {packTraversalAdjacency, traversalSourceInterval} from './traversal-graph-storage.js';
 import { createTraversalSegmentIndex } from './traversal-segment-index.js';
 
 const TRAVERSAL_NODE_GRID = 2.5;
@@ -107,7 +108,6 @@ function traversalNodeKey(x, z, feature = null) {
 function buildTraversalGraph(mode = 'walk') {
   const features = traversableFeaturesForMode(mode);
   const nodes = [];
-  const adjacency = [];
   const segments = [];
   const nodesByKey = new Map();
   const featureKinds = {};
@@ -134,7 +134,6 @@ function buildTraversalGraph(mode = 'walk') {
       sumZ: point.z,
       sampleCount: 1
     });
-    adjacency.push([]);
     return nodeId;
   };
 
@@ -149,13 +148,13 @@ function buildTraversalGraph(mode = 'walk') {
         Math.hypot(points[index].x - points[index - 1].x, points[index].z - points[index - 1].z);
     }
     if (stations.length === 0) {
-      return points.map((point, index) => ({
+      return {distances, samples: points.map((point, index) => ({
         point,
         distanceAlong: distances[index],
         segmentIndex: Math.min(points.length - 2, index),
         segmentT: index === points.length - 1 ? 1 : 0,
         graphNodeId: ''
-      }));
+      }))};
     }
     const samples = points.map((point, index) => ({
       point,
@@ -188,25 +187,7 @@ function buildTraversalGraph(mode = 'walk') {
       }
       compact.push(sample);
     }
-    return compact;
-  };
-  const sourceInterval = (feature, startDistance, endDistance) => {
-    const midpoint = (startDistance + endDistance) * 0.5;
-    let walked = 0;
-    for (let index = 0; index < feature.pts.length - 1; index += 1) {
-      const start = feature.pts[index];
-      const end = feature.pts[index + 1];
-      const length = Math.hypot(end.x - start.x, end.z - start.z);
-      if (midpoint <= walked + length + 1e-6 || index === feature.pts.length - 2) {
-        return {
-          segmentIndex: index,
-          startT: Math.max(0, Math.min(1, (startDistance - walked) / Math.max(1e-6, length))),
-          endT: Math.max(0, Math.min(1, (endDistance - walked) / Math.max(1e-6, length)))
-        };
-      }
-      walked += length;
-    }
-    return { segmentIndex: 0, startT: 0, endT: 1 };
+    return {samples: compact, distances};
   };
 
   for (let f = 0; f < features.length; f++) {
@@ -215,7 +196,7 @@ function buildTraversalGraph(mode = 'walk') {
 
     const kind = traversalFeatureKind(feature);
     featureKinds[kind] = (featureKinds[kind] || 0) + 1;
-    const pathPoints = compiledPathPoints(feature);
+    const {samples: pathPoints, distances} = compiledPathPoints(feature);
     const nodeIds = pathPoints.map((sample) =>
       upsertNode(sample.point, feature, sample.graphNodeId)
     );
@@ -233,8 +214,8 @@ function buildTraversalGraph(mode = 'walk') {
       const p2 = pathPoints[i + 1].point;
       const length = Math.hypot(p2.x - p1.x, p2.z - p1.z);
       if (!(length > 0.05)) continue;
-      const source = sourceInterval(
-        feature,
+      const source = traversalSourceInterval(
+        feature.pts, distances,
         pathPoints[i].distanceAlong,
         pathPoints[i + 1].distanceAlong
       );
@@ -245,9 +226,6 @@ function buildTraversalGraph(mode = 'walk') {
         source.endT
       )) continue;
 
-      const weight = length * segmentPenalty;
-      if (direction !== 'reverse') adjacency[fromId].push({ to: toId, weight });
-      if (direction !== 'forward') adjacency[toId].push({ to: fromId, weight });
       segments.push({
         feature,
         direction,
@@ -269,7 +247,7 @@ function buildTraversalGraph(mode = 'walk') {
     authority: appCtx.transportNetworkModel?.authority || 'legacy_traversal_graph',
     transportGraphId: appCtx.transportNetworkModel?.id || null,
     nodes: nodes.map((node) => ({ x: node.x, z: node.z })),
-    adjacency,
+    adjacency: packTraversalAdjacency(nodes.length, segments),
     segments,
     featureKinds,
     featureCount: features.length,
@@ -447,7 +425,7 @@ export function measureRemainingPolylineDistance(x, z, points) {
 }
 
 function aStarTraversalPath(graph, startId, endId) {
-  if (!graph || !Array.isArray(graph.nodes) || !Array.isArray(graph.adjacency)) return null;
+  if (!graph || !Array.isArray(graph.nodes) || !graph.adjacency?.offsets) return null;
   if (!Number.isInteger(startId) || !Number.isInteger(endId)) return null;
   if (startId === endId) return { nodeIds: [startId], cost: 0 };
 
@@ -516,15 +494,15 @@ function aStarTraversalPath(graph, startId, endId) {
     if (current.priority > fScore[currentId] + 1e-6) continue;
     if (currentId === endId) break;
 
-    const edges = graph.adjacency[currentId] || [];
-    for (let i = 0; i < edges.length; i++) {
-      const edge = edges[i];
-      const tentative = gScore[currentId] + edge.weight;
-      if (tentative + 1e-6 >= gScore[edge.to]) continue;
-      cameFrom[edge.to] = currentId;
-      gScore[edge.to] = tentative;
-      fScore[edge.to] = tentative + heuristic(edge.to, endId);
-      pushOpen(edge.to, fScore[edge.to]);
+    const {offsets, targets, weights} = graph.adjacency;
+    for (let i = offsets[currentId]; i < offsets[currentId + 1]; i++) {
+      const target = targets[i];
+      const tentative = gScore[currentId] + weights[i];
+      if (tentative + 1e-6 >= gScore[target]) continue;
+      cameFrom[target] = currentId;
+      gScore[target] = tentative;
+      fScore[target] = tentative + heuristic(target, endId);
+      pushOpen(target, fScore[target]);
     }
   }
 

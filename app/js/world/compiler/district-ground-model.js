@@ -277,9 +277,9 @@ export function compileDistrictGroundModel(options = {}) {
   });
 }
 
-export function sampleDistrictGroundMeters(model, eastingMeters, northingMeters) {
+function sampleDistrictGround(model, eastingMeters, northingMeters, elevationOnly) {
   if (model?.type !== 'DistrictGroundModel' || model.status !== 'accepted') {
-    return Object.freeze({ status: 'unavailable', reason: 'model-not-accepted' });
+    return elevationOnly ? NaN : Object.freeze({ status: 'unavailable', reason: 'model-not-accepted' });
   }
   assertFinite(eastingMeters, 'easting');
   assertFinite(northingMeters, 'northing');
@@ -310,45 +310,53 @@ export function sampleDistrictGroundMeters(model, eastingMeters, northingMeters)
     row0 < minRow ||
     row0 > maxRow
   ) {
-    return Object.freeze({ status: 'unavailable', reason: 'outside-model' });
+    return elevationOnly ? NaN : Object.freeze({ status: 'unavailable', reason: 'outside-model' });
   }
 
   const encoded = model.encodedSamples;
   const width = maxColumn - minColumn + 1;
-  const encodedSample = (column, row) => {
-    if (!encoded) return model.samplesByKey[sampleKey(column, row)];
-    const index = (row - minRow) * width + (column - minColumn);
-    return {
-      key: sampleKey(column, row),
-      rawElevationMeters: encoded.rawElevationMeters[index],
-      groundElevationMeters: encoded.groundElevationMeters[index],
-      confidence: encoded.shared.confidence
-    };
-  };
-  const samples = [
-    encodedSample(column0, row0),
-    encodedSample(column1, row0),
-    encodedSample(column0, row1),
-    encodedSample(column1, row1)
-  ];
-  if (samples.some((sample) => !sample)) {
-    return Object.freeze({ status: 'unavailable', reason: 'missing-cell' });
+  const i00 = (row0 - minRow) * width + column0 - minColumn;
+  const i10 = (row0 - minRow) * width + column1 - minColumn;
+  const i01 = (row1 - minRow) * width + column0 - minColumn;
+  const i11 = (row1 - minRow) * width + column1 - minColumn;
+  const s00 = encoded ? null : model.samplesByKey[sampleKey(column0, row0)];
+  const s10 = encoded ? null : model.samplesByKey[sampleKey(column1, row0)];
+  const s01 = encoded ? null : model.samplesByKey[sampleKey(column0, row1)];
+  const s11 = encoded ? null : model.samplesByKey[sampleKey(column1, row1)];
+  if (!encoded && (!s00 || !s10 || !s01 || !s11)) {
+    return elevationOnly ? NaN : Object.freeze({ status: 'unavailable', reason: 'missing-cell' });
   }
   const xBlend = column1 === column0 ? 0 : columnFloat - column0;
   const yBlend = row1 === row0 ? 0 : rowFloat - row0;
-  const interpolate = (field) => {
-    const north0 = samples[0][field] +
-      (samples[1][field] - samples[0][field]) * xBlend;
-    const north1 = samples[2][field] +
-      (samples[3][field] - samples[2][field]) * xBlend;
-    return north0 + (north1 - north0) * yBlend;
-  };
-
+  const g = encoded?.groundElevationMeters;
+  const groundElevationMeters = interpolateCell(
+    g ? g[i00] : s00.groundElevationMeters, g ? g[i10] : s10.groundElevationMeters,
+    g ? g[i01] : s01.groundElevationMeters, g ? g[i11] : s11.groundElevationMeters, xBlend, yBlend);
+  // Height-only consumers do not need four sample records, provenance keys,
+  // raw elevation interpolation or a frozen result object per query.
+  if (elevationOnly) return groundElevationMeters;
+  const raw = encoded?.rawElevationMeters;
   return Object.freeze({
     status: 'available',
-    groundElevationMeters: interpolate('groundElevationMeters'),
-    rawElevationMeters: interpolate('rawElevationMeters'),
-    confidence: Math.min(...samples.map((sample) => sample.confidence)),
-    sampleKeys: Object.freeze(samples.map((sample) => sample.key))
+    groundElevationMeters,
+    rawElevationMeters: interpolateCell(
+      raw ? raw[i00] : s00.rawElevationMeters, raw ? raw[i10] : s10.rawElevationMeters,
+      raw ? raw[i01] : s01.rawElevationMeters, raw ? raw[i11] : s11.rawElevationMeters, xBlend, yBlend),
+    confidence: encoded ? encoded.shared.confidence : Math.min(s00.confidence, s10.confidence, s01.confidence, s11.confidence),
+    sampleKeys: Object.freeze([sampleKey(column0, row0), sampleKey(column1, row0), sampleKey(column0, row1), sampleKey(column1, row1)])
   });
+}
+
+function interpolateCell(a, b, c, d, xBlend, yBlend) {
+  const north0 = a + (b - a) * xBlend;
+  const north1 = c + (d - c) * xBlend;
+  return north0 + (north1 - north0) * yBlend;
+}
+
+export function sampleDistrictGroundMeters(model, eastingMeters, northingMeters) {
+  return sampleDistrictGround(model, eastingMeters, northingMeters, false);
+}
+
+export function sampleDistrictGroundElevationMeters(model, eastingMeters, northingMeters) {
+  return sampleDistrictGround(model, eastingMeters, northingMeters, true);
 }

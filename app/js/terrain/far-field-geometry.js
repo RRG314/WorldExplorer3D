@@ -1,3 +1,4 @@
+import {mappedWaterBedMetersAt, createMappedWaterBedSampler} from './mapped-water-bed.js';
 import {
   addCoverageEdges,
   cellFullyInsideDetailedCoverage,
@@ -62,36 +63,6 @@ function farFieldPointWithinOuterBounds(x, z, outer, toleranceWorld = 0.05) {
 function smoothstep01(value) {
   const t = Math.max(0, Math.min(1, value));
   return t * t * (3 - 2 * t);
-}
-
-function mappedWaterBedMetersAt(
-  longitude,
-  latitude,
-  terrainMeters,
-  waterAreas = [],
-  pointInMappedWaterArea = null,
-  bedDepthMeters = 12
-) {
-  if (!Number.isFinite(terrainMeters) || typeof pointInMappedWaterArea !== 'function') {
-    return terrainMeters;
-  }
-  let resolvedMeters = terrainMeters;
-  // The fixed location LOD uses a 320 m grid. A shallow sub-meter cut can
-  // still let one coarse terrain triangle cross the water plane between its
-  // vertices, especially with a 12 km camera depth range. Keep the regional
-  // bed safely below the mapped surface; the detailed terrain pipeline owns
-  // the fine shoreline feather close to the selected city.
-  for (const area of waterAreas || []) {
-    const surfaceMeters = Number(area?.surfaceMeters);
-    if (!Number.isFinite(surfaceMeters)) continue;
-    if (!pointInMappedWaterArea(longitude, latitude, area)) continue;
-    const coastalOwner = area?.kind === 'ocean' || area?._surfaceOwnerKind === 'ocean';
-    const depth = coastalOwner
-      ? Math.max(30, Number(bedDepthMeters) || 12)
-      : Math.max(2, Number(bedDepthMeters) || 12);
-    resolvedMeters = Math.min(resolvedMeters, surfaceMeters - depth);
-  }
-  return resolvedMeters;
 }
 
 function normalizeMappedWaterSurfaceOwnership(
@@ -226,6 +197,7 @@ function createFarFieldGeometryPlanner(deps = {}) {
     farFieldSeamBlendMeters,
     latLonToTileXY,
     sampleAcceptedGroundAtLatLon,
+    sampleAcceptedGroundElevationAtLatLon,
     sampleDetailedTerrainMetersAtLatLon,
     sampleTileElevationMeters,
     pointInMappedWaterArea,
@@ -234,6 +206,22 @@ function createFarFieldGeometryPlanner(deps = {}) {
     tileXYToLatLonBounds,
     worldToLatLon
   } = deps;
+
+  const acceptedElevation = sampleAcceptedGroundElevationAtLatLon || ((lat, lon) => {
+    const sample = sampleAcceptedGroundAtLatLon(lat, lon);
+    return sample?.status === 'available' ? Number(sample.groundElevationMeters) : NaN;
+  });
+
+  const waterBedSamplers = new WeakMap();
+  function waterBedAt(lon, lat, meters, areas) {
+    if (!areas?.length) return meters;
+    let entry = waterBedSamplers.get(areas);
+    if (!entry || entry.length !== areas.length) {
+      entry = {length:areas.length, sample:createMappedWaterBedSampler(areas, pointInMappedWaterArea)};
+      waterBedSamplers.set(areas, entry);
+    }
+    return entry.sample(lon, lat, meters);
+  }
 
   function innerWorldBounds(z, centerX, centerY, ring) {
     const northWest = tileXYToLatLonBounds(centerX - ring, centerY - ring, z);
@@ -397,10 +385,9 @@ function createFarFieldGeometryPlanner(deps = {}) {
     // for a deliberately unloaded neighbor and reject the entire fixed mesh.
     const samplePoint = insetFarFieldSamplePoint(x, z, spec.outer);
     const { lat, lon } = worldToLatLon(samplePoint.x, samplePoint.z);
-    const accepted = sampleAcceptedGroundAtLatLon(lat, lon);
-    const acceptedMeters = Number(accepted?.groundElevationMeters);
+    const acceptedMeters = acceptedElevation(lat, lon);
     let meters;
-    if (accepted?.status === 'available' && Number.isFinite(acceptedMeters)) {
+    if (Number.isFinite(acceptedMeters)) {
       meters = acceptedMeters;
     } else {
       const sampledSourceMeters = sampleSourceMeters(lat, lon, spec.sourceZoom, loadedTiles);
@@ -416,23 +403,14 @@ function createFarFieldGeometryPlanner(deps = {}) {
         const detailedMeters = detailedSample === null || detailedSample === undefined
           ? NaN
           : Number(detailedSample);
-        const seamAccepted = Number.isFinite(detailedMeters) ? null : sampleAcceptedGroundAtLatLon(lat, lon);
-        const seamMeters = Number.isFinite(detailedMeters)
-          ? detailedMeters
-          : Number(seamAccepted?.groundElevationMeters);
+        const seamMeters = Number.isFinite(detailedMeters) ? detailedMeters : acceptedElevation(lat, lon);
         if (Number.isFinite(seamMeters)) {
           const blend = smoothstep01(distanceFromSeam / Math.max(1, seamBlendWorld));
           meters = seamMeters + (meters - seamMeters) * blend;
         }
       }
     }
-    const resolvedMeters = mappedWaterBedMetersAt(
-      lon,
-      lat,
-      meters,
-      mappedContext?.waterAreas,
-      pointInMappedWaterArea
-    );
+    const resolvedMeters = waterBedAt(lon, lat, meters, mappedContext?.waterAreas);
     if (maskStats && resolvedMeters < meters - 1e-6) maskStats.waterMaskedVertices += 1;
     return resolvedMeters;
   }

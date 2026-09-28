@@ -54,6 +54,7 @@ if(i===0){
   canvases:[...document.querySelectorAll('canvas')].map(e=>({id:e.id,style:e.getAttribute('style'),display:getComputedStyle(e).display,visibility:getComputedStyle(e).visibility,rect:e.getBoundingClientRect().toJSON()}))
  })),null,2));
  await page.locator('body > canvas:not(#minimap)').click();
+ if (process.env.WE3D_EXPECT_ENVIRONMENT==='MOON' && await page.locator('#starInfo').isVisible()) throw new Error('Ground click selected an occluded star');
  await page.keyboard.press('Escape');
  await page.locator('#pauseScreen.show').waitFor({state:'visible'});
  const readFrames=()=>page.evaluate(()=>window.getWorldExplorerRuntimeDiagnostics?.().runtimeKernel?.phases?.render?.find(s=>s.id==='core.renderer')?.updates);

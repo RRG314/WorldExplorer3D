@@ -1,0 +1,19 @@
+<!doctype html><meta charset="utf-8"><title>Earth overlay lifecycle</title>
+<style>body{background:#132b3d;color:white;font:18px system-ui;padding:24px}button{font:inherit;padding:14px}aside{margin:20px;padding:20px;background:#324959}#urbanCivicStatus:not(.show){display:none}</style>
+<h1>Earth → Ocean overlay lifecycle</h1><button id="transition">Enter Ocean</button><p id="status">Earth selection and civic status are active.</p>
+<aside id="worldSelectionNotice">Selected Earth building <button data-world-selection-action>Improve this place</button></aside>
+<aside id="urbanCivicStatus" class="show" aria-hidden="false">Earth responder status</aside>
+<script type="module">
+import {commitEnvironment} from '/app/js/session-coordinator.js?v=2';
+import {getEnv} from '/app/js/env.js?v=58';
+const state={ready:true,passed:false};window.render_game_to_text=()=>JSON.stringify(state);window.advanceTime=async()=>{};
+commitEnvironment('EARTH');
+const card=document.querySelector('#worldSelectionNotice'),action=card.querySelector('button');action.onclick=()=>{};
+document.querySelector('#transition').onclick=()=>{
+ const rejected=commitEnvironment('UNKNOWN')===false&&!card.hidden;
+ const committed=commitEnvironment('OCEAN');
+ Object.assign(state,{rejectedPreservedSelection:rejected,committed,environment:getEnv(),selectionHidden:card.hidden,actionReleased:action.onclick===null,civicHidden:!document.querySelector('#urbanCivicStatus').classList.contains('show')});
+ state.passed=rejected&&committed&&state.selectionHidden&&state.actionReleased&&state.civicHidden;
+ document.querySelector('#status').textContent=state.passed?'PASS · Earth actions released; Ocean has no stale Earth overlays.':'FAIL';
+};
+</script>

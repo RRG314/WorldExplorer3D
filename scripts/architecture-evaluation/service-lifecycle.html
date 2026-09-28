@@ -1,0 +1,21 @@
+<!doctype html><meta charset="utf-8"><title>Service lifecycle verification</title>
+<style>body{font:18px system-ui;background:#eef2f6;color:#102438;margin:32px}canvas{display:block;margin:16px 0;background:white}button{font:inherit;padding:12px}</style>
+<h1>Service lifecycle fixture</h1><p>Actual registry module; no world, WebGL or network services.</p>
+<button id="run">Run reset / replacement</button><canvas width="680" height="200"></canvas>
+<script type="module">
+import {createPlatformServiceRegistry} from '/app/js/platform/service-registry.js';
+const state={status:'idle',disposed:0,ready:null,error:null};
+const g=document.querySelector('canvas').getContext('2d');
+function draw(){g.fillStyle='#fff';g.fillRect(0,0,680,200);g.fillStyle=state.status==='passed'?'#146a39':'#142b44';g.font='24px system-ui';g.fillText(`Lifecycle: ${state.status}`,20,45);g.font='18px system-ui';g.fillText(`Current service: ${state.ready||'none'}`,20,90);g.fillText(`Stale resources disposed: ${state.disposed}`,20,125);g.fillText(`Invalidated request: ${state.error||'none'}`,20,160);}
+window.render_game_to_text=()=>JSON.stringify(state);window.advanceTime=async()=>{};
+document.querySelector('#run').onclick=async()=>{
+ state.status='running';state.disposed=0;draw();let complete;
+ let loads=0;const registry=createPlatformServiceRegistry();
+ registry.register({id:'test',load:()=>++loads===1?new Promise(resolve=>complete=resolve):{id:'replacement'}});
+ const old=registry.ensure('test');await Promise.resolve();registry.reset('test');await registry.ensure('test');
+ complete({id:'stale',dispose(){state.disposed++;}});
+ try{await old;}catch(error){state.error=error.name;}
+ state.ready=registry.peek('test')?.id;state.status=state.ready==='replacement'&&state.disposed===1&&state.error==='AbortError'?'passed':'failed';draw();
+ if(state.status!=='passed')console.error('Lifecycle invariant failed');
+};draw();
+</script>

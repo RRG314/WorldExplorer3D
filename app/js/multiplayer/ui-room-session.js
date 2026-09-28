@@ -46,6 +46,7 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
     clearSubscriptions,
     currentRoomName,
     ensureGhostManager,
+    ensureGhostTicker,
     installPaintClaimPublisher,
     syncRoomWorldContext
   } = runtime;
@@ -259,6 +260,7 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
     });
 
     startPresence(room.id, helpers.readPoseSnapshot);
+    ensureGhostTicker();
     await syncRoomWorldContext(room, false, true);
     if (!isCurrent()) return false;
 

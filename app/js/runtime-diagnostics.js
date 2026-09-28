@@ -1,3 +1,4 @@
+import { rendererOwnershipSnapshot } from './runtime/renderer-owners.js';
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { buildingExteriorMaterialPoolSnapshot } from './engine/building-facade-materials.js?v=19';
 
@@ -581,8 +582,7 @@ function surfaceChainSnapshot(actor = appCtx.activeTransportActor?.() || null) {
   };
 }
 
-function rendererSnapshot() {
-  const renderer = appCtx.renderer;
+function rendererSnapshot(renderer) {
   if (!renderer) return null;
 
   let contextLost = null;
@@ -978,6 +978,7 @@ function environmentEvidenceSnapshot() {
 }
 
 function getWorldExplorerRuntimeDiagnostics() {
+  const rendererOwners = rendererOwnershipSnapshot(appCtx, rendererSnapshot);
   const activeActor = appCtx.activeTransportActor?.() || null;
   const interiorCandidates = !appCtx.activeInterior && activeActor?.position &&
       typeof appCtx.listSupportedInteriorsNear === 'function'
@@ -1189,7 +1190,8 @@ function getWorldExplorerRuntimeDiagnostics() {
           fogDensity: numberOrNull(appCtx.scene.fog?.density)
         }
       : null,
-    renderer: rendererSnapshot(),
+    renderer: rendererOwners.main,
+    rendererOwners,
     accessibility: globalThis.getWorldExplorerAccessibilitySnapshot?.() || null,
     lastEarthWorldRelease: appCtx.lastEarthWorldRelease || null,
     composer: composerSnapshot(),
@@ -1205,6 +1207,7 @@ function getWorldExplorerRuntimeDiagnostics() {
     buildingExteriors: appCtx.buildingExteriorDetailPublication || null,
     buildingExteriorMaterials: buildingExteriorMaterialPoolSnapshot(),
     farTerrainClipmap: appCtx.farTerrainClipmapState || null,
+    transportDetail: appCtx.transportDetail?.stats || null,
     quality: appCtx.renderQualityLevel || null,
     earthOrigin: {
       lat: numberOrNull(appCtx.LOC?.lat),

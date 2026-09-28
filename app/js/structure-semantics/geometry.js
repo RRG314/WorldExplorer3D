@@ -1,3 +1,4 @@
+import { sampleProfileAtDistance } from './profile-sampling.js';
 function smoothstep01(value) {
   const t = Math.max(0, Math.min(1, Number(value) || 0));
   return t * t * (3 - 2 * t);
@@ -13,36 +14,6 @@ function polylineDistances(points = []) {
   return { distances, total };
 }
 
-function sampleProfileAtDistance(distances, values, distance) {
-  const numericDistances = distances instanceof Float32Array || distances instanceof Float64Array;
-  const numericValues = Array.isArray(values) || values instanceof Float32Array || values instanceof Float64Array;
-  if (!numericDistances || !numericValues) return NaN;
-  if (distances.length === 0 || values.length === 0) return NaN;
-  if (distance <= 0) {
-    const first = Number(values[0]);
-    return Number.isFinite(first) ? first : NaN;
-  }
-  const lastIndex = Math.min(distances.length, values.length) - 1;
-  if (distance >= distances[lastIndex]) {
-    const last = Number(values[lastIndex]);
-    return Number.isFinite(last) ? last : NaN;
-  }
-
-  for (let i = 0; i < lastIndex; i++) {
-    const start = distances[i];
-    const end = distances[i + 1];
-    if (distance < start || distance > end) continue;
-    const span = end - start;
-    const t = span > 1e-6 ? (distance - start) / span : 0;
-    const rawFrom = Number(values[i]);
-    const from = Number.isFinite(rawFrom) ? rawFrom : 0;
-    const rawTo = Number(values[i + 1]);
-    const to = Number.isFinite(rawTo) ? rawTo : from;
-    return from + (to - from) * t;
-  }
-  const fallback = Number(values[lastIndex]);
-  return Number.isFinite(fallback) ? fallback : NaN;
-}
 
 function segmentIntersection2D(a1, a2, b1, b2) {
   const x1 = a1.x;

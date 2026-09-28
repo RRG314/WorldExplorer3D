@@ -70,3 +70,53 @@ test('semantic grade separation excludes frontage even with missing source tags'
     assert.equal(createStreetFrontageGrading([],1).outerDistance(road,{segIndex:0,t:.5},10,-5,4),4);
   }
 });
+test('frontage broad phase preserves near-contact tolerance and source edge order',()=>{
+  const policy=createStreetFrontagePolicy([rect(10,0,32,32)],1);
+  const p={x:10-0.5e-8,z:16};
+  assert.deepEqual(policy.query(p,p,0),[policy.edges[3]]);
+  const outside={x:10-2e-8,z:16};
+  assert.deepEqual(policy.query(outside,outside,0),[]);
+  const a={x:0,z:16},b={x:50,z:16};
+  assert.deepEqual(policy.query(a,b,0),[policy.edges[1],policy.edges[3]]);
+});
+test('translated diagonal and degenerate frontage queries retain exact contacts',()=>{
+  for(const shift of [-1e9,0,1e9]){
+    const p=(x,z)=>({x:x+shift,z:z+shift});
+    const policy=createStreetFrontagePolicy([{pts:[p(0,0),p(32,32),p(0,32)]}],1);
+    assert.deepEqual(policy.query(p(16,16),p(16,16),0),[policy.edges[0]]);
+    assert.deepEqual(policy.query(p(16,-1),p(16,33),0),[policy.edges[0],policy.edges[1]]);
+  }
+});
+
+
+test('repeated bucket candidates never cache exact hits or survive disposal',()=>{
+  const policy=createStreetFrontagePolicy([rect(10,0,8,8)],1);
+  const near={x:9,z:4},far={x:2,z:4};
+  assert.deepEqual(policy.query(near,near,2),[policy.edges[3]]);
+  assert.deepEqual(policy.query(far,far,2),[],'different points in the same buckets require a fresh exact distance');
+  assert.deepEqual(policy.query(near,near,2),[policy.edges[3]]);
+  for(let i=0;i<300;i++)policy.query({x:i*128,z:i*128},undefined,2);
+  assert.deepEqual(policy.query(near,near,2),[policy.edges[3]],'eviction cannot alter accepted edge order');
+  policy.dispose();assert.deepEqual(policy.query(near,near,2),[]);
+});
+
+test('squared broad comparison agrees with hypot at random and rounding-boundary reaches',()=>{
+  function pointDistance(p,a,b){const dx=b.x-a.x,dz=b.z-a.z,l=dx*dx+dz*dz,t=l?Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.z-a.z)*dz)/l)):0;return Math.hypot(p.x-a.x-dx*t,p.z-a.z-dz*t);}
+  const cross=(p,q,r)=>(q.x-p.x)*(r.z-p.z)-(q.z-p.z)*(r.x-p.x);
+  const distance=(a,b,c,d)=>cross(a,b,c)*cross(a,b,d)<0&&cross(c,d,a)*cross(c,d,b)<0?0:Math.min(pointDistance(a,c,d),pointDistance(b,c,d),pointDistance(c,a,b),pointDistance(d,a,b));
+  let seed=7139;const random=()=>((seed=Math.imul(seed,1664525)+1013904223>>>0)/2**32);
+  for(const shift of [0,1e9,-1e9]){
+    const point=()=>({x:shift+random()*140,z:shift+random()*140});
+    const policy=createStreetFrontagePolicy(Array.from({length:12},()=>({pts:[point(),point(),point()]})),1);
+    for(let i=0;i<200;i++){
+      const a=point(),b=i%2?a:point(),target=policy.edges[i%policy.edges.length];
+      const threshold=distance(a,b,target.a,target.b);
+      for(const pad of [random()*30,Math.max(0,threshold-1e-8),Math.max(0,threshold-1e-8+1e-13)]){
+        const expected=policy.edges.filter(e=>distance(a,b,e.a,e.b)<=pad+1e-8).map(e=>policy.edges.indexOf(e));
+        const actual=policy.query(a,b,pad).map(e=>policy.edges.indexOf(e)).sort((x,y)=>x-y);
+        assert.deepEqual(actual,expected);
+      }
+    }
+    policy.dispose();
+  }
+});

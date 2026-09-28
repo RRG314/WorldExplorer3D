@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "types": [],
+    "skipLibCheck": true
+  },
+  "files": [
+    "types/world-boundaries.ts",
+    "tests/world-boundaries.type-test.ts"
+  ]
+}

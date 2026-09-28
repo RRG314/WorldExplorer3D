@@ -40,3 +40,36 @@ test('entering an overlapping junction footprint cannot suddenly switch to an eq
  const left=api.applyStructureTerrainCuts(1.99999,1,0),right=api.applyStructureTerrainCuts(2.00001,1,0);
  assert.ok(Math.abs(left-right)<1e-4,`junction boundary step ${Math.abs(left-right)}`);
 });
+
+test('terrain ownership accumulation matches the original ordered sample reduction exactly',()=>{
+ // Independent reference retains the original array-and-filter reduction.
+ const roads=Array.from({length:9},(_,i)=>road(i*2-8,(i%3)*1.25));
+ const api=createTerrainHeightSamplingApi({appCtx:{structureTerrainCuts:roads},elevationWorldYAtWorldXZ:()=>0});
+ for(let z=-16;z<=16;z+=.03125){
+  const samples=[];
+  for(const r of roads){
+   const distance=Math.abs(z-r.pts[0].z),edge=2,blend=3.5;
+   if(distance>edge+blend)continue;
+   const t=Math.max(0,Math.min(1,(distance-edge)/blend));
+   samples.push({target:r.transportSurfaceModel.centerHeights[0]-.18,weight:distance<=edge?1:1-t*t*(3-2*t),edgeDistance:Math.max(0,distance-edge),penetration:Math.max(0,edge-distance)});
+  }
+  const owned=samples.filter(s=>s.edgeDistance===0);let y=0,w=0,strongest=0;
+  for(const s of owned.length?owned:samples){const weight=owned.length?Math.max(1e-12,s.penetration**2):s.weight**4/s.edgeDistance**2;y+=s.target*weight;w+=weight;strongest=Math.max(strongest,s.weight);}
+  assert.equal(api.applyStructureTerrainCuts(10,z,0),w>0?y/w*strongest:0);
+ }
+});
+
+test('sparse overview retains exact pavement and non-sidewalk road context without empty-cell allocation',async()=>{
+ const {prepareStreetPavement,compilePavementTile,pavementTileHasWork}=await import('../app/js/world/compiler/street-pavement.js');
+ const withoutSidewalk=road(0,0);withoutSidewalk.pts=[{x:-2000,z:0},{x:2000,z:0}];withoutSidewalk.tags={sidewalk:'no'};
+ const withSidewalk=road(0,0);withSidewalk.pts=[{x:0,z:-100},{x:0,z:100}];
+ const input={roads:[withoutSidewalk,withSidewalk],buildings,metersPerWorldUnit:1};
+ const original=prepareStreetPavement(input),expected=original.tiles.filter(t=>pavementTileHasWork(t,false));
+ const sparse=prepareStreetPavement({...input,sparseOverview:true});
+ assert.equal(sparse.sourceCellCount,original.tiles.length);
+ assert.deepEqual(sparse.tiles.map(t=>t.key),expected.map(t=>t.key));assert.ok(sparse.tiles.length<original.tiles.length/3);
+ for(let i=0;i<expected.length;i++){
+  for(const kind of ['segments','joins','paths','crossings','obstacles','areas','edges','frontageBarriers'])assert.deepEqual(sparse.tiles[i][kind],expected[i][kind]);
+  assert.deepEqual(compilePavementTile(sparse.tiles[i],1,{includeMarkings:false}),compilePavementTile(expected[i],1,{includeMarkings:false}));
+ }
+});

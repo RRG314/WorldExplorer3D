@@ -1,4 +1,6 @@
-import { roadWidthAtSegment } from './road-cross-section-profile.js?v=1';
+import { roadWidthAtSegment, sourceRoadWidthMeters } from './road-cross-section-profile.js?v=1';
+
+import { roadMetersPerWorldUnit } from './road-units.js';
 
 const CELL_SIZE = 64;
 const clearance = 1.1; // Pole/bin footprint plus a margin outside the travel surface.
@@ -12,7 +14,7 @@ export function isGroundRoad(road) {
 // Build once per publication. Every proposed fixture is tested against ALL
 // intersecting road envelopes, including the other arm of a junction.
 export function createRoadsidePlacementResolver(roads = [], { blocked = () => false } = {}) {
-  const cells = new Map(), broad = [], occupied = [], gradeSeparated = [];
+  const cells = new Map(), broad = [], occupied = [], structureCells = new Map(), broadStructures = [];
   const key = (x, z) => `${Math.floor(x / CELL_SIZE)}:${Math.floor(z / CELL_SIZE)}`;
   for (const road of roads) {
     const points = road.pts || [];
@@ -21,15 +23,17 @@ export function createRoadsidePlacementResolver(roads = [], { blocked = () => fa
       if (![a.x, a.z, b.x, b.z].every(Number.isFinite)) continue;
       const length = Math.hypot(b.x - a.x, b.z - a.z);
       if (length < .01) continue;
-      const width = Math.max(...[0, .5, 1].map(t => roadWidthAtSegment(road, index, t)));
+      const width = Math.max(sourceRoadWidthMeters(road)/roadMetersPerWorldUnit(road), ...[0, .5, 1].map(t => roadWidthAtSegment(road, index, t)));
       const segment = { road, index, a, b, length, width };
-      if (!isGroundRoad(road)) { gradeSeparated.push(segment); continue; }
-      const padding = width / 2 + clearance;
+      const ground = isGroundRoad(road);
+      const targetCells = ground ? cells : structureCells;
+      const targetBroad = ground ? broad : broadStructures;
+      const padding = width / 2 + (ground ? clearance : 3);
       const minX = Math.floor((Math.min(a.x, b.x) - padding) / CELL_SIZE), maxX = Math.floor((Math.max(a.x, b.x) + padding) / CELL_SIZE);
       const minZ = Math.floor((Math.min(a.z, b.z) - padding) / CELL_SIZE), maxZ = Math.floor((Math.max(a.z, b.z) + padding) / CELL_SIZE);
-      if ((maxX - minX + 1) * (maxZ - minZ + 1) > 1024) { broad.push(segment); continue; }
+      if ((maxX - minX + 1) * (maxZ - minZ + 1) > 1024) { targetBroad.push(segment); continue; }
       for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) {
-        const k = `${x}:${z}`; if (!cells.has(k)) cells.set(k, []); cells.get(k).push(segment);
+        const k = `${x}:${z}`; if (!targetCells.has(k)) targetCells.set(k, []); targetCells.get(k).push(segment);
       }
     }
   }
@@ -41,18 +45,21 @@ export function createRoadsidePlacementResolver(roads = [], { blocked = () => fa
     return { x, z, ux, uz, t, width: roadWidthAtSegment(road, index, t), distance: Math.hypot(point.x - x, point.z - z) };
   }
   function roadBlocked(point) {
-    return [...(cells.get(key(point.x, point.z)) || []), ...broad].some(segment => {
+    const intersects = segment => {
       const p = projection(point, segment);
       return p.distance < p.width / 2 + clearance;
-    });
+    };
+    return (cells.get(key(point.x, point.z)) || []).some(intersects) || broad.some(intersects);
   }
   function safe(point) {
     // This builder owns ground fixtures. A mapped bridge/tunnel pole requires
     // a structure-local anchor, not the unrelated ground underneath it.
-    const unsupportedStructure = gradeSeparated.some(segment => {
+    const intersectsStructure = segment => {
       const p = projection(point, segment);
       return p.distance < p.width / 2 + 3;
-    });
+    };
+    const unsupportedStructure = (structureCells.get(key(point.x, point.z)) || []).some(intersectsStructure) ||
+      broadStructures.some(intersectsStructure);
     return !unsupportedStructure && !roadBlocked(point) && !blocked(point.x, point.z) &&
       !occupied.some(other => Math.hypot(point.x - other.x, point.z - other.z) < 2.2);
   }

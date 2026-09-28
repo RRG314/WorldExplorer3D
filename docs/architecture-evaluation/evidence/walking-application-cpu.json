@@ -1,0 +1,659 @@
+{
+  "scope": "10-second sampled CPU profile; self samples are not invocation counts or exact function durations. Browser (program), idle and vendor samples excluded from this app-only ranking.",
+  "rows": [
+    {
+      "module": "world/compiler/transport-surface-model.js",
+      "function": "sampleTransportSurfaceAtDistance",
+      "line": 477,
+      "sampledSelfMs": 143.56
+    },
+    {
+      "module": "structure-semantics/geometry.js",
+      "function": "sampleProfileAtDistance",
+      "line": 16,
+      "sampledSelfMs": 129.241
+    },
+    {
+      "module": "engine/vehicle-road-attitude.js",
+      "function": "resolveVehicleRoadContactPose",
+      "line": 25,
+      "sampledSelfMs": 55.764
+    },
+    {
+      "module": "engine/vehicle-road-attitude.js",
+      "function": "footprint",
+      "line": 41,
+      "sampledSelfMs": 51.645
+    },
+    {
+      "module": "structure-semantics.js",
+      "function": "sampleFeatureSurfaceY",
+      "line": 743,
+      "sampledSelfMs": 48.344
+    },
+    {
+      "module": "living-world/population.js",
+      "function": "agentPose",
+      "line": 248,
+      "sampledSelfMs": 47.304
+    },
+    {
+      "module": "editable-world/runtime.js",
+      "function": "getLocalWorldModificationSnapshot",
+      "line": 152,
+      "sampledSelfMs": 44.052
+    },
+    {
+      "module": "discovery/runtime.js",
+      "function": "update",
+      "line": 2310,
+      "sampledSelfMs": 42.99
+    },
+    {
+      "module": "discovery/runtime.js",
+      "function": "render",
+      "line": 756,
+      "sampledSelfMs": 42.104
+    },
+    {
+      "module": "character/model.js",
+      "function": "normalizeCharacterState",
+      "line": 135,
+      "sampledSelfMs": 41.688
+    },
+    {
+      "module": "world/building-spatial-index.js",
+      "function": "getNearbyBuildings",
+      "line": 71,
+      "sampledSelfMs": 40.204
+    },
+    {
+      "module": "world/navigation.js",
+      "function": "evaluateNearestRoadCandidate",
+      "line": 291,
+      "sampledSelfMs": 34.983
+    },
+    {
+      "module": "tutorial/tutorial.js",
+      "function": "getTutorialSnapshot",
+      "line": 505,
+      "sampledSelfMs": 33.543
+    },
+    {
+      "module": "urban-sandbox/runtime.js",
+      "function": "nearestFurnitureCandidate",
+      "line": 669,
+      "sampledSelfMs": 27.636
+    },
+    {
+      "module": "living-world/pedestrian-spacing.js",
+      "function": "update",
+      "line": 6,
+      "sampledSelfMs": 25.2
+    },
+    {
+      "module": "boat-mode/surface-effects.js",
+      "function": "applyWaveUniformsToMaterial",
+      "line": 140,
+      "sampledSelfMs": 19.087
+    },
+    {
+      "module": "map/tiles.js",
+      "function": "",
+      "line": 110,
+      "sampledSelfMs": 18.986
+    },
+    {
+      "module": "walking/curated-explorer-character.js",
+      "function": "updateCuratedCharacterAnimation",
+      "line": 120,
+      "sampledSelfMs": 18.575
+    },
+    {
+      "module": "ui/accessibility.js",
+      "function": "",
+      "line": 202,
+      "sampledSelfMs": 18.229
+    },
+    {
+      "module": "living-world/population.js",
+      "function": "pedestrianSnapshot",
+      "line": 624,
+      "sampledSelfMs": 18.053
+    },
+    {
+      "module": "physics/building-collision.js",
+      "function": "checkBuildingCollision",
+      "line": 14,
+      "sampledSelfMs": 17.525
+    },
+    {
+      "module": "player/backpack-model.js",
+      "function": "",
+      "line": 179,
+      "sampledSelfMs": 16.989
+    },
+    {
+      "module": "urban-sandbox/runtime.js",
+      "function": "",
+      "line": 673,
+      "sampledSelfMs": 16.326
+    },
+    {
+      "module": "map/earth-base.js",
+      "function": "visibleRoadMapCandidates",
+      "line": 59,
+      "sampledSelfMs": 15.692
+    },
+    {
+      "module": "world/traversal-segment-index.js",
+      "function": "query",
+      "line": 22,
+      "sampledSelfMs": 15.412
+    },
+    {
+      "module": "world/pavement-terrain-mask.js",
+      "function": "publish",
+      "line": 64,
+      "sampledSelfMs": 15.307
+    },
+    {
+      "module": "living-world/population.js",
+      "function": "advanceAgents",
+      "line": 332,
+      "sampledSelfMs": 13.065
+    },
+    {
+      "module": "map/earth-base.js",
+      "function": "",
+      "line": 254,
+      "sampledSelfMs": 11.704
+    },
+    {
+      "module": "map/earth-base.js",
+      "function": "",
+      "line": 157,
+      "sampledSelfMs": 11.605
+    },
+    {
+      "module": "terrain/road-contact-index.js",
+      "function": "sampleAt",
+      "line": 148,
+      "sampledSelfMs": 11.4
+    },
+    {
+      "module": "world/street-overview.js",
+      "function": "worker.onmessage",
+      "line": 27,
+      "sampledSelfMs": 11.207
+    },
+    {
+      "module": "urban-sandbox/runtime.js",
+      "function": "",
+      "line": 655,
+      "sampledSelfMs": 8.992
+    },
+    {
+      "module": "urban-sandbox/runtime.js",
+      "function": "",
+      "line": 810,
+      "sampledSelfMs": 8.986
+    },
+    {
+      "module": "urban-sandbox/runtime.js",
+      "function": "nearestStoreCandidate",
+      "line": 801,
+      "sampledSelfMs": 8.956
+    },
+    {
+      "module": "runtime/kernel.js",
+      "function": "",
+      "line": 42,
+      "sampledSelfMs": 8.868
+    },
+    {
+      "module": "character/model.js",
+      "function": "normalizeSpecialties",
+      "line": 62,
+      "sampledSelfMs": 8.724
+    },
+    {
+      "module": "boat-mode/water-geometry.js",
+      "function": "nearestPointOnPolygon",
+      "line": 133,
+      "sampledSelfMs": 7.618
+    },
+    {
+      "module": "terrain/height-sampling.js",
+      "function": "terrainMeshHeightAt",
+      "line": 50,
+      "sampledSelfMs": 7.593
+    },
+    {
+      "module": "map/icons.js",
+      "function": "drawMapCompass",
+      "line": 134,
+      "sampledSelfMs": 7.587
+    },
+    {
+      "module": "structure-semantics.js",
+      "function": "applyJunctionTransitionY",
+      "line": 582,
+      "sampledSelfMs": 7.551
+    },
+    {
+      "module": "transport/maritime-runtime.js",
+      "function": "nearestVessel",
+      "line": 362,
+      "sampledSelfMs": 7.53
+    },
+    {
+      "module": "player/backpack-model.js",
+      "function": "snapshot",
+      "line": 178,
+      "sampledSelfMs": 7.439
+    },
+    {
+      "module": "living-world/population.js",
+      "function": "",
+      "line": 654,
+      "sampledSelfMs": 7.058
+    },
+    {
+      "module": "boat-mode/surface-effects.js",
+      "function": "buildBoatWaveProfile",
+      "line": 113,
+      "sampledSelfMs": 6.957
+    },
+    {
+      "module": "living-world/pedestrian-spacing.js",
+      "function": "limit",
+      "line": 16,
+      "sampledSelfMs": 6.275
+    },
+    {
+      "module": "character/capability-resolver.js",
+      "function": "resolve",
+      "line": 192,
+      "sampledSelfMs": 5.969
+    },
+    {
+      "module": "runtime/kernel.js",
+      "function": "",
+      "line": 290,
+      "sampledSelfMs": 5.512
+    },
+    {
+      "module": "ar/eligibility.js",
+      "function": "",
+      "line": 44,
+      "sampledSelfMs": 5.462
+    },
+    {
+      "module": "discovery/tools.js",
+      "function": "listAvailableTools",
+      "line": 20,
+      "sampledSelfMs": 5.226
+    },
+    {
+      "module": "world/navigation.js",
+      "function": "indexedRoadCandidates",
+      "line": 125,
+      "sampledSelfMs": 5.048
+    },
+    {
+      "module": "character/model.js",
+      "function": "createDefaultCharacterState",
+      "line": 105,
+      "sampledSelfMs": 5.043
+    },
+    {
+      "module": "world/traversal.js",
+      "function": "findNearestTraversalFeatures",
+      "line": 344,
+      "sampledSelfMs": 4.988
+    },
+    {
+      "module": "world/furniture.js",
+      "function": "group.userData.setTrafficSignalState",
+      "line": 387,
+      "sampledSelfMs": 4.975
+    },
+    {
+      "module": "water-dynamics.js",
+      "function": "resolveWaterMotionProfile",
+      "line": 228,
+      "sampledSelfMs": 4.721
+    },
+    {
+      "module": "transport/damage-model.js",
+      "function": "transportDamagePresentation",
+      "line": 20,
+      "sampledSelfMs": 4.684
+    },
+    {
+      "module": "living-world/population.js",
+      "function": "vehicleSnapshot",
+      "line": 596,
+      "sampledSelfMs": 4.438
+    },
+    {
+      "module": "urban-sandbox/runtime.js",
+      "function": "maintainNearbyVehicleDetails",
+      "line": 1411,
+      "sampledSelfMs": 4.335
+    },
+    {
+      "module": "discovery/tools.js",
+      "function": "",
+      "line": 9,
+      "sampledSelfMs": 4.26
+    },
+    {
+      "module": "urban-sandbox/runtime.js",
+      "function": "",
+      "line": 676,
+      "sampledSelfMs": 4.223
+    },
+    {
+      "module": "living-world/runtime.js",
+      "function": "updateTrafficSignalVisuals",
+      "line": 189,
+      "sampledSelfMs": 3.795
+    },
+    {
+      "module": "walking/physics.js",
+      "function": "updateWalkPhysics",
+      "line": 225,
+      "sampledSelfMs": 3.773
+    },
+    {
+      "module": "ground.js",
+      "function": "walkSurfaceInfo",
+      "line": 309,
+      "sampledSelfMs": 3.764
+    },
+    {
+      "module": "discovery/runtime.js",
+      "function": "backpackEquipmentIds",
+      "line": 56,
+      "sampledSelfMs": 3.734
+    },
+    {
+      "module": "map/earth-markers.js",
+      "function": "",
+      "line": 114,
+      "sampledSelfMs": 3.712
+    },
+    {
+      "module": "controls/action-input.js",
+      "function": "keyboardControlActions",
+      "line": 78,
+      "sampledSelfMs": 3.712
+    },
+    {
+      "module": "sky/astronomical-state.js",
+      "function": "refreshAstronomicalSky",
+      "line": 509,
+      "sampledSelfMs": 3.647
+    },
+    {
+      "module": "world/furniture.js",
+      "function": "updateStreetFurnitureVisibility",
+      "line": 254,
+      "sampledSelfMs": 3.546
+    },
+    {
+      "module": "urban-sandbox/equipment-visuals.js",
+      "function": "",
+      "line": 146,
+      "sampledSelfMs": 3.3
+    },
+    {
+      "module": "character/wildlife-assistance.js",
+      "function": "companionHandlingTuning",
+      "line": 23,
+      "sampledSelfMs": 2.65
+    },
+    {
+      "module": "living-world/runtime.js",
+      "function": "sampleEdgeTransitionPlane",
+      "line": 55,
+      "sampledSelfMs": 2.641
+    },
+    {
+      "module": "runtime/core-frame-systems.js",
+      "function": "update",
+      "line": 18,
+      "sampledSelfMs": 2.639
+    },
+    {
+      "module": "ui/ambient-notices.js",
+      "function": "now",
+      "line": 3,
+      "sampledSelfMs": 2.621
+    },
+    {
+      "module": "boat-mode/prompt-ui.js",
+      "function": "updateBoatMenuUi",
+      "line": 28,
+      "sampledSelfMs": 2.61
+    },
+    {
+      "module": "map/tiles.js",
+      "function": "",
+      "line": 122,
+      "sampledSelfMs": 2.584
+    },
+    {
+      "module": "ar/eligibility.js",
+      "function": "",
+      "line": 34,
+      "sampledSelfMs": 2.576
+    },
+    {
+      "module": "urban-sandbox/runtime.js",
+      "function": "nearestResponderLootCandidate",
+      "line": 680,
+      "sampledSelfMs": 2.56
+    },
+    {
+      "module": "map/earth-base.js",
+      "function": "drawEarthBaseLayers",
+      "line": 100,
+      "sampledSelfMs": 2.549
+    },
+    {
+      "module": "hud.js",
+      "function": "updateSkyPositions",
+      "line": 256,
+      "sampledSelfMs": 2.548
+    },
+    {
+      "module": "transport/maritime-runtime.js",
+      "function": "updateAmbientVessel",
+      "line": 336,
+      "sampledSelfMs": 2.546
+    },
+    {
+      "module": "reality-capture/nearby-refresh.js",
+      "function": "update",
+      "line": 4,
+      "sampledSelfMs": 2.546
+    },
+    {
+      "module": "world/navigation.js",
+      "function": "evaluateRoad",
+      "line": 429,
+      "sampledSelfMs": 2.543
+    },
+    {
+      "module": "runtime/kernel.js",
+      "function": "systemEnabled",
+      "line": 128,
+      "sampledSelfMs": 2.542
+    },
+    {
+      "module": "transport/maritime-runtime.js",
+      "function": "interactionCandidate",
+      "line": 402,
+      "sampledSelfMs": 2.541
+    },
+    {
+      "module": "discovery/runtime.js",
+      "function": "",
+      "line": 847,
+      "sampledSelfMs": 2.54
+    },
+    {
+      "module": "runtime/core-frame-systems.js",
+      "function": "enabled",
+      "line": 80,
+      "sampledSelfMs": 2.537
+    },
+    {
+      "module": "urban-sandbox/equipment-model.js",
+      "function": "",
+      "line": 77,
+      "sampledSelfMs": 2.536
+    },
+    {
+      "module": "transport/ambient-route-motion.js",
+      "function": "normalizeAngle",
+      "line": 5,
+      "sampledSelfMs": 2.529
+    },
+    {
+      "module": "building-entry.js",
+      "function": "hasUsableBuildingFootprint",
+      "line": 172,
+      "sampledSelfMs": 2.523
+    },
+    {
+      "module": "ground.js",
+      "function": "",
+      "line": 209,
+      "sampledSelfMs": 2.522
+    },
+    {
+      "module": "controls/action-input.js",
+      "function": "connectedGamepad",
+      "line": 66,
+      "sampledSelfMs": 2.522
+    },
+    {
+      "module": "runtime/core-frame-systems.js",
+      "function": "update",
+      "line": 48,
+      "sampledSelfMs": 2.52
+    },
+    {
+      "module": "main.js",
+      "function": "enabled",
+      "line": 129,
+      "sampledSelfMs": 2.52
+    },
+    {
+      "module": "poi/semantic-authority.js",
+      "function": "activateNearbyPois",
+      "line": 191,
+      "sampledSelfMs": 2.519
+    },
+    {
+      "module": "transport/ambient-route-motion.js",
+      "function": "advanceAmbientRouteMotion",
+      "line": 27,
+      "sampledSelfMs": 2.519
+    },
+    {
+      "module": "map/earth-base.js",
+      "function": "",
+      "line": 296,
+      "sampledSelfMs": 2.519
+    },
+    {
+      "module": "physics/mode-dispatch.js",
+      "function": "updateAlternateTravelMode",
+      "line": 92,
+      "sampledSelfMs": 2.518
+    },
+    {
+      "module": "tutorial/tutorial.js",
+      "function": "tutorialUpdate",
+      "line": 443,
+      "sampledSelfMs": 2.518
+    },
+    {
+      "module": "discovery/wildlife-runtime.js",
+      "function": "",
+      "line": 160,
+      "sampledSelfMs": 2.516
+    },
+    {
+      "module": "discovery/runtime.js",
+      "function": "state.resolveCharacterCapability",
+      "line": 1240,
+      "sampledSelfMs": 2.515
+    },
+    {
+      "module": "runtime/core-frame-systems.js",
+      "function": "update",
+      "line": 109,
+      "sampledSelfMs": 2.515
+    },
+    {
+      "module": "tutorial/tutorial.js",
+      "function": "directActionVisible",
+      "line": 165,
+      "sampledSelfMs": 2.513
+    },
+    {
+      "module": "living-world/demand-model.js",
+      "function": "activityLabelForEdge",
+      "line": 94,
+      "sampledSelfMs": 2.512
+    },
+    {
+      "module": "urban-sandbox/runtime.js",
+      "function": "nearestLootPickupCandidate",
+      "line": 685,
+      "sampledSelfMs": 2.511
+    },
+    {
+      "module": "living-world/population.js",
+      "function": "fixedUpdate",
+      "line": 909,
+      "sampledSelfMs": 2.504
+    },
+    {
+      "module": "character/model.js",
+      "function": "",
+      "line": 54,
+      "sampledSelfMs": 2.502
+    },
+    {
+      "module": "character/model.js",
+      "function": "normalizeProficiencies",
+      "line": 77,
+      "sampledSelfMs": 2.481
+    },
+    {
+      "module": "weather.js",
+      "function": "getWeatherClockDate",
+      "line": 92,
+      "sampledSelfMs": 2.468
+    },
+    {
+      "module": "ar/eligibility.js",
+      "function": "",
+      "line": 18,
+      "sampledSelfMs": 2.343
+    },
+    {
+      "module": "urban-sandbox/runtime.js",
+      "function": "updateCivicStatus",
+      "line": 1978,
+      "sampledSelfMs": 2.333
+    }
+  ]
+}

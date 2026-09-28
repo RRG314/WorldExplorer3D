@@ -13,13 +13,13 @@ class Attribute {
 }
 globalThis.THREE={BufferAttribute:Attribute};
 const source=readFileSync(new URL('../app/js/terrain/surface-profiles.js',import.meta.url),'utf8');
-const cacheCode=source.slice(source.indexOf('let detailedGroundCollection'),source.indexOf('const SNOW_COLOR_HEX'));
+const cacheCode=source.slice(source.indexOf('let detailedGroundCollection'),source.indexOf('const SNOW_COLOR_HEX')).replaceAll('export function','function');
 const applyCode=source.slice(source.indexOf('export function applyMappedSemanticVertexTints'),source.indexOf('function applyLoadedWorldCoverBaseline')).replace('export function','function');
 test('actual terrain publication reapplies mapped cover after baseline reset and a same-count world change',()=>{
   const land=(type)=>({type,pts:[{x:-2,z:-2},{x:2,z:-2},{x:2,z:2},{x:-2,z:2}],bounds:{minX:-2,maxX:2,minZ:-2,maxZ:2}});
   const ctx={LOC:{lat:39,lon:-76},landuses:[land('forest')],worldToLatLon:()=>({lat:39,lon:-76})};
   const context=vm.createContext({appCtx:ctx,THREE:globalThis.THREE,indexMappedGround,ensureTerrainSurfaceMixAttributes,setTerrainSurfaceMaterialMixAt,setNormalizedTerrainAttribute});
-  vm.runInContext(cacheCode+applyCode+';this.apply=applyMappedSemanticVertexTints;',context);
+  vm.runInContext('let cachedGroundFallbackMesh=null;'+cacheCode+applyCode+';this.apply=applyMappedSemanticVertexTints;',context);
   const geometry={attributes:{position:new Attribute(new Float32Array([0,0,0]),3)},setAttribute(name,value){this.attributes[name]=value;}};
   const mesh={geometry,position:{x:0,z:0},material:{},userData:{}};
   assert.equal(context.apply(mesh,null),1);
@@ -32,4 +32,9 @@ test('actual terrain publication reapplies mapped cover after baseline reset and
   context.apply(mesh,null);
   assert.equal(geometry.attributes.terrainSurfaceMixA.array[1],255,'same-size reused collection must not retain old-world forest');
   assert.equal(geometry.attributes.terrainSurfaceMixA.array[2],0);
+  context.resetTerrainSurfaceProfileCache();
+  assert.equal(vm.runInContext('detailedGroundCollection',context),null);
+  assert.equal(vm.runInContext('detailedGroundIndex',context),null);
+  context.apply(mesh,null);
+  assert.equal(geometry.attributes.terrainSurfaceMixA.array[1],255);
 });

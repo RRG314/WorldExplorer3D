@@ -127,7 +127,7 @@ function buildIndexedBatchMesh({
   receiveShadow = true,
   frustumCulled = false
 } = {}) {
-  if (!scene || !material || !Array.isArray(verts) || !Array.isArray(indices) || !verts.length || !indices.length) {
+  if (!scene || !material || !(Array.isArray(verts)||ArrayBuffer.isView(verts)) || !(Array.isArray(indices)||ArrayBuffer.isView(indices)) || !verts.length || !indices.length) {
     return null;
   }
   const geometry = new THREE.BufferGeometry();

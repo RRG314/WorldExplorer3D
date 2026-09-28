@@ -1,3 +1,5 @@
+import {GeometryBatchStorage, batchStorageView} from './geometry-batch-storage.js';
+import {compactBuildingVertices} from './building-vertex-storage.js';
 import { FACADE_OPENINGS_GLSL } from './building-facade-layout.js?v=2';
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
@@ -33,8 +35,9 @@ export function appendMidFacadeAttributes(batch, material, exteriorPresentation,
     Number(material?.map?.repeat?.x || 0.08),Number(material?.map?.repeat?.y || (1/16)),
     Number(material?.map?.offset?.x || 0),Number(material?.map?.offset?.y || 0)
   ];
+  const normals = batchStorageView(batch.normals);
   for (let vertexIndex = vertexStart; vertexIndex < vertexStart + vertexCount; vertexIndex += 1) {
-    const normalY = Number(batch.normals[vertexIndex * 3 + 1] || 0);
+    const normalY = Number(normals[vertexIndex * 3 + 1] || 0);
     const wallMask = Math.max(0, Math.min(1, (1 - Math.abs(normalY) - 0.18) / 0.54));
     batch.colors.push(wallColor.r, wallColor.g, wallColor.b);
     batch.facadeParams.push(repeatX, repeatY, offsetX, offsetY);
@@ -236,19 +239,23 @@ async function batchBuildingMeshesByTier(tiers = ['near'], options = {}) {
         continue;
       }
 
-      const batch = { positions: [], normals: [], uvs: [], indices: [], facadeLayouts: [], facadeOpenings: [] };
-      if (group.lodTier === 'near') batch.facadeEntrances = [];
+      const vertexCapacity = group.meshes.reduce((sum, mesh) => sum + (mesh.geometry?.attributes?.position?.count || 0), 0);
+      const indexCapacity = group.meshes.reduce((sum, mesh) => sum + (mesh.geometry?.index?.count ?? mesh.geometry?.attributes?.position?.count ?? 0), 0);
+      const storage = components => new GeometryBatchStorage(vertexCapacity * components);
+      const batch = { positions: storage(3), normals: storage(3), uvs: storage(2), indices: new GeometryBatchStorage(indexCapacity), facadeLayouts: storage(4), facadeOpenings: storage(4) };
+      if (group.lodTier === 'near') batch.facadeEntrances = storage(4);
       if (group.midFacadeBatch) {
-        batch.colors = [];
-        batch.facadeParams = [];
-        batch.roofAParams = [];
-        batch.roofColorsB = [];
+        batch.colors = storage(3);
+        batch.facadeParams = storage(4);
+        batch.roofAParams = storage(4);
+        batch.roofColorsB = storage(4);
       }
       const sourceMeshes = [];
       const xzPoints = [];
       const provenanceByFeatureId = new Map();
       const visualTopOffsetByFeatureId = new Map();
       const editableIndexRanges = [];
+      const vertexOwnershipRanges = [];
 
       for (let i = 0; i < group.meshes.length; i++) {
         const mesh = group.meshes[i];
@@ -279,6 +286,7 @@ async function batchBuildingMeshesByTier(tiers = ['near'], options = {}) {
         }
         const sourceBuildingId = String(mesh.userData?.sourceBuildingId || featureId || '');
         const indexCount = batch.indices.length - indexStart;
+        vertexOwnershipRanges.push({start:indexStart,count:indexCount});
         if (sourceBuildingId && indexCount > 0) {
           editableIndexRanges.push(Object.freeze({
             sourceBuildingId,
@@ -305,6 +313,8 @@ async function batchBuildingMeshesByTier(tiers = ['near'], options = {}) {
         keep.push(...sourceMeshes);
         continue;
       }
+
+      const vertexStorage = compactBuildingVertices(geometry, vertexOwnershipRanges);
 
       const material = group.midFacadeBatch
         ? createMidFacadeBatchMaterial(group.material, group.batchKey)
@@ -347,6 +357,7 @@ async function batchBuildingMeshesByTier(tiers = ['near'], options = {}) {
       mergedMesh.userData = {
         lodTier: group.lodTier || 'near',
         isBuildingBatch: true,
+        vertexStorage,
         isNearBuildingBatch: true,
         batchCount: sourceMeshes.length,
         buildingProvenanceRecords: Object.freeze([...provenanceByFeatureId.values()]),

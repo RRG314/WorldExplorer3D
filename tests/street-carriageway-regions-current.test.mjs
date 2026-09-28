@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {prepareCarriagewayTiles,unionCarriageway} from '../app/js/world/compiler/street-carriageway.js';
+import {prepareCarriagewayTiles,unionCarriageway,streetRoadSegments} from '../app/js/world/compiler/street-carriageway.js';
 import {meshCarriagewayTile} from '../app/js/world/compiler/street-carriageway-mesh.js';
 import {prepareStreetPavement,compilePavementTile} from '../app/js/world/compiler/street-pavement.js';
 import {streetPolygonKernel as clip} from '../app/js/world/compiler/street-polygon-kernel.js';
@@ -110,4 +110,68 @@ test('removing the intermediate road grid retains a sharp terrain crest and cont
   for(let x=-11.9;x<12;x+=.13)for(const z of [-1.9,0,1.9])assert.ok(Math.abs(contact.sampleAt(x,z)-sample(x))<1e-5);
   assert.ok(Math.abs(contact.sampleAt(0,0)-2.18)<1e-5);
   contact.dispose();partition.dispose();
+});
+
+ test('multi-triangle turn fans have one owner per intersecting tile',()=>{
+  for(const points of [[[10,10],[30,10],[30,30]],[[10,10],[30,10],[10,11]]]) {
+    const tiles=prepareCarriagewayTiles([road(points)],16);
+    assert.ok(tiles.some(tile=>tile.joins.length));
+    for(const tile of tiles) {
+      assert.equal(tile.joins.length,new Set(tile.joins).size);
+      const ordinary=unionCarriageway(tile);
+      const repeated=unionCarriageway({...tile,joins:tile.joins.flatMap(join=>[join,join,join])});
+      assert.ok(Math.abs(area(ordinary)-area(repeated))<1e-8);
+    }
+  }
+});
+
+
+test('tile height reuse preserves exact coordinates and expires before the next build',()=>{
+  const tile=prepareCarriagewayTiles([road([[8,64],[120,64]])])[0];
+  let epoch=0,calls=0;const seen=new Set();
+  const sample=(x,z)=>{const key=`${x}:${z}`;assert.ok(!seen.has(key),'duplicate height query within tile');seen.add(key);calls++;return x*.12345+z*.98765+epoch;};
+  const partition=(vertices,sampleTop)=>{
+    for(let i=0;i<vertices.length;i+=3){assert.equal(sampleTop(vertices[i],vertices[i+2]),vertices[i+1]);}
+    return vertices;
+  };
+  const first=meshCarriagewayTile(tile,sample,partition);assert.ok(calls>0);assert.ok(calls<first.indices.length);
+  seen.clear();epoch=7;
+  const next=meshCarriagewayTile(tile,sample,partition);
+  assert.deepEqual(next.indices,first.indices);
+  for(let i=0;i<first.positions.length;i+=3){assert.equal(next.positions[i],first.positions[i]);assert.equal(next.positions[i+2],first.positions[i+2]);assert.ok(Math.abs(next.positions[i+1]-first.positions[i+1]-7)<1e-5);}
+});
+
+
+test('long constant-width source edges retain their footprint without artificial cuts',()=>{
+  const r=road([[0,0],[320,0],[320,320]],{width:8,metersPerWorldUnit:1});
+  const segments=[...streetRoadSegments(r)];
+  assert.equal(segments.length,2);
+  assert.deepEqual(segments.map(s=>[s.index,s.t0,s.t1]),[[0,0,1],[1,0,1]]);
+  const straight=road([[0,0],[320,0]],{width:8,metersPerWorldUnit:1});
+  for(const size of [16,32,128]) assert.ok(Math.abs(area(flatten(prepareCarriagewayTiles([straight],size)))-2560)<1e-6);
+  const subdivided=road([[0,0],[80,0],[160,0],[240,0],[320,0],[320,80],[320,160],[320,240],[320,320]],{width:8,metersPerWorldUnit:1});
+  const actual=flatten(prepareCarriagewayTiles([r]));
+  const reference=flatten(prepareCarriagewayTiles([subdivided]));
+  assert.ok(area(clip.difference(actual,reference))+area(clip.difference(reference,actual))<1e-5);
+});
+
+test('building constraints keep interior narrowing and smooth width transitions',()=>{
+  const r=road([[0,0],[120,0]],{width:8,metersPerWorldUnit:1,resolvedCrossSection:{
+    sourceWidthMeters:8,segmentWidthsMeters:new Float32Array([4]),constrainedSegmentCount:1,
+    segmentProfiles:[[{startT:.4,endT:.6,widthMeters:4}]]
+  }});
+  const segments=[...streetRoadSegments(r)];
+  assert.ok(segments.length>=20);
+  assert.equal(segments[0].wa,8);
+  assert.equal(segments.at(-1).wb,8);
+  assert.ok(segments.some(s=>s.wa===4 && s.wb===4));
+  assert.ok(segments.some(s=>s.wa>4 && s.wa<8));
+  assert.ok(area(flatten(prepareCarriagewayTiles([r])))<960);
+  const changing=road([[0,0],[120,0],[240,0]],{width:8,metersPerWorldUnit:1,resolvedCrossSection:{
+    sourceWidthMeters:8,segmentWidthsMeters:new Float32Array([4,8]),constrainedSegmentCount:1
+  }});
+  const second=[...streetRoadSegments(changing)].filter(s=>s.index===1);
+  assert.equal(second[0].wa,4);
+  assert.equal(second.at(-1).wb,8);
+  assert.ok(second.length>1);
 });

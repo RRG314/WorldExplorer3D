@@ -8,7 +8,7 @@ import {
   geographicToWebMercatorMeters
 } from './source-contract.js?v=2';
 import {
-  sampleDistrictGroundMeters
+  sampleDistrictGroundMeters, sampleDistrictGroundElevationMeters
 } from '../world/compiler/district-ground-model.js?v=2';
 
 function freezeState(state) {
@@ -119,6 +119,28 @@ export function createAcceptedGroundRuntime(options = {}) {
       eastingMeters: projected.eastingMeters,
       northingMeters: projected.northingMeters
     });
+  };
+
+  const elevationAtLatLon = (latitude, longitude) => {
+    // The same transform, artifact order and interpolation as the diagnostic
+    // API, without constructing immutable provenance on every terrain query.
+    const lat = Number(latitude), lon = Number(longitude);
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90) throw new RangeError('latitude must be a finite value from -90 through 90');
+    if (!Number.isFinite(lon)) throw new TypeError('longitude must be finite');
+    if (activeArtifacts.length === 0 || state.status !== 'accepted') return NaN;
+    const projected = geographicToWebMercatorMeters(lat, lon);
+    for (const artifact of activeArtifacts) {
+      const elevation = sampleDistrictGroundElevationMeters(artifact.model, projected.eastingMeters, projected.northingMeters);
+      if (Number.isFinite(elevation)) return elevation;
+    }
+    return NaN;
+  };
+  const elevationAtWorldXZ = (x, z) => {
+    if (!worldToLatLon) return NaN;
+    const worldX = Number(x), worldZ = Number(z);
+    if (!Number.isFinite(worldX) || !Number.isFinite(worldZ)) throw new TypeError('world coordinates must be finite');
+    const geographic = worldToLatLon(worldX, worldZ);
+    return elevationAtLatLon(geographic.lat, geographic.lon);
   };
 
   const sampleAtWorldXZ = (x, z) => {
@@ -311,6 +333,8 @@ export function createAcceptedGroundRuntime(options = {}) {
     prepare,
     sampleAtLatLon,
     sampleAtWorldXZ,
+    elevationAtLatLon,
+    elevationAtWorldXZ,
     snapshot: () => state,
     verifyCoverage
   });

@@ -40,8 +40,28 @@ function segmentDistance(a,b,c,d) {
   if(cross(a,b,c)*cross(a,b,d)<0 && cross(c,d,a)*cross(c,d,b)<0)return 0;
   return Math.min(pointSegment(a,c,d),pointSegment(b,c,d),pointSegment(c,a,b),pointSegment(d,a,b));
 }
+function pointSegmentSquared(p,a,b) {
+  const dx=b.x-a.x,dz=b.z-a.z,length=dx*dx+dz*dz;
+  const t=length ? Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.z-a.z)*dz)/length)) : 0;
+  const x=p.x-a.x-dx*t,z=p.z-a.z-dz*t;
+  return x*x+z*z;
+}
+function segmentWithinReach(a,b,c,d,reach) {
+  if(a.x!==b.x || a.z!==b.z) {
+    if(cross(a,b,c)*cross(a,b,d)<0 && cross(c,d,a)*cross(c,d,b)<0)return true;
+  }
+  const squared=a.x===b.x && a.z===b.z ? pointSegmentSquared(a,c,d) :
+    Math.min(pointSegmentSquared(a,c,d),pointSegmentSquared(b,c,d),pointSegmentSquared(c,a,b),pointSegmentSquared(d,a,b));
+  const limit=reach*reach;
+  // Near the decision boundary, retain the original hypot calculation and
+  // its rounding. Squared comparisons only reject/accept well-separated cases.
+  if(reach<0 || !Number.isFinite(squared) || !Number.isFinite(limit) ||
+    Math.abs(squared-limit)<=32*Number.EPSILON*Math.max(1,squared,limit))return segmentDistance(a,b,c,d)<=reach;
+  return squared<limit;
+}
 export function createStreetFrontagePolicy(buildings = [], metersPerWorldUnit = 1.11) {
   const scale=streetScale(metersPerWorldUnit), edges=[], corners=new Map(), buckets=new Map(), sections=new WeakMap();
+  const candidateRegions=new Map();
   const rings=buildings.map(streetFootprint);
   // Exact shared source vertices are invariant under translation and rotation.
   // Quantizing absolute coordinates made attachment depend on the map origin.
@@ -62,10 +82,33 @@ export function createStreetFrontagePolicy(buildings = [], metersPerWorldUnit = 
     }
   }
   function query(a,b=a,pad=0){
-    const box=bounds(a,b),seen=new Set();
-    for(let x=Math.floor((box.minX-pad)/cell);x<=Math.floor((box.maxX+pad)/cell);x++)for(let z=Math.floor((box.minZ-pad)/cell);z<=Math.floor((box.maxZ+pad)/cell);z++)for(const edge of buckets.get(`${x}:${z}`)||[])seen.add(edge);
+    const box=bounds(a,b);
+    const x0=Math.floor((box.minX-pad)/cell),x1=Math.floor((box.maxX+pad)/cell);
+    const z0=Math.floor((box.minZ-pad)/cell),z1=Math.floor((box.maxZ+pad)/cell);
+    const key=`${x0}:${x1}:${z0}:${z1}`;
+    let candidates=candidateRegions.get(key);
+    if(!candidates){
+      const seen=new Set();
+      for(let x=x0;x<=x1;x++)for(let z=z0;z<=z1;z++)for(const edge of buckets.get(`${x}:${z}`)||[])seen.add(edge);
+      candidates=[...seen];
+      // Neighboring terrain samples revisit the same buckets. Cache only
+      // their ordered candidates, never an approximate distance/result.
+      // Bound both region count and retained edge references for large cities.
+      if(candidates.length<=2048){
+        if(candidateRegions.size>=128)candidateRegions.delete(candidateRegions.keys().next().value);
+        candidateRegions.set(key,candidates);
+      }
+    }
     const result=[];
-    for(const edge of seen)if(segmentDistance(a,b,edge.a,edge.b)<=pad+1e-8)result.push(edge);
+    // Bucket overlap is only a coarse candidate test. Reject disjoint edge
+    // bounds before the exact projections, retaining a conservative roundoff
+    // margin for translated coordinates and the existing distance tolerance.
+    const reach=pad+1e-8+8*Number.EPSILON*Math.max(1,Math.abs(box.minX),Math.abs(box.maxX),Math.abs(box.minZ),Math.abs(box.maxZ),Math.abs(pad));
+    for(const edge of candidates){
+      const eb=edge.bounds;
+      if(eb.maxX<box.minX-reach || eb.minX>box.maxX+reach || eb.maxZ<box.minZ-reach || eb.minZ>box.maxZ+reach)continue;
+      if(segmentWithinReach(a,b,edge.a,edge.b,pad+1e-8))result.push(edge);
+    }
     return result;
   }
   return { edges, query,
@@ -78,6 +121,6 @@ export function createStreetFrontagePolicy(buildings = [], metersPerWorldUnit = 
       if (!isGroundStreet(road)) for (const side of ['left','right']) section[side]={...section[side],presence:'absent',source:'excluded-structure',widthMeters:null};
       cache.set(index,section);return section;
     },
-    dispose(){edges.length=0;buckets.clear();corners.clear();}
+    dispose(){edges.length=0;buckets.clear();corners.clear();candidateRegions.clear();}
   };
 }

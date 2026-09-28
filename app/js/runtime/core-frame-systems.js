@@ -37,6 +37,15 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       phase: 'simulation',
       enabled: () => !!appCtx.gameStarted && !appCtx.worldLoading && !appCtx.titleLaunchPending,
       update(frame) {
+        const earthActive=!appCtx.onMoon&&!appCtx.onMars&&!appCtx.activePlanetaryBodyId&&
+          (!appCtx.isEnv||!appCtx.ENV||appCtx.isEnv(appCtx.ENV.EARTH));
+        const detail=earthActive?appCtx.transportDetail:null;
+        if(detail){
+          const point=appCtx.activeEarthActorPosition?.()||{x:0,z:0};
+          detail.step(point);
+          const terrainY=['plane','drone'].includes(point.source)?appCtx.terrainMeshHeightAt?.(point.x,point.z):NaN;
+          if(!detail.readyForActor(point,terrainY))return;
+        }
         appCtx.update(frame.dt);
       }
     },

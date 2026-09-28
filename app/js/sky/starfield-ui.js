@@ -333,6 +333,15 @@ export function checkStarClick(clientX, clientY) {
 
   appCtx.skyRaycaster.setFromCamera(mouse, appCtx.camera);
 
+  // Surface skies are clipped at the observer's horizon. Their invisible
+  // catalog hitboxes must obey that same boundary instead of selecting stars
+  // through the ground when a player clicks/taps the driving view.
+  if (appCtx.starField.userData?.planetarySurfaceOcclusion === true &&
+      appCtx.skyRaycaster.ray.direction.y <= 0) {
+    if (appCtx.selectedStar) clearStarSelection();
+    return false;
+  }
+
   const clickableStars = [];
   appCtx.starField.traverse((obj) => {
     if (obj.userData && obj.userData.isClickable) {

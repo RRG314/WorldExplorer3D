@@ -1,0 +1,48 @@
+<!doctype html><meta charset="utf-8"><title>Portable location data proof</title>
+<style>body{margin:0;background:#111d2b;color:#fff;font:15px system-ui}aside{position:absolute;left:20px;top:16px;background:#111d2bee;padding:16px;max-width:430px}h1{font-size:21px;margin:0 0 8px}p{margin:6px 0}canvas{display:block}</style>
+<aside><h1>Baltimore · portable data proof</h1><p>Diagnostic geometry from existing published records.</p><p>Not replacement game artwork or a new world authority.</p><p id="status">Loading…</p><p>Coordinates: X east, Y up, Z south.</p></aside>
+<script src="/node_modules/three/build/three.min.js"></script>
+<script type="module">
+import {appendUpwardRibbonGeometry,buildIndexedBatchMesh} from '/app/js/road-render.js?v=4';
+import {projectDecalPolygon} from '/app/js/terrain/surface-decal-projection.js';
+import {polylineDistances,sampleProfileAtDistance} from '/app/js/structure-semantics/geometry.js?v=2';
+const state={ready:false};window.render_game_to_text=()=>JSON.stringify(state);window.advanceTime=async()=>{};
+try {
+ const world=await (await fetch('/output/architecture-evaluation/world-boundary-and-environments/world-projection.json')).json();
+ const scene=new THREE.Scene();scene.background=new THREE.Color(0x203348);
+ const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(1000,720);renderer.setPixelRatio(1);document.body.append(renderer.domElement);
+ const camera=new THREE.PerspectiveCamera(48,1000/720,1,2500);camera.position.set(390,430,440);camera.lookAt(0,15,0);
+ scene.add(new THREE.HemisphereLight(0xffffff,0x8a8174,1));const sun=new THREE.DirectionalLight(0xffffff,.8);sun.position.set(100,300,90);scene.add(sun);
+ const terrain=world.terrain,n=terrain.gridSize,r=world.coverage.radiusWorld,positions=[],indices=[];
+ for(let z=0;z<n;z++)for(let x=0;x<n;x++)positions.push(-r+2*r*x/(n-1),terrain.heights[z*n+x]??0,-r+2*r*z/(n-1));
+ for(let z=0;z<n-1;z++)for(let x=0;x<n-1;x++){const a=z*n+x;indices.push(a,a+n,a+1,a+1,a+n,a+n+1);}
+ const ground=new THREE.BufferGeometry();ground.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));ground.setIndex(indices);ground.computeVertexNormals();
+ scene.add(new THREE.Mesh(ground,new THREE.MeshStandardMaterial({color:0x7b8e74,roughness:1,side:THREE.DoubleSide})));
+ let components=0;
+ for(const building of world.buildings)for(const component of building.components){
+  if(component.footprint.length<3||component.minY===null||component.maxY===null)continue;
+  const shape=new THREE.Shape(component.footprint.map(p=>new THREE.Vector2(p.x,-p.z)));
+  const geometry=new THREE.ExtrudeGeometry(shape,{depth:Math.max(.01,component.maxY-component.minY),bevelEnabled:false});geometry.rotateX(-Math.PI/2);
+  const mesh=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color:building.provenance.identity.role==='part'?0xc6ac8a:0xd5d9dd,roughness:1}));mesh.position.y=component.minY;mesh.userData.sourceBuildingId=building.id;scene.add(mesh);components++;
+ }
+ let renderedRoads=0,markingTriangles=0;
+ for(const road of world.roads){
+  if(!road.surface||road.points.length<2)continue;
+  const ds=Float64Array.from(road.surface.distances),vs=Float64Array.from(road.surface.centerHeights),path=polylineDistances(road.points).distances;
+  const left=[],right=[];
+  road.points.forEach((p,i)=>{const a=road.points[Math.max(0,i-1)],b=road.points[Math.min(road.points.length-1,i+1)],dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz)||1,hw=(road.width||2)/2,y=sampleProfileAtDistance(ds,vs,path[i])+.04;
+   left.push({x:p.x-dz/len*hw,y,z:p.z+dx/len*hw});right.push({x:p.x+dz/len*hw,y,z:p.z-dx/len*hw});});
+  const vertices=[],triangles=[];appendUpwardRibbonGeometry(left,right,vertices,triangles);
+  const mesh=buildIndexedBatchMesh({scene,verts:vertices,indices:triangles,material:new THREE.MeshStandardMaterial({color:0x333d46,side:THREE.DoubleSide})});if(mesh)renderedRoads++;
+  const supports=[];
+  for(let i=0;i<triangles.length;i+=3){const a=triangles[i]*3,b=triangles[i+1]*3,c=triangles[i+2]*3,p=vertices;supports.push({positions:p,a,b,c,denominator:(p[b+2]-p[c+2])*(p[a]-p[c])+(p[c]-p[b])*(p[a+2]-p[c+2])});}
+  const a=road.points[0],b=road.points[1],dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz)||1,w=.18;
+  const marking=projectDecalPolygon([{x:a.x-dz/len*w,z:a.z+dx/len*w},{x:b.x-dz/len*w,z:b.z+dx/len*w},{x:b.x+dz/len*w,z:b.z-dx/len*w},{x:a.x+dz/len*w,z:a.z-dx/len*w}],supports,.06);
+  if(marking.length){const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(marking,3));scene.add(new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:0xffec98,side:THREE.DoubleSide})));markingTriangles+=marking.length/9;}
+
+ }
+ renderer.render(scene,camera);
+ Object.assign(state,{ready:true,source:world.publicationId,buildings:world.buildings.length,components,roads:renderedRoads,markingTriangles,entrances:world.entrances.length,pois:world.pois.length,finiteTerrain:terrain.heights.every(Number.isFinite),programs:renderer.info.programs.length});
+ document.querySelector('#status').textContent=`${state.buildings} building identities · ${state.roads} roads · ${state.entrances} entrance records · ${state.pois} POIs`;
+}catch(error){state.error=error.message;document.querySelector('#status').textContent=error.message;console.error(error);}
+</script>

@@ -762,6 +762,11 @@ body.deflock-active .floatBtn::after {
   display: none;
 }
 
+/* Selected-place actions resume when the player closes the hotbar menu. */
+body:has(.floatMenu.open) .world-selection-notice {
+  display: none;
+}
+
 .world-selection-notice div {
   display: grid;
   gap: 4px;

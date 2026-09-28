@@ -119,6 +119,29 @@ try {
     'Movement after chat close must reach the other client from the loaded spawn without a world-sized jump');
   report.checks.push('Closing chat restores normal driving with no extra pointer action; the other client reads changed committed position');
   await member.page.screenshot({ path: `${out}/chat-closed-driving.png` });
+  const beforeDisconnect = await readPose();
+  await member.page.context().setOffline(true);
+  try {
+    await member.page.keyboard.down('KeyW');
+    try { await advanceGameplay(member.page, 1000); }
+    finally { await member.page.keyboard.up('KeyW'); }
+    await member.page.waitForTimeout(3000);
+  } finally {
+    await member.page.context().setOffline(false);
+  }
+  let recoveredPose;
+  const reconnectDeadline = Date.now() + 30000;
+  do {
+    recoveredPose = await readPose();
+    if (recoveredPose && distance(beforeDisconnect, recoveredPose) > 1) break;
+    await member.page.waitForTimeout(250);
+  } while (Date.now() < reconnectDeadline);
+  assert.ok(recoveredPose && distance(beforeDisconnect, recoveredPose) > 1,
+    'Reconnecting the same authenticated client must resume committed movement');
+  assert.ok((await member.page.locator('#roomPanelRoomCode').textContent()).includes(code));
+  report.reconnect = { ok: true, uid: member.uid, before: beforeDisconnect, after: recoveredPose,
+    scope: 'short transport loss within the admission lease; expired lease/capacity tested separately by backend admission' };
+  report.checks.push('A short network disconnect preserves room identity and resumes committed movement after reconnect');
   assert.deepEqual(report.errors, []);
   report.ok = true;
 } catch (error) {

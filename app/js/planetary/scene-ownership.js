@@ -20,7 +20,8 @@ function disposeDetachedWorldObject(object) {
   if (!object) return;
   object.parent?.remove?.(object);
   object.traverse?.((child) => {
-    child.geometry?.dispose?.();
+    if (!child.geometry?.userData?.sharedRuntimeGeometry) child.geometry?.dispose?.();
+      if (child.isInstancedMesh) child.dispose?.();
     if (!child.material) return;
     const sharedMaterial = !!(
       child.userData?.sharedRoadMaterial ||

@@ -1,0 +1,275 @@
+{
+  "source": "ee1bca65bef2ccd00c740536343e9fc64f20400d",
+  "quality": "med fixed; auto-quality disabled",
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "complete": false,
+  "failure": "locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('#fSpaceRocket')\u001b[22m\n\u001b[2m    - locator resolved to <div tabindex=\"0\" role=\"button\" class=\"floatItem\" id=\"fSpaceRocket\" aria-pressed=\"false\" data-we3d-keyboard-button=\"true\">\u2726 Enter Free Space Flight</div>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 \u00d7 waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <button type=\"button\" data-world-selection-action=\"\">Improve this place</button> from <aside aria-live=\"polite\" id=\"worldSelectionNotice\" class=\"world-selection-notice\">\u2026</aside> subtree intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 \u00d7 waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <span>Approach an entrance to enter, open Real Estate, \u2026</span> from <aside aria-live=\"polite\" id=\"worldSelectionNotice\" class=\"world-selection-notice\">\u2026</aside> subtree intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    13 \u00d7 waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m       - element is visible, enabled and stable\u001b[22m\n\u001b[2m       - scrolling into view if needed\u001b[22m\n\u001b[2m       - done scrolling\u001b[22m\n\u001b[2m       - <span>Approach an entrance to enter, open Real Estate, \u2026</span> from <aside aria-live=\"polite\" id=\"worldSelectionNotice\" class=\"world-selection-notice\">\u2026</aside> subtree intercepts pointer events\u001b[22m\n\u001b[2m     - retrying click action\u001b[22m\n\u001b[2m       - waiting 500ms\u001b[22m\n\u001b[2m       - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m       - element is visible, enabled and stable\u001b[22m\n\u001b[2m       - scrolling into view if needed\u001b[22m\n\u001b[2m       - done scrolling\u001b[22m\n\u001b[2m       - <button type=\"button\" data-world-selection-action=\"\">Improve this place</button> from <aside aria-live=\"polite\" id=\"worldSelectionNotice\" class=\"world-selection-notice\">\u2026</aside> subtree intercepts pointer events\u001b[22m\n\u001b[2m     - retrying click action\u001b[22m\n\u001b[2m       - waiting 500ms\u001b[22m\n\u001b[2m       - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m       - element is visible, enabled and stable\u001b[22m\n\u001b[2m       - scrolling into view if needed\u001b[22m\n\u001b[2m       - done scrolling\u001b[22m\n\u001b[2m       - <span>Approach an entrance to enter, open Real Estate, \u2026</span> from <aside aria-live=\"polite\" id=\"worldSelectionNotice\" class=\"world-selection-notice\">\u2026</aside> subtree intercepts pointer events\u001b[22m\n\u001b[2m     - retrying click action\u001b[22m\n\u001b[2m       - waiting 500ms\u001b[22m\n\u001b[2m       - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m       - element is visible, enabled and stable\u001b[22m\n\u001b[2m       - scrolling into view if needed\u001b[22m\n\u001b[2m       - done scrolling\u001b[22m\n\u001b[2m       - <span>Approach an entrance to enter, open Real Estate, \u2026</span> from <aside aria-live=\"polite\" id=\"worldSelectionNotice\" class=\"world-selection-notice\">\u2026</aside> subtree intercepts pointer events\u001b[22m\n\u001b[2m     - retrying click action\u001b[22m\n\u001b[2m       - waiting 500ms\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m    - element is visible, enabled and stable\u001b[22m\n\u001b[2m    - scrolling into view if needed\u001b[22m\n\u001b[2m    - done scrolling\u001b[22m\n\u001b[2m    - <span>Approach an entrance to enter, open Real Estate, \u2026</span> from <aside aria-live=\"polite\" id=\"worldSelectionNotice\" class=\"world-selection-notice\">\u2026</aside> subtree intercepts pointer events\u001b[22m\n\u001b[2m  - retrying click action\u001b[22m\n\u001b[2m    - waiting 500ms\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m    - element is visible, enabled and stable\u001b[22m\n\u001b[2m    - scrolling into view if needed\u001b[22m\n\u001b[2m    - done scrolling\u001b[22m\n\u001b[2m    - <button type=\"button\" data-world-selection-action=\"\">Improve this place</button> from <aside aria-live=\"polite\" id=\"worldSelectionNotice\" class=\"world-selection-notice\">\u2026</aside> subtree intercepts pointer events\u001b[22m\n\u001b[2m  - retrying click action\u001b[22m\n\u001b[2m    - waiting 500ms\u001b[22m\n",
+  "errors": [],
+  "samples": [
+    {
+      "id": "walking-stationary",
+      "elapsedMs": 15032.599999999991,
+      "frames": 715,
+      "meanMs": 21.024615384615373,
+      "p95Ms": 34.10000000000582,
+      "p99Ms": 34.30000000000291,
+      "start": {
+        "x": 0,
+        "z": 0
+      },
+      "end": {
+        "x": 0,
+        "z": 0
+      },
+      "distance": 0,
+      "renderer": {
+        "contextLost": false,
+        "glError": 0,
+        "pixelRatio": 1,
+        "width": 1280,
+        "height": 800,
+        "calls": 1007,
+        "triangles": 3073378,
+        "programs": 60,
+        "geometries": 1308,
+        "textures": 161
+      },
+      "worldCounts": {
+        "buildings": 25507,
+        "buildingMeshes": 540,
+        "landuseMeshes": 111,
+        "roadMeshes": 779,
+        "roads": 18758,
+        "terrainTiles": 49,
+        "visibleBuildingMeshes": 540,
+        "pitchedRoofMeshes": 35,
+        "inferredPitchedRoofMeshes": 0,
+        "guardedRoads": 0,
+        "guardrailColliders": 0,
+        "guardrailVisualInstances": 0
+      },
+      "jsHeapUsedBytes": 2065415656,
+      "scriptSeconds": 9.896692,
+      "taskSeconds": 10.964661000000007,
+      "dom": {
+        "documents": 2,
+        "nodes": 22744,
+        "jsEventListeners": 1094
+      }
+    },
+    {
+      "id": "walking-moving",
+      "elapsedMs": 15017.699999999997,
+      "frames": 702,
+      "meanMs": 21.392735042735037,
+      "p95Ms": 34.19999999999709,
+      "p99Ms": 34.39999999999418,
+      "start": {
+        "x": 0,
+        "z": 0.1372
+      },
+      "end": {
+        "x": 0,
+        "z": 9.006759999999998
+      },
+      "distance": 8.869559999999998,
+      "renderer": {
+        "contextLost": false,
+        "glError": 0,
+        "pixelRatio": 1,
+        "width": 1280,
+        "height": 800,
+        "calls": 953,
+        "triangles": 3031382,
+        "programs": 60,
+        "geometries": 1308,
+        "textures": 161
+      },
+      "worldCounts": {
+        "buildings": 25507,
+        "buildingMeshes": 540,
+        "landuseMeshes": 111,
+        "roadMeshes": 779,
+        "roads": 18758,
+        "terrainTiles": 49,
+        "visibleBuildingMeshes": 540,
+        "pitchedRoofMeshes": 35,
+        "inferredPitchedRoofMeshes": 0,
+        "guardedRoads": 0,
+        "guardrailColliders": 0,
+        "guardrailVisualInstances": 0
+      },
+      "jsHeapUsedBytes": 2108588096,
+      "scriptSeconds": 11.555276000000001,
+      "taskSeconds": 12.669519000000008,
+      "dom": {
+        "documents": 2,
+        "nodes": 36713,
+        "jsEventListeners": 1136
+      }
+    },
+    {
+      "id": "driving-moving",
+      "elapsedMs": 15049.099999999977,
+      "frames": 694,
+      "meanMs": 21.68458213256481,
+      "p95Ms": 34.19999999998254,
+      "p99Ms": 34.39999999999418,
+      "start": {
+        "x": 0.962312080352028,
+        "z": -0.6163616662909871
+      },
+      "end": {
+        "x": -151.1834527921491,
+        "z": -19.319850059519137
+      },
+      "distance": 153.29107686592204,
+      "renderer": {
+        "contextLost": false,
+        "glError": 0,
+        "pixelRatio": 1,
+        "width": 1280,
+        "height": 800,
+        "calls": 692,
+        "triangles": 3067365,
+        "programs": 92,
+        "geometries": 1862,
+        "textures": 187
+      },
+      "worldCounts": {
+        "buildings": 25507,
+        "buildingMeshes": 540,
+        "landuseMeshes": 111,
+        "roadMeshes": 779,
+        "roads": 18758,
+        "terrainTiles": 49,
+        "visibleBuildingMeshes": 540,
+        "pitchedRoofMeshes": 35,
+        "inferredPitchedRoofMeshes": 0,
+        "guardedRoads": 0,
+        "guardrailColliders": 0,
+        "guardrailVisualInstances": 0
+      },
+      "jsHeapUsedBytes": 2126704912,
+      "scriptSeconds": 9.399161,
+      "taskSeconds": 10.722689000000003,
+      "dom": {
+        "documents": 2,
+        "nodes": 63077,
+        "jsEventListeners": 1211
+      }
+    },
+    {
+      "id": "ocean-stationary",
+      "elapsedMs": 15000.200000000012,
+      "frames": 900,
+      "meanMs": 16.666888888888902,
+      "p95Ms": 17.099999999976717,
+      "p99Ms": 17.70000000001164,
+      "start": {
+        "x": 0,
+        "z": 62.02505167171197
+      },
+      "end": {
+        "x": 16.27981698866822,
+        "z": 97.73984270525318
+      },
+      "distance": 39.250206875302524,
+      "renderer": {
+        "contextLost": false,
+        "glError": 0,
+        "pixelRatio": 1,
+        "width": 1280,
+        "height": 800,
+        "calls": 1248,
+        "triangles": 3137343,
+        "programs": 93,
+        "geometries": 2070,
+        "textures": 193
+      },
+      "worldCounts": {
+        "buildings": 25507,
+        "buildingMeshes": 540,
+        "landuseMeshes": 111,
+        "roadMeshes": 779,
+        "roads": 18758,
+        "terrainTiles": 49,
+        "visibleBuildingMeshes": 540,
+        "pitchedRoofMeshes": 35,
+        "inferredPitchedRoofMeshes": 0,
+        "guardedRoads": 0,
+        "guardrailColliders": 0,
+        "guardrailVisualInstances": 0
+      },
+      "jsHeapUsedBytes": 486258608,
+      "scriptSeconds": 1.737726000000002,
+      "taskSeconds": 4.745735999999994,
+      "dom": {
+        "documents": 2,
+        "nodes": 16484,
+        "jsEventListeners": 648
+      }
+    },
+    {
+      "id": "earth-return-stationary",
+      "elapsedMs": 15000.100000000006,
+      "frames": 681,
+      "meanMs": 22.026578560939804,
+      "p95Ms": 33.39999999999418,
+      "p99Ms": 33.60000000000582,
+      "start": {
+        "x": -151.4315611631254,
+        "z": -23.077587256200694
+      },
+      "end": {
+        "x": -113.8001423943322,
+        "z": 237.29682378901657
+      },
+      "distance": 263.0797552182532,
+      "renderer": {
+        "contextLost": false,
+        "glError": 0,
+        "pixelRatio": 1,
+        "width": 1280,
+        "height": 800,
+        "calls": 667,
+        "triangles": 2392196,
+        "programs": 94,
+        "geometries": 2088,
+        "textures": 194
+      },
+      "worldCounts": {
+        "buildings": 25507,
+        "buildingMeshes": 540,
+        "landuseMeshes": 111,
+        "roadMeshes": 779,
+        "roads": 18758,
+        "terrainTiles": 49,
+        "visibleBuildingMeshes": 540,
+        "pitchedRoofMeshes": 35,
+        "inferredPitchedRoofMeshes": 0,
+        "guardedRoads": 0,
+        "guardrailColliders": 0,
+        "guardrailVisualInstances": 0
+      },
+      "jsHeapUsedBytes": 532518596,
+      "scriptSeconds": 9.356888000000005,
+      "taskSeconds": 10.451301,
+      "dom": {
+        "documents": 2,
+        "nodes": 34542,
+        "jsEventListeners": 696
+      }
+    }
+  ],
+  "portableProjection": {
+    "buildings": 139,
+    "roads": 59,
+    "entrances": 102,
+    "pois": 29,
+    "water": 0
+  }
+}

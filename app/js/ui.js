@@ -547,7 +547,15 @@ function setupUI() {
     }
     closeAllFloatMenus();
   });
-  document.getElementById('fRespawn').addEventListener('click', () => {appCtx.spawnOnRoad();closeAllFloatMenus();});
+  document.getElementById('fRespawn').addEventListener('click', () => {
+    // Relocating inactive ground actors does not stop an active aircraft or boat.
+    // Release the current controller before applying the authoritative ground spawn.
+    const mode = appCtx.getCurrentTravelMode?.() === 'drive' ? 'drive' : 'walk';
+    appCtx.clearActiveInterior?.({ restorePlayer: false, preserveCache: true });
+    appCtx.setTravelMode(mode, { source: 'safe_ground_recovery', force: true });
+    appCtx.spawnOnRoad();
+    closeAllFloatMenus();
+  });
   document.getElementById('fRespawnRand').addEventListener('click', () => {
     if (typeof appCtx.spawnOnRoad === 'function') appCtx.spawnOnRoad({ random: true });
     closeAllFloatMenus();
