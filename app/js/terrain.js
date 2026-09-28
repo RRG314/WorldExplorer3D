@@ -127,6 +127,8 @@ const prepareAcceptedGroundFromCatalog = async (options = {}) => {
 const getAcceptedGroundCatalogSnapshot = () => acceptedGroundCatalogState;
 const sampleAcceptedGroundAtLatLon = (latitude, longitude) =>
   acceptedGroundRuntime.sampleAtLatLon(latitude, longitude);
+const sampleAcceptedGroundElevationAtLatLon = (latitude, longitude) =>
+  acceptedGroundRuntime.elevationAtLatLon(latitude, longitude);
 const sampleAcceptedGroundAtWorldXZ = (x, z) =>
   acceptedGroundRuntime.sampleAtWorldXZ(x, z);
 const verifyAcceptedGroundCoverage = (locations) =>
@@ -155,11 +157,7 @@ function elevationMetersAtLatLon(latitude, longitude) {
       ? clampElevationMeters(Number(sample.elevationMeters))
       : null;
   }
-  const sample = acceptedGroundRuntime.sampleAtLatLon(latitude, longitude);
-  return sample.status === 'available' &&
-    Number.isFinite(Number(sample.groundElevationMeters))
-    ? clampElevationMeters(Number(sample.groundElevationMeters))
-    : null;
+  return clampElevationMeters(acceptedGroundRuntime.elevationAtLatLon(latitude, longitude));
 }
 
 function elevationWorldYAtWorldXZ(x, z) {
@@ -174,15 +172,12 @@ function elevationWorldYAtWorldXZ(x, z) {
         appCtx.WORLD_UNITS_PER_METER * appCtx.TERRAIN_Y_EXAGGERATION
       : null;
   }
-  const sample = acceptedGroundRuntime.sampleAtWorldXZ(x, z);
-  if (
-    sample.status !== 'available' ||
-    !Number.isFinite(Number(sample.groundElevationMeters))
-  ) {
+  const meters = acceptedGroundRuntime.elevationAtWorldXZ(x, z);
+  if (!Number.isFinite(meters)) {
     const farTerrainY = appCtx.sampleFarTerrainWorldYAt?.(x, z);
     return Number.isFinite(farTerrainY) ? farTerrainY : null;
   }
-  return clampElevationMeters(Number(sample.groundElevationMeters)) *
+  return clampElevationMeters(meters) *
     appCtx.WORLD_UNITS_PER_METER *
     appCtx.TERRAIN_Y_EXAGGERATION;
 }
@@ -197,10 +192,7 @@ function peekElevationMetersAtLatLon(latitude, longitude) {
       ? clampElevationMeters(Number(sample.elevationMeters))
       : null;
   }
-  const sample = acceptedGroundRuntime.sampleAtLatLon(latitude, longitude);
-  return sample.status === 'available' && Number.isFinite(Number(sample.groundElevationMeters))
-    ? clampElevationMeters(Number(sample.groundElevationMeters))
-    : null;
+  return clampElevationMeters(acceptedGroundRuntime.elevationAtLatLon(latitude, longitude));
 }
 
 function peekElevationWorldYAtWorldXZ(x, z) {
@@ -257,6 +249,7 @@ function resolveWaterTerrainY(x, z, terrainY, candidates = null) {
 const terrainTileDeps = {
   clampElevationMeters,
   sampleAcceptedGroundAtLatLon,
+  sampleAcceptedGroundElevationAtLatLon,
   usesAcceptedGround: () =>
     appCtx.worldLoadRuntimeState?.groundMode === 'accepted-ground',
   applyStructureTerrainCuts: (worldX, worldZ, terrainY) => applyStructureTerrainCuts(worldX, worldZ, terrainY),
@@ -416,6 +409,7 @@ const {
       : null;
   },
   sampleAcceptedGroundAtLatLon,
+  sampleAcceptedGroundElevationAtLatLon,
   sampleTileElevationMeters,
   terrainTileDeps,
   tileXYToLatLonBounds,
@@ -641,6 +635,7 @@ Object.assign(appCtx, {
   sampleFarTerrainWorldYAt,
   getFarTerrainSurfaceSnapshot,
   sampleAcceptedGroundAtLatLon,
+  sampleAcceptedGroundElevationAtLatLon,
   sampleAcceptedGroundAtWorldXZ,
   scheduleFarTerrainSurfaceRefresh,
   terrainSourceSampleAtLatLon: (lat, lon) =>
@@ -705,6 +700,7 @@ export {
   resetEarthStreaming,
   resetLocationTerrainPublication,
   sampleAcceptedGroundAtLatLon,
+  sampleAcceptedGroundElevationAtLatLon,
   sampleAcceptedGroundAtWorldXZ,
   terrainSourceSampleAtLatLon,
   terrainSourceSampleAtWorldXZ,

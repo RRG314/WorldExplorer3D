@@ -1,3 +1,4 @@
+import {createHeightCache} from './height-cache.js';
 import {terrainGridInterval} from './world-grid.js';
 import { streetSideEdge } from '../world/compiler/street-frontage-policy.js';
 import {
@@ -8,21 +9,6 @@ import { roadWidthAtProjection } from '../world/road-cross-section-profile.js?v=
 import { terrainHeightWithPortalCuts } from './structure-terrain-portals.js?v=2';
 
 const MAX_HEIGHT_CACHE_ENTRIES = 65536;
-
-function rememberHeight(cache, key, height) {
-  if (!Number.isFinite(height)) return height;
-  if (cache.size >= MAX_HEIGHT_CACHE_ENTRIES) {
-    // Batched FIFO eviction bounds metropolitan builds without maintaining a
-    // second index or doing a linked-list update on every terrain sample.
-    let remaining = MAX_HEIGHT_CACHE_ENTRIES / 2;
-    for (const oldest of cache.keys()) {
-      cache.delete(oldest);
-      if (--remaining === 0) break;
-    }
-  }
-  cache.set(key, height);
-  return height;
-}
 
 // THREE.PlaneGeometry splits each grid cell along the bottom-left to
 // top-right diagonal. Runtime ground queries must use those same two planes;
@@ -43,8 +29,8 @@ function createTerrainHeightSamplingApi(deps = {}) {
     elevationWorldYAtWorldXZ
   } = deps;
 
-  const terrainHeightCache = new Map();
-  const baseTerrainHeightCache = new Map();
+  const terrainHeightCache = createHeightCache(MAX_HEIGHT_CACHE_ENTRIES);
+  const baseTerrainHeightCache = createHeightCache(MAX_HEIGHT_CACHE_ENTRIES);
   let terrainHeightCacheEnabled = true;
 
   function terrainMeshHeightAt(x, z, options = {}) {
@@ -113,9 +99,8 @@ function createTerrainHeightSamplingApi(deps = {}) {
   }
 
   function cachedBaseTerrainHeight(x, z) {
-    const key = `${x},${z}`;
-    if (baseTerrainHeightCache.has(key)) return baseTerrainHeightCache.get(key);
-    return rememberHeight(baseTerrainHeightCache,key,baseTerrainHeightAt(x,z));
+    const height = baseTerrainHeightCache.get(x,z);
+    return height !== undefined ? height : baseTerrainHeightCache.set(x,z,baseTerrainHeightAt(x,z));
   }
 
   function applyStructureTerrainCuts(worldX, worldZ, terrainY) {
@@ -297,9 +282,8 @@ function createTerrainHeightSamplingApi(deps = {}) {
 
   function cachedTerrainHeight(x, z) {
     if (!terrainHeightCacheEnabled) return terrainMeshHeightAt(x, z);
-    const key = `${x},${z}`;
-    if (terrainHeightCache.has(key)) return terrainHeightCache.get(key);
-    return rememberHeight(terrainHeightCache,key,terrainMeshHeightAt(x,z));
+    const height = terrainHeightCache.get(x,z);
+    return height !== undefined ? height : terrainHeightCache.set(x,z,terrainMeshHeightAt(x,z));
   }
 
   function clearTerrainHeightCache() {
