@@ -1,5 +1,7 @@
 # World loading and memory — September 27, 2026
 
+The later whole-process investigation is recorded in [RESOURCE_BUDGET.md](RESOURCE_BUDGET.md). The measurements below describe the earlier `5e88a56b` work and must not be mistaken for total browser memory.
+
 ## Scope and method
 
 Local changes on `steven/architecture-evaluation`; production is unchanged. Compare the existing staged-loading runtime `8b5c0161` with the memory work ending at `5e88a56b`. Each browser uses the same Baltimore location, 1440×900 viewport, real M1 Chrome and staging services. Heavy runs are sequential. Ordinary Chrome remains open.
