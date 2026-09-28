@@ -166,3 +166,28 @@ terrain and geometry calculations, not a reason to assign a 28 GiB memory budget
 The profile is under `output/architecture-evaluation/current-allocation-audit/`.
 The full production execution matrix remains required; these focused results do
 not establish whole-product release readiness.
+
+### Release-matrix performance finding and lighting repair
+
+The `16434f84` candidate completed 45 functional release gates before performance
+failed. Desktop entry was 46.425 seconds; mobile emulation entered in 20.703
+seconds and averaged about 60 FPS. Natural desktop ground-mode heaps were
+approximately 806–896 MiB and sustained-flight heap about 405 MiB, below the
+existing 1 GiB JavaScript limit. Teardown, retention, world coverage, transfers,
+storage and browser errors passed. Ground FPS and shader count did not: driving
+averaged 37.48 FPS in the initial stationary sample and 40.33 FPS while moving;
+flight averaged 46.32 FPS but accumulated 158 programs against a limit of 128.
+
+Program-key inspection identified changing spotlight counts as a cause of shader
+multiplication. A fixed light pool with zero-intensity inactive slots and a
+zero-color fragment shortcut reduced a diagnostic journey to 59 walking and 61
+driving/flight programs. The source pixel fixture matched the original lighting
+exactly for zero, one, three and eight active lights, including a lower-intensity
+comparison with distinct brightness for each case. This is a verified rendering
+identity and shader-count improvement, not a claim that all ground-frame costs
+are fixed. The next built candidate must pass its own performance gate.
+
+Alternating same-scene tests of frozen static transforms, hidden-character matrix
+updates and conditional roof-noise calculations did not establish a consistent
+walking/driving benefit. Those experiments were not included. Existing FPS,
+frame-time, geometry, texture, heap and transfer thresholds remain unchanged.

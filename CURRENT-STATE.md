@@ -1,67 +1,38 @@
 # Current local verification state
 
-Worktree: `/Users/stevenreid/.codex/worktrees/architecture-evaluation/WorldExplorer3D-live-deployed-20260320`
-Branch: `steven/architecture-evaluation`. This work remains local; do not push or deploy automatically. Keep ordinary Chrome open. Run heavyweight checks sequentially and preserve source/history.
+Updated September 28, 2026. Older measurements remain in the linked audit documents; they are not current release receipts.
 
-## Production identity verified September 27, 2026 UTC
+## Workspace and release authority
 
-The public build manifest at `https://worldexplorer3d.io/build-manifest.json` reports
-`5.3.0+bbe6502228e3.8044052b36c00b4a.production`, clean source commit
-`bbe6502228e369fe2a15dc6a177f5d83948584c3`. Earlier notes describing production as 5.2 are historical and no longer current.
+Worktree: `/Users/stevenreid/.codex/worktrees/architecture-evaluation/WorldExplorer3D-live-deployed-20260320`.
+Branch: `steven/architecture-evaluation`. Work remains local: do not push or deploy automatically. Keep ordinary Chrome open, run heavyweight checks sequentially, and preserve source/history.
 
-## Local scope
+The current saved candidate is identified by `.local-candidates/latest` and its `build-manifest.json`. The preview server may still serve an older candidate; verify its manifest before handing it back. Never infer the served version from a browser query parameter.
 
-The measured refactor changes location-selection boundaries, service lifecycle, frontage/profile/decal calculations, renderer diagnostics and Earth presentation cleanup. Later local changes add shared layered character animation, equipment presentation, presence wrap/frame fixes and a server action cooldown repair.
+Release authority is the generated evidence under `output/release-evidence/current/`, matched to the current commit, workspace fingerprint and artifact. A component count, older successful scope, or diagnostic overlay does not establish production readiness. Run `npm run verify:release-ready` only after the complete candidate and backend scopes have current evidence.
 
-The new action resolver and receipt ledger are contained R&D components. They do not establish a deployed action gateway, server movement, PvP, durable shared pickups or a complete new multiplayer game mode. They must not be presented as shipping capability. Details: `docs/action-game-rnd/ACCEPTANCE_MATRIX.md`.
+## Production
 
-## Current verification
+Read-only identity check on September 27, 2026 UTC: `https://worldexplorer3d.io/build-manifest.json` reported `5.3.0+bbe6502228e3.8044052b36c00b4a.production`, source commit `bbe6502228e369fe2a15dc6a177f5d83948584c3`. Local performance work has not changed GitHub or production.
 
-Focused verification passed: current component suite without skips, portable-boundary types, backend admission/capacity/privacy and urban/civic authority, built public-room discovery and two-player vehicle handoff, packaged Moon controls/pause, Moon/Mars/Space/Ocean entry, equipment use, ship research, shared expeditions, chat and short transport reconnect. Screenshots exposed a planetary ground/star hitbox mismatch; it was fixed and visually rechecked in candidate `b7d62ba1`.
+## Consolidated loading and memory work
 
-Read-only production checks confirmed public room queries (unfiltered and city-filtered), three READY directory indexes and ACTIVE join/vehicle/impact Functions. No production data was modified. Production's old server cooldown implementation remains unchanged until an authorized backend release.
+Implemented scalar ground interpolation, exact numeric height caching, indexed mapped-water sampling, overlapped planar road compilation behind a terrain readiness barrier, pre-sized building compilation buffers, and frontage calculations that avoid unnecessary projection and cache-key allocation. Published geometry, road coverage and quality settings are preserved.
 
-The full release gate is still pending. Use the machine-written evidence in `output/release-evidence/current/` and the final `verify:release-ready` result; do not substitute this note, test counts or focused diagnostics for a completed matrix. The current regression reports are under `output/verification/refactor-release/` and each named verification directory.
+On the physical M1, dense-city first play improved from 59.25 seconds in the earlier comparison to 49.99/49.36 seconds, then 48.71 seconds with bounded building buffers. The last full performance attempt on `16434f84` entered in 46.425 seconds. These are individual runs, not a cross-device percentile. Mobile emulation entered in 20.703 seconds at about 60 FPS; physical-phone performance remains unverified.
 
-No new authoritative PvP capability or automatic deployment is approved by these results. The R&D program and physical-phone acceptance remain separately incomplete.
+The bounded-buffer measurement preserved 25,507 buildings, 18,759 roads, 49 terrain tiles and all 4,358 overview cells. Road-ready primary-renderer footprint fell from 3,912 to 3,277 MiB in the matched milestones. Completed-world footprint was about 2,894 MiB. Repeated entry still produced approximately 3.8–4.0 GiB renderer footprints before diagnostic GC. Retained post-exit heap was about 46 MiB; that is not a whole-process memory measurement or proof that all native overhead is resolved.
 
-## Loading investigation — September 27
+The first 45 candidate gates passed on `16434f84`. Performance then failed on ground-level FPS and accumulated shader programs, while loading, natural active heap, teardown, retention, coverage, transfer, storage and browser-error checks passed. The initial credential-expiry interruption was diagnosed; its successful gate receipts were reused rather than rerun.
 
-See `docs/architecture-evaluation/LOADING_AUDIT.md` for measured loading bottlenecks, local repairs, rejected experiments and the implemented staged road publication. The staged-loading runtime was `8b5c0161`: a same-night Baltimore comparison entered in 56.339 s versus 64.382 s, with all 555 road regions complete around 72.35 s. Background refinement has a temporary frame-rate cost; completed-world driving/flight were in the previous build's range. Local loading improvements do not close the full release gate. Production was not changed.
+## Rendering follow-up
 
+Nearby light counts created many material variants. The fixed spotlight pool uses intensity to turn unused slots off and skips their fragment-light calculation. A packaged-runtime diagnostic reduced shader growth from roughly 154–158 programs to 61 across walking, driving and sustained flight. The source fixture showed identical pixels for zero, one, three and eight illuminated lights. Headlight placement now updates the car transform before sampling it.
 
-## Memory follow-up — September 27
+Static-transform, hidden-character and conditional roof-noise experiments did not establish a consistent frame-rate gain and were not included. Performance limits have not been lowered. The lighting repair requires its own built-candidate acceptance evidence; earlier `16434f84` receipts do not certify the changed runtime.
 
-The previous user-tested runtime `5e88a56b` (candidate `5.3.0+5e88a56b9f21.caccc30c0e584177.staging`) shares vegetation geometry, packs traversal adjacency and releases old-world indexes/closures/support references. Two actual Baltimore load/exit cycles retained full road coverage and passed Backpack re-entry; a WeakRef confirmed collection of the first world's road. Main Menu heap fell from 162.29 MiB to 41.58/43.20 MiB. Settled heap/backing storage fell about 34/59 MiB on the first visit. The unprofiled loading comparison remained approximately 55 seconds; no substantial additional load-speed gain is claimed. See `docs/architecture-evaluation/MEMORY_AND_LOADING.md` for scope, measurements and remaining costs. Production and GitHub are unchanged.
+## Scope boundaries and evidence
 
+The action resolver and receipt ledger are contained R&D components, not a deployed action gateway, server movement, PvP, durable shared pickups or a complete new multiplayer mode. See `docs/action-game-rnd/ACCEPTANCE_MATRIX.md`.
 
-## Whole-process memory — September 27–28
-
-Latest local runtime: `8910f7d5`, candidate `5.3.0+8910f7d5ee2b.31be0230ce176c9a.staging`. Terrain sampling/clipping avoids transient objects, lossless building compaction saves 61.70 MiB per CPU/logical GPU geometry copy, and pavement overview allocates only useful cells and releases finished inputs. No world coverage or visual-detail settings were reduced.
-
-The reported ~3.8 GiB renderer footprint reproduced on physical M1. Sparse-overview road-ready measurements reduced renderer footprint approximately 240 MiB and active worker heap from 352 to 167 MiB. Final completed-background measurement: 3,119 MiB primary renderer, 4,311 MiB browser-owned sum; the native ownership gap remains unresolved. First-play loading remains 55–60 seconds. Full overview completion was observed after about 208 seconds from probe start, with worker shutdown. See `docs/architecture-evaluation/RESOURCE_BUDGET.md` for budget calculations, exact evidence scopes and harness failures. Do not represent these results as a complete performance fix or production certification. GitHub and production remain unchanged.
-
-
-## Consolidated loading/memory continuation — September 28
-
-The scalar ground/cache/water work and overlapped planar transport preparation
-reduced dense-city first play from 59.25 seconds in the comparison run to
-49.99/49.36 seconds. Bounded Float64 building compilation storage then entered
-in 48.714 seconds. No detail or world coverage was reduced. Latest measured
-candidate is `5.3.0+2c1b1eac4887.20e1aa1f53db09f2.staging`; the subsequent frontage
-comparison refinement requires its own packaged verification. The local
-`.local-candidates/latest` manifest is the candidate identity authority.
-
-The 2c1b1eac repeated-entry journey, packaged Moon controls, mobile city/GPS load,
-Manchester terrain-boundary check and artifact integrity passed without browser
-errors. All 1,456 current contracts passed before the final frontage refinement.
-Natural process memory remains expensive: about 2.8 GiB main renderer after
-background completion, and about 3.8–4.0 GiB after repeated entry before GC.
-Diagnostic retained heap is about 46 MiB after exit; it does not describe the
-whole renderer. Sustained flight passed the existing FPS/frame-time bounds;
-the short driving sample remains below the inherited average-FPS gate.
-
-See `docs/architecture-evaluation/RESOURCE_BUDGET.md` and the ignored `progress.md`
-continuation ledger. Do not report production readiness or deploy based on the
-component count. Production and GitHub remain unchanged. Owned preview 4193
-must be switched to the final tested candidate before handing it back.
+See `docs/architecture-evaluation/RESOURCE_BUDGET.md` for measurements and memory accounting, `docs/architecture-evaluation/LOADING_AUDIT.md` for the loading architecture, and the ignored `progress.md` for active process IDs and continuation details. Keep diagnostic, component, packaged-browser, emulator and live-service evidence distinct.

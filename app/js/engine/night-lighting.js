@@ -12,6 +12,26 @@ const headlightLocalTarget = new THREE.Vector3();
 
 let lastStreetUpdateAt = 0;
 
+// A fixed pool avoids compiling every material again as nearby lamps enter or
+// leave range. Zero-intensity slots must also skip their fragment-light work.
+export function installInactiveSpotLightShortcut(three) {
+  const chunk = three?.ShaderChunk?.lights_fragment_begin;
+  const marker = '// WE3D inactive spotlight slot';
+  if (typeof chunk !== 'string' || chunk.includes(marker)) return false;
+  const assignment = 'spotLight = spotLights[ i ];';
+  const direct = 'RE_Direct( directLight, geometry, material, reflectedLight );';
+  const start = chunk.indexOf(assignment);
+  const end = chunk.indexOf(direct, start);
+  if (start < 0 || end < start) return false;
+  const tail = end + direct.length;
+  three.ShaderChunk.lights_fragment_begin = chunk.slice(0, start) + assignment +
+    `\n${marker}\nif (any(notEqual(spotLight.color, vec3(0.0)))) {\n` +
+    chunk.slice(start + assignment.length, tail) + '\n}' + chunk.slice(tail);
+  return true;
+}
+
+installInactiveSpotLightShortcut(THREE);
+
 function nightFactor() {
   if (appCtx.onMoon || appCtx.onMars) return 0;
   if (appCtx.timeOfDay === 'night') return 1;
@@ -33,7 +53,7 @@ function ensureStreetLightPool() {
     const target = new THREE.Object3D();
     const light = new THREE.SpotLight(STREET_LIGHT_COLOR, 0, STREET_LIGHT_DISTANCE, 0.78, 0.62, 1.5);
     light.target = target;
-    light.visible = false;
+    light.visible = true;
     light.castShadow = false;
     light.userData.worldStreetLight = true;
     appCtx.scene?.add(light);
@@ -51,7 +71,7 @@ export function createVehicleHeadlightRig(carMesh) {
     const light = new THREE.SpotLight(HEADLIGHT_COLOR, 0, 76, 0.34, 0.68, 1.35);
     light.target = target;
     light.castShadow = false;
-    light.visible = false;
+    light.visible = true;
     target.visible = false;
     appCtx.scene?.add(light);
     appCtx.scene?.add(target);
@@ -65,7 +85,7 @@ export function resetStreetLampFixtures() {
   appCtx.streetLampFixtures = [];
   lastStreetUpdateAt = -Infinity;
   for (const entry of appCtx.streetLightPool || []) {
-    entry.light.visible = false;
+    entry.light.visible = true;
     entry.light.intensity = 0;
   }
 }
@@ -79,8 +99,9 @@ export function registerStreetLamp(group, head, target = null) {
 function updateHeadlights(factor) {
   const rig = appCtx.carMesh?.userData?.headlightRig || [];
   const active = factor > 0.02 && appCtx.carMesh?.visible !== false && !appCtx.boatMode?.active;
+  if (active) appCtx.carMesh?.updateWorldMatrix?.(true, false);
   for (const entry of rig) {
-    entry.light.visible = active;
+    entry.light.visible = true;
     entry.light.intensity = active ? HEADLIGHT_INTENSITY * factor : 0;
     if (active) {
       headlightLocalPosition.set(entry.x, -0.48, 1.65);
@@ -129,7 +150,7 @@ function updateStreetLights(factor, now) {
     const light = entry.light;
     const fixture = fixtures[index]?.fixture;
     if (!fixture) {
-      light.visible = false;
+      light.visible = true;
       light.intensity = 0;
       continue;
     }
