@@ -2886,7 +2886,7 @@ function startUrbanSandboxRuntime(options = {}) {
     appCtx.connectedExplorerWallet = null;
   }
   const connectedWallet = appCtx.connectedExplorerWallet || createConnectedExplorerWallet({
-    onError: () => appCtx.urbanSandboxRuntime && setStatus(appCtx.urbanSandboxRuntime, 'Explorer Wallet is reconnecting.', 2200)
+    onError: handleWalletReconnect
   });
   if (connectedWallet) appCtx.connectedExplorerWallet = connectedWallet;
   const stopWalletSubscription = connectedWallet?.subscribe?.(() => {
@@ -2909,8 +2909,8 @@ function startUrbanSandboxRuntime(options = {}) {
     appCtx.connectedExplorerPlayerState = createConnectedPlayerState({
       conditionAuthority: playerConditionAuthority,
       vehicleUpgradeStore,
-      onError: () => appCtx.urbanSandboxRuntime && setStatus(appCtx.urbanSandboxRuntime, 'Explorer health and upgrades are reconnecting.', 2200),
-      onChange: () => appCtx.urbanSandboxRuntime && renderEquipment(appCtx.urbanSandboxRuntime)
+      onError: handlePlayerStateReconnect,
+      onChange: refreshActiveEquipment
     });
   }
   const storeUi = {
@@ -3309,14 +3309,7 @@ function startUrbanSandboxRuntime(options = {}) {
   activeRuntime = state;
   appCtx.urbanSandboxRuntime = state;
   state.vehicles.forEach((vehicle) => attachCuratedTrafficDetail(state, vehicle));
-  appCtx.disposeUrbanSandboxRuntime = (reason = 'world-reload') => disposeRuntime(activeRuntime, reason);
-  appCtx.urbanSandboxRuntimeSnapshot = () => snapshot(activeRuntime);
   appCtx.resolveUrbanActorCollision = resolveUrbanActorCollision;
-  appCtx.enterUrbanVehicleByIdForSupport = (vehicleId) => beginEnter(state, vehicles.find((vehicle) => vehicle.id === vehicleId));
-  appCtx.exitUrbanVehicleForSupport = () => beginExit(state);
-  appCtx.toggleUrbanEquipment = (force) => toggleEquipment(state, force);
-  appCtx.equipUrbanEquipmentSlot = (slot) => equipSlot(state, slot);
-  appCtx.handleUrbanEquipmentUse = () => useEquipped(state);
   state.handleMechanicInteraction = () => openNearbyMechanic(state);
   appCtx.handleMechanicInteraction = state.handleMechanicInteraction;
   state.prepareAirborneParachute = (options = {}) => {
@@ -3377,18 +3370,35 @@ function startUrbanSandboxRuntime(options = {}) {
   };
   appCtx.isUrbanParachuteDeployed = state.isParachuteDeployed;
   appCtx.onUrbanParachuteLanded = state.onParachuteLanded;
-  appCtx.handleUrbanNpcTake = () => {
-    const candidate = interactionCandidate(state);
-    if (candidate?.action === 'loot_responder') return performResponderLoot(state, candidate);
-    return candidate?.action === 'talk_npc' || candidate?.action === 'loot_npc' ? performNpcTake(state, candidate) : false;
-  };
   updatePrompt(state);
   updateCivicStatus(state);
   renderEquipment(state);
   return state;
 }
 
+// These callbacks outlive a location. Keep them out of its closure scope and
+// resolve the current runtime at invocation instead of capturing an old world.
+function handleWalletReconnect() {
+  if (activeRuntime) setStatus(activeRuntime, 'Explorer Wallet is reconnecting.', 2200);
+}
+function handlePlayerStateReconnect() {
+  if (activeRuntime) setStatus(activeRuntime, 'Explorer health and upgrades are reconnecting.', 2200);
+}
+function refreshActiveEquipment() { if (activeRuntime) renderEquipment(activeRuntime); }
+
 Object.assign(appCtx, {
+  enterUrbanVehicleByIdForSupport: vehicleId => activeRuntime ? beginEnter(activeRuntime, activeRuntime.vehicles.find(vehicle => vehicle.id === vehicleId)) : false,
+  exitUrbanVehicleForSupport: () => activeRuntime ? beginExit(activeRuntime) : false,
+  toggleUrbanEquipment: force => activeRuntime ? toggleEquipment(activeRuntime, force) : false,
+  equipUrbanEquipmentSlot: slot => activeRuntime ? equipSlot(activeRuntime, slot) : false,
+  handleUrbanEquipmentUse: () => activeRuntime ? useEquipped(activeRuntime) : false,
+  handleUrbanNpcTake: () => {
+    const state = activeRuntime;
+    if (!state) return false;
+    const candidate = interactionCandidate(state);
+    if (candidate?.action === 'loot_responder') return performResponderLoot(state, candidate);
+    return candidate?.action === 'talk_npc' || candidate?.action === 'loot_npc' ? performNpcTake(state, candidate) : false;
+  },
   disposeUrbanSandboxRuntime: (reason = 'world-reload') => disposeRuntime(activeRuntime, reason),
   startUrbanSandboxRuntime,
   urbanSandboxRuntimeSnapshot: () => snapshot(activeRuntime)
