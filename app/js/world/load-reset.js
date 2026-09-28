@@ -25,7 +25,8 @@ function disposeSceneMeshes(meshes, options = {}) {
     if (typeof mesh.removeFromParent === 'function') mesh.removeFromParent();
     else mesh.parent?.remove?.(mesh);
     mesh.traverse?.((object) => {
-      object.geometry?.dispose?.();
+      if (!object.geometry?.userData?.sharedRuntimeGeometry) object.geometry?.dispose?.();
+      if (object.isInstancedMesh) object.dispose?.();
       if (!object.material) return;
       if (skipSharedUrbanSurfaceMaterial && object.userData?.sharedUrbanSurfaceMaterial) return;
       if (Array.isArray(object.material)) {
@@ -234,6 +235,7 @@ export function resetWorldForReload(options = {}) {
   // previously batched world objects that are no longer reachable from a list.
   appCtx.clearEarthWorldSceneObjects?.();
 
+  appCtx.GroundHeight?.invalidate?.();
   resetWorldFurnitureCaches();
   if (typeof appCtx.invalidateRoadCache === 'function') appCtx.invalidateRoadCache();
   appCtx.renderer?.renderLists?.dispose?.();

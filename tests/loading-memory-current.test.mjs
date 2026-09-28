@@ -59,8 +59,30 @@ test('world reset releases derived transport models as well as scene objects',as
  const source=(await readFile(new URL('../app/js/world/load-reset.js',import.meta.url),'utf8')).replace(/^import[^;]+;\s*/gm,'').replaceAll('export function','function');
  const keys=['transportNetworkModel','transportStructureModel','transportStructureAssembly','transportJunctionProfile','sharedTransportSurfacePresentation','tunnelSolidCompilation','structureProfileCompilation'];
  const appCtx={resetEarthStreaming(){},replaceWorldCollection(k){this[k]=[];},clearWorldCollections(keys){for(const k of keys)this[k]=[];}};
+ let groundInvalidations=0;appCtx.GroundHeight={invalidate(){groundInvalidations++;}};
  for(const key of keys)appCtx[key]={oldWorldFeature:{}};
  const context=vm.createContext({appCtx,releaseLocationModels(){},clearBuildingExteriorMaterialPool(){},clearBuildingExteriorDetails(){}});
  vm.runInContext(source,context);context.resetWorldForReload({showLoading:false});
  for(const key of keys)assert.equal(appCtx[key],null,key);
+ assert.equal(groundInvalidations,1);
+});
+
+test('shared vegetation cells cull independently, re-enter view and keep LOD distances',async()=>{
+ const {createVegetationCell}=await import('../app/js/world/vegetation-cell.js');
+ const camera=new THREE.PerspectiveCamera(60,1,.1,3000);camera.updateMatrixWorld(true);
+ const geometry=new THREE.BoxGeometry(2,8,2);geometry.userData.sharedRuntimeGeometry=true;
+ const make=x=>{const cell=createVegetationCell(THREE);cell.position.set(x,0,-100);for(const d of [0,300]){const mesh=new THREE.InstancedMesh(geometry,new THREE.MeshBasicMaterial(),1);mesh.frustumCulled=false;cell.addLevel(mesh,d);}cell.addLevel(new THREE.Group(),1600);cell.includeBounds(new THREE.Box3(new THREE.Vector3(-2,-2,-2),new THREE.Vector3(2,8,2)));cell.updateMatrixWorld(true);return cell;};
+ const a=make(0),b=make(1000);a.update(camera);b.update(camera);
+ assert.equal(a.levels[0].object.visible,true);assert.ok(b.levels.every(l=>!l.object.visible));
+ assert.equal(a.levels[0].object.geometry,b.levels[0].object.geometry);
+ b.position.x=0;b.updateMatrixWorld(true);b.update(camera);assert.equal(b.levels[0].object.visible,true);
+ a.position.z=-500;a.updateMatrixWorld(true);a.update(camera);assert.equal(a.levels[1].object.visible,true);assert.equal(a.levels[0].object.visible,false);
+ a.position.z=-1700;a.updateMatrixWorld(true);a.update(camera);assert.equal(a.levels[2].object.visible,true);
+ const source=(await readFile(new URL('../app/js/world/vegetation-models.js',import.meta.url),'utf8')).replace(/^import[^;]+;\s*/gm,'').replaceAll('export function','function');
+ const context=vm.createContext({});vm.runInContext(source,context);
+ let geometryDisposals=0,instanceDisposals=0;
+ geometry.addEventListener('dispose',()=>geometryDisposals++);
+ for(const l of a.levels)l.object.addEventListener('dispose',()=>instanceDisposals++);
+ context.disposeVegetationBatch(a);assert.equal(geometryDisposals,0);assert.equal(instanceDisposals,2);
+ b.update(camera);assert.equal(b.levels[0].object.visible,true);
 });

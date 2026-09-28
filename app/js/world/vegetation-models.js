@@ -2,6 +2,8 @@ import {drainCooperatively} from './cooperative-scheduling.js?v=1';
 import {loadModelAsset} from '../assets/model-asset-runtime.js?v=16';
 import {vegetationIdentitySeed} from './vegetation-spatial.js';
 
+import {createVegetationCell} from './vegetation-cell.js';
+
 const models = new Map();
 const CELL_METERS = 192;
 
@@ -43,7 +45,8 @@ function requestModel(ctx, kind) {
           const geometry=mesh.geometry.clone();geometry.applyMatrix4(mesh.matrixWorld);
           geometry.translate(0,-bounds.min.y,0);geometry.scale(normalizedScale,normalizedScale,normalizedScale);
           const material=mesh.material.clone();material.roughness=0.93;
-          // Templates own textures across world reloads; batches own their geometry/materials.
+          // Templates own geometry and textures across reloads; cells own materials and instance buffers.
+          geometry.userData.sharedRuntimeGeometry=true;
           for(const value of Object.values(material)) if(value?.isTexture) {
             value.userData=value.userData || {};
             value.userData.sharedRuntimeTexture=true;
@@ -84,7 +87,7 @@ function* vegetationModelSteps(ctx, placements) {
   }
   for(const group of groups.values()) {
     yield;
-    const lod=new THREE.LOD();
+    const lod=createVegetationCell(THREE);
     ctx.vegetationMeshes.push(lod);
     const centerX=(group.cx+.5)*CELL_METERS, centerZ=(group.cz+.5)*CELL_METERS;
     const centerY=group.placements.reduce((sum,p)=>sum+p.baseY,0)/group.placements.length;
@@ -93,7 +96,7 @@ function* vegetationModelSteps(ctx, placements) {
       const root=new THREE.Group();
       lod.addLevel(root,level===0 ? 0 : 300);
       for(const part of group.model.parts[level]) {
-        const geometry=part.geometry.clone(), material=part.material.clone();
+        const geometry=part.geometry, material=part.material.clone();
         const mesh=new THREE.InstancedMesh(geometry,material,group.placements.length);
         root.add(mesh);
         const bound=new THREE.Box3(), localBox=new THREE.Box3().setFromBufferAttribute(geometry.attributes.position);
@@ -107,10 +110,9 @@ function* vegetationModelSteps(ctx, placements) {
           matrix.compose(new THREE.Vector3(p.x-centerX,p.baseY-centerY,p.z-centerZ),quaternion,scale);
           mesh.setMatrixAt(index,matrix);bound.union(localBox.clone().applyMatrix4(matrix));
         }
-        // Three r128 culls instances using geometry bounds, not instance bounds.
-        geometry.boundingSphere=bound.getBoundingSphere(new THREE.Sphere());
-        geometry.boundingBox=bound;
-        mesh.frustumCulled=true;mesh.castShadow=false;mesh.receiveShadow=true;
+        // The cell owns aggregate bounds; the model geometry remains shared and immutable.
+        lod.includeBounds(bound);
+        mesh.frustumCulled=false;mesh.castShadow=false;mesh.receiveShadow=true;
         mesh.instanceMatrix.needsUpdate=true;
       }
     }
@@ -136,7 +138,8 @@ export function renderVegetationModelsCooperatively(ctx,placements,schedule) {
 export function disposeVegetationBatch(root) {
   root?.parent?.remove(root);
   root?.traverse?.(object=>{
-    object.geometry?.dispose?.();
+    if (!object.geometry?.userData?.sharedRuntimeGeometry) object.geometry?.dispose?.();
+    if (object.isInstancedMesh) object.dispose?.();
     const materials=Array.isArray(object.material) ? object.material : [object.material];
     materials.forEach(material=>material?.dispose?.());
   });
