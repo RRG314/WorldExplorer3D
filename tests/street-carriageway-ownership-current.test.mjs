@@ -58,3 +58,18 @@ test('terrain ownership accumulation matches the original ordered sample reducti
   assert.equal(api.applyStructureTerrainCuts(10,z,0),w>0?y/w*strongest:0);
  }
 });
+
+test('sparse overview retains exact pavement and non-sidewalk road context without empty-cell allocation',async()=>{
+ const {prepareStreetPavement,compilePavementTile,pavementTileHasWork}=await import('../app/js/world/compiler/street-pavement.js');
+ const withoutSidewalk=road(0,0);withoutSidewalk.pts=[{x:-2000,z:0},{x:2000,z:0}];withoutSidewalk.tags={sidewalk:'no'};
+ const withSidewalk=road(0,0);withSidewalk.pts=[{x:0,z:-100},{x:0,z:100}];
+ const input={roads:[withoutSidewalk,withSidewalk],buildings,metersPerWorldUnit:1};
+ const original=prepareStreetPavement(input),expected=original.tiles.filter(t=>pavementTileHasWork(t,false));
+ const sparse=prepareStreetPavement({...input,sparseOverview:true});
+ assert.equal(sparse.sourceCellCount,original.tiles.length);
+ assert.deepEqual(sparse.tiles.map(t=>t.key),expected.map(t=>t.key));assert.ok(sparse.tiles.length<original.tiles.length/3);
+ for(let i=0;i<expected.length;i++){
+  for(const kind of ['segments','joins','paths','crossings','obstacles','areas','edges','frontageBarriers'])assert.deepEqual(sparse.tiles[i][kind],expected[i][kind]);
+  assert.deepEqual(compilePavementTile(sparse.tiles[i],1,{includeMarkings:false}),compilePavementTile(expected[i],1,{includeMarkings:false}));
+ }
+});

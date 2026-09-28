@@ -5,7 +5,7 @@ const pending=new Set();
 self.onmessage=({data})=>{
  try{
   if(data.type==='prepare'){
-   plan=prepareStreetPavement(data.input);plan.sourceCells=plan.tiles.length;
+   plan=prepareStreetPavement({...data.input,sparseOverview:true});plan.sourceCells=plan.sourceCellCount;
    plan.tiles=plan.tiles.filter(tile=>pavementTileHasWork(tile,false));
    pending.clear();plan.tiles.forEach((_,i)=>pending.add(i));
    self.postMessage({type:'prepared',tiles:plan.tiles.length,keys:plan.tiles.map(tile=>tile.key),sourceCells:plan.sourceCells,excludedCells:plan.sourceCells-plan.tiles.length});

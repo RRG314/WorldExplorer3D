@@ -85,13 +85,22 @@ function compilePackagedRegions(tile, metersPerWorldUnit, options) {
 }
 
 // All spatial indexing uses world coordinates; dimensions supplied in metres are converted once.
-function prepareStreetRegions({ roads = [], buildings = [], landuses = [], linearFeatures = [], metersPerWorldUnit = 1.11, chunkSize = 64, coverageBounds = null }) {
+function prepareStreetRegions({ roads = [], buildings = [], landuses = [], linearFeatures = [], metersPerWorldUnit = 1.11, chunkSize = 64, coverageBounds = null, sparseOverview = false }) {
   streetScale(metersPerWorldUnit);
   const frontageBarriers=createStreetCarriagewayBarriers(roads);
   const frontagePolicy = createStreetFrontagePolicy(buildings, metersPerWorldUnit);
   const segments = [], paths = [], obstacles = [], mappedAreas = [], buildingEdges = [];
   const tiles = new Map();
+  // Overview has no marking-only cells. Determine work keys before allocating
+  // eight context arrays per cell, then replay all insertions in source order.
+  // Roads without sidewalks still subtract carriageways in neighboring cells.
+  const queued = [], workKeys = new Set(), sourceKeys = new Set();
+  let collecting = sparseOverview;
   const insert = (kind, value, bounds, pad = 0) => {
+    if (collecting) queued.push({kind,value,bounds,pad});
+    const hasWork = kind === 'paths' || kind === 'areas' ||
+      (['segments','joins'].includes(kind) &&
+       (value.section?.left?.presence === 'present' || value.section?.right?.presence === 'present'));
     const minX=Math.max(Math.floor((bounds.minX-pad)/chunkSize),coverageBounds ? Math.floor(coverageBounds.minX/chunkSize) : -Infinity);
     const maxX=Math.min(Math.floor((bounds.maxX+pad)/chunkSize),coverageBounds ? Math.ceil(coverageBounds.maxX/chunkSize)-1 : Infinity);
     const minZ=Math.max(Math.floor((bounds.minZ-pad)/chunkSize),coverageBounds ? Math.floor(coverageBounds.minZ/chunkSize) : -Infinity);
@@ -100,6 +109,8 @@ function prepareStreetRegions({ roads = [], buildings = [], landuses = [], linea
       for (let iz = minZ; iz <= maxZ; iz++) {
         if (coverageBounds && (ix*chunkSize < coverageBounds.minX || (ix+1)*chunkSize > coverageBounds.maxX || iz*chunkSize < coverageBounds.minZ || (iz+1)*chunkSize > coverageBounds.maxZ)) continue;
         const key = `${ix}:${iz}`;
+        if (collecting) {sourceKeys.add(key);if(hasWork)workKeys.add(key);continue;}
+        if (sparseOverview && !workKeys.has(key)) continue;
         if (!tiles.has(key)) tiles.set(key, { key, ix, iz, segments: [], joins: [], paths: [], crossings: [], obstacles: [], areas: [], edges: [] });
         tiles.get(key)[kind].push(value);
       }
@@ -150,6 +161,12 @@ function prepareStreetRegions({ roads = [], buildings = [], landuses = [], linea
     }
   }
   for (const area of mappedAreas) insert('areas', area, area.bounds);
+  const sourceCellCount = sparseOverview ? sourceKeys.size : tiles.size;
+  if (sparseOverview) {
+    collecting = false;
+    for (const entry of queued) insert(entry.kind,entry.value,entry.bounds,entry.pad);
+    queued.length=0;workKeys.clear();sourceKeys.clear();
+  }
   // Index context by occupied cells instead of scanning every building for every street cell.
   const assign = (kind, items, pad = 0) => {
     for (const item of items) {
@@ -170,7 +187,7 @@ function prepareStreetRegions({ roads = [], buildings = [], landuses = [], linea
     tile.frontageBarriers=frontageBarriers.query(point,chunkSize+44/metersPerWorldUnit);
   }
   frontagePolicy.dispose();frontageBarriers.dispose();
-  return { tiles: [...tiles.values()].sort((a, b) => a.ix - b.ix || a.iz - b.iz), metersPerWorldUnit, chunkSize,
+  return { tiles: [...tiles.values()].sort((a, b) => a.ix - b.ix || a.iz - b.iz), sourceCellCount, metersPerWorldUnit, chunkSize,
     managedPaths: linearFeatures.filter(f => groundFeature(f) && f.kind === 'footway' && f.subtype === 'sidewalk') };
 }
 
