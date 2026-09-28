@@ -28,3 +28,8 @@ No new authoritative PvP capability or automatic deployment is approved by these
 ## Loading investigation — September 27
 
 See `docs/architecture-evaluation/LOADING_AUDIT.md` for measured loading bottlenecks, local repairs, rejected experiments and the implemented staged road publication. The latest local runtime is `8b5c0161`: a same-night Baltimore comparison entered in 56.339 s versus 64.382 s, with all 555 road regions complete around 72.35 s. Background refinement has a temporary frame-rate cost; completed-world driving/flight were in the previous build's range. Local loading improvements do not close the full release gate. Production was not changed.
+
+
+## Memory follow-up — September 27
+
+Latest local runtime `5e88a56b` (candidate `5.3.0+5e88a56b9f21.caccc30c0e584177.staging`) shares vegetation geometry, packs traversal adjacency and releases old-world indexes/closures/support references. Two actual Baltimore load/exit cycles retained full road coverage and passed Backpack re-entry; a WeakRef confirmed collection of the first world's road. Main Menu heap fell from 162.29 MiB to 41.58/43.20 MiB. Settled heap/backing storage fell about 34/59 MiB on the first visit. The unprofiled loading comparison remained approximately 55 seconds; no substantial additional load-speed gain is claimed. See `docs/architecture-evaluation/MEMORY_AND_LOADING.md` for scope, measurements and remaining costs. Production and GitHub are unchanged.

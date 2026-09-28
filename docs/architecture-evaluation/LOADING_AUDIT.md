@@ -87,3 +87,8 @@ The prescribed packaged-Moon controls, pause/resume and title-auth smoke check a
 ### Limits
 
 This completes the staged road-detail portion of the loading plan. Initial terrain/structure preparation, building construction and variable provider waits still cost time. The optional Overpass supplement took about nine seconds in these runs; it remains enabled to preserve available data. This is not an instant-loading architecture, an all-location guarantee, or completion of the separate rendering and production-release gates. Physical-phone acceptance and the existing FPS/program budgets remain open. Nothing was pushed or deployed.
+
+
+## Memory follow-up
+
+See [Memory and loading measurements](MEMORY_AND_LOADING.md) for shared vegetation geometry, compact traversal storage and verified old-world cleanup. The additional unprofiled Baltimore entry was 55.545 s; the major measured gain in this pass is memory, not a substantial further load-time reduction.
