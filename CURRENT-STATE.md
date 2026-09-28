@@ -27,4 +27,4 @@ No new authoritative PvP capability or automatic deployment is approved by these
 
 ## Loading investigation — September 27
 
-See `docs/architecture-evaluation/LOADING_AUDIT.md` for measured loading bottlenecks, local repairs, rejected experiments and remaining publication architecture work. Local loading improvements do not close the full release gate. Production was not changed.
+See `docs/architecture-evaluation/LOADING_AUDIT.md` for measured loading bottlenecks, local repairs, rejected experiments and the implemented staged road publication. The latest local runtime is `8b5c0161`: a same-night Baltimore comparison entered in 56.339 s versus 64.382 s, with all 555 road regions complete around 72.35 s. Background refinement has a temporary frame-rate cost; completed-world driving/flight were in the previous build's range. Local loading improvements do not close the full release gate. Production was not changed.

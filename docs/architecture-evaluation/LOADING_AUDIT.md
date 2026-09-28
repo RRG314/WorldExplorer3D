@@ -2,7 +2,7 @@
 
 Local branch: `steven/architecture-evaluation`. These changes are not deployed. Timings below come from hardware-accelerated Chrome on the physical M1 Mac, with live provider requests. They are observations, not a cold-load percentile or a production-readiness certificate.
 
-## Why loading is slow
+## Original bottlenecks
 
 The main cost is constructing the world, rather than opening the application. The measured document/runtime startup took about 1.5–2.3 seconds in the initial comparisons. Gameplay then waited for a fixed 14 km regional world containing 18,759 roads and 25,507 buildings.
 
@@ -41,7 +41,7 @@ A separate seeded furniture comparison covered 6,000 road segments, including 1,
 
 Larger road construction tiles were rejected: 256- and 512-unit tiles produced more terrain-partition triangles and took longer than 128-unit tiles. The compiler tile size is unchanged.
 
-## Verification
+## Verification before staged publication
 
 - Road/sidewalk/frontage/terrain checks: 180 passed after the source-edge change, including exact straight-road footprint, turn equivalence and retained narrowing/transition checks.
 - Furniture checks include junction clearance, obstacle rejection, occupancy reservation, coordinate scale, cell boundaries, broad structures and width peaks between samples.
@@ -50,10 +50,40 @@ Larger road construction tiles were rejected: 256- and 512-unit tiles produced m
 
 Local machine-readable evidence is under `output/architecture-evaluation/loading-source-edges/`, `loading-overlap/`, `loading-indexed/`, and `output/verification/`. Consult each report's candidate identity. These paths are local evidence, not shipped application assets.
 
-## Remaining architecture work
+## Staged road publication implemented
 
-The current full-region gate is still the dominant limitation. A substantial reduction requires separate readiness contracts for the player's collision-safe neighborhood, visible regional context and detailed distant geometry. Those products must share source identity, coordinates, terrain revisions and cancellation; completed regions must publish atomically, with fast travel waiting for the destination's required products. Distant work can then be scheduled by actual need without dropping it.
+The road-detail gate is now split. The starting neighborhood receives exact road geometry and contact data before entry. Complete terrain grading, bridges, tunnels, buildings and source coverage still publish initially. A worker then builds the remaining at-grade road regions, prioritized around the actor. The compiler still uses the same 128-unit cells; 1,024-unit regions are publication units, not a change in source resolution.
 
-Before implementing that change, capture near/distant construction costs and provider dependencies separately. Do not replace the current gate with a radius reduction or a timer. Verify ground/bridge/tunnel seams, flight across publication boundaries, immediate travel, cancellation and world release. Worker transfer or a Rust port alone does not remove redundant work or shorten the total CPU dependency chain. Persistent compiled caches also require complete source/terrain/compiler revision keys and bounded eviction before they are safe.
+Distant roads remain visible through a terrain coverage layer until their exact geometry, contact index and markings commit together. Ground travel waits at an unfinished region; boats and aircraft safely above the terrain do not wait for road detail. Cancellation terminates the worker and rejects stale publication. Once all regions finish, the temporary coverage layer stops sampling without recompiling shaders.
 
-These loading measurements do not close the existing frame-rate/shader-program budget failures or constitute multiplayer/release certification. Live time/weather differed between runs, so their gameplay FPS is not used to claim a rendering improvement.
+Local implementation commits: `d98bd053`, `0fa99e48`, `8b5c0161`. The first prototype failed because the renderer rejected transferred typed arrays. A real renderer/contact test caught and now covers that boundary. A later comparison exposed additional rendering cost from the temporary coverage layer remaining enabled; it is disabled after completion. Neither failed prototype is treated as accepted evidence.
+
+### Physical-browser comparison
+
+The same Baltimore route and live providers were checked in hardware-accelerated Chrome on the M1, under night conditions. These are individual observations, not statistically established percentiles.
+
+| Measure | Previous build `b9d07ab0` | Staged build `8b5c0161` |
+| --- | ---: | ---: |
+| First playable | 64.382 s | 56.339 s |
+| Initial transport construction | 30.781 s | 21.687 s |
+| Initial carriageway construction | 11.609 s | 6.368 s |
+| Stationary walking during initial observation | 44.4 FPS | 39.5 FPS |
+| Stationary driving | 41.7 FPS | 41.3 FPS |
+| Moving driving | 42.7 FPS | 42.3 FPS |
+| Controlled flight | 36.5 FPS | 36.8 FPS |
+
+Entry improved by 8.043 seconds (12.5%) in this comparison. All 555 regions completed around 72.35 seconds from navigation, approximately 16 seconds after entry. Background work has a temporary cost: walking averaged lower FPS during refinement, with a worst sampled frame of 183 ms. Completed-world driving and flight were in the prior build's range; no general frame-rate improvement is claimed. Regional ownership also produces more render batches (1,134 road/marking/skirt meshes versus 777 previously).
+
+The completed city retained 18,759 roads and 25,507 detailed buildings. All 11,246 at-grade junction checks found published contact within the compiler's rounding tolerance; there were zero coverage gaps, invalid triangles or downward-facing triangles. All 260 sampled worker heights matched the main terrain authority exactly. Fixture-level staged versus full compilation has an identical canonical triangle hash, including region-boundary contacts. The fixture is not a whole-city bitwise comparison.
+
+Walking, driving, a controlled flight beyond the initial exact neighborhood, full regional completion and Main Menu return passed without browser or local-resource errors. Gameplay screenshots were inspected. Evidence: `output/architecture-evaluation/loading-staged-coverage/report.json`; same-night comparison: `loading-staged-night-baseline/report.json`. The preceding repaired run entered in 59.582 seconds, illustrating live-load variation.
+
+The current component suite passed 1,435 checks with no failures or skips, including worker preparation cancellation, cancellation during asynchronous publication, contact readiness, transferred geometry and independent terrain shader layers. Component checks do not establish browser or service behavior.
+
+A separate real-browser cancellation run returned to Main Menu while 470 regions were pending. After three seconds, the detail controller, preparation callback, roads, road meshes and readiness notice were all absent; no stale publication or browser/resource error was recorded. That run entered in 54.672 seconds. Evidence: `output/architecture-evaluation/loading-staged-cancel/report.json`.
+
+The prescribed packaged-Moon controls, pause/resume and title-auth smoke check also passed on `8b5c0161`; its gameplay screenshot was inspected. This is separate from Earth performance and does not certify the full app.
+
+### Limits
+
+This completes the staged road-detail portion of the loading plan. Initial terrain/structure preparation, building construction and variable provider waits still cost time. The optional Overpass supplement took about nine seconds in these runs; it remains enabled to preserve available data. This is not an instant-loading architecture, an all-location guarantee, or completion of the separate rendering and production-release gates. Physical-phone acceptance and the existing FPS/program budgets remain open. Nothing was pushed or deployed.
